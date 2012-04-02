@@ -15,7 +15,7 @@ import org.jboss.netty.logging.InternalLogLevel
 
 import org.codehaus.jackson.map.ObjectMapper
 
-import akka.actor.Actor
+import akka.actor.{Actor, ActorRef}
 import akka.actor.ActorSystem
 import akka.actor.Props
 
@@ -135,6 +135,29 @@ package protocol {
     lazy val header = MessageHeader(size, requestID, responseTo, op.code)
   }
 
+  case class ReadReply(
+    header: MessageHeader,
+    reply: Reply,
+    documents: Array[Byte]
+  )
+
+  class WritableMessageEncoder extends OneToOneEncoder {
+    def encode(ctx: ChannelHandlerContext, channel: Channel, obj: Object) = {
+      obj match {
+        case message: WritableMessage => {
+          println("WritableMessageEncoder: " + message)
+          val buffer :ChannelBuffer = ChannelBuffers.dynamicBuffer(ByteOrder.LITTLE_ENDIAN, 1000)
+          message writeTo buffer
+          buffer
+        }
+        case _ => {
+           println("WritableMessageEncoder: weird... " + obj)
+           obj
+        }
+      }
+    }
+  }
+
   class ReplyDecoder extends OneToOneDecoder {
     def decode(ctx: ChannelHandlerContext, channel: Channel, obj: Object) = {
       println("ReplyDecoder: " + obj.asInstanceOf[ChannelBuffer].factory().getDefaultOrder)
@@ -145,7 +168,27 @@ package protocol {
       println(header)
       println(reply)
       println(json)
-      obj
+      ReadReply(header, reply, Array())
+    }
+  }
+
+  class MongoHandler extends SimpleChannelHandler {
+    override def messageReceived(ctx: ChannelHandlerContext, e: MessageEvent) {
+      import akka.dispatch.Await
+      import akka.pattern.ask
+      import akka.util.Timeout
+      import akka.util.duration._
+      /*val buf = e.getMessage().asInstanceOf[ChannelBuffer]
+      val response = MongoResponse.apply(buf)*/
+      println("handler: message received " + e.getMessage)
+      MongoSystem.actor ! e.getMessage.asInstanceOf[ReadReply]
+      /*implicit val timeout = Timeout(5 seconds)
+      val readReply = e.getMessage.asInstanceOf[ReadReply]
+      val actor = Await.result( (MongoSystem.actor ? readReply.header.responseTo), Timeout(5 seconds).duration).asInstanceOf[Option[String]]*/
+      //println("find conn " + actor + " for responseTo " + readReply.header.responseTo)
+    }
+    override def channelConnected(ctx: ChannelHandlerContext, e: ChannelStateEvent) {
+      println("connected")
     }
   }
 
@@ -205,14 +248,12 @@ package protocol {
 }
 
 
-
-
-
 class ChannelActor extends Actor {
+  println("creating channelActor")
   val channel = ChannelFactory.create()
   def receive = {
-    case message :ChannelBuffer => {
-      println("will send buffer " + message)
+    case message :protocol.WritableMessage => {
+      println("will send WritableMessage " + message)
       val f = channel.write(message)
       f.addListener(new ChannelFutureListener() {
         override def operationComplete(fut: ChannelFuture) {
@@ -228,6 +269,58 @@ class ChannelActor extends Actor {
   }
 }
 
+class MongoActor extends Actor {
+  import scala.collection.mutable.ListMap
+  private val channelActor = context.actorOf(Props[ChannelActor], name = "mongoconnection1")
+  private val map = ListMap[Int, String]()
+
+  private val m = ListMap[Int, ActorRef]()
+
+  override def receive = {
+    case message: protocol.WritableMessage => {
+      map += ((message.requestID, "mongoconnection1"))
+      m += ((message.requestID, sender))
+      println("now map is " + map)
+      channelActor forward message
+    }
+    case requestID: Int => {
+      println("in charge from map " + map)
+      sender ! inCharge(requestID)
+    }
+    case message: protocol.ReadReply => {
+      m.get(message.header.responseTo) match {
+        case Some(_sender) => {
+          println("ok, will send message="+message + " to sender " + _sender)
+          _sender ! message
+        }
+        case None => println("oups. " + message.header.responseTo + " not found!")
+      }
+    }
+    case _ => println("not supported")
+  }
+  def inCharge(requestID: Int) = map.get(requestID) map { s => println("found " + s + " for requestID=" + requestID);context.actorFor(s) }
+}
+
+object MongoSystem {
+  val system = ActorSystem("mongosystem")
+  val actor = system.actorOf(Props[MongoActor], name = "router")
+
+  def send(message: protocol.WritableMessage) = {
+    import akka.dispatch.Await
+    import akka.pattern.ask
+    import akka.util.Timeout
+    import akka.util.duration._
+
+    implicit val timeout = Timeout(5 seconds)
+
+    val future = actor ? message
+    println("FUTURE is "+ future)
+    val response = Await.result(future, timeout.duration).asInstanceOf[protocol.ReadReply]
+    println("hey, got response! " + response)
+      //println("find conn " + actor + " for responseTo " + readReply.header.responseTo)
+    future
+  }
+}
 
 object ChannelFactory {
   val factory = new NioClientSocketChannelFactory(
@@ -240,11 +333,13 @@ object ChannelFactory {
 
     bootstrap.setPipelineFactory(new ChannelPipelineFactory() {
       override def getPipeline :ChannelPipeline = {
-        Channels.pipeline(new MongoDecoder(), new MongoEncoder(), new MongoHandler())
+        //Channels.pipeline(new MongoDecoder(), new MongoEncoder(), new MongoHandler())
+        Channels.pipeline(new protocol.WritableMessageEncoder(), new protocol.ReplyDecoder(), new protocol.MongoHandler())
       }
     })
 
     bootstrap.setOption("tcpNoDelay", true)
+    bootstrap.setOption("bufferFactory", new HeapChannelBufferFactory(java.nio.ByteOrder.LITTLE_ENDIAN))
     bootstrap.connect(new InetSocketAddress(host, port)).await.getChannel
   }
 }
@@ -264,6 +359,7 @@ class MongoHandler extends SimpleChannelHandler {
   }
 }
 
+// TODO que le mongo encoder serve à quelque chose ici...
 class MongoEncoder extends OneToOneEncoder {
   def encode(ctx: ChannelHandlerContext, channel: Channel, obj: Object) = {
     println("sending " + obj)
@@ -274,17 +370,18 @@ class MongoEncoder extends OneToOneEncoder {
 class MongoDecoder/*(callback: () => Unit)*/ extends OneToOneDecoder {
   def decode(ctx: ChannelHandlerContext, channel: Channel, obj: Object) = {
     println("decoding...")
-    MongoResponse.apply(obj.asInstanceOf[ChannelBuffer])
+    //MongoResponse.apply(obj.asInstanceOf[ChannelBuffer])
+    obj
   }
 }
 
 object Client {
   def test {
-    val system = ActorSystem("MySystem")
-    val myActor = system.actorOf(Props[ChannelActor], name = "myactor")
-    val buffer :ChannelBuffer = ChannelBuffers.dynamicBuffer(ByteOrder.LITTLE_ENDIAN, 1000)
-    writeMessage(buffer)
-    myActor ! buffer
+    //val system = ActorSystem("MySystem")
+    //val myActor = system.actorOf(Props[ChannelActor], name = "myactor")
+    /*val buffer :ChannelBuffer = ChannelBuffers.dynamicBuffer(ByteOrder.LITTLE_ENDIAN, 1000)
+    writeMessage(buffer)*/
+    MongoSystem send message
   }
 
   def main(args: Array[String]) {
@@ -298,7 +395,8 @@ object Client {
     bootstrap.setPipelineFactory(new ChannelPipelineFactory() {
       override def getPipeline :ChannelPipeline = {
         //Channels.pipeline(new protocol.ReplyDecoder(), new MongoDecoder(), new MongoEncoder(), new MongoHandler())
-        Channels.pipeline(new protocol.ReplyDecoder(), new MongoEncoder(), new MongoHandler())
+        //Channels.pipeline(new protocol.ReplyDecoder(), new MongoEncoder(), new MongoHandler())
+        Channels.pipeline(new protocol.WritableMessageEncoder(), new protocol.ReplyDecoder(), new MongoHandler())
       }
     })
 
@@ -306,21 +404,14 @@ object Client {
     bootstrap.setOption("bufferFactory", new HeapChannelBufferFactory(java.nio.ByteOrder.LITTLE_ENDIAN))
     val channelFuture = bootstrap.connect(new InetSocketAddress("localhost", 27017))
 
-    val buffer :ChannelBuffer = ChannelBuffers.dynamicBuffer(ByteOrder.LITTLE_ENDIAN, 1000)
+    /*val buffer :ChannelBuffer = ChannelBuffers.dynamicBuffer(ByteOrder.LITTLE_ENDIAN, 1000)
     writeMessage(buffer)
 
-    println("buffer contains: '" + buffer.toString("UTF-8") + "'")
-
-    val oldbuffer :ChannelBuffer = ChannelBuffers.dynamicBuffer(ByteOrder.LITTLE_ENDIAN, 1000)
-    oldwriteMessage(oldbuffer)
-
-    println("oldbuffer contains: '" + oldbuffer.toString("UTF-8") + "'")
-
-    println("equals ? " + oldbuffer.equals(buffer))
+    println("buffer contains: '" + buffer.toString("UTF-8") + "'")*/
 
     //buffer.writeBytes()
     val channel = channelFuture.await().getChannel
-    channel.write(buffer).await
+    channel.write(message).await
     println("write done!")
 
     /*channel.close.awaitUninterruptibly
@@ -329,7 +420,7 @@ object Client {
     println("all done, exit")*/
   }
 
-  def oldwriteMessage(buffer: ChannelBuffer) {
+  val message = {
     import java.io._
     import de.undercouch.bson4jackson._
     import de.undercouch.bson4jackson.io._
@@ -343,12 +434,8 @@ object Client {
     gen.writeEndObject()
     gen.close()
 
-    val message = Message(109, 0, Query(0, "plugin.acoll", 0, 0, baos.toByteArray))
-    //val message = protocol.WritableMessage(109, 0, protocol.Query(0, "plugin.acoll", 0, 0), baos.toByteArray)
-
-    println("has built message : " + message)
-
-    message writeTo buffer
+    //val message = Message(109, 0, Query(0, "plugin.acoll", 0, 0, baos.toByteArray))
+    protocol.WritableMessage(109, 0, protocol.Query(0, "plugin.acoll", 0, 0), baos.toByteArray)
   }
 
   def writeMessage(buffer: ChannelBuffer) {
@@ -374,126 +461,3 @@ object Client {
   }
 }
 
-
-
-
-import de.undercouch.bson4jackson._
-import de.undercouch.bson4jackson.io._
-import java.io._
-
-object Utils {
-  def writeUTF8(s: String, buffer: ChannelBuffer) :ChannelBuffer = {
-    var bytes = s.getBytes("UTF-8")
-    buffer writeBytes bytes
-    buffer
-  }
-}
-
-case class Message(
-  requestID: Int,
-  responseTo: Int,
-  op: Op
-) {
-  def writeTo(buffer: ChannelBuffer) :ChannelBuffer = {
-    buffer writeInt (4 + 4 + 4 + 4 + op.length)
-    buffer writeInt requestID
-    buffer writeInt responseTo
-    buffer writeInt (op.opCode)
-    op writeTo buffer
-    buffer
-  }
-}
-
-trait Op {
-  val opCode :Int
-  val length :Int
-  //val bytes :Array[Byte]
-  def writeTo(buffer: ChannelBuffer) :ChannelBuffer
-}
-
-case class Query (
-  flags: Int,
-  fullCollectionName: String,
-  numberToSkip: Int,
-  numberToReturn: Int,
-  documents: Array[Byte]
-) extends Op {
-  override val opCode = 2004
-  override lazy val length = {
-    4 + fullCollectionName.length + 1 + 4 + 4 + documents.length
-  }
-  def writeTo(buffer: ChannelBuffer) :ChannelBuffer = {
-    buffer writeInt flags
-    //buffer write fullCollectionName
-    Utils.writeUTF8(fullCollectionName, buffer)
-    buffer writeByte 0
-    buffer writeInt numberToSkip
-    buffer writeInt numberToReturn
-    buffer writeBytes (documents)
-    buffer
-  }
-}
-
-/*
-struct {
-    MsgHeader header;         // standard message header
-    int32     responseFlags;  // bit vector - see details below
-    int64     cursorID;       // cursor id if client needs to do get more's
-    int32     startingFrom;   // where in the cursor this reply is starting
-    int32     numberReturned; // number of documents in the reply
-    document* documents;      // documents
-}
-*/
-
-case class MongoResponse(
-  length: Int,
-  responseFlags: Int,
-  cursorID: Long,
-  startingFrom: Int,
-  numberReturned: Int
-) extends Op {
-  override val opCode = 1
-  def writeTo(buffer: ChannelBuffer) :ChannelBuffer = buffer
-}
-
-object MongoResponse {
-  def apply(buffer: ChannelBuffer) :MongoResponse = {
-    println("applying response...")
-    val os = new PipedOutputStream()
-    val is = new PipedInputStream()
-    os.connect(is)
-    println("applying response: connected...")
-    val nreadableBytes = buffer.readableBytes
-    buffer.readBytes(os, nreadableBytes)
-    println("applying response: "+ nreadableBytes+ "bytes read...")
-    
-    val leis = new LittleEndianInputStream(is)
-    println("applying response: leis done")
-    
-    val length = leis readInt
-    val requestID = leis readInt
-    val responseTo = leis readInt
-    val opCode = leis readInt
-    val responseFlags = leis readInt
-    val cursorID = leis readLong
-    val startingFrom = leis readInt
-
-    val numberReturned :Int = leis.readInt()
-
-    //val factory = new BsonFactory();
-    val mapper = new ObjectMapper(new BsonFactory())
-    println("applying response: requestID=" + requestID + ", responseTo=" + responseTo)
-    //val parser = factory.createJsonParser(leis);
-    println("applying response: done")
-    //new  play.api.libs.json.MongoJsValueDeserializer().deserialize(parser, List())
-    for( i <- 0 until numberReturned) {
-      //println("response read doc " + i + " : " + parser.nextToken())
-      println("response read doc " + i + "=> " + mapper.readValue(leis, classOf[java.util.HashMap[Object, Object]]))
-    }
-    println("applying response: docs read")
-
-    MongoResponse(length, responseFlags, cursorID, startingFrom, numberReturned)
-  }
-
-
-}
