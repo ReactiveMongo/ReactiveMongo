@@ -16,6 +16,7 @@ object `package` {
   case class ExtendedBuffer(buffer: ChannelBuffer) {
     def writeUTF8(s: String) {
       buffer writeBytes (s.getBytes("UTF-8"))
+      buffer writeByte 0
     }
     def write(writable: ChannelBufferWritable) {
       writable writeTo buffer
@@ -43,6 +44,8 @@ sealed trait Op {
 }
 
 sealed trait WritableOp extends Op with ChannelBufferWritable
+
+sealed trait AwaitingResponse extends WritableOp
 
 trait BSONReader[DocumentType] {
   val count: Int
@@ -76,21 +79,86 @@ object MessageHeader extends ChannelBufferReadable[MessageHeader] {
   )
 }
 
+case class Update(
+  fullCollectionName: String,
+  flags: Int
+) extends WritableOp {
+  override val code = 2001
+  override def writeTo(buffer: ChannelBuffer) {
+    buffer writeInt 0
+    buffer writeUTF8 fullCollectionName
+    buffer writeInt flags
+  }
+  override def size = 4 /* int32 = ZERO */ + 4 + fullCollectionName.length + 1
+}
+
+case class Insert(
+  flags: Int,
+  fullCollectionName: String
+) extends WritableOp {
+  override val code = 2002
+  override def writeTo(buffer: ChannelBuffer) {
+    buffer writeInt flags
+    buffer writeUTF8 fullCollectionName
+  }
+  override def size = 4 + fullCollectionName.length + 1
+}
+
 case class Query(
   flags: Int,
   fullCollectionName: String,
   numberToSkip: Int,
   numberToReturn: Int
-) extends WritableOp {
+) extends AwaitingResponse {
   override val code = 2004
   override def writeTo(buffer: ChannelBuffer) {
     buffer writeInt flags
     buffer writeUTF8 fullCollectionName
-    buffer writeByte 0
     buffer writeInt numberToSkip
     buffer writeInt numberToReturn
   }
   override def size = 4 + fullCollectionName.length + 1 + 4 + 4
+}
+
+case class GetMore(
+  fullCollectionName: String,
+  numberToReturn: Int,
+  cursorID: Long
+) extends AwaitingResponse {
+  override val code = 2005
+  override def writeTo(buffer: ChannelBuffer) {
+    buffer writeInt 0
+    buffer writeUTF8 fullCollectionName
+    buffer writeInt numberToReturn
+    buffer writeLong cursorID
+  }
+  override def size = 4 /* int32 ZERO */ + fullCollectionName.length + 1 + 4 + 8
+}
+
+case class Delete(
+  fullCollectionName: String,
+  flags: Int
+) extends WritableOp {
+  override val code = 2006
+  override def writeTo(buffer: ChannelBuffer) {
+    buffer writeInt 0
+    buffer writeUTF8 fullCollectionName
+    buffer writeInt flags
+  }
+  override def size = 4 /* int32 ZERO */ + fullCollectionName.length + 1 + 4
+}
+
+case class KillCursors(
+  cursorIDs: Set[Long]
+) extends WritableOp {
+  override val code = 2007
+  override def writeTo(buffer: ChannelBuffer) {
+    buffer writeInt cursorIDs.size
+    for(cursorID <- cursorIDs) {
+      buffer writeLong cursorID
+    }
+  }
+  override def size = 4 /* int32 ZERO */ + 4 + cursorIDs.size * 8
 }
 
 case class Reply(
@@ -111,11 +179,11 @@ object Reply extends ChannelBufferReadable[Reply] {
   )
 }
 
-case class WritableMessage(
-  requestID: Int,
-  responseTo: Int,
-  op: WritableOp,
-  documents: Array[Byte]
+case class WritableMessage[+T <: WritableOp] (
+  val requestID: Int,
+  val responseTo: Int,
+  val op: T,
+  val documents: Array[Byte]
 ) extends ChannelBufferWritable {
   override def writeTo(buffer: ChannelBuffer) {
     println("write into buffer, header=" + header + ", op=" + op)
@@ -127,6 +195,11 @@ case class WritableMessage(
   lazy val header = MessageHeader(size, requestID, responseTo, op.code)
 }
 
+/* object WritableMessage {
+  def apply(requestID: Int, responseTo: Int, op: WritableOp, documents: Array[Byte]) = new WritableMessage(requestID, responseTo, op, documents)
+  def withResponse(requestID: Int, responseTo: Int, op: WritableOp, documents: Array[Byte]) = new WritableMessage(requestID, responseTo, op, documents) with AwaitingResponse
+} */
+
 case class ReadReply(
   header: MessageHeader,
   reply: Reply,
@@ -136,7 +209,7 @@ case class ReadReply(
 class WritableMessageEncoder extends OneToOneEncoder {
   def encode(ctx: ChannelHandlerContext, channel: Channel, obj: Object) = {
     obj match {
-      case message: WritableMessage => {
+      case message: WritableMessage[WritableOp] => {
         println("WritableMessageEncoder: " + message)
         val buffer :ChannelBuffer = ChannelBuffers.dynamicBuffer(ByteOrder.LITTLE_ENDIAN, 1000)
         message writeTo buffer

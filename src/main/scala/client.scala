@@ -18,7 +18,7 @@ package actors {
     println("creating channelActor")
     val channel = ChannelFactory.create()
     def receive = {
-      case message :WritableMessage => {
+      case message :WritableMessage[WritableOp] => {
         println("will send WritableMessage " + message)
         val f = channel.write(message)
         f.addListener(new ChannelFutureListener() {
@@ -38,19 +38,21 @@ package actors {
   class MongoActor extends Actor {
     import scala.collection.mutable.ListMap
     private val channelActor = context.actorOf(Props[ChannelActor], name = "mongoconnection1")
-    private val map = ListMap[Int, String]()
 
-    private val m = ListMap[Int, ActorRef]()
+    private val awaitingResponses = ListMap[Int, ActorRef]()
 
     override def receive = {
-      case message: WritableMessage => {
-        map += ((message.requestID, "mongoconnection1"))
-        m += ((message.requestID, sender))
-        println("now map is " + map)
+      case message: WritableMessage[AwaitingResponse] => {
+        println("registering awaiting response for requestID " + message.requestID)
+        awaitingResponses += ((message.requestID, sender))
+        channelActor forward message
+      }
+      case message: WritableMessage[WritableOp] => {
+        println("NOT registering awaiting response for requestID " + message.requestID)
         channelActor forward message
       }
       case message: ReadReply => {
-        m.get(message.header.responseTo) match {
+        awaitingResponses.get(message.header.responseTo) match {
           case Some(_sender) => {
             println("ok, will send message="+message + " to sender " + _sender)
             _sender ! message
@@ -92,7 +94,7 @@ object MongoSystem {
   val system = ActorSystem("mongosystem")
   val actor = system.actorOf(Props[actors.MongoActor], name = "router")
 
-  def send(message: WritableMessage) = {
+  def ask(message: WritableMessage[AwaitingResponse]) = {
     import akka.dispatch.Await
     import akka.pattern.ask
     import akka.util.Timeout
@@ -107,22 +109,34 @@ object MongoSystem {
       //println("find conn " + actor + " for responseTo " + readReply.header.responseTo)
     future
   }
+
+  def send(message: WritableMessage[WritableOp]) = actor ! message
 }
 
 object Client {
+  import java.io._
+  import de.undercouch.bson4jackson._
+  import de.undercouch.bson4jackson.io._
+
   def test {
-    MongoSystem send message
+    MongoSystem ask list
+    MongoSystem send insert
   }
 
-  def main(args: Array[String]) {
-    test
+  val insert = {
+    val factory = new BsonFactory()
+    //serialize data
+    val baos = new ByteArrayOutputStream();
+    val gen = factory.createJsonGenerator(baos);
+    gen.writeStartObject();
+    gen.writeStringField("name", "Jack")
+    gen.writeEndObject()
+    gen.close()
+
+    WritableMessage(109, 0, Insert(0, "plugin.acoll"), baos.toByteArray)
   }
 
-  val message = {
-    import java.io._
-    import de.undercouch.bson4jackson._
-    import de.undercouch.bson4jackson.io._
-
+  val list = {
     val factory = new BsonFactory()
  
     //serialize data
