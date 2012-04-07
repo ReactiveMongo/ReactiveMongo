@@ -183,7 +183,8 @@ case class WritableMessage[+T <: WritableOp] (
   val requestID: Int,
   val responseTo: Int,
   val op: T,
-  val documents: Array[Byte]
+  //val documents: Array[Byte]
+  val documents: ChannelBuffer
 ) extends ChannelBufferWritable {
   override def writeTo(buffer: ChannelBuffer) {
     println("write into buffer, header=" + header + ", op=" + op)
@@ -191,8 +192,19 @@ case class WritableMessage[+T <: WritableOp] (
     buffer write op
     buffer writeBytes documents
   }
-  override def size = 16 + op.size + documents.size
+  override def size = {println("documents.size=" + documents.writerIndex); 16 + op.size + documents.writerIndex}
   lazy val header = MessageHeader(size, requestID, responseTo, op.code)
+  val expectingLastError :Boolean = false
+}
+
+object WritableMessage{
+  def apply[T <: WritableOp](requestID: Int, responseTo: Int, op: T, documents: Array[Byte]) :WritableMessage[T] = {
+    WritableMessage(
+      requestID,
+      responseTo,
+      op,
+      ChannelBuffers.wrappedBuffer(ByteOrder.LITTLE_ENDIAN, documents))
+  }
 }
 
 /* object WritableMessage {
@@ -211,6 +223,9 @@ class WritableMessageEncoder extends OneToOneEncoder {
     obj match {
       case message: WritableMessage[WritableOp] => {
         println("WritableMessageEncoder: " + message)
+        if(message.expectingLastError)
+          ctx.setAttachment(true)
+        else ctx.setAttachment(false)
         val buffer :ChannelBuffer = ChannelBuffers.dynamicBuffer(ByteOrder.LITTLE_ENDIAN, 1000)
         message writeTo buffer
         buffer
@@ -237,9 +252,23 @@ class ReplyDecoder extends OneToOneDecoder {
   }
 }
 
+object PrebuiltMessages {
+  def getLastError = {
+    import org.asyncmongo.bson._
+
+    val bson = new Bson
+    bson.writeElement("getLastError", 1)
+    
+    WritableMessage(0, 0, Query(0, "$cmd", 0, 1), bson.getBuffer)
+  }
+}
+
 class MongoHandler extends SimpleChannelHandler {
   override def messageReceived(ctx: ChannelHandlerContext, e: MessageEvent) {
     println("handler: message received " + e.getMessage)
+    if(ctx.getAttachment == true) {
+      e.getChannel.write()
+    }
     MongoSystem.actor ! e.getMessage.asInstanceOf[ReadReply]
   }
   override def channelConnected(ctx: ChannelHandlerContext, e: ChannelStateEvent) {
