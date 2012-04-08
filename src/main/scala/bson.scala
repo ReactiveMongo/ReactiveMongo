@@ -202,8 +202,9 @@ object Bson {
     val baos = new ByteArrayOutputStream();
     val gen = factory.createJsonGenerator(baos);
     gen.writeStartObject();
-    gen.writeStringField("name", "Jack")
-    gen.writeNumberField("age", 37)
+    /*gen.writeStringField("name", "Jack")
+    gen.writeNumberField("age", 37)*/
+    gen.writeNumberField("getLastError", 1)
     gen.writeEndObject()
     gen.close()
 
@@ -211,8 +212,9 @@ object Bson {
 
 
 		val bson = new Bson
-		bson.writeElement("name", "Jack")
-		bson.writeElement("age", 37)
+		/*bson.writeElement("name", "Jack")
+		bson.writeElement("age", 37)*/
+		bson.writeElement("getLastError", 1)
 		val is = new ChannelBufferInputStream(bson.getBuffer)
 		val produced = mapper.readValue(is, classOf[java.util.HashMap[Object, Object]])
 		println(produced)

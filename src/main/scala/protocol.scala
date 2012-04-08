@@ -180,11 +180,12 @@ object Reply extends ChannelBufferReadable[Reply] {
 }
 
 case class WritableMessage[+T <: WritableOp] (
-  val requestID: Int,
-  val responseTo: Int,
-  val op: T,
+  requestID: Int,
+  responseTo: Int,
+  op: T,
   //val documents: Array[Byte]
-  val documents: ChannelBuffer
+  documents: ChannelBuffer,
+  expectingLastError :Boolean
 ) extends ChannelBufferWritable {
   override def writeTo(buffer: ChannelBuffer) {
     println("write into buffer, header=" + header + ", op=" + op)
@@ -194,17 +195,19 @@ case class WritableMessage[+T <: WritableOp] (
   }
   override def size = {println("documents.size=" + documents.writerIndex); 16 + op.size + documents.writerIndex}
   lazy val header = MessageHeader(size, requestID, responseTo, op.code)
-  val expectingLastError :Boolean = false
 }
 
 object WritableMessage{
-  def apply[T <: WritableOp](requestID: Int, responseTo: Int, op: T, documents: Array[Byte]) :WritableMessage[T] = {
+  def apply[T <: WritableOp](requestID: Int, responseTo: Int, op: T, documents: Array[Byte], expectingLastError :Boolean) :WritableMessage[T] = {
     WritableMessage(
       requestID,
       responseTo,
       op,
-      ChannelBuffers.wrappedBuffer(ByteOrder.LITTLE_ENDIAN, documents))
+      ChannelBuffers.wrappedBuffer(ByteOrder.LITTLE_ENDIAN, documents),
+      expectingLastError)
   }
+  def apply[T <: WritableOp](requestID: Int, responseTo: Int, op: T, documents: Array[Byte]) :WritableMessage[T] = WritableMessage.apply(requestID, responseTo, op, documents, false)
+  def apply[T <: WritableOp](requestID: Int, responseTo: Int, op: T, documents: ChannelBuffer) :WritableMessage[T] = WritableMessage.apply(requestID, responseTo, op, documents, false)
 }
 
 /* object WritableMessage {
@@ -223,9 +226,10 @@ class WritableMessageEncoder extends OneToOneEncoder {
     obj match {
       case message: WritableMessage[WritableOp] => {
         println("WritableMessageEncoder: " + message)
-        if(message.expectingLastError)
-          ctx.setAttachment(true)
-        else ctx.setAttachment(false)
+        if(message.expectingLastError) {
+          println("WritableMessageEncoder: setting setAttachment to " + message.requestID)
+          ctx.setAttachment(message.requestID)
+        }
         val buffer :ChannelBuffer = ChannelBuffers.dynamicBuffer(ByteOrder.LITTLE_ENDIAN, 1000)
         message writeTo buffer
         buffer
@@ -253,26 +257,43 @@ class ReplyDecoder extends OneToOneDecoder {
 }
 
 object PrebuiltMessages {
-  def getLastError = {
+  def getLastError(db: String, requestID: Int) = {
     import org.asyncmongo.bson._
 
     val bson = new Bson
-    bson.writeElement("getLastError", 1)
+    bson.writeElement("getlasterror", 1)
     
-    WritableMessage(0, 0, Query(0, "$cmd", 0, 1), bson.getBuffer)
+    WritableMessage(requestID, 0, Query(0, db + ".$cmd", 0, 1), bson.getBuffer)
   }
 }
 
 class MongoHandler extends SimpleChannelHandler {
   override def messageReceived(ctx: ChannelHandlerContext, e: MessageEvent) {
-    println("handler: message received " + e.getMessage)
-    if(ctx.getAttachment == true) {
-      e.getChannel.write()
-    }
-    MongoSystem.actor ! e.getMessage.asInstanceOf[ReadReply]
+    val readReply = e.getMessage.asInstanceOf[ReadReply]
+    println("messageReceived: " + readReply)
+    if(ctx.getAttachment != null) {
+      println("messageReceived: ignoring this response " + readReply)
+      //e.getChannel.write(PrebuiltMessages.getLastError(readReply.header.responseTo))
+      ctx.setAttachment(null)
+    } else MongoSystem.actor ! readReply
+    super.messageReceived(ctx, e)
+  }
+  override def writeComplete(ctx: ChannelHandlerContext, e: WriteCompletionEvent) {
+    /*println("writeComplete: checking if getLastError is needed (" + e.getWrittenAmount + " were written), getAttachment=" + ctx.getAttachment)
+    if(ctx.getAttachment != null) {
+      val replyTo = ctx.getAttachment.asInstanceOf[Int]
+      println("writeComplete: got lastError! " + replyTo)
+      e.getChannel.write(PrebuiltMessages.getLastError(replyTo))
+    }*/
+    super.writeComplete(ctx, e)
+  }
+  override def writeRequested(ctx: ChannelHandlerContext, e: MessageEvent) {
+    //println("writeRequested with attachment " + ctx.getAttachment)
+    super.writeRequested(ctx, e)
   }
   override def channelConnected(ctx: ChannelHandlerContext, e: ChannelStateEvent) {
     println("connected")
+    super.channelConnected(ctx, e)
   }
 }
 

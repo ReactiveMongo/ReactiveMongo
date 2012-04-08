@@ -21,13 +21,23 @@ package actors {
       case message :WritableMessage[WritableOp] => {
         println("will send WritableMessage " + message)
         val f = channel.write(message)
-        f.addListener(new ChannelFutureListener() {
+        if(message.expectingLastError) {
+          message.op match {
+            case named: {val fullCollectionName :String} => {
+              println(named)
+              println("channelActor: request getlasterror")
+              channel.write(protocol.PrebuiltMessages.getLastError("plugin", message.header.requestID))
+            }
+          }
+          
+        }
+        /*f.addListener(new ChannelFutureListener() {
           override def operationComplete(fut: ChannelFuture) {
             println("actor: operation complete with fut="+fut)
           }
         })
         f.await
-        println("sent")
+        println("sent")*/
       }
       case "toto" => println("toto")
       case s:String => println("received string=" + s)
@@ -79,6 +89,7 @@ package actors {
       bootstrap.setPipelineFactory(new ChannelPipelineFactory() {
         override def getPipeline :ChannelPipeline = {
           //Channels.pipeline(new MongoDecoder(), new MongoEncoder(), new MongoHandler())
+          println("getting a new pipeline")
           Channels.pipeline(new WritableMessageEncoder(), new ReplyDecoder(), new MongoHandler())
         }
       })
@@ -133,7 +144,7 @@ object Client {
     gen.writeEndObject()
     gen.close()
 
-    WritableMessage(109, 0, Insert(0, "plugin.acoll"), baos.toByteArray)
+    WritableMessage(109, 0, Insert(0, "plugin.acoll"), baos.toByteArray).copy(expectingLastError=true)
   }
 
   val list = {
