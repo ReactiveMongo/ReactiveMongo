@@ -102,6 +102,8 @@ package actors {
 }
 
 object MongoSystem {
+  import protocol.messages._
+
   val system = ActorSystem("mongosystem")
   val actor = system.actorOf(Props[actors.MongoActor], name = "router")
 
@@ -121,8 +123,11 @@ object MongoSystem {
     future
   }
 
+  def ask(message: WritableMessage[WritableOp], writeConcern: GetLastError) = None
+
   def send(message: WritableMessage[WritableOp]) = actor ! message
 }
+
 
 object Client {
   import java.io._

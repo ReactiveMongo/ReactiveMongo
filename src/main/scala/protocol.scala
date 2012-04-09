@@ -271,24 +271,13 @@ class MongoHandler extends SimpleChannelHandler {
   override def messageReceived(ctx: ChannelHandlerContext, e: MessageEvent) {
     val readReply = e.getMessage.asInstanceOf[ReadReply]
     println("messageReceived: " + readReply)
-    if(ctx.getAttachment != null) {
-      println("messageReceived: ignoring this response " + readReply)
-      //e.getChannel.write(PrebuiltMessages.getLastError(readReply.header.responseTo))
-      ctx.setAttachment(null)
-    } else MongoSystem.actor ! readReply
+    MongoSystem.actor ! readReply
     super.messageReceived(ctx, e)
   }
   override def writeComplete(ctx: ChannelHandlerContext, e: WriteCompletionEvent) {
-    /*println("writeComplete: checking if getLastError is needed (" + e.getWrittenAmount + " were written), getAttachment=" + ctx.getAttachment)
-    if(ctx.getAttachment != null) {
-      val replyTo = ctx.getAttachment.asInstanceOf[Int]
-      println("writeComplete: got lastError! " + replyTo)
-      e.getChannel.write(PrebuiltMessages.getLastError(replyTo))
-    }*/
     super.writeComplete(ctx, e)
   }
   override def writeRequested(ctx: ChannelHandlerContext, e: MessageEvent) {
-    //println("writeRequested with attachment " + ctx.getAttachment)
     super.writeRequested(ctx, e)
   }
   override def channelConnected(ctx: ChannelHandlerContext, e: ChannelStateEvent) {
