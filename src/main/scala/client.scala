@@ -28,16 +28,8 @@ package actors {
               println("channelActor: request getlasterror")
               channel.write(protocol.PrebuiltMessages.getLastError("plugin", message.header.requestID))
             }
-          }
-          
+          } 
         }
-        /*f.addListener(new ChannelFutureListener() {
-          override def operationComplete(fut: ChannelFuture) {
-            println("actor: operation complete with fut="+fut)
-          }
-        })
-        f.await
-        println("sent")*/
       }
       case "toto" => println("toto")
       case s:String => println("received string=" + s)
@@ -123,7 +115,7 @@ object MongoSystem {
     future
   }
 
-  def ask(message: WritableMessage[WritableOp], writeConcern: GetLastError) = None
+  def ask(message: WritableMessage[WritableOp], writeConcern: GetLastError = GetLastError()) = None
 
   def send(message: WritableMessage[WritableOp]) = actor ! message
 }
