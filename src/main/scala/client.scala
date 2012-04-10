@@ -17,18 +17,14 @@ package actors {
   class ChannelActor extends Actor {
     val channel = ChannelFactory.create()
     def receive = {
+      case (message :WritableMessage[WritableOp], writeConcern :WritableMessage[WritableOp]) => {
+        println("ChannelActor: will send WritableMessage " + message + " followed by writeConcern " + writeConcern)
+        channel.write(message)
+        channel.write(writeConcern)
+      }
       case message :WritableMessage[WritableOp] => {
         println("ChannelActor: will send WritableMessage " + message)
-        val f = channel.write(message)
-        if(message.expectingLastError) {
-          message.op match {
-            case named: {val fullCollectionName :String} => {
-              println(named)
-              println("channelActor: request getlasterror")
-              channel.write(protocol.PrebuiltMessages.getLastError("plugin", message.header.requestID))
-            }
-          } 
-        }
+        channel.write(message)
       }
       case "toto" => println("toto")
       case s:String => println("received string=" + s)
@@ -47,6 +43,12 @@ package actors {
         awaitingResponses += ((message.requestID, sender))
         println("registering awaiting response for requestID " + message.requestID + ", awaitingResponses: " + awaitingResponses)
         channelActor forward message
+      }
+      case (message: WritableMessage[WritableOp], writeConcern: WritableMessage[WritableOp]) => {
+        awaitingResponses += ((message.requestID, sender))
+        println("registering writeConcern-awaiting response for requestID " + message.requestID + ", awaitingResponses: " + awaitingResponses)
+        channelActor forward message
+        channelActor forward writeConcern
       }
       case message: WritableMessage[WritableOp] => {
         println("NOT registering awaiting response for requestID " + message.requestID)
@@ -110,7 +112,10 @@ object MongoSystem {
   def ask(message: WritableMessage[WritableOp])(implicit timeout: Timeout) = None
 
   /** write a no-response op followed by a GetLastError command and wait for its response */
-  def ask(message: WritableMessage[WritableOp], writeConcern: GetLastError = GetLastError())(implicit timeout: Timeout) = None
+  def ask(message: WritableMessage[WritableOp], writeConcern: GetLastError = GetLastError())(implicit timeout: Timeout) = {
+    import akka.pattern.ask
+    (actor ? ((message, writeConcern.makeWritableMessage("plugin", message.header.requestID)))).mapTo[ReadReply]
+  }
 
   /** write a no-response op without getting a future */
   def send(message: WritableMessage[WritableOp]) = actor ! message
@@ -122,6 +127,7 @@ object Client {
   import de.undercouch.bson4jackson._
   import de.undercouch.bson4jackson.io._
 
+  import protocol.messages._
   import akka.util.Timeout
   import akka.util.duration._
 
@@ -141,15 +147,17 @@ object Client {
 
   def testNonWaitingList {
     MongoSystem send list
+    MongoSystem send insert
+    MongoSystem ask(insert, GetLastError(true))
     //MongoSystem send insert
   }
 
   def test {
-    testNonWaitingList
+    MongoSystem send list
     //testNonWaitingList
   }
 
-  val insert = {
+  def insert = {
     val factory = new BsonFactory()
     //serialize data
     val baos = new ByteArrayOutputStream();
