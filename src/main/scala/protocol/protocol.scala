@@ -79,12 +79,12 @@ case class WritableMessage[+T <: WritableOp] (
   expectingLastError :Boolean
 ) extends ChannelBufferWritable {
   override def writeTo(buffer: ChannelBuffer) {
-    println("write into buffer, header=" + header + ", op=" + op)
+    //println("write into buffer, header=" + header + ", op=" + op)
     buffer write header
     buffer write op
     buffer writeBytes documents
   }
-  override def size = {println("documents.size=" + documents.writerIndex); 16 + op.size + documents.writerIndex}
+  override def size = 16 + op.size + documents.writerIndex
   lazy val header = MessageHeader(size, requestID, responseTo, op.code)
 }
 
@@ -111,11 +111,7 @@ class WritableMessageEncoder extends OneToOneEncoder {
   def encode(ctx: ChannelHandlerContext, channel: Channel, obj: Object) = {
     obj match {
       case message: WritableMessage[WritableOp] => {
-        println("WritableMessageEncoder: " + message)
-        if(message.expectingLastError) {
-          println("WritableMessageEncoder: setting setAttachment to " + message.requestID)
-          ctx.setAttachment(message.requestID)
-        }
+        println("WritableMessageEncoder: encoding " + message)
         val buffer :ChannelBuffer = ChannelBuffers.dynamicBuffer(ByteOrder.LITTLE_ENDIAN, 1000)
         message writeTo buffer
         buffer
@@ -130,15 +126,21 @@ class WritableMessageEncoder extends OneToOneEncoder {
 
 class ReplyDecoder extends OneToOneDecoder {
   def decode(ctx: ChannelHandlerContext, channel: Channel, obj: Object) = {
-    println("ReplyDecoder: " + obj.asInstanceOf[ChannelBuffer].factory().getDefaultOrder)
     val buffer = obj.asInstanceOf[ChannelBuffer]
     val header = MessageHeader(buffer)
     val reply = Reply(buffer)
-    val json = MapReaderHandler.handle(reply, buffer).next
+
+    println("buffer is " + buffer.readableBytes)
+
+    val docs = new Array[Byte](buffer.readableBytes)
+    buffer.readBytes(docs)
+    println("available ? " + buffer.readableBytes)
+
+    /*val json = MapReaderHandler.handle(reply, buffer).next
     println(header)
     println(reply)
-    println(json)
-    ReadReply(header, reply, Array())
+    println(json)*/
+    ReadReply(header, reply, docs)
   }
 }
 
@@ -156,18 +158,20 @@ object PrebuiltMessages {
 class MongoHandler extends SimpleChannelHandler {
   override def messageReceived(ctx: ChannelHandlerContext, e: MessageEvent) {
     val readReply = e.getMessage.asInstanceOf[ReadReply]
-    println("messageReceived: " + readReply)
+    println("MongoHandler: messageReceived " + readReply)
     MongoSystem.actor ! readReply
     super.messageReceived(ctx, e)
   }
   override def writeComplete(ctx: ChannelHandlerContext, e: WriteCompletionEvent) {
+    println("MongoHandler: a write is complete!")
     super.writeComplete(ctx, e)
   }
   override def writeRequested(ctx: ChannelHandlerContext, e: MessageEvent) {
+    println("MongoHandler: a write is requested!")
     super.writeRequested(ctx, e)
   }
   override def channelConnected(ctx: ChannelHandlerContext, e: ChannelStateEvent) {
-    println("connected")
+    println("MongoHandler: connected")
     super.channelConnected(ctx, e)
   }
 }

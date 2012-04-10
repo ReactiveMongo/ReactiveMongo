@@ -15,11 +15,10 @@ package actors {
 
 
   class ChannelActor extends Actor {
-    println("creating channelActor")
     val channel = ChannelFactory.create()
     def receive = {
       case message :WritableMessage[WritableOp] => {
-        println("will send WritableMessage " + message)
+        println("ChannelActor: will send WritableMessage " + message)
         val f = channel.write(message)
         if(message.expectingLastError) {
           message.op match {
@@ -45,8 +44,8 @@ package actors {
 
     override def receive = {
       case message: WritableMessage[AwaitingResponse] => {
-        println("registering awaiting response for requestID " + message.requestID)
         awaitingResponses += ((message.requestID, sender))
+        println("registering awaiting response for requestID " + message.requestID + ", awaitingResponses: " + awaitingResponses)
         channelActor forward message
       }
       case message: WritableMessage[WritableOp] => {
@@ -95,28 +94,25 @@ package actors {
 
 object MongoSystem {
   import protocol.messages._
+  import akka.util.Timeout
+  import akka.dispatch.Future
 
   val system = ActorSystem("mongosystem")
   val actor = system.actorOf(Props[actors.MongoActor], name = "router")
 
-  def ask(message: WritableMessage[AwaitingResponse]) = {
-    import akka.dispatch.Await
+  /** write a response op and get a future for its response */
+  def ask(message: WritableMessage[AwaitingResponse])(implicit timeout: Timeout) :Future[ReadReply] = {
     import akka.pattern.ask
-    import akka.util.Timeout
-    import akka.util.duration._
-
-    implicit val timeout = Timeout(5 seconds)
-
-    val future = actor ? message
-    println("FUTURE is "+ future)
-    val response = Await.result(future, timeout.duration).asInstanceOf[ReadReply]
-    println("hey, got response! " + response)
-      //println("find conn " + actor + " for responseTo " + readReply.header.responseTo)
-    future
+    (actor ? message).mapTo[ReadReply]
   }
 
-  def ask(message: WritableMessage[WritableOp], writeConcern: GetLastError = GetLastError()) = None
+  /** write a no-response op and wait for db response */
+  def ask(message: WritableMessage[WritableOp])(implicit timeout: Timeout) = None
 
+  /** write a no-response op followed by a GetLastError command and wait for its response */
+  def ask(message: WritableMessage[WritableOp], writeConcern: GetLastError = GetLastError())(implicit timeout: Timeout) = None
+
+  /** write a no-response op without getting a future */
   def send(message: WritableMessage[WritableOp]) = actor ! message
 }
 
@@ -126,9 +122,31 @@ object Client {
   import de.undercouch.bson4jackson._
   import de.undercouch.bson4jackson.io._
 
+  import akka.util.Timeout
+  import akka.util.duration._
+
+  implicit val timeout = Timeout(5 seconds)
+
+  def testList {
+    import akka.dispatch.Await
+    val future = MongoSystem ask list
+    println("in test: future is " + future)
+    val response = Await.result(future, timeout.duration)
+    println("hey, got response! " + response)
+    println("response embeds " + response.reply.numberReturned + " documents")
+      //println("find conn " + actor + " for responseTo " + readReply.header.responseTo)
+    future
+    //MongoSystem send insert
+  }
+
+  def testNonWaitingList {
+    MongoSystem send list
+    //MongoSystem send insert
+  }
+
   def test {
-    MongoSystem ask list
-    MongoSystem send insert
+    testNonWaitingList
+    //testNonWaitingList
   }
 
   val insert = {
@@ -144,7 +162,7 @@ object Client {
     WritableMessage(109, 0, Insert(0, "plugin.acoll"), baos.toByteArray).copy(expectingLastError=true)
   }
 
-  val list = {
+  def list = {
     val factory = new BsonFactory()
  
     //serialize data
@@ -153,6 +171,9 @@ object Client {
     gen.writeStartObject();
     gen.writeEndObject()
     gen.close()
+
+    val random = (new java.util.Random()).nextInt(Integer.MAX_VALUE)
+    println("generated list request #" + random)
 
     WritableMessage(109, 0, Query(0, "plugin.acoll", 0, 0), baos.toByteArray)
   }
