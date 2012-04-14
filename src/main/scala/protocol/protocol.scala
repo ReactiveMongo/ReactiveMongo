@@ -6,23 +6,26 @@ import org.jboss.netty.channel._
 import org.jboss.netty.buffer._
 import org.jboss.netty.channel.socket.nio._
 import org.jboss.netty.handler.codec.oneone._
-
 import org.codehaus.jackson.map.ObjectMapper
-
 import org.asyncmongo.MongoSystem
+
+// json stuff
+import org.codehaus.jackson.JsonNode
+import org.jboss.netty.handler.codec.frame.FrameDecoder
 
  // implicits
 object `package` {
-  case class ExtendedBuffer(buffer: ChannelBuffer) {
-    def writeUTF8(s: String) {
-      buffer writeBytes (s.getBytes("UTF-8"))
-      buffer writeByte 0
-    }
-    def write(writable: ChannelBufferWritable) {
-      writable writeTo buffer
-    }
-  }
   implicit def channelBufferToExtendedBuffer(buffer: ChannelBuffer) = ExtendedBuffer(buffer)
+}
+
+case class ExtendedBuffer(buffer: ChannelBuffer) {
+  def writeUTF8(s: String) {
+    buffer writeBytes (s.getBytes("UTF-8"))
+    buffer writeByte 0
+  }
+  def write(writable: ChannelBufferWritable) {
+    writable writeTo buffer
+  }
 }
 
  // traits
@@ -62,12 +65,18 @@ case class MessageHeader(
 }
 
 object MessageHeader extends ChannelBufferReadable[MessageHeader] {
-  override def readFrom(buffer: ChannelBuffer) = MessageHeader(
-    buffer.readInt,
-    buffer.readInt,
-    buffer.readInt,
-    buffer.readInt
-  )
+  override def readFrom(buffer: ChannelBuffer) = {
+    println("byte order of response is " +buffer.order)
+    val messageLength = buffer.readInt
+    val requestID = buffer.readInt
+    val responseTo = buffer.readInt
+    val opCode = buffer.readInt
+    MessageHeader(
+    messageLength,
+    requestID,
+    responseTo,
+    opCode
+  )}
 }
 
 case class WritableMessage[+T <: WritableOp] (
@@ -104,22 +113,41 @@ object WritableMessage{
 case class ReadReply(
   header: MessageHeader,
   reply: Reply,
-  documents: Array[Byte]
+  documents: Array[Byte],
+  info: ReadReplyInfo
 )
+
+case class ReadReplyInfo(channelID: Int, localAddress: String, remoteAddress: String)
 
 class WritableMessageEncoder extends OneToOneEncoder {
   def encode(ctx: ChannelHandlerContext, channel: Channel, obj: Object) = {
     obj match {
       case message: WritableMessage[WritableOp] => {
-        println("WritableMessageEncoder: encoding " + message)
+        //println("WritableMessageEncoder: encoding " + message)
         val buffer :ChannelBuffer = ChannelBuffers.dynamicBuffer(ByteOrder.LITTLE_ENDIAN, 1000)
         message writeTo buffer
         buffer
       }
       case _ => {
-         println("WritableMessageEncoder: weird... " + obj)
+         //println("WritableMessageEncoder: weird... " + obj)
          obj
       }
+    }
+  }
+}
+
+class ReplyFrameDecoder extends FrameDecoder {
+  override def decode(context: ChannelHandlerContext, channel: Channel, buffer: ChannelBuffer) = {
+    val readableBytes = buffer.readableBytes
+    println("reply frame decoder : " + readableBytes + " readable bytes")
+    if(readableBytes < 4) null
+    else {
+      val length = buffer.readInt
+      buffer.resetReaderIndex
+      println("reply frame decoder: expected length is " + length + ", there are " + readableBytes + " readable bytes")
+      if(length <= readableBytes)
+        buffer.readBytes(length)
+      else null
     }
   }
 }
@@ -130,17 +158,18 @@ class ReplyDecoder extends OneToOneDecoder {
     val header = MessageHeader(buffer)
     val reply = Reply(buffer)
 
-    println("buffer is " + buffer.readableBytes)
+    //println("buffer is " + buffer.readableBytes)
 
     val docs = new Array[Byte](buffer.readableBytes)
     buffer.readBytes(docs)
-    println("available ? " + buffer.readableBytes)
+    //println("available ? " + buffer.readableBytes)
 
     /*val json = MapReaderHandler.handle(reply, buffer).next
     println(header)
     println(reply)
     println(json)*/
-    ReadReply(header, reply, docs)
+    import java.net.InetSocketAddress
+    ReadReply(header, reply, docs, ReadReplyInfo(channel.getId, channel.getLocalAddress.asInstanceOf[InetSocketAddress].toString, channel.getRemoteAddress.asInstanceOf[InetSocketAddress].toString))
   }
 }
 
@@ -158,26 +187,24 @@ object PrebuiltMessages {
 class MongoHandler extends SimpleChannelHandler {
   override def messageReceived(ctx: ChannelHandlerContext, e: MessageEvent) {
     val readReply = e.getMessage.asInstanceOf[ReadReply]
-    println("MongoHandler: messageReceived " + readReply)
+    log(e, "messageReceived " + readReply)
     MongoSystem.actor ! readReply
     super.messageReceived(ctx, e)
   }
   override def writeComplete(ctx: ChannelHandlerContext, e: WriteCompletionEvent) {
-    println("MongoHandler: a write is complete!")
+    log(e, "a write is complete!")
     super.writeComplete(ctx, e)
   }
   override def writeRequested(ctx: ChannelHandlerContext, e: MessageEvent) {
-    println("MongoHandler: a write is requested!")
+    log(e, "a write is requested!")
     super.writeRequested(ctx, e)
   }
   override def channelConnected(ctx: ChannelHandlerContext, e: ChannelStateEvent) {
-    println("MongoHandler: connected")
+    log(e, "connected")
     super.channelConnected(ctx, e)
   }
+  def log(e: ChannelEvent, s: String) = println("MongoHandler [" + e.getChannel.getId + "] : " + s)
 }
-
-// json stuff
-import org.codehaus.jackson.JsonNode
 
 object JacksonNodeReaderHandler extends BSONReaderHandler[JsonNode] {
   override def handle(reply: Reply, buffer: ChannelBuffer) :BSONReader[JsonNode] = JacksonNodeReader(reply.numberReturned, buffer)

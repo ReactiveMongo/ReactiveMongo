@@ -3,8 +3,10 @@ package org.asyncmongo
 import akka.actor.{Actor, ActorRef}
 import akka.actor.ActorSystem
 import akka.actor.Props
-
 import protocol._
+import akka.actor.ActorContext
+import akka.routing.RoundRobinRouter
+import java.net.InetSocketAddress
 
 package actors {
   import java.nio.ByteOrder
@@ -13,58 +15,69 @@ package actors {
   import org.jboss.netty.buffer._
   import org.jboss.netty.channel.socket.nio._
 
-
   class ChannelActor extends Actor {
     val channel = ChannelFactory.create()
     def receive = {
       case (message :WritableMessage[WritableOp], writeConcern :WritableMessage[WritableOp]) => {
-        println("ChannelActor: will send WritableMessage " + message + " followed by writeConcern " + writeConcern)
+        log("will send WritableMessage " + message + " followed by writeConcern " + writeConcern)
         channel.write(message)
         channel.write(writeConcern)
       }
       case message :WritableMessage[WritableOp] => {
-        println("ChannelActor: will send WritableMessage " + message)
+        log("will send WritableMessage " + message)
+        log(channel.getLocalAddress.asInstanceOf[InetSocketAddress].toString)
         channel.write(message)
       }
-      case "toto" => println("toto")
-      case s:String => println("received string=" + s)
-      case _ => println("something else")
+      case "toto" => log("toto")
+      case s:String => log("received string=" + s)
+      case _ => log("something else")
     }
+    def log(s: String) = println("ChannelActor [" + self.path + "] : " + s)
   }
 
+  private object ActorMaker {
+    def makeRouter(context: ActorContext, name: String, n: Int = 3, host: String = "localhost", port: Int = 27017) :ActorRef = {
+      context.actorOf(Props[ChannelActor].withRouter(RoundRobinRouter(routees = 
+        for(i <- 0 to n) yield context.actorOf(Props[ChannelActor], name = name + "connection" + i)
+      )))
+    }
+  }
+  
   class MongoActor extends Actor {
     import scala.collection.mutable.ListMap
-    private val channelActor = context.actorOf(Props[ChannelActor], name = "mongoconnection1")
+    //private val channelActor = context.actorOf(Props[ChannelActor], name = "mongoconnection1")
+    private val channelActor = ActorMaker.makeRouter(context, "primary")
 
     private val awaitingResponses = ListMap[Int, ActorRef]()
 
     override def receive = {
       case message: WritableMessage[AwaitingResponse] => {
         awaitingResponses += ((message.requestID, sender))
-        println("registering awaiting response for requestID " + message.requestID + ", awaitingResponses: " + awaitingResponses)
+        log("registering awaiting response for requestID " + message.requestID + ", awaitingResponses: " + awaitingResponses)
         channelActor forward message
       }
       case (message: WritableMessage[WritableOp], writeConcern: WritableMessage[WritableOp]) => {
         awaitingResponses += ((message.requestID, sender))
-        println("registering writeConcern-awaiting response for requestID " + message.requestID + ", awaitingResponses: " + awaitingResponses)
-        channelActor forward message
-        channelActor forward writeConcern
+        log("registering writeConcern-awaiting response for requestID " + message.requestID + ", awaitingResponses: " + awaitingResponses)
+        channelActor forward (message, writeConcern)
+        //channelActor forward writeConcern
       }
       case message: WritableMessage[WritableOp] => {
-        println("NOT registering awaiting response for requestID " + message.requestID)
+        log("NOT registering awaiting response for requestID " + message.requestID)
         channelActor forward message
       }
       case message: ReadReply => {
         awaitingResponses.get(message.header.responseTo) match {
           case Some(_sender) => {
-            println("ok, will send message="+message + " to sender " + _sender)
+            log("Got a response! Will give back message="+message + " to sender " + _sender)
             _sender ! message
           }
-          case None => println("oups. " + message.header.responseTo + " not found!")
+          case None => log("oups. " + message.header.responseTo + " not found! complete message is " + message)
         }
       }
-      case _ => println("not supported")
+      case _ => log("not supported")
     }
+    def log(s: String) = println("MongoActor [" + self.path + "] : " + s)
   }
 
   object ChannelFactory {
@@ -83,7 +96,7 @@ package actors {
         override def getPipeline :ChannelPipeline = {
           //Channels.pipeline(new MongoDecoder(), new MongoEncoder(), new MongoHandler())
           println("getting a new pipeline")
-          Channels.pipeline(new WritableMessageEncoder(), new ReplyDecoder(), new MongoHandler())
+          Channels.pipeline(new WritableMessageEncoder(), new ReplyFrameDecoder(), new ReplyDecoder(), new MongoHandler())
         }
       })
 
@@ -148,7 +161,7 @@ object Client {
   def testNonWaitingList {
     MongoSystem send list
     MongoSystem send insert
-    MongoSystem ask(insert, GetLastError(true))
+    MongoSystem ask(insert, GetLastError())
     //MongoSystem send insert
   }
 
@@ -166,8 +179,11 @@ object Client {
     gen.writeStringField("name", "Jack")
     gen.writeEndObject()
     gen.close()
+    
+    val random = (new java.util.Random()).nextInt(Integer.MAX_VALUE)
+    println("generated list request #" + random)
 
-    WritableMessage(109, 0, Insert(0, "plugin.acoll"), baos.toByteArray).copy(expectingLastError=true)
+    WritableMessage(random, 0, Insert(0, "plugin.acoll"), baos.toByteArray).copy(expectingLastError=true)
   }
 
   def list = {
@@ -183,7 +199,7 @@ object Client {
     val random = (new java.util.Random()).nextInt(Integer.MAX_VALUE)
     println("generated list request #" + random)
 
-    WritableMessage(109, 0, Query(0, "plugin.acoll", 0, 0), baos.toByteArray)
+    WritableMessage(random, 0, Query(0, "plugin.acoll", 0, 0), baos.toByteArray)
   }
 }
 
