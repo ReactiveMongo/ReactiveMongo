@@ -162,6 +162,14 @@ object Client {
     MongoSystem send list
     MongoSystem send insert
     MongoSystem ask(insert, GetLastError())
+    val future = MongoSystem ask list
+    println(future)
+    future.onComplete({
+      case Right(reply) => {
+        println("future is complete! got this response: " + reply)
+      }
+      case Left(error) => throw error
+    })
     //MongoSystem send insert
   }
 
@@ -183,7 +191,7 @@ object Client {
     val random = (new java.util.Random()).nextInt(Integer.MAX_VALUE)
     println("generated list request #" + random)
 
-    WritableMessage(random, 0, Insert(0, "plugin.acoll"), baos.toByteArray).copy(expectingLastError=true)
+    WritableMessage(random, 0, Insert(0, "plugin.acoll"), baos.toByteArray)
   }
 
   def list = {

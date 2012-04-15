@@ -3,6 +3,8 @@ package org.asyncmongo.protocol
 import org.jboss.netty.channel._
 import org.jboss.netty.buffer._
 
+import org.asyncmongo.utils.BufferAccessors._
+
 sealed trait Op {
   val code :Int
 }
@@ -34,11 +36,7 @@ case class Update(
   flags: Int
 ) extends WritableOp {
   override val code = 2001
-  override def writeTo(buffer: ChannelBuffer) {
-    buffer writeInt 0
-    buffer writeUTF8 fullCollectionName
-    buffer writeInt flags
-  }
+  override val writeTo = writeTupleToBuffer3( (0, fullCollectionName, flags) ) _
   override def size = 4 /* int32 = ZERO */ + 4 + fullCollectionName.length + 1
 }
 
@@ -47,10 +45,7 @@ case class Insert(
   fullCollectionName: String
 ) extends WritableOp {
   override val code = 2002
-  override def writeTo(buffer: ChannelBuffer) {
-    buffer writeInt flags
-    buffer writeUTF8 fullCollectionName
-  }
+  override val writeTo = writeTupleToBuffer2( (flags, fullCollectionName) ) _
   override def size = 4 + fullCollectionName.length + 1
 }
 
@@ -61,12 +56,7 @@ case class Query(
   numberToReturn: Int
 ) extends AwaitingResponse {
   override val code = 2004
-  override def writeTo(buffer: ChannelBuffer) {
-    buffer writeInt flags
-    buffer writeUTF8 fullCollectionName
-    buffer writeInt numberToSkip
-    buffer writeInt numberToReturn
-  }
+  override val writeTo = writeTupleToBuffer4( (flags, fullCollectionName, numberToSkip, numberToReturn) ) _
   override def size = 4 + fullCollectionName.length + 1 + 4 + 4
 }
 
@@ -76,12 +66,7 @@ case class GetMore(
   cursorID: Long
 ) extends AwaitingResponse {
   override val code = 2005
-  override def writeTo(buffer: ChannelBuffer) {
-    buffer writeInt 0
-    buffer writeUTF8 fullCollectionName
-    buffer writeInt numberToReturn
-    buffer writeLong cursorID
-  }
+  override val writeTo = writeTupleToBuffer4( (0, fullCollectionName, numberToReturn, cursorID) ) _
   override def size = 4 /* int32 ZERO */ + fullCollectionName.length + 1 + 4 + 8
 }
 
@@ -90,11 +75,7 @@ case class Delete(
   flags: Int
 ) extends WritableOp {
   override val code = 2006
-  override def writeTo(buffer: ChannelBuffer) {
-    buffer writeInt 0
-    buffer writeUTF8 fullCollectionName
-    buffer writeInt flags
-  }
+  override val writeTo = writeTupleToBuffer3( (0, fullCollectionName, flags) ) _
   override def size = 4 /* int32 ZERO */ + fullCollectionName.length + 1 + 4
 }
 
@@ -102,7 +83,7 @@ case class KillCursors(
   cursorIDs: Set[Long]
 ) extends WritableOp {
   override val code = 2007
-  override def writeTo(buffer: ChannelBuffer) {
+  override val writeTo = { buffer: ChannelBuffer =>
     buffer writeInt cursorIDs.size
     for(cursorID <- cursorIDs) {
       buffer writeLong cursorID

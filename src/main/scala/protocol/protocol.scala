@@ -8,29 +8,18 @@ import org.jboss.netty.channel.socket.nio._
 import org.jboss.netty.handler.codec.oneone._
 import org.codehaus.jackson.map.ObjectMapper
 import org.asyncmongo.MongoSystem
+import org.asyncmongo.utils.RichBuffer._
+import org.asyncmongo.utils.BufferAccessors._
 
 // json stuff
 import org.codehaus.jackson.JsonNode
 import org.jboss.netty.handler.codec.frame.FrameDecoder
 
- // implicits
-object `package` {
-  implicit def channelBufferToExtendedBuffer(buffer: ChannelBuffer) = ExtendedBuffer(buffer)
-}
-
-case class ExtendedBuffer(buffer: ChannelBuffer) {
-  def writeUTF8(s: String) {
-    buffer writeBytes (s.getBytes("UTF-8"))
-    buffer writeByte 0
-  }
-  def write(writable: ChannelBufferWritable) {
-    writable writeTo buffer
-  }
-}
 
  // traits
 trait ChannelBufferWritable {
-  def writeTo(buffer: ChannelBuffer) :Unit
+  //def writeTo(buffer: ChannelBuffer) :Unit
+  val writeTo :ChannelBuffer => Unit
   def size: Int
 }
 
@@ -55,65 +44,56 @@ case class MessageHeader(
   responseTo: Int,
   opCode: Int
 ) extends ChannelBufferWritable {
-  def writeTo(buffer: ChannelBuffer) {
-    buffer writeInt messageLength
-    buffer writeInt requestID
-    buffer writeInt responseTo
-    buffer writeInt opCode
-  }
+  override val writeTo = writeTupleToBuffer4( (messageLength, requestID, responseTo, opCode) ) _
   override def size = 4 + 4 + 4 + 4
 }
 
 object MessageHeader extends ChannelBufferReadable[MessageHeader] {
   override def readFrom(buffer: ChannelBuffer) = {
-    println("byte order of response is " +buffer.order)
+    println("byte order of response is " + buffer.order)
     val messageLength = buffer.readInt
     val requestID = buffer.readInt
     val responseTo = buffer.readInt
     val opCode = buffer.readInt
     MessageHeader(
-    messageLength,
-    requestID,
-    responseTo,
-    opCode
-  )}
+      messageLength,
+      requestID,
+      responseTo,
+      opCode)
+  }
 }
 
 case class WritableMessage[+T <: WritableOp] (
   requestID: Int,
   responseTo: Int,
   op: T,
-  //val documents: Array[Byte]
-  documents: ChannelBuffer,
-  expectingLastError :Boolean
+  documents: ChannelBuffer
 ) extends ChannelBufferWritable {
-  override def writeTo(buffer: ChannelBuffer) {
-    //println("write into buffer, header=" + header + ", op=" + op)
+  override val writeTo = { buffer: ChannelBuffer => {
     buffer write header
     buffer write op
     buffer writeBytes documents
-  }
+  } }
   override def size = 16 + op.size + documents.writerIndex
   lazy val header = MessageHeader(size, requestID, responseTo, op.code)
 }
 
 object WritableMessage{
-  def apply[T <: WritableOp](requestID: Int, responseTo: Int, op: T, documents: Array[Byte], expectingLastError :Boolean) :WritableMessage[T] = {
+  def apply[T <: WritableOp](requestID: Int, responseTo: Int, op: T, documents: Array[Byte]) :WritableMessage[T] = {
     WritableMessage(
       requestID,
       responseTo,
       op,
-      ChannelBuffers.wrappedBuffer(ByteOrder.LITTLE_ENDIAN, documents),
-      expectingLastError)
+      ChannelBuffers.wrappedBuffer(ByteOrder.LITTLE_ENDIAN, documents))
   }
-  def apply[T <: WritableOp](requestID: Int, responseTo: Int, op: T, documents: Array[Byte]) :WritableMessage[T] = WritableMessage.apply(requestID, responseTo, op, documents, false)
-  def apply[T <: WritableOp](requestID: Int, responseTo: Int, op: T, documents: ChannelBuffer) :WritableMessage[T] = WritableMessage.apply(requestID, responseTo, op, documents, false)
+  def apply[T <: WritableOp](op: T, documents: ChannelBuffer) :WritableMessage[T] = WritableMessage.apply((new java.util.Random()).nextInt(Integer.MAX_VALUE), 0, op, documents)
+  def apply[T <: WritableOp](op: T, documents: Array[Byte]) :WritableMessage[T] = WritableMessage.apply((new java.util.Random()).nextInt(Integer.MAX_VALUE), 0, op, documents)
 }
 
 case class ReadReply(
   header: MessageHeader,
   reply: Reply,
-  documents: Array[Byte],
+  documents: ChannelBuffer,
   info: ReadReplyInfo
 )
 
@@ -123,7 +103,6 @@ class WritableMessageEncoder extends OneToOneEncoder {
   def encode(ctx: ChannelHandlerContext, channel: Channel, obj: Object) = {
     obj match {
       case message: WritableMessage[WritableOp] => {
-        //println("WritableMessageEncoder: encoding " + message)
         val buffer :ChannelBuffer = ChannelBuffers.dynamicBuffer(ByteOrder.LITTLE_ENDIAN, 1000)
         message writeTo buffer
         buffer
@@ -139,12 +118,10 @@ class WritableMessageEncoder extends OneToOneEncoder {
 class ReplyFrameDecoder extends FrameDecoder {
   override def decode(context: ChannelHandlerContext, channel: Channel, buffer: ChannelBuffer) = {
     val readableBytes = buffer.readableBytes
-    println("reply frame decoder : " + readableBytes + " readable bytes")
     if(readableBytes < 4) null
     else {
       val length = buffer.readInt
       buffer.resetReaderIndex
-      println("reply frame decoder: expected length is " + length + ", there are " + readableBytes + " readable bytes")
       if(length <= readableBytes)
         buffer.readBytes(length)
       else null
@@ -160,8 +137,8 @@ class ReplyDecoder extends OneToOneDecoder {
 
     //println("buffer is " + buffer.readableBytes)
 
-    val docs = new Array[Byte](buffer.readableBytes)
-    buffer.readBytes(docs)
+    /*val docs = new Array[Byte](buffer.readableBytes)
+    buffer.readBytes(docs)*/ 
     //println("available ? " + buffer.readableBytes)
 
     /*val json = MapReaderHandler.handle(reply, buffer).next
@@ -169,18 +146,7 @@ class ReplyDecoder extends OneToOneDecoder {
     println(reply)
     println(json)*/
     import java.net.InetSocketAddress
-    ReadReply(header, reply, docs, ReadReplyInfo(channel.getId, channel.getLocalAddress.asInstanceOf[InetSocketAddress].toString, channel.getRemoteAddress.asInstanceOf[InetSocketAddress].toString))
-  }
-}
-
-object PrebuiltMessages {
-  def getLastError(db: String, requestID: Int) = {
-    import org.asyncmongo.bson._
-
-    val bson = new Bson
-    bson.writeElement("getlasterror", 1)
-    
-    WritableMessage(requestID, 0, Query(0, db + ".$cmd", 0, 1), bson.getBuffer)
+    ReadReply(header, reply, buffer, ReadReplyInfo(channel.getId, channel.getLocalAddress.asInstanceOf[InetSocketAddress].toString, channel.getRemoteAddress.asInstanceOf[InetSocketAddress].toString))
   }
 }
 
