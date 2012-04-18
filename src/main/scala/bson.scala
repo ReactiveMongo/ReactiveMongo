@@ -51,6 +51,13 @@ class Bson(val estimatedLength: Int = 32) {
     writeString(value)
     this
   }
+  
+  def writeElement(name: String, value: Bson, asArray: Boolean = false): Bson = {
+    buffer writeByte (if(asArray) 0x04 else 0x03)
+    writeCString(name)
+    buffer.writeBytes(value.getBuffer)
+    this
+  }
 
   def writeElement(name: String, value: Array[Byte], subtype: Subtype): Bson = {
     buffer writeByte 0x05

@@ -1,24 +1,66 @@
 package org.asyncmongo.api
 
 import akka.dispatch.Future
-import org.asyncmongo.protocol.Query
-import org.asyncmongo.protocol.WritableMessage
+import org.asyncmongo.protocol._
+import org.asyncmongo.protocol.messages._
 import akka.util.Timeout
 import akka.util.duration._
 import org.asyncmongo.protocol.Reply
 import org.jboss.netty.buffer.ChannelBuffer
 import org.jboss.netty.buffer.ChannelBufferInputStream
+import org.asyncmongo.MongoSystem
 
 object Mongo {
   implicit val timeout = Timeout(5 seconds)
   
-  def find[T, U](fullCollectionName: String, query: T, limit: Int)(implicit writer: BSONWriter[T], reader: BSONReaderHandler[U], m: Manifest[U]) :Future[Iterator[U]] = {
-    val op = Query(0, fullCollectionName, 0, limit)
-    val bson = writer.write(query)
+  def find[T, U, V](fullCollectionName: String, query: T, fields: Option[U], skip: Int, limit: Int)(implicit writer: BSONWriter[T], writer2: BSONWriter[U], reader: BSONReaderHandler[V], m: Manifest[V]) :Future[Iterator[V]] = {
+    val op = Query(0, fullCollectionName, skip, limit)
+    val bson = if(fields.isDefined) writer.write(query) ++ writer2.write(fields.get) else writer.write(query)
     val message = WritableMessage(op, bson)
     
-    org.asyncmongo.MongoSystem.ask(message).map { response =>
+    MongoSystem.ask(message).map { response =>
       reader.handle(response.reply, response.documents)
+    }
+  }
+  
+  def count[U](fullCollectionName: String)(implicit reader: BSONReaderHandler[U], m: Manifest[U]) :Future[U] = {
+    val message = Count.makeWritableMessage(fullCollectionName.span(_ != '.')._1, fullCollectionName, None, None, (new java.util.Random()).nextInt(Integer.MAX_VALUE))
+    MongoSystem.ask(message).map { response =>
+      reader.handle(response.reply, response.documents).next
+    }
+  }
+  
+  def insert[T](fullCollectionName: String, document: T)(implicit writer: BSONWriter[T]) :Unit = {
+    val op = Insert(0, fullCollectionName)
+    val bson = writer.write(document)
+    val message = WritableMessage(op, bson)
+    MongoSystem.send(message)
+  }
+  
+  def insert[T, U](fullCollectionName: String, document: T, writeConcern: GetLastError)(implicit writer: BSONWriter[T], reader: BSONReaderHandler[U], m: Manifest[U]) :Future[U] = {
+    val op = Insert(0, fullCollectionName)
+    val bson = writer.write(document)
+    val message = WritableMessage(op, bson)
+    MongoSystem.ask(message, writeConcern).map { response =>
+      reader.handle(response.reply, response.documents).next
+    }
+  }
+  
+  def remove[T](fullCollectionName: String, query: T)(implicit writer: BSONWriter[T]) :Unit = remove(fullCollectionName, query, false)
+  
+  def remove[T](fullCollectionName: String, query: T, firstMatchOnly: Boolean)(implicit writer: BSONWriter[T]) : Unit = {
+    val op = Delete(fullCollectionName, if(firstMatchOnly) 1 else 0)
+    val bson = writer.write(query)
+    val message = WritableMessage(op, bson)
+    MongoSystem.send(message)
+  }
+  
+  def remove[T, U](fullCollectionName: String, query: T, writeConcern: GetLastError, firstMatchOnly: Boolean = false)(implicit writer: BSONWriter[T], reader: BSONReaderHandler[U], m: Manifest[U]) :Future[U] = {
+    val op = Delete(fullCollectionName, if(firstMatchOnly) 1 else 0)
+    val bson = writer.write(query)
+    val message = WritableMessage(op, bson)
+    MongoSystem.ask(message, writeConcern).map { response =>
+      reader.handle(response.reply, response.documents).next
     }
   }
 }
@@ -77,11 +119,11 @@ object DefaultBSONHandlers {
 import java.util.HashMap
 import DefaultBSONHandlers._
 
-object Test {
+object Test { //Mongo.find[HashMap[Object, Object], HashMap[Object, Object]]("plugin.acoll", query, 2)
   def test = {
     val query = new HashMap[Object, Object]()
     query.put("name", "Jack")
-    val future = Mongo.find[HashMap[Object, Object], HashMap[Object, Object]]("plugin.acoll", query, 2)
+    val future = Mongo.find("plugin.acoll", query, None, 2, 0)
     println("Test: future is " + future)
     future.onComplete {
       case Right(map) => {
@@ -89,6 +131,13 @@ object Test {
         for(m <- map) {
           println("doc: " + m)
         }
+      }
+      case Left(e) => throw e
+    }
+    Mongo.count("plugin.acoll").onComplete {
+      case Right(map) => {
+        println("count! " + map.size + " documents available")
+        println("doc: " + map)
       }
       case Left(e) => throw e
     }
