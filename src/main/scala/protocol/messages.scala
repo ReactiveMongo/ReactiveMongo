@@ -33,3 +33,11 @@ object Count {
     WritableMessage(requestID, 0, Query(0, db + ".$cmd", 0, 1), bson.getBuffer)
   }
 }
+
+object IsMaster {
+  def makeWritableMessage(db: String, requestID: Int) :WritableMessage[Query] = {
+    val bson = new Bson
+    bson.writeElement("isMaster", 1)
+    WritableMessage(requestID, 0, Query(0, db + ".$cmd", 0, 1), bson.getBuffer)
+  }
+}

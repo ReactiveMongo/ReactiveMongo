@@ -10,10 +10,9 @@ import org.codehaus.jackson.map.ObjectMapper
 import org.asyncmongo.MongoSystem
 import org.asyncmongo.utils.RichBuffer._
 import org.asyncmongo.utils.BufferAccessors._
-
-// json stuff
 import org.codehaus.jackson.JsonNode
 import org.jboss.netty.handler.codec.frame.FrameDecoder
+import akka.actor.ActorRef
 
 
  // traits
@@ -120,9 +119,11 @@ class ReplyFrameDecoder extends FrameDecoder {
     val readableBytes = buffer.readableBytes
     if(readableBytes < 4) null
     else {
+      buffer.markReaderIndex
       val length = buffer.readInt
+      println("decode:: readableBytes=" + readableBytes + ", claimed length is " + length)
       buffer.resetReaderIndex
-      if(length <= readableBytes)
+      if(length <= readableBytes && length > 0)
         buffer.readBytes(length)
       else null
     }
@@ -150,11 +151,12 @@ class ReplyDecoder extends OneToOneDecoder {
   }
 }
 
-class MongoHandler extends SimpleChannelHandler {
+class MongoHandler(receiver: ActorRef) extends SimpleChannelHandler {
+  println("MongoHandler: receiver is " + receiver)
   override def messageReceived(ctx: ChannelHandlerContext, e: MessageEvent) {
     val readReply = e.getMessage.asInstanceOf[ReadReply]
-    log(e, "messageReceived " + readReply)
-    MongoSystem.actor ! readReply
+    log(e, "messageReceived " + readReply + " will be send to " + receiver)
+    receiver ! readReply
     super.messageReceived(ctx, e)
   }
   override def writeComplete(ctx: ChannelHandlerContext, e: WriteCompletionEvent) {

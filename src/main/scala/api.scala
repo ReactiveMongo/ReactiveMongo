@@ -65,6 +65,17 @@ object Mongo {
   }
 }
 
+
+class DB(
+  val name: String,
+  val nodes: List[(String, Int)] = List("localhost" -> 27017)
+) {
+  
+}
+
+
+
+
 trait BSONReader[DocumentType] extends Iterator[DocumentType] {
   val count: Int
 }
