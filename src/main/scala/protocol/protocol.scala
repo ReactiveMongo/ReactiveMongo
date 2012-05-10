@@ -7,7 +7,6 @@ import org.jboss.netty.buffer._
 import org.jboss.netty.channel.socket.nio._
 import org.jboss.netty.handler.codec.oneone._
 import org.codehaus.jackson.map.ObjectMapper
-import org.asyncmongo.MongoSystem
 import org.asyncmongo.utils.RichBuffer._
 import org.asyncmongo.utils.BufferAccessors._
 import org.codehaus.jackson.JsonNode
@@ -17,7 +16,6 @@ import akka.actor.ActorRef
 
  // traits
 trait ChannelBufferWritable {
-  //def writeTo(buffer: ChannelBuffer) :Unit
   val writeTo :ChannelBuffer => Unit
   def size: Int
 }
@@ -66,7 +64,8 @@ case class WritableMessage[+T <: WritableOp] (
   requestID: Int,
   responseTo: Int,
   op: T,
-  documents: ChannelBuffer
+  documents: ChannelBuffer,
+  connectionId: Option[Int] = None
 ) extends ChannelBufferWritable {
   override val writeTo = { buffer: ChannelBuffer => {
     buffer write header
@@ -87,16 +86,19 @@ object WritableMessage{
   }
   def apply[T <: WritableOp](op: T, documents: ChannelBuffer) :WritableMessage[T] = WritableMessage.apply((new java.util.Random()).nextInt(Integer.MAX_VALUE), 0, op, documents)
   def apply[T <: WritableOp](op: T, documents: Array[Byte]) :WritableMessage[T] = WritableMessage.apply((new java.util.Random()).nextInt(Integer.MAX_VALUE), 0, op, documents)
+  def apply[T <: WritableOp](op: T) :WritableMessage[T] = WritableMessage.apply(op, new Array[Byte](0))
 }
 
 case class ReadReply(
   header: MessageHeader,
   reply: Reply,
   documents: ChannelBuffer,
-  info: ReadReplyInfo
-)
+  info: ReadReplyInfo)
 
-case class ReadReplyInfo(channelID: Int, localAddress: String, remoteAddress: String)
+case class ReadReplyInfo(
+  channelID: Int,
+  localAddress: String,
+  remoteAddress: String)
 
 class WritableMessageEncoder extends OneToOneEncoder {
   def encode(ctx: ChannelHandlerContext, channel: Channel, obj: Object) = {
@@ -104,10 +106,12 @@ class WritableMessageEncoder extends OneToOneEncoder {
       case message: WritableMessage[WritableOp] => {
         val buffer :ChannelBuffer = ChannelBuffers.dynamicBuffer(ByteOrder.LITTLE_ENDIAN, 1000)
         message writeTo buffer
+        //println(java.util.Arrays.toString(buffer.toByteBuffer.array()))
+        println("writing to buffer message " + message + " of length=" + buffer.array().length + ", => " + buffer.writerIndex)
         buffer
       }
       case _ => {
-         //println("WritableMessageEncoder: weird... " + obj)
+         println("WritableMessageEncoder: weird... " + obj)
          obj
       }
     }
@@ -131,23 +135,15 @@ class ReplyFrameDecoder extends FrameDecoder {
 }
 
 class ReplyDecoder extends OneToOneDecoder {
+  import java.net.InetSocketAddress
+
   def decode(ctx: ChannelHandlerContext, channel: Channel, obj: Object) = {
     val buffer = obj.asInstanceOf[ChannelBuffer]
     val header = MessageHeader(buffer)
     val reply = Reply(buffer)
 
-    //println("buffer is " + buffer.readableBytes)
-
-    /*val docs = new Array[Byte](buffer.readableBytes)
-    buffer.readBytes(docs)*/ 
-    //println("available ? " + buffer.readableBytes)
-
-    /*val json = MapReaderHandler.handle(reply, buffer).next
-    println(header)
-    println(reply)
-    println(json)*/
-    import java.net.InetSocketAddress
-    ReadReply(header, reply, buffer, ReadReplyInfo(channel.getId, channel.getLocalAddress.asInstanceOf[InetSocketAddress].toString, channel.getRemoteAddress.asInstanceOf[InetSocketAddress].toString))
+    ReadReply(header, reply, buffer,
+      ReadReplyInfo(channel.getId, channel.getLocalAddress.asInstanceOf[InetSocketAddress].toString, channel.getRemoteAddress.asInstanceOf[InetSocketAddress].toString))
   }
 }
 

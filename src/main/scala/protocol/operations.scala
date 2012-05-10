@@ -9,9 +9,9 @@ sealed trait Op {
   val code :Int
 }
 
-sealed trait WritableOp extends Op with ChannelBufferWritable
-
-sealed trait AwaitingResponse extends WritableOp
+sealed trait WritableOp extends Op with ChannelBufferWritable {
+  val expectsResponse :Boolean = false
+}
 
 case class Reply(
   flags: Int,
@@ -54,7 +54,8 @@ case class Query(
   fullCollectionName: String,
   numberToSkip: Int,
   numberToReturn: Int
-) extends AwaitingResponse {
+) extends WritableOp {
+  override val expectsResponse = true
   override val code = 2004
   override val writeTo = writeTupleToBuffer4( (flags, fullCollectionName, numberToSkip, numberToReturn) ) _
   override def size = 4 + fullCollectionName.length + 1 + 4 + 4
@@ -64,7 +65,8 @@ case class GetMore(
   fullCollectionName: String,
   numberToReturn: Int,
   cursorID: Long
-) extends AwaitingResponse {
+) extends WritableOp {
+  override val expectsResponse = true
   override val code = 2005
   override val writeTo = writeTupleToBuffer4( (0, fullCollectionName, numberToReturn, cursorID) ) _
   override def size = 4 /* int32 ZERO */ + fullCollectionName.length + 1 + 4 + 8
@@ -79,11 +81,14 @@ case class Delete(
   override def size = 4 /* int32 ZERO */ + fullCollectionName.length + 1 + 4
 }
 
+import org.asyncmongo.utils.RichBuffer._
+
 case class KillCursors(
   cursorIDs: Set[Long]
 ) extends WritableOp {
   override val code = 2007
   override val writeTo = { buffer: ChannelBuffer =>
+    buffer writeInt 0
     buffer writeInt cursorIDs.size
     for(cursorID <- cursorIDs) {
       buffer writeLong cursorID
