@@ -13,6 +13,26 @@ case class RichBuffer(buffer: ChannelBuffer) {
   def write(writable: ChannelBufferWritable) {
     writable writeTo buffer
   }
+  def readUTF8 :String = {
+    val bytes = new Array[Byte](buffer.readInt)
+    buffer.readBytes(bytes)
+    new String(bytes, "UTF-8")
+  }
+  def readArray(n: Int) :Array[Byte] = {
+    val bytes = new Array[Byte](buffer.readInt)
+    buffer.readBytes(bytes)
+    bytes
+  }
+
+  import scala.collection.mutable.ArrayBuffer
+  @scala.annotation.tailrec
+  private def readCString(array: ArrayBuffer[Byte]) :String = {
+    val byte = buffer.readByte
+    if(byte == 0x00)
+      new String(array.toArray, "UTF-8")
+    else readCString(array += byte)
+  }
+  def readCString :String = readCString(new ArrayBuffer[Byte](16))
 }
 
 object RichBuffer {

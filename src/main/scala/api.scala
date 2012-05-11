@@ -72,7 +72,7 @@ class Cursor[T](response: ReadReply, connection: MongoConnection, query: Query)(
     } else None
   }
   def hasNext :Boolean = response.reply.cursorID != 0
-  override def finalize = if(hasNext) {
+  def close = if(hasNext) {
     connection.send(WritableMessage(KillCursors(Set(response.reply.cursorID))))
   }
 }

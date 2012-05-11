@@ -35,9 +35,25 @@ object Count {
 }
 
 object IsMaster {
-  def makeWritableMessage(db: String, requestID: Int) :WritableMessage[Query] = {
+  def makeWritableMessage(db: String) :WritableMessage[Query] = {
     val bson = new Bson
     bson.writeElement("isMaster", 1)
-    WritableMessage(requestID, 0, Query(0, db + ".$cmd", 0, 1), bson.getBuffer)
+    WritableMessage(Query(0, db + ".$cmd", 0, 1), bson.getBuffer)
+  }
+}
+
+object ReplStatus {
+  def makeWritableMessage(db: String) :WritableMessage[Query] = {
+    val bson = new Bson
+    bson.writeElement("replSetGetStatus", 1)
+    WritableMessage(Query(0, "admin.$cmd", 0, 1), bson.getBuffer)
+  }
+}
+
+object Status {
+  def makeWritableMessage(db: String) :WritableMessage[Query] = {
+    val bson = new Bson
+    bson.writeElement("serverStatus", 1)
+    WritableMessage(Query(0, db + ".$cmd", 0, 1), bson.getBuffer)
   }
 }

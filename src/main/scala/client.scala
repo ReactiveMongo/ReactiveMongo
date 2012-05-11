@@ -22,7 +22,16 @@ object Client {
 
   def test = {
     val connection = MongoConnection( List( "localhost" -> 27017 ) )
-    connection.ask(WritableMessage(KillCursors(Set(900))))
+    //connection.ask(WritableMessage(KillCursors(Set(900))))
+    def p(name: String) :Either[Throwable, ReadReply] => Unit = {
+      case Right(reply) => {
+        println(name + ": \n" + bson.DefaultBSONIterator.pretty(bson.DefaultBSONIterator(reply.documents)))
+      }
+      case Left(error) => throw error
+    }
+    connection.ask(messages.IsMaster.makeWritableMessage("plugin")).onComplete(p("IsMaster"))
+    connection.ask(messages.Status.makeWritableMessage("plugin")).onComplete(p("Status"))
+    connection.ask(messages.ReplStatus.makeWritableMessage("plugin")).onComplete(p("ReplStatus"))
     //connection.ask(WritableMessage(KillCursors(Set(900)), Array[Byte](0)))
     /*connection send list
     connection send insert
