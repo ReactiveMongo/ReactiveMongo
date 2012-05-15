@@ -176,11 +176,7 @@ class Bson(val estimatedLength: Int = 32) {
 
   lazy val getBuffer = {
     buffer.writeByte(0)
-    val index = buffer.writerIndex
-    println("buffer index is " + index)
-    buffer.setInt(0, index)
-    println(buffer)
-    println("-----ing: " + java.util.Arrays.toString(buffer.toByteBuffer.array()))
+    buffer.setInt(0, buffer.writerIndex)
     buffer
   }
 }
@@ -220,7 +216,13 @@ case class BSONDocument      (name: String, value: ChannelBuffer)            ext
 case class BSONArray         (name: String, value: ChannelBuffer)            extends BSONElement { val code = 0x04; }
 case class BSONBinary        (name: String, value: ChannelBuffer)            extends BSONElement { val code = 0x05; }
 case class BSONUndefined     (name: String)                                  extends BSONElement { val code = 0x06; }
-case class BSONObjectID      (name: String, value: Array[Byte])              extends BSONElement { val code = 0x07; }
+case class BSONObjectID      (name: String, value: Array[Byte])              extends BSONElement { val code = 0x07;
+	lazy val stringify = org.asyncmongo.utils.Converters.hex2Str(value)
+
+	override def toString = "BSONObjectID[\"" + stringify + "\"]"
+
+	def this(name: String, value: String) = this(name, org.asyncmongo.utils.Converters.str2Hex(value))
+}
 case class BSONBoolean       (name: String, value: Boolean)                  extends BSONElement { val code = 0x08; }
 case class BSONDateTime      (name: String, value: Long)                     extends BSONElement { val code = 0x09; }
 case class BSONNull          (name: String)                                  extends BSONElement { val code = 0x0A; }
@@ -239,7 +241,6 @@ sealed trait BSONIterable extends Iterator[BSONElement] {
 	import org.asyncmongo.utils.RichBuffer._
 
 	val buffer :ChannelBuffer
-	//implicit def stringToKey[Key](s: String) :Key
 
 	val startIndex = buffer.readerIndex
 	val documentSize = buffer.readInt
@@ -267,23 +268,25 @@ sealed trait BSONIterable extends Iterator[BSONElement] {
 		case 0x7F => BSONMaxKey(buffer.readCString)
 	}
 
-	def hasNext = {
-		println("buffer hasNext :: readerIndex=" + buffer.readerIndex + ", startIndex=" + startIndex + ", documentSize=" + documentSize + ", " + (buffer.readerIndex - startIndex))
-		buffer.readerIndex - startIndex + 1< documentSize
-	}
+	def hasNext = buffer.readerIndex - startIndex + 1< documentSize
 }
 
 case class DefaultBSONIterator(buffer: ChannelBuffer) extends BSONIterable
+
+case class DocumentsIterator(buffer: ChannelBuffer) extends Iterator[BSONIterable] {
+	def hasNext = buffer.readable
+	def next = DefaultBSONIterator(buffer.readBytes(buffer.getInt(buffer.readerIndex)))
+}
 
 object DefaultBSONIterator {
 	private def pretty(i: Int, it: DefaultBSONIterator) :String = {
 		val prefix = (0 to i).map {i => "\t"}.mkString("")
 		(for(v <- it) yield {
 			v match {
-				case BSONDocument(n, b) => prefix + n + " -> {\n" + pretty(i + 1, DefaultBSONIterator(b)) + "\n" + prefix +" }"
-				case _ => prefix + v.name + " -> " + v.toString
+				case BSONDocument(n, b) => prefix + n + ": {\n" + pretty(i + 1, DefaultBSONIterator(b)) + "\n" + prefix +" }"
+				case _ => prefix + v.name + ": " + v.toString
 			}
-		}).mkString("\n")
+		}).mkString(",\n")
 	}
 	def pretty(it: DefaultBSONIterator) :String = "{\n" + pretty(0, it) + "\n}"
 }

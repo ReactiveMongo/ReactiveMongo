@@ -11,9 +11,11 @@ import org.jboss.netty.buffer.ChannelBuffer
 import org.jboss.netty.buffer.ChannelBufferInputStream
 
 case class Mongo(connection: MongoConnection, implicit val timeout :Timeout = Timeout(5 seconds)) {
-  def find[T, U, V](fullCollectionName: String, query: T, fields: Option[U], skip: Int, limit: Int)(implicit writer: BSONWriter[T], writer2: BSONWriter[U], reader: BSONReaderHandler[V], m: Manifest[V]) :Future[Cursor[V]] = {
+  def find[T, U, V](fullCollectionName: String, query: T, fields: Option[U], skip: Int, limit: Int)(implicit writer: BSONWriter[T], writer2: BSONWriter[U], handler: BSONReaderHandler, reader: BSONReader[V], m: Manifest[V]) :Future[Cursor[V]] = {
     val op = Query(0, fullCollectionName, skip, 19)
-    val bson = if(fields.isDefined) writer.write(query) ++ writer2.write(fields.get) else writer.write(query)
+    val bson = writer.write(query)
+    if(fields.isDefined)
+      bson.writeBytes(writer2.write(fields.get))
     val message = WritableMessage(op, bson)
     
     connection.ask(message).map { response =>
@@ -21,10 +23,10 @@ case class Mongo(connection: MongoConnection, implicit val timeout :Timeout = Ti
     }
   }
   
-  def count[U](fullCollectionName: String)(implicit reader: BSONReaderHandler[U], m: Manifest[U]) :Future[U] = {
+  def count[U](fullCollectionName: String)(implicit handler: BSONReaderHandler, reader: BSONReader[U], m: Manifest[U]) :Future[U] = {
     val message = Count.makeWritableMessage(fullCollectionName.span(_ != '.')._1, fullCollectionName, None, None, (new java.util.Random()).nextInt(Integer.MAX_VALUE))
     connection.ask(message).map { response =>
-      reader.handle(response.reply, response.documents).next
+      handler.handle(response.reply, response.documents).next
     }
   }
   
@@ -35,12 +37,12 @@ case class Mongo(connection: MongoConnection, implicit val timeout :Timeout = Ti
     connection.send(message)
   }
   
-  def insert[T, U](fullCollectionName: String, document: T, writeConcern: GetLastError)(implicit writer: BSONWriter[T], reader: BSONReaderHandler[U], m: Manifest[U]) :Future[U] = {
+  def insert[T, U](fullCollectionName: String, document: T, writeConcern: GetLastError)(implicit writer: BSONWriter[T], handler: BSONReaderHandler, reader: BSONReader[U], m: Manifest[U]) :Future[U] = {
     val op = Insert(0, fullCollectionName)
     val bson = writer.write(document)
     val message = WritableMessage(op, bson)
     connection.ask(message, writeConcern).map { response =>
-      reader.handle(response.reply, response.documents).next
+      handler.handle(response.reply, response.documents).next
     }
   }
   
@@ -53,20 +55,21 @@ case class Mongo(connection: MongoConnection, implicit val timeout :Timeout = Ti
     connection.send(message)
   }
   
-  def remove[T, U](fullCollectionName: String, query: T, writeConcern: GetLastError, firstMatchOnly: Boolean = false)(implicit writer: BSONWriter[T], reader: BSONReaderHandler[U], m: Manifest[U]) :Future[U] = {
+  def remove[T, U](fullCollectionName: String, query: T, writeConcern: GetLastError, firstMatchOnly: Boolean = false)(implicit writer: BSONWriter[T], handler: BSONReaderHandler, reader: BSONReader[U], m: Manifest[U]) :Future[U] = {
     val op = Delete(fullCollectionName, if(firstMatchOnly) 1 else 0)
     val bson = writer.write(query)
     val message = WritableMessage(op, bson)
     connection.ask(message, writeConcern).map { response =>
-      reader.handle(response.reply, response.documents).next
+      handler.handle(response.reply, response.documents).next
     }
   }
 }
 
-class Cursor[T](response: ReadReply, connection: MongoConnection, query: Query)(implicit reader: BSONReaderHandler[T], timeout :Timeout) {
-  lazy val iterator :Iterator[T] = reader.handle(response.reply, response.documents)
+class Cursor[T](response: ReadReply, connection: MongoConnection, query: Query)(implicit handler: BSONReaderHandler, reader: BSONReader[T], timeout :Timeout) {
+  lazy val iterator :Iterator[T] = handler.handle(response.reply, response.documents)
   def next :Option[Future[Cursor[T]]] = {
     if(hasNext) {
+      println("cursor: call next")
       val op = GetMore(query.fullCollectionName, query.numberToReturn, response.reply.cursorID)
       Some(connection.ask(WritableMessage(op)).map { response => new Cursor(response, connection, query) })
     } else None
@@ -88,6 +91,34 @@ object Cursor {
       stream(Await.result(cursor.next.get, timeout.duration))
     } else Stream.empty
   }
+
+  import play.api.libs.iteratee._
+  import play.api.libs.concurrent.{Promise => PlayPromise, _}
+
+
+  def enumerate[T](futureCursor: Option[Future[Cursor[T]]]) :Enumerator[T] = {
+    var currentCursor :Option[Cursor[T]] = None
+    Enumerator.fromCallback { () =>
+      if(currentCursor.isDefined && currentCursor.get.iterator.hasNext){
+        println("enumerate: give next element from iterator")
+        PlayPromise.pure(Some(currentCursor.get.iterator.next))
+      } else if(currentCursor.isDefined && currentCursor.get.hasNext) {
+        println("enumerate: fetching next cursor")
+        new AkkaPromise(currentCursor.get.next.get.map { cursor =>
+          println("redeemed from next cursor")
+          currentCursor = Some(cursor)
+          Some(cursor.iterator.next)
+        })
+      } else if(!currentCursor.isDefined && futureCursor.isDefined) {
+        println("enumerate: fetching from first future")
+        new AkkaPromise(futureCursor.get.map { cursor =>
+          println("redeemed from first cursor")
+          currentCursor = Some(cursor)
+          Some(cursor.iterator.next)
+        })
+      } else PlayPromise.pure(None)
+    }
+  }
 }
 
 class DB(
@@ -97,19 +128,44 @@ class DB(
   
 }
 
-trait BSONReader[DocumentType] extends Iterator[DocumentType] {
-  val count: Int
-}
-trait BSONReaderHandler[DocumentType] {
-  def handle(reply: Reply, buffer: ChannelBuffer) :BSONReader[DocumentType]
-  //def handle(reply: Reply, bytes: Array[Byte]) :BSONReader[DocumentType]
+trait BSONWriter[DocumentType] {
+  def write(document: DocumentType) :ChannelBuffer
 }
 
-trait BSONWriter[DocumentType] {
-  def write(document: DocumentType) :Array[Byte]
+trait BSONReader[DocumentType] {
+  def read(buffer: ChannelBuffer) :DocumentType
 }
+
+trait BSONReaderHandler {
+  def handle[DocumentType](reply: Reply, buffer: ChannelBuffer)(implicit reader: BSONReader[DocumentType]) :Iterator[DocumentType]
+}
+
+import org.asyncmongo.bson._
 
 object DefaultBSONHandlers {
+  import de.undercouch.bson4jackson._
+  import de.undercouch.bson4jackson.io._
+  import de.undercouch.bson4jackson.uuid._
+  import org.codehaus.jackson.map.ObjectMapper
+
+  implicit object DefaultBSONReaderHandler extends BSONReaderHandler {
+    def handle[DocumentType](reply: Reply, buffer: ChannelBuffer)(implicit reader: BSONReader[DocumentType]) :Iterator[DocumentType] = {
+      new Iterator[DocumentType] {
+        def hasNext = buffer.readable
+        def next = reader.read(buffer.readBytes(buffer.getInt(buffer.readerIndex)))
+      }
+    }
+  }
+  implicit object DefaultBSONReader extends BSONReader[DefaultBSONIterator] {
+    override def read(buffer: ChannelBuffer): DefaultBSONIterator = DefaultBSONIterator(buffer)
+  }
+
+  implicit object DefaultBSONWriter extends BSONWriter[Bson] {
+    def write(document: Bson) = document.getBuffer
+  }
+}
+
+/*object DefaultBSONHandlers {
   import de.undercouch.bson4jackson._
   import de.undercouch.bson4jackson.io._
   import de.undercouch.bson4jackson.uuid._
@@ -145,7 +201,7 @@ object DefaultBSONHandlers {
     }
     def write(document :java.util.HashMap[Object, Object]) = mapper.writeValueAsBytes(document)
   }
-}
+}*/
 
 
 import java.util.HashMap
@@ -156,37 +212,20 @@ object Test { //Mongo.find[HashMap[Object, Object], HashMap[Object, Object]]("pl
   import akka.pattern.ask
   import akka.util.Timeout
   import akka.util.duration._
+
+  import play.api.libs.iteratee._
    
   implicit val timeout = Timeout(5 seconds)
 
   def test = {
     val mongo = Mongo(MongoConnection(List("localhost" -> 27017)))
-    val query = new HashMap[Object, Object]()
-    query.put("name", "Jack")
+    val query = new Bson()//new HashMap[Object, Object]()
+    query.writeElement("name", "Jack")
     val future = mongo.find("plugin.acoll", query, None, 2, 0)
     println("Test: future is " + future)
-    future.onComplete {
-      case Right(map) => {
-        println("got a result! ")// + map.size + " documents available")
-        var i = 0
-        println(map)
-        /*Cursor.stream(map).foreach { doc =>
-          println("[" + i + "] " + doc)
-          i = i +1
-        }*/
-        /*for(m <- map) {
-          println("[" + i + "] doc: " + Await.result(m, timeout.duration))
-          i = i +1
-        }*/
-      }
-      case Left(e) => throw e
-    }
-    /*mongo.count("plugin.acoll").onComplete {
-      case Right(map) => {
-        println("count! " + map.size + " documents available")
-        println("doc: " + map)
-      }
-      case Left(e) => throw e
-    }*/
+    //Cursor.stream(Await.result(future, timeout.duration)).print("\n")
+    Cursor.enumerate(Some(future))(Iteratee.foreach { t =>
+      println("fetched t=" + DefaultBSONIterator.pretty(t))
+    })
   }
 }

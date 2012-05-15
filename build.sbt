@@ -9,10 +9,11 @@ resolvers += "Typesafe repository snapshots" at "http://repo.typesafe.com/typesa
 
 resolvers += "Typesafe repository releases" at "http://repo.typesafe.com/typesafe/releases/" 
 
-resolvers += Resolver.file("local repository", file("/Users/pvo/.ivy2/local"))(Resolver.ivyStylePatterns)
+resolvers += Resolver.file("local repository", file("/Users/sgo/.ivy2/local"))(Resolver.ivyStylePatterns)
 
 libraryDependencies ++= Seq(
 	"io.netty" % "netty" % "3.3.1.Final",
 	"de.undercouch" % "bson4jackson" % "1.2.0",
-	"com.typesafe.akka" % "akka-actor" % "2.0"
+	"com.typesafe.akka" % "akka-actor" % "2.0",
+	"play" %% "play" % "2.1-SNAPSHOT"
 )
