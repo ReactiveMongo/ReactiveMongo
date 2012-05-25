@@ -5,9 +5,13 @@ import org.jboss.netty.buffer._
 
 import org.asyncmongo.protocol.ChannelBufferWritable
 
+object `package` {
+  def randomInt = (new java.util.Random()).nextInt(Integer.MAX_VALUE)
+}
+
 object Converters {
   private val HEX_CHARS :Array[Char] = "0123456789abcdef".toCharArray();
-  
+
   def hex2Str(bytes: Array[Byte]) :String = {
     val hex = new Array[Char](2 * bytes.length)
     var i = 0

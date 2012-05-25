@@ -1,5 +1,6 @@
 package org.asyncmongo.protocol.messages
 
+import org.asyncmongo.utils._
 import org.asyncmongo.bson.Bson
 import org.asyncmongo.protocol.{WritableMessage, Query}
 
@@ -21,6 +22,29 @@ case class GetLastError(
       bson.writeElement("fsync", true)
     }
     WritableMessage(requestID, 0, Query(0, db + ".$cmd", 0, 1), bson.getBuffer)
+  }
+}
+
+trait Message {
+  val db: String
+  def makeQuery :Query = Query(0, db + ".$cmd", 0, 1)
+  def makeDocuments :Bson
+  def makeWritableMessage :WritableMessage[Query] = makeWritableMessage(randomInt)
+  def makeWritableMessage(requestID: Int) :WritableMessage[Query] = WritableMessage(requestID, 0, makeQuery, makeDocuments.getBuffer)
+}
+
+case class Count(
+  db: String,
+  collectionName: String,
+  query: Option[Bson] = None,
+  fields: Option[Bson] = None
+) extends Message {
+  def makeDocuments = {
+    val bson = new Bson
+    bson.writeElement("count", collectionName)
+    bson.writeElement("query", query.getOrElse(new Bson))
+    bson.writeElement("fields", fields.getOrElse(new Bson))
+    bson
   }
 }
 

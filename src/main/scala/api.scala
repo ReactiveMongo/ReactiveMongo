@@ -10,9 +10,9 @@ import org.asyncmongo.handlers._
 import org.asyncmongo.protocol._
 import org.asyncmongo.protocol.messages._
 
-case class Mongo(connection: MongoConnection, implicit val timeout :Timeout = Timeout(5 seconds)) {
-  def find[T, U, V](fullCollectionName: String, query: T, fields: Option[U], skip: Int, limit: Int)(implicit writer: BSONWriter[T], writer2: BSONWriter[U], handler: BSONReaderHandler, reader: BSONReader[V], m: Manifest[V]) :Future[Cursor[V]] = {
-    val op = Query(0, fullCollectionName, skip, 19)
+case class DB(dbName: String, connection: MongoConnection, implicit val timeout :Timeout = Timeout(5 seconds)) {
+  def find[T, U, V](collection: String, query: T, fields: Option[U], skip: Int, limit: Int)(implicit writer: BSONWriter[T], writer2: BSONWriter[U], handler: BSONReaderHandler, reader: BSONReader[V], m: Manifest[V]) :Future[Cursor[V]] = {
+    val op = Query(0, collection, skip, 19)
     val bson = writer.write(query)
     if(fields.isDefined)
       bson.writeBytes(writer2.write(fields.get))
@@ -23,22 +23,25 @@ case class Mongo(connection: MongoConnection, implicit val timeout :Timeout = Ti
     }
   }
   
-  def count[U](fullCollectionName: String)(implicit handler: BSONReaderHandler, reader: BSONReader[U], m: Manifest[U]) :Future[U] = {
-    val message = Count.makeWritableMessage(fullCollectionName.span(_ != '.')._1, fullCollectionName, None, None, (new java.util.Random()).nextInt(Integer.MAX_VALUE))
-    connection.ask(message).map { response =>
-      handler.handle(response.reply, response.documents).next
+  def count(collection: String) :Future[Int] = {
+    import DefaultBSONHandlers._
+    connection.ask(Count(dbName, collection).makeWritableMessage).map { response =>
+      DefaultBSONReaderHandler.handle(response.reply, response.documents).next.find(_.name == "n").get match {
+        case BSONDouble(_, n) => n.toInt
+        case _ => throw new RuntimeException("...")
+      }
     }
   }
   
-  def insert[T](fullCollectionName: String, document: T)(implicit writer: BSONWriter[T]) :Unit = {
-    val op = Insert(0, fullCollectionName)
+  def insert[T](collection: String, document: T)(implicit writer: BSONWriter[T]) :Unit = {
+    val op = Insert(0, collection)
     val bson = writer.write(document)
     val message = WritableMessage(op, bson)
     connection.send(message)
   }
   
-  def insert[T, U](fullCollectionName: String, document: T, writeConcern: GetLastError)(implicit writer: BSONWriter[T], handler: BSONReaderHandler, reader: BSONReader[U], m: Manifest[U]) :Future[U] = {
-    val op = Insert(0, fullCollectionName)
+  def insert[T, U](collection: String, document: T, writeConcern: GetLastError)(implicit writer: BSONWriter[T], handler: BSONReaderHandler, reader: BSONReader[U], m: Manifest[U]) :Future[U] = {
+    val op = Insert(0, collection)
     val bson = writer.write(document)
     val message = WritableMessage(op, bson)
     connection.ask(message, writeConcern).map { response =>
@@ -46,17 +49,17 @@ case class Mongo(connection: MongoConnection, implicit val timeout :Timeout = Ti
     }
   }
   
-  def remove[T](fullCollectionName: String, query: T)(implicit writer: BSONWriter[T]) :Unit = remove(fullCollectionName, query, false)
+  def remove[T](collection: String, query: T)(implicit writer: BSONWriter[T]) :Unit = remove(collection, query, false)
   
-  def remove[T](fullCollectionName: String, query: T, firstMatchOnly: Boolean)(implicit writer: BSONWriter[T]) : Unit = {
-    val op = Delete(fullCollectionName, if(firstMatchOnly) 1 else 0)
+  def remove[T](collection: String, query: T, firstMatchOnly: Boolean)(implicit writer: BSONWriter[T]) : Unit = {
+    val op = Delete(collection, if(firstMatchOnly) 1 else 0)
     val bson = writer.write(query)
     val message = WritableMessage(op, bson)
     connection.send(message)
   }
   
-  def remove[T, U](fullCollectionName: String, query: T, writeConcern: GetLastError, firstMatchOnly: Boolean = false)(implicit writer: BSONWriter[T], handler: BSONReaderHandler, reader: BSONReader[U], m: Manifest[U]) :Future[U] = {
-    val op = Delete(fullCollectionName, if(firstMatchOnly) 1 else 0)
+  def remove[T, U](collection: String, query: T, writeConcern: GetLastError, firstMatchOnly: Boolean = false)(implicit writer: BSONWriter[T], handler: BSONReaderHandler, reader: BSONReader[U], m: Manifest[U]) :Future[U] = {
+    val op = Delete(collection, if(firstMatchOnly) 1 else 0)
     val bson = writer.write(query)
     val message = WritableMessage(op, bson)
     connection.ask(message, writeConcern).map { response =>
@@ -121,13 +124,6 @@ object Cursor {
   }
 }
 
-class DB(
-  val name: String,
-  val nodes: List[(String, Int)] = List("localhost" -> 27017)
-) {
-  
-}
-
 object Test {
   import akka.dispatch.Await
   import akka.pattern.ask
@@ -137,10 +133,14 @@ object Test {
   implicit val timeout = Timeout(5 seconds)
 
   def test = {
-    val mongo = Mongo(MongoConnection(List("localhost" -> 27017)))
+    val mongo = DB("plugin", MongoConnection(List("localhost" -> 27017)))
     val query = new Bson()//new HashMap[Object, Object]()
     query.writeElement("name", "Jack")
     val future = mongo.find("plugin.acoll", query, None, 2, 0)
+    mongo.count("acoll").onComplete {
+      case Left(t) =>
+      case Right(t) => println("count on plugin.acoll gave " + t)
+    }
     println("Test: future is " + future)
     val toSave = new Bson()
     val tags = new Bson()
@@ -149,12 +149,13 @@ object Test {
     toSave.writeElement("name", "Kurt")
     toSave.writeElement("tags", tags)
     //Cursor.stream(Await.result(future, timeout.duration)).print("\n")
-    Cursor.enumerate(Some(future))(Iteratee.foreach { t =>
+    /*Cursor.enumerate(Some(future))(Iteratee.foreach { t =>
       println("fetched t=" + DefaultBSONIterator.pretty(t))
     })
     mongo.insert("plugin.acoll", toSave, GetLastError()).onComplete {
       case Left(t) => println("error!, throwable = " + t)
       case Right(t) => println("inserted, GetLastError=" + DefaultBSONIterator.pretty(t))
-    }
+    }*/
+
   }
 }
