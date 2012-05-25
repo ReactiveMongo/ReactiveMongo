@@ -17,3 +17,5 @@ libraryDependencies ++= Seq(
 	"com.typesafe.akka" % "akka-actor" % "2.0",
 	"play" %% "play" % "2.1-SNAPSHOT"
 )
+
+scalacOptions ++= Seq("-unchecked", "-deprecation")

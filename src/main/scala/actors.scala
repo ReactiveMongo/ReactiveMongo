@@ -1,18 +1,20 @@
 package org.asyncmongo.actors
 
-import akka.actor.{Actor, ActorRef}
-import akka.actor.ActorSystem
-import akka.actor.Props
-import org.asyncmongo.protocol._
-import akka.actor.ActorContext
+import akka.actor._
+import akka.dispatch.Future
+import akka.pattern.ask
 import akka.routing.RoundRobinRouter
-import java.net.InetSocketAddress
-import akka.routing.Broadcast
+import akka.util.Timeout
 
+import org.asyncmongo.protocol._
+import org.asyncmongo.protocol.messages._
+
+import java.net.InetSocketAddress
 import java.nio.ByteOrder
+
 import org.jboss.netty.bootstrap._
-import org.jboss.netty.channel._
 import org.jboss.netty.buffer._
+import org.jboss.netty.channel._
 import org.jboss.netty.channel.socket.nio._
 
 class ChannelActor(val channel: Channel) extends Actor {
@@ -153,19 +155,13 @@ class MongoDBSystem(val nodes: List[(String, Int)]) extends Actor {
 class MongoConnection(
   mongosystem: ActorRef
 ) {
-  import org.asyncmongo.protocol.messages._
-  import akka.util.Timeout
-  import akka.dispatch.Future
-
   /** write an op and wait for db response */
   def ask(message: WritableMessage[WritableOp])(implicit timeout: Timeout) :Future[ReadReply] = {
-    import akka.pattern.ask
     (mongosystem ? message).mapTo[ReadReply]
   }
 
   /** write a no-response op followed by a GetLastError command and wait for its response */
   def ask(message: WritableMessage[WritableOp], writeConcern: GetLastError = GetLastError())(implicit timeout: Timeout) = {
-    import akka.pattern.ask
     (mongosystem ? ((message, writeConcern.makeWritableMessage("plugin", message.header.requestID)))).mapTo[ReadReply]
   }
 

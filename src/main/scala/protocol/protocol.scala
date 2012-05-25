@@ -1,18 +1,15 @@
 package org.asyncmongo.protocol
 
+import akka.actor.ActorRef
 import java.nio.ByteOrder
-import org.jboss.netty.bootstrap._
-import org.jboss.netty.channel._
-import org.jboss.netty.buffer._
-import org.jboss.netty.channel.socket.nio._
-import org.jboss.netty.handler.codec.oneone._
-import org.codehaus.jackson.map.ObjectMapper
 import org.asyncmongo.utils.RichBuffer._
 import org.asyncmongo.utils.BufferAccessors._
-import org.codehaus.jackson.JsonNode
+import org.jboss.netty.buffer._
+import org.jboss.netty.bootstrap._
+import org.jboss.netty.channel._
+import org.jboss.netty.channel.socket.nio._
+import org.jboss.netty.handler.codec.oneone._
 import org.jboss.netty.handler.codec.frame.FrameDecoder
-import akka.actor.ActorRef
-
 
  // traits
 trait ChannelBufferWritable {
@@ -25,15 +22,6 @@ trait ChannelBufferReadable[T] {
   def apply(buffer: ChannelBuffer) :T = readFrom(buffer)
 }
 
-
-
-trait BSONReader[DocumentType] {
-  val count: Int
-  def next: Option[DocumentType]
-}
-trait BSONReaderHandler[DocumentType] {
-  def handle(reply: Reply, buffer: ChannelBuffer) :BSONReader[DocumentType]
-}
  // concrete classes
 case class MessageHeader(
   messageLength: Int,
@@ -168,50 +156,4 @@ class MongoHandler(receiver: ActorRef) extends SimpleChannelHandler {
     super.channelConnected(ctx, e)
   }
   def log(e: ChannelEvent, s: String) = println("MongoHandler [" + e.getChannel.getId + "] : " + s)
-}
-
-object JacksonNodeReaderHandler extends BSONReaderHandler[JsonNode] {
-  override def handle(reply: Reply, buffer: ChannelBuffer) :BSONReader[JsonNode] = JacksonNodeReader(reply.numberReturned, buffer)
-}
-
-case class JacksonNodeReader(count: Int, buffer: ChannelBuffer) extends BSONReader[JsonNode] {
-  import de.undercouch.bson4jackson._
-  import de.undercouch.bson4jackson.io._
-  import de.undercouch.bson4jackson.uuid._
-   private val mapper = {
-    val fac = new BsonFactory()
-    fac.enable(BsonParser.Feature.HONOR_DOCUMENT_LENGTH)
-    val om = new ObjectMapper(fac)
-    om.registerModule(new BsonUuidModule())
-    om
-  }
-  private val is = new ChannelBufferInputStream(buffer)
-   override def next :Option[JsonNode] = {
-    if(is.available > 0)
-      Some(mapper.readValue(new ChannelBufferInputStream(buffer), classOf[JsonNode]))
-    else None
-  }
-}
-
-object MapReaderHandler extends BSONReaderHandler[java.util.HashMap[Object, Object]] {
-  override def handle(reply: Reply, buffer: ChannelBuffer) :BSONReader[java.util.HashMap[Object, Object]] = MapReader(reply.numberReturned, buffer)
-}
-
-case class MapReader(count: Int, buffer: ChannelBuffer) extends BSONReader[java.util.HashMap[Object, Object]] {
-  import de.undercouch.bson4jackson._
-  import de.undercouch.bson4jackson.io._
-  import de.undercouch.bson4jackson.uuid._
-  private val mapper = {
-    val fac = new BsonFactory()
-    fac.enable(BsonParser.Feature.HONOR_DOCUMENT_LENGTH)
-    val om = new ObjectMapper(fac)
-    om.registerModule(new BsonUuidModule())
-    om
-  }
-  private val is = new ChannelBufferInputStream(buffer)
-  override def next :Option[java.util.HashMap[Object, Object]] = {
-    if(is.available > 0)
-      Some(mapper.readValue(new ChannelBufferInputStream(buffer), classOf[java.util.HashMap[Object, Object]]))
-    else None
-  }
 }

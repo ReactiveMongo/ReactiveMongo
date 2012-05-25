@@ -1,14 +1,14 @@
 package org.asyncmongo.api
 
-import akka.dispatch.{Future, Promise}
-import org.asyncmongo.protocol._
-import org.asyncmongo.protocol.messages._
+import akka.dispatch.Future
 import akka.util.Timeout
 import akka.util.duration._
-import org.asyncmongo.protocol.Reply
+
 import org.asyncmongo.actors.MongoConnection
-import org.jboss.netty.buffer.ChannelBuffer
-import org.jboss.netty.buffer.ChannelBufferInputStream
+import org.asyncmongo.bson._
+import org.asyncmongo.handlers._
+import org.asyncmongo.protocol._
+import org.asyncmongo.protocol.messages._
 
 case class Mongo(connection: MongoConnection, implicit val timeout :Timeout = Timeout(5 seconds)) {
   def find[T, U, V](fullCollectionName: String, query: T, fields: Option[U], skip: Int, limit: Int)(implicit writer: BSONWriter[T], writer2: BSONWriter[U], handler: BSONReaderHandler, reader: BSONReader[V], m: Manifest[V]) :Future[Cursor[V]] = {
@@ -128,91 +128,10 @@ class DB(
   
 }
 
-trait BSONWriter[DocumentType] {
-  def write(document: DocumentType) :ChannelBuffer
-}
-
-trait BSONReader[DocumentType] {
-  def read(buffer: ChannelBuffer) :DocumentType
-}
-
-trait BSONReaderHandler {
-  def handle[DocumentType](reply: Reply, buffer: ChannelBuffer)(implicit reader: BSONReader[DocumentType]) :Iterator[DocumentType]
-}
-
-import org.asyncmongo.bson._
-
-object DefaultBSONHandlers {
-  import de.undercouch.bson4jackson._
-  import de.undercouch.bson4jackson.io._
-  import de.undercouch.bson4jackson.uuid._
-  import org.codehaus.jackson.map.ObjectMapper
-
-  implicit object DefaultBSONReaderHandler extends BSONReaderHandler {
-    def handle[DocumentType](reply: Reply, buffer: ChannelBuffer)(implicit reader: BSONReader[DocumentType]) :Iterator[DocumentType] = {
-      new Iterator[DocumentType] {
-        def hasNext = buffer.readable
-        def next = reader.read(buffer.readBytes(buffer.getInt(buffer.readerIndex)))
-      }
-    }
-  }
-  implicit object DefaultBSONReader extends BSONReader[DefaultBSONIterator] {
-    override def read(buffer: ChannelBuffer): DefaultBSONIterator = DefaultBSONIterator(buffer)
-  }
-
-  implicit object DefaultBSONWriter extends BSONWriter[Bson] {
-    def write(document: Bson) = document.getBuffer
-  }
-}
-
-/*object DefaultBSONHandlers {
-  import de.undercouch.bson4jackson._
-  import de.undercouch.bson4jackson.io._
-  import de.undercouch.bson4jackson.uuid._
-  import org.codehaus.jackson.map.ObjectMapper
-
-  implicit object MapReaderHandler extends BSONReaderHandler[java.util.HashMap[Object, Object]] {
-    override def handle(reply: Reply, buffer: ChannelBuffer): BSONReader[java.util.HashMap[Object, Object]] = MapReader(reply.numberReturned, buffer)
-  }
-
-  case class MapReader(count: Int, buffer: ChannelBuffer) extends BSONReader[java.util.HashMap[Object, Object]] {
-    private val mapper = {
-      val fac = new BsonFactory()
-      fac.enable(BsonParser.Feature.HONOR_DOCUMENT_LENGTH)
-      val om = new ObjectMapper(fac)
-      om.registerModule(new BsonUuidModule())
-      om
-    }
-    private val is = new ChannelBufferInputStream(buffer)
-    override def next: java.util.HashMap[Object, Object] = {
-      mapper.readValue(new ChannelBufferInputStream(buffer), classOf[java.util.HashMap[Object, Object]])
-    }
-    override def hasNext = is.available > 0
-    override def size = count
-  }
-  
-  implicit object HashMapWriter extends BSONWriter[java.util.HashMap[Object, Object]] {
-    private val mapper = {
-      val fac = new BsonFactory()
-      fac.enable(BsonParser.Feature.HONOR_DOCUMENT_LENGTH)
-      val om = new ObjectMapper(fac)
-      om.registerModule(new BsonUuidModule())
-      om
-    }
-    def write(document :java.util.HashMap[Object, Object]) = mapper.writeValueAsBytes(document)
-  }
-}*/
-
-
-import java.util.HashMap
-import DefaultBSONHandlers._
-
-object Test { //Mongo.find[HashMap[Object, Object], HashMap[Object, Object]]("plugin.acoll", query, 2)
+object Test {
   import akka.dispatch.Await
   import akka.pattern.ask
-  import akka.util.Timeout
-  import akka.util.duration._
-
+  import DefaultBSONHandlers._
   import play.api.libs.iteratee._
    
   implicit val timeout = Timeout(5 seconds)
@@ -223,9 +142,19 @@ object Test { //Mongo.find[HashMap[Object, Object], HashMap[Object, Object]]("pl
     query.writeElement("name", "Jack")
     val future = mongo.find("plugin.acoll", query, None, 2, 0)
     println("Test: future is " + future)
+    val toSave = new Bson()
+    val tags = new Bson()
+    tags.writeElement("tag1", "yop")
+    tags.writeElement("tag2", "...")
+    toSave.writeElement("name", "Kurt")
+    toSave.writeElement("tags", tags)
     //Cursor.stream(Await.result(future, timeout.duration)).print("\n")
     Cursor.enumerate(Some(future))(Iteratee.foreach { t =>
       println("fetched t=" + DefaultBSONIterator.pretty(t))
     })
+    mongo.insert("plugin.acoll", toSave, GetLastError()).onComplete {
+      case Left(t) => println("error!, throwable = " + t)
+      case Right(t) => println("inserted, GetLastError=" + DefaultBSONIterator.pretty(t))
+    }
   }
 }

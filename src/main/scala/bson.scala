@@ -3,10 +3,6 @@ package org.asyncmongo.bson
 import org.jboss.netty.buffer.{ChannelBuffer, ChannelBuffers}
 import java.nio.ByteOrder
 
-object `package` {
-
-}
-
 sealed trait Subtype {
   val value: Int
 }
