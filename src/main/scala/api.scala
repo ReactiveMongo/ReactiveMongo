@@ -11,8 +11,29 @@ import org.asyncmongo.protocol._
 import org.asyncmongo.protocol.messages._
 
 case class DB(dbName: String, connection: MongoConnection, implicit val timeout :Timeout = Timeout(5 seconds)) {
-  def find[T, U, V](collection: String, query: T, fields: Option[U], skip: Int, limit: Int)(implicit writer: BSONWriter[T], writer2: BSONWriter[U], handler: BSONReaderHandler, reader: BSONReader[V], m: Manifest[V]) :Future[Cursor[V]] = {
-    val op = Query(0, collection, skip, 19)
+  def apply(name: String) :Collection = Collection(dbName, name, connection, timeout)
+}
+
+case class Collection(
+  dbName: String,
+  collectionName: String,
+  connection: MongoConnection,
+  implicit val timeout :Timeout
+) {
+  lazy val fullCollectionName = dbName + "." + collectionName
+
+  def count :Future[Int] = {
+    import DefaultBSONHandlers._
+    connection.ask(Count(dbName, collectionName).makeWritableMessage).map { response =>
+      DefaultBSONReaderHandler.handle(response.reply, response.documents).next.find(_.name == "n").get match {
+        case BSONDouble(_, n) => n.toInt
+        case _ => 0
+      }
+    }
+  }
+
+  def find[T, U, V](query: T, fields: Option[U], skip: Int, limit: Int)(implicit writer: BSONWriter[T], writer2: BSONWriter[U], handler: BSONReaderHandler, reader: BSONReader[V], m: Manifest[V]) :Future[Cursor[V]] = {
+    val op = Query(0, fullCollectionName, skip, 19)
     val bson = writer.write(query)
     if(fields.isDefined)
       bson.writeBytes(writer2.write(fields.get))
@@ -23,25 +44,15 @@ case class DB(dbName: String, connection: MongoConnection, implicit val timeout 
     }
   }
   
-  def count(collection: String) :Future[Int] = {
-    import DefaultBSONHandlers._
-    connection.ask(Count(dbName, collection).makeWritableMessage).map { response =>
-      DefaultBSONReaderHandler.handle(response.reply, response.documents).next.find(_.name == "n").get match {
-        case BSONDouble(_, n) => n.toInt
-        case _ => throw new RuntimeException("...")
-      }
-    }
-  }
-  
-  def insert[T](collection: String, document: T)(implicit writer: BSONWriter[T]) :Unit = {
-    val op = Insert(0, collection)
+  def insert[T](document: T)(implicit writer: BSONWriter[T]) :Unit = {
+    val op = Insert(0, fullCollectionName)
     val bson = writer.write(document)
     val message = WritableMessage(op, bson)
     connection.send(message)
   }
   
-  def insert[T, U](collection: String, document: T, writeConcern: GetLastError)(implicit writer: BSONWriter[T], handler: BSONReaderHandler, reader: BSONReader[U], m: Manifest[U]) :Future[U] = {
-    val op = Insert(0, collection)
+  def insert[T, U](document: T, writeConcern: GetLastError)(implicit writer: BSONWriter[T], handler: BSONReaderHandler, reader: BSONReader[U], m: Manifest[U]) :Future[U] = {
+    val op = Insert(0, fullCollectionName)
     val bson = writer.write(document)
     val message = WritableMessage(op, bson)
     connection.ask(message, writeConcern).map { response =>
@@ -49,17 +60,17 @@ case class DB(dbName: String, connection: MongoConnection, implicit val timeout 
     }
   }
   
-  def remove[T](collection: String, query: T)(implicit writer: BSONWriter[T]) :Unit = remove(collection, query, false)
+  def remove[T](query: T)(implicit writer: BSONWriter[T]) :Unit = remove(query, false)
   
-  def remove[T](collection: String, query: T, firstMatchOnly: Boolean)(implicit writer: BSONWriter[T]) : Unit = {
-    val op = Delete(collection, if(firstMatchOnly) 1 else 0)
+  def remove[T](query: T, firstMatchOnly: Boolean)(implicit writer: BSONWriter[T]) : Unit = {
+    val op = Delete(fullCollectionName, if(firstMatchOnly) 1 else 0)
     val bson = writer.write(query)
     val message = WritableMessage(op, bson)
     connection.send(message)
   }
   
-  def remove[T, U](collection: String, query: T, writeConcern: GetLastError, firstMatchOnly: Boolean = false)(implicit writer: BSONWriter[T], handler: BSONReaderHandler, reader: BSONReader[U], m: Manifest[U]) :Future[U] = {
-    val op = Delete(collection, if(firstMatchOnly) 1 else 0)
+  def remove[T, U](query: T, writeConcern: GetLastError, firstMatchOnly: Boolean = false)(implicit writer: BSONWriter[T], handler: BSONReaderHandler, reader: BSONReader[U], m: Manifest[U]) :Future[U] = {
+    val op = Delete(fullCollectionName, if(firstMatchOnly) 1 else 0)
     val bson = writer.write(query)
     val message = WritableMessage(op, bson)
     connection.ask(message, writeConcern).map { response =>
@@ -98,7 +109,6 @@ object Cursor {
   import play.api.libs.iteratee._
   import play.api.libs.concurrent.{Promise => PlayPromise, _}
 
-
   def enumerate[T](futureCursor: Option[Future[Cursor[T]]]) :Enumerator[T] = {
     var currentCursor :Option[Cursor[T]] = None
     Enumerator.fromCallback { () =>
@@ -133,11 +143,12 @@ object Test {
   implicit val timeout = Timeout(5 seconds)
 
   def test = {
-    val mongo = DB("plugin", MongoConnection(List("localhost" -> 27017)))
+    val db = DB("plugin", MongoConnection(List("localhost" -> 27017)))
+    val collection = db("acoll")
     val query = new Bson()//new HashMap[Object, Object]()
     query.writeElement("name", "Jack")
-    val future = mongo.find("plugin.acoll", query, None, 2, 0)
-    mongo.count("acoll").onComplete {
+    val future = collection.find(query, None, 2, 0)
+    collection.count.onComplete {
       case Left(t) =>
       case Right(t) => println("count on plugin.acoll gave " + t)
     }
@@ -152,7 +163,7 @@ object Test {
     /*Cursor.enumerate(Some(future))(Iteratee.foreach { t =>
       println("fetched t=" + DefaultBSONIterator.pretty(t))
     })
-    mongo.insert("plugin.acoll", toSave, GetLastError()).onComplete {
+    collection.insert(toSave, GetLastError()).onComplete {
       case Left(t) => println("error!, throwable = " + t)
       case Right(t) => println("inserted, GetLastError=" + DefaultBSONIterator.pretty(t))
     }*/

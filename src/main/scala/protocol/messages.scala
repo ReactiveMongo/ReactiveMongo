@@ -48,16 +48,6 @@ case class Count(
   }
 }
 
-object Count {
-  def makeWritableMessage(db: String, fullCollectionName: String, query: Option[Bson], fields: Option[Bson], requestID: Int) :WritableMessage[Query] = {
-    val bson = new Bson
-    bson.writeElement("count", fullCollectionName.span(_ != '.')._2.tail)
-    bson.writeElement("query", query.getOrElse(new Bson))
-    bson.writeElement("fields", fields.getOrElse(new Bson))
-    WritableMessage(requestID, 0, Query(0, db + ".$cmd", 0, 1), bson.getBuffer)
-  }
-}
-
 object IsMaster {
   def makeWritableMessage(db: String) :WritableMessage[Query] = {
     val bson = new Bson
