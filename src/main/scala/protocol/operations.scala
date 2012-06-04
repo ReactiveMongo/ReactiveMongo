@@ -20,6 +20,16 @@ case class Reply(
   numberReturned: Int
 ) extends Op {
   override val code = 1
+
+  lazy val cursorNotFound = (flags & 0x01) != 0
+  lazy val queryFailure = (flags & 0x02) != 0
+  lazy val awaitCapable = (flags & 0x08) != 0
+
+  private def str(b: Boolean, s: String) = if(b) s else ""
+
+  lazy val inError = cursorNotFound || queryFailure
+
+  lazy val stringify = toString + " [" + str(cursorNotFound, "CursorNotFound;") + str(queryFailure, "QueryFailure;") + str(awaitCapable, "AwaitCapable") + "]"
 }
 
 object Reply extends ChannelBufferReadable[Reply] {

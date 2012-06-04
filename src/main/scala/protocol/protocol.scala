@@ -81,12 +81,43 @@ case class ReadReply(
   header: MessageHeader,
   reply: Reply,
   documents: ChannelBuffer,
-  info: ReadReplyInfo)
+  info: ReadReplyInfo) {
+
+  lazy val error :Option[ExplainedError] = {
+    if(reply.inError) {
+      import org.asyncmongo.handlers.DefaultBSONHandlers._
+      val bson = DefaultBSONReaderHandler.handle(reply, documents)
+      if(bson.hasNext)
+        ExplainedError(DefaultBSONReaderHandler.handle(reply, documents).next)
+      else None
+    } else None
+  }
+}
+
+case class ExplainedError(
+  err: String
+)
+
+object ExplainedError {
+  import org.asyncmongo.bson._
+  
+  def apply(bson: DefaultBSONIterator) :Option[ExplainedError] = {
+    bson.find(_.name == "err").map {
+      case err: BSONString => ExplainedError(err.value)
+      case _ => throw new RuntimeException("???")
+    }
+  }
+}
 
 case class ReadReplyInfo(
   channelID: Int,
   localAddress: String,
   remoteAddress: String)
+
+case class ErrorResponse(
+  readReply: ReadReply,
+  err: String
+)
 
 class WritableMessageEncoder extends OneToOneEncoder {
   def encode(ctx: ChannelHandlerContext, channel: Channel, obj: Object) = {

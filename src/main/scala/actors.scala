@@ -147,6 +147,7 @@ class MongoDBSystem(val nodes: List[(String, Int)]) extends Actor {
     }
     case _ => log("not supported")
   }
+
   def log(s: String) = println("MongoDBSystem [" + self.path + "] : " + s)
 
   def resolveReceiver(message: WritableMessage[WritableOp]) :ActorRef = message.connectionId.map{ id => context.actorFor(id.toString) }.getOrElse(secondaries)

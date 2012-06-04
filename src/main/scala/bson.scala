@@ -233,7 +233,7 @@ case class BSONLong          (name: String, value: Long)                     ext
 case class BSONMinKey        (name: String)                                  extends BSONElement { val code = 0xFF; }
 case class BSONMaxKey        (name: String)                                  extends BSONElement { val code = 0x7F; }
 
-sealed trait BSONIterable extends Iterator[BSONElement] {
+sealed trait BSONIterator extends Iterator[BSONElement] {
 	import org.asyncmongo.utils.RichBuffer._
 
 	val buffer :ChannelBuffer
@@ -265,14 +265,13 @@ sealed trait BSONIterable extends Iterator[BSONElement] {
 	}
 
 	def hasNext = buffer.readerIndex - startIndex + 1< documentSize
+
+	def mapped :Map[String, BSONElement] = {
+		for(el <- this) yield (el.name, el)
+	}.toMap
 }
 
-case class DefaultBSONIterator(buffer: ChannelBuffer) extends BSONIterable
-
-case class DocumentsIterator(buffer: ChannelBuffer) extends Iterator[BSONIterable] {
-	def hasNext = buffer.readable
-	def next = DefaultBSONIterator(buffer.readBytes(buffer.getInt(buffer.readerIndex)))
-}
+case class DefaultBSONIterator(buffer: ChannelBuffer) extends BSONIterator
 
 object DefaultBSONIterator {
 	private def pretty(i: Int, it: DefaultBSONIterator) :String = {

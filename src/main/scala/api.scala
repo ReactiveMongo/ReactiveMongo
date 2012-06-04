@@ -51,12 +51,14 @@ case class Collection(
     connection.send(message)
   }
   
-  def insert[T, U](document: T, writeConcern: GetLastError)(implicit writer: BSONWriter[T], handler: BSONReaderHandler, reader: BSONReader[U], m: Manifest[U]) :Future[U] = {
+  def insert[T](document: T, writeConcern: GetLastError)(implicit writer: BSONWriter[T], handler: BSONReaderHandler) :Future[LastError] = {
     val op = Insert(0, fullCollectionName)
     val bson = writer.write(document)
     val message = WritableMessage(op, bson)
     connection.ask(message, writeConcern).map { response =>
-      handler.handle(response.reply, response.documents).next
+      println(response.reply.stringify)
+      import DefaultBSONHandlers._
+      LastError(handler.handle(response.reply, response.documents).next)
     }
   }
   
@@ -76,6 +78,30 @@ case class Collection(
     connection.ask(message, writeConcern).map { response =>
       handler.handle(response.reply, response.documents).next
     }
+  }
+}
+
+case class LastError(
+  ok: Boolean,
+  err: Option[String],
+  code: Option[Int],
+  message: Option[String],
+  original: Map[String, BSONElement]
+) {
+  lazy val inError :Boolean = !ok || err.isDefined
+  lazy val stringify :String = toString + " [inError: " + inError + "]"
+}
+
+object LastError {
+  def apply(bson: BSONIterator) :LastError = {
+    val mapped = bson.mapped
+    LastError(
+      mapped.get("ok").map(_.asInstanceOf[BSONDouble].value == 1).getOrElse(true),
+      mapped.get("err").map(_.asInstanceOf[BSONString].value),
+      mapped.get("code").map(_.asInstanceOf[BSONInteger].value),
+      mapped.get("errmsg").map(_.asInstanceOf[BSONString].value),
+      mapped
+    )
   }
 }
 
@@ -143,9 +169,17 @@ object Test {
   implicit val timeout = Timeout(5 seconds)
 
   def test = {
-    val db = DB("plugin", MongoConnection(List("localhost" -> 27017)))
+    val connection = MongoConnection(List("localhost" -> 27017))
+    val db = DB("plugin", connection)
     val collection = db("acoll")
     val query = new Bson()//new HashMap[Object, Object]()
+    connection.ask(WritableMessage(GetMore("plugin.acoll", 2, 12))).onComplete {
+      case Right(response) =>
+      println()
+      println("!! \t Wrong GetMore gave " + response.reply.stringify + "\n\t\t ==> " + response.error)
+      println()
+      case _ =>
+    }
     query.writeElement("name", "Jack")
     val future = collection.find(query, None, 2, 0)
     collection.count.onComplete {
@@ -158,15 +192,18 @@ object Test {
     tags.writeElement("tag1", "yop")
     tags.writeElement("tag2", "...")
     toSave.writeElement("name", "Kurt")
+    toSave.writeElement("$kk", "Kurt")
     toSave.writeElement("tags", tags)
     //Cursor.stream(Await.result(future, timeout.duration)).print("\n")
     /*Cursor.enumerate(Some(future))(Iteratee.foreach { t =>
       println("fetched t=" + DefaultBSONIterator.pretty(t))
-    })
-    collection.insert(toSave, GetLastError()).onComplete {
+    })*/
+    collection.insert(toSave, GetLastError(false, None, false)).onComplete {
       case Left(t) => println("error!, throwable = " + t)
-      case Right(t) => println("inserted, GetLastError=" + DefaultBSONIterator.pretty(t))
-    }*/
+      case Right(le) => {
+        println("insertion " + (if(le.inError) "failed" else "succeeded") + ": " + le.stringify)
+      }
+    }
 
   }
 }
