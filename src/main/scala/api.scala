@@ -180,7 +180,7 @@ object Test {
       println()
       case _ =>
     }
-    query.writeElement("name", "Jack")
+    query.write(BSONString("name", "Jack"))
     val future = collection.find(query, None, 2, 0)
     collection.count.onComplete {
       case Left(t) =>
@@ -189,11 +189,11 @@ object Test {
     println("Test: future is " + future)
     val toSave = new Bson()
     val tags = new Bson()
-    tags.writeElement("tag1", "yop")
-    tags.writeElement("tag2", "...")
-    toSave.writeElement("name", "Kurt")
-    toSave.writeElement("$kk", "Kurt")
-    toSave.writeElement("tags", tags)
+    tags.write(BSONString("tag1", "yop"))
+    tags.write(BSONString("tag2", "..."))
+    toSave.write(BSONString("name", "Kurt"))
+    toSave.write(BSONString("$kk", "Kurt"))
+    toSave.write(BSONDocument("tags", tags.getBuffer))
     //Cursor.stream(Await.result(future, timeout.duration)).print("\n")
     /*Cursor.enumerate(Some(future))(Iteratee.foreach { t =>
       println("fetched t=" + DefaultBSONIterator.pretty(t))

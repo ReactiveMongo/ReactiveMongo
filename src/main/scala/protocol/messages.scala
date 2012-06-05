@@ -1,7 +1,7 @@
 package org.asyncmongo.protocol.messages
 
 import org.asyncmongo.utils._
-import org.asyncmongo.bson.Bson
+import org.asyncmongo.bson._
 import org.asyncmongo.protocol.{WritableMessage, Query}
 
 case class GetLastError(
@@ -11,15 +11,15 @@ case class GetLastError(
 ) {
   def makeWritableMessage(db: String, requestID: Int) :WritableMessage[Query] = {
     val bson = new Bson
-    bson.writeElement("getlasterror", 1)
+    bson.write(BSONInteger("getlasterror", 1))
     if(awaitJournalCommit) {
-      bson.writeElement("j", true)
+      bson.write(BSONBoolean("j", true))
     }
     if(waitForReplicatedOn.isDefined) {
-      bson.writeElement("w", waitForReplicatedOn.get)
+      bson.write(BSONInteger("w", waitForReplicatedOn.get))
     }
     if(fsync) {
-      bson.writeElement("fsync", true)
+      bson.write(BSONBoolean("fsync", true))
     }
     WritableMessage(requestID, 0, Query(0, db + ".$cmd", 0, 1), bson.getBuffer)
   }
@@ -41,9 +41,11 @@ case class Count(
 ) extends Message {
   def makeDocuments = {
     val bson = new Bson
-    bson.writeElement("count", collectionName)
-    bson.writeElement("query", query.getOrElse(new Bson))
-    bson.writeElement("fields", fields.getOrElse(new Bson))
+    bson.write(BSONString("count", collectionName))
+    if(query.isDefined)
+      bson.write(BSONDocument("query", query.get.getBuffer))
+    if(fields.isDefined)
+      bson.write(BSONDocument("fields", fields.get.getBuffer))
     bson
   }
 }
@@ -51,7 +53,7 @@ case class Count(
 object IsMaster {
   def makeWritableMessage(db: String) :WritableMessage[Query] = {
     val bson = new Bson
-    bson.writeElement("isMaster", 1)
+    bson.write(BSONInteger("isMaster", 1))
     WritableMessage(Query(0, db + ".$cmd", 0, 1), bson.getBuffer)
   }
 }
@@ -59,7 +61,7 @@ object IsMaster {
 object ReplStatus {
   def makeWritableMessage(db: String) :WritableMessage[Query] = {
     val bson = new Bson
-    bson.writeElement("replSetGetStatus", 1)
+    bson.write(BSONInteger("replSetGetStatus", 1))
     WritableMessage(Query(0, "admin.$cmd", 0, 1), bson.getBuffer)
   }
 }
@@ -67,7 +69,7 @@ object ReplStatus {
 object Status {
   def makeWritableMessage(db: String) :WritableMessage[Query] = {
     val bson = new Bson
-    bson.writeElement("serverStatus", 1)
+    bson.write(BSONInteger("serverStatus", 1))
     WritableMessage(Query(0, db + ".$cmd", 0, 1), bson.getBuffer)
   }
 }
