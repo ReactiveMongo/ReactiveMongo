@@ -34,6 +34,7 @@ sealed trait BSONElement {
   def write(buffer: ChannelBuffer) :ChannelBuffer = {
     buffer writeByte code
     writeCString(name, buffer)
+    writeContent(buffer)
   }
 
   def writeContent(buffer: ChannelBuffer) :ChannelBuffer
@@ -210,6 +211,65 @@ class Bson(val estimatedLength: Int = 32) {
   }
 }
 
+object Bson {
+  def apply = new Bson
+
+  def apply(el: BSONElement, els: BSONElement*) = {
+    val bson = new Bson
+    bson.write(el)
+    for(e <- els) {
+      bson.write(e)
+    }
+    bson
+  }
+
+  // test purposes - to remove
+  def test {
+    import de.undercouch.bson4jackson._
+    import de.undercouch.bson4jackson.io._
+    import de.undercouch.bson4jackson.uuid._
+    import org.jboss.netty.channel._
+    import org.jboss.netty.buffer._
+    import org.codehaus.jackson.map.ObjectMapper
+    import java.io._
+    val mapper = {
+      val fac = new BsonFactory()
+      fac.enable(BsonParser.Feature.HONOR_DOCUMENT_LENGTH)
+      val om = new ObjectMapper(fac)
+      om.registerModule(new BsonUuidModule())
+      om
+    }
+
+    val factory = new BsonFactory()
+
+    //serialize data
+    val baos = new ByteArrayOutputStream();
+    val gen = factory.createJsonGenerator(baos);
+    gen.writeStartObject();
+    gen.writeStringField("name", "Jack")
+    gen.writeNumberField("age", 37)
+    gen.writeNumberField("getLastError", 1)
+    gen.writeEndObject()
+    gen.close()
+
+    println("awaiting: " + java.util.Arrays.toString(baos.toByteArray))
+
+    val bson = Bson(
+      BSONString("name", "Jack"),
+      BSONInteger("age", 37),
+      BSONInteger("getLastError", 1)
+    )
+    println("produced: " + java.util.Arrays.toString(bson.getBuffer.array))
+    println(DefaultBSONIterator(bson.getBuffer).toList)
+    //val it = DefaultBSONIterator(bson.getBuffer)
+    //while(it.hasNext)
+    //  println(it.next)
+    /*val is = new ChannelBufferInputStream(bson.getBuffer)
+    val produced = mapper.readValue(is, classOf[java.util.HashMap[Object, Object]])
+    println(produced)*/
+  }
+}
+
 
 sealed trait BSONIterator extends Iterator[BSONElement] {
   import org.asyncmongo.utils.RichBuffer._
@@ -273,51 +333,4 @@ object DefaultBSONIterator {
     }).mkString(",\n")
   }
   def pretty(it: DefaultBSONIterator) :String = "{\n" + pretty(0, it) + "\n}"
-}
-
-
-// test purposes - to remove
-object Bson {
-  def test {
-    import de.undercouch.bson4jackson._
-    import de.undercouch.bson4jackson.io._
-    import de.undercouch.bson4jackson.uuid._
-    import org.jboss.netty.channel._
-    import org.jboss.netty.buffer._
-    import org.codehaus.jackson.map.ObjectMapper
-    import java.io._
-    val mapper = {
-      val fac = new BsonFactory()
-      fac.enable(BsonParser.Feature.HONOR_DOCUMENT_LENGTH)
-      val om = new ObjectMapper(fac)
-      om.registerModule(new BsonUuidModule())
-      om
-    }
-
-    val factory = new BsonFactory()
-
-    //serialize data
-    val baos = new ByteArrayOutputStream();
-    val gen = factory.createJsonGenerator(baos);
-    gen.writeStartObject();
-    /*gen.writeStringField("name", "Jack")
-    gen.writeNumberField("age", 37)*/
-    gen.writeNumberField("getLastError", 1)
-    gen.writeEndObject()
-    gen.close()
-
-    println("awaiting: " + java.util.Arrays.toString(baos.toByteArray))
-
-    val bson = new Bson
-    bson.write(BSONString("name", "Jack"))
-    bson.write(BSONInteger("age", 37))
-    bson.write(BSONInteger("getLastError", 1))
-    println(DefaultBSONIterator(bson.getBuffer).toList)
-    //val it = DefaultBSONIterator(bson.getBuffer)
-    //while(it.hasNext)
-    //  println(it.next)
-    /*val is = new ChannelBufferInputStream(bson.getBuffer)
-    val produced = mapper.readValue(is, classOf[java.util.HashMap[Object, Object]])
-    println(produced)*/
-  }
 }
