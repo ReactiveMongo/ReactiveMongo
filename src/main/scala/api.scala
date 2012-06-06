@@ -97,9 +97,18 @@ object LastError {
     val mapped = bson.mapped
     LastError(
       mapped.get("ok").map(_.asInstanceOf[BSONDouble].value == 1).getOrElse(true),
-      mapped.get("err").map(_.asInstanceOf[BSONString].value),
-      mapped.get("code").map(_.asInstanceOf[BSONInteger].value),
-      mapped.get("errmsg").map(_.asInstanceOf[BSONString].value),
+      mapped.get("err").flatMap{
+        case BSONString(_, v) => Some(v)
+        case _ => None
+      },
+      mapped.get("code").flatMap{
+        case BSONInteger(_, v) => Some(v)
+        case _ => None
+      },
+      mapped.get("errmsg").flatMap{
+        case BSONString(_, v) => Some(v)
+        case _ => None
+      },
       mapped
     )
   }
