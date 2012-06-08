@@ -11,6 +11,7 @@ sealed trait Op {
 
 sealed trait WritableOp extends Op with ChannelBufferWritable {
   val expectsResponse :Boolean = false
+  val requiresPrimary :Boolean = false
 }
 
 case class Reply(
@@ -48,6 +49,7 @@ case class Update(
   override val code = 2001
   override val writeTo = writeTupleToBuffer3( (0, fullCollectionName, flags) ) _
   override def size = 4 /* int32 = ZERO */ + 4 + fullCollectionName.length + 1
+  override val requiresPrimary = true
 }
 
 case class Insert(
@@ -57,6 +59,7 @@ case class Insert(
   override val code = 2002
   override val writeTo = writeTupleToBuffer2( (flags, fullCollectionName) ) _
   override def size = 4 + fullCollectionName.length + 1
+  override val requiresPrimary = true
 }
 
 case class Query(
@@ -69,6 +72,16 @@ case class Query(
   override val code = 2004
   override val writeTo = writeTupleToBuffer4( (flags, fullCollectionName, numberToSkip, numberToReturn) ) _
   override def size = 4 + fullCollectionName.length + 1 + 4 + 4
+}
+
+object QueryFlags {
+  val TailableCursor = 0x02
+  val SlaveOk = 0x04
+  val OplogReplay = 0x08
+  val NoCursorTimeout = 0x10
+  val AwaitData = 0x20
+  val Exhaust = 0x40
+  val Partial = 0x80
 }
 
 case class GetMore(
@@ -89,6 +102,7 @@ case class Delete(
   override val code = 2006
   override val writeTo = writeTupleToBuffer3( (0, fullCollectionName, flags) ) _
   override def size = 4 /* int32 ZERO */ + fullCollectionName.length + 1 + 4
+  override val requiresPrimary = true
 }
 
 import org.asyncmongo.utils.RichBuffer._

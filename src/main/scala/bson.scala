@@ -328,6 +328,7 @@ object DefaultBSONIterator {
     (for(v <- it) yield {
       v match {
         case BSONDocument(n, b) => prefix + n + ": {\n" + pretty(i + 1, DefaultBSONIterator(b)) + "\n" + prefix +" }"
+        case BSONArray(n, b) => prefix + n + ": [\n" + pretty(i + 1, DefaultBSONIterator(b)) + "\n" + prefix +" ]"
         case _ => prefix + v.name + ": " + v.toString
       }
     }).mkString(",\n")

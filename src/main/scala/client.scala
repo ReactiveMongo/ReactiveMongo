@@ -29,9 +29,9 @@ object Client {
       }
       case Left(error) => throw error
     }
-    connection.ask(messages.IsMaster.makeWritableMessage("plugin")).onComplete(p("IsMaster"))
-    connection.ask(messages.Status.makeWritableMessage("plugin")).onComplete(p("Status"))
-    connection.ask(messages.ReplStatus.makeWritableMessage("plugin")).onComplete(p("ReplStatus"))
+    connection.ask(messages.IsMaster("plugin").makeWritableMessage).onComplete(p("IsMaster"))
+    connection.ask(messages.Status("plugin").makeWritableMessage).onComplete(p("Status"))
+    connection.ask(messages.ReplStatus.makeWritableMessage).onComplete(p("ReplStatus"))
     //connection.ask(WritableMessage(KillCursors(Set(900)), Array[Byte](0)))
     /*connection send list
     connection send insert

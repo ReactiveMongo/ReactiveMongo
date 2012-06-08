@@ -3,9 +3,11 @@ package org.asyncmongo.actors
 import akka.actor._
 import akka.dispatch.Future
 import akka.pattern.ask
-import akka.routing.RoundRobinRouter
+import akka.routing.{Broadcast, RoundRobinRouter}
 import akka.util.Timeout
 
+import org.asyncmongo.bson._
+import org.asyncmongo.handlers.DefaultBSONHandlers._
 import org.asyncmongo.protocol._
 import org.asyncmongo.protocol.messages._
 
@@ -33,19 +35,71 @@ class ChannelActor(val channel: Channel) extends Actor {
     case s:String => log("received string=" + s)
     case t => log("something else " + t)
   }
+
+  override def postStop = {
+    log("stopping !")
+    channel.close
+  }
+
   def log(s: String) = println("ChannelActor [" + self.path + "] : " + s)
 }
 
 private object NodeRouterMaker {
-  def apply(creator: ActorRef, context: ActorContext, name: String, n: Int = 3, host: String = "localhost", port: Int = 27017) :ActorRef = {
+  def apply(creator: ActorRef, context: ActorContext, host: String = "localhost", port: Int = 27017, n: Int = 3) :ActorRef = {
     context.actorOf(Props.empty.withRouter(RoundRobinRouter(routees = 
       for(i <- 0 to n) yield {
         println("creating actor on " + host + ":" + port + " with parent " + context.parent + ", dispatcher is " + context.dispatcher)
         val channel = ChannelFactory.create(host, port, creator)
         context.actorOf(Props(new ChannelActor(channel)), name = channel.getId.toString)
       }
-    )), name)
+    )), makeName(host, port))
   }
+  def makeName(host: String, port: Int) :String = {
+    host + "-" + port
+  }
+}
+
+private case class Node(
+  host: String,
+  port: Int,
+  actorRef: ActorRef
+) {
+  val name :String = NodeRouterMaker.makeName(host, port)
+}
+
+private[asyncmongo] class NodeManager(creator: ActorRef, context: ActorContext, numberOfConnections: Int, init: Option[List[(String, Int)]]) {
+  private var nodes = List[Node]()
+
+  private var index = -1
+
+  def pick :ActorRef = {
+    index = if(index >= nodes.length - 1) 0 else index + 1
+    nodes(index).actorRef
+  }
+
+  def all :List[ActorRef] = nodes.map(_.actorRef)
+
+  def addNode(host: String, port: Int) :ActorRef = {
+    nodes.find(_.name == NodeRouterMaker.makeName(host, port)).getOrElse({
+      val node = Node(host, port, {
+        context.actorOf(Props.empty.withRouter(RoundRobinRouter(routees =
+          for(i <- 0 until numberOfConnections) yield {
+            println("creating actor on " + host + ":" + port + " with parent " + context.parent + ", dispatcher is " + context.dispatcher)
+            val channel = ChannelFactory.create(host, port, creator)
+            context.actorOf(Props(new ChannelActor(channel)), name = channel.getId.toString)
+          }
+        )), NodeRouterMaker.makeName(host, port))
+      })
+      nodes = nodes :+ node
+      node
+    }).actorRef
+  }
+
+  override def toString = "NodeManager[nodes = " + nodes + "]"
+
+  init.map( _.foreach { node =>
+    addNode(node._1, node._2)
+  })
 }
 
 object ChannelFactory {
@@ -72,64 +126,51 @@ object ChannelFactory {
   }
 }
 
-private[asyncmongo] class NodeResizer(init: Option[IndexedSeq[ActorRef]] = None) extends akka.routing.Resizer {
-  private var toAdd :IndexedSeq[ActorRef] = init.getOrElse(Vector())
-  private var toRemove :IndexedSeq[ActorRef] = Vector()
-
-  def isTimeForResize(messageCounter: Long) :Boolean = {
-    println("resizer = " + messageCounter)
-    messageCounter == 0 || !toRemove.isEmpty || !toAdd.isEmpty
-  }
-
-  def resize(props: Props, routeeProvider: akka.routing.RouteeProvider) {
-    if(!toRemove.isEmpty)
-      routeeProvider.unregisterRoutees(toRemove)
-    if(!toAdd.isEmpty)
-      routeeProvider.registerRoutees(toAdd)
-    toRemove = Vector()
-    toAdd = Vector()
-    println("called for resize, now actors = " + routeeProvider.routees)
-  }
-
-  def addActor(a :ActorRef) {
-    toAdd = toAdd :+ a
-  }
-
-  def removeActor(a :ActorRef) {
-    toRemove = toRemove :+ a
-    println("remove " + a)
-  }
-}
-
 class MongoDBSystem(val nodes: List[(String, Int)]) extends Actor {
-  val secondaries = context.actorOf(
-    Props.empty.withRouter(
-      RoundRobinRouter(resizer = Some(
-        new NodeResizer(Some(
-          (for(node <- nodes)
-            yield NodeRouterMaker(self, context, "yop", 0, node._1, node._2)
-          ).toIndexedSeq
-        ))
-      ))
-    ), "toto"
-  )
+  val nodeManager = new NodeManager(self, context, 3, Some(nodes))
 
-  println("secondaries router is " + secondaries)
+  var primary :Option[ActorRef] = None
+  var isElecting = false
 
+  log("starting with " + nodeManager)
+
+  // todo: if primary changes again while sending queued messages ?
+  private val queuedMessages = scala.collection.mutable.Queue[(ActorRef, Either[(WritableMessage[WritableOp], WritableMessage[WritableOp]), WritableMessage[WritableOp]])]()
   private val awaitingResponses = scala.collection.mutable.ListMap[Int, ActorRef]()
 
   override def receive = {
+    // todo: refactoring
     case message: WritableMessage[WritableOp] => {
+      log("received a message!")
       if(message.op.expectsResponse) {
         awaitingResponses += ((message.requestID, sender))
         log("registering awaiting response for requestID " + message.requestID + ", awaitingResponses: " + awaitingResponses)
       } else log("NOT registering awaiting response for requestID " + message.requestID)
-      resolveReceiver(message) forward message
+      if(secondaryOK(message)) {
+        resolveReceiver(message) forward message
+      } else if(!primary.isDefined) {
+        log("delaying send because primary is not available")
+        queuedMessages += (sender -> Right(message))
+        if(!isElecting) elect
+      } else {
+        primary.get forward message
+      }
     }
     case (message: WritableMessage[WritableOp], writeConcern: WritableMessage[WritableOp]) => {
-      awaitingResponses += ((message.requestID, sender))
-      log("registering writeConcern-awaiting response for requestID " + message.requestID + ", awaitingResponses: " + awaitingResponses)
-      resolveReceiver(message) forward (message, writeConcern)
+      log("received a message!")
+      //if(message.op.expectsResponse) {
+        awaitingResponses += ((message.requestID, sender))
+        log("registering writeConcern-awaiting response for requestID " + message.requestID + ", awaitingResponses: " + awaitingResponses)
+      //} else log("NOT registering awaiting response for requestID " + message.requestID)
+      if(secondaryOK(message)) {
+        resolveReceiver(message) forward (message, writeConcern)
+      } else if(!primary.isDefined) {
+        log("delaying send because primary is not available")
+        queuedMessages += (sender -> Left(message -> writeConcern))
+        if(!isElecting) elect
+      } else {
+        primary.get forward ((message, writeConcern))
+      }
     }
     case message: ReadReply => {
       awaitingResponses.get(message.header.responseTo) match {
@@ -142,7 +183,28 @@ class MongoDBSystem(val nodes: List[(String, Int)]) extends Actor {
           awaitingResponses -= message.header.responseTo
           _sender ! message
         }
-        case None => log("oups. " + message.header.responseTo + " not found! complete message is " + message)
+        case None => {
+          log("oups. " + message.header.responseTo + " not found! complete message is " + message)
+          log("maybe it's for myself?") // check if the message is a replset msg. And replace replstatus by ismaster
+          val toAdd = parseForRSNodes(DefaultBSONReaderHandler.handle(message.reply, message.documents).next).get
+          for(node <- toAdd) {
+            node._3 match {
+              case PRIMARY => {
+                isElecting = false
+                primary = Some(nodeManager.addNode(node._1, node._2))
+                log("ok, found primary, sending all the queued messages...")
+                queuedMessages.dequeueAll( _ => true).foreach {
+                  case (actorRef, Left( (message, writeConcern) )) => primary.get tell ( (message, writeConcern), actorRef )
+                  case (actorRef, Right(message)) => primary.get tell (message, actorRef)
+                }
+              }
+              case SECONDARY => nodeManager.addNode(node._1, node._2)
+              case _ =>
+            }
+          }
+          log("received " + toAdd)
+          log("added nodes, now nodes are : " + nodeManager)
+        }
       }
     }
     case _ => log("not supported")
@@ -150,11 +212,51 @@ class MongoDBSystem(val nodes: List[(String, Int)]) extends Actor {
 
   def log(s: String) = println("MongoDBSystem [" + self.path + "] : " + s)
 
-  def resolveReceiver(message: WritableMessage[WritableOp]) :ActorRef = message.connectionId.map{ id => context.actorFor(id.toString) }.getOrElse(secondaries)
+  def secondaryOK(message: WritableMessage[WritableOp]) = !message.op.requiresPrimary && (message.op match {
+    case query: Query => (query.flags & QueryFlags.SlaveOk) != 0
+    case _ :KillCursors => true
+    case _ => false
+  })
+
+  def elect = {
+    log("starting electing process...")
+    isElecting = true
+    for(node <- nodeManager.all) {
+      node ! ReplStatus.makeWritableMessage
+    }
+  }
+
+  sealed trait NodeState
+  object PRIMARY extends NodeState
+  object SECONDARY extends NodeState
+  object ANY_OTHER_STATE extends NodeState // well, we dont care for other states right now
+
+  def parseForRSNodes(document: BSONIterator) :Option[List[(String, Int, NodeState)]]= {
+    val map = document.mapped
+    println(map)
+    map.get("members").flatMap {
+      case BSONArray(_, b) => {
+        val it: Iterator[(String, Int, NodeState)] = for(o <- DefaultBSONIterator(b)) yield {
+          val member = DefaultBSONIterator(o.asInstanceOf[BSONDocument].value).mapped
+          val (name, port) = member.get("name").get.asInstanceOf[BSONString].value.span(_ != ':')
+          val p2 = port.drop(1)
+          (name, port.drop(1).toInt, member.get("state").get.asInstanceOf[BSONInteger].value match {
+            case 1 => PRIMARY
+            case 2 => SECONDARY
+            case _ => ANY_OTHER_STATE
+          })
+        }
+        Some(it.toList)
+      }
+      case _ => None
+    }
+  }
+
+  def resolveReceiver(message: WritableMessage[WritableOp]) :ActorRef = message.connectionId.map{ id => context.actorFor(id.toString) }.getOrElse(nodeManager.pick)
 }
 
 class MongoConnection(
-  mongosystem: ActorRef
+  val mongosystem: ActorRef
 ) {
   /** write an op and wait for db response */
   def ask(message: WritableMessage[WritableOp])(implicit timeout: Timeout) :Future[ReadReply] = {

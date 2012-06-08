@@ -43,8 +43,9 @@ case class RichBuffer(buffer: ChannelBuffer) {
     writable writeTo buffer
   }
   def readUTF8 :String = {
-    val bytes = new Array[Byte](buffer.readInt)
+    val bytes = new Array[Byte](buffer.readInt - 1)
     buffer.readBytes(bytes)
+    buffer.readByte
     new String(bytes, "UTF-8")
   }
   def readArray(n: Int) :Array[Byte] = {
