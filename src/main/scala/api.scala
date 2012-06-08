@@ -165,9 +165,19 @@ object Cursor {
         new AkkaPromise(futureCursor.get.map { cursor =>
           println("redeemed from first cursor")
           currentCursor = Some(cursor)
-          Some(cursor.iterator.next)
+          if(cursor.iterator.hasNext) {
+            println("has result")
+            Some(cursor.iterator.next)
+          }
+          else {
+            println("no result")
+            None
+          }
         })
-      } else PlayPromise.pure(None)
+      } else {
+        println("Nothing to enumerate")
+        PlayPromise.pure(None)
+      }
     }
   }
 }
