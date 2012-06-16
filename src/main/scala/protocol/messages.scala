@@ -50,7 +50,7 @@ case class Count(
   }
 }
 
-case class IsMaster(db: String) extends Command {
+case class IsMaster(db: String = "admin") extends Command {
   def makeDocuments = Bson(BSONInteger("isMaster", 1))
 }
 

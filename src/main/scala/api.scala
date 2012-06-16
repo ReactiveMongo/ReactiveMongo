@@ -33,7 +33,7 @@ case class Collection(
   }
 
   def find[T, U, V](query: T, fields: Option[U], skip: Int, limit: Int)(implicit writer: BSONWriter[T], writer2: BSONWriter[U], handler: BSONReaderHandler, reader: BSONReader[V]) :Future[Cursor[V]] = {
-    val op = Query(0, fullCollectionName, skip, 19)
+    val op = Query(0, fullCollectionName, skip, 10) // TODO: test-purpose number of docs to return, remove
     val bson = writer.write(query)
     if(fields.isDefined)
       bson.writeBytes(writer2.write(fields.get))
@@ -123,7 +123,7 @@ class Cursor[T](response: ReadReply, connection: MongoConnection, query: Query)(
     if(hasNext) {
       println("cursor: call next")
       val op = GetMore(query.fullCollectionName, query.numberToReturn, response.reply.cursorID)
-      Some(connection.ask(WritableMessage(op)).map { response => new Cursor(response, connection, query) })
+      Some(connection.ask(WritableMessage(op).copy(channelIdHint=Some(response.info.channelId))).map { response => new Cursor(response, connection, query) })
     } else None
   }
   def hasNext :Boolean = response.reply.cursorID != 0
@@ -191,7 +191,7 @@ object Test {
   implicit val timeout = Timeout(5 seconds)
 
   def test = {
-    val connection = MongoConnection(List("localhost" -> 27018))
+    val connection = MongoConnection(List("localhost" -> 27016))
     val db = DB("plugin", connection)
     val collection = db("acoll")
     /*val query = new Bson()//new HashMap[Object, Object]()
@@ -220,17 +220,25 @@ object Test {
     /*Cursor.enumerate(Some(future))(Iteratee.foreach { t =>
       println("fetched t=" + DefaultBSONIterator.pretty(t))
     })*/
-    collection.insert(toSave, GetLastError(false, None, false)).onComplete {
+    /*collection.insert(toSave, GetLastError(false, None, false)).onComplete {
       case Left(t) => println("error!, throwable = " + t)
       case Right(le) => {
         println("insertion " + (if(le.inError) "failed" else "succeeded") + ": " + le.stringify)
       }
+    }*/
+    for(i <- 0 until 1) {
+      println()
+      Cursor.enumerate(Some(collection.find(new Bson(), None, 0, 0)))(Iteratee.foreach { t =>
+        println("fetched t=" + DefaultBSONIterator.pretty(t))
+        //print(".")
+      })
+      println()
     }
     MongoConnection.system.scheduler.scheduleOnce(7000 milliseconds) {
       println("sending scheduled message...")
       //connection.mongosystem ! IsMaster("plugin").makeWritableMessage
       Cursor.enumerate(Some(collection.find(new Bson(), None, 0, 0)))(Iteratee.foreach { t =>
-        println("fetched t=" + DefaultBSONIterator.pretty(t))
+        //println("fetched t=" + DefaultBSONIterator.pretty(t))
       })
     }
 

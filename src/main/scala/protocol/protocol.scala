@@ -53,7 +53,7 @@ case class WritableMessage[+T <: WritableOp] (
   responseTo: Int,
   op: T,
   documents: ChannelBuffer,
-  connectionId: Option[Int] = None
+  channelIdHint: Option[Int] = None
 ) extends ChannelBufferWritable {
   override val writeTo = { buffer: ChannelBuffer => {
     buffer write header
@@ -110,7 +110,7 @@ object ExplainedError {
 }
 
 case class ReadReplyInfo(
-  channelID: Int,
+  channelId: Int,
   localAddress: String,
   remoteAddress: String)
 
