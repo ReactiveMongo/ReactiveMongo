@@ -4,7 +4,7 @@ import akka.dispatch.Future
 import akka.util.Timeout
 import akka.util.duration._
 
-import org.asyncmongo.actors.MongoConnection
+import org.asyncmongo.actors.{MongoConnection, LastError}
 import org.asyncmongo.bson._
 import org.asyncmongo.handlers._
 import org.asyncmongo.protocol._
@@ -24,7 +24,7 @@ case class Collection(
 
   def count :Future[Int] = {
     import DefaultBSONHandlers._
-    connection.ask(Count(dbName, collectionName).makeWritableMessage).map { response =>
+    connection.ask(Count(dbName, collectionName).maker).map { response =>
       DefaultBSONReaderHandler.handle(response.reply, response.documents).next.find(_.name == "n").get match {
         case BSONDouble(_, n) => n.toInt
         case _ => 0
@@ -37,7 +37,7 @@ case class Collection(
     val bson = writer.write(query)
     if(fields.isDefined)
       bson.writeBytes(writer2.write(fields.get))
-    val message = WritableMessage(op, bson)
+    val message = RequestMaker(op, bson)
     
     connection.ask(message).map { response =>
       new Cursor(response, connection, op)
@@ -47,14 +47,14 @@ case class Collection(
   def insert[T](document: T)(implicit writer: BSONWriter[T]) :Unit = {
     val op = Insert(0, fullCollectionName)
     val bson = writer.write(document)
-    val message = WritableMessage(op, bson)
+    val message = RequestMaker(op, bson)
     connection.send(message)
   }
   
   def insert[T](document: T, writeConcern: GetLastError)(implicit writer: BSONWriter[T], handler: BSONReaderHandler) :Future[LastError] = {
     val op = Insert(0, fullCollectionName)
     val bson = writer.write(document)
-    val message = WritableMessage(op, bson)
+    val message = RequestMaker(op, bson)
     connection.ask(message, writeConcern).map { response =>
       println(response.reply.stringify)
       import DefaultBSONHandlers._
@@ -67,68 +67,32 @@ case class Collection(
   def remove[T](query: T, firstMatchOnly: Boolean)(implicit writer: BSONWriter[T]) : Unit = {
     val op = Delete(fullCollectionName, if(firstMatchOnly) 1 else 0)
     val bson = writer.write(query)
-    val message = WritableMessage(op, bson)
+    val message = RequestMaker(op, bson)
     connection.send(message)
   }
   
   def remove[T, U](query: T, writeConcern: GetLastError, firstMatchOnly: Boolean = false)(implicit writer: BSONWriter[T], handler: BSONReaderHandler, reader: BSONReader[U], m: Manifest[U]) :Future[U] = {
     val op = Delete(fullCollectionName, if(firstMatchOnly) 1 else 0)
     val bson = writer.write(query)
-    val message = WritableMessage(op, bson)
+    val message = RequestMaker(op, bson)
     connection.ask(message, writeConcern).map { response =>
       handler.handle(response.reply, response.documents).next
     }
   }
 }
 
-case class LastError(
-  ok: Boolean,
-  err: Option[String],
-  code: Option[Int],
-  message: Option[String],
-  original: Map[String, BSONElement]
-) {
-  lazy val inError :Boolean = !ok || err.isDefined
-  lazy val stringify :String = toString + " [inError: " + inError + "]"
-}
-
-object LastError {
-  def apply(bson: BSONIterator) :LastError = {
-    val mapped = bson.mapped
-    LastError(
-      mapped.get("ok").flatMap {
-        case d: BSONDouble => Some(true)
-        case _ => None
-      }.getOrElse(true),
-      mapped.get("err").flatMap {
-        case s: BSONString => Some(s.value)
-        case _ => None
-      },
-      mapped.get("code").flatMap {
-        case i: BSONInteger => Some(i.value)
-        case _ => None
-      },
-      mapped.get("errmsg").flatMap {
-        case s: BSONString => Some(s.value)
-        case _ => None
-      },
-      mapped
-    )
-  }
-}
-
-class Cursor[T](response: ReadReply, connection: MongoConnection, query: Query)(implicit handler: BSONReaderHandler, reader: BSONReader[T], timeout :Timeout) {
+class Cursor[T](response: Response, connection: MongoConnection, query: Query)(implicit handler: BSONReaderHandler, reader: BSONReader[T], timeout :Timeout) {
   lazy val iterator :Iterator[T] = handler.handle(response.reply, response.documents)
   def next :Option[Future[Cursor[T]]] = {
     if(hasNext) {
       println("cursor: call next")
       val op = GetMore(query.fullCollectionName, query.numberToReturn, response.reply.cursorID)
-      Some(connection.ask(WritableMessage(op).copy(channelIdHint=Some(response.info.channelId))).map { response => new Cursor(response, connection, query) })
+      Some(connection.ask(RequestMaker(op).copy(channelIdHint=Some(response.info.channelId))).map { response => new Cursor(response, connection, query) })
     } else None
   }
   def hasNext :Boolean = response.reply.cursorID != 0
   def close = if(hasNext) {
-    connection.send(WritableMessage(KillCursors(Set(response.reply.cursorID))))
+    connection.send(RequestMaker(KillCursors(Set(response.reply.cursorID))))
   }
 }
 
@@ -191,11 +155,11 @@ object Test {
   implicit val timeout = Timeout(5 seconds)
 
   def test = {
-    val connection = MongoConnection(List("localhost" -> 27016))
+    val connection = MongoConnection(List("localhost:27016"))
     val db = DB("plugin", connection)
     val collection = db("acoll")
     /*val query = new Bson()//new HashMap[Object, Object]()
-    connection.ask(WritableMessage(GetMore("plugin.acoll", 2, 12))).onComplete {
+    connection.ask(Request(GetMore("plugin.acoll", 2, 12))).onComplete {
       case Right(response) =>
       println()
       println("!! \t Wrong GetMore gave " + response.reply.stringify + "\n\t\t ==> " + response.error)
@@ -220,13 +184,27 @@ object Test {
     /*Cursor.enumerate(Some(future))(Iteratee.foreach { t =>
       println("fetched t=" + DefaultBSONIterator.pretty(t))
     })*/
-    /*collection.insert(toSave, GetLastError(false, None, false)).onComplete {
-      case Left(t) => println("error!, throwable = " + t)
-      case Right(le) => {
-        println("insertion " + (if(le.inError) "failed" else "succeeded") + ": " + le.stringify)
-      }
-    }*/
-    for(i <- 0 until 1) {
+      MongoConnection.system.scheduler.scheduleOnce(2000 milliseconds) {
+        collection.insert(toSave, GetLastError("plugin", false, None, false)).onComplete {
+          case Left(t) => { println("error!, throwable\n\t\t"); t.printStackTrace; println("\n\t for insert=" + toSave) }
+          case Right(le) => {
+            println("insertion " + (if(le.inError) "failed" else "succeeded") + ": " + le.stringify)
+          }
+        }
+        connection.ask(ReplStatus.maker).onComplete {
+          case Left(t) => println("error!, throwable = " + t)
+          case Right(message) => {
+            println("ReplStatus " + DefaultBSONIterator.pretty(DefaultBSONReaderHandler.handle(message.reply, message.documents).next))
+          }
+        }
+        connection.ask(IsMaster().maker).onComplete {
+          case Left(t) => println("error!, throwable = " + t)
+          case Right(message) => {
+            println("IsMaster " + DefaultBSONIterator.pretty(DefaultBSONReaderHandler.handle(message.reply, message.documents).next))
+          }
+        }
+    }
+    /*for(i <- 0 until 1) {
       println()
       Cursor.enumerate(Some(collection.find(new Bson(), None, 0, 0)))(Iteratee.foreach { t =>
         println("fetched t=" + DefaultBSONIterator.pretty(t))
@@ -236,11 +214,11 @@ object Test {
     }
     MongoConnection.system.scheduler.scheduleOnce(7000 milliseconds) {
       println("sending scheduled message...")
-      //connection.mongosystem ! IsMaster("plugin").makeWritableMessage
+      //connection.mongosystem ! IsMaster("plugin").makeRequest
       Cursor.enumerate(Some(collection.find(new Bson(), None, 0, 0)))(Iteratee.foreach { t =>
         //println("fetched t=" + DefaultBSONIterator.pretty(t))
       })
-    }
+    }*/
 
   }
 }

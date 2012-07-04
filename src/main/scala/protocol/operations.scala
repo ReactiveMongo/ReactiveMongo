@@ -9,7 +9,7 @@ sealed trait Op {
   val code :Int
 }
 
-sealed trait WritableOp extends Op with ChannelBufferWritable {
+sealed trait RequestOp extends Op with ChannelBufferWritable {
   val expectsResponse :Boolean = false
   val requiresPrimary :Boolean = false
 }
@@ -45,7 +45,7 @@ object Reply extends ChannelBufferReadable[Reply] {
 case class Update(
   fullCollectionName: String,
   flags: Int
-) extends WritableOp {
+) extends RequestOp {
   override val code = 2001
   override val writeTo = writeTupleToBuffer3( (0, fullCollectionName, flags) ) _
   override def size = 4 /* int32 = ZERO */ + 4 + fullCollectionName.length + 1
@@ -55,7 +55,7 @@ case class Update(
 case class Insert(
   flags: Int,
   fullCollectionName: String
-) extends WritableOp {
+) extends RequestOp {
   override val code = 2002
   override val writeTo = writeTupleToBuffer2( (flags, fullCollectionName) ) _
   override def size = 4 + fullCollectionName.length + 1
@@ -67,7 +67,7 @@ case class Query(
   fullCollectionName: String,
   numberToSkip: Int,
   numberToReturn: Int
-) extends WritableOp {
+) extends RequestOp {
   override val expectsResponse = true
   override val code = 2004
   override val writeTo = writeTupleToBuffer4( (flags, fullCollectionName, numberToSkip, numberToReturn) ) _
@@ -88,7 +88,7 @@ case class GetMore(
   fullCollectionName: String,
   numberToReturn: Int,
   cursorID: Long
-) extends WritableOp {
+) extends RequestOp {
   override val expectsResponse = true
   override val code = 2005
   override val writeTo = writeTupleToBuffer4( (0, fullCollectionName, numberToReturn, cursorID) ) _
@@ -98,7 +98,7 @@ case class GetMore(
 case class Delete(
   fullCollectionName: String,
   flags: Int
-) extends WritableOp {
+) extends RequestOp {
   override val code = 2006
   override val writeTo = writeTupleToBuffer3( (0, fullCollectionName, flags) ) _
   override def size = 4 /* int32 ZERO */ + fullCollectionName.length + 1 + 4
@@ -109,7 +109,7 @@ import org.asyncmongo.utils.RichBuffer._
 
 case class KillCursors(
   cursorIDs: Set[Long]
-) extends WritableOp {
+) extends RequestOp {
   override val code = 2007
   override val writeTo = { buffer: ChannelBuffer =>
     buffer writeInt 0

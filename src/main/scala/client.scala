@@ -21,18 +21,18 @@ object Client {
   implicit val timeout = Timeout(5 seconds)
 
   def test = {
-    val connection = MongoConnection( List( "localhost" -> 27017 ) )
-    //connection.ask(WritableMessage(KillCursors(Set(900))))
-    def p(name: String) :Either[Throwable, ReadReply] => Unit = {
+    val connection = MongoConnection( List( "localhost:27017" ) )
+    //connection.ask(Request(KillCursors(Set(900))))
+    def p(name: String) :Either[Throwable, Response] => Unit = {
       case Right(reply) => {
         println(name + ": \n" + bson.DefaultBSONIterator.pretty(bson.DefaultBSONIterator(reply.documents)))
       }
       case Left(error) => throw error
     }
-    connection.ask(messages.IsMaster("plugin").makeWritableMessage).onComplete(p("IsMaster"))
-    connection.ask(messages.Status("plugin").makeWritableMessage).onComplete(p("Status"))
-    connection.ask(messages.ReplStatus.makeWritableMessage).onComplete(p("ReplStatus"))
-    //connection.ask(WritableMessage(KillCursors(Set(900)), Array[Byte](0)))
+    connection.ask(messages.IsMaster("plugin").maker).onComplete(p("IsMaster"))
+    connection.ask(messages.Status("plugin").maker).onComplete(p("Status"))
+    connection.ask(messages.ReplStatus.maker).onComplete(p("ReplStatus"))
+    //connection.ask(Request(KillCursors(Set(900)), Array[Byte](0)))
     /*connection send list
     connection send insert
     connection ask(insert, GetLastError())
@@ -75,7 +75,7 @@ object Client {
     val random = (new java.util.Random()).nextInt(Integer.MAX_VALUE)
     println("generated list request #" + random)
 
-    WritableMessage(random, 0, Insert(0, "plugin.acoll"), baos.toByteArray)
+    Request(random, 0, Insert(0, "plugin.acoll"), baos.toByteArray)
   }
 
   def list = {
@@ -91,6 +91,6 @@ object Client {
     val random = (new java.util.Random()).nextInt(Integer.MAX_VALUE)
     println("generated list request #" + random)
 
-    WritableMessage(random, 0, Query(0, "plugin.acoll", 0, 0), baos.toByteArray)
+    Request(random, 0, Query(0, "plugin.acoll", 0, 0), baos.toByteArray)
   }
 }
