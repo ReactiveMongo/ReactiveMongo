@@ -64,6 +64,24 @@ case class Status(db: String) extends Command {
   def makeDocuments = Bson(BSONInteger("serverStatus", 1))
 }
 
+case class Getnonce(db: String) extends Command {
+  def makeDocuments = Bson(BSONInteger("getnonce", 1))
+}
+
+case class GetnonceResult(nonce: String)
+
+object GetnonceResult extends CommandResult[GetnonceResult]{
+  def apply(response: Response) = GetnonceResult(DefaultBSONHandlers.parse(response).next().mapped.get("nonce").get.asInstanceOf[BSONString].value)
+}
+
+case class Authenticate(db: String, user: String, password: String, nonce: String) extends Command {
+  import Converters._
+  lazy val pwdDigest = md5Hex(user + ":mongo:" + password)
+  lazy val key = md5Hex(nonce + user + pwdDigest)
+
+  def makeDocuments = Bson(BSONInteger("authenticate", 1)).write(BSONString("user", user)).write(BSONString("nonce", nonce)).write(BSONString("key", key))
+}
+
 case class IsMaster(db: String = "admin") extends Command {
   def makeDocuments = Bson(BSONInteger("isMaster", 1))
 }

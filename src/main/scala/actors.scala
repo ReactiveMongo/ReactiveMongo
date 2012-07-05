@@ -10,21 +10,30 @@ import akka.util.Timeout
 import org.asyncmongo.bson._
 import org.asyncmongo.handlers.DefaultBSONHandlers._
 import org.asyncmongo.protocol._
-import org.asyncmongo.protocol.messages._
+import org.asyncmongo.protocol.ChannelState._
+import org.asyncmongo.protocol.messages.{Authenticate => AuthenticateCommand, _}
 import org.asyncmongo.protocol.NodeState._
 import java.net.InetSocketAddress
 import java.nio.ByteOrder
 import org.jboss.netty.bootstrap._
 import org.jboss.netty.buffer._
-import org.jboss.netty.channel._
+import org.jboss.netty.channel.{Channels, Channel, ChannelPipeline}
 import org.jboss.netty.channel.socket.nio._
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.ObservableBuffer
 import org.asyncmongo.handlers.DefaultBSONHandlers
 
+case class MongoChannel(channel: Channel, state: ChannelState) {
+  lazy val useable = state.isInstanceOf[Useable]
+}
+
+object MongoChannel {
+  implicit def mongoChannelToChannel(mc: MongoChannel) :Channel = mc.channel
+}
+
 case class Node(
   name: String,
-  channels: IndexedSeq[Channel],
+  channels: IndexedSeq[MongoChannel],
   state: NodeState,
   mongoId: Option[Int]
 ) {
@@ -36,11 +45,15 @@ case class Node(
       case _ => 27017
     })
   }
-  
+
+  lazy val isQueryable :Boolean = (state == PRIMARY || state == SECONDARY) && queryable.size > 0
+
+  lazy val queryable :IndexedSeq[MongoChannel] = channels.filter(_.useable == true)
+
   def connect() :Unit = channels.foreach(channel => if(!channel.isConnected) channel.connect(new InetSocketAddress(host, port)))
-  
+
   def disconnect() :Unit = channels.foreach(channel => if(channel.isConnected) channel.disconnect)
-  
+
   def close() :Unit = channels.foreach(channel => if(channel.isOpen) channel.close)
 }
 
@@ -49,7 +62,7 @@ object Node {
   def apply(name: String, state: NodeState) :Node = new Node(name, Vector.empty, state, None)
   def apply(name: String, nbConnections: Int, creator: ActorRef) :Node = {
     val node = Node(name)
-    node.copy(channels = for(i <- 0 until nbConnections) yield ChannelFactory.create(node.host, node.port, creator))
+    node.copy(channels = for(i <- 0 until nbConnections) yield MongoChannel(ChannelFactory.create(node.host, node.port, creator), NotConnected))
   }
 }
 
@@ -60,7 +73,7 @@ case class NodeSet(
 ) {
   def connected :IndexedSeq[Node] = nodes.filter(node => node.state != NOT_CONNECTED)
   
-  def queryable :IndexedSeq[Node] = nodes.filter(node => node.state == PRIMARY || node.state == SECONDARY)
+  def queryable :IndexedSeq[Node] = nodes.filter(_.isQueryable)
   
   def primary :Option[Node] = nodes.find(_.state == PRIMARY)
   
@@ -121,7 +134,7 @@ class RoundRobiner[A](val subject: IndexedSeq[A], private var i: Int = 0) {
   } else None
 }
 
-case class NodeWrapper(node: Node) extends RoundRobiner(node.channels) {
+case class NodeWrapper(node: Node) extends RoundRobiner(node.queryable) {
   def send(message :Request, writeConcern :Request) {
     pick.map { channel =>
       log("connection " + channel.getId + " will send Request " + message + " followed by writeConcern " + writeConcern)
@@ -140,7 +153,7 @@ case class NodeWrapper(node: Node) extends RoundRobiner(node.channels) {
 
 case class NodeSetManager(nodeSet: NodeSet) extends RoundRobiner(nodeSet.queryable.map { node => NodeWrapper(node)}) {
   def pickNode :Option[Node] = pick.map(_.node)
-  def pickChannel :Option[Channel] = pick.flatMap(_.pick)
+  def pickChannel :Option[Channel] = pick.flatMap(_.pick.map(_.channel))
   
   def getNodeWrapperByChannelId(channelId: Int) = subject.find(_.node.channels.exists(_.getId == channelId))
   
@@ -240,11 +253,13 @@ case object Init
 case object ConnectAll
 case object RefreshAllNodes
 case object Close
+case class Authenticate(db: String, user: String, password: String)
+
 case class Connected(channelId: Int)
 case class Disconnected(channelId: Int)
 
 class MongoDBSystem(seeds: List[String] = List("localhost:27017")) extends Actor {
-  val requestIdIterator :Iterator[Int] = Iterator.iterate(1000)(i => if(i == Int.MaxValue) 1000 else i + 1)
+  val requestIdIterator :Iterator[Int] = Iterator.iterate(3000)(i => if(i == Int.MaxValue) 3000 else i + 1)
   def requestId :Int = requestIdIterator.next
 
   // todo: if primary changes again while sending queued messages ? -> don't care, an error will be sent as the result of the promise
@@ -303,33 +318,6 @@ class MongoDBSystem(seeds: List[String] = List("localhost:27017")) extends Actor
       val id = requestId
       receiveCheckedRequest(requestMaker(id), writeConcernMaker(id))
     }
-    case response: Response if response.header.responseTo >= 1000 => {
-      awaitingResponses.get(response.header.responseTo) match {
-        case Some(AwaitingResponse(_, _sender, isGetLastError)) => {
-          log("Got a response from " + response.info.channelId + "! Will give back message="+response + " to sender " + _sender)
-          awaitingResponses -= response.header.responseTo
-          if(isGetLastError) {
-            log("{" + response.header.responseTo + "} it's a getlasterror")
-            // todo, for now rewinding buffer at original index
-            val ridx = response.documents.readerIndex
-            val lastError = LastError(DefaultBSONReaderHandler.handle(response.reply, response.documents).next)
-            if(lastError.code.isDefined && isNotPrimaryErrorCode(lastError.code.get)) {
-              log("{" + response.header.responseTo + "} sending a failure...")
-              _sender ! Failure(DefaultMongoError(lastError.message, lastError.code))
-            } else {
-              response.documents.readerIndex(ridx)
-              _sender ! response
-            }
-          } else {
-            log("{" + response.header.responseTo + "} sending a success!")
-            _sender ! response
-          }
-        }
-        case None => {
-          log("oups. " + response.header.responseTo + " not found! complete message is " + response)
-        }
-      }
-    }
     
     // monitor
     case ConnectAll => {
@@ -345,20 +333,25 @@ class MongoDBSystem(seeds: List[String] = List("localhost:27017")) extends Actor
       log("RefreshAllNodes Job running... current state is: " + state)
       nodeSetManager.nodeSet.nodes.foreach { node =>
         log("try to refresh " + node.name)
-        node.channels.find(_.isConnected).map(_.write(IsMaster().maker(monitoringRequestId)))
+        node.channels.find(_.isConnected).map(_.write(IsMaster().maker(isMasterRequestId)))
       }
     }
     case Connected(channelId) => {
       if(seedSet.isDefined) {
         seedSet = seedSet.map(_.updateByChannelId(channelId, node => node.copy(state = CONNECTED)))
-        seedSet.map(_.findNodeByChannelId(channelId).get.channels(0).write(IsMaster().maker(monitoringRequestId)))
+        seedSet.map(_.findNodeByChannelId(channelId).get.channels(0).write(IsMaster().maker(isMasterRequestId)))
       } else {
-        nodeSetManager = NodeSetManager(nodeSetManager.nodeSet.updateByChannelId(channelId, node => node.state match {
-          case state: MongoNodeState => node
-          case _ => {
-            node.channels.find(_.getId == channelId).map(_.write(IsMaster().maker(monitoringRequestId)))
-            node.copy(state = CONNECTED)
-          }
+        nodeSetManager = NodeSetManager(nodeSetManager.nodeSet.updateByChannelId(channelId, node => {
+            //node.channels.find(_.getId == channelId).map(_.write(IsMaster().maker(monitoringRequestId)))
+          node.copy(channels = node.channels.map { channel =>
+            if(channel.getId == channelId) {
+              channel.write(IsMaster().maker(isMasterRequestId))
+              channel.copy(state = Useable(None))
+            } else channel
+          }, state = node.state match {
+            case _: MongoNodeState => node.state
+            case _ => CONNECTED
+          })
         }))
         //nodeSetManager.getNodeWrapperByChannelId(channelId).map(_.send(message))
       }
@@ -371,6 +364,16 @@ class MongoDBSystem(seeds: List[String] = List("localhost:27017")) extends Actor
       }))
       log(channelId + " is disconnected")
     }
+    case Authenticate(db, user, password) => {
+      log("authenticate process starts...")
+      nodeSetManager = NodeSetManager(nodeSetManager.nodeSet.updateAll(node =>
+        node.copy(channels = node.channels.map { channel =>
+          channel.write(Getnonce(db).maker(getNonceRequestId))
+          channel.copy(state = Authenticating(db, user, password, None))
+        })
+      ))
+    }
+    // isMaster response
     case response: Response if response.header.responseTo < 1000 => {
       val isMaster = IsMasterResponse(response)
       nodeSetManager = if(isMaster.hosts.isDefined) {// then it's a ReplicaSet
@@ -393,7 +396,63 @@ class MongoDBSystem(seeds: List[String] = List("localhost:27017")) extends Actor
         println("Init is done")
       }
     }
+    // getnonce response
+    case response: Response if response.header.responseTo >= 1000 && response.header.responseTo < 2000 => {
+      val getnonce = GetnonceResult(response)
+      log("got nonce for channel " + response.info.channelId + ": " + getnonce.nonce)
+      nodeSetManager = NodeSetManager(nodeSetManager.nodeSet.updateByChannelId(response.info.channelId, node =>
+        node.copy(channels = node.channels.map { channel =>
+          if(channel.getId == response.info.channelId) {
+            val authenticating = channel.state.asInstanceOf[Authenticating]
+            channel.write(AuthenticateCommand(authenticating.db, authenticating.user, authenticating.password, getnonce.nonce).maker(authenticateRequestId))
+            channel.copy(state = authenticating.copy(nonce = Some(getnonce.nonce)))
+          } else channel
+        })
+      ))
+    }
+    // authenticate response
+    case response: Response if response.header.responseTo >= 2000 && response.header.responseTo < 3000 => {
+      nodeSetManager = NodeSetManager(nodeSetManager.nodeSet.updateByChannelId(response.info.channelId, node =>
+        node.copy(channels = node.channels.map { channel =>
+          if(channel.getId == response.info.channelId) {
+            val authenticating = channel.state.asInstanceOf[Authenticating]
+            log("channel " + channel.channel + " is authenticated with " + authenticating + "!")
+            channel.copy(state = Useable(None))
+          } else channel
+        })
+      ))
+    }
     
+    // any other response
+    case response: Response if response.header.responseTo >= 3000 => {
+      awaitingResponses.get(response.header.responseTo) match {
+        case Some(AwaitingResponse(_, _sender, isGetLastError)) => {
+          log("Got a response from " + response.info.channelId + "! Will give back message="+response + " to sender " + _sender)
+          awaitingResponses -= response.header.responseTo
+          if(isGetLastError) {
+            log("{" + response.header.responseTo + "} it's a getlasterror")
+            // todo, for now rewinding buffer at original index
+            val ridx = response.documents.readerIndex
+            val lastError = LastError(DefaultBSONReaderHandler.handle(response.reply, response.documents).next)
+            if(lastError.code.isDefined && isNotPrimaryErrorCode(lastError.code.get)) {
+              log("{" + response.header.responseTo + "} sending a failure...")
+              self ! RefreshAllNodes
+              nodeSetManager = NodeSetManager(nodeSetManager.nodeSet.updateAll(node => if(node.state == PRIMARY) node.copy(state = UNKNOWN) else node))
+              _sender ! Failure(DefaultMongoError(lastError.message, lastError.code))
+            } else {
+              response.documents.readerIndex(ridx)
+              _sender ! response
+            }
+          } else {
+            log("{" + response.header.responseTo + "} sending a success!")
+            _sender ! response
+          }
+        }
+        case None => {
+          log("oups. " + response.header.responseTo + " not found! complete message is " + response)
+        }
+      }
+    }
     case a @ _ => log("not supported " + a)
   }
   
@@ -403,9 +462,17 @@ class MongoDBSystem(seeds: List[String] = List("localhost:27017")) extends Actor
   
   var nodeSetManager = NodeSetManager(NodeSet(None, None, Vector.empty))
   
-  // all requestIds <= 999 are for monitors
-  val monitoringIdIterator :Iterator[Int] = Iterator.iterate(0)(i => if(i == 999) 0 else i + 1)
-  def monitoringRequestId = monitoringIdIterator.next
+  // all requestIds [0, 1000[ are for isMaster messages
+  val isMasterRequestIdIterator :Iterator[Int] = Iterator.iterate(0)(i => if(i == 1000) 0 else i + 1)
+  def isMasterRequestId = isMasterRequestIdIterator.next
+  
+  // all requestIds [1000, 2000[ are for getnonce messages
+  val getNonceRequestIdIterator :Iterator[Int] = Iterator.iterate(1000)(i => if(i == 2000) 1000 else i + 1)
+  def getNonceRequestId = getNonceRequestIdIterator.next
+  
+  // all requestIds [2000, 3000[ are for authenticate messages
+  val authenticateRequestIdIterator :Iterator[Int] = Iterator.iterate(2000)(i => if(i == 3000) 2000 else i + 1)
+  def authenticateRequestId = authenticateRequestIdIterator.next
     
   def createNeededChannels(nodeSet: NodeSet) :NodeSet = {
     nodeSet.copy(nodes = nodeSet.nodes.foldLeft(Vector.empty[Node]) { (nodes, node) =>
@@ -416,12 +483,13 @@ class MongoDBSystem(seeds: List[String] = List("localhost:27017")) extends Actor
   def createNeededChannels(node: Node) :Node = {
     node.copy(channels = node.channels ++ (
       for(i <- 0 until (3 - node.channels.size))
-        yield ChannelFactory.create(node.host, node.port, self)))
+        yield MongoChannel(ChannelFactory.create(node.host, node.port, self), NotConnected))
+    )
   }
   
   def makeChannels(node: Node) :Node = {
     if(node.channels.size < 3) {
-      node.copy(channels = node.channels.++(for(i <- 0 until (3 - node.channels.size)) yield ChannelFactory.create(node.host, node.port, self)))
+      node.copy(channels = node.channels.++(for(i <- 0 until (3 - node.channels.size)) yield MongoChannel(ChannelFactory.create(node.host, node.port, self), NotConnected)))
     } else node
   }
   // <-- monitor
@@ -476,6 +544,11 @@ class MongoConnection(
 
   /** write a no-response op without getting a future */
   def send(message: RequestMaker) = mongosystem ! message
+
+  /** authenticate on the given db. Must return a future. TODO */
+  def authenticate(db: String, user: String, password: String) :Unit = {
+    mongosystem ! Authenticate(db, user, password)
+  }
 
   def stop = MongoConnection.system.stop(mongosystem)
 }

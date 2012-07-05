@@ -12,6 +12,8 @@ import org.asyncmongo.protocol.messages._
 
 case class DB(dbName: String, connection: MongoConnection, implicit val timeout :Timeout = Timeout(5 seconds)) {
   def apply(name: String) :Collection = Collection(dbName, name, connection, timeout)
+  /* TODO: must send a future... */
+  def authenticate(user: String, password: String) :Unit = connection.authenticate(dbName, user, password)
 }
 
 case class Collection(
@@ -157,6 +159,9 @@ object Test {
   def test = {
     val connection = MongoConnection(List("localhost:27016"))
     val db = DB("plugin", connection)
+    MongoConnection.system.scheduler.scheduleOnce(1000 milliseconds) {
+      db.authenticate("jack", "toto")
+    }
     val collection = db("acoll")
     /*val query = new Bson()//new HashMap[Object, Object]()
     connection.ask(Request(GetMore("plugin.acoll", 2, 12))).onComplete {

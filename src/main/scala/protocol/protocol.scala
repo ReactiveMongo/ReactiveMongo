@@ -251,3 +251,11 @@ object NodeState {
   case object NOT_CONNECTED extends NodeState
   case object CONNECTED extends NodeState
 }
+
+sealed trait ChannelState
+object ChannelState {
+  case object Closed extends ChannelState
+  case object NotConnected extends ChannelState
+  case class Useable(logged: Option[String]) extends ChannelState
+  case class Authenticating(db: String, user: String, password: String, nonce: Option[String]) extends ChannelState
+}

@@ -32,6 +32,9 @@ object Converters {
     }
     bytes
   }
+
+  def md5Hex(s: String) :String =
+    hex2Str(java.security.MessageDigest.getInstance("MD5").digest(s.getBytes))
 }
 
 case class RichBuffer(buffer: ChannelBuffer) {
