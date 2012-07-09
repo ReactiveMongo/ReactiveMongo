@@ -3,12 +3,12 @@ package org.asyncmongo.api
 import akka.dispatch.Future
 import akka.util.Timeout
 import akka.util.duration._
-
-import org.asyncmongo.actors.{MongoConnection, LastError}
+import org.asyncmongo.actors.MongoConnection
 import org.asyncmongo.bson._
 import org.asyncmongo.handlers._
 import org.asyncmongo.protocol._
 import org.asyncmongo.protocol.messages._
+import org.asyncmongo.actors.Authenticate
 
 case class DB(dbName: String, connection: MongoConnection, implicit val timeout :Timeout = Timeout(5 seconds)) {
   def apply(name: String) :Collection = Collection(dbName, name, connection, timeout)
@@ -60,7 +60,7 @@ case class Collection(
     connection.ask(message, writeConcern).map { response =>
       println(response.reply.stringify)
       import DefaultBSONHandlers._
-      LastError(handler.handle(response.reply, response.documents).next)
+      LastError(response)
     }
   }
   
@@ -157,11 +157,13 @@ object Test {
   implicit val timeout = Timeout(5 seconds)
 
   def test = {
-    val connection = MongoConnection(List("localhost:27016"))
+    val connection = MongoConnection(List("localhost:27016"))//, List(Authenticate("plugin", "jack", "toto")))
+    val fut = connection.authenticate("plugin", "jack", "toto")
+    fut.onComplete { case yop => println("auth completed for jack " + yop) }
     val db = DB("plugin", connection)
-    MongoConnection.system.scheduler.scheduleOnce(1000 milliseconds) {
+    /*MongoConnection.system.scheduler.scheduleOnce(1000 milliseconds) {
       db.authenticate("jack", "toto")
-    }
+    }*/
     val collection = db("acoll")
     /*val query = new Bson()//new HashMap[Object, Object]()
     connection.ask(Request(GetMore("plugin.acoll", 2, 12))).onComplete {
@@ -190,6 +192,7 @@ object Test {
       println("fetched t=" + DefaultBSONIterator.pretty(t))
     })*/
       MongoConnection.system.scheduler.scheduleOnce(2000 milliseconds) {
+        connection.authenticate("plugin", "franck", "toto").onComplete { case yop => println("auth completed for franck " + yop) }
         collection.insert(toSave, GetLastError("plugin", false, None, false)).onComplete {
           case Left(t) => { println("error!, throwable\n\t\t"); t.printStackTrace; println("\n\t for insert=" + toSave) }
           case Right(le) => {

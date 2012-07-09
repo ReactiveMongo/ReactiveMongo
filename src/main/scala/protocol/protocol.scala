@@ -185,19 +185,19 @@ class ResponseDecoder extends OneToOneDecoder {
 }
 
 class MongoHandler(receiver: ActorRef) extends SimpleChannelHandler {
-  println("MongoHandler: receiver is " + receiver)
+  //println("MongoHandler: receiver is " + receiver)
   override def messageReceived(ctx: ChannelHandlerContext, e: MessageEvent) {
     val response = e.getMessage.asInstanceOf[Response]
-    log(e, "messageReceived " + response + " will be send to " + receiver)
+    //log(e, "messageReceived " + response + " will be send to " + receiver)
     receiver ! response
     super.messageReceived(ctx, e)
   }
   override def writeComplete(ctx: ChannelHandlerContext, e: WriteCompletionEvent) {
-    log(e, "a write is complete!")
+    //log(e, "a write is complete!")
     super.writeComplete(ctx, e)
   }
   override def writeRequested(ctx: ChannelHandlerContext, e: MessageEvent) {
-    log(e, "a write is requested!")
+    //log(e, "a write is requested!")
     super.writeRequested(ctx, e)
   }
   override def channelConnected(ctx: ChannelHandlerContext, e: ChannelStateEvent) {
@@ -256,6 +256,6 @@ sealed trait ChannelState
 object ChannelState {
   case object Closed extends ChannelState
   case object NotConnected extends ChannelState
-  case class Useable(logged: Option[String]) extends ChannelState
+  case object Useable extends ChannelState
   case class Authenticating(db: String, user: String, password: String, nonce: Option[String]) extends ChannelState
 }

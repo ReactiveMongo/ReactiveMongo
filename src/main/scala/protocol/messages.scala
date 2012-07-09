@@ -39,6 +39,42 @@ case class GetLastError(
   }
 }
 
+case class LastError(
+  ok: Boolean,
+  err: Option[String],
+  code: Option[Int],
+  message: Option[String],
+  original: Map[String, BSONElement]
+) {
+  lazy val inError :Boolean = !ok || err.isDefined
+  lazy val stringify :String = toString + " [inError: " + inError + "]"
+}
+
+object LastError extends CommandResult[LastError] {
+  def apply(response: Response) :LastError = {
+    val mapped = DefaultBSONHandlers.parse(response).next().mapped
+    LastError(
+      mapped.get("ok").flatMap {
+        case d: BSONDouble => Some(true)
+        case _ => None
+      }.getOrElse(true),
+      mapped.get("err").flatMap {
+        case s: BSONString => Some(s.value)
+        case _ => None
+      },
+      mapped.get("code").flatMap {
+        case i: BSONInteger => Some(i.value)
+        case _ => None
+      },
+      mapped.get("errmsg").flatMap {
+        case s: BSONString => Some(s.value)
+        case _ => None
+      },
+      mapped
+    )
+  }
+}
+
 case class Count(
   db: String,
   collectionName: String,
