@@ -1,19 +1,22 @@
 package org.asyncmongo.api
 
+import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.dispatch.Future
+import akka.pattern.ask
 import akka.util.Timeout
 import akka.util.duration._
-import org.asyncmongo.actors.MongoConnection
+import org.asyncmongo.actors.MongoDBSystem
 import org.asyncmongo.bson._
 import org.asyncmongo.handlers._
 import org.asyncmongo.protocol._
 import org.asyncmongo.protocol.messages._
 import org.asyncmongo.actors.Authenticate
+import akka.actor.ActorSystem$
 
 case class DB(dbName: String, connection: MongoConnection, implicit val timeout :Timeout = Timeout(5 seconds)) {
   def apply(name: String) :Collection = Collection(dbName, name, connection, timeout)
-  /* TODO: must send a future... */
-  def authenticate(user: String, password: String) :Unit = connection.authenticate(dbName, user, password)
+
+  def authenticate(user: String, password: String) :Future[Boolean] = connection.authenticate(dbName, user, password)
 }
 
 case class Collection(
@@ -145,6 +148,42 @@ object Cursor {
         PlayPromise.pure(None)
       }
     }
+  }
+}
+
+class MongoConnection(
+  val mongosystem: ActorRef
+) {
+  /** write an op and wait for db response */
+  def ask(message: RequestMaker)(implicit timeout: Timeout) :Future[Response] = {
+    (mongosystem ? message).mapTo[Response]
+  }
+
+  /** write a no-response op followed by a GetLastError command and wait for its response */
+  def ask(message: RequestMaker, writeConcern: GetLastError)(implicit timeout: Timeout) = {
+    (mongosystem ? ((message, writeConcern.maker))).mapTo[Response] // Broken
+  }
+
+  /** write a no-response op without getting a future */
+  def send(message: RequestMaker) = mongosystem ! message
+
+  /** authenticate on the given db. */
+  def authenticate(db: String, user: String, password: String)(implicit timeout: Timeout) :Future[Boolean] = {
+    (mongosystem ? Authenticate(db, user, password)).mapTo[Boolean]
+  }
+
+  def stop = MongoConnection.system.stop(mongosystem)
+}
+
+object MongoConnection {
+  import com.typesafe.config.ConfigFactory
+  val config = ConfigFactory.load()
+
+  val system = ActorSystem("mongodb", config.getConfig("mongo-async-driver"))
+
+  def apply(nodes: List[String], authentications :List[Authenticate] = List.empty, name: Option[String]= None) = {
+    val props = Props(new MongoDBSystem(nodes, authentications))
+    new MongoConnection(if(name.isDefined) system.actorOf(props, name = name.get) else system.actorOf(props))
   }
 }
 
