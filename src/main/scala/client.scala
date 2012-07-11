@@ -30,9 +30,9 @@ object Client {
       }
       case Left(error) => throw error
     }
-    connection.ask(messages.IsMaster("plugin").maker).onComplete(p("IsMaster"))
-    connection.ask(messages.Status("plugin").maker).onComplete(p("Status"))
-    connection.ask(messages.ReplStatus.maker).onComplete(p("ReplStatus"))
+    connection.ask(commands.IsMaster("plugin").maker).onComplete(p("IsMaster"))
+    connection.ask(commands.Status("plugin").maker).onComplete(p("Status"))
+    connection.ask(commands.ReplStatus().maker).onComplete(p("ReplStatus"))
     //connection.ask(Request(KillCursors(Set(900)), Array[Byte](0)))
     /*connection send list
     connection send insert

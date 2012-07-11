@@ -11,6 +11,7 @@ import org.jboss.netty.channel.socket.nio._
 import org.jboss.netty.handler.codec.oneone._
 import org.jboss.netty.handler.codec.frame.FrameDecoder
 import org.asyncmongo.actors.{Connected, Disconnected}
+import org.asyncmongo.protocol.commands.GetLastError
 
  // traits
 trait ChannelBufferWritable {
@@ -64,10 +65,13 @@ case class Request (
   lazy val header = MessageHeader(size, requestID, responseTo, op.code)
 }
 
-case class CheckedRequest(
-  request: Request,
-  lastErrorRequest: Request
-)
+case class CheckedWriteRequest(
+  op: WriteRequestOp,
+  documents: ChannelBuffer,
+  getLastError: GetLastError
+) {
+  def apply() :(RequestMaker, RequestMaker) = RequestMaker(op, documents, None) -> getLastError.apply(op.db).maker
+}
 
 case class RequestMaker(
   op: RequestOp,
@@ -118,7 +122,7 @@ case class ExplainedError(
 
 object ExplainedError {
   import org.asyncmongo.bson._
-  
+
   def apply(bson: DefaultBSONIterator) :Option[ExplainedError] = {
     bson.find(_.name == "err").map {
       case err: BSONString => ExplainedError(err.value)
@@ -237,7 +241,7 @@ object NodeState {
     case 9 => ROLLBACK
     case _ => NONE
   }
-  
+
   case object PRIMARY    extends NodeState with MongoNodeState { override val code = 1 } // Primary
   case object SECONDARY  extends NodeState with MongoNodeState { override val code = 2 } // Secondary
   case object RECOVERING extends NodeState with MongoNodeState { override val code = 3 } // Recovering (initial syncing, post-rollback, stale members)

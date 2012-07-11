@@ -32,7 +32,7 @@ object DefaultBSONHandlers {
   implicit object DefaultBSONWriter extends BSONWriter[Bson] {
     def write(document: Bson) = document.getBuffer
   }
-  
+
   def parse(response: Response) = DefaultBSONReaderHandler.handle(response.reply, response.documents)(DefaultBSONReader)
 }
 

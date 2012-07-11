@@ -18,4 +18,4 @@ libraryDependencies ++= Seq(
 	"play" %% "play" % "2.1-SNAPSHOT"
 )
 
-scalacOptions ++= Seq("-unchecked", "-deprecation")
+scalacOptions ++= Seq("-unchecked", "-deprecation", "-Ydependent-method-types")

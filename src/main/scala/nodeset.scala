@@ -4,7 +4,7 @@ import akka.actor._
 import org.asyncmongo.bson._
 import org.asyncmongo.protocol._
 import org.asyncmongo.protocol.ChannelState._
-import org.asyncmongo.protocol.messages.{Authenticate => AuthenticateCommand, _}
+import org.asyncmongo.protocol.commands.{Authenticate => AuthenticateCommand, _}
 import org.asyncmongo.protocol.NodeState._
 import java.net.InetSocketAddress
 import org.jboss.netty.buffer._

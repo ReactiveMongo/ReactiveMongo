@@ -74,19 +74,19 @@ object RichBuffer {
 
 object BufferAccessors {
   import RichBuffer._
-  
+
   sealed trait BufferInteroperable[T] {
     def apply(buffer: ChannelBuffer, t: T) :Unit
   }
-  
+
   implicit object IntChannelInteroperable extends BufferInteroperable[Int] {
     def apply(buffer: ChannelBuffer, i: Int) = buffer writeInt i
   }
-  
+
   implicit object LongChannelInteroperable extends BufferInteroperable[Long] {
     def apply(buffer: ChannelBuffer, l: Long) = buffer writeLong l
   }
-  
+
   implicit object StringChannelInteroperable extends BufferInteroperable[String] {
     def apply(buffer: ChannelBuffer, s: String) = buffer writeUTF8(s)
   }
