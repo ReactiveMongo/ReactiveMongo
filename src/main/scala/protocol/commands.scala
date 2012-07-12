@@ -82,7 +82,7 @@ object LastError extends CommandResultMaker[LastError] {
     val mapped = DefaultBSONHandlers.parse(response).next().mapped
     LastError(
       mapped.get("ok").flatMap {
-        case d: BSONDouble => Some(true)
+        case d: BSONDouble => Some(d == 1)
         case _ => None
       }.getOrElse(true),
       mapped.get("err").flatMap {

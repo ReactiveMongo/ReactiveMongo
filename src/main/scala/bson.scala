@@ -285,6 +285,7 @@ sealed trait BSONIterator extends Iterator[BSONElement] {
     case 0x03 => BSONDocument(buffer.readCString, buffer.readBytes(buffer.getInt(buffer.readerIndex)))
     case 0x04 => BSONArray(buffer.readCString, buffer.readBytes(buffer.getInt(buffer.readerIndex)))
     case 0x05 => {
+      val name = buffer.readCString
       val length = buffer.readInt
       val subtype = buffer.readByte match {
         case 0x00 => genericBinarySubtype
@@ -295,7 +296,7 @@ sealed trait BSONIterator extends Iterator[BSONElement] {
         case 0x80 => userDefinedSubtype
         case _ => throw new RuntimeException("unsupported binary subtype")
       }
-      BSONBinary(buffer.readCString, buffer.readBytes(length), subtype) }
+      BSONBinary(name, buffer.readBytes(length), subtype) }
     case 0x06 => BSONUndefined(buffer.readCString)
     case 0x07 => BSONObjectID(buffer.readCString, buffer.readArray(12))
     case 0x08 => BSONBoolean(buffer.readCString, buffer.readByte == 0x01)
