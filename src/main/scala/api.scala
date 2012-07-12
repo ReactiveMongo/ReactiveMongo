@@ -175,6 +175,8 @@ class MongoConnection(
     (mongosystem ? Authenticate(db, user, password)).mapTo[Map[String, BSONElement]]
   }
 
+  def close(implicit timeout: Timeout) :Future[String] = (mongosystem ? org.asyncmongo.actors.Close).mapTo[String]
+
   def stop = MongoConnection.system.stop(mongosystem)
 }
 

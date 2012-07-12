@@ -9,6 +9,7 @@ import org.asyncmongo.protocol.NodeState._
 import java.net.InetSocketAddress
 import org.jboss.netty.buffer._
 import org.jboss.netty.channel.{Channels, Channel, ChannelPipeline}
+import org.jboss.netty.channel.group._
 import org.jboss.netty.channel.socket.nio._
 
 case class MongoChannel(
@@ -50,6 +51,13 @@ case class Node(
   def disconnect() :Unit = channels.foreach(channel => if(channel.isConnected) channel.disconnect)
 
   def close() :Unit = channels.foreach(channel => if(channel.isOpen) channel.close)
+
+  def createNeededChannels(receiver: ActorRef, upTo: Int) :Node = {
+    if(channels.size < upTo) {
+      copy(channels = channels.++(for(i <- 0 until (upTo - channels.size)) yield
+          MongoChannel(ChannelFactory.create(host, port, receiver), NotConnected, Set.empty)))
+    } else this
+  }
 }
 
 object Node {
@@ -112,6 +120,21 @@ case class NodeSet(
         node.copy(channels = oldNode.channels.union(node.channels).distinct)
       }.getOrElse(node)
     })
+  }
+
+  def createNeededChannels(receiver: ActorRef, upTo: Int) :NodeSet = {
+    copy(nodes = nodes.foldLeft(Vector.empty[Node]) { (nodes, node) =>
+      nodes :+ node.createNeededChannels(receiver, upTo)
+    })
+  }
+
+  def makeChannelGroup() :ChannelGroup = {
+    val result = new DefaultChannelGroup
+    for(node <- nodes) {
+      for(channel <- node.channels)
+        result.add(channel.channel)
+    }
+    result
   }
 }
 
