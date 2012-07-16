@@ -84,6 +84,8 @@ case class BSONBinary        (name: String, value: ChannelBuffer, subtype: Subty
   val code = 0x05
 
   def writeContent(buffer: ChannelBuffer) = { buffer writeInt value.readableBytes; buffer writeByte subtype.value; buffer writeBytes value; buffer }
+
+  def this(name: String, value: Array[Byte], subtype: Subtype) = this(name, ChannelBuffers.wrappedBuffer(ByteOrder.LITTLE_ENDIAN, value), subtype)
 }
 
 case class BSONUndefined     (name: String) extends BSONElement {
