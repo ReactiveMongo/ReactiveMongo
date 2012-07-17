@@ -15,7 +15,9 @@ libraryDependencies ++= Seq(
 	"io.netty" % "netty" % "3.3.1.Final",
 	"de.undercouch" % "bson4jackson" % "1.2.0",
 	"com.typesafe.akka" % "akka-actor" % "2.0",
-	"play" %% "play" % "2.1-SNAPSHOT"
+	"play" %% "play" % "2.1-SNAPSHOT",
+	"ch.qos.logback" % "logback-core" % "1.0.0",
+    "ch.qos.logback" % "logback-classic" % "1.0.0"
 )
 
 scalacOptions ++= Seq("-unchecked", "-deprecation", "-Ydependent-method-types")

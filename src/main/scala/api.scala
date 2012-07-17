@@ -5,13 +5,12 @@ import akka.dispatch.Future
 import akka.pattern.ask
 import akka.util.Timeout
 import akka.util.duration._
-import org.asyncmongo.actors.MongoDBSystem
+import org.asyncmongo.actors.{Authenticate, MongoDBSystem}
 import org.asyncmongo.bson._
 import org.asyncmongo.handlers._
 import org.asyncmongo.protocol._
 import org.asyncmongo.protocol.commands.{Update => FindAndModifyUpdate, _}
-import org.asyncmongo.actors.Authenticate
-import akka.actor.ActorSystem$
+import org.slf4j.{Logger, LoggerFactory}
 
 case class DB(dbName: String, connection: MongoConnection, implicit val timeout :Timeout = Timeout(5 seconds)) {
   def apply(name: String) :Collection = Collection(dbName, name, connection, timeout)
@@ -38,7 +37,7 @@ case class Collection(
   }
 
   def find[T, U, V](query: T, fields: Option[U] = None, skip: Int = 0, limit: Int = 0, flags: Int = 0)(implicit writer: BSONWriter[T], writer2: BSONWriter[U], handler: BSONReaderHandler, reader: BSONReader[V]) :Future[Cursor[V]] = {
-    val op = Query(flags, fullCollectionName, skip, limit) // TODO: test-purpose number of docs to return, remove
+    val op = Query(flags, fullCollectionName, skip, limit)
     val bson = writer.write(query)
     if(fields.isDefined)
       bson.writeBytes(writer2.write(fields.get))
@@ -61,8 +60,6 @@ case class Collection(
     val bson = writer.write(document)
     val checkedWriteRequest = CheckedWriteRequest(op, bson, writeConcern)
     connection.ask(checkedWriteRequest).map { response =>
-      println(response.reply.stringify)
-      import DefaultBSONHandlers._
       LastError(response)
     }
   }
@@ -89,11 +86,16 @@ case class Collection(
     connection.ask(command.apply(dbName).maker).map(command.ResultMaker(_))
 }
 
+object Collection {
+  private val logger = LoggerFactory.getLogger("Collection")
+}
+
 class Cursor[T](response: Response, connection: MongoConnection, query: Query)(implicit handler: BSONReaderHandler, reader: BSONReader[T], timeout :Timeout) {
+  import Cursor.logger
   lazy val iterator :Iterator[T] = handler.handle(response.reply, response.documents)
   def next :Option[Future[Cursor[T]]] = {
     if(hasNext) {
-      println("cursor: call next")
+      logger.debug("cursor: calling next on " + response.reply.cursorID)
       val op = GetMore(query.fullCollectionName, query.numberToReturn, response.reply.cursorID)
       Some(connection.ask(RequestMaker(op).copy(channelIdHint=Some(response.info.channelId))).map { response => new Cursor(response, connection, query) })
     } else None
@@ -105,6 +107,7 @@ class Cursor[T](response: Response, connection: MongoConnection, query: Query)(i
 }
 
 object Cursor {
+  private val logger = LoggerFactory.getLogger("Cursor")
   // for test purposes
   import akka.dispatch.Await
   def stream[T](cursor: Cursor[T])(implicit timeout :Timeout) :Stream[T] = {
@@ -123,31 +126,31 @@ object Cursor {
     var currentCursor :Option[Cursor[T]] = None
     Enumerator.fromCallback { () =>
       if(currentCursor.isDefined && currentCursor.get.iterator.hasNext){
-        println("enumerate: give next element from iterator")
+        logger.trace("enumerate: give next element from iterator")
         PlayPromise.pure(Some(currentCursor.get.iterator.next))
       } else if(currentCursor.isDefined && currentCursor.get.hasNext) {
-        println("enumerate: fetching next cursor")
+        logger.trace("enumerate: fetching next cursor")
         new AkkaPromise(currentCursor.get.next.get.map { cursor =>
-          println("redeemed from next cursor")
+          logger.trace("redeemed from next cursor")
           currentCursor = Some(cursor)
           Some(cursor.iterator.next)
         })
       } else if(!currentCursor.isDefined && futureCursor.isDefined) {
-        println("enumerate: fetching from first future")
+        logger.trace("enumerate: fetching from first future")
         new AkkaPromise(futureCursor.get.map { cursor =>
-          println("redeemed from first cursor")
+          logger.trace("redeemed from first cursor")
           currentCursor = Some(cursor)
           if(cursor.iterator.hasNext) {
-            println("has result")
+            logger.trace("has result")
             Some(cursor.iterator.next)
           }
           else {
-            println("no result")
+            logger.trace("no result")
             None
           }
         })
       } else {
-        println("Nothing to enumerate")
+        logger.debug("Nothing to enumerate")
         PlayPromise.pure(None)
       }
     }

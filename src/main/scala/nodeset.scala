@@ -1,16 +1,17 @@
 package org.asyncmongo.nodeset
 
 import akka.actor._
+import java.net.InetSocketAddress
 import org.asyncmongo.bson._
 import org.asyncmongo.protocol._
 import org.asyncmongo.protocol.ChannelState._
 import org.asyncmongo.protocol.commands.{Authenticate => AuthenticateCommand, _}
 import org.asyncmongo.protocol.NodeState._
-import java.net.InetSocketAddress
 import org.jboss.netty.buffer._
 import org.jboss.netty.channel.{Channels, Channel, ChannelPipeline}
 import org.jboss.netty.channel.group._
 import org.jboss.netty.channel.socket.nio._
+import org.slf4j.{Logger, LoggerFactory}
 
 case class MongoChannel(
   channel: Channel,
@@ -151,20 +152,24 @@ class RoundRobiner[A](val subject: IndexedSeq[A], private var i: Int = 0) {
 }
 
 case class NodeWrapper(node: Node) extends RoundRobiner(node.queryable) {
+  import NodeWrapper._
   def send(message :Request, writeConcern :Request) {
     pick.map { channel =>
-      log("connection " + channel.getId + " will send Request " + message + " followed by writeConcern " + writeConcern)
+      logger.trace("connection " + channel.getId + " will send Request " + message + " followed by writeConcern " + writeConcern)
       channel.write(message)
       channel.write(writeConcern)
     }
   }
   def send(message: Request) {
     pick.map { channel =>
-      log("connection " + channel.getId + " will send Request " + message)
+      logger.trace("connection " + channel.getId + " will send Request " + message)
       channel.write(message)
     }
   }
-  def log(s: String) = println("NodeWrapper[" + node + "] :: " + s)
+}
+
+object NodeWrapper {
+  private val logger = LoggerFactory.getLogger("NodeWrapper")
 }
 
 case class NodeSetManager(nodeSet: NodeSet) extends RoundRobiner(nodeSet.queryable.map { node => NodeWrapper(node)}) {
@@ -173,22 +178,19 @@ case class NodeSetManager(nodeSet: NodeSet) extends RoundRobiner(nodeSet.queryab
 
   def getNodeWrapperByChannelId(channelId: Int) = subject.find(_.node.channels.exists(_.getId == channelId))
 
-  def primaryWrapper :Option[NodeWrapper] = {
-    val yy = subject.find(_.node.state == PRIMARY)
-    println("finding primaryWrapper = " + yy)
-    yy
-  }
+  def primaryWrapper :Option[NodeWrapper] = subject.find(_.node.state == PRIMARY)
 }
 
 case class LoggedIn(db: String, user: String)
 
 object ChannelFactory {
-  import java.net.InetSocketAddress
   import java.util.concurrent.Executors
+
+  private val logger = LoggerFactory.getLogger("ChannelFactory")
 
   def create(host: String = "localhost", port: Int = 27017, receiver: ActorRef) = {
     val channel = makeChannel(receiver)
-    println("created a new channel: " + channel)
+    logger.trace("created a new channel: " + channel)
     channel
   }
 

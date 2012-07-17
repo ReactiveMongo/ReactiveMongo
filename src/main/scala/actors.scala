@@ -11,6 +11,7 @@ import org.asyncmongo.protocol.commands.{Authenticate => AuthenticateCommand, _}
 import org.asyncmongo.protocol.NodeState._
 import org.asyncmongo.handlers.DefaultBSONHandlers
 import org.jboss.netty.channel.group._
+import org.slf4j.{Logger, LoggerFactory}
 
 // messages
 case class Authenticate(db: String, user: String, password: String)
@@ -21,6 +22,8 @@ private[asyncmongo] case class Connected(channelId: Int)
 private[asyncmongo] case class Disconnected(channelId: Int)
 
 class MongoDBSystem(seeds: List[String] = List("localhost:27017"), auth :List[Authenticate]) extends Actor {
+  import MongoDBSystem._
+
   val requestIdGenerator = new {
     // all requestIds [0, 1000[ are for isMaster messages
     val isMasterRequestIdIterator :Iterator[Int] = Iterator.iterate(0)(i => if(i == 1000) 0 else i + 1)
@@ -56,17 +59,17 @@ class MongoDBSystem(seeds: List[String] = List("localhost:27017"), auth :List[Au
     RefreshAllNodes)
 
   def receiveRequest(request: Request): Unit = {
-    log("received a request!")
+    logger.trace("received a request")
     if(request.op.expectsResponse) {
       awaitingResponses += request.requestID -> AwaitingResponse(request.requestID, sender, false)
-      log("registering awaiting response for requestID " + request.requestID + ", awaitingResponses: " + awaitingResponses)
-    } else log("NOT registering awaiting response for requestID " + request.requestID)
+      logger.trace("registering awaiting response for requestID " + request.requestID + ", awaitingResponses: " + awaitingResponses)
+    } else logger.trace("NOT registering awaiting response for requestID " + request.requestID)
     if(secondaryOK(request)) {
       val server = pickNode(request)
-      log("node " + server + "will send the query " + request.op)
+      logger.debug("node " + server + "will send the query " + request.op)
       server.map(_.send(request))
     } else if(!nodeSetManager.get.primaryWrapper.isDefined) {
-      log("delaying send because primary is not available")
+      logger.info("delaying send because primary is not available")
       queuedMessages += (sender -> Right(request))
     } else {
       nodeSetManager.get.primaryWrapper.get.send(request)
@@ -74,32 +77,33 @@ class MongoDBSystem(seeds: List[String] = List("localhost:27017"), auth :List[Au
   }
 
   def receiveCheckedWriteRequest(checkedWriteRequest: CheckedWriteRequest) :Unit = {
+    logger.trace("received a checked write request")
     val requestId = requestIdGenerator.user
     val (request, writeConcern) = {
       val tuple = checkedWriteRequest()
       tuple._1(requestId) -> tuple._2(requestId)
     }
     awaitingResponses += requestId -> AwaitingResponse(requestId, sender, true)
-    log("registering writeConcern-awaiting response for requestID " + requestId + ", awaitingResponses: " + awaitingResponses)
+    logger.trace("registering writeConcern-awaiting response for requestID " + requestId + ", awaitingResponses: " + awaitingResponses)
     if(secondaryOK(request)) {
       pickNode(request).map(_.send(request, writeConcern))
     } else if(!nodeSetManager.get.primaryWrapper.isDefined) {
-      log("delaying send because primary is not available")
+      logger.info("delaying send because primary is not available")
       queuedMessages += (sender -> Left(request -> writeConcern))
-      log("now queuedMessages is " + queuedMessages)
+      logger.debug("now queuedMessages is " + queuedMessages)
     } else {
       nodeSetManager.get.primaryWrapper.get.send(request, writeConcern)
     }
   }
 
   def authenticateChannel(channel: MongoChannel, continuing: Boolean = false) :MongoChannel = channel.state match {
-    case _: Authenticating if !continuing => {log("AUTH: delaying auth on " + channel);channel}
+    case _: Authenticating if !continuing => {logger.debug("AUTH: delaying auth on " + channel);channel}
     case _ => if(channel.loggedIn.size < authenticationHistory.authenticates.size) {
       val nextAuth = authenticationHistory.authenticates(channel.loggedIn.size)
-      log("channel " + channel.channel + " is now starting to process the next auth with " + nextAuth + "!")
+      logger.debug("channel " + channel.channel + " is now starting to process the next auth with " + nextAuth + "!")
       channel.write(Getnonce(nextAuth.db).maker(requestIdGenerator.getNonce))
       channel.copy(state = Authenticating(nextAuth.db, nextAuth.user, nextAuth.password, None))
-    } else { log("AUTH: nothing to do. authenticationHistory is " + authenticationHistory); channel.copy(state = Useable) }
+    } else { logger.debug("AUTH: nothing to do. authenticationHistory is " + authenticationHistory); channel.copy(state = Useable) }
   }
 
   override def receive = {
@@ -114,7 +118,7 @@ class MongoDBSystem(seeds: List[String] = List("localhost:27017"), auth :List[Au
       else sender ! "done"
     }
     case message if !nodeSetManager.isDefined => {
-      log("dropping message " + message + " as this system is closed")
+      logger.error("dropping message " + message + " as this system is closed")
     }
     // todo: refactoring
     case request: Request => receiveRequest(request)
@@ -123,7 +127,7 @@ class MongoDBSystem(seeds: List[String] = List("localhost:27017"), auth :List[Au
 
     // monitor
     case ConnectAll => {
-      log("ConnectAll Job running...")
+      logger.debug("ConnectAll Job running...")
       updateNodeSetManager(NodeSetManager(nodeSetManager.get.nodeSet.createNeededChannels(self, 1)))
       nodeSetManager.get.nodeSet.connectAll
     }
@@ -132,9 +136,9 @@ class MongoDBSystem(seeds: List[String] = List("localhost:27017"), auth :List[Au
       (for(node <- nodeSetManager.get.nodeSet.nodes) yield "['" + node.name + "' in state " + node.state + " with " + node.channels.foldLeft(0) { (count, channel) =>
         if(channel.isConnected) count + 1 else count
       } + " connected channels]") + "}";
-      log("RefreshAllNodes Job running... current state is: " + state)
+      logger.debug("RefreshAllNodes Job running... current state is: " + state)
       nodeSetManager.get.nodeSet.nodes.foreach { node =>
-        log("try to refresh " + node.name)
+        logger.trace("try to refresh " + node.name)
         node.channels.find(_.isConnected).map(_.write(IsMaster().maker(requestIdGenerator.isMaster)))
       }
     }
@@ -155,22 +159,22 @@ class MongoDBSystem(seeds: List[String] = List("localhost:27017"), auth :List[Au
           })
         })))
       }
-      log(channelId + " is connected")
+      logger.trace(channelId + " is connected")
     }
     case Disconnected(channelId) => {
       updateNodeSetManager(NodeSetManager(nodeSetManager.get.nodeSet.updateByChannelId(channelId, node => {
         node.copy(state = NOT_CONNECTED, channels = node.channels.collect{ case channel if channel.isOpen => channel })
       })))
-      log(channelId + " is disconnected")
+      logger.debug(channelId + " is disconnected")
     }
     case auth @ Authenticate(db, user, password) => {
       if(!authenticationHistory.authenticates.contains(auth)) {
-        log("authenticate process starts with " + auth + "...")
+        logger.debug("authenticate process starts with " + auth + "...")
         authenticationHistory = AuthHistory(authenticationHistory.authenticateRequests :+ (auth -> List(sender)))
         updateNodeSetManager(NodeSetManager(nodeSetManager.get.nodeSet.updateAll(node =>
           node.copy(channels = node.channels.map(authenticateChannel(_)))
         )))
-      } else log("auth not performed as already registered...")
+      } else logger.debug("auth not performed as already registered...")
     }
     // isMaster response
     case response: Response if response.header.responseTo < 1000 => {
@@ -179,18 +183,18 @@ class MongoDBSystem(seeds: List[String] = List("localhost:27017"), auth :List[Au
         val mynodes = isMaster.hosts.get.map(name => Node(name, if(isMaster.me.exists(_ == name)) isMaster.state else NONE))
         NodeSetManager(nodeSetManager.get.nodeSet.addNodes(mynodes).copy(name = isMaster.setName).createNeededChannels(self, 1))
       } else if(nodeSetManager.get.nodeSet.nodes.length > 0) {
-        log("single node, update..." + nodeSetManager)
+        logger.debug("single node, update..." + nodeSetManager)
         NodeSetManager(NodeSet(None, None, nodeSetManager.get.nodeSet.nodes.slice(0, 1).map(_.copy(state = isMaster.state))).createNeededChannels(self, 1))
       } else if(seedSet.isDefined && seedSet.get.findNodeByChannelId(response.info.channelId).isDefined) {
-        log("single node, creation..." + nodeSetManager)
+        logger.debug("single node, creation..." + nodeSetManager)
         NodeSetManager(NodeSet(None, None, Vector(Node(seedSet.get.findNodeByChannelId(response.info.channelId).get.name))).createNeededChannels(self, 1))
       } else throw new RuntimeException("single node discovery failure..."))
-      log("NodeSetManager is now " + nodeSetManager)
+      logger.debug("NodeSetManager is now " + nodeSetManager)
       nodeSetManager.get.nodeSet.connectAll
       if(seedSet.isDefined) {
         seedSet.get.closeAll
         seedSet = None
-        println("Init is done")
+        logger.debug("Init is done")
       }
       updateNodeSetManager(NodeSetManager(nodeSetManager.get.nodeSet.updateByChannelId(response.info.channelId,
         _.updateChannelById(response.info.channelId, authenticateChannel(_)))))
@@ -198,12 +202,12 @@ class MongoDBSystem(seeds: List[String] = List("localhost:27017"), auth :List[Au
     // getnonce response
     case response: Response if response.header.responseTo >= 1000 && response.header.responseTo < 2000 => {
       val getnonce = Getnonce.ResultMaker(response)
-      log("AUTH: got nonce for channel " + response.info.channelId + ": " + getnonce.nonce)
+      logger.debug("AUTH: got nonce for channel " + response.info.channelId + ": " + getnonce.nonce)
       updateNodeSetManager(NodeSetManager(nodeSetManager.get.nodeSet.updateByChannelId(response.info.channelId, node =>
         node.copy(channels = node.channels.map { channel =>
           if(channel.getId == response.info.channelId) {
             val authenticating = channel.state.asInstanceOf[Authenticating]
-            log("AUTH: authentifying with " + authenticating)
+            logger.debug("AUTH: authentifying with " + authenticating)
             channel.write(AuthenticateCommand(authenticating.user, authenticating.password, getnonce.nonce)(authenticating.db).maker(requestIdGenerator.authenticate))
             channel.copy(state = authenticating.copy(nonce = Some(getnonce.nonce)))
           } else channel
@@ -212,18 +216,21 @@ class MongoDBSystem(seeds: List[String] = List("localhost:27017"), auth :List[Au
     }
     // authenticate response
     case response: Response if response.header.responseTo >= 2000 && response.header.responseTo < 3000 => {
-      log("AUTH: got authentified response! " + response.info.channelId)
+      logger.debug("AUTH: got authentified response! " + response.info.channelId)
       updateNodeSetManager(NodeSetManager(nodeSetManager.get.nodeSet.updateByChannelId(response.info.channelId, { node =>
-        log("AUTH: updating node " + node + "...")
+        logger.debug("AUTH: updating node " + node + "...")
         node.updateChannelById(response.info.channelId, { channel =>
           authenticationHistory = authenticationHistory
           val authenticating = channel.state.asInstanceOf[Authenticating]
-          log("AUTH: got auth response from channel " + channel.channel + " for auth=" + authenticating + "!")
+          logger.debug("AUTH: got auth response from channel " + channel.channel + " for auth=" + authenticating + "!")
           val (success, history) = authenticationHistory.handleResponse(authenticating, response)
           authenticationHistory = history;
           if(success)
             authenticateChannel(channel.copy(loggedIn = channel.loggedIn + LoggedIn(authenticating.db, authenticating.user)), true)
-          else authenticateChannel(channel, true)
+          else {
+            logger.warn("AUTH: failed !!!");
+            authenticateChannel(channel, true)
+          }
         })
       })
       ))
@@ -233,15 +240,15 @@ class MongoDBSystem(seeds: List[String] = List("localhost:27017"), auth :List[Au
     case response: Response if response.header.responseTo >= 3000 => {
       awaitingResponses.get(response.header.responseTo) match {
         case Some(AwaitingResponse(_, _sender, isGetLastError)) => {
-          log("Got a response from " + response.info.channelId + "! Will give back message="+response + " to sender " + _sender)
+          logger.debug("Got a response from " + response.info.channelId + "! Will give back message="+response + " to sender " + _sender)
           awaitingResponses -= response.header.responseTo
           if(isGetLastError) {
-            log("{" + response.header.responseTo + "} it's a getlasterror")
+            logger.debug("{" + response.header.responseTo + "} it's a getlasterror")
             // todo, for now rewinding buffer at original index
             val ridx = response.documents.readerIndex
             val lastError = LastError(response)
             if(lastError.code.isDefined && isNotPrimaryErrorCode(lastError.code.get)) {
-              log("{" + response.header.responseTo + "} sending a failure...")
+              logger.debug("{" + response.header.responseTo + "} sending a failure...")
               self ! RefreshAllNodes
               updateNodeSetManager(NodeSetManager(nodeSetManager.get.nodeSet.updateAll(node => if(node.state == PRIMARY) node.copy(state = UNKNOWN) else node)))
               _sender ! Failure(DefaultMongoError(lastError.message, lastError.code))
@@ -250,17 +257,16 @@ class MongoDBSystem(seeds: List[String] = List("localhost:27017"), auth :List[Au
               _sender ! response
             }
           } else {
-            log("{" + response.header.responseTo + "} sending a success!")
+            logger.trace("{" + response.header.responseTo + "} sending a success!")
             _sender ! response
           }
         }
         case None => {
-          log("oups. " + response.header.responseTo + " not found! complete message is " + response)
+          logger.error("oups. " + response.header.responseTo + " not found! complete message is " + response)
         }
       }
-      log("YYYYY:::: " + nodeSetManager.get.nodeSet)
     }
-    case a @ _ => log("not supported " + a)
+    case a @ _ => logger.error("not supported " + a)
   }
 
   // monitor -->
@@ -275,8 +281,6 @@ class MongoDBSystem(seeds: List[String] = List("localhost:27017"), auth :List[Au
     case _ => false
   }
 
-  def log(s: String) = println("MongoDBSystem [" + self.path + "] : " + s)
-
   def updateNodeSetManager(nodeSetManager: NodeSetManager) :NodeSetManager = {
     this.nodeSetManager = Some(nodeSetManager)
     if(nodeSetManager.primaryWrapper.isDefined)
@@ -285,12 +289,14 @@ class MongoDBSystem(seeds: List[String] = List("localhost:27017"), auth :List[Au
   }
 
   def foundPrimary() {
-    log("ok, found primary, sending all the queued messages... ")
-    queuedMessages.dequeueAll( _ => true).foreach {
-      case (originalSender, Left( (message, writeConcern) )) => {
-        nodeSetManager.map(_.primaryWrapper.get.send(message, writeConcern))
+    if(!queuedMessages.isEmpty) {
+      logger.info("ok, found the primary node, sending all the queued messages... ")
+      queuedMessages.dequeueAll( _ => true).foreach {
+        case (originalSender, Left( (message, writeConcern) )) => {
+          nodeSetManager.map(_.primaryWrapper.get.send(message, writeConcern))
+        }
+        case (originalSender, Right(message)) => nodeSetManager.map(_.primaryWrapper.get.send(message))
       }
-      case (originalSender, Right(message)) => nodeSetManager.map(_.primaryWrapper.get.send(message))
     }
   }
 
@@ -308,7 +314,6 @@ class MongoDBSystem(seeds: List[String] = List("localhost:27017"), auth :List[Au
   }
 
   override def postStop() {
-    println("postStop!")
     if(nodeSetManager.isDefined)
       nodeSetManager.get.nodeSet.makeChannelGroup.close
   }
@@ -316,6 +321,7 @@ class MongoDBSystem(seeds: List[String] = List("localhost:27017"), auth :List[Au
 
 object MongoDBSystem {
   private[asyncmongo] val DefaultConnectionRetryInterval :Int = 2000 // milliseconds
+  private val logger = LoggerFactory.getLogger("MongoDBSystem")
 }
 
 trait MongoError extends Throwable {
@@ -338,7 +344,6 @@ private[actors] case class AuthHistory(
 
   def failed(selector: (Authenticate) => Boolean, err: FailedAuthentication) :AuthHistory = AuthHistory(authenticateRequests.filterNot { request =>
     if(selector(request._1)) {
-      println("AUTH: failed for request=" + request + " !!!")
       request._2.foreach(_ ! Failure(err))
       true
     } else false

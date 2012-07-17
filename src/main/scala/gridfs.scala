@@ -21,6 +21,7 @@ import java.io.{OutputStream, ByteArrayOutputStream}
 import play.api.libs.concurrent.{AkkaPromise, Promise}
 import play.api.libs.iteratee._
 import akka.dispatch.Future
+import org.slf4j.{Logger, LoggerFactory}
 
 case class GridFSFile(
   id: Option[BSONElement],
@@ -42,7 +43,65 @@ case class GridFSFile(
   }
 }
 
+case class PutResult(
+  nbChunks: Int,
+  md5: Option[String]
+)
+
+class GridFSIteratee(
+  files_id: BSONElement,
+  chunksCollection: Collection,
+  chunkSize: Int = 262144 // default chunk size is 256k (GridFS spec)
+) {
+  import GridFSIteratee._
+  implicit val ec = MongoConnection.system
+  def iteratee = Iteratee.fold1(Chunk()) { (previous, chunk :Array[Byte]) =>
+    logger.debug("processing new enumerated chunk from n=" + previous.n + "...\n")
+    previous.feed(chunk)
+  }.mapDone(_.finish)
+
+  private case class Chunk(
+    previous: Array[Byte] = new Array(0),
+    n: Int = 0,
+    md: java.security.MessageDigest = java.security.MessageDigest.getInstance("MD5")
+  ) {
+    def feed(chunk: Array[Byte]) :Promise[Chunk] = {
+      val (toWrite, left) = (previous ++ chunk).grouped(chunkSize).partition(_.length == chunkSize)
+      val writes = toWrite.toList.zipWithIndex
+      new AkkaPromise(
+        Future.traverse(writes) { ci =>
+          writeChunk(n + ci._2, ci._1)
+        }.map { _ =>
+          logger.debug("all futures for the last given chunk are redeemed.")
+          Chunk(
+            if(left.isEmpty) Array.empty else left.next,
+            n + writes.length,
+            { md.update(chunk) ; md }
+          )
+        })
+    }
+    def finish() :Promise[PutResult] = {
+      logger.debug("writing last chunk (n=" + n + ")!")
+      new AkkaPromise(writeChunk(n, previous).map { _ =>
+        PutResult(n, Some(Converters.hex2Str(md.digest)))
+      })
+    }
+    def writeChunk(n: Int, array: Array[Byte]) = {
+      val bson = Bson(files_id)
+      bson.write(BSONInteger("n", n))
+      bson.write(new BSONBinary("data", array, genericBinarySubtype))
+      logger.debug("writing chunk " + n)
+      chunksCollection.insert(bson, GetLastError())
+    }
+  }
+}
+
+object GridFSIteratee {
+  private val logger = LoggerFactory.getLogger("GridFSIteratee")
+}
+
 class GridFS(db: DB, name: String = "fs") {
+  import GridFS._
   val files = db(name + ".files")
   val chunks = db(name + ".chunks")
 
@@ -54,8 +113,8 @@ class GridFS(db: DB, name: String = "fs") {
         case BSONBinary(_, data, _) => Some(data.array())
         case _ => None
       }.getOrElse {
-        println("ahem.")
-        throw new RuntimeException("not a chunk")
+        logger.error("not a chunk! failed assertion: data field is missing")
+        throw new RuntimeException("not a chunk! failed assertion: data field is missing")
       }
     })
     e2
@@ -64,7 +123,6 @@ class GridFS(db: DB, name: String = "fs") {
   def readContent(id: BSONElement, os: OutputStream) :Promise[Iteratee[Array[Byte],Unit]] = {
     readContent(id)(Iteratee.foreach { chunk =>
       os.write(chunk)
-      println("wrote a chunk into os.")
     })
   }
 
@@ -86,59 +144,8 @@ class GridFS(db: DB, name: String = "fs") {
   }
 }
 
-case class PutResult(
-  nbChunks: Int,
-  md5: Option[String]
-)
-
-class GridFSIteratee(
-  files_id: BSONElement,
-  chunksCollection: Collection,
-  chunkSize: Int = 262144 // default chunk size is 256k (GridFS spec)
-) {
-  implicit val ec = MongoConnection.system
-  def iteratee = Iteratee.fold1(Chunk()) { (previous, chunk :Array[Byte]) =>
-    println("\nGRIDFS: processing n=" + previous.n + "...\n")
-    previous.feed(chunk)
-  }.mapDone(_.finish)
-
-  private case class Chunk(
-    previous: Array[Byte] = new Array(0),
-    n: Int = 0,
-    md: java.security.MessageDigest = java.security.MessageDigest.getInstance("MD5")
-  ) {
-    def feed(chunk: Array[Byte]) :Promise[Chunk] = {
-      val (toWrite, left) = (previous ++ chunk).grouped(chunkSize).partition(_.length == chunkSize)
-      val writes = toWrite.toList.zipWithIndex
-      new AkkaPromise(
-        Future.traverse(writes) { ci =>
-          writeChunk(n + ci._2, ci._1)
-        }.map { _ =>
-          println("all futures for the last given chunk are redeemed")
-          Chunk(
-            if(left.isEmpty) Array.empty else left.next,
-            n + writes.length,
-            { md.update(chunk) ; md }
-          )
-        })
-    }
-    def finish() :Promise[PutResult] = {
-      println("GRIDFS: writing last chunk!")
-      new AkkaPromise(writeChunk(n, previous).map { _ =>
-        PutResult(n, Some(Converters.hex2Str(md.digest)))
-      })
-    }
-    def writeChunk(n: Int, array: Array[Byte]) = {
-      val bson = Bson(files_id)
-      bson.write(BSONInteger("n", n))
-      bson.write(new BSONBinary("data", array, genericBinarySubtype))
-      println("GRIDFS: writing chunk " + n)
-      chunksCollection.insert(bson, GetLastError())
-    }
-  }
-}
-
 object GridFS {
+  private val logger = LoggerFactory.getLogger("GridFS")
   def iteratee(files_id: BSONElement, chunksCollection: Collection, chunkSize: Int) :Iteratee[Array[Byte], Promise[PutResult]] =
     new GridFSIteratee(files_id, chunksCollection, chunkSize).iteratee
   def iteratee(files_id: BSONElement, chunksCollection: Collection) :Iteratee[Array[Byte], Promise[PutResult]] =

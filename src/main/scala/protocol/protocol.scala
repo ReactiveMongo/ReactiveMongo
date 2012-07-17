@@ -12,6 +12,7 @@ import org.jboss.netty.handler.codec.oneone._
 import org.jboss.netty.handler.codec.frame.FrameDecoder
 import org.asyncmongo.actors.{Connected, Disconnected}
 import org.asyncmongo.protocol.commands.GetLastError
+import org.slf4j.{Logger, LoggerFactory}
 
  // traits
 trait ChannelBufferWritable {
@@ -142,21 +143,25 @@ case class ErrorResponse(
 )
 
 class RequestEncoder extends OneToOneEncoder {
+  import RequestEncoder._
   def encode(ctx: ChannelHandlerContext, channel: Channel, obj: Object) = {
     obj match {
       case message: Request => {
         val buffer :ChannelBuffer = ChannelBuffers.dynamicBuffer(ByteOrder.LITTLE_ENDIAN, 1000)
         message writeTo buffer
-        //println(java.util.Arrays.toString(buffer.toByteBuffer.array()))
-        println("writing to buffer message " + message + " of length=" + buffer.array().length + ", => " + buffer.writerIndex)
+        logger.trace("writing to buffer message " + message + " of length=" + buffer.array().length + ", => " + buffer.writerIndex)
         buffer
       }
       case _ => {
-         println("RequestEncoder: weird... " + obj)
+         logger.error("RequestEncoder: weird... do not know how to encode this object: " + obj)
          obj
       }
     }
   }
+}
+
+object RequestEncoder {
+  val logger = LoggerFactory.getLogger("protocol/RequestEncoder")
 }
 
 class ResponseFrameDecoder extends FrameDecoder {
@@ -166,7 +171,6 @@ class ResponseFrameDecoder extends FrameDecoder {
     else {
       buffer.markReaderIndex
       val length = buffer.readInt
-      println("decode:: readableBytes=" + readableBytes + ", claimed length is " + length)
       buffer.resetReaderIndex
       if(length <= readableBytes && length > 0)
         buffer.readBytes(length)
@@ -189,19 +193,19 @@ class ResponseDecoder extends OneToOneDecoder {
 }
 
 class MongoHandler(receiver: ActorRef) extends SimpleChannelHandler {
-  //println("MongoHandler: receiver is " + receiver)
+  import MongoHandler._
   override def messageReceived(ctx: ChannelHandlerContext, e: MessageEvent) {
     val response = e.getMessage.asInstanceOf[Response]
-    //log(e, "messageReceived " + response + " will be send to " + receiver)
+    log(e, "messageReceived " + response + " will be send to " + receiver)
     receiver ! response
     super.messageReceived(ctx, e)
   }
   override def writeComplete(ctx: ChannelHandlerContext, e: WriteCompletionEvent) {
-    //log(e, "a write is complete!")
+    log(e, "a write is complete!")
     super.writeComplete(ctx, e)
   }
   override def writeRequested(ctx: ChannelHandlerContext, e: MessageEvent) {
-    //log(e, "a write is requested!")
+    log(e, "a write is requested!")
     super.writeRequested(ctx, e)
   }
   override def channelConnected(ctx: ChannelHandlerContext, e: ChannelStateEvent) {
@@ -220,7 +224,11 @@ class MongoHandler(receiver: ActorRef) extends SimpleChannelHandler {
   override def exceptionCaught(ctx: org.jboss.netty.channel.ChannelHandlerContext, e: org.jboss.netty.channel.ExceptionEvent) {
     log(e, "CHANNEL ERROR: " + e.getCause)
   }
-  def log(e: ChannelEvent, s: String) = println("MongoHandler [" + e.getChannel.getId + "] : " + s)
+  def log(e: ChannelEvent, s: String) = logger.trace("(channel=" + e.getChannel.getId + ") " + s)
+}
+
+object MongoHandler {
+  private val logger = LoggerFactory.getLogger("protocol/MongoHandler")
 }
 
 sealed trait NodeState
