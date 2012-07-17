@@ -37,8 +37,8 @@ case class Collection(
     }
   }
 
-  def find[T, U, V](query: T, fields: Option[U], skip: Int, limit: Int, flags: Int = 0)(implicit writer: BSONWriter[T], writer2: BSONWriter[U], handler: BSONReaderHandler, reader: BSONReader[V]) :Future[Cursor[V]] = {
-    val op = Query(flags, fullCollectionName, skip, 10) // TODO: test-purpose number of docs to return, remove
+  def find[T, U, V](query: T, fields: Option[U] = None, skip: Int = 0, limit: Int = 0, flags: Int = 0)(implicit writer: BSONWriter[T], writer2: BSONWriter[U], handler: BSONReaderHandler, reader: BSONReader[V]) :Future[Cursor[V]] = {
+    val op = Query(flags, fullCollectionName, skip, limit) // TODO: test-purpose number of docs to return, remove
     val bson = writer.write(query)
     if(fields.isDefined)
       bson.writeBytes(writer2.write(fields.get))
