@@ -7,24 +7,84 @@ import org.asyncmongo.protocol.NodeState
 import org.asyncmongo.protocol.NodeState._
 import org.asyncmongo.utils._
 
+/**
+ * A MongoDB Command.
+ *
+ * Basically, it's as query that is performed on any db.\$cmd collection
+ * and gives back one document as a result.
+ */
 trait Command {
+  /**
+   * This command's result type.
+   */
   type Result
 
+  /**
+   * Deserializer for this command's result.
+   */
   val ResultMaker :CommandResultMaker[Result]
 
+  /**
+   * States if this command can be run on secondaries.
+   */
   val slaveOk :Boolean = false
+
+  /**
+   * Makes the [[org.asyncmongo.bson.Bson]] for documents that will be send as body of this command's query.
+   */
   def makeDocuments :Bson
 
-  def apply(db: String) :MakableCommand = MakableCommand(db, this)
+  /**
+   * Produces a [[org.asyncmongo.protocol.commands.MakableCommand]] instance of this command.
+   *
+   * @param db name of the target database.
+   */
+  def apply(db: String) :MakableCommand = new MakableCommand(db, this)
 }
 
+/**
+ * Handler for deserializing commands results.
+ *
+ * @tparam Result the result type of this command.
+ */
 trait CommandResultMaker[Result] {
+  /**
+   * Deserializes the given response into an instance of Result.
+   */
   def apply(response: Response) :Result
 }
 
+/**
+ * A command that targets the ''admin'' database only (administrative commands).
+ */
 trait AdminCommand extends Command {
+  /**
+   * As and admin command targets only the ''admin'' database, @param db will be ignored.
+   * @inheritdoc
+   */
   override def apply(db: String) :MakableCommand = apply()
-  def apply() :MakableCommand = MakableCommand("admin", this)
+
+  /**
+   * Produces a [[org.asyncmongo.protocol.commands.MakableCommand]] instance of this command.
+   */
+  def apply() :MakableCommand = new MakableCommand("admin", this)
+}
+
+/**
+ * A makable command, that can produce a request maker ready to be sent to a [[org.asyncmongo.actors.MongoDBSystem]] actor.
+ *
+ * @param db Database name.
+ * @param command Subject command.
+ */
+class MakableCommand(val db: String, val command: Command) {
+  /**
+   * Produces the [[org.asyncmongo.protocol.Query]] instance for the given command.
+   */
+  def makeQuery :Query = Query(if(command.slaveOk) QueryFlags.SlaveOk else 0, db + ".$cmd", 0, 1)
+  /**
+   * Returns the [[org.asyncmongo.protocol.RequestMaker]] for the given command.
+   */
+  def maker = RequestMaker(makeQuery, command.makeDocuments.getBuffer)
 }
 
 case class RawCommand(bson: Bson) extends Command {
@@ -37,11 +97,18 @@ case class RawCommand(bson: Bson) extends Command {
   }
 }
 
-case class MakableCommand(db: String, command: Command) {
-  def makeQuery :Query = Query(if(command.slaveOk) QueryFlags.SlaveOk else 0, db + ".$cmd", 0, 1)
-  def maker = RequestMaker(makeQuery, command.makeDocuments.getBuffer)
-}
-
+/**
+ * GetLastError Command.
+ *
+ * This command is used to check the status of the immediately previous operation.
+ * It is commonly used to make sure that a write request has been effectively done (so it is also knwon as ''writeConcern'').
+ * This command will return only when the previous operation is complete and matches its parameters
+ * (for example, with waitForReplicatedOn set to Some(2), this command will return only when at least two replicas have also run the previous operation).
+ *
+ * @param awaitJournalCommit Make sure that the previous operation has been commited into the journal. Journaling must be enabled on the servers.
+ * @param waitForReplicatedOn Make sure that the previous (write) operation has been run on at least ''n'' replicas, with ''n'' = waitReplicatedOn.get
+ * @param fsync Make sure that the previous (write) operation has been written on the disk.
+ */
 case class GetLastError(
   awaitJournalCommit: Boolean = false,
   waitForReplicatedOn: Option[Int] = None,
@@ -66,6 +133,15 @@ case class GetLastError(
   val ResultMaker = LastError
 }
 
+/**
+ * Result of the [[org.asyncmongo.protocol.commands.GetLastError]] command.
+ *
+ * @param ok true if the last operation was successful
+ * @param err the err field, if any
+ * @param code the error code, if any
+ * @param message the message (often regarding an error) if any
+ * @param original the whole map resulting of the deserialization of the response with the [[org.asyncmongo.handlers.DefaultBSONHandlers]].
+ */
 case class LastError(
   ok: Boolean,
   err: Option[String],
@@ -73,10 +149,14 @@ case class LastError(
   message: Option[String],
   original: Map[String, BSONElement]
 ) {
+  /** states if the last operation ended up with an error */
   lazy val inError :Boolean = !ok || err.isDefined
   lazy val stringify :String = toString + " [inError: " + inError + "]"
 }
 
+/**
+ * Deserializer for [[org.asyncmongo.protocol.commands.GetLastError]] command result.
+ */
 object LastError extends CommandResultMaker[LastError] {
   def apply(response: Response) = {
     val mapped = DefaultBSONHandlers.parse(response).next().mapped
@@ -102,6 +182,14 @@ object LastError extends CommandResultMaker[LastError] {
   }
 }
 
+/**
+ * The Count command.
+ *
+ * Returns a document containing the number of documents matching the query.
+ * @param collectionName the name of the target collection
+ * @param query the document selector
+ * @param fields select only the matching fields
+ */
 case class Count(
   collectionName: String,
   query: Option[Bson] = None,
@@ -120,6 +208,9 @@ case class Count(
   val ResultMaker = Count
 }
 
+/**
+ * Deserializer for the Count command. Basically returns an Int (number of counted documents)
+ */
 object Count extends CommandResultMaker[Int] {
   def apply(response: Response) = DefaultBSONHandlers.parse(response).next().find(_.name == "n").get match {
     case BSONDouble(_, n) => n.toInt
@@ -127,6 +218,11 @@ object Count extends CommandResultMaker[Int] {
   }
 }
 
+/**
+ * ReplSetGetStatus Command.
+ *
+ * Returns the state of the Replica Set from the target server's point of view.
+ */
 object ReplStatus extends AdminCommand {
   override def makeDocuments = Bson(BSONInteger("replSetGetStatus", 1))
 
@@ -137,6 +233,11 @@ object ReplStatus extends AdminCommand {
   }
 }
 
+/**
+ * ServerStatus Command.
+ *
+ * Gets the detailed status of the target server.
+ */
 object Status extends AdminCommand {
   override def makeDocuments = Bson(BSONInteger("serverStatus", 1))
 
@@ -147,6 +248,11 @@ object Status extends AdminCommand {
   }
 }
 
+/**
+ * Getnonce Command.
+ *
+ * Gets a nonce for authentication token.
+ */
 object Getnonce extends Command {
   override def makeDocuments = Bson(BSONInteger("getnonce", 1))
 
@@ -157,11 +263,21 @@ object Getnonce extends Command {
   }
 }
 
+/** Getnonce Command's result (holding a string representation of the nonce) */
 case class GetnonceResult(nonce: String)
 
+/**
+ * Authenticate Command.
+ *
+ * @param user username
+ * @param password user's password
+ * @param nonce the previous nonce given by the server
+ */
 case class Authenticate(user: String, password: String, nonce: String) extends Command {
   import Converters._
+  /** the computed digest of the password */
   lazy val pwdDigest = md5Hex(user + ":mongo:" + password)
+  /** the digest of the tuple (''nonce'', ''user'', ''pwdDigest'') */
   lazy val key = md5Hex(nonce + user + pwdDigest)
 
   override def makeDocuments = Bson(BSONInteger("authenticate", 1)).write(BSONString("user", user)).write(BSONString("nonce", nonce)).write(BSONString("key", key))
@@ -173,6 +289,7 @@ case class Authenticate(user: String, password: String, nonce: String) extends C
   }
 }
 
+/** Authentication command's response deserializer. */
 object Authenticate extends CommandResultMaker[AuthenticationResult] {
   def apply(response: Response) = {
     val mapped = DefaultBSONHandlers.parse(response).next().mapped
@@ -190,20 +307,39 @@ object Authenticate extends CommandResultMaker[AuthenticationResult] {
   }
 }
 
+/** an authentication result */
 sealed trait AuthenticationResult
 
+/**
+ * A failed authentication result
+ *
+ * @param message the explaination of the error.
+ */
 case class FailedAuthentication(
   message: String
 ) extends Exception with AuthenticationResult {
   override def getMessage() = message
 }
 
+/**
+ * A successful authentication result.
+ *
+ * @param db database name
+ * @param user username
+ * @param readOnly states if the authentication gives us only the right to read from the database.
+ */
 case class SuccessfulAuthentication(
   db: String,
   user: String,
   readOnly: Boolean
 ) extends AuthenticationResult
 
+/**
+ * IsMaster Command.
+ *
+ * States if the target server is a primary.
+ * This command also gives some useful information, like the other nodes in the replica set.
+ */
 object IsMaster extends AdminCommand {
   def makeDocuments = Bson(BSONInteger("isMaster", 1))
 
@@ -244,6 +380,16 @@ object IsMaster extends AdminCommand {
   }
 }
 
+/**
+ * Deserialized IsMaster command response.
+ *
+ * @param isMaster states if the server is a primary
+ * @param secondary states if the server is a secondary
+ * @param maxBsonObjectSize the maximum document size allowed by the server
+ * @param setName the name of the replica set, if any
+ * @param hosts the names (''servername'':''port'') of the other nodes in the replica set, if any
+ * @param me the name (''servername'':''port'') of the answering server
+ */
 case class IsMasterResponse(
   isMaster: Boolean,
   secondary: Boolean,
@@ -252,32 +398,45 @@ case class IsMasterResponse(
   hosts: Option[List[String]],
   me: Option[String]
 ) {
+  /** the resolved [[org.asyncmongo.protocol.NodeState]] of the answering server */
   lazy val state :NodeState = if(isMaster) PRIMARY else if(secondary) SECONDARY else UNKNOWN
 }
 
-/*
-{ findAndModify: "collection", query: {processed:false}, update: {$set: {processed:true}}, new: true}
-{ findAndModify: "collection", query: {processed:false}, remove: true, sort: {priority:-1}}
-*/
+/** A modify operation, part of a FindAndModify command */
 sealed trait Modify {
   protected[commands] def alter(bson: Bson) :Bson
 }
+
+/**
+ * Update (part of a FindAndModify command).
+ *
+ * @param update the modifier document.
+ * @param fetchNewObject the command result must be the new object instead of the old one.
+ */
 case class Update(update: Bson, fetchNewObject: Boolean) extends Modify {
   override def alter(bson: Bson) = bson
       .write(BSONDocument("update", update.getBuffer))
       .write(BSONBoolean("new", fetchNewObject))
 }
+
+/** Remove (part of a FindAndModify command). */
 object Remove extends Modify {
   override def alter(bson: Bson) = bson.write(BSONBoolean("remove", true))
 }
-/*query  a filter for the query  {}
-sort   if multiple docs match, choose the first one in the specified sort order as the object to manipulate  {}
-remove   set to a true to remove the object before returning 
-N/A
-update   a modifier object   N/A
-new  set to true if you want to return the modified object rather than the original. Ignored for remove.   false
-fields   see Retrieving a Subset of Fields (1.5.0+)  All fields
-upsert   create object if it doesn't exist; a query must be supplied! examples (1.5.4+)  false*/
+
+/**
+ * FindAndModify command.
+ *
+ * This command allows to perform a modify operation (update/remove) matching a query, without the extra requests.
+ * It returns the old document by default.
+ *
+ * @param collection the target collection name
+ * @param query the filter for this command
+ * @param modify the [[org.asyncmongo.protocol.commands.Modify]] operation to do
+ * @param upsert states if a new document should be inserted if no match
+ * @param sort the sort document
+ * @param fields retrieve only a subset of the returned document
+ */
 case class FindAndModify(
   collection: String,
   query: Bson,
@@ -302,6 +461,10 @@ case class FindAndModify(
   val ResultMaker = FindAndModify
 }
 
+/**
+ * FindAndModify command deserializer
+ * @todo [[org.asyncmongo.handlers.BSONReader[T]]] typeclass
+ */
 object FindAndModify extends CommandResultMaker[Option[BSONDocument]] {
   def apply(response: Response) = DefaultBSONHandlers.parse(response).next().mapped.get("value") flatMap {
     case doc: BSONDocument => Some(doc)
