@@ -12,20 +12,39 @@ import org.asyncmongo.protocol._
 import org.asyncmongo.protocol.commands.{Update => FindAndModifyUpdate, _}
 import org.slf4j.{Logger, LoggerFactory}
 
-case class DB(dbName: String, connection: MongoConnection, implicit val timeout :Timeout = Timeout(5 seconds)) {
+/**
+ * A Mongo Database.
+ *
+ * @param dbName database name.
+ * @param connection the [[org.asyncmongo.api.MongoConnection]] that will be used to query this database.
+ * @param timeout the default timeout for the queries. Defaults to 5 seconds.
+ */
+case class DB(dbName: String, connection: MongoConnection, implicit val timeout :Timeout = Timeout(5 seconds)) { // TODO timeout
+  /**  Gets a [[org.asyncmongo.api.Collection]] from this database. */
   def apply(name: String) :Collection = Collection(dbName, name, connection, timeout)
 
+  /** Authenticates the connection on this database. */ // TODO return type
   def authenticate(user: String, password: String) :Future[Map[String, BSONElement]] = connection.authenticate(dbName, user, password)
 }
 
+/**
+ * A Mongo Collection.
+ *
+ * @param dbName database name.
+ * @param collectionName the name of this collection.
+ * @param connection the [[org.asyncmongo.api.MongoConnection]] that will be used to query this database.
+ * @param timeout the default timeout for the queries.
+ */
 case class Collection(
   dbName: String,
   collectionName: String,
   connection: MongoConnection,
   implicit val timeout :Timeout
 ) {
+  /** The full collection name. */
   lazy val fullCollectionName = dbName + "." + collectionName
 
+  /** Counts the number of documents in this collection. */
   def count :Future[Int] = {
     import DefaultBSONHandlers._
     connection.ask(Count(collectionName)(dbName).maker).map { response =>
@@ -36,6 +55,51 @@ case class Collection(
     }
   }
 
+  /**
+   * Find the documents matching the given criteria.
+   *
+   * Example:
+   * {{{
+   * import org.asyncmongo.api._
+import org.asyncmongo.bson._
+import org.asyncmongo.handlers.DefaultBSONHandlers._
+import play.api.libs.iteratee.Iteratee
+
+object Samples {
+
+  def listDocs() = {
+    val connection = MongoConnection( List( "localhost:27016" ) )
+    val db = DB("plugin", connection)
+    val collection = db("acoll")
+
+    // get a Future[Cursor[DefaultBSONIterator]]
+    val futureCursor = collection.find(Bson(BSONString("name", "Jack")))
+
+    // let's enumerate this cursor and print a readable representation of each document in the response
+    Cursor.enumerate(Some(futureCursor))(Iteratee.foreach { doc =>
+      println("found document: " + DefaultBSONIterator.pretty(doc))
+    })
+  }
+}
+   * }}}
+   *
+   * This method accepts any query and fields object, provided that there is an implicit [[org.asyncmongo.handlers.BSONWriter]] typeclass for handling them in the scope.
+   * You can use the typeclasses defined in [[org.asyncmongo.handlers.DefaultBSONHandlers]] object.
+   *
+   * Please take a look to the [[http://www.mongodb.org/display/DOCS/Querying mongodb documentation]] to know how querying works.
+   *
+   * @tparam T the type of the query. An implicit [[org.asyncmongo.handlers.BSONWriter]][T] typeclass for handling it has to be in the scope.
+   * @tparam U the type of the fields object. An implicit [[org.asyncmongo.handlers.BSONWriter]][U] typeclass for handling it has to be in the scope.
+   * @tparam V the type of the matched documents. An implicit [[org.asyncmongo.handlers.BSONReader]][V] typeclass for handling it has to be in the scope.
+   *
+   * @param query The selector query.
+   * @param fields Get only a subset of each matched documents. Defaults to None.
+   * @param skip A number of documents to skip. Defaults to 0.
+   * @param limit An upper limit on the number of documents to retrieve. Defaults to 0 (meaning no upper limit).
+   * @param flags Optional query flags.
+   *
+   * @return a future cursor of documents. You can get an enumerator for it, please see the [[org.asyncmongo.api.Cursor]] companion object.
+   */
   def find[T, U, V](query: T, fields: Option[U] = None, skip: Int = 0, limit: Int = 0, flags: Int = 0)(implicit writer: BSONWriter[T], writer2: BSONWriter[U], handler: BSONReaderHandler, reader: BSONReader[V]) :Future[Cursor[V]] = {
     val op = Query(flags, fullCollectionName, skip, limit)
     val bson = writer.write(query)
@@ -48,6 +112,15 @@ case class Collection(
     }
   }
 
+  /**
+   * Inserts a document into the collection without writeConcern.
+   *
+   * Please note that you cannot be sure that the document has been effectively written and when (hence the Unit return type).
+   *
+   * @tparam T the type of the document to insert. An implicit [[org.asyncmongo.handlers.BSONWriter]][T] typeclass for handling it has to be in the scope.
+   *
+   * @param document the document to insert.
+   */
   def insert[T](document: T)(implicit writer: BSONWriter[T]) :Unit = {
     val op = Insert(0, fullCollectionName)
     val bson = writer.write(document)
@@ -55,7 +128,19 @@ case class Collection(
     connection.send(message)
   }
 
-  def insert[T](document: T, writeConcern: GetLastError)(implicit writer: BSONWriter[T], handler: BSONReaderHandler) :Future[LastError] = {
+  /**
+   * Inserts a document into the collection and wait for the [[org.asyncmongo.protocol.commands.LastError]] result.
+   *
+   * Please read the documentation about [[org.asyncmongo.protocol.commands.GetLastError]] to know how to use it properly.
+   *
+   * @tparam T the type of the document to insert. An implicit [[org.asyncmongo.handlers.BSONWriter]][T] typeclass for handling it has to be in the scope.
+   *
+   * @param document the document to insert.
+   * @param writeConcern the [[org.asyncmongo.protocol.commands.GetLastError]] command message to send in order to control how the document is inserted.
+   *
+   * @return a future [[org.asyncmongo.protocol.commands.LastError]] that can be used to check whether the insertion was successful.
+   */
+  def insert[T](document: T, writeConcern: GetLastError)(implicit writer: BSONWriter[T]) :Future[LastError] = {
     val op = Insert(0, fullCollectionName)
     val bson = writer.write(document)
     val checkedWriteRequest = CheckedWriteRequest(op, bson, writeConcern)
@@ -64,8 +149,28 @@ case class Collection(
     }
   }
 
+  /**
+   * Remove the matched document(s) from the collection without writeConcern.
+   *
+   * Please note that you cannot be sure that the matched documents have been effectively removed and when (hence the Unit return type).
+   *
+   * @tparam T the type of the selector of documents to remove. An implicit [[org.asyncmongo.handlers.BSONWriter]][T] typeclass for handling it has to be in the scope.
+   *
+   * @param query the selector of documents to remove.
+   * @param firstMatchOnly states whether only the first matched documents has to be removed from this collection.
+   */
   def remove[T](query: T)(implicit writer: BSONWriter[T]) :Unit = remove(query, false)
 
+  /**
+   * Remove the matched document(s) from the collection without writeConcern.
+   *
+   * Please note that you cannot be sure that the matched documents have been effectively removed and when (hence the Unit return type).
+   *
+   * @tparam T the type of the selector of documents to remove. An implicit [[org.asyncmongo.handlers.BSONWriter]][T] typeclass for handling it has to be in the scope.
+   *
+   * @param query the selector of documents to remove.
+   * @param firstMatchOnly states whether only the first matched documents has to be removed from this collection.
+   */
   def remove[T](query: T, firstMatchOnly: Boolean)(implicit writer: BSONWriter[T]) : Unit = {
     val op = Delete(fullCollectionName, if(firstMatchOnly) 1 else 0)
     val bson = writer.write(query)
@@ -73,15 +178,35 @@ case class Collection(
     connection.send(message)
   }
 
-  def remove[T, U](query: T, writeConcern: GetLastError, firstMatchOnly: Boolean = false)(implicit writer: BSONWriter[T], handler: BSONReaderHandler, reader: BSONReader[U], m: Manifest[U]) :Future[U] = {
+  /**
+   * Remove the matched document(s) from the collection and wait for the [[org.asyncmongo.protocol.commands.LastError]] result.
+   *
+   * Please read the documentation about [[org.asyncmongo.protocol.commands.GetLastError]] to know how to use it properly.
+   *
+   * @tparam T the type of the selector of documents to remove. An implicit [[org.asyncmongo.handlers.BSONWriter]][T] typeclass for handling it has to be in the scope.
+   *
+   * @param query the selector of documents to remove.
+   * @param writeConcern the [[org.asyncmongo.protocol.commands.GetLastError]] command message to send in order to control how the documents are removed.
+   * @param firstMatchOnly states whether only the first matched documents has to be removed from this collection.
+   *
+   * @return a future [[org.asyncmongo.protocol.commands.LastError]] that can be used to check whether the removal was successful.
+   */
+  def remove[T](query: T, writeConcern: GetLastError, firstMatchOnly: Boolean = false)(implicit writer: BSONWriter[T]) :Future[LastError] = {
     val op = Delete(fullCollectionName, if(firstMatchOnly) 1 else 0)
     val bson = writer.write(query)
     val checkedWriteRequest = CheckedWriteRequest(op, bson, writeConcern)
     connection.ask(checkedWriteRequest).map { response =>
-      handler.handle(response.reply, response.documents).next
+      LastError(response)
     }
   }
 
+  /**
+   * Sends a command and get the future result of the command.
+   *
+   * @param command The command to send.
+   *
+   * @return a future containing the result of the command.
+   */ // TODO move into DB
   def command(command: Command) :Future[command.Result] =
     connection.ask(command.apply(dbName).maker).map(command.ResultMaker(_))
 }
@@ -90,9 +215,51 @@ object Collection {
   private val logger = LoggerFactory.getLogger("Collection")
 }
 
+/**
+ * Allows to fetch the next documents matching a query.
+ *
+ * Please note that you should not use Cursor directly.
+ * You are invited to use the enumerator/iteratee pattern to handle Cursor operations.
+ * You may take a look to {{{Cursor.enumerate[T](futureCursor: Option[Future[Cursor[T]]]) :Enumerator[T]}}} to produce an enumerator and consume the documents using an iteratee on your own.
+ *
+ * Example:
+ * {{{
+ * import org.asyncmongo.api._
+import org.asyncmongo.bson._
+import org.asyncmongo.handlers.DefaultBSONHandlers._
+import play.api.libs.iteratee.Iteratee
+
+object Samples {
+
+  def listDocs() = {
+    val connection = MongoConnection( List( "localhost:27016" ) )
+    val db = DB("plugin", connection)
+    val collection = db("acoll")
+
+    // get a Future[Cursor[DefaultBSONIterator]]
+    val futureCursor = collection.find(Bson(BSONString("name", "Jack")))
+
+    // let's enumerate this cursor and print a readable representation of each document in the response
+    Cursor.enumerate(Some(futureCursor))(Iteratee.foreach { doc =>
+      println("found document: " + DefaultBSONIterator.pretty(doc))
+    })
+  }
+}
+}}}
+ *
+ * It is worth diving into the [[https://github.com/playframework/Play20/wiki/Iteratees Play! 2.0 Iteratee documentation]].
+ *
+ * @tparam T the type of the matched documents. An implicit [[org.asyncmongo.handlers.BSONReader]][T] typeclass for handling it has to be in the scope.
+ *
+ * @param response The response to handle.
+ * @param connection The connection that must be used to fetch the next documents.
+ * @param query The original query.
+ */
 class Cursor[T](response: Response, connection: MongoConnection, query: Query)(implicit handler: BSONReaderHandler, reader: BSONReader[T], timeout :Timeout) {
   import Cursor.logger
+  /** An iterator on the last fetched documents. */
   lazy val iterator :Iterator[T] = handler.handle(response.reply, response.documents)
+  /** Gets the next instance of that cursor. */
   def next :Option[Future[Cursor[T]]] = {
     if(hasNext) {
       logger.debug("cursor: calling next on " + response.reply.cursorID)
@@ -100,7 +267,9 @@ class Cursor[T](response: Response, connection: MongoConnection, query: Query)(i
       Some(connection.ask(RequestMaker(op).copy(channelIdHint=Some(response.info.channelId))).map { response => new Cursor(response, connection, query) })
     } else None
   }
+  /** Tells if another instance of cursor can be fetched. */ // TODO redundant!
   def hasNext :Boolean = response.reply.cursorID != 0
+  /** Explicitly closes that cursor. */
   def close = if(hasNext) {
     connection.send(RequestMaker(KillCursors(Set(response.reply.cursorID))))
   }
@@ -122,6 +291,38 @@ object Cursor {
   import play.api.libs.iteratee._
   import play.api.libs.concurrent.{Promise => PlayPromise, _}
 
+  /**
+   * Enumerates the given future cursor.
+   *
+   * Example:
+   * {{{
+import org.asyncmongo.api._
+import org.asyncmongo.bson._
+import org.asyncmongo.handlers.DefaultBSONHandlers._
+import play.api.libs.iteratee.Iteratee
+
+object Samples {
+
+  def listDocs() = {
+    val connection = MongoConnection( List( "localhost:27016" ) )
+    val db = DB("plugin", connection)
+    val collection = db("acoll")
+
+    // get a Future[Cursor[DefaultBSONIterator]]
+    val futureCursor = collection.find(Bson(BSONString("name", "Jack")))
+
+    // let's enumerate this cursor and print a readable representation of each document in the response
+    Cursor.enumerate(Some(futureCursor))(Iteratee.foreach { doc =>
+      println("found document: " + DefaultBSONIterator.pretty(doc))
+    })
+  }
+}
+}}}
+   *
+   * It is worth diving into the [[https://github.com/playframework/Play20/wiki/Iteratees Play! 2.0 Iteratee documentation]].
+   *
+   * @tparam T the type of the matched documents. An implicit [[org.asyncmongo.handlers.BSONReader]][T] typeclass for handling it has to be in the scope.
+   */
   def enumerate[T](futureCursor: Option[Future[Cursor[T]]]) :Enumerator[T] = {
     var currentCursor :Option[Cursor[T]] = None
     Enumerator.fromCallback { () =>
@@ -157,23 +358,48 @@ object Cursor {
   }
 }
 
+/**
+ * A Mongo Connection.
+ *
+ * This is a wrapper around a reference to a [[org.asyncmongo.actors.MongoDBSystem]] Actor.
+ * Connection here does not mean that there is one open channel to the server.
+ * Behind the scene, many connections (channels) are open on all the available servers in the replica set.
+ *
+ * @param mongosystem A reference to a [[org.asyncmongo.actors.MongoDBSystem]] Actor.
+ */
 class MongoConnection(
   val mongosystem: ActorRef
 ) {
-  /** write an op and wait for db response */
+  /**
+   * Writes a request and wait for a response.
+   *
+   * @param message The request maker.
+   *
+   * @return The future response.
+   */
   def ask(message: RequestMaker)(implicit timeout: Timeout) :Future[Response] = {
     (mongosystem ? message).mapTo[Response]
   }
 
-  /** write a no-response op followed by a GetLastError command and wait for its response */
+  /**
+   * Writes a checked write request and wait for a response.
+   *
+   * @param message The request maker.
+   *
+   * @return The future response.
+   */
   def ask(checkedWriteRequest: CheckedWriteRequest)(implicit timeout: Timeout) = {
     (mongosystem ? checkedWriteRequest).mapTo[Response]
   }
 
-  /** write a no-response op without getting a future */
+  /**
+   * Writes a request and drop the response if any.
+   *
+   * @param message The request maker.
+   */
   def send(message: RequestMaker) = mongosystem ! message
 
-  /** authenticate on the given db. */
+  /** Authenticates the connection on the given database. */ // TODO return type
   def authenticate(db: String, user: String, password: String)(implicit timeout: Timeout) :Future[Map[String, BSONElement]] = {
     (mongosystem ? Authenticate(db, user, password)).mapTo[Map[String, BSONElement]]
   }
@@ -187,8 +413,18 @@ object MongoConnection {
   import com.typesafe.config.ConfigFactory
   val config = ConfigFactory.load()
 
+  /**
+   * The actor system that creates all the required actors.
+   */
   val system = ActorSystem("mongodb", config.getConfig("mongo-async-driver"))
 
+  /**
+   * Creates a new MongoConnection.
+   *
+   * @param nodes A list of node names, like ''node1.foo.com:27017''. Port is optional, it is 27017 by default.
+   * @param authentications A list of Authenticates.
+   * @param name The name of the newly created [[org.asyncmongo.actors.MongoDBSystem]] actor, if needed.
+   */
   def apply(nodes: List[String], authentications :List[Authenticate] = List.empty, name: Option[String]= None) = {
     val props = Props(new MongoDBSystem(nodes, authentications))
     new MongoConnection(if(name.isDefined) system.actorOf(props, name = name.get) else system.actorOf(props))
@@ -200,7 +436,7 @@ object Test {
   import akka.pattern.ask
   import DefaultBSONHandlers._
   import play.api.libs.iteratee._
- 
+
   implicit val timeout = Timeout(5 seconds)
 
   def test = {

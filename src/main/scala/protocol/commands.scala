@@ -101,11 +101,11 @@ case class RawCommand(bson: Bson) extends Command {
  * GetLastError Command.
  *
  * This command is used to check the status of the immediately previous operation.
- * It is commonly used to make sure that a write request has been effectively done (so it is also knwon as ''writeConcern'').
+ * It is commonly used to make sure that a write request has been effectively done (so it is also known as ''writeConcern'').
  * This command will return only when the previous operation is complete and matches its parameters
  * (for example, with waitForReplicatedOn set to Some(2), this command will return only when at least two replicas have also run the previous operation).
  *
- * @param awaitJournalCommit Make sure that the previous operation has been commited into the journal. Journaling must be enabled on the servers.
+ * @param awaitJournalCommit Make sure that the previous operation has been committed into the journal. Journaling must be enabled on the servers.
  * @param waitForReplicatedOn Make sure that the previous (write) operation has been run on at least ''n'' replicas, with ''n'' = waitReplicatedOn.get
  * @param fsync Make sure that the previous (write) operation has been written on the disk.
  */
@@ -313,7 +313,7 @@ sealed trait AuthenticationResult
 /**
  * A failed authentication result
  *
- * @param message the explaination of the error.
+ * @param message the explanation of the error.
  */
 case class FailedAuthentication(
   message: String

@@ -15,17 +15,37 @@ import org.asyncmongo.protocol.commands.GetLastError
 import org.slf4j.{Logger, LoggerFactory}
 
  // traits
+/**
+ * Something that can be written into a [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]].
+ */
 trait ChannelBufferWritable {
-  val writeTo :ChannelBuffer => Unit
+  /** Write this instance into the given [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]]. */
+  def writeTo :ChannelBuffer => Unit
+  /** Size of the content that would be written. */
   def size: Int
 }
 
+/**
+ * A constructor of T instances from a [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]].
+ *
+ * @tparam T type which instances can be constructed with this.
+ */
 trait ChannelBufferReadable[T] {
+  /** Makes an instance of T from the data from the given buffer. */
   def readFrom(buffer: ChannelBuffer) :T
+  /** @see readFrom */
   def apply(buffer: ChannelBuffer) :T = readFrom(buffer)
 }
 
  // concrete classes
+/**
+ * Header of a Mongo Wire Protocol message.
+ *
+ * @param messageLength length of this message.
+ * @param requestID id of this request (> 0 for request operations, else 0).
+ * @param responseTo id of the request that the message including this a response to (> 0 for reply operation, else 0).
+ * @param opCode operation code of this message.
+ */
 case class MessageHeader(
   messageLength: Int,
   requestID: Int,
@@ -36,6 +56,7 @@ case class MessageHeader(
   override def size = 4 + 4 + 4 + 4
 }
 
+/** Header deserializer from a [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]]. */
 object MessageHeader extends ChannelBufferReadable[MessageHeader] {
   override def readFrom(buffer: ChannelBuffer) = {
     val messageLength = buffer.readInt
@@ -50,9 +71,17 @@ object MessageHeader extends ChannelBufferReadable[MessageHeader] {
   }
 }
 
+/**
+ * Request message.
+ *
+ * @param requestID id of this request, so that the response may be identifiable. Should be strictly positive.
+ * @param op request operation.
+ * @param documents body of this request, a [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]] containing 0, 1, or many documents.
+ * @param channelIdHint a hint for sending this request on a particular channel.
+ */
 case class Request (
   requestID: Int,
-  responseTo: Int,
+  responseTo: Int, // TODO remove, nothing to do here.
   op: RequestOp,
   documents: ChannelBuffer,
   channelIdHint: Option[Int] = None
@@ -63,9 +92,17 @@ case class Request (
     buffer writeBytes documents
   } }
   override def size = 16 + op.size + documents.writerIndex
+  /** Header of this request */
   lazy val header = MessageHeader(size, requestID, responseTo, op.code)
 }
 
+/**
+ * A helper to build write request which result needs to be checked (by sending a [[org.asyncmongo.protocol.commands.GetLastError]] command after).
+ *
+ * @param op write operation.
+ * @param documents body of this request, a [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]] containing 0, 1, or many documents.
+ * @param getLastError a [[org.asyncmongo.protocol.commands.GetLastError]] command message.
+ */
 case class CheckedWriteRequest(
   op: WriteRequestOp,
   documents: ChannelBuffer,
@@ -74,6 +111,13 @@ case class CheckedWriteRequest(
   def apply() :(RequestMaker, RequestMaker) = RequestMaker(op, documents, None) -> getLastError.apply(op.db).maker
 }
 
+/**
+ * A helper to build requests.
+ *
+ * @param op write operation.
+ * @param documents body of this request, a [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]] containing 0, 1, or many documents.
+ * @param channelIdHint a hint for sending this request on a particular channel.
+ */
 case class RequestMaker(
   op: RequestOp,
   documents: ChannelBuffer,
@@ -82,12 +126,26 @@ case class RequestMaker(
   def apply(id: Int) = Request(id, 0, op, documents, None)
 }
 
+// TODO remove, useless
 object RequestMaker {
   def apply(op: RequestOp) :RequestMaker = RequestMaker(op, new LittleEndianHeapChannelBuffer(0), None)
   def apply(op: RequestOp, buffer: ChannelBuffer) :RequestMaker = RequestMaker(op, buffer, None)
 }
 
+/**
+ * @define requestID id of this request, so that the response may be identifiable. Should be strictly positive.
+ * @define op request operation.
+ * @define documentsA body of this request, a [[scala.Array]] containing 0, 1, or many documents.
+ * @define documentsC body of this request, a [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]] containing 0, 1, or many documents.
+ */
 object Request{
+  /**
+   * Create a request.
+   *
+   * @param requestID $requestID
+   * @param op $op
+   * @param documents $documentsA
+   */
   def apply(requestID: Int, responseTo: Int, op: RequestOp, documents: Array[Byte]) :Request = {
     Request(
       requestID,
@@ -95,36 +153,69 @@ object Request{
       op,
       ChannelBuffers.wrappedBuffer(ByteOrder.LITTLE_ENDIAN, documents))
   }
+  /**
+   * Create a request.
+   *
+   * @param requestID $requestID
+   * @param op $op
+   * @param documents $documentsC
+   */
   def apply(requestID: Int, op: RequestOp, documents: ChannelBuffer) :Request = Request.apply(requestID, 0, op, documents)
+  /**
+   * Create a request.
+   *
+   * @param requestID $requestID
+   * @param op $op
+   * @param documents $documentsA
+   */
   def apply(requestID: Int, op: RequestOp, documents: Array[Byte]) :Request = Request.apply(requestID, 0, op, documents)
+  /**
+   * Create a request.
+   *
+   * @param requestID $requestID
+   * @param op $op
+   */
   def apply(requestID: Int, op: RequestOp) :Request = Request.apply(requestID, op, new Array[Byte](0))
 }
 
+/**
+ * A Mongo Wire Protocol Response messages.
+ *
+ * @param header header of this response.
+ * @param reply the reply operation contained in this response.
+ * @param documents body of this response, a [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]] containing 0, 1, or many documents.
+ * @param info some meta information about this response, see [[org.asyncmongo.protocol.ResponseInfo]].
+ */
 case class Response(
   header: MessageHeader,
   reply: Reply,
   documents: ChannelBuffer,
   info: ResponseInfo) {
-
+  /**
+   * if this response is in error, explain this error.
+   */
   lazy val error :Option[ExplainedError] = {
     if(reply.inError) {
       import org.asyncmongo.handlers.DefaultBSONHandlers._
       val bson = DefaultBSONReaderHandler.handle(reply, documents)
-      if(bson.hasNext) 
+      if(bson.hasNext)
         ExplainedError(DefaultBSONReaderHandler.handle(reply, documents).next)
       else None
     } else None
   }
 }
 
+/** An error */ // TODO
 case class ExplainedError(
   err: String
 )
 
 object ExplainedError {
   import org.asyncmongo.bson._
-
-  def apply(bson: DefaultBSONIterator) :Option[ExplainedError] = {
+  /**
+   * Make an [[org.asyncmongo.protocol.ExplainedError]] from the given [[org.asyncmongo.bson.BSONIterator]].
+   */
+  def apply(bson: BSONIterator) :Option[ExplainedError] = {
     bson.find(_.name == "err").map {
       case err: BSONString => ExplainedError(err.value)
       case _ => throw new RuntimeException("???")
@@ -132,17 +223,20 @@ object ExplainedError {
   }
 }
 
+/**
+ * Response meta information.
+ *
+ * @param channelId the id of the channel that carried this response.
+ * @param localAddress string representation of the local address of the channel
+ * @param remoteAddress string representation of the remote address of the channel
+ */
 case class ResponseInfo(
   channelId: Int,
-  localAddress: String,
+  localAddress: String, // TODO
   remoteAddress: String)
 
-case class ErrorResponse(
-  readReply: Response,
-  err: String
-)
-
-class RequestEncoder extends OneToOneEncoder {
+// protocol handlers for netty.
+private[asyncmongo] class RequestEncoder extends OneToOneEncoder {
   import RequestEncoder._
   def encode(ctx: ChannelHandlerContext, channel: Channel, obj: Object) = {
     obj match {
@@ -153,18 +247,18 @@ class RequestEncoder extends OneToOneEncoder {
         buffer
       }
       case _ => {
-         logger.error("RequestEncoder: weird... do not know how to encode this object: " + obj)
+         logger.error("weird... do not know how to encode this object: " + obj)
          obj
       }
     }
   }
 }
 
-object RequestEncoder {
+private[asyncmongo] object RequestEncoder {
   val logger = LoggerFactory.getLogger("protocol/RequestEncoder")
 }
 
-class ResponseFrameDecoder extends FrameDecoder {
+private[asyncmongo] class ResponseFrameDecoder extends FrameDecoder {
   override def decode(context: ChannelHandlerContext, channel: Channel, buffer: ChannelBuffer) = {
     val readableBytes = buffer.readableBytes
     if(readableBytes < 4) null
@@ -179,7 +273,7 @@ class ResponseFrameDecoder extends FrameDecoder {
   }
 }
 
-class ResponseDecoder extends OneToOneDecoder {
+private[asyncmongo] class ResponseDecoder extends OneToOneDecoder {
   import java.net.InetSocketAddress
 
   def decode(ctx: ChannelHandlerContext, channel: Channel, obj: Object) = {
@@ -192,7 +286,7 @@ class ResponseDecoder extends OneToOneDecoder {
   }
 }
 
-class MongoHandler(receiver: ActorRef) extends SimpleChannelHandler {
+private[asyncmongo] class MongoHandler(receiver: ActorRef) extends SimpleChannelHandler {
   import MongoHandler._
   override def messageReceived(ctx: ChannelHandlerContext, e: MessageEvent) {
     val response = e.getMessage.asInstanceOf[Response]
@@ -227,16 +321,28 @@ class MongoHandler(receiver: ActorRef) extends SimpleChannelHandler {
   def log(e: ChannelEvent, s: String) = logger.trace("(channel=" + e.getChannel.getId + ") " + s)
 }
 
-object MongoHandler {
+private[asyncmongo] object MongoHandler {
   private val logger = LoggerFactory.getLogger("protocol/MongoHandler")
 }
 
+/**
+ * State of a node.
+ */
 sealed trait NodeState
+/**
+ * State of a node in a replica set.
+ */
 sealed trait MongoNodeState {
+  /**
+   * state code
+   */
   val code: Int
 }
 
 object NodeState {
+  /**
+   * Gets the NodeState matching the given state code.
+   */
   def apply(i: Int) :NodeState = i match {
     case 1 => PRIMARY
     case 2 => SECONDARY
@@ -250,24 +356,41 @@ object NodeState {
     case _ => NONE
   }
 
-  case object PRIMARY    extends NodeState with MongoNodeState { override val code = 1 } // Primary
-  case object SECONDARY  extends NodeState with MongoNodeState { override val code = 2 } // Secondary
-  case object RECOVERING extends NodeState with MongoNodeState { override val code = 3 } // Recovering (initial syncing, post-rollback, stale members)
-  case object FATAL      extends NodeState with MongoNodeState { override val code = 4 } // Fatal error
-  case object STARTING   extends NodeState with MongoNodeState { override val code = 5 } // Starting up, phase 2 (forking threads)
-  case object UNKNOWN    extends NodeState with MongoNodeState { override val code = 6 } // Unknown state (member has never been reached)
-  case object ARBITER    extends NodeState with MongoNodeState { override val code = 7 } // Arbiter
-  case object DOWN       extends NodeState with MongoNodeState { override val code = 8 } // Down
-  case object ROLLBACK   extends NodeState with MongoNodeState { override val code = 9 } // Rollback
+  /** This node is a primary (both read and write operations are allowed). */
+  case object PRIMARY    extends NodeState with MongoNodeState { override val code = 1 }
+  /** This node is a secondary (only read operations that are slaveOk are allowed). */
+  case object SECONDARY  extends NodeState with MongoNodeState { override val code = 2 }
+  /** This node is recovering (initial syncing, post-rollback, stale members). */
+  case object RECOVERING extends NodeState with MongoNodeState { override val code = 3 }
+  /** This node encountered a fatal error. */
+  case object FATAL      extends NodeState with MongoNodeState { override val code = 4 }
+  /** This node is starting up (phase 2, forking threads). */
+  case object STARTING   extends NodeState with MongoNodeState { override val code = 5 }
+  /** This node is in an unknown state (it has never been reached from another node's point of view). */
+  case object UNKNOWN    extends NodeState with MongoNodeState { override val code = 6 }
+  /** This node is an arbiter (contains no data). */
+  case object ARBITER    extends NodeState with MongoNodeState { override val code = 7 }
+  /** This node is down. */
+  case object DOWN       extends NodeState with MongoNodeState { override val code = 8 }
+  /** This node is the rollback state. */
+  case object ROLLBACK   extends NodeState with MongoNodeState { override val code = 9 }
+  /** This node has no state yet (never been reached by the driver). */
   case object NONE       extends NodeState
+  /** This node is not connected. */
   case object NOT_CONNECTED extends NodeState
+  /** This node is connected. */
   case object CONNECTED extends NodeState
 }
 
+/** State of a channel. Useful mainly for authentication. */
 sealed trait ChannelState
 object ChannelState {
+  /** This channel is closed. */
   case object Closed extends ChannelState
+  /** This channel is not connected. */
   case object NotConnected extends ChannelState
-  case object Useable extends ChannelState
+  /** This channel is usable, meaning that it can be used for sending wire protocol messages. */
+  case object Useable extends ChannelState // TODO useable => usable
+  /** This channel is currently authenticating, it should not been used for other kind of messages until the authentication process is done. */
   case class Authenticating(db: String, user: String, password: String, nonce: Option[String]) extends ChannelState
 }
