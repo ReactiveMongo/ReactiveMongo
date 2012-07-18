@@ -89,7 +89,7 @@ class GridFSIteratee(
     def writeChunk(n: Int, array: Array[Byte]) = {
       val bson = Bson(files_id)
       bson.write(BSONInteger("n", n))
-      bson.write(new BSONBinary("data", array, genericBinarySubtype))
+      bson.write(new BSONBinary("data", array, Subtype.GenericBinarySubtype))
       logger.debug("writing chunk " + n)
       chunksCollection.insert(bson, GetLastError())
     }

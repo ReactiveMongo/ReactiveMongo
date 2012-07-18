@@ -14,13 +14,30 @@ import org.jboss.netty.channel.group._
 import org.slf4j.{Logger, LoggerFactory}
 
 // messages
+/**
+ * Authenticate message.
+ *
+ * @param db The name of the target database
+ * @param user The username
+ * @param password The password
+ */
 case class Authenticate(db: String, user: String, password: String)
+/**
+ * Message to close all active connections.
+ * The MongoDBSystem actor must be used after this message has been sent.
+ */
 case object Close
 private[asyncmongo] case object ConnectAll
 private[asyncmongo] case object RefreshAllNodes
 private[asyncmongo] case class Connected(channelId: Int)
 private[asyncmongo] case class Disconnected(channelId: Int)
 
+/**
+ * Main actor that processes the requests.
+ *
+ * @param seeds nodes that will be probed to discover the whole replica set (or one standalone node)
+ * @param auth list of authenticate messages - all the nodes will be authenticated as soon they are connected.
+ */
 class MongoDBSystem(seeds: List[String] = List("localhost:27017"), auth :List[Authenticate]) extends Actor {
   import MongoDBSystem._
 
@@ -207,7 +224,7 @@ class MongoDBSystem(seeds: List[String] = List("localhost:27017"), auth :List[Au
         node.copy(channels = node.channels.map { channel =>
           if(channel.getId == response.info.channelId) {
             val authenticating = channel.state.asInstanceOf[Authenticating]
-            logger.debug("AUTH: authentifying with " + authenticating)
+            logger.debug("AUTH: authenticating with " + authenticating)
             channel.write(AuthenticateCommand(authenticating.user, authenticating.password, getnonce.nonce)(authenticating.db).maker(requestIdGenerator.authenticate))
             channel.copy(state = authenticating.copy(nonce = Some(getnonce.nonce)))
           } else channel
@@ -216,7 +233,7 @@ class MongoDBSystem(seeds: List[String] = List("localhost:27017"), auth :List[Au
     }
     // authenticate response
     case response: Response if response.header.responseTo >= 2000 && response.header.responseTo < 3000 => {
-      logger.debug("AUTH: got authentified response! " + response.info.channelId)
+      logger.debug("AUTH: got authenticated response! " + response.info.channelId)
       updateNodeSetManager(NodeSetManager(nodeSetManager.get.nodeSet.updateByChannelId(response.info.channelId, { node =>
         logger.debug("AUTH: updating node " + node + "...")
         node.updateChannelById(response.info.channelId, { channel =>
@@ -324,8 +341,13 @@ object MongoDBSystem {
   private val logger = LoggerFactory.getLogger("MongoDBSystem")
 }
 
+/**
+ * A mongo error
+ */
 trait MongoError extends Throwable {
+  /** error code */
   val code: Option[Int]
+  /** explanation message */
   val message: Option[String]
   override def getMessage :String = "MongoError[code=" + code.getOrElse("None") + " => message: " + message.getOrElse("None") + "]"
 }
