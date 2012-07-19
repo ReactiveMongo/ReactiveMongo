@@ -16,7 +16,7 @@ object Samples {
     val futureCursor = collection.find(Bson("name" -> BSONString("Jack")))
 
     // let's enumerate this cursor and print a readable representation of each document in the response
-    Cursor.enumerate(Some(futureCursor))(Iteratee.foreach { doc =>
+    Cursor.enumerate(futureCursor)(Iteratee.foreach { doc =>
       println("found document: " + DefaultBSONIterator.pretty(doc))
     })
   }

@@ -76,7 +76,7 @@ object Samples {
     val futureCursor = collection.find(Bson(BSONString("name", "Jack")))
 
     // let's enumerate this cursor and print a readable representation of each document in the response
-    Cursor.enumerate(Some(futureCursor))(Iteratee.foreach { doc =>
+    Cursor.enumerate(futureCursor)(Iteratee.foreach { doc =>
       println("found document: " + DefaultBSONIterator.pretty(doc))
     })
   }
@@ -220,7 +220,7 @@ object Collection {
  *
  * Please note that you should not use Cursor directly.
  * You are invited to use the enumerator/iteratee pattern to handle Cursor operations.
- * You may take a look to {{{Cursor.enumerate[T](futureCursor: Option[Future[Cursor[T]]]) :Enumerator[T]}}} to produce an enumerator and consume the documents using an iteratee on your own.
+ * You may take a look to {{{Cursor.enumerate[T](futureCursor: Future[Cursor[T]]) :Enumerator[T]}}} to produce an enumerator and consume the documents using an iteratee on your own.
  *
  * Example:
  * {{{
@@ -240,7 +240,7 @@ object Samples {
     val futureCursor = collection.find(Bson(BSONString("name", "Jack")))
 
     // let's enumerate this cursor and print a readable representation of each document in the response
-    Cursor.enumerate(Some(futureCursor))(Iteratee.foreach { doc =>
+    Cursor.enumerate(futureCursor)(Iteratee.foreach { doc =>
       println("found document: " + DefaultBSONIterator.pretty(doc))
     })
   }
@@ -312,7 +312,7 @@ object Samples {
     val futureCursor = collection.find(Bson(BSONString("name", "Jack")))
 
     // let's enumerate this cursor and print a readable representation of each document in the response
-    Cursor.enumerate(Some(futureCursor))(Iteratee.foreach { doc =>
+    Cursor.enumerate(futureCursor)(Iteratee.foreach { doc =>
       println("found document: " + DefaultBSONIterator.pretty(doc))
     })
   }
@@ -323,39 +323,17 @@ object Samples {
    *
    * @tparam T the type of the matched documents. An implicit [[org.asyncmongo.handlers.BSONReader]][T] typeclass for handling it has to be in the scope.
    */
-  def enumerate[T](futureCursor: Option[Future[Cursor[T]]]) :Enumerator[T] = {
-    var currentCursor :Option[Cursor[T]] = None
-    Enumerator.fromCallback { () =>
-      if(currentCursor.isDefined && currentCursor.get.iterator.hasNext){
-        logger.trace("enumerate: give next element from iterator")
-        PlayPromise.pure(Some(currentCursor.get.iterator.next))
-      } else if(currentCursor.isDefined && currentCursor.get.hasNext) {
-        logger.trace("enumerate: fetching next cursor")
-        new AkkaPromise(currentCursor.get.next.get.map { cursor =>
-          logger.trace("redeemed from next cursor")
-          currentCursor = Some(cursor)
-          Some(cursor.iterator.next)
-        })
-      } else if(!currentCursor.isDefined && futureCursor.isDefined) {
-        logger.trace("enumerate: fetching from first future")
-        new AkkaPromise(futureCursor.get.map { cursor =>
-          logger.trace("redeemed from first cursor")
-          currentCursor = Some(cursor)
-          if(cursor.iterator.hasNext) {
-            logger.trace("has result")
-            Some(cursor.iterator.next)
-          }
-          else {
-            logger.trace("no result")
-            None
-          }
-        })
-      } else {
-        logger.debug("Nothing to enumerate")
-        PlayPromise.pure(None)
+  def enumerate[T](futureCursor: Future[Cursor[T]]) :Enumerator[T] =
+    Enumerator.flatten(futureCursor.map { cursor =>
+      Enumerator.unfoldM(cursor) { cursor =>
+        if(cursor.iterator.hasNext)
+          PlayPromise.pure(Some((cursor,Some(cursor.iterator.next))))
+        else if (cursor.hasNext)
+          cursor.next.get.asPromise.map(c => Some((c,None)))
+        else
+          PlayPromise.pure(None)
       }
-    }
-  }
+    }.asPromise) &> Enumeratee.collect { case Some(e) => e }
 }
 
 /**
