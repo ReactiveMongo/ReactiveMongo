@@ -13,7 +13,7 @@ object Samples {
     val collection = db("acoll")
 
     // get a Future[Cursor[DefaultBSONIterator]]
-    val futureCursor = collection.find(Bson(BSONString("name", "Jack")))
+    val futureCursor = collection.find(Bson("name" -> BSONString("Jack")))
 
     // let's enumerate this cursor and print a readable representation of each document in the response
     Cursor.enumerate(Some(futureCursor))(Iteratee.foreach { doc =>
