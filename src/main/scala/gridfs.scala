@@ -31,14 +31,14 @@ case class GridFSFile(
   filename: Option[String]) {
   def toBson = {
     val bson = Bson(
-      BSONInteger("length", length),
-      BSONInteger("chunkSize", chunkSize))
+      "length" -> BSONInteger(length),
+      "chunkSize" -> BSONInteger(chunkSize))
     if(md5.isDefined)
-      BSONString("md5", md5.get)
+      bson.write("md5" -> BSONString(md5.get))
     if(id.isDefined)
       bson.write(id.get)
     if(filename.isDefined)
-      bson.write(BSONString("filename", filename.get))
+      bson.write("filename" -> BSONString(filename.get))
     bson
   }
 }
@@ -49,7 +49,7 @@ case class PutResult(
 )
 
 class GridFSIteratee(
-  files_id: BSONElement,
+  files_id: BSONValue,
   chunksCollection: Collection,
   chunkSize: Int = 262144 // default chunk size is 256k (GridFS spec)
 ) {
@@ -87,9 +87,9 @@ class GridFSIteratee(
       })
     }
     def writeChunk(n: Int, array: Array[Byte]) = {
-      val bson = Bson(files_id)
-      bson.write(BSONInteger("n", n))
-      bson.write(new BSONBinary("data", array, Subtype.GenericBinarySubtype))
+      val bson = Bson("files_id" -> files_id)
+      bson.write("n" -> BSONInteger(n))
+      bson.write("data" -> new BSONBinary(array, Subtype.GenericBinarySubtype))
       logger.debug("writing chunk " + n)
       chunksCollection.insert(bson, GetLastError())
     }
@@ -105,12 +105,12 @@ class GridFS(db: DB, name: String = "fs") {
   val files = db(name + ".files")
   val chunks = db(name + ".chunks")
 
-  def readContent(id: BSONElement) :Enumerator[Array[Byte]] = {
-    val toto = chunks.find(Bson(id), None, 0, Int.MaxValue)
+  def readContent(id: BSONValue) :Enumerator[Array[Byte]] = {
+    val toto = chunks.find(Bson("files_id" -> id), None, 0, Int.MaxValue)
     val e = Cursor.enumerate(Some(toto))
     val e2 = e.through(Enumeratee.map { doc =>
       doc.find(_.name == "data").flatMap {
-        case BSONBinary(_, data, _) => Some(data.array())
+        case ReadBSONElement(_, BSONBinary(data, _)) => Some(data.array())
         case _ => None
       }.getOrElse {
         logger.error("not a chunk! failed assertion: data field is missing")
@@ -120,7 +120,7 @@ class GridFS(db: DB, name: String = "fs") {
     e2
   }
 
-  def readContent(id: BSONElement, os: OutputStream) :Promise[Iteratee[Array[Byte],Unit]] = {
+  def readContent(id: BSONValue, os: OutputStream) :Promise[Iteratee[Array[Byte],Unit]] = {
     readContent(id)(Iteratee.foreach { chunk =>
       os.write(chunk)
     })
@@ -128,15 +128,15 @@ class GridFS(db: DB, name: String = "fs") {
 
   def write(file: File, chunkSize: Int = 16) :Promise[PutResult] = {
     val enumerator = Enumerator.fromFile(file, 100)
-    val id = BSONString("_id", file.getName + Random.nextInt)
+    val id = BSONString(file.getName + Random.nextInt)
     val bson = Bson(
-        id,
-        BSONInteger("chunkSize", chunkSize),
-        BSONString("filename", file.getName),
-        BSONInteger("length", file.length.toInt))
+        "_id" -> id,
+        "chunkSize" -> BSONInteger(chunkSize),
+        "filename" -> BSONString(file.getName),
+        "length" -> BSONInteger(file.length.toInt))
 
     new AkkaPromise(files.insert(bson, GetLastError())).flatMap { _ =>
-      val iteratee = GridFS.iteratee(id.copy(name="files_id"), chunks, chunkSize)
+      val iteratee = GridFS.iteratee(id, chunks, chunkSize)
       val e = enumerator(iteratee)
       val pp = Iteratee.flatten(e).run
       pp.flatMap(i => i)
@@ -146,16 +146,16 @@ class GridFS(db: DB, name: String = "fs") {
 
 object GridFS {
   private val logger = LoggerFactory.getLogger("GridFS")
-  def iteratee(files_id: BSONElement, chunksCollection: Collection, chunkSize: Int) :Iteratee[Array[Byte], Promise[PutResult]] =
+  def iteratee(files_id: BSONValue, chunksCollection: Collection, chunkSize: Int) :Iteratee[Array[Byte], Promise[PutResult]] =
     new GridFSIteratee(files_id, chunksCollection, chunkSize).iteratee
-  def iteratee(files_id: BSONElement, chunksCollection: Collection) :Iteratee[Array[Byte], Promise[PutResult]] =
+  def iteratee(files_id: BSONValue, chunksCollection: Collection) :Iteratee[Array[Byte], Promise[PutResult]] =
     new GridFSIteratee(files_id, chunksCollection).iteratee
 
   // tests
   def read {
     val gfs = new GridFS(DB("plugin", MongoConnection(List("localhost:27016"))))
     val baos = new ByteArrayOutputStream
-    gfs.readContent(BSONString("files_id", "TODO.txt-1978187670"), baos).onRedeem(_ => {
+    gfs.readContent(BSONString("TODO.txt4521292"), baos).onRedeem(_ => {
       val result = baos.toString("utf-8")
       println("DONE \n => " + result)
       println("\tof md5 = " + Converters.hex2Str(java.security.MessageDigest.getInstance("MD5").digest(baos.toByteArray)))

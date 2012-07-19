@@ -1,6 +1,7 @@
 package org.asyncmongo.bson
 
 import org.asyncmongo.utils.Converters
+import org.asyncmongo.utils.RichBuffer._
 import org.jboss.netty.buffer.{ChannelBuffer, ChannelBuffers}
 import java.nio.ByteOrder
 
@@ -31,48 +32,39 @@ element  ::=  "\x01" e_name double  Floating point
  * A BSON pair (name, bsonvalue).
  */
 sealed trait BSONElement {
-  /** BSON type code */
-  val code :Int
   val name: String
+  val value: BSONValue
 
   /** Writes this element to the given [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]] */
   def write(buffer: ChannelBuffer) :ChannelBuffer = {
-    buffer writeByte code
-    writeCString(name, buffer)
-    writeContent(buffer)
-  }
-
-  /** Writes the value without the name and the code */
-  def writeContent(buffer: ChannelBuffer) :ChannelBuffer
-
-  protected[bson] final def writeCString(s: String, buffer: ChannelBuffer): ChannelBuffer = {
-    val bytes = s.getBytes("utf-8")
-    buffer writeBytes bytes
-    buffer writeByte 0
-    buffer
-  }
-
-  protected[bson] final def writeString(s: String, buffer: ChannelBuffer): ChannelBuffer = {
-    val bytes = s.getBytes("utf-8")
-    buffer writeInt (bytes.size + 1)
-    buffer writeBytes bytes
-    buffer writeByte 0
-    buffer
+    buffer writeByte value.code
+    buffer writeCString name
+    value write buffer
   }
 }
-// sam apple pie
-/** A BSON Double element */
-case class BSONDouble        (name: String, value: Double) extends BSONElement {
+
+// TODO eager/lazy
+case class DefaultBSONElement(name: String, value: BSONValue) extends BSONElement
+case class ReadBSONElement(name: String, value: BSONValue) extends BSONElement
+
+sealed trait BSONValue {
+  /** bson type code */
+  val code: Int
+  /** Writes this value int the given [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]] */
+  def write(buffer: ChannelBuffer) :ChannelBuffer
+}
+
+case class BSONDouble(value: Double) extends BSONValue {
   val code = 0x01
 
-  def writeContent(buffer: ChannelBuffer) = { buffer writeDouble value; buffer }
+  def write(buffer: ChannelBuffer) = { buffer writeDouble value; buffer }
 }
 
-/** A BSON String element */
-case class BSONString        (name: String, value: String) extends BSONElement {
+/** A BSON String */
+case class BSONString(value: String) extends BSONValue {
   val code = 0x02
 
-  def writeContent(buffer: ChannelBuffer) = { writeString(value, buffer) }
+  def write(buffer: ChannelBuffer) = { buffer writeString value }
 }
 
 /**
@@ -80,10 +72,10 @@ case class BSONString        (name: String, value: String) extends BSONElement {
  *
  * @param value The [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]] containing the embedded document.
  */
-case class BSONDocument      (name: String, value: ChannelBuffer) extends BSONElement {
+case class BSONDocument(value: ChannelBuffer) extends BSONValue {
   val code = 0x03
 
-  def writeContent(buffer: ChannelBuffer) = { buffer.writeBytes(value); buffer }
+  def write(buffer: ChannelBuffer) = { buffer.writeBytes(value); buffer }
 }
 
 /**
@@ -91,149 +83,149 @@ case class BSONDocument      (name: String, value: ChannelBuffer) extends BSONEl
  *
  * @param value The [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]] containing the embedded array.
  */
-case class BSONArray         (name: String, value: ChannelBuffer) extends BSONElement {
+case class BSONArray(value: ChannelBuffer) extends BSONValue {
   val code = 0x04
 
-  def writeContent(buffer: ChannelBuffer) = { buffer writeBytes value; buffer }
+  def write(buffer: ChannelBuffer) = { buffer writeBytes value; buffer }
 }
 
 /**
- * A BSON binary element.
+ * A BSON binary value.
  *
  * @param value The binary content.
  * @param subtype The type of the binary content.
  */
-case class BSONBinary        (name: String, value: ChannelBuffer, subtype: Subtype) extends BSONElement {
+case class BSONBinary(value: ChannelBuffer, subtype: Subtype) extends BSONValue {
   val code = 0x05
 
-  def writeContent(buffer: ChannelBuffer) = { buffer writeInt value.readableBytes; buffer writeByte subtype.value; buffer writeBytes value; buffer }
+  def write(buffer: ChannelBuffer) = { buffer writeInt value.readableBytes; buffer writeByte subtype.value; buffer writeBytes value; buffer }
 
-  def this(name: String, value: Array[Byte], subtype: Subtype) = this(name, ChannelBuffers.wrappedBuffer(ByteOrder.LITTLE_ENDIAN, value), subtype)
+  def this(value: Array[Byte], subtype: Subtype) = this(ChannelBuffers.wrappedBuffer(ByteOrder.LITTLE_ENDIAN, value), subtype)
 }
 
 /** BSON Undefined value */
-case class BSONUndefined     (name: String) extends BSONElement {
+object BSONUndefined extends BSONValue {
   val code = 0x06
 
-  def writeContent(buffer: ChannelBuffer) = buffer
+  def write(buffer: ChannelBuffer) = buffer
 }
 
-/** BSON ObjectId element. */
-case class BSONObjectID      (name: String, value: Array[Byte]) extends BSONElement {
+/** BSON ObjectId value. */
+case class BSONObjectID(value: Array[Byte]) extends BSONValue {
   val code = 0x07
 
   /** Constructs a BSON ObjectId element from a hexadecimal String representation */
-  def this(name: String, value: String) = this(name, Converters.str2Hex(value))
+  def this(value: String) = this(Converters.str2Hex(value))
 
   /** ObjectId hexadecimal String representation */
   lazy val stringify = Converters.hex2Str(value)
 
   override def toString = "BSONObjectID[\"" + stringify + "\"]"
 
-  def writeContent(buffer: ChannelBuffer) = { buffer writeBytes value; buffer }
+  def write(buffer: ChannelBuffer) = { buffer writeBytes value; buffer }
 }
 
-/** BSON boolean element */
-case class BSONBoolean       (name: String, value: Boolean) extends BSONElement {
+/** BSON boolean value */
+case class BSONBoolean(value: Boolean) extends BSONValue {
   val code = 0x08
 
-  def writeContent(buffer: ChannelBuffer) = { buffer writeByte (if (value) 1 else 0); buffer }
+  def write(buffer: ChannelBuffer) = { buffer writeByte (if (value) 1 else 0); buffer }
 }
 
-/** BSON date time element */
-case class BSONDateTime      (name: String, value: Long) extends BSONElement {
+/** BSON date time value */
+case class BSONDateTime(value: Long) extends BSONValue {
   val code = 0x09
 
-  def writeContent(buffer: ChannelBuffer) = { buffer writeLong value; buffer }
+  def write(buffer: ChannelBuffer) = { buffer writeLong value; buffer }
 }
 
 /** BSON null value */
-case class BSONNull          (name: String) extends BSONElement {
+object BSONNull extends BSONValue {
   val code = 0x0A
 
-  def writeContent(buffer: ChannelBuffer) = { buffer }
+  def write(buffer: ChannelBuffer) = { buffer }
 }
 
 /**
- * BSON Regex element.
+ * BSON Regex value.
  *
  * @param flags Regex flags.
  */
-case class BSONRegex         (name: String, value: String, flags: String) extends BSONElement {
+case class BSONRegex(value: String, flags: String) extends BSONValue {
   val code = 0x0B
 
-  def writeContent(buffer: ChannelBuffer) = { writeCString(value, buffer); writeCString(flags, buffer) }
+  def write(buffer: ChannelBuffer) = { buffer writeCString value; buffer writeCString flags }
 }
 
-/** BSON DBPointer element. TODO */
-case class BSONDBPointer     (name: String, value: String, id: Array[Byte]) extends BSONElement {
+/** BSON DBPointer value. TODO */
+case class BSONDBPointer(value: String, id: Array[Byte]) extends BSONValue {
   val code = 0x0C
 
-  def writeContent(buffer: ChannelBuffer) = { buffer } // todo
+  def write(buffer: ChannelBuffer) = { buffer } // todo
 }
 
 /**
- * BSON JavaScript element.
+ * BSON JavaScript value.
  *
  * @param value The JavaScript source code.
  */
-case class BSONJavaScript    (name: String, value: String) extends BSONElement {
+case class BSONJavaScript(value: String) extends BSONValue {
   val code = 0x0D
 
-  def writeContent(buffer: ChannelBuffer) = { writeString(value, buffer) }
+  def write(buffer: ChannelBuffer) = { buffer writeString value }
 }
 
 /** BSON Symbol value. */
-case class BSONSymbol        (name: String, value: String) extends BSONElement {
+case class BSONSymbol(value: String) extends BSONValue {
   val code = 0x0E
 
-  def writeContent(buffer: ChannelBuffer) = { writeString(value, buffer) }
+  def write(buffer: ChannelBuffer) = { buffer writeString value }
 }
 
 /**
- * BSON scoped JavaScript element.
+ * BSON scoped JavaScript value.
  *
  * @param value The JavaScript source code. TODO
  */
-case class BSONJavaScriptWS  (name: String, value: String) extends BSONElement {
+case class BSONJavaScriptWS(value: String) extends BSONValue {
   val code = 0x0F
 
-  def writeContent(buffer: ChannelBuffer) = { writeString(value, buffer) } // todo: where is the ws document ?
+  def write(buffer: ChannelBuffer) = { buffer writeString value } // todo: where is the ws document ?
 }
 
-/** BSON Integer element */
-case class BSONInteger       (name: String, value: Int) extends BSONElement {
+/** BSON Integer value */
+case class BSONInteger(value: Int) extends BSONValue {
   val code = 0x10
 
-  def writeContent(buffer: ChannelBuffer) = { buffer writeInt value; buffer }
+  def write(buffer: ChannelBuffer) = { buffer writeInt value; buffer }
 }
 
-/** BSON Timestamp element. TODO */
-case class BSONTimestamp     (name: String, value: Long) extends BSONElement {
+/** BSON Timestamp value. TODO */
+case class BSONTimestamp(value: Long) extends BSONValue {
   val code = 0x11
 
-  def writeContent(buffer: ChannelBuffer) = { buffer writeLong value; buffer }
+  def write(buffer: ChannelBuffer) = { buffer writeLong value; buffer }
 }
 
-/** BSON Long element */
-case class BSONLong          (name: String, value: Long) extends BSONElement {
+/** BSON Long value */
+case class BSONLong(value: Long) extends BSONValue {
   val code = 0x12
 
-  def writeContent(buffer: ChannelBuffer) = { buffer writeLong value; buffer }
+  def write(buffer: ChannelBuffer) = { buffer writeLong value; buffer }
 }
 
 /** BSON Min key value */
-case class BSONMinKey        (name: String) extends BSONElement {
+object BSONMinKey extends BSONValue {
   val code = 0xFF
 
-  def writeContent(buffer: ChannelBuffer) = { buffer }
+  def write(buffer: ChannelBuffer) = { buffer }
 }
 
 /** BSON Max key value */
-case class BSONMaxKey        (name: String) extends BSONElement {
+object BSONMaxKey extends BSONValue {
   val code = 0x7F
 
-  def writeContent(buffer: ChannelBuffer) = { buffer }
+  def write(buffer: ChannelBuffer) = { buffer }
 }
 
 /** Binary Subtype */
@@ -266,6 +258,12 @@ class Bson(val estimatedLength: Int = 32) {
     this
   }
 
+  /** Writes a BSON value of the given name into this buffer. */
+  def write(el: (String, BSONValue)) :Bson = {
+    DefaultBSONElement(el._1, el._2).write(buffer)
+    this
+  }
+
   /**
    * Ends the Bson, sets the length and returns the buffer.
    *
@@ -279,12 +277,21 @@ class Bson(val estimatedLength: Int = 32) {
 }
 
 object Bson {
-  def apply = new Bson
-
   /** Creates a Bson object and adds the given elements. */
   def apply(el: BSONElement, els: BSONElement*) = {
     val bson = new Bson
     bson.write(el)
+    for(e <- els) {
+      bson.write(e)
+    }
+    bson
+  }
+
+  /**
+   * Creates a Bson object and adds the given name -> value.
+   */
+  def apply(els: (String, BSONValue)*) = {
+    val bson = new Bson
     for(e <- els) {
       bson.write(e)
     }
@@ -323,9 +330,9 @@ object Bson {
     println("awaiting: " + java.util.Arrays.toString(baos.toByteArray))
 
     val bson = Bson(
-      BSONString("name", "Jack"),
-      BSONInteger("age", 37),
-      BSONInteger("getLastError", 1)
+      "name" -> BSONString("Jack"),
+      "age" -> BSONInteger(37),
+      "getLastError" -> BSONInteger(1)
     )
     println("produced: " + java.util.Arrays.toString(bson.getBuffer.array))
     println(DefaultBSONIterator(bson.getBuffer).toList)
@@ -353,10 +360,10 @@ sealed trait BSONIterator extends Iterator[BSONElement] {
   val documentSize = buffer.readInt
 
   def next :BSONElement = buffer.readByte match {
-    case 0x01 => BSONDouble(buffer.readCString, buffer.readDouble)
-    case 0x02 => BSONString(buffer.readCString, buffer.readUTF8)
-    case 0x03 => BSONDocument(buffer.readCString, buffer.readBytes(buffer.getInt(buffer.readerIndex)))
-    case 0x04 => BSONArray(buffer.readCString, buffer.readBytes(buffer.getInt(buffer.readerIndex)))
+    case 0x01 => ReadBSONElement(buffer.readCString, BSONDouble(buffer.readDouble))
+    case 0x02 => ReadBSONElement(buffer.readCString, BSONString(buffer.readString))
+    case 0x03 => ReadBSONElement(buffer.readCString, BSONDocument(buffer.readBytes(buffer.getInt(buffer.readerIndex))))
+    case 0x04 => ReadBSONElement(buffer.readCString, BSONArray(buffer.readBytes(buffer.getInt(buffer.readerIndex))))
     case 0x05 => {
       val name = buffer.readCString
       val length = buffer.readInt
@@ -369,22 +376,22 @@ sealed trait BSONIterator extends Iterator[BSONElement] {
         case 0x80 => UserDefinedSubtype
         case _ => throw new RuntimeException("unsupported binary subtype")
       }
-      BSONBinary(name, buffer.readBytes(length), subtype) }
-    case 0x06 => BSONUndefined(buffer.readCString)
-    case 0x07 => BSONObjectID(buffer.readCString, buffer.readArray(12))
-    case 0x08 => BSONBoolean(buffer.readCString, buffer.readByte == 0x01)
-    case 0x09 => BSONDateTime(buffer.readCString, buffer.readLong)
-    case 0x0A => BSONNull(buffer.readCString)
-    case 0x0B => BSONRegex(buffer.readCString, buffer.readCString, buffer.readCString)
-    case 0x0C => BSONDBPointer(buffer.readCString, buffer.readCString, buffer.readArray(12))
-    case 0x0D => BSONJavaScript(buffer.readCString, buffer.readUTF8)
-    case 0x0E => BSONSymbol(buffer.readCString, buffer.readUTF8)
-    case 0x0F => BSONJavaScriptWS(buffer.readCString, buffer.readUTF8)
-    case 0x10 => BSONInteger(buffer.readCString, buffer.readInt)
-    case 0x11 => BSONTimestamp(buffer.readCString, buffer.readLong)
-    case 0x12 => BSONLong(buffer.readCString, buffer.readLong)
-    case 0xFF => BSONMinKey(buffer.readCString)
-    case 0x7F => BSONMaxKey(buffer.readCString)
+      ReadBSONElement(name, BSONBinary(buffer.readBytes(length), subtype)) }
+    case 0x06 => ReadBSONElement(buffer.readCString, BSONUndefined)
+    case 0x07 => ReadBSONElement(buffer.readCString, BSONObjectID(buffer.readArray(12)))
+    case 0x08 => ReadBSONElement(buffer.readCString, BSONBoolean(buffer.readByte == 0x01))
+    case 0x09 => ReadBSONElement(buffer.readCString, BSONDateTime(buffer.readLong))
+    case 0x0A => ReadBSONElement(buffer.readCString, BSONNull)
+    case 0x0B => ReadBSONElement(buffer.readCString, BSONRegex(buffer.readCString, buffer.readCString))
+    case 0x0C => ReadBSONElement(buffer.readCString, BSONDBPointer(buffer.readCString, buffer.readArray(12)))
+    case 0x0D => ReadBSONElement(buffer.readCString, BSONJavaScript( buffer.readString))
+    case 0x0E => ReadBSONElement(buffer.readCString, BSONSymbol(buffer.readString))
+    case 0x0F => ReadBSONElement(buffer.readCString, BSONJavaScriptWS(buffer.readString))
+    case 0x10 => ReadBSONElement(buffer.readCString, BSONInteger(buffer.readInt))
+    case 0x11 => ReadBSONElement(buffer.readCString, BSONTimestamp(buffer.readLong))
+    case 0x12 => ReadBSONElement(buffer.readCString, BSONLong(buffer.readLong))
+    case 0xFF => ReadBSONElement(buffer.readCString, BSONMinKey)
+    case 0x7F => ReadBSONElement(buffer.readCString, BSONMaxKey)
   }
 
   def hasNext = buffer.readerIndex - startIndex + 1 < documentSize
@@ -401,10 +408,10 @@ object DefaultBSONIterator {
   private def pretty(i: Int, it: DefaultBSONIterator) :String = {
     val prefix = (0 to i).map {i => "\t"}.mkString("")
     (for(v <- it) yield {
-      v match {
-        case BSONDocument(n, b) => prefix + n + ": {\n" + pretty(i + 1, DefaultBSONIterator(b)) + "\n" + prefix +" }"
-        case BSONArray(n, b) => prefix + n + ": [\n" + pretty(i + 1, DefaultBSONIterator(b)) + "\n" + prefix +" ]"
-        case _ => prefix + v.name + ": " + v.toString
+      v.value match {
+        case BSONDocument(b) => prefix + v.name + ": {\n" + pretty(i + 1, DefaultBSONIterator(b)) + "\n" + prefix +" }"
+        case BSONArray(b) => prefix + v.name + ": [\n" + pretty(i + 1, DefaultBSONIterator(b)) + "\n" + prefix +" ]"
+        case _ => prefix + v.name + ": " + v.value.toString
       }
     }).mkString(",\n")
   }

@@ -3,7 +3,75 @@ package org.asyncmongo.protocol
 import org.jboss.netty.channel._
 import org.jboss.netty.buffer._
 
-import org.asyncmongo.utils.BufferAccessors._
+/**
+ * Helper methods to write tuples of supported types into a [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]].
+ */
+private[protocol] object BufferAccessors {
+  import org.asyncmongo.utils.RichBuffer._
+
+  /**
+   * Typeclass for types that can be written into a [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]]
+   * via writeTupleToBufferN methods.
+   *
+   * @tparam T type to be written via BufferAccessors.writeTupleToBufferN(...) methods.
+   */
+  sealed trait BufferInteroperable[T] {
+    def apply(buffer: ChannelBuffer, t: T) :Unit
+  }
+
+  implicit object IntChannelInteroperable extends BufferInteroperable[Int] {
+    def apply(buffer: ChannelBuffer, i: Int) = buffer writeInt i
+  }
+
+  implicit object LongChannelInteroperable extends BufferInteroperable[Long] {
+    def apply(buffer: ChannelBuffer, l: Long) = buffer writeLong l
+  }
+
+  implicit object StringChannelInteroperable extends BufferInteroperable[String] {
+    def apply(buffer: ChannelBuffer, s: String) = buffer writeCString s
+  }
+
+  /**
+   * Write the given tuple into the given [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]].
+   *
+   * @tparam A type that have an implicit typeclass [[org.asyncmongo.utils.BufferAccessors.BufferInteroperable]].
+   * @tparam B type that have an implicit typeclass [[org.asyncmongo.utils.BufferAccessors.BufferInteroperable]].
+   */
+  def writeTupleToBuffer2[A, B](t: (A, B))(buffer: ChannelBuffer)(implicit i1: BufferInteroperable[A], i2: BufferInteroperable[B]): Unit = {
+    i1(buffer, t._1)
+    i2(buffer, t._2)
+  }
+
+  /**
+   * Write the given tuple into the given [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]].
+   *
+   * @tparam A type that have an implicit typeclass [[org.asyncmongo.utils.BufferAccessors.BufferInteroperable]].
+   * @tparam B type that have an implicit typeclass [[org.asyncmongo.utils.BufferAccessors.BufferInteroperable]].
+   * @tparam C type that have an implicit typeclass [[org.asyncmongo.utils.BufferAccessors.BufferInteroperable]].
+   */
+  def writeTupleToBuffer3[A, B, C](t: (A, B, C))(buffer: ChannelBuffer)(implicit i1: BufferInteroperable[A], i2: BufferInteroperable[B], i3: BufferInteroperable[C]): Unit = {
+    i1(buffer, t._1)
+    i2(buffer, t._2)
+    i3(buffer, t._3)
+  }
+
+  /**
+   * Write the given tuple into the given [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]].
+   *
+   * @tparam A type that have an implicit typeclass [[org.asyncmongo.utils.BufferAccessors.BufferInteroperable]].
+   * @tparam B type that have an implicit typeclass [[org.asyncmongo.utils.BufferAccessors.BufferInteroperable]].
+   * @tparam C type that have an implicit typeclass [[org.asyncmongo.utils.BufferAccessors.BufferInteroperable]].
+   * @tparam D type that have an implicit typeclass [[org.asyncmongo.utils.BufferAccessors.BufferInteroperable]].
+   */
+  def writeTupleToBuffer4[A, B, C, D](t: (A, B, C, D))(buffer: ChannelBuffer)(implicit i1: BufferInteroperable[A], i2: BufferInteroperable[B], i3: BufferInteroperable[C], i4: BufferInteroperable[D]): Unit = {
+    i1(buffer, t._1)
+    i2(buffer, t._2)
+    i3(buffer, t._3)
+    i4(buffer, t._4)
+  }
+}
+
+import BufferAccessors._
 
 /** A Mongo Wire Protocol operation */
 sealed trait Op {

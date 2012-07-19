@@ -115,15 +115,15 @@ case class GetLastError(
   fsync: Boolean = false
 ) extends Command {
   override def makeDocuments = {
-    val bson = Bson(BSONInteger("getlasterror", 1))
+    val bson = Bson("getlasterror" -> BSONInteger(1))
     if(awaitJournalCommit) {
-      bson.write(BSONBoolean("j", true))
+      bson.write("j" -> BSONBoolean(true))
     }
     if(waitForReplicatedOn.isDefined) {
-      bson.write(BSONInteger("w", waitForReplicatedOn.get))
+      bson.write("w" -> BSONInteger(waitForReplicatedOn.get))
     }
     if(fsync) {
-      bson.write(BSONBoolean("fsync", true))
+      bson.write("fsync" -> BSONBoolean(true))
     }
     bson
   }
@@ -196,11 +196,11 @@ case class Count(
   fields: Option[Bson] = None
 ) extends Command {
   override def makeDocuments = {
-    val bson = Bson(BSONString("count", collectionName))
+    val bson = Bson("count" -> BSONString(collectionName))
     if(query.isDefined)
-      bson.write(BSONDocument("query", query.get.getBuffer))
+      bson.write("query" -> BSONDocument(query.get.getBuffer))
     if(fields.isDefined)
-      bson.write(BSONDocument("fields", fields.get.getBuffer))
+      bson.write("fields" -> BSONDocument(fields.get.getBuffer))
     bson
   }
 
@@ -213,7 +213,7 @@ case class Count(
  */
 object Count extends CommandResultMaker[Int] {
   def apply(response: Response) = DefaultBSONHandlers.parse(response).next().find(_.name == "n").get match {
-    case BSONDouble(_, n) => n.toInt
+    case ReadBSONElement(_, BSONDouble(n)) => n.toInt
     case _ => 0
   }
 }
@@ -224,7 +224,7 @@ object Count extends CommandResultMaker[Int] {
  * Returns the state of the Replica Set from the target server's point of view.
  */
 object ReplStatus extends AdminCommand {
-  override def makeDocuments = Bson(BSONInteger("replSetGetStatus", 1))
+  override def makeDocuments = Bson("replSetGetStatus" -> BSONInteger(1))
 
   type Result = Map[String, BSONElement]
 
@@ -239,7 +239,7 @@ object ReplStatus extends AdminCommand {
  * Gets the detailed status of the target server.
  */
 object Status extends AdminCommand {
-  override def makeDocuments = Bson(BSONInteger("serverStatus", 1))
+  override def makeDocuments = Bson("serverStatus" -> BSONInteger(1))
 
   type Result = Map[String, BSONElement]
 
@@ -254,12 +254,12 @@ object Status extends AdminCommand {
  * Gets a nonce for authentication token.
  */
 object Getnonce extends Command {
-  override def makeDocuments = Bson(BSONInteger("getnonce", 1))
+  override def makeDocuments = Bson("getnonce" -> BSONInteger(1))
 
   type Result = GetnonceResult
 
   object ResultMaker extends CommandResultMaker[Result] {
-    def apply(response: Response) = GetnonceResult(DefaultBSONHandlers.parse(response).next().mapped.get("nonce").get.asInstanceOf[BSONString].value)
+    def apply(response: Response) = GetnonceResult(DefaultBSONHandlers.parse(response).next().mapped.get("nonce").get.value.asInstanceOf[BSONString].value)
   }
 }
 
@@ -280,7 +280,7 @@ case class Authenticate(user: String, password: String, nonce: String) extends C
   /** the digest of the tuple (''nonce'', ''user'', ''pwdDigest'') */
   lazy val key = md5Hex(nonce + user + pwdDigest)
 
-  override def makeDocuments = Bson(BSONInteger("authenticate", 1)).write(BSONString("user", user)).write(BSONString("nonce", nonce)).write(BSONString("key", key))
+  override def makeDocuments = Bson("authenticate" -> BSONInteger(1), "user" -> BSONString(user), "nonce" -> BSONString(nonce), "key" -> BSONString(key))
 
   type Result = Map[String, BSONElement]
 
@@ -293,14 +293,13 @@ case class Authenticate(user: String, password: String, nonce: String) extends C
 object Authenticate extends CommandResultMaker[AuthenticationResult] {
   def apply(response: Response) = {
     val mapped = DefaultBSONHandlers.parse(response).next().mapped
-    println("\n" + mapped + "\n" + mapped.get("ok") + " => " + mapped.get("ok").get.asInstanceOf[BSONDouble].value == 0)
-    if(mapped.get("ok").get.asInstanceOf[BSONDouble].value == 0)
-      FailedAuthentication(mapped.get("errmsg").map(_.asInstanceOf[BSONString].value).getOrElse(""))
+    if(mapped.get("ok").get.value.asInstanceOf[BSONDouble].value == 0)
+      FailedAuthentication(mapped.get("errmsg").map(_.value.asInstanceOf[BSONString].value).getOrElse(""))
     else SuccessfulAuthentication(
-        mapped.get("dbname").get.asInstanceOf[BSONString].value,
-        mapped.get("user").get.asInstanceOf[BSONString].value,
+        mapped.get("dbname").get.value.asInstanceOf[BSONString].value,
+        mapped.get("user").get.value.asInstanceOf[BSONString].value,
         mapped.get("readOnly").flatMap {
-          case BSONBoolean(_, value) => Some(value)
+          case ReadBSONElement(_, BSONBoolean(value)) => Some(value)
           case _ => Some(false)
         }.get
     )
@@ -341,7 +340,7 @@ case class SuccessfulAuthentication(
  * This command also gives some useful information, like the other nodes in the replica set.
  */
 object IsMaster extends AdminCommand {
-  def makeDocuments = Bson(BSONInteger("isMaster", 1))
+  def makeDocuments = Bson("isMaster" -> BSONInteger(1))
 
   type Result = IsMasterResponse
 
@@ -350,29 +349,29 @@ object IsMaster extends AdminCommand {
       val mapped = DefaultBSONHandlers.parse(response).next().mapped
       IsMasterResponse(
         mapped.get("ismaster").flatMap {
-          case BSONBoolean(_, b) => Some(b)
+          case ReadBSONElement(_, BSONBoolean(b)) => Some(b)
           case _ => None
         }.getOrElse(false),
         mapped.get("secondary").flatMap {
-          case BSONBoolean(_, b) => Some(b)
+          case ReadBSONElement(_, BSONBoolean(b)) => Some(b)
           case _ => None
         }.getOrElse(false),
         mapped.get("maxBsonObjectSize").flatMap {
-          case BSONInteger(_, i) => Some(i)
+          case ReadBSONElement(_, BSONInteger(i)) => Some(i)
           case _ => None
         }.getOrElse(16777216),
         mapped.get("setName").flatMap {
-          case BSONString(_, name) => Some(name)
+          case ReadBSONElement(_, BSONString(name)) => Some(name)
           case _ => None
         },
         mapped.get("hosts").flatMap {
-          case BSONArray(_, buffer) => Some((for(e <- DefaultBSONIterator(buffer)) yield {
-            e.asInstanceOf[BSONString].value
+          case ReadBSONElement(_, BSONArray(buffer)) => Some((for(e <- DefaultBSONIterator(buffer)) yield {
+            e.value.asInstanceOf[BSONString].value
           }).toList)
           case _ => None
         },
         mapped.get("me").flatMap {
-          case BSONString(_, name) => Some(name)
+          case ReadBSONElement(_, BSONString(name)) => Some(name)
           case _ => None
         }
       )
@@ -415,13 +414,13 @@ sealed trait Modify {
  */
 case class Update(update: Bson, fetchNewObject: Boolean) extends Modify {
   override def alter(bson: Bson) = bson
-      .write(BSONDocument("update", update.getBuffer))
-      .write(BSONBoolean("new", fetchNewObject))
+      .write("update" -> BSONDocument(update.getBuffer))
+      .write("new" -> BSONBoolean(fetchNewObject))
 }
 
 /** Remove (part of a FindAndModify command). */
 object Remove extends Modify {
-  override def alter(bson: Bson) = bson.write(BSONBoolean("remove", true))
+  override def alter(bson: Bson) = bson.write("remove" -> BSONBoolean(true))
 }
 
 /**
@@ -446,13 +445,13 @@ case class FindAndModify(
   fields: Option[Bson] = None
 ) extends Command {
   override def makeDocuments: Bson = {
-    val bson = Bson(BSONString("findAndModify", collection)).write(BSONDocument("query", query.getBuffer))
+    val bson = Bson("findAndModify" -> BSONString(collection), "query" -> BSONDocument(query.getBuffer))
     if(sort.isDefined)
-      bson.write(BSONDocument("sort", sort.get.getBuffer))
+      bson.write("sort" -> BSONDocument(sort.get.getBuffer))
     if(fields.isDefined)
-      bson.write(BSONDocument("fields", fields.get.getBuffer))
+      bson.write("fields" -> BSONDocument(fields.get.getBuffer))
     if(upsert)
-      bson.write(BSONBoolean("upsert", true))
+      bson.write("upsert" -> BSONBoolean(true))
     modify.alter(bson)
   }
 

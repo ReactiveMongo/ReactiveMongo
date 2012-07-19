@@ -49,7 +49,7 @@ case class Collection(
     import DefaultBSONHandlers._
     connection.ask(Count(collectionName)(dbName).maker).map { response =>
       DefaultBSONReaderHandler.handle(response.reply, response.documents).next.find(_.name == "n").get match {
-        case BSONDouble(_, n) => n.toInt
+        case ReadBSONElement(_, BSONDouble(n)) => n.toInt
         case _ => 0
       }
     }
@@ -448,7 +448,7 @@ object Test {
       case yop => {
         println("auth completed for jack " + yop)
 
-        val toSave = Bson(BSONString("name", "Kurt"))
+        val toSave = Bson("name" -> BSONString("Kurt"))
         collection.insert(toSave, GetLastError(false, None, false)).onComplete {
           case Left(t) => { println("error!, throwable\n\t\t"); t.printStackTrace; println("\n\t for insert=" + toSave) }
           case Right(le) => {
@@ -457,15 +457,15 @@ object Test {
         }
         db.connection.ask(FindAndModify(
             "acoll",
-            Bson(BSONString("name", "Jack")),
-            FindAndModifyUpdate(Bson(BSONDocument("$set", Bson(BSONString("name", "JACK")).getBuffer)), false)
+            Bson("name" -> BSONString("Jack")),
+            FindAndModifyUpdate(Bson("$set" -> BSONDocument(Bson("name" -> BSONString("JACK")).getBuffer)), false)
         )(db.dbName).maker).onComplete {
           case Right(response) => println("FINDANDMODIFY gave " + DefaultBSONIterator.pretty(DefaultBSONHandlers.parse(response).next))
         }
         collection.command(FindAndModify(
             "acoll",
-            Bson(BSONString("name", "Jack")),
-            FindAndModifyUpdate(Bson(BSONDocument("$set", Bson(BSONString("name", "JACK")).getBuffer)), false)
+            Bson("name" -> BSONString("Jack")),
+            FindAndModifyUpdate(Bson("$set" -> BSONDocument(Bson("name" -> BSONString("JACK")).getBuffer)), false)
         )).onComplete {
           case Right(Some(doc)) => println("FINDANDMODIFY #2 gave " + DefaultBSONIterator.pretty(DefaultBSONReader.read(doc.value)))
           case Right(_) => println("FINDANDMODIFY #2 gave no value")
@@ -494,11 +494,11 @@ object Test {
     }
     println("Test: future is " + future)*/
     val tags = Bson(
-      BSONString("tag1", "yop"),
-      BSONString("tag2", "..."))
+      "tag1" -> BSONString("yop"),
+      "tag2" -> BSONString("..."))
     val toSave = Bson(
-      BSONString("name", "Kurt"),
-      BSONDocument("tags", tags.getBuffer))
+      "name" -> BSONString("Kurt"),
+      "tags" -> BSONDocument(tags.getBuffer))
     //toSave.write(BSONString("$kk", "Kurt"))
     //Cursor.stream(Await.result(future, timeout.duration)).print("\n")
     /*Cursor.enumerate(Some(future))(Iteratee.foreach { t =>

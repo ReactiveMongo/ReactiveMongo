@@ -3,7 +3,6 @@ package org.asyncmongo.protocol
 import akka.actor.ActorRef
 import java.nio.ByteOrder
 import org.asyncmongo.utils.RichBuffer._
-import org.asyncmongo.utils.BufferAccessors._
 import org.jboss.netty.buffer._
 import org.jboss.netty.bootstrap._
 import org.jboss.netty.channel._
@@ -13,6 +12,8 @@ import org.jboss.netty.handler.codec.frame.FrameDecoder
 import org.asyncmongo.actors.{Connected, Disconnected}
 import org.asyncmongo.protocol.commands.GetLastError
 import org.slf4j.{Logger, LoggerFactory}
+
+import BufferAccessors._
 
  // traits
 /**
