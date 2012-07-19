@@ -106,9 +106,8 @@ class GridFS(db: DB, name: String = "fs") {
   val chunks = db(name + ".chunks")
 
   def readContent(id: BSONValue) :Enumerator[Array[Byte]] = {
-    val toto = chunks.find(Bson("files_id" -> id), None, 0, Int.MaxValue)
-    val e = Cursor.enumerate(toto)
-    val e2 = e.through(Enumeratee.map { doc =>
+    val cursor = chunks.find(Bson("files_id" -> id), None, 0, Int.MaxValue)
+    Cursor.enumerate(cursor) &> (Enumeratee.map { doc =>
       doc.find(_.name == "data").flatMap {
         case ReadBSONElement(_, BSONBinary(data, _)) => Some(data.array())
         case _ => None
@@ -117,7 +116,6 @@ class GridFS(db: DB, name: String = "fs") {
         throw new RuntimeException("not a chunk! failed assertion: data field is missing")
       }
     })
-    e2
   }
 
   def readContent(id: BSONValue, os: OutputStream) :Promise[Iteratee[Array[Byte],Unit]] = {

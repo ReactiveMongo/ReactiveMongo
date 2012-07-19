@@ -47,6 +47,7 @@ sealed trait BSONElement {
 case class DefaultBSONElement(name: String, value: BSONValue) extends BSONElement
 case class ReadBSONElement(name: String, value: BSONValue) extends BSONElement
 
+/** A BSON Value type */
 sealed trait BSONValue {
   /** bson type code */
   val code: Int
