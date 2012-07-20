@@ -39,6 +39,8 @@ libraryDependencies ++= Seq(
 )
 }}}
 
+== Setup your MongoDB ==
+
 == Connect to a database ==
 
 You can get a connection to a server (or a replica set) like this:
