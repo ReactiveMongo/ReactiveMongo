@@ -60,8 +60,7 @@ The {{{connection}}} reference manages a pool of connections. You can provide a 
 
 == Run a simple query ==
 
-{{{
-#!scala
+```scala
 package foo
 
 import org.asyncmongo.api._
@@ -83,34 +82,30 @@ object Samples {
     })
   }
 }
-
-}}}
+```
 
 The above code deserves some explanations.
 First, let's take a look to the {{{collection.find}}} signature:
 
-{{{
-#!scala
+```scala
 def find[T, U, V](query: T, fields: Option[U] = None, skip: Int = 0, limit: Int = 0, flags: Int = 0)(implicit writer: BSONWriter[T], writer2: BSONWriter[U], handler: BSONReaderHandler, reader: BSONReader[V]) :Future[Cursor[V]]
-}}}
+```
 
 The find method allows you to pass any query object of type {{{T}}}, provided that there is an implicit {{{BSONWriter[T]}}} in the scope. {{{BSONWriter[T]}}} is a typeclass which instances implement a {{{write(document: T)}}} method that returns a {{{ChannelBuffer}}}:
 
-{{{
-#!scala
+```scala
 trait BSONWriter[DocumentType] {
   def write(document: DocumentType) :ChannelBuffer
 }
-}}}
+```
 
 {{{BSONReader[V]}}} is the opposite typeclass. It's typically a deserializer that takes a {{{ChannelBuffer}}} and returns an instance of {{{V}}}:
 
-{{{
-#!scala
+```scala
 trait BSONReader[DocumentType] {
   def read(buffer: ChannelBuffer) :DocumentType
 }
-}}}
+```
 
 These two typeclasses allow you to provide different de/serializers for different types.
 For this example, we don't need to write specific handlers, so we use the default ones by importing {{{org.asyncmongo.handlers.DefaultBSONHandlers._}}}.
@@ -125,12 +120,11 @@ That's where the Enumerator/Iteratee pattern (or immutable Producer/Consumer pat
 
 Let's consider the next statement:
 
-{{{
-#!scala
+```scala
 Cursor.enumerate(futureCursor)(Iteratee.foreach { doc =>
   println("found document: " + DefaultBSONIterator.pretty(doc))
 })
-}}}
+```
 
 The method {{{Cursor.enumerate[T](Future[Cursor[T]])}}} returns an {{{Enumerator[T]}}}. Enumerators can be seen as //producers// of data: their job is to give chunks of data when data is available. In this case, we get a producer of documents, which source is a future cursor.
 
@@ -140,7 +134,7 @@ Here, we write a very simple Iteratee: each time it gets a document, it makes a 
 
 When this snippet is run, we get the following:
 
-{{{
+```
 found document: {
 	_id: BSONObjectID["4f899e7eaf527324ab25c56b"],
 	name: BSONString(Jack)
@@ -165,7 +159,7 @@ found document: {
 	_id: BSONObjectID["4fa15559af527324ab25c570"],
 	name: BSONString(Jack)
 }
-}}}
+```
 
 == Go further! ==
 
