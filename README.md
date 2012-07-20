@@ -159,13 +159,13 @@ found document: {
 }
 ```
 
-== Go further! ==
+## Go further!
 
 MongoAsync makes a heavy usage of the Iteratee library provided by the [Play! Framework 2.0](http://www.playframework.org/). You can dive into [Play's Iteratee documentation](http://www.playframework.org/documentation/2.0.2/Iteratees) to learn about this cool piece of software, and make your own Iteratees and Enumerators.
 
 Used in conjonction with stream-aware frameworks, like Play!, you can easily stream the data stored in MongoDB. See the examples and get convinced!
 
-=== Samples ===
+### Samples
 
 * [MongoAsync Tailable Cursor, WebSocket and Play 2](https://github.com/sgodbillon/demo-mongo-async)
 
