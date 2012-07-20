@@ -14,7 +14,7 @@ MongoAsync is designed to avoid any kind of blocking request. Every operation re
 
 ## Let the stream flow!
 
-The future of the web is streaming data to a very large number clients at the same time. Twitter Stream API is a good example of this paradigm shift that is radically altering the way data is consumed all over the web.
+The future of the web is in streaming data to a very large number of clients simultaneously. Twitter Stream API is a good example of this paradigm shift that is radically altering the way data is consumed all over the web.
 
 MongoAsync enables you to build such a web application right now. It allows you to stream data both into and from your MongoDB servers.
 
