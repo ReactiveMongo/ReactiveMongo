@@ -23,3 +23,14 @@ libraryDependencies ++= Seq(
 scalacOptions ++= Seq("-unchecked", "-deprecation", "-Ydependent-method-types")
 
 unmanagedSourceDirectories in Compile <+= baseDirectory( _ / "src" / "samples" / "scala" )
+
+publishTo <<= version { (version: String) =>
+  val localPublishRepo = "/Volumes/Data/code/repository"
+  if(version.trim.endsWith("SNAPSHOT"))
+    Some(Resolver.file("snapshots", new File(localPublishRepo + "/snapshots")))
+  else Some(Resolver.file("releases", new File(localPublishRepo + "/releases")))
+}
+
+publishMavenStyle := true
+
+sources in (Compile, doc) ~= (_ filter (!_.getAbsolutePath.contains("src/samples")))
