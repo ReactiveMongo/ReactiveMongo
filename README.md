@@ -1,7 +1,6 @@
 # MongoDB Async Driver
 
-[MongoAsync](https://bitbucket.org/sgodbillon/mongodb-async-driver) is a scala driver that provides fully non-blocking and asynchronous I/O operations.
-----
+[MongoAsync](https://github.com/zenexity/AsyncMongo/) is a scala driver that provides fully non-blocking and asynchronous I/O operations.
 
 ## Scale better, use less threads
 
@@ -90,7 +89,7 @@ First, let's take a look to the `collection.find` signature:
 def find[T, U, V](query: T, fields: Option[U] = None, skip: Int = 0, limit: Int = 0, flags: Int = 0)(implicit writer: BSONWriter[T], writer2: BSONWriter[U], handler: BSONReaderHandler, reader: BSONReader[V]) :Future[Cursor[V]]
 ```
 
-The find method allows you to pass any query object of type {{{T}}}, provided that there is an implicit {{{BSONWriter[T]}}} in the scope. {{{BSONWriter[T]}}} is a typeclass which instances implement a {{{write(document: T)}}} method that returns a {{{ChannelBuffer}}}:
+The find method allows you to pass any query object of type `T`, provided that there is an implicit `BSONWriter[T]` in the scope. `BSONWriter[T]` is a typeclass which instances implement a `write(document: T)` method that returns a `ChannelBuffer`:
 
 ```scala
 trait BSONWriter[DocumentType] {
@@ -111,7 +110,7 @@ For this example, we don't need to write specific handlers, so we use the defaul
 
 Among `DefaultBSONHandlers` is a `BSONWriter[Bson]` that handles the shipped-in BSON library.
 
-You may have noticed that `collection.find` returns a `Future[Cursor[V]]`. In fact, //everything in MongoAsync is both non-blocking and asynchronous//. That means each time you make a query, the only immediate result you get is a future of result, so the current thread is not blocked waiting for its completion. You don't need to have //n// threads to process //n// database operations at the same time anymore.
+You may have noticed that `collection.find` returns a `Future[Cursor[V]]`. In fact, *everything in MongoAsync is both non-blocking and asynchronous*. That means each time you make a query, the only immediate result you get is a future of result, so the current thread is not blocked waiting for its completion. You don't need to have *n* threads to process *n* database operations at the same time anymore.
 
 When a query matches too much documents, Mongo sends just a part of them and creates a Cursor  in order to get the next documents. The problem is, how to handle it in a non-blocking, asynchronous, yet elegant way?
 
