@@ -267,13 +267,13 @@ class Bson(val estimatedLength: Int = 32) {
 
   /**
    * Ends the Bson, sets the length and returns the buffer.
-   *
-   * Note that after calling this method, the Bson instance should not be used anymore.
+   * The underlying buffer is not affected, so this Bson instance can be used again.
    */
-  def getBuffer() = {
-    buffer.writeByte(0)
-    buffer.setInt(0, buffer.writerIndex)
-    buffer
+  def makeBuffer = {
+    val result = buffer.copy()
+    result.writeByte(0)
+    result.setInt(0, result.writerIndex)
+    result
   }
 }
 
@@ -335,8 +335,8 @@ object Bson {
       "age" -> BSONInteger(37),
       "getLastError" -> BSONInteger(1)
     )
-    println("produced: " + java.util.Arrays.toString(bson.getBuffer.array))
-    println(DefaultBSONIterator(bson.getBuffer).toList)
+    println("produced: " + java.util.Arrays.toString(bson.makeBuffer.array))
+    println(DefaultBSONIterator(bson.makeBuffer).toList)
     //val it = DefaultBSONIterator(bson.getBuffer)
     //while(it.hasNext)
     //  println(it.next)

@@ -45,7 +45,7 @@ object DefaultBSONHandlers {
   }
 
   implicit object DefaultBSONWriter extends BSONWriter[Bson] {
-    def write(document: Bson) = document.getBuffer
+    def write(document: Bson) = document.makeBuffer
   }
 
   /** Parses the given response and produces an iterator of [[org.asyncmongo.bson.DefaultBSONIterator]]s. */

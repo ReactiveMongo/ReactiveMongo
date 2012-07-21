@@ -436,14 +436,14 @@ object Test {
         db.connection.ask(FindAndModify(
             "acoll",
             Bson("name" -> BSONString("Jack")),
-            FindAndModifyUpdate(Bson("$set" -> BSONDocument(Bson("name" -> BSONString("JACK")).getBuffer)), false)
+            FindAndModifyUpdate(Bson("$set" -> BSONDocument(Bson("name" -> BSONString("JACK")).makeBuffer)), false)
         )(db.dbName).maker).onComplete {
           case Right(response) => println("FINDANDMODIFY gave " + DefaultBSONIterator.pretty(DefaultBSONHandlers.parse(response).next))
         }
         collection.command(FindAndModify(
             "acoll",
             Bson("name" -> BSONString("Jack")),
-            FindAndModifyUpdate(Bson("$set" -> BSONDocument(Bson("name" -> BSONString("JACK")).getBuffer)), false)
+            FindAndModifyUpdate(Bson("$set" -> BSONDocument(Bson("name" -> BSONString("JACK")).makeBuffer)), false)
         )).onComplete {
           case Right(Some(doc)) => println("FINDANDMODIFY #2 gave " + DefaultBSONIterator.pretty(DefaultBSONReader.read(doc.value)))
           case Right(_) => println("FINDANDMODIFY #2 gave no value")
@@ -476,7 +476,7 @@ object Test {
       "tag2" -> BSONString("..."))
     val toSave = Bson(
       "name" -> BSONString("Kurt"),
-      "tags" -> BSONDocument(tags.getBuffer))
+      "tags" -> BSONDocument(tags.makeBuffer))
     //toSave.write(BSONString("$kk", "Kurt"))
     //Cursor.stream(Await.result(future, timeout.duration)).print("\n")
     /*Cursor.enumerate(Some(future))(Iteratee.foreach { t =>

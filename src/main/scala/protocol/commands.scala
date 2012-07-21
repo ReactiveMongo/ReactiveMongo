@@ -84,7 +84,7 @@ class MakableCommand(val db: String, val command: Command) {
   /**
    * Returns the [[org.asyncmongo.protocol.RequestMaker]] for the given command.
    */
-  def maker = RequestMaker(makeQuery, command.makeDocuments.getBuffer)
+  def maker = RequestMaker(makeQuery, command.makeDocuments.makeBuffer)
 }
 
 case class RawCommand(bson: Bson) extends Command {
@@ -198,9 +198,9 @@ case class Count(
   override def makeDocuments = {
     val bson = Bson("count" -> BSONString(collectionName))
     if(query.isDefined)
-      bson.write("query" -> BSONDocument(query.get.getBuffer))
+      bson.write("query" -> BSONDocument(query.get.makeBuffer))
     if(fields.isDefined)
-      bson.write("fields" -> BSONDocument(fields.get.getBuffer))
+      bson.write("fields" -> BSONDocument(fields.get.makeBuffer))
     bson
   }
 
@@ -414,7 +414,7 @@ sealed trait Modify {
  */
 case class Update(update: Bson, fetchNewObject: Boolean) extends Modify {
   override def alter(bson: Bson) = bson
-      .write("update" -> BSONDocument(update.getBuffer))
+      .write("update" -> BSONDocument(update.makeBuffer))
       .write("new" -> BSONBoolean(fetchNewObject))
 }
 
@@ -445,11 +445,11 @@ case class FindAndModify(
   fields: Option[Bson] = None
 ) extends Command {
   override def makeDocuments: Bson = {
-    val bson = Bson("findAndModify" -> BSONString(collection), "query" -> BSONDocument(query.getBuffer))
+    val bson = Bson("findAndModify" -> BSONString(collection), "query" -> BSONDocument(query.makeBuffer))
     if(sort.isDefined)
-      bson.write("sort" -> BSONDocument(sort.get.getBuffer))
+      bson.write("sort" -> BSONDocument(sort.get.makeBuffer))
     if(fields.isDefined)
-      bson.write("fields" -> BSONDocument(fields.get.getBuffer))
+      bson.write("fields" -> BSONDocument(fields.get.makeBuffer))
     if(upsert)
       bson.write("upsert" -> BSONBoolean(true))
     modify.alter(bson)
