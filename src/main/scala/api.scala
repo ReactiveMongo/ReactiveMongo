@@ -44,8 +44,9 @@ case class Collection(
   /** The full collection name. */
   lazy val fullCollectionName = dbName + "." + collectionName
 
+  // TODO
   /** Counts the number of documents in this collection. */
-  def count :Future[Int] = {
+  def count() :Future[Int] = {
     import DefaultBSONHandlers._
     connection.ask(Count(collectionName)(dbName).maker).map { response =>
       DefaultBSONReaderHandler.handle(response.reply, response.documents).next.find(_.name == "n").get match {
@@ -121,7 +122,7 @@ object Samples {
    *
    * @param document the document to insert.
    */
-  def insert[T](document: T)(implicit writer: BSONWriter[T]) :Unit = {
+  def uncheckedInsert[T](document: T)(implicit writer: BSONWriter[T]) :Unit = {
     val op = Insert(0, fullCollectionName)
     val bson = writer.write(document)
     val message = RequestMaker(op, bson)
@@ -136,15 +137,62 @@ object Samples {
    * @tparam T the type of the document to insert. An implicit [[org.asyncmongo.handlers.BSONWriter]][T] typeclass for handling it has to be in the scope.
    *
    * @param document the document to insert.
-   * @param writeConcern the [[org.asyncmongo.protocol.commands.GetLastError]] command message to send in order to control how the document is inserted.
+   * @param writeConcern the [[org.asyncmongo.protocol.commands.GetLastError]] command message to send in order to control how the document is inserted. Defaults to GetLastError().
    *
    * @return a future [[org.asyncmongo.protocol.commands.LastError]] that can be used to check whether the insertion was successful.
    */
-  def insert[T](document: T, writeConcern: GetLastError)(implicit writer: BSONWriter[T]) :Future[LastError] = {
+  def insert[T](document: T, writeConcern: GetLastError = GetLastError())(implicit writer: BSONWriter[T]) :Future[LastError] = {
     val op = Insert(0, fullCollectionName)
     val bson = writer.write(document)
     val checkedWriteRequest = CheckedWriteRequest(op, bson, writeConcern)
     connection.ask(checkedWriteRequest).map { response =>
+      LastError(response)
+    }
+  }
+
+  /**
+   * Updates one or more documents matching the given selector with the given modifier or update object.
+   *
+   * Please note that you cannot be sure that the matched documents have been effectively updated and when (hence the Unit return type).
+   *
+   * @tparam S the type of the selector object. An implicit [[org.asyncmongo.handlers.BSONWriter]][S] typeclass for handling it has to be in the scope.
+   * @tparam U the type of the modifier or update object. An implicit [[org.asyncmongo.handlers.BSONWriter]][U] typeclass for handling it has to be in the scope.
+   *
+   * @param selector the selector object, for finding the documents to update.
+   * @param update the modifier object (with special keys like \$set) or replacement object.
+   * @param upsert states whether the update objet should be inserted if no match found. Defaults to false.
+   * @param multi states whether the update may be done on all the matching documents.
+   */
+  def uncheckedUpdate[S, U](selector: S, update: U, upsert: Boolean = false, multi: Boolean = false)(implicit selectorWriter: BSONWriter[S], updateWriter: BSONWriter[U]) :Unit = {
+    val flags = 0 | (if(upsert) UpdateFlags.Upsert else 0) | (if(multi) UpdateFlags.MultiUpdate else 0)
+    val op = Update(fullCollectionName, flags)
+    val bson = selectorWriter.write(selector)
+    bson.writeBytes(updateWriter.write(update))
+    val message = RequestMaker(op, bson)
+    connection.send(message)
+  }
+
+  /**
+   * Updates one or more documents matching the given selector with the given modifier or update object.
+   *
+   * @tparam S the type of the selector object. An implicit [[org.asyncmongo.handlers.BSONWriter]][S] typeclass for handling it has to be in the scope.
+   * @tparam U the type of the modifier or update object. An implicit [[org.asyncmongo.handlers.BSONWriter]][U] typeclass for handling it has to be in the scope.
+   *
+   * @param selector the selector object, for finding the documents to update.
+   * @param update the modifier object (with special keys like \$set) or replacement object.
+   * @param writeConcern the [[org.asyncmongo.protocol.commands.GetLastError]] command message to send in order to control how the documents are updated. Defaults to GetLastError().
+   * @param upsert states whether the update objet should be inserted if no match found. Defaults to false.
+   * @param multi states whether the update may be done on all the matching documents.
+   *
+   * @return a future [[org.asyncmongo.protocol.commands.LastError]] that can be used to check whether the update was successful.
+   */
+  def update[S, U](selector: S, update: U, writeConcern: GetLastError = GetLastError(), upsert: Boolean = false, multi: Boolean = false)(implicit selectorWriter: BSONWriter[S], updateWriter: BSONWriter[U]) :Future[LastError] = {
+    val flags = 0 | (if(upsert) UpdateFlags.Upsert else 0) | (if(multi) UpdateFlags.MultiUpdate else 0)
+    val op = Update(fullCollectionName, flags)
+    val bson = selectorWriter.write(selector)
+    bson.writeBytes(updateWriter.write(update))
+    val message = CheckedWriteRequest(op, bson, writeConcern)
+    connection.ask(message).map { response =>
       LastError(response)
     }
   }
@@ -159,19 +207,7 @@ object Samples {
    * @param query the selector of documents to remove.
    * @param firstMatchOnly states whether only the first matched documents has to be removed from this collection.
    */
-  def remove[T](query: T)(implicit writer: BSONWriter[T]) :Unit = remove(query, false)
-
-  /**
-   * Remove the matched document(s) from the collection without writeConcern.
-   *
-   * Please note that you cannot be sure that the matched documents have been effectively removed and when (hence the Unit return type).
-   *
-   * @tparam T the type of the selector of documents to remove. An implicit [[org.asyncmongo.handlers.BSONWriter]][T] typeclass for handling it has to be in the scope.
-   *
-   * @param query the selector of documents to remove.
-   * @param firstMatchOnly states whether only the first matched documents has to be removed from this collection.
-   */
-  def remove[T](query: T, firstMatchOnly: Boolean)(implicit writer: BSONWriter[T]) : Unit = {
+  def uncheckedRemove[T](query: T, firstMatchOnly: Boolean = false)(implicit writer: BSONWriter[T]) : Unit = {
     val op = Delete(fullCollectionName, if(firstMatchOnly) 1 else 0)
     val bson = writer.write(query)
     val message = RequestMaker(op, bson)
@@ -186,12 +222,12 @@ object Samples {
    * @tparam T the type of the selector of documents to remove. An implicit [[org.asyncmongo.handlers.BSONWriter]][T] typeclass for handling it has to be in the scope.
    *
    * @param query the selector of documents to remove.
-   * @param writeConcern the [[org.asyncmongo.protocol.commands.GetLastError]] command message to send in order to control how the documents are removed.
+   * @param writeConcern the [[org.asyncmongo.protocol.commands.GetLastError]] command message to send in order to control how the documents are removed. Defaults to GetLastError().
    * @param firstMatchOnly states whether only the first matched documents has to be removed from this collection.
    *
    * @return a future [[org.asyncmongo.protocol.commands.LastError]] that can be used to check whether the removal was successful.
    */
-  def remove[T](query: T, writeConcern: GetLastError, firstMatchOnly: Boolean = false)(implicit writer: BSONWriter[T]) :Future[LastError] = {
+  def remove[T](query: T, writeConcern: GetLastError = GetLastError(), firstMatchOnly: Boolean = false)(implicit writer: BSONWriter[T]) :Future[LastError] = {
     val op = Delete(fullCollectionName, if(firstMatchOnly) 1 else 0)
     val bson = writer.write(query)
     val checkedWriteRequest = CheckedWriteRequest(op, bson, writeConcern)

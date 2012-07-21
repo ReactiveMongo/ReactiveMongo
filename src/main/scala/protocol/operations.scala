@@ -158,6 +158,13 @@ case class Update(
   override val requiresPrimary = true
 }
 
+object UpdateFlags {
+  /** If set, the database will insert the supplied object into the collection if no matching document is found. */
+  val Upsert = 0x01
+  /** If set, the database will update all matching objects in the collection. Otherwise only updates first matching doc. */
+  val MultiUpdate = 0x02
+}
+
 /**
  * Insert operation.
  *
