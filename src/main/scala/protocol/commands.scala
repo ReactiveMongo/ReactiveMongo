@@ -465,8 +465,11 @@ case class FindAndModify(
  * @todo [[org.asyncmongo.handlers.BSONReader[T]]] typeclass
  */
 object FindAndModify extends CommandResultMaker[Option[BSONDocument]] {
-  def apply(response: Response) = DefaultBSONHandlers.parse(response).next().mapped.get("value") flatMap {
-    case doc: BSONDocument => Some(doc)
-    case _ => None
-  }
+  def apply(response: Response) =
+    DefaultBSONHandlers.parse(response).next().mapped.get("value") flatMap { element =>
+      element.value match {
+        case doc: BSONDocument => Some(doc)
+        case _ => None
+      }
+    }
 }
