@@ -24,7 +24,22 @@ But if what you're interested in is live feeds then you can stream a MongoDB cap
 
 Moreover, you can now use GridFS as a non-blocking, streaming datastore. MongoAsync retrieves the file, chunk by chunk, and streams it until the client is done or there's no more data. Neither huge memory consumption, nor blocked thread during the process!
 
-## Set up your project dependencies
+## Step By Step Example 
+
+Let's show a simple use case: print the documents of a capped collection.
+
+### Prerequisites
+
+We assume that you got a running MongoDB instance. If not, get [the latest MongoDB binaries](http://www.mongodb.org/downloads) and unzip the archive. Then you can launch the database:
+
+```
+$ mkdir data
+$ ./bin/mongod --dbpath data
+```
+
+This will start a standalone MongoDB instance that stores its data in the ```data``` directory and listens on the TCP port 27017.
+
+### Set up your project dependencies
 
 There is a Maven repository at `https://bitbucket.org/sgodbillon/repository/raw/master/snapshots/`.
 
@@ -38,9 +53,7 @@ libraryDependencies ++= Seq(
 )
 ```
 
-## Setup your MongoDB
-
-## Connect to a database
+### Connect to the database
 
 You can get a connection to a server (or a replica set) like this:
 
@@ -56,7 +69,7 @@ def test() {
 
 The `connection` reference manages a pool of connections. You can provide a list of one ore more servers; the driver will guess if it's a standalone server or a replica set configuration. Even with one replica node, the driver will probe for other nodes and add them automatically.
 
-## Run a simple query
+### Run a simple query
 
 ```scala
 package foo
