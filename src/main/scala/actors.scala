@@ -27,6 +27,10 @@ case class Authenticate(db: String, user: String, password: String)
  * The MongoDBSystem actor must be used after this message has been sent.
  */
 case object Close
+/**
+ * Message to send in order to get warned the next time a primary is found.
+ */
+case object WaitPrimary
 private[asyncmongo] case object ConnectAll
 private[asyncmongo] case object RefreshAllNodes
 private[asyncmongo] case class Connected(channelId: Int)
@@ -64,6 +68,8 @@ class MongoDBSystem(seeds: List[String] = List("localhost:27017"), auth :List[Au
   // todo: if primary changes again while sending queued messages ? -> don't care, an error will be sent as the result of the promise
   private val queuedMessages = scala.collection.mutable.Queue[(ActorRef, Either[(Request, Request), Request])]()
   private val awaitingResponses = scala.collection.mutable.ListMap[Int, AwaitingResponse]()
+
+  private val waitingForPrimary = scala.collection.mutable.Queue[ActorRef]()
 
   private val connectAllJob = context.system.scheduler.schedule(MongoDBSystem.DefaultConnectionRetryInterval milliseconds,
     MongoDBSystem.DefaultConnectionRetryInterval milliseconds,
@@ -134,6 +140,9 @@ class MongoDBSystem(seeds: List[String] = List("localhost:27017"), auth :List[Au
         })
       else sender ! "done"
     }
+    case WaitPrimary => {
+      waitingForPrimary += sender
+    }
     case message if !nodeSetManager.isDefined => {
       logger.error("dropping message " + message + " as this system is closed")
     }
@@ -145,7 +154,7 @@ class MongoDBSystem(seeds: List[String] = List("localhost:27017"), auth :List[Au
     // monitor
     case ConnectAll => {
       logger.debug("ConnectAll Job running...")
-      updateNodeSetManager(NodeSetManager(nodeSetManager.get.nodeSet.createNeededChannels(self, 1)))
+      updateNodeSetManager(NodeSetManager(nodeSetManager.get.nodeSet.createNeededChannels(self, 10)))
       nodeSetManager.get.nodeSet.connectAll
     }
     case RefreshAllNodes => {
@@ -198,13 +207,13 @@ class MongoDBSystem(seeds: List[String] = List("localhost:27017"), auth :List[Au
       val isMaster = IsMaster.ResultMaker(response)
       updateNodeSetManager(if(isMaster.hosts.isDefined) {// then it's a ReplicaSet
         val mynodes = isMaster.hosts.get.map(name => Node(name, if(isMaster.me.exists(_ == name)) isMaster.state else NONE))
-        NodeSetManager(nodeSetManager.get.nodeSet.addNodes(mynodes).copy(name = isMaster.setName).createNeededChannels(self, 1))
+        NodeSetManager(nodeSetManager.get.nodeSet.addNodes(mynodes).copy(name = isMaster.setName).createNeededChannels(self, 10))
       } else if(nodeSetManager.get.nodeSet.nodes.length > 0) {
         logger.debug("single node, update..." + nodeSetManager)
-        NodeSetManager(NodeSet(None, None, nodeSetManager.get.nodeSet.nodes.slice(0, 1).map(_.copy(state = isMaster.state))).createNeededChannels(self, 1))
+        NodeSetManager(NodeSet(None, None, nodeSetManager.get.nodeSet.nodes.slice(0, 1).map(_.copy(state = isMaster.state))).createNeededChannels(self, 10))
       } else if(seedSet.isDefined && seedSet.get.findNodeByChannelId(response.info.channelId).isDefined) {
         logger.debug("single node, creation..." + nodeSetManager)
-        NodeSetManager(NodeSet(None, None, Vector(Node(seedSet.get.findNodeByChannelId(response.info.channelId).get.name))).createNeededChannels(self, 1))
+        NodeSetManager(NodeSet(None, None, Vector(Node(seedSet.get.findNodeByChannelId(response.info.channelId).get.name))).createNeededChannels(self, 10))
       } else throw new RuntimeException("single node discovery failure..."))
       logger.debug("NodeSetManager is now " + nodeSetManager)
       nodeSetManager.get.nodeSet.connectAll
@@ -314,6 +323,9 @@ class MongoDBSystem(seeds: List[String] = List("localhost:27017"), auth :List[Au
         }
         case (originalSender, Right(message)) => nodeSetManager.map(_.primaryWrapper.get.send(message))
       }
+    }
+    if(!waitingForPrimary.isEmpty) {
+      waitingForPrimary.dequeueAll(_ => true).foreach(_ ! "true")
     }
   }
 
