@@ -32,9 +32,31 @@ object Converters {
     bytes
   }
 
+  /** Computes the MD5 hash of the given String. */
+  def md5(s: String) = java.security.MessageDigest.getInstance("MD5").digest(s.getBytes)
+
+  /** Computes the MD5 hash of the given Array of Bytes. */
+  def md5(array: Array[Byte]) = java.security.MessageDigest.getInstance("MD5").digest(array)
+
   /** Computes the MD5 hash of the given String and turns it into a hexadecimal String representation. */
-  def md5Hex(s: String) :String =
-    hex2Str(java.security.MessageDigest.getInstance("MD5").digest(s.getBytes))
+  def md5Hex(s: String) :String = hex2Str(md5(s))
+}
+
+object ArrayUtils {
+  /** Concats two array - fast way */ // TODO
+  def concat[T](a1: Array[T], a2: Array[T])(implicit m: Manifest[T]) :Array[T] = {
+    var i, j = 0
+    val result = new Array[T](a1.length + a2.length)
+    while(i < a1.length) {
+      result(i) = a1(i)
+      i = i + 1
+    }
+    while(j < a2.length) {
+      result(i + j) = a2(j)
+      j = j + 1
+    }
+    result
+  }
 }
 
 /** Extends a [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]] with handy functions for the Mongo Wire Protocol. */
