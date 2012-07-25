@@ -5,7 +5,7 @@ import akka.dispatch.Future
 import akka.pattern.ask
 import akka.util.Timeout
 import akka.util.duration._
-import org.asyncmongo.actors.{Authenticate, MongoDBSystem}
+import org.asyncmongo.actors.{Authenticate, MongoDBSystem, MonitorActor}
 import org.asyncmongo.bson._
 import org.asyncmongo.handlers._
 import org.asyncmongo.protocol._
@@ -382,10 +382,21 @@ object Samples {
  * @param mongosystem A reference to a [[org.asyncmongo.actors.MongoDBSystem]] Actor.
  */
 class MongoConnection(
-  val mongosystem: ActorRef
+  val mongosystem: ActorRef,
+  monitor: ActorRef
 ) {
   /**
+   * Get a future that will be successful when a primary node is available or times out.
+   */
+  def waitForPrimary(waitForAvailability: Timeout) :Future[_] = {
+    monitor.ask(org.asyncmongo.actors.WaitForPrimary)(waitForAvailability)
+  }
+
+  /**
    * Writes a request and wait for a response.
+   *
+   * The implicit timeout concerns the time of execution on the database.
+   * If no suitable node for handling this request is available, the returned future will be in error.
    *
    * @param message The request maker.
    *
@@ -393,6 +404,24 @@ class MongoConnection(
    */
   def ask(message: RequestMaker)(implicit timeout: Timeout) :Future[Response] = {
     (mongosystem ? message).mapTo[Response]
+  }
+
+  /**
+   * Writes a request and wait for a response, waiting for a suitable node or times out.
+   *
+   * The implicit timeout concerns the time of execution on the database.
+   *   - waitForAvailability is the maximum amount of time that will be spent expecting a suitable node for this request.
+   *   - dbTimemout is the maximum amount of time that will be spent expecting a response from a database.
+   *
+   * @param message The request maker.
+   * @param waitForAvailability wait for a suitable node up to the given timeout.
+   *
+   * @return The future response.
+   */
+  def ask(message: RequestMaker, waitForAvailability: Timeout)(implicit dbTimeout: Timeout) :Future[Response] = {
+    monitor.ask("primary")(waitForAvailability).flatMap { s=>
+      (mongosystem ? message).mapTo[Response]
+    }
   }
 
   /**
@@ -404,6 +433,24 @@ class MongoConnection(
    */
   def ask(checkedWriteRequest: CheckedWriteRequest)(implicit timeout: Timeout) = {
     (mongosystem ? checkedWriteRequest).mapTo[Response]
+  }
+
+  /**
+   * Writes a checked write request and wait for a response, waiting for a primary node or times out.
+   *
+   * The implicit timeout concerns the time of execution on the database.
+   *   - waitForAvailability is the maximum amount of time that will be spent expecting a primary node for this request.
+   *   - dbTimemout is the maximum amount of time that will be spent expecting a response from the database.
+   *
+   * @param message The request maker.
+   * @param waitForAvailability wait for a primary node up to the given timeout.
+   *
+   * @return The future response.
+   */
+  def ask(checkedWriteRequest: CheckedWriteRequest, waitForAvailability: Timeout)(implicit dbTimeout: Timeout) :Future[Response] = {
+    monitor.ask("primary")(waitForAvailability).flatMap { s=>
+      (mongosystem ? checkedWriteRequest).mapTo[Response]
+    }
   }
 
   /**
@@ -441,7 +488,9 @@ object MongoConnection {
    */
   def apply(nodes: List[String], authentications :List[Authenticate] = List.empty, name: Option[String]= None) = {
     val props = Props(new MongoDBSystem(nodes, authentications))
-    new MongoConnection(if(name.isDefined) system.actorOf(props, name = name.get) else system.actorOf(props))
+    val mongosystem = if(name.isDefined) system.actorOf(props, name = name.get) else system.actorOf(props)
+    val monitor = system.actorOf(Props(new MonitorActor(mongosystem)))
+    new MongoConnection(mongosystem, monitor)
   }
 }
 

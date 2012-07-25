@@ -1,15 +1,21 @@
 package foo
 
+import akka.util.Timeout
+import akka.util.duration._
+import akka.dispatch.Await
 import org.asyncmongo.api._
 import org.asyncmongo.bson._
+import org.asyncmongo.protocol.commands._
 import org.asyncmongo.handlers.DefaultBSONHandlers._
 import play.api.libs.iteratee.Iteratee
-import org.asyncmongo.protocol.commands._
 
 object Samples {
   val connection = MongoConnection( List( "localhost:27016" ) )
   val db = DB("plugin", connection)
   val collection = db("acoll")
+
+  // just for running examples - avoid this in production since it blocks the current thread
+  Await.result(connection.waitForPrimary(Timeout(5 seconds)), 5 seconds)
 
   def listDocs() = {
     // get a Future[Cursor[DefaultBSONIterator]]

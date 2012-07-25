@@ -30,11 +30,21 @@ case object Close
 /**
  * Message to send in order to get warned the next time a primary is found.
  */
-case object WaitPrimary
 private[asyncmongo] case object ConnectAll
 private[asyncmongo] case object RefreshAllNodes
 private[asyncmongo] case class Connected(channelId: Int)
 private[asyncmongo] case class Disconnected(channelId: Int)
+
+/** Message sent when the primary has been discovered. */
+case object PrimaryAvailable
+/** Message sent when the primary has been lost. */
+case object PrimaryUnavailable
+// TODO
+case object SetAvailable
+// TODO
+case object SetUnavailable
+/** Register a monitor. */
+case object RegisterMonitor
 
 /**
  * Main actor that processes the requests.
@@ -65,11 +75,9 @@ class MongoDBSystem(seeds: List[String] = List("localhost:27017"), auth :List[Au
 
   private var authenticationHistory :AuthHistory = AuthHistory(for(a <- auth) yield a -> Nil)
 
-  // todo: if primary changes again while sending queued messages ? -> don't care, an error will be sent as the result of the promise
-  private val queuedMessages = scala.collection.mutable.Queue[(ActorRef, Either[(Request, Request), Request])]()
   private val awaitingResponses = scala.collection.mutable.ListMap[Int, AwaitingResponse]()
 
-  private val waitingForPrimary = scala.collection.mutable.Queue[ActorRef]()
+  private val monitors = scala.collection.mutable.ListBuffer[ActorRef]()
 
   private val connectAllJob = context.system.scheduler.schedule(MongoDBSystem.DefaultConnectionRetryInterval milliseconds,
     MongoDBSystem.DefaultConnectionRetryInterval milliseconds,
@@ -92,8 +100,7 @@ class MongoDBSystem(seeds: List[String] = List("localhost:27017"), auth :List[Au
       logger.debug("node " + server + "will send the query " + request.op)
       server.map(_.send(request))
     } else if(!nodeSetManager.get.primaryWrapper.isDefined) {
-      logger.info("delaying send because primary is not available")
-      queuedMessages += (sender -> Right(request))
+      sender ! Failure(PrimaryUnavailableException)
     } else {
       nodeSetManager.get.primaryWrapper.get.send(request)
     }
@@ -111,9 +118,7 @@ class MongoDBSystem(seeds: List[String] = List("localhost:27017"), auth :List[Au
     if(secondaryOK(request)) {
       pickNode(request).map(_.send(request, writeConcern))
     } else if(!nodeSetManager.get.primaryWrapper.isDefined) {
-      logger.info("delaying send because primary is not available")
-      queuedMessages += (sender -> Left(request -> writeConcern))
-      logger.debug("now queuedMessages is " + queuedMessages)
+      sender ! Failure(PrimaryUnavailableException)
     } else {
       nodeSetManager.get.primaryWrapper.get.send(request, writeConcern)
     }
@@ -130,6 +135,7 @@ class MongoDBSystem(seeds: List[String] = List("localhost:27017"), auth :List[Au
   }
 
   override def receive = {
+    case RegisterMonitor => monitors += sender
     case Close => {
       if(nodeSetManager.isDefined)
         nodeSetManager.get.nodeSet.makeChannelGroup.close.addListener(new ChannelGroupFutureListener {
@@ -139,9 +145,6 @@ class MongoDBSystem(seeds: List[String] = List("localhost:27017"), auth :List[Au
           }
         })
       else sender ! "done"
-    }
-    case WaitPrimary => {
-      waitingForPrimary += sender
     }
     case message if !nodeSetManager.isDefined => {
       logger.error("dropping message " + message + " as this system is closed")
@@ -191,6 +194,8 @@ class MongoDBSystem(seeds: List[String] = List("localhost:27017"), auth :List[Au
       updateNodeSetManager(NodeSetManager(nodeSetManager.get.nodeSet.updateByChannelId(channelId, node => {
         node.copy(state = NOT_CONNECTED, channels = node.channels.collect{ case channel if channel.isOpen => channel })
       })))
+      if(!nodeSetManager.exists(_.primaryWrapper.isDefined))
+        broadcastMonitors(PrimaryUnavailable)
       logger.debug(channelId + " is disconnected")
     }
     case auth @ Authenticate(db, user, password) => {
@@ -278,6 +283,7 @@ class MongoDBSystem(seeds: List[String] = List("localhost:27017"), auth :List[Au
               self ! RefreshAllNodes
               updateNodeSetManager(NodeSetManager(nodeSetManager.get.nodeSet.updateAll(node => if(node.state == PRIMARY) node.copy(state = UNKNOWN) else node)))
               _sender ! Failure(DefaultMongoError(lastError.message, lastError.code))
+              broadcastMonitors(PrimaryUnavailable)
             } else {
               response.documents.readerIndex(ridx)
               _sender ! response
@@ -310,23 +316,8 @@ class MongoDBSystem(seeds: List[String] = List("localhost:27017"), auth :List[Au
   def updateNodeSetManager(nodeSetManager: NodeSetManager) :NodeSetManager = {
     this.nodeSetManager = Some(nodeSetManager)
     if(nodeSetManager.primaryWrapper.isDefined)
-      foundPrimary()
+      broadcastMonitors(PrimaryAvailable)
     nodeSetManager
-  }
-
-  def foundPrimary() {
-    if(!queuedMessages.isEmpty) {
-      logger.info("ok, found the primary node, sending all the queued messages... ")
-      queuedMessages.dequeueAll( _ => true).foreach {
-        case (originalSender, Left( (message, writeConcern) )) => {
-          nodeSetManager.map(_.primaryWrapper.get.send(message, writeConcern))
-        }
-        case (originalSender, Right(message)) => nodeSetManager.map(_.primaryWrapper.get.send(message))
-      }
-    }
-    if(!waitingForPrimary.isEmpty) {
-      waitingForPrimary.dequeueAll(_ => true).foreach(_ ! "true")
-    }
   }
 
   def secondaryOK(message: Request) = !message.op.requiresPrimary && (message.op match {
@@ -346,6 +337,8 @@ class MongoDBSystem(seeds: List[String] = List("localhost:27017"), auth :List[Au
     if(nodeSetManager.isDefined)
       nodeSetManager.get.nodeSet.makeChannelGroup.close
   }
+
+  def broadcastMonitors(message: AnyRef) = monitors.foreach(_ ! message)
 }
 
 object MongoDBSystem {
@@ -403,3 +396,49 @@ private[actors] case class AwaitingResponse(
   actor: ActorRef,
   isGetLastError: Boolean
 )
+
+/** A message to send to a MonitorActor to be warned when a primary has been discovered. */
+case object WaitForPrimary
+
+/**
+ * A monitor for MongoDBSystem actors.
+ *
+ * This monitor will be sent node state change events (like PrimaryAvailable, PrimaryUnavailable, etc.).
+ * See WaitForPrimary message.
+ */
+class MonitorActor(sys: ActorRef) extends Actor {
+  import MonitorActor._
+
+  sys ! RegisterMonitor
+
+  private val waitingForPrimary = scala.collection.mutable.Queue[ActorRef]()
+  var primaryAvailable = false
+
+  override def receive = {
+    case PrimaryAvailable =>
+      logger.debug("set: a primary is available")
+      primaryAvailable = true
+      waitingForPrimary.dequeueAll(_ => true).foreach(_ ! PrimaryAvailable)
+    case PrimaryUnavailable =>
+      logger.debug("set: no primary available")
+      primaryAvailable = false
+    case WaitForPrimary =>
+      if(primaryAvailable) {
+        logger.debug(sender + " is waiting for a primary... available right now, go!")
+        sender ! PrimaryAvailable
+      } else {
+        logger.debug(sender + " is waiting for a primary...  not available, warning as soon a primary is available.")
+        waitingForPrimary += sender
+      }
+  }
+}
+
+object MonitorActor {
+  private val logger = LoggerFactory.getLogger("MonitorActor")
+}
+
+// exceptions
+/** An exception to be thrown when a request needs a non available primary. */
+object PrimaryUnavailableException extends RuntimeException {
+  override def getMessage() = "No primary node is available!"
+}
