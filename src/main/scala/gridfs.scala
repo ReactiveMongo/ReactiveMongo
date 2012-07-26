@@ -26,14 +26,18 @@ import scala.util.Random
  * A file's metadata.
  */
 trait FileEntry {
+  /** File name */
+  val filename: String
   /** length of the file */
   val length: Int
   /** size of the chunks of this file */
   val chunkSize: Int
   /** the date when this file was uploaded. */
   val uploadDate: Option[Long]
-  /** the MD5 hasgh of this file. */
+  /** the MD5 hash of this file. */
   val md5: Option[String]
+  /** mimetype of this file. */
+  val contentType: Option[String]
   /** the GridFS store of this file. */
   val gridFS: GridFS
 }
@@ -94,6 +98,14 @@ object ReadFileEntry {
           case BSONString(m) => Some(m)
           case _ => None
         })
+        val filename = map.get("filename").flatMap(_.value match {
+          case BSONString(name) => Some(name)
+          case _ => None
+        }).getOrElse("")
+        val contentType = map.get("contentType").flatMap(_.value match {
+          case BSONString(ct) => Some(ct)
+          case _ => None
+        })
         val id = map.get("_id").getOrElse(throw new RuntimeException("_id is mandatory for a stored gridfs file!")).value
         val gridFS = gFS
       }
@@ -109,7 +121,8 @@ object ReadFileEntry {
  */
 case class FileToWrite(
   id: Option[BSONValue],
-  name: String
+  name: String,
+  contentType: Option[String]
 ) {
   import FileToWrite.logger
 
@@ -161,6 +174,8 @@ case class FileToWrite(
             "chunkSize" -> BSONInteger(chunkSize),
             "length" -> BSONInteger(length),
             "uploadDate" -> BSONDateTime(System.currentTimeMillis))
+          if(contentType.isDefined)
+            bson.write("contentType" -> BSONString(contentType.get))
           gfs.files.insert(bson).map(_ => PutResult(files_id, n, length, Some(Converters.hex2Str(md.digest))))
         })
       }
@@ -241,10 +256,16 @@ case class GridFS(db: DB, prefix: String = "fs") {
    *
    * @return an iteratee to be applied to an enumerator of chunks of bytes.
    */
-  def save(name: String, id: Option[BSONValue]) :Iteratee[Array[Byte], Promise[PutResult]] = FileToWrite(id, name).iteratee(this)
+  def save(name: String, id: Option[BSONValue], contentType: Option[String] = None) :Iteratee[Array[Byte], Promise[PutResult]] = FileToWrite(id, name, contentType).iteratee(this)
 }
 
 object GridFS {
+  import akka.pattern.ask
+  import akka.util.Timeout
+  import akka.util.duration._
+
+  implicit val timeout = Timeout(5 seconds)
+
   // tests
   def read {
     val gfs = new GridFS(DB("plugin", MongoConnection(List("localhost:27016"))))
@@ -267,11 +288,14 @@ object GridFS {
     val start = System.currentTimeMillis
     val connection = MongoConnection(List("localhost:27016"))
     (connection.mongosystem ? WaitPrimary).onSuccess {
+    connection.waitForPrimary(timeout).onSuccess {
       case _ => val gfs = new GridFS(DB("plugin", connection))
 
       val filetowrite = FileToWrite(None, "hepla.txt")
+      val filetowrite = FileToWrite(None, "hepla.txt", Some("text/plain"))
 
       val iteratee = filetowrite.iteratee(gfs)
+      val iteratee = filetowrite.iteratee(gfs, 11)
 
       val file = new File("/Volumes/Data/code/mongo-async-driver/TODO.txt")
       val enumerator = Enumerator.fromFile(file, 1024 * 1024)
