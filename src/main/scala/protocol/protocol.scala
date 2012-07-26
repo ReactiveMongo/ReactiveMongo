@@ -386,12 +386,14 @@ object NodeState {
 /** State of a channel. Useful mainly for authentication. */
 sealed trait ChannelState
 object ChannelState {
+  /** This channel is usable for any kind of queries, depending on its node state. */
+  sealed trait Usable extends ChannelState
   /** This channel is closed. */
   case object Closed extends ChannelState
   /** This channel is not connected. */
   case object NotConnected extends ChannelState
   /** This channel is usable, meaning that it can be used for sending wire protocol messages. */
-  case object Useable extends ChannelState // TODO useable => usable
-  /** This channel is currently authenticating, it should not been used for other kind of messages until the authentication process is done. */
-  case class Authenticating(db: String, user: String, password: String, nonce: Option[String]) extends ChannelState
+  case object Ready extends Usable
+  /** This channel is currently authenticating. It can be used for other queries though. */
+  case class Authenticating(db: String, user: String, password: String, nonce: Option[String]) extends Usable
 }

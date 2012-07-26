@@ -484,10 +484,11 @@ object MongoConnection {
    *
    * @param nodes A list of node names, like ''node1.foo.com:27017''. Port is optional, it is 27017 by default.
    * @param authentications A list of Authenticates.
+   * @param nbChannelsPerNode Number of channels to open per node. Defaults to 10.
    * @param name The name of the newly created [[org.asyncmongo.actors.MongoDBSystem]] actor, if needed.
    */
-  def apply(nodes: List[String], authentications :List[Authenticate] = List.empty, name: Option[String]= None) = {
-    val props = Props(new MongoDBSystem(nodes, authentications))
+  def apply(nodes: List[String], authentications :List[Authenticate] = List.empty, nbChannelsPerNode :Int = 10, name: Option[String] = None) = {
+    val props = Props(new MongoDBSystem(nodes, authentications, nbChannelsPerNode))
     val mongosystem = if(name.isDefined) system.actorOf(props, name = name.get) else system.actorOf(props)
     val monitor = system.actorOf(Props(new MonitorActor(mongosystem)))
     new MongoConnection(mongosystem, monitor)

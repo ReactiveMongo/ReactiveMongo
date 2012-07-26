@@ -18,7 +18,10 @@ case class MongoChannel(
   state: ChannelState,
   loggedIn: Set[LoggedIn]
 ) {
-  lazy val useable = state == Useable
+  lazy val usable = state match {
+    case _ :Usable => true
+    case _ => false
+  }
 }
 
 object MongoChannel {
@@ -42,7 +45,7 @@ case class Node(
 
   lazy val isQueryable :Boolean = (state == PRIMARY || state == SECONDARY) && queryable.size > 0
 
-  lazy val queryable :IndexedSeq[MongoChannel] = channels.filter(_.useable == true)
+  lazy val queryable :IndexedSeq[MongoChannel] = channels.filter(_.usable == true)
 
   def updateChannelById(channelId: Int, transform: (MongoChannel) => MongoChannel) :Node =
     copy(channels = channels.map(channel => if(channel.getId == channelId) transform(channel) else channel))

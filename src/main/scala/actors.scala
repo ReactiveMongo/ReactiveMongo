@@ -51,8 +51,12 @@ case object RegisterMonitor
  *
  * @param seeds nodes that will be probed to discover the whole replica set (or one standalone node)
  * @param auth list of authenticate messages - all the nodes will be authenticated as soon they are connected.
+ * @param nbChannelsPerNode number of open channels by node
  */
-class MongoDBSystem(seeds: List[String] = List("localhost:27017"), auth :List[Authenticate]) extends Actor {
+class MongoDBSystem(
+  seeds: List[String],
+  auth :List[Authenticate],
+  nbChannelsPerNode :Int) extends Actor {
   import MongoDBSystem._
 
   val requestIdGenerator = new {
@@ -131,7 +135,7 @@ class MongoDBSystem(seeds: List[String] = List("localhost:27017"), auth :List[Au
       logger.debug("channel " + channel.channel + " is now starting to process the next auth with " + nextAuth + "!")
       channel.write(Getnonce(nextAuth.db).maker(requestIdGenerator.getNonce))
       channel.copy(state = Authenticating(nextAuth.db, nextAuth.user, nextAuth.password, None))
-    } else { logger.debug("AUTH: nothing to do. authenticationHistory is " + authenticationHistory); channel.copy(state = Useable) }
+    } else { logger.debug("AUTH: nothing to do. authenticationHistory is " + authenticationHistory); channel.copy(state = Ready) }
   }
 
   override def receive = {
@@ -157,7 +161,7 @@ class MongoDBSystem(seeds: List[String] = List("localhost:27017"), auth :List[Au
     // monitor
     case ConnectAll => {
       logger.debug("ConnectAll Job running...")
-      updateNodeSetManager(NodeSetManager(nodeSetManager.get.nodeSet.createNeededChannels(self, 10)))
+      updateNodeSetManager(NodeSetManager(nodeSetManager.get.nodeSet.createNeededChannels(self, nbChannelsPerNode)))
       nodeSetManager.get.nodeSet.connectAll
     }
     case RefreshAllNodes => {
@@ -180,7 +184,7 @@ class MongoDBSystem(seeds: List[String] = List("localhost:27017"), auth :List[Au
           node.copy(channels = node.channels.map { channel =>
             if(channel.getId == channelId) {
               channel.write(IsMaster().maker(requestIdGenerator.isMaster))
-              channel.copy(state = Useable)
+              channel.copy(state = Ready)
             } else channel
           }, state = node.state match {
             case _: MongoNodeState => node.state
@@ -212,13 +216,13 @@ class MongoDBSystem(seeds: List[String] = List("localhost:27017"), auth :List[Au
       val isMaster = IsMaster.ResultMaker(response)
       updateNodeSetManager(if(isMaster.hosts.isDefined) {// then it's a ReplicaSet
         val mynodes = isMaster.hosts.get.map(name => Node(name, if(isMaster.me.exists(_ == name)) isMaster.state else NONE))
-        NodeSetManager(nodeSetManager.get.nodeSet.addNodes(mynodes).copy(name = isMaster.setName).createNeededChannels(self, 10))
+        NodeSetManager(nodeSetManager.get.nodeSet.addNodes(mynodes).copy(name = isMaster.setName).createNeededChannels(self, nbChannelsPerNode))
       } else if(nodeSetManager.get.nodeSet.nodes.length > 0) {
         logger.debug("single node, update..." + nodeSetManager)
-        NodeSetManager(NodeSet(None, None, nodeSetManager.get.nodeSet.nodes.slice(0, 1).map(_.copy(state = isMaster.state))).createNeededChannels(self, 10))
+        NodeSetManager(NodeSet(None, None, nodeSetManager.get.nodeSet.nodes.slice(0, 1).map(_.copy(state = isMaster.state))).createNeededChannels(self, nbChannelsPerNode))
       } else if(seedSet.isDefined && seedSet.get.findNodeByChannelId(response.info.channelId).isDefined) {
         logger.debug("single node, creation..." + nodeSetManager)
-        NodeSetManager(NodeSet(None, None, Vector(Node(seedSet.get.findNodeByChannelId(response.info.channelId).get.name))).createNeededChannels(self, 10))
+        NodeSetManager(NodeSet(None, None, Vector(Node(seedSet.get.findNodeByChannelId(response.info.channelId).get.name))).createNeededChannels(self, nbChannelsPerNode))
       } else throw new RuntimeException("single node discovery failure..."))
       logger.debug("NodeSetManager is now " + nodeSetManager)
       nodeSetManager.get.nodeSet.connectAll
