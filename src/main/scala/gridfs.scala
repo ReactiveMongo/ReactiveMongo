@@ -281,20 +281,16 @@ object GridFS {
     import akka.pattern.ask
     import akka.util.Timeout
     import akka.util.duration._
-    import org.asyncmongo.actors.WaitPrimary
 
     implicit val timeout = Timeout(5 seconds)
 
     val start = System.currentTimeMillis
     val connection = MongoConnection(List("localhost:27016"))
-    (connection.mongosystem ? WaitPrimary).onSuccess {
     connection.waitForPrimary(timeout).onSuccess {
       case _ => val gfs = new GridFS(DB("plugin", connection))
 
-      val filetowrite = FileToWrite(None, "hepla.txt")
       val filetowrite = FileToWrite(None, "hepla.txt", Some("text/plain"))
 
-      val iteratee = filetowrite.iteratee(gfs)
       val iteratee = filetowrite.iteratee(gfs, 11)
 
       val file = new File("/Volumes/Data/code/mongo-async-driver/TODO.txt")

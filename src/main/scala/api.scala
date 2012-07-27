@@ -24,7 +24,7 @@ case class DB(dbName: String, connection: MongoConnection, implicit val timeout 
   def apply(name: String) :Collection = Collection(dbName, name, connection, timeout)
 
   /** Authenticates the connection on this database. */ // TODO return type
-  def authenticate(user: String, password: String) :Future[Map[String, BSONElement]] = connection.authenticate(dbName, user, password)
+  def authenticate(user: String, password: String) :Future[AuthenticationResult] = connection.authenticate(dbName, user, password)
 }
 
 /**
@@ -461,8 +461,8 @@ class MongoConnection(
   def send(message: RequestMaker) = mongosystem ! message
 
   /** Authenticates the connection on the given database. */ // TODO return type
-  def authenticate(db: String, user: String, password: String)(implicit timeout: Timeout) :Future[Map[String, BSONElement]] = {
-    (mongosystem ? Authenticate(db, user, password)).mapTo[Map[String, BSONElement]]
+  def authenticate(db: String, user: String, password: String)(implicit timeout: Timeout) :Future[AuthenticationResult] = {
+    (mongosystem ? Authenticate(db, user, password)).mapTo[AuthenticationResult]
   }
 
   def close(implicit timeout: Timeout) :Future[String] = (mongosystem ? org.asyncmongo.actors.Close).mapTo[String]

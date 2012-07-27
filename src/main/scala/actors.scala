@@ -209,7 +209,10 @@ class MongoDBSystem(
         updateNodeSetManager(NodeSetManager(nodeSetManager.get.nodeSet.updateAll(node =>
           node.copy(channels = node.channels.map(authenticateChannel(_)))
         )))
-      } else logger.debug("auth not performed as already registered...")
+      } else {
+        logger.debug("auth not performed as already registered...")
+        sender ! SuccessfulAuthentication(db, user, false) // TODO refactor auth
+      }
     }
     // isMaster response
     case response: Response if response.header.responseTo < 1000 => {
