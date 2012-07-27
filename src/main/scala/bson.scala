@@ -55,6 +55,7 @@ sealed trait BSONValue {
   def write(buffer: ChannelBuffer) :ChannelBuffer
 }
 
+/** A BSON Double. */
 case class BSONDouble(value: Double) extends BSONValue {
   val code = 0x01
 
@@ -77,6 +78,8 @@ case class BSONDocument(value: ChannelBuffer) extends BSONValue {
   val code = 0x03
 
   def write(buffer: ChannelBuffer) = { buffer.writeBytes(value); buffer }
+
+  def parse() = DefaultBSONIterator(value)
 }
 
 /**
@@ -88,6 +91,8 @@ case class BSONArray(value: ChannelBuffer) extends BSONValue {
   val code = 0x04
 
   def write(buffer: ChannelBuffer) = { buffer writeBytes value; buffer }
+
+  def parse() = DefaultBSONIterator(value)
 }
 
 /**
@@ -300,17 +305,23 @@ class Bson(val estimatedLength: Int = 32) {
   private val buffer = ChannelBuffers.dynamicBuffer(ByteOrder.LITTLE_ENDIAN, estimatedLength)
   buffer.writeInt(0)
 
-  /** Writes a BSON element into this buffer. */
-  def write(el: BSONElement) :Bson = {
+  /** Adds a BSON element into this buffer. */
+  def add(el: BSONElement) :Bson = {
     el.write(buffer)
     this
   }
 
   /** Writes a BSON value of the given name into this buffer. */
-  def write(el: (String, BSONValue)) :Bson = {
+  def add(el: (String, BSONValue)) :Bson = {
     DefaultBSONElement(el._1, el._2).write(buffer)
     this
   }
+
+  /** Alias for add(BSONElement) */
+  def += (el: BSONElement) :Bson = add(el)
+
+  /** Alias for add( (String, BSONValue) ) */
+  def += (el: (String, BSONValue)) :Bson = add(el)
 
   /**
    * Ends the Bson, sets the length and returns the buffer.
@@ -322,16 +333,21 @@ class Bson(val estimatedLength: Int = 32) {
     result.setInt(0, result.writerIndex)
     result
   }
+
+  /**
+   * Returns a BSONDocument from the buffer produced by makeBuffer.
+   * The underlying buffer is not affected, so this Bson instance can be used again.
+   */
+  def toDocument = BSONDocument(makeBuffer)
 }
 
 object Bson {
   /** Creates a Bson object and adds the given elements. */
   def apply(el: BSONElement, els: BSONElement*) = {
     val bson = new Bson
-    bson.write(el)
-    for(e <- els) {
-      bson.write(e)
-    }
+    bson += el
+    for(e <- els)
+      bson += e
     bson
   }
 
@@ -340,9 +356,8 @@ object Bson {
    */
   def apply(els: (String, BSONValue)*) = {
     val bson = new Bson
-    for(e <- els) {
-      bson.write(e)
-    }
+    for(e <- els)
+      bson += e
     bson
   }
 

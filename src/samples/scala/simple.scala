@@ -39,10 +39,10 @@ object Samples {
       "firstName" -> BSONString("Stephane"),
       "lastName" -> BSONString("Godbillon"),
       "age" -> BSONInteger(28),
-      "company" -> BSONDocument(Bson(
+      "company" -> Bson(
         "name" -> BSONString("Zenexity"),
         "address" -> BSONString("56 rue Saint Lazare 75009 Paris")
-      ).makeBuffer)
+      ).toDocument
     )
 
     val future = collection.insert(document, GetLastError())
@@ -59,10 +59,10 @@ object Samples {
       "firstName" -> BSONString("Stephane"),
       "lastName" -> BSONString("Godbillon"),
       "age" -> BSONInteger(28),
-      "company" -> BSONDocument(Bson(
+      "company" -> Bson(
         "name" -> BSONString("Zenexity"),
         "address" -> BSONString("56 rue Saint Lazare 75009 Paris")
-      ).makeBuffer)
+      ).toDocument
     )
 
     // get the future result of the insertion
@@ -92,11 +92,11 @@ object Samples {
     val selector = Bson("name" -> BSONString("Jack"))
 
     val modifier = Bson(
-      "$set" -> BSONDocument(Bson(
+      "$set" -> Bson(
         "lastName" ->BSONString("London"),
-        "firstName" -> BSONString("Jack")).makeBuffer),
-      "$unset" -> BSONDocument(Bson(
-        "name" -> BSONInteger(1)).makeBuffer)
+        "firstName" -> BSONString("Jack")).toDocument,
+      "$unset" -> Bson(
+        "name" -> BSONInteger(1)).toDocument
     )
 
     // get a future update
@@ -138,8 +138,7 @@ object Samples {
       "lastName" -> BSONString("Godbillon"))
 
     val modifier = Bson(
-      "$set" -> BSONDocument(
-        Bson("lastName" -> BSONString("GODBILLON")).makeBuffer))
+      "$set" -> Bson("lastName" -> BSONString("GODBILLON")).toDocument)
 
     val command = FindAndModify(
       collection.collectionName,

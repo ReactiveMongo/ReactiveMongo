@@ -175,14 +175,14 @@ case class FileToWrite(
             "length" -> BSONInteger(length),
             "uploadDate" -> BSONDateTime(System.currentTimeMillis))
           if(contentType.isDefined)
-            bson.write("contentType" -> BSONString(contentType.get))
+            bson.add("contentType" -> BSONString(contentType.get))
           gfs.files.insert(bson).map(_ => PutResult(files_id, n, length, Some(Converters.hex2Str(md.digest))))
         })
       }
       def writeChunk(n: Int, array: Array[Byte]) = {
         val bson = Bson("files_id" -> files_id)
-        bson.write("n" -> BSONInteger(n))
-        bson.write("data" -> new BSONBinary(array, Subtype.GenericBinarySubtype))
+        bson.add("n" -> BSONInteger(n))
+        bson.add("data" -> new BSONBinary(array, Subtype.GenericBinarySubtype))
         logger.debug("writing chunk " + n)
         gfs.chunks.insert(bson)
       }

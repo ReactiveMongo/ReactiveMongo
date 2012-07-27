@@ -116,15 +116,12 @@ case class GetLastError(
 ) extends Command {
   override def makeDocuments = {
     val bson = Bson("getlasterror" -> BSONInteger(1))
-    if(awaitJournalCommit) {
-      bson.write("j" -> BSONBoolean(true))
-    }
-    if(waitForReplicatedOn.isDefined) {
-      bson.write("w" -> BSONInteger(waitForReplicatedOn.get))
-    }
-    if(fsync) {
-      bson.write("fsync" -> BSONBoolean(true))
-    }
+    if(awaitJournalCommit)
+      bson.add("j" -> BSONBoolean(true))
+    if(waitForReplicatedOn.isDefined)
+      bson.add("w" -> BSONInteger(waitForReplicatedOn.get))
+    if(fsync)
+      bson.add("fsync" -> BSONBoolean(true))
     bson
   }
 
@@ -198,9 +195,9 @@ case class Count(
   override def makeDocuments = {
     val bson = Bson("count" -> BSONString(collectionName))
     if(query.isDefined)
-      bson.write("query" -> BSONDocument(query.get.makeBuffer))
+      bson.add("query" -> BSONDocument(query.get.makeBuffer))
     if(fields.isDefined)
-      bson.write("fields" -> BSONDocument(fields.get.makeBuffer))
+      bson.add("fields" -> BSONDocument(fields.get.makeBuffer))
     bson
   }
 
@@ -414,13 +411,13 @@ sealed trait Modify {
  */
 case class Update(update: Bson, fetchNewObject: Boolean) extends Modify {
   override def alter(bson: Bson) = bson
-      .write("update" -> BSONDocument(update.makeBuffer))
-      .write("new" -> BSONBoolean(fetchNewObject))
+      .add("update" -> BSONDocument(update.makeBuffer))
+      .add("new" -> BSONBoolean(fetchNewObject))
 }
 
 /** Remove (part of a FindAndModify command). */
 object Remove extends Modify {
-  override def alter(bson: Bson) = bson.write("remove" -> BSONBoolean(true))
+  override def alter(bson: Bson) = bson.add("remove" -> BSONBoolean(true))
 }
 
 /**
@@ -447,11 +444,11 @@ case class FindAndModify(
   override def makeDocuments: Bson = {
     val bson = Bson("findAndModify" -> BSONString(collection), "query" -> BSONDocument(query.makeBuffer))
     if(sort.isDefined)
-      bson.write("sort" -> BSONDocument(sort.get.makeBuffer))
+      bson.add("sort" -> BSONDocument(sort.get.makeBuffer))
     if(fields.isDefined)
-      bson.write("fields" -> BSONDocument(fields.get.makeBuffer))
+      bson.add("fields" -> BSONDocument(fields.get.makeBuffer))
     if(upsert)
-      bson.write("upsert" -> BSONBoolean(true))
+      bson.add("upsert" -> BSONBoolean(true))
     modify.alter(bson)
   }
 
