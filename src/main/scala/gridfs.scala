@@ -51,7 +51,19 @@ trait ReadFileEntry extends FileEntry {
 
   /** Produces an enumerator of chunks of bytes from the ''chunks'' collection. */
   def enumerate() :Enumerator[Array[Byte]] = {
-    val cursor = gridFS.chunks.find(Bson("files_id" -> id), None, 0, Int.MaxValue)
+    val selector = Bson(
+      "$query" -> Bson(
+        "files_id" -> id,
+        "n" -> Bson(
+          "$gte" -> BSONInteger(0),
+          "$lte" -> BSONInteger( length/chunkSize + (if(length % chunkSize > 0) 1 else 0) )
+        ).toDocument
+      ).toDocument,
+      "$orderBy" -> Bson(
+        "n" -> BSONInteger(1)
+      ).toDocument
+    )
+    val cursor = gridFS.chunks.find(selector, None, 0, Int.MaxValue)
     Cursor.enumerate(cursor) &> (Enumeratee.map { doc =>
       doc.find(_.name == "data").flatMap {
         case ReadBSONElement(_, BSONBinary(data, _)) => Some(data.array())
@@ -147,6 +159,8 @@ case class FileToWrite(
         val wholeChunk = ArrayUtils.concat(previous, chunk)
 
         val normalizedChunkNumber = wholeChunk.length / chunkSize
+
+        logger.debug("wholeChunk size is " + wholeChunk.length + " => " + normalizedChunkNumber)
 
         val zipped = for(i <- 0 until normalizedChunkNumber) yield
           Arrays.copyOfRange(wholeChunk, i * chunkSize, (i + 1) * chunkSize) -> i
