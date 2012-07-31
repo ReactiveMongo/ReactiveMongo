@@ -1,6 +1,6 @@
 package org.asyncmongo.gridfs
 
-import akka.dispatch.Future
+import scala.concurrent.{Future, ExecutionContext}
 
 import java.io._
 import java.util.Arrays
@@ -17,7 +17,7 @@ import org.asyncmongo.utils.ArrayUtils
 import org.jboss.netty.buffer.ChannelBuffer
 import org.slf4j.{Logger, LoggerFactory}
 
-import play.api.libs.concurrent.{AkkaPromise, Promise}
+import play.api.libs.concurrent.PlayPromise
 import play.api.libs.iteratee._
 
 import scala.util.Random
@@ -50,7 +50,7 @@ trait ReadFileEntry extends FileEntry {
   import ReadFileEntry.logger
 
   /** Produces an enumerator of chunks of bytes from the ''chunks'' collection. */
-  def enumerate() :Enumerator[Array[Byte]] = {
+  def enumerate(implicit ctx: ExecutionContext) :Enumerator[Array[Byte]] = {
     val selector = Bson(
       "$query" -> Bson(
         "files_id" -> id,
@@ -80,8 +80,8 @@ trait ReadFileEntry extends FileEntry {
    *
    * Basically it's just an enumerator produced by the ''enumerate'' method that is applied to an Iteratee that writes the consumed chunks into the given stream.
    */
-  def readContent(os: OutputStream) :Promise[Iteratee[Array[Byte],Unit]] = {
-    enumerate()(Iteratee.foreach { chunk =>
+  def readContent(os: OutputStream)(implicit ctx: ExecutionContext) :Future[Iteratee[Array[Byte],Unit]] = {
+    enumerate(ctx)(Iteratee.foreach { chunk =>
       os.write(chunk)
     })
   }
@@ -139,12 +139,12 @@ case class FileToWrite(
   import FileToWrite.logger
 
   /**
-   * Returns an Iteratee[Array[Byte], Promise[PutResult]] that will consume chunks of bytes, normalize their size and write them into the ''chunks'' collection.
+   * Returns an Iteratee[Array[Byte], Future[PutResult]] that will consume chunks of bytes, normalize their size and write them into the ''chunks'' collection.
    *
    * @param gfs The GridFS store.
    * @param chunkSize The size of the chunks to be written. Defaults to 256k (GridFS Spec).
    */
-  def iteratee(gfs: GridFS, chunkSize: Int = 262144) = {
+  def iteratee(gfs: GridFS, chunkSize: Int = 262144)(implicit ctx: ExecutionContext) = {
     implicit val ec = MongoConnection.system
 
     val files_id = id.getOrElse(BSONObjectID.generate)
@@ -155,7 +155,7 @@ case class FileToWrite(
       md: java.security.MessageDigest = java.security.MessageDigest.getInstance("MD5"),
       length: Int = 0
     ) {
-      def feed(chunk: Array[Byte]) :Promise[Chunk] = {
+      def feed(chunk: Array[Byte]) :Future[Chunk] = {
         val wholeChunk = ArrayUtils.concat(previous, chunk)
 
         val normalizedChunkNumber = wholeChunk.length / chunkSize
@@ -167,7 +167,7 @@ case class FileToWrite(
 
         val left = Arrays.copyOfRange(wholeChunk, normalizedChunkNumber * chunkSize, wholeChunk.length)
 
-        new AkkaPromise(Future.traverse(zipped) { ci =>
+        Future.traverse(zipped) { ci =>
           writeChunk(n + ci._2, ci._1)
         }.map { _ =>
           logger.debug("all futures for the last given chunk are redeemed.")
@@ -177,11 +177,11 @@ case class FileToWrite(
             md,//{ md.update(chunk) ; md },
             length + chunk.length
           )
-        })
+        }
       }
-      def finish() :Promise[PutResult] = {
+      def finish() :Future[PutResult] = {
         logger.debug("writing last chunk (n=" + n + ")!")
-        new AkkaPromise(writeChunk(n, previous).flatMap { _ =>
+        writeChunk(n, previous).flatMap { _ =>
           val bson = Bson(
             "_id" -> files_id,
             "filename" -> BSONString(name),
@@ -191,7 +191,7 @@ case class FileToWrite(
           if(contentType.isDefined)
             bson.add("contentType" -> BSONString(contentType.get))
           gfs.files.insert(bson).map(_ => PutResult(files_id, n, length, Some(Converters.hex2Str(md.digest))))
-        })
+        }
       }
       def writeChunk(n: Int, array: Array[Byte]) = {
         val bson = Bson("files_id" -> files_id)
@@ -255,7 +255,7 @@ case class GridFS(db: DB, prefix: String = "fs") {
    * @param selector The document to select the files to return
    * @param limit Limits the returned documents.
    */
-  def find[S](selector: S, limit :Int = Int.MaxValue)(implicit sWriter: BSONWriter[S]) :Future[Cursor[ReadFileEntry]] = {
+  def find[S](selector: S, limit :Int = Int.MaxValue)(implicit sWriter: BSONWriter[S], ctx: ExecutionContext) :Future[Cursor[ReadFileEntry]] = {
     implicit val rfeReader = ReadFileEntry.bsonReader(this)
     files.find(selector, None, 0, limit, 0)
   }
@@ -270,7 +270,7 @@ case class GridFS(db: DB, prefix: String = "fs") {
    *
    * @return an iteratee to be applied to an enumerator of chunks of bytes.
    */
-  def save(name: String, id: Option[BSONValue], contentType: Option[String] = None) :Iteratee[Array[Byte], Promise[PutResult]] = FileToWrite(id, name, contentType).iteratee(this)
+  def save(name: String, id: Option[BSONValue], contentType: Option[String] = None)(implicit ctx: ExecutionContext) :Iteratee[Array[Byte], Future[PutResult]] = FileToWrite(id, name, contentType).iteratee(this)
 }
 
 object GridFS {
@@ -282,21 +282,26 @@ object GridFS {
 
   // tests
   def read {
+    // TODO create own ExecutionContext
+    import ExecutionContext.Implicits.global
+
     val gfs = new GridFS(DB("plugin", MongoConnection(List("localhost:27016"))))
     val baos = new ByteArrayOutputStream
-    new AkkaPromise(gfs.find(Bson(), 1)).flatMap( _.iterator.next.readContent(baos) ).onRedeem(_ => {
+    gfs.find(Bson(), 1).flatMap( _.iterator.next.readContent(baos) ).onSuccess{ case _ =>
       val result = baos.toString("utf-8")
       println("DONE \n => " + result)
       println("\tof md5 = " + Converters.hex2Str(java.security.MessageDigest.getInstance("MD5").digest(baos.toByteArray)))
-    })
+    }
   }
 
   def write3 {
     import akka.pattern.ask
-    import akka.util.Timeout
-    import akka.util.duration._
+    import scala.concurrent.util.duration._
 
-    implicit val timeout = Timeout(5 seconds)
+    // TODO create own ExecutionContext
+    import ExecutionContext.Implicits.global
+
+    implicit val timeout = 5 seconds
 
     val start = System.currentTimeMillis
     val connection = MongoConnection(List("localhost:27016"))
@@ -311,7 +316,7 @@ object GridFS {
       val enumerator = Enumerator.fromFile(file, 1024 * 1024)
 
       val pp = Iteratee.flatten(enumerator(iteratee)).run
-      pp.flatMap(i => i).onRedeem { result =>
+      pp.flatMap(i => i).onSuccess { case result: PutResult =>
         println("successfully inserted file with result " + result + " in " + (System.currentTimeMillis - start) + " ms")
       }
 
