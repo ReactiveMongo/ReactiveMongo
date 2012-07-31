@@ -1,10 +1,11 @@
 package org.asyncmongo.api
 
 import akka.actor.{ActorRef, ActorSystem, Props}
-import akka.dispatch.Future
+import scala.concurrent.{Future, ExecutionContext}
+import scala.concurrent.util.Duration
+import scala.concurrent.util.duration._
 import akka.pattern.ask
-import akka.util.Timeout
-import akka.util.duration._
+
 import org.asyncmongo.actors.{Authenticate, MongoDBSystem, MonitorActor}
 import org.asyncmongo.bson._
 import org.asyncmongo.handlers._
@@ -19,9 +20,9 @@ import org.slf4j.{Logger, LoggerFactory}
  * @param connection the [[org.asyncmongo.api.MongoConnection]] that will be used to query this database.
  * @param timeout the default timeout for the queries. Defaults to 5 seconds.
  */
-case class DB(dbName: String, connection: MongoConnection, implicit val timeout :Timeout = Timeout(5 seconds)) { // TODO timeout
+case class DB(dbName: String, connection: MongoConnection)(implicit timeout :Duration = 5 seconds, context: ExecutionContext) { // TODO timeout
   /**  Gets a [[org.asyncmongo.api.Collection]] from this database. */
-  def apply(name: String) :Collection = Collection(dbName, name, connection, timeout)
+  def apply(name: String) :Collection = Collection(dbName, name, connection)(timeout, context)
 
   /** Authenticates the connection on this database. */ // TODO return type
   def authenticate(user: String, password: String) :Future[AuthenticationResult] = connection.authenticate(dbName, user, password)
@@ -38,9 +39,8 @@ case class DB(dbName: String, connection: MongoConnection, implicit val timeout 
 case class Collection(
   dbName: String,
   collectionName: String,
-  connection: MongoConnection,
-  implicit val timeout :Timeout
-) {
+  connection: MongoConnection
+)(implicit timeout: Duration, context: ExecutionContext) {
   /** The full collection name. */
   lazy val fullCollectionName = dbName + "." + collectionName
 
@@ -291,7 +291,7 @@ object Samples {
  * @param connection The connection that must be used to fetch the next documents.
  * @param query The original query.
  */
-class Cursor[T](response: Response, connection: MongoConnection, query: Query)(implicit handler: BSONReaderHandler, reader: BSONReader[T], timeout :Timeout) {
+class Cursor[T](response: Response, connection: MongoConnection, query: Query)(implicit handler: BSONReaderHandler, reader: BSONReader[T], timeout :Duration, ctx: ExecutionContext) {
   import Cursor.logger
   /** An iterator on the last fetched documents. */
   lazy val iterator :Iterator[T] = handler.handle(response.reply, response.documents)
@@ -314,13 +314,12 @@ class Cursor[T](response: Response, connection: MongoConnection, query: Query)(i
 object Cursor {
   private val logger = LoggerFactory.getLogger("Cursor")
   // for test purposes
-  import akka.dispatch.Await
-  def stream[T](cursor: Cursor[T])(implicit timeout :Timeout) :Stream[T] = {
+  def stream[T](cursor: Cursor[T])(implicit timeout :Duration) :Stream[T] = {
     implicit val ec = MongoConnection.system.dispatcher
     if(cursor.iterator.hasNext) {
       Stream.cons(cursor.iterator.next, stream(cursor))
     } else if(cursor.hasNext) {
-      stream(Await.result(cursor.next.get, timeout.duration))
+      stream(scala.concurrent.Await.result(cursor.next.get, timeout))
     } else Stream.empty
   }
 
@@ -348,7 +347,8 @@ object Samples {
     val futureCursor = collection.find(Bson(BSONString("name", "Jack")))
 
     // let's enumerate this cursor and print a readable representation of each document in the response
-    Cursor.enumerate(futureCursor)(Iteratee.foreach { doc =>
+    val enumerator = Cursor.enumerate(futureCursor)
+    enumerator(Iteratee.foreach { doc =>
       println("found document: " + DefaultBSONIterator.pretty(doc))
     })
   }
@@ -359,17 +359,17 @@ object Samples {
    *
    * @tparam T the type of the matched documents. An implicit [[org.asyncmongo.handlers.BSONReader]][T] typeclass for handling it has to be in the scope.
    */
-  def enumerate[T](futureCursor: Future[Cursor[T]]) :Enumerator[T] =
+  def enumerate[T](futureCursor: Future[Cursor[T]])(implicit ctx: ExecutionContext) :Enumerator[T] =
     Enumerator.flatten(futureCursor.map { cursor =>
       Enumerator.unfoldM(cursor) { cursor =>
         if(cursor.iterator.hasNext)
-          PlayPromise.pure(Some((cursor,Some(cursor.iterator.next))))
+          Future(Some((cursor,Some(cursor.iterator.next))))
         else if (cursor.hasNext)
-          cursor.next.get.asPromise.map(c => Some((c,None)))
+          cursor.next.get.map(c => Some((c,None)))
         else
-          PlayPromise.pure(None)
+          Future(None)
       }
-    }.asPromise) &> Enumeratee.collect { case Some(e) => e }
+    }) &> Enumeratee.collect { case Some(e) => e }
 }
 
 /**
@@ -388,8 +388,10 @@ class MongoConnection(
   /**
    * Get a future that will be successful when a primary node is available or times out.
    */
-  def waitForPrimary(waitForAvailability: Timeout) :Future[_] = {
-    monitor.ask(org.asyncmongo.actors.WaitForPrimary)(waitForAvailability)
+  def waitForPrimary(waitForAvailability: Duration) :Future[_] = {
+    new play.api.libs.concurrent.AkkaPromise(
+      monitor.ask(org.asyncmongo.actors.WaitForPrimary)(akka.util.Timeout(waitForAvailability.length, waitForAvailability.unit))
+    )
   }
 
   /**
@@ -402,8 +404,10 @@ class MongoConnection(
    *
    * @return The future response.
    */
-  def ask(message: RequestMaker)(implicit timeout: Timeout) :Future[Response] = {
-    (mongosystem ? message).mapTo[Response]
+  def ask(message: RequestMaker)(implicit timeout: Duration) :Future[Response] = {
+    new play.api.libs.concurrent.AkkaPromise(
+      (mongosystem ? message)(akka.util.Timeout(timeout.length, timeout.unit)).mapTo[Response]
+    )
   }
 
   /**
@@ -418,10 +422,12 @@ class MongoConnection(
    *
    * @return The future response.
    */
-  def ask(message: RequestMaker, waitForAvailability: Timeout)(implicit dbTimeout: Timeout) :Future[Response] = {
-    monitor.ask("primary")(waitForAvailability).flatMap { s=>
-      (mongosystem ? message).mapTo[Response]
-    }
+  def ask(message: RequestMaker, waitForAvailability: Duration)(implicit dbTimeout: Duration) :Future[Response] = {
+    new play.api.libs.concurrent.AkkaPromise(
+      monitor.ask("primary")(akka.util.Timeout(waitForAvailability.length, waitForAvailability.unit)).flatMap { s=>
+        (mongosystem ? message)(akka.util.Timeout(dbTimeout.length, dbTimeout.unit)).mapTo[Response]
+      }
+    )
   }
 
   /**
@@ -431,8 +437,10 @@ class MongoConnection(
    *
    * @return The future response.
    */
-  def ask(checkedWriteRequest: CheckedWriteRequest)(implicit timeout: Timeout) = {
-    (mongosystem ? checkedWriteRequest).mapTo[Response]
+  def ask(checkedWriteRequest: CheckedWriteRequest)(implicit timeout: Duration) = {
+    new play.api.libs.concurrent.AkkaPromise(
+      (mongosystem ? checkedWriteRequest)(akka.util.Timeout(timeout.length, timeout.unit)).mapTo[Response]
+    )
   }
 
   /**
@@ -447,10 +455,12 @@ class MongoConnection(
    *
    * @return The future response.
    */
-  def ask(checkedWriteRequest: CheckedWriteRequest, waitForAvailability: Timeout)(implicit dbTimeout: Timeout) :Future[Response] = {
-    monitor.ask("primary")(waitForAvailability).flatMap { s=>
-      (mongosystem ? checkedWriteRequest).mapTo[Response]
-    }
+  def ask(checkedWriteRequest: CheckedWriteRequest, waitForAvailability: Duration)(implicit dbTimeout: Duration) :Future[Response] = {
+    new play.api.libs.concurrent.AkkaPromise(
+      monitor.ask("primary")(akka.util.Timeout(waitForAvailability.length, waitForAvailability.unit)).flatMap { s =>
+        (mongosystem ? checkedWriteRequest)(akka.util.Timeout(dbTimeout.length, dbTimeout.unit)).mapTo[Response]
+      }
+    )
   }
 
   /**
@@ -461,11 +471,11 @@ class MongoConnection(
   def send(message: RequestMaker) = mongosystem ! message
 
   /** Authenticates the connection on the given database. */ // TODO return type
-  def authenticate(db: String, user: String, password: String)(implicit timeout: Timeout) :Future[AuthenticationResult] = {
-    (mongosystem ? Authenticate(db, user, password)).mapTo[AuthenticationResult]
+  def authenticate(db: String, user: String, password: String)(implicit timeout: Duration) :Future[AuthenticationResult] = {
+    new play.api.libs.concurrent.AkkaPromise((mongosystem ? Authenticate(db, user, password))(akka.util.Timeout(timeout.length, timeout.unit)).mapTo[AuthenticationResult])
   }
 
-  def close(implicit timeout: Timeout) :Future[String] = (mongosystem ? org.asyncmongo.actors.Close).mapTo[String]
+  def close(implicit timeout: Duration) :Future[String] = new play.api.libs.concurrent.AkkaPromise((mongosystem ? org.asyncmongo.actors.Close)(akka.util.Timeout(timeout.length, timeout.unit)).mapTo[String])
 
   def stop = MongoConnection.system.stop(mongosystem)
 }
@@ -496,12 +506,14 @@ object MongoConnection {
 }
 
 object Test {
-  import akka.dispatch.Await
   import akka.pattern.ask
   import DefaultBSONHandlers._
   import play.api.libs.iteratee._
 
-  implicit val timeout = Timeout(5 seconds)
+  import scala.concurrent.util.duration._
+
+  implicit val timeout = 5 seconds
+  import ExecutionContext.Implicits.global // TODO create default ExecutionContext
 
   def test = {
     val connection = MongoConnection(List("localhost:27016"))//, List(Authenticate("plugin", "jack", "toto")))
@@ -521,20 +533,22 @@ object Test {
         }
         db.connection.ask(FindAndModify(
             "acoll",
-            Bson("name" -> BSONString("Jack")),
+            Bson("name" -> BSONString("Kurt")),
             FindAndModifyUpdate(Bson("$set" -> BSONDocument(Bson("name" -> BSONString("JACK")).makeBuffer)), false)
         )(db.dbName).maker).onComplete {
-          case Right(response) => println("FINDANDMODIFY gave " + DefaultBSONIterator.pretty(DefaultBSONHandlers.parse(response).next))
+          case Right(response) => 
+            println("FINDANDMODIFY gave " + DefaultBSONIterator.pretty(DefaultBSONHandlers.parse(response).next))
+            collection.command(FindAndModify(
+                "acoll",
+                Bson("name" -> BSONString("JACK")),
+                FindAndModifyUpdate(Bson("$set" -> BSONDocument(Bson("name" -> BSONString("JACK")).makeBuffer)), false)
+            )).onComplete {
+              case Right(Some(doc)) => println("FINDANDMODIFY #2 gave " + DefaultBSONIterator.pretty(DefaultBSONReader.read(doc.value)))
+              case Right(_) => println("FINDANDMODIFY #2 gave no value")
+              case Left(response) => println("FINDANDMODIFY ERROR #2")
+            }
         }
-        collection.command(FindAndModify(
-            "acoll",
-            Bson("name" -> BSONString("Jack")),
-            FindAndModifyUpdate(Bson("$set" -> BSONDocument(Bson("name" -> BSONString("JACK")).makeBuffer)), false)
-        )).onComplete {
-          case Right(Some(doc)) => println("FINDANDMODIFY #2 gave " + DefaultBSONIterator.pretty(DefaultBSONReader.read(doc.value)))
-          case Right(_) => println("FINDANDMODIFY #2 gave no value")
-          case Left(response) => println("FINDANDMODIFY ERROR #2")
-        }
+        
       }
     }
     //connection.authenticate("plugin", "franck", "toto").onComplete { case yop => println("auth completed for franck " + yop) }

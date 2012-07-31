@@ -1,8 +1,8 @@
 package foo
 
-import akka.util.Timeout
-import akka.util.duration._
-import akka.dispatch.Await
+import scala.concurrent.Await
+import scala.concurrent.util._
+import scala.concurrent.util.duration._
 import org.asyncmongo.api._
 import org.asyncmongo.bson._
 import org.asyncmongo.protocol.commands._
@@ -10,12 +10,14 @@ import org.asyncmongo.handlers.DefaultBSONHandlers._
 import play.api.libs.iteratee.Iteratee
 
 object Samples {
+  import scala.concurrent.ExecutionContext.Implicits.global // TODO create own ExecutionContext
+
   val connection = MongoConnection( List( "localhost:27016" ) )
   val db = DB("plugin", connection)
   val collection = db("acoll")
 
   // just for running examples - avoid this in production since it blocks the current thread
-  Await.result(connection.waitForPrimary(Timeout(5 seconds)), 5 seconds)
+  Await.result(connection.waitForPrimary(5 seconds), 5 seconds)
 
   def listDocs() = {
     // get a Future[Cursor[DefaultBSONIterator]]
@@ -29,7 +31,8 @@ object Samples {
     )
 
     // let's enumerate this cursor and print a readable representation of each document in the response
-    Cursor.enumerate(futureCursor)(Iteratee.foreach { doc =>
+    val enumerator = Cursor.enumerate(futureCursor)
+    enumerator(Iteratee.foreach { doc =>
       println("found document: " + DefaultBSONIterator.pretty(doc))
     })
   }
@@ -112,7 +115,8 @@ object Samples {
     }
 
     // let's enumerate this cursor and print a readable representation of each document in the response
-    Cursor.enumerate(futureCursor)(Iteratee.foreach { doc =>
+    val enumerator = Cursor.enumerate(futureCursor)
+    enumerator(Iteratee.foreach { doc =>
       println("found document: " + DefaultBSONIterator.pretty(doc))
     })
   }
