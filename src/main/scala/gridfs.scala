@@ -59,7 +59,7 @@ trait ReadFileEntry extends FileEntry {
           "$lte" -> BSONInteger( length/chunkSize + (if(length % chunkSize > 0) 1 else 0) )
         ).toDocument
       ).toDocument,
-      "$orderBy" -> Bson(
+      "$orderby" -> Bson(
         "n" -> BSONInteger(1)
       ).toDocument
     )

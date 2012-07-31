@@ -61,19 +61,19 @@ class MongoDBSystem(
 
   val requestIdGenerator = new {
     // all requestIds [0, 1000[ are for isMaster messages
-    val isMasterRequestIdIterator :Iterator[Int] = Iterator.iterate(0)(i => if(i == 1000) 0 else i + 1)
+    val isMasterRequestIdIterator :Iterator[Int] = Iterator.iterate(0)(i => if(i == 999) 0 else i + 1)
     def isMaster = isMasterRequestIdIterator.next
 
     // all requestIds [1000, 2000[ are for getnonce messages
-    val getNonceRequestIdIterator :Iterator[Int] = Iterator.iterate(1000)(i => if(i == 2000) 1000 else i + 1)
+    val getNonceRequestIdIterator :Iterator[Int] = Iterator.iterate(1000)(i => if(i == 1999) 1000 else i + 1)
     def getNonce = getNonceRequestIdIterator.next
 
     // all requestIds [2000, 3000[ are for authenticate messages
-    val authenticateRequestIdIterator :Iterator[Int] = Iterator.iterate(2000)(i => if(i == 3000) 2000 else i + 1)
+    val authenticateRequestIdIterator :Iterator[Int] = Iterator.iterate(2000)(i => if(i == 2999) 2000 else i + 1)
     def authenticate = authenticateRequestIdIterator.next
 
     // all requestIds [3000[ are for user messages
-    val userIterator :Iterator[Int] = Iterator.iterate(3000)(i => if(i == Int.MaxValue) 3000 else i + 1)
+    val userIterator :Iterator[Int] = Iterator.iterate(3000)(i => if(i == Int.MaxValue - 1) 3000 else i + 1)
     def user :Int = userIterator.next
   }
 
@@ -196,7 +196,7 @@ class MongoDBSystem(
     }
     case Disconnected(channelId) => {
       updateNodeSetManager(NodeSetManager(nodeSetManager.get.nodeSet.updateByChannelId(channelId, node => {
-        node.copy(state = NOT_CONNECTED, channels = node.channels.collect{ case channel if channel.isOpen => channel })
+        node.copy(state = NOT_CONNECTED, channels = node.channels.filter{ _.isOpen })
       })))
       if(!nodeSetManager.exists(_.primaryWrapper.isDefined))
         broadcastMonitors(PrimaryUnavailable)
