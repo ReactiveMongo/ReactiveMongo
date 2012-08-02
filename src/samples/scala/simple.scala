@@ -20,21 +20,24 @@ object Samples {
   Await.result(connection.waitForPrimary(5 seconds), 5 seconds)
 
   def listDocs() = {
-    // get a Future[Cursor[DefaultBSONIterator]]
-    val futureCursor = collection.find(
-      Bson("name" -> BSONString("Jack")),
-      // select only the field 'name'
-      Some(Bson(
-        "name" -> BSONInteger(1),
-        "_id" -> BSONInteger(0)
-      ))
+    // select only the documents which field 'name' equals 'Jack'
+    val query = Bson("name" -> BSONString("Jack"))
+    // select only the field 'name'
+    val filter = Bson(
+      "name" -> BSONInteger(1),
+      "_id" -> BSONInteger(0)
     )
 
+    // get a Cursor[DefaultBSONIterator]
+    val cursor = collection.find(query, Some(filter))
     // let's enumerate this cursor and print a readable representation of each document in the response
-    val enumerator = Cursor.enumerate(futureCursor)
-    enumerator(Iteratee.foreach { doc =>
+    cursor.enumerate.apply(Iteratee.foreach { doc =>
       println("found document: " + DefaultBSONIterator.pretty(doc))
     })
+
+    // or, the same with getting a list
+    val cursor2 = collection.find(query, Some(filter))
+    val list = cursor2.toList
   }
 
   def insert() = {
@@ -105,8 +108,8 @@ object Samples {
     // get a future update
     val futureUpdate = collection.update(selector, modifier, GetLastError())
 
-    // get a future cursor of documents that have lastName: "London" and firstName: "Jack". Our updated document should be included.
-    val futureCursor = futureUpdate.flatMap { lastError =>
+    // get a cursor of documents that have lastName: "London" and firstName: "Jack". Our updated document should be included.
+    val futureCursor = futureUpdate.map { lastError =>
       val updatedDocumentSelector = Bson(
         "lastName" -> BSONString("London"),
         "firstName" -> BSONString("Jack"))
@@ -115,7 +118,7 @@ object Samples {
     }
 
     // let's enumerate this cursor and print a readable representation of each document in the response
-    val enumerator = Cursor.enumerate(futureCursor)
+    val enumerator = Cursor.flatten(futureCursor).enumerate
     enumerator(Iteratee.foreach { doc =>
       println("found document: " + DefaultBSONIterator.pretty(doc))
     })

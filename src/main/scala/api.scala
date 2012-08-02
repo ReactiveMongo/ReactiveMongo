@@ -1,10 +1,10 @@
 package org.asyncmongo.api
 
 import akka.actor.{ActorRef, ActorSystem, Props}
+import akka.pattern.ask
 import scala.concurrent.{Future, ExecutionContext}
 import scala.concurrent.util.Duration
 import scala.concurrent.util.duration._
-import akka.pattern.ask
 
 import org.asyncmongo.actors.{Authenticate, MongoDBSystem, MonitorActor}
 import org.asyncmongo.bson._
@@ -61,28 +61,39 @@ case class Collection(
    *
    * Example:
    * {{{
-   * import org.asyncmongo.api._
+import org.asyncmongo.api._
 import org.asyncmongo.bson._
 import org.asyncmongo.handlers.DefaultBSONHandlers._
 import play.api.libs.iteratee.Iteratee
 
 object Samples {
 
+  val connection = MongoConnection( List( "localhost:27016" ) )
+  val db = DB("plugin", connection)
+  val collection = db("acoll")
+
   def listDocs() = {
-    val connection = MongoConnection( List( "localhost:27016" ) )
-    val db = DB("plugin", connection)
-    val collection = db("acoll")
+    // select only the documents which field 'name' equals 'Jack'
+    val query = Bson("name" -> BSONString("Jack"))
+    // select only the field 'name'
+    val filter = Bson(
+      "name" -> BSONInteger(1),
+      "_id" -> BSONInteger(0)
+    )
 
-    // get a Future[Cursor[DefaultBSONIterator]]
-    val futureCursor = collection.find(Bson(BSONString("name", "Jack")))
-
+    // get a Cursor[DefaultBSONIterator]
+    val cursor = collection.find(query, Some(filter))
     // let's enumerate this cursor and print a readable representation of each document in the response
-    Cursor.enumerate(futureCursor)(Iteratee.foreach { doc =>
+    cursor.enumerate.apply(Iteratee.foreach { doc =>
       println("found document: " + DefaultBSONIterator.pretty(doc))
     })
+
+    // or, the same with getting a list
+    val cursor2 = collection.find(query, Some(filter))
+    val list = cursor.toList
   }
 }
-   * }}}
+}}}
    *
    * This method accepts any query and fields object, provided that there is an implicit [[org.asyncmongo.handlers.BSONWriter]] typeclass for handling them in the scope.
    * You can use the typeclasses defined in [[org.asyncmongo.handlers.DefaultBSONHandlers]] object.
@@ -101,16 +112,16 @@ object Samples {
    *
    * @return a future cursor of documents. You can get an enumerator for it, please see the [[org.asyncmongo.api.Cursor]] companion object.
    */
-  def find[T, U, V](query: T, fields: Option[U] = None, skip: Int = 0, limit: Int = 0, flags: Int = 0)(implicit writer: BSONWriter[T], writer2: BSONWriter[U], handler: BSONReaderHandler, reader: BSONReader[V]) :Future[Cursor[V]] = {
+  def find[T, U, V](query: T, fields: Option[U] = None, skip: Int = 0, limit: Int = 0, flags: Int = 0)(implicit writer: BSONWriter[T], writer2: BSONWriter[U], handler: BSONReaderHandler, reader: BSONReader[V]) :FlattenedCursor[V] = {
     val op = Query(flags, fullCollectionName, skip, limit)
     val bson = writer.write(query)
     if(fields.isDefined)
       bson.writeBytes(writer2.write(fields.get))
     val message = RequestMaker(op, bson)
 
-    connection.ask(message).map { response =>
-      new Cursor(response, connection, op)
-    }
+    Cursor.flatten(connection.ask(message).map { response =>
+      new DefaultCursor(response, connection, op)
+    })
   }
 
   /**
@@ -251,83 +262,10 @@ object Collection {
   private val logger = LoggerFactory.getLogger("Collection")
 }
 
-/**
- * Allows to fetch the next documents matching a query.
- *
- * Please note that you should not use Cursor directly.
- * You are invited to use the enumerator/iteratee pattern to handle Cursor operations.
- * You may take a look to {{{Cursor.enumerate[T](futureCursor: Future[Cursor[T]]) :Enumerator[T]}}} to produce an enumerator and consume the documents using an iteratee on your own.
- *
- * Example:
- * {{{
- * import org.asyncmongo.api._
-import org.asyncmongo.bson._
-import org.asyncmongo.handlers.DefaultBSONHandlers._
-import play.api.libs.iteratee.Iteratee
-
-object Samples {
-
-  def listDocs() = {
-    val connection = MongoConnection( List( "localhost:27016" ) )
-    val db = DB("plugin", connection)
-    val collection = db("acoll")
-
-    // get a Future[Cursor[DefaultBSONIterator]]
-    val futureCursor = collection.find(Bson(BSONString("name", "Jack")))
-
-    // let's enumerate this cursor and print a readable representation of each document in the response
-    Cursor.enumerate(futureCursor)(Iteratee.foreach { doc =>
-      println("found document: " + DefaultBSONIterator.pretty(doc))
-    })
-  }
-}
-}}}
- *
- * It is worth diving into the [[https://github.com/playframework/Play20/wiki/Iteratees Play! 2.0 Iteratee documentation]].
- *
- * @tparam T the type of the matched documents. An implicit [[org.asyncmongo.handlers.BSONReader]][T] typeclass for handling it has to be in the scope.
- *
- * @param response The response to handle.
- * @param connection The connection that must be used to fetch the next documents.
- * @param query The original query.
- */
-class Cursor[T](response: Response, connection: MongoConnection, query: Query)(implicit handler: BSONReaderHandler, reader: BSONReader[T], timeout :Duration, ctx: ExecutionContext) {
-  import Cursor.logger
-  /** An iterator on the last fetched documents. */
-  lazy val iterator :Iterator[T] = handler.handle(response.reply, response.documents)
-  /** Gets the next instance of that cursor. */
-  def next :Option[Future[Cursor[T]]] = {
-    if(hasNext) {
-      logger.debug("cursor: calling next on " + response.reply.cursorID)
-      val op = GetMore(query.fullCollectionName, query.numberToReturn, response.reply.cursorID)
-      Some(connection.ask(RequestMaker(op).copy(channelIdHint=Some(response.info.channelId))).map { response => new Cursor(response, connection, query) })
-    } else None
-  }
-  /** Tells if another instance of cursor can be fetched. */ // TODO redundant!
-  def hasNext :Boolean = response.reply.cursorID != 0
-  /** Explicitly closes that cursor. */
-  def close = if(hasNext) {
-    connection.send(RequestMaker(KillCursors(Set(response.reply.cursorID))))
-  }
-}
-
-object Cursor {
-  private val logger = LoggerFactory.getLogger("Cursor")
-  // for test purposes
-  def stream[T](cursor: Cursor[T])(implicit timeout :Duration) :Stream[T] = {
-    implicit val ec = MongoConnection.system.dispatcher
-    if(cursor.iterator.hasNext) {
-      Stream.cons(cursor.iterator.next, stream(cursor))
-    } else if(cursor.hasNext) {
-      stream(scala.concurrent.Await.result(cursor.next.get, timeout))
-    } else Stream.empty
-  }
-
-  import play.api.libs.iteratee._
-  import play.api.libs.concurrent.{Promise => PlayPromise, _}
-
   /**
-   * Enumerates the given future cursor.
+   * Allows to fetch the next documents matching a query.
+   *
+   * Please that after invoking some Cursor methods, this Cursor instance should not be reused as it may cause unexpected behavior.
    *
    * Example:
    * {{{
@@ -338,19 +276,29 @@ import play.api.libs.iteratee.Iteratee
 
 object Samples {
 
+  val connection = MongoConnection( List( "localhost:27016" ) )
+  val db = DB("plugin", connection)
+  val collection = db("acoll")
+
   def listDocs() = {
-    val connection = MongoConnection( List( "localhost:27016" ) )
-    val db = DB("plugin", connection)
-    val collection = db("acoll")
+    // select only the documents which field 'name' equals 'Jack'
+    val query = Bson("name" -> BSONString("Jack"))
+    // select only the field 'name'
+    val filter = Bson(
+      "name" -> BSONInteger(1),
+      "_id" -> BSONInteger(0)
+    )
 
-    // get a Future[Cursor[DefaultBSONIterator]]
-    val futureCursor = collection.find(Bson(BSONString("name", "Jack")))
-
+    // get a Cursor[DefaultBSONIterator]
+    val cursor = collection.find(query, Some(filter))
     // let's enumerate this cursor and print a readable representation of each document in the response
-    val enumerator = Cursor.enumerate(futureCursor)
-    enumerator(Iteratee.foreach { doc =>
+    cursor.enumerate.apply(Iteratee.foreach { doc =>
       println("found document: " + DefaultBSONIterator.pretty(doc))
     })
+
+    // or, the same with getting a list
+    val cursor2 = collection.find(query, Some(filter))
+    val list = cursor2.toList
   }
 }
 }}}
@@ -358,18 +306,206 @@ object Samples {
    * It is worth diving into the [[https://github.com/playframework/Play20/wiki/Iteratees Play! 2.0 Iteratee documentation]].
    *
    * @tparam T the type of the matched documents. An implicit [[org.asyncmongo.handlers.BSONReader]][T] typeclass for handling it has to be in the scope.
+   *
+*/
+trait Cursor[T] {
+  /** An iterator on the last fetched documents. */
+  val iterator: Iterator[T]
+
+  val cursorId: Option[Long]
+  val connection: Option[MongoConnection]
+
+  /** Gets the next instance of that cursor. */
+  def next: Future[Cursor[T]]
+
+  /** Tells if another instance of cursor can be fetched. */
+  def hasNext: Boolean
+
+  import play.api.libs.iteratee._
+  import play.api.libs.concurrent.{Promise => PlayPromise, _}
+  import scala.collection.generic.CanBuildFrom
+
+  /**
+   * Enumerates this cursor.
+   * The reuse of this cursor may cause unexpected behavior.
+   *
+   * Example:
+   * {{{
+// get a Cursor[DefaultBSONIterator]
+val cursor = collection.find(query, Some(filter))
+// let's enumerate this cursor and print a readable representation of each document in the response
+cursor.enumerate.apply(Iteratee.foreach { doc =>
+  println("found document: " + DefaultBSONIterator.pretty(doc))
+})
+}
+}}}
+   *
+   * It is worth diving into the [[https://github.com/playframework/Play20/wiki/Iteratees Play! 2.0 Iteratee documentation]].
+   *
+   * @tparam T the type of the matched documents. An implicit [[org.asyncmongo.handlers.BSONReader]][T] typeclass for handling it has to be in the scope.
+   *
+*/
+  def enumerate()(implicit ctx: ExecutionContext) :Enumerator[T] =
+    if(hasNext)
+      Enumerator.unfoldM(this) { cursor =>
+        Cursor.nextElement(cursor)
+      } &> Enumeratee.collect { case Some(e) => e }
+    else Enumerator.eof
+
+  /**
+   * Collects all the documents into a collection of type '''M[T]'''.
+   * The reuse of this cursor may cause unexpected behavior.
+   *
+   * Example:
+   * {{{
+val cursor2 = collection.find(query, Some(filter))
+val list = cursor2[List].collect()
+}}}
+   *
+   * @tparam M the type of the returned collection.
+   * @tparam T the type of the matched documents. An implicit [[org.asyncmongo.handlers.BSONReader]][T] typeclass for handling it has to be in the scope.
    */
-  def enumerate[T](futureCursor: Future[Cursor[T]])(implicit ctx: ExecutionContext) :Enumerator[T] =
-    Enumerator.flatten(futureCursor.map { cursor =>
-      Enumerator.unfoldM(cursor) { cursor =>
-        if(cursor.iterator.hasNext)
-          Future(Some((cursor,Some(cursor.iterator.next))))
-        else if (cursor.hasNext)
-          cursor.next.get.map(c => Some((c,None)))
-        else
-          Future(None)
+  def collect[M[_]]()(implicit cbf: CanBuildFrom[M[_], T, M[T]], ec: ExecutionContext) :Future[M[T]] = {
+    enumerate |>>> Iteratee.fold(cbf.apply) { (builder, t :T) => builder += t }.map(_.result)
+  }
+
+   /**
+   * Collects all the documents into a collection of type '''M[T]'''.
+   * The reuse of this cursor may cause unexpected behavior.
+   *
+   * Example:
+   * {{{
+val cursor = collection.find(query, Some(filter))
+// gather the first 3 documents
+val list = cursor[List].collect(3)
+}}}
+   *
+   * @tparam M the type of the returned collection.
+   * @tparam T the type of the matched documents. An implicit [[org.asyncmongo.handlers.BSONReader]][T] typeclass for handling it has to be in the scope.
+   * @param upTo The maximum size of this collection.
+   */
+  def collect[M[_]](upTo: Int)(implicit cbf: CanBuildFrom[M[_], T, M[T]], ec: ExecutionContext) :Future[M[T]] = {
+    enumerate &> Enumeratee.take(upTo) |>>> Iteratee.fold(cbf.apply) { (builder, t :T) => builder += t }.map(_.result)
+  }
+
+  /**
+   * Collects all the documents into a collection of type '''M[T]'''.
+   * The reuse of this cursor may cause unexpected behavior.
+   *
+   * Example:
+   * {{{
+val cursor2 = collection.find(query, Some(filter))
+val list = cursor2.toList
+}}}
+   *
+   * @tparam M the type of the returned collection.
+   * @tparam T the type of the matched documents. An implicit [[org.asyncmongo.handlers.BSONReader]][T] typeclass for handling it has to be in the scope.
+   */
+  def toList()(implicit ctx: ExecutionContext) :Future[List[T]] = collect[List]()
+
+  /**
+   * Collects all the documents into a collection of type '''M[T]'''.
+   * The reuse of this cursor may cause unexpected behavior.
+   *
+   * Example:
+   * {{{
+val cursor2 = collection.find(query, Some(filter))
+// return the 3 first documents in a list.
+val list = cursor2.toList(3)
+}}}
+   *
+   * @tparam M the type of the returned collection.
+   * @tparam T the type of the matched documents. An implicit [[org.asyncmongo.handlers.BSONReader]][T] typeclass for handling it has to be in the scope.
+   */
+  def toList(upTo: Int)(implicit ctx: ExecutionContext) :Future[List[T]] = collect[List](upTo)
+
+  /**
+   * Gets the first returned document, if any.
+   *
+   * Example:
+   * {{{
+val cursor2 = collection.find(query, Some(filter))
+val list = cursor2[List].collect()
+}}}
+   *
+   * @tparam T the type of the matched documents. An implicit [[org.asyncmongo.handlers.BSONReader]][T] typeclass for handling it has to be in the scope.
+   */
+  def headOption()(implicit ec: ExecutionContext) :Future[Option[T]] = {
+    collect[Iterable](1).map(_.headOption)
+  }
+
+  /** Explicitly closes that cursor. */
+  def close = if(hasNext && cursorId.isDefined && connection.isDefined) {
+      connection.get.send(RequestMaker(KillCursors(Set(cursorId.get))))
+  }
+
+  /*def nextElement()(implicit ec: ExecutionContext) :Future[Option[(Cursor[T], T)]] = {
+    Cursor.nextElement(this).flatMap {
+      case result @ Some((cursor, Some(e))) => Future(Some(cursor -> e))
+      case Some((cursor, None)) => Cursor.nextElement(cursor).flatMap { // we just got a new cursor. If this cursor has no element, then the Mongo cursor is done.
+        case result @ Some((cursor, Some(e))) => Future(Some(cursor -> e))
+        case _ => Future(None)
       }
-    }) &> Enumeratee.collect { case Some(e) => e }
+      case _ => Future(None)
+    }
+  }*/
+}
+
+class DefaultCursor[T](response: Response, mongoConnection: MongoConnection, query: Query)(implicit handler: BSONReaderHandler, reader: BSONReader[T], timeout :Duration, ctx: ExecutionContext) extends Cursor[T] {
+  import DefaultCursor.logger
+
+  lazy val iterator :Iterator[T] = handler.handle(response.reply, response.documents)
+
+  val cursorId = Some(response.reply.cursorID)
+  override val connection = Some(mongoConnection)
+
+  def next :Future[DefaultCursor[T]] = {
+    if(hasNext) {
+      logger.debug("cursor: calling next on " + response.reply.cursorID)
+      val op = GetMore(query.fullCollectionName, query.numberToReturn, response.reply.cursorID)
+      mongoConnection.ask(RequestMaker(op).copy(channelIdHint=Some(response.info.channelId))).map { response => new DefaultCursor(response, mongoConnection, query) }
+    } else throw new NoSuchElementException()
+  }
+
+  def hasNext :Boolean = response.reply.cursorID != 0
+}
+
+/**
+ * A [[org.asyncmongo.api.Cursor]] that holds no document, and which the next cursor is given in the constructor.
+ */
+class FlattenedCursor[T](futureCursor: Future[Cursor[T]]) extends Cursor[T] {
+  val iterator :Iterator[T] = Iterator.empty
+
+  val cursorId = None
+
+  val connection = None
+
+  def next = futureCursor
+
+  def hasNext = true
+}
+
+object Cursor {
+  import play.api.libs.iteratee._
+  import play.api.libs.concurrent.{Promise => PlayPromise, _}
+
+  /**
+   * Flattens the given future [[org.asyncmongo.api.Cursor]] to a [[org.asyncmongo.api.FlattenedCursor]].
+   */
+  def flatten[T](futureCursor: Future[Cursor[T]]) = new FlattenedCursor(futureCursor)
+
+  private def nextElement[T](cursor: Cursor[T])(implicit ec: ExecutionContext) :Future[Option[(Cursor[T], Option[T])]] = {
+    if(cursor.iterator.hasNext)
+      Future(Some((cursor,Some(cursor.iterator.next))))
+    else if (cursor.hasNext)
+      cursor.next.map(c => Some((c,None)))
+    else
+      Future(None)
+  }
+}
+
+object DefaultCursor {
+  private val logger = LoggerFactory.getLogger("Cursor")
 }
 
 /**
@@ -517,6 +653,8 @@ object Test {
 
   def test = {
     val connection = MongoConnection(List("localhost:27016"))//, List(Authenticate("plugin", "jack", "toto")))
+    MongoConnection.system.scheduler.scheduleOnce(akka.util.duration.intToDurationInt(100).milliseconds) {
+
     val db = DB("plugin", connection)
     val collection = db("acoll")
     db.authenticate("plop", "toto")
@@ -524,7 +662,20 @@ object Test {
       case yop => {
         println("auth completed for jack " + yop)
 
-        val toSave = Bson("name" -> BSONString("Kurt"))
+        /*val futureCursor = collection.find(Bson()).enumerate.apply(Iteratee.foreach{ t=>
+          println("fetched t=" + DefaultBSONIterator.pretty(t))
+        })*/
+
+        val cursor = collection.find(Bson())
+
+        cursor.collect[List](1).map { list =>
+          println("list size=" + list.size)
+          list.headOption.map { e =>
+            println("fetched t=" + DefaultBSONIterator.pretty(e))
+          }
+        }
+
+        /*val toSave = Bson("name" -> BSONString("Kurt"))
         collection.insert(toSave, GetLastError(false, None, false)).onComplete {
           case Left(t) => { println("error!, throwable\n\t\t"); t.printStackTrace; println("\n\t for insert=" + toSave) }
           case Right(le) => {
@@ -536,7 +687,7 @@ object Test {
             Bson("name" -> BSONString("Kurt")),
             FindAndModifyUpdate(Bson("$set" -> BSONDocument(Bson("name" -> BSONString("JACK")).makeBuffer)), false)
         )(db.dbName).maker).onComplete {
-          case Right(response) => 
+          case Right(response) =>
             println("FINDANDMODIFY gave " + DefaultBSONIterator.pretty(DefaultBSONHandlers.parse(response).next))
             collection.command(FindAndModify(
                 "acoll",
@@ -547,8 +698,8 @@ object Test {
               case Right(_) => println("FINDANDMODIFY #2 gave no value")
               case Left(response) => println("FINDANDMODIFY ERROR #2")
             }
-        }
-        
+        }*/
+
       }
     }
     //connection.authenticate("plugin", "franck", "toto").onComplete { case yop => println("auth completed for franck " + yop) }
@@ -618,6 +769,6 @@ object Test {
         //println("fetched t=" + DefaultBSONIterator.pretty(t))
       })
     }*/
-
+    }
   }
 }

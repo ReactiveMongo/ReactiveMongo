@@ -64,7 +64,7 @@ trait ReadFileEntry extends FileEntry {
       ).toDocument
     )
     val cursor = gridFS.chunks.find(selector, None, 0, Int.MaxValue)
-    Cursor.enumerate(cursor) &> (Enumeratee.map { doc =>
+    cursor.enumerate &> (Enumeratee.map { doc =>
       doc.find(_.name == "data").flatMap {
         case ReadBSONElement(_, BSONBinary(data, _)) => Some(data.array())
         case _ => None
@@ -255,7 +255,7 @@ case class GridFS(db: DB, prefix: String = "fs") {
    * @param selector The document to select the files to return
    * @param limit Limits the returned documents.
    */
-  def find[S](selector: S, limit :Int = Int.MaxValue)(implicit sWriter: BSONWriter[S], ctx: ExecutionContext) :Future[Cursor[ReadFileEntry]] = {
+  def find[S](selector: S, limit :Int = Int.MaxValue)(implicit sWriter: BSONWriter[S], ctx: ExecutionContext) :Cursor[ReadFileEntry] = {
     implicit val rfeReader = ReadFileEntry.bsonReader(this)
     files.find(selector, None, 0, limit, 0)
   }
@@ -274,11 +274,7 @@ case class GridFS(db: DB, prefix: String = "fs") {
 }
 
 object GridFS {
-  import akka.pattern.ask
-  import akka.util.Timeout
-  import akka.util.duration._
-
-  implicit val timeout = Timeout(5 seconds)
+  import scala.concurrent.util.duration._
 
   // tests
   def read {
@@ -287,10 +283,19 @@ object GridFS {
 
     val gfs = new GridFS(DB("plugin", MongoConnection(List("localhost:27016"))))
     val baos = new ByteArrayOutputStream
-    gfs.find(Bson(), 1).flatMap( _.iterator.next.readContent(baos) ).onSuccess{ case _ =>
-      val result = baos.toString("utf-8")
-      println("DONE \n => " + result)
-      println("\tof md5 = " + Converters.hex2Str(java.security.MessageDigest.getInstance("MD5").digest(baos.toByteArray)))
+
+    gfs.db.connection.waitForPrimary(1 seconds).onComplete {
+      case Left(e) => println("ERROR " + e); e.printStackTrace
+      case _ =>
+        gfs.find(Bson()).headOption.filter(_.isDefined).map(_.get).map { e =>
+          e.readContent(baos).onComplete {
+            case Left(e) =>println("ERROR " + e); e.printStackTrace
+            case Right(e) =>
+              val result = baos.toString("utf-8")
+              println("DONE \n => " + result)
+              println("\tof md5 = " + Converters.hex2Str(java.security.MessageDigest.getInstance("MD5").digest(baos.toByteArray)))
+          }
+        }
     }
   }
 
