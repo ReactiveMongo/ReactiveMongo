@@ -60,7 +60,8 @@ You can get a connection to a server (or a replica set) like this:
 ```scala
 def test() {
   import org.asyncmongo.api._
-
+  import scala.concurrent.ExecutionContext.Implicits.global
+  
   val connection = MongoConnection( List( "localhost:27017" ) )
   val db = DB("plugin", connection)
   val collection = db("acoll")
@@ -80,15 +81,16 @@ import org.asyncmongo.handlers.DefaultBSONHandlers._
 import play.api.libs.iteratee.Iteratee
 
 object Samples {
+  import scala.concurrent.ExecutionContext.Implicits.global
 
   def listDocs() = {
     val connection = MongoConnection( List( "localhost:27017" ) )
     val db = DB("plugin", connection)
     val collection = db("acoll")
     
-    val futureCursor = collection.find(Bson("name" -> BSONString("Jack")))
+    val cursor = collection.find(Bson("name" -> BSONString("Jack")))
     
-    Cursor.enumerate(futureCursor)(Iteratee.foreach { doc =>
+    cursor.enumerate.apply(Iteratee.foreach { doc =>
       println("found document: " + DefaultBSONIterator.pretty(doc))
     })
   }
@@ -99,7 +101,7 @@ The above code deserves some explanations.
 First, let's take a look to the `collection.find` signature:
 
 ```scala
-def find[T, U, V](query: T, fields: Option[U] = None, skip: Int = 0, limit: Int = 0, flags: Int = 0)(implicit writer: BSONWriter[T], writer2: BSONWriter[U], handler: BSONReaderHandler, reader: BSONReader[V]) :Future[Cursor[V]]
+def find[T, U, V](query: T, fields: Option[U] = None, skip: Int = 0, limit: Int = 0, flags: Int = 0)(implicit writer: BSONWriter[T], writer2: BSONWriter[U], handler: BSONReaderHandler, reader: BSONReader[V]) :FlattenedCursor[V]
 ```
 
 The find method allows you to pass any query object of type `T`, provided that there is an implicit `BSONWriter[T]` in the scope. `BSONWriter[T]` is a typeclass which instances implement a `write(document: T)` method that returns a `ChannelBuffer`:
@@ -123,21 +125,29 @@ For this example, we don't need to write specific handlers, so we use the defaul
 
 Among `DefaultBSONHandlers` is a `BSONWriter[Bson]` that handles the shipped-in BSON library.
 
-You may have noticed that `collection.find` returns a `Future[Cursor[V]]`. In fact, *everything in MongoAsync is both non-blocking and asynchronous*. That means each time you make a query, the only immediate result you get is a future of result, so the current thread is not blocked waiting for its completion. You don't need to have *n* threads to process *n* database operations at the same time anymore.
+You may have noticed that `collection.find` returns a `FlattenedCursor[V]]`. This cursor is actually a future cursor. In fact, *everything in MongoAsync is both non-blocking and asynchronous*. That means each time you make a query, the only immediate result you get is a future of result, so the current thread is not blocked waiting for its completion. You don't need to have *n* threads to process *n* database operations at the same time anymore.
 
-When a query matches too much documents, Mongo sends just a part of them and creates a Cursor  in order to get the next documents. The problem is, how to handle it in a non-blocking, asynchronous, yet elegant way?
+When a query matches too much documents, Mongo sends just a part of them and creates a Cursor in order to get the next documents. The problem is, how to handle it in a non-blocking, asynchronous, yet elegant way?
+
+Obviously MongoAsync's cursor provides helpful methods to build a collection (like a list) from it, so we could write:
+
+```scala
+val list = cursor.toList
+```
+
+As always, this is perfectly non-blocking... but what if we want to process the returned documents on the fly, without creating a potentially big list in memory?
 
 That's where the Enumerator/Iteratee pattern (or immutable Producer/Consumer pattern) comes to the rescue!
 
 Let's consider the next statement:
 
 ```scala
-Cursor.enumerate(futureCursor)(Iteratee.foreach { doc =>
+cursor.enumerate.apply(Iteratee.foreach { doc =>
   println("found document: " + DefaultBSONIterator.pretty(doc))
 })
 ```
 
-The method `Cursor.enumerate[T](Future[Cursor[T]])` returns an `Enumerator[T]`. Enumerators can be seen as //producers// of data: their job is to give chunks of data when data is available. In this case, we get a producer of documents, which source is a future cursor.
+The method `cursor.enumerate` returns an `Enumerator[T]`. Enumerators can be seen as //producers// of data: their job is to give chunks of data when data is available. In this case, we get a producer of documents, which source is a future cursor.
 
 Now that we have the producer, we need to define how the documents are processed: that is the `Iteratee`'s job. Iteratees, as the opposite of Enumerators, are consumers: they are fed in by enumerators and do some computation with the chunks they get.
 
@@ -174,7 +184,7 @@ found document: {
 
 ## Go further!
 
-MongoAsync makes a heavy usage of the Iteratee library provided by the [Play! Framework 2.0](http://www.playframework.org/). You can dive into [Play's Iteratee documentation](http://www.playframework.org/documentation/2.0.2/Iteratees) to learn about this cool piece of software, and make your own Iteratees and Enumerators.
+MongoAsync makes a heavy usage of the Iteratee library provided by the [Play! Framework 2.1](http://www.playframework.org/). You can dive into [Play's Iteratee documentation](http://www.playframework.org/documentation/2.0.2/Iteratees) to learn about this cool piece of software, and make your own Iteratees and Enumerators.
 
 Used in conjonction with stream-aware frameworks, like Play!, you can easily stream the data stored in MongoDB. See the examples and get convinced!
 
