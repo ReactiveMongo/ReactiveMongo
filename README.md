@@ -132,10 +132,13 @@ When a query matches too much documents, Mongo sends just a part of them and cre
 Obviously MongoAsync's cursor provides helpful methods to build a collection (like a list) from it, so we could write:
 
 ```scala
-val list = cursor.toList
+val futureList :Future[List] = cursor.toList
+futureList.map { list =>
+  println("ok, got the list: " + list)
+}
 ```
 
-As always, this is perfectly non-blocking... but what if we want to process the returned documents on the fly, without creating a potentially big list in memory?
+As always, this is perfectly non-blocking... but what if we want to process the returned documents on the fly, without creating a potentially huge list in memory?
 
 That's where the Enumerator/Iteratee pattern (or immutable Producer/Consumer pattern) comes to the rescue!
 
