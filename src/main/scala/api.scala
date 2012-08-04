@@ -49,10 +49,7 @@ case class Collection(
   def count() :Future[Int] = {
     import DefaultBSONHandlers._
     connection.ask(Count(collectionName)(dbName).maker).map { response =>
-      DefaultBSONReaderHandler.handle(response.reply, response.documents).next.find(_.name == "n").get match {
-        case ReadBSONElement(_, BSONDouble(n)) => n.toInt
-        case _ => 0
-      }
+      DefaultBSONReaderHandler.handle(response.reply, response.documents).next.getAs[BSONDouble]("n").map(_.value.toInt).getOrElse(0)
     }
   }
 
@@ -322,7 +319,6 @@ trait Cursor[T] {
   def hasNext: Boolean
 
   import play.api.libs.iteratee._
-  import play.api.libs.concurrent.{Promise => PlayPromise, _}
   import scala.collection.generic.CanBuildFrom
 
   /**
@@ -651,6 +647,42 @@ object Test {
   implicit val timeout = 5 seconds
   import ExecutionContext.Implicits.global // TODO create default ExecutionContext
 
+  def test2 = {
+    val connection = MongoConnection(List("localhost:27016"))
+    val db = DB("plugin", connection)
+    val collection = db("acoll")
+    connection.waitForPrimary(timeout).map { _ =>
+      println("ok, let's go \n")
+      collection.find(BSONDocument(
+        "_id" -> new BSONObjectID("501c3a63faf8fdc95e050178")
+      )).headOption.filter(_.isDefined).map { k =>
+        println(DefaultBSONIterator.pretty(k.get.bsonIterator))
+      }
+      /*val toSave = Bson("name" -> BSONString("Kurt"))
+        val toSave2 = new ng.WritableBSONDocument(32)
+        toSave2.append("name" -> BSONString("Kurt")) ;
+        val arr = new ng.WritableBSONArray(32) ;
+        arr.append(BSONInteger(2)) ;
+        arr.append(BSONString("hey")) ;
+        toSave2.append("plop" -> arr)
+        collection.insert(toSave :Bson, GetLastError(false, None, false)).onComplete {
+          case Left(t) => { println("\n\n\nNORMAL error!, throwable\n\t\t"); t.printStackTrace; println("\n\t for insert=" + toSave) }
+          case Right(le) => {
+            println("\n\n\nNORMAL insertion " + (if(le.inError) "failed" else "succeeded") + ": " + le.stringify)
+          }
+        }
+        collection.insert(FBson(toSave2.makeBuffer) :Bson, GetLastError(false, None, false)).onComplete {
+          case Left(t) => { println("\n\n\nerror!, throwable\n\t\t"); t.printStackTrace; println("\n\t for insert=" + toSave) }
+          case Right(le) => {
+            println("\n\n\ninsertion " + (if(le.inError) "failed" else "succeeded") + ": " + le.stringify)
+          }
+        }*/
+    }.onComplete {
+      case Left(e) => println("\n\tERROR!! " + e); e.printStackTrace
+      case Right(t) => println("\n\tdone: " + t)
+    }
+  }
+
   def test = {
     val connection = MongoConnection(List("localhost:27016"))//, List(Authenticate("plugin", "jack", "toto")))
     MongoConnection.system.scheduler.scheduleOnce(akka.util.duration.intToDurationInt(100).milliseconds) {
@@ -666,22 +698,25 @@ object Test {
           println("fetched t=" + DefaultBSONIterator.pretty(t))
         })*/
 
-        val cursor = collection.find(Bson())
+        /*val cursor = collection.find(Bson())
 
         cursor.collect[List](1).map { list =>
           println("list size=" + list.size)
           list.headOption.map { e =>
             println("fetched t=" + DefaultBSONIterator.pretty(e))
           }
-        }
+        }*/
 
-        /*val toSave = Bson("name" -> BSONString("Kurt"))
-        collection.insert(toSave, GetLastError(false, None, false)).onComplete {
-          case Left(t) => { println("error!, throwable\n\t\t"); t.printStackTrace; println("\n\t for insert=" + toSave) }
+        val toSave = BSONDocument("name" -> BSONString("Kurt"))
+        val toSave2 = BSONDocument("name" -> BSONString("Kurt")) ;
+        val arr = BSONArray(BSONInteger(2), BSONString("hey")) ;
+        toSave2.append("plop" -> arr)
+        collection.insert(toSave2, GetLastError(false, None, false)).onComplete {
+          case Left(t) => { println("\n\n\nerror!, throwable\n\t\t"); t.printStackTrace; println("\n\t for insert=" + toSave) }
           case Right(le) => {
-            println("insertion " + (if(le.inError) "failed" else "succeeded") + ": " + le.stringify)
+            println("\n\n\ninsertion " + (if(le.inError) "failed" else "succeeded") + ": " + le.stringify)
           }
-        }
+        }/*
         db.connection.ask(FindAndModify(
             "acoll",
             Bson("name" -> BSONString("Kurt")),
@@ -722,10 +757,10 @@ object Test {
       case Right(t) => println("count on plugin.acoll gave " + t)
     }
     println("Test: future is " + future)*/
-    val tags = Bson(
+    val tags = BSONDocument(
       "tag1" -> BSONString("yop"),
       "tag2" -> BSONString("..."))
-    val toSave = Bson(
+    val toSave = BSONDocument(
       "name" -> BSONString("Kurt"),
       "tags" -> BSONDocument(tags.makeBuffer))
     //toSave.write(BSONString("$kk", "Kurt"))

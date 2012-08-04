@@ -69,31 +69,229 @@ case class BSONString(value: String) extends BSONValue {
   def write(buffer: ChannelBuffer) = { buffer writeString value }
 }
 
+
+// BSON Structure handlers ----------------------------------->
 /**
- * A BSON embedded document.
- *
- * @param value The [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]] containing the embedded document.
+ * A BSON Structure (a BSON array or document).
  */
-case class BSONDocument(value: ChannelBuffer) extends BSONValue {
+sealed trait BSONStructure extends BSONValue {
+  private[bson] val buffer :ChannelBuffer
+
+  /**
+   * Writes the content of this structure into the given ChannelBuffer.
+   * If this is an appendable structure, its underlying buffer will be copied, and ended.
+   * The underlying buffer is not affected, so this instance can be used again.
+   */
+  def write(buffer: ChannelBuffer) = { buffer.writeBytes(makeBuffer); buffer }
+
+  /**
+   * If this structure is traversable, copies the underlying buffer.
+   *
+   * Otherwise, if this structure is appendable, copies the underlying buffer, ends the Bson, sets the length and returns the copied buffer.
+   * The underlying buffer is not affected, so this instance can be used again.
+   */
+  def makeBuffer :ChannelBuffer
+}
+
+/** A BSON Document structure. */
+sealed trait BSONDocument extends BSONStructure {
   val code = 0x03
+}
+/** A BSON Array structure. */
+sealed trait BSONArray extends BSONStructure {
+  val code = 0x04
+}
+/**
+ * A structure builder. It will accept elements of '''E''' and write them into its underlying buffer.
+ *
+ * @tparam E The type of the elements that can be appended to this structure.
+ */
+sealed trait AppendableBSONStructure[E] extends BSONStructure {
+  private[bson] val buffer = ChannelBuffers.dynamicBuffer(ByteOrder.LITTLE_ENDIAN, 32)
+  buffer.writeInt(0)
 
-  def write(buffer: ChannelBuffer) = { buffer.writeBytes(value); buffer }
+  /**
+   * Appends the given elements to this structure.
+   */
+  def append(e: E*) :this.type
 
-  def parse() = DefaultBSONIterator(value)
+  /**
+   * Alias for append(e: E*) : appends the given elements to this structure.
+   */
+  def += (e: E*) :this.type = append(e:_*)
+
+  /** The opposite type of this appendable structure (so, a [[org.asyncmongo.bson.TraversableBSONStructure]]). */
+  type Opposite <: TraversableBSONStructure[_]
+
+  /** Makes a [[org.asyncmongo.bson.TraversableBSONStructure]] with the buffer of this [[org.asyncmongo.bson.AppendableBSONStructure]]. */
+  def toTraversable :Opposite
+
+  def makeBuffer = {
+    val result = buffer.copy()
+    result.writeByte(0)
+    result.setInt(0, result.writerIndex)
+    result
+  }
 }
 
 /**
- * A BSON embedded array.
+ * A structure reader. It will give the value matching the given key of type '''Key''', if it exists.
  *
- * @param value The [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]] containing the embedded array.
+ * This reader is lazy: it deserializes values only when required.
+ * Moreover, it memoizes the already deserialized values, to avoid n computations.
+ *
+ * @tparam Key The type of the keys of this structure.
  */
-case class BSONArray(value: ChannelBuffer) extends BSONValue {
-  val code = 0x04
+sealed trait TraversableBSONStructure[Key] extends BSONStructure {
+  protected val stream = DefaultBSONIterator(buffer).toStream
 
-  def write(buffer: ChannelBuffer) = { buffer writeBytes value; buffer }
+  /** Gets the value matching the given key, if it exists. */
+  def get(key: Key) :Option[BSONValue]
 
-  def parse() = DefaultBSONIterator(value)
+  /**
+   * Gets the value matching the given key, if it exists and if it is of type '''T'''.
+   *
+   * @tparam T the type of the BSONValue to find.
+   */
+  def getAs[T <: BSONValue :Manifest](key: Key) :Option[T] = {
+    val m = manifest[T]
+    get(key).flatMap { e =>
+      if(scala.reflect.ClassManifest.fromClass(e.getClass) <:<  m)
+        Some(e.asInstanceOf[T])
+      else None
+    }
+  }
+
+  /** The opposite type of this traversable structure (so, an [[org.asyncmongo.bson.AppendableBSONStructure]]). */
+  type Opposite <: AppendableBSONStructure[_]
+
+  /** Makes a [[org.asyncmongo.bson.AppendableBSONStructure]] with the buffer of this [[org.asyncmongo.bson.TraversableBSONStructure]]. */
+  def toAppendable :Opposite
+
+  def makeBuffer = buffer.copy()
+
+  /**
+   * An iterator of the elements that are present in this structure.
+   *
+   * This iterator is produced from a stream that memoizes the already computed values (to avoid unnecessarily computation).
+   */
+  def bsonIterator :Iterator[BSONElement]= stream.iterator
+
+  /** A map containing all the values of this structure. */
+  def mapped :Map[Key, BSONValue]
 }
+
+/**
+ * An array reader. It will give the value matching the index, if it exists.
+ *
+ * This reader is lazy: it deserializes values only when required.
+ * Moreover, it memoizes the already deserialized values, to avoid n computations.
+ */
+case class TraversableBSONArray(buffer: ChannelBuffer) extends TraversableBSONStructure[Int] with BSONArray {
+  def get(i :Int) = {
+    val iterator = stream.iterator
+    iterator.find(_.name.toInt == i).map(_.value)
+  }
+
+  type Opposite = AppendableBSONArray
+
+  def toAppendable = new AppendableBSONArray()
+
+  def mapped :Map[Int, BSONValue] = {
+    for(el <- bsonIterator) yield (el.name.toInt, el.value)
+  }.toMap
+
+  /**
+   * Makes a list containing all the value of this array (ascending order).
+   */
+  def toList :List[BSONValue] = bsonIterator.map(_.value).toList
+}
+
+/**
+ * A BSON Array builder. It will append the given values to this array.
+ */
+class AppendableBSONArray extends AppendableBSONStructure[BSONValue] with BSONArray {
+  var i = 0
+  def append(values: BSONValue*) = {
+    for(value <- values) {
+      new DefaultBSONElement(i.toString, value).write(buffer)
+      i = i + 1
+    }
+    this
+  }
+
+  type Opposite = TraversableBSONArray
+
+  def toTraversable = new TraversableBSONArray(makeBuffer)
+}
+
+/**
+ * A document reader. It will give the value matching the given name, if it exists.
+ *
+ * This reader is lazy: it deserializes values only when required.
+ * Moreover, it memoizes the already deserialized values, to avoid n computations.
+ */
+case class TraversableBSONDocument(buffer: ChannelBuffer) extends TraversableBSONStructure[String] with BSONDocument {
+  def get(name: String) = {
+    val iterator = stream.iterator
+    iterator.find(_.name == name).map(_.value)
+  }
+
+  type Opposite = AppendableBSONDocument
+
+  def toAppendable = new AppendableBSONDocument()
+
+  def mapped :Map[String, BSONValue] = {
+    for(el <- bsonIterator) yield (el.name, el.value)
+  }.toMap
+}
+
+/**
+ * A BSON Document builder. It will append the given values to this array.
+ */
+class AppendableBSONDocument extends AppendableBSONStructure[(String, BSONValue)] with BSONDocument {
+  def append( els: (String, BSONValue)* ) = {
+    for(el <- els)
+      new DefaultBSONElement(el._1, el._2).write(buffer)
+    this
+  }
+
+  /**
+   * Appends elements to this document.
+   */
+  def append(el: BSONElement, els: BSONElement*) :this.type = {
+    el.write(buffer)
+    for(el <- els)
+      el.write(buffer)
+    this
+  }
+
+  /**
+   * Appends elements to this document.
+   * Alias for append(BSONElement, BSONElement*).
+   */
+  def += (el: BSONElement, els: BSONElement*) :this.type = append(el, els :_*)
+
+  type Opposite = TraversableBSONDocument
+
+  def toTraversable = new TraversableBSONDocument(makeBuffer)
+}
+
+object BSONDocument {
+  /** Makes an [[org.asyncmongo.bson.AppendableBSONDocument]] containing the given values. */
+  def apply( els: (String, BSONValue)* ) :AppendableBSONDocument = new AppendableBSONDocument().append(els :_*)
+  /** Makes a [[org.asyncmongo.bson.TraversableBSONDocument]] from the given buffer. */
+  def apply(buffer: ChannelBuffer) :TraversableBSONDocument = new TraversableBSONDocument(buffer)
+}
+
+object BSONArray {
+  /** Makes an [[org.asyncmongo.bson.AppendableBSONArray]] containing the given values. */
+  def apply(values: BSONValue*) :AppendableBSONArray = new AppendableBSONArray().append(values :_*)
+  /** Makes a [[org.asyncmongo.bson.TraversableBSONArray]] from the given buffer. */
+  def apply(buffer: ChannelBuffer) :TraversableBSONArray = new TraversableBSONArray(buffer)
+}
+// <---------------------------- BSON Structure handlers
+
 
 /**
  * A BSON binary value.
@@ -297,118 +495,6 @@ object Subtype {
 }
 
 /**
- *  A Bson producer.
- *
- *  @param estimatedLength The estimated length of the Bson buffer. Defaults to 32.
- */
-class Bson(val estimatedLength: Int = 32) {
-  private val buffer = ChannelBuffers.dynamicBuffer(ByteOrder.LITTLE_ENDIAN, estimatedLength)
-  buffer.writeInt(0)
-
-  /** Adds a BSON element into this buffer. */
-  def add(el: BSONElement) :Bson = {
-    el.write(buffer)
-    this
-  }
-
-  /** Writes a BSON value of the given name into this buffer. */
-  def add(el: (String, BSONValue)) :Bson = {
-    DefaultBSONElement(el._1, el._2).write(buffer)
-    this
-  }
-
-  /** Alias for add(BSONElement) */
-  def += (el: BSONElement) :Bson = add(el)
-
-  /** Alias for add( (String, BSONValue) ) */
-  def += (el: (String, BSONValue)) :Bson = add(el)
-
-  /**
-   * Ends the Bson, sets the length and returns the buffer.
-   * The underlying buffer is not affected, so this Bson instance can be used again.
-   */
-  def makeBuffer = {
-    val result = buffer.copy()
-    result.writeByte(0)
-    result.setInt(0, result.writerIndex)
-    result
-  }
-
-  /**
-   * Returns a BSONDocument from the buffer produced by makeBuffer.
-   * The underlying buffer is not affected, so this Bson instance can be used again.
-   */
-  def toDocument = BSONDocument(makeBuffer)
-}
-
-object Bson {
-  /** Creates a Bson object and adds the given elements. */
-  def apply(el: BSONElement, els: BSONElement*) = {
-    val bson = new Bson
-    bson += el
-    for(e <- els)
-      bson += e
-    bson
-  }
-
-  /**
-   * Creates a Bson object and adds the given name -> value.
-   */
-  def apply(els: (String, BSONValue)*) = {
-    val bson = new Bson
-    for(e <- els)
-      bson += e
-    bson
-  }
-
-  // test purposes - to remove
-  def test {
-    import de.undercouch.bson4jackson._
-    import de.undercouch.bson4jackson.io._
-    import de.undercouch.bson4jackson.uuid._
-    import org.jboss.netty.channel._
-    import org.jboss.netty.buffer._
-    import org.codehaus.jackson.map.ObjectMapper
-    import java.io._
-    val mapper = {
-      val fac = new BsonFactory()
-      fac.enable(BsonParser.Feature.HONOR_DOCUMENT_LENGTH)
-      val om = new ObjectMapper(fac)
-      om.registerModule(new BsonUuidModule())
-      om
-    }
-
-    val factory = new BsonFactory()
-
-    //serialize data
-    val baos = new ByteArrayOutputStream();
-    val gen = factory.createJsonGenerator(baos);
-    gen.writeStartObject();
-    gen.writeStringField("name", "Jack")
-    gen.writeNumberField("age", 37)
-    gen.writeNumberField("getLastError", 1)
-    gen.writeEndObject()
-    gen.close()
-
-    println("awaiting: " + java.util.Arrays.toString(baos.toByteArray))
-
-    val bson = Bson(
-      "name" -> BSONString("Jack"),
-      "age" -> BSONInteger(37),
-      "getLastError" -> BSONInteger(1)
-    )
-    println("produced: " + java.util.Arrays.toString(bson.makeBuffer.array))
-    println(DefaultBSONIterator(bson.makeBuffer).toList)
-    //val it = DefaultBSONIterator(bson.getBuffer)
-    //while(it.hasNext)
-    //  println(it.next)
-    /*val is = new ChannelBufferInputStream(bson.getBuffer)
-    val produced = mapper.readValue(is, classOf[java.util.HashMap[Object, Object]])
-    println(produced)*/
-  }
-}
-
-/**
  * A Bson iterator from a [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]].
  *
  * Iterating over this is completely lazy.
@@ -468,16 +554,16 @@ sealed trait BSONIterator extends Iterator[BSONElement] {
 case class DefaultBSONIterator(buffer: ChannelBuffer) extends BSONIterator
 
 object DefaultBSONIterator {
-  private def pretty(i: Int, it: DefaultBSONIterator) :String = {
+  private def pretty(i: Int, it: Iterator[BSONElement]) :String = {
     val prefix = (0 to i).map {i => "\t"}.mkString("")
     (for(v <- it) yield {
       v.value match {
-        case BSONDocument(b) => prefix + v.name + ": {\n" + pretty(i + 1, DefaultBSONIterator(b)) + "\n" + prefix +" }"
-        case BSONArray(b) => prefix + v.name + ": [\n" + pretty(i + 1, DefaultBSONIterator(b)) + "\n" + prefix +" ]"
+        case doc :TraversableBSONDocument => prefix + v.name + ": {\n" + pretty(i + 1, doc.bsonIterator) + "\n" + prefix +" }"
+        case array :TraversableBSONArray => prefix + v.name + ": [\n" + pretty(i + 1, array.bsonIterator) + "\n" + prefix +" ]"
         case _ => prefix + v.name + ": " + v.value.toString
       }
     }).mkString(",\n")
   }
   /** Makes a pretty String representation of the given [[org.asyncmongo.bson.BSONIterator]]. */
-  def pretty(it: DefaultBSONIterator) :String = "{\n" + pretty(0, it) + "\n}"
+  def pretty(it: Iterator[BSONElement]) :String = "{\n" + pretty(0, it) + "\n}"
 }

@@ -17,7 +17,6 @@ import org.asyncmongo.utils.ArrayUtils
 import org.jboss.netty.buffer.ChannelBuffer
 import org.slf4j.{Logger, LoggerFactory}
 
-import play.api.libs.concurrent.PlayPromise
 import play.api.libs.iteratee._
 
 import scala.util.Random
@@ -51,22 +50,22 @@ trait ReadFileEntry extends FileEntry {
 
   /** Produces an enumerator of chunks of bytes from the ''chunks'' collection. */
   def enumerate(implicit ctx: ExecutionContext) :Enumerator[Array[Byte]] = {
-    val selector = Bson(
-      "$query" -> Bson(
+    val selector = BSONDocument(
+      "$query" -> BSONDocument(
         "files_id" -> id,
-        "n" -> Bson(
+        "n" -> BSONDocument(
           "$gte" -> BSONInteger(0),
           "$lte" -> BSONInteger( length/chunkSize + (if(length % chunkSize > 0) 1 else 0) )
-        ).toDocument
-      ).toDocument,
-      "$orderby" -> Bson(
+        )
+      ),
+      "$orderby" -> BSONDocument(
         "n" -> BSONInteger(1)
-      ).toDocument
+      )
     )
     val cursor = gridFS.chunks.find(selector, None, 0, Int.MaxValue)
     cursor.enumerate &> (Enumeratee.map { doc =>
-      doc.find(_.name == "data").flatMap {
-        case ReadBSONElement(_, BSONBinary(data, _)) => Some(data.array())
+      doc.get("data").flatMap {
+        case BSONBinary(data, _) => Some(data.array())
         case _ => None
       }.getOrElse {
         logger.error("not a chunk! failed assertion: data field is missing")
@@ -91,34 +90,33 @@ object ReadFileEntry {
   private val logger = LoggerFactory.getLogger("ReadFileEntry")
   def bsonReader(gFS: GridFS) = new BSONReader[ReadFileEntry] {
     def read(buffer: ChannelBuffer) = {
-      val iterator = DefaultBSONHandlers.DefaultBSONReader.read(buffer)
-      val map = iterator.mapped
+      val document = DefaultBSONHandlers.DefaultBSONDocumentReader.read(buffer)
       new ReadFileEntry {
-        val length = map.get("length").flatMap(_.value match {
+        val length = document.get("length").flatMap {
           case BSONInteger(i) => Some(i)
           case _ => None
-        }).getOrElse(throw new RuntimeException("length is mandatory for a stored gridfs file!"))
-        override val chunkSize = map.get("chunkSize").flatMap(_.value match {
+        }.getOrElse(throw new RuntimeException("length is mandatory for a stored gridfs file!"))
+        override val chunkSize = document.get("chunkSize").flatMap {
           case BSONInteger(i) => Some(i)
           case _ => None
-        }).getOrElse(throw new RuntimeException("chunkSize is mandatory for a stored gridfs file!"))
-        val uploadDate = map.get("uploadDate").flatMap(_.value match {
+        }.getOrElse(throw new RuntimeException("chunkSize is mandatory for a stored gridfs file!"))
+        val uploadDate = document.get("uploadDate").flatMap {
           case BSONDateTime(time) => Some(time)
           case _ => None
-        })
-        val md5 = map.get("md5").flatMap(_.value match {
+        }
+        val md5 = document.get("md5").flatMap {
           case BSONString(m) => Some(m)
           case _ => None
-        })
-        val filename = map.get("filename").flatMap(_.value match {
+        }
+        val filename = document.get("filename").flatMap {
           case BSONString(name) => Some(name)
           case _ => None
-        }).getOrElse("")
-        val contentType = map.get("contentType").flatMap(_.value match {
+        }.getOrElse("")
+        val contentType = document.get("contentType").flatMap {
           case BSONString(ct) => Some(ct)
           case _ => None
-        })
-        val id = map.get("_id").getOrElse(throw new RuntimeException("_id is mandatory for a stored gridfs file!")).value
+        }
+        val id = document.get("_id").getOrElse(throw new RuntimeException("_id is mandatory for a stored gridfs file!"))
         val gridFS = gFS
       }
     }
@@ -182,21 +180,21 @@ case class FileToWrite(
       def finish() :Future[PutResult] = {
         logger.debug("writing last chunk (n=" + n + ")!")
         writeChunk(n, previous).flatMap { _ =>
-          val bson = Bson(
+          val bson = BSONDocument(
             "_id" -> files_id,
             "filename" -> BSONString(name),
             "chunkSize" -> BSONInteger(chunkSize),
             "length" -> BSONInteger(length),
             "uploadDate" -> BSONDateTime(System.currentTimeMillis))
           if(contentType.isDefined)
-            bson.add("contentType" -> BSONString(contentType.get))
+            bson += ("contentType" -> BSONString(contentType.get))
           gfs.files.insert(bson).map(_ => PutResult(files_id, n, length, Some(Converters.hex2Str(md.digest))))
         }
       }
       def writeChunk(n: Int, array: Array[Byte]) = {
-        val bson = Bson("files_id" -> files_id)
-        bson.add("n" -> BSONInteger(n))
-        bson.add("data" -> new BSONBinary(array, Subtype.GenericBinarySubtype))
+        val bson = BSONDocument("files_id" -> files_id)
+        bson += ("n" -> BSONInteger(n))
+        bson += ("data" -> new BSONBinary(array, Subtype.GenericBinarySubtype))
         logger.debug("writing chunk " + n)
         gfs.chunks.insert(bson)
       }
@@ -287,7 +285,7 @@ object GridFS {
     gfs.db.connection.waitForPrimary(1 seconds).onComplete {
       case Left(e) => println("ERROR " + e); e.printStackTrace
       case _ =>
-        gfs.find(Bson()).headOption.filter(_.isDefined).map(_.get).map { e =>
+        gfs.find(BSONDocument()).headOption.filter(_.isDefined).map(_.get).map { e =>
           e.readContent(baos).onComplete {
             case Left(e) =>println("ERROR " + e); e.printStackTrace
             case Right(e) =>

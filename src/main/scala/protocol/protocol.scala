@@ -216,11 +216,8 @@ object ExplainedError {
   /**
    * Make an [[org.asyncmongo.protocol.ExplainedError]] from the given [[org.asyncmongo.bson.BSONIterator]].
    */
-  def apply(bson: BSONIterator) :Option[ExplainedError] = {
-    bson.find(_.name == "err").map {
-      case err: BSONString => ExplainedError(err.value)
-      case _ => throw new RuntimeException("???")
-    }
+  def apply(bson: TraversableBSONDocument) :Option[ExplainedError] = {
+    bson.getAs[BSONString]("err").map(bs => ExplainedError(bs.value)).orElse(throw new RuntimeException("???"))
   }
 }
 

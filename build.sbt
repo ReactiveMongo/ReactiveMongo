@@ -13,7 +13,6 @@ resolvers += Resolver.file("local repository", file("/Users/sgo/.ivy2/local"))(R
 
 libraryDependencies ++= Seq(
 	"io.netty" % "netty" % "3.3.1.Final",
-	"de.undercouch" % "bson4jackson" % "1.2.0",
 	"com.typesafe.akka" % "akka-actor" % "2.0",
 	"play" %% "play" % "2.1-SNAPSHOT",
 	"ch.qos.logback" % "logback-core" % "1.0.0",

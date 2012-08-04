@@ -21,9 +21,9 @@ object Samples {
 
   def listDocs() = {
     // select only the documents which field 'name' equals 'Jack'
-    val query = Bson("name" -> BSONString("Jack"))
+    val query = BSONDocument("name" -> BSONString("Jack"))
     // select only the field 'name'
-    val filter = Bson(
+    val filter = BSONDocument(
       "name" -> BSONInteger(1),
       "_id" -> BSONInteger(0)
     )
@@ -32,43 +32,46 @@ object Samples {
     val cursor = collection.find(query, Some(filter))
     // let's enumerate this cursor and print a readable representation of each document in the response
     cursor.enumerate.apply(Iteratee.foreach { doc =>
-      println("found document: " + DefaultBSONIterator.pretty(doc))
+      println("found document: " + DefaultBSONIterator.pretty(doc.bsonIterator))
     })
 
     // or, the same with getting a list
     val cursor2 = collection.find(query, Some(filter))
-    val list = cursor2.toList
+    val futurelist = cursor2.toList
+    futurelist.onSuccess {
+      case list => println(list)
+    }
   }
 
   def insert() = {
-    val document = Bson(
+    val document = BSONDocument(
       "firstName" -> BSONString("Stephane"),
       "lastName" -> BSONString("Godbillon"),
       "age" -> BSONInteger(28),
-      "company" -> Bson(
+      "company" -> BSONDocument(
         "name" -> BSONString("Zenexity"),
         "address" -> BSONString("56 rue Saint Lazare 75009 Paris")
-      ).toDocument
+      )
     )
 
     val future = collection.insert(document, GetLastError())
     future.onComplete {
       case Left(e) => throw e
       case Right(lastError) => {
-        println("successfully inserted document")
+        println("successfully inserted document: "  + lastError)
       }
     }
   }
 
   def insertThenCount() = {
-    val document = Bson(
+    val document = BSONDocument(
       "firstName" -> BSONString("Stephane"),
       "lastName" -> BSONString("Godbillon"),
       "age" -> BSONInteger(28),
-      "company" -> Bson(
+      "company" -> BSONDocument(
         "name" -> BSONString("Zenexity"),
         "address" -> BSONString("56 rue Saint Lazare 75009 Paris")
-      ).toDocument
+      )
     )
 
     // get the future result of the insertion
@@ -79,7 +82,7 @@ object Samples {
       println("successfully inserted document (lasterror is " + lasterror + ")")
       val count = Count(
         collection.collectionName,
-        Some(Bson(
+        Some(BSONDocument(
           "company.name" -> BSONString("Zenexity")
         )))
       // get the future count
@@ -95,14 +98,14 @@ object Samples {
   }
 
   def update() = {
-    val selector = Bson("name" -> BSONString("Jack"))
+    val selector = BSONDocument("name" -> BSONString("Jack"))
 
-    val modifier = Bson(
-      "$set" -> Bson(
+    val modifier = BSONDocument(
+      "$set" -> BSONDocument(
         "lastName" ->BSONString("London"),
-        "firstName" -> BSONString("Jack")).toDocument,
-      "$unset" -> Bson(
-        "name" -> BSONInteger(1)).toDocument
+        "firstName" -> BSONString("Jack")),
+      "$unset" -> BSONDocument(
+        "name" -> BSONInteger(1))
     )
 
     // get a future update
@@ -110,7 +113,7 @@ object Samples {
 
     // get a cursor of documents that have lastName: "London" and firstName: "Jack". Our updated document should be included.
     val futureCursor = futureUpdate.map { lastError =>
-      val updatedDocumentSelector = Bson(
+      val updatedDocumentSelector = BSONDocument(
         "lastName" -> BSONString("London"),
         "firstName" -> BSONString("Jack"))
 
@@ -120,13 +123,13 @@ object Samples {
     // let's enumerate this cursor and print a readable representation of each document in the response
     val enumerator = Cursor.flatten(futureCursor).enumerate
     enumerator(Iteratee.foreach { doc =>
-      println("found document: " + DefaultBSONIterator.pretty(doc))
+      println("found document: " + DefaultBSONIterator.pretty(doc.bsonIterator))
     })
   }
 
   def remove() = {
     // let's remove all documents that have company.name = Zenexity
-    val selector = Bson(
+    val selector = BSONDocument(
       "company.name" -> BSONString("Zenexity"))
 
     val futureRemove = collection.remove(selector, GetLastError(), false)
@@ -141,11 +144,11 @@ object Samples {
 
   // finds all documents with lastName = Godbillon and replace lastName with GODBILLON
   def findAndModify() = {
-    val selector = Bson(
+    val selector = BSONDocument(
       "lastName" -> BSONString("Godbillon"))
 
-    val modifier = Bson(
-      "$set" -> Bson("lastName" -> BSONString("GODBILLON")).toDocument)
+    val modifier = BSONDocument(
+      "$set" -> BSONDocument("lastName" -> BSONString("GODBILLON")))
 
     val command = FindAndModify(
       collection.collectionName,
@@ -157,10 +160,9 @@ object Samples {
       case Right(maybeDocument) => println("findAndModify successfully done with original document = " +
         // if there is an original document returned, print it in a pretty format
         maybeDocument.map(doc => {
-          // get a BSONIterator (lazy BSON parser) of this document
-          val bsonIterator = DefaultBSONReader.read(doc.value)
+          // get a BSONIterator (lazy BSON parser) of this document 
           // stringify it with DefaultBSONIterator.pretty
-          DefaultBSONIterator.pretty(bsonIterator)
+          DefaultBSONIterator.pretty(doc.bsonIterator)
         })
       )
     }
