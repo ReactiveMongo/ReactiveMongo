@@ -240,6 +240,7 @@ case class PutResult(
  * @param prefix The prefix of this GridFS. Defaults to "fs".
  */
 case class GridFS(db: DB, prefix: String = "fs") {
+  import indexes._
   /** The ''files'' collection */
   val files = db(prefix + ".files")
   /** The ''chunks'' collection */
@@ -269,6 +270,14 @@ case class GridFS(db: DB, prefix: String = "fs") {
    * @return an iteratee to be applied to an enumerator of chunks of bytes.
    */
   def save(name: String, id: Option[BSONValue], contentType: Option[String] = None)(implicit ctx: ExecutionContext) :Iteratee[Array[Byte], Future[PutResult]] = FileToWrite(id, name, contentType).iteratee(this)
+
+  /**
+   * Creates the needed index on the ''chunks'' collection, if none.
+   *
+   * Please note that you should really consider reading [[http://www.mongodb.org/display/DOCS/Indexes]] before doing this, especially in production.
+   */
+  def ensureIndex()(implicit ctx: ExecutionContext) :Future[Boolean] =
+    chunks.indexes.ensure(Index( List("files_id" -> true, "n" -> true), unique = true ))
 }
 
 object GridFS {
@@ -309,7 +318,7 @@ object GridFS {
     val start = System.currentTimeMillis
     val connection = MongoConnection(List("localhost:27016"))
     connection.waitForPrimary(timeout).onSuccess {
-      case _ => val gfs = new GridFS(DB("plugin", connection))
+      case _ => val gfs = new GridFS(DB("app", connection))
 
       val filetowrite = FileToWrite(None, "hepla.txt", Some("text/plain"))
 

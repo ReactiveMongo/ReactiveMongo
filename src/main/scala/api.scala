@@ -13,6 +13,8 @@ import org.asyncmongo.protocol._
 import org.asyncmongo.protocol.commands.{Update => FindAndModifyUpdate, _}
 import org.slf4j.{Logger, LoggerFactory}
 
+import indexes._
+
 /**
  * A Mongo Database.
  *
@@ -22,33 +24,36 @@ import org.slf4j.{Logger, LoggerFactory}
  */
 case class DB(dbName: String, connection: MongoConnection)(implicit timeout :Duration = 5 seconds, context: ExecutionContext) { // TODO timeout
   /**  Gets a [[org.asyncmongo.api.Collection]] from this database. */
-  def apply(name: String) :Collection = Collection(dbName, name, connection)(timeout, context)
+  def apply(name: String) :Collection = Collection(this, name, connection)(timeout, context)
 
   /** Authenticates the connection on this database. */ // TODO return type
   def authenticate(user: String, password: String) :Future[AuthenticationResult] = connection.authenticate(dbName, user, password)
+
+  /** The index manager for this database. */
+  lazy val indexes = new IndexesManager(this)
 }
 
 /**
  * A Mongo Collection.
  *
- * @param dbName database name.
+ * @param db database.
  * @param collectionName the name of this collection.
  * @param connection the [[org.asyncmongo.api.MongoConnection]] that will be used to query this database.
  * @param timeout the default timeout for the queries.
  */
 case class Collection(
-  dbName: String,
+  db: DB,
   collectionName: String,
   connection: MongoConnection
 )(implicit timeout: Duration, context: ExecutionContext) {
   /** The full collection name. */
-  lazy val fullCollectionName = dbName + "." + collectionName
+  lazy val fullCollectionName = db.dbName + "." + collectionName
 
   // TODO
   /** Counts the number of documents in this collection. */
   def count() :Future[Int] = {
     import DefaultBSONHandlers._
-    connection.ask(Count(collectionName)(dbName).maker).map { response =>
+    connection.ask(Count(collectionName)(db.dbName).maker).map { response =>
       DefaultBSONReaderHandler.handle(response.reply, response.documents).next.getAs[BSONDouble]("n").map(_.value.toInt).getOrElse(0)
     }
   }
@@ -252,7 +257,10 @@ object Samples {
    * @return a future containing the result of the command.
    */ // TODO move into DB
   def command(command: Command) :Future[command.Result] =
-    connection.ask(command.apply(dbName).maker).map(command.ResultMaker(_))
+    connection.ask(command.apply(db.dbName).maker).map(command.ResultMaker(_))
+
+  /** The index manager for this collection. */
+  lazy val indexes = db.indexes.onCollection(collectionName)
 }
 
 object Collection {
@@ -653,11 +661,13 @@ object Test {
     val collection = db("acoll")
     connection.waitForPrimary(timeout).map { _ =>
       println("ok, let's go \n")
-      collection.find(BSONDocument(
+      db.indexes.list.map(list => println("DB=> " + list))
+      collection.indexes.list.map(list => println("Collection=> " + list))
+      /*collection.find(BSONDocument(
         "_id" -> new BSONObjectID("501c3a63faf8fdc95e050178")
       )).headOption.filter(_.isDefined).map { k =>
         println(DefaultBSONIterator.pretty(k.get.bsonIterator))
-      }
+      }*/
       /*val toSave = Bson("name" -> BSONString("Kurt"))
         val toSave2 = new ng.WritableBSONDocument(32)
         toSave2.append("name" -> BSONString("Kurt")) ;
