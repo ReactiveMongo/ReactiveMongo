@@ -275,64 +275,9 @@ case class GridFS(db: DB, prefix: String = "fs") {
    * Creates the needed index on the ''chunks'' collection, if none.
    *
    * Please note that you should really consider reading [[http://www.mongodb.org/display/DOCS/Indexes]] before doing this, especially in production.
+   *
+   * @return a future containing true if the index was created, false if it already exists.
    */
   def ensureIndex()(implicit ctx: ExecutionContext) :Future[Boolean] =
     chunks.indexes.ensure(Index( List("files_id" -> true, "n" -> true), unique = true ))
-}
-
-object GridFS {
-  import scala.concurrent.util.duration._
-
-  // tests
-  def read {
-    // TODO create own ExecutionContext
-    import ExecutionContext.Implicits.global
-
-    val gfs = new GridFS(DB("plugin", MongoConnection(List("localhost:27016"))))
-    val baos = new ByteArrayOutputStream
-
-    gfs.db.connection.waitForPrimary(1 seconds).onComplete {
-      case Left(e) => println("ERROR " + e); e.printStackTrace
-      case _ =>
-        gfs.find(BSONDocument()).headOption.filter(_.isDefined).map(_.get).map { e =>
-          e.readContent(baos).onComplete {
-            case Left(e) =>println("ERROR " + e); e.printStackTrace
-            case Right(e) =>
-              val result = baos.toString("utf-8")
-              println("DONE \n => " + result)
-              println("\tof md5 = " + Converters.hex2Str(java.security.MessageDigest.getInstance("MD5").digest(baos.toByteArray)))
-          }
-        }
-    }
-  }
-
-  def write3 {
-    import akka.pattern.ask
-    import scala.concurrent.util.duration._
-
-    // TODO create own ExecutionContext
-    import ExecutionContext.Implicits.global
-
-    implicit val timeout = 5 seconds
-
-    val start = System.currentTimeMillis
-    val connection = MongoConnection(List("localhost:27016"))
-    connection.waitForPrimary(timeout).onSuccess {
-      case _ => val gfs = new GridFS(DB("app", connection))
-
-      val filetowrite = FileToWrite(None, "hepla.txt", Some("text/plain"))
-
-      val iteratee = filetowrite.iteratee(gfs, 11)
-
-      val file = new File("/Volumes/Data/code/mongo-async-driver/TODO.txt")
-      val enumerator = Enumerator.fromFile(file, 1024 * 1024)
-
-      val pp = Iteratee.flatten(enumerator(iteratee)).run
-      pp.flatMap(i => i).onSuccess { case result: PutResult =>
-        println("successfully inserted file with result " + result + " in " + (System.currentTimeMillis - start) + " ms")
-      }
-
-    }
-
-  }
 }

@@ -51,7 +51,7 @@ case class ReadBSONElement(name: String, value: BSONValue) extends BSONElement
 sealed trait BSONValue {
   /** bson type code */
   val code: Int
-  /** Writes this value int the given [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]] */
+  /** Writes this value in the given [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]] */
   def write(buffer: ChannelBuffer) :ChannelBuffer
 }
 

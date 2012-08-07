@@ -81,9 +81,10 @@ class IndexesManager(db: DB)(implicit context: ExecutionContext) {
    * You should really consider reading [[http://www.mongodb.org/display/DOCS/Indexes]] before doing this, especially in production.
    *
    * @param The index to create.
+   *
+   * @return a future containing true if the index was created, false if it already exists.
    */
   def ensure(nsIndex: NSIndex) :Future[Boolean] = {
-    println(nsIndex.namespace + " ====> " + nsIndex.index.eventualName)
     val query = BSONDocument(
       "ns" -> BSONString(nsIndex.namespace),
       "name" -> BSONString(nsIndex.index.eventualName))
@@ -92,7 +93,7 @@ class IndexesManager(db: DB)(implicit context: ExecutionContext) {
       if(!opt.isDefined)
         create(nsIndex).map(_ => true)
       // there is a match, returning a future ok. TODO
-      else Future(true)
+      else Future(false)
     }
   }
 
@@ -106,29 +107,20 @@ class IndexesManager(db: DB)(implicit context: ExecutionContext) {
    */
   def create(nsIndex: NSIndex) :Future[LastError] = {
     implicit val writer = IndexesManager.NSIndexWriter
-    println("\t\tCreating index = " + nsIndex)
-    val hop = collection.insert(nsIndex).filter(!_.inError)
-    hop.onComplete {
-      case Left(e) =>
-        println("\t\terror while creating index " + e)
-        e.printStackTrace
-      case Right(b) =>
-        println("\t\tcompl while creating index " + b)
-    }
-    hop
+    collection.insert(nsIndex).filter(!_.inError)
   }
 
   /**
    * Deletes the given index on that database.
    *
-   * @returns The deleted index number.
+   * @return The deleted index number.
    */
   def delete(nsIndex: NSIndex) :Future[Int] = delete(nsIndex.collectionName, nsIndex.index.eventualName)
 
   /**
    * Deletes the given index on that database.
    *
-   * @returns The deleted index number.
+   * @return The deleted index number.
    */
   def delete(collectionName: String, indexName: String) :Future[Int] = db(collectionName).command(DeleteIndex(collectionName, indexName))
 
@@ -153,6 +145,8 @@ class CollectionIndexesManager(fqName: String, manager: IndexesManager)(implicit
    * You should really consider reading [[http://www.mongodb.org/display/DOCS/Indexes]] before doing this, especially in production.
    *
    * @param The index to create.
+   *
+   * @return a future containing true if the index was created, false if it already exists.
    */
   def ensure(index: Index) :Future[Boolean] =
     manager.ensure(NSIndex(fqName, index))
@@ -171,14 +165,14 @@ class CollectionIndexesManager(fqName: String, manager: IndexesManager)(implicit
   /**
    * Deletes the given index on that collection.
    *
-   * @returns The deleted index number.
+   * @return The deleted index number.
    */
   def delete(index: Index) = manager.delete(NSIndex(collectionName, index))
 
   /**
    * Deletes the given index on that collection.
    *
-   * @returns The deleted index number.
+   * @return The deleted index number.
    */
   def delete(name: String) = manager.delete(collectionName, name)
 }
