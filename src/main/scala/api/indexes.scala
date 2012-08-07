@@ -2,13 +2,13 @@ package org.asyncmongo.api.indexes
 
 import org.asyncmongo.api._
 import org.asyncmongo.bson._
-import org.asyncmongo.protocol.commands.{FindAndModify, LastError, Update}
-import org.asyncmongo.handlers._
+import org.asyncmongo.bson.handlers._
+import org.asyncmongo.core.commands.{FindAndModify, LastError, Update}
 import scala.concurrent.{Future, ExecutionContext}
 import scala.concurrent.util.Duration
 import scala.concurrent.util.duration._
-import org.asyncmongo.protocol.commands.FindAndModify
-import org.asyncmongo.protocol.commands.DeleteIndex
+import org.asyncmongo.core.commands.FindAndModify
+import org.asyncmongo.core.commands.DeleteIndex
 
 /**
  * A MongoDB index (excluding the namespace).

@@ -1,7 +1,7 @@
-package org.asyncmongo.handlers
+package org.asyncmongo.bson.handlers
 
 import org.asyncmongo.bson._
-import org.asyncmongo.protocol._
+import org.asyncmongo.core.protocol._
 import org.jboss.netty.buffer._
 
 /**

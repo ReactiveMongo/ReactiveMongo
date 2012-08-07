@@ -1,4 +1,4 @@
-package org.asyncmongo.protocol
+package org.asyncmongo.core.protocol
 
 import akka.actor.ActorRef
 import java.nio.ByteOrder
@@ -9,8 +9,8 @@ import org.jboss.netty.channel._
 import org.jboss.netty.channel.socket.nio._
 import org.jboss.netty.handler.codec.oneone._
 import org.jboss.netty.handler.codec.frame.FrameDecoder
-import org.asyncmongo.actors.{Connected, Disconnected}
-import org.asyncmongo.protocol.commands.GetLastError
+import org.asyncmongo.core.actors.{Connected, Disconnected}
+import org.asyncmongo.core.commands.GetLastError
 import org.slf4j.{Logger, LoggerFactory}
 
 import BufferAccessors._
@@ -197,7 +197,7 @@ case class Response(
    */
   lazy val error :Option[ExplainedError] = {
     if(reply.inError) {
-      import org.asyncmongo.handlers.DefaultBSONHandlers._
+      import org.asyncmongo.bson.handlers.DefaultBSONHandlers._
       val bson = DefaultBSONReaderHandler.handle(reply, documents)
       if(bson.hasNext)
         ExplainedError(DefaultBSONReaderHandler.handle(reply, documents).next)

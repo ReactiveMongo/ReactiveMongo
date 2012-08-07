@@ -1,10 +1,10 @@
-package org.asyncmongo.protocol.commands
+package org.asyncmongo.core.commands
 
 import org.asyncmongo.bson._
-import org.asyncmongo.handlers.DefaultBSONHandlers
-import org.asyncmongo.protocol.{RequestMaker, Query, QueryFlags, Response}
-import org.asyncmongo.protocol.NodeState
-import org.asyncmongo.protocol.NodeState._
+import org.asyncmongo.bson.handlers.DefaultBSONHandlers
+import org.asyncmongo.core.protocol.{RequestMaker, Query, QueryFlags, Response}
+import org.asyncmongo.core.protocol.NodeState
+import org.asyncmongo.core.protocol.NodeState._
 import org.asyncmongo.utils._
 
 /**

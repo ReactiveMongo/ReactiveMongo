@@ -6,11 +6,11 @@ import scala.concurrent.{Future, ExecutionContext}
 import scala.concurrent.util.Duration
 import scala.concurrent.util.duration._
 
-import org.asyncmongo.actors.{Authenticate, MongoDBSystem, MonitorActor}
+import org.asyncmongo.core.actors.{Authenticate, MongoDBSystem, MonitorActor}
 import org.asyncmongo.bson._
-import org.asyncmongo.handlers._
-import org.asyncmongo.protocol._
-import org.asyncmongo.protocol.commands.{Update => FindAndModifyUpdate, _}
+import org.asyncmongo.bson.handlers._
+import org.asyncmongo.core.protocol._
+import org.asyncmongo.core.commands.{Update => FindAndModifyUpdate, _}
 import org.slf4j.{Logger, LoggerFactory}
 
 import indexes._
@@ -530,7 +530,7 @@ class MongoConnection(
    */
   def waitForPrimary(waitForAvailability: Duration) :Future[_] = {
     new play.api.libs.concurrent.AkkaPromise(
-      monitor.ask(org.asyncmongo.actors.WaitForPrimary)(akka.util.Timeout(waitForAvailability.length, waitForAvailability.unit))
+      monitor.ask(org.asyncmongo.core.actors.WaitForPrimary)(akka.util.Timeout(waitForAvailability.length, waitForAvailability.unit))
     )
   }
 
@@ -615,7 +615,7 @@ class MongoConnection(
     new play.api.libs.concurrent.AkkaPromise((mongosystem ? Authenticate(db, user, password))(akka.util.Timeout(timeout.length, timeout.unit)).mapTo[AuthenticationResult])
   }
 
-  def close(implicit timeout: Duration) :Future[String] = new play.api.libs.concurrent.AkkaPromise((mongosystem ? org.asyncmongo.actors.Close)(akka.util.Timeout(timeout.length, timeout.unit)).mapTo[String])
+  def close(implicit timeout: Duration) :Future[String] = new play.api.libs.concurrent.AkkaPromise((mongosystem ? org.asyncmongo.core.actors.Close)(akka.util.Timeout(timeout.length, timeout.unit)).mapTo[String])
 
   def stop = MongoConnection.system.stop(mongosystem)
 }

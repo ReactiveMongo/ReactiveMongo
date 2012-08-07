@@ -3,7 +3,7 @@ package org.asyncmongo.utils
 import org.jboss.netty.channel._
 import org.jboss.netty.buffer._
 
-import org.asyncmongo.protocol.ChannelBufferWritable
+import org.asyncmongo.core.protocol.ChannelBufferWritable
 
 /** Common functions */
 object Converters {

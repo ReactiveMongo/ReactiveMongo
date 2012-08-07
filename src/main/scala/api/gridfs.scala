@@ -1,4 +1,4 @@
-package org.asyncmongo.gridfs
+package org.asyncmongo.api.gridfs
 
 import scala.concurrent.{Future, ExecutionContext}
 
@@ -7,10 +7,10 @@ import java.util.Arrays
 
 import org.asyncmongo.api._
 import org.asyncmongo.bson._
-import org.asyncmongo.handlers._
-import org.asyncmongo.handlers.DefaultBSONHandlers._
-import org.asyncmongo.protocol.commands.GetLastError
-import org.asyncmongo.protocol.Response
+import org.asyncmongo.bson.handlers._
+import org.asyncmongo.bson.handlers.DefaultBSONHandlers._
+import org.asyncmongo.core.commands.GetLastError
+import org.asyncmongo.core.protocol.Response
 import org.asyncmongo.utils.Converters
 import org.asyncmongo.utils.ArrayUtils
 

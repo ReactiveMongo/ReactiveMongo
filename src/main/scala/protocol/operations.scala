@@ -1,4 +1,4 @@
-package org.asyncmongo.protocol
+package org.asyncmongo.core.protocol
 
 import org.jboss.netty.channel._
 import org.jboss.netty.buffer._
