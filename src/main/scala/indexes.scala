@@ -8,6 +8,7 @@ import scala.concurrent.{Future, ExecutionContext}
 import scala.concurrent.util.Duration
 import scala.concurrent.util.duration._
 import org.asyncmongo.protocol.commands.FindAndModify
+import org.asyncmongo.protocol.commands.DeleteIndex
 
 /**
  * A MongoDB index (excluding the namespace).
@@ -117,11 +118,29 @@ class IndexesManager(db: DB)(implicit context: ExecutionContext) {
     hop
   }
 
+  /**
+   * Deletes the given index on that database.
+   *
+   * @returns The deleted index number.
+   */
+  def delete(nsIndex: NSIndex) :Future[Int] = delete(nsIndex.collectionName, nsIndex.index.eventualName)
+
+  /**
+   * Deletes the given index on that database.
+   *
+   * @returns The deleted index number.
+   */
+  def delete(collectionName: String, indexName: String) :Future[Int] = db(collectionName).command(DeleteIndex(collectionName, indexName))
+
   /** Gets a manager for the given collection. */
-  def onCollection(name: String) = new CollectionIndexesManager(db + "." + name, this)
+  def onCollection(name: String) = new CollectionIndexesManager(db.dbName + "." + name, this)
 }
 
 class CollectionIndexesManager(fqName: String, manager: IndexesManager)(implicit timeout :Duration = 5 seconds, context: ExecutionContext) {
+  lazy val collectionName = {
+    val (_, r) = fqName.span(_ != '.')
+    r.drop(1)
+  }
   def list() :Future[List[Index]] = manager.list.map { list =>
     list.filter( nsIndex =>
       nsIndex.dbName == fqName).map(_.index)
@@ -148,6 +167,20 @@ class CollectionIndexesManager(fqName: String, manager: IndexesManager)(implicit
    */
   def create(index: Index) :Future[LastError] =
     manager.create(NSIndex(fqName, index))
+
+  /**
+   * Deletes the given index on that collection.
+   *
+   * @returns The deleted index number.
+   */
+  def delete(index: Index) = manager.delete(NSIndex(collectionName, index))
+
+  /**
+   * Deletes the given index on that collection.
+   *
+   * @returns The deleted index number.
+   */
+  def delete(name: String) = manager.delete(collectionName, name)
 }
 
 object IndexesManager {

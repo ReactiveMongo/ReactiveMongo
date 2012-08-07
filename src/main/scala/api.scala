@@ -663,6 +663,7 @@ object Test {
       println("ok, let's go \n")
       db.indexes.list.map(list => println("DB=> " + list))
       collection.indexes.list.map(list => println("Collection=> " + list))
+      collection.indexes.delete("name_1")
       /*collection.find(BSONDocument(
         "_id" -> new BSONObjectID("501c3a63faf8fdc95e050178")
       )).headOption.filter(_.isDefined).map { k =>

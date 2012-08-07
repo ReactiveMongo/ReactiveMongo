@@ -451,3 +451,18 @@ object FindAndModify extends CommandResultMaker[Option[TraversableBSONDocument]]
       case _ => None
     }
 }
+
+case class DeleteIndex(
+  collection: String,
+  index: String
+) extends Command {
+  override def makeDocuments = BSONDocument(
+    "deleteIndexes" -> BSONString(collection),
+    "index" -> BSONString(index))
+
+  type Result = Int // nIndexWas
+
+  object ResultMaker extends CommandResultMaker[Result] {
+    def apply(response: Response) = DefaultBSONHandlers.parse(response).next().getAs[BSONDouble]("nIndexWas").map(_.value.toInt).get
+  }
+}
