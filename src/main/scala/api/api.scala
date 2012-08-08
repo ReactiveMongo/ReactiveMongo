@@ -11,6 +11,7 @@ import org.asyncmongo.bson._
 import org.asyncmongo.bson.handlers._
 import org.asyncmongo.core.protocol._
 import org.asyncmongo.core.commands.{Update => FindAndModifyUpdate, _}
+import org.jboss.netty.buffer.ChannelBuffer
 import org.slf4j.{Logger, LoggerFactory}
 
 import indexes._
@@ -35,6 +36,42 @@ case class DB(dbName: String, connection: MongoConnection)(implicit timeout :Dur
 
 /**
  * A Mongo Collection.
+ *
+ * Example:
+{{{
+import org.asyncmongo.api._
+import org.asyncmongo.bson._
+import org.asyncmongo.handlers.DefaultBSONHandlers._
+import play.api.libs.iteratee.Iteratee
+
+object Samples {
+
+  val connection = MongoConnection( List( "localhost:27016" ) )
+  val db = DB("plugin", connection)
+  val collection :Collection = db("acoll")
+
+  def listDocs() = {
+    // select only the documents which field 'name' equals 'Jack'
+    val query = Bson("name" -> BSONString("Jack"))
+    // select only the field 'name'
+    val filter = Bson(
+      "name" -> BSONInteger(1),
+      "_id" -> BSONInteger(0)
+    )
+
+    // get a Cursor[DefaultBSONIterator]
+    val cursor = collection.find(query, Some(filter))
+    // let's enumerate this cursor and print a readable representation of each document in the response
+    cursor.enumerate.apply(Iteratee.foreach { doc =>
+      println("found document: " + DefaultBSONIterator.pretty(doc))
+    })
+
+    // or, the same with getting a list
+    val cursor2 = collection.find(query, Some(filter))
+    val list = cursor.toList
+  }
+}
+}}}
  *
  * @param db database.
  * @param collectionName the name of this collection.
@@ -61,65 +98,95 @@ case class Collection(
   /**
    * Find the documents matching the given criteria.
    *
-   * Example:
-   * {{{
-import org.asyncmongo.api._
-import org.asyncmongo.bson._
-import org.asyncmongo.handlers.DefaultBSONHandlers._
-import play.api.libs.iteratee.Iteratee
-
-object Samples {
-
-  val connection = MongoConnection( List( "localhost:27016" ) )
-  val db = DB("plugin", connection)
-  val collection = db("acoll")
-
-  def listDocs() = {
-    // select only the documents which field 'name' equals 'Jack'
-    val query = Bson("name" -> BSONString("Jack"))
-    // select only the field 'name'
-    val filter = Bson(
-      "name" -> BSONInteger(1),
-      "_id" -> BSONInteger(0)
-    )
-
-    // get a Cursor[DefaultBSONIterator]
-    val cursor = collection.find(query, Some(filter))
-    // let's enumerate this cursor and print a readable representation of each document in the response
-    cursor.enumerate.apply(Iteratee.foreach { doc =>
-      println("found document: " + DefaultBSONIterator.pretty(doc))
-    })
-
-    // or, the same with getting a list
-    val cursor2 = collection.find(query, Some(filter))
-    val list = cursor.toList
-  }
-}
-}}}
-   *
-   * This method accepts any query and fields object, provided that there is an implicit [[org.asyncmongo.handlers.BSONWriter]] typeclass for handling them in the scope.
+   * This method accepts any query and projection object, provided that there is an implicit [[org.asyncmongo.handlers.BSONWriter]] typeclass for handling them in the scope.
    * You can use the typeclasses defined in [[org.asyncmongo.handlers.DefaultBSONHandlers]] object.
    *
    * Please take a look to the [[http://www.mongodb.org/display/DOCS/Querying mongodb documentation]] to know how querying works.
    *
-   * @tparam T the type of the query. An implicit [[org.asyncmongo.handlers.BSONWriter]][T] typeclass for handling it has to be in the scope.
-   * @tparam U the type of the fields object. An implicit [[org.asyncmongo.handlers.BSONWriter]][U] typeclass for handling it has to be in the scope.
-   * @tparam V the type of the matched documents. An implicit [[org.asyncmongo.handlers.BSONReader]][V] typeclass for handling it has to be in the scope.
+   * @tparam Qry the type of the query. An implicit [[org.asyncmongo.handlers.BSONWriter]][Qry] typeclass for handling it has to be in the scope.
+   * @tparam Pjn the type of the projection object. An implicit [[org.asyncmongo.handlers.BSONWriter]][Pjn] typeclass for handling it has to be in the scope.
+   * @tparam Rst the type of the matched documents. An implicit [[org.asyncmongo.handlers.BSONReader]][Rst] typeclass for handling it has to be in the scope.
    *
    * @param query The selector query.
-   * @param fields Get only a subset of each matched documents. Defaults to None.
-   * @param skip A number of documents to skip. Defaults to 0.
-   * @param limit An upper limit on the number of documents to retrieve. Defaults to 0 (meaning no upper limit).
-   * @param flags Optional query flags.
+   * @param projection Get only a subset of each matched documents. Defaults to None.
+   * @param opts The query options (skip, batchSize, flags...).
    *
-   * @return a future cursor of documents. You can get an enumerator for it, please see the [[org.asyncmongo.api.Cursor]] companion object.
+   * @return a cursor over the matched documents. You can get an enumerator for it, please see the [[org.asyncmongo.api.Cursor]] companion object.
    */
-  def find[T, U, V](query: T, fields: Option[U] = None, skip: Int = 0, limit: Int = 0, flags: Int = 0)(implicit writer: BSONWriter[T], writer2: BSONWriter[U], handler: BSONReaderHandler, reader: BSONReader[V]) :FlattenedCursor[V] = {
-    val op = Query(flags, fullCollectionName, skip, limit)
-    val bson = writer.write(query)
-    if(fields.isDefined)
-      bson.writeBytes(writer2.write(fields.get))
-    val message = RequestMaker(op, bson)
+  def find[Qry, Pjn, Rst](query: Qry, projection: Pjn, opts: QueryOpts = QueryOpts())(implicit writer: BSONWriter[Qry], writer2: BSONWriter[Pjn], handler: BSONReaderHandler, reader: BSONReader[Rst]) :FlattenedCursor[Rst] =
+    find(writer.write(query), Some(writer2.write(projection)), opts)
+
+  /**
+   * Find the documents matching the given criteria.
+   *
+   * This method accepts any query object, provided that there is an implicit [[org.asyncmongo.handlers.BSONWriter]] typeclass for handling it in the scope.
+   * You can use the typeclasses defined in [[org.asyncmongo.handlers.DefaultBSONHandlers]] object.
+   *
+   * Please take a look to the [[http://www.mongodb.org/display/DOCS/Querying mongodb documentation]] to know how querying works.
+   *
+   * @tparam Qry the type of the query. An implicit [[org.asyncmongo.handlers.BSONWriter]][Qry] typeclass for handling it has to be in the scope.
+   * @tparam Rst the type of the matched documents. An implicit [[org.asyncmongo.handlers.BSONReader]][Rst] typeclass for handling it has to be in the scope.
+   *
+   * @param query The selector query.
+   * @param opts The query options (skip, batchSize, flags...).
+   *
+   * @return a cursor over the matched documents. You can get an enumerator for it, please see the [[org.asyncmongo.api.Cursor]] companion object.
+   */
+  def find[Qry, Rst](query: Qry, opts: QueryOpts)(implicit writer: BSONWriter[Qry], handler: BSONReaderHandler, reader: BSONReader[Rst]) :FlattenedCursor[Rst] =
+    find(writer.write(query), None, opts)
+
+  /**
+   * Find the documents matching the given criteria.
+   *
+   * This method accepts any query object, provided that there is an implicit [[org.asyncmongo.handlers.BSONWriter]] typeclass for handling it in the scope.
+   * You can use the typeclasses defined in [[org.asyncmongo.handlers.DefaultBSONHandlers]] object.
+   *
+   * Please take a look to the [[http://www.mongodb.org/display/DOCS/Querying mongodb documentation]] to know how querying works.
+   *
+   * @tparam Qry the type of the query. An implicit [[org.asyncmongo.handlers.BSONWriter]][Qry] typeclass for handling it has to be in the scope.
+   * @tparam Rst the type of the matched documents. An implicit [[org.asyncmongo.handlers.BSONReader]][Rst] typeclass for handling it has to be in the scope.
+   *
+   * @param query The selector query.
+   *
+   * @return a cursor over the matched documents. You can get an enumerator for it, please see the [[org.asyncmongo.api.Cursor]] companion object.
+   */
+  def find[Qry, Rst](query: Qry)(implicit writer: BSONWriter[Qry], handler: BSONReaderHandler, reader: BSONReader[Rst]) :FlattenedCursor[Rst] =
+    find(writer.write(query), None, QueryOpts())
+
+  /**
+   * Find the documents matching the given criteria, using the given [[org.asyncmongo.api.QueryBuilder]] instance.
+   *
+   * Please take a look to the [[http://www.mongodb.org/display/DOCS/Querying mongodb documentation]] to know how querying works.
+   *
+   * @tparam Rst the type of the matched documents. An implicit [[org.asyncmongo.handlers.BSONReader]][Rst] typeclass for handling it has to be in the scope.
+   *
+   * @param query The selector query.
+   * @param opts The query options (skip, batchSize, flags...).
+   *
+   * @return a cursor over the matched documents. You can get an enumerator for it, please see the [[org.asyncmongo.api.Cursor]] companion object.
+   */
+  def find[Rst](query: QueryBuilder, opts: QueryOpts)(implicit handler: BSONReaderHandler, reader: BSONReader[Rst]) :FlattenedCursor[Rst] =
+    find(query.makeMergedBuffer, None, opts)
+
+  /**
+   * Find the documents matching the given criteria, using the given [[org.asyncmongo.api.QueryBuilder]] instance.
+   *
+   * Please take a look to the [[http://www.mongodb.org/display/DOCS/Querying mongodb documentation]] to know how querying works.
+   *
+   * @tparam Rst the type of the matched documents. An implicit [[org.asyncmongo.handlers.BSONReader]][Rst] typeclass for handling it has to be in the scope.
+   *
+   * @param query The selector query.
+   *
+   * @return a cursor over the matched documents. You can get an enumerator for it, please see the [[org.asyncmongo.api.Cursor]] companion object.
+   */
+  def find[Rst](query: QueryBuilder)(implicit handler: BSONReaderHandler, reader: BSONReader[Rst]) :FlattenedCursor[Rst] =
+    find(query.makeMergedBuffer, None, QueryOpts())
+
+  private def find[Rst](query: ChannelBuffer, projection: Option[ChannelBuffer], opts: QueryOpts)(implicit handler: BSONReaderHandler, reader: BSONReader[Rst]) :FlattenedCursor[Rst] = {
+    val op = Query(opts.flagsN, fullCollectionName, opts.skipN, opts.batchSizeN)
+    if(projection.isDefined)
+      query.writeBytes(projection.get)
+    val message = RequestMaker(op, query)
 
     Cursor.flatten(connection.ask(message).map { response =>
       new DefaultCursor(response, connection, op)

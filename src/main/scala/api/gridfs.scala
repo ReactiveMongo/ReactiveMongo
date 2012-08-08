@@ -62,7 +62,7 @@ trait ReadFileEntry extends FileEntry {
         "n" -> BSONInteger(1)
       )
     )
-    val cursor = gridFS.chunks.find(selector, None, 0, Int.MaxValue)
+    val cursor = gridFS.chunks.find(selector)
     cursor.enumerate &> (Enumeratee.map { doc =>
       doc.get("data").flatMap {
         case BSONBinary(data, _) => Some(data.array())
@@ -252,11 +252,10 @@ case class GridFS(db: DB, prefix: String = "fs") {
    * @tparam S the type of the selector document. An implicit [[org.asyncmongo.handlers.BSONWriter]][S] must be in the scope.
    *
    * @param selector The document to select the files to return
-   * @param limit Limits the returned documents.
    */
-  def find[S](selector: S, limit :Int = Int.MaxValue)(implicit sWriter: BSONWriter[S], ctx: ExecutionContext) :Cursor[ReadFileEntry] = {
+  def find[S](selector: S)(implicit sWriter: BSONWriter[S], ctx: ExecutionContext) :Cursor[ReadFileEntry] = {
     implicit val rfeReader = ReadFileEntry.bsonReader(this)
-    files.find(selector, None, 0, limit, 0)
+    files.find(selector)
   }
 
   /**

@@ -29,14 +29,14 @@ object Samples {
     )
 
     // get a Cursor[DefaultBSONIterator]
-    val cursor = collection.find(query, Some(filter))
+    val cursor = collection.find(query, filter)
     // let's enumerate this cursor and print a readable representation of each document in the response
     cursor.enumerate.apply(Iteratee.foreach { doc =>
       println("found document: " + DefaultBSONIterator.pretty(doc.bsonIterator))
     })
 
     // or, the same with getting a list
-    val cursor2 = collection.find(query, Some(filter))
+    val cursor2 = collection.find(query, filter)
     val futurelist = cursor2.toList
     futurelist.onSuccess {
       case list => println(list)
