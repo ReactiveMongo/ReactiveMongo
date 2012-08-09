@@ -2,6 +2,7 @@ package org.asyncmongo.core.nodeset
 
 import akka.actor._
 import java.net.InetSocketAddress
+import java.util.concurrent.{Executor, Executors}
 import org.asyncmongo.bson._
 import org.asyncmongo.core.protocol._
 import org.asyncmongo.core.protocol.ChannelState._
@@ -33,7 +34,7 @@ case class Node(
   channels: IndexedSeq[MongoChannel],
   state: NodeState,
   mongoId: Option[Int]
-) {
+)(implicit channelFactory: ChannelFactory) {
   lazy val (host :String, port :Int) = {
     val splitted = name.span(_ != ':')
     splitted._1 -> (try {
@@ -59,21 +60,21 @@ case class Node(
   def createNeededChannels(receiver: ActorRef, upTo: Int) :Node = {
     if(channels.size < upTo) {
       copy(channels = channels.++(for(i <- 0 until (upTo - channels.size)) yield
-          MongoChannel(ChannelFactory.create(host, port, receiver), NotConnected, Set.empty)))
+          MongoChannel(channelFactory.create(host, port, receiver), NotConnected, Set.empty)))
     } else this
   }
 }
 
 object Node {
-  def apply(name: String) :Node = new Node(name, Vector.empty, NONE, None)
-  def apply(name: String, state: NodeState) :Node = new Node(name, Vector.empty, state, None)
+  def apply(name: String)(implicit channelFactory: ChannelFactory) :Node = new Node(name, Vector.empty, NONE, None)
+  def apply(name: String, state: NodeState)(implicit channelFactory: ChannelFactory) :Node = new Node(name, Vector.empty, state, None)
 }
 
 case class NodeSet(
   name: Option[String],
   version: Option[Long],
   nodes: IndexedSeq[Node]
-) {
+)(implicit channelFactory: ChannelFactory) {
   def connected :IndexedSeq[Node] = nodes.filter(node => node.state != NOT_CONNECTED)
 
   def queryable :IndexedSeq[Node] = nodes.filter(_.isQueryable)
@@ -186,9 +187,7 @@ case class NodeSetManager(nodeSet: NodeSet) extends RoundRobiner(nodeSet.queryab
 
 case class LoggedIn(db: String, user: String)
 
-object ChannelFactory {
-  import java.util.concurrent.Executors
-
+class ChannelFactory(bossExecutor: Executor = Executors.newCachedThreadPool, workerExecutor: Executor = Executors.newCachedThreadPool) {
   private val logger = LoggerFactory.getLogger("ChannelFactory")
 
   def create(host: String = "localhost", port: Int = 27017, receiver: ActorRef) = {
@@ -197,10 +196,7 @@ object ChannelFactory {
     channel
   }
 
-  private val channelFactory = new NioClientSocketChannelFactory(
-    Executors.newCachedThreadPool,
-    Executors.newCachedThreadPool
-  )
+  val channelFactory = new NioClientSocketChannelFactory(bossExecutor, workerExecutor)
 
   private val bufferFactory = new HeapChannelBufferFactory(java.nio.ByteOrder.LITTLE_ENDIAN)
 

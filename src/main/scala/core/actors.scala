@@ -24,7 +24,7 @@ import org.slf4j.{Logger, LoggerFactory}
 case class Authenticate(db: String, user: String, password: String)
 /**
  * Message to close all active connections.
- * The MongoDBSystem actor must be used after this message has been sent.
+ * The MongoDBSystem actor must not be used after this message has been sent.
  */
 case object Close
 /**
@@ -45,6 +45,7 @@ case object SetAvailable
 case object SetUnavailable
 /** Register a monitor. */
 case object RegisterMonitor
+case object Closed
 
 /**
  * Main actor that processes the requests.
@@ -56,8 +57,11 @@ case object RegisterMonitor
 class MongoDBSystem(
   seeds: List[String],
   auth :List[Authenticate],
-  nbChannelsPerNode :Int) extends Actor {
+  nbChannelsPerNode :Int,
+  channelFactory: ChannelFactory = new ChannelFactory()) extends Actor {
   import MongoDBSystem._
+
+  private implicit val cFactory = channelFactory
 
   val requestIdGenerator = new {
     // all requestIds [0, 1000[ are for isMaster messages
@@ -140,19 +144,6 @@ class MongoDBSystem(
 
   override def receive = {
     case RegisterMonitor => monitors += sender
-    case Close => {
-      if(nodeSetManager.isDefined)
-        nodeSetManager.get.nodeSet.makeChannelGroup.close.addListener(new ChannelGroupFutureListener {
-          override def operationComplete(future: ChannelGroupFuture) :Unit = {
-            nodeSetManager = None
-            sender ! "done"
-          }
-        })
-      else sender ! "done"
-    }
-    case message if !nodeSetManager.isDefined => {
-      logger.error("dropping message " + message + " as this system is closed")
-    }
     // todo: refactoring
     case request: Request => receiveRequest(request)
     case requestMaker :RequestMaker => receiveRequest(requestMaker(requestIdGenerator.user))
@@ -341,8 +332,28 @@ class MongoDBSystem(
   }
 
   override def postStop() {
-    if(nodeSetManager.isDefined)
-      nodeSetManager.get.nodeSet.makeChannelGroup.close
+    import org.jboss.netty.channel.group.{ChannelGroupFuture, ChannelGroupFutureListener}
+
+    if(nodeSetManager.isDefined) {
+      nodeSetManager.get.nodeSet.makeChannelGroup.close.addListener(new ChannelGroupFutureListener {
+        def operationComplete(future: ChannelGroupFuture) :Unit = {
+          logger.debug("all channels are closed.")
+          channelFactory.channelFactory.releaseExternalResources
+          broadcastMonitors(Closed)
+        }
+      })
+    }
+
+    if(seedSet.isDefined) {
+      seedSet.get.makeChannelGroup.close.addListener(new ChannelGroupFutureListener {
+        def operationComplete(future: ChannelGroupFuture) :Unit = {
+          logger.debug("(seeds) all channels are closed.")
+          channelFactory.channelFactory.releaseExternalResources
+          broadcastMonitors(Closed)
+        }
+      })
+    }
+    logger.debug("MongoDBSystem stopped.")
   }
 
   def broadcastMonitors(message: AnyRef) = monitors.foreach(_ ! message)
@@ -415,11 +426,15 @@ case object WaitForPrimary
  */
 class MonitorActor(sys: ActorRef) extends Actor {
   import MonitorActor._
+  import scala.collection.mutable.Queue
 
   sys ! RegisterMonitor
 
-  private val waitingForPrimary = scala.collection.mutable.Queue[ActorRef]()
+  private val waitingForPrimary = Queue[ActorRef]()
   var primaryAvailable = false
+
+  private val waitingForClose = Queue[ActorRef]()
+  var killed = false
 
   override def receive = {
     case PrimaryAvailable =>
@@ -430,13 +445,27 @@ class MonitorActor(sys: ActorRef) extends Actor {
       logger.debug("set: no primary available")
       primaryAvailable = false
     case WaitForPrimary =>
-      if(primaryAvailable) {
+      if(killed)
+        sender ! Failure(new RuntimeException("MongoDBSystem actor shutting down or no longer active"))
+      else if(primaryAvailable) {
         logger.debug(sender + " is waiting for a primary... available right now, go!")
         sender ! PrimaryAvailable
       } else {
         logger.debug(sender + " is waiting for a primary...  not available, warning as soon a primary is available.")
         waitingForPrimary += sender
       }
+    case Close =>
+      killed = true
+      sys ! PoisonPill
+      waitingForClose += sender
+      waitingForPrimary.dequeueAll(_ => true).foreach(_ ! Failure(new RuntimeException("MongoDBSystem actor shutting down or no longer active")))
+    case Closed =>
+      waitingForClose.dequeueAll(_ => true).foreach(_ ! Closed)
+      self ! PoisonPill
+  }
+
+  override def postStop {
+    logger.debug("Monitor actor stopped.")
   }
 }
 

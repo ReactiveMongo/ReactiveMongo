@@ -5,15 +5,13 @@ import akka.pattern.ask
 import scala.concurrent.{Future, ExecutionContext}
 import scala.concurrent.util.Duration
 import scala.concurrent.util.duration._
-
-import org.asyncmongo.core.actors.{Authenticate, MongoDBSystem, MonitorActor}
+import org.asyncmongo.core.actors.{Authenticate, MongoDBSystem, MonitorActor, Close}
 import org.asyncmongo.bson._
 import org.asyncmongo.bson.handlers._
 import org.asyncmongo.core.protocol._
 import org.asyncmongo.core.commands.{Update => FindAndModifyUpdate, _}
 import org.jboss.netty.buffer.ChannelBuffer
 import org.slf4j.{Logger, LoggerFactory}
-
 import indexes._
 
 /**
@@ -682,9 +680,11 @@ class MongoConnection(
     new play.api.libs.concurrent.AkkaPromise((mongosystem ? Authenticate(db, user, password))(akka.util.Timeout(timeout.length, timeout.unit)).mapTo[AuthenticationResult])
   }
 
-  def close(implicit timeout: Duration) :Future[String] = new play.api.libs.concurrent.AkkaPromise((mongosystem ? org.asyncmongo.core.actors.Close)(akka.util.Timeout(timeout.length, timeout.unit)).mapTo[String])
+  /** Closes this MongoConnection (closes all the channels and ends the actors) */
+  def askClose()(implicit timeout: Duration) :Future[_] = new play.api.libs.concurrent.AkkaPromise((monitor ? Close)(akka.util.Timeout(timeout.length, timeout.unit)))
 
-  def stop = MongoConnection.system.stop(mongosystem)
+  /** Closes this MongoConnection (closes all the channels and ends the actors) */
+  def close() :Unit = monitor ! Close
 }
 
 object MongoConnection {
