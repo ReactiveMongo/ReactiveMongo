@@ -12,6 +12,7 @@ import org.asyncmongo.core.protocol._
 import org.asyncmongo.core.commands.{Update => FindAndModifyUpdate, _}
 import org.jboss.netty.buffer.ChannelBuffer
 import org.slf4j.{Logger, LoggerFactory}
+import play.api.libs.iteratee._
 import indexes._
 
 /**
@@ -229,6 +230,19 @@ case class Collection(
   }
 
   /**
+   * Returns an iteratee that will consume chunks (chunk == document of type '''T''') and insert them into the given collection.
+   *
+   * This iteratee eventually gives the number of documents that have been inserted into the given collection.
+   *
+   * @tparam T the type of the documents to insert. An implicit [[org.asyncmongo.handlers.BSONWriter]][T] typeclass for handling it has to be in the scope.
+   * @param coll The collection where the documents will be stored.
+   * @param bulkSize The number of documents per bulk.
+   * @param bulkByteSize The maximum size for a bulk, in bytes.
+   */
+  def insertIteratee[T](bulkSize: Int = bulk.MaxDocs, bulkByteSize: Int = bulk.MaxBulkSize)(implicit writer: BSONWriter[T]) :Iteratee[T, Int] =
+    Enumeratee.map { doc:T => writer.write(doc) } &>> bulk.iteratee(this, bulkSize, bulkByteSize)
+
+  /**
    * Updates one or more documents matching the given selector with the given modifier or update object.
    *
    * Please note that you cannot be sure that the matched documents have been effectively updated and when (hence the Unit return type).
@@ -391,7 +405,6 @@ trait Cursor[T] {
   /** Tells if another instance of cursor can be fetched. */
   def hasNext: Boolean
 
-  import play.api.libs.iteratee._
   import scala.collection.generic.CanBuildFrom
 
   /**
