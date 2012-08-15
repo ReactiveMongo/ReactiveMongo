@@ -11,6 +11,7 @@ import org.jboss.netty.handler.codec.oneone._
 import org.jboss.netty.handler.codec.frame.FrameDecoder
 import org.asyncmongo.core.actors.{Connected, Disconnected}
 import org.asyncmongo.core.commands.GetLastError
+import org.asyncmongo.utils.LazyLogger
 import org.slf4j.{Logger, LoggerFactory}
 
 import BufferAccessors._
@@ -253,7 +254,7 @@ private[asyncmongo] class RequestEncoder extends OneToOneEncoder {
 }
 
 private[asyncmongo] object RequestEncoder {
-  val logger = LoggerFactory.getLogger("protocol/RequestEncoder")
+  val logger = LazyLogger(LoggerFactory.getLogger("protocol/RequestEncoder"))
 }
 
 private[asyncmongo] class ResponseFrameDecoder extends FrameDecoder {
@@ -320,7 +321,7 @@ private[asyncmongo] class MongoHandler(receiver: ActorRef) extends SimpleChannel
 }
 
 private[asyncmongo] object MongoHandler {
-  private val logger = LoggerFactory.getLogger("protocol/MongoHandler")
+  private val logger = LazyLogger(LoggerFactory.getLogger("protocol/MongoHandler"))
 }
 
 /**

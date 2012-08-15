@@ -2,6 +2,7 @@ package org.asyncmongo.api
 
 import java.nio.ByteOrder._
 import org.asyncmongo.bson.handlers.BSONWriter
+import org.asyncmongo.utils.LazyLogger
 import org.jboss.netty.buffer.{ChannelBuffer, ChannelBuffers}
 import org.slf4j.{Logger, LoggerFactory}
 import play.api.libs.iteratee._
@@ -11,7 +12,7 @@ import scala.concurrent.{ExecutionContext, Future}
  * Bulk insertion.
  */
 object bulk {
-  private val logger = LoggerFactory.getLogger("Bulk")
+  private val logger = LazyLogger(LoggerFactory.getLogger("Bulk"))
   /** Default maximum size for a bulk (1MB). */
   val MaxBulkSize = 1024 * 1024
   /** Default maximum documents number for a bulk (100). */

@@ -9,6 +9,7 @@ import org.asyncmongo.core.nodeset._
 import org.asyncmongo.core.protocol._
 import org.asyncmongo.core.protocol.ChannelState._
 import org.asyncmongo.core.protocol.NodeState._
+import org.asyncmongo.utils.LazyLogger
 import org.asyncmongo.core.commands.{Authenticate => AuthenticateCommand, _}
 import org.jboss.netty.channel.group._
 import org.slf4j.{Logger, LoggerFactory}
@@ -361,7 +362,7 @@ class MongoDBSystem(
 
 object MongoDBSystem {
   private[asyncmongo] val DefaultConnectionRetryInterval :Int = 2000 // milliseconds
-  private val logger = LoggerFactory.getLogger("MongoDBSystem")
+  private val logger = LazyLogger(LoggerFactory.getLogger("MongoDBSystem"))
 }
 
 /**
@@ -470,7 +471,7 @@ class MonitorActor(sys: ActorRef) extends Actor {
 }
 
 object MonitorActor {
-  private val logger = LoggerFactory.getLogger("MonitorActor")
+  private val logger = LazyLogger(LoggerFactory.getLogger("MonitorActor"))
 }
 
 // exceptions

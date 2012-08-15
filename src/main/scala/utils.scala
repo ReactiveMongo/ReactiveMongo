@@ -117,3 +117,11 @@ object RichBuffer {
   /** Implicit conversion between a [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]] and [[org.asyncmongo.utils.RichBuffer]]. */
   implicit def channelBufferToExtendedBuffer(buffer: ChannelBuffer) = RichBuffer(buffer)
 }
+
+case class LazyLogger(logger: org.slf4j.Logger) {
+  def trace(s: => String) { if(logger.isTraceEnabled) logger.trace(s) }
+  def debug(s: => String) { if(logger.isDebugEnabled) logger.debug(s) }
+  def info(s: => String) { if(logger.isInfoEnabled) logger.info(s) }
+  def warn(s: => String) { if(logger.isWarnEnabled) logger.warn(s) }
+  def error(s: => String) { if(logger.isErrorEnabled) logger.error(s) }
+}

@@ -11,8 +11,7 @@ import org.asyncmongo.bson.handlers._
 import org.asyncmongo.bson.handlers.DefaultBSONHandlers._
 import org.asyncmongo.core.commands.GetLastError
 import org.asyncmongo.core.protocol.Response
-import org.asyncmongo.utils.Converters
-import org.asyncmongo.utils.ArrayUtils
+import org.asyncmongo.utils.{ArrayUtils, Converters, LazyLogger}
 
 import org.jboss.netty.buffer.ChannelBuffer
 import org.slf4j.{Logger, LoggerFactory}
@@ -87,7 +86,7 @@ trait ReadFileEntry extends FileEntry {
 }
 
 object ReadFileEntry {
-  private val logger = LoggerFactory.getLogger("ReadFileEntry")
+  private val logger = LazyLogger(LoggerFactory.getLogger("ReadFileEntry"))
   def bsonReader(gFS: GridFS) = new BSONReader[ReadFileEntry] {
     def read(buffer: ChannelBuffer) = {
       val document = DefaultBSONHandlers.DefaultBSONDocumentReader.read(buffer)
@@ -142,7 +141,7 @@ case class FileToWrite(
    * @param gfs The GridFS store.
    * @param chunkSize The size of the chunks to be written. Defaults to 256k (GridFS Spec).
    */
-  def iteratee(gfs: GridFS, chunkSize: Int = 262144)(implicit ctx: ExecutionContext) = {
+  def iteratee(gfs: GridFS, chunkSize: Int = 262144)(implicit ctx: ExecutionContext): Iteratee[Array[Byte], Future[PutResult]] = {
     implicit val ec = MongoConnection.system
 
     val files_id = id.getOrElse(BSONObjectID.generate)
@@ -208,7 +207,7 @@ case class FileToWrite(
 }
 
 object FileToWrite {
-  private val logger = LoggerFactory.getLogger("FileToWrite")
+  private val logger = LazyLogger(LoggerFactory.getLogger("FileToWrite"))
 }
 
 /**

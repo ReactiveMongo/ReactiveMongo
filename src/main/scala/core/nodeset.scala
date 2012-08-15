@@ -8,6 +8,7 @@ import org.asyncmongo.core.protocol._
 import org.asyncmongo.core.protocol.ChannelState._
 import org.asyncmongo.core.commands.{Authenticate => AuthenticateCommand, _}
 import org.asyncmongo.core.protocol.NodeState._
+import org.asyncmongo.utils.LazyLogger
 import org.jboss.netty.buffer._
 import org.jboss.netty.channel.{Channels, Channel, ChannelPipeline}
 import org.jboss.netty.channel.group._
@@ -173,7 +174,7 @@ case class NodeWrapper(node: Node) extends RoundRobiner(node.queryable) {
 }
 
 object NodeWrapper {
-  private val logger = LoggerFactory.getLogger("NodeWrapper")
+  private val logger = LazyLogger(LoggerFactory.getLogger("NodeWrapper"))
 }
 
 case class NodeSetManager(nodeSet: NodeSet) extends RoundRobiner(nodeSet.queryable.map { node => NodeWrapper(node)}) {
@@ -188,7 +189,7 @@ case class NodeSetManager(nodeSet: NodeSet) extends RoundRobiner(nodeSet.queryab
 case class LoggedIn(db: String, user: String)
 
 class ChannelFactory(bossExecutor: Executor = Executors.newCachedThreadPool, workerExecutor: Executor = Executors.newCachedThreadPool) {
-  private val logger = LoggerFactory.getLogger("ChannelFactory")
+  private val logger = LazyLogger(LoggerFactory.getLogger("ChannelFactory"))
 
   def create(host: String = "localhost", port: Int = 27017, receiver: ActorRef) = {
     val channel = makeChannel(receiver)
