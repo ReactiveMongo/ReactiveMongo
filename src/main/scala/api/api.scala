@@ -220,7 +220,7 @@ case class Collection(
    *
    * @return a future [[org.asyncmongo.protocol.commands.LastError]] that can be used to check whether the insertion was successful.
    */
-  def insert[T](document: T, writeConcern: GetLastError = GetLastError())(implicit writer: BSONWriter[T]) :Future[LastError] = {
+  def insert[T](document: T, writeConcern: GetLastError)(implicit writer: BSONWriter[T]) :Future[LastError] = {
     val op = Insert(0, fullCollectionName)
     val bson = writer.write(document)
     val checkedWriteRequest = CheckedWriteRequest(op, bson, writeConcern)
@@ -230,17 +230,44 @@ case class Collection(
   }
 
   /**
-   * Returns an iteratee that will consume chunks (chunk == document of type '''T''') and insert them into the given collection.
+   * Inserts a document into the collection and wait for the [[org.asyncmongo.protocol.commands.LastError]] result.
    *
-   * This iteratee eventually gives the number of documents that have been inserted into the given collection.
+   * Please read the documentation about [[org.asyncmongo.protocol.commands.GetLastError]] to know how to use it properly.
+   *
+   * @tparam T the type of the document to insert. An implicit [[org.asyncmongo.handlers.BSONWriter]][T] typeclass for handling it has to be in the scope.
+   *
+   * @param document the document to insert.
+   *
+   * @return a future [[org.asyncmongo.protocol.commands.LastError]] that can be used to check whether the insertion was successful.
+   */
+  def insert[T](document: T)(implicit writer: BSONWriter[T]) :Future[LastError] = insert(document, GetLastError())
+
+  /**
+   * Returns an iteratee that will insert the documents it feeds.
+   *
+   * This iteratee eventually gives the number of documents that have been inserted into the collection.
    *
    * @tparam T the type of the documents to insert. An implicit [[org.asyncmongo.handlers.BSONWriter]][T] typeclass for handling it has to be in the scope.
-   * @param coll The collection where the documents will be stored.
    * @param bulkSize The number of documents per bulk.
    * @param bulkByteSize The maximum size for a bulk, in bytes.
    */
   def insertIteratee[T](bulkSize: Int = bulk.MaxDocs, bulkByteSize: Int = bulk.MaxBulkSize)(implicit writer: BSONWriter[T]) :Iteratee[T, Int] =
     Enumeratee.map { doc:T => writer.write(doc) } &>> bulk.iteratee(this, bulkSize, bulkByteSize)
+
+  /**
+   * Inserts the documents provided by the given enumerator into the collection and eventually returns the number of inserted documents.
+   *
+   *
+   * @tparam T the type of the document to insert. An implicit [[org.asyncmongo.handlers.BSONWriter]][T] typeclass for handling it has to be in the scope.
+   *
+   * @param enumerator An enumerator of '''T'''.
+   * @param bulkSize The number of documents per bulk.
+   * @param bulkByteSize The maximum size for a bulk, in bytes.
+   *
+   * @return a future [[org.asyncmongo.protocol.commands.LastError]] that can be used to check whether the insertion was successful.
+   */
+  def insert[T](enumerator: Enumerator[T], bulkSize: Int = bulk.MaxDocs, bulkByteSize: Int = bulk.MaxBulkSize)(implicit writer: BSONWriter[T]) :Future[Int] =
+    enumerator |>>> insertIteratee(bulkSize, bulkByteSize)
 
   /**
    * Updates one or more documents matching the given selector with the given modifier or update object.
