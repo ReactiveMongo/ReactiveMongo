@@ -4,12 +4,13 @@ organization := "reactivemongo"
 
 version := "0.1-SNAPSHOT"
 
+resolvers += Resolver.file("LocalPlayRepo", file("/Volumes/Data/zenexity/Play20/repository/local"))(Resolver.ivyStylePatterns)
 
-resolvers += "Typesafe repository snapshots" at "http://repo.typesafe.com/typesafe/snapshots/"
+// resolvers += "Typesafe repository snapshots" at "http://repo.typesafe.com/typesafe/snapshots/"
 
 resolvers += "Typesafe repository releases" at "http://repo.typesafe.com/typesafe/releases/" 
 
-resolvers += Resolver.file("local repository", file("/Users/sgo/.ivy2/local"))(Resolver.ivyStylePatterns)
+// resolvers += Resolver.file("local repository", file("/Users/sgo/.ivy2/local"))(Resolver.ivyStylePatterns)
 
 libraryDependencies ++= Seq(
   "io.netty" % "netty" % "3.3.1.Final",

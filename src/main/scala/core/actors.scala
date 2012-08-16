@@ -16,6 +16,21 @@ import reactivemongo.utils.LazyLogger
 import reactivemongo.core.commands.{Authenticate => AuthenticateCommand, _}
 
 // messages
+import scala.concurrent.{Future, Promise}
+trait ExpectingResponse {
+  val promise: Promise[Response] = MongoFuture.promise
+  val future: Future[Response] = promise.future
+}
+
+case class RequestMakerExpectingResponse(
+  requestMaker: RequestMaker
+) extends ExpectingResponse
+
+case class CheckedWriteRequestExpectingResponse(
+  checkedWriteRequest: CheckedWriteRequest
+) extends ExpectingResponse
+
+
 /**
  * Authenticate message.
  *
@@ -99,41 +114,6 @@ class MongoDBSystem(
     self,
     RefreshAllNodes)
 
-  def receiveRequest(request: Request): Unit = {
-    logger.trace("received a request")
-    if(request.op.expectsResponse) {
-      awaitingResponses += request.requestID -> AwaitingResponse(request.requestID, sender, false)
-      logger.trace("registering awaiting response for requestID " + request.requestID + ", awaitingResponses: " + awaitingResponses)
-    } else logger.trace("NOT registering awaiting response for requestID " + request.requestID)
-    if(secondaryOK(request)) {
-      val server = pickNode(request)
-      logger.debug("node " + server + "will send the query " + request.op)
-      server.map(_.send(request))
-    } else if(!nodeSetManager.get.primaryWrapper.isDefined) {
-      sender ! Failure(PrimaryUnavailableException)
-    } else {
-      nodeSetManager.get.primaryWrapper.get.send(request)
-    }
-  }
-
-  def receiveCheckedWriteRequest(checkedWriteRequest: CheckedWriteRequest) :Unit = {
-    logger.trace("received a checked write request")
-    val requestId = requestIdGenerator.user
-    val (request, writeConcern) = {
-      val tuple = checkedWriteRequest()
-      tuple._1(requestId) -> tuple._2(requestId)
-    }
-    awaitingResponses += requestId -> AwaitingResponse(requestId, sender, true)
-    logger.trace("registering writeConcern-awaiting response for requestID " + requestId + ", awaitingResponses: " + awaitingResponses)
-    if(secondaryOK(request)) {
-      pickNode(request).map(_.send(request, writeConcern))
-    } else if(!nodeSetManager.get.primaryWrapper.isDefined) {
-      sender ! Failure(PrimaryUnavailableException)
-    } else {
-      nodeSetManager.get.primaryWrapper.get.send(request, writeConcern)
-    }
-  }
-
   def authenticateChannel(channel: MongoChannel, continuing: Boolean = false) :MongoChannel = channel.state match {
     case _: Authenticating if !continuing => {logger.debug("AUTH: delaying auth on " + channel);channel}
     case _ => if(channel.loggedIn.size < authenticationHistory.authenticates.size) {
@@ -147,9 +127,44 @@ class MongoDBSystem(
   override def receive = {
     case RegisterMonitor => monitors += sender
     // todo: refactoring
-    case request: Request => receiveRequest(request)
+    /*case request: Request => receiveRequest(request)
     case requestMaker :RequestMaker => receiveRequest(requestMaker(requestIdGenerator.user))
-    case checkedWriteRequest :CheckedWriteRequest => receiveCheckedWriteRequest(checkedWriteRequest)
+    case checkedWriteRequest :CheckedWriteRequest => receiveCheckedWriteRequest(checkedWriteRequest)*/
+    
+    case req :RequestMakerExpectingResponse =>
+      logger.trace("received a request")
+      val request = req.requestMaker(requestIdGenerator.user)
+      if(request.op.expectsResponse) {
+        awaitingResponses += request.requestID -> AwaitingResponse(request.requestID, req.promise, false)
+        logger.trace("registering awaiting response for requestID " + request.requestID + ", awaitingResponses: " + awaitingResponses)
+      } else logger.trace("NOT registering awaiting response for requestID " + request.requestID)
+      if(secondaryOK(request)) {
+        val server = pickNode(request)
+        logger.debug("node " + server + "will send the query " + request.op)
+        server.map(_.send(request))
+      } else if(!nodeSetManager.get.primaryWrapper.isDefined) {
+        req.promise.failure(PrimaryUnavailableException)
+      } else {
+        nodeSetManager.get.primaryWrapper.get.send(request)
+      }
+      
+    case req :CheckedWriteRequestExpectingResponse =>
+      logger.trace("received a checked write request")
+      val checkedWriteRequest = req.checkedWriteRequest
+      val requestId = requestIdGenerator.user
+      val (request, writeConcern) = {
+        val tuple = checkedWriteRequest()
+        tuple._1(requestId) -> tuple._2(requestId)
+      }
+      awaitingResponses += requestId -> AwaitingResponse(requestId, req.promise, true)
+      logger.trace("registering writeConcern-awaiting response for requestID " + requestId + ", awaitingResponses: " + awaitingResponses)
+      if(secondaryOK(request)) {
+        pickNode(request).map(_.send(request, writeConcern))
+      } else if(!nodeSetManager.get.primaryWrapper.isDefined) {
+        req.promise.failure(PrimaryUnavailableException)
+      } else {
+        nodeSetManager.get.primaryWrapper.get.send(request, writeConcern)
+      }
 
     // monitor
     case ConnectAll => {
@@ -270,14 +285,14 @@ class MongoDBSystem(
     // any other response
     case response: Response if response.header.responseTo >= 3000 => {
       awaitingResponses.get(response.header.responseTo) match {
-        case Some(AwaitingResponse(_, _sender, isGetLastError)) => {
-          logger.debug("Got a response from " + response.info.channelId + "! Will give back message="+response + " to sender " + _sender)
+        case Some(AwaitingResponse(_, promise, isGetLastError)) => {
+          logger.debug("Got a response from " + response.info.channelId + "! Will give back message="+response + " to promise " + promise)
           awaitingResponses -= response.header.responseTo
           if(response.error.isDefined) {
             logger.debug("{" + response.header.responseTo + "} sending a failure... (" + response.error.get + ")")
             if(response.error.get.isNotAPrimaryError)
               onPrimaryUnavailable()
-            _sender ! Failure(response.error.get)
+              promise.failure(response.error.get)
           } else if(isGetLastError) {
             logger.debug("{" + response.header.responseTo + "} it's a getlasterror")
             // todo, for now rewinding buffer at original index
@@ -285,14 +300,14 @@ class MongoDBSystem(
             val lastError = LastError(response)
             if(lastError.isNotAPrimaryError) {
               onPrimaryUnavailable()
-              _sender ! Failure(lastError)
+              promise.failure(lastError)
             } else {
               response.documents.readerIndex(ridx)
-              _sender ! response
+              promise.success(response)
             }
           } else {
             logger.trace("{" + response.header.responseTo + "} sending a success!")
-            _sender ! response
+            promise.success(response)
           }
         }
         case None => {
@@ -400,7 +415,7 @@ private[actors] case class AuthHistory(
 
 private[actors] case class AwaitingResponse(
   requestID: Int,
-  actor: ActorRef,
+  promise: Promise[Response],
   isGetLastError: Boolean
 )
 

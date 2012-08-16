@@ -6,7 +6,7 @@ import org.jboss.netty.buffer.ChannelBuffer
 import org.slf4j.{Logger, LoggerFactory}
 import play.api.libs.iteratee._
 import reactivemongo.api.indexes._
-import reactivemongo.core.actors.{Authenticate, MongoDBSystem, MonitorActor, Close}
+import reactivemongo.core.actors.{Authenticate, CheckedWriteRequestExpectingResponse, MongoDBSystem, MonitorActor, RequestMakerExpectingResponse, Close}
 import reactivemongo.bson._
 import reactivemongo.bson.handlers._
 import reactivemongo.core.protocol._
@@ -24,7 +24,7 @@ import scala.concurrent.util.duration._
  */
 case class DB(dbName: String, connection: MongoConnection)(implicit timeout :Duration = 5 seconds, context: ExecutionContext) { // TODO timeout
   /**  Gets a [[reactivemongo.api.Collection]] from this database. */
-  def apply(name: String) :Collection = Collection(this, name, connection)(timeout, context)
+  def apply(name: String) :Collection = Collection(this, name, connection)(timeout, MongoConnection.ec)
 
   /** Authenticates the connection on this database. */
   def authenticate(user: String, password: String) :Future[AuthenticationResult] = connection.authenticate(dbName, user, password)
@@ -640,10 +640,13 @@ class MongoConnection(
    *
    * @return The future response.
    */
-  def ask(message: RequestMaker)(implicit timeout: Duration) :Future[Response] = {
-    new play.api.libs.concurrent.AkkaPromise(
+  def ask(message: RequestMaker) :Future[Response] = {
+    val msg = RequestMakerExpectingResponse(message)
+    mongosystem ! msg
+    msg.future
+    /*new play.api.libs.concurrent.AkkaPromise(
       (mongosystem ? message)(akka.util.Timeout(timeout.length, timeout.unit)).mapTo[Response]
-    )
+    )*/
   }
 
   /**
@@ -658,13 +661,13 @@ class MongoConnection(
    *
    * @return The future response.
    */
-  def ask(message: RequestMaker, waitForAvailability: Duration)(implicit dbTimeout: Duration) :Future[Response] = {
+  /*def ask(message: RequestMaker, waitForAvailability: Duration)(implicit dbTimeout: Duration) :Future[Response] = {
     new play.api.libs.concurrent.AkkaPromise(
       monitor.ask("primary")(akka.util.Timeout(waitForAvailability.length, waitForAvailability.unit)).flatMap { s=>
         (mongosystem ? message)(akka.util.Timeout(dbTimeout.length, dbTimeout.unit)).mapTo[Response]
       }
     )
-  }
+  }*/
 
   /**
    * Writes a checked write request and wait for a response.
@@ -673,10 +676,13 @@ class MongoConnection(
    *
    * @return The future response.
    */
-  def ask(checkedWriteRequest: CheckedWriteRequest)(implicit timeout: Duration) = {
-    new play.api.libs.concurrent.AkkaPromise(
+  def ask(checkedWriteRequest: CheckedWriteRequest) = {
+    val msg = CheckedWriteRequestExpectingResponse(checkedWriteRequest)
+    mongosystem ! msg
+    msg.future
+    /*new play.api.libs.concurrent.AkkaPromise(
       (mongosystem ? checkedWriteRequest)(akka.util.Timeout(timeout.length, timeout.unit)).mapTo[Response]
-    )
+    )*/
   }
 
   /**
@@ -691,13 +697,13 @@ class MongoConnection(
    *
    * @return The future response.
    */
-  def ask(checkedWriteRequest: CheckedWriteRequest, waitForAvailability: Duration)(implicit dbTimeout: Duration) :Future[Response] = {
+  /*def ask(checkedWriteRequest: CheckedWriteRequest, waitForAvailability: Duration)(implicit dbTimeout: Duration) :Future[Response] = {
     new play.api.libs.concurrent.AkkaPromise(
       monitor.ask("primary")(akka.util.Timeout(waitForAvailability.length, waitForAvailability.unit)).flatMap { s =>
         (mongosystem ? checkedWriteRequest)(akka.util.Timeout(dbTimeout.length, dbTimeout.unit)).mapTo[Response]
       }
     )
-  }
+  }*/
 
   /**
    * Writes a request and drop the response if any.
@@ -721,6 +727,8 @@ class MongoConnection(
 object MongoConnection {
   import com.typesafe.config.ConfigFactory
   val config = ConfigFactory.load()
+  
+  val ec = ExecutionContext.fromExecutor(java.util.concurrent.Executors.newCachedThreadPool)
 
   /**
    * The actor system that creates all the required actors.
