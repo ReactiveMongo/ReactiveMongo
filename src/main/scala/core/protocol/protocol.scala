@@ -230,9 +230,7 @@ object ExplainedError {
  * @param remoteAddress string representation of the remote address of the channel
  */
 case class ResponseInfo(
-  channelId: Int,
-  localAddress: String, // TODO
-  remoteAddress: String)
+  channelId: Int)
 
 // protocol handlers for netty.
 private[asyncmongo] class RequestEncoder extends OneToOneEncoder {
@@ -240,9 +238,8 @@ private[asyncmongo] class RequestEncoder extends OneToOneEncoder {
   def encode(ctx: ChannelHandlerContext, channel: Channel, obj: Object) = {
     obj match {
       case message: Request => {
-        val buffer :ChannelBuffer = ChannelBuffers.dynamicBuffer(ByteOrder.LITTLE_ENDIAN, 1000)
+        val buffer :ChannelBuffer = ChannelBuffers.buffer(ByteOrder.LITTLE_ENDIAN, message.size)//ChannelBuffers.dynamicBuffer(ByteOrder.LITTLE_ENDIAN, 1000)
         message writeTo buffer
-        logger.trace("writing to buffer message " + message + " of length=" + buffer.array().length + ", => " + buffer.writerIndex)
         buffer
       }
       case _ => {
@@ -281,7 +278,7 @@ private[asyncmongo] class ResponseDecoder extends OneToOneDecoder {
     val reply = Reply(buffer)
 
     Response(header, reply, buffer,
-      ResponseInfo(channel.getId, channel.getLocalAddress.asInstanceOf[InetSocketAddress].toString, channel.getRemoteAddress.asInstanceOf[InetSocketAddress].toString))
+      ResponseInfo(channel.getId))
   }
 }
 
