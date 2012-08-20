@@ -1,14 +1,12 @@
-package org.asyncmongo.api.indexes
+package reactivemongo.api.indexes
 
-import org.asyncmongo.api._
-import org.asyncmongo.bson._
-import org.asyncmongo.bson.handlers._
-import org.asyncmongo.core.commands.{FindAndModify, LastError, Update}
+import reactivemongo.api._
+import reactivemongo.bson._
+import reactivemongo.bson.handlers._
+import reactivemongo.core.commands.{DeleteIndex, FindAndModify, LastError, Update}
 import scala.concurrent.{Future, ExecutionContext}
 import scala.concurrent.util.Duration
 import scala.concurrent.util.duration._
-import org.asyncmongo.core.commands.FindAndModify
-import org.asyncmongo.core.commands.DeleteIndex
 
 /**
  * A MongoDB index (excluding the namespace).

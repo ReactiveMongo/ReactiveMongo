@@ -1,23 +1,18 @@
-package org.asyncmongo.api.gridfs
-
-import scala.concurrent.{Future, ExecutionContext}
+package reactivemongo.api.gridfs
 
 import java.io._
 import java.util.Arrays
-
-import org.asyncmongo.api._
-import org.asyncmongo.bson._
-import org.asyncmongo.bson.handlers._
-import org.asyncmongo.bson.handlers.DefaultBSONHandlers._
-import org.asyncmongo.core.commands.GetLastError
-import org.asyncmongo.core.protocol.Response
-import org.asyncmongo.utils.{ArrayUtils, Converters, LazyLogger}
-
 import org.jboss.netty.buffer.ChannelBuffer
 import org.slf4j.{Logger, LoggerFactory}
-
 import play.api.libs.iteratee._
-
+import reactivemongo.api._
+import reactivemongo.bson._
+import reactivemongo.bson.handlers._
+import reactivemongo.bson.handlers.DefaultBSONHandlers._
+import reactivemongo.core.commands.GetLastError
+import reactivemongo.core.protocol.Response
+import reactivemongo.utils.{ArrayUtils, Converters, LazyLogger}
+import scala.concurrent.{Future, ExecutionContext}
 import scala.util.Random
 
 /**

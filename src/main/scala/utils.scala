@@ -1,9 +1,9 @@
-package org.asyncmongo.utils
+package reactivemongo.utils
 
 import org.jboss.netty.channel._
 import org.jboss.netty.buffer._
 
-import org.asyncmongo.core.protocol.ChannelBufferWritable
+import reactivemongo.core.protocol.ChannelBufferWritable
 
 /** Common functions */
 object Converters {

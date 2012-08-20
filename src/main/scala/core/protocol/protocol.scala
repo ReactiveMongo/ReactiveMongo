@@ -1,18 +1,18 @@
-package org.asyncmongo.core.protocol
+package reactivemongo.core.protocol
 
 import akka.actor.ActorRef
 import java.nio.ByteOrder
-import org.asyncmongo.utils.RichBuffer._
 import org.jboss.netty.buffer._
 import org.jboss.netty.bootstrap._
 import org.jboss.netty.channel._
 import org.jboss.netty.channel.socket.nio._
 import org.jboss.netty.handler.codec.oneone._
 import org.jboss.netty.handler.codec.frame.FrameDecoder
-import org.asyncmongo.core.actors.{Connected, Disconnected}
-import org.asyncmongo.core.commands.GetLastError
-import org.asyncmongo.utils.LazyLogger
 import org.slf4j.{Logger, LoggerFactory}
+import reactivemongo.core.actors.{Connected, Disconnected}
+import reactivemongo.core.commands.GetLastError
+import reactivemongo.utils.LazyLogger
+import reactivemongo.utils.RichBuffer._
 
 import BufferAccessors._
 
@@ -198,7 +198,7 @@ case class Response(
    */
   lazy val error :Option[ExplainedError] = {
     if(reply.inError) {
-      import org.asyncmongo.bson.handlers.DefaultBSONHandlers._
+      import reactivemongo.bson.handlers.DefaultBSONHandlers._
       val bson = DefaultBSONReaderHandler.handle(reply, documents)
       if(bson.hasNext)
         ExplainedError(DefaultBSONReaderHandler.handle(reply, documents).next)
@@ -213,7 +213,7 @@ case class ExplainedError(
 )
 
 object ExplainedError {
-  import org.asyncmongo.bson._
+  import reactivemongo.bson._
   /**
    * Make an [[org.asyncmongo.protocol.ExplainedError]] from the given [[org.asyncmongo.bson.BSONIterator]].
    */
@@ -233,7 +233,7 @@ case class ResponseInfo(
   channelId: Int)
 
 // protocol handlers for netty.
-private[asyncmongo] class RequestEncoder extends OneToOneEncoder {
+private[reactivemongo] class RequestEncoder extends OneToOneEncoder {
   import RequestEncoder._
   def encode(ctx: ChannelHandlerContext, channel: Channel, obj: Object) = {
     obj match {
@@ -250,11 +250,11 @@ private[asyncmongo] class RequestEncoder extends OneToOneEncoder {
   }
 }
 
-private[asyncmongo] object RequestEncoder {
+private[reactivemongo] object RequestEncoder {
   val logger = LazyLogger(LoggerFactory.getLogger("protocol/RequestEncoder"))
 }
 
-private[asyncmongo] class ResponseFrameDecoder extends FrameDecoder {
+private[reactivemongo] class ResponseFrameDecoder extends FrameDecoder {
   override def decode(context: ChannelHandlerContext, channel: Channel, buffer: ChannelBuffer) = {
     val readableBytes = buffer.readableBytes
     if(readableBytes < 4) null
@@ -269,7 +269,7 @@ private[asyncmongo] class ResponseFrameDecoder extends FrameDecoder {
   }
 }
 
-private[asyncmongo] class ResponseDecoder extends OneToOneDecoder {
+private[reactivemongo] class ResponseDecoder extends OneToOneDecoder {
   import java.net.InetSocketAddress
 
   def decode(ctx: ChannelHandlerContext, channel: Channel, obj: Object) = {
@@ -282,7 +282,7 @@ private[asyncmongo] class ResponseDecoder extends OneToOneDecoder {
   }
 }
 
-private[asyncmongo] class MongoHandler(receiver: ActorRef) extends SimpleChannelHandler {
+private[reactivemongo] class MongoHandler(receiver: ActorRef) extends SimpleChannelHandler {
   import MongoHandler._
   override def messageReceived(ctx: ChannelHandlerContext, e: MessageEvent) {
     val response = e.getMessage.asInstanceOf[Response]
@@ -317,7 +317,7 @@ private[asyncmongo] class MongoHandler(receiver: ActorRef) extends SimpleChannel
   def log(e: ChannelEvent, s: String) = logger.trace("(channel=" + e.getChannel.getId + ") " + s)
 }
 
-private[asyncmongo] object MongoHandler {
+private[reactivemongo] object MongoHandler {
   private val logger = LazyLogger(LoggerFactory.getLogger("protocol/MongoHandler"))
 }
 

@@ -1,10 +1,9 @@
-package org.asyncmongo.api
-
-import org.asyncmongo.bson._
-import org.asyncmongo.bson.handlers._
-import org.asyncmongo.core.protocol.QueryFlags
+package reactivemongo.api
 
 import org.jboss.netty.buffer.ChannelBuffer
+import reactivemongo.bson._
+import reactivemongo.bson.handlers._
+import reactivemongo.core.protocol.QueryFlags
 
 sealed trait SortOrder
 object SortOrder {

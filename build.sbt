@@ -33,3 +33,5 @@ publishTo <<= version { (version: String) =>
 publishMavenStyle := true
 
 sources in (Compile, doc) ~= (_ filter (!_.getAbsolutePath.contains("src/samples")))
+
+scalaVersion := "2.9.2"

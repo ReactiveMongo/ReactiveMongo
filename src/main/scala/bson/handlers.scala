@@ -1,8 +1,8 @@
-package org.asyncmongo.bson.handlers
+package reactivemongo.bson.handlers
 
-import org.asyncmongo.bson._
-import org.asyncmongo.core.protocol._
 import org.jboss.netty.buffer._
+import reactivemongo.bson._
+import reactivemongo.core.protocol._
 
 /**
  * A typeclass that writes a ''DocumentType'' instance as a Bson document into a [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]].

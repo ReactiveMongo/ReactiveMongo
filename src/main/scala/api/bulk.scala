@@ -1,11 +1,11 @@
-package org.asyncmongo.api
+package reactivemongo.api
 
 import java.nio.ByteOrder._
-import org.asyncmongo.bson.handlers.BSONWriter
-import org.asyncmongo.utils.LazyLogger
 import org.jboss.netty.buffer.{ChannelBuffer, ChannelBuffers}
 import org.slf4j.{Logger, LoggerFactory}
 import play.api.libs.iteratee._
+import reactivemongo.bson.handlers.BSONWriter
+import reactivemongo.utils.LazyLogger
 import scala.concurrent.{ExecutionContext, Future}
 
 /**

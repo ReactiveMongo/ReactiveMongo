@@ -1,18 +1,18 @@
-package org.asyncmongo.core.actors
+package reactivemongo.core.actors
 
 import akka.actor._
 import akka.actor.Status.Failure
 import akka.util.duration._
-import org.asyncmongo.bson._
-import org.asyncmongo.bson.handlers.DefaultBSONHandlers
-import org.asyncmongo.core.nodeset._
-import org.asyncmongo.core.protocol._
-import org.asyncmongo.core.protocol.ChannelState._
-import org.asyncmongo.core.protocol.NodeState._
-import org.asyncmongo.utils.LazyLogger
-import org.asyncmongo.core.commands.{Authenticate => AuthenticateCommand, _}
 import org.jboss.netty.channel.group._
 import org.slf4j.{Logger, LoggerFactory}
+import reactivemongo.bson._
+import reactivemongo.bson.handlers.DefaultBSONHandlers
+import reactivemongo.core.nodeset._
+import reactivemongo.core.protocol._
+import reactivemongo.core.protocol.ChannelState._
+import reactivemongo.core.protocol.NodeState._
+import reactivemongo.utils.LazyLogger
+import reactivemongo.core.commands.{Authenticate => AuthenticateCommand, _}
 
 // messages
 /**
@@ -31,10 +31,10 @@ case object Close
 /**
  * Message to send in order to get warned the next time a primary is found.
  */
-private[asyncmongo] case object ConnectAll
-private[asyncmongo] case object RefreshAllNodes
-private[asyncmongo] case class Connected(channelId: Int)
-private[asyncmongo] case class Disconnected(channelId: Int)
+private[reactivemongo] case object ConnectAll
+private[reactivemongo] case object RefreshAllNodes
+private[reactivemongo] case class Connected(channelId: Int)
+private[reactivemongo] case class Disconnected(channelId: Int)
 
 /** Message sent when the primary has been discovered. */
 case object PrimaryAvailable
@@ -361,7 +361,7 @@ class MongoDBSystem(
 }
 
 object MongoDBSystem {
-  private[asyncmongo] val DefaultConnectionRetryInterval :Int = 2000 // milliseconds
+  private[reactivemongo] val DefaultConnectionRetryInterval :Int = 2000 // milliseconds
   private val logger = LazyLogger(LoggerFactory.getLogger("MongoDBSystem"))
 }
 

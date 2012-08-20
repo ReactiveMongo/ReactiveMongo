@@ -1,19 +1,19 @@
-package org.asyncmongo.core.nodeset
+package reactivemongo.core.nodeset
 
 import akka.actor._
 import java.net.InetSocketAddress
 import java.util.concurrent.{Executor, Executors}
-import org.asyncmongo.bson._
-import org.asyncmongo.core.protocol._
-import org.asyncmongo.core.protocol.ChannelState._
-import org.asyncmongo.core.commands.{Authenticate => AuthenticateCommand, _}
-import org.asyncmongo.core.protocol.NodeState._
-import org.asyncmongo.utils.LazyLogger
 import org.jboss.netty.buffer._
 import org.jboss.netty.channel.{Channels, Channel, ChannelPipeline}
 import org.jboss.netty.channel.group._
 import org.jboss.netty.channel.socket.nio._
 import org.slf4j.{Logger, LoggerFactory}
+import reactivemongo.bson._
+import reactivemongo.core.protocol._
+import reactivemongo.core.protocol.ChannelState._
+import reactivemongo.core.commands.{Authenticate => AuthenticateCommand, _}
+import reactivemongo.core.protocol.NodeState._
+import reactivemongo.utils.LazyLogger
 
 case class MongoChannel(
   channel: Channel,

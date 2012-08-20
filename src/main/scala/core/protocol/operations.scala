@@ -1,4 +1,4 @@
-package org.asyncmongo.core.protocol
+package reactivemongo.core.protocol
 
 import org.jboss.netty.channel._
 import org.jboss.netty.buffer._
@@ -7,7 +7,7 @@ import org.jboss.netty.buffer._
  * Helper methods to write tuples of supported types into a [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]].
  */
 private[protocol] object BufferAccessors {
-  import org.asyncmongo.utils.RichBuffer._
+  import reactivemongo.utils.RichBuffer._
 
   /**
    * Typeclass for types that can be written into a [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]]
@@ -255,7 +255,7 @@ case class Delete(
   override val requiresPrimary = true
 }
 
-import org.asyncmongo.utils.RichBuffer._
+import reactivemongo.utils.RichBuffer._
 
 /**
  * KillCursors operation.

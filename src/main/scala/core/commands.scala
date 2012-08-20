@@ -1,11 +1,11 @@
-package org.asyncmongo.core.commands
+package reactivemongo.core.commands
 
-import org.asyncmongo.bson._
-import org.asyncmongo.bson.handlers.DefaultBSONHandlers
-import org.asyncmongo.core.protocol.{RequestMaker, Query, QueryFlags, Response}
-import org.asyncmongo.core.protocol.NodeState
-import org.asyncmongo.core.protocol.NodeState._
-import org.asyncmongo.utils._
+import reactivemongo.bson._
+import reactivemongo.bson.handlers.DefaultBSONHandlers
+import reactivemongo.core.protocol.{RequestMaker, Query, QueryFlags, Response}
+import reactivemongo.core.protocol.NodeState
+import reactivemongo.core.protocol.NodeState._
+import reactivemongo.utils._
 
 /**
  * A MongoDB Command.

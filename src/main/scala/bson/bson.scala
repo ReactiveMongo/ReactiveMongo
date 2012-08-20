@@ -1,9 +1,10 @@
-package org.asyncmongo.bson
+package reactivemongo.bson
 
-import org.asyncmongo.utils.Converters
-import org.asyncmongo.utils.RichBuffer._
-import org.jboss.netty.buffer.{ChannelBuffer, ChannelBuffers}
 import java.nio.ByteOrder
+import org.jboss.netty.buffer.{ChannelBuffer, ChannelBuffers}
+import reactivemongo.utils.Converters
+import reactivemongo.utils.RichBuffer._
+
 
 /*
 element  ::=  "\x01" e_name double  Floating point
@@ -500,7 +501,7 @@ object Subtype {
  * Iterating over this is completely lazy.
  */
 sealed trait BSONIterator extends Iterator[BSONElement] {
-  import org.asyncmongo.utils.RichBuffer._
+  import reactivemongo.utils.RichBuffer._
   import Subtype._
 
   val buffer :ChannelBuffer

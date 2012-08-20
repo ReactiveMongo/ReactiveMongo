@@ -1,19 +1,19 @@
-package org.asyncmongo.api
+package reactivemongo.api
 
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.pattern.ask
-import scala.concurrent.{Future, ExecutionContext}
-import scala.concurrent.util.Duration
-import scala.concurrent.util.duration._
-import org.asyncmongo.core.actors.{Authenticate, MongoDBSystem, MonitorActor, Close}
-import org.asyncmongo.bson._
-import org.asyncmongo.bson.handlers._
-import org.asyncmongo.core.protocol._
-import org.asyncmongo.core.commands.{Update => FindAndModifyUpdate, _}
 import org.jboss.netty.buffer.ChannelBuffer
 import org.slf4j.{Logger, LoggerFactory}
 import play.api.libs.iteratee._
-import indexes._
+import reactivemongo.api.indexes._
+import reactivemongo.core.actors.{Authenticate, MongoDBSystem, MonitorActor, Close}
+import reactivemongo.bson._
+import reactivemongo.bson.handlers._
+import reactivemongo.core.protocol._
+import reactivemongo.core.commands.{Update => FindAndModifyUpdate, _}
+import scala.concurrent.{Future, ExecutionContext}
+import scala.concurrent.util.Duration
+import scala.concurrent.util.duration._
 
 /**
  * A Mongo Database.
@@ -635,7 +635,7 @@ class MongoConnection(
    */
   def waitForPrimary(waitForAvailability: Duration) :Future[_] = {
     new play.api.libs.concurrent.AkkaPromise(
-      monitor.ask(org.asyncmongo.core.actors.WaitForPrimary)(akka.util.Timeout(waitForAvailability.length, waitForAvailability.unit))
+      monitor.ask(reactivemongo.core.actors.WaitForPrimary)(akka.util.Timeout(waitForAvailability.length, waitForAvailability.unit))
     )
   }
 

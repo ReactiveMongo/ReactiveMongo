@@ -1,13 +1,13 @@
 package foo
 
+import play.api.libs.iteratee.Iteratee
+import reactivemongo.api._
+import reactivemongo.bson._
+import reactivemongo.bson.handlers.DefaultBSONHandlers._
+import reactivemongo.core.commands._
 import scala.concurrent.Await
 import scala.concurrent.util._
 import scala.concurrent.util.duration._
-import org.asyncmongo.api._
-import org.asyncmongo.bson._
-import org.asyncmongo.bson.handlers.DefaultBSONHandlers._
-import org.asyncmongo.core.commands._
-import play.api.libs.iteratee.Iteratee
 
 object Samples {
   import scala.concurrent.ExecutionContext.Implicits.global // TODO create own ExecutionContext
