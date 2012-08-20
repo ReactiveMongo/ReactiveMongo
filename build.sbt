@@ -1,6 +1,6 @@
-name := "Mongo Async Driver"
+name := "ReactiveMongo"
 
-organization := "org.asyncmongo"
+organization := "reactivemongo"
 
 version := "0.1-SNAPSHOT"
 
