@@ -64,7 +64,7 @@ case class QueryBuilder(
   /**
    * Sets the query (the selector document).
    *
-   * @tparam Qry The type of the query. An implicit [[org.asyncmongo.handlers.BSONWriter]][Qry] typeclass for handling it has to be in the scope.
+   * @tparam Qry The type of the query. An implicit [[reactivemongo.bson.handlers.BSONWriter]][Qry] typeclass for handling it has to be in the scope.
    */
   def query[Qry](selector: Qry)(implicit writer: BSONWriter[Qry]) :QueryBuilder = copy(queryDoc=Some(
     BSONDocument(writer.write(selector))
@@ -94,7 +94,7 @@ case class QueryBuilder(
   /**
    * Sets the projection document (for [[http://www.mongodb.org/display/DOCS/Retrieving+a+Subset+of+Fields retrieving only a subset of fields]]).
    *
-   * @tparam Pjn The type of the projection. An implicit [[org.asyncmongo.handlers.BSONWriter]][Pjn] typeclass for handling it has to be in the scope.
+   * @tparam Pjn The type of the projection. An implicit [[reactivemongo.bson.handlers.BSONWriter]][Pjn] typeclass for handling it has to be in the scope.
    */
   def projection[Pjn](p: Pjn)(implicit writer: BSONWriter[Pjn]) :QueryBuilder = copy(projectionDoc=Some(
     BSONDocument(writer.write(p))

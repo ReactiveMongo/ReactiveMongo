@@ -86,7 +86,7 @@ object Samples {
           "company.name" -> BSONString("Zenexity")
         )))
       // get the future count
-      collection.command(count)
+      db.command(count)
     })
 
     futureInsertThenCount.onComplete {
@@ -155,8 +155,10 @@ object Samples {
       selector,
       Update(modifier, false))
 
-    collection.command(command).onComplete {
-      case Left(error) => throw error
+    db.command(command).onComplete {
+      case Left(error) => {
+        throw new RuntimeException("got an error while performing findAndModify", error)
+      }
       case Right(maybeDocument) => println("findAndModify successfully done with original document = " +
         // if there is an original document returned, print it in a pretty format
         maybeDocument.map(doc => {

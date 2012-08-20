@@ -24,13 +24,13 @@ trait BSONReader[+DocumentType] {
 
 /**
  * A handler that produces an Iterator of ''DocumentType'',
- * provided that there is an implicit [[org.asyncmongo.handlers.BSONReader]][DocumentType] in the scope.
+ * provided that there is an implicit [[reactivemongo.bson.handlers.BSONReader]][DocumentType] in the scope.
  */
 trait BSONReaderHandler {
   def handle[DocumentType](reply: Reply, buffer: ChannelBuffer)(implicit reader: BSONReader[DocumentType]) :Iterator[DocumentType]
 }
 
-/** Default [[org.asyncmongo.handlers.BSONReader]], [[org.asyncmongo.handlers.BSONWriter]], [[org.asyncmongo.handlers.BSONReaderHandler]]. */
+/** Default [[reactivemongo.bson.handlers.BSONReader]], [[reactivemongo.bson.handlers.BSONWriter]], [[reactivemongo.bson.handlers.BSONReaderHandler]]. */
 object DefaultBSONHandlers {
   implicit object DefaultBSONReaderHandler extends BSONReaderHandler {
     def handle[DocumentType](reply: Reply, buffer: ChannelBuffer)(implicit reader: BSONReader[DocumentType]) :Iterator[DocumentType] = {
@@ -49,6 +49,6 @@ object DefaultBSONHandlers {
     def write(document :BSONDocument) = document.makeBuffer
   }
 
-  /** Parses the given response and produces an iterator of [[org.asyncmongo.bson.DefaultBSONIterator]]s. */
+  /** Parses the given response and produces an iterator of [[reactivemongo.bson.DefaultBSONIterator]]s. */
   def parse(response: Response) = DefaultBSONReaderHandler.handle(response.reply, response.documents)(DefaultBSONDocumentReader)
 }

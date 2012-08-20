@@ -120,7 +120,7 @@ class IndexesManager(db: DB)(implicit context: ExecutionContext) {
    *
    * @return The deleted index number.
    */
-  def delete(collectionName: String, indexName: String) :Future[Int] = db(collectionName).command(DeleteIndex(collectionName, indexName))
+  def delete(collectionName: String, indexName: String) :Future[Int] = db.command(DeleteIndex(collectionName, indexName))
 
   /** Gets a manager for the given collection. */
   def onCollection(name: String) = new CollectionIndexesManager(db.dbName + "." + name, this)

@@ -19,18 +19,28 @@ import scala.concurrent.util.duration._
  * A Mongo Database.
  *
  * @param dbName database name.
- * @param connection the [[org.asyncmongo.api.MongoConnection]] that will be used to query this database.
+ * @param connection the [[reactivemongo.api.MongoConnection]] that will be used to query this database.
  * @param timeout the default timeout for the queries. Defaults to 5 seconds.
  */
 case class DB(dbName: String, connection: MongoConnection)(implicit timeout :Duration = 5 seconds, context: ExecutionContext) { // TODO timeout
-  /**  Gets a [[org.asyncmongo.api.Collection]] from this database. */
+  /**  Gets a [[reactivemongo.api.Collection]] from this database. */
   def apply(name: String) :Collection = Collection(this, name, connection)(timeout, context)
 
-  /** Authenticates the connection on this database. */ // TODO return type
+  /** Authenticates the connection on this database. */
   def authenticate(user: String, password: String) :Future[AuthenticationResult] = connection.authenticate(dbName, user, password)
 
   /** The index manager for this database. */
   lazy val indexes = new IndexesManager(this)
+
+  /**
+   * Sends a command and get the future result of the command.
+   *
+   * @param command The command to send.
+   *
+   * @return a future containing the result of the command.
+   */
+  def command(command: Command) :Future[command.Result] =
+    connection.ask(command.apply(dbName).maker).map(command.ResultMaker(_))
 }
 
 /**
@@ -38,10 +48,10 @@ case class DB(dbName: String, connection: MongoConnection)(implicit timeout :Dur
  *
  * Example:
 {{{
-import org.asyncmongo.api._
-import org.asyncmongo.bson._
-import org.asyncmongo.handlers.DefaultBSONHandlers._
 import play.api.libs.iteratee.Iteratee
+import reactivemongo.api._
+import reactivemongo.bson._
+import reactivemongo.bson.handlers.DefaultBSONHandlers._
 
 object Samples {
 
@@ -51,9 +61,9 @@ object Samples {
 
   def listDocs() = {
     // select only the documents which field 'name' equals 'Jack'
-    val query = Bson("name" -> BSONString("Jack"))
+    val query = BSONDocument("name" -> BSONString("Jack"))
     // select only the field 'name'
-    val filter = Bson(
+    val filter = BSONDocument(
       "name" -> BSONInteger(1),
       "_id" -> BSONInteger(0)
     )
@@ -74,7 +84,7 @@ object Samples {
  *
  * @param db database.
  * @param collectionName the name of this collection.
- * @param connection the [[org.asyncmongo.api.MongoConnection]] that will be used to query this database.
+ * @param connection the [[reactivemongo.api.MongoConnection]] that will be used to query this database.
  * @param timeout the default timeout for the queries.
  */
 case class Collection(
@@ -85,32 +95,23 @@ case class Collection(
   /** The full collection name. */
   lazy val fullCollectionName = db.dbName + "." + collectionName
 
-  // TODO
-  /** Counts the number of documents in this collection. */
-  def count() :Future[Int] = {
-    import DefaultBSONHandlers._
-    connection.ask(Count(collectionName)(db.dbName).maker).map { response =>
-      DefaultBSONReaderHandler.handle(response.reply, response.documents).next.getAs[BSONDouble]("n").map(_.value.toInt).getOrElse(0)
-    }
-  }
-
   /**
    * Find the documents matching the given criteria.
    *
-   * This method accepts any query and projection object, provided that there is an implicit [[org.asyncmongo.handlers.BSONWriter]] typeclass for handling them in the scope.
-   * You can use the typeclasses defined in [[org.asyncmongo.handlers.DefaultBSONHandlers]] object.
+   * This method accepts any query and projection object, provided that there is an implicit [[reactivemongo.bson.handlers.BSONWriter]] typeclass for handling them in the scope.
+   * You can use the typeclasses defined in [[reactivemongo.bson.handlers.DefaultBSONHandlers]] object.
    *
    * Please take a look to the [[http://www.mongodb.org/display/DOCS/Querying mongodb documentation]] to know how querying works.
    *
-   * @tparam Qry the type of the query. An implicit [[org.asyncmongo.handlers.BSONWriter]][Qry] typeclass for handling it has to be in the scope.
-   * @tparam Pjn the type of the projection object. An implicit [[org.asyncmongo.handlers.BSONWriter]][Pjn] typeclass for handling it has to be in the scope.
-   * @tparam Rst the type of the matched documents. An implicit [[org.asyncmongo.handlers.BSONReader]][Rst] typeclass for handling it has to be in the scope.
+   * @tparam Qry the type of the query. An implicit [[reactivemongo.bson.handlers.BSONWriter]][Qry] typeclass for handling it has to be in the scope.
+   * @tparam Pjn the type of the projection object. An implicit [[reactivemongo.bson.handlers.BSONWriter]][Pjn] typeclass for handling it has to be in the scope.
+   * @tparam Rst the type of the matched documents. An implicit [[reactivemongo.bson.handlers.BSONReader]][Rst] typeclass for handling it has to be in the scope.
    *
    * @param query The selector query.
    * @param projection Get only a subset of each matched documents. Defaults to None.
    * @param opts The query options (skip, batchSize, flags...).
    *
-   * @return a cursor over the matched documents. You can get an enumerator for it, please see the [[org.asyncmongo.api.Cursor]] companion object.
+   * @return a cursor over the matched documents. You can get an enumerator for it, please see the [[reactivemongo.api.Cursor]] companion object.
    */
   def find[Qry, Pjn, Rst](query: Qry, projection: Pjn, opts: QueryOpts = QueryOpts())(implicit writer: BSONWriter[Qry], writer2: BSONWriter[Pjn], handler: BSONReaderHandler, reader: BSONReader[Rst]) :FlattenedCursor[Rst] =
     find(writer.write(query), Some(writer2.write(projection)), opts)
@@ -118,13 +119,13 @@ case class Collection(
   /**
    * Find the documents matching the given criteria.
    *
-   * This method accepts any query object, provided that there is an implicit [[org.asyncmongo.handlers.BSONWriter]] typeclass for handling it in the scope.
+   * This method accepts any query object, provided that there is an implicit [[reactivemongo.bson.handlers.BSONWriter]] typeclass for handling it in the scope.
    * You can use the typeclasses defined in [[org.asyncmongo.handlers.DefaultBSONHandlers]] object.
    *
    * Please take a look to the [[http://www.mongodb.org/display/DOCS/Querying mongodb documentation]] to know how querying works.
    *
-   * @tparam Qry the type of the query. An implicit [[org.asyncmongo.handlers.BSONWriter]][Qry] typeclass for handling it has to be in the scope.
-   * @tparam Rst the type of the matched documents. An implicit [[org.asyncmongo.handlers.BSONReader]][Rst] typeclass for handling it has to be in the scope.
+   * @tparam Qry the type of the query. An implicit [[reactivemongo.bson.handlers.BSONWriter]][Qry] typeclass for handling it has to be in the scope.
+   * @tparam Rst the type of the matched documents. An implicit [[reactivemongo.bson.handlers.BSONReader]][Rst] typeclass for handling it has to be in the scope.
    *
    * @param query The selector query.
    * @param opts The query options (skip, batchSize, flags...).
@@ -137,27 +138,27 @@ case class Collection(
   /**
    * Find the documents matching the given criteria.
    *
-   * This method accepts any query object, provided that there is an implicit [[org.asyncmongo.handlers.BSONWriter]] typeclass for handling it in the scope.
+   * This method accepts any query object, provided that there is an implicit [[reactivemongo.bson.handlers.BSONWriter]] typeclass for handling it in the scope.
    * You can use the typeclasses defined in [[org.asyncmongo.handlers.DefaultBSONHandlers]] object.
    *
    * Please take a look to the [[http://www.mongodb.org/display/DOCS/Querying mongodb documentation]] to know how querying works.
    *
-   * @tparam Qry the type of the query. An implicit [[org.asyncmongo.handlers.BSONWriter]][Qry] typeclass for handling it has to be in the scope.
-   * @tparam Rst the type of the matched documents. An implicit [[org.asyncmongo.handlers.BSONReader]][Rst] typeclass for handling it has to be in the scope.
+   * @tparam Qry the type of the query. An implicit [[reactivemongo.bson.handlers.BSONWriter]][Qry] typeclass for handling it has to be in the scope.
+   * @tparam Rst the type of the matched documents. An implicit [[reactivemongo.bson.handlers.BSONReader]][Rst] typeclass for handling it has to be in the scope.
    *
    * @param query The selector query.
    *
-   * @return a cursor over the matched documents. You can get an enumerator for it, please see the [[org.asyncmongo.api.Cursor]] companion object.
+   * @return a cursor over the matched documents. You can get an enumerator for it, please see the [[reactivemongo.api.Cursor]] companion object.
    */
   def find[Qry, Rst](query: Qry)(implicit writer: BSONWriter[Qry], handler: BSONReaderHandler, reader: BSONReader[Rst]) :FlattenedCursor[Rst] =
     find(writer.write(query), None, QueryOpts())
 
   /**
-   * Find the documents matching the given criteria, using the given [[org.asyncmongo.api.QueryBuilder]] instance.
+   * Find the documents matching the given criteria, using the given [[reactivemongo.api.QueryBuilder]] instance.
    *
    * Please take a look to the [[http://www.mongodb.org/display/DOCS/Querying mongodb documentation]] to know how querying works.
    *
-   * @tparam Rst the type of the matched documents. An implicit [[org.asyncmongo.handlers.BSONReader]][Rst] typeclass for handling it has to be in the scope.
+   * @tparam Rst the type of the matched documents. An implicit [[reactivemongo.bson.handlers.BSONReader]][Rst] typeclass for handling it has to be in the scope.
    *
    * @param query The selector query.
    * @param opts The query options (skip, batchSize, flags...).
@@ -168,15 +169,15 @@ case class Collection(
     find(query.makeMergedBuffer, None, opts)
 
   /**
-   * Find the documents matching the given criteria, using the given [[org.asyncmongo.api.QueryBuilder]] instance.
+   * Find the documents matching the given criteria, using the given [[reactivemongo.api.QueryBuilder]] instance.
    *
    * Please take a look to the [[http://www.mongodb.org/display/DOCS/Querying mongodb documentation]] to know how querying works.
    *
-   * @tparam Rst the type of the matched documents. An implicit [[org.asyncmongo.handlers.BSONReader]][Rst] typeclass for handling it has to be in the scope.
+   * @tparam Rst the type of the matched documents. An implicit [[reactivemongo.bson.handlers.BSONReader]][Rst] typeclass for handling it has to be in the scope.
    *
    * @param query The selector query.
    *
-   * @return a cursor over the matched documents. You can get an enumerator for it, please see the [[org.asyncmongo.api.Cursor]] companion object.
+   * @return a cursor over the matched documents. You can get an enumerator for it, please see the [[reactivemongo.api.Cursor]] companion object.
    */
   def find[Rst](query: QueryBuilder)(implicit handler: BSONReaderHandler, reader: BSONReader[Rst]) :FlattenedCursor[Rst] =
     find(query.makeMergedBuffer, None, QueryOpts())
@@ -197,7 +198,7 @@ case class Collection(
    *
    * Please note that you cannot be sure that the document has been effectively written and when (hence the Unit return type).
    *
-   * @tparam T the type of the document to insert. An implicit [[org.asyncmongo.handlers.BSONWriter]][T] typeclass for handling it has to be in the scope.
+   * @tparam T the type of the document to insert. An implicit [[reactivemongo.bson.handlers.BSONWriter]][T] typeclass for handling it has to be in the scope.
    *
    * @param document the document to insert.
    */
@@ -209,16 +210,16 @@ case class Collection(
   }
 
   /**
-   * Inserts a document into the collection and wait for the [[org.asyncmongo.protocol.commands.LastError]] result.
+   * Inserts a document into the collection and wait for the [[reactivemongo.core.protocol.commands.LastError]] result.
    *
-   * Please read the documentation about [[org.asyncmongo.protocol.commands.GetLastError]] to know how to use it properly.
+   * Please read the documentation about [[reactivemongo.core.protocol.commands.GetLastError]] to know how to use it properly.
    *
-   * @tparam T the type of the document to insert. An implicit [[org.asyncmongo.handlers.BSONWriter]][T] typeclass for handling it has to be in the scope.
+   * @tparam T the type of the document to insert. An implicit [[reactivemongo.bson.handlers.BSONWriter]][T] typeclass for handling it has to be in the scope.
    *
    * @param document the document to insert.
-   * @param writeConcern the [[org.asyncmongo.protocol.commands.GetLastError]] command message to send in order to control how the document is inserted. Defaults to GetLastError().
+   * @param writeConcern the [[reactivemongo.core.protocol.commands.GetLastError]] command message to send in order to control how the document is inserted. Defaults to GetLastError().
    *
-   * @return a future [[org.asyncmongo.protocol.commands.LastError]] that can be used to check whether the insertion was successful.
+   * @return a future [[reactivemongo.core.protocol.commands.LastError]] that can be used to check whether the insertion was successful.
    */
   def insert[T](document: T, writeConcern: GetLastError)(implicit writer: BSONWriter[T]) :Future[LastError] = {
     val op = Insert(0, fullCollectionName)
@@ -230,15 +231,15 @@ case class Collection(
   }
 
   /**
-   * Inserts a document into the collection and wait for the [[org.asyncmongo.protocol.commands.LastError]] result.
+   * Inserts a document into the collection and wait for the [[reactivemongo.core.protocol.commands.LastError]] result.
    *
-   * Please read the documentation about [[org.asyncmongo.protocol.commands.GetLastError]] to know how to use it properly.
+   * Please read the documentation about [[reactivemongo.core.protocol.commands.GetLastError]] to know how to use it properly.
    *
-   * @tparam T the type of the document to insert. An implicit [[org.asyncmongo.handlers.BSONWriter]][T] typeclass for handling it has to be in the scope.
+   * @tparam T the type of the document to insert. An implicit [[reactivemongo.bson.handlers.BSONWriter]][T] typeclass for handling it has to be in the scope.
    *
    * @param document the document to insert.
    *
-   * @return a future [[org.asyncmongo.protocol.commands.LastError]] that can be used to check whether the insertion was successful.
+   * @return a future [[reactivemongo.core.protocol.commands.LastError]] that can be used to check whether the insertion was successful.
    */
   def insert[T](document: T)(implicit writer: BSONWriter[T]) :Future[LastError] = insert(document, GetLastError())
 
@@ -247,7 +248,7 @@ case class Collection(
    *
    * This iteratee eventually gives the number of documents that have been inserted into the collection.
    *
-   * @tparam T the type of the documents to insert. An implicit [[org.asyncmongo.handlers.BSONWriter]][T] typeclass for handling it has to be in the scope.
+   * @tparam T the type of the documents to insert. An implicit [[reactivemongo.bson.handlers.BSONWriter]][T] typeclass for handling it has to be in the scope.
    * @param bulkSize The number of documents per bulk.
    * @param bulkByteSize The maximum size for a bulk, in bytes.
    */
@@ -258,13 +259,13 @@ case class Collection(
    * Inserts the documents provided by the given enumerator into the collection and eventually returns the number of inserted documents.
    *
    *
-   * @tparam T the type of the document to insert. An implicit [[org.asyncmongo.handlers.BSONWriter]][T] typeclass for handling it has to be in the scope.
+   * @tparam T the type of the document to insert. An implicit [[reactivemongo.bson.handlers.BSONWriter]][T] typeclass for handling it has to be in the scope.
    *
    * @param enumerator An enumerator of '''T'''.
    * @param bulkSize The number of documents per bulk.
    * @param bulkByteSize The maximum size for a bulk, in bytes.
    *
-   * @return a future [[org.asyncmongo.protocol.commands.LastError]] that can be used to check whether the insertion was successful.
+   * @return a future [[reactivemongo.core.protocol.commands.LastError]] that can be used to check whether the insertion was successful.
    */
   def insert[T](enumerator: Enumerator[T], bulkSize: Int = bulk.MaxDocs, bulkByteSize: Int = bulk.MaxBulkSize)(implicit writer: BSONWriter[T]) :Future[Int] =
     enumerator |>>> insertIteratee(bulkSize, bulkByteSize)
@@ -274,8 +275,8 @@ case class Collection(
    *
    * Please note that you cannot be sure that the matched documents have been effectively updated and when (hence the Unit return type).
    *
-   * @tparam S the type of the selector object. An implicit [[org.asyncmongo.handlers.BSONWriter]][S] typeclass for handling it has to be in the scope.
-   * @tparam U the type of the modifier or update object. An implicit [[org.asyncmongo.handlers.BSONWriter]][U] typeclass for handling it has to be in the scope.
+   * @tparam S the type of the selector object. An implicit [[reactivemongo.bson.handlers.BSONWriter]][S] typeclass for handling it has to be in the scope.
+   * @tparam U the type of the modifier or update object. An implicit [[reactivemongo.bson.handlers.BSONWriter]][U] typeclass for handling it has to be in the scope.
    *
    * @param selector the selector object, for finding the documents to update.
    * @param update the modifier object (with special keys like \$set) or replacement object.
@@ -294,16 +295,16 @@ case class Collection(
   /**
    * Updates one or more documents matching the given selector with the given modifier or update object.
    *
-   * @tparam S the type of the selector object. An implicit [[org.asyncmongo.handlers.BSONWriter]][S] typeclass for handling it has to be in the scope.
-   * @tparam U the type of the modifier or update object. An implicit [[org.asyncmongo.handlers.BSONWriter]][U] typeclass for handling it has to be in the scope.
+   * @tparam S the type of the selector object. An implicit [[reactivemongo.bson.handlers.BSONWriter]][S] typeclass for handling it has to be in the scope.
+   * @tparam U the type of the modifier or update object. An implicit [[reactivemongo.bson.handlers.BSONWriter]][U] typeclass for handling it has to be in the scope.
    *
    * @param selector the selector object, for finding the documents to update.
    * @param update the modifier object (with special keys like \$set) or replacement object.
-   * @param writeConcern the [[org.asyncmongo.protocol.commands.GetLastError]] command message to send in order to control how the documents are updated. Defaults to GetLastError().
+   * @param writeConcern the [[reactivemongo.core.protocol.commands.GetLastError]] command message to send in order to control how the documents are updated. Defaults to GetLastError().
    * @param upsert states whether the update objet should be inserted if no match found. Defaults to false.
    * @param multi states whether the update may be done on all the matching documents.
    *
-   * @return a future [[org.asyncmongo.protocol.commands.LastError]] that can be used to check whether the update was successful.
+   * @return a future [[reactivemongo.core.protocol.commands.LastError]] that can be used to check whether the update was successful.
    */
   def update[S, U](selector: S, update: U, writeConcern: GetLastError = GetLastError(), upsert: Boolean = false, multi: Boolean = false)(implicit selectorWriter: BSONWriter[S], updateWriter: BSONWriter[U]) :Future[LastError] = {
     val flags = 0 | (if(upsert) UpdateFlags.Upsert else 0) | (if(multi) UpdateFlags.MultiUpdate else 0)
@@ -321,7 +322,7 @@ case class Collection(
    *
    * Please note that you cannot be sure that the matched documents have been effectively removed and when (hence the Unit return type).
    *
-   * @tparam T the type of the selector of documents to remove. An implicit [[org.asyncmongo.handlers.BSONWriter]][T] typeclass for handling it has to be in the scope.
+   * @tparam T the type of the selector of documents to remove. An implicit [[reactivemongo.bson.handlers.BSONWriter]][T] typeclass for handling it has to be in the scope.
    *
    * @param query the selector of documents to remove.
    * @param firstMatchOnly states whether only the first matched documents has to be removed from this collection.
@@ -334,17 +335,17 @@ case class Collection(
   }
 
   /**
-   * Remove the matched document(s) from the collection and wait for the [[org.asyncmongo.protocol.commands.LastError]] result.
+   * Remove the matched document(s) from the collection and wait for the [[reactivemongo.core.protocol.commands.LastError]] result.
    *
-   * Please read the documentation about [[org.asyncmongo.protocol.commands.GetLastError]] to know how to use it properly.
+   * Please read the documentation about [[reactivemongo.core.protocol.commands.GetLastError]] to know how to use it properly.
    *
-   * @tparam T the type of the selector of documents to remove. An implicit [[org.asyncmongo.handlers.BSONWriter]][T] typeclass for handling it has to be in the scope.
+   * @tparam T the type of the selector of documents to remove. An implicit [[reactivemongo.bson.handlers.BSONWriter]][T] typeclass for handling it has to be in the scope.
    *
    * @param query the selector of documents to remove.
-   * @param writeConcern the [[org.asyncmongo.protocol.commands.GetLastError]] command message to send in order to control how the documents are removed. Defaults to GetLastError().
+   * @param writeConcern the [[reactivemongo.core.protocol.commands.GetLastError]] command message to send in order to control how the documents are removed. Defaults to GetLastError().
    * @param firstMatchOnly states whether only the first matched documents has to be removed from this collection.
    *
-   * @return a future [[org.asyncmongo.protocol.commands.LastError]] that can be used to check whether the removal was successful.
+   * @return a future [[reactivemongo.core.protocol.commands.LastError]] that can be used to check whether the removal was successful.
    */
   def remove[T](query: T, writeConcern: GetLastError = GetLastError(), firstMatchOnly: Boolean = false)(implicit writer: BSONWriter[T]) :Future[LastError] = {
     val op = Delete(fullCollectionName, if(firstMatchOnly) 1 else 0)
@@ -354,16 +355,6 @@ case class Collection(
       LastError(response)
     }
   }
-
-  /**
-   * Sends a command and get the future result of the command.
-   *
-   * @param command The command to send.
-   *
-   * @return a future containing the result of the command.
-   */ // TODO move into DB
-  def command(command: Command) :Future[command.Result] =
-    connection.ask(command.apply(db.dbName).maker).map(command.ResultMaker(_))
 
   /** The index manager for this collection. */
   lazy val indexes = db.indexes.onCollection(collectionName)
@@ -380,10 +371,10 @@ object Collection {
    *
    * Example:
    * {{{
-import org.asyncmongo.api._
-import org.asyncmongo.bson._
-import org.asyncmongo.handlers.DefaultBSONHandlers._
 import play.api.libs.iteratee.Iteratee
+import reactivemongo.api._
+import reactivemongo.bson._
+import reactivemongo.bson.handlers.DefaultBSONHandlers._
 
 object Samples {
 
@@ -416,7 +407,7 @@ object Samples {
    *
    * It is worth diving into the [[https://github.com/playframework/Play20/wiki/Iteratees Play! 2.0 Iteratee documentation]].
    *
-   * @tparam T the type of the matched documents. An implicit [[org.asyncmongo.handlers.BSONReader]][T] typeclass for handling it has to be in the scope.
+   * @tparam T the type of the matched documents. An implicit [[reactivemongo.bson.handlers.BSONReader]][T] typeclass for handling it has to be in the scope.
    *
 */
 trait Cursor[T] {
@@ -451,7 +442,7 @@ cursor.enumerate.apply(Iteratee.foreach { doc =>
    *
    * It is worth diving into the [[https://github.com/playframework/Play20/wiki/Iteratees Play! 2.0 Iteratee documentation]].
    *
-   * @tparam T the type of the matched documents. An implicit [[org.asyncmongo.handlers.BSONReader]][T] typeclass for handling it has to be in the scope.
+   * @tparam T the type of the matched documents. An implicit [[reactivemongo.bson.handlers.BSONReader]][T] typeclass for handling it has to be in the scope.
    *
 */
   def enumerate()(implicit ctx: ExecutionContext) :Enumerator[T] =
@@ -472,7 +463,7 @@ val list = cursor2[List].collect()
 }}}
    *
    * @tparam M the type of the returned collection.
-   * @tparam T the type of the matched documents. An implicit [[org.asyncmongo.handlers.BSONReader]][T] typeclass for handling it has to be in the scope.
+   * @tparam T the type of the matched documents. An implicit [[reactivemongo.bson.handlers.BSONReader]][T] typeclass for handling it has to be in the scope.
    */
   def collect[M[_]]()(implicit cbf: CanBuildFrom[M[_], T, M[T]], ec: ExecutionContext) :Future[M[T]] = {
     enumerate |>>> Iteratee.fold(cbf.apply) { (builder, t :T) => builder += t }.map(_.result)
@@ -490,7 +481,7 @@ val list = cursor[List].collect(3)
 }}}
    *
    * @tparam M the type of the returned collection.
-   * @tparam T the type of the matched documents. An implicit [[org.asyncmongo.handlers.BSONReader]][T] typeclass for handling it has to be in the scope.
+   * @tparam T the type of the matched documents. An implicit [[reactivemongo.bson.handlers.BSONReader]][T] typeclass for handling it has to be in the scope.
    * @param upTo The maximum size of this collection.
    */
   def collect[M[_]](upTo: Int)(implicit cbf: CanBuildFrom[M[_], T, M[T]], ec: ExecutionContext) :Future[M[T]] = {
@@ -508,7 +499,7 @@ val list = cursor2.toList
 }}}
    *
    * @tparam M the type of the returned collection.
-   * @tparam T the type of the matched documents. An implicit [[org.asyncmongo.handlers.BSONReader]][T] typeclass for handling it has to be in the scope.
+   * @tparam T the type of the matched documents. An implicit [[reactivemongo.bson.handlers.BSONReader]][T] typeclass for handling it has to be in the scope.
    */
   def toList()(implicit ctx: ExecutionContext) :Future[List[T]] = collect[List]()
 
@@ -524,7 +515,7 @@ val list = cursor2.toList(3)
 }}}
    *
    * @tparam M the type of the returned collection.
-   * @tparam T the type of the matched documents. An implicit [[org.asyncmongo.handlers.BSONReader]][T] typeclass for handling it has to be in the scope.
+   * @tparam T the type of the matched documents. An implicit [[reactivemongo.bson.handlers.BSONReader]][T] typeclass for handling it has to be in the scope.
    */
   def toList(upTo: Int)(implicit ctx: ExecutionContext) :Future[List[T]] = collect[List](upTo)
 
@@ -537,7 +528,7 @@ val cursor2 = collection.find(query, Some(filter))
 val list = cursor2[List].collect()
 }}}
    *
-   * @tparam T the type of the matched documents. An implicit [[org.asyncmongo.handlers.BSONReader]][T] typeclass for handling it has to be in the scope.
+   * @tparam T the type of the matched documents. An implicit [[reactivemongo.bson.handlers.BSONReader]][T] typeclass for handling it has to be in the scope.
    */
   def headOption()(implicit ec: ExecutionContext) :Future[Option[T]] = {
     collect[Iterable](1).map(_.headOption)
@@ -580,7 +571,7 @@ class DefaultCursor[T](response: Response, mongoConnection: MongoConnection, que
 }
 
 /**
- * A [[org.asyncmongo.api.Cursor]] that holds no document, and which the next cursor is given in the constructor.
+ * A [[reactivemongo.api.Cursor]] that holds no document, and which the next cursor is given in the constructor.
  */
 class FlattenedCursor[T](futureCursor: Future[Cursor[T]]) extends Cursor[T] {
   val iterator :Iterator[T] = Iterator.empty
@@ -599,7 +590,7 @@ object Cursor {
   import play.api.libs.concurrent.{Promise => PlayPromise, _}
 
   /**
-   * Flattens the given future [[org.asyncmongo.api.Cursor]] to a [[org.asyncmongo.api.FlattenedCursor]].
+   * Flattens the given future [[reactivemongo.api.Cursor]] to a [[reactivemongo.api.FlattenedCursor]].
    */
   def flatten[T](futureCursor: Future[Cursor[T]]) = new FlattenedCursor(futureCursor)
 
@@ -620,11 +611,11 @@ object DefaultCursor {
 /**
  * A Mongo Connection.
  *
- * This is a wrapper around a reference to a [[org.asyncmongo.actors.MongoDBSystem]] Actor.
+ * This is a wrapper around a reference to a [[reactivemongo.core.actors.MongoDBSystem]] Actor.
  * Connection here does not mean that there is one open channel to the server.
  * Behind the scene, many connections (channels) are open on all the available servers in the replica set.
  *
- * @param mongosystem A reference to a [[org.asyncmongo.actors.MongoDBSystem]] Actor.
+ * @param mongosystem A reference to a [[reactivemongo.core.actors.MongoDBSystem]] Actor.
  */
 class MongoConnection(
   val mongosystem: ActorRef,
@@ -742,7 +733,7 @@ object MongoConnection {
    * @param nodes A list of node names, like ''node1.foo.com:27017''. Port is optional, it is 27017 by default.
    * @param authentications A list of Authenticates.
    * @param nbChannelsPerNode Number of channels to open per node. Defaults to 10.
-   * @param name The name of the newly created [[org.asyncmongo.actors.MongoDBSystem]] actor, if needed.
+   * @param name The name of the newly created [[reactivemongo.core.actors.MongoDBSystem]] actor, if needed.
    */
   def apply(nodes: List[String], authentications :List[Authenticate] = List.empty, nbChannelsPerNode :Int = 10, name: Option[String] = None) = {
     val props = Props(new MongoDBSystem(nodes, authentications, nbChannelsPerNode))
