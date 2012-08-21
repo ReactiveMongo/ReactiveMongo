@@ -11,6 +11,7 @@ import org.jboss.netty.handler.codec.frame.FrameDecoder
 import org.slf4j.{Logger, LoggerFactory}
 import reactivemongo.core.actors.{Connected, Disconnected}
 import reactivemongo.core.commands.GetLastError
+import reactivemongo.core.errors._
 import reactivemongo.utils.LazyLogger
 import reactivemongo.utils.RichBuffer._
 
@@ -196,38 +197,18 @@ case class Response(
   /**
    * if this response is in error, explain this error.
    */
-  lazy val error :Option[ExplainedError] = {
+  lazy val error :Option[DBError] = {
     if(reply.inError) {
       import reactivemongo.bson.handlers.DefaultBSONHandlers._
       val bson = DefaultBSONReaderHandler.handle(reply, documents)
       if(bson.hasNext)
-        Some(ExplainedError(DefaultBSONReaderHandler.handle(reply, documents).next))
+        Some(ReactiveMongoError(DefaultBSONReaderHandler.handle(reply, documents).next))
       else None
     } else None
   }
 }
 
-/** An error */ // TODO
-case class ExplainedError(
-  err: String,
-  code: Option[Int],
-  doc: reactivemongo.bson.TraversableBSONDocument
-) extends Exception {
-  override def getMessage() = err + code.map(c => " [code = " + c + "]").getOrElse("")
-}
 
-object ExplainedError {
-  import reactivemongo.bson._
-
-  /**
-   * Make an [[reactivemongo.core.protocol.ExplainedError]] from the given [[reactivemongo.bson.TraversableBSONDocument]].
-   */
-  def apply(bson: TraversableBSONDocument) :ExplainedError =
-    ExplainedError(
-      bson.getAs[BSONString]("$err").map(_.value).getOrElse("$err is not present, unknown error"),
-      bson.getAs[BSONInteger]("code").map(_.value),
-      bson)
-}
 
 /**
  * Response meta information.

@@ -2,6 +2,7 @@ package reactivemongo.core.commands
 
 import reactivemongo.bson._
 import reactivemongo.bson.handlers.DefaultBSONHandlers
+import reactivemongo.core.errors._
 import reactivemongo.core.protocol.{RequestMaker, Query, QueryFlags, Response}
 import reactivemongo.core.protocol.NodeState
 import reactivemongo.core.protocol.NodeState._
@@ -136,19 +137,21 @@ case class GetLastError(
  * @param ok true if the last operation was successful
  * @param err the err field, if any
  * @param code the error code, if any
- * @param message the message (often regarding an error) if any
+ * @param errMsg the message (often regarding an error) if any
  * @param original the whole map resulting of the deserialization of the response with the [[org.asyncmongo.handlers.DefaultBSONHandlers]].
  */
 case class LastError(
   ok: Boolean,
   err: Option[String],
   code: Option[Int],
-  message: Option[String],
-  original: Map[String, BSONValue]
-) {
+  errMsg: Option[String],
+  originalDocument: Option[TraversableBSONDocument]
+) extends DBError {
   /** states if the last operation ended up with an error */
   lazy val inError :Boolean = !ok || err.isDefined
   lazy val stringify :String = toString + " [inError: " + inError + "]"
+
+  lazy val message = err.orElse(errMsg).getOrElse("empty lastError message")
 }
 
 /**
@@ -162,7 +165,7 @@ object LastError extends CommandResultMaker[LastError] {
       document.getAs[BSONString]("err").map(_.value),
       document.getAs[BSONInteger]("code").map(_.value),
       document.getAs[BSONString]("errmsg").map(_.value),
-      document.mapped
+      Some(document)
     )
   }
 }

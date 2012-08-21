@@ -7,6 +7,7 @@ import org.jboss.netty.channel.group._
 import org.slf4j.{Logger, LoggerFactory}
 import reactivemongo.bson._
 import reactivemongo.bson.handlers.DefaultBSONHandlers
+import reactivemongo.core.errors._
 import reactivemongo.core.nodeset._
 import reactivemongo.core.protocol._
 import reactivemongo.core.protocol.ChannelState._
@@ -273,24 +274,18 @@ class MongoDBSystem(
           logger.debug("Got a response from " + response.info.channelId + "! Will give back message="+response + " to sender " + _sender)
           awaitingResponses -= response.header.responseTo
           if(response.error.isDefined) {
-            logger.debug("{" + response.header.responseTo + "} sending a failure...\n\tgot error: " +
-              reactivemongo.bson.DefaultBSONIterator.pretty(response.error.get.doc.bsonIterator))
-            if(response.error.get.code.isDefined && isNotPrimaryErrorCode(response.error.get.code.get)) {
-              self ! RefreshAllNodes
-              updateNodeSetManager(NodeSetManager(nodeSetManager.get.nodeSet.updateAll(node => if(node.state == PRIMARY) node.copy(state = UNKNOWN) else node)))
-            }
+            logger.debug("{" + response.header.responseTo + "} sending a failure... (" + response.error.get + ")")
+            if(response.error.get.isNotAPrimaryError)
+              onPrimaryUnavailable()
             _sender ! Failure(response.error.get)
           } else if(isGetLastError) {
             logger.debug("{" + response.header.responseTo + "} it's a getlasterror")
             // todo, for now rewinding buffer at original index
             val ridx = response.documents.readerIndex
             val lastError = LastError(response)
-            if(lastError.code.isDefined && isNotPrimaryErrorCode(lastError.code.get)) {
-              logger.debug("{" + response.header.responseTo + "} sending a failure...")
-              self ! RefreshAllNodes
-              updateNodeSetManager(NodeSetManager(nodeSetManager.get.nodeSet.updateAll(node => if(node.state == PRIMARY) node.copy(state = UNKNOWN) else node)))
-              _sender ! Failure(DefaultMongoError(lastError.message, lastError.code))
-              broadcastMonitors(PrimaryUnavailable)
+            if(lastError.isNotAPrimaryError) {
+              onPrimaryUnavailable()
+              _sender ! Failure(lastError)
             } else {
               response.documents.readerIndex(ridx)
               _sender ! response
@@ -315,9 +310,10 @@ class MongoDBSystem(
   var nodeSetManager :Option[NodeSetManager] = Some(NodeSetManager(NodeSet(None, None, Vector.empty)))
   // <-- monitor
 
-  def isNotPrimaryErrorCode(code: Int) = code match {
-    case 10054 | 10056 | 10058 | 10107 | 13435 | 13436 => true
-    case _ => false
+  def onPrimaryUnavailable() {
+    self ! RefreshAllNodes
+    updateNodeSetManager(NodeSetManager(nodeSetManager.get.nodeSet.updateAll(node => if(node.state == PRIMARY) node.copy(state = UNKNOWN) else node)))
+    broadcastMonitors(PrimaryUnavailable)
   }
 
   def updateNodeSetManager(nodeSetManager: NodeSetManager) :NodeSetManager = {
@@ -372,22 +368,6 @@ object MongoDBSystem {
   private[reactivemongo] val DefaultConnectionRetryInterval :Int = 2000 // milliseconds
   private val logger = LazyLogger(LoggerFactory.getLogger("MongoDBSystem"))
 }
-
-/**
- * A mongo error
- */
-trait MongoError extends Throwable {
-  /** error code */
-  val code: Option[Int]
-  /** explanation message */
-  val message: Option[String]
-  override def getMessage :String = "MongoError[code=" + code.getOrElse("None") + " => message: " + message.getOrElse("None") + "]"
-}
-
-case class DefaultMongoError(
-  message: Option[String],
-  code: Option[Int]
-) extends MongoError
 
 private[actors] case class AuthHistory(
   authenticateRequests: List[(Authenticate, List[ActorRef])]
