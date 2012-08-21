@@ -183,9 +183,9 @@ case class Count(
   override def makeDocuments = {
     val bson = BSONDocument("count" -> BSONString(collectionName))
     if(query.isDefined)
-      bson += ("query" -> BSONDocument(query.get.makeBuffer))
+      bson += ("query" -> query.get)
     if(fields.isDefined)
-      bson += ("fields" -> BSONDocument(fields.get.makeBuffer))
+      bson += ("fields" -> fields.get)
     bson
   }
 
@@ -197,7 +197,8 @@ case class Count(
  * Deserializer for the Count command. Basically returns an Int (number of counted documents)
  */
 object Count extends CommandResultMaker[Int] {
-  def apply(response: Response) = DefaultBSONHandlers.parse(response).next().getAs[BSONInteger]("n").map(_.value.toInt).getOrElse(0)
+  def apply(response: Response) =
+    DefaultBSONHandlers.parse(response).next().getAs[BSONDouble]("n").map(_.value.toInt).getOrElse(0)
 }
 
 /**
@@ -394,7 +395,7 @@ sealed trait Modify {
  */
 case class Update(update: BSONDocument, fetchNewObject: Boolean) extends Modify {
   override def alter(bson: AppendableBSONDocument) = bson
-      .append("update" -> BSONDocument(update.makeBuffer))
+      .append("update" -> update)
       .append("new" -> BSONBoolean(fetchNewObject))
 }
 

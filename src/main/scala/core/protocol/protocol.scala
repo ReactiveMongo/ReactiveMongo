@@ -201,7 +201,7 @@ case class Response(
       import reactivemongo.bson.handlers.DefaultBSONHandlers._
       val bson = DefaultBSONReaderHandler.handle(reply, documents)
       if(bson.hasNext)
-        ExplainedError(DefaultBSONReaderHandler.handle(reply, documents).next)
+        Some(ExplainedError(DefaultBSONReaderHandler.handle(reply, documents).next))
       else None
     } else None
   }
@@ -209,17 +209,24 @@ case class Response(
 
 /** An error */ // TODO
 case class ExplainedError(
-  err: String
-)
+  err: String,
+  code: Option[Int],
+  doc: reactivemongo.bson.TraversableBSONDocument
+) extends Exception {
+  override def getMessage() = err + code.map(c => " [code = " + c + "]").getOrElse("")
+}
 
 object ExplainedError {
   import reactivemongo.bson._
+
   /**
-   * Make an [[org.asyncmongo.protocol.ExplainedError]] from the given [[org.asyncmongo.bson.BSONIterator]].
+   * Make an [[reactivemongo.core.protocol.ExplainedError]] from the given [[reactivemongo.bson.TraversableBSONDocument]].
    */
-  def apply(bson: TraversableBSONDocument) :Option[ExplainedError] = {
-    bson.getAs[BSONString]("err").map(bs => ExplainedError(bs.value)).orElse(throw new RuntimeException("???"))
-  }
+  def apply(bson: TraversableBSONDocument) :ExplainedError =
+    ExplainedError(
+      bson.getAs[BSONString]("$err").map(_.value).getOrElse("$err is not present, unknown error"),
+      bson.getAs[BSONInteger]("code").map(_.value),
+      bson)
 }
 
 /**

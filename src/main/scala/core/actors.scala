@@ -272,7 +272,15 @@ class MongoDBSystem(
         case Some(AwaitingResponse(_, _sender, isGetLastError)) => {
           logger.debug("Got a response from " + response.info.channelId + "! Will give back message="+response + " to sender " + _sender)
           awaitingResponses -= response.header.responseTo
-          if(isGetLastError) {
+          if(response.error.isDefined) {
+            logger.debug("{" + response.header.responseTo + "} sending a failure...\n\tgot error: " +
+              reactivemongo.bson.DefaultBSONIterator.pretty(response.error.get.doc.bsonIterator))
+            if(response.error.get.code.isDefined && isNotPrimaryErrorCode(response.error.get.code.get)) {
+              self ! RefreshAllNodes
+              updateNodeSetManager(NodeSetManager(nodeSetManager.get.nodeSet.updateAll(node => if(node.state == PRIMARY) node.copy(state = UNKNOWN) else node)))
+            }
+            _sender ! Failure(response.error.get)
+          } else if(isGetLastError) {
             logger.debug("{" + response.header.responseTo + "} it's a getlasterror")
             // todo, for now rewinding buffer at original index
             val ridx = response.documents.readerIndex

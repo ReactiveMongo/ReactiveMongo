@@ -37,7 +37,7 @@ sealed trait BSONElement {
   val value: BSONValue
 
   /** Writes this element to the given [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]] */
-  def write(buffer: ChannelBuffer) :ChannelBuffer = {
+  final def write(buffer: ChannelBuffer) :ChannelBuffer = {
     buffer writeByte value.code
     buffer writeCString name
     value write buffer
@@ -121,10 +121,10 @@ sealed trait AppendableBSONStructure[E] extends BSONStructure {
    */
   def += (e: E*) :this.type = append(e:_*)
 
-  /** The opposite type of this appendable structure (so, a [[org.asyncmongo.bson.TraversableBSONStructure]]). */
+  /** The opposite type of this appendable structure (so, a [[reactivemongo.bson.TraversableBSONStructure]]). */
   type Opposite <: TraversableBSONStructure[_]
 
-  /** Makes a [[org.asyncmongo.bson.TraversableBSONStructure]] with the buffer of this [[org.asyncmongo.bson.AppendableBSONStructure]]. */
+  /** Makes a [[reactivemongo.bson.TraversableBSONStructure]] with the buffer of this [[reactivemongo.bson.AppendableBSONStructure]]. */
   def toTraversable :Opposite
 
   def makeBuffer = {
@@ -144,6 +144,7 @@ sealed trait AppendableBSONStructure[E] extends BSONStructure {
  * @tparam Key The type of the keys of this structure.
  */
 sealed trait TraversableBSONStructure[Key] extends BSONStructure {
+  private val rdx = buffer.readerIndex
   protected val stream = DefaultBSONIterator(buffer).toStream
 
   /** Gets the value matching the given key, if it exists. */
@@ -163,13 +164,18 @@ sealed trait TraversableBSONStructure[Key] extends BSONStructure {
     }
   }
 
-  /** The opposite type of this traversable structure (so, an [[org.asyncmongo.bson.AppendableBSONStructure]]). */
+  /** The opposite type of this traversable structure (so, an [[reactivemongo.bson.AppendableBSONStructure]]). */
   type Opposite <: AppendableBSONStructure[_]
 
-  /** Makes a [[org.asyncmongo.bson.AppendableBSONStructure]] with the buffer of this [[org.asyncmongo.bson.TraversableBSONStructure]]. */
+  /** Makes a [[reactivemongo.bson.AppendableBSONStructure]] with the buffer of this [[reactivemongo.bson.TraversableBSONStructure]]. */
   def toAppendable :Opposite
 
-  def makeBuffer = buffer.copy()
+  def makeBuffer = {
+    val pos = buffer.readerIndex
+    val result = buffer.copy(rdx, buffer.capacity)
+    buffer.readerIndex(pos)
+    result
+  }
 
   /**
    * An iterator of the elements that are present in this structure.
@@ -279,16 +285,16 @@ class AppendableBSONDocument extends AppendableBSONStructure[(String, BSONValue)
 }
 
 object BSONDocument {
-  /** Makes an [[org.asyncmongo.bson.AppendableBSONDocument]] containing the given values. */
+  /** Makes an [[reactivemongo.bson.AppendableBSONDocument]] containing the given values. */
   def apply( els: (String, BSONValue)* ) :AppendableBSONDocument = new AppendableBSONDocument().append(els :_*)
-  /** Makes a [[org.asyncmongo.bson.TraversableBSONDocument]] from the given buffer. */
+  /** Makes a [[reactivemongo.bson.TraversableBSONDocument]] from the given buffer. */
   def apply(buffer: ChannelBuffer) :TraversableBSONDocument = new TraversableBSONDocument(buffer)
 }
 
 object BSONArray {
-  /** Makes an [[org.asyncmongo.bson.AppendableBSONArray]] containing the given values. */
+  /** Makes an [[reactivemongo.bson.AppendableBSONArray]] containing the given values. */
   def apply(values: BSONValue*) :AppendableBSONArray = new AppendableBSONArray().append(values :_*)
-  /** Makes a [[org.asyncmongo.bson.TraversableBSONArray]] from the given buffer. */
+  /** Makes a [[reactivemongo.bson.TraversableBSONArray]] from the given buffer. */
   def apply(buffer: ChannelBuffer) :TraversableBSONArray = new TraversableBSONArray(buffer)
 }
 // <---------------------------- BSON Structure handlers
@@ -565,6 +571,6 @@ object DefaultBSONIterator {
       }
     }).mkString(",\n")
   }
-  /** Makes a pretty String representation of the given [[org.asyncmongo.bson.BSONIterator]]. */
+  /** Makes a pretty String representation of the given [[reactivemongo.bson.BSONIterator]]. */
   def pretty(it: Iterator[BSONElement]) :String = "{\n" + pretty(0, it) + "\n}"
 }

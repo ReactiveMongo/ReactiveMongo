@@ -43,6 +43,42 @@ object Samples {
     }
   }
 
+  def count() = {
+    // select only the documents which company name equals 'Zenexity'
+    val query = BSONDocument("company.name" -> BSONString("Zenexity"))
+    val futureCount = db.command(
+      Count(
+        // run this command on the given collection
+        collection.collectionName,
+        // ... with the query we wrote above
+        Some(query)
+      )
+    )
+    futureCount.map { count =>
+      println("found " + count + " documents which company name is 'Zenexity'")
+    }
+  }
+
+  def querybuilder() = {
+    val query = QueryBuilder().
+      // select only the documents which company name equals 'Zenexity'
+      query( BSONDocument("company.name" -> BSONString("Zenexity")) ).
+      // sort by lastName
+      sort("lastName" -> SortOrder.Ascending).
+      // retrieve only lastName and firstName
+      projection( BSONDocument(
+        "lastName" -> BSONInteger(1),
+        "firstName" -> BSONInteger(1),
+        "_id" -> BSONInteger(0)) )
+    // get a Cursor[DefaultBSONIterator]
+    val cursor = collection.find(query)
+    // get a future list
+    val futurelist = cursor.toList
+    futurelist.onSuccess {
+      case list => println(list.map(doc => DefaultBSONIterator.pretty(doc.bsonIterator)))
+    }
+  }
+
   def insert() = {
     val document = BSONDocument(
       "firstName" -> BSONString("Stephane"),
@@ -162,7 +198,7 @@ object Samples {
       case Right(maybeDocument) => println("findAndModify successfully done with original document = " +
         // if there is an original document returned, print it in a pretty format
         maybeDocument.map(doc => {
-          // get a BSONIterator (lazy BSON parser) of this document 
+          // get a BSONIterator (lazy BSON parser) of this document
           // stringify it with DefaultBSONIterator.pretty
           DefaultBSONIterator.pretty(doc.bsonIterator)
         })
