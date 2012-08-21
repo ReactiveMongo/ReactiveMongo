@@ -1,0 +1,244 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
+<html>
+        <head>
+          <title>reactivemongo.core.actors</title>
+          <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+          
+      <link type="text/css" media="screen" rel="stylesheet" href="../../../lib/template.css" />
+      <script type="text/javascript" src="../../../lib/jquery.js"></script>
+      <script type="text/javascript" src="../../../lib/jquery-ui.js"></script>
+      <script type="text/javascript" src="../../../lib/template.js"></script>
+      <script type="text/javascript" src="../../../lib/tools.tooltip.js"></script>
+    
+        </head>
+        <body onload="sh_highlightDocument('../lib/', '.min.js');" class="value">
+      <div id="definition">
+        <img src="../../../lib/package_big.png" />
+        <p id="owner"><a name="reactivemongo" class="extype" href="../../package.html">reactivemongo</a>.<a name="reactivemongo.core" class="extype" href="../package.html">core</a></p>
+        <h1>actors</h1>
+      </div>
+
+      <h4 class="signature" id="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">package</span>
+      </span>
+      <span class="symbol">
+        <span class="name">actors</span>
+      </span>
+      </h4>
+      
+      <div class="fullcommenttop" id="comment"></div>
+    
+
+      <div id="mbrsel">
+        <div id="textfilter"><span class="pre"></span><span class="input"><input accesskey="/" type="text" /></span><span class="post"></span></div>
+        
+        
+        <div id="visbl">
+            <span class="filtertype">Visibility</span>
+            <ol><li class="public in"><span>Public</span></li><li class="all out"><span>All</span></li></ol>
+          </div>
+      </div>
+
+      <div id="template">
+        <div id="allMembers">
+        
+
+        <div class="types members" id="types">
+              <h3>Type Members</h3>
+              <ol><li visbl="pub" name="reactivemongo.core.actors.Authenticate" data-isabs="false">
+      <a id="Authenticate:Authenticate"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="Authenticate.html"><span class="name">Authenticate</span></a><span class="params">(<span name="db">db: String</span>, <span name="user">user: String</span>, <span name="password">password: String</span>)</span><span class="result"> extends Product with Serializable</span>
+      </span>
+      </h4>
+      <p class="comment cmt">Authenticate message.</p>
+    </li><li visbl="pub" name="reactivemongo.core.actors.MongoDBSystem" data-isabs="false">
+      <a id="MongoDBSystem:MongoDBSystem"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">class</span>
+      </span>
+      <span class="symbol">
+        <a href="MongoDBSystem.html"><span class="name">MongoDBSystem</span></a><span class="result"> extends Actor</span>
+      </span>
+      </h4>
+      <p class="comment cmt">Main actor that processes the requests.</p>
+    </li><li visbl="pub" name="reactivemongo.core.actors.MonitorActor" data-isabs="false">
+      <a id="MonitorActor:MonitorActor"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">class</span>
+      </span>
+      <span class="symbol">
+        <a href="MonitorActor.html"><span class="name">MonitorActor</span></a><span class="result"> extends Actor</span>
+      </span>
+      </h4>
+      <p class="comment cmt">A monitor for MongoDBSystem actors.</p>
+    </li></ol>
+            </div>
+
+        
+
+        <div class="values members" id="values">
+              <h3>Value Members</h3>
+              <ol><li visbl="pub" name="reactivemongo.core.actors.Close" data-isabs="false">
+      <a id="Close:Close"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">object</span>
+      </span>
+      <span class="symbol">
+        <a href="Close$.html"><span class="name">Close</span></a><span class="result"> extends Product with Serializable</span>
+      </span>
+      </h4>
+      <p class="comment cmt">Message to close all active connections.</p>
+    </li><li visbl="pub" name="reactivemongo.core.actors.Closed" data-isabs="false">
+      <a id="Closed:Closed"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">object</span>
+      </span>
+      <span class="symbol">
+        <a href="Closed$.html"><span class="name">Closed</span></a><span class="result"> extends Product with Serializable</span>
+      </span>
+      </h4>
+      
+    </li><li visbl="pub" name="reactivemongo.core.actors.MongoDBSystem" data-isabs="false">
+      <a id="MongoDBSystem:MongoDBSystem"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">object</span>
+      </span>
+      <span class="symbol">
+        <a href="MongoDBSystem$.html"><span class="name">MongoDBSystem</span></a><span class="result"> extends AnyRef</span>
+      </span>
+      </h4>
+      
+    </li><li visbl="pub" name="reactivemongo.core.actors.MonitorActor" data-isabs="false">
+      <a id="MonitorActor:MonitorActor"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">object</span>
+      </span>
+      <span class="symbol">
+        <a href="MonitorActor$.html"><span class="name">MonitorActor</span></a><span class="result"> extends AnyRef</span>
+      </span>
+      </h4>
+      
+    </li><li visbl="pub" name="reactivemongo.core.actors.PrimaryAvailable" data-isabs="false">
+      <a id="PrimaryAvailable:PrimaryAvailable"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">object</span>
+      </span>
+      <span class="symbol">
+        <a href="PrimaryAvailable$.html"><span class="name">PrimaryAvailable</span></a><span class="result"> extends Product with Serializable</span>
+      </span>
+      </h4>
+      <p class="comment cmt">Message sent when the primary has been discovered.</p>
+    </li><li visbl="pub" name="reactivemongo.core.actors.PrimaryUnavailable" data-isabs="false">
+      <a id="PrimaryUnavailable:PrimaryUnavailable"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">object</span>
+      </span>
+      <span class="symbol">
+        <a href="PrimaryUnavailable$.html"><span class="name">PrimaryUnavailable</span></a><span class="result"> extends Product with Serializable</span>
+      </span>
+      </h4>
+      <p class="comment cmt">Message sent when the primary has been lost.</p>
+    </li><li visbl="pub" name="reactivemongo.core.actors.PrimaryUnavailableException" data-isabs="false">
+      <a id="PrimaryUnavailableException:PrimaryUnavailableException"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">object</span>
+      </span>
+      <span class="symbol">
+        <a href="PrimaryUnavailableException$.html"><span class="name">PrimaryUnavailableException</span></a><span class="result"> extends RuntimeException</span>
+      </span>
+      </h4>
+      <p class="comment cmt">An exception to be thrown when a request needs a non available primary.</p>
+    </li><li visbl="pub" name="reactivemongo.core.actors.RegisterMonitor" data-isabs="false">
+      <a id="RegisterMonitor:RegisterMonitor"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">object</span>
+      </span>
+      <span class="symbol">
+        <a href="RegisterMonitor$.html"><span class="name">RegisterMonitor</span></a><span class="result"> extends Product with Serializable</span>
+      </span>
+      </h4>
+      <p class="comment cmt">Register a monitor.</p>
+    </li><li visbl="pub" name="reactivemongo.core.actors.SetAvailable" data-isabs="false">
+      <a id="SetAvailable:SetAvailable"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">object</span>
+      </span>
+      <span class="symbol">
+        <a href="SetAvailable$.html"><span class="name">SetAvailable</span></a><span class="result"> extends Product with Serializable</span>
+      </span>
+      </h4>
+      
+    </li><li visbl="pub" name="reactivemongo.core.actors.SetUnavailable" data-isabs="false">
+      <a id="SetUnavailable:SetUnavailable"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">object</span>
+      </span>
+      <span class="symbol">
+        <a href="SetUnavailable$.html"><span class="name">SetUnavailable</span></a><span class="result"> extends Product with Serializable</span>
+      </span>
+      </h4>
+      
+    </li><li visbl="pub" name="reactivemongo.core.actors.WaitForPrimary" data-isabs="false">
+      <a id="WaitForPrimary:WaitForPrimary"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">object</span>
+      </span>
+      <span class="symbol">
+        <a href="WaitForPrimary$.html"><span class="name">WaitForPrimary</span></a><span class="result"> extends Product with Serializable</span>
+      </span>
+      </h4>
+      <p class="comment cmt">A message to send to a MonitorActor to be warned when a primary has been discovered.</p>
+    </li></ol>
+            </div>
+
+        
+        </div>
+
+        <div id="inheritedMembers">
+        
+        </div>
+
+      </div>
+
+      <div id="tooltip"></div>
+
+      <div id="footer">  </div>
+
+
+    </body>
+      </html>

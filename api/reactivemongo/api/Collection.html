@@ -1,0 +1,772 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
+<html>
+        <head>
+          <title>reactivemongo.api.Collection</title>
+          <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+          
+      <link type="text/css" media="screen" rel="stylesheet" href="../../lib/template.css" />
+      <script type="text/javascript" src="../../lib/jquery.js"></script>
+      <script type="text/javascript" src="../../lib/jquery-ui.js"></script>
+      <script type="text/javascript" src="../../lib/template.js"></script>
+      <script type="text/javascript" src="../../lib/tools.tooltip.js"></script>
+    
+        </head>
+        <body onload="sh_highlightDocument('../lib/', '.min.js');" class="type">
+      <div id="definition">
+        <a title="Go to companion" href="Collection$.html"><img src="../../lib/class_to_object_big.png" /></a>
+        <p id="owner"><a name="reactivemongo" class="extype" href="../package.html">reactivemongo</a>.<a name="reactivemongo.api" class="extype" href="package.html">api</a></p>
+        <h1><a title="Go to companion" href="Collection$.html">Collection</a></h1>
+      </div>
+
+      <h4 class="signature" id="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <span class="name">Collection</span><span class="params">(<span name="db">db: <a name="reactivemongo.api.DB" class="extype" href="DB.html">DB</a></span>, <span name="collectionName">collectionName: String</span>, <span name="connection">connection: <a name="reactivemongo.api.MongoConnection" class="extype" href="MongoConnection.html">MongoConnection</a></span>, <span name="timeout">timeout: <span name="scala.concurrent.util.Duration" class="extype">Duration</span></span>, <span name="context">context: <span name="scala.concurrent.ExecutionContext" class="extype">ExecutionContext</span></span>)</span><span class="result"> extends <span name="scala.Product" class="extype">Product</span> with <span name="scala.Serializable" class="extype">Serializable</span></span>
+      </span>
+      </h4>
+      
+      <div class="fullcommenttop" id="comment"><div class="comment cmt"><p>A Mongo Collection.</p><p>Example:</p><pre>
+<span class="kw">import</span> play.api.libs.iteratee.Iteratee
+<span class="kw">import</span> reactivemongo.api._
+<span class="kw">import</span> reactivemongo.bson._
+<span class="kw">import</span> reactivemongo.bson.handlers.DefaultBSONHandlers._
+
+<span class="kw">object</span> Samples {
+
+  <span class="kw">val</span> connection = MongoConnection( <span class="std">List</span>( <span class="lit">"localhost:27016"</span> ) )
+  <span class="kw">val</span> db = DB(<span class="lit">"plugin"</span>, connection)
+  <span class="kw">val</span> collection :Collection = db(<span class="lit">"acoll"</span>)
+
+  <span class="kw">def</span> listDocs() = {
+    <span class="cmt">// select only the documents which field 'name' equals 'Jack'</span>
+    <span class="kw">val</span> query = BSONDocument(<span class="lit">"name"</span> -&gt; BSONString(<span class="lit">"Jack"</span>))
+    <span class="cmt">// select only the field 'name'</span>
+    <span class="kw">val</span> filter = BSONDocument(
+      <span class="lit">"name"</span> -&gt; BSONInteger(<span class="num">1</span>),
+      <span class="lit">"_id"</span> -&gt; BSONInteger(<span class="num">0</span>)
+    )
+
+    <span class="cmt">// get a Cursor[DefaultBSONIterator]</span>
+    <span class="kw">val</span> cursor = collection.find(query, <span class="std">Some</span>(filter))
+    <span class="cmt">// let's enumerate this cursor and print a readable representation of each document in the response</span>
+    cursor.enumerate.apply(Iteratee.foreach { doc <span class="kw">=&gt;</span>
+      println(<span class="lit">"found document: "</span> + DefaultBSONIterator.pretty(doc))
+    })
+
+    <span class="cmt">// or, the same with getting a list</span>
+    <span class="kw">val</span> cursor2 = collection.find(query, <span class="std">Some</span>(filter))
+    <span class="kw">val</span> list = cursor.toList
+  }
+}
+</pre></div><dl class="paramcmts block"><dt class="param">db</dt><dd class="cmt"><p>database.</p></dd><dt class="param">collectionName</dt><dd class="cmt"><p>the name of this collection.</p></dd><dt class="param">connection</dt><dd class="cmt"><p>the <a name="reactivemongo.api.MongoConnection" class="extype" href="MongoConnection.html">MongoConnection</a> that will be used to query this database.</p></dd><dt class="param">timeout</dt><dd class="cmt"><p>the default timeout for the queries.
+</p></dd></dl><div class="toggleContainer block">
+          <span class="toggle">Linear Supertypes</span>
+          <div class="superTypes hiddenContent"><span name="scala.Serializable" class="extype">Serializable</span>, <span name="java.io.Serializable" class="extype">Serializable</span>, <span name="scala.Product" class="extype">Product</span>, <span name="scala.Equals" class="extype">Equals</span>, AnyRef, <span name="scala.Any" class="extype">Any</span></div>
+        </div></div>
+    
+
+      <div id="mbrsel">
+        <div id="textfilter"><span class="pre"></span><span class="input"><input accesskey="/" type="text" /></span><span class="post"></span></div>
+        <div id="order">
+              <span class="filtertype">Ordering</span>
+              <ol><li class="alpha in"><span>Alphabetic</span></li><li class="inherit out"><span>By inheritance</span></li></ol>
+            </div>
+        <div id="ancestors">
+              <span class="filtertype">Inherited</span>
+              <ol><li class="hideall out"><span>Hide All</span></li>
+              <li class="showall in"><span>Show all</span></li></ol>
+              <ol id="linearization"><li name="reactivemongo.api.Collection" class="in"><span>Collection</span></li><li name="scala.Serializable" class="in"><span>Serializable</span></li><li name="java.io.Serializable" class="in"><span>Serializable</span></li><li name="scala.Product" class="in"><span>Product</span></li><li name="scala.Equals" class="in"><span>Equals</span></li><li name="scala.AnyRef" class="in"><span>AnyRef</span></li><li name="scala.Any" class="in"><span>Any</span></li></ol>
+            </div>
+        <div id="visbl">
+            <span class="filtertype">Visibility</span>
+            <ol><li class="public in"><span>Public</span></li><li class="all out"><span>All</span></li></ol>
+          </div>
+      </div>
+
+      <div id="template">
+        <div id="allMembers">
+        <div class="members" id="constructors">
+              <h3>Instance Constructors</h3>
+              <ol><li visbl="pub" name="reactivemongo.api.Collection#this" data-isabs="false">
+      <a id="this:Collection"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">new</span>
+      </span>
+      <span class="symbol">
+        <span class="name">Collection</span><span class="params">(<span name="db">db: <a name="reactivemongo.api.DB" class="extype" href="DB.html">DB</a></span>, <span name="collectionName">collectionName: String</span>, <span name="connection">connection: <a name="reactivemongo.api.MongoConnection" class="extype" href="MongoConnection.html">MongoConnection</a></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="timeout">timeout: <span name="scala.concurrent.util.Duration" class="extype">Duration</span></span>, <span name="context">context: <span name="scala.concurrent.ExecutionContext" class="extype">ExecutionContext</span></span>)</span>
+      </span>
+      </h4>
+      <p class="shortcomment cmt"></p><div class="fullcomment"><div class="comment cmt"></div><dl class="paramcmts block"><dt class="param">db</dt><dd class="cmt"><p>database.</p></dd><dt class="param">collectionName</dt><dd class="cmt"><p>the name of this collection.</p></dd><dt class="param">connection</dt><dd class="cmt"><p>the <a name="reactivemongo.api.MongoConnection" class="extype" href="MongoConnection.html">MongoConnection</a> that will be used to query this database.</p></dd><dt class="param">timeout</dt><dd class="cmt"><p>the default timeout for the queries.
+</p></dd></dl></div>
+    </li></ol>
+            </div>
+
+        
+
+        
+
+        <div class="values members" id="values">
+              <h3>Value Members</h3>
+              <ol><li visbl="pub" name="scala.AnyRef#!=" data-isabs="false">
+      <a id="!=(AnyRef):Boolean"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">final </span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name" title="gt4s: $bang$eq">!=</span><span class="params">(<span name="arg0">arg0: AnyRef</span>)</span><span class="result">: <span name="scala.Boolean" class="extype">Boolean</span></span>
+      </span>
+      </h4>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>AnyRef</dd></dl></div>
+    </li><li visbl="pub" name="scala.Any#!=" data-isabs="false">
+      <a id="!=(Any):Boolean"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">final </span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name" title="gt4s: $bang$eq">!=</span><span class="params">(<span name="arg0">arg0: <span name="scala.Any" class="extype">Any</span></span>)</span><span class="result">: <span name="scala.Boolean" class="extype">Boolean</span></span>
+      </span>
+      </h4>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>Any</dd></dl></div>
+    </li><li visbl="pub" name="scala.AnyRef###" data-isabs="false">
+      <a id="##():Int"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">final </span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name" title="gt4s: $hash$hash">##</span><span class="params">()</span><span class="result">: <span name="scala.Int" class="extype">Int</span></span>
+      </span>
+      </h4>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>AnyRef → Any</dd></dl></div>
+    </li><li visbl="pub" name="scala.AnyRef#==" data-isabs="false">
+      <a id="==(AnyRef):Boolean"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">final </span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name" title="gt4s: $eq$eq">==</span><span class="params">(<span name="arg0">arg0: AnyRef</span>)</span><span class="result">: <span name="scala.Boolean" class="extype">Boolean</span></span>
+      </span>
+      </h4>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>AnyRef</dd></dl></div>
+    </li><li visbl="pub" name="scala.Any#==" data-isabs="false">
+      <a id="==(Any):Boolean"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">final </span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name" title="gt4s: $eq$eq">==</span><span class="params">(<span name="arg0">arg0: <span name="scala.Any" class="extype">Any</span></span>)</span><span class="result">: <span name="scala.Boolean" class="extype">Boolean</span></span>
+      </span>
+      </h4>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>Any</dd></dl></div>
+    </li><li visbl="pub" name="scala.Any#asInstanceOf" data-isabs="false">
+      <a id="asInstanceOf[T0]:T0"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">final </span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">asInstanceOf</span><span class="tparams">[<span name="T0">T0</span>]</span><span class="result">: T0</span>
+      </span>
+      </h4>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>Any</dd></dl></div>
+    </li><li visbl="pub" name="reactivemongo.api.Collection#canEqual" data-isabs="false">
+      <a id="canEqual(Any):Boolean"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">canEqual</span><span class="params">(<span name="arg0">arg0: <span name="scala.Any" class="extype">Any</span></span>)</span><span class="result">: <span name="scala.Boolean" class="extype">Boolean</span></span>
+      </span>
+      </h4>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd><a name="reactivemongo.api.Collection" class="extype" href="">Collection</a> → Equals</dd></dl></div>
+    </li><li visbl="prt" name="scala.AnyRef#clone" data-isabs="false">
+      <a id="clone():AnyRef"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">clone</span><span class="params">()</span><span class="result">: AnyRef</span>
+      </span>
+      </h4>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Attributes</dt><dd>protected[<a name="java.lang" class="extype" href="../../java/lang/package.html">lang</a>] </dd><dt>Definition Classes</dt><dd>AnyRef</dd><dt>Annotations</dt><dd>
+                <span class="name">@throws</span><span class="args">()</span>
+              
+        </dd></dl></div>
+    </li><li visbl="pub" name="reactivemongo.api.Collection#collectionName" data-isabs="false">
+      <a id="collectionName:String"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">val</span>
+      </span>
+      <span class="symbol">
+        <span class="name">collectionName</span><span class="result">: String</span>
+      </span>
+      </h4>
+      <p class="shortcomment cmt">the name of this collection.</p>
+    </li><li visbl="pub" name="reactivemongo.api.Collection#connection" data-isabs="false">
+      <a id="connection:MongoConnection"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">val</span>
+      </span>
+      <span class="symbol">
+        <span class="name">connection</span><span class="result">: <a name="reactivemongo.api.MongoConnection" class="extype" href="MongoConnection.html">MongoConnection</a></span>
+      </span>
+      </h4>
+      <p class="shortcomment cmt">the <a name="reactivemongo.api.MongoConnection" class="extype" href="MongoConnection.html">MongoConnection</a> that will be used to query this database.</p>
+    </li><li visbl="pub" name="reactivemongo.api.Collection#db" data-isabs="false">
+      <a id="db:DB"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">val</span>
+      </span>
+      <span class="symbol">
+        <span class="name">db</span><span class="result">: <a name="reactivemongo.api.DB" class="extype" href="DB.html">DB</a></span>
+      </span>
+      </h4>
+      <p class="shortcomment cmt">database.</p>
+    </li><li visbl="pub" name="scala.AnyRef#eq" data-isabs="false">
+      <a id="eq(AnyRef):Boolean"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">final </span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">eq</span><span class="params">(<span name="arg0">arg0: AnyRef</span>)</span><span class="result">: <span name="scala.Boolean" class="extype">Boolean</span></span>
+      </span>
+      </h4>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>AnyRef</dd></dl></div>
+    </li><li visbl="pub" name="reactivemongo.api.Collection#equals" data-isabs="false">
+      <a id="equals(Any):Boolean"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">equals</span><span class="params">(<span name="arg0">arg0: <span name="scala.Any" class="extype">Any</span></span>)</span><span class="result">: <span name="scala.Boolean" class="extype">Boolean</span></span>
+      </span>
+      </h4>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd><a name="reactivemongo.api.Collection" class="extype" href="">Collection</a> → Equals → AnyRef → Any</dd></dl></div>
+    </li><li visbl="prt" name="scala.AnyRef#finalize" data-isabs="false">
+      <a id="finalize():Unit"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">finalize</span><span class="params">()</span><span class="result">: <span name="scala.Unit" class="extype">Unit</span></span>
+      </span>
+      </h4>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Attributes</dt><dd>protected[<a name="java.lang" class="extype" href="../../java/lang/package.html">lang</a>] </dd><dt>Definition Classes</dt><dd>AnyRef</dd><dt>Annotations</dt><dd>
+                <span class="name">@throws</span><span class="args">()</span>
+              
+        </dd></dl></div>
+    </li><li visbl="pub" name="reactivemongo.api.Collection#find" data-isabs="false">
+      <a id="find[Rst](QueryBuilder)(BSONReaderHandler,BSONReader[Rst]):FlattenedCursor[Rst]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">find</span><span class="tparams">[<span name="Rst">Rst</span>]</span><span class="params">(<span name="query">query: <a name="reactivemongo.api.QueryBuilder" class="extype" href="QueryBuilder.html">QueryBuilder</a></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="handler">handler: <a name="reactivemongo.bson.handlers.BSONReaderHandler" class="extype" href="../bson/handlers/BSONReaderHandler.html">BSONReaderHandler</a></span>, <span name="reader">reader: <a name="reactivemongo.bson.handlers.BSONReader" class="extype" href="../bson/handlers/BSONReader.html">BSONReader</a>[Rst]</span>)</span><span class="result">: <a name="reactivemongo.api.FlattenedCursor" class="extype" href="FlattenedCursor.html">FlattenedCursor</a>[Rst]</span>
+      </span>
+      </h4>
+      <p class="shortcomment cmt">Find the documents matching the given criteria, using the given <a name="reactivemongo.api.QueryBuilder" class="extype" href="QueryBuilder.html">QueryBuilder</a> instance.</p><div class="fullcomment"><div class="comment cmt"><p>Find the documents matching the given criteria, using the given <a name="reactivemongo.api.QueryBuilder" class="extype" href="QueryBuilder.html">QueryBuilder</a> instance.</p><p>Please take a look to the <a href="http://www.mongodb.org/display/DOCS/Querying">mongodb documentation</a> to know how querying works.
+</p></div><dl class="paramcmts block"><dt class="tparam">Rst</dt><dd class="cmt"><p>the type of the matched documents. An implicit <a name="reactivemongo.bson.handlers.BSONReader" class="extype" href="../bson/handlers/BSONReader.html">BSONReader</a>[Rst] typeclass for handling it has to be in the scope.
+</p></dd><dt class="param">query</dt><dd class="cmt"><p>The selector query.
+</p></dd><dt>returns</dt><dd class="cmt"><p>a cursor over the matched documents. You can get an enumerator for it, please see the <a name="reactivemongo.api.Cursor" class="extype" href="Cursor.html">Cursor</a> companion object.
+</p></dd></dl></div>
+    </li><li visbl="pub" name="reactivemongo.api.Collection#find" data-isabs="false">
+      <a id="find[Rst](QueryBuilder,QueryOpts)(BSONReaderHandler,BSONReader[Rst]):FlattenedCursor[Rst]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">find</span><span class="tparams">[<span name="Rst">Rst</span>]</span><span class="params">(<span name="query">query: <a name="reactivemongo.api.QueryBuilder" class="extype" href="QueryBuilder.html">QueryBuilder</a></span>, <span name="opts">opts: <a name="reactivemongo.api.QueryOpts" class="extype" href="QueryOpts.html">QueryOpts</a></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="handler">handler: <a name="reactivemongo.bson.handlers.BSONReaderHandler" class="extype" href="../bson/handlers/BSONReaderHandler.html">BSONReaderHandler</a></span>, <span name="reader">reader: <a name="reactivemongo.bson.handlers.BSONReader" class="extype" href="../bson/handlers/BSONReader.html">BSONReader</a>[Rst]</span>)</span><span class="result">: <a name="reactivemongo.api.FlattenedCursor" class="extype" href="FlattenedCursor.html">FlattenedCursor</a>[Rst]</span>
+      </span>
+      </h4>
+      <p class="shortcomment cmt">Find the documents matching the given criteria, using the given <a name="reactivemongo.api.QueryBuilder" class="extype" href="QueryBuilder.html">QueryBuilder</a> instance.</p><div class="fullcomment"><div class="comment cmt"><p>Find the documents matching the given criteria, using the given <a name="reactivemongo.api.QueryBuilder" class="extype" href="QueryBuilder.html">QueryBuilder</a> instance.</p><p>Please take a look to the <a href="http://www.mongodb.org/display/DOCS/Querying">mongodb documentation</a> to know how querying works.
+</p></div><dl class="paramcmts block"><dt class="tparam">Rst</dt><dd class="cmt"><p>the type of the matched documents. An implicit <a name="reactivemongo.bson.handlers.BSONReader" class="extype" href="../bson/handlers/BSONReader.html">BSONReader</a>[Rst] typeclass for handling it has to be in the scope.
+</p></dd><dt class="param">query</dt><dd class="cmt"><p>The selector query.</p></dd><dt class="param">opts</dt><dd class="cmt"><p>The query options (skip, batchSize, flags...).
+</p></dd><dt>returns</dt><dd class="cmt"><p>a cursor over the matched documents. You can get an enumerator for it, please see the org.asyncmongo.api.Cursor companion object.
+</p></dd></dl></div>
+    </li><li visbl="pub" name="reactivemongo.api.Collection#find" data-isabs="false">
+      <a id="find[Qry, Rst](Qry)(BSONWriter[Qry],BSONReaderHandler,BSONReader[Rst]):FlattenedCursor[Rst]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">find</span><span class="tparams">[<span name="Qry">Qry</span>, <span name="Rst">Rst</span>]</span><span class="params">(<span name="query">query: Qry</span>)</span><span class="params">(<span class="implicit">implicit </span><span name="writer">writer: <a name="reactivemongo.bson.handlers.BSONWriter" class="extype" href="../bson/handlers/BSONWriter.html">BSONWriter</a>[Qry]</span>, <span name="handler">handler: <a name="reactivemongo.bson.handlers.BSONReaderHandler" class="extype" href="../bson/handlers/BSONReaderHandler.html">BSONReaderHandler</a></span>, <span name="reader">reader: <a name="reactivemongo.bson.handlers.BSONReader" class="extype" href="../bson/handlers/BSONReader.html">BSONReader</a>[Rst]</span>)</span><span class="result">: <a name="reactivemongo.api.FlattenedCursor" class="extype" href="FlattenedCursor.html">FlattenedCursor</a>[Rst]</span>
+      </span>
+      </h4>
+      <p class="shortcomment cmt">Find the documents matching the given criteria.</p><div class="fullcomment"><div class="comment cmt"><p>Find the documents matching the given criteria.</p><p>This method accepts any query object, provided that there is an implicit <a name="reactivemongo.bson.handlers.BSONWriter" class="extype" href="../bson/handlers/BSONWriter.html">BSONWriter</a> typeclass for handling it in the scope.
+You can use the typeclasses defined in org.asyncmongo.handlers.DefaultBSONHandlers object.</p><p>Please take a look to the <a href="http://www.mongodb.org/display/DOCS/Querying">mongodb documentation</a> to know how querying works.
+</p></div><dl class="paramcmts block"><dt class="tparam">Qry</dt><dd class="cmt"><p>the type of the query. An implicit <a name="reactivemongo.bson.handlers.BSONWriter" class="extype" href="../bson/handlers/BSONWriter.html">BSONWriter</a>[Qry] typeclass for handling it has to be in the scope.</p></dd><dt class="tparam">Rst</dt><dd class="cmt"><p>the type of the matched documents. An implicit <a name="reactivemongo.bson.handlers.BSONReader" class="extype" href="../bson/handlers/BSONReader.html">BSONReader</a>[Rst] typeclass for handling it has to be in the scope.
+</p></dd><dt class="param">query</dt><dd class="cmt"><p>The selector query.
+</p></dd><dt>returns</dt><dd class="cmt"><p>a cursor over the matched documents. You can get an enumerator for it, please see the <a name="reactivemongo.api.Cursor" class="extype" href="Cursor.html">Cursor</a> companion object.
+</p></dd></dl></div>
+    </li><li visbl="pub" name="reactivemongo.api.Collection#find" data-isabs="false">
+      <a id="find[Qry, Rst](Qry,QueryOpts)(BSONWriter[Qry],BSONReaderHandler,BSONReader[Rst]):FlattenedCursor[Rst]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">find</span><span class="tparams">[<span name="Qry">Qry</span>, <span name="Rst">Rst</span>]</span><span class="params">(<span name="query">query: Qry</span>, <span name="opts">opts: <a name="reactivemongo.api.QueryOpts" class="extype" href="QueryOpts.html">QueryOpts</a></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="writer">writer: <a name="reactivemongo.bson.handlers.BSONWriter" class="extype" href="../bson/handlers/BSONWriter.html">BSONWriter</a>[Qry]</span>, <span name="handler">handler: <a name="reactivemongo.bson.handlers.BSONReaderHandler" class="extype" href="../bson/handlers/BSONReaderHandler.html">BSONReaderHandler</a></span>, <span name="reader">reader: <a name="reactivemongo.bson.handlers.BSONReader" class="extype" href="../bson/handlers/BSONReader.html">BSONReader</a>[Rst]</span>)</span><span class="result">: <a name="reactivemongo.api.FlattenedCursor" class="extype" href="FlattenedCursor.html">FlattenedCursor</a>[Rst]</span>
+      </span>
+      </h4>
+      <p class="shortcomment cmt">Find the documents matching the given criteria.</p><div class="fullcomment"><div class="comment cmt"><p>Find the documents matching the given criteria.</p><p>This method accepts any query object, provided that there is an implicit <a name="reactivemongo.bson.handlers.BSONWriter" class="extype" href="../bson/handlers/BSONWriter.html">BSONWriter</a> typeclass for handling it in the scope.
+You can use the typeclasses defined in org.asyncmongo.handlers.DefaultBSONHandlers object.</p><p>Please take a look to the <a href="http://www.mongodb.org/display/DOCS/Querying">mongodb documentation</a> to know how querying works.
+</p></div><dl class="paramcmts block"><dt class="tparam">Qry</dt><dd class="cmt"><p>the type of the query. An implicit <a name="reactivemongo.bson.handlers.BSONWriter" class="extype" href="../bson/handlers/BSONWriter.html">BSONWriter</a>[Qry] typeclass for handling it has to be in the scope.</p></dd><dt class="tparam">Rst</dt><dd class="cmt"><p>the type of the matched documents. An implicit <a name="reactivemongo.bson.handlers.BSONReader" class="extype" href="../bson/handlers/BSONReader.html">BSONReader</a>[Rst] typeclass for handling it has to be in the scope.
+</p></dd><dt class="param">query</dt><dd class="cmt"><p>The selector query.</p></dd><dt class="param">opts</dt><dd class="cmt"><p>The query options (skip, batchSize, flags...).
+</p></dd><dt>returns</dt><dd class="cmt"><p>a cursor over the matched documents. You can get an enumerator for it, please see the org.asyncmongo.api.Cursor companion object.
+</p></dd></dl></div>
+    </li><li visbl="pub" name="reactivemongo.api.Collection#find" data-isabs="false">
+      <a id="find[Qry, Pjn, Rst](Qry,Pjn,QueryOpts)(BSONWriter[Qry],BSONWriter[Pjn],BSONReaderHandler,BSONReader[Rst]):FlattenedCursor[Rst]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">find</span><span class="tparams">[<span name="Qry">Qry</span>, <span name="Pjn">Pjn</span>, <span name="Rst">Rst</span>]</span><span class="params">(<span name="query">query: Qry</span>, <span name="projection">projection: Pjn</span>, <span name="opts">opts: <a name="reactivemongo.api.QueryOpts" class="extype" href="QueryOpts.html">QueryOpts</a></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="writer">writer: <a name="reactivemongo.bson.handlers.BSONWriter" class="extype" href="../bson/handlers/BSONWriter.html">BSONWriter</a>[Qry]</span>, <span name="writer2">writer2: <a name="reactivemongo.bson.handlers.BSONWriter" class="extype" href="../bson/handlers/BSONWriter.html">BSONWriter</a>[Pjn]</span>, <span name="handler">handler: <a name="reactivemongo.bson.handlers.BSONReaderHandler" class="extype" href="../bson/handlers/BSONReaderHandler.html">BSONReaderHandler</a></span>, <span name="reader">reader: <a name="reactivemongo.bson.handlers.BSONReader" class="extype" href="../bson/handlers/BSONReader.html">BSONReader</a>[Rst]</span>)</span><span class="result">: <a name="reactivemongo.api.FlattenedCursor" class="extype" href="FlattenedCursor.html">FlattenedCursor</a>[Rst]</span>
+      </span>
+      </h4>
+      <p class="shortcomment cmt">Find the documents matching the given criteria.</p><div class="fullcomment"><div class="comment cmt"><p>Find the documents matching the given criteria.</p><p>This method accepts any query and projection object, provided that there is an implicit <a name="reactivemongo.bson.handlers.BSONWriter" class="extype" href="../bson/handlers/BSONWriter.html">BSONWriter</a> typeclass for handling them in the scope.
+You can use the typeclasses defined in reactivemongo.bson.handlers.DefaultBSONHandlers object.</p><p>Please take a look to the <a href="http://www.mongodb.org/display/DOCS/Querying">mongodb documentation</a> to know how querying works.
+</p></div><dl class="paramcmts block"><dt class="tparam">Qry</dt><dd class="cmt"><p>the type of the query. An implicit <a name="reactivemongo.bson.handlers.BSONWriter" class="extype" href="../bson/handlers/BSONWriter.html">BSONWriter</a>[Qry] typeclass for handling it has to be in the scope.</p></dd><dt class="tparam">Pjn</dt><dd class="cmt"><p>the type of the projection object. An implicit <a name="reactivemongo.bson.handlers.BSONWriter" class="extype" href="../bson/handlers/BSONWriter.html">BSONWriter</a>[Pjn] typeclass for handling it has to be in the scope.</p></dd><dt class="tparam">Rst</dt><dd class="cmt"><p>the type of the matched documents. An implicit <a name="reactivemongo.bson.handlers.BSONReader" class="extype" href="../bson/handlers/BSONReader.html">BSONReader</a>[Rst] typeclass for handling it has to be in the scope.
+</p></dd><dt class="param">query</dt><dd class="cmt"><p>The selector query.</p></dd><dt class="param">projection</dt><dd class="cmt"><p>Get only a subset of each matched documents. Defaults to None.</p></dd><dt class="param">opts</dt><dd class="cmt"><p>The query options (skip, batchSize, flags...).
+</p></dd><dt>returns</dt><dd class="cmt"><p>a cursor over the matched documents. You can get an enumerator for it, please see the <a name="reactivemongo.api.Cursor" class="extype" href="Cursor.html">Cursor</a> companion object.
+</p></dd></dl></div>
+    </li><li visbl="pub" name="reactivemongo.api.Collection#fullCollectionName" data-isabs="false">
+      <a id="fullCollectionName:String"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">lazy val</span>
+      </span>
+      <span class="symbol">
+        <span class="name">fullCollectionName</span><span class="result">: <span name="java.lang.String" class="extype">String</span></span>
+      </span>
+      </h4>
+      <p class="shortcomment cmt">The full collection name.</p>
+    </li><li visbl="pub" name="scala.AnyRef#getClass" data-isabs="false">
+      <a id="getClass():java.lang.Class[_]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">final </span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">getClass</span><span class="params">()</span><span class="result">: java.lang.Class[_]</span>
+      </span>
+      </h4>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>AnyRef → Any</dd></dl></div>
+    </li><li visbl="pub" name="reactivemongo.api.Collection#hashCode" data-isabs="false">
+      <a id="hashCode():Int"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">hashCode</span><span class="params">()</span><span class="result">: <span name="scala.Int" class="extype">Int</span></span>
+      </span>
+      </h4>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd><a name="reactivemongo.api.Collection" class="extype" href="">Collection</a> → AnyRef → Any</dd></dl></div>
+    </li><li visbl="pub" name="reactivemongo.api.Collection#indexes" data-isabs="false">
+      <a id="indexes:CollectionIndexesManager"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">lazy val</span>
+      </span>
+      <span class="symbol">
+        <span class="name">indexes</span><span class="result">: <a name="reactivemongo.api.indexes.CollectionIndexesManager" class="extype" href="indexes/CollectionIndexesManager.html">CollectionIndexesManager</a></span>
+      </span>
+      </h4>
+      <p class="shortcomment cmt">The index manager for this collection.</p>
+    </li><li visbl="pub" name="reactivemongo.api.Collection#insert" data-isabs="false">
+      <a id="insert[T](Enumerator[T],Int,Int)(BSONWriter[T]):Future[Int]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">insert</span><span class="tparams">[<span name="T">T</span>]</span><span class="params">(<span name="enumerator">enumerator: <span name="play.api.libs.iteratee.Enumerator" class="extype">Enumerator</span>[T]</span>, <span name="bulkSize">bulkSize: <span name="scala.Int" class="extype">Int</span></span>, <span name="bulkByteSize">bulkByteSize: <span name="scala.Int" class="extype">Int</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="writer">writer: <a name="reactivemongo.bson.handlers.BSONWriter" class="extype" href="../bson/handlers/BSONWriter.html">BSONWriter</a>[T]</span>)</span><span class="result">: <span name="scala.concurrent.Future" class="extype">Future</span>[<span name="scala.Int" class="extype">Int</span>]</span>
+      </span>
+      </h4>
+      <p class="shortcomment cmt">Inserts the documents provided by the given enumerator into the collection and eventually returns the number of inserted documents.</p><div class="fullcomment"><div class="comment cmt"><p>Inserts the documents provided by the given enumerator into the collection and eventually returns the number of inserted documents.</p></div><dl class="paramcmts block"><dt class="tparam">T</dt><dd class="cmt"><p>the type of the document to insert. An implicit <a name="reactivemongo.bson.handlers.BSONWriter" class="extype" href="../bson/handlers/BSONWriter.html">BSONWriter</a>[T] typeclass for handling it has to be in the scope.
+</p></dd><dt class="param">enumerator</dt><dd class="cmt"><p>An enumerator of <b>T</b>.</p></dd><dt class="param">bulkSize</dt><dd class="cmt"><p>The number of documents per bulk.</p></dd><dt class="param">bulkByteSize</dt><dd class="cmt"><p>The maximum size for a bulk, in bytes.
+</p></dd><dt>returns</dt><dd class="cmt"><p>a future reactivemongo.core.protocol.commands.LastError that can be used to check whether the insertion was successful.
+</p></dd></dl></div>
+    </li><li visbl="pub" name="reactivemongo.api.Collection#insert" data-isabs="false">
+      <a id="insert[T](T)(BSONWriter[T]):Future[LastError]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">insert</span><span class="tparams">[<span name="T">T</span>]</span><span class="params">(<span name="document">document: T</span>)</span><span class="params">(<span class="implicit">implicit </span><span name="writer">writer: <a name="reactivemongo.bson.handlers.BSONWriter" class="extype" href="../bson/handlers/BSONWriter.html">BSONWriter</a>[T]</span>)</span><span class="result">: <span name="scala.concurrent.Future" class="extype">Future</span>[<a name="reactivemongo.core.commands.LastError" class="extype" href="../core/commands/LastError.html">LastError</a>]</span>
+      </span>
+      </h4>
+      <p class="shortcomment cmt">Inserts a document into the collection and wait for the reactivemongo.core.protocol.commands.LastError result.</p><div class="fullcomment"><div class="comment cmt"><p>Inserts a document into the collection and wait for the reactivemongo.core.protocol.commands.LastError result.</p><p>Please read the documentation about reactivemongo.core.protocol.commands.GetLastError to know how to use it properly.
+</p></div><dl class="paramcmts block"><dt class="tparam">T</dt><dd class="cmt"><p>the type of the document to insert. An implicit <a name="reactivemongo.bson.handlers.BSONWriter" class="extype" href="../bson/handlers/BSONWriter.html">BSONWriter</a>[T] typeclass for handling it has to be in the scope.
+</p></dd><dt class="param">document</dt><dd class="cmt"><p>the document to insert.
+</p></dd><dt>returns</dt><dd class="cmt"><p>a future reactivemongo.core.protocol.commands.LastError that can be used to check whether the insertion was successful.
+</p></dd></dl></div>
+    </li><li visbl="pub" name="reactivemongo.api.Collection#insert" data-isabs="false">
+      <a id="insert[T](T,GetLastError)(BSONWriter[T]):Future[LastError]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">insert</span><span class="tparams">[<span name="T">T</span>]</span><span class="params">(<span name="document">document: T</span>, <span name="writeConcern">writeConcern: <a name="reactivemongo.core.commands.GetLastError" class="extype" href="../core/commands/GetLastError.html">GetLastError</a></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="writer">writer: <a name="reactivemongo.bson.handlers.BSONWriter" class="extype" href="../bson/handlers/BSONWriter.html">BSONWriter</a>[T]</span>)</span><span class="result">: <span name="scala.concurrent.Future" class="extype">Future</span>[<a name="reactivemongo.core.commands.LastError" class="extype" href="../core/commands/LastError.html">LastError</a>]</span>
+      </span>
+      </h4>
+      <p class="shortcomment cmt">Inserts a document into the collection and wait for the reactivemongo.core.protocol.commands.LastError result.</p><div class="fullcomment"><div class="comment cmt"><p>Inserts a document into the collection and wait for the reactivemongo.core.protocol.commands.LastError result.</p><p>Please read the documentation about reactivemongo.core.protocol.commands.GetLastError to know how to use it properly.
+</p></div><dl class="paramcmts block"><dt class="tparam">T</dt><dd class="cmt"><p>the type of the document to insert. An implicit <a name="reactivemongo.bson.handlers.BSONWriter" class="extype" href="../bson/handlers/BSONWriter.html">BSONWriter</a>[T] typeclass for handling it has to be in the scope.
+</p></dd><dt class="param">document</dt><dd class="cmt"><p>the document to insert.</p></dd><dt class="param">writeConcern</dt><dd class="cmt"><p>the reactivemongo.core.protocol.commands.GetLastError command message to send in order to control how the document is inserted. Defaults to GetLastError().
+</p></dd><dt>returns</dt><dd class="cmt"><p>a future reactivemongo.core.protocol.commands.LastError that can be used to check whether the insertion was successful.
+</p></dd></dl></div>
+    </li><li visbl="pub" name="reactivemongo.api.Collection#insertIteratee" data-isabs="false">
+      <a id="insertIteratee[T](Int,Int)(BSONWriter[T]):Iteratee[T, Int]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">insertIteratee</span><span class="tparams">[<span name="T">T</span>]</span><span class="params">(<span name="bulkSize">bulkSize: <span name="scala.Int" class="extype">Int</span> = <span class="symbol"><span class="name"><a href="bulk$.html">bulk.MaxDocs</a></span></span></span>, <span name="bulkByteSize">bulkByteSize: <span name="scala.Int" class="extype">Int</span> = <span class="symbol"><span class="name"><a href="bulk$.html">bulk.MaxBulkSize</a></span></span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="writer">writer: <a name="reactivemongo.bson.handlers.BSONWriter" class="extype" href="../bson/handlers/BSONWriter.html">BSONWriter</a>[T]</span>)</span><span class="result">: <span name="play.api.libs.iteratee.Iteratee" class="extype">Iteratee</span>[T, <span name="scala.Int" class="extype">Int</span>]</span>
+      </span>
+      </h4>
+      <p class="shortcomment cmt">Returns an iteratee that will insert the documents it feeds.</p><div class="fullcomment"><div class="comment cmt"><p>Returns an iteratee that will insert the documents it feeds.</p><p>This iteratee eventually gives the number of documents that have been inserted into the collection.
+</p></div><dl class="paramcmts block"><dt class="tparam">T</dt><dd class="cmt"><p>the type of the documents to insert. An implicit <a name="reactivemongo.bson.handlers.BSONWriter" class="extype" href="../bson/handlers/BSONWriter.html">BSONWriter</a>[T] typeclass for handling it has to be in the scope.</p></dd><dt class="param">bulkSize</dt><dd class="cmt"><p>The number of documents per bulk.</p></dd><dt class="param">bulkByteSize</dt><dd class="cmt"><p>The maximum size for a bulk, in bytes.
+</p></dd></dl></div>
+    </li><li visbl="pub" name="scala.Any#isInstanceOf" data-isabs="false">
+      <a id="isInstanceOf[T0]:Boolean"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">final </span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">isInstanceOf</span><span class="tparams">[<span name="T0">T0</span>]</span><span class="result">: <span name="scala.Boolean" class="extype">Boolean</span></span>
+      </span>
+      </h4>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>Any</dd></dl></div>
+    </li><li visbl="pub" name="scala.AnyRef#ne" data-isabs="false">
+      <a id="ne(AnyRef):Boolean"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">final </span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">ne</span><span class="params">(<span name="arg0">arg0: AnyRef</span>)</span><span class="result">: <span name="scala.Boolean" class="extype">Boolean</span></span>
+      </span>
+      </h4>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>AnyRef</dd></dl></div>
+    </li><li visbl="pub" name="scala.AnyRef#notify" data-isabs="false">
+      <a id="notify():Unit"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">final </span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">notify</span><span class="params">()</span><span class="result">: <span name="scala.Unit" class="extype">Unit</span></span>
+      </span>
+      </h4>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>AnyRef</dd></dl></div>
+    </li><li visbl="pub" name="scala.AnyRef#notifyAll" data-isabs="false">
+      <a id="notifyAll():Unit"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">final </span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">notifyAll</span><span class="params">()</span><span class="result">: <span name="scala.Unit" class="extype">Unit</span></span>
+      </span>
+      </h4>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>AnyRef</dd></dl></div>
+    </li><li visbl="pub" name="reactivemongo.api.Collection#productArity" data-isabs="false">
+      <a id="productArity:Int"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">productArity</span><span class="result">: <span name="scala.Int" class="extype">Int</span></span>
+      </span>
+      </h4>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd><a name="reactivemongo.api.Collection" class="extype" href="">Collection</a> → Product</dd></dl></div>
+    </li><li visbl="pub" name="reactivemongo.api.Collection#productElement" data-isabs="false">
+      <a id="productElement(Int):Any"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">productElement</span><span class="params">(<span name="arg0">arg0: <span name="scala.Int" class="extype">Int</span></span>)</span><span class="result">: <span name="scala.Any" class="extype">Any</span></span>
+      </span>
+      </h4>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd><a name="reactivemongo.api.Collection" class="extype" href="">Collection</a> → Product</dd></dl></div>
+    </li><li visbl="pub" name="scala.Product#productIterator" data-isabs="false">
+      <a id="productIterator:Iterator[Any]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">productIterator</span><span class="result">: Iterator[<span name="scala.Any" class="extype">Any</span>]</span>
+      </span>
+      </h4>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>Product</dd></dl></div>
+    </li><li visbl="pub" name="reactivemongo.api.Collection#productPrefix" data-isabs="false">
+      <a id="productPrefix:String"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">productPrefix</span><span class="result">: <span name="java.lang.String" class="extype">String</span></span>
+      </span>
+      </h4>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd><a name="reactivemongo.api.Collection" class="extype" href="">Collection</a> → Product</dd></dl></div>
+    </li><li visbl="pub" name="reactivemongo.api.Collection#remove" data-isabs="false">
+      <a id="remove[T](T,GetLastError,Boolean)(BSONWriter[T]):Future[LastError]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">remove</span><span class="tparams">[<span name="T">T</span>]</span><span class="params">(<span name="query">query: T</span>, <span name="writeConcern">writeConcern: <a name="reactivemongo.core.commands.GetLastError" class="extype" href="../core/commands/GetLastError.html">GetLastError</a></span>, <span name="firstMatchOnly">firstMatchOnly: <span name="scala.Boolean" class="extype">Boolean</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="writer">writer: <a name="reactivemongo.bson.handlers.BSONWriter" class="extype" href="../bson/handlers/BSONWriter.html">BSONWriter</a>[T]</span>)</span><span class="result">: <span name="scala.concurrent.Future" class="extype">Future</span>[<a name="reactivemongo.core.commands.LastError" class="extype" href="../core/commands/LastError.html">LastError</a>]</span>
+      </span>
+      </h4>
+      <p class="shortcomment cmt">Remove the matched document(s) from the collection and wait for the reactivemongo.core.protocol.commands.LastError result.</p><div class="fullcomment"><div class="comment cmt"><p>Remove the matched document(s) from the collection and wait for the reactivemongo.core.protocol.commands.LastError result.</p><p>Please read the documentation about reactivemongo.core.protocol.commands.GetLastError to know how to use it properly.
+</p></div><dl class="paramcmts block"><dt class="tparam">T</dt><dd class="cmt"><p>the type of the selector of documents to remove. An implicit <a name="reactivemongo.bson.handlers.BSONWriter" class="extype" href="../bson/handlers/BSONWriter.html">BSONWriter</a>[T] typeclass for handling it has to be in the scope.
+</p></dd><dt class="param">query</dt><dd class="cmt"><p>the selector of documents to remove.</p></dd><dt class="param">writeConcern</dt><dd class="cmt"><p>the reactivemongo.core.protocol.commands.GetLastError command message to send in order to control how the documents are removed. Defaults to GetLastError().</p></dd><dt class="param">firstMatchOnly</dt><dd class="cmt"><p>states whether only the first matched documents has to be removed from this collection.
+</p></dd><dt>returns</dt><dd class="cmt"><p>a future reactivemongo.core.protocol.commands.LastError that can be used to check whether the removal was successful.
+</p></dd></dl></div>
+    </li><li visbl="pub" name="scala.AnyRef#synchronized" data-isabs="false">
+      <a id="synchronized[T0](⇒ T0):T0"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">final </span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">synchronized</span><span class="tparams">[<span name="T0">T0</span>]</span><span class="params">(<span name="arg0">arg0: ⇒ T0</span>)</span><span class="result">: T0</span>
+      </span>
+      </h4>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>AnyRef</dd></dl></div>
+    </li><li visbl="pub" name="reactivemongo.api.Collection#toString" data-isabs="false">
+      <a id="toString():String"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">toString</span><span class="params">()</span><span class="result">: String</span>
+      </span>
+      </h4>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd><a name="reactivemongo.api.Collection" class="extype" href="">Collection</a> → AnyRef → Any</dd></dl></div>
+    </li><li visbl="pub" name="reactivemongo.api.Collection#uncheckedInsert" data-isabs="false">
+      <a id="uncheckedInsert[T](T)(BSONWriter[T]):Unit"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">uncheckedInsert</span><span class="tparams">[<span name="T">T</span>]</span><span class="params">(<span name="document">document: T</span>)</span><span class="params">(<span class="implicit">implicit </span><span name="writer">writer: <a name="reactivemongo.bson.handlers.BSONWriter" class="extype" href="../bson/handlers/BSONWriter.html">BSONWriter</a>[T]</span>)</span><span class="result">: <span name="scala.Unit" class="extype">Unit</span></span>
+      </span>
+      </h4>
+      <p class="shortcomment cmt">Inserts a document into the collection without writeConcern.</p><div class="fullcomment"><div class="comment cmt"><p>Inserts a document into the collection without writeConcern.</p><p>Please note that you cannot be sure that the document has been effectively written and when (hence the Unit return type).
+</p></div><dl class="paramcmts block"><dt class="tparam">T</dt><dd class="cmt"><p>the type of the document to insert. An implicit <a name="reactivemongo.bson.handlers.BSONWriter" class="extype" href="../bson/handlers/BSONWriter.html">BSONWriter</a>[T] typeclass for handling it has to be in the scope.
+</p></dd><dt class="param">document</dt><dd class="cmt"><p>the document to insert.
+</p></dd></dl></div>
+    </li><li visbl="pub" name="reactivemongo.api.Collection#uncheckedRemove" data-isabs="false">
+      <a id="uncheckedRemove[T](T,Boolean)(BSONWriter[T]):Unit"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">uncheckedRemove</span><span class="tparams">[<span name="T">T</span>]</span><span class="params">(<span name="query">query: T</span>, <span name="firstMatchOnly">firstMatchOnly: <span name="scala.Boolean" class="extype">Boolean</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="writer">writer: <a name="reactivemongo.bson.handlers.BSONWriter" class="extype" href="../bson/handlers/BSONWriter.html">BSONWriter</a>[T]</span>)</span><span class="result">: <span name="scala.Unit" class="extype">Unit</span></span>
+      </span>
+      </h4>
+      <p class="shortcomment cmt">Remove the matched document(s) from the collection without writeConcern.</p><div class="fullcomment"><div class="comment cmt"><p>Remove the matched document(s) from the collection without writeConcern.</p><p>Please note that you cannot be sure that the matched documents have been effectively removed and when (hence the Unit return type).
+</p></div><dl class="paramcmts block"><dt class="tparam">T</dt><dd class="cmt"><p>the type of the selector of documents to remove. An implicit <a name="reactivemongo.bson.handlers.BSONWriter" class="extype" href="../bson/handlers/BSONWriter.html">BSONWriter</a>[T] typeclass for handling it has to be in the scope.
+</p></dd><dt class="param">query</dt><dd class="cmt"><p>the selector of documents to remove.</p></dd><dt class="param">firstMatchOnly</dt><dd class="cmt"><p>states whether only the first matched documents has to be removed from this collection.
+</p></dd></dl></div>
+    </li><li visbl="pub" name="reactivemongo.api.Collection#uncheckedUpdate" data-isabs="false">
+      <a id="uncheckedUpdate[S, U](S,U,Boolean,Boolean)(BSONWriter[S],BSONWriter[U]):Unit"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">uncheckedUpdate</span><span class="tparams">[<span name="S">S</span>, <span name="U">U</span>]</span><span class="params">(<span name="selector">selector: S</span>, <span name="update">update: U</span>, <span name="upsert">upsert: <span name="scala.Boolean" class="extype">Boolean</span></span>, <span name="multi">multi: <span name="scala.Boolean" class="extype">Boolean</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="selectorWriter">selectorWriter: <a name="reactivemongo.bson.handlers.BSONWriter" class="extype" href="../bson/handlers/BSONWriter.html">BSONWriter</a>[S]</span>, <span name="updateWriter">updateWriter: <a name="reactivemongo.bson.handlers.BSONWriter" class="extype" href="../bson/handlers/BSONWriter.html">BSONWriter</a>[U]</span>)</span><span class="result">: <span name="scala.Unit" class="extype">Unit</span></span>
+      </span>
+      </h4>
+      <p class="shortcomment cmt">Updates one or more documents matching the given selector with the given modifier or update object.</p><div class="fullcomment"><div class="comment cmt"><p>Updates one or more documents matching the given selector with the given modifier or update object.</p><p>Please note that you cannot be sure that the matched documents have been effectively updated and when (hence the Unit return type).
+</p></div><dl class="paramcmts block"><dt class="tparam">S</dt><dd class="cmt"><p>the type of the selector object. An implicit <a name="reactivemongo.bson.handlers.BSONWriter" class="extype" href="../bson/handlers/BSONWriter.html">BSONWriter</a>[S] typeclass for handling it has to be in the scope.</p></dd><dt class="tparam">U</dt><dd class="cmt"><p>the type of the modifier or update object. An implicit <a name="reactivemongo.bson.handlers.BSONWriter" class="extype" href="../bson/handlers/BSONWriter.html">BSONWriter</a>[U] typeclass for handling it has to be in the scope.
+</p></dd><dt class="param">selector</dt><dd class="cmt"><p>the selector object, for finding the documents to update.</p></dd><dt class="param">update</dt><dd class="cmt"><p>the modifier object (with special keys like $set) or replacement object.</p></dd><dt class="param">upsert</dt><dd class="cmt"><p>states whether the update objet should be inserted if no match found. Defaults to false.</p></dd><dt class="param">multi</dt><dd class="cmt"><p>states whether the update may be done on all the matching documents.
+</p></dd></dl></div>
+    </li><li visbl="pub" name="reactivemongo.api.Collection#update" data-isabs="false">
+      <a id="update[S, U](S,U,GetLastError,Boolean,Boolean)(BSONWriter[S],BSONWriter[U]):Future[LastError]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">update</span><span class="tparams">[<span name="S">S</span>, <span name="U">U</span>]</span><span class="params">(<span name="selector">selector: S</span>, <span name="update">update: U</span>, <span name="writeConcern">writeConcern: <a name="reactivemongo.core.commands.GetLastError" class="extype" href="../core/commands/GetLastError.html">GetLastError</a></span>, <span name="upsert">upsert: <span name="scala.Boolean" class="extype">Boolean</span></span>, <span name="multi">multi: <span name="scala.Boolean" class="extype">Boolean</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="selectorWriter">selectorWriter: <a name="reactivemongo.bson.handlers.BSONWriter" class="extype" href="../bson/handlers/BSONWriter.html">BSONWriter</a>[S]</span>, <span name="updateWriter">updateWriter: <a name="reactivemongo.bson.handlers.BSONWriter" class="extype" href="../bson/handlers/BSONWriter.html">BSONWriter</a>[U]</span>)</span><span class="result">: <span name="scala.concurrent.Future" class="extype">Future</span>[<a name="reactivemongo.core.commands.LastError" class="extype" href="../core/commands/LastError.html">LastError</a>]</span>
+      </span>
+      </h4>
+      <p class="shortcomment cmt">Updates one or more documents matching the given selector with the given modifier or update object.</p><div class="fullcomment"><div class="comment cmt"><p>Updates one or more documents matching the given selector with the given modifier or update object.
+</p></div><dl class="paramcmts block"><dt class="tparam">S</dt><dd class="cmt"><p>the type of the selector object. An implicit <a name="reactivemongo.bson.handlers.BSONWriter" class="extype" href="../bson/handlers/BSONWriter.html">BSONWriter</a>[S] typeclass for handling it has to be in the scope.</p></dd><dt class="tparam">U</dt><dd class="cmt"><p>the type of the modifier or update object. An implicit <a name="reactivemongo.bson.handlers.BSONWriter" class="extype" href="../bson/handlers/BSONWriter.html">BSONWriter</a>[U] typeclass for handling it has to be in the scope.
+</p></dd><dt class="param">selector</dt><dd class="cmt"><p>the selector object, for finding the documents to update.</p></dd><dt class="param">update</dt><dd class="cmt"><p>the modifier object (with special keys like $set) or replacement object.</p></dd><dt class="param">writeConcern</dt><dd class="cmt"><p>the reactivemongo.core.protocol.commands.GetLastError command message to send in order to control how the documents are updated. Defaults to GetLastError().</p></dd><dt class="param">upsert</dt><dd class="cmt"><p>states whether the update objet should be inserted if no match found. Defaults to false.</p></dd><dt class="param">multi</dt><dd class="cmt"><p>states whether the update may be done on all the matching documents.
+</p></dd><dt>returns</dt><dd class="cmt"><p>a future reactivemongo.core.protocol.commands.LastError that can be used to check whether the update was successful.
+</p></dd></dl></div>
+    </li><li visbl="pub" name="scala.AnyRef#wait" data-isabs="false">
+      <a id="wait():Unit"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">final </span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">wait</span><span class="params">()</span><span class="result">: <span name="scala.Unit" class="extype">Unit</span></span>
+      </span>
+      </h4>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>AnyRef</dd><dt>Annotations</dt><dd>
+                <span class="name">@throws</span><span class="args">()</span>
+              
+        </dd></dl></div>
+    </li><li visbl="pub" name="scala.AnyRef#wait" data-isabs="false">
+      <a id="wait(Long,Int):Unit"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">final </span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">wait</span><span class="params">(<span name="arg0">arg0: <span name="scala.Long" class="extype">Long</span></span>, <span name="arg1">arg1: <span name="scala.Int" class="extype">Int</span></span>)</span><span class="result">: <span name="scala.Unit" class="extype">Unit</span></span>
+      </span>
+      </h4>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>AnyRef</dd><dt>Annotations</dt><dd>
+                <span class="name">@throws</span><span class="args">()</span>
+              
+        </dd></dl></div>
+    </li><li visbl="pub" name="scala.AnyRef#wait" data-isabs="false">
+      <a id="wait(Long):Unit"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">final </span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name">wait</span><span class="params">(<span name="arg0">arg0: <span name="scala.Long" class="extype">Long</span></span>)</span><span class="result">: <span name="scala.Unit" class="extype">Unit</span></span>
+      </span>
+      </h4>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>AnyRef</dd><dt>Annotations</dt><dd>
+                <span class="name">@throws</span><span class="args">()</span>
+              
+        </dd></dl></div>
+    </li></ol>
+            </div>
+
+        <div class="values members" id="values">
+              <h3>Deprecated Value Members</h3>
+              <ol><li visbl="pub" name="scala.Product#productElements" data-isabs="false">
+      <a id="productElements:Iterator[Any]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">def</span>
+      </span>
+      <span class="symbol">
+        <span class="name deprecated" title="Deprecated: (Since version 2.8.0) use productIterator instead">productElements</span><span class="result">: Iterator[<span name="scala.Any" class="extype">Any</span>]</span>
+      </span>
+      </h4>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Definition Classes</dt><dd>Product</dd><dt>Annotations</dt><dd>
+                <span class="name">@deprecated</span>
+              
+        </dd><dt>Deprecated</dt><dd class="cmt"><p><i>(Since version 2.8.0)</i> use productIterator instead</p></dd></dl></div>
+    </li></ol>
+            </div>
+        </div>
+
+        <div id="inheritedMembers">
+        <div name="scala.Serializable" class="parent">
+              <h3>Inherited from <span name="scala.Serializable" class="extype">Serializable</span></h3>
+            </div><div name="java.io.Serializable" class="parent">
+              <h3>Inherited from <span name="java.io.Serializable" class="extype">Serializable</span></h3>
+            </div><div name="scala.Product" class="parent">
+              <h3>Inherited from <span name="scala.Product" class="extype">Product</span></h3>
+            </div><div name="scala.Equals" class="parent">
+              <h3>Inherited from <span name="scala.Equals" class="extype">Equals</span></h3>
+            </div><div name="scala.AnyRef" class="parent">
+              <h3>Inherited from AnyRef</h3>
+            </div><div name="scala.Any" class="parent">
+              <h3>Inherited from <span name="scala.Any" class="extype">Any</span></h3>
+            </div>
+        </div>
+
+      </div>
+
+      <div id="tooltip"></div>
+
+      <div id="footer">  </div>
+
+
+    </body>
+      </html>

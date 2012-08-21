@@ -1,0 +1,280 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
+<html>
+        <head>
+          <title>reactivemongo.api</title>
+          <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+          
+      <link type="text/css" media="screen" rel="stylesheet" href="../../lib/template.css" />
+      <script type="text/javascript" src="../../lib/jquery.js"></script>
+      <script type="text/javascript" src="../../lib/jquery-ui.js"></script>
+      <script type="text/javascript" src="../../lib/template.js"></script>
+      <script type="text/javascript" src="../../lib/tools.tooltip.js"></script>
+    
+        </head>
+        <body onload="sh_highlightDocument('../lib/', '.min.js');" class="value">
+      <div id="definition">
+        <img src="../../lib/package_big.png" />
+        <p id="owner"><a name="reactivemongo" class="extype" href="../package.html">reactivemongo</a></p>
+        <h1>api</h1>
+      </div>
+
+      <h4 class="signature" id="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">package</span>
+      </span>
+      <span class="symbol">
+        <span class="name">api</span>
+      </span>
+      </h4>
+      
+      <div class="fullcommenttop" id="comment"></div>
+    
+
+      <div id="mbrsel">
+        <div id="textfilter"><span class="pre"></span><span class="input"><input accesskey="/" type="text" /></span><span class="post"></span></div>
+        
+        
+        <div id="visbl">
+            <span class="filtertype">Visibility</span>
+            <ol><li class="public in"><span>Public</span></li><li class="all out"><span>All</span></li></ol>
+          </div>
+      </div>
+
+      <div id="template">
+        <div id="allMembers">
+        
+
+        <div class="types members" id="types">
+              <h3>Type Members</h3>
+              <ol><li visbl="pub" name="reactivemongo.api.Collection" data-isabs="false">
+      <a id="Collection:Collection"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="Collection.html"><span class="name">Collection</span></a><span class="params">(<span name="db">db: DB</span>, <span name="collectionName">collectionName: String</span>, <span name="connection">connection: MongoConnection</span>, <span name="timeout">timeout: Duration</span>, <span name="context">context: ExecutionContext</span>)</span><span class="result"> extends Product with Serializable</span>
+      </span>
+      </h4>
+      <p class="comment cmt">A Mongo Collection.</p>
+    </li><li visbl="pub" name="reactivemongo.api.Cursor" data-isabs="true">
+      <a id="Cursor:Cursor[T]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">trait</span>
+      </span>
+      <span class="symbol">
+        <a href="Cursor.html"><span class="name">Cursor</span></a><span class="tparams">[<span name="T">T</span>]</span><span class="result"> extends AnyRef</span>
+      </span>
+      </h4>
+      <p class="comment cmt">Allows to fetch the next documents matching a query.</p>
+    </li><li visbl="pub" name="reactivemongo.api.DB" data-isabs="false">
+      <a id="DB:DB"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="DB.html"><span class="name">DB</span></a><span class="params">(<span name="dbName">dbName: String</span>, <span name="connection">connection: MongoConnection</span>, <span name="timeout">timeout: Duration</span>, <span name="context">context: ExecutionContext</span>)</span><span class="result"> extends Product with Serializable</span>
+      </span>
+      </h4>
+      <p class="comment cmt">A Mongo Database.</p>
+    </li><li visbl="pub" name="reactivemongo.api.DefaultCursor" data-isabs="false">
+      <a id="DefaultCursor:DefaultCursor[T]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">class</span>
+      </span>
+      <span class="symbol">
+        <a href="DefaultCursor.html"><span class="name">DefaultCursor</span></a><span class="tparams">[<span name="T">T</span>]</span><span class="result"> extends Cursor[T]</span>
+      </span>
+      </h4>
+      
+    </li><li visbl="pub" name="reactivemongo.api.FlattenedCursor" data-isabs="false">
+      <a id="FlattenedCursor:FlattenedCursor[T]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">class</span>
+      </span>
+      <span class="symbol">
+        <a href="FlattenedCursor.html"><span class="name">FlattenedCursor</span></a><span class="tparams">[<span name="T">T</span>]</span><span class="result"> extends Cursor[T]</span>
+      </span>
+      </h4>
+      <p class="comment cmt">A <a name="reactivemongo.api.Cursor" class="extype" href="Cursor.html">Cursor</a> that holds no document, and which the next cursor is given in the constructor.</p>
+    </li><li visbl="pub" name="reactivemongo.api.MongoConnection" data-isabs="false">
+      <a id="MongoConnection:MongoConnection"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">class</span>
+      </span>
+      <span class="symbol">
+        <a href="MongoConnection.html"><span class="name">MongoConnection</span></a><span class="result"> extends AnyRef</span>
+      </span>
+      </h4>
+      <p class="comment cmt">A Mongo Connection.</p>
+    </li><li visbl="pub" name="reactivemongo.api.QueryBuilder" data-isabs="false">
+      <a id="QueryBuilder:QueryBuilder"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="QueryBuilder.html"><span class="name">QueryBuilder</span></a><span class="params">(<span name="queryDoc">queryDoc: Option[BSONDocument]</span>, <span name="sortDoc">sortDoc: Option[BSONDocument]</span>, <span name="hintDoc">hintDoc: Option[BSONDocument]</span>, <span name="projectionDoc">projectionDoc: Option[BSONDocument]</span>, <span name="explainFlag">explainFlag: Boolean</span>, <span name="snapshotFlag">snapshotFlag: Boolean</span>, <span name="commentString">commentString: Option[String]</span>)</span><span class="result"> extends Product with Serializable</span>
+      </span>
+      </h4>
+      <p class="comment cmt">A helper to make query documents.</p>
+    </li><li visbl="pub" name="reactivemongo.api.QueryOpts" data-isabs="false">
+      <a id="QueryOpts:QueryOpts"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="QueryOpts.html"><span class="name">QueryOpts</span></a><span class="params">(<span name="skipN">skipN: Int</span>, <span name="batchSizeN">batchSizeN: Int</span>, <span name="flagsN">flagsN: Int</span>)</span><span class="result"> extends Product with Serializable</span>
+      </span>
+      </h4>
+      <p class="comment cmt">A helper to make the query options.</p>
+    </li><li visbl="pub" name="reactivemongo.api.SortOrder" data-isabs="true">
+      <a id="SortOrder:SortOrder"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">sealed </span>
+        <span class="kind">trait</span>
+      </span>
+      <span class="symbol">
+        <a href="SortOrder.html"><span class="name">SortOrder</span></a><span class="result"> extends AnyRef</span>
+      </span>
+      </h4>
+      
+    </li></ol>
+            </div>
+
+        
+
+        <div class="values members" id="values">
+              <h3>Value Members</h3>
+              <ol><li visbl="pub" name="reactivemongo.api.Collection" data-isabs="false">
+      <a id="Collection:Collection"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">object</span>
+      </span>
+      <span class="symbol">
+        <a href="Collection$.html"><span class="name">Collection</span></a><span class="result"> extends Serializable</span>
+      </span>
+      </h4>
+      
+    </li><li visbl="pub" name="reactivemongo.api.Cursor" data-isabs="false">
+      <a id="Cursor:Cursor"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">object</span>
+      </span>
+      <span class="symbol">
+        <a href="Cursor$.html"><span class="name">Cursor</span></a><span class="result"> extends AnyRef</span>
+      </span>
+      </h4>
+      
+    </li><li visbl="pub" name="reactivemongo.api.DefaultCursor" data-isabs="false">
+      <a id="DefaultCursor:DefaultCursor"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">object</span>
+      </span>
+      <span class="symbol">
+        <a href="DefaultCursor$.html"><span class="name">DefaultCursor</span></a><span class="result"> extends AnyRef</span>
+      </span>
+      </h4>
+      
+    </li><li visbl="pub" name="reactivemongo.api.MongoConnection" data-isabs="false">
+      <a id="MongoConnection:MongoConnection"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">object</span>
+      </span>
+      <span class="symbol">
+        <a href="MongoConnection$.html"><span class="name">MongoConnection</span></a><span class="result"> extends AnyRef</span>
+      </span>
+      </h4>
+      
+    </li><li visbl="pub" name="reactivemongo.api.SortOrder" data-isabs="false">
+      <a id="SortOrder:SortOrder"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">object</span>
+      </span>
+      <span class="symbol">
+        <a href="SortOrder$.html"><span class="name">SortOrder</span></a><span class="result"> extends AnyRef</span>
+      </span>
+      </h4>
+      
+    </li><li visbl="pub" name="reactivemongo.api.bulk" data-isabs="false">
+      <a id="bulk:bulk"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">object</span>
+      </span>
+      <span class="symbol">
+        <a href="bulk$.html"><span class="name">bulk</span></a><span class="result"> extends AnyRef</span>
+      </span>
+      </h4>
+      <p class="comment cmt">Bulk insertion.</p>
+    </li><li visbl="pub" name="reactivemongo.api.gridfs" data-isabs="false">
+      <a id="gridfs:gridfs"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">package</span>
+      </span>
+      <span class="symbol">
+        <a href="gridfs/package.html"><span class="name">gridfs</span></a>
+      </span>
+      </h4>
+      
+    </li><li visbl="pub" name="reactivemongo.api.indexes" data-isabs="false">
+      <a id="indexes:indexes"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">package</span>
+      </span>
+      <span class="symbol">
+        <a href="indexes/package.html"><span class="name">indexes</span></a>
+      </span>
+      </h4>
+      
+    </li></ol>
+            </div>
+
+        
+        </div>
+
+        <div id="inheritedMembers">
+        
+        </div>
+
+      </div>
+
+      <div id="tooltip"></div>
+
+      <div id="footer">  </div>
+
+
+    </body>
+      </html>

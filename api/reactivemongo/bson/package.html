@@ -1,0 +1,556 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
+<html>
+        <head>
+          <title>reactivemongo.bson</title>
+          <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+          
+      <link type="text/css" media="screen" rel="stylesheet" href="../../lib/template.css" />
+      <script type="text/javascript" src="../../lib/jquery.js"></script>
+      <script type="text/javascript" src="../../lib/jquery-ui.js"></script>
+      <script type="text/javascript" src="../../lib/template.js"></script>
+      <script type="text/javascript" src="../../lib/tools.tooltip.js"></script>
+    
+        </head>
+        <body onload="sh_highlightDocument('../lib/', '.min.js');" class="value">
+      <div id="definition">
+        <img src="../../lib/package_big.png" />
+        <p id="owner"><a name="reactivemongo" class="extype" href="../package.html">reactivemongo</a></p>
+        <h1>bson</h1>
+      </div>
+
+      <h4 class="signature" id="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">package</span>
+      </span>
+      <span class="symbol">
+        <span class="name">bson</span>
+      </span>
+      </h4>
+      
+      <div class="fullcommenttop" id="comment"></div>
+    
+
+      <div id="mbrsel">
+        <div id="textfilter"><span class="pre"></span><span class="input"><input accesskey="/" type="text" /></span><span class="post"></span></div>
+        
+        
+        <div id="visbl">
+            <span class="filtertype">Visibility</span>
+            <ol><li class="public in"><span>Public</span></li><li class="all out"><span>All</span></li></ol>
+          </div>
+      </div>
+
+      <div id="template">
+        <div id="allMembers">
+        
+
+        <div class="types members" id="types">
+              <h3>Type Members</h3>
+              <ol><li visbl="pub" name="reactivemongo.bson.AppendableBSONArray" data-isabs="false">
+      <a id="AppendableBSONArray:AppendableBSONArray"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">class</span>
+      </span>
+      <span class="symbol">
+        <a href="AppendableBSONArray.html"><span class="name">AppendableBSONArray</span></a><span class="result"> extends AppendableBSONStructure[BSONValue] with BSONArray</span>
+      </span>
+      </h4>
+      <p class="comment cmt">A BSON Array builder.</p>
+    </li><li visbl="pub" name="reactivemongo.bson.AppendableBSONDocument" data-isabs="false">
+      <a id="AppendableBSONDocument:AppendableBSONDocument"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">class</span>
+      </span>
+      <span class="symbol">
+        <a href="AppendableBSONDocument.html"><span class="name">AppendableBSONDocument</span></a><span class="result"> extends AppendableBSONStructure[(String, BSONValue)] with BSONDocument</span>
+      </span>
+      </h4>
+      <p class="comment cmt">A BSON Document builder.</p>
+    </li><li visbl="pub" name="reactivemongo.bson.AppendableBSONStructure" data-isabs="true">
+      <a id="AppendableBSONStructure:AppendableBSONStructure[E]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">sealed </span>
+        <span class="kind">trait</span>
+      </span>
+      <span class="symbol">
+        <a href="AppendableBSONStructure.html"><span class="name">AppendableBSONStructure</span></a><span class="tparams">[<span name="E">E</span>]</span><span class="result"> extends BSONStructure</span>
+      </span>
+      </h4>
+      <p class="comment cmt">A structure builder.</p>
+    </li><li visbl="pub" name="reactivemongo.bson.BSONArray" data-isabs="true">
+      <a id="BSONArray:BSONArray"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">sealed </span>
+        <span class="kind">trait</span>
+      </span>
+      <span class="symbol">
+        <a href="BSONArray.html"><span class="name">BSONArray</span></a><span class="result"> extends BSONStructure</span>
+      </span>
+      </h4>
+      <p class="comment cmt">A BSON Array structure.</p>
+    </li><li visbl="pub" name="reactivemongo.bson.BSONBinary" data-isabs="false">
+      <a id="BSONBinary:BSONBinary"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="BSONBinary.html"><span class="name">BSONBinary</span></a><span class="params">(<span name="value">value: ChannelBuffer</span>, <span name="subtype">subtype: Subtype</span>)</span><span class="result"> extends BSONValue with Product with Serializable</span>
+      </span>
+      </h4>
+      <p class="comment cmt">A BSON binary value.</p>
+    </li><li visbl="pub" name="reactivemongo.bson.BSONBoolean" data-isabs="false">
+      <a id="BSONBoolean:BSONBoolean"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="BSONBoolean.html"><span class="name">BSONBoolean</span></a><span class="params">(<span name="value">value: Boolean</span>)</span><span class="result"> extends BSONValue with Product with Serializable</span>
+      </span>
+      </h4>
+      <p class="comment cmt">BSON boolean value</p>
+    </li><li visbl="pub" name="reactivemongo.bson.BSONDBPointer" data-isabs="false">
+      <a id="BSONDBPointer:BSONDBPointer"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="BSONDBPointer.html"><span class="name">BSONDBPointer</span></a><span class="params">(<span name="value">value: String</span>, <span name="id">id: Array[Byte]</span>)</span><span class="result"> extends BSONValue with Product with Serializable</span>
+      </span>
+      </h4>
+      <p class="comment cmt">BSON DBPointer value.</p>
+    </li><li visbl="pub" name="reactivemongo.bson.BSONDateTime" data-isabs="false">
+      <a id="BSONDateTime:BSONDateTime"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="BSONDateTime.html"><span class="name">BSONDateTime</span></a><span class="params">(<span name="value">value: Long</span>)</span><span class="result"> extends BSONValue with Product with Serializable</span>
+      </span>
+      </h4>
+      <p class="comment cmt">BSON date time value</p>
+    </li><li visbl="pub" name="reactivemongo.bson.BSONDocument" data-isabs="true">
+      <a id="BSONDocument:BSONDocument"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">sealed </span>
+        <span class="kind">trait</span>
+      </span>
+      <span class="symbol">
+        <a href="BSONDocument.html"><span class="name">BSONDocument</span></a><span class="result"> extends BSONStructure</span>
+      </span>
+      </h4>
+      <p class="comment cmt">A BSON Document structure.</p>
+    </li><li visbl="pub" name="reactivemongo.bson.BSONDouble" data-isabs="false">
+      <a id="BSONDouble:BSONDouble"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="BSONDouble.html"><span class="name">BSONDouble</span></a><span class="params">(<span name="value">value: Double</span>)</span><span class="result"> extends BSONValue with Product with Serializable</span>
+      </span>
+      </h4>
+      <p class="comment cmt">A BSON Double.</p>
+    </li><li visbl="pub" name="reactivemongo.bson.BSONElement" data-isabs="true">
+      <a id="BSONElement:BSONElement"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">sealed </span>
+        <span class="kind">trait</span>
+      </span>
+      <span class="symbol">
+        <a href="BSONElement.html"><span class="name">BSONElement</span></a><span class="result"> extends AnyRef</span>
+      </span>
+      </h4>
+      <p class="comment cmt">A BSON pair (name, bsonvalue).</p>
+    </li><li visbl="pub" name="reactivemongo.bson.BSONInteger" data-isabs="false">
+      <a id="BSONInteger:BSONInteger"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="BSONInteger.html"><span class="name">BSONInteger</span></a><span class="params">(<span name="value">value: Int</span>)</span><span class="result"> extends BSONValue with Product with Serializable</span>
+      </span>
+      </h4>
+      <p class="comment cmt">BSON Integer value</p>
+    </li><li visbl="pub" name="reactivemongo.bson.BSONIterator" data-isabs="true">
+      <a id="BSONIterator:BSONIterator"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">sealed </span>
+        <span class="kind">trait</span>
+      </span>
+      <span class="symbol">
+        <a href="BSONIterator.html"><span class="name">BSONIterator</span></a><span class="result"> extends Iterator[BSONElement]</span>
+      </span>
+      </h4>
+      <p class="comment cmt">A Bson iterator from a <a href="http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html">ChannelBuffer</a>.</p>
+    </li><li visbl="pub" name="reactivemongo.bson.BSONJavaScript" data-isabs="false">
+      <a id="BSONJavaScript:BSONJavaScript"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="BSONJavaScript.html"><span class="name">BSONJavaScript</span></a><span class="params">(<span name="value">value: String</span>)</span><span class="result"> extends BSONValue with Product with Serializable</span>
+      </span>
+      </h4>
+      <p class="comment cmt">BSON JavaScript value.</p>
+    </li><li visbl="pub" name="reactivemongo.bson.BSONJavaScriptWS" data-isabs="false">
+      <a id="BSONJavaScriptWS:BSONJavaScriptWS"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="BSONJavaScriptWS.html"><span class="name">BSONJavaScriptWS</span></a><span class="params">(<span name="value">value: String</span>)</span><span class="result"> extends BSONValue with Product with Serializable</span>
+      </span>
+      </h4>
+      <p class="comment cmt">BSON scoped JavaScript value.</p>
+    </li><li visbl="pub" name="reactivemongo.bson.BSONLong" data-isabs="false">
+      <a id="BSONLong:BSONLong"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="BSONLong.html"><span class="name">BSONLong</span></a><span class="params">(<span name="value">value: Long</span>)</span><span class="result"> extends BSONValue with Product with Serializable</span>
+      </span>
+      </h4>
+      <p class="comment cmt">BSON Long value</p>
+    </li><li visbl="pub" name="reactivemongo.bson.BSONObjectID" data-isabs="false">
+      <a id="BSONObjectID:BSONObjectID"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="BSONObjectID.html"><span class="name">BSONObjectID</span></a><span class="params">(<span name="value">value: Array[Byte]</span>)</span><span class="result"> extends BSONValue with Product with Serializable</span>
+      </span>
+      </h4>
+      <p class="comment cmt">BSON ObjectId value.</p>
+    </li><li visbl="pub" name="reactivemongo.bson.BSONRegex" data-isabs="false">
+      <a id="BSONRegex:BSONRegex"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="BSONRegex.html"><span class="name">BSONRegex</span></a><span class="params">(<span name="value">value: String</span>, <span name="flags">flags: String</span>)</span><span class="result"> extends BSONValue with Product with Serializable</span>
+      </span>
+      </h4>
+      <p class="comment cmt">BSON Regex value.</p>
+    </li><li visbl="pub" name="reactivemongo.bson.BSONString" data-isabs="false">
+      <a id="BSONString:BSONString"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="BSONString.html"><span class="name">BSONString</span></a><span class="params">(<span name="value">value: String</span>)</span><span class="result"> extends BSONValue with Product with Serializable</span>
+      </span>
+      </h4>
+      <p class="comment cmt">A BSON String</p>
+    </li><li visbl="pub" name="reactivemongo.bson.BSONStructure" data-isabs="true">
+      <a id="BSONStructure:BSONStructure"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">sealed </span>
+        <span class="kind">trait</span>
+      </span>
+      <span class="symbol">
+        <a href="BSONStructure.html"><span class="name">BSONStructure</span></a><span class="result"> extends BSONValue</span>
+      </span>
+      </h4>
+      <p class="comment cmt">A BSON Structure (a BSON array or document).</p>
+    </li><li visbl="pub" name="reactivemongo.bson.BSONSymbol" data-isabs="false">
+      <a id="BSONSymbol:BSONSymbol"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="BSONSymbol.html"><span class="name">BSONSymbol</span></a><span class="params">(<span name="value">value: String</span>)</span><span class="result"> extends BSONValue with Product with Serializable</span>
+      </span>
+      </h4>
+      <p class="comment cmt">BSON Symbol value.</p>
+    </li><li visbl="pub" name="reactivemongo.bson.BSONTimestamp" data-isabs="false">
+      <a id="BSONTimestamp:BSONTimestamp"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="BSONTimestamp.html"><span class="name">BSONTimestamp</span></a><span class="params">(<span name="value">value: Long</span>)</span><span class="result"> extends BSONValue with Product with Serializable</span>
+      </span>
+      </h4>
+      <p class="comment cmt">BSON Timestamp value.</p>
+    </li><li visbl="pub" name="reactivemongo.bson.BSONValue" data-isabs="true">
+      <a id="BSONValue:BSONValue"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">sealed </span>
+        <span class="kind">trait</span>
+      </span>
+      <span class="symbol">
+        <a href="BSONValue.html"><span class="name">BSONValue</span></a><span class="result"> extends AnyRef</span>
+      </span>
+      </h4>
+      <p class="comment cmt">A BSON Value type</p>
+    </li><li visbl="pub" name="reactivemongo.bson.DefaultBSONElement" data-isabs="false">
+      <a id="DefaultBSONElement:DefaultBSONElement"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="DefaultBSONElement.html"><span class="name">DefaultBSONElement</span></a><span class="params">(<span name="name">name: String</span>, <span name="value">value: BSONValue</span>)</span><span class="result"> extends BSONElement with Product with Serializable</span>
+      </span>
+      </h4>
+      
+    </li><li visbl="pub" name="reactivemongo.bson.DefaultBSONIterator" data-isabs="false">
+      <a id="DefaultBSONIterator:DefaultBSONIterator"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="DefaultBSONIterator.html"><span class="name">DefaultBSONIterator</span></a><span class="params">(<span name="buffer">buffer: ChannelBuffer</span>)</span><span class="result"> extends BSONIterator with Product with Serializable</span>
+      </span>
+      </h4>
+      <p class="comment cmt">Concrete lazy BSON iterator from a <a href="http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html">ChannelBuffer</a>.</p>
+    </li><li visbl="pub" name="reactivemongo.bson.ReadBSONElement" data-isabs="false">
+      <a id="ReadBSONElement:ReadBSONElement"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="ReadBSONElement.html"><span class="name">ReadBSONElement</span></a><span class="params">(<span name="name">name: String</span>, <span name="value">value: BSONValue</span>)</span><span class="result"> extends BSONElement with Product with Serializable</span>
+      </span>
+      </h4>
+      
+    </li><li visbl="pub" name="reactivemongo.bson.Subtype" data-isabs="true">
+      <a id="Subtype:Subtype"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">sealed </span>
+        <span class="kind">trait</span>
+      </span>
+      <span class="symbol">
+        <a href="Subtype.html"><span class="name">Subtype</span></a><span class="result"> extends AnyRef</span>
+      </span>
+      </h4>
+      <p class="comment cmt">Binary Subtype</p>
+    </li><li visbl="pub" name="reactivemongo.bson.TraversableBSONArray" data-isabs="false">
+      <a id="TraversableBSONArray:TraversableBSONArray"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="TraversableBSONArray.html"><span class="name">TraversableBSONArray</span></a><span class="params">(<span name="buffer">buffer: ChannelBuffer</span>)</span><span class="result"> extends TraversableBSONStructure[Int] with BSONArray with Product with Serializable</span>
+      </span>
+      </h4>
+      <p class="comment cmt">An array reader.</p>
+    </li><li visbl="pub" name="reactivemongo.bson.TraversableBSONDocument" data-isabs="false">
+      <a id="TraversableBSONDocument:TraversableBSONDocument"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="TraversableBSONDocument.html"><span class="name">TraversableBSONDocument</span></a><span class="params">(<span name="buffer">buffer: ChannelBuffer</span>)</span><span class="result"> extends TraversableBSONStructure[String] with BSONDocument with Product with Serializable</span>
+      </span>
+      </h4>
+      <p class="comment cmt">A document reader.</p>
+    </li><li visbl="pub" name="reactivemongo.bson.TraversableBSONStructure" data-isabs="true">
+      <a id="TraversableBSONStructure:TraversableBSONStructure[Key]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier">sealed </span>
+        <span class="kind">trait</span>
+      </span>
+      <span class="symbol">
+        <a href="TraversableBSONStructure.html"><span class="name">TraversableBSONStructure</span></a><span class="tparams">[<span name="Key">Key</span>]</span><span class="result"> extends BSONStructure</span>
+      </span>
+      </h4>
+      <p class="comment cmt">A structure reader.</p>
+    </li></ol>
+            </div>
+
+        
+
+        <div class="values members" id="values">
+              <h3>Value Members</h3>
+              <ol><li visbl="pub" name="reactivemongo.bson.BSONArray" data-isabs="false">
+      <a id="BSONArray:BSONArray"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">object</span>
+      </span>
+      <span class="symbol">
+        <a href="BSONArray$.html"><span class="name">BSONArray</span></a><span class="result"> extends AnyRef</span>
+      </span>
+      </h4>
+      
+    </li><li visbl="pub" name="reactivemongo.bson.BSONDocument" data-isabs="false">
+      <a id="BSONDocument:BSONDocument"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">object</span>
+      </span>
+      <span class="symbol">
+        <a href="BSONDocument$.html"><span class="name">BSONDocument</span></a><span class="result"> extends AnyRef</span>
+      </span>
+      </h4>
+      
+    </li><li visbl="pub" name="reactivemongo.bson.BSONMaxKey" data-isabs="false">
+      <a id="BSONMaxKey:BSONMaxKey"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">object</span>
+      </span>
+      <span class="symbol">
+        <a href="BSONMaxKey$.html"><span class="name">BSONMaxKey</span></a><span class="result"> extends BSONValue</span>
+      </span>
+      </h4>
+      <p class="comment cmt">BSON Max key value</p>
+    </li><li visbl="pub" name="reactivemongo.bson.BSONMinKey" data-isabs="false">
+      <a id="BSONMinKey:BSONMinKey"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">object</span>
+      </span>
+      <span class="symbol">
+        <a href="BSONMinKey$.html"><span class="name">BSONMinKey</span></a><span class="result"> extends BSONValue</span>
+      </span>
+      </h4>
+      <p class="comment cmt">BSON Min key value</p>
+    </li><li visbl="pub" name="reactivemongo.bson.BSONNull" data-isabs="false">
+      <a id="BSONNull:BSONNull"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">object</span>
+      </span>
+      <span class="symbol">
+        <a href="BSONNull$.html"><span class="name">BSONNull</span></a><span class="result"> extends BSONValue</span>
+      </span>
+      </h4>
+      <p class="comment cmt">BSON null value</p>
+    </li><li visbl="pub" name="reactivemongo.bson.BSONObjectID" data-isabs="false">
+      <a id="BSONObjectID:BSONObjectID"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">object</span>
+      </span>
+      <span class="symbol">
+        <a href="BSONObjectID$.html"><span class="name">BSONObjectID</span></a><span class="result"> extends Serializable</span>
+      </span>
+      </h4>
+      
+    </li><li visbl="pub" name="reactivemongo.bson.BSONUndefined" data-isabs="false">
+      <a id="BSONUndefined:BSONUndefined"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">object</span>
+      </span>
+      <span class="symbol">
+        <a href="BSONUndefined$.html"><span class="name">BSONUndefined</span></a><span class="result"> extends BSONValue</span>
+      </span>
+      </h4>
+      <p class="comment cmt">BSON Undefined value</p>
+    </li><li visbl="pub" name="reactivemongo.bson.DefaultBSONIterator" data-isabs="false">
+      <a id="DefaultBSONIterator:DefaultBSONIterator"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">object</span>
+      </span>
+      <span class="symbol">
+        <a href="DefaultBSONIterator$.html"><span class="name">DefaultBSONIterator</span></a><span class="result"> extends Serializable</span>
+      </span>
+      </h4>
+      
+    </li><li visbl="pub" name="reactivemongo.bson.Subtype" data-isabs="false">
+      <a id="Subtype:Subtype"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">object</span>
+      </span>
+      <span class="symbol">
+        <a href="Subtype$.html"><span class="name">Subtype</span></a><span class="result"> extends AnyRef</span>
+      </span>
+      </h4>
+      
+    </li><li visbl="pub" name="reactivemongo.bson.handlers" data-isabs="false">
+      <a id="handlers:handlers"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">package</span>
+      </span>
+      <span class="symbol">
+        <a href="handlers/package.html"><span class="name">handlers</span></a>
+      </span>
+      </h4>
+      
+    </li></ol>
+            </div>
+
+        
+        </div>
+
+        <div id="inheritedMembers">
+        
+        </div>
+
+      </div>
+
+      <div id="tooltip"></div>
+
+      <div id="footer">  </div>
+
+
+    </body>
+      </html>

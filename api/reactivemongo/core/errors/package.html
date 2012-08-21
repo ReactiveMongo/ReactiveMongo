@@ -1,0 +1,148 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
+<html>
+        <head>
+          <title>reactivemongo.core.errors</title>
+          <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+          
+      <link type="text/css" media="screen" rel="stylesheet" href="../../../lib/template.css" />
+      <script type="text/javascript" src="../../../lib/jquery.js"></script>
+      <script type="text/javascript" src="../../../lib/jquery-ui.js"></script>
+      <script type="text/javascript" src="../../../lib/template.js"></script>
+      <script type="text/javascript" src="../../../lib/tools.tooltip.js"></script>
+    
+        </head>
+        <body onload="sh_highlightDocument('../lib/', '.min.js');" class="value">
+      <div id="definition">
+        <img src="../../../lib/package_big.png" />
+        <p id="owner"><a name="reactivemongo" class="extype" href="../../package.html">reactivemongo</a>.<a name="reactivemongo.core" class="extype" href="../package.html">core</a></p>
+        <h1>errors</h1>
+      </div>
+
+      <h4 class="signature" id="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">package</span>
+      </span>
+      <span class="symbol">
+        <span class="name">errors</span>
+      </span>
+      </h4>
+      
+      <div class="fullcommenttop" id="comment"></div>
+    
+
+      <div id="mbrsel">
+        <div id="textfilter"><span class="pre"></span><span class="input"><input accesskey="/" type="text" /></span><span class="post"></span></div>
+        
+        
+        <div id="visbl">
+            <span class="filtertype">Visibility</span>
+            <ol><li class="public in"><span>Public</span></li><li class="all out"><span>All</span></li></ol>
+          </div>
+      </div>
+
+      <div id="template">
+        <div id="allMembers">
+        
+
+        <div class="types members" id="types">
+              <h3>Type Members</h3>
+              <ol><li visbl="pub" name="reactivemongo.core.errors.CompleteDBError" data-isabs="false">
+      <a id="CompleteDBError:CompleteDBError"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">class</span>
+      </span>
+      <span class="symbol">
+        <a href="CompleteDBError.html"><span class="name">CompleteDBError</span></a><span class="result"> extends Throwable with DBError</span>
+      </span>
+      </h4>
+      <p class="comment cmt">An error thrown by a MongoDB node (containing the original document of the error).</p>
+    </li><li visbl="pub" name="reactivemongo.core.errors.DBError" data-isabs="true">
+      <a id="DBError:DBError"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">trait</span>
+      </span>
+      <span class="symbol">
+        <a href="DBError.html"><span class="name">DBError</span></a><span class="result"> extends Throwable with ReactiveMongoError</span>
+      </span>
+      </h4>
+      <p class="comment cmt">An error thrown by a MongoDB node.</p>
+    </li><li visbl="pub" name="reactivemongo.core.errors.GenericDBError" data-isabs="false">
+      <a id="GenericDBError:GenericDBError"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="GenericDBError.html"><span class="name">GenericDBError</span></a><span class="params">(<span name="message">message: String</span>, <span name="code">code: Option[Int]</span>)</span><span class="result"> extends Throwable with DBError with Product with Serializable</span>
+      </span>
+      </h4>
+      <p class="comment cmt">A generic error thrown by a MongoDB node.</p>
+    </li><li visbl="pub" name="reactivemongo.core.errors.GenericMongoError" data-isabs="false">
+      <a id="GenericMongoError:GenericMongoError"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="GenericMongoError.html"><span class="name">GenericMongoError</span></a><span class="params">(<span name="message">message: String</span>)</span><span class="result"> extends Throwable with ReactiveMongoError with Product with Serializable</span>
+      </span>
+      </h4>
+      <p class="comment cmt">A generic driver error.</p>
+    </li><li visbl="pub" name="reactivemongo.core.errors.ReactiveMongoError" data-isabs="true">
+      <a id="ReactiveMongoError:ReactiveMongoError"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">trait</span>
+      </span>
+      <span class="symbol">
+        <a href="ReactiveMongoError.html"><span class="name">ReactiveMongoError</span></a><span class="result"> extends Throwable</span>
+      </span>
+      </h4>
+      <p class="comment cmt">A driver error - can be from a MongoDB node or not.</p>
+    </li></ol>
+            </div>
+
+        
+
+        <div class="values members" id="values">
+              <h3>Value Members</h3>
+              <ol><li visbl="pub" name="reactivemongo.core.errors.ReactiveMongoError" data-isabs="false">
+      <a id="ReactiveMongoError:ReactiveMongoError"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">object</span>
+      </span>
+      <span class="symbol">
+        <a href="ReactiveMongoError$.html"><span class="name">ReactiveMongoError</span></a><span class="result"> extends Serializable</span>
+      </span>
+      </h4>
+      
+    </li></ol>
+            </div>
+
+        
+        </div>
+
+        <div id="inheritedMembers">
+        
+        </div>
+
+      </div>
+
+      <div id="tooltip"></div>
+
+      <div id="footer">  </div>
+
+
+    </body>
+      </html>
