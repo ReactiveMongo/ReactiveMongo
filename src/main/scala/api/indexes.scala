@@ -192,6 +192,8 @@ object IndexesManager {
       doc += "dropDups" -> BSONBoolean(true)
     if(nsIndex.index.sparse)
       doc += "sparse" -> BSONBoolean(true)
+    if(nsIndex.index.unique)
+      doc += "unique" -> BSONBoolean(true)
     doc
   }
 
