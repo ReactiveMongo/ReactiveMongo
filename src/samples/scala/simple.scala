@@ -21,10 +21,10 @@ object Samples {
 
   def listDocs() = {
     // select only the documents which field 'name' equals 'Jack'
-    val query = BSONDocument("name" -> BSONString("Jack"))
+    val query = BSONDocument("firstName" -> BSONString("Jack"))
     // select only the field 'name'
     val filter = BSONDocument(
-      "name" -> BSONInteger(1),
+      "lastName" -> BSONInteger(1),
       "_id" -> BSONInteger(0)
     )
 
@@ -39,7 +39,9 @@ object Samples {
     val cursor2 = collection.find(query, filter)
     val futurelist = cursor2.toList
     futurelist.onSuccess {
-      case list => println(list)
+      case list =>
+        val names = list.map(_.getAs[BSONString]("lastName").get.value)
+        println("got names: " + names)
     }
   }
 
