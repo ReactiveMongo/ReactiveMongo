@@ -172,7 +172,7 @@ sealed trait TraversableBSONStructure[Key] extends BSONStructure {
 
   def makeBuffer = {
     val pos = buffer.readerIndex
-    val result = buffer.copy(rdx, buffer.capacity)
+    val result = buffer.copy(rdx, buffer.writerIndex)
     buffer.readerIndex(pos)
     result
   }
@@ -180,7 +180,7 @@ sealed trait TraversableBSONStructure[Key] extends BSONStructure {
   /**
    * An iterator of the elements that are present in this structure.
    *
-   * This iterator is produced from a stream that memoizes the already computed values (to avoid unnecessarily computation).
+   * This iterator is produced from a stream that memoizes the already computed values (to avoid unnecessary computation).
    */
   def bsonIterator :Iterator[BSONElement]= stream.iterator
 
@@ -202,7 +202,12 @@ case class TraversableBSONArray(buffer: ChannelBuffer) extends TraversableBSONSt
 
   type Opposite = AppendableBSONArray
 
-  def toAppendable = new AppendableBSONArray()
+  def toAppendable = {
+    val result = new AppendableBSONArray()
+    for(el <- bsonIterator)
+      result += el.value
+    result
+  }
 
   def mapped :Map[Int, BSONValue] = {
     for(el <- bsonIterator) yield (el.name.toInt, el.value)
@@ -246,7 +251,12 @@ case class TraversableBSONDocument(buffer: ChannelBuffer) extends TraversableBSO
 
   type Opposite = AppendableBSONDocument
 
-  def toAppendable = new AppendableBSONDocument()
+  def toAppendable = {
+    val doc = new AppendableBSONDocument()
+    for(el <- bsonIterator)
+      doc += el
+    doc
+  }
 
   def mapped :Map[String, BSONValue] = {
     for(el <- bsonIterator) yield (el.name, el.value)
