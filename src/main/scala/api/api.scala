@@ -188,7 +188,7 @@ case class Collection(
       query.writeBytes(projection.get)
     val requestMaker = RequestMaker(op, query)
 
-    Cursor.flatten(Failover(requestMaker, connection.mongosystem, failoverStrategy).future.map(new DefaultCursor(_, connection, op)))
+    Cursor.flatten(Failover(requestMaker, connection.mongosystem, failoverStrategy).future.map(new DefaultCursor(_, connection, op, failoverStrategy)))
   }
 
   /**
@@ -543,7 +543,7 @@ val list = cursor2[List].collect()
   }*/
 }
 
-class DefaultCursor[T](response: Response, mongoConnection: MongoConnection, query: Query)(implicit handler: BSONReaderHandler, reader: BSONReader[T], ctx: ExecutionContext) extends Cursor[T] {
+class DefaultCursor[T](response: Response, mongoConnection: MongoConnection, query: Query, failoverStrategy: FailoverStrategy)(implicit handler: BSONReaderHandler, reader: BSONReader[T], ctx: ExecutionContext) extends Cursor[T] {
   import DefaultCursor.logger
 
   lazy val iterator :Iterator[T] = handler.handle(response.reply, response.documents)
@@ -555,7 +555,7 @@ class DefaultCursor[T](response: Response, mongoConnection: MongoConnection, que
     if(hasNext) {
       logger.debug("cursor: calling next on " + response.reply.cursorID)
       val op = GetMore(query.fullCollectionName, query.numberToReturn, response.reply.cursorID)
-      mongoConnection.ask(RequestMaker(op).copy(channelIdHint=Some(response.info.channelId))).map { response => new DefaultCursor(response, mongoConnection, query) }
+      Failover(RequestMaker(op).copy(channelIdHint=Some(response.info.channelId)), mongoConnection.mongosystem, failoverStrategy).future.map { response => new DefaultCursor(response, mongoConnection, query, failoverStrategy) }
     } else throw new NoSuchElementException()
   }
 

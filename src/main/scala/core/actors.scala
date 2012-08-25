@@ -24,7 +24,7 @@ import scala.concurrent.{Future, Promise}
  * The future can be used to get the error or the successful response.
  */
 trait ExpectingResponse {
-  private[reactivemongo] val promise: Promise[Response] = MongoFuture.promise
+  private[reactivemongo] val promise: Promise[Response] = Promise()
   /** The future response of this request. */
   val future: Future[Response] = promise.future
 }
