@@ -22,9 +22,9 @@ import scala.concurrent.util.duration._
  * @param dbName database name.
  * @param connection the [[reactivemongo.api.MongoConnection]] that will be used to query this database.
  */
-case class DB(dbName: String, connection: MongoConnection)(implicit context: ExecutionContext) {
+case class DB(dbName: String, connection: MongoConnection, failoverStrategy: FailoverStrategy = FailoverStrategy())(implicit context: ExecutionContext) {
   /**  Gets a [[reactivemongo.api.Collection]] from this database. */
-  def apply(name: String) :Collection = Collection(this, name, connection)(MongoConnection.ec)
+  def apply(name: String) :Collection = Collection(this, name, connection, failoverStrategy)(MongoConnection.ec)
 
   /** Authenticates the connection on this database. */
   def authenticate(user: String, password: String)(implicit timeout: Duration) :Future[AuthenticationResult] = connection.authenticate(dbName, user, password)
@@ -40,7 +40,7 @@ case class DB(dbName: String, connection: MongoConnection)(implicit context: Exe
    * @return a future containing the result of the command.
    */
   def command(command: Command) :Future[command.Result] =
-    connection.ask(command.apply(dbName).maker).map(command.ResultMaker(_))
+    Failover(command.apply(dbName).maker, connection.mongosystem, failoverStrategy).future.map(command.ResultMaker(_))
 }
 
 /**
