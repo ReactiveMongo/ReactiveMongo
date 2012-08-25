@@ -28,7 +28,7 @@ trait Command {
   /**
    * States if this command can be run on secondaries.
    */
-  val slaveOk :Boolean = false
+  def slaveOk :Boolean = false
 
   /**
    * Makes the [[org.asyncmongo.bson.Bson]] for documents that will be send as body of this command's query.
