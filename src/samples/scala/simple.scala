@@ -16,9 +16,6 @@ object Samples {
   val db = DB("plugin", connection)
   val collection = db("acoll")
 
-  // just for running examples - avoid this in production since it blocks the current thread
-  Await.result(connection.waitForPrimary(5 seconds), 5 seconds)
-
   def listDocs() = {
     // select only the documents which field 'name' equals 'Jack'
     val query = BSONDocument("firstName" -> BSONString("Jack"))

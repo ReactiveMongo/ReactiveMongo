@@ -14,22 +14,38 @@ import reactivemongo.core.protocol.ChannelState._
 import reactivemongo.core.protocol.NodeState._
 import reactivemongo.utils.LazyLogger
 import reactivemongo.core.commands.{Authenticate => AuthenticateCommand, _}
+import scala.concurrent.{Future, Promise}
 
 // messages
-import scala.concurrent.{Future, Promise}
+
+/**
+ * A message expecting a response from database.
+ * It holds a promise that will be completed by the MongoDBSystem actor.
+ * The future can be used to get the error or the successful response.
+ */
 trait ExpectingResponse {
-  val promise: Promise[Response] = MongoFuture.promise
+  private[reactivemongo] val promise: Promise[Response] = MongoFuture.promise
+  /** The future response of this request. */
   val future: Future[Response] = promise.future
 }
 
+/**
+ * A request expecting a response.
+ *
+ * @param requestMaker The request maker.
+ */
 case class RequestMakerExpectingResponse(
   requestMaker: RequestMaker
 ) extends ExpectingResponse
 
+/**
+ * A checked write request expecting a response.
+ *
+ * @param checkedWriteRequest The request maker.
+ */
 case class CheckedWriteRequestExpectingResponse(
   checkedWriteRequest: CheckedWriteRequest
 ) extends ExpectingResponse
-
 
 /**
  * Authenticate message.
@@ -130,7 +146,7 @@ class MongoDBSystem(
     /*case request: Request => receiveRequest(request)
     case requestMaker :RequestMaker => receiveRequest(requestMaker(requestIdGenerator.user))
     case checkedWriteRequest :CheckedWriteRequest => receiveCheckedWriteRequest(checkedWriteRequest)*/
-    
+
     case req :RequestMakerExpectingResponse =>
       logger.trace("received a request")
       val request = req.requestMaker(requestIdGenerator.user)
@@ -147,7 +163,7 @@ class MongoDBSystem(
       } else {
         nodeSetManager.get.primaryWrapper.get.send(request)
       }
-      
+
     case req :CheckedWriteRequestExpectingResponse =>
       logger.trace("received a checked write request")
       val checkedWriteRequest = req.checkedWriteRequest

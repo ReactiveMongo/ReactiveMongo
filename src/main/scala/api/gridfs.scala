@@ -11,7 +11,7 @@ import reactivemongo.bson.handlers._
 import reactivemongo.bson.handlers.DefaultBSONHandlers._
 import reactivemongo.core.commands.GetLastError
 import reactivemongo.core.protocol.Response
-import reactivemongo.utils.{ArrayUtils, Converters, LazyLogger}
+import reactivemongo.utils.{RichBuffer => _, _}
 import scala.concurrent.{Future, ExecutionContext}
 import scala.util.Random
 
@@ -148,7 +148,7 @@ case class FileToWrite(
       length: Int = 0
     ) {
       def feed(chunk: Array[Byte]) :Future[Chunk] = {
-        val wholeChunk = ArrayUtils.concat(previous, chunk)
+        val wholeChunk = concat(previous, chunk)
 
         val normalizedChunkNumber = wholeChunk.length / chunkSize
 

@@ -6,11 +6,12 @@ import org.jboss.netty.buffer.ChannelBuffer
 import org.slf4j.{Logger, LoggerFactory}
 import play.api.libs.iteratee._
 import reactivemongo.api.indexes._
-import reactivemongo.core.actors.{Authenticate, CheckedWriteRequestExpectingResponse, MongoDBSystem, MonitorActor, RequestMakerExpectingResponse, Close}
+import reactivemongo.core.actors._
 import reactivemongo.bson._
 import reactivemongo.bson.handlers._
 import reactivemongo.core.protocol._
-import reactivemongo.core.commands.{Update => FindAndModifyUpdate, _}
+import reactivemongo.core.commands.{AuthenticationResult, Command, GetLastError, LastError}
+import reactivemongo.utils.scalaToAkkaDuration
 import scala.concurrent.{Future, ExecutionContext}
 import scala.concurrent.util.Duration
 import scala.concurrent.util.duration._
@@ -20,14 +21,13 @@ import scala.concurrent.util.duration._
  *
  * @param dbName database name.
  * @param connection the [[reactivemongo.api.MongoConnection]] that will be used to query this database.
- * @param timeout the default timeout for the queries. Defaults to 5 seconds.
  */
-case class DB(dbName: String, connection: MongoConnection)(implicit timeout :Duration = 5 seconds, context: ExecutionContext) { // TODO timeout
+case class DB(dbName: String, connection: MongoConnection)(implicit context: ExecutionContext) {
   /**  Gets a [[reactivemongo.api.Collection]] from this database. */
-  def apply(name: String) :Collection = Collection(this, name, connection)(timeout, MongoConnection.ec)
+  def apply(name: String) :Collection = Collection(this, name, connection)(MongoConnection.ec)
 
   /** Authenticates the connection on this database. */
-  def authenticate(user: String, password: String) :Future[AuthenticationResult] = connection.authenticate(dbName, user, password)
+  def authenticate(user: String, password: String)(implicit timeout: Duration) :Future[AuthenticationResult] = connection.authenticate(dbName, user, password)
 
   /** The index manager for this database. */
   lazy val indexes = new IndexesManager(this)
@@ -85,13 +85,13 @@ object Samples {
  * @param db database.
  * @param collectionName the name of this collection.
  * @param connection the [[reactivemongo.api.MongoConnection]] that will be used to query this database.
- * @param timeout the default timeout for the queries.
  */
 case class Collection(
   db: DB,
   collectionName: String,
-  connection: MongoConnection
-)(implicit timeout: Duration, context: ExecutionContext) {
+  connection: MongoConnection,
+  failoverStrategy: FailoverStrategy = FailoverStrategy()
+)(implicit context: ExecutionContext) {
   /** The full collection name. */
   lazy val fullCollectionName = db.dbName + "." + collectionName
 
@@ -186,11 +186,9 @@ case class Collection(
     val op = Query(opts.flagsN, fullCollectionName, opts.skipN, opts.batchSizeN)
     if(projection.isDefined)
       query.writeBytes(projection.get)
-    val message = RequestMaker(op, query)
+    val requestMaker = RequestMaker(op, query)
 
-    Cursor.flatten(connection.ask(message).map { response =>
-      new DefaultCursor(response, connection, op)
-    })
+    Cursor.flatten(Failover(requestMaker, connection.mongosystem, failoverStrategy).future.map(new DefaultCursor(_, connection, op)))
   }
 
   /**
@@ -225,9 +223,7 @@ case class Collection(
     val op = Insert(0, fullCollectionName)
     val bson = writer.write(document)
     val checkedWriteRequest = CheckedWriteRequest(op, bson, writeConcern)
-    connection.ask(checkedWriteRequest).map { response =>
-      LastError(response)
-    }
+    Failover(checkedWriteRequest, connection.mongosystem, failoverStrategy).future.map(LastError(_))
   }
 
   /**
@@ -311,10 +307,8 @@ case class Collection(
     val op = Update(fullCollectionName, flags)
     val bson = selectorWriter.write(selector)
     bson.writeBytes(updateWriter.write(update))
-    val message = CheckedWriteRequest(op, bson, writeConcern)
-    connection.ask(message).map { response =>
-      LastError(response)
-    }
+    val checkedWriteRequest = CheckedWriteRequest(op, bson, writeConcern)
+    Failover(checkedWriteRequest, connection.mongosystem, failoverStrategy).future.map(LastError(_))
   }
 
   /**
@@ -351,9 +345,7 @@ case class Collection(
     val op = Delete(fullCollectionName, if(firstMatchOnly) 1 else 0)
     val bson = writer.write(query)
     val checkedWriteRequest = CheckedWriteRequest(op, bson, writeConcern)
-    connection.ask(checkedWriteRequest).map { response =>
-      LastError(response)
-    }
+    Failover(checkedWriteRequest, connection.mongosystem, failoverStrategy).future.map(LastError(_))
   }
 
   /** The index manager for this collection. */
@@ -551,7 +543,7 @@ val list = cursor2[List].collect()
   }*/
 }
 
-class DefaultCursor[T](response: Response, mongoConnection: MongoConnection, query: Query)(implicit handler: BSONReaderHandler, reader: BSONReader[T], timeout :Duration, ctx: ExecutionContext) extends Cursor[T] {
+class DefaultCursor[T](response: Response, mongoConnection: MongoConnection, query: Query)(implicit handler: BSONReaderHandler, reader: BSONReader[T], ctx: ExecutionContext) extends Cursor[T] {
   import DefaultCursor.logger
 
   lazy val iterator :Iterator[T] = handler.handle(response.reply, response.documents)
@@ -609,6 +601,84 @@ object DefaultCursor {
 }
 
 /**
+ * A helper that sends the given message to the given actor, following a failover strategy.
+ * This helper holds a future reference that is completed with a result, after 1 or more attempts (specified in the given strategy).
+ * If the all the tryouts configured by the given strategy were unsuccessful, the future reference is completed with a Throwable.
+ *
+ * Should not be used directly for most use cases.
+ *
+ * @tparam T Type of the message to send.
+ * @param message The message to send to the given actor. This message will be wrapped into an Expecting Response message by the ''expectingResponseMaker'' function.
+ * @param actorRef The reference to the MongoDBSystem actor the given message will be sent to.
+ * @param strategy The Failover strategy.
+ * @param expectingResponseMaker A function that takes a message of type '''T''' and wraps it into an ExpectingResponse message.
+ */
+class Failover[T](message: T, actorRef: ActorRef, strategy: FailoverStrategy)(expectingResponseMaker: T => ExpectingResponse)(implicit ec: ExecutionContext) {
+  import Failover.logger
+  private val promise = scala.concurrent.Promise[Response]()
+  val future: Future[Response] = promise.future
+
+  val akkaDelay = scalaToAkkaDuration(strategy.initialDelay)
+
+  def send(n: Int) {
+    val expectingResponse = expectingResponseMaker(message)
+    actorRef ! expectingResponse
+    expectingResponse.future.onComplete {
+      case Left(e) =>
+        if(n < strategy.retries) {
+          logger.debug("Got an error, retrying...")
+          MongoConnection.system.scheduler.scheduleOnce(akkaDelay * strategy.delayFactor(n))(send(n + 1))
+        } else {
+          logger.info("Got an error, no more attempts to do. Completing with an error...")
+          promise.failure(e)
+        }
+      case Right(response) =>
+        logger.debug("Got a successful result, completing...")
+        promise.success(response)
+    }
+  }
+
+  send(0)
+}
+
+object Failover {
+  private val logger = LoggerFactory.getLogger("Failover")
+  /**
+   * Produces a [[reactivemongo.api.Failover]] holding a future reference that is completed with a result, after 1 or more attempts (specified in the given strategy).
+   *
+   * @param checkedWriteRequest The checkedWriteRequest to send to the given actor.
+   * @param actorRef The reference to the MongoDBSystem actor the given message will be sent to.
+   * @param strategy The Failover strategy.
+   */
+  def apply(checkedWriteRequest: CheckedWriteRequest, actorRef: ActorRef, strategy: FailoverStrategy)(implicit ec: ExecutionContext) :Failover[CheckedWriteRequest] =
+    new Failover(checkedWriteRequest, actorRef, strategy)(CheckedWriteRequestExpectingResponse.apply)
+
+  /**
+   * Produces a [[reactivemongo.api.Failover]] holding a future reference that is completed with a result, after 1 or more attempts (specified in the given strategy).
+   *
+   * @param requestMaker The requestMaker to send to the given actor.
+   * @param actorRef The reference to the MongoDBSystem actor the given message will be sent to.
+   * @param strategy The Failover strategy.
+   */
+  def apply(requestMaker: RequestMaker, actorRef: ActorRef, strategy: FailoverStrategy)(implicit ec: ExecutionContext) :Failover[RequestMaker] =
+    new Failover(requestMaker, actorRef, strategy)(RequestMakerExpectingResponse.apply)
+}
+
+/**
+ * A failover strategy for sending requests.
+ *
+ * @param initialDelay the initial delay between the first failed attempt and the next one.
+ * @param retries the number of retries to do before giving up.
+ * @param delayFactor a function that takes the current iteration and returns a factor to be applied to the initialDelay.
+ */
+case class FailoverStrategy(
+  initialDelay: Duration = 500 milliseconds,
+  retries: Int = 5,
+  delayFactor: Int => Double = n => 1)
+
+
+
+/**
  * A Mongo Connection.
  *
  * This is a wrapper around a reference to a [[reactivemongo.core.actors.MongoDBSystem]] Actor.
@@ -626,15 +696,12 @@ class MongoConnection(
    */
   def waitForPrimary(waitForAvailability: Duration) :Future[_] = {
     new play.api.libs.concurrent.AkkaPromise(
-      monitor.ask(reactivemongo.core.actors.WaitForPrimary)(akka.util.Timeout(waitForAvailability.length, waitForAvailability.unit))
+      monitor.ask(reactivemongo.core.actors.WaitForPrimary)(scalaToAkkaDuration(waitForAvailability))
     )
   }
 
   /**
    * Writes a request and wait for a response.
-   *
-   * The implicit timeout concerns the time of execution on the database.
-   * If no suitable node for handling this request is available, the returned future will be in error.
    *
    * @param message The request maker.
    *
@@ -644,30 +711,7 @@ class MongoConnection(
     val msg = RequestMakerExpectingResponse(message)
     mongosystem ! msg
     msg.future
-    /*new play.api.libs.concurrent.AkkaPromise(
-      (mongosystem ? message)(akka.util.Timeout(timeout.length, timeout.unit)).mapTo[Response]
-    )*/
   }
-
-  /**
-   * Writes a request and wait for a response, waiting for a suitable node or times out.
-   *
-   * The implicit timeout concerns the time of execution on the database.
-   *   - waitForAvailability is the maximum amount of time that will be spent expecting a suitable node for this request.
-   *   - dbTimemout is the maximum amount of time that will be spent expecting a response from a database.
-   *
-   * @param message The request maker.
-   * @param waitForAvailability wait for a suitable node up to the given timeout.
-   *
-   * @return The future response.
-   */
-  /*def ask(message: RequestMaker, waitForAvailability: Duration)(implicit dbTimeout: Duration) :Future[Response] = {
-    new play.api.libs.concurrent.AkkaPromise(
-      monitor.ask("primary")(akka.util.Timeout(waitForAvailability.length, waitForAvailability.unit)).flatMap { s=>
-        (mongosystem ? message)(akka.util.Timeout(dbTimeout.length, dbTimeout.unit)).mapTo[Response]
-      }
-    )
-  }*/
 
   /**
    * Writes a checked write request and wait for a response.
@@ -680,30 +724,7 @@ class MongoConnection(
     val msg = CheckedWriteRequestExpectingResponse(checkedWriteRequest)
     mongosystem ! msg
     msg.future
-    /*new play.api.libs.concurrent.AkkaPromise(
-      (mongosystem ? checkedWriteRequest)(akka.util.Timeout(timeout.length, timeout.unit)).mapTo[Response]
-    )*/
   }
-
-  /**
-   * Writes a checked write request and wait for a response, waiting for a primary node or times out.
-   *
-   * The implicit timeout concerns the time of execution on the database.
-   *   - waitForAvailability is the maximum amount of time that will be spent expecting a primary node for this request.
-   *   - dbTimemout is the maximum amount of time that will be spent expecting a response from the database.
-   *
-   * @param message The request maker.
-   * @param waitForAvailability wait for a primary node up to the given timeout.
-   *
-   * @return The future response.
-   */
-  /*def ask(checkedWriteRequest: CheckedWriteRequest, waitForAvailability: Duration)(implicit dbTimeout: Duration) :Future[Response] = {
-    new play.api.libs.concurrent.AkkaPromise(
-      monitor.ask("primary")(akka.util.Timeout(waitForAvailability.length, waitForAvailability.unit)).flatMap { s =>
-        (mongosystem ? checkedWriteRequest)(akka.util.Timeout(dbTimeout.length, dbTimeout.unit)).mapTo[Response]
-      }
-    )
-  }*/
 
   /**
    * Writes a request and drop the response if any.
@@ -712,13 +733,13 @@ class MongoConnection(
    */
   def send(message: RequestMaker) = mongosystem ! message
 
-  /** Authenticates the connection on the given database. */ // TODO return type
+  /** Authenticates the connection on the given database. */
   def authenticate(db: String, user: String, password: String)(implicit timeout: Duration) :Future[AuthenticationResult] = {
-    new play.api.libs.concurrent.AkkaPromise((mongosystem ? Authenticate(db, user, password))(akka.util.Timeout(timeout.length, timeout.unit)).mapTo[AuthenticationResult])
+    new play.api.libs.concurrent.AkkaPromise((mongosystem ? Authenticate(db, user, password))(scalaToAkkaDuration(timeout)).mapTo[AuthenticationResult])
   }
 
   /** Closes this MongoConnection (closes all the channels and ends the actors) */
-  def askClose()(implicit timeout: Duration) :Future[_] = new play.api.libs.concurrent.AkkaPromise((monitor ? Close)(akka.util.Timeout(timeout.length, timeout.unit)))
+  def askClose()(implicit timeout: Duration) :Future[_] = new play.api.libs.concurrent.AkkaPromise((monitor ? Close)(scalaToAkkaDuration(timeout)))
 
   /** Closes this MongoConnection (closes all the channels and ends the actors) */
   def close() :Unit = monitor ! Close
@@ -727,7 +748,7 @@ class MongoConnection(
 object MongoConnection {
   import com.typesafe.config.ConfigFactory
   val config = ConfigFactory.load()
-  
+
   val ec = ExecutionContext.fromExecutor(java.util.concurrent.Executors.newCachedThreadPool)
 
   /**

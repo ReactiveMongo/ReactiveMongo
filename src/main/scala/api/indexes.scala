@@ -5,8 +5,6 @@ import reactivemongo.bson._
 import reactivemongo.bson.handlers._
 import reactivemongo.core.commands.{DeleteIndex, FindAndModify, LastError, Update}
 import scala.concurrent.{Future, ExecutionContext}
-import scala.concurrent.util.Duration
-import scala.concurrent.util.duration._
 
 /**
  * A MongoDB index (excluding the namespace).
@@ -126,7 +124,7 @@ class IndexesManager(db: DB)(implicit context: ExecutionContext) {
   def onCollection(name: String) = new CollectionIndexesManager(db.dbName + "." + name, this)
 }
 
-class CollectionIndexesManager(fqName: String, manager: IndexesManager)(implicit timeout :Duration = 5 seconds, context: ExecutionContext) {
+class CollectionIndexesManager(fqName: String, manager: IndexesManager)(implicit context: ExecutionContext) {
   lazy val collectionName = {
     val (_, r) = fqName.span(_ != '.')
     r.drop(1)
