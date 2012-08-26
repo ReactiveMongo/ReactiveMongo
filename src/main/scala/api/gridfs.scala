@@ -243,7 +243,7 @@ case class GridFS(db: DB, prefix: String = "fs") {
   /**
    * Finds the files matching the given selector.
    *
-   * @tparam S the type of the selector document. An implicit [[org.asyncmongo.handlers.BSONWriter]][S] must be in the scope.
+   * @tparam S the type of the selector document. An implicit [[reactivemongo.bson.handlers.BSONWriter]][S] must be in the scope.
    *
    * @param selector The document to select the files to return
    */

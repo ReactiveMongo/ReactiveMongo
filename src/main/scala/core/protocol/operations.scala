@@ -34,8 +34,8 @@ private[protocol] object BufferAccessors {
   /**
    * Write the given tuple into the given [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]].
    *
-   * @tparam A type that have an implicit typeclass [[org.asyncmongo.utils.BufferAccessors.BufferInteroperable]].
-   * @tparam B type that have an implicit typeclass [[org.asyncmongo.utils.BufferAccessors.BufferInteroperable]].
+   * @tparam A type that have an implicit typeclass [[reactivemongo.core.protocol.BufferAccessors.BufferInteroperable]].
+   * @tparam B type that have an implicit typeclass [[reactivemongo.core.protocol.BufferAccessors.BufferInteroperable]].
    */
   def writeTupleToBuffer2[A, B](t: (A, B))(buffer: ChannelBuffer)(implicit i1: BufferInteroperable[A], i2: BufferInteroperable[B]): Unit = {
     i1(buffer, t._1)
@@ -45,9 +45,9 @@ private[protocol] object BufferAccessors {
   /**
    * Write the given tuple into the given [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]].
    *
-   * @tparam A type that have an implicit typeclass [[org.asyncmongo.utils.BufferAccessors.BufferInteroperable]].
-   * @tparam B type that have an implicit typeclass [[org.asyncmongo.utils.BufferAccessors.BufferInteroperable]].
-   * @tparam C type that have an implicit typeclass [[org.asyncmongo.utils.BufferAccessors.BufferInteroperable]].
+   * @tparam A type that have an implicit typeclass [[reactivemongo.core.protocol.BufferAccessors.BufferInteroperable]].
+   * @tparam B type that have an implicit typeclass [[reactivemongo.core.protocol.BufferAccessors.BufferInteroperable]].
+   * @tparam C type that have an implicit typeclass [[reactivemongo.core.protocol.BufferAccessors.BufferInteroperable]].
    */
   def writeTupleToBuffer3[A, B, C](t: (A, B, C))(buffer: ChannelBuffer)(implicit i1: BufferInteroperable[A], i2: BufferInteroperable[B], i3: BufferInteroperable[C]): Unit = {
     i1(buffer, t._1)
@@ -58,10 +58,10 @@ private[protocol] object BufferAccessors {
   /**
    * Write the given tuple into the given [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]].
    *
-   * @tparam A type that have an implicit typeclass [[org.asyncmongo.utils.BufferAccessors.BufferInteroperable]].
-   * @tparam B type that have an implicit typeclass [[org.asyncmongo.utils.BufferAccessors.BufferInteroperable]].
-   * @tparam C type that have an implicit typeclass [[org.asyncmongo.utils.BufferAccessors.BufferInteroperable]].
-   * @tparam D type that have an implicit typeclass [[org.asyncmongo.utils.BufferAccessors.BufferInteroperable]].
+   * @tparam A type that have an implicit typeclass [[reactivemongo.core.protocol.BufferAccessors.BufferInteroperable]].
+   * @tparam B type that have an implicit typeclass [[reactivemongo.core.protocol.BufferAccessors.BufferInteroperable]].
+   * @tparam C type that have an implicit typeclass [[reactivemongo.core.protocol.BufferAccessors.BufferInteroperable]].
+   * @tparam D type that have an implicit typeclass [[reactivemongo.core.protocol.BufferAccessors.BufferInteroperable]].
    */
   def writeTupleToBuffer4[A, B, C, D](t: (A, B, C, D))(buffer: ChannelBuffer)(implicit i1: BufferInteroperable[A], i2: BufferInteroperable[B], i3: BufferInteroperable[C], i4: BufferInteroperable[D]): Unit = {
     i1(buffer, t._1)

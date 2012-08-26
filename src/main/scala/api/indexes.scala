@@ -36,7 +36,7 @@ case class Index(
 
 /**
  * A MongoDB namespaced index.
- * A MongoDB index is composed with the namespace (the fully qualified collection name) and the other fields of [[org.asyncmongo.api.indexes.Index]].
+ * A MongoDB index is composed with the namespace (the fully qualified collection name) and the other fields of [[reactivemongo.api.indexes.Index]].
  *
  * Consider reading [[http://www.mongodb.org/display/DOCS/Indexes the documentation about indexes in MongoDB]].
  *

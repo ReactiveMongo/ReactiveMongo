@@ -83,7 +83,7 @@ case class RichBuffer(buffer: ChannelBuffer) {
     buffer writeByte 0
     buffer
   }
-  /** Write the contents of the given [[org.asyncmongo.protocol.ChannelBufferWritable]]. */
+  /** Write the contents of the given [[reactivemongo.core.protocol.ChannelBufferWritable]]. */
   def write(writable: ChannelBufferWritable) {
     writable writeTo buffer
   }
@@ -120,7 +120,7 @@ case class RichBuffer(buffer: ChannelBuffer) {
 }
 
 object RichBuffer {
-  /** Implicit conversion between a [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]] and [[org.asyncmongo.utils.RichBuffer]]. */
+  /** Implicit conversion between a [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]] and [[reactivemongo.utils.RichBuffer]]. */
   implicit def channelBufferToExtendedBuffer(buffer: ChannelBuffer) = RichBuffer(buffer)
 }
 

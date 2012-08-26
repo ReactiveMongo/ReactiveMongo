@@ -19,12 +19,28 @@ import scala.concurrent.util.duration._
 /**
  * A Mongo Database.
  *
+ * Example:
+{{{
+import reactivemongo.api._
+
+val connection = MongoConnection( List( "localhost:27016" ) )
+val db = connection("plugin")
+val collection = db("acoll")
+
+// more explicit way
+val db2 = connection.db("plugin")
+val collection2 = db2.collection("plugin")
+}}}
  * @param dbName database name.
  * @param connection the [[reactivemongo.api.MongoConnection]] that will be used to query this database.
+ * @param failoverStrategy a failover strategy for sending requests.
  */
 case class DB(dbName: String, connection: MongoConnection, failoverStrategy: FailoverStrategy = FailoverStrategy())(implicit context: ExecutionContext) {
   /**  Gets a [[reactivemongo.api.Collection]] from this database. */
-  def apply(name: String) :Collection = Collection(this, name, connection, failoverStrategy)(MongoConnection.ec)
+  def apply(name: String) :Collection = Collection(this, name, connection, failoverStrategy)(context)
+
+  /**  Gets a [[reactivemongo.api.Collection]] from this database (alias for the `apply` method). */
+  def collection(name: String) :Collection = Collection(this, name, connection, failoverStrategy)(context)
 
   /** Authenticates the connection on this database. */
   def authenticate(user: String, password: String)(implicit timeout: Duration) :Future[AuthenticationResult] = connection.authenticate(dbName, user, password)
@@ -56,28 +72,28 @@ import reactivemongo.bson.handlers.DefaultBSONHandlers._
 object Samples {
 
   val connection = MongoConnection( List( "localhost:27016" ) )
-  val db = DB("plugin", connection)
-  val collection :Collection = db("acoll")
+  val db = connection("plugin")
+  val collection = db("acoll")
 
   def listDocs() = {
-    // select only the documents which field 'name' equals 'Jack'
-    val query = BSONDocument("name" -> BSONString("Jack"))
-    // select only the field 'name'
+    // select only the documents which field 'firstName' equals 'Jack'
+    val query = BSONDocument("firstName" -> BSONString("Jack"))
+    // select only the field 'lastName'
     val filter = BSONDocument(
-      "name" -> BSONInteger(1),
+      "lastName" -> BSONInteger(1),
       "_id" -> BSONInteger(0)
     )
 
-    // get a Cursor[DefaultBSONIterator]
+    // get a Cursor[TraversableBSONDocument]
     val cursor = collection.find(query, Some(filter))
     // let's enumerate this cursor and print a readable representation of each document in the response
     cursor.enumerate.apply(Iteratee.foreach { doc =>
-      println("found document: " + DefaultBSONIterator.pretty(doc))
+      println("found document: " + DefaultBSONIterator.pretty(doc.bsonIterator))
     })
 
     // or, the same with getting a list
     val cursor2 = collection.find(query, Some(filter))
-    val list = cursor.toList
+    val futurelist = cursor.toList
   }
 }
 }}}
@@ -85,6 +101,7 @@ object Samples {
  * @param db database.
  * @param collectionName the name of this collection.
  * @param connection the [[reactivemongo.api.MongoConnection]] that will be used to query this database.
+ * @param failoverStrategy a failover strategy for sending requests.
  */
 case class Collection(
   db: DB,
@@ -120,7 +137,7 @@ case class Collection(
    * Find the documents matching the given criteria.
    *
    * This method accepts any query object, provided that there is an implicit [[reactivemongo.bson.handlers.BSONWriter]] typeclass for handling it in the scope.
-   * You can use the typeclasses defined in [[org.asyncmongo.handlers.DefaultBSONHandlers]] object.
+   * You can use the typeclasses defined in [[reactivemongo.bson.handlers.DefaultBSONHandlers]] object.
    *
    * Please take a look to the [[http://www.mongodb.org/display/DOCS/Querying mongodb documentation]] to know how querying works.
    *
@@ -130,7 +147,7 @@ case class Collection(
    * @param query The selector query.
    * @param opts The query options (skip, batchSize, flags...).
    *
-   * @return a cursor over the matched documents. You can get an enumerator for it, please see the [[org.asyncmongo.api.Cursor]] companion object.
+   * @return a cursor over the matched documents. You can get an enumerator for it, please see the [[reactivemongo.api.Cursor]] companion object.
    */
   def find[Qry, Rst](query: Qry, opts: QueryOpts)(implicit writer: BSONWriter[Qry], handler: BSONReaderHandler, reader: BSONReader[Rst]) :FlattenedCursor[Rst] =
     find(writer.write(query), None, opts)
@@ -139,7 +156,7 @@ case class Collection(
    * Find the documents matching the given criteria.
    *
    * This method accepts any query object, provided that there is an implicit [[reactivemongo.bson.handlers.BSONWriter]] typeclass for handling it in the scope.
-   * You can use the typeclasses defined in [[org.asyncmongo.handlers.DefaultBSONHandlers]] object.
+   * You can use the typeclasses defined in [[reactivemongo.bson.handlers.DefaultBSONHandlers]] object.
    *
    * Please take a look to the [[http://www.mongodb.org/display/DOCS/Querying mongodb documentation]] to know how querying works.
    *
@@ -163,7 +180,7 @@ case class Collection(
    * @param query The selector query.
    * @param opts The query options (skip, batchSize, flags...).
    *
-   * @return a cursor over the matched documents. You can get an enumerator for it, please see the [[org.asyncmongo.api.Cursor]] companion object.
+   * @return a cursor over the matched documents. You can get an enumerator for it, please see the [[reactivemongo.api.Cursor]] companion object.
    */
   def find[Rst](query: QueryBuilder, opts: QueryOpts)(implicit handler: BSONReaderHandler, reader: BSONReader[Rst]) :FlattenedCursor[Rst] =
     find(query.makeMergedBuffer, None, opts)
@@ -371,28 +388,28 @@ import reactivemongo.bson.handlers.DefaultBSONHandlers._
 object Samples {
 
   val connection = MongoConnection( List( "localhost:27016" ) )
-  val db = DB("plugin", connection)
+  val db = connection("plugin")
   val collection = db("acoll")
 
   def listDocs() = {
-    // select only the documents which field 'name' equals 'Jack'
-    val query = Bson("name" -> BSONString("Jack"))
-    // select only the field 'name'
-    val filter = Bson(
-      "name" -> BSONInteger(1),
+    // select only the documents which field 'firstName' equals 'Jack'
+    val query = BSONDocument("firstName" -> BSONString("Jack"))
+    // select only the field 'lastName'
+    val filter = BSONDocument(
+      "lastName" -> BSONInteger(1),
       "_id" -> BSONInteger(0)
     )
 
-    // get a Cursor[DefaultBSONIterator]
-    val cursor = collection.find(query, Some(filter))
+    // get a Cursor[TraversableBSONDocument]
+    val cursor = collection.find(query, filter)
     // let's enumerate this cursor and print a readable representation of each document in the response
     cursor.enumerate.apply(Iteratee.foreach { doc =>
-      println("found document: " + DefaultBSONIterator.pretty(doc))
+      println("found document: " + DefaultBSONIterator.pretty(doc.bsonIterator))
     })
 
     // or, the same with getting a list
-    val cursor2 = collection.find(query, Some(filter))
-    val list = cursor2.toList
+    val cursor2 = collection.find(query, filter)
+    val futurelist = cursor2.toList
   }
 }
 }}}
@@ -424,7 +441,7 @@ trait Cursor[T] {
    * Example:
    * {{{
 // get a Cursor[DefaultBSONIterator]
-val cursor = collection.find(query, Some(filter))
+val cursor = collection.find(query, filter)
 // let's enumerate this cursor and print a readable representation of each document in the response
 cursor.enumerate.apply(Iteratee.foreach { doc =>
   println("found document: " + DefaultBSONIterator.pretty(doc))
@@ -450,7 +467,7 @@ cursor.enumerate.apply(Iteratee.foreach { doc =>
    *
    * Example:
    * {{{
-val cursor2 = collection.find(query, Some(filter))
+val cursor2 = collection.find(query, filter)
 val list = cursor2[List].collect()
 }}}
    *
@@ -467,7 +484,7 @@ val list = cursor2[List].collect()
    *
    * Example:
    * {{{
-val cursor = collection.find(query, Some(filter))
+val cursor = collection.find(query, filter)
 // gather the first 3 documents
 val list = cursor[List].collect(3)
 }}}
@@ -486,7 +503,7 @@ val list = cursor[List].collect(3)
    *
    * Example:
    * {{{
-val cursor2 = collection.find(query, Some(filter))
+val cursor2 = collection.find(query, filter)
 val list = cursor2.toList
 }}}
    *
@@ -501,7 +518,7 @@ val list = cursor2.toList
    *
    * Example:
    * {{{
-val cursor2 = collection.find(query, Some(filter))
+val cursor2 = collection.find(query, filter)
 // return the 3 first documents in a list.
 val list = cursor2.toList(3)
 }}}
@@ -516,7 +533,7 @@ val list = cursor2.toList(3)
    *
    * Example:
    * {{{
-val cursor2 = collection.find(query, Some(filter))
+val cursor2 = collection.find(query, filter)
 val list = cursor2[List].collect()
 }}}
    *
@@ -602,7 +619,7 @@ object DefaultCursor {
 
 /**
  * A helper that sends the given message to the given actor, following a failover strategy.
- * This helper holds a future reference that is completed with a result, after 1 or more attempts (specified in the given strategy).
+ * This helper holds a future reference that is completed with a response, after 1 or more attempts (specified in the given strategy).
  * If the all the tryouts configured by the given strategy were unsuccessful, the future reference is completed with a Throwable.
  *
  * Should not be used directly for most use cases.
@@ -615,12 +632,13 @@ object DefaultCursor {
  */
 class Failover[T](message: T, actorRef: ActorRef, strategy: FailoverStrategy)(expectingResponseMaker: T => ExpectingResponse)(implicit ec: ExecutionContext) {
   import Failover.logger
+  private val akkaDelay = scalaToAkkaDuration(strategy.initialDelay)
   private val promise = scala.concurrent.Promise[Response]()
+
+  /** A future that is completed with a response, after 1 or more attempts (specified in the given strategy). */
   val future: Future[Response] = promise.future
 
-  val akkaDelay = scalaToAkkaDuration(strategy.initialDelay)
-
-  def send(n: Int) {
+  private def send(n: Int) {
     val expectingResponse = expectingResponseMaker(message)
     actorRef ! expectingResponse
     expectingResponse.future.onComplete {
@@ -685,12 +703,41 @@ case class FailoverStrategy(
  * Connection here does not mean that there is one open channel to the server.
  * Behind the scene, many connections (channels) are open on all the available servers in the replica set.
  *
+ * Example:
+{{{
+import reactivemongo.api._
+
+val connection = MongoConnection( List( "localhost:27016" ) )
+val db = connection("plugin")
+val collection = db("acoll")
+
+// more explicit way
+val db2 = connection.db("plugin")
+val collection2 = db2.collection("plugin")
+}}}
+ *
  * @param mongosystem A reference to a [[reactivemongo.core.actors.MongoDBSystem]] Actor.
  */
 class MongoConnection(
   val mongosystem: ActorRef,
   monitor: ActorRef
 ) {
+  /**
+   * Returns a DB reference using this connection.
+   *
+   * @param name The database name.
+   * @param failoverStrategy a failover strategy for sending requests.
+   */
+  def apply(name: String, failoverStrategy: FailoverStrategy = FailoverStrategy())(implicit context: ExecutionContext) :DB = DB(name, this, failoverStrategy)
+
+  /**
+   * Returns a DB reference using this connection (alias for the `apply` method).
+   *
+   * @param name The database name.
+   * @param failoverStrategy a failover strategy for sending requests.
+   */
+  def db(name: String, failoverStrategy: FailoverStrategy = FailoverStrategy())(implicit context: ExecutionContext) :DB = apply(name, failoverStrategy)
+
   /**
    * Get a future that will be successful when a primary node is available or times out.
    */
@@ -748,8 +795,6 @@ class MongoConnection(
 object MongoConnection {
   import com.typesafe.config.ConfigFactory
   val config = ConfigFactory.load()
-
-  val ec = ExecutionContext.fromExecutor(java.util.concurrent.Executors.newCachedThreadPool)
 
   /**
    * The actor system that creates all the required actors.

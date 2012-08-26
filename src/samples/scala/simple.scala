@@ -13,19 +13,19 @@ object Samples {
   import scala.concurrent.ExecutionContext.Implicits.global // TODO create own ExecutionContext
 
   val connection = MongoConnection( List( "localhost:27016" ) )
-  val db = DB("plugin", connection)
+  val db = connection("plugin")
   val collection = db("acoll")
 
   def listDocs() = {
-    // select only the documents which field 'name' equals 'Jack'
+    // select only the documents which field 'firstName' equals 'Jack'
     val query = BSONDocument("firstName" -> BSONString("Jack"))
-    // select only the field 'name'
+    // select only the field 'lastName'
     val filter = BSONDocument(
       "lastName" -> BSONInteger(1),
       "_id" -> BSONInteger(0)
     )
 
-    // get a Cursor[DefaultBSONIterator]
+    // get a Cursor[TraversableBSONDocument]
     val cursor = collection.find(query, filter)
     // let's enumerate this cursor and print a readable representation of each document in the response
     cursor.enumerate.apply(Iteratee.foreach { doc =>

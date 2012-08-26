@@ -100,11 +100,11 @@ case class Request (
 }
 
 /**
- * A helper to build write request which result needs to be checked (by sending a [[org.asyncmongo.protocol.commands.GetLastError]] command after).
+ * A helper to build write request which result needs to be checked (by sending a [[reactivemongo.core.commands.GetLastError]] command after).
  *
  * @param op write operation.
  * @param documents body of this request, a [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]] containing 0, 1, or many documents.
- * @param getLastError a [[org.asyncmongo.protocol.commands.GetLastError]] command message.
+ * @param getLastError a [[reactivemongo.core.commands.GetLastError]] command message.
  */
 case class CheckedWriteRequest(
   op: WriteRequestOp,
@@ -187,7 +187,7 @@ object Request{
  * @param header header of this response.
  * @param reply the reply operation contained in this response.
  * @param documents body of this response, a [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]] containing 0, 1, or many documents.
- * @param info some meta information about this response, see [[org.asyncmongo.protocol.ResponseInfo]].
+ * @param info some meta information about this response, see [[reactivemongo.core.protocol.ResponseInfo]].
  */
 case class Response(
   header: MessageHeader,

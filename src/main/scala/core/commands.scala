@@ -31,12 +31,12 @@ trait Command {
   def slaveOk :Boolean = false
 
   /**
-   * Makes the [[org.asyncmongo.bson.Bson]] for documents that will be send as body of this command's query.
+   * Makes the [[reactivemongo.bson.BSONDocument]] for documents that will be send as body of this command's query.
    */
   def makeDocuments :BSONDocument
 
   /**
-   * Produces a [[org.asyncmongo.protocol.commands.MakableCommand]] instance of this command.
+   * Produces a [[reactivemongo.core.commands.MakableCommand]] instance of this command.
    *
    * @param db name of the target database.
    */
@@ -66,24 +66,24 @@ trait AdminCommand extends Command {
   override def apply(db: String) :MakableCommand = apply()
 
   /**
-   * Produces a [[org.asyncmongo.protocol.commands.MakableCommand]] instance of this command.
+   * Produces a [[reactivemongo.core.commands.MakableCommand]] instance of this command.
    */
   def apply() :MakableCommand = new MakableCommand("admin", this)
 }
 
 /**
- * A makable command, that can produce a request maker ready to be sent to a [[org.asyncmongo.actors.MongoDBSystem]] actor.
+ * A makable command, that can produce a request maker ready to be sent to a [[reactivemongo.core.actors.MongoDBSystem]] actor.
  *
  * @param db Database name.
  * @param command Subject command.
  */
 class MakableCommand(val db: String, val command: Command) {
   /**
-   * Produces the [[org.asyncmongo.protocol.Query]] instance for the given command.
+   * Produces the [[reactivemongo.core.protocol.Query]] instance for the given command.
    */
   def makeQuery :Query = Query(if(command.slaveOk) QueryFlags.SlaveOk else 0, db + ".$cmd", 0, 1)
   /**
-   * Returns the [[org.asyncmongo.protocol.RequestMaker]] for the given command.
+   * Returns the [[reactivemongo.core.protocol.RequestMaker]] for the given command.
    */
   def maker = RequestMaker(makeQuery, command.makeDocuments.makeBuffer)
 }
@@ -132,13 +132,13 @@ case class GetLastError(
 }
 
 /**
- * Result of the [[org.asyncmongo.protocol.commands.GetLastError]] command.
+ * Result of the [[reactivemongo.commands.GetLastError]] command.
  *
  * @param ok true if the last operation was successful
  * @param err the err field, if any
  * @param code the error code, if any
  * @param errMsg the message (often regarding an error) if any
- * @param original the whole map resulting of the deserialization of the response with the [[org.asyncmongo.handlers.DefaultBSONHandlers]].
+ * @param original the whole map resulting of the deserialization of the response with the [[reactivemongo.bson.handlers.DefaultBSONHandlers]].
  */
 case class LastError(
   ok: Boolean,
@@ -155,7 +155,7 @@ case class LastError(
 }
 
 /**
- * Deserializer for [[org.asyncmongo.protocol.commands.GetLastError]] command result.
+ * Deserializer for [[reactivemongo.core.commands.GetLastError]] command result.
  */
 object LastError extends CommandResultMaker[LastError] {
   def apply(response: Response) = {
@@ -381,7 +381,7 @@ case class IsMasterResponse(
   hosts: Option[List[String]],
   me: Option[String]
 ) {
-  /** the resolved [[org.asyncmongo.protocol.NodeState]] of the answering server */
+  /** the resolved [[reactivemongo.core.protocol.NodeState]] of the answering server */
   lazy val state :NodeState = if(isMaster) PRIMARY else if(secondary) SECONDARY else UNKNOWN
 }
 
@@ -415,7 +415,7 @@ object Remove extends Modify {
  *
  * @param collection the target collection name
  * @param query the filter for this command
- * @param modify the [[org.asyncmongo.protocol.commands.Modify]] operation to do
+ * @param modify the [[reactivemongo.core.commands.Modify]] operation to do
  * @param upsert states if a new document should be inserted if no match
  * @param sort the sort document
  * @param fields retrieve only a subset of the returned document
@@ -446,7 +446,7 @@ case class FindAndModify(
 
 /**
  * FindAndModify command deserializer
- * @todo [[org.asyncmongo.handlers.BSONReader[T]]] typeclass
+ * @todo [[reactivemongo.bson.handlers.BSONReader[T]]] typeclass
  */
 object FindAndModify extends CommandResultMaker[Option[TraversableBSONDocument]] {
   def apply(response: Response) =
