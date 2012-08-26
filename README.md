@@ -1,6 +1,6 @@
-# MongoDB Async Driver
+# ReactiveMongo - Asynchronous & Non-Blocking Scala Driver for MongoDB
 
-[MongoAsync](https://github.com/zenexity/AsyncMongo/) is a scala driver that provides fully non-blocking and asynchronous I/O operations.
+[ReactiveMongo](https://github.com/zenexity/AsyncMongo/) is a scala driver that provides fully non-blocking and asynchronous I/O operations.
 
 ## Scale better, use less threads
 
@@ -10,19 +10,19 @@ Imagine that you have a web application with 10 concurrent accesses to the datab
 
 The problem is getting more and more obvious while using the new generation of web frameworks. What's the point of using a nifty, powerful, fully asynchronous web framework if all your database accesses are blocking?
 
-MongoAsync is designed to avoid any kind of blocking request. Every operation returns immediately, freeing the running thread and resuming execution when it is over. Accessing the database is not a bottleneck anymore.
+ReactiveMongo is designed to avoid any kind of blocking request. Every operation returns immediately, freeing the running thread and resuming execution when it is over. Accessing the database is not a bottleneck anymore.
 
 ## Let the stream flow!
 
 The future of the web is in streaming data to a very large number of clients simultaneously. Twitter Stream API is a good example of this paradigm shift that is radically altering the way data is consumed all over the web.
 
-MongoAsync enables you to build such a web application right now. It allows you to stream data both into and from your MongoDB servers.
+ReactiveMongo enables you to build such a web application right now. It allows you to stream data both into and from your MongoDB servers.
 
 One scenario could be consuming progressively your collection of documents as needed without filling memory unnecessarily.
 
 But if what you're interested in is live feeds then you can stream a MongoDB capped collection through a websocket, comet or any other streaming protocol. Each time a document is stored into this collection, the webapp broadcasts it to all the interested clients, in a complete non-blocking way.
 
-Moreover, you can now use GridFS as a non-blocking, streaming datastore. MongoAsync retrieves the file, chunk by chunk, and streams it until the client is done or there's no more data. Neither huge memory consumption, nor blocked thread during the process!
+Moreover, you can now use GridFS as a non-blocking, streaming datastore. ReactiveMongo retrieves the file, chunk by chunk, and streams it until the client is done or there's no more data. Neither huge memory consumption, nor blocked thread during the process!
 
 ## Step By Step Example 
 
@@ -49,7 +49,7 @@ If you use SBT, you just have to edit your build.properties and add the followin
 resolvers += "sgodbillon" at "https://bitbucket.org/sgodbillon/repository/raw/master/snapshots/"
 
 libraryDependencies ++= Seq(
-  "org.asyncmongo" %% "mongo-async-driver" % "0.1-SNAPSHOT"
+  "reactivemongo" %% "reactivemongo" % "0.1-SNAPSHOT"
 )
 ```
 
@@ -59,7 +59,7 @@ You can get a connection to a server (or a replica set) like this:
 
 ```scala
 def test() {
-  import org.asyncmongo.api._
+  import reactivemongo.api._
   import scala.concurrent.ExecutionContext.Implicits.global
   
   val connection = MongoConnection( List( "localhost:27017" ) )
@@ -75,24 +75,33 @@ The `connection` reference manages a pool of connections. You can provide a list
 ```scala
 package foo
 
-import org.asyncmongo.api._
-import org.asyncmongo.bson._
-import org.asyncmongo.handlers.DefaultBSONHandlers._
+import reactivemongo.api._
+import reactivemongo.bson._
+import reactivemongo.bson.handlers.DefaultBSONHandlers._
 import play.api.libs.iteratee.Iteratee
 
 object Samples {
   import scala.concurrent.ExecutionContext.Implicits.global
 
   def listDocs() = {
-    val connection = MongoConnection( List( "localhost:27017" ) )
-    val db = DB("plugin", connection)
-    val collection = db("acoll")
-    
-    val cursor = collection.find(Bson("name" -> BSONString("Jack")))
-    
+    // select only the documents which field 'firstName' equals 'Jack'
+    val query = BSONDocument("firstName" -> BSONString("Jack"))
+
+    // get a Cursor[DefaultBSONIterator]
+    val cursor = collection.find(query)
+    // let's enumerate this cursor and print a readable representation of each document in the response
     cursor.enumerate.apply(Iteratee.foreach { doc =>
-      println("found document: " + DefaultBSONIterator.pretty(doc))
+      println("found document: " + DefaultBSONIterator.pretty(doc.bsonIterator))
     })
+
+    // or, the same with getting a list
+    val cursor2 = collection.find(query)
+    val futurelist = cursor2.toList
+    futurelist.onSuccess {
+      case list =>
+        val names = list.map(_.getAs[BSONString]("lastName").get.value)
+        println("got names: " + names)
+    }
   }
 }
 ```
@@ -101,10 +110,10 @@ The above code deserves some explanations.
 First, let's take a look to the `collection.find` signature:
 
 ```scala
-def find[T, U, V](query: T, fields: Option[U] = None, skip: Int = 0, limit: Int = 0, flags: Int = 0)(implicit writer: BSONWriter[T], writer2: BSONWriter[U], handler: BSONReaderHandler, reader: BSONReader[V]) :FlattenedCursor[V]
+def find[Qry, Rst](query: Qry)(implicit writer: BSONWriter[Qry], handler: BSONReaderHandler, reader: BSONReader[Rst]) :FlattenedCursor[Rst]
 ```
 
-The find method allows you to pass any query object of type `T`, provided that there is an implicit `BSONWriter[T]` in the scope. `BSONWriter[T]` is a typeclass which instances implement a `write(document: T)` method that returns a `ChannelBuffer`:
+The find method allows you to pass any query object of type `Qry`, provided that there is an implicit `BSONWriter[Qry]` in the scope. `BSONWriter[Qry]` is a typeclass which instances implement a `write(document: Qry)` method that returns a `ChannelBuffer`:
 
 ```scala
 trait BSONWriter[DocumentType] {
@@ -112,7 +121,7 @@ trait BSONWriter[DocumentType] {
 }
 ```
 
-`BSONReader[V]` is the opposite typeclass. It's typically a deserializer that takes a `ChannelBuffer` and returns an instance of `V`:
+`BSONReader[Rst]` is the opposite typeclass. It's typically a deserializer that takes a `ChannelBuffer` and returns an instance of `Rst`:
 
 ```scala
 trait BSONReader[DocumentType] {
@@ -121,15 +130,15 @@ trait BSONReader[DocumentType] {
 ```
 
 These two typeclasses allow you to provide different de/serializers for different types.
-For this example, we don't need to write specific handlers, so we use the default ones by importing `org.asyncmongo.handlers.DefaultBSONHandlers._`.
+For this example, we don't need to write specific handlers, so we use the default ones by importing `reactivemongo.bson.handlers.DefaultBSONHandlers._`.
 
-Among `DefaultBSONHandlers` is a `BSONWriter[Bson]` that handles the shipped-in BSON library.
+Among `DefaultBSONHandlers` is a `BSONWriter[BSONDocument]` that handles the shipped-in BSON library.
 
-You may have noticed that `collection.find` returns a `FlattenedCursor[V]]`. This cursor is actually a future cursor. In fact, *everything in MongoAsync is both non-blocking and asynchronous*. That means each time you make a query, the only immediate result you get is a future of result, so the current thread is not blocked waiting for its completion. You don't need to have *n* threads to process *n* database operations at the same time anymore.
+You may have noticed that `collection.find` returns a `FlattenedCursor[Rst]]`. This cursor is actually a future cursor. In fact, *everything in ReactiveMongo is both non-blocking and asynchronous*. That means each time you make a query, the only immediate result you get is a future of result, so the current thread is not blocked waiting for its completion. You don't need to have *n* threads to process *n* database operations at the same time anymore.
 
 When a query matches too much documents, Mongo sends just a part of them and creates a Cursor in order to get the next documents. The problem is, how to handle it in a non-blocking, asynchronous, yet elegant way?
 
-Obviously MongoAsync's cursor provides helpful methods to build a collection (like a list) from it, so we could write:
+Obviously ReactiveMongo's cursor provides helpful methods to build a collection (like a list) from it, so we could write:
 
 ```scala
 val futureList :Future[List] = cursor.toList
@@ -161,37 +170,28 @@ When this snippet is run, we get the following:
 ```
 found document: {
 	_id: BSONObjectID["4f899e7eaf527324ab25c56b"],
-	name: BSONString(Jack)
+  firstName: BSONString(Jack),
+	lastName: BSONString(London)
 }
 found document: {
 	_id: BSONObjectID["4f899f9baf527324ab25c56c"],
-	name: BSONString(Jack)
+  firstName: BSONString(Jack),
+	lastName: BSONString(Kerouac)
 }
 found document: {
 	_id: BSONObjectID["4f899f9baf527324ab25c56d"],
-	name: BSONString(Jack)
-}
-found document: {
-	_id: BSONObjectID["4f8a269aaf527324ab25c56e"],
-	name: BSONString(Jack)
-}
-found document: {
-	_id: BSONObjectID["4f8a269aaf527324ab25c56f"],
-	name: BSONString(Jack)
-}
-found document: {
-	_id: BSONObjectID["4fa15559af527324ab25c570"],
-	name: BSONString(Jack)
+  firstName: BSONString(Jack),
+	lastName: BSONString(Nicholson)
 }
 ```
 
 ## Go further!
 
-MongoAsync makes a heavy usage of the Iteratee library provided by the [Play! Framework 2.1](http://www.playframework.org/). You can dive into [Play's Iteratee documentation](http://www.playframework.org/documentation/2.0.2/Iteratees) to learn about this cool piece of software, and make your own Iteratees and Enumerators.
+ReactiveMongo makes a heavy usage of the Iteratee library provided by the [Play! Framework 2.1](http://www.playframework.org/). You can dive into [Play's Iteratee documentation](http://www.playframework.org/documentation/2.0.2/Iteratees) to learn about this cool piece of software, and make your own Iteratees and Enumerators.
 
 Used in conjonction with stream-aware frameworks, like Play!, you can easily stream the data stored in MongoDB. See the examples and get convinced!
 
 ### Samples
 
-* [MongoAsync Tailable Cursor, WebSocket and Play 2](https://github.com/sgodbillon/demo-mongo-async)
-
+* [ReactiveMongo Tailable Cursor, WebSocket and Play 2](https://github.com/sgodbillon/reactivemongo-tailablecursor-demo)
+* [Full Web Application featuring basic CRUD operations and GridFS streaming](https://github.com/sgodbillon/reactivemongo-demo-app)
