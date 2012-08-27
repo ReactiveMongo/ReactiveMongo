@@ -54,6 +54,8 @@ sealed trait BSONValue {
   val code: Int
   /** Writes this value in the given [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]] */
   def write(buffer: ChannelBuffer) :ChannelBuffer
+  /** Returns a new buffer containing this value. */
+  def toBuffer :ChannelBuffer = write(ChannelBuffers.dynamicBuffer())
 }
 
 /** A BSON Double. */
