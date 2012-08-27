@@ -142,10 +142,6 @@ class MongoDBSystem(
 
   override def receive = {
     case RegisterMonitor => monitors += sender
-    // todo: refactoring
-    /*case request: Request => receiveRequest(request)
-    case requestMaker :RequestMaker => receiveRequest(requestMaker(requestIdGenerator.user))
-    case checkedWriteRequest :CheckedWriteRequest => receiveCheckedWriteRequest(checkedWriteRequest)*/
 
     case req :RequestMakerExpectingResponse =>
       logger.trace("received a request")

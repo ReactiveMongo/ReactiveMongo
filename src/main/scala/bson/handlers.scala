@@ -5,7 +5,7 @@ import reactivemongo.bson._
 import reactivemongo.core.protocol._
 
 /**
- * A typeclass that writes a ''DocumentType'' instance as a Bson document into a [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]].
+ * A typeclass that writes a `DocumentType` instance as a Bson document into a [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]].
  *
  * @tparam DocumentType The type of instances that can be turned into Bson documents.
  */
@@ -14,7 +14,7 @@ trait BSONWriter[-DocumentType] {
 }
 
 /**
- * A typeclass that creates a ''DocumentType'' instance from as a Bson document from a [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]].
+ * A typeclass that creates a `DocumentType` instance from as a Bson document from a [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]].
  *
  * @tparam DocumentType The type of instances to create.
  */
@@ -23,7 +23,7 @@ trait BSONReader[+DocumentType] {
 }
 
 /**
- * A handler that produces an Iterator of ''DocumentType'',
+ * A handler that produces an Iterator of `DocumentType`,
  * provided that there is an implicit [[reactivemongo.bson.handlers.BSONReader]][DocumentType] in the scope.
  */
 trait BSONReaderHandler {

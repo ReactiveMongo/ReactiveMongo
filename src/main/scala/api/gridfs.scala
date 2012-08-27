@@ -42,7 +42,7 @@ trait ReadFileEntry extends FileEntry {
 
   import ReadFileEntry.logger
 
-  /** Produces an enumerator of chunks of bytes from the ''chunks'' collection. */
+  /** Produces an enumerator of chunks of bytes from the `chunks` collection. */
   def enumerate(implicit ctx: ExecutionContext) :Enumerator[Array[Byte]] = {
     val selector = BSONDocument(
       "$query" -> BSONDocument(
@@ -71,7 +71,7 @@ trait ReadFileEntry extends FileEntry {
   /**
    * Helper to write the contents of this file into an OutputStream.
    *
-   * Basically it's just an enumerator produced by the ''enumerate'' method that is applied to an Iteratee that writes the consumed chunks into the given stream.
+   * Basically it's just an enumerator produced by the `enumerate` method that is applied to an Iteratee that writes the consumed chunks into the given stream.
    */
   def readContent(os: OutputStream)(implicit ctx: ExecutionContext) :Future[Iteratee[Array[Byte],Unit]] = {
     enumerate(ctx)(Iteratee.foreach { chunk =>
@@ -131,7 +131,7 @@ case class FileToWrite(
   import FileToWrite.logger
 
   /**
-   * Returns an Iteratee[Array[Byte], Future[PutResult]] that will consume chunks of bytes, normalize their size and write them into the ''chunks'' collection.
+   * Returns an Iteratee[Array[Byte], Future[PutResult]] that will consume chunks of bytes, normalize their size and write them into the `chunks` collection.
    *
    * @param gfs The GridFS store.
    * @param chunkSize The size of the chunks to be written. Defaults to 256k (GridFS Spec).
@@ -209,7 +209,7 @@ object FileToWrite {
  * The metadata of the saved file.
  *
  * @param id The id of the saved file.
- * @param nbChunks The number of chunks that have been written into the ''chunks'' collection.
+ * @param nbChunks The number of chunks that have been written into the `chunks` collection.
  * @param length The length of the saved file.
  * @param md5 The MD5 hash of the saved file, if computed.
  */
@@ -223,7 +223,7 @@ case class PutResult(
 /**
  * A helper class to make GridFS queries.
  *
- * GridFS creates two collections, ''files'' and ''chunks'', that store respectively the files metadata ant their chunks.
+ * GridFS creates two collections, `files` and `chunks`, that store respectively the files metadata ant their chunks.
  * These collections are prefixed by a customizable name (usually "fs") followed by a dot character.
  *
  * So, if the database is "media" and the GridFS prefix is "photos", the two collections are:
@@ -235,9 +235,9 @@ case class PutResult(
  */
 case class GridFS(db: DB, prefix: String = "fs") {
   import indexes._
-  /** The ''files'' collection */
+  /** The `files` collection */
   val files = db(prefix + ".files")
-  /** The ''chunks'' collection */
+  /** The `chunks` collection */
   val chunks = db(prefix + ".chunks")
 
   /**
@@ -285,7 +285,7 @@ case class GridFS(db: DB, prefix: String = "fs") {
   }
 
   /**
-   * Creates the needed index on the ''chunks'' collection, if none.
+   * Creates the needed index on the `chunks` collection, if none.
    *
    * Please note that you should really consider reading [[http://www.mongodb.org/display/DOCS/Indexes]] before doing this, especially in production.
    *

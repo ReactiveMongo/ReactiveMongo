@@ -5,9 +5,6 @@ import reactivemongo.api._
 import reactivemongo.bson._
 import reactivemongo.bson.handlers.DefaultBSONHandlers._
 import reactivemongo.core.commands._
-import scala.concurrent.Await
-import scala.concurrent.util._
-import scala.concurrent.util.duration._
 
 object Samples {
   import scala.concurrent.ExecutionContext.Implicits.global // TODO create own ExecutionContext

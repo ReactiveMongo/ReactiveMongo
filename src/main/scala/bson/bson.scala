@@ -103,7 +103,7 @@ sealed trait BSONArray extends BSONStructure {
   val code = 0x04
 }
 /**
- * A structure builder. It will accept elements of '''E''' and write them into its underlying buffer.
+ * A structure builder. It will accept elements of `E` and write them into its underlying buffer.
  *
  * @tparam E The type of the elements that can be appended to this structure.
  */
@@ -136,7 +136,7 @@ sealed trait AppendableBSONStructure[E] extends BSONStructure {
 }
 
 /**
- * A structure reader. It will give the value matching the given key of type '''Key''', if it exists.
+ * A structure reader. It will give the value matching the given key of type `Key`, if it exists.
  *
  * This reader is lazy: it deserializes values only when required.
  * Moreover, it memoizes the already deserialized values, to avoid n computations.
@@ -151,7 +151,7 @@ sealed trait TraversableBSONStructure[Key] extends BSONStructure {
   def get(key: Key) :Option[BSONValue]
 
   /**
-   * Gets the value matching the given key, if it exists and if it is of type '''T'''.
+   * Gets the value matching the given key, if it exists and if it is of type `T`.
    *
    * @tparam T the type of the BSONValue to find.
    */

@@ -274,7 +274,7 @@ case class Collection(
    *
    * @tparam T the type of the document to insert. An implicit [[reactivemongo.bson.handlers.BSONWriter]][T] typeclass for handling it has to be in the scope.
    *
-   * @param enumerator An enumerator of '''T'''.
+   * @param enumerator An enumerator of `T`.
    * @param bulkSize The number of documents per bulk.
    * @param bulkByteSize The maximum size for a bulk, in bytes.
    *
@@ -462,7 +462,7 @@ cursor.enumerate.apply(Iteratee.foreach { doc =>
     else Enumerator.eof
 
   /**
-   * Collects all the documents into a collection of type '''M[T]'''.
+   * Collects all the documents into a collection of type `M[T]`.
    * The reuse of this cursor may cause unexpected behavior.
    *
    * Example:
@@ -479,7 +479,7 @@ val list = cursor2[List].collect()
   }
 
    /**
-   * Collects all the documents into a collection of type '''M[T]'''.
+   * Collects all the documents into a collection of type `M[T]`.
    * The reuse of this cursor may cause unexpected behavior.
    *
    * Example:
@@ -498,7 +498,7 @@ val list = cursor[List].collect(3)
   }
 
   /**
-   * Collects all the documents into a collection of type '''M[T]'''.
+   * Collects all the documents into a collection of type `M[T]`.
    * The reuse of this cursor may cause unexpected behavior.
    *
    * Example:
@@ -513,7 +513,7 @@ val list = cursor2.toList
   def toList()(implicit ctx: ExecutionContext) :Future[List[T]] = collect[List]()
 
   /**
-   * Collects all the documents into a collection of type '''M[T]'''.
+   * Collects all the documents into a collection of type `M[T]`.
    * The reuse of this cursor may cause unexpected behavior.
    *
    * Example:
@@ -625,10 +625,10 @@ object DefaultCursor {
  * Should not be used directly for most use cases.
  *
  * @tparam T Type of the message to send.
- * @param message The message to send to the given actor. This message will be wrapped into an Expecting Response message by the ''expectingResponseMaker'' function.
+ * @param message The message to send to the given actor. This message will be wrapped into an ExpectingResponse message by the `expectingResponseMaker` function.
  * @param actorRef The reference to the MongoDBSystem actor the given message will be sent to.
  * @param strategy The Failover strategy.
- * @param expectingResponseMaker A function that takes a message of type '''T''' and wraps it into an ExpectingResponse message.
+ * @param expectingResponseMaker A function that takes a message of type `T` and wraps it into an ExpectingResponse message.
  */
 class Failover[T](message: T, actorRef: ActorRef, strategy: FailoverStrategy)(expectingResponseMaker: T => ExpectingResponse)(implicit ec: ExecutionContext) {
   import Failover.logger

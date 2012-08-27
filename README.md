@@ -63,7 +63,7 @@ def test() {
   import scala.concurrent.ExecutionContext.Implicits.global
   
   val connection = MongoConnection( List( "localhost:27017" ) )
-  val db = DB("plugin", connection)
+  val db = connection("plugin")
   val collection = db("acoll")
 }
 ```
@@ -134,7 +134,7 @@ For this example, we don't need to write specific handlers, so we use the defaul
 
 Among `DefaultBSONHandlers` is a `BSONWriter[BSONDocument]` that handles the shipped-in BSON library.
 
-You may have noticed that `collection.find` returns a `FlattenedCursor[Rst]]`. This cursor is actually a future cursor. In fact, *everything in ReactiveMongo is both non-blocking and asynchronous*. That means each time you make a query, the only immediate result you get is a future of result, so the current thread is not blocked waiting for its completion. You don't need to have *n* threads to process *n* database operations at the same time anymore.
+You may have noticed that `collection.find` returns a `FlattenedCursor[Rst]`. This cursor is actually a future cursor. In fact, *everything in ReactiveMongo is both non-blocking and asynchronous*. That means each time you make a query, the only immediate result you get is a future of result, so the current thread is not blocked waiting for its completion. You don't need to have *n* threads to process *n* database operations at the same time anymore.
 
 When a query matches too much documents, Mongo sends just a part of them and creates a Cursor in order to get the next documents. The problem is, how to handle it in a non-blocking, asynchronous, yet elegant way?
 
