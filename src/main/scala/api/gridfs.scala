@@ -9,7 +9,7 @@ import reactivemongo.api._
 import reactivemongo.bson._
 import reactivemongo.bson.handlers._
 import reactivemongo.bson.handlers.DefaultBSONHandlers._
-import reactivemongo.core.commands.GetLastError
+import reactivemongo.core.commands.{GetLastError, LastError}
 import reactivemongo.core.protocol.Response
 import reactivemongo.utils.{RichBuffer => _, _}
 import scala.concurrent.{Future, ExecutionContext}
@@ -263,6 +263,26 @@ case class GridFS(db: DB, prefix: String = "fs") {
    * @return an iteratee to be applied to an enumerator of chunks of bytes.
    */
   def save(name: String, id: Option[BSONValue], contentType: Option[String] = None)(implicit ctx: ExecutionContext) :Iteratee[Array[Byte], Future[PutResult]] = FileToWrite(id, name, contentType).iteratee(this)
+
+  /**
+   * Removes a file from this store.
+   * Note that if the file does not actually exist, the returned future will not be hold an error.
+   *
+   * @param file The file entry to remove from this store.
+   */
+  def remove(file: ReadFileEntry)(implicit ctx: ExecutionContext) :Future[LastError] = remove(file.id)
+
+  /**
+   * Removes a file from this store.
+   * Note that if the file does not actually exist, the returned future will not be hold an error.
+   *
+   * @param id The file id to remove from this store.
+   */
+  def remove(id: BSONValue)(implicit ctx: ExecutionContext) :Future[LastError] = {
+    chunks.remove(BSONDocument("files_id" -> id)).flatMap { _ =>
+      files.remove(BSONDocument("_id" -> id))
+    }
+  }
 
   /**
    * Creates the needed index on the ''chunks'' collection, if none.
