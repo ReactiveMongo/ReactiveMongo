@@ -366,25 +366,22 @@ class MongoDBSystem(
   override def postStop() {
     import org.jboss.netty.channel.group.{ChannelGroupFuture, ChannelGroupFutureListener}
 
-    if(nodeSetManager.isDefined) {
-      nodeSetManager.get.nodeSet.makeChannelGroup.close.addListener(new ChannelGroupFutureListener {
-        def operationComplete(future: ChannelGroupFuture) :Unit = {
-          logger.debug("all channels are closed.")
-          channelFactory.channelFactory.releaseExternalResources
-          broadcastMonitors(Closed)
-        }
-      })
+    val listener = new ChannelGroupFutureListener {
+      val factory = channelFactory
+      val monitorActors = monitors
+      def operationComplete(future: ChannelGroupFuture) :Unit = {
+        logger.debug("all channels are closed.")
+        factory.channelFactory.releaseExternalResources
+        monitorActors foreach (_ ! Closed)
+      }
     }
 
-    if(seedSet.isDefined) {
-      seedSet.get.makeChannelGroup.close.addListener(new ChannelGroupFutureListener {
-        def operationComplete(future: ChannelGroupFuture) :Unit = {
-          logger.debug("(seeds) all channels are closed.")
-          channelFactory.channelFactory.releaseExternalResources
-          broadcastMonitors(Closed)
-        }
-      })
-    }
+    if(nodeSetManager.isDefined)
+      nodeSetManager.get.nodeSet.makeChannelGroup.close.addListener(listener)
+
+    if(seedSet.isDefined)
+      seedSet.get.makeChannelGroup.close.addListener(listener)
+
     logger.debug("MongoDBSystem stopped.")
   }
 
