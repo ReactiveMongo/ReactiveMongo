@@ -195,7 +195,7 @@ object IndexesManager {
     doc
   }
 
-  implicit object NSIndexWriter extends BSONWriter[NSIndex] {
+  implicit object NSIndexWriter extends RawBSONWriter[NSIndex] {
     import org.jboss.netty.buffer._
     def write(nsIndex: NSIndex) :ChannelBuffer = {
       if(nsIndex.index.key.isEmpty)
@@ -204,7 +204,7 @@ object IndexesManager {
     }
   }
 
-  implicit object NSIndexReader extends BSONReader[NSIndex] {
+  implicit object NSIndexReader extends RawBSONReader[NSIndex] {
     import org.jboss.netty.buffer._
     def read(buffer: ChannelBuffer) :NSIndex = {
       val doc = DefaultBSONHandlers.DefaultBSONDocumentReader.read(buffer)

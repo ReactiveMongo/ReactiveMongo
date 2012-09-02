@@ -82,7 +82,8 @@ trait ReadFileEntry extends FileEntry {
 
 object ReadFileEntry {
   private val logger = LazyLogger(LoggerFactory.getLogger("ReadFileEntry"))
-  def bsonReader(gFS: GridFS) = new BSONReader[ReadFileEntry] {
+  // TODO
+  def bsonReader(gFS: GridFS) = new RawBSONReader[ReadFileEntry] {
     def read(buffer: ChannelBuffer) = {
       val document = DefaultBSONHandlers.DefaultBSONDocumentReader.read(buffer)
       new ReadFileEntry {
@@ -243,11 +244,11 @@ case class GridFS(db: DB, prefix: String = "fs") {
   /**
    * Finds the files matching the given selector.
    *
-   * @tparam S the type of the selector document. An implicit [[reactivemongo.bson.handlers.BSONWriter]][S] must be in the scope.
+   * @tparam S the type of the selector document. An implicit [[reactivemongo.bson.handlers.RawBSONWriter]][S] must be in the scope.
    *
    * @param selector The document to select the files to return
    */
-  def find[S](selector: S)(implicit sWriter: BSONWriter[S], ctx: ExecutionContext) :Cursor[ReadFileEntry] = {
+  def find[S](selector: S)(implicit sWriter: RawBSONWriter[S], ctx: ExecutionContext) :Cursor[ReadFileEntry] = {
     implicit val rfeReader = ReadFileEntry.bsonReader(this)
     files.find(selector)
   }

@@ -94,15 +94,40 @@ sealed trait BSONStructure extends BSONValue {
    * The underlying buffer is not affected, so this instance can be used again.
    */
   def makeBuffer :ChannelBuffer
+
+
+  type Appendable <: AppendableBSONStructure[_]
+
+  type Traversable <: TraversableBSONStructure[_]
+
+  /**
+   * Returns an appendable structure from this structure.
+   * If this structure is already appendable, it may return itself.
+   */
+  def toAppendable :Appendable
+
+  /**
+   * Returns a traversable structure from this structure.
+   * If this structure is already traversable, it may return itself.
+   */
+  def toTraversable :Traversable
 }
 
 /** A BSON Document structure. */
 sealed trait BSONDocument extends BSONStructure {
   val code = 0x03
+
+  type Appendable = AppendableBSONDocument
+
+  type Traversable = TraversableBSONDocument
 }
 /** A BSON Array structure. */
 sealed trait BSONArray extends BSONStructure {
   val code = 0x04
+
+  type Appendable = AppendableBSONArray
+
+  type Traversable = TraversableBSONArray
 }
 /**
  * A structure builder. It will accept elements of `E` and write them into its underlying buffer.
@@ -122,12 +147,6 @@ sealed trait AppendableBSONStructure[E] extends BSONStructure {
    * Alias for append(e: E*) : appends the given elements to this structure.
    */
   def += (e: E*) :this.type = append(e:_*)
-
-  /** The opposite type of this appendable structure (so, a [[reactivemongo.bson.TraversableBSONStructure]]). */
-  type Opposite <: TraversableBSONStructure[_]
-
-  /** Makes a [[reactivemongo.bson.TraversableBSONStructure]] with the buffer of this [[reactivemongo.bson.AppendableBSONStructure]]. */
-  def toTraversable :Opposite
 
   def makeBuffer = {
     val result = buffer.copy()
@@ -166,12 +185,6 @@ sealed trait TraversableBSONStructure[Key] extends BSONStructure {
     }
   }
 
-  /** The opposite type of this traversable structure (so, an [[reactivemongo.bson.AppendableBSONStructure]]). */
-  type Opposite <: AppendableBSONStructure[_]
-
-  /** Makes a [[reactivemongo.bson.AppendableBSONStructure]] with the buffer of this [[reactivemongo.bson.TraversableBSONStructure]]. */
-  def toAppendable :Opposite
-
   def makeBuffer = {
     val pos = buffer.readerIndex
     val result = buffer.copy(rdx, buffer.writerIndex)
@@ -202,14 +215,14 @@ case class TraversableBSONArray(buffer: ChannelBuffer) extends TraversableBSONSt
     iterator.find(_.name.toInt == i).map(_.value)
   }
 
-  type Opposite = AppendableBSONArray
-
   def toAppendable = {
     val result = new AppendableBSONArray()
     for(el <- bsonIterator)
       result += el.value
     result
   }
+
+  def toTraversable = this
 
   def mapped :Map[Int, BSONValue] = {
     for(el <- bsonIterator) yield (el.name.toInt, el.value)
@@ -234,7 +247,7 @@ class AppendableBSONArray extends AppendableBSONStructure[BSONValue] with BSONAr
     this
   }
 
-  type Opposite = TraversableBSONArray
+  def toAppendable = this
 
   def toTraversable = new TraversableBSONArray(makeBuffer)
 }
@@ -251,14 +264,14 @@ case class TraversableBSONDocument(buffer: ChannelBuffer) extends TraversableBSO
     iterator.find(_.name == name).map(_.value)
   }
 
-  type Opposite = AppendableBSONDocument
-
   def toAppendable = {
     val doc = new AppendableBSONDocument()
     for(el <- bsonIterator)
       doc += el
     doc
   }
+
+  def toTraversable = this
 
   def mapped :Map[String, BSONValue] = {
     for(el <- bsonIterator) yield (el.name, el.value)
@@ -291,7 +304,7 @@ class AppendableBSONDocument extends AppendableBSONStructure[(String, BSONValue)
    */
   def += (el: BSONElement, els: BSONElement*) :this.type = append(el, els :_*)
 
-  type Opposite = TraversableBSONDocument
+  def toAppendable = this
 
   def toTraversable = new TraversableBSONDocument(makeBuffer)
 }
