@@ -209,7 +209,7 @@ sealed trait TraversableBSONStructure[Key] extends BSONStructure {
  * This reader is lazy: it deserializes values only when required.
  * Moreover, it memoizes the already deserialized values, to avoid n computations.
  */
-case class TraversableBSONArray(buffer: ChannelBuffer) extends TraversableBSONStructure[Int] with BSONArray {
+class TraversableBSONArray(private[bson] val buffer: ChannelBuffer) extends TraversableBSONStructure[Int] with BSONArray {
   def get(i :Int) = {
     val iterator = stream.iterator
     iterator.find(_.name.toInt == i).map(_.value)
@@ -258,7 +258,7 @@ class AppendableBSONArray extends AppendableBSONStructure[BSONValue] with BSONAr
  * This reader is lazy: it deserializes values only when required.
  * Moreover, it memoizes the already deserialized values, to avoid n computations.
  */
-case class TraversableBSONDocument(buffer: ChannelBuffer) extends TraversableBSONStructure[String] with BSONDocument {
+class TraversableBSONDocument(private[bson] val buffer: ChannelBuffer) extends TraversableBSONStructure[String] with BSONDocument {
   def get(name: String) = {
     val iterator = stream.iterator
     iterator.find(_.name == name).map(_.value)
