@@ -36,11 +36,21 @@ val collection2 = db2.collection("plugin")
  * @param failoverStrategy a failover strategy for sending requests.
  */
 case class DB(dbName: String, connection: MongoConnection, failoverStrategy: FailoverStrategy = FailoverStrategy())(implicit context: ExecutionContext) {
-  /**  Gets a [[reactivemongo.api.Collection]] from this database. */
-  def apply(name: String) :Collection = Collection(this, name, connection, failoverStrategy)(context)
+  /**
+   * Gets a [[reactivemongo.api.Collection]] from this database.
+   *
+   * @param name The name of the collection to open.
+   * @param failoverStrategy a failover strategy for sending requests.
+   */
+  def apply(name: String, failoverStrategy: FailoverStrategy = this.failoverStrategy) :Collection = Collection(this, name, connection, failoverStrategy)(context)
 
-  /**  Gets a [[reactivemongo.api.Collection]] from this database (alias for the `apply` method). */
-  def collection(name: String) :Collection = Collection(this, name, connection, failoverStrategy)(context)
+  /**
+   * Gets a [[reactivemongo.api.Collection]] from this database (alias for the `apply` method).
+   *
+   * @param name The name of the collection to open.
+   * @param failoverStrategy a failover strategy for sending requests.
+   */
+  def collection(name: String, failoverStrategy: FailoverStrategy = this.failoverStrategy) :Collection = Collection(this, name, connection, failoverStrategy)(context)
 
   /** Authenticates the connection on this database. */
   def authenticate(user: String, password: String)(implicit timeout: Duration) :Future[AuthenticationResult] = connection.authenticate(dbName, user, password)
@@ -644,10 +654,13 @@ class Failover[T](message: T, actorRef: ActorRef, strategy: FailoverStrategy)(ex
     expectingResponse.future.onComplete {
       case Left(e) =>
         if(n < strategy.retries) {
-          logger.debug("Got an error, retrying...")
-          MongoConnection.system.scheduler.scheduleOnce(akkaDelay * strategy.delayFactor(n))(send(n + 1))
+          val `try` = n + 1
+          val delayFactor = strategy.delayFactor(`try`)
+          val delay = akkaDelay * delayFactor
+          logger.warn("Got an error, retrying... (try #" + `try` + " is scheduled in " + delay.toMillis + " ms)", e)
+          MongoConnection.system.scheduler.scheduleOnce(delay)(send(`try`))
         } else {
-          logger.info("Got an error, no more attempts to do. Completing with an error...")
+          logger.error("Got an error, no more attempts to do. Completing with an error...")
           promise.failure(e)
         }
       case Right(response) =>

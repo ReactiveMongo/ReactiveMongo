@@ -84,6 +84,8 @@ case class NodeSet(
 
   def isReplicaSet :Boolean = name.isDefined
 
+  lazy val isReachable = !queryable.isEmpty
+
   def connectAll() :Unit = nodes.foreach(_.connect)
 
   def closeAll() :Unit = nodes.foreach(_.close)

@@ -146,18 +146,19 @@ class MongoDBSystem(
     case req :RequestMakerExpectingResponse =>
       logger.trace("received a request")
       val request = req.requestMaker(requestIdGenerator.user)
-      if(request.op.expectsResponse) {
-        awaitingResponses += request.requestID -> AwaitingResponse(request.requestID, req.promise, false)
-        logger.trace("registering awaiting response for requestID " + request.requestID + ", awaitingResponses: " + awaitingResponses)
-      } else logger.trace("NOT registering awaiting response for requestID " + request.requestID)
-      if(secondaryOK(request)) {
-        val server = pickNode(request)
-        logger.debug("node " + server + "will send the query " + request.op)
-        server.map(_.send(request))
-      } else if(!nodeSetManager.get.primaryWrapper.isDefined) {
-        req.promise.failure(PrimaryUnavailableException)
+
+      if(!nodeSetManager.get.nodeSet.isReachable) {
+        req.promise.failure(Exceptions.NodeSetNotReachable)
+      } else if(secondaryOK(request) || nodeSetManager.get.primaryWrapper.isDefined) {
+        val node = (if(secondaryOK(request)) pickNode(request) else nodeSetManager.get.primaryWrapper).get
+        logger.debug("node " + node + "will send the query " + request.op)
+        if(request.op.expectsResponse) {
+          awaitingResponses += request.requestID -> AwaitingResponse(request.requestID, req.promise, false)
+          logger.trace("registering awaiting response for requestID " + request.requestID + ", awaitingResponses: " + awaitingResponses)
+        } else logger.trace("NOT registering awaiting response for requestID " + request.requestID)
+        node.send(request)
       } else {
-        nodeSetManager.get.primaryWrapper.get.send(request)
+        req.promise.failure(Exceptions.PrimaryUnavailableException)
       }
 
     case req :CheckedWriteRequestExpectingResponse =>
@@ -168,21 +169,28 @@ class MongoDBSystem(
         val tuple = checkedWriteRequest()
         tuple._1(requestId) -> tuple._2(requestId)
       }
-      awaitingResponses += requestId -> AwaitingResponse(requestId, req.promise, true)
-      logger.trace("registering writeConcern-awaiting response for requestID " + requestId + ", awaitingResponses: " + awaitingResponses)
-      if(secondaryOK(request)) {
-        pickNode(request).map(_.send(request, writeConcern))
-      } else if(!nodeSetManager.get.primaryWrapper.isDefined) {
-        req.promise.failure(PrimaryUnavailableException)
+      if(!nodeSetManager.get.nodeSet.isReachable) {
+        req.promise.failure(Exceptions.NodeSetNotReachable)
+      } else if(nodeSetManager.get.primaryWrapper.isDefined) {
+        val node = nodeSetManager.get.primaryWrapper.get
+        logger.debug("node " + node + "will send the query " + request.op)
+        awaitingResponses += requestId -> AwaitingResponse(requestId, req.promise, true)
+        logger.trace("registering writeConcern-awaiting response for requestID " + requestId + ", awaitingResponses: " + awaitingResponses)
+        node.send(request, writeConcern)
       } else {
-        nodeSetManager.get.primaryWrapper.get.send(request, writeConcern)
+        req.promise.failure(Exceptions.PrimaryUnavailableException)
       }
 
     // monitor
     case ConnectAll => {
       logger.debug("ConnectAll Job running...")
-      updateNodeSetManager(NodeSetManager(nodeSetManager.get.nodeSet.createNeededChannels(self, nbChannelsPerNode)))
-      nodeSetManager.get.nodeSet.connectAll
+      if(seedSet.isDefined) {
+        seedSet = Some(seedSet.get.createNeededChannels(self, 1))
+        seedSet.get.connectAll
+      } else {
+        updateNodeSetManager(NodeSetManager(nodeSetManager.get.nodeSet.createNeededChannels(self, nbChannelsPerNode)))
+        nodeSetManager.get.nodeSet.connectAll
+      }
     }
     case RefreshAllNodes => {
       val state = "setName=" + nodeSetManager.get.nodeSet.name + " with nodes={" +
@@ -215,12 +223,24 @@ class MongoDBSystem(
       logger.trace(channelId + " is connected")
     }
     case Disconnected(channelId) => {
-      updateNodeSetManager(NodeSetManager(nodeSetManager.get.nodeSet.updateByChannelId(channelId, node => {
-        node.copy(state = NOT_CONNECTED, channels = node.channels.filter{ _.isOpen })
-      })))
-      if(!nodeSetManager.exists(_.primaryWrapper.isDefined))
-        broadcastMonitors(PrimaryUnavailable)
-      logger.debug(channelId + " is disconnected")
+      if(seedSet.isDefined) {
+        seedSet = Some(seedSet.get.updateByChannelId(channelId, node => {
+          logger.error("[Init] Encountered a connection problem with the following node: " + node)
+          node.copy(state = NOT_CONNECTED, channels = node.channels.filter{ _.isOpen })
+        }))
+      } else {
+        updateNodeSetManager(NodeSetManager(nodeSetManager.get.nodeSet.updateByChannelId(channelId, node => {
+          node.copy(state = NOT_CONNECTED, channels = node.channels.filter{ _.isOpen })
+        })))
+        if(nodeSetManager.exists(!_.nodeSet.isReachable)) {
+          logger.error("The entire node set is unreachable, is there a network problem?")
+          broadcastMonitors(PrimaryUnavailable) // TODO
+        } else if(!nodeSetManager.exists(_.primaryWrapper.isDefined)) {
+          logger.warn("The primary is unavailable, is there a network problem?")
+          broadcastMonitors(PrimaryUnavailable)
+        }
+        logger.debug(channelId + " is disconnected")
+      }
     }
     case auth @ Authenticate(db, user, password) => {
       if(!authenticationHistory.authenticates.contains(auth)) {
@@ -252,7 +272,7 @@ class MongoDBSystem(
       if(seedSet.isDefined) {
         seedSet.get.closeAll
         seedSet = None
-        logger.debug("Init is done")
+        logger.info("[Init] Init is done")
       }
       updateNodeSetManager(NodeSetManager(nodeSetManager.get.nodeSet.updateByChannelId(response.info.channelId,
         _.updateChannelById(response.info.channelId, authenticateChannel(_)))))
@@ -487,7 +507,13 @@ object MonitorActor {
 }
 
 // exceptions
-/** An exception to be thrown when a request needs a non available primary. */
-object PrimaryUnavailableException extends RuntimeException {
-  override def getMessage() = "No primary node is available!"
+object Exceptions {
+  /** An exception thrown when a request needs a non available primary. */
+  object PrimaryUnavailableException extends ReactiveMongoError {
+    val message = "No primary node is available!"
+  }
+  /** An exception thrown when the entire node set is unavailable. The application may not have access to the network anymore. */
+  object NodeSetNotReachable extends ReactiveMongoError {
+    val message = "The node set can not be reached! Please check your network connectivity."
+  }
 }

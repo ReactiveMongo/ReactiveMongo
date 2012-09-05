@@ -27,6 +27,11 @@ trait DBError extends ReactiveMongoError {
   }.getOrElse(false)
 }
 
+/** A non recoverable error */
+trait NonRecoverableError {
+  self :ReactiveMongoError =>
+}
+
 object ReactiveMongoError {
   def apply(message: String) :ReactiveMongoError = GenericMongoError(message)
 
