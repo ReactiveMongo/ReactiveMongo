@@ -87,7 +87,7 @@ object Samples {
     // select only the documents which field 'firstName' equals 'Jack'
     val query = BSONDocument("firstName" -> BSONString("Jack"))
 
-    // get a Cursor[DefaultBSONIterator]
+    // get a Cursor[BSONDocument]
     val cursor = collection.find(query)
     // let's enumerate this cursor and print a readable representation of each document in the response
     cursor.enumerate.apply(Iteratee.foreach { doc =>
@@ -110,22 +110,35 @@ The above code deserves some explanations.
 First, let's take a look to the `collection.find` signature:
 
 ```scala
-def find[Qry, Rst](query: Qry)(implicit writer: BSONWriter[Qry], handler: BSONReaderHandler, reader: BSONReader[Rst]) :FlattenedCursor[Rst]
+def find[Qry, Rst](query: Qry)(implicit writer: RawBSONWriter[Qry], handler: BSONReaderHandler, reader: RawBSONReader[Rst]) :FlattenedCursor[Rst]
 ```
 
-The find method allows you to pass any query object of type `Qry`, provided that there is an implicit `BSONWriter[Qry]` in the scope. `BSONWriter[Qry]` is a typeclass which instances implement a `write(document: Qry)` method that returns a `ChannelBuffer`:
+The find method allows you to pass any query object of type `Qry`, provided that there is an implicit `RawBSONWriter[Qry]` in the scope. `RawBSONWriter[Qry]` is a typeclass which instances implement a `write(document: Qry)` method that returns a `ChannelBuffer`:
 
 ```scala
-trait BSONWriter[DocumentType] {
+trait RawBSONWriter[-DocumentType] {
   def write(document: DocumentType) :ChannelBuffer
 }
 ```
 
-`BSONReader[Rst]` is the opposite typeclass. It's typically a deserializer that takes a `ChannelBuffer` and returns an instance of `Rst`:
+`RawBSONReader[Rst]` is the opposite typeclass. It's typically a deserializer that takes a `ChannelBuffer` and returns an instance of `Rst`:
 
 ```scala
-trait BSONReader[DocumentType] {
+trait RawBSONReader[+DocumentType] {
   def read(buffer: ChannelBuffer) :DocumentType
+}
+```
+
+Of course, you can rely on the shipped-in BSON library. There are two subtraits that enable to de/serialize your models using `BSONDocuments`:
+
+```scala
+trait BSONWriter[-DocumentType] extends RawBSONWriter[DocumentType] {
+  def toBSON(document: DocumentType) :BSONDocument
+}
+```
+```scala
+trait BSONReader[+DocumentType] extends RawBSONReader[DocumentType] {
+  def fromBSON(doc: BSONDocument) :DocumentType
 }
 ```
 
