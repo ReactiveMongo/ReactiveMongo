@@ -66,7 +66,7 @@ case class DB(dbName: String, connection: MongoConnection, failoverStrategy: Fai
    *
    * @return a future containing the result of the command.
    */
-  def command(command: Command) :Future[command.Result] =
+  def command[T](command: Command[T]) :Future[T] =
     Failover(command.apply(dbName).maker, connection.mongosystem, failoverStrategy).future.mapEither(command.ResultMaker(_))
 }
 

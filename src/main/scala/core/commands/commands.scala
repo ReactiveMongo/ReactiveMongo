@@ -13,13 +13,10 @@ import reactivemongo.utils._
  *
  * Basically, it's as query that is performed on any db.\$cmd collection
  * and gives back one document as a result.
+ *
+ * @param Result This command's result type.
  */
-trait Command {
-  /**
-   * This command's result type.
-   */
-  type Result
-
+trait Command[Result] {
   /**
    * Deserializer for this command's result.
    */
@@ -46,7 +43,7 @@ trait Command {
 /**
  * Handler for deserializing commands results.
  *
- * @tparam Result the result type of this command.
+ * @tparam Result The result type of this command.
  */
 trait CommandResultMaker[Result] {
   /**
@@ -78,7 +75,7 @@ trait BSONCommandResultMaker[Result] extends CommandResultMaker[Result] {
 /**
  * A command that targets the ''admin'' database only (administrative commands).
  */
-trait AdminCommand extends Command {
+trait AdminCommand[Result] extends Command[Result] {
   /**
    * As and admin command targets only the ''admin'' database, @param db will be ignored.
    * @inheritdoc
@@ -156,7 +153,7 @@ class DefaultCommandError(
  * @param db Database name.
  * @param command Subject command.
  */
-class MakableCommand(val db: String, val command: Command) {
+class MakableCommand(val db: String, val command: Command[_]) {
   /**
    * Produces the [[reactivemongo.core.protocol.Query]] instance for the given command.
    */
@@ -167,12 +164,10 @@ class MakableCommand(val db: String, val command: Command) {
   def maker = RequestMaker(makeQuery, command.makeDocuments.makeBuffer)
 }
 
-case class RawCommand(bson: BSONDocument) extends Command {
+case class RawCommand(bson: BSONDocument) extends Command[TraversableBSONDocument] {
   def makeDocuments = bson
 
-  type Result = TraversableBSONDocument
-
-  object ResultMaker extends BSONCommandResultMaker[Result] {
+  object ResultMaker extends BSONCommandResultMaker[TraversableBSONDocument] {
     def apply(document: TraversableBSONDocument) = CommandError.checkOk(document, None).toLeft(document)
   }
 }
@@ -193,7 +188,7 @@ case class GetLastError(
   awaitJournalCommit: Boolean = false,
   waitForReplicatedOn: Option[Int] = None,
   fsync: Boolean = false
-) extends Command {
+) extends Command[LastError] {
   override def makeDocuments = {
     val doc = BSONDocument("getlasterror" -> BSONInteger(1))
     if(awaitJournalCommit)
@@ -204,8 +199,6 @@ case class GetLastError(
       doc.append("fsync" -> BSONBoolean(true))
     doc
   }
-
-  type Result = LastError
 
   val ResultMaker = LastError
 }
@@ -260,7 +253,7 @@ case class Count(
   collectionName: String,
   query: Option[BSONDocument] = None,
   fields: Option[BSONDocument] = None
-) extends Command {
+) extends Command[Int] {
   override def makeDocuments = {
     val bson = BSONDocument("count" -> BSONString(collectionName))
     if(query.isDefined)
@@ -270,7 +263,6 @@ case class Count(
     bson
   }
 
-  type Result = Int
   val ResultMaker = Count
 }
 
@@ -287,12 +279,10 @@ object Count extends BSONCommandResultMaker[Int] {
  *
  * Returns the state of the Replica Set from the target server's point of view.
  */
-object ReplStatus extends AdminCommand {
+object ReplStatus extends AdminCommand[Map[String, BSONValue]] {
   override def makeDocuments = BSONDocument("replSetGetStatus" -> BSONInteger(1))
 
-  type Result = Map[String, BSONValue]
-
-  object ResultMaker extends BSONCommandResultMaker[Result] {
+  object ResultMaker extends BSONCommandResultMaker[Map[String, BSONValue]] {
     def apply(document: TraversableBSONDocument) = Right(document.mapped)
   }
 }
@@ -302,12 +292,10 @@ object ReplStatus extends AdminCommand {
  *
  * Gets the detailed status of the target server.
  */
-object Status extends AdminCommand {
+object Status extends AdminCommand[Map[String, BSONValue]] {
   override def makeDocuments = BSONDocument("serverStatus" -> BSONInteger(1))
 
-  type Result = Map[String, BSONValue]
-
-  object ResultMaker extends BSONCommandResultMaker[Result] {
+  object ResultMaker extends BSONCommandResultMaker[Map[String, BSONValue]] {
     def apply(document: TraversableBSONDocument) = Right(document.mapped)
   }
 }
@@ -317,12 +305,10 @@ object Status extends AdminCommand {
  *
  * Gets a nonce for authentication token.
  */
-object Getnonce extends Command {
+object Getnonce extends Command[String] {
   override def makeDocuments = BSONDocument("getnonce" -> BSONInteger(1))
 
-  type Result = String
-
-  object ResultMaker extends BSONCommandResultMaker[Result] {
+  object ResultMaker extends BSONCommandResultMaker[String] {
     def apply(document: TraversableBSONDocument) = {
       CommandError.checkOk(document, Some("getnonce")).toLeft(document.getAs[BSONString]("nonce").get.value)
     }
@@ -336,7 +322,7 @@ object Getnonce extends Command {
  * @param password user's password
  * @param nonce the previous nonce given by the server
  */
-case class Authenticate(user: String, password: String, nonce: String) extends Command {
+case class Authenticate(user: String, password: String, nonce: String) extends Command[SuccessfulAuthentication] {
   import Converters._
   /** the computed digest of the password */
   lazy val pwdDigest = md5Hex(user + ":mongo:" + password)
@@ -344,8 +330,6 @@ case class Authenticate(user: String, password: String, nonce: String) extends C
   lazy val key = md5Hex(nonce + user + pwdDigest)
 
   override def makeDocuments = BSONDocument("authenticate" -> BSONInteger(1), "user" -> BSONString(user), "nonce" -> BSONString(nonce), "key" -> BSONString(key))
-
-  type Result = SuccessfulAuthentication
 
   val ResultMaker = Authenticate
 }
@@ -400,12 +384,10 @@ case class SuccessfulAuthentication(
  * States if the target server is a primary.
  * This command also gives some useful information, like the other nodes in the replica set.
  */
-object IsMaster extends AdminCommand {
+object IsMaster extends AdminCommand[IsMasterResponse] {
   def makeDocuments = BSONDocument("isMaster" -> BSONInteger(1))
 
-  type Result = IsMasterResponse
-
-  object ResultMaker extends BSONCommandResultMaker[Result] {
+  object ResultMaker extends BSONCommandResultMaker[IsMasterResponse] {
     def apply(document: TraversableBSONDocument) = {
       CommandError.checkOk(document, Some("isMaster")).toLeft(IsMasterResponse(
         document.getAs[BSONBoolean]("ismaster").map(_.value).getOrElse(false),
@@ -485,7 +467,7 @@ case class FindAndModify(
   upsert: Boolean = false,
   sort: Option[BSONDocument] = None,
   fields: Option[BSONDocument] = None
-) extends Command {
+) extends Command[Option[TraversableBSONDocument]] {
   override def makeDocuments = {
     val bson = BSONDocument("findAndModify" -> BSONString(collection), "query" -> query)
     if(sort.isDefined)
@@ -496,8 +478,6 @@ case class FindAndModify(
       bson += ("upsert" -> BSONBoolean(true))
     modify.alter(bson)
   }
-
-  type Result = Option[TraversableBSONDocument]
 
   val ResultMaker = FindAndModify
 }
@@ -514,14 +494,12 @@ object FindAndModify extends BSONCommandResultMaker[Option[TraversableBSONDocume
 case class DeleteIndex(
   collection: String,
   index: String
-) extends Command {
+) extends Command[Int] {
   override def makeDocuments = BSONDocument(
     "deleteIndexes" -> BSONString(collection),
     "index" -> BSONString(index))
 
-  type Result = Int // nIndexWas
-
-  object ResultMaker extends BSONCommandResultMaker[Result] {
+  object ResultMaker extends BSONCommandResultMaker[Int] {
     def apply(document: TraversableBSONDocument) =
       CommandError.checkOk(document, Some("deleteIndexes")).toLeft(document.getAs[BSONDouble]("nIndexWas").map(_.value.toInt).get)
   }

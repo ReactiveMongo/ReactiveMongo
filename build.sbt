@@ -23,6 +23,7 @@ libraryDependencies ++= Seq(
 )
 
 scalacOptions ++= Seq("-unchecked", "-deprecation", "-Ydependent-method-types")
+scalacOptions ++= Seq("-unchecked", "-deprecation")
 
 unmanagedSourceDirectories in Compile <+= baseDirectory( _ / "src" / "samples" / "scala" )
 

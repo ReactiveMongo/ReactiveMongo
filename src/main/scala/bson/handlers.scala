@@ -64,7 +64,7 @@ object DefaultBSONHandlers {
   }
 
   implicit object DefaultBSONDocumentReader extends BSONReader[TraversableBSONDocument] {
-    def fromBSON(doc: BSONDocument) = doc.toTraversable
+    def fromBSON(doc: BSONDocument) :TraversableBSONDocument = doc.toTraversable
   }
 
   implicit object DefaultBSONDocumentWriter extends BSONWriter[BSONDocument] {

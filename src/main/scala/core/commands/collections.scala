@@ -28,7 +28,7 @@ class CreateCollection(
   name: String,
   capped: Option[CappedOptions] = None,
   autoIndexId: Option[Boolean] = None
-) extends Command {
+) extends Command[Boolean] {
   def makeDocuments = {
     val doc = BSONDocument("create" -> BSONString(name))
     if(capped.isDefined)
@@ -37,8 +37,6 @@ class CreateCollection(
       doc += "autoIndexId" -> BSONBoolean(autoIndexId.get)
     doc
   }
-
-  type Result = Boolean
 
   object ResultMaker extends BSONCommandResultMaker[Boolean] {
     def apply(doc: TraversableBSONDocument)  = {
@@ -56,13 +54,11 @@ class CreateCollection(
 class ConvertToCapped(
   name: String,
   capped: CappedOptions
-) extends Command {
+) extends Command[Boolean] {
   def makeDocuments = {
     val doc = BSONDocument("convertToCapped" -> BSONString(name))
     capped.write(doc)
   }
-
-  type Result = Boolean
 
   object ResultMaker extends BSONCommandResultMaker[Boolean] {
     def apply(doc: TraversableBSONDocument) = {
@@ -80,15 +76,13 @@ class ConvertToCapped(
 class CollStats(
   name: String,
   scale :Option[Int] = None
-) extends Command {
+) extends Command[CollStatsResult] {
   def makeDocuments = {
     val doc = BSONDocument("collStats" -> BSONString(name))
     if(scale.isDefined)
       doc += "scale" -> BSONInteger(scale.get)
     else doc
   }
-
-  type Result = CollStatsResult
 
   val ResultMaker = CollStatsResult
 }
