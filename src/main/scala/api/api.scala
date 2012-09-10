@@ -10,8 +10,9 @@ import reactivemongo.core.actors._
 import reactivemongo.bson._
 import reactivemongo.bson.handlers._
 import reactivemongo.core.protocol._
-import reactivemongo.core.commands.{AuthenticationResult, Command, GetLastError, LastError}
+import reactivemongo.core.commands.{Command, GetLastError, LastError, SuccessfulAuthentication}
 import reactivemongo.utils.scalaToAkkaDuration
+import reactivemongo.utils.EitherMappableFuture._
 import scala.concurrent.{Future, ExecutionContext}
 import scala.concurrent.util.Duration
 import scala.concurrent.util.duration._
@@ -53,7 +54,7 @@ case class DB(dbName: String, connection: MongoConnection, failoverStrategy: Fai
   def collection(name: String, failoverStrategy: FailoverStrategy = this.failoverStrategy) :Collection = Collection(this, name, connection, failoverStrategy)(context)
 
   /** Authenticates the connection on this database. */
-  def authenticate(user: String, password: String)(implicit timeout: Duration) :Future[AuthenticationResult] = connection.authenticate(dbName, user, password)
+  def authenticate(user: String, password: String)(implicit timeout: Duration) :Future[SuccessfulAuthentication] = connection.authenticate(dbName, user, password)
 
   /** The index manager for this database. */
   lazy val indexes = new IndexesManager(this)
@@ -66,7 +67,7 @@ case class DB(dbName: String, connection: MongoConnection, failoverStrategy: Fai
    * @return a future containing the result of the command.
    */
   def command(command: Command) :Future[command.Result] =
-    Failover(command.apply(dbName).maker, connection.mongosystem, failoverStrategy).future.map(command.ResultMaker(_))
+    Failover(command.apply(dbName).maker, connection.mongosystem, failoverStrategy).future.mapEither(command.ResultMaker(_))
 }
 
 /**
@@ -250,7 +251,7 @@ case class Collection(
     val op = Insert(0, fullCollectionName)
     val bson = writer.write(document)
     val checkedWriteRequest = CheckedWriteRequest(op, bson, writeConcern)
-    Failover(checkedWriteRequest, connection.mongosystem, failoverStrategy).future.map(LastError(_))
+    Failover(checkedWriteRequest, connection.mongosystem, failoverStrategy).future.mapEither(LastError(_))
   }
 
   /**
@@ -335,7 +336,7 @@ case class Collection(
     val bson = selectorWriter.write(selector)
     bson.writeBytes(updateWriter.write(update))
     val checkedWriteRequest = CheckedWriteRequest(op, bson, writeConcern)
-    Failover(checkedWriteRequest, connection.mongosystem, failoverStrategy).future.map(LastError(_))
+    Failover(checkedWriteRequest, connection.mongosystem, failoverStrategy).future.mapEither(LastError(_))
   }
 
   /**
@@ -372,7 +373,7 @@ case class Collection(
     val op = Delete(fullCollectionName, if(firstMatchOnly) 1 else 0)
     val bson = writer.write(query)
     val checkedWriteRequest = CheckedWriteRequest(op, bson, writeConcern)
-    Failover(checkedWriteRequest, connection.mongosystem, failoverStrategy).future.map(LastError(_))
+    Failover(checkedWriteRequest, connection.mongosystem, failoverStrategy).future.mapEither(LastError(_))
   }
 
   /** The index manager for this collection. */
@@ -794,8 +795,8 @@ class MongoConnection(
   def send(message: RequestMaker) = mongosystem ! message
 
   /** Authenticates the connection on the given database. */
-  def authenticate(db: String, user: String, password: String)(implicit timeout: Duration) :Future[AuthenticationResult] = {
-    new play.api.libs.concurrent.AkkaPromise((mongosystem ? Authenticate(db, user, password))(scalaToAkkaDuration(timeout)).mapTo[AuthenticationResult])
+  def authenticate(db: String, user: String, password: String)(implicit timeout: Duration) :Future[SuccessfulAuthentication] = {
+    new play.api.libs.concurrent.AkkaPromise((mongosystem ? Authenticate(db, user, password))(scalaToAkkaDuration(timeout)).mapTo[SuccessfulAuthentication])
   }
 
   /** Closes this MongoConnection (closes all the channels and ends the actors) */

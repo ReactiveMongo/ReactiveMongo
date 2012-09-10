@@ -256,7 +256,7 @@ class MongoDBSystem(
     }
     // isMaster response
     case response: Response if response.header.responseTo < 1000 => {
-      val isMaster = IsMaster.ResultMaker(response)
+      val isMaster = IsMaster.ResultMaker(response).right.get
       updateNodeSetManager(if(isMaster.hosts.isDefined) {// then it's a ReplicaSet
         val mynodes = isMaster.hosts.get.map(name => Node(name, if(isMaster.me.exists(_ == name)) isMaster.state else NONE))
         NodeSetManager(nodeSetManager.get.nodeSet.addNodes(mynodes).copy(name = isMaster.setName).createNeededChannels(self, nbChannelsPerNode))
@@ -279,15 +279,15 @@ class MongoDBSystem(
     }
     // getnonce response
     case response: Response if response.header.responseTo >= 1000 && response.header.responseTo < 2000 => {
-      val getnonce = Getnonce.ResultMaker(response)
-      logger.debug("AUTH: got nonce for channel " + response.info.channelId + ": " + getnonce.nonce)
+      val nonce = Getnonce.ResultMaker(response).right.get
+      logger.debug("AUTH: got nonce for channel " + response.info.channelId + ": " + nonce)
       updateNodeSetManager(NodeSetManager(nodeSetManager.get.nodeSet.updateByChannelId(response.info.channelId, node =>
         node.copy(channels = node.channels.map { channel =>
           if(channel.getId == response.info.channelId) {
             val authenticating = channel.state.asInstanceOf[Authenticating]
             logger.debug("AUTH: authenticating with " + authenticating)
-            channel.write(AuthenticateCommand(authenticating.user, authenticating.password, getnonce.nonce)(authenticating.db).maker(requestIdGenerator.authenticate))
-            channel.copy(state = authenticating.copy(nonce = Some(getnonce.nonce)))
+            channel.write(AuthenticateCommand(authenticating.user, authenticating.password, nonce)(authenticating.db).maker(requestIdGenerator.authenticate))
+            channel.copy(state = authenticating.copy(nonce = Some(nonce)))
           } else channel
         })
       )))
@@ -329,7 +329,7 @@ class MongoDBSystem(
             logger.debug("{" + response.header.responseTo + "} it's a getlasterror")
             // todo, for now rewinding buffer at original index
             val ridx = response.documents.readerIndex
-            val lastError = LastError(response)
+            val lastError = LastError(response).right.get
             if(lastError.isNotAPrimaryError) {
               onPrimaryUnavailable()
               promise.failure(lastError)
@@ -420,7 +420,7 @@ private[actors] case class AuthHistory(
 
   lazy val expectingAuthenticationCompletion = authenticateRequests.filter(!_._2.isEmpty)
 
-  def failed(selector: (Authenticate) => Boolean, err: FailedAuthentication) :AuthHistory = AuthHistory(authenticateRequests.filterNot { request =>
+  def failed(selector: (Authenticate) => Boolean, err: Throwable) :AuthHistory = AuthHistory(authenticateRequests.filterNot { request =>
     if(selector(request._1)) {
       request._2.foreach(_ ! Failure(err))
       true
@@ -436,8 +436,8 @@ private[actors] case class AuthHistory(
 
   def handleResponse(authenticating: Authenticating, response: Response) :(Boolean, AuthHistory) = {
     AuthenticateCommand(response) match {
-      case auth @ SuccessfulAuthentication(db, user, _) => true -> succeeded(a => a.db == db && a.user == user, auth)
-      case err: FailedAuthentication => false -> failed(a => a.db == authenticating.db && a.user == authenticating.user, err)
+      case Right(auth @ SuccessfulAuthentication(db, user, _)) => true -> succeeded(a => a.db == db && a.user == user, auth)
+      case Left(err) => false -> failed(a => a.db == authenticating.db && a.user == authenticating.user, err)
     }
   }
 }

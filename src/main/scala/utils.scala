@@ -131,3 +131,19 @@ case class LazyLogger(logger: org.slf4j.Logger) {
   def warn(s: => String) { if(logger.isWarnEnabled) logger.warn(s) }
   def error(s: => String) { if(logger.isErrorEnabled) logger.error(s) }
 }
+
+import scala.concurrent.{ExecutionContext, Future}
+
+case class EitherMappableFuture[A](future: Future[A]) {
+  def mapEither[E <: Throwable, B](f: A => Either[E, B])(implicit ec: ExecutionContext) = {
+    future.flatMap(
+      f(_) match {
+        case Left(e) => Future.failed(e)
+        case Right(b) => Future.successful(b)
+      }
+    )
+  }
+}
+object EitherMappableFuture {
+  implicit def futureToEitherMappable[A](future: Future[A]) :EitherMappableFuture[A] = EitherMappableFuture(future)
+}
