@@ -245,13 +245,13 @@ class MongoDBSystem(
     case auth @ Authenticate(db, user, password) => {
       if(!authenticationHistory.authenticates.contains(auth)) {
         logger.debug("authenticate process starts with " + auth + "...")
-        authenticationHistory = AuthHistory(authenticationHistory.authenticateRequests :+ (auth -> List(sender)))
+        authenticationHistory = AuthHistory(authenticationHistory.authenticateRequests :+ auth -> List(sender))
         updateNodeSetManager(NodeSetManager(nodeSetManager.get.nodeSet.updateAll(node =>
           node.copy(channels = node.channels.map(authenticateChannel(_)))
         )))
       } else {
         logger.debug("auth not performed as already registered...")
-        sender ! SuccessfulAuthentication(db, user, false) // TODO refactor auth
+        sender ! VerboseSuccessfulAuthentication(db, user, false)
       }
     }
     // isMaster response
@@ -420,15 +420,15 @@ private[actors] case class AuthHistory(
 
   lazy val expectingAuthenticationCompletion = authenticateRequests.filter(!_._2.isEmpty)
 
-  def failed(selector: (Authenticate) => Boolean, err: Throwable) :AuthHistory = AuthHistory(authenticateRequests.filterNot { request =>
-    if(selector(request._1)) {
+  def failed(authenticating: Authenticating, err: Throwable) :AuthHistory = AuthHistory(authenticateRequests.filterNot { request =>
+    if(request._1.db == authenticating.db && request._1.user == authenticating.user) {
       request._2.foreach(_ ! Failure(err))
       true
     } else false
   })
 
-  def succeeded(selector: (Authenticate) => Boolean, auth: SuccessfulAuthentication) :AuthHistory = AuthHistory(authenticateRequests.map { request =>
-    if(selector(request._1)) {
+  def succeeded(authenticating: Authenticating, auth: SuccessfulAuthentication) :AuthHistory = AuthHistory(authenticateRequests.map { request =>
+    if(request._1.db == authenticating.db && request._1.user == authenticating.user) {
       request._2.foreach(_ ! auth)
       request._1 -> Nil
     } else request
@@ -436,8 +436,8 @@ private[actors] case class AuthHistory(
 
   def handleResponse(authenticating: Authenticating, response: Response) :(Boolean, AuthHistory) = {
     AuthenticateCommand(response) match {
-      case Right(auth @ SuccessfulAuthentication(db, user, _)) => true -> succeeded(a => a.db == db && a.user == user, auth)
-      case Left(err) => false -> failed(a => a.db == authenticating.db && a.user == authenticating.user, err)
+      case Right(auth) => true -> succeeded(authenticating, auth)
+      case Left(err) => false -> failed(authenticating, err)
     }
   }
 }

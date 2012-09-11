@@ -339,19 +339,43 @@ object Authenticate extends BSONCommandResultMaker[SuccessfulAuthentication] {
   def apply(document: TraversableBSONDocument) = {
     CommandError.checkOk(document, Some("authenticate"), (doc, name) => {
       FailedAuthentication(doc.getAs[BSONString]("errmsg").map(_.value).getOrElse(""), Some(doc))
-    }).toLeft(SuccessfulAuthentication(
-      document.get("dbname").get.asInstanceOf[BSONString].value,
-      document.get("user").get.asInstanceOf[BSONString].value,
-      document.get("readOnly").flatMap {
-        case BSONBoolean(value) => Some(value)
-        case _ => Some(false)
-      }.get
-    ))
+    }).toLeft(document.get("dbname") match {
+      case Some(BSONString(dbname)) => VerboseSuccessfulAuthentication(
+        dbname,
+        document.get("user").get.asInstanceOf[BSONString].value,
+        document.get("readOnly").flatMap {
+          case BSONBoolean(value) => Some(value)
+          case _ => Some(false)
+        }.get
+      )
+      case _ => SilentSuccessfulAuthentication
+    })
   }
 }
 
 /** an authentication result */
 sealed trait AuthenticationResult
+
+/** A successful authentication result. */
+sealed trait SuccessfulAuthentication extends AuthenticationResult
+
+/** A silent successful authentication result (MongoDB <= 2.0).*/
+object SilentSuccessfulAuthentication extends SuccessfulAuthentication
+
+/**
+ * A verbose successful authentication result (MongoDB >= 2.2).
+ *
+ * Previous versions of MongoDB only return ok = BSONDouble(1.0).
+ *
+ * @param db database name
+ * @param user username
+ * @param readOnly states if the authentication gives us only the right to read from the database.
+ */
+case class VerboseSuccessfulAuthentication(
+  db: String,
+  user: String,
+  readOnly: Boolean
+) extends SuccessfulAuthentication
 
 /**
  * A failed authentication result
@@ -364,19 +388,6 @@ case class FailedAuthentication(
 ) extends BSONCommandError with AuthenticationResult {
   val code = None
 }
-
-/**
- * A successful authentication result.
- *
- * @param db database name
- * @param user username
- * @param readOnly states if the authentication gives us only the right to read from the database.
- */
-case class SuccessfulAuthentication(
-  db: String,
-  user: String,
-  readOnly: Boolean
-) extends AuthenticationResult
 
 /**
  * IsMaster Command.
