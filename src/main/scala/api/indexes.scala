@@ -58,7 +58,7 @@ case class NSIndex(
  *
  * @param db The subject database.
  */
-class IndexesManager(db: DB)(implicit context: ExecutionContext) {
+class IndexesManager(db: DB[Collection])(implicit context: ExecutionContext) {
   import DefaultBSONHandlers._
 
   val collection = db("system.indexes")
@@ -121,7 +121,7 @@ class IndexesManager(db: DB)(implicit context: ExecutionContext) {
   def delete(collectionName: String, indexName: String) :Future[Int] = db.command(DeleteIndex(collectionName, indexName))
 
   /** Gets a manager for the given collection. */
-  def onCollection(name: String) = new CollectionIndexesManager(db.dbName + "." + name, this)
+  def onCollection(name: String) = new CollectionIndexesManager(db.name + "." + name, this)
 }
 
 class CollectionIndexesManager(fqName: String, manager: IndexesManager)(implicit context: ExecutionContext) {

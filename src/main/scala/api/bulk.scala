@@ -43,7 +43,7 @@ object bulk {
       logger.debug("bulk= " + bulk)
       if(reachedUpperBound(bulk.currentBulkDocsNumber + 1, bulk.docs.writerIndex + doc.writerIndex)) {
         logger.debug("inserting, at " + bulk.collectedDocs)
-        coll.insert(bulk)(BulkWriter).map { _ =>
+        coll.insert(bulk)(BulkWriter, context).map { _ =>
           val nextBulk = Bulk(collectedDocs = bulk.collectedDocs) +> doc
           logger.debug("redeemed, will give " + nextBulk)
           nextBulk
@@ -51,7 +51,7 @@ object bulk {
       } else Future(bulk +> doc)
     }.flatMap { bulk =>
       logger.debug("inserting (last), at " + bulk.collectedDocs)
-      Iteratee.flatten(coll.insert(bulk)(BulkWriter).map(_ => Done[ChannelBuffer, Int](bulk.collectedDocs, Input.EOF)))
+      Iteratee.flatten(coll.insert(bulk)(BulkWriter, context).map(_ => Done[ChannelBuffer, Int](bulk.collectedDocs, Input.EOF)))
     }
   }
 

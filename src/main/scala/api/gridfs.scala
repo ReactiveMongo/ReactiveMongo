@@ -234,8 +234,9 @@ case class PutResult(
  * @param db The database where the GridFS collections are.
  * @param prefix The prefix of this GridFS. Defaults to "fs".
  */
-case class GridFS(db: DB, prefix: String = "fs") {
+case class GridFS(db: DB[Collection] with DBMetaCommands, prefix: String = "fs") {
   import indexes._
+
   /** The `files` collection */
   val files = db(prefix + ".files")
   /** The `chunks` collection */
@@ -293,5 +294,5 @@ case class GridFS(db: DB, prefix: String = "fs") {
    * @return a future containing true if the index was created, false if it already exists.
    */
   def ensureIndex()(implicit ctx: ExecutionContext) :Future[Boolean] =
-    chunks.indexes.ensure(Index( List("files_id" -> true, "n" -> true), unique = true ))
+    db.indexesManager.onCollection("chunks").ensure(Index( List("files_id" -> true, "n" -> true), unique = true ))
 }

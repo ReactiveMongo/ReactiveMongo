@@ -45,7 +45,7 @@ object Samples {
     val futureCount = db.command(
       Count(
         // run this command on the given collection
-        collection.collectionName,
+        collection.name,
         // ... with the query we wrote above
         Some(query)
       )
@@ -113,7 +113,7 @@ object Samples {
     val futureInsertThenCount = futureInsert.flatMap(lasterror => {
       println("successfully inserted document (lasterror is " + lasterror + ")")
       val count = Count(
-        collection.collectionName,
+        collection.name,
         Some(BSONDocument(
           "company.name" -> BSONString("Zenexity")
         )))
@@ -183,7 +183,7 @@ object Samples {
       "$set" -> BSONDocument("lastName" -> BSONString("GODBILLON")))
 
     val command = FindAndModify(
-      collection.collectionName,
+      collection.name,
       selector,
       Update(modifier, false))
 
