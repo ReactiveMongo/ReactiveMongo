@@ -292,7 +292,12 @@ trait FailoverBasicCollection {
       query.writeBytes(projection.get)
     val requestMaker = RequestMaker(op, query)
 
-    Cursor.flatten(Failover(requestMaker, db.connection.mongosystem, failoverStrategy).future.map { response => new DefaultCursor(response, db.connection, op, query, failoverStrategy)})
+    Cursor.flatten(Failover(requestMaker, db.connection.mongosystem, failoverStrategy).future.map { response =>
+      val cursor = new DefaultCursor(response, db.connection, op, query, failoverStrategy)
+      if( (opts.flagsN & QueryFlags.TailableCursor) != 0 )
+        new TailableCursor(cursor)
+      else cursor
+    })
   }
 
   def insert[T](document: T, writeConcern: GetLastError)(implicit writer: RawBSONWriter[T], ec: ExecutionContext) :Future[LastError] = {

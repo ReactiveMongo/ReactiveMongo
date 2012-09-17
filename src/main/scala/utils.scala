@@ -132,7 +132,7 @@ case class LazyLogger(logger: org.slf4j.Logger) {
   def error(s: => String) { if(logger.isErrorEnabled) logger.error(s) }
 }
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent._
 
 case class EitherMappableFuture[A](future: Future[A]) {
   def mapEither[E <: Throwable, B](f: A => Either[E, B])(implicit ec: ExecutionContext) = {
@@ -146,4 +146,16 @@ case class EitherMappableFuture[A](future: Future[A]) {
 }
 object EitherMappableFuture {
   implicit def futureToEitherMappable[A](future: Future[A]) :EitherMappableFuture[A] = EitherMappableFuture(future)
+}
+
+object ExtendedFutures {
+  import akka.actor.{ActorSystem, Scheduler}
+  import akka.util.Duration
+  // better way to this?
+  def DelayedFuture(millis: Long, scheduler: Scheduler) :Future[Unit] = {
+    val promise = Promise[Unit]()
+    scheduler.scheduleOnce(Duration.apply(millis, "millis"))(promise.success())
+    promise.future
+  }
+  def DelayedFuture(millis: Long, system: ActorSystem) :Future[Unit] = DelayedFuture(millis, system.scheduler)
 }

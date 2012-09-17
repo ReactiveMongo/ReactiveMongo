@@ -20,13 +20,26 @@ case class MongoChannel(
   state: ChannelState,
   loggedIn: Set[LoggedIn]
 ) {
+  import MongoChannel._
+
   lazy val usable = state match {
     case _ :Usable => true
     case _ => false
   }
+
+  def send(message :Request, writeConcern :Request) {
+    logger.trace("connection " + channel.getId + " will send Request " + message + " followed by writeConcern " + writeConcern)
+    channel.write(message)
+    channel.write(writeConcern)
+  }
+  def send(message: Request) {
+    logger.trace("connection " + channel.getId + " will send Request " + message)
+    channel.write(message)
+  }
 }
 
 object MongoChannel {
+  private val logger = LazyLogger(LoggerFactory.getLogger("NodeWrapper"))
   implicit def mongoChannelToChannel(mc: MongoChannel) :Channel = mc.channel
 }
 
@@ -161,17 +174,10 @@ class RoundRobiner[A](val subject: IndexedSeq[A], private var i: Int = 0) {
 case class NodeWrapper(node: Node) extends RoundRobiner(node.queryable) {
   import NodeWrapper._
   def send(message :Request, writeConcern :Request) {
-    pick.map { channel =>
-      logger.trace("connection " + channel.getId + " will send Request " + message + " followed by writeConcern " + writeConcern)
-      channel.write(message)
-      channel.write(writeConcern)
-    }
+    pick.map(_.send(message, writeConcern))
   }
   def send(message: Request) {
-    pick.map { channel =>
-      logger.trace("connection " + channel.getId + " will send Request " + message)
-      channel.write(message)
-    }
+    pick.map(_.send(message))
   }
 }
 

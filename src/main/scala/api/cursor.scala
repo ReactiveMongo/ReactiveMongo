@@ -56,11 +56,13 @@ object Samples {
  *
 */
 trait Cursor[T] {
+  import Cursor.logger
   /** An iterator on the last fetched documents. */
   val iterator: Iterator[T]
 
-  val cursorId: Option[Long]
-  val connection: Option[MongoConnection]
+  def cursorId: Future[Long]
+
+  def connection: Future[MongoConnection]
 
   /** Gets the next instance of that cursor. */
   def next: Future[Cursor[T]]
@@ -90,12 +92,16 @@ cursor.enumerate.apply(Iteratee.foreach { doc =>
    * @tparam T the type of the matched documents. An implicit [[reactivemongo.bson.handlers.RawBSONReader]][T] typeclass for handling it has to be in the scope.
    *
 */
-  def enumerate()(implicit ctx: ExecutionContext) :Enumerator[T] =
-    if(hasNext)
+  def enumerate()(implicit ctx: ExecutionContext) :Enumerator[T] = {
+    if(hasNext) {
       Enumerator.unfoldM(this) { cursor =>
         Cursor.nextElement(cursor)
-      } &> Enumeratee.collect { case Some(e) => e }
-    else Enumerator.eof
+      } &> Enumeratee.collect { case Some(e) => e } &> Enumeratee.onIterateeDone(() => {
+        logger.trace("iteratee is done, closing cursor")
+        close
+      })
+    } else Enumerator.eof
+  }
 
   /**
    * Collects all the documents into a collection of type `M[T]`.
@@ -179,57 +185,134 @@ val list = cursor2[List].collect()
     collect[Iterable](1).map(_.headOption)
   }
 
-  /** Explicitly closes that cursor. */
-  def close = if(hasNext && cursorId.isDefined && connection.isDefined) {
-      connection.get.send(RequestMaker(KillCursors(Set(cursorId.get))))
-  }
-
-  /*def nextElement()(implicit ec: ExecutionContext) :Future[Option[(Cursor[T], T)]] = {
-    Cursor.nextElement(this).flatMap {
-      case result @ Some((cursor, Some(e))) => Future(Some(cursor -> e))
-      case Some((cursor, None)) => Cursor.nextElement(cursor).flatMap { // we just got a new cursor. If this cursor has no element, then the Mongo cursor is done.
-        case result @ Some((cursor, Some(e))) => Future(Some(cursor -> e))
-        case _ => Future(None)
-      }
-      case _ => Future(None)
-    }
-  }*/
+  /** Explicitly closes that cursor. It cannot be used again. */
+  def close() :Unit
 }
 
 class DefaultCursor[T](response: Response, private[api] val mongoConnection: MongoConnection, private[api] val query: Query, private[api] val originalRequest: ChannelBuffer, private[api] val failoverStrategy: FailoverStrategy)(implicit handler: BSONReaderHandler, reader: RawBSONReader[T], ctx: ExecutionContext) extends Cursor[T] {
   import Cursor.logger
+  logger.debug("making default cursor instance from response " + response + response.reply)
 
-  logger.trace("response is " + response + response.reply)
   lazy val iterator :Iterator[T] = handler.handle(response.reply, response.documents)
 
-  val cursorId = Some(response.reply.cursorID)
-  override val connection = Some(mongoConnection)
+  val cursorId = Future(response.reply.cursorID)
+  def connection = Future(mongoConnection)
 
   def next :Future[DefaultCursor[T]] = {
     if(response.reply.cursorID != 0) {
       logger.debug("cursor: calling next on " + response.reply.cursorID)
       val op = GetMore(query.fullCollectionName, query.numberToReturn, response.reply.cursorID)
       Failover(RequestMaker(op).copy(channelIdHint=Some(response.info.channelId)), mongoConnection.mongosystem, failoverStrategy).future.map { response => new DefaultCursor(response, mongoConnection, query, originalRequest, failoverStrategy) }
-    } else throw new NoSuchElementException()
+    } else {
+      logger.debug("throwing no such element exception")
+      Future.failed(new NoSuchElementException())
+    }
   }
 
   def hasNext :Boolean = response.reply.cursorID != 0
+
+  def regenerate = {
+    val requestMaker = RequestMaker(query, {
+      val buf = originalRequest.duplicate
+      buf.readerIndex(0)
+      buf
+    })
+    Failover(requestMaker, mongoConnection.mongosystem, failoverStrategy).future.map { response =>
+            new DefaultCursor(response, mongoConnection, query, originalRequest, failoverStrategy)}
+  }
+
+  def close() = {
+    Cursor.logger.debug("sending killcursor on id = " + response.reply.cursorID)
+    connection.map(_.send(RequestMaker(KillCursors(Set(response.reply.cursorID)))))
+  }
 }
 
 
 /**
  * A [[reactivemongo.api.Cursor]] that holds no document, and which the next cursor is given in the constructor.
  */
-class FlattenedCursor[T](futureCursor: Future[Cursor[T]]) extends Cursor[T] {
+class FlattenedCursor[T](futureCursor: Future[Cursor[T]])(implicit ctx: ExecutionContext) extends Cursor[T] {
+  import Cursor.logger
+
+  logger.debug("making flattened cursor instance")
+
   val iterator :Iterator[T] = Iterator.empty
 
-  val cursorId = None
+  def cursorId = futureCursor.flatMap(_.cursorId)
 
-  val connection = None
+  def connection = futureCursor.flatMap(_.connection)
 
   def next = futureCursor
 
   def hasNext = true
+
+  def close() = {
+    logger.debug("FlattenedCursor closing")
+    futureCursor.map(_.close)
+  }
+}
+
+private[api] class TailableController() {
+  private var isStopped = false
+
+  def stopped = isStopped
+
+  def stop() = isStopped = true
+
+  override def toString = {
+    "TailableController(" + isStopped + ")"
+  }
+}
+
+class TailableCursor[T](cursor: DefaultCursor[T], private val controller: TailableController = new TailableController())(implicit ctx: ExecutionContext) extends Cursor[T] {
+  import Cursor.logger
+
+  logger.debug("making tailable cursor instance")
+
+  val iterator :Iterator[T] = cursor.iterator
+
+  def connection = cursor.connection
+
+  def cursorId = cursor.cursorId
+
+  def next = {
+    logger.debug("calling next on tailable cursor, controller=" + controller)
+    if(controller.stopped)
+      Future.failed(new NoSuchElementException())
+    else {
+      val fut = cursor.next.recoverWith {
+        case _ =>
+          logger.debug("regenerating cursor")
+          val f = DelayedFuture(500, MongoConnection.system).flatMap(_ => cursor.regenerate)
+          f.onComplete {
+            case Left(e) => e.printStackTrace
+            case Right(t) => logger.debug("regenerate is ok")
+          }
+          f
+      }.map(new TailableCursor(_, controller))
+      fut.onComplete {
+        case Left(e) => e.printStackTrace
+        case Right(t) => logger.debug("next is ok")
+      }
+      fut
+    }
+  }
+
+  def hasNext = {
+    logger.debug("calling hasNext on tailable cursor");
+    !controller.stopped
+  }
+
+  def close() = {
+    logger.debug("TailableCursor closing")
+    cursor.cursorId.map { id =>
+      controller.stop
+      if(id > 0) {
+        Cursor.logger.debug("sending killcursor on id = " + id)
+        connection.map(_.send(RequestMaker(KillCursors(Set(id)))))
+      }
+    }
+  }
 }
 
 object Cursor {
@@ -241,14 +324,13 @@ object Cursor {
   /**
    * Flattens the given future [[reactivemongo.api.Cursor]] to a [[reactivemongo.api.FlattenedCursor]].
    */
-  def flatten[T](futureCursor: Future[Cursor[T]]) = new FlattenedCursor(futureCursor)
+  def flatten[T](futureCursor: Future[Cursor[T]])(implicit ctx: ExecutionContext) = new FlattenedCursor(futureCursor)
 
   private def nextElement[T](cursor: Cursor[T])(implicit ec: ExecutionContext) :Future[Option[(Cursor[T], Option[T])]] = {
     if(cursor.iterator.hasNext)
       Future(Some((cursor,Some(cursor.iterator.next))))
     else if (cursor.hasNext)
       cursor.next.map(c => Some((c,None)))
-    else
-      Future(None)
+    else Future(None)
   }
 }

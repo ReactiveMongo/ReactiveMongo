@@ -143,23 +143,24 @@ class MongoDBSystem(
   override def receive = {
     case RegisterMonitor => monitors += sender
 
-    case req :RequestMakerExpectingResponse =>
+    case req: RequestMaker =>
       logger.trace("received a request")
-      val request = req.requestMaker(requestIdGenerator.user)
+      val r = req(requestIdGenerator.user)
+      pickChannel(r).right.map(_._2.send(r))
 
-      if(!nodeSetManager.get.nodeSet.isReachable) {
-        req.promise.failure(Exceptions.NodeSetNotReachable)
-      } else if(secondaryOK(request) || nodeSetManager.get.primaryWrapper.isDefined) {
-        val node = (if(secondaryOK(request)) pickNode(request) else nodeSetManager.get.primaryWrapper).get
-        logger.debug("node " + node + "will send the query " + request.op)
-        if(request.op.expectsResponse) {
-          awaitingResponses += request.requestID -> AwaitingResponse(request.requestID, req.promise, false)
-          logger.trace("registering awaiting response for requestID " + request.requestID + ", awaitingResponses: " + awaitingResponses)
-        } else logger.trace("NOT registering awaiting response for requestID " + request.requestID)
-        node.send(request)
-      } else {
-        req.promise.failure(Exceptions.PrimaryUnavailableException)
-      }
+    case req :RequestMakerExpectingResponse =>
+      logger.trace("received a request expecting a response")
+      val request = req.requestMaker(requestIdGenerator.user)
+      pickChannel(request).fold(
+        error => req.promise.failure(error),
+        nodeChannel => {
+          logger.debug("channel " + nodeChannel + "will send the query " + request.op)
+          if(request.op.expectsResponse) {
+            awaitingResponses += request.requestID -> AwaitingResponse(request.requestID, req.promise, false)
+            logger.trace("registering awaiting response for requestID " + request.requestID + ", awaitingResponses: " + awaitingResponses)
+          } else logger.trace("NOT registering awaiting response for requestID " + request.requestID)
+          nodeChannel._2.send(request)
+        })
 
     case req :CheckedWriteRequestExpectingResponse =>
       logger.trace("received a checked write request")
@@ -169,17 +170,14 @@ class MongoDBSystem(
         val tuple = checkedWriteRequest()
         tuple._1(requestId) -> tuple._2(requestId)
       }
-      if(!nodeSetManager.get.nodeSet.isReachable) {
-        req.promise.failure(Exceptions.NodeSetNotReachable)
-      } else if(nodeSetManager.get.primaryWrapper.isDefined) {
-        val node = nodeSetManager.get.primaryWrapper.get
-        logger.debug("node " + node + "will send the query " + request.op)
-        awaitingResponses += requestId -> AwaitingResponse(requestId, req.promise, true)
-        logger.trace("registering writeConcern-awaiting response for requestID " + requestId + ", awaitingResponses: " + awaitingResponses)
-        node.send(request, writeConcern)
-      } else {
-        req.promise.failure(Exceptions.PrimaryUnavailableException)
-      }
+      pickChannel(request).fold(
+        error => req.promise.failure(error),
+        nodeChannel => {
+          logger.debug("channel " + nodeChannel + "will send the query " + request.op)
+          awaitingResponses += requestId -> AwaitingResponse(requestId, req.promise, true)
+          logger.trace("registering writeConcern-awaiting response for requestID " + requestId + ", awaitingResponses: " + awaitingResponses)
+          nodeChannel._2.send(request)
+        })
 
     // monitor
     case ConnectAll => {
@@ -377,6 +375,14 @@ class MongoDBSystem(
     case _ => false
   })
 
+  def pickChannel(request: Request) :Either[ReactiveMongoError, (Node, MongoChannel)] = {
+    if(request.channelIdHint.isDefined)
+      nodeSetManager.flatMap(_.nodeSet.findByChannelId(request.channelIdHint.get)).toRight(Exceptions.ChannelNotFound)
+    else if(secondaryOK(request))
+      nodeSetManager.flatMap(_.pick.flatMap(node => node.pick.map(node.node -> _))).toRight(Exceptions.NodeSetNotReachable)
+    else nodeSetManager.flatMap(_.primaryWrapper.flatMap(node => node.pick.map(node.node -> _))).toRight(Exceptions.PrimaryUnavailableException)
+  }
+
   def pickNode(message: Request) :Option[NodeWrapper] = {
     message.channelIdHint.flatMap(channelId => {
       nodeSetManager.flatMap(_.getNodeWrapperByChannelId(channelId))
@@ -515,5 +521,8 @@ object Exceptions {
   /** An exception thrown when the entire node set is unavailable. The application may not have access to the network anymore. */
   object NodeSetNotReachable extends ReactiveMongoError {
     val message = "The node set can not be reached! Please check your network connectivity."
+  }
+  object ChannelNotFound extends ReactiveMongoError {
+    val message = "ChannelNotFound"
   }
 }
