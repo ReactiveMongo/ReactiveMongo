@@ -314,6 +314,8 @@ object BSONDocument {
   def apply( els: (String, BSONValue)* ) :AppendableBSONDocument = new AppendableBSONDocument().append(els :_*)
   /** Makes a [[reactivemongo.bson.TraversableBSONDocument]] from the given buffer. */
   def apply(buffer: ChannelBuffer) :TraversableBSONDocument = new TraversableBSONDocument(buffer)
+  /** Returns a String representing the given BSONDocument. */
+  def pretty(document: BSONDocument) = "{\n" + BSONIterator.pretty(0, document.toTraversable.bsonIterator) + "\n}"
 }
 
 object BSONArray {
@@ -321,6 +323,8 @@ object BSONArray {
   def apply(values: BSONValue*) :AppendableBSONArray = new AppendableBSONArray().append(values :_*)
   /** Makes a [[reactivemongo.bson.TraversableBSONArray]] from the given buffer. */
   def apply(buffer: ChannelBuffer) :TraversableBSONArray = new TraversableBSONArray(buffer)
+  /** Returns a String representing the given BSONArray. */
+  def pretty(array: BSONArray) = "[\n" + BSONIterator.pretty(0, array.toTraversable.bsonIterator) + "\n]"
 }
 // <---------------------------- BSON Structure handlers
 
@@ -585,8 +589,8 @@ sealed trait BSONIterator extends Iterator[BSONElement] {
 /** Concrete lazy BSON iterator from a [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]]. */
 case class DefaultBSONIterator(buffer: ChannelBuffer) extends BSONIterator
 
-object DefaultBSONIterator {
-  private def pretty(i: Int, it: Iterator[BSONElement]) :String = {
+object BSONIterator {
+  private[bson] def pretty(i: Int, it: Iterator[BSONElement]) :String = {
     val prefix = (0 to i).map {i => "\t"}.mkString("")
     (for(v <- it) yield {
       v.value match {

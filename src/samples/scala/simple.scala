@@ -26,7 +26,7 @@ object Samples {
     val cursor = collection.find(query, filter)
     // let's enumerate this cursor and print a readable representation of each document in the response
     cursor.enumerate.apply(Iteratee.foreach { doc =>
-      println("found document: " + DefaultBSONIterator.pretty(doc.bsonIterator))
+      println("found document: " + BSONDocument.pretty(doc))
     })
 
     // or, the same with getting a list
@@ -71,7 +71,7 @@ object Samples {
     // get a future list
     val futurelist = cursor.toList
     futurelist.onSuccess {
-      case list => println(list.map(doc => DefaultBSONIterator.pretty(doc.bsonIterator)))
+      case list => println(list.map(doc => BSONDocument.pretty(doc)))
     }
   }
 
@@ -155,7 +155,7 @@ object Samples {
     // let's enumerate this cursor and print a readable representation of each document in the response
     val enumerator = Cursor.flatten(futureCursor).enumerate
     enumerator(Iteratee.foreach { doc =>
-      println("found document: " + DefaultBSONIterator.pretty(doc.bsonIterator))
+      println("found document: " + BSONDocument.pretty(doc))
     })
   }
 
@@ -196,7 +196,7 @@ object Samples {
         maybeDocument.map(doc => {
           // get a BSONIterator (lazy BSON parser) of this document
           // stringify it with DefaultBSONIterator.pretty
-          DefaultBSONIterator.pretty(doc.bsonIterator)
+          BSONDocument.pretty(doc)
         })
       )
     }

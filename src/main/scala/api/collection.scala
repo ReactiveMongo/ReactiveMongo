@@ -42,7 +42,7 @@ object Samples {
     val cursor = collection.find(query, Some(filter))
     // let's enumerate this cursor and print a readable representation of each document in the response
     cursor.enumerate.apply(Iteratee.foreach { doc =>
-      println("found document: " + DefaultBSONIterator.pretty(doc.bsonIterator))
+      println("found document: " + BSONDocument.pretty(doc))
     })
 
     // or, the same with getting a list

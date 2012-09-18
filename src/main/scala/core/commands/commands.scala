@@ -102,7 +102,7 @@ trait BSONCommandError extends CommandError {
 
   override def getMessage :String =
     "BSONCommandError['" + message + "'" + code.map(c => " (code = " + c + ")").getOrElse("") + "]" +
-      originalDocument.map(doc => " with original doc " + DefaultBSONIterator.pretty(doc.bsonIterator)).getOrElse("")
+      originalDocument.map(doc => " with original doc " + BSONDocument.pretty(doc)).getOrElse("")
 }
 
 object CommandError {
