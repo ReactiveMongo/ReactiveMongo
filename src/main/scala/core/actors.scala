@@ -154,7 +154,7 @@ class MongoDBSystem(
       pickChannel(request).fold(
         error => req.promise.failure(error),
         nodeChannel => {
-          logger.debug("channel " + nodeChannel + "will send the query " + request.op)
+          logger.debug("Sending request expecting response " + request + " by channel " + nodeChannel)
           if(request.op.expectsResponse) {
             awaitingResponses += request.requestID -> AwaitingResponse(request.requestID, req.promise, false)
             logger.trace("registering awaiting response for requestID " + request.requestID + ", awaitingResponses: " + awaitingResponses)
@@ -173,10 +173,10 @@ class MongoDBSystem(
       pickChannel(request).fold(
         error => req.promise.failure(error),
         nodeChannel => {
-          logger.debug("channel " + nodeChannel + "will send the query " + request.op)
+          logger.debug("Sending checked write request " + request + " by channel " + nodeChannel)
           awaitingResponses += requestId -> AwaitingResponse(requestId, req.promise, true)
           logger.trace("registering writeConcern-awaiting response for requestID " + requestId + ", awaitingResponses: " + awaitingResponses)
-          nodeChannel._2.send(request)
+          nodeChannel._2.send(request, writeConcern)
         })
 
     // monitor
