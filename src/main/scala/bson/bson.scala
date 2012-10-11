@@ -354,6 +354,8 @@ object BSONUndefined extends BSONValue {
 case class BSONObjectID(value: Array[Byte]) extends BSONValue {
   val code = 0x07
 
+  import java.util.Arrays
+
   /** Constructs a BSON ObjectId element from a hexadecimal String representation */
   def this(value: String) = this(Converters.str2Hex(value))
 
@@ -361,6 +363,13 @@ case class BSONObjectID(value: Array[Byte]) extends BSONValue {
   lazy val stringify = Converters.hex2Str(value)
 
   override def toString = "BSONObjectID[\"" + stringify + "\"]"
+
+  override def equals(obj: Any) :Boolean = obj match {
+    case BSONObjectID(arr) => Arrays.equals(value, arr)
+    case _ => false
+  }
+
+  override lazy val hashCode :Int = Arrays.hashCode(value)
 
   def write(buffer: ChannelBuffer) = { buffer writeBytes value; buffer }
 }
@@ -380,6 +389,9 @@ object BSONObjectID {
       .getOrElse(InetAddress.getLocalHost.getHostName.getBytes)
       .take(3)
   }
+
+  /** Constructs a BSON ObjectId element from a hexadecimal String representation */
+  def apply(id: String) :BSONObjectID = new BSONObjectID(id)
 
   /** Generates a new BSON ObjectID. */
   def generate :BSONObjectID = {

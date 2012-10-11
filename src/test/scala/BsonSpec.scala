@@ -1,7 +1,7 @@
 import org.specs2.mutable._
 import reactivemongo.bson._
-
 import java.util.Arrays
+import reactivemongo.bson.BSONObjectID
 
 class BsonSpec extends Specification {
   val simple = Array[Byte] (0x16, 0x00, 0x00, 0x00, 0x02, 'h', 'e', 'l', 'l', 'o', 0x00, 0x06, 0x00, 0x00, 0x00, 'w', 'o', 'r', 'l', 'd', 0x00, 0x00)
@@ -53,7 +53,6 @@ class BsonSpec extends Specification {
           BSONDouble(5.05),
           BSONDouble(1986)
         )).toTraversable
-      traversable.getAs[TraversableBSONArray]("BSON").get.buffer.array
       val buffer = traversable.toAppendable.makeBuffer
       compare(embeddingArray, buffer)
     }
@@ -93,5 +92,49 @@ class BsonSpec extends Specification {
     println(Arrays.toString(origin))
     println(Arrays.toString(test))
     println(Arrays.toString(buffer.array()))
+  }
+}
+
+import reactivemongo.utils.Converters
+
+object BSONObjectIDSpec extends Specification {
+
+  "BSONObjectID" should {
+
+    "equal when created with string" in {
+      val objectID = BSONObjectID.generate
+      val sameObjectID = BSONObjectID(objectID.stringify)
+      objectID.value must equalTo(sameObjectID.value)
+    }
+
+    "equal another instance of BSONObjectID with the same value" in {
+      val objectID = BSONObjectID.generate
+      val sameObjectID = BSONObjectID(objectID.stringify)
+      objectID must equalTo(sameObjectID)
+    }
+
+    "not equal another newly generated instance of BSONObjectID" in {
+      val objectID = BSONObjectID.generate
+      val nextObjectID = BSONObjectID(BSONObjectID.generate.stringify)
+      objectID must not equalTo(nextObjectID)
+    }
+
+  }
+
+  "Converters" should {
+
+    "strings equal each other" in {
+      val objectID = "506fff5bb8f6b133007b5bcf"
+      val hex = Converters.str2Hex(objectID)
+      val string = Converters.hex2Str(hex)
+      string must equalTo(objectID)
+    }
+
+    "bytes generated equal bytes converted from string" in {
+      val objectID = BSONObjectID.generate
+      val bytes = Converters.str2Hex(objectID.stringify)
+      objectID.value must equalTo(bytes)
+    }
+
   }
 }
