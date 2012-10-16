@@ -5,6 +5,7 @@ import reactivemongo.api._
 import reactivemongo.bson._
 import reactivemongo.bson.handlers.DefaultBSONHandlers._
 import reactivemongo.core.commands._
+import scala.util.{Failure, Success}
 
 object Samples {
   import scala.concurrent.ExecutionContext.Implicits.global // TODO create own ExecutionContext
@@ -88,8 +89,8 @@ object Samples {
 
     val future = collection.insert(document, GetLastError())
     future.onComplete {
-      case Left(e) => throw e
-      case Right(lastError) => {
+      case Failure(e) => throw e
+      case Success(lastError) => {
         println("successfully inserted document: "  + lastError)
       }
     }
@@ -122,8 +123,8 @@ object Samples {
     })
 
     futureInsertThenCount.onComplete {
-      case Left(e) => throw e
-      case Right(count) => {
+      case Failure(e) => throw e
+      case Success(count) => {
         println("successfully inserted document, now there are " + count + " zenexity guys here")
       }
     }
@@ -167,8 +168,8 @@ object Samples {
     val futureRemove = collection.remove(selector, GetLastError(), false)
 
     futureRemove.onComplete {
-      case Left(e) => throw e
-      case Right(lasterror) => {
+      case Failure(e) => throw e
+      case Success(lasterror) => {
         println("successfully removed document")
       }
     }
@@ -188,10 +189,10 @@ object Samples {
       Update(modifier, false))
 
     db.command(command).onComplete {
-      case Left(error) => {
+      case Failure(error) => {
         throw new RuntimeException("got an error while performing findAndModify", error)
       }
-      case Right(maybeDocument) => println("findAndModify successfully done with original document = " +
+      case Success(maybeDocument) => println("findAndModify successfully done with original document = " +
         // if there is an original document returned, print it in a pretty format
         maybeDocument.map(doc => {
           // get a BSONIterator (lazy BSON parser) of this document

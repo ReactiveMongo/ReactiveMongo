@@ -1,5 +1,6 @@
 package reactivemongo.api
 
+import reactivemongo.core.actors.RequestMakerExpectingResponse
 import reactivemongo.bson.handlers._
 import reactivemongo.core.protocol._
 import reactivemongo.utils.ExtendedFutures._
@@ -8,6 +9,7 @@ import org.jboss.netty.buffer.ChannelBuffer
 import org.slf4j.LoggerFactory
 import play.api.libs.iteratee._
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.{Failure, Success}
 
 /**
  * Allows to fetch the next documents matching a query.
@@ -93,14 +95,22 @@ cursor.enumerate.apply(Iteratee.foreach { doc =>
    *
 */
   def enumerate()(implicit ctx: ExecutionContext) :Enumerator[T] = {
-    if(hasNext) {
+    println("enumerate")
+    //if(hasNext) {
       Enumerator.unfoldM(this) { cursor =>
         Cursor.nextElement(cursor)
-      } &> Enumeratee.collect { case Some(e) => e } &> Enumeratee.onIterateeDone(() => {
-        logger.trace("iteratee is done, closing cursor")
+      }.onDoneEnumerating{
+        println("done")
+      }.andThen(Enumerator.eof) &> Enumeratee.collect {
+        case Some(e) => e
+      }/* &> Enumeratee.onIterateeDone(() => {
+        logger.debug("iteratee is done, closing cursor")
         close
-      })
-    } else Enumerator.eof
+      })*/
+    //} else {
+      //println("enumerator done")
+      //Enumerator.eof
+    //}
   }
 
   /**
@@ -191,18 +201,21 @@ val list = cursor2[List].collect()
 
 class DefaultCursor[T](response: Response, private[api] val mongoConnection: MongoConnection, private[api] val query: Query, private[api] val originalRequest: ChannelBuffer, private[api] val failoverStrategy: FailoverStrategy)(implicit handler: BSONReaderHandler, reader: RawBSONReader[T], ctx: ExecutionContext) extends Cursor[T] {
   import Cursor.logger
-  logger.debug("making default cursor instance from response " + response + response.reply)
+  logger.debug("making default cursor instance from response " + response + ", returned=" + response.reply.numberReturned)
 
   lazy val iterator :Iterator[T] = handler.handle(response.reply, response.documents)
 
-  val cursorId = Future(response.reply.cursorID)
+  def cursorId = Future(response.reply.cursorID)
   def connection = Future(mongoConnection)
 
   def next :Future[DefaultCursor[T]] = {
     if(response.reply.cursorID != 0) {
-      logger.debug("cursor: calling next on " + response.reply.cursorID)
-      val op = GetMore(query.fullCollectionName, query.numberToReturn, response.reply.cursorID)
-      Failover(RequestMaker(op).copy(channelIdHint=Some(response.info.channelId)), mongoConnection.mongosystem, failoverStrategy).future.map { response => new DefaultCursor(response, mongoConnection, query, originalRequest, failoverStrategy) }
+      val op = GetMore(query.fullCollectionName, /*query.numberToReturn*/ 100, response.reply.cursorID)
+      logger.debug("cursor: calling next on " + response.reply.cursorID + ", op=" + op)
+      val expectingResponse = RequestMakerExpectingResponse(RequestMaker(op).copy(channelIdHint=Some(response.info.channelId)))
+    mongoConnection.mongosystem ! expectingResponse
+    expectingResponse.future.map { r => logger.debug("from " + response + " to " + r); new DefaultCursor(r, mongoConnection, query, originalRequest, failoverStrategy) }
+      //Failover(RequestMaker(op).copy(channelIdHint=Some(response.info.channelId)), mongoConnection.mongosystem, failoverStrategy).future.map { r => logger.debug("from " + response + " to " + r); new DefaultCursor(r, mongoConnection, query, originalRequest, failoverStrategy) }
     } else {
       logger.debug("throwing no such element exception")
       Future.failed(new NoSuchElementException())
@@ -212,6 +225,7 @@ class DefaultCursor[T](response: Response, private[api] val mongoConnection: Mon
   def hasNext :Boolean = response.reply.cursorID != 0
 
   def regenerate = {
+    logger.debug("regenerating")
     val requestMaker = RequestMaker(query, {
       val buf = originalRequest.duplicate
       buf.readerIndex(0)
@@ -285,14 +299,14 @@ class TailableCursor[T](cursor: DefaultCursor[T], private val controller: Tailab
           logger.debug("regenerating cursor")
           val f = DelayedFuture(500, MongoConnection.system).flatMap(_ => cursor.regenerate)
           f.onComplete {
-            case Left(e) => e.printStackTrace
-            case Right(t) => logger.debug("regenerate is ok")
+            case Failure(e) => e.printStackTrace
+            case Success(t) => logger.debug("regenerate is ok")
           }
           f
       }.map(new TailableCursor(_, controller))
       fut.onComplete {
-        case Left(e) => e.printStackTrace
-        case Right(t) => logger.debug("next is ok")
+        case Failure(e) => e.printStackTrace
+        case Success(t) => logger.debug("next is ok")
       }
       fut
     }
@@ -317,20 +331,42 @@ class TailableCursor[T](cursor: DefaultCursor[T], private val controller: Tailab
 
 object Cursor {
   import play.api.libs.iteratee._
-  import play.api.libs.concurrent.{Promise => PlayPromise, _}
 
   private[api] val logger = LoggerFactory.getLogger("Cursor")
 
+  def trace[T](cursor: Cursor[T], i:Int = 0)(implicit ctx: ExecutionContext) :Unit = {
+    
+    //if(cursor.hasNext) {
+      cursor.next.map { cur =>
+        print("cursor #" + i + " arrived, " + cur.iterator.size + " elems")
+        trace(cur, i + 1)
+      }.recover{case e => print("stop"); e.printStackTrace()}
+    //}
+  }
+  
   /**
    * Flattens the given future [[reactivemongo.api.Cursor]] to a [[reactivemongo.api.FlattenedCursor]].
    */
   def flatten[T](futureCursor: Future[Cursor[T]])(implicit ctx: ExecutionContext) = new FlattenedCursor(futureCursor)
 
   private def nextElement[T](cursor: Cursor[T])(implicit ec: ExecutionContext) :Future[Option[(Cursor[T], Option[T])]] = {
-    if(cursor.iterator.hasNext)
+    try {
+    if(cursor.iterator.hasNext) {
+      println("***** cursor iterator next")
       Future(Some((cursor,Some(cursor.iterator.next))))
-    else if (cursor.hasNext)
+    }
+    else if (cursor.hasNext) {
+      println("***** iterator reached the end, fetching next")
       cursor.next.map(c => Some((c,None)))
-    else Future(None)
+    }
+    else {
+      println("***** last, sending none")
+      Future(None)
+    }
+    } catch {
+      case e => println("toto")
+      e.printStackTrace
+      throw e
+    }
   }
 }

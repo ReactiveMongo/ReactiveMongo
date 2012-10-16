@@ -2,7 +2,6 @@ package reactivemongo.core.actors
 
 import akka.actor._
 import akka.actor.Status.Failure
-import akka.util.duration._
 import org.jboss.netty.channel.group._
 import org.slf4j.{Logger, LoggerFactory}
 import reactivemongo.bson._
@@ -14,7 +13,7 @@ import reactivemongo.core.protocol.ChannelState._
 import reactivemongo.core.protocol.NodeState._
 import reactivemongo.utils.LazyLogger
 import reactivemongo.core.commands.{Authenticate => AuthenticateCommand, _}
-import scala.concurrent.{Future, Promise}
+import scala.concurrent.{Future}
 
 // messages
 
@@ -24,7 +23,8 @@ import scala.concurrent.{Future, Promise}
  * The future can be used to get the error or the successful response.
  */
 trait ExpectingResponse {
-  private[reactivemongo] val promise: Promise[Response] = Promise()
+  import reactivemongo.utils.DebuggingPromise
+  private[reactivemongo] val promise: DebuggingPromise[Response] = DebuggingPromise(scala.concurrent.Promise())
   /** The future response of this request. */
   val future: Future[Response] = promise.future
 }
@@ -96,6 +96,8 @@ class MongoDBSystem(
 
   private implicit val cFactory = channelFactory
 
+  import scala.concurrent.util.duration._
+  
   val requestIdGenerator = new {
     // all requestIds [0, 1000[ are for isMaster messages
     val isMasterRequestIdIterator :Iterator[Int] = Iterator.iterate(0)(i => if(i == 999) 0 else i + 1)
@@ -119,7 +121,7 @@ class MongoDBSystem(
   private val awaitingResponses = scala.collection.mutable.ListMap[Int, AwaitingResponse]()
 
   private val monitors = scala.collection.mutable.ListBuffer[ActorRef]()
-
+  implicit val ec = context.system.dispatcher
   private val connectAllJob = context.system.scheduler.schedule(MongoDBSystem.DefaultConnectionRetryInterval milliseconds,
     MongoDBSystem.DefaultConnectionRetryInterval milliseconds,
     self,
@@ -144,15 +146,20 @@ class MongoDBSystem(
     case RegisterMonitor => monitors += sender
 
     case req: RequestMaker =>
-      logger.trace("received a request")
+      
+      logger.debug("WARNING received a request")
       val r = req(requestIdGenerator.user)
       pickChannel(r).right.map(_._2.send(r))
 
     case req :RequestMakerExpectingResponse =>
-      logger.trace("received a request expecting a response")
+      logger.debug("received a request expecting a response")
       val request = req.requestMaker(requestIdGenerator.user)
+      try {
       pickChannel(request).fold(
-        error => req.promise.failure(error),
+        error => {
+          println("NO CHANNEL, error with promise " + req.promise)
+          req.promise.failure(error)
+        },
         nodeChannel => {
           logger.debug("Sending request expecting response " + request + " by channel " + nodeChannel)
           if(request.op.expectsResponse) {
@@ -161,9 +168,15 @@ class MongoDBSystem(
           } else logger.trace("NOT registering awaiting response for requestID " + request.requestID)
           nodeChannel._2.send(request)
         })
+      } catch {
+            case e =>
+              e.printStackTrace
+              println("request is=" + request + ", promise=" + req.promise)
+              throw e
+          }
 
+      logger.debug("received a checked write request")
     case req :CheckedWriteRequestExpectingResponse =>
-      logger.trace("received a checked write request")
       val checkedWriteRequest = req.checkedWriteRequest
       val requestId = requestIdGenerator.user
       val (request, writeConcern) = {
@@ -314,10 +327,15 @@ class MongoDBSystem(
 
     // any other response
     case response: Response if response.header.responseTo >= 3000 => {
+      println(awaitingResponses.map { h =>
+        h._1 + ":" + h._2.promise.isCompleted
+      }.mkString(","))
       awaitingResponses.get(response.header.responseTo) match {
         case Some(AwaitingResponse(_, promise, isGetLastError)) => {
           logger.debug("Got a response from " + response.info.channelId + "! Will give back message="+response + " to promise " + promise)
           awaitingResponses -= response.header.responseTo
+          println("PROMISE " + promise + " completed? " + promise.isCompleted)
+          try {
           if(response.error.isDefined) {
             logger.debug("{" + response.header.responseTo + "} sending a failure... (" + response.error.get + ")")
             if(response.error.get.isNotAPrimaryError)
@@ -338,6 +356,12 @@ class MongoDBSystem(
           } else {
             logger.trace("{" + response.header.responseTo + "} sending a success!")
             promise.success(response)
+          }
+          } catch {
+            case e =>
+              e.printStackTrace
+              println("response is=" + response + ", promise=" + promise)
+              throw e
           }
         }
         case None => {
@@ -444,13 +468,13 @@ private[actors] case class AuthHistory(
     AuthenticateCommand(response) match {
       case Right(auth) => true -> succeeded(authenticating, auth)
       case Left(err) => false -> failed(authenticating, err)
-    }
+    } 
   }
 }
-
+import reactivemongo.utils.DebuggingPromise
 private[actors] case class AwaitingResponse(
   requestID: Int,
-  promise: Promise[Response],
+  promise: DebuggingPromise[Response],
   isGetLastError: Boolean
 )
 

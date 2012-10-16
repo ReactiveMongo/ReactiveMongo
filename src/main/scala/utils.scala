@@ -3,14 +3,12 @@ package reactivemongo.utils
 import org.jboss.netty.channel._
 import org.jboss.netty.buffer._
 
+
+import scala.concurrent._
+import scala.concurrent.util.Duration
 import reactivemongo.core.protocol.ChannelBufferWritable
 
 object `package` {
-  import scala.concurrent.util.Duration
-  import akka.util.{Duration => AkkaDuration}
-
-  def scalaToAkkaDuration(duration: Duration) =
-    AkkaDuration.apply(duration.length, duration.unit)
 
   /** Concats two array - fast way */
   def concat[T](a1: Array[T], a2: Array[T])(implicit m: Manifest[T]) :Array[T] = {
@@ -132,8 +130,6 @@ case class LazyLogger(logger: org.slf4j.Logger) {
   def error(s: => String) { if(logger.isErrorEnabled) logger.error(s) }
 }
 
-import scala.concurrent._
-
 case class EitherMappableFuture[A](future: Future[A]) {
   def mapEither[E <: Throwable, B](f: A => Either[E, B])(implicit ec: ExecutionContext) = {
     future.flatMap(
@@ -150,12 +146,38 @@ object EitherMappableFuture {
 
 object ExtendedFutures {
   import akka.actor.{ActorSystem, Scheduler}
-  import akka.util.Duration
+  
   // better way to this?
-  def DelayedFuture(millis: Long, scheduler: Scheduler) :Future[Unit] = {
-    val promise = Promise[Unit]()
-    scheduler.scheduleOnce(Duration.apply(millis, "millis"))(promise.success())
+  def DelayedFuture(millis: Long, system: ActorSystem) :Future[Unit] = {
+    implicit val ec = system.dispatcher
+    val promise = DebuggingPromise(Promise[Unit]())
+    system.scheduler.scheduleOnce(Duration.apply(millis, "millis"))(promise.success())
     promise.future
   }
-  def DelayedFuture(millis: Long, system: ActorSystem) :Future[Unit] = DelayedFuture(millis, system.scheduler)
+}
+
+case class DebuggingPromise[T](private val promise: scala.concurrent.Promise[T]) extends scala.concurrent.Promise[T] {
+  def log(s: String) = println("*** DEBUGGING PROMISE[" + promise  + "] :: " + s)
+  def future: scala.concurrent.Future[T] = {
+    log("requesting: future")
+    promise.future
+  }
+  def isCompleted: Boolean = {
+    val c = promise.isCompleted
+    log("requesting: isCompleted? " + c)
+    c
+  }
+  def tryComplete(result: scala.util.Try[T]): Boolean = {
+    log("requesting: tryComplete (completed? " + promise.isCompleted + ") with result=" + result)
+    try {
+      val ok = promise.tryComplete(result)
+      log("ok=" + ok)
+      ok
+    } catch {
+      case e: Throwable =>
+        log("error while completing! ")
+        e.printStackTrace
+        throw e
+    }
+  }
 }

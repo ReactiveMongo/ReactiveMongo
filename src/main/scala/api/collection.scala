@@ -6,12 +6,11 @@ import reactivemongo.bson.handlers._
 import reactivemongo.core.commands.{Update => UpdateCommand, _}
 import reactivemongo.core.protocol._
 import reactivemongo.utils.EitherMappableFuture._
-
 import org.jboss.netty.buffer.ChannelBuffer
 import play.api.libs.iteratee._
-
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.util.Duration
+import reactivemongo.core.actors.RequestMakerExpectingResponse
 
 /**
  * A Mongo Collection.
@@ -288,6 +287,7 @@ trait FailoverBasicCollection {
 
   protected def find[Rst](query: ChannelBuffer, projection: Option[ChannelBuffer], opts: QueryOpts)(implicit handler: BSONReaderHandler, reader: RawBSONReader[Rst], ec: ExecutionContext) :FlattenedCursor[Rst] = {
     val op = Query(opts.flagsN, fullCollectionName, opts.skipN, opts.batchSizeN)
+    println("OP:" + op)
     if(projection.isDefined)
       query.writeBytes(projection.get)
     val requestMaker = RequestMaker(op, query)
