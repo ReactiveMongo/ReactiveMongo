@@ -384,10 +384,10 @@ object BSONObjectID {
   private val machineId = {
     val networkInterfacesEnum = NetworkInterface.getNetworkInterfaces
     val networkInterfaces = scala.collection.JavaConverters.enumerationAsScalaIteratorConverter(networkInterfacesEnum).asScala
-    networkInterfaces.find(_.getHardwareAddress != null)
+    val ha = networkInterfaces.find(ha => ha.getHardwareAddress != null && ha.getHardwareAddress.length == 6)
       .map(_.getHardwareAddress)
       .getOrElse(InetAddress.getLocalHost.getHostName.getBytes)
-      .take(3)
+    Converters.md5(ha).take(3)
   }
 
   /** Constructs a BSON ObjectId element from a hexadecimal String representation */
