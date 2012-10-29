@@ -239,6 +239,15 @@ object LastError extends BSONCommandResultMaker[LastError] {
       Some(document)
     ))
   }
+  def meaningful(response: Response) = {
+    apply(response) match {
+      case Left(e) => Left(e)
+      case Right(lastError) =>
+        if(lastError.inError)
+          Left(lastError)
+        else Right(lastError)
+    }
+  }
 }
 
 /**

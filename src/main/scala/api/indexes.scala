@@ -103,7 +103,7 @@ class IndexesManager(db: DB[Collection])(implicit context: ExecutionContext) {
    */
   def create(nsIndex: NSIndex) :Future[LastError] = {
     implicit val writer = IndexesManager.NSIndexWriter
-    collection.insert(nsIndex).filter(!_.inError)
+    collection.insert(nsIndex)
   }
 
   /**

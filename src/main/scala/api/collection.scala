@@ -304,14 +304,14 @@ trait FailoverBasicCollection {
     val op = Insert(0, fullCollectionName)
     val bson = writer.write(document)
     val checkedWriteRequest = CheckedWriteRequest(op, bson, writeConcern)
-    Failover(checkedWriteRequest, db.connection.mongosystem, failoverStrategy).future.mapEither(LastError(_))
+    Failover(checkedWriteRequest, db.connection.mongosystem, failoverStrategy).future.mapEither(LastError.meaningful(_))
   }
 
   def remove[T](query: T, writeConcern: GetLastError = GetLastError(), firstMatchOnly: Boolean = false)(implicit writer: RawBSONWriter[T], ec: ExecutionContext) :Future[LastError] = {
     val op = Delete(fullCollectionName, if(firstMatchOnly) 1 else 0)
     val bson = writer.write(query)
     val checkedWriteRequest = CheckedWriteRequest(op, bson, writeConcern)
-    Failover(checkedWriteRequest, db.connection.mongosystem, failoverStrategy).future.mapEither(LastError(_))
+    Failover(checkedWriteRequest, db.connection.mongosystem, failoverStrategy).future.mapEither(LastError.meaningful(_))
   }
 
   def uncheckedRemove[T](query: T, firstMatchOnly: Boolean = false)(implicit writer: RawBSONWriter[T], ec: ExecutionContext) : Unit = {
@@ -327,7 +327,7 @@ trait FailoverBasicCollection {
     val bson = selectorWriter.write(selector)
     bson.writeBytes(updateWriter.write(update))
     val checkedWriteRequest = CheckedWriteRequest(op, bson, writeConcern)
-    Failover(checkedWriteRequest, db.connection.mongosystem, failoverStrategy).future.mapEither(LastError(_))
+    Failover(checkedWriteRequest, db.connection.mongosystem, failoverStrategy).future.mapEither(LastError.meaningful(_))
   }
 
   def uncheckedUpdate[S, U](selector: S, update: U, upsert: Boolean = false, multi: Boolean = false)(implicit selectorWriter: RawBSONWriter[S], updateWriter: RawBSONWriter[U]) :Unit = {
