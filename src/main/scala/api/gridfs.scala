@@ -80,40 +80,53 @@ trait ReadFileEntry extends FileEntry {
   }
 }
 
+case class DefaultReadFileEntry(
+  id: BSONValue,
+  filename: String,
+  length: Int,
+  chunkSize: Int,
+  uploadDate: Option[Long],
+  md5: Option[String],
+  contentType: Option[String],
+  gridFS: GridFS
+) extends ReadFileEntry
+
 object ReadFileEntry {
   private val logger = LazyLogger(LoggerFactory.getLogger("ReadFileEntry"))
   // TODO
-  def bsonReader(gFS: GridFS) = new RawBSONReader[ReadFileEntry] {
-    def read(buffer: ChannelBuffer) = {
-      val document = DefaultBSONHandlers.DefaultBSONDocumentReader.read(buffer)
-      new ReadFileEntry {
-        val length = document.get("length").flatMap {
-          case BSONInteger(i) => Some(i)
-          case _ => None
-        }.getOrElse(throw new RuntimeException("length is mandatory for a stored gridfs file!"))
-        override val chunkSize = document.get("chunkSize").flatMap {
-          case BSONInteger(i) => Some(i)
-          case _ => None
-        }.getOrElse(throw new RuntimeException("chunkSize is mandatory for a stored gridfs file!"))
-        val uploadDate = document.get("uploadDate").flatMap {
-          case BSONDateTime(time) => Some(time)
-          case _ => None
-        }
-        val md5 = document.get("md5").flatMap {
-          case BSONString(m) => Some(m)
-          case _ => None
-        }
-        val filename = document.get("filename").flatMap {
+  def bsonReader(gFS: GridFS) = new Reader(gFS)
+
+  class Reader(gFS: GridFS) extends BSONReader[DefaultReadFileEntry] {
+    def fromBSON(doc: BSONDocument) = {
+      val document = doc.toTraversable
+      DefaultReadFileEntry(
+        document.get("_id").getOrElse(throw new RuntimeException("_id is mandatory for a stored gridfs file!")),
+        document.get("filename").flatMap {
           case BSONString(name) => Some(name)
           case _ => None
-        }.getOrElse("")
-        val contentType = document.get("contentType").flatMap {
+        }.getOrElse(""),
+        document.get("length").flatMap {
+          case BSONInteger(i) => Some(i)
+          case _ => None
+        }.getOrElse(throw new RuntimeException("length is mandatory for a stored gridfs file!")),
+        document.get("chunkSize").flatMap {
+          case BSONInteger(i) => Some(i)
+          case _ => None
+        }.getOrElse(throw new RuntimeException("chunkSize is mandatory for a stored gridfs file!")),
+        document.get("uploadDate").flatMap {
+          case BSONDateTime(time) => Some(time)
+          case _ => None
+        },
+        document.get("md5").flatMap {
+          case BSONString(m) => Some(m)
+          case _ => None
+        },
+        document.get("contentType").flatMap {
           case BSONString(ct) => Some(ct)
           case _ => None
-        }
-        val id = document.get("_id").getOrElse(throw new RuntimeException("_id is mandatory for a stored gridfs file!"))
-        val gridFS = gFS
-      }
+        },
+        gFS
+      )
     }
   }
 }
@@ -137,7 +150,7 @@ case class FileToWrite(
    * @param gfs The GridFS store.
    * @param chunkSize The size of the chunks to be written. Defaults to 256k (GridFS Spec).
    */
-  def iteratee(gfs: GridFS, chunkSize: Int = 262144)(implicit ctx: ExecutionContext): Iteratee[Array[Byte], Future[PutResult]] = {
+  def iteratee(gfs: GridFS, chunkSize: Int = 262144)(implicit ctx: ExecutionContext): Iteratee[Array[Byte], Future[ReadFileEntry]] = {
     implicit val ec = MongoConnection.system
 
     val files_id = id.getOrElse(BSONObjectID.generate)
@@ -172,18 +185,28 @@ case class FileToWrite(
           )
         }
       }
-      def finish() :Future[PutResult] = {
+      def finish() :Future[ReadFileEntry] = {
         logger.debug("writing last chunk (n=" + n + ")!")
+        val uploadDate = System.currentTimeMillis
         writeChunk(n, previous).flatMap { _ =>
           val bson = BSONDocument(
             "_id" -> files_id,
             "filename" -> BSONString(name),
             "chunkSize" -> BSONInteger(chunkSize),
             "length" -> BSONInteger(length),
-            "uploadDate" -> BSONDateTime(System.currentTimeMillis))
+            "uploadDate" -> BSONDateTime(uploadDate))
           if(contentType.isDefined)
             bson += ("contentType" -> BSONString(contentType.get))
-          gfs.files.insert(bson).map(_ => PutResult(files_id, n, length, Some(Converters.hex2Str(md.digest))))
+          gfs.files.insert(bson).map(_ => DefaultReadFileEntry(
+            files_id,
+            name,
+            length,
+            chunkSize,
+            Some(uploadDate),
+            None, // TODO
+            contentType,
+            gfs
+          ))
         }
       }
       def writeChunk(n: Int, array: Array[Byte]) = {
@@ -205,21 +228,6 @@ case class FileToWrite(
 object FileToWrite {
   private val logger = LazyLogger(LoggerFactory.getLogger("FileToWrite"))
 }
-
-/**
- * The metadata of the saved file.
- *
- * @param id The id of the saved file.
- * @param nbChunks The number of chunks that have been written into the `chunks` collection.
- * @param length The length of the saved file.
- * @param md5 The MD5 hash of the saved file, if computed.
- */
-case class PutResult(
-  id: BSONValue,
-  nbChunks: Int,
-  length: Int,
-  md5: Option[String]
-)
 
 /**
  * A helper class to make GridFS queries.
@@ -264,7 +272,7 @@ case class GridFS(db: DB[Collection] with DBMetaCommands, prefix: String = "fs")
    *
    * @return an iteratee to be applied to an enumerator of chunks of bytes.
    */
-  def save(name: String, id: Option[BSONValue], contentType: Option[String] = None)(implicit ctx: ExecutionContext) :Iteratee[Array[Byte], Future[PutResult]] = FileToWrite(id, name, contentType).iteratee(this)
+  def save(name: String, id: Option[BSONValue], contentType: Option[String] = None)(implicit ctx: ExecutionContext) :Iteratee[Array[Byte], Future[ReadFileEntry]] = FileToWrite(id, name, contentType).iteratee(this)
 
   /**
    * Removes a file from this store.
