@@ -77,6 +77,9 @@ trait FailoverDB {
 trait DBMetaCommands {
   self: DB[Collection] =>
 
+  /** Drops this database. */
+  def drop()(implicit ec: ExecutionContext) :Future[Boolean] = command(new DropDatabase())
+
   /** Returns an index manager for this database. */
   def indexesManager(implicit ec: ExecutionContext) = new IndexesManager(self)
 }
