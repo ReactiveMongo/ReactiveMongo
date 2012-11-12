@@ -38,12 +38,10 @@ class Failover[T](message: T, actorRef: ActorRef, strategy: FailoverStrategy)(ex
   val future: Future[Response] = promise.future
 
   private def send(n: Int) {
-    println("send(" + n + ") PROMISE " + promise + " completed? " + promise.isCompleted)
     val expectingResponse = expectingResponseMaker(message)
     actorRef ! expectingResponse
     expectingResponse.future.onComplete {
       case Failure(e) =>
-        println("send(" + n + ") [left] PROMISE " + promise + " completed? " + promise.isCompleted)
         if(n < strategy.retries) {
           val `try` = n + 1
           val delayFactor = strategy.delayFactor(`try`)
@@ -55,17 +53,8 @@ class Failover[T](message: T, actorRef: ActorRef, strategy: FailoverStrategy)(ex
           promise.failure(e)
         }
       case Success(response) =>
-        println("send(" + n + ") [right] PROMISE " + promise + " completed? " + promise.isCompleted)
         logger.debug("Got a successful result, completing...")
-        try {
-          logger.debug("promise is completed? " + promise.isCompleted)
         promise.success(response)
-        } catch {
-          case e: Throwable =>
-            e.printStackTrace
-            println("failover with expectingResponse=" + expectingResponse + " and promise=" + promise)
-            throw e
-        }
     }
   }
 

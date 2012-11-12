@@ -98,8 +98,6 @@ cursor.enumerate.apply(Iteratee.foreach { doc =>
     if(hasNext) {
       Enumerator.unfoldM(this) { cursor =>
         Cursor.nextElement(cursor)
-      }.onDoneEnumerating{
-        println("done")
       }.andThen(Enumerator.eof) &> Enumeratee.collect {
         case Some(e) => e
       } &> Enumeratee.onIterateeDone(() => {
@@ -107,7 +105,6 @@ cursor.enumerate.apply(Iteratee.foreach { doc =>
         close
       })
     } else {
-      //println("enumerator done")
       Enumerator.eof
     }
   }

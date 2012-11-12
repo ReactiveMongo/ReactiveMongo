@@ -138,10 +138,9 @@ class MongoDBSystem(
     case req :RequestMakerExpectingResponse =>
       logger.debug("received a request expecting a response")
       val request = req.requestMaker(requestIds.common.next)
-      try {
       pickChannel(request).fold(
         error => {
-          println("NO CHANNEL, error with promise " + req.promise)
+          logger.debug("NO CHANNEL, error with promise " + req.promise)
           req.promise.failure(error)
         },
         nodeChannel => {
@@ -152,15 +151,9 @@ class MongoDBSystem(
           } else logger.trace("NOT registering awaiting response for requestID " + request.requestID)
           nodeChannel._2.send(request)
         })
-      } catch {
-            case e: Throwable =>
-              e.printStackTrace
-              println("request is=" + request + ", promise=" + req.promise)
-              throw e
-          }
 
-      logger.debug("received a checked write request")
     case req :CheckedWriteRequestExpectingResponse =>
+      logger.debug("received a checked write request")
       val checkedWriteRequest = req.checkedWriteRequest
       val requestId = requestIds.common.next
       val (request, writeConcern) = {
@@ -318,8 +311,6 @@ class MongoDBSystem(
         case Some(AwaitingResponse(_, promise, isGetLastError)) => {
           logger.debug("Got a response from " + response.info.channelId + "! Will give back message="+response + " to promise " + promise)
           awaitingResponses -= response.header.responseTo
-          println("PROMISE " + promise + " completed? " + promise.isCompleted)
-          try {
           if(response.error.isDefined) {
             logger.debug("{" + response.header.responseTo + "} sending a failure... (" + response.error.get + ")")
             if(response.error.get.isNotAPrimaryError)
@@ -340,12 +331,6 @@ class MongoDBSystem(
           } else {
             logger.trace("{" + response.header.responseTo + "} sending a success!")
             promise.success(response)
-          }
-          } catch {
-            case e: Throwable =>
-              e.printStackTrace
-              println("response is=" + response + ", promise=" + promise)
-              throw e
           }
         }
         case None => {
