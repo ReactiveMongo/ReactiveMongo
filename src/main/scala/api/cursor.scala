@@ -95,22 +95,21 @@ cursor.enumerate.apply(Iteratee.foreach { doc =>
    *
 */
   def enumerate()(implicit ctx: ExecutionContext) :Enumerator[T] = {
-    println("enumerate")
-    //if(hasNext) {
+    if(hasNext) {
       Enumerator.unfoldM(this) { cursor =>
         Cursor.nextElement(cursor)
       }.onDoneEnumerating{
         println("done")
       }.andThen(Enumerator.eof) &> Enumeratee.collect {
         case Some(e) => e
-      }/* &> Enumeratee.onIterateeDone(() => {
+      } &> Enumeratee.onIterateeDone(() => {
         logger.debug("iteratee is done, closing cursor")
         close
-      })*/
-    //} else {
+      })
+    } else {
       //println("enumerator done")
-      //Enumerator.eof
-    //}
+      Enumerator.eof
+    }
   }
 
   /**
@@ -213,8 +212,8 @@ class DefaultCursor[T](response: Response, private[api] val mongoConnection: Mon
       val op = GetMore(query.fullCollectionName, /*query.numberToReturn*/ 100, response.reply.cursorID)
       logger.debug("cursor: calling next on " + response.reply.cursorID + ", op=" + op)
       val expectingResponse = RequestMakerExpectingResponse(RequestMaker(op).copy(channelIdHint=Some(response.info.channelId)))
-    mongoConnection.mongosystem ! expectingResponse
-    expectingResponse.future.map { r => logger.debug("from " + response + " to " + r); new DefaultCursor(r, mongoConnection, query, originalRequest, failoverStrategy) }
+      mongoConnection.mongosystem ! expectingResponse
+      expectingResponse.future.map { r => logger.debug("from " + response + " to " + r); new DefaultCursor(r, mongoConnection, query, originalRequest, failoverStrategy) }
       //Failover(RequestMaker(op).copy(channelIdHint=Some(response.info.channelId)), mongoConnection.mongosystem, failoverStrategy).future.map { r => logger.debug("from " + response + " to " + r); new DefaultCursor(r, mongoConnection, query, originalRequest, failoverStrategy) }
     } else {
       logger.debug("throwing no such element exception")
@@ -333,16 +332,6 @@ object Cursor {
   import play.api.libs.iteratee._
 
   private[api] val logger = LoggerFactory.getLogger("Cursor")
-
-  def trace[T](cursor: Cursor[T], i:Int = 0)(implicit ctx: ExecutionContext) :Unit = {
-    
-    //if(cursor.hasNext) {
-      cursor.next.map { cur =>
-        print("cursor #" + i + " arrived, " + cur.iterator.size + " elems")
-        trace(cur, i + 1)
-      }.recover{case e => print("stop"); e.printStackTrace()}
-    //}
-  }
   
   /**
    * Flattens the given future [[reactivemongo.api.Cursor]] to a [[reactivemongo.api.FlattenedCursor]].
@@ -350,23 +339,10 @@ object Cursor {
   def flatten[T](futureCursor: Future[Cursor[T]])(implicit ctx: ExecutionContext) = new FlattenedCursor(futureCursor)
 
   private def nextElement[T](cursor: Cursor[T])(implicit ec: ExecutionContext) :Future[Option[(Cursor[T], Option[T])]] = {
-    try {
-    if(cursor.iterator.hasNext) {
-      println("***** cursor iterator next")
+    if(cursor.iterator.hasNext)
       Future(Some((cursor,Some(cursor.iterator.next))))
-    }
-    else if (cursor.hasNext) {
-      println("***** iterator reached the end, fetching next")
+    else if (cursor.hasNext)
       cursor.next.map(c => Some((c,None)))
-    }
-    else {
-      println("***** last, sending none")
-      Future(None)
-    }
-    } catch {
-      case e => println("toto")
-      e.printStackTrace
-      throw e
-    }
+    else Future(None)
   }
 }

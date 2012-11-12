@@ -5,7 +5,6 @@ import org.jboss.netty.buffer.{ChannelBuffer, ChannelBuffers}
 import reactivemongo.utils.Converters
 import reactivemongo.utils.RichBuffer._
 
-
 /*
 element  ::=  "\x01" e_name double  Floating point
 |  "\x02" e_name string  UTF-8 string

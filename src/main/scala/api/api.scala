@@ -14,10 +14,8 @@ import reactivemongo.core.commands.{Command, GetLastError, LastError, Successful
 import reactivemongo.utils.EitherMappableFuture._
 import reactivemongo.utils.DebuggingPromise
 import scala.concurrent.{Future, ExecutionContext}
-import scala.concurrent.util.Duration
-import scala.concurrent.util.duration._
+import scala.concurrent.duration._
 import scala.util.{Failure, Success}
-import scala.concurrent.util.FiniteDuration
 
 /**
  * A helper that sends the given message to the given actor, following a failover strategy.
@@ -49,7 +47,7 @@ class Failover[T](message: T, actorRef: ActorRef, strategy: FailoverStrategy)(ex
         if(n < strategy.retries) {
           val `try` = n + 1
           val delayFactor = strategy.delayFactor(`try`)
-          val delay = strategy.initialDelay * delayFactor
+          val delay = Duration.unapply(strategy.initialDelay * delayFactor).map(t => FiniteDuration(t._1, t._2)).getOrElse(strategy.initialDelay)
           logger.warn("Got an error, retrying... (try #" + `try` + " is scheduled in " + delay.toMillis + " ms)", e)
           MongoConnection.system.scheduler.scheduleOnce(delay)(send(`try`))
         } else {
@@ -63,7 +61,7 @@ class Failover[T](message: T, actorRef: ActorRef, strategy: FailoverStrategy)(ex
           logger.debug("promise is completed? " + promise.isCompleted)
         promise.success(response)
         } catch {
-          case e =>
+          case e: Throwable =>
             e.printStackTrace
             println("failover with expectingResponse=" + expectingResponse + " and promise=" + promise)
             throw e

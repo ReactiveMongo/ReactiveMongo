@@ -96,25 +96,9 @@ class MongoDBSystem(
 
   private implicit val cFactory = channelFactory
 
-  import scala.concurrent.util.duration._
+  import scala.concurrent.duration._
   
-  val requestIdGenerator = new {
-    // all requestIds [0, 1000[ are for isMaster messages
-    val isMasterRequestIdIterator :Iterator[Int] = Iterator.iterate(0)(i => if(i == 999) 0 else i + 1)
-    def isMaster = isMasterRequestIdIterator.next
-
-    // all requestIds [1000, 2000[ are for getnonce messages
-    val getNonceRequestIdIterator :Iterator[Int] = Iterator.iterate(1000)(i => if(i == 1999) 1000 else i + 1)
-    def getNonce = getNonceRequestIdIterator.next
-
-    // all requestIds [2000, 3000[ are for authenticate messages
-    val authenticateRequestIdIterator :Iterator[Int] = Iterator.iterate(2000)(i => if(i == 2999) 2000 else i + 1)
-    def authenticate = authenticateRequestIdIterator.next
-
-    // all requestIds [3000[ are for user messages
-    val userIterator :Iterator[Int] = Iterator.iterate(3000)(i => if(i == Int.MaxValue - 1) 3000 else i + 1)
-    def user :Int = userIterator.next
-  }
+  val requestIds = new RequestIds
 
   private var authenticationHistory :AuthHistory = AuthHistory(for(a <- auth) yield a -> Nil)
 
@@ -137,7 +121,7 @@ class MongoDBSystem(
     case _ => if(channel.loggedIn.size < authenticationHistory.authenticates.size) {
       val nextAuth = authenticationHistory.authenticates(channel.loggedIn.size)
       logger.debug("channel " + channel.channel + " is now starting to process the next auth with " + nextAuth + "!")
-      channel.write(Getnonce(nextAuth.db).maker(requestIdGenerator.getNonce))
+      channel.write(Getnonce(nextAuth.db).maker(requestIds.getNonce.next))
       channel.copy(state = Authenticating(nextAuth.db, nextAuth.user, nextAuth.password, None))
     } else { logger.debug("AUTH: nothing to do. authenticationHistory is " + authenticationHistory); channel.copy(state = Ready) }
   }
@@ -148,12 +132,12 @@ class MongoDBSystem(
     case req: RequestMaker =>
       
       logger.debug("WARNING received a request")
-      val r = req(requestIdGenerator.user)
+      val r = req(requestIds.common.next)
       pickChannel(r).right.map(_._2.send(r))
 
     case req :RequestMakerExpectingResponse =>
       logger.debug("received a request expecting a response")
-      val request = req.requestMaker(requestIdGenerator.user)
+      val request = req.requestMaker(requestIds.common.next)
       try {
       pickChannel(request).fold(
         error => {
@@ -169,7 +153,7 @@ class MongoDBSystem(
           nodeChannel._2.send(request)
         })
       } catch {
-            case e =>
+            case e: Throwable =>
               e.printStackTrace
               println("request is=" + request + ", promise=" + req.promise)
               throw e
@@ -178,7 +162,7 @@ class MongoDBSystem(
       logger.debug("received a checked write request")
     case req :CheckedWriteRequestExpectingResponse =>
       val checkedWriteRequest = req.checkedWriteRequest
-      val requestId = requestIdGenerator.user
+      val requestId = requestIds.common.next
       val (request, writeConcern) = {
         val tuple = checkedWriteRequest()
         tuple._1(requestId) -> tuple._2(requestId)
@@ -211,18 +195,18 @@ class MongoDBSystem(
       logger.debug("RefreshAllNodes Job running... current state is: " + state)
       nodeSetManager.get.nodeSet.nodes.foreach { node =>
         logger.trace("try to refresh " + node.name)
-        node.channels.find(_.isConnected).map(_.write(IsMaster().maker(requestIdGenerator.isMaster)))
+        node.channels.find(_.isConnected).map(_.write(IsMaster().maker(requestIds.isMaster.next)))
       }
     }
     case Connected(channelId) => {
       if(seedSet.isDefined) {
         seedSet = seedSet.map(_.updateByChannelId(channelId, node => node.copy(state = CONNECTED)))
-        seedSet.map(_.findNodeByChannelId(channelId).get.channels(0).write(IsMaster().maker(requestIdGenerator.isMaster)))
+        seedSet.map(_.findNodeByChannelId(channelId).get.channels(0).write(IsMaster().maker(requestIds.isMaster.next)))
       } else {
         updateNodeSetManager(NodeSetManager(nodeSetManager.get.nodeSet.updateByChannelId(channelId, node => {
           node.copy(channels = node.channels.map { channel =>
             if(channel.getId == channelId) {
-              channel.write(IsMaster().maker(requestIdGenerator.isMaster))
+              channel.write(IsMaster().maker(requestIds.isMaster.next))
               channel.copy(state = Ready)
             } else channel
           }, state = node.state match {
@@ -266,7 +250,7 @@ class MongoDBSystem(
       }
     }
     // isMaster response
-    case response: Response if response.header.responseTo < 1000 => {
+    case response: Response if requestIds.isMaster accepts response => {
       val isMaster = IsMaster.ResultMaker(response).right.get
       updateNodeSetManager(if(isMaster.hosts.isDefined) {// then it's a ReplicaSet
         val mynodes = isMaster.hosts.get.map(name => Node(name, if(isMaster.me.exists(_ == name)) isMaster.state else NONE))
@@ -289,7 +273,7 @@ class MongoDBSystem(
         _.updateChannelById(response.info.channelId, authenticateChannel(_)))))
     }
     // getnonce response
-    case response: Response if response.header.responseTo >= 1000 && response.header.responseTo < 2000 => {
+    case response: Response if requestIds.getNonce accepts response => {
       val nonce = Getnonce.ResultMaker(response).right.get
       logger.debug("AUTH: got nonce for channel " + response.info.channelId + ": " + nonce)
       updateNodeSetManager(NodeSetManager(nodeSetManager.get.nodeSet.updateByChannelId(response.info.channelId, node =>
@@ -297,14 +281,14 @@ class MongoDBSystem(
           if(channel.getId == response.info.channelId) {
             val authenticating = channel.state.asInstanceOf[Authenticating]
             logger.debug("AUTH: authenticating with " + authenticating)
-            channel.write(AuthenticateCommand(authenticating.user, authenticating.password, nonce)(authenticating.db).maker(requestIdGenerator.authenticate))
+            channel.write(AuthenticateCommand(authenticating.user, authenticating.password, nonce)(authenticating.db).maker(requestIds.authenticate.next))
             channel.copy(state = authenticating.copy(nonce = Some(nonce)))
           } else channel
         })
       )))
     }
     // authenticate response
-    case response: Response if response.header.responseTo >= 2000 && response.header.responseTo < 3000 => {
+    case response: Response if requestIds.authenticate accepts response => {
       logger.debug("AUTH: got authenticated response! " + response.info.channelId)
       updateNodeSetManager(NodeSetManager(nodeSetManager.get.nodeSet.updateByChannelId(response.info.channelId, { node =>
         logger.debug("AUTH: updating node " + node + "...")
@@ -326,7 +310,7 @@ class MongoDBSystem(
     }
 
     // any other response
-    case response: Response if response.header.responseTo >= 3000 => {
+    case response: Response if requestIds.common accepts response => {
       println(awaitingResponses.map { h =>
         h._1 + ":" + h._2.promise.isCompleted
       }.mkString(","))
@@ -358,7 +342,7 @@ class MongoDBSystem(
             promise.success(response)
           }
           } catch {
-            case e =>
+            case e: Throwable =>
               e.printStackTrace
               println("response is=" + response + ", promise=" + promise)
               throw e
@@ -549,4 +533,25 @@ object Exceptions {
   object ChannelNotFound extends ReactiveMongoError {
     val message = "ChannelNotFound"
   }
+}
+
+private[actors] class RequestIds {
+  // all requestIds [0, 1000[ are for isMaster messages
+  val isMaster = RequestIdGenerator(0, 999)
+  // all requestIds [1000, 2000[ are for getnonce messages
+  val getNonce = RequestIdGenerator(1000, 1999)
+  // all requestIds [2000, 3000[ are for authenticate messages
+  val authenticate = RequestIdGenerator(2000, 2999)
+  // all requestIds [3000[ are for common messages
+  val common = RequestIdGenerator(3000, Int.MaxValue - 1)
+}
+
+private[actors] case class RequestIdGenerator(
+  lower: Int,
+  upper: Int) {
+  private val iterator = Iterator.iterate(lower)(i => if(i == upper) lower else i + 1)
+
+  def next = iterator.next
+  def accepts(id: Int) :Boolean = id >= lower && id <= upper
+  def accepts(response: Response) :Boolean = accepts(response.header.responseTo)
 }

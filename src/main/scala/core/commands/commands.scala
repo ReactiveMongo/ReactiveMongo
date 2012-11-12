@@ -59,7 +59,7 @@ trait BSONCommandResultMaker[Result] extends CommandResultMaker[Result] {
       apply(document)
     } catch {
       case e :CommandError => Left(e)
-      case e =>
+      case e: Throwable =>
         val error = CommandError("exception while deserializing this command's result!", Some(document))
         error.initCause(e);
         Left(error)

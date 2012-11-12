@@ -3,9 +3,8 @@ package reactivemongo.utils
 import org.jboss.netty.channel._
 import org.jboss.netty.buffer._
 
-
 import scala.concurrent._
-import scala.concurrent.util.Duration
+import scala.concurrent.duration._
 import reactivemongo.core.protocol.ChannelBufferWritable
 
 object `package` {

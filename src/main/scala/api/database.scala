@@ -11,7 +11,7 @@ import org.jboss.netty.buffer.ChannelBuffer
 import play.api.libs.iteratee._
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.concurrent.util.Duration
+import scala.concurrent.duration._
 
 /**
  * A Mongo Database.

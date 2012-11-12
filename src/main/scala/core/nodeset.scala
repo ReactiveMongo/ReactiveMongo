@@ -54,7 +54,7 @@ case class Node(
     splitted._1 -> (try {
       splitted._2.drop(1).toInt
     } catch {
-      case _ => 27017
+      case _: Throwable => 27017
     })
   }
 
