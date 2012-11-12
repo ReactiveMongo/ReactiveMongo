@@ -59,7 +59,7 @@ trait DB[+C <: Collection] {
   def command[T](command: Command[T])(implicit ec: ExecutionContext) :Future[T]
 
   /** Authenticates the connection on this database. */
-  def authenticate(user: String, password: String)(implicit timeout: Duration) :Future[SuccessfulAuthentication] = connection.authenticate(name, user, password)
+  def authenticate(user: String, password: String)(implicit timeout: FiniteDuration) :Future[SuccessfulAuthentication] = connection.authenticate(name, user, password)
 }
 
 /** A mixin for making failover requests on the database. */

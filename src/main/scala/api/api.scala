@@ -1,7 +1,6 @@
 package reactivemongo.api
 
 import akka.actor.{ActorRef, ActorSystem, Props}
-import akka.pattern.ask
 import org.jboss.netty.buffer.ChannelBuffer
 import org.slf4j.{Logger, LoggerFactory}
 import play.api.libs.iteratee._
@@ -124,6 +123,8 @@ class MongoConnection(
   val mongosystem: ActorRef,
   monitor: ActorRef
 ) {
+  import akka.pattern.{ask => akkaAsk}
+  import akka.util.Timeout
   /**
    * Returns a DefaultDB reference using this connection.
    *
@@ -143,12 +144,8 @@ class MongoConnection(
   /**
    * Get a future that will be successful when a primary node is available or times out.
    */
-  def waitForPrimary(waitForAvailability: Duration) :Future[_] = {
-    null // TODO
-    /*new play.api.libs.concurrent.AkkaPromise(
-      monitor.ask(reactivemongo.core.actors.WaitForPrimary)(scalaToAkkaDuration(waitForAvailability))
-    )*/
-  }
+  def waitForPrimary(implicit waitForAvailability: FiniteDuration) :Future[_] =
+    akkaAsk(monitor, reactivemongo.core.actors.WaitForPrimary)(Timeout(waitForAvailability))
 
   /**
    * Writes a request and wait for a response.
@@ -184,13 +181,12 @@ class MongoConnection(
   def send(message: RequestMaker) = mongosystem ! message
 
   /** Authenticates the connection on the given database. */
-  def authenticate(db: String, user: String, password: String)(implicit timeout: Duration) :Future[SuccessfulAuthentication] = {
-    null // TODO
-    //new play.api.libs.concurrent.AkkaPromise((mongosystem ? Authenticate(db, user, password))(scalaToAkkaDuration(timeout)).mapTo[SuccessfulAuthentication])
-  }
+  def authenticate(db: String, user: String, password: String)(implicit timeout: FiniteDuration) :Future[SuccessfulAuthentication] =
+    akkaAsk(mongosystem, Authenticate(db, user, password))(Timeout(timeout)).mapTo[SuccessfulAuthentication]
 
   /** Closes this MongoConnection (closes all the channels and ends the actors) */
-  def askClose()(implicit timeout: Duration) :Future[_] = null // TODO new play.api.libs.concurrent.AkkaPromise((monitor ? Close)(scalaToAkkaDuration(timeout)))
+  def askClose()(implicit timeout: FiniteDuration) :Future[_] =
+    akkaAsk(monitor, Close)(Timeout(timeout))
 
   /** Closes this MongoConnection (closes all the channels and ends the actors) */
   def close() :Unit = monitor ! Close
