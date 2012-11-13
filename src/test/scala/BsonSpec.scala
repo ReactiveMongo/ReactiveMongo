@@ -3,7 +3,7 @@ import reactivemongo.bson._
 import java.util.Arrays
 import reactivemongo.bson.BSONObjectID
 
-object BsonSpec extends Specification {
+class BsonSpec extends Specification {
   val simple = Array[Byte] (0x16, 0x00, 0x00, 0x00, 0x02, 'h', 'e', 'l', 'l', 'o', 0x00, 0x06, 0x00, 0x00, 0x00, 'w', 'o', 'r', 'l', 'd', 0x00, 0x00)
 
   val embeddingArray = Array[Byte] (70, 0, 0, 0, 7, 95, 105, 100, 0, 80, 55, -110, -63, -104, 69, -121, -105, 27, 20, 83, 14, 4, 66, 83, 79, 78, 0, 42, 0, 0, 0, 2, 48, 0, 8, 0, 0, 0, 97, 119, 101, 115, 111, 109, 101, 0, 1, 49, 0, 51, 51, 51, 51, 51, 51, 20, 64, 1, 50, 0, 0, 0, 0, 0, 0, 8, -97, 64, 0, 0)
@@ -97,7 +97,7 @@ object BsonSpec extends Specification {
 
 import reactivemongo.utils.Converters
 
-object BSONObjectIDSpec extends Specification {
+class BSONObjectIDSpec extends Specification {
 
   "BSONObjectID" should {
 

@@ -4,50 +4,38 @@ import reactivemongo.core.commands.Count
 import scala.concurrent._
 
 import org.specs2.mutable._
-object CollectionSpec extends Specification {
+class CollectionSpec extends Specification {
   import Common._
+
+  sequential
 
   lazy val collection = db("somecollection_collectionspec")
 
   "ReactiveMongo" should {
-    "administrate a collection" in {
-      create
-      convert
-      checkCapped
-      insert
-      empty
-      drop
+    "create a collection" in {
+      Await.result(collection.create(), timeout) mustEqual true
     }
-  }
-
-  def create = {
-    Await.result(collection.create(), timeout) mustEqual true
-  }
-
-  def convert = {
-    Await.result(collection.convertToCapped(2 * 1024 * 1024, None), timeout) mustEqual true
-  }
-
-  def checkCapped = {
-    // convertToCapped is async. Let's wait a little while before checking if it's done
-    Await.result(reactivemongo.utils.ExtendedFutures.DelayedFuture(4000, MongoConnection.system), timeout)
-    println("\n\n\t***** CHECKING \n\n")
-    val stats = Await.result(collection.stats, timeout)
-    println(stats)
-    stats.capped mustEqual true
-  }
-
-  def insert = {
-    Await.result(collection.insert(BSONDocument("name" -> BSONString("Jack"))), timeout).ok mustEqual true
-    Await.result(db.command(Count(collection.name)), timeout) mustEqual 1
-  }
-
-  def empty = {
-    Await.result(collection.emptyCapped(), timeout) mustEqual true
-    Await.result(db.command(Count(collection.name)), timeout) mustEqual 0
-  }
-
-  def drop = {
-    Await.result(collection.drop(), timeout) mustEqual true
+    "convert to capped" in {
+      Await.result(collection.convertToCapped(2 * 1024 * 1024, None), timeout) mustEqual true
+    }
+    "check if it's capped" in {
+      // convertToCapped is async. Let's wait a little while before checking if it's done
+      Await.result(reactivemongo.utils.ExtendedFutures.DelayedFuture(4000, MongoConnection.system), timeout)
+      println("\n\n\t***** CHECKING \n\n")
+      val stats = Await.result(collection.stats, timeout)
+      println(stats)
+      stats.capped mustEqual true
+    }
+    "insert some docs then count" in {
+      Await.result(collection.insert(BSONDocument("name" -> BSONString("Jack"))), timeout).ok mustEqual true
+      Await.result(db.command(Count(collection.name)), timeout) mustEqual 1
+    }
+    "empty the capped collection" in {
+      Await.result(collection.emptyCapped(), timeout) mustEqual true
+      Await.result(db.command(Count(collection.name)), timeout) mustEqual 0
+    }
+    "drop it" in {
+      Await.result(collection.drop(), timeout) mustEqual true
+    }
   }
 }
