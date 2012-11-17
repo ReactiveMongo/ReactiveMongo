@@ -11,8 +11,7 @@ import reactivemongo.bson.handlers._
 import reactivemongo.core.protocol._
 import reactivemongo.core.commands.{Command, GetLastError, LastError, SuccessfulAuthentication}
 import reactivemongo.utils.EitherMappableFuture._
-import reactivemongo.utils.DebuggingPromise
-import scala.concurrent.{Future, ExecutionContext}
+import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
@@ -31,7 +30,7 @@ import scala.util.{Failure, Success}
  */
 class Failover[T](message: T, actorRef: ActorRef, strategy: FailoverStrategy)(expectingResponseMaker: T => ExpectingResponse)(implicit ec: ExecutionContext) {
   import Failover.logger
-  private val promise = DebuggingPromise(scala.concurrent.Promise[Response]())
+  private val promise = Promise[Response]()
 
   /** A future that is completed with a response, after 1 or more attempts (specified in the given strategy). */
   val future: Future[Response] = promise.future

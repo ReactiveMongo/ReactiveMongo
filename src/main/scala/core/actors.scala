@@ -13,7 +13,7 @@ import reactivemongo.core.protocol.ChannelState._
 import reactivemongo.core.protocol.NodeState._
 import reactivemongo.utils.LazyLogger
 import reactivemongo.core.commands.{Authenticate => AuthenticateCommand, _}
-import scala.concurrent.{Future}
+import scala.concurrent.{Future, Promise}
 
 // messages
 
@@ -23,8 +23,7 @@ import scala.concurrent.{Future}
  * The future can be used to get the error or the successful response.
  */
 trait ExpectingResponse {
-  import reactivemongo.utils.DebuggingPromise
-  private[reactivemongo] val promise: DebuggingPromise[Response] = DebuggingPromise(scala.concurrent.Promise())
+  private[reactivemongo] val promise: Promise[Response] = Promise()
   /** The future response of this request. */
   val future: Future[Response] = promise.future
 }
@@ -440,10 +439,10 @@ private[actors] case class AuthHistory(
     } 
   }
 }
-import reactivemongo.utils.DebuggingPromise
+
 private[actors] case class AwaitingResponse(
   requestID: Int,
-  promise: DebuggingPromise[Response],
+  promise: Promise[Response],
   isGetLastError: Boolean
 )
 

@@ -149,34 +149,8 @@ object ExtendedFutures {
   // better way to this?
   def DelayedFuture(millis: Long, system: ActorSystem) :Future[Unit] = {
     implicit val ec = system.dispatcher
-    val promise = DebuggingPromise(Promise[Unit]())
+    val promise = Promise[Unit]()
     system.scheduler.scheduleOnce(Duration.apply(millis, "millis"))(promise.success())
     promise.future
-  }
-}
-
-case class DebuggingPromise[T](private val promise: scala.concurrent.Promise[T]) extends scala.concurrent.Promise[T] {
-  def log(s: String) = println("*** DEBUGGING PROMISE[" + promise  + "] :: " + s)
-  def future: scala.concurrent.Future[T] = {
-    log("requesting: future")
-    promise.future
-  }
-  def isCompleted: Boolean = {
-    val c = promise.isCompleted
-    log("requesting: isCompleted? " + c)
-    c
-  }
-  def tryComplete(result: scala.util.Try[T]): Boolean = {
-    log("requesting: tryComplete (completed? " + promise.isCompleted + ") with result=" + result)
-    try {
-      val ok = promise.tryComplete(result)
-      log("ok=" + ok)
-      ok
-    } catch {
-      case e: Throwable =>
-        log("error while completing! ")
-        e.printStackTrace
-        throw e
-    }
   }
 }
