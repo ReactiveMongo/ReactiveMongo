@@ -46,3 +46,5 @@ publishMavenStyle := true
 sources in (Compile, doc) ~= (_ filter (p => !p.getAbsolutePath.contains("src/samples") && !p.getAbsolutePath.contains("src/main/scala/tests")))
 
 scalaVersion := "2.10.0-RC2"
+
+crossVersion := CrossVersion.full
