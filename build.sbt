@@ -24,6 +24,12 @@ libraryDependencies ++= Seq(
 
 scalacOptions ++= Seq("-unchecked", "-deprecation")
 
+scalacOptions in (Compile, doc) ++= Seq("-unchecked", "-deprecation", "-diagrams", "-implicits")
+
+scalacOptions in (Compile, doc) ++= Opts.doc.title("ReactiveMongo API")
+
+scalacOptions in (Compile, doc) ++= Opts.doc.version("0.1")
+
 unmanagedSourceDirectories in Compile <+= baseDirectory( _ / "src" / "samples" / "scala" )
 
 publishTo <<= version { (version: String) =>

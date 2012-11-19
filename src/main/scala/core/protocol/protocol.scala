@@ -138,7 +138,7 @@ object RequestMaker {
 /**
  * @define requestID id of this request, so that the response may be identifiable. Should be strictly positive.
  * @define op request operation.
- * @define documentsA body of this request, a [[scala.Array]] containing 0, 1, or many documents.
+ * @define documentsA body of this request, an Array containing 0, 1, or many documents.
  * @define documentsC body of this request, a [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]] containing 0, 1, or many documents.
  */
 object Request{

@@ -78,16 +78,16 @@ trait Collection {
   def uncheckedInsert[T](document: T)(implicit writer: RawBSONWriter[T]) :Unit
 
   /**
-   * Inserts a document into the collection and wait for the [[reactivemongo.core.protocol.commands.LastError]] result.
+   * Inserts a document into the collection and wait for the [[reactivemongo.core.commands.LastError]] result.
    *
-   * Please read the documentation about [[reactivemongo.core.protocol.commands.GetLastError]] to know how to use it properly.
+   * Please read the documentation about [[reactivemongo.core.commands.GetLastError]] to know how to use it properly.
    *
    * @tparam T the type of the document to insert. An implicit [[reactivemongo.bson.handlers.RawBSONWriter]][T] typeclass for handling it has to be in the scope.
    *
    * @param document the document to insert.
-   * @param writeConcern the [[reactivemongo.core.protocol.commands.GetLastError]] command message to send in order to control how the document is inserted. Defaults to GetLastError().
+   * @param writeConcern the [[reactivemongo.core.commands.GetLastError]] command message to send in order to control how the document is inserted. Defaults to GetLastError().
    *
-   * @return a future [[reactivemongo.core.protocol.commands.LastError]] that can be used to check whether the insertion was successful.
+   * @return a future [[reactivemongo.core.commands.LastError]] that can be used to check whether the insertion was successful.
    */
   def insert[T](document: T, writeConcern: GetLastError)(implicit writer: RawBSONWriter[T], ec: ExecutionContext) :Future[LastError]
 
@@ -114,11 +114,11 @@ trait Collection {
    *
    * @param selector the selector object, for finding the documents to update.
    * @param update the modifier object (with special keys like \$set) or replacement object.
-   * @param writeConcern the [[reactivemongo.core.protocol.commands.GetLastError]] command message to send in order to control how the documents are updated. Defaults to GetLastError().
+   * @param writeConcern the [[reactivemongo.core.commands.GetLastError]] command message to send in order to control how the documents are updated. Defaults to GetLastError().
    * @param upsert states whether the update objet should be inserted if no match found. Defaults to false.
    * @param multi states whether the update may be done on all the matching documents.
    *
-   * @return a future [[reactivemongo.core.protocol.commands.LastError]] that can be used to check whether the update was successful.
+   * @return a future [[reactivemongo.core.commands.LastError]] that can be used to check whether the update was successful.
    */
   def update[S, U](selector: S, update: U, writeConcern: GetLastError = GetLastError(), upsert: Boolean = false, multi: Boolean = false)(implicit selectorWriter: RawBSONWriter[S], updateWriter: RawBSONWriter[U], ec: ExecutionContext) :Future[LastError]
 
@@ -135,17 +135,17 @@ trait Collection {
   def uncheckedRemove[T](query: T, firstMatchOnly: Boolean = false)(implicit writer: RawBSONWriter[T], ec: ExecutionContext) : Unit
 
   /**
-   * Remove the matched document(s) from the collection and wait for the [[reactivemongo.core.protocol.commands.LastError]] result.
+   * Remove the matched document(s) from the collection and wait for the [[reactivemongo.core.commands.LastError]] result.
    *
-   * Please read the documentation about [[reactivemongo.core.protocol.commands.GetLastError]] to know how to use it properly.
+   * Please read the documentation about [[reactivemongo.core.commands.GetLastError]] to know how to use it properly.
    *
    * @tparam T the type of the selector of documents to remove. An implicit [[reactivemongo.bson.handlers.RawBSONWriter]][T] typeclass for handling it has to be in the scope.
    *
    * @param query the selector of documents to remove.
-   * @param writeConcern the [[reactivemongo.core.protocol.commands.GetLastError]] command message to send in order to control how the documents are removed. Defaults to GetLastError().
+   * @param writeConcern the [[reactivemongo.core.commands.GetLastError]] command message to send in order to control how the documents are removed. Defaults to GetLastError().
    * @param firstMatchOnly states whether only the first matched documents has to be removed from this collection.
    *
-   * @return a future [[reactivemongo.core.protocol.commands.LastError]] that can be used to check whether the removal was successful.
+   * @return a future [[reactivemongo.core.commands.LastError]] that can be used to check whether the removal was successful.
    */
   def remove[T](query: T, writeConcern: GetLastError = GetLastError(), firstMatchOnly: Boolean = false)(implicit writer: RawBSONWriter[T], ec: ExecutionContext) :Future[LastError]
 
@@ -239,15 +239,15 @@ trait Collection {
     find(query.makeMergedBuffer, None, QueryOpts())
 
   /**
-   * Inserts a document into the collection and wait for the [[reactivemongo.core.protocol.commands.LastError]] result.
+   * Inserts a document into the collection and wait for the [[reactivemongo.core.commands.LastError]] result.
    *
-   * Please read the documentation about [[reactivemongo.core.protocol.commands.GetLastError]] to know how to use it properly.
+   * Please read the documentation about [[reactivemongo.core.commands.GetLastError]] to know how to use it properly.
    *
    * @tparam T the type of the document to insert. An implicit [[reactivemongo.bson.handlers.RawBSONWriter]][T] typeclass for handling it has to be in the scope.
    *
    * @param document the document to insert.
    *
-   * @return a future [[reactivemongo.core.protocol.commands.LastError]] that can be used to check whether the insertion was successful.
+   * @return a future [[reactivemongo.core.commands.LastError]] that can be used to check whether the insertion was successful.
    */
   def insert[T](document: T)(implicit writer: RawBSONWriter[T], ec: ExecutionContext) :Future[LastError] = insert(document, GetLastError())
 
@@ -273,7 +273,7 @@ trait Collection {
    * @param bulkSize The number of documents per bulk.
    * @param bulkByteSize The maximum size for a bulk, in bytes.
    *
-   * @return a future [[reactivemongo.core.protocol.commands.LastError]] that can be used to check whether the insertion was successful.
+   * @return a future [[reactivemongo.core.commands.LastError]] that can be used to check whether the insertion was successful.
    */
   def insert[T](enumerator: Enumerator[T], bulkSize: Int = bulk.MaxDocs, bulkByteSize: Int = bulk.MaxBulkSize)(implicit writer: RawBSONWriter[T], ec: ExecutionContext) :Future[Int] =
     enumerator |>>> insertIteratee(bulkSize, bulkByteSize)
