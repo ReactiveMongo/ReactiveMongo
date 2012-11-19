@@ -77,8 +77,6 @@ case class BSONString(value: String) extends BSONValue {
  * A BSON Structure (a BSON array or document).
  */
 sealed trait BSONStructure extends BSONValue {
-  private[bson] val buffer :ChannelBuffer
-
   /**
    * Writes the content of this structure into the given ChannelBuffer.
    * If this is an appendable structure, its underlying buffer will be copied, and ended.
@@ -110,6 +108,12 @@ sealed trait BSONStructure extends BSONValue {
    * If this structure is already traversable, it may return itself.
    */
   def toTraversable :Traversable
+
+  /** An iterator over the BSONElements this structure contains. */
+  def iterator :Iterator[BSONElement]
+
+  /** An iterator over the values this structure contains. */
+  def values :Iterator[BSONValue] = iterator.map(_.value)
 }
 
 /** A BSON Document structure. */
@@ -119,6 +123,11 @@ sealed trait BSONDocument extends BSONStructure {
   type Appendable = AppendableBSONDocument
 
   type Traversable = TraversableBSONDocument
+
+  /** Makes a map of the values indexed by their names. */
+  def mapped :Map[String, BSONValue] = {
+    for(el <- iterator) yield (el.name, el.value)
+  }.toMap
 }
 /** A BSON Array structure. */
 sealed trait BSONArray extends BSONStructure {
@@ -127,32 +136,59 @@ sealed trait BSONArray extends BSONStructure {
   type Appendable = AppendableBSONArray
 
   type Traversable = TraversableBSONArray
+
+  /** Makes a map of the values by their index. */
+  def mapped :Map[Int, BSONValue] = {
+    for(el <- iterator) yield (el.name.toInt, el.value)
+  }.toMap
 }
+
 /**
  * A structure builder. It will accept elements of `E` and write them into its underlying buffer.
  *
  * @tparam E The type of the elements that can be appended to this structure.
  */
 sealed trait AppendableBSONStructure[E] extends BSONStructure {
-  private[bson] val buffer = ChannelBuffers.dynamicBuffer(ByteOrder.LITTLE_ENDIAN, 32)
-  buffer.writeInt(0)
+  type Self <: AppendableBSONStructure[E]
+
+  def elements :Seq[BSONElement]
 
   /**
    * Appends the given elements to this structure.
    */
-  def append(e: E*) :this.type
+  def append(e: E*) :Self
 
   /**
-   * Alias for append(e: E*) : appends the given elements to this structure.
+   * Alias for append(e: E*): appends the given elements to this structure.
    */
-  def += (e: E*) :this.type = append(e:_*)
+  def ++ (e: E*) :Self = append(e:_*)
+
+  /** Appends the given option of elements (produced by an `Implicits.Producer[E]`), if they are defined. */
+  def append(producer: Implicits.Producer[E], producers: Implicits.Producer[E]*) :Self = {
+    append( (for(e <- (producer +: producers) if e.produce.isDefined) yield e.produce.get) :_*)
+  }
+
+  /** Alias for `append(producers: Implicits.Producer[E]*)`: appends the given option of elements (produced by an `Implicits.Producer[E]`), if they are defined. */
+  def ++ (producer: Implicits.Producer[E], producers: Implicits.Producer[E]*) :Self = append(producer, producers :_*)
+
+  /** Appends another structure to this one. */
+  def append(other: BSONStructure) :Self
+
+  /** Alias for `append(other: BSONStructure)`: Appends another structure to this one. */
+  def ++ (other: BSONStructure) :Self = append(other)
+
+  def iterator :Iterator[BSONElement] = elements.iterator
 
   def makeBuffer = {
-    val result = buffer.copy()
+    val result = ChannelBuffers.dynamicBuffer(ByteOrder.LITTLE_ENDIAN, 32)
+    result.writeInt(0)
+    for(el <- iterator)
+      el.write(result)
     result.writeByte(0)
     result.setInt(0, result.writerIndex)
     result
   }
+
 }
 
 /**
@@ -164,6 +200,7 @@ sealed trait AppendableBSONStructure[E] extends BSONStructure {
  * @tparam Key The type of the keys of this structure.
  */
 sealed trait TraversableBSONStructure[Key] extends BSONStructure {
+  private[bson] val buffer :ChannelBuffer
   private val rdx = buffer.readerIndex
   protected val stream = DefaultBSONIterator(buffer).toStream
 
@@ -196,7 +233,7 @@ sealed trait TraversableBSONStructure[Key] extends BSONStructure {
    *
    * This iterator is produced from a stream that memoizes the already computed values (to avoid unnecessary computation).
    */
-  def bsonIterator :Iterator[BSONElement]= stream.iterator
+  def iterator :Iterator[BSONElement]= stream.iterator
 
   /** A map containing all the values of this structure. */
   def mapped :Map[Key, BSONValue]
@@ -214,37 +251,29 @@ class TraversableBSONArray(private[bson] val buffer: ChannelBuffer) extends Trav
     iterator.find(_.name.toInt == i).map(_.value)
   }
 
-  def toAppendable = {
-    val result = new AppendableBSONArray()
-    for(el <- bsonIterator)
-      result += el.value
-    result
-  }
+  def toAppendable = new AppendableBSONArray(iterator.toVector)
 
   def toTraversable = this
-
-  def mapped :Map[Int, BSONValue] = {
-    for(el <- bsonIterator) yield (el.name.toInt, el.value)
-  }.toMap
 
   /**
    * Makes a list containing all the value of this array (ascending order).
    */
-  def toList :List[BSONValue] = bsonIterator.map(_.value).toList
+  def toList :List[BSONValue] = iterator.map(_.value).toList
 }
 
 /**
  * A BSON Array builder. It will append the given values to this array.
  */
-class AppendableBSONArray extends AppendableBSONStructure[BSONValue] with BSONArray {
-  var i = 0
-  def append(values: BSONValue*) = {
-    for(value <- values) {
-      new DefaultBSONElement(i.toString, value).write(buffer)
-      i = i + 1
-    }
-    this
+class AppendableBSONArray private[bson](val elements: Vector[BSONElement]) extends AppendableBSONStructure[BSONValue] with BSONArray {
+  type Self = AppendableBSONArray
+
+  def append(values: BSONValue*) :Self = {
+    new AppendableBSONArray(elements ++ (for(
+      (value, i) <- values.zipWithIndex
+    ) yield DefaultBSONElement((elements.length + i).toString, value)))
   }
+
+  def append(other: BSONStructure) :Self = append(other.iterator.map(_.value).toList :_*)
 
   def toAppendable = this
 
@@ -263,45 +292,22 @@ class TraversableBSONDocument(private[bson] val buffer: ChannelBuffer) extends T
     iterator.find(_.name == name).map(_.value)
   }
 
-  def toAppendable = {
-    val doc = new AppendableBSONDocument()
-    for(el <- bsonIterator)
-      doc += el
-    doc
-  }
+  def toAppendable = new AppendableBSONDocument(iterator.toList)
 
   def toTraversable = this
-
-  def mapped :Map[String, BSONValue] = {
-    for(el <- bsonIterator) yield (el.name, el.value)
-  }.toMap
 }
 
 /**
  * A BSON Document builder. It will append the given values to this array.
  */
-class AppendableBSONDocument extends AppendableBSONStructure[(String, BSONValue)] with BSONDocument {
-  def append( els: (String, BSONValue)* ) = {
-    for(el <- els)
-      new DefaultBSONElement(el._1, el._2).write(buffer)
-    this
+class AppendableBSONDocument private[bson](val elements: List[BSONElement]) extends AppendableBSONStructure[(String, BSONValue)] with BSONDocument {
+  type Self = AppendableBSONDocument
+
+  def append( els: (String, BSONValue)* ) :Self = {
+    new AppendableBSONDocument(elements ++ els.map(el => DefaultBSONElement(el._1, el._2)))
   }
 
-  /**
-   * Appends elements to this document.
-   */
-  def append(el: BSONElement, els: BSONElement*) :this.type = {
-    el.write(buffer)
-    for(el <- els)
-      el.write(buffer)
-    this
-  }
-
-  /**
-   * Appends elements to this document.
-   * Alias for append(BSONElement, BSONElement*).
-   */
-  def += (el: BSONElement, els: BSONElement*) :this.type = append(el, els :_*)
+  def append(other: BSONStructure) = new AppendableBSONDocument(elements ++ other.iterator)
 
   def toAppendable = this
 
@@ -310,20 +316,24 @@ class AppendableBSONDocument extends AppendableBSONStructure[(String, BSONValue)
 
 object BSONDocument {
   /** Makes an [[reactivemongo.bson.AppendableBSONDocument]] containing the given values. */
-  def apply( els: (String, BSONValue)* ) :AppendableBSONDocument = new AppendableBSONDocument().append(els :_*)
+  def apply( els: (String, BSONValue)* ) :AppendableBSONDocument = new AppendableBSONDocument(List()).append(els :_*)
+  /** Makes an [[reactivemongo.bson.AppendableBSONDocument]] containing the given values (produced by an `Implicits.Producer[E]`), if they are defined. */
+  def apply( producer: Implicits.Producer[(String, BSONValue)], producers: Implicits.Producer[(String, BSONValue)]* ) :AppendableBSONDocument = new AppendableBSONDocument(List()).append(producer, producers :_*)
   /** Makes a [[reactivemongo.bson.TraversableBSONDocument]] from the given buffer. */
   def apply(buffer: ChannelBuffer) :TraversableBSONDocument = new TraversableBSONDocument(buffer)
   /** Returns a String representing the given BSONDocument. */
-  def pretty(document: BSONDocument) = "{\n" + BSONIterator.pretty(0, document.toTraversable.bsonIterator) + "\n}"
+  def pretty(document: BSONDocument) = "{\n" + BSONIterator.pretty(0, document.toTraversable.iterator) + "\n}"
 }
 
 object BSONArray {
   /** Makes an [[reactivemongo.bson.AppendableBSONArray]] containing the given values. */
-  def apply(values: BSONValue*) :AppendableBSONArray = new AppendableBSONArray().append(values :_*)
+  def apply(values: BSONValue*) :AppendableBSONArray = new AppendableBSONArray(Vector()).append(values :_*)
+  /** Makes an [[reactivemongo.bson.AppendableBSONDocument]] containing the given values (produced by an `Implicits.Producer[E]`), if they are defined. */
+  def apply( producer: Implicits.Producer[BSONValue], producers: Implicits.Producer[BSONValue]* ) :AppendableBSONArray = new AppendableBSONArray(Vector()).append(producer, producers :_*)
   /** Makes a [[reactivemongo.bson.TraversableBSONArray]] from the given buffer. */
   def apply(buffer: ChannelBuffer) :TraversableBSONArray = new TraversableBSONArray(buffer)
   /** Returns a String representing the given BSONArray. */
-  def pretty(array: BSONArray) = "[\n" + BSONIterator.pretty(0, array.toTraversable.bsonIterator) + "\n]"
+  def pretty(array: BSONArray) = "[\n" + BSONIterator.pretty(0, array.toTraversable.iterator) + "\n]"
 }
 // <---------------------------- BSON Structure handlers
 
@@ -605,12 +615,57 @@ object BSONIterator {
     val prefix = (0 to i).map {i => "\t"}.mkString("")
     (for(v <- it) yield {
       v.value match {
-        case doc :TraversableBSONDocument => prefix + v.name + ": {\n" + pretty(i + 1, doc.bsonIterator) + "\n" + prefix +" }"
-        case array :TraversableBSONArray => prefix + v.name + ": [\n" + pretty(i + 1, array.bsonIterator) + "\n" + prefix +" ]"
+        case doc :TraversableBSONDocument => prefix + v.name + ": {\n" + pretty(i + 1, doc.iterator) + "\n" + prefix +" }"
+        case array :TraversableBSONArray => prefix + v.name + ": [\n" + pretty(i + 1, array.iterator) + "\n" + prefix +" ]"
         case _ => prefix + v.name + ": " + v.value.toString
       }
     }).mkString(",\n")
   }
   /** Makes a pretty String representation of the given [[reactivemongo.bson.BSONIterator]]. */
   def pretty(it: Iterator[BSONElement]) :String = "{\n" + pretty(0, it) + "\n}"
+}
+
+/**
+ * Implicits for appending a mix of `BSONValue`, `Option[BSONValue]` in `BSONArray`s, of `(String, BSONValue)` and `(String, Option[BSONValue])` in `BSONDocument`s.
+ * Example:
+{{{
+case class CappedOptions(
+  size: Long,
+  maxDocuments: Option[Int] = None
+) {
+  def toDocument = BSONDocument(
+    "capped" -> BSONBoolean(true),
+    "size" -> BSONLong(size),
+    "max" -> maxDocuments.map(max => BSONLong(max)))
+}
+}}}
+ */
+object Implicits {
+  trait Producer[T] {
+    def produce :Option[T]
+  }
+
+  case class NameValueProducer(element: (String, BSONValue)) extends Producer[(String, BSONValue)] {
+    def produce = Some(element)
+  }
+
+  case class NameOptionValueProducer(element: (String, Option[BSONValue])) extends Producer[(String, BSONValue)] {
+    def produce = element._2.map(value => element._1 -> value)
+  }
+
+  case class ValueProducer(element: BSONValue) extends Producer[BSONValue] {
+    def produce =  Some(element)
+  }
+
+  case class OptionValueProducer(element: Option[BSONValue]) extends Producer[BSONValue] {
+    def produce = element
+  }
+
+  implicit def nameValue2Producer(element: (String, BSONValue)) = NameValueProducer(element)
+
+  implicit def nameOptionValue2Producer(element: (String, Option[BSONValue])) = NameOptionValueProducer(element)
+
+  implicit def valueProducer(element: BSONValue) = ValueProducer(element)
+
+  implicit def optionValueProducer(element: Option[BSONValue]) = OptionValueProducer(element)
 }

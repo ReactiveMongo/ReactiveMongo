@@ -4,6 +4,7 @@ import org.jboss.netty.buffer.ChannelBuffer
 import reactivemongo.bson._
 import reactivemongo.bson.handlers._
 import reactivemongo.core.protocol.QueryFlags
+import reactivemongo.utils.option
 
 sealed trait SortOrder
 object SortOrder {
@@ -38,19 +39,14 @@ case class QueryBuilder(
     if(!sortDoc.isDefined && !hintDoc.isDefined && !explainFlag && !snapshotFlag && !commentString.isDefined)
       queryDoc.getOrElse(BSONDocument())
     else {
-      val bson = BSONDocument()
-      bson += "$query" -> queryDoc.getOrElse(BSONDocument())
-      if(sortDoc.isDefined)
-        bson += "$orderby" -> sortDoc.get
-      if(hintDoc.isDefined)
-        bson += "$hint" -> hintDoc.get
-      if(explainFlag)
-        bson += "$explain" -> BSONBoolean(true)
-      if(snapshotFlag)
-        bson += "$snapshot" -> BSONBoolean(true)
-      if(commentString.isDefined)
-        bson += "$comment" -> BSONString(commentString.get)
-      bson
+      BSONDocument(
+        "$query"    -> queryDoc.getOrElse(BSONDocument()),
+        "$orderby"  -> sortDoc,
+        "$hint"     -> hintDoc,
+        "$comment"  -> commentString.map(BSONString(_)),
+        "$explain"  -> option(explainFlag,  BSONBoolean(true)),
+        "$snapshot" -> option(snapshotFlag, BSONBoolean(true))
+      )
     }
   }
 
@@ -81,12 +77,14 @@ case class QueryBuilder(
     if(sorters.size == 0)
       None
     else {
-      val bson = BSONDocument()
-      for(sorter <- sorters)
-        bson += sorter._1 -> BSONInteger(sorter._2 match {
-          case SortOrder.Ascending => 1
-          case SortOrder.Descending => -1
-        })
+      val bson = BSONDocument(
+        (for(sorter <- sorters) yield sorter._1 -> BSONInteger(
+          sorter._2 match {
+            case SortOrder.Ascending => 1
+            case SortOrder.Descending => -1
+          }
+        )) :_*
+      )
       Some(bson)
     }
   })

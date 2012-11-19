@@ -75,6 +75,30 @@ class BsonSpec extends Specification {
 
       compare(expected, doc.makeBuffer)
     }
+    "concat two arrays" in {
+      val array1 = BSONArray(BSONInteger(1), BSONInteger(2))
+      val array2 = BSONArray(BSONString("a"), BSONString("b"))
+      val mergedArray = array1 ++ array2
+      val str = mergedArray.values.map {
+        case BSONString(value) => value.toString
+        case BSONInteger(value) => value.toString
+        case _ => "NOELEM"
+      }.mkString(",")
+      str must equalTo("1,2,a,b")
+    }
+    "build arrays with mixed values and optional values" in {
+      val array = BSONArray(
+        BSONInteger(1),
+        Some(BSONInteger(2)),
+        None,
+        Some(BSONInteger(4))
+      )
+      val str = array.values.map {
+        case BSONInteger(value) => value.toString
+        case _ => "NOELEM"
+      }.mkString(",")
+      str mustEqual "1,2,4"
+    }
   }
 
   def compare(origin: Array[Byte], buffer: org.jboss.netty.buffer.ChannelBuffer) = {

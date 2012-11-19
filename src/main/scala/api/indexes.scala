@@ -4,6 +4,7 @@ import reactivemongo.api._
 import reactivemongo.bson._
 import reactivemongo.bson.handlers._
 import reactivemongo.core.commands.{DeleteIndex, FindAndModify, LastError, Update}
+import reactivemongo.utils.option
 import scala.concurrent.{Future, ExecutionContext}
 
 /**
@@ -82,7 +83,7 @@ class IndexesManager(db: DB[Collection])(implicit context: ExecutionContext) {
    */
   def ensure(nsIndex: NSIndex) :Future[Boolean] = {
     val query = BSONDocument(
-      "ns" -> BSONString(nsIndex.namespace),
+      "ns"   -> BSONString(nsIndex.namespace),
       "name" -> BSONString(nsIndex.index.eventualName))
 
     collection.find(query).headOption.flatMap { opt =>
@@ -175,24 +176,17 @@ class CollectionIndexesManager(fqName: String, manager: IndexesManager)(implicit
 
 object IndexesManager {
   protected def toBSONDocument(nsIndex :NSIndex) = {
-    val doc = BSONDocument(
-      "ns" -> BSONString(nsIndex.namespace),
-      "name" -> BSONString(nsIndex.index.eventualName),
-      "key" -> {
-        val doc = BSONDocument()
-        for(kv <- nsIndex.index.key)
-          doc += kv._1 -> BSONInteger(if(kv._2) 1 else -1)
-        doc
-      })
-    if(nsIndex.index.background)
-      doc += "background" -> BSONBoolean(true)
-    if(nsIndex.index.dropDups)
-      doc += "dropDups" -> BSONBoolean(true)
-    if(nsIndex.index.sparse)
-      doc += "sparse" -> BSONBoolean(true)
-    if(nsIndex.index.unique)
-      doc += "unique" -> BSONBoolean(true)
-    doc
+    BSONDocument(
+      "ns"         -> BSONString(nsIndex.namespace),
+      "name"       -> BSONString(nsIndex.index.eventualName),
+      "key"        -> BSONDocument(
+          (for(kv <- nsIndex.index.key)
+            yield kv._1 -> BSONInteger(if(kv._2) 1 else -1)) :_*),
+      "background" -> option(nsIndex.index.background, BSONBoolean(true)),
+      "dropDups"   -> option(nsIndex.index.dropDups,   BSONBoolean(true)),
+      "sparse"     -> option(nsIndex.index.sparse,     BSONBoolean(true)),
+      "unique"     -> option(nsIndex.index.unique,     BSONBoolean(true))
+    )
   }
 
   implicit object NSIndexWriter extends RawBSONWriter[NSIndex] {
@@ -211,7 +205,7 @@ object IndexesManager {
       NSIndex(
         doc.getAs[BSONString]("ns").map(_.value).get,
         Index(
-          doc.getAs[TraversableBSONDocument]("key").get.bsonIterator.toList.map { elem =>
+          doc.getAs[TraversableBSONDocument]("key").get.iterator.toList.map { elem =>
             elem.name -> (elem.value.asInstanceOf[BSONInteger].value == 1)
           },
           doc.getAs[BSONString]("name").map(_.value),

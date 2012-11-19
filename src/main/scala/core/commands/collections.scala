@@ -7,12 +7,10 @@ case class CappedOptions(
   size: Long,
   maxDocuments: Option[Int] = None
 ) {
-  def write(doc: AppendableBSONDocument) :AppendableBSONDocument = {
-    doc +=  ("capped" -> BSONBoolean(true), "size" -> BSONLong(size))
-    if(maxDocuments.isDefined)
-      doc += "max" -> BSONLong(maxDocuments.get)
-    else doc
-  }
+  def toDocument = BSONDocument(
+    "capped" -> BSONBoolean(true),
+    "size"   -> BSONLong(size),
+    "max"    -> maxDocuments.map(max => BSONLong(max)))
 }
 
 /**
@@ -30,12 +28,12 @@ class CreateCollection(
   autoIndexId: Option[Boolean] = None
 ) extends Command[Boolean] {
   def makeDocuments = {
-    val doc = BSONDocument("create" -> BSONString(name))
+    val doc = BSONDocument(
+      "create"      -> BSONString(name),
+      "autoIndexId" -> autoIndexId.map(BSONBoolean(_)))
     if(capped.isDefined)
-      capped.get.write(doc)
-    if(autoIndexId.isDefined)
-      doc += "autoIndexId" -> BSONBoolean(autoIndexId.get)
-    doc
+      doc ++ capped.get.toDocument
+    else doc
   }
 
   object ResultMaker extends BSONCommandResultMaker[Boolean] {
@@ -56,8 +54,7 @@ class ConvertToCapped(
   capped: CappedOptions
 ) extends Command[Boolean] {
   def makeDocuments = {
-    val doc = BSONDocument("convertToCapped" -> BSONString(name))
-    capped.write(doc)
+    BSONDocument("convertToCapped" -> BSONString(name)) ++ capped.toDocument
   }
 
   object ResultMaker extends BSONCommandResultMaker[Boolean] {
@@ -78,10 +75,9 @@ class CollStats(
   scale :Option[Int] = None
 ) extends Command[CollStatsResult] {
   def makeDocuments = {
-    val doc = BSONDocument("collStats" -> BSONString(name))
-    if(scale.isDefined)
-      doc += "scale" -> BSONInteger(scale.get)
-    else doc
+    BSONDocument(
+      "collStats" -> BSONString(name),
+      "scale"     -> scale.map(BSONInteger(_)))
   }
 
   val ResultMaker = CollStatsResult
@@ -124,7 +120,7 @@ case class CollStatsResult(
 )
 
 object CollStatsResult extends BSONCommandResultMaker[CollStatsResult] {
-  def apply(doc: TraversableBSONDocument) = {
+  def apply(doc: TraversableBSONDocument) :Either[CommandError, CollStatsResult] = {
     CommandError.checkOk(doc, Some("collStats")).toLeft {
       CollStatsResult(
         doc.getAs[BSONString]("ns").get.value,
@@ -199,7 +195,10 @@ class RenameCollection(
   dropTarget: Boolean = false
 ) extends Command[Boolean] {
   def makeDocuments =
-    BSONDocument("renameCollection" -> BSONString(name), "to" -> BSONString(target), "dropTarget" -> BSONBoolean(dropTarget))
+    BSONDocument(
+      "renameCollection" -> BSONString(name),
+      "to"               -> BSONString(target),
+      "dropTarget"       -> BSONBoolean(dropTarget))
 
   object ResultMaker extends BSONCommandResultMaker[Boolean] {
     def apply(doc: TraversableBSONDocument) = {

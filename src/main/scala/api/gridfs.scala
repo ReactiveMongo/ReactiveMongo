@@ -190,13 +190,13 @@ case class FileToWrite(
         val uploadDate = System.currentTimeMillis
         writeChunk(n, previous).flatMap { _ =>
           val bson = BSONDocument(
-            "_id" -> files_id,
-            "filename" -> BSONString(name),
-            "chunkSize" -> BSONInteger(chunkSize),
-            "length" -> BSONInteger(length),
-            "uploadDate" -> BSONDateTime(uploadDate))
-          if(contentType.isDefined)
-            bson += ("contentType" -> BSONString(contentType.get))
+            "_id"         -> files_id,
+            "filename"    -> BSONString(name),
+            "chunkSize"   -> BSONInteger(chunkSize),
+            "length"      -> BSONInteger(length),
+            "uploadDate"  -> BSONDateTime(uploadDate),
+            "contentType" -> contentType.map(BSONString(_))
+          )
           gfs.files.insert(bson).map(_ => DefaultReadFileEntry(
             files_id,
             name,
@@ -210,10 +210,12 @@ case class FileToWrite(
         }
       }
       def writeChunk(n: Int, array: Array[Byte]) = {
-        val bson = BSONDocument("files_id" -> files_id)
-        bson += ("n" -> BSONInteger(n))
-        bson += ("data" -> new BSONBinary(array, Subtype.GenericBinarySubtype))
         logger.debug("writing chunk " + n)
+        val bson = BSONDocument(
+          "files_id" -> files_id,
+          "n"        -> BSONInteger(n),
+          "data"     -> new BSONBinary(array, Subtype.GenericBinarySubtype)
+        )
         gfs.chunks.insert(bson)
       }
     }

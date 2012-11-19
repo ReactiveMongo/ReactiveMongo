@@ -23,6 +23,9 @@ object `package` {
     }
     result
   }
+
+  /** Makes an option of the value matching the condition. */
+  def option[T](cond: => Boolean, value: => T) :Option[T] = (if(cond) Some(value) else None)
 }
 
 /** Common functions */
