@@ -4,6 +4,7 @@ import reactivemongo.api._
 import reactivemongo.bson._
 import reactivemongo.core.commands.Count
 import scala.concurrent._
+import scala.util.Failure
 
 class CommonUseCases extends Specification {
   import Common._
@@ -21,7 +22,8 @@ class CommonUseCases extends Specification {
       Await.result(collection.insert(enum, 100), timeout) mustEqual 43
     }
     "find them" in {
-      val it = collection.find(BSONDocument())
+      // batchSize (>1) allows us to test cursors ;)
+      val it = collection.find(BSONDocument(), QueryOpts().batchSize(2))
       Await.result(it.toList, timeout).map(_.getAs[BSONInteger]("age").get.value).mkString("") mustEqual (18 to 60).mkString("")
     }
     "find by regexp" in {
@@ -68,6 +70,12 @@ class CommonUseCases extends Specification {
       val doc = Await.result(collection.find(BSONDocument("coucou" -> BSONString("coucou"))).headOption, timeout)
       println("\n" + doc.map(BSONDocument.pretty(_)) + "\n")
       doc.isDefined mustEqual true
+    }
+    "fail with this error" in {
+      val query = BSONDocument("$and" -> BSONDocument("name" -> BSONString("toto")))
+      val future = collection.find(query).headOption
+      Await.ready(future, timeout)
+      (future.value.get match { case f:Failure[_] => true; case _ => false}) mustEqual true
     }
   }
 }

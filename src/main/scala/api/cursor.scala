@@ -3,6 +3,7 @@ package reactivemongo.api
 import reactivemongo.core.actors.RequestMakerExpectingResponse
 import reactivemongo.bson.handlers._
 import reactivemongo.core.protocol._
+import reactivemongo.utils.buffers._
 import reactivemongo.utils.ExtendedFutures._
 
 import org.jboss.netty.buffer.ChannelBuffer
@@ -195,7 +196,7 @@ val list = cursor2[List].collect()
   def close() :Unit
 }
 
-class DefaultCursor[T](response: Response, private[api] val mongoConnection: MongoConnection, private[api] val query: Query, private[api] val originalRequest: ChannelBuffer, private[api] val failoverStrategy: FailoverStrategy)(implicit handler: BSONReaderHandler, reader: RawBSONReader[T], ctx: ExecutionContext) extends Cursor[T] {
+class DefaultCursor[T](response: Response, private[api] val mongoConnection: MongoConnection, private[api] val query: Query, private[api] val originalRequest: BufferSequence, private[api] val failoverStrategy: FailoverStrategy)(implicit handler: BSONReaderHandler, reader: RawBSONReader[T], ctx: ExecutionContext) extends Cursor[T] {
   import Cursor.logger
   logger.debug("making default cursor instance from response " + response + ", returned=" + response.reply.numberReturned)
 
@@ -206,12 +207,9 @@ class DefaultCursor[T](response: Response, private[api] val mongoConnection: Mon
 
   def next :Future[DefaultCursor[T]] = {
     if(response.reply.cursorID != 0) {
-      val op = GetMore(query.fullCollectionName, /*query.numberToReturn*/ 100, response.reply.cursorID)
+      val op = GetMore(query.fullCollectionName, query.numberToReturn, response.reply.cursorID)
       logger.debug("cursor: calling next on " + response.reply.cursorID + ", op=" + op)
-      val expectingResponse = RequestMakerExpectingResponse(RequestMaker(op).copy(channelIdHint=Some(response.info.channelId)))
-      mongoConnection.mongosystem ! expectingResponse
-      expectingResponse.future.map { r => logger.debug("from " + response + " to " + r); new DefaultCursor(r, mongoConnection, query, originalRequest, failoverStrategy) }
-      //Failover(RequestMaker(op).copy(channelIdHint=Some(response.info.channelId)), mongoConnection.mongosystem, failoverStrategy).future.map { r => logger.debug("from " + response + " to " + r); new DefaultCursor(r, mongoConnection, query, originalRequest, failoverStrategy) }
+      Failover(RequestMaker(op).copy(channelIdHint=Some(response.info.channelId)), mongoConnection.mongosystem, failoverStrategy).future.map { r => logger.debug("from " + response + " to " + r); new DefaultCursor(r, mongoConnection, query, originalRequest, failoverStrategy) }
     } else {
       logger.debug("throwing no such element exception")
       Future.failed(new NoSuchElementException())
@@ -222,11 +220,7 @@ class DefaultCursor[T](response: Response, private[api] val mongoConnection: Mon
 
   def regenerate = {
     logger.debug("regenerating")
-    val requestMaker = RequestMaker(query, {
-      val buf = originalRequest.duplicate
-      buf.readerIndex(0)
-      buf
-    })
+    val requestMaker = RequestMaker(query, originalRequest)
     Failover(requestMaker, mongoConnection.mongosystem, failoverStrategy).future.map { response =>
             new DefaultCursor(response, mongoConnection, query, originalRequest, failoverStrategy)}
   }

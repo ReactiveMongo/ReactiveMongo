@@ -13,7 +13,7 @@ import reactivemongo.core.actors.{Connected, Disconnected}
 import reactivemongo.core.commands.GetLastError
 import reactivemongo.core.errors._
 import reactivemongo.utils.LazyLogger
-import reactivemongo.utils.RichBuffer._
+import reactivemongo.utils.buffers._
 
 import BufferAccessors._
 
@@ -86,15 +86,15 @@ case class Request (
   requestID: Int,
   responseTo: Int, // TODO remove, nothing to do here.
   op: RequestOp,
-  documents: ChannelBuffer,
+  documents: BufferSequence,
   channelIdHint: Option[Int] = None
 ) extends ChannelBufferWritable {
   override val writeTo = { buffer: ChannelBuffer => {
     buffer write header
     buffer write op
-    buffer writeBytes documents
+    buffer writeBytes documents.merged
   } }
-  override def size = 16 + op.size + documents.writerIndex
+  override def size = 16 + op.size + documents.merged.writerIndex
   /** Header of this request */
   lazy val header = MessageHeader(size, requestID, responseTo, op.code)
 }
@@ -108,7 +108,7 @@ case class Request (
  */
 case class CheckedWriteRequest(
   op: WriteRequestOp,
-  documents: ChannelBuffer,
+  documents: BufferSequence,
   getLastError: GetLastError
 ) {
   def apply() :(RequestMaker, RequestMaker) = RequestMaker(op, documents, None) -> getLastError.apply(op.db).maker
@@ -123,16 +123,10 @@ case class CheckedWriteRequest(
  */
 case class RequestMaker(
   op: RequestOp,
-  documents: ChannelBuffer,
-  channelIdHint: Option[Int]
+  documents: BufferSequence = BufferSequence.empty,
+  channelIdHint: Option[Int] = None
 ) {
   def apply(id: Int) = Request(id, 0, op, documents, None)
-}
-
-// TODO remove, useless
-object RequestMaker {
-  def apply(op: RequestOp) :RequestMaker = RequestMaker(op, new LittleEndianHeapChannelBuffer(0), None)
-  def apply(op: RequestOp, buffer: ChannelBuffer) :RequestMaker = RequestMaker(op, buffer, None)
 }
 
 /**
@@ -154,16 +148,8 @@ object Request{
       requestID,
       responseTo,
       op,
-      ChannelBuffers.wrappedBuffer(ByteOrder.LITTLE_ENDIAN, documents))
+      BufferSequence(ChannelBuffers.wrappedBuffer(ByteOrder.LITTLE_ENDIAN, documents)))
   }
-  /**
-   * Create a request.
-   *
-   * @param requestID $requestID
-   * @param op $op
-   * @param documents $documentsC
-   */
-  def apply(requestID: Int, op: RequestOp, documents: ChannelBuffer) :Request = Request.apply(requestID, 0, op, documents)
   /**
    * Create a request.
    *

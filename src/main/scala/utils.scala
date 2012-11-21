@@ -1,14 +1,9 @@
 package reactivemongo.utils
 
-import org.jboss.netty.channel._
-import org.jboss.netty.buffer._
-
 import scala.concurrent._
 import scala.concurrent.duration._
-import reactivemongo.core.protocol.ChannelBufferWritable
 
 object `package` {
-
   /** Concats two array - fast way */
   def concat[T](a1: Array[T], a2: Array[T])(implicit m: Manifest[T]) :Array[T] = {
     var i, j = 0
@@ -65,65 +60,6 @@ object Converters {
   def md5Hex(s: String) :String = hex2Str(md5(s))
 }
 
-/** Extends a [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]] with handy functions for the Mongo Wire Protocol. */
-case class RichBuffer(buffer: ChannelBuffer) {
-  /** Write a UTF-8 encoded C-Style String. */
-  def writeCString(s: String): ChannelBuffer = {
-    val bytes = s.getBytes("utf-8")
-    buffer writeBytes bytes
-    buffer writeByte 0
-    buffer
-  }
-
-  /** Write a UTF-8 encoded String. */
-  def writeString(s: String): ChannelBuffer = {
-    val bytes = s.getBytes("utf-8")
-    buffer writeInt (bytes.size + 1)
-    buffer writeBytes bytes
-    buffer writeByte 0
-    buffer
-  }
-  /** Write the contents of the given [[reactivemongo.core.protocol.ChannelBufferWritable]]. */
-  def write(writable: ChannelBufferWritable) {
-    writable writeTo buffer
-  }
-  /** Reads a UTF-8 String. */
-  def readString() :String = {
-    val bytes = new Array[Byte](buffer.readInt - 1)
-    buffer.readBytes(bytes)
-    buffer.readByte
-    new String(bytes, "UTF-8")
-  }
-  /**
-   * Reads an array of Byte of the given length.
-   *
-   * @param length Length of the newly created array.
-   */
-  def readArray(length: Int) :Array[Byte] = {
-    val bytes = new Array[Byte](length)
-    buffer.readBytes(bytes)
-    bytes
-  }
-
-  import scala.collection.mutable.ArrayBuffer
-
-  /** Reads a UTF-8 C-Style String. */
-  def readCString() :String = readCString(new ArrayBuffer[Byte](16))
-
-  @scala.annotation.tailrec
-  private def readCString(array: ArrayBuffer[Byte]) :String = {
-    val byte = buffer.readByte
-    if(byte == 0x00)
-      new String(array.toArray, "UTF-8")
-    else readCString(array += byte)
-  }
-}
-
-object RichBuffer {
-  /** Implicit conversion between a [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]] and [[reactivemongo.utils.RichBuffer]]. */
-  implicit def channelBufferToExtendedBuffer(buffer: ChannelBuffer) = RichBuffer(buffer)
-}
-
 case class LazyLogger(logger: org.slf4j.Logger) {
   def trace(s: => String) { if(logger.isTraceEnabled) logger.trace(s) }
   def debug(s: => String) { if(logger.isDebugEnabled) logger.debug(s) }
@@ -148,12 +84,92 @@ object EitherMappableFuture {
 
 object ExtendedFutures {
   import akka.actor.{ActorSystem, Scheduler}
-  
+
   // better way to this?
   def DelayedFuture(millis: Long, system: ActorSystem) :Future[Unit] = {
     implicit val ec = system.dispatcher
     val promise = Promise[Unit]()
     system.scheduler.scheduleOnce(Duration.apply(millis, "millis"))(promise.success())
     promise.future
+  }
+}
+
+package buffers {
+  import org.jboss.netty.channel._
+  import org.jboss.netty.buffer._
+  import reactivemongo.core.protocol.ChannelBufferWritable
+  import scala.collection.mutable.ArrayBuffer
+
+  object `package` {
+    /** Extends a [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]] with handy functions for the Mongo Wire Protocol. */
+    implicit class RichBuffer(buffer: ChannelBuffer) {
+      /** Write a UTF-8 encoded C-Style String. */
+      def writeCString(s: String): ChannelBuffer = {
+        val bytes = s.getBytes("utf-8")
+        buffer writeBytes bytes
+        buffer writeByte 0
+        buffer
+      }
+
+      /** Write a UTF-8 encoded String. */
+      def writeString(s: String): ChannelBuffer = {
+        val bytes = s.getBytes("utf-8")
+        buffer writeInt (bytes.size + 1)
+        buffer writeBytes bytes
+        buffer writeByte 0
+        buffer
+      }
+
+      /** Write the contents of the given [[reactivemongo.core.protocol.ChannelBufferWritable]]. */
+      def write(writable: ChannelBufferWritable) {
+        writable writeTo buffer
+      }
+
+      /** Reads a UTF-8 String. */
+      def readString() :String = {
+        val bytes = new Array[Byte](buffer.readInt - 1)
+        buffer.readBytes(bytes)
+        buffer.readByte
+        new String(bytes, "UTF-8")
+      }
+
+      /**
+       * Reads an array of Byte of the given length.
+       *
+       * @param length Length of the newly created array.
+       */
+      def readArray(length: Int) :Array[Byte] = {
+        val bytes = new Array[Byte](length)
+        buffer.readBytes(bytes)
+        bytes
+      }
+
+      /** Reads a UTF-8 C-Style String. */
+      def readCString() :String = readCString(new ArrayBuffer[Byte](16))
+
+      @scala.annotation.tailrec
+      private def readCString(array: ArrayBuffer[Byte]) :String = {
+        val byte = buffer.readByte
+        if(byte == 0x00)
+          new String(array.toArray, "UTF-8")
+        else readCString(array += byte)
+      }
+    }
+  }
+
+  case class BufferSequence(private val head: ChannelBuffer, private val tail: ChannelBuffer*) {
+    def merged :ChannelBuffer = mergedBuffer.duplicate()
+
+    private lazy val mergedBuffer = {
+      val bufs = (head +: tail).map(cb =>cb.duplicate())
+      bufs.tail.foldLeft(bufs.head) { (result, buf) =>
+        result writeBytes buf
+        result
+      }
+    }
+  }
+
+  object BufferSequence {
+    val empty = BufferSequence(new LittleEndianHeapChannelBuffer(0))
   }
 }

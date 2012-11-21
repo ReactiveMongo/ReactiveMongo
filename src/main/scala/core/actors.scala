@@ -303,9 +303,6 @@ class MongoDBSystem(
 
     // any other response
     case response: Response if requestIds.common accepts response => {
-      println(awaitingResponses.map { h =>
-        h._1 + ":" + h._2.promise.isCompleted
-      }.mkString(","))
       awaitingResponses.get(response.header.responseTo) match {
         case Some(AwaitingResponse(_, promise, isGetLastError)) => {
           logger.debug("Got a response from " + response.info.channelId + "! Will give back message="+response + " to promise " + promise)
@@ -314,7 +311,7 @@ class MongoDBSystem(
             logger.debug("{" + response.header.responseTo + "} sending a failure... (" + response.error.get + ")")
             if(response.error.get.isNotAPrimaryError)
               onPrimaryUnavailable()
-              promise.failure(response.error.get)
+            promise.failure(response.error.get)
           } else if(isGetLastError) {
             logger.debug("{" + response.header.responseTo + "} it's a getlasterror")
             // todo, for now rewinding buffer at original index

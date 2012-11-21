@@ -8,6 +8,7 @@ import reactivemongo.core.protocol.{RequestMaker, Query, QueryFlags, Response}
 import reactivemongo.core.protocol.NodeState
 import reactivemongo.core.protocol.NodeState._
 import reactivemongo.utils._
+import reactivemongo.utils.buffers._
 
 /**
  * A MongoDB Command.
@@ -162,7 +163,7 @@ class MakableCommand(val db: String, val command: Command[_]) {
   /**
    * Returns the [[reactivemongo.core.protocol.RequestMaker]] for the given command.
    */
-  def maker = RequestMaker(makeQuery, command.makeDocuments.makeBuffer)
+  def maker = RequestMaker(makeQuery, BufferSequence(command.makeDocuments.makeBuffer))
 }
 
 case class RawCommand(bson: BSONDocument) extends Command[TraversableBSONDocument] {

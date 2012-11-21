@@ -3,7 +3,7 @@ package reactivemongo.bson
 import java.nio.ByteOrder
 import org.jboss.netty.buffer.{ChannelBuffer, ChannelBuffers}
 import reactivemongo.utils.Converters
-import reactivemongo.utils.RichBuffer._
+import reactivemongo.utils.buffers._
 
 /*
 element  ::=  "\x01" e_name double  Floating point
@@ -557,7 +557,6 @@ object Subtype {
  * Iterating over this is completely lazy.
  */
 sealed trait BSONIterator extends Iterator[BSONElement] {
-  import reactivemongo.utils.RichBuffer._
   import Subtype._
 
   val buffer :ChannelBuffer

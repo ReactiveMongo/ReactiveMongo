@@ -5,6 +5,7 @@ import reactivemongo.bson._
 import reactivemongo.bson.handlers._
 import reactivemongo.core.commands.{Update => UpdateCommand, _}
 import reactivemongo.core.protocol._
+import reactivemongo.utils.buffers._
 import reactivemongo.utils.EitherMappableFuture._
 import org.jboss.netty.buffer.ChannelBuffer
 import play.api.libs.iteratee._
@@ -61,10 +62,8 @@ trait Collection {
   lazy val fullCollectionName = db.name + "." + name
 
   // abstract
-
   /** A low-level method for finding documents. Should not be used outside. */
-  protected def find[Rst](query: ChannelBuffer, projection: Option[ChannelBuffer], opts: QueryOpts)(implicit handler: BSONReaderHandler, reader: RawBSONReader[Rst], ec: ExecutionContext) :FlattenedCursor[Rst]
-
+  protected def find[Rst](documents: BufferSequence, opts: QueryOpts)(implicit handler: BSONReaderHandler, reader: RawBSONReader[Rst], ec: ExecutionContext) :FlattenedCursor[Rst]
 
   /**
    * Inserts a document into the collection without writeConcern.
@@ -170,7 +169,7 @@ trait Collection {
    * @return a cursor over the matched documents. You can get an enumerator for it, please see the [[reactivemongo.api.Cursor]] companion object.
    */
   def find[Qry, Pjn, Rst](query: Qry, projection: Pjn, opts: QueryOpts = QueryOpts())(implicit writer: RawBSONWriter[Qry], writer2: RawBSONWriter[Pjn], handler: BSONReaderHandler, reader: RawBSONReader[Rst], ec: ExecutionContext) :FlattenedCursor[Rst] =
-    find(writer.write(query), Some(writer2.write(projection)), opts)
+    find(BufferSequence(writer.write(query), writer2.write(projection)), opts)
 
   /**
    * Find the documents matching the given criteria.
@@ -189,7 +188,7 @@ trait Collection {
    * @return a cursor over the matched documents. You can get an enumerator for it, please see the [[reactivemongo.api.Cursor]] companion object.
    */
   def find[Qry, Rst](query: Qry, opts: QueryOpts)(implicit writer: RawBSONWriter[Qry], handler: BSONReaderHandler, reader: RawBSONReader[Rst], ec: ExecutionContext) :FlattenedCursor[Rst] =
-    find(writer.write(query), None, opts)
+    find(BufferSequence(writer.write(query)), opts)
 
   /**
    * Find the documents matching the given criteria.
@@ -207,7 +206,7 @@ trait Collection {
    * @return a cursor over the matched documents. You can get an enumerator for it, please see the [[reactivemongo.api.Cursor]] companion object.
    */
   def find[Qry, Rst](query: Qry)(implicit writer: RawBSONWriter[Qry], handler: BSONReaderHandler, reader: RawBSONReader[Rst], ec: ExecutionContext) :FlattenedCursor[Rst] =
-    find(writer.write(query), None, QueryOpts())
+    find(BufferSequence(writer.write(query)), QueryOpts())
 
   /**
    * Find the documents matching the given criteria, using the given [[reactivemongo.api.QueryBuilder]] instance.
@@ -222,7 +221,7 @@ trait Collection {
    * @return a cursor over the matched documents. You can get an enumerator for it, please see the [[reactivemongo.api.Cursor]] companion object.
    */
   def find[Rst](query: QueryBuilder, opts: QueryOpts)(implicit handler: BSONReaderHandler, reader: RawBSONReader[Rst], ec: ExecutionContext) :FlattenedCursor[Rst] =
-    find(query.makeMergedBuffer, None, opts)
+    find(BufferSequence(query.makeMergedBuffer), opts)
 
   /**
    * Find the documents matching the given criteria, using the given [[reactivemongo.api.QueryBuilder]] instance.
@@ -236,7 +235,7 @@ trait Collection {
    * @return a cursor over the matched documents. You can get an enumerator for it, please see the [[reactivemongo.api.Cursor]] companion object.
    */
   def find[Rst](query: QueryBuilder)(implicit handler: BSONReaderHandler, reader: RawBSONReader[Rst], ec: ExecutionContext) :FlattenedCursor[Rst] =
-    find(query.makeMergedBuffer, None, QueryOpts())
+    find(BufferSequence(query.makeMergedBuffer), QueryOpts())
 
   /**
    * Inserts a document into the collection and wait for the [[reactivemongo.core.commands.LastError]] result.
@@ -285,15 +284,12 @@ trait FailoverBasicCollection {
 
   val failoverStrategy: FailoverStrategy
 
-  protected def find[Rst](query: ChannelBuffer, projection: Option[ChannelBuffer], opts: QueryOpts)(implicit handler: BSONReaderHandler, reader: RawBSONReader[Rst], ec: ExecutionContext) :FlattenedCursor[Rst] = {
+  protected def find[Rst](documents: BufferSequence, opts: QueryOpts)(implicit handler: BSONReaderHandler, reader: RawBSONReader[Rst], ec: ExecutionContext) :FlattenedCursor[Rst] = {
     val op = Query(opts.flagsN, fullCollectionName, opts.skipN, opts.batchSizeN)
-    println("OP:" + op)
-    if(projection.isDefined)
-      query.writeBytes(projection.get)
-    val requestMaker = RequestMaker(op, query)
+    val requestMaker = RequestMaker(op, documents)
 
     Cursor.flatten(Failover(requestMaker, db.connection.mongosystem, failoverStrategy).future.map { response =>
-      val cursor = new DefaultCursor(response, db.connection, op, query, failoverStrategy)
+      val cursor = new DefaultCursor(response, db.connection, op, documents, failoverStrategy)
       if( (opts.flagsN & QueryFlags.TailableCursor) != 0 )
         new TailableCursor(cursor)
       else cursor
@@ -303,21 +299,21 @@ trait FailoverBasicCollection {
   def insert[T](document: T, writeConcern: GetLastError)(implicit writer: RawBSONWriter[T], ec: ExecutionContext) :Future[LastError] = {
     val op = Insert(0, fullCollectionName)
     val bson = writer.write(document)
-    val checkedWriteRequest = CheckedWriteRequest(op, bson, writeConcern)
+    val checkedWriteRequest = CheckedWriteRequest(op, BufferSequence(bson), writeConcern)
     Failover(checkedWriteRequest, db.connection.mongosystem, failoverStrategy).future.mapEither(LastError.meaningful(_))
   }
 
   def remove[T](query: T, writeConcern: GetLastError = GetLastError(), firstMatchOnly: Boolean = false)(implicit writer: RawBSONWriter[T], ec: ExecutionContext) :Future[LastError] = {
     val op = Delete(fullCollectionName, if(firstMatchOnly) 1 else 0)
     val bson = writer.write(query)
-    val checkedWriteRequest = CheckedWriteRequest(op, bson, writeConcern)
+    val checkedWriteRequest = CheckedWriteRequest(op, BufferSequence(bson), writeConcern)
     Failover(checkedWriteRequest, db.connection.mongosystem, failoverStrategy).future.mapEither(LastError.meaningful(_))
   }
 
   def uncheckedRemove[T](query: T, firstMatchOnly: Boolean = false)(implicit writer: RawBSONWriter[T], ec: ExecutionContext) : Unit = {
     val op = Delete(fullCollectionName, if(firstMatchOnly) 1 else 0)
     val bson = writer.write(query)
-    val message = RequestMaker(op, bson)
+    val message = RequestMaker(op, BufferSequence(bson))
     db.connection.send(message)
   }
 
@@ -326,7 +322,7 @@ trait FailoverBasicCollection {
     val op = Update(fullCollectionName, flags)
     val bson = selectorWriter.write(selector)
     bson.writeBytes(updateWriter.write(update))
-    val checkedWriteRequest = CheckedWriteRequest(op, bson, writeConcern)
+    val checkedWriteRequest = CheckedWriteRequest(op, BufferSequence(bson), writeConcern)
     Failover(checkedWriteRequest, db.connection.mongosystem, failoverStrategy).future.mapEither(LastError.meaningful(_))
   }
 
@@ -335,14 +331,14 @@ trait FailoverBasicCollection {
     val op = Update(fullCollectionName, flags)
     val bson = selectorWriter.write(selector)
     bson.writeBytes(updateWriter.write(update))
-    val message = RequestMaker(op, bson)
+    val message = RequestMaker(op, BufferSequence(bson))
     db.connection.send(message)
   }
 
   def uncheckedInsert[T](document: T)(implicit writer: RawBSONWriter[T]) :Unit = {
     val op = Insert(0, fullCollectionName)
     val bson = writer.write(document)
-    val message = RequestMaker(op, bson)
+    val message = RequestMaker(op, BufferSequence(bson))
     db.connection.send(message)
   }
 }

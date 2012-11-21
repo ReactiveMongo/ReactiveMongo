@@ -9,7 +9,7 @@ object Common {
   implicit val reader = DefaultBSONHandlers.DefaultBSONDocumentReader
   implicit val handler = DefaultBSONHandlers.DefaultBSONReaderHandler
   
-  val timeout = 5 seconds
+  val timeout = 10 seconds
   
   lazy val connection = MongoConnection(List("localhost:27017"))
   lazy val db = {

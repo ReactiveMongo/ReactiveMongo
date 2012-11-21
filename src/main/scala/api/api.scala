@@ -47,7 +47,7 @@ class Failover[T](message: T, actorRef: ActorRef, strategy: FailoverStrategy)(ex
           logger.warn("Got an error, retrying... (try #" + `try` + " is scheduled in " + delay.toMillis + " ms)", e)
           MongoConnection.system.scheduler.scheduleOnce(delay)(send(`try`))
         } else {
-          logger.error("Got an error, no more attempts to do. Completing with an error...")
+          logger.error("Got an error, no more attempts to do. Completing with an error...", e)
           promise.failure(e)
         }
       case Success(response) =>

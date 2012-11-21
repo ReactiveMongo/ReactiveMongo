@@ -7,7 +7,7 @@ import org.jboss.netty.buffer._
  * Helper methods to write tuples of supported types into a [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]].
  */
 private[protocol] object BufferAccessors {
-  import reactivemongo.utils.RichBuffer._
+  import reactivemongo.utils.buffers._
 
   /**
    * Typeclass for types that can be written into a [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]]
@@ -254,8 +254,6 @@ case class Delete(
   override def size = 4 /* int32 ZERO */ + fullCollectionName.length + 1 + 4
   override val requiresPrimary = true
 }
-
-import reactivemongo.utils.RichBuffer._
 
 /**
  * KillCursors operation.
