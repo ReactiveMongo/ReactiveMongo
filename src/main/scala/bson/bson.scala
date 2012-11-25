@@ -1,6 +1,7 @@
 package reactivemongo.bson
 
 import java.nio.ByteOrder
+import java.nio.ByteBuffer
 import org.jboss.netty.buffer.{ChannelBuffer, ChannelBuffers}
 import reactivemongo.utils.Converters
 import reactivemongo.utils.buffers._
@@ -381,6 +382,12 @@ case class BSONObjectID(value: Array[Byte]) extends BSONValue {
   override lazy val hashCode :Int = Arrays.hashCode(value)
 
   def write(buffer: ChannelBuffer) = { buffer writeBytes value; buffer }
+
+  /** The time of this BSONObjectId, in milliseconds */
+  def time: Long = this.timeSecond * 1000L
+
+  /** The time of this BSONObjectId, in seconds */
+  def timeSecond: Int = ByteBuffer.wrap(this.value.take(4)).getInt
 }
 
 object BSONObjectID {
