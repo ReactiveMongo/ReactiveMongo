@@ -145,7 +145,7 @@ class MongoDBSystem(
         nodeChannel => {
           logger.debug("Sending request expecting response " + request + " by channel " + nodeChannel)
           if(request.op.expectsResponse) {
-            awaitingResponses += request.requestID -> AwaitingResponse(request.requestID, req.promise, false)
+            awaitingResponses += request.requestID -> AwaitingResponse(request.requestID, nodeChannel._2.channel.getId(), req.promise, false)
             logger.trace("registering awaiting response for requestID " + request.requestID + ", awaitingResponses: " + awaitingResponses)
           } else logger.trace("NOT registering awaiting response for requestID " + request.requestID)
           nodeChannel._2.send(request)
@@ -163,7 +163,7 @@ class MongoDBSystem(
         error => req.promise.failure(error),
         nodeChannel => {
           logger.debug("Sending checked write request " + request + " by channel " + nodeChannel)
-          awaitingResponses += requestId -> AwaitingResponse(requestId, req.promise, true)
+          awaitingResponses += requestId -> AwaitingResponse(requestId, nodeChannel._2.channel.getId(), req.promise, true)
           logger.trace("registering writeConcern-awaiting response for requestID " + requestId + ", awaitingResponses: " + awaitingResponses)
           nodeChannel._2.send(request, writeConcern)
         })
@@ -171,71 +171,61 @@ class MongoDBSystem(
     // monitor
     case ConnectAll => {
       logger.debug("ConnectAll Job running...")
-      if(seedSet.isDefined) {
-        seedSet = Some(seedSet.get.createNeededChannels(self, 1))
-        seedSet.get.connectAll
-      } else {
-        updateNodeSetManager(NodeSetManager(nodeSetManager.get.nodeSet.createNeededChannels(self, nbChannelsPerNode)))
-        nodeSetManager.get.nodeSet.connectAll
-      }
+      updateNodeSet(nodeSet.createNeededChannels(self, nbChannelsPerNode))
+      nodeSet.connectAll
     }
     case RefreshAllNodes => {
-      val state = "setName=" + nodeSetManager.get.nodeSet.name + " with nodes={" +
-      (for(node <- nodeSetManager.get.nodeSet.nodes) yield "['" + node.name + "' in state " + node.state + " with " + node.channels.foldLeft(0) { (count, channel) =>
+      val state = "setName=" + nodeSet.name + " with nodes={" +
+      (for(node <- nodeSet.nodes) yield "['" + node.name + "' in state " + node.state + " with " + node.channels.foldLeft(0) { (count, channel) =>
         if(channel.isConnected) count + 1 else count
       } + " connected channels]") + "}";
       logger.debug("RefreshAllNodes Job running... current state is: " + state)
-      nodeSetManager.get.nodeSet.nodes.foreach { node =>
+      nodeSet.nodes.foreach { node =>
         logger.trace("try to refresh " + node.name)
         node.channels.find(_.isConnected).map(_.write(IsMaster().maker(requestIds.isMaster.next)))
       }
     }
     case Connected(channelId) => {
-      if(seedSet.isDefined) {
-        seedSet = seedSet.map(_.updateByChannelId(channelId, node => node.copy(state = CONNECTED)))
-        seedSet.map(_.findNodeByChannelId(channelId).get.channels(0).write(IsMaster().maker(requestIds.isMaster.next)))
-      } else {
-        updateNodeSetManager(NodeSetManager(nodeSetManager.get.nodeSet.updateByChannelId(channelId, node => {
-          node.copy(channels = node.channels.map { channel =>
-            if(channel.getId == channelId) {
-              channel.write(IsMaster().maker(requestIds.isMaster.next))
-              channel.copy(state = Ready)
-            } else channel
-          }, state = node.state match {
-            case _: MongoNodeState => node.state
-            case _ => CONNECTED
-          })
-        })))
-      }
+      updateNodeSet(nodeSet.updateByChannelId(channelId, node => {
+        node.copy(channels = node.channels.map { channel =>
+          if(channel.getId == channelId) {
+            channel.write(IsMaster().maker(requestIds.isMaster.next))
+            channel.copy(state = Ready)
+          } else channel
+        }, state = node.state match {
+          case _: MongoNodeState => node.state
+          case _ => CONNECTED
+        })
+      }))
       logger.trace(channelId + " is connected")
     }
     case Disconnected(channelId) => {
-      if(seedSet.isDefined) {
-        seedSet = Some(seedSet.get.updateByChannelId(channelId, node => {
-          logger.error("[Init] Encountered a connection problem with the following node: " + node)
-          node.copy(state = NOT_CONNECTED, channels = node.channels.filter{ _.isOpen })
-        }))
-      } else {
-        updateNodeSetManager(NodeSetManager(nodeSetManager.get.nodeSet.updateByChannelId(channelId, node => {
-          node.copy(state = NOT_CONNECTED, channels = node.channels.filter{ _.isOpen })
-        })))
-        if(nodeSetManager.exists(!_.nodeSet.isReachable)) {
-          logger.error("The entire node set is unreachable, is there a network problem?")
-          broadcastMonitors(PrimaryUnavailable) // TODO
-        } else if(!nodeSetManager.exists(_.primaryWrapper.isDefined)) {
-          logger.warn("The primary is unavailable, is there a network problem?")
-          broadcastMonitors(PrimaryUnavailable)
-        }
-        logger.debug(channelId + " is disconnected")
+      updateNodeSet(nodeSet.updateByChannelId(channelId, node => {
+        node.copy(state = NOT_CONNECTED, channels = node.channels.filter{ _.isOpen })
+      }))
+      awaitingResponses.retain { (_, awaitingResponse) =>
+        if(awaitingResponse.channelID == channelId) {
+          logger.debug("completing promise " + awaitingResponse.promise + " with error='socket disconnected'")
+          awaitingResponse.promise.failure(GenericMongoError("socket disconnected"))
+          false
+        } else true
       }
+      if(!nodeSet.isReachable) {
+        logger.error("The entire node set is unreachable, is there a network problem?")
+        broadcastMonitors(PrimaryUnavailable) // TODO
+      } else if(!nodeSet.primary.isDefined) {
+        logger.warn("The primary is unavailable, is there a network problem?")
+        broadcastMonitors(PrimaryUnavailable)
+      }
+      logger.debug(channelId + " is disconnected")
     }
     case auth @ Authenticate(db, user, password) => {
       if(!authenticationHistory.authenticates.contains(auth)) {
         logger.debug("authenticate process starts with " + auth + "...")
         authenticationHistory = AuthHistory(authenticationHistory.authenticateRequests :+ auth -> List(sender))
-        updateNodeSetManager(NodeSetManager(nodeSetManager.get.nodeSet.updateAll(node =>
+        updateNodeSet(nodeSet.updateAll(node =>
           node.copy(channels = node.channels.map(authenticateChannel(_)))
-        )))
+        ))
       } else {
         logger.debug("auth not performed as already registered...")
         sender ! VerboseSuccessfulAuthentication(db, user, false)
@@ -244,31 +234,23 @@ class MongoDBSystem(
     // isMaster response
     case response: Response if requestIds.isMaster accepts response => {
       val isMaster = IsMaster.ResultMaker(response).right.get
-      updateNodeSetManager(if(isMaster.hosts.isDefined) {// then it's a ReplicaSet
+      updateNodeSet(if(isMaster.hosts.isDefined) {// then it's a ReplicaSet
         val mynodes = isMaster.hosts.get.map(name => Node(name, if(isMaster.me.exists(_ == name)) isMaster.state else NONE))
-        NodeSetManager(nodeSetManager.get.nodeSet.addNodes(mynodes).copy(name = isMaster.setName).createNeededChannels(self, nbChannelsPerNode))
-      } else if(nodeSetManager.get.nodeSet.nodes.length > 0) {
-        logger.debug("single node, update..." + nodeSetManager)
-        NodeSetManager(NodeSet(None, None, nodeSetManager.get.nodeSet.nodes.slice(0, 1).map(_.copy(state = isMaster.state))).createNeededChannels(self, nbChannelsPerNode))
-      } else if(seedSet.isDefined && seedSet.get.findNodeByChannelId(response.info.channelId).isDefined) {
-        logger.debug("single node, creation..." + nodeSetManager)
-        NodeSetManager(NodeSet(None, None, Vector(Node(seedSet.get.findNodeByChannelId(response.info.channelId).get.name))).createNeededChannels(self, nbChannelsPerNode))
+        nodeSet.addNodes(mynodes).copy(name = isMaster.setName).createNeededChannels(self, nbChannelsPerNode)
+      } else if(nodeSet.nodes.length > 0) {
+        logger.debug("single node, update..." + nodeSet)
+        NodeSet(None, None, nodeSet.nodes.slice(0, 1).map(_.copy(state = isMaster.state))).createNeededChannels(self, nbChannelsPerNode)
       } else throw new RuntimeException("single node discovery failure..."))
-      logger.debug("NodeSetManager is now " + nodeSetManager)
-      nodeSetManager.get.nodeSet.connectAll
-      if(seedSet.isDefined) {
-        seedSet.get.closeAll
-        seedSet = None
-        logger.info("[Init] Init is done")
-      }
-      updateNodeSetManager(NodeSetManager(nodeSetManager.get.nodeSet.updateByChannelId(response.info.channelId,
-        _.updateChannelById(response.info.channelId, authenticateChannel(_)))))
+      logger.debug("NodeSet is now " + nodeSet)
+      nodeSet.connectAll
+      updateNodeSet(nodeSet.updateByChannelId(response.info.channelId,
+        _.updateChannelById(response.info.channelId, authenticateChannel(_))))
     }
     // getnonce response
     case response: Response if requestIds.getNonce accepts response => {
       val nonce = Getnonce.ResultMaker(response).right.get
       logger.debug("AUTH: got nonce for channel " + response.info.channelId + ": " + nonce)
-      updateNodeSetManager(NodeSetManager(nodeSetManager.get.nodeSet.updateByChannelId(response.info.channelId, node =>
+      updateNodeSet(nodeSet.updateByChannelId(response.info.channelId, node =>
         node.copy(channels = node.channels.map { channel =>
           if(channel.getId == response.info.channelId) {
             val authenticating = channel.state.asInstanceOf[Authenticating]
@@ -277,12 +259,12 @@ class MongoDBSystem(
             channel.copy(state = authenticating.copy(nonce = Some(nonce)))
           } else channel
         })
-      )))
+      ))
     }
     // authenticate response
     case response: Response if requestIds.authenticate accepts response => {
       logger.debug("AUTH: got authenticated response! " + response.info.channelId)
-      updateNodeSetManager(NodeSetManager(nodeSetManager.get.nodeSet.updateByChannelId(response.info.channelId, { node =>
+      updateNodeSet(nodeSet.updateByChannelId(response.info.channelId, { node =>
         logger.debug("AUTH: updating node " + node + "...")
         node.updateChannelById(response.info.channelId, { channel =>
           authenticationHistory = authenticationHistory
@@ -298,13 +280,13 @@ class MongoDBSystem(
           }
         })
       })
-      ))
+      )
     }
 
     // any other response
     case response: Response if requestIds.common accepts response => {
       awaitingResponses.get(response.header.responseTo) match {
-        case Some(AwaitingResponse(_, promise, isGetLastError)) => {
+        case Some(AwaitingResponse(_, _, promise, isGetLastError)) => {
           logger.debug("Got a response from " + response.info.channelId + "! Will give back message="+response + " to promise " + promise)
           awaitingResponses -= response.header.responseTo
           if(response.error.isDefined) {
@@ -338,23 +320,21 @@ class MongoDBSystem(
   }
 
   // monitor -->
-  var seedSet :Option[NodeSet] = Some(NodeSet(None, None, seeds.map(seed => Node(seed).createNeededChannels(self, 1)).toIndexedSeq))
-  seedSet.get.connectAll
-
-  var nodeSetManager :Option[NodeSetManager] = Some(NodeSetManager(NodeSet(None, None, Vector.empty)))
+  var nodeSet :NodeSet = NodeSet(None, None, seeds.map(seed => Node(seed).createNeededChannels(self, 1)).toIndexedSeq)
+  nodeSet.connectAll
   // <-- monitor
 
   def onPrimaryUnavailable() {
     self ! RefreshAllNodes
-    updateNodeSetManager(NodeSetManager(nodeSetManager.get.nodeSet.updateAll(node => if(node.state == PRIMARY) node.copy(state = UNKNOWN) else node)))
+    updateNodeSet(nodeSet.updateAll(node => if(node.state == PRIMARY) node.copy(state = UNKNOWN) else node))
     broadcastMonitors(PrimaryUnavailable)
   }
 
-  def updateNodeSetManager(nodeSetManager: NodeSetManager) :NodeSetManager = {
-    this.nodeSetManager = Some(nodeSetManager)
-    if(nodeSetManager.primaryWrapper.isDefined)
+  def updateNodeSet(nodeSet: NodeSet) :NodeSet = {
+    this.nodeSet = nodeSet
+    if(nodeSet.primary.isDefined)
       broadcastMonitors(PrimaryAvailable)
-    nodeSetManager
+    nodeSet
   }
 
   def secondaryOK(message: Request) = !message.op.requiresPrimary && (message.op match {
@@ -366,16 +346,16 @@ class MongoDBSystem(
 
   def pickChannel(request: Request) :Either[ReactiveMongoError, (Node, MongoChannel)] = {
     if(request.channelIdHint.isDefined)
-      nodeSetManager.flatMap(_.nodeSet.findByChannelId(request.channelIdHint.get)).toRight(Exceptions.ChannelNotFound)
+      nodeSet.findByChannelId(request.channelIdHint.get).toRight(Exceptions.ChannelNotFound)
     else if(secondaryOK(request))
-      nodeSetManager.flatMap(_.pick.flatMap(node => node.pick.map(node.node -> _))).toRight(Exceptions.NodeSetNotReachable)
-    else nodeSetManager.flatMap(_.primaryWrapper.flatMap(node => node.pick.map(node.node -> _))).toRight(Exceptions.PrimaryUnavailableException)
+      nodeSet.queryable.pick.flatMap(node => node.pick.map(node.node -> _)).toRight(Exceptions.NodeSetNotReachable)
+    else nodeSet.queryable.primaryRoundRobiner.flatMap(node => node.pick.map(node.node -> _)).toRight(Exceptions.PrimaryUnavailableException)
   }
 
-  def pickNode(message: Request) :Option[NodeWrapper] = {
+  def pickNode(message: Request) :Option[NodeRoundRobiner] = {
     message.channelIdHint.flatMap(channelId => {
-      nodeSetManager.flatMap(_.getNodeWrapperByChannelId(channelId))
-    }).orElse(nodeSetManager.flatMap(_.pick))
+      nodeSet.queryable.getNodeRoundRobinerByChannelId(channelId)
+    }).orElse(nodeSet.queryable.pick)
   }
 
   override def postStop() {
@@ -391,11 +371,7 @@ class MongoDBSystem(
       }
     }
 
-    if(nodeSetManager.isDefined)
-      nodeSetManager.get.nodeSet.makeChannelGroup.close.addListener(listener)
-
-    if(seedSet.isDefined)
-      seedSet.get.makeChannelGroup.close.addListener(listener)
+    nodeSet.makeChannelGroup.close.addListener(listener)
 
     logger.debug("MongoDBSystem stopped.")
   }
@@ -439,6 +415,7 @@ private[actors] case class AuthHistory(
 
 private[actors] case class AwaitingResponse(
   requestID: Int,
+  channelID: Int,
   promise: Promise[Response],
   isGetLastError: Boolean
 )

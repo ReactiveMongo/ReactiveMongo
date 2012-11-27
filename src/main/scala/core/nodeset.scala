@@ -89,15 +89,15 @@ case class NodeSet(
   version: Option[Long],
   nodes: IndexedSeq[Node]
 )(implicit channelFactory: ChannelFactory) {
-  def connected :IndexedSeq[Node] = nodes.filter(node => node.state != NOT_CONNECTED)
+  lazy val connected :IndexedSeq[Node] = nodes.filter(node => node.state != NOT_CONNECTED)
 
-  def queryable :IndexedSeq[Node] = nodes.filter(_.isQueryable)
+  lazy val queryable :QueryableNodeSet = QueryableNodeSet(this)
 
-  def primary :Option[Node] = nodes.find(_.state == PRIMARY)
+  lazy val primary :Option[Node] = nodes.find(_.state == PRIMARY)
 
-  def isReplicaSet :Boolean = name.isDefined
+  lazy val isReplicaSet :Boolean = name.isDefined
 
-  lazy val isReachable = !queryable.isEmpty
+  lazy val isReachable = !queryable.subject.isEmpty
 
   def connectAll() :Unit = nodes.foreach(_.connect)
 
@@ -159,6 +159,16 @@ case class NodeSet(
   }
 }
 
+case class QueryableNodeSet(nodeSet: NodeSet) extends RoundRobiner(nodeSet.nodes.filter(_.isQueryable).map { node => NodeRoundRobiner(node)}) {
+  def pickChannel :Option[Channel] = pick.flatMap(_.pick.map(_.channel))
+
+  def getNodeRoundRobinerByChannelId(channelId: Int) = subject.find(_.node.channels.exists(_.getId == channelId))
+
+  def primaryRoundRobiner :Option[NodeRoundRobiner] = subject.find(_.node.state == PRIMARY)
+}
+
+case class NodeRoundRobiner(node: Node) extends RoundRobiner(node.queryable)
+
 class RoundRobiner[A](val subject: IndexedSeq[A], private var i: Int = 0) {
   private val length = subject.length
 
@@ -169,29 +179,6 @@ class RoundRobiner[A](val subject: IndexedSeq[A], private var i: Int = 0) {
     i = if(i == length - 1) 0 else i + 1
     result
   } else None
-}
-
-case class NodeWrapper(node: Node) extends RoundRobiner(node.queryable) {
-  import NodeWrapper._
-  def send(message :Request, writeConcern :Request) {
-    pick.map(_.send(message, writeConcern))
-  }
-  def send(message: Request) {
-    pick.map(_.send(message))
-  }
-}
-
-object NodeWrapper {
-  private val logger = LazyLogger(LoggerFactory.getLogger("NodeWrapper"))
-}
-
-case class NodeSetManager(nodeSet: NodeSet) extends RoundRobiner(nodeSet.queryable.map { node => NodeWrapper(node)}) {
-  def pickNode :Option[Node] = pick.map(_.node)
-  def pickChannel :Option[Channel] = pick.flatMap(_.pick.map(_.channel))
-
-  def getNodeWrapperByChannelId(channelId: Int) = subject.find(_.node.channels.exists(_.getId == channelId))
-
-  def primaryWrapper :Option[NodeWrapper] = subject.find(_.node.state == PRIMARY)
 }
 
 case class LoggedIn(db: String, user: String)
