@@ -126,7 +126,7 @@ case class RequestMaker(
   documents: BufferSequence = BufferSequence.empty,
   channelIdHint: Option[Int] = None
 ) {
-  def apply(id: Int) = Request(id, 0, op, documents, None)
+  def apply(id: Int) = Request(id, 0, op, documents, channelIdHint)
 }
 
 /**

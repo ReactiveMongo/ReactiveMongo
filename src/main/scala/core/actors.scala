@@ -143,7 +143,7 @@ class MongoDBSystem(
           req.promise.failure(error)
         },
         nodeChannel => {
-          logger.debug("Sending request expecting response " + request + " by channel " + nodeChannel)
+          logger.debug("Sending request expecting response " + request + " by channel " + nodeChannel._2.channel + " of node " + nodeChannel._1.name)
           if(request.op.expectsResponse) {
             awaitingResponses += request.requestID -> AwaitingResponse(request.requestID, nodeChannel._2.channel.getId(), req.promise, false)
             logger.trace("registering awaiting response for requestID " + request.requestID + ", awaitingResponses: " + awaitingResponses)
@@ -162,7 +162,7 @@ class MongoDBSystem(
       pickChannel(request).fold(
         error => req.promise.failure(error),
         nodeChannel => {
-          logger.debug("Sending checked write request " + request + " by channel " + nodeChannel)
+          logger.debug("Sending request expecting response " + request + " by channel " + nodeChannel._2.channel + " of node " + nodeChannel._1.name)
           awaitingResponses += requestId -> AwaitingResponse(requestId, nodeChannel._2.channel.getId(), req.promise, true)
           logger.trace("registering writeConcern-awaiting response for requestID " + requestId + ", awaitingResponses: " + awaitingResponses)
           nodeChannel._2.send(request, writeConcern)
@@ -350,12 +350,6 @@ class MongoDBSystem(
     else if(secondaryOK(request))
       nodeSet.queryable.pick.flatMap(node => node.pick.map(node.node -> _)).toRight(Exceptions.NodeSetNotReachable)
     else nodeSet.queryable.primaryRoundRobiner.flatMap(node => node.pick.map(node.node -> _)).toRight(Exceptions.PrimaryUnavailableException)
-  }
-
-  def pickNode(message: Request) :Option[NodeRoundRobiner] = {
-    message.channelIdHint.flatMap(channelId => {
-      nodeSet.queryable.getNodeRoundRobinerByChannelId(channelId)
-    }).orElse(nodeSet.queryable.pick)
   }
 
   override def postStop() {
