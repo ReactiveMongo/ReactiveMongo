@@ -21,19 +21,19 @@ import scala.util.Random
  */
 trait FileEntry {
   /** File name */
-  val filename: String
+  def filename: String
   /** length of the file */
-  val length: Int
+  def length: Int
   /** size of the chunks of this file */
-  val chunkSize: Int
+  def chunkSize: Int
   /** the date when this file was uploaded. */
-  val uploadDate: Option[Long]
+  def uploadDate: Option[Long]
   /** the MD5 hash of this file. */
-  val md5: Option[String]
+  def md5: Option[String]
   /** mimetype of this file. */
-  val contentType: Option[String]
+  def contentType: Option[String]
   /** the GridFS store of this file. */
-  val gridFS: GridFS
+  def gridFS: GridFS
 }
 
 /** A read file's metadata */
@@ -50,13 +50,14 @@ trait ReadFileEntry extends FileEntry {
         "files_id" -> id,
         "n" -> BSONDocument(
           "$gte" -> BSONInteger(0),
-          "$lte" -> BSONInteger( length/chunkSize + (if(length % chunkSize > 0) 1 else 0) )
+          "$lte" -> BSONInteger( (length/chunkSize).toInt + (if(length % chunkSize > 0) 1 else 0) )
         )
       ),
       "$orderby" -> BSONDocument(
         "n" -> BSONInteger(1)
       )
     )
+
     val cursor = gridFS.chunks.find(selector)
     cursor.enumerate &> (Enumeratee.map { doc =>
       doc.get("data").flatMap {
@@ -102,30 +103,12 @@ object ReadFileEntry {
       val document = doc.toTraversable
       DefaultReadFileEntry(
         document.get("_id").getOrElse(throw new RuntimeException("_id is mandatory for a stored gridfs file!")),
-        document.get("filename").flatMap {
-          case BSONString(name) => Some(name)
-          case _ => None
-        }.getOrElse(""),
-        document.get("length").flatMap {
-          case BSONInteger(i) => Some(i)
-          case _ => None
-        }.getOrElse(throw new RuntimeException("length is mandatory for a stored gridfs file!")),
-        document.get("chunkSize").flatMap {
-          case BSONInteger(i) => Some(i)
-          case _ => None
-        }.getOrElse(throw new RuntimeException("chunkSize is mandatory for a stored gridfs file!")),
-        document.get("uploadDate").flatMap {
-          case BSONDateTime(time) => Some(time)
-          case _ => None
-        },
-        document.get("md5").flatMap {
-          case BSONString(m) => Some(m)
-          case _ => None
-        },
-        document.get("contentType").flatMap {
-          case BSONString(ct) => Some(ct)
-          case _ => None
-        },
+        document.getAs[BSONString]("filename").map(_.value).getOrElse(""),
+        document.getAs[BSONNumberLike]("length").map(_.toInt).getOrElse(throw new RuntimeException("length is mandatory for a stored gridfs file!")),
+        document.getAs[BSONNumberLike]("chunkSize").map(_.toInt).getOrElse(throw new RuntimeException("chunkSize is mandatory for a stored gridfs file!")),
+        document.getAs[BSONDateTime]("uploadDate").map(_.value),
+        document.getAs[BSONString]("md5").map(_.value),
+        document.getAs[BSONString]("contentType").map(_.value),
         gFS
       )
     }

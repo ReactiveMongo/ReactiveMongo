@@ -48,8 +48,22 @@ sealed trait BSONElement {
 case class DefaultBSONElement(name: String, value: BSONValue) extends BSONElement
 case class ReadBSONElement(name: String, value: BSONValue) extends BSONElement
 
+sealed trait BSONValueLike
+
+sealed trait BSONBooleanLike extends BSONValueLike {
+  def toBoolean :Boolean
+}
+
+sealed trait BSONNumberLike extends BSONBooleanLike {
+  def toInt :Int
+  def toLong :Long
+  def toDouble :Double
+
+  def toBoolean = toDouble != 0
+}
+
 /** A BSON Value type */
-sealed trait BSONValue {
+sealed trait BSONValue extends BSONValueLike {
   /** bson type code */
   val code: Int
   /** Writes this value in the given [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]] */
@@ -59,10 +73,14 @@ sealed trait BSONValue {
 }
 
 /** A BSON Double. */
-case class BSONDouble(value: Double) extends BSONValue {
+case class BSONDouble(value: Double) extends BSONValue with BSONNumberLike {
   val code = 0x01
 
   def write(buffer: ChannelBuffer) = { buffer writeDouble value; buffer }
+
+  lazy val toInt = value.toInt
+  lazy val toLong = value.toLong
+  lazy val toDouble = value
 }
 
 /** A BSON String */
@@ -213,7 +231,7 @@ sealed trait TraversableBSONStructure[Key] extends BSONStructure {
    *
    * @tparam T the type of the BSONValue to find.
    */
-  def getAs[T <: BSONValue :Manifest](key: Key) :Option[T] = {
+  def getAs[T <: BSONValueLike :Manifest](key: Key) :Option[T] = {
     val m = manifest[T]
     get(key).flatMap { e =>
       if(scala.reflect.ClassManifest.fromClass(e.getClass) <:<  m)
@@ -354,10 +372,12 @@ case class BSONBinary(value: ChannelBuffer, subtype: Subtype) extends BSONValue 
 }
 
 /** BSON Undefined value */
-object BSONUndefined extends BSONValue {
+object BSONUndefined extends BSONValue with BSONBooleanLike {
   val code = 0x06
 
   def write(buffer: ChannelBuffer) = buffer
+
+  val toBoolean = false
 }
 
 /** BSON ObjectId value. */
@@ -441,10 +461,12 @@ object BSONObjectID {
 }
 
 /** BSON boolean value */
-case class BSONBoolean(value: Boolean) extends BSONValue {
+case class BSONBoolean(value: Boolean) extends BSONValue with BSONBooleanLike {
   val code = 0x08
 
   def write(buffer: ChannelBuffer) = { buffer writeByte (if (value) 1 else 0); buffer }
+
+  val toBoolean = value
 }
 
 /** BSON date time value */
@@ -455,10 +477,12 @@ case class BSONDateTime(value: Long) extends BSONValue {
 }
 
 /** BSON null value */
-object BSONNull extends BSONValue {
+object BSONNull extends BSONValue with BSONBooleanLike {
   val code = 0x0A
 
   def write(buffer: ChannelBuffer) = { buffer }
+
+  val toBoolean = false
 }
 
 /**
@@ -509,10 +533,14 @@ case class BSONJavaScriptWS(value: String) extends BSONValue {
 }
 
 /** BSON Integer value */
-case class BSONInteger(value: Int) extends BSONValue {
+case class BSONInteger(value: Int) extends BSONValue with BSONNumberLike {
   val code = 0x10
 
   def write(buffer: ChannelBuffer) = { buffer writeInt value; buffer }
+
+  lazy val toInt = value
+  lazy val toLong = value.toLong
+  lazy val toDouble = value.toDouble
 }
 
 /** BSON Timestamp value. TODO */
@@ -523,10 +551,14 @@ case class BSONTimestamp(value: Long) extends BSONValue {
 }
 
 /** BSON Long value */
-case class BSONLong(value: Long) extends BSONValue {
+case class BSONLong(value: Long) extends BSONValue with BSONNumberLike {
   val code = 0x12
 
   def write(buffer: ChannelBuffer) = { buffer writeLong value; buffer }
+
+  lazy val toInt = value.toInt
+  lazy val toLong = value
+  lazy val toDouble = value.toDouble
 }
 
 /** BSON Min key value */
