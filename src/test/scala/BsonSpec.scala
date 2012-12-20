@@ -99,6 +99,32 @@ class BsonSpec extends Specification {
       }.mkString(",")
       str mustEqual "1,2,4"
     }
+    val docLike = BSONDocument(
+      "likeFalseInt" -> BSONInteger(0),
+      "likeFalseLong" -> BSONLong(0),
+      "likeFalseDouble" -> BSONDouble(0.0),
+      "likeFalseUndefined" -> BSONUndefined,
+      "likeFalseNull" -> BSONNull,
+      "likeTrueInt" -> BSONInteger(1),
+      "likeTrueLong" -> BSONLong(2),
+      "likeTrueDouble" -> BSONDouble(-0.1),
+      "anInt" -> BSONInteger(200),
+      "aLong" -> BSONLong(12345678912L),
+      "aDouble" -> BSONDouble(9876543210.98)
+    ).toTraversable
+    "abstract booleans and numbers" in {
+      docLike.getAs[BSONBooleanLike]("likeFalseInt").get.toBoolean mustEqual false
+      docLike.getAs[BSONBooleanLike]("likeFalseLong").get.toBoolean mustEqual false
+      docLike.getAs[BSONBooleanLike]("likeFalseDouble").get.toBoolean mustEqual false
+      docLike.getAs[BSONBooleanLike]("likeFalseUndefined").get.toBoolean mustEqual false
+      docLike.getAs[BSONBooleanLike]("likeFalseNull").get.toBoolean mustEqual false
+      docLike.getAs[BSONBooleanLike]("likeTrueInt").get.toBoolean mustEqual true
+      docLike.getAs[BSONBooleanLike]("likeTrueLong").get.toBoolean mustEqual true
+      docLike.getAs[BSONBooleanLike]("likeTrueDouble").get.toBoolean mustEqual true
+      docLike.getAs[BSONNumberLike]("anInt").get.toDouble mustEqual 200
+      docLike.getAs[BSONNumberLike]("aLong").get.toDouble mustEqual 12345678912L
+      docLike.getAs[BSONNumberLike]("aDouble").get.toDouble mustEqual 9876543210.98
+    }
   }
 
   def compare(origin: Array[Byte], buffer: org.jboss.netty.buffer.ChannelBuffer) = {

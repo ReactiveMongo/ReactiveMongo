@@ -2,142 +2,155 @@ package reactivemongo.api.gridfs
 
 import java.io._
 import java.util.Arrays
-import org.jboss.netty.buffer.ChannelBuffer
-import org.slf4j.{Logger, LoggerFactory}
 import play.api.libs.iteratee._
 import reactivemongo.api._
 import reactivemongo.bson._
 import reactivemongo.bson.handlers._
-import reactivemongo.bson.handlers.DefaultBSONHandlers._
-import reactivemongo.core.commands.{GetLastError, LastError}
-import reactivemongo.core.protocol.Response
+import reactivemongo.core.commands.LastError
 import reactivemongo.utils._
-import reactivemongo.utils.buffers._
-import scala.concurrent.{Future, ExecutionContext}
-import scala.util.Random
+import scala.concurrent.{ExecutionContext, Future}
 
-/**
- * A file's metadata.
- */
-trait FileEntry {
-  /** File name */
-  def filename: String
-  /** length of the file */
-  def length: Int
-  /** size of the chunks of this file */
-  def chunkSize: Int
-  /** the date when this file was uploaded. */
-  def uploadDate: Option[Long]
-  /** the MD5 hash of this file. */
-  def md5: Option[String]
-  /** mimetype of this file. */
-  def contentType: Option[String]
-  /** the GridFS store of this file. */
-  def gridFS: GridFS
+object `package` {
+  private[gridfs] val logger = LazyLogger("reactivemongo.api.gridfs")
 }
 
-/** A read file's metadata */
-trait ReadFileEntry extends FileEntry {
-  /** The id of this file. */
-  val id: BSONValue
-
-  import ReadFileEntry.logger
-
-  /** Produces an enumerator of chunks of bytes from the `chunks` collection. */
-  def enumerate(implicit ctx: ExecutionContext) :Enumerator[Array[Byte]] = {
-    val selector = BSONDocument(
-      "$query" -> BSONDocument(
-        "files_id" -> id,
-        "n" -> BSONDocument(
-          "$gte" -> BSONInteger(0),
-          "$lte" -> BSONInteger( (length/chunkSize).toInt + (if(length % chunkSize > 0) 1 else 0) )
-        )
-      ),
-      "$orderby" -> BSONDocument(
-        "n" -> BSONInteger(1)
-      )
-    )
-
-    val cursor = gridFS.chunks.find(selector)
-    cursor.enumerate &> (Enumeratee.map { doc =>
-      doc.get("data").flatMap {
-        case BSONBinary(data, _) => Some(data.array())
-        case _ => None
-      }.getOrElse {
-        logger.error("not a chunk! failed assertion: data field is missing")
-        throw new RuntimeException("not a chunk! failed assertion: data field is missing")
-      }
-    })
-  }
-
-  /**
-   * Helper to write the contents of this file into an OutputStream.
-   *
-   * Basically it's just an enumerator produced by the `enumerate` method that is applied to an Iteratee that writes the consumed chunks into the given stream.
-   */
-  def readContent(os: OutputStream)(implicit ctx: ExecutionContext) :Future[Iteratee[Array[Byte],Unit]] = {
-    enumerate(ctx)(Iteratee.foreach { chunk =>
-      os.write(chunk)
-    })
-  }
-}
-
-case class DefaultReadFileEntry(
-  id: BSONValue,
-  filename: String,
-  length: Int,
-  chunkSize: Int,
-  uploadDate: Option[Long],
-  md5: Option[String],
-  contentType: Option[String],
-  gridFS: GridFS
-) extends ReadFileEntry
-
-object ReadFileEntry {
-  private val logger = LazyLogger(LoggerFactory.getLogger("reactivemongo.api.gridfs.ReadFileEntry"))
-  // TODO
-  def bsonReader(gFS: GridFS) = new Reader(gFS)
-
-  class Reader(gFS: GridFS) extends BSONReader[DefaultReadFileEntry] {
-    def fromBSON(doc: BSONDocument) = {
-      val document = doc.toTraversable
-      DefaultReadFileEntry(
-        document.get("_id").getOrElse(throw new RuntimeException("_id is mandatory for a stored gridfs file!")),
-        document.getAs[BSONString]("filename").map(_.value).getOrElse(""),
-        document.getAs[BSONNumberLike]("length").map(_.toInt).getOrElse(throw new RuntimeException("length is mandatory for a stored gridfs file!")),
-        document.getAs[BSONNumberLike]("chunkSize").map(_.toInt).getOrElse(throw new RuntimeException("chunkSize is mandatory for a stored gridfs file!")),
-        document.getAs[BSONDateTime]("uploadDate").map(_.value),
-        document.getAs[BSONString]("md5").map(_.value),
-        document.getAs[BSONString]("contentType").map(_.value),
-        gFS
+object Implicits {
+  /** A default `BSONReader` for `ReadFile`. */
+  implicit object DefaultReadFileReader extends BSONReader[DefaultReadFile] {
+    def fromBSON(document: BSONDocument) = {
+      val doc = document.toTraversable
+      val metadata = doc.mapped.filterNot { element =>
+        element._1 == "contentType" || element._1 == "filename" || element._1 == "uploadDate" ||
+          element._1 == "chunkSize" || element._1 == "length" || element._1 == "md5" || element._1 == "_id"
+      }.toSeq
+      DefaultReadFile(
+        doc.get("_id").get,
+        doc.getAs[BSONString]("contentType").map(_.value),
+        doc.getAs[BSONString]("filename").map(_.value).get,
+        doc.getAs[BSONNumberLike]("uploadDate").map(_.toLong),
+        doc.getAs[BSONNumberLike]("chunkSize").map(_.toInt).get,
+        doc.getAs[BSONNumberLike]("length").map(_.toInt).get,
+        doc.getAs[BSONString]("md5").map(_.value),
+        BSONDocument(metadata :_*)
       )
     }
   }
 }
 
+/** Metadata that cannot be customized. */
+trait ComputedMetadata {
+  /** Length of the file. */
+  def length :Int
+  /** Size of the chunks of this file. */
+  def chunkSize :Int
+  /** MD5 hash of this file. */
+  def md5 :Option[String]
+}
+
 /**
- * A file to write.
- *
- * @param id The id of the file to write. If an id is provided, the matching file metadata will be replaced.
- * @param name The name of the file to write.
+ * Common metadata.
+ * @tparam Id Type of the id of this file (generally `BSONObjectID` or `BSONValue`).
  */
-case class FileToWrite(
-  id: Option[BSONValue],
-  name: String,
-  contentType: Option[String]
-) {
-  import FileToWrite.logger
+trait BasicMetadata[+Id <: BSONValue] {
+  /** Id of this file. */
+  def id: Id
+  /** Name of this file. */
+  def filename :String
+  /** Date when this file was uploaded. */
+  def uploadDate :Option[Long]
+  /** Content type of this file. */
+  def contentType :Option[String]
+}
+
+/** Custom metadata (generic trait) */
+trait CustomMetadata {
+  /** A BSONDocument holding all the metadata that are not standard. */
+  def metadata :BSONDocument
+}
+
+/**
+ * A file that will be saved in a GridFS store.
+ * @tparam Id Type of the id of this file (generally `BSONObjectID` or `BSONValue`).
+ */
+trait FileToSave[+Id <: BSONValue] extends BasicMetadata[Id] with CustomMetadata
+
+/** A default implementation of `FileToSave[BSONValue]`. */
+case class DefaultFileToSave(
+  filename: String,
+  contentType: Option[String] = None,
+  uploadDate: Option[Long] = None,
+  metadata: BSONDocument = BSONDocument(),
+  id: BSONValue = BSONObjectID.generate) extends FileToSave[BSONValue]
+
+/**
+ * A file read from a GridFS store.
+ * @tparam Id Type of the id of this file (generally `BSONObjectID` or `BSONValue`).
+ */
+trait ReadFile[+Id <: BSONValue] extends BasicMetadata[Id] with CustomMetadata with ComputedMetadata
+
+/** A default implementation of `ReadFile[BSONValue]`. */
+case class DefaultReadFile(
+    id: reactivemongo.bson.BSONValue,
+    contentType: Option[String],
+    filename: String,
+    uploadDate: Option[Long],
+    chunkSize: Int,
+    length: Int,
+    md5: Option[String],
+    metadata: reactivemongo.bson.BSONDocument
+) extends ReadFile[BSONValue]
+
+/**
+ * A GridFS store.
+ * @param db The database where this store is located.
+ * @param prefix The prefix of this store. The `files` and `chunks` collections will be actually named `prefix.files` and `prefix.chunks`.
+ */
+class GridFS(db: DB[Collection] with DBMetaCommands, prefix: String = "fs") {
+  import indexes._
+  import handlers.DefaultBSONHandlers._
+  
+  /** The `files` collection */
+  val files = db(prefix + ".files")
+  /** The `chunks` collection */
+  val chunks = db(prefix + ".chunks")
 
   /**
-   * Returns an Iteratee[Array[Byte], Future[PutResult]] that will consume chunks of bytes, normalize their size and write them into the `chunks` collection.
+   * Finds the files matching the given selector.
    *
-   * @param gfs The GridFS store.
-   * @param chunkSize The size of the chunks to be written. Defaults to 256k (GridFS Spec).
+   * @param selector The document to select the files to return
+   *
+   * @tparam S The type of the selector document. An implicit [[reactivemongo.bson.handlers.RawBSONWriter]][S] must be in the scope.
    */
-  def iteratee(gfs: GridFS, chunkSize: Int = 262144)(implicit ctx: ExecutionContext): Iteratee[Array[Byte], Future[ReadFileEntry]] = {
+  def find[S, T <: ReadFile[_]](selector: S)(implicit sWriter: RawBSONWriter[S], readFileReader: BSONReader[T], ctx: ExecutionContext) :Cursor[T] = {
+    files.find(selector)
+  }
+
+  /**
+   * Saves the content provided by the given enumerator with the given metadata.
+   *
+   * @param enumerator Producer of content.
+   * @param file Metadata of the file to store.
+   * @param chunkSize Size of the chunks. Defaults to 256kB.
+   *
+   * @return A future of a ReadFile[Id].
+   */
+  def save[Id <: BSONValue](enumerator: Enumerator[Array[Byte]], file: FileToSave[Id], chunkSize: Int = 262144)(implicit readFileReader: BSONReader[ReadFile[Id]], ctx: ExecutionContext) :Future[ReadFile[Id]] = {
+    (enumerator |>>> iteratee(file, chunkSize)).flatMap(f => f)
+  }
+
+  /**
+   * Gets an `Iteratee` that will consume data to put into a GridFS store.
+   * @param file Metadata of the file to store.
+   * @param chunkSize Size of the chunks. Defaults to 256kB.
+   *
+   * @tparam Id Type of the id of this file (generally `BSONObjectID` or `BSONValue`).
+   *
+   * @return An `Iteratee` that will consume data to put into a GridFS store.
+   */
+  def iteratee[Id <: BSONValue](file: FileToSave[Id], chunkSize: Int = 262144)(implicit readFileReader: BSONReader[ReadFile[Id]], ctx: ExecutionContext): Iteratee[Array[Byte], Future[ReadFile[Id]]] = {
     implicit val ec = MongoConnection.system
 
-    val files_id = id.getOrElse(BSONObjectID.generate)
+    import reactivemongo.bson.handlers.DefaultBSONHandlers._
 
     case class Chunk(
       previous: Array[Byte] = new Array(0),
@@ -169,38 +182,29 @@ case class FileToWrite(
           )
         }
       }
-      def finish() :Future[ReadFileEntry] = {
+      def finish() :Future[ReadFile[Id]] = {
         logger.debug("writing last chunk (n=" + n + ")!")
-        val uploadDate = System.currentTimeMillis
-        writeChunk(n, previous).flatMap { _ =>
+        val uploadDate = file.uploadDate.getOrElse(System.currentTimeMillis)
+        writeChunk(n, previous).flatMap { f =>
           val bson = BSONDocument(
-            "_id"         -> files_id,
-            "filename"    -> BSONString(name),
+            "_id"         -> file.id,
+            "filename"    -> BSONString(file.filename),
             "chunkSize"   -> BSONInteger(chunkSize),
             "length"      -> BSONInteger(length),
             "uploadDate"  -> BSONDateTime(uploadDate),
-            "contentType" -> contentType.map(BSONString(_))
-          )
-          gfs.files.insert(bson).map(_ => DefaultReadFileEntry(
-            files_id,
-            name,
-            length,
-            chunkSize,
-            Some(uploadDate),
-            None, // TODO
-            contentType,
-            gfs
-          ))
+            "contentType" -> file.contentType.map(BSONString(_))
+          ) ++ file.metadata
+          files.insert(bson).map(_ => readFileReader.fromBSON(bson))
         }
       }
       def writeChunk(n: Int, array: Array[Byte]) = {
         logger.debug("writing chunk " + n)
         val bson = BSONDocument(
-          "files_id" -> files_id,
+          "files_id" -> file.id,
           "n"        -> BSONInteger(n),
           "data"     -> new BSONBinary(array, Subtype.GenericBinarySubtype)
         )
-        gfs.chunks.insert(bson)
+        chunks.insert(bson)
       }
     }
 
@@ -209,56 +213,45 @@ case class FileToWrite(
       previous.feed(chunk)
     }.mapDone(_.finish)
   }
-}
+  
+  /** Produces an enumerator of chunks of bytes from the `chunks` collection matching the given file metadata. */
+  def enumerate(file: ReadFile[_ <: BSONValue])(implicit ctx: ExecutionContext) :Enumerator[Array[Byte]] = {
+    val selector = BSONDocument(
+      "$query" -> BSONDocument(
+        "files_id" -> file.id,
+        "n" -> BSONDocument(
+          "$gte" -> BSONInteger(0),
+          "$lte" -> BSONInteger( file.length/file.chunkSize + (if(file.length % file.chunkSize > 0) 1 else 0) )
+        )
+      ),
+      "$orderby" -> BSONDocument(
+        "n" -> BSONInteger(1)
+      )
+    )
 
-object FileToWrite {
-  private val logger = LazyLogger(LoggerFactory.getLogger("reactivemongo.api.gridfs.FileToWrite"))
-}
-
-/**
- * A helper class to make GridFS queries.
- *
- * GridFS creates two collections, `files` and `chunks`, that store respectively the files metadata ant their chunks.
- * These collections are prefixed by a customizable name (usually "fs") followed by a dot character.
- *
- * So, if the database is "media" and the GridFS prefix is "photos", the two collections are:
- *   - media.photos.files
- *   - media.photos.chunks
- *
- * @param db The database where the GridFS collections are.
- * @param prefix The prefix of this GridFS. Defaults to "fs".
- */
-case class GridFS(db: DB[Collection] with DBMetaCommands, prefix: String = "fs") {
-  import indexes._
-
-  /** The `files` collection */
-  val files = db(prefix + ".files")
-  /** The `chunks` collection */
-  val chunks = db(prefix + ".chunks")
-
-  /**
-   * Finds the files matching the given selector.
-   *
-   * @tparam S the type of the selector document. An implicit [[reactivemongo.bson.handlers.RawBSONWriter]][S] must be in the scope.
-   *
-   * @param selector The document to select the files to return
-   */
-  def find[S](selector: S)(implicit sWriter: RawBSONWriter[S], ctx: ExecutionContext) :Cursor[ReadFileEntry] = {
-    implicit val rfeReader = ReadFileEntry.bsonReader(this)
-    files.find(selector)
+    val cursor = chunks.find(selector)
+    cursor.enumerate &> (Enumeratee.map { doc =>
+      doc.get("data").flatMap {
+        case BSONBinary(data, _) => Some(data.array())
+        case _ => None
+      }.getOrElse {
+        logger.error("not a chunk! failed assertion: data field is missing")
+        throw new RuntimeException("not a chunk! failed assertion: data field is missing")
+      }
+    })
   }
 
-  /**
-   * Saves a file with the given name.
-   *
-   * If an id is provided, the matching file metadata will be replaced.
-   *
-   * @param name the file name.
-   * @param id an id for the new file. If none is provided, a new ObjectId will be generated.
-   *
-   * @return an iteratee to be applied to an enumerator of chunks of bytes.
-   */
-  def save(name: String, id: Option[BSONValue], contentType: Option[String] = None)(implicit ctx: ExecutionContext) :Iteratee[Array[Byte], Future[ReadFileEntry]] = FileToWrite(id, name, contentType).iteratee(this)
+  /** Reads the given file and writes its contents to the given OutputStream */
+  def readToOutputStream(file: ReadFile[_ <: BSONValue], out: OutputStream)(implicit ctx: ExecutionContext) :Future[Unit] = {
+    enumerate(file) |>>> Iteratee.foreach { chunk =>
+      out.write(chunk)
+    }
+  }
+
+  /** Writes the data provided by the given InputStream to the given file. */
+  def writeFromInputStream[Id <: BSONValue](file: FileToSave[Id], input: InputStream, chunkSize: Int = 262144)(implicit readFileReader: BSONReader[ReadFile[Id]], ctx: ExecutionContext) :Future[ReadFile[Id]] = {
+    save(Enumerator.fromStream(input, chunkSize), file)
+  }
 
   /**
    * Removes a file from this store.
@@ -266,7 +259,7 @@ case class GridFS(db: DB[Collection] with DBMetaCommands, prefix: String = "fs")
    *
    * @param file The file entry to remove from this store.
    */
-  def remove(file: ReadFileEntry)(implicit ctx: ExecutionContext) :Future[LastError] = remove(file.id)
+  def remove[Id <: BSONValue](file: BasicMetadata[Id])(implicit ctx: ExecutionContext) :Future[LastError] = remove(file.id)
 
   /**
    * Removes a file from this store.
@@ -285,8 +278,13 @@ case class GridFS(db: DB[Collection] with DBMetaCommands, prefix: String = "fs")
    *
    * Please note that you should really consider reading [[http://www.mongodb.org/display/DOCS/Indexes]] before doing this, especially in production.
    *
-   * @return a future containing true if the index was created, false if it already exists.
+   * @return A future containing true if the index was created, false if it already exists.
    */
   def ensureIndex()(implicit ctx: ExecutionContext) :Future[Boolean] =
     db.indexesManager.onCollection(prefix + ".chunks").ensure(Index( List("files_id" -> true, "n" -> true), unique = true ))
+}
+
+object GridFS {
+  def apply(db: DB[Collection] with DBMetaCommands, prefix: String = "fs") =
+    new GridFS(db, prefix)
 }

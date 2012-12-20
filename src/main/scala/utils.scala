@@ -68,6 +68,10 @@ case class LazyLogger(logger: org.slf4j.Logger) {
   def error(s: => String) { if(logger.isErrorEnabled) logger.error(s) }
 }
 
+object LazyLogger {
+  def apply(logger: String) :LazyLogger = LazyLogger(org.slf4j.LoggerFactory.getLogger("ReadFileEntry"))
+}
+
 case class EitherMappableFuture[A](future: Future[A]) {
   def mapEither[E <: Throwable, B](f: A => Either[E, B])(implicit ec: ExecutionContext) = {
     future.flatMap(
