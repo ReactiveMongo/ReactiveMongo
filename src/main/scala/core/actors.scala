@@ -101,7 +101,7 @@ class MongoDBSystem(
 
   private var authenticationHistory :AuthHistory = AuthHistory(for(a <- auth) yield a -> Nil)
 
-  private val awaitingResponses = scala.collection.mutable.ListMap[Int, AwaitingResponse]()
+  private val awaitingResponses = scala.collection.mutable.LinkedHashMap[Int, AwaitingResponse]()
 
   private val monitors = scala.collection.mutable.ListBuffer[ActorRef]()
   implicit val ec = context.system.dispatcher
