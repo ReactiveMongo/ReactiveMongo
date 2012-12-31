@@ -225,7 +225,7 @@ private[reactivemongo] class RequestEncoder extends OneToOneEncoder {
 }
 
 private[reactivemongo] object RequestEncoder {
-  val logger = LazyLogger(LoggerFactory.getLogger("protocol/RequestEncoder"))
+  val logger = LazyLogger(LoggerFactory.getLogger("reactivemongo.core.protocol.RequestEncoder"))
 }
 
 private[reactivemongo] class ResponseFrameDecoder extends FrameDecoder {
@@ -292,7 +292,7 @@ private[reactivemongo] class MongoHandler(receiver: ActorRef) extends SimpleChan
 }
 
 private[reactivemongo] object MongoHandler {
-  private val logger = LazyLogger(LoggerFactory.getLogger("protocol/MongoHandler"))
+  private val logger = LazyLogger(LoggerFactory.getLogger("reactivemongo.core.protocol.MongoHandler"))
 }
 
 /**

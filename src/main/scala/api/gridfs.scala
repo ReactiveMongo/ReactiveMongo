@@ -93,7 +93,7 @@ case class DefaultReadFileEntry(
 ) extends ReadFileEntry
 
 object ReadFileEntry {
-  private val logger = LazyLogger(LoggerFactory.getLogger("ReadFileEntry"))
+  private val logger = LazyLogger(LoggerFactory.getLogger("reactivemongo.api.gridfs.ReadFileEntry"))
   // TODO
   def bsonReader(gFS: GridFS) = new Reader(gFS)
 
@@ -229,7 +229,7 @@ case class FileToWrite(
 }
 
 object FileToWrite {
-  private val logger = LazyLogger(LoggerFactory.getLogger("FileToWrite"))
+  private val logger = LazyLogger(LoggerFactory.getLogger("reactivemongo.api.gridfs.FileToWrite"))
 }
 
 /**
