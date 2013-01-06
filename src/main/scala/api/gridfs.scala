@@ -31,7 +31,7 @@ object Implicits {
         doc.getAs[BSONNumberLike]("chunkSize").map(_.toInt).get,
         doc.getAs[BSONNumberLike]("length").map(_.toInt).get,
         doc.getAs[BSONString]("md5").map(_.value),
-        BSONDocument(metadata :_*)
+        BSONDocument(metadata :_*).toTraversable
       )
     }
   }
@@ -79,7 +79,7 @@ case class DefaultFileToSave(
   filename: String,
   contentType: Option[String] = None,
   uploadDate: Option[Long] = None,
-  metadata: BSONDocument = BSONDocument(),
+  metadata: AppendableBSONDocument = BSONDocument(),
   id: BSONValue = BSONObjectID.generate) extends FileToSave[BSONValue]
 
 /**
@@ -90,14 +90,14 @@ trait ReadFile[+Id <: BSONValue] extends BasicMetadata[Id] with CustomMetadata w
 
 /** A default implementation of `ReadFile[BSONValue]`. */
 case class DefaultReadFile(
-    id: reactivemongo.bson.BSONValue,
+    id: BSONValue,
     contentType: Option[String],
     filename: String,
     uploadDate: Option[Long],
     chunkSize: Int,
     length: Int,
     md5: Option[String],
-    metadata: reactivemongo.bson.BSONDocument
+    metadata: TraversableBSONDocument
 ) extends ReadFile[BSONValue]
 
 /**
