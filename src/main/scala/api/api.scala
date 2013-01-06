@@ -60,7 +60,7 @@ class Failover[T](message: T, actorRef: ActorRef, strategy: FailoverStrategy)(ex
 }
 
 object Failover {
-  private val logger = LoggerFactory.getLogger("Failover")
+  private val logger = LoggerFactory.getLogger("reactivemongo.api.Failover")
   /**
    * Produces a [[reactivemongo.api.Failover]] holding a future reference that is completed with a result, after 1 or more attempts (specified in the given strategy).
    *

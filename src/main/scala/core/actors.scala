@@ -375,7 +375,7 @@ class MongoDBSystem(
 
 object MongoDBSystem {
   private[reactivemongo] val DefaultConnectionRetryInterval :Int = 2000 // milliseconds
-  private val logger = LazyLogger(LoggerFactory.getLogger("MongoDBSystem"))
+  private val logger = LazyLogger(LoggerFactory.getLogger("reactivemongo.core.actors.MongoDBSystem"))
 }
 
 private[actors] case class AuthHistory(
@@ -469,7 +469,7 @@ class MonitorActor(sys: ActorRef) extends Actor {
 }
 
 object MonitorActor {
-  private val logger = LazyLogger(LoggerFactory.getLogger("MonitorActor"))
+  private val logger = LazyLogger(LoggerFactory.getLogger("reactivemongo.core.actors.MonitorActor"))
 }
 
 // exceptions

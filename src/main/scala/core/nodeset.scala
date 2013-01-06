@@ -39,7 +39,7 @@ case class MongoChannel(
 }
 
 object MongoChannel {
-  private val logger = LazyLogger(LoggerFactory.getLogger("NodeWrapper"))
+  private val logger = LazyLogger(LoggerFactory.getLogger("reactivemongo.core.nodeset.MongoChannel"))
   implicit def mongoChannelToChannel(mc: MongoChannel) :Channel = mc.channel
 }
 
@@ -184,7 +184,7 @@ class RoundRobiner[A](val subject: IndexedSeq[A], private var i: Int = 0) {
 case class LoggedIn(db: String, user: String)
 
 class ChannelFactory(bossExecutor: Executor = Executors.newCachedThreadPool, workerExecutor: Executor = Executors.newCachedThreadPool) {
-  private val logger = LazyLogger(LoggerFactory.getLogger("ChannelFactory"))
+  private val logger = LazyLogger(LoggerFactory.getLogger("reactivemongo.core.nodeset.ChannelFactory"))
 
   def create(host: String = "localhost", port: Int = 27017, receiver: ActorRef) = {
     val channel = makeChannel(receiver)

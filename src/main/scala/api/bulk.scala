@@ -12,7 +12,7 @@ import scala.concurrent.{ExecutionContext, Future}
  * Bulk insertion.
  */
 object bulk {
-  private val logger = LazyLogger(LoggerFactory.getLogger("Bulk"))
+  private val logger = LazyLogger(LoggerFactory.getLogger("reactivemongo.api.Bulk"))
   /** Default maximum size for a bulk (1MB). */
   val MaxBulkSize = 1024 * 1024
   /** Default maximum documents number for a bulk (100). */

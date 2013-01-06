@@ -322,7 +322,7 @@ class TailableCursor[T](cursor: DefaultCursor[T], private val controller: Tailab
 object Cursor {
   import play.api.libs.iteratee._
 
-  private[api] val logger = LoggerFactory.getLogger("Cursor")
+  private[api] val logger = LoggerFactory.getLogger("reactivemongo.api.Cursor")
   
   /**
    * Flattens the given future [[reactivemongo.api.Cursor]] to a [[reactivemongo.api.FlattenedCursor]].
