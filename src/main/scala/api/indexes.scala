@@ -3,9 +3,46 @@ package reactivemongo.api.indexes
 import reactivemongo.api._
 import reactivemongo.bson._
 import reactivemongo.bson.handlers._
-import reactivemongo.core.commands.{DeleteIndex, FindAndModify, LastError, Update}
+import reactivemongo.core.commands.{DeleteIndex, LastError}
 import reactivemongo.utils.option
 import scala.concurrent.{Future, ExecutionContext}
+
+/** Type of Index */
+sealed trait IndexType {
+  /** Value of the index (`{fieldName: value}`). */
+  def value :BSONValue
+  private[indexes] def valueStr :String
+}
+
+object IndexType {
+  object Ascending extends IndexType {
+    def value = BSONInteger(1)
+    def valueStr = "1"
+  }
+
+  object Descending extends IndexType {
+    def value = BSONInteger(-1)
+    def valueStr = "-1"
+  }
+
+  object Geo2D extends IndexType {
+    def value = BSONString("2d")
+    def valueStr = "2d"
+  }
+
+  object GeoHaystack extends IndexType {
+    def value = BSONString("geoHaystack")
+    def valueStr = "geoHaystack"
+  }
+
+  def apply(value: BSONValue) = value match {
+    case BSONInteger(i) if i > 0 => Ascending
+    case BSONInteger(i) if i < 0 => Descending
+    case BSONString(s) if s == "2d" => Geo2D
+    case BSONString(s) if s == "geoHaystack" => GeoHaystack
+    case _ => throw new IllegalArgumentException("unsupported index type")
+  }
+}
 
 /**
  * A MongoDB index (excluding the namespace).
@@ -19,19 +56,21 @@ import scala.concurrent.{Future, ExecutionContext}
  * @param dropDups States if duplicates should be discarded (if unique = true). Warning: you should read [[http://www.mongodb.org/display/DOCS/Indexes#Indexes-dropDups%3Atrue the documentation]].
  * @param sparse States if the index to build should only consider the documents that have the indexed fields. See [[http://www.mongodb.org/display/DOCS/Indexes#Indexes-sparse%3Atrue the documentation]] on the consequences of such an index.
  * @param version Indicates the [[http://www.mongodb.org/display/DOCS/Index+Versions version]] of the index (1 for >= 2.0, else 0). You should let MongoDB decide.
+ * @param options Optional parameters for this index (typically specific to an IndexType like Geo2D).
  */
 case class Index(
-  key: List[(String, Boolean)], // true -> ascending (1)
+  key: List[(String, IndexType)],
   name: Option[String] = None,
   unique: Boolean = false,
   background: Boolean = false,
   dropDups: Boolean = false,
   sparse: Boolean = false,
-  version: Option[Int] = None // let MongoDB decide
+  version: Option[Int] = None, // let MongoDB decide
+  options: BSONDocument = BSONDocument()
 ) {
   /** The name of the index (a default one is computed if none). */
   lazy val eventualName :String = name.getOrElse(key.foldLeft("") { (name, kv) =>
-    name + (if(name.length > 0) "_" else "") + kv._1 + "_" + (if(kv._2) 1 else -1)
+    name + (if(name.length > 0) "_" else "") + kv._1 + "_" + kv._2.valueStr
   })
 }
 
@@ -77,7 +116,7 @@ class IndexesManager(db: DB[Collection])(implicit context: ExecutionContext) {
    * Warning: given the options you choose, and the data to index, it can be a long and blocking operation on the database.
    * You should really consider reading [[http://www.mongodb.org/display/DOCS/Indexes]] before doing this, especially in production.
    *
-   * @param The index to create.
+   * @param nsIndex The index to create.
    *
    * @return a future containing true if the index was created, false if it already exists.
    */
@@ -100,7 +139,7 @@ class IndexesManager(db: DB[Collection])(implicit context: ExecutionContext) {
    * Warning: given the options you choose, and the data to index, it can be a long and blocking operation on the database.
    * You should really consider reading [[http://www.mongodb.org/display/DOCS/Indexes]] before doing this, especially in production.
    *
-   * @param The index to create.
+   * @param nsIndex The index to create.
    */
   def create(nsIndex: NSIndex) :Future[LastError] = {
     implicit val writer = IndexesManager.NSIndexWriter
@@ -131,8 +170,8 @@ class CollectionIndexesManager(fqName: String, manager: IndexesManager)(implicit
     r.drop(1)
   }
   def list() :Future[List[Index]] = manager.list.map { list =>
-    list.filter( nsIndex =>
-      nsIndex.dbName == fqName).map(_.index)
+    list.filter(nsIndex =>
+      nsIndex.namespace == fqName).map(_.index)
   }
 
   /**
@@ -141,7 +180,7 @@ class CollectionIndexesManager(fqName: String, manager: IndexesManager)(implicit
    * Warning: given the options you choose, and the data to index, it can be a long and blocking operation on the database.
    * You should really consider reading [[http://www.mongodb.org/display/DOCS/Indexes]] before doing this, especially in production.
    *
-   * @param The index to create.
+   * @param index The index to create.
    *
    * @return a future containing true if the index was created, false if it already exists.
    */
@@ -154,7 +193,7 @@ class CollectionIndexesManager(fqName: String, manager: IndexesManager)(implicit
    * Warning: given the options you choose, and the data to index, it can be a long and blocking operation on the database.
    * You should really consider reading [[http://www.mongodb.org/display/DOCS/Indexes]] before doing this, especially in production.
    *
-   * @param The index to create.
+   * @param index The index to create.
    */
   def create(index: Index) :Future[LastError] =
     manager.create(NSIndex(fqName, index))
@@ -181,12 +220,12 @@ object IndexesManager {
       "name"       -> BSONString(nsIndex.index.eventualName),
       "key"        -> BSONDocument(
           (for(kv <- nsIndex.index.key)
-            yield kv._1 -> BSONInteger(if(kv._2) 1 else -1)) :_*),
+            yield kv._1 -> kv._2.value) :_*),
       "background" -> option(nsIndex.index.background, BSONBoolean(true)),
       "dropDups"   -> option(nsIndex.index.dropDups,   BSONBoolean(true)),
       "sparse"     -> option(nsIndex.index.sparse,     BSONBoolean(true)),
       "unique"     -> option(nsIndex.index.unique,     BSONBoolean(true))
-    )
+    ) ++ nsIndex.index.options
   }
 
   implicit object NSIndexWriter extends RawBSONWriter[NSIndex] {
@@ -202,18 +241,23 @@ object IndexesManager {
     import org.jboss.netty.buffer._
     def read(buffer: ChannelBuffer) :NSIndex = {
       val doc = DefaultBSONHandlers.DefaultBSONDocumentReader.read(buffer)
+      val options = doc.mapped.filterNot { element =>
+        element._1 == "ns" || element._1 == "key" || element._1 == "name" || element._1 == "unique" ||
+          element._1 == "background" || element._1 == "dropDups" || element._1 == "sparse" || element._1 == "v"
+      }.toSeq
       NSIndex(
         doc.getAs[BSONString]("ns").map(_.value).get,
         Index(
           doc.getAs[TraversableBSONDocument]("key").get.iterator.toList.map { elem =>
-            elem.name -> (elem.value.asInstanceOf[BSONInteger].value == 1)
+            elem.name -> IndexType(elem.value)
           },
           doc.getAs[BSONString]("name").map(_.value),
           doc.getAs[BSONBoolean]("unique").map(_.value).getOrElse(false),
           doc.getAs[BSONBoolean]("background").map(_.value).getOrElse(false),
           doc.getAs[BSONBoolean]("dropDups").map(_.value).getOrElse(false),
           doc.getAs[BSONBoolean]("sparse").map(_.value).getOrElse(false),
-          doc.getAs[BSONInteger]("v").map(_.value)
+          doc.getAs[BSONInteger]("v").map(_.value),
+          BSONDocument(options :_*)
         )
       )
     }

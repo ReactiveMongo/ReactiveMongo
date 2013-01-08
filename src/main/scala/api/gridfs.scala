@@ -107,6 +107,7 @@ case class DefaultReadFile(
  */
 class GridFS(db: DB[Collection] with DBMetaCommands, prefix: String = "fs") {
   import indexes._
+  import IndexType._
   import handlers.DefaultBSONHandlers._
   
   /** The `files` collection */
@@ -281,7 +282,7 @@ class GridFS(db: DB[Collection] with DBMetaCommands, prefix: String = "fs") {
    * @return A future containing true if the index was created, false if it already exists.
    */
   def ensureIndex()(implicit ctx: ExecutionContext) :Future[Boolean] =
-    db.indexesManager.onCollection(prefix + ".chunks").ensure(Index( List("files_id" -> true, "n" -> true), unique = true ))
+    db.indexesManager.onCollection(prefix + ".chunks").ensure(Index( List("files_id" -> Ascending, "n" -> Ascending), unique = true ))
 }
 
 object GridFS {
