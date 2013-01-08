@@ -1,12 +1,11 @@
 package reactivemongo.api
 
-import reactivemongo.core.actors.RequestMakerExpectingResponse
 import reactivemongo.bson.handlers._
+import reactivemongo.core.iteratees._
 import reactivemongo.core.protocol._
 import reactivemongo.utils.buffers._
 import reactivemongo.utils.ExtendedFutures._
 
-import org.jboss.netty.buffer.ChannelBuffer
 import org.slf4j.LoggerFactory
 import play.api.libs.iteratee._
 import scala.concurrent.{ExecutionContext, Future}
@@ -92,18 +91,16 @@ cursor.enumerate.apply(Iteratee.foreach { doc =>
    *
    * It is worth diving into the [[https://github.com/playframework/Play20/wiki/Iteratees Play! 2.0 Iteratee documentation]].
    *
-   * @tparam T the type of the matched documents. An implicit [[reactivemongo.bson.handlers.RawBSONReader]][T] typeclass for handling it has to be in the scope.
-   *
 */
   def enumerate()(implicit ctx: ExecutionContext) :Enumerator[T] = {
     if(hasNext) {
-      Enumerator.unfoldM(this) { cursor =>
+      CustomEnumerator.unfoldM(this) { cursor =>
         Cursor.nextElement(cursor)
       }.andThen(Enumerator.eof) &> Enumeratee.collect {
         case Some(e) => e
       } &> Enumeratee.onIterateeDone(() => {
         logger.debug("iteratee is done, closing cursor")
-        close
+        close()
       })
     } else {
       Enumerator.eof
@@ -121,7 +118,6 @@ val list = cursor2[List].collect()
 }}}
    *
    * @tparam M the type of the returned collection.
-   * @tparam T the type of the matched documents. An implicit [[reactivemongo.bson.handlers.RawBSONReader]][T] typeclass for handling it has to be in the scope.
    */
   def collect[M[_]]()(implicit cbf: CanBuildFrom[M[_], T, M[T]], ec: ExecutionContext) :Future[M[T]] = {
     enumerate |>>> Iteratee.fold(cbf.apply) { (builder, t :T) => builder += t }.map(_.result)
@@ -155,9 +151,6 @@ val list = cursor[List].collect(3)
 val cursor2 = collection.find(query, filter)
 val list = cursor2.toList
 }}}
-   *
-   * @tparam M the type of the returned collection.
-   * @tparam T the type of the matched documents. An implicit [[reactivemongo.bson.handlers.RawBSONReader]][T] typeclass for handling it has to be in the scope.
    */
   def toList()(implicit ctx: ExecutionContext) :Future[List[T]] = collect[List]()
 
@@ -171,9 +164,6 @@ val cursor2 = collection.find(query, filter)
 // return the 3 first documents in a list.
 val list = cursor2.toList(3)
 }}}
-   *
-   * @tparam M the type of the returned collection.
-   * @tparam T the type of the matched documents. An implicit [[reactivemongo.bson.handlers.RawBSONReader]][T] typeclass for handling it has to be in the scope.
    */
   def toList(upTo: Int)(implicit ctx: ExecutionContext) :Future[List[T]] = collect[List](upTo)
 
@@ -185,15 +175,13 @@ val list = cursor2.toList(3)
 val cursor2 = collection.find(query, filter)
 val list = cursor2[List].collect()
 }}}
-   *
-   * @tparam T the type of the matched documents. An implicit [[reactivemongo.bson.handlers.RawBSONReader]][T] typeclass for handling it has to be in the scope.
    */
   def headOption()(implicit ec: ExecutionContext) :Future[Option[T]] = {
     collect[Iterable](1).map(_.headOption)
   }
 
   /** Explicitly closes that cursor. It cannot be used again. */
-  def close() :Unit
+  def close()
 }
 
 class DefaultCursor[T](response: Response, private[api] val mongoConnection: MongoConnection, private[api] val query: Query, private[api] val originalRequest: BufferSequence, private[api] val failoverStrategy: FailoverStrategy)(implicit handler: BSONReaderHandler, reader: RawBSONReader[T], ctx: ExecutionContext) extends Cursor[T] {
@@ -225,7 +213,7 @@ class DefaultCursor[T](response: Response, private[api] val mongoConnection: Mon
             new DefaultCursor(response, mongoConnection, query, originalRequest, failoverStrategy)}
   }
 
-  def close() = {
+  def close() {
     Cursor.logger.debug("sending killcursor on id = " + response.reply.cursorID)
     connection.map(_.send(RequestMaker(KillCursors(Set(response.reply.cursorID)))))
   }
@@ -250,9 +238,9 @@ class FlattenedCursor[T](futureCursor: Future[Cursor[T]])(implicit ctx: Executio
 
   def hasNext = true
 
-  def close() = {
+  def close() {
     logger.debug("FlattenedCursor closing")
-    futureCursor.map(_.close)
+    futureCursor.map(_.close())
   }
 }
 
@@ -261,7 +249,9 @@ private[api] class TailableController() {
 
   def stopped = isStopped
 
-  def stop() = isStopped = true
+  def stop() {
+    isStopped = true
+  }
 
   override def toString = {
     "TailableController(" + isStopped + ")"
@@ -289,13 +279,13 @@ class TailableCursor[T](cursor: DefaultCursor[T], private val controller: Tailab
           logger.debug("regenerating cursor")
           val f = DelayedFuture(500, MongoConnection.system).flatMap(_ => cursor.regenerate)
           f.onComplete {
-            case Failure(e) => e.printStackTrace
+            case Failure(e) => e.printStackTrace()
             case Success(t) => logger.debug("regenerate is ok")
           }
           f
       }.map(new TailableCursor(_, controller))
       fut.onComplete {
-        case Failure(e) => e.printStackTrace
+        case Failure(e) => e.printStackTrace()
         case Success(t) => logger.debug("next is ok")
       }
       fut
@@ -303,14 +293,14 @@ class TailableCursor[T](cursor: DefaultCursor[T], private val controller: Tailab
   }
 
   def hasNext = {
-    logger.debug("calling hasNext on tailable cursor");
+    logger.debug("calling hasNext on tailable cursor")
     !controller.stopped
   }
 
-  def close() = {
+  def close() {
     logger.debug("TailableCursor closing")
     cursor.cursorId.map { id =>
-      controller.stop
+      controller.stop()
       if(id > 0) {
         Cursor.logger.debug("sending killcursor on id = " + id)
         connection.map(_.send(RequestMaker(KillCursors(Set(id)))))
@@ -320,8 +310,6 @@ class TailableCursor[T](cursor: DefaultCursor[T], private val controller: Tailab
 }
 
 object Cursor {
-  import play.api.libs.iteratee._
-
   private[api] val logger = LoggerFactory.getLogger("reactivemongo.api.Cursor")
   
   /**
@@ -331,7 +319,7 @@ object Cursor {
 
   private def nextElement[T](cursor: Cursor[T])(implicit ec: ExecutionContext) :Future[Option[(Cursor[T], Option[T])]] = {
     if(cursor.iterator.hasNext)
-      Future(Some((cursor,Some(cursor.iterator.next))))
+      Future(Some((cursor,Some(cursor.iterator.next()))))
     else if (cursor.hasNext)
       cursor.next.map(c => Some((c,None)))
     else Future(None)
