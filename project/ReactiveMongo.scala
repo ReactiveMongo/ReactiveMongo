@@ -17,6 +17,37 @@ object BuildSettings {
 }
 
 
+
+object Publish {
+  lazy val settings = Seq(
+    publishMavenStyle := true,
+    publishTo <<= version { (v: String) =>
+      val nexus = "https://oss.sonatype.org/"
+      if (v.trim.endsWith("SNAPSHOT"))
+        Some("snapshots" at nexus + "content/repositories/snapshots")
+      else
+        Some("releases"  at nexus + "service/local/staging/deploy/maven2")
+    },
+    publishArtifact in Test := false,
+    pomIncludeRepository := { _ => false },
+    licenses := Seq("Apache 2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0")),
+    homepage := Some(url("https://github.com/zenexity/ReactiveMongo")),
+    pomExtra := (
+      <scm>
+        <url>git://github.com/zenexity/ReactiveMongo.git</url>
+        <connection>scm:git://github.com/zenexity/ReactiveMongo.git</connection>
+      </scm>
+        <developers>
+          <developer>
+            <id>sgodbillon</id>
+            <name>Stephane Godbillon</name>
+            <url>http://www.zenexity.com/</url>
+          </developer>
+        </developers>)
+  )
+}
+
+
 object Format {
 
   import com.typesafe.sbt.SbtScalariform._
