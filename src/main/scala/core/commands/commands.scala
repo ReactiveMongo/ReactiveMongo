@@ -1,12 +1,14 @@
 package reactivemongo.core.commands
 
 import reactivemongo.bson._
+import reactivemongo.bson.Implicits._
 import reactivemongo.bson.handlers.DefaultBSONHandlers
 import reactivemongo.core.errors._
 import reactivemongo.core.protocol.{RequestMaker, Query, QueryFlags, Response}
 import reactivemongo.core.protocol.NodeState
 import reactivemongo.core.protocol.NodeState._
 import reactivemongo.utils._
+import reactivemongo.utils.buffers._
 
 /**
  * A MongoDB Command.
@@ -59,7 +61,7 @@ trait BSONCommandResultMaker[Result] extends CommandResultMaker[Result] {
       apply(document)
     } catch {
       case e :CommandError => Left(e)
-      case e =>
+      case e: Throwable =>
         val error = CommandError("exception while deserializing this command's result!", Some(document))
         error.initCause(e);
         Left(error)
@@ -161,7 +163,7 @@ class MakableCommand(val db: String, val command: Command[_]) {
   /**
    * Returns the [[reactivemongo.core.protocol.RequestMaker]] for the given command.
    */
-  def maker = RequestMaker(makeQuery, command.makeDocuments.makeBuffer)
+  def maker = RequestMaker(makeQuery, BufferSequence(command.makeDocuments.makeBuffer))
 }
 
 case class RawCommand(bson: BSONDocument) extends Command[TraversableBSONDocument] {
@@ -189,22 +191,19 @@ case class GetLastError(
   waitForReplicatedOn: Option[Int] = None,
   fsync: Boolean = false
 ) extends Command[LastError] {
-  override def makeDocuments = {
-    val doc = BSONDocument("getlasterror" -> BSONInteger(1))
-    if(awaitJournalCommit)
-      doc += ("j" -> BSONBoolean(true))
-    if(waitForReplicatedOn.isDefined)
-      doc += ("w" -> BSONInteger(waitForReplicatedOn.get))
-    if(fsync)
-      doc.append("fsync" -> BSONBoolean(true))
-    doc
-  }
+  override def makeDocuments =
+    BSONDocument(
+      "getlasterror"        -> BSONInteger(1),
+      "waitForReplicatedOn" -> waitForReplicatedOn.map(w => BSONInteger(w)),
+      "fsync"               -> option(fsync, BSONBoolean(true)),
+      "j"                   -> option(awaitJournalCommit, BSONBoolean(true))
+    )
 
   val ResultMaker = LastError
 }
 
 /**
- * Result of the [[reactivemongo.commands.GetLastError]] command.
+ * Result of the [[reactivemongo.core.commands.GetLastError]] command.
  *
  * @param ok true if the last operation was successful
  * @param err the err field, if any
@@ -239,6 +238,15 @@ object LastError extends BSONCommandResultMaker[LastError] {
       Some(document)
     ))
   }
+  def meaningful(response: Response) = {
+    apply(response) match {
+      case Left(e) => Left(e)
+      case Right(lastError) =>
+        if(lastError.inError)
+          Left(lastError)
+        else Right(lastError)
+    }
+  }
 }
 
 /**
@@ -254,14 +262,12 @@ case class Count(
   query: Option[BSONDocument] = None,
   fields: Option[BSONDocument] = None
 ) extends Command[Int] {
-  override def makeDocuments = {
-    val bson = BSONDocument("count" -> BSONString(collectionName))
-    if(query.isDefined)
-      bson += ("query" -> query.get)
-    if(fields.isDefined)
-      bson += ("fields" -> fields.get)
-    bson
-  }
+  override def makeDocuments =
+    BSONDocument(
+      "count"  -> BSONString(collectionName),
+      "query"  -> query,
+      "fields" -> fields
+    )
 
   val ResultMaker = Count
 }
@@ -406,7 +412,7 @@ object IsMaster extends AdminCommand[IsMasterResponse] {
         document.getAs[BSONInteger]("maxBsonObjectSize").map(_.value).getOrElse(16777216),
         document.getAs[BSONString]("setName").map(_.value),
         document.getAs[TraversableBSONArray]("hosts").map(
-          _.bsonIterator.map(_.value.asInstanceOf[BSONString].value).toList
+          _.iterator.map(_.value.asInstanceOf[BSONString].value).toList
         ),
         document.getAs[BSONString]("me").map(_.value)
       ))
@@ -438,7 +444,7 @@ case class IsMasterResponse(
 
 /** A modify operation, part of a FindAndModify command */
 sealed trait Modify {
-  protected[commands] def alter(bson: AppendableBSONDocument) :AppendableBSONDocument
+  protected[commands] def toDocument :AppendableBSONDocument
 }
 
 /**
@@ -448,14 +454,15 @@ sealed trait Modify {
  * @param fetchNewObject the command result must be the new object instead of the old one.
  */
 case class Update(update: BSONDocument, fetchNewObject: Boolean) extends Modify {
-  override def alter(bson: AppendableBSONDocument) = bson
-      .append("update" -> update)
-      .append("new" -> BSONBoolean(fetchNewObject))
+  override def toDocument = BSONDocument(
+    "update" -> update,
+    "new"    -> BSONBoolean(fetchNewObject)
+  )
 }
 
 /** Remove (part of a FindAndModify command). */
 object Remove extends Modify {
-  override def alter(bson: AppendableBSONDocument) = bson.append("remove" -> BSONBoolean(true))
+  override def toDocument = BSONDocument("remove" -> BSONBoolean(true))
 }
 
 /**
@@ -479,23 +486,20 @@ case class FindAndModify(
   sort: Option[BSONDocument] = None,
   fields: Option[BSONDocument] = None
 ) extends Command[Option[TraversableBSONDocument]] {
-  override def makeDocuments = {
-    val bson = BSONDocument("findAndModify" -> BSONString(collection), "query" -> query)
-    if(sort.isDefined)
-      bson += ("sort" -> sort.get)
-    if(fields.isDefined)
-      bson += ("fields" -> fields.get)
-    if(upsert)
-      bson += ("upsert" -> BSONBoolean(true))
-    modify.alter(bson)
-  }
+  override def makeDocuments =
+    BSONDocument(
+      "findAndModify" -> BSONString(collection),
+      "query" -> query,
+      "sort" -> sort,
+      "fields" -> fields,
+      "upsert" -> option(upsert, BSONBoolean(true))) ++ modify.toDocument
 
   val ResultMaker = FindAndModify
 }
 
 /**
  * FindAndModify command deserializer
- * @todo [[reactivemongo.bson.handlers.BSONReader[T]]] typeclass
+ * @todo [[reactivemongo.bson.handlers.BSONReader]][T] typeclass
  */
 object FindAndModify extends BSONCommandResultMaker[Option[TraversableBSONDocument]] {
   def apply(document: TraversableBSONDocument) =

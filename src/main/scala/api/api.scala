@@ -1,7 +1,6 @@
 package reactivemongo.api
 
 import akka.actor.{ActorRef, ActorSystem, Props}
-import akka.pattern.ask
 import org.jboss.netty.buffer.ChannelBuffer
 import org.slf4j.{Logger, LoggerFactory}
 import play.api.libs.iteratee._
@@ -11,11 +10,10 @@ import reactivemongo.bson._
 import reactivemongo.bson.handlers._
 import reactivemongo.core.protocol._
 import reactivemongo.core.commands.{Command, GetLastError, LastError, SuccessfulAuthentication}
-import reactivemongo.utils.scalaToAkkaDuration
 import reactivemongo.utils.EitherMappableFuture._
-import scala.concurrent.{Future, ExecutionContext}
-import scala.concurrent.util.Duration
-import scala.concurrent.util.duration._
+import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.concurrent.duration._
+import scala.util.{Failure, Success}
 
 /**
  * A helper that sends the given message to the given actor, following a failover strategy.
@@ -32,8 +30,7 @@ import scala.concurrent.util.duration._
  */
 class Failover[T](message: T, actorRef: ActorRef, strategy: FailoverStrategy)(expectingResponseMaker: T => ExpectingResponse)(implicit ec: ExecutionContext) {
   import Failover.logger
-  private val akkaDelay = scalaToAkkaDuration(strategy.initialDelay)
-  private val promise = scala.concurrent.Promise[Response]()
+  private val promise = Promise[Response]()
 
   /** A future that is completed with a response, after 1 or more attempts (specified in the given strategy). */
   val future: Future[Response] = promise.future
@@ -42,18 +39,18 @@ class Failover[T](message: T, actorRef: ActorRef, strategy: FailoverStrategy)(ex
     val expectingResponse = expectingResponseMaker(message)
     actorRef ! expectingResponse
     expectingResponse.future.onComplete {
-      case Left(e) =>
+      case Failure(e) =>
         if(n < strategy.retries) {
           val `try` = n + 1
           val delayFactor = strategy.delayFactor(`try`)
-          val delay = akkaDelay * delayFactor
+          val delay = Duration.unapply(strategy.initialDelay * delayFactor).map(t => FiniteDuration(t._1, t._2)).getOrElse(strategy.initialDelay)
           logger.warn("Got an error, retrying... (try #" + `try` + " is scheduled in " + delay.toMillis + " ms)", e)
           MongoConnection.system.scheduler.scheduleOnce(delay)(send(`try`))
         } else {
-          logger.error("Got an error, no more attempts to do. Completing with an error...")
+          logger.error("Got an error, no more attempts to do. Completing with an error...", e)
           promise.failure(e)
         }
-      case Right(response) =>
+      case Success(response) =>
         logger.debug("Got a successful result, completing...")
         promise.success(response)
     }
@@ -63,7 +60,7 @@ class Failover[T](message: T, actorRef: ActorRef, strategy: FailoverStrategy)(ex
 }
 
 object Failover {
-  private val logger = LoggerFactory.getLogger("Failover")
+  private val logger = LoggerFactory.getLogger("reactivemongo.api.Failover")
   /**
    * Produces a [[reactivemongo.api.Failover]] holding a future reference that is completed with a result, after 1 or more attempts (specified in the given strategy).
    *
@@ -93,7 +90,7 @@ object Failover {
  * @param delayFactor a function that takes the current iteration and returns a factor to be applied to the initialDelay.
  */
 case class FailoverStrategy(
-  initialDelay: Duration = 500 milliseconds,
+  initialDelay: FiniteDuration = 500 milliseconds,
   retries: Int = 5,
   delayFactor: Int => Double = n => 1)
 
@@ -125,6 +122,8 @@ class MongoConnection(
   val mongosystem: ActorRef,
   monitor: ActorRef
 ) {
+  import akka.pattern.{ask => akkaAsk}
+  import akka.util.Timeout
   /**
    * Returns a DefaultDB reference using this connection.
    *
@@ -144,11 +143,8 @@ class MongoConnection(
   /**
    * Get a future that will be successful when a primary node is available or times out.
    */
-  def waitForPrimary(waitForAvailability: Duration) :Future[_] = {
-    new play.api.libs.concurrent.AkkaPromise(
-      monitor.ask(reactivemongo.core.actors.WaitForPrimary)(scalaToAkkaDuration(waitForAvailability))
-    )
-  }
+  def waitForPrimary(implicit waitForAvailability: FiniteDuration) :Future[_] =
+    akkaAsk(monitor, reactivemongo.core.actors.WaitForPrimary)(Timeout(waitForAvailability))
 
   /**
    * Writes a request and wait for a response.
@@ -184,12 +180,12 @@ class MongoConnection(
   def send(message: RequestMaker) = mongosystem ! message
 
   /** Authenticates the connection on the given database. */
-  def authenticate(db: String, user: String, password: String)(implicit timeout: Duration) :Future[SuccessfulAuthentication] = {
-    new play.api.libs.concurrent.AkkaPromise((mongosystem ? Authenticate(db, user, password))(scalaToAkkaDuration(timeout)).mapTo[SuccessfulAuthentication])
-  }
+  def authenticate(db: String, user: String, password: String)(implicit timeout: FiniteDuration) :Future[SuccessfulAuthentication] =
+    akkaAsk(mongosystem, Authenticate(db, user, password))(Timeout(timeout)).mapTo[SuccessfulAuthentication]
 
   /** Closes this MongoConnection (closes all the channels and ends the actors) */
-  def askClose()(implicit timeout: Duration) :Future[_] = new play.api.libs.concurrent.AkkaPromise((monitor ? Close)(scalaToAkkaDuration(timeout)))
+  def askClose()(implicit timeout: FiniteDuration) :Future[_] =
+    akkaAsk(monitor, Close)(Timeout(timeout))
 
   /** Closes this MongoConnection (closes all the channels and ends the actors) */
   def close() :Unit = monitor ! Close

@@ -11,7 +11,7 @@ import org.jboss.netty.buffer.ChannelBuffer
 import play.api.libs.iteratee._
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.concurrent.util.Duration
+import scala.concurrent.duration._
 
 /**
  * A Mongo Database.
@@ -59,7 +59,7 @@ trait DB[+C <: Collection] {
   def command[T](command: Command[T])(implicit ec: ExecutionContext) :Future[T]
 
   /** Authenticates the connection on this database. */
-  def authenticate(user: String, password: String)(implicit timeout: Duration) :Future[SuccessfulAuthentication] = connection.authenticate(name, user, password)
+  def authenticate(user: String, password: String)(implicit timeout: FiniteDuration) :Future[SuccessfulAuthentication] = connection.authenticate(name, user, password)
 }
 
 /** A mixin for making failover requests on the database. */
@@ -76,6 +76,9 @@ trait FailoverDB {
 /** A mixin that provides commands about this database itself. */
 trait DBMetaCommands {
   self: DB[Collection] =>
+
+  /** Drops this database. */
+  def drop()(implicit ec: ExecutionContext) :Future[Boolean] = command(new DropDatabase())
 
   /** Returns an index manager for this database. */
   def indexesManager(implicit ec: ExecutionContext) = new IndexesManager(self)

@@ -7,12 +7,10 @@ case class CappedOptions(
   size: Long,
   maxDocuments: Option[Int] = None
 ) {
-  def write(doc: AppendableBSONDocument) :AppendableBSONDocument = {
-    doc +=  ("capped" -> BSONBoolean(true), "size" -> BSONLong(size))
-    if(maxDocuments.isDefined)
-      doc += "max" -> BSONLong(maxDocuments.get)
-    else doc
-  }
+  def toDocument = BSONDocument(
+    "capped" -> BSONBoolean(true),
+    "size"   -> BSONLong(size),
+    "max"    -> maxDocuments.map(max => BSONLong(max)))
 }
 
 /**
@@ -30,12 +28,12 @@ class CreateCollection(
   autoIndexId: Option[Boolean] = None
 ) extends Command[Boolean] {
   def makeDocuments = {
-    val doc = BSONDocument("create" -> BSONString(name))
+    val doc = BSONDocument(
+      "create"      -> BSONString(name),
+      "autoIndexId" -> autoIndexId.map(BSONBoolean(_)))
     if(capped.isDefined)
-      capped.get.write(doc)
-    if(autoIndexId.isDefined)
-      doc += "autoIndexId" -> BSONBoolean(autoIndexId.get)
-    doc
+      doc ++ capped.get.toDocument
+    else doc
   }
 
   object ResultMaker extends BSONCommandResultMaker[Boolean] {
@@ -56,8 +54,7 @@ class ConvertToCapped(
   capped: CappedOptions
 ) extends Command[Boolean] {
   def makeDocuments = {
-    val doc = BSONDocument("convertToCapped" -> BSONString(name))
-    capped.write(doc)
+    BSONDocument("convertToCapped" -> BSONString(name)) ++ capped.toDocument
   }
 
   object ResultMaker extends BSONCommandResultMaker[Boolean] {
@@ -78,10 +75,9 @@ class CollStats(
   scale :Option[Int] = None
 ) extends Command[CollStatsResult] {
   def makeDocuments = {
-    val doc = BSONDocument("collStats" -> BSONString(name))
-    if(scale.isDefined)
-      doc += "scale" -> BSONInteger(scale.get)
-    else doc
+    BSONDocument(
+      "collStats" -> BSONString(name),
+      "scale"     -> scale.map(BSONInteger(_)))
   }
 
   val ResultMaker = CollStatsResult
@@ -109,14 +105,14 @@ case class CollStatsResult(
   ns: String,
   count: Int,
   size: Int,
-  averageObjectSize: Option[Int],
+  averageObjectSize: Option[Double],
   storageSize: Int,
   numExtents: Int,
   nindexes: Int,
   lastExtentSize: Int,
   paddingFactor: Double,
-  systemFlags: Int,
-  userFlags: Int,
+  systemFlags: Option[Int],
+  userFlags: Option[Int],
   totalIndexSize: Int,
   indexSizes: Array[(String, Int)],
   capped: Boolean,
@@ -124,28 +120,89 @@ case class CollStatsResult(
 )
 
 object CollStatsResult extends BSONCommandResultMaker[CollStatsResult] {
-  def apply(doc: TraversableBSONDocument) = {
-    CommandError.checkOk(doc, Some("collStats")).toLeft(
+  def apply(doc: TraversableBSONDocument) :Either[CommandError, CollStatsResult] = {
+    CommandError.checkOk(doc, Some("collStats")).toLeft {
       CollStatsResult(
         doc.getAs[BSONString]("ns").get.value,
         doc.getAs[BSONInteger]("count").get.value,
         doc.getAs[BSONInteger]("size").get.value,
-        doc.getAs[BSONInteger]("avgObjSize").map(_.value),
+        doc.getAs[BSONDouble]("avgObjSize").map(_.value),
         doc.getAs[BSONInteger]("storageSize").get.value,
         doc.getAs[BSONInteger]("numExtents").get.value,
         doc.getAs[BSONInteger]("nindexes").get.value,
         doc.getAs[BSONInteger]("lastExtentSize").get.value,
         doc.getAs[BSONDouble]("paddingFactor").get.value,
-        doc.getAs[BSONInteger]("systemFlags").get.value,
-        doc.getAs[BSONInteger]("userFlags").get.value,
+        doc.getAs[BSONInteger]("systemFlags").map(_.value),
+        doc.getAs[BSONInteger]("userFlags").map(_.value),
         doc.getAs[BSONInteger]("totalIndexSize").get.value,
         {
           val indexSizes = doc.getAs[TraversableBSONDocument]("indexSizes").get
           (for(kv <- indexSizes.mapped) yield kv._1 -> kv._2.asInstanceOf[BSONInteger].value).toArray
         },
-        doc.getAs[BSONBoolean]("capped").map(_.value).getOrElse(false),
+        doc.getAs[BSONInteger]("capped").map(_.value == 1).getOrElse(false),
         doc.getAs[BSONDouble]("max").map(_.value.toLong)
       )
-    )
+    }
+  }
+}
+
+/**
+ * Drop a collection.
+ *
+ * @param name The collection name.
+ */
+class Drop(
+  name: String
+) extends Command[Boolean] {
+  def makeDocuments =
+    BSONDocument("drop" -> BSONString(name))
+
+  object ResultMaker extends BSONCommandResultMaker[Boolean] {
+    def apply(doc: TraversableBSONDocument) = {
+      CommandError.checkOk(doc, Some("drop")).toLeft(true)
+    }
+  }
+}
+
+/**
+ * Empty a capped collection.
+ *
+ * @param name The collection name.
+ */
+class EmptyCapped(
+  name: String
+) extends Command[Boolean] {
+  def makeDocuments =
+    BSONDocument("emptycapped" -> BSONString(name))
+
+  object ResultMaker extends BSONCommandResultMaker[Boolean] {
+    def apply(doc: TraversableBSONDocument) = {
+      CommandError.checkOk(doc, Some("emptycapped")).toLeft(true)
+    }
+  }
+}
+
+/**
+ * Rename a collection.
+ *
+ * @param name The collection name.
+ * @param target The new name of the collection.
+ * @param dropTarget If a collection of name `target` already exists, drop it before renaming this collection.
+ */
+class RenameCollection(
+  name: String,
+  target: String,
+  dropTarget: Boolean = false
+) extends Command[Boolean] {
+  def makeDocuments =
+    BSONDocument(
+      "renameCollection" -> BSONString(name),
+      "to"               -> BSONString(target),
+      "dropTarget"       -> BSONBoolean(dropTarget))
+
+  object ResultMaker extends BSONCommandResultMaker[Boolean] {
+    def apply(doc: TraversableBSONDocument) = {
+      CommandError.checkOk(doc, Some("renameCollection")).toLeft(true)
+    }
   }
 }
