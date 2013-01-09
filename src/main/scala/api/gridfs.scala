@@ -218,7 +218,7 @@ case class FileToWrite(
       }
     }
 
-    Iteratee.fold1(Chunk()) { (previous, chunk :Array[Byte]) =>
+    Iteratee.fold1(Future(Chunk())) { (previous, chunk :Array[Byte]) =>
       logger.debug("processing new enumerated chunk from n=" + previous.n + "...\n")
       previous.feed(chunk)
     }.mapDone(_.finish)
