@@ -12,7 +12,7 @@ object BuildSettings {
     crossScalaVersions := Seq("2.10.0"),
     crossVersion := CrossVersion.binary,
     shellPrompt := ShellPrompt.buildShellPrompt
-  ) ++ Format.settings
+  )// ++ Format.settings
 
 }
 
