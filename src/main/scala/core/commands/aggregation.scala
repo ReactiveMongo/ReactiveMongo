@@ -1,8 +1,5 @@
 package core.commands
 
-import reflect.macros.Context
-import language.experimental.macros
-
 import reactivemongo.bson._
 import reactivemongo.bson.BSONString
 import reactivemongo.core.commands.{BSONCommandResultMaker, Command}
@@ -22,8 +19,6 @@ case class Aggregate[T](
     )
 
   val ResultMaker = throw new UnsupportedOperationException
-
-  def rm_impl(c: Context)()
 }
 
 sealed trait PipelineOperator {
