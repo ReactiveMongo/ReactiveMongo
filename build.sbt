@@ -14,11 +14,12 @@ resolvers += "Typesafe repository releases" at "http://repo.typesafe.com/typesaf
 
 libraryDependencies ++= Seq(
   "io.netty" % "netty" % "3.3.1.Final",
-  "com.typesafe.akka" % "akka-actor_2.10.0-RC2" % "2.1.0-RC2",
-  "play" % "play-iteratees_2.10" % "2.1-RC1",
+  "org.scala-lang" % "scala-actors" % "2.10.0",
+  "com.typesafe.akka" %% "akka-actor" % "2.1.0",
+  "play" %% "play-iteratees" % "2.1-SNAPSHOT",
   "ch.qos.logback" % "logback-core" % "1.0.0",
   "ch.qos.logback" % "logback-classic" % "1.0.0",
-  "org.specs2" % "specs2_2.10.0-RC2" % "1.12.2" % "test",
+  "org.specs2" %% "specs2" % "1.13" % "test",
   "junit" % "junit" % "4.8" % "test"
 )
 
@@ -51,6 +52,6 @@ publishMavenStyle := true
 
 sources in (Compile, doc) ~= (_ filter (p => !p.getAbsolutePath.contains("src/samples") && !p.getAbsolutePath.contains("src/main/scala/tests")))
 
-scalaVersion := "2.10.0-RC1"
+scalaVersion := "2.10.0"
 
 crossVersion := CrossVersion.full

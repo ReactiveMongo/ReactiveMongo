@@ -209,7 +209,7 @@ class GridFS(db: DB[Collection] with DBMetaCommands, prefix: String = "fs") {
       }
     }
 
-    Iteratee.fold1(Chunk()) { (previous, chunk :Array[Byte]) =>
+    Iteratee.foldM(Chunk()) { (previous, chunk :Array[Byte]) =>
       logger.debug("processing new enumerated chunk from n=" + previous.n + "...\n")
       previous.feed(chunk)
     }.mapDone(_.finish)
