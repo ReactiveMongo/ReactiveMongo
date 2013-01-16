@@ -2,7 +2,7 @@ import sbt._
 import sbt.Keys._
 
 object BuildSettings {
-  val buildVersion = "0.8"
+  val buildVersion = "0.9-SNAPSHOT"
 
   val filter = { (ms: Seq[(File, String)]) =>
     ms filter { case (file, path) =>
