@@ -119,7 +119,7 @@ class MongoDBSystem(
     case _: Authenticating if !continuing => {logger.debug("AUTH: delaying auth on " + channel);channel}
     case _ => if(channel.loggedIn.size < authenticationHistory.authenticates.size) {
       val nextAuth = authenticationHistory.authenticates(channel.loggedIn.size)
-      logger.debug("channel " + channel.channel + " is now starting to process the next auth with " + nextAuth + "!")
+      logger.debug("channel " + channel + " is now starting to process the next auth with " + nextAuth + "!")
       channel.write(Getnonce(nextAuth.db).maker(requestIds.getNonce.next))
       channel.copy(state = Authenticating(nextAuth.db, nextAuth.user, nextAuth.password, None))
     } else { logger.debug("AUTH: nothing to do. authenticationHistory is " + authenticationHistory); channel.copy(state = Ready) }
@@ -251,13 +251,14 @@ class MongoDBSystem(
       val nonce = Getnonce.ResultMaker(response).right.get
       logger.debug("AUTH: got nonce for channel " + response.info.channelId + ": " + nonce)
       updateNodeSet(nodeSet.updateByChannelId(response.info.channelId, node =>
-        node.copy(channels = node.channels.map { channel =>
-          if(channel.getId == response.info.channelId) {
-            val authenticating = channel.state.asInstanceOf[Authenticating]
-            logger.debug("AUTH: authenticating with " + authenticating)
+        node.updateChannelById(response.info.channelId, {
+          case mongoChannel @ MongoChannel(channel, authenticating: Authenticating, _) =>
+            logger.debug("NONCE authenticating channel is " + channel + " with " + authenticating)
             channel.write(AuthenticateCommand(authenticating.user, authenticating.password, nonce)(authenticating.db).maker(requestIds.authenticate.next))
-            channel.copy(state = authenticating.copy(nonce = Some(nonce)))
-          } else channel
+            mongoChannel.copy(state = authenticating.copy(nonce = Some(nonce)))
+          case channel =>
+            logger.debug("channel got authenticated response while not authenticating! " + channel)
+            channel
         })
       ))
     }
@@ -266,21 +267,23 @@ class MongoDBSystem(
       logger.debug("AUTH: got authenticated response! " + response.info.channelId)
       updateNodeSet(nodeSet.updateByChannelId(response.info.channelId, { node =>
         logger.debug("AUTH: updating node " + node + "...")
-        node.updateChannelById(response.info.channelId, { channel =>
-          authenticationHistory = authenticationHistory
-          val authenticating = channel.state.asInstanceOf[Authenticating]
-          logger.debug("AUTH: got auth response from channel " + channel.channel + " for auth=" + authenticating + "!")
-          val (success, history) = authenticationHistory.handleResponse(authenticating, response)
-          authenticationHistory = history;
-          if(success)
-            authenticateChannel(channel.copy(loggedIn = channel.loggedIn + LoggedIn(authenticating.db, authenticating.user)), true)
-          else {
-            logger.warn("AUTH: failed !!!");
-            authenticateChannel(channel, true)
-          }
+        node.updateChannelById(response.info.channelId, {
+          case mongoChannel @ MongoChannel(channel, authenticating: Authenticating, _) =>
+            authenticationHistory = authenticationHistory
+            logger.debug("AUTH: got auth response from channel " + channel + " for auth=" + authenticating + "!")
+            val (success, history) = authenticationHistory.handleResponse(authenticating, response)
+            authenticationHistory = history;
+            if(success)
+              authenticateChannel(mongoChannel.copy(loggedIn = mongoChannel.loggedIn + LoggedIn(authenticating.db, authenticating.user)), true)
+            else {
+              logger.warn("AUTH: failed !!!");
+              authenticateChannel(mongoChannel, true)
+            }
+          case channel =>
+            logger.debug("channel got authenticated response while not authenticating! " + channel)
+            channel
         })
-      })
-      )
+      }))
     }
 
     // any other response
