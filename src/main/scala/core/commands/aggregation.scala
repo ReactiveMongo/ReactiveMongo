@@ -2,14 +2,12 @@ package core.commands
 
 import reactivemongo.bson._
 import reactivemongo.bson.BSONString
-import reactivemongo.core.commands.{BSONCommandResultMaker, Command}
+import reactivemongo.core.commands.{CommandError, BSONCommandResultMaker, Command}
 
-case class Aggregate[T](
-  name: String
-)(
+case class Aggregate (
   collectionName: String,
   pipeline: Seq[PipelineOperator]
-) extends Command[T] {
+) extends Command[BSONValue] {
   override def makeDocuments =
     BSONDocument(
       "aggregate" -> BSONString(collectionName),
@@ -18,21 +16,26 @@ case class Aggregate[T](
       )
     )
 
-  val ResultMaker = throw new UnsupportedOperationException
+  val ResultMaker = Aggregate
+}
+
+object Aggregate extends BSONCommandResultMaker[BSONValue] {
+  def apply(document: TraversableBSONDocument) =
+    CommandError.checkOk(document, Some("aggregate")).toLeft(document.get("result").get)
 }
 
 sealed trait PipelineOperator {
   def makePipe: BSONValue
 }
 
-case class Project(fields: Seq[String]) extends PipelineOperator{
-  override val makePipe = BSONDocument(
+case class Project(fields: String*) extends PipelineOperator{
+  override val makePipe = BSONDocument("$project" -> BSONDocument(
     {for (field <- fields) yield field -> BSONInteger(1)} : _*
-  )
+  ))
 }
 
 case class Match(predicate: BSONDocument) extends PipelineOperator{
-  override val makePipe = predicate
+  override val makePipe = BSONDocument("$match" -> predicate)
 }
 
 case class Limit(limit: Int) extends PipelineOperator{
@@ -47,12 +50,28 @@ case class Unwind(field: String) extends PipelineOperator{
   override val makePipe = BSONDocument("$unwind" -> BSONString("$" + field))
 }
 
-case class Group(idField: String*)(ops: (String, GroupFunction)*) extends PipelineOperator{
+case class GroupField(idField: String)(ops: (String, GroupFunction)*) extends PipelineOperator {
   override val makePipe = BSONDocument(
     "$group" -> BSONDocument(
-      ops.map{
+    {"_id" -> BSONString(idField)}
+      +: {ops.map{
         case (field, operator) => field -> operator.makeFunction
-      }:_*
+      }}:_*
+    )
+  )
+}
+
+case class GroupMulti(idField: (String, String)*)(ops: (String, GroupFunction)*) extends PipelineOperator {
+  override val makePipe = BSONDocument(
+    "$group" -> BSONDocument(
+      {"_id" -> BSONDocument(
+        idField.map{
+          case (alias, attribute) => alias -> BSONString("$" + attribute)
+        }:_*
+      )} +:
+      {ops.map{
+        case (field, operator) => field -> operator.makeFunction
+      }}:_*
     )
   )
 }
