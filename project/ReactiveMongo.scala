@@ -1,55 +1,67 @@
-
 import sbt._
 import sbt.Keys._
 
 object BuildSettings {
-  val buildVersion = "0.1-SNAPSHOT"
+  val buildVersion = "0.8"
+
+  val filter = { (ms: Seq[(File, String)]) =>
+    ms filter { case (file, path) =>
+      path != "logback.xml" && !path.startsWith("toignore") && !path.startsWith("samples")
+    }
+  }
 
   val buildSettings = Defaults.defaultSettings ++ Seq(
-    organization := "reactivemongo",
+    organization := "org.reactivemongo",
     version := buildVersion,
     scalaVersion := "2.10.0",
     crossScalaVersions := Seq("2.10.0"),
     crossVersion := CrossVersion.binary,
-    shellPrompt := ShellPrompt.buildShellPrompt
-  ) // ++ Format.settings ++ Publish.settings
-
+    shellPrompt := ShellPrompt.buildShellPrompt,
+    mappings in (Compile, packageBin) ~= filter,
+    mappings in (Compile, packageSrc) ~= filter,
+    mappings in (Compile, packageDoc) ~= filter
+  ) ++ Publish.settings // ++ Format.settings
 }
 
-
-
 object Publish {
-  lazy val settings = Seq(
-    publishMavenStyle := true,
-    publishTo <<= version { (v: String) =>
+  object TargetRepository {
+    def local: Project.Initialize[Option[sbt.Resolver]] = version { (version: String) =>
+      val localPublishRepo = "/Volumes/Data/code/repository"
+      if(version.trim.endsWith("SNAPSHOT"))
+        Some(Resolver.file("snapshots", new File(localPublishRepo + "/snapshots")))
+      else Some(Resolver.file("releases", new File(localPublishRepo + "/releases")))
+    }
+    def sonatype: Project.Initialize[Option[sbt.Resolver]] = version { (version: String) =>
       val nexus = "https://oss.sonatype.org/"
-      if (v.trim.endsWith("SNAPSHOT"))
+      if (version.trim.endsWith("SNAPSHOT"))
         Some("snapshots" at nexus + "content/repositories/snapshots")
       else
         Some("releases"  at nexus + "service/local/staging/deploy/maven2")
-    },
+    }
+  }
+  lazy val settings = Seq(
+    publishMavenStyle := true,
+    publishTo <<= TargetRepository.local,
     publishArtifact in Test := false,
     pomIncludeRepository := { _ => false },
     licenses := Seq("Apache 2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0")),
-    homepage := Some(url("https://github.com/zenexity/ReactiveMongo")),
+    homepage := Some(url("http://reactivemongo.org")),
     pomExtra := (
       <scm>
         <url>git://github.com/zenexity/ReactiveMongo.git</url>
         <connection>scm:git://github.com/zenexity/ReactiveMongo.git</connection>
       </scm>
-        <developers>
-          <developer>
-            <id>sgodbillon</id>
-            <name>Stephane Godbillon</name>
-            <url>http://www.zenexity.com/</url>
-          </developer>
-        </developers>)
+      <developers>
+        <developer>
+          <id>sgodbillon</id>
+          <name>Stephane Godbillon</name>
+          <url>http://stephane.godbillon.com</url>
+        </developer>
+      </developers>)
   )
 }
 
-
 object Format {
-
   import com.typesafe.sbt.SbtScalariform._
 
   lazy val settings = scalariformSettings ++ Seq(
@@ -81,7 +93,6 @@ object Format {
 // Shell prompt which show the current project,
 // git branch and build version
 object ShellPrompt {
-
   object devnull extends ProcessLogger {
     def info(s: => String) {}
 
@@ -105,7 +116,6 @@ object ShellPrompt {
   }
 }
 
-
 object Resolvers {
   val typesafe = Seq(
     "Typesafe repository snapshots" at "http://repo.typesafe.com/typesafe/snapshots/",
@@ -113,7 +123,6 @@ object Resolvers {
   )
   val resolversList = typesafe
 }
-
 
 object Dependencies {
   val netty = "io.netty" % "netty" % "3.3.1.Final" cross CrossVersion.Disabled
@@ -123,7 +132,7 @@ object Dependencies {
   }
 
   def iteratees(sv: String) = sv match {
-    case "2.10.0" => "play" %% "play-iteratees" % "2.1-RC1"
+    case "2.10.0" => "play" %% "play-iteratees" % "2.1-RC2"
   }
 
   val logbackVer = "1.0.9"
@@ -132,27 +141,21 @@ object Dependencies {
     "ch.qos.logback" % "logback-classic" % logbackVer
   )
 
-//  val compileDeps = Seq(netty, akkaActor, iteratees) ++ logback
-
-
   def specs(sv: String) = sv match {
     case "2.10.0" => "org.specs2" % "specs2" % "1.13" % "test" cross CrossVersion.binary
   }
 
   val junit = "junit" % "junit" % "4.8" % "test" cross CrossVersion.Disabled
   val testDeps = Seq(junit)
-
-
 }
 
 object ReactiveMongoBuild extends Build {
-
   import BuildSettings._
   import Resolvers._
   import Dependencies._
 
   lazy val reactivemongo = Project(
-    "reactivemongo",
+    "ReactiveMongo",
     file("."),
     settings = buildSettings ++ Seq(
       resolvers := resolversList,

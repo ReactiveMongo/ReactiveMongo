@@ -1,4 +1,4 @@
-package foo
+package samples
 
 import play.api.libs.iteratee.Iteratee
 import reactivemongo.api._
@@ -7,7 +7,7 @@ import reactivemongo.bson.handlers.DefaultBSONHandlers._
 import reactivemongo.core.commands._
 import scala.util.{Failure, Success}
 
-object Samples {
+object SimpleUseCases {
   import scala.concurrent.ExecutionContext.Implicits.global // TODO create own ExecutionContext
 
   val connection = MongoConnection( List( "localhost:27016" ) )
