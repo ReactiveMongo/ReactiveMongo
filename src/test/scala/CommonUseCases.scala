@@ -29,6 +29,11 @@ class CommonUseCases extends Specification {
     "find by regexp" in {
       Await.result(collection.find(BSONDocument("name" -> BSONRegex("ack2", ""))).toList, timeout).size mustEqual 10
     }
+    "find them with a projection" in {
+      val pjn = BSONDocument("name" -> BSONInteger(1), "age" -> BSONInteger(1), "something" -> BSONInteger(1))
+      val it = collection.find(BSONDocument(), pjn, QueryOpts().batchSize(2))
+      Await.result(it.toList, timeout).map(_.getAs[BSONInteger]("age").get.value).mkString("") mustEqual (18 to 60).mkString("")
+    }
     "insert a document containing a merged array of objects, fetch and check it" in {
       val array = BSONArray(
         BSONDocument(
