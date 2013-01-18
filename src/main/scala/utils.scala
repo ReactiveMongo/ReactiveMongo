@@ -165,11 +165,12 @@ package buffers {
     def merged :ChannelBuffer = mergedBuffer.duplicate()
 
     private lazy val mergedBuffer = {
-      val bufs = (head +: tail).map(cb =>cb.duplicate())
-      bufs.tail.foldLeft(bufs.head) { (result, buf) =>
-        result writeBytes buf
-        result
-      }
+      val bufs = (head +: tail) // .map(cb =>cb.duplicate())
+      ChannelBuffers.wrappedBuffer(bufs: _*)
+      // bufs.tail.foldLeft(bufs.head) { (result, buf) =>
+      //   result writeBytes buf
+      //   result
+      // }
     }
   }
 
