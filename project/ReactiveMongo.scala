@@ -16,6 +16,10 @@ object BuildSettings {
     scalaVersion := "2.10.0",
     crossScalaVersions := Seq("2.10.0"),
     crossVersion := CrossVersion.binary,
+    scalacOptions ++= Seq("-unchecked", "-deprecation" /*, "-Xlog-implicits", "-Yinfer-debug", "-Xprint:typer", "-Yinfer-debug", "-Xlog-implicits", "-Xprint:typer"*/),
+    scalacOptions in (Compile, doc) ++= Seq("-unchecked", "-deprecation", "-diagrams", "-implicits"),
+    scalacOptions in (Compile, doc) ++= Opts.doc.title("ReactiveMongo API"),
+    scalacOptions in (Compile, doc) ++= Opts.doc.version("0.9-SNAPSHOT"),
     shellPrompt := ShellPrompt.buildShellPrompt,
     mappings in (Compile, packageBin) ~= filter,
     mappings in (Compile, packageSrc) ~= filter,
@@ -132,7 +136,7 @@ object Dependencies {
   }
 
   def iteratees(sv: String) = sv match {
-    case "2.10.0" => "play" %% "play-iteratees" % "2.1-RC2"
+    case "2.10.0" => "play" %% "play-iteratees" % "2.1.0"
   }
 
   val logbackVer = "1.0.9"
