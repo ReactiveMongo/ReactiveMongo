@@ -4,7 +4,7 @@ import java.nio.ByteOrder._
 import org.jboss.netty.buffer.{ChannelBuffer, ChannelBuffers}
 import org.slf4j.{Logger, LoggerFactory}
 import play.api.libs.iteratee._
-import reactivemongo.bson.handlers.RawBSONWriter
+import reactivemongo.bson.handlers.RawBSONDocumentWriter
 import reactivemongo.utils.LazyLogger
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -67,7 +67,7 @@ object bulk {
     }
   }
 
-  private[bulk] object BulkWriter extends RawBSONWriter[Bulk] {
+  private[bulk] object BulkWriter extends RawBSONDocumentWriter[Bulk] {
     override def write(bulk: Bulk) = bulk.docs
   }
 }

@@ -2,6 +2,7 @@ import org.specs2.mutable._
 import play.api.libs.iteratee.Enumerator
 import reactivemongo.api._
 import reactivemongo.bson._
+import DefaultBSONHandlers._
 import reactivemongo.core.commands.Count
 import scala.concurrent._
 import scala.util.Failure
@@ -53,11 +54,11 @@ class CommonUseCases extends Specification {
       Await.result(collection.insert(doc), timeout).ok mustEqual true
       val fetched = Await.result(collection.find(BSONDocument("name" -> BSONString("Joe"))).headOption, timeout)
       fetched.isDefined mustEqual true
-      val contactsString = fetched.get.getAs[BSONArray]("contacts").get.iterator.map { _.value match {
+      val contactsString = fetched.get.getAs[BSONArray]("contacts").get.values.map {
         case contact: BSONDocument =>
-          contact.toTraversable.getAs[BSONString]("type").get.value + ":" +
-          contact.toTraversable.getAs[BSONString]("value").get.value
-      }}.mkString(",")
+          contact.getAs[BSONString]("type").get.value + ":" +
+          contact.getAs[BSONString]("value").get.value
+      }.mkString(",")
       contactsString mustEqual "telephone:+331234567890,mail:joe@plop.com"
     }
     "insert a weird doc" in {

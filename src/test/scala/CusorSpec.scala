@@ -1,5 +1,6 @@
 import org.specs2.mutable._
 import reactivemongo.bson._
+import DefaultBSONHandlers._
 import scala.concurrent.Future
 import scala.concurrent.Await
 import scala.concurrent.duration._

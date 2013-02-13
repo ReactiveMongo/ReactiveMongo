@@ -2,6 +2,7 @@ package reactivemongo.bson.handlers
 
 import org.jboss.netty.buffer._
 import reactivemongo.bson._
+import reactivemongo.bson.netty._
 import reactivemongo.core.protocol._
 
 /**
@@ -9,7 +10,7 @@ import reactivemongo.core.protocol._
  *
  * @tparam DocumentType The type of the instance that can be turned into a BSON document.
  */
-trait RawBSONWriter[-DocumentType] {
+trait RawBSONDocumentWriter[-DocumentType] {
   def write(document: DocumentType) :ChannelBuffer
 }
 
@@ -18,7 +19,7 @@ trait RawBSONWriter[-DocumentType] {
  *
  * @tparam DocumentType The type of the instance to create.
  */
-trait RawBSONReader[+DocumentType] {
+trait RawBSONDocumentReader[+DocumentType] {
   def read(buffer: ChannelBuffer) :DocumentType
 }
 
@@ -27,10 +28,14 @@ trait RawBSONReader[+DocumentType] {
  *
  * @tparam DocumentType The type of the instance that can be turned into a BSONDocument.
  */
-trait BSONWriter[-DocumentType] extends RawBSONWriter[DocumentType] {
+trait BSONDocumentWriter[-DocumentType] extends RawBSONDocumentWriter[DocumentType] {
   def toBSON(document: DocumentType) :BSONDocument
 
-  final def write(document: DocumentType) = toBSON(document).makeBuffer
+  final def write(document: DocumentType) = {
+    val buffer = ChannelBufferWritableBuffer()
+    DefaultBufferHandler.write(buffer, toBSON(document))
+    buffer.buffer
+  }
 }
 
 /**
@@ -38,10 +43,14 @@ trait BSONWriter[-DocumentType] extends RawBSONWriter[DocumentType] {
  *
  * @tparam DocumentType The type of the instance to create.
  */
-trait BSONReader[+DocumentType] extends RawBSONReader[DocumentType] {
+trait BSONDocumentReader[+DocumentType] extends RawBSONDocumentReader[DocumentType] {
   def fromBSON(doc: BSONDocument) :DocumentType
 
-  final def read(buffer: ChannelBuffer) = fromBSON(BSONDocument(buffer))
+  final def read(buffer: ChannelBuffer) = {
+    val readableBuffer = ChannelBufferReadableBuffer(buffer)
+    val doc = DefaultBufferHandler.readDocument(readableBuffer).get // TODO
+    fromBSON(doc)
+  }
 }
 
 /**
@@ -49,13 +58,13 @@ trait BSONReader[+DocumentType] extends RawBSONReader[DocumentType] {
  * provided that there is an implicit [[reactivemongo.bson.handlers.BSONReader]][DocumentType] in the scope.
  */
 trait BSONReaderHandler {
-  def handle[DocumentType](reply: Reply, buffer: ChannelBuffer)(implicit reader: RawBSONReader[DocumentType]) :Iterator[DocumentType]
+  def handle[DocumentType](reply: Reply, buffer: ChannelBuffer)(implicit reader: RawBSONDocumentReader[DocumentType]) :Iterator[DocumentType]
 }
 
 /** Default [[reactivemongo.bson.handlers.BSONReader]], [[reactivemongo.bson.handlers.BSONWriter]], [[reactivemongo.bson.handlers.BSONReaderHandler]]. */
 object DefaultBSONHandlers {
   implicit object DefaultBSONReaderHandler extends BSONReaderHandler {
-    def handle[DocumentType](reply: Reply, buffer: ChannelBuffer)(implicit reader: RawBSONReader[DocumentType]) :Iterator[DocumentType] = {
+    def handle[DocumentType](reply: Reply, buffer: ChannelBuffer)(implicit reader: RawBSONDocumentReader[DocumentType]) :Iterator[DocumentType] = {
       new Iterator[DocumentType] {
         def hasNext = buffer.readable
         def next = reader.read(buffer.readBytes(buffer.getInt(buffer.readerIndex)))
@@ -63,11 +72,11 @@ object DefaultBSONHandlers {
     }
   }
 
-  implicit object DefaultBSONDocumentReader extends BSONReader[TraversableBSONDocument] {
-    def fromBSON(doc: BSONDocument) :TraversableBSONDocument = doc.toTraversable
+  implicit object DefaultBSONDocumentReader extends BSONDocumentReader[BSONDocument] {
+    def fromBSON(doc: BSONDocument) :BSONDocument = doc
   }
 
-  implicit object DefaultBSONDocumentWriter extends BSONWriter[BSONDocument] {
+  implicit object DefaultBSONDocumentWriter extends BSONDocumentWriter[BSONDocument] {
     def toBSON(doc: BSONDocument) = doc
   }
 

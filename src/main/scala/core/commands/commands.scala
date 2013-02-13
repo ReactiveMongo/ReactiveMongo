@@ -1,7 +1,7 @@
 package reactivemongo.core.commands
 
 import reactivemongo.bson._
-import reactivemongo.bson.Implicits._
+import DefaultBSONHandlers._
 import reactivemongo.bson.handlers.DefaultBSONHandlers
 import reactivemongo.core.errors._
 import reactivemongo.core.protocol.{RequestMaker, Query, QueryFlags, Response}
@@ -71,7 +71,7 @@ trait BSONCommandResultMaker[Result] extends CommandResultMaker[Result] {
   /**
    * Deserializes the given document into an instance of Result.
    */
-  def apply(document: TraversableBSONDocument) :Either[CommandError, Result]
+  def apply(document: BSONDocument) :Either[CommandError, Result]
 }
 
 /**
@@ -100,7 +100,7 @@ trait CommandError extends ReactiveMongoError {
 
 /** A command error that optionally holds the original TraversableBSONDocument */
 trait BSONCommandError extends CommandError {
-  val originalDocument: Option[TraversableBSONDocument]
+  val originalDocument: Option[BSONDocument]
 
   override def getMessage :String =
     "BSONCommandError['" + message + "'" + code.map(c => " (code = " + c + ")").getOrElse("") + "]" +
@@ -115,7 +115,7 @@ object CommandError {
    * @param originalDocument The original document contained in the response.
    * @param code The code of the error, if any.
    */
-  def apply(message: String, originalDocument: Option[TraversableBSONDocument] = None, code: Option[Int] = None) :DefaultCommandError =
+  def apply(message: String, originalDocument: Option[BSONDocument] = None, code: Option[Int] = None) :DefaultCommandError =
     new DefaultCommandError(message, code, originalDocument)
 
   /**
@@ -126,8 +126,8 @@ object CommandError {
    * @param error A function that takes the document of the response and the optional name of the command as arguments, and produces a command error.
    */
   def checkOk(
-    doc: TraversableBSONDocument, name: Option[String],
-    error: (TraversableBSONDocument, Option[String]) => CommandError = (doc, name) => CommandError("command " + name.map(_ + " ").getOrElse("") + "failed because the 'ok' field is missing or equals 0", Some(doc))
+    doc: BSONDocument, name: Option[String],
+    error: (BSONDocument, Option[String]) => CommandError = (doc, name) => CommandError("command " + name.map(_ + " ").getOrElse("") + "failed because the 'ok' field is missing or equals 0", Some(doc))
   ) :Option[CommandError] = {
     doc.getAs[BSONDouble]("ok").map(_.value).orElse(Some(0)).flatMap {
       case 1 => None
@@ -146,7 +146,7 @@ object CommandError {
 class DefaultCommandError(
   val message: String,
   val code: Option[Int],
-  val originalDocument: Option[TraversableBSONDocument]
+  val originalDocument: Option[BSONDocument]
 ) extends BSONCommandError
 
 /**
@@ -166,11 +166,11 @@ class MakableCommand(val db: String, val command: Command[_]) {
   def maker = RequestMaker(makeQuery, BufferSequence(command.makeDocuments.makeBuffer))
 }
 
-case class RawCommand(bson: BSONDocument) extends Command[TraversableBSONDocument] {
+case class RawCommand(bson: BSONDocument) extends Command[BSONDocument] {
   def makeDocuments = bson
 
-  object ResultMaker extends BSONCommandResultMaker[TraversableBSONDocument] {
-    def apply(document: TraversableBSONDocument) = CommandError.checkOk(document, None).toLeft(document)
+  object ResultMaker extends BSONCommandResultMaker[BSONDocument] {
+    def apply(document: BSONDocument) = CommandError.checkOk(document, None).toLeft(document)
   }
 }
 
@@ -216,7 +216,7 @@ case class LastError(
   err: Option[String],
   code: Option[Int],
   errMsg: Option[String],
-  originalDocument: Option[TraversableBSONDocument]
+  originalDocument: Option[BSONDocument]
 ) extends DBError {
   /** states if the last operation ended up with an error */
   lazy val inError :Boolean = !ok || err.isDefined
@@ -229,7 +229,7 @@ case class LastError(
  * Deserializer for [[reactivemongo.core.commands.GetLastError]] command result.
  */
 object LastError extends BSONCommandResultMaker[LastError] {
-  def apply(document: TraversableBSONDocument) = {
+  def apply(document: BSONDocument) = {
     Right(LastError(
       document.getAs[BSONDouble]("ok").map(_.value == 1).getOrElse(true),
       document.getAs[BSONString]("err").map(_.value),
@@ -276,7 +276,7 @@ case class Count(
  * Deserializer for the Count command. Basically returns an Int (number of counted documents)
  */
 object Count extends BSONCommandResultMaker[Int] {
-  def apply(document: TraversableBSONDocument) =
+  def apply(document: BSONDocument) =
     CommandError.checkOk(document, Some("count")).toLeft(document.getAs[BSONDouble]("n").map(_.value.toInt).get)
 }
 
@@ -289,7 +289,7 @@ object ReplStatus extends AdminCommand[Map[String, BSONValue]] {
   override def makeDocuments = BSONDocument("replSetGetStatus" -> BSONInteger(1))
 
   object ResultMaker extends BSONCommandResultMaker[Map[String, BSONValue]] {
-    def apply(document: TraversableBSONDocument) = Right(document.mapped)
+    def apply(document: BSONDocument) = Right(document.elements.toMap)
   }
 }
 
@@ -302,7 +302,7 @@ object Status extends AdminCommand[Map[String, BSONValue]] {
   override def makeDocuments = BSONDocument("serverStatus" -> BSONInteger(1))
 
   object ResultMaker extends BSONCommandResultMaker[Map[String, BSONValue]] {
-    def apply(document: TraversableBSONDocument) = Right(document.mapped)
+    def apply(document: BSONDocument) = Right(document.elements.toMap)
   }
 }
 
@@ -315,7 +315,7 @@ object Getnonce extends Command[String] {
   override def makeDocuments = BSONDocument("getnonce" -> BSONInteger(1))
 
   object ResultMaker extends BSONCommandResultMaker[String] {
-    def apply(document: TraversableBSONDocument) = {
+    def apply(document: BSONDocument) = {
       CommandError.checkOk(document, Some("getnonce")).toLeft(document.getAs[BSONString]("nonce").get.value)
     }
   }
@@ -342,7 +342,7 @@ case class Authenticate(user: String, password: String, nonce: String) extends C
 
 /** Authentication command's response deserializer. */
 object Authenticate extends BSONCommandResultMaker[SuccessfulAuthentication] {
-  def apply(document: TraversableBSONDocument) = {
+  def apply(document: BSONDocument) = {
     CommandError.checkOk(document, Some("authenticate"), (doc, name) => {
       FailedAuthentication(doc.getAs[BSONString]("errmsg").map(_.value).getOrElse(""), Some(doc))
     }).toLeft(document.get("dbname") match {
@@ -390,7 +390,7 @@ case class VerboseSuccessfulAuthentication(
  */
 case class FailedAuthentication(
   message: String,
-  originalDocument :Option[TraversableBSONDocument]
+  originalDocument :Option[BSONDocument]
 ) extends BSONCommandError with AuthenticationResult {
   val code = None
 }
@@ -405,14 +405,14 @@ object IsMaster extends AdminCommand[IsMasterResponse] {
   def makeDocuments = BSONDocument("isMaster" -> BSONInteger(1))
 
   object ResultMaker extends BSONCommandResultMaker[IsMasterResponse] {
-    def apply(document: TraversableBSONDocument) = {
+    def apply(document: BSONDocument) = {
       CommandError.checkOk(document, Some("isMaster")).toLeft(IsMasterResponse(
         document.getAs[BSONBoolean]("ismaster").map(_.value).getOrElse(false),
         document.getAs[BSONBoolean]("secondary").map(_.value).getOrElse(false),
         document.getAs[BSONInteger]("maxBsonObjectSize").map(_.value).getOrElse(16777216),
         document.getAs[BSONString]("setName").map(_.value),
-        document.getAs[TraversableBSONArray]("hosts").map(
-          _.iterator.map(_.value.asInstanceOf[BSONString].value).toList
+        document.getAs[BSONArray]("hosts").map(
+          _.values.map(_.asInstanceOf[BSONString].value).toList
         ),
         document.getAs[BSONString]("me").map(_.value)
       ))
@@ -444,7 +444,7 @@ case class IsMasterResponse(
 
 /** A modify operation, part of a FindAndModify command */
 sealed trait Modify {
-  protected[commands] def toDocument :AppendableBSONDocument
+  protected[commands] def toDocument :BSONDocument
 }
 
 /**
@@ -485,7 +485,7 @@ case class FindAndModify(
   upsert: Boolean = false,
   sort: Option[BSONDocument] = None,
   fields: Option[BSONDocument] = None
-) extends Command[Option[TraversableBSONDocument]] {
+) extends Command[Option[BSONDocument]] {
   override def makeDocuments =
     BSONDocument(
       "findAndModify" -> BSONString(collection),
@@ -501,9 +501,9 @@ case class FindAndModify(
  * FindAndModify command deserializer
  * @todo [[reactivemongo.bson.handlers.BSONReader]][T] typeclass
  */
-object FindAndModify extends BSONCommandResultMaker[Option[TraversableBSONDocument]] {
-  def apply(document: TraversableBSONDocument) =
-    CommandError.checkOk(document, Some("findAndModify")).toLeft(document.getAs[TraversableBSONDocument]("value"))
+object FindAndModify extends BSONCommandResultMaker[Option[BSONDocument]] {
+  def apply(document: BSONDocument) =
+    CommandError.checkOk(document, Some("findAndModify")).toLeft(document.getAs[BSONDocument]("value"))
 }
 
 case class DeleteIndex(
@@ -515,7 +515,7 @@ case class DeleteIndex(
     "index" -> BSONString(index))
 
   object ResultMaker extends BSONCommandResultMaker[Int] {
-    def apply(document: TraversableBSONDocument) =
+    def apply(document: BSONDocument) =
       CommandError.checkOk(document, Some("deleteIndexes")).toLeft(document.getAs[BSONDouble]("nIndexWas").map(_.value.toInt).get)
   }
 }

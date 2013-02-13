@@ -5,8 +5,9 @@ object BuildSettings {
   val buildVersion = "0.9-SNAPSHOT"
 
   val filter = { (ms: Seq[(File, String)]) =>
-    ms filter { case (file, path) =>
-      path != "logback.xml" && !path.startsWith("toignore") && !path.startsWith("samples")
+    ms filter {
+      case (file, path) =>
+        path != "logback.xml" && !path.startsWith("toignore") && !path.startsWith("samples")
     }
   }
 
@@ -16,22 +17,21 @@ object BuildSettings {
     scalaVersion := "2.10.0",
     crossScalaVersions := Seq("2.10.0"),
     crossVersion := CrossVersion.binary,
-    scalacOptions ++= Seq("-unchecked", "-deprecation" /*, "-Xlog-implicits", "-Yinfer-debug", "-Xprint:typer", "-Yinfer-debug", "-Xlog-implicits", "-Xprint:typer"*/),
+    scalacOptions ++= Seq("-unchecked", "-deprecation" /*, "-Xlog-implicits", "-Yinfer-debug", "-Xprint:typer", "-Yinfer-debug", "-Xlog-implicits", "-Xprint:typer"*/ ),
     scalacOptions in (Compile, doc) ++= Seq("-unchecked", "-deprecation", "-diagrams", "-implicits"),
     scalacOptions in (Compile, doc) ++= Opts.doc.title("ReactiveMongo API"),
     scalacOptions in (Compile, doc) ++= Opts.doc.version("0.9-SNAPSHOT"),
     shellPrompt := ShellPrompt.buildShellPrompt,
     mappings in (Compile, packageBin) ~= filter,
     mappings in (Compile, packageSrc) ~= filter,
-    mappings in (Compile, packageDoc) ~= filter
-  ) ++ Publish.settings // ++ Format.settings
+    mappings in (Compile, packageDoc) ~= filter) ++ Publish.settings // ++ Format.settings
 }
 
 object Publish {
   object TargetRepository {
     def local: Project.Initialize[Option[sbt.Resolver]] = version { (version: String) =>
       val localPublishRepo = "/Volumes/Data/code/repository"
-      if(version.trim.endsWith("SNAPSHOT"))
+      if (version.trim.endsWith("SNAPSHOT"))
         Some(Resolver.file("snapshots", new File(localPublishRepo + "/snapshots")))
       else Some(Resolver.file("releases", new File(localPublishRepo + "/releases")))
     }
@@ -40,7 +40,7 @@ object Publish {
       if (version.trim.endsWith("SNAPSHOT"))
         Some("snapshots" at nexus + "content/repositories/snapshots")
       else
-        Some("releases"  at nexus + "service/local/staging/deploy/maven2")
+        Some("releases" at nexus + "service/local/staging/deploy/maven2")
     }
   }
   lazy val settings = Seq(
@@ -61,16 +61,14 @@ object Publish {
           <name>Stephane Godbillon</name>
           <url>http://stephane.godbillon.com</url>
         </developer>
-      </developers>)
-  )
+      </developers>))
 }
 
 object Format {
   import com.typesafe.sbt.SbtScalariform._
 
   lazy val settings = scalariformSettings ++ Seq(
-    ScalariformKeys.preferences := formattingPreferences
-  )
+    ScalariformKeys.preferences := formattingPreferences)
 
   lazy val formattingPreferences = {
     import scalariform.formatter.preferences._
@@ -107,24 +105,22 @@ object ShellPrompt {
 
   def currBranch = (
     ("git status -sb" lines_! devnull headOption)
-      getOrElse "-" stripPrefix "## "
-    )
+    getOrElse "-" stripPrefix "## ")
 
   val buildShellPrompt = {
-    (state: State) => {
-      val currProject = Project.extract(state).currentProject.id
-      "%s:%s:%s> ".format(
-        currProject, currBranch, BuildSettings.buildVersion
-      )
-    }
+    (state: State) =>
+      {
+        val currProject = Project.extract(state).currentProject.id
+        "%s:%s:%s> ".format(
+          currProject, currBranch, BuildSettings.buildVersion)
+      }
   }
 }
 
 object Resolvers {
   val typesafe = Seq(
     "Typesafe repository snapshots" at "http://repo.typesafe.com/typesafe/snapshots/",
-    "Typesafe repository releases" at "http://repo.typesafe.com/typesafe/releases/"
-  )
+    "Typesafe repository releases" at "http://repo.typesafe.com/typesafe/releases/")
   val resolversList = typesafe
 }
 
@@ -142,8 +138,7 @@ object Dependencies {
   val logbackVer = "1.0.9"
   val logback = Seq(
     "ch.qos.logback" % "logback-core" % logbackVer,
-    "ch.qos.logback" % "logback-classic" % logbackVer
-  )
+    "ch.qos.logback" % "logback-classic" % logbackVer)
 
   def specs(sv: String) = sv match {
     case "2.10.0" => "org.specs2" % "specs2" % "1.13" % "test" cross CrossVersion.binary
@@ -167,10 +162,10 @@ object ReactiveMongoBuild extends Build {
         netty,
         akkaActor(sv),
         iteratees(sv),
-        specs(sv)
-      ) ++ logback ++ testDeps
-      )
-    )
-  )
+        specs(sv)) ++ logback ++ testDeps))) dependsOn (bson)
+
+  lazy val bson = Project(
+    "ReactiveMongo-BSON",
+    file("bson"))
 }
 

@@ -3,13 +3,13 @@ package reactivemongo.api
 import reactivemongo.api.indexes.IndexesManager
 import reactivemongo.bson._
 import reactivemongo.bson.handlers._
-import reactivemongo.core.commands.{Update => UpdateCommand, _}
+import reactivemongo.core.commands.{ Update => UpdateCommand, _ }
 import reactivemongo.core.protocol._
 import reactivemongo.utils.buffers._
 import reactivemongo.utils.EitherMappableFuture._
 import org.jboss.netty.buffer.ChannelBuffer
 import play.api.libs.iteratee._
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.{ ExecutionContext, Future }
 import scala.concurrent.duration._
 import reactivemongo.core.actors.RequestMakerExpectingResponse
 
@@ -63,7 +63,7 @@ trait Collection {
 
   // abstract
   /** A low-level method for finding documents. Should not be used outside. */
-  protected def find[Rst](documents: BufferSequence, opts: QueryOpts)(implicit handler: BSONReaderHandler, reader: RawBSONReader[Rst], ec: ExecutionContext) :FlattenedCursor[Rst]
+  protected def find[Rst](documents: BufferSequence, opts: QueryOpts)(implicit handler: BSONReaderHandler, reader: RawBSONDocumentReader[Rst], ec: ExecutionContext): FlattenedCursor[Rst]
 
   /**
    * Inserts a document into the collection without writeConcern.
@@ -74,7 +74,7 @@ trait Collection {
    *
    * @param document the document to insert.
    */
-  def uncheckedInsert[T](document: T)(implicit writer: RawBSONWriter[T]) :Unit
+  def uncheckedInsert[T](document: T)(implicit writer: RawBSONDocumentWriter[T]): Unit
 
   /**
    * Inserts a document into the collection and wait for the [[reactivemongo.core.commands.LastError]] result.
@@ -88,7 +88,7 @@ trait Collection {
    *
    * @return a future [[reactivemongo.core.commands.LastError]] that can be used to check whether the insertion was successful.
    */
-  def insert[T](document: T, writeConcern: GetLastError)(implicit writer: RawBSONWriter[T], ec: ExecutionContext) :Future[LastError]
+  def insert[T](document: T, writeConcern: GetLastError)(implicit writer: RawBSONDocumentWriter[T], ec: ExecutionContext): Future[LastError]
 
   /**
    * Updates one or more documents matching the given selector with the given modifier or update object.
@@ -103,7 +103,7 @@ trait Collection {
    * @param upsert states whether the update objet should be inserted if no match found. Defaults to false.
    * @param multi states whether the update may be done on all the matching documents.
    */
-  def uncheckedUpdate[S, U](selector: S, update: U, upsert: Boolean = false, multi: Boolean = false)(implicit selectorWriter: RawBSONWriter[S], updateWriter: RawBSONWriter[U]) :Unit
+  def uncheckedUpdate[S, U](selector: S, update: U, upsert: Boolean = false, multi: Boolean = false)(implicit selectorWriter: RawBSONDocumentWriter[S], updateWriter: RawBSONDocumentWriter[U]): Unit
 
   /**
    * Updates one or more documents matching the given selector with the given modifier or update object.
@@ -119,9 +119,9 @@ trait Collection {
    *
    * @return a future [[reactivemongo.core.commands.LastError]] that can be used to check whether the update was successful.
    */
-  def update[S, U](selector: S, update: U, writeConcern: GetLastError = GetLastError(), upsert: Boolean = false, multi: Boolean = false)(implicit selectorWriter: RawBSONWriter[S], updateWriter: RawBSONWriter[U], ec: ExecutionContext) :Future[LastError]
+  def update[S, U](selector: S, update: U, writeConcern: GetLastError = GetLastError(), upsert: Boolean = false, multi: Boolean = false)(implicit selectorWriter: RawBSONDocumentWriter[S], updateWriter: RawBSONDocumentWriter[U], ec: ExecutionContext): Future[LastError]
 
-    /**
+  /**
    * Remove the matched document(s) from the collection without writeConcern.
    *
    * Please note that you cannot be sure that the matched documents have been effectively removed and when (hence the Unit return type).
@@ -131,7 +131,7 @@ trait Collection {
    * @param query the selector of documents to remove.
    * @param firstMatchOnly states whether only the first matched documents has to be removed from this collection.
    */
-  def uncheckedRemove[T](query: T, firstMatchOnly: Boolean = false)(implicit writer: RawBSONWriter[T], ec: ExecutionContext) : Unit
+  def uncheckedRemove[T](query: T, firstMatchOnly: Boolean = false)(implicit writer: RawBSONDocumentWriter[T], ec: ExecutionContext): Unit
 
   /**
    * Remove the matched document(s) from the collection and wait for the [[reactivemongo.core.commands.LastError]] result.
@@ -146,7 +146,7 @@ trait Collection {
    *
    * @return a future [[reactivemongo.core.commands.LastError]] that can be used to check whether the removal was successful.
    */
-  def remove[T](query: T, writeConcern: GetLastError = GetLastError(), firstMatchOnly: Boolean = false)(implicit writer: RawBSONWriter[T], ec: ExecutionContext) :Future[LastError]
+  def remove[T](query: T, writeConcern: GetLastError = GetLastError(), firstMatchOnly: Boolean = false)(implicit writer: RawBSONDocumentWriter[T], ec: ExecutionContext): Future[LastError]
 
   // concrete
 
@@ -168,7 +168,7 @@ trait Collection {
    *
    * @return a cursor over the matched documents. You can get an enumerator for it, please see the [[reactivemongo.api.Cursor]] companion object.
    */
-  def find[Qry, Pjn, Rst](query: Qry, projection: Pjn, opts: QueryOpts = QueryOpts())(implicit writer: RawBSONWriter[Qry], writer2: RawBSONWriter[Pjn], handler: BSONReaderHandler, reader: RawBSONReader[Rst], ec: ExecutionContext) :FlattenedCursor[Rst] =
+  def find[Qry, Pjn, Rst](query: Qry, projection: Pjn, opts: QueryOpts = QueryOpts())(implicit writer: RawBSONDocumentWriter[Qry], writer2: RawBSONDocumentWriter[Pjn], handler: BSONReaderHandler, reader: RawBSONDocumentReader[Rst], ec: ExecutionContext): FlattenedCursor[Rst] =
     find(BufferSequence(writer.write(query), writer2.write(projection)), opts)
 
   /**
@@ -187,7 +187,7 @@ trait Collection {
    *
    * @return a cursor over the matched documents. You can get an enumerator for it, please see the [[reactivemongo.api.Cursor]] companion object.
    */
-  def find[Qry, Rst](query: Qry, opts: QueryOpts)(implicit writer: RawBSONWriter[Qry], handler: BSONReaderHandler, reader: RawBSONReader[Rst], ec: ExecutionContext) :FlattenedCursor[Rst] =
+  def find[Qry, Rst](query: Qry, opts: QueryOpts)(implicit writer: RawBSONDocumentWriter[Qry], handler: BSONReaderHandler, reader: RawBSONDocumentReader[Rst], ec: ExecutionContext): FlattenedCursor[Rst] =
     find(BufferSequence(writer.write(query)), opts)
 
   /**
@@ -205,7 +205,7 @@ trait Collection {
    *
    * @return a cursor over the matched documents. You can get an enumerator for it, please see the [[reactivemongo.api.Cursor]] companion object.
    */
-  def find[Qry, Rst](query: Qry)(implicit writer: RawBSONWriter[Qry], handler: BSONReaderHandler, reader: RawBSONReader[Rst], ec: ExecutionContext) :FlattenedCursor[Rst] =
+  def find[Qry, Rst](query: Qry)(implicit writer: RawBSONDocumentWriter[Qry], handler: BSONReaderHandler, reader: RawBSONDocumentReader[Rst], ec: ExecutionContext): FlattenedCursor[Rst] =
     find(BufferSequence(writer.write(query)), QueryOpts())
 
   /**
@@ -220,7 +220,7 @@ trait Collection {
    *
    * @return a cursor over the matched documents. You can get an enumerator for it, please see the [[reactivemongo.api.Cursor]] companion object.
    */
-  def find[Rst](query: QueryBuilder, opts: QueryOpts)(implicit handler: BSONReaderHandler, reader: RawBSONReader[Rst], ec: ExecutionContext) :FlattenedCursor[Rst] =
+  def find[Rst](query: QueryBuilder, opts: QueryOpts)(implicit handler: BSONReaderHandler, reader: RawBSONDocumentReader[Rst], ec: ExecutionContext): FlattenedCursor[Rst] =
     find(BufferSequence(query.makeMergedBuffer), opts)
 
   /**
@@ -234,7 +234,7 @@ trait Collection {
    *
    * @return a cursor over the matched documents. You can get an enumerator for it, please see the [[reactivemongo.api.Cursor]] companion object.
    */
-  def find[Rst](query: QueryBuilder)(implicit handler: BSONReaderHandler, reader: RawBSONReader[Rst], ec: ExecutionContext) :FlattenedCursor[Rst] =
+  def find[Rst](query: QueryBuilder)(implicit handler: BSONReaderHandler, reader: RawBSONDocumentReader[Rst], ec: ExecutionContext): FlattenedCursor[Rst] =
     find(BufferSequence(query.makeMergedBuffer), QueryOpts())
 
   /**
@@ -248,7 +248,7 @@ trait Collection {
    *
    * @return a future [[reactivemongo.core.commands.LastError]] that can be used to check whether the insertion was successful.
    */
-  def insert[T](document: T)(implicit writer: RawBSONWriter[T], ec: ExecutionContext) :Future[LastError] = insert(document, GetLastError())
+  def insert[T](document: T)(implicit writer: RawBSONDocumentWriter[T], ec: ExecutionContext): Future[LastError] = insert(document, GetLastError())
 
   /**
    * Returns an iteratee that will insert the documents it feeds.
@@ -259,8 +259,8 @@ trait Collection {
    * @param bulkSize The number of documents per bulk.
    * @param bulkByteSize The maximum size for a bulk, in bytes.
    */
-  def insertIteratee[T](bulkSize: Int = bulk.MaxDocs, bulkByteSize: Int = bulk.MaxBulkSize)(implicit writer: RawBSONWriter[T], ec: ExecutionContext) :Iteratee[T, Int] =
-    Enumeratee.map { doc:T => writer.write(doc) } &>> bulk.iteratee(this, bulkSize, bulkByteSize)
+  def insertIteratee[T](bulkSize: Int = bulk.MaxDocs, bulkByteSize: Int = bulk.MaxBulkSize)(implicit writer: RawBSONDocumentWriter[T], ec: ExecutionContext): Iteratee[T, Int] =
+    Enumeratee.map { doc: T => writer.write(doc) } &>> bulk.iteratee(this, bulkSize, bulkByteSize)
 
   /**
    * Inserts the documents provided by the given enumerator into the collection and eventually returns the number of inserted documents.
@@ -274,7 +274,7 @@ trait Collection {
    *
    * @return a future [[reactivemongo.core.commands.LastError]] that can be used to check whether the insertion was successful.
    */
-  def insert[T](enumerator: Enumerator[T], bulkSize: Int = bulk.MaxDocs, bulkByteSize: Int = bulk.MaxBulkSize)(implicit writer: RawBSONWriter[T], ec: ExecutionContext) :Future[Int] =
+  def insert[T](enumerator: Enumerator[T], bulkSize: Int = bulk.MaxDocs, bulkByteSize: Int = bulk.MaxBulkSize)(implicit writer: RawBSONDocumentWriter[T], ec: ExecutionContext): Future[Int] =
     enumerator |>>> insertIteratee(bulkSize, bulkByteSize)
 }
 
@@ -284,41 +284,41 @@ trait FailoverBasicCollection {
 
   val failoverStrategy: FailoverStrategy
 
-  protected def find[Rst](documents: BufferSequence, opts: QueryOpts)(implicit handler: BSONReaderHandler, reader: RawBSONReader[Rst], ec: ExecutionContext) :FlattenedCursor[Rst] = {
+  protected def find[Rst](documents: BufferSequence, opts: QueryOpts)(implicit handler: BSONReaderHandler, reader: RawBSONDocumentReader[Rst], ec: ExecutionContext): FlattenedCursor[Rst] = {
     val op = Query(opts.flagsN, fullCollectionName, opts.skipN, opts.batchSizeN)
     val requestMaker = RequestMaker(op, documents)
 
     Cursor.flatten(Failover(requestMaker, db.connection.mongosystem, failoverStrategy).future.map { response =>
       val cursor = new DefaultCursor(response, db.connection, op, documents, failoverStrategy)
-      if( (opts.flagsN & QueryFlags.TailableCursor) != 0 )
+      if ((opts.flagsN & QueryFlags.TailableCursor) != 0)
         new TailableCursor(cursor)
       else cursor
     })
   }
 
-  def insert[T](document: T, writeConcern: GetLastError)(implicit writer: RawBSONWriter[T], ec: ExecutionContext) :Future[LastError] = {
+  def insert[T](document: T, writeConcern: GetLastError)(implicit writer: RawBSONDocumentWriter[T], ec: ExecutionContext): Future[LastError] = {
     val op = Insert(0, fullCollectionName)
     val bson = writer.write(document)
     val checkedWriteRequest = CheckedWriteRequest(op, BufferSequence(bson), writeConcern)
     Failover(checkedWriteRequest, db.connection.mongosystem, failoverStrategy).future.mapEither(LastError.meaningful(_))
   }
 
-  def remove[T](query: T, writeConcern: GetLastError = GetLastError(), firstMatchOnly: Boolean = false)(implicit writer: RawBSONWriter[T], ec: ExecutionContext) :Future[LastError] = {
-    val op = Delete(fullCollectionName, if(firstMatchOnly) 1 else 0)
+  def remove[T](query: T, writeConcern: GetLastError = GetLastError(), firstMatchOnly: Boolean = false)(implicit writer: RawBSONDocumentWriter[T], ec: ExecutionContext): Future[LastError] = {
+    val op = Delete(fullCollectionName, if (firstMatchOnly) 1 else 0)
     val bson = writer.write(query)
     val checkedWriteRequest = CheckedWriteRequest(op, BufferSequence(bson), writeConcern)
     Failover(checkedWriteRequest, db.connection.mongosystem, failoverStrategy).future.mapEither(LastError.meaningful(_))
   }
 
-  def uncheckedRemove[T](query: T, firstMatchOnly: Boolean = false)(implicit writer: RawBSONWriter[T], ec: ExecutionContext) : Unit = {
-    val op = Delete(fullCollectionName, if(firstMatchOnly) 1 else 0)
+  def uncheckedRemove[T](query: T, firstMatchOnly: Boolean = false)(implicit writer: RawBSONDocumentWriter[T], ec: ExecutionContext): Unit = {
+    val op = Delete(fullCollectionName, if (firstMatchOnly) 1 else 0)
     val bson = writer.write(query)
     val message = RequestMaker(op, BufferSequence(bson))
     db.connection.send(message)
   }
 
-  def update[S, U](selector: S, update: U, writeConcern: GetLastError = GetLastError(), upsert: Boolean = false, multi: Boolean = false)(implicit selectorWriter: RawBSONWriter[S], updateWriter: RawBSONWriter[U], ec: ExecutionContext) :Future[LastError] = {
-    val flags = 0 | (if(upsert) UpdateFlags.Upsert else 0) | (if(multi) UpdateFlags.MultiUpdate else 0)
+  def update[S, U](selector: S, update: U, writeConcern: GetLastError = GetLastError(), upsert: Boolean = false, multi: Boolean = false)(implicit selectorWriter: RawBSONDocumentWriter[S], updateWriter: RawBSONDocumentWriter[U], ec: ExecutionContext): Future[LastError] = {
+    val flags = 0 | (if (upsert) UpdateFlags.Upsert else 0) | (if (multi) UpdateFlags.MultiUpdate else 0)
     val op = Update(fullCollectionName, flags)
     val bson = selectorWriter.write(selector)
     bson.writeBytes(updateWriter.write(update))
@@ -326,8 +326,8 @@ trait FailoverBasicCollection {
     Failover(checkedWriteRequest, db.connection.mongosystem, failoverStrategy).future.mapEither(LastError.meaningful(_))
   }
 
-  def uncheckedUpdate[S, U](selector: S, update: U, upsert: Boolean = false, multi: Boolean = false)(implicit selectorWriter: RawBSONWriter[S], updateWriter: RawBSONWriter[U]) :Unit = {
-    val flags = 0 | (if(upsert) UpdateFlags.Upsert else 0) | (if(multi) UpdateFlags.MultiUpdate else 0)
+  def uncheckedUpdate[S, U](selector: S, update: U, upsert: Boolean = false, multi: Boolean = false)(implicit selectorWriter: RawBSONDocumentWriter[S], updateWriter: RawBSONDocumentWriter[U]): Unit = {
+    val flags = 0 | (if (upsert) UpdateFlags.Upsert else 0) | (if (multi) UpdateFlags.MultiUpdate else 0)
     val op = Update(fullCollectionName, flags)
     val bson = selectorWriter.write(selector)
     bson.writeBytes(updateWriter.write(update))
@@ -335,7 +335,7 @@ trait FailoverBasicCollection {
     db.connection.send(message)
   }
 
-  def uncheckedInsert[T](document: T)(implicit writer: RawBSONWriter[T]) :Unit = {
+  def uncheckedInsert[T](document: T)(implicit writer: RawBSONDocumentWriter[T]): Unit = {
     val op = Insert(0, fullCollectionName)
     val bson = writer.write(document)
     val message = RequestMaker(op, BufferSequence(bson))
@@ -354,7 +354,7 @@ trait CollectionMetaCommands {
    *
    * @param autoIndexId States if should automatically add an index on the _id field. By default, regular collections will have an indexed _id field, in contrast to capped collections.
    */
-  def create(autoIndexId: Boolean = true)(implicit ec: ExecutionContext) :Future[Boolean] = db.command(new CreateCollection(name, None, if(autoIndexId) None else Some(false)))
+  def create(autoIndexId: Boolean = true)(implicit ec: ExecutionContext): Future[Boolean] = db.command(new CreateCollection(name, None, if (autoIndexId) None else Some(false)))
 
   /**
    * Creates this collection as a capped one.
@@ -363,19 +363,19 @@ trait CollectionMetaCommands {
    *
    * @param autoIndexId States if should automatically add an index on the _id field. By default, capped collections will NOT have an indexed _id field, in contrast to regular collections.
    */
-  def createCapped(size: Long, maxDocuments: Option[Int], autoIndexId: Boolean = false)(implicit ec: ExecutionContext) :Future[Boolean] = db.command(new CreateCollection(name, Some(CappedOptions(size, maxDocuments)), if(autoIndexId) Some(true) else None))
+  def createCapped(size: Long, maxDocuments: Option[Int], autoIndexId: Boolean = false)(implicit ec: ExecutionContext): Future[Boolean] = db.command(new CreateCollection(name, Some(CappedOptions(size, maxDocuments)), if (autoIndexId) Some(true) else None))
 
   /**
    * Drops this collection.
    *
    * The returned future will be completed with an error if this collection does not exist.
    */
-  def drop()(implicit ec: ExecutionContext) :Future[Boolean] = db.command(new Drop(name))
+  def drop()(implicit ec: ExecutionContext): Future[Boolean] = db.command(new Drop(name))
 
   /**
    * If this collection is capped, removes all the documents it contains.
    */
-  def emptyCapped()(implicit ec: ExecutionContext) :Future[Boolean] = db.command(new EmptyCapped(name))
+  def emptyCapped()(implicit ec: ExecutionContext): Future[Boolean] = db.command(new EmptyCapped(name))
 
   /**
    * Converts this collection to a capped one.
@@ -383,7 +383,7 @@ trait CollectionMetaCommands {
    * @param size The size of this capped collection, in bytes.
    * @param maxDocuments The maximum number of documents this capped collection can contain.
    */
-  def convertToCapped(size: Long, maxDocuments: Option[Int])(implicit ec: ExecutionContext) :Future[Boolean] = db.command(new ConvertToCapped(name, CappedOptions(size, maxDocuments)))
+  def convertToCapped(size: Long, maxDocuments: Option[Int])(implicit ec: ExecutionContext): Future[Boolean] = db.command(new ConvertToCapped(name, CappedOptions(size, maxDocuments)))
 
   /**
    * Renames this collection.
@@ -391,19 +391,19 @@ trait CollectionMetaCommands {
    * @param to The new name of this collection.
    * @param dropExisting If a collection of name `to` already exists, then drops that collection before renaming this one.
    */
-  def rename(to: String, dropExisting: Boolean = false)(implicit ec: ExecutionContext) :Future[Boolean] = db.command(new RenameCollection(name, to, dropExisting))
+  def rename(to: String, dropExisting: Boolean = false)(implicit ec: ExecutionContext): Future[Boolean] = db.command(new RenameCollection(name, to, dropExisting))
 
   /**
    * Returns various information about this collection.
    */
-  def stats()(implicit ec: ExecutionContext) :Future[CollStatsResult] = db.command(new CollStats(name))
+  def stats()(implicit ec: ExecutionContext): Future[CollStatsResult] = db.command(new CollStats(name))
 
   /**
    * Returns various information about this collection.
    *
    * @param scale A scale factor (for example, to get all the sizes in kilobytes).
    */
-  def stats(scale: Int)(implicit ec: ExecutionContext) :Future[CollStatsResult] = db.command(new CollStats(name, Some(scale)))
+  def stats(scale: Int)(implicit ec: ExecutionContext): Future[CollStatsResult] = db.command(new CollStats(name, Some(scale)))
 
   /** Returns an index manager for this collection. */
   def indexesManager(implicit ec: ExecutionContext) = new IndexesManager(self.db).onCollection(name)
@@ -416,5 +416,5 @@ case class DefaultCollection(
   failoverStrategy: FailoverStrategy = FailoverStrategy()) extends Collection with FailoverBasicCollection with CollectionMetaCommands
 
 object Collection {
-  def apply(name: String, db: DB[DefaultCollection], failoverStrategy: FailoverStrategy = FailoverStrategy()) :DefaultCollection = DefaultCollection(name, db, failoverStrategy)
+  def apply(name: String, db: DB[DefaultCollection], failoverStrategy: FailoverStrategy = FailoverStrategy()): DefaultCollection = DefaultCollection(name, db, failoverStrategy)
 }

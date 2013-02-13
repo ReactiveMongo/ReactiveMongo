@@ -5,6 +5,7 @@ import java.util.Arrays
 import play.api.libs.iteratee._
 import reactivemongo.api._
 import reactivemongo.bson._
+import DefaultBSONHandlers._
 import reactivemongo.bson.handlers._
 import reactivemongo.core.commands.LastError
 import reactivemongo.utils._
@@ -16,22 +17,21 @@ object `package` {
 
 object Implicits {
   /** A default `BSONReader` for `ReadFile`. */
-  implicit object DefaultReadFileReader extends BSONReader[DefaultReadFile] {
-    def fromBSON(document: BSONDocument) = {
-      val doc = document.toTraversable
-      val metadata = doc.mapped.filterNot { element =>
+  implicit object DefaultReadFileReader extends BSONDocumentReader[DefaultReadFile] {
+    def fromBSON(doc: BSONDocument) = {
+      val metadata = doc.elements.filterNot { element =>
         element._1 == "contentType" || element._1 == "filename" || element._1 == "uploadDate" ||
           element._1 == "chunkSize" || element._1 == "length" || element._1 == "md5" || element._1 == "_id"
       }.toSeq
       DefaultReadFile(
-        doc.get("_id").get,
+        doc.getAs[BSONValue]("_id").get,
         doc.getAs[BSONString]("contentType").map(_.value),
         doc.getAs[BSONString]("filename").map(_.value).get,
         doc.getAs[BSONNumberLike]("uploadDate").map(_.toLong),
         doc.getAs[BSONNumberLike]("chunkSize").map(_.toInt).get,
         doc.getAs[BSONNumberLike]("length").map(_.toInt).get,
         doc.getAs[BSONString]("md5").map(_.value),
-        BSONDocument(metadata :_*).toTraversable
+        BSONDocument(metadata.toStream)
       )
     }
   }
@@ -79,7 +79,7 @@ case class DefaultFileToSave(
   filename: String,
   contentType: Option[String] = None,
   uploadDate: Option[Long] = None,
-  metadata: AppendableBSONDocument = BSONDocument(),
+  metadata: BSONDocument = BSONDocument(),
   id: BSONValue = BSONObjectID.generate) extends FileToSave[BSONValue]
 
 /**
@@ -97,7 +97,7 @@ case class DefaultReadFile(
     chunkSize: Int,
     length: Int,
     md5: Option[String],
-    metadata: TraversableBSONDocument
+    metadata: BSONDocument
 ) extends ReadFile[BSONValue]
 
 /**
@@ -122,7 +122,7 @@ class GridFS(db: DB[Collection] with DBMetaCommands, prefix: String = "fs") {
    *
    * @tparam S The type of the selector document. An implicit [[reactivemongo.bson.handlers.RawBSONWriter]][S] must be in the scope.
    */
-  def find[S, T <: ReadFile[_]](selector: S)(implicit sWriter: RawBSONWriter[S], readFileReader: BSONReader[T], ctx: ExecutionContext) :Cursor[T] = {
+  def find[S, T <: ReadFile[_]](selector: S)(implicit sWriter: RawBSONDocumentWriter[S], readFileReader: BSONDocumentReader[T], ctx: ExecutionContext) :Cursor[T] = {
     files.find(selector)
   }
 
@@ -135,7 +135,7 @@ class GridFS(db: DB[Collection] with DBMetaCommands, prefix: String = "fs") {
    *
    * @return A future of a ReadFile[Id].
    */
-  def save[Id <: BSONValue](enumerator: Enumerator[Array[Byte]], file: FileToSave[Id], chunkSize: Int = 262144)(implicit readFileReader: BSONReader[ReadFile[Id]], ctx: ExecutionContext) :Future[ReadFile[Id]] = {
+  def save[Id <: BSONValue](enumerator: Enumerator[Array[Byte]], file: FileToSave[Id], chunkSize: Int = 262144)(implicit readFileReader: BSONDocumentReader[ReadFile[Id]], ctx: ExecutionContext) :Future[ReadFile[Id]] = {
     (enumerator |>>> iteratee(file, chunkSize)).flatMap(f => f)
   }
 
@@ -148,7 +148,7 @@ class GridFS(db: DB[Collection] with DBMetaCommands, prefix: String = "fs") {
    *
    * @return An `Iteratee` that will consume data to put into a GridFS store.
    */
-  def iteratee[Id <: BSONValue](file: FileToSave[Id], chunkSize: Int = 262144)(implicit readFileReader: BSONReader[ReadFile[Id]], ctx: ExecutionContext): Iteratee[Array[Byte], Future[ReadFile[Id]]] = {
+  def iteratee[Id <: BSONValue](file: FileToSave[Id], chunkSize: Int = 262144)(implicit readFileReader: BSONDocumentReader[ReadFile[Id]], ctx: ExecutionContext): Iteratee[Array[Byte], Future[ReadFile[Id]]] = {
     implicit val ec = MongoConnection.system
 
     import reactivemongo.bson.handlers.DefaultBSONHandlers._
@@ -203,7 +203,7 @@ class GridFS(db: DB[Collection] with DBMetaCommands, prefix: String = "fs") {
         val bson = BSONDocument(
           "files_id" -> file.id,
           "n"        -> BSONInteger(n),
-          "data"     -> new BSONBinary(array, Subtype.GenericBinarySubtype)
+          "data"     -> BSONBinary(array, Subtype.GenericBinarySubtype)
         )
         chunks.insert(bson)
       }
@@ -233,7 +233,11 @@ class GridFS(db: DB[Collection] with DBMetaCommands, prefix: String = "fs") {
     val cursor = chunks.find(selector)
     cursor.enumerate &> (Enumeratee.map { doc =>
       doc.get("data").flatMap {
-        case BSONBinary(data, _) => Some(data.array())
+        case BSONBinary(data, _) => {
+          val array = new Array[Byte](data.readable)
+          data.slice(data.readable).readBytes(array)//Some(data.array()) // TODO TODO TODO
+          Some(array)
+        }
         case _ => None
       }.getOrElse {
         logger.error("not a chunk! failed assertion: data field is missing")
@@ -250,7 +254,7 @@ class GridFS(db: DB[Collection] with DBMetaCommands, prefix: String = "fs") {
   }
 
   /** Writes the data provided by the given InputStream to the given file. */
-  def writeFromInputStream[Id <: BSONValue](file: FileToSave[Id], input: InputStream, chunkSize: Int = 262144)(implicit readFileReader: BSONReader[ReadFile[Id]], ctx: ExecutionContext) :Future[ReadFile[Id]] = {
+  def writeFromInputStream[Id <: BSONValue](file: FileToSave[Id], input: InputStream, chunkSize: Int = 262144)(implicit readFileReader: BSONDocumentReader[ReadFile[Id]], ctx: ExecutionContext) :Future[ReadFile[Id]] = {
     save(Enumerator.fromStream(input, chunkSize), file)
   }
 

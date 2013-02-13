@@ -1,6 +1,7 @@
 package reactivemongo.core.errors
 
 import reactivemongo.bson._
+import DefaultBSONHandlers._
 
 /** A driver error - can be from a MongoDB node or not. */
 trait ReactiveMongoError extends Throwable {
@@ -13,7 +14,7 @@ trait ReactiveMongoError extends Throwable {
 /** An error thrown by a MongoDB node. */
 trait DBError extends ReactiveMongoError {
   /** original document of this error */
-  val originalDocument: Option[TraversableBSONDocument]
+  val originalDocument: Option[BSONDocument]
 
   /** error code */
   val code: Option[Int]
@@ -35,7 +36,7 @@ trait NonRecoverableError {
 object ReactiveMongoError {
   def apply(message: String) :ReactiveMongoError = GenericMongoError(message)
 
-  def apply(doc: TraversableBSONDocument) :DBError = new CompleteDBError(doc)
+  def apply(doc: BSONDocument) :DBError = new CompleteDBError(doc)
 }
 
 /** A generic driver error. */
@@ -53,7 +54,7 @@ case class GenericDBError(
 
 /** An error thrown by a MongoDB node (containing the original document of the error). */
 class CompleteDBError(
-  doc: TraversableBSONDocument
+  doc: BSONDocument
 ) extends DBError {
   val originalDocument = Some(doc)
   lazy val message = doc.getAs[BSONString]("$err").map(_.value).getOrElse("$err is not present, unknown error")

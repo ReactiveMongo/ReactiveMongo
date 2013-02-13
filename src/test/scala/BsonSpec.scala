@@ -1,5 +1,9 @@
+package reactivemongo
+
 import org.specs2.mutable._
 import reactivemongo.bson._
+import DefaultBSONHandlers._
+import reactivemongo.utils._
 import java.util.Arrays
 import reactivemongo.bson.BSONObjectID
 
@@ -12,17 +16,14 @@ class BsonSpec extends Specification {
 
   "ReactiveMongo" should {
     "produce a simple doc" in {
-      val buffer = BSONDocument("hello" -> BSONString("world")).makeBuffer
+      val doc = BSONDocument("hello" -> BSONString("world"))
+      val buffer = doc.makeBuffer
       compare(simple, buffer)
     }
     "produce a simple doc through a traversable" in {
       val buffer = BSONDocument("hello" -> BSONString("world")).makeBuffer
-      val buffer2 = BSONDocument(buffer).makeBuffer
+      val buffer2 = buffer.makeDocument.makeBuffer
       compare(simple, buffer2)
-    }
-    "produce a simple doc through a traversable through appendable" in {
-      val buffer = BSONDocument("hello" -> BSONString("world")).toTraversable.toAppendable.makeBuffer
-      compare(simple, buffer)
     }
     "produce a document embedding an array" in {
       val buffer = BSONDocument(
@@ -42,35 +43,15 @@ class BsonSpec extends Specification {
           BSONDouble(5.05),
           BSONDouble(1986)
         )).makeBuffer
-      val buffer2 = BSONDocument(buffer).makeBuffer
+      val buffer2 = buffer.makeDocument.makeBuffer
       compare(embeddingArray, buffer2)
-    }
-    "produce a document embedding an array through traversable through appendable" in {
-      val traversable = BSONDocument(
-        "_id" -> new BSONObjectID("503792c1984587971b14530e"),
-          "BSON" -> BSONArray(
-          BSONString("awesome"),
-          BSONDouble(5.05),
-          BSONDouble(1986)
-        )).toTraversable
-      val buffer = traversable.toAppendable.makeBuffer
-      compare(embeddingArray, buffer)
-    }
-    "produce an array through through traversable through appendable" in {
-      val traversable = BSONArray(
-        BSONString("awesome"),
-        BSONDouble(5.05),
-        BSONDouble(1986)
-      ).toTraversable
-      val buffer = traversable.toAppendable.makeBuffer
-      compare(bsonArray, buffer)
     }
     "nested subdocuments and arrays" in {
       val expected = Array[Byte] (72, 0, 0, 0, 3, 112, 117, 115, 104, 65, 108, 108, 0, 58, 0, 0, 0, 4, 99, 111, 110, 102, 105, 103, 0, 45, 0, 0, 0, 3, 48, 0, 37, 0, 0, 0, 2, 110, 97, 109, 101, 0, 7, 0, 0, 0, 102, 111, 111, 98, 97, 114, 0, 2, 118, 97, 108, 117, 101, 0, 4, 0, 0, 0, 98, 97, 114, 0, 0, 0, 0, 0)
       // {"pushAll":{"config":[{"name":"foobar","value":"bar"}]}}
       val subsubdoc = BSONDocument("name" -> BSONString("foobar"), "value" -> BSONString("bar"))
       val arr = BSONArray(subsubdoc)
-      val subdoc = BSONDocument("config" -> BSONArray(arr.makeBuffer))
+      val subdoc = BSONDocument("config" -> arr)
       val doc = BSONDocument("pushAll" -> subdoc)
 
       compare(expected, doc.makeBuffer)
@@ -111,7 +92,7 @@ class BsonSpec extends Specification {
       "anInt" -> BSONInteger(200),
       "aLong" -> BSONLong(12345678912L),
       "aDouble" -> BSONDouble(9876543210.98)
-    ).toTraversable
+    )
     "abstract booleans and numbers" in {
       docLike.getAs[BSONBooleanLike]("likeFalseInt").get.toBoolean mustEqual false
       docLike.getAs[BSONBooleanLike]("likeFalseLong").get.toBoolean mustEqual false

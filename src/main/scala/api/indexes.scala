@@ -2,9 +2,10 @@ package reactivemongo.api.indexes
 
 import reactivemongo.api._
 import reactivemongo.bson._
+import DefaultBSONHandlers._
 import reactivemongo.bson.handlers._
 import reactivemongo.core.commands.{DeleteIndex, LastError}
-import reactivemongo.utils.option
+import reactivemongo.utils._
 import scala.concurrent.{Future, ExecutionContext}
 
 /** Type of Index */
@@ -99,7 +100,7 @@ case class NSIndex(
  * @param db The subject database.
  */
 class IndexesManager(db: DB[Collection])(implicit context: ExecutionContext) {
-  import DefaultBSONHandlers._
+  import handlers.DefaultBSONHandlers._
 
   val collection = db("system.indexes")
 
@@ -220,7 +221,7 @@ object IndexesManager {
       "name"       -> BSONString(nsIndex.index.eventualName),
       "key"        -> BSONDocument(
           (for(kv <- nsIndex.index.key)
-            yield kv._1 -> kv._2.value) :_*),
+            yield kv._1 -> kv._2.value).toStream),
       "background" -> option(nsIndex.index.background, BSONBoolean(true)),
       "dropDups"   -> option(nsIndex.index.dropDups,   BSONBoolean(true)),
       "sparse"     -> option(nsIndex.index.sparse,     BSONBoolean(true)),
@@ -228,7 +229,7 @@ object IndexesManager {
     ) ++ nsIndex.index.options
   }
 
-  implicit object NSIndexWriter extends RawBSONWriter[NSIndex] {
+  implicit object NSIndexWriter extends RawBSONDocumentWriter[NSIndex] {
     import org.jboss.netty.buffer._
     def write(nsIndex: NSIndex) :ChannelBuffer = {
       if(nsIndex.index.key.isEmpty)
@@ -237,27 +238,27 @@ object IndexesManager {
     }
   }
 
-  implicit object NSIndexReader extends RawBSONReader[NSIndex] {
+  implicit object NSIndexReader extends RawBSONDocumentReader[NSIndex] {
     import org.jboss.netty.buffer._
     def read(buffer: ChannelBuffer) :NSIndex = {
-      val doc = DefaultBSONHandlers.DefaultBSONDocumentReader.read(buffer)
-      val options = doc.mapped.filterNot { element =>
+      val doc = handlers.DefaultBSONHandlers.DefaultBSONDocumentReader.read(buffer)
+      val options = doc.elements.filterNot { element =>
         element._1 == "ns" || element._1 == "key" || element._1 == "name" || element._1 == "unique" ||
           element._1 == "background" || element._1 == "dropDups" || element._1 == "sparse" || element._1 == "v"
       }.toSeq
       NSIndex(
         doc.getAs[BSONString]("ns").map(_.value).get,
         Index(
-          doc.getAs[TraversableBSONDocument]("key").get.iterator.toList.map { elem =>
-            elem.name -> IndexType(elem.value)
-          },
+          doc.getAs[BSONDocument]("key").get.elements.map { elem =>
+            elem._1 -> IndexType(elem._2)
+          }.toList,
           doc.getAs[BSONString]("name").map(_.value),
           doc.getAs[BSONBoolean]("unique").map(_.value).getOrElse(false),
           doc.getAs[BSONBoolean]("background").map(_.value).getOrElse(false),
           doc.getAs[BSONBoolean]("dropDups").map(_.value).getOrElse(false),
           doc.getAs[BSONBoolean]("sparse").map(_.value).getOrElse(false),
           doc.getAs[BSONInteger]("v").map(_.value),
-          BSONDocument(options :_*)
+          BSONDocument(options.toStream)
         )
       )
     }

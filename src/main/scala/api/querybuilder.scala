@@ -2,9 +2,10 @@ package reactivemongo.api
 
 import org.jboss.netty.buffer.ChannelBuffer
 import reactivemongo.bson._
+import DefaultBSONHandlers._
 import reactivemongo.bson.handlers._
 import reactivemongo.core.protocol.QueryFlags
-import reactivemongo.utils.option
+import reactivemongo.utils._
 
 sealed trait SortOrder
 object SortOrder {
@@ -62,8 +63,8 @@ case class QueryBuilder(
    *
    * @tparam Qry The type of the query. An implicit [[reactivemongo.bson.handlers.RawBSONWriter]][Qry] typeclass for handling it has to be in the scope.
    */
-  def query[Qry](selector: Qry)(implicit writer: RawBSONWriter[Qry]) :QueryBuilder = copy(queryDoc=Some(
-    BSONDocument(writer.write(selector))
+  def query[Qry](selector: Qry)(implicit writer: RawBSONDocumentWriter[Qry]) :QueryBuilder = copy(queryDoc=Some(
+    writer.write(selector).makeDocument
   ))
 
   /** Sets the query (the selector document). */
@@ -83,7 +84,7 @@ case class QueryBuilder(
             case SortOrder.Ascending => 1
             case SortOrder.Descending => -1
           }
-        )) :_*
+        )).toStream
       )
       Some(bson)
     }
@@ -94,8 +95,8 @@ case class QueryBuilder(
    *
    * @tparam Pjn The type of the projection. An implicit [[reactivemongo.bson.handlers.RawBSONWriter]][Pjn] typeclass for handling it has to be in the scope.
    */
-  def projection[Pjn](p: Pjn)(implicit writer: RawBSONWriter[Pjn]) :QueryBuilder = copy(projectionDoc=Some(
-    BSONDocument(writer.write(p))
+  def projection[Pjn](p: Pjn)(implicit writer: RawBSONDocumentWriter[Pjn]) :QueryBuilder = copy(projectionDoc=Some(
+    writer.write(p).makeDocument
   ))
 
   /** Sets the hint document (a document that declares the index MongoDB should use for this query). */

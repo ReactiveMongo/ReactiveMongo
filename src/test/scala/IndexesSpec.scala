@@ -2,6 +2,7 @@ import org.specs2.mutable._
 import reactivemongo.api.indexes._
 import reactivemongo.api.indexes.IndexType.Geo2D
 import reactivemongo.bson._
+import DefaultBSONHandlers._
 import reactivemongo.core.errors.DBError
 import scala.concurrent.Future
 import scala.concurrent.Await
@@ -53,9 +54,9 @@ class IndexesSpec  extends Specification {
       val index = Await.result(future, DurationInt(5).seconds)
       index.key(0)._1 mustEqual "loc"
       index.key(0)._2 mustEqual Geo2D
-      index.options.toTraversable.getAs[BSONInteger]("min").get.value mustEqual -95
-      index.options.toTraversable.getAs[BSONInteger]("max").get.value mustEqual 95
-      index.options.toTraversable.getAs[BSONInteger]("bits").get.value mustEqual 28
+      index.options.getAs[BSONInteger]("min").get.value mustEqual -95
+      index.options.getAs[BSONInteger]("max").get.value mustEqual 95
+      index.options.getAs[BSONInteger]("bits").get.value mustEqual 28
     }
   }
 }
