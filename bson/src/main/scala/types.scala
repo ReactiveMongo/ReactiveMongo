@@ -1,3 +1,19 @@
+/*
+ * Copyright 2013 Stephane Godbillon
+ * @sgodbillon
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package reactivemongo.bson
 
 import scala.util.{ Failure, Success, Try }
@@ -26,19 +42,9 @@ class BSONDocument(val stream: Stream[Try[BSONElement]]) extends BSONValue {
       Try(option.getOrElse(throw new NoSuchElementException(s)))
     }
 
-  //def get(s: String) = elements.find(_._1 == s).map(_._2)
-
   def getAs[T](s: String)(implicit reader: BSONReader[_ <: BSONValue, T]): Option[T] = {
     getTry(s).toOption.flatten.flatMap { element =>
-      //println(reader)
-      //println(element)
-      val t = Try(reader.asInstanceOf[BSONReader[BSONValue, T]].read(element))
-      /*t match {
-        case f: Failure[_] => f.exception.printStackTrace()
-        case s: Success[_] => println("success: " + s)
-      }
-      println("\t" + t)*/
-      t.toOption
+      Try(reader.asInstanceOf[BSONReader[BSONValue, T]].read(element)).toOption
     }
   }
 
@@ -68,7 +74,6 @@ object BSONDocument {
   def apply(elements: Producer[(String, BSONValue)]*): BSONDocument = new BSONDocument(
     elements.flatMap { el =>
       el.produce.map(value => Seq(Try(value))).getOrElse(Seq.empty)
-      //el._2.produce.map(value => Seq(Try(el._1 -> value))).getOrElse(Seq.empty)
     }.toStream)
 
   def apply(elements: Stream[(String, BSONValue)]): BSONDocument = {
@@ -76,7 +81,7 @@ object BSONDocument {
   }
 
   def pretty(doc: BSONDocument) = BSONIterator.pretty(doc.stream.iterator)
-  
+
   def write(value: BSONDocument, buffer: WritableBuffer)(implicit bufferHandler: BufferHandler = DefaultBufferHandler): WritableBuffer = {
     bufferHandler.writeDocument(value, buffer)
   }
@@ -90,15 +95,16 @@ class BSONArray(val stream: Stream[Try[BSONValue]]) extends BSONValue {
 
   def get(i: Int) = Try(stream.drop(i).head).flatten
 
-  def getAs[T](i: Int)(implicit reader: BSONReader[_ <: BSONValue, T]) =
+  def getAs[T](i: Int)(implicit reader: BSONReader[_ <: BSONValue, T]) = {
     Try(reader.asInstanceOf[BSONReader[BSONValue, T]].read(get(i).get)).toOption
+  }
 
   def iterator: Iterator[Try[(String, BSONValue)]] = stream.zipWithIndex.map { vv =>
     vv._1.map(vv._2.toString -> _)
   }.toIterator
 
   def values: Stream[BSONValue] = stream.filter(_.isSuccess).map(_.get)
-  
+
   def ++(array: BSONArray): BSONArray = new BSONArray(stream ++ array.stream)
 }
 

@@ -1,19 +1,26 @@
+/*
+ * Copyright 2013 Stephane Godbillon
+ * @sgodbillon
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package reactivemongo.bson
 
-import scala.util.{Failure, Success, Try}
+import scala.util.{ Failure, Success, Try }
 
 trait BufferHandler {
   def serialize(bson: BSONValue, buffer: WritableBuffer): WritableBuffer
   def deserialize(buffer: ReadableBuffer): Try[(String, BSONValue)]
-
-  /*def write(buffer: WritableBuffer, elements: (String, BSONValue)* ) = {
-    elements.foreach { e =>
-      buffer.writeByte(e._2.code.toByte)
-      buffer.writeCString(e._1)
-      serialize(e._2, buffer)
-    }
-    buffer
-  }*/
 
   def write(buffer: WritableBuffer, document: BSONDocument) = {
     serialize(document, buffer)
@@ -24,7 +31,7 @@ trait BufferHandler {
   }
 
   def readDocument(buffer: ReadableBuffer): Try[BSONDocument]
-  
+
   def writeDocument(document: BSONDocument, buffer: WritableBuffer): WritableBuffer
 
   def stream(buffer: ReadableBuffer): Stream[(String, BSONValue)] = {
@@ -85,10 +92,6 @@ object DefaultBufferHandler extends BufferHandler {
         buffer.writeCString(e._1)
         serialize(e._2, buffer)
       }
-      println("size is " + (buffer.writerIndex - now + 1))
-      /*doc.elements.iterator.foreach { el =>
-        handlersByCode.get(el._2.code).get.asInstanceOf[BufferRW[BSONValue]].write(el._2, buffer)
-      }*/
       buffer.setInt(now, (buffer.writerIndex - now + 1))
       buffer.writeByte(0)
       buffer
@@ -97,24 +100,19 @@ object DefaultBufferHandler extends BufferHandler {
 
       val startIndex = b.index
       val length = b.readInt
-      println(s"size: ${b.size}, index = ${b.index}, length is = $length, position is ${b.index}")
       val buffer = b.slice(length - 4)
-      println(s"new position is ${b.index}")
       b.discard(length - 4 + 1)
         def makeStream(): Stream[Try[(String, BSONValue)]] = {
-          println("readable " + buffer.readable)
           if (buffer.readable > 1) { // last is 0
             val code = buffer.readByte
             val name = buffer.readCString
-            println(s"reading '$name' of code $code")
             val elem = Try(name -> DefaultBufferHandler.handlersByCode.get(code).map(_.read(buffer)).get)
             elem #:: makeStream
           } else Stream.empty
         }
       val stream = makeStream
-      stream.force
+      stream.force // TODO remove
       new BSONDocument(stream)
-      //new BSONDocument(new BSONIterator { val buffer = b }.toStream) // TODO
     }
   }
   object BSONArrayBufferHandler extends BufferRW[BSONArray] {
@@ -139,13 +137,12 @@ object DefaultBufferHandler extends BufferHandler {
           if (buffer.readable > 1) { // last is 0
             val code = buffer.readByte
             val name = buffer.readCString
-            println(s"reading '$name' of code $code (in array)")
             val elem = Try(DefaultBufferHandler.handlersByCode.get(code).map(_.read(buffer)).get)
             elem #:: makeStream
           } else Stream.empty
         }
       val stream = makeStream
-      stream.force
+      stream.force // TODO remove
       new BSONArray(stream)
     }
   }
@@ -224,7 +221,7 @@ object DefaultBufferHandler extends BufferHandler {
   def readDocument(buffer: ReadableBuffer): Try[BSONDocument] = Try {
     BSONDocumentBufferHandler.read(buffer)
   }
-  
+
   def writeDocument(document: BSONDocument, buffer: WritableBuffer): WritableBuffer =
     serialize(document, buffer)
 }
@@ -250,19 +247,16 @@ sealed trait BSONIterator extends Iterator[BSONElement] {
 object BSONIterator {
   private[bson] def pretty(i: Int, it: Iterator[Try[BSONElement]]): String = {
     val prefix = (0 to i).map { i => "\t" }.mkString("")
-    (for (tryElem <- it) yield { tryElem match {
-      case Success(elem) => elem._2 match {
-        case doc: BSONDocument => prefix + elem._1 + ": {\n" + pretty(i + 1, doc.stream.iterator) + "\n" + prefix + " }"
-        case array: BSONArray => prefix + elem._1 + ": [\n" + pretty(i + 1, array.iterator) + "\n" + prefix + " ]"
-        case _ => prefix + elem._1 + ": " + elem._2.toString
+    (for (tryElem <- it) yield {
+      tryElem match {
+        case Success(elem) => elem._2 match {
+          case doc: BSONDocument => prefix + elem._1 + ": {\n" + pretty(i + 1, doc.stream.iterator) + "\n" + prefix + " }"
+          case array: BSONArray => prefix + elem._1 + ": [\n" + pretty(i + 1, array.iterator) + "\n" + prefix + " ]"
+          case _ => prefix + elem._1 + ": " + elem._2.toString
+        }
+        case Failure(e) => prefix + s"ERROR[${e.getMessage()}]"
       }
-      case Failure(e) => prefix + s"ERROR["
-      /*v._2 match {
-        case doc: BSONDocument => prefix + v._1 + ": {\n" + pretty(i + 1, doc.elements.iterator) + "\n" + prefix + " }"
-        case array: BSONArray => prefix + v._1 + ": [\n" + pretty(i + 1, array.iterator) + "\n" + prefix + " ]"
-        case _ => prefix + v._1 + ": " + v._2.toString
-      }*/
-    }}).mkString(",\n")
+    }).mkString(",\n")
   }
   /** Makes a pretty String representation of the given [[reactivemongo.bson.BSONIterator]]. */
   def pretty(it: Iterator[Try[BSONElement]]): String = "{\n" + pretty(0, it) + "\n}"

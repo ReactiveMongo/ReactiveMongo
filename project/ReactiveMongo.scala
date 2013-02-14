@@ -19,8 +19,6 @@ object BuildSettings {
     crossVersion := CrossVersion.binary,
     scalacOptions ++= Seq("-unchecked", "-deprecation" /*, "-Xlog-implicits", "-Yinfer-debug", "-Xprint:typer", "-Yinfer-debug", "-Xlog-implicits", "-Xprint:typer"*/ ),
     scalacOptions in (Compile, doc) ++= Seq("-unchecked", "-deprecation", "-diagrams", "-implicits"),
-    scalacOptions in (Compile, doc) ++= Opts.doc.title("ReactiveMongo API"),
-    scalacOptions in (Compile, doc) ++= Opts.doc.version("0.9-SNAPSHOT"),
     shellPrompt := ShellPrompt.buildShellPrompt,
     mappings in (Compile, packageBin) ~= filter,
     mappings in (Compile, packageSrc) ~= filter,
@@ -162,10 +160,11 @@ object ReactiveMongoBuild extends Build {
         netty,
         akkaActor(sv),
         iteratees(sv),
-        specs(sv)) ++ logback ++ testDeps))) dependsOn (bson)
+        specs(sv)) ++ logback ++ testDeps))) dependsOn (bson) aggregate(bson)
 
   lazy val bson = Project(
     "ReactiveMongo-BSON",
-    file("bson"))
+    file("bson"),
+    settings = buildSettings)
 }
 

@@ -1,3 +1,19 @@
+/*
+ * Copyright 2013 Stephane Godbillon
+ * @sgodbillon
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package reactivemongo.bson
 
 import scala.collection.mutable.ArrayBuffer
@@ -94,21 +110,17 @@ class ArrayReadableBuffer private(bytebuffer: ByteBuffer) extends ReadableBuffer
 
   def index = bytebuffer.position()
 
-  def discard(n: Int) = {
-    println(s"discarding $n bytes at position ${bytebuffer.position()} (capacity is ${bytebuffer.capacity()})")
+  def discard(n: Int) =
     bytebuffer.position(bytebuffer.position() + n - 1)
-  }
 
   def slice(n: Int) = {
     val nb = bytebuffer.slice()
-    println(s"slice: ${bytebuffer.position()} + $n/${nb.capacity()} (${nb.limit()})")
     nb.limit(n)
     new ArrayReadableBuffer(nb)
   }
 
-  def readBytes(array: Array[Byte]): Unit = {
+  def readBytes(array: Array[Byte]): Unit =
     bytebuffer.get(array)
-  }
 
   def readByte() = bytebuffer.get()
 
@@ -139,7 +151,6 @@ class ArrayBSONBuffer extends WritableBuffer {
 
   def setInt(index: Int, value: Int) = {
     val array = bytebuffer(4).putInt(value).array
-    //println("SETINT = " + java.util.Arrays.toString(array))
     buffer.update(index, array(0))
     buffer.update(index + 1, array(1))
     buffer.update(index + 2, array(2))
@@ -160,7 +171,6 @@ class ArrayBSONBuffer extends WritableBuffer {
 
   def writeInt(int: Int): WritableBuffer = {
     val array = bytebuffer(4).putInt(int).array
-    //println(java.util.Arrays.toString(array))
     buffer ++= array
     writerIndex += 4
     this

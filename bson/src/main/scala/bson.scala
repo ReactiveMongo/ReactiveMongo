@@ -1,3 +1,19 @@
+/*
+ * Copyright 2013 Stephane Godbillon
+ * @sgodbillon
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package reactivemongo.bson
 
 object `package` {
@@ -9,12 +25,12 @@ sealed trait Producer[T] {
 }
 
 object Producer {
-  case class NameOptionValueProducer(element: (String, Option[BSONValue])) extends Producer[(String, BSONValue)] {
-    def produce = element._2.map(value => element._1 -> value)
+  case class NameOptionValueProducer(private val element: (String, Option[BSONValue])) extends Producer[(String, BSONValue)] {
+    private[bson] def produce = element._2.map(value => element._1 -> value)
   }
 
-  case class OptionValueProducer(element: Option[BSONValue]) extends Producer[BSONValue] {
-    def produce = element
+  case class OptionValueProducer(private val element: Option[BSONValue]) extends Producer[BSONValue] {
+    private[bson] def produce = element
   }
 
   implicit def nameValue2Producer[T](element: (String, T))(implicit writer: BSONWriter[T, _ <: BSONValue]) =
@@ -42,11 +58,17 @@ trait BSONValue {
 
 object BSONValue {
   import scala.util.Try
-  implicit class ExtendedBSONValue[B <: BSONValue](bson: B) {
+  implicit class ExtendedBSONValue[B <: BSONValue](val bson: B) extends AnyVal {
     def asTry[T](implicit reader: BSONReader[B, T]): Try[T] = {
       reader.readTry(bson)
     }
     def asOpt[T](implicit reader: BSONReader[B, T]): Option[T] = asTry.toOption
     def as[T](implicit reader: BSONReader[B, T]): T = asTry.get
+
+    def seeAsTry[T](implicit reader: BSONReader[_ <: BSONValue, T]): Try[T] =
+      Try { reader.asInstanceOf[BSONReader[BSONValue, T]].readTry(bson) }.flatten
+
+    def seeAsOpt[T](implicit reader: BSONReader[_ <: BSONValue, T]): Option[T] =
+      seeAsTry[T].toOption
   }
 }
