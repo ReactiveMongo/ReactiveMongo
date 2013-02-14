@@ -188,7 +188,7 @@ class GridFS(db: DB[Collection] with DBMetaCommands, prefix: String = "fs") {
         val uploadDate = file.uploadDate.getOrElse(System.currentTimeMillis)
         writeChunk(n, previous).flatMap { f =>
           val bson = BSONDocument(
-            "_id"         -> file.id,
+            "_id"         -> file.id.asInstanceOf[BSONValue],
             "filename"    -> BSONString(file.filename),
             "chunkSize"   -> BSONInteger(chunkSize),
             "length"      -> BSONInteger(length),
@@ -201,7 +201,7 @@ class GridFS(db: DB[Collection] with DBMetaCommands, prefix: String = "fs") {
       def writeChunk(n: Int, array: Array[Byte]) = {
         logger.debug("writing chunk " + n)
         val bson = BSONDocument(
-          "files_id" -> file.id,
+          "files_id" -> file.id.asInstanceOf[BSONValue],
           "n"        -> BSONInteger(n),
           "data"     -> BSONBinary(array, Subtype.GenericBinarySubtype)
         )
