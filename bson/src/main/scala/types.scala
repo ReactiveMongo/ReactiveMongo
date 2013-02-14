@@ -16,6 +16,7 @@
  */
 package reactivemongo.bson
 
+import exceptions.DocumentKeyNotFound
 import scala.util.{ Failure, Success, Try }
 import scala.collection.generic.CanBuildFrom
 import utils.Converters
@@ -25,79 +26,217 @@ case class BSONDouble(value: Double) extends BSONValue { val code = 0x01 }
 
 case class BSONString(value: String) extends BSONValue { val code = 0x02 }
 
+/**
+ * A `BSONDocument` structure (BSON type `0x03`).
+ *
+ * A `BSONDocument` is basically a stream of tuples `(String, BSONValue)`.
+ * It is completely lazy. The stream it wraps is a `Stream[Try[(String, BSONValue)]]` since
+ * we cannot be sure that a not yet deserialized value will be processed without error.
+ */
 class BSONDocument(val stream: Stream[Try[BSONElement]]) extends BSONValue {
   val code = 0x03
 
-  def get(s: String): Option[BSONValue] = getTry(s).toOption.flatten
+  /**
+   * Returns the [[BSONValue]] associated with the given `key`.
+   *
+   * If the key is not found or the matching value cannot be deserialized, returns `None`.
+   */
+  def get(key: String): Option[BSONValue] = getTry(key).toOption
 
-  def getTry(s: String): Try[Option[BSONValue]] = Try {
+  /**
+   * Returns the [[BSONValue]] associated with the given `key`.
+   *
+   * If the key is not found or the matching value cannot be deserialized, returns a `Failure`.
+   * The `Failure` holds a [[exceptions.DocumentKeyNotFound]] if the key could not be found.
+   */
+  def getTry(key: String): Try[BSONValue] = Try {
     stream.find {
-      case Success(element) => element._1 == s
+      case Success(element) => element._1 == key
       case Failure(e) => throw e
-    }.map(_.get._2)
+    }.map(_.get._2).getOrElse(throw DocumentKeyNotFound(key))
   }
 
-  def getFlattenedTry(s: String): Try[BSONValue] =
-    getTry(s) flatMap { option =>
-      Try(option.getOrElse(throw new NoSuchElementException(s)))
-    }
+  /**
+   * Returns the [[BSONValue]] associated with the given `key`.
+   *
+   * If the key could not be found, the resulting option will be `None`.
+   * If the matching value could not be deserialized, returns a `Failure`.
+   */
+  def getUnflattenedTry(key: String): Try[Option[BSONValue]] = getTry(key) match {
+    case Failure(e: DocumentKeyNotFound) => Success(None)
+    case Failure(e) => Failure(e)
+    case Success(e) => Success(Some(e))
+  }
 
+  /**
+   * Returns the [[BSONValue]] associated with the given `key`, and converts it with the given implicit [[BSONReader]].
+   *
+   * If there is no matching value, or the value could not be deserialized or converted, returns a `None`.
+   */
   def getAs[T](s: String)(implicit reader: BSONReader[_ <: BSONValue, T]): Option[T] = {
-    getTry(s).toOption.flatten.flatMap { element =>
+    getTry(s).toOption.flatMap { element =>
       Try(reader.asInstanceOf[BSONReader[BSONValue, T]].read(element)).toOption
     }
   }
 
-  def getAsTry[T](s: String)(implicit reader: BSONReader[_ <: BSONValue, T]): Try[Option[T]] = {
+  /**
+   * Returns the [[BSONValue]] associated with the given `key`, and converts it with the given implicit [[BSONReader]].
+   *
+   * If there is no matching value, or the value could not be deserialized or converted, returns a `Failure`.
+   * The `Failure` holds a [[exceptions.DocumentKeyNotFound]] if the key could not be found.
+   */
+  def getAsTry[T](s: String)(implicit reader: BSONReader[_ <: BSONValue, T]): Try[T] = {
     val tt = getTry(s)
-    tt.flatMap {
-      case Some(element) => Try(Some(reader.asInstanceOf[BSONReader[BSONValue, T]].read(element)))
-      case None => Success(None)
-    }
+    tt.flatMap { element => Try(reader.asInstanceOf[BSONReader[BSONValue, T]].read(element)) }
   }
 
-  def getAsFlattenedTry[T](s: String)(implicit reader: BSONReader[_ <: BSONValue, T]): Try[T] =
-    getAsTry(s) flatMap { option =>
-      Try(option.getOrElse(throw new NoSuchElementException(s)))
-    }
-
-  def ++(doc: BSONDocument): BSONDocument = new BSONDocument(stream ++ doc.stream)
-
-  def add[T](el: (String, T))(implicit writer: BSONWriter[T, _ <: BSONValue]): BSONDocument = {
-    new BSONDocument(stream :+ Try(el._1 -> writer.write(el._2)))
+  /**
+   * Returns the [[BSONValue]] associated with the given `key`, and converts it with the given implicit [[BSONReader]].
+   *
+   * If there is no matching value, returns a `Success` holding `None`.
+   * If the value could not be deserialized or converted, returns a `Failure`.
+   */
+  def getAsUnflattenedTry[T](s: String)(implicit reader: BSONReader[_ <: BSONValue, T]): Try[Option[T]] = getAsTry(s) match {
+    case Failure(e: DocumentKeyNotFound) => Success(None)
+    case Failure(e) => Failure(e)
+    case Success(e) => Success(Some(e))
   }
 
+  /** Creates a new [[BSONDocument]] containing all the elements of this one and the elements of the given document. */
+  def add(doc: BSONDocument): BSONDocument = new BSONDocument(stream ++ doc.stream)
+
+  /** Creates a new [[BSONDocument]] containing all the elements of this one and the given `elements`. */
+  def add(elements: Producer[(String, BSONValue)]*): BSONDocument = new BSONDocument(
+    stream ++ elements.flatMap { el =>
+      el.produce.map(value => Seq(Try(value))).getOrElse(Seq.empty)
+    }.toStream)
+
+  /** Alias for `add(doc: BSONDocument): BSONDocument` */
+  def ++(doc: BSONDocument): BSONDocument = add(doc)
+
+  /** Alias for `add(elements: Producer[(String, BSONValue)]*): BSONDocument` */
+  def ++(elements: Producer[(String, BSONValue)]*): BSONDocument = add(elements: _*)
+
+  /** Returns a `Stream` for all the elements of this `BSONDocument`. */
   def elements: Stream[BSONElement] = stream.filter(_.isSuccess).map(_.get)
 }
 
 object BSONDocument {
+  /** Creates a new [[BSONDocument]] containing all the given `elements`. */
   def apply(elements: Producer[(String, BSONValue)]*): BSONDocument = new BSONDocument(
     elements.flatMap { el =>
       el.produce.map(value => Seq(Try(value))).getOrElse(Seq.empty)
     }.toStream)
 
+  /** Creates a new [[BSONDocument]] containing all the `elements` in the given `Stream`. */
   def apply(elements: Stream[(String, BSONValue)]): BSONDocument = {
     new BSONDocument(elements.map(Success(_)))
   }
 
+  /** Returns a String representing the given [[BSONDocument]]. */
   def pretty(doc: BSONDocument) = BSONIterator.pretty(doc.stream.iterator)
 
+  /** Writes the `document` into the `buffer`. */
   def write(value: BSONDocument, buffer: WritableBuffer)(implicit bufferHandler: BufferHandler = DefaultBufferHandler): WritableBuffer = {
     bufferHandler.writeDocument(value, buffer)
   }
+  /**
+   * Reads a `document` from the `buffer`.
+   *
+   * Note that the buffer's readerIndex must be set on the start of a document, or it will fail.
+   */
   def read(buffer: ReadableBuffer)(implicit bufferHandler: BufferHandler = DefaultBufferHandler): BSONDocument = {
     bufferHandler.readDocument(buffer).get
   }
 }
 
+/**
+ * A `BSONArray` structure (BSON type `0x04`).
+ *
+ * A `BSONArray` is a straightforward `BSONDocument` where keys are a sequence of positive integers.
+ *
+ * A `BSONArray` is basically a stream of tuples `(String, BSONValue)` where the first member is a string representation of an index.
+ * It is completely lazy. The stream it wraps is a `Stream[Try[(String, BSONValue)]]` since
+ * we cannot be sure that a not yet deserialized value will be processed without error.
+ */
 class BSONArray(val stream: Stream[Try[BSONValue]]) extends BSONValue {
   val code = 0x04
 
-  def get(i: Int) = Try(stream.drop(i).head).flatten
+  /**
+   * Returns the [[BSONValue]] at the given `index`.
+   *
+   * If there is no such `index` or the matching value cannot be deserialized, returns `None`.
+   */
+  def get(index: Int): Option[BSONValue] = getTry(index).toOption
 
-  def getAs[T](i: Int)(implicit reader: BSONReader[_ <: BSONValue, T]) = {
-    Try(reader.asInstanceOf[BSONReader[BSONValue, T]].read(get(i).get)).toOption
+  /**
+   * Returns the [[BSONValue]] at the given `index`.
+   *
+   * If there is no such `index` or the matching value cannot be deserialized, returns a `Failure`.
+   * The `Failure` holds a [[exceptions.DocumentKeyNotFound]] if the key could not be found.
+   */
+  def getTry(index: Int): Try[BSONValue] = stream.drop(index).headOption.getOrElse(Failure(DocumentKeyNotFound(index.toString)))
+
+  /**
+   * Returns the [[BSONValue]] at the given `index`.
+   *
+   * If there is no such `index`, the resulting option will be `None`.
+   * If the matching value could not be deserialized, returns a `Failure`.
+   */
+  def getUnflattenedTry(index: Int): Try[Option[BSONValue]] = getTry(index) match {
+    case Failure(e: DocumentKeyNotFound) => Success(None)
+    case Failure(e) => Failure(e)
+    case Success(e) => Success(Some(e))
   }
+
+  /**
+   * Gets the [[BSONValue]] at the given `index`, and converts it with the given implicit [[BSONReader]].
+   *
+   * If there is no matching value, or the value could not be deserialized or converted, returns a `None`.
+   */
+  def getAs[T](index: Int)(implicit reader: BSONReader[_ <: BSONValue, T]): Option[T] = {
+    getTry(index).toOption.flatMap { element =>
+      Try(reader.asInstanceOf[BSONReader[BSONValue, T]].read(element)).toOption
+    }
+  }
+
+  /**
+   * Gets the [[BSONValue]] at the given `index`, and converts it with the given implicit [[BSONReader]].
+   *
+   * If there is no matching value, or the value could not be deserialized or converted, returns a `Failure`.
+   * The `Failure` holds a [[exceptions.DocumentKeyNotFound]] if the key could not be found.
+   */
+  def getAsTry[T](index: Int)(implicit reader: BSONReader[_ <: BSONValue, T]): Try[T] = {
+    val tt = getTry(index)
+    tt.flatMap { element => Try(reader.asInstanceOf[BSONReader[BSONValue, T]].read(element)) }
+  }
+
+  /**
+   * Gets the [[BSONValue]] at the given `index`, and converts it with the given implicit [[BSONReader]].
+   *
+   * If there is no matching value, returns a `Success` holding `None`.
+   * If the value could not be deserialized or converted, returns a `Failure`.
+   */
+  def getAsUnflattenedTry[T](index: Int)(implicit reader: BSONReader[_ <: BSONValue, T]): Try[Option[T]] = getAsTry(index) match {
+    case Failure(e: DocumentKeyNotFound) => Success(None)
+    case Failure(e) => Failure(e)
+    case Success(e) => Success(Some(e))
+  }
+
+  /** Creates a new [[BSONDocument]] containing all the elements of this one and the elements of the given document. */
+  def add(doc: BSONArray): BSONArray = new BSONArray(stream ++ doc.stream)
+
+  /** Creates a new [[BSONDocument]] containing all the elements of this one and the given `elements`. */
+  def add(elements: Producer[BSONValue]*): BSONArray = new BSONArray(
+    stream ++ elements.flatMap { el =>
+      el.produce.map(value => Seq(Try(value))).getOrElse(Seq.empty)
+    }.toStream)
+
+  /** Alias for `add(doc: BSONDocument): BSONDocument` */
+  def ++(array: BSONArray): BSONArray = add(array)
+
+  /** Alias for `add(elements: Producer[(String, BSONValue)]*): BSONDocument` */
+  def ++(elements: Producer[BSONValue]*): BSONArray = add(elements: _*)
 
   def iterator: Iterator[Try[(String, BSONValue)]] = stream.zipWithIndex.map { vv =>
     vv._1.map(vv._2.toString -> _)
@@ -105,15 +244,17 @@ class BSONArray(val stream: Stream[Try[BSONValue]]) extends BSONValue {
 
   def values: Stream[BSONValue] = stream.filter(_.isSuccess).map(_.get)
 
-  def ++(array: BSONArray): BSONArray = new BSONArray(stream ++ array.stream)
+  lazy val length = stream.size
 }
 
 object BSONArray {
+  /** Creates a new [[BSONArray]] containing all the given `elements`. */
   def apply(elements: Producer[BSONValue]*): BSONArray = new BSONArray(
     elements.flatMap { el =>
       el.produce.map(value => Seq(Try(value))).getOrElse(Seq.empty)
     }.toStream)
 
+  /** Returns a String representing the given [[BSONArray]]. */
   def pretty(array: BSONArray) = BSONIterator.pretty(array.iterator)
 }
 
@@ -130,6 +271,7 @@ object BSONBinary {
     BSONBinary(ArrayReadableBuffer(value), subtype)
 }
 
+/** BSON Undefined value */
 case object BSONUndefined extends BSONValue { val code = 0x06 }
 
 /** BSON ObjectId value. */
@@ -211,6 +353,7 @@ object BSONObjectID {
   }
 }
 
+/** BSON boolean value */
 case class BSONBoolean(value: Boolean) extends BSONValue { val code = 0x08 }
 
 /** BSON date time value */
@@ -246,6 +389,7 @@ case class BSONSymbol(value: String) extends BSONValue { val code = 0x0E }
  */
 case class BSONJavaScriptWS(value: String) extends BSONValue { val code = 0x0F }
 
+/** BSON Integer value */
 case class BSONInteger(value: Int) extends BSONValue { val code = 0x10 }
 
 /** BSON Timestamp value. TODO */

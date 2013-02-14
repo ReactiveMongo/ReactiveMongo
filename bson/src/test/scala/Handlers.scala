@@ -37,43 +37,90 @@ class Handlers extends Specification {
         Some("spamaddrjames@example.org")),
       "adress" -> BSONString("coucou")),
     "lastSeen" -> BSONLong(1360512704747L))
-  
+
+  val array = BSONArray(
+    BSONString("elem0"),
+    None,
+    1,
+    2.222,
+    BSONDocument(
+      "name" -> "Joe"),
+    BSONArray(0L),
+    "pp[4]")
+
   "Complex Document" should {
     "have a name == 'James'" in {
-      doc.getTry("name") mustEqual Success(Some(BSONString("James")))
-      doc.getAsTry[BSONString]("name") mustEqual Success(Some(BSONString("James")))
-      doc.getAsTry[String]("name") mustEqual Success(Some("James"))
-      
+      doc.getTry("name") mustEqual Success(BSONString("James"))
+      doc.getAsTry[BSONString]("name") mustEqual Success(BSONString("James"))
+      doc.getAsTry[String]("name") mustEqual Success("James")
+
       doc.getAsTry[BSONInteger]("name").isFailure mustEqual true
       doc.getAs[BSONInteger]("name") mustEqual None
       doc.getAsTry[Int]("name").isFailure mustEqual true
       doc.getAs[Int]("name") mustEqual None
       doc.getAsTry[BSONNumberLike]("name").isFailure mustEqual true
-      
+
       doc.get("name").get.seeAsTry[String] mustEqual Success("James")
       doc.get("name").get.seeAsTry[Int].isFailure mustEqual true
       doc.get("name").get.seeAsOpt[String] mustEqual Some("James")
     }
-    "have a scode == 3.88" in {
-      doc.getTry("score") mustEqual Success(Some(BSONDouble(3.88)))
-      doc.getAsTry[BSONDouble]("score") mustEqual Success(Some(BSONDouble(3.88)))
-      doc.getAsTry[Double]("score") mustEqual Success(Some(3.88))
-      
+    "have a score == 3.88" in {
+      doc.getTry("score") mustEqual Success(BSONDouble(3.88))
+      doc.getAsTry[BSONDouble]("score") mustEqual Success(BSONDouble(3.88))
+      doc.getAsTry[Double]("score") mustEqual Success(3.88)
+
       doc.getAsTry[BSONInteger]("score").isFailure mustEqual true
       doc.getAsTry[Int]("score").isFailure mustEqual true
-      
+
+      doc.getAsUnflattenedTry[BSONInteger]("score").isFailure mustEqual true
+      doc.getAsUnflattenedTry[BSONDouble]("score").get.isDefined mustEqual true
+
       val tryNumberLike = doc.getAsTry[BSONNumberLike]("score")
       tryNumberLike.isSuccess mustEqual true
-      tryNumberLike.get.isDefined mustEqual true
-      tryNumberLike.get.get.toDouble mustEqual 3.88
-      tryNumberLike.get.get.toFloat mustEqual 3.88f
-      tryNumberLike.get.get.toLong mustEqual 3
-      tryNumberLike.get.get.toInt mustEqual 3
-      
+      tryNumberLike.get.toDouble mustEqual 3.88
+      tryNumberLike.get.toFloat mustEqual 3.88f
+      tryNumberLike.get.toLong mustEqual 3
+      tryNumberLike.get.toInt mustEqual 3
+
       val tryBooleanLike = doc.getAsTry[BSONBooleanLike]("score")
       tryBooleanLike.isSuccess mustEqual true
-      tryBooleanLike.get.isDefined mustEqual true
-      tryBooleanLike.get.get.toBoolean mustEqual true
+      tryBooleanLike.get.toBoolean mustEqual true
+    }
+    "should not have a surname2" in {
+      doc.getTry("surname2").isFailure mustEqual true
+      doc.getUnflattenedTry("surname2").isSuccess mustEqual true
+      doc.getUnflattenedTry("surname2").get.isDefined mustEqual false
+    }
+  }
+
+  "Complex Array" should {
+    "be of size = 6" in {
+      array.length mustEqual 6
+    }
+    "have a an int = 2 at index 2" in {
+      array.get(1).isDefined mustEqual true
+      array.get(1).get mustEqual BSONInteger(1)
+      array.getAs[Int](1) mustEqual Some(1)
+    }
+    "get bsondocunment at index 3" in {
+      val maybedoc = array.getAs[BSONDocument](3)
+      maybedoc.isDefined mustEqual true
+      val maybename = maybedoc.get.getAs[String]("name")
+      maybename.isDefined mustEqual true
+      maybename.get mustEqual "Joe"
+    }
+    "get bsonarray at index 4" in {
+      val tdoc = array.getAsTry[BSONDocument](4)
+      tdoc.isFailure mustEqual true
+      tdoc.failed.get.isInstanceOf[exceptions.DocumentKeyNotFound] mustEqual false
+      val tarray = array.getAsTry[BSONArray](4)
+      tarray.isSuccess mustEqual true
+      val olong = tarray.get.getAs[BSONLong](0)
+      olong.isDefined mustEqual true
+      olong.get mustEqual BSONLong(0L)
+      val booleanlike = tarray.get.getAs[BSONBooleanLike](0)
+      booleanlike.isDefined mustEqual true
+      booleanlike.get.toBoolean mustEqual false
     }
   }
 }

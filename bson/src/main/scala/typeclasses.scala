@@ -20,11 +20,23 @@ import scala.math.Numeric
 
 sealed trait BSONNumberLikeClass[B <: BSONValue] extends BSONNumberLike
 
+/**
+ * A BSON value that can be seen as a number.
+ *
+ * Conversions:
+ *   - [[BSONLong]]
+ *   - [[BSONInteger]]
+ *   - [[BSONDouble]]
+ */
 sealed trait BSONNumberLike { self: BSONNumberLikeClass[_] =>
   private[bson] def underlying: BSONValue
+  /** Converts this number into an `Int`. */
   def toInt: Int
+  /** Converts this number into a `Long`. */
   def toLong: Long
+  /** Converts this number into a `Float`. */
   def toFloat: Float
+  /** Converts this number into a `Double`. */
   def toDouble: Double
 }
 
@@ -57,8 +69,19 @@ object BSONNumberLike {
   }
 }
 
+/**
+ * A BSON value that can be seen as a boolean.
+ *
+ * Conversions:
+ *   - `number = 0 ~> false`
+ *   - `number != 0 ~> true`
+ *   - `boolean`
+ *   - `undefined ~> false`
+ *   - `null ~> false`
+ */
 sealed trait BSONBooleanLike { self: BSONBooleanLikeClass[_] =>
   private[bson] def underlying: BSONValue
+  /** Returns the boolean equivalent value */
   def toBoolean: Boolean
 }
 sealed trait BSONBooleanLikeClass[B <: BSONValue] extends BSONBooleanLike
