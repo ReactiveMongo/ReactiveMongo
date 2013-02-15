@@ -85,14 +85,14 @@ object DefaultBufferHandler extends BufferHandler {
   }
   object BSONDocumentBufferHandler extends BufferRW[BSONDocument] {
     def write(doc: BSONDocument, buffer: WritableBuffer) = {
-      val now = buffer.writerIndex
+      val now = buffer.index
       buffer.writeInt(0)
       doc.elements.foreach { e =>
         buffer.writeByte(e._2.code.toByte)
         buffer.writeCString(e._1)
         serialize(e._2, buffer)
       }
-      buffer.setInt(now, (buffer.writerIndex - now + 1))
+      buffer.setInt(now, (buffer.index - now + 1))
       buffer.writeByte(0)
       buffer
     }
@@ -117,14 +117,14 @@ object DefaultBufferHandler extends BufferHandler {
   }
   object BSONArrayBufferHandler extends BufferRW[BSONArray] {
     def write(array: BSONArray, buffer: WritableBuffer) = {
-      val now = buffer.writerIndex
+      val now = buffer.index
       buffer.writeInt(0)
       array.values.zipWithIndex.foreach { e =>
         buffer.writeByte(e._1.code.toByte)
         buffer.writeCString(e._2.toString)
         serialize(e._1, buffer)
       }
-      buffer.setInt(now, (buffer.writerIndex - now + 1))
+      buffer.setInt(now, (buffer.index - now + 1))
       buffer.writeByte(0)
       buffer
     }

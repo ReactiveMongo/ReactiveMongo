@@ -18,19 +18,31 @@ package reactivemongo.bson
 
 import scala.collection.mutable.ArrayBuffer
 
+/**
+ * A writable buffer.
+ *
+ * The implementation '''MUST''' ensure it stores data in little endian when needed.
+ */
 trait WritableBuffer {
-  def writerIndex: Int
+  /** Returns the current write index of this buffer. */
+  def index: Int
 
-  def setInt(index: Int, value: Int)
+  /** Replaces 4 bytes at the given `index` by the given `value` */
+  def setInt(index: Int, value: Int): WritableBuffer
 
+  /** Writes the bytes stored in the given `array` into this buffer. */
   def writeBytes(array: Array[Byte]): WritableBuffer
 
+  /** Writes the given `Byte` into this buffer. */
   def writeByte(byte: Byte): WritableBuffer
 
+  /** Writes the given `Int` into this buffer. */
   def writeInt(int: Int): WritableBuffer
 
+  /** Writes the given `Long` into this buffer. */
   def writeLong(long: Long): WritableBuffer
 
+  /** Writes the given `Double` into this buffer. */
   def writeDouble(double: Double): WritableBuffer
 
   /** Write a UTF-8 encoded C-Style String. */
@@ -46,23 +58,41 @@ trait WritableBuffer {
   }
 }
 
+/**
+ * A readable buffer.
+ *
+ * The implementation '''MUST''' ensure it reads data in little endian when needed.
+ */
 trait ReadableBuffer {
+  /** Returns the current read index of this buffer. */
   def index: Int
 
+  /** Sets the read index to `index + n` (in other words, skips `n` bytes). */
   def discard(n: Int): Unit
 
+  /** Fills the given array with the bytes read from this buffer. */
   def readBytes(bytes: Array[Byte]): Unit
 
+  /** Reads a `Byte` from this buffer. */
   def readByte(): Byte
 
+  /** Reads an `Int` from this buffer. */
   def readInt(): Int
 
+  /** Reads a `Long` from this buffer. */
   def readLong(): Long
 
+  /** Reads a `Double` from this buffer. */
   def readDouble(): Double
 
+  /** Returns the number of readable remaining bytes of this buffer. */
   def readable(): Int
 
+  /**
+   * Returns a new instance of ReadableBuffer which starts at the current index and contains `n` bytes.
+   *
+   * This method does not update the read index of the original buffer.
+   */
   def slice(n: Int): ReadableBuffer
 
   def size: Int
@@ -103,7 +133,8 @@ trait BSONBuffer extends ReadableBuffer with WritableBuffer
 import java.nio.ByteBuffer
 import java.nio.ByteOrder._
 
-class ArrayReadableBuffer private(bytebuffer: ByteBuffer) extends ReadableBuffer {
+/** An array-backed readable buffer. */
+class ArrayReadableBuffer private (bytebuffer: ByteBuffer) extends ReadableBuffer {
   bytebuffer.order(LITTLE_ENDIAN)
 
   def size = bytebuffer.limit()
@@ -134,11 +165,13 @@ class ArrayReadableBuffer private(bytebuffer: ByteBuffer) extends ReadableBuffer
 }
 
 object ArrayReadableBuffer {
+  /** Returns an [[ArrayReadableBuffer]] which source is the given `array`. */
   def apply(array: Array[Byte]) = new ArrayReadableBuffer(ByteBuffer.wrap(array))
 }
 
+/** An array-backed writable buffer. */
 class ArrayBSONBuffer extends WritableBuffer {
-  var writerIndex = 0
+  var index = 0
 
   def bytebuffer(size: Int) = {
     val b = ByteBuffer.allocate(size)
@@ -146,7 +179,9 @@ class ArrayBSONBuffer extends WritableBuffer {
     b
   }
 
-  val buffer = new ArrayBuffer[Byte]()
+  protected val buffer = new ArrayBuffer[Byte]()
+
+  /** Returns an array containing all the data that were put in this buffer. */
   def array = buffer.toArray
 
   def setInt(index: Int, value: Int) = {
@@ -155,36 +190,37 @@ class ArrayBSONBuffer extends WritableBuffer {
     buffer.update(index + 1, array(1))
     buffer.update(index + 2, array(2))
     buffer.update(index + 3, array(3))
+    this
   }
 
   def writeBytes(array: Array[Byte]): WritableBuffer = {
     buffer ++= array
-    writerIndex += array.length
+    index += array.length
     this
   }
 
   def writeByte(byte: Byte): WritableBuffer = {
     buffer += byte
-    writerIndex += 1
+    index += 1
     this
   }
 
   def writeInt(int: Int): WritableBuffer = {
     val array = bytebuffer(4).putInt(int).array
     buffer ++= array
-    writerIndex += 4
+    index += 4
     this
   }
 
   def writeLong(long: Long): WritableBuffer = {
     buffer ++= bytebuffer(8).putLong(long).array
-    writerIndex += 8
+    index += 8
     this
   }
 
   def writeDouble(double: Double): WritableBuffer = {
     buffer ++= bytebuffer(8).putDouble(double).array
-    writerIndex += 8
+    index += 8
     this
   }
 }

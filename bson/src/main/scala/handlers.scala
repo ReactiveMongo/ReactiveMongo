@@ -19,24 +19,72 @@ package reactivemongo.bson
 import scala.collection.generic.CanBuildFrom
 import scala.util.{ Failure, Success, Try }
 
+/**
+ * A reader that produces an instance of `T` from a subtype of [[BSONValue]].
+ */
 trait BSONReader[B <: BSONValue, T] {
-  def read(bson: B): T = readTry(bson).get
+  /**
+   * Reads a BSON value and produce an instance of `T`.
+   *
+   * This method may throw exceptions at runtime.
+   * If used outside a reader, one should consider `readTry(bson: B): Try[T]` or `readOpt(bson: B): Option[T]`.
+   */
+  def read(bson: B): T
+  /** Tries to produce an instance of `T` from the `bson` value, returns `None` if an error occurred. */
   def readOpt(bson: B): Option[T] = readTry(bson).toOption
-  def readTry(bson: B): Try[T]
+  /** Tries to produce an instance of `T` from the `bson` value. */
+  def readTry(bson: B): Try[T] = Try(read(bson))
 }
 
+/**
+ * A writer that produces a subtype of [[BSONValue]] fron an instance of `T`.
+ */
 trait BSONWriter[T, B <: BSONValue] {
+  /**
+   * Writes an instance of `T` as a BSON value.
+   *
+   * This method may throw exceptions at runtime.
+   * If used outside a reader, one should consider `writeTry(bson: B): Try[T]` or `writeOpt(bson: B): Option[T]`.
+   */
   def write(t: T): B
+  /** Tries to produce a BSON value from an instance of `T`, returns `None` if an error occurred. */
+  def writeOpt(t: T): Option[B] = writeTry(t).toOption
+  /** Tries to produce a BSON value from an instance of `T`. */
+  def writeTry(t: T): Try[B] = Try(write(t))
 }
 
+/**
+ * A reader that produces an instance of `T` from a subtype of [[BSONValue]].
+ */
 trait VariantBSONReader[-B <: BSONValue, +T] {
-  def read(bson: B): T = readTry(bson).get
+  /**
+   * Reads a BSON value and produce an instance of `T`.
+   *
+   * This method may throw exceptions at runtime.
+   * If used outside a reader, one should consider `readTry(bson: B): Try[T]` or `readOpt(bson: B): Option[T]`.
+   */
+  def read(bson: B): T
+  /** Tries to produce an instance of `T` from the `bson` value, returns `None` if an error occurred. */
   def readOpt(bson: B): Option[T] = readTry(bson).toOption
-  def readTry(bson: B): Try[T]
+  /** Tries to produce an instance of `T` from the `bson` value. */
+  def readTry(bson: B): Try[T] = Try(read(bson))
 }
 
+/**
+ * A writer that produces a subtype of [[BSONValue]] fron an instance of `T`.
+ */
 trait VariantBSONWriter[-T, +B <: BSONValue] {
+  /**
+   * Writes an instance of `T` as a BSON value.
+   *
+   * This method may throw exceptions at runtime.
+   * If used outside a reader, one should consider `writeTry(bson: B): Try[T]` or `writeOpt(bson: B): Option[T]`.
+   */
   def write(t: T): B
+  /** Tries to produce a BSON value from an instance of `T`, returns `None` if an error occurred. */
+  def writeOpt(t: T): Option[B] = writeTry(t).toOption
+  /** Tries to produce a BSON value from an instance of `T`. */
+  def writeTry(t: T): Try[B] = Try(write(t))
 }
 
 class VariantBSONWriterWrapper[T, B <: BSONValue](writer: VariantBSONWriter[T, B]) extends BSONWriter[T, B] {
@@ -44,31 +92,31 @@ class VariantBSONWriterWrapper[T, B <: BSONValue](writer: VariantBSONWriter[T, B
 }
 
 class VariantBSONReaderWrapper[B <: BSONValue, T](reader: VariantBSONReader[B, T]) extends BSONReader[B, T] {
-  def readTry(b: B) = reader.readTry(b)
+  def read(b: B) = reader.read(b)
 }
 
 trait BSONHandler[B <: BSONValue, T] extends BSONReader[B, T] with BSONWriter[T, B]
 
 trait DefaultBSONHandlers {
   implicit object BSONIntegerHandler extends BSONHandler[BSONInteger, Int] {
-    def readTry(int: BSONInteger) = Try(int.value)
+    def read(int: BSONInteger) = int.value
     def write(int: Int) = BSONInteger(int)
   }
   implicit object BSONLongHandler extends BSONHandler[BSONLong, Long] {
-    def readTry(long: BSONLong) = Try(long.value)
+    def read(long: BSONLong) = long.value
     def write(long: Long) = BSONLong(long)
   }
   implicit object BSONDoubleHandler extends BSONHandler[BSONDouble, Double] {
-    def readTry(double: BSONDouble) = Try(double.value)
+    def read(double: BSONDouble) = double.value
     def write(double: Double) = BSONDouble(double)
   }
 
   implicit object BSONStringHandler extends BSONHandler[BSONString, String] {
-    def readTry(string: BSONString) = Try(string.value)
+    def read(string: BSONString) = string.value
     def write(string: String) = BSONString(string)
   }
   implicit object BSONBooleanHandler extends BSONHandler[BSONBoolean, Boolean] {
-    def readTry(boolean: BSONBoolean) = Try(boolean.value)
+    def read(boolean: BSONBoolean) = boolean.value
     def write(boolean: Boolean) = BSONBoolean(boolean)
   }
 
@@ -77,12 +125,12 @@ trait DefaultBSONHandlers {
   import BSONBooleanLike._
 
   class BSONNumberLikeReader[B <: BSONValue] extends BSONReader[B, BSONNumberLike] {
-    def readTry(bson: B) = Try(bson match {
+    def read(bson: B) = bson match {
       case int: BSONInteger => BSONIntegerNumberLike(int)
       case long: BSONLong => BSONLongNumberLike(long)
       case double: BSONDouble => BSONDoubleNumberLike(double)
       case _ => throw new UnsupportedOperationException()
-    })
+    }
   }
 
   implicit object BSONNumberLikeWriter extends VariantBSONWriter[BSONNumberLike, BSONValue] {
@@ -92,7 +140,7 @@ trait DefaultBSONHandlers {
   implicit def bsonNumberLikeReader[B <: BSONValue] = new BSONNumberLikeReader[B]
 
   class BSONBooleanLikeReader[B <: BSONValue] extends BSONReader[B, BSONBooleanLike] {
-    def readTry(bson: B) = Try(bson match {
+    def read(bson: B) = bson match {
       case int: BSONInteger => BSONIntegerBooleanLike(int)
       case double: BSONDouble => BSONDoubleBooleanLike(double)
       case long: BSONLong => BSONLongBooleanLike(long)
@@ -100,7 +148,7 @@ trait DefaultBSONHandlers {
       case nll: BSONNull.type => BSONNullBooleanLike(BSONNull)
       case udf: BSONUndefined.type => BSONUndefinedBooleanLike(BSONUndefined)
       case _ => throw new UnsupportedOperationException()
-    })
+    }
   }
 
   implicit object BSONBooleanLikeWriter extends VariantBSONWriter[BSONBooleanLike, BSONValue] {
@@ -111,11 +159,10 @@ trait DefaultBSONHandlers {
 
   // Collections Handlers
   class BSONArrayCollectionReader[M[_], T](implicit cbf: CanBuildFrom[M[_], T, M[T]], reader: BSONReader[_ <: BSONValue, T]) extends BSONReader[BSONArray, M[T]] {
-    def readTry(array: BSONArray) = Try {
+    def read(array: BSONArray) =
       array.stream.filter(_.isSuccess).map { v =>
         reader.asInstanceOf[BSONReader[BSONValue, T]].read(v.get)
       }.to[M]
-    }
   }
 
   class BSONArrayCollectionWriter[T, Repr <% Traversable[T]](implicit writer: BSONWriter[T, _ <: BSONValue]) extends VariantBSONWriter[Repr, BSONArray] {
@@ -133,72 +180,72 @@ trait DefaultBSONHandlers {
   }
 
   implicit object BSONStringIdentity extends BSONReader[BSONString, BSONString] with BSONWriter[BSONString, BSONString] {
-    def readTry(b: BSONString) = Try(b)
+    def read(b: BSONString) = b
     def write(b: BSONString) = b
   }
 
   implicit object BSONIntegerIdentity extends BSONReader[BSONInteger, BSONInteger] with BSONWriter[BSONInteger, BSONInteger] {
-    def readTry(b: BSONInteger) = Try(b)
+    def read(b: BSONInteger) = b
     def write(b: BSONInteger) = b
   }
 
   implicit object BSONArrayIdentity extends BSONReader[BSONArray, BSONArray] with BSONWriter[BSONArray, BSONArray] {
-    def readTry(b: BSONArray) = Try(b)
+    def read(b: BSONArray) = b
     def write(b: BSONArray) = b
   }
 
   implicit object BSONDocumentIdentity extends BSONReader[BSONDocument, BSONDocument] with BSONWriter[BSONDocument, BSONDocument] {
-    def readTry(b: BSONDocument) = Try(b)
+    def read(b: BSONDocument) = b
     def write(b: BSONDocument) = b
   }
 
   implicit object BSONBooleanIdentity extends BSONReader[BSONBoolean, BSONBoolean] with BSONWriter[BSONBoolean, BSONBoolean] {
-    def readTry(b: BSONBoolean) = Try(b)
+    def read(b: BSONBoolean) = b
     def write(b: BSONBoolean) = b
   }
 
   implicit object BSONLongIdentity extends BSONReader[BSONLong, BSONLong] with BSONWriter[BSONLong, BSONLong] {
-    def readTry(b: BSONLong) = Try(b)
+    def read(b: BSONLong) = b
     def write(b: BSONLong) = b
   }
 
   implicit object BSONDoubleIdentity extends BSONReader[BSONDouble, BSONDouble] with BSONWriter[BSONDouble, BSONDouble] {
-    def readTry(b: BSONDouble) = Try(b)
+    def read(b: BSONDouble) = b
     def write(b: BSONDouble) = b
   }
 
   implicit object BSONValueIdentity extends BSONReader[BSONValue, BSONValue] with BSONWriter[BSONValue, BSONValue] {
-    def readTry(b: BSONValue) = Try(b)
+    def read(b: BSONValue) = b
     def write(b: BSONValue) = b
   }
 
   implicit object BSONObjectIDIdentity extends BSONReader[BSONObjectID, BSONObjectID] with BSONWriter[BSONObjectID, BSONObjectID] {
-    def readTry(b: BSONObjectID) = Try(b)
+    def read(b: BSONObjectID) = b
     def write(b: BSONObjectID) = b
   }
 
   implicit object BSONBinaryIdentity extends BSONReader[BSONBinary, BSONBinary] with BSONWriter[BSONBinary, BSONBinary] {
-    def readTry(b: BSONBinary) = Try(b)
+    def read(b: BSONBinary) = b
     def write(b: BSONBinary) = b
   }
 
   implicit object BSONDateTimeIdentity extends BSONReader[BSONDateTime, BSONDateTime] with BSONWriter[BSONDateTime, BSONDateTime] {
-    def readTry(b: BSONDateTime) = Try(b)
+    def read(b: BSONDateTime) = b
     def write(b: BSONDateTime) = b
   }
 
   implicit object BSONNullIdentity extends BSONReader[BSONNull.type, BSONNull.type] with BSONWriter[BSONNull.type, BSONNull.type] {
-    def readTry(b: BSONNull.type) = Try(b)
+    def read(b: BSONNull.type) = b
     def write(b: BSONNull.type) = b
   }
 
   implicit object BSONUndefinedIdentity extends BSONReader[BSONUndefined.type, BSONUndefined.type] with BSONWriter[BSONUndefined.type, BSONUndefined.type] {
-    def readTry(b: BSONUndefined.type) = Try(b)
+    def read(b: BSONUndefined.type) = b
     def write(b: BSONUndefined.type) = b
   }
 
   implicit object BSONRegexIdentity extends BSONReader[BSONRegex, BSONRegex] with BSONWriter[BSONRegex, BSONRegex] {
-    def readTry(b: BSONRegex) = Try(b)
+    def read(b: BSONRegex) = b
     def write(b: BSONRegex) = b
   }
 

@@ -57,10 +57,11 @@ object ChannelBufferReadableBuffer {
 class ChannelBufferWritableBuffer extends WritableBuffer {
   val buffer = ChannelBuffers.dynamicBuffer(LITTLE_ENDIAN, 32)
 
-  def writerIndex = buffer.writerIndex
+  def index = buffer.writerIndex
 
   def setInt(index: Int, value: Int) = {
     buffer.setInt(index, value)
+    this
   }
 
   def writeBytes(array: Array[Byte]): WritableBuffer = {
