@@ -3,16 +3,16 @@ package reactivemongo
 import org.specs2.mutable._
 import reactivemongo.bson._
 import DefaultBSONHandlers._
-import reactivemongo.utils._
+import reactivemongo.core.netty._
 import java.util.Arrays
 import reactivemongo.bson.BSONObjectID
 
 class BsonSpec extends Specification {
-  val simple = Array[Byte] (0x16, 0x00, 0x00, 0x00, 0x02, 'h', 'e', 'l', 'l', 'o', 0x00, 0x06, 0x00, 0x00, 0x00, 'w', 'o', 'r', 'l', 'd', 0x00, 0x00)
+  val simple = Array[Byte](0x16, 0x00, 0x00, 0x00, 0x02, 'h', 'e', 'l', 'l', 'o', 0x00, 0x06, 0x00, 0x00, 0x00, 'w', 'o', 'r', 'l', 'd', 0x00, 0x00)
 
-  val embeddingArray = Array[Byte] (70, 0, 0, 0, 7, 95, 105, 100, 0, 80, 55, -110, -63, -104, 69, -121, -105, 27, 20, 83, 14, 4, 66, 83, 79, 78, 0, 42, 0, 0, 0, 2, 48, 0, 8, 0, 0, 0, 97, 119, 101, 115, 111, 109, 101, 0, 1, 49, 0, 51, 51, 51, 51, 51, 51, 20, 64, 1, 50, 0, 0, 0, 0, 0, 0, 8, -97, 64, 0, 0)
+  val embeddingArray = Array[Byte](70, 0, 0, 0, 7, 95, 105, 100, 0, 80, 55, -110, -63, -104, 69, -121, -105, 27, 20, 83, 14, 4, 66, 83, 79, 78, 0, 42, 0, 0, 0, 2, 48, 0, 8, 0, 0, 0, 97, 119, 101, 115, 111, 109, 101, 0, 1, 49, 0, 51, 51, 51, 51, 51, 51, 20, 64, 1, 50, 0, 0, 0, 0, 0, 0, 8, -97, 64, 0, 0)
 
-  val bsonArray = Array[Byte] (42, 0, 0, 0, 2, 48, 0, 8, 0, 0, 0, 97, 119, 101, 115, 111, 109, 101, 0, 1, 49, 0, 51, 51, 51, 51, 51, 51, 20, 64, 1, 50, 0, 0, 0, 0, 0, 0, 8, -97, 64, 0)
+  val bsonArray = Array[Byte](42, 0, 0, 0, 2, 48, 0, 8, 0, 0, 0, 97, 119, 101, 115, 111, 109, 101, 0, 1, 49, 0, 51, 51, 51, 51, 51, 51, 20, 64, 1, 50, 0, 0, 0, 0, 0, 0, 8, -97, 64, 0)
 
   "ReactiveMongo" should {
     "produce a simple doc" in {
@@ -28,26 +28,24 @@ class BsonSpec extends Specification {
     "produce a document embedding an array" in {
       val buffer = BSONDocument(
         "_id" -> new BSONObjectID("503792c1984587971b14530e"),
-          "BSON" -> BSONArray(
+        "BSON" -> BSONArray(
           BSONString("awesome"),
           BSONDouble(5.05),
-          BSONDouble(1986)
-        )).makeBuffer
+          BSONDouble(1986))).makeBuffer
       compare(embeddingArray, buffer)
     }
     "produce a document embedding an array through traversable" in {
       val buffer = BSONDocument(
         "_id" -> new BSONObjectID("503792c1984587971b14530e"),
-          "BSON" -> BSONArray(
+        "BSON" -> BSONArray(
           BSONString("awesome"),
           BSONDouble(5.05),
-          BSONDouble(1986)
-        )).makeBuffer
+          BSONDouble(1986))).makeBuffer
       val buffer2 = buffer.makeDocument.makeBuffer
       compare(embeddingArray, buffer2)
     }
     "nested subdocuments and arrays" in {
-      val expected = Array[Byte] (72, 0, 0, 0, 3, 112, 117, 115, 104, 65, 108, 108, 0, 58, 0, 0, 0, 4, 99, 111, 110, 102, 105, 103, 0, 45, 0, 0, 0, 3, 48, 0, 37, 0, 0, 0, 2, 110, 97, 109, 101, 0, 7, 0, 0, 0, 102, 111, 111, 98, 97, 114, 0, 2, 118, 97, 108, 117, 101, 0, 4, 0, 0, 0, 98, 97, 114, 0, 0, 0, 0, 0)
+      val expected = Array[Byte](72, 0, 0, 0, 3, 112, 117, 115, 104, 65, 108, 108, 0, 58, 0, 0, 0, 4, 99, 111, 110, 102, 105, 103, 0, 45, 0, 0, 0, 3, 48, 0, 37, 0, 0, 0, 2, 110, 97, 109, 101, 0, 7, 0, 0, 0, 102, 111, 111, 98, 97, 114, 0, 2, 118, 97, 108, 117, 101, 0, 4, 0, 0, 0, 98, 97, 114, 0, 0, 0, 0, 0)
       // {"pushAll":{"config":[{"name":"foobar","value":"bar"}]}}
       val subsubdoc = BSONDocument("name" -> BSONString("foobar"), "value" -> BSONString("bar"))
       val arr = BSONArray(subsubdoc)
@@ -72,8 +70,7 @@ class BsonSpec extends Specification {
         BSONInteger(1),
         Some(BSONInteger(2)),
         None,
-        Some(BSONInteger(4))
-      )
+        Some(BSONInteger(4)))
       val str = array.values.map {
         case BSONInteger(value) => value.toString
         case _ => "NOELEM"
@@ -91,8 +88,7 @@ class BsonSpec extends Specification {
       "likeTrueDouble" -> BSONDouble(-0.1),
       "anInt" -> BSONInteger(200),
       "aLong" -> BSONLong(12345678912L),
-      "aDouble" -> BSONDouble(9876543210.98)
-    )
+      "aDouble" -> BSONDouble(9876543210.98))
     "abstract booleans and numbers" in {
       docLike.getAs[BSONBooleanLike]("likeFalseInt").get.toBoolean mustEqual false
       docLike.getAs[BSONBooleanLike]("likeFalseLong").get.toBoolean mustEqual false
@@ -113,7 +109,7 @@ class BsonSpec extends Specification {
     buffer.readBytes(array)
     val result = array.corresponds(origin)(_ == _)
 
-    if(!result) {
+    if (!result) {
       log(origin, array, buffer)
       failure
     } else success
@@ -147,7 +143,7 @@ class BSONObjectIDSpec extends Specification {
     "not equal another newly generated instance of BSONObjectID" in {
       val objectID = BSONObjectID.generate
       val nextObjectID = BSONObjectID(BSONObjectID.generate.stringify)
-      objectID must not equalTo(nextObjectID)
+      objectID must not equalTo (nextObjectID)
     }
 
   }

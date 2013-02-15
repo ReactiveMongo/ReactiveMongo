@@ -19,6 +19,7 @@ package reactivemongo.bson
 import exceptions.DocumentKeyNotFound
 import scala.util.{ Failure, Success, Try }
 import scala.collection.generic.CanBuildFrom
+import buffer._
 import utils.Converters
 
 /** A BSON Double. */

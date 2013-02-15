@@ -5,7 +5,8 @@ import reactivemongo.bson._
 import DefaultBSONHandlers._
 import reactivemongo.bson.handlers._
 import reactivemongo.core.commands.{DeleteIndex, LastError}
-import reactivemongo.utils._
+import reactivemongo.utils.option
+import reactivemongo.core.netty._
 import scala.concurrent.{Future, ExecutionContext}
 
 /** Type of Index */

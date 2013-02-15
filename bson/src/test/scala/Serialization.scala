@@ -16,6 +16,7 @@
  */
 import org.specs2.mutable._
 import reactivemongo.bson._
+import buffer._
 import java.util.Arrays
 import reactivemongo.bson.DefaultBSONHandlers._
 

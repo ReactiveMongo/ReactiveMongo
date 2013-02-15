@@ -5,7 +5,7 @@ import reactivemongo.bson._
 import reactivemongo.bson.handlers._
 import reactivemongo.core.commands.{ Update => UpdateCommand, _ }
 import reactivemongo.core.protocol._
-import reactivemongo.utils.buffers._
+import reactivemongo.core.netty.BufferSequence
 import reactivemongo.utils.EitherMappableFuture._
 import org.jboss.netty.buffer.ChannelBuffer
 import play.api.libs.iteratee._

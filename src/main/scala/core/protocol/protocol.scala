@@ -8,22 +8,81 @@ import org.jboss.netty.channel._
 import org.jboss.netty.channel.socket.nio._
 import org.jboss.netty.handler.codec.oneone._
 import org.jboss.netty.handler.codec.frame.FrameDecoder
-import org.slf4j.{Logger, LoggerFactory}
-import reactivemongo.core.actors.{Connected, Disconnected}
+import org.slf4j.{ Logger, LoggerFactory }
+import reactivemongo.core.actors.{ Connected, Disconnected }
 import reactivemongo.core.commands.GetLastError
 import reactivemongo.core.errors._
+import reactivemongo.core.netty._
 import reactivemongo.utils.LazyLogger
-import reactivemongo.utils.buffers._
 
 import BufferAccessors._
 
- // traits
+object `package` {
+  implicit class RichBuffer(val buffer: ChannelBuffer) extends AnyVal {
+    import scala.collection.mutable.ArrayBuffer
+    /** Write a UTF-8 encoded C-Style String. */
+    def writeCString(s: String): ChannelBuffer = {
+      val bytes = s.getBytes("utf-8")
+      buffer writeBytes bytes
+      buffer writeByte 0
+      buffer
+    }
+
+    /** Write a UTF-8 encoded String. */
+    def writeString(s: String): ChannelBuffer = {
+      val bytes = s.getBytes("utf-8")
+      buffer writeInt (bytes.size + 1)
+      buffer writeBytes bytes
+      buffer writeByte 0
+      buffer
+    }
+
+    /** Write the contents of the given [[reactivemongo.core.protocol.ChannelBufferWritable]]. */
+    def write(writable: ChannelBufferWritable) {
+      writable writeTo buffer
+    }
+
+    /** Reads a UTF-8 String. */
+    def readString(): String = {
+      val bytes = new Array[Byte](buffer.readInt - 1)
+      buffer.readBytes(bytes)
+      buffer.readByte
+      new String(bytes, "UTF-8")
+    }
+
+    /**
+     * Reads an array of Byte of the given length.
+     *
+     * @param length Length of the newly created array.
+     */
+    def readArray(length: Int): Array[Byte] = {
+      val bytes = new Array[Byte](length)
+      buffer.readBytes(bytes)
+      bytes
+    }
+
+    /** Reads a UTF-8 C-Style String. */
+    def readCString(): String = {
+      @scala.annotation.tailrec
+      def readCString(array: ArrayBuffer[Byte]): String = {
+        val byte = buffer.readByte
+        if (byte == 0x00)
+          new String(array.toArray, "UTF-8")
+        else readCString(array += byte)
+      }
+      readCString(new ArrayBuffer[Byte](16))
+    }
+
+  }
+}
+
+// traits
 /**
  * Something that can be written into a [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]].
  */
 trait ChannelBufferWritable {
   /** Write this instance into the given [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]]. */
-  def writeTo :ChannelBuffer => Unit
+  def writeTo: ChannelBuffer => Unit
   /** Size of the content that would be written. */
   def size: Int
 }
@@ -35,12 +94,12 @@ trait ChannelBufferWritable {
  */
 trait ChannelBufferReadable[T] {
   /** Makes an instance of T from the data from the given buffer. */
-  def readFrom(buffer: ChannelBuffer) :T
+  def readFrom(buffer: ChannelBuffer): T
   /** @see readFrom */
-  def apply(buffer: ChannelBuffer) :T = readFrom(buffer)
+  def apply(buffer: ChannelBuffer): T = readFrom(buffer)
 }
 
- // concrete classes
+// concrete classes
 /**
  * Header of a Mongo Wire Protocol message.
  *
@@ -53,9 +112,8 @@ case class MessageHeader(
   messageLength: Int,
   requestID: Int,
   responseTo: Int,
-  opCode: Int
-) extends ChannelBufferWritable {
-  override val writeTo = writeTupleToBuffer4( (messageLength, requestID, responseTo, opCode) ) _
+  opCode: Int) extends ChannelBufferWritable {
+  override val writeTo = writeTupleToBuffer4((messageLength, requestID, responseTo, opCode)) _
   override def size = 4 + 4 + 4 + 4
 }
 
@@ -82,18 +140,19 @@ object MessageHeader extends ChannelBufferReadable[MessageHeader] {
  * @param documents body of this request, a [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]] containing 0, 1, or many documents.
  * @param channelIdHint a hint for sending this request on a particular channel.
  */
-case class Request (
+case class Request(
   requestID: Int,
   responseTo: Int, // TODO remove, nothing to do here.
   op: RequestOp,
   documents: BufferSequence,
-  channelIdHint: Option[Int] = None
-) extends ChannelBufferWritable {
-  override val writeTo = { buffer: ChannelBuffer => {
-    buffer write header
-    buffer write op
-    buffer writeBytes documents.merged
-  } }
+  channelIdHint: Option[Int] = None) extends ChannelBufferWritable {
+  override val writeTo = { buffer: ChannelBuffer =>
+    {
+      buffer write header
+      buffer write op
+      buffer writeBytes documents.merged
+    }
+  }
   override def size = 16 + op.size + documents.merged.writerIndex
   /** Header of this request */
   lazy val header = MessageHeader(size, requestID, responseTo, op.code)
@@ -109,9 +168,8 @@ case class Request (
 case class CheckedWriteRequest(
   op: WriteRequestOp,
   documents: BufferSequence,
-  getLastError: GetLastError
-) {
-  def apply() :(RequestMaker, RequestMaker) = RequestMaker(op, documents, None) -> getLastError.apply(op.db).maker
+  getLastError: GetLastError) {
+  def apply(): (RequestMaker, RequestMaker) = RequestMaker(op, documents, None) -> getLastError.apply(op.db).maker
 }
 
 /**
@@ -124,8 +182,7 @@ case class CheckedWriteRequest(
 case class RequestMaker(
   op: RequestOp,
   documents: BufferSequence = BufferSequence.empty,
-  channelIdHint: Option[Int] = None
-) {
+  channelIdHint: Option[Int] = None) {
   def apply(id: Int) = Request(id, 0, op, documents, channelIdHint)
 }
 
@@ -135,7 +192,7 @@ case class RequestMaker(
  * @define documentsA body of this request, an Array containing 0, 1, or many documents.
  * @define documentsC body of this request, a [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]] containing 0, 1, or many documents.
  */
-object Request{
+object Request {
   /**
    * Create a request.
    *
@@ -143,7 +200,7 @@ object Request{
    * @param op $op
    * @param documents $documentsA
    */
-  def apply(requestID: Int, responseTo: Int, op: RequestOp, documents: Array[Byte]) :Request = {
+  def apply(requestID: Int, responseTo: Int, op: RequestOp, documents: Array[Byte]): Request = {
     Request(
       requestID,
       responseTo,
@@ -157,14 +214,14 @@ object Request{
    * @param op $op
    * @param documents $documentsA
    */
-  def apply(requestID: Int, op: RequestOp, documents: Array[Byte]) :Request = Request.apply(requestID, 0, op, documents)
+  def apply(requestID: Int, op: RequestOp, documents: Array[Byte]): Request = Request.apply(requestID, 0, op, documents)
   /**
    * Create a request.
    *
    * @param requestID $requestID
    * @param op $op
    */
-  def apply(requestID: Int, op: RequestOp) :Request = Request.apply(requestID, op, new Array[Byte](0))
+  def apply(requestID: Int, op: RequestOp): Request = Request.apply(requestID, op, new Array[Byte](0))
 }
 
 /**
@@ -183,18 +240,16 @@ case class Response(
   /**
    * if this response is in error, explain this error.
    */
-  lazy val error :Option[DBError] = {
-    if(reply.inError) {
+  lazy val error: Option[DBError] = {
+    if (reply.inError) {
       import reactivemongo.bson.handlers.DefaultBSONHandlers._
       val bson = DefaultBSONReaderHandler.handle(reply, documents)
-      if(bson.hasNext)
+      if (bson.hasNext)
         Some(ReactiveMongoError(DefaultBSONReaderHandler.handle(reply, documents).next))
       else None
     } else None
   }
 }
-
-
 
 /**
  * Response meta information.
@@ -212,13 +267,13 @@ private[reactivemongo] class RequestEncoder extends OneToOneEncoder {
   def encode(ctx: ChannelHandlerContext, channel: Channel, obj: Object) = {
     obj match {
       case message: Request => {
-        val buffer :ChannelBuffer = ChannelBuffers.buffer(ByteOrder.LITTLE_ENDIAN, message.size)//ChannelBuffers.dynamicBuffer(ByteOrder.LITTLE_ENDIAN, 1000)
+        val buffer: ChannelBuffer = ChannelBuffers.buffer(ByteOrder.LITTLE_ENDIAN, message.size) //ChannelBuffers.dynamicBuffer(ByteOrder.LITTLE_ENDIAN, 1000)
         message writeTo buffer
         buffer
       }
       case _ => {
-         logger.error("weird... do not know how to encode this object: " + obj)
-         obj
+        logger.error("weird... do not know how to encode this object: " + obj)
+        obj
       }
     }
   }
@@ -231,12 +286,12 @@ private[reactivemongo] object RequestEncoder {
 private[reactivemongo] class ResponseFrameDecoder extends FrameDecoder {
   override def decode(context: ChannelHandlerContext, channel: Channel, buffer: ChannelBuffer) = {
     val readableBytes = buffer.readableBytes
-    if(readableBytes < 4) null
+    if (readableBytes < 4) null
     else {
       buffer.markReaderIndex
       val length = buffer.readInt
       buffer.resetReaderIndex
-      if(length <= readableBytes && length > 0)
+      if (length <= readableBytes && length > 0)
         buffer.readBytes(length)
       else null
     }
@@ -313,7 +368,7 @@ object NodeState {
   /**
    * Gets the NodeState matching the given state code.
    */
-  def apply(i: Int) :NodeState = i match {
+  def apply(i: Int): NodeState = i match {
     case 1 => PRIMARY
     case 2 => SECONDARY
     case 3 => RECOVERING
@@ -327,25 +382,25 @@ object NodeState {
   }
 
   /** This node is a primary (both read and write operations are allowed). */
-  case object PRIMARY    extends NodeState with MongoNodeState { override val code = 1 }
+  case object PRIMARY extends NodeState with MongoNodeState { override val code = 1 }
   /** This node is a secondary (only read operations that are slaveOk are allowed). */
-  case object SECONDARY  extends NodeState with MongoNodeState { override val code = 2 }
+  case object SECONDARY extends NodeState with MongoNodeState { override val code = 2 }
   /** This node is recovering (initial syncing, post-rollback, stale members). */
   case object RECOVERING extends NodeState with MongoNodeState { override val code = 3 }
   /** This node encountered a fatal error. */
-  case object FATAL      extends NodeState with MongoNodeState { override val code = 4 }
+  case object FATAL extends NodeState with MongoNodeState { override val code = 4 }
   /** This node is starting up (phase 2, forking threads). */
-  case object STARTING   extends NodeState with MongoNodeState { override val code = 5 }
+  case object STARTING extends NodeState with MongoNodeState { override val code = 5 }
   /** This node is in an unknown state (it has never been reached from another node's point of view). */
-  case object UNKNOWN    extends NodeState with MongoNodeState { override val code = 6 }
+  case object UNKNOWN extends NodeState with MongoNodeState { override val code = 6 }
   /** This node is an arbiter (contains no data). */
-  case object ARBITER    extends NodeState with MongoNodeState { override val code = 7 }
+  case object ARBITER extends NodeState with MongoNodeState { override val code = 7 }
   /** This node is down. */
-  case object DOWN       extends NodeState with MongoNodeState { override val code = 8 }
+  case object DOWN extends NodeState with MongoNodeState { override val code = 8 }
   /** This node is the rollback state. */
-  case object ROLLBACK   extends NodeState with MongoNodeState { override val code = 9 }
+  case object ROLLBACK extends NodeState with MongoNodeState { override val code = 9 }
   /** This node has no state yet (never been reached by the driver). */
-  case object NONE       extends NodeState
+  case object NONE extends NodeState
   /** This node is not connected. */
   case object NOT_CONNECTED extends NodeState
   /** This node is connected. */

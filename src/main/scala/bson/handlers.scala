@@ -2,7 +2,8 @@ package reactivemongo.bson.handlers
 
 import org.jboss.netty.buffer._
 import reactivemongo.bson._
-import reactivemongo.bson.netty._
+import reactivemongo.bson.buffer._
+import reactivemongo.core.netty._
 import reactivemongo.core.protocol._
 
 /**

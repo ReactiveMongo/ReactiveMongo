@@ -14,12 +14,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package reactivemongo.bson.netty
+package reactivemongo.core.netty
 
 import java.nio.ByteOrder._
-import reactivemongo.bson.{ ReadableBuffer, WritableBuffer }
-import org.jboss.netty.buffer.ChannelBuffer
-import org.jboss.netty.buffer.ChannelBuffers
+import reactivemongo.bson.BSONDocument
+import reactivemongo.bson.buffer.{ ReadableBuffer, WritableBuffer }
+import org.jboss.netty.buffer._
 
 class ChannelBufferReadableBuffer(protected val buffer: ChannelBuffer) extends ReadableBuffer {
   def size = buffer.capacity()
@@ -92,4 +92,37 @@ class ChannelBufferWritableBuffer extends WritableBuffer {
 
 object ChannelBufferWritableBuffer {
   def apply() = new ChannelBufferWritableBuffer()
+}
+
+case class BufferSequence(private val head: ChannelBuffer, private val tail: ChannelBuffer*) {
+  def merged: ChannelBuffer = mergedBuffer.duplicate()
+
+  private lazy val mergedBuffer = {
+    val bufs = (head +: tail).map(cb => cb.duplicate())
+    bufs.tail.foldLeft(bufs.head) { (result, buf) =>
+      result writeBytes buf
+      result
+    }
+  }
+}
+
+object BufferSequence {
+  val empty = BufferSequence(new LittleEndianHeapChannelBuffer(0))
+}
+
+object `package` {
+  protected[reactivemongo] implicit class BSONDocumentNettyWritable(val doc: BSONDocument) extends AnyVal {
+    def makeBuffer = {
+      val buffer = ChannelBufferWritableBuffer()
+      BSONDocument.write(doc, buffer)
+      buffer.buffer
+    }
+  }
+
+  protected[reactivemongo] implicit class BSONDocumentNettyReadable(val buffer: ChannelBuffer) extends AnyVal {
+    def makeDocument = {
+      val bf = ChannelBufferReadableBuffer(buffer)
+      BSONDocument.read(bf) // TODO handle errors
+    }
+  }
 }

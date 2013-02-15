@@ -3,7 +3,7 @@ package reactivemongo.api
 import reactivemongo.bson.handlers._
 import reactivemongo.core.iteratees._
 import reactivemongo.core.protocol._
-import reactivemongo.utils.buffers._
+import reactivemongo.core.netty.BufferSequence
 import reactivemongo.utils.ExtendedFutures._
 
 import org.slf4j.LoggerFactory

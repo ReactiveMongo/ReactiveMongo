@@ -14,8 +14,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package reactivemongo.bson
+package reactivemongo.bson.buffer
 
+import reactivemongo.bson._
 import scala.util.{ Failure, Success, Try }
 
 trait BufferHandler {
@@ -58,7 +59,7 @@ object DefaultBufferHandler extends BufferHandler {
     0x02 -> BSONStringBufferHandler,
     0x03 -> BSONDocumentBufferHandler,
     0x04 -> BSONArrayBufferHandler, // array
-    0x05 -> null, // binary
+    0x05 -> null, // binary TODO
     0x06 -> BSONUndefinedBufferHandler, // undefined,
     0x07 -> BSONObjectIDBufferHandler, // objectid,
     0x08 -> BSONBooleanBufferHandler, // boolean
