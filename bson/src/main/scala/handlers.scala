@@ -87,6 +87,11 @@ trait VariantBSONWriter[-T, +B <: BSONValue] {
   def writeTry(t: T): Try[B] = Try(write(t))
 }
 
+trait BSONDocumentReader[T] extends BSONReader[BSONDocument, T]
+trait BSONDocumentWriter[T] extends BSONWriter[T, BSONDocument]
+trait VariantBSONDocumentReader[+T] extends VariantBSONReader[BSONDocument, T]
+trait VariantBSONDocumentWriter[-T] extends VariantBSONWriter[T, BSONDocument]
+
 class VariantBSONWriterWrapper[T, B <: BSONValue](writer: VariantBSONWriter[T, B]) extends BSONWriter[T, B] {
   def write(t: T) = writer.write(t)
 }

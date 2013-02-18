@@ -230,19 +230,19 @@ object IndexesManager {
     ) ++ nsIndex.index.options
   }
 
-  implicit object NSIndexWriter extends RawBSONDocumentWriter[NSIndex] {
+  implicit object NSIndexWriter extends RawBSONDocumentSerializer[NSIndex] {
     import org.jboss.netty.buffer._
-    def write(nsIndex: NSIndex) :ChannelBuffer = {
+    def serialize(nsIndex: NSIndex) :ChannelBuffer = {
       if(nsIndex.index.key.isEmpty)
         throw new RuntimeException("the key should not be empty!")
       toBSONDocument(nsIndex).makeBuffer
     }
   }
 
-  implicit object NSIndexReader extends RawBSONDocumentReader[NSIndex] {
+  implicit object NSIndexReader extends RawBSONDocumentDeserializer[NSIndex] {
     import org.jboss.netty.buffer._
-    def read(buffer: ChannelBuffer) :NSIndex = {
-      val doc = handlers.DefaultBSONHandlers.DefaultBSONDocumentReader.read(buffer)
+    def deserialize(buffer: ChannelBuffer) :NSIndex = {
+      val doc = handlers.DefaultBSONHandlers.DefaultBSONDocumentReader.deserialize(buffer)
       val options = doc.elements.filterNot { element =>
         element._1 == "ns" || element._1 == "key" || element._1 == "name" || element._1 == "unique" ||
           element._1 == "background" || element._1 == "dropDups" || element._1 == "sparse" || element._1 == "v"

@@ -65,8 +65,8 @@ case class QueryBuilder(
    *
    * @tparam Qry The type of the query. An implicit [[reactivemongo.bson.handlers.RawBSONWriter]][Qry] typeclass for handling it has to be in the scope.
    */
-  def query[Qry](selector: Qry)(implicit writer: RawBSONDocumentWriter[Qry]) :QueryBuilder = copy(queryDoc=Some(
-    writer.write(selector).makeDocument
+  def query[Qry](selector: Qry)(implicit writer: RawBSONDocumentSerializer[Qry]) :QueryBuilder = copy(queryDoc=Some(
+    writer.serialize(selector).makeDocument
   ))
 
   /** Sets the query (the selector document). */
@@ -97,8 +97,8 @@ case class QueryBuilder(
    *
    * @tparam Pjn The type of the projection. An implicit [[reactivemongo.bson.handlers.RawBSONWriter]][Pjn] typeclass for handling it has to be in the scope.
    */
-  def projection[Pjn](p: Pjn)(implicit writer: RawBSONDocumentWriter[Pjn]) :QueryBuilder = copy(projectionDoc=Some(
-    writer.write(p).makeDocument
+  def projection[Pjn](p: Pjn)(implicit writer: RawBSONDocumentSerializer[Pjn]) :QueryBuilder = copy(projectionDoc=Some(
+    writer.serialize(p).makeDocument
   ))
 
   /** Sets the hint document (a document that declares the index MongoDB should use for this query). */

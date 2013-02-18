@@ -63,7 +63,7 @@ trait Collection {
 
   // abstract
   /** A low-level method for finding documents. Should not be used outside. */
-  protected def find[Rst](documents: BufferSequence, opts: QueryOpts)(implicit handler: BSONReaderHandler, reader: RawBSONDocumentReader[Rst], ec: ExecutionContext): FlattenedCursor[Rst]
+  protected def find[Rst](documents: BufferSequence, opts: QueryOpts)(implicit handler: BSONReaderHandler, reader: RawBSONDocumentDeserializer[Rst], ec: ExecutionContext): FlattenedCursor[Rst]
 
   /**
    * Inserts a document into the collection without writeConcern.
@@ -74,7 +74,7 @@ trait Collection {
    *
    * @param document the document to insert.
    */
-  def uncheckedInsert[T](document: T)(implicit writer: RawBSONDocumentWriter[T]): Unit
+  def uncheckedInsert[T](document: T)(implicit writer: RawBSONDocumentSerializer[T]): Unit
 
   /**
    * Inserts a document into the collection and wait for the [[reactivemongo.core.commands.LastError]] result.
@@ -88,7 +88,7 @@ trait Collection {
    *
    * @return a future [[reactivemongo.core.commands.LastError]] that can be used to check whether the insertion was successful.
    */
-  def insert[T](document: T, writeConcern: GetLastError)(implicit writer: RawBSONDocumentWriter[T], ec: ExecutionContext): Future[LastError]
+  def insert[T](document: T, writeConcern: GetLastError)(implicit writer: RawBSONDocumentSerializer[T], ec: ExecutionContext): Future[LastError]
 
   /**
    * Updates one or more documents matching the given selector with the given modifier or update object.
@@ -103,7 +103,7 @@ trait Collection {
    * @param upsert states whether the update objet should be inserted if no match found. Defaults to false.
    * @param multi states whether the update may be done on all the matching documents.
    */
-  def uncheckedUpdate[S, U](selector: S, update: U, upsert: Boolean = false, multi: Boolean = false)(implicit selectorWriter: RawBSONDocumentWriter[S], updateWriter: RawBSONDocumentWriter[U]): Unit
+  def uncheckedUpdate[S, U](selector: S, update: U, upsert: Boolean = false, multi: Boolean = false)(implicit selectorWriter: RawBSONDocumentSerializer[S], updateWriter: RawBSONDocumentSerializer[U]): Unit
 
   /**
    * Updates one or more documents matching the given selector with the given modifier or update object.
@@ -119,7 +119,7 @@ trait Collection {
    *
    * @return a future [[reactivemongo.core.commands.LastError]] that can be used to check whether the update was successful.
    */
-  def update[S, U](selector: S, update: U, writeConcern: GetLastError = GetLastError(), upsert: Boolean = false, multi: Boolean = false)(implicit selectorWriter: RawBSONDocumentWriter[S], updateWriter: RawBSONDocumentWriter[U], ec: ExecutionContext): Future[LastError]
+  def update[S, U](selector: S, update: U, writeConcern: GetLastError = GetLastError(), upsert: Boolean = false, multi: Boolean = false)(implicit selectorWriter: RawBSONDocumentSerializer[S], updateWriter: RawBSONDocumentSerializer[U], ec: ExecutionContext): Future[LastError]
 
   /**
    * Remove the matched document(s) from the collection without writeConcern.
@@ -131,7 +131,7 @@ trait Collection {
    * @param query the selector of documents to remove.
    * @param firstMatchOnly states whether only the first matched documents has to be removed from this collection.
    */
-  def uncheckedRemove[T](query: T, firstMatchOnly: Boolean = false)(implicit writer: RawBSONDocumentWriter[T], ec: ExecutionContext): Unit
+  def uncheckedRemove[T](query: T, firstMatchOnly: Boolean = false)(implicit writer: RawBSONDocumentSerializer[T], ec: ExecutionContext): Unit
 
   /**
    * Remove the matched document(s) from the collection and wait for the [[reactivemongo.core.commands.LastError]] result.
@@ -146,7 +146,7 @@ trait Collection {
    *
    * @return a future [[reactivemongo.core.commands.LastError]] that can be used to check whether the removal was successful.
    */
-  def remove[T](query: T, writeConcern: GetLastError = GetLastError(), firstMatchOnly: Boolean = false)(implicit writer: RawBSONDocumentWriter[T], ec: ExecutionContext): Future[LastError]
+  def remove[T](query: T, writeConcern: GetLastError = GetLastError(), firstMatchOnly: Boolean = false)(implicit writer: RawBSONDocumentSerializer[T], ec: ExecutionContext): Future[LastError]
 
   // concrete
 
@@ -168,8 +168,8 @@ trait Collection {
    *
    * @return a cursor over the matched documents. You can get an enumerator for it, please see the [[reactivemongo.api.Cursor]] companion object.
    */
-  def find[Qry, Pjn, Rst](query: Qry, projection: Pjn, opts: QueryOpts = QueryOpts())(implicit writer: RawBSONDocumentWriter[Qry], writer2: RawBSONDocumentWriter[Pjn], handler: BSONReaderHandler, reader: RawBSONDocumentReader[Rst], ec: ExecutionContext): FlattenedCursor[Rst] =
-    find(BufferSequence(writer.write(query), writer2.write(projection)), opts)
+  def find[Qry, Pjn, Rst](query: Qry, projection: Pjn, opts: QueryOpts = QueryOpts())(implicit writer: RawBSONDocumentSerializer[Qry], writer2: RawBSONDocumentSerializer[Pjn], handler: BSONReaderHandler, reader: RawBSONDocumentDeserializer[Rst], ec: ExecutionContext): FlattenedCursor[Rst] =
+    find(BufferSequence(writer.serialize(query), writer2.serialize(projection)), opts)
 
   /**
    * Find the documents matching the given criteria.
@@ -187,8 +187,8 @@ trait Collection {
    *
    * @return a cursor over the matched documents. You can get an enumerator for it, please see the [[reactivemongo.api.Cursor]] companion object.
    */
-  def find[Qry, Rst](query: Qry, opts: QueryOpts)(implicit writer: RawBSONDocumentWriter[Qry], handler: BSONReaderHandler, reader: RawBSONDocumentReader[Rst], ec: ExecutionContext): FlattenedCursor[Rst] =
-    find(BufferSequence(writer.write(query)), opts)
+  def find[Qry, Rst](query: Qry, opts: QueryOpts)(implicit writer: RawBSONDocumentSerializer[Qry], handler: BSONReaderHandler, reader: RawBSONDocumentDeserializer[Rst], ec: ExecutionContext): FlattenedCursor[Rst] =
+    find(BufferSequence(writer.serialize(query)), opts)
 
   /**
    * Find the documents matching the given criteria.
@@ -205,8 +205,8 @@ trait Collection {
    *
    * @return a cursor over the matched documents. You can get an enumerator for it, please see the [[reactivemongo.api.Cursor]] companion object.
    */
-  def find[Qry, Rst](query: Qry)(implicit writer: RawBSONDocumentWriter[Qry], handler: BSONReaderHandler, reader: RawBSONDocumentReader[Rst], ec: ExecutionContext): FlattenedCursor[Rst] =
-    find(BufferSequence(writer.write(query)), QueryOpts())
+  def find[Qry, Rst](query: Qry)(implicit writer: RawBSONDocumentSerializer[Qry], handler: BSONReaderHandler, reader: RawBSONDocumentDeserializer[Rst], ec: ExecutionContext): FlattenedCursor[Rst] =
+    find(BufferSequence(writer.serialize(query)), QueryOpts())
 
   /**
    * Find the documents matching the given criteria, using the given [[reactivemongo.api.QueryBuilder]] instance.
@@ -220,7 +220,7 @@ trait Collection {
    *
    * @return a cursor over the matched documents. You can get an enumerator for it, please see the [[reactivemongo.api.Cursor]] companion object.
    */
-  def find[Rst](query: QueryBuilder, opts: QueryOpts)(implicit handler: BSONReaderHandler, reader: RawBSONDocumentReader[Rst], ec: ExecutionContext): FlattenedCursor[Rst] =
+  def find[Rst](query: QueryBuilder, opts: QueryOpts)(implicit handler: BSONReaderHandler, reader: RawBSONDocumentDeserializer[Rst], ec: ExecutionContext): FlattenedCursor[Rst] =
     find(BufferSequence(query.makeMergedBuffer), opts)
 
   /**
@@ -234,7 +234,7 @@ trait Collection {
    *
    * @return a cursor over the matched documents. You can get an enumerator for it, please see the [[reactivemongo.api.Cursor]] companion object.
    */
-  def find[Rst](query: QueryBuilder)(implicit handler: BSONReaderHandler, reader: RawBSONDocumentReader[Rst], ec: ExecutionContext): FlattenedCursor[Rst] =
+  def find[Rst](query: QueryBuilder)(implicit handler: BSONReaderHandler, reader: RawBSONDocumentDeserializer[Rst], ec: ExecutionContext): FlattenedCursor[Rst] =
     find(BufferSequence(query.makeMergedBuffer), QueryOpts())
 
   /**
@@ -248,7 +248,7 @@ trait Collection {
    *
    * @return a future [[reactivemongo.core.commands.LastError]] that can be used to check whether the insertion was successful.
    */
-  def insert[T](document: T)(implicit writer: RawBSONDocumentWriter[T], ec: ExecutionContext): Future[LastError] = insert(document, GetLastError())
+  def insert[T](document: T)(implicit writer: RawBSONDocumentSerializer[T], ec: ExecutionContext): Future[LastError] = insert(document, GetLastError())
 
   /**
    * Returns an iteratee that will insert the documents it feeds.
@@ -259,8 +259,8 @@ trait Collection {
    * @param bulkSize The number of documents per bulk.
    * @param bulkByteSize The maximum size for a bulk, in bytes.
    */
-  def insertIteratee[T](bulkSize: Int = bulk.MaxDocs, bulkByteSize: Int = bulk.MaxBulkSize)(implicit writer: RawBSONDocumentWriter[T], ec: ExecutionContext): Iteratee[T, Int] =
-    Enumeratee.map { doc: T => writer.write(doc) } &>> bulk.iteratee(this, bulkSize, bulkByteSize)
+  def insertIteratee[T](bulkSize: Int = bulk.MaxDocs, bulkByteSize: Int = bulk.MaxBulkSize)(implicit writer: RawBSONDocumentSerializer[T], ec: ExecutionContext): Iteratee[T, Int] =
+    Enumeratee.map { doc: T => writer.serialize(doc) } &>> bulk.iteratee(this, bulkSize, bulkByteSize)
 
   /**
    * Inserts the documents provided by the given enumerator into the collection and eventually returns the number of inserted documents.
@@ -274,7 +274,7 @@ trait Collection {
    *
    * @return a future [[reactivemongo.core.commands.LastError]] that can be used to check whether the insertion was successful.
    */
-  def insert[T](enumerator: Enumerator[T], bulkSize: Int = bulk.MaxDocs, bulkByteSize: Int = bulk.MaxBulkSize)(implicit writer: RawBSONDocumentWriter[T], ec: ExecutionContext): Future[Int] =
+  def insert[T](enumerator: Enumerator[T], bulkSize: Int = bulk.MaxDocs, bulkByteSize: Int = bulk.MaxBulkSize)(implicit writer: RawBSONDocumentSerializer[T], ec: ExecutionContext): Future[Int] =
     enumerator |>>> insertIteratee(bulkSize, bulkByteSize)
 }
 
@@ -284,7 +284,7 @@ trait FailoverBasicCollection {
 
   val failoverStrategy: FailoverStrategy
 
-  protected def find[Rst](documents: BufferSequence, opts: QueryOpts)(implicit handler: BSONReaderHandler, reader: RawBSONDocumentReader[Rst], ec: ExecutionContext): FlattenedCursor[Rst] = {
+  protected def find[Rst](documents: BufferSequence, opts: QueryOpts)(implicit handler: BSONReaderHandler, reader: RawBSONDocumentDeserializer[Rst], ec: ExecutionContext): FlattenedCursor[Rst] = {
     val op = Query(opts.flagsN, fullCollectionName, opts.skipN, opts.batchSizeN)
     val requestMaker = RequestMaker(op, documents)
 
@@ -296,48 +296,48 @@ trait FailoverBasicCollection {
     })
   }
 
-  def insert[T](document: T, writeConcern: GetLastError)(implicit writer: RawBSONDocumentWriter[T], ec: ExecutionContext): Future[LastError] = {
+  def insert[T](document: T, writeConcern: GetLastError)(implicit writer: RawBSONDocumentSerializer[T], ec: ExecutionContext): Future[LastError] = {
     val op = Insert(0, fullCollectionName)
-    val bson = writer.write(document)
+    val bson = writer.serialize(document)
     val checkedWriteRequest = CheckedWriteRequest(op, BufferSequence(bson), writeConcern)
     Failover(checkedWriteRequest, db.connection.mongosystem, failoverStrategy).future.mapEither(LastError.meaningful(_))
   }
 
-  def remove[T](query: T, writeConcern: GetLastError = GetLastError(), firstMatchOnly: Boolean = false)(implicit writer: RawBSONDocumentWriter[T], ec: ExecutionContext): Future[LastError] = {
+  def remove[T](query: T, writeConcern: GetLastError = GetLastError(), firstMatchOnly: Boolean = false)(implicit writer: RawBSONDocumentSerializer[T], ec: ExecutionContext): Future[LastError] = {
     val op = Delete(fullCollectionName, if (firstMatchOnly) 1 else 0)
-    val bson = writer.write(query)
+    val bson = writer.serialize(query)
     val checkedWriteRequest = CheckedWriteRequest(op, BufferSequence(bson), writeConcern)
     Failover(checkedWriteRequest, db.connection.mongosystem, failoverStrategy).future.mapEither(LastError.meaningful(_))
   }
 
-  def uncheckedRemove[T](query: T, firstMatchOnly: Boolean = false)(implicit writer: RawBSONDocumentWriter[T], ec: ExecutionContext): Unit = {
+  def uncheckedRemove[T](query: T, firstMatchOnly: Boolean = false)(implicit writer: RawBSONDocumentSerializer[T], ec: ExecutionContext): Unit = {
     val op = Delete(fullCollectionName, if (firstMatchOnly) 1 else 0)
-    val bson = writer.write(query)
+    val bson = writer.serialize(query)
     val message = RequestMaker(op, BufferSequence(bson))
     db.connection.send(message)
   }
 
-  def update[S, U](selector: S, update: U, writeConcern: GetLastError = GetLastError(), upsert: Boolean = false, multi: Boolean = false)(implicit selectorWriter: RawBSONDocumentWriter[S], updateWriter: RawBSONDocumentWriter[U], ec: ExecutionContext): Future[LastError] = {
+  def update[S, U](selector: S, update: U, writeConcern: GetLastError = GetLastError(), upsert: Boolean = false, multi: Boolean = false)(implicit selectorWriter: RawBSONDocumentSerializer[S], updateWriter: RawBSONDocumentSerializer[U], ec: ExecutionContext): Future[LastError] = {
     val flags = 0 | (if (upsert) UpdateFlags.Upsert else 0) | (if (multi) UpdateFlags.MultiUpdate else 0)
     val op = Update(fullCollectionName, flags)
-    val bson = selectorWriter.write(selector)
-    bson.writeBytes(updateWriter.write(update))
+    val bson = selectorWriter.serialize(selector)
+    bson.writeBytes(updateWriter.serialize(update))
     val checkedWriteRequest = CheckedWriteRequest(op, BufferSequence(bson), writeConcern)
     Failover(checkedWriteRequest, db.connection.mongosystem, failoverStrategy).future.mapEither(LastError.meaningful(_))
   }
 
-  def uncheckedUpdate[S, U](selector: S, update: U, upsert: Boolean = false, multi: Boolean = false)(implicit selectorWriter: RawBSONDocumentWriter[S], updateWriter: RawBSONDocumentWriter[U]): Unit = {
+  def uncheckedUpdate[S, U](selector: S, update: U, upsert: Boolean = false, multi: Boolean = false)(implicit selectorWriter: RawBSONDocumentSerializer[S], updateWriter: RawBSONDocumentSerializer[U]): Unit = {
     val flags = 0 | (if (upsert) UpdateFlags.Upsert else 0) | (if (multi) UpdateFlags.MultiUpdate else 0)
     val op = Update(fullCollectionName, flags)
-    val bson = selectorWriter.write(selector)
-    bson.writeBytes(updateWriter.write(update))
+    val bson = selectorWriter.serialize(selector)
+    bson.writeBytes(updateWriter.serialize(update))
     val message = RequestMaker(op, BufferSequence(bson))
     db.connection.send(message)
   }
 
-  def uncheckedInsert[T](document: T)(implicit writer: RawBSONDocumentWriter[T]): Unit = {
+  def uncheckedInsert[T](document: T)(implicit writer: RawBSONDocumentSerializer[T]): Unit = {
     val op = Insert(0, fullCollectionName)
-    val bson = writer.write(document)
+    val bson = writer.serialize(document)
     val message = RequestMaker(op, BufferSequence(bson))
     db.connection.send(message)
   }

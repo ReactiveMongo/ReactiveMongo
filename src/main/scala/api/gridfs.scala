@@ -17,8 +17,8 @@ object `package` {
 
 object Implicits {
   /** A default `BSONReader` for `ReadFile`. */
-  implicit object DefaultReadFileReader extends BSONDocumentReader[DefaultReadFile] {
-    def fromBSON(doc: BSONDocument) = {
+  implicit object DefaultReadFileReader extends BSONDocumentDeserializer[DefaultReadFile] {
+    def read(doc: BSONDocument) = {
       val metadata = doc.elements.filterNot { element =>
         element._1 == "contentType" || element._1 == "filename" || element._1 == "uploadDate" ||
           element._1 == "chunkSize" || element._1 == "length" || element._1 == "md5" || element._1 == "_id"
@@ -122,7 +122,7 @@ class GridFS(db: DB[Collection] with DBMetaCommands, prefix: String = "fs") {
    *
    * @tparam S The type of the selector document. An implicit [[reactivemongo.bson.handlers.RawBSONWriter]][S] must be in the scope.
    */
-  def find[S, T <: ReadFile[_]](selector: S)(implicit sWriter: RawBSONDocumentWriter[S], readFileReader: BSONDocumentReader[T], ctx: ExecutionContext) :Cursor[T] = {
+  def find[S, T <: ReadFile[_]](selector: S)(implicit sWriter: RawBSONDocumentSerializer[S], readFileReader: RawBSONDocumentDeserializer[T], ctx: ExecutionContext) :Cursor[T] = {
     files.find(selector)
   }
 
@@ -135,7 +135,7 @@ class GridFS(db: DB[Collection] with DBMetaCommands, prefix: String = "fs") {
    *
    * @return A future of a ReadFile[Id].
    */
-  def save[Id <: BSONValue](enumerator: Enumerator[Array[Byte]], file: FileToSave[Id], chunkSize: Int = 262144)(implicit readFileReader: BSONDocumentReader[ReadFile[Id]], ctx: ExecutionContext) :Future[ReadFile[Id]] = {
+  def save[Id <: BSONValue](enumerator: Enumerator[Array[Byte]], file: FileToSave[Id], chunkSize: Int = 262144)(implicit readFileReader: BSONDocumentDeserializer[ReadFile[Id]], ctx: ExecutionContext) :Future[ReadFile[Id]] = {
     (enumerator |>>> iteratee(file, chunkSize)).flatMap(f => f)
   }
 
@@ -148,7 +148,7 @@ class GridFS(db: DB[Collection] with DBMetaCommands, prefix: String = "fs") {
    *
    * @return An `Iteratee` that will consume data to put into a GridFS store.
    */
-  def iteratee[Id <: BSONValue](file: FileToSave[Id], chunkSize: Int = 262144)(implicit readFileReader: BSONDocumentReader[ReadFile[Id]], ctx: ExecutionContext): Iteratee[Array[Byte], Future[ReadFile[Id]]] = {
+  def iteratee[Id <: BSONValue](file: FileToSave[Id], chunkSize: Int = 262144)(implicit readFileReader: BSONDocumentDeserializer[ReadFile[Id]], ctx: ExecutionContext): Iteratee[Array[Byte], Future[ReadFile[Id]]] = {
     implicit val ec = MongoConnection.system
 
     import reactivemongo.bson.handlers.DefaultBSONHandlers._
@@ -195,7 +195,7 @@ class GridFS(db: DB[Collection] with DBMetaCommands, prefix: String = "fs") {
             "uploadDate"  -> BSONDateTime(uploadDate),
             "contentType" -> file.contentType.map(BSONString(_))
           ) ++ file.metadata
-          files.insert(bson).map(_ => readFileReader.fromBSON(bson))
+          files.insert(bson).map(_ => readFileReader.read(bson))
         }
       }
       def writeChunk(n: Int, array: Array[Byte]) = {
@@ -254,7 +254,7 @@ class GridFS(db: DB[Collection] with DBMetaCommands, prefix: String = "fs") {
   }
 
   /** Writes the data provided by the given InputStream to the given file. */
-  def writeFromInputStream[Id <: BSONValue](file: FileToSave[Id], input: InputStream, chunkSize: Int = 262144)(implicit readFileReader: BSONDocumentReader[ReadFile[Id]], ctx: ExecutionContext) :Future[ReadFile[Id]] = {
+  def writeFromInputStream[Id <: BSONValue](file: FileToSave[Id], input: InputStream, chunkSize: Int = 262144)(implicit readFileReader: BSONDocumentDeserializer[ReadFile[Id]], ctx: ExecutionContext) :Future[ReadFile[Id]] = {
     save(Enumerator.fromStream(input, chunkSize), file)
   }
 

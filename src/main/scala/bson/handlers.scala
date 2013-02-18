@@ -11,8 +11,8 @@ import reactivemongo.core.protocol._
  *
  * @tparam DocumentType The type of the instance that can be turned into a BSON document.
  */
-trait RawBSONDocumentWriter[-DocumentType] {
-  def write(document: DocumentType) :ChannelBuffer
+trait RawBSONDocumentSerializer[-DocumentType] {
+  def serialize(document: DocumentType) :ChannelBuffer
 }
 
 /**
@@ -20,8 +20,8 @@ trait RawBSONDocumentWriter[-DocumentType] {
  *
  * @tparam DocumentType The type of the instance to create.
  */
-trait RawBSONDocumentReader[+DocumentType] {
-  def read(buffer: ChannelBuffer) :DocumentType
+trait RawBSONDocumentDeserializer[+DocumentType] {
+  def deserialize(buffer: ChannelBuffer) :DocumentType
 }
 
 /**
@@ -29,12 +29,10 @@ trait RawBSONDocumentReader[+DocumentType] {
  *
  * @tparam DocumentType The type of the instance that can be turned into a BSONDocument.
  */
-trait BSONDocumentWriter[-DocumentType] extends RawBSONDocumentWriter[DocumentType] {
-  def toBSON(document: DocumentType) :BSONDocument
-
-  final def write(document: DocumentType) = {
+trait BSONDocumentSerializer[-DocumentType] extends RawBSONDocumentSerializer[DocumentType] with VariantBSONDocumentWriter[DocumentType] {
+  final def serialize(document: DocumentType) = {
     val buffer = ChannelBufferWritableBuffer()
-    DefaultBufferHandler.write(buffer, toBSON(document))
+    DefaultBufferHandler.write(buffer, write(document)) // TODO
     buffer.buffer
   }
 }
@@ -44,13 +42,10 @@ trait BSONDocumentWriter[-DocumentType] extends RawBSONDocumentWriter[DocumentTy
  *
  * @tparam DocumentType The type of the instance to create.
  */
-trait BSONDocumentReader[+DocumentType] extends RawBSONDocumentReader[DocumentType] {
-  def fromBSON(doc: BSONDocument) :DocumentType
-
-  final def read(buffer: ChannelBuffer) = {
+trait BSONDocumentDeserializer[+DocumentType] extends RawBSONDocumentDeserializer[DocumentType] with VariantBSONDocumentReader[DocumentType] {
+  final def deserialize(buffer: ChannelBuffer) = {
     val readableBuffer = ChannelBufferReadableBuffer(buffer)
-    val doc = DefaultBufferHandler.readDocument(readableBuffer).get // TODO
-    fromBSON(doc)
+    read(DefaultBufferHandler.readDocument(readableBuffer).get) // TODO
   }
 }
 
@@ -59,26 +54,26 @@ trait BSONDocumentReader[+DocumentType] extends RawBSONDocumentReader[DocumentTy
  * provided that there is an implicit [[reactivemongo.bson.handlers.BSONReader]][DocumentType] in the scope.
  */
 trait BSONReaderHandler {
-  def handle[DocumentType](reply: Reply, buffer: ChannelBuffer)(implicit reader: RawBSONDocumentReader[DocumentType]) :Iterator[DocumentType]
+  def handle[DocumentType](reply: Reply, buffer: ChannelBuffer)(implicit reader: RawBSONDocumentDeserializer[DocumentType]) :Iterator[DocumentType]
 }
 
 /** Default [[reactivemongo.bson.handlers.BSONReader]], [[reactivemongo.bson.handlers.BSONWriter]], [[reactivemongo.bson.handlers.BSONReaderHandler]]. */
 object DefaultBSONHandlers {
   implicit object DefaultBSONReaderHandler extends BSONReaderHandler {
-    def handle[DocumentType](reply: Reply, buffer: ChannelBuffer)(implicit reader: RawBSONDocumentReader[DocumentType]) :Iterator[DocumentType] = {
+    def handle[DocumentType](reply: Reply, buffer: ChannelBuffer)(implicit reader: RawBSONDocumentDeserializer[DocumentType]) :Iterator[DocumentType] = {
       new Iterator[DocumentType] {
         def hasNext = buffer.readable
-        def next = reader.read(buffer.readBytes(buffer.getInt(buffer.readerIndex)))
+        def next = reader.deserialize(buffer.readBytes(buffer.getInt(buffer.readerIndex)))
       }
     }
   }
 
-  implicit object DefaultBSONDocumentReader extends BSONDocumentReader[BSONDocument] {
-    def fromBSON(doc: BSONDocument) :BSONDocument = doc
+  implicit object DefaultBSONDocumentReader extends BSONDocumentDeserializer[BSONDocument] {
+    def read(doc: BSONDocument) :BSONDocument = doc
   }
 
-  implicit object DefaultBSONDocumentWriter extends BSONDocumentWriter[BSONDocument] {
-    def toBSON(doc: BSONDocument) = doc
+  implicit object DefaultBSONDocumentWriter extends BSONDocumentSerializer[BSONDocument] {
+    def write(doc: BSONDocument) = doc
   }
 
   /** Parses the given response and produces an iterator of [[reactivemongo.bson.DefaultBSONIterator]]s. */
