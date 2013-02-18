@@ -184,11 +184,11 @@ val list = cursor2[List].collect()
   def close()
 }
 
-class DefaultCursor[T](response: Response, private[api] val mongoConnection: MongoConnection, private[api] val query: Query, private[api] val originalRequest: BufferSequence, private[api] val failoverStrategy: FailoverStrategy)(implicit handler: BSONReaderHandler, reader: RawBSONDocumentDeserializer[T], ctx: ExecutionContext) extends Cursor[T] {
+class DefaultCursor[T](response: Response, private[api] val mongoConnection: MongoConnection, private[api] val query: Query, private[api] val originalRequest: BufferSequence, private[api] val failoverStrategy: FailoverStrategy)(implicit reader: RawBSONDocumentDeserializer[T], ctx: ExecutionContext) extends Cursor[T] {
   import Cursor.logger
   logger.debug("making default cursor instance from response " + response + ", returned=" + response.reply.numberReturned)
 
-  lazy val iterator :Iterator[T] = handler.handle(response.reply, response.documents)
+  lazy val iterator :Iterator[T] = ReplyDocumentIterator(response.reply, response.documents)
 
   def cursorId = Future(response.reply.cursorID)
   def connection = Future(mongoConnection)

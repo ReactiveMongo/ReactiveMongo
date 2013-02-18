@@ -49,25 +49,8 @@ trait BSONDocumentDeserializer[+DocumentType] extends RawBSONDocumentDeserialize
   }
 }
 
-/**
- * A handler that produces an Iterator of `DocumentType`,
- * provided that there is an implicit [[reactivemongo.bson.handlers.BSONReader]][DocumentType] in the scope.
- */
-trait BSONReaderHandler {
-  def handle[DocumentType](reply: Reply, buffer: ChannelBuffer)(implicit reader: RawBSONDocumentDeserializer[DocumentType]) :Iterator[DocumentType]
-}
-
 /** Default [[reactivemongo.bson.handlers.BSONReader]], [[reactivemongo.bson.handlers.BSONWriter]], [[reactivemongo.bson.handlers.BSONReaderHandler]]. */
 object DefaultBSONHandlers {
-  implicit object DefaultBSONReaderHandler extends BSONReaderHandler {
-    def handle[DocumentType](reply: Reply, buffer: ChannelBuffer)(implicit reader: RawBSONDocumentDeserializer[DocumentType]) :Iterator[DocumentType] = {
-      new Iterator[DocumentType] {
-        def hasNext = buffer.readable
-        def next = reader.deserialize(buffer.readBytes(buffer.getInt(buffer.readerIndex)))
-      }
-    }
-  }
-
   implicit object DefaultBSONDocumentReader extends BSONDocumentDeserializer[BSONDocument] {
     def read(doc: BSONDocument) :BSONDocument = doc
   }
@@ -76,6 +59,6 @@ object DefaultBSONHandlers {
     def write(doc: BSONDocument) = doc
   }
 
-  /** Parses the given response and produces an iterator of [[reactivemongo.bson.DefaultBSONIterator]]s. */
-  def parse(response: Response) = DefaultBSONReaderHandler.handle(response.reply, response.documents)(DefaultBSONDocumentReader)
+  /** Parses the given response and produces an iterator of [[reactivemongo.bson.BSONDocument]]s. */
+  def parse(response: Response): Iterator[BSONDocument] = ReplyDocumentIterator(response.reply, response.documents)(DefaultBSONDocumentReader)
 }

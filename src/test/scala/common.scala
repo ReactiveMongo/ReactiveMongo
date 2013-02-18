@@ -7,7 +7,6 @@ object Common {
   implicit val ec = ExecutionContext.Implicits.global
   implicit val writer = DefaultBSONHandlers.DefaultBSONDocumentWriter
   implicit val reader = DefaultBSONHandlers.DefaultBSONDocumentReader
-  implicit val handler = DefaultBSONHandlers.DefaultBSONReaderHandler
   
   val timeout = 10 seconds
   

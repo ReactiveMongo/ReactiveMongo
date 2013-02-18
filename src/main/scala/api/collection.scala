@@ -63,7 +63,7 @@ trait Collection {
 
   // abstract
   /** A low-level method for finding documents. Should not be used outside. */
-  protected def find[Rst](documents: BufferSequence, opts: QueryOpts)(implicit handler: BSONReaderHandler, reader: RawBSONDocumentDeserializer[Rst], ec: ExecutionContext): FlattenedCursor[Rst]
+  protected def find[Rst](documents: BufferSequence, opts: QueryOpts)(implicit reader: RawBSONDocumentDeserializer[Rst], ec: ExecutionContext): FlattenedCursor[Rst]
 
   /**
    * Inserts a document into the collection without writeConcern.
@@ -168,7 +168,7 @@ trait Collection {
    *
    * @return a cursor over the matched documents. You can get an enumerator for it, please see the [[reactivemongo.api.Cursor]] companion object.
    */
-  def find[Qry, Pjn, Rst](query: Qry, projection: Pjn, opts: QueryOpts = QueryOpts())(implicit writer: RawBSONDocumentSerializer[Qry], writer2: RawBSONDocumentSerializer[Pjn], handler: BSONReaderHandler, reader: RawBSONDocumentDeserializer[Rst], ec: ExecutionContext): FlattenedCursor[Rst] =
+  def find[Qry, Pjn, Rst](query: Qry, projection: Pjn, opts: QueryOpts = QueryOpts())(implicit writer: RawBSONDocumentSerializer[Qry], writer2: RawBSONDocumentSerializer[Pjn], reader: RawBSONDocumentDeserializer[Rst], ec: ExecutionContext): FlattenedCursor[Rst] =
     find(BufferSequence(writer.serialize(query), writer2.serialize(projection)), opts)
 
   /**
@@ -187,7 +187,7 @@ trait Collection {
    *
    * @return a cursor over the matched documents. You can get an enumerator for it, please see the [[reactivemongo.api.Cursor]] companion object.
    */
-  def find[Qry, Rst](query: Qry, opts: QueryOpts)(implicit writer: RawBSONDocumentSerializer[Qry], handler: BSONReaderHandler, reader: RawBSONDocumentDeserializer[Rst], ec: ExecutionContext): FlattenedCursor[Rst] =
+  def find[Qry, Rst](query: Qry, opts: QueryOpts)(implicit writer: RawBSONDocumentSerializer[Qry], reader: RawBSONDocumentDeserializer[Rst], ec: ExecutionContext): FlattenedCursor[Rst] =
     find(BufferSequence(writer.serialize(query)), opts)
 
   /**
@@ -205,7 +205,7 @@ trait Collection {
    *
    * @return a cursor over the matched documents. You can get an enumerator for it, please see the [[reactivemongo.api.Cursor]] companion object.
    */
-  def find[Qry, Rst](query: Qry)(implicit writer: RawBSONDocumentSerializer[Qry], handler: BSONReaderHandler, reader: RawBSONDocumentDeserializer[Rst], ec: ExecutionContext): FlattenedCursor[Rst] =
+  def find[Qry, Rst](query: Qry)(implicit writer: RawBSONDocumentSerializer[Qry], reader: RawBSONDocumentDeserializer[Rst], ec: ExecutionContext): FlattenedCursor[Rst] =
     find(BufferSequence(writer.serialize(query)), QueryOpts())
 
   /**
@@ -220,7 +220,7 @@ trait Collection {
    *
    * @return a cursor over the matched documents. You can get an enumerator for it, please see the [[reactivemongo.api.Cursor]] companion object.
    */
-  def find[Rst](query: QueryBuilder, opts: QueryOpts)(implicit handler: BSONReaderHandler, reader: RawBSONDocumentDeserializer[Rst], ec: ExecutionContext): FlattenedCursor[Rst] =
+  def find[Rst](query: QueryBuilder, opts: QueryOpts)(implicit reader: RawBSONDocumentDeserializer[Rst], ec: ExecutionContext): FlattenedCursor[Rst] =
     find(BufferSequence(query.makeMergedBuffer), opts)
 
   /**
@@ -234,7 +234,7 @@ trait Collection {
    *
    * @return a cursor over the matched documents. You can get an enumerator for it, please see the [[reactivemongo.api.Cursor]] companion object.
    */
-  def find[Rst](query: QueryBuilder)(implicit handler: BSONReaderHandler, reader: RawBSONDocumentDeserializer[Rst], ec: ExecutionContext): FlattenedCursor[Rst] =
+  def find[Rst](query: QueryBuilder)(implicit reader: RawBSONDocumentDeserializer[Rst], ec: ExecutionContext): FlattenedCursor[Rst] =
     find(BufferSequence(query.makeMergedBuffer), QueryOpts())
 
   /**
@@ -284,7 +284,7 @@ trait FailoverBasicCollection {
 
   val failoverStrategy: FailoverStrategy
 
-  protected def find[Rst](documents: BufferSequence, opts: QueryOpts)(implicit handler: BSONReaderHandler, reader: RawBSONDocumentDeserializer[Rst], ec: ExecutionContext): FlattenedCursor[Rst] = {
+  protected def find[Rst](documents: BufferSequence, opts: QueryOpts)(implicit reader: RawBSONDocumentDeserializer[Rst], ec: ExecutionContext): FlattenedCursor[Rst] = {
     val op = Query(opts.flagsN, fullCollectionName, opts.skipN, opts.batchSizeN)
     val requestMaker = RequestMaker(op, documents)
 

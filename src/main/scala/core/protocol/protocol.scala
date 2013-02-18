@@ -243,9 +243,9 @@ case class Response(
   lazy val error: Option[DBError] = {
     if (reply.inError) {
       import reactivemongo.bson.handlers.DefaultBSONHandlers._
-      val bson = DefaultBSONReaderHandler.handle(reply, documents)
+      val bson = ReplyDocumentIterator(reply, documents)
       if (bson.hasNext)
-        Some(ReactiveMongoError(DefaultBSONReaderHandler.handle(reply, documents).next))
+        Some(ReactiveMongoError(ReplyDocumentIterator(reply, documents).next))
       else None
     } else None
   }
@@ -277,6 +277,11 @@ private[reactivemongo] class RequestEncoder extends OneToOneEncoder {
       }
     }
   }
+}
+
+private[reactivemongo] case class ReplyDocumentIterator[T](private val reply: Reply, private val buffer: ChannelBuffer)(implicit reader: reactivemongo.bson.handlers.RawBSONDocumentDeserializer[T]) extends Iterator[T] {
+  def hasNext = buffer.readable
+  def next = reader.deserialize(buffer.readBytes(buffer.getInt(buffer.readerIndex)))
 }
 
 private[reactivemongo] object RequestEncoder {
