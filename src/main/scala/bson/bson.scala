@@ -84,10 +84,19 @@ case class BSONDouble(value: Double) extends BSONValue with BSONNumberLike {
 }
 
 /** A BSON String */
-case class BSONString(value: String) extends BSONValue {
+case class BSONString(value: String) extends BSONValue with BSONNumberLike with BSONBooleanLike {
   val code = 0x02
 
   def write(buffer: ChannelBuffer) = { buffer writeString value }
+
+  def toDouble = value.toDouble
+  def toLong = value.toLong
+  def toInt = value.toInt
+
+  override def toBoolean: Boolean = value.toLowerCase.trim match {
+    case "y" | "yes" | "o" | "oui" => true
+    case _ => false
+  }
 }
 
 
