@@ -21,7 +21,7 @@ import reactivemongo.bson.BSONDocument
 import reactivemongo.bson.buffer.{ ReadableBuffer, WritableBuffer }
 import org.jboss.netty.buffer._
 
-class ChannelBufferReadableBuffer(protected val buffer: ChannelBuffer) extends ReadableBuffer {
+class ChannelBufferReadableBuffer(protected[netty] val buffer: ChannelBuffer) extends ReadableBuffer {
   def size = buffer.capacity()
 
   def index = buffer.readerIndex()
@@ -48,15 +48,18 @@ class ChannelBufferReadableBuffer(protected val buffer: ChannelBuffer) extends R
   def readDouble() = buffer.readDouble()
 
   def readable() = buffer.readableBytes()
+  
+  def toWritableBuffer: ChannelBufferWritableBuffer = {
+    val buf = new ChannelBufferWritableBuffer
+    buf.writeBytes(buffer)
+  }
 }
 
 object ChannelBufferReadableBuffer {
   def apply(buffer: ChannelBuffer) = new ChannelBufferReadableBuffer(buffer)
 }
 
-class ChannelBufferWritableBuffer extends WritableBuffer {
-  val buffer = ChannelBuffers.dynamicBuffer(LITTLE_ENDIAN, 32)
-
+class ChannelBufferWritableBuffer(val buffer: ChannelBuffer = ChannelBuffers.dynamicBuffer(LITTLE_ENDIAN, 32)) extends WritableBuffer {
   def index = buffer.writerIndex
 
   def setInt(index: Int, value: Int) = {
@@ -70,6 +73,22 @@ class ChannelBufferWritableBuffer extends WritableBuffer {
 
   def writeBytes(array: Array[Byte]): WritableBuffer = {
     buffer writeBytes array
+    this
+  }
+
+  override def writeBytes(buf: ReadableBuffer) = {
+    buf match {
+      case nettyBuffer: ChannelBufferReadableBuffer =>
+        val readable = nettyBuffer.buffer.slice()
+        buffer.writeBytes(readable)
+        this
+      case _ => super.writeBytes(buf)
+    }
+  }
+
+  def writeBytes(buf: ChannelBuffer) = {
+    val readable = buf.slice()
+    buffer.writeBytes(readable)
     this
   }
 

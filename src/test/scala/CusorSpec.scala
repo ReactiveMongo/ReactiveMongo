@@ -24,7 +24,7 @@ class CursorSpec  extends Specification {
     }
     "get all the 16,517 documents" in {
       var i = 0
-      val future = coll.find(BSONDocument()).enumerate |>>> (Iteratee.foreach({ e =>
+      val future = coll.find(BSONDocument()).cursor.enumerate |>>> (Iteratee.foreach({ e =>
         i += 1
       }))
       Await.result(future, DurationInt(21).seconds) mustEqual ()

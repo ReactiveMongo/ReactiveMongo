@@ -2,7 +2,6 @@ package reactivemongo.api
 
 import reactivemongo.api.indexes.IndexesManager
 import reactivemongo.bson._
-import reactivemongo.bson.handlers._
 import reactivemongo.core.commands.{Update => UpdateCommand, _}
 import reactivemongo.core.protocol._
 import reactivemongo.utils.EitherMappableFuture._
@@ -29,7 +28,7 @@ val db2 = connection.db("plugin")
 val collection2 = db2.collection("plugin")
 }}}
  */
-trait DB[+C <: Collection] {
+trait DB {
   /** The [[reactivemongo.api.MongoConnection]] that will be used to query this database. */
   val connection: MongoConnection
   /** This database name. */
@@ -40,14 +39,17 @@ trait DB[+C <: Collection] {
    *
    * @param name The name of the collection to open.
    */
-  def apply(name: String) :C = collection(name)
+    def apply[C <: Collection](name: String, failoverStrategy: FailoverStrategy = FailoverStrategy())(implicit producer: CollectionProducer[C] = collections.default.BSONCollectionProducer): C = collection(name, failoverStrategy)
+
 
   /**
    * Gets a [[reactivemongo.api.Collection]] from this database.
    *
    * @param name The name of the collection to open.
    */
-  def collection(name: String) :C
+  def collection[C <: Collection](name: String, failoverStrategy: FailoverStrategy = FailoverStrategy())(implicit producer: CollectionProducer[C] = collections.default.BSONCollectionProducer): C = {
+    producer.apply(this, name, failoverStrategy)
+  }
 
   /**
    * Sends a command and get the future result of the command.
@@ -60,11 +62,14 @@ trait DB[+C <: Collection] {
 
   /** Authenticates the connection on this database. */
   def authenticate(user: String, password: String)(implicit timeout: FiniteDuration) :Future[SuccessfulAuthentication] = connection.authenticate(name, user, password)
+  
+  
+  
 }
 
 /** A mixin for making failover requests on the database. */
 trait FailoverDB {
-  self: DB[_] =>
+  self: DB=>
 
   /** A failover strategy for sending requests. */
   val failoverStrategy: FailoverStrategy
@@ -75,7 +80,7 @@ trait FailoverDB {
 
 /** A mixin that provides commands about this database itself. */
 trait DBMetaCommands {
-  self: DB[Collection] =>
+  self: DB =>
 
   /** Drops this database. */
   def drop()(implicit ec: ExecutionContext) :Future[Boolean] = command(new DropDatabase())
@@ -89,8 +94,8 @@ case class DefaultDB(
   name: String,
   connection: MongoConnection,
   failoverStrategy: FailoverStrategy = FailoverStrategy()
-) extends DB[DefaultCollection] with DBMetaCommands with FailoverDB {
-  def collection(name: String) = DefaultCollection(name, this, failoverStrategy)
+) extends DB with DBMetaCommands with FailoverDB {
+  //def collection(name: String) = DefaultCollection(name, this, failoverStrategy)
 }
 
 object DB {

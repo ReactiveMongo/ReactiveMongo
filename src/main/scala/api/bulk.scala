@@ -1,17 +1,18 @@
 package reactivemongo.api
 
 import java.nio.ByteOrder._
-import org.jboss.netty.buffer.{ChannelBuffer, ChannelBuffers}
-import org.slf4j.{Logger, LoggerFactory}
+import org.jboss.netty.buffer.{ ChannelBuffer, ChannelBuffers }
+import org.slf4j.{ Logger, LoggerFactory }
 import play.api.libs.iteratee._
-import reactivemongo.bson.handlers.RawBSONDocumentSerializer
 import reactivemongo.utils.LazyLogger
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.{ ExecutionContext, Future }
+import reactivemongo.core.netty.ChannelBufferWritableBuffer
 
 /**
  * Bulk insertion.
  */
 object bulk {
+  import reactivemongo.api.collections.buffer._
   private val logger = LazyLogger(LoggerFactory.getLogger("reactivemongo.api.Bulk"))
   /** Default maximum size for a bulk (1MB). */
   val MaxBulkSize = 1024 * 1024
@@ -27,7 +28,7 @@ object bulk {
    * @param bulkSize The number of documents per bulk.
    * @param bulkByteSize The maximum size for a bulk, in bytes.
    */
-  def iteratee(coll: Collection, bulkSize: Int = MaxDocs, bulkByteSize: Int = MaxBulkSize)(implicit context: ExecutionContext) :Iteratee[ChannelBuffer, Int] =
+  def iteratee(coll: Collection, bulkSize: Int = MaxDocs, bulkByteSize: Int = MaxBulkSize)(implicit context: ExecutionContext): Iteratee[ChannelBuffer, Int] =
     iteratee(coll, (docs, bulk) => docs > bulkSize || bulk > bulkByteSize)
 
   /**
@@ -38,12 +39,13 @@ object bulk {
    * @param coll The collection where the documents will be stored.
    * @param reachedUpperBound A function that returns true if the staging bulk can be sent to be written. This function has two parameters: numberOfDocuments and numberOfBytes.
    */
-  def iteratee(coll: Collection, reachedUpperBound: (Int, Int) => Boolean)(implicit context: ExecutionContext) :Iteratee[ChannelBuffer, Int] = {
-    Iteratee.foldM(Bulk()) { (bulk, doc :ChannelBuffer) =>
+  def iteratee(coll: Collection, reachedUpperBound: (Int, Int) => Boolean)(implicit context: ExecutionContext): Iteratee[ChannelBuffer, Int] = {
+    val channelColl = coll.as(coll.failoverStrategy)
+    Iteratee.foldM(Bulk()) { (bulk, doc: ChannelBuffer) =>
       logger.debug("bulk= " + bulk)
-      if(reachedUpperBound(bulk.currentBulkDocsNumber + 1, bulk.docs.writerIndex + doc.writerIndex)) {
+      if (reachedUpperBound(bulk.currentBulkDocsNumber + 1, bulk.docs.writerIndex + doc.writerIndex)) {
         logger.debug("inserting, at " + bulk.collectedDocs)
-        coll.insert(bulk)(BulkWriter, context).map { _ =>
+        channelColl.insert(bulk)(BulkWriter, context).map { _ =>
           val nextBulk = Bulk(collectedDocs = bulk.collectedDocs) +> doc
           logger.debug("redeemed, will give " + nextBulk)
           nextBulk
@@ -51,7 +53,7 @@ object bulk {
       } else Future(bulk +> doc)
     }.flatMap { bulk =>
       logger.debug("inserting (last), at " + bulk.collectedDocs)
-      Iteratee.flatten(coll.insert(bulk)(BulkWriter, context).map(_ => Done[ChannelBuffer, Int](bulk.collectedDocs, Input.EOF)))
+      Iteratee.flatten(channelColl.insert(bulk)(BulkWriter, context).map(_ => Done[ChannelBuffer, Int](bulk.collectedDocs, Input.EOF)))
     }
   }
 
@@ -60,7 +62,7 @@ object bulk {
     docs: ChannelBuffer = ChannelBuffers.dynamicBuffer(LITTLE_ENDIAN, 32),
     collectedDocs: Int = 0) {
 
-    def +> (doc: ChannelBuffer) = {
+    def +>(doc: ChannelBuffer) = {
       val buf = docs.copy
       buf.writeBytes(doc)
       Bulk(currentBulkDocsNumber + 1, buf, collectedDocs + 1)
@@ -68,6 +70,6 @@ object bulk {
   }
 
   private[bulk] object BulkWriter extends RawBSONDocumentSerializer[Bulk] {
-    override def serialize(bulk: Bulk) = bulk.docs
+    override def serialize(bulk: Bulk) = new ChannelBufferWritableBuffer(bulk.docs)
   }
 }

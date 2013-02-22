@@ -20,15 +20,15 @@ class CommonUseCases extends Specification {
     }
     "insert some docs from an enumerator of docs" in {
       val enum = Enumerator((18 to 60).map(i => BSONDocument("age" -> BSONInteger(i), "name" -> BSONString("Jack" + i))) :_*)
-      Await.result(collection.insert(enum, 100), timeout) mustEqual 43
+      Await.result(collection.bulkInsert(enum, 100), timeout) mustEqual 43
     }
     "find them" in {
       // batchSize (>1) allows us to test cursors ;)
-      val it = collection.find(BSONDocument(), QueryOpts().batchSize(2))
+      val it = collection.find(BSONDocument()).options(QueryOpts().batchSize(2)).cursor
       Await.result(it.toList, timeout).map(_.getAs[BSONInteger]("age").get.value).mkString("") mustEqual (18 to 60).mkString("")
     }
     "find by regexp" in {
-      Await.result(collection.find(BSONDocument("name" -> BSONRegex("ack2", ""))).toList, timeout).size mustEqual 10
+      Await.result(collection.find(BSONDocument("name" -> BSONRegex("ack2", ""))).cursor.toList, timeout).size mustEqual 10
     }
     "insert a document containing a merged array of objects, fetch and check it" in {
       val array = BSONArray(
@@ -52,7 +52,7 @@ class CommonUseCases extends Specification {
         "contacts" -> (array ++ array2)
       )
       Await.result(collection.insert(doc), timeout).ok mustEqual true
-      val fetched = Await.result(collection.find(BSONDocument("name" -> BSONString("Joe"))).headOption, timeout)
+      val fetched = Await.result(collection.find(BSONDocument("name" -> BSONString("Joe"))).one, timeout)
       fetched.isDefined mustEqual true
       val contactsString = fetched.get.getAs[BSONArray]("contacts").get.values.map {
         case contact: BSONDocument =>
@@ -68,15 +68,15 @@ class CommonUseCases extends Specification {
       result.ok mustEqual true
     }
     "find this weird doc" in {
-      val doc = Await.result(collection.find(BSONDocument("coucou" -> BSONString("coucou"))).headOption, timeout)
+      val doc = Await.result(collection.find(BSONDocument("coucou" -> BSONString("coucou"))).one, timeout)
       println("\n" + doc.map(BSONDocument.pretty(_)) + "\n")
       doc.isDefined mustEqual true
     }
     "fail with this error" in {
       val query = BSONDocument("$and" -> BSONDocument("name" -> BSONString("toto")))
-      val future = collection.find(query).headOption
+      val future = collection.find(query).one
       Await.ready(future, timeout)
-      (future.value.get match { case f:Failure[_] => true; case _ => false}) mustEqual true
+      (future.value.get match { case Failure(e) => e.printStackTrace(); true; case _ => false}) mustEqual true
     }
   }
 }

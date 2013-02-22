@@ -3,7 +3,6 @@ package reactivemongo.api.indexes
 import reactivemongo.api._
 import reactivemongo.bson._
 import DefaultBSONHandlers._
-import reactivemongo.bson.handlers._
 import reactivemongo.core.commands.{DeleteIndex, LastError}
 import reactivemongo.utils.option
 import reactivemongo.core.netty._
@@ -100,15 +99,13 @@ case class NSIndex(
  *
  * @param db The subject database.
  */
-class IndexesManager(db: DB[Collection])(implicit context: ExecutionContext) {
-  import handlers.DefaultBSONHandlers._
-
+class IndexesManager(db: DB)(implicit context: ExecutionContext) {
   val collection = db("system.indexes")
 
   /** Gets a future list of all the index on this database. */
   def list() :Future[List[NSIndex]] = {
     implicit val reader = IndexesManager.NSIndexReader
-    val cursor :Cursor[NSIndex] = collection.find(BSONDocument())
+    val cursor :Cursor[NSIndex] = collection.find(BSONDocument()).cursor
     cursor.toList()
   }
 
@@ -127,7 +124,7 @@ class IndexesManager(db: DB[Collection])(implicit context: ExecutionContext) {
       "ns"   -> BSONString(nsIndex.namespace),
       "name" -> BSONString(nsIndex.index.eventualName))
 
-    collection.find(query).headOption.flatMap { opt =>
+    collection.find(query).one.flatMap { opt =>
       if(!opt.isDefined)
         create(nsIndex).map(_ => true)
       // there is a match, returning a future ok. TODO
@@ -230,19 +227,18 @@ object IndexesManager {
     ) ++ nsIndex.index.options
   }
 
-  implicit object NSIndexWriter extends RawBSONDocumentSerializer[NSIndex] {
+  implicit object NSIndexWriter extends BSONDocumentWriter[NSIndex] {
     import org.jboss.netty.buffer._
-    def serialize(nsIndex: NSIndex) :ChannelBuffer = {
+    def write(nsIndex: NSIndex) :BSONDocument = {
       if(nsIndex.index.key.isEmpty)
         throw new RuntimeException("the key should not be empty!")
-      toBSONDocument(nsIndex).makeBuffer
+      toBSONDocument(nsIndex)
     }
   }
 
-  implicit object NSIndexReader extends RawBSONDocumentDeserializer[NSIndex] {
+  implicit object NSIndexReader extends BSONDocumentReader[NSIndex] {
     import org.jboss.netty.buffer._
-    def deserialize(buffer: ChannelBuffer) :NSIndex = {
-      val doc = handlers.DefaultBSONHandlers.DefaultBSONDocumentReader.deserialize(buffer)
+    def read(doc: BSONDocument) :NSIndex = {
       val options = doc.elements.filterNot { element =>
         element._1 == "ns" || element._1 == "key" || element._1 == "name" || element._1 == "unique" ||
           element._1 == "background" || element._1 == "dropDups" || element._1 == "sparse" || element._1 == "v"

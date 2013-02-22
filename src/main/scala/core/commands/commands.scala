@@ -2,7 +2,6 @@ package reactivemongo.core.commands
 
 import reactivemongo.bson._
 import DefaultBSONHandlers._
-import reactivemongo.bson.handlers.DefaultBSONHandlers
 import reactivemongo.core.errors._
 import reactivemongo.core.protocol.{RequestMaker, Query, QueryFlags, Response}
 import reactivemongo.core.protocol.NodeState
@@ -30,7 +29,7 @@ trait Command[Result] {
   def slaveOk :Boolean = false
 
   /**
-   * Makes the [[reactivemongo.bson.BSONDocument]] for documents that will be send as body of this command's query.
+   * Makes the `BSONDocument` for documents that will be send as body of this command's query.
    */
   def makeDocuments :BSONDocument
 
@@ -56,7 +55,7 @@ trait CommandResultMaker[Result] {
 
 trait BSONCommandResultMaker[Result] extends CommandResultMaker[Result] {
   final def apply(response: Response) :Either[CommandError, Result] = {
-    val document = DefaultBSONHandlers.parse(response).next()
+    val document = Response.parse(response).next()
     try {
       apply(document)
     } catch {

@@ -33,6 +33,20 @@ trait WritableBuffer {
   /** Writes the bytes stored in the given `array` into this buffer. */
   def writeBytes(array: Array[Byte]): WritableBuffer
 
+  /** Writes the bytes stored in the given `buffer` into this buffer. */
+  def writeBytes(buffer: ReadableBuffer): WritableBuffer = {
+      @scala.annotation.tailrec
+      def write(buffer: ReadableBuffer): WritableBuffer = {
+        if (buffer.readable > 1024) {
+          writeBytes(buffer.readArray(1024))
+          write(buffer)
+        } else {
+          writeBytes(buffer.readArray(buffer.readable))
+        }
+      }
+    write(buffer.slice(buffer.readable))
+  }
+
   /** Writes the given `Byte` into this buffer. */
   def writeByte(byte: Byte): WritableBuffer
 
@@ -89,6 +103,8 @@ trait ReadableBuffer {
 
   /** Returns the number of readable remaining bytes of this buffer. */
   def readable(): Int
+
+  def toWritableBuffer: WritableBuffer
 
   /**
    * Returns a new instance of ReadableBuffer which starts at the current index and contains `n` bytes.
@@ -164,6 +180,11 @@ class ArrayReadableBuffer private (bytebuffer: ByteBuffer) extends ReadableBuffe
   def readDouble() = bytebuffer.getDouble()
 
   def readable() = bytebuffer.remaining()
+
+  def toWritableBuffer: WritableBuffer = {
+    val buf = new ArrayBSONBuffer()
+    buf.writeBytes(this)
+  }
 }
 
 object ArrayReadableBuffer {
@@ -172,8 +193,8 @@ object ArrayReadableBuffer {
 }
 
 /** An array-backed writable buffer. */
-class ArrayBSONBuffer extends WritableBuffer {
-  var index = 0
+class ArrayBSONBuffer protected[buffer] (protected val buffer: ArrayBuffer[Byte]) extends WritableBuffer {
+  def index = buffer.length // useless
 
   def bytebuffer(size: Int) = {
     val b = ByteBuffer.allocate(size)
@@ -181,7 +202,7 @@ class ArrayBSONBuffer extends WritableBuffer {
     b
   }
 
-  protected val buffer = new ArrayBuffer[Byte]()
+  def this() = this(new ArrayBuffer[Byte]())
 
   /** Returns an array containing all the data that were put in this buffer. */
   def array = buffer.toArray
@@ -199,32 +220,32 @@ class ArrayBSONBuffer extends WritableBuffer {
 
   def writeBytes(array: Array[Byte]): WritableBuffer = {
     buffer ++= array
-    index += array.length
+    //index += array.length
     this
   }
 
   def writeByte(byte: Byte): WritableBuffer = {
     buffer += byte
-    index += 1
+    //index += 1
     this
   }
 
   def writeInt(int: Int): WritableBuffer = {
     val array = bytebuffer(4).putInt(int).array
     buffer ++= array
-    index += 4
+    //index += 4
     this
   }
 
   def writeLong(long: Long): WritableBuffer = {
     buffer ++= bytebuffer(8).putLong(long).array
-    index += 8
+    //index += 8
     this
   }
 
   def writeDouble(double: Double): WritableBuffer = {
     buffer ++= bytebuffer(8).putDouble(double).array
-    index += 8
+    //index += 8
     this
   }
 }

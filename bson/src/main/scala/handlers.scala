@@ -199,7 +199,7 @@ trait DefaultBSONHandlers {
     def write(b: BSONArray) = b
   }
 
-  implicit object BSONDocumentIdentity extends BSONReader[BSONDocument, BSONDocument] with BSONWriter[BSONDocument, BSONDocument] with BSONDocumentReader[BSONDocument] {
+  implicit object BSONDocumentIdentity extends BSONReader[BSONDocument, BSONDocument] with BSONWriter[BSONDocument, BSONDocument] with BSONDocumentReader[BSONDocument] with BSONDocumentWriter[BSONDocument] {
     def read(b: BSONDocument) = b
     def write(b: BSONDocument) = b
   }

@@ -242,13 +242,20 @@ case class Response(
    */
   lazy val error: Option[DBError] = {
     if (reply.inError) {
-      import reactivemongo.bson.handlers.DefaultBSONHandlers._
-      val bson = ReplyDocumentIterator(reply, documents)
+      val bson = Response.parse(this)
+      //val bson = ReplyDocumentIterator(reply, documents)
       if (bson.hasNext)
-        Some(ReactiveMongoError(ReplyDocumentIterator(reply, documents).next))
+        Some(ReactiveMongoError(bson.next))
       else None
     } else None
   }
+}
+
+object Response {
+  import reactivemongo.bson.BSONDocument
+  import reactivemongo.bson.DefaultBSONHandlers.BSONDocumentIdentity
+  import reactivemongo.api.collections.default.BSONDocumentReaderAsBufferReader
+  def parse(response: Response): Iterator[BSONDocument] = ReplyDocumentIterator(response.reply, response.documents)(BSONDocumentReaderAsBufferReader(BSONDocumentIdentity))
 }
 
 /**
@@ -279,9 +286,9 @@ private[reactivemongo] class RequestEncoder extends OneToOneEncoder {
   }
 }
 
-private[reactivemongo] case class ReplyDocumentIterator[T](private val reply: Reply, private val buffer: ChannelBuffer)(implicit reader: reactivemongo.bson.handlers.RawBSONDocumentDeserializer[T]) extends Iterator[T] {
+private[reactivemongo] case class ReplyDocumentIterator[T](private val reply: Reply, private val buffer: ChannelBuffer)(implicit reader: reactivemongo.api.BufferReader[T]) extends Iterator[T] {
   def hasNext = buffer.readable
-  def next = reader.deserialize(buffer.readBytes(buffer.getInt(buffer.readerIndex)))
+  def next = reader.read(ChannelBufferReadableBuffer(buffer.readBytes(buffer.getInt(buffer.readerIndex))))
 }
 
 private[reactivemongo] object RequestEncoder {

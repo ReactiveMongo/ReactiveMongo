@@ -16,7 +16,7 @@
  */
 package reactivemongo.bson
 
-object `package` {
+object `package` extends DefaultBSONHandlers {
   type BSONElement = (String, BSONValue)
 }
 
@@ -62,8 +62,8 @@ object BSONValue {
     def asTry[T](implicit reader: BSONReader[B, T]): Try[T] = {
       reader.readTry(bson)
     }
-    def asOpt[T](implicit reader: BSONReader[B, T]): Option[T] = asTry.toOption
-    def as[T](implicit reader: BSONReader[B, T]): T = asTry.get
+    def asOpt[T](implicit reader: BSONReader[B, T]): Option[T] = asTry(reader).toOption
+    def as[T](implicit reader: BSONReader[B, T]): T = asTry(reader).get
 
     def seeAsTry[T](implicit reader: BSONReader[_ <: BSONValue, T]): Try[T] =
       Try { reader.asInstanceOf[BSONReader[BSONValue, T]].readTry(bson) }.flatten

@@ -5,7 +5,6 @@ import akka.actor.Status.Failure
 import org.jboss.netty.channel.group._
 import org.slf4j.{Logger, LoggerFactory}
 import reactivemongo.bson._
-import reactivemongo.bson.handlers.DefaultBSONHandlers
 import reactivemongo.core.errors._
 import reactivemongo.core.nodeset._
 import reactivemongo.core.protocol._
@@ -301,7 +300,13 @@ class MongoDBSystem(
             logger.debug("{" + response.header.responseTo + "} it's a getlasterror")
             // todo, for now rewinding buffer at original index
             val ridx = response.documents.readerIndex
-            val lastError = LastError(response).right.get
+            val lastErrorE = LastError(response)
+            lastErrorE match {
+              case Left(e) =>
+                e.printStackTrace()
+              case Right(ok) => println("lasterror ok")
+            }
+            val lastError = lastErrorE.right.get
             if(lastError.isNotAPrimaryError) {
               onPrimaryUnavailable()
               promise.failure(lastError)

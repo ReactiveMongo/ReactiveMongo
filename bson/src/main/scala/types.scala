@@ -97,7 +97,7 @@ class BSONDocument(val stream: Stream[Try[BSONElement]]) extends BSONValue {
    * If there is no matching value, returns a `Success` holding `None`.
    * If the value could not be deserialized or converted, returns a `Failure`.
    */
-  def getAsUnflattenedTry[T](s: String)(implicit reader: BSONReader[_ <: BSONValue, T]): Try[Option[T]] = getAsTry(s) match {
+  def getAsUnflattenedTry[T](s: String)(implicit reader: BSONReader[_ <: BSONValue, T]): Try[Option[T]] = getAsTry(s)(reader) match {
     case Failure(e: DocumentKeyNotFound) => Success(None)
     case Failure(e) => Failure(e)
     case Success(e) => Success(Some(e))
@@ -218,7 +218,7 @@ class BSONArray(val stream: Stream[Try[BSONValue]]) extends BSONValue {
    * If there is no matching value, returns a `Success` holding `None`.
    * If the value could not be deserialized or converted, returns a `Failure`.
    */
-  def getAsUnflattenedTry[T](index: Int)(implicit reader: BSONReader[_ <: BSONValue, T]): Try[Option[T]] = getAsTry(index) match {
+  def getAsUnflattenedTry[T](index: Int)(implicit reader: BSONReader[_ <: BSONValue, T]): Try[Option[T]] = getAsTry(index)(reader) match {
     case Failure(e: DocumentKeyNotFound) => Success(None)
     case Failure(e) => Failure(e)
     case Success(e) => Success(Some(e))

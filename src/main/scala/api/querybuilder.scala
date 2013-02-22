@@ -3,7 +3,6 @@ package reactivemongo.api
 import org.jboss.netty.buffer.ChannelBuffer
 import reactivemongo.bson._
 import DefaultBSONHandlers._
-import reactivemongo.bson.handlers._
 import reactivemongo.core.protocol.QueryFlags
 import reactivemongo.utils._
 import reactivemongo.core.netty._
@@ -13,107 +12,6 @@ sealed trait SortOrder
 object SortOrder {
   case object Ascending extends SortOrder
   case object Descending extends SortOrder
-}
-
-/**
- * A helper to make query documents.
- *
- * You may use the methods to set the fields of this class, or set them directly.
- * Reading the [[http://www.mongodb.org/display/DOCS/Advanced+Queries documentation about advanced queries]] may be very useful.
- *
- * @param queryDoc The query itself (actually the selector)
- * @param sortDoc The sorting document.
- * @param hintDoc The index hint document.
- * @param explainFlag The explain mode setter.
- * @param snapshotFlag The snapshot mode setter.
- * @param commentString A comment about this query.
- */
-case class QueryBuilder(
-  queryDoc: Option[BSONDocument] = None,
-  sortDoc: Option[BSONDocument] = None,
-  hintDoc: Option[BSONDocument] = None,
-  projectionDoc: Option[BSONDocument] = None,
-  explainFlag: Boolean = false,
-  snapshotFlag: Boolean = false,
-  commentString: Option[String] = None
-) {
-  /** Builds the query document by merging all the params. */
-  def makeQueryDocument :BSONDocument = {
-    if(!sortDoc.isDefined && !hintDoc.isDefined && !explainFlag && !snapshotFlag && !commentString.isDefined)
-      queryDoc.getOrElse(BSONDocument())
-    else {
-      BSONDocument(
-        "$query"    -> queryDoc.getOrElse(BSONDocument()),
-        "$orderby"  -> sortDoc,
-        "$hint"     -> hintDoc,
-        "$comment"  -> commentString.map(BSONString(_)),
-        "$explain"  -> option(explainFlag,  BSONBoolean(true)),
-        "$snapshot" -> option(snapshotFlag, BSONBoolean(true))
-      )
-    }
-  }
-
-  def makeMergedBuffer :ChannelBuffer = {
-    val buffer = makeQueryDocument.makeBuffer
-    if(projectionDoc.isDefined)
-      buffer.writeBytes(projectionDoc.get.makeBuffer)
-    buffer
-  }
-
-  /**
-   * Sets the query (the selector document).
-   *
-   * @tparam Qry The type of the query. An implicit [[reactivemongo.bson.handlers.RawBSONWriter]][Qry] typeclass for handling it has to be in the scope.
-   */
-  def query[Qry](selector: Qry)(implicit writer: RawBSONDocumentSerializer[Qry]) :QueryBuilder = copy(queryDoc=Some(
-    writer.serialize(selector).makeDocument
-  ))
-
-  /** Sets the query (the selector document). */
-  def query(selector: BSONDocument) :QueryBuilder = copy(queryDoc=Some(selector))
-
-  /** Sets the sorting document. */
-  def sort(document: BSONDocument) :QueryBuilder = copy(sortDoc=Some(document))
-
-  /** Sets the sorting document. */
-  def sort( sorters: (String, SortOrder)* ) :QueryBuilder = copy(sortDoc = {
-    if(sorters.size == 0)
-      None
-    else {
-      val bson = BSONDocument(
-        (for(sorter <- sorters) yield sorter._1 -> BSONInteger(
-          sorter._2 match {
-            case SortOrder.Ascending => 1
-            case SortOrder.Descending => -1
-          }
-        )).toStream
-      )
-      Some(bson)
-    }
-  })
-
-  /**
-   * Sets the projection document (for [[http://www.mongodb.org/display/DOCS/Retrieving+a+Subset+of+Fields retrieving only a subset of fields]]).
-   *
-   * @tparam Pjn The type of the projection. An implicit [[reactivemongo.bson.handlers.RawBSONWriter]][Pjn] typeclass for handling it has to be in the scope.
-   */
-  def projection[Pjn](p: Pjn)(implicit writer: RawBSONDocumentSerializer[Pjn]) :QueryBuilder = copy(projectionDoc=Some(
-    writer.serialize(p).makeDocument
-  ))
-
-  /** Sets the hint document (a document that declares the index MongoDB should use for this query). */
-  def hint(document: BSONDocument) :QueryBuilder = copy(hintDoc=Some(document))
-
-  /** Sets the hint document (a document that declares the index MongoDB should use for this query). */
-  def hint(indexName: String) :QueryBuilder = copy(hintDoc=Some(BSONDocument(indexName -> BSONInteger(1))))
-
-  //TODO def explain(flag: Boolean = true) :QueryBuilder = copy(explainFlag=flag)
-
-  /** Toggles [[http://www.mongodb.org/display/DOCS/How+to+do+Snapshotted+Queries+in+the+Mongo+Database snapshot mode]]. */
-  def snapshot(flag: Boolean = true) :QueryBuilder = copy(snapshotFlag=flag)
-
-  /** Adds a comment to this query, that may appear in the MongoDB logs. */
-  def comment(message: String) :QueryBuilder = copy(commentString=Some(message))
 }
 
 /**

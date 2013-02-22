@@ -160,11 +160,11 @@ object ReactiveMongoBuild extends Build {
         netty,
         akkaActor(sv),
         iteratees(sv),
-        specs(sv)) ++ logback ++ testDeps))) dependsOn (bson) aggregate(bson)
+        specs(sv)) ++ logback ++ testDeps)) ++ Unidoc.settings) dependsOn (bson) aggregate(bson)
 
   lazy val bson = Project(
     "ReactiveMongo-BSON",
     file("bson"),
-    settings = buildSettings)
+    settings = buildSettings ++ Unidoc.settings)
 }
 

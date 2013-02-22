@@ -7,7 +7,6 @@ import play.api.libs.iteratee._
 import reactivemongo.api.indexes._
 import reactivemongo.core.actors._
 import reactivemongo.bson._
-import reactivemongo.bson.handlers._
 import reactivemongo.core.protocol._
 import reactivemongo.core.commands.{Command, GetLastError, LastError, SuccessfulAuthentication}
 import reactivemongo.utils.EitherMappableFuture._
