@@ -59,7 +59,7 @@ object IndexType {
  * @param options Optional parameters for this index (typically specific to an IndexType like Geo2D).
  */
 case class Index(
-  key: List[(String, IndexType)],
+  key: Seq[(String, IndexType)],
   name: Option[String] = None,
   unique: Boolean = false,
   background: Boolean = false,

@@ -277,7 +277,8 @@ class TraversableBSONArray(private[bson] val buffer: ChannelBuffer) extends Trav
   /**
    * Makes a list containing all the value of this array (ascending order).
    */
-  def toList :List[BSONValue] = iterator.map(_.value).toList
+  def toList: List[BSONValue] = iterator.map(_.value).toList
+  def toSeq: Seq[BSONValue] = toList
 }
 
 /**
@@ -319,7 +320,7 @@ class TraversableBSONDocument(private[bson] val buffer: ChannelBuffer) extends T
 /**
  * A BSON Document builder. It will append the given values to this array.
  */
-class AppendableBSONDocument private[bson](val elements: List[BSONElement]) extends AppendableBSONStructure[(String, BSONValue)] with BSONDocument {
+class AppendableBSONDocument private[bson](val elements: Seq[BSONElement]) extends AppendableBSONStructure[(String, BSONValue)] with BSONDocument {
   type Self = AppendableBSONDocument
 
   def append( els: (String, BSONValue)* ) :Self = {

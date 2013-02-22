@@ -87,16 +87,16 @@ case object Closed
  * @param nbChannelsPerNode number of open channels by node
  */
 class MongoDBSystem(
-  seeds: List[String],
-  auth :List[Authenticate],
-  nbChannelsPerNode :Int,
+  seeds: Seq[String],
+  auth: Seq[Authenticate],
+  nbChannelsPerNode: Int,
   channelFactory: ChannelFactory = new ChannelFactory()) extends Actor {
   import MongoDBSystem._
 
   private implicit val cFactory = channelFactory
 
   import scala.concurrent.duration._
-  
+
   val requestIds = new RequestIds
 
   private var authenticationHistory :AuthHistory = AuthHistory(for(a <- auth) yield a -> Nil)
@@ -129,7 +129,7 @@ class MongoDBSystem(
     case RegisterMonitor => monitors += sender
 
     case req: RequestMaker =>
-      
+
       logger.debug("WARNING received a request")
       val r = req(requestIds.common.next)
       pickChannel(r).right.map(_._2.send(r))
@@ -382,9 +382,9 @@ object MongoDBSystem {
 }
 
 private[actors] case class AuthHistory(
-  authenticateRequests: List[(Authenticate, List[ActorRef])]
+  authenticateRequests: Seq[(Authenticate, Seq[ActorRef])]
 ) {
-  lazy val authenticates : List[Authenticate] = authenticateRequests.map(_._1)
+  lazy val authenticates : Seq[Authenticate] = authenticateRequests.map(_._1)
 
   lazy val expectingAuthenticationCompletion = authenticateRequests.filter(!_._2.isEmpty)
 
@@ -406,7 +406,7 @@ private[actors] case class AuthHistory(
     AuthenticateCommand(response) match {
       case Right(auth) => true -> succeeded(authenticating, auth)
       case Left(err) => false -> failed(authenticating, err)
-    } 
+    }
   }
 }
 

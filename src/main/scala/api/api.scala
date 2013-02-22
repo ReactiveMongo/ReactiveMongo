@@ -208,7 +208,7 @@ object MongoConnection {
    * @param nbChannelsPerNode Number of channels to open per node. Defaults to 10.
    * @param name The name of the newly created [[reactivemongo.core.actors.MongoDBSystem]] actor, if needed.
    */
-  def apply(nodes: List[String], authentications :List[Authenticate] = List.empty, nbChannelsPerNode :Int = 10, name: Option[String] = None) = {
+  def apply(nodes: Seq[String], authentications: Seq[Authenticate] = Seq.empty, nbChannelsPerNode: Int = 10, name: Option[String] = None) = {
     val props = Props(new MongoDBSystem(nodes, authentications, nbChannelsPerNode))
     val mongosystem = if(name.isDefined) system.actorOf(props, name = name.get) else system.actorOf(props)
     val monitor = system.actorOf(Props(new MonitorActor(mongosystem)))
