@@ -123,4 +123,90 @@ class Handlers extends Specification {
       booleanlike.get.toBoolean mustEqual false
     }
   }
+
+  case class Album(
+    name: String,
+    releaseYear: Int,
+    tracks: List[String])
+
+  case class Artist(
+    name: String,
+    albums: List[Album])
+
+  val neilYoung = Artist(
+    "Neil Young",
+    List(
+      Album(
+        "Everybody Knows this is Nowhere",
+        1969,
+        List(
+          "Cinnamon Girl",
+          "Everybody Knows this is Nowhere",
+          "Round & Round (it Won't Be Long)",
+          "Down By the River",
+          "Losing End (When You're On)",
+          "Running Dry (Requiem For the Rockets)",
+          "Cowgirl in the Sand"))))
+
+  implicit object AlbumHandler extends BSONDocumentWriter[Album] with BSONDocumentReader[Album] {
+    def write(album: Album) = BSONDocument(
+      "name" -> album.name,
+      "releaseYear" -> album.releaseYear,
+      "tracks" -> album.tracks)
+
+    def read(doc: BSONDocument) = Album(
+      doc.getAs[String]("name").get,
+      doc.getAs[Int]("releaseYear").get,
+      doc.getAs[List[String]]("tracks").get)
+  }
+
+  implicit object ArtistHandler extends BSONDocumentWriter[Artist] with BSONDocumentReader[Artist] {
+    def write(artist: Artist) =
+      BSONDocument(
+        "name" -> artist.name,
+        "albums" -> artist.albums)
+
+    def read(doc: BSONDocument) = {
+      Artist(doc.getAs[String]("name").get, doc.getAs[List[Album]]("albums").get)
+    }
+  }
+
+  "Neil Young" should {
+    "produce the expected BSONDocument" in {
+      val doc = BSON.write(neilYoung)
+      println(BSONDocument.pretty(doc))
+      BSONDocument.pretty(doc) mustEqual """{
+	name: BSONString(Neil Young),
+	albums: [
+		0: {
+			name: BSONString(Everybody Knows this is Nowhere),
+			releaseYear: BSONInteger(1969),
+			tracks: [
+				0: BSONString(Cinnamon Girl),
+				1: BSONString(Everybody Knows this is Nowhere),
+				2: BSONString(Round & Round (it Won't Be Long)),
+				3: BSONString(Down By the River),
+				4: BSONString(Losing End (When You're On)),
+				5: BSONString(Running Dry (Requiem For the Rockets)),
+				6: BSONString(Cowgirl in the Sand)
+			 ]
+		 }
+	 ]
+}"""
+      val ny2 = BSON.read[Artist](doc)
+      val allSongs = doc.getAs[List[Album]]("albums").toList.flatten.flatMap(_.tracks)
+      println(allSongs)
+      allSongs mustEqual List(
+        "Cinnamon Girl",
+        "Everybody Knows this is Nowhere",
+        "Round & Round (it Won't Be Long)",
+        "Down By the River",
+        "Losing End (When You're On)",
+        "Running Dry (Requiem For the Rockets)",
+        "Cowgirl in the Sand")
+      println(ny2)
+      ny2 mustEqual neilYoung
+      success
+    }
+  }
 }

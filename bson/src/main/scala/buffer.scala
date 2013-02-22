@@ -45,6 +45,8 @@ trait WritableBuffer {
   /** Writes the given `Double` into this buffer. */
   def writeDouble(double: Double): WritableBuffer
 
+  def toReadableBuffer(): ReadableBuffer
+
   /** Write a UTF-8 encoded C-Style String. */
   def writeCString(s: String): WritableBuffer = {
     val bytes = s.getBytes("utf-8")
@@ -192,6 +194,8 @@ class ArrayBSONBuffer extends WritableBuffer {
     buffer.update(index + 3, array(3))
     this
   }
+
+  def toReadableBuffer = ArrayReadableBuffer(array)
 
   def writeBytes(array: Array[Byte]): WritableBuffer = {
     buffer ++= array

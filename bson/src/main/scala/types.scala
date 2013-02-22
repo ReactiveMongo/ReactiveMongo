@@ -255,6 +255,11 @@ object BSONArray {
       el.produce.map(value => Seq(Try(value))).getOrElse(Seq.empty)
     }.toStream)
 
+  /** Creates a new [[BSONValue]] containing all the `elements` in the given `Stream`. */
+  def apply(elements: Stream[BSONValue]): BSONArray = {
+    new BSONArray(elements.map(Success(_)))
+  }
+
   /** Returns a String representing the given [[BSONArray]]. */
   def pretty(array: BSONArray) = BSONIterator.pretty(array.iterator)
 }
@@ -412,10 +417,19 @@ sealed trait Subtype {
 }
 
 object Subtype {
-  case object GenericBinarySubtype extends Subtype { override val value = 0x00 }
-  case object FunctionSubtype extends Subtype { override val value = 0x01 }
-  case object OldBinarySubtype extends Subtype { override val value = 0x02 }
-  case object UuidSubtype extends Subtype { override val value = 0x03 }
-  case object Md5Subtype extends Subtype { override val value = 0x05 }
-  case object UserDefinedSubtype extends Subtype { override val value = 0x80 }
+  case object GenericBinarySubtype extends Subtype { val value = 0x00 }
+  case object FunctionSubtype extends Subtype { val value = 0x01 }
+  case object OldBinarySubtype extends Subtype { val value = 0x02 }
+  case object UuidSubtype extends Subtype { val value = 0x03 }
+  case object Md5Subtype extends Subtype { val value = 0x05 }
+  case object UserDefinedSubtype extends Subtype { val value = 0x80 }
+  def apply(code: Int) = code match {
+    case 0x00 => GenericBinarySubtype
+    case 0x01 => FunctionSubtype
+    case 0x02 => OldBinarySubtype
+    case 0x03 => UuidSubtype
+    case 0x05 => Md5Subtype
+    case 0x80 => UserDefinedSubtype
+    case _ => throw new NoSuchElementException(s"binary type = $code")
+  }
 }

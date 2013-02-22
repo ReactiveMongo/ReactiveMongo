@@ -64,6 +64,10 @@ class ChannelBufferWritableBuffer extends WritableBuffer {
     this
   }
 
+  def toReadableBuffer = {
+    ChannelBufferReadableBuffer(buffer.duplicate())
+  }
+
   def writeBytes(array: Array[Byte]): WritableBuffer = {
     buffer writeBytes array
     this

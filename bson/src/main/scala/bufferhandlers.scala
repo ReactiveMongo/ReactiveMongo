@@ -59,7 +59,7 @@ object DefaultBufferHandler extends BufferHandler {
     0x02 -> BSONStringBufferHandler,
     0x03 -> BSONDocumentBufferHandler,
     0x04 -> BSONArrayBufferHandler, // array
-    0x05 -> null, // binary TODO
+    0x05 -> BSONBinaryBufferHandler, // binary TODO
     0x06 -> BSONUndefinedBufferHandler, // undefined,
     0x07 -> BSONObjectIDBufferHandler, // objectid,
     0x08 -> BSONBooleanBufferHandler, // boolean
@@ -145,6 +145,22 @@ object DefaultBufferHandler extends BufferHandler {
       val stream = makeStream
       stream.force // TODO remove
       new BSONArray(stream)
+    }
+  }
+  object BSONBinaryBufferHandler extends BufferRW[BSONBinary] {
+    def write(binary: BSONBinary, buffer: WritableBuffer) = {
+      buffer.writeInt(binary.value.readable)
+      buffer.writeByte(binary.subtype.value.toByte)
+      val bin = binary.value.slice(binary.value.readable)
+      buffer.writeBytes(bin.readArray(bin.readable)) // TODO
+      buffer
+    }
+    def read(buffer: ReadableBuffer) = {
+      val length = buffer.readInt
+      val subtype = Subtype.apply(buffer.readByte)
+      val bin = buffer.slice(length)
+      buffer.discard(length)
+      BSONBinary(bin, subtype)
     }
   }
   object BSONUndefinedBufferHandler extends BufferRW[BSONUndefined.type] {

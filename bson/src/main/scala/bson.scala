@@ -72,3 +72,8 @@ object BSONValue {
       seeAsTry[T].toOption
   }
 }
+
+object BSON {
+  def read[T](doc: BSONDocument)(implicit reader: BSONReader[BSONDocument, T]): T = reader.read(doc)
+  def write[T](t: T)(implicit writer: BSONWriter[T, BSONDocument]): BSONDocument = writer.write(t)
+}
