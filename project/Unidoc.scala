@@ -1,4 +1,4 @@
-// From the Akka project ;)
+// Borrowed from the Akka project ;)
 import sbt._
 import sbt.Keys._
 import sbt.Project.Initialize
@@ -23,19 +23,17 @@ object Unidoc {
   )
 
   def allSources(projectRef: ProjectRef, structure: Load.BuildStructure, exclude: Seq[String]): Task[Seq[Seq[File]]] = {
-    val projects = aggregated(projectRef, structure, exclude) :+ "."
-    println(projects)
+    val projects = aggregated(projectRef, structure, exclude)
     projects flatMap { sources in Compile in LocalProject(_) get structure.data } join
   }
 
   def allClasspaths(projectRef: ProjectRef, structure: Load.BuildStructure, exclude: Seq[String]): Task[Seq[Classpath]] = {
-    val projects = aggregated(projectRef, structure, exclude) :+ "."
+    val projects = aggregated(projectRef, structure, exclude)
     projects flatMap { dependencyClasspath in Compile in LocalProject(_) get structure.data } join
   }
 
   def aggregated(projectRef: ProjectRef, structure: Load.BuildStructure, exclude: Seq[String]): Seq[String] = {
     val aggregate = Project.getProject(projectRef, structure).toSeq.flatMap(_.aggregate)
-    println("aggregate: " + aggregate)
     aggregate flatMap { ref =>
       if (exclude contains ref.project) Seq.empty
       else ref.project +: aggregated(ref, structure, exclude)
@@ -46,7 +44,6 @@ object Unidoc {
     (compilers, cacheDirectory, unidocSources, unidocClasspath, unidocDirectory, scalacOptions in doc, streams) map {
       (compilers, cache, sources, classpath, target, options, s) => {
         val scaladoc = new Scaladoc(100, compilers.scalac)
-        println("sources: " + sources + ", classpath: " + classpath)
         scaladoc.cached(cache / "unidoc", "main", sources, classpath, target, options, s.log)
         target
       }

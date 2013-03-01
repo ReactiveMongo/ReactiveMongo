@@ -152,19 +152,24 @@ object ReactiveMongoBuild extends Build {
   import Dependencies._
 
   lazy val reactivemongo = Project(
-    "ReactiveMongo",
+    "ReactiveMongo-Root",
     file("."),
+    settings = buildSettings ++ Unidoc.settings) aggregate(driver, bson)
+
+  lazy val driver = Project(
+    "ReactiveMongo",
+    file("driver"),
     settings = buildSettings ++ Seq(
       resolvers := resolversList,
       libraryDependencies <++= (scalaVersion)(sv => Seq(
         netty,
         akkaActor(sv),
         iteratees(sv),
-        specs(sv)) ++ logback ++ testDeps)) ++ Unidoc.settings) dependsOn (bson) aggregate(bson)
+        specs(sv)) ++ logback ++ testDeps))) dependsOn (bson)
 
   lazy val bson = Project(
     "ReactiveMongo-BSON",
     file("bson"),
-    settings = buildSettings ++ Unidoc.settings)
+    settings = buildSettings)
 }
 
