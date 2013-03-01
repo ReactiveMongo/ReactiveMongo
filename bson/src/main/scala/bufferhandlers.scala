@@ -275,6 +275,6 @@ object BSONIterator {
       }
     }).mkString(",\n")
   }
-  /** Makes a pretty String representation of the given [[reactivemongo.bson.BSONIterator]]. */
+  /** Makes a pretty String representation of the given iterator of BSON elements. */
   def pretty(it: Iterator[Try[BSONElement]]): String = "{\n" + pretty(0, it) + "\n}"
 }

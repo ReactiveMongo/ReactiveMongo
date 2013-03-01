@@ -14,8 +14,8 @@ import reactivemongo.core.commands.GetLastError
 import reactivemongo.core.errors._
 import reactivemongo.core.netty._
 import reactivemongo.utils.LazyLogger
-
 import BufferAccessors._
+import reactivemongo.api.collections.BufferReader
 
 object `package` {
   implicit class RichBuffer(val buffer: ChannelBuffer) extends AnyVal {
@@ -286,7 +286,7 @@ private[reactivemongo] class RequestEncoder extends OneToOneEncoder {
   }
 }
 
-private[reactivemongo] case class ReplyDocumentIterator[T](private val reply: Reply, private val buffer: ChannelBuffer)(implicit reader: reactivemongo.api.BufferReader[T]) extends Iterator[T] {
+private[reactivemongo] case class ReplyDocumentIterator[T](private val reply: Reply, private val buffer: ChannelBuffer)(implicit reader: BufferReader[T]) extends Iterator[T] {
   def hasNext = buffer.readable
   def next = reader.read(ChannelBufferReadableBuffer(buffer.readBytes(buffer.getInt(buffer.readerIndex))))
 }

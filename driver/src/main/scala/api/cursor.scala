@@ -4,11 +4,11 @@ import reactivemongo.core.iteratees._
 import reactivemongo.core.protocol._
 import reactivemongo.core.netty.BufferSequence
 import reactivemongo.utils.ExtendedFutures._
-
 import org.slf4j.LoggerFactory
 import play.api.libs.iteratee._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
+import reactivemongo.api.collections.BufferReader
 
 /**
  * Allows to fetch the next documents matching a query.
@@ -17,43 +17,47 @@ import scala.util.{Failure, Success}
  *
  * Example:
  * {{{
-import play.api.libs.iteratee.Iteratee
-import reactivemongo.api._
-import reactivemongo.bson._
-import reactivemongo.bson.handlers.DefaultBSONHandlers._
-
 object Samples {
 
-  val connection = MongoConnection( List( "localhost:27016" ) )
+  val connection = MongoConnection(List("localhost"))
+
+  // Gets a reference to the database "plugin"
   val db = connection("plugin")
+
+  // Gets a reference to the collection "acoll"
+  // By default, you get a BSONCollection.
   val collection = db("acoll")
 
   def listDocs() = {
-    // select only the documents which field 'firstName' equals 'Jack'
-    val query = BSONDocument("firstName" -> BSONString("Jack"))
+    // Select only the documents which field 'firstName' equals 'Jack'
+    val query = BSONDocument("firstName" -> "Jack")
     // select only the field 'lastName'
     val filter = BSONDocument(
-      "lastName" -> BSONInteger(1),
-      "_id" -> BSONInteger(0)
-    )
+      "lastName" -> 1,
+      "_id" -> 0)
 
-    // get a Cursor[TraversableBSONDocument]
-    val cursor = collection.find(query, filter)
-    // let's enumerate this cursor and print a readable representation of each document in the response
+    // Get a cursor of BSONDocuments
+    val cursor = collection.find(query, filter).cursor
+    // Let's enumerate this cursor and print a readable representation of each document in the response
     cursor.enumerate.apply(Iteratee.foreach { doc =>
       println("found document: " + BSONDocument.pretty(doc))
     })
 
-    // or, the same with getting a list
-    val cursor2 = collection.find(query, filter)
-    val futurelist = cursor2.toList
+    // Or, the same with getting a list
+    val cursor2 = collection.find(query, filter).cursor
+    val futureList = cursor.toList
+    futureList.map { list =>
+      list.foreach { doc =>
+        println("found document: " + BSONDocument.pretty(doc))
+      }
+    }
   }
 }
 }}}
  *
  * It is worth diving into the [[https://github.com/playframework/Play20/wiki/Iteratees Play! 2.0 Iteratee documentation]].
  *
- * @tparam T the type of the matched documents. An implicit [[reactivemongo.bson.handlers.RawBSONReader]][T] typeclass for handling it has to be in the scope.
+ * @tparam T the type of the matched documents. An implicit [[reactivemongo.api.BufferReader]][T] typeclass for handling it has to be in the scope.
  *
 */
 trait Cursor[T] {
@@ -79,13 +83,12 @@ trait Cursor[T] {
    *
    * Example:
    * {{{
-// get a Cursor[DefaultBSONIterator]
-val cursor = collection.find(query, filter)
-// let's enumerate this cursor and print a readable representation of each document in the response
+// Get a cursor of BSONDocuments
+val cursor = collection.find(query, filter).cursor
+// Let's enumerate this cursor and print a readable representation of each document in the response
 cursor.enumerate.apply(Iteratee.foreach { doc =>
   println("found document: " + BSONDocument.pretty(doc))
 })
-}
 }}}
    *
    * It is worth diving into the [[https://github.com/playframework/Play20/wiki/Iteratees Play! 2.0 Iteratee documentation]].
@@ -112,8 +115,13 @@ cursor.enumerate.apply(Iteratee.foreach { doc =>
    *
    * Example:
    * {{{
-val cursor2 = collection.find(query, filter)
-val list = cursor2[List].collect()
+val cursor2 = collection.find(query, filter).cursor
+val futureList = cursor.toList
+futureList.map { list =>
+  list.foreach { doc =>
+    println("found document: " + BSONDocument.pretty(doc))
+  }
+}
 }}}
    *
    * @tparam M the type of the returned collection.
@@ -128,9 +136,9 @@ val list = cursor2[List].collect()
    *
    * Example:
    * {{{
-val cursor = collection.find(query, filter)
+val cursor2 = collection.find(query, filter).cursor
 // gather the first 3 documents
-val list = cursor[List].collect(3)
+val futureList = cursor.collect[List](3)
 }}}
    *
    * @tparam M the type of the returned collection.
@@ -147,7 +155,7 @@ val list = cursor[List].collect(3)
    *
    * Example:
    * {{{
-val cursor2 = collection.find(query, filter)
+val cursor2 = collection.find(query, filter).cursor
 val list = cursor2.toList
 }}}
    */
@@ -159,7 +167,7 @@ val list = cursor2.toList
    *
    * Example:
    * {{{
-val cursor2 = collection.find(query, filter)
+val cursor2 = collection.find(query, filter).cursor
 // return the 3 first documents in a list.
 val list = cursor2.toList(3)
 }}}
@@ -171,8 +179,8 @@ val list = cursor2.toList(3)
    *
    * Example:
    * {{{
-val cursor2 = collection.find(query, filter)
-val list = cursor2[List].collect()
+val cursor2 = collection.find(query, filter).cursor
+val maybeOneDoc = cursor2.headOption
 }}}
    */
   def headOption()(implicit ec: ExecutionContext) :Future[Option[T]] = {

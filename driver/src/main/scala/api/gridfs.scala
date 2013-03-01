@@ -5,11 +5,12 @@ import java.util.Arrays
 import play.api.libs.iteratee._
 import reactivemongo.api._
 import reactivemongo.bson._
-
 import reactivemongo.core.commands.LastError
 import reactivemongo.utils._
 import scala.concurrent.{ ExecutionContext, Future }
 import reactivemongo.core.netty.ChannelBufferWritableBuffer
+import reactivemongo.api.collections.GenericCollectionProducer
+import reactivemongo.api.collections.GenericCollection
 
 object `package` {
   private[gridfs] val logger = LazyLogger("reactivemongo.api.gridfs")
@@ -118,7 +119,7 @@ class GridFS[Structure, Reader[_], Writer[_]](db: DB with DBMetaCommands, prefix
    *
    * @param selector The document to select the files to return
    *
-   * @tparam S The type of the selector document. An implicit [[reactivemongo.bson.handlers.RawBSONWriter]][S] must be in the scope.
+   * @tparam S The type of the selector document. An implicit `Writer[S]` must be in the scope.
    */ // TODO More generic deserializers ?
   def find[S, T <: ReadFile[_]](selector: S)(implicit sWriter: Writer[S], readFileReader: Reader[T], ctx: ExecutionContext): Cursor[T] = {
     files.find(selector).cursor

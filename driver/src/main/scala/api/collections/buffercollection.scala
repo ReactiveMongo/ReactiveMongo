@@ -2,6 +2,7 @@ package reactivemongo.api.collections.buffer
 
 import reactivemongo.bson.buffer.{BSONBuffer, ReadableBuffer, WritableBuffer}
 import reactivemongo.api._
+import reactivemongo.api.collections._
 import reactivemongo.core.netty._
 
 /**

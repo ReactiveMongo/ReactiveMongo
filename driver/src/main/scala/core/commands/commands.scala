@@ -496,10 +496,7 @@ case class FindAndModify(
   val ResultMaker = FindAndModify
 }
 
-/**
- * FindAndModify command deserializer
- * @todo [[reactivemongo.bson.handlers.BSONReader]][T] typeclass
- */
+/** FindAndModify command deserializer */
 object FindAndModify extends BSONCommandResultMaker[Option[BSONDocument]] {
   def apply(document: BSONDocument) =
     CommandError.checkOk(document, Some("findAndModify")).toLeft(document.getAs[BSONDocument]("value"))
