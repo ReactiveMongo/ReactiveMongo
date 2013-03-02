@@ -209,14 +209,18 @@ case class GetLastError(
  * @param err the err field, if any
  * @param code the error code, if any
  * @param errMsg the message (often regarding an error) if any
- * @param original the whole map resulting of the deserialization of the response with the [[reactivemongo.bson.handlers.DefaultBSONHandlers]].
+ * @param originalDocument the whole map resulting of the deserialization of the response with the [[reactivemongo.bson.handlers.DefaultBSONHandlers]].
+ * @param documents The number of documents affected by last command, 0 if none
+ * @param updatedExisting When true, the last update operation resulted in change of existing documents
  */
 case class LastError(
   ok: Boolean,
   err: Option[String],
   code: Option[Int],
   errMsg: Option[String],
-  originalDocument: Option[TraversableBSONDocument]
+  originalDocument: Option[TraversableBSONDocument],
+  documents : Int,
+  updatedExisting : Boolean
 ) extends DBError {
   /** states if the last operation ended up with an error */
   lazy val inError :Boolean = !ok || err.isDefined
@@ -235,7 +239,9 @@ object LastError extends BSONCommandResultMaker[LastError] {
       document.getAs[BSONString]("err").map(_.value),
       document.getAs[BSONInteger]("code").map(_.value),
       document.getAs[BSONString]("errmsg").map(_.value),
-      Some(document)
+      Some(document),
+      document.getAs[BSONInteger]("n").map(_.value).getOrElse(0),
+      document.getAs[BSONBoolean]("updatedExisting").map(_.value).getOrElse(false)
     ))
   }
   def meaningful(response: Response) = {
