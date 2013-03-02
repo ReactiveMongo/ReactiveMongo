@@ -1,6 +1,5 @@
 /*
- * Copyright 2013 Stephane Godbillon
- * @sgodbillon
+ * Copyright 2013 Stephane Godbillon (@sgodbillon)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -103,14 +102,14 @@ object DefaultBufferHandler extends BufferHandler {
       val length = b.readInt
       val buffer = b.slice(length - 4)
       b.discard(length - 4 + 1)
-        def makeStream(): Stream[Try[(String, BSONValue)]] = {
-          if (buffer.readable > 1) { // last is 0
-            val code = buffer.readByte
-            val name = buffer.readCString
-            val elem = Try(name -> DefaultBufferHandler.handlersByCode.get(code).map(_.read(buffer)).get)
-            elem #:: makeStream
-          } else Stream.empty
-        }
+      def makeStream(): Stream[Try[(String, BSONValue)]] = {
+        if (buffer.readable > 1) { // last is 0
+          val code = buffer.readByte
+          val name = buffer.readCString
+          val elem = Try(name -> DefaultBufferHandler.handlersByCode.get(code).map(_.read(buffer)).get)
+          elem #:: makeStream
+        } else Stream.empty
+      }
       val stream = makeStream
       stream.force // TODO remove
       new BSONDocument(stream)
@@ -134,14 +133,14 @@ object DefaultBufferHandler extends BufferHandler {
       val length = b.readInt
       val buffer = b.slice(length - 4)
       b.discard(length - 4 + 1)
-        def makeStream(): Stream[Try[BSONValue]] = {
-          if (buffer.readable > 1) { // last is 0
-            val code = buffer.readByte
-            val name = buffer.readCString
-            val elem = Try(DefaultBufferHandler.handlersByCode.get(code).map(_.read(buffer)).get)
-            elem #:: makeStream
-          } else Stream.empty
-        }
+      def makeStream(): Stream[Try[BSONValue]] = {
+        if (buffer.readable > 1) { // last is 0
+          val code = buffer.readByte
+          val name = buffer.readCString
+          val elem = Try(DefaultBufferHandler.handlersByCode.get(code).map(_.read(buffer)).get)
+          elem #:: makeStream
+        } else Stream.empty
+      }
       val stream = makeStream
       stream.force // TODO remove
       new BSONArray(stream)

@@ -1,18 +1,33 @@
+/*
+ * Copyright 2012-2013 Stephane Godbillon (@sgodbillon) and Zenexity
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package reactivemongo.api.indexes
 
 import reactivemongo.api._
 import reactivemongo.bson._
 import DefaultBSONHandlers._
-import reactivemongo.core.commands.{DeleteIndex, LastError}
+import reactivemongo.core.commands.{ DeleteIndex, LastError }
 import reactivemongo.utils.option
 import reactivemongo.core.netty._
-import scala.concurrent.{Future, ExecutionContext}
+import scala.concurrent.{ Future, ExecutionContext }
 
 /** Type of Index */
 sealed trait IndexType {
   /** Value of the index (`{fieldName: value}`). */
-  def value :BSONValue
-  private[indexes] def valueStr :String
+  def value: BSONValue
+  private[indexes] def valueStr: String
 }
 
 object IndexType {
@@ -60,18 +75,17 @@ object IndexType {
  * @param options Optional parameters for this index (typically specific to an IndexType like Geo2D).
  */
 case class Index(
-  key: List[(String, IndexType)],
-  name: Option[String] = None,
-  unique: Boolean = false,
-  background: Boolean = false,
-  dropDups: Boolean = false,
-  sparse: Boolean = false,
-  version: Option[Int] = None, // let MongoDB decide
-  options: BSONDocument = BSONDocument()
-) {
+    key: List[(String, IndexType)],
+    name: Option[String] = None,
+    unique: Boolean = false,
+    background: Boolean = false,
+    dropDups: Boolean = false,
+    sparse: Boolean = false,
+    version: Option[Int] = None, // let MongoDB decide
+    options: BSONDocument = BSONDocument()) {
   /** The name of the index (a default one is computed if none). */
-  lazy val eventualName :String = name.getOrElse(key.foldLeft("") { (name, kv) =>
-    name + (if(name.length > 0) "_" else "") + kv._1 + "_" + kv._2.valueStr
+  lazy val eventualName: String = name.getOrElse(key.foldLeft("") { (name, kv) =>
+    name + (if (name.length > 0) "_" else "") + kv._1 + "_" + kv._2.valueStr
   })
 }
 
@@ -85,10 +99,9 @@ case class Index(
  * @param index The other fields of the index.
  */
 case class NSIndex(
-  namespace: String,
-  index: Index
-) {
-  val (dbName :String, collectionName :String) = {
+    namespace: String,
+    index: Index) {
+  val (dbName: String, collectionName: String) = {
     val spanned = namespace.span(_ != '.')
     spanned._1 -> spanned._2.drop(1)
   }
@@ -103,9 +116,9 @@ class IndexesManager(db: DB)(implicit context: ExecutionContext) {
   val collection = db("system.indexes")
 
   /** Gets a future list of all the index on this database. */
-  def list() :Future[List[NSIndex]] = {
+  def list(): Future[List[NSIndex]] = {
     implicit val reader = IndexesManager.NSIndexReader
-    val cursor :Cursor[NSIndex] = collection.find(BSONDocument()).cursor
+    val cursor: Cursor[NSIndex] = collection.find(BSONDocument()).cursor
     cursor.toList()
   }
 
@@ -119,13 +132,13 @@ class IndexesManager(db: DB)(implicit context: ExecutionContext) {
    *
    * @return a future containing true if the index was created, false if it already exists.
    */
-  def ensure(nsIndex: NSIndex) :Future[Boolean] = {
+  def ensure(nsIndex: NSIndex): Future[Boolean] = {
     val query = BSONDocument(
-      "ns"   -> BSONString(nsIndex.namespace),
+      "ns" -> BSONString(nsIndex.namespace),
       "name" -> BSONString(nsIndex.index.eventualName))
 
     collection.find(query).one.flatMap { opt =>
-      if(!opt.isDefined)
+      if (!opt.isDefined)
         create(nsIndex).map(_ => true)
       // there is a match, returning a future ok. TODO
       else Future(false)
@@ -140,7 +153,7 @@ class IndexesManager(db: DB)(implicit context: ExecutionContext) {
    *
    * @param nsIndex The index to create.
    */
-  def create(nsIndex: NSIndex) :Future[LastError] = {
+  def create(nsIndex: NSIndex): Future[LastError] = {
     implicit val writer = IndexesManager.NSIndexWriter
     collection.insert(nsIndex)
   }
@@ -150,14 +163,14 @@ class IndexesManager(db: DB)(implicit context: ExecutionContext) {
    *
    * @return The deleted index number.
    */
-  def delete(nsIndex: NSIndex) :Future[Int] = delete(nsIndex.collectionName, nsIndex.index.eventualName)
+  def delete(nsIndex: NSIndex): Future[Int] = delete(nsIndex.collectionName, nsIndex.index.eventualName)
 
   /**
    * Deletes the given index on that database.
    *
    * @return The deleted index number.
    */
-  def delete(collectionName: String, indexName: String) :Future[Int] = db.command(DeleteIndex(collectionName, indexName))
+  def delete(collectionName: String, indexName: String): Future[Int] = db.command(DeleteIndex(collectionName, indexName))
 
   /** Gets a manager for the given collection. */
   def onCollection(name: String) = new CollectionIndexesManager(db.name + "." + name, this)
@@ -168,7 +181,7 @@ class CollectionIndexesManager(fqName: String, manager: IndexesManager)(implicit
     val (_, r) = fqName.span(_ != '.')
     r.drop(1)
   }
-  def list() :Future[List[Index]] = manager.list.map { list =>
+  def list(): Future[List[Index]] = manager.list.map { list =>
     list.filter(nsIndex =>
       nsIndex.namespace == fqName).map(_.index)
   }
@@ -183,7 +196,7 @@ class CollectionIndexesManager(fqName: String, manager: IndexesManager)(implicit
    *
    * @return a future containing true if the index was created, false if it already exists.
    */
-  def ensure(index: Index) :Future[Boolean] =
+  def ensure(index: Index): Future[Boolean] =
     manager.ensure(NSIndex(fqName, index))
 
   /**
@@ -194,7 +207,7 @@ class CollectionIndexesManager(fqName: String, manager: IndexesManager)(implicit
    *
    * @param index The index to create.
    */
-  def create(index: Index) :Future[LastError] =
+  def create(index: Index): Future[LastError] =
     manager.create(NSIndex(fqName, index))
 
   /**
@@ -213,24 +226,23 @@ class CollectionIndexesManager(fqName: String, manager: IndexesManager)(implicit
 }
 
 object IndexesManager {
-  protected def toBSONDocument(nsIndex :NSIndex) = {
+  protected def toBSONDocument(nsIndex: NSIndex) = {
     BSONDocument(
-      "ns"         -> BSONString(nsIndex.namespace),
-      "name"       -> BSONString(nsIndex.index.eventualName),
-      "key"        -> BSONDocument(
-          (for(kv <- nsIndex.index.key)
-            yield kv._1 -> kv._2.value).toStream),
+      "ns" -> BSONString(nsIndex.namespace),
+      "name" -> BSONString(nsIndex.index.eventualName),
+      "key" -> BSONDocument(
+        (for (kv <- nsIndex.index.key)
+          yield kv._1 -> kv._2.value).toStream),
       "background" -> option(nsIndex.index.background, BSONBoolean(true)),
-      "dropDups"   -> option(nsIndex.index.dropDups,   BSONBoolean(true)),
-      "sparse"     -> option(nsIndex.index.sparse,     BSONBoolean(true)),
-      "unique"     -> option(nsIndex.index.unique,     BSONBoolean(true))
-    ) ++ nsIndex.index.options
+      "dropDups" -> option(nsIndex.index.dropDups, BSONBoolean(true)),
+      "sparse" -> option(nsIndex.index.sparse, BSONBoolean(true)),
+      "unique" -> option(nsIndex.index.unique, BSONBoolean(true))) ++ nsIndex.index.options
   }
 
   implicit object NSIndexWriter extends BSONDocumentWriter[NSIndex] {
     import org.jboss.netty.buffer._
-    def write(nsIndex: NSIndex) :BSONDocument = {
-      if(nsIndex.index.key.isEmpty)
+    def write(nsIndex: NSIndex): BSONDocument = {
+      if (nsIndex.index.key.isEmpty)
         throw new RuntimeException("the key should not be empty!")
       toBSONDocument(nsIndex)
     }
@@ -238,7 +250,7 @@ object IndexesManager {
 
   implicit object NSIndexReader extends BSONDocumentReader[NSIndex] {
     import org.jboss.netty.buffer._
-    def read(doc: BSONDocument) :NSIndex = {
+    def read(doc: BSONDocument): NSIndex = {
       val options = doc.elements.filterNot { element =>
         element._1 == "ns" || element._1 == "key" || element._1 == "name" || element._1 == "unique" ||
           element._1 == "background" || element._1 == "dropDups" || element._1 == "sparse" || element._1 == "v"
@@ -255,9 +267,7 @@ object IndexesManager {
           doc.getAs[BSONBoolean]("dropDups").map(_.value).getOrElse(false),
           doc.getAs[BSONBoolean]("sparse").map(_.value).getOrElse(false),
           doc.getAs[BSONInteger]("v").map(_.value),
-          BSONDocument(options.toStream)
-        )
-      )
+          BSONDocument(options.toStream)))
     }
   }
 }

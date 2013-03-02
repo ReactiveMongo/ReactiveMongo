@@ -1,18 +1,33 @@
+/*
+ * Copyright 2012-2013 Stephane Godbillon (@sgodbillon) and Zenexity
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package reactivemongo.api
 
-import akka.actor.{ActorRef, ActorSystem, Props}
+import akka.actor.{ ActorRef, ActorSystem, Props }
 import org.jboss.netty.buffer.ChannelBuffer
-import org.slf4j.{Logger, LoggerFactory}
+import org.slf4j.{ Logger, LoggerFactory }
 import play.api.libs.iteratee._
 import reactivemongo.api.indexes._
 import reactivemongo.core.actors._
 import reactivemongo.bson._
 import reactivemongo.core.protocol._
-import reactivemongo.core.commands.{Command, GetLastError, LastError, SuccessfulAuthentication}
+import reactivemongo.core.commands.{ Command, GetLastError, LastError, SuccessfulAuthentication }
 import reactivemongo.utils.EitherMappableFuture._
-import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.concurrent.{ ExecutionContext, Future, Promise }
 import scala.concurrent.duration._
-import scala.util.{Failure, Success}
+import scala.util.{ Failure, Success }
 
 /**
  * A helper that sends the given message to the given actor, following a failover strategy.
@@ -39,7 +54,7 @@ class Failover[T](message: T, actorRef: ActorRef, strategy: FailoverStrategy)(ex
     actorRef ! expectingResponse
     expectingResponse.future.onComplete {
       case Failure(e) =>
-        if(n < strategy.retries) {
+        if (n < strategy.retries) {
           val `try` = n + 1
           val delayFactor = strategy.delayFactor(`try`)
           val delay = Duration.unapply(strategy.initialDelay * delayFactor).map(t => FiniteDuration(t._1, t._2)).getOrElse(strategy.initialDelay)
@@ -67,7 +82,7 @@ object Failover {
    * @param actorRef The reference to the MongoDBSystem actor the given message will be sent to.
    * @param strategy The Failover strategy.
    */
-  def apply(checkedWriteRequest: CheckedWriteRequest, actorRef: ActorRef, strategy: FailoverStrategy)(implicit ec: ExecutionContext) :Failover[CheckedWriteRequest] =
+  def apply(checkedWriteRequest: CheckedWriteRequest, actorRef: ActorRef, strategy: FailoverStrategy)(implicit ec: ExecutionContext): Failover[CheckedWriteRequest] =
     new Failover(checkedWriteRequest, actorRef, strategy)(CheckedWriteRequestExpectingResponse.apply)
 
   /**
@@ -77,7 +92,7 @@ object Failover {
    * @param actorRef The reference to the MongoDBSystem actor the given message will be sent to.
    * @param strategy The Failover strategy.
    */
-  def apply(requestMaker: RequestMaker, actorRef: ActorRef, strategy: FailoverStrategy)(implicit ec: ExecutionContext) :Failover[RequestMaker] =
+  def apply(requestMaker: RequestMaker, actorRef: ActorRef, strategy: FailoverStrategy)(implicit ec: ExecutionContext): Failover[RequestMaker] =
     new Failover(requestMaker, actorRef, strategy)(RequestMakerExpectingResponse.apply)
 }
 
@@ -93,8 +108,6 @@ case class FailoverStrategy(
   retries: Int = 5,
   delayFactor: Int => Double = n => 1)
 
-
-
 /**
  * A Mongo Connection.
  *
@@ -103,25 +116,24 @@ case class FailoverStrategy(
  * Behind the scene, many connections (channels) are open on all the available servers in the replica set.
  *
  * Example:
-{{{
-import reactivemongo.api._
-
-val connection = MongoConnection( List( "localhost:27016" ) )
-val db = connection("plugin")
-val collection = db("acoll")
-
-// more explicit way
-val db2 = connection.db("plugin")
-val collection2 = db2.collection("plugin")
-}}}
+ * {{{
+ * import reactivemongo.api._
+ *
+ * val connection = MongoConnection( List( "localhost" ) )
+ * val db = connection("plugin")
+ * val collection = db("acoll")
+ *
+ * // more explicit way
+ * val db2 = connection.db("plugin")
+ * val collection2 = db2.collection("plugin")
+ * }}}
  *
  * @param mongosystem A reference to a [[reactivemongo.core.actors.MongoDBSystem]] Actor.
  */
 class MongoConnection(
-  val mongosystem: ActorRef,
-  monitor: ActorRef
-) {
-  import akka.pattern.{ask => akkaAsk}
+    val mongosystem: ActorRef,
+    monitor: ActorRef) {
+  import akka.pattern.{ ask => akkaAsk }
   import akka.util.Timeout
   /**
    * Returns a DefaultDB reference using this connection.
@@ -129,7 +141,7 @@ class MongoConnection(
    * @param name The database name.
    * @param failoverStrategy a failover strategy for sending requests.
    */
-  def apply(name: String, failoverStrategy: FailoverStrategy = FailoverStrategy())(implicit context: ExecutionContext) :DefaultDB = DefaultDB(name, this, failoverStrategy)
+  def apply(name: String, failoverStrategy: FailoverStrategy = FailoverStrategy())(implicit context: ExecutionContext): DefaultDB = DefaultDB(name, this, failoverStrategy)
 
   /**
    * Returns a DefaultDB reference using this connection (alias for the `apply` method).
@@ -137,12 +149,12 @@ class MongoConnection(
    * @param name The database name.
    * @param failoverStrategy a failover strategy for sending requests.
    */
-  def db(name: String, failoverStrategy: FailoverStrategy = FailoverStrategy())(implicit context: ExecutionContext) :DefaultDB = apply(name, failoverStrategy)
+  def db(name: String, failoverStrategy: FailoverStrategy = FailoverStrategy())(implicit context: ExecutionContext): DefaultDB = apply(name, failoverStrategy)
 
   /**
    * Get a future that will be successful when a primary node is available or times out.
    */
-  def waitForPrimary(implicit waitForAvailability: FiniteDuration) :Future[_] =
+  def waitForPrimary(implicit waitForAvailability: FiniteDuration): Future[_] =
     akkaAsk(monitor, reactivemongo.core.actors.WaitForPrimary)(Timeout(waitForAvailability))
 
   /**
@@ -152,7 +164,7 @@ class MongoConnection(
    *
    * @return The future response.
    */
-  def ask(message: RequestMaker) :Future[Response] = {
+  def ask(message: RequestMaker): Future[Response] = {
     val msg = RequestMakerExpectingResponse(message)
     mongosystem ! msg
     msg.future
@@ -179,15 +191,15 @@ class MongoConnection(
   def send(message: RequestMaker) = mongosystem ! message
 
   /** Authenticates the connection on the given database. */
-  def authenticate(db: String, user: String, password: String)(implicit timeout: FiniteDuration) :Future[SuccessfulAuthentication] =
+  def authenticate(db: String, user: String, password: String)(implicit timeout: FiniteDuration): Future[SuccessfulAuthentication] =
     akkaAsk(mongosystem, Authenticate(db, user, password))(Timeout(timeout)).mapTo[SuccessfulAuthentication]
 
   /** Closes this MongoConnection (closes all the channels and ends the actors) */
-  def askClose()(implicit timeout: FiniteDuration) :Future[_] =
+  def askClose()(implicit timeout: FiniteDuration): Future[_] =
     akkaAsk(monitor, Close)(Timeout(timeout))
 
   /** Closes this MongoConnection (closes all the channels and ends the actors) */
-  def close() :Unit = monitor ! Close
+  def close(): Unit = monitor ! Close
 }
 
 object MongoConnection {
@@ -207,9 +219,9 @@ object MongoConnection {
    * @param nbChannelsPerNode Number of channels to open per node. Defaults to 10.
    * @param name The name of the newly created [[reactivemongo.core.actors.MongoDBSystem]] actor, if needed.
    */
-  def apply(nodes: List[String], authentications :List[Authenticate] = List.empty, nbChannelsPerNode :Int = 10, name: Option[String] = None) = {
+  def apply(nodes: List[String], authentications: List[Authenticate] = List.empty, nbChannelsPerNode: Int = 10, name: Option[String] = None) = {
     val props = Props(new MongoDBSystem(nodes, authentications, nbChannelsPerNode))
-    val mongosystem = if(name.isDefined) system.actorOf(props, name = name.get) else system.actorOf(props)
+    val mongosystem = if (name.isDefined) system.actorOf(props, name = name.get) else system.actorOf(props)
     val monitor = system.actorOf(Props(new MonitorActor(mongosystem)))
     new MongoConnection(mongosystem, monitor)
   }

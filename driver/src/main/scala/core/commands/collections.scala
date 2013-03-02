@@ -1,3 +1,18 @@
+/*
+ * Copyright 2012-2013 Stephane Godbillon (@sgodbillon) and Zenexity
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package reactivemongo.core.commands
 
 import reactivemongo.bson._
@@ -5,8 +20,8 @@ import DefaultBSONHandlers._
 import reactivemongo.core.protocol.Response
 
 case class CappedOptions(
-  size: Long,
-  maxDocuments: Option[Int] = None) {
+    size: Long,
+    maxDocuments: Option[Int] = None) {
   def toDocument = BSONDocument(
     "capped" -> BSONBoolean(true),
     "size" -> BSONLong(size),
@@ -23,9 +38,9 @@ case class CappedOptions(
  * @param autoIndexId States if should automatically add an index on the _id field. By default, regular collections will have an indexed _id field, in contrast to capped collections.
  */
 class CreateCollection(
-  name: String,
-  capped: Option[CappedOptions] = None,
-  autoIndexId: Option[Boolean] = None) extends Command[Boolean] {
+    name: String,
+    capped: Option[CappedOptions] = None,
+    autoIndexId: Option[Boolean] = None) extends Command[Boolean] {
   def makeDocuments = {
     val doc = BSONDocument(
       "create" -> BSONString(name),
@@ -49,8 +64,8 @@ class CreateCollection(
  * @param capped The capped collection options.
  */
 class ConvertToCapped(
-  name: String,
-  capped: CappedOptions) extends Command[Boolean] {
+    name: String,
+    capped: CappedOptions) extends Command[Boolean] {
   def makeDocuments = {
     BSONDocument("convertToCapped" -> BSONString(name)) ++ capped.toDocument
   }
@@ -69,8 +84,8 @@ class ConvertToCapped(
  * @param scale A number to divide the numbers representing size (useful for getting sizes in kB (1024) or MB (1024 * 1024)).
  */
 class CollStats(
-  name: String,
-  scale: Option[Int] = None) extends Command[CollStatsResult] {
+    name: String,
+    scale: Option[Int] = None) extends Command[CollStatsResult] {
   def makeDocuments = {
     BSONDocument(
       "collStats" -> BSONString(name),
@@ -147,7 +162,7 @@ object CollStatsResult extends BSONCommandResultMaker[CollStatsResult] {
  * @param name The collection name.
  */
 class Drop(
-  name: String) extends Command[Boolean] {
+    name: String) extends Command[Boolean] {
   def makeDocuments =
     BSONDocument("drop" -> BSONString(name))
 
@@ -164,7 +179,7 @@ class Drop(
  * @param name The collection name.
  */
 class EmptyCapped(
-  name: String) extends Command[Boolean] {
+    name: String) extends Command[Boolean] {
   def makeDocuments =
     BSONDocument("emptycapped" -> BSONString(name))
 
@@ -183,9 +198,9 @@ class EmptyCapped(
  * @param dropTarget If a collection of name `target` already exists, drop it before renaming this collection.
  */
 class RenameCollection(
-  name: String,
-  target: String,
-  dropTarget: Boolean = false) extends Command[Boolean] {
+    name: String,
+    target: String,
+    dropTarget: Boolean = false) extends Command[Boolean] {
   def makeDocuments =
     BSONDocument(
       "renameCollection" -> BSONString(name),

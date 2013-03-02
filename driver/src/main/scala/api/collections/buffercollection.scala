@@ -1,6 +1,21 @@
+/*
+ * Copyright 2012-2013 Stephane Godbillon (@sgodbillon) and Zenexity
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package reactivemongo.api.collections.buffer
 
-import reactivemongo.bson.buffer.{BSONBuffer, ReadableBuffer, WritableBuffer}
+import reactivemongo.bson.buffer.{ BSONBuffer, ReadableBuffer, WritableBuffer }
 import reactivemongo.api._
 import reactivemongo.api.collections._
 import reactivemongo.core.netty._
@@ -11,7 +26,7 @@ import reactivemongo.core.netty._
  * @tparam DocumentType The type of the instance that can be turned into a BSON document.
  */
 trait RawBSONDocumentSerializer[-DocumentType] {
-  def serialize(document: DocumentType) :WritableBuffer
+  def serialize(document: DocumentType): WritableBuffer
 }
 
 /**
@@ -20,7 +35,7 @@ trait RawBSONDocumentSerializer[-DocumentType] {
  * @tparam DocumentType The type of the instance to create.
  */
 trait RawBSONDocumentDeserializer[+DocumentType] {
-  def deserialize(buffer: ReadableBuffer) :DocumentType
+  def deserialize(buffer: ReadableBuffer): DocumentType
 }
 
 object `package` {
@@ -53,24 +68,24 @@ trait BufferGenericHandlers extends GenericHandlers[WritableBuffer, RawBSONDocum
 object BufferGenericHandlers extends BufferGenericHandlers
 
 case class ChannelCollection(
-  db: DB,
-  name: String,
-  failoverStrategy: FailoverStrategy) extends GenericCollection[WritableBuffer, RawBSONDocumentDeserializer, RawBSONDocumentSerializer] with BufferGenericHandlers {
+    db: DB,
+    name: String,
+    failoverStrategy: FailoverStrategy) extends GenericCollection[WritableBuffer, RawBSONDocumentDeserializer, RawBSONDocumentSerializer] with BufferGenericHandlers {
   def genericQueryBuilder: GenericQueryBuilder[WritableBuffer, RawBSONDocumentDeserializer, RawBSONDocumentSerializer] =
     ChannelQueryBuilder(this, failoverStrategy)
 }
 
 case class ChannelQueryBuilder(
-  collection: Collection,
-  failover: FailoverStrategy,
-  queryOption: Option[WritableBuffer] = None,
-  sortOption: Option[WritableBuffer] = None,
-  projectionOption: Option[WritableBuffer] = None,
-  hintOption: Option[WritableBuffer] = None,
-  explainFlag: Boolean = false,
-  snapshotFlag: Boolean = false,
-  commentString: Option[String] = None,
-  options: QueryOpts = QueryOpts()) extends GenericQueryBuilder[WritableBuffer, RawBSONDocumentDeserializer, RawBSONDocumentSerializer] with BufferGenericHandlers {
+    collection: Collection,
+    failover: FailoverStrategy,
+    queryOption: Option[WritableBuffer] = None,
+    sortOption: Option[WritableBuffer] = None,
+    projectionOption: Option[WritableBuffer] = None,
+    hintOption: Option[WritableBuffer] = None,
+    explainFlag: Boolean = false,
+    snapshotFlag: Boolean = false,
+    commentString: Option[String] = None,
+    options: QueryOpts = QueryOpts()) extends GenericQueryBuilder[WritableBuffer, RawBSONDocumentDeserializer, RawBSONDocumentSerializer] with BufferGenericHandlers {
 
   type Self = ChannelQueryBuilder
 
@@ -79,16 +94,16 @@ case class ChannelQueryBuilder(
   }
   def merge() = {
     import reactivemongo.bson.BSONDocument
-      def emptyDoc = {
-        val buf = ChannelBufferWritableBuffer()
-        reactivemongo.bson.buffer.DefaultBufferHandler.BSONDocumentBufferHandler.write(BSONDocument(), buf)
-        buf
-      }
-      def writeDocChannel(buffer: WritableBuffer, name: String, doc: WritableBuffer) = {
-        buffer.writeByte(0x03)
-        buffer.writeCString(name)
-        buffer.writeBytes(doc.toReadableBuffer)
-      }
+    def emptyDoc = {
+      val buf = ChannelBufferWritableBuffer()
+      reactivemongo.bson.buffer.DefaultBufferHandler.BSONDocumentBufferHandler.write(BSONDocument(), buf)
+      buf
+    }
+    def writeDocChannel(buffer: WritableBuffer, name: String, doc: WritableBuffer) = {
+      buffer.writeByte(0x03)
+      buffer.writeCString(name)
+      buffer.writeBytes(doc.toReadableBuffer)
+    }
     val buffer = ChannelBufferWritableBuffer()
     val now = buffer.index
     buffer.writeInt(0)

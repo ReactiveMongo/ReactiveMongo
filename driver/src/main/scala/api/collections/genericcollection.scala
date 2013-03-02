@@ -1,3 +1,18 @@
+/*
+ * Copyright 2012-2013 Stephane Godbillon (@sgodbillon) and Zenexity
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package reactivemongo.api.collections
 
 import reactivemongo.bson.buffer.ReadableBuffer
@@ -269,9 +284,9 @@ trait GenericCollection[Structure, Reader[_], Writer[_]] extends Collection with
 
 /**
  * A builder that helps to make a fine-tuned query to MongoDB.
- * 
+ *
  * When the query is ready, you can call `cursor` to get a [[Cursor]], or `one` if you want to retrieve just one document.
- * 
+ *
  */
 trait GenericQueryBuilder[Structure, Reader[_], Writer[_]] extends GenericHandlers[Structure, Reader, Writer] {
   type Self <: GenericQueryBuilder[Structure, Reader, Writer]
@@ -308,7 +323,7 @@ trait GenericQueryBuilder[Structure, Reader[_], Writer[_]] extends GenericHandle
 
   /**
    * Sends this query and gets a [[Cursor]] of instances of `T`.
-   * 
+   *
    * An implicit `Reader[T]` must be present in the scope.
    */
   def cursor[T](implicit reader: Reader[T] = structureReader, ec: ExecutionContext): Cursor[T] = {
@@ -332,7 +347,7 @@ trait GenericQueryBuilder[Structure, Reader[_], Writer[_]] extends GenericHandle
 
   /**
    * Sends this query and gets a future `Option[T]`.
-   * 
+   *
    * An implicit `Reader[T]` must be present in the scope.
    */
   def one[T](implicit reader: Reader[T], ec: ExecutionContext): Future[Option[T]] = copy(options = options.batchSize(1)).cursor(reader, ec).headOption

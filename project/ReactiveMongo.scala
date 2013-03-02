@@ -73,14 +73,14 @@ object Format {
     FormattingPreferences().
       setPreference(AlignParameters, true).
       setPreference(AlignSingleLineCaseStatements, true).
-      setPreference(CompactControlReadability, true).
-      setPreference(CompactStringConcatenation, true).
+      setPreference(CompactControlReadability, false).
+      setPreference(CompactStringConcatenation, false).
       setPreference(DoubleIndentClassDeclaration, true).
       setPreference(FormatXml, true).
-      setPreference(IndentLocalDefs, true).
+      setPreference(IndentLocalDefs, false).
       setPreference(IndentPackageBlocks, true).
       setPreference(IndentSpaces, 2).
-      setPreference(MultilineScaladocCommentsStartOnFirstLine, true).
+      setPreference(MultilineScaladocCommentsStartOnFirstLine, false).
       setPreference(PreserveSpaceBeforeArguments, false).
       setPreference(PreserveDanglingCloseParenthesis, false).
       setPreference(RewriteArrowSymbols, false).

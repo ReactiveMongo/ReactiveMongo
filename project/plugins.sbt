@@ -20,3 +20,5 @@ addSbtPlugin("com.timushev.sbt" % "sbt-updates" % "0.1.0")
 resolvers += "jgit-repo" at "http://download.eclipse.org/jgit/maven"
 
 addSbtPlugin("com.typesafe.sbt" % "sbt-git" % "0.5.0")
+
+addSbtPlugin("com.orrsella" %% "sbt-stats" % "1.0")

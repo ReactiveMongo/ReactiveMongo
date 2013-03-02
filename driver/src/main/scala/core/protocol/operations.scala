@@ -1,3 +1,18 @@
+/*
+ * Copyright 2012-2013 Stephane Godbillon (@sgodbillon) and Zenexity
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package reactivemongo.core.protocol
 
 import org.jboss.netty.channel._
@@ -14,7 +29,7 @@ private[protocol] object BufferAccessors {
    * @tparam T type to be written via BufferAccessors.writeTupleToBufferN(...) methods.
    */
   sealed trait BufferInteroperable[T] {
-    def apply(buffer: ChannelBuffer, t: T) :Unit
+    def apply(buffer: ChannelBuffer, t: T): Unit
   }
 
   implicit object IntChannelInteroperable extends BufferInteroperable[Int] {
@@ -74,7 +89,7 @@ import BufferAccessors._
 /** A Mongo Wire Protocol operation */
 sealed trait Op {
   /** operation code */
-  val code :Int
+  val code: Int
 }
 
 /**
@@ -84,18 +99,18 @@ sealed trait Op {
  */
 sealed trait RequestOp extends Op with ChannelBufferWritable {
   /** States if this request expects a response. */
-  val expectsResponse :Boolean = false
+  val expectsResponse: Boolean = false
   /** States if this request has to be run on a primary. */
-  val requiresPrimary :Boolean = false
+  val requiresPrimary: Boolean = false
 }
 
 /** A request that needs to know the full collection name. */
 sealed trait CollectionAwareRequestOp extends RequestOp {
   /** The full collection name (''<dbname.collectionname>'') */
-  val fullCollectionName :String
+  val fullCollectionName: String
 
   /** Database and collection name */
-  lazy val (db :String, collectionName :String) = fullCollectionName.span(_ != '.')
+  lazy val (db: String, collectionName: String) = fullCollectionName.span(_ != '.')
 }
 
 /** A request that will perform a write on the database */
@@ -110,11 +125,10 @@ sealed trait WriteRequestOp extends CollectionAwareRequestOp
  * @param numberReturned The number of documents that are present in this reply.
  */
 case class Reply(
-  flags: Int,
-  cursorID: Long,
-  startingFrom: Int,
-  numberReturned: Int
-) extends Op {
+    flags: Int,
+    cursorID: Long,
+    startingFrom: Int,
+    numberReturned: Int) extends Op {
   override val code = 1
 
   /** States whether the cursor given in the request was found */
@@ -124,7 +138,7 @@ case class Reply(
   /** States if the answering server supports the AwaitData query option */
   lazy val awaitCapable = (flags & 0x08) != 0
 
-  private def str(b: Boolean, s: String) = if(b) s else ""
+  private def str(b: Boolean, s: String) = if (b) s else ""
 
   /** States if this reply is in error */
   lazy val inError = cursorNotFound || queryFailure
@@ -137,8 +151,7 @@ object Reply extends ChannelBufferReadable[Reply] {
     buffer.readInt,
     buffer.readLong,
     buffer.readInt,
-    buffer.readInt
-  )
+    buffer.readInt)
 }
 
 /**
@@ -147,11 +160,10 @@ object Reply extends ChannelBufferReadable[Reply] {
  * @param flags Operation flags.
  */
 case class Update(
-  fullCollectionName: String,
-  flags: Int
-) extends WriteRequestOp {
+    fullCollectionName: String,
+    flags: Int) extends WriteRequestOp {
   override val code = 2001
-  override val writeTo = writeTupleToBuffer3( (0, fullCollectionName, flags) ) _
+  override val writeTo = writeTupleToBuffer3((0, fullCollectionName, flags)) _
   override def size = 4 /* int32 = ZERO */ + 4 + fullCollectionName.length + 1
   override val requiresPrimary = true
 }
@@ -169,11 +181,10 @@ object UpdateFlags {
  * @param flags Operation flags.
  */
 case class Insert(
-  flags: Int,
-  fullCollectionName: String
-) extends WriteRequestOp {
+    flags: Int,
+    fullCollectionName: String) extends WriteRequestOp {
   override val code = 2002
-  override val writeTo = writeTupleToBuffer2( (flags, fullCollectionName) ) _
+  override val writeTo = writeTupleToBuffer2((flags, fullCollectionName)) _
   override def size = 4 + fullCollectionName.length + 1
   override val requiresPrimary = true
 }
@@ -186,14 +197,13 @@ case class Insert(
  * @param numberToReturn number of documents to return in the response. 0 means the server will choose.
  */
 case class Query(
-  flags: Int,
-  fullCollectionName: String,
-  numberToSkip: Int,
-  numberToReturn: Int
-) extends CollectionAwareRequestOp {
+    flags: Int,
+    fullCollectionName: String,
+    numberToSkip: Int,
+    numberToReturn: Int) extends CollectionAwareRequestOp {
   override val expectsResponse = true
   override val code = 2004
-  override val writeTo = writeTupleToBuffer4( (flags, fullCollectionName, numberToSkip, numberToReturn) ) _
+  override val writeTo = writeTupleToBuffer4((flags, fullCollectionName, numberToSkip, numberToReturn)) _
   override def size = 4 + fullCollectionName.length + 1 + 4 + 4
 }
 
@@ -228,13 +238,12 @@ object QueryFlags {
  * @param cursorId id of the cursor.
  */
 case class GetMore(
-  fullCollectionName: String,
-  numberToReturn: Int,
-  cursorID: Long
-) extends CollectionAwareRequestOp {
+    fullCollectionName: String,
+    numberToReturn: Int,
+    cursorID: Long) extends CollectionAwareRequestOp {
   override val expectsResponse = true
   override val code = 2005
-  override val writeTo = writeTupleToBuffer4( (0, fullCollectionName, numberToReturn, cursorID) ) _
+  override val writeTo = writeTupleToBuffer4((0, fullCollectionName, numberToReturn, cursorID)) _
   override def size = 4 /* int32 ZERO */ + fullCollectionName.length + 1 + 4 + 8
 }
 
@@ -244,11 +253,10 @@ case class GetMore(
  * @param flags operation flags.
  */
 case class Delete(
-  fullCollectionName: String,
-  flags: Int
-) extends WriteRequestOp {
+    fullCollectionName: String,
+    flags: Int) extends WriteRequestOp {
   override val code = 2006
-  override val writeTo = writeTupleToBuffer3( (0, fullCollectionName, flags) ) _
+  override val writeTo = writeTupleToBuffer3((0, fullCollectionName, flags)) _
   override def size = 4 /* int32 ZERO */ + fullCollectionName.length + 1 + 4
   override val requiresPrimary = true
 }
@@ -259,13 +267,12 @@ case class Delete(
  * @param cursorIDs ids of the cursors to kill. Should not be empty.
  */
 case class KillCursors(
-  cursorIDs: Set[Long]
-) extends RequestOp {
+    cursorIDs: Set[Long]) extends RequestOp {
   override val code = 2007
   override val writeTo = { buffer: ChannelBuffer =>
     buffer writeInt 0
     buffer writeInt cursorIDs.size
-    for(cursorID <- cursorIDs) {
+    for (cursorID <- cursorIDs) {
       buffer writeLong cursorID
     }
   }

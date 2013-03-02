@@ -2,9 +2,17 @@ ReactiveMongo: a reactive, non-blocking, Scala Driver for MongoDB
 
   Non-blocking, Reactive MongoDB Driver for Scala
 
-Copyright 2012-2013 Stephane Godbillon (@sgodbillon) and contributors.
+Copyright 2012-2013 Stephane Godbillon (@sgodbillon) and Zenexity (http://zenexity.com)
 
-Please read each subproject's NOTICE.txt file for more specific information.
+
+Contributors:
+- Pascal Voitot (@mandubian)
+- Arthur Gautier (@baloose)
+- Sadek Drobi (@sadache)
+- Sebastien Renault (@srenaultcontact)
+- Florin Stan (namtzigla)
+- Alexander Jarvis (alexanderjarvis)
+- Mark van der Tol (MarkvanderTol)
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.

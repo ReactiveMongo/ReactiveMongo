@@ -1,6 +1,5 @@
 /*
- * Copyright 2013 Stephane Godbillon
- * @sgodbillon
+ * Copyright 2013 Stephane Godbillon (@sgodbillon)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,15 +34,15 @@ trait WritableBuffer {
 
   /** Writes the bytes stored in the given `buffer` into this buffer. */
   def writeBytes(buffer: ReadableBuffer): WritableBuffer = {
-      @scala.annotation.tailrec
-      def write(buffer: ReadableBuffer): WritableBuffer = {
-        if (buffer.readable > 1024) {
-          writeBytes(buffer.readArray(1024))
-          write(buffer)
-        } else {
-          writeBytes(buffer.readArray(buffer.readable))
-        }
+    @scala.annotation.tailrec
+    def write(buffer: ReadableBuffer): WritableBuffer = {
+      if (buffer.readable > 1024) {
+        writeBytes(buffer.readArray(1024))
+        write(buffer)
+      } else {
+        writeBytes(buffer.readArray(buffer.readable))
       }
+    }
     write(buffer.slice(buffer.readable))
   }
 

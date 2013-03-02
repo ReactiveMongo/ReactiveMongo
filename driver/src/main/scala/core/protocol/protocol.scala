@@ -1,3 +1,18 @@
+/*
+ * Copyright 2012-2013 Stephane Godbillon (@sgodbillon) and Zenexity
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package reactivemongo.core.protocol
 
 import akka.actor.ActorRef
@@ -109,10 +124,10 @@ trait ChannelBufferReadable[T] {
  * @param opCode operation code of this message.
  */
 case class MessageHeader(
-  messageLength: Int,
-  requestID: Int,
-  responseTo: Int,
-  opCode: Int) extends ChannelBufferWritable {
+    messageLength: Int,
+    requestID: Int,
+    responseTo: Int,
+    opCode: Int) extends ChannelBufferWritable {
   override val writeTo = writeTupleToBuffer4((messageLength, requestID, responseTo, opCode)) _
   override def size = 4 + 4 + 4 + 4
 }
@@ -141,11 +156,11 @@ object MessageHeader extends ChannelBufferReadable[MessageHeader] {
  * @param channelIdHint a hint for sending this request on a particular channel.
  */
 case class Request(
-  requestID: Int,
-  responseTo: Int, // TODO remove, nothing to do here.
-  op: RequestOp,
-  documents: BufferSequence,
-  channelIdHint: Option[Int] = None) extends ChannelBufferWritable {
+    requestID: Int,
+    responseTo: Int, // TODO remove, nothing to do here.
+    op: RequestOp,
+    documents: BufferSequence,
+    channelIdHint: Option[Int] = None) extends ChannelBufferWritable {
   override val writeTo = { buffer: ChannelBuffer =>
     {
       buffer write header
@@ -166,9 +181,9 @@ case class Request(
  * @param getLastError a [[reactivemongo.core.commands.GetLastError]] command message.
  */
 case class CheckedWriteRequest(
-  op: WriteRequestOp,
-  documents: BufferSequence,
-  getLastError: GetLastError) {
+    op: WriteRequestOp,
+    documents: BufferSequence,
+    getLastError: GetLastError) {
   def apply(): (RequestMaker, RequestMaker) = RequestMaker(op, documents, None) -> getLastError.apply(op.db).maker
 }
 
@@ -180,9 +195,9 @@ case class CheckedWriteRequest(
  * @param channelIdHint a hint for sending this request on a particular channel.
  */
 case class RequestMaker(
-  op: RequestOp,
-  documents: BufferSequence = BufferSequence.empty,
-  channelIdHint: Option[Int] = None) {
+    op: RequestOp,
+    documents: BufferSequence = BufferSequence.empty,
+    channelIdHint: Option[Int] = None) {
   def apply(id: Int) = Request(id, 0, op, documents, channelIdHint)
 }
 
@@ -233,10 +248,10 @@ object Request {
  * @param info some meta information about this response, see [[reactivemongo.core.protocol.ResponseInfo]].
  */
 case class Response(
-  header: MessageHeader,
-  reply: Reply,
-  documents: ChannelBuffer,
-  info: ResponseInfo) {
+    header: MessageHeader,
+    reply: Reply,
+    documents: ChannelBuffer,
+    info: ResponseInfo) {
   /**
    * if this response is in error, explain this error.
    */

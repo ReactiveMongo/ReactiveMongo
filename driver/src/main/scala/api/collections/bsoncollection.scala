@@ -1,3 +1,18 @@
+/*
+ * Copyright 2012-2013 Stephane Godbillon (@sgodbillon) and Zenexity
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package reactivemongo.api.collections.default
 
 import reactivemongo.api._
@@ -57,63 +72,63 @@ object BSONGenericHandlers extends BSONGenericHandlers
  * The default implementation of [[Collection]].
  *
  * {{{
-object Samples {
-
-  val connection = MongoConnection(List("localhost"))
-
-  // Gets a reference to the database "plugin"
-  val db = connection("plugin")
-
-  // Gets a reference to the collection "acoll"
-  // By default, you get a BSONCollection.
-  val collection = db("acoll")
-
-  def listDocs() = {
-    // Select only the documents which field 'firstName' equals 'Jack'
-    val query = BSONDocument("firstName" -> "Jack")
-    // select only the field 'lastName'
-    val filter = BSONDocument(
-      "lastName" -> 1,
-      "_id" -> 0)
-
-    // Get a cursor of BSONDocuments
-    val cursor = collection.find(query, filter).cursor
-    // Let's enumerate this cursor and print a readable representation of each document in the response
-    cursor.enumerate.apply(Iteratee.foreach { doc =>
-      println("found document: " + BSONDocument.pretty(doc))
-    })
-
-    // Or, the same with getting a list
-    val cursor2 = collection.find(query, filter).cursor
-    val futureList = cursor.toList
-    futureList.map { list =>
-      list.foreach { doc =>
-        println("found document: " + BSONDocument.pretty(doc))
-      }
-    }
-  }
-}
-}}}
+ * object Samples {
+ *
+ *   val connection = MongoConnection(List("localhost"))
+ *
+ *   // Gets a reference to the database "plugin"
+ *   val db = connection("plugin")
+ *
+ *   // Gets a reference to the collection "acoll"
+ *   // By default, you get a BSONCollection.
+ *   val collection = db("acoll")
+ *
+ *   def listDocs() = {
+ *     // Select only the documents which field 'firstName' equals 'Jack'
+ *     val query = BSONDocument("firstName" -> "Jack")
+ *     // select only the field 'lastName'
+ *     val filter = BSONDocument(
+ *       "lastName" -> 1,
+ *       "_id" -> 0)
+ *
+ *     // Get a cursor of BSONDocuments
+ *     val cursor = collection.find(query, filter).cursor
+ *     // Let's enumerate this cursor and print a readable representation of each document in the response
+ *     cursor.enumerate.apply(Iteratee.foreach { doc =>
+ *       println("found document: " + BSONDocument.pretty(doc))
+ *     })
+ *
+ *     // Or, the same with getting a list
+ *     val cursor2 = collection.find(query, filter).cursor
+ *     val futureList = cursor.toList
+ *     futureList.map { list =>
+ *       list.foreach { doc =>
+ *         println("found document: " + BSONDocument.pretty(doc))
+ *       }
+ *     }
+ *   }
+ * }
+ * }}}
  */
 case class BSONCollection(
-  db: DB,
-  name: String,
-  failoverStrategy: FailoverStrategy) extends GenericCollection[BSONDocument, BSONDocumentReader, BSONDocumentWriter] with BSONGenericHandlers with CollectionMetaCommands {
+    db: DB,
+    name: String,
+    failoverStrategy: FailoverStrategy) extends GenericCollection[BSONDocument, BSONDocumentReader, BSONDocumentWriter] with BSONGenericHandlers with CollectionMetaCommands {
   def genericQueryBuilder: GenericQueryBuilder[BSONDocument, BSONDocumentReader, BSONDocumentWriter] =
     BSONQueryBuilder(this, failoverStrategy)
 }
 
 case class BSONQueryBuilder(
-  collection: Collection,
-  failover: FailoverStrategy,
-  queryOption: Option[BSONDocument] = None,
-  sortOption: Option[BSONDocument] = None,
-  projectionOption: Option[BSONDocument] = None,
-  hintOption: Option[BSONDocument] = None,
-  explainFlag: Boolean = false,
-  snapshotFlag: Boolean = false,
-  commentString: Option[String] = None,
-  options: QueryOpts = QueryOpts()) extends GenericQueryBuilder[BSONDocument, BSONDocumentReader, BSONDocumentWriter] with BSONConverters with BSONGenericHandlers {
+    collection: Collection,
+    failover: FailoverStrategy,
+    queryOption: Option[BSONDocument] = None,
+    sortOption: Option[BSONDocument] = None,
+    projectionOption: Option[BSONDocument] = None,
+    hintOption: Option[BSONDocument] = None,
+    explainFlag: Boolean = false,
+    snapshotFlag: Boolean = false,
+    commentString: Option[String] = None,
+    options: QueryOpts = QueryOpts()) extends GenericQueryBuilder[BSONDocument, BSONDocumentReader, BSONDocumentWriter] with BSONConverters with BSONGenericHandlers {
   import reactivemongo.bson._
   import reactivemongo.bson.DefaultBSONHandlers._
   import reactivemongo.utils.option

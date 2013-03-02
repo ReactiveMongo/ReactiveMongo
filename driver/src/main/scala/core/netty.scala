@@ -1,6 +1,5 @@
 /*
- * Copyright 2013 Stephane Godbillon
- * @sgodbillon
+ * Copyright 2012-2013 Stephane Godbillon (@sgodbillon) and Zenexity
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -48,7 +47,7 @@ class ChannelBufferReadableBuffer(protected[netty] val buffer: ChannelBuffer) ex
   def readDouble() = buffer.readDouble()
 
   def readable() = buffer.readableBytes()
-  
+
   def toWritableBuffer: ChannelBufferWritableBuffer = {
     val buf = new ChannelBufferWritableBuffer
     buf.writeBytes(buffer)

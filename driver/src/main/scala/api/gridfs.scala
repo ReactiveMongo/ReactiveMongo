@@ -1,3 +1,18 @@
+/*
+ * Copyright 2012-2013 Stephane Godbillon (@sgodbillon) and Zenexity
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package reactivemongo.api.gridfs
 
 import java.io._
@@ -154,10 +169,10 @@ class GridFS[Structure, Reader[_], Writer[_]](db: DB with DBMetaCommands, prefix
     implicit val ec = MongoConnection.system
 
     case class Chunk(
-      previous: Array[Byte] = new Array(0),
-      n: Int = 0,
-      md: java.security.MessageDigest = java.security.MessageDigest.getInstance("MD5"),
-      length: Int = 0) {
+        previous: Array[Byte] = new Array(0),
+        n: Int = 0,
+        md: java.security.MessageDigest = java.security.MessageDigest.getInstance("MD5"),
+        length: Int = 0) {
       def feed(chunk: Array[Byte]): Future[Chunk] = {
         val wholeChunk = concat(previous, chunk)
 
@@ -195,12 +210,6 @@ class GridFS[Structure, Reader[_], Writer[_]](db: DB with DBMetaCommands, prefix
           files[BSONCollection].insert(bson).map(_ =>
             files(producer).BufferReaderInstance(readFileReader).read(
               files[BSONCollection].StructureBufferWriter.write(bson, ChannelBufferWritableBuffer()).toReadableBuffer))
-
-          /*val ccc = files[BSONCollection]
-          ccc.StructureBufferWriter.write(bson, ChannelBufferWritableBuffer).toReadableBuffer
-            files(producer).BufferReaderInstance(???).read(buffer) */
-          // TODO !!
-          ///files[BSONCollection].insert(bson).map(_ => readFileReader.read(bson))
         }
       }
       def writeChunk(n: Int, array: Array[Byte]) = {
@@ -208,9 +217,9 @@ class GridFS[Structure, Reader[_], Writer[_]](db: DB with DBMetaCommands, prefix
         val bson = {
           import DefaultBSONHandlers._
           BSONDocument(
-          "files_id" -> file.id.asInstanceOf[BSONValue],
-          "n" -> BSONInteger(n),
-          "data" -> BSONBinary(array, Subtype.GenericBinarySubtype))
+            "files_id" -> file.id.asInstanceOf[BSONValue],
+            "n" -> BSONInteger(n),
+            "data" -> BSONBinary(array, Subtype.GenericBinarySubtype))
         }
         chunks[BSONCollection].insert(bson)
       }
