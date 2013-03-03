@@ -119,13 +119,8 @@ object ChannelBufferWritableBuffer {
 case class BufferSequence(private val head: ChannelBuffer, private val tail: ChannelBuffer*) {
   def merged: ChannelBuffer = mergedBuffer.duplicate()
 
-  private lazy val mergedBuffer = {
-    val bufs = (head +: tail).map(cb => cb.duplicate())
-    bufs.tail.foldLeft(bufs.head) { (result, buf) =>
-      result writeBytes buf
-      result
-    }
-  }
+  private lazy val mergedBuffer =
+    ChannelBuffers.wrappedBuffer((head +: tail): _*)
 }
 
 object BufferSequence {
