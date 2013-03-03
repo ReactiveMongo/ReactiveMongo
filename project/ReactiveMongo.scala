@@ -154,7 +154,9 @@ object ReactiveMongoBuild extends Build {
   lazy val reactivemongo = Project(
     "ReactiveMongo-Root",
     file("."),
-    settings = buildSettings ++ Unidoc.settings) aggregate(driver, bson)
+    settings = buildSettings ++ Unidoc.settings ++ Seq(
+      publish := {}
+    )) aggregate(driver, bson)
 
   lazy val driver = Project(
     "ReactiveMongo",
