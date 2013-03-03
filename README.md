@@ -41,15 +41,21 @@ This will start a standalone MongoDB instance that stores its data in the ```dat
 
 ### Set up your project dependencies
 
-There is a Maven repository at `https://bitbucket.org/sgodbillon/repository/raw/master/snapshots/`.
-
-If you use SBT, you just have to edit your build.properties and add the following:
+If you use SBT, you just have to edit your build.sbt and add the following:
 
 ```scala
-resolvers += "sgodbillon" at "https://bitbucket.org/sgodbillon/repository/raw/master/snapshots/"
+libraryDependencies ++= Seq(
+  "org.reactivemongo" %% "reactivemongo" % "0.8"
+)
+```
+
+If you want to use the latest snapshot, add the following instead:
+
+```scala
+resolvers += "Sonatype Snapshots" at "http://oss.sonatype.org/content/repositories/snapshots/"
 
 libraryDependencies ++= Seq(
-  "reactivemongo" %% "reactivemongo" % "0.1-SNAPSHOT"
+  "org.reactivemongo" %% "reactivemongo" % "0.9-SNAPSHOT"
 )
 ```
 
