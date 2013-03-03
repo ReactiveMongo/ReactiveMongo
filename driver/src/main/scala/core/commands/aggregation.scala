@@ -1,8 +1,7 @@
 package core.commands
 
 import reactivemongo.bson._
-import reactivemongo.bson.BSONString
-import reactivemongo.core.commands.{CommandError, BSONCommandResultMaker, Command}
+import reactivemongo.core.commands.{ CommandError, BSONCommandResultMaker, Command }
 
 /**
  * Implements the "aggregation" command, otherwise known as the "Aggregation Framework."
@@ -11,23 +10,20 @@ import reactivemongo.core.commands.{CommandError, BSONCommandResultMaker, Comman
  * @param collectionName Collection to aggregate against
  * @param pipeline Sequence of MongoDB aggregation operations.
  */
-case class Aggregate (
-  collectionName: String,
-  pipeline: Seq[PipelineOperator]
-) extends Command[BSONValue] {
+case class Aggregate(
+    collectionName: String,
+    pipeline: Seq[PipelineOperator]) extends Command[BSONValue] {
   override def makeDocuments =
     BSONDocument(
       "aggregate" -> BSONString(collectionName),
       "pipeline" -> BSONArray(
-        {for (pipe <- pipeline) yield pipe.makePipe} : _*
-      )
-    )
+        { for (pipe <- pipeline) yield pipe.makePipe }.toStream))
 
   val ResultMaker = Aggregate
 }
 
 object Aggregate extends BSONCommandResultMaker[BSONValue] {
-  def apply(document: TraversableBSONDocument) =
+  def apply(document: BSONDocument) =
     CommandError.checkOk(document, Some("aggregate")).toLeft(document.get("result").get)
 }
 
@@ -46,10 +42,9 @@ sealed trait PipelineOperator {
  * http://docs.mongodb.org/manual/reference/aggregation/project/#_S_project
  * @param fields Fields to include. The resulting objects will contain only these fields
  */
-case class Project(fields: String*) extends PipelineOperator{
+case class Project(fields: String*) extends PipelineOperator {
   override val makePipe = BSONDocument("$project" -> BSONDocument(
-    {for (field <- fields) yield field -> BSONInteger(1)} : _*
-  ))
+    { for (field <- fields) yield field -> BSONInteger(1) }.toStream))
 }
 
 /**
@@ -57,7 +52,7 @@ case class Project(fields: String*) extends PipelineOperator{
  * http://docs.mongodb.org/manual/reference/aggregation/match/#_S_match
  * @param predicate Query that documents must satisfy to be in the stream.
  */
-case class Match(predicate: BSONDocument) extends PipelineOperator{
+case class Match(predicate: BSONDocument) extends PipelineOperator {
   override val makePipe = BSONDocument("$match" -> predicate)
 }
 
@@ -66,7 +61,7 @@ case class Match(predicate: BSONDocument) extends PipelineOperator{
  * http://docs.mongodb.org/manual/reference/aggregation/limit/#_S_limit
  * @param limit Number of documents to allow through.
  */
-case class Limit(limit: Int) extends PipelineOperator{
+case class Limit(limit: Int) extends PipelineOperator {
   override val makePipe = BSONDocument("$limit" -> BSONInteger(limit))
 }
 
@@ -75,7 +70,7 @@ case class Limit(limit: Int) extends PipelineOperator{
  * http://docs.mongodb.org/manual/reference/aggregation/skip/#_S_skip
  * @param skip Number of documents to skip.
  */
-case class Skip(skip: Int) extends PipelineOperator{
+case class Skip(skip: Int) extends PipelineOperator {
   override val makePipe = BSONDocument("$skip" -> BSONInteger(skip))
 }
 
@@ -85,7 +80,7 @@ case class Skip(skip: Int) extends PipelineOperator{
  * http://docs.mongodb.org/manual/reference/aggregation/unwind/#_S_unwind
  * @param field Name of the array to unwind.
  */
-case class Unwind(field: String) extends PipelineOperator{
+case class Unwind(field: String) extends PipelineOperator {
   override val makePipe = BSONDocument("$unwind" -> BSONString("$" + field))
 }
 
@@ -99,12 +94,12 @@ case class Unwind(field: String) extends PipelineOperator{
 case class GroupField(idField: String)(ops: (String, GroupFunction)*) extends PipelineOperator {
   override val makePipe = BSONDocument(
     "$group" -> BSONDocument(
-    {"_id" -> BSONString(idField)}
-      +: {ops.map{
-        case (field, operator) => field -> operator.makeFunction
-      }}:_*
-    )
-  )
+      { "_id" -> BSONString(idField) }
+        +: {
+          ops.map {
+            case (field, operator) => field -> operator.makeFunction
+          }
+        }.toStream))
 }
 
 /**
@@ -117,16 +112,17 @@ case class GroupField(idField: String)(ops: (String, GroupFunction)*) extends Pi
 case class GroupMulti(idField: (String, String)*)(ops: (String, GroupFunction)*) extends PipelineOperator {
   override val makePipe = BSONDocument(
     "$group" -> BSONDocument(
-      {"_id" -> BSONDocument(
-        idField.map{
-          case (alias, attribute) => alias -> BSONString("$" + attribute)
-        }:_*
-      )} +:
-      {ops.map{
-        case (field, operator) => field -> operator.makeFunction
-      }}:_*
-    )
-  )
+      {
+        "_id" -> BSONDocument(
+          idField.map {
+            case (alias, attribute) => alias -> BSONString("$" + attribute)
+          }.toStream)
+      } +:
+        {
+          ops.map {
+            case (field, operator) => field -> operator.makeFunction
+          }
+        }.toStream))
 }
 
 /**
@@ -134,11 +130,11 @@ case class GroupMulti(idField: (String, String)*)(ops: (String, GroupFunction)*)
  * http://docs.mongodb.org/manual/reference/aggregation/sort/#_S_sort
  * @param fields Fields to sort by.
  */
-case class Sort(fields: Seq[SortOrder]) extends PipelineOperator{
-  override val makePipe = BSONDocument("$sort" -> BSONDocument(fields.map{
+case class Sort(fields: Seq[SortOrder]) extends PipelineOperator {
+  override val makePipe = BSONDocument("$sort" -> BSONDocument(fields.map {
     case Ascending(field) => field -> BSONInteger(1)
     case Descending(field) => field -> BSONInteger(-1)
-  } : _*))
+  }.toStream))
 }
 
 /**
@@ -157,7 +153,7 @@ sealed trait GroupFunction {
   def makeFunction: BSONValue
 }
 
-case class AddToSet(field: String) extends GroupFunction{
+case class AddToSet(field: String) extends GroupFunction {
   def makeFunction = BSONDocument("$addToSet" -> BSONString(field))
 }
 
