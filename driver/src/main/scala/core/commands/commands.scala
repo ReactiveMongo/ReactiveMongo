@@ -442,7 +442,7 @@ case class IsMasterResponse(
     secondary: Boolean,
     maxBsonObjectSize: Int,
     setName: Option[String],
-    hosts: Option[List[String]],
+    hosts: Option[Seq[String]],
     me: Option[String]) {
   /** the resolved [[reactivemongo.core.protocol.NodeState]] of the answering server */
   lazy val state: NodeState = if (isMaster) PRIMARY else if (secondary) SECONDARY else UNKNOWN

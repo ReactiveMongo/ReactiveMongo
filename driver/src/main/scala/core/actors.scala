@@ -99,8 +99,8 @@ case object Closed
  * @param nbChannelsPerNode number of open channels by node
  */
 class MongoDBSystem(
-    seeds: List[String],
-    auth: List[Authenticate],
+    seeds: Seq[String],
+    auth: Seq[Authenticate],
     nbChannelsPerNode: Int,
     channelFactory: ChannelFactory = new ChannelFactory()) extends Actor {
   import MongoDBSystem._
@@ -410,8 +410,8 @@ object MongoDBSystem {
 }
 
 private[actors] case class AuthHistory(
-    authenticateRequests: List[(Authenticate, List[ActorRef])]) {
-  lazy val authenticates: List[Authenticate] = authenticateRequests.map(_._1)
+    authenticateRequests: Seq[(Authenticate, List[ActorRef])]) {
+  lazy val authenticates: Seq[Authenticate] = authenticateRequests.map(_._1)
 
   lazy val expectingAuthenticationCompletion = authenticateRequests.filter(!_._2.isEmpty)
 
