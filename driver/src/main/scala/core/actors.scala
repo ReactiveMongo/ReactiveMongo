@@ -243,35 +243,44 @@ class MongoDBSystem(
       }
     }
     // isMaster response
-    case response: Response if requestIds.isMaster accepts response => {
-      val isMaster = IsMaster.ResultMaker(response).right.get
-      updateNodeSet(if (isMaster.hosts.isDefined) { // then it's a ReplicaSet
-        val mynodes = isMaster.hosts.get.map(name => Node(name, if (isMaster.me.exists(_ == name)) isMaster.state else NONE))
-        nodeSet.addNodes(mynodes).copy(name = isMaster.setName).createNeededChannels(self, nbChannelsPerNode)
-      } else if (nodeSet.nodes.length > 0) {
-        logger.debug("single node, update..." + nodeSet)
-        NodeSet(None, None, nodeSet.nodes.slice(0, 1).map(_.copy(state = isMaster.state))).createNeededChannels(self, nbChannelsPerNode)
-      } else throw new RuntimeException("single node discovery failure..."))
-      logger.debug("NodeSet is now " + nodeSet)
-      nodeSet.connectAll
-      updateNodeSet(nodeSet.updateByChannelId(response.info.channelId,
-        _.updateChannelById(response.info.channelId, authenticateChannel(_))))
-    }
+    case response: Response if requestIds.isMaster accepts response =>
+      IsMaster.ResultMaker(response).fold(
+        e => {
+          logger.error(s"error while processing isMaster response #${response.header.responseTo}", e)
+        },
+        isMaster => {
+          updateNodeSet(if (isMaster.hosts.isDefined) { // then it's a ReplicaSet
+            val mynodes = isMaster.hosts.get.map(name => Node(name, if (isMaster.me.exists(_ == name)) isMaster.state else NONE))
+            nodeSet.addNodes(mynodes).copy(name = isMaster.setName).createNeededChannels(self, nbChannelsPerNode)
+          } else if (nodeSet.nodes.length > 0) {
+            logger.debug("single node, update..." + nodeSet)
+            NodeSet(None, None, nodeSet.nodes.slice(0, 1).map(_.copy(state = isMaster.state))).createNeededChannels(self, nbChannelsPerNode)
+          } else throw new RuntimeException("single node discovery failure..."))
+          logger.debug("NodeSet is now " + nodeSet)
+          nodeSet.connectAll
+          updateNodeSet(nodeSet.updateByChannelId(response.info.channelId,
+            _.updateChannelById(response.info.channelId, authenticateChannel(_))))
+        })
+
     // getnonce response
-    case response: Response if requestIds.getNonce accepts response => {
-      val nonce = Getnonce.ResultMaker(response).right.get
-      logger.debug("AUTH: got nonce for channel " + response.info.channelId + ": " + nonce)
-      updateNodeSet(nodeSet.updateByChannelId(response.info.channelId, node =>
-        node.updateChannelById(response.info.channelId, {
-          case mongoChannel @ MongoChannel(channel, authenticating: Authenticating, _) =>
-            logger.debug("NONCE authenticating channel is " + channel + " with " + authenticating)
-            channel.write(AuthenticateCommand(authenticating.user, authenticating.password, nonce)(authenticating.db).maker(requestIds.authenticate.next))
-            mongoChannel.copy(state = authenticating.copy(nonce = Some(nonce)))
-          case channel =>
-            logger.debug("channel got authenticated response while not authenticating! " + channel)
-            channel
-        })))
-    }
+    case response: Response if requestIds.getNonce accepts response =>
+      Getnonce.ResultMaker(response).fold(
+        e =>
+          logger.error(s"error while processing getNonce response #${response.header.responseTo}", e),
+        nonce => {
+          logger.debug("AUTH: got nonce for channel " + response.info.channelId + ": " + nonce)
+          updateNodeSet(nodeSet.updateByChannelId(response.info.channelId, node =>
+            node.updateChannelById(response.info.channelId, {
+              case mongoChannel @ MongoChannel(channel, authenticating: Authenticating, _) =>
+                logger.debug("NONCE authenticating channel is " + channel + " with " + authenticating)
+                channel.write(AuthenticateCommand(authenticating.user, authenticating.password, nonce)(authenticating.db).maker(requestIds.authenticate.next))
+                mongoChannel.copy(state = authenticating.copy(nonce = Some(nonce)))
+              case channel =>
+                logger.debug("channel got authenticated response while not authenticating! " + channel)
+                channel
+            })))
+        })
+
     // authenticate response
     case response: Response if requestIds.authenticate accepts response => {
       logger.debug("AUTH: got authenticated response! " + response.info.channelId)
@@ -311,20 +320,23 @@ class MongoDBSystem(
             logger.debug("{" + response.header.responseTo + "} it's a getlasterror")
             // todo, for now rewinding buffer at original index
             val ridx = response.documents.readerIndex
-            val lastErrorE = LastError(response)
-            lastErrorE match {
-              case Left(e) =>
-                e.printStackTrace()
-              case Right(ok) => println("lasterror ok")
-            }
-            val lastError = lastErrorE.right.get
-            if (lastError.isNotAPrimaryError) {
-              onPrimaryUnavailable()
-              promise.failure(lastError)
-            } else {
-              response.documents.readerIndex(ridx)
-              promise.success(response)
-            }
+            LastError(response).fold(
+              e => {
+                logger.error(s"Error deserializing LastError message #${response.header.responseTo}", e)
+                promise.failure(new RuntimeException(s"Error deserializing LastError message #${response.header.responseTo}", e))
+              },
+              lastError => {
+                if (lastError.inError) {
+                  logger.debug("{" + response.header.responseTo + "} sending a failure (lasterror is not ok)")
+                  if (lastError.isNotAPrimaryError)
+                    onPrimaryUnavailable()
+                  promise.failure(lastError)
+                } else {
+                  logger.trace("{" + response.header.responseTo + "} sending a success (lasterror is ok)")
+                  response.documents.readerIndex(ridx)
+                  promise.success(response)
+                }
+              })
           } else {
             logger.trace("{" + response.header.responseTo + "} sending a success!")
             promise.success(response)

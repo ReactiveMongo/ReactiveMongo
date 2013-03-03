@@ -81,6 +81,7 @@ case class LazyLogger(logger: org.slf4j.Logger) {
   def info(s: => String) { if (logger.isInfoEnabled) logger.info(s) }
   def warn(s: => String) { if (logger.isWarnEnabled) logger.warn(s) }
   def error(s: => String) { if (logger.isErrorEnabled) logger.error(s) }
+  def error(s: => String, e: => Throwable) { if (logger.isErrorEnabled) logger.error(s, e) }
 }
 
 object LazyLogger {
