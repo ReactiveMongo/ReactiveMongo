@@ -238,8 +238,10 @@ class DefaultCursor[T](response: Response, private[api] val mongoConnection: Mon
   }
 
   def close() {
-    Cursor.logger.debug("sending killcursor on id = " + response.reply.cursorID)
-    connection.map(_.send(RequestMaker(KillCursors(Set(response.reply.cursorID)))))
+    if (response.reply.cursorID != 0) {
+      Cursor.logger.debug("sending killcursor on id = " + response.reply.cursorID)
+      connection.map(_.send(RequestMaker(KillCursors(Set(response.reply.cursorID)))))
+    }
   }
 }
 
@@ -324,7 +326,7 @@ class TailableCursor[T](cursor: DefaultCursor[T], private val controller: Tailab
     logger.debug("TailableCursor closing")
     cursor.cursorId.map { id =>
       controller.stop()
-      if (id > 0) {
+      if (id != 0) {
         Cursor.logger.debug("sending killcursor on id = " + id)
         connection.map(_.send(RequestMaker(KillCursors(Set(id)))))
       }
