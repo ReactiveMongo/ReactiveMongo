@@ -33,7 +33,7 @@ object `package` {
 
 object Implicits {
   /** A default `BSONReader` for `ReadFile`. */
-  implicit object DefaultReadFileReader extends BSONDocumentReader[DefaultReadFile] {
+  implicit object DefaultReadFileReader extends BSONDocumentReader[ReadFile[BSONValue]] {
     import DefaultBSONHandlers._
     def read(doc: BSONDocument) = {
       val metadata = doc.elements.filterNot { element =>
