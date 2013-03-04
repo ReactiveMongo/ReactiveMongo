@@ -87,7 +87,7 @@ trait FailoverDB {
   val failoverStrategy: FailoverStrategy
 
   def command[T](command: Command[T])(implicit ec: ExecutionContext): Future[T] =
-    Failover(command.apply(name).maker, connection.mongosystem, failoverStrategy).future.mapEither(command.ResultMaker(_))
+    Failover(command.apply(name).maker, connection, failoverStrategy).future.mapEither(command.ResultMaker(_))
 }
 
 /** A mixin that provides commands about this database itself. */

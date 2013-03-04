@@ -163,7 +163,7 @@ class GridFS[Structure, Reader[_], Writer[_]](db: DB with DBMetaCommands, prefix
    * @return An `Iteratee` that will consume data to put into a GridFS store.
    */
   def iteratee[Id <: BSONValue](file: FileToSave[Id], chunkSize: Int = 262144)(implicit readFileReader: Reader[ReadFile[Id]], ctx: ExecutionContext): Iteratee[Array[Byte], Future[ReadFile[Id]]] = {
-    implicit val ec = MongoConnection.system
+    implicit val ec = db.connection.actorSystem
 
     case class Chunk(
         previous: Array[Byte] = new Array(0),

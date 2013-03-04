@@ -9,7 +9,8 @@ object Common {
   
   val timeout = 10 seconds
   
-  lazy val connection = MongoConnection(List("localhost:27017"))
+  lazy val driver = new MongoDriver
+  lazy val connection = driver.connection(List("localhost:27017"))
   lazy val db = {
     val _db = connection("specs2-test-reactivemongo")
     Await.ready(_db.drop, timeout)

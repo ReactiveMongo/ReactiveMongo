@@ -42,7 +42,7 @@ import scala.util.{ Failure, Success }
  * @param strategy The Failover strategy.
  * @param expectingResponseMaker A function that takes a message of type `T` and wraps it into an ExpectingResponse message.
  */
-class Failover[T](message: T, actorRef: ActorRef, strategy: FailoverStrategy)(expectingResponseMaker: T => ExpectingResponse)(implicit ec: ExecutionContext) {
+class Failover[T](message: T, connection: MongoConnection, strategy: FailoverStrategy)(expectingResponseMaker: T => ExpectingResponse)(implicit ec: ExecutionContext) {
   import Failover.logger
   import reactivemongo.core.errors._
   import reactivemongo.core.actors.Exceptions._
@@ -53,7 +53,7 @@ class Failover[T](message: T, actorRef: ActorRef, strategy: FailoverStrategy)(ex
 
   private def send(n: Int) {
     val expectingResponse = expectingResponseMaker(message)
-    actorRef ! expectingResponse
+    connection.mongosystem ! expectingResponse
     expectingResponse.future.onComplete {
       case Failure(e) if isRetryable(e) =>
         if (n < strategy.retries) {
@@ -61,7 +61,7 @@ class Failover[T](message: T, actorRef: ActorRef, strategy: FailoverStrategy)(ex
           val delayFactor = strategy.delayFactor(`try`)
           val delay = Duration.unapply(strategy.initialDelay * delayFactor).map(t => FiniteDuration(t._1, t._2)).getOrElse(strategy.initialDelay)
           logger.warn("Got an error, retrying... (try #" + `try` + " is scheduled in " + delay.toMillis + " ms)", e)
-          MongoConnection.system.scheduler.scheduleOnce(delay)(send(`try`))
+          connection.actorSystem.scheduler.scheduleOnce(delay)(send(`try`))
         } else {
           // generally that means that the primary is not available or the nodeset is unreachable
           logger.error("Got an error, no more attempts to do. Completing with a failure...", e)
@@ -95,8 +95,8 @@ object Failover {
    * @param actorRef The reference to the MongoDBSystem actor the given message will be sent to.
    * @param strategy The Failover strategy.
    */
-  def apply(checkedWriteRequest: CheckedWriteRequest, actorRef: ActorRef, strategy: FailoverStrategy)(implicit ec: ExecutionContext): Failover[CheckedWriteRequest] =
-    new Failover(checkedWriteRequest, actorRef, strategy)(CheckedWriteRequestExpectingResponse.apply)
+  def apply(checkedWriteRequest: CheckedWriteRequest, connection: MongoConnection, strategy: FailoverStrategy)(implicit ec: ExecutionContext): Failover[CheckedWriteRequest] =
+    new Failover(checkedWriteRequest, connection, strategy)(CheckedWriteRequestExpectingResponse.apply)
 
   /**
    * Produces a [[reactivemongo.api.Failover]] holding a future reference that is completed with a result, after 1 or more attempts (specified in the given strategy).
@@ -105,8 +105,8 @@ object Failover {
    * @param actorRef The reference to the MongoDBSystem actor the given message will be sent to.
    * @param strategy The Failover strategy.
    */
-  def apply(requestMaker: RequestMaker, actorRef: ActorRef, strategy: FailoverStrategy)(implicit ec: ExecutionContext): Failover[RequestMaker] =
-    new Failover(requestMaker, actorRef, strategy)(RequestMakerExpectingResponse.apply)
+  def apply(requestMaker: RequestMaker, connection: MongoConnection, strategy: FailoverStrategy)(implicit ec: ExecutionContext): Failover[RequestMaker] =
+    new Failover(requestMaker, connection, strategy)(RequestMakerExpectingResponse.apply)
 }
 
 /**
@@ -144,6 +144,7 @@ case class FailoverStrategy(
  * @param mongosystem A reference to a [[reactivemongo.core.actors.MongoDBSystem]] Actor.
  */
 class MongoConnection(
+    val actorSystem: ActorSystem,
     val mongosystem: ActorRef,
     monitor: ActorRef) {
   import akka.pattern.{ ask => akkaAsk }
@@ -215,15 +216,16 @@ class MongoConnection(
   def close(): Unit = monitor ! Close
 }
 
-object MongoConnection {
-  import com.typesafe.config.ConfigFactory
-  val config = ConfigFactory.load()
+class MongoDriver {
+  val system = {
+    import com.typesafe.config.ConfigFactory
+    val config = ConfigFactory.load()
+    ActorSystem("reactivemongo", config.getConfig("mongo-async-driver"))
+  }
 
-  /**
-   * The actor system that creates all the required actors.
-   */
-  val system = ActorSystem("mongodb", config.getConfig("mongo-async-driver"))
-
+  def close() = {
+    system.shutdown
+  }
   /**
    * Creates a new MongoConnection.
    *
@@ -232,10 +234,10 @@ object MongoConnection {
    * @param nbChannelsPerNode Number of channels to open per node. Defaults to 10.
    * @param name The name of the newly created [[reactivemongo.core.actors.MongoDBSystem]] actor, if needed.
    */
-  def apply(nodes: Seq[String], authentications: Seq[Authenticate] = Seq.empty, nbChannelsPerNode: Int = 10, name: Option[String] = None) = {
+  def connection(nodes: Seq[String], authentications: Seq[Authenticate] = Seq.empty, nbChannelsPerNode: Int = 10, name: Option[String] = None) = {
     val props = Props(new MongoDBSystem(nodes, authentications, nbChannelsPerNode))
     val mongosystem = if (name.isDefined) system.actorOf(props, name = name.get) else system.actorOf(props)
     val monitor = system.actorOf(Props(new MonitorActor(mongosystem)))
-    new MongoConnection(mongosystem, monitor)
+    new MongoConnection(system, mongosystem, monitor)
   }
 }

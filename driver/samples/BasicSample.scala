@@ -2,14 +2,24 @@ package samples
 
 import play.api.libs.iteratee.Iteratee
 
-import reactivemongo.api.MongoConnection
+import reactivemongo.api.MongoDriver
 import reactivemongo.bson._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
 object Samples {
 
-  val connection = MongoConnection(List("localhost"))
+  // gets an instance of the driver
+  // (creates an actor system)
+  val driver = new MongoDriver
+  /* Gets a connection using this MongoDriver instance.
+   * The connection creates a pool of connections.
+   * *** USE WITH CAUTION ***
+   * Both ReactiveMongo class and MongoConnection class should be instantiated one time in your application
+   * (each time you make a ReactiveMongo instance, you create an actor system; each time you create a MongoConnection
+   * instance, you create a pool of connections).
+   */
+  val connection = driver.connection(List("localhost"))
 
   // Gets a reference to the database "plugin"
   val db = connection("plugin")

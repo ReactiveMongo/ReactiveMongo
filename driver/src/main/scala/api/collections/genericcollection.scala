@@ -148,7 +148,7 @@ trait GenericCollection[Structure, Reader[_], Writer[_]] extends Collection with
     val op = Insert(0, fullCollectionName)
     val bson = writeDoc(document, writer)
     val checkedWriteRequest = CheckedWriteRequest(op, BufferSequence(bson), writeConcern)
-    Failover(checkedWriteRequest, db.connection.mongosystem, failoverStrategy).future.mapEither(LastError.meaningful(_))
+    Failover(checkedWriteRequest, db.connection, failoverStrategy).future.mapEither(LastError.meaningful(_))
   }
 
   /**
@@ -165,7 +165,7 @@ trait GenericCollection[Structure, Reader[_], Writer[_]] extends Collection with
     val op = Insert(0, fullCollectionName)
     val bson = writeDoc(document)
     val checkedWriteRequest = CheckedWriteRequest(op, BufferSequence(bson), writeConcern) //TODO
-    Failover(checkedWriteRequest, db.connection.mongosystem, failoverStrategy).future.mapEither(LastError.meaningful(_))
+    Failover(checkedWriteRequest, db.connection, failoverStrategy).future.mapEither(LastError.meaningful(_))
   }
 
   /**
@@ -197,7 +197,7 @@ trait GenericCollection[Structure, Reader[_], Writer[_]] extends Collection with
     val bson = writeDoc(selector, selectorWriter)
     bson.writeBytes(writeDoc(update, updateWriter))
     val checkedWriteRequest = CheckedWriteRequest(op, BufferSequence(bson), writeConcern)
-    Failover(checkedWriteRequest, db.connection.mongosystem, failoverStrategy).future.mapEither(LastError.meaningful(_))
+    Failover(checkedWriteRequest, db.connection, failoverStrategy).future.mapEither(LastError.meaningful(_))
   }
 
   /**
@@ -217,7 +217,7 @@ trait GenericCollection[Structure, Reader[_], Writer[_]] extends Collection with
     val op = Delete(fullCollectionName, if (firstMatchOnly) 1 else 0)
     val bson = writeDoc(query, writer)
     val checkedWriteRequest = CheckedWriteRequest(op, BufferSequence(bson), writeConcern)
-    Failover(checkedWriteRequest, db.connection.mongosystem, failoverStrategy).future.mapEither(LastError.meaningful(_))
+    Failover(checkedWriteRequest, db.connection, failoverStrategy).future.mapEither(LastError.meaningful(_))
   }
 
   def bulkInsert[T](enumerator: Enumerator[T], bulkSize: Int = bulk.MaxDocs, bulkByteSize: Int = bulk.MaxBulkSize)(implicit writer: Writer[T], ec: ExecutionContext): Future[Int] =
@@ -337,7 +337,7 @@ trait GenericQueryBuilder[Structure, Reader[_], Writer[_]] extends GenericHandle
     val op = Query(options.flagsN, collection.fullCollectionName, options.skipN, options.batchSizeN)
     val requestMaker = RequestMaker(op, documents)
 
-    Cursor.flatten(Failover(requestMaker, collection.db.connection.mongosystem, failover).future.map { response =>
+    Cursor.flatten(Failover(requestMaker, collection.db.connection, failover).future.map { response =>
       val cursor = new DefaultCursor(response, collection.db.connection, op, documents, failover)(BufferReaderInstance(reader), ec)
       if ((options.flagsN & QueryFlags.TailableCursor) != 0)
         new TailableCursor(cursor)

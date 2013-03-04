@@ -280,7 +280,7 @@ class DefaultCursor[T](response: Response, private[api] val mongoConnection: Mon
     if (response.reply.cursorID != 0) {
       val op = GetMore(query.fullCollectionName, query.numberToReturn, response.reply.cursorID)
       logger.debug("cursor: calling next on " + response.reply.cursorID + ", op=" + op)
-      Failover(RequestMaker(op).copy(channelIdHint = Some(response.info.channelId)), mongoConnection.mongosystem, failoverStrategy).future.map { r => logger.debug("from " + response + " to " + r); new DefaultCursor(r, mongoConnection, query, originalRequest, failoverStrategy) }
+      Failover(RequestMaker(op).copy(channelIdHint = Some(response.info.channelId)), mongoConnection, failoverStrategy).future.map { r => logger.debug("from " + response + " to " + r); new DefaultCursor(r, mongoConnection, query, originalRequest, failoverStrategy) }
     } else {
       logger.debug("throwing no such element exception")
       Future.failed(new NoSuchElementException())
@@ -292,7 +292,7 @@ class DefaultCursor[T](response: Response, private[api] val mongoConnection: Mon
   def regenerate = {
     logger.debug("regenerating")
     val requestMaker = RequestMaker(query, originalRequest)
-    Failover(requestMaker, mongoConnection.mongosystem, failoverStrategy).future.map { response =>
+    Failover(requestMaker, mongoConnection, failoverStrategy).future.map { response =>
       new DefaultCursor(response, mongoConnection, query, originalRequest, failoverStrategy)
     }
   }
@@ -366,7 +366,7 @@ class TailableCursor[T](cursor: DefaultCursor[T], private val controller: Tailab
       val fut = cursor.next.recoverWith {
         case _ =>
           logger.debug("regenerating cursor")
-          val f = DelayedFuture(500, MongoConnection.system).flatMap(_ => cursor.regenerate)
+          val f = DelayedFuture(500, cursor.mongoConnection.actorSystem).flatMap(_ => cursor.regenerate)
           f.onComplete {
             case Failure(e) => e.printStackTrace()
             case Success(t) => logger.debug("regenerate is ok")
