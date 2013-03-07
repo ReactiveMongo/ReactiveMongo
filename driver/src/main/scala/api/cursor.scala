@@ -112,10 +112,10 @@ trait Cursor[T] {
    */
   def enumerate()(implicit ctx: ExecutionContext): Enumerator[T] = {
     if (hasNext) {
-      CustomEnumerator.unfoldM(this) { cursor =>
-        Cursor.nextElement(cursor)
-      }.andThen(Enumerator.eof) &> Enumeratee.collect {
-        case Some(e) => e
+      CustomEnumerator.StateEnumerator(Cursor.nextElement(this)) { coucou =>
+        Cursor.nextElement(coucou._1)
+      } &> Enumeratee.collect {
+        case (_, Some(t)) => t
       } &> Enumeratee.onIterateeDone(() => {
         logger.debug("iteratee is done, closing cursor")
         close()
@@ -124,6 +124,9 @@ trait Cursor[T] {
       Enumerator.eof
     }
   }
+
+  def enumerate(upTo: Int)(implicit ctx: ExecutionContext): Enumerator[T] =
+    enumerate &> Enumeratee.take(upTo)
 
   /**
    * Collects all the documents into a collection of type `M[T]`.
@@ -342,7 +345,7 @@ object Cursor {
    */
   def flatten[T](futureCursor: Future[Cursor[T]])(implicit ctx: ExecutionContext) = new FlattenedCursor(futureCursor)
 
-  private def nextElement[T](cursor: Cursor[T])(implicit ec: ExecutionContext): Future[Option[(Cursor[T], Option[T])]] = {
+  def nextElement[T](cursor: Cursor[T])(implicit ec: ExecutionContext): Future[Option[(Cursor[T], Option[T])]] = {
     if (cursor.iterator.hasNext)
       Future(Some((cursor, Some(cursor.iterator.next()))))
     else if (cursor.hasNext)
