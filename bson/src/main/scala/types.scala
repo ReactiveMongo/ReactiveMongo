@@ -22,9 +22,9 @@ import buffer._
 import utils.Converters
 
 /** A BSON Double. */
-case class BSONDouble(value: Double) extends BSONValue { val code = 0x01 }
+case class BSONDouble(value: Double) extends BSONValue { val code = 0x01.toByte }
 
-case class BSONString(value: String) extends BSONValue { val code = 0x02 }
+case class BSONString(value: String) extends BSONValue { val code = 0x02.toByte }
 
 /**
  * A `BSONDocument` structure (BSON type `0x03`).
@@ -34,7 +34,7 @@ case class BSONString(value: String) extends BSONValue { val code = 0x02 }
  * we cannot be sure that a not yet deserialized value will be processed without error.
  */
 class BSONDocument(val stream: Stream[Try[BSONElement]]) extends BSONValue {
-  val code = 0x03
+  val code = 0x03.toByte
 
   /**
    * Returns the [[BSONValue]] associated with the given `key`.
@@ -160,7 +160,7 @@ object BSONDocument {
  * we cannot be sure that a not yet deserialized value will be processed without error.
  */
 class BSONArray(val stream: Stream[Try[BSONValue]]) extends BSONValue {
-  val code = 0x04
+  val code = 0x04.toByte
 
   /**
    * Returns the [[BSONValue]] at the given `index`.
@@ -269,7 +269,7 @@ object BSONArray {
  * @param value The binary content.
  * @param subtype The type of the binary content.
  */
-case class BSONBinary(value: ReadableBuffer, subtype: Subtype) extends BSONValue { val code = 0x05 } // TODO
+case class BSONBinary(value: ReadableBuffer, subtype: Subtype) extends BSONValue { val code = 0x05.toByte } // TODO
 
 object BSONBinary {
   def apply(value: Array[Byte], subtype: Subtype): BSONBinary =
@@ -277,11 +277,11 @@ object BSONBinary {
 }
 
 /** BSON Undefined value */
-case object BSONUndefined extends BSONValue { val code = 0x06 }
+case object BSONUndefined extends BSONValue { val code = 0x06.toByte }
 
 /** BSON ObjectId value. */
 case class BSONObjectID(value: Array[Byte]) extends BSONValue {
-  val code = 0x07
+  val code = 0x07.toByte
 
   import java.util.Arrays
   import java.nio.ByteBuffer
@@ -359,76 +359,76 @@ object BSONObjectID {
 }
 
 /** BSON boolean value */
-case class BSONBoolean(value: Boolean) extends BSONValue { val code = 0x08 }
+case class BSONBoolean(value: Boolean) extends BSONValue { val code = 0x08.toByte }
 
 /** BSON date time value */
-case class BSONDateTime(value: Long) extends BSONValue { val code = 0x09 }
+case class BSONDateTime(value: Long) extends BSONValue { val code = 0x09.toByte }
 
 /** BSON null value */
-case object BSONNull extends BSONValue { val code = 0x0A }
+case object BSONNull extends BSONValue { val code = 0x0A.toByte }
 
 /**
  * BSON Regex value.
  *
  * @param flags Regex flags.
  */
-case class BSONRegex(value: String, flags: String) extends BSONValue { val code = 0x0B }
+case class BSONRegex(value: String, flags: String) extends BSONValue { val code = 0x0B.toByte }
 
 /** BSON DBPointer value. TODO */
-case class BSONDBPointer(value: String, id: Array[Byte]) extends BSONValue { val code = 0x0C }
+case class BSONDBPointer(value: String, id: Array[Byte]) extends BSONValue { val code = 0x0C.toByte }
 
 /**
  * BSON JavaScript value.
  *
  * @param value The JavaScript source code.
  */
-case class BSONJavaScript(value: String) extends BSONValue { val code = 0x0D }
+case class BSONJavaScript(value: String) extends BSONValue { val code = 0x0D.toByte }
 
 /** BSON Symbol value. */
-case class BSONSymbol(value: String) extends BSONValue { val code = 0x0E }
+case class BSONSymbol(value: String) extends BSONValue { val code = 0x0E.toByte }
 
 /**
  * BSON scoped JavaScript value.
  *
  * @param value The JavaScript source code. TODO
  */
-case class BSONJavaScriptWS(value: String) extends BSONValue { val code = 0x0F }
+case class BSONJavaScriptWS(value: String) extends BSONValue { val code = 0x0F.toByte }
 
 /** BSON Integer value */
-case class BSONInteger(value: Int) extends BSONValue { val code = 0x10 }
+case class BSONInteger(value: Int) extends BSONValue { val code = 0x10.toByte }
 
 /** BSON Timestamp value. TODO */
-case class BSONTimestamp(value: Long) extends BSONValue { val code = 0x11 }
+case class BSONTimestamp(value: Long) extends BSONValue { val code = 0x11.toByte }
 
 /** BSON Long value */
-case class BSONLong(value: Long) extends BSONValue { val code = 0x12 }
+case class BSONLong(value: Long) extends BSONValue { val code = 0x12.toByte }
 
 /** BSON Min key value */
-object BSONMinKey extends BSONValue { val code = 0xFF }
+object BSONMinKey extends BSONValue { val code = 0xFF.toByte }
 
 /** BSON Max key value */
-object BSONMaxKey extends BSONValue { val code = 0x7F }
+object BSONMaxKey extends BSONValue { val code = 0x7F.toByte }
 
 /** Binary Subtype */
 sealed trait Subtype {
   /** Subtype code */
-  val value: Int
+  val value: Byte
 }
 
 object Subtype {
-  case object GenericBinarySubtype extends Subtype { val value = 0x00 }
-  case object FunctionSubtype extends Subtype { val value = 0x01 }
-  case object OldBinarySubtype extends Subtype { val value = 0x02 }
-  case object UuidSubtype extends Subtype { val value = 0x03 }
-  case object Md5Subtype extends Subtype { val value = 0x05 }
-  case object UserDefinedSubtype extends Subtype { val value = 0x80 }
-  def apply(code: Int) = code match {
-    case 0x00 => GenericBinarySubtype
-    case 0x01 => FunctionSubtype
-    case 0x02 => OldBinarySubtype
-    case 0x03 => UuidSubtype
-    case 0x05 => Md5Subtype
-    case 0x80 => UserDefinedSubtype
+  case object GenericBinarySubtype extends Subtype { val value = 0x00.toByte }
+  case object FunctionSubtype extends Subtype { val value = 0x01.toByte }
+  case object OldBinarySubtype extends Subtype { val value = 0x02.toByte }
+  case object UuidSubtype extends Subtype { val value = 0x03.toByte }
+  case object Md5Subtype extends Subtype { val value = 0x05.toByte }
+  case object UserDefinedSubtype extends Subtype { val value = 0x80.toByte }
+  def apply(code: Byte) = code match {
+    case 0 => GenericBinarySubtype
+    case 1 => FunctionSubtype
+    case 2 => OldBinarySubtype
+    case 3 => UuidSubtype
+    case 5 => Md5Subtype
+    case -128 => UserDefinedSubtype
     case _ => throw new NoSuchElementException(s"binary type = $code")
   }
 }

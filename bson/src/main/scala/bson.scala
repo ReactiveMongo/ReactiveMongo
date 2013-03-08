@@ -52,7 +52,7 @@ object Producer {
 }
 
 trait BSONValue {
-  val code: Int
+  val code: Byte
 }
 
 object BSONValue {
