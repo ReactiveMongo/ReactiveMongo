@@ -53,27 +53,27 @@ object DefaultBufferHandler extends BufferHandler {
 
   sealed trait BufferRW[B <: BSONValue] extends BufferWriter[B] with BufferReader[B]
 
-  val handlersByCode: Map[Int, BufferRW[_ <: BSONValue]] = Map(
-    0x01 -> BSONDoubleBufferHandler,
-    0x02 -> BSONStringBufferHandler,
-    0x03 -> BSONDocumentBufferHandler,
-    0x04 -> BSONArrayBufferHandler, // array
-    0x05 -> BSONBinaryBufferHandler, // binary TODO
-    0x06 -> BSONUndefinedBufferHandler, // undefined,
-    0x07 -> BSONObjectIDBufferHandler, // objectid,
-    0x08 -> BSONBooleanBufferHandler, // boolean
-    0x09 -> BSONDateTimeBufferHandler, // datetime
-    0x0A -> BSONNullBufferHandler, // null
-    0x0B -> BSONRegexBufferHandler, // regex
-    0x0C -> BSONDBPointerBufferHandler, // dbpointer
-    0x0D -> BSONJavaScriptBufferHandler, // JS
-    0x0E -> BSONSymbolBufferHandler, // symbol
-    0x0F -> BSONJavaScriptWSBufferHandler, // JS with scope
-    0x10 -> BSONIntegerBufferHandler,
-    0x11 -> BSONTimestampBufferHandler, // timestamp,
-    0x12 -> BSONLongBufferHandler, // long,
-    0xFF -> BSONMinKeyBufferHandler, // min
-    0x7F -> BSONMaxKeyBufferHandler) // max
+  val handlersByCode: Map[Byte, BufferRW[_ <: BSONValue]] = Map(
+    0x01.toByte -> BSONDoubleBufferHandler,
+    0x02.toByte -> BSONStringBufferHandler,
+    0x03.toByte -> BSONDocumentBufferHandler,
+    0x04.toByte -> BSONArrayBufferHandler, // array
+    0x05.toByte -> BSONBinaryBufferHandler, // binary TODO
+    0x06.toByte -> BSONUndefinedBufferHandler, // undefined,
+    0x07.toByte -> BSONObjectIDBufferHandler, // objectid,
+    0x08.toByte -> BSONBooleanBufferHandler, // boolean
+    0x09.toByte -> BSONDateTimeBufferHandler, // datetime
+    0x0A.toByte -> BSONNullBufferHandler, // null
+    0x0B.toByte -> BSONRegexBufferHandler, // regex
+    0x0C.toByte -> BSONDBPointerBufferHandler, // dbpointer
+    0x0D.toByte -> BSONJavaScriptBufferHandler, // JS
+    0x0E.toByte -> BSONSymbolBufferHandler, // symbol
+    0x0F.toByte -> BSONJavaScriptWSBufferHandler, // JS with scope
+    0x10.toByte -> BSONIntegerBufferHandler,
+    0x11.toByte -> BSONTimestampBufferHandler, // timestamp,
+    0x12.toByte -> BSONLongBufferHandler, // long,
+    0xFF.toByte -> BSONMinKeyBufferHandler, // min
+    0x7F.toByte -> BSONMaxKeyBufferHandler) // max
 
   object BSONDoubleBufferHandler extends BufferRW[BSONDouble] {
     def write(value: BSONDouble, buffer: WritableBuffer): WritableBuffer = buffer.writeDouble(value.value)
