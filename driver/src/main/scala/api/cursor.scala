@@ -80,6 +80,8 @@ trait Cursor[T] {
   import Cursor.logger
   /** An iterator on the last fetched documents. */
   val iterator: Iterator[T]
+  def nDocs: Int
+  def offset: Option[Int]
 
   def cursorId: Future[Long]
 
@@ -112,8 +114,8 @@ trait Cursor[T] {
    */
   def enumerate()(implicit ctx: ExecutionContext): Enumerator[T] = {
     if (hasNext) {
-      CustomEnumerator.StateEnumerator(Cursor.nextElement(this)) { coucou =>
-        Cursor.nextElement(coucou._1)
+      CustomEnumerator.StateEnumerator(Cursor.nextElement(this)) { state =>
+        Cursor.nextElement(state._1)
       } &> Enumeratee.collect {
         case (_, Some(t)) => t
       } &> Enumeratee.onIterateeDone(() => {
@@ -127,6 +129,47 @@ trait Cursor[T] {
 
   def enumerate(upTo: Int)(implicit ctx: ExecutionContext): Enumerator[T] =
     enumerate &> Enumeratee.take(upTo)
+
+  /** Cursor enumerator. */
+  def enumerateCursor()(implicit ctx: ExecutionContext): Enumerator[Cursor[T]] = {
+    val enum: Enumerator[Cursor[T]] = (if (hasNext) {
+      CustomEnumerator.StateEnumerator(Future(Some(this))) { cursor =>
+        if (cursor.hasNext)
+          cursor.next.map(Some(_))
+        else Future(None)
+      }
+    } else Enumerator.eof)
+    enum &> Enumeratee.filterNot(_.iterator.isEmpty) &> Enumeratee.onIterateeDone(() => {
+      logger.debug("iteratee is done, closing cursor...")
+      close()
+    })
+  }
+
+  /**
+   * Bulk enumerator.
+   *
+   * Much faster when dealing with large collections.
+   */
+  def enumerateBulks()(implicit ctx: ExecutionContext): Enumerator[Iterator[T]] = {
+    enumerateCursor &> Enumeratee.map { _.iterator }
+  }
+
+  /**
+   * Bulk enumerator.
+   *
+   * Much faster when dealing with large collections.
+   *
+   * @param limit Stop enumerating when at least n documents have been received.
+   */
+  def enumerateBulks(limit: Int)(implicit ctx: ExecutionContext): Enumerator[Iterator[T]] = {
+    enumerateCursor &> Enumeratee.takeWhile { cursor =>
+      !cursor.offset.isDefined || cursor.offset.get < limit
+    } &> Enumeratee.map { cursor =>
+      if (cursor.offset.exists(offset => (offset + cursor.nDocs) > limit))
+        cursor.iterator.take(limit - cursor.offset.get)
+      else cursor.iterator
+    }
+  }
 
   /**
    * Collects all the documents into a collection of type `M[T]`.
@@ -215,6 +258,8 @@ class DefaultCursor[T](response: Response, private[api] val mongoConnection: Mon
   logger.debug("making default cursor instance from response " + response + ", returned=" + response.reply.numberReturned)
 
   lazy val iterator: Iterator[T] = ReplyDocumentIterator(response.reply, response.documents)
+  def nDocs = response.reply.numberReturned
+  def offset = Some(response.reply.startingFrom)
 
   def cursorId = Future(response.reply.cursorID)
   def connection = Future(mongoConnection)
@@ -257,6 +302,8 @@ class FlattenedCursor[T](futureCursor: Future[Cursor[T]])(implicit ctx: Executio
   logger.debug("making flattened cursor instance")
 
   val iterator: Iterator[T] = Iterator.empty
+  def nDocs = 0
+  def offset = None
 
   def cursorId = futureCursor.flatMap(_.cursorId)
 
@@ -292,6 +339,8 @@ class TailableCursor[T](cursor: DefaultCursor[T], private val controller: Tailab
   logger.debug("making tailable cursor instance")
 
   val iterator: Iterator[T] = cursor.iterator
+  def nDocs = cursor.nDocs
+  def offset = None
 
   def connection = cursor.connection
 
