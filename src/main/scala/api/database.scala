@@ -49,6 +49,36 @@ trait DB[+C <: Collection] {
    */
   def collection(name: String) :C
 
+
+  private lazy val collectionNameReader = new BSONReader[String] {
+    val prefixLength = name.size + 1
+
+    def extractName(from: String) =
+      from.substring(prefixLength)
+
+
+    def fromBSON(doc: BSONDocument) =
+      doc.mapped.get("name")
+        .map(name => extractName(name.asInstanceOf[BSONString].value))
+        .getOrElse(throw new Exception("name is expected on system.namespaces query"))
+  }
+
+  /**
+   * Returns lost of collection names in this database
+   * @return
+   */
+  def collectionNames(implicit ec: ExecutionContext): FlattenedCursor[String] = {
+    import reactivemongo.bson.handlers.DefaultBSONHandlers._
+
+    collection("system.namespaces")
+      .find[BSONDocument, String](
+      BSONDocument(
+        "name" -> BSONRegex("^[^\\$]+$", "") // strip off any indexes
+      )
+    )(DefaultBSONDocumentWriter, DefaultBSONReaderHandler, collectionNameReader, ec)
+
+  }
+
   /**
    * Sends a command and get the future result of the command.
    *
