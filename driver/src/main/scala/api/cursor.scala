@@ -130,7 +130,13 @@ trait Cursor[T] {
   def enumerate(upTo: Int)(implicit ctx: ExecutionContext): Enumerator[T] =
     enumerate &> Enumeratee.take(upTo)
 
-  /** Cursor enumerator. */
+  /**
+   * Cursor enumerator.
+   * The reuse of this cursor may cause unexpected behavior.
+   *
+   * Low-level API, consider enumerate() or enumerateBulks() instead.
+   *
+   */
   def enumerateCursor()(implicit ctx: ExecutionContext): Enumerator[Cursor[T]] = {
     val enum: Enumerator[Cursor[T]] = (if (hasNext) {
       CustomEnumerator.StateEnumerator(Future(Some(this))) { cursor =>
@@ -147,6 +153,7 @@ trait Cursor[T] {
 
   /**
    * Bulk enumerator.
+   * The reuse of this cursor may cause unexpected behavior.
    *
    * Much faster when dealing with large collections.
    */
@@ -156,10 +163,11 @@ trait Cursor[T] {
 
   /**
    * Bulk enumerator.
+   * The reuse of this cursor may cause unexpected behavior.
    *
    * Much faster when dealing with large collections.
    *
-   * @param limit Stop enumerating when at least n documents have been received.
+   * @param limit Stop enumerating when at least `limit` documents have been received.
    */
   def enumerateBulks(limit: Int)(implicit ctx: ExecutionContext): Enumerator[Iterator[T]] = {
     enumerateCursor &> Enumeratee.takeWhile { cursor =>
@@ -189,7 +197,9 @@ trait Cursor[T] {
    * @tparam M the type of the returned collection.
    */
   def collect[M[_]]()(implicit cbf: CanBuildFrom[M[_], T, M[T]], ec: ExecutionContext): Future[M[T]] = {
-    enumerate |>>> Iteratee.fold(cbf.apply) { (builder, t: T) => builder += t }.map(_.result)
+    enumerateBulks |>>> Iteratee.fold(cbf.apply) { (builder, iterator: Iterator[T]) =>
+      builder ++= iterator
+    }.map(_.result)
   }
 
   /**
@@ -208,7 +218,9 @@ trait Cursor[T] {
    * @param upTo The maximum size of this collection.
    */
   def collect[M[_]](upTo: Int)(implicit cbf: CanBuildFrom[M[_], T, M[T]], ec: ExecutionContext): Future[M[T]] = {
-    enumerate &> Enumeratee.take(upTo) |>>> Iteratee.fold(cbf.apply) { (builder, t: T) => builder += t }.map(_.result)
+    enumerateBulks(upTo) |>>> Iteratee.fold(cbf.apply) { (builder, iterator: Iterator[T]) =>
+      builder ++= iterator
+    }.map(_.result)
   }
 
   /**
