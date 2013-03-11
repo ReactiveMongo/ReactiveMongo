@@ -176,22 +176,22 @@ class Handlers extends Specification {
       val doc = BSON.write(neilYoung)
       println(BSONDocument.pretty(doc))
       BSONDocument.pretty(doc) mustEqual """{
-	name: BSONString(Neil Young),
-	albums: [
-		0: {
-			name: BSONString(Everybody Knows this is Nowhere),
-			releaseYear: BSONInteger(1969),
-			tracks: [
-				0: BSONString(Cinnamon Girl),
-				1: BSONString(Everybody Knows this is Nowhere),
-				2: BSONString(Round & Round (it Won't Be Long)),
-				3: BSONString(Down By the River),
-				4: BSONString(Losing End (When You're On)),
-				5: BSONString(Running Dry (Requiem For the Rockets)),
-				6: BSONString(Cowgirl in the Sand)
-			 ]
-		 }
-	 ]
+  name: BSONString(Neil Young),
+  albums: [
+    0: {
+      name: BSONString(Everybody Knows this is Nowhere),
+      releaseYear: BSONInteger(1969),
+      tracks: [
+        0: BSONString(Cinnamon Girl),
+        1: BSONString(Everybody Knows this is Nowhere),
+        2: BSONString(Round & Round (it Won't Be Long)),
+        3: BSONString(Down By the River),
+        4: BSONString(Losing End (When You're On)),
+        5: BSONString(Running Dry (Requiem For the Rockets)),
+        6: BSONString(Cowgirl in the Sand)
+      ]
+    }
+  ]
 }"""
       val ny2 = BSON.read[Artist](doc)
       val allSongs = doc.getAs[List[Album]]("albums").toList.flatten.flatMap(_.tracks)
