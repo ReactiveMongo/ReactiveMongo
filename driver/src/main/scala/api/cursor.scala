@@ -80,6 +80,8 @@ trait Cursor[T] {
   import Cursor.logger
   /** An iterator on the last fetched documents. */
   val iterator: Iterator[T]
+  def nDocs: Int
+  def offset: Option[Int]
 
   def cursorId: Future[Long]
 
@@ -112,16 +114,68 @@ trait Cursor[T] {
    */
   def enumerate()(implicit ctx: ExecutionContext): Enumerator[T] = {
     if (hasNext) {
-      CustomEnumerator.unfoldM(this) { cursor =>
-        Cursor.nextElement(cursor)
-      }.andThen(Enumerator.eof) &> Enumeratee.collect {
-        case Some(e) => e
+      CustomEnumerator.StateEnumerator(Cursor.nextElement(this)) { state =>
+        Cursor.nextElement(state._1)
+      } &> Enumeratee.collect {
+        case (_, Some(t)) => t
       } &> Enumeratee.onIterateeDone(() => {
         logger.debug("iteratee is done, closing cursor")
         close()
       })
     } else {
       Enumerator.eof
+    }
+  }
+
+  def enumerate(upTo: Int)(implicit ctx: ExecutionContext): Enumerator[T] =
+    enumerate &> Enumeratee.take(upTo)
+
+  /**
+   * Cursor enumerator.
+   * The reuse of this cursor may cause unexpected behavior.
+   *
+   * Low-level API, consider enumerate() or enumerateBulks() instead.
+   *
+   */
+  def enumerateCursor()(implicit ctx: ExecutionContext): Enumerator[Cursor[T]] = {
+    val enum: Enumerator[Cursor[T]] = (if (hasNext) {
+      CustomEnumerator.StateEnumerator(Future(Some(this))) { cursor =>
+        if (cursor.hasNext)
+          cursor.next.map(Some(_))
+        else Future(None)
+      }
+    } else Enumerator.eof)
+    enum &> Enumeratee.filterNot(_.iterator.isEmpty) &> Enumeratee.onIterateeDone(() => {
+      logger.debug("iteratee is done, closing cursor...")
+      close()
+    })
+  }
+
+  /**
+   * Bulk enumerator.
+   * The reuse of this cursor may cause unexpected behavior.
+   *
+   * Much faster when dealing with large collections.
+   */
+  def enumerateBulks()(implicit ctx: ExecutionContext): Enumerator[Iterator[T]] = {
+    enumerateCursor &> Enumeratee.map { _.iterator }
+  }
+
+  /**
+   * Bulk enumerator.
+   * The reuse of this cursor may cause unexpected behavior.
+   *
+   * Much faster when dealing with large collections.
+   *
+   * @param limit Stop enumerating when at least `limit` documents have been received.
+   */
+  def enumerateBulks(limit: Int)(implicit ctx: ExecutionContext): Enumerator[Iterator[T]] = {
+    enumerateCursor &> Enumeratee.takeWhile { cursor =>
+      !cursor.offset.isDefined || cursor.offset.get < limit
+    } &> Enumeratee.map { cursor =>
+      if (cursor.offset.exists(offset => (offset + cursor.nDocs) > limit))
+        cursor.iterator.take(limit - cursor.offset.get)
+      else cursor.iterator
     }
   }
 
@@ -143,7 +197,9 @@ trait Cursor[T] {
    * @tparam M the type of the returned collection.
    */
   def collect[M[_]]()(implicit cbf: CanBuildFrom[M[_], T, M[T]], ec: ExecutionContext): Future[M[T]] = {
-    enumerate |>>> Iteratee.fold(cbf.apply) { (builder, t: T) => builder += t }.map(_.result)
+    enumerateBulks |>>> Iteratee.fold(cbf.apply) { (builder, iterator: Iterator[T]) =>
+      builder ++= iterator
+    }.map(_.result)
   }
 
   /**
@@ -162,7 +218,9 @@ trait Cursor[T] {
    * @param upTo The maximum size of this collection.
    */
   def collect[M[_]](upTo: Int)(implicit cbf: CanBuildFrom[M[_], T, M[T]], ec: ExecutionContext): Future[M[T]] = {
-    enumerate &> Enumeratee.take(upTo) |>>> Iteratee.fold(cbf.apply) { (builder, t: T) => builder += t }.map(_.result)
+    enumerateBulks(upTo) |>>> Iteratee.fold(cbf.apply) { (builder, iterator: Iterator[T]) =>
+      builder ++= iterator
+    }.map(_.result)
   }
 
   /**
@@ -212,6 +270,8 @@ class DefaultCursor[T](response: Response, private[api] val mongoConnection: Mon
   logger.debug("making default cursor instance from response " + response + ", returned=" + response.reply.numberReturned)
 
   lazy val iterator: Iterator[T] = ReplyDocumentIterator(response.reply, response.documents)
+  def nDocs = response.reply.numberReturned
+  def offset = Some(response.reply.startingFrom)
 
   def cursorId = Future(response.reply.cursorID)
   def connection = Future(mongoConnection)
@@ -254,6 +314,8 @@ class FlattenedCursor[T](futureCursor: Future[Cursor[T]])(implicit ctx: Executio
   logger.debug("making flattened cursor instance")
 
   val iterator: Iterator[T] = Iterator.empty
+  def nDocs = 0
+  def offset = None
 
   def cursorId = futureCursor.flatMap(_.cursorId)
 
@@ -289,6 +351,8 @@ class TailableCursor[T](cursor: DefaultCursor[T], private val controller: Tailab
   logger.debug("making tailable cursor instance")
 
   val iterator: Iterator[T] = cursor.iterator
+  def nDocs = cursor.nDocs
+  def offset = None
 
   def connection = cursor.connection
 
@@ -342,7 +406,7 @@ object Cursor {
    */
   def flatten[T](futureCursor: Future[Cursor[T]])(implicit ctx: ExecutionContext) = new FlattenedCursor(futureCursor)
 
-  private def nextElement[T](cursor: Cursor[T])(implicit ec: ExecutionContext): Future[Option[(Cursor[T], Option[T])]] = {
+  def nextElement[T](cursor: Cursor[T])(implicit ec: ExecutionContext): Future[Option[(Cursor[T], Option[T])]] = {
     if (cursor.iterator.hasNext)
       Future(Some((cursor, Some(cursor.iterator.next()))))
     else if (cursor.hasNext)

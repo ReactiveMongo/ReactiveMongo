@@ -41,17 +41,63 @@ object CustomEnumerator {
   def unfoldM[S, E](s: S)(f: S => Future[Option[(S, E)]])(implicit ec: ExecutionContext): Enumerator[E] = {
     def process[A](loop: (Iteratee[E, A], S) => Future[Iteratee[E, A]], s: S, k: Input[E] => Iteratee[E, A]): Future[Iteratee[E, A]] = f(s).flatMap {
       case Some((newS, e)) => intermediatePromise(loop(k(Input.El(e)), newS))
-      case None => Future(Cont(k))
+      case None            => Future(Cont(k))
     }
     new Enumerator[E] {
       def apply[A](it: Iteratee[E, A]): Future[Iteratee[E, A]] = {
         def step(it: Iteratee[E, A], state: S): Future[Iteratee[E, A]] = it.fold {
-          case Step.Done(a, e) => Future(Done(a, e))
-          case Step.Cont(k) => process[A](step, state, k)
+          case Step.Done(a, e)    => Future(Done(a, e))
+          case Step.Cont(k)       => process[A](step, state, k)
           case Step.Error(msg, e) => Future(Error(msg, e))
         }
         step(it, s)
       }
     }
+  }
+
+  class StateEnumerator[Chunk](zero: Future[Option[Chunk]])(nextChunk: Chunk => Future[Option[Chunk]])(implicit ec: ExecutionContext) extends Enumerator[Chunk] {
+    def apply[A](i: Iteratee[Chunk, A]): Future[Iteratee[Chunk, A]] = {
+      val promise = Promise[Iteratee[Chunk, A]]
+      def inloop(step: Future[Option[Chunk]], iteratee: Iteratee[Chunk, A]): Unit = {
+        iteratee.fold {
+          case Step.Cont(f) => {
+            val future = step.map {
+              case Some(state) =>
+                (Some(state), f(Input.El(state)))
+              case None =>
+                (None, f(Input.EOF))
+            }
+            future.onSuccess {
+              case (state, iteratee) =>
+                if (state.isDefined)
+                  inloop(nextChunk(state.get), iteratee)
+                else
+                  promise.success(iteratee)
+            }
+            future.onFailure {
+              case e => promise.failure(e)
+            }
+            future.map(_._2)
+          }
+          case Step.Done(a, e) => {
+            val finalIteratee = Done(a, e)
+            promise.success(finalIteratee)
+            Future.successful(finalIteratee)
+          }
+          case Step.Error(msg, e) => {
+            val finalIteratee = Error(msg, e)
+            promise.success(finalIteratee)
+            Future.successful(finalIteratee)
+          }
+        }
+      }
+      inloop(zero, i)
+      promise.future
+    }
+  }
+
+  object StateEnumerator {
+    def apply[Chunk](zero: Future[Option[Chunk]])(nextChunk: Chunk => Future[Option[Chunk]])(implicit ec: ExecutionContext): Enumerator[Chunk] =
+      new StateEnumerator(zero)(nextChunk)
   }
 }
