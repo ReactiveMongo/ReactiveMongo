@@ -419,14 +419,16 @@ object Subtype {
   case object GenericBinarySubtype extends Subtype { val value = 0x00.toByte }
   case object FunctionSubtype extends Subtype { val value = 0x01.toByte }
   case object OldBinarySubtype extends Subtype { val value = 0x02.toByte }
-  case object UuidSubtype extends Subtype { val value = 0x03.toByte }
+  case object OldUuidSubtype extends Subtype { val value = 0x03.toByte }
+  case object UuidSubtype extends Subtype { val value = 0x04.toByte }
   case object Md5Subtype extends Subtype { val value = 0x05.toByte }
   case object UserDefinedSubtype extends Subtype { val value = 0x80.toByte }
   def apply(code: Byte) = code match {
     case 0 => GenericBinarySubtype
     case 1 => FunctionSubtype
     case 2 => OldBinarySubtype
-    case 3 => UuidSubtype
+    case 3 => OldUuidSubtype
+    case 4 => UuidSubtype
     case 5 => Md5Subtype
     case -128 => UserDefinedSubtype
     case _ => throw new NoSuchElementException(s"binary type = $code")
