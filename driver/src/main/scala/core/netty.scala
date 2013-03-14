@@ -26,7 +26,7 @@ class ChannelBufferReadableBuffer(protected[netty] val buffer: ChannelBuffer) ex
   def index = buffer.readerIndex()
 
   def discard(n: Int) = {
-    buffer.readerIndex(buffer.readerIndex + n - 1)
+    buffer.readerIndex(buffer.readerIndex + n)
   }
 
   def slice(n: Int) = {
