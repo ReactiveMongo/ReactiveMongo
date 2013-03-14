@@ -101,7 +101,7 @@ object DefaultBufferHandler extends BufferHandler {
       val startIndex = b.index
       val length = b.readInt
       val buffer = b.slice(length - 4)
-      b.discard(length - 4 + 1)
+      b.discard(length - 4)
       def makeStream(): Stream[Try[(String, BSONValue)]] = {
         if (buffer.readable > 1) { // last is 0
           val code = buffer.readByte
@@ -132,7 +132,7 @@ object DefaultBufferHandler extends BufferHandler {
       val startIndex = b.index
       val length = b.readInt
       val buffer = b.slice(length - 4)
-      b.discard(length - 4 + 1)
+      b.discard(length - 4)
       def makeStream(): Stream[Try[BSONValue]] = {
         if (buffer.readable > 1) { // last is 0
           val code = buffer.readByte
