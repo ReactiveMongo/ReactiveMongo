@@ -150,7 +150,7 @@ object CollStatsResult extends BSONCommandResultMaker[CollStatsResult] {
           val indexSizes = doc.getAs[BSONDocument]("indexSizes").get
           (for (kv <- indexSizes.elements) yield kv._1 -> kv._2.asInstanceOf[BSONInteger].value).toArray
         },
-        doc.getAs[BSONInteger]("capped").map(_.value == 1).getOrElse(false),
+        doc.getAs[BSONBooleanLike]("capped").map(_.toBoolean).getOrElse(false),
         doc.getAs[BSONDouble]("max").map(_.value.toLong))
     }
   }
