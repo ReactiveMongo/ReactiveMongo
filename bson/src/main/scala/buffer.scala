@@ -159,7 +159,7 @@ class ArrayReadableBuffer private (bytebuffer: ByteBuffer) extends ReadableBuffe
   def index = bytebuffer.position()
 
   def discard(n: Int) =
-    bytebuffer.position(bytebuffer.position() + n - 1)
+    bytebuffer.position(bytebuffer.position() + n)
 
   def slice(n: Int) = {
     val nb = bytebuffer.slice()
