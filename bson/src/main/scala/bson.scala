@@ -76,3 +76,25 @@ object BSON {
   def read[T](doc: BSONDocument)(implicit reader: BSONReader[BSONDocument, T]): T = reader.read(doc)
   def write[T](t: T)(implicit writer: BSONWriter[T, BSONDocument]): BSONDocument = writer.write(t)
 }
+
+object Macros {
+  import language.experimental.macros
+
+  def read[A]: BSONReader[BSONDocument, A] = macro MacroImpl.read[A, Options.Default]
+  def readOpts[A, Opts <: Options.Default]: BSONReader[BSONDocument, A] = macro MacroImpl.read[A, Opts]
+
+  def write[A]: BSONWriter[A, BSONDocument] = macro MacroImpl.write[A, Options.Default]
+  def writeOpts[A, Opts  <: Options.Default]: BSONWriter[A, BSONDocument] = macro MacroImpl.write[A,Opts]
+
+  def format[A]: BSONReader[BSONDocument, A] with BSONWriter[A, BSONDocument] = macro MacroImpl.format[A, Options.Default]
+  def formatOpts[A, Opts  <: Options.Default]: BSONReader[BSONDocument, A] with BSONWriter[A, BSONDocument] = macro MacroImpl.format[A, Opts]
+
+  object Options {
+    trait Default
+    trait Verbose extends Default
+    trait SaveClassName extends Default
+    trait UnionType[Types <: \/[_,_]] extends SaveClassName with Default
+
+    trait \/[A,B]
+  }
+}
