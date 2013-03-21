@@ -80,14 +80,14 @@ object BSON {
 object Macros {
   import language.experimental.macros
 
-  def read[A]: BSONReader[BSONDocument, A] = macro MacroImpl.read[A, Options.Default]
-  def readOpts[A, Opts <: Options.Default]: BSONReader[BSONDocument, A] = macro MacroImpl.read[A, Opts]
+  def reader[A]: BSONReader[BSONDocument, A] = macro MacroImpl.reader[A, Options.Default]
+  def readerOpts[A, Opts <: Options.Default]: BSONReader[BSONDocument, A] = macro MacroImpl.reader[A, Opts]
 
-  def write[A]: BSONWriter[A, BSONDocument] = macro MacroImpl.write[A, Options.Default]
-  def writeOpts[A, Opts  <: Options.Default]: BSONWriter[A, BSONDocument] = macro MacroImpl.write[A,Opts]
+  def writer[A]: BSONWriter[A, BSONDocument] = macro MacroImpl.writer[A, Options.Default]
+  def writerOpts[A, Opts  <: Options.Default]: BSONWriter[A, BSONDocument] = macro MacroImpl.writer[A,Opts]
 
-  def format[A]: BSONReader[BSONDocument, A] with BSONWriter[A, BSONDocument] = macro MacroImpl.format[A, Options.Default]
-  def formatOpts[A, Opts  <: Options.Default]: BSONReader[BSONDocument, A] with BSONWriter[A, BSONDocument] = macro MacroImpl.format[A, Opts]
+  def handler[A]: BSONReader[BSONDocument, A] with BSONWriter[A, BSONDocument] = macro MacroImpl.handler[A, Options.Default]
+  def handlerOpts[A, Opts  <: Options.Default]: BSONReader[BSONDocument, A] with BSONWriter[A, BSONDocument] = macro MacroImpl.handler[A, Opts]
 
   object Options {
     trait Default

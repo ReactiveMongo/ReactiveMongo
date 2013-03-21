@@ -9,7 +9,7 @@ import scala.reflect.macros.Context
  * Time: 6:51 PM
  */
 private object MacroImpl {
-  def read[A: c.WeakTypeTag, Opts: c.WeakTypeTag](c: Context): c.Expr[BSONReader[BSONDocument, A]] = {
+  def reader[A: c.WeakTypeTag, Opts: c.WeakTypeTag](c: Context): c.Expr[BSONReader[BSONDocument, A]] = {
     val h = Helper[A,Opts](c)
     val body = h.readBody
     c.universe.reify {
@@ -19,7 +19,7 @@ private object MacroImpl {
     }
   }
 
-  def write[A: c.WeakTypeTag, Opts: c.WeakTypeTag](c: Context): c.Expr[BSONWriter[A, BSONDocument]] = {
+  def writer[A: c.WeakTypeTag, Opts: c.WeakTypeTag](c: Context): c.Expr[BSONWriter[A, BSONDocument]] = {
     val h = Helper[A,Opts](c)
     val body = h.writeBody
     c.universe.reify (
@@ -29,7 +29,7 @@ private object MacroImpl {
     )
   }
 
-  def format[A: c.WeakTypeTag, Opts: c.WeakTypeTag](c: Context): c.Expr[BSONReader[BSONDocument, A] with BSONWriter[A, BSONDocument]] = {
+  def handler[A: c.WeakTypeTag, Opts: c.WeakTypeTag](c: Context): c.Expr[BSONReader[BSONDocument, A] with BSONWriter[A, BSONDocument]] = {
     val h = Helper[A,Opts](c)
     val r = h.readBody
     val w = h.writeBody

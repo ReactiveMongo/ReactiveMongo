@@ -38,25 +38,25 @@ class Macros extends Specification {
 
   trait NestModule{
     case class Nested(name: String)
-    val format = Macros.format[Nested]
+    val format = Macros.handler[Nested]
   }
 
   "Formatter" should {
     "handle primitives" in {
       roundtrip(
         Primitives(1.2, "hai", true, 42, Long.MaxValue),
-        Macros.format[Primitives]
+        Macros.handler[Primitives]
       )
     }
 
     "support nesting" in {
-      implicit val personFormat = Macros.format[Person]
+      implicit val personFormat = Macros.handler[Person]
       val doc = Pet("woof", Person("john", "doe"))
-      roundtrip(doc, Macros.format[Pet])
+      roundtrip(doc, Macros.handler[Pet])
     }
 
     "support option" in {
-      val format = Macros.formatOpts[Optional, Macros.Options.Verbose]
+      val format = Macros.handlerOpts[Optional, Macros.Options.Verbose]
       val some = Optional("some", Some("value"))
       val none = Optional("none", None)
       roundtrip(some, format)
@@ -66,49 +66,49 @@ class Macros extends Specification {
     "support single member case classes" in {
       roundtrip(
         Single("Foo"),
-        Macros.format[Single]
+        Macros.handler[Single]
       )
     }
 
     "support single member options" in {
-      val f = Macros.format[OptionalSingle]
+      val f = Macros.handler[OptionalSingle]
       roundtrip(OptionalSingle(Some("foo")), f)
       roundtrip(OptionalSingle(None), f)
     }
 
     "support case class definitions inside an object" in {
       import Nest._
-      roundtrip(Nested("foo"), Macros.format[Nested])
+      roundtrip(Nested("foo"), Macros.handler[Nested])
     }
 
     "handle overloaded apply correctly" in {
       val doc1 = OverloadedApply("hello")
       val doc2 = OverloadedApply(List("hello", "world"))
-      val f = Macros.format[OverloadedApply]
+      val f = Macros.handler[OverloadedApply]
       roundtrip(doc1, f)
       roundtrip(doc2, f)
     }
 
-    "case class and format inside trait" in {
+    "case class and handler inside trait" in {
       val t = new NestModule {}
       roundtrip(t.Nested("it works"), t.format)
     }
 
-    "case class inside trait with format outside" in {
+    "case class inside trait with handler outside" in {
       val t = new NestModule {}
       import t._ //you need Nested in scope because t.Nested won't work
-      val format = Macros.format[Nested]
+      val format = Macros.handler[Nested]
       roundtrip(Nested("it works"), format)
     }
 
     "respect compilation options" in {
-      val format = Macros.formatOpts[Person, Macros.Options.Verbose] //more stuff in compiler log
+      val format = Macros.handlerOpts[Person, Macros.Options.Verbose] //more stuff in compiler log
       roundtrip(Person("john","doe"), format)
     }
 
     "persist class name on demand" in {
       val person = Person("john", "doe")
-      val format = Macros.formatOpts[Person, Macros.Options.SaveClassName]
+      val format = Macros.handlerOpts[Person, Macros.Options.SaveClassName]
       val doc = format write person
       doc.getAs[String]("className") mustEqual Some("Macros.Person")
       roundtrip(person, format)
@@ -119,7 +119,7 @@ class Macros extends Specification {
       import Macros.Options._
       val a = UA(1)
       val b = UB("hai")
-      val format = Macros.formatOpts[UT, UnionType[UA \/ UB]]
+      val format = Macros.handlerOpts[UT, UnionType[UA \/ UB]]
       println(BSONDocument pretty (format write a))
       println(BSONDocument pretty (format write b))
       roundtrip(a, format)
