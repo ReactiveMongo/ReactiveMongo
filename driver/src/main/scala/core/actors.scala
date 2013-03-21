@@ -65,7 +65,9 @@ case class CheckedWriteRequestExpectingResponse(
  * @param user The username
  * @param password The password
  */
-case class Authenticate(db: String, user: String, password: String)
+case class Authenticate(db: String, user: String, password: String) {
+  override def toString: String = db + ", " + user
+}
 /**
  * Message to close all active connections.
  * The MongoDBSystem actor must not be used after this message has been sent.
