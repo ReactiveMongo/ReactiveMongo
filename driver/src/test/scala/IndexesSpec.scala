@@ -3,7 +3,7 @@ import reactivemongo.api.indexes._
 import reactivemongo.api.indexes.IndexType.Geo2D
 import reactivemongo.bson._
 import DefaultBSONHandlers._
-import reactivemongo.core.errors.DBError
+import reactivemongo.core.errors.DatabaseException
 import scala.concurrent.Future
 import scala.concurrent.Await
 import scala.concurrent.duration._
@@ -42,7 +42,7 @@ class IndexesSpec  extends Specification {
         Await.result(future, DurationInt(5).seconds)
         failure
       } catch {
-        case e: DBError =>
+        case e: DatabaseException =>
           e.code mustEqual Some(13027) // MongoError['point not in interval of [ -95, 95 )' (code = 13027)]
       }
       success

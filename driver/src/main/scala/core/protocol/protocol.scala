@@ -255,12 +255,12 @@ case class Response(
   /**
    * if this response is in error, explain this error.
    */
-  lazy val error: Option[DBError] = {
+  lazy val error: Option[DatabaseException] = {
     if (reply.inError) {
       val bson = Response.parse(this)
       //val bson = ReplyDocumentIterator(reply, documents)
       if (bson.hasNext)
-        Some(ReactiveMongoError(bson.next))
+        Some(ReactiveMongoException(bson.next))
       else None
     } else None
   }

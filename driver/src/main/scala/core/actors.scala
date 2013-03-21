@@ -218,7 +218,7 @@ class MongoDBSystem(
       awaitingResponses.retain { (_, awaitingResponse) =>
         if (awaitingResponse.channelID == channelId) {
           logger.debug("completing promise " + awaitingResponse.promise + " with error='socket disconnected'")
-          awaitingResponse.promise.failure(GenericMongoError("socket disconnected"))
+          awaitingResponse.promise.failure(GenericDriverException("socket disconnected"))
           false
         } else true
       }
@@ -375,7 +375,7 @@ class MongoDBSystem(
     case _ => false
   })
 
-  def pickChannel(request: Request): Either[ReactiveMongoError, (Node, MongoChannel)] = {
+  def pickChannel(request: Request): Either[ReactiveMongoException, (Node, MongoChannel)] = {
     if (request.channelIdHint.isDefined)
       nodeSet.findByChannelId(request.channelIdHint.get).toRight(Exceptions.ChannelNotFound)
     else if (secondaryOK(request))
@@ -504,14 +504,14 @@ object MonitorActor {
 // exceptions
 object Exceptions {
   /** An exception thrown when a request needs a non available primary. */
-  object PrimaryUnavailableException extends ReactiveMongoError {
+  object PrimaryUnavailableException extends DriverException {
     val message = "No primary node is available!"
   }
   /** An exception thrown when the entire node set is unavailable. The application may not have access to the network anymore. */
-  object NodeSetNotReachable extends ReactiveMongoError {
+  object NodeSetNotReachable extends DriverException {
     val message = "The node set can not be reached! Please check your network connectivity."
   }
-  object ChannelNotFound extends ReactiveMongoError {
+  object ChannelNotFound extends DriverException {
     val message = "ChannelNotFound"
   }
 }

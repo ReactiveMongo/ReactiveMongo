@@ -104,7 +104,7 @@ trait AdminCommand[Result] extends Command[Result] {
 }
 
 /** A generic command error. */
-trait CommandError extends ReactiveMongoError {
+trait CommandError extends ReactiveMongoException {
   /** error code */
   val code: Option[Int]
 
@@ -229,7 +229,7 @@ case class LastError(
     errMsg: Option[String],
     originalDocument: Option[BSONDocument],
     documents: Int,
-    updatedExisting: Boolean) extends DBError {
+    updatedExisting: Boolean) extends DatabaseException {
   /** states if the last operation ended up with an error */
   lazy val inError: Boolean = !ok || err.isDefined
   lazy val stringify: String = toString + " [inError: " + inError + "]"

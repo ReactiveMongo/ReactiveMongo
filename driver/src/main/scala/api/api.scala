@@ -44,6 +44,8 @@ import scala.util.{ Failure, Success }
  */
 class Failover[T](message: T, actorRef: ActorRef, strategy: FailoverStrategy)(expectingResponseMaker: T => ExpectingResponse)(implicit ec: ExecutionContext) {
   import Failover.logger
+  import reactivemongo.core.errors._
+  import reactivemongo.core.actors.Exceptions._
   private val promise = Promise[Response]()
 
   /** A future that is completed with a response, after 1 or more attempts (specified in the given strategy). */
@@ -53,7 +55,7 @@ class Failover[T](message: T, actorRef: ActorRef, strategy: FailoverStrategy)(ex
     val expectingResponse = expectingResponseMaker(message)
     actorRef ! expectingResponse
     expectingResponse.future.onComplete {
-      case Failure(e) =>
+      case Failure(e) if isRetryable(e) =>
         if (n < strategy.retries) {
           val `try` = n + 1
           val delayFactor = strategy.delayFactor(`try`)
@@ -61,13 +63,24 @@ class Failover[T](message: T, actorRef: ActorRef, strategy: FailoverStrategy)(ex
           logger.warn("Got an error, retrying... (try #" + `try` + " is scheduled in " + delay.toMillis + " ms)", e)
           MongoConnection.system.scheduler.scheduleOnce(delay)(send(`try`))
         } else {
-          logger.error("Got an error, no more attempts to do. Completing with an error...", e)
+          // generally that means that the primary is not available or the nodeset is unreachable
+          logger.error("Got an error, no more attempts to do. Completing with a failure...", e)
           promise.failure(e)
         }
+      case Failure(e) =>
+        logger.debug("Got an non retryable error, completing with a failure...", e)
+        promise.failure(e)
       case Success(response) =>
-        logger.debug("Got a successful result, completing...")
+        logger.trace("Got a successful result, completing...")
         promise.success(response)
     }
+  }
+
+  private def isRetryable(throwable: Throwable) = throwable match {
+    case PrimaryUnavailableException | NodeSetNotReachable => true
+    case e: DatabaseException if e.isNotAPrimaryError => true
+    case _: ConnectionException => true
+    case _ => false
   }
 
   send(0)

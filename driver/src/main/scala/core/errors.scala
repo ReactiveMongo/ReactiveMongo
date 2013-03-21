@@ -18,23 +18,29 @@ package reactivemongo.core.errors
 import reactivemongo.bson._
 import DefaultBSONHandlers._
 
-/** A driver error - can be from a MongoDB node or not. */
-trait ReactiveMongoError extends Throwable {
+/** An error that can come from a MongoDB node or not. */
+trait ReactiveMongoException extends Throwable {
   /** explanation message */
   val message: String
 
   override def getMessage: String = "MongoError['" + message + "']"
 }
 
+object ReactiveMongoException {
+  def apply(message: String): ReactiveMongoException = GenericDriverException(message)
+
+  def apply(doc: BSONDocument): DatabaseException = new DetailedDatabaseException(doc)
+}
+
 /** An error thrown by a MongoDB node. */
-trait DBError extends ReactiveMongoError {
+trait DatabaseException extends ReactiveMongoException {
   /** original document of this error */
   val originalDocument: Option[BSONDocument]
 
   /** error code */
   val code: Option[Int]
 
-  override def getMessage: String = "MongoError['" + message + "'" + code.map(c => " (code = " + c + ")").getOrElse("") + "]"
+  override def getMessage: String = "DatabaseException['" + message + "'" + code.map(c => " (code = " + c + ")").getOrElse("") + "]"
 
   /** Tells if this error is due to a write on a secondary node. */
   lazy val isNotAPrimaryError: Boolean = code.map {
@@ -43,31 +49,25 @@ trait DBError extends ReactiveMongoError {
   }.getOrElse(false)
 }
 
-/** A non recoverable error */
-trait NonRecoverableError {
-  self: ReactiveMongoError =>
-}
-
-object ReactiveMongoError {
-  def apply(message: String): ReactiveMongoError = GenericMongoError(message)
-
-  def apply(doc: BSONDocument): DBError = new CompleteDBError(doc)
-}
+/** A driver-specific error */
+trait DriverException extends ReactiveMongoException
 
 /** A generic driver error. */
-case class GenericMongoError(
-  message: String) extends ReactiveMongoError
+case class GenericDriverException(
+  message: String) extends DriverException
+
+case class ConnectionException(message: String) extends DriverException
 
 /** A generic error thrown by a MongoDB node. */
-case class GenericDBError(
+case class GenericDatabaseException(
     message: String,
-    code: Option[Int]) extends DBError {
+    code: Option[Int]) extends DatabaseException {
   val originalDocument = None
 }
 
 /** An error thrown by a MongoDB node (containing the original document of the error). */
-class CompleteDBError(
-    doc: BSONDocument) extends DBError {
+class DetailedDatabaseException(
+    doc: BSONDocument) extends DatabaseException {
   val originalDocument = Some(doc)
   lazy val message = doc.getAs[BSONString]("$err").map(_.value).getOrElse("$err is not present, unknown error")
   lazy val code = doc.getAs[BSONInteger]("code").map(_.value)
