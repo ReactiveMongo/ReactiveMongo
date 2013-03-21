@@ -16,7 +16,6 @@
 package reactivemongo.core.commands
 
 import reactivemongo.bson._
-import DefaultBSONHandlers._
 import reactivemongo.core.errors._
 import reactivemongo.core.protocol.{ RequestMaker, Query, QueryFlags, Response }
 import reactivemongo.core.protocol.NodeState
@@ -289,7 +288,7 @@ case class Count(
  */
 object Count extends BSONCommandResultMaker[Int] {
   def apply(document: BSONDocument) =
-    CommandError.checkOk(document, Some("count")).toLeft(document.getAs[BSONDouble]("n").map(_.value.toInt).get)
+    CommandError.checkOk(document, Some("count")).toLeft(document.getAs[BSONNumberLike]("n").map(_.toInt).get)
 }
 
 /**
