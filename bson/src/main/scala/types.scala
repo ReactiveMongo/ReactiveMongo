@@ -119,6 +119,11 @@ case class BSONDocument(stream: Stream[Try[BSONElement]]) extends BSONValue {
 
   /** Returns a `Stream` for all the elements of this `BSONDocument`. */
   def elements: Stream[BSONElement] = stream.filter(_.isSuccess).map(_.get)
+
+  /** Is this document empty? */
+  def isEmpty: Boolean = stream.isEmpty
+
+  override def toString: String = "BSONDocument(<" + (if (isEmpty) "empty" else "non-empty") + ">)"
 }
 
 object BSONDocument {
@@ -148,6 +153,9 @@ object BSONDocument {
   def read(buffer: ReadableBuffer)(implicit bufferHandler: BufferHandler = DefaultBufferHandler): BSONDocument = {
     bufferHandler.readDocument(buffer).get
   }
+
+  /** An empty BSONDocument. */
+  val empty: BSONDocument = BSONDocument()
 }
 
 /**
@@ -245,6 +253,11 @@ case class BSONArray(stream: Stream[Try[BSONValue]]) extends BSONValue {
   def values: Stream[BSONValue] = stream.filter(_.isSuccess).map(_.get)
 
   lazy val length = stream.size
+
+  /** Is this array empty? */
+  def isEmpty: Boolean = stream.isEmpty
+
+  override def toString: String = "BSONDocument(<" + (if (isEmpty) "empty" else "non-empty") + ">)"
 }
 
 object BSONArray {
@@ -261,6 +274,9 @@ object BSONArray {
 
   /** Returns a String representing the given [[BSONArray]]. */
   def pretty(array: BSONArray) = BSONIterator.pretty(array.iterator)
+
+  /** An empty BSONArray. */
+  val empty: BSONArray = BSONArray()
 }
 
 /**

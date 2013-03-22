@@ -36,10 +36,6 @@ object Implicits {
   implicit object DefaultReadFileReader extends BSONDocumentReader[ReadFile[BSONValue]] {
     import DefaultBSONHandlers._
     def read(doc: BSONDocument) = {
-      val metadata = doc.elements.filterNot { element =>
-        element._1 == "contentType" || element._1 == "filename" || element._1 == "uploadDate" ||
-          element._1 == "chunkSize" || element._1 == "length" || element._1 == "md5" || element._1 == "_id"
-      }.toSeq
       DefaultReadFile(
         doc.getAs[BSONValue]("_id").get,
         doc.getAs[BSONString]("contentType").map(_.value),
@@ -48,7 +44,8 @@ object Implicits {
         doc.getAs[BSONNumberLike]("chunkSize").map(_.toInt).get,
         doc.getAs[BSONNumberLike]("length").map(_.toInt).get,
         doc.getAs[BSONString]("md5").map(_.value),
-        BSONDocument(metadata.toStream))
+        doc.getAs[BSONDocument]("metadata").getOrElse(BSONDocument()),
+        doc)
     }
   }
 }
@@ -113,7 +110,8 @@ case class DefaultReadFile(
   chunkSize: Int,
   length: Int,
   md5: Option[String],
-  metadata: BSONDocument) extends ReadFile[BSONValue]
+  metadata: BSONDocument,
+  original: BSONDocument) extends ReadFile[BSONValue]
 
 /**
  * A GridFS store.
@@ -154,7 +152,6 @@ class GridFS[Structure, Reader[_], Writer[_]](db: DB with DBMetaCommands, prefix
   }
 
   import reactivemongo.api.collections.default.{ BSONCollection, BSONCollectionProducer }
-  //import reactivemongo.bson.DefaultBSONHandlers._
 
   /**
    * Gets an `Iteratee` that will consume data to put into a GridFS store.
@@ -206,7 +203,8 @@ class GridFS[Structure, Reader[_], Writer[_]](db: DB with DBMetaCommands, prefix
             "chunkSize" -> BSONInteger(chunkSize),
             "length" -> BSONInteger(length),
             "uploadDate" -> BSONDateTime(uploadDate),
-            "contentType" -> file.contentType.map(BSONString(_))) ++ file.metadata
+            "contentType" -> file.contentType.map(BSONString(_)),
+            "metadata" -> option(!file.metadata.isEmpty, file.metadata))
           files[BSONCollection].insert(bson).map(_ =>
             files(producer).BufferReaderInstance(readFileReader).read(
               files[BSONCollection].StructureBufferWriter.write(bson, ChannelBufferWritableBuffer()).toReadableBuffer))
