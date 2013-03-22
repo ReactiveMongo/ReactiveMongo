@@ -66,7 +66,7 @@ case class CheckedWriteRequestExpectingResponse(
  * @param password The password
  */
 case class Authenticate(db: String, user: String, password: String) {
-  override def toString: String = db + ", " + user
+  override def toString: String = "Authenticate(" + db + ", " + user + ")"
 }
 /**
  * Message to close all active connections.
