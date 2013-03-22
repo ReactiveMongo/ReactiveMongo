@@ -33,7 +33,7 @@ case class BSONString(value: String) extends BSONValue { val code = 0x02.toByte 
  * It is completely lazy. The stream it wraps is a `Stream[Try[(String, BSONValue)]]` since
  * we cannot be sure that a not yet deserialized value will be processed without error.
  */
-class BSONDocument(val stream: Stream[Try[BSONElement]]) extends BSONValue {
+case class BSONDocument(stream: Stream[Try[BSONElement]]) extends BSONValue {
   val code = 0x03.toByte
 
   /**
@@ -128,9 +128,9 @@ object BSONDocument {
       el.produce.map(value => Seq(Try(value))).getOrElse(Seq.empty)
     }.toStream)
 
-  /** Creates a new [[BSONDocument]] containing all the `elements` in the given `Stream`. */
-  def apply(elements: Stream[(String, BSONValue)]): BSONDocument = {
-    new BSONDocument(elements.map(Success(_)))
+  /** Creates a new [[BSONDocument]] containing all the `elements` in the given `Traversable`. */
+  def apply(elements: Traversable[(String, BSONValue)]): BSONDocument = {
+    new BSONDocument(elements.toStream.map(Success(_)))
   }
 
   /** Returns a String representing the given [[BSONDocument]]. */
@@ -159,7 +159,7 @@ object BSONDocument {
  * It is completely lazy. The stream it wraps is a `Stream[Try[(String, BSONValue)]]` since
  * we cannot be sure that a not yet deserialized value will be processed without error.
  */
-class BSONArray(val stream: Stream[Try[BSONValue]]) extends BSONValue {
+case class BSONArray(stream: Stream[Try[BSONValue]]) extends BSONValue {
   val code = 0x04.toByte
 
   /**
@@ -254,9 +254,9 @@ object BSONArray {
       el.produce.map(value => Seq(Try(value))).getOrElse(Seq.empty)
     }.toStream)
 
-  /** Creates a new [[BSONValue]] containing all the `elements` in the given `Stream`. */
-  def apply(elements: Stream[BSONValue]): BSONArray = {
-    new BSONArray(elements.map(Success(_)))
+  /** Creates a new [[BSONValue]] containing all the `elements` in the given `Traversable`. */
+  def apply(elements: Traversable[BSONValue]): BSONArray = {
+    new BSONArray(elements.toStream.map(Success(_)))
   }
 
   /** Returns a String representing the given [[BSONArray]]. */
