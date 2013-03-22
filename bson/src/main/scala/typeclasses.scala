@@ -66,6 +66,9 @@ object BSONNumberLike {
   implicit class BSONLongNumberLike(private[bson] val underlying: BSONLong) extends BSONNumberLikeClass[BSONLong] with IsNumeric[Long] {
     private[bson] lazy val number = ExtendedNumeric(underlying.value)
   }
+  implicit class BSONDateTimeNumberLike(private[bson] val underlying: BSONLong) extends BSONNumberLikeClass[BSONDateTime] with IsNumeric[Long] {
+    private[bson] lazy val number = ExtendedNumeric(underlying.value)
+  }
 }
 
 /**
