@@ -1,5 +1,5 @@
-import org.specs2.mutable._
 import reactivemongo.bson._
+import org.specs2.mutable._
 
 class Macros extends Specification {
   def roundtrip[A](original: A, format: BSONReader[BSONDocument, A] with BSONWriter[A, BSONDocument]) = {
