@@ -2,11 +2,9 @@ import org.specs2.mutable._
 import reactivemongo.api.indexes._
 import reactivemongo.api.indexes.IndexType.Geo2D
 import reactivemongo.bson._
-import DefaultBSONHandlers._
 import reactivemongo.core.errors.DatabaseException
 import scala.concurrent.Future
 import scala.concurrent.Await
-import scala.concurrent.duration._
 
 class IndexesSpec  extends Specification {
   sequential
@@ -20,7 +18,7 @@ class IndexesSpec  extends Specification {
       val futs = for(i <- 1 until 10)
       yield geo.insert(BSONDocument("loc" -> BSONArray( BSONDouble(i + 2), BSONDouble(i * 2) )))
       val fut = Future.sequence(futs)
-      Await.result(fut, DurationInt(5).seconds)
+      Await.result(fut, timeout)
       success
     }
     "make index" in {
@@ -34,12 +32,12 @@ class IndexesSpec  extends Specification {
           )
         )
       )
-      Await.result(created, DurationInt(5).seconds) mustEqual true
+      Await.result(created, timeout) mustEqual true
     }
     "fail to insert some points out of range" in {
       val future = geo.insert(BSONDocument("loc" -> BSONArray( BSONDouble(27.88), BSONDouble(97.21) )))
       try {
-        Await.result(future, DurationInt(5).seconds)
+        Await.result(future, timeout)
         failure
       } catch {
         case e: DatabaseException =>
@@ -51,7 +49,7 @@ class IndexesSpec  extends Specification {
       val future = geo.indexesManager.list().map {
         _.filter(_.name.get == "loc_2d")
       }.filter(!_.isEmpty).map(_.apply(0))
-      val index = Await.result(future, DurationInt(5).seconds)
+      val index = Await.result(future, timeout)
       index.key(0)._1 mustEqual "loc"
       index.key(0)._2 mustEqual Geo2D
       index.options.getAs[BSONInteger]("min").get.value mustEqual -95

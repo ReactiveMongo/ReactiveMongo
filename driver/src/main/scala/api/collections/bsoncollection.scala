@@ -123,9 +123,17 @@ case class BSONCollection(
    * Inserts the document, or updates it if it already exists in the collection.
    *
    * @param doc The document to save.
+   */
+  def save(doc: BSONDocument)(implicit ec: ExecutionContext): Future[LastError] =
+    save(doc, GetLastError())
+
+  /**
+   * Inserts the document, or updates it if it already exists in the collection.
+   *
+   * @param doc The document to save.
    * @param writeConcern the [[reactivemongo.core.commands.GetLastError]] command message to send in order to control how the document is inserted. Defaults to GetLastError().
    */
-  def save(doc: BSONDocument, writeConcern: GetLastError = GetLastError())(implicit ec: ExecutionContext): Future[LastError] = {
+  def save(doc: BSONDocument, writeConcern: GetLastError)(implicit ec: ExecutionContext): Future[LastError] = {
     doc.get("_id").map { id =>
       update(BSONDocument("_id" -> id), doc, upsert = true)
     }.getOrElse(insert(doc.add("_id" -> BSONObjectID.generate)))
