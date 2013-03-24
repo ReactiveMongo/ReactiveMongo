@@ -17,26 +17,26 @@ class Macros extends Specification {
   case class SingleTuple(value: (String, String))
   case class User(_id: BSONObjectID = BSONObjectID.generate, name: String)
 
-  object Nest{
+  object Nest {
     case class Nested(name: String)
   }
 
   case class OverloadedApply(string: String)
-  object OverloadedApply{
-    def apply(n: Int){
+  object OverloadedApply {
+    def apply(n: Int) {
       println(n)
     }
 
     def apply(seq: Seq[String]): OverloadedApply = OverloadedApply(seq mkString " ")
   }
 
-  object Union{
+  object Union {
     sealed trait UT
     case class UA(n: Int) extends UT
     case class UB(s: String) extends UT
   }
 
-  trait NestModule{
+  trait NestModule {
     case class Nested(name: String)
     val format = Macros.handler[Nested]
   }
@@ -45,8 +45,7 @@ class Macros extends Specification {
     "handle primitives" in {
       roundtrip(
         Primitives(1.2, "hai", true, 42, Long.MaxValue),
-        Macros.handler[Primitives]
-      )
+        Macros.handler[Primitives])
     }
 
     "support nesting" in {
@@ -66,8 +65,7 @@ class Macros extends Specification {
     "support single member case classes" in {
       roundtrip(
         Single("Foo"),
-        Macros.handler[Single]
-      )
+        Macros.handler[Single])
     }
 
     "support single member options" in {
@@ -103,7 +101,7 @@ class Macros extends Specification {
 
     "respect compilation options" in {
       val format = Macros.handlerOpts[Person, Macros.Options.Verbose] //more stuff in compiler log
-      roundtrip(Person("john","doe"), format)
+      roundtrip(Person("john", "doe"), format)
     }
 
     "persist class name on demand" in {
