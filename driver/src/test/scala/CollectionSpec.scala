@@ -3,8 +3,10 @@ import reactivemongo.bson._
 import DefaultBSONHandlers._
 import reactivemongo.core.commands.Count
 import scala.concurrent._
+import scala.util.{Try, Success, Failure}
 
 import org.specs2.mutable._
+
 class CollectionSpec extends Specification {
   import Common._
 
@@ -27,8 +29,16 @@ class CollectionSpec extends Specification {
       println(stats)
       stats.capped mustEqual true
     }
-    "insert some docs then count" in {
-      Await.result(collection.insert(BSONDocument("name" -> BSONString("Jack"))), timeout).ok mustEqual true
+    "insert some docs then test lastError result and finally count" in {
+      val lastError = Await.result(collection.insert(BSONDocument("name" -> BSONString("Jack"))), timeout)
+      lastError.ok mustEqual true
+      lastError.updated mustEqual 0
+      lastError.n mustEqual 0
+      lastError.updatedExisting mustEqual false
+      lastError.get("ok") mustEqual Some(BSONDouble(1))
+      lastError.getTry("ok") mustEqual Success(BSONDouble(1))
+      lastError.getAs[BSONDouble]("ok") mustEqual Some(BSONDouble(1))
+
       Await.result(db.command(Count(collection.name)), timeout) mustEqual 1
     }
     "empty the capped collection" in {
