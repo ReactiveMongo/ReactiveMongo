@@ -15,7 +15,10 @@
  */
 package reactivemongo.core.commands
 
+import scala.util.{Try, Failure}
 import reactivemongo.bson._
+import reactivemongo.bson.exceptions.DocumentKeyNotFound
+import DefaultBSONHandlers._
 import reactivemongo.core.errors._
 import reactivemongo.core.protocol.{ RequestMaker, Query, QueryFlags, Response }
 import reactivemongo.core.protocol.NodeState
@@ -212,14 +215,14 @@ case class GetLastError(
 }
 
 /**
- * Result of the [[reactivemongo.core.commands.GetLastError]] command.
+ * Result of the [[reactivemongo.core.commands.GetLastError GetLastError]] command.
  *
- * @param ok true if the last operation was successful
- * @param err the err field, if any
- * @param code the error code, if any
- * @param errMsg the message (often regarding an error) if any
- * @param originalDocument the whole map resulting of the deserialization of the response with the [[reactivemongo.bson.handlers.DefaultBSONHandlers]].
- * @param documents The number of documents affected by last command, 0 if none
+ * @param ok True if the last operation was successful
+ * @param err The err field, if any
+ * @param code The error code, if any
+ * @param errMsg The message (often regarding an error) if any
+ * @param originalDocument The whole map resulting of the deserialization of the response with the [[reactivemongo.bson.DefaultBSONHandlers DefaultBSONHandlers]].
+ * @param updated The number of documents affected by last command, 0 if none
  * @param updatedExisting When true, the last update operation resulted in change of existing documents
  */
 case class LastError(
@@ -228,17 +231,75 @@ case class LastError(
     code: Option[Int],
     errMsg: Option[String],
     originalDocument: Option[BSONDocument],
-    documents: Int,
+    updated: Int,
     updatedExisting: Boolean) extends DatabaseException {
-  /** states if the last operation ended up with an error */
+  /** States if the last operation ended up with an error */
   lazy val inError: Boolean = !ok || err.isDefined
   lazy val stringify: String = toString + " [inError: " + inError + "]"
 
   lazy val message = err.orElse(errMsg).getOrElse("empty lastError message")
+
+  /** Alias for [[reactivemongo.core.commands.LastError#updated updated]] to also support the short MongoDB syntax */
+  def n: Int = updated
+
+  /** Returns a `Stream` corresponding to the stream of the [[reactivemongo.core.commands.LastError#originalDocument originalDocument]] if present, otherwise an empty `Stream`. */
+  def stream: Stream[Try[BSONElement]] = originalDocument.map(_.stream).getOrElse(Stream.empty[Try[BSONElement]])
+
+  /** Returns a `Stream` for all the elements of the [[reactivemongo.core.commands.LastError#originalDocument originalDocument]] if present, otherwise an empty `Stream`. */
+  def elements: Stream[BSONElement] = originalDocument.map(_.elements).getOrElse(Stream.empty[BSONElement])
+    
+  /**
+   * Returns the [[reactivemongo.bson.BSONValue BSONValue]] associated with the given `key` of the [[reactivemongo.core.commands.LastError#originalDocument originalDocument]].
+   *
+   * If the key is not found or the matching value cannot be deserialized, returns `None`.
+   */
+  def get(key: String): Option[BSONValue] = originalDocument.flatMap(_.get(key))
+
+  /**
+   * Returns the [[reactivemongo.bson.BSONValue BSONValue BSONValue]] associated with the given `key` of the [[reactivemongo.core.commands.LastError#originalDocument originalDocument]].
+   *
+   * If the key is not found or the matching value cannot be deserialized, returns a `Failure`.
+   * The `Failure` holds a [[reactivemongo.bson.exceptions.DocumentKeyNotFound DocumentKeyNotFound]] if the key could not be found.
+   */
+  def getTry(key: String): Try[BSONValue] = originalDocument.map(_.getTry(key)).getOrElse(Failure(DocumentKeyNotFound(key)))
+
+  /**
+   * Returns the [[reactivemongo.bson.BSONValue BSONValue]] associated with the given `key` of the [[reactivemongo.core.commands.LastError#originalDocument originalDocument]].
+   *
+   * If the key could not be found, the resulting option will be `None`.
+   * If the matching value could not be deserialized, returns a `Failure`.
+   */
+  def getUnflattenedTry(key: String): Try[Option[BSONValue]] = originalDocument.map(_.getUnflattenedTry(key)).getOrElse(Failure(DocumentKeyNotFound(key)))
+
+  /**
+   * Returns the [[reactivemongo.bson.BSONValue BSONValue]] associated with the given `key` of the [[reactivemongo.core.commands.LastError#originalDocument originalDocument]], 
+   * and converts it with the given implicit [[reactivemongo.bson.BSONReader BSONReader]].
+   *
+   * If there is no matching value, or the value could not be deserialized or converted, returns a `None`.
+   */
+  def getAs[T](s: String)(implicit reader: BSONReader[_ <: BSONValue, T]): Option[T] = originalDocument.flatMap(_.getAs[T](s))
+
+  /**
+   * Returns the [[reactivemongo.bson.BSONValue BSONValue]] associated with the given `key` of the [[reactivemongo.core.commands.LastError#originalDocument originalDocument]], 
+   * and converts it with the given implicit [[reactivemongo.bson.BSONReader BSONReader]].
+   *
+   * If there is no matching value, or the value could not be deserialized or converted, returns a `Failure`.
+   * The `Failure` holds a [[reactivemongo.bson.exceptions.DocumentKeyNotFound DocumentKeyNotFound]] if the key could not be found.
+   */  
+  def getAsTry[T](s: String)(implicit reader: BSONReader[_ <: BSONValue, T]): Try[T] = originalDocument.map(_.getAsTry[T](s)).getOrElse(Failure(DocumentKeyNotFound(s)))
+  
+  /**
+   * Returns the [[reactivemongo.bson.BSONValue BSONValue]] associated with the given `key` of the [[reactivemongo.core.commands.LastError#originalDocument originalDocument]], 
+   * and converts it with the given implicit [[reactivemongo.bson.BSONReader BSONReader]].
+   *
+   * If there is no matching value, returns a `Success` holding `None`.
+   * If the value could not be deserialized or converted, returns a `Failure`.
+   */
+  def getAsUnflattenedTry[T](s: String)(implicit reader: BSONReader[_ <: BSONValue, T]): Try[Option[T]] = originalDocument.map(_.getAsUnflattenedTry[T](s)).getOrElse(Failure(DocumentKeyNotFound(s)))
 }
 
 /**
- * Deserializer for [[reactivemongo.core.commands.GetLastError]] command result.
+ * Deserializer for [[reactivemongo.core.commands.GetLastError GetLastError]] command result.
  */
 object LastError extends BSONCommandResultMaker[LastError] {
   def apply(document: BSONDocument) = {
