@@ -9,32 +9,32 @@ import scala.reflect.macros.Context
  * Time: 6:51 PM
  */
 private object MacroImpl {
-  def reader[A: c.WeakTypeTag, Opts: c.WeakTypeTag](c: Context): c.Expr[BSONReader[BSONDocument, A]] = {
+  def reader[A: c.WeakTypeTag, Opts: c.WeakTypeTag](c: Context): c.Expr[BSONDocumentReader[A]] = {
     val h = Helper[A,Opts](c)
     val body = h.readBody
     c.universe.reify {
-      new BSONReader[BSONDocument, A] {
+      new BSONDocumentReader[A] {
         def read(document: BSONDocument): A = body.splice
       }
     }
   }
 
-  def writer[A: c.WeakTypeTag, Opts: c.WeakTypeTag](c: Context): c.Expr[BSONWriter[A, BSONDocument]] = {
+  def writer[A: c.WeakTypeTag, Opts: c.WeakTypeTag](c: Context): c.Expr[BSONDocumentWriter[A]] = {
     val h = Helper[A,Opts](c)
     val body = h.writeBody
     c.universe.reify (
-      new BSONWriter[A, BSONDocument]{
+      new BSONDocumentWriter[A]{
         def write(document: A): BSONDocument = body.splice
       }
     )
   }
 
-  def handler[A: c.WeakTypeTag, Opts: c.WeakTypeTag](c: Context): c.Expr[BSONReader[BSONDocument, A] with BSONWriter[A, BSONDocument]] = {
+  def handler[A: c.WeakTypeTag, Opts: c.WeakTypeTag](c: Context): c.Expr[BSONDocumentReader[A] with BSONDocumentWriter[A] with BSONHandler[BSONDocument, A]] = {
     val h = Helper[A,Opts](c)
     val r = h.readBody
     val w = h.writeBody
     c.universe.reify(
-      new BSONReader[BSONDocument,A] with BSONWriter[A, BSONDocument] {
+      new BSONDocumentReader[A] with BSONDocumentWriter[A] with BSONHandler[BSONDocument, A] {
         def read(document: BSONDocument): A = r.splice
 
         def write(document: A): BSONDocument = w.splice
