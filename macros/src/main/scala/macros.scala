@@ -133,7 +133,7 @@ private object MacroImpl {
           val bs_value = c.Expr[BSONValue](Apply(Select(writer, "write"), List(tuple_i)))
           val name = c.literal(param.name.toString)
           reify(
-            (name.splice, bs_value.splice)
+            (name.splice, bs_value.splice): (String, BSONValue)
           ).tree
         }
       }
