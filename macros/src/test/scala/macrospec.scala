@@ -16,6 +16,7 @@ class Macros extends Specification {
   case class OptionalSingle(value: Option[String])
   case class SingleTuple(value: (String, String))
   case class User(_id: BSONObjectID = BSONObjectID.generate, name: String)
+  case class WordLover(name: String, words: Seq[String])
 
   object Nest {
     case class Nested(name: String)
@@ -60,6 +61,13 @@ class Macros extends Specification {
       val none = Optional("none", None)
       roundtrip(some, format)
       roundtrip(none, format)
+    }
+
+    "support seq" in {
+      roundtrip(
+        WordLover("john", Seq("hello", "world")),
+        Macros.handler[WordLover]
+      )
     }
 
     "support single member case classes" in {

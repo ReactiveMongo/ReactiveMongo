@@ -62,22 +62,22 @@ object Macros {
    * Creates an instance of BSONReader for case class A
    * @see Macros
    */
-  def reader[A]: BSONReader[BSONDocument, A] = macro MacroImpl.reader[A, Options.Default]
+  def reader[A]: BSONDocumentReader[A] = macro MacroImpl.reader[A, Options.Default]
 
   /** Creates an instance of BSONReader for case class A and takes additional options */
-  def readerOpts[A, Opts <: Options.Default]: BSONReader[BSONDocument, A] = macro MacroImpl.reader[A, Opts]
+  def readerOpts[A, Opts <: Options.Default]: BSONDocumentReader[A] = macro MacroImpl.reader[A, Opts]
 
   /** Creates an instance of BSONWriter for case class A */
-  def writer[A]: BSONWriter[A, BSONDocument] = macro MacroImpl.writer[A, Options.Default]
+  def writer[A]: BSONDocumentWriter[A] = macro MacroImpl.writer[A, Options.Default]
 
   /** Creates an instance of BSONWriter for case class A and takes additional options */
-  def writerOpts[A, Opts <: Options.Default]: BSONWriter[A, BSONDocument] = macro MacroImpl.writer[A, Opts]
+  def writerOpts[A, Opts <: Options.Default]:BSONDocumentWriter[A] = macro MacroImpl.writer[A, Opts]
 
   /** Creates an instance of BSONReader and BSONWriter for case class A */
-  def handler[A]: BSONReader[BSONDocument, A] with BSONWriter[A, BSONDocument] = macro MacroImpl.handler[A, Options.Default]
+  def handler[A]: BSONDocumentReader[A] with BSONDocumentWriter[A] with BSONHandler[BSONDocument, A] = macro MacroImpl.handler[A, Options.Default]
 
   /**Creates an instance of BSONReader and BSONWriter for case class A and takes additional options */
-  def handlerOpts[A, Opts <: Options.Default]: BSONReader[BSONDocument, A] with BSONWriter[A, BSONDocument] = macro MacroImpl.handler[A, Opts]
+  def handlerOpts[A, Opts <: Options.Default]: BSONDocumentReader[A] with BSONDocumentWriter[A]  with BSONHandler[BSONDocument, A] = macro MacroImpl.handler[A, Opts]
 
   /**
    * Methods with 'Opts' postfix will take additional options in the form of
