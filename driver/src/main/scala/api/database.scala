@@ -15,14 +15,12 @@
  */
 package reactivemongo.api
 
+import collections.default.BSONCollection
 import reactivemongo.api.indexes.IndexesManager
 import reactivemongo.bson._
 import reactivemongo.core.commands.{ Update => UpdateCommand, _ }
-import reactivemongo.core.protocol._
 import reactivemongo.utils.EitherMappableFuture._
 
-import org.jboss.netty.buffer.ChannelBuffer
-import play.api.libs.iteratee._
 
 import scala.concurrent.{ ExecutionContext, Future }
 import scala.concurrent.duration._
@@ -63,6 +61,30 @@ trait DB {
    */
   def collection[C <: Collection](name: String, failoverStrategy: FailoverStrategy = FailoverStrategy())(implicit producer: CollectionProducer[C] = collections.default.BSONCollectionProducer): C = {
     producer.apply(this, name, failoverStrategy)
+  }
+
+  private lazy val collectionNameReader =
+    new BSONDocumentReader[String] {
+      val prefixLength = name.size + 1
+
+      def read(bson: BSONDocument) =
+        bson
+          .get("name")
+          .collect { case bsonStr: BSONString => bsonStr.value.substring(prefixLength) }
+          .getOrElse(throw new Exception("name is expected on system.namespaces query"))
+    }
+
+  /**
+   * Returns lost of collection names in this database
+   * @return
+   */
+  def collectionNames(implicit ec: ExecutionContext): Cursor[String] = {
+
+    collection("system.namespaces").as[BSONCollection]()
+      .find(BSONDocument(
+     "name" -> BSONRegex("^[^\\$]+$", "") // strip off any indexes
+    ))
+      .cursor(collectionNameReader,ec)
   }
 
   /**
