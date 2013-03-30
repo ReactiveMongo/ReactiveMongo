@@ -52,7 +52,7 @@ case class BSONDocument(stream: Stream[Try[BSONElement]]) extends BSONValue {
   def getTry(key: String): Try[BSONValue] = Try {
     stream.find {
       case Success(element) => element._1 == key
-      case Failure(e) => throw e
+      case Failure(e)       => throw e
     }.map(_.get._2).getOrElse(throw DocumentKeyNotFound(key))
   }
 
@@ -64,8 +64,8 @@ case class BSONDocument(stream: Stream[Try[BSONElement]]) extends BSONValue {
    */
   def getUnflattenedTry(key: String): Try[Option[BSONValue]] = getTry(key) match {
     case Failure(e: DocumentKeyNotFound) => Success(None)
-    case Failure(e) => Failure(e)
-    case Success(e) => Success(Some(e))
+    case Failure(e)                      => Failure(e)
+    case Success(e)                      => Success(Some(e))
   }
 
   /**
@@ -98,8 +98,8 @@ case class BSONDocument(stream: Stream[Try[BSONElement]]) extends BSONValue {
    */
   def getAsUnflattenedTry[T](s: String)(implicit reader: BSONReader[_ <: BSONValue, T]): Try[Option[T]] = getAsTry(s)(reader) match {
     case Failure(e: DocumentKeyNotFound) => Success(None)
-    case Failure(e) => Failure(e)
-    case Success(e) => Success(Some(e))
+    case Failure(e)                      => Failure(e)
+    case Success(e)                      => Success(Some(e))
   }
 
   /** Creates a new [[BSONDocument]] containing all the elements of this one and the elements of the given document. */
@@ -193,8 +193,8 @@ case class BSONArray(stream: Stream[Try[BSONValue]]) extends BSONValue {
    */
   def getUnflattenedTry(index: Int): Try[Option[BSONValue]] = getTry(index) match {
     case Failure(e: DocumentKeyNotFound) => Success(None)
-    case Failure(e) => Failure(e)
-    case Success(e) => Success(Some(e))
+    case Failure(e)                      => Failure(e)
+    case Success(e)                      => Success(Some(e))
   }
 
   /**
@@ -227,8 +227,8 @@ case class BSONArray(stream: Stream[Try[BSONValue]]) extends BSONValue {
    */
   def getAsUnflattenedTry[T](index: Int)(implicit reader: BSONReader[_ <: BSONValue, T]): Try[Option[T]] = getAsTry(index)(reader) match {
     case Failure(e: DocumentKeyNotFound) => Success(None)
-    case Failure(e) => Failure(e)
-    case Success(e) => Success(Some(e))
+    case Failure(e)                      => Failure(e)
+    case Success(e)                      => Success(Some(e))
   }
 
   /** Creates a new [[BSONDocument]] containing all the elements of this one and the elements of the given document. */
@@ -312,7 +312,7 @@ case class BSONObjectID(value: Array[Byte]) extends BSONValue {
 
   override def equals(obj: Any): Boolean = obj match {
     case BSONObjectID(arr) => Arrays.equals(value, arr)
-    case _ => false
+    case _                 => false
   }
 
   override lazy val hashCode: Int = Arrays.hashCode(value)
@@ -340,8 +340,20 @@ object BSONObjectID {
     Converters.md5(ha).take(3)
   }
 
-  /** Constructs a BSON ObjectId element from a hexadecimal String representation */
-  def apply(id: String): BSONObjectID = new BSONObjectID(id)
+  /**
+   * Constructs a BSON ObjectId element from a hexadecimal String representation.
+   * Throws an exception if the given argument is not a valid ObjectID.
+   *
+   * `parse(str: String): Try[BSONObjectID]` should be considered instead of this method.
+   */
+  def apply(id: String): BSONObjectID = {
+    if (id.length != 24)
+      throw new IllegalArgumentException(s"wrong ObjectId: '$id'")
+    else new BSONObjectID(id)
+  }
+
+  /** Tries to make a BSON ObjectId element from a hexadecimal String representation. */
+  def parse(str: String): Try[BSONObjectID] = Try(apply(str))
 
   /** Generates a new BSON ObjectID. */
   def generate: BSONObjectID = {
@@ -440,13 +452,13 @@ object Subtype {
   case object Md5Subtype extends Subtype { val value = 0x05.toByte }
   case object UserDefinedSubtype extends Subtype { val value = 0x80.toByte }
   def apply(code: Byte) = code match {
-    case 0 => GenericBinarySubtype
-    case 1 => FunctionSubtype
-    case 2 => OldBinarySubtype
-    case 3 => OldUuidSubtype
-    case 4 => UuidSubtype
-    case 5 => Md5Subtype
+    case 0    => GenericBinarySubtype
+    case 1    => FunctionSubtype
+    case 2    => OldBinarySubtype
+    case 3    => OldUuidSubtype
+    case 4    => UuidSubtype
+    case 5    => Md5Subtype
     case -128 => UserDefinedSubtype
-    case _ => throw new NoSuchElementException(s"binary type = $code")
+    case _    => throw new NoSuchElementException(s"binary type = $code")
   }
 }
