@@ -43,23 +43,25 @@ import scala.concurrent.duration._
  */
 trait DB {
   /** The [[reactivemongo.api.MongoConnection]] that will be used to query this database. */
-  val connection: MongoConnection
+  def connection: MongoConnection
   /** This database name. */
-  val name: String
+  def name: String
+  /** A failover strategy for sending requests. */
+  def failoverStrategy: FailoverStrategy
 
   /**
    * Gets a [[reactivemongo.api.Collection]] from this database (alias for the `collection` method).
    *
    * @param name The name of the collection to open.
    */
-  def apply[C <: Collection](name: String, failoverStrategy: FailoverStrategy = FailoverStrategy())(implicit producer: CollectionProducer[C] = collections.default.BSONCollectionProducer): C = collection(name, failoverStrategy)
+  def apply[C <: Collection](name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit producer: CollectionProducer[C] = collections.default.BSONCollectionProducer): C = collection(name, failoverStrategy)
 
   /**
    * Gets a [[reactivemongo.api.Collection]] from this database.
    *
    * @param name The name of the collection to open.
    */
-  def collection[C <: Collection](name: String, failoverStrategy: FailoverStrategy = FailoverStrategy())(implicit producer: CollectionProducer[C] = collections.default.BSONCollectionProducer): C = {
+  def collection[C <: Collection](name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit producer: CollectionProducer[C] = collections.default.BSONCollectionProducer): C = {
     producer.apply(this, name, failoverStrategy)
   }
 
@@ -94,22 +96,14 @@ trait DB {
    *
    * @return a future containing the result of the command.
    */
-  def command[T](command: Command[T])(implicit ec: ExecutionContext): Future[T]
+  def command[T](command: Command[T])(implicit ec: ExecutionContext): Future[T] =
+    Failover(command.apply(name).maker, connection, failoverStrategy).future.mapEither(command.ResultMaker(_))
 
   /** Authenticates the connection on this database. */
   def authenticate(user: String, password: String)(implicit timeout: FiniteDuration): Future[SuccessfulAuthentication] = connection.authenticate(name, user, password)
 
-}
-
-/** A mixin for making failover requests on the database. */
-trait FailoverDB {
-  self: DB =>
-
-  /** A failover strategy for sending requests. */
-  val failoverStrategy: FailoverStrategy
-
-  def command[T](command: Command[T])(implicit ec: ExecutionContext): Future[T] =
-    Failover(command.apply(name).maker, connection, failoverStrategy).future.mapEither(command.ResultMaker(_))
+  /** Returns the database of the given name on the same MongoConnection. */
+  def sister(name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit ec: ExecutionContext) = connection.db(name, failoverStrategy)
 }
 
 /** A mixin that provides commands about this database itself. */
@@ -127,7 +121,7 @@ trait DBMetaCommands {
 case class DefaultDB(
     name: String,
     connection: MongoConnection,
-    failoverStrategy: FailoverStrategy = FailoverStrategy()) extends DB with DBMetaCommands with FailoverDB
+    failoverStrategy: FailoverStrategy = FailoverStrategy()) extends DB with DBMetaCommands
 
 object DB {
   def apply(name: String, connection: MongoConnection, failoverStrategy: FailoverStrategy = FailoverStrategy()) = DefaultDB(name, connection, failoverStrategy)
