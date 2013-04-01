@@ -21,7 +21,6 @@ import reactivemongo.bson._
 import reactivemongo.core.commands.{ Update => UpdateCommand, _ }
 import reactivemongo.utils.EitherMappableFuture._
 
-
 import scala.concurrent.{ ExecutionContext, Future }
 import scala.concurrent.duration._
 
@@ -65,30 +64,6 @@ trait DB {
     producer.apply(this, name, failoverStrategy)
   }
 
-  private lazy val collectionNameReader =
-    new BSONDocumentReader[String] {
-      val prefixLength = name.size + 1
-
-      def read(bson: BSONDocument) =
-        bson
-          .get("name")
-          .collect { case bsonStr: BSONString => bsonStr.value.substring(prefixLength) }
-          .getOrElse(throw new Exception("name is expected on system.namespaces query"))
-    }
-
-  /**
-   * Returns lost of collection names in this database
-   * @return
-   */
-  def collectionNames(implicit ec: ExecutionContext): Cursor[String] = {
-
-    collection("system.namespaces").as[BSONCollection]()
-      .find(BSONDocument(
-     "name" -> BSONRegex("^[^\\$]+$", "") // strip off any indexes
-    ))
-      .cursor(collectionNameReader,ec)
-  }
-
   /**
    * Sends a command and get the future result of the command.
    *
@@ -115,13 +90,34 @@ trait DBMetaCommands {
 
   /** Returns an index manager for this database. */
   def indexesManager(implicit ec: ExecutionContext) = new IndexesManager(self)
+
+  private lazy val collectionNameReader =
+    new BSONDocumentReader[String] {
+      val prefixLength = name.size + 1
+
+      def read(bson: BSONDocument) =
+        bson
+          .get("name")
+          .collect { case bsonStr: BSONString => bsonStr.value.substring(prefixLength) }
+          .getOrElse(throw new Exception("name is expected on system.namespaces query"))
+    }
+
+  /** Returns the names of the collections in this database. */
+  def collectionNames(implicit ec: ExecutionContext): Future[List[String]] = {
+    collection("system.namespaces").as[BSONCollection]()
+      .find(BSONDocument(
+        "name" -> BSONRegex("^[^\\$]+$", "") // strip off any indexes
+        ))
+      .cursor(collectionNameReader, ec)
+      .toList
+  }
 }
 
 /** The default DB implementation, that mixes in the database traits. */
 case class DefaultDB(
-    name: String,
-    connection: MongoConnection,
-    failoverStrategy: FailoverStrategy = FailoverStrategy()) extends DB with DBMetaCommands
+  name: String,
+  connection: MongoConnection,
+  failoverStrategy: FailoverStrategy = FailoverStrategy()) extends DB with DBMetaCommands
 
 object DB {
   def apply(name: String, connection: MongoConnection, failoverStrategy: FailoverStrategy = FailoverStrategy()) = DefaultDB(name, connection, failoverStrategy)
