@@ -96,6 +96,8 @@ trait GenericCollection[Structure, Reader[_], Writer[_]] extends Collection with
 
   private def writeDoc[T](doc: T, writer: Writer[T]) = BufferWriterInstance(writer).write(doc, ChannelBufferWritableBuffer()).buffer
 
+  protected def watchFailure[T](future: => Future[T]): Future[T] = Try(future).recover { case e: Throwable => Future.failed(e) }.get
+
   def genericQueryBuilder: GenericQueryBuilder[Structure, Reader, Writer]
 
   /**
@@ -144,7 +146,7 @@ trait GenericCollection[Structure, Reader[_], Writer[_]] extends Collection with
    *
    * @return a future [[reactivemongo.core.commands.LastError]] that can be used to check whether the insertion was successful.
    */
-  def insert[T](document: T, writeConcern: GetLastError = GetLastError())(implicit writer: Writer[T], ec: ExecutionContext): Future[LastError] = {
+  def insert[T](document: T, writeConcern: GetLastError = GetLastError())(implicit writer: Writer[T], ec: ExecutionContext): Future[LastError] = watchFailure {
     val op = Insert(0, fullCollectionName)
     val bson = writeDoc(document, writer)
     val checkedWriteRequest = CheckedWriteRequest(op, BufferSequence(bson), writeConcern)
@@ -161,7 +163,7 @@ trait GenericCollection[Structure, Reader[_], Writer[_]] extends Collection with
    *
    * @return a future [[reactivemongo.core.commands.LastError]] that can be used to check whether the insertion was successful.
    */
-  def insert(document: Structure, writeConcern: GetLastError)(implicit ec: ExecutionContext): Future[LastError] = {
+  def insert(document: Structure, writeConcern: GetLastError)(implicit ec: ExecutionContext): Future[LastError] = watchFailure {
     val op = Insert(0, fullCollectionName)
     val bson = writeDoc(document)
     val checkedWriteRequest = CheckedWriteRequest(op, BufferSequence(bson), writeConcern) //TODO
@@ -191,7 +193,7 @@ trait GenericCollection[Structure, Reader[_], Writer[_]] extends Collection with
    *
    * @return a future [[reactivemongo.core.commands.LastError]] that can be used to check whether the update was successful.
    */
-  def update[S, U](selector: S, update: U, writeConcern: GetLastError = GetLastError(), upsert: Boolean = false, multi: Boolean = false)(implicit selectorWriter: Writer[S], updateWriter: Writer[U], ec: ExecutionContext): Future[LastError] = {
+  def update[S, U](selector: S, update: U, writeConcern: GetLastError = GetLastError(), upsert: Boolean = false, multi: Boolean = false)(implicit selectorWriter: Writer[S], updateWriter: Writer[U], ec: ExecutionContext): Future[LastError] = watchFailure {
     val flags = 0 | (if (upsert) UpdateFlags.Upsert else 0) | (if (multi) UpdateFlags.MultiUpdate else 0)
     val op = Update(fullCollectionName, flags)
     val bson = writeDoc(selector, selectorWriter)
@@ -213,7 +215,7 @@ trait GenericCollection[Structure, Reader[_], Writer[_]] extends Collection with
    *
    * @return a future [[reactivemongo.core.commands.LastError]] that can be used to check whether the removal was successful.
    */
-  def remove[T](query: T, writeConcern: GetLastError = GetLastError(), firstMatchOnly: Boolean = false)(implicit writer: Writer[T], ec: ExecutionContext): Future[LastError] = {
+  def remove[T](query: T, writeConcern: GetLastError = GetLastError(), firstMatchOnly: Boolean = false)(implicit writer: Writer[T], ec: ExecutionContext): Future[LastError] = watchFailure {
     val op = Delete(fullCollectionName, if (firstMatchOnly) 1 else 0)
     val bson = writeDoc(query, writer)
     val checkedWriteRequest = CheckedWriteRequest(op, BufferSequence(bson), writeConcern)
