@@ -193,7 +193,7 @@ class Handlers extends Specification {
     }
   ]
 }"""
-      val ny2 = BSON.read[Artist](doc)
+      val ny2 = BSON.readDocument[Artist](doc)
       val allSongs = doc.getAs[List[Album]]("albums").toList.flatten.flatMap(_.tracks)
       println(allSongs)
       allSongs mustEqual List(

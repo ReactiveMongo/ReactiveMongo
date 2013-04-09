@@ -257,5 +257,5 @@ object BSONSamples {
    * 
    * So we have to explicitly give the type of the instance we want to get from the document.
    */
-  val neilYoungAgain = BSON.read[Artist](neilYoungDoc)
+  val neilYoungAgain = BSON.readDocument[Artist](neilYoungDoc)
 }
