@@ -1,7 +1,6 @@
-package core.commands
+package reactivemongo.core.commands
 
 import reactivemongo.bson._
-import reactivemongo.core.commands.{ CommandError, BSONCommandResultMaker, Command }
 
 /**
  * Implements the "aggregation" command, otherwise known as the "Aggregation Framework."

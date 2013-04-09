@@ -24,7 +24,8 @@ import reactivemongo.core.protocol.{ RequestMaker, Query, QueryFlags, Response }
 import reactivemongo.core.protocol.NodeState
 import reactivemongo.core.protocol.NodeState._
 import reactivemongo.core.netty._
-import reactivemongo.utils._
+import reactivemongo.utils.option
+import reactivemongo.bson.utils.Converters
 
 /**
  * A MongoDB Command.
