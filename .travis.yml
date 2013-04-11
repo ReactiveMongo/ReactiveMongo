@@ -1,4 +1,5 @@
 language: scala
+script: sbt ';set scalaVersion in Global := "2.10.1"; test'
 scala:
   - "2.10.1"
   - "2.10.0"
