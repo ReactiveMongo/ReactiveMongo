@@ -1,5 +1,5 @@
 language: scala
-script: sbt ';set scalaVersion in Global := "2.10.1"; test-only * -- -exclude testCommands --'
+script: sbt ++$TRAVIS_SCALA_VERSION "test-only * -- -exclude testCommands --"
 scala:
   - "2.10.1"
   - "2.10.0"
