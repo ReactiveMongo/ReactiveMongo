@@ -127,10 +127,12 @@ object Dependencies {
 
   def akkaActor(sv: String) = sv match {
     case "2.10.0" => "com.typesafe.akka" %% "akka-actor" % "2.1.0"
+    case "2.10.1" => "com.typesafe.akka" %% "akka-actor" % "2.1.0"
   }
 
   def iteratees(sv: String) = sv match {
     case "2.10.0" => "play" %% "play-iteratees" % "2.1.0"
+    case "2.10.1" => "play" %% "play-iteratees" % "2.1.1"
   }
 
   val logbackVer = "1.0.9"
@@ -140,6 +142,7 @@ object Dependencies {
 
   def specs(sv: String) = sv match {
     case "2.10.0" => "org.specs2" % "specs2" % "1.13" % "test" cross CrossVersion.binary
+    case "2.10.1" => "org.specs2" % "specs2" % "1.13" % "test" cross CrossVersion.binary
   }
 
   val junit = "junit" % "junit" % "4.8" % "test" cross CrossVersion.Disabled
