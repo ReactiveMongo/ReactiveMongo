@@ -100,3 +100,76 @@ trait Collection {
 trait CollectionProducer[+C <: Collection] {
   def apply(db: DB, name: String, failoverStrategy: FailoverStrategy = FailoverStrategy()): C
 }
+
+/** A mixin that provides commands about this Collection itself. */
+trait CollectionMetaCommands {
+  self: Collection =>
+
+  import concurrent.{ ExecutionContext, Future }
+  import reactivemongo.core.commands._
+  import reactivemongo.api.indexes.{ CollectionIndexesManager, IndexesManager }
+
+  /**
+   * Creates this collection.
+   *
+   * The returned future will be completed with an error if this collection already exists.
+   *
+   * @param autoIndexId States if should automatically add an index on the _id field. By default, regular collections will have an indexed _id field, in contrast to capped collections.
+   */
+  def create(autoIndexId: Boolean = true)(implicit ec: ExecutionContext): Future[Boolean] = db.command(new CreateCollection(name, None, if (autoIndexId) None else Some(false)))
+
+  /**
+   * Creates this collection as a capped one.
+   *
+   * The returned future will be completed with an error if this collection already exists.
+   *
+   * @param autoIndexId States if should automatically add an index on the _id field. By default, capped collections will NOT have an indexed _id field, in contrast to regular collections.
+   */
+  def createCapped(size: Long, maxDocuments: Option[Int], autoIndexId: Boolean = false)(implicit ec: ExecutionContext): Future[Boolean] = db.command(new CreateCollection(name, Some(CappedOptions(size, maxDocuments)), if (autoIndexId) Some(true) else None))
+
+  /**
+   * Drops this collection.
+   *
+   * The returned future will be completed with an error if this collection does not exist.
+   */
+  def drop()(implicit ec: ExecutionContext): Future[Boolean] = db.command(new Drop(name))
+
+  /**
+   * If this collection is capped, removes all the documents it contains.
+   *
+   * Deprecated because it became an internal command, unavailable by default.
+   */
+  @deprecated("Deprecated because emptyCapped became an internal command, unavailable by default.", "0.9")
+  def emptyCapped()(implicit ec: ExecutionContext): Future[Boolean] = db.command(new EmptyCapped(name))
+
+  /**
+   * Converts this collection to a capped one.
+   *
+   * @param size The size of this capped collection, in bytes.
+   * @param maxDocuments The maximum number of documents this capped collection can contain.
+   */
+  def convertToCapped(size: Long, maxDocuments: Option[Int])(implicit ec: ExecutionContext): Future[Boolean] = db.command(new ConvertToCapped(name, CappedOptions(size, maxDocuments)))
+
+  /**
+   * Renames this collection.
+   *
+   * @param to The new name of this collection.
+   * @param dropExisting If a collection of name `to` already exists, then drops that collection before renaming this one.
+   */
+  def rename(to: String, dropExisting: Boolean = false)(implicit ec: ExecutionContext): Future[Boolean] = db.command(new RenameCollection(name, to, dropExisting))
+
+  /**
+   * Returns various information about this collection.
+   */
+  def stats()(implicit ec: ExecutionContext): Future[CollStatsResult] = db.command(new CollStats(name))
+
+  /**
+   * Returns various information about this collection.
+   *
+   * @param scale A scale factor (for example, to get all the sizes in kilobytes).
+   */
+  def stats(scale: Int)(implicit ec: ExecutionContext): Future[CollStatsResult] = db.command(new CollStats(name, Some(scale)))
+
+  /** Returns an index manager for this collection. */
+  def indexesManager(implicit ec: ExecutionContext): CollectionIndexesManager = new IndexesManager(self.db).onCollection(name)
+}
