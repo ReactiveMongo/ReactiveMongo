@@ -7,7 +7,7 @@ import scala.util.{Try, Success, Failure}
 
 import org.specs2.mutable._
 
-class CollectionSpec extends Specification {
+class CollectionSpec extends Specification with Tags {
   import Common._
 
   sequential
@@ -41,10 +41,14 @@ class CollectionSpec extends Specification {
 
       Await.result(db.command(Count(collection.name)), timeout) mustEqual 1
     }
+
+    // Empty capped need to be enabled with enableTestCommands
+    // see: http://docs.mongodb.org/manual/reference/command/emptycapped/#dbcmd.emptycapped
     "empty the capped collection" in {
       Await.result(collection.emptyCapped(), timeout) mustEqual true
       Await.result(db.command(Count(collection.name)), timeout) mustEqual 0
-    }
+    } tag ("testCommands")
+
     "drop it" in {
       Await.result(collection.drop(), timeout) mustEqual true
     }
