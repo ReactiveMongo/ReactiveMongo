@@ -1,6 +1,6 @@
 # ReactiveMongo - Asynchronous & Non-Blocking Scala Driver for MongoDB
 
-![Build Status](https://travis-ci.org/zenexity/ReactiveMongo.png)
+[![Build Status](https://travis-ci.org/zenexity/ReactiveMongo.png?branch=master)](https://travis-ci.org/zenexity/ReactiveMongo)
 
 [ReactiveMongo](https://github.com/zenexity/ReactiveMongo/) is a scala driver that provides fully non-blocking and asynchronous I/O operations.
 
