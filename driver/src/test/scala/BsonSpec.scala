@@ -1,11 +1,12 @@
 package reactivemongo
 
-import org.specs2.mutable._
-import reactivemongo.bson._
-import DefaultBSONHandlers._
-import reactivemongo.core.netty._
 import java.util.Arrays
+import org.specs2.mutable._
+
+import reactivemongo.bson._
 import reactivemongo.bson.BSONObjectID
+import reactivemongo.bson.utils.Converters
+import reactivemongo.core.netty._
 
 class BsonSpec extends Specification {
   val simple = Array[Byte](0x16, 0x00, 0x00, 0x00, 0x02, 'h', 'e', 'l', 'l', 'o', 0x00, 0x06, 0x00, 0x00, 0x00, 'w', 'o', 'r', 'l', 'd', 0x00, 0x00)
@@ -59,9 +60,9 @@ class BsonSpec extends Specification {
       val array2 = BSONArray(BSONString("a"), BSONString("b"))
       val mergedArray = array1 ++ array2
       val str = mergedArray.values.map {
-        case BSONString(value) => value.toString
+        case BSONString(value)  => value.toString
         case BSONInteger(value) => value.toString
-        case _ => "NOELEM"
+        case _                  => "NOELEM"
       }.mkString(",")
       str must equalTo("1,2,a,b")
     }
@@ -73,7 +74,7 @@ class BsonSpec extends Specification {
         Some(BSONInteger(4)))
       val str = array.values.map {
         case BSONInteger(value) => value.toString
-        case _ => "NOELEM"
+        case _                  => "NOELEM"
       }.mkString(",")
       str mustEqual "1,2,4"
     }
@@ -121,8 +122,6 @@ class BsonSpec extends Specification {
     println(Arrays.toString(buffer.array()))
   }
 }
-
-import reactivemongo.utils.Converters
 
 class BSONObjectIDSpec extends Specification {
 

@@ -16,9 +16,6 @@
  */
 import org.specs2.mutable._
 import reactivemongo.bson._
-import java.util.Arrays
-import reactivemongo.bson.DefaultBSONHandlers._
-
 import scala.util._
 
 class Handlers extends Specification {
@@ -174,7 +171,6 @@ class Handlers extends Specification {
   "Neil Young" should {
     "produce the expected BSONDocument" in {
       val doc = BSON.write(neilYoung)
-      println(BSONDocument.pretty(doc))
       BSONDocument.pretty(doc) mustEqual """{
   name: BSONString(Neil Young),
   albums: [
@@ -195,7 +191,6 @@ class Handlers extends Specification {
 }"""
       val ny2 = BSON.readDocument[Artist](doc)
       val allSongs = doc.getAs[List[Album]]("albums").toList.flatten.flatMap(_.tracks)
-      println(allSongs)
       allSongs mustEqual List(
         "Cinnamon Girl",
         "Everybody Knows this is Nowhere",
@@ -204,7 +199,6 @@ class Handlers extends Specification {
         "Losing End (When You're On)",
         "Running Dry (Requiem For the Rockets)",
         "Cowgirl in the Sand")
-      println(ny2)
       ny2 mustEqual neilYoung
       success
     }

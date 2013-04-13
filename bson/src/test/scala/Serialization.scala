@@ -27,7 +27,6 @@ class SerializationSpecs extends Specification {
 
   def compare(a1: Array[Byte], a2: Array[Byte]) = {
     if (Arrays.equals(a1, a2)) {
-      println(s"\texpected:\n${Arrays.toString(a1)},\n\tgot:\n${Arrays.toString(a2)}")
       success
     } else {
       println(s"\texpected:\n${Arrays.toString(a1)},\n\tgot:\n${Arrays.toString(a2)}")
@@ -54,7 +53,6 @@ class SerializationSpecs extends Specification {
             Some("spamaddrjames@example.org")),
           "adress" -> BSONString("coucou")),
         "lastSeen" -> BSONLong(1360512704747L))
-      println(BSONDocument.pretty(doc))
       val buffer = new ArrayBSONBuffer
       DefaultBufferHandler.write(buffer, doc)
       compare(expectedWholeDocumentBytes, buffer.array)
@@ -125,12 +123,7 @@ class SerializationSpecs extends Specification {
   "BSON Default Deserializer" should {
     "deserialize a complex document" in {
       val buffer = ArrayReadableBuffer(expectedWholeDocumentBytes)
-      //val buffer = ArrayReadableBuffer(Array[Byte](14, 0, 0, 0, 16, 105, 110, 116, 0, 8, 0, 0, 0, 0))
       val doc = DefaultBufferHandler.readDocument(buffer)
-      doc.get.elements.iterator.foreach { e =>
-        println("\t" + e)
-      }
-      println("DESERIALIZED=" + doc.map(BSONDocument.pretty(_)))
       doc.recover {
         case e => e.printStackTrace()
       }

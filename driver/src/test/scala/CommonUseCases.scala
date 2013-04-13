@@ -2,7 +2,6 @@ import org.specs2.mutable._
 import play.api.libs.iteratee.Enumerator
 import reactivemongo.api._
 import reactivemongo.bson._
-import DefaultBSONHandlers._
 import reactivemongo.core.commands.Count
 import scala.concurrent._
 import scala.util.Failure

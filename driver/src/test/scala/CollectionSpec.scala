@@ -1,6 +1,5 @@
 import reactivemongo.api._
 import reactivemongo.bson._
-import DefaultBSONHandlers._
 import reactivemongo.core.commands.Count
 import scala.concurrent._
 import scala.util.{Try, Success, Failure}
