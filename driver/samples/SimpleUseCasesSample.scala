@@ -4,10 +4,11 @@ import play.api.libs.iteratee.Iteratee
 import reactivemongo.api._
 import reactivemongo.bson._
 import reactivemongo.core.commands._
+import reactivemongo.api.collections.default.BSONCollection
 import scala.util.{ Failure, Success }
 
 object SimpleUseCases {
-  import scala.concurrent.ExecutionContext.Implicits.global // TODO create own ExecutionContext
+  import scala.concurrent.ExecutionContext.Implicits.global
 
   // gets an instance of the driver
   // (creates an actor system)
@@ -26,7 +27,7 @@ object SimpleUseCases {
 
   // Gets a reference to the collection "acoll"
   // By default, you get a BSONCollection.
-  val collection = db("acoll")
+  val collection = db[BSONCollection]("acoll")
 
   def listDocs() = {
     // select only the documents which field 'firstName' equals 'Jack'
