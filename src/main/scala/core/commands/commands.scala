@@ -349,10 +349,9 @@ object Authenticate extends BSONCommandResultMaker[SuccessfulAuthentication] {
       case Some(BSONString(dbname)) => VerboseSuccessfulAuthentication(
         dbname,
         document.get("user").get.asInstanceOf[BSONString].value,
-        document.get("readOnly").flatMap {
-          case BSONBoolean(value) => Some(value)
-          case _ => Some(false)
-        }.get
+        document.get("readOnly").collect {
+          case BSONBoolean(value) => value
+        }.getOrElse(false)
       )
       case _ => SilentSuccessfulAuthentication
     })
