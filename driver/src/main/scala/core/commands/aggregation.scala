@@ -10,8 +10,8 @@ import reactivemongo.bson._
  * @param pipeline Sequence of MongoDB aggregation operations.
  */
 case class Aggregate(
-    collectionName: String,
-    pipeline: Seq[PipelineOperator]) extends Command[BSONValue] {
+      collectionName: String,
+      pipeline: Seq[PipelineOperator]) extends Command[Stream[BSONDocument]] {
   override def makeDocuments =
     BSONDocument(
       "aggregate" -> BSONString(collectionName),
@@ -21,9 +21,9 @@ case class Aggregate(
   val ResultMaker = Aggregate
 }
 
-object Aggregate extends BSONCommandResultMaker[BSONValue] {
+object Aggregate extends BSONCommandResultMaker[Stream[BSONDocument]] {
   def apply(document: BSONDocument) =
-    CommandError.checkOk(document, Some("aggregate")).toLeft(document.get("result").get)
+    CommandError.checkOk(document, Some("aggregate")).toLeft(document.get("result").get.asInstanceOf[BSONArray].values.map(_.asInstanceOf[BSONDocument]))
 }
 
 /**
@@ -37,13 +37,12 @@ sealed trait PipelineOperator {
 /**
  * Reshapes a document stream by renaming, adding, or removing fields.
  * Also use "Project" to create computed values or sub-objects.
- * NOTE: Currently only supports removing fields fields.
  * http://docs.mongodb.org/manual/reference/aggregation/project/#_S_project
  * @param fields Fields to include. The resulting objects will contain only these fields
  */
-case class Project(fields: String*) extends PipelineOperator {
+case class Project(fields: (String, Int)*) extends PipelineOperator {
   override val makePipe = BSONDocument("$project" -> BSONDocument(
-    { for (field <- fields) yield field -> BSONInteger(1) }.toStream))
+    { for (field <- fields) yield field._1 -> BSONInteger(field._2) }.toStream))
 }
 
 /**
