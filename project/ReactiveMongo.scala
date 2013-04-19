@@ -2,7 +2,7 @@ import sbt._
 import sbt.Keys._
 
 object BuildSettings {
-  val buildVersion = "0.8"
+  val buildVersion = "0.8.1-SNAPSHOT"
 
   val filter = { (ms: Seq[(File, String)]) =>
     ms filter { case (file, path) =>
@@ -41,7 +41,7 @@ object Publish {
   }
   lazy val settings = Seq(
     publishMavenStyle := true,
-    publishTo <<= TargetRepository.local,
+    publishTo <<= TargetRepository.sonatype,
     publishArtifact in Test := false,
     pomIncludeRepository := { _ => false },
     licenses := Seq("Apache 2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0")),
