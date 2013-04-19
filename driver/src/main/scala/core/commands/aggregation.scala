@@ -10,8 +10,8 @@ import reactivemongo.bson._
  * @param pipeline Sequence of MongoDB aggregation operations.
  */
 case class Aggregate(
-    collectionName: String,
-    pipeline: Seq[PipelineOperator]) extends Command[BSONValue] {
+      collectionName: String,
+      pipeline: Seq[PipelineOperator]) extends Command[Stream[BSONDocument]] {
   override def makeDocuments =
     BSONDocument(
       "aggregate" -> BSONString(collectionName),
@@ -21,9 +21,9 @@ case class Aggregate(
   val ResultMaker = Aggregate
 }
 
-object Aggregate extends BSONCommandResultMaker[BSONValue] {
+object Aggregate extends BSONCommandResultMaker[Stream[BSONDocument]] {
   def apply(document: BSONDocument) =
-    CommandError.checkOk(document, Some("aggregate")).toLeft(document.get("result").get)
+    CommandError.checkOk(document, Some("aggregate")).toLeft(document.get("result").get.asInstanceOf[BSONArray].values.map(_.asInstanceOf[BSONDocument]))
 }
 
 /**
