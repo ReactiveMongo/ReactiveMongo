@@ -123,11 +123,11 @@ object Resolvers {
 }
 
 object Dependencies {
-  val netty = "io.netty" % "netty" % "3.3.1.Final" cross CrossVersion.Disabled
+  val netty = "io.netty" % "netty" % "3.6.5.Final" cross CrossVersion.Disabled
 
   def akkaActor(sv: String) = sv match {
     case "2.10.0" => "com.typesafe.akka" %% "akka-actor" % "2.1.0"
-    case "2.10.1" => "com.typesafe.akka" %% "akka-actor" % "2.1.0"
+    case "2.10.1" => "com.typesafe.akka" %% "akka-actor" % "2.1.2"
   }
 
   def iteratees(sv: String) = sv match {
@@ -135,14 +135,14 @@ object Dependencies {
     case "2.10.1" => "play" %% "play-iteratees" % "2.1.1"
   }
 
-  val logbackVer = "1.0.9"
+  val logbackVer = "1.0.11"
   val logback = Seq(
     "ch.qos.logback" % "logback-core" % logbackVer,
     "ch.qos.logback" % "logback-classic" % logbackVer)
 
   def specs(sv: String) = sv match {
-    case "2.10.0" => "org.specs2" % "specs2" % "1.13" % "test" cross CrossVersion.binary
-    case "2.10.1" => "org.specs2" % "specs2" % "1.13" % "test" cross CrossVersion.binary
+    case "2.10.0" => "org.specs2" % "specs2" % "1.14" % "test" cross CrossVersion.binary
+    case "2.10.1" => "org.specs2" % "specs2" % "1.14" % "test" cross CrossVersion.binary
   }
 
   val junit = "junit" % "junit" % "4.8" % "test" cross CrossVersion.Disabled
