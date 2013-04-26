@@ -126,8 +126,8 @@ object Dependencies {
   val netty = "io.netty" % "netty" % "3.6.5.Final" cross CrossVersion.Disabled
 
   def akkaActor(sv: String) = sv match {
-    case "2.10.0" => "com.typesafe.akka" %% "akka-actor" % "2.2-M3"
-    case "2.10.1" => "com.typesafe.akka" %% "akka-actor" % "2.2-M3"
+    case "2.10.0" => "com.typesafe.akka" %% "akka-actor" % "2.1.0"
+    case "2.10.1" => "com.typesafe.akka" %% "akka-actor" % "2.1.2"
   }
 
   def iteratees(sv: String) = sv match {
