@@ -196,7 +196,7 @@ When this snippet is run, we get the following:
 
 ## Go further!
 
-There is a pretty complete [Scaladoc](http://reactivemongo.org/api/0.9/index.html) available. The code is accessible from the [Github repository](https://github.com/zenexity/ReactiveMongo). And obviously, don't hesitate to ask questions in the [ReactiveMongo Google Group](https://groups.google.com/forum/?fromgroups#!forum/reactivemongo)!
+There is a pretty complete [Scaladoc](http://reactivemongo.org/releases/0.9/api/index.html) available. The code is accessible from the [Github repository](https://github.com/zenexity/ReactiveMongo). And obviously, don't hesitate to ask questions in the [ReactiveMongo Google Group](https://groups.google.com/forum/?fromgroups#!forum/reactivemongo)!
 
 ReactiveMongo makes a heavy usage of the [Iteratee](http://www.playframework.com/documentation/2.1.1/Iteratees) library. Although it is developped by the [Play! Framework](http://www.playframework.com) team, it does _not_ depend on any other part of the framework. You can dive into [Play's Iteratee documentation](http://www.playframework.com/documentation/2.1.1/Iteratees) to learn about this cool piece of software, and make your own Iteratees and Enumerators.
 
