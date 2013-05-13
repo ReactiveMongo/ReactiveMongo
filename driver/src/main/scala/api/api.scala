@@ -216,12 +216,7 @@ class MongoConnection(
   def close(): Unit = monitor ! Close
 }
 
-class MongoDriver {
-  val system = {
-    import com.typesafe.config.ConfigFactory
-    val config = ConfigFactory.load()
-    ActorSystem("reactivemongo", config.getConfig("mongo-async-driver"))
-  }
+class MongoDriver(system: ActorSystem = MongoDriver.defaultSystem) {
 
   def close() = {
     system.shutdown
@@ -241,3 +236,28 @@ class MongoDriver {
     new MongoConnection(system, mongosystem, monitor)
   }
 }
+
+object MongoDriver {
+
+  /** Default ActorSystem used in the default MongoDriver constructor. */
+  private def defaultSystem = {
+    import com.typesafe.config.ConfigFactory
+    val config = ConfigFactory.load()
+    ActorSystem("reactivemongo", config.getConfig("mongo-async-driver"))
+  }
+
+  /** Creates a new MongoDriver with a new ActorSystem. */
+  def apply() = new MongoDriver
+
+  /**
+   * Creates a new MongoDriver with specified ActorSystem.
+   *
+   * @param system An ActorSystem for ReactiveMongo to use.  
+   */
+  def apply(system: ActorSystem) = new MongoDriver(system)
+
+}
+
+
+
+
