@@ -15,7 +15,7 @@
  */
 package reactivemongo.api
 
-import akka.actor.{ ActorRef, ActorSystem, Props }
+import akka.actor.{ ActorRef, ActorSystem, PoisonPill, Props }
 import org.jboss.netty.buffer.ChannelBuffer
 import org.slf4j.{ Logger, LoggerFactory }
 import play.api.libs.iteratee._
@@ -25,6 +25,7 @@ import reactivemongo.bson._
 import reactivemongo.core.protocol._
 import reactivemongo.core.commands.{ Command, GetLastError, LastError, SuccessfulAuthentication }
 import reactivemongo.utils.EitherMappableFuture._
+import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.{ ExecutionContext, Future, Promise }
 import scala.concurrent.duration._
 import scala.util.{ Failure, Success }
@@ -146,7 +147,7 @@ case class FailoverStrategy(
 class MongoConnection(
     val actorSystem: ActorSystem,
     val mongosystem: ActorRef,
-    monitor: ActorRef) {
+    val monitor: ActorRef) {
   import akka.pattern.{ ask => akkaAsk }
   import akka.util.Timeout
   /**
@@ -216,11 +217,26 @@ class MongoConnection(
   def close(): Unit = monitor ! Close
 }
 
-class MongoDriver(system: ActorSystem = MongoDriver.defaultSystem) {
+class MongoDriver(systemOption: Option[ActorSystem] = None) {
 
-  def close() = {
-    system.shutdown
+  def this(system: ActorSystem) = this(Some(system))
+
+  /** Keep a list of all connections so that we can terminate the actors */
+  val connections = ArrayBuffer[MongoConnection]()
+
+  val system = systemOption.getOrElse(MongoDriver.defaultSystem)
+
+  def close() = systemOption match {
+    // Non default actor system -- terminate actors used by MongoConnections 
+    case Some(_) =>
+      connections.foreach { connection =>
+        connection.mongosystem ! PoisonPill
+        connection.monitor ! PoisonPill
+      }
+    // Default actor system -- just shut it down
+    case None => system.shutdown()
   }
+
   /**
    * Creates a new MongoConnection.
    *
@@ -233,7 +249,9 @@ class MongoDriver(system: ActorSystem = MongoDriver.defaultSystem) {
     val props = Props(new MongoDBSystem(nodes, authentications, nbChannelsPerNode))
     val mongosystem = if (name.isDefined) system.actorOf(props, name = name.get) else system.actorOf(props)
     val monitor = system.actorOf(Props(new MonitorActor(mongosystem)))
-    new MongoConnection(system, mongosystem, monitor)
+    val connection = new MongoConnection(system, mongosystem, monitor)
+    connections += connection
+    connection
   }
 }
 
@@ -257,7 +275,4 @@ object MongoDriver {
   def apply(system: ActorSystem) = new MongoDriver(system)
 
 }
-
-
-
 
