@@ -179,6 +179,12 @@ case class Push(field: String) extends GroupFunction {
   def makeFunction = BSONDocument("$push" -> BSONString("$" + field))
 }
 
+case class PushMulti(fields: (String, String)*) extends GroupFunction {
+  def makeFunction = BSONDocument("$push" -> BSONDocument(
+    fields.map(field => field._1 -> BSONString("$"+field._2))
+  ))
+}
+
 case class SumField(field: String) extends GroupFunction {
   def makeFunction = BSONDocument("$sum" -> BSONString("$" + field))
 }
