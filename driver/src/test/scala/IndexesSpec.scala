@@ -6,7 +6,7 @@ import reactivemongo.core.errors.DatabaseException
 import scala.concurrent.Future
 import scala.concurrent.Await
 
-class IndexesSpec  extends Specification {
+class IndexesSpec extends Specification with Tags {
   sequential
 
   import Common._
@@ -95,7 +95,7 @@ class IndexesSpec  extends Specification {
           e.code mustEqual Some(16572) // MongoError['Can't extract geo keys from object, malformed geometry?' (code = 16572)]
       }
       success
-    }
+    } tag ("mongo2_4")
 
     "retrieve indexes" in {
       val future = geo2DSpherical.indexesManager.list().map {
