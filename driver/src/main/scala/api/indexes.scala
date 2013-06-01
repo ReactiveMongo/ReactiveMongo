@@ -46,16 +46,28 @@ object IndexType {
     def valueStr = "2d"
   }
 
+  object Geo2DSpherical extends IndexType {
+    def value = BSONString("2dsphere")
+    def valueStr = "2dsphere"
+  }
+
   object GeoHaystack extends IndexType {
     def value = BSONString("geoHaystack")
     def valueStr = "geoHaystack"
+  }
+
+  object Hashed extends IndexType {
+    def value = BSONString("hashed")
+    def valueStr = "hashed"
   }
 
   def apply(value: BSONValue) = value match {
     case BSONInteger(i) if i > 0 => Ascending
     case BSONInteger(i) if i < 0 => Descending
     case BSONString(s) if s == "2d" => Geo2D
+    case BSONString(s) if s == "2dsphere" => Geo2DSpherical
     case BSONString(s) if s == "geoHaystack" => GeoHaystack
+    case BSONString(s) if s == "hashed" => Hashed
     case _ => throw new IllegalArgumentException("unsupported index type")
   }
 }
