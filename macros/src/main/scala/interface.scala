@@ -28,8 +28,6 @@ package reactivemongo.bson
  * too. For example if you have `case class Foo(bar: Bar)` and want to create a
  * handler for it is enough to put an implicit handler for `Bar` in it's
  * companion object. That handler might be macro generated or written by hand.
- * As this might imply, recursive structures are not currently supported since
- * that would be a cyclic dependency between implicits.
  *
  * Case classes can also be defined inside other classes, objects or traits
  * but not inside functions(known limitation). In order to work you should
@@ -52,6 +50,20 @@ package reactivemongo.bson
  *
  * Also supported neat trick are 'union types' that make for easy work with
  * algebraic data types. See the UnionType option for more details.
+ *
+ * You can also create recursive structures by explicitly annotating types of
+ * the implicit handlers. (To let the compiler know they exist)
+ * Example
+ * {{{
+ * sealed trait Tree
+ * case class Node(left: Tree, right: Tree) extends Tree
+ * case class Leaf(data: String) extends Tree
+ *
+ * object Tree {
+ *   import Macros.Options._
+ *   implicit val bson: Handler[Tree] = Macros.handlerOpts[Tree, UnionType[Node \/ Leaf]]
+ * }
+ * }}}
  *
  * @see Macros.Options for specific options
  */

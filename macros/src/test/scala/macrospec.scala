@@ -44,6 +44,22 @@ class Macros extends Specification {
     val format = Macros.handler[Nested]
   }
 
+  object TreeModule {
+    type Handler[A] = BSONDocumentReader[A] with BSONDocumentWriter[A]  with BSONHandler[BSONDocument, A]
+
+    //due to compiler limitations(read: only workaround I found), handlers must be defined here
+    //and explicit type annotations added to enable compiler to use implicit handlers recursively
+
+    sealed trait Tree
+    case class Node(left: Tree, right: Tree) extends Tree
+    case class Leaf(data: String) extends Tree
+
+    object Tree {
+      import Macros.Options._
+      implicit val bson: Handler[Tree] = Macros.handlerOpts[Tree, UnionType[Node \/ Leaf]]
+    }
+  }
+
   "Formatter" should {
     "handle primitives" in {
       roundtrip(
@@ -132,6 +148,13 @@ class Macros extends Specification {
       println(BSONDocument pretty (format write b))
       roundtrip(a, format)
       roundtrip(b, format)
+    }
+
+    "handle recursive structure" in {
+      import TreeModule._
+      //handlers defined at tree module
+      val tree: Tree = Node(Leaf("hi"), Node(Leaf("hello"), Leaf("world")))
+      roundtrip(tree, Tree.bson)
     }
   }
 }
