@@ -35,6 +35,8 @@ class Macros extends Specification {
     sealed trait UT
     case class UA(n: Int) extends UT
     case class UB(s: String) extends UT
+    case class UC(s: String) extends UT
+    case class UD(s: String) extends UT
   }
 
   trait NestModule {
@@ -125,7 +127,7 @@ class Macros extends Specification {
       import Macros.Options._
       val a = UA(1)
       val b = UB("hai")
-      val format = Macros.handlerOpts[UT, UnionType[UA \/ UB]]
+      val format = Macros.handlerOpts[UT, UnionType[UA \/ UB \/ UC \/ UD]]
       println(BSONDocument pretty (format write a))
       println(BSONDocument pretty (format write b))
       roundtrip(a, format)

@@ -189,7 +189,7 @@ private object MacroImpl {
       def parseUnionTree(tree: Type): List[Type] = {
         if(tree <:< union) {
           tree match {
-            case TypeRef(_,_, List(a,b)) => a :: parseUnionTree(b)
+            case TypeRef(_,_, List(a,b)) => parseUnionTree(a) ::: parseUnionTree(b)
           }
         } else List(tree)
       }
