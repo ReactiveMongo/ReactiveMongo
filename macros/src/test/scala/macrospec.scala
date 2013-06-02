@@ -2,6 +2,8 @@ import reactivemongo.bson._
 import org.specs2.mutable._
 
 class Macros extends Specification {
+  type Handler[A] = BSONDocumentReader[A] with BSONDocumentWriter[A]  with BSONHandler[BSONDocument, A]
+
   def roundtrip[A](original: A, format: BSONReader[BSONDocument, A] with BSONWriter[A, BSONDocument]) = {
     val serialized = format write original
     val deserialized = format read serialized
@@ -35,11 +37,46 @@ class Macros extends Specification {
     sealed trait UT
     case class UA(n: Int) extends UT
     case class UB(s: String) extends UT
+    case class UC(s: String) extends UT
+    case class UD(s: String) extends UT
   }
 
   trait NestModule {
     case class Nested(name: String)
     val format = Macros.handler[Nested]
+  }
+
+  object TreeModule {
+    //due to compiler limitations(read: only workaround I found), handlers must be defined here
+    //and explicit type annotations added to enable compiler to use implicit handlers recursively
+
+    sealed trait Tree
+    case class Node(left: Tree, right: Tree) extends Tree
+    case class Leaf(data: String) extends Tree
+
+    object Tree {
+      import Macros.Options._
+      implicit val bson: Handler[Tree] = Macros.handlerOpts[Tree, UnionType[Node \/ Leaf]]
+    }
+  }
+
+  object TreeCustom{
+    sealed trait Tree
+    case class Node(left: Tree, right: Tree) extends Tree
+    case class Leaf(data: String) extends Tree
+
+    object Leaf {
+      private val helper = Macros.handler[Leaf]
+      implicit val bson: Handler[Leaf] = new BSONDocumentReader[Leaf] with BSONDocumentWriter[Leaf] with BSONHandler[BSONDocument, Leaf] {
+        def write(t: Leaf): BSONDocument = helper.write(Leaf("hai"))
+        def read(bson: BSONDocument): Leaf = helper read bson
+      }
+    }
+
+    object Tree {
+      import Macros.Options._
+      implicit val bson: Handler[Tree] = Macros.handlerOpts[Tree, UnionType[Node \/ Leaf] with Verbose]
+    }
   }
 
   "Formatter" should {
@@ -56,7 +93,7 @@ class Macros extends Specification {
     }
 
     "support option" in {
-      val format = Macros.handlerOpts[Optional, Macros.Options.Verbose]
+      val format = Macros.handler[Optional]
       val some = Optional("some", Some("value"))
       val none = Optional("none", None)
       roundtrip(some, format)
@@ -125,11 +162,27 @@ class Macros extends Specification {
       import Macros.Options._
       val a = UA(1)
       val b = UB("hai")
-      val format = Macros.handlerOpts[UT, UnionType[UA \/ UB]]
+      val format = Macros.handlerOpts[UT, UnionType[UA \/ UB \/ UC \/ UD]]
       println(BSONDocument pretty (format write a))
       println(BSONDocument pretty (format write b))
       roundtrip(a, format)
       roundtrip(b, format)
+    }
+
+    "handle recursive structure" in {
+      import TreeModule._
+      //handlers defined at tree module
+      val tree: Tree = Node(Leaf("hi"), Node(Leaf("hello"), Leaf("world")))
+      roundtrip(tree, Tree.bson)
+    }
+
+    "grab an implicit handler for type used in union" in {
+      import TreeCustom._
+      val tree: Tree = Node(Leaf("hi"), Node(Leaf("hello"), Leaf("world")))
+      val serialized = BSON writeDocument tree
+      val deserialized = BSON.readDocument[Tree](serialized)
+      val expected = Node(Leaf("hai"), Node(Leaf("hai"),Leaf("hai")))
+      assert( deserialized === expected )
     }
   }
 }

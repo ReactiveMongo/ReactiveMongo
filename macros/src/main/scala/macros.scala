@@ -56,7 +56,7 @@ private object MacroImpl {
       val writer = unionTypes map { types =>
         val cases = types map { typ =>
           val pattern = Literal(Constant(typ.typeSymbol.fullName)) //todo
-          val body = readBodyConstruct(typ)
+          val body = readBodyFromImplicit(typ)
           CaseDef(pattern, body)
         }
         val className = c.parse("""document.getAs[String]("className").get""")
@@ -75,7 +75,7 @@ private object MacroImpl {
       val writer = unionTypes map { types =>
         val cases = types map { typ =>
           val pattern = Bind(newTermName("document"), Typed(Ident(nme.WILDCARD), TypeTree(typ)))
-          val body = writeBodyConstruct(typ)
+          val body = writeBodyFromImplicit(typ)
           CaseDef(pattern, body)
         }
         Match(Ident("document"), cases)
@@ -87,6 +87,14 @@ private object MacroImpl {
         c.echo(c.enclosingPosition, show(result))
       }
       result
+    }
+
+    private def readBodyFromImplicit(A: c.Type) = {
+      val reader = c.inferImplicitValue(appliedType(readerType, List(A)))
+      if(! reader.isEmpty)
+        Apply(Select(reader, "read"), List(Ident("document")))
+      else
+        readBodyConstruct(A)
     }
 
     private def readBodyConstruct(implicit A: c.Type) = {
@@ -115,6 +123,21 @@ private object MacroImpl {
 
       val constructorTree = Select(Ident(companion.name.toString), "apply")
       Apply(constructorTree, values)
+    }
+
+    private def writeBodyFromImplicit(A: c.Type) = {
+      val writer = c.inferImplicitValue(appliedType(writerType, List(A)))
+      if(! writer.isEmpty) {
+        val doc = Apply(Select(writer, "write"), List(Ident("document")))
+        classNameTree(A) map { className =>
+          val nameE = c.Expr[(String, BSONString)](className)
+          val docE = c.Expr[BSONDocument](doc)
+          reify{
+            docE.splice ++ BSONDocument(Seq((nameE.splice)))
+          }.tree
+        } getOrElse doc
+      } else
+        writeBodyConstruct(A)
     }
 
     private def writeBodyConstruct(A: c.Type): c.Tree = {
@@ -156,15 +179,7 @@ private object MacroImpl {
         }
       }
 
-      val className = if (hasOption[Macros.Options.SaveClassName]) Some {
-        val name = c.literal(A.typeSymbol.fullName)
-        reify {
-          ("className", BSONStringHandler.write(name.splice))
-
-        }.tree
-      } else None
-
-      val mkBSONdoc = Apply(bsonDocPath, values ++ className)
+      val mkBSONdoc = Apply(bsonDocPath, values ++ classNameTree(A))
 
       val withAppends = List(
         ValDef(Modifiers(), newTermName("bson"), TypeTree(), mkBSONdoc),
@@ -183,13 +198,23 @@ private object MacroImpl {
       )
     }
 
+    private def classNameTree(A: c.Type) = {
+      val className = if (hasOption[Macros.Options.SaveClassName]) Some {
+        val name = c.literal(A.typeSymbol.fullName)
+        reify {
+          ("className", BSONStringHandler.write(name.splice))
+        }.tree
+      } else None
+      className
+    }
+
     private lazy val unionTypes: Option[List[c.Type]] = {
       val unionOption = c.typeOf[Macros.Options.UnionType[_]]
       val union = c.typeOf[Macros.Options.\/[_,_]]
       def parseUnionTree(tree: Type): List[Type] = {
         if(tree <:< union) {
           tree match {
-            case TypeRef(_,_, List(a,b)) => a :: parseUnionTree(b)
+            case TypeRef(_,_, List(a,b)) => parseUnionTree(a) ::: parseUnionTree(b)
           }
         } else List(tree)
       }
@@ -268,9 +293,11 @@ private object MacroImpl {
       (apply,unapply)
     }
 
+    type Reader[A] = BSONReader[_ <: BSONValue, A]
     type Writer[A] = BSONWriter[A, _ <: BSONValue]
 
     private def writerType: c.Type = typeOf[Writer[_]].typeConstructor
+    private def readerType: c.Type = typeOf[Reader[_]].typeConstructor
 
     private def companion(implicit A: c.Type): c.Symbol = A.typeSymbol.companionSymbol
   }
