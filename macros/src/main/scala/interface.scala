@@ -122,6 +122,10 @@ object Macros {
      * [[reactivemongo.bson.Macros.Options.SaveClassName]] in to ensure class
      * names are always serialized.
      *
+     * If there are handlers available in implicit scope for any of the types
+     * in the union they will be used to handle (de)serialization, otherwise
+     * handlers for all types will be generated.
+     *
      * Example
      * {{{
      * sealed trait Tree
