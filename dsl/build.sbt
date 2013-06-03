@@ -1,6 +1,6 @@
 organization := "org.reactivemongo"
 
-name := "ReactiveMongo-BSON-Macros"
+name := "ReactiveMongo-DSL"
 
 version := "0.9"
 
@@ -10,6 +10,6 @@ scalacOptions ++= Seq("-unchecked", "-deprecation")
 
 libraryDependencies += "org.specs2" %% "specs2" % "1.13" % "test"
 
-scalacOptions in (Compile, doc) ++= Opts.doc.title("ReactiveMongo-BSON-Macros API")
+scalacOptions in (Compile, doc) ++= Opts.doc.title("ReactiveMongo-DSL API")
 
 scalacOptions in (Compile, doc) ++= Opts.doc.version("0.9-SNAPSHOT")

@@ -1,5 +1,49 @@
 # ReactiveMongo - Asynchronous & Non-Blocking Scala Driver for MongoDB
 
+## Query DSL Fork
+
+This is a fork of the [original ReactiveMongo project](https://github.com/zenexity/ReactiveMongo/) that adds a _Criteria DSL_ option to [ReactiveMongo](https://github.com/zenexity/ReactiveMongo/).
+
+### Original Query Syntax
+
+The `reactivemongo.api.collections.GenericCollection` type provides the `find` method used to find documents matching a criteria.  It is this interaction which the DSL targets.  Originally, providing a selector to `find` had an interaction similar to:
+
+```scala
+  val cursor = collection.find(BSONDocument("firstName" -> "Jack")).cursor[BSONDocument]
+```
+
+This is, of course, still supported as the DSL does not preclude this usage.
+
+### Criteria DSL
+
+What the DSL *does* provide is the ablity to formulate queries thusly:
+
+```scala
+  {
+  // Using a Criteria based on a PersonDocument
+  case class PersonDocument (firstName : String, lastName : String, age : Int)
+
+  val query = Criteria[PersonDocument] {
+    firstName === "Jack" && age >= 18;
+
+	// This would not compile:
+	// firstName === 99 && otherProperty =/= "hello, world";
+    }
+  val cursor = collection.find(query).cursor[BSONDocument]
+  }
+
+  // Or, using an UntypedCriteria
+  {
+  import Untyped._
+
+  val untyped = criteria.firstName === "Jack" && criteria.age >= 18;
+  val anotherCursor = collection.find(untyped).cursor[BSONDocument]
+  }
+```
+
+What follows is the original README.md from [ReactiveMongo](https://github.com/zenexity/ReactiveMongo/) as it was originally authored.
+
+
 [![Build Status](https://travis-ci.org/zenexity/ReactiveMongo.png?branch=master)](https://travis-ci.org/zenexity/ReactiveMongo)
 
 [ReactiveMongo](https://github.com/zenexity/ReactiveMongo/) is a scala driver that provides fully non-blocking and asynchronous I/O operations.
