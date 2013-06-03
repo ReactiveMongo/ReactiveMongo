@@ -2,6 +2,7 @@ target/
 .idea*
 *.iml
 *.ipr
+.cache
 .classpath*
 .project*
 .settings*

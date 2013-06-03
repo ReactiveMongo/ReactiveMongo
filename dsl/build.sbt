@@ -4,7 +4,7 @@ name := "ReactiveMongo-DSL"
 
 version := "0.9"
 
-scalaVersion := "2.10.1"
+scalaVersion := "2.10.0"
 
 scalacOptions ++= Seq("-unchecked", "-deprecation")
 

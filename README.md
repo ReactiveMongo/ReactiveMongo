@@ -23,8 +23,10 @@ What the DSL *does* provide is the ablity to formulate queries thusly:
   {
   import Untyped._
 
-  val untyped = criteria.firstName === "Jack" && criteria.age >= 18;
-  val anotherCursor = collection.find(untyped).cursor[BSONDocument]
+  // The MongoDB properties referenced are not enforced by the compiler
+  // to belong to any particular type.  This is what is meant by "Untyped".
+  val adhoc = criteria.firstName === "Jack" && criteria.age >= 18;
+  val cursor = collection.find(adhoc).cursor[BSONDocument]
   }
 ```
 

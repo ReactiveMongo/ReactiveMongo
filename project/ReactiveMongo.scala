@@ -14,8 +14,8 @@ object BuildSettings {
   val buildSettings = Defaults.defaultSettings ++ Seq(
     organization := "org.reactivemongo",
     version := buildVersion,
-    scalaVersion := "2.10.1",
-    crossScalaVersions := Seq("2.10.1"),
+    scalaVersion := "2.10.0",
+    crossScalaVersions := Seq("2.10.0"),
     crossVersion := CrossVersion.binary,
     javaOptions in test ++= Seq("-Xmx512m", "-XX:MaxPermSize=512m"),
     scalacOptions ++= Seq("-unchecked", "-deprecation" /*, "-Xlog-implicits", "-Yinfer-debug", "-Xprint:typer", "-Yinfer-debug", "-Xlog-implicits", "-Xprint:typer"*/ ),
@@ -190,6 +190,6 @@ object ReactiveMongoBuild extends Build {
     file("dsl"),
     settings = buildSettings ++ Seq(
       libraryDependencies <+= (scalaVersion)("org.scala-lang" % "scala-compiler" % _)
-    )) dependsOn (driver)
+    )) dependsOn (bson)
 }
 
