@@ -160,7 +160,7 @@ object ReactiveMongoBuild extends Build {
     file("."),
     settings = buildSettings ++ Unidoc.settings ++ Seq(
       publish := {}
-    )) aggregate(driver, bson, bsonmacros)
+    )) aggregate(driver, bson, bsonmacros, dsl)
 
   lazy val driver = Project(
     "ReactiveMongo",
