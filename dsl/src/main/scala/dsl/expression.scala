@@ -27,9 +27,38 @@ import reactivemongo.bson._
  * The '''Expression''' type defines a recursive propositional abstract
  * syntax tree central to the MongoDB EDSL.
  */
-case class Expression (name : String, value : BSONValue)
+case class Expression (name : Option[String], element : BSONElement)
 {
-  def toElement : BSONElement = (name, value);
+  import Expression._
+  
+  /**
+   * The logical negation operator attempts to invert this '''Expression'''
+   * by using complimentary operators if possible, falling back to the
+   * general-case wrapping in a `$not` operator.
+   */
+  def unary_! : Expression =
+    this match {
+      case Expression (term, ("$in", vals)) =>
+        Expression (term, ("$nin", vals));
+        
+      case Expression (term, ("$nin", vals)) =>
+        Expression (term, ("$in", vals));
+        
+      case Expression (None, ("$nor", vals)) =>
+        Expression (None, ("$or" -> vals));
+        
+      case Expression (None, ("$or", vals)) =>
+        Expression (None, ("$nor" -> vals));
+        
+      case Expression (Some ("$not"), el) =>
+        Expression (None, el);
+        
+      case Expression (Some (n), _) =>
+        Expression (Some ("$not"), (n -> BSONDocument (element)));
+        
+      case Expression (None, el) =>
+        Expression (Some ("$not"), el);
+      }
   
   def && (rhs : Expression) : Expression = combine ("$and", rhs);
   
@@ -38,14 +67,14 @@ case class Expression (name : String, value : BSONValue)
   def || (rhs : Expression) : Expression = combine ("$or", rhs);
   
   private def combine (op : String, rhs : Expression) : Expression =
-    (name, value) match {
+    element match {
       case (`op`, arr : BSONArray) =>
-	    Expression (name, arr ++ BSONArray (BSONDocument (rhs.toElement)))
+	    Expression (None, (op, arr ++ BSONArray (toBSONDocument (rhs))));
 
       case _ =>
         Expression (
-          op,
-          BSONArray (BSONDocument (toElement), BSONDocument (rhs.toElement))
+          None,
+          (op -> BSONArray (toBSONDocument (this), toBSONDocument (rhs)))
           );
     }
 }
@@ -53,15 +82,25 @@ case class Expression (name : String, value : BSONValue)
 
 object Expression
 {
+  def apply (name : String, element : BSONElement) : Expression =
+    new Expression (Some (name), element);
+  
   /// Implicit Conversions
   implicit object ExpressionWriter extends BSONWriter[Expression, BSONDocument]
   {
     override def write (expr : Expression) : BSONDocument = toBSONDocument (expr);
   }
   
-  implicit def toBSONDocument (expr : Expression) : BSONDocument = BSONDocument (expr.toElement);
+  implicit def toBSONDocument (expr : Expression) : BSONDocument =
+    expr match {
+      case Expression (Some (name), element) =>
+        BSONDocument (name -> BSONDocument (element));
+        
+      case Expression (None, element) =>
+        BSONDocument (element);
+    }
   
-  implicit def toBSONElement (expr : Expression) : BSONElement = expr.toElement;
+  implicit def toBSONElement (expr : Expression) : BSONElement = expr.element;
 }
 
 
@@ -135,26 +174,35 @@ case class Term[T] (name : String)
 	extends Dynamic
 {
   def ===[U <: T : ValueBuilder] (rhs : U) : Expression =
-    Expression (name, implicitly[ValueBuilder[U]].bson (rhs));
+    Expression (name, "$eq" -> implicitly[ValueBuilder[U]].bson (rhs));
   
   def @==[U <: T : ValueBuilder] (rhs : U) : Expression = ===[U] (rhs);
   
   def <>[U <: T : ValueBuilder] (rhs : U) : Expression =
-    Expression (name, BSONDocument ("$ne" -> implicitly[ValueBuilder[U]].bson (rhs)));
+    Expression (name, "$ne" -> implicitly[ValueBuilder[U]].bson (rhs));
   
   def =/=[U <: T : ValueBuilder] (rhs : U) : Expression = <>[U] (rhs);
   
   def <[U <: T : ValueBuilder] (rhs : U) : Expression =
-    Expression (name, BSONDocument ("$lt" -> implicitly[ValueBuilder[U]].bson (rhs)));
+    Expression (name, "$lt" -> implicitly[ValueBuilder[U]].bson (rhs));
   
   def <=[U <: T : ValueBuilder] (rhs : U) : Expression =
-    Expression (name, BSONDocument ("$lte" -> implicitly[ValueBuilder[U]].bson (rhs)));
+    Expression (name, "$lte" -> implicitly[ValueBuilder[U]].bson (rhs));
   
   def >[U <: T : ValueBuilder] (rhs : U) : Expression =
-    Expression (name, BSONDocument ("$gt" -> implicitly[ValueBuilder[U]].bson (rhs)));
+    Expression (name, "$gt" -> implicitly[ValueBuilder[U]].bson (rhs));
   
   def >=[U <: T : ValueBuilder] (rhs : U) : Expression =
-    Expression (name, BSONDocument ("$gte" -> implicitly[ValueBuilder[U]].bson (rhs)));
+    Expression (name, "$gte" -> implicitly[ValueBuilder[U]].bson (rhs));
+    
+  def exists : Expression =
+    Expression (name, "$exists" -> BSONBoolean (true));
+    
+  def in[U <: T : ValueBuilder] (values : Traversable[U]) (implicit B : ValueBuilder[U]) : Expression =
+    Expression (name, "$in" -> BSONArray (values map (B.bson)));
+  
+  def in[U <: T : ValueBuilder] (head : U, tail : U *) (implicit B : ValueBuilder[U]) : Expression =
+    Expression (name, "$in" -> BSONArray (Seq (B.bson (head)) ++ tail.map (B.bson)));
   
   def selectDynamic(field : String) : Term[Any] = Term[Any] (name + "." + field);
 }
@@ -164,20 +212,17 @@ object Term
 {
   implicit class CollectionTermOps[T] (val term : Term[Seq[T]]) extends AnyVal
   {
-    def all (values : Seq[T]) (implicit B : ValueBuilder[T]) : Expression =
-      Expression (term.name, BSONDocument ("$all" -> BSONArray (values map (B.bson))));
-    
-    def in (values : Seq[T]) (implicit B : ValueBuilder[T]) : Expression =
-      Expression (term.name, BSONDocument ("$in" -> BSONArray (values map (B.bson))));
+    def all (values : Traversable[T]) (implicit B : ValueBuilder[T]) : Expression =
+      Expression (term.name, "$all" -> BSONArray (values map (B.bson)));
   }
   
   implicit class StringTermOps[T >: String] (val term : Term[T]) extends AnyVal
   {
     def =~ (re : String) : Expression =
-      Expression (term.name, BSONDocument ("$regex" -> BSONRegex (re, "")));
+      Expression (term.name, "$regex" -> BSONRegex (re, ""));
     
     def !~ (re : String) : Expression =
-      Expression (term.name, BSONDocument ("$not" -> BSONDocument ("$regex" -> BSONRegex (re, ""))));
+      Expression (term.name, "$not" -> BSONDocument ("$regex" -> BSONRegex (re, "")));
   }
 }
 

@@ -39,7 +39,15 @@ class UntypedCriteriaSpec extends Specification
     "support simple filtering" in {
       val q = criteria.myField === "a value";
       
-      q.toElement should be_== (("myField", BSONString ("a value")));
+      BSONDocument.pretty (q) should_== (
+        BSONDocument.pretty (
+          BSONDocument (
+            "myField" ->
+            BSONDocument ("$eq" -> BSONString ("a value")
+            )
+          )
+        )
+      );
     }
     
     "support nested object selectors" in {
@@ -48,7 +56,9 @@ class UntypedCriteriaSpec extends Specification
       BSONDocument.pretty (q) should_== (
         BSONDocument.pretty (
           BSONDocument (
-            "outer.inner" -> BSONInteger (99)
+            "outer.inner" ->
+            BSONDocument ("$eq" -> BSONInteger (99)
+            )
           )
         )
       );
@@ -69,10 +79,10 @@ class UntypedCriteriaSpec extends Specification
       );
     }
     
-    "support compound filtering" in {
-      val q = criteria.first < 10 && (criteria.second >= 20.0 || criteria.second < 0.0);
+    "support conjunctions" in {
+      val q = criteria.first < 10 && criteria.second >= 20.0;
       
-      BSONDocument.pretty (q) should_== (
+      BSONDocument.pretty (BSONDocument (q.element)) should_== (
         BSONDocument.pretty (
           BSONDocument (
             "$and" ->
@@ -81,15 +91,27 @@ class UntypedCriteriaSpec extends Specification
                 "first" -> BSONDocument ("$lt" -> BSONInteger (10))
               ),
               BSONDocument (
-                "$or" ->
-                BSONArray (
-                  BSONDocument (
-                    "second" -> BSONDocument ("$gte" -> BSONDouble (20.0))
-                  ),
-                  BSONDocument (
-                    "second" -> BSONDocument ("$lt" -> BSONDouble (0.0))
-                  )
-                )
+                "second" -> BSONDocument ("$gte" -> BSONDouble (20.0))
+              )
+            )
+          )
+        )
+      );
+    }
+    
+    "support disjunctions" in {
+      val q = criteria.first < 10 || criteria.second >= 20.0;
+      
+      BSONDocument.pretty (BSONDocument (q.element)) should_== (
+        BSONDocument.pretty (
+          BSONDocument (
+            "$or" ->
+            BSONArray (
+              BSONDocument (
+                "first" -> BSONDocument ("$lt" -> BSONInteger (10))
+              ),
+              BSONDocument (
+                "second" -> BSONDocument ("$gte" -> BSONDouble (20.0))
               )
             )
           )
@@ -100,7 +122,7 @@ class UntypedCriteriaSpec extends Specification
     "combine adjacent conjunctions" in {
       val q = criteria.first < 10 && criteria.second >= 20.0 && criteria.third < 0.0;
       
-      BSONDocument.pretty (BSONDocument (q.toElement)) should_== (
+      BSONDocument.pretty (BSONDocument (q.element)) should_== (
         BSONDocument.pretty (
           BSONDocument (
             "$and" ->
@@ -123,7 +145,7 @@ class UntypedCriteriaSpec extends Specification
     "combine adjacent disjunctions" in {
       val q = criteria.first < 10 || criteria.second >= 20.0 || criteria.third < 0.0;
       
-      BSONDocument.pretty (BSONDocument (q.toElement)) should_== (
+      BSONDocument.pretty (BSONDocument (q.element)) should_== (
         BSONDocument.pretty (
           BSONDocument (
             "$or" ->
@@ -143,10 +165,42 @@ class UntypedCriteriaSpec extends Specification
       );
     }
     
+    "support compound filtering" in {
+      val q = criteria.first < 10 && (criteria.second >= 20.0 || criteria.second.in (0.0, 1.0));
+      
+      BSONDocument.pretty (q) should_== (
+        BSONDocument.pretty (
+          BSONDocument (
+            "$and" ->
+            BSONArray (
+              BSONDocument (
+                "first" -> BSONDocument ("$lt" -> BSONInteger (10))
+              ),
+              BSONDocument (
+                "$or" ->
+                BSONArray (
+                  BSONDocument (
+                    "second" -> BSONDocument ("$gte" -> BSONDouble (20.0))
+                  ),
+                  BSONDocument (
+                    "second" ->
+                    BSONDocument (
+                      "$in" ->
+                      BSONArray (BSONDouble (0.0), BSONDouble (1.0))
+                    )
+                  )
+                )
+              )
+            )
+          )
+        )
+      );
+    }
+    
     "support alternating logical operators" in {
       val q = criteria.first < 10 && criteria.second >= 20.0 || criteria.third < 0.0 && criteria.fourth =~ "some regex";
       
-      BSONDocument.pretty (BSONDocument (q.toElement)) should_== (
+      BSONDocument.pretty (BSONDocument (q.element)) should_== (
         BSONDocument.pretty (
           BSONDocument (
             "$or" ->
@@ -171,6 +225,44 @@ class UntypedCriteriaSpec extends Specification
                   BSONDocument (
                     "fourth" -> BSONDocument ("$regex" -> BSONRegex ("some regex", ""))
                   )
+                )
+              )
+            )
+          )
+        )
+      );
+    }
+    
+    "support logical negation" in {
+      BSONDocument.pretty (!(criteria.a =~ "regex(p)?")) should_== (
+        BSONDocument.pretty (
+          BSONDocument (
+            "$not" ->
+            BSONDocument (
+              "a" ->
+              BSONDocument (
+                "$regex" -> BSONRegex ("regex(p)?", "")
+              )
+            )
+          )
+        )
+      );
+      
+      BSONDocument.pretty (!(criteria.xyz === 1 || criteria.xyz === 2)) should_== (
+        BSONDocument.pretty (
+          BSONDocument (
+            "$nor" ->
+            BSONArray (
+              BSONDocument (
+                "xyz" ->
+                BSONDocument (
+                  "$eq" -> BSONInteger (1)
+                )
+              ),
+              BSONDocument (
+                "xyz" ->
+                BSONDocument (
+                  "$eq" -> BSONInteger (2)
                 )
               )
             )
