@@ -19,20 +19,7 @@ This is, of course, still supported as the DSL does not preclude this usage.
 What the DSL *does* provide is the ablity to formulate queries thusly:
 
 ```scala
-  {
-  // Using a Criteria based on a PersonDocument
-  case class PersonDocument (firstName : String, lastName : String, age : Int)
-
-  val query = Criteria[PersonDocument] {
-    firstName === "Jack" && age >= 18;
-
-	// This would not compile:
-	// firstName === 99 && otherProperty =/= "hello, world";
-    }
-  val cursor = collection.find(query).cursor[BSONDocument]
-  }
-
-  // Or, using an UntypedCriteria
+  // Using an Untyped.criteria
   {
   import Untyped._
 
@@ -40,6 +27,8 @@ What the DSL *does* provide is the ablity to formulate queries thusly:
   val anotherCursor = collection.find(untyped).cursor[BSONDocument]
   }
 ```
+
+I plan on doing a type-safe version using Scala macros at some point if requested or the `Untyped` version proves unsastifactory.
 
 What follows is the original README.md from [ReactiveMongo](https://github.com/zenexity/ReactiveMongo/) as it was originally authored.
 
