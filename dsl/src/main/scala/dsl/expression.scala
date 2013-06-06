@@ -86,7 +86,7 @@ object Expression
     new Expression (Some (name), element);
   
   /// Implicit Conversions
-  implicit object ExpressionWriter extends BSONWriter[Expression, BSONDocument]
+  implicit object ExpressionWriter extends BSONDocumentWriter[Expression]
   {
     override def write (expr : Expression) : BSONDocument = toBSONDocument (expr);
   }
