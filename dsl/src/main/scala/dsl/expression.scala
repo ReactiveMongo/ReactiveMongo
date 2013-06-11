@@ -170,41 +170,41 @@ object ValueBuilder
  * top-level or nested.  Operators common to all ''T'' types are defined here
  * with type-specific ones provided in the companion object below.
  */
-case class Term[T] (name : String)
+case class Term[T] (`_term$name` : String)
 	extends Dynamic
 {
   def ===[U <: T : ValueBuilder] (rhs : U) : Expression =
-    Expression (name, "$eq" -> implicitly[ValueBuilder[U]].bson (rhs));
+    Expression (`_term$name`, "$eq" -> implicitly[ValueBuilder[U]].bson (rhs));
   
   def @==[U <: T : ValueBuilder] (rhs : U) : Expression = ===[U] (rhs);
   
   def <>[U <: T : ValueBuilder] (rhs : U) : Expression =
-    Expression (name, "$ne" -> implicitly[ValueBuilder[U]].bson (rhs));
+    Expression (`_term$name`, "$ne" -> implicitly[ValueBuilder[U]].bson (rhs));
   
   def =/=[U <: T : ValueBuilder] (rhs : U) : Expression = <>[U] (rhs);
   
   def <[U <: T : ValueBuilder] (rhs : U) : Expression =
-    Expression (name, "$lt" -> implicitly[ValueBuilder[U]].bson (rhs));
+    Expression (`_term$name`, "$lt" -> implicitly[ValueBuilder[U]].bson (rhs));
   
   def <=[U <: T : ValueBuilder] (rhs : U) : Expression =
-    Expression (name, "$lte" -> implicitly[ValueBuilder[U]].bson (rhs));
+    Expression (`_term$name`, "$lte" -> implicitly[ValueBuilder[U]].bson (rhs));
   
   def >[U <: T : ValueBuilder] (rhs : U) : Expression =
-    Expression (name, "$gt" -> implicitly[ValueBuilder[U]].bson (rhs));
+    Expression (`_term$name`, "$gt" -> implicitly[ValueBuilder[U]].bson (rhs));
   
   def >=[U <: T : ValueBuilder] (rhs : U) : Expression =
-    Expression (name, "$gte" -> implicitly[ValueBuilder[U]].bson (rhs));
+    Expression (`_term$name`, "$gte" -> implicitly[ValueBuilder[U]].bson (rhs));
     
   def exists : Expression =
-    Expression (name, "$exists" -> BSONBoolean (true));
+    Expression (`_term$name`, "$exists" -> BSONBoolean (true));
     
   def in[U <: T : ValueBuilder] (values : Traversable[U]) (implicit B : ValueBuilder[U]) : Expression =
-    Expression (name, "$in" -> BSONArray (values map (B.bson)));
+    Expression (`_term$name`, "$in" -> BSONArray (values map (B.bson)));
   
   def in[U <: T : ValueBuilder] (head : U, tail : U *) (implicit B : ValueBuilder[U]) : Expression =
-    Expression (name, "$in" -> BSONArray (Seq (B.bson (head)) ++ tail.map (B.bson)));
+    Expression (`_term$name`, "$in" -> BSONArray (Seq (B.bson (head)) ++ tail.map (B.bson)));
   
-  def selectDynamic(field : String) : Term[Any] = Term[Any] (name + "." + field);
+  def selectDynamic(field : String) : Term[Any] = Term[Any] (`_term$name` + "." + field);
 }
 
 
@@ -213,16 +213,16 @@ object Term
   implicit class CollectionTermOps[T] (val term : Term[Seq[T]]) extends AnyVal
   {
     def all (values : Traversable[T]) (implicit B : ValueBuilder[T]) : Expression =
-      Expression (term.name, "$all" -> BSONArray (values map (B.bson)));
+      Expression (term.`_term$name`, "$all" -> BSONArray (values map (B.bson)));
   }
   
   implicit class StringTermOps[T >: String] (val term : Term[T]) extends AnyVal
   {
     def =~ (re : String) : Expression =
-      Expression (term.name, "$regex" -> BSONRegex (re, ""));
+      Expression (term.`_term$name`, "$regex" -> BSONRegex (re, ""));
     
     def !~ (re : String) : Expression =
-      Expression (term.name, "$not" -> BSONDocument ("$regex" -> BSONRegex (re, "")));
+      Expression (term.`_term$name`, "$not" -> BSONDocument ("$regex" -> BSONRegex (re, "")));
   }
 }
 
