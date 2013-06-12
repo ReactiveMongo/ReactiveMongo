@@ -116,6 +116,11 @@ sealed trait ValueBuilder[T]
 
 object ValueBuilder
 {
+  implicit def bsonValueIdentityValue[T <: BSONValue] : ValueBuilder[T] =
+  	new ValueBuilder[T] {
+      override def bson (v : T) : T = v;
+      }
+  
   implicit object DateTimeValue
   	extends ValueBuilder[java.util.Date]
   {
