@@ -90,14 +90,9 @@ case class Unwind(field: String) extends PipelineOperator {
  * @param ops Sequence of operators specifying aggregate calculation.
  */
 case class GroupField(idField: String)(ops: (String, GroupFunction)*) extends PipelineOperator {
-  override val makePipe = BSONDocument(
-    "$group" -> BSONDocument(
-      { "_id" -> BSONString("$" + idField) }
-        +: {
-          ops.map {
-            case (field, operator) => field -> operator.makeFunction
-          }
-        }.toStream))
+  override val makePipe = Group(BSONDocument(
+    "_id" -> BSONString("$" + idField) 
+  ))(ops: _*).makePipe
 }
 
 /**
@@ -108,13 +103,25 @@ case class GroupField(idField: String)(ops: (String, GroupFunction)*) extends Pi
  * @param ops Sequence of operators specifying aggregate calculation.
  */
 case class GroupMulti(idField: (String, String)*)(ops: (String, GroupFunction)*) extends PipelineOperator {
+  override val makePipe = Group(BSONDocument(
+    idField.map {
+      case (alias, attribute) => alias -> BSONString("$" + attribute)
+    }.toStream
+  ))(ops: _*).makePipe
+}
+
+/**
+ * Groups documents together to calulate aggregates on document collections. This command
+ * aggregates on arbitrary identifiers. Document fields identifier must be prefixed with `$`.
+ * http://docs.mongodb.org/manual/reference/aggregation/group/#_S_group
+ * @param identifiers Any BSON value acceptable by mongodb as identifier
+ * @param ops Sequence of operators specifying aggregate calculation.
+ */
+case class Group(identifiers: BSONValue)(ops: (String, GroupFunction)*) extends PipelineOperator {
   override val makePipe = BSONDocument(
     "$group" -> BSONDocument(
       {
-        "_id" -> BSONDocument(
-          idField.map {
-            case (alias, attribute) => alias -> BSONString("$" + attribute)
-          }.toStream)
+        "_id" -> identifiers
       } +:
         {
           ops.map {
