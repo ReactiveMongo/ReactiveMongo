@@ -58,7 +58,7 @@ object bulk {
     val channelColl = coll.as(coll.failoverStrategy)
     Iteratee.foldM(Bulk()) { (bulk, doc: ChannelBuffer) =>
       logger.debug("bulk= " + bulk)
-      if (reachedUpperBound(bulk.currentBulkDocsNumber + 1, bulk.docs.writerIndex + doc.writerIndex)) {
+      if (bulk.currentBulkDocsNumber > 0 && reachedUpperBound(bulk.currentBulkDocsNumber + 1, bulk.docs.writerIndex + doc.writerIndex)) {
         logger.debug("inserting, at " + bulk.collectedDocs)
         channelColl.insert(bulk)(BulkWriter, context).map { _ =>
           val nextBulk = Bulk(collectedDocs = bulk.collectedDocs) +> doc
@@ -68,7 +68,11 @@ object bulk {
       } else Future(bulk +> doc)
     }.flatMap { bulk =>
       logger.debug("inserting (last), at " + bulk.collectedDocs)
-      Iteratee.flatten(channelColl.insert(bulk)(BulkWriter, context).map(_ => Done[ChannelBuffer, Int](bulk.collectedDocs, Input.EOF)))
+      val done = Done[ChannelBuffer, Int](bulk.collectedDocs, Input.EOF)
+      if (bulk.currentBulkDocsNumber == 0)
+        done
+      else
+        Iteratee.flatten(channelColl.insert(bulk)(BulkWriter, context).map(_ => done))
     }
   }
 
