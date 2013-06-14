@@ -270,5 +270,53 @@ class UntypedCriteriaSpec extends Specification
         )
       );
     }
+
+    "have an 'empty' resulting in no criteria" in {
+      BSONDocument.pretty (Expression.empty) should_== (
+        BSONDocument.pretty (BSONDocument ())
+      );
+    }
+
+    "ignore 'empty' in logical operators" in {
+      BSONDocument.pretty (criteria.a === 1 && Expression.empty) should_== (
+        BSONDocument.pretty (
+          BSONDocument (
+            "a" ->
+            BSONDocument ("$eq" -> BSONInteger (1)
+            )
+          )
+        )
+      );
+
+      BSONDocument.pretty (Expression.empty && criteria.a === 2.0) should_== (
+        BSONDocument.pretty (
+          BSONDocument (
+            "a" ->
+            BSONDocument ("$eq" -> BSONDouble (2.0)
+            )
+          )
+        )
+      );
+
+      BSONDocument.pretty (Expression.empty || criteria.a === "three") should_== (
+        BSONDocument.pretty (
+          BSONDocument (
+            "a" ->
+            BSONDocument ("$eq" -> BSONString ("three")
+            )
+          )
+        )
+      );
+
+      BSONDocument.pretty (criteria.a === 4L || Expression.empty) should_== (
+        BSONDocument.pretty (
+          BSONDocument (
+            "a" ->
+            BSONDocument ("$eq" -> BSONLong (4L)
+            )
+          )
+        )
+      );
+    }
   }
 }

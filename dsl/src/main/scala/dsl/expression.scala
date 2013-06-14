@@ -66,22 +66,37 @@ case class Expression (name : Option[String], element : BSONElement)
   
   def || (rhs : Expression) : Expression = combine ("$or", rhs);
   
-  private def combine (op : String, rhs : Expression) : Expression =
-    element match {
-      case (`op`, arr : BSONArray) =>
-	    Expression (None, (op, arr ++ BSONArray (toBSONDocument (rhs))));
+  def isEmpty : Boolean = name.isEmpty && element._1.isEmpty;
 
-      case _ =>
-        Expression (
-          None,
-          (op -> BSONArray (toBSONDocument (this), toBSONDocument (rhs)))
-          );
+  private def combine (op : String, rhs : Expression) : Expression =
+    if (rhs.isEmpty)
+        this;
+    else
+      element match {
+        case (`op`, arr : BSONArray) =>
+	      Expression (None, (op, arr ++ BSONArray (toBSONDocument (rhs))));
+
+        case ("", _) =>
+          rhs;
+
+        case _ =>
+          Expression (
+            None,
+            (op -> BSONArray (toBSONDocument (this), toBSONDocument (rhs)))
+            );
     }
 }
 
 
 object Expression
 {
+  /**
+   * The empty property is provided so that ''monoid'' definitions for '''Expression''' can
+   * be easily provided.
+   */
+  val empty = new Expression (None, "" -> BSONDocument.empty);
+
+
   def apply (name : String, element : BSONElement) : Expression =
     new Expression (Some (name), element);
   
@@ -96,6 +111,9 @@ object Expression
       case Expression (Some (name), element) =>
         BSONDocument (name -> BSONDocument (element));
         
+      case Expression (None, ("", _)) =>
+        BSONDocument.empty;
+
       case Expression (None, element) =>
         BSONDocument (element);
     }
