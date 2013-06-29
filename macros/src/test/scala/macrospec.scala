@@ -19,6 +19,7 @@ class Macros extends Specification {
   case class SingleTuple(value: (String, String))
   case class User(_id: BSONObjectID = BSONObjectID.generate, name: String)
   case class WordLover(name: String, words: Seq[String])
+  case class Empty()
 
   object Nest {
     case class Nested(name: String)
@@ -183,6 +184,12 @@ class Macros extends Specification {
       val deserialized = BSON.readDocument[Tree](serialized)
       val expected = Node(Leaf("hai"), Node(Leaf("hai"),Leaf("hai")))
       assert( deserialized === expected )
+    }
+
+    "handle empty case classes" in {
+      val empty = Empty()
+      val format = Macros.handler[Empty]
+      roundtrip(empty, format)
     }
   }
 }

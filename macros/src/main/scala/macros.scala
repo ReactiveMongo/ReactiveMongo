@@ -56,7 +56,7 @@ private object MacroImpl {
       val writer = unionTypes map { types =>
         val cases = types map { typ =>
           val pattern = Literal(Constant(typ.typeSymbol.fullName)) //todo
-          val body = readBodyFromImplicit(typ)
+        val body = readBodyFromImplicit(typ)
           CaseDef(pattern, body)
         }
         val className = c.parse("""document.getAs[String]("className").get""")
@@ -193,9 +193,11 @@ private object MacroImpl {
       val invokeUnapply = Select(Apply(unapplyTree, List(document)), "get")
       val tupleDef = ValDef(Modifiers(), newTermName("tuple"), TypeTree(), invokeUnapply)
 
-      Block(
-        (tupleDef :: writer): _*
-      )
+      if(values.length + appends.length > 0){
+        Block( (tupleDef :: writer): _*)
+      } else {
+        writer.head
+      }
     }
 
     private def classNameTree(A: c.Type) = {
@@ -235,6 +237,7 @@ private object MacroImpl {
 
     private def unapplyReturnTypes(deconstructor: c.universe.MethodSymbol): List[c.Type] = {
       val opt = deconstructor.returnType match {
+        case TypeRef(_, _, Nil) => Some(Nil)
         case TypeRef(_, _, args) =>
           args.head match {
             case t@TypeRef(_, _, Nil) => Some(List(t))
