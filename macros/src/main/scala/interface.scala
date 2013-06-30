@@ -152,5 +152,25 @@ object Macros {
      * `Foo \/ Bar \/ Baz` is interpreted as type Foo or type Bar or type Baz
      */
     trait \/[A, B]
+
+    /**
+     * Similar to [[reactivemongo.bson.Macros.Options.UnionType]] but finds all
+     * implementations of the top trait automatically. For this to be possible
+     * the top trait has to be sealed. If your tree is deeper(class extends trait
+     * that extends top trait) all the intermediate traits have to be sealed too!
+     *
+     * Example
+     * {{{
+     * sealed trait TopTrait
+     * case class OneImplementation(data: String) extends TopTrait
+     * case class SecondImplementation(data: Int) extends TopTrait
+     * sealed trait RefinedTrait extends TopTrait
+     * case class ThirdImplementation(data: Float, name: String) extends RefinedTrait
+     * case object StaticImplementation extends RefinedTrait
+     *
+     * val handler = Macros.handlerOpts[TopTrait, AllImplementations]
+     * }}}
+     */
+    trait AllImplementations extends SaveClassName with Default
   }
 }

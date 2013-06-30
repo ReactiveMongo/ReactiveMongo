@@ -105,8 +105,13 @@ private object MacroImpl {
     }
 
     private def readBodyConstructSingleton(implicit A: c.Type) = {
-      val SingleType(_, sym) = A
-      Ident(sym.name)
+      val sym = A match {
+        case SingleType(_, sym) => sym
+        case TypeRef(_, sym, _) => sym
+        case _ => c.abort(c.enclosingPosition, s"Something weird is going on with '$A'. Should be a singleton but can't parse it")
+      }
+      val name = stringToTermName(sym.name.toString) //this is ugly but quite stable compared to other attempts
+      Ident(name)
     }
 
     private def readBodyConstructClass(implicit A: c.Type) = {
@@ -238,6 +243,10 @@ private object MacroImpl {
     }
 
     private lazy val unionTypes: Option[List[c.Type]] = {
+      parseUnionTypes orElse parseAllImplementationTypes
+    }
+
+    private def parseUnionTypes: Option[List[c.Type]] = {
       val unionOption = c.typeOf[Macros.Options.UnionType[_]]
       val union = c.typeOf[Macros.Options.\/[_,_]]
       def parseUnionTree(tree: Type): List[Type] = {
@@ -258,6 +267,15 @@ private object MacroImpl {
         case _ => None
       }
       tree map {t => parseUnionTree(t)}
+    }
+
+    private def parseAllImplementationTypes: Option[List[Type]] = {
+      val allOption = typeOf[Macros.Options.AllImplementations]
+      if(Opts <:< allOption){
+        Some(allImplementations(A).toList)
+      } else{
+        None
+      }
     }
 
     private def hasOption[O: c.TypeTag]: Boolean = Opts <:< typeOf[O]
@@ -295,6 +313,17 @@ private object MacroImpl {
 
     private def bsonDocPath: c.universe.Select = {
       Select(Select(Ident(newTermName("reactivemongo")), "bson"), "BSONDocument")
+    }
+
+    private def allSubclasses(A: Symbol): Set[Symbol] = {
+      val sub = A.asClass.knownDirectSubclasses
+      val subsub = sub flatMap allSubclasses
+      subsub ++ sub + A
+    }
+
+    private def allImplementations(A: Type) = {
+      val classes = allSubclasses(A.typeSymbol) map (_.asClass)
+      classes filterNot (_.isAbstractClass) map (_.toType)
     }
 
     private def applyMethod(implicit A: c.Type): c.universe.Symbol = {

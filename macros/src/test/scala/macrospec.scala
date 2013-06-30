@@ -1,4 +1,3 @@
-import org.specs2.matcher.MatchResult
 import reactivemongo.bson._
 import org.specs2.mutable._
 
@@ -93,6 +92,14 @@ class Macros extends Specification {
       import Macros.Options._
       implicit val bson: Handler[IntList] = Macros.handlerOpts[IntList, UnionType[Cons \/ Tail.type]]
     }
+  }
+
+  object InheritanceModule {
+    sealed trait T
+    case class A() extends T
+    case object B extends T
+    sealed trait TT extends T
+    case class C() extends TT
   }
 
   "Formatter" should {
@@ -216,6 +223,25 @@ class Macros extends Specification {
       import IntListModule._
       roundtripImp[IntList](Tail)
       roundtripImp[IntList](Cons(1, Cons(2, Cons(3, Tail))))
+    }
+
+    "automate Union on sealed traits" in {
+      import Macros.Options._
+      import Union._
+      implicit val format = Macros.handlerOpts[UT, AllImplementations]
+      roundtripImp[UT](UA(17))
+      roundtripImp[UT](UB("foo"))
+      roundtripImp[UT](UC("bar"))
+      roundtripImp[UT](UD("baz"))
+    }
+
+    "support automatic implementations search with nested traits" in {
+      import Macros.Options._
+      import InheritanceModule._
+      implicit val format = Macros.handlerOpts[T, AllImplementations]
+      roundtripImp[T](A())
+      roundtripImp[T](B)
+      roundtripImp[T](C())
     }
   }
 }
