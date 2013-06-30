@@ -98,6 +98,18 @@ private object MacroImpl {
     }
 
     private def readBodyConstruct(implicit A: c.Type) = {
+      if(isSingleton(A))
+        readBodyConstructSingleton
+      else
+        readBodyConstructClass
+    }
+
+    private def readBodyConstructSingleton(implicit A: c.Type) = {
+      val SingleType(_, sym) = A
+      Ident(sym.name)
+    }
+
+    private def readBodyConstructClass(implicit A: c.Type) = {
       val (constructor, _) = matchingApplyUnapply
 
       val values = constructor.paramss.head map {
@@ -141,6 +153,21 @@ private object MacroImpl {
     }
 
     private def writeBodyConstruct(A: c.Type): c.Tree = {
+      if(isSingleton(A))
+        writeBodyConstructSingleton(A)
+      else
+        writeBodyConstructClass(A)
+    }
+
+    private def writeBodyConstructSingleton(A: c.Type): c.Tree = {
+      val expr =classNameTree(A) map { className =>
+        val nameE = c.Expr[(String, BSONString)](className)
+        reify{ BSONDocument(Seq((nameE.splice))) }
+      } getOrElse reify{ BSONDocument.empty }
+      expr.tree
+    }
+
+    private def writeBodyConstructClass(A: c.Type): c.Tree = {
       val (constructor, deconstructor) = matchingApplyUnapply(A)
       val types = unapplyReturnTypes(deconstructor)
       val constructorParams = constructor.paramss.head
@@ -299,6 +326,7 @@ private object MacroImpl {
     type Reader[A] = BSONReader[_ <: BSONValue, A]
     type Writer[A] = BSONWriter[A, _ <: BSONValue]
 
+    private def isSingleton(t: Type): Boolean = t <:< typeOf[Singleton]
     private def writerType: c.Type = typeOf[Writer[_]].typeConstructor
     private def readerType: c.Type = typeOf[Reader[_]].typeConstructor
 

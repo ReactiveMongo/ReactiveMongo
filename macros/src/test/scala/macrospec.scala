@@ -1,3 +1,4 @@
+import org.specs2.matcher.MatchResult
 import reactivemongo.bson._
 import org.specs2.mutable._
 
@@ -10,6 +11,8 @@ class Macros extends Specification {
     original mustEqual deserialized
   }
 
+  def roundtripImp[A](data:A)(implicit format: BSONReader[BSONDocument, A] with BSONWriter[A, BSONDocument]) = roundtrip(data, format)
+
   case class Person(firstName: String, lastName: String)
   case class Pet(name: String, owner: Person)
   case class Primitives(dbl: Double, str: String, bl: Boolean, int: Int, long: Long)
@@ -20,6 +23,7 @@ class Macros extends Specification {
   case class User(_id: BSONObjectID = BSONObjectID.generate, name: String)
   case class WordLover(name: String, words: Seq[String])
   case class Empty()
+  object EmptyObject
 
   object Nest {
     case class Nested(name: String)
@@ -77,6 +81,17 @@ class Macros extends Specification {
     object Tree {
       import Macros.Options._
       implicit val bson: Handler[Tree] = Macros.handlerOpts[Tree, UnionType[Node \/ Leaf] with Verbose]
+    }
+  }
+
+  object IntListModule {
+    sealed trait IntList
+    case class Cons(head: Int, tail: IntList) extends IntList
+    case object Tail extends IntList
+
+    object IntList{
+      import Macros.Options._
+      implicit val bson: Handler[IntList] = Macros.handlerOpts[IntList, UnionType[Cons \/ Tail.type]]
     }
   }
 
@@ -190,6 +205,17 @@ class Macros extends Specification {
       val empty = Empty()
       val format = Macros.handler[Empty]
       roundtrip(empty, format)
+    }
+
+    "do nothing with objects" in {
+      val format = Macros.handler[EmptyObject.type]
+      roundtrip(EmptyObject, format)
+    }
+
+    "handle ADTs with objects" in {
+      import IntListModule._
+      roundtripImp[IntList](Tail)
+      roundtripImp[IntList](Cons(1, Cons(2, Cons(3, Tail))))
     }
   }
 }

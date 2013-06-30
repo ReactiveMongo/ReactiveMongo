@@ -126,6 +126,9 @@ object Macros {
      * in the union they will be used to handle (de)serialization, otherwise
      * handlers for all types will be generated.
      *
+     * You can also use case object but you have to refer to their types as to
+     * singleton types. e.g. case object MyObject, type would be MyObject.type
+     *
      * Example
      * {{{
      * sealed trait Tree
