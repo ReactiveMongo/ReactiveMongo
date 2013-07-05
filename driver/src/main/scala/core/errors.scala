@@ -19,7 +19,7 @@ import reactivemongo.bson._
 import DefaultBSONHandlers._
 
 /** An error that can come from a MongoDB node or not. */
-trait ReactiveMongoException extends Throwable {
+trait ReactiveMongoException extends Exception {
   /** explanation message */
   val message: String
 
