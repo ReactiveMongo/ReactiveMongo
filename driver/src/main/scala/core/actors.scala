@@ -16,7 +16,6 @@
 package reactivemongo.core.actors
 
 import akka.actor._
-import akka.actor.Status.Failure
 import org.jboss.netty.channel.group._
 import org.slf4j.{ Logger, LoggerFactory }
 import reactivemongo.bson._
@@ -28,6 +27,7 @@ import reactivemongo.core.protocol.NodeState._
 import reactivemongo.utils.LazyLogger
 import reactivemongo.core.commands.{ Authenticate => AuthenticateCommand, _ }
 import scala.concurrent.{ Future, Promise }
+import scala.util.{ Failure, Success, Try }
 
 // messages
 
@@ -146,24 +146,23 @@ class MongoDBSystem(
 
       logger.debug("WARNING received a request")
       val r = req(requestIds.common.next)
-      pickChannel(r).right.map(_._2.send(r))
+      pickChannel(r).map(_._2.send(r))
 
     case req: RequestMakerExpectingResponse =>
       logger.debug("received a request expecting a response")
       val request = req.requestMaker(requestIds.common.next)
-      pickChannel(request).fold(
-        error => {
+      pickChannel(request) match {
+        case Failure(error) =>
           logger.debug("NO CHANNEL, error with promise " + req.promise)
           req.promise.failure(error)
-        },
-        nodeChannel => {
-          logger.debug("Sending request expecting response " + request + " by channel " + nodeChannel._2.channel + " of node " + nodeChannel._1.name)
+        case Success((node, channel)) =>
+          logger.debug("Sending request expecting response " + request + " by channel " + channel + " of node " + node.name)
           if (request.op.expectsResponse) {
-            awaitingResponses += request.requestID -> AwaitingResponse(request.requestID, nodeChannel._2.channel.getId(), req.promise, false)
+            awaitingResponses += request.requestID -> AwaitingResponse(request.requestID, channel.getId(), req.promise, false)
             logger.trace("registering awaiting response for requestID " + request.requestID + ", awaitingResponses: " + awaitingResponses)
           } else logger.trace("NOT registering awaiting response for requestID " + request.requestID)
-          nodeChannel._2.send(request)
-        })
+          channel.send(request)
+      }
 
     case req: CheckedWriteRequestExpectingResponse =>
       logger.debug("received a checked write request")
@@ -173,45 +172,42 @@ class MongoDBSystem(
         val tuple = checkedWriteRequest()
         tuple._1(requestId) -> tuple._2(requestId)
       }
-      pickChannel(request).fold(
-        error => req.promise.failure(error),
-        nodeChannel => {
-          logger.debug("Sending request expecting response " + request + " by channel " + nodeChannel._2.channel + " of node " + nodeChannel._1.name)
-          awaitingResponses += requestId -> AwaitingResponse(requestId, nodeChannel._2.channel.getId(), req.promise, true)
+      pickChannel(request) match {
+        case Failure(error) => req.promise.failure(error)
+        case Success((node, channel)) =>
+          logger.debug("Sending request expecting response " + request + " by channel " + channel + " of node " + node.name)
+          awaitingResponses += requestId -> AwaitingResponse(requestId, channel.getId(), req.promise, true)
           logger.trace("registering writeConcern-awaiting response for requestID " + requestId + ", awaitingResponses: " + awaitingResponses)
-          nodeChannel._2.send(request, writeConcern)
-        })
+          channel.send(request, writeConcern)
+      }
 
     // monitor
     case ConnectAll => {
-      logger.debug("ConnectAll Job running...")
       updateNodeSet(nodeSet.createNeededChannels(self, nbChannelsPerNode))
+      logger.debug("ConnectAll Job running... Status: " + nodeSet.nodes.map(_.shortSummary).mkString(" | "))
       nodeSet.connectAll
     }
     case RefreshAllNodes => {
-      val state = "setName=" + nodeSet.name + " with nodes={" +
-        (for (node <- nodeSet.nodes) yield "['" + node.name + "' in state " + node.state + " with " + node.channels.foldLeft(0) { (count, channel) =>
-          if (channel.isConnected) count + 1 else count
-        } + " connected channels]") + "}";
-      logger.debug("RefreshAllNodes Job running... current state is: " + state)
       nodeSet.nodes.foreach { node =>
         logger.trace("try to refresh " + node.name)
-        node.channels.find(_.isConnected).map(_.write(IsMaster().maker(requestIds.isMaster.next)))
+        updateNodeSet(nodeSet.updateAll { node =>
+          node.sendIsMaster(requestIds.isMaster.next)
+        })
       }
+      logger.debug("RefreshAllNodes Job running... Status: " + nodeSet.shortStatus)
     }
     case Connected(channelId) => {
       updateNodeSet(nodeSet.updateByChannelId(channelId, node => {
         node.copy(channels = node.channels.map { channel =>
           if (channel.getId == channelId) {
-            channel.write(IsMaster().maker(requestIds.isMaster.next))
             channel.copy(state = Ready)
           } else channel
         }, state = node.state match {
           case _: MongoNodeState => node.state
-          case _ => CONNECTED
-        })
+          case _                 => CONNECTED
+        }).sendIsMaster(requestIds.isMaster.next)
       }))
-      logger.trace(channelId + " is connected")
+      logger.trace(s"Channel #$channelId connected. NodeSet status: ${nodeSet.shortStatus}")
     }
     case Disconnected(channelId) => {
       updateNodeSet(nodeSet.updateByChannelId(channelId, node => {
@@ -251,6 +247,8 @@ class MongoDBSystem(
           logger.error(s"error while processing isMaster response #${response.header.responseTo}", e)
         },
         isMaster => {
+          updateNodeSet(nodeSet.updateByChannelId(response.info.channelId, _.isMasterReceived(response.header.responseTo))) // TODO
+
           updateNodeSet(if (isMaster.hosts.isDefined) { // then it's a ReplicaSet
             val mynodes = isMaster.hosts.get.map(name => Node(name, if (isMaster.me.exists(_ == name)) isMaster.state else NONE))
             nodeSet.addNodes(mynodes).copy(name = isMaster.setName).createNeededChannels(self, nbChannelsPerNode)
@@ -371,18 +369,19 @@ class MongoDBSystem(
   }
 
   def secondaryOK(message: Request) = !message.op.requiresPrimary && (message.op match {
-    case query: Query => (query.flags & QueryFlags.SlaveOk) != 0
+    case query: Query   => (query.flags & QueryFlags.SlaveOk) != 0
     case _: KillCursors => true
-    case _: GetMore => true
-    case _ => false
+    case _: GetMore     => true
+    case _              => false
   })
 
-  def pickChannel(request: Request): Either[ReactiveMongoException, (Node, MongoChannel)] = {
+  def pickChannel(request: Request): Try[(Node, MongoChannel)] = {
     if (request.channelIdHint.isDefined)
-      nodeSet.findByChannelId(request.channelIdHint.get).toRight(Exceptions.ChannelNotFound)
+      nodeSet.findByChannelId(request.channelIdHint.get).map(Success(_)).getOrElse(Failure(Exceptions.ChannelNotFound))
     else if (secondaryOK(request))
-      nodeSet.queryable.pick.flatMap(node => node.pick.map(node.node -> _)).toRight(Exceptions.NodeSetNotReachable)
+      nodeSet.queryable.pick.flatMap(node => node.pick.map(channel => Success(node.node -> channel))).getOrElse(Failure(Exceptions.NodeSetNotReachable))
     else nodeSet.queryable.primaryRoundRobiner.flatMap(node => node.pick.map(node.node -> _)).toRight(Exceptions.PrimaryUnavailableException)
+      nodeSet.findByChannelId(request.channelIdHint.get).map(Success(_)).getOrElse(Failure(Exceptions.ChannelNotFound))
   }
 
   override def postStop() {
@@ -434,7 +433,7 @@ private[actors] case class AuthHistory(
   def handleResponse(authenticating: Authenticating, response: Response): (Boolean, AuthHistory) = {
     AuthenticateCommand(response) match {
       case Right(auth) => true -> succeeded(authenticating, auth)
-      case Left(err) => false -> failed(authenticating, err)
+      case Left(err)   => false -> failed(authenticating, err)
     }
   }
 }

@@ -38,7 +38,7 @@ case class MongoChannel(
 
   lazy val usable = state match {
     case _: Usable => true
-    case _ => false
+    case _         => false
   }
 
   def send(message: Request, writeConcern: Request) {
@@ -57,11 +57,21 @@ object MongoChannel {
   implicit def mongoChannelToChannel(mc: MongoChannel): Channel = mc.channel
 }
 
+case class PingInfo(
+  ping: Long = 0,
+  lastIsMasterTime: Long = 0,
+  lastIsMasterId: Int = -1)
+
+object PingInfo {
+  val pingTimeout = 60 * 1000
+}
+
 case class Node(
     name: String,
     channels: IndexedSeq[MongoChannel],
     state: NodeState,
-    mongoId: Option[Int])(implicit channelFactory: ChannelFactory) {
+    mongoId: Option[Int],
+    pingInfo: PingInfo = PingInfo())(implicit channelFactory: ChannelFactory) {
   lazy val (host: String, port: Int) = {
     val splitted = name.span(_ != ':')
     splitted._1 -> (try {
@@ -88,6 +98,43 @@ case class Node(
     if (channels.size < upTo) {
       copy(channels = channels.++(for (i <- 0 until (upTo - channels.size)) yield MongoChannel(channelFactory.create(host, port, receiver), NotConnected, Set.empty)))
     } else this
+  }
+
+  def sendIsMaster(id: Int): Node = {
+    queryable.headOption.map { channel =>
+      channel.send(IsMaster().maker(id))
+      // println(s"sent IsMaster #$id")
+      if (pingInfo.lastIsMasterId == -1) {
+        val up = this.copy(pingInfo = pingInfo.copy(lastIsMasterTime = System.currentTimeMillis(), lastIsMasterId = id))
+        // println(s"updated pingInfo ${up.pingInfo}")
+        up
+      } else if (pingInfo.lastIsMasterId >= PingInfo.pingTimeout) {
+        val up = this.copy(pingInfo = pingInfo.copy(lastIsMasterTime = System.currentTimeMillis(), lastIsMasterId = id, ping = Long.MaxValue))
+        // println(s"updated pingInfo(timeout) ${up.pingInfo}")
+        up
+      } else {
+        // println(s"ignore pingInfo update for #$id")
+        this
+      }
+    }.getOrElse {
+      // println(s"failed to send IsMaster (no queryable channel) #$id")
+      this
+    }
+  }
+
+  def isMasterReceived(id: Int): Node = {
+    if (pingInfo.lastIsMasterId == id) {
+      val updated = this.copy(pingInfo = pingInfo.copy(ping = System.currentTimeMillis() - pingInfo.lastIsMasterTime, lastIsMasterTime = 0, lastIsMasterId = -1))
+      // println(s"received isMaster #$id, updated is ${updated.shortSummary}")
+      updated
+    } else {
+      // println(s"ignore isMaster #$id")
+      this
+    }
+  }
+
+  def shortSummary: String = {
+    s"Node[$name: $state (${queryable.size} queryable nodes), latency=${pingInfo.ping}]"
   }
 }
 
@@ -137,7 +184,7 @@ case class NodeSet(
       case -1 => this.copy(nodes = node +: nodes)
       case i => {
         val replaced = nodes(i)
-        this.copy(nodes = nodes.updated(i, Node(node.name, replaced.channels, if (node.state != NONE) node.state else replaced.state, node.mongoId)))
+        this.copy(nodes = nodes.updated(i, replaced.copy(state = if (node.state != NONE) node.state else replaced.state)))
       }
     }
   }
@@ -168,6 +215,8 @@ case class NodeSet(
     }
     result
   }
+
+  def shortStatus = s"{{NodeSet $name ${nodes.map(_.shortSummary).mkString(" | ")} }}"
 }
 
 case class QueryableNodeSet(nodeSet: NodeSet) extends RoundRobiner(nodeSet.nodes.filter(_.isQueryable).map { node => NodeRoundRobiner(node) }) {
@@ -175,7 +224,13 @@ case class QueryableNodeSet(nodeSet: NodeSet) extends RoundRobiner(nodeSet.nodes
 
   def getNodeRoundRobinerByChannelId(channelId: Int) = subject.find(_.node.channels.exists(_.getId == channelId))
 
-  def primaryRoundRobiner: Option[NodeRoundRobiner] = subject.find(_.node.state == PRIMARY)
+  val primaryRoundRobiner: Option[NodeRoundRobiner] = subject.find(_.node.state == PRIMARY)
+  val secondaryRoundRobiner = new RoundRobiner(subject.filter(_.node.state == SECONDARY))
+
+  val nearest = {
+    // println(s"QueryableNodeSet. Current status of nodeSet is ${nodeSet.shortStatus}, nearest node is ${subject.sortBy(_.node.pingInfo.ping).headOption.map(_.node.shortSummary)}")
+    subject.sortBy(_.node.pingInfo.ping).headOption
+  }
 }
 
 case class NodeRoundRobiner(node: Node) extends RoundRobiner(node.queryable)
@@ -189,6 +244,18 @@ class RoundRobiner[A](val subject: IndexedSeq[A], private var i: Int = 0) {
     val result = Some(subject(i))
     i = if (i == length - 1) 0 else i + 1
     result
+  } else None
+
+  def pickWithFilter(filter: A => Boolean): Option[A] = pickWithFilter(filter, 0)
+
+  @scala.annotation.tailrec
+  private def pickWithFilter(filter: A => Boolean, tested: Int): Option[A] = if (length > 0 && tested < length) {
+    val a = pick
+    if (!a.isDefined)
+      None
+    else if (filter(a.get))
+      a
+    else pickWithFilter(filter, tested + 1)
   } else None
 }
 

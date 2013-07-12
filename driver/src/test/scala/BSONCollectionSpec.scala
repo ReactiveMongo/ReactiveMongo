@@ -25,8 +25,13 @@ class BSONCollectionSpec extends Specification {
     def read(doc: BSONDocument): Person = throw CustomException("hey hey hey")
   }
 
-  val PersonWriter = Macros.writer[Person]
-  val PersonReader = Macros.reader[Person]
+  object PersonWriter extends BSONDocumentWriter[Person] {
+    def write(p: Person): BSONDocument = throw CustomException("PersonWrite error")
+  }
+
+  object PersonReader extends BSONDocumentReader[Person] {
+    def read(doc: BSONDocument): Person = throw CustomException("hey hey hey")
+  }
 
   val person = Person("Jack", 25)
 

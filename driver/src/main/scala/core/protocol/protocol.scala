@@ -162,11 +162,9 @@ case class Request(
     documents: BufferSequence,
     channelIdHint: Option[Int] = None) extends ChannelBufferWritable {
   override val writeTo = { buffer: ChannelBuffer =>
-    {
-      buffer write header
-      buffer write op
-      buffer writeBytes documents.merged
-    }
+    buffer write header
+    buffer write op
+    buffer writeBytes documents.merged
   }
   override def size = 16 + op.size + documents.merged.writerIndex
   /** Header of this request */
@@ -184,7 +182,7 @@ case class CheckedWriteRequest(
     op: WriteRequestOp,
     documents: BufferSequence,
     getLastError: GetLastError) {
-  def apply(): (RequestMaker, RequestMaker) = RequestMaker(op, documents, None) -> getLastError.apply(op.db).maker
+  def apply(): (RequestMaker, RequestMaker) = RequestMaker(op, documents) -> getLastError.apply(op.db).maker
 }
 
 /**
