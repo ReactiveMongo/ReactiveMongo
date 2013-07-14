@@ -197,7 +197,7 @@ class MongoDBSystem(
       logger.debug("RefreshAllNodes Job running... Status: " + nodeSet.shortStatus)
     }
     case Connected(channelId) => {
-      updateNodeSet(nodeSet.updateByChannelId(channelId, node => {
+      updateNodeSet(nodeSet.updateNodeByChannelId(channelId) { node =>
         node.copy(channels = node.channels.map { channel =>
           if (channel.getId == channelId) {
             channel.copy(state = Ready)
@@ -206,13 +206,13 @@ class MongoDBSystem(
           case _: MongoNodeState => node.state
           case _                 => CONNECTED
         }).sendIsMaster(requestIds.isMaster.next)
-      }))
+      })
       logger.trace(s"Channel #$channelId connected. NodeSet status: ${nodeSet.shortStatus}")
     }
     case Disconnected(channelId) => {
-      updateNodeSet(nodeSet.updateByChannelId(channelId, node => {
+      updateNodeSet(nodeSet.updateNodeByChannelId(channelId) { node =>
         node.copy(state = NOT_CONNECTED, channels = node.channels.filter { _.isOpen })
-      }))
+      })
       awaitingResponses.retain { (_, awaitingResponse) =>
         if (awaitingResponse.channelID == channelId) {
           logger.debug("completing promise " + awaitingResponse.promise + " with error='socket disconnected'")
@@ -247,19 +247,22 @@ class MongoDBSystem(
           logger.error(s"error while processing isMaster response #${response.header.responseTo}", e)
         },
         isMaster => {
-          updateNodeSet(nodeSet.updateByChannelId(response.info.channelId, _.isMasterReceived(response.header.responseTo))) // TODO
-
-          updateNodeSet(if (isMaster.hosts.isDefined) { // then it's a ReplicaSet
-            val mynodes = isMaster.hosts.get.map(name => Node(name, if (isMaster.me.exists(_ == name)) isMaster.state else NONE))
-            nodeSet.addNodes(mynodes).copy(name = isMaster.setName).createNeededChannels(self, nbChannelsPerNode)
-          } else if (nodeSet.nodes.length > 0) {
-            logger.debug("single node, update..." + nodeSet)
-            NodeSet(None, None, nodeSet.nodes.slice(0, 1).map(_.copy(state = isMaster.state))).createNeededChannels(self, nbChannelsPerNode)
-          } else throw new RuntimeException("single node discovery failure..."))
-          logger.debug("NodeSet is now " + nodeSet)
-          nodeSet.connectAll
-          updateNodeSet(nodeSet.updateByChannelId(response.info.channelId,
-            _.updateChannelById(response.info.channelId, authenticateChannel(_))))
+          val ns = nodeSet.updateNodeByChannelId(response.info.channelId) { node =>
+            if (isMaster.state == NodeState.PRIMARY || isMaster.state == NodeState.SECONDARY)
+              node
+                .isMasterReceived(response.header.responseTo)
+                .updateChannelById(response.info.channelId, authenticateChannel(_))
+            else node.isMasterReceived(response.header.responseTo)
+          }
+          updateNodeSet {
+            if (isMaster.hosts.isDefined) { // then it's a ReplicaSet
+              val mynodes = isMaster.hosts.get.map(name => Node(name, if (isMaster.me.exists(_ == name)) isMaster.state else NONE))
+              ns.addNodes(mynodes).copy(name = isMaster.setName).createNeededChannels(self, nbChannelsPerNode)
+            } else if (ns.nodes.length > 0) {
+              logger.debug("single node, update..." + ns)
+              NodeSet(None, None, ns.nodes.slice(0, 1).map(_.copy(state = isMaster.state))).createNeededChannels(self, nbChannelsPerNode)
+            } else throw new RuntimeException("single node discovery failure...")
+          }
         })
 
     // getnonce response
@@ -269,7 +272,7 @@ class MongoDBSystem(
           logger.error(s"error while processing getNonce response #${response.header.responseTo}", e),
         nonce => {
           logger.debug("AUTH: got nonce for channel " + response.info.channelId + ": " + nonce)
-          updateNodeSet(nodeSet.updateByChannelId(response.info.channelId, node =>
+          updateNodeSet(nodeSet.updateNodeByChannelId(response.info.channelId) { node =>
             node.updateChannelById(response.info.channelId, {
               case mongoChannel @ MongoChannel(channel, authenticating: Authenticating, _) =>
                 logger.debug("NONCE authenticating channel is " + channel + " with " + authenticating)
@@ -278,13 +281,14 @@ class MongoDBSystem(
               case channel =>
                 logger.debug("channel got authenticated response while not authenticating! " + channel)
                 channel
-            })))
+            })
+          })
         })
 
     // authenticate response
     case response: Response if requestIds.authenticate accepts response => {
       logger.debug("AUTH: got authenticated response! " + response.info.channelId)
-      updateNodeSet(nodeSet.updateByChannelId(response.info.channelId, { node =>
+      updateNodeSet(nodeSet.updateNodeByChannelId(response.info.channelId) { node =>
         logger.debug("AUTH: updating node " + node + "...")
         node.updateChannelById(response.info.channelId, {
           case mongoChannel @ MongoChannel(channel, authenticating: Authenticating, _) =>
@@ -302,7 +306,7 @@ class MongoDBSystem(
             logger.debug("channel got authenticated response while not authenticating! " + channel)
             channel
         })
-      }))
+      })
     }
 
     // any other response
@@ -377,11 +381,11 @@ class MongoDBSystem(
 
   def pickChannel(request: Request): Try[(Node, MongoChannel)] = {
     if (request.channelIdHint.isDefined)
-      nodeSet.findByChannelId(request.channelIdHint.get).map(Success(_)).getOrElse(Failure(Exceptions.ChannelNotFound))
+      nodeSet.findNodeAndChannelByChannelId(request.channelIdHint.get).map(Success(_)).getOrElse(Failure(Exceptions.ChannelNotFound))
     else if (secondaryOK(request))
       nodeSet.queryable.pick.flatMap(node => node.pick.map(channel => Success(node.node -> channel))).getOrElse(Failure(Exceptions.NodeSetNotReachable))
     else nodeSet.queryable.primaryRoundRobiner.flatMap(node => node.pick.map(node.node -> _)).toRight(Exceptions.PrimaryUnavailableException)
-      nodeSet.findByChannelId(request.channelIdHint.get).map(Success(_)).getOrElse(Failure(Exceptions.ChannelNotFound))
+    nodeSet.findNodeAndChannelByChannelId(request.channelIdHint.get).map(Success(_)).getOrElse(Failure(Exceptions.ChannelNotFound))
   }
 
   override def postStop() {

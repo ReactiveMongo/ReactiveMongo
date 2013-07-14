@@ -30,6 +30,8 @@ import reactivemongo.core.commands.{ Authenticate => AuthenticateCommand, _ }
 import reactivemongo.core.protocol.NodeState._
 import reactivemongo.utils.LazyLogger
 
+case class LoggedIn(db: String, user: String)
+
 case class MongoChannel(
     channel: Channel,
     state: ChannelState,
@@ -163,14 +165,12 @@ case class NodeSet(
 
   def findNodeByChannelId(channelId: Int): Option[Node] = nodes.find(_.channels.exists(_.getId == channelId))
 
-  def findByChannelId(channelId: Int): Option[(Node, MongoChannel)] = nodes.flatMap(node => node.channels.map(node -> _)).find(_._2.getId == channelId)
+  def updateNodeByChannelId(channelId: Int)(transform: Node => Node): NodeSet = copy(nodes = nodes.map(node => if (node.channels.exists(_.getId == channelId)) transform(node) else node))
+
+  def findNodeAndChannelByChannelId(channelId: Int): Option[(Node, MongoChannel)] = nodes.flatMap(node => node.channels.map(node -> _)).find(_._2.getId == channelId)
 
   def updateByMongoId(mongoId: Int, transform: (Node) => Node): NodeSet = {
     new NodeSet(name, version, nodes.updated(mongoId, transform(nodes(mongoId))))
-  }
-
-  def updateByChannelId(channelId: Int, transform: (Node) => Node): NodeSet = {
-    new NodeSet(name, version, nodes.map(node => if (node.channels.exists(_.getId == channelId)) transform(node) else node))
   }
 
   def updateAll(transform: (Node) => Node): NodeSet = {
@@ -258,8 +258,6 @@ class RoundRobiner[A](val subject: IndexedSeq[A], private var i: Int = 0) {
     else pickWithFilter(filter, tested + 1)
   } else None
 }
-
-case class LoggedIn(db: String, user: String)
 
 class ChannelFactory(bossExecutor: Executor = Executors.newCachedThreadPool, workerExecutor: Executor = Executors.newCachedThreadPool) {
   private val logger = LazyLogger(LoggerFactory.getLogger("reactivemongo.core.nodeset.ChannelFactory"))
