@@ -25,7 +25,45 @@ import reactivemongo.bson._
 
 /**
  * The '''Expression''' type defines a recursive propositional abstract
- * syntax tree central to the MongoDB EDSL.
+ * syntax tree central to the MongoDB embedded domain-specific language (EDSL).
+ * It is the main abstraction used to provide the EDSL and results in being
+ * able to write:
+ *
+ * {{{
+ * import Untyped._
+ *
+ * val edslQuery = criteria.first < 10 && (
+ *	criteria.second >= 20.0 || criteria.second.in (0.0, 1.0)
+ *	);
+ * }}}
+ *
+ * And have that equivalent to this filter:
+ *
+ * {{{
+ * val bsonQuery = BSONDocument (
+ *	 "$and" ->
+ *	 BSONArray (
+ *		 BSONDocument (
+ *			 "first" -> BSONDocument ("$lt" -> BSONInteger (10))
+ *	 		),
+ *		BSONDocument (
+ *			"$or" ->
+ *			BSONArray (
+ *				BSONDocument (
+ *					"second" -> BSONDocument ("$gte" -> BSONDouble (20.0))
+ *					),
+ *				BSONDocument (
+ *					"second" ->
+ *					BSONDocument (
+ *						"$in" -> BSONArray (BSONDouble (0.0), BSONDouble (1.0))
+ *						)
+ *					)
+ *				)
+ *			)
+ *		)
+ *	);
+ * }}}
+ *
  */
 case class Expression (name : Option[String], element : BSONElement)
 {
@@ -60,10 +98,19 @@ case class Expression (name : Option[String], element : BSONElement)
         Expression (Some ("$not"), el);
       }
   
+  /**
+   * Conjunction: ''AND''.
+   */
   def && (rhs : Expression) : Expression = combine ("$and", rhs);
   
+  /**
+   * Negation of conjunction: ''NOR''.
+   */
   def !&& (rhs : Expression) : Expression = combine ("$nor", rhs);
   
+  /**
+   * Disjunction: ''OR''.
+   */
   def || (rhs : Expression) : Expression = combine ("$or", rhs);
   
   def isEmpty : Boolean = name.isEmpty && element._1.isEmpty;
@@ -97,6 +144,10 @@ object Expression
   val empty = new Expression (None, "" -> BSONDocument.empty);
 
 
+  /**
+   * The apply method provides functional-style creation syntax for
+   * [[reactivemongo.dsl.Expression]] instances.
+   */
   def apply (name : String, element : BSONElement) : Expression =
     new Expression (Some (name), element);
   
@@ -126,12 +177,17 @@ object Expression
  * The '''ValueBuilder'' type is a model of the ''type class'' pattern used to
  * produce a ''T''-specific [[reactivemongo.bson.BSONValue]] instance.
  */
-sealed trait ValueBuilder[T]
+trait ValueBuilder[T]
 {
   def bson (v : T) : BSONValue;
 }
 
 
+/**
+ * The '''ValueBuilder''' companion object defines common [[reactivemongo.dsl.ValueBuilder]]
+ * ''type classes'' available for any project.  Types not known to the library can define
+ * [[reactivemongo.dsl.ValueBuilder]] instances as needed to extend the DSL.
+ */
 object ValueBuilder
 {
   implicit def bsonValueIdentityValue[T <: BSONValue] : ValueBuilder[T] =
@@ -196,34 +252,67 @@ object ValueBuilder
 case class Term[T] (`_term$name` : String)
 	extends Dynamic
 {
+  /**
+   * Logical equality: '''$eq'''.
+   */
   def ===[U <: T : ValueBuilder] (rhs : U) : Expression =
     Expression (`_term$name`, "$eq" -> implicitly[ValueBuilder[U]].bson (rhs));
   
+  /**
+   * Logical equality: '''$eq'''.
+   */
   def @==[U <: T : ValueBuilder] (rhs : U) : Expression = ===[U] (rhs);
   
+  /**
+   * Logical inequality: '''$ne'''.
+   */
   def <>[U <: T : ValueBuilder] (rhs : U) : Expression =
     Expression (`_term$name`, "$ne" -> implicitly[ValueBuilder[U]].bson (rhs));
   
+  /**
+   * Logical inequality: '''$ne'''.
+   */
   def =/=[U <: T : ValueBuilder] (rhs : U) : Expression = <>[U] (rhs);
   
+  /**
+   * Less-than comparison: '''$lt'''.
+   */
   def <[U <: T : ValueBuilder] (rhs : U) : Expression =
     Expression (`_term$name`, "$lt" -> implicitly[ValueBuilder[U]].bson (rhs));
   
+  /**
+   * Less-than or equal comparison: '''$lte'''.
+   */
   def <=[U <: T : ValueBuilder] (rhs : U) : Expression =
     Expression (`_term$name`, "$lte" -> implicitly[ValueBuilder[U]].bson (rhs));
   
+  /**
+   * Greater-than comparison: '''$gt'''.
+   */
   def >[U <: T : ValueBuilder] (rhs : U) : Expression =
     Expression (`_term$name`, "$gt" -> implicitly[ValueBuilder[U]].bson (rhs));
   
+  /**
+   * Greater-than or equal comparison: '''$gte'''.
+   */
   def >=[U <: T : ValueBuilder] (rhs : U) : Expression =
     Expression (`_term$name`, "$gte" -> implicitly[ValueBuilder[U]].bson (rhs));
     
+  /**
+   * Field existence: '''$exists'''.
+   */
   def exists : Expression =
     Expression (`_term$name`, "$exists" -> BSONBoolean (true));
     
+  /**
+   * Field value equals one of the '''values''': '''$in'''.
+   */
   def in[U <: T : ValueBuilder] (values : Traversable[U]) (implicit B : ValueBuilder[U]) : Expression =
     Expression (`_term$name`, "$in" -> BSONArray (values map (B.bson)));
   
+  /**
+   * Field value equals either '''head''' or one of the (optional) '''tail''' values: '''$in'''.
+   */
   def in[U <: T : ValueBuilder] (head : U, tail : U *) (implicit B : ValueBuilder[U]) : Expression =
     Expression (`_term$name`, "$in" -> BSONArray (Seq (B.bson (head)) ++ tail.map (B.bson)));
   
