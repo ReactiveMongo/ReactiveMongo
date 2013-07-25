@@ -49,11 +49,18 @@ case class BSONDocument(stream: Stream[Try[BSONElement]]) extends BSONValue {
    * If the key is not found or the matching value cannot be deserialized, returns a `Failure`.
    * The `Failure` holds a [[exceptions.DocumentKeyNotFound]] if the key could not be found.
    */
-  def getTry(key: String): Try[BSONValue] = Try {
-    stream.find {
-      case Success(element) => element._1 == key
-      case Failure(e)       => throw e
-    }.map(_.get._2).getOrElse(throw DocumentKeyNotFound(key))
+  def getTry(key: String): Try[BSONValue] = {
+    val tried = Try {
+      stream.find {
+        case Success(element) => element._1 == key
+        case Failure(e)       => throw e
+      }.map(_.get._2)
+    }
+    tried match {
+      case Success(Some(x)) => Success(x)
+      case Success(None)    => Failure(DocumentKeyNotFound(key))
+      case f: Failure[_]    => f.asInstanceOf[Try[BSONValue]]
+    }
   }
 
   /**
@@ -73,11 +80,7 @@ case class BSONDocument(stream: Stream[Try[BSONElement]]) extends BSONValue {
    *
    * If there is no matching value, or the value could not be deserialized or converted, returns a `None`.
    */
-  def getAs[T](s: String)(implicit reader: BSONReader[_ <: BSONValue, T]): Option[T] = {
-    getTry(s).toOption.flatMap { element =>
-      Try(reader.asInstanceOf[BSONReader[BSONValue, T]].read(element)).toOption
-    }
-  }
+  def getAs[T](s: String)(implicit reader: BSONReader[_ <: BSONValue, T]): Option[T] = getAsTry[T](s).toOption
 
   /**
    * Returns the [[BSONValue]] associated with the given `key`, and converts it with the given implicit [[BSONReader]].
@@ -87,7 +90,12 @@ case class BSONDocument(stream: Stream[Try[BSONElement]]) extends BSONValue {
    */
   def getAsTry[T](s: String)(implicit reader: BSONReader[_ <: BSONValue, T]): Try[T] = {
     val tt = getTry(s)
-    tt.flatMap { element => Try(reader.asInstanceOf[BSONReader[BSONValue, T]].read(element)) }
+    tt.flatMap {
+      case BSONNull if !reader.isInstanceOf[BSONReader[BSONValue, T]] => Failure(DocumentKeyNotFound(s))
+      case element =>
+        val cast = reader.asInstanceOf[BSONReader[BSONValue, T]] // do not catch ClassCastException in Try
+        Try(cast.read(element))
+    }
   }
 
   /**
@@ -202,11 +210,7 @@ case class BSONArray(stream: Stream[Try[BSONValue]]) extends BSONValue {
    *
    * If there is no matching value, or the value could not be deserialized or converted, returns a `None`.
    */
-  def getAs[T](index: Int)(implicit reader: BSONReader[_ <: BSONValue, T]): Option[T] = {
-    getTry(index).toOption.flatMap { element =>
-      Try(reader.asInstanceOf[BSONReader[BSONValue, T]].read(element)).toOption
-    }
-  }
+  def getAs[T](index: Int)(implicit reader: BSONReader[_ <: BSONValue, T]): Option[T] = getAsTry[T](index).toOption
 
   /**
    * Gets the [[BSONValue]] at the given `index`, and converts it with the given implicit [[BSONReader]].
@@ -216,7 +220,12 @@ case class BSONArray(stream: Stream[Try[BSONValue]]) extends BSONValue {
    */
   def getAsTry[T](index: Int)(implicit reader: BSONReader[_ <: BSONValue, T]): Try[T] = {
     val tt = getTry(index)
-    tt.flatMap { element => Try(reader.asInstanceOf[BSONReader[BSONValue, T]].read(element)) }
+    tt.flatMap {
+      case BSONNull if !reader.isInstanceOf[BSONReader[BSONValue, T]] => Failure(DocumentKeyNotFound(index.toString))
+      case element =>
+        val cast = reader.asInstanceOf[BSONReader[BSONValue, T]] // do not catch ClassCastException in Try
+        Try(cast.read(element))
+    }
   }
 
   /**
