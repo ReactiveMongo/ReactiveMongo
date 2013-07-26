@@ -15,8 +15,9 @@
  */
 package reactivemongo.bson
 
+import reactivemongo.bson.exceptions.{ValueIsNull, DeserializationException}
 import scala.collection.generic.CanBuildFrom
-import scala.util.{ Failure, Success, Try }
+import scala.util.{ Failure, Try }
 
 /**
  * A reader that produces an instance of `T` from a subtype of [[BSONValue]].
@@ -101,26 +102,50 @@ class VariantBSONReaderWrapper[B <: BSONValue, T](reader: VariantBSONReader[B, T
 
 trait BSONHandler[B <: BSONValue, T] extends BSONReader[B, T] with BSONWriter[T, B]
 
+trait AllowNullable[T] extends BSONReader[BSONValue, T] {
+  override def readTry(bson: BSONValue): Try[T] = bson match {
+    case BSONNull | BSONUndefined => Failure(ValueIsNull)
+    case x => super.readTry(x)
+  }
+}
+
 trait DefaultBSONHandlers {
-  implicit object BSONIntegerHandler extends BSONHandler[BSONInteger, Int] {
-    def read(int: BSONInteger) = int.value
+  import DefaultBSONHandlers._
+
+  implicit object BSONIntegerHandler extends BSONHandler[BSONValue, Int] with AllowNullable[Int] {
+    def read(bson: BSONValue) = bson match {
+      case BSONInteger(value) => value
+      case x                  => deserializationError(s"Expected BSONInteger, but got $x")
+    }
     def write(int: Int) = BSONInteger(int)
   }
-  implicit object BSONLongHandler extends BSONHandler[BSONLong, Long] {
-    def read(long: BSONLong) = long.value
+  implicit object BSONLongHandler extends BSONHandler[BSONValue, Long] with AllowNullable[Long] {
+    def read(bson: BSONValue) = bson match {
+      case BSONLong(value) => value
+      case x               => deserializationError(s"Expected BSONLong, but got $x")
+    }
     def write(long: Long) = BSONLong(long)
   }
-  implicit object BSONDoubleHandler extends BSONHandler[BSONDouble, Double] {
-    def read(double: BSONDouble) = double.value
+  implicit object BSONDoubleHandler extends BSONHandler[BSONValue, Double] with AllowNullable[Double] {
+    def read(bson: BSONValue) = bson match {
+      case BSONDouble(value) => value
+      case x                 => deserializationError(s"Expected BSONDouble, but got $x")
+    }
     def write(double: Double) = BSONDouble(double)
   }
 
-  implicit object BSONStringHandler extends BSONHandler[BSONString, String] {
-    def read(string: BSONString) = string.value
+  implicit object BSONStringHandler extends BSONHandler[BSONValue, String] with AllowNullable[String] {
+    def read(bson: BSONValue) = bson match {
+      case BSONString(value) => value
+      case x                 => deserializationError(s"Expected BSONString, but got $x")
+    }
     def write(string: String) = BSONString(string)
   }
-  implicit object BSONBooleanHandler extends BSONHandler[BSONBoolean, Boolean] {
-    def read(boolean: BSONBoolean) = boolean.value
+  implicit object BSONBooleanHandler extends BSONHandler[BSONValue, Boolean] with AllowNullable[Boolean] {
+    def read(bson: BSONValue) = bson match {
+      case BSONBoolean(value) => value
+      case x                  => deserializationError(s"Expected BSONBoolean, but got $x")
+    }
     def write(boolean: Boolean) = BSONBoolean(boolean)
   }
 
@@ -128,8 +153,8 @@ trait DefaultBSONHandlers {
   import BSONNumberLike._
   import BSONBooleanLike._
 
-  class BSONNumberLikeReader[B <: BSONValue] extends BSONReader[B, BSONNumberLike] {
-    def read(bson: B) = bson match {
+  implicit object BSONNumberLikeReader extends BSONReader[BSONValue, BSONNumberLike] with AllowNullable[BSONNumberLike] {
+    def read(bson: BSONValue) = bson match {
       case int: BSONInteger => BSONIntegerNumberLike(int)
       case long: BSONLong => BSONLongNumberLike(long)
       case double: BSONDouble => BSONDoubleNumberLike(double)
@@ -141,10 +166,8 @@ trait DefaultBSONHandlers {
     def write(number: BSONNumberLike) = number.underlying
   }
 
-  implicit def bsonNumberLikeReader[B <: BSONValue] = new BSONNumberLikeReader[B]
-
-  class BSONBooleanLikeReader[B <: BSONValue] extends BSONReader[B, BSONBooleanLike] {
-    def read(bson: B) = bson match {
+  implicit object BSONBooleanLikeReader extends BSONReader[BSONValue, BSONBooleanLike] {
+    def read(bson: BSONValue) = bson match {
       case int: BSONInteger => BSONIntegerBooleanLike(int)
       case double: BSONDouble => BSONDoubleBooleanLike(double)
       case long: BSONLong => BSONLongBooleanLike(long)
@@ -158,8 +181,6 @@ trait DefaultBSONHandlers {
   implicit object BSONBooleanLikeWriter extends VariantBSONWriter[BSONBooleanLike, BSONValue] {
     def write(number: BSONBooleanLike) = number.underlying
   }
-
-  implicit def bsonBooleanLikeReader[B <: BSONValue] = new BSONBooleanLikeReader[B]
 
   // Collections Handlers
   class BSONArrayCollectionReader[M[_], T](implicit cbf: CanBuildFrom[M[_], T, M[T]], reader: BSONReader[_ <: BSONValue, T]) extends BSONReader[BSONArray, M[T]] {
@@ -183,18 +204,27 @@ trait DefaultBSONHandlers {
     new BSONArrayCollectionReader
   }
 
-  implicit object BSONStringIdentity extends BSONReader[BSONString, BSONString] with BSONWriter[BSONString, BSONString] {
-    def read(b: BSONString) = b
+  implicit object BSONStringIdentity extends BSONReader[BSONValue, BSONString] with BSONWriter[BSONString, BSONValue] with AllowNullable[BSONString] {
+    def read(bson: BSONValue) = bson match {
+      case x: BSONString => x
+      case x             => deserializationError(s"Expected BSONString, but got: $x")
+    }
     def write(b: BSONString) = b
   }
 
-  implicit object BSONIntegerIdentity extends BSONReader[BSONInteger, BSONInteger] with BSONWriter[BSONInteger, BSONInteger] {
-    def read(b: BSONInteger) = b
+  implicit object BSONIntegerIdentity extends BSONReader[BSONValue, BSONInteger] with BSONWriter[BSONInteger, BSONValue] with AllowNullable[BSONInteger] {
+    def read(bson: BSONValue) = bson match {
+      case x: BSONInteger => x
+      case x              => deserializationError(s"Expected BSONInteger, but got: $x")
+    }
     def write(b: BSONInteger) = b
   }
 
-  implicit object BSONArrayIdentity extends BSONReader[BSONArray, BSONArray] with BSONWriter[BSONArray, BSONArray] {
-    def read(b: BSONArray) = b
+  implicit object BSONArrayIdentity extends BSONReader[BSONValue, BSONArray] with BSONWriter[BSONArray, BSONValue] with AllowNullable[BSONArray] {
+    def read(bson: BSONValue) = bson match {
+      case x: BSONArray => x
+      case x            => deserializationError(s"Expected BSONArray, but got: $x")
+    }
     def write(b: BSONArray) = b
   }
 
@@ -203,18 +233,27 @@ trait DefaultBSONHandlers {
     def write(b: BSONDocument) = b
   }
 
-  implicit object BSONBooleanIdentity extends BSONReader[BSONBoolean, BSONBoolean] with BSONWriter[BSONBoolean, BSONBoolean] {
-    def read(b: BSONBoolean) = b
+  implicit object BSONBooleanIdentity extends BSONReader[BSONValue, BSONBoolean] with BSONWriter[BSONBoolean, BSONValue] with AllowNullable[BSONBoolean] {
+    def read(bson: BSONValue) = bson match {
+      case x: BSONBoolean => x
+      case x              => deserializationError(s"Expected BSONBoolean, but got: $x")
+    }
     def write(b: BSONBoolean) = b
   }
 
-  implicit object BSONLongIdentity extends BSONReader[BSONLong, BSONLong] with BSONWriter[BSONLong, BSONLong] {
-    def read(b: BSONLong) = b
+  implicit object BSONLongIdentity extends BSONReader[BSONValue, BSONLong] with BSONWriter[BSONLong, BSONValue] with AllowNullable[BSONLong] {
+    def read(bson: BSONValue) = bson match {
+      case x: BSONLong => x
+      case x           => deserializationError(s"Expected BSONLong, but got: $x")
+    }
     def write(b: BSONLong) = b
   }
 
-  implicit object BSONDoubleIdentity extends BSONReader[BSONDouble, BSONDouble] with BSONWriter[BSONDouble, BSONDouble] {
-    def read(b: BSONDouble) = b
+  implicit object BSONDoubleIdentity extends BSONReader[BSONValue, BSONDouble] with BSONWriter[BSONDouble, BSONValue] with AllowNullable[BSONDouble] {
+    def read(bson: BSONValue) = bson match {
+      case x: BSONDouble => x
+      case x             => deserializationError(s"Expected BSONDouble, but got: $x")
+    }
     def write(b: BSONDouble) = b
   }
 
@@ -223,33 +262,51 @@ trait DefaultBSONHandlers {
     def write(b: BSONValue) = b
   }
 
-  implicit object BSONObjectIDIdentity extends BSONReader[BSONObjectID, BSONObjectID] with BSONWriter[BSONObjectID, BSONObjectID] {
-    def read(b: BSONObjectID) = b
+  implicit object BSONObjectIDIdentity extends BSONReader[BSONValue, BSONObjectID] with BSONWriter[BSONObjectID, BSONValue] with AllowNullable[BSONObjectID] {
+    def read(bson: BSONValue) = bson match {
+      case x: BSONObjectID => x
+      case x               => deserializationError(s"Expected BSONObjectID, but got: $x")
+    }
     def write(b: BSONObjectID) = b
   }
 
-  implicit object BSONBinaryIdentity extends BSONReader[BSONBinary, BSONBinary] with BSONWriter[BSONBinary, BSONBinary] {
-    def read(b: BSONBinary) = b
+  implicit object BSONBinaryIdentity extends BSONReader[BSONValue, BSONBinary] with BSONWriter[BSONBinary, BSONValue] with AllowNullable[BSONBinary] {
+    def read(bson: BSONValue) = bson match {
+      case x: BSONBinary => x
+      case x             => deserializationError(s"Expected BSONBinary, but got: $x")
+    }
     def write(b: BSONBinary) = b
   }
 
-  implicit object BSONDateTimeIdentity extends BSONReader[BSONDateTime, BSONDateTime] with BSONWriter[BSONDateTime, BSONDateTime] {
-    def read(b: BSONDateTime) = b
+  implicit object BSONDateTimeIdentity extends BSONReader[BSONValue, BSONDateTime] with BSONWriter[BSONDateTime, BSONValue] with AllowNullable[BSONDateTime] {
+    def read(bson: BSONValue) = bson match {
+      case x: BSONDateTime => x
+      case x               => deserializationError(s"Expected BSONDateTime, but got: $x")
+    }
     def write(b: BSONDateTime) = b
   }
 
-  implicit object BSONNullIdentity extends BSONReader[BSONNull.type, BSONNull.type] with BSONWriter[BSONNull.type, BSONNull.type] {
-    def read(b: BSONNull.type) = b
+  implicit object BSONNullIdentity extends BSONReader[BSONValue, BSONNull.type] with BSONWriter[BSONNull.type, BSONValue] {
+    def read(bson: BSONValue) = bson match {
+      case BSONNull => BSONNull
+      case x        => deserializationError(s"Expected BSONNull, but got: $x")
+    }
     def write(b: BSONNull.type) = b
   }
 
-  implicit object BSONUndefinedIdentity extends BSONReader[BSONUndefined.type, BSONUndefined.type] with BSONWriter[BSONUndefined.type, BSONUndefined.type] {
-    def read(b: BSONUndefined.type) = b
+  implicit object BSONUndefinedIdentity extends BSONReader[BSONValue, BSONUndefined.type] with BSONWriter[BSONUndefined.type, BSONValue] {
+    def read(bson: BSONValue) = bson match {
+      case BSONUndefined => BSONUndefined
+      case x             => deserializationError(s"Expected BSONUndefined, but got: $x")
+    }
     def write(b: BSONUndefined.type) = b
   }
 
-  implicit object BSONRegexIdentity extends BSONReader[BSONRegex, BSONRegex] with BSONWriter[BSONRegex, BSONRegex] {
-    def read(b: BSONRegex) = b
+  implicit object BSONRegexIdentity extends BSONReader[BSONValue, BSONRegex] with BSONWriter[BSONRegex, BSONValue] with AllowNullable[BSONRegex] {
+    def read(bson: BSONValue) = bson match {
+      case x: BSONRegex => x
+      case x            => deserializationError(s"Expected BSONRegex, but got: $x")
+    }
     def write(b: BSONRegex) = b
   }
 
@@ -270,4 +327,6 @@ trait DefaultBSONHandlers {
     new VariantBSONReaderWrapper(reader)
 }
 
-object DefaultBSONHandlers extends DefaultBSONHandlers
+object DefaultBSONHandlers extends DefaultBSONHandlers {
+  def deserializationError(msg: String) = throw new DeserializationException(msg)
+}
