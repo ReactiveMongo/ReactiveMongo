@@ -76,11 +76,17 @@ case class Expression (name : Option[String], element : BSONElement)
    */
   def unary_! : Expression =
     this match {
-      case Expression (term, ("$in", vals)) =>
+      case Expression (Some (term), ("$in", vals)) =>
         Expression (term, ("$nin", vals));
         
-      case Expression (term, ("$nin", vals)) =>
+      case Expression (Some (term), ("$nin", vals)) =>
         Expression (term, ("$in", vals));
+        
+      case Expression (Some (term), ("$ne", vals)) =>
+        Expression (term, (term, vals));
+        
+      case Expression (Some (term), (field, vals)) if (field == term) =>
+        Expression (term, ("$ne", vals));
         
       case Expression (None, ("$nor", vals)) =>
         Expression (None, ("$or" -> vals));
@@ -159,6 +165,9 @@ object Expression
   
   implicit def toBSONDocument (expr : Expression) : BSONDocument =
     expr match {
+      case Expression (Some (name), (field, element)) if (name == field) =>
+	  	BSONDocument (field -> element);
+
       case Expression (Some (name), element) =>
         BSONDocument (name -> BSONDocument (element));
         
@@ -253,13 +262,13 @@ case class Term[T] (`_term$name` : String)
 	extends Dynamic
 {
   /**
-   * Logical equality: '''$eq'''.
+   * Logical equality.
    */
   def ===[U <: T : ValueBuilder] (rhs : U) : Expression =
-    Expression (`_term$name`, "$eq" -> implicitly[ValueBuilder[U]].bson (rhs));
+    Expression (`_term$name`, `_term$name` -> implicitly[ValueBuilder[U]].bson (rhs));
   
   /**
-   * Logical equality: '''$eq'''.
+   * Logical equality.
    */
   def @==[U <: T : ValueBuilder] (rhs : U) : Expression = ===[U] (rhs);
   

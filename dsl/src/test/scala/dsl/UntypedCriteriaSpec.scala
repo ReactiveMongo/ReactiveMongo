@@ -42,23 +42,20 @@ class UntypedCriteriaSpec extends Specification
       BSONDocument.pretty (q) should_== (
         BSONDocument.pretty (
           BSONDocument (
-            "myField" ->
-            BSONDocument ("$eq" -> BSONString ("a value")
-            )
+            "myField" -> BSONString ("a value")
           )
         )
       );
     }
     
     "support nested object selectors" in {
-      val q = criteria.outer.inner === 99;
+      val q = criteria.outer.inner =/= 99;
       
       BSONDocument.pretty (q) should_== (
         BSONDocument.pretty (
           BSONDocument (
             "outer.inner" ->
-            BSONDocument ("$eq" -> BSONInteger (99)
-            )
+            BSONDocument ("$ne" -> BSONInteger (99))
           )
         )
       );
@@ -234,6 +231,15 @@ class UntypedCriteriaSpec extends Specification
     }
     
     "support logical negation" in {
+      BSONDocument.pretty (!(criteria.a === 42)) should_== (
+        BSONDocument.pretty (
+          BSONDocument (
+            "a" ->
+            BSONDocument ("$ne" -> BSONInteger (42))
+          )
+        )
+      );
+      
       BSONDocument.pretty (!(criteria.a =~ "regex(p)?")) should_== (
         BSONDocument.pretty (
           BSONDocument (
@@ -254,16 +260,10 @@ class UntypedCriteriaSpec extends Specification
             "$nor" ->
             BSONArray (
               BSONDocument (
-                "xyz" ->
-                BSONDocument (
-                  "$eq" -> BSONInteger (1)
-                )
+                "xyz" -> BSONInteger (1)
               ),
               BSONDocument (
-                "xyz" ->
-                BSONDocument (
-                  "$eq" -> BSONInteger (2)
-                )
+                "xyz" -> BSONInteger (2)
               )
             )
           )
@@ -281,9 +281,7 @@ class UntypedCriteriaSpec extends Specification
       BSONDocument.pretty (criteria.a === 1 && Expression.empty) should_== (
         BSONDocument.pretty (
           BSONDocument (
-            "a" ->
-            BSONDocument ("$eq" -> BSONInteger (1)
-            )
+            "a" -> BSONInteger (1)
           )
         )
       );
@@ -291,9 +289,7 @@ class UntypedCriteriaSpec extends Specification
       BSONDocument.pretty (Expression.empty && criteria.a === 2.0) should_== (
         BSONDocument.pretty (
           BSONDocument (
-            "a" ->
-            BSONDocument ("$eq" -> BSONDouble (2.0)
-            )
+            "a" -> BSONDouble (2.0)
           )
         )
       );
@@ -301,9 +297,7 @@ class UntypedCriteriaSpec extends Specification
       BSONDocument.pretty (Expression.empty || criteria.a === "three") should_== (
         BSONDocument.pretty (
           BSONDocument (
-            "a" ->
-            BSONDocument ("$eq" -> BSONString ("three")
-            )
+            "a" -> BSONString ("three")
           )
         )
       );
@@ -311,9 +305,7 @@ class UntypedCriteriaSpec extends Specification
       BSONDocument.pretty (criteria.a === 4L || Expression.empty) should_== (
         BSONDocument.pretty (
           BSONDocument (
-            "a" ->
-            BSONDocument ("$eq" -> BSONLong (4L)
-            )
+            "a" -> BSONLong (4L)
           )
         )
       );
