@@ -160,7 +160,7 @@ object ReactiveMongoBuild extends Build {
     file("."),
     settings = buildSettings ++ Unidoc.settings ++ Seq(
       publish := {}
-    )) aggregate(driver, bson, bsonmacros)
+    )) aggregate(driver, bson, bsonmacros, dsl)
 
   lazy val driver = Project(
     "ReactiveMongo",
@@ -181,6 +181,13 @@ object ReactiveMongoBuild extends Build {
   lazy val bsonmacros = Project(
     "ReactiveMongo-BSON-Macros",
     file("macros"),
+    settings = buildSettings ++ Seq(
+      libraryDependencies <+= (scalaVersion)("org.scala-lang" % "scala-compiler" % _)
+    )) dependsOn (bson)
+
+  lazy val dsl = Project(
+    "ReactiveMongo-DSL",
+    file("dsl"),
     settings = buildSettings ++ Seq(
       libraryDependencies <+= (scalaVersion)("org.scala-lang" % "scala-compiler" % _)
     )) dependsOn (bson)
