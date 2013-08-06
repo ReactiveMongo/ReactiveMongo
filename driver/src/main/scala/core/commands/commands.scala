@@ -21,11 +21,10 @@ import reactivemongo.bson.exceptions.DocumentKeyNotFound
 import DefaultBSONHandlers._
 import reactivemongo.core.errors._
 import reactivemongo.core.protocol.{ RequestMaker, Query, QueryFlags, Response }
-import reactivemongo.core.protocol.NodeState
-import reactivemongo.core.protocol.NodeState._
 import reactivemongo.core.netty._
 import reactivemongo.utils.option
 import reactivemongo.bson.utils.Converters
+import reactivemongo.core.nodeset.NodeStatus
 
 /**
  * A MongoDB Command.
@@ -503,7 +502,7 @@ case class IsMasterResponse(
     hosts: Option[Seq[String]],
     me: Option[String]) {
   /** the resolved [[reactivemongo.core.protocol.NodeState]] of the answering server */
-  lazy val state: NodeState = if (isMaster) PRIMARY else if (secondary) SECONDARY else UNKNOWN
+  lazy val state: NodeStatus = if (isMaster) NodeStatus.Primary else if (secondary) NodeStatus.Secondary else NodeStatus.NonQueryableUnknownStatus
 }
 
 /** A modify operation, part of a FindAndModify command */

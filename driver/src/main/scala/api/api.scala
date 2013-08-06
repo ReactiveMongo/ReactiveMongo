@@ -21,6 +21,7 @@ import org.slf4j.{ Logger, LoggerFactory }
 import play.api.libs.iteratee._
 import reactivemongo.api.indexes._
 import reactivemongo.core.actors._
+import reactivemongo.core.nodeset.Authenticate
 import reactivemongo.bson._
 import reactivemongo.core.protocol._
 import reactivemongo.core.commands.{ Command, GetLastError, LastError, SuccessfulAuthentication }
@@ -79,7 +80,7 @@ class Failover[T](message: T, connection: MongoConnection, strategy: FailoverStr
 
   private def isRetryable(throwable: Throwable) = throwable match {
     case PrimaryUnavailableException | NodeSetNotReachable => true
-    case e: DatabaseException if e.isNotAPrimaryError => true
+    case e: DatabaseException if e.isNotAPrimaryError || e.isUnauthorized => true
     case _: ConnectionException => true
     case _ => false
   }
@@ -206,8 +207,11 @@ class MongoConnection(
   def send(message: RequestMaker) = mongosystem ! message
 
   /** Authenticates the connection on the given database. */
-  def authenticate(db: String, user: String, password: String)(implicit timeout: FiniteDuration): Future[SuccessfulAuthentication] =
-    akkaAsk(mongosystem, Authenticate(db, user, password))(Timeout(timeout)).mapTo[SuccessfulAuthentication]
+  def authenticate(db: String, user: String, password: String): Future[SuccessfulAuthentication] = {
+    val req = AuthRequest(Authenticate(user, db, password))
+    mongosystem ! req
+    req.future
+  }
 
   /** Closes this MongoConnection (closes all the channels and ends the actors) */
   def askClose()(implicit timeout: FiniteDuration): Future[_] =
@@ -270,7 +274,7 @@ object MongoDriver {
   /**
    * Creates a new MongoDriver with specified ActorSystem.
    *
-   * @param system An ActorSystem for ReactiveMongo to use.  
+   * @param system An ActorSystem for ReactiveMongo to use.
    */
   def apply(system: ActorSystem) = new MongoDriver(system)
 

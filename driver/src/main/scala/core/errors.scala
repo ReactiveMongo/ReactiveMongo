@@ -43,9 +43,15 @@ trait DatabaseException extends ReactiveMongoException {
   override def getMessage: String = "DatabaseException['" + message + "'" + code.map(c => " (code = " + c + ")").getOrElse("") + "]"
 
   /** Tells if this error is due to a write on a secondary node. */
-  lazy val isNotAPrimaryError: Boolean = code.map {
+  def isNotAPrimaryError: Boolean = code.map {
     case 10054 | 10056 | 10058 | 10107 | 13435 | 13436 => true
     case _ => false
+  }.getOrElse(false)
+
+  /** Tells if this error is related to authentication issues. */
+  def isUnauthorized: Boolean = code.map {
+    case 10057 | 15845 | 16550 => true
+    case _                     => false
   }.getOrElse(false)
 }
 
