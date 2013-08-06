@@ -18,10 +18,8 @@ package reactivemongo.core.actors
 import akka.actor._
 import org.jboss.netty.channel.group._
 import org.slf4j.{ Logger, LoggerFactory }
-//import reactivemongo.bson._
 import reactivemongo.core.errors._
 import reactivemongo.core.protocol._
-import reactivemongo.core.protocol.NodeState._
 import reactivemongo.utils.LazyLogger
 import reactivemongo.core.commands.{ Authenticate => AuthenticateCommand, _ }
 import scala.annotation.tailrec
@@ -246,11 +244,11 @@ class MongoDBSystem(
               if (node.pingInfo.lastIsMasterId == response.header.responseTo)
                 node.pingInfo.copy(ping = System.currentTimeMillis() - node.pingInfo.lastIsMasterTime, lastIsMasterTime = 0, lastIsMasterId = -1)
               else node.pingInfo
-            val authenticated = isMaster.state match {
+            val authenticating = isMaster.status match {
               case _: QueryableNodeStatus => authenticateNode(node, nodeSet.authenticates.toSeq)
               case _                      => node
             }
-            authenticated.copy(status = isMaster.state, pingInfo = pingInfo, name = isMaster.me.getOrElse(node.name))
+            authenticating.copy(status = isMaster.status, pingInfo = pingInfo, name = isMaster.me.getOrElse(node.name))
           }
           updateNodeSet {
             connectAll {

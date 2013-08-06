@@ -502,7 +502,7 @@ case class IsMasterResponse(
     hosts: Option[Seq[String]],
     me: Option[String]) {
   /** the resolved [[reactivemongo.core.protocol.NodeState]] of the answering server */
-  lazy val state: NodeStatus = if (isMaster) NodeStatus.Primary else if (secondary) NodeStatus.Secondary else NodeStatus.NonQueryableUnknownStatus
+  val status: NodeStatus = if (isMaster) NodeStatus.Primary else if (secondary) NodeStatus.Secondary else NodeStatus.NonQueryableUnknownStatus
 }
 
 /** A modify operation, part of a FindAndModify command */
