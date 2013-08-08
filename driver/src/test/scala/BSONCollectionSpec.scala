@@ -26,11 +26,10 @@ class BSONCollectionSpec extends Specification {
   }
 
   object PersonWriter extends BSONDocumentWriter[Person] {
-    def write(p: Person): BSONDocument = throw CustomException("PersonWrite error")
+    def write(p: Person): BSONDocument = BSONDocument("age" -> p.age, "name" -> p.name)
   }
-
   object PersonReader extends BSONDocumentReader[Person] {
-    def read(doc: BSONDocument): Person = throw CustomException("hey hey hey")
+    def read(doc: BSONDocument): Person = Person(doc.getAs[String]("name").get, doc.getAs[Int]("age").get)
   }
 
   val person = Person("Jack", 25)
