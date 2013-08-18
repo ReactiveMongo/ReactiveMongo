@@ -113,22 +113,21 @@ trait Cursor[T] {
    *
    */
   def enumerate()(implicit ctx: ExecutionContext): Enumerator[T] = {
-    if (hasNext) {
-      CustomEnumerator.StateEnumerator(Cursor.nextElement(this)) { state =>
-        Cursor.nextElement(state._1)
-      } &> Enumeratee.collect {
-        case (_, Some(t)) => t
-      } &> Enumeratee.onIterateeDone(() => {
-        logger.debug("iteratee is done, closing cursor")
-        close()
-      })
-    } else {
-      Enumerator.eof
+    val enum = enumerateBulks
+    enum.flatMap { it =>
+      if (it.hasNext)
+        CustomEnumerator.SEnumerator.apply(it.next) { _ => if (it.hasNext) Some(Future(it.next)) else None }
+      else Enumerator()
     }
   }
 
-  def enumerate(upTo: Int)(implicit ctx: ExecutionContext): Enumerator[T] =
-    enumerate &> Enumeratee.take(upTo)
+  def enumerate(upTo: Int)(implicit ctx: ExecutionContext): Enumerator[T] = {
+    enumerateBulks(upTo).flatMap { it =>
+      if (it.hasNext)
+        CustomEnumerator.SEnumerator.apply(it.next) { _ => if (it.hasNext) Some(Future(it.next)) else None }
+      else Enumerator()
+    }
+  }
 
   /**
    * Cursor enumerator.
@@ -137,14 +136,17 @@ trait Cursor[T] {
    * Low-level API, consider enumerate() or enumerateBulks() instead.
    *
    */
-  def enumerateCursor()(implicit ctx: ExecutionContext): Enumerator[Cursor[T]] = {
-    val enum: Enumerator[Cursor[T]] = (if (hasNext) {
-      CustomEnumerator.StateEnumerator(Future(Some(this))) { cursor =>
-        if (cursor.hasNext)
-          cursor.next.map(Some(_))
-        else Future(None)
-      }
-    } else Enumerator.eof)
+   def enumerateCursor()(implicit ctx: ExecutionContext): Enumerator[Cursor[T]] = {
+    val enum: Enumerator[Cursor[T]] =
+      if (hasNext)
+        CustomEnumerator.SEnumerator(this)(
+          next = { cursor =>
+            if (cursor.hasNext)
+              Some(cursor.next)
+            else None
+          })
+      else Enumerator.eof
+
     enum &> Enumeratee.filterNot(_.iterator.isEmpty) &> Enumeratee.onIterateeDone(() => {
       logger.debug("iteratee is done, closing cursor...")
       close()
@@ -170,8 +172,8 @@ trait Cursor[T] {
    * @param limit Stop enumerating when at least `limit` documents have been received.
    */
   def enumerateBulks(limit: Int)(implicit ctx: ExecutionContext): Enumerator[Iterator[T]] = {
-    enumerateCursor &> Enumeratee.takeWhile { cursor =>
-      !cursor.offset.isDefined || cursor.offset.get < limit
+    enumerateCursor &> CustomEnumeratee.TakeTo { cursor =>
+      !cursor.offset.isDefined || cursor.offset.get + cursor.nDocs < limit
     } &> Enumeratee.map { cursor =>
       if (cursor.offset.exists(offset => (offset + cursor.nDocs) > limit))
         cursor.iterator.take(limit - cursor.offset.get)
