@@ -124,22 +124,31 @@ object Resolvers {
 }
 
 object Dependencies {
+
   val netty = "io.netty" % "netty" % "3.6.5.Final" cross CrossVersion.Disabled
 
-  def akkaActor(sv: String) = sv match {
-    case "2.10.0" => "com.typesafe.akka" %% "akka-actor" % "2.1.0"
-    case "2.10.1" => "com.typesafe.akka" %% "akka-actor" % "2.1.2"
+  object akka {
+    def actor(sv: String) = sv match {
+      case "2.10.0" => "com.typesafe.akka" %% "akka-actor" % "2.1.0"
+      case "2.10.1" => "com.typesafe.akka" %% "akka-actor" % "2.1.2"
+    }
+    lazy val actor22M3 = "com.typesafe.akka" %% "akka-actor" % "2.2-M3"
   }
 
-  def iteratees(sv: String) = sv match {
-    case "2.10.0" => "play" %% "play-iteratees" % "2.1.0"
-    case "2.10.1" => "play" %% "play-iteratees" % "2.1.1"
+  object play {
+    def iteratees(sv: String) = sv match {
+      case "2.10.0" => "play" %% "play-iteratees" % "2.1.0"
+      case "2.10.1" => "play" %% "play-iteratees" % "2.1.1"
+    }
   }
 
-  val logbackVer = "1.0.11"
-  val logback = Seq(
-    "ch.qos.logback" % "logback-core" % logbackVer,
-    "ch.qos.logback" % "logback-classic" % logbackVer)
+  object logback {
+    val classic = "ch.qos.logback" % "logback-classic" % "1.0.11" % "test"
+  }
+
+  object slf4j {
+    val api = "org.slf4j" % "slf4j-api" % "1.7.5"
+  }
 
   def specs(sv: String) = sv match {
     case "2.10.0" => "org.specs2" % "specs2" % "1.14" % "test" cross CrossVersion.binary
@@ -147,7 +156,6 @@ object Dependencies {
   }
 
   val junit = "junit" % "junit" % "4.8" % "test" cross CrossVersion.Disabled
-  val testDeps = Seq(junit)
 }
 
 object ReactiveMongoBuild extends Build {
@@ -160,18 +168,39 @@ object ReactiveMongoBuild extends Build {
     file("."),
     settings = buildSettings ++ Unidoc.settings ++ Seq(
       publish := {}
-    )) aggregate(driver, bson, bsonmacros)
+    )
+  ) aggregate(driver, bson, bsonmacros)
+
+  lazy val driverCommonSettings = buildSettings ++ Seq(
+    resolvers := resolversList,
+    libraryDependencies <++= (scalaVersion)(sv => Seq(
+      netty,
+      //akka.actor(sv),
+      play.iteratees(sv),
+      slf4j.api,
+      specs(sv),
+      junit,
+      logback.classic
+    ))
+  )
 
   lazy val driver = Project(
     "ReactiveMongo",
     file("driver"),
-    settings = buildSettings ++ Seq(
-      resolvers := resolversList,
-      libraryDependencies <++= (scalaVersion)(sv => Seq(
-        netty,
-        akkaActor(sv),
-        iteratees(sv),
-        specs(sv)) ++ logback ++ testDeps))) dependsOn (bsonmacros)
+    settings = driverCommonSettings ++ Seq(
+      libraryDependencies <+= (scalaVersion)(akka.actor _)
+    )
+  ) dependsOn (bsonmacros)
+
+
+  lazy val driver22M3 = Project(
+    "ReactiveMongo_Akka22M3",
+    file("driver"),
+    settings = driverCommonSettings ++ Seq(
+      libraryDependencies += akka.actor22M3
+    )
+  ) dependsOn (bsonmacros)
+
 
   lazy val bson = Project(
     "ReactiveMongo-BSON",
@@ -183,6 +212,7 @@ object ReactiveMongoBuild extends Build {
     file("macros"),
     settings = buildSettings ++ Seq(
       libraryDependencies <+= (scalaVersion)("org.scala-lang" % "scala-compiler" % _)
-    )) dependsOn (bson)
+    )
+  ) dependsOn (bson)
 }
 
