@@ -23,7 +23,7 @@ object BuildSettings {
     shellPrompt := ShellPrompt.buildShellPrompt,
     mappings in (Compile, packageBin) ~= filter,
     mappings in (Compile, packageSrc) ~= filter,
-    mappings in (Compile, packageDoc) ~= filter) // ++ Publish.settings // ++ Format.settings
+    mappings in (Compile, packageDoc) ~= filter) ++ Publish.settings // ++ Format.settings
 }
 
 object Publish {
