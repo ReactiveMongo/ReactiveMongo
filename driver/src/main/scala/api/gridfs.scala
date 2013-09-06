@@ -226,7 +226,7 @@ class GridFS[Structure, Reader[_], Writer[_]](db: DB with DBMetaCommands, prefix
     Iteratee.foldM(Chunk()) { (previous, chunk: Array[Byte]) =>
       logger.debug("processing new enumerated chunk from n=" + previous.n + "...\n")
       previous.feed(chunk)
-    }.mapDone(_.finish)
+    }.map(_.finish)
   }
 
   /** Produces an enumerator of chunks of bytes from the `chunks` collection matching the given file metadata. */
