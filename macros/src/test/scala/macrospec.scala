@@ -10,6 +10,8 @@ class Macros extends Specification {
     original mustEqual deserialized
   }
 
+  def roundtripImp[A](data:A)(implicit format: BSONReader[BSONDocument, A] with BSONWriter[A, BSONDocument]) = roundtrip(data, format)
+
   case class Person(firstName: String, lastName: String)
   case class Pet(name: String, owner: Person)
   case class Primitives(dbl: Double, str: String, bl: Boolean, int: Int, long: Long)
@@ -19,6 +21,8 @@ class Macros extends Specification {
   case class SingleTuple(value: (String, String))
   case class User(_id: BSONObjectID = BSONObjectID.generate, name: String)
   case class WordLover(name: String, words: Seq[String])
+  case class Empty()
+  object EmptyObject
 
   object Nest {
     case class Nested(name: String)
@@ -77,6 +81,25 @@ class Macros extends Specification {
       import Macros.Options._
       implicit val bson: Handler[Tree] = Macros.handlerOpts[Tree, UnionType[Node \/ Leaf] with Verbose]
     }
+  }
+
+  object IntListModule {
+    sealed trait IntList
+    case class Cons(head: Int, tail: IntList) extends IntList
+    case object Tail extends IntList
+
+    object IntList{
+      import Macros.Options._
+      implicit val bson: Handler[IntList] = Macros.handlerOpts[IntList, UnionType[Cons \/ Tail.type]]
+    }
+  }
+
+  object InheritanceModule {
+    sealed trait T
+    case class A() extends T
+    case object B extends T
+    sealed trait TT extends T
+    case class C() extends TT
   }
 
   "Formatter" should {
@@ -183,6 +206,42 @@ class Macros extends Specification {
       val deserialized = BSON.readDocument[Tree](serialized)
       val expected = Node(Leaf("hai"), Node(Leaf("hai"),Leaf("hai")))
       assert( deserialized === expected )
+    }
+
+    "handle empty case classes" in {
+      val empty = Empty()
+      val format = Macros.handler[Empty]
+      roundtrip(empty, format)
+    }
+
+    "do nothing with objects" in {
+      val format = Macros.handler[EmptyObject.type]
+      roundtrip(EmptyObject, format)
+    }
+
+    "handle ADTs with objects" in {
+      import IntListModule._
+      roundtripImp[IntList](Tail)
+      roundtripImp[IntList](Cons(1, Cons(2, Cons(3, Tail))))
+    }
+
+    "automate Union on sealed traits" in {
+      import Macros.Options._
+      import Union._
+      implicit val format = Macros.handlerOpts[UT, AllImplementations]
+      roundtripImp[UT](UA(17))
+      roundtripImp[UT](UB("foo"))
+      roundtripImp[UT](UC("bar"))
+      roundtripImp[UT](UD("baz"))
+    }
+
+    "support automatic implementations search with nested traits" in {
+      import Macros.Options._
+      import InheritanceModule._
+      implicit val format = Macros.handlerOpts[T, AllImplementations]
+      roundtripImp[T](A())
+      roundtripImp[T](B)
+      roundtripImp[T](C())
     }
   }
 }

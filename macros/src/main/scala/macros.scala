@@ -56,7 +56,7 @@ private object MacroImpl {
       val writer = unionTypes map { types =>
         val cases = types map { typ =>
           val pattern = Literal(Constant(typ.typeSymbol.fullName)) //todo
-          val body = readBodyFromImplicit(typ)
+        val body = readBodyFromImplicit(typ)
           CaseDef(pattern, body)
         }
         val className = c.parse("""document.getAs[String]("className").get""")
@@ -98,6 +98,23 @@ private object MacroImpl {
     }
 
     private def readBodyConstruct(implicit A: c.Type) = {
+      if(isSingleton(A))
+        readBodyConstructSingleton
+      else
+        readBodyConstructClass
+    }
+
+    private def readBodyConstructSingleton(implicit A: c.Type) = {
+      val sym = A match {
+        case SingleType(_, sym) => sym
+        case TypeRef(_, sym, _) => sym
+        case _ => c.abort(c.enclosingPosition, s"Something weird is going on with '$A'. Should be a singleton but can't parse it")
+      }
+      val name = stringToTermName(sym.name.toString) //this is ugly but quite stable compared to other attempts
+      Ident(name)
+    }
+
+    private def readBodyConstructClass(implicit A: c.Type) = {
       val (constructor, _) = matchingApplyUnapply
 
       val values = constructor.paramss.head map {
@@ -141,6 +158,21 @@ private object MacroImpl {
     }
 
     private def writeBodyConstruct(A: c.Type): c.Tree = {
+      if(isSingleton(A))
+        writeBodyConstructSingleton(A)
+      else
+        writeBodyConstructClass(A)
+    }
+
+    private def writeBodyConstructSingleton(A: c.Type): c.Tree = {
+      val expr =classNameTree(A) map { className =>
+        val nameE = c.Expr[(String, BSONString)](className)
+        reify{ BSONDocument(Seq((nameE.splice))) }
+      } getOrElse reify{ BSONDocument.empty }
+      expr.tree
+    }
+
+    private def writeBodyConstructClass(A: c.Type): c.Tree = {
       val (constructor, deconstructor) = matchingApplyUnapply(A)
       val types = unapplyReturnTypes(deconstructor)
       val constructorParams = constructor.paramss.head
@@ -193,9 +225,11 @@ private object MacroImpl {
       val invokeUnapply = Select(Apply(unapplyTree, List(document)), "get")
       val tupleDef = ValDef(Modifiers(), newTermName("tuple"), TypeTree(), invokeUnapply)
 
-      Block(
-        (tupleDef :: writer): _*
-      )
+      if(values.length + appends.length > 0){
+        Block( (tupleDef :: writer): _*)
+      } else {
+        writer.head
+      }
     }
 
     private def classNameTree(A: c.Type) = {
@@ -209,6 +243,10 @@ private object MacroImpl {
     }
 
     private lazy val unionTypes: Option[List[c.Type]] = {
+      parseUnionTypes orElse parseAllImplementationTypes
+    }
+
+    private def parseUnionTypes: Option[List[c.Type]] = {
       val unionOption = c.typeOf[Macros.Options.UnionType[_]]
       val union = c.typeOf[Macros.Options.\/[_,_]]
       def parseUnionTree(tree: Type): List[Type] = {
@@ -231,10 +269,20 @@ private object MacroImpl {
       tree map {t => parseUnionTree(t)}
     }
 
+    private def parseAllImplementationTypes: Option[List[Type]] = {
+      val allOption = typeOf[Macros.Options.AllImplementations]
+      if(Opts <:< allOption){
+        Some(allImplementations(A).toList)
+      } else{
+        None
+      }
+    }
+
     private def hasOption[O: c.TypeTag]: Boolean = Opts <:< typeOf[O]
 
     private def unapplyReturnTypes(deconstructor: c.universe.MethodSymbol): List[c.Type] = {
       val opt = deconstructor.returnType match {
+        case TypeRef(_, _, Nil) => Some(Nil)
         case TypeRef(_, _, args) =>
           args.head match {
             case t@TypeRef(_, _, Nil) => Some(List(t))
@@ -267,6 +315,17 @@ private object MacroImpl {
       Select(Select(Ident(newTermName("reactivemongo")), "bson"), "BSONDocument")
     }
 
+    private def allSubclasses(A: Symbol): Set[Symbol] = {
+      val sub = A.asClass.knownDirectSubclasses
+      val subsub = sub flatMap allSubclasses
+      subsub ++ sub + A
+    }
+
+    private def allImplementations(A: Type) = {
+      val classes = allSubclasses(A.typeSymbol) map (_.asClass)
+      classes filterNot (_.isAbstractClass) map (_.toType)
+    }
+
     private def applyMethod(implicit A: c.Type): c.universe.Symbol = {
       companion(A).typeSignature.declaration(stringToTermName("apply")) match {
         case NoSymbol => c.abort(c.enclosingPosition, s"No apply function found for $A")
@@ -296,6 +355,7 @@ private object MacroImpl {
     type Reader[A] = BSONReader[_ <: BSONValue, A]
     type Writer[A] = BSONWriter[A, _ <: BSONValue]
 
+    private def isSingleton(t: Type): Boolean = t <:< typeOf[Singleton]
     private def writerType: c.Type = typeOf[Writer[_]].typeConstructor
     private def readerType: c.Type = typeOf[Reader[_]].typeConstructor
 
