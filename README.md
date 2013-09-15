@@ -63,6 +63,12 @@ libraryDependencies ++= Seq(
 )
 ```
 
+You may also need to add the [Typesafe Repository](http://repo.typesafe.com/typesafe/releases/) as a resolver:
+
+```scala
+resolvers += "Typesafe repository" at "http://repo.typesafe.com/typesafe/releases/"
+```
+
 ### Connect to the database
 
 You can get a connection to a server (or a replica set) like this:
