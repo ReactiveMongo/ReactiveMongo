@@ -2,7 +2,7 @@ import sbt._
 import sbt.Keys._
 
 object BuildSettings {
-  val buildVersion = "0.9"
+  val buildVersion = "0.10.0-SNAPSHOT"
 
   val filter = { (ms: Seq[(File, String)]) =>
     ms filter {
@@ -14,8 +14,8 @@ object BuildSettings {
   val buildSettings = Defaults.defaultSettings ++ Seq(
     organization := "org.reactivemongo",
     version := buildVersion,
-    scalaVersion := "2.10.0",
-    crossScalaVersions := Seq("2.10.0"),
+    scalaVersion := "2.10.2",
+    crossScalaVersions := Seq("2.10.2"),
     crossVersion := CrossVersion.binary,
     javaOptions in test ++= Seq("-Xmx512m", "-XX:MaxPermSize=512m"),
     scalacOptions ++= Seq("-unchecked", "-deprecation" /*, "-Xlog-implicits", "-Yinfer-debug", "-Xprint:typer", "-Yinfer-debug", "-Xlog-implicits", "-Xprint:typer"*/ ),
@@ -127,13 +127,15 @@ object Dependencies {
   val netty = "io.netty" % "netty" % "3.6.5.Final" cross CrossVersion.Disabled
 
   def akkaActor(sv: String) = sv match {
-    case "2.10.0" => "com.typesafe.akka" %% "akka-actor" % "2.1.0"
-    case "2.10.1" => "com.typesafe.akka" %% "akka-actor" % "2.1.2"
+    //case "2.10.0" => "com.typesafe.akka" %% "akka-actor" % "2.1.0"
+    //case "2.10.1" => "com.typesafe.akka" %% "akka-actor" % "2.1.2"
+    case "2.10.2" => "com.typesafe.akka" %% "akka-actor" % "2.2.1"
   }
 
   def iteratees(sv: String) = sv match {
-    case "2.10.0" => "play" %% "play-iteratees" % "2.1.0"
-    case "2.10.1" => "play" %% "play-iteratees" % "2.1.1"
+    //case "2.10.0" => "play" %% "play-iteratees" % "2.1.0"
+    //case "2.10.1" => "play" %% "play-iteratees" % "2.1.1"
+    case "2.10.2" => "com.typesafe.play" %% "play-iteratees" % "2.2.0-RC1"
   }
 
   val logbackVer = "1.0.11"
@@ -142,8 +144,9 @@ object Dependencies {
     "ch.qos.logback" % "logback-classic" % logbackVer)
 
   def specs(sv: String) = sv match {
-    case "2.10.0" => "org.specs2" % "specs2" % "1.14" % "test" cross CrossVersion.binary
-    case "2.10.1" => "org.specs2" % "specs2" % "1.14" % "test" cross CrossVersion.binary
+    //case "2.10.0" => "org.specs2" % "specs2" % "1.14" % "test" cross CrossVersion.binary
+    //case "2.10.1" => "org.specs2" % "specs2" % "1.14" % "test" cross CrossVersion.binary
+    case "2.10.2" => "org.specs2" % "specs2" % "1.14" % "test" cross CrossVersion.binary
   }
 
   val junit = "junit" % "junit" % "4.8" % "test" cross CrossVersion.Disabled
