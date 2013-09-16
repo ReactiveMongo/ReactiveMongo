@@ -80,7 +80,7 @@ case class Skip(skip: Int) extends PipelineOperator {
  * @param field Name of the array to unwind.
  */
 case class Unwind(field: String) extends PipelineOperator {
-  override val makePipe = BSONDocument("$unwind" -> BSONString("$" + field))
+  override val makePipe = BSONDocument("$unwind" -> BSONString(field))
 }
 
 /**
@@ -92,7 +92,7 @@ case class Unwind(field: String) extends PipelineOperator {
  */
 case class GroupField(idField: String)(ops: (String, GroupFunction)*) extends PipelineOperator {
   override val makePipe = Group(BSONDocument(
-    "_id" -> BSONString("$" + idField)
+    "_id" -> BSONString(idField)
   ))(ops: _*).makePipe
 }
 
@@ -106,7 +106,7 @@ case class GroupField(idField: String)(ops: (String, GroupFunction)*) extends Pi
 case class GroupMulti(idField: (String, String)*)(ops: (String, GroupFunction)*) extends PipelineOperator {
   override val makePipe = Group(BSONDocument(
     idField.map {
-      case (alias, attribute) => alias -> BSONString("$" + attribute)
+      case (alias, attribute) => alias -> BSONString(attribute)
     }.toStream
   ))(ops: _*).makePipe
 }
@@ -164,37 +164,37 @@ case class AddToSet(field: String) extends GroupFunction {
 }
 
 case class First(field: String) extends GroupFunction {
-  def makeFunction = BSONDocument("$first" -> BSONString("$" + field))
+  def makeFunction = BSONDocument("$first" -> BSONString(field))
 }
 
 case class Last(field: String) extends GroupFunction {
-  def makeFunction = BSONDocument("$last" -> BSONString("$" + field))
+  def makeFunction = BSONDocument("$last" -> BSONString(field))
 }
 
 case class Max(field: String) extends GroupFunction {
-  def makeFunction = BSONDocument("$max" -> BSONString("$" + field))
+  def makeFunction = BSONDocument("$max" -> BSONString(field))
 }
 
 case class Min(field: String) extends GroupFunction {
-  def makeFunction = BSONDocument("$min" -> BSONString("$" + field))
+  def makeFunction = BSONDocument("$min" -> BSONString(field))
 }
 
 case class Avg(field: String) extends GroupFunction {
-  def makeFunction = BSONDocument("$avg" -> BSONString("$" + field))
+  def makeFunction = BSONDocument("$avg" -> BSONString(field))
 }
 
 case class Push(field: String) extends GroupFunction {
-  def makeFunction = BSONDocument("$push" -> BSONString("$" + field))
+  def makeFunction = BSONDocument("$push" -> BSONString(field))
 }
 
 case class PushMulti(fields: (String, String)*) extends GroupFunction {
   def makeFunction = BSONDocument("$push" -> BSONDocument(
-    fields.map(field => field._1 -> BSONString("$"+field._2))
+    fields.map(field => field._1 -> BSONString(field._2))
   ))
 }
 
 case class SumField(field: String) extends GroupFunction {
-  def makeFunction = BSONDocument("$sum" -> BSONString("$" + field))
+  def makeFunction = BSONDocument("$sum" -> BSONString(field))
 }
 
 case class SumValue(value: Int) extends GroupFunction {
