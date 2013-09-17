@@ -130,12 +130,10 @@ object Dependencies {
 
   val iteratees = "com.typesafe.play" %% "play-iteratees" % "2.2.0-RC2"
 
-  val logbackVer = "1.0.11"
-  val logback = Seq(
-    "ch.qos.logback" % "logback-core" % logbackVer,
-    "ch.qos.logback" % "logback-classic" % logbackVer)
-
   val specs = "org.specs2" %% "specs2" % "2.2.1" % "test"
+
+  val log4jVersion = "2.0-beta9"
+  val log4j = Seq("org.apache.logging.log4j" % "log4j-api" % log4jVersion, "org.apache.logging.log4j" % "log4j-core" % log4jVersion)
 }
 
 object ReactiveMongoBuild extends Build {
@@ -159,7 +157,7 @@ object ReactiveMongoBuild extends Build {
         netty,
         akkaActor,
         iteratees,
-        specs) ++ logback))) dependsOn (bsonmacros)
+        specs) ++ log4j))) dependsOn (bsonmacros)
 
   lazy val bson = Project(
     "ReactiveMongo-BSON",

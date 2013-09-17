@@ -17,7 +17,6 @@ package reactivemongo.api
 
 import akka.actor.{ ActorRef, ActorSystem, PoisonPill, Props }
 import org.jboss.netty.buffer.ChannelBuffer
-import org.slf4j.{ Logger, LoggerFactory }
 import play.api.libs.iteratee._
 import reactivemongo.api.indexes._
 import reactivemongo.core.actors._
@@ -25,6 +24,7 @@ import reactivemongo.core.nodeset.Authenticate
 import reactivemongo.bson._
 import reactivemongo.core.protocol._
 import reactivemongo.core.commands.{ Command, GetLastError, LastError, SuccessfulAuthentication }
+import reactivemongo.utils.LazyLogger
 import reactivemongo.utils.EitherMappableFuture._
 import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.{ ExecutionContext, Future, Promise }
@@ -89,7 +89,7 @@ class Failover[T](message: T, connection: MongoConnection, strategy: FailoverStr
 }
 
 object Failover {
-  private val logger = LoggerFactory.getLogger("reactivemongo.api.Failover")
+  private val logger = LazyLogger("reactivemongo.api.Failover")
   /**
    * Produces a [[reactivemongo.api.Failover]] holding a future reference that is completed with a result, after 1 or more attempts (specified in the given strategy).
    *

@@ -17,7 +17,6 @@ package reactivemongo.core.actors
 
 import akka.actor._
 import org.jboss.netty.channel.group._
-import org.slf4j.{ Logger, LoggerFactory }
 import reactivemongo.core.errors._
 import reactivemongo.core.protocol._
 import reactivemongo.utils.LazyLogger
@@ -478,7 +477,7 @@ case class AuthRequest(authenticate: Authenticate, promise: Promise[SuccessfulAu
 
 object MongoDBSystem {
   private[actors] val DefaultConnectionRetryInterval: Int = 2000 // milliseconds
-  private val logger = LazyLogger(LoggerFactory.getLogger("reactivemongo.core.actors.MongoDBSystem"))
+  private val logger = LazyLogger("reactivemongo.core.actors.MongoDBSystem")
 }
 
 private[actors] case class AwaitingResponse(
@@ -542,7 +541,7 @@ class MonitorActor(sys: ActorRef) extends Actor {
 }
 
 object MonitorActor {
-  private val logger = LazyLogger(LoggerFactory.getLogger("reactivemongo.core.actors.MonitorActor"))
+  private val logger = LazyLogger("reactivemongo.core.actors.MonitorActor")
 }
 
 // exceptions

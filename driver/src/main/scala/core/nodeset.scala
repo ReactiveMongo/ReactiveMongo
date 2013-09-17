@@ -9,7 +9,6 @@ import reactivemongo.utils.LazyLogger
 import org.jboss.netty.channel.socket.nio.NioClientSocketChannelFactory
 import org.jboss.netty.buffer.HeapChannelBufferFactory
 import org.jboss.netty.channel.{ Channel, ChannelPipeline, Channels }
-import org.slf4j.LoggerFactory
 import reactivemongo.core.protocol._
 
 package object utils {
@@ -299,7 +298,7 @@ class RoundRobiner[A, M[T] <: Iterable[T]](val subject: M[A], startAtIndex: Int 
 }
 
 class ChannelFactory(bossExecutor: Executor = Executors.newCachedThreadPool, workerExecutor: Executor = Executors.newCachedThreadPool) {
-  private val logger = LazyLogger(LoggerFactory.getLogger("reactivemongo.core.nodeset.ChannelFactory"))
+  private val logger = LazyLogger("reactivemongo.core.nodeset.ChannelFactory")
 
   def create(host: String = "localhost", port: Int = 27017, receiver: ActorRef) = {
     val channel = makeChannel(receiver)

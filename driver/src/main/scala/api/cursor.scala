@@ -19,7 +19,7 @@ import reactivemongo.core.iteratees._
 import reactivemongo.core.protocol._
 import reactivemongo.core.netty.BufferSequence
 import reactivemongo.utils.ExtendedFutures._
-import org.slf4j.LoggerFactory
+import reactivemongo.utils.LazyLogger
 import play.api.libs.iteratee._
 import scala.concurrent.{ ExecutionContext, Future }
 import scala.util.{ Failure, Success }
@@ -401,7 +401,7 @@ class TailableCursor[T](cursor: DefaultCursor[T], private val controller: Tailab
 }
 
 object Cursor {
-  private[api] val logger = LoggerFactory.getLogger("reactivemongo.api.Cursor")
+  private[api] val logger = LazyLogger("reactivemongo.api.Cursor")
 
   /**
    * Flattens the given future [[reactivemongo.api.Cursor]] to a [[reactivemongo.api.FlattenedCursor]].

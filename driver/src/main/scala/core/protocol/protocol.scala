@@ -23,7 +23,6 @@ import org.jboss.netty.channel._
 import org.jboss.netty.channel.socket.nio._
 import org.jboss.netty.handler.codec.oneone._
 import org.jboss.netty.handler.codec.frame.FrameDecoder
-import org.slf4j.{ Logger, LoggerFactory }
 import reactivemongo.core.actors.{ Connected, Disconnected }
 import reactivemongo.core.commands.GetLastError
 import reactivemongo.core.errors._
@@ -305,7 +304,7 @@ private[reactivemongo] case class ReplyDocumentIterator[T](private val reply: Re
 }
 
 private[reactivemongo] object RequestEncoder {
-  val logger = LazyLogger(LoggerFactory.getLogger("reactivemongo.core.protocol.RequestEncoder"))
+  val logger = LazyLogger("reactivemongo.core.protocol.RequestEncoder")
 }
 
 private[reactivemongo] class ResponseFrameDecoder extends FrameDecoder {
@@ -372,5 +371,5 @@ private[reactivemongo] class MongoHandler(receiver: ActorRef) extends SimpleChan
 }
 
 private[reactivemongo] object MongoHandler {
-  private val logger = LazyLogger(LoggerFactory.getLogger("reactivemongo.core.protocol.MongoHandler"))
+  private val logger = LazyLogger("reactivemongo.core.protocol.MongoHandler")
 }
