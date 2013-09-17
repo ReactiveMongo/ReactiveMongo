@@ -135,7 +135,7 @@ object Dependencies {
   def iteratees(sv: String) = sv match {
     //case "2.10.0" => "play" %% "play-iteratees" % "2.1.0"
     //case "2.10.1" => "play" %% "play-iteratees" % "2.1.1"
-    case "2.10.2" => "com.typesafe.play" %% "play-iteratees" % "2.2.0-RC1"
+    case "2.10.2" => "com.typesafe.play" %% "play-iteratees" % "2.2.0-RC2"
   }
 
   val logbackVer = "1.0.11"
