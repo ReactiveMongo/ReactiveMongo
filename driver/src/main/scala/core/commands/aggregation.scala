@@ -91,9 +91,7 @@ case class Unwind(field: String) extends PipelineOperator {
  * @param ops Sequence of operators specifying aggregate calculation.
  */
 case class GroupField(idField: String)(ops: (String, GroupFunction)*) extends PipelineOperator {
-  override val makePipe = Group(BSONDocument(
-    "_id" -> BSONString("$" + idField)
-  ))(ops: _*).makePipe
+  override val makePipe = Group(BSONString("$" + idField))(ops: _*).makePipe
 }
 
 /**
