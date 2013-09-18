@@ -90,7 +90,7 @@ case object Closed
  */
 class MongoDBSystem(
     seeds: Seq[String],
-    __auth: Seq[Authenticate],
+    initialAuthenticates: Seq[Authenticate],
     nbChannelsPerNode: Int,
     channelFactory: ChannelFactory = new ChannelFactory()) extends Actor {
   import MongoDBSystem._
@@ -359,7 +359,7 @@ class MongoDBSystem(
   }
 
   // monitor -->
-  var nodeSet: NodeSet = NodeSet(None, None, seeds.map(seed => Node(seed, NodeStatus.Unknown, Vector.empty, Set.empty).createNeededChannels(self, 1)).toVector, Set.empty)
+  var nodeSet: NodeSet = NodeSet(None, None, seeds.map(seed => Node(seed, NodeStatus.Unknown, Vector.empty, Set.empty).createNeededChannels(self, 1)).toVector, initialAuthenticates.toSet)
   connectAll(nodeSet)
   // <-- monitor
 
@@ -445,7 +445,7 @@ class MongoDBSystem(
 
   // Auth Methods
   object AuthRequestsManager {
-    var authRequests: Map[Authenticate, List[Promise[SuccessfulAuthentication]]] = Map.empty
+    private var authRequests: Map[Authenticate, List[Promise[SuccessfulAuthentication]]] = Map.empty
     def addAuthRequest(request: AuthRequest): Map[Authenticate, List[Promise[SuccessfulAuthentication]]] = {
       val found = authRequests.get(request.authenticate)
       authRequests = authRequests + (request.authenticate -> (request.promise :: found.getOrElse(Nil)))
