@@ -200,7 +200,7 @@ class EmptyCapped(
 class RenameCollection(
     name: String,
     target: String,
-    dropTarget: Boolean = false) extends Command[Boolean] {
+    dropTarget: Boolean = false) extends AdminCommand[Boolean] {
   def makeDocuments =
     BSONDocument(
       "renameCollection" -> BSONString(name),
