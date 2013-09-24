@@ -334,7 +334,7 @@ object BSONObjectID {
   private val machineId = {
     val networkInterfacesEnum = NetworkInterface.getNetworkInterfaces
     val networkInterfaces = scala.collection.JavaConverters.enumerationAsScalaIteratorConverter(networkInterfacesEnum).asScala
-    val ha = networkInterfaces.find(ha => ha.getHardwareAddress != null && ha.getHardwareAddress.length == 6)
+    val ha = networkInterfaces.find(ha => Try(ha.getHardwareAddress).isSuccess && ha.getHardwareAddress != null && ha.getHardwareAddress.length == 6)
       .map(_.getHardwareAddress)
       .getOrElse(InetAddress.getLocalHost.getHostName.getBytes)
     Converters.md5(ha).take(3)
