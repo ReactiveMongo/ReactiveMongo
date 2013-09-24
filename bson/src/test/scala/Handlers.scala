@@ -16,6 +16,7 @@
  */
 import org.specs2.mutable._
 import reactivemongo.bson._
+import reactivemongo.bson.exceptions._
 import scala.util._
 
 class Handlers extends Specification {
@@ -52,10 +53,13 @@ class Handlers extends Specification {
       doc.getAsTry[String]("name") mustEqual Success("James")
 
       doc.getAsTry[BSONInteger]("name").isFailure mustEqual true
+      doc.getAsTry[BSONInteger]("name").get must throwA[DeserializationException]
       doc.getAs[BSONInteger]("name") mustEqual None
       doc.getAsTry[Int]("name").isFailure mustEqual true
+      doc.getAsTry[Int]("name").get must throwA[DeserializationException]
       doc.getAs[Int]("name") mustEqual None
       doc.getAsTry[BSONNumberLike]("name").isFailure mustEqual true
+      doc.getAsTry[BSONNumberLike]("name").get must throwA[UnsupportedOperationException]
 
       doc.get("name").get.seeAsTry[String] mustEqual Success("James")
       doc.get("name").get.seeAsTry[Int].isFailure mustEqual true
@@ -87,6 +91,58 @@ class Handlers extends Specification {
       doc.getTry("surname2").isFailure mustEqual true
       doc.getUnflattenedTry("surname2").isSuccess mustEqual true
       doc.getUnflattenedTry("surname2").get.isDefined mustEqual false
+    }
+  }
+
+  "Document" should {
+    val doc = BSONDocument("test" -> BSONNull, "test2" -> BSONUndefined)
+
+    "handle 'null'" in {
+      doc.getAs[BSONString]("test") mustEqual None
+      doc.getAs[String]("test") mustEqual None
+      doc.getAsTry[BSONString]("test") mustEqual Failure(ValueIsNull)
+      doc.getAsTry[String]("test") mustEqual Failure(ValueIsNull)
+      doc.getAsTry[BSONBoolean]("test") mustEqual Failure(ValueIsNull)
+      doc.getAsTry[Boolean]("test") mustEqual Failure(ValueIsNull)
+      doc.getAsUnflattenedTry[BSONString]("test") mustEqual Success(None)
+      doc.getAsUnflattenedTry[String]("test") mustEqual Success(None)
+      doc.getAsUnflattenedTry[BSONBoolean]("test") mustEqual Success(None)
+      doc.getAsUnflattenedTry[Boolean]("test") mustEqual Success(None)
+      doc.getAs[BSONBoolean]("test") mustEqual None
+      doc.getAs[Boolean]("test") mustEqual None
+      doc.getAs[BSONBooleanLike]("test").get.toBoolean mustEqual false
+    }
+
+    "handle 'key not found'" in {
+      doc.getAs[BSONString]("test1") mustEqual None
+      doc.getAs[String]("test1") mustEqual None
+      doc.getAsTry[BSONString]("test1") mustEqual Failure(DocumentKeyNotFound("test1"))
+      doc.getAsTry[String]("test1") mustEqual Failure(DocumentKeyNotFound("test1"))
+      doc.getAsTry[BSONBoolean]("test1") mustEqual Failure(DocumentKeyNotFound("test1"))
+      doc.getAsTry[Boolean]("test1") mustEqual Failure(DocumentKeyNotFound("test1"))
+      doc.getAsUnflattenedTry[BSONString]("test1") mustEqual Success(None)
+      doc.getAsUnflattenedTry[String]("test1") mustEqual Success(None)
+      doc.getAsUnflattenedTry[BSONBoolean]("test1") mustEqual Success(None)
+      doc.getAsUnflattenedTry[Boolean]("test1") mustEqual Success(None)
+      doc.getAs[BSONBoolean]("test1") mustEqual None
+      doc.getAs[Boolean]("test1") mustEqual None
+      doc.getAsTry[BSONBooleanLike]("test1") mustEqual Failure(DocumentKeyNotFound("test1"))
+    }
+
+    "handle 'undefined'" in {
+      doc.getAs[BSONString]("test2") mustEqual None
+      doc.getAs[String]("test2") mustEqual None
+      doc.getAsTry[BSONString]("test2") mustEqual Failure(ValueIsNull)
+      doc.getAsTry[String]("test2") mustEqual Failure(ValueIsNull)
+      doc.getAsTry[BSONBoolean]("test2") mustEqual Failure(ValueIsNull)
+      doc.getAsTry[Boolean]("test2") mustEqual Failure(ValueIsNull)
+      doc.getAsUnflattenedTry[BSONString]("test2") mustEqual Success(None)
+      doc.getAsUnflattenedTry[String]("test2") mustEqual Success(None)
+      doc.getAsUnflattenedTry[BSONBoolean]("test2") mustEqual Success(None)
+      doc.getAsUnflattenedTry[Boolean]("test2") mustEqual Success(None)
+      doc.getAs[BSONBoolean]("test2") mustEqual None
+      doc.getAs[Boolean]("test2") mustEqual None
+      doc.getAs[BSONBooleanLike]("test").get.toBoolean mustEqual false
     }
   }
 

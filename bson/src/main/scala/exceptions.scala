@@ -15,6 +15,8 @@
  */
 package reactivemongo.bson.exceptions
 
-case class DocumentKeyNotFound(name: String) extends Exception {
-  override def getMessage = s"The key '$name' could be found in this document or array"
-}
+case class DocumentKeyNotFound(name: String) extends Exception(s"The key '$name' could be found in this document or array")
+
+case object ValueIsNull extends RuntimeException("A value is null or undefined")
+
+class DeserializationException(msg: String) extends RuntimeException(msg)

@@ -15,9 +15,8 @@
  */
 package reactivemongo.bson
 
-import exceptions.DocumentKeyNotFound
+import reactivemongo.bson.exceptions.{ ValueIsNull, DocumentKeyNotFound }
 import scala.util.{ Failure, Success, Try }
-import scala.collection.generic.CanBuildFrom
 import buffer._
 import utils.Converters
 
@@ -64,6 +63,7 @@ case class BSONDocument(stream: Stream[Try[BSONElement]]) extends BSONValue {
    */
   def getUnflattenedTry(key: String): Try[Option[BSONValue]] = getTry(key) match {
     case Failure(e: DocumentKeyNotFound) => Success(None)
+    case Failure(ValueIsNull)            => Success(None)
     case Failure(e)                      => Failure(e)
     case Success(e)                      => Success(Some(e))
   }
@@ -73,11 +73,7 @@ case class BSONDocument(stream: Stream[Try[BSONElement]]) extends BSONValue {
    *
    * If there is no matching value, or the value could not be deserialized or converted, returns a `None`.
    */
-  def getAs[T](s: String)(implicit reader: BSONReader[_ <: BSONValue, T]): Option[T] = {
-    getTry(s).toOption.flatMap { element =>
-      Try(reader.asInstanceOf[BSONReader[BSONValue, T]].read(element)).toOption
-    }
-  }
+  def getAs[T](s: String)(implicit reader: BSONReader[_ <: BSONValue, T]): Option[T] = getAsTry[T](s).toOption
 
   /**
    * Returns the [[BSONValue]] associated with the given `key`, and converts it with the given implicit [[BSONReader]].
@@ -87,7 +83,7 @@ case class BSONDocument(stream: Stream[Try[BSONElement]]) extends BSONValue {
    */
   def getAsTry[T](s: String)(implicit reader: BSONReader[_ <: BSONValue, T]): Try[T] = {
     val tt = getTry(s)
-    tt.flatMap { element => Try(reader.asInstanceOf[BSONReader[BSONValue, T]].read(element)) }
+    tt.flatMap { element => reader.asInstanceOf[BSONReader[BSONValue, T]].readTry(element) }
   }
 
   /**
@@ -98,6 +94,7 @@ case class BSONDocument(stream: Stream[Try[BSONElement]]) extends BSONValue {
    */
   def getAsUnflattenedTry[T](s: String)(implicit reader: BSONReader[_ <: BSONValue, T]): Try[Option[T]] = getAsTry(s)(reader) match {
     case Failure(e: DocumentKeyNotFound) => Success(None)
+    case Failure(ValueIsNull)            => Success(None)
     case Failure(e)                      => Failure(e)
     case Success(e)                      => Success(Some(e))
   }
@@ -193,6 +190,7 @@ case class BSONArray(stream: Stream[Try[BSONValue]]) extends BSONValue {
    */
   def getUnflattenedTry(index: Int): Try[Option[BSONValue]] = getTry(index) match {
     case Failure(e: DocumentKeyNotFound) => Success(None)
+    case Failure(ValueIsNull)            => Success(None)
     case Failure(e)                      => Failure(e)
     case Success(e)                      => Success(Some(e))
   }
@@ -202,11 +200,7 @@ case class BSONArray(stream: Stream[Try[BSONValue]]) extends BSONValue {
    *
    * If there is no matching value, or the value could not be deserialized or converted, returns a `None`.
    */
-  def getAs[T](index: Int)(implicit reader: BSONReader[_ <: BSONValue, T]): Option[T] = {
-    getTry(index).toOption.flatMap { element =>
-      Try(reader.asInstanceOf[BSONReader[BSONValue, T]].read(element)).toOption
-    }
-  }
+  def getAs[T](index: Int)(implicit reader: BSONReader[_ <: BSONValue, T]): Option[T] = getAsTry[T](index).toOption
 
   /**
    * Gets the [[BSONValue]] at the given `index`, and converts it with the given implicit [[BSONReader]].
@@ -216,7 +210,7 @@ case class BSONArray(stream: Stream[Try[BSONValue]]) extends BSONValue {
    */
   def getAsTry[T](index: Int)(implicit reader: BSONReader[_ <: BSONValue, T]): Try[T] = {
     val tt = getTry(index)
-    tt.flatMap { element => Try(reader.asInstanceOf[BSONReader[BSONValue, T]].read(element)) }
+    tt.flatMap { element => reader.asInstanceOf[BSONReader[BSONValue, T]].readTry(element) }
   }
 
   /**
@@ -227,6 +221,7 @@ case class BSONArray(stream: Stream[Try[BSONValue]]) extends BSONValue {
    */
   def getAsUnflattenedTry[T](index: Int)(implicit reader: BSONReader[_ <: BSONValue, T]): Try[Option[T]] = getAsTry(index)(reader) match {
     case Failure(e: DocumentKeyNotFound) => Success(None)
+    case Failure(ValueIsNull)            => Success(None)
     case Failure(e)                      => Failure(e)
     case Success(e)                      => Success(Some(e))
   }
