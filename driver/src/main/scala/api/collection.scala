@@ -156,7 +156,7 @@ trait CollectionMetaCommands {
    * @param to The new name of this collection.
    * @param dropExisting If a collection of name `to` already exists, then drops that collection before renaming this one.
    */
-  def rename(to: String, dropExisting: Boolean = false)(implicit ec: ExecutionContext): Future[Boolean] = db.command(new RenameCollection(db.name + "." + name, db.name + "." + to, to, dropExisting))
+  def rename(to: String, dropExisting: Boolean = false)(implicit ec: ExecutionContext): Future[Boolean] = db.command(new RenameCollection(db.name + "." + name, db.name + "." + to, dropExisting))
 
   /**
    * Returns various information about this collection.
