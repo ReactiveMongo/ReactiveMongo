@@ -109,7 +109,7 @@ trait DBMetaCommands {
         "name" -> BSONRegex("^[^\\$]+$", "") // strip off any indexes
         ))
       .cursor(collectionNameReader, ec)
-      .toList
+      .collect[List]()
   }
 }
 

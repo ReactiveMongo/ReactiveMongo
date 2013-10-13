@@ -43,10 +43,10 @@ class CollectionSpec extends Specification with Tags {
 
     // Empty capped need to be enabled with enableTestCommands
     // see: http://docs.mongodb.org/manual/reference/command/emptycapped/#dbcmd.emptycapped
-    "empty the capped collection" in {
+    /*"empty the capped collection" in {
       Await.result(collection.emptyCapped(), timeout) mustEqual true
       Await.result(db.command(Count(collection.name)), timeout) mustEqual 0
-    } tag ("testCommands")
+    } tag ("testCommands")*/
 
     "drop it" in {
       Await.result(collection.drop(), timeout) mustEqual true

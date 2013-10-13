@@ -15,389 +15,132 @@
  */
 package reactivemongo.api
 
-import reactivemongo.core.iteratees._
-import reactivemongo.core.protocol._
-import reactivemongo.core.netty.BufferSequence
-import reactivemongo.utils.ExtendedFutures._
-import reactivemongo.utils.LazyLogger
-import play.api.libs.iteratee._
-import scala.concurrent.{ ExecutionContext, Future }
-import scala.util.{ Failure, Success }
+import scala.collection.generic.CanBuildFrom
+import scala.concurrent.ExecutionContext
+import scala.concurrent.Future
+
+import play.api.libs.iteratee.{ Enumeratee, Enumerator, Iteratee }
 import reactivemongo.api.collections.BufferReader
+import reactivemongo.core.iteratees.{ CustomEnumeratee, CustomEnumerator }
+import reactivemongo.core.netty.BufferSequence
+import reactivemongo.core.protocol.GetMore
+import reactivemongo.core.protocol.KillCursors
+import reactivemongo.core.protocol.Query
+import reactivemongo.core.protocol.QueryFlags
+import reactivemongo.core.protocol.ReplyDocumentIterator
+import reactivemongo.core.protocol.RequestMaker
+import reactivemongo.core.protocol.Response
+import reactivemongo.utils.LazyLogger
 
-/**
- * Allows to fetch the next documents matching a query.
- *
- * Please that after invoking some Cursor methods, this Cursor instance should not be reused as it may cause unexpected behavior.
- *
- * Example:
- *
- * {{{
- * object Samples {
- *
- *   val connection = MongoConnection(List("localhost"))
- *
- *   // Gets a reference to the database "plugin"
- *   val db = connection("plugin")
- *
- *   // Gets a reference to the collection "acoll"
- *   // By default, you get a BSONCollection.
- *   val collection = db("acoll")
- *
- *   def listDocs() = {
- *     // Select only the documents which field 'firstName' equals 'Jack'
- *     val query = BSONDocument("firstName" -> "Jack")
- *     // select only the field 'lastName'
- *     val filter = BSONDocument(
- *       "lastName" -> 1,
- *       "_id" -> 0)
- *
- *     // Get a cursor of BSONDocuments
- *     val cursor = collection.find(query, filter).cursor[BSONDocument]
- *     // Let's enumerate this cursor and print a readable representation of each document in the response
- *     cursor.enumerate.apply(Iteratee.foreach { doc =>
- *       println("found document: " + BSONDocument.pretty(doc))
- *     })
- *
- *     // Or, the same with getting a list
- *     val cursor2 = collection.find(query, filter).cursor[BSONDocument]
- *     val futureList = cursor.toList
- *     futureList.map { list =>
- *       list.foreach { doc =>
- *         println("found document: " + BSONDocument.pretty(doc))
- *       }
- *     }
- *   }
- * }
- * }}}
- *
- * It is worth diving into the [[https://github.com/playframework/Play20/wiki/Iteratees Play! 2.0 Iteratee documentation]].
- *
- * @tparam T the type of the matched documents. An implicit [[reactivemongo.api.BufferReader]][T] typeclass for handling it has to be in the scope.
- *
- */
 trait Cursor[T] {
-  import Cursor.logger
-  /** An iterator on the last fetched documents. */
-  val iterator: Iterator[T]
-  def nDocs: Int
-  def offset: Option[Int]
-
-  def cursorId: Future[Long]
-
-  def connection: Future[MongoConnection]
-
-  /** Gets the next instance of that cursor. */
-  def next: Future[Cursor[T]]
-
-  /** Tells if another instance of cursor can be fetched. */
-  def hasNext: Boolean
-
-  import scala.collection.generic.CanBuildFrom
+  /**
+   * Produces an Enumerator of documents.
+   * Given the `stopOnError` parameter, this Enumerator may stop on any non-fatal exception, or skip and continue.
+   *
+   * @param maxDocs Enumerate up to `maxDocs` documents.
+   * @param stopOnError States if the produced Enumerator may stop on non-fatal exception.
+   *
+   * @return an Enumerator of documents.
+   */
+  def enumerate(maxDocs: Int = Int.MaxValue, stopOnError: Boolean = false)(implicit ctx: ExecutionContext): Enumerator[T]
 
   /**
-   * Enumerates this cursor.
-   * The reuse of this cursor may cause unexpected behavior.
+   * Produces an Enumerator of Iterator of documents.
+   * Given the `stopOnError` parameter, this Enumerator may stop on any non-fatal exception, or skip and continue.
    *
-   * Example:
-   * {{{
-   * // Get a cursor of BSONDocuments
-   * val cursor = collection.find(query, filter).cursor
-   * // Let's enumerate this cursor and print a readable representation of each document in the response
-   * cursor.enumerate.apply(Iteratee.foreach { doc =>
-   *   println("found document: " + BSONDocument.pretty(doc))
-   * })
-   * }}}
+   * @param maxDocs Enumerate up to `maxDocs` documents.
+   * @param stopOnError States if the produced Enumerator may stop on non-fatal exception.
    *
-   * It is worth diving into the [[https://github.com/playframework/Play20/wiki/Iteratees Play! 2.0 Iteratee documentation]].
-   *
+   * @return an Enumerator of Iterators of documents.
    */
-  def enumerate()(implicit ctx: ExecutionContext): Enumerator[T] = {
-    val enum = enumerateBulks
-    enum.flatMap { it =>
-      if (it.hasNext)
-        CustomEnumerator.SEnumerator.apply(it.next) { _ => if (it.hasNext) Some(Future(it.next)) else None }
-      else Enumerator()
-    }
-  }
-
-  def enumerate(upTo: Int)(implicit ctx: ExecutionContext): Enumerator[T] = {
-    enumerateBulks(upTo).flatMap { it =>
-      if (it.hasNext)
-        CustomEnumerator.SEnumerator.apply(it.next) { _ => if (it.hasNext) Some(Future(it.next)) else None }
-      else Enumerator()
-    }
-  }
+  def enumerateBulks(maxDocs: Int = Int.MaxValue, stopOnError: Boolean = false)(implicit ctx: ExecutionContext): Enumerator[Iterator[T]]
 
   /**
-   * Cursor enumerator.
-   * The reuse of this cursor may cause unexpected behavior.
+   * Produces an Enumerator of responses from the database.
+   * Given the `stopOnError` parameter, this Enumerator may stop on any non-fatal exception, or skip and continue.
    *
-   * Low-level API, consider enumerate() or enumerateBulks() instead.
+   * @param maxDocs Enumerate up to `maxDocs` documents.
+   * @param stopOnError States if the produced Enumerator may stop on non-fatal exception.
    *
+   * @return an Enumerator of Responses.
    */
-   def enumerateCursor()(implicit ctx: ExecutionContext): Enumerator[Cursor[T]] = {
-    val enum: Enumerator[Cursor[T]] =
-      if (hasNext)
-        CustomEnumerator.SEnumerator(this)(
-          next = { cursor =>
-            if (cursor.hasNext)
-              Some(cursor.next)
-            else None
-          })
-      else Enumerator.eof
-
-    enum &> Enumeratee.filterNot(_.iterator.isEmpty) &> Enumeratee.onIterateeDone(() => {
-      logger.debug("iteratee is done, closing cursor...")
-      close()
-    })
-  }
-
-  /**
-   * Bulk enumerator.
-   * The reuse of this cursor may cause unexpected behavior.
-   *
-   * Much faster when dealing with large collections.
-   */
-  def enumerateBulks()(implicit ctx: ExecutionContext): Enumerator[Iterator[T]] = {
-    enumerateCursor &> Enumeratee.map { _.iterator }
-  }
-
-  /**
-   * Bulk enumerator.
-   * The reuse of this cursor may cause unexpected behavior.
-   *
-   * Much faster when dealing with large collections.
-   *
-   * @param limit Stop enumerating when at least `limit` documents have been received.
-   */
-  def enumerateBulks(limit: Int)(implicit ctx: ExecutionContext): Enumerator[Iterator[T]] = {
-    enumerateCursor &> CustomEnumeratee.TakeTo { cursor =>
-      !cursor.offset.isDefined || cursor.offset.get + cursor.nDocs < limit
-    } &> Enumeratee.map { cursor =>
-      if (cursor.offset.exists(offset => (offset + cursor.nDocs) > limit))
-        cursor.iterator.take(limit - cursor.offset.get)
-      else cursor.iterator
-    }
-  }
+  def enumerateResponses(maxDocs: Int = Int.MaxValue, stopOnError: Boolean = false)(implicit ctx: ExecutionContext): Enumerator[Response]
 
   /**
    * Collects all the documents into a collection of type `M[T]`.
-   * The reuse of this cursor may cause unexpected behavior.
+   * Given the `stopOnError` parameter (which defaults to true), the resulting Future may fail if any
+   * non-fatal exception occurs. If set to false, all the documents that caused exceptions are skipped.
+   *
+   * @param maxDocs Collect up to `maxDocs` documents.
+   * @param stopOnError States if the Future should fail if any non-fatal exception occurs.
    *
    * Example:
    * {{{
-   * val cursor2 = collection.find(query, filter).cursor
-   * val futureList = cursor.toList
-   * futureList.map { list =>
-   *   list.foreach { doc =>
-   *     println("found document: " + BSONDocument.pretty(doc))
-   *   }
-   * }
-   * }}}
-   *
-   * @tparam M the type of the returned collection.
-   */
-  def collect[M[_]]()(implicit cbf: CanBuildFrom[M[_], T, M[T]], ec: ExecutionContext): Future[M[T]] = {
-    enumerateBulks |>>> Iteratee.fold(cbf.apply) { (builder, iterator: Iterator[T]) =>
-      builder ++= iterator
-    }.map(_.result)
-  }
-
-  /**
-   * Collects all the documents into a collection of type `M[T]`.
-   * The reuse of this cursor may cause unexpected behavior.
-   *
-   * Example:
-   * {{{
-   * val cursor2 = collection.find(query, filter).cursor
-   * // gather the first 3 documents
-   * val futureList = cursor.collect[List](3)
-   * }}}
-   *
-   * @tparam M the type of the returned collection.
-   * @tparam T the type of the matched documents. An implicit [[reactivemongo.bson.handlers.RawBSONReader]][T] typeclass for handling it has to be in the scope.
-   * @param upTo The maximum size of this collection.
-   */
-  def collect[M[_]](upTo: Int)(implicit cbf: CanBuildFrom[M[_], T, M[T]], ec: ExecutionContext): Future[M[T]] = {
-    enumerateBulks(upTo) |>>> Iteratee.fold(cbf.apply) { (builder, iterator: Iterator[T]) =>
-      builder ++= iterator
-    }.map(_.result)
-  }
-
-  /**
-   * Collects all the documents into a collection of type `M[T]`.
-   * The reuse of this cursor may cause unexpected behavior.
-   *
-   * Example:
-   * {{{
-   * val cursor2 = collection.find(query, filter).cursor
-   * val list = cursor2.toList
+   * val cursor = collection.find(query, filter).cursor[BSONDocument]
+   * // return the 3 first documents in a Vector[BSONDocument].
+   * val list = cursor2.collect[Vector](3)
    * }}}
    */
-  def toList()(implicit ctx: ExecutionContext): Future[List[T]] = collect[List]()
+  def collect[M[_]](upTo: Int = Int.MaxValue, stopOnError: Boolean = true)(implicit cbf: CanBuildFrom[M[_], T, M[T]], ec: ExecutionContext): Future[M[T]]
 
   /**
-   * Collects all the documents into a collection of type `M[T]`.
-   * The reuse of this cursor may cause unexpected behavior.
+   * Collects all the documents into a `List[T]`.
+   * Given the `stopOnError` parameter (which defaults to true), the resulting Future may fail if any
+   * non-fatal exception occurs. If set to false, all the documents that caused exceptions are skipped.
+   *
+   * @param maxDocs Collect up to `maxDocs` documents.
+   * @param stopOnError States if the Future should fail if any non-fatal exception occurs.
    *
    * Example:
    * {{{
-   * val cursor2 = collection.find(query, filter).cursor
+   * val cursor = collection.find(query, filter).cursor[BSONDocument]
    * // return the 3 first documents in a list.
    * val list = cursor2.toList(3)
    * }}}
    */
-  def toList(upTo: Int)(implicit ctx: ExecutionContext): Future[List[T]] = collect[List](upTo)
+  @deprecated("consider using collect[List] instead", "0.10.0")
+  def toList(upTo: Int = Int.MaxValue, stopOnError: Boolean = true)(implicit ctx: ExecutionContext): Future[List[T]] = collect[List](upTo, stopOnError)
 
   /**
-   * Gets the first returned document, if any.
+   * Gets the first document matching the query, if any.
+   * The resulting Future may fail if any non-fatal exception occurs (for example, while deserializing the document).
    *
    * Example:
    * {{{
-   * val cursor2 = collection.find(query, filter).cursor
-   * val maybeOneDoc = cursor2.headOption
+   * val cursor = collection.find(query, filter).cursor[BSONDocument]
+   * // return the 3 first documents in a list.
+   * val first: Future[Option[BSONDocument]] = cursor2.headOption
    * }}}
    */
-  def headOption()(implicit ec: ExecutionContext): Future[Option[T]] = {
-    collect[Iterable](1).map(_.headOption)
-  }
+  def headOption(implicit ctx: ExecutionContext): Future[Option[T]] = collect[Iterable](1, true).map(_.headOption)
 
-  /** Explicitly closes that cursor. It cannot be used again. */
-  def close()
+  /**
+   * Produces an Enumerator of responses from the database.
+   * An Enumeratee for error handling should be used to prevent silent failures.
+   * Consider using `enumerateResponses` instead.
+   *
+   * @param maxDocs Enumerate up to `maxDocs` documents.
+   *
+   * @return an Enumerator of Responses.
+   */
+  def rawEnumerateResponses(maxDocs: Int = Int.MaxValue)(implicit ctx: ExecutionContext): Enumerator[Response]
 }
 
-class DefaultCursor[T](response: Response, private[api] val mongoConnection: MongoConnection, private[api] val query: Query, private[api] val originalRequest: BufferSequence, private[api] val failoverStrategy: FailoverStrategy)(implicit reader: BufferReader[T], ctx: ExecutionContext) extends Cursor[T] {
-  import Cursor.logger
-  logger.debug("making default cursor instance from response " + response + ", returned=" + response.reply.numberReturned)
+class FlattenedCursor[T](cursor: Future[Cursor[T]]) extends Cursor[T] {
+  def enumerate(maxDocs: Int = Int.MaxValue, stopOnError: Boolean = false)(implicit ctx: ExecutionContext): Enumerator[T] =
+    Enumerator.flatten(cursor.map(_.enumerate(maxDocs, stopOnError)))
 
-  lazy val iterator: Iterator[T] = ReplyDocumentIterator(response.reply, response.documents)
-  def nDocs = response.reply.numberReturned
-  def offset = Some(response.reply.startingFrom)
+  def enumerateBulks(maxDocs: Int = Int.MaxValue, stopOnError: Boolean = false)(implicit ctx: ExecutionContext): Enumerator[Iterator[T]] =
+    Enumerator.flatten(cursor.map(_.enumerateBulks(maxDocs, stopOnError)))
 
-  def cursorId = Future(response.reply.cursorID)
-  def connection = Future(mongoConnection)
+  def enumerateResponses(maxDocs: Int = Int.MaxValue, stopOnError: Boolean = false)(implicit ctx: ExecutionContext): Enumerator[Response] =
+    Enumerator.flatten(cursor.map(_.enumerateResponses(maxDocs, stopOnError)))
 
-  def next: Future[DefaultCursor[T]] = {
-    if (response.reply.cursorID != 0) {
-      val op = GetMore(query.fullCollectionName, query.numberToReturn, response.reply.cursorID)
-      logger.debug("cursor: calling next on " + response.reply.cursorID + ", op=" + op)
-      Failover(RequestMaker(op).copy(channelIdHint = Some(response.info.channelId)), mongoConnection, failoverStrategy).future.map { r => logger.debug("from " + response + " to " + r); new DefaultCursor(r, mongoConnection, query, originalRequest, failoverStrategy) }
-    } else {
-      logger.debug("throwing no such element exception")
-      Future.failed(new NoSuchElementException())
-    }
-  }
+  def collect[M[_]](upTo: Int, stopOnError: Boolean)(implicit cbf: CanBuildFrom[M[_], T, M[T]], ec: ExecutionContext): Future[M[T]] =
+    cursor.flatMap { _.collect[M](upTo, stopOnError) }
 
-  def hasNext: Boolean = response.reply.cursorID != 0
-
-  def regenerate = {
-    logger.debug("regenerating")
-    val requestMaker = RequestMaker(query, originalRequest)
-    Failover(requestMaker, mongoConnection, failoverStrategy).future.map { response =>
-      new DefaultCursor(response, mongoConnection, query, originalRequest, failoverStrategy)
-    }
-  }
-
-  def close() {
-    if (response.reply.cursorID != 0) {
-      Cursor.logger.debug("sending killcursor on id = " + response.reply.cursorID)
-      connection.map(_.send(RequestMaker(KillCursors(Set(response.reply.cursorID)))))
-    }
-  }
-}
-
-/**
- * A [[reactivemongo.api.Cursor]] that holds no document, and which the next cursor is given in the constructor.
- */
-class FlattenedCursor[T](futureCursor: Future[Cursor[T]])(implicit ctx: ExecutionContext) extends Cursor[T] {
-  import Cursor.logger
-
-  logger.debug("making flattened cursor instance")
-
-  val iterator: Iterator[T] = Iterator.empty
-  def nDocs = 0
-  def offset = None
-
-  def cursorId = futureCursor.flatMap(_.cursorId)
-
-  def connection = futureCursor.flatMap(_.connection)
-
-  def next = futureCursor
-
-  def hasNext = true
-
-  def close() {
-    logger.debug("FlattenedCursor closing")
-    futureCursor.map(_.close())
-  }
-}
-
-private[api] class TailableController() {
-  private var isStopped = false
-
-  def stopped = isStopped
-
-  def stop() {
-    isStopped = true
-  }
-
-  override def toString = {
-    "TailableController(" + isStopped + ")"
-  }
-}
-
-class TailableCursor[T](cursor: DefaultCursor[T], private val controller: TailableController = new TailableController())(implicit ctx: ExecutionContext) extends Cursor[T] {
-  import Cursor.logger
-
-  logger.debug("making tailable cursor instance")
-
-  val iterator: Iterator[T] = cursor.iterator
-  def nDocs = cursor.nDocs
-  def offset = None
-
-  def connection = cursor.connection
-
-  def cursorId = cursor.cursorId
-
-  def next = {
-    logger.debug("calling next on tailable cursor, controller=" + controller)
-    if (controller.stopped)
-      Future.failed(new NoSuchElementException())
-    else {
-      val fut = cursor.next.recoverWith {
-        case _ =>
-          logger.debug("regenerating cursor")
-          val f = DelayedFuture(500, cursor.mongoConnection.actorSystem).flatMap(_ => cursor.regenerate)
-          f.onComplete {
-            case Failure(e) => e.printStackTrace()
-            case Success(t) => logger.debug("regenerate is ok")
-          }
-          f
-      }.map(new TailableCursor(_, controller))
-      fut.onComplete {
-        case Failure(e) => e.printStackTrace()
-        case Success(t) => logger.debug("next is ok")
-      }
-      fut
-    }
-  }
-
-  def hasNext = {
-    logger.debug("calling hasNext on tailable cursor")
-    !controller.stopped
-  }
-
-  def close() {
-    logger.debug("TailableCursor closing")
-    cursor.cursorId.map { id =>
-      controller.stop()
-      if (id != 0) {
-        Cursor.logger.debug("sending killcursor on id = " + id)
-        connection.map(_.send(RequestMaker(KillCursors(Set(id)))))
-      }
-    }
-  }
+  def rawEnumerateResponses(maxDocs: Int = Int.MaxValue)(implicit ctx: ExecutionContext): Enumerator[Response] =
+    Enumerator.flatten(cursor.map(_.rawEnumerateResponses(maxDocs)))
 }
 
 object Cursor {
@@ -406,13 +149,110 @@ object Cursor {
   /**
    * Flattens the given future [[reactivemongo.api.Cursor]] to a [[reactivemongo.api.FlattenedCursor]].
    */
-  def flatten[T](futureCursor: Future[Cursor[T]])(implicit ctx: ExecutionContext) = new FlattenedCursor(futureCursor)
+  def flatten[T](future: Future[Cursor[T]]) = new FlattenedCursor(future)
+}
 
-  def nextElement[T](cursor: Cursor[T])(implicit ec: ExecutionContext): Future[Option[(Cursor[T], Option[T])]] = {
-    if (cursor.iterator.hasNext)
-      Future(Some((cursor, Some(cursor.iterator.next()))))
-    else if (cursor.hasNext)
-      cursor.next.map(c => Some((c, None)))
-    else Future(None)
+class DefaultCursor[T](
+    query: Query,
+    documents: BufferSequence,
+    mongoConnection: MongoConnection,
+    failoverStrategy: FailoverStrategy)(implicit reader: BufferReader[T]) extends Cursor[T] {
+  import Cursor.logger
+
+  private def next(response: Response)(implicit ctx: ExecutionContext): Option[Future[Response]] = {
+    if (response.reply.cursorID != 0) {
+      val op = GetMore(query.fullCollectionName, query.numberToReturn, response.reply.cursorID)
+      logger.trace("[Cursor] Calling next on " + response.reply.cursorID + ", op=" + op)
+      Some(Failover(RequestMaker(op).copy(channelIdHint = Some(response.info.channelId)), mongoConnection, failoverStrategy).future)
+    } else {
+      logger.error("[Cursor] Call to next() but cursorID is 0, there is probably a bug")
+      None
+    }
+  }
+
+  @inline
+  private def hasNext(response: Response): Boolean = response.reply.cursorID != 0
+
+  @inline
+  private def hasNext(response: Response, maxDocs: Int): Boolean = {
+    response.reply.cursorID != 0 && (response.reply.numberReturned + response.reply.startingFrom) < maxDocs
+  }
+
+  @inline
+  private def makeIterator(response: Response) = ReplyDocumentIterator(response.reply, response.documents)
+
+  @inline
+  private def makeRequest(implicit ctx: ExecutionContext): Future[Response] =
+    Failover(RequestMaker(query, documents), mongoConnection, failoverStrategy).future
+
+  @inline
+  private def isTailable = (query.flags & QueryFlags.TailableCursor) == QueryFlags.TailableCursor
+
+  def simpleCursorEnumerateResponses(maxDocs: Int = Int.MaxValue)(implicit ctx: ExecutionContext): Enumerator[Response] = {
+    Enumerator.flatten(makeRequest.map(new CustomEnumerator.SEnumerator(_)(
+      next = response => if (hasNext(response, maxDocs)) next(response) else None,
+      cleanUp = response =>
+        if (response.reply.cursorID != 0) {
+          logger.debug(s"[Cursor] Clean up ${response.reply.cursorID}, sending KillCursor")
+          mongoConnection.send(RequestMaker(KillCursors(Set(response.reply.cursorID))))
+        } else logger.trace(s"[Cursor] Cursor exhausted (${response.reply.cursorID})"))))
+  }
+
+  def tailableCursorEnumerateResponses(maxDocs: Int = Int.MaxValue)(implicit ctx: ExecutionContext): Enumerator[Response] = {
+    Enumerator.flatten(makeRequest.map { response =>
+      new CustomEnumerator.SEnumerator((response, maxDocs))(
+        next = current => {
+          if (maxDocs - current._1.reply.numberReturned > 0) {
+            val nextResponse =
+              if (hasNext(current._1)) {
+                next(current._1)
+              } else {
+                logger.debug("[Tailable Cursor] Current cursor exhausted, renewing...")
+                Some(makeRequest)
+              }
+            nextResponse.map(_.map((_, maxDocs - current._1.reply.numberReturned)))
+          } else None
+        },
+        cleanUp = current =>
+          if (current._1.reply.cursorID != 0) {
+            logger.debug(s"[Tailable Cursor] Closing  cursor ${current._1.reply.cursorID}, cleanup")
+            mongoConnection.send(RequestMaker(KillCursors(Set(current._1.reply.cursorID))))
+          } else logger.trace(s"[Tailable Cursor] Cursor exhausted (${current._1.reply.cursorID})"))
+    }).map(_._1)
+  }
+
+  def rawEnumerateResponses(maxDocs: Int = Int.MaxValue)(implicit ctx: ExecutionContext): Enumerator[Response] =
+    if (isTailable) tailableCursorEnumerateResponses(maxDocs) else simpleCursorEnumerateResponses(maxDocs)
+
+  def enumerateResponses(maxDocs: Int = Int.MaxValue, stopOnError: Boolean = false)(implicit ctx: ExecutionContext): Enumerator[Response] =
+    rawEnumerateResponses(maxDocs) &> {
+      if (stopOnError)
+        CustomEnumeratee.stopOnError
+      else CustomEnumeratee.continueOnError
+    }
+
+  def enumerateBulks(maxDocs: Int = Int.MaxValue, stopOnError: Boolean = false)(implicit ctx: ExecutionContext): Enumerator[Iterator[T]] =
+    enumerateResponses(maxDocs, stopOnError) &> Enumeratee.map(response => ReplyDocumentIterator(response.reply, response.documents))
+
+  def enumerate(maxDocs: Int = Int.MaxValue, stopOnError: Boolean = false)(implicit ctx: ExecutionContext): Enumerator[T] =
+    enumerateResponses(maxDocs, stopOnError) &> Enumeratee.mapFlatten { response =>
+      val iterator = ReplyDocumentIterator(response.reply, response.documents)
+
+      CustomEnumerator.SEnumerator(iterator.next) { _ =>
+        if (iterator.hasNext)
+          Some(Future(iterator.next))
+        else None
+      }
+    }
+
+  def collect[M[_]](upTo: Int = Int.MaxValue, stopOnError: Boolean = true)(implicit cbf: CanBuildFrom[M[_], T, M[T]], ctx: ExecutionContext): Future[M[T]] = {
+    (enumerateResponses(upTo, stopOnError) |>>> Iteratee.fold(cbf.apply) { (builder, response) =>
+      logger.trace(s"[collect] got response $response")
+      val iterator =
+        if (upTo < response.reply.numberReturned + response.reply.startingFrom)
+          makeIterator(response).take(upTo - response.reply.startingFrom)
+        else makeIterator(response)
+      builder ++= iterator
+    }).map(_.result)
   }
 }

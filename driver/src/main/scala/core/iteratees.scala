@@ -20,45 +20,51 @@ import play.api.libs.iteratee.Enumeratee.CheckDone
 import scala.concurrent._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{ Failure, Success }
+import scala.util.control.NonFatal
 
 object CustomEnumeratee {
-  object TakeTo {
-    def apply[E](p: E => Boolean): Enumeratee[E, E] = new TakeTo(p)
+  trait RecoverFromErrorFunction {
+    def apply[E, A](throwable: Throwable, input: Input[E], continue: () => Iteratee[E, A]): Iteratee[E, A]
   }
-
-  /**
-   * Take elements while the predicate is true, and stops including the last evaluated element.
-   *
-   * More formally, takes all the elements while the predicate is valid and the first for which the predicate returns false.
-   */
-  class TakeTo[E](p: E => Boolean) extends Enumeratee[E, E] {
-    def step[A](k: K[E, A]): K[E, Iteratee[E, A]] = {
-      case in @ Input.El(e) =>
-        new CheckDone[E, E] {
-          def continue[A](k: K[E, A]) =
-            if (!p(e)) {
-              Done(Cont(k), in)
-            } else {
-              Cont(step(k))
-            }
-        } &> k(in)
-
-      case in @ Input.Empty =>
-        new CheckDone[E, E] { def continue[A](k: K[E, A]) = Cont(step(k)) } &> k(in)
-
-      case Input.EOF => Done(Cont(k), Input.EOF)
+  object RecoverFromErrorFunction {
+    object StopOnError extends RecoverFromErrorFunction {
+      def apply[E, A](throwable: Throwable, input: Input[E], continue: () => Iteratee[E, A]): Iteratee[E, A] =
+        Error(throwable.getMessage(), input)
     }
-
-    def continue[A](k: K[E, A]) = Cont(step(k))
-
-    override def applyOn[A](it: Iteratee[E, A]): Iteratee[E, Iteratee[E, A]] =
-      it.pureFlatFold {
-        case Step.Cont(k) => continue(k)
-        case _            => Done(it, Input.Empty)
-      }
-
+    object ContinueOnError extends RecoverFromErrorFunction {
+      def apply[E, A](throwable: Throwable, input: Input[E], continue: () => Iteratee[E, A]): Iteratee[E, A] =
+        continue()
+    }
   }
-
+  def stopOnError[E]: Enumeratee[E, E] = recover(RecoverFromErrorFunction.StopOnError)
+  def continueOnError[E]: Enumeratee[E, E] = recover(RecoverFromErrorFunction.ContinueOnError)
+  def recover[E](ƒ: RecoverFromErrorFunction)(implicit ec: ExecutionContext): Enumeratee[E, E] = {
+    new Enumeratee[E, E] {
+      def applyOn[A](it: Iteratee[E, A]): Iteratee[E, Iteratee[E, A]] = {
+        def step(it: Iteratee[E, A])(input: Input[E]): Iteratee[E, Iteratee[E, A]] = input match {
+          case in @ (Input.El(_) | Input.Empty) =>
+            val next: Future[Iteratee[E, Iteratee[E, A]]] = it.pureFlatFold[E, Iteratee[E, A]] {
+              case Step.Cont(k) =>
+                val n = k(in)
+                n.pureFlatFold[E, Iteratee[E, A]] {
+                  case Step.Cont(k) => Cont(step(n))
+                  case _            => Done(n, Input.Empty)
+                }
+              case other => Done(other.it, in)
+            }.unflatten.map({ s =>
+              s.it
+            }).recover({
+              case e: Throwable =>
+                ƒ(e, in, () => Cont(step(it)))
+            })
+            Iteratee.flatten(next)
+          case Input.EOF =>
+            Done(it, Input.Empty)
+        }
+        Cont(step(it))
+      }
+    }
+  }
 }
 
 object CustomEnumerator {
@@ -73,17 +79,17 @@ object CustomEnumerator {
     promise.future
   }
 
-  class SEnumerator[C](zero: C)(next: C => Option[Future[C]])(implicit ec: ExecutionContext) extends Enumerator[C] {
+  class SEnumerator[C](zero: C)(next: C => Option[Future[C]], cleanUp: C => Unit)(implicit ec: ExecutionContext) extends Enumerator[C] {
     def apply[A](iteratee: Iteratee[C, A]): Future[Iteratee[C, A]] = {
       val promise = Promise[Iteratee[C, A]]
 
       def loop(current: C, iteratee: Iteratee[C, A]): Unit = {
         iteratee.fold {
-          case Step.Cont(ƒ) =>
+          case step @ Step.Cont(ƒ) =>
             next(current) match {
               case Some(future) =>
                 val f = intermediatePromise(future.map { c =>
-                  (c, ƒ(Input.El(c)))
+                  c -> ƒ(Input.El(c))
                 })
                 f.onComplete {
                   case Success((c, i)) =>
@@ -91,19 +97,22 @@ object CustomEnumerator {
                   case Failure(e) =>
                     promise.failure(e)
                 }
-                f
+                f.map(_._2)
               case None =>
                 val it = ƒ(Input.Empty)
+                cleanUp(current)
                 // enumerator is done, nothing to do
                 promise.success(it)
                 Future(it)
             }
           case Step.Done(a, e) =>
             val done = Done(a, e)
+            cleanUp(current)
             promise.success(done)
             Future(done)
           case Step.Error(msg, e) =>
             val error = Error(msg, e)
+            cleanUp(current)
             promise.success(error)
             Future(error)
         }
@@ -128,7 +137,7 @@ object CustomEnumerator {
     }
   }
   object SEnumerator {
-    def apply[C](zero: C)(next: C => Option[Future[C]])(implicit ec: ExecutionContext) = new SEnumerator(zero)(next)
+    def apply[C](zero: C)(next: C => Option[Future[C]])(implicit ec: ExecutionContext) = new SEnumerator(zero)(next, _ => ())
   }
 
   /*

@@ -323,7 +323,7 @@ trait GenericQueryBuilder[Structure, Reader[_], Writer[_]] extends GenericHandle
     StructureBufferWriter.write(structure, buffer)
   }
 
-  /**
+  /* /**
    * Sends this query and gets a [[Cursor]] of instances of `T`.
    *
    * An implicit `Reader[T]` must be present in the scope.
@@ -345,6 +345,21 @@ trait GenericQueryBuilder[Structure, Reader[_], Writer[_]] extends GenericHandle
         new TailableCursor(cursor)
       else cursor
     })
+  } */
+  
+  
+  def cursor[T](implicit reader: Reader[T] = structureReader, ec: ExecutionContext): Cursor[T] = {
+    val documents = BufferSequence {
+      val buffer = write(merge, ChannelBufferWritableBuffer())
+      projectionOption.map { projection =>
+        write(projection, buffer)
+      }.getOrElse(buffer).buffer
+    }
+
+    val op = Query(options.flagsN, collection.fullCollectionName, options.skipN, options.batchSizeN)
+    val requestMaker = RequestMaker(op, documents)
+    
+    new DefaultCursor(op, documents, collection.db.connection, failover)(BufferReaderInstance(reader))
   }
 
   /**

@@ -240,7 +240,7 @@ class GridFS[Structure, Reader[_], Writer[_]](db: DB with DBMetaCommands, prefix
           "$lte" -> BSONInteger(file.length / file.chunkSize + (if (file.length % file.chunkSize > 0) 1 else 0)))),
       "$orderby" -> BSONDocument(
         "n" -> BSONInteger(1)))
-
+/*
     val cursor = chunks[BSONCollection].find(selector).cursor
     cursor.enumerate &> (Enumeratee.map { doc =>
       doc.get("data").flatMap {
@@ -253,8 +253,9 @@ class GridFS[Structure, Reader[_], Writer[_]](db: DB with DBMetaCommands, prefix
       }.getOrElse {
         logger.error("not a chunk! failed assertion: data field is missing")
         throw new RuntimeException("not a chunk! failed assertion: data field is missing")
-      }
-    })
+       }
+    })*/
+        ???
   }
 
   /** Reads the given file and writes its contents to the given OutputStream */
