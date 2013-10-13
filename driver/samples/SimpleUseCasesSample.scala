@@ -40,13 +40,13 @@ object SimpleUseCases {
     // get a Cursor[BSONDocument]
     val cursor = collection.find(query, filter).cursor[BSONDocument]
     // let's enumerate this cursor and print a readable representation of each document in the response
-    cursor.enumerate.apply(Iteratee.foreach { doc =>
+    cursor.enumerate().apply(Iteratee.foreach { doc =>
       println("found document: " + BSONDocument.pretty(doc))
     })
 
     // or, the same with getting a list
     val cursor2 = collection.find(query, filter).cursor[BSONDocument]
-    val futurelist = cursor2.toList
+    val futurelist = cursor2.collect[List]()
     futurelist.onSuccess {
       case list =>
         val names = list.map(_.getAs[String]("lastName").get)
@@ -84,7 +84,7 @@ object SimpleUseCases {
         cursor[BSONDocument]
 
     // get a future list of BSONDocuments
-    val futurelist = cursor.toList
+    val futurelist = cursor.collect[List]()
     futurelist.onSuccess {
       case list => println(list.map(doc => BSONDocument.pretty(doc)))
     }
@@ -162,7 +162,7 @@ object SimpleUseCases {
     }
 
     // let's enumerate this cursor and print a readable representation of each document in the response
-    val enumerator = Cursor.flatten(futureCursor).enumerate
+    val enumerator = Cursor.flatten(futureCursor).enumerate()
     enumerator(Iteratee.foreach { doc =>
       println("found document: " + BSONDocument.pretty(doc))
     })
