@@ -49,7 +49,7 @@ class BSONCollectionSpec extends Specification {
   val person5 = Person("Joline", 34)
 
   "BSONCollection" should {
-    "write three docs with success" in {
+    "write five docs with success" in {
       implicit val writer = PersonWriter
       Await.result(collection.insert(person), timeout).ok mustEqual true
       Await.result(collection.insert(person2), timeout).ok mustEqual true
@@ -60,10 +60,10 @@ class BSONCollectionSpec extends Specification {
     "read a doc with success" in {
       implicit val reader = PersonReader
       Await.result(collection.find(BSONDocument()).one[Person], timeout).get mustEqual person
-    }/*
+    }
     "read all with success" in {
       implicit val reader = PersonReader
-      Await.result(collection.find(BSONDocument()).cursor[Person].toList, timeout) mustEqual List(person, person2, person3, person4, person5)
+      Await.result(collection.find(BSONDocument()).cursor[Person].collect[List](), timeout) mustEqual List(person, person2, person3, person4, person5)
     }
     "read a doc with error" in {
       implicit val reader = BuggyPersonReader
@@ -77,10 +77,10 @@ class BSONCollectionSpec extends Specification {
       println(s"read a doc with error: $r")
       Await.result(future, timeout) mustEqual -1
     }
-    /*"read docs with error" in {
+    "read docs with error" in {
       implicit val reader = new SometimesBuggyPersonReader
-      val future = collection.find(BSONDocument()).cursor[Person].toList.map(_.size).recover {
-        case ce: CustomException => -1
+      val future = collection.find(BSONDocument()).cursor[Person].collect[Vector]().map(_.size).recover {
+        case e if e.getMessage == "hey hey hey" => -1
         case e =>
           e.printStackTrace()
           -2
@@ -88,21 +88,9 @@ class BSONCollectionSpec extends Specification {
       val r = Await.result(future, timeout)
       println(s"read docs with error: $r")
       Await.result(future, timeout) mustEqual -1
-    }*/
+    }
     "read docs until error" in {
       implicit val reader = new SometimesBuggyPersonReader
-      /*val stream = collection.find(BSONDocument()).cursor[Person].documentStream
-      
-      var i = 0
-      val future = stream.map { doc =>
-        i += 1
-        println(s"\tgot doc: $doc")
-        doc
-      }.run
-      val r = Await.result(future.recover { case e => i }, timeout)
-      println(s"read $r/5 docs (expected 3/5)")
-      r mustEqual 3 */
-      
       val enumerator = collection.find(BSONDocument()).cursor[Person].enumerate(stopOnError = true)
       var i = 0
       val future = enumerator |>>> Iteratee.foreach { doc =>
@@ -112,10 +100,24 @@ class BSONCollectionSpec extends Specification {
       val r = Await.result(future.recover { case e => i }, timeout)
       println(s"read $r/5 docs (expected 3/5)")
       r mustEqual 3
-      
-      /*val r = Await.result(future, timeout)
-      println(s"read a doc with error: $r")
-      Await.result(future, timeout) mustEqual -1*/
+    }
+    "read docs skipping errors" in {
+      implicit val reader = new SometimesBuggyPersonReader
+      val enumerator = collection.find(BSONDocument()).cursor[Person].enumerate(stopOnError = false)
+      var i = 0
+      val future = enumerator |>>> Iteratee.foreach { doc =>
+        i += 1
+        println(s"\t(skipping [$i]) got doc: $doc")
+      }
+      val r = Await.result(future, timeout)
+      println(s"read $i/5 docs (expected 4/5)")
+      i mustEqual 4
+    }
+    "read docs skipping errors using collect" in {
+      implicit val reader = new SometimesBuggyPersonReader
+      val result = Await.result(collection.find(BSONDocument()).cursor[Person].collect[Vector](stopOnError = false), timeout)
+      println(s"(read docs skipping errors using collect) got result $result")
+      result.length mustEqual 4
     }
     "write a doc with error" in {
       implicit val writer = BuggyPersonWriter
@@ -129,6 +131,6 @@ class BSONCollectionSpec extends Specification {
             e.printStackTrace()
             -2
         }, timeout) mustEqual -1
-    }*/
+    }
   }
 }

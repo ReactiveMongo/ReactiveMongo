@@ -15,27 +15,23 @@
  */
 package reactivemongo.api
 
-import scala.collection.generic.CanBuildFrom
-import scala.concurrent.ExecutionContext
-import scala.concurrent.Future
-
 import play.api.libs.iteratee.{ Enumeratee, Enumerator, Iteratee }
 import reactivemongo.api.collections.BufferReader
 import reactivemongo.core.iteratees.{ CustomEnumeratee, CustomEnumerator }
 import reactivemongo.core.netty.BufferSequence
-import reactivemongo.core.protocol.GetMore
-import reactivemongo.core.protocol.KillCursors
-import reactivemongo.core.protocol.Query
-import reactivemongo.core.protocol.QueryFlags
-import reactivemongo.core.protocol.ReplyDocumentIterator
-import reactivemongo.core.protocol.RequestMaker
-import reactivemongo.core.protocol.Response
+import reactivemongo.core.protocol._
 import reactivemongo.utils.LazyLogger
+import scala.annotation.tailrec
+import scala.collection.generic.CanBuildFrom
+import scala.concurrent.{ ExecutionContext, Future }
+import scala.util._
 
 trait Cursor[T] {
   /**
    * Produces an Enumerator of documents.
    * Given the `stopOnError` parameter, this Enumerator may stop on any non-fatal exception, or skip and continue.
+   * The returned enumerator may process up to `maxDocs`. If `stopOnError` is false, then documents that cause error
+   * are dropped, so the enumerator may emit a little less than `maxDocs` even if it processes `maxDocs` documents.
    *
    * @param maxDocs Enumerate up to `maxDocs` documents.
    * @param stopOnError States if the produced Enumerator may stop on non-fatal exception.
@@ -70,6 +66,8 @@ trait Cursor[T] {
    * Collects all the documents into a collection of type `M[T]`.
    * Given the `stopOnError` parameter (which defaults to true), the resulting Future may fail if any
    * non-fatal exception occurs. If set to false, all the documents that caused exceptions are skipped.
+   * Up to `maxDocs` returned by the database may be processed. If `stopOnError` is false, then documents that cause error
+   * are dropped, so the result may contain a little less than `maxDocs` even if `maxDocs` documents were processed.
    *
    * @param maxDocs Collect up to `maxDocs` documents.
    * @param stopOnError States if the Future should fail if any non-fatal exception occurs.
@@ -103,7 +101,7 @@ trait Cursor[T] {
 
   /**
    * Gets the first document matching the query, if any.
-   * The resulting Future may fail if any non-fatal exception occurs (for example, while deserializing the document).
+   * The resulting Future may fail if any exception occurs (for example, while deserializing the document).
    *
    * Example:
    * {{{
@@ -234,24 +232,42 @@ class DefaultCursor[T](
   def enumerateBulks(maxDocs: Int = Int.MaxValue, stopOnError: Boolean = false)(implicit ctx: ExecutionContext): Enumerator[Iterator[T]] =
     enumerateResponses(maxDocs, stopOnError) &> Enumeratee.map(response => ReplyDocumentIterator(response.reply, response.documents))
 
-  def enumerate(maxDocs: Int = Int.MaxValue, stopOnError: Boolean = false)(implicit ctx: ExecutionContext): Enumerator[T] =
+  def enumerate(maxDocs: Int = Int.MaxValue, stopOnError: Boolean = false)(implicit ctx: ExecutionContext): Enumerator[T] = {
+    @tailrec
+    def next(it: Iterator[T], stopOnError: Boolean): Option[Try[T]] = {
+      if (it.hasNext) {
+        val tried = Try(it.next)
+        if (tried.isFailure && !stopOnError)
+          next(it, stopOnError)
+        else Some(tried)
+      } else None
+    }
     enumerateResponses(maxDocs, stopOnError) &> Enumeratee.mapFlatten { response =>
       val iterator = ReplyDocumentIterator(response.reply, response.documents)
-
       CustomEnumerator.SEnumerator(iterator.next) { _ =>
-        if (iterator.hasNext)
-          Some(Future(iterator.next))
-        else None
+        next(iterator, stopOnError).map {
+          case Success(mt) => Future.successful(mt)
+          case Failure(e)  => Future.failed(e)
+        }
       }
     }
+  }
 
   def collect[M[_]](upTo: Int = Int.MaxValue, stopOnError: Boolean = true)(implicit cbf: CanBuildFrom[M[_], T, M[T]], ctx: ExecutionContext): Future[M[T]] = {
     (enumerateResponses(upTo, stopOnError) |>>> Iteratee.fold(cbf.apply) { (builder, response) =>
+
+      def tried[T](it: Iterator[T]) = new Iterator[Try[T]] { def hasNext = it.hasNext; def next = Try(it.next) }
+
       logger.trace(s"[collect] got response $response")
+
+      val filteredIterator =
+        if (!stopOnError)
+          tried(makeIterator(response)).filter(_.isSuccess).map(_.get)
+        else makeIterator(response)
       val iterator =
         if (upTo < response.reply.numberReturned + response.reply.startingFrom)
-          makeIterator(response).take(upTo - response.reply.startingFrom)
-        else makeIterator(response)
+          filteredIterator.take(upTo - response.reply.startingFrom)
+        else filteredIterator
       builder ++= iterator
     }).map(_.result)
   }
