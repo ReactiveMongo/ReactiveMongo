@@ -349,6 +349,7 @@ object BSONObjectID {
    */
 
   private val machineId = {
+    import java.net._
     val validPlatform = Try{
       val correctVersion = System.getProperty("java.version").substring(0,3).toFloat >= 1.8
       val noIpv6 = System.getProperty("java.net.preferIPv4Stack") == true
@@ -357,8 +358,13 @@ object BSONObjectID {
       !isLinux || correctVersion || noIpv6
     }.getOrElse(false)
 
-    if (validPlatform) {
-      import java.net._
+    // Check java policies
+    val permitted = {
+      val sec = System.getSecurityManager();
+      Try{sec.checkPermission(new NetPermission("getNetworkInformation"))}.toOption.map(_ => true).getOrElse(false);
+    }
+
+    if (validPlatform && permitted) {
       val networkInterfacesEnum = NetworkInterface.getNetworkInterfaces
       val networkInterfaces = scala.collection.JavaConverters.enumerationAsScalaIteratorConverter(networkInterfacesEnum).asScala
       val ha = networkInterfaces.find(ha => Try(ha.getHardwareAddress).isSuccess && ha.getHardwareAddress != null && ha.getHardwareAddress.length == 6)
