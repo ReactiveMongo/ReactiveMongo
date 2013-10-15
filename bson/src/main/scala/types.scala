@@ -345,7 +345,7 @@ object BSONObjectID {
    * * http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=7078386
    *
    * and fix in openjdk8:
-   * * http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=7078386
+   * * http://hg.openjdk.java.net/jdk8/tl/jdk/rev/b1814b3ea6d3
    */
 
   private val machineId = {
