@@ -1,5 +1,6 @@
 import reactivemongo.bson._
 import org.specs2.mutable._
+import reactivemongo.bson.exceptions.DocumentKeyNotFound
 
 class Macros extends Specification {
   type Handler[A] = BSONDocumentReader[A] with BSONDocumentWriter[A]  with BSONHandler[BSONDocument, A]
@@ -244,4 +245,23 @@ class Macros extends Specification {
       roundtripImp[T](C())
     }
   }
+
+  "Reader" should {
+    "throw meaningful exception if required field is missing" in {
+      val personDoc = BSONDocument("firstName" -> "joe")
+      Macros.reader[Person].read(personDoc) must throwA[DocumentKeyNotFound].like {
+        case e => e.getMessage must contain("lastName")
+      }
+    }
+
+    "throw meaningful exception if field has another type" in {
+      val primitivesDoc = BSONDocument("dbl" -> 2D, "str" -> "str", "bl" -> true, "int" -> 2D, "long" -> 2L)
+      Macros.reader[Primitives].read(primitivesDoc) must throwA[ClassCastException].like {
+        case e =>
+          e.getMessage must contain(classOf[BSONDouble].getName)
+          e.getMessage must contain(classOf[BSONInteger].getName)
+      }
+    }
+  }
+
 }
