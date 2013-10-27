@@ -402,8 +402,13 @@ case object BSONNull extends BSONValue { val code = 0x0A.toByte }
  */
 case class BSONRegex(value: String, flags: String) extends BSONValue { val code = 0x0B.toByte }
 
-/** BSON DBPointer value. TODO */
-case class BSONDBPointer(value: String, id: Array[Byte]) extends BSONValue { val code = 0x0C.toByte }
+/** BSON DBPointer value. */
+case class BSONDBPointer(value: String, id: Array[Byte]) extends BSONValue {
+  val code = 0x0C.toByte
+
+  /** The BSONObjectID representation of this reference. */
+  val objectId = BSONObjectID(id)
+}
 
 /**
  * BSON JavaScript value.
