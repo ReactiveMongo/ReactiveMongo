@@ -15,7 +15,7 @@
  */
 package reactivemongo.api
 
-import play.api.libs.iteratee.{ Enumeratee, Enumerator, Iteratee }
+import play.api.libs.iteratee._
 import reactivemongo.api.collections.BufferReader
 import reactivemongo.core.iteratees.{ CustomEnumeratee, CustomEnumerator }
 import reactivemongo.core.netty.BufferSequence
@@ -226,7 +226,21 @@ class DefaultCursor[T](
     rawEnumerateResponses(maxDocs) &> {
       if (stopOnError)
         CustomEnumeratee.stopOnError
-      else CustomEnumeratee.continueOnError
+      else CustomEnumeratee.recover {
+        new CustomEnumeratee.RecoverFromErrorFunction {
+          def apply[E, A](throwable: Throwable, input: Input[E], continue: () => Iteratee[E, A]): Iteratee[E, A] = throwable match {
+            case e: ReplyDocumentIteratorExhaustedException =>
+              val errstr = "ReplyDocumentIterator exhausted! " +
+                "Was this enumerator applied to many iteratees concurrently? " +
+                "Stopping to prevent infinite recovery."
+              logger.error(errstr, e)
+              Error(errstr, input)
+            case e =>
+              logger.debug("There was an exception during the stream, dropping it since stopOnError is false", e)
+              continue()
+          }
+        }
+      }
     }
 
   def enumerateBulks(maxDocs: Int = Int.MaxValue, stopOnError: Boolean = false)(implicit ctx: ExecutionContext): Enumerator[Iterator[T]] =

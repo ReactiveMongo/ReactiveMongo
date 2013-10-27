@@ -300,8 +300,20 @@ private[reactivemongo] class RequestEncoder extends OneToOneEncoder {
 
 private[reactivemongo] case class ReplyDocumentIterator[T](private val reply: Reply, private val buffer: ChannelBuffer)(implicit reader: BufferReader[T]) extends Iterator[T] {
   def hasNext = buffer.readable
-  def next = reader.read(ChannelBufferReadableBuffer(buffer.readBytes(buffer.getInt(buffer.readerIndex))))
+  def next =
+    try {
+      reader.read(ChannelBufferReadableBuffer(buffer.readBytes(buffer.getInt(buffer.readerIndex))))
+    } catch {
+      case e: IndexOutOfBoundsException =>
+        /*
+         * If this happens, the buffer is exhausted, and there is probably a bug.
+         * It may happen if an enumerator relying on it is concurrently applied to many iteratees – which should not be done!
+         */
+        throw new ReplyDocumentIteratorExhaustedException(e)
+    }
 }
+
+case class ReplyDocumentIteratorExhaustedException(val cause: Exception) extends Exception(cause)
 
 private[reactivemongo] object RequestEncoder {
   val logger = LazyLogger("reactivemongo.core.protocol.RequestEncoder")
