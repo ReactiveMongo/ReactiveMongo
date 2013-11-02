@@ -10,6 +10,7 @@ import org.jboss.netty.channel.socket.nio.NioClientSocketChannelFactory
 import org.jboss.netty.buffer.HeapChannelBufferFactory
 import org.jboss.netty.channel.{ Channel, ChannelPipeline, Channels }
 import reactivemongo.core.protocol._
+import reactivemongo.api.ReadPreference
 
 package object utils {
   def updateFirst[A, M[T] <: Iterable[T]](coll: M[A])(ƒ: A => Option[A])(implicit cbf: CanBuildFrom[M[_], A, M[A]]): M[A] = {
@@ -39,15 +40,6 @@ package object utils {
   }
 }
 
-sealed trait ReadPreference
-object ReadPreference {
-  object Primary extends ReadPreference
-  object PrimaryPrefered extends ReadPreference
-  object Secondary extends ReadPreference
-  object SecondaryPrefered extends ReadPreference
-  object Nearest extends ReadPreference
-}
-
 case class NodeSet(
     name: Option[String],
     version: Option[Long],
@@ -56,6 +48,8 @@ case class NodeSet(
   val primary: Option[Node] = nodes.find(_.status == NodeStatus.Primary)
   val secondaries = new RoundRobiner(nodes.filter(_.status == NodeStatus.Secondary))
   val queryable = secondaries.subject ++ primary
+  val queryableByDistance = queryable.sortWith { _.pingInfo.ping < _.pingInfo.ping }
+  val nearest = queryableByDistance.headOption
 
   def primary(authenticated: Authenticated): Option[Node] =
     primary.filter(_.authenticated.exists(_ == authenticated))
@@ -109,14 +103,12 @@ case class NodeSet(
   }
 
   def pick(preference: ReadPreference): Option[(Node, Connection)] = preference match {
-    case ReadPreference.Primary           => pickConnectionAndFlatten(primary)
-    case ReadPreference.PrimaryPrefered   => pickConnectionAndFlatten(primary.orElse(secondaries.pick))
-    case ReadPreference.Secondary         => pickConnectionAndFlatten(secondaries.pick)
-    case ReadPreference.SecondaryPrefered => pickConnectionAndFlatten(secondaries.pick.orElse(primary))
-    case ReadPreference.Nearest           => pickConnectionAndFlatten(primary) // TODO
+    case ReadPreference.Primary                   => pickConnectionAndFlatten(primary)
+    case ReadPreference.PrimaryPrefered(filter)   => pickConnectionAndFlatten(primary.orElse(secondaries.pick))
+    case ReadPreference.Secondary(filter)         => pickConnectionAndFlatten(secondaries.pick)
+    case ReadPreference.SecondaryPrefered(filter) => pickConnectionAndFlatten(secondaries.pick.orElse(primary))
+    case ReadPreference.Nearest(filter)           => pickConnectionAndFlatten(nearest)
   }
-
-  //
 
   def createNeededChannels(receiver: ActorRef, upTo: Int)(implicit channelFactory: ChannelFactory): NodeSet = {
     copy(nodes = nodes.foldLeft(Vector.empty[Node]) { (nodes, node) =>

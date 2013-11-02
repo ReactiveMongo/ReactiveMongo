@@ -29,6 +29,7 @@ import reactivemongo.core.errors._
 import reactivemongo.core.netty._
 import reactivemongo.utils.LazyLogger
 import BufferAccessors._
+import reactivemongo.api.ReadPreference
 import reactivemongo.api.collections.BufferReader
 
 object `package` {
@@ -159,6 +160,7 @@ case class Request(
     responseTo: Int, // TODO remove, nothing to do here.
     op: RequestOp,
     documents: BufferSequence,
+    readPreference: ReadPreference = ReadPreference.primary,
     channelIdHint: Option[Int] = None) extends ChannelBufferWritable {
   override val writeTo = { buffer: ChannelBuffer =>
     buffer write header
@@ -194,8 +196,9 @@ case class CheckedWriteRequest(
 case class RequestMaker(
     op: RequestOp,
     documents: BufferSequence = BufferSequence.empty,
+    readPreference: ReadPreference = ReadPreference.primary,
     channelIdHint: Option[Int] = None) {
-  def apply(id: Int) = Request(id, 0, op, documents, channelIdHint)
+  def apply(id: Int) = Request(id, 0, op, documents, readPreference, channelIdHint)
 }
 
 /**

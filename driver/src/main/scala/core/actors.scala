@@ -26,6 +26,7 @@ import scala.concurrent.{ Future, Promise }
 import scala.util.{ Failure, Success, Try }
 import reactivemongo.core.nodeset._
 import java.net.InetSocketAddress
+import reactivemongo.api.ReadPreference
 
 // messages
 
@@ -386,9 +387,7 @@ class MongoDBSystem(
   def pickChannel(request: Request): Try[(Node, Connection)] = {
     if (request.channelIdHint.isDefined)
       nodeSet.pickByChannelId(request.channelIdHint.get).map(Success(_)).getOrElse(Failure(Exceptions.ChannelNotFound))
-    else if (secondaryOK(request))
-      nodeSet.pick(ReadPreference.SecondaryPrefered).map(Success(_)).getOrElse(Failure(Exceptions.NodeSetNotReachable))
-    else nodeSet.pick(ReadPreference.Primary).map(Success(_)).getOrElse(Failure(Exceptions.PrimaryUnavailableException))
+    else nodeSet.pick(request.readPreference).map(Success(_)).getOrElse(Failure(Exceptions.PrimaryUnavailableException))
   }
 
   override def postStop() {

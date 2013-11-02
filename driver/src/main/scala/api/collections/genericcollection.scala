@@ -324,11 +324,20 @@ trait GenericQueryBuilder[Structure, Reader[_], Writer[_]] extends GenericHandle
   }
 
   /**
-   * Makes a [[Cursor]] of this query, which can be enumerated.
+   * Sends this query and gets a [[Cursor]] of instances of `T`.
    *
    * An implicit `Reader[T]` must be present in the scope.
    */
-  def cursor[T](implicit reader: Reader[T] = structureReader, ec: ExecutionContext): Cursor[T] = {
+  def cursor[T](implicit reader: Reader[T] = structureReader, ec: ExecutionContext): Cursor[T] = cursor(ReadPreference.primary)
+
+  /**
+   * Makes a [[Cursor]] of this query, which can be enumerated.
+   *
+   * An implicit `Reader[T]` must be present in the scope.
+   *
+   * @param readPreference The ReadPreference for this request. If the ReadPreference implies that this request might be run on a Secondary, the slaveOk flag will be set.
+   */
+  def cursor[T](readPreference: ReadPreference)(implicit reader: Reader[T] = structureReader, ec: ExecutionContext): Cursor[T] = {
     val documents = BufferSequence {
       val buffer = write(merge, ChannelBufferWritableBuffer())
       projectionOption.map { projection =>
@@ -336,10 +345,11 @@ trait GenericQueryBuilder[Structure, Reader[_], Writer[_]] extends GenericHandle
       }.getOrElse(buffer).buffer
     }
 
-    val op = Query(options.flagsN, collection.fullCollectionName, options.skipN, options.batchSizeN)
-    val requestMaker = RequestMaker(op, documents)
-    
-    new DefaultCursor(op, documents, collection.db.connection, failover)(BufferReaderInstance(reader))
+    val flags = if (readPreference.slaveOk) options.flagsN | QueryFlags.SlaveOk else options.flagsN
+
+    val op = Query(flags, collection.fullCollectionName, options.skipN, options.batchSizeN)
+
+    new DefaultCursor(op, documents, readPreference, collection.db.connection, failover)(BufferReaderInstance(reader))
   }
 
   /**
@@ -348,6 +358,15 @@ trait GenericQueryBuilder[Structure, Reader[_], Writer[_]] extends GenericHandle
    * An implicit `Reader[T]` must be present in the scope.
    */
   def one[T](implicit reader: Reader[T], ec: ExecutionContext): Future[Option[T]] = copy(options = options.batchSize(1)).cursor(reader, ec).headOption
+
+  /**
+   * Sends this query and gets a future `Option[T]`.
+   *
+   * An implicit `Reader[T]` must be present in the scope.
+   *
+   * @param readPreference The ReadPreference for this request. If the ReadPreference implies that this request might be run on a Secondary, the slaveOk flag will be set.
+   */
+  def one[T](readPreference: ReadPreference)(implicit reader: Reader[T], ec: ExecutionContext): Future[Option[T]] = copy(options = options.batchSize(1)).cursor(readPreference)(reader, ec).headOption
 
   /**
    * Sets the query (the selector document).

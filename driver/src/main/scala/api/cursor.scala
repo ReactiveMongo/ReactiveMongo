@@ -153,6 +153,7 @@ object Cursor {
 class DefaultCursor[T](
     query: Query,
     documents: BufferSequence,
+    readPreference: ReadPreference,
     mongoConnection: MongoConnection,
     failoverStrategy: FailoverStrategy)(implicit reader: BufferReader[T]) extends Cursor[T] {
   import Cursor.logger
@@ -181,7 +182,7 @@ class DefaultCursor[T](
 
   @inline
   private def makeRequest(implicit ctx: ExecutionContext): Future[Response] =
-    Failover(RequestMaker(query, documents), mongoConnection, failoverStrategy).future
+    Failover(RequestMaker(query, documents, readPreference), mongoConnection, failoverStrategy).future
 
   @inline
   private def isTailable = (query.flags & QueryFlags.TailableCursor) == QueryFlags.TailableCursor
