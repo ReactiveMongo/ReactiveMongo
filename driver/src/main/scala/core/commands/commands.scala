@@ -196,20 +196,23 @@ case class RawCommand(bson: BSONDocument) extends Command[BSONDocument] {
  * This command will return only when the previous operation is complete and matches its parameters
  * (for example, with waitForReplicatedOn set to Some(2), this command will return only when at least two replicas have also run the previous operation).
  *
- * @param awaitJournalCommit Make sure that the previous operation has been committed into the journal. Journaling must be enabled on the servers.
- * @param waitForReplicatedOn Make sure that the previous (write) operation has been run on at least ''n'' replicas, with ''n'' = waitReplicatedOn.get
+ * @param j Make sure that the previous operation has been committed into the journal. Journaling must be enabled on the servers.
+ * @param w Specify the level of replication for a write operation. Should be a BSONString or BSONInteger. See [[http://docs.mongodb.org/manual/reference/command/getLastError/#dbcmd.getLastError the MongoDB documentation]].
+ * @param wtimeout Write propagation timeout (in milliseconds). See [[http://docs.mongodb.org/manual/reference/command/getLastError/#dbcmd.getLastError the MongoDB documentation]].
  * @param fsync Make sure that the previous (write) operation has been written on the disk.
  */
 case class GetLastError(
-    awaitJournalCommit: Boolean = false,
-    waitForReplicatedOn: Option[Int] = None,
+    j: Boolean = false,
+    w: Option[BSONValue] = None,
+    wtimeout: Int = 0,
     fsync: Boolean = false) extends Command[LastError] {
   override def makeDocuments =
     BSONDocument(
       "getlasterror" -> BSONInteger(1),
-      "waitForReplicatedOn" -> waitForReplicatedOn.map(w => BSONInteger(w)),
+      "w" -> w,
+      "wtimeout" -> Option(wtimeout).filter(_ > 0),
       "fsync" -> option(fsync, BSONBoolean(true)),
-      "j" -> option(awaitJournalCommit, BSONBoolean(true)))
+      "j" -> option(j, BSONBoolean(true)))
 
   val ResultMaker = LastError
 }
