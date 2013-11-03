@@ -16,6 +16,7 @@
 package reactivemongo.core.commands
 
 import scala.util.{ Try, Failure }
+import reactivemongo.api.ReadPreference
 import reactivemongo.bson._
 import reactivemongo.bson.exceptions.DocumentKeyNotFound
 import DefaultBSONHandlers._
@@ -174,10 +175,23 @@ class MakableCommand(val db: String, val command: Command[_]) {
    * Produces the [[reactivemongo.core.protocol.Query]] instance for the given command.
    */
   def makeQuery: Query = Query(if (command.slaveOk) QueryFlags.SlaveOk else 0, db + ".$cmd", 0, 1)
+
   /**
    * Returns the [[reactivemongo.core.protocol.RequestMaker]] for the given command.
    */
   def maker = RequestMaker(makeQuery, BufferSequence(command.makeDocuments.makeBuffer))
+
+  /**
+   * Returns the [[reactivemongo.core.protocol.RequestMaker]] for the given command, using the given ReadPreference.
+   */
+  def maker(readPreference: ReadPreference) = {
+    val query = makeQuery
+    val flags =
+      if(readPreference.slaveOk)
+        query.flags | QueryFlags.SlaveOk
+      else query.flags
+    RequestMaker(query.copy(flags = flags), BufferSequence(command.makeDocuments.makeBuffer), readPreference)
+  }
 }
 
 case class RawCommand(bson: BSONDocument) extends Command[BSONDocument] {

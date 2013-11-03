@@ -68,11 +68,13 @@ trait DB {
    * Sends a command and get the future result of the command.
    *
    * @param command The command to send.
+   * @param readPreference The ReadPreference to use for this command (defaults to ReadPreference.primary).
    *
    * @return a future containing the result of the command.
    */
-  def command[T](command: Command[T])(implicit ec: ExecutionContext): Future[T] =
-    Failover(command.apply(name).maker, connection, failoverStrategy).future.mapEither(command.ResultMaker(_))
+  def command[T](command: Command[T], readPreference: ReadPreference = ReadPreference.primary)(implicit ec: ExecutionContext): Future[T] = {
+    Failover(command.apply(name).maker(readPreference), connection, failoverStrategy).future.mapEither(command.ResultMaker(_))
+  }
 
   /** Authenticates the connection on this database. */
   def authenticate(user: String, password: String)(implicit timeout: FiniteDuration): Future[SuccessfulAuthentication] = connection.authenticate(name, user, password)
