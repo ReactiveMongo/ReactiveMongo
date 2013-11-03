@@ -125,7 +125,7 @@ private object MacroImpl {
 
           val getter = Apply(
             TypeApply(
-              Select(Ident("document"), "getAs"),
+              Select(Ident("document"), "getAsTry"),
               List(TypeTree(typ))
 
             ),
@@ -133,7 +133,7 @@ private object MacroImpl {
           )
 
           if (optTyp.isDefined)
-            getter
+            Select(getter, "toOption")
           else
             Select(getter, "get")
       }
