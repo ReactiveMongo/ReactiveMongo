@@ -116,9 +116,9 @@ class CollStats(
 case class CollStatsResult(
   ns: String,
   count: Int,
-  size: Int,
+  size: Double,
   averageObjectSize: Option[Double],
-  storageSize: Int,
+  storageSize: Double,
   numExtents: Int,
   nindexes: Int,
   lastExtentSize: Int,
@@ -136,9 +136,9 @@ object CollStatsResult extends BSONCommandResultMaker[CollStatsResult] {
       CollStatsResult(
         doc.getAs[BSONString]("ns").get.value,
         doc.getAs[BSONInteger]("count").get.value,
-        doc.getAs[BSONInteger]("size").get.value,
+        doc.getAs[BSONNumberLike]("size").get.toDouble,
         doc.getAs[BSONDouble]("avgObjSize").map(_.value),
-        doc.getAs[BSONInteger]("storageSize").get.value,
+        doc.getAs[BSONNumberLike]("storageSize").get.toDouble,
         doc.getAs[BSONInteger]("numExtents").get.value,
         doc.getAs[BSONInteger]("nindexes").get.value,
         doc.getAs[BSONInteger]("lastExtentSize").get.value,
