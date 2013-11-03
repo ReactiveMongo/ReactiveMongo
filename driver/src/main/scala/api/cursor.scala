@@ -69,14 +69,14 @@ trait Cursor[T] {
    * Up to `maxDocs` returned by the database may be processed. If `stopOnError` is false, then documents that cause error
    * are dropped, so the result may contain a little less than `maxDocs` even if `maxDocs` documents were processed.
    *
-   * @param maxDocs Collect up to `maxDocs` documents.
+   * @param upTo Collect up to `upTo` documents.
    * @param stopOnError States if the Future should fail if any non-fatal exception occurs.
    *
    * Example:
    * {{{
    * val cursor = collection.find(query, filter).cursor[BSONDocument]
    * // return the 3 first documents in a Vector[BSONDocument].
-   * val list = cursor2.collect[Vector](3)
+   * val vector = cursor.collect[Vector](3)
    * }}}
    */
   def collect[M[_]](upTo: Int = Int.MaxValue, stopOnError: Boolean = true)(implicit cbf: CanBuildFrom[M[_], T, M[T]], ec: ExecutionContext): Future[M[T]]
@@ -86,14 +86,14 @@ trait Cursor[T] {
    * Given the `stopOnError` parameter (which defaults to true), the resulting Future may fail if any
    * non-fatal exception occurs. If set to false, all the documents that caused exceptions are skipped.
    *
-   * @param maxDocs Collect up to `maxDocs` documents.
+   * @param upTo Collect up to `maxDocs` documents.
    * @param stopOnError States if the Future should fail if any non-fatal exception occurs.
    *
    * Example:
    * {{{
    * val cursor = collection.find(query, filter).cursor[BSONDocument]
    * // return the 3 first documents in a list.
-   * val list = cursor2.toList(3)
+   * val list = cursor.toList(3)
    * }}}
    */
   @deprecated("consider using collect[List] instead", "0.10.0")
@@ -106,8 +106,8 @@ trait Cursor[T] {
    * Example:
    * {{{
    * val cursor = collection.find(query, filter).cursor[BSONDocument]
-   * // return the 3 first documents in a list.
-   * val first: Future[Option[BSONDocument]] = cursor2.headOption
+   * // return option of the first element.
+   * val first: Future[Option[BSONDocument]] = cursor.headOption
    * }}}
    */
   def headOption(implicit ctx: ExecutionContext): Future[Option[T]] = collect[Iterable](1, true).map(_.headOption)
