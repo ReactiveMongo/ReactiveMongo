@@ -4,23 +4,24 @@ import reactivemongo.bson._
 
 sealed trait ReadPreference {
   def slaveOk: Boolean = true
-  def filterTag: BSONDocument => Boolean
+  def filterTag: Option[BSONDocument => Boolean]
 }
 
 object ReadPreference {
   object Primary extends ReadPreference {
     override def slaveOk = false
-    override def filterTag = _ => true
+    override def filterTag = None
   }
-  case class PrimaryPrefered(filterTag: BSONDocument => Boolean) extends ReadPreference
-  case class Secondary(filterTag: BSONDocument => Boolean) extends ReadPreference
-  case class SecondaryPrefered(filterTag: BSONDocument => Boolean) extends ReadPreference
-  case class Nearest(filterTag: BSONDocument => Boolean) extends ReadPreference
+  case class PrimaryPrefered(filterTag: Option[BSONDocument => Boolean]) extends ReadPreference
+  case class Secondary(filterTag: Option[BSONDocument => Boolean]) extends ReadPreference
+  case class SecondaryPrefered(filterTag: Option[BSONDocument => Boolean]) extends ReadPreference
+  case class Nearest(filterTag: Option[BSONDocument => Boolean]) extends ReadPreference
 
   private implicit class BSONDocumentWrapper(val underlying: BSONDocument) extends AnyVal {
     def contains(doc: BSONDocument): Boolean = {
+
       val els = underlying.elements
-      doc.elements.find { element =>
+      doc.elements.forall { element =>
         els.find {
           case (name, value) => element._1 == name && ((element._2, value) match {
             case (d1: BSONDocument, d2: BSONDocument) => d1.elements == d2.elements
@@ -28,7 +29,7 @@ object ReadPreference {
             case (v1, v2)                             => v1 == v2
           })
         }.isDefined
-      }.isDefined
+      }
     }
   }
 
@@ -36,23 +37,23 @@ object ReadPreference {
 
   def primary: Primary.type = Primary
 
-  def primaryPrefered: PrimaryPrefered = new PrimaryPrefered(defaultFilterTag)
+  def primaryPrefered: PrimaryPrefered = new PrimaryPrefered(None)
 
   def primaryPrefered[T](tag: T)(implicit writer: BSONDocumentWriter[T]): PrimaryPrefered =
-    new PrimaryPrefered(doc => writer.write(tag).contains(doc))
+    new PrimaryPrefered(Some(doc => doc.contains(writer.write(tag))))
 
-  def secondary: Secondary = new Secondary(defaultFilterTag)
+  def secondary: Secondary = new Secondary(None)
 
   def secondary[T](tag: T)(implicit writer: BSONDocumentWriter[T]): Secondary =
-    new Secondary(doc => writer.write(tag).contains(doc))
+    new Secondary(Some(doc => doc.contains(writer.write(tag))))
 
-  def secondaryPrefered: SecondaryPrefered = new SecondaryPrefered(defaultFilterTag)
+  def secondaryPrefered: SecondaryPrefered = new SecondaryPrefered(None)
 
   def secondaryPrefered[T](tag: T)(implicit writer: BSONDocumentWriter[T]): SecondaryPrefered =
-    new SecondaryPrefered(doc => writer.write(tag).contains(doc))
+    new SecondaryPrefered(Some(doc => doc.contains(writer.write(tag))))
 
-  def nearest: Nearest = new Nearest(defaultFilterTag)
+  def nearest: Nearest = new Nearest(None)
 
   def nearest[T](tag: T)(implicit writer: BSONDocumentWriter[T]): Nearest =
-    new Nearest(doc => writer.write(tag).contains(doc))
+    new Nearest(Some(doc => doc.contains(writer.write(tag))))
 }

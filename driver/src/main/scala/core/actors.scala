@@ -138,7 +138,7 @@ class MongoDBSystem(
 
   final def authenticateNodeSet(nodeSet: NodeSet): NodeSet = {
     nodeSet.copy(nodes = nodeSet.nodes.map {
-      case node @ Node(_, _: QueryableNodeStatus, _, _, _) => authenticateNode(node, nodeSet.authenticates.toSeq)
+      case node @ Node(_, _: QueryableNodeStatus, _, _, _, _) => authenticateNode(node, nodeSet.authenticates.toSeq)
       case node => node
     })
   }
@@ -248,13 +248,13 @@ class MongoDBSystem(
               case _: QueryableNodeStatus => authenticateNode(node, nodeSet.authenticates.toSeq)
               case _                      => node
             }
-            authenticating.copy(status = isMaster.status, pingInfo = pingInfo, name = isMaster.me.getOrElse(node.name))
+            authenticating.copy(status = isMaster.status, pingInfo = pingInfo, name = isMaster.me.getOrElse(node.name), tags = isMaster.tags)
           }
           updateNodeSet {
             connectAll {
               (if (isMaster.hosts.isDefined) {
                 ns.copy(nodes = ns.nodes ++ isMaster.hosts.get.collect {
-                  case host if !ns.nodes.exists(_.name == host) => Node(host, NodeStatus.Uninitialized, Vector.empty, Set.empty)
+                  case host if !ns.nodes.exists(_.name == host) => Node(host, NodeStatus.Uninitialized, Vector.empty, Set.empty, None)
                 })
               } else {
                 ns
@@ -360,7 +360,7 @@ class MongoDBSystem(
   }
 
   // monitor -->
-  var nodeSet: NodeSet = NodeSet(None, None, seeds.map(seed => Node(seed, NodeStatus.Unknown, Vector.empty, Set.empty).createNeededChannels(self, 1)).toVector, initialAuthenticates.toSet)
+  var nodeSet: NodeSet = NodeSet(None, None, seeds.map(seed => Node(seed, NodeStatus.Unknown, Vector.empty, Set.empty, None).createNeededChannels(self, 1)).toVector, initialAuthenticates.toSet)
   connectAll(nodeSet)
   // <-- monitor
 

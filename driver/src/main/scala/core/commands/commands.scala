@@ -478,11 +478,12 @@ object IsMaster extends AdminCommand[IsMasterResponse] {
       CommandError.checkOk(document, Some("isMaster")).toLeft(IsMasterResponse(
         document.getAs[BSONBoolean]("ismaster").map(_.value).getOrElse(false),
         document.getAs[BSONBoolean]("secondary").map(_.value).getOrElse(false),
-        document.getAs[BSONInteger]("maxBsonObjectSize").map(_.value).getOrElse(16777216),
+        document.getAs[BSONInteger]("maxBsonObjectSize").map(_.value).getOrElse(16777216), // TODO: default value should be 4M
         document.getAs[BSONString]("setName").map(_.value),
         document.getAs[BSONArray]("hosts").map(
           _.values.map(_.asInstanceOf[BSONString].value).toList),
-        document.getAs[BSONString]("me").map(_.value)))
+        document.getAs[BSONString]("me").map(_.value),
+        document.getAs[BSONDocument]("tags")))
     }
   }
 }
@@ -503,7 +504,8 @@ case class IsMasterResponse(
     maxBsonObjectSize: Int,
     setName: Option[String],
     hosts: Option[Seq[String]],
-    me: Option[String]) {
+    me: Option[String],
+    tags: Option[BSONDocument]) {
   /** the resolved [[reactivemongo.core.protocol.NodeState]] of the answering server */
   val status: NodeStatus = if (isMaster) NodeStatus.Primary else if (secondary) NodeStatus.Secondary else NodeStatus.NonQueryableUnknownStatus
 }

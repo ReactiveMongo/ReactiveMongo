@@ -11,6 +11,7 @@ import org.jboss.netty.buffer.HeapChannelBufferFactory
 import org.jboss.netty.channel.{ Channel, ChannelPipeline, Channels }
 import reactivemongo.core.protocol._
 import reactivemongo.api.ReadPreference
+import reactivemongo.bson._
 
 package object utils {
   def updateFirst[A, M[T] <: Iterable[T]](coll: M[A])(ƒ: A => Option[A])(implicit cbf: CanBuildFrom[M[_], A, M[A]]): M[A] = {
@@ -48,8 +49,8 @@ case class NodeSet(
   val primary: Option[Node] = nodes.find(_.status == NodeStatus.Primary)
   val secondaries = new RoundRobiner(nodes.filter(_.status == NodeStatus.Secondary))
   val queryable = secondaries.subject ++ primary
-  val queryableByDistance = queryable.sortWith { _.pingInfo.ping < _.pingInfo.ping }
-  val nearest = queryableByDistance.headOption
+  val nearestGroup = new RoundRobiner(queryable.sortWith { _.pingInfo.ping < _.pingInfo.ping })
+  val nearest = nearestGroup.subject.headOption
 
   def primary(authenticated: Authenticated): Option[Node] =
     primary.filter(_.authenticated.exists(_ == authenticated))
@@ -102,12 +103,21 @@ case class NodeSet(
     node.map(node => node -> node.authenticatedNodes.pick).collect { case (node, Some(connection)) => (node, connection) }
   }
 
+  private def pickFromGroupWithFilter(roundRobiner: RoundRobiner[Node, Vector], filter: Option[BSONDocument => Boolean], fallback: => Option[Node]) = {
+    def nodeMatchesFilter(filter: BSONDocument => Boolean): Node => Boolean = _.tags.map(filter(_)).getOrElse(false)
+
+    filter.map { filter =>
+      roundRobiner.pickWithFilter(nodeMatchesFilter(filter))
+    }.getOrElse(fallback)
+  }
+
+  // http://docs.mongodb.org/manual/reference/read-preference/
   def pick(preference: ReadPreference): Option[(Node, Connection)] = preference match {
     case ReadPreference.Primary                   => pickConnectionAndFlatten(primary)
-    case ReadPreference.PrimaryPrefered(filter)   => pickConnectionAndFlatten(primary.orElse(secondaries.pick))
-    case ReadPreference.Secondary(filter)         => pickConnectionAndFlatten(secondaries.pick)
-    case ReadPreference.SecondaryPrefered(filter) => pickConnectionAndFlatten(secondaries.pick.orElse(primary))
-    case ReadPreference.Nearest(filter)           => pickConnectionAndFlatten(nearest)
+    case ReadPreference.PrimaryPrefered(filter)   => pickConnectionAndFlatten(primary.orElse(pickFromGroupWithFilter(secondaries, filter, secondaries.pick)))
+    case ReadPreference.Secondary(filter)         => pickConnectionAndFlatten(pickFromGroupWithFilter(secondaries, filter, secondaries.pick))
+    case ReadPreference.SecondaryPrefered(filter) => pickConnectionAndFlatten(pickFromGroupWithFilter(secondaries, filter, secondaries.pick).orElse(primary))
+    case ReadPreference.Nearest(filter)           => pickConnectionAndFlatten(pickFromGroupWithFilter(nearestGroup, filter, nearest))
   }
 
   def createNeededChannels(receiver: ActorRef, upTo: Int)(implicit channelFactory: ChannelFactory): NodeSet = {
@@ -124,6 +134,7 @@ case class Node(
     status: NodeStatus,
     connections: Vector[Connection],
     authenticated: Set[Authenticated],
+    tags: Option[BSONDocument],
     pingInfo: PingInfo = PingInfo()) {
 
   val (host: String, port: Int) = {
