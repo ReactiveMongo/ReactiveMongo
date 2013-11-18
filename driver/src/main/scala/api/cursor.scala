@@ -20,6 +20,7 @@ import reactivemongo.api.collections.BufferReader
 import reactivemongo.core.iteratees.{ CustomEnumeratee, CustomEnumerator }
 import reactivemongo.core.netty.BufferSequence
 import reactivemongo.core.protocol._
+import reactivemongo.utils.ExtendedFutures.DelayedFuture
 import reactivemongo.utils.LazyLogger
 import scala.annotation.tailrec
 import scala.collection.generic.CanBuildFrom
@@ -207,7 +208,7 @@ class DefaultCursor[T](
                 next(current._1)
               } else {
                 logger.debug("[Tailable Cursor] Current cursor exhausted, renewing...")
-                Some(makeRequest)
+                Some(DelayedFuture(500, mongoConnection.actorSystem).flatMap(_ => makeRequest))
               }
             nextResponse.map(_.map((_, maxDocs - current._1.reply.numberReturned)))
           } else None
