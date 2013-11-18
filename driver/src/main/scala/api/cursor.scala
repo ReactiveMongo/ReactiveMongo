@@ -259,12 +259,15 @@ class DefaultCursor[T](
     }
     enumerateResponses(maxDocs, stopOnError) &> Enumeratee.mapFlatten { response =>
       val iterator = ReplyDocumentIterator(response.reply, response.documents)
-      CustomEnumerator.SEnumerator(iterator.next) { _ =>
-        next(iterator, stopOnError).map {
-          case Success(mt) => Future.successful(mt)
-          case Failure(e)  => Future.failed(e)
+      if(!iterator.hasNext)
+        Enumerator.empty
+      else
+        CustomEnumerator.SEnumerator(iterator.next) { _ =>
+          next(iterator, stopOnError).map {
+            case Success(mt) => Future.successful(mt)
+            case Failure(e)  => Future.failed(e)
+          }
         }
-      }
     }
   }
 
