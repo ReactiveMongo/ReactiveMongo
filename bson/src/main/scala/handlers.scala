@@ -253,6 +253,18 @@ trait DefaultBSONHandlers {
     def write(b: BSONRegex) = b
   }
 
+  // Vendor handlers
+  
+  // Looking for an org.joda.time.DateTime handler?
+  // ReactiveMongo has no such dependency, but you can copy this to your project:
+  /*
+  import reactivemongo.bson.{ BSONHandler, BSONDateTime }
+  implicit object BSONJodaDateTimeHandler extends BSONHandler[BSONDateTime, DateTime] {
+    def read(x: BSONDateTime) = new DateTime(x.value)
+    def write(x: DateTime) = BSONDateTime(x.getMillis)
+  }
+  */
+
   /*// Generic Handlers
   class BSONValueIdentity[B <: BSONValue] extends BSONWriter[B, B] with BSONReader[B, B] {
     def write(b: B): B = b
