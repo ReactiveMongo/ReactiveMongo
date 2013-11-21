@@ -253,6 +253,11 @@ trait DefaultBSONHandlers {
     def write(b: BSONRegex) = b
   }
 
+  implicit object BSONJavaScriptIdentity extends BSONReader[BSONJavaScript, BSONJavaScript] with BSONWriter[BSONJavaScript, BSONJavaScript] {
+    def read(b: BSONJavaScript) = b
+    def write(b: BSONJavaScript) = b
+  }
+
   /*// Generic Handlers
   class BSONValueIdentity[B <: BSONValue] extends BSONWriter[B, B] with BSONReader[B, B] {
     def write(b: B): B = b
