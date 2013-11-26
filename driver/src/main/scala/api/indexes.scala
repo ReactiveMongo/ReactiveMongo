@@ -61,6 +61,11 @@ object IndexType {
     def valueStr = "hashed"
   }
 
+  object Text extends IndexType {
+    def value = BSONString("text")
+    def valueStr = "text"
+  }
+
   def apply(value: BSONValue) = value match {
     case BSONInteger(i) if i > 0 => Ascending
     case BSONInteger(i) if i < 0 => Descending
@@ -68,6 +73,7 @@ object IndexType {
     case BSONString(s) if s == "2dsphere" => Geo2DSpherical
     case BSONString(s) if s == "geoHaystack" => GeoHaystack
     case BSONString(s) if s == "hashed" => Hashed
+    case BSONString(s) if s == "text" => Text
     case _ => throw new IllegalArgumentException("unsupported index type")
   }
 }
