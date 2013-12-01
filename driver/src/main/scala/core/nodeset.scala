@@ -176,7 +176,7 @@ case class Connection(
     channel.write(message)
   }
 
-  def isAuthenticated(user: String, db: String) = authenticated.exists(auth => auth.user == user && auth.db == db)
+  def isAuthenticated(db: String, user: String) = authenticated.exists(auth => auth.user == user && auth.db == db)
 }
 
 case class PingInfo(
@@ -244,13 +244,14 @@ sealed trait Authentication {
   def user: String
   def db: String
 }
-case class Authenticate(user: String, db: String, pwd: String) extends Authentication {
+
+case class Authenticate(db: String, user: String, password: String) extends Authentication {
   override def toString: String = "Authenticate(" + db + ", " + user + ")"
 }
-case class Authenticating(user: String, db: String, pwd: String, nonce: Option[String]) extends Authentication {
+case class Authenticating(db: String, user: String, password: String, nonce: Option[String]) extends Authentication {
   override def toString: String = s"Authenticating($db, $user, ${nonce.map(_ => "<nonce>").getOrElse("<>")})"
 }
-case class Authenticated(user: String, db: String) extends Authentication
+case class Authenticated(db: String, user: String) extends Authentication
 
 class ContinuousIterator[A](iterable: Iterable[A], private var toDrop: Int = 0) extends Iterator[A] {
   private var iterator = iterable.iterator

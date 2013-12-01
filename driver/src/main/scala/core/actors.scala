@@ -120,11 +120,11 @@ class MongoDBSystem(
   final def authenticateConnection(connection: Connection, auths: Seq[Authenticate]): Connection = {
     if (connection.authenticating.isEmpty && !auths.isEmpty) {
       val nextAuth = auths.head
-      if (connection.isAuthenticated(nextAuth.user, nextAuth.db))
+      if (connection.isAuthenticated(nextAuth.db, nextAuth.user))
         authenticateConnection(connection, auths.tail)
       else {
         connection.send(Getnonce(nextAuth.db).maker(requestIds.getNonce.next))
-        connection.copy(authenticating = Some(Authenticating(nextAuth.user, nextAuth.db, nextAuth.pwd, None)))
+        connection.copy(authenticating = Some(Authenticating(nextAuth.db, nextAuth.user, nextAuth.password, None)))
       }
     } else connection
   }
@@ -278,7 +278,7 @@ class MongoDBSystem(
           updateNodeSet(nodeSet.updateConnectionByChannelId(response.info.channelId) { connection =>
             connection.authenticating match {
               case Some(authenticating) =>
-                connection.send(AuthenticateCommand(authenticating.user, authenticating.pwd, nonce)(authenticating.db).maker(requestIds.authenticate.next))
+                connection.send(AuthenticateCommand(authenticating.user, authenticating.password, nonce)(authenticating.db).maker(requestIds.authenticate.next))
                 connection.copy(authenticating = Some(authenticating.copy(nonce = Some(nonce))))
               case _ => connection
             }
@@ -291,11 +291,11 @@ class MongoDBSystem(
       val auth = nodeSet.pickByChannelId(response.info.channelId).flatMap(_._2.authenticating)
       updateNodeSet(auth match {
         case Some(authenticating) =>
-          val originalAuthenticate = Authenticate(authenticating.user, authenticating.db, authenticating.pwd)
+          val originalAuthenticate = Authenticate(authenticating.db, authenticating.user, authenticating.password)
           val authenticated = AuthenticateCommand(response) match {
             case Right(successfulAuthentication) =>
               AuthRequestsManager.handleAuthResult(originalAuthenticate, successfulAuthentication)
-              Some(Authenticated(authenticating.user, authenticating.db))
+              Some(Authenticated(authenticating.db, authenticating.user))
             case Left(error) =>
               AuthRequestsManager.handleAuthResult(originalAuthenticate, error)
               None

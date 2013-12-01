@@ -208,7 +208,7 @@ class MongoConnection(
 
   /** Authenticates the connection on the given database. */
   def authenticate(db: String, user: String, password: String): Future[SuccessfulAuthentication] = {
-    val req = AuthRequest(Authenticate(user, db, password))
+    val req = AuthRequest(Authenticate(db, user, password))
     mongosystem ! req
     req.future
   }
