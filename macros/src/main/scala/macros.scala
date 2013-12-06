@@ -1,6 +1,7 @@
 package reactivemongo.bson
 
 import collection.mutable.ListBuffer
+import reactivemongo.bson.Macros.Annotations.Key
 import scala.reflect.macros.Context
 
 /**
@@ -129,7 +130,7 @@ private object MacroImpl {
               List(TypeTree(typ))
 
             ),
-            List(Literal(Constant(param.name.toString)))
+            List(Literal(Constant(paramName(param))))
           )
 
           if (optTyp.isDefined)
@@ -186,7 +187,7 @@ private object MacroImpl {
           if (writer.isEmpty) c.abort(c.enclosingPosition, s"Implicit $typ for '$param' not found")
           val tuple_i = if (types.length == 1) tuple else Select(tuple, "_" + (i + 1))
           val bs_value = c.Expr[BSONValue](Apply(Select(writer, "write"), List(tuple_i)))
-          val name = c.literal(param.name.toString)
+          val name = c.literal(paramName(param))
           reify(
             (name.splice, bs_value.splice): (String, BSONValue)
           ).tree
@@ -202,7 +203,7 @@ private object MacroImpl {
           val tuple_i= if (types.length == 1) tuple else Select(tuple, "_" + (i + 1))
           val buf = Ident("buf")
           val bs_value = c.Expr[BSONValue](Apply(Select(writer, "write"), List(Select(tuple_i, "get"))))
-          val name = c.literal(param.name.toString)
+          val name = c.literal(paramName(param))
           If(
             Select(tuple_i, "isDefined"),
             Apply(Select(Ident("buf"), "$plus$colon$eq"), List(reify((name.splice,bs_value.splice)).tree)),
@@ -313,6 +314,19 @@ private object MacroImpl {
 
     private def bsonDocPath: c.universe.Select = {
       Select(Select(Ident(newTermName("reactivemongo")), "bson"), "BSONDocument")
+    }
+
+    private def paramName(param: c.Symbol): String = {
+      param.annotations.collect{
+        case ann if ann.tpe =:= typeOf[Key] =>
+          ann.scalaArgs.collect{
+            case l: Literal => l.value.value
+          }.collect{
+            case value: String => value
+          }
+        case other =>
+          c.abort(c.enclosingPosition, other.tpe + " " + other.scalaArgs)
+      }.flatten.headOption getOrElse param.name.toString
     }
 
     private def allSubclasses(A: Symbol): Set[Symbol] = {
