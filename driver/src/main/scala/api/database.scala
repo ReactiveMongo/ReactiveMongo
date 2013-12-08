@@ -80,7 +80,11 @@ trait DB {
   def authenticate(user: String, password: String)(implicit timeout: FiniteDuration): Future[SuccessfulAuthentication] = connection.authenticate(name, user, password)
 
   /** Returns the database of the given name on the same MongoConnection. */
-  def sister(name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit ec: ExecutionContext) = connection.db(name, failoverStrategy)
+  @deprecated("Consider using `sibling` instead", "0.10")
+  def sister(name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit ec: ExecutionContext) = sibling(name, failoverStrategy)
+
+  /** Returns the database of the given name on the same MongoConnection. */
+  def sibling(name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit ec: ExecutionContext) = connection.db(name, failoverStrategy)
 }
 
 /** A mixin that provides commands about this database itself. */

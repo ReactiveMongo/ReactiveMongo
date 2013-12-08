@@ -87,9 +87,19 @@ trait Collection {
    * @param name The other collection name.
    * @param failoverStrategy Overrides the default strategy.
    */
-  def sister[C <: Collection](name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit producer: CollectionProducer[C] = collections.default.BSONCollectionProducer): C = {
+  @deprecated("Consider using `sibling` instead", "0.10")
+  def sister[C <: Collection](name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit producer: CollectionProducer[C] = collections.default.BSONCollectionProducer): C =
+    sibling(name, failoverStrategy)
+
+  /**
+   * Gets another collection in the current database.
+   * An implicit CollectionProducer[C] must be present in the scope, or it will be the default implementation ([[reactivemongo.api.collections.default.BSONCollection]]).
+   *
+   * @param name The other collection name.
+   * @param failoverStrategy Overrides the default strategy.
+   */
+  def sibling[C <: Collection](name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit producer: CollectionProducer[C] = collections.default.BSONCollectionProducer): C =
     producer.apply(db, name, failoverStrategy)
-  }
 }
 
 /**
