@@ -173,4 +173,28 @@ object Macros {
      */
     trait AllImplementations extends SaveClassName with Default
   }
+
+  /**
+   * Annotations to use on case classes that are being processed by macros
+   */
+  object Annotations {
+    import scala.annotation.{StaticAnnotation, meta}
+
+    /**
+     * Specify a key different from field name in your case class.
+     * Convenient to use when you'd like to leverage mongo's _id index but don't want
+     * to actually use `_id` in your code.
+     *
+     * Example
+     * {{{
+     * case class Website(@Key("_id") url: String, content: Content)
+     * }}}
+     *
+     * Generated handler will map the `url` field in your code to `_id` field in BSON
+     *
+     * @param key the desired key to use in BSON
+     */
+    @meta.param
+    case class Key(key: String) extends StaticAnnotation
+  }
 }
