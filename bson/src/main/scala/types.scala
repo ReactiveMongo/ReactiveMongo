@@ -330,7 +330,6 @@ object BSONObjectID {
 
   private def counter = (increment.getAndIncrement + maxCounterValue) % maxCounterValue
 
-
   /**
    * The following implemtation of machineId work around openjdk limitations in
    * version 6 and 7
@@ -350,8 +349,8 @@ object BSONObjectID {
 
   private val machineId = {
     import java.net._
-    val validPlatform = Try{
-      val correctVersion = System.getProperty("java.version").substring(0,3).toFloat >= 1.8
+    val validPlatform = Try {
+      val correctVersion = System.getProperty("java.version").substring(0, 3).toFloat >= 1.8
       val noIpv6 = System.getProperty("java.net.preferIPv4Stack") == true
       val isLinux = System.getProperty("os.name") == "Linux"
 
@@ -361,7 +360,7 @@ object BSONObjectID {
     // Check java policies
     val permitted = {
       val sec = System.getSecurityManager();
-      Try{sec.checkPermission(new NetPermission("getNetworkInformation"))}.toOption.map(_ => true).getOrElse(false);
+      Try { sec.checkPermission(new NetPermission("getNetworkInformation")) }.toOption.map(_ => true).getOrElse(false);
     }
 
     if (validPlatform && permitted) {
@@ -398,45 +397,68 @@ object BSONObjectID {
   /** Tries to make a BSON ObjectId element from a hexadecimal String representation. */
   def parse(str: String): Try[BSONObjectID] = Try(apply(str))
 
-  /** Generates a new BSON ObjectID. */
-  def generate: BSONObjectID = {
-    val timestamp = (System.currentTimeMillis / 1000).toInt
+  /**
+   * Generates a new BSON ObjectID.
+   *
+   * +------------------------+------------------------+------------------------+------------------------+
+   * + timestamp (in seconds) +   machine identifier   +    thread identifier   +        increment       +
+   * +        (4 bytes)       +        (3 bytes)       +        (2 bytes)       +        (3 bytes)       +
+   * +------------------------+------------------------+------------------------+------------------------+
+   *
+   * The returned BSONObjectID contains a timestamp set to the current time (in seconds),
+   * with the `machine identifier`, `thread identifier` and `increment` properly set.
+   */
+  def generate: BSONObjectID = fromTime(System.currentTimeMillis, false)
 
+  /**
+   * Generates a new BSON ObjectID from the given timestamp in milliseconds.
+   *
+   * +------------------------+------------------------+------------------------+------------------------+
+   * + timestamp (in seconds) +   machine identifier   +    thread identifier   +        increment       +
+   * +        (4 bytes)       +        (3 bytes)       +        (2 bytes)       +        (3 bytes)       +
+   * +------------------------+------------------------+------------------------+------------------------+
+   *
+   * The included timestamp is the number of seconds since epoch, so a BSONObjectID time part has only
+   * a precision up to the second. To get a reasonably unique ID, you _must_ set `onlyTimestamp` to false.
+   *
+   * Crafting a BSONObjectID from a timestamp with `fillOnlyTimestamp` set to true is helpful for range queries,
+   * eg if you want of find documents an _id field which timestamp part is greater than or lesser than
+   * the one of another id.
+   *
+   * If you do not intend to use the produced BSONObjectID for range queries, then you'd rather use
+   * the `generate` method instead.
+   *
+   * @param fillOnlyTimestamp if true, the returned BSONObjectID will only have the timestamp bytes set; the other will be set to zero.
+   */
+  def fromTime(timeMillis: Long, fillOnlyTimestamp: Boolean = true): BSONObjectID = {
     // n of seconds since epoch. Big endian
+    val timestamp = (timeMillis / 1000).toInt
     val id = new Array[Byte](12)
+
     id(0) = (timestamp >>> 24).toByte
     id(1) = (timestamp >> 16 & 0xFF).toByte
     id(2) = (timestamp >> 8 & 0xFF).toByte
     id(3) = (timestamp & 0xFF).toByte
 
-    // machine id, 3 first bytes of md5(macadress or hostname)
-    id(4) = machineId(0)
-    id(5) = machineId(1)
-    id(6) = machineId(2)
+    if (fillOnlyTimestamp) {
+      // machine id, 3 first bytes of md5(macadress or hostname)
+      id(4) = machineId(0)
+      id(5) = machineId(1)
+      id(6) = machineId(2)
 
-    // 2 bytes of the pid or thread id. Thread id in our case. Low endian
-    val threadId = Thread.currentThread.getId.toInt
-    id(7) = (threadId & 0xFF).toByte
-    id(8) = (threadId >> 8 & 0xFF).toByte
+      // 2 bytes of the pid or thread id. Thread id in our case. Low endian
+      val threadId = Thread.currentThread.getId.toInt
+      id(7) = (threadId & 0xFF).toByte
+      id(8) = (threadId >> 8 & 0xFF).toByte
 
-    // 3 bytes of counter sequence, which start is randomized. Big endian
-    val c = counter
-    id(9) = (c >> 16 & 0xFF).toByte
-    id(10) = (c >> 8 & 0xFF).toByte
-    id(11) = (c & 0xFF).toByte
+      // 3 bytes of counter sequence, which start is randomized. Big endian
+      val c = counter
+      id(9) = (c >> 16 & 0xFF).toByte
+      id(10) = (c >> 8 & 0xFF).toByte
+      id(11) = (c & 0xFF).toByte
+    }
 
     BSONObjectID(id)
-  }
-  
-  /** Generate a BSON ObjectID from a timestamp, especially for range queries */
-  def fromTime(timeMs: Long): BSONObjectID = {
-    val timestamp = (timeMs / 1000).toInt
-    val buf = new Array[Byte](12)
-    buf(0) = (timestamp >>> 24).toByte
-    buf(1) = (timestamp >> 16 & 0xFF).toByte
-    buf(2) = (timestamp >> 8 & 0xFF).toByte
-    buf(3) = (timestamp & 0xFF).toByte
-    BSONObjectID(buf)
   }
 }
 
