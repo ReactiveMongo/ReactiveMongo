@@ -440,7 +440,7 @@ object BSONObjectID {
     id(2) = (timestamp >> 8 & 0xFF).toByte
     id(3) = (timestamp & 0xFF).toByte
 
-    if (fillOnlyTimestamp) {
+    if (!fillOnlyTimestamp) {
       // machine id, 3 first bytes of md5(macadress or hostname)
       id(4) = machineId(0)
       id(5) = machineId(1)
