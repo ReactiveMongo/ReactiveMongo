@@ -91,7 +91,7 @@ case class NodeSet(
 
   def pickByChannelId(id: Int): Option[(Node, Connection)] =
     nodes.view.map(node => node -> node.connections.find(_.channel.getId() == id)).collectFirst {
-      case (node, connection) if connection.isDefined => node -> connection.get
+      case (node, connection) if connection.exists(_.status == ConnectionStatus.Connected) => node -> connection.get
     }
 
   def pickForWrite: Option[(Node, Connection)] =

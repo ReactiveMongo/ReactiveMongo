@@ -35,7 +35,7 @@ import reactivemongo.api.ReadPreference
  * It holds a promise that will be completed by the MongoDBSystem actor.
  * The future can be used to get the error or the successful response.
  */
-trait ExpectingResponse {
+sealed trait ExpectingResponse {
   private[actors] val promise: Promise[Response] = Promise()
   /** The future response of this request. */
   val future: Future[Response] = promise.future
@@ -67,8 +67,9 @@ case object Close
  */
 private[reactivemongo] case object ConnectAll
 private[reactivemongo] case object RefreshAllNodes
-private[reactivemongo] case class Connected(channelId: Int)
-private[reactivemongo] case class Disconnected(channelId: Int)
+private[reactivemongo] case class ChannelConnected(channelId: Int)
+private[reactivemongo] case class ChannelDisconnected(channelId: Int)
+private[reactivemongo] case class ChannelClosed(channelId: Int)
 
 /** Message sent when the primary has been discovered. */
 case object PrimaryAvailable
@@ -143,8 +144,98 @@ class MongoDBSystem(
     })
   }
 
+  def updateNodeSetOnDisconnect(channelId: Int): NodeSet =
+    updateNodeSet(nodeSet.updateNodeByChannelId(channelId) { node =>
+      val connections = node.connections.map { connection =>
+        if (connection.channel.getId() == channelId)
+          connection.copy(status = ConnectionStatus.Disconnected)
+        else connection
+      }
+
+      node.copy(
+        status = NodeStatus.Unknown,
+        connections = connections,
+        authenticated = if (connections.isEmpty) Set.empty else node.authenticated)
+    })
+
+  val closing: Receive = {
+    case req: RequestMaker =>
+      logger.error(s"Received a non-expecting response request during closing process: $req")
+
+    case RegisterMonitor => monitors += sender
+
+    case req: ExpectingResponse =>
+      logger.debug(s"Received an expecting response request during closing process: $req, completing its promise with a failure")
+      req.promise.failure(Exceptions.ClosedException)
+
+    case msg @ ChannelClosed(channelId) =>
+      updateNodeSet(nodeSet.updateNodeByChannelId(channelId) { node =>
+        val connections = node.connections.filter { connection =>
+          connection.channel.getId() != channelId
+        }
+        node.copy(
+          status = NodeStatus.Unknown,
+          connections = connections,
+          authenticated = if (connections.isEmpty) Set.empty else node.authenticated)
+      })
+      val remainingConnections = nodeSet.nodes.foldLeft(0) { (open, node) =>
+        open + node.connections.size
+      }
+      if(logger.logger.isDebugEnabled()) {
+        val disconnected = nodeSet.nodes.foldLeft(0) { (open, node) =>
+          open + node.connections.count(_.status == ConnectionStatus.Disconnected)
+        }
+        logger.debug(s"(State: Closing) Received $msg, remainingConnections = $remainingConnections, disconnected = $disconnected, connected = ${remainingConnections - disconnected}")
+      }
+      if(remainingConnections == 0) {
+        monitors foreach (_ ! Closed)
+        logger.info(s"MongoDBSystem $self is stopping.")
+        context.stop(self)
+      }
+
+    case msg @ ChannelDisconnected(channelId) =>
+      updateNodeSetOnDisconnect(channelId)
+      if(logger.logger.isDebugEnabled()) {
+        val remainingConnections = nodeSet.nodes.foldLeft(0) { (open, node) =>
+          open + node.connections.size
+        }
+        val disconnected = nodeSet.nodes.foldLeft(0) { (open, node) =>
+          open + node.connections.count(_.status == ConnectionStatus.Disconnected)
+        }
+        logger.debug(s"(State: Closing) Received $msg, remainingConnections = $remainingConnections, disconnected = $disconnected, connected = ${remainingConnections - disconnected}")
+      }
+
+    case other =>
+      logger.error(s"(State: Closing) UNHANDLED MESSAGE: $other")
+  }
+
   override def receive = {
     case RegisterMonitor => monitors += sender
+
+    case Close =>
+      logger.info("Received Close message, going to close connections and moving on stage Closing")
+
+      // cancel all jobs
+      connectAllJob.cancel
+      refreshAllJob.cancel
+
+      // close all connections
+      val listener = new ChannelGroupFutureListener {
+        val factory = channelFactory
+        val monitorActors = monitors
+        def operationComplete(future: ChannelGroupFuture): Unit = {
+          logger.debug("Netty says all channels are closed.")
+          factory.channelFactory.releaseExternalResources
+        }
+      }
+      allChannelGroup(nodeSet).close.addListener(listener)
+
+      // fail all requests waiting for a response
+      awaitingResponses.foreach( _._2.promise.failure(Exceptions.ClosedException) )
+      awaitingResponses.empty
+
+      // moving to closing state
+      context become closing
 
     case req: RequestMaker =>
 
@@ -200,7 +291,7 @@ class MongoDBSystem(
       }
       logger.debug("RefreshAllNodes Job running... Status: " + nodeSet.toShortString)
     }
-    case Connected(channelId) => {
+    case c@ ChannelConnected(channelId) => {
       updateNodeSet(nodeSet.updateByChannelId(channelId) { connection =>
         connection.copy(status = ConnectionStatus.Connected)
       } { node =>
@@ -208,9 +299,30 @@ class MongoDBSystem(
       })
       logger.trace(s"Channel #$channelId connected. NodeSet status: ${nodeSet.toShortString}")
     }
-    case Disconnected(channelId) => {
+    case ChannelDisconnected(channelId) => {
+      updateNodeSetOnDisconnect(channelId)
+      awaitingResponses.retain { (_, awaitingResponse) =>
+        if (awaitingResponse.channelID == channelId) {
+          logger.debug("completing promise " + awaitingResponse.promise + " with error='socket disconnected'")
+          awaitingResponse.promise.failure(GenericDriverException("socket disconnected"))
+          false
+        } else true
+      }
+      if (!nodeSet.isReachable) {
+        logger.error("The entire node set is unreachable, is there a network problem?")
+        broadcastMonitors(PrimaryUnavailable) // TODO
+      } else if (!nodeSet.primary.isDefined) {
+        logger.warn("The primary is unavailable, is there a network problem?")
+        broadcastMonitors(PrimaryUnavailable)
+      }
+      logger.debug(channelId + " is disconnected")
+    }
+    case ChannelClosed(channelId) =>
+      logger.debug(s"Channel #$channelId closed.")
       updateNodeSet(nodeSet.updateNodeByChannelId(channelId) { node =>
-        val connections = node.connections.filter(_.channel.isConnected())
+        val connections = node.connections.filter { connection =>
+          connection.channel.getId() != channelId
+        }
         node.copy(
           status = NodeStatus.Unknown,
           connections = connections,
@@ -231,7 +343,6 @@ class MongoDBSystem(
         broadcastMonitors(PrimaryUnavailable)
       }
       logger.debug(channelId + " is disconnected")
-    }
     // isMaster response
     case response: Response if requestIds.isMaster accepts response =>
       IsMaster.ResultMaker(response).fold(
@@ -391,21 +502,7 @@ class MongoDBSystem(
   }
 
   override def postStop() {
-    import org.jboss.netty.channel.group.{ ChannelGroupFuture, ChannelGroupFutureListener }
-
-    val listener = new ChannelGroupFutureListener {
-      val factory = channelFactory
-      val monitorActors = monitors
-      def operationComplete(future: ChannelGroupFuture): Unit = {
-        logger.debug("all channels are closed.")
-        factory.channelFactory.releaseExternalResources
-        monitorActors foreach (_ ! Closed)
-      }
-    }
-
-    allChannelGroup(nodeSet).close.addListener(listener)
-
-    logger.debug("MongoDBSystem stopped.")
+    logger.warn(s"MongoDBSystem $self stopped.")
   }
 
   def broadcastMonitors(message: AnyRef) = monitors.foreach(_ ! message)
@@ -525,17 +622,19 @@ class MonitorActor(sys: ActorRef) extends Actor {
         waitingForPrimary += sender
       }
     case Close =>
+      logger.debug("Monitor received Close")
       killed = true
-      sys ! PoisonPill
+      sys ! Close
       waitingForClose += sender
       waitingForPrimary.dequeueAll(_ => true).foreach(_ ! Failure(new RuntimeException("MongoDBSystem actor shutting down or no longer active")))
     case Closed =>
+      logger.debug(s"Monitor $self closed, stopping...")
       waitingForClose.dequeueAll(_ => true).foreach(_ ! Closed)
-      self ! PoisonPill
+      context.stop(self)
   }
 
   override def postStop {
-    logger.debug("Monitor actor stopped.")
+    logger.debug(s"Monitor $self stopped.")
   }
 }
 
@@ -555,6 +654,9 @@ object Exceptions {
   }
   object ChannelNotFound extends DriverException {
     val message = "ChannelNotFound"
+  }
+  object ClosedException extends DriverException {
+    val message = "This MongoConnection is closed"
   }
 }
 

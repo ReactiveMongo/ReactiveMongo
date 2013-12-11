@@ -234,8 +234,7 @@ class MongoDriver(systemOption: Option[ActorSystem] = None) {
     // Non default actor system -- terminate actors used by MongoConnections 
     case Some(_) =>
       connections.foreach { connection =>
-        connection.mongosystem ! PoisonPill
-        connection.monitor ! PoisonPill
+        connection.monitor ! Close
       }
     // Default actor system -- just shut it down
     case None => system.shutdown()
