@@ -68,8 +68,10 @@ case object Close
 private[reactivemongo] case object ConnectAll
 private[reactivemongo] case object RefreshAllNodes
 private[reactivemongo] case class ChannelConnected(channelId: Int)
-private[reactivemongo] case class ChannelDisconnected(channelId: Int)
-private[reactivemongo] case class ChannelClosed(channelId: Int)
+sealed trait ChannelUnavailable { def channelId: Int }
+object ChannelUnavailable { def unapply(cu: ChannelUnavailable): Option[Int] = Some(cu.channelId) }
+private[reactivemongo] case class ChannelDisconnected(channelId: Int) extends ChannelUnavailable
+private[reactivemongo] case class ChannelClosed(channelId: Int) extends ChannelUnavailable
 
 /** Message sent when the primary has been discovered. */
 case object PrimaryAvailable
@@ -291,7 +293,7 @@ class MongoDBSystem(
       }
       logger.debug("RefreshAllNodes Job running... Status: " + nodeSet.toShortString)
     }
-    case c@ ChannelConnected(channelId) => {
+    case ChannelConnected(channelId) => {
       updateNodeSet(nodeSet.updateByChannelId(channelId) { connection =>
         connection.copy(status = ConnectionStatus.Connected)
       } { node =>
@@ -299,8 +301,24 @@ class MongoDBSystem(
       })
       logger.trace(s"Channel #$channelId connected. NodeSet status: ${nodeSet.toShortString}")
     }
-    case ChannelDisconnected(channelId) => {
-      updateNodeSetOnDisconnect(channelId)
+    case channelUnavailable @ ChannelUnavailable(channelId) => {
+      logger.debug(s"Channel #$channelId unavailable ($channelUnavailable).")
+      val nodeSetWasReachable = nodeSet.isReachable
+      val primaryWasAvailable = nodeSet.primary.isDefined
+      channelUnavailable match {
+        case _: ChannelClosed =>
+          updateNodeSet(nodeSet.updateNodeByChannelId(channelId) { node =>
+            val connections = node.connections.filter { connection =>
+              connection.channel.getId() != channelId
+            }
+            node.copy(
+              status = NodeStatus.Unknown,
+              connections = connections,
+              authenticated = if (connections.isEmpty) Set.empty else node.authenticated)
+          })
+        case _: ChannelDisconnected =>
+          updateNodeSetOnDisconnect(channelId)
+      }
       awaitingResponses.retain { (_, awaitingResponse) =>
         if (awaitingResponse.channelID == channelId) {
           logger.debug("completing promise " + awaitingResponse.promise + " with error='socket disconnected'")
@@ -309,42 +327,22 @@ class MongoDBSystem(
         } else true
       }
       if (!nodeSet.isReachable) {
-        logger.error("The entire node set is unreachable, is there a network problem?")
+        if(nodeSetWasReachable)
+          logger.error("The entire node set is unreachable, is there a network problem?")
+        else logger.debug("The entire node set is still unreachable, is there a network problem?")
         broadcastMonitors(PrimaryUnavailable) // TODO
       } else if (!nodeSet.primary.isDefined) {
-        logger.warn("The primary is unavailable, is there a network problem?")
+        if(primaryWasAvailable)
+          logger.error("The primary is unavailable, is there a network problem?")
+        else logger.debug("The primary is still unavailable, is there a network problem?")
         broadcastMonitors(PrimaryUnavailable)
       }
       logger.debug(channelId + " is disconnected")
     }
-    case ChannelClosed(channelId) =>
-      logger.debug(s"Channel #$channelId closed.")
-      updateNodeSet(nodeSet.updateNodeByChannelId(channelId) { node =>
-        val connections = node.connections.filter { connection =>
-          connection.channel.getId() != channelId
-        }
-        node.copy(
-          status = NodeStatus.Unknown,
-          connections = connections,
-          authenticated = if (connections.isEmpty) Set.empty else node.authenticated)
-      })
-      awaitingResponses.retain { (_, awaitingResponse) =>
-        if (awaitingResponse.channelID == channelId) {
-          logger.debug("completing promise " + awaitingResponse.promise + " with error='socket disconnected'")
-          awaitingResponse.promise.failure(GenericDriverException("socket disconnected"))
-          false
-        } else true
-      }
-      if (!nodeSet.isReachable) {
-        logger.error("The entire node set is unreachable, is there a network problem?")
-        broadcastMonitors(PrimaryUnavailable) // TODO
-      } else if (!nodeSet.primary.isDefined) {
-        logger.warn("The primary is unavailable, is there a network problem?")
-        broadcastMonitors(PrimaryUnavailable)
-      }
-      logger.debug(channelId + " is disconnected")
     // isMaster response
     case response: Response if requestIds.isMaster accepts response =>
+      val nodeSetWasReachable = nodeSet.isReachable
+      val primaryWasAvailable = nodeSet.primary.isDefined
       IsMaster.ResultMaker(response).fold(
         e => {
           logger.error(s"error while processing isMaster response #${response.header.responseTo}", e)
@@ -373,6 +371,10 @@ class MongoDBSystem(
             }
           }
         })
+      if(!nodeSetWasReachable && nodeSet.isReachable)
+        logger.info("The node set is now available")
+      if(!primaryWasAvailable && nodeSet.primary.isDefined)
+        logger.info("The primary is now available")
 
     case request @ AuthRequest(authenticate, _) => {
       // TODO warn auth ok

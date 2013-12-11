@@ -62,7 +62,7 @@ class Failover[T](message: T, connection: MongoConnection, strategy: FailoverStr
           val `try` = n + 1
           val delayFactor = strategy.delayFactor(`try`)
           val delay = Duration.unapply(strategy.initialDelay * delayFactor).map(t => FiniteDuration(t._1, t._2)).getOrElse(strategy.initialDelay)
-          logger.warn("Got an error, retrying... (try #" + `try` + " is scheduled in " + delay.toMillis + " ms)", e)
+          logger.debug("Got an error, retrying... (try #" + `try` + " is scheduled in " + delay.toMillis + " ms)", e)
           connection.actorSystem.scheduler.scheduleOnce(delay)(send(`try`))
         } else {
           // generally that means that the primary is not available or the nodeset is unreachable
@@ -70,7 +70,7 @@ class Failover[T](message: T, connection: MongoConnection, strategy: FailoverStr
           promise.failure(e)
         }
       case Failure(e) =>
-        logger.debug("Got an non retryable error, completing with a failure...", e)
+        logger.trace("Got an non retryable error, completing with a failure...", e)
         promise.failure(e)
       case Success(response) =>
         logger.trace("Got a successful result, completing...")
@@ -278,4 +278,3 @@ object MongoDriver {
   def apply(system: ActorSystem) = new MongoDriver(system)
 
 }
-

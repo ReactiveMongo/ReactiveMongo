@@ -95,12 +95,12 @@ case class NodeSet(
     }
 
   def pickForWrite: Option[(Node, Connection)] =
-    primary.view.map(node => node -> node.authenticatedNodes.subject.headOption).collectFirst {
+    primary.view.map(node => node -> node.authenticatedConnections.subject.headOption).collectFirst {
       case (node, Some(connection)) => node -> connection
     }
 
   private val pickConnectionAndFlatten: Option[Node] => Option[(Node, Connection)] = { node =>
-    node.map(node => node -> node.authenticatedNodes.pick).collect { case (node, Some(connection)) => (node, connection) }
+    node.map(node => node -> node.authenticatedConnections.pick).collect { case (node, Some(connection)) => (node, connection) }
   }
 
   private def pickFromGroupWithFilter(roundRobiner: RoundRobiner[Node, Vector], filter: Option[BSONDocument => Boolean], fallback: => Option[Node]) = {
@@ -148,7 +148,7 @@ case class Node(
 
   val connected = connections.filter(_.status == ConnectionStatus.Connected)
 
-  val authenticatedNodes = new RoundRobiner(connected.filter(_.authenticated.forall { auth =>
+  val authenticatedConnections = new RoundRobiner(connected.filter(_.authenticated.forall { auth =>
     authenticated.exists(_ == auth)
   }))
 
@@ -167,12 +167,10 @@ case class Connection(
     authenticated: Set[Authenticated],
     authenticating: Option[Authenticating]) {
   def send(message: Request, writeConcern: Request) {
-    //logger.trace("connection " + channel.getId + " will send Request " + message + " followed by writeConcern " + writeConcern)
     channel.write(message)
     channel.write(writeConcern)
   }
   def send(message: Request) {
-    //logger.trace("connection " + channel.getId + " will send Request " + message)
     channel.write(message)
   }
 
