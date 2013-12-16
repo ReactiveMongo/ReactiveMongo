@@ -117,6 +117,15 @@ trait DBMetaCommands {
       .cursor(collectionNameReader, ec)
       .collect[List]()
   }
+
+  /**
+   * Execute MongoDB eval command and return the result
+   * @param javascript javascript code for evaluation
+   * @param nolock donn't get global lock for the operation
+   * @param ec execution context
+   * @return operation result as BSONValue
+   */
+  def eval(javascript: String, nolock: Boolean)(implicit ec: ExecutionContext): Future[BSONValue] = command(new EvalCommnd(javascript, nolock))
 }
 
 /** The default DB implementation, that mixes in the database traits. */
