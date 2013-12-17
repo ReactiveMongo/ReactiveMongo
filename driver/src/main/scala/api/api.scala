@@ -26,7 +26,6 @@ import reactivemongo.core.protocol._
 import reactivemongo.core.commands.{ Command, GetLastError, LastError, SuccessfulAuthentication }
 import reactivemongo.utils.LazyLogger
 import reactivemongo.utils.EitherMappableFuture._
-import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.{ ExecutionContext, Future, Promise }
 import scala.concurrent.duration._
 import scala.util.{ Failure, Success }
@@ -225,8 +224,10 @@ class MongoDriver(systemOption: Option[ActorSystem] = None) {
 
   def this(system: ActorSystem) = this(Some(system))
 
+  @volatile private var _connections = List[MongoConnection]()
+
   /** Keep a list of all connections so that we can terminate the actors */
-  val connections = ArrayBuffer[MongoConnection]()
+  def connections: Seq[MongoConnection] = _connections
 
   val system = systemOption.getOrElse(MongoDriver.defaultSystem)
 
@@ -253,7 +254,9 @@ class MongoDriver(systemOption: Option[ActorSystem] = None) {
     val mongosystem = if (name.isDefined) system.actorOf(props, name = name.get) else system.actorOf(props)
     val monitor = system.actorOf(Props(new MonitorActor(mongosystem)))
     val connection = new MongoConnection(system, mongosystem, monitor)
-    connections += connection
+    this.synchronized {
+      _connections = connection :: _connections
+    }
     connection
   }
 }
