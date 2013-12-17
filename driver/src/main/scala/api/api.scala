@@ -28,7 +28,9 @@ import reactivemongo.utils.LazyLogger
 import reactivemongo.utils.EitherMappableFuture._
 import scala.concurrent.{ ExecutionContext, Future, Promise }
 import scala.concurrent.duration._
-import scala.util.{ Failure, Success }
+import scala.util.{ Try, Failure, Success }
+import scala.util.control.NoStackTrace
+import scala.util.control.NonFatal
 
 /**
  * A helper that sends the given message to the given actor, following a failover strategy.
@@ -220,6 +222,77 @@ class MongoConnection(
   def close(): Unit = monitor ! Close
 }
 
+object MongoConnection {
+  val DefaultHost = "localhost"
+  val DefaultPort = 27017
+
+  final class URIParsingException(message: String) extends Exception with NoStackTrace {
+    override def getMessage() = message
+  }
+
+  final case class ParsedURI(
+    hosts: List[(String, Int)],
+    db: Option[String],
+    authenticate: Option[Authenticate])
+
+  /**
+   * Parses a MongoURI.
+   *
+   * See [[http://docs.mongodb.org/manual/reference/connection-string/ the MongoDB URI documentation]] for more information.
+   * Please note that as of 0.10.0, options are ignored.
+   */
+  def parseURI(uri: String): Try[ParsedURI] = {
+    val prefix = "mongodb://"
+    def parseAuth(usernameAndPassword: String): (String, String) = {
+      usernameAndPassword.split(":").toList match {
+        case username :: password :: Nil => username -> password
+        case _                           => throw new URIParsingException(s"Could not parse URI '$uri': invalid authentication '$usernameAndPassword'")
+      }
+    }
+    def parseHosts(hosts: String) =
+      hosts.split(",").toList.map { host =>
+        host.split(':').toList match {
+          case host :: port :: Nil => host -> {
+            try {
+              val p = port.toInt
+              if (p > 0 && p < 65536)
+                p
+              else throw new URIParsingException(s"Could not parse URI '$uri': invalid port '$port'")
+            } catch {
+              case _: NumberFormatException => throw new URIParsingException(s"Could not parse URI '$uri': invalid port '$port'")
+              case NonFatal(e)              => throw e
+            }
+          }
+          case host :: Nil => host -> DefaultPort
+          case _           => throw new URIParsingException(s"Could not parse URI '$uri': invalid host definition '$hosts'")
+        }
+      }
+    def parseHostsAndDbName(hostsPortAndDbName: String): (Option[String], List[(String, Int)]) = {
+      hostsPortAndDbName.split("/").toList match {
+        case hosts :: Nil           => None -> parseHosts(hosts.takeWhile(_ != '?'))
+        case hosts :: dbName :: Nil => Some(dbName.takeWhile(_ != '?')) -> parseHosts(hosts)
+        case _                      => throw new URIParsingException(s"Could not parse URI '$uri'")
+      }
+    }
+
+    Try {
+      val useful = uri.replace(prefix, "")
+      useful.split("@").toList match {
+        case hostsPortsAndDbName :: Nil =>
+          val (db, hosts) = parseHostsAndDbName(hostsPortsAndDbName)
+          ParsedURI(hosts, db, None)
+        case usernamePasswd :: hostsPortsAndDbName :: Nil =>
+          val (db, hosts) = parseHostsAndDbName(hostsPortsAndDbName)
+          if (!db.isDefined)
+            throw new URIParsingException(s"Could not parse URI '$uri': authentication information found but no database name in URI")
+          val authenticate = parseAuth(usernamePasswd)
+          ParsedURI(hosts, db, Some(Authenticate.apply(db.get, authenticate._1, authenticate._2)))
+        case _ => throw new URIParsingException(s"Could not parse URI '$uri'")
+      }
+    }
+  }
+}
+
 class MongoDriver(systemOption: Option[ActorSystem] = None) {
 
   def this(system: ActorSystem) = this(Some(system))
@@ -244,12 +317,15 @@ class MongoDriver(systemOption: Option[ActorSystem] = None) {
   /**
    * Creates a new MongoConnection.
    *
+   * See [[http://docs.mongodb.org/manual/reference/connection-string/ the MongoDB URI documentation]] for more information.
+   * Please note that as of 0.10.0, options are ignored.
+   *
    * @param nodes A list of node names, like ''node1.foo.com:27017''. Port is optional, it is 27017 by default.
    * @param authentications A list of Authenticates.
    * @param nbChannelsPerNode Number of channels to open per node. Defaults to 10.
    * @param name The name of the newly created [[reactivemongo.core.actors.MongoDBSystem]] actor, if needed.
    */
-  def connection(nodes: Seq[String], authentications: Seq[Authenticate] = Seq.empty, nbChannelsPerNode: Int = 10, name: Option[String] = None) = {
+  def connection(nodes: Seq[String], authentications: Seq[Authenticate] = Seq.empty, nbChannelsPerNode: Int = 10, name: Option[String] = None): MongoConnection = {
     val props = Props(new MongoDBSystem(nodes, authentications, nbChannelsPerNode))
     val mongosystem = if (name.isDefined) system.actorOf(props, name = name.get) else system.actorOf(props)
     val monitor = system.actorOf(Props(new MonitorActor(mongosystem)))
@@ -259,6 +335,42 @@ class MongoDriver(systemOption: Option[ActorSystem] = None) {
     }
     connection
   }
+
+  /**
+   * Creates a new MongoConnection from URI.
+   *
+   * See [[http://docs.mongodb.org/manual/reference/connection-string/ the MongoDB URI documentation]] for more information.
+   * Please note that as of 0.10.0, options are ignored.
+   *
+   * @param parsedURI The URI parsed by [[reactivemongo.api.MongoConnection.parseURI]]
+   * @param nbChannelsPerNode Number of channels to open per node.
+   * @param name The name of the newly created [[reactivemongo.core.actors.MongoDBSystem]] actor, if needed.
+   */
+  def connection(parsedURI: MongoConnection.ParsedURI, nbChannelsPerNode: Int, name: Option[String]): MongoConnection =
+    connection(parsedURI.hosts.map(h => h._1 + ':' + h._2), parsedURI.authenticate.toSeq, nbChannelsPerNode, name)
+
+  /**
+   * Creates a new MongoConnection from URI.
+   *
+   * See [[http://docs.mongodb.org/manual/reference/connection-string/ the MongoDB URI documentation]] for more information.
+   * Please note that as of 0.10.0, options are ignored.
+   *
+   * @param parsedURI The URI parsed by [[reactivemongo.api.MongoConnection.parseURI]]
+   * @param nbChannelsPerNode Number of channels to open per node.
+   */
+  def connection(parsedURI: MongoConnection.ParsedURI, nbChannelsPerNode: Int): MongoConnection =
+    connection(parsedURI, nbChannelsPerNode, None)
+
+  /**
+   * Creates a new MongoConnection from URI.
+   *
+   * See [[http://docs.mongodb.org/manual/reference/connection-string/ the MongoDB URI documentation]] for more information.
+   * Please note that as of 0.10.0, options are ignored.
+   *
+   * @param parsedURI The URI parsed by [[reactivemongo.api.MongoConnection.parseURI]]
+   */
+  def connection(parsedURI: MongoConnection.ParsedURI): MongoConnection =
+    connection(parsedURI, 10, None)
 }
 
 object MongoDriver {
