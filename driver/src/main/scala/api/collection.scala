@@ -49,7 +49,7 @@ package reactivemongo.api
  *
  *     // Or, the same with getting a list
  *     val cursor2 = collection.find(query, filter).cursor[BSONDocument]
- *     val futureList = cursor.toList
+ *     val futureList = cursor.collect[List]()
  *     futureList.map { list =>
  *       list.foreach { doc =>
  *         println("found document: " + BSONDocument.pretty(doc))

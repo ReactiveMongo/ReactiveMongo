@@ -520,7 +520,7 @@ case class IsMasterResponse(
     hosts: Option[Seq[String]],
     me: Option[String],
     tags: Option[BSONDocument]) {
-  /** the resolved [[reactivemongo.core.protocol.NodeState]] of the answering server */
+  /** the resolved [[reactivemongo.core.nodeset.NodeStatus]] of the answering server */
   val status: NodeStatus = if (isMaster) NodeStatus.Primary else if (secondary) NodeStatus.Secondary else NodeStatus.NonQueryableUnknownStatus
 }
 

@@ -68,8 +68,8 @@ case object Close
 private[reactivemongo] case object ConnectAll
 private[reactivemongo] case object RefreshAllNodes
 private[reactivemongo] case class ChannelConnected(channelId: Int)
-sealed trait ChannelUnavailable { def channelId: Int }
-object ChannelUnavailable { def unapply(cu: ChannelUnavailable): Option[Int] = Some(cu.channelId) }
+private[reactivemongo] sealed trait ChannelUnavailable { def channelId: Int }
+private[reactivemongo] object ChannelUnavailable { def unapply(cu: ChannelUnavailable): Option[Int] = Some(cu.channelId) }
 private[reactivemongo] case class ChannelDisconnected(channelId: Int) extends ChannelUnavailable
 private[reactivemongo] case class ChannelClosed(channelId: Int) extends ChannelUnavailable
 
@@ -83,6 +83,7 @@ case object SetAvailable
 case object SetUnavailable
 /** Register a monitor. */
 case object RegisterMonitor
+/** MongoDBSystem has been shut down. */
 case object Closed
 
 /**
