@@ -18,8 +18,8 @@ object BuildSettings {
     crossScalaVersions := Seq("2.10.2"),
     crossVersion := CrossVersion.binary,
     javaOptions in test ++= Seq("-Xmx512m", "-XX:MaxPermSize=512m"),
-    scalacOptions ++= Seq("-unchecked", "-deprecation" /*, "-Xlog-implicits", "-Yinfer-debug", "-Xprint:typer", "-Yinfer-debug", "-Xlog-implicits", "-Xprint:typer"*/ ),
-    scalacOptions in (Compile, doc) ++= Seq("-unchecked", "-deprecation", "-diagrams", "-implicits"),
+    scalacOptions ++= Seq("-unchecked", "-deprecation"),
+    scalacOptions in (Compile, doc) ++= Seq("-unchecked", "-deprecation", "-diagrams", "-implicits", "-skip-packages", "samples"),
     shellPrompt := ShellPrompt.buildShellPrompt,
     mappings in (Compile, packageBin) ~= filter,
     mappings in (Compile, packageSrc) ~= filter,
@@ -27,32 +27,25 @@ object BuildSettings {
 }
 
 object Publish {
-  object TargetRepository {
-    def local: Project.Initialize[Option[sbt.Resolver]] = version { (version: String) =>
-      val localPublishRepo = "/Volumes/Data/code/repository"
-      if (version.trim.endsWith("SNAPSHOT"))
-        Some(Resolver.file("snapshots", new File(localPublishRepo + "/snapshots")))
-      else Some(Resolver.file("releases", new File(localPublishRepo + "/releases")))
-    }
-    def sonatype: Project.Initialize[Option[sbt.Resolver]] = version { (version: String) =>
-      val nexus = "https://oss.sonatype.org/"
-      if (version.trim.endsWith("SNAPSHOT"))
-        Some("snapshots" at nexus + "content/repositories/snapshots")
-      else
-        Some("releases" at nexus + "service/local/staging/deploy/maven2")
-    }
+  def targetRepository: Project.Initialize[Option[sbt.Resolver]] = version { (version: String) =>
+    val nexus = "https://oss.sonatype.org/"
+    if (version.trim.endsWith("SNAPSHOT"))
+      Some("snapshots" at nexus + "content/repositories/snapshots")
+    else
+      Some("releases" at nexus + "service/local/staging/deploy/maven2")
   }
+
   lazy val settings = Seq(
     publishMavenStyle := true,
-    publishTo <<= TargetRepository.sonatype,
+    publishTo <<= targetRepository,
     publishArtifact in Test := false,
     pomIncludeRepository := { _ => false },
     licenses := Seq("Apache 2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0")),
     homepage := Some(url("http://reactivemongo.org")),
     pomExtra := (
       <scm>
-        <url>git://github.com/zenexity/ReactiveMongo.git</url>
-        <connection>scm:git://github.com/zenexity/ReactiveMongo.git</connection>
+        <url>git://github.com/ReactiveMongo/ReactiveMongo.git</url>
+        <connection>scm:git://github.com/ReactiveMongo/ReactiveMongo.git</connection>
       </scm>
       <developers>
         <developer>
@@ -140,13 +133,16 @@ object ReactiveMongoBuild extends Build {
   import BuildSettings._
   import Resolvers._
   import Dependencies._
+  import sbtunidoc.{ Plugin => UnidocPlugin }
 
-  lazy val reactivemongo = Project(
-    "ReactiveMongo-Root",
-    file("."),
-    settings = buildSettings ++ Unidoc.settings ++ Seq(
-      publish := {}
-    )) aggregate(driver, bson, bsonmacros)
+  lazy val reactivemongo =
+    Project(
+      "ReactiveMongo-Root",
+      file("."),
+      settings = buildSettings).
+    settings(publish := {}).
+    settings(UnidocPlugin.unidocSettings: _*).
+    aggregate(driver, bson, bsonmacros)
 
   lazy val driver = Project(
     "ReactiveMongo",
