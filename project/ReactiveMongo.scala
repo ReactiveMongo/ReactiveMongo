@@ -139,8 +139,7 @@ object ReactiveMongoBuild extends Build {
     Project(
       "ReactiveMongo-Root",
       file("."),
-      settings = buildSettings).
-    settings(publish := {}).
+      settings = buildSettings ++ (publishArtifact := false) ).
     settings(UnidocPlugin.unidocSettings: _*).
     aggregate(driver, bson, bsonmacros)
 
