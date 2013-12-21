@@ -328,15 +328,17 @@ class MongoDBSystem(
         } else true
       }
       if (!nodeSet.isReachable) {
-        if(nodeSetWasReachable)
+        if(nodeSetWasReachable) {
           logger.error("The entire node set is unreachable, is there a network problem?")
+          broadcastMonitors(SetUnavailable)
+        }
         else logger.debug("The entire node set is still unreachable, is there a network problem?")
-        broadcastMonitors(PrimaryUnavailable) // TODO
       } else if (!nodeSet.primary.isDefined) {
-        if(primaryWasAvailable)
+        if(primaryWasAvailable) {
           logger.error("The primary is unavailable, is there a network problem?")
+          broadcastMonitors(PrimaryUnavailable)
+        }
         else logger.debug("The primary is still unavailable, is there a network problem?")
-        broadcastMonitors(PrimaryUnavailable)
       }
       logger.debug(channelId + " is disconnected")
     }
@@ -372,10 +374,14 @@ class MongoDBSystem(
             }
           }
         })
-      if(!nodeSetWasReachable && nodeSet.isReachable)
+      if(!nodeSetWasReachable && nodeSet.isReachable) {
+        broadcastMonitors(SetAvailable)
         logger.info("The node set is now available")
-      if(!primaryWasAvailable && nodeSet.primary.isDefined)
+      }
+      if(!primaryWasAvailable && nodeSet.primary.isDefined) {
+        broadcastMonitors(PrimaryAvailable)
         logger.info("The primary is now available")
+      }
 
     case request @ AuthRequest(authenticate, _) => {
       // TODO warn auth ok
@@ -486,8 +492,6 @@ class MongoDBSystem(
 
   def updateNodeSet(nodeSet: NodeSet): NodeSet = {
     this.nodeSet = nodeSet
-    if (nodeSet.primary.isDefined)
-      broadcastMonitors(PrimaryAvailable)
     nodeSet
   }
 
