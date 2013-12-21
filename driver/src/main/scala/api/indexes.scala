@@ -134,11 +134,8 @@ class IndexesManager(db: DB)(implicit context: ExecutionContext) {
   val collection = db("system.indexes")
 
   /** Gets a future list of all the index on this database. */
-  def list(): Future[List[NSIndex]] = {
-    implicit val reader = IndexesManager.NSIndexReader
-    val cursor: Cursor[NSIndex] = collection.find(BSONDocument()).cursor
-    cursor.toList()
-  }
+  def list(): Future[List[NSIndex]] =
+    collection.find(BSONDocument()).cursor(IndexesManager.NSIndexReader, context).collect[List]()
 
   /**
    * Creates the given index only if it does not exist on this database.
