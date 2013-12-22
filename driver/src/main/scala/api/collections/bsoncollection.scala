@@ -96,7 +96,7 @@ object BSONGenericHandlers extends BSONGenericHandlers
  *     // Get a cursor of BSONDocuments
  *     val cursor = collection.find(query, filter).cursor[BSONDocument]
  *     // Let's enumerate this cursor and print a readable representation of each document in the response
- *     cursor.enumerate.apply(Iteratee.foreach { doc =>
+ *     cursor.enumerate().apply(Iteratee.foreach { doc =>
  *       println("found document: " + BSONDocument.pretty(doc))
  *     })
  *

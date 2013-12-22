@@ -20,6 +20,8 @@ object BuildSettings {
     javaOptions in test ++= Seq("-Xmx512m", "-XX:MaxPermSize=512m"),
     scalacOptions ++= Seq("-unchecked", "-deprecation"),
     scalacOptions in (Compile, doc) ++= Seq("-unchecked", "-deprecation", "-diagrams", "-implicits", "-skip-packages", "samples"),
+    scalacOptions in (Compile, doc) ++= Opts.doc.title("ReactiveMongo API"),
+    scalacOptions in (Compile, doc) ++= Opts.doc.version(buildVersion),
     shellPrompt := ShellPrompt.buildShellPrompt,
     mappings in (Compile, packageBin) ~= filter,
     mappings in (Compile, packageSrc) ~= filter,

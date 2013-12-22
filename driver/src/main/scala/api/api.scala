@@ -318,7 +318,6 @@ class MongoDriver(systemOption: Option[ActorSystem] = None) {
    * Creates a new MongoConnection.
    *
    * See [[http://docs.mongodb.org/manual/reference/connection-string/ the MongoDB URI documentation]] for more information.
-   * Please note that as of 0.10.0, options are ignored.
    *
    * @param nodes A list of node names, like ''node1.foo.com:27017''. Port is optional, it is 27017 by default.
    * @param authentications A list of Authenticates.
@@ -340,7 +339,6 @@ class MongoDriver(systemOption: Option[ActorSystem] = None) {
    * Creates a new MongoConnection from URI.
    *
    * See [[http://docs.mongodb.org/manual/reference/connection-string/ the MongoDB URI documentation]] for more information.
-   * Please note that as of 0.10.0, options are ignored.
    *
    * @param parsedURI The URI parsed by [[reactivemongo.api.MongoConnection.parseURI]]
    * @param nbChannelsPerNode Number of channels to open per node.
@@ -353,7 +351,6 @@ class MongoDriver(systemOption: Option[ActorSystem] = None) {
    * Creates a new MongoConnection from URI.
    *
    * See [[http://docs.mongodb.org/manual/reference/connection-string/ the MongoDB URI documentation]] for more information.
-   * Please note that as of 0.10.0, options are ignored.
    *
    * @param parsedURI The URI parsed by [[reactivemongo.api.MongoConnection.parseURI]]
    * @param nbChannelsPerNode Number of channels to open per node.
@@ -365,7 +362,6 @@ class MongoDriver(systemOption: Option[ActorSystem] = None) {
    * Creates a new MongoConnection from URI.
    *
    * See [[http://docs.mongodb.org/manual/reference/connection-string/ the MongoDB URI documentation]] for more information.
-   * Please note that as of 0.10.0, options are ignored.
    *
    * @param parsedURI The URI parsed by [[reactivemongo.api.MongoConnection.parseURI]]
    */
