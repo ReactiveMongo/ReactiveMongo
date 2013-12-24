@@ -208,7 +208,7 @@ class Macros extends Specification {
       val serialized = BSON writeDocument tree
       val deserialized = BSON.readDocument[Tree](serialized)
       val expected = Node(Leaf("hai"), Node(Leaf("hai"),Leaf("hai")))
-      assert( deserialized === expected )
+      deserialized mustEqual expected
     }
 
     "handle empty case classes" in {

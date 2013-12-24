@@ -159,13 +159,16 @@ object ReactiveMongoBuild extends Build {
   lazy val bson = Project(
     "ReactiveMongo-BSON",
     file("bson"),
-    settings = buildSettings)
+    settings = buildSettings).
+    settings(libraryDependencies += Dependencies.specs)
 
   lazy val bsonmacros = Project(
     "ReactiveMongo-BSON-Macros",
     file("macros"),
     settings = buildSettings ++ Seq(
       libraryDependencies <+= (scalaVersion)("org.scala-lang" % "scala-compiler" % _)
-    )) dependsOn (bson)
+    )).
+    settings(libraryDependencies += Dependencies.specs).
+    dependsOn (bson)
 }
 
