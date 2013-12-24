@@ -113,13 +113,13 @@ def listDocs() = {
   val cursor = collection.find(query, filter).cursor[BSONDocument]
   /* Let's enumerate this cursor and print a readable
    * representation of each document in the response */
-  cursor.enumerate.apply(Iteratee.foreach { doc =>
+  cursor.enumerate().apply(Iteratee.foreach { doc =>
     println("found document: " + BSONDocument.pretty(doc))
   })
 
   // Or, the same with getting a list
   val cursor2 = collection.find(query, filter).cursor[BSONDocument]
-  val futureList: Future[List[BSONDocument]] = cursor.toList
+  val futureList: Future[List[BSONDocument]] = cursor.collect[List]()
   futureList.map { list =>
     list.foreach { doc =>
       println("found document: " + BSONDocument.pretty(doc))
@@ -154,14 +154,12 @@ trait BSONDocumentReader[DocumentType] {
 
 Like for `BSONDocumentWriter[T]`, there is a default reader for `BSONDocument` in the package `reactivemongo.bson`.
 
-You may have noticed that the `cursor[T]` metho returns a `FlattenedCursor[T]`. This cursor is actually a future cursor. In fact, _everything in ReactiveMongo is both non-blocking and asynchronous_. That means each time you make a query, the only immediate result you get is a future of result, so the current thread is not blocked waiting for its completion. You don't need to have _n_ threads to process _n_ database operations at the same time anymore.
-
 When a query matches too much documents, Mongo sends just a part of them and creates a Cursor in order to get the next documents. The problem is, how to handle it in a non-blocking, asynchronous, yet elegant way?
 
 Obviously ReactiveMongo's cursor provides helpful methods to build a collection (like a list) from it, so we could write:
 
 ```scala
-val futureList: Future[List[BSONDocument]] = cursor.toList
+val futureList: Future[List[BSONDocument]] = cursor.collect[List]()
 futureList.map { list =>
   println("ok, got the list: " + list)
 }
@@ -174,12 +172,12 @@ That's where the Enumerator/Iteratee pattern (or immutable Producer/Consumer pat
 Let's consider the following statement:
 
 ```scala
-cursor.enumerate.apply(Iteratee.foreach { doc =>
+cursor.enumerate().apply(Iteratee.foreach { doc =>
   println("found document: " + BSONDocument.pretty(doc))
 })
 ```
 
-The method `cursor.enumerate` returns an `Enumerator[T]`. Enumerators can be seen as _producers_ of data: their job is to give chunks of data when data is available. In this case, we get a producer of documents, which source is a future cursor.
+The method `cursor.enumerate()` returns an `Enumerator[T]`. Enumerators can be seen as _producers_ of data: their job is to give chunks of data when data is available. In this case, we get a producer of documents, which source is a future cursor.
 
 Now that we have the producer, we need to define how the documents are processed: that is the `Iteratee`'s job. Iteratees, as the opposite of Enumerators, are consumers: they are fed in by enumerators and do some computation with the chunks they get.
 
@@ -202,15 +200,15 @@ When this snippet is run, we get the following:
 
 ## Go further!
 
-There is a pretty complete [Scaladoc](http://reactivemongo.org/releases/0.9/api/index.html) available. The code is accessible from the [Github repository](https://github.com/zenexity/ReactiveMongo). And obviously, don't hesitate to ask questions in the [ReactiveMongo Google Group](https://groups.google.com/forum/?fromgroups#!forum/reactivemongo)!
+You can read the [full documentation on the project website](http://reactivemongo.org/documentation.html). There is a pretty complete [Scaladoc](http://reactivemongo.org/releases/0.10/api/index.html) available. The code is accessible from the [Github repository](https://github.com/ReactiveMongo/ReactiveMongo). And obviously, don't hesitate to ask questions in the [ReactiveMongo Google Group](https://groups.google.com/forum/?fromgroups#!forum/reactivemongo)!
 
-ReactiveMongo makes a heavy usage of the [Iteratee](http://www.playframework.com/documentation/2.1.1/Iteratees) library. Although it is developped by the [Play! Framework](http://www.playframework.com) team, it does _not_ depend on any other part of the framework. You can dive into [Play's Iteratee documentation](http://www.playframework.com/documentation/2.1.1/Iteratees) to learn about this cool piece of software, and make your own Iteratees and Enumerators.
+ReactiveMongo makes a heavy usage of the [Iteratee](http://www.playframework.com/documentation/2.2.x/Iteratees) library. Although it is developped by the [Play! Framework](http://www.playframework.com) team, it does _not_ depend on any other part of the framework. You can dive into [Play's Iteratee documentation](http://www.playframework.com/documentation/2.2.x/Iteratees) to learn about this cool piece of software, and make your own Iteratees and Enumerators.
 
-Used in conjonction with stream-aware frameworks, like Play!, you can easily stream the data stored in MongoDB. For Play, there is a [ReactiveMongo Plugin](https://github.com/zenexity/Play-ReactiveMongo) that brings some cool stuff, like JSON-specialized collection and helpers for GridFS. See the examples and get convinced!
+Used in conjonction with stream-aware frameworks, like Play!, you can easily stream the data stored in MongoDB. For Play, there is a [ReactiveMongo Plugin](https://github.com/ReactiveMongo/Play-ReactiveMongo) that brings some cool stuff, like JSON-specialized collection and helpers for GridFS. See the examples and get convinced!
 
 ### Samples
 
-These sample applications are kept up to date with the latest driver version. They are built upon Play 2.1.
+These sample applications are kept up to date with the latest driver version. They are built upon Play 2.2.
 
 * [ReactiveMongo Tailable Cursor, WebSocket and Play 2](https://github.com/sgodbillon/reactivemongo-tailablecursor-demo)
 * [Full Web Application featuring basic CRUD operations and GridFS streaming](https://github.com/sgodbillon/reactivemongo-demo-app)
