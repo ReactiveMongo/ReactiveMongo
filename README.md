@@ -49,7 +49,7 @@ If you use SBT, you just have to edit `build.sbt` and add the following:
 
 ```scala
 libraryDependencies ++= Seq(
-  "org.reactivemongo" %% "reactivemongo" % "0.9"
+  "org.reactivemongo" %% "reactivemongo" % "0.10.0"
 )
 ```
 
@@ -59,7 +59,7 @@ Or if you want to be on the bleeding edge using snapshots:
 resolvers += "Sonatype Snapshots" at "http://oss.sonatype.org/content/repositories/snapshots/"
 
 libraryDependencies ++= Seq(
-  "org.reactivemongo" %% "reactivemongo" % "0.10.0-SNAPSHOT"
+  "org.reactivemongo" %% "reactivemongo" % "0.11.0-SNAPSHOT"
 )
 ```
 
