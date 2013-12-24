@@ -296,32 +296,31 @@ object BSONBinary {
 case object BSONUndefined extends BSONValue { val code = 0x06.toByte }
 
 /** BSON ObjectId value. */
-case class BSONObjectID(value: Array[Byte]) extends BSONValue {
+class BSONObjectID private (raw: Array[Byte]) extends BSONValue {
   val code = 0x07.toByte
 
   import java.util.Arrays
   import java.nio.ByteBuffer
 
-  /** Constructs a BSON ObjectId element from a hexadecimal String representation */
-  def this(value: String) = this(Converters.str2Hex(value))
-
   /** ObjectId hexadecimal String representation */
-  lazy val stringify = Converters.hex2Str(value)
+  lazy val stringify = Converters.hex2Str(raw)
 
   override def toString = "BSONObjectID(\"" + stringify + "\")"
 
   override def equals(obj: Any): Boolean = obj match {
-    case BSONObjectID(arr) => Arrays.equals(value, arr)
+    case BSONObjectID(arr) => Arrays.equals(raw, arr)
     case _                 => false
   }
 
-  override lazy val hashCode: Int = Arrays.hashCode(value)
+  override lazy val hashCode: Int = Arrays.hashCode(raw)
 
   /** The time of this BSONObjectId, in milliseconds */
   def time: Long = this.timeSecond * 1000L
 
   /** The time of this BSONObjectId, in seconds */
-  def timeSecond: Int = ByteBuffer.wrap(this.value.take(4)).getInt
+  def timeSecond: Int = ByteBuffer.wrap(raw.take(4)).getInt
+
+  def valueAsArray = Arrays.copyOf(raw, 12)
 }
 
 object BSONObjectID {
@@ -391,8 +390,17 @@ object BSONObjectID {
   def apply(id: String): BSONObjectID = {
     if (id.length != 24)
       throw new IllegalArgumentException(s"wrong ObjectId: '$id'")
-    else new BSONObjectID(id)
+    /** Constructs a BSON ObjectId element from a hexadecimal String representation */
+    new BSONObjectID(Converters.str2Hex(id))
   }
+
+  def apply(array: Array[Byte]): BSONObjectID = {
+    if(array.length != 12)
+      throw new IllegalArgumentException(s"wrong byte array for an ObjectId (size ${array.length})")
+    new BSONObjectID(java.util.Arrays.copyOf(array, 12))
+  }
+
+  def unapply(id: BSONObjectID): Option[Array[Byte]] = Some(id.valueAsArray)
 
   /** Tries to make a BSON ObjectId element from a hexadecimal String representation. */
   def parse(str: String): Try[BSONObjectID] = Try(apply(str))

@@ -167,7 +167,7 @@ object DefaultBufferHandler extends BufferHandler {
     def read(buffer: ReadableBuffer) = BSONUndefined
   }
   object BSONObjectIDBufferHandler extends BufferRW[BSONObjectID] {
-    def write(objectId: BSONObjectID, buffer: WritableBuffer) = buffer writeBytes objectId.value
+    def write(objectId: BSONObjectID, buffer: WritableBuffer) = buffer writeBytes objectId.valueAsArray
     def read(buffer: ReadableBuffer) = BSONObjectID(buffer.readArray(12))
   }
   object BSONBooleanBufferHandler extends BufferRW[BSONBoolean] {
