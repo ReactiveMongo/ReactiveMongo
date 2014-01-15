@@ -40,7 +40,7 @@ object Implicits {
         doc.getAs[BSONValue]("_id").get,
         doc.getAs[BSONString]("contentType").map(_.value),
         doc.getAs[BSONString]("filename").map(_.value).get,
-        doc.getAs[BSONNumberLike]("uploadDate").map(_.toLong),
+        doc.getAs[BSONDateTime]("uploadDate").map(_.value),
         doc.getAs[BSONNumberLike]("chunkSize").map(_.toInt).get,
         doc.getAs[BSONNumberLike]("length").map(_.toInt).get,
         doc.getAs[BSONString]("md5").map(_.value),
