@@ -21,20 +21,20 @@ class GridfsSpec extends Specification {
   "ReactiveMongo" should {
 
     "store a file in gridfs" in {
-      val actual = Await.result(gfs.save(fileContent, file), Duration(3, SECONDS))
+      val actual = Await.result(gfs.save(fileContent, file), timeout)
       actual.filename mustEqual "somefile"
     }
 
     "find this file in gridfs" in {
       val futureFile = gfs.find(BSONDocument("filename" -> "somefile")).collect[List]()
-      val actual = Await.result(futureFile, Duration(3, SECONDS)).head
+      val actual = Await.result(futureFile, timeout).head
       (actual.filename mustEqual file.filename) and
       (actual.uploadDate must beSome) and
       (actual.contentType mustEqual file.contentType)
     }
 
     "delete this file from gridfs" in {
-      val actual = Await.result(gfs.remove(file.id), Duration(3, SECONDS))
+      val actual = Await.result(gfs.remove(file.id), timeout)
       actual.n mustEqual 1
     }
   }
