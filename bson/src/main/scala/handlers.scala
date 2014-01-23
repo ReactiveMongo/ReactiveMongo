@@ -133,6 +133,7 @@ trait DefaultBSONHandlers {
       case int: BSONInteger => BSONIntegerNumberLike(int)
       case long: BSONLong => BSONLongNumberLike(long)
       case double: BSONDouble => BSONDoubleNumberLike(double)
+      case dt: BSONDateTime => BSONDateTimeNumberLike(dt)
       case _ => throw new UnsupportedOperationException()
     }
   }
