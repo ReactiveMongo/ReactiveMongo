@@ -509,6 +509,27 @@ class MongoDBSystem(
   }
 
   override def postStop() {
+    // COPY OF CLOSING CODE FROM LINE 218
+
+    // cancel all jobs
+    connectAllJob.cancel
+    refreshAllJob.cancel
+
+    // close all connections
+    val listener = new ChannelGroupFutureListener {
+      val factory = channelFactory
+      val monitorActors = monitors
+      def operationComplete(future: ChannelGroupFuture): Unit = {
+        logger.debug("Netty says all channels are closed.")
+        factory.channelFactory.releaseExternalResources
+      }
+    }
+    allChannelGroup(nodeSet).close.addListener(listener)
+
+    // fail all requests waiting for a response
+    awaitingResponses.foreach( _._2.promise.failure(Exceptions.ClosedException) )
+    awaitingResponses.empty
+
     logger.warn(s"MongoDBSystem $self stopped.")
   }
 
@@ -641,6 +662,17 @@ class MonitorActor(sys: ActorRef) extends Actor {
   }
 
   override def postStop {
+    // COPY OF CLOSING CODE FROM LINE 656
+    // I'm not sure this will actually be useful because the close message we send to sys
+    // will probably not be received if we are stopping because the Actorsystem is killed.
+    // I can't hurt though...
+    killed = true
+    sys ! Close
+    waitingForClose += sender
+    waitingForPrimary.dequeueAll(_ => true).foreach(_ ! Failure(new RuntimeException("MongoDBSystem actor shutting down or no longer active")))
+
+    // EXECUTE "CLOSED" CODE too?
+
     logger.debug(s"Monitor $self stopped.")
   }
 }
