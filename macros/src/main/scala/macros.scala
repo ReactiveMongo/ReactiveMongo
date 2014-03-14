@@ -360,7 +360,12 @@ private object MacroImpl {
 
       val alternatives = applySymbol.asTerm.alternatives map (_.asMethod)
       val u = unapplyReturnTypes(unapply)
-      val applys = alternatives filter (_.paramss.head.map(_.typeSignature) == u)
+      val applys = alternatives filter { alt =>
+        val sig = alt.paramss.head.map(_.typeSignature)
+        sig.size == u.size && sig.zip(u).forall {
+          case (left, right) => left =:= right
+        }
+      }
 
       val apply = applys.headOption getOrElse c.abort(c.enclosingPosition, "No matching apply/unapply found")
       (apply,unapply)
