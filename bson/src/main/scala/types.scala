@@ -41,7 +41,12 @@ case class BSONDocument(stream: Stream[Try[BSONElement]]) extends BSONValue {
    *
    * If the key is not found or the matching value cannot be deserialized, returns `None`.
    */
-  def get(key: String): Option[BSONValue] = getTry(key).toOption
+  def get(key: String): Option[BSONValue] = {
+    stream.find {
+      case Success(element) => element._1 == key
+      case Failure(e)       => false
+    }.map(_.get._2)
+  }
 
   /**
    * Returns the [[BSONValue]] associated with the given `key`.
@@ -74,8 +79,11 @@ case class BSONDocument(stream: Stream[Try[BSONElement]]) extends BSONValue {
    * If there is no matching value, or the value could not be deserialized or converted, returns a `None`.
    */
   def getAs[T](s: String)(implicit reader: BSONReader[_ <: BSONValue, T]): Option[T] = {
-    getTry(s).toOption.flatMap { element =>
-      Try(reader.asInstanceOf[BSONReader[BSONValue, T]].read(element)).toOption
+    get(s).flatMap { element =>
+      reader match {
+        case r: BSONReader[BSONValue, T]@unchecked => r.readOpt(element)
+        case _ => None
+      }
     }
   }
 
