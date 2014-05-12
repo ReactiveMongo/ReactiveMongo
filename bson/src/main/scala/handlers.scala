@@ -184,75 +184,40 @@ trait DefaultBSONHandlers {
     new BSONArrayCollectionReader
   }
 
-  implicit object BSONStringIdentity extends BSONReader[BSONString, BSONString] with BSONWriter[BSONString, BSONString] {
-    def read(b: BSONString) = b
-    def write(b: BSONString) = b
+  abstract class IdentityBSONConverter[T <: BSONValue](implicit m: Manifest[T]) extends BSONReader[T, T] with BSONWriter[T, T] {
+    override def write(t: T): T = m.runtimeClass.cast(t).asInstanceOf[T]
+    override def writeOpt(t: T): Option[T] = if (m.runtimeClass.isInstance(t)) Some(t.asInstanceOf[T]) else None
+    override def read(bson: T): T = m.runtimeClass.cast(bson).asInstanceOf[T]
+    override def readOpt(bson: T): Option[T] = if (m.runtimeClass.isInstance(bson)) Some(bson.asInstanceOf[T]) else None
   }
 
-  implicit object BSONIntegerIdentity extends BSONReader[BSONInteger, BSONInteger] with BSONWriter[BSONInteger, BSONInteger] {
-    def read(b: BSONInteger) = b
-    def write(b: BSONInteger) = b
-  }
+  implicit object BSONStringIdentity extends IdentityBSONConverter[BSONString]
 
-  implicit object BSONArrayIdentity extends BSONReader[BSONArray, BSONArray] with BSONWriter[BSONArray, BSONArray] {
-    def read(b: BSONArray) = b
-    def write(b: BSONArray) = b
-  }
+  implicit object BSONIntegerIdentity extends IdentityBSONConverter[BSONInteger]
 
-  implicit object BSONDocumentIdentity extends BSONReader[BSONDocument, BSONDocument] with BSONWriter[BSONDocument, BSONDocument] with BSONDocumentReader[BSONDocument] with BSONDocumentWriter[BSONDocument] {
-    def read(b: BSONDocument) = b
-    def write(b: BSONDocument) = b
-  }
+  implicit object BSONArrayIdentity extends IdentityBSONConverter[BSONArray]
 
-  implicit object BSONBooleanIdentity extends BSONReader[BSONBoolean, BSONBoolean] with BSONWriter[BSONBoolean, BSONBoolean] {
-    def read(b: BSONBoolean) = b
-    def write(b: BSONBoolean) = b
-  }
+  implicit object BSONDocumentIdentity extends IdentityBSONConverter[BSONDocument] with BSONDocumentReader[BSONDocument] with BSONDocumentWriter[BSONDocument]
 
-  implicit object BSONLongIdentity extends BSONReader[BSONLong, BSONLong] with BSONWriter[BSONLong, BSONLong] {
-    def read(b: BSONLong) = b
-    def write(b: BSONLong) = b
-  }
+  implicit object BSONBooleanIdentity extends IdentityBSONConverter[BSONBoolean]
 
-  implicit object BSONDoubleIdentity extends BSONReader[BSONDouble, BSONDouble] with BSONWriter[BSONDouble, BSONDouble] {
-    def read(b: BSONDouble) = b
-    def write(b: BSONDouble) = b
-  }
+  implicit object BSONLongIdentity extends IdentityBSONConverter[BSONLong]
 
-  implicit object BSONValueIdentity extends BSONReader[BSONValue, BSONValue] with BSONWriter[BSONValue, BSONValue] {
-    def read(b: BSONValue) = b
-    def write(b: BSONValue) = b
-  }
+  implicit object BSONDoubleIdentity extends IdentityBSONConverter[BSONDouble]
 
-  implicit object BSONObjectIDIdentity extends BSONReader[BSONObjectID, BSONObjectID] with BSONWriter[BSONObjectID, BSONObjectID] {
-    def read(b: BSONObjectID) = b
-    def write(b: BSONObjectID) = b
-  }
+  implicit object BSONValueIdentity extends IdentityBSONConverter[BSONValue]
 
-  implicit object BSONBinaryIdentity extends BSONReader[BSONBinary, BSONBinary] with BSONWriter[BSONBinary, BSONBinary] {
-    def read(b: BSONBinary) = b
-    def write(b: BSONBinary) = b
-  }
+  implicit object BSONObjectIDIdentity extends IdentityBSONConverter[BSONObjectID]
 
-  implicit object BSONDateTimeIdentity extends BSONReader[BSONDateTime, BSONDateTime] with BSONWriter[BSONDateTime, BSONDateTime] {
-    def read(b: BSONDateTime) = b
-    def write(b: BSONDateTime) = b
-  }
+  implicit object BSONBinaryIdentity extends IdentityBSONConverter[BSONBinary]
 
-  implicit object BSONNullIdentity extends BSONReader[BSONNull.type, BSONNull.type] with BSONWriter[BSONNull.type, BSONNull.type] {
-    def read(b: BSONNull.type) = b
-    def write(b: BSONNull.type) = b
-  }
+  implicit object BSONDateTimeIdentity extends IdentityBSONConverter[BSONDateTime]
 
-  implicit object BSONUndefinedIdentity extends BSONReader[BSONUndefined.type, BSONUndefined.type] with BSONWriter[BSONUndefined.type, BSONUndefined.type] {
-    def read(b: BSONUndefined.type) = b
-    def write(b: BSONUndefined.type) = b
-  }
+  implicit object BSONNullIdentity extends IdentityBSONConverter[BSONNull.type]
 
-  implicit object BSONRegexIdentity extends BSONReader[BSONRegex, BSONRegex] with BSONWriter[BSONRegex, BSONRegex] {
-    def read(b: BSONRegex) = b
-    def write(b: BSONRegex) = b
-  }
+  implicit object BSONUndefinedIdentity extends IdentityBSONConverter[BSONUndefined.type]
+
+  implicit object BSONRegexIdentity extends IdentityBSONConverter[BSONRegex]
 
   implicit object BSONJavaScriptIdentity extends BSONReader[BSONJavaScript, BSONJavaScript] with BSONWriter[BSONJavaScript, BSONJavaScript] {
     def read(b: BSONJavaScript) = b
