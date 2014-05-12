@@ -204,7 +204,7 @@ You can read the [full documentation on the project website](http://reactivemong
 
 ReactiveMongo makes a heavy usage of the [Iteratee](http://www.playframework.com/documentation/2.2.x/Iteratees) library. Although it is developped by the [Play! Framework](http://www.playframework.com) team, it does _not_ depend on any other part of the framework. You can dive into [Play's Iteratee documentation](http://www.playframework.com/documentation/2.2.x/Iteratees) to learn about this cool piece of software, and make your own Iteratees and Enumerators.
 
-Used in conjonction with stream-aware frameworks, like Play!, you can easily stream the data stored in MongoDB. For Play, there is a [ReactiveMongo Plugin](https://github.com/ReactiveMongo/Play-ReactiveMongo) that brings some cool stuff, like JSON-specialized collection and helpers for GridFS. See the examples and get convinced!
+Used in conjunction with stream-aware frameworks, like Play!, you can easily stream the data stored in MongoDB. For Play, there is a [ReactiveMongo Plugin](https://github.com/ReactiveMongo/Play-ReactiveMongo) that brings some cool stuff, like JSON-specialized collection and helpers for GridFS. See the examples and get convinced!
 
 ### Samples
 
