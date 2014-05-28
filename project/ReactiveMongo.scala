@@ -2,7 +2,7 @@ import sbt._
 import sbt.Keys._
 
 object BuildSettings {
-  val buildVersion = "0.11.0-SNAPSHOT"
+  val buildVersion = "0.10.5.akka23-SNAPSHOT"
 
   val filter = { (ms: Seq[(File, String)]) =>
     ms filter {
@@ -121,9 +121,9 @@ object Resolvers {
 object Dependencies {
   val netty = "io.netty" % "netty" % "3.6.5.Final" cross CrossVersion.Disabled
 
-  val akkaActor = "com.typesafe.akka" %% "akka-actor" % "2.3.2"
+  val akkaActor = "com.typesafe.akka" %% "akka-actor" % "2.3.3"
 
-  val iteratees = "com.typesafe.play" %% "play-iteratees" % "2.3.0-RC1"
+  val iteratees = "com.typesafe.play" %% "play-iteratees" % "2.3.0-RC2"
 
   val specs = "org.specs2" %% "specs2-core" % "2.3.11" % "test"
 
