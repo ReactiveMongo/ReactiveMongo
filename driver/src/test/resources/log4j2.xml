@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration status="DEBUG">
+  <appenders>
+    <Console name="Console" target="SYSTEM_OUT">
+      <!-- <PatternLayout pattern="%d{HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n"/> -->
+      <PatternLayout pattern="%d{HH:mm:ss.SSS} ReactiveMongo %-5level [%logger{1.}] :: %msg%n" />
+    </Console>
+  </appenders>
+  <loggers>
+    <root level="info">
+      <appender-ref ref="Console"/>
+    </root>
+  </loggers>
+</configuration>

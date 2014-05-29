@@ -17,18 +17,20 @@ package reactivemongo.api
 
 import akka.actor.{ ActorRef, ActorSystem, PoisonPill, Props }
 import org.jboss.netty.buffer.ChannelBuffer
-import org.slf4j.{ Logger, LoggerFactory }
 import play.api.libs.iteratee._
 import reactivemongo.api.indexes._
 import reactivemongo.core.actors._
+import reactivemongo.core.nodeset.Authenticate
 import reactivemongo.bson._
 import reactivemongo.core.protocol._
 import reactivemongo.core.commands.{ Command, GetLastError, LastError, SuccessfulAuthentication }
+import reactivemongo.utils.LazyLogger
 import reactivemongo.utils.EitherMappableFuture._
-import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.{ ExecutionContext, Future, Promise }
 import scala.concurrent.duration._
-import scala.util.{ Failure, Success }
+import scala.util.{ Try, Failure, Success }
+import scala.util.control.NoStackTrace
+import scala.util.control.NonFatal
 
 /**
  * A helper that sends the given message to the given actor, following a failover strategy.
@@ -61,7 +63,7 @@ class Failover[T](message: T, connection: MongoConnection, strategy: FailoverStr
           val `try` = n + 1
           val delayFactor = strategy.delayFactor(`try`)
           val delay = Duration.unapply(strategy.initialDelay * delayFactor).map(t => FiniteDuration(t._1, t._2)).getOrElse(strategy.initialDelay)
-          logger.warn("Got an error, retrying... (try #" + `try` + " is scheduled in " + delay.toMillis + " ms)", e)
+          logger.debug("Got an error, retrying... (try #" + `try` + " is scheduled in " + delay.toMillis + " ms)", e)
           connection.actorSystem.scheduler.scheduleOnce(delay)(send(`try`))
         } else {
           // generally that means that the primary is not available or the nodeset is unreachable
@@ -69,7 +71,7 @@ class Failover[T](message: T, connection: MongoConnection, strategy: FailoverStr
           promise.failure(e)
         }
       case Failure(e) =>
-        logger.debug("Got an non retryable error, completing with a failure...", e)
+        logger.trace("Got an non retryable error, completing with a failure...", e)
         promise.failure(e)
       case Success(response) =>
         logger.trace("Got a successful result, completing...")
@@ -79,7 +81,7 @@ class Failover[T](message: T, connection: MongoConnection, strategy: FailoverStr
 
   private def isRetryable(throwable: Throwable) = throwable match {
     case PrimaryUnavailableException | NodeSetNotReachable => true
-    case e: DatabaseException if e.isNotAPrimaryError => true
+    case e: DatabaseException if e.isNotAPrimaryError || e.isUnauthorized => true
     case _: ConnectionException => true
     case _ => false
   }
@@ -88,7 +90,7 @@ class Failover[T](message: T, connection: MongoConnection, strategy: FailoverStr
 }
 
 object Failover {
-  private val logger = LoggerFactory.getLogger("reactivemongo.api.Failover")
+  private val logger = LazyLogger("reactivemongo.api.Failover")
   /**
    * Produces a [[reactivemongo.api.Failover]] holding a future reference that is completed with a result, after 1 or more attempts (specified in the given strategy).
    *
@@ -206,8 +208,11 @@ class MongoConnection(
   def send(message: RequestMaker) = mongosystem ! message
 
   /** Authenticates the connection on the given database. */
-  def authenticate(db: String, user: String, password: String)(implicit timeout: FiniteDuration): Future[SuccessfulAuthentication] =
-    akkaAsk(mongosystem, Authenticate(db, user, password))(Timeout(timeout)).mapTo[SuccessfulAuthentication]
+  def authenticate(db: String, user: String, password: String): Future[SuccessfulAuthentication] = {
+    val req = AuthRequest(Authenticate(db, user, password))
+    mongosystem ! req
+    req.future
+  }
 
   /** Closes this MongoConnection (closes all the channels and ends the actors) */
   def askClose()(implicit timeout: FiniteDuration): Future[_] =
@@ -217,12 +222,85 @@ class MongoConnection(
   def close(): Unit = monitor ! Close
 }
 
+object MongoConnection {
+  val DefaultHost = "localhost"
+  val DefaultPort = 27017
+
+  final class URIParsingException(message: String) extends Exception with NoStackTrace {
+    override def getMessage() = message
+  }
+
+  final case class ParsedURI(
+    hosts: List[(String, Int)],
+    db: Option[String],
+    authenticate: Option[Authenticate])
+
+  /**
+   * Parses a MongoURI.
+   *
+   * See [[http://docs.mongodb.org/manual/reference/connection-string/ the MongoDB URI documentation]] for more information.
+   * Please note that as of 0.10.0, options are ignored.
+   */
+  def parseURI(uri: String): Try[ParsedURI] = {
+    val prefix = "mongodb://"
+    def parseAuth(usernameAndPassword: String): (String, String) = {
+      usernameAndPassword.split(":").toList match {
+        case username :: password :: Nil => username -> password
+        case _                           => throw new URIParsingException(s"Could not parse URI '$uri': invalid authentication '$usernameAndPassword'")
+      }
+    }
+    def parseHosts(hosts: String) =
+      hosts.split(",").toList.map { host =>
+        host.split(':').toList match {
+          case host :: port :: Nil => host -> {
+            try {
+              val p = port.toInt
+              if (p > 0 && p < 65536)
+                p
+              else throw new URIParsingException(s"Could not parse URI '$uri': invalid port '$port'")
+            } catch {
+              case _: NumberFormatException => throw new URIParsingException(s"Could not parse URI '$uri': invalid port '$port'")
+              case NonFatal(e)              => throw e
+            }
+          }
+          case host :: Nil => host -> DefaultPort
+          case _           => throw new URIParsingException(s"Could not parse URI '$uri': invalid host definition '$hosts'")
+        }
+      }
+    def parseHostsAndDbName(hostsPortAndDbName: String): (Option[String], List[(String, Int)]) = {
+      hostsPortAndDbName.split("/").toList match {
+        case hosts :: Nil           => None -> parseHosts(hosts.takeWhile(_ != '?'))
+        case hosts :: dbName :: Nil => Some(dbName.takeWhile(_ != '?')) -> parseHosts(hosts)
+        case _                      => throw new URIParsingException(s"Could not parse URI '$uri'")
+      }
+    }
+
+    Try {
+      val useful = uri.replace(prefix, "")
+      useful.split("@").toList match {
+        case hostsPortsAndDbName :: Nil =>
+          val (db, hosts) = parseHostsAndDbName(hostsPortsAndDbName)
+          ParsedURI(hosts, db, None)
+        case usernamePasswd :: hostsPortsAndDbName :: Nil =>
+          val (db, hosts) = parseHostsAndDbName(hostsPortsAndDbName)
+          if (!db.isDefined)
+            throw new URIParsingException(s"Could not parse URI '$uri': authentication information found but no database name in URI")
+          val authenticate = parseAuth(usernamePasswd)
+          ParsedURI(hosts, db, Some(Authenticate.apply(db.get, authenticate._1, authenticate._2)))
+        case _ => throw new URIParsingException(s"Could not parse URI '$uri'")
+      }
+    }
+  }
+}
+
 class MongoDriver(systemOption: Option[ActorSystem] = None) {
 
   def this(system: ActorSystem) = this(Some(system))
 
+  @volatile private var _connections = List[MongoConnection]()
+
   /** Keep a list of all connections so that we can terminate the actors */
-  val connections = ArrayBuffer[MongoConnection]()
+  def connections: Seq[MongoConnection] = _connections
 
   val system = systemOption.getOrElse(MongoDriver.defaultSystem)
 
@@ -230,8 +308,7 @@ class MongoDriver(systemOption: Option[ActorSystem] = None) {
     // Non default actor system -- terminate actors used by MongoConnections 
     case Some(_) =>
       connections.foreach { connection =>
-        connection.mongosystem ! PoisonPill
-        connection.monitor ! PoisonPill
+        connection.monitor ! Close
       }
     // Default actor system -- just shut it down
     case None => system.shutdown()
@@ -240,19 +317,56 @@ class MongoDriver(systemOption: Option[ActorSystem] = None) {
   /**
    * Creates a new MongoConnection.
    *
+   * See [[http://docs.mongodb.org/manual/reference/connection-string/ the MongoDB URI documentation]] for more information.
+   *
    * @param nodes A list of node names, like ''node1.foo.com:27017''. Port is optional, it is 27017 by default.
    * @param authentications A list of Authenticates.
    * @param nbChannelsPerNode Number of channels to open per node. Defaults to 10.
    * @param name The name of the newly created [[reactivemongo.core.actors.MongoDBSystem]] actor, if needed.
    */
-  def connection(nodes: Seq[String], authentications: Seq[Authenticate] = Seq.empty, nbChannelsPerNode: Int = 10, name: Option[String] = None) = {
+  def connection(nodes: Seq[String], authentications: Seq[Authenticate] = Seq.empty, nbChannelsPerNode: Int = 10, name: Option[String] = None): MongoConnection = {
     val props = Props(new MongoDBSystem(nodes, authentications, nbChannelsPerNode))
     val mongosystem = if (name.isDefined) system.actorOf(props, name = name.get) else system.actorOf(props)
     val monitor = system.actorOf(Props(new MonitorActor(mongosystem)))
     val connection = new MongoConnection(system, mongosystem, monitor)
-    connections += connection
+    this.synchronized {
+      _connections = connection :: _connections
+    }
     connection
   }
+
+  /**
+   * Creates a new MongoConnection from URI.
+   *
+   * See [[http://docs.mongodb.org/manual/reference/connection-string/ the MongoDB URI documentation]] for more information.
+   *
+   * @param parsedURI The URI parsed by [[reactivemongo.api.MongoConnection.parseURI]]
+   * @param nbChannelsPerNode Number of channels to open per node.
+   * @param name The name of the newly created [[reactivemongo.core.actors.MongoDBSystem]] actor, if needed.
+   */
+  def connection(parsedURI: MongoConnection.ParsedURI, nbChannelsPerNode: Int, name: Option[String]): MongoConnection =
+    connection(parsedURI.hosts.map(h => h._1 + ':' + h._2), parsedURI.authenticate.toSeq, nbChannelsPerNode, name)
+
+  /**
+   * Creates a new MongoConnection from URI.
+   *
+   * See [[http://docs.mongodb.org/manual/reference/connection-string/ the MongoDB URI documentation]] for more information.
+   *
+   * @param parsedURI The URI parsed by [[reactivemongo.api.MongoConnection.parseURI]]
+   * @param nbChannelsPerNode Number of channels to open per node.
+   */
+  def connection(parsedURI: MongoConnection.ParsedURI, nbChannelsPerNode: Int): MongoConnection =
+    connection(parsedURI, nbChannelsPerNode, None)
+
+  /**
+   * Creates a new MongoConnection from URI.
+   *
+   * See [[http://docs.mongodb.org/manual/reference/connection-string/ the MongoDB URI documentation]] for more information.
+   *
+   * @param parsedURI The URI parsed by [[reactivemongo.api.MongoConnection.parseURI]]
+   */
+  def connection(parsedURI: MongoConnection.ParsedURI): MongoConnection =
+    connection(parsedURI, 10, None)
 }
 
 object MongoDriver {
@@ -270,9 +384,8 @@ object MongoDriver {
   /**
    * Creates a new MongoDriver with specified ActorSystem.
    *
-   * @param system An ActorSystem for ReactiveMongo to use.  
+   * @param system An ActorSystem for ReactiveMongo to use.
    */
   def apply(system: ActorSystem) = new MongoDriver(system)
 
 }
-

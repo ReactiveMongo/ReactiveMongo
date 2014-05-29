@@ -28,15 +28,23 @@ class CommonUseCases extends Specification {
     "find them" in {
       // batchSize (>1) allows us to test cursors ;)
       val it = collection.find(BSONDocument()).options(QueryOpts().batchSize(2)).cursor
-      Await.result(it.toList, timeout).map(_.getAs[BSONInteger]("age").get.value).mkString("") mustEqual (18 to 60).mkString("")
+      Await.result(it.collect[List](), timeout).map(_.getAs[BSONInteger]("age").get.value).mkString("") mustEqual (18 to 60).mkString("")
     }
     "find by regexp" in {
-      Await.result(collection.find(BSONDocument("name" -> BSONRegex("ack2", ""))).cursor.toList, timeout).size mustEqual 10
+      Await.result(collection.find(BSONDocument("name" -> BSONRegex("ack2", ""))).cursor.collect[List](), timeout).size mustEqual 10
+    }
+    "find by regexp with flag" in {
+      val q =
+        BSONDocument(
+          "$or" -> BSONArray(
+            BSONDocument("name" -> BSONRegex("^jack2", "i")),
+            BSONDocument("name" -> BSONRegex("^jack3", "i"))))
+      Await.result(collection.find(q).cursor.collect[List](), timeout).size mustEqual 20
     }
     "find them with a projection" in {
       val pjn = BSONDocument("name" -> BSONInteger(1), "age" -> BSONInteger(1), "something" -> BSONInteger(1))
       val it = collection.find(BSONDocument(), pjn).options(QueryOpts().batchSize(2)).cursor
-      Await.result(it.toList, timeout).map(_.getAs[BSONInteger]("age").get.value).mkString("") mustEqual (18 to 60).mkString("")
+      Await.result(it.collect[List](), timeout).map(_.getAs[BSONInteger]("age").get.value).mkString("") mustEqual (18 to 60).mkString("")
     }
     "insert a document containing a merged array of objects, fetch and check it" in {
       val array = BSONArray(

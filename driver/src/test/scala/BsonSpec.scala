@@ -28,7 +28,7 @@ class BsonSpec extends Specification {
     }
     "produce a document embedding an array" in {
       val buffer = BSONDocument(
-        "_id" -> new BSONObjectID("503792c1984587971b14530e"),
+        "_id" -> BSONObjectID("503792c1984587971b14530e"),
         "BSON" -> BSONArray(
           BSONString("awesome"),
           BSONDouble(5.05),
@@ -37,7 +37,7 @@ class BsonSpec extends Specification {
     }
     "produce a document embedding an array through traversable" in {
       val buffer = BSONDocument(
-        "_id" -> new BSONObjectID("503792c1984587971b14530e"),
+        "_id" -> BSONObjectID("503792c1984587971b14530e"),
         "BSON" -> BSONArray(
           BSONString("awesome"),
           BSONDouble(5.05),
@@ -130,7 +130,7 @@ class BSONObjectIDSpec extends Specification {
     "equal when created with string" in {
       val objectID = BSONObjectID.generate
       val sameObjectID = BSONObjectID(objectID.stringify)
-      objectID.value must equalTo(sameObjectID.value)
+      objectID.valueAsArray must equalTo(sameObjectID.valueAsArray)
     }
 
     "equal another instance of BSONObjectID with the same value" in {
@@ -159,7 +159,7 @@ class BSONObjectIDSpec extends Specification {
     "bytes generated equal bytes converted from string" in {
       val objectID = BSONObjectID.generate
       val bytes = Converters.str2Hex(objectID.stringify)
-      objectID.value must equalTo(bytes)
+      objectID.valueAsArray must equalTo(bytes)
     }
 
   }

@@ -1,68 +1,143 @@
-/*
- * Copyright 2012-2013 Stephane Godbillon (@sgodbillon) and Zenexity
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *   http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package reactivemongo.core.nodeset
 
-import akka.actor._
-import java.net.InetSocketAddress
+import reactivemongo.core.protocol.Request
+import akka.actor.ActorRef
+import scala.annotation.tailrec
+import scala.collection.generic.CanBuildFrom
 import java.util.concurrent.{ Executor, Executors }
-import org.jboss.netty.buffer._
-import org.jboss.netty.channel.{ Channels, Channel, ChannelPipeline }
-import org.jboss.netty.channel.group._
-import org.jboss.netty.channel.socket.nio._
-import org.slf4j.{ Logger, LoggerFactory }
-import reactivemongo.bson._
-import reactivemongo.core.protocol._
-import reactivemongo.core.protocol.ChannelState._
-import reactivemongo.core.commands.{ Authenticate => AuthenticateCommand, _ }
-import reactivemongo.core.protocol.NodeState._
 import reactivemongo.utils.LazyLogger
+import org.jboss.netty.channel.socket.nio.NioClientSocketChannelFactory
+import org.jboss.netty.buffer.HeapChannelBufferFactory
+import org.jboss.netty.channel.{ Channel, ChannelPipeline, Channels }
+import reactivemongo.core.protocol._
+import reactivemongo.api.ReadPreference
+import reactivemongo.bson._
 
-case class MongoChannel(
-    channel: Channel,
-    state: ChannelState,
-    loggedIn: Set[LoggedIn]) {
-  import MongoChannel._
-
-  lazy val usable = state match {
-    case _: Usable => true
-    case _ => false
+package object utils {
+  def updateFirst[A, M[T] <: Iterable[T]](coll: M[A])(ƒ: A => Option[A])(implicit cbf: CanBuildFrom[M[_], A, M[A]]): M[A] = {
+    val builder = cbf.apply
+    def run(iterator: Iterator[A]): Unit = {
+      while (iterator.hasNext) {
+        val e = iterator.next
+        val updated = ƒ(e)
+        if (updated.isDefined) {
+          builder += updated.get
+          builder ++= iterator
+        } else builder += e
+      }
+    }
+    builder.result
   }
 
-  def send(message: Request, writeConcern: Request) {
-    logger.trace("connection " + channel.getId + " will send Request " + message + " followed by writeConcern " + writeConcern)
-    channel.write(message)
-    channel.write(writeConcern)
-  }
-  def send(message: Request) {
-    logger.trace("connection " + channel.getId + " will send Request " + message)
-    channel.write(message)
+  def update[A, M[T] <: Iterable[T]](coll: M[A])(f: PartialFunction[A, A])(implicit cbf: CanBuildFrom[M[_], A, M[A]]): (M[A], Boolean) = {
+    val builder = cbf.apply
+    val (head, tail) = coll.span(!f.isDefinedAt(_))
+    builder ++= head
+    if (!tail.isEmpty) {
+      builder += f(tail.head)
+      builder ++= tail.drop(1)
+    }
+    builder.result -> !tail.isEmpty
   }
 }
 
-object MongoChannel {
-  private val logger = LazyLogger(LoggerFactory.getLogger("reactivemongo.core.nodeset.MongoChannel"))
-  implicit def mongoChannelToChannel(mc: MongoChannel): Channel = mc.channel
+case class NodeSet(
+    name: Option[String],
+    version: Option[Long],
+    nodes: Vector[Node],
+    authenticates: Set[Authenticate]) {
+  val primary: Option[Node] = nodes.find(_.status == NodeStatus.Primary)
+  val secondaries = new RoundRobiner(nodes.filter(_.status == NodeStatus.Secondary))
+  val queryable = secondaries.subject ++ primary
+  val nearestGroup = new RoundRobiner(queryable.sortWith { _.pingInfo.ping < _.pingInfo.ping })
+  val nearest = nearestGroup.subject.headOption
+
+  def primary(authenticated: Authenticated): Option[Node] =
+    primary.filter(_.authenticated.exists(_ == authenticated))
+
+  def isReachable = !primary.isEmpty || !secondaries.subject.isEmpty
+
+  def updateOrAddNode(ƒ: PartialFunction[Node, Node], default: Node) = {
+    val (maybeUpdatedNodes, updated) = utils.update(nodes)(ƒ)
+    if (!updated)
+      copy(nodes = default +: nodes)
+    else copy(nodes = maybeUpdatedNodes)
+  }
+
+  def updateOrAddNodes(ƒ: PartialFunction[Node, Node], nodes: Seq[Node]) =
+    nodes.foldLeft(this)(_ updateOrAddNode (ƒ, _))
+
+  def updateAll(ƒ: Node => Node) =
+    copy(nodes = nodes.map(ƒ))
+
+  def updateNodeByChannelId(id: Int)(ƒ: Node => Node) =
+    updateByChannelId(id)(identity)(ƒ)
+
+  def updateConnectionByChannelId(id: Int)(ƒ: Connection => Connection) =
+    updateByChannelId(id)(ƒ)(identity)
+
+  def updateByChannelId(id: Int)(ƒc: Connection => Connection)(ƒn: Node => Node) = {
+    copy(nodes = nodes.map { node =>
+      val (connections, updated) = utils.update(node.connections) {
+        case conn if {
+          conn.channel.getId == id
+        } => ƒc(conn)
+      }
+      if (updated)
+        ƒn(node.copy(connections = connections))
+      else node
+    })
+  }
+
+  def pickByChannelId(id: Int): Option[(Node, Connection)] =
+    nodes.view.map(node => node -> node.connections.find(_.channel.getId() == id)).collectFirst {
+      case (node, connection) if connection.exists(_.status == ConnectionStatus.Connected) => node -> connection.get
+    }
+
+  def pickForWrite: Option[(Node, Connection)] =
+    primary.view.map(node => node -> node.authenticatedConnections.subject.headOption).collectFirst {
+      case (node, Some(connection)) => node -> connection
+    }
+
+  private val pickConnectionAndFlatten: Option[Node] => Option[(Node, Connection)] = { node =>
+    node.map(node => node -> node.authenticatedConnections.pick).collect { case (node, Some(connection)) => (node, connection) }
+  }
+
+  private def pickFromGroupWithFilter(roundRobiner: RoundRobiner[Node, Vector], filter: Option[BSONDocument => Boolean], fallback: => Option[Node]) = {
+    def nodeMatchesFilter(filter: BSONDocument => Boolean): Node => Boolean = _.tags.map(filter(_)).getOrElse(false)
+
+    filter.map { filter =>
+      roundRobiner.pickWithFilter(nodeMatchesFilter(filter))
+    }.getOrElse(fallback)
+  }
+
+  // http://docs.mongodb.org/manual/reference/read-preference/
+  def pick(preference: ReadPreference): Option[(Node, Connection)] = preference match {
+    case ReadPreference.Primary                   => pickConnectionAndFlatten(primary)
+    case ReadPreference.PrimaryPrefered(filter)   => pickConnectionAndFlatten(primary.orElse(pickFromGroupWithFilter(secondaries, filter, secondaries.pick)))
+    case ReadPreference.Secondary(filter)         => pickConnectionAndFlatten(pickFromGroupWithFilter(secondaries, filter, secondaries.pick))
+    case ReadPreference.SecondaryPrefered(filter) => pickConnectionAndFlatten(pickFromGroupWithFilter(secondaries, filter, secondaries.pick).orElse(primary))
+    case ReadPreference.Nearest(filter)           => pickConnectionAndFlatten(pickFromGroupWithFilter(nearestGroup, filter, nearest))
+  }
+
+  def createNeededChannels(receiver: ActorRef, upTo: Int)(implicit channelFactory: ChannelFactory): NodeSet = {
+    copy(nodes = nodes.foldLeft(Vector.empty[Node]) { (nodes, node) =>
+      nodes :+ node.createNeededChannels(receiver, upTo)
+    })
+  }
+
+  def toShortString = s"{{NodeSet $name ${nodes.map(_.toShortString).mkString(" | ")} }}"
 }
 
 case class Node(
     name: String,
-    channels: IndexedSeq[MongoChannel],
-    state: NodeState,
-    mongoId: Option[Int])(implicit channelFactory: ChannelFactory) {
-  lazy val (host: String, port: Int) = {
+    status: NodeStatus,
+    connections: Vector[Connection],
+    authenticated: Set[Authenticated],
+    tags: Option[BSONDocument],
+    pingInfo: PingInfo = PingInfo()) {
+
+  val (host: String, port: Int) = {
     val splitted = name.span(_ != ':')
     splitted._1 -> (try {
       splitted._2.drop(1).toInt
@@ -71,131 +146,161 @@ case class Node(
     })
   }
 
-  lazy val isQueryable: Boolean = (state == PRIMARY || state == SECONDARY) && queryable.size > 0
+  val connected = connections.filter(_.status == ConnectionStatus.Connected)
 
-  lazy val queryable: IndexedSeq[MongoChannel] = channels.filter(_.usable == true)
+  val authenticatedConnections = new RoundRobiner(connected.filter(_.authenticated.forall { auth =>
+    authenticated.exists(_ == auth)
+  }))
 
-  def updateChannelById(channelId: Int, transform: (MongoChannel) => MongoChannel): Node =
-    copy(channels = channels.map(channel => if (channel.getId == channelId) transform(channel) else channel))
-
-  def connect(): Unit = channels.foreach(channel => if (!channel.isConnected) channel.connect(new InetSocketAddress(host, port)))
-
-  def disconnect(): Unit = channels.foreach(channel => if (channel.isConnected) channel.disconnect)
-
-  def close(): Unit = channels.foreach(channel => if (channel.isOpen) channel.close)
-
-  def createNeededChannels(receiver: ActorRef, upTo: Int): Node = {
-    if (channels.size < upTo) {
-      copy(channels = channels.++(for (i <- 0 until (upTo - channels.size)) yield MongoChannel(channelFactory.create(host, port, receiver), NotConnected, Set.empty)))
+  def createNeededChannels(receiver: ActorRef, upTo: Int)(implicit channelFactory: ChannelFactory): Node = {
+    if (connections.size < upTo) {
+      copy(connections = connections.++(for (i <- 0 until (upTo - connections.size)) yield Connection(channelFactory.create(host, port, receiver), ConnectionStatus.Disconnected, Set.empty, None)))
     } else this
   }
+
+  def toShortString = s"Node[$name: $status (${connected.size}/${connections.size} available connections), latency=${pingInfo.ping}], auth=${authenticated}"
 }
 
-object Node {
-  def apply(name: String)(implicit channelFactory: ChannelFactory): Node = new Node(name, Vector.empty, NONE, None)
-  def apply(name: String, state: NodeState)(implicit channelFactory: ChannelFactory): Node = new Node(name, Vector.empty, state, None)
+case class Connection(
+    channel: Channel,
+    status: ConnectionStatus,
+    authenticated: Set[Authenticated],
+    authenticating: Option[Authenticating]) {
+  def send(message: Request, writeConcern: Request) {
+    channel.write(message)
+    channel.write(writeConcern)
+  }
+  def send(message: Request) {
+    channel.write(message)
+  }
+
+  def isAuthenticated(db: String, user: String) = authenticated.exists(auth => auth.user == user && auth.db == db)
 }
 
-case class NodeSet(
-    name: Option[String],
-    version: Option[Long],
-    nodes: IndexedSeq[Node])(implicit channelFactory: ChannelFactory) {
-  lazy val connected: IndexedSeq[Node] = nodes.filter(node => node.state != NOT_CONNECTED)
+case class PingInfo(
+  ping: Long = 0,
+  lastIsMasterTime: Long = 0,
+  lastIsMasterId: Int = -1)
 
-  lazy val queryable: QueryableNodeSet = QueryableNodeSet(this)
+object PingInfo {
+  val pingTimeout = 60 * 1000
+}
 
-  lazy val primary: Option[Node] = nodes.find(_.state == PRIMARY)
+sealed trait NodeStatus { def queryable = false }
+sealed trait QueryableNodeStatus { self: NodeStatus => override def queryable = true }
+sealed trait CanonicalNodeStatus { self: NodeStatus => }
+object NodeStatus {
+  object Uninitialized extends NodeStatus { override def toString = "Uninitialized" }
+  object NonQueryableUnknownStatus extends NodeStatus { override def toString = "NonQueryableUnknownStatus" }
 
-  lazy val isReplicaSet: Boolean = name.isDefined
+  /** Cannot vote. All members start up in this state. The mongod parses the replica set configuration document while in STARTUP. */
+  object Startup extends NodeStatus with CanonicalNodeStatus { override def toString = "Startup" }
+  /** Can vote. The primary is the only member to accept write operations. */
+  object Primary extends NodeStatus with QueryableNodeStatus with CanonicalNodeStatus { override def toString = "Primary" }
+  /** Can vote. The secondary replicates the data store. */
+  object Secondary extends NodeStatus with QueryableNodeStatus with CanonicalNodeStatus { override def toString = "Secondary" }
+  /** Can vote. Members either perform startup self-checks, or transition from completing a rollback or resync. */
+  object Recovering extends NodeStatus with CanonicalNodeStatus { override def toString = "Recovering" }
+  /** Cannot vote. Has encountered an unrecoverable error. */
+  object Fatal extends NodeStatus with CanonicalNodeStatus { override def toString = "Fatal" }
+  /** Cannot vote. Forks replication and election threads before becoming a secondary. */
+  object Startup2 extends NodeStatus with CanonicalNodeStatus { override def toString = "Startup2" }
+  /** Cannot vote. Has never connected to the replica set. */
+  object Unknown extends NodeStatus with CanonicalNodeStatus { override def toString = "Unknown" }
+  /** Can vote. Arbiters do not replicate data and exist solely to participate in elections. */
+  object Arbiter extends NodeStatus with CanonicalNodeStatus { override def toString = "Arbiter" }
+  /** Cannot vote. Is not accessible to the set. */
+  object Down extends NodeStatus with CanonicalNodeStatus { override def toString = "Down" }
+  /** Can vote. Performs a rollback. */
+  object Rollback extends NodeStatus with CanonicalNodeStatus { override def toString = "Rollback" }
+  /** Shunned. */
+  object Shunned extends NodeStatus with CanonicalNodeStatus { override def toString = "Shunned" }
 
-  lazy val isReachable = !queryable.subject.isEmpty
+  def apply(code: Int): NodeStatus = code match {
+    case 0  => Startup
+    case 1  => Primary
+    case 2  => Secondary
+    case 3  => Recovering
+    case 4  => Fatal
+    case 5  => Startup2
+    case 6  => Unknown
+    case 7  => Arbiter
+    case 8  => Down
+    case 9  => Rollback
+    case 10 => Shunned
+    case _  => NonQueryableUnknownStatus
+  }
+}
 
-  def connectAll(): Unit = nodes.foreach(_.connect)
+sealed trait ConnectionStatus
+object ConnectionStatus {
+  object Disconnected extends ConnectionStatus { override def toString = "Disconnected" }
+  object Connected extends ConnectionStatus { override def toString = "Connected" }
+}
 
-  def closeAll(): Unit = nodes.foreach(_.close)
+sealed trait Authentication {
+  def user: String
+  def db: String
+}
 
-  def findNodeByChannelId(channelId: Int): Option[Node] = nodes.find(_.channels.exists(_.getId == channelId))
+case class Authenticate(db: String, user: String, password: String) extends Authentication {
+  override def toString: String = "Authenticate(" + db + ", " + user + ")"
+}
+case class Authenticating(db: String, user: String, password: String, nonce: Option[String]) extends Authentication {
+  override def toString: String = s"Authenticating($db, $user, ${nonce.map(_ => "<nonce>").getOrElse("<>")})"
+}
+case class Authenticated(db: String, user: String) extends Authentication
 
-  def findByChannelId(channelId: Int): Option[(Node, MongoChannel)] = nodes.flatMap(node => node.channels.map(node -> _)).find(_._2.getId == channelId)
+class ContinuousIterator[A](iterable: Iterable[A], private var toDrop: Int = 0) extends Iterator[A] {
+  private var iterator = iterable.iterator
+  private var i = 0
 
-  def updateByMongoId(mongoId: Int, transform: (Node) => Node): NodeSet = {
-    new NodeSet(name, version, nodes.updated(mongoId, transform(nodes(mongoId))))
+  val hasNext = iterator.hasNext
+
+  if (hasNext) {
+    drop(toDrop)
   }
 
-  def updateByChannelId(channelId: Int, transform: (Node) => Node): NodeSet = {
-    new NodeSet(name, version, nodes.map(node => if (node.channels.exists(_.getId == channelId)) transform(node) else node))
-  }
-
-  def updateAll(transform: (Node) => Node): NodeSet = {
-    new NodeSet(name, version, nodes.map(transform))
-  }
-
-  def channels = nodes.flatMap(_.channels)
-
-  def addNode(node: Node): NodeSet = {
-    nodes.indexWhere(_.name == node.name) match {
-      case -1 => this.copy(nodes = node +: nodes)
-      case i => {
-        val replaced = nodes(i)
-        this.copy(nodes = nodes.updated(i, Node(node.name, replaced.channels, if (node.state != NONE) node.state else replaced.state, node.mongoId)))
+  def next =
+    if (!hasNext)
+      throw new NoSuchElementException("empty iterator")
+    else {
+      if (!iterator.hasNext) {
+        iterator = iterable.iterator
+        i = 0
       }
+      val a = iterator.next
+      i += 1
+      a
     }
-  }
 
-  def addNodes(nodes: Seq[Node]): NodeSet = {
-    nodes.foldLeft(this)(_ addNode _)
-  }
-
-  def merge(nodeSet: NodeSet): NodeSet = {
-    NodeSet(nodeSet.name, nodeSet.version, nodeSet.nodes.map { node =>
-      nodes.find(_.name == node.name).map { oldNode =>
-        node.copy(channels = oldNode.channels.union(node.channels).distinct)
-      }.getOrElse(node)
-    })
-  }
-
-  def createNeededChannels(receiver: ActorRef, upTo: Int): NodeSet = {
-    copy(nodes = nodes.foldLeft(Vector.empty[Node]) { (nodes, node) =>
-      nodes :+ node.createNeededChannels(receiver, upTo)
-    })
-  }
-
-  def makeChannelGroup(): ChannelGroup = {
-    val result = new DefaultChannelGroup
-    for (node <- nodes) {
-      for (channel <- node.channels)
-        result.add(channel.channel)
-    }
-    result
-  }
+  def nextIndex = i
 }
 
-case class QueryableNodeSet(nodeSet: NodeSet) extends RoundRobiner(nodeSet.nodes.filter(_.isQueryable).map { node => NodeRoundRobiner(node) }) {
-  def pickChannel: Option[Channel] = pick.flatMap(_.pick.map(_.channel))
+class RoundRobiner[A, M[T] <: Iterable[T]](val subject: M[A], startAtIndex: Int = 0) {
+  private val iterator = new ContinuousIterator(subject)
+  private val length = subject.size
 
-  def getNodeRoundRobinerByChannelId(channelId: Int) = subject.find(_.node.channels.exists(_.getId == channelId))
+  def pick: Option[A] = if (iterator.hasNext) Some(iterator.next) else None
 
-  def primaryRoundRobiner: Option[NodeRoundRobiner] = subject.find(_.node.state == PRIMARY)
+  def pickWithFilter(filter: A => Boolean): Option[A] = pickWithFilter(filter, 0)
+
+  @scala.annotation.tailrec
+  private def pickWithFilter(filter: A => Boolean, tested: Int): Option[A] =
+    if (length > 0 && tested < length) {
+      val a = pick
+      if (!a.isDefined)
+        None
+      else if (filter(a.get))
+        a
+      else pickWithFilter(filter, tested + 1)
+    } else None
+
+  def copy(subject: M[A], startAtIndex: Int = iterator.nextIndex) = new RoundRobiner(subject, startAtIndex)
 }
-
-case class NodeRoundRobiner(node: Node) extends RoundRobiner(node.queryable)
-
-class RoundRobiner[A](val subject: IndexedSeq[A], private var i: Int = 0) {
-  private val length = subject.length
-
-  if (i < 0) i = 0
-
-  def pick: Option[A] = if (length > 0) {
-    val result = Some(subject(i))
-    i = if (i == length - 1) 0 else i + 1
-    result
-  } else None
-}
-
-case class LoggedIn(db: String, user: String)
 
 class ChannelFactory(bossExecutor: Executor = Executors.newCachedThreadPool, workerExecutor: Executor = Executors.newCachedThreadPool) {
-  private val logger = LazyLogger(LoggerFactory.getLogger("reactivemongo.core.nodeset.ChannelFactory"))
+  private val logger = LazyLogger("reactivemongo.core.nodeset.ChannelFactory")
 
   def create(host: String = "localhost", port: Int = 27017, receiver: ActorRef) = {
     val channel = makeChannel(receiver)

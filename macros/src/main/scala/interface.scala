@@ -126,6 +126,9 @@ object Macros {
      * in the union they will be used to handle (de)serialization, otherwise
      * handlers for all types will be generated.
      *
+     * You can also use case object but you have to refer to their types as to
+     * singleton types. e.g. case object MyObject, type would be MyObject.type
+     *
      * Example
      * {{{
      * sealed trait Tree
@@ -149,5 +152,49 @@ object Macros {
      * `Foo \/ Bar \/ Baz` is interpreted as type Foo or type Bar or type Baz
      */
     trait \/[A, B]
+
+    /**
+     * Similar to [[reactivemongo.bson.Macros.Options.UnionType]] but finds all
+     * implementations of the top trait automatically. For this to be possible
+     * the top trait has to be sealed. If your tree is deeper(class extends trait
+     * that extends top trait) all the intermediate traits have to be sealed too!
+     *
+     * Example
+     * {{{
+     * sealed trait TopTrait
+     * case class OneImplementation(data: String) extends TopTrait
+     * case class SecondImplementation(data: Int) extends TopTrait
+     * sealed trait RefinedTrait extends TopTrait
+     * case class ThirdImplementation(data: Float, name: String) extends RefinedTrait
+     * case object StaticImplementation extends RefinedTrait
+     *
+     * val handler = Macros.handlerOpts[TopTrait, AllImplementations]
+     * }}}
+     */
+    trait AllImplementations extends SaveClassName with Default
+  }
+
+  /**
+   * Annotations to use on case classes that are being processed by macros
+   */
+  object Annotations {
+    import scala.annotation.{StaticAnnotation, meta}
+
+    /**
+     * Specify a key different from field name in your case class.
+     * Convenient to use when you'd like to leverage mongo's _id index but don't want
+     * to actually use `_id` in your code.
+     *
+     * Example
+     * {{{
+     * case class Website(@Key("_id") url: String, content: Content)
+     * }}}
+     *
+     * Generated handler will map the `url` field in your code to `_id` field in BSON
+     *
+     * @param key the desired key to use in BSON
+     */
+    @meta.param
+    case class Key(key: String) extends StaticAnnotation
   }
 }

@@ -1,5 +1,6 @@
 /*
- * Copyright 2013 Stephane Godbillon (@sgodbillon)
+ * Copyright 2013 Stephane Godbillon
+ * @sgodbillon
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,8 +14,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package reactivemongo.bson.exceptions
+import org.specs2.mutable._
+import reactivemongo.bson._
+import scala.util._
 
-case class DocumentKeyNotFound(name: String) extends Exception {
-  override def getMessage = s"The key '$name' could not be found in this document or array"
+class Types extends Specification {
+
+  "Generating BSONObjectID" should {
+    "not throw a SocketException" in {
+
+      /*
+       * for i in `seq 1 257`; do
+       *   openvpn --mktun --dev tun$i
+       *   ip link set tun$i up
+       *   ip -6 addr add 2001:DB8::`printf %04x $i`/128 dev tun$i
+       * done
+       */
+      BSONObjectID.generate must beAnInstanceOf[BSONObjectID]
+    }
+  }
 }

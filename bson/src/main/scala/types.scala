@@ -41,7 +41,12 @@ case class BSONDocument(stream: Stream[Try[BSONElement]]) extends BSONValue {
    *
    * If the key is not found or the matching value cannot be deserialized, returns `None`.
    */
-  def get(key: String): Option[BSONValue] = getTry(key).toOption
+  def get(key: String): Option[BSONValue] = {
+    stream.find {
+      case Success(element) => element._1 == key
+      case Failure(e)       => false
+    }.map(_.get._2)
+  }
 
   /**
    * Returns the [[BSONValue]] associated with the given `key`.
@@ -74,8 +79,11 @@ case class BSONDocument(stream: Stream[Try[BSONElement]]) extends BSONValue {
    * If there is no matching value, or the value could not be deserialized or converted, returns a `None`.
    */
   def getAs[T](s: String)(implicit reader: BSONReader[_ <: BSONValue, T]): Option[T] = {
-    getTry(s).toOption.flatMap { element =>
-      Try(reader.asInstanceOf[BSONReader[BSONValue, T]].read(element)).toOption
+    get(s).flatMap { element =>
+      reader match {
+        case r: BSONReader[BSONValue, T]@unchecked => r.readOpt(element)
+        case _ => None
+      }
     }
   }
 
@@ -296,48 +304,89 @@ object BSONBinary {
 case object BSONUndefined extends BSONValue { val code = 0x06.toByte }
 
 /** BSON ObjectId value. */
-case class BSONObjectID(value: Array[Byte]) extends BSONValue {
+class BSONObjectID private (raw: Array[Byte]) extends BSONValue {
   val code = 0x07.toByte
 
   import java.util.Arrays
   import java.nio.ByteBuffer
 
-  /** Constructs a BSON ObjectId element from a hexadecimal String representation */
-  def this(value: String) = this(Converters.str2Hex(value))
-
   /** ObjectId hexadecimal String representation */
-  lazy val stringify = Converters.hex2Str(value)
+  lazy val stringify = Converters.hex2Str(raw)
 
   override def toString = "BSONObjectID(\"" + stringify + "\")"
 
   override def equals(obj: Any): Boolean = obj match {
-    case BSONObjectID(arr) => Arrays.equals(value, arr)
+    case BSONObjectID(arr) => Arrays.equals(raw, arr)
     case _                 => false
   }
 
-  override lazy val hashCode: Int = Arrays.hashCode(value)
+  override lazy val hashCode: Int = Arrays.hashCode(raw)
 
   /** The time of this BSONObjectId, in milliseconds */
   def time: Long = this.timeSecond * 1000L
 
   /** The time of this BSONObjectId, in seconds */
-  def timeSecond: Int = ByteBuffer.wrap(this.value.take(4)).getInt
+  def timeSecond: Int = ByteBuffer.wrap(raw.take(4)).getInt
+
+  def valueAsArray = Arrays.copyOf(raw, 12)
 }
 
 object BSONObjectID {
-  import java.net._
   private val maxCounterValue = 16777216
   private val increment = new java.util.concurrent.atomic.AtomicInteger(scala.util.Random.nextInt(maxCounterValue))
 
   private def counter = (increment.getAndIncrement + maxCounterValue) % maxCounterValue
 
+  /**
+   * The following implemtation of machineId work around openjdk limitations in
+   * version 6 and 7
+   *
+   * Openjdk fails to parse /proc/net/if_inet6 correctly to determine macaddress
+   * resulting in SocketException thrown.
+   *
+   * Please see:
+   * * https://github.com/openjdk-mirror/jdk7u-jdk/blob/feeaec0647609a1e6266f902de426f1201f77c55/src/solaris/native/java/net/NetworkInterface.c#L1130
+   * * http://lxr.free-electrons.com/source/net/ipv6/addrconf.c?v=3.11#L3442
+   * * http://lxr.free-electrons.com/source/include/linux/netdevice.h?v=3.11#L1130
+   * * http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=7078386
+   *
+   * and fix in openjdk8:
+   * * http://hg.openjdk.java.net/jdk8/tl/jdk/rev/b1814b3ea6d3
+   */
+
   private val machineId = {
-    val networkInterfacesEnum = NetworkInterface.getNetworkInterfaces
-    val networkInterfaces = scala.collection.JavaConverters.enumerationAsScalaIteratorConverter(networkInterfacesEnum).asScala
-    val ha = networkInterfaces.find(ha => ha.getHardwareAddress != null && ha.getHardwareAddress.length == 6)
-      .map(_.getHardwareAddress)
-      .getOrElse(InetAddress.getLocalHost.getHostName.getBytes)
-    Converters.md5(ha).take(3)
+    import java.net._
+    val validPlatform = Try {
+      val correctVersion = System.getProperty("java.version").substring(0, 3).toFloat >= 1.8
+      val noIpv6 = System.getProperty("java.net.preferIPv4Stack") == true
+      val isLinux = System.getProperty("os.name") == "Linux"
+
+      !isLinux || correctVersion || noIpv6
+    }.getOrElse(false)
+
+    // Check java policies
+    val permitted = {
+      val sec = System.getSecurityManager();
+      Try { sec.checkPermission(new NetPermission("getNetworkInformation")) }.toOption.map(_ => true).getOrElse(false);
+    }
+
+    if (validPlatform && permitted) {
+      val networkInterfacesEnum = NetworkInterface.getNetworkInterfaces
+      val networkInterfaces = scala.collection.JavaConverters.enumerationAsScalaIteratorConverter(networkInterfacesEnum).asScala
+      val ha = networkInterfaces.find(ha => Try(ha.getHardwareAddress).isSuccess && ha.getHardwareAddress != null && ha.getHardwareAddress.length == 6)
+        .map(_.getHardwareAddress)
+        .getOrElse(InetAddress.getLocalHost.getHostName.getBytes)
+      Converters.md5(ha).take(3)
+    } else {
+      val threadId = Thread.currentThread.getId.toInt
+      val arr = new Array[Byte](3)
+
+      arr(0) = (threadId & 0xFF).toByte
+      arr(1) = (threadId >> 8 & 0xFF).toByte
+      arr(2) = (threadId >> 16 & 0xFF).toByte
+
+      arr
+    }
   }
 
   /**
@@ -349,38 +398,81 @@ object BSONObjectID {
   def apply(id: String): BSONObjectID = {
     if (id.length != 24)
       throw new IllegalArgumentException(s"wrong ObjectId: '$id'")
-    else new BSONObjectID(id)
+    /** Constructs a BSON ObjectId element from a hexadecimal String representation */
+    new BSONObjectID(Converters.str2Hex(id))
   }
+
+  def apply(array: Array[Byte]): BSONObjectID = {
+    if(array.length != 12)
+      throw new IllegalArgumentException(s"wrong byte array for an ObjectId (size ${array.length})")
+    new BSONObjectID(java.util.Arrays.copyOf(array, 12))
+  }
+
+  def unapply(id: BSONObjectID): Option[Array[Byte]] = Some(id.valueAsArray)
 
   /** Tries to make a BSON ObjectId element from a hexadecimal String representation. */
   def parse(str: String): Try[BSONObjectID] = Try(apply(str))
 
-  /** Generates a new BSON ObjectID. */
-  def generate: BSONObjectID = {
-    val timestamp = (System.currentTimeMillis / 1000).toInt
+  /**
+   * Generates a new BSON ObjectID.
+   *
+   * +------------------------+------------------------+------------------------+------------------------+
+   * + timestamp (in seconds) +   machine identifier   +    thread identifier   +        increment       +
+   * +        (4 bytes)       +        (3 bytes)       +        (2 bytes)       +        (3 bytes)       +
+   * +------------------------+------------------------+------------------------+------------------------+
+   *
+   * The returned BSONObjectID contains a timestamp set to the current time (in seconds),
+   * with the `machine identifier`, `thread identifier` and `increment` properly set.
+   */
+  def generate: BSONObjectID = fromTime(System.currentTimeMillis, false)
 
+  /**
+   * Generates a new BSON ObjectID from the given timestamp in milliseconds.
+   *
+   * +------------------------+------------------------+------------------------+------------------------+
+   * + timestamp (in seconds) +   machine identifier   +    thread identifier   +        increment       +
+   * +        (4 bytes)       +        (3 bytes)       +        (2 bytes)       +        (3 bytes)       +
+   * +------------------------+------------------------+------------------------+------------------------+
+   *
+   * The included timestamp is the number of seconds since epoch, so a BSONObjectID time part has only
+   * a precision up to the second. To get a reasonably unique ID, you _must_ set `onlyTimestamp` to false.
+   *
+   * Crafting a BSONObjectID from a timestamp with `fillOnlyTimestamp` set to true is helpful for range queries,
+   * eg if you want of find documents an _id field which timestamp part is greater than or lesser than
+   * the one of another id.
+   *
+   * If you do not intend to use the produced BSONObjectID for range queries, then you'd rather use
+   * the `generate` method instead.
+   *
+   * @param fillOnlyTimestamp if true, the returned BSONObjectID will only have the timestamp bytes set; the other will be set to zero.
+   */
+  def fromTime(timeMillis: Long, fillOnlyTimestamp: Boolean = true): BSONObjectID = {
     // n of seconds since epoch. Big endian
+    val timestamp = (timeMillis / 1000).toInt
     val id = new Array[Byte](12)
+
     id(0) = (timestamp >>> 24).toByte
     id(1) = (timestamp >> 16 & 0xFF).toByte
     id(2) = (timestamp >> 8 & 0xFF).toByte
     id(3) = (timestamp & 0xFF).toByte
 
-    // machine id, 3 first bytes of md5(macadress or hostname)
-    id(4) = machineId(0)
-    id(5) = machineId(1)
-    id(6) = machineId(2)
+    if (!fillOnlyTimestamp) {
+      // machine id, 3 first bytes of md5(macadress or hostname)
+      id(4) = machineId(0)
+      id(5) = machineId(1)
+      id(6) = machineId(2)
 
-    // 2 bytes of the pid or thread id. Thread id in our case. Low endian
-    val threadId = Thread.currentThread.getId.toInt
-    id(7) = (threadId & 0xFF).toByte
-    id(8) = (threadId >> 8 & 0xFF).toByte
+      // 2 bytes of the pid or thread id. Thread id in our case. Low endian
+      val threadId = Thread.currentThread.getId.toInt
+      id(7) = (threadId & 0xFF).toByte
+      id(8) = (threadId >> 8 & 0xFF).toByte
 
-    // 3 bytes of counter sequence, which start is randomized. Big endian
-    val c = counter
-    id(9) = (c >> 16 & 0xFF).toByte
-    id(10) = (c >> 8 & 0xFF).toByte
-    id(11) = (c & 0xFF).toByte
+      // 3 bytes of counter sequence, which start is randomized. Big endian
+      val c = counter
+      id(9) = (c >> 16 & 0xFF).toByte
+      id(10) = (c >> 8 & 0xFF).toByte
+      id(11) = (c & 0xFF).toByte
+    }
 
     BSONObjectID(id)
   }
@@ -402,8 +494,13 @@ case object BSONNull extends BSONValue { val code = 0x0A.toByte }
  */
 case class BSONRegex(value: String, flags: String) extends BSONValue { val code = 0x0B.toByte }
 
-/** BSON DBPointer value. TODO */
-case class BSONDBPointer(value: String, id: Array[Byte]) extends BSONValue { val code = 0x0C.toByte }
+/** BSON DBPointer value. */
+case class BSONDBPointer(value: String, id: Array[Byte]) extends BSONValue {
+  val code = 0x0C.toByte
+
+  /** The BSONObjectID representation of this reference. */
+  val objectId = BSONObjectID(id)
+}
 
 /**
  * BSON JavaScript value.

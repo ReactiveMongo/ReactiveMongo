@@ -17,7 +17,6 @@ package reactivemongo.api
 
 import java.nio.ByteOrder._
 import org.jboss.netty.buffer.{ ChannelBuffer, ChannelBuffers }
-import org.slf4j.{ Logger, LoggerFactory }
 import play.api.libs.iteratee._
 import reactivemongo.utils.LazyLogger
 import scala.concurrent.{ ExecutionContext, Future }
@@ -28,7 +27,7 @@ import reactivemongo.core.netty.ChannelBufferWritableBuffer
  */
 object bulk {
   import reactivemongo.api.collections.buffer._
-  private val logger = LazyLogger(LoggerFactory.getLogger("reactivemongo.api.Bulk"))
+  private val logger = LazyLogger("reactivemongo.api.Bulk")
   /** Default maximum size for a bulk (1MB). */
   val MaxBulkSize = 1024 * 1024
   /** Default maximum documents number for a bulk (100). */

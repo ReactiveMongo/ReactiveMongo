@@ -6,4 +6,5 @@ target/
 .project*
 .settings*
 .worksheet/
+.plugins.sbt
 bson/.cache

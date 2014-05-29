@@ -15,17 +15,17 @@
  */
 package reactivemongo.core.commands
 
-import scala.util.{Try, Failure}
+import scala.util.{ Try, Failure }
+import reactivemongo.api.ReadPreference
 import reactivemongo.bson._
 import reactivemongo.bson.exceptions.DocumentKeyNotFound
 import DefaultBSONHandlers._
 import reactivemongo.core.errors._
 import reactivemongo.core.protocol.{ RequestMaker, Query, QueryFlags, Response }
-import reactivemongo.core.protocol.NodeState
-import reactivemongo.core.protocol.NodeState._
 import reactivemongo.core.netty._
 import reactivemongo.utils.option
 import reactivemongo.bson.utils.Converters
+import reactivemongo.core.nodeset.NodeStatus
 
 /**
  * A MongoDB Command.
@@ -175,10 +175,23 @@ class MakableCommand(val db: String, val command: Command[_]) {
    * Produces the [[reactivemongo.core.protocol.Query]] instance for the given command.
    */
   def makeQuery: Query = Query(if (command.slaveOk) QueryFlags.SlaveOk else 0, db + ".$cmd", 0, 1)
+
   /**
    * Returns the [[reactivemongo.core.protocol.RequestMaker]] for the given command.
    */
   def maker = RequestMaker(makeQuery, BufferSequence(command.makeDocuments.makeBuffer))
+
+  /**
+   * Returns the [[reactivemongo.core.protocol.RequestMaker]] for the given command, using the given ReadPreference.
+   */
+  def maker(readPreference: ReadPreference) = {
+    val query = makeQuery
+    val flags =
+      if(readPreference.slaveOk)
+        query.flags | QueryFlags.SlaveOk
+      else query.flags
+    RequestMaker(query.copy(flags = flags), BufferSequence(command.makeDocuments.makeBuffer), readPreference)
+  }
 }
 
 case class RawCommand(bson: BSONDocument) extends Command[BSONDocument] {
@@ -197,20 +210,23 @@ case class RawCommand(bson: BSONDocument) extends Command[BSONDocument] {
  * This command will return only when the previous operation is complete and matches its parameters
  * (for example, with waitForReplicatedOn set to Some(2), this command will return only when at least two replicas have also run the previous operation).
  *
- * @param awaitJournalCommit Make sure that the previous operation has been committed into the journal. Journaling must be enabled on the servers.
- * @param waitForReplicatedOn Make sure that the previous (write) operation has been run on at least ''n'' replicas, with ''n'' = waitReplicatedOn.get
+ * @param j Make sure that the previous operation has been committed into the journal. Journaling must be enabled on the servers.
+ * @param w Specify the level of replication for a write operation. Should be a BSONString or BSONInteger. See [[http://docs.mongodb.org/manual/reference/command/getLastError/#dbcmd.getLastError the MongoDB documentation]].
+ * @param wtimeout Write propagation timeout (in milliseconds). See [[http://docs.mongodb.org/manual/reference/command/getLastError/#dbcmd.getLastError the MongoDB documentation]].
  * @param fsync Make sure that the previous (write) operation has been written on the disk.
  */
 case class GetLastError(
-    awaitJournalCommit: Boolean = false,
-    waitForReplicatedOn: Option[Int] = None,
+    j: Boolean = false,
+    w: Option[BSONValue] = None,
+    wtimeout: Int = 0,
     fsync: Boolean = false) extends Command[LastError] {
   override def makeDocuments =
     BSONDocument(
       "getlasterror" -> BSONInteger(1),
-      "waitForReplicatedOn" -> waitForReplicatedOn.map(w => BSONInteger(w)),
+      "w" -> w,
+      "wtimeout" -> Option(wtimeout).filter(_ > 0),
       "fsync" -> option(fsync, BSONBoolean(true)),
-      "j" -> option(awaitJournalCommit, BSONBoolean(true)))
+      "j" -> option(j, BSONBoolean(true)))
 
   val ResultMaker = LastError
 }
@@ -248,7 +264,7 @@ case class LastError(
 
   /** Returns a `Stream` for all the elements of the [[reactivemongo.core.commands.LastError#originalDocument originalDocument]] if present, otherwise an empty `Stream`. */
   def elements: Stream[BSONElement] = originalDocument.map(_.elements).getOrElse(Stream.empty[BSONElement])
-    
+
   /**
    * Returns the [[reactivemongo.bson.BSONValue BSONValue]] associated with the given `key` of the [[reactivemongo.core.commands.LastError#originalDocument originalDocument]].
    *
@@ -273,7 +289,7 @@ case class LastError(
   def getUnflattenedTry(key: String): Try[Option[BSONValue]] = originalDocument.map(_.getUnflattenedTry(key)).getOrElse(Failure(DocumentKeyNotFound(key)))
 
   /**
-   * Returns the [[reactivemongo.bson.BSONValue BSONValue]] associated with the given `key` of the [[reactivemongo.core.commands.LastError#originalDocument originalDocument]], 
+   * Returns the [[reactivemongo.bson.BSONValue BSONValue]] associated with the given `key` of the [[reactivemongo.core.commands.LastError#originalDocument originalDocument]],
    * and converts it with the given implicit [[reactivemongo.bson.BSONReader BSONReader]].
    *
    * If there is no matching value, or the value could not be deserialized or converted, returns a `None`.
@@ -281,16 +297,16 @@ case class LastError(
   def getAs[T](s: String)(implicit reader: BSONReader[_ <: BSONValue, T]): Option[T] = originalDocument.flatMap(_.getAs[T](s))
 
   /**
-   * Returns the [[reactivemongo.bson.BSONValue BSONValue]] associated with the given `key` of the [[reactivemongo.core.commands.LastError#originalDocument originalDocument]], 
+   * Returns the [[reactivemongo.bson.BSONValue BSONValue]] associated with the given `key` of the [[reactivemongo.core.commands.LastError#originalDocument originalDocument]],
    * and converts it with the given implicit [[reactivemongo.bson.BSONReader BSONReader]].
    *
    * If there is no matching value, or the value could not be deserialized or converted, returns a `Failure`.
    * The `Failure` holds a [[reactivemongo.bson.exceptions.DocumentKeyNotFound DocumentKeyNotFound]] if the key could not be found.
-   */  
+   */
   def getAsTry[T](s: String)(implicit reader: BSONReader[_ <: BSONValue, T]): Try[T] = originalDocument.map(_.getAsTry[T](s)).getOrElse(Failure(DocumentKeyNotFound(s)))
-  
+
   /**
-   * Returns the [[reactivemongo.bson.BSONValue BSONValue]] associated with the given `key` of the [[reactivemongo.core.commands.LastError#originalDocument originalDocument]], 
+   * Returns the [[reactivemongo.bson.BSONValue BSONValue]] associated with the given `key` of the [[reactivemongo.core.commands.LastError#originalDocument originalDocument]],
    * and converts it with the given implicit [[reactivemongo.bson.BSONReader BSONReader]].
    *
    * If there is no matching value, returns a `Success` holding `None`.
@@ -476,11 +492,12 @@ object IsMaster extends AdminCommand[IsMasterResponse] {
       CommandError.checkOk(document, Some("isMaster")).toLeft(IsMasterResponse(
         document.getAs[BSONBoolean]("ismaster").map(_.value).getOrElse(false),
         document.getAs[BSONBoolean]("secondary").map(_.value).getOrElse(false),
-        document.getAs[BSONInteger]("maxBsonObjectSize").map(_.value).getOrElse(16777216),
+        document.getAs[BSONInteger]("maxBsonObjectSize").map(_.value).getOrElse(16777216), // TODO: default value should be 4M
         document.getAs[BSONString]("setName").map(_.value),
         document.getAs[BSONArray]("hosts").map(
           _.values.map(_.asInstanceOf[BSONString].value).toList),
-        document.getAs[BSONString]("me").map(_.value)))
+        document.getAs[BSONString]("me").map(_.value),
+        document.getAs[BSONDocument]("tags")))
     }
   }
 }
@@ -501,9 +518,10 @@ case class IsMasterResponse(
     maxBsonObjectSize: Int,
     setName: Option[String],
     hosts: Option[Seq[String]],
-    me: Option[String]) {
-  /** the resolved [[reactivemongo.core.protocol.NodeState]] of the answering server */
-  lazy val state: NodeState = if (isMaster) PRIMARY else if (secondary) SECONDARY else UNKNOWN
+    me: Option[String],
+    tags: Option[BSONDocument]) {
+  /** the resolved [[reactivemongo.core.nodeset.NodeStatus]] of the answering server */
+  val status: NodeStatus = if (isMaster) NodeStatus.Primary else if (secondary) NodeStatus.Secondary else NodeStatus.NonQueryableUnknownStatus
 }
 
 /** A modify operation, part of a FindAndModify command */
@@ -574,6 +592,5 @@ case class DeleteIndex(
 
   object ResultMaker extends BSONCommandResultMaker[Int] {
     def apply(document: BSONDocument) =
-      CommandError.checkOk(document, Some("deleteIndexes")).toLeft(document.getAs[BSONDouble]("nIndexWas").map(_.value.toInt).get)
-  }
+      CommandError.checkOk(document, Some("deleteIndexes")).toLeft(document.getAs[BSONDouble]("nIndexesWas").map(_.value.toInt).get) }
 }

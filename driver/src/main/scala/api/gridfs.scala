@@ -226,7 +226,7 @@ class GridFS[Structure, Reader[_], Writer[_]](db: DB with DBMetaCommands, prefix
     Iteratee.foldM(Chunk()) { (previous, chunk: Array[Byte]) =>
       logger.debug("processing new enumerated chunk from n=" + previous.n + "...\n")
       previous.feed(chunk)
-    }.mapDone(_.finish)
+    }.map(_.finish)
   }
 
   /** Produces an enumerator of chunks of bytes from the `chunks` collection matching the given file metadata. */
@@ -242,11 +242,11 @@ class GridFS[Structure, Reader[_], Writer[_]](db: DB with DBMetaCommands, prefix
         "n" -> BSONInteger(1)))
 
     val cursor = chunks[BSONCollection].find(selector).cursor
-    cursor.enumerate &> (Enumeratee.map { doc =>
+    cursor.enumerate() &> Enumeratee.map { doc =>
       doc.get("data").flatMap {
         case BSONBinary(data, _) => {
           val array = new Array[Byte](data.readable)
-          data.slice(data.readable).readBytes(array) //Some(data.array()) // TODO TODO TODO
+          data.slice(data.readable).readBytes(array)
           Some(array)
         }
         case _ => None
@@ -254,7 +254,7 @@ class GridFS[Structure, Reader[_], Writer[_]](db: DB with DBMetaCommands, prefix
         logger.error("not a chunk! failed assertion: data field is missing")
         throw new RuntimeException("not a chunk! failed assertion: data field is missing")
       }
-    })
+    }
   }
 
   /** Reads the given file and writes its contents to the given OutputStream */

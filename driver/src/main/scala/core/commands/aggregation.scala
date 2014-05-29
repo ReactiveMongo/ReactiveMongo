@@ -40,9 +40,10 @@ sealed trait PipelineOperator {
  * http://docs.mongodb.org/manual/reference/aggregation/project/#_S_project
  * @param fields Fields to include. The resulting objects will contain only these fields
  */
-case class Project(fields: (String, Int)*) extends PipelineOperator {
+case class Project(fields: (String, BSONValue)*) extends PipelineOperator {
   override val makePipe = BSONDocument("$project" -> BSONDocument(
-    { for (field <- fields) yield field._1 -> BSONInteger(field._2) }.toStream))
+    { for (field <- fields) yield field._1 -> field._2 }.toStream
+  ))
 }
 
 /**
@@ -90,9 +91,7 @@ case class Unwind(field: String) extends PipelineOperator {
  * @param ops Sequence of operators specifying aggregate calculation.
  */
 case class GroupField(idField: String)(ops: (String, GroupFunction)*) extends PipelineOperator {
-  override val makePipe = Group(BSONDocument(
-    "_id" -> BSONString("$" + idField) 
-  ))(ops: _*).makePipe
+  override val makePipe = Group(BSONString("$" + idField))(ops: _*).makePipe
 }
 
 /**

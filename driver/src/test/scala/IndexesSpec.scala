@@ -88,11 +88,15 @@ class IndexesSpec extends Specification with Tags {
         "coordinates" -> BSONArray( BSONDouble(-195), BSONDouble(25) )
       )))
       try {
-        Await.result(future, timeout)
+        val result = Await.result(future, timeout)
+        println(s"\n\n \tPOOR: $result \n\n")
         failure
       } catch {
         case e: DatabaseException =>
           e.code mustEqual Some(16572) // MongoError['Can't extract geo keys from object, malformed geometry?' (code = 16572)]
+        case e =>
+          e.printStackTrace()
+          throw e
       }
       success
     } tag ("mongo2_4")

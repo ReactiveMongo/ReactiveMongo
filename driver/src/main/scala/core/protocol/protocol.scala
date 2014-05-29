@@ -23,13 +23,13 @@ import org.jboss.netty.channel._
 import org.jboss.netty.channel.socket.nio._
 import org.jboss.netty.handler.codec.oneone._
 import org.jboss.netty.handler.codec.frame.FrameDecoder
-import org.slf4j.{ Logger, LoggerFactory }
-import reactivemongo.core.actors.{ Connected, Disconnected }
+import reactivemongo.core.actors.{ ChannelConnected, ChannelClosed, ChannelDisconnected }
 import reactivemongo.core.commands.GetLastError
 import reactivemongo.core.errors._
 import reactivemongo.core.netty._
 import reactivemongo.utils.LazyLogger
 import BufferAccessors._
+import reactivemongo.api.ReadPreference
 import reactivemongo.api.collections.BufferReader
 
 object `package` {
@@ -160,13 +160,12 @@ case class Request(
     responseTo: Int, // TODO remove, nothing to do here.
     op: RequestOp,
     documents: BufferSequence,
+    readPreference: ReadPreference = ReadPreference.primary,
     channelIdHint: Option[Int] = None) extends ChannelBufferWritable {
   override val writeTo = { buffer: ChannelBuffer =>
-    {
-      buffer write header
-      buffer write op
-      buffer writeBytes documents.merged
-    }
+    buffer write header
+    buffer write op
+    buffer writeBytes documents.merged
   }
   override def size = 16 + op.size + documents.merged.writerIndex
   /** Header of this request */
@@ -184,7 +183,7 @@ case class CheckedWriteRequest(
     op: WriteRequestOp,
     documents: BufferSequence,
     getLastError: GetLastError) {
-  def apply(): (RequestMaker, RequestMaker) = RequestMaker(op, documents, None) -> getLastError.apply(op.db).maker
+  def apply(): (RequestMaker, RequestMaker) = RequestMaker(op, documents) -> getLastError.apply(op.db).maker
 }
 
 /**
@@ -197,8 +196,9 @@ case class CheckedWriteRequest(
 case class RequestMaker(
     op: RequestOp,
     documents: BufferSequence = BufferSequence.empty,
+    readPreference: ReadPreference = ReadPreference.primary,
     channelIdHint: Option[Int] = None) {
-  def apply(id: Int) = Request(id, 0, op, documents, channelIdHint)
+  def apply(id: Int) = Request(id, 0, op, documents, readPreference, channelIdHint)
 }
 
 /**
@@ -303,11 +303,23 @@ private[reactivemongo] class RequestEncoder extends OneToOneEncoder {
 
 private[reactivemongo] case class ReplyDocumentIterator[T](private val reply: Reply, private val buffer: ChannelBuffer)(implicit reader: BufferReader[T]) extends Iterator[T] {
   def hasNext = buffer.readable
-  def next = reader.read(ChannelBufferReadableBuffer(buffer.readBytes(buffer.getInt(buffer.readerIndex))))
+  def next =
+    try {
+      reader.read(ChannelBufferReadableBuffer(buffer.readBytes(buffer.getInt(buffer.readerIndex))))
+    } catch {
+      case e: IndexOutOfBoundsException =>
+        /*
+         * If this happens, the buffer is exhausted, and there is probably a bug.
+         * It may happen if an enumerator relying on it is concurrently applied to many iteratees – which should not be done!
+         */
+        throw new ReplyDocumentIteratorExhaustedException(e)
+    }
 }
 
+case class ReplyDocumentIteratorExhaustedException(val cause: Exception) extends Exception(cause)
+
 private[reactivemongo] object RequestEncoder {
-  val logger = LazyLogger(LoggerFactory.getLogger("reactivemongo.core.protocol.RequestEncoder"))
+  val logger = LazyLogger("reactivemongo.core.protocol.RequestEncoder")
 }
 
 private[reactivemongo] class ResponseFrameDecoder extends FrameDecoder {
@@ -356,16 +368,16 @@ private[reactivemongo] class MongoHandler(receiver: ActorRef) extends SimpleChan
   }
   override def channelConnected(ctx: ChannelHandlerContext, e: ChannelStateEvent) {
     log(e, "connected")
-    receiver ! Connected(e.getChannel.getId)
+    receiver ! ChannelConnected(e.getChannel.getId)
     super.channelConnected(ctx, e)
   }
   override def channelDisconnected(ctx: ChannelHandlerContext, e: ChannelStateEvent) {
     log(e, "disconnected")
-    receiver ! Disconnected(e.getChannel.getId)
+    receiver ! ChannelDisconnected(e.getChannel.getId)
   }
   override def channelClosed(ctx: ChannelHandlerContext, e: ChannelStateEvent) {
     log(e, "closed")
-    receiver ! Disconnected(e.getChannel.getId)
+    receiver ! ChannelClosed(e.getChannel.getId)
   }
   override def exceptionCaught(ctx: org.jboss.netty.channel.ChannelHandlerContext, e: org.jboss.netty.channel.ExceptionEvent) {
     log(e, "CHANNEL ERROR: " + e.getCause)
@@ -374,77 +386,5 @@ private[reactivemongo] class MongoHandler(receiver: ActorRef) extends SimpleChan
 }
 
 private[reactivemongo] object MongoHandler {
-  private val logger = LazyLogger(LoggerFactory.getLogger("reactivemongo.core.protocol.MongoHandler"))
-}
-
-/**
- * State of a node.
- */
-sealed trait NodeState
-/**
- * State of a node in a replica set.
- */
-sealed trait MongoNodeState {
-  /**
-   * state code
-   */
-  val code: Int
-}
-
-object NodeState {
-  /**
-   * Gets the NodeState matching the given state code.
-   */
-  def apply(i: Int): NodeState = i match {
-    case 1 => PRIMARY
-    case 2 => SECONDARY
-    case 3 => RECOVERING
-    case 4 => FATAL
-    case 5 => STARTING
-    case 6 => UNKNOWN
-    case 7 => ARBITER
-    case 8 => DOWN
-    case 9 => ROLLBACK
-    case _ => NONE
-  }
-
-  /** This node is a primary (both read and write operations are allowed). */
-  case object PRIMARY extends NodeState with MongoNodeState { override val code = 1 }
-  /** This node is a secondary (only read operations that are slaveOk are allowed). */
-  case object SECONDARY extends NodeState with MongoNodeState { override val code = 2 }
-  /** This node is recovering (initial syncing, post-rollback, stale members). */
-  case object RECOVERING extends NodeState with MongoNodeState { override val code = 3 }
-  /** This node encountered a fatal error. */
-  case object FATAL extends NodeState with MongoNodeState { override val code = 4 }
-  /** This node is starting up (phase 2, forking threads). */
-  case object STARTING extends NodeState with MongoNodeState { override val code = 5 }
-  /** This node is in an unknown state (it has never been reached from another node's point of view). */
-  case object UNKNOWN extends NodeState with MongoNodeState { override val code = 6 }
-  /** This node is an arbiter (contains no data). */
-  case object ARBITER extends NodeState with MongoNodeState { override val code = 7 }
-  /** This node is down. */
-  case object DOWN extends NodeState with MongoNodeState { override val code = 8 }
-  /** This node is the rollback state. */
-  case object ROLLBACK extends NodeState with MongoNodeState { override val code = 9 }
-  /** This node has no state yet (never been reached by the driver). */
-  case object NONE extends NodeState
-  /** This node is not connected. */
-  case object NOT_CONNECTED extends NodeState
-  /** This node is connected. */
-  case object CONNECTED extends NodeState
-}
-
-/** State of a channel. Useful mainly for authentication. */
-sealed trait ChannelState
-object ChannelState {
-  /** This channel is usable for any kind of queries, depending on its node state. */
-  sealed trait Usable extends ChannelState
-  /** This channel is closed. */
-  case object Closed extends ChannelState
-  /** This channel is not connected. */
-  case object NotConnected extends ChannelState
-  /** This channel is usable, meaning that it can be used for sending wire protocol messages. */
-  case object Ready extends Usable
-  /** This channel is currently authenticating. It can be used for other queries though. */
-  case class Authenticating(db: String, user: String, password: String, nonce: Option[String]) extends Usable
+  private val logger = LazyLogger("reactivemongo.core.protocol.MongoHandler")
 }
