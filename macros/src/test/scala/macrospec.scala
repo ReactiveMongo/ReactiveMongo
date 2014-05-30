@@ -25,7 +25,7 @@ class Macros extends Specification {
   case class WordLover(name: String, words: Seq[String])
   case class Empty()
   object EmptyObject
-  case class RenamedId(@Key("_id") myID: BSONObjectID = BSONObjectID.generate, value: String)
+  case class RenamedId(@Key("_id") myID: BSONObjectID = BSONObjectID.generate, @CustomAnnotation value: String)
 
   object Nest {
     case class Nested(name: String)
