@@ -14,8 +14,8 @@ object BuildSettings {
   val buildSettings = Defaults.defaultSettings ++ Seq(
     organization := "org.reactivemongo",
     version := buildVersion,
-    scalaVersion := "2.11.0",
-    crossScalaVersions  := Seq("2.11.0", "2.10.4"),
+    scalaVersion := "2.11.1",
+    crossScalaVersions  := Seq("2.11.1", "2.10.4"),
     crossVersion := CrossVersion.binary,
     javaOptions in test ++= Seq("-Xmx512m", "-XX:MaxPermSize=512m"),
     scalacOptions ++= Seq("-unchecked", "-deprecation"),
@@ -123,7 +123,7 @@ object Dependencies {
 
   val akkaActor = "com.typesafe.akka" %% "akka-actor" % "2.3.3"
 
-  val iteratees = "com.typesafe.play" %% "play-iteratees" % "2.3.0-RC2"
+  val iteratees = "com.typesafe.play" %% "play-iteratees" % "2.3.0"
 
   val specs = "org.specs2" %% "specs2-core" % "2.3.11" % "test"
 
