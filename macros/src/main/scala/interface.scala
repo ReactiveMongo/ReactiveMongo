@@ -1,5 +1,10 @@
 package reactivemongo.bson
 
+case class Queryable[T] {
+  import language.experimental.macros
+	def eq[A](p : T => A, value : A) : BSONDocument = macro QueryMacroImpl.eq[T, A]
+}
+
 /**
  * Macros for generating `BSONReader` and `SONWriter` implementations for case
  * at compile time. Invoking these macros is equivalent to writing anonymous
@@ -90,6 +95,8 @@ object Macros {
 
   /**Creates an instance of BSONReader and BSONWriter for case class A and takes additional options */
   def handlerOpts[A, Opts <: Options.Default]: BSONDocumentReader[A] with BSONDocumentWriter[A]  with BSONHandler[BSONDocument, A] = macro MacroImpl.handler[A, Opts]
+  
+  def where[A](p: A => Boolean) : BSONDocument = BSONDocument()
 
   /**
    * Methods with 'Opts' postfix will take additional options in the form of
