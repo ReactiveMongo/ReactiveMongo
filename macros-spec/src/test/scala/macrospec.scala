@@ -2,7 +2,11 @@ import reactivemongo.bson._
 import org.specs2.mutable._
 import reactivemongo.bson.exceptions.DocumentKeyNotFound
 import reactivemongo.bson.Macros.Annotations.Key
+import org.specs2.runner._
+import org.junit.runner._
+import org.scalatest.junit.JUnitRunner
 
+@RunWith(classOf[JUnitRunner])
 class Macros extends Specification {
   type Handler[A] = BSONDocumentReader[A] with BSONDocumentWriter[A]  with BSONHandler[BSONDocument, A]
 
