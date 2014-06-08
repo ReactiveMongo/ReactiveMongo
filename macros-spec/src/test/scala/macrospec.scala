@@ -6,7 +6,17 @@ import reactivemongo.bson.Macros.Annotations.Key
 import org.junit.runner.RunWith
 import org.specs2.runner.JUnitRunner
 
+case class Person(firstName: String, lastName: String)
 
+@RunWith(classOf[JUnitRunner])
+class QueryMacroSpec extends Specification {
+  "eq" in {
+    val q = Queryable[Person].eq(_.firstName, "abc")
+    println(q.elements)
+    println(q.get("test").get)
+    "" mustEqual ""
+  }
+}
 
 
 @RunWith(classOf[JUnitRunner])
@@ -21,7 +31,7 @@ class MacrosSpec extends Specification  {
 
   def roundtripImp[A](data:A)(implicit format: BSONReader[BSONDocument, A] with BSONWriter[A, BSONDocument]) = roundtrip(data, format)
 
-  case class Person(firstName: String, lastName: String)
+  
   case class Pet(name: String, owner: Person)
   case class Primitives(dbl: Double, str: String, bl: Boolean, int: Int, long: Long)
   case class Optional(name: String, value: Option[String])

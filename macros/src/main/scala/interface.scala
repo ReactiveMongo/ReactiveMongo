@@ -2,7 +2,7 @@ package reactivemongo.bson
 
 case class Queryable[T] {
   import language.experimental.macros
-	def eq[A](p : T => A, value : A) : BSONDocument = macro QueryMacroImpl.eq[T, A]
+	def eq[A](p : T => A, value: A) : BSONDocument = macro QueryMacroImpl.eq[T, A]
 }
 
 /**

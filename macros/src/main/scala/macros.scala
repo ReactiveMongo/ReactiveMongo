@@ -384,8 +384,16 @@ private object MacroImpl {
 
 private object QueryMacroImpl{
  def eq[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => A], value: c.Expr[A]): c.Expr[BSONDocument] = {
-    c.universe.reify {
-      BSONDocument()
+   import c.universe._
+   val vType = weakTypeOf[T]
+   println(vType.members)
+   val paramRep = p.tree.collect({ case m: c.universe.TermTreeApi => m }).head.children.length.toString
+   val paramRepTree = Literal(Constant(paramRep))
+   
+   
+   c.universe.reify {
+      
+      BSONDocument("test" -> c.Expr[String](paramRepTree).splice)
     }
   } 
 }
