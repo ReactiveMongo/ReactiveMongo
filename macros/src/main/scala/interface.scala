@@ -1,8 +1,32 @@
 package reactivemongo.bson
 
+
+
+object Query{
+  def on[T] = Queryable[T]
+}
+
+
 case class Queryable[T] {
   import language.experimental.macros
-	def eq[A](p : T => A, value: A) : BSONDocument = macro QueryMacroImpl.eq[T, A]
+  
+  private def nameOf[A](p : T => A, value: A) : String = macro QueryMacroImpl.nameImpl[T, A]
+  
+	def eq[A](p: T => A, value: A) : BSONDocument = macro QueryMacroImpl.eq[T, A]
+	def gt[A](p: T => A, value: A) : BSONDocument = BSONDocument()
+	def gte[A](p: T => A, value: A) : BSONDocument = BSONDocument()
+	def in[A](p: T => A, values: A *) : BSONDocument = BSONDocument()
+	def lt[A](p: T => A, value: A) : BSONDocument = BSONDocument()
+	def lte[A](p: T => A, value: A) : BSONDocument = BSONDocument()
+	def ne[A](p: T => A, values: A *) : BSONDocument = BSONDocument()
+	def nin[A](p: T => A, value: A) : BSONDocument = BSONDocument()
+	
+	
+	
+	def and(exps: Queryable[T] => BSONDocument *) = BSONDocument()
+	def or(exps: Queryable[T] => BSONDocument *) = BSONDocument()
+	def not(expr: Queryable[T] => BSONDocument) = BSONDocument()
+	def nor(expr: Queryable[T] => BSONDocument) = BSONDocument()
 }
 
 /**

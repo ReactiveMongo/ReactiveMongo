@@ -11,6 +11,11 @@ case class Person(firstName: String, lastName: String)
 @RunWith(classOf[JUnitRunner])
 class QueryMacroSpec extends Specification {
   "eq" in {
+    import Query._
+    
+    on[Person].eq(_.firstName, "")
+    on[Person].and(_.eq(_.firstName, "j"), _.eq(_.lastName, "doe"))
+    on[Person].or(_.eq(_.firstName, "alex"), _.eq(_.lastName, "m"), _.gte(_.lastName, "aaaaaaa"), _.eq(_.lastName, ""))
     val q = Queryable[Person].eq(_.firstName, "abc")
     println(q.elements)
     println(q.get("test").get)
