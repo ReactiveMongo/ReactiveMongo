@@ -384,7 +384,9 @@ private object MacroImpl {
 
 private object QueryMacroImpl{
   
-  def nameImpl[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => A], value: c.Expr[A]): c.Expr[String] = {
+  
+  
+  def nameImpl[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => A]): c.Expr[String] = {
     import c.universe._
     p.tree.children(1) match {
      case Select(a, b) => {
@@ -398,11 +400,15 @@ private object QueryMacroImpl{
   
  def eq[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => A], value: c.Expr[A]): c.Expr[BSONDocument] = {
    import c.universe._
+   
+   
+   
    p.tree.children(1) match {
      case Select(a, b) => {
        val paramRepTree = Literal(Constant(b.decoded))
 	   c.universe.reify {
-	      BSONDocument("test" -> c.Expr[String](paramRepTree).splice)
+         
+	      BSONDocument(c.Expr[String](paramRepTree).splice -> value.splice)
 	    }
      }
    } 
