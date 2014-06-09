@@ -10,14 +10,14 @@ object Query{
 case class Queryable[T] {
   import language.experimental.macros
   
-	def eq[A](p: T => A, value: A)(implicit handler: BSONHandler[_ <: BSONValue, A]) : BSONDocument = macro QueryMacroImpl.eq[T,A]
-	def gt[A](p: T => A, value: A)(implicit handler: BSONHandler[_ <: BSONValue, A]) : BSONDocument = BSONDocument() //macro QueryMacroImpl.gt[T, A]
-	def gte[A](p: T => A, value: A) : BSONDocument = BSONDocument()
-	def in[A](p: T => A, values: A *) : BSONDocument = BSONDocument()
-	def lt[A](p: T => A, value: A) : BSONDocument = BSONDocument()
-	def lte[A](p: T => A, value: A) : BSONDocument = BSONDocument()
-	def ne[A](p: T => A, values: A *) : BSONDocument = BSONDocument()
-	def nin[A](p: T => A, value: A) : BSONDocument = BSONDocument()
+	def eq[A](p: T => A, value: A)(implicit handler: BSONHandler[_ <: BSONValue, A]) : BSONDocument = macro QueryMacroImpl.eq[T, A]
+	def gt[A](p: T => A, value: A)(implicit handler: BSONHandler[_ <: BSONValue, A]) : BSONDocument = macro QueryMacroImpl.gt[T, A]
+	def gte[A](p: T => A, value: A)(implicit handler: BSONHandler[_ <: BSONValue, A]) : BSONDocument = macro QueryMacroImpl.gte[T, A]
+	def in[A](p: T => A, values: List[A])(implicit handler: BSONHandler[_ <: BSONValue, A]) : BSONDocument = macro QueryMacroImpl.in[T, A]
+	def lt[A](p: T => A, value: A)(implicit handler: BSONHandler[_ <: BSONValue, A]) : BSONDocument = macro QueryMacroImpl.lt[T, A]
+	def lte[A](p: T => A, value: A)(implicit handler: BSONHandler[_ <: BSONValue, A]) : BSONDocument = macro QueryMacroImpl.lte[T, A]
+	def ne[A](p: T => A, value: A)(implicit handler: BSONHandler[_ <: BSONValue, A]) : BSONDocument = macro QueryMacroImpl.ne[T, A]
+	def nin[A](p: T => A, values: List[A])(implicit handler: BSONHandler[_ <: BSONValue, A]) : BSONDocument = BSONDocument()
 	
 	
 	

@@ -10,19 +10,36 @@ case class Person(firstName: String, lastName: String)
 
 @RunWith(classOf[JUnitRunner])
 class QueryMacroSpec extends Specification {
-  "eq" in {
-    import Query._
-    import reactivemongo.bson.DefaultBSONHandlers._
+  import Query._
+  import reactivemongo.bson.DefaultBSONHandlers._
+  
+    "in" in {
+    val q = on[Person].in(_.firstName, List("abc", "cde"))
+    q.elements must have size(1)
     
-    /*on[Person].eq(_.firstName, "")(reactivemongo.bson.DefaultBSONHandlers.BSONStringHandler)
-    on[Person].and(_.eq(_.firstName, "j"), _.eq(_.lastName, "doe"))
-    on[Person].or(_.eq(_.firstName, "alex"), _.eq(_.lastName, "m"), _.gte(_.lastName, "aaaaaaa"), _.eq(_.lastName, ""))
-    * 
-    */
-    val q = Queryable[Person].eq(_.firstName, "abc")
-    println(q.elements)
-    println(q.get("test").get)
-    "" mustEqual ""
+    val in = q.getAs[BSONDocument]("firstName").get
+    
+    in.elements must have size(1)
+    
+    val arr = in.getAs[BSONArray]("$in").get
+    
+    arr.length mustEqual 2
+        
+    arr.getAs[BSONString](0).get.value mustEqual "abc"
+    arr.getAs[BSONString](1).get.value mustEqual "cde"
+  	}
+  
+  "gt" in {
+    val q = on[Person].gt(_.firstName, "abc")
+    q.elements must have size(1)
+    q.getAs[BSONDocument]("firstName").get.getAs[BSONString]("$gt").get.value mustEqual "abc"
+    
+  }
+  
+  "eq" in {
+    val q = on[Person].eq(_.firstName, "abc")
+    q.elements must have size(1)
+    //q.getAs[BSONString]("firstName")
   }
 }
 
