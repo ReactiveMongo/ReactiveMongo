@@ -12,10 +12,13 @@ case class Person(firstName: String, lastName: String)
 class QueryMacroSpec extends Specification {
   "eq" in {
     import Query._
+    import reactivemongo.bson.DefaultBSONHandlers._
     
-    on[Person].eq(_.firstName, "")
+    /*on[Person].eq(_.firstName, "")(reactivemongo.bson.DefaultBSONHandlers.BSONStringHandler)
     on[Person].and(_.eq(_.firstName, "j"), _.eq(_.lastName, "doe"))
     on[Person].or(_.eq(_.firstName, "alex"), _.eq(_.lastName, "m"), _.gte(_.lastName, "aaaaaaa"), _.eq(_.lastName, ""))
+    * 
+    */
     val q = Queryable[Person].eq(_.firstName, "abc")
     println(q.elements)
     println(q.get("test").get)

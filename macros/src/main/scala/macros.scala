@@ -398,19 +398,32 @@ private object QueryMacroImpl{
    }
   }
   
- def eq[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => A], value: c.Expr[A]): c.Expr[BSONDocument] = {
+ def eq[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => A], value: c.Expr[A])(handler: c.Expr[BSONHandler[_ <: BSONValue, A]]): c.Expr[BSONDocument] = {
    import c.universe._
-   
-   
-   
    p.tree.children(1) match {
      case Select(a, b) => {
        val paramRepTree = Literal(Constant(b.decoded))
 	   c.universe.reify {
-         
-	      BSONDocument(c.Expr[String](paramRepTree).splice -> value.splice)
+       val n = c.Expr[String](paramRepTree).splice
+       val v = handler.splice.write(value.splice)
+	      BSONDocument(List((n, v)))
+	    }
+     }
+   } 
+  }
+ 
+ def gt[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => BSONValue], value: c.Expr[BSONValue]): c.Expr[BSONDocument] = {
+   import c.universe._
+   p.tree.children(1) match {
+     case Select(a, b) => {
+       val paramRepTree = Literal(Constant(b.decoded))
+	   c.universe.reify {
+         val n = c.Expr[String](paramRepTree).splice
+         val v = value.splice
+	      BSONDocument(List((n, v)))
 	    }
      }
    } 
   } 
+
 }

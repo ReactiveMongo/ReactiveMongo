@@ -10,8 +10,8 @@ object Query{
 case class Queryable[T] {
   import language.experimental.macros
   
-	def eq[A](p: T => A, value: A) : BSONDocument = macro QueryMacroImpl.eq[T,A]
-	def gt[A](p: T => A, value: A) : BSONDocument = BSONDocument()
+	def eq[A](p: T => A, value: A)(implicit handler: BSONHandler[_ <: BSONValue, A]) : BSONDocument = macro QueryMacroImpl.eq[T,A]
+	def gt[A](p: T => A, value: A)(implicit handler: BSONHandler[_ <: BSONValue, A]) : BSONDocument = BSONDocument() //macro QueryMacroImpl.gt[T, A]
 	def gte[A](p: T => A, value: A) : BSONDocument = BSONDocument()
 	def in[A](p: T => A, values: A *) : BSONDocument = BSONDocument()
 	def lt[A](p: T => A, value: A) : BSONDocument = BSONDocument()
