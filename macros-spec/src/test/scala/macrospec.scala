@@ -29,17 +29,18 @@ class QueryMacroSpec extends Specification {
     arr.getAs[BSONString](1).get.value mustEqual "cde"
   	}
   
-  "gt" in {
-    val q = on[Person].gt(_.firstName, "abc")
-    q.elements must have size(1)
-    q.getAs[BSONDocument]("firstName").get.getAs[BSONString]("$gt").get.value mustEqual "abc"
+  "gt,gte,lt,lte,ne" in {
+    val query = on[Person]
+    val value = "abc"
+    val operations = List[Pair[String, (Queryable[Person], String)  => BSONDocument]](
+        ("$gt", (q, v) => q.gt(_.firstName, v)),
+        ("$gte",(q, v) => q.gte(_.firstName, v)),
+        ("$lt",(q, v) => q.lt(_.firstName, v)),
+        ("$lte",(q, v) => q.lte(_.firstName, v)),
+        ("$ne",(q, v) => q.ne(_.firstName, v))
+        )
     
-  }
-  
-  "eq" in {
-    val q = on[Person].eq(_.firstName, "abc")
-    q.elements must have size(1)
-    //q.getAs[BSONString]("firstName")
+        operations.forall(p=> p._2(query, value) mustEqual BSONDocument("firstName" -> BSONDocument(p._1 -> value)))
   }
 }
 
