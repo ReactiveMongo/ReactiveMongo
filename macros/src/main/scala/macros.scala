@@ -451,6 +451,10 @@ private object QueryMacroImpl{
  (handler: c.Expr[BSONHandler[_ <: BSONValue, A]]): c.Expr[BSONDocument] = 
    builder[T, A](c)(p, value)(handler)("$ne")
    
+ def set[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => A], value: c.Expr[A])
+ (handler: c.Expr[BSONHandler[_ <: BSONValue, A]]): c.Expr[BSONDocument] = 
+   builder[T, A](c)(p, value)(handler)("$set")
+   
  def in[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => A], values: c.Expr[List[A]])
  (handler: c.Expr[BSONHandler[_ <: BSONValue, A]]): c.Expr[BSONDocument] = {
    import c.universe._
@@ -468,5 +472,22 @@ private object QueryMacroImpl{
      }
    }
  }
- 
+
+ def nin[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => A], values: c.Expr[List[A]])
+ (handler: c.Expr[BSONHandler[_ <: BSONValue, A]]): c.Expr[BSONDocument] = {
+   import c.universe._
+   p.tree.children(1) match {
+     case Select(a, b) => {
+       val paramRepTree = Literal(Constant(b.decoded))
+       
+	   c.universe.reify {
+	       val n = c.Expr[String](paramRepTree).splice
+	       val writer = handler.splice
+	       val items = values.splice.map(writer.write(_))
+	       val v = BSONDocument(List(("$in", BSONArray(items))))
+	       BSONDocument(List((n, v)))
+       }
+     }
+   }
+ }
 }
