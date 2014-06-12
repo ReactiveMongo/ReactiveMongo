@@ -56,7 +56,7 @@ libraryDependencies ++= Seq(
 There is also a snapshot of the stable branch that compiles against Akka 2.3 (and both Scala 2.10/2.11):
 
 ```scala
-resolvers += "Sonatype Snapshots" at "http://oss.sonatype.org/content/repositories/snapshots/"
+resolvers += "Sonatype Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots/"
 
 libraryDependencies ++= Seq(
   "org.reactivemongo" %% "reactivemongo" % "0.10.5.akka23-SNAPSHOT"
@@ -66,7 +66,7 @@ libraryDependencies ++= Seq(
 Or if you want to be on the bleeding edge using snapshots:
 
 ```scala
-resolvers += "Sonatype Snapshots" at "http://oss.sonatype.org/content/repositories/snapshots/"
+resolvers += "Sonatype Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots/"
 
 libraryDependencies ++= Seq(
   "org.reactivemongo" %% "reactivemongo" % "0.11.0-SNAPSHOT"
