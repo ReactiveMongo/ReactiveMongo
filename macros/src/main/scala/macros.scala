@@ -452,8 +452,18 @@ private object QueryMacroImpl{
    builder[T, A](c)(p, value)(handler)("$ne")
    
  def set[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => A], value: c.Expr[A])
- (handler: c.Expr[BSONHandler[_ <: BSONValue, A]]): c.Expr[BSONDocument] = 
-   builder[T, A](c)(p, value)(handler)("$set")
+ (handler: c.Expr[BSONHandler[_ <: BSONValue, A]]): c.Expr[SetOperator] = {
+    import c.universe._
+   p.tree.children(1) match {
+     case Select(a, b) => {
+       val paramTree = Literal(Constant(b.decoded))
+  	   c.universe.reify {
+  	     val param = c.Expr[String](paramTree).splice
+         SetOperator(param, handler.splice.write(value.splice))
+  	    }
+     }
+   } 
+  }
    
  def in[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => A], values: c.Expr[List[A]])
  (handler: c.Expr[BSONHandler[_ <: BSONValue, A]]): c.Expr[BSONDocument] = {

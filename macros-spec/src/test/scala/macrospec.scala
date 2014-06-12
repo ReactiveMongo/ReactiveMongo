@@ -39,8 +39,15 @@ class QueryMacroSpec extends Specification {
         ("$lte",(q, v) => q.lte(_.firstName, v)),
         ("$ne",(q, v) => q.ne(_.firstName, v))
         )
-    
         operations.forall(p=> p._2(query, value) mustEqual BSONDocument("firstName" -> BSONDocument(p._1 -> value)))
+  }
+  
+  "set" in {
+   val query = on[Person]
+   val updateQuery = query.update(_.set(_.firstName, "john"), _.set(_.lastName, "doe"))
+   
+   updateQuery.getAs[BSONDocument]("$set") must beSome(BSONDocument("firstName" -> "john", "lastName" -> "doe"))
+   
   }
 }
 

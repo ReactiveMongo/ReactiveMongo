@@ -6,9 +6,20 @@ object Query{
   def on[T] = Queryable[T]
 }
 
+trait UpdateOperator {
+  val operator: String
+  val field: String
+  val value: BSONValue
+}
+
+case class SetOperator(val field: String, val value: BSONValue) extends UpdateOperator {
+  val operator = "$set"
+}
+
 
 case class Queryable[T] {
   import language.experimental.macros
+  import Query._
   
 	def eq[A](p: T => A, value: A)(implicit handler: BSONHandler[_ <: BSONValue, A]) : BSONDocument = macro QueryMacroImpl.eq[T, A]
 	def gt[A](p: T => A, value: A)(implicit handler: BSONHandler[_ <: BSONValue, A]) : BSONDocument = macro QueryMacroImpl.gt[T, A]
@@ -18,14 +29,20 @@ case class Queryable[T] {
 	def lte[A](p: T => A, value: A)(implicit handler: BSONHandler[_ <: BSONValue, A]) : BSONDocument = macro QueryMacroImpl.lte[T, A]
 	def ne[A](p: T => A, value: A)(implicit handler: BSONHandler[_ <: BSONValue, A]) : BSONDocument = macro QueryMacroImpl.ne[T, A]
 	def nin[A](p: T => A, values: List[A])(implicit handler: BSONHandler[_ <: BSONValue, A]) : BSONDocument = macro QueryMacroImpl.nin[T, A]
-	def set[A](p: T => A, value: A)(implicit handler: BSONHandler[_ <: BSONValue, A]) : BSONDocument = macro QueryMacroImpl.set[T, A]
+  
+  
+	def set[A](p: T => A, value: A)(implicit handler: BSONHandler[_ <: BSONValue, A]) : SetOperator = macro QueryMacroImpl.set[T, A]
 	
 	
-  //def update(sets: Queryable[T] => BSONDocument *) 
-	def and(exps: Queryable[T] => BSONDocument *) = BSONDocument("$and" -> BSONArray(exps.map(_(Query.on[T]))))
-	def or(exps: Queryable[T] => BSONDocument *) = BSONDocument("$or" -> BSONArray(exps.map(_(Query.on[T]))))
-	def not(exp: Queryable[T] => BSONDocument) = BSONDocument("$not" -> exp(Query.on[T]))
-	def nor(exps: Queryable[T] => BSONDocument *) = BSONDocument("$nor" -> BSONArray(exps.map(_(Query.on[T]))))
+  def update(updateOperators: Queryable[T] => UpdateOperator *) = {
+    val operators = updateOperators.map(_ apply on[T]).groupBy(_.operator)
+         .map(p => (p._1, BSONDocument(p._2.map(x => (x.field, x.value)))))
+    BSONDocument(operators)
+  }
+	def and(exps: Queryable[T] => BSONDocument *) = BSONDocument("$and" -> BSONArray(exps.map(_(on[T]))))
+	def or(exps: Queryable[T] => BSONDocument *) = BSONDocument("$or" -> BSONArray(exps.map(_(on[T]))))
+	def not(exp: Queryable[T] => BSONDocument) = BSONDocument("$not" -> exp(on[T]))
+	def nor(exps: Queryable[T] => BSONDocument *) = BSONDocument("$nor" -> BSONArray(exps.map(_(on[T]))))
 }
 
 /**
