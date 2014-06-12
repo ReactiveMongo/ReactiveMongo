@@ -464,7 +464,120 @@ private object QueryMacroImpl{
      }
    } 
   }
-   
+ 
+ def unset[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => A]): c.Expr[UnsetOperator] = {
+    import c.universe._
+   p.tree.children(1) match {
+     case Select(a, b) => {
+       val paramTree = Literal(Constant(b.decoded))
+  	   c.universe.reify {
+  	     val param = c.Expr[String](paramTree).splice
+         UnsetOperator(param)
+  	    }
+     }
+   } 
+  }
+ 
+ def inc[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => A], value: c.Expr[A])
+ (handler: c.Expr[BSONHandler[_ <: BSONValue, A]]): c.Expr[IncOperator] = {
+    import c.universe._
+   p.tree.children(1) match {
+     case Select(a, b) => {
+       val paramTree = Literal(Constant(b.decoded))
+  	   c.universe.reify {
+  	     val param = c.Expr[String](paramTree).splice
+         IncOperator(param, handler.splice.write(value.splice))
+  	    }
+     }
+   } 
+  }
+ 
+ def mul[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => A], value: c.Expr[A])
+ (handler: c.Expr[BSONHandler[_ <: BSONValue, A]]): c.Expr[MulOperator] = {
+    import c.universe._
+   p.tree.children(1) match {
+     case Select(a, b) => {
+       val paramTree = Literal(Constant(b.decoded))
+  	   c.universe.reify {
+  	     val param = c.Expr[String](paramTree).splice
+         MulOperator(param, handler.splice.write(value.splice))
+  	    }
+     }
+   } 
+  }
+
+ def min[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => A], value: c.Expr[A])
+ (handler: c.Expr[BSONHandler[_ <: BSONValue, A]]): c.Expr[MinOperator] = {
+    import c.universe._
+   p.tree.children(1) match {
+     case Select(a, b) => {
+       val paramTree = Literal(Constant(b.decoded))
+  	   c.universe.reify {
+  	     val param = c.Expr[String](paramTree).splice
+         MinOperator(param, handler.splice.write(value.splice))
+  	    }
+     }
+   } 
+  }
+ 
+ def max[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => A], value: c.Expr[A])
+ (handler: c.Expr[BSONHandler[_ <: BSONValue, A]]): c.Expr[MaxOperator] = {
+    import c.universe._
+   p.tree.children(1) match {
+     case Select(a, b) => {
+       val paramTree = Literal(Constant(b.decoded))
+  	   c.universe.reify {
+  	     val param = c.Expr[String](paramTree).splice
+         MaxOperator(param, handler.splice.write(value.splice))
+  	    }
+     }
+   } 
+  }
+ 
+  def addToSet[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => A], value: c.Expr[A])
+ (handler: c.Expr[BSONHandler[_ <: BSONValue, A]]): c.Expr[AddToSetOperator] = {
+    import c.universe._
+   p.tree.children(1) match {
+     case Select(a, b) => {
+       val paramTree = Literal(Constant(b.decoded))
+  	   c.universe.reify {
+  	     val param = c.Expr[String](paramTree).splice
+         AddToSetOperator(param, handler.splice.write(value.splice))
+  	    }
+     }
+   } 
+  }
+  
+  def pullAll[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => A], value: c.Expr[List[A]])
+ (handler: c.Expr[BSONHandler[_ <: BSONValue, A]]): c.Expr[PullAllOperator] = {
+    import c.universe._
+   p.tree.children(1) match {
+     case Select(a, b) => {
+       val paramTree = Literal(Constant(b.decoded))
+  	   c.universe.reify {
+  	     val param = c.Expr[String](paramTree).splice
+  	     val items = value.splice.map(handler.splice.write(_))
+         PullAllOperator(param, BSONArray(items))
+  	    }
+     }
+   } 
+  }
+  
+  
+  def push[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => A], value: c.Expr[A])
+ (handler: c.Expr[BSONHandler[_ <: BSONValue, A]]): c.Expr[PushOperator] = {
+    import c.universe._
+   p.tree.children(1) match {
+     case Select(a, b) => {
+       val paramTree = Literal(Constant(b.decoded))
+  	   c.universe.reify {
+  	     val param = c.Expr[String](paramTree).splice
+         PushOperator(param, handler.splice.write(value.splice))
+  	    }
+     }
+   } 
+  }
+ 
  def in[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => A], values: c.Expr[List[A]])
  (handler: c.Expr[BSONHandler[_ <: BSONValue, A]]): c.Expr[BSONDocument] = {
    import c.universe._

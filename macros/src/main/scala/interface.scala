@@ -15,6 +15,35 @@ trait UpdateOperator {
 case class SetOperator(val field: String, val value: BSONValue) extends UpdateOperator {
   val operator = "$set"
 }
+case class UnsetOperator(val field: String) extends UpdateOperator {
+  val operator = "$unset"
+  val value = BSONString("")
+}
+case class IncOperator(val field: String, val value: BSONValue) extends UpdateOperator {
+  val operator = "$inc"
+}
+case class MulOperator(val field: String, val value: BSONValue) extends UpdateOperator {
+  val operator = "$mul"
+}
+case class MinOperator(val field: String, val value: BSONValue) extends UpdateOperator {
+  val operator = "$min"
+}
+case class MaxOperator(val field: String, val value: BSONValue) extends UpdateOperator {
+  val operator = "$max"
+}
+case class AddToSetOperator(val field: String, val value: BSONValue) extends UpdateOperator {
+  val operator = "$addToSet"
+}
+case class PopOperator(val field: String, val value: BSONValue) extends UpdateOperator {
+  val operator = "$pop"
+}
+case class PullAllOperator(val field: String, val value: BSONValue) extends UpdateOperator {
+  val operator = "$pullAll"
+}
+case class PushOperator(val field: String, val value: BSONValue) extends UpdateOperator {
+  val operator = "$push"
+}
+
 
 
 case class Queryable[T] {
@@ -32,7 +61,15 @@ case class Queryable[T] {
   
   
 	def set[A](p: T => A, value: A)(implicit handler: BSONHandler[_ <: BSONValue, A]) : SetOperator = macro QueryMacroImpl.set[T, A]
+  def unset[A](p: T => A) : UnsetOperator = macro QueryMacroImpl.unset[T, A]
+  def inc[A](p: T => A, value: A)(implicit handler: BSONHandler[_ <: BSONValue, A]) : IncOperator = macro QueryMacroImpl.inc[T, A]
 	
+  def mul[A](p: T => A, value: A)(implicit handler: BSONHandler[_ <: BSONValue, A]) : MulOperator = macro QueryMacroImpl.mul[T, A]
+  def min[A](p: T => A, value: A)(implicit handler: BSONHandler[_ <: BSONValue, A]) : MinOperator = macro QueryMacroImpl.min[T, A]
+  def max[A](p: T => A, value: A)(implicit handler: BSONHandler[_ <: BSONValue, A]) : MaxOperator = macro QueryMacroImpl.max[T, A]
+  def addToSet[A](p: T => A, value: A)(implicit handler: BSONHandler[_ <: BSONValue, A]) : AddToSetOperator = macro QueryMacroImpl.addToSet[T, A]
+  def pullAll[A](p: T => A, value: List[A])(implicit handler: BSONHandler[_ <: BSONValue, A]) : PullAllOperator = macro QueryMacroImpl.pullAll[T, A]
+  def push[A](p: T => A, value: A)(implicit handler: BSONHandler[_ <: BSONValue, A]) : PushOperator = macro QueryMacroImpl.push[T, A]
 	
   def update(updateOperators: Queryable[T] => UpdateOperator *) = {
     val operators = updateOperators.map(_ apply on[T]).groupBy(_.operator)
