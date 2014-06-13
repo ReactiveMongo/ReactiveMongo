@@ -19,9 +19,7 @@ object PetType extends Enumeration {
 import PetType._
 
 
-
-
-
+case class Account(_id: BSONObjectID, login: String)
 case class Person(firstName: String, lastName: String)
 case class Pet(nick: String, age: Int, typ: PetType, favoriteDishes: List[String])
 
@@ -29,6 +27,14 @@ case class Pet(nick: String, age: Int, typ: PetType, favoriteDishes: List[String
 class QueryMacroSpec extends Specification {
   import Query._
   import reactivemongo.bson.DefaultBSONHandlers._
+  
+  "eq" in {
+    val id = BSONObjectID.generate
+    val findById = on[Account].eq(_._id, id)
+    findById mustEqual BSONDocument("_id" -> id)
+  }
+  
+  
   
     "in" in {
     val q = on[Person].in(_.firstName, List("abc", "cde"))
@@ -95,7 +101,6 @@ class QueryMacroSpec extends Specification {
   
   "addToSet" in {
     import PetTypeBSONHandler._
-    
     val update = on[Pet].update(_.addToSet(_.favoriteDishes, List("Milk")))
     update.getAs[BSONDocument]("$addToSet") must beSome(BSONDocument("favoriteDishes" -> "Milk"))
     update.elements must be size(1)

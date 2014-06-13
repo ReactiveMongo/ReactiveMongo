@@ -3,7 +3,7 @@ package reactivemongo.bson
 
 
 object Query{
-  def on[T] = Queryable[T]
+  def on[T] = new Queryable[T]
 }
 
 trait UpdateOperator {
@@ -46,31 +46,30 @@ case class PushOperator(val field: String, val value: BSONValue) extends UpdateO
 
 
 
-case class Queryable[T] {
+class Queryable[T] {
   import language.experimental.macros
   import Query._
   
-	def eq[A](p: T => A, value: A)(implicit handler: BSONHandler[_ <: BSONValue, A]) : BSONDocument = macro QueryMacroImpl.eq[T, A]
-	def gt[A](p: T => A, value: A)(implicit handler: BSONHandler[_ <: BSONValue, A]) : BSONDocument = macro QueryMacroImpl.gt[T, A]
-	def gte[A](p: T => A, value: A)(implicit handler: BSONHandler[_ <: BSONValue, A]) : BSONDocument = macro QueryMacroImpl.gte[T, A]
-	def in[A](p: T => A, values: List[A])(implicit handler: BSONHandler[_ <: BSONValue, A]) : BSONDocument = macro QueryMacroImpl.in[T, A]
-	def lt[A](p: T => A, value: A)(implicit handler: BSONHandler[_ <: BSONValue, A]) : BSONDocument = macro QueryMacroImpl.lt[T, A]
-	def lte[A](p: T => A, value: A)(implicit handler: BSONHandler[_ <: BSONValue, A]) : BSONDocument = macro QueryMacroImpl.lte[T, A]
-	def ne[A](p: T => A, value: A)(implicit handler: BSONHandler[_ <: BSONValue, A]) : BSONDocument = macro QueryMacroImpl.ne[T, A]
-	def nin[A](p: T => A, values: List[A])(implicit handler: BSONHandler[_ <: BSONValue, A]) : BSONDocument = macro QueryMacroImpl.nin[T, A]
+	def eq[A](p: T => A, value: A)(implicit handler: BSONWriter[A, _ <: BSONValue]) : BSONDocument = macro QueryMacroImpl.eq[T, A]
+	def gt[A](p: T => A, value: A)(implicit handler: BSONWriter[A, _ <: BSONValue]) : BSONDocument = macro QueryMacroImpl.gt[T, A]
+	def gte[A](p: T => A, value: A)(implicit handler: BSONWriter[A, _ <: BSONValue]) : BSONDocument = macro QueryMacroImpl.gte[T, A]
+	def in[A](p: T => A, values: List[A])(implicit handler: BSONWriter[A, _ <: BSONValue]) : BSONDocument = macro QueryMacroImpl.in[T, A]
+	def lt[A](p: T => A, value: A)(implicit handler: BSONWriter[A, _ <: BSONValue]) : BSONDocument = macro QueryMacroImpl.lt[T, A]
+	def lte[A](p: T => A, value: A)(implicit handler: BSONWriter[A, _ <: BSONValue]) : BSONDocument = macro QueryMacroImpl.lte[T, A]
+	def ne[A](p: T => A, value: A)(implicit handler: BSONWriter[A, _ <: BSONValue]) : BSONDocument = macro QueryMacroImpl.ne[T, A]
+	def nin[A](p: T => A, values: List[A])(implicit handler: BSONWriter[A, _ <: BSONValue]) : BSONDocument = macro QueryMacroImpl.nin[T, A]
   
   
-	def set[A](p: T => A, value: A)(implicit handler: BSONHandler[_ <: BSONValue, A]) : SetOperator = macro QueryMacroImpl.set[T, A]
+	def set[A](p: T => A, value: A)(implicit handler: BSONWriter[A, _ <: BSONValue]) : SetOperator = macro QueryMacroImpl.set[T, A]
   def unset[A](p: T => A) : UnsetOperator = macro QueryMacroImpl.unset[T, A]
-  def inc[A](p: T => A, value: A)(implicit handler: BSONHandler[_ <: BSONValue, A]) : IncOperator = macro QueryMacroImpl.inc[T, A]
-	
-  def mul[A](p: T => A, value: A)(implicit handler: BSONHandler[_ <: BSONValue, A]) : MulOperator = macro QueryMacroImpl.mul[T, A]
-  def min[A](p: T => A, value: A)(implicit handler: BSONHandler[_ <: BSONValue, A]) : MinOperator = macro QueryMacroImpl.min[T, A]
-  def max[A](p: T => A, value: A)(implicit handler: BSONHandler[_ <: BSONValue, A]) : MaxOperator = macro QueryMacroImpl.max[T, A]
-  def addToSet[A](p: T => Traversable[A], values: Traversable[A])(implicit handler: BSONHandler[_ <: BSONValue, A]) : AddToSetOperator = macro QueryMacroImpl.addToSet[T, A]
+  def inc[A](p: T => A, value: A)(implicit handler: BSONWriter[A, _ <: BSONValue]) : IncOperator = macro QueryMacroImpl.inc[T, A]
+  def mul[A](p: T => A, value: A)(implicit handler: BSONWriter[A, _ <: BSONValue]) : MulOperator = macro QueryMacroImpl.mul[T, A]
+  def min[A](p: T => A, value: A)(implicit handler: BSONWriter[A, _ <: BSONValue]) : MinOperator = macro QueryMacroImpl.min[T, A]
+  def max[A](p: T => A, value: A)(implicit handler: BSONWriter[A, _ <: BSONValue]) : MaxOperator = macro QueryMacroImpl.max[T, A]
+  def addToSet[A](p: T => Traversable[A], values: Traversable[A])(implicit handler: BSONWriter[A, _ <: BSONValue]) : AddToSetOperator = macro QueryMacroImpl.addToSet[T, A]
   
-  def pullAll[A](p: T => Traversable[A], value: Traversable[A])(implicit handler: BSONHandler[_ <: BSONValue, A]) : PullAllOperator = macro QueryMacroImpl.pullAll[T, A]
-	def push[A](p: T => Traversable[A], values: Traversable[A])(implicit handler: BSONHandler[_ <: BSONValue, A]) : PushOperator = macro QueryMacroImpl.push[T, A]
+  def pullAll[A](p: T => Traversable[A], value: Traversable[A])(implicit handler: BSONWriter[A, _ <: BSONValue]) : PullAllOperator = macro QueryMacroImpl.pullAll[T, A]
+	def push[A](p: T => Traversable[A], values: Traversable[A])(implicit handler: BSONWriter[A, _ <: BSONValue]) : PushOperator = macro QueryMacroImpl.push[T, A]
   
   
   

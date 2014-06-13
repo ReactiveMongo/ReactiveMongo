@@ -385,7 +385,7 @@ private object MacroImpl {
 private object QueryMacroImpl{
   
   private def builder[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => A], value: c.Expr[A])
- (handler: c.Expr[BSONHandler[_ <: BSONValue, A]])
+ (handler: c.Expr[BSONWriter[A, _ <: BSONValue]])
  (tag: String): c.Expr[BSONDocument] = {
     import c.universe._
    p.tree.children(1) match {
@@ -417,7 +417,7 @@ private object QueryMacroImpl{
   }
   
  def eq[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => A], value: c.Expr[A])
- (handler: c.Expr[BSONHandler[_ <: BSONValue, A]]): c.Expr[BSONDocument] = {
+ (handler: c.Expr[BSONWriter[A, _ <: BSONValue]]): c.Expr[BSONDocument] = {
    import c.universe._
    p.tree.children(1) match {
      case Select(a, b) => {
@@ -432,27 +432,27 @@ private object QueryMacroImpl{
   }
  
  def gt[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => A], value: c.Expr[A])
- (handler: c.Expr[BSONHandler[_ <: BSONValue, A]]): c.Expr[BSONDocument] = 
+ (handler: c.Expr[BSONWriter[A, _ <: BSONValue]]): c.Expr[BSONDocument] = 
    builder[T, A](c)(p, value)(handler)("$gt")
    
  def gte[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => A], value: c.Expr[A])
- (handler: c.Expr[BSONHandler[_ <: BSONValue, A]]): c.Expr[BSONDocument] = 
+ (handler: c.Expr[BSONWriter[A, _ <: BSONValue]]): c.Expr[BSONDocument] = 
    builder[T, A](c)(p, value)(handler)("$gte")
    
  def lt[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => A], value: c.Expr[A])
- (handler: c.Expr[BSONHandler[_ <: BSONValue, A]]): c.Expr[BSONDocument] = 
+ (handler: c.Expr[BSONWriter[A, _ <: BSONValue]]): c.Expr[BSONDocument] = 
    builder[T, A](c)(p, value)(handler)("$lt")
    
  def lte[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => A], value: c.Expr[A])
- (handler: c.Expr[BSONHandler[_ <: BSONValue, A]]): c.Expr[BSONDocument] = 
+ (handler: c.Expr[BSONWriter[A, _ <: BSONValue]]): c.Expr[BSONDocument] = 
    builder[T, A](c)(p, value)(handler)("$lte")
    
  def ne[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => A], value: c.Expr[A])
- (handler: c.Expr[BSONHandler[_ <: BSONValue, A]]): c.Expr[BSONDocument] = 
+ (handler: c.Expr[BSONWriter[A, _ <: BSONValue]]): c.Expr[BSONDocument] = 
    builder[T, A](c)(p, value)(handler)("$ne")
    
  def set[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => A], value: c.Expr[A])
- (handler: c.Expr[BSONHandler[_ <: BSONValue, A]]): c.Expr[SetOperator] = {
+ (handler: c.Expr[BSONWriter[A, _ <: BSONValue]]): c.Expr[SetOperator] = {
     import c.universe._
    p.tree.children(1) match {
      case Select(a, b) => {
@@ -479,7 +479,7 @@ private object QueryMacroImpl{
   }
  
  def inc[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => A], value: c.Expr[A])
- (handler: c.Expr[BSONHandler[_ <: BSONValue, A]]): c.Expr[IncOperator] = {
+ (handler: c.Expr[BSONWriter[A, _ <: BSONValue]]): c.Expr[IncOperator] = {
     import c.universe._
    p.tree.children(1) match {
      case Select(a, b) => {
@@ -493,7 +493,7 @@ private object QueryMacroImpl{
   }
  
  def mul[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => A], value: c.Expr[A])
- (handler: c.Expr[BSONHandler[_ <: BSONValue, A]]): c.Expr[MulOperator] = {
+ (handler: c.Expr[BSONWriter[A, _ <: BSONValue]]): c.Expr[MulOperator] = {
     import c.universe._
    p.tree.children(1) match {
      case Select(a, b) => {
@@ -507,7 +507,7 @@ private object QueryMacroImpl{
   }
 
  def min[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => A], value: c.Expr[A])
- (handler: c.Expr[BSONHandler[_ <: BSONValue, A]]): c.Expr[MinOperator] = {
+ (handler: c.Expr[BSONWriter[A, _ <: BSONValue]]): c.Expr[MinOperator] = {
     import c.universe._
    p.tree.children(1) match {
      case Select(a, b) => {
@@ -521,7 +521,7 @@ private object QueryMacroImpl{
   }
  
  def max[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => A], value: c.Expr[A])
- (handler: c.Expr[BSONHandler[_ <: BSONValue, A]]): c.Expr[MaxOperator] = {
+ (handler: c.Expr[BSONWriter[A, _ <: BSONValue]]): c.Expr[MaxOperator] = {
     import c.universe._
    p.tree.children(1) match {
      case Select(a, b) => {
@@ -535,7 +535,7 @@ private object QueryMacroImpl{
   }
  
   def addToSet[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => Traversable[A]], values: c.Expr[Traversable[A]])
- (handler: c.Expr[BSONHandler[_ <: BSONValue, A]]): c.Expr[AddToSetOperator] = {
+ (handler: c.Expr[BSONWriter[A, _ <: BSONValue]]): c.Expr[AddToSetOperator] = {
     import c.universe._
    p.tree.children(1) match {
      case Select(a, b) => {
@@ -553,7 +553,7 @@ private object QueryMacroImpl{
   }
   
   def pullAll[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => Traversable[A]], value: c.Expr[Traversable[A]])
- (handler: c.Expr[BSONHandler[_ <: BSONValue, A]]): c.Expr[PullAllOperator] = {
+ (handler: c.Expr[BSONWriter[A, _ <: BSONValue]]): c.Expr[PullAllOperator] = {
     import c.universe._
    p.tree.children(1) match {
      case Select(a, b) => {
@@ -568,7 +568,7 @@ private object QueryMacroImpl{
   }
  
   def push[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => Traversable[A]], values: c.Expr[Traversable[A]])
- (handler: c.Expr[BSONHandler[_ <: BSONValue, A]]): c.Expr[PushOperator] = {
+ (handler: c.Expr[BSONWriter[A, _ <: BSONValue]]): c.Expr[PushOperator] = {
     import c.universe._
    p.tree.children(1) match {
      case Select(a, b) => {
@@ -586,7 +586,7 @@ private object QueryMacroImpl{
   }
   
  def in[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => A], values: c.Expr[List[A]])
- (handler: c.Expr[BSONHandler[_ <: BSONValue, A]]): c.Expr[BSONDocument] = {
+ (handler: c.Expr[BSONWriter[A, _ <: BSONValue]]): c.Expr[BSONDocument] = {
    import c.universe._
    p.tree.children(1) match {
      case Select(a, b) => {
@@ -604,7 +604,7 @@ private object QueryMacroImpl{
  }
 
  def nin[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => A], values: c.Expr[List[A]])
- (handler: c.Expr[BSONHandler[_ <: BSONValue, A]]): c.Expr[BSONDocument] = {
+ (handler: c.Expr[BSONWriter[A, _ <: BSONValue]]): c.Expr[BSONDocument] = {
    import c.universe._
    p.tree.children(1) match {
      case Select(a, b) => {
