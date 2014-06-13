@@ -68,6 +68,8 @@ case class Queryable[T] {
   def min[A](p: T => A, value: A)(implicit handler: BSONHandler[_ <: BSONValue, A]) : MinOperator = macro QueryMacroImpl.min[T, A]
   def max[A](p: T => A, value: A)(implicit handler: BSONHandler[_ <: BSONValue, A]) : MaxOperator = macro QueryMacroImpl.max[T, A]
   def addToSet[A](p: T => A, value: A)(implicit handler: BSONHandler[_ <: BSONValue, A]) : AddToSetOperator = macro QueryMacroImpl.addToSet[T, A]
+  def addToSet[A](p: T => A, values: List[A])(implicit handler: BSONHandler[_ <: BSONValue, A]) : AddToSetOperator = macro QueryMacroImpl.addToSetEach[T, A]
+  
   def pullAll[A](p: T => A, value: List[A])(implicit handler: BSONHandler[_ <: BSONValue, A]) : PullAllOperator = macro QueryMacroImpl.pullAll[T, A]
   def push[A](p: T => A, value: A)(implicit handler: BSONHandler[_ <: BSONValue, A]) : PushOperator = macro QueryMacroImpl.push[T, A]
 	

@@ -548,6 +548,21 @@ private object QueryMacroImpl{
    } 
   }
   
+  def addToSetEach[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => A], values: c.Expr[List[A]])
+ (handler: c.Expr[BSONHandler[_ <: BSONValue, A]]): c.Expr[AddToSetOperator] = {
+    import c.universe._
+   p.tree.children(1) match {
+     case Select(a, b) => {
+       val paramTree = Literal(Constant(b.decoded))
+  	   c.universe.reify {
+  	     val param = c.Expr[String](paramTree).splice
+  	     val items = values.splice.map(handler.splice.write(_))
+         AddToSetOperator(param, BSONDocument("$each" -> BSONArray(items)))
+  	    }
+     }
+   } 
+  }
+  
   def pullAll[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => A], value: c.Expr[List[A]])
  (handler: c.Expr[BSONHandler[_ <: BSONValue, A]]): c.Expr[PullAllOperator] = {
     import c.universe._
