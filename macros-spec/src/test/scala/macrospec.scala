@@ -6,7 +6,24 @@ import reactivemongo.bson.Macros.Annotations.Key
 import org.junit.runner.RunWith
 import org.specs2.runner.JUnitRunner
 
+object PetType extends Enumeration {
+    type PetType = Value
+    val Dog, Cat, Rabbit = Value
+    
+   implicit object PetTypeBSONHandler extends BSONHandler[BSONString, PetType] {
+      def read(v: BSONString) = PetType.withName(v.value)
+      def write(v: PetType) = BSONString(v.toString())
+    }
+  }
+
+import PetType._
+
+
+
+
+
 case class Person(firstName: String, lastName: String)
+case class Pet(nick: String, age: Int, typ: PetType, favoriteDishes: List[String])
 
 @RunWith(classOf[JUnitRunner])
 class QueryMacroSpec extends Specification {
@@ -47,7 +64,45 @@ class QueryMacroSpec extends Specification {
    val updateQuery = query.update(_.set(_.firstName, "john"), _.set(_.lastName, "doe"))
    
    updateQuery.getAs[BSONDocument]("$set") must beSome(BSONDocument("firstName" -> "john", "lastName" -> "doe"))
-   
+  }
+  
+  "set, inc & handler" in {
+    import PetTypeBSONHandler._
+    val update = on[Pet].update(_.set(_.typ, PetType.Cat), _.set(_.nick, "Manul"), _.inc(_.age, 1))
+    update.getAs[BSONDocument]("$inc") must beSome(BSONDocument("age" -> 1))
+    update.getAs[BSONDocument]("$set") must beSome(BSONDocument("typ" -> "Cat", "nick" -> "Manul"))
+    update.elements must be size(2)
+  }
+  
+  "mul" in {
+    import PetTypeBSONHandler._
+    val update = on[Pet].update(_.mul(_.age, 2))
+    update.getAs[BSONDocument]("$mul") must beSome(BSONDocument("age" -> 2))
+    update.elements must be size(1)
+  }
+  
+  "push" in {
+    import PetTypeBSONHandler._
+    
+    val update = on[Pet].update(_.push(_.favoriteDishes, List("Milk")))
+    update.getAs[BSONDocument]("$push") must beSome(BSONDocument("favoriteDishes" -> "Milk"))
+    update.elements must be size(1)
+    
+    val updateEach = on[Pet].update(_.push(_.favoriteDishes, List("Milk", "Fish")))
+    updateEach.getAs[BSONDocument]("$push") must beSome(BSONDocument("favoriteDishes" -> BSONDocument("$each" -> BSONArray("Milk", "Fish"))))
+    updateEach.elements must be size(1)
+  }
+  
+  "addToSet" in {
+    import PetTypeBSONHandler._
+    
+    val update = on[Pet].update(_.addToSet(_.favoriteDishes, List("Milk")))
+    update.getAs[BSONDocument]("$addToSet") must beSome(BSONDocument("favoriteDishes" -> "Milk"))
+    update.elements must be size(1)
+    
+    val updateEach = on[Pet].update(_.addToSet(_.favoriteDishes, List("Milk", "Fish")))
+    updateEach.getAs[BSONDocument]("$addToSet") must beSome(BSONDocument("favoriteDishes" -> BSONDocument("$each" -> BSONArray("Milk", "Fish"))))
+    updateEach.elements must be size(1)
   }
 }
 

@@ -534,21 +534,7 @@ private object QueryMacroImpl{
    } 
   }
  
-  def addToSet[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => A], value: c.Expr[A])
- (handler: c.Expr[BSONHandler[_ <: BSONValue, A]]): c.Expr[AddToSetOperator] = {
-    import c.universe._
-   p.tree.children(1) match {
-     case Select(a, b) => {
-       val paramTree = Literal(Constant(b.decoded))
-  	   c.universe.reify {
-  	     val param = c.Expr[String](paramTree).splice
-         AddToSetOperator(param, handler.splice.write(value.splice))
-  	    }
-     }
-   } 
-  }
-  
-  def addToSetEach[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => A], values: c.Expr[List[A]])
+  def addToSet[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => Traversable[A]], values: c.Expr[Traversable[A]])
  (handler: c.Expr[BSONHandler[_ <: BSONValue, A]]): c.Expr[AddToSetOperator] = {
     import c.universe._
    p.tree.children(1) match {
@@ -557,13 +543,16 @@ private object QueryMacroImpl{
   	   c.universe.reify {
   	     val param = c.Expr[String](paramTree).splice
   	     val items = values.splice.map(handler.splice.write(_))
-         AddToSetOperator(param, BSONDocument("$each" -> BSONArray(items)))
+  	     items match {
+  	       case head :: Nil => AddToSetOperator(param, head)
+  	       case _ => AddToSetOperator(param, BSONDocument("$each" -> BSONArray(items)))
+  	     }
   	    }
      }
    } 
   }
   
-  def pullAll[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => A], value: c.Expr[List[A]])
+  def pullAll[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => Traversable[A]], value: c.Expr[Traversable[A]])
  (handler: c.Expr[BSONHandler[_ <: BSONValue, A]]): c.Expr[PullAllOperator] = {
     import c.universe._
    p.tree.children(1) match {
@@ -577,9 +566,8 @@ private object QueryMacroImpl{
      }
    } 
   }
-  
-  
-  def push[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => A], value: c.Expr[A])
+ 
+  def push[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => Traversable[A]], values: c.Expr[Traversable[A]])
  (handler: c.Expr[BSONHandler[_ <: BSONValue, A]]): c.Expr[PushOperator] = {
     import c.universe._
    p.tree.children(1) match {
@@ -587,12 +575,16 @@ private object QueryMacroImpl{
        val paramTree = Literal(Constant(b.decoded))
   	   c.universe.reify {
   	     val param = c.Expr[String](paramTree).splice
-         PushOperator(param, handler.splice.write(value.splice))
+  	     val items = values.splice.map(handler.splice.write(_))
+  	     items match {
+  	       case head :: Nil => PushOperator(param, head)
+  	       case _ => PushOperator(param, BSONDocument("$each" -> BSONArray(items)))
+  	     }
   	    }
      }
    } 
   }
- 
+  
  def in[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => A], values: c.Expr[List[A]])
  (handler: c.Expr[BSONHandler[_ <: BSONValue, A]]): c.Expr[BSONDocument] = {
    import c.universe._
