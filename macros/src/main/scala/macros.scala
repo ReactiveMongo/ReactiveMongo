@@ -381,3 +381,259 @@ private object MacroImpl {
     private def companion(implicit A: c.Type): c.Symbol = A.typeSymbol.companionSymbol
   }
 }
+
+private object QueryMacroImpl{
+  
+  private def builder[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => A], value: c.Expr[A])
+ (handler: c.Expr[BSONWriter[A, _ <: BSONValue]])
+ (tag: String): c.Expr[BSONDocument] = {
+    import c.universe._
+   p.tree.children(1) match {
+     case Select(a, b) => {
+       val paramRepTree = Literal(Constant(b.decoded))
+       val tagRepTree = Literal(Constant(tag))
+	   c.universe.reify {
+         val tagName = c.Expr[String](tagRepTree).splice
+         val n = c.Expr[String](paramRepTree).splice
+         val v = handler.splice.write(value.splice)
+         val v2 = BSONDocument(List((tagName, v)))
+	     BSONDocument(List((n, v2)))
+	    }
+     }
+   } 
+  }
+  
+  
+  def nameOf[T, A](c: Context)(p : c.Expr[T => A]): c.Expr[String] = {
+    import c.universe._
+    p.tree.children(1) match {
+     case Select(a, b) => {
+       val paramRepTree = Literal(Constant(b.decoded))
+	   c.universe.reify {
+	      c.Expr[String](paramRepTree).splice
+	    }
+     }
+   }
+  }
+  
+ def eq[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => A], value: c.Expr[A])
+ (handler: c.Expr[BSONWriter[A, _ <: BSONValue]]): c.Expr[BSONDocument] = {
+   import c.universe._
+   p.tree.children(1) match {
+     case Select(a, b) => {
+       val paramRepTree = Literal(Constant(b.decoded))
+	   c.universe.reify {
+       val n = c.Expr[String](paramRepTree).splice
+       val v = handler.splice.write(value.splice)
+	      BSONDocument(List((n, v)))
+	    }
+     }
+   } 
+  }
+ 
+ def gt[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => A], value: c.Expr[A])
+ (handler: c.Expr[BSONWriter[A, _ <: BSONValue]]): c.Expr[BSONDocument] = 
+   builder[T, A](c)(p, value)(handler)("$gt")
+   
+ def gte[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => A], value: c.Expr[A])
+ (handler: c.Expr[BSONWriter[A, _ <: BSONValue]]): c.Expr[BSONDocument] = 
+   builder[T, A](c)(p, value)(handler)("$gte")
+   
+ def lt[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => A], value: c.Expr[A])
+ (handler: c.Expr[BSONWriter[A, _ <: BSONValue]]): c.Expr[BSONDocument] = 
+   builder[T, A](c)(p, value)(handler)("$lt")
+   
+ def lte[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => A], value: c.Expr[A])
+ (handler: c.Expr[BSONWriter[A, _ <: BSONValue]]): c.Expr[BSONDocument] = 
+   builder[T, A](c)(p, value)(handler)("$lte")
+   
+ def ne[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => A], value: c.Expr[A])
+ (handler: c.Expr[BSONWriter[A, _ <: BSONValue]]): c.Expr[BSONDocument] = 
+   builder[T, A](c)(p, value)(handler)("$ne")
+   
+ def set[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => A], value: c.Expr[A])
+ (handler: c.Expr[BSONWriter[A, _ <: BSONValue]]): c.Expr[SetOperator] = {
+    import c.universe._
+   p.tree.children(1) match {
+     case Select(a, b) => {
+       val paramTree = Literal(Constant(b.decoded))
+  	   c.universe.reify {
+  	     val param = c.Expr[String](paramTree).splice
+         SetOperator(param, handler.splice.write(value.splice))
+  	    }
+     }
+   } 
+  }
+ 
+ def setOpt[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => Option[A]], value: c.Expr[Option[A]])
+ (handler: c.Expr[BSONWriter[A, _ <: BSONValue]]): c.Expr[UpdateOperator] = {
+   import c.universe._
+   p.tree.children(1) match {
+     case Select(a, b) => {
+       val paramTree = Literal(Constant(b.decoded))
+  	   c.universe.reify {
+  	     val param = c.Expr[String](paramTree).splice
+         val opt = value.splice
+         opt.map(p => SetOperator(param, handler.splice.write(p))).getOrElse(UnsetOperator(param))
+  	    }
+     }
+   }
+  }
+ 
+ 
+ def unset[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => A]): c.Expr[UnsetOperator] = {
+    import c.universe._
+   p.tree.children(1) match {
+     case Select(a, b) => {
+       val paramTree = Literal(Constant(b.decoded))
+  	   c.universe.reify {
+  	     val param = c.Expr[String](paramTree).splice
+         UnsetOperator(param)
+  	    }
+     }
+   } 
+  }
+ 
+ def inc[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => A], value: c.Expr[A])
+ (handler: c.Expr[BSONWriter[A, _ <: BSONValue]]): c.Expr[IncOperator] = {
+    import c.universe._
+   p.tree.children(1) match {
+     case Select(a, b) => {
+       val paramTree = Literal(Constant(b.decoded))
+  	   c.universe.reify {
+  	     val param = c.Expr[String](paramTree).splice
+         IncOperator(param, handler.splice.write(value.splice))
+  	    }
+     }
+   } 
+  }
+ 
+ def mul[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => A], value: c.Expr[A])
+ (handler: c.Expr[BSONWriter[A, _ <: BSONValue]]): c.Expr[MulOperator] = {
+    import c.universe._
+   p.tree.children(1) match {
+     case Select(a, b) => {
+       val paramTree = Literal(Constant(b.decoded))
+  	   c.universe.reify {
+  	     val param = c.Expr[String](paramTree).splice
+         MulOperator(param, handler.splice.write(value.splice))
+  	    }
+     }
+   } 
+  }
+
+ def min[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => A], value: c.Expr[A])
+ (handler: c.Expr[BSONWriter[A, _ <: BSONValue]]): c.Expr[MinOperator] = {
+    import c.universe._
+   p.tree.children(1) match {
+     case Select(a, b) => {
+       val paramTree = Literal(Constant(b.decoded))
+  	   c.universe.reify {
+  	     val param = c.Expr[String](paramTree).splice
+         MinOperator(param, handler.splice.write(value.splice))
+  	    }
+     }
+   } 
+  }
+ 
+ def max[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => A], value: c.Expr[A])
+ (handler: c.Expr[BSONWriter[A, _ <: BSONValue]]): c.Expr[MaxOperator] = {
+    import c.universe._
+   p.tree.children(1) match {
+     case Select(a, b) => {
+       val paramTree = Literal(Constant(b.decoded))
+  	   c.universe.reify {
+  	     val param = c.Expr[String](paramTree).splice
+         MaxOperator(param, handler.splice.write(value.splice))
+  	    }
+     }
+   } 
+  }
+ 
+  def addToSet[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => Traversable[A]], values: c.Expr[Traversable[A]])
+ (handler: c.Expr[BSONWriter[A, _ <: BSONValue]]): c.Expr[AddToSetOperator] = {
+    import c.universe._
+   p.tree.children(1) match {
+     case Select(a, b) => {
+       val paramTree = Literal(Constant(b.decoded))
+  	   c.universe.reify {
+  	     val param = c.Expr[String](paramTree).splice
+  	     val items = values.splice.map(handler.splice.write(_))
+  	     items match {
+  	       case head :: Nil => AddToSetOperator(param, head)
+  	       case _ => AddToSetOperator(param, BSONDocument("$each" -> BSONArray(items)))
+  	     }
+  	    }
+     }
+   } 
+  }
+  
+  def pullAll[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => Traversable[A]], value: c.Expr[Traversable[A]])
+ (handler: c.Expr[BSONWriter[A, _ <: BSONValue]]): c.Expr[PullAllOperator] = {
+    import c.universe._
+   p.tree.children(1) match {
+     case Select(a, b) => {
+       val paramTree = Literal(Constant(b.decoded))
+  	   c.universe.reify {
+  	     val param = c.Expr[String](paramTree).splice
+  	     val items = value.splice.map(handler.splice.write(_))
+         PullAllOperator(param, BSONArray(items))
+  	    }
+     }
+   } 
+  }
+ 
+  def push[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => Traversable[A]], values: c.Expr[Traversable[A]])
+ (handler: c.Expr[BSONWriter[A, _ <: BSONValue]]): c.Expr[PushOperator] = {
+    import c.universe._
+   p.tree.children(1) match {
+     case Select(a, b) => {
+       val paramTree = Literal(Constant(b.decoded))
+  	   c.universe.reify {
+  	     val param = c.Expr[String](paramTree).splice
+  	     val items = values.splice.map(handler.splice.write(_))
+  	     items match {
+  	       case head :: Nil => PushOperator(param, head)
+  	       case _ => PushOperator(param, BSONDocument("$each" -> BSONArray(items)))
+  	     }
+  	    }
+     }
+   } 
+  }
+  
+ def in[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => A], values: c.Expr[List[A]])
+ (handler: c.Expr[BSONWriter[A, _ <: BSONValue]]): c.Expr[BSONDocument] = {
+   import c.universe._
+   p.tree.children(1) match {
+     case Select(a, b) => {
+       val paramRepTree = Literal(Constant(b.decoded))
+       
+	   c.universe.reify {
+	       val n = c.Expr[String](paramRepTree).splice
+	       val writer = handler.splice
+	       val items = values.splice.map(writer.write(_))
+	       val v = BSONDocument(List(("$in", BSONArray(items))))
+	       BSONDocument(List((n, v)))
+       }
+     }
+   }
+ }
+
+ def nin[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => A], values: c.Expr[List[A]])
+ (handler: c.Expr[BSONWriter[A, _ <: BSONValue]]): c.Expr[BSONDocument] = {
+   import c.universe._
+   p.tree.children(1) match {
+     case Select(a, b) => {
+       val paramRepTree = Literal(Constant(b.decoded))
+       
+	   c.universe.reify {
+	       val n = c.Expr[String](paramRepTree).splice
+	       val writer = handler.splice
+	       val items = values.splice.map(writer.write(_))
+	       val v = BSONDocument(List(("$in", BSONArray(items))))
+	       BSONDocument(List((n, v)))
+       }
+     }
+   }
+ }
+}

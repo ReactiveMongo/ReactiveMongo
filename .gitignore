@@ -7,3 +7,4 @@ target/
 .settings*
 .worksheet/
 .plugins.sbt
+bson/.cache

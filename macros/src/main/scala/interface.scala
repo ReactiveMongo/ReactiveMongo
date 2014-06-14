@@ -1,5 +1,90 @@
 package reactivemongo.bson
 
+
+
+object Query{
+  def on[T] = new Queryable[T]
+}
+
+trait UpdateOperator {
+  val operator: String
+  val field: String
+  val value: BSONValue
+}
+
+case class SetOperator(val field: String, val value: BSONValue) extends UpdateOperator {
+  val operator = "$set"
+}
+case class UnsetOperator(val field: String) extends UpdateOperator {
+  val operator = "$unset"
+  val value = BSONString("")
+}
+case class IncOperator(val field: String, val value: BSONValue) extends UpdateOperator {
+  val operator = "$inc"
+}
+case class MulOperator(val field: String, val value: BSONValue) extends UpdateOperator {
+  val operator = "$mul"
+}
+case class MinOperator(val field: String, val value: BSONValue) extends UpdateOperator {
+  val operator = "$min"
+}
+case class MaxOperator(val field: String, val value: BSONValue) extends UpdateOperator {
+  val operator = "$max"
+}
+case class AddToSetOperator(val field: String, val value: BSONValue) extends UpdateOperator {
+  val operator = "$addToSet"
+}
+case class PopOperator(val field: String, val value: BSONValue) extends UpdateOperator {
+  val operator = "$pop"
+}
+case class PullAllOperator(val field: String, val value: BSONValue) extends UpdateOperator {
+  val operator = "$pullAll"
+}
+case class PushOperator(val field: String, val value: BSONValue) extends UpdateOperator {
+  val operator = "$push"
+}
+
+
+
+class Queryable[T] {
+  import language.experimental.macros
+  import Query._
+  
+	def eq[A](p: T => A, value: A)(implicit handler: BSONWriter[A, _ <: BSONValue]) : BSONDocument = macro QueryMacroImpl.eq[T, A]
+	def gt[A](p: T => A, value: A)(implicit handler: BSONWriter[A, _ <: BSONValue]) : BSONDocument = macro QueryMacroImpl.gt[T, A]
+	def gte[A](p: T => A, value: A)(implicit handler: BSONWriter[A, _ <: BSONValue]) : BSONDocument = macro QueryMacroImpl.gte[T, A]
+	def in[A](p: T => A, values: List[A])(implicit handler: BSONWriter[A, _ <: BSONValue]) : BSONDocument = macro QueryMacroImpl.in[T, A]
+	def lt[A](p: T => A, value: A)(implicit handler: BSONWriter[A, _ <: BSONValue]) : BSONDocument = macro QueryMacroImpl.lt[T, A]
+	def lte[A](p: T => A, value: A)(implicit handler: BSONWriter[A, _ <: BSONValue]) : BSONDocument = macro QueryMacroImpl.lte[T, A]
+	def ne[A](p: T => A, value: A)(implicit handler: BSONWriter[A, _ <: BSONValue]) : BSONDocument = macro QueryMacroImpl.ne[T, A]
+	def nin[A](p: T => A, values: List[A])(implicit handler: BSONWriter[A, _ <: BSONValue]) : BSONDocument = macro QueryMacroImpl.nin[T, A]
+  
+  
+	def set[A](p: T => A, value: A)(implicit handler: BSONWriter[A, _ <: BSONValue]) : SetOperator = macro QueryMacroImpl.set[T, A]
+  def setOpt[A](p: T => Option[A], value: Option[A])(implicit handler: BSONWriter[A, _ <: BSONValue]) : UpdateOperator = macro QueryMacroImpl.setOpt[T, A]
+  def unset[A](p: T => A) : UnsetOperator = macro QueryMacroImpl.unset[T, A]
+  def inc[A](p: T => A, value: A)(implicit handler: BSONWriter[A, _ <: BSONValue]) : IncOperator = macro QueryMacroImpl.inc[T, A]
+  def mul[A](p: T => A, value: A)(implicit handler: BSONWriter[A, _ <: BSONValue]) : MulOperator = macro QueryMacroImpl.mul[T, A]
+  def min[A](p: T => A, value: A)(implicit handler: BSONWriter[A, _ <: BSONValue]) : MinOperator = macro QueryMacroImpl.min[T, A]
+  def max[A](p: T => A, value: A)(implicit handler: BSONWriter[A, _ <: BSONValue]) : MaxOperator = macro QueryMacroImpl.max[T, A]
+  def addToSet[A](p: T => Traversable[A], values: Traversable[A])(implicit handler: BSONWriter[A, _ <: BSONValue]) : AddToSetOperator = macro QueryMacroImpl.addToSet[T, A]
+  
+  def pullAll[A](p: T => Traversable[A], value: Traversable[A])(implicit handler: BSONWriter[A, _ <: BSONValue]) : PullAllOperator = macro QueryMacroImpl.pullAll[T, A]
+	def push[A](p: T => Traversable[A], values: Traversable[A])(implicit handler: BSONWriter[A, _ <: BSONValue]) : PushOperator = macro QueryMacroImpl.push[T, A]
+  
+  
+  
+  def update(updateOperators: Queryable[T] => UpdateOperator *) = {
+    val operators = updateOperators.map(_ apply on[T]).groupBy(_.operator)
+         .map(p => (p._1, BSONDocument(p._2.map(x => (x.field, x.value)))))
+    BSONDocument(operators)
+  }
+	def and(exps: Queryable[T] => BSONDocument *) = BSONDocument("$and" -> BSONArray(exps.map(_(on[T]))))
+	def or(exps: Queryable[T] => BSONDocument *) = BSONDocument("$or" -> BSONArray(exps.map(_(on[T]))))
+	def not(exp: Queryable[T] => BSONDocument) = BSONDocument("$not" -> exp(on[T]))
+	def nor(exps: Queryable[T] => BSONDocument *) = BSONDocument("$nor" -> BSONArray(exps.map(_(on[T]))))
+}
+
 /**
  * Macros for generating `BSONReader` and `SONWriter` implementations for case
  * at compile time. Invoking these macros is equivalent to writing anonymous
@@ -90,6 +175,8 @@ object Macros {
 
   /**Creates an instance of BSONReader and BSONWriter for case class A and takes additional options */
   def handlerOpts[A, Opts <: Options.Default]: BSONDocumentReader[A] with BSONDocumentWriter[A]  with BSONHandler[BSONDocument, A] = macro MacroImpl.handler[A, Opts]
+  
+  def where[A](p: A => Boolean) : BSONDocument = BSONDocument()
 
   /**
    * Methods with 'Opts' postfix will take additional options in the form of

@@ -1,9 +1,127 @@
+
 import reactivemongo.bson._
 import org.specs2.mutable._
 import reactivemongo.bson.exceptions.DocumentKeyNotFound
 import reactivemongo.bson.Macros.Annotations.Key
+import org.junit.runner.RunWith
+import org.specs2.runner.JUnitRunner
 
-class Macros extends Specification {
+object PetType extends Enumeration {
+    type PetType = Value
+    val Dog, Cat, Rabbit = Value
+    
+   implicit object PetTypeBSONHandler extends BSONHandler[BSONString, PetType] {
+      def read(v: BSONString) = PetType.withName(v.value)
+      def write(v: PetType) = BSONString(v.toString())
+    }
+  }
+
+import PetType._
+
+
+case class Account(_id: BSONObjectID, login: String, age: Option[Int])
+case class Person(firstName: String, lastName: String)
+case class Pet(nick: String, age: Int, typ: PetType, favoriteDishes: List[String])
+
+@RunWith(classOf[JUnitRunner])
+class QueryMacroSpec extends Specification {
+  import Query._
+  import reactivemongo.bson.DefaultBSONHandlers._
+  
+  "eq" in {
+    val id = BSONObjectID.generate
+    val findById = on[Account].eq(_._id, id)
+    findById mustEqual BSONDocument("_id" -> id)
+  }
+  
+  
+  
+    "in" in {
+    val q = on[Person].in(_.firstName, List("abc", "cde"))
+    q.elements must have size(1)
+    
+    val in = q.getAs[BSONDocument]("firstName").get
+    
+    in.elements must have size(1)
+    
+    val arr = in.getAs[BSONArray]("$in").get
+    
+    arr.length mustEqual 2
+        
+    arr.getAs[BSONString](0).get.value mustEqual "abc"
+    arr.getAs[BSONString](1).get.value mustEqual "cde"
+  	}
+  
+  "gt,gte,lt,lte,ne" in {
+    val query = on[Person]
+    val value = "abc"
+    val operations = List[Pair[String, (Queryable[Person], String)  => BSONDocument]](
+        ("$gt", (q, v) => q.gt(_.firstName, v)),
+        ("$gte",(q, v) => q.gte(_.firstName, v)),
+        ("$lt",(q, v) => q.lt(_.firstName, v)),
+        ("$lte",(q, v) => q.lte(_.firstName, v)),
+        ("$ne",(q, v) => q.ne(_.firstName, v))
+        )
+        operations.forall(p=> p._2(query, value) mustEqual BSONDocument("firstName" -> BSONDocument(p._1 -> value)))
+  }
+  
+  "set" in {
+   val query = on[Person]
+   val updateQuery = query.update(_.set[String](_.firstName, "john"), _.set(_.lastName, "doe"))
+   
+   updateQuery.getAs[BSONDocument]("$set") must beSome(BSONDocument("firstName" -> "john", "lastName" -> "doe"))
+  }
+  
+  "setOpt" in {
+    val setQuery = on[Account].update(_.setOpt(_.age, Some(42)))
+    setQuery mustEqual BSONDocument("$set" -> BSONDocument("age" -> 42))
+    
+    val unsetQuery = on[Account].update(_.setOpt(_.age, None))
+    unsetQuery mustEqual BSONDocument("$unset" -> BSONDocument("age" -> ""))
+  }
+  
+  "set, inc & handler" in {
+    import PetTypeBSONHandler._
+    val update = on[Pet].update(_.set(_.typ, PetType.Cat), _.set(_.nick, "Manul"), _.inc(_.age, 1))
+    update.getAs[BSONDocument]("$inc") must beSome(BSONDocument("age" -> 1))
+    update.getAs[BSONDocument]("$set") must beSome(BSONDocument("typ" -> "Cat", "nick" -> "Manul"))
+    update.elements must be size(2)
+  }
+  
+  "mul" in {
+    import PetTypeBSONHandler._
+    val update = on[Pet].update(_.mul(_.age, 2))
+    update.getAs[BSONDocument]("$mul") must beSome(BSONDocument("age" -> 2))
+    update.elements must be size(1)
+  }
+  
+  "push" in {
+    import PetTypeBSONHandler._
+    
+    val update = on[Pet].update(_.push(_.favoriteDishes, List("Milk")))
+    update.getAs[BSONDocument]("$push") must beSome(BSONDocument("favoriteDishes" -> "Milk"))
+    update.elements must be size(1)
+    
+    val updateEach = on[Pet].update(_.push(_.favoriteDishes, List("Milk", "Fish")))
+    updateEach.getAs[BSONDocument]("$push") must beSome(BSONDocument("favoriteDishes" -> BSONDocument("$each" -> BSONArray("Milk", "Fish"))))
+    updateEach.elements must be size(1)
+  }
+  
+  "addToSet" in {
+    import PetTypeBSONHandler._
+    val update = on[Pet].update(_.addToSet(_.favoriteDishes, List("Milk")))
+    update.getAs[BSONDocument]("$addToSet") must beSome(BSONDocument("favoriteDishes" -> "Milk"))
+    update.elements must be size(1)
+    
+    val updateEach = on[Pet].update(_.addToSet(_.favoriteDishes, List("Milk", "Fish")))
+    updateEach.getAs[BSONDocument]("$addToSet") must beSome(BSONDocument("favoriteDishes" -> BSONDocument("$each" -> BSONArray("Milk", "Fish"))))
+    updateEach.elements must be size(1)
+  }
+}
+
+
+@RunWith(classOf[JUnitRunner])
+class MacrosSpec extends Specification  {
   type Handler[A] = BSONDocumentReader[A] with BSONDocumentWriter[A]  with BSONHandler[BSONDocument, A]
 
   def roundtrip[A](original: A, format: BSONReader[BSONDocument, A] with BSONWriter[A, BSONDocument]) = {
@@ -14,7 +132,7 @@ class Macros extends Specification {
 
   def roundtripImp[A](data:A)(implicit format: BSONReader[BSONDocument, A] with BSONWriter[A, BSONDocument]) = roundtrip(data, format)
 
-  case class Person(firstName: String, lastName: String)
+  
   case class Pet(name: String, owner: Person)
   case class Primitives(dbl: Double, str: String, bl: Boolean, int: Int, long: Long)
   case class Optional(name: String, value: Option[String])

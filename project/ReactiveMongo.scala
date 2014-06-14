@@ -125,7 +125,8 @@ object Dependencies {
 
   val iteratees = "com.typesafe.play" %% "play-iteratees" % "2.3.0"
 
-  val specs = "org.specs2" %% "specs2-core" % "2.3.11" % "test"
+  val specs = "org.specs2" %% "specs2" % "2.3.12" % "test"
+  val scalatest = "org.scalatest" % "scalatest_2.10" % "2.1.7" % "test"
 
   val log4jVersion = "2.0-beta9"
   val log4j = Seq("org.apache.logging.log4j" % "log4j-api" % log4jVersion, "org.apache.logging.log4j" % "log4j-core" % log4jVersion)
@@ -170,5 +171,16 @@ object ReactiveMongoBuild extends Build {
     )).
     settings(libraryDependencies += Dependencies.specs).
     dependsOn (bson)
+
+    lazy val bsonmacrosspec = Project(
+    "ReactiveMongo-BSON-Macros-Spec",
+    file("macros-spec"),
+    settings = buildSettings ++ Seq(
+      libraryDependencies <+= (scalaVersion)("org.scala-lang" % "scala-compiler" % _)
+    )).
+    settings(libraryDependencies += Dependencies.specs).
+	settings(libraryDependencies += Dependencies.scalatest).
+    dependsOn (bson).
+    dependsOn (bsonmacros)
 }
 
