@@ -404,7 +404,7 @@ private object QueryMacroImpl{
   }
   
   
-  def nameImpl[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => A]): c.Expr[String] = {
+  def nameOf[T, A](c: Context)(p : c.Expr[T => A]): c.Expr[String] = {
     import c.universe._
     p.tree.children(1) match {
      case Select(a, b) => {
@@ -464,6 +464,22 @@ private object QueryMacroImpl{
      }
    } 
   }
+ 
+ def setOpt[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => Option[A]], value: c.Expr[Option[A]])
+ (handler: c.Expr[BSONWriter[A, _ <: BSONValue]]): c.Expr[UpdateOperator] = {
+   import c.universe._
+   p.tree.children(1) match {
+     case Select(a, b) => {
+       val paramTree = Literal(Constant(b.decoded))
+  	   c.universe.reify {
+  	     val param = c.Expr[String](paramTree).splice
+         val opt = value.splice
+         opt.map(p => SetOperator(param, handler.splice.write(p))).getOrElse(UnsetOperator(param))
+  	    }
+     }
+   }
+  }
+ 
  
  def unset[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => A]): c.Expr[UnsetOperator] = {
     import c.universe._

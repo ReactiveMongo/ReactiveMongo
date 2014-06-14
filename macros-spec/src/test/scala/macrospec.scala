@@ -19,7 +19,7 @@ object PetType extends Enumeration {
 import PetType._
 
 
-case class Account(_id: BSONObjectID, login: String)
+case class Account(_id: BSONObjectID, login: String, age: Option[Int])
 case class Person(firstName: String, lastName: String)
 case class Pet(nick: String, age: Int, typ: PetType, favoriteDishes: List[String])
 
@@ -67,9 +67,17 @@ class QueryMacroSpec extends Specification {
   
   "set" in {
    val query = on[Person]
-   val updateQuery = query.update(_.set(_.firstName, "john"), _.set(_.lastName, "doe"))
+   val updateQuery = query.update(_.set[String](_.firstName, "john"), _.set(_.lastName, "doe"))
    
    updateQuery.getAs[BSONDocument]("$set") must beSome(BSONDocument("firstName" -> "john", "lastName" -> "doe"))
+  }
+  
+  "setOpt" in {
+    val setQuery = on[Account].update(_.setOpt(_.age, Some(42)))
+    setQuery mustEqual BSONDocument("$set" -> BSONDocument("age" -> 42))
+    
+    val unsetQuery = on[Account].update(_.setOpt(_.age, None))
+    unsetQuery mustEqual BSONDocument("$unset" -> BSONDocument("age" -> ""))
   }
   
   "set, inc & handler" in {

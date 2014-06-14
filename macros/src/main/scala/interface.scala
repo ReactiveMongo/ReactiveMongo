@@ -61,6 +61,7 @@ class Queryable[T] {
   
   
 	def set[A](p: T => A, value: A)(implicit handler: BSONWriter[A, _ <: BSONValue]) : SetOperator = macro QueryMacroImpl.set[T, A]
+  def setOpt[A](p: T => Option[A], value: Option[A])(implicit handler: BSONWriter[A, _ <: BSONValue]) : UpdateOperator = macro QueryMacroImpl.setOpt[T, A]
   def unset[A](p: T => A) : UnsetOperator = macro QueryMacroImpl.unset[T, A]
   def inc[A](p: T => A, value: A)(implicit handler: BSONWriter[A, _ <: BSONValue]) : IncOperator = macro QueryMacroImpl.inc[T, A]
   def mul[A](p: T => A, value: A)(implicit handler: BSONWriter[A, _ <: BSONValue]) : MulOperator = macro QueryMacroImpl.mul[T, A]
