@@ -451,6 +451,21 @@ private object QueryMacroImpl{
  (handler: c.Expr[BSONWriter[A, _ <: BSONValue]]): c.Expr[BSONDocument] = 
    builder[T, A](c)(p, value)(handler)("$ne")
    
+   
+ def sortAsc[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => A]): c.Expr[BSONDocument] = {
+   import c.universe._
+   c.universe.reify {
+     BSONDocument(nameOf(c)(p).splice -> 1)
+   }
+ }
+ 
+ def sortDesc[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => A]): c.Expr[BSONDocument] = {
+   import c.universe._
+   c.universe.reify {
+     BSONDocument(nameOf(c)(p).splice -> -1)
+   }
+ }
+   
 def exists[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => Option[A]], exists: c.Expr[Boolean]): c.Expr[BSONDocument] = {
    import c.universe._
    p.tree.children(1) match {

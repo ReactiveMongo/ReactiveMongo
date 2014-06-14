@@ -122,6 +122,12 @@ class QueryMacroSpec extends Specification {
     updateEach.getAs[BSONDocument]("$addToSet") must beSome(BSONDocument("favoriteDishes" -> BSONDocument("$each" -> BSONArray("Milk", "Fish"))))
     updateEach.elements must be size(1)
   }
+  
+  "sort" in {
+    val q = on[Account].orderBy(_.sortAsc(_.age), _.sortDesc(_.login))
+    
+    q mustEqual BSONDocument("age" -> 1, "login" -> -1)
+  }
 }
 
 
