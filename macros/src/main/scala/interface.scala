@@ -58,7 +58,7 @@ class Queryable[T] {
 	def lte[A](p: T => A, value: A)(implicit handler: BSONWriter[A, _ <: BSONValue]) : BSONDocument = macro QueryMacroImpl.lte[T, A]
 	def ne[A](p: T => A, value: A)(implicit handler: BSONWriter[A, _ <: BSONValue]) : BSONDocument = macro QueryMacroImpl.ne[T, A]
 	def nin[A](p: T => A, values: List[A])(implicit handler: BSONWriter[A, _ <: BSONValue]) : BSONDocument = macro QueryMacroImpl.nin[T, A]
-  
+  def exists[A](p: T => Option[A], exists: Boolean): BSONDocument = macro QueryMacroImpl.exists[T, A]
   
 	def set[A](p: T => A, value: A)(implicit handler: BSONWriter[A, _ <: BSONValue]) : SetOperator = macro QueryMacroImpl.set[T, A]
   def setOpt[A](p: T => Option[A], value: Option[A])(implicit handler: BSONWriter[A, _ <: BSONValue]) : UpdateOperator = macro QueryMacroImpl.setOpt[T, A]

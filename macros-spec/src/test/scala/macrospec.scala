@@ -80,6 +80,11 @@ class QueryMacroSpec extends Specification {
     unsetQuery mustEqual BSONDocument("$unset" -> BSONDocument("age" -> ""))
   }
   
+  "exists" in {
+    val query = on[Account].exists(_.age, true)
+    query mustEqual BSONDocument("age" -> BSONDocument("$exists" -> true))
+  }
+  
   "set, inc & handler" in {
     import PetTypeBSONHandler._
     val update = on[Pet].update(_.set(_.typ, PetType.Cat), _.set(_.nick, "Manul"), _.inc(_.age, 1))

@@ -451,6 +451,19 @@ private object QueryMacroImpl{
  (handler: c.Expr[BSONWriter[A, _ <: BSONValue]]): c.Expr[BSONDocument] = 
    builder[T, A](c)(p, value)(handler)("$ne")
    
+def exists[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => Option[A]], exists: c.Expr[Boolean]): c.Expr[BSONDocument] = {
+   import c.universe._
+   p.tree.children(1) match {
+     case Select(a, b) => {
+       val paramTree = Literal(Constant(b.decoded))
+  	   c.universe.reify {
+  	     val param = c.Expr[String](paramTree).splice
+         BSONDocument(param -> BSONDocument("$exists" -> BSONBoolean(exists.splice)))
+  	    }
+     }
+   }
+ }
+   
  def set[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => A], value: c.Expr[A])
  (handler: c.Expr[BSONWriter[A, _ <: BSONValue]]): c.Expr[SetOperator] = {
     import c.universe._

@@ -121,9 +121,9 @@ object Resolvers {
 object Dependencies {
   val netty = "io.netty" % "netty" % "3.6.5.Final" cross CrossVersion.Disabled
 
-  val akkaActor = "com.typesafe.akka" %% "akka-actor" % "2.3.2"
+  val akkaActor = "com.typesafe.akka" %% "akka-actor" % "2.2.1"
 
-  val iteratees = "com.typesafe.play" %% "play-iteratees" % "2.3.0-RC1"
+  val iteratees = "com.typesafe.play" %% "play-iteratees" % "2.2.3"
 
   val specs = "org.specs2" %% "specs2" % "2.3.12" % "test"
   val scalatest = "org.scalatest" % "scalatest_2.10" % "2.1.7" % "test"
