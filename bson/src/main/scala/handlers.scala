@@ -161,6 +161,20 @@ trait DefaultBSONHandlers {
   }
 
   implicit def bsonBooleanLikeReader[B <: BSONValue] = new BSONBooleanLikeReader[B]
+  
+  
+  class BSONOptionReader[B <: BSONValue, T](implicit reader: BSONReader[B, T]) extends BSONReader[B, Option[T]] {
+    def read(value: B) = reader.readOpt(value)
+  }
+  
+  
+  class BSONOptionWriter[B <: BSONValue, T](implicit writer: BSONWriter[T, B]) extends BSONWriter[Option[T], BSONValue] {
+    def write(obj: Option[T]) = obj match {
+      case Some(o) => writer.write(o)
+      case None => BSONNull
+    } 
+  }
+  
 
   // Collections Handlers
   class BSONArrayCollectionReader[M[_], T](implicit cbf: CanBuildFrom[M[_], T, M[T]], reader: BSONReader[_ <: BSONValue, T]) extends BSONReader[BSONArray, M[T]] {
@@ -175,6 +189,11 @@ trait DefaultBSONHandlers {
       new BSONArray(repr.map(s => Try(writer.write(s))).to[Stream])
     }
   }
+  
+  
+  implicit def optionToBSONWriter[T, B <: BSONValue](implicit writer: BSONWriter[T, B]) : BSONWriter[Option[T], BSONValue] = {
+    new BSONOptionWriter()
+  } 
 
   implicit def collectionToBSONArrayCollectionWriter[T, Repr <% Traversable[T]](implicit writer: BSONWriter[T, _ <: BSONValue]): VariantBSONWriter[Repr, BSONArray] = {
     new BSONArrayCollectionWriter[T, Repr]

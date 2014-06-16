@@ -26,12 +26,32 @@ case class Pet(nick: String, age: Int, typ: PetType, favoriteDishes: List[String
 @RunWith(classOf[JUnitRunner])
 class QueryMacroSpec extends Specification {
   import Query._
-  import reactivemongo.bson.DefaultBSONHandlers._
+  
   
   "eq" in {
     val id = BSONObjectID.generate
     val findById = on[Account].eq(_._id, id)
     findById mustEqual BSONDocument("_id" -> id)
+  }
+  
+  "eq Option" in {
+    val q = on[Account].eq(_.age, Some(18))
+    
+    
+    def test[A](value: A)(implicit handler: BSONWriter[A, _ <: BSONValue]) = {
+      
+      println(handler.getClass())
+    }
+    
+    test(Some(1))
+    
+    q.getAs[BSONValue]("age").get match {
+      case BSONInteger(a) => println(a)
+      case BSONDocument(stream) => println("steram")
+      case BSONArray(stream) => stream.map(p => println(p.get))
+      case _ => println(q.getAs[BSONValue]("age").get.getClass())
+    }
+    q mustEqual BSONDocument("age" -> 18)
   }
   
   
