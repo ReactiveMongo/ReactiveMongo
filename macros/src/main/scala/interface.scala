@@ -1,9 +1,32 @@
 package reactivemongo.bson
 
+trait BSONQueryWriter[C, T, B <: BSONValue] {
+  def write: BSONWriter[T, B]
+}
 
+abstract class PlainBSONQueryWriter[C, T, B <: BSONValue] extends BSONQueryWriter[C, T, B]
+
+case class ValueBSONQueryWriter[T, B <: BSONValue](implicit writer: BSONWriter[T, B]) extends PlainBSONQueryWriter[T, T, B] {
+  def write = writer
+}
+
+case class OptionBSONQueryWriter[C <: Option[T], T , B <: BSONValue](implicit writer: BSONWriter[T, B]) extends PlainBSONQueryWriter[Option[T], T, B] {
+  def write = writer
+}
+
+case class TraversableBSONQueryWriter[C <: Traversable[T], T , B <: BSONValue](implicit writer: BSONWriter[T, B]) extends BSONQueryWriter[C, T,  B] {
+  def write = writer
+}
 
 object Query{
   def on[T] = new Queryable[T]
+  
+  implicit def valueQueryWriter[T, B <: BSONValue](implicit writer: BSONWriter[T, B]) : PlainBSONQueryWriter[T, T, B] = ValueBSONQueryWriter[T, B]()
+  
+  implicit def optionQueryWriter[C <: Option[T], T , B <: BSONValue](implicit writer: BSONWriter[T, B]): PlainBSONQueryWriter[Option[T], T,  B] = OptionBSONQueryWriter[C, T, B]()
+  
+  implicit def traversableQueryWriter[C <: Traversable[T], T , B <: BSONValue](implicit writer: BSONWriter[T, B]): BSONQueryWriter[C, T,  B] = TraversableBSONQueryWriter[C, T, B]() 
+  
 }
 
 trait UpdateOperator {
@@ -55,14 +78,15 @@ class Queryable[T] {
 	  case _ => BSONDocument(tag -> BSONArray(exps))
 	}
   
-	def eq[A](p: T => A, value: A)(implicit handler: BSONWriter[A, _ <: BSONValue]) : BSONDocument = macro QueryMacroImpl.eq[T, A]
-	def gt[A](p: T => A, value: A)(implicit handler: BSONWriter[A, _ <: BSONValue]) : BSONDocument = macro QueryMacroImpl.gt[T, A]
-	def gte[A](p: T => A, value: A)(implicit handler: BSONWriter[A, _ <: BSONValue]) : BSONDocument = macro QueryMacroImpl.gte[T, A]
-	def in[A](p: T => A, values: List[A])(implicit handler: BSONWriter[A, _ <: BSONValue]) : BSONDocument = macro QueryMacroImpl.in[T, A]
-	def lt[A](p: T => A, value: A)(implicit handler: BSONWriter[A, _ <: BSONValue]) : BSONDocument = macro QueryMacroImpl.lt[T, A]
-	def lte[A](p: T => A, value: A)(implicit handler: BSONWriter[A, _ <: BSONValue]) : BSONDocument = macro QueryMacroImpl.lte[T, A]
-	def ne[A](p: T => A, value: A)(implicit handler: BSONWriter[A, _ <: BSONValue]) : BSONDocument = macro QueryMacroImpl.ne[T, A]
-	def nin[A](p: T => A, values: List[A])(implicit handler: BSONWriter[A, _ <: BSONValue]) : BSONDocument = macro QueryMacroImpl.nin[T, A]
+  
+	def eq[C, A](p: T => C, value: A)(implicit queryWriter: BSONQueryWriter[C, A, _ <: BSONValue]) : BSONDocument = macro QueryMacroImpl.eq[T, A, C]
+	def gt[A, C](p: T => C, value: A)(implicit queryWriter: PlainBSONQueryWriter[C, A, _ <: BSONValue]) : BSONDocument = macro QueryMacroImpl.gt[T, A, C]
+	def gte[A, C](p: T => C, value: A)(implicit queryWriter: PlainBSONQueryWriter[C, A, _ <: BSONValue]) : BSONDocument = macro QueryMacroImpl.gte[T, A, C]
+	def in[C, A](p: T => C, values: Traversable[A])(implicit queryWriter: BSONQueryWriter[C, A, _ <: BSONValue]) : BSONDocument = macro QueryMacroImpl.in[T, A, C]
+	def lt[A, C](p: T => C, value: A)(implicit queryWriter: PlainBSONQueryWriter[C, A, _ <: BSONValue]) : BSONDocument = macro QueryMacroImpl.lt[T, A, C]
+	def lte[A, C](p: T => C, value: A)(implicit queryWriter: PlainBSONQueryWriter[C, A, _ <: BSONValue]) : BSONDocument = macro QueryMacroImpl.lte[T, A, C]
+	def ne[C, A](p: T => C, value: A)(implicit queryWriter: BSONQueryWriter[C, A, _ <: BSONValue]) : BSONDocument = macro QueryMacroImpl.ne[T, A, C]
+	def nin[C, A](p: T => C, values: Traversable[A])(implicit queryWriter: BSONQueryWriter[C, A, _ <: BSONValue]) : BSONDocument = macro QueryMacroImpl.nin[T, A, C]
   def exists[A](p: T => Option[A], exists: Boolean): BSONDocument = macro QueryMacroImpl.exists[T, A]
 	
 	def sortAsc[A](p: T => A): BSONDocument = macro QueryMacroImpl.sortAsc[T, A]

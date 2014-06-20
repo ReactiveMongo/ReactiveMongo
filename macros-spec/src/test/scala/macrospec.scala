@@ -34,13 +34,15 @@ class QueryMacroSpec extends Specification {
     findById mustEqual BSONDocument("_id" -> id)
   }
   
+  "eq Traversable" in {
+    val pet = Pet("dog", 5, PetType.Dog, List("beaf", "meal", "fish"))
+    val q = on[Pet].eq(_.favoriteDishes, "fish")
+    q mustEqual BSONDocument("favoriteDishes" -> "fish")
+  }
+  
   "eq Option" in {
-    val q = on[Account].eq(_.age, Some(18))
+    val q = on[Account].eq(_.age, 18)
     q mustEqual BSONDocument("age" -> 18)
-    
-    val qOpt = on[Account].eq(_.age, None)
-    qOpt mustEqual BSONDocument("age" -> BSONNull)
-    
   }
   
   
@@ -72,6 +74,11 @@ class QueryMacroSpec extends Specification {
         ("$ne",(q, v) => q.ne(_.firstName, v))
         )
         operations.forall(p=> p._2(query, value) mustEqual BSONDocument("firstName" -> BSONDocument(p._1 -> value)))
+  }
+  
+  "gt option" in {
+    val q = on[Account].gt(_.age, 18)
+    q mustEqual BSONDocument("age" -> BSONDocument("$gt" -> 18))
   }
   
   "set" in {
