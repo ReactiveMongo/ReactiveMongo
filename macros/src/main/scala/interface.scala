@@ -74,6 +74,7 @@ class Queryable[T] {
   import Query._
   
   private def aggr(exps: Traversable[BSONDocument], tag: String) = exps match {
+    case Nil => BSONDocument()
 	  case item :: Nil => item
 	  case _ => BSONDocument(tag -> BSONArray(exps))
 	}
@@ -114,8 +115,8 @@ class Queryable[T] {
          .map(p => (p._1, BSONDocument(p._2.map(x => (x.field, x.value)))))
     BSONDocument(operators)
   }
-	def and(exps: Queryable[T] => BSONDocument *) = BSONDocument("$and" -> BSONArray(exps.map(_(on[T]))))
-	def and(exps: Traversable[BSONDocument]) = aggr(exps, "$and")
+	def and(exps: Queryable[T] => BSONDocument *): BSONDocument =  and(exps.map(_(on[T])))
+	def and(exps: Traversable[BSONDocument]): BSONDocument = aggr(exps, "$and")
 	def or(exps: Queryable[T] => BSONDocument *) = BSONDocument("$or" -> BSONArray(exps.map(_(on[T]))))
 	def or(exps: Traversable[BSONDocument]) = aggr(exps, "$or")
 	def not(exp: Queryable[T] => BSONDocument) = BSONDocument("$not" -> exp(on[T]))

@@ -27,6 +27,15 @@ case class Pet(nick: String, age: Int, typ: PetType, favoriteDishes: List[String
 class QueryMacroSpec extends Specification {
   import Query._
   
+  "and" in {
+    on[Pet].and(List(BSONDocument())) mustEqual BSONDocument()
+    on[Pet].and(List(BSONDocument("age" -> 2))) mustEqual BSONDocument("age" -> 2)
+    on[Pet].and(List(BSONDocument("age" -> 2), BSONDocument("nick" -> "kitty"))) mustEqual BSONDocument("$and" -> BSONArray(List(BSONDocument("age" -> 2), BSONDocument("nick" -> "kitty"))))
+    
+    on[Pet].and() mustEqual BSONDocument()
+    on[Pet].and(_.eq(_.age, 2)) mustEqual BSONDocument("$and" -> BSONArray(List(BSONDocument("age" -> 2))))
+    on[Pet].and(_.eq(_.age, 2), _.eq(_.nick, "kitty")) mustEqual BSONDocument("$and" -> BSONArray(List(BSONDocument("age" -> 2), BSONDocument("nick" -> "kitty"))))
+  }
   
   "eq" in {
     val id = BSONObjectID.generate
