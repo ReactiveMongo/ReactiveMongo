@@ -73,12 +73,7 @@ class Queryable[T] {
   import language.experimental.macros
   import Query._
   
-  private def aggr(exps: Traversable[BSONDocument], tag: String) = exps match {
-    case Nil => BSONDocument()
-	  case item :: Nil => item
-	  case _ => BSONDocument(tag -> BSONArray(exps))
-	}
-  
+  private def aggr(exps: Traversable[BSONDocument], tag: String) = if(exps.isEmpty) BSONDocument() else BSONDocument(tag -> BSONArray(exps))
   
 	def eq[C, A](p: T => C, value: A)(implicit queryWriter: BSONQueryWriter[C, A, _ <: BSONValue]) : BSONDocument = macro QueryMacroImpl.eq[T, A, C]
 	def gt[A, C](p: T => C, value: A)(implicit queryWriter: PlainBSONQueryWriter[C, A, _ <: BSONValue]) : BSONDocument = macro QueryMacroImpl.gt[T, A, C]
@@ -115,7 +110,7 @@ class Queryable[T] {
          .map(p => (p._1, BSONDocument(p._2.map(x => (x.field, x.value)))))
     BSONDocument(operators)
   }
-	def and(exps: Queryable[T] => BSONDocument *): BSONDocument =  and(exps.map(_(on[T])))
+	def and(exps: Queryable[T] => BSONDocument *): BSONDocument =  and(exps.map(_(on[T])).toSeq)
 	def and(exps: Traversable[BSONDocument]): BSONDocument = aggr(exps, "$and")
 	def or(exps: Queryable[T] => BSONDocument *) = BSONDocument("$or" -> BSONArray(exps.map(_(on[T]))))
 	def or(exps: Traversable[BSONDocument]) = aggr(exps, "$or")
