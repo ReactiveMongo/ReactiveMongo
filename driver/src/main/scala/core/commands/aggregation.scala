@@ -158,7 +158,7 @@ sealed trait GroupFunction {
 }
 
 case class AddToSet(field: String) extends GroupFunction {
-  def makeFunction = BSONDocument("$addToSet" -> BSONString(field))
+  def makeFunction = BSONDocument("$addToSet" -> BSONString("$" + field))
 }
 
 case class First(field: String) extends GroupFunction {
