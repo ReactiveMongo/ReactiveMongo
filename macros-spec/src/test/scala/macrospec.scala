@@ -22,6 +22,8 @@ import PetType._
 case class Account(_id: BSONObjectID, login: String, age: Option[Int])
 case class Person(firstName: String, lastName: String)
 case class Pet(nick: String, age: Int, typ: PetType, favoriteDishes: List[String])
+case class Contacts(email: String, phone: String)
+case class Employee(name: String, contacts: Contacts)
 
 @RunWith(classOf[JUnitRunner])
 class QueryMacroSpec extends Specification {
@@ -52,6 +54,12 @@ class QueryMacroSpec extends Specification {
   "eq Option" in {
     val q = on[Account].eq(_.age, 18)
     q mustEqual BSONDocument("age" -> 18)
+  }
+  
+  "eq multiple access" in {
+    val q = on[Employee].eq(_.contacts.email, "john@doe.com")
+    println(q.elements(0)._1)
+    q mustEqual BSONDocument("contacts.email" -> "john@doe.com")
   }
   
   
@@ -146,6 +154,17 @@ class QueryMacroSpec extends Specification {
     val updateEach = on[Pet].update(_.addToSet(_.favoriteDishes, List("Milk", "Fish")))
     updateEach.getAs[BSONDocument]("$addToSet") must beSome(BSONDocument("favoriteDishes" -> BSONDocument("$each" -> BSONArray("Milk", "Fish"))))
     updateEach.elements must be size(1)
+  }
+  
+  "multiple updates" in {
+    import PetTypeBSONHandler._
+    
+    val update = on[Pet].update(_.set(_.nick, "kitty"), _.addToSet(_.favoriteDishes, List("milk")))
+    update.elements must be size(2)
+    println(update.elements(0)._1)
+    println(update.elements(1)._1)
+    update.getAs[BSONDocument]("$set") must beSome(BSONDocument("nick" -> "kitty"))
+    update.getAs[BSONDocument]("$addToSet") must beSome(BSONDocument("favoriteDishes" -> "milk"))
   }
   
   "sort" in {
