@@ -1,8 +1,8 @@
 language: scala
-script: sbt ++$TRAVIS_SCALA_VERSION "test-only * -- -exclude testCommands,mongo2_4 --"
+script: sbt ++$TRAVIS_SCALA_VERSION "testOnly * -- -exclude testCommands,mongo2_4 --"
 scala:
-  - "2.10.1"
-  - "2.10.0"
+  - "2.11.1"
+  - "2.10.4"
 jdk:
   - oraclejdk7
   - openjdk7

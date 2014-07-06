@@ -45,12 +45,10 @@ This will start a standalone MongoDB instance that stores its data in the ```dat
 
 ReactiveMongo is available on [Maven Central](http://search.maven.org/#browse%7C1306790).
 
-If you use SBT, you just have to edit `build.sbt` and add the following:
+If you use sbt, you just have to edit `build.sbt` and add the following:
 
 ```scala
-libraryDependencies ++= Seq(
-  "org.reactivemongo" %% "reactivemongo" % "0.10.0"
-)
+libraryDependencies += "org.reactivemongo" %% "reactivemongo" % "0.10.0"
 ```
 
 There is also a snapshot of the stable branch that compiles against Akka 2.3 (and both Scala 2.10/2.11):
@@ -58,9 +56,7 @@ There is also a snapshot of the stable branch that compiles against Akka 2.3 (an
 ```scala
 resolvers += "Sonatype Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots/"
 
-libraryDependencies ++= Seq(
-  "org.reactivemongo" %% "reactivemongo" % "0.10.5.akka23-SNAPSHOT"
-)
+libraryDependencies += "org.reactivemongo" %% "reactivemongo" % "0.10.5.akka23-SNAPSHOT"
 ```
 
 Or if you want to be on the bleeding edge using snapshots:
@@ -68,9 +64,7 @@ Or if you want to be on the bleeding edge using snapshots:
 ```scala
 resolvers += "Sonatype Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots/"
 
-libraryDependencies ++= Seq(
-  "org.reactivemongo" %% "reactivemongo" % "0.11.0-SNAPSHOT"
-)
+libraryDependencies += "org.reactivemongo" %% "reactivemongo" % "0.11.0-SNAPSHOT"
 ```
 
 You may also need to add the [Typesafe Repository](http://repo.typesafe.com/typesafe/releases/) as a resolver:

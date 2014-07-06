@@ -1,3 +1,5 @@
+scalacOptions ++= Seq("-deprecation", "-unchecked")
+
 addSbtPlugin("com.typesafe.sbt" % "sbt-scalariform" % "1.2.1")
 
 resolvers += "jgit-repo" at "http://download.eclipse.org/jgit/maven"
