@@ -135,8 +135,8 @@ case class BSONCollection(
    */
   def save(doc: BSONDocument, writeConcern: GetLastError)(implicit ec: ExecutionContext): Future[LastError] = {
     doc.get("_id").map { id =>
-      update(BSONDocument("_id" -> id), doc, upsert = true)
-    }.getOrElse(insert(doc.add("_id" -> BSONObjectID.generate)))
+      update(BSONDocument("_id" -> id), doc, writeConcern, upsert = true)
+    }.getOrElse(insert(doc.add("_id" -> BSONObjectID.generate)), writeConcern)
   }
 
   /**
