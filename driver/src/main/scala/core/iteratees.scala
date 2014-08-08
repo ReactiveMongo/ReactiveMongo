@@ -20,7 +20,7 @@ import play.api.libs.iteratee.Enumeratee.CheckDone
 import scala.concurrent._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{ Failure, Success }
-import scala.util.control.NonFatal
+import scala.util.control.NonFatal 
 
 object CustomEnumeratee {
   trait RecoverFromErrorFunction {
