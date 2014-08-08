@@ -21,7 +21,6 @@ import scala.concurrent._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{ Failure, Success }
 import scala.util.control.NonFatal
-import scala.util.Random
 
 object CustomEnumeratee {
   trait RecoverFromErrorFunction {
@@ -82,7 +81,6 @@ object CustomEnumerator {
 
   class SEnumerator[C](zero: C)(next: C => Option[Future[C]], cleanUp: C => Unit)(implicit ec: ExecutionContext) extends Enumerator[C] {
     
-    val rnd = Random.nextInt
     def apply[A](iteratee: Iteratee[C, A]): Future[Iteratee[C, A]] = {
 
       def loop(current: C, iteratee: Iteratee[C, A]): Future[Iteratee[C, A]] = {
