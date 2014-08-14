@@ -29,6 +29,16 @@ trait RawBSONDocumentSerializer[-DocumentType] {
   def serialize(document: DocumentType): WritableBuffer
 }
 
+object RawBSONDocumentSerializer {
+  implicit object DefaultRawBSONDocumentSerializer extends RawBSONDocumentSerializer[BSONDocument] {
+    def serialize(bsonDocument: BSONDocument) = {
+      val writeableBuffer = new ChannelBufferWritableBuffer
+      BSONDocument.write(bsonDocument, writeableBuffer)
+      writeableBuffer
+    }
+  }
+}
+
 /**
  * A typeclass that creates a `DocumentType` instance from a raw BSON document contained in a [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]].
  *
