@@ -29,17 +29,17 @@ object BuildSettings {
 }
 
 object Publish {
-  def targetRepository: Project.Initialize[Option[sbt.Resolver]] = version { (version: String) =>
+  def targetRepository: Def.Initialize[Option[Resolver]] = Def.setting {
     val nexus = "https://oss.sonatype.org/"
-    if (version.trim.endsWith("SNAPSHOT"))
-      Some("snapshots" at nexus + "content/repositories/snapshots")
-    else
-      Some("releases" at nexus + "service/local/staging/deploy/maven2")
+    val snapshotsR = "snapshots" at nexus + "content/repositories/snapshots"
+    val releasesR  = "releases"  at nexus + "service/local/staging/deploy/maven2"
+    val resolver = if (isSnapshot.value) snapshotsR else releasesR
+    Some(resolver)
   }
 
   lazy val settings = Seq(
     publishMavenStyle := true,
-    publishTo <<= targetRepository,
+    publishTo := targetRepository.value,
     publishArtifact in Test := false,
     pomIncludeRepository := { _ => false },
     licenses := Seq("Apache 2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0")),
@@ -137,38 +137,39 @@ object ReactiveMongoBuild extends Build {
   import Dependencies._
   import sbtunidoc.{ Plugin => UnidocPlugin }
 
+  val projectPrefix = "ReactiveMongo"
+
   lazy val reactivemongo =
     Project(
-      "ReactiveMongo-Root",
+      s"$projectPrefix-Root",
       file("."),
       settings = buildSettings ++ (publishArtifact := false) ).
     settings(UnidocPlugin.unidocSettings: _*).
     aggregate(driver, bson, bsonmacros)
 
   lazy val driver = Project(
-    "ReactiveMongo",
+    projectPrefix,
     file("driver"),
     settings = buildSettings ++ Seq(
       resolvers := resolversList,
-      libraryDependencies <++= (scalaVersion)(sv => Seq(
+      libraryDependencies ++= Seq(
         netty,
         akkaActor,
         iteratees,
-        specs) ++ log4j))) dependsOn (bsonmacros)
+        specs) ++ log4j)).dependsOn(bsonmacros)
 
   lazy val bson = Project(
-    "ReactiveMongo-BSON",
+    s"$projectPrefix-BSON",
     file("bson"),
     settings = buildSettings).
     settings(libraryDependencies += Dependencies.specs)
 
   lazy val bsonmacros = Project(
-    "ReactiveMongo-BSON-Macros",
+    s"$projectPrefix-BSON-Macros",
     file("macros"),
     settings = buildSettings ++ Seq(
-      libraryDependencies <+= (scalaVersion)("org.scala-lang" % "scala-compiler" % _)
+      libraryDependencies += "org.scala-lang" % "scala-compiler" % scalaVersion.value
     )).
     settings(libraryDependencies += Dependencies.specs).
-    dependsOn (bson)
+    dependsOn(bson)
 }
-
