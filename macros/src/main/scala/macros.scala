@@ -324,8 +324,6 @@ private object MacroImpl {
           }.collect{
             case value: String => value
           }
-        case other =>
-          c.abort(c.enclosingPosition, other.tpe + " " + other.scalaArgs)
       }.flatten.headOption getOrElse param.name.toString
     }
 
