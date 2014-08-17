@@ -20,7 +20,7 @@ import play.api.libs.iteratee.Enumeratee.CheckDone
 import scala.concurrent._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{ Failure, Success }
-import scala.util.control.NonFatal
+import scala.util.control.NonFatal 
 
 object CustomEnumeratee {
   trait RecoverFromErrorFunction {
@@ -48,7 +48,7 @@ object CustomEnumeratee {
                 val n = k(in)
                 n.pureFlatFold[E, Iteratee[E, A]] {
                   case Step.Cont(k) => Cont(step(n))
-                  case _            => Done(n, Input.Empty)
+                  case _ => Done(n, Input.Empty)
                 }
               case other => Done(other.it, in)
             }.unflatten.map({ s =>
@@ -80,60 +80,45 @@ object CustomEnumerator {
   }
 
   class SEnumerator[C](zero: C)(next: C => Option[Future[C]], cleanUp: C => Unit)(implicit ec: ExecutionContext) extends Enumerator[C] {
+    
     def apply[A](iteratee: Iteratee[C, A]): Future[Iteratee[C, A]] = {
-      val promise = Promise[Iteratee[C, A]]
 
-      def loop(current: C, iteratee: Iteratee[C, A]): Unit = {
+      def loop(current: C, iteratee: Iteratee[C, A]): Future[Iteratee[C, A]] = {
         iteratee.fold {
-          case step @ Step.Cont(ƒ) =>
-            next(current) match {
-              case Some(future) =>
-                val f = intermediatePromise(future.map { c =>
-                  c -> ƒ(Input.El(c))
-                })
-                f.onComplete {
-                  case Success((c, i)) =>
-                    loop(c, i)
-                  case Failure(e) =>
-                    promise.failure(e)
-                }
-                f.map(_._2)
+          case step @ Step.Cont(ƒ) => {
+        	next(current) match {
+              case Some(future) => {
+                future.flatMap { nnx => loop(nnx, ƒ(Input.El(nnx))) }
+              }
               case None =>
                 val it = ƒ(Input.Empty)
                 cleanUp(current)
-                // enumerator is done, nothing to do
-                promise.success(it)
-                Future(it)
+                Future.successful(it)
             }
+          }
           case Step.Done(a, e) =>
             val done = Done(a, e)
             cleanUp(current)
-            promise.success(done)
-            Future(done)
+
+            Future.successful(done)
           case Step.Error(msg, e) =>
             val error = Error(msg, e)
             cleanUp(current)
-            promise.success(error)
-            Future(error)
+            Future.successful(error)
         }
       }
 
       iteratee fold {
         case Step.Cont(ƒ) =>
-          val it = ƒ(Input.El(zero))
-          loop(zero, it)
-          Future(it)
+          loop(zero, ƒ(Input.El(zero)))
         case Step.Done(a, e) =>
           val done = Done(a, e)
-          promise.success(done)
-          Future(done)
+          Future.successful(done)
         case Step.Error(msg, e) =>
           val error = Error(msg, e)
-          promise.success(error)
-          Future(error)
+          Future.successful(error)
       }
 
-      promise.future
     }
   }
   object SEnumerator {
