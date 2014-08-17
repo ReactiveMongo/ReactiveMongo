@@ -15,6 +15,7 @@
  */
 package reactivemongo.api.collections.buffer
 
+import reactivemongo.bson.BSONDocument
 import reactivemongo.bson.buffer.{ BSONBuffer, ReadableBuffer, WritableBuffer }
 import reactivemongo.api._
 import reactivemongo.api.collections._
