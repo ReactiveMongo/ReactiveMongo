@@ -196,5 +196,11 @@ object Macros {
      */
     @meta.param
     case class Key(key: String) extends StaticAnnotation
+    
+    /**
+     * Ignores a field
+     */
+    @meta.param
+    case class Ignore() extends StaticAnnotation
   }
 }
