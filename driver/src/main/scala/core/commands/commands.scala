@@ -145,7 +145,7 @@ object CommandError {
   def checkOk(
     doc: BSONDocument, name: Option[String],
     error: (BSONDocument, Option[String]) => CommandError = (doc, name) => CommandError("command " + name.map(_ + " ").getOrElse("") + "failed because the 'ok' field is missing or equals 0", Some(doc))): Option[CommandError] = {
-    doc.getAs[BSONDouble]("ok").map(_.value).orElse(Some(0)).flatMap {
+    doc.getAs[BSONNumberLike]("ok").map(_.toInt).orElse(Some(0)).flatMap {
       case 1 => None
       case _ => Some(error(doc, name))
     }
