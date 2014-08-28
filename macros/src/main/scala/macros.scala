@@ -179,7 +179,7 @@ private object MacroImpl {
       val constructorParams = constructor.paramss.head
 
       val tuple = Ident(newTermName("tuple"))
-      val (optional, required) = constructorParams.filter(p => !ignoreField(p)).zipWithIndex zip types partition (t => isOptionalType(t._2))
+      val (optional, required) = constructorParams.filterNot(ignoreField).zipWithIndex zip types partition (t => isOptionalType(t._2))
       val values = required map {
         case ((param, i), typ) => {
           val neededType = appliedType(writerType, List(typ))
@@ -328,9 +328,7 @@ private object MacroImpl {
     }
     
     private def ignoreField(param: c.Symbol): Boolean = {
-      param.annotations.collectFirst{
-        case ann => ann.tpe =:= typeOf[Ignore] || ann.tpe =:= typeOf[transient]
-      }.getOrElse(false)
+      param.annotations.exists(ann => ann.tpe =:= typeOf[Ignore] || ann.tpe =:= typeOf[transient])
     }
 
     private def allSubclasses(A: Symbol): Set[Symbol] = {
