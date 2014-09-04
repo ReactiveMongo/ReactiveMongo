@@ -396,6 +396,19 @@ object Status extends AdminCommand[Map[String, BSONValue]] {
 }
 
 /**
+ * BuildInfo Command.
+ *
+ * Gets detailed build information of the target server. Does not require admin rights.
+ */
+object BuildInfo extends Command[Map[String, BSONValue]] {
+  override def makeDocuments = BSONDocument("buildinfo" -> BSONInteger(1))
+
+  object ResultMaker extends BSONCommandResultMaker[Map[String, BSONValue]] {
+    def apply(document: BSONDocument) = Right(document.elements.toMap)
+  }
+}
+
+/**
  * Getnonce Command.
  *
  * Gets a nonce for authentication token.
