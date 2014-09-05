@@ -62,5 +62,11 @@ class MongoURISpec extends Specification {
       val p = MongoConnection.parseURI(fullFeatured)
       p mustEqual Success(ParsedURI(hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020), db = Some("somedb"), authenticate = Some(Authenticate("somedb", "user123", "passwd123"))))
     }
+
+    val withAuthParamAndSource = "mongodb://user123:passwd123@host1:27018,host2:27019,host3:27020/somedb?foo=bar&authSource=authdb"
+    s"parse $withAuthParamAndSource with success" in {
+      val p = MongoConnection.parseURI(withAuthParamAndSource)
+      p mustEqual Success(ParsedURI(hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020), db = Some("somedb"), authenticate = Some(Authenticate("authdb", "user123", "passwd123"))))
+    }
   }
 }

@@ -274,6 +274,17 @@ object MongoConnection {
         case _                      => throw new URIParsingException(s"Could not parse URI '$uri'")
       }
     }
+    def parseOptions(uriAndOptions: String): Map[String, String] = {
+      uriAndOptions.split('?').toList match {
+        case uri :: options :: Nil => options.split("&").map{ option =>
+          option.split("=").toList match {
+            case key :: value :: Nil => (key -> value)
+            case _ => throw new URIParsingException(s"Could not parse URI '$uri': invalid options '$options'")
+          }
+        }.toMap
+        case _ => Map.empty
+      }
+    }
 
     Try {
       val useful = uri.replace(prefix, "")
@@ -285,8 +296,9 @@ object MongoConnection {
           val (db, hosts) = parseHostsAndDbName(hostsPortsAndDbName)
           if (!db.isDefined)
             throw new URIParsingException(s"Could not parse URI '$uri': authentication information found but no database name in URI")
+          val options = parseOptions(hostsPortsAndDbName)
           val authenticate = parseAuth(usernamePasswd)
-          ParsedURI(hosts, db, Some(Authenticate.apply(db.get, authenticate._1, authenticate._2)))
+          ParsedURI(hosts, db, Some(Authenticate.apply(options.get("authSource").getOrElse(db.get), authenticate._1, authenticate._2)))
         case _ => throw new URIParsingException(s"Could not parse URI '$uri'")
       }
     }
@@ -305,7 +317,7 @@ class MongoDriver(systemOption: Option[ActorSystem] = None) {
   val system = systemOption.getOrElse(MongoDriver.defaultSystem)
 
   def close() = systemOption match {
-    // Non default actor system -- terminate actors used by MongoConnections 
+    // Non default actor system -- terminate actors used by MongoConnections
     case Some(_) =>
       connections.foreach { connection =>
         connection.monitor ! Close
