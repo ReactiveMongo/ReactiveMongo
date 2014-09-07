@@ -406,19 +406,15 @@ private object QueryMacroImpl{
  (handler: c.Expr[BSONQueryWriter[C, A, _ <: BSONValue]])
  (tag: String): c.Expr[BSONDocument] = {
     import c.universe._
-   p.tree.children(1) match {
-     case Select(a, b) => {
-       val paramRepTree = Literal(Constant(b.decoded))
-       val tagRepTree = Literal(Constant(tag))
-	   c.universe.reify {
-         val tagName = c.Expr[String](tagRepTree).splice
-         val n = c.Expr[String](paramRepTree).splice
-         val v = handler.splice.write.write(value.splice)
-         val v2 = BSONDocument(List((tagName, v)))
-	     BSONDocument(List((n, v2)))
-	    }
-     }
-   } 
+    
+    val tagRepTree = Literal(Constant(tag))
+    reify {
+      val tagName = c.Expr[String](tagRepTree).splice
+      val n = path(c)(p).splice
+      val v = handler.splice.write.write(value.splice)
+      val v2 = BSONDocument(List((tagName, v)))
+	    BSONDocument(List((n, v2)))
+    } 
   }
   
  def eq[T: c.WeakTypeTag, A: c.WeakTypeTag, C: c.WeakTypeTag](c: Context)(p : c.Expr[T => C], value: c.Expr[A])
@@ -456,18 +452,13 @@ private object QueryMacroImpl{
  def in[T: c.WeakTypeTag, A: c.WeakTypeTag, C: c.WeakTypeTag](c: Context)(p : c.Expr[T => C], values: c.Expr[Traversable[A]])
  (queryWriter: c.Expr[BSONQueryWriter[C, A, _ <: BSONValue]]): c.Expr[BSONDocument] = {
    import c.universe._
-   p.tree.children(1) match {
-     case Select(a, b) => {
-       val paramRepTree = Literal(Constant(b.decoded))
-       
-	   c.universe.reify {
-	       val n = c.Expr[String](paramRepTree).splice
-	       val writer = queryWriter.splice.write
-	       val items = values.splice.map(writer.write(_))
-	       val v = BSONDocument(List(("$in", BSONArray(items))))
-	       BSONDocument(List((n, v)))
-       }
-     }
+   
+   reify {
+    val n = path(c)(p).splice
+	  val writer = queryWriter.splice.write
+	  val items = values.splice.map(writer.write(_))
+	  val v = BSONDocument(List(("$in", BSONArray(items))))
+	  BSONDocument(List((n, v))) 
    }
  }
 
