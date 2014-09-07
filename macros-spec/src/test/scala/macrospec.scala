@@ -128,6 +128,7 @@ class QueryMacroSpec extends Specification {
   
   "mul" in {
     import PetTypeBSONHandler._
+
     val update = on[Pet].update(_.mul(_.age, 2))
     update.getAs[BSONDocument]("$mul") must beSome(BSONDocument("age" -> 2))
     update.elements must be size(1)
@@ -161,8 +162,6 @@ class QueryMacroSpec extends Specification {
     
     val update = on[Pet].update(_.set(_.nick, "kitty"), _.addToSet(_.favoriteDishes, List("milk")))
     update.elements must be size(2)
-    println(update.elements(0)._1)
-    println(update.elements(1)._1)
     update.getAs[BSONDocument]("$set") must beSome(BSONDocument("nick" -> "kitty"))
     update.getAs[BSONDocument]("$addToSet") must beSome(BSONDocument("favoriteDishes" -> "milk"))
   }

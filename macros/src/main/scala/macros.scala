@@ -384,6 +384,24 @@ private object MacroImpl {
 
 private object QueryMacroImpl{
   
+  private def path[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => A]) = {
+    import c.universe._
+    object propertyTraverser extends Traverser {
+      var applies = List[String]()
+       override def traverse(tree: c.universe.Tree): Unit = tree match {
+       case Select(a, b) => {
+         applies = b.decoded :: applies
+         this.traverse(a)
+       }
+       case _ => super.traverse(tree)   
+      } 
+    }
+    propertyTraverser.traverse(p.tree.children(1))
+    val literal = Literal(Constant(propertyTraverser.applies.mkString(".")))
+    c.Expr[String](literal)
+  }
+  
+  
   private def builder[T: c.WeakTypeTag, A: c.WeakTypeTag, C: c.WeakTypeTag](c: Context)(p : c.Expr[T => C], value: c.Expr[A])
  (handler: c.Expr[BSONQueryWriter[C, A, _ <: BSONValue]])
  (tag: String): c.Expr[BSONDocument] = {
@@ -419,16 +437,12 @@ private object QueryMacroImpl{
  def eq[T: c.WeakTypeTag, A: c.WeakTypeTag, C: c.WeakTypeTag](c: Context)(p : c.Expr[T => C], value: c.Expr[A])
  (queryWriter: c.Expr[BSONQueryWriter[C, A, _ <: BSONValue]]): c.Expr[BSONDocument] = {
    import c.universe._
-   p.tree.children(1) match {
-     case Select(a, b) => {
-       val paramRepTree = Literal(Constant(b.decoded))
-	   c.universe.reify {
-       val n = c.Expr[String](paramRepTree).splice
+     c.universe.reify {
+       val n = path(c)(p).splice
        val v = queryWriter.splice.write.write(value.splice)
-	      BSONDocument(List((n, v)))
+	     BSONDocument(List((n, v)))
 	    }
-     }
-   } 
+    
   }
  
  def gt[T: c.WeakTypeTag, A: c.WeakTypeTag, C: c.WeakTypeTag](c: Context)(p : c.Expr[T => C], value: c.Expr[A])
@@ -651,19 +665,15 @@ def exists[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => Optio
   def push[T: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(p : c.Expr[T => Traversable[A]], values: c.Expr[Traversable[A]])
  (handler: c.Expr[BSONWriter[A, _ <: BSONValue]]): c.Expr[PushOperator] = {
     import c.universe._
-   p.tree.children(1) match {
-     case Select(a, b) => {
-       val paramTree = Literal(Constant(b.decoded))
-  	   c.universe.reify {
-  	     val param = c.Expr[String](paramTree).splice
-  	     val items = values.splice.map(handler.splice.write(_))
-  	     items match {
+    
+    c.universe.reify {
+      val param = path(c)(p).splice
+  	  val items = values.splice.map(handler.splice.write(_))
+  	  items match {
   	       case head :: Nil => PushOperator(param, head)
   	       case _ => PushOperator(param, BSONDocument("$each" -> BSONArray(items)))
   	     }
-  	    }
-     }
-   } 
+    } 
   }
  
 }
