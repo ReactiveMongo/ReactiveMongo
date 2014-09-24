@@ -89,6 +89,56 @@ class Failover[T](message: T, connection: MongoConnection, strategy: FailoverStr
   send(0)
 }
 
+class Failover2[A](producer: () => Future[A], connection: MongoConnection, strategy: FailoverStrategy)(implicit ec: ExecutionContext) {
+  import Failover2.logger
+  import reactivemongo.core.errors._
+  import reactivemongo.core.actors.Exceptions._
+
+  private val promise = Promise[A]()
+
+  /** A future that is completed with a response, after 1 or more attempts (specified in the given strategy). */
+  val future: Future[A] = promise.future
+
+  private def send(n: Int): Unit = {
+    producer().onComplete {
+      case Failure(e) if isRetryable(e) =>
+        if (n < strategy.retries) {
+          val `try` = n + 1
+          val delayFactor = strategy.delayFactor(`try`)
+          val delay = Duration.unapply(strategy.initialDelay * delayFactor).map(t => FiniteDuration(t._1, t._2)).getOrElse(strategy.initialDelay)
+          logger.debug("Got an error, retrying... (try #" + `try` + " is scheduled in " + delay.toMillis + " ms)", e)
+          connection.actorSystem.scheduler.scheduleOnce(delay)(send(`try`))
+        } else {
+          // generally that means that the primary is not available or the nodeset is unreachable
+          logger.error("Got an error, no more attempts to do. Completing with a failure...", e)
+          promise.failure(e)
+        }
+      case Failure(e) =>
+        logger.trace("Got an non retryable error, completing with a failure...", e)
+        promise.failure(e)
+      case Success(response) =>
+        logger.trace("Got a successful result, completing...")
+        promise.success(response)
+    }
+  }
+
+  private def isRetryable(throwable: Throwable) = throwable match {
+    case PrimaryUnavailableException | NodeSetNotReachable => true
+    case e: DatabaseException if e.isNotAPrimaryError || e.isUnauthorized => true
+    case _: ConnectionException => true
+    case _ => false
+  }
+
+  send(0)
+}
+
+object Failover2 {
+  private val logger = LazyLogger("reactivemongo.api.Failover2")
+
+  def apply[A](connection: MongoConnection, strategy: FailoverStrategy)(producer: () => Future[A])(implicit ec: ExecutionContext): Failover2[A] =
+    new Failover2(producer, connection, strategy)
+}
+
 object Failover {
   private val logger = LazyLogger("reactivemongo.api.Failover")
   /**
@@ -205,7 +255,19 @@ class MongoConnection(
    *
    * @param message The request maker.
    */
-  def send(message: RequestMaker) = mongosystem ! message
+  def send(message: RequestMaker): Unit = mongosystem ! message
+
+  def sendExpectingResponse(checkedWriteRequest: CheckedWriteRequest)(implicit ec: ExecutionContext): Future[Response] = {
+    val expectingResponse = CheckedWriteRequestExpectingResponse(checkedWriteRequest)
+    mongosystem ! expectingResponse
+    expectingResponse.future
+  }
+
+  def sendExpectingResponse(requestMaker: RequestMaker)(implicit ec: ExecutionContext): Future[Response] = {
+    val expectingResponse = RequestMakerExpectingResponse(requestMaker)
+    mongosystem ! expectingResponse
+    expectingResponse.future
+  }
 
   /** Authenticates the connection on the given database. */
   def authenticate(db: String, user: String, password: String): Future[SuccessfulAuthentication] = {
@@ -220,6 +282,10 @@ class MongoConnection(
 
   /** Closes this MongoConnection (closes all the channels and ends the actors) */
   def close(): Unit = monitor ! Close
+
+  // TODO
+  def wireVersion: Option[MongoWireVersionRange] =
+    Some(MongoWireVersionRange(MongoWireVersion.V24AndBefore, MongoWireVersion.V26))
 }
 
 object MongoConnection {
@@ -293,6 +359,10 @@ object MongoConnection {
   }
 }
 
+case class MongoWireVersionRange(
+  minWireVersion: MongoWireVersion,
+  maxWireVersion: MongoWireVersion)
+
 class MongoDriver(systemOption: Option[ActorSystem] = None) {
 
   def this(system: ActorSystem) = this(Some(system))
@@ -305,7 +375,7 @@ class MongoDriver(systemOption: Option[ActorSystem] = None) {
   val system = systemOption.getOrElse(MongoDriver.defaultSystem)
 
   def close() = systemOption match {
-    // Non default actor system -- terminate actors used by MongoConnections 
+    // Non default actor system -- terminate actors used by MongoConnections
     case Some(_) =>
       connections.foreach { connection =>
         connection.monitor ! Close

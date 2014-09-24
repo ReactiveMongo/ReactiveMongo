@@ -21,7 +21,7 @@ import DefaultBSONHandlers._
 /** An error that can come from a MongoDB node or not. */
 trait ReactiveMongoException extends Exception {
   /** explanation message */
-  val message: String
+  def message: String
 
   override def getMessage: String = "MongoError['" + message + "']"
 }
@@ -35,10 +35,10 @@ object ReactiveMongoException {
 /** An error thrown by a MongoDB node. */
 trait DatabaseException extends ReactiveMongoException {
   /** original document of this error */
-  val originalDocument: Option[BSONDocument]
+  def originalDocument: Option[BSONDocument]
 
   /** error code */
-  val code: Option[Int]
+  def code: Option[Int]
 
   override def getMessage: String = "DatabaseException['" + message + "'" + code.map(c => " (code = " + c + ")").getOrElse("") + "]"
 

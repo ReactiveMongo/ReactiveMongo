@@ -283,6 +283,27 @@ object Response {
 case class ResponseInfo(
   channelId: Int)
 
+
+sealed trait MongoWireVersion {
+  def value: Int
+}
+
+object MongoWireVersion {
+  /*
+   * Original meaning of MongoWireVersion is more about protocol features.
+   *
+   * - RELEASE_2_4_AND_BEFORE (0)
+   * - AGG_RETURNS_CURSORS (1)
+   * - BATCH_COMMANDS (2)
+   *
+   * But wireProtocol=1 is virtually non-existent; Mongo 2.4 was 0 and Mongo 2.6 is 2.
+   */
+  object V24AndBefore extends MongoWireVersion { def value = 0 }
+  object V26 extends MongoWireVersion { def value = 2 }
+
+  def unapply(v: MongoWireVersion): Option[Int] = Some(v.value)
+}
+
 // protocol handlers for netty.
 private[reactivemongo] class RequestEncoder extends OneToOneEncoder {
   import RequestEncoder._

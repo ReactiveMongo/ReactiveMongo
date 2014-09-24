@@ -36,6 +36,31 @@ class SerializationSpecs extends Specification {
 
   val expectedWholeDocumentBytes = Array[Byte](-45, 0, 0, 0, 2, 110, 97, 109, 101, 0, 6, 0, 0, 0, 74, 97, 109, 101, 115, 0, 16, 97, 103, 101, 0, 27, 0, 0, 0, 2, 115, 117, 114, 110, 97, 109, 101, 49, 0, 4, 0, 0, 0, 74, 105, 109, 0, 1, 115, 99, 111, 114, 101, 0, 10, -41, -93, 112, 61, 10, 15, 64, 8, 111, 110, 108, 105, 110, 101, 0, 1, 7, 95, 105, 100, 0, 81, 23, -58, 57, 26, -91, 98, -87, 0, -104, -10, 33, 3, 99, 111, 110, 116, 97, 99, 116, 0, 95, 0, 0, 0, 4, 101, 109, 97, 105, 108, 115, 0, 63, 0, 0, 0, 2, 48, 0, 18, 0, 0, 0, 106, 97, 109, 101, 115, 64, 101, 120, 97, 109, 112, 108, 101, 46, 111, 114, 103, 0, 2, 49, 0, 26, 0, 0, 0, 115, 112, 97, 109, 97, 100, 100, 114, 106, 97, 109, 101, 115, 64, 101, 120, 97, 109, 112, 108, 101, 46, 111, 114, 103, 0, 0, 2, 97, 100, 114, 101, 115, 115, 0, 7, 0, 0, 0, 99, 111, 117, 99, 111, 117, 0, 0, 18, 108, 97, 115, 116, 83, 101, 101, 110, 0, -21, 96, -32, -60, 60, 1, 0, 0, 0)
 
+  "BSON Raw Buffer Writer" should {
+    import reactivemongo.bson.lowlevel.LowLevelBsonDocWriter
+
+    "serialize a whole document" in {
+      val buf = new LowLevelBsonDocWriter(new ArrayBSONBuffer)
+      buf.
+        putString("name", "James").
+        putInt("age", 27).
+        putString("surname1", "Jim").
+        putDouble("score", 3.88).
+        putBoolean("online", true).
+        putObjectId("_id", BSONObjectID("5117c6391aa562a90098f621").valueAsArray).
+        openDocument("contact").
+          openArray("emails").
+            putString("0", "james@example.org").
+            putString("1", "spamaddrjames@example.org").
+          close.
+          putString("adress", "coucou").
+        close.
+        putLong("lastSeen", 1360512704747L).
+      close
+      compare(expectedWholeDocumentBytes, buf.result.array)
+    }
+  }
+
   "BSON Default Serializer" should {
     "serialize a whole document" in {
       val doc = BSONDocument(

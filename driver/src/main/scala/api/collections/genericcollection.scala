@@ -32,6 +32,7 @@ import reactivemongo.core.commands.LastError
 import reactivemongo.core.netty.BufferSequence
 import org.jboss.netty.buffer.ChannelBuffer
 import scala.util._
+import scala.util.control.NonFatal
 import reactivemongo.bson.buffer.WritableBuffer
 import reactivemongo.core.commands.GetLastError
 import reactivemongo.api._
@@ -96,7 +97,7 @@ trait GenericCollection[Structure, Reader[_], Writer[_]] extends Collection with
 
   private def writeDoc[T](doc: T, writer: Writer[T]) = BufferWriterInstance(writer).write(doc, ChannelBufferWritableBuffer()).buffer
 
-  protected def watchFailure[T](future: => Future[T]): Future[T] = Try(future).recover { case e: Throwable => Future.failed(e) }.get
+  protected def watchFailure[T](future: => Future[T]): Future[T] = Try(future).recover { case NonFatal(e) => Future.failed(e) }.get
 
   def genericQueryBuilder: GenericQueryBuilder[Structure, Reader, Writer]
 

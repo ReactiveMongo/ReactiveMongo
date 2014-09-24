@@ -4,7 +4,31 @@ import reactivemongo.api.BSONSerializationPack
 import reactivemongo.api.commands._
 import reactivemongo.bson._
 
-private case class Implicits[W <: WriteCommandsCommon[BSONSerializationPack.type]](subject: W) {
+object BSONGetLastErrorImplicits {
+  implicit object LastErrorReader extends BSONDocumentReader[LastError] {
+    def read(doc: BSONDocument): LastError =
+      LastError(
+        ok = doc.getAs[BSONBooleanLike]("ok").map(_.toBoolean).getOrElse(false),
+        err = doc.getAs[String]("err"),
+        code = doc.getAs[Int]("code"),
+        lastOp = doc.getAs[BSONNumberLike]("lastOp").map(_.toLong),
+        n = doc.getAs[Int]("n").getOrElse(0),
+        singleShard = doc.getAs[String]("singleShard"),
+        updatedExisting = doc.getAs[BSONBooleanLike]("updatedExisting").map(_.toBoolean).getOrElse(false),
+        upserted = doc.getAs[BSONObjectID]("upserted"),
+        wnote = doc.get("wnote").map {
+          case BSONString("majority") => GetLastError.Majority
+          case BSONString(tagSet) => GetLastError.TagSet(tagSet)
+          case BSONInteger(acks) => GetLastError.WaitForAknowledgments(acks)
+        },
+        wtimeout = doc.getAs[Boolean]("wtimeout").getOrElse(false),
+        waited = doc.getAs[Int]("waited"),
+        wtime = doc.getAs[Int]("wtime")
+      )
+  }
+}
+
+object BSONCommonWriteCommandsImplicits {
   implicit object WriteConcernWriter extends BSONDocumentWriter[WriteConcern] {
     def write(wc: WriteConcern): BSONDocument = BSONDocument(
       "w" -> ((wc.w match {
@@ -15,18 +39,29 @@ private case class Implicits[W <: WriteCommandsCommon[BSONSerializationPack.type
       "j" -> (if(wc.j) Some(true) else None),
       "wtimeout" -> wc.wtimeout)
   }
-  implicit object WriteErrorReader extends BSONDocumentReader[subject.WriteError] {
-    def read(doc: BSONDocument): subject.WriteError =
-      subject.WriteError(
+  implicit object WriteErrorReader extends BSONDocumentReader[WriteError] {
+    def read(doc: BSONDocument): WriteError =
+      WriteError(
         index = doc.getAs[Int]("index").get,
         code = doc.getAs[Int]("code").get,
         errmsg = doc.getAs[String]("errmsg").get)
   }
-  implicit object WriteConcernErrorReader extends BSONDocumentReader[subject.WriteConcernError] {
-    def read(doc: BSONDocument): subject.WriteConcernError =
-      subject.WriteConcernError(
+  implicit object WriteConcernErrorReader extends BSONDocumentReader[WriteConcernError] {
+    def read(doc: BSONDocument): WriteConcernError =
+      WriteConcernError(
         code = doc.getAs[Int]("code").get,
         errmsg = doc.getAs[String]("errmsg").get)
+  }
+  implicit object DefaultWriteResultReader extends BSONDocumentReader[DefaultWriteResult] {
+    def read(doc: BSONDocument): DefaultWriteResult = {
+      DefaultWriteResult(
+        ok = doc.getAs[Int]("ok").exists(_ != 0),
+        n = doc.getAs[Int]("n").getOrElse(0),
+        writeErrors = doc.getAs[Seq[WriteError]]("writeErrors").getOrElse(Seq.empty),
+        writeConcernError = doc.getAs[WriteConcernError]("writeConcernError"),
+        code = doc.getAs[Int]("code"),
+        errmsg = doc.getAs[String]("errmsg"))
+    }
   }
 }
 
@@ -35,9 +70,8 @@ object BSONInsertCommand extends InsertCommand[BSONSerializationPack.type] {
 }
 
 object BSONInsertCommandImplicits {
-  private val imp = Implicits(BSONInsertCommand)
   import BSONInsertCommand._
-  import imp._
+  import BSONCommonWriteCommandsImplicits._
 
   implicit object InsertWriter extends BSONDocumentWriter[ResolvedCollectionCommand[Insert]] {
     def write(command: ResolvedCollectionCommand[Insert]) = {
@@ -49,14 +83,6 @@ object BSONInsertCommandImplicits {
       )
     }
   }
-  implicit object InsertResultReader extends BSONDocumentReader[InsertResult] {
-    def read(doc: BSONDocument): InsertResult = InsertResult(
-      ok = doc.getAs[Int]("ok").exists(_ != 0),
-      n = doc.getAs[Int]("n").get,
-      writeErrors = doc.getAs[Seq[WriteError]]("writeErrors").getOrElse(Seq.empty),
-      writeConcernError = doc.getAs[WriteConcernError]("writeConcernError")
-    )
-  }
 }
 
 object BSONUpdateCommand extends UpdateCommand[BSONSerializationPack.type] {
@@ -64,9 +90,8 @@ object BSONUpdateCommand extends UpdateCommand[BSONSerializationPack.type] {
 }
 
 object BSONUpdateCommandImplicits {
-  private val imp = Implicits(BSONUpdateCommand)
   import BSONUpdateCommand._
-  import imp._
+  import BSONCommonWriteCommandsImplicits._
 
   implicit object UpdateElementWriter extends BSONDocumentWriter[UpdateElement] {
     def write(element: UpdateElement) =
@@ -96,13 +121,15 @@ object BSONUpdateCommandImplicits {
   }
   implicit object UpdateResultReader extends BSONDocumentReader[UpdateResult] {
     def read(doc: BSONDocument): UpdateResult = {
-      UpdateResult(
+      UpdateWriteResult(
         ok = doc.getAs[Int]("ok").exists(_ != 0),
         n = doc.getAs[Int]("n").getOrElse(0),
         nModified = doc.getAs[Int]("nModified").getOrElse(0),
         upserted = doc.getAs[Seq[Upserted]]("writeErrors").getOrElse(Seq.empty),
         writeErrors = doc.getAs[Seq[WriteError]]("writeErrors").getOrElse(Seq.empty),
-        writeConcernError = doc.getAs[WriteConcernError]("writeConcernError")
+        writeConcernError = doc.getAs[WriteConcernError]("writeConcernError"),
+        code = doc.getAs[Int]("code"),
+        errmsg = doc.getAs[String]("errmsg")
       )
     }
   }
@@ -113,9 +140,8 @@ object BSONDeleteCommand extends DeleteCommand[BSONSerializationPack.type] {
 }
 
 object BSONDeleteCommandImplicits {
-  private val imp = Implicits(BSONDeleteCommand)
   import BSONDeleteCommand._
-  import imp._
+  import BSONCommonWriteCommandsImplicits._
 
   implicit object DeleteElementWriter extends BSONDocumentWriter[DeleteElement] {
     def write(element: DeleteElement): BSONDocument = {
@@ -132,16 +158,6 @@ object BSONDeleteCommandImplicits {
         "deletes" -> delete.command.deletes,
         "ordered" -> delete.command.ordered,
         "writeConcern" -> delete.command.writeConcern)
-    }
-  }
-
-  implicit object DeleteResultReader extends BSONDocumentReader[DeleteResult] {
-    def read(doc: BSONDocument): DeleteResult = {
-      DeleteResult(
-        ok = doc.getAs[Int]("ok").exists(_ != 0),
-        n = doc.getAs[Int]("n").get,
-        writeErrors = doc.getAs[Seq[WriteError]]("writeErrors").getOrElse(Seq.empty),
-        writeConcernError = doc.getAs[WriteConcernError]("writeConcernError"))
     }
   }
 }
