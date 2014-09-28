@@ -350,7 +350,7 @@ trait GenericQueryBuilder[Structure, Reader[_], Writer[_]] extends GenericHandle
 
     val op = Query(flags, collection.fullCollectionName, options.skipN, options.batchSizeN)
 
-    new DefaultCursor(op, documents, readPreference, collection.db.connection, failover)(BufferReaderInstance(reader))
+    new DefaultCursor(op, documents, readPreference, collection.db.connection, failover, false)(BufferReaderInstance(reader))
   }
 
   /**

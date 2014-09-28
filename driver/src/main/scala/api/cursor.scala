@@ -156,14 +156,17 @@ class DefaultCursor[T](
     documents: BufferSequence,
     readPreference: ReadPreference,
     mongoConnection: MongoConnection,
-    failoverStrategy: FailoverStrategy)(implicit reader: BufferReader[T]) extends Cursor[T] {
+    failoverStrategy: FailoverStrategy,
+    isMongo26WriteOp: Boolean)(implicit reader: BufferReader[T]) extends Cursor[T] {
   import Cursor.logger
 
   private def next(response: Response)(implicit ctx: ExecutionContext): Option[Future[Response]] = {
     if (response.reply.cursorID != 0) {
       val op = GetMore(query.fullCollectionName, query.numberToReturn, response.reply.cursorID)
       logger.trace("[Cursor] Calling next on " + response.reply.cursorID + ", op=" + op)
-      Some(Failover(RequestMaker(op).copy(channelIdHint = Some(response.info.channelId)), mongoConnection, failoverStrategy).future)
+      Some(Failover2(mongoConnection, failoverStrategy) { () =>
+        mongoConnection.sendExpectingResponse(RequestMaker(op).copy(channelIdHint = Some(response.info.channelId)), isMongo26WriteOp)
+      }.future)
     } else {
       logger.error("[Cursor] Call to next() but cursorID is 0, there is probably a bug")
       None
@@ -183,7 +186,9 @@ class DefaultCursor[T](
 
   @inline
   private def makeRequest(implicit ctx: ExecutionContext): Future[Response] =
-    Failover(RequestMaker(query, documents, readPreference), mongoConnection, failoverStrategy).future
+    Failover2(mongoConnection, failoverStrategy) { () =>
+      mongoConnection.sendExpectingResponse(RequestMaker(query, documents, readPreference), isMongo26WriteOp)
+    }.future
 
   @inline
   private def isTailable = (query.flags & QueryFlags.TailableCursor) == QueryFlags.TailableCursor

@@ -5,6 +5,8 @@ import reactivemongo.api.{ BSONSerializationPack, Cursor, SerializationPack }
 import reactivemongo.bson.BSONObjectID
 import reactivemongo.core.errors.DatabaseException
 
+trait Mongo26WriteCommand
+
 case class GetLastError(
   w: GetLastError.W,
   j: Boolean,
@@ -141,7 +143,7 @@ trait InsertCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] /*
   case class Insert(
     documents: Seq[P#Document],
     ordered: Boolean,
-    writeConcern: WriteConcern) extends CollectionCommand with CommandWithResult[InsertResult]
+    writeConcern: WriteConcern) extends CollectionCommand with CommandWithResult[InsertResult] with Mongo26WriteCommand
 
   type InsertResult = DefaultWriteResult // for simplified imports
 
@@ -157,7 +159,7 @@ trait UpdateCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] {
   case class Update(
     documents: Seq[UpdateElement],
     ordered: Boolean,
-    writeConcern: WriteConcern) extends CollectionCommand with CommandWithResult[UpdateResult]
+    writeConcern: WriteConcern) extends CollectionCommand with CommandWithResult[UpdateResult] with Mongo26WriteCommand
 
   type UpdateResult = UpdateWriteResult
 
@@ -191,7 +193,7 @@ trait DeleteCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] {
   case class Delete(
     deletes: Seq[DeleteElement],
     ordered: Boolean,
-    writeConcern: WriteConcern) extends CollectionCommand with CommandWithResult[DeleteResult]
+    writeConcern: WriteConcern) extends CollectionCommand with CommandWithResult[DeleteResult] with Mongo26WriteCommand
 
   object Delete {
     def apply(firstDelete: DeleteElement, deletes: DeleteElement*): Delete =

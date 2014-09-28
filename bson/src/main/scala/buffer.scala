@@ -82,6 +82,8 @@ trait ReadableBuffer {
   /** Returns the current read index of this buffer. */
   def index: Int
 
+  def index_=(i: Int): Unit
+
   /** Sets the read index to `index + n` (in other words, skips `n` bytes). */
   def discard(n: Int): Unit
 
@@ -157,6 +159,8 @@ class ArrayReadableBuffer private (bytebuffer: ByteBuffer) extends ReadableBuffe
   def size = bytebuffer.limit()
 
   def index = bytebuffer.position()
+
+  def index_=(i: Int) = bytebuffer.position(i)
 
   def discard(n: Int) =
     bytebuffer.position(bytebuffer.position() + n)

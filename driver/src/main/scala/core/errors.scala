@@ -62,6 +62,11 @@ trait DriverException extends ReactiveMongoException
 case class GenericDriverException(
   message: String) extends DriverException
 
+case class ConnectionNotInitialized(message: String) extends DriverException
+object ConnectionNotInitialized {
+  def MissingMetadata = ConnectionNotInitialized("Connection is missing metadata (like protocol version, etc.) The connection pool is probably being initialized.")
+}
+
 case class ConnectionException(message: String) extends DriverException
 
 /** A generic error thrown by a MongoDB node. */

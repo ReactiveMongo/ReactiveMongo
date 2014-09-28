@@ -36,6 +36,7 @@ import scala.util.control.NonFatal
 import reactivemongo.bson.buffer.WritableBuffer
 import reactivemongo.core.commands.GetLastError
 import reactivemongo.api._
+import reactivemongo.core.errors.ConnectionNotInitialized
 
 trait GenericCollectionWithCommands[P <: SerializationPack with Singleton] { self: GenericCollection[P] =>
   val pack: P
@@ -169,8 +170,14 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
           Future.successful(List(wr))
       }
     }
-    createBulk(documents, Mongo26WriteCommand.insert(ordered, reactivemongo.api.commands.WriteConcern.DefaultWriteConcern)).map { list =>
-      list.foldLeft(MultiBulkWriteResult())( (r, w) => r.merge(w) )}
+    // TODO failover
+    val havingMetadata = Failover2(db.connection, FailoverStrategy()) { () =>
+      db.connection.metadata.map(Future.successful).getOrElse(Future.failed(ConnectionNotInitialized.MissingMetadata))
+    }.future
+    havingMetadata.flatMap { metadata =>
+      createBulk(documents, Mongo26WriteCommand.insert(ordered, reactivemongo.api.commands.WriteConcern.DefaultWriteConcern, metadata)).map { list =>
+        list.foldLeft(MultiBulkWriteResult())( (r, w) => r.merge(w) )}
+    }
   }
 
   /**
@@ -187,31 +194,21 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    */
   def insert[T](document: T, writeConcern: GetLastError = GetLastError())(implicit writer: pack.Writer[T], ec: ExecutionContext): Future[WriteResult] = {
     Failover2(db.connection, failoverStrategy) { () =>
-      db.connection.wireVersion match {
-        case Some(MongoWireVersionRange(_, MongoWireVersion(version))) if version >= MongoWireVersion.V26.value =>
+      import MongoWireVersion._
+      db.connection.metadata match {
+        case Some(metadata) if metadata.maxWireVersion >= MongoWireVersion.V26 =>
           import reactivemongo.api.commands._
-          println(s"insert the new way... pack = $pack")
           runCommand(BatchCommands.InsertCommand.Insert(document))
         case Some(_) =>
-          println("insert the old way...")
           val op = Insert(0, fullCollectionName)
           val bson = writeDoc(document, writer)
           val checkedWriteRequest = CheckedWriteRequest(op, BufferSequence(bson), writeConcern)
           db.connection.sendExpectingResponse(checkedWriteRequest).map(pack.readAndDeserialize(_, LastErrorReader))
         case None =>
-          println("failing")
-          Future.failed(new IllegalStateException("connection not initialized yet"))
+          Future.failed(ConnectionNotInitialized.MissingMetadata)
       }
     }.future
   }
-
-
-   /*watchFailure {
-    val op = Insert(0, fullCollectionName)
-    val bson = writeDoc(document, writer)
-    val checkedWriteRequest = CheckedWriteRequest(op, BufferSequence(bson), writeConcern)
-    Failover(checkedWriteRequest, db.connection, failoverStrategy).future.mapEither(LastError.meaningful(_))
-  }*/
 
   /**
    * Inserts a document into the collection and wait for the [[reactivemongo.core.commands.LastError]] result.
@@ -225,20 +222,17 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    */
   def insert(document: pack.Document, writeConcern: GetLastError)(implicit ec: ExecutionContext): Future[WriteResult] =
     Failover2(db.connection, failoverStrategy) { () =>
-      db.connection.wireVersion match {
-        case Some(MongoWireVersionRange(_, MongoWireVersion(version))) if version >= MongoWireVersion.V26.value =>
+      db.connection.metadata match {
+        case Some(metadata) if metadata.maxWireVersion >= MongoWireVersion.V26 =>
           import reactivemongo.api.commands._
-          println(s"insert the new way... pack = $pack, this = $self")
           runCommand(BatchCommands.InsertCommand.Insert(document))
         case Some(_) =>
-          println("insert the old way...")
           val op = Insert(0, fullCollectionName)
           val bson = writeDoc(document)
           val checkedWriteRequest = CheckedWriteRequest(op, BufferSequence(bson), writeConcern)
           db.connection.sendExpectingResponse(checkedWriteRequest).map(pack.readAndDeserialize(_, LastErrorReader))
         case None =>
-          println("failing")
-          Future.failed(new IllegalStateException("connection not initialized yet"))
+          Future.failed(ConnectionNotInitialized.MissingMetadata)
       }
     }.future
 
@@ -274,14 +268,12 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
     Failover(checkedWriteRequest, db.connection, failoverStrategy).future.mapEither(LastError.meaningful(_))
   }*/
     Failover2(db.connection, failoverStrategy) { () =>
-      db.connection.wireVersion match {
-        case Some(MongoWireVersionRange(_, MongoWireVersion(version))) if version >= MongoWireVersion.V26.value =>
+      db.connection.metadata match {
+        case Some(metadata) if metadata.maxWireVersion >= MongoWireVersion.V26 =>
           import reactivemongo.api.commands._
           import BatchCommands.UpdateCommand.{ Update, UpdateElement }
-          println("update the new way...")
           runCommand(Update(UpdateElement(selector, update)))
         case Some(_) =>
-          println("update the old way...")
           val flags = 0 | (if (upsert) UpdateFlags.Upsert else 0) | (if (multi) UpdateFlags.MultiUpdate else 0)
           val op = Update(fullCollectionName, flags)
           val bson = writeDoc(selector, selectorWriter)
@@ -289,8 +281,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
           val checkedWriteRequest = CheckedWriteRequest(op, BufferSequence(bson), writeConcern)
           db.connection.sendExpectingResponse(checkedWriteRequest).map(pack.readAndDeserialize(_, LastErrorReader))
         case None =>
-          println("update failing")
-          Future.failed(new IllegalStateException("connection not initialized yet"))
+          Future.failed(ConnectionNotInitialized.MissingMetadata)
       }
     }.future
 
@@ -314,21 +305,18 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
     Failover(checkedWriteRequest, db.connection, failoverStrategy).future.mapEither(LastError.meaningful(_))
   }*/
     Failover2(db.connection, failoverStrategy) { () =>
-      db.connection.wireVersion match {
-        case Some(MongoWireVersionRange(_, MongoWireVersion(version))) if version >= MongoWireVersion.V26.value =>
+      db.connection.metadata match {
+        case Some(metadata) if metadata.maxWireVersion >= MongoWireVersion.V26 =>
           import reactivemongo.api.commands._
           import BatchCommands.DeleteCommand.{ Delete, DeleteElement }
-          println("delete the new way...")
           runCommand(Delete(DeleteElement(query, 1)))
         case Some(_) =>
-          println("delete the old way...")
           val op = Delete(fullCollectionName, if (firstMatchOnly) 1 else 0)
           val bson = writeDoc(query, writer)
           val checkedWriteRequest = CheckedWriteRequest(op, BufferSequence(bson), writeConcern)
           db.connection.sendExpectingResponse(checkedWriteRequest).map(pack.readAndDeserialize(_, LastErrorReader))
         case None =>
-          println("delete failing")
-          Future.failed(new IllegalStateException("connection not initialized yet"))
+          Future.failed(ConnectionNotInitialized.MissingMetadata)
       }
     }.future
 
@@ -395,17 +383,16 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
 
   import reactivemongo.api.commands.WriteConcern
   import reactivemongo.api.collections.BufferReader
+  import reactivemongo.core.nodeset.ProtocolMetadata
 
   protected object Mongo26WriteCommand {
-    def insert(ordered: Boolean, writeConcern: WriteConcern): Mongo26WriteCommand = new Mongo26WriteCommand("insert", ordered, writeConcern)
-    def update(ordered: Boolean, writeConcern: WriteConcern): Mongo26WriteCommand = new Mongo26WriteCommand("update", ordered, writeConcern)
-    def delete(ordered: Boolean, writeConcern: WriteConcern): Mongo26WriteCommand = new Mongo26WriteCommand("delete", ordered, writeConcern)
+    def insert(ordered: Boolean, writeConcern: WriteConcern, metadata: ProtocolMetadata): Mongo26WriteCommand = new Mongo26WriteCommand("insert", ordered, writeConcern, metadata)
+    def update(ordered: Boolean, writeConcern: WriteConcern, metadata: ProtocolMetadata): Mongo26WriteCommand = new Mongo26WriteCommand("update", ordered, writeConcern, metadata)
+    def delete(ordered: Boolean, writeConcern: WriteConcern, metadata: ProtocolMetadata): Mongo26WriteCommand = new Mongo26WriteCommand("delete", ordered, writeConcern, metadata)
 
     private[Mongo26WriteCommand] object DefaultWriteResultBufferReader extends BufferReader[WriteResult] {
-      def read(buffer: ReadableBuffer): WriteResult = {
-        ???
+      def read(buffer: ReadableBuffer): WriteResult =
         pack.readAndDeserialize(buffer, BatchCommands.DefaultWriteResultReader)
-      }
     }
     private[Mongo26WriteCommand] object UpdateWriteResultBufferReader extends BufferReader[UpdateWriteResult] {
       def read(buffer: ReadableBuffer): UpdateWriteResult =
@@ -413,7 +400,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
     }
   }
 
-  protected class Mongo26WriteCommand private(tpe: String, ordered: Boolean, writeConcern: WriteConcern) {
+  protected class Mongo26WriteCommand private(tpe: String, ordered: Boolean, writeConcern: WriteConcern, metadata: ProtocolMetadata) {
     import reactivemongo.bson._
     import reactivemongo.bson.buffer._
     import reactivemongo.bson.lowlevel.LowLevelBsonDocWriter
@@ -428,8 +415,8 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
     // val thresholdDocs = 100
     //val thresholdBytes = 1 * 1024 * 1024 - 2 - 1000
     //val thresholdBytes = 2048
-    val thresholdDocs = 1000000
-    val thresholdBytes = 23022
+    val thresholdDocs = metadata.maxBulkSize
+    val thresholdBytes = metadata.maxBsonSize
 
     init()
 
@@ -452,7 +439,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
       if(done)
         throw new RuntimeException("violated assertion: Mongo26WriteCommand should not be used again after it is done")
       if(docsN >= thresholdDocs) {
-        val newmwc = new Mongo26WriteCommand(tpe, ordered, writeConcern)
+        val newmwc = new Mongo26WriteCommand(tpe, ordered, writeConcern, metadata)
         newmwc.putOrIssueNewCommand(doc)
         Some(newmwc)
       } else {
@@ -465,7 +452,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
           if(buf.index > thresholdBytes && docsN == 0) // first and already out of bound
             throw new RuntimeException("Mongo26WriteCommand could not accept doc of size = ${buf.index - start} bytes")
           else if(buf.index > thresholdBytes) {
-            val newmwc = new Mongo26WriteCommand(tpe, ordered, writeConcern)
+            val newmwc = new Mongo26WriteCommand(tpe, ordered, writeConcern, metadata)
             newmwc.buf.writeByte(0x03)
             newmwc.buf.writeCString("0")
             newmwc.buf.buffer.writeBytes(buf.buffer, start2, buf.index - start2)
@@ -501,7 +488,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
 
       val op = Query(0, db.name + ".$cmd", 0, 1)
 
-      val cursor = new DefaultCursor(op, documents, ReadPreference.primary, db.connection, failoverStrategy)(Mongo26WriteCommand.DefaultWriteResultBufferReader)
+      val cursor = new DefaultCursor(op, documents, ReadPreference.primary, db.connection, failoverStrategy, true)(Mongo26WriteCommand.DefaultWriteResultBufferReader)
 
       cursor.headOption.flatMap {
         case Some(wr) if wr.inError => Future.failed(wr)
@@ -602,7 +589,7 @@ trait GenericQueryBuilder[P <: SerializationPack] {
    *
    * @param readPreference The ReadPreference for this request. If the ReadPreference implies that this request might be run on a Secondary, the slaveOk flag will be set.
    */
-  def cursor[T](readPreference: ReadPreference)(implicit reader: pack.Reader[T], ec: ExecutionContext): Cursor[T] = {
+  def cursor[T](readPreference: ReadPreference, isMongo26WriteOp: Boolean = false)(implicit reader: pack.Reader[T], ec: ExecutionContext): Cursor[T] = {
     val documents = BufferSequence {
       val buffer = write(merge, ChannelBufferWritableBuffer())
       projectionOption.map { projection =>
@@ -618,7 +605,7 @@ trait GenericQueryBuilder[P <: SerializationPack] {
       def read(buffer: ReadableBuffer): T =
         pack.readAndDeserialize(buffer, reader)
     }
-    new DefaultCursor(op, documents, readPreference, collection.db.connection, failover)(br)
+    new DefaultCursor(op, documents, readPreference, collection.db.connection, failover, isMongo26WriteOp)(br)
   }
 
   /**

@@ -51,6 +51,7 @@ case class NodeSet(
   val queryable = secondaries.subject ++ primary
   val nearestGroup = new RoundRobiner(queryable.sortWith { _.pingInfo.ping < _.pingInfo.ping })
   val nearest = nearestGroup.subject.headOption
+  val protocolMetadata = primary.orElse(secondaries.subject.headOption).map(_.protocolMetadata).getOrElse(ProtocolMetadata.Default)
 
   def primary(authenticated: Authenticated): Option[Node] =
     primary.filter(_.authenticated.exists(_ == authenticated))
@@ -135,6 +136,7 @@ case class Node(
     connections: Vector[Connection],
     authenticated: Set[Authenticated],
     tags: Option[BSONDocument],
+    protocolMetadata: ProtocolMetadata,
     pingInfo: PingInfo = PingInfo()) {
 
   val (host: String, port: Int) = {
@@ -159,6 +161,17 @@ case class Node(
   }
 
   def toShortString = s"Node[$name: $status (${connected.size}/${connections.size} available connections), latency=${pingInfo.ping}], auth=${authenticated}"
+}
+
+case class ProtocolMetadata(
+  minWireVersion: MongoWireVersion,
+  maxWireVersion: MongoWireVersion,
+  maxMessageSizeBytes: Int,
+  maxBsonSize: Int,
+  maxBulkSize: Int
+)
+object ProtocolMetadata {
+  val Default = ProtocolMetadata(MongoWireVersion.V24AndBefore, MongoWireVersion.V24AndBefore, 48000000, 16 * 1024 * 1024, 1000)
 }
 
 case class Connection(

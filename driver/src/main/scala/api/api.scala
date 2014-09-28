@@ -83,6 +83,7 @@ class Failover[T](message: T, connection: MongoConnection, strategy: FailoverStr
     case PrimaryUnavailableException | NodeSetNotReachable => true
     case e: DatabaseException if e.isNotAPrimaryError || e.isUnauthorized => true
     case _: ConnectionException => true
+    case _: ConnectionNotInitialized => true
     case _ => false
   }
 
@@ -126,6 +127,7 @@ class Failover2[A](producer: () => Future[A], connection: MongoConnection, strat
     case PrimaryUnavailableException | NodeSetNotReachable => true
     case e: DatabaseException if e.isNotAPrimaryError || e.isUnauthorized => true
     case _: ConnectionException => true
+    case _: ConnectionNotInitialized => true
     case _ => false
   }
 
@@ -159,7 +161,7 @@ object Failover {
    * @param strategy The Failover strategy.
    */
   def apply(requestMaker: RequestMaker, connection: MongoConnection, strategy: FailoverStrategy)(implicit ec: ExecutionContext): Failover[RequestMaker] =
-    new Failover(requestMaker, connection, strategy)(RequestMakerExpectingResponse.apply)
+    new Failover(requestMaker, connection, strategy)(RequestMakerExpectingResponse(_, false))
 }
 
 /**
@@ -198,8 +200,7 @@ case class FailoverStrategy(
  */
 class MongoConnection(
     val actorSystem: ActorSystem,
-    val mongosystem: ActorRef,
-    val monitor: ActorRef) {
+    val mongosystem: ActorRef) {
   import akka.pattern.{ ask => akkaAsk }
   import akka.util.Timeout
   /**
@@ -231,8 +232,8 @@ class MongoConnection(
    *
    * @return The future response.
    */
-  def ask(message: RequestMaker): Future[Response] = {
-    val msg = RequestMakerExpectingResponse(message)
+  def ask(message: RequestMaker, isMongo26WriteOp: Boolean): Future[Response] = {
+    val msg = RequestMakerExpectingResponse(message, isMongo26WriteOp)
     mongosystem ! msg
     msg.future
   }
@@ -263,8 +264,8 @@ class MongoConnection(
     expectingResponse.future
   }
 
-  def sendExpectingResponse(requestMaker: RequestMaker)(implicit ec: ExecutionContext): Future[Response] = {
-    val expectingResponse = RequestMakerExpectingResponse(requestMaker)
+  def sendExpectingResponse(requestMaker: RequestMaker, isMongo26WriteOp: Boolean)(implicit ec: ExecutionContext): Future[Response] = {
+    val expectingResponse = RequestMakerExpectingResponse(requestMaker, isMongo26WriteOp)
     mongosystem ! expectingResponse
     expectingResponse.future
   }
@@ -283,9 +284,71 @@ class MongoConnection(
   /** Closes this MongoConnection (closes all the channels and ends the actors) */
   def close(): Unit = monitor ! Close
 
-  // TODO
-  def wireVersion: Option[MongoWireVersionRange] =
-    Some(MongoWireVersionRange(MongoWireVersion.V24AndBefore, MongoWireVersion.V26))
+
+  import akka.actor._
+  import reactivemongo.core.nodeset.ProtocolMetadata
+
+  val monitor = actorSystem.actorOf(Props(new MonitorActor))
+
+  @volatile private[reactivemongo] var metadata: Option[ProtocolMetadata] = None
+
+  private class MonitorActor extends Actor {
+    import MonitorActor._
+    import scala.collection.mutable.Queue
+
+    mongosystem ! RegisterMonitor
+
+    private val waitingForPrimary = Queue[ActorRef]()
+
+    var primaryAvailable = false
+
+    private val waitingForClose = Queue[ActorRef]()
+    var killed = false
+
+    override def receive = {
+      case pa: PrimaryAvailable =>
+        logger.debug("set: a primary is available")
+        primaryAvailable = true
+        metadata = Some(pa.metadata)
+        waitingForPrimary.dequeueAll(_ => true).foreach(_ ! pa)
+      case PrimaryUnavailable =>
+        logger.debug("set: no primary available")
+        primaryAvailable = false
+      case sa: SetAvailable =>
+        logger.debug("set: a node is available")
+        metadata = Some(sa.metadata)
+      case SetUnavailable =>
+        logger.debug("set: no node seems to be available")
+      case WaitForPrimary =>
+        if (killed)
+          sender ! Failure(new RuntimeException("MongoDBSystem actor shutting down or no longer active"))
+        else if (primaryAvailable && metadata.isDefined) {
+          logger.debug(sender + " is waiting for a primary... available right now, go!")
+          sender ! PrimaryAvailable(metadata.get)
+        } else {
+          logger.debug(sender + " is waiting for a primary...  not available, warning as soon a primary is available.")
+          waitingForPrimary += sender
+        }
+      case Close =>
+        logger.debug("Monitor received Close")
+        killed = true
+        mongosystem ! Close
+        waitingForClose += sender
+        waitingForPrimary.dequeueAll(_ => true).foreach(_ ! Failure(new RuntimeException("MongoDBSystem actor shutting down or no longer active")))
+      case Closed =>
+        logger.debug(s"Monitor $self closed, stopping...")
+        waitingForClose.dequeueAll(_ => true).foreach(_ ! Closed)
+        context.stop(self)
+    }
+
+    override def postStop {
+      logger.debug(s"Monitor $self stopped.")
+    }
+  }
+
+  object MonitorActor {
+    private val logger = LazyLogger("reactivemongo.core.actors.MonitorActor")
+  }
 }
 
 object MongoConnection {
@@ -359,10 +422,6 @@ object MongoConnection {
   }
 }
 
-case class MongoWireVersionRange(
-  minWireVersion: MongoWireVersion,
-  maxWireVersion: MongoWireVersion)
-
 class MongoDriver(systemOption: Option[ActorSystem] = None) {
 
   def this(system: ActorSystem) = this(Some(system))
@@ -397,8 +456,7 @@ class MongoDriver(systemOption: Option[ActorSystem] = None) {
   def connection(nodes: Seq[String], authentications: Seq[Authenticate] = Seq.empty, nbChannelsPerNode: Int = 10, name: Option[String] = None): MongoConnection = {
     val props = Props(new MongoDBSystem(nodes, authentications, nbChannelsPerNode))
     val mongosystem = if (name.isDefined) system.actorOf(props, name = name.get) else system.actorOf(props)
-    val monitor = system.actorOf(Props(new MonitorActor(mongosystem)))
-    val connection = new MongoConnection(system, mongosystem, monitor)
+    val connection = new MongoConnection(system, mongosystem)
     this.synchronized {
       _connections = connection :: _connections
     }

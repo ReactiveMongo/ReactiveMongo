@@ -27,12 +27,13 @@ object BSONIsMasterCommandImplicits {
           isArbiterOnly = doc.getAs[Boolean]("arbiterOnly").getOrElse(false),
           isPassive = doc.getAs[Boolean]("passive").getOrElse(false),
           isHidden = doc.getAs[Boolean]("hidden").getOrElse(false),
-          tags = doc.getAs[Seq[BSONDocument]]("tags").getOrElse(Seq.empty))
+          tags = doc.getAs[BSONDocument]("tags"))
       }
       IsMasterResult(
         isMaster = doc.getAs[Boolean]("ismaster").getOrElse(false), // `ismaster`
         maxBsonObjectSize = doc.getAs[Int]("maxBsonObjectSize").getOrElse(16777216), // default = 16 * 1024 * 1024
         maxMessageSizeBytes = doc.getAs[Int]("maxMessageSizeBytes").getOrElse(48000000), // default = 48000000, mongod >= 2.4
+        maxWriteBatchSize = doc.getAs[Int]("maxWriteBatchSize").getOrElse(1000),
         localTime = doc.getAs[BSONDateTime]("localTime").map(_.value), // date? mongod >= 2.2
         minWireVersion = doc.getAs[Int]("minWireVersion").getOrElse(0), // int? mongod >= 2.6
         maxWireVersion = doc.getAs[Int]("maxWireVersion").getOrElse(0), // int? mongod >= 2.6

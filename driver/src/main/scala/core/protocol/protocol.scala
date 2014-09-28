@@ -284,8 +284,13 @@ case class ResponseInfo(
   channelId: Int)
 
 
-sealed trait MongoWireVersion {
+sealed trait MongoWireVersion extends Ordered[MongoWireVersion] {
   def value: Int
+
+  final def compare(x: MongoWireVersion): Int =
+    if(value == x.value) 0
+    else if(value < x.value) -1
+    else 1
 }
 
 object MongoWireVersion {
@@ -300,6 +305,10 @@ object MongoWireVersion {
    */
   object V24AndBefore extends MongoWireVersion { def value = 0 }
   object V26 extends MongoWireVersion { def value = 2 }
+
+  def apply(v: Int): MongoWireVersion =
+    if(v >= V26.value) V26
+    else V24AndBefore
 
   def unapply(v: MongoWireVersion): Option[Int] = Some(v.value)
 }
