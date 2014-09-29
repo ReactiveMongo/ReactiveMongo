@@ -18,7 +18,8 @@ package reactivemongo.api.indexes
 import reactivemongo.api._
 import reactivemongo.bson._
 import DefaultBSONHandlers._
-import reactivemongo.core.commands.{ DeleteIndex, LastError }
+import reactivemongo.api.commands.WriteResult
+import reactivemongo.core.commands.{ DeleteIndex }
 import reactivemongo.utils.option
 import reactivemongo.core.netty._
 import scala.concurrent.{ Future, ExecutionContext }
@@ -168,7 +169,7 @@ class IndexesManager(db: DB)(implicit context: ExecutionContext) {
    *
    * @param nsIndex The index to create.
    */
-  def create(nsIndex: NSIndex): Future[LastError] = {
+  def create(nsIndex: NSIndex): Future[WriteResult] = {
     implicit val writer = IndexesManager.NSIndexWriter
     collection.insert(nsIndex)
   }
@@ -222,7 +223,7 @@ class CollectionIndexesManager(fqName: String, manager: IndexesManager)(implicit
    *
    * @param index The index to create.
    */
-  def create(index: Index): Future[LastError] =
+  def create(index: Index): Future[WriteResult] =
     manager.create(NSIndex(fqName, index))
 
   /**

@@ -5,6 +5,17 @@ import reactivemongo.api.commands._
 import reactivemongo.bson._
 
 object BSONGetLastErrorImplicits {
+  implicit object GetLastErrorWriter extends BSONDocumentWriter[GetLastError] {
+    def write(wc: GetLastError): BSONDocument = BSONDocument(
+      "getlasterror" -> 1,
+      "w" -> ((wc.w match {
+        case GetLastError.Majority => BSONString("majority")
+        case GetLastError.TagSet(tagSet) => BSONString(tagSet)
+        case GetLastError.WaitForAknowledgments(n) => BSONInteger(n)
+      }): BSONValue),
+      "j" -> (if(wc.j) Some(true) else None),
+      "wtimeout" -> wc.wtimeout)
+  }
   implicit object LastErrorReader extends BSONDocumentReader[LastError] {
     def read(doc: BSONDocument): LastError =
       LastError(

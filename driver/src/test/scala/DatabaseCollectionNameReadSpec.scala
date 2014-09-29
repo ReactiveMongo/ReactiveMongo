@@ -9,7 +9,7 @@ class DatabaseCollectionNameReadSpec extends Specification {
   import Common._
 
   "ReactiveMongo db" should {
-    val db2 = db.sister("specs2-test-reactivemongo-DatabaseCollectionNameReadSpec")
+    val db2 = db.sibling("specs2-test-reactivemongo-DatabaseCollectionNameReadSpec")
 
     "query names of collection from database" in {
 
@@ -21,8 +21,8 @@ class DatabaseCollectionNameReadSpec extends Specification {
 
       Await.result(c2.insert(BSONDocument("one" -> BSONString("two"))), DurationInt(10) second)
 
-      Await.result(db2.collectionNames, DurationInt(10) second)
-        .mustEqual(Seq("system.indexes", "collection_one", "collection_two"))
+      Await.result(db2.collectionNames, DurationInt(10) second).toSet
+        .mustEqual(Set("system.indexes", "collection_one", "collection_two"))
     }
 
     "remove db..." in {

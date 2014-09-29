@@ -14,7 +14,6 @@ object BSONIsMasterCommandImplicits {
   }
   implicit object IsMasterResultReader extends BSONDocumentReader[IsMasterResult] {
     def read(doc: BSONDocument): IsMasterResult = {
-      println(BSONDocument.pretty(doc))
       val rs = doc.getAs[String]("me").map { me =>
         ReplicaSet(
           setName = doc.getAs[String]("setName").get,

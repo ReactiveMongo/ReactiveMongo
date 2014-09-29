@@ -15,7 +15,7 @@
  */
 package reactivemongo.api
 
-import collections.default.BSONCollection
+import collections.bson.BSONCollection
 import reactivemongo.api.indexes.IndexesManager
 import reactivemongo.bson._
 import reactivemongo.core.commands.{ Update => UpdateCommand, _ }
@@ -53,14 +53,14 @@ trait DB {
    *
    * @param name The name of the collection to open.
    */
-  def apply[C <: Collection](name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit producer: CollectionProducer[C] = collections.default.BSONCollectionProducer): C = collection(name, failoverStrategy)
+  def apply[C <: Collection](name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit producer: CollectionProducer[C] = collections.bson.BSONCollectionProducer): C = collection(name, failoverStrategy)
 
   /**
    * Gets a [[reactivemongo.api.Collection]] from this database.
    *
    * @param name The name of the collection to open.
    */
-  def collection[C <: Collection](name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit producer: CollectionProducer[C] = collections.default.BSONCollectionProducer): C = {
+  def collection[C <: Collection](name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit producer: CollectionProducer[C] = collections.bson.BSONCollectionProducer): C = {
     producer.apply(this, name, failoverStrategy)
   }
 

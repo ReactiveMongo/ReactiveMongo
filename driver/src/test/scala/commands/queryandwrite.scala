@@ -55,7 +55,7 @@ class QueryAndWriteCommands extends Specification {
     }
   }
 
-  import reactivemongo.api.collections2.bson._
+  import reactivemongo.api.collections.bson._
   import scala.concurrent.duration._
 
   val nDocs = 1000000

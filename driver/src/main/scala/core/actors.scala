@@ -501,39 +501,39 @@ class MongoDBSystem(
           } else if(isMongo26WriteOp) {
             // TODO - logs, bson
             // MongoDB 26 Write Protocol errors
-            logger.info("received a response to a MongoDB2.6 Write Op")
+            logger.trace("received a response to a MongoDB2.6 Write Op")
             import reactivemongo.bson.lowlevel._
             import reactivemongo.core.netty.ChannelBufferReadableBuffer
             val reader = new LowLevelBsonDocReader(new ChannelBufferReadableBuffer(response.documents))
             val fields = reader.fieldStream
             val okField = fields.find(_.name == "ok")
-            logger.info(s"{${response.header.responseTo}} ok field is: $okField")
+            logger.trace(s"{${response.header.responseTo}} ok field is: $okField")
             val processedOk = okField.collect {
               case BooleanField(_, v) => v
               case IntField(_, v) => v != 0
               case DoubleField(_, v) => v != 0
             }.getOrElse(false)
             if(processedOk) {
-              logger.info(s"{${response.header.responseTo}} [MongoDB26 Write Op response] sending a success!")
+              logger.trace(s"{${response.header.responseTo}} [MongoDB26 Write Op response] sending a success!")
               promise.success(response)
             } else {
-              logger.info(s"{${response.header.responseTo}} [MongoDB26 Write Op response] processedOk is false! sending an error")
+              logger.debug(s"{${response.header.responseTo}} [MongoDB26 Write Op response] processedOk is false! sending an error")
               val notAPrimary = fields.find(_.name == "errmsg").exists {
                 case errmsg @ LazyField(0x02, _, buf) =>
-                  logger.info(s"{${response.header.responseTo}} [MongoDB26 Write Op response] errmsg is $errmsg!")
+                  logger.debug(s"{${response.header.responseTo}} [MongoDB26 Write Op response] errmsg is $errmsg!")
                   buf.readString == "not a primary"
                 case errmsg =>
-                  logger.info(s"{${response.header.responseTo}} [MongoDB26 Write Op response] errmsg is $errmsg but not interesting!")
+                  logger.debug(s"{${response.header.responseTo}} [MongoDB26 Write Op response] errmsg is $errmsg but not interesting!")
                   false
               }
               if(notAPrimary) {
-                logger.info(s"{${response.header.responseTo}} [MongoDB26 Write Op response] not a primary error!")
+                logger.debug(s"{${response.header.responseTo}} [MongoDB26 Write Op response] not a primary error!")
                 onPrimaryUnavailable()
               }
               promise.failure(new RuntimeException("not ok"))
             }
           } else {
-            logger.info(s"{${response.header.responseTo}} [MongoDB26 Write Op response] sending a success!")
+            logger.trace(s"{${response.header.responseTo}} [MongoDB26 Write Op response] sending a success!")
             promise.success(response)
           }
         }

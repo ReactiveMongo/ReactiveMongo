@@ -20,7 +20,7 @@ import java.util.Arrays
 import play.api.libs.iteratee._
 import reactivemongo.api._
 import reactivemongo.bson._
-import reactivemongo.core.commands.LastError
+import reactivemongo.api.commands.WriteResult
 import reactivemongo.utils._
 import scala.concurrent.{ ExecutionContext, Future }
 import reactivemongo.core.netty.ChannelBufferWritableBuffer
@@ -118,14 +118,16 @@ case class DefaultReadFile(
  * @param db The database where this store is located.
  * @param prefix The prefix of this store. The `files` and `chunks` collections will be actually named `prefix.files` and `prefix.chunks`.
  */
-class GridFS[Structure, Reader[_], Writer[_]](db: DB with DBMetaCommands, prefix: String = "fs")(implicit producer: GenericCollectionProducer[Structure, Reader, Writer, GenericCollection[Structure, Reader, Writer]] = collections.default.BSONCollectionProducer) {
+class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, prefix: String = "fs")(implicit producer: GenericCollectionProducer[P, GenericCollection[P]] = collections.bson.BSONCollectionProducer) {
   import indexes._
   import IndexType._
 
   /** The `files` collection */
-  def files[C <: Collection](implicit collProducer: CollectionProducer[C] = producer) = db(prefix + ".files")(collProducer)
+  val files = db(prefix + ".files")(producer)
   /** The `chunks` collection */
-  def chunks[C <: Collection](implicit collProducer: CollectionProducer[C] = producer) = db(prefix + ".chunks")(collProducer)
+  val chunks = db(prefix + ".chunks")(producer)
+
+  val pack: files.pack.type = files.pack
 
   /**
    * Finds the files matching the given selector.
@@ -134,7 +136,7 @@ class GridFS[Structure, Reader[_], Writer[_]](db: DB with DBMetaCommands, prefix
    *
    * @tparam S The type of the selector document. An implicit `Writer[S]` must be in the scope.
    */ // TODO More generic deserializers ?
-  def find[S, T <: ReadFile[_]](selector: S)(implicit sWriter: Writer[S], readFileReader: Reader[T], ctx: ExecutionContext): Cursor[T] = {
+  def find[S, T <: ReadFile[_]](selector: S)(implicit sWriter: pack.Writer[S], readFileReader: pack.Reader[T], ctx: ExecutionContext): Cursor[T] = {
     files.find(selector).cursor
   }
 
@@ -147,11 +149,11 @@ class GridFS[Structure, Reader[_], Writer[_]](db: DB with DBMetaCommands, prefix
    *
    * @return A future of a ReadFile[Id].
    */
-  def save[Id <: BSONValue](enumerator: Enumerator[Array[Byte]], file: FileToSave[Id], chunkSize: Int = 262144)(implicit readFileReader: Reader[ReadFile[Id]], ctx: ExecutionContext): Future[ReadFile[Id]] = {
+  def save[Id <: BSONValue](enumerator: Enumerator[Array[Byte]], file: FileToSave[Id], chunkSize: Int = 262144)(implicit readFileReader: pack.Reader[ReadFile[Id]], ctx: ExecutionContext): Future[ReadFile[Id]] = {
     (enumerator |>>> iteratee(file, chunkSize)).flatMap(f => f)
   }
 
-  import reactivemongo.api.collections.default.{ BSONCollection, BSONCollectionProducer }
+  import reactivemongo.api.collections.bson.{ BSONCollection, BSONCollectionProducer }
 
   /**
    * Gets an `Iteratee` that will consume data to put into a GridFS store.
@@ -162,7 +164,7 @@ class GridFS[Structure, Reader[_], Writer[_]](db: DB with DBMetaCommands, prefix
    *
    * @return An `Iteratee` that will consume data to put into a GridFS store.
    */
-  def iteratee[Id <: BSONValue](file: FileToSave[Id], chunkSize: Int = 262144)(implicit readFileReader: Reader[ReadFile[Id]], ctx: ExecutionContext): Iteratee[Array[Byte], Future[ReadFile[Id]]] = {
+  def iteratee[Id <: BSONValue](file: FileToSave[Id], chunkSize: Int = 262144)(implicit readFileReader: pack.Reader[ReadFile[Id]], ctx: ExecutionContext): Iteratee[Array[Byte], Future[ReadFile[Id]]] = {
     implicit val ec = db.connection.actorSystem
 
     case class Chunk(
@@ -205,9 +207,11 @@ class GridFS[Structure, Reader[_], Writer[_]](db: DB with DBMetaCommands, prefix
             "uploadDate" -> BSONDateTime(uploadDate),
             "contentType" -> file.contentType.map(BSONString(_)),
             "metadata" -> option(!file.metadata.isEmpty, file.metadata))
-          files[BSONCollection].insert(bson).map(_ =>
-            files(producer).BufferReaderInstance(readFileReader).read(
-              files[BSONCollection].StructureBufferWriter.write(bson, ChannelBufferWritableBuffer()).toReadableBuffer))
+          files.as[BSONCollection]().insert(bson).map { _ =>
+            val buf = ChannelBufferWritableBuffer()
+            BSONSerializationPack.writeToBuffer(buf, bson)
+            pack.readAndDeserialize(buf.toReadableBuffer, readFileReader)
+          }
         }
       }
       def writeChunk(n: Int, array: Array[Byte]) = {
@@ -219,7 +223,7 @@ class GridFS[Structure, Reader[_], Writer[_]](db: DB with DBMetaCommands, prefix
             "n" -> BSONInteger(n),
             "data" -> BSONBinary(array, Subtype.GenericBinarySubtype))
         }
-        chunks[BSONCollection].insert(bson)
+        chunks.as[BSONCollection]().insert(bson)
       }
     }
 
@@ -241,7 +245,7 @@ class GridFS[Structure, Reader[_], Writer[_]](db: DB with DBMetaCommands, prefix
       "$orderby" -> BSONDocument(
         "n" -> BSONInteger(1)))
 
-    val cursor = chunks[BSONCollection].find(selector).cursor
+    val cursor = chunks.as[BSONCollection]().find(selector).cursor
     cursor.enumerate() &> Enumeratee.map { doc =>
       doc.get("data").flatMap {
         case BSONBinary(data, _) => {
@@ -265,7 +269,7 @@ class GridFS[Structure, Reader[_], Writer[_]](db: DB with DBMetaCommands, prefix
   }
 
   /** Writes the data provided by the given InputStream to the given file. */
-  def writeFromInputStream[Id <: BSONValue](file: FileToSave[Id], input: InputStream, chunkSize: Int = 262144)(implicit readFileReader: Reader[ReadFile[Id]], ctx: ExecutionContext): Future[ReadFile[Id]] = {
+  def writeFromInputStream[Id <: BSONValue](file: FileToSave[Id], input: InputStream, chunkSize: Int = 262144)(implicit readFileReader: pack.Reader[ReadFile[Id]], ctx: ExecutionContext): Future[ReadFile[Id]] = {
     save(Enumerator.fromStream(input, chunkSize), file)
   }
 
@@ -275,7 +279,7 @@ class GridFS[Structure, Reader[_], Writer[_]](db: DB with DBMetaCommands, prefix
    *
    * @param file The file entry to remove from this store.
    */
-  def remove[Id <: BSONValue](file: BasicMetadata[Id])(implicit ctx: ExecutionContext): Future[LastError] = remove(file.id)
+  def remove[Id <: BSONValue](file: BasicMetadata[Id])(implicit ctx: ExecutionContext): Future[WriteResult] = remove(file.id)
 
   /**
    * Removes a file from this store.
@@ -283,10 +287,10 @@ class GridFS[Structure, Reader[_], Writer[_]](db: DB with DBMetaCommands, prefix
    *
    * @param id The file id to remove from this store.
    */
-  def remove(id: BSONValue)(implicit ctx: ExecutionContext): Future[LastError] = {
+  def remove(id: BSONValue)(implicit ctx: ExecutionContext): Future[WriteResult] = {
     import DefaultBSONHandlers._
-    chunks[BSONCollection].remove(BSONDocument("files_id" -> id)).flatMap { _ =>
-      files[BSONCollection].remove(BSONDocument("_id" -> id))
+    chunks.as[BSONCollection]().remove(BSONDocument("files_id" -> id)).flatMap { _ =>
+      files.as[BSONCollection]().remove(BSONDocument("_id" -> id))
     }
   }
 
@@ -302,6 +306,6 @@ class GridFS[Structure, Reader[_], Writer[_]](db: DB with DBMetaCommands, prefix
 }
 
 object GridFS {
-  def apply[Structure, Reader[_], Writer[_]](db: DB with DBMetaCommands, prefix: String = "fs")(implicit producer: GenericCollectionProducer[Structure, Reader, Writer, GenericCollection[Structure, Reader, Writer]] = collections.default.BSONCollectionProducer) =
+  def apply[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, prefix: String = "fs")(implicit producer: GenericCollectionProducer[P, GenericCollection[P]] = collections.bson.BSONCollectionProducer) =
     new GridFS(db, prefix)(producer)
 }

@@ -51,7 +51,7 @@ sealed trait WriteResult extends DatabaseException with NoStackTrace {
   def n: Int
   def writeErrors: Seq[WriteError]
   def writeConcernError: Option[WriteConcernError]
-  //def code: Option[Int]
+  def code: Option[Int]
   def errmsg: Option[String]
 
   def hasErrors: Boolean = !writeErrors.isEmpty || !writeConcernError.isEmpty
@@ -78,7 +78,18 @@ case class DefaultWriteResult(
   writeConcernError: Option[WriteConcernError],
   code: Option[Int],
   errmsg: Option[String]
-) extends WriteResult
+) extends WriteResult {
+  def flatten =
+    if(!writeErrors.isEmpty)
+      DefaultWriteResult(
+        ok = false,
+        n = n,
+        writeErrors = writeErrors,
+        writeConcernError = writeConcernError,
+        code = code.orElse(Some(writeErrors.head.code)),
+        errmsg = errmsg.orElse(Some(writeErrors.head.errmsg)))
+    else this
+}
 
 case class Upserted(
   index: Int,
@@ -93,7 +104,20 @@ case class UpdateWriteResult(
   writeConcernError: Option[WriteConcernError],
   code: Option[Int],
   errmsg: Option[String]
-) extends WriteResult
+) extends WriteResult {
+  def flatten =
+    if(!writeErrors.isEmpty)
+      UpdateWriteResult(
+        ok = false,
+        n = n,
+        nModified = nModified,
+        upserted = upserted,
+        writeErrors = writeErrors,
+        writeConcernError = writeConcernError,
+        code = code.orElse(Some(writeErrors.head.code)),
+        errmsg = errmsg.orElse(Some(writeErrors.head.errmsg)))
+    else this
+}
 
 object MultiBulkWriteResult {
   def apply(): MultiBulkWriteResult =

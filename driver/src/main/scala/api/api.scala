@@ -101,7 +101,7 @@ class Failover2[A](producer: () => Future[A], connection: MongoConnection, strat
   val future: Future[A] = promise.future
 
   private def send(n: Int): Unit = {
-    producer().onComplete {
+    Future(producer()).flatMap(identity).onComplete {
       case Failure(e) if isRetryable(e) =>
         if (n < strategy.retries) {
           val `try` = n + 1
