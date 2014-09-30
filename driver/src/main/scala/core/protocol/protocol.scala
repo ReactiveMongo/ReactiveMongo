@@ -31,7 +31,6 @@ import reactivemongo.core.netty._
 import reactivemongo.utils.LazyLogger
 import BufferAccessors._
 import reactivemongo.api.ReadPreference
-import reactivemongo.api.collections.BufferReader
 
 object `package` {
   implicit class RichBuffer(val buffer: ChannelBuffer) extends AnyVal {

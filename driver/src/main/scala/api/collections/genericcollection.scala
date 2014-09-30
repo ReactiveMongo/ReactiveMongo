@@ -27,14 +27,6 @@ import reactivemongo.core.protocol._
 import reactivemongo.core.netty._
 import reactivemongo.core.errors.ConnectionNotInitialized
 
-trait BufferWriter[-T] {
-  def write[B <: WritableBuffer](t: T, buffer: B): B
-}
-
-trait BufferReader[+T] {
-  def read(buffer: ReadableBuffer): T
-}
-
 trait GenericCollectionProducer[P <: SerializationPack with Singleton, +C <: GenericCollection[P]] extends CollectionProducer[C]
 
 trait GenericCollectionWithCommands[P <: SerializationPack with Singleton] { self: GenericCollection[P] =>
@@ -384,19 +376,9 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
     def insert(ordered: Boolean, writeConcern: WriteConcern, metadata: ProtocolMetadata): Mongo26WriteCommand = new Mongo26WriteCommand("insert", ordered, writeConcern, metadata)
     def update(ordered: Boolean, writeConcern: WriteConcern, metadata: ProtocolMetadata): Mongo26WriteCommand = new Mongo26WriteCommand("update", ordered, writeConcern, metadata)
     def delete(ordered: Boolean, writeConcern: WriteConcern, metadata: ProtocolMetadata): Mongo26WriteCommand = new Mongo26WriteCommand("delete", ordered, writeConcern, metadata)
-
-    private[Mongo26WriteCommand] object DefaultWriteResultBufferReader extends BufferReader[WriteResult] {
-      def read(buffer: ReadableBuffer): WriteResult =
-        pack.readAndDeserialize(buffer, BatchCommands.DefaultWriteResultReader)
-    }
-    private[Mongo26WriteCommand] object UpdateWriteResultBufferReader extends BufferReader[UpdateWriteResult] {
-      def read(buffer: ReadableBuffer): UpdateWriteResult =
-        pack.readAndDeserialize(buffer, BatchCommands.UpdateReader)
-    }
   }
 
   import reactivemongo.bson._
-  import reactivemongo.bson.buffer._
   import reactivemongo.bson.lowlevel.LowLevelBsonDocWriter
   import reactivemongo.core.netty.ChannelBufferWritableBuffer
 
@@ -467,6 +449,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
 
     // TODO remove
     def _debug(): Unit = {
+      import reactivemongo.bson.buffer.DefaultBufferHandler
       val rix = buf.buffer.readerIndex
       val wix = buf.buffer.writerIndex
       val doc = DefaultBufferHandler.BSONDocumentBufferHandler.read(new ChannelBufferReadableBuffer(buf.buffer))

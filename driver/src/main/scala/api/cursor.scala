@@ -16,7 +16,6 @@
 package reactivemongo.api
 
 import play.api.libs.iteratee._
-import reactivemongo.api.collections.BufferReader
 import reactivemongo.core.iteratees.{ CustomEnumeratee, CustomEnumerator }
 import reactivemongo.core.netty.BufferSequence
 import reactivemongo.core.protocol._

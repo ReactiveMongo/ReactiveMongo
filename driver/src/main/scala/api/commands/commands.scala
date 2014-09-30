@@ -46,21 +46,13 @@ trait RawCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] {
 object Command {
   import reactivemongo.api.{ DefaultCursor, FailoverStrategy, ReadPreference }
   import reactivemongo.core.actors.RequestMakerExpectingResponse
-  import reactivemongo.api.collections.{ BufferReader, BufferWriter }
   import reactivemongo.bson.buffer.{ ReadableBuffer, WritableBuffer }
   import reactivemongo.core.netty._
   import reactivemongo.core.protocol.{ RequestMaker, Query, QueryFlags, Response }
 
   def defaultCursorFetcher[P <: SerializationPack, A](db: DB, p: P, command: A, failover: FailoverStrategy)(implicit writer: p.Writer[A]): CursorFetcher[p.type, Cursor] = new CursorFetcher[p.type, Cursor] {
     val pack: p.type = p
-    private implicit def bufferWriter[A](implicit w: pack.Writer[A]) = new BufferWriter[A] {
-      def write[B <: WritableBuffer](document: A, buffer: B): B =
-        pack.serializeAndWrite(buffer, document, w).asInstanceOf[B] // TODO !!!!!!!!!
-    }
-    private implicit def bufferReader[A](implicit r: pack.Reader[A]) = new BufferReader[A] {
-      def read(buffer: ReadableBuffer): A =
-        pack.readAndDeserialize(buffer, r)
-    }
+
     def one[A](implicit reader: pack.Reader[A]): Future[A] = cursor.collect[Iterable](1, true).map(_.head)
     def cursor[A](implicit reader: pack.Reader[A]): Cursor[A] = {
       val buffer = ChannelBufferWritableBuffer()
@@ -74,10 +66,6 @@ object Command {
       // TODO customize ReadPreference
       DefaultCursor(pack, op, bs, ReadPreference.primary, db.connection, failover, mongo26WriteCommand)
     }
-  }
-
-  def deserialize[P <: SerializationPack, A](pack: P, response: Response)(implicit reader: pack.Reader[A]): A = {
-    pack.readAndDeserialize(response, reader)
   }
 
   case class CommandWithPackRunner[P <: SerializationPack](pack: P, failover: FailoverStrategy = FailoverStrategy()) {
@@ -115,6 +103,10 @@ object Command {
 
   def run[P <: SerializationPack](pack: P): CommandWithPackRunner[pack.type] = CommandWithPackRunner(pack)
 
+
+  private[reactivemongo] def deserialize[P <: SerializationPack, A](pack: P, response: Response)(implicit reader: pack.Reader[A]): A = {
+    pack.readAndDeserialize(response, reader)
+  }
 
   private[reactivemongo] case class CommandWithPackMaker[P <: SerializationPack](pack: P) {
     def apply[C <: Command](db: DB, command: C, readPreference: ReadPreference)(implicit writer: pack.Writer[C]): RequestMakerExpectingResponse =

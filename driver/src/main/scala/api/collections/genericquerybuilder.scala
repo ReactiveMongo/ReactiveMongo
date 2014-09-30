@@ -88,10 +88,6 @@ trait GenericQueryBuilder[P <: SerializationPack] {
 
     val op = Query(flags, collection.fullCollectionName, options.skipN, options.batchSizeN)
 
-    val br = new reactivemongo.api.collections.BufferReader[T] {
-      def read(buffer: ReadableBuffer): T =
-        pack.readAndDeserialize(buffer, reader)
-    }
     DefaultCursor(pack, op, documents, readPreference, collection.db.connection, failover, isMongo26WriteOp)(reader)
   }
 
