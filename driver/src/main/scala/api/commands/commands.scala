@@ -178,33 +178,8 @@ final case class ResolvedCollectionCommand[
 
 
 object `package` {
-  /*implicit def resolvedCollectionCommand[
-    P <: SerializationPack,
-    R,
-    C <: CollectionCommand with CommandWithResult[R] with CommandWithPack[P]](implicit writer: P#Writer[C]):
-    ResolvedCollectionCommandWithPackAndResult[P, R, C] = ???
-
-  implicit def resolvedCollectionCommand[
-    P <: SerializationPack,
-    C <: CollectionCommand with CommandWithPack[P]](implicit writer: P#Writer[C]):
-    ResolvedCollectionCommandWithPack[P, C] = ???*/
-
-  type FullCollectionCommand[C <: CollectionCommand] = (String, C)
-
   type WriteConcern = GetLastError
   val WriteConcern = GetLastError
 
   type SerializationPackObject = SerializationPack with Singleton
-
-  object test {
-    import reactivemongo.bson._
-    import BSONFindAndModify._
-    val db: DB = ???
-    val collection: Collection = ???
-    val fam = BSONFindAndModify(BSONDocument("hey" -> "hey"), true)
-    val mmm = Command.run(BSONSerializationPack)(collection, fam)
-    //mmm : Short
-    //mmm.map(_.result[BSONDocument]) : String
-    //mmm:String
-  }
 }
