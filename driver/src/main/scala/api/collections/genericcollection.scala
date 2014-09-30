@@ -20,12 +20,11 @@ import scala.util.Try
 import scala.util.control.NonFatal
 import org.jboss.netty.buffer.ChannelBuffer
 import reactivemongo.api._
-import reactivemongo.api.commands.WriteConcern
+import reactivemongo.api.commands.{ LastError, WriteConcern }
 import reactivemongo.bson.buffer.{ ReadableBuffer, WritableBuffer }
 import reactivemongo.core.nodeset.ProtocolMetadata
 import reactivemongo.core.protocol._
 import reactivemongo.core.netty._
-import reactivemongo.core.commands.GetLastError
 import reactivemongo.core.errors.ConnectionNotInitialized
 
 trait BufferWriter[-T] {
@@ -153,59 +152,47 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
 
   def bulkInsert(ordered: Boolean)(documents: ImplicitlyDocumentProducer*)(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] =
     db.connection.metadata.map { metadata =>
-      bulkInsert(documents.toStream.map(_.produce), ordered, GetLastError(), metadata.maxBulkSize, metadata.maxBsonSize)
+      bulkInsert(documents.toStream.map(_.produce), ordered, WriteConcern.Default, metadata.maxBulkSize, metadata.maxBsonSize)
     }.getOrElse(Future.failed(ConnectionNotInitialized.MissingMetadata))
 
-  def bulkInsert(ordered: Boolean, writeConcern: GetLastError)(documents: ImplicitlyDocumentProducer*)(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] =
+  def bulkInsert(ordered: Boolean, writeConcern: WriteConcern)(documents: ImplicitlyDocumentProducer*)(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] =
     db.connection.metadata.map { metadata =>
       bulkInsert(documents.toStream.map(_.produce), ordered, writeConcern, metadata.maxBulkSize, metadata.maxBsonSize)
     }.getOrElse(Future.failed(ConnectionNotInitialized.MissingMetadata))
 
-  def bulkInsert(ordered: Boolean, writeConcern: GetLastError, bulkSize: Int, bulkByteSize: Int)(documents: ImplicitlyDocumentProducer*)(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] =
+  def bulkInsert(ordered: Boolean, writeConcern: WriteConcern, bulkSize: Int, bulkByteSize: Int)(documents: ImplicitlyDocumentProducer*)(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] =
     bulkInsert(documents.toStream.map(_.produce), ordered, writeConcern, bulkSize, bulkByteSize)
 
   def bulkInsert(documents: Stream[pack.Document], ordered: Boolean)(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] =
-    bulkInsert(documents, ordered, GetLastError())
+    bulkInsert(documents, ordered, WriteConcern.Default)
 
-  def bulkInsert(documents: Stream[pack.Document], ordered: Boolean, writeConcern: GetLastError)(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] =
+  def bulkInsert(documents: Stream[pack.Document], ordered: Boolean, writeConcern: WriteConcern)(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] =
     db.connection.metadata.map { metadata =>
       bulkInsert(documents, ordered, writeConcern, metadata.maxBulkSize, metadata.maxBsonSize)
     }.getOrElse(Future.failed(ConnectionNotInitialized.MissingMetadata))
 
-  def bulkInsert(documents: Stream[pack.Document], ordered: Boolean, writeConcern: GetLastError = GetLastError(), bulkSize: Int, bulkByteSize: Int)(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] = watchFailure {
+  def bulkInsert(documents: Stream[pack.Document], ordered: Boolean, writeConcern: WriteConcern = WriteConcern.Default, bulkSize: Int, bulkByteSize: Int)(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] = watchFailure {
+    def createBulk[R, A <: BulkMaker[R, A]](docs: Stream[pack.Document], command: A with BulkMaker[R, A]): Future[List[R]] =  {
+      val (tail, nc) = command.fill(docs)
+      command.send().
+        flatMap { wr =>
+          if(nc.isDefined)
+            createBulk(tail, nc.get).map(wr2 => wr :: wr2)
+          else // done
+            Future.successful(List(wr))
+        }
+    }
     val metadata = db.connection.metadata
     if(!documents.isEmpty) {
-      // TODO failover
-      val havingMetadata = Failover2(db.connection, FailoverStrategy()) { () =>
+      val havingMetadata = Failover2(db.connection, failoverStrategy) { () =>
         metadata.map(Future.successful).getOrElse(Future.failed(ConnectionNotInitialized.MissingMetadata))
       }.future
       havingMetadata.flatMap { metadata =>
         if(metadata.maxWireVersion >= MongoWireVersion.V26) {
-          def createBulk(docs: Stream[pack.Document], command: Mongo26WriteCommand): Future[List[WriteResult]] = {
-            val (tail, nc) = command.fill(docs)
-            command.send().flatMap { wr =>
-              if(nc.isDefined)
-                createBulk(tail, nc.get).map(wr2 => wr :: wr2)
-              else // done
-                Future.successful(List(wr))
-            }
-          }
-          createBulk(documents, Mongo26WriteCommand.insert(ordered, reactivemongo.api.commands.WriteConcern.DefaultWriteConcern, metadata)).map { list =>
+          createBulk(documents, Mongo26WriteCommand.insert(ordered, writeConcern, metadata)).map { list =>
             list.foldLeft(MultiBulkWriteResult())( (r, w) => r.merge(w) )}
         } else {
-          def createBulk(docs: Stream[pack.Document], command: Mongo24BulkInsert): Future[List[WriteResult]] = {
-            val (tail, nc) = command.fill(docs)
-            db.connection.
-              sendExpectingResponse(command.resultAsCheckedWriteRequest(Insert(0, fullCollectionName), reactivemongo.api.commands.WriteConcern.DefaultWriteConcern)).
-              map(pack.readAndDeserialize(_, LastErrorReader)).
-              flatMap { wr =>
-                if(nc.isDefined)
-                  createBulk(tail, nc.get).map(wr2 => wr :: wr2)
-                else // done
-                  Future.successful(List(wr))
-              }
-          }
-          createBulk(documents, new Mongo24BulkInsert(metadata)).map { list =>
+          createBulk(documents, new Mongo24BulkInsert(Insert(0, fullCollectionName), writeConcern, metadata)).map { list =>
             list.foldLeft(MultiBulkWriteResult())( (r, w) => r.merge(w) )}
         }
       }
@@ -236,7 +223,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    *
    * @return a future [[reactivemongo.core.commands.LastError]] that can be used to check whether the insertion was successful.
    */
-  def insert[T](document: T, writeConcern: WriteConcern = WriteConcern.DefaultWriteConcern)(implicit writer: pack.Writer[T], ec: ExecutionContext): Future[WriteResult] = {
+  def insert[T](document: T, writeConcern: WriteConcern = WriteConcern.Default)(implicit writer: pack.Writer[T], ec: ExecutionContext): Future[WriteResult] = {
     Failover2(db.connection, failoverStrategy) { () =>
       import MongoWireVersion._
       db.connection.metadata match {
@@ -260,46 +247,6 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
   }
 
   /**
-   * Inserts a document into the collection and wait for the [[reactivemongo.core.commands.LastError]] result.
-   *
-   * Please read the documentation about [[reactivemongo.core.commands.GetLastError]] to know how to use it properly.
-   *
-   * @param document the document to insert.
-   * @param writeConcern the [[reactivemongo.core.commands.GetLastError]] command message to send in order to control how the document is inserted. Defaults to GetLastError().
-   *
-   * @return a future [[reactivemongo.core.commands.LastError]] that can be used to check whether the insertion was successful.
-   */
-  def insert(document: pack.Document, writeConcern: WriteConcern)(implicit ec: ExecutionContext): Future[WriteResult] =
-    Failover2(db.connection, failoverStrategy) { () =>
-      db.connection.metadata match {
-        case Some(metadata) if metadata.maxWireVersion >= MongoWireVersion.V26 =>
-          import reactivemongo.api.commands._
-          runCommand(BatchCommands.InsertCommand.Insert(document)).flatMap { wr =>
-            val flattened = wr.flatten
-            if(!flattened.ok) // was ordered, with one doc => fail if has an error
-              Future.failed(flattened)
-            else Future.successful(wr)
-          }
-        case Some(_) =>
-          val op = Insert(0, fullCollectionName)
-          val bson = writeDoc(document)
-          val checkedWriteRequest = CheckedWriteRequest(op, BufferSequence(bson), writeConcern)
-          db.connection.sendExpectingResponse(checkedWriteRequest).map(pack.readAndDeserialize(_, LastErrorReader))
-        case None =>
-          Future.failed(ConnectionNotInitialized.MissingMetadata)
-      }
-    }.future
-
- /* /**
-   * Inserts a document into the collection and wait for the [[reactivemongo.core.commands.LastError]] result.
-   *
-   * @param document the document to insert.
-   *
-   * @return a future [[reactivemongo.core.commands.LastError]] that can be used to check whether the insertion was successful.
-   */
-  def insert(document: pack.Document)(implicit ec: ExecutionContext): Future[WriteResult] = insert(document, GetLastError())*/
-
-  /**
    * Updates one or more documents matching the given selector with the given modifier or update object.
    *
    * @tparam S the type of the selector object. An implicit `Writer[S]` typeclass for handling it has to be in the scope.
@@ -313,7 +260,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    *
    * @return a future [[reactivemongo.core.commands.LastError]] that can be used to check whether the update was successful.
    */
-  def update[S, U](selector: S, update: U, writeConcern: WriteConcern = WriteConcern.DefaultWriteConcern, upsert: Boolean = false, multi: Boolean = false)(implicit selectorWriter: pack.Writer[S], updateWriter: pack.Writer[U], ec: ExecutionContext): Future[WriteResult] =
+  def update[S, U](selector: S, update: U, writeConcern: WriteConcern = WriteConcern.Default, upsert: Boolean = false, multi: Boolean = false)(implicit selectorWriter: pack.Writer[S], updateWriter: pack.Writer[U], ec: ExecutionContext): Future[WriteResult] =
     Failover2(db.connection, failoverStrategy) { () =>
       db.connection.metadata match {
         case Some(metadata) if metadata.maxWireVersion >= MongoWireVersion.V26 =>
@@ -350,7 +297,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    *
    * @return a future [[reactivemongo.core.commands.LastError]] that can be used to check whether the removal was successful.
    */
-  def remove[T](query: T, writeConcern: WriteConcern = WriteConcern.DefaultWriteConcern, firstMatchOnly: Boolean = false)(implicit writer: pack.Writer[T], ec: ExecutionContext): Future[WriteResult] =
+  def remove[T](query: T, writeConcern: WriteConcern = WriteConcern.Default, firstMatchOnly: Boolean = false)(implicit writer: pack.Writer[T], ec: ExecutionContext): Future[WriteResult] =
     Failover2(db.connection, failoverStrategy) { () =>
       db.connection.metadata match {
         case Some(metadata) if metadata.maxWireVersion >= MongoWireVersion.V26 =>
@@ -453,24 +400,10 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
   import reactivemongo.bson.lowlevel.LowLevelBsonDocWriter
   import reactivemongo.core.netty.ChannelBufferWritableBuffer
 
-  protected class Mongo26WriteCommand private(tpe: String, ordered: Boolean, writeConcern: WriteConcern, metadata: ProtocolMetadata) {
-    private var done = false
-    private var docsN = 0
-    private val buf = ChannelBufferWritableBuffer()
-    private val writer = new LowLevelBsonDocWriter(buf)
-
-    // val thresholdBytes = 24022//15 * 1024 * 1024 - 2
-    // val thresholdDocs = 100
-    //val thresholdBytes = 1 * 1024 * 1024 - 2 - 1000
-    //val thresholdBytes = 2048
-    val thresholdDocs = metadata.maxBulkSize
-    val thresholdBytes = metadata.maxBsonSize
-
-    init()
-
-    def fill(docs: Stream[pack.Document]): (Stream[pack.Document], Option[Mongo26WriteCommand]) = {
+  protected sealed trait BulkMaker[R, S <: BulkMaker[R, S]] {
+    def fill(docs: Stream[pack.Document]): (Stream[pack.Document], Option[S]) = {
       @scala.annotation.tailrec
-      def loop(docs: Stream[pack.Document]): (Stream[pack.Document], Option[Mongo26WriteCommand]) = {
+      def loop(docs: Stream[pack.Document]): (Stream[pack.Document], Option[S]) = {
         if(docs.isEmpty)
           Stream.empty -> None
         else {
@@ -482,15 +415,31 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
       }
       loop(docs)
     }
+    def putOrIssueNewCommand(doc: pack.Document): Option[S]
+    def result(): ChannelBuffer
+    def send()(implicit ec: ExecutionContext): Future[R]
+  }
+
+  protected class Mongo26WriteCommand private(tpe: String, ordered: Boolean, writeConcern: WriteConcern, metadata: ProtocolMetadata) extends BulkMaker[WriteResult, Mongo26WriteCommand] {
+    private var done = false
+    private var docsN = 0
+    private val buf = ChannelBufferWritableBuffer()
+    private val writer = new LowLevelBsonDocWriter(buf)
+
+    val thresholdDocs = metadata.maxBulkSize
+    // minus 2 for the trailing '\0'
+    val thresholdBytes = metadata.maxBsonSize - 2
+
+    init()
 
     def putOrIssueNewCommand(doc: pack.Document): Option[Mongo26WriteCommand] = {
       if(done)
         throw new RuntimeException("violated assertion: Mongo26WriteCommand should not be used again after it is done")
       if(docsN >= thresholdDocs) {
         closeIfNecessary()
-        val newmwc = new Mongo26WriteCommand(tpe, ordered, writeConcern, metadata)
-        newmwc.putOrIssueNewCommand(doc)
-        Some(newmwc)
+        val nextCommand = new Mongo26WriteCommand(tpe, ordered, writeConcern, metadata)
+        nextCommand.putOrIssueNewCommand(doc)
+        Some(nextCommand)
       } else {
         val start = buf.index
         buf.writeByte(0x03)
@@ -501,15 +450,15 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
           if(buf.index > thresholdBytes && docsN == 0) // first and already out of bound
             throw new RuntimeException("Mongo26WriteCommand could not accept doc of size = ${buf.index - start} bytes")
           else if(buf.index > thresholdBytes) {
-            val newmwc = new Mongo26WriteCommand(tpe, ordered, writeConcern, metadata)
-            newmwc.buf.writeByte(0x03)
-            newmwc.buf.writeCString("0")
-            newmwc.buf.buffer.writeBytes(buf.buffer, start2, buf.index - start2)
-            newmwc.docsN = 1
+            val nextCommand = new Mongo26WriteCommand(tpe, ordered, writeConcern, metadata)
+            nextCommand.buf.writeByte(0x03)
+            nextCommand.buf.writeCString("0")
+            nextCommand.buf.buffer.writeBytes(buf.buffer, start2, buf.index - start2)
+            nextCommand.docsN = 1
             buf.buffer.readerIndex(0)
             buf.buffer.writerIndex(start)
             closeIfNecessary()
-            Some(newmwc)
+            Some(nextCommand)
           } else None
         docsN += 1
         result
@@ -582,7 +531,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
     }
   }
 
-  protected class Mongo24BulkInsert(metadata: ProtocolMetadata) {
+  protected class Mongo24BulkInsert(op: Insert, writeConcern: WriteConcern, metadata: ProtocolMetadata) extends BulkMaker[LastError, Mongo24BulkInsert] {
     private var done = false
     private var docsN = 0
     private val buf = ChannelBufferWritableBuffer()
@@ -591,41 +540,26 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
     // max size for docs is max bson size minus 16 bytes for header, 4 bytes for flags, and 124 bytes max for fullCollectionName
     val thresholdBytes = metadata.maxBsonSize - (4 * 4 + 4 + 124)
 
-    def fill(docs: Stream[pack.Document]): (Stream[pack.Document], Option[Mongo24BulkInsert]) = {
-      @scala.annotation.tailrec
-      def loop(docs: Stream[pack.Document]): (Stream[pack.Document], Option[Mongo24BulkInsert]) = {
-        if(docs.isEmpty)
-          Stream.empty -> None
-        else {
-          val res = putOrIssueNewCommand(docs.head)
-          if(res.isDefined)
-            docs.tail -> res
-          else loop(docs.tail)
-        }
-      }
-      loop(docs)
-    }
-
     def putOrIssueNewCommand(doc: pack.Document): Option[Mongo24BulkInsert] = {
       if(done)
         throw new RuntimeException("violated assertion: Mongo24BulkInsert should not be used again after it is done")
       if(docsN >= thresholdDocs) {
-        val newbi = new Mongo24BulkInsert(metadata)
-        newbi.putOrIssueNewCommand(doc)
-        Some(newbi)
+        val nextBulk = new Mongo24BulkInsert(op, writeConcern, metadata)
+        nextBulk.putOrIssueNewCommand(doc)
+        Some(nextBulk)
       } else {
         val start = buf.index
         pack.writeToBuffer(buf, doc)
         if(buf.index > thresholdBytes) {
           if(docsN == 0) // first and already out of bound
             throw new RuntimeException("Mongo24BulkInsert could not accept doc of size = ${buf.index - start} bytes")
-          val newbi = new Mongo24BulkInsert(metadata)
-          newbi.buf.buffer.writeBytes(buf.buffer, start, buf.index - start)
-          newbi.docsN = 1
+          val nextBulk = new Mongo24BulkInsert(op, writeConcern, metadata)
+          nextBulk.buf.buffer.writeBytes(buf.buffer, start, buf.index - start)
+          nextBulk.docsN = 1
           buf.buffer.readerIndex(0)
           buf.buffer.writerIndex(start)
           done = true
-          Some(newbi)
+          Some(nextBulk)
         } else {
           docsN += 1
           None
@@ -640,6 +574,11 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
 
     def resultAsCheckedWriteRequest(op: Insert, writeConcern: WriteConcern) = {
       CheckedWriteRequest(op, BufferSequence(result()), writeConcern)
+    }
+
+    def send()(implicit ec: ExecutionContext): Future[LastError] = {
+      val f = () => db.connection.sendExpectingResponse(resultAsCheckedWriteRequest(op, writeConcern))
+      Failover2(db.connection, failoverStrategy)(f).future.map(pack.readAndDeserialize(_, LastErrorReader))
     }
   }
 }

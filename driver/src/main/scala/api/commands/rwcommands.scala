@@ -22,7 +22,19 @@ object GetLastError {
     implicit def strToTagSet(s: String): W = TagSet(s)
     implicit def intToWaitForAknowledgments(i: Int): W = WaitForAknowledgments(i)
   }
-  val DefaultWriteConcern = GetLastError(WaitForAknowledgments(1), false, false, Some(0))
+
+  val Unacknowledged: GetLastError =
+    GetLastError(WaitForAknowledgments(0), false, false, None)
+  val Acknowledged: GetLastError =
+    GetLastError(WaitForAknowledgments(1), false, false, None)
+  val Journaled: GetLastError =
+    GetLastError(WaitForAknowledgments(1), true, false, None)
+  def ReplicaAcknowledged(n: Int, timeout: Int, journaled: Boolean): GetLastError =
+    GetLastError(WaitForAknowledgments(if(n < 2) 2 else n), journaled, false, (if(timeout <= 0) None else Some(timeout)))
+  def TagReplicaAcknowledged(tag: String, timeout: Int, journaled: Boolean): GetLastError =
+    GetLastError(TagSet(tag), journaled, false, (if(timeout <= 0) None else Some(timeout)))
+
+  def Default: GetLastError = Acknowledged
 }
 case class LastError(
   ok: Boolean,
@@ -174,7 +186,7 @@ trait InsertCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] /*
   object Insert {
     def apply(firstDoc: ImplicitlyDocumentProducer, otherDocs: ImplicitlyDocumentProducer*): Insert =
       apply()(firstDoc, otherDocs: _*)
-    def apply(ordered: Boolean = true, writeConcern: WriteConcern = WriteConcern.DefaultWriteConcern)(firstDoc: ImplicitlyDocumentProducer, otherDocs: ImplicitlyDocumentProducer*): Insert =
+    def apply(ordered: Boolean = true, writeConcern: WriteConcern = WriteConcern.Default)(firstDoc: ImplicitlyDocumentProducer, otherDocs: ImplicitlyDocumentProducer*): Insert =
       new Insert(firstDoc.produce #:: otherDocs.toStream.map(_.produce), ordered, writeConcern)
   }
 }
@@ -205,7 +217,7 @@ trait UpdateCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] {
   object Update {
     def apply(firstUpdate: UpdateElement, updates: UpdateElement*): Update =
       apply()(firstUpdate, updates: _*)
-    def apply(ordered: Boolean = true, writeConcern: WriteConcern = WriteConcern.DefaultWriteConcern)(firstUpdate: UpdateElement, updates: UpdateElement*): Update =
+    def apply(ordered: Boolean = true, writeConcern: WriteConcern = WriteConcern.Default)(firstUpdate: UpdateElement, updates: UpdateElement*): Update =
       Update(
         firstUpdate +: updates,
         ordered,
@@ -222,7 +234,7 @@ trait DeleteCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] {
   object Delete {
     def apply(firstDelete: DeleteElement, deletes: DeleteElement*): Delete =
       apply()(firstDelete, deletes: _*)
-    def apply(ordered: Boolean = true, writeConcern: WriteConcern = WriteConcern.DefaultWriteConcern)(firstDelete: DeleteElement, deletes: DeleteElement*): Delete =
+    def apply(ordered: Boolean = true, writeConcern: WriteConcern = WriteConcern.Default)(firstDelete: DeleteElement, deletes: DeleteElement*): Delete =
       Delete(firstDelete +: deletes, ordered, writeConcern)
   }
 
