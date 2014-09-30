@@ -15,10 +15,10 @@ class CollectionSpec extends Specification with Tags {
 
   "ReactiveMongo" should {
     "create a collection" in {
-      Await.result(collection.create(), timeout) mustEqual true
+      Await.result(collection.create(), timeout) mustEqual (())
     }
     "convert to capped" in {
-      Await.result(collection.convertToCapped(2 * 1024 * 1024, None), timeout) mustEqual true
+      Await.result(collection.convertToCapped(2 * 1024 * 1024, None), timeout) mustEqual (())
     }
     "check if it's capped" in {
       // convertToCapped is async. Let's wait a little while before checking if it's done
@@ -50,7 +50,7 @@ class CollectionSpec extends Specification with Tags {
     } tag ("testCommands")*/
 
     "drop it" in {
-      Await.result(collection.drop(), timeout) mustEqual true
+      Await.result(collection.drop(), timeout) mustEqual (())
     }
   }
 }

@@ -16,7 +16,7 @@ class CommonUseCases extends Specification {
 
   "ReactiveMongo" should {
     "create a collection" in {
-      Await.result(collection.create(), timeout) mustEqual true
+      Await.result(collection.create(), timeout) mustEqual (())
     }
     // TODO !!!
     /*

@@ -26,7 +26,7 @@ class DatabaseCollectionNameReadSpec extends Specification {
     }
 
     "remove db..." in {
-      Await.result(db2.drop, DurationInt(10) second) mustEqual true
+      Await.result(db2.drop, DurationInt(10) second) mustEqual (())
     }
   }
 }
