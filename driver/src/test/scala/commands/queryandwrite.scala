@@ -41,7 +41,7 @@ class QueryAndWriteCommands extends Specification {
       val ismaster = Await.result(Command.run(BSONSerializationPack)(db, IsMaster), timeout)
       println(ismaster)
       true mustEqual true
-    }
+    } tag ("mongo2_6")
     "insert 1 doc with collection.insert and retrieve it" in {
       val doc = BSONDocument("name" -> "joe", "plop" -> -2)
       val lastError = Await.result(collection.insert(doc), timeout)
@@ -93,7 +93,7 @@ class QueryAndWriteCommands extends Specification {
       println(s"took ${System.currentTimeMillis - start} ms")
       val count = Await.result(Command.run(BSONSerializationPack).unboxed(collection,Count(BSONDocument("bulk" -> true))), timeout)
       count mustEqual (nDocs - 3) // all docs minus errors
-    }
+    } tag ("mongo2_6")
   }
 
 }
