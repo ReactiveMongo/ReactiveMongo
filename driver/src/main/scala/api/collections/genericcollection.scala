@@ -38,7 +38,7 @@ trait GenericCollectionWithCommands[P <: SerializationPack with Singleton] { sel
 
   def runCommand[R, C <: CollectionCommand with CommandWithResult[R]]
     (command: C with CommandWithResult[R])
-    (implicit writer: pack.Writer[ResolvedCollectionCommand[C]], reader: pack.Reader[R]): Future[R] =
+    (implicit writer: pack.Writer[ResolvedCollectionCommand[C]], reader: pack.Reader[R], ec: ExecutionContext): Future[R] =
     runner(self, command)
 
   def runCommand[C <: CollectionCommand]
@@ -48,7 +48,7 @@ trait GenericCollectionWithCommands[P <: SerializationPack with Singleton] { sel
 
   def runValueCommand[A <: AnyVal, R <: BoxedAnyVal[A], C <: CollectionCommand with CommandWithResult[R]]
     (command: C with CommandWithResult[R with BoxedAnyVal[A]])
-    (implicit writer: pack.Writer[ResolvedCollectionCommand[C]], reader: pack.Reader[R]): Future[A] =
+    (implicit writer: pack.Writer[ResolvedCollectionCommand[C]], reader: pack.Reader[R], ec: ExecutionContext): Future[A] =
     runner.unboxed(self, command)
 }
 

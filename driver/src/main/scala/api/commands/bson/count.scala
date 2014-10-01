@@ -29,8 +29,8 @@ object BSONCountCommandImplicits {
       )
   }
 
-  implicit object CountResultReader extends BSONDocumentReader[CountResult] {
-    def read(doc: BSONDocument): CountResult = {
+  implicit object CountResultReader extends DealingWithGenericCommandErrorsReader[CountResult] {
+    def readResult(doc: BSONDocument): CountResult = {
       println(BSONDocument.pretty(doc))
       CountResult(doc.getAs[BSONNumberLike]("n").map(_.toInt).getOrElse(0))
     }

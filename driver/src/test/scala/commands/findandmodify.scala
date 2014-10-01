@@ -2,10 +2,11 @@ import org.specs2.mutable._
 import play.api.libs.iteratee.Enumerator
 import scala.concurrent._
 import scala.util.{ Try, Failure }
+import scala.util.control.NonFatal
 
 import reactivemongo.api._
 import reactivemongo.bson._
-import reactivemongo.api.commands.Command
+import reactivemongo.api.commands.{ Command, CommandError }
 import reactivemongo.api.commands.bson._
 import BSONFindAndModifyCommand._
 import BSONFindAndModifyImplicits._
@@ -56,7 +57,6 @@ class FindAndModifySpec extends Specification {
     }
     "modify a doc and fetch its previous value" in {
       val jack = Person("Jack", "London", 40)
-      //val future = collection.runCommand(FindAndModify(jack, Update(BSONDocument("$inc" -> "age"))))
       val future = collection.runCommand(FindAndModify(jack, Update(BSONDocument("$inc" -> BSONDocument("age" -> 1)))))
       val result = Await.result(future, timeout)
       println(s"FAM(modify) result is $result")
@@ -67,6 +67,19 @@ class FindAndModifySpec extends Specification {
       previousValue.get.lastName mustEqual "London"
       previousValue.get.age mustEqual 40
       Await.result(collection.find(jack.copy(age = jack.age + 1)).one[Person], timeout).exists(_.age == 41) mustEqual true
+    }
+    "make a failing FindAndModify" in {
+      val query = BSONDocument()
+      val future =
+        collection.
+          runCommand(FindAndModify(query, Update(BSONDocument("$inc" -> "age")))).
+          map(_ => None).
+          recover {
+            case e: CommandError =>
+              e.printStackTrace
+              Some(e)
+          }
+      Await.result(future, timeout).isDefined mustEqual true
     }
   }
 }

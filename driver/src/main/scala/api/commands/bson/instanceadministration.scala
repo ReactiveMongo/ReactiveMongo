@@ -57,8 +57,8 @@ object BSONCollStatsImplicits {
         "collStats" -> command.collection,
         "scale" -> command.command.scale)
   }
-  implicit object CollStatsResultReader extends BSONDocumentReader[CollStatsResult] {
-    def read(doc: BSONDocument): CollStatsResult =
+  implicit object CollStatsResultReader extends DealingWithGenericCommandErrorsReader[CollStatsResult] {
+    def readResult(doc: BSONDocument): CollStatsResult =
       CollStatsResult(
         doc.getAs[String]("ns").get,
         doc.getAs[Int]("count").get,

@@ -96,7 +96,7 @@ trait GenericDB[P <: SerializationPack with Singleton] { self: DB =>
 
   def runCommand[R, C <: Command with CommandWithResult[R]]
     (command: C with CommandWithResult[R])
-    (implicit writer: pack.Writer[C], reader: pack.Reader[R]): Future[R] =
+    (implicit writer: pack.Writer[C], reader: pack.Reader[R], ec: ExecutionContext): Future[R] =
     runner(self, command)
 
   def runCommand[C <: Command]
@@ -106,7 +106,7 @@ trait GenericDB[P <: SerializationPack with Singleton] { self: DB =>
 
   def runValueCommand[A <: AnyVal, R <: BoxedAnyVal[A], C <: Command with CommandWithResult[R]]
     (command: C with CommandWithResult[R with BoxedAnyVal[A]])
-    (implicit writer: pack.Writer[C], reader: pack.Reader[R]): Future[A] =
+    (implicit writer: pack.Writer[C], reader: pack.Reader[R], ec: ExecutionContext): Future[A] =
     runner.unboxed(self, command)
 }
 

@@ -12,8 +12,8 @@ object BSONIsMasterCommandImplicits {
     def write(im: IsMaster.type) =
       BSONDocument("ismaster" -> 1)
   }
-  implicit object IsMasterResultReader extends BSONDocumentReader[IsMasterResult] {
-    def read(doc: BSONDocument): IsMasterResult = {
+  implicit object IsMasterResultReader extends DealingWithGenericCommandErrorsReader[IsMasterResult] {
+    def readResult(doc: BSONDocument): IsMasterResult = {
       val rs = doc.getAs[String]("me").map { me =>
         ReplicaSet(
           setName = doc.getAs[String]("setName").get,

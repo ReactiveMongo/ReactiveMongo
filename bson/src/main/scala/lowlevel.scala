@@ -24,6 +24,18 @@ case class LongField(tpe: Byte, name: String, value: Long) extends Field with Va
 case class StructureField[A <: ReadableBuffer](tpe: Byte, name: String, reader: LowLevelBsonDocReader[A]) extends Field
 case class LazyField[A <: ReadableBuffer](tpe: Byte, name: String, buffer: A) extends Field
 
+object LoweLevelDocumentIterator extends (ReadableBuffer => Iterator[ReadableBuffer]) {
+  def apply(buf: ReadableBuffer): Iterator[ReadableBuffer] = new Iterator[ReadableBuffer] {
+    private val slice = buf.slice(buf.readable)
+    def hasNext = slice.readable >= 5 // length + 0x00
+    def next = {
+      val length = slice.readInt
+      slice.index -= 4
+      slice.slice(length)
+    }
+  }
+}
+
 class LowLevelBsonDocReader[A <: ReadableBuffer](rbuf: A) {
   private val start = rbuf.index
   private val length = {

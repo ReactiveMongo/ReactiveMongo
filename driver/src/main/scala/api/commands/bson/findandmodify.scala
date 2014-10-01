@@ -10,8 +10,8 @@ object BSONFindAndModifyCommand extends FindAndModifyCommand[BSONSerializationPa
 
 object BSONFindAndModifyImplicits {
   import BSONFindAndModifyCommand._
-  implicit object FindAndModifyResultReader extends BSONDocumentReader[FindAndModifyResult] {
-    def read(result: BSONDocument): FindAndModifyResult = {
+  implicit object FindAndModifyResultReader extends DealingWithGenericCommandErrorsReader[FindAndModifyResult] {
+    def readResult(result: BSONDocument): FindAndModifyResult =
       FindAndModifyResult(
         result.getAs[BSONDocument]("lastErrorObject").map { doc =>
           UpdateLastError(
@@ -23,7 +23,6 @@ object BSONFindAndModifyImplicits {
         },
         result.getAs[BSONDocument]("value")
       )
-    }
   }
   implicit object FindAndModifyWriter extends BSONDocumentWriter[ResolvedCollectionCommand[FindAndModify]] {
     def write(command: ResolvedCollectionCommand[FindAndModify]): BSONDocument =

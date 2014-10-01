@@ -16,8 +16,8 @@ object BSONGetLastErrorImplicits {
       "j" -> (if(wc.j) Some(true) else None),
       "wtimeout" -> wc.wtimeout)
   }
-  implicit object LastErrorReader extends BSONDocumentReader[LastError] {
-    def read(doc: BSONDocument): LastError =
+  implicit object LastErrorReader extends DealingWithGenericCommandErrorsReader[LastError] {
+    def readResult(doc: BSONDocument): LastError =
       LastError(
         ok = doc.getAs[BSONBooleanLike]("ok").map(_.toBoolean).getOrElse(false),
         err = doc.getAs[String]("err"),
@@ -63,8 +63,8 @@ object BSONCommonWriteCommandsImplicits {
         code = doc.getAs[Int]("code").get,
         errmsg = doc.getAs[String]("errmsg").get)
   }
-  implicit object DefaultWriteResultReader extends BSONDocumentReader[DefaultWriteResult] {
-    def read(doc: BSONDocument): DefaultWriteResult = {
+  implicit object DefaultWriteResultReader extends DealingWithGenericCommandErrorsReader[DefaultWriteResult] {
+    def readResult(doc: BSONDocument): DefaultWriteResult = {
       DefaultWriteResult(
         ok = doc.getAs[Int]("ok").exists(_ != 0),
         n = doc.getAs[Int]("n").getOrElse(0),
@@ -130,8 +130,8 @@ object BSONUpdateCommandImplicits {
         _id = doc.get("_id"))
     }
   }
-  implicit object UpdateResultReader extends BSONDocumentReader[UpdateResult] {
-    def read(doc: BSONDocument): UpdateResult = {
+  implicit object UpdateResultReader extends DealingWithGenericCommandErrorsReader[UpdateResult] {
+    def readResult(doc: BSONDocument): UpdateResult = {
       UpdateWriteResult(
         ok = doc.getAs[Int]("ok").exists(_ != 0),
         n = doc.getAs[Int]("n").getOrElse(0),
