@@ -1,5 +1,5 @@
 language: scala
-script: sbt ++$TRAVIS_SCALA_VERSION "testOnly * -- -exclude testCommands,mongo2_4 --"
+script: sbt ++$TRAVIS_SCALA_VERSION "testOnly * -- -exclude testCommands,mongo2_6 --"
 scala:
   - "2.11.1"
   - "2.10.4"
