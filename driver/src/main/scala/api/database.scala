@@ -125,7 +125,7 @@ trait DBMetaCommands {
    * @param ec execution context
    * @return operation result as BSONValue
    */
-  def eval(javascript: String, nolock: Boolean)(implicit ec: ExecutionContext): Future[BSONValue] = command(new EvalCommnd(javascript, nolock))
+  def eval(javascript: String, nolock: Boolean)(implicit ec: ExecutionContext): Future[Option[BSONValue]] = command(new EvalCommand(javascript, nolock))
 }
 
 /** The default DB implementation, that mixes in the database traits. */

@@ -21,8 +21,8 @@ class DatabaseCollectionNameReadSpec extends Specification {
 
       Await.result(c2.insert(BSONDocument("one" -> BSONString("two"))), DurationInt(10) second)
 
-      Await.result(db2.collectionNames, DurationInt(10) second)
-        .mustEqual(Seq("system.indexes", "collection_one", "collection_two"))
+      Await.result(db2.collectionNames, DurationInt(10) second).toSet
+        .mustEqual(Set("system.indexes", "collection_one", "collection_two"))
     }
 
     "remove db..." in {

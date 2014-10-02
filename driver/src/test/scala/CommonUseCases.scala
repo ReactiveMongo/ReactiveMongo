@@ -95,8 +95,12 @@ class CommonUseCases extends Specification {
 
       val result = Await.result(future, timeout)
 
-      println(BSONDocument.pretty(result))
-      result mustEqual BSONBoolean(true)
+      println(result.map {
+        case doc: BSONDocument => BSONDocument.pretty(doc)
+        case other => other.toString
+      })
+
+      result mustEqual Some(BSONBoolean(true))
     }
   }
 }

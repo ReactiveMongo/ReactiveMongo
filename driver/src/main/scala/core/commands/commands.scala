@@ -596,7 +596,7 @@ case class DeleteIndex(
 }
 
 /** eval command */
-case class EvalCommnd(
+case class EvalCommand(
     javascript: String,
     nolock: Boolean) extends Command[Option[BSONValue]] {
   override def makeDocuments = BSONDocument(
