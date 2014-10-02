@@ -37,6 +37,7 @@ case class CappedOptions(
  * @param capped The collection to be created will be a capped collection if some CappedOptions instance is supplied.
  * @param autoIndexId States if should automatically add an index on the _id field. By default, regular collections will have an indexed _id field, in contrast to capped collections.
  */
+@deprecated("consider using reactivemongo.api.commands.Create instead", "0.11.0")
 class CreateCollection(
     name: String,
     capped: Option[CappedOptions] = None,
@@ -63,6 +64,7 @@ class CreateCollection(
  * @param name The collection name.
  * @param capped The capped collection options.
  */
+@deprecated("consider using reactivemongo.api.commands.ConvertToCapped instead", "0.11.0")
 class ConvertToCapped(
     name: String,
     capped: CappedOptions) extends Command[Boolean] {
@@ -83,6 +85,7 @@ class ConvertToCapped(
  * @param name The collection name.
  * @param scale A number to divide the numbers representing size (useful for getting sizes in kB (1024) or MB (1024 * 1024)).
  */
+@deprecated("consider using reactivemongo.api.commands.CollStats instead", "0.11.0")
 class CollStats(
     name: String,
     scale: Option[Int] = None) extends Command[CollStatsResult] {
@@ -161,6 +164,7 @@ object CollStatsResult extends BSONCommandResultMaker[CollStatsResult] {
  *
  * @param name The collection name.
  */
+@deprecated("consider using reactivemongo.api.commands.Drop instead", "0.11.0")
 class Drop(
     name: String) extends Command[Boolean] {
   def makeDocuments =
@@ -178,6 +182,7 @@ class Drop(
  *
  * @param name The collection name.
  */
+@deprecated("consider using reactivemongo.api.commands.EmptyCapped instead", "0.11.0")
 class EmptyCapped(
     name: String) extends Command[Boolean] {
   def makeDocuments =
@@ -197,6 +202,7 @@ class EmptyCapped(
  * @param target The new name of the collection.
  * @param dropTarget If a collection of name `target` already exists, drop it before renaming this collection.
  */
+@deprecated("consider using reactivemongo.api.commands.RenameCollection instead", "0.11.0")
 class RenameCollection(
     name: String,
     target: String,

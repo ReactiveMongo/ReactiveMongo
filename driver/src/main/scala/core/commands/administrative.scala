@@ -20,6 +20,7 @@ import DefaultBSONHandlers._
 import reactivemongo.core.protocol.Response
 
 /** Drop a database. */
+@deprecated("consider using reactivemongo.api.commands.DropDatabase instead", "0.11.0")
 class DropDatabase() extends Command[Boolean] {
   def makeDocuments =
     BSONDocument("dropDatabase" -> BSONInteger(1))
