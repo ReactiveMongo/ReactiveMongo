@@ -1,7 +1,7 @@
 package reactivemongo.bson
 
 import collection.mutable.ListBuffer
-import reactivemongo.bson.Macros.Annotations.Key
+import reactivemongo.bson.Macros.Annotations.{Key, Ignore}
 import scala.reflect.macros.Context
 
 /**
@@ -179,7 +179,7 @@ private object MacroImpl {
       val constructorParams = constructor.paramss.head
 
       val tuple = Ident(newTermName("tuple"))
-      val (optional, required) = constructorParams.zipWithIndex zip types partition (t => isOptionalType(t._2))
+      val (optional, required) = constructorParams.filterNot(ignoreField).zipWithIndex zip types partition (t => isOptionalType(t._2))
       val values = required map {
         case ((param, i), typ) => {
           val neededType = appliedType(writerType, List(typ))
@@ -325,6 +325,10 @@ private object MacroImpl {
             case value: String => value
           }
       }.flatten.headOption getOrElse param.name.toString
+    }
+    
+    private def ignoreField(param: c.Symbol): Boolean = {
+      param.annotations.exists(ann => ann.tpe =:= typeOf[Ignore] || ann.tpe =:= typeOf[transient])
     }
 
     private def allSubclasses(A: Symbol): Set[Symbol] = {
