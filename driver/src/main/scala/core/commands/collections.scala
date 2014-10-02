@@ -121,8 +121,8 @@ case class CollStatsResult(
   storageSize: Double,
   numExtents: Int,
   nindexes: Int,
-  lastExtentSize: Int,
-  paddingFactor: Double,
+  lastExtentSize: Option[Int],
+  paddingFactor: Option[Double],
   systemFlags: Option[Int],
   userFlags: Option[Int],
   totalIndexSize: Int,
@@ -132,6 +132,7 @@ case class CollStatsResult(
 
 object CollStatsResult extends BSONCommandResultMaker[CollStatsResult] {
   def apply(doc: BSONDocument): Either[CommandError, CollStatsResult] = {
+    // TODO support sharding info
     CommandError.checkOk(doc, Some("collStats")).toLeft {
       CollStatsResult(
         doc.getAs[BSONString]("ns").get.value,
@@ -141,8 +142,8 @@ object CollStatsResult extends BSONCommandResultMaker[CollStatsResult] {
         doc.getAs[BSONNumberLike]("storageSize").get.toDouble,
         doc.getAs[BSONInteger]("numExtents").get.value,
         doc.getAs[BSONInteger]("nindexes").get.value,
-        doc.getAs[BSONInteger]("lastExtentSize").get.value,
-        doc.getAs[BSONDouble]("paddingFactor").get.value,
+        doc.getAs[BSONInteger]("lastExtentSize").map(_.value),
+        doc.getAs[BSONDouble]("paddingFactor").map(_.value),
         doc.getAs[BSONInteger]("systemFlags").map(_.value),
         doc.getAs[BSONInteger]("userFlags").map(_.value),
         doc.getAs[BSONInteger]("totalIndexSize").get.value,
