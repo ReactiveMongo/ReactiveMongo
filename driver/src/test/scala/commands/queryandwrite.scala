@@ -85,7 +85,6 @@ class QueryAndWriteCommands extends Specification {
       val res = Try(Await.result(coll.bulkInsert(docs, false), DurationInt(60).seconds))
       println(res)
       if(res.isFailure) {
-        println(s"failure with exception: ${scala.runtime.ScalaRunTime._toString(res.failed.get)}")
         throw res.failed.get
       }
       //println(s"writeErrors: ${res.get.map(_.writeErrors)}")
