@@ -89,5 +89,14 @@ class CommonUseCases extends Specification {
       Await.ready(future, timeout)
       (future.value.get match { case Failure(e) => e.printStackTrace(); true; case _ => false }) mustEqual true
     }
+    "eval custom javascript code" in {
+      val js = "return 1 === 1;"
+      val future = db.eval(js, nolock = false)
+
+      val result = Await.result(future, timeout)
+
+      println(BSONDocument.pretty(result))
+      result mustEqual BSONBoolean(true)
+    }
   }
 }

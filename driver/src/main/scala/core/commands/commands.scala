@@ -594,3 +594,17 @@ case class DeleteIndex(
     def apply(document: BSONDocument) =
       CommandError.checkOk(document, Some("deleteIndexes")).toLeft(document.getAs[BSONDouble]("nIndexesWas").map(_.value.toInt).get) }
 }
+
+/** eval command */
+case class EvalCommnd(
+    javascript: String,
+    nolock: Boolean) extends Command[Option[BSONValue]] {
+  override def makeDocuments = BSONDocument(
+    "eval" -> BSONString(javascript),
+    "nolock" -> BSONBoolean(nolock))
+
+  object ResultMaker extends BSONCommandResultMaker[Option[BSONValue]] {
+    def apply(document: BSONDocument) =
+      CommandError.checkOk(document, Some("eval")).toLeft(document.get("retval"))
+  }
+}
