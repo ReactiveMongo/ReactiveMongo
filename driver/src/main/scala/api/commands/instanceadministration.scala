@@ -61,3 +61,7 @@ case class CollStatsResult(
   indexSizes: Array[(String, Int)],
   capped: Boolean,
   max: Option[Long])
+
+case class DropIndexes(index: String) extends CollectionCommand with CommandWithResult[DropIndexesResult]
+
+case class DropIndexesResult(value: Int) extends BoxedAnyVal[Int]

@@ -1,3 +1,4 @@
+import util.control.NonFatal
 import org.specs2.mutable._
 import reactivemongo.api.indexes._
 import reactivemongo.api.indexes.IndexType.{Hashed, Geo2D, Geo2DSpherical}
@@ -96,7 +97,7 @@ class IndexesSpec extends Specification with Tags {
           e.code.exists(code => code == 16572 || code == 16755) mustEqual true
           // MongoError['Can't extract geo keys from object, malformed geometry?' (code = 16572)] (< 2.4)
           // 16755 Can't extract geo keys from object, malformed geometry? (2.6)
-        case e =>
+        case NonFatal(e) =>
           e.printStackTrace()
           throw e
       }
@@ -132,6 +133,12 @@ class IndexesSpec extends Specification with Tags {
       val index = Await.result(future, timeout)
       index.key(0)._1 mustEqual "field"
       index.key(0)._2 mustEqual Hashed
+    }
+  }
+
+  "ReactiveMongo index manager" should {
+    "drop all indexes in db.geo" in {
+      Await.result(geo.indexesManager.dropAll(), timeout) mustEqual 2 // _id and loc
     }
   }
 }

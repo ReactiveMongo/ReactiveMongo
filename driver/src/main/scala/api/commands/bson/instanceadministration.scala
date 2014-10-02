@@ -87,3 +87,18 @@ object BSONConvertToCappedImplicits {
       BSONDocument("convertToCapped" -> command.collection) ++ BSONCreateImplicits.CappedWriter.write(command.command.capped)
   }
 }
+
+object BSONDropIndexesImplicits {
+  implicit object BSONDropIndexesWriter extends BSONDocumentWriter[ResolvedCollectionCommand[DropIndexes]] {
+    def write(command: ResolvedCollectionCommand[DropIndexes]): BSONDocument =
+      BSONDocument(
+        "dropIndexes" -> command.collection,
+        "index" -> command.command.index
+      )
+  }
+
+  implicit object BSONDropIndexesReader extends DealingWithGenericCommandErrorsReader[DropIndexesResult] {
+    def readResult(doc: BSONDocument): DropIndexesResult =
+      DropIndexesResult(doc.getAs[BSONNumberLike]("nIndexesWas").map(_.toInt).getOrElse(0))
+  }
+}
