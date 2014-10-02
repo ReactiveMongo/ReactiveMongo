@@ -72,6 +72,7 @@ trait DB {
    *
    * @return a future containing the result of the command.
    */
+  @deprecated("consider using reactivemongo.api.commands along with `GenericDB.runCommand` methods", "0.11.0")
   def command[T](command: Command[T], readPreference: ReadPreference = ReadPreference.primary)(implicit ec: ExecutionContext): Future[T] = {
     Failover(command.apply(name).maker(readPreference), connection, failoverStrategy).future.mapEither(command.ResultMaker(_))
   }

@@ -10,6 +10,18 @@ object CommonImplicits {
   }
 }
 
+object BSONRawCommand extends RawCommand[BSONSerializationPack.type] {
+  val pack: BSONSerializationPack.type = BSONSerializationPack
+}
+
+object BSONRawCommandImplicits {
+  import BSONRawCommand.Raw
+
+  implicit object BSONRawWriter extends BSONDocumentWriter[Raw] {
+    def write(raw: Raw): BSONDocument = raw.doc.produce
+  }
+}
+
 trait BSONCommandError extends CommandError {
   def originalDocument: BSONDocument
 }
