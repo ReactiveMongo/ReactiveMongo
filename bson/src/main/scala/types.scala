@@ -304,7 +304,8 @@ object BSONBinary {
 case object BSONUndefined extends BSONValue { val code = 0x06.toByte }
 
 /** BSON ObjectId value. */
-class BSONObjectID private (raw: Array[Byte]) extends BSONValue {
+@SerialVersionUID(1L)
+class BSONObjectID private (private val raw: Array[Byte]) extends BSONValue with Serializable {
   val code = 0x07.toByte
 
   import java.util.Arrays
