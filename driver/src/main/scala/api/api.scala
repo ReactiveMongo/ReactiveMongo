@@ -149,7 +149,8 @@ case class FailoverStrategy(
 class MongoConnection(
     val actorSystem: ActorSystem,
     val mongosystem: ActorRef,
-    val monitor: ActorRef) {
+    val monitor: ActorRef,
+    val options: MongoConnectionOptions) {
   import akka.pattern.{ ask => akkaAsk }
   import akka.util.Timeout
   /**
@@ -232,6 +233,8 @@ object MongoConnection {
 
   final case class ParsedURI(
     hosts: List[(String, Int)],
+    options: MongoConnectionOptions,
+    ignoredOptions: List[String],
     db: Option[String],
     authenticate: Option[Authenticate])
 
@@ -285,27 +288,65 @@ object MongoConnection {
         case _ => Map.empty
       }
     }
+    def makeOptions(opts: Map[String, String]): (List[String], MongoConnectionOptions) = {
+      opts.iterator.foldLeft(List.empty[String] -> MongoConnectionOptions()) { case ((unsupportedKeys, result), kv) =>
+        kv match {
+          case ("authSource", v)           => unsupportedKeys -> result.copy(authSource = Some(v))
+          case ("connectTimeoutMS", v)     => unsupportedKeys -> result.copy(connectTimeoutMS = v.toInt)
+
+          case ("rm.tcpNoDelay", v)        => unsupportedKeys -> result.copy(tcpNoDelay = v.toBoolean)
+          case ("rm.keepAlive", v)         => unsupportedKeys -> result.copy(keepAlive = v.toBoolean)
+          case ("rm.nbChannelsPerNode", v) => unsupportedKeys -> result.copy(nbChannelsPerNode = v.toInt    )
+
+          case (k, _) => (k :: unsupportedKeys) -> result
+        }
+      }
+    }
 
     Try {
       val useful = uri.replace(prefix, "")
+      def opts = makeOptions(parseOptions(useful))
       useful.split("@").toList match {
         case hostsPortsAndDbName :: Nil =>
           val (db, hosts) = parseHostsAndDbName(hostsPortsAndDbName)
-          ParsedURI(hosts, db, None)
+          val (unsupportedKeys, options) = opts
+          ParsedURI(hosts, options, unsupportedKeys, db, None)
         case usernamePasswd :: hostsPortsAndDbName :: Nil =>
           val (db, hosts) = parseHostsAndDbName(hostsPortsAndDbName)
           if (!db.isDefined)
             throw new URIParsingException(s"Could not parse URI '$uri': authentication information found but no database name in URI")
-          val options = parseOptions(hostsPortsAndDbName)
+          val (unsupportedKeys, options) = opts
           val authenticate = parseAuth(usernamePasswd)
-          ParsedURI(hosts, db, Some(Authenticate.apply(options.get("authSource").getOrElse(db.get), authenticate._1, authenticate._2)))
+          ParsedURI(hosts, options, unsupportedKeys, db, Some(Authenticate.apply(options.authSource.getOrElse(db.get), authenticate._1, authenticate._2)))
         case _ => throw new URIParsingException(s"Could not parse URI '$uri'")
       }
     }
   }
 }
 
+/**
+ * Options for MongoConnection.
+ *
+ * @param connectTimeoutMS The number of milliseconds to wait for a connection to be established before giving up.
+ * @param authSource The database source for authentication credentials.
+ * @param tcpNoDelay TCPNoDelay flag (ReactiveMongo-specific option).
+ * @param keepAlive TCP KeepAlive flag (ReactiveMongo-specific option).
+ * @param nbChannelsPerNode Number of channels (connections) per node (ReactiveMongo-specific option).
+ */
+case class MongoConnectionOptions(
+  // canonical options - connection
+  connectTimeoutMS: Int = 0,
+  // canonical options - authentication options
+  authSource: Option[String] = None,
+
+  // reactivemongo specific options
+  tcpNoDelay: Boolean = true,
+  keepAlive: Boolean = true,
+  nbChannelsPerNode: Int = 10
+)
+
 class MongoDriver(systemOption: Option[ActorSystem] = None) {
+  import MongoDriver.logger
 
   def this(system: ActorSystem) = this(Some(system))
 
@@ -336,11 +377,11 @@ class MongoDriver(systemOption: Option[ActorSystem] = None) {
    * @param nbChannelsPerNode Number of channels to open per node. Defaults to 10.
    * @param name The name of the newly created [[reactivemongo.core.actors.MongoDBSystem]] actor, if needed.
    */
-  def connection(nodes: Seq[String], authentications: Seq[Authenticate] = Seq.empty, nbChannelsPerNode: Int = 10, name: Option[String] = None): MongoConnection = {
-    val props = Props(new MongoDBSystem(nodes, authentications, nbChannelsPerNode))
+  def connection(nodes: Seq[String], options: MongoConnectionOptions = MongoConnectionOptions(), authentications: Seq[Authenticate] = Seq.empty, nbChannelsPerNode: Int = 10, name: Option[String] = None): MongoConnection = {
+    val props = Props(new MongoDBSystem(nodes, authentications, options)())
     val mongosystem = if (name.isDefined) system.actorOf(props, name = name.get) else system.actorOf(props)
     val monitor = system.actorOf(Props(new MonitorActor(mongosystem)))
-    val connection = new MongoConnection(system, mongosystem, monitor)
+    val connection = new MongoConnection(system, mongosystem, monitor, options)
     this.synchronized {
       _connections = connection :: _connections
     }
@@ -356,8 +397,11 @@ class MongoDriver(systemOption: Option[ActorSystem] = None) {
    * @param nbChannelsPerNode Number of channels to open per node.
    * @param name The name of the newly created [[reactivemongo.core.actors.MongoDBSystem]] actor, if needed.
    */
-  def connection(parsedURI: MongoConnection.ParsedURI, nbChannelsPerNode: Int, name: Option[String]): MongoConnection =
-    connection(parsedURI.hosts.map(h => h._1 + ':' + h._2), parsedURI.authenticate.toSeq, nbChannelsPerNode, name)
+  def connection(parsedURI: MongoConnection.ParsedURI, nbChannelsPerNode: Int, name: Option[String]): MongoConnection = {
+    if(!parsedURI.ignoredOptions.isEmpty)
+      logger.warn(s"Some options were ignored because they are not supported (yet): ${parsedURI.ignoredOptions.mkString(", ")}")
+    connection(parsedURI.hosts.map(h => h._1 + ':' + h._2), parsedURI.options, parsedURI.authenticate.toSeq, nbChannelsPerNode, name)
+  }
 
   /**
    * Creates a new MongoConnection from URI.
@@ -382,6 +426,7 @@ class MongoDriver(systemOption: Option[ActorSystem] = None) {
 }
 
 object MongoDriver {
+  private val logger = LazyLogger("reactivemongo.api.MongoDriver")
 
   /** Default ActorSystem used in the default MongoDriver constructor. */
   private def defaultSystem = {

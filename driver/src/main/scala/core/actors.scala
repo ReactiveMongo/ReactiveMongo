@@ -26,7 +26,7 @@ import scala.concurrent.{ Future, Promise }
 import scala.util.{ Failure, Success, Try }
 import reactivemongo.core.nodeset._
 import java.net.InetSocketAddress
-import reactivemongo.api.ReadPreference
+import reactivemongo.api.{ MongoConnectionOptions, ReadPreference }
 
 // messages
 
@@ -89,15 +89,15 @@ case object Closed
 /**
  * Main actor that processes the requests.
  *
- * @param seeds nodes that will be probed to discover the whole replica set (or one standalone node)
+ * @param seeds nodes that will be probed to discover the whole replica set (or one standalone node).
  * @param auth list of authenticate messages - all the nodes will be authenticated as soon they are connected.
- * @param nbChannelsPerNode number of open channels by node
+ * @param options MongoConnectionOption instance (used for tweaking connection flags and pool size).
  */
 class MongoDBSystem(
     seeds: Seq[String],
     initialAuthenticates: Seq[Authenticate],
-    nbChannelsPerNode: Int,
-    channelFactory: ChannelFactory = new ChannelFactory()) extends Actor {
+    options: MongoConnectionOptions)
+    (channelFactory: ChannelFactory = new ChannelFactory(options)) extends Actor {
   import MongoDBSystem._
 
   private implicit val cFactory = channelFactory
@@ -281,7 +281,7 @@ class MongoDBSystem(
 
     // monitor
     case ConnectAll => {
-      updateNodeSet(nodeSet.createNeededChannels(self, nbChannelsPerNode))
+      updateNodeSet(nodeSet.createNeededChannels(self, options.nbChannelsPerNode))
       logger.debug("ConnectAll Job running... Status: " + nodeSet.nodes.map(_.toShortString).mkString(" | "))
       connectAll(nodeSet)
     }
@@ -370,7 +370,7 @@ class MongoDBSystem(
                 })
               } else {
                 ns
-              }).createNeededChannels(self, nbChannelsPerNode)
+              }).createNeededChannels(self, options.nbChannelsPerNode)
             }
           }
         })

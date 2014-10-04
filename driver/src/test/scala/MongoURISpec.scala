@@ -12,19 +12,37 @@ class MongoURISpec extends Specification {
     val simplest = "mongodb://host1"
     s"parse $simplest with success" in {
       val p = MongoConnection.parseURI(simplest)
-      p mustEqual Success(ParsedURI(hosts = List("host1" -> 27017), db = None, authenticate = None))
+      p mustEqual Success(
+        ParsedURI(
+          hosts = List("host1" -> 27017),
+          db = None,
+          authenticate = None,
+          options = MongoConnectionOptions(),
+          ignoredOptions = List()))
     }
 
     val withOpts = "mongodb://host1?foo=bar"
     s"parse $withOpts with success" in {
       val p = MongoConnection.parseURI(withOpts)
-      p mustEqual Success(ParsedURI(hosts = List("host1" -> 27017), db = None, authenticate = None))
+      p mustEqual Success(
+        ParsedURI(
+          hosts = List("host1" -> 27017),
+          db = None,
+          authenticate = None,
+          options = MongoConnectionOptions(),
+          ignoredOptions = List("foo")))
     }
 
     val withPort = "mongodb://host1:27018"
     s"parse $withPort with success" in {
       val p = MongoConnection.parseURI(withPort)
-      p mustEqual Success(ParsedURI(hosts = List("host1" -> 27018), db = None, authenticate = None))
+      p mustEqual Success(
+        ParsedURI(
+          hosts = List("host1" -> 27018),
+          db = None,
+          authenticate = None,
+          options = MongoConnectionOptions(),
+          ignoredOptions = List()))
     }
 
     val withWrongPort = "mongodb://host1:68903"
@@ -42,13 +60,25 @@ class MongoURISpec extends Specification {
     val withDb = "mongodb://host1/somedb"
     s"parse $withDb with success" in {
       val p = MongoConnection.parseURI(withDb)
-      p mustEqual Success(ParsedURI(hosts = List("host1" -> 27017), db = Some("somedb"), authenticate = None))
+      p mustEqual Success(
+        ParsedURI(
+          hosts = List("host1" -> 27017),
+          db = Some("somedb"),
+          authenticate = None,
+          options = MongoConnectionOptions(),
+          ignoredOptions = List()))
     }
 
     val withAuth = "mongodb://user123:passwd123@host1/somedb"
     s"parse $withAuth with success" in {
       val p = MongoConnection.parseURI(withAuth)
-      p mustEqual Success(ParsedURI(hosts = List("host1" -> 27017), db = Some("somedb"), authenticate = Some(Authenticate("somedb", "user123", "passwd123"))))
+      p mustEqual Success(
+        ParsedURI(
+          hosts = List("host1" -> 27017),
+          db = Some("somedb"),
+          authenticate = Some(Authenticate("somedb", "user123", "passwd123")),
+          options = MongoConnectionOptions(),
+          ignoredOptions = List()))
     }
 
     val wrongWithAuth = "mongodb://user123:passwd123@host1"
@@ -60,13 +90,25 @@ class MongoURISpec extends Specification {
     val fullFeatured = "mongodb://user123:passwd123@host1:27018,host2:27019,host3:27020/somedb?foo=bar"
     s"parse $fullFeatured with success" in {
       val p = MongoConnection.parseURI(fullFeatured)
-      p mustEqual Success(ParsedURI(hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020), db = Some("somedb"), authenticate = Some(Authenticate("somedb", "user123", "passwd123"))))
+      p mustEqual Success(
+        ParsedURI(
+          hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
+          db = Some("somedb"),
+          authenticate = Some(Authenticate("somedb", "user123", "passwd123")),
+          options = MongoConnectionOptions(),
+          ignoredOptions = List("foo")))
     }
 
     val withAuthParamAndSource = "mongodb://user123:passwd123@host1:27018,host2:27019,host3:27020/somedb?foo=bar&authSource=authdb"
     s"parse $withAuthParamAndSource with success" in {
       val p = MongoConnection.parseURI(withAuthParamAndSource)
-      p mustEqual Success(ParsedURI(hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020), db = Some("somedb"), authenticate = Some(Authenticate("authdb", "user123", "passwd123"))))
+      p mustEqual Success(
+        ParsedURI(
+          hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
+          db = Some("somedb"),
+          authenticate = Some(Authenticate("authdb", "user123", "passwd123")),
+          options = MongoConnectionOptions(authSource = Some("authdb")),
+          ignoredOptions = List("foo")))
     }
   }
 }
