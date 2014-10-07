@@ -45,7 +45,7 @@ object bulk {
    * @param bulkByteSize The maximum size for a bulk, in bytes.
    */
   def iteratee(coll: Collection, writeConcern: GetLastError = GetLastError(), bulkSize: Int = MaxDocs, bulkByteSize: Int = MaxBulkSize)(implicit context: ExecutionContext): Iteratee[ChannelBuffer, Int] =
-    iteratee(coll, GetLastError(), (docs, bulk) => docs > bulkSize || bulk > bulkByteSize)
+    iteratee(coll, writeConcern, (docs, bulk) => docs > bulkSize || bulk > bulkByteSize)
 
   /**
    * Returns an iteratee that will consume chunks (chunk == document) and insert them into the given collection.
