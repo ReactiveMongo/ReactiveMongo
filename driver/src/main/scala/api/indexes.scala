@@ -69,6 +69,10 @@ object IndexType {
   def apply(value: BSONValue) = value match {
     case BSONInteger(i) if i > 0 => Ascending
     case BSONInteger(i) if i < 0 => Descending
+    case BSONDouble(i) if i > 0 => Ascending
+    case BSONDouble(i) if i < 0 => Descending
+    case BSONLong(i) if i > 0 => Ascending
+    case BSONLong(i) if i < 0 => Descending
     case BSONString(s) if s == "2d" => Geo2D
     case BSONString(s) if s == "2dsphere" => Geo2DSpherical
     case BSONString(s) if s == "geoHaystack" => GeoHaystack
