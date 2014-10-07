@@ -222,11 +222,11 @@ trait GenericCollection[Structure, Reader[_], Writer[_]] extends Collection with
     Failover(checkedWriteRequest, db.connection, failoverStrategy).future.mapEither(LastError.meaningful(_))
   }
 
-  def bulkInsert[T](enumerator: Enumerator[T], bulkSize: Int = bulk.MaxDocs, bulkByteSize: Int = bulk.MaxBulkSize)(implicit writer: Writer[T], ec: ExecutionContext): Future[Int] =
-    enumerator |>>> bulkInsertIteratee(bulkSize, bulkByteSize)
+  def bulkInsert[T](enumerator: Enumerator[T], writeConcern: GetLastError = GetLastError(), bulkSize: Int = bulk.MaxDocs, bulkByteSize: Int = bulk.MaxBulkSize)(implicit writer: Writer[T], ec: ExecutionContext): Future[Int] =
+    enumerator |>>> bulkInsertIteratee(writeConcern, bulkSize, bulkByteSize)
 
-  def bulkInsertIteratee[T](bulkSize: Int = bulk.MaxDocs, bulkByteSize: Int = bulk.MaxBulkSize)(implicit writer: Writer[T], ec: ExecutionContext): Iteratee[T, Int] =
-    Enumeratee.map { doc: T => writeDoc(doc, writer) } &>> bulk.iteratee(this, bulkSize, bulkByteSize)
+  def bulkInsertIteratee[T](writeConcern: GetLastError = GetLastError(), bulkSize: Int = bulk.MaxDocs, bulkByteSize: Int = bulk.MaxBulkSize)(implicit writer: Writer[T], ec: ExecutionContext): Iteratee[T, Int] =
+    Enumeratee.map { doc: T => writeDoc(doc, writer) } &>> bulk.iteratee(this, writeConcern, bulkSize, bulkByteSize)
 
   /**
    * Remove the matched document(s) from the collection without writeConcern.

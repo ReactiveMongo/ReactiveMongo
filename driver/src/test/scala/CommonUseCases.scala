@@ -19,11 +19,11 @@ class CommonUseCases extends Specification {
     }
     "insert some docs from an enumerator of docs" in {
       val enum = Enumerator((18 to 60).map(i => BSONDocument("age" -> BSONInteger(i), "name" -> BSONString("Jack" + i))): _*)
-      Await.result(collection.bulkInsert(enum, 100), timeout) mustEqual 43
+      Await.result(collection.bulkInsert(enum, bulkSize = 100), timeout) mustEqual 43
     }
     "insert from an empty enumerator of docs" in {
       val enum = Enumerator[BSONDocument]()
-      Await.result(collection.bulkInsert(enum, 100), timeout) mustEqual 0
+      Await.result(collection.bulkInsert(enum, bulkSize = 100), timeout) mustEqual 0
     }
     "find them" in {
       // batchSize (>1) allows us to test cursors ;)

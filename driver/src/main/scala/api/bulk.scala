@@ -20,6 +20,7 @@ import org.jboss.netty.buffer.{ ChannelBuffer, ChannelBuffers }
 import play.api.libs.iteratee._
 import reactivemongo.utils.LazyLogger
 import scala.concurrent.{ ExecutionContext, Future }
+import reactivemongo.core.commands.GetLastError
 import reactivemongo.core.netty.ChannelBufferWritableBuffer
 
 /**
@@ -39,11 +40,12 @@ object bulk {
    * This iteratee eventually gives the number of documents that have been inserted into the given collection.
    *
    * @param coll The collection where the documents will be stored.
+   * @param writeConcern the [[reactivemongo.core.commands.GetLastError]] command message to send in order to control how the documents are removed. Defaults to GetLastError().
    * @param bulkSize The number of documents per bulk.
    * @param bulkByteSize The maximum size for a bulk, in bytes.
    */
-  def iteratee(coll: Collection, bulkSize: Int = MaxDocs, bulkByteSize: Int = MaxBulkSize)(implicit context: ExecutionContext): Iteratee[ChannelBuffer, Int] =
-    iteratee(coll, (docs, bulk) => docs > bulkSize || bulk > bulkByteSize)
+  def iteratee(coll: Collection, writeConcern: GetLastError = GetLastError(), bulkSize: Int = MaxDocs, bulkByteSize: Int = MaxBulkSize)(implicit context: ExecutionContext): Iteratee[ChannelBuffer, Int] =
+    iteratee(coll, GetLastError(), (docs, bulk) => docs > bulkSize || bulk > bulkByteSize)
 
   /**
    * Returns an iteratee that will consume chunks (chunk == document) and insert them into the given collection.
@@ -51,15 +53,16 @@ object bulk {
    * This iteratee eventually gives the number of documents that have been inserted into the given collection.
    *
    * @param coll The collection where the documents will be stored.
+   * @param writeConcern the [[reactivemongo.core.commands.GetLastError]] command message to send in order to control how the documents are removed. Defaults to GetLastError().
    * @param reachedUpperBound A function that returns true if the staging bulk can be sent to be written. This function has two parameters: numberOfDocuments and numberOfBytes.
    */
-  def iteratee(coll: Collection, reachedUpperBound: (Int, Int) => Boolean)(implicit context: ExecutionContext): Iteratee[ChannelBuffer, Int] = {
+  def iteratee(coll: Collection, writeConcern: GetLastError, reachedUpperBound: (Int, Int) => Boolean)(implicit context: ExecutionContext): Iteratee[ChannelBuffer, Int] = {
     val channelColl = coll.as(coll.failoverStrategy)
     Iteratee.foldM(Bulk()) { (bulk, doc: ChannelBuffer) =>
       logger.debug("bulk= " + bulk)
       if (bulk.currentBulkDocsNumber > 0 && reachedUpperBound(bulk.currentBulkDocsNumber + 1, bulk.docs.writerIndex + doc.writerIndex)) {
         logger.debug("inserting, at " + bulk.collectedDocs)
-        channelColl.insert(bulk)(BulkWriter, context).map { _ =>
+        channelColl.insert(bulk, writeConcern)(BulkWriter, context).map { _ =>
           val nextBulk = Bulk(collectedDocs = bulk.collectedDocs) +> doc
           logger.debug("redeemed, will give " + nextBulk)
           nextBulk
@@ -71,7 +74,7 @@ object bulk {
       if (bulk.currentBulkDocsNumber == 0)
         done
       else
-        Iteratee.flatten(channelColl.insert(bulk)(BulkWriter, context).map(_ => done))
+        Iteratee.flatten(channelColl.insert(bulk, writeConcern)(BulkWriter, context).map(_ => done))
     }
   }
 
