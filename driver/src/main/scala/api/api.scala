@@ -376,6 +376,7 @@ class MongoDriver(systemOption: Option[ActorSystem] = None) {
    * @param authentications A list of Authenticates.
    * @param nbChannelsPerNode Number of channels to open per node. Defaults to 10.
    * @param name The name of the newly created [[reactivemongo.core.actors.MongoDBSystem]] actor, if needed.
+   * @param options Options for the new connection pool.
    */
   def connection(nodes: Seq[String], options: MongoConnectionOptions = MongoConnectionOptions(), authentications: Seq[Authenticate] = Seq.empty, nbChannelsPerNode: Int = 10, name: Option[String] = None): MongoConnection = {
     val props = Props(new MongoDBSystem(nodes, authentications, options)())
