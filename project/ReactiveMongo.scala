@@ -14,8 +14,8 @@ object BuildSettings {
   val buildSettings = Defaults.defaultSettings ++ Seq(
     organization := "org.reactivemongo",
     version := buildVersion,
-    scalaVersion := "2.11.1",
-    crossScalaVersions  := Seq("2.11.1", "2.10.4"),
+    scalaVersion := "2.11.2",
+    crossScalaVersions  := Seq("2.11.2", "2.10.4"),
     crossVersion := CrossVersion.binary,
     javaOptions in test ++= Seq("-Xmx512m", "-XX:MaxPermSize=512m"),
     scalacOptions ++= Seq("-unchecked", "-deprecation", "-target:jvm-1.6"),
@@ -121,13 +121,13 @@ object Resolvers {
 object Dependencies {
   val netty = "io.netty" % "netty" % "3.6.5.Final" cross CrossVersion.Disabled
 
-  val akkaActor = "com.typesafe.akka" %% "akka-actor" % "2.3.3"
+  val akkaActor = "com.typesafe.akka" %% "akka-actor" % "2.3.6"
 
-  val iteratees = "com.typesafe.play" %% "play-iteratees" % "2.3.0"
+  val iteratees = "com.typesafe.play" %% "play-iteratees" % "2.3.5"
 
   val specs = "org.specs2" %% "specs2-core" % "2.3.11" % "test"
 
-  val log4jVersion = "2.0-beta9"
+  val log4jVersion = "2.0.2"
   val log4j = Seq("org.apache.logging.log4j" % "log4j-api" % log4jVersion, "org.apache.logging.log4j" % "log4j-core" % log4jVersion)
 }
 
