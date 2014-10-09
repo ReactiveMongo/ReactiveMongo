@@ -26,7 +26,7 @@ But if what you're interested in is live feeds then you can stream a MongoDB cap
 
 Moreover, you can now use GridFS as a non-blocking, streaming datastore. ReactiveMongo retrieves the file, chunk by chunk, and streams it until the client is done or there's no more data. Neither huge memory consumption, nor blocked thread during the process!
 
-## Step By Step Example 
+## Step By Step Example
 
 Let's show a simple use case: print the documents of a collection.
 
@@ -48,16 +48,11 @@ ReactiveMongo is available on [Maven Central](http://search.maven.org/#browse%7C
 If you use sbt, you just have to edit `build.sbt` and add the following:
 
 ```scala
-libraryDependencies += "org.reactivemongo" %% "reactivemongo" % "0.10.0"
+// using akka 2.3.x and scala 2.10.x or 2.11.x
+libraryDependencies += "org.reactivemongo" %% "reactivemongo" % "0.10.5.0.akka23"
 ```
 
-There is also a snapshot of the stable branch that compiles against Akka 2.3 (and both Scala 2.10/2.11):
-
-```scala
-resolvers += "Sonatype Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots/"
-
-libraryDependencies += "org.reactivemongo" %% "reactivemongo" % "0.10.5.akka23-SNAPSHOT"
-```
+Note: there is a version compiled against akka 2.2.x and scala 2.10.x only (`0.10.5.0.akka22`).
 
 Or if you want to be on the bleeding edge using snapshots:
 
