@@ -1,5 +1,5 @@
 import org.specs2.mutable._
-import play.api.libs.iteratee.Enumerator
+import play.api.libs.iteratee._
 import reactivemongo.api._
 import reactivemongo.api.gridfs.{ReadFile, DefaultFileToSave, GridFS}
 import reactivemongo.api.gridfs.Implicits._
@@ -31,6 +31,11 @@ class GridfsSpec extends Specification {
       (actual.filename mustEqual file.filename) and
       (actual.uploadDate must beSome) and
       (actual.contentType mustEqual file.contentType)
+      import scala.collection.mutable.ArrayBuilder
+      val res = Await.result(gfs.enumerate(actual) |>>> Iteratee.fold(ArrayBuilder.make[Byte]()) { (result, arr) =>
+        result ++= arr
+      }, timeout)
+      res.result mustEqual ((1 to 100).map(_.toByte).toArray)
     }
 
     "delete this file from gridfs" in {

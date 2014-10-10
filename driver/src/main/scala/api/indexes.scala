@@ -18,7 +18,9 @@ package reactivemongo.api.indexes
 import reactivemongo.api._
 import reactivemongo.bson._
 import DefaultBSONHandlers._
-import reactivemongo.core.commands.{ DeleteIndex, LastError }
+import reactivemongo.api.commands.WriteResult
+import reactivemongo.api.commands.DropIndexes
+import reactivemongo.api.commands.bson.BSONDropIndexesImplicits._
 import reactivemongo.utils.option
 import reactivemongo.core.netty._
 import scala.concurrent.{ Future, ExecutionContext }
@@ -172,24 +174,45 @@ class IndexesManager(db: DB)(implicit context: ExecutionContext) {
    *
    * @param nsIndex The index to create.
    */
-  def create(nsIndex: NSIndex): Future[LastError] = {
+  def create(nsIndex: NSIndex): Future[WriteResult] = {
     implicit val writer = IndexesManager.NSIndexWriter
     collection.insert(nsIndex)
   }
 
   /**
-   * Deletes the given index on that database.
+   * Deletes the given index on the given collection.
    *
    * @return The deleted index number.
    */
+  @deprecated("Use drop instead", "0.11.0")
   def delete(nsIndex: NSIndex): Future[Int] = delete(nsIndex.collectionName, nsIndex.index.eventualName)
 
   /**
-   * Deletes the given index on that database.
+   * Deletes the given index on the given collection.
    *
-   * @return The deleted index number.
+   * @return The number of indexes that were dropped.
    */
-  def delete(collectionName: String, indexName: String): Future[Int] = db.command(DeleteIndex(collectionName, indexName))
+  @deprecated("Use drop instead", "0.11.0")
+  def delete(collectionName: String, indexName: String): Future[Int] = db.collection(collectionName).runValueCommand(DropIndexes(indexName))
+
+  /**
+   * Drops the given index on the given collection.
+   *
+   * @return The number of indexes that were dropped.
+   */
+  def drop(nsIndex: NSIndex): Future[Int] = drop(nsIndex.collectionName, nsIndex.index.eventualName)
+
+  /**
+   * Drops the given index on the given collection.
+   *
+   * @return The number of indexes that were dropped.
+   */
+  def drop(collectionName: String, indexName: String): Future[Int] = db.collection(collectionName).runValueCommand(DropIndexes(indexName))
+
+  /**
+   * Drops all the indexes on the given collection.
+   */
+  def dropAll(collectionName: String): Future[Int] = drop(collectionName, "*")
 
   /** Gets a manager for the given collection. */
   def onCollection(name: String) = new CollectionIndexesManager(db.name + "." + name, this)
@@ -226,7 +249,7 @@ class CollectionIndexesManager(fqName: String, manager: IndexesManager)(implicit
    *
    * @param index The index to create.
    */
-  def create(index: Index): Future[LastError] =
+  def create(index: Index): Future[WriteResult] =
     manager.create(NSIndex(fqName, index))
 
   /**
@@ -234,6 +257,7 @@ class CollectionIndexesManager(fqName: String, manager: IndexesManager)(implicit
    *
    * @return The deleted index number.
    */
+  @deprecated("Use drop instead", "0.11.0")
   def delete(index: Index) = manager.delete(NSIndex(collectionName, index))
 
   /**
@@ -241,7 +265,27 @@ class CollectionIndexesManager(fqName: String, manager: IndexesManager)(implicit
    *
    * @return The deleted index number.
    */
+  @deprecated("Use drop instead", "0.11.0")
   def delete(name: String) = manager.delete(collectionName, name)
+
+  /**
+   * Drops the given index on that collection.
+   *
+   * @return The number of indexes that were dropped.
+   */
+  def drop(nsIndex: NSIndex): Future[Int] = manager.drop(nsIndex)
+
+  /**
+   * Drops the given index on that collection.
+   *
+   * @return The number of indexes that were dropped.
+   */
+  def drop(indexName: String): Future[Int] = manager.drop(collectionName, indexName)
+
+  /**
+   * Drops all the indexes on that collection.
+   */
+  def dropAll(): Future[Int] = manager.dropAll(collectionName)
 }
 
 object IndexesManager {

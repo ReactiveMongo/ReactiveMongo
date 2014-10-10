@@ -10,7 +10,7 @@ class BSONCollectionSpec extends Specification {
 
   sequential
 
-  import reactivemongo.api.collections.default._
+  import reactivemongo.api.collections.bson._
 
   lazy val collection = db("somecollection_bsoncollectionspec")
 

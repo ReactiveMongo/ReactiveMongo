@@ -15,7 +15,7 @@
  */
 package reactivemongo.api
 
-import collections.default.BSONCollection
+import collections.bson.BSONCollection
 import reactivemongo.api.indexes.IndexesManager
 import reactivemongo.bson._
 import reactivemongo.core.commands.{ Update => UpdateCommand, _ }
@@ -53,14 +53,14 @@ trait DB {
    *
    * @param name The name of the collection to open.
    */
-  def apply[C <: Collection](name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit producer: CollectionProducer[C] = collections.default.BSONCollectionProducer): C = collection(name, failoverStrategy)
+  def apply[C <: Collection](name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit producer: CollectionProducer[C] = collections.bson.BSONCollectionProducer): C = collection(name, failoverStrategy)
 
   /**
    * Gets a [[reactivemongo.api.Collection]] from this database.
    *
    * @param name The name of the collection to open.
    */
-  def collection[C <: Collection](name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit producer: CollectionProducer[C] = collections.default.BSONCollectionProducer): C = {
+  def collection[C <: Collection](name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit producer: CollectionProducer[C] = collections.bson.BSONCollectionProducer): C = {
     producer.apply(this, name, failoverStrategy)
   }
 
@@ -72,6 +72,7 @@ trait DB {
    *
    * @return a future containing the result of the command.
    */
+  @deprecated("consider using reactivemongo.api.commands along with `GenericDB.runCommand` methods", "0.11.0")
   def command[T](command: Command[T], readPreference: ReadPreference = ReadPreference.primary)(implicit ec: ExecutionContext): Future[T] = {
     Failover(command.apply(name).maker(readPreference), connection, failoverStrategy).future.mapEither(command.ResultMaker(_))
   }
@@ -87,12 +88,41 @@ trait DB {
   def sibling(name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit ec: ExecutionContext) = connection.db(name, failoverStrategy)
 }
 
+trait GenericDB[P <: SerializationPack with Singleton] { self: DB =>
+  val pack: P
+
+  import reactivemongo.api.commands._
+
+  def runner = Command.run(pack)
+
+  def runCommand[R, C <: Command with CommandWithResult[R]]
+    (command: C with CommandWithResult[R])
+    (implicit writer: pack.Writer[C], reader: pack.Reader[R], ec: ExecutionContext): Future[R] =
+    runner(self, command)
+
+  def runCommand[C <: Command]
+    (command: C)
+    (implicit writer: pack.Writer[C]): CursorFetcher[pack.type, Cursor] =
+    runner(self, command)
+
+  def runValueCommand[A <: AnyVal, R <: BoxedAnyVal[A], C <: Command with CommandWithResult[R]]
+    (command: C with CommandWithResult[R with BoxedAnyVal[A]])
+    (implicit writer: pack.Writer[C], reader: pack.Reader[R], ec: ExecutionContext): Future[A] =
+    runner.unboxed(self, command)
+}
+
 /** A mixin that provides commands about this database itself. */
 trait DBMetaCommands {
   self: DB =>
 
+  import reactivemongo.api.commands.{ Command, DropDatabase }
+  import reactivemongo.api.commands.bson.{ CommonImplicits, BSONDropDatabaseImplicits }
+  import CommonImplicits._
+  import BSONDropDatabaseImplicits._
+
   /** Drops this database. */
-  def drop()(implicit ec: ExecutionContext): Future[Boolean] = command(new DropDatabase())
+  def drop()(implicit ec: ExecutionContext): Future[Unit] =
+    Command.run(BSONSerializationPack).unboxed(self, DropDatabase)
 
   /** Returns an index manager for this database. */
   def indexesManager(implicit ec: ExecutionContext) = new IndexesManager(self)
@@ -118,6 +148,7 @@ trait DBMetaCommands {
       .collect[List]()
   }
 
+/* // TODO
   /**
    * Execute MongoDB eval command and return the result
    * @param javascript javascript code for evaluation
@@ -125,14 +156,16 @@ trait DBMetaCommands {
    * @param ec execution context
    * @return operation result as BSONValue
    */
-  def eval(javascript: String, nolock: Boolean)(implicit ec: ExecutionContext): Future[Option[BSONValue]] = command(new EvalCommand(javascript, nolock))
+  def eval(javascript: String, nolock: Boolean)(implicit ec: ExecutionContext): Future[Option[BSONValue]] = command(new EvalCommand(javascript, nolock)) */
 }
 
 /** The default DB implementation, that mixes in the database traits. */
 case class DefaultDB(
   name: String,
   connection: MongoConnection,
-  failoverStrategy: FailoverStrategy = FailoverStrategy()) extends DB with DBMetaCommands
+  failoverStrategy: FailoverStrategy = FailoverStrategy()) extends DB with DBMetaCommands with GenericDB[BSONSerializationPack.type] {
+  val pack: BSONSerializationPack.type = BSONSerializationPack
+}
 
 object DB {
   def apply(name: String, connection: MongoConnection, failoverStrategy: FailoverStrategy = FailoverStrategy()) = DefaultDB(name, connection, failoverStrategy)

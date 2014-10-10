@@ -97,7 +97,6 @@ object DefaultBufferHandler extends BufferHandler {
       buffer
     }
     def read(b: ReadableBuffer) = {
-
       val startIndex = b.index
       val length = b.readInt
       val buffer = b.slice(length - 4)

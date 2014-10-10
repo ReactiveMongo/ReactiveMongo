@@ -24,13 +24,13 @@ import org.jboss.netty.channel.socket.nio._
 import org.jboss.netty.handler.codec.oneone._
 import org.jboss.netty.handler.codec.frame.FrameDecoder
 import reactivemongo.core.actors.{ ChannelConnected, ChannelClosed, ChannelDisconnected }
-import reactivemongo.core.commands.GetLastError
+import reactivemongo.api.SerializationPack
+import reactivemongo.api.commands.GetLastError
 import reactivemongo.core.errors._
 import reactivemongo.core.netty._
 import reactivemongo.utils.LazyLogger
 import BufferAccessors._
 import reactivemongo.api.ReadPreference
-import reactivemongo.api.collections.BufferReader
 
 object `package` {
   implicit class RichBuffer(val buffer: ChannelBuffer) extends AnyVal {
@@ -183,7 +183,13 @@ case class CheckedWriteRequest(
     op: WriteRequestOp,
     documents: BufferSequence,
     getLastError: GetLastError) {
-  def apply(): (RequestMaker, RequestMaker) = RequestMaker(op, documents) -> getLastError.apply(op.db).maker
+  def apply(): (RequestMaker, RequestMaker) = {
+    import reactivemongo.api.BSONSerializationPack
+    import reactivemongo.api.commands.Command
+    import reactivemongo.api.commands.bson.BSONGetLastErrorImplicits.GetLastErrorWriter
+    val gleRequestMaker = Command.requestMaker(BSONSerializationPack).onDatabase(op.db, getLastError, ReadPreference.primary)(GetLastErrorWriter).requestMaker
+    RequestMaker(op, documents) -> gleRequestMaker
+  }
 }
 
 /**
@@ -267,10 +273,13 @@ case class Response(
 }
 
 object Response {
+  import reactivemongo.api.BSONSerializationPack
   import reactivemongo.bson.BSONDocument
   import reactivemongo.bson.DefaultBSONHandlers.BSONDocumentIdentity
-  import reactivemongo.api.collections.default.BSONDocumentReaderAsBufferReader
-  def parse(response: Response): Iterator[BSONDocument] = ReplyDocumentIterator(response.reply, response.documents)(BSONDocumentReaderAsBufferReader(BSONDocumentIdentity))
+  //import reactivemongo.api.collections.default.BSONDocumentReaderAsBufferReader
+
+  def parse(response: Response): Iterator[BSONDocument] =
+    ReplyDocumentIterator(BSONSerializationPack)(response.reply, response.documents)(BSONDocumentIdentity)
 }
 
 /**
@@ -282,6 +291,36 @@ object Response {
  */
 case class ResponseInfo(
   channelId: Int)
+
+
+sealed trait MongoWireVersion extends Ordered[MongoWireVersion] {
+  def value: Int
+
+  final def compare(x: MongoWireVersion): Int =
+    if(value == x.value) 0
+    else if(value < x.value) -1
+    else 1
+}
+
+object MongoWireVersion {
+  /*
+   * Original meaning of MongoWireVersion is more about protocol features.
+   *
+   * - RELEASE_2_4_AND_BEFORE (0)
+   * - AGG_RETURNS_CURSORS (1)
+   * - BATCH_COMMANDS (2)
+   *
+   * But wireProtocol=1 is virtually non-existent; Mongo 2.4 was 0 and Mongo 2.6 is 2.
+   */
+  object V24AndBefore extends MongoWireVersion { def value = 0 }
+  object V26 extends MongoWireVersion { def value = 2 }
+
+  def apply(v: Int): MongoWireVersion =
+    if(v >= V26.value) V26
+    else V24AndBefore
+
+  def unapply(v: MongoWireVersion): Option[Int] = Some(v.value)
+}
 
 // protocol handlers for netty.
 private[reactivemongo] class RequestEncoder extends OneToOneEncoder {
@@ -301,10 +340,30 @@ private[reactivemongo] class RequestEncoder extends OneToOneEncoder {
   }
 }
 
-private[reactivemongo] case class ReplyDocumentIterator[T](private val reply: Reply, private val buffer: ChannelBuffer)(implicit reader: BufferReader[T]) extends Iterator[T] {
+object ReplyDocumentIterator  {
+  def apply[P <: SerializationPack, A](pack: P)(reply: Reply, buffer: ChannelBuffer)(implicit reader: pack.Reader[A]): Iterator[A] = new Iterator[A] {
+    override def hasNext = buffer.readable
+    override def next =
+      try {
+        val cbrb = ChannelBufferReadableBuffer(buffer.readBytes(buffer.getInt(buffer.readerIndex)))
+        pack.readAndDeserialize(cbrb, reader)
+      } catch {
+        case e: IndexOutOfBoundsException =>
+          /*
+           * If this happens, the buffer is exhausted, and there is probably a bug.
+           * It may happen if an enumerator relying on it is concurrently applied to many iteratees – which should not be done!
+           */
+          throw new ReplyDocumentIteratorExhaustedException(e)
+      }
+  }
+}
+
+/*private[reactivemongo] case class ReplyDocumentIterator[P <: SerializationPack, T](pack: P, private val reply: Reply, private val buffer: ChannelBuffer)(implicit reader: P#Reader[T]) extends Iterator[T] {
   def hasNext = buffer.readable
   def next =
     try {
+      val cbrb = ChannelBufferReadableBuffer(buffer.readBytes(buffer.getInt(buffer.readerIndex)))
+      pack.readAndDeserialize(cbrb, reader)
       reader.read(ChannelBufferReadableBuffer(buffer.readBytes(buffer.getInt(buffer.readerIndex))))
     } catch {
       case e: IndexOutOfBoundsException =>
@@ -314,7 +373,7 @@ private[reactivemongo] case class ReplyDocumentIterator[T](private val reply: Re
          */
         throw new ReplyDocumentIteratorExhaustedException(e)
     }
-}
+}*/
 
 case class ReplyDocumentIteratorExhaustedException(val cause: Exception) extends Exception(cause)
 

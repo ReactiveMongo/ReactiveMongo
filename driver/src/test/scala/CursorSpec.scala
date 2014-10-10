@@ -27,7 +27,7 @@ class CursorSpec  extends Specification {
       val future = coll.find(BSONDocument()).cursor.enumerate() |>>> (Iteratee.foreach({ e =>
         //println(s"doc $i => $e")
         i += 1
-      })) 
+      }))
       /*val future = coll.find(BSONDocument()).cursor.documentStream.map { doc =>
         i += 1
         println("fetched " + doc)

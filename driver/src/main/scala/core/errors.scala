@@ -21,7 +21,7 @@ import DefaultBSONHandlers._
 /** An error that can come from a MongoDB node or not. */
 trait ReactiveMongoException extends Exception {
   /** explanation message */
-  val message: String
+  def message: String
 
   override def getMessage: String = "MongoError['" + message + "']"
 }
@@ -35,10 +35,10 @@ object ReactiveMongoException {
 /** An error thrown by a MongoDB node. */
 trait DatabaseException extends ReactiveMongoException {
   /** original document of this error */
-  val originalDocument: Option[BSONDocument]
+  def originalDocument: Option[BSONDocument]
 
   /** error code */
-  val code: Option[Int]
+  def code: Option[Int]
 
   override def getMessage: String = "DatabaseException['" + message + "'" + code.map(c => " (code = " + c + ")").getOrElse("") + "]"
 
@@ -61,6 +61,11 @@ trait DriverException extends ReactiveMongoException
 /** A generic driver error. */
 case class GenericDriverException(
   message: String) extends DriverException
+
+case class ConnectionNotInitialized(message: String) extends DriverException
+object ConnectionNotInitialized {
+  def MissingMetadata = ConnectionNotInitialized("Connection is missing metadata (like protocol version, etc.) The connection pool is probably being initialized.")
+}
 
 case class ConnectionException(message: String) extends DriverException
 

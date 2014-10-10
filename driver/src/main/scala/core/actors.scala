@@ -47,7 +47,7 @@ sealed trait ExpectingResponse {
  * @param requestMaker The request maker.
  */
 case class RequestMakerExpectingResponse(
-  requestMaker: RequestMaker) extends ExpectingResponse
+  requestMaker: RequestMaker, isMongo26WriteOp: Boolean) extends ExpectingResponse
 
 /**
  * A checked write request expecting a response.
@@ -74,17 +74,18 @@ private[reactivemongo] case class ChannelDisconnected(channelId: Int) extends Ch
 private[reactivemongo] case class ChannelClosed(channelId: Int) extends ChannelUnavailable
 
 /** Message sent when the primary has been discovered. */
-case object PrimaryAvailable
+case class PrimaryAvailable(metadata: ProtocolMetadata)
 /** Message sent when the primary has been lost. */
 case object PrimaryUnavailable
 // TODO
-case object SetAvailable
+case class SetAvailable(metadata: ProtocolMetadata)
 // TODO
 case object SetUnavailable
 /** Register a monitor. */
 case object RegisterMonitor
 /** MongoDBSystem has been shut down. */
 case object Closed
+case object GetLastMetadata
 
 /**
  * Main actor that processes the requests.
@@ -142,7 +143,7 @@ class MongoDBSystem(
 
   final def authenticateNodeSet(nodeSet: NodeSet): NodeSet = {
     nodeSet.copy(nodes = nodeSet.nodes.map {
-      case node @ Node(_, _: QueryableNodeStatus, _, _, _, _) => authenticateNode(node, nodeSet.authenticates.toSeq)
+      case node @ Node(_, _: QueryableNodeStatus, _, _, _, _, _) => authenticateNode(node, nodeSet.authenticates.toSeq)
       case node => node
     })
   }
@@ -256,7 +257,7 @@ class MongoDBSystem(
         case Success((node, connection)) =>
           logger.debug("Sending request expecting response " + request + " by connection " + connection + " of node " + node.name)
           if (request.op.expectsResponse) {
-            awaitingResponses += request.requestID -> AwaitingResponse(request.requestID, connection.channel.getId(), req.promise, false)
+            awaitingResponses += request.requestID -> AwaitingResponse(request.requestID, connection.channel.getId(), req.promise, isGetLastError = false, isMongo26WriteOp = req.isMongo26WriteOp)
             logger.trace("registering awaiting response for requestID " + request.requestID + ", awaitingResponses: " + awaitingResponses)
           } else logger.trace("NOT registering awaiting response for requestID " + request.requestID)
           connection.send(request)
@@ -274,7 +275,7 @@ class MongoDBSystem(
         case Failure(error) => req.promise.failure(error)
         case Success((node, connection)) =>
           logger.debug("Sending request expecting response " + request + " by connection " + connection + " of node " + node.name)
-          awaitingResponses += requestId -> AwaitingResponse(requestId, connection.channel.getId(), req.promise, true)
+          awaitingResponses += requestId -> AwaitingResponse(requestId, connection.channel.getId(), req.promise, isGetLastError = true, isMongo26WriteOp = false)
           logger.trace("registering writeConcern-awaiting response for requestID " + requestId + ", awaitingResponses: " + awaitingResponses)
           connection.send(request, writeConcern)
       }
@@ -346,7 +347,38 @@ class MongoDBSystem(
     case response: Response if requestIds.isMaster accepts response =>
       val nodeSetWasReachable = nodeSet.isReachable
       val primaryWasAvailable = nodeSet.primary.isDefined
-      IsMaster.ResultMaker(response).fold(
+      // TODO
+      import reactivemongo.api.BSONSerializationPack
+      import reactivemongo.api.commands.bson.BSONIsMasterCommandImplicits
+      import reactivemongo.api.commands.Command
+
+      // TODO
+      val isMaster = Command.deserialize(BSONSerializationPack, response)(BSONIsMasterCommandImplicits.IsMasterResultReader)
+
+      val ns = nodeSet.updateNodeByChannelId(response.info.channelId) { node =>
+        val pingInfo =
+          if (node.pingInfo.lastIsMasterId == response.header.responseTo)
+            node.pingInfo.copy(ping = System.currentTimeMillis() - node.pingInfo.lastIsMasterTime, lastIsMasterTime = 0, lastIsMasterId = -1)
+          else node.pingInfo
+        val authenticating = isMaster.status match {
+          case _: QueryableNodeStatus => authenticateNode(node, nodeSet.authenticates.toSeq)
+          case _                      => node
+        }
+        authenticating.copy(
+          status = isMaster.status,
+          pingInfo = pingInfo,
+          name = isMaster.replicaSet.map(_.me).getOrElse(node.name),
+          tags = isMaster.replicaSet.flatMap(_.tags),
+          protocolMetadata = ProtocolMetadata(MongoWireVersion(isMaster.minWireVersion), MongoWireVersion(isMaster.maxWireVersion), isMaster.maxBsonObjectSize, isMaster.maxMessageSizeBytes, isMaster.maxWriteBatchSize))
+      }
+      updateNodeSet {
+        connectAll {
+          ns.copy(nodes = ns.nodes ++ isMaster.replicaSet.toSeq.flatMap(_.hosts).collect {
+            case host if !ns.nodes.exists(_.name == host) => Node(host, NodeStatus.Uninitialized, Vector.empty, Set.empty, None, ProtocolMetadata.Default)
+          }).createNeededChannels(self, options.nbChannelsPerNode)
+        }
+      }
+      /*IsMaster.ResultMaker(response).fold(
         e => {
           logger.error(s"error while processing isMaster response #${response.header.responseTo}", e)
         },
@@ -373,13 +405,13 @@ class MongoDBSystem(
               }).createNeededChannels(self, options.nbChannelsPerNode)
             }
           }
-        })
+        })*/
       if(!nodeSetWasReachable && nodeSet.isReachable) {
-        broadcastMonitors(SetAvailable)
+        broadcastMonitors(new SetAvailable(nodeSet.protocolMetadata))
         logger.info("The node set is now available")
       }
       if(!primaryWasAvailable && nodeSet.primary.isDefined) {
-        broadcastMonitors(PrimaryAvailable)
+        broadcastMonitors(new PrimaryAvailable(nodeSet.protocolMetadata))
         logger.info("The primary is now available")
       }
 
@@ -437,7 +469,7 @@ class MongoDBSystem(
     // any other response
     case response: Response if requestIds.common accepts response => {
       awaitingResponses.get(response.header.responseTo) match {
-        case Some(AwaitingResponse(_, _, promise, isGetLastError)) => {
+        case Some(AwaitingResponse(_, _, promise, isGetLastError, isMongo26WriteOp)) => {
           logger.debug("Got a response from " + response.info.channelId + "! Will give back message=" + response + " to promise " + promise)
           awaitingResponses -= response.header.responseTo
           if (response.error.isDefined) {
@@ -466,8 +498,42 @@ class MongoDBSystem(
                   promise.success(response)
                 }
               })
+          } else if(isMongo26WriteOp) {
+            // TODO - logs, bson
+            // MongoDB 26 Write Protocol errors
+            logger.trace("received a response to a MongoDB2.6 Write Op")
+            import reactivemongo.bson.lowlevel._
+            import reactivemongo.core.netty.ChannelBufferReadableBuffer
+            val reader = new LowLevelBsonDocReader(new ChannelBufferReadableBuffer(response.documents))
+            val fields = reader.fieldStream
+            val okField = fields.find(_.name == "ok")
+            logger.trace(s"{${response.header.responseTo}} ok field is: $okField")
+            val processedOk = okField.collect {
+              case BooleanField(_, v) => v
+              case IntField(_, v) => v != 0
+              case DoubleField(_, v) => v != 0
+            }.getOrElse(false)
+            if(processedOk) {
+              logger.trace(s"{${response.header.responseTo}} [MongoDB26 Write Op response] sending a success!")
+              promise.success(response)
+            } else {
+              logger.debug(s"{${response.header.responseTo}} [MongoDB26 Write Op response] processedOk is false! sending an error")
+              val notAPrimary = fields.find(_.name == "errmsg").exists {
+                case errmsg @ LazyField(0x02, _, buf) =>
+                  logger.debug(s"{${response.header.responseTo}} [MongoDB26 Write Op response] errmsg is $errmsg!")
+                  buf.readString == "not a primary"
+                case errmsg =>
+                  logger.debug(s"{${response.header.responseTo}} [MongoDB26 Write Op response] errmsg is $errmsg but not interesting!")
+                  false
+              }
+              if(notAPrimary) {
+                logger.debug(s"{${response.header.responseTo}} [MongoDB26 Write Op response] not a primary error!")
+                onPrimaryUnavailable()
+              }
+              promise.failure(new RuntimeException("not ok"))
+            }
           } else {
-            logger.trace("{" + response.header.responseTo + "} sending a success!")
+            logger.trace(s"{${response.header.responseTo}} [MongoDB26 Write Op response] sending a success!")
             promise.success(response)
           }
         }
@@ -480,7 +546,7 @@ class MongoDBSystem(
   }
 
   // monitor -->
-  var nodeSet: NodeSet = NodeSet(None, None, seeds.map(seed => Node(seed, NodeStatus.Unknown, Vector.empty, Set.empty, None).createNeededChannels(self, 1)).toVector, initialAuthenticates.toSet)
+  var nodeSet: NodeSet = NodeSet(None, None, seeds.map(seed => Node(seed, NodeStatus.Unknown, Vector.empty, Set.empty, None, ProtocolMetadata.Default).createNeededChannels(self, 1)).toVector, initialAuthenticates.toSet)
   connectAll(nodeSet)
   // <-- monitor
 
@@ -608,78 +674,11 @@ private[actors] case class AwaitingResponse(
   requestID: Int,
   channelID: Int,
   promise: Promise[Response],
-  isGetLastError: Boolean)
+  isGetLastError: Boolean,
+  isMongo26WriteOp: Boolean)
 
 /** A message to send to a MonitorActor to be warned when a primary has been discovered. */
 case object WaitForPrimary
-
-/**
- * A monitor for MongoDBSystem actors.
- *
- * This monitor will be sent node state change events (like PrimaryAvailable, PrimaryUnavailable, etc.).
- * See WaitForPrimary message.
- */
-class MonitorActor(sys: ActorRef) extends Actor {
-  import MonitorActor._
-  import scala.collection.mutable.Queue
-
-  sys ! RegisterMonitor
-
-  private val waitingForPrimary = Queue[ActorRef]()
-  var primaryAvailable = false
-
-  private val waitingForClose = Queue[ActorRef]()
-  var killed = false
-
-  override def receive = {
-    case PrimaryAvailable =>
-      logger.debug("set: a primary is available")
-      primaryAvailable = true
-      waitingForPrimary.dequeueAll(_ => true).foreach(_ ! PrimaryAvailable)
-    case PrimaryUnavailable =>
-      logger.debug("set: no primary available")
-      primaryAvailable = false
-    case WaitForPrimary =>
-      if (killed)
-        sender ! Failure(new RuntimeException("MongoDBSystem actor shutting down or no longer active"))
-      else if (primaryAvailable) {
-        logger.debug(sender + " is waiting for a primary... available right now, go!")
-        sender ! PrimaryAvailable
-      } else {
-        logger.debug(sender + " is waiting for a primary...  not available, warning as soon a primary is available.")
-        waitingForPrimary += sender
-      }
-    case Close =>
-      logger.debug("Monitor received Close")
-      killed = true
-      sys ! Close
-      waitingForClose += sender
-      waitingForPrimary.dequeueAll(_ => true).foreach(_ ! Failure(new RuntimeException("MongoDBSystem actor shutting down or no longer active")))
-    case Closed =>
-      logger.debug(s"Monitor $self closed, stopping...")
-      waitingForClose.dequeueAll(_ => true).foreach(_ ! Closed)
-      context.stop(self)
-  }
-
-  override def postStop {
-    // COPY OF CLOSING CODE FROM LINE 656
-    // I'm not sure this will actually be useful because the close message we send to sys
-    // will probably not be received if we are stopping because the Actorsystem is killed.
-    // I can't hurt though...
-    killed = true
-    sys ! Close
-    waitingForClose += sender
-    waitingForPrimary.dequeueAll(_ => true).foreach(_ ! Failure(new RuntimeException("MongoDBSystem actor shutting down or no longer active")))
-
-    // EXECUTE "CLOSED" CODE too?
-
-    logger.debug(s"Monitor $self stopped.")
-  }
-}
-
-object MonitorActor {
-  private val logger = LazyLogger("reactivemongo.core.actors.MonitorActor")
-}
 
 // exceptions
 object Exceptions {
