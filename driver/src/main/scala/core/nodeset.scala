@@ -114,11 +114,11 @@ case class NodeSet(
 
   // http://docs.mongodb.org/manual/reference/read-preference/
   def pick(preference: ReadPreference): Option[(Node, Connection)] = preference match {
-    case ReadPreference.Primary                   => pickConnectionAndFlatten(primary)
-    case ReadPreference.PrimaryPrefered(filter)   => pickConnectionAndFlatten(primary.orElse(pickFromGroupWithFilter(secondaries, filter, secondaries.pick)))
-    case ReadPreference.Secondary(filter)         => pickConnectionAndFlatten(pickFromGroupWithFilter(secondaries, filter, secondaries.pick))
-    case ReadPreference.SecondaryPrefered(filter) => pickConnectionAndFlatten(pickFromGroupWithFilter(secondaries, filter, secondaries.pick).orElse(primary))
-    case ReadPreference.Nearest(filter)           => pickConnectionAndFlatten(pickFromGroupWithFilter(nearestGroup, filter, nearest))
+    case ReadPreference.Primary                    => pickConnectionAndFlatten(primary)
+    case ReadPreference.PrimaryPreferred(filter)   => pickConnectionAndFlatten(primary.orElse(pickFromGroupWithFilter(secondaries, filter, secondaries.pick)))
+    case ReadPreference.Secondary(filter)          => pickConnectionAndFlatten(pickFromGroupWithFilter(secondaries, filter, secondaries.pick))
+    case ReadPreference.SecondaryPreferred(filter) => pickConnectionAndFlatten(pickFromGroupWithFilter(secondaries, filter, secondaries.pick).orElse(primary))
+    case ReadPreference.Nearest(filter)            => pickConnectionAndFlatten(pickFromGroupWithFilter(nearestGroup, filter, nearest))
   }
 
   def createNeededChannels(receiver: ActorRef, upTo: Int)(implicit channelFactory: ChannelFactory): NodeSet = {

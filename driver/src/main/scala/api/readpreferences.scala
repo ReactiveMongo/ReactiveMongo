@@ -18,11 +18,11 @@ object ReadPreference {
     override def filterTag = None
   }
   /** Read from the primary if it is available, or secondaries if it is not. */
-  case class PrimaryPrefered(filterTag: Option[BSONDocument => Boolean]) extends ReadPreference
+  case class PrimaryPreferred(filterTag: Option[BSONDocument => Boolean]) extends ReadPreference
   /** Read only from any secondary. */
   case class Secondary(filterTag: Option[BSONDocument => Boolean]) extends ReadPreference
   /** Read from any secondary, or from the primary if they are not available. */
-  case class SecondaryPrefered(filterTag: Option[BSONDocument => Boolean]) extends ReadPreference
+  case class SecondaryPreferred(filterTag: Option[BSONDocument => Boolean]) extends ReadPreference
   /**
    * Read from the faster node (ie the node which replies faster than all others), regardless its status
    * (primary or secondary).
@@ -51,11 +51,11 @@ object ReadPreference {
   def primary: Primary.type = Primary
 
   /** Read from the primary if it is available, or secondaries if it is not. */
-  def primaryPrefered: PrimaryPrefered = new PrimaryPrefered(None)
+  def primaryPreferred: PrimaryPreferred = new PrimaryPreferred(None)
 
   /**  Read from any node that has the given `tag` in the replica set (preferably the primary). */
-  def primaryPrefered[T](tag: T)(implicit writer: BSONDocumentWriter[T]): PrimaryPrefered =
-    new PrimaryPrefered(Some(doc => doc.contains(writer.write(tag))))
+  def primaryPreferred[T](tag: T)(implicit writer: BSONDocumentWriter[T]): PrimaryPreferred =
+    new PrimaryPreferred(Some(doc => doc.contains(writer.write(tag))))
 
   /** Read only from any secondary. */
   def secondary: Secondary = new Secondary(None)
@@ -65,11 +65,11 @@ object ReadPreference {
     new Secondary(Some(doc => doc.contains(writer.write(tag))))
 
   /** Read from any secondary, or from the primary if they are not available. */
-  def secondaryPrefered: SecondaryPrefered = new SecondaryPrefered(None)
+  def secondaryPreferred: SecondaryPreferred = new SecondaryPreferred(None)
 
   /**  Read from any node that has the given `tag` in the replica set (preferably a secondary). */
-  def secondaryPrefered[T](tag: T)(implicit writer: BSONDocumentWriter[T]): SecondaryPrefered =
-    new SecondaryPrefered(Some(doc => doc.contains(writer.write(tag))))
+  def secondaryPreferred[T](tag: T)(implicit writer: BSONDocumentWriter[T]): SecondaryPreferred =
+    new SecondaryPreferred(Some(doc => doc.contains(writer.write(tag))))
 
   /**
    * Read from the fastest node (ie the node which replies faster than all others), regardless its status
