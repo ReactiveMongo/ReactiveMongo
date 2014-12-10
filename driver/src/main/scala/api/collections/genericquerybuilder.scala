@@ -42,7 +42,7 @@ trait GenericQueryBuilder[P <: SerializationPack] {
   def failover: FailoverStrategy
   def collection: Collection
 
-  def merge: pack.Document
+  def merge(readPreference: ReadPreference): pack.Document
 
   //def structureReader: pack.Reader[pack.Document]
 
@@ -78,7 +78,7 @@ trait GenericQueryBuilder[P <: SerializationPack] {
    */
   def cursor[T](readPreference: ReadPreference, isMongo26WriteOp: Boolean = false)(implicit reader: pack.Reader[T], ec: ExecutionContext): Cursor[T] = {
     val documents = BufferSequence {
-      val buffer = write(merge, ChannelBufferWritableBuffer())
+      val buffer = write(merge(readPreference), ChannelBufferWritableBuffer())
       projectionOption.map { projection =>
         write(projection, buffer)
       }.getOrElse(buffer).buffer
