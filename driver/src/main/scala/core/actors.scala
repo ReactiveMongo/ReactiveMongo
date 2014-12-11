@@ -143,7 +143,7 @@ class MongoDBSystem(
 
   final def authenticateNodeSet(nodeSet: NodeSet): NodeSet = {
     nodeSet.copy(nodes = nodeSet.nodes.map {
-      case node @ Node(_, _: QueryableNodeStatus, _, _, _, _, _) => authenticateNode(node, nodeSet.authenticates.toSeq)
+      case node @ Node(_, _: QueryableNodeStatus, _, _, _, _, _, _) => authenticateNode(node, nodeSet.authenticates.toSeq)
       case node => node
     })
   }
@@ -369,7 +369,8 @@ class MongoDBSystem(
           pingInfo = pingInfo,
           name = isMaster.replicaSet.map(_.me).getOrElse(node.name),
           tags = isMaster.replicaSet.flatMap(_.tags),
-          protocolMetadata = ProtocolMetadata(MongoWireVersion(isMaster.minWireVersion), MongoWireVersion(isMaster.maxWireVersion), isMaster.maxBsonObjectSize, isMaster.maxMessageSizeBytes, isMaster.maxWriteBatchSize))
+          protocolMetadata = ProtocolMetadata(MongoWireVersion(isMaster.minWireVersion), MongoWireVersion(isMaster.maxWireVersion), isMaster.maxBsonObjectSize, isMaster.maxMessageSizeBytes, isMaster.maxWriteBatchSize),
+          isMongos = isMaster.isMongos)
       }
       updateNodeSet {
         connectAll {

@@ -46,6 +46,7 @@ case class NodeSet(
     version: Option[Long],
     nodes: Vector[Node],
     authenticates: Set[Authenticate]) {
+  val mongos: Option[Node] = nodes.find(_.isMongos)
   val primary: Option[Node] = nodes.find(_.status == NodeStatus.Primary)
   val secondaries = new RoundRobiner(nodes.filter(_.status == NodeStatus.Secondary))
   val queryable = secondaries.subject ++ primary
@@ -113,12 +114,18 @@ case class NodeSet(
   }
 
   // http://docs.mongodb.org/manual/reference/read-preference/
-  def pick(preference: ReadPreference): Option[(Node, Connection)] = preference match {
-    case ReadPreference.Primary                    => pickConnectionAndFlatten(primary)
-    case ReadPreference.PrimaryPreferred(filter)   => pickConnectionAndFlatten(primary.orElse(pickFromGroupWithFilter(secondaries, filter, secondaries.pick)))
-    case ReadPreference.Secondary(filter)          => pickConnectionAndFlatten(pickFromGroupWithFilter(secondaries, filter, secondaries.pick))
-    case ReadPreference.SecondaryPreferred(filter) => pickConnectionAndFlatten(pickFromGroupWithFilter(secondaries, filter, secondaries.pick).orElse(primary))
-    case ReadPreference.Nearest(filter)            => pickConnectionAndFlatten(pickFromGroupWithFilter(nearestGroup, filter, nearest))
+  def pick(preference: ReadPreference): Option[(Node, Connection)] = {
+    if (mongos.isDefined) {
+      pickConnectionAndFlatten(mongos)
+    } else {
+      preference match {
+        case ReadPreference.Primary                    => pickConnectionAndFlatten(primary)
+        case ReadPreference.PrimaryPreferred(filter)   => pickConnectionAndFlatten(primary.orElse(pickFromGroupWithFilter(secondaries, filter, secondaries.pick)))
+        case ReadPreference.Secondary(filter)          => pickConnectionAndFlatten(pickFromGroupWithFilter(secondaries, filter, secondaries.pick))
+        case ReadPreference.SecondaryPreferred(filter) => pickConnectionAndFlatten(pickFromGroupWithFilter(secondaries, filter, secondaries.pick).orElse(primary))
+        case ReadPreference.Nearest(filter)            => pickConnectionAndFlatten(pickFromGroupWithFilter(nearestGroup, filter, nearest))
+      }
+    }
   }
 
   def createNeededChannels(receiver: ActorRef, upTo: Int)(implicit channelFactory: ChannelFactory): NodeSet = {
@@ -137,7 +144,8 @@ case class Node(
     authenticated: Set[Authenticated],
     tags: Option[BSONDocument],
     protocolMetadata: ProtocolMetadata,
-    pingInfo: PingInfo = PingInfo()) {
+    pingInfo: PingInfo = PingInfo(),
+    isMongos: Boolean = false) {
 
   val (host: String, port: Int) = {
     val splitted = name.span(_ != ':')
