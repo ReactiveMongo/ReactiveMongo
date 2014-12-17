@@ -101,6 +101,13 @@ class VariantBSONReaderWrapper[B <: BSONValue, T](reader: VariantBSONReader[B, T
 
 trait BSONHandler[B <: BSONValue, T] extends BSONReader[B, T] with BSONWriter[T, B]
 
+object BSONHandler {
+  def apply[B <: BSONValue, T](read: B => T, write: T => B) = new BSONHandler[B, T] {
+    override def read(x: B): T = read(x)
+    override def write(x: T): B = write(x)
+  }
+}
+
 trait DefaultBSONHandlers {
   implicit object BSONIntegerHandler extends BSONHandler[BSONInteger, Int] {
     def read(int: BSONInteger) = int.value
