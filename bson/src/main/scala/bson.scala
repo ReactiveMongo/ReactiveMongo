@@ -17,6 +17,7 @@ package reactivemongo.bson
 
 object `package` extends DefaultBSONHandlers {
   type BSONElement = (String, BSONValue)
+  type BSONCodec[A] = BSONDocumentReader[A] with BSONDocumentWriter[A] with BSONHandler[BSONDocument, A]
 }
 
 sealed trait Producer[T] {
