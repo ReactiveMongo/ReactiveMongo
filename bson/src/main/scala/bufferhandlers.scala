@@ -186,7 +186,7 @@ object DefaultBufferHandler extends BufferHandler {
     def read(buffer: ReadableBuffer) = BSONRegex(buffer.readCString, buffer.readCString)
   }
   object BSONDBPointerBufferHandler extends BufferRW[BSONDBPointer] {
-    def write(pointer: BSONDBPointer, buffer: WritableBuffer) = buffer // TODO
+    def write(pointer: BSONDBPointer, buffer: WritableBuffer) = { buffer writeCString pointer.value; buffer writeBytes pointer.id }
     def read(buffer: ReadableBuffer) = BSONDBPointer(buffer.readCString, buffer.readArray(12))
   }
   object BSONJavaScriptBufferHandler extends BufferRW[BSONJavaScript] {
