@@ -17,7 +17,6 @@ package reactivemongo.bson
 
 import exceptions.DocumentKeyNotFound
 import scala.util.{ Failure, Success, Try }
-import scala.collection.generic.CanBuildFrom
 import buffer._
 import utils.Converters
 
@@ -239,19 +238,19 @@ case class BSONArray(stream: Stream[Try[BSONValue]]) extends BSONValue {
     case Success(e)                      => Success(Some(e))
   }
 
-  /** Creates a new [[BSONDocument]] containing all the elements of this one and the elements of the given document. */
+  /** Creates a new [[BSONArray]] containing all the elements of this one and the elements of the given document. */
   def add(doc: BSONArray): BSONArray = new BSONArray(stream ++ doc.stream)
 
-  /** Creates a new [[BSONDocument]] containing all the elements of this one and the given `elements`. */
+  /** Creates a new [[BSONArray]] containing all the elements of this one and the given `elements`. */
   def add(elements: Producer[BSONValue]*): BSONArray = new BSONArray(
     stream ++ elements.flatMap { el =>
       el.produce.map(value => Seq(Try(value))).getOrElse(Seq.empty)
     }.toStream)
 
-  /** Alias for `add(doc: BSONDocument): BSONDocument` */
+  /** Alias for `add(arr: BSONArray): BSONArray` */
   def ++(array: BSONArray): BSONArray = add(array)
 
-  /** Alias for `add(elements: Producer[(String, BSONValue)]*): BSONDocument` */
+  /** Alias for `add(elements: Producer[BSONValue]*): BSONArray` */
   def ++(elements: Producer[BSONValue]*): BSONArray = add(elements: _*)
 
   def iterator: Iterator[Try[(String, BSONValue)]] = stream.zipWithIndex.map { vv =>
@@ -265,7 +264,7 @@ case class BSONArray(stream: Stream[Try[BSONValue]]) extends BSONValue {
   /** Is this array empty? */
   def isEmpty: Boolean = stream.isEmpty
 
-  override def toString: String = "BSONDocument(<" + (if (isEmpty) "empty" else "non-empty") + ">)"
+  override def toString: String = s"BSONArray(<${if (isEmpty) "empty" else "non-empty"}>)"
 }
 
 object BSONArray {
@@ -275,7 +274,7 @@ object BSONArray {
       el.produce.map(value => Seq(Try(value))).getOrElse(Seq.empty)
     }.toStream)
 
-  /** Creates a new [[BSONValue]] containing all the `elements` in the given `Traversable`. */
+  /** Creates a new [[BSONArray]] containing all the `elements` in the given `Traversable`. */
   def apply(elements: Traversable[BSONValue]): BSONArray = {
     new BSONArray(elements.toStream.map(Success(_)))
   }
@@ -305,7 +304,7 @@ case object BSONUndefined extends BSONValue { val code = 0x06.toByte }
 
 /** BSON ObjectId value. */
 @SerialVersionUID(1L)
-class BSONObjectID private (private val raw: Array[Byte]) extends BSONValue with Serializable {
+class BSONObjectID private (private val raw: Array[Byte]) extends BSONValue with Serializable with Equals {
   val code = 0x07.toByte
 
   import java.util.Arrays
@@ -316,9 +315,10 @@ class BSONObjectID private (private val raw: Array[Byte]) extends BSONValue with
 
   override def toString = "BSONObjectID(\"" + stringify + "\")"
 
-  override def equals(obj: Any): Boolean = obj match {
-    case BSONObjectID(arr) => Arrays.equals(raw, arr)
-    case _                 => false
+  override def canEqual(that: Any) : Boolean = that.isInstanceOf[BSONObjectID]
+
+  override def equals(that: Any): Boolean = {
+    canEqual(that) && Arrays.equals(this.raw, that.asInstanceOf[BSONObjectID].raw)
   }
 
   override lazy val hashCode: Int = Arrays.hashCode(raw)
@@ -501,6 +501,15 @@ case class BSONDBPointer(value: String, id: Array[Byte]) extends BSONValue {
 
   /** The BSONObjectID representation of this reference. */
   val objectId = BSONObjectID(id)
+
+  override def canEqual(that: Any) : Boolean = that.isInstanceOf[BSONDBPointer]
+  override def equals(that: Any) : Boolean = {
+    canEqual(that) && {
+      val other = that.asInstanceOf[BSONDBPointer]
+      this.value.equals(other.value) &&
+      java.util.Arrays.equals(this.id,other.id)
+    }
+  }
 }
 
 /**
