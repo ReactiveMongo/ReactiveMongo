@@ -1,6 +1,7 @@
 package reactivemongo.api
 
 import reactivemongo.bson.buffer.{ ReadableBuffer, WritableBuffer }
+import scala.language.higherKinds
 
 trait SerializationPack { self: Singleton =>
   type Document

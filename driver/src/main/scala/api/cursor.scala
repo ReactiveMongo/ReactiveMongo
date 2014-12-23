@@ -21,6 +21,7 @@ import reactivemongo.core.netty.BufferSequence
 import reactivemongo.core.protocol._
 import reactivemongo.utils.ExtendedFutures.DelayedFuture
 import reactivemongo.utils.LazyLogger
+import scala.language.higherKinds
 import scala.annotation.tailrec
 import scala.collection.generic.CanBuildFrom
 import scala.concurrent.{ ExecutionContext, Future }

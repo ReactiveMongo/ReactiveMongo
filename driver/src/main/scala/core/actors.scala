@@ -15,18 +15,21 @@
  */
 package reactivemongo.core.actors
 
+import java.net.InetSocketAddress
+
+import scala.language.postfixOps
+import scala.annotation.tailrec
+import scala.concurrent.{ Future, Promise }
+import scala.util.{ Failure, Success, Try }
+
 import akka.actor._
 import org.jboss.netty.channel.group._
+import reactivemongo.api.MongoConnectionOptions
 import reactivemongo.core.errors._
 import reactivemongo.core.protocol._
 import reactivemongo.utils.LazyLogger
 import reactivemongo.core.commands.{ Authenticate => AuthenticateCommand, _ }
-import scala.annotation.tailrec
-import scala.concurrent.{ Future, Promise }
-import scala.util.{ Failure, Success, Try }
 import reactivemongo.core.nodeset._
-import java.net.InetSocketAddress
-import reactivemongo.api.{ MongoConnectionOptions, ReadPreference }
 
 // messages
 
@@ -593,8 +596,12 @@ class MongoDBSystem(
     }
     allChannelGroup(nodeSet).close.addListener(listener)
 
-    // fail all requests waiting for a response
-    awaitingResponses.foreach( _._2.promise.failure(Exceptions.ClosedException) )
+    // fail all requests waiting for a response if the promise is not completed already
+    awaitingResponses.foreach { pair =>
+      val promise = pair._2.promise
+      if (!promise.isCompleted)
+        promise.failure(Exceptions.ClosedException)
+    }
     awaitingResponses.empty
 
     logger.warn(s"MongoDBSystem $self stopped.")
@@ -605,7 +612,7 @@ class MongoDBSystem(
   def connectAll(nodeSet: NodeSet) = {
     for {
       node <- nodeSet.nodes
-      connection <- node.connections if !connection.channel.isConnected()
+      connection <- node.connections if !connection.channel.isConnected
     } yield connection.channel.connect(new InetSocketAddress(node.host, node.port))
     nodeSet
   }
