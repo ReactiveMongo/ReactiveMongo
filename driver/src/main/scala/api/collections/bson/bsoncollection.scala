@@ -15,7 +15,7 @@
  */
 package reactivemongo.api.collections.bson
 
-import reactivemongo.api.{ Collection, DB, FailoverStrategy, QueryOpts }
+import reactivemongo.api.{ Collection, DB, FailoverStrategy, QueryOpts, ReadPreference }
 import reactivemongo.api.commands.bson._
 import reactivemongo.api.collections.{ BatchCommands, GenericCollection, GenericCollectionProducer, GenericQueryBuilder }
 import reactivemongo.api.BSONSerializationPack
@@ -77,16 +77,28 @@ case class BSONQueryBuilder(
     failover: FailoverStrategy = failover): BSONQueryBuilder =
     BSONQueryBuilder(collection, failover, queryOption, sortOption, projectionOption, hintOption, explainFlag, snapshotFlag, commentString, options)
 
-  def merge: BSONDocument =
-    if (!sortOption.isDefined && !hintOption.isDefined && !explainFlag && !snapshotFlag && !commentString.isDefined)
-      queryOption.getOrElse(BSONDocument())
+  def merge(readPreference: ReadPreference): BSONDocument = {
+    // Primary and SecondaryPreferred are encoded as the slaveOk flag;
+    // the others are encoded as $readPreference field.
+    val readPreferenceDocument = readPreference match {
+      case ReadPreference.Primary                    => None
+      case ReadPreference.PrimaryPreferred(filter)   => Some(BSONDocument("mode" -> "primaryPreferred"))
+      case ReadPreference.Secondary(filter)          => Some(BSONDocument("mode" -> "secondary"))
+      case ReadPreference.SecondaryPreferred(filter) => None
+      case ReadPreference.Nearest(filter)            => Some(BSONDocument("mode" -> "nearest"))
+    }
+    val optionalFields = List(
+      sortOption.map { "$orderby" -> _ },
+      hintOption.map { "$hint" -> _ },
+      commentString.map { "$comment" -> BSONString(_) },
+      option(explainFlag, "$explain" -> BSONBoolean(true)),
+      option(snapshotFlag, "$snapshot" -> BSONBoolean(true)),
+      readPreferenceDocument.map { "$readPreference" -> _ }
+    ).flatten
+    val query = queryOption.getOrElse(BSONDocument())
+    if (optionalFields.isEmpty)
+      query
     else
-      BSONDocument(
-        "$query" -> queryOption.getOrElse(BSONDocument()),
-        "$orderby" -> sortOption,
-        "$hint" -> hintOption,
-        "$comment" -> commentString.map(BSONString(_)),
-        "$explain" -> option(explainFlag, BSONBoolean(true)),
-        "$snapshot" -> option(snapshotFlag, BSONBoolean(true)))
-
+      BSONDocument(("$query" -> query) :: optionalFields)
+  }
 }
