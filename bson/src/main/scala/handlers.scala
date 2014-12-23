@@ -15,6 +15,7 @@
  */
 package reactivemongo.bson
 
+import scala.language.higherKinds
 import scala.collection.generic.CanBuildFrom
 import scala.util.{ Failure, Success, Try }
 

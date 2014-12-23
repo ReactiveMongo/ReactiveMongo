@@ -17,6 +17,7 @@ package reactivemongo.utils
 
 import scala.concurrent._
 import scala.concurrent.duration._
+import scala.language.implicitConversions
 
 object `package` {
   /** Concats two array - fast way */
