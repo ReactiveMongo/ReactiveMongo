@@ -124,19 +124,27 @@ private object MacroImpl {
           val optTyp = optionTypeParameter(sig)
           val typ = optTyp getOrElse sig
 
-          val getter = Apply(
-            TypeApply(
-              Select(Ident("document"), "getAsTry"),
-              List(TypeTree(typ))
+          if (optTyp.isDefined) {
+            Apply(
+              TypeApply(
+                Select(Ident("document"), "getAs"),
+                List(TypeTree(typ))
+              ),
+              List(Literal(Constant(paramName(param))))
+            )
+          }
+          else {
+            val getter = Apply(
+              TypeApply(
+                Select(Ident("document"), "getAsTry"),
+                List(TypeTree(typ))
 
-            ),
-            List(Literal(Constant(paramName(param))))
-          )
-
-          if (optTyp.isDefined)
-            Select(getter, "toOption")
-          else
+              ),
+              List(Literal(Constant(paramName(param))))
+            )
             Select(getter, "get")
+          }
+
       }
 
       val constructorTree = Select(Ident(companion.name.toString), "apply")
