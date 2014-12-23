@@ -1,7 +1,7 @@
 package reactivemongo.bson
 
 /**
- * Macros for generating `BSONReader` and `SONWriter` implementations for case
+ * Macros for generating `BSONReader` and `BSONWriter` implementations for case
  * at compile time. Invoking these macros is equivalent to writing anonymous
  * class implementations by hand.
  *
@@ -196,7 +196,7 @@ object Macros {
      */
     @meta.param
     case class Key(key: String) extends StaticAnnotation
-    
+
      /**
      * Ignores a field
      */

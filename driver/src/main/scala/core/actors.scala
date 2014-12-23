@@ -91,7 +91,7 @@ case object GetLastMetadata
  * Main actor that processes the requests.
  *
  * @param seeds nodes that will be probed to discover the whole replica set (or one standalone node).
- * @param auth list of authenticate messages - all the nodes will be authenticated as soon they are connected.
+ * @param initialAuthenticates list of authenticate messages - all the nodes will be authenticated as soon they are connected.
  * @param options MongoConnectionOption instance (used for tweaking connection flags and pool size).
  */
 class MongoDBSystem(
@@ -208,6 +208,10 @@ class MongoDBSystem(
         }
         logger.debug(s"(State: Closing) Received $msg, remainingConnections = $remainingConnections, disconnected = $disconnected, connected = ${remainingConnections - disconnected}")
       }
+
+    case msg @ ChannelConnected(channelId) =>
+      logger.warn(s"(State: Closing) SPURIOUS $msg (ignored, channel closed)")
+      updateNodeSetOnDisconnect(channelId)
 
     case other =>
       logger.error(s"(State: Closing) UNHANDLED MESSAGE: $other")
