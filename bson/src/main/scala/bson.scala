@@ -15,6 +15,8 @@
  */
 package reactivemongo.bson
 
+import scala.language.implicitConversions
+
 object `package` extends DefaultBSONHandlers {
   type BSONElement = (String, BSONValue)
 }

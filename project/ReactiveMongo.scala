@@ -1,5 +1,6 @@
 import sbt._
 import sbt.Keys._
+import scala.language.postfixOps
 
 object BuildSettings {
   val buildVersion = "0.11.0-SNAPSHOT"
@@ -11,7 +12,7 @@ object BuildSettings {
     }
   }
 
-  val buildSettings = Defaults.defaultSettings ++ Seq(
+  val buildSettings = Defaults.coreDefaultSettings ++ Seq(
     organization := "org.reactivemongo",
     version := buildVersion,
     scalaVersion := "2.11.2",

@@ -1,5 +1,8 @@
 package reactivemongo.api.commands
 
+import scala.language.higherKinds
+import scala.language.implicitConversions
+
 import concurrent.{ ExecutionContext, Future }
 import util.control.NoStackTrace
 import reactivemongo.api.{ BSONSerializationPack, Cursor, SerializationPack, SerializationPackObject, DB, Collection }

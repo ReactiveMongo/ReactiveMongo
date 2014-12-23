@@ -1,7 +1,7 @@
 package reactivemongo.api.commands
 
-import concurrent.Future
-import reactivemongo.api.{ BSONSerializationPack, Cursor, SerializationPack }
+import scala.language.implicitConversions
+import reactivemongo.api.{ BSONSerializationPack, SerializationPack }
 
 trait AggregationFramework[P <: SerializationPack] {
   case class AggregateCursorOptions(batchSize: Int = 0)

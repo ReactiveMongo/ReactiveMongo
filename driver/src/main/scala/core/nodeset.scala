@@ -2,7 +2,7 @@ package reactivemongo.core.nodeset
 
 import reactivemongo.core.protocol.Request
 import akka.actor.ActorRef
-import scala.annotation.tailrec
+import scala.language.higherKinds
 import scala.collection.generic.CanBuildFrom
 import java.util.concurrent.{ Executor, Executors }
 import reactivemongo.utils.LazyLogger
