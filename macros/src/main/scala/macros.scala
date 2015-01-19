@@ -1,5 +1,5 @@
 package reactivemongo.bson
-
+i
 import collection.mutable.ListBuffer
 import reactivemongo.bson.Macros.Annotations.{Key, Ignore}
 import scala.reflect.macros.Context
@@ -187,8 +187,8 @@ private object MacroImpl {
       val constructorParams = constructor.paramss.head
 
       val tuple = Ident(newTermName("tuple"))
-      val (optional, required) = constructorParams.filterNot(ignoreField).zipWithIndex zip types partition (t => isOptionalType(t._2))
-      val values = required map {
+      val (optional, required) = constructorParams.zipWithIndex zip types partition (t => isOptionalType(t._2))
+      val values = required.filterNot(ignoreField) map {
         case ((param, i), typ) => {
           val neededType = appliedType(writerType, List(typ))
           val writer = c.inferImplicitValue(neededType)
@@ -335,8 +335,8 @@ private object MacroImpl {
       }.flatten.headOption getOrElse param.name.toString
     }
     
-    private def ignoreField(param: c.Symbol): Boolean = {
-      param.annotations.exists(ann => ann.tpe =:= typeOf[Ignore] || ann.tpe =:= typeOf[transient])
+    private def ignoreField(p: ((c.Symbol, Int), c.Type)): Boolean = {
+      p._1._1.annotations.exists(ann => ann.tpe =:= typeOf[Ignore] || ann.tpe =:= typeOf[transient])
     }
 
     private def allSubclasses(A: Symbol): Set[Symbol] = {
