@@ -361,8 +361,8 @@ private object MacroImpl {
       }.flatten.headOption getOrElse param.name.toString
     }
     
-    private def ignoreField(param: c.Symbol): Boolean = {
-      param.annotations.exists(ann => ann.tpe =:= typeOf[Ignore] || ann.tpe =:= typeOf[transient])
+    private def ignoreField(p: ((c.Symbol, Int), c.Type)): Boolean = {
+      p._1._1.annotations.exists(ann => ann.tpe =:= typeOf[Ignore] || ann.tpe =:= typeOf[transient])
     }
 
     private def allSubclasses(A: Symbol): Set[Symbol] = {
