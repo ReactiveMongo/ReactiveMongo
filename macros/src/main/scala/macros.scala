@@ -114,6 +114,35 @@ private object MacroImpl {
       val name = stringToTermName(sym.name.toString) //this is ugly but quite stable compared to other attempts
       Ident(name)
     }
+    
+    private def getValueByType(t: c.Type): Any = t match {
+      case t if t =:= typeOf[Byte] || t =:= typeOf[Short] || t =:= typeOf[Int] || t =:= typeOf[Long] ||
+        t =:= typeOf[Float] || t =:= typeOf[Double] => 0
+      case t if t =:= typeOf[Char] => ' '
+      case t if t =:= typeOf[Boolean] => false
+      case _ => null
+    }
+
+    private def getIgnoredDefaultValue(param: c.Symbol): Option[c.Tree] = {
+      param.annotations.collect {
+        case ann if ann.tpe =:= typeOf[transient] => Literal(Constant(getValueByType(param.typeSignature)))
+        case ann if ann.tpe =:= typeOf[Ignore] => {
+
+          val value = ann.scalaArgs.collect {
+            case l: Literal => l.value.value
+          }.collect {
+            case value if value != null => value
+          }.headOption
+
+          if(value.isDefined){
+            Literal(Constant(value.get))
+          }
+          else
+            Literal(Constant(getValueByType(param.typeSignature)))
+        }
+
+      }.headOption
+    }
 
     private def readBodyConstructClass(implicit A: c.Type) = {
       val (constructor, _) = matchingApplyUnapply
@@ -134,15 +163,21 @@ private object MacroImpl {
             )
           }
           else {
-            val getter = Apply(
-              TypeApply(
-                Select(Ident("document"), "getAsTry"),
-                List(TypeTree(typ))
-
-              ),
-              List(Literal(Constant(paramName(param))))
-            )
-            Select(getter, "get")
+            val v = getIgnoredDefaultValue(param)
+            
+            if(v.isDefined)
+              v.get
+            else {
+              val getter = Apply(
+                TypeApply(
+                  Select(Ident("document"), "getAsTry"),
+                  List(TypeTree(typ))
+  
+                ),
+                List(Literal(Constant(paramName(param))))
+              )
+              Select(getter, "get")
+            }
           }
 
       }
@@ -187,8 +222,8 @@ private object MacroImpl {
       val constructorParams = constructor.paramss.head
 
       val tuple = Ident(newTermName("tuple"))
-      val (optional, required) = constructorParams.filterNot(ignoreField).zipWithIndex zip types partition (t => isOptionalType(t._2))
-      val values = required map {
+      val (optional, required) = constructorParams.zipWithIndex zip types partition (t => isOptionalType(t._2))
+      val values = required.filterNot(ignoreField) map {
         case ((param, i), typ) => {
           val neededType = appliedType(writerType, List(typ))
           val writer = c.inferImplicitValue(neededType)
