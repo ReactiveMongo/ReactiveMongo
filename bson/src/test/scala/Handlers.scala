@@ -188,9 +188,9 @@ class Handlers extends Specification {
       ]
     }
   ]
-}"""
+}""".replaceAll("\r", "")
       val ny2 = BSON.readDocument[Artist](doc)
-      val allSongs = doc.getAs[List[Album]]("albums").toList.flatten.flatMap(_.tracks)
+      val allSongs = doc.getAs[List[Album]]("albums").getOrElse(List.empty).flatMap(_.tracks)
       allSongs mustEqual List(
         "Cinnamon Girl",
         "Everybody Knows this is Nowhere",
