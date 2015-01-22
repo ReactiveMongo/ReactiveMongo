@@ -153,7 +153,7 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder._
 
 /** An array-backed readable buffer. */
-class ArrayReadableBuffer private (bytebuffer: ByteBuffer) extends ReadableBuffer {
+case class ArrayReadableBuffer private (bytebuffer: ByteBuffer) extends ReadableBuffer {
   bytebuffer.order(LITTLE_ENDIAN)
 
   def size = bytebuffer.limit()
