@@ -529,9 +529,8 @@ class MongoDriver(config: Option[Config] = None) {
       case Some(nm) => system.actorOf(props, nm);
       case None => system.actorOf(props, "Connection-" +  + MongoDriver.nextCounter)
     }
-    implicit val timeout: Timeout = Timeout(10, TimeUnit.SECONDS)
-    val connection = Await.result(supervisorActor ? AddConnection(options, mongosystem), Duration.Inf)
-    connection.asInstanceOf[MongoConnection]
+    val connection = (supervisorActor ? AddConnection(options, mongosystem))(Timeout(10, TimeUnit.SECONDS))
+    Await.result(connection.mapTo[MongoConnection], Duration.Inf)
   }
 
   /**
@@ -574,7 +573,6 @@ class MongoDriver(config: Option[Config] = None) {
   private case class CloseWithTimeout(timeout: FiniteDuration)
 
   private case class SupervisorActor(driver: MongoDriver) extends Actor {
-    import MongoDriver.logger
 
     def isEmpty = driver.connectionMonitors.isEmpty
 
@@ -630,5 +628,5 @@ object MongoDriver {
   def apply(config: Config) = new MongoDriver(Some(config))
 
   private[api] val _counter = new AtomicLong(0)
-  def nextCounter : Long = _counter.incrementAndGet()
+  private[api] def nextCounter : Long = _counter.incrementAndGet()
 }
