@@ -15,18 +15,20 @@
  */
 package reactivemongo.api
 
-import akka.actor.{ ActorRef, ActorSystem, PoisonPill, Props }
-import org.jboss.netty.buffer.ChannelBuffer
-import play.api.libs.iteratee._
-import reactivemongo.api.indexes._
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicLong
+
+import akka.actor._
+import akka.pattern._
+import akka.util.Timeout
+import com.typesafe.config.Config
 import reactivemongo.core.actors._
 import reactivemongo.core.nodeset.Authenticate
-import reactivemongo.bson._
 import reactivemongo.core.protocol._
-import reactivemongo.core.commands.{ Command, GetLastError, LastError, SuccessfulAuthentication }
+import reactivemongo.core.commands.SuccessfulAuthentication
 import reactivemongo.utils.LazyLogger
-import reactivemongo.utils.EitherMappableFuture._
-import scala.concurrent.{ ExecutionContext, Future, Promise }
+import scala.collection.mutable
+import scala.concurrent.{Await, ExecutionContext, Future, Promise}
 import scala.concurrent.duration._
 import scala.util.{ Try, Failure, Success }
 import scala.util.control.NoStackTrace
@@ -41,7 +43,7 @@ import scala.util.control.NonFatal
  *
  * @tparam T Type of the message to send.
  * @param message The message to send to the given actor. This message will be wrapped into an ExpectingResponse message by the `expectingResponseMaker` function.
- * @param actorRef The reference to the MongoDBSystem actor the given message will be sent to.
+ * @param connection The reference to the MongoConnection the given message will be sent to.
  * @param strategy The Failover strategy.
  * @param expectingResponseMaker A function that takes a message of type `T` and wraps it into an ExpectingResponse message.
  */
@@ -147,7 +149,7 @@ object Failover {
    * Produces a [[reactivemongo.api.Failover]] holding a future reference that is completed with a result, after 1 or more attempts (specified in the given strategy).
    *
    * @param checkedWriteRequest The checkedWriteRequest to send to the given actor.
-   * @param actorRef The reference to the MongoDBSystem actor the given message will be sent to.
+   * @param connection The reference to the MongoConnection the given message will be sent to.
    * @param strategy The Failover strategy.
    */
   def apply(checkedWriteRequest: CheckedWriteRequest, connection: MongoConnection, strategy: FailoverStrategy)(implicit ec: ExecutionContext): Failover[CheckedWriteRequest] =
@@ -157,7 +159,7 @@ object Failover {
    * Produces a [[reactivemongo.api.Failover]] holding a future reference that is completed with a result, after 1 or more attempts (specified in the given strategy).
    *
    * @param requestMaker The requestMaker to send to the given actor.
-   * @param actorRef The reference to the MongoDBSystem actor the given message will be sent to.
+   * @param connection The reference to the MongoConnection actor the given message will be sent to.
    * @param strategy The Failover strategy.
    */
   def apply(requestMaker: RequestMaker, connection: MongoConnection, strategy: FailoverStrategy)(implicit ec: ExecutionContext): Failover[RequestMaker] =
@@ -242,7 +244,7 @@ class MongoConnection(
   /**
    * Writes a checked write request and wait for a response.
    *
-   * @param message The request maker.
+   * @param checkedWriteRequest The request maker.
    *
    * @return The future response.
    */
@@ -289,7 +291,7 @@ class MongoConnection(
   import akka.actor._
   import reactivemongo.core.nodeset.ProtocolMetadata
 
-  val monitor = actorSystem.actorOf(Props(new MonitorActor))
+  val monitor = actorSystem.actorOf(Props(new MonitorActor), "Monitor-" + MongoDriver.nextCounter)
 
   @volatile private[reactivemongo] var metadata: Option[ProtocolMetadata] = None
 
@@ -474,26 +476,40 @@ case class MongoConnectionOptions(
   nbChannelsPerNode: Int = 10
 )
 
-class MongoDriver(systemOption: Option[ActorSystem] = None) {
+class MongoDriver(config: Option[Config] = None) {
   import MongoDriver.logger
 
-  def this(system: ActorSystem) = this(Some(system))
+  /* MongoDriver always uses its own ActorSystem so it can have complete control separate from other
+   * Actor Systems in the application
+   */
+  val system = {
+    import com.typesafe.config.ConfigFactory
+    val cfg = config match { case Some(c) => c; case None => ConfigFactory.load() }
+    ActorSystem("reactivemongo", cfg.getConfig("mongo-async-driver"))
+  }
 
-  @volatile private var _connections = List[MongoConnection]()
+  private val supervisorActor = system.actorOf(Props(new SupervisorActor(this)),"Supervisor-" + MongoDriver.nextCounter)
+
+  private val connectionMonitors = mutable.Map.empty[ActorRef,MongoConnection]
 
   /** Keep a list of all connections so that we can terminate the actors */
-  def connections: Seq[MongoConnection] = _connections
+  def connections: Iterable[MongoConnection] = connectionMonitors.values
 
-  val system = systemOption.getOrElse(MongoDriver.defaultSystem)
+  def numConnections: Int = connectionMonitors.size
 
-  def close() = systemOption match {
-    // Non default actor system -- terminate actors used by MongoConnections
-    case Some(_) =>
-      connections.foreach { connection =>
-        connection.monitor ! Close
-      }
-    // Default actor system -- just shut it down
-    case None => system.shutdown()
+  def close(timeout: FiniteDuration = 0.seconds) = {
+    // Terminate actors used by MongoConnections
+    connections.foreach { connection =>
+      connection.monitor ! Close
+    }
+
+    // Tell the supervisor to close. It will shut down all the connections and monitors
+    // and then shut down the ActorSystem as it is exiting.
+    supervisorActor ! Close
+
+    // When the actorSystem is shutdown, it means that supervisorActor has exited (run its postStop)
+    // So, wait for that event.
+    system.awaitTermination(timeout)
   }
 
   /**
@@ -509,12 +525,12 @@ class MongoDriver(systemOption: Option[ActorSystem] = None) {
    */
   def connection(nodes: Seq[String], options: MongoConnectionOptions = MongoConnectionOptions(), authentications: Seq[Authenticate] = Seq.empty, nbChannelsPerNode: Int = 10, name: Option[String] = None): MongoConnection = {
     val props = Props(new MongoDBSystem(nodes, authentications, options)())
-    val mongosystem = if (name.isDefined) system.actorOf(props, name = name.get) else system.actorOf(props)
-    val connection = new MongoConnection(system, mongosystem, options)
-    this.synchronized {
-      _connections = connection :: _connections
+    val mongosystem = name match {
+      case Some(nm) => system.actorOf(props, nm);
+      case None => system.actorOf(props, "Connection-" +  + MongoDriver.nextCounter)
     }
-    connection
+    val connection = (supervisorActor ? AddConnection(options, mongosystem))(Timeout(10, TimeUnit.SECONDS))
+    Await.result(connection.mapTo[MongoConnection], Duration.Inf)
   }
 
   /**
@@ -552,26 +568,65 @@ class MongoDriver(systemOption: Option[ActorSystem] = None) {
    */
   def connection(parsedURI: MongoConnection.ParsedURI): MongoConnection =
     connection(parsedURI, 10, None)
+
+  private case class AddConnection(options: MongoConnectionOptions, mongosystem: ActorRef)
+  private case class CloseWithTimeout(timeout: FiniteDuration)
+
+  private case class SupervisorActor(driver: MongoDriver) extends Actor {
+
+    def isEmpty = driver.connectionMonitors.isEmpty
+
+    override def receive = {
+      case ac: AddConnection =>
+        val connection = new MongoConnection(driver.system, ac.mongosystem, ac.options)
+        driver.connectionMonitors.put(connection.monitor, connection)
+        val actor = connection.monitor
+        context.watch(actor)
+        sender ! connection
+      case Terminated(actor) =>
+        driver.connectionMonitors.remove(actor)
+      case CloseWithTimeout(timeout) =>
+        if (isEmpty) {
+          context.stop(self)
+        } else {
+          context.become(closing(timeout))
+        }
+      case Close =>
+        if (isEmpty) {
+          context.stop(self)
+        } else {
+          context.become(closing(0.seconds))
+        }
+    }
+
+    def closing(shutdownTimeout: FiniteDuration) : Receive = {
+      case ac: AddConnection =>
+        logger.warn("Refusing to add connection while MongoDriver is closing.")
+      case Terminated(actor) =>
+        driver.connectionMonitors.remove(actor)
+        if (isEmpty) {
+          context.stop(self)
+        }
+      case CloseWithTimeout(timeout) =>
+        logger.warn("CloseWithTimeout ignored, already closing.")
+      case Close =>
+        logger.warn("Close ignored, already closing.")
+    }
+
+    override def postStop {
+      driver.system.shutdown()
+    }
+  }
 }
 
 object MongoDriver {
   private val logger = LazyLogger("reactivemongo.api.MongoDriver")
 
-  /** Default ActorSystem used in the default MongoDriver constructor. */
-  private def defaultSystem = {
-    import com.typesafe.config.ConfigFactory
-    val config = ConfigFactory.load()
-    ActorSystem("reactivemongo", config.getConfig("mongo-async-driver"))
-  }
-
   /** Creates a new MongoDriver with a new ActorSystem. */
   def apply() = new MongoDriver
 
-  /**
-   * Creates a new MongoDriver with specified ActorSystem.
-   *
-   * @param system An ActorSystem for ReactiveMongo to use.
-   */
-  def apply(system: ActorSystem) = new MongoDriver(system)
+  def apply(config: Config) = new MongoDriver(Some(config))
 
+  private[api] val _counter = new AtomicLong(0)
+  private[api] def nextCounter : Long = _counter.incrementAndGet()
 }
