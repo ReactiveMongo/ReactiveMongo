@@ -1,5 +1,6 @@
 package reactivemongo.api.commands
 
+import scala.language.implicitConversions
 import scala.util.control.NoStackTrace
 import reactivemongo.api.{ BSONSerializationPack, Cursor, SerializationPack }
 import reactivemongo.bson.BSONObjectID

@@ -15,9 +15,7 @@ object BuildSettings {
   val buildSettings = Defaults.coreDefaultSettings ++ Seq(
     organization := "org.reactivemongo",
     version := buildVersion,
-    scalaVersion := "2.11.2",
-    crossScalaVersions  := Seq("2.11.2", "2.10.4"),
-    crossVersion := CrossVersion.binary,
+    scalaVersion := "2.11.4",
     javaOptions in test ++= Seq("-Xmx512m", "-XX:MaxPermSize=512m"),
     scalacOptions ++= Seq("-unchecked", "-deprecation", "-target:jvm-1.6"),
     scalacOptions in (Compile, doc) ++= Seq("-unchecked", "-deprecation", "-diagrams", "-implicits", "-skip-packages", "samples"),
@@ -45,7 +43,7 @@ object Publish {
     pomIncludeRepository := { _ => false },
     licenses := Seq("Apache 2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0")),
     homepage := Some(url("http://reactivemongo.org")),
-    pomExtra := (
+    pomExtra :=
       <scm>
         <url>git://github.com/ReactiveMongo/ReactiveMongo.git</url>
         <connection>scm:git://github.com/ReactiveMongo/ReactiveMongo.git</connection>
@@ -56,7 +54,7 @@ object Publish {
           <name>Stephane Godbillon</name>
           <url>http://stephane.godbillon.com</url>
         </developer>
-      </developers>))
+      </developers>)
 }
 
 object Format {
@@ -120,11 +118,11 @@ object Resolvers {
 }
 
 object Dependencies {
-  val netty = "io.netty" % "netty" % "3.6.5.Final" cross CrossVersion.Disabled
+  val netty = "io.netty" % "netty" % "3.6.5.Final"
 
-  val akkaActor = "com.typesafe.akka" %% "akka-actor" % "2.3.6"
+  val akkaActor = "com.typesafe.akka" %% "akka-actor" % "2.3.8"
 
-  val iteratees = "com.typesafe.play" %% "play-iteratees" % "2.3.5"
+  val iteratees = "com.typesafe.play" %% "play-iteratees" % "2.3.7"
 
   val specs = "org.specs2" %% "specs2-core" % "2.3.11" % "test"
 

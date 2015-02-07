@@ -42,7 +42,7 @@ class CursorSpec  extends Specification {
     "get 10 first docs" in {
       println("\n\n\n\n\tGET FIRST 10 docs\n")
       //Await.result(coll.find(BSONDocument()).cursor.toListByStream(10), timeout).size mustEqual 10
-      Await.result(coll.find(BSONDocument()).cursor.toList(10), timeout).size mustEqual 10
+      Await.result(coll.find(BSONDocument()).cursor.collect[List](10), timeout).size mustEqual 10
     }
   }
 }
