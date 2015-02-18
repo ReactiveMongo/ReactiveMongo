@@ -15,9 +15,9 @@ object BuildSettings {
   val buildSettings = Defaults.coreDefaultSettings ++ Seq(
     organization := "org.reactivemongo",
     version := buildVersion,
-    scalaVersion := "2.11.2",
-    crossScalaVersions  := Seq("2.11.2", "2.10.4"),
-    crossVersion := CrossVersion.binary,
+    scalaVersion := "2.11.5",
+    //crossScalaVersions  := Seq("2.11.2", "2.10.4"),
+    //crossVersion := CrossVersion.binary,
     javaOptions in test ++= Seq("-Xmx512m", "-XX:MaxPermSize=512m"),
     scalacOptions ++= Seq("-unchecked", "-deprecation", "-target:jvm-1.6"),
     scalacOptions in (Compile, doc) ++= Seq("-unchecked", "-deprecation", "-diagrams", "-implicits", "-skip-packages", "samples"),
