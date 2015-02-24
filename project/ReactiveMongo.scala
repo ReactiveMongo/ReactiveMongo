@@ -122,14 +122,20 @@ object Resolvers {
 object Dependencies {
   val netty = "io.netty" % "netty" % "3.6.5.Final" cross CrossVersion.Disabled
 
-  val akkaActor = "com.typesafe.akka" %% "akka-actor" % "2.3.6"
+  val akkajVersion = "2.3.6"
+  val akkaActor = "com.typesafe.akka" %% "akka-actor" % akkajVersion
+  val akkaSlf4j = "com.typesafe.akka" %% "akka-slf4j" % akkajVersion
 
   val iteratees = "com.typesafe.play" %% "play-iteratees" % "2.3.5"
 
   val specs = "org.specs2" %% "specs2-core" % "2.3.11" % "test"
 
   val log4jVersion = "2.0.2"
-  val log4j = Seq("org.apache.logging.log4j" % "log4j-api" % log4jVersion, "org.apache.logging.log4j" % "log4j-core" % log4jVersion)
+  val log4j = Seq(
+    "org.apache.logging.log4j" % "log4j-slf4j-impl" % log4jVersion % "test",
+    "org.apache.logging.log4j" % "log4j-api" % log4jVersion % "test",
+    "org.apache.logging.log4j" % "log4j-core" % log4jVersion % "test"
+  )
 }
 
 object ReactiveMongoBuild extends Build {
@@ -153,11 +159,9 @@ object ReactiveMongoBuild extends Build {
     file("driver"),
     settings = buildSettings ++ Seq(
       resolvers := resolversList,
-      libraryDependencies ++= Seq(
-        netty,
-        akkaActor,
-        iteratees,
-        specs) ++ log4j)).dependsOn(bsonmacros)
+      libraryDependencies ++= Seq(netty, akkaActor, akkaSlf4j, iteratees, specs) ++ log4j
+    )
+  ).dependsOn(bsonmacros)
 
   lazy val bson = Project(
     s"$projectPrefix-BSON",

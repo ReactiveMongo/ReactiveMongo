@@ -38,7 +38,7 @@ object `package` {
   def option[T](cond: => Boolean, value: => T): Option[T] = (if (cond) Some(value) else None)
 }
 
-case class LazyLogger(logger: org.apache.logging.log4j.Logger) {
+case class LazyLogger(logger: org.slf4j.Logger) {
   def trace(s: => String) { if (logger.isTraceEnabled) logger.trace(s) }
   def trace(s: => String, e: => Throwable) { if (logger.isTraceEnabled) logger.trace(s, e) }
   def debug(s: => String) { if (logger.isDebugEnabled) logger.debug(s) }
@@ -52,7 +52,7 @@ case class LazyLogger(logger: org.apache.logging.log4j.Logger) {
 }
 
 object LazyLogger {
-  def apply(logger: String): LazyLogger = LazyLogger(org.apache.logging.log4j.LogManager.getLogger(logger))
+  def apply(logger: String): LazyLogger = LazyLogger(org.slf4j.LoggerFactory.getLogger(logger))
 }
 
 case class EitherMappableFuture[A](future: Future[A]) {
