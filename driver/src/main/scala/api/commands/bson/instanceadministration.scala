@@ -54,30 +54,29 @@ object BSONCollStatsImplicits {
   implicit object CollStatsWriter extends BSONDocumentWriter[ResolvedCollectionCommand[CollStats]] {
     def write(command: ResolvedCollectionCommand[CollStats]): BSONDocument =
       BSONDocument(
-        "collStats" -> command.collection,
-        "scale" -> command.command.scale)
+        "collStats" -> command.collection, "scale" -> command.command.scale)
   }
+
   implicit object CollStatsResultReader extends DealingWithGenericCommandErrorsReader[CollStatsResult] {
-    def readResult(doc: BSONDocument): CollStatsResult =
-      CollStatsResult(
-        doc.getAs[String]("ns").get,
-        doc.getAs[Int]("count").get,
-        doc.getAs[BSONNumberLike]("size").get.toDouble,
-        doc.getAs[Double]("avgObjSize"),
-        doc.getAs[BSONNumberLike]("storageSize").get.toDouble,
-        doc.getAs[Int]("numExtents").get,
-        doc.getAs[Int]("nindexes").get,
-        doc.getAs[Int]("lastExtentSize").get,
-        doc.getAs[Double]("paddingFactor").get,
-        doc.getAs[Int]("systemFlags"),
-        doc.getAs[Int]("userFlags"),
-        doc.getAs[Int]("totalIndexSize").get,
-        {
-          val indexSizes = doc.getAs[BSONDocument]("indexSizes").get
+    def readResult(doc: BSONDocument): CollStatsResult = CollStatsResult(
+      doc.getAs[String]("ns").get,
+      doc.getAs[BSONNumberLike]("count").map(_.toInt).get,
+      doc.getAs[BSONNumberLike]("size").map(_.toDouble).get,
+      doc.getAs[BSONNumberLike]("avgObjSize").map(_.toDouble),
+      doc.getAs[BSONNumberLike]("storageSize").map(_.toDouble).get,
+      doc.getAs[BSONNumberLike]("numExtents").map(_.toInt),
+      doc.getAs[BSONNumberLike]("nindexes").map(_.toInt).get,
+      doc.getAs[BSONNumberLike]("lastExtentSize").map(_.toInt),
+      doc.getAs[BSONNumberLike]("paddingFactor").map(_.toDouble),
+      doc.getAs[BSONNumberLike]("systemFlags").map(_.toInt),
+      doc.getAs[BSONNumberLike]("userFlags").map(_.toInt),
+      doc.getAs[BSONNumberLike]("totalIndexSize").map(_.toInt).get,
+      {
+        val indexSizes = doc.getAs[BSONDocument]("indexSizes").get
           (for (kv <- indexSizes.elements) yield kv._1 -> kv._2.asInstanceOf[BSONInteger].value).toArray
-        },
-        doc.getAs[BSONBooleanLike]("capped").map(_.toBoolean).getOrElse(false),
-        doc.getAs[BSONNumberLike]("max").map(_.toLong))
+      },
+      doc.getAs[BSONBooleanLike]("capped").fold(false)(_.toBoolean),
+      doc.getAs[BSONNumberLike]("max").map(_.toLong))
   }
 }
 

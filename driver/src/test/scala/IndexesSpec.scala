@@ -46,7 +46,9 @@ class IndexesSpec extends Specification with Tags {
       }
       success
     }
+
     "retrieve indexes" in {
+      // TODO: Fix with WT
       val future = geo.indexesManager.list().map {
         _.filter(_.name.get == "loc_2d")
       }.filter(!_.isEmpty).map(_.apply(0))
@@ -105,6 +107,7 @@ class IndexesSpec extends Specification with Tags {
     } tag ("mongo2_4")
 
     "retrieve indexes" in {
+      // TODO: Fix with WT      
       val future = geo2DSpherical.indexesManager.list().map {
         _.filter(_.name.get == "loc_2dsphere")
       }.filter(!_.isEmpty).map(_.apply(0))
@@ -127,6 +130,7 @@ class IndexesSpec extends Specification with Tags {
     }
 
     "retrieve indexes" in {
+      // TODO: Fix with WT
       val future = hashed.indexesManager.list().map {
         _.filter(_.name.get == "field_hashed")
       }.filter(!_.isEmpty).map(_.apply(0))

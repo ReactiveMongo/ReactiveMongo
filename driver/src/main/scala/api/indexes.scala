@@ -140,7 +140,7 @@ class IndexesManager(db: DB)(implicit context: ExecutionContext) {
   val collection = db("system.indexes")
 
   /** Gets a future list of all the index on this database. */
-  def list(): Future[List[NSIndex]] =
+  def list(): Future[List[NSIndex]] = // TODO: listIndexes, check with WT
     collection.find(BSONDocument()).cursor(IndexesManager.NSIndexReader, context).collect[List]()
 
   /**

@@ -140,6 +140,7 @@ trait DBMetaCommands {
 
   /** Returns the names of the collections in this database. */
   def collectionNames(implicit ec: ExecutionContext): Future[List[String]] = {
+    // TODO: Use command { 'listCollections': 1 }, check with WT
     collection("system.namespaces").as[BSONCollection]()
       .find(BSONDocument(
         "name" -> BSONRegex("^[^\\$]+$", "") // strip off any indexes
