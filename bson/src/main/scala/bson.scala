@@ -15,7 +15,7 @@
  */
 package reactivemongo.bson
 
-object `package` extends DefaultBSONHandlers {
+object `package` extends DefaultBSONConverters {
   type BSONElement = (String, BSONValue)
 }
 

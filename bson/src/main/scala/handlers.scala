@@ -253,4 +253,11 @@ trait DefaultBSONHandlers {
     new VariantBSONReaderWrapper(reader)
 }
 
+/** Extra (low priority) BSON readers, converting read value. */
+trait DefaultBSONConverters extends DefaultBSONHandlers {
+  implicit object BSONDoubleAsLong extends BSONReader[BSONDouble, Long] {
+    def read(double: BSONDouble): Long = double.value.toLong
+  }
+}
+
 object DefaultBSONHandlers extends DefaultBSONHandlers

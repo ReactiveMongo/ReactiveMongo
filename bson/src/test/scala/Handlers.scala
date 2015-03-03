@@ -83,6 +83,11 @@ class Handlers extends Specification {
       tryBooleanLike.isSuccess mustEqual true
       tryBooleanLike.get.toBoolean mustEqual true
     }
+
+    "have a score 3.88 converted as long 3" in {
+      doc.getAsTry[Long]("score") mustEqual Success(3L)
+    }
+
     "should not have a surname2" in {
       doc.getTry("surname2").isFailure mustEqual true
       doc.getUnflattenedTry("surname2").isSuccess mustEqual true
