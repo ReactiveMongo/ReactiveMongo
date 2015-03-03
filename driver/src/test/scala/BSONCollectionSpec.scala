@@ -57,24 +57,38 @@ class BSONCollectionSpec extends Specification {
       Await.result(collection.insert(person4), timeout).ok mustEqual true
       Await.result(collection.insert(person5), timeout).ok mustEqual true
     }
-    "read empty cursor with success using collect" in {
-      val list = collection.find(BSONDocument("plop" -> "plop")).cursor[BSONDocument].collect[Vector](10)
-      Await.result(list, timeout).length mustEqual 0
-    }
-    "read empty cursor with success using enumerate" in {
-      val enumerator = collection.find(BSONDocument("plop" -> "plop")).cursor[BSONDocument].enumerate(10)
-      val n = enumerator |>>> Iteratee.fold(0) { (r, doc) =>
-        r + 1
+
+    "read empty cursor" >> {
+      @inline def col = collection.find(BSONDocument("plop" -> "plop"))
+
+      "with success using collect" in {
+        val list = col.cursor[BSONDocument].collect[Vector](10)
+        Await.result(list, timeout).length mustEqual 0
       }
-      Await.result(n, timeout) mustEqual 0
+
+      "with success using enumerate" in {
+        val enumerator = col.cursor[BSONDocument].enumerate(10)
+        val n = enumerator |>>> Iteratee.fold(0) { (r, doc) =>
+          r + 1
+        }
+        Await.result(n, timeout) mustEqual 0
+      }
+
+      "with success as option" in {
+        col.cursor[BSONDocument].headOption must beNone.await(timeoutMillis)
+      }      
     }
+
     "read a doc with success" in {
       implicit val reader = PersonReader
       Await.result(collection.find(BSONDocument()).one[Person], timeout).get mustEqual person
     }
     "read all with success" in {
       implicit val reader = PersonReader
-      Await.result(collection.find(BSONDocument()).cursor[Person].collect[List](), timeout) mustEqual List(person, person2, person3, person4, person5)
+      @inline def cursor = collection.find(BSONDocument()).cursor[Person]
+      cursor.collect[List]() must beEqualTo(List(
+        person, person2, person3, person4, person5)).await(timeoutMillis) and (
+        cursor.headOption must beSome(person).await(timeoutMillis))
     }
     "read a doc with error" in {
       implicit val reader = BuggyPersonReader

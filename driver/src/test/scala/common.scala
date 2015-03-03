@@ -6,6 +6,7 @@ object Common {
   implicit val ec = ExecutionContext.Implicits.global
 
   val timeout = 10 seconds
+  val timeoutMillis = timeout.toMillis.toInt
 
   lazy val driver = new MongoDriver
   lazy val connection = driver.connection(List("localhost:27017"))
