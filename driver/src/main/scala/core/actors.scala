@@ -458,9 +458,10 @@ class MongoDBSystem(
               None
           }
           val ns = nodeSet.updateByChannelId(response.info.channelId) { connection =>
+            val auths = nodeSet.authenticates + originalAuthenticate
             authenticateConnection(connection.copy(
               authenticated = authenticated.map(connection.authenticated + _).getOrElse(connection.authenticated),
-              authenticating = None), nodeSet.authenticates.toSeq)
+              authenticating = None), auths.toSeq)
           } { node =>
             node.copy(authenticated = authenticated.map(node.authenticated + _).getOrElse(node.authenticated))
           }
