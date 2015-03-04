@@ -312,8 +312,8 @@ object MongoWireVersion {
    *
    * But wireProtocol=1 is virtually non-existent; Mongo 2.4 was 0 and Mongo 2.6 is 2.
    */
-  object V24AndBefore extends MongoWireVersion { def value = 0 }
-  object V26 extends MongoWireVersion { def value = 2 }
+  object V24AndBefore extends MongoWireVersion { val value = 0 }
+  object V26 extends MongoWireVersion { val value = 2 }
 
   def apply(v: Int): MongoWireVersion =
     if(v >= V26.value) V26
