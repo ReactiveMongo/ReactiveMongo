@@ -61,16 +61,14 @@ case class NodeSet(
 
   def updateOrAddNode(ƒ: PartialFunction[Node, Node], default: Node) = {
     val (maybeUpdatedNodes, updated) = utils.update(nodes)(ƒ)
-    if (!updated)
-      copy(nodes = default +: nodes)
+    if (!updated) copy(nodes = default +: nodes)
     else copy(nodes = maybeUpdatedNodes)
   }
 
   def updateOrAddNodes(ƒ: PartialFunction[Node, Node], nodes: Seq[Node]) =
-    nodes.foldLeft(this)(_ updateOrAddNode (ƒ, _))
+    nodes.foldLeft(this)(_.updateOrAddNode(ƒ, _))
 
-  def updateAll(ƒ: Node => Node) =
-    copy(nodes = nodes.map(ƒ))
+  def updateAll(ƒ: Node => Node) = copy(nodes = nodes.map(ƒ))
 
   def updateNodeByChannelId(id: Int)(ƒ: Node => Node) =
     updateByChannelId(id)(identity)(ƒ)
@@ -81,19 +79,18 @@ case class NodeSet(
   def updateByChannelId(id: Int)(ƒc: Connection => Connection)(ƒn: Node => Node) = {
     copy(nodes = nodes.map { node =>
       val (connections, updated) = utils.update(node.connections) {
-        case conn if {
-          conn.channel.getId == id
-        } => ƒc(conn)
+        case conn if (conn.channel.getId == id) => ƒc(conn)
       }
-      if (updated)
-        ƒn(node.copy(connections = connections))
+      if (updated) ƒn(node.copy(connections = connections))
       else node
     })
   }
 
-  def pickByChannelId(id: Int): Option[(Node, Connection)] =
-    nodes.view.map(node => node -> node.connections.find(_.channel.getId() == id)).collectFirst {
-      case (node, connection) if connection.exists(_.status == ConnectionStatus.Connected) => node -> connection.get
+  def pickByChannelId(id: Int): Option[(Node, Connection)] = 
+    nodes.view.map(node =>
+      node -> node.connections.find(_.channel.getId == id)).collectFirst {
+      case (node, Some(con)) if (
+        con.status == ConnectionStatus.Connected) => node -> con
     }
 
   def pickForWrite: Option[(Node, Connection)] =
@@ -101,40 +98,34 @@ case class NodeSet(
       case (node, Some(connection)) => node -> connection
     }
 
-  private val pickConnectionAndFlatten: Option[Node] => Option[(Node, Connection)] = { node =>
-    node.map(node => node -> node.authenticatedConnections.pick).collect { case (node, Some(connection)) => (node, connection) }
+  private val pickConnectionAndFlatten: Option[Node] => Option[(Node, Connection)] = _.map(node => node -> node.authenticatedConnections.pick).collect {
+    case (node, Some(connection)) => (node, connection)
   }
 
-  private def pickFromGroupWithFilter(roundRobiner: RoundRobiner[Node, Vector], filter: Option[BSONDocument => Boolean], fallback: => Option[Node]) = {
-    def nodeMatchesFilter(filter: BSONDocument => Boolean): Node => Boolean = _.tags.map(filter(_)).getOrElse(false)
-
-    filter.map { filter =>
-      roundRobiner.pickWithFilter(nodeMatchesFilter(filter))
-    }.getOrElse(fallback)
-  }
+  private def pickFromGroupWithFilter(roundRobiner: RoundRobiner[Node, Vector], filter: Option[BSONDocument => Boolean], fallback: => Option[Node]) = 
+    filter.fold(fallback)(f =>
+      roundRobiner.pickWithFilter(_.tags.fold(false)(f)))
 
   // http://docs.mongodb.org/manual/reference/read-preference/
   def pick(preference: ReadPreference): Option[(Node, Connection)] = {
     if (mongos.isDefined) {
       pickConnectionAndFlatten(mongos)
-    } else {
-      preference match {
-        case ReadPreference.Primary                    => pickConnectionAndFlatten(primary)
-        case ReadPreference.PrimaryPreferred(filter)   => pickConnectionAndFlatten(primary.orElse(pickFromGroupWithFilter(secondaries, filter, secondaries.pick)))
-        case ReadPreference.Secondary(filter)          => pickConnectionAndFlatten(pickFromGroupWithFilter(secondaries, filter, secondaries.pick))
-        case ReadPreference.SecondaryPreferred(filter) => pickConnectionAndFlatten(pickFromGroupWithFilter(secondaries, filter, secondaries.pick).orElse(primary))
-        case ReadPreference.Nearest(filter)            => pickConnectionAndFlatten(pickFromGroupWithFilter(nearestGroup, filter, nearest))
-      }
+    } else preference match {
+      case ReadPreference.Primary                    => pickConnectionAndFlatten(primary)
+      case ReadPreference.PrimaryPreferred(filter)   => pickConnectionAndFlatten(primary.orElse(pickFromGroupWithFilter(secondaries, filter, secondaries.pick)))
+      case ReadPreference.Secondary(filter)          => pickConnectionAndFlatten(pickFromGroupWithFilter(secondaries, filter, secondaries.pick))
+      case ReadPreference.SecondaryPreferred(filter) => pickConnectionAndFlatten(pickFromGroupWithFilter(secondaries, filter, secondaries.pick).orElse(primary))
+      case ReadPreference.Nearest(filter)            => pickConnectionAndFlatten(pickFromGroupWithFilter(nearestGroup, filter, nearest))
     }
   }
 
-  def createNeededChannels(receiver: ActorRef, upTo: Int)(implicit channelFactory: ChannelFactory): NodeSet = {
+  def createNeededChannels(receiver: ActorRef, upTo: Int)(implicit channelFactory: ChannelFactory): NodeSet = 
     copy(nodes = nodes.foldLeft(Vector.empty[Node]) { (nodes, node) =>
       nodes :+ node.createNeededChannels(receiver, upTo)
     })
-  }
 
-  def toShortString = s"{{NodeSet $name ${nodes.map(_.toShortString).mkString(" | ")} }}"
+  def toShortString =
+    s"{{NodeSet $name ${nodes.map(_.toShortString).mkString(" | ")} }}"
 }
 
 case class Node(
@@ -183,19 +174,20 @@ object ProtocolMetadata {
 }
 
 case class Connection(
-    channel: Channel,
-    status: ConnectionStatus,
-    authenticated: Set[Authenticated],
-    authenticating: Option[Authenticating]) {
+  channel: Channel,
+  status: ConnectionStatus,
+  authenticated: Set[Authenticated],
+  authenticating: Option[Authenticating]) {
+
   def send(message: Request, writeConcern: Request) {
     channel.write(message)
     channel.write(writeConcern)
   }
-  def send(message: Request) {
-    channel.write(message)
-  }
 
-  def isAuthenticated(db: String, user: String) = authenticated.exists(auth => auth.user == user && auth.db == db)
+  def send(message: Request) = channel.write(message)
+
+  def isAuthenticated(db: String, user: String) =
+    authenticated.exists(auth => auth.user == user && auth.db == db)
 }
 
 case class PingInfo(
@@ -268,7 +260,8 @@ case class Authenticate(db: String, user: String, password: String) extends Auth
   override def toString: String = "Authenticate(" + db + ", " + user + ")"
 }
 case class Authenticating(db: String, user: String, password: String, nonce: Option[String]) extends Authentication {
-  override def toString: String = s"Authenticating($db, $user, ${nonce.map(_ => "<nonce>").getOrElse("<>")})"
+  override def toString: String =
+    s"Authenticating($db, $user, ${nonce.map(_ => "<nonce>").getOrElse("<>")})"
 }
 case class Authenticated(db: String, user: String) extends Authentication
 
@@ -278,13 +271,10 @@ class ContinuousIterator[A](iterable: Iterable[A], private var toDrop: Int = 0) 
 
   val hasNext = iterator.hasNext
 
-  if (hasNext) {
-    drop(toDrop)
-  }
+  if (hasNext) drop(toDrop)
 
   def next =
-    if (!hasNext)
-      throw new NoSuchElementException("empty iterator")
+    if (!hasNext) throw new NoSuchElementException("empty iterator")
     else {
       if (!iterator.hasNext) {
         iterator = iterable.iterator
@@ -310,17 +300,18 @@ class RoundRobiner[A, M[T] <: Iterable[T]](val subject: M[A], startAtIndex: Int 
   private def pickWithFilter(filter: A => Boolean, tested: Int): Option[A] =
     if (length > 0 && tested < length) {
       val a = pick
-      if (!a.isDefined)
-        None
-      else if (filter(a.get))
-        a
+      if (!a.isDefined) None
+      else if (filter(a.get)) a
       else pickWithFilter(filter, tested + 1)
     } else None
 
-  def copy(subject: M[A], startAtIndex: Int = iterator.nextIndex) = new RoundRobiner(subject, startAtIndex)
+  def copy(subject: M[A], startAtIndex: Int = iterator.nextIndex) =
+    new RoundRobiner(subject, startAtIndex)
 }
 
 class ChannelFactory(options: MongoConnectionOptions, bossExecutor: Executor = Executors.newCachedThreadPool, workerExecutor: Executor = Executors.newCachedThreadPool) {
+  import javax.net.ssl.{ KeyManager, SSLContext }
+
   private val logger = LazyLogger("reactivemongo.core.nodeset.ChannelFactory")
 
   def create(host: String = "localhost", port: Int = 27017, receiver: ActorRef) = {
@@ -333,7 +324,34 @@ class ChannelFactory(options: MongoConnectionOptions, bossExecutor: Executor = E
 
   private val bufferFactory = new HeapChannelBufferFactory(java.nio.ByteOrder.LITTLE_ENDIAN)
 
-  private def makePipeline(receiver: ActorRef): ChannelPipeline = Channels.pipeline(new RequestEncoder(), new ResponseFrameDecoder(), new ResponseDecoder(), new MongoHandler(receiver))
+  private def makePipeline(receiver: ActorRef): ChannelPipeline = {
+    val pipeline = Channels.pipeline(new ResponseFrameDecoder(),
+      new ResponseDecoder(), new RequestEncoder(), new MongoHandler(receiver))
+
+    if (options.sslEnabled) {
+      val sslCtx = {
+        val tm: Array[javax.net.ssl.TrustManager] =
+          if (options.sslAllowsInvalidCert) Array(TrustAny) else null
+
+        val ctx = SSLContext.getInstance("SSL")
+        ctx.init(null, tm, new java.security.SecureRandom())
+        ctx
+      }
+
+      val sslEng = {
+        val engine = sslCtx.createSSLEngine()
+        engine.setUseClientMode(true)
+        engine
+      }
+
+      val sslHandler =
+        new org.jboss.netty.handler.ssl.SslHandler(sslEng, false/* TLS */)
+      
+      pipeline.addFirst("ssl", sslHandler)
+    }
+
+    pipeline
+  }
 
   private def makeChannel(receiver: ActorRef): Channel = {
     val channel = channelFactory.newChannel(makePipeline(receiver))
@@ -343,5 +361,13 @@ class ChannelFactory(options: MongoConnectionOptions, bossExecutor: Executor = E
     config.setKeepAlive(options.keepAlive)
     config.setConnectTimeoutMillis(options.connectTimeoutMS)
     channel
+  }
+
+  private object TrustAny extends javax.net.ssl.X509TrustManager {
+    import java.security.cert.X509Certificate
+
+    override def checkClientTrusted(cs: Array[X509Certificate], a: String) = {}
+    override def checkServerTrusted(cs: Array[X509Certificate], a: String) = {}
+    override def getAcceptedIssuers(): Array[X509Certificate] = null
   }
 }

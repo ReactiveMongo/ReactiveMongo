@@ -239,14 +239,14 @@ class MongoDBSystem(
       allChannelGroup(nodeSet).close.addListener(listener)
 
       // fail all requests waiting for a response
-      awaitingResponses.foreach( _._2.promise.failure(Exceptions.ClosedException) )
+      awaitingResponses.foreach(
+        _._2.promise.failure(Exceptions.ClosedException))
       awaitingResponses.empty
 
       // moving to closing state
       context become closing
 
     case req: RequestMaker =>
-
       logger.debug("WARNING received a request")
       val r = req(requestIds.common.next)
       pickChannel(r).map(_._2.send(r))
@@ -333,17 +333,18 @@ class MongoDBSystem(
         } else true
       }
       if (!nodeSet.isReachable) {
-        if(nodeSetWasReachable) {
+        if (nodeSetWasReachable) {
           logger.error("The entire node set is unreachable, is there a network problem?")
           broadcastMonitors(SetUnavailable)
         }
         else logger.debug("The entire node set is still unreachable, is there a network problem?")
       } else if (!nodeSet.primary.isDefined) {
-        if(primaryWasAvailable) {
+        if (primaryWasAvailable) {
           logger.error("The primary is unavailable, is there a network problem?")
           broadcastMonitors(PrimaryUnavailable)
         }
-        else logger.debug("The primary is still unavailable, is there a network problem?")
+        else logger.debug(
+          "The primary is still unavailable, is there a network problem?")
       }
       logger.debug(channelId + " is disconnected")
     }
@@ -479,23 +480,20 @@ class MongoDBSystem(
           awaitingResponses -= response.header.responseTo
           if (response.error.isDefined) {
             logger.debug("{" + response.header.responseTo + "} sending a failure... (" + response.error.get + ")")
-            if (response.error.get.isNotAPrimaryError)
-              onPrimaryUnavailable()
+            if (response.error.get.isNotAPrimaryError) onPrimaryUnavailable()
             promise.failure(response.error.get)
           } else if (isGetLastError) {
             logger.debug("{" + response.header.responseTo + "} it's a getlasterror")
             // todo, for now rewinding buffer at original index
             val ridx = response.documents.readerIndex
-            LastError(response).fold(
-              e => {
-                logger.error(s"Error deserializing LastError message #${response.header.responseTo}", e)
-                promise.failure(new RuntimeException(s"Error deserializing LastError message #${response.header.responseTo}", e))
-              },
+            LastError(response).fold(e => {
+              logger.error(s"Error deserializing LastError message #${response.header.responseTo}", e)
+              promise.failure(new RuntimeException(s"Error deserializing LastError message #${response.header.responseTo}", e))
+            },
               lastError => {
                 if (lastError.inError) {
                   logger.debug("{" + response.header.responseTo + "} sending a failure (lasterror is not ok)")
-                  if (lastError.isNotAPrimaryError)
-                    onPrimaryUnavailable()
+                  if (lastError.isNotAPrimaryError) onPrimaryUnavailable()
                   promise.failure(lastError)
                 } else {
                   logger.trace("{" + response.header.responseTo + "} sending a success (lasterror is ok)")
@@ -503,7 +501,7 @@ class MongoDBSystem(
                   promise.success(response)
                 }
               })
-          } else if(isMongo26WriteOp) {
+          } else if (isMongo26WriteOp) {
             // TODO - logs, bson
             // MongoDB 26 Write Protocol errors
             logger.trace("received a response to a MongoDB2.6 Write Op")
@@ -518,7 +516,8 @@ class MongoDBSystem(
               case IntField(_, v) => v != 0
               case DoubleField(_, v) => v != 0
             }.getOrElse(false)
-            if(processedOk) {
+
+            if (processedOk) {
               logger.trace(s"{${response.header.responseTo}} [MongoDB26 Write Op response] sending a success!")
               promise.success(response)
             } else {
@@ -598,7 +597,7 @@ class MongoDBSystem(
     allChannelGroup(nodeSet).close.addListener(listener)
 
     // fail all requests waiting for a response
-    awaitingResponses.foreach( _._2.promise.failure(Exceptions.ClosedException) )
+    awaitingResponses.foreach(_._2.promise.failure(Exceptions.ClosedException))
     awaitingResponses.empty
 
     logger.warn(s"MongoDBSystem $self stopped.")
@@ -610,7 +609,8 @@ class MongoDBSystem(
     for {
       node <- nodeSet.nodes
       connection <- node.connections if !connection.channel.isConnected()
-    } yield connection.channel.connect(new InetSocketAddress(node.host, node.port))
+    } yield connection.channel.connect(
+      new InetSocketAddress(node.host, node.port))
     nodeSet
   }
 
