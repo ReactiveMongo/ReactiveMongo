@@ -13,9 +13,11 @@ class MongoDriverSpec extends Specification {
   "MongoDriver" should {
     "start and close cleanly with no connections" in {
       val md = MongoDriver()
+
       md.numConnections must_== 0 and (
         md.close(FiniteDuration(200,"milliseconds")) must not(
           throwA[Throwable]))
+
     }
 
     "start and close with one connection open" in {
