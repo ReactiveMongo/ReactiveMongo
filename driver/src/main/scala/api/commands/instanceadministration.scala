@@ -35,10 +35,10 @@ case class CollStats(scale: Option[Int] = None) extends CollectionCommand with C
  * @param size The size in bytes (or in bytes / scale, if any).
  * @param averageObjectSize The average object size in bytes (or in bytes / scale, if any).
  * @param storageSize Preallocated space for the collection.
- * @param numExtents Number of extents (contiguously allocated chunks of datafile space).
+ * @param numExtents Number of extents (contiguously allocated chunks of datafile space, only for mmapv1 storage engine).
  * @param nindexes Number of indexes.
- * @param lastExtentSize Size of the most recently created extent.
- * @param paddingFactor Padding can speed up updates if documents grow.
+ * @param lastExtentSize Size of the most recently created extent (only for mmapv1 storage engine).
+ * @param paddingFactor Padding can speed up updates if documents grow (only for mmapv1 storage engine).
  * @param systemFlags System flags.
  * @param userFlags User flags.
  * @param indexSizes Size of specific indexes in bytes.
@@ -51,10 +51,10 @@ case class CollStatsResult(
   size: Double,
   averageObjectSize: Option[Double],
   storageSize: Double,
-  numExtents: Int,
+  numExtents: Option[Int],
   nindexes: Int,
-  lastExtentSize: Int,
-  paddingFactor: Double,
+  lastExtentSize: Option[Int],
+  paddingFactor: Option[Double],
   systemFlags: Option[Int],
   userFlags: Option[Int],
   totalIndexSize: Int,
