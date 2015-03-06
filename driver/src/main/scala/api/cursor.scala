@@ -24,7 +24,7 @@ import reactivemongo.utils.LazyLogger
 import scala.annotation.tailrec
 import scala.collection.generic.CanBuildFrom
 import scala.concurrent.{ ExecutionContext, Future }
-import scala.util._
+import scala.util.{ Failure, Success, Try }
 
 trait Cursor[T] {
   /**
@@ -82,6 +82,47 @@ trait Cursor[T] {
   def collect[M[_]](upTo: Int = Int.MaxValue, stopOnError: Boolean = true)(implicit cbf: CanBuildFrom[M[_], T, M[T]], ec: ExecutionContext): Future[M[T]]
 
   /**
+   * Applies a binary operator to a start value and all responses handled  
+   * by this cursor, going first to last.
+   * 
+   * @tparam A the result type of the binary operator.
+   * @param z the start value.
+   * @param maxDocs the maximum number of documents to be read.
+   * @param suc the binary operator to be applied when the next response is successfully read.
+   * @param err the binary operator to be applied when failing to get the next response.
+   */
+  def foldResponses[A](z: => A, maxDocs: Int = Int.MaxValue)(suc: (A, Response) => Cursor.State[A], err: (A, Throwable) => Cursor.State[A])(implicit ctx: ExecutionContext): Future[A]
+
+  /**
+   * Applies a binary operator to a start value and all bulks of documents
+   * retrieved by this cursor, going first to last.
+   * 
+   * @tparam A the result type of the binary operator.
+   * @param z the start value.
+   * @param maxDocs the maximum number of documents to be read.
+   * @param suc the binary operator to be applied when the next response is successfully read.
+   * @param err the binary operator to be applied when failing to get the next response.
+    */
+  def foldBulks[A](z: => A, maxDocs: Int = Int.MaxValue)(suc: (A, Iterator[T]) => Cursor.State[A], err: (A, Throwable) => Cursor.State[A])(implicit ctx: ExecutionContext): Future[A]
+
+  /**
+   * Applies a binary operator to a start value and all elements retrieved 
+   * by this cursor, going first to last.
+   * 
+   * @tparam A the result type of the binary operator.
+   * @param z the start value.
+   * @param maxDocs the maximum number of documents to be read.
+   * @param suc the binary operator to be applied when the next document is successfully read.
+   * @param err the binary operator to be applied when failing to read the next document.
+   * 
+   * {{{
+   * cursor.foldWhile(Nil: Seq[Person])((s, p) => Cursor.Cont(s :+ p), 
+   *   { (l, e) => println("last valid value: " + l); Cursor.Fail(e) })
+   * }}}
+   */
+  def foldWhile[A](z: => A, maxDocs: Int = Int.MaxValue)(suc: (A, T) => Cursor.State[A], err: (A, Throwable) => Cursor.State[A])(implicit ctx: ExecutionContext): Future[A]
+
+  /**
    * Collects all the documents into a `List[T]`.
    * Given the `stopOnError` parameter (which defaults to true), the resulting Future may fail if any
    * non-fatal exception occurs. If set to false, all the documents that caused exceptions are skipped.
@@ -135,7 +176,13 @@ class FlattenedCursor[T](cursor: Future[Cursor[T]]) extends Cursor[T] {
     Enumerator.flatten(cursor.map(_.enumerateResponses(maxDocs, stopOnError)))
 
   def collect[M[_]](upTo: Int, stopOnError: Boolean)(implicit cbf: CanBuildFrom[M[_], T, M[T]], ec: ExecutionContext): Future[M[T]] =
-    cursor.flatMap { _.collect[M](upTo, stopOnError) }
+    cursor.flatMap(_.collect[M](upTo, stopOnError))
+
+  def foldResponses[A](z: => A, maxDocs: Int = Int.MaxValue)(suc: (A, Response) => Cursor.State[A], err: (A, Throwable) => Cursor.State[A])(implicit ctx: ExecutionContext): Future[A] = cursor.flatMap(_.foldResponses(z, maxDocs)(suc, err))
+
+  def foldBulks[A](z: => A, maxDocs: Int = Int.MaxValue)(suc: (A, Iterator[T]) => Cursor.State[A], err: (A, Throwable) => Cursor.State[A])(implicit ctx: ExecutionContext): Future[A] = cursor.flatMap(_.foldBulks(z, maxDocs)(suc, err))
+
+  def foldWhile[A](z: => A, maxDocs: Int = Int.MaxValue)(suc: (A, T) => Cursor.State[A], err: (A, Throwable) => Cursor.State[A])(implicit ctx: ExecutionContext): Future[A] = cursor.flatMap(_.foldWhile(z, maxDocs)(suc, err))
 
   def rawEnumerateResponses(maxDocs: Int = Int.MaxValue)(implicit ctx: ExecutionContext): Enumerator[Response] =
     Enumerator.flatten(cursor.map(_.rawEnumerateResponses(maxDocs)))
@@ -162,6 +209,12 @@ trait WrappedCursor[T] extends Cursor[T] {
     wrappee.collect[M](upTo, stopOnError)
 
   def rawEnumerateResponses(maxDocs: Int = Int.MaxValue)(implicit ctx: ExecutionContext): Enumerator[Response] = wrappee.rawEnumerateResponses(maxDocs)
+
+  def foldResponses[A](z: => A, maxDocs: Int = Int.MaxValue)(suc: (A, Response) => Cursor.State[A], err: (A, Throwable) => Cursor.State[A])(implicit ctx: ExecutionContext): Future[A] = wrappee.foldResponses(z, maxDocs)(suc, err)
+
+  def foldBulks[A](z: => A, maxDocs: Int = Int.MaxValue)(suc: (A, Iterator[T]) => Cursor.State[A], err: (A, Throwable) => Cursor.State[A])(implicit ctx: ExecutionContext): Future[A] = wrappee.foldBulks(z, maxDocs)(suc, err)
+
+  def foldWhile[A](z: => A, maxDocs: Int = Int.MaxValue)(suc: (A, T) => Cursor.State[A], err: (A, Throwable) => Cursor.State[A])(implicit ctx: ExecutionContext): Future[A] = wrappee.foldWhile(z, maxDocs)(suc, err)
   
 }
 
@@ -172,10 +225,21 @@ object Cursor {
    * Flattens the given future [[reactivemongo.api.Cursor]] to a [[reactivemongo.api.FlattenedCursor]].
    */
   def flatten[T](future: Future[Cursor[T]]) = new FlattenedCursor(future)
+
+  sealed trait State[A]
+
+  /** Continue with given value */
+  case class Cont[T](value: T) extends State[T]
+
+  /** Successfully stop processing with given value */
+  case class Done[T](value: T) extends State[T]
+
+  /** Ends processing due to failure of given `cause` */
+  case class Fail[T](cause: Throwable) extends State[T]
 }
 
 object DefaultCursor {
-  import Cursor.logger
+  import Cursor.{ State, Cont, Done, Fail, logger }
 
   def apply[P <: SerializationPack, A](
     pack: P,
@@ -202,55 +266,87 @@ object DefaultCursor {
       private def hasNext(response: Response): Boolean = response.reply.cursorID != 0
 
       @inline
-      private def hasNext(response: Response, maxDocs: Int): Boolean = {
-        response.reply.cursorID != 0 && (response.reply.numberReturned + response.reply.startingFrom) < maxDocs
-      }
+      private def hasNext(response: Response, maxDocs: Int): Boolean =
+        hasNext(response) && (response.reply.numberReturned + response.reply.startingFrom) < maxDocs
 
       @inline
       private def makeIterator(response: Response) = ReplyDocumentIterator(pack)(response.reply, response.documents)
 
-      @inline
-      private def makeRequest(implicit ctx: ExecutionContext): Future[Response] =
-        Failover2(mongoConnection, failoverStrategy) { () =>
-          mongoConnection.sendExpectingResponse(RequestMaker(query, documents, readPreference), isMongo26WriteOp)
-        }.future
+    @inline
+    private def makeRequest(implicit ctx: ExecutionContext): Future[Response] =
+      Failover2(mongoConnection, failoverStrategy) { () =>
+        mongoConnection.sendExpectingResponse(RequestMaker(query, documents, readPreference), isMongo26WriteOp)
+      }.future
 
-      @inline
-      private def isTailable = (query.flags & QueryFlags.TailableCursor) == QueryFlags.TailableCursor
+    @inline
+    private def isTailable =
+      (query.flags & QueryFlags.TailableCursor) == QueryFlags.TailableCursor
 
-      def simpleCursorEnumerateResponses(maxDocs: Int = Int.MaxValue)(implicit ctx: ExecutionContext): Enumerator[Response] = {
-        Enumerator.flatten(makeRequest.map(new CustomEnumerator.SEnumerator(_)(
-          next = response => if (hasNext(response, maxDocs)) next(response) else None,
-          cleanUp = response =>
-            if (response.reply.cursorID != 0) {
-              logger.debug(s"[Cursor] Clean up ${response.reply.cursorID}, sending KillCursor")
-              mongoConnection.send(RequestMaker(KillCursors(Set(response.reply.cursorID))))
-            } else logger.trace(s"[Cursor] Cursor exhausted (${response.reply.cursorID})"))))
+    /** Returns next response using tailable mode */
+    private def tailResponse(current: Response, maxDocs: Int)(implicit context: ExecutionContext): Option[Future[Response]] =
+      if (hasNext(current)) next(current)
+      else {
+        logger.debug("[Tailable Cursor] Current cursor exhausted, renewing...")
+        Some(DelayedFuture(500, mongoConnection.actorSystem).
+          flatMap(_ => makeRequest))
       }
 
-      def tailableCursorEnumerateResponses(maxDocs: Int = Int.MaxValue)(implicit ctx: ExecutionContext): Enumerator[Response] = {
-        Enumerator.flatten(makeRequest.map { response =>
-          new CustomEnumerator.SEnumerator(response -> 0)(
-            next = current => {
-              val (r, c) = current
-              if (c < maxDocs) {
-                val nextResponse =
-                  if (hasNext(r)) {
-                    next(r)
-                  } else {
-                    logger.debug("[Tailable Cursor] Current cursor exhausted, renewing...")
-                    Some(DelayedFuture(500, mongoConnection.actorSystem).flatMap(_ => makeRequest))
-                  }
-                nextResponse.map(_.map((_, c + r.reply.numberReturned)))
-              } else None
-            },
-            cleanUp = current =>
-              if (current._1.reply.cursorID != 0) {
-                logger.debug(s"[Tailable Cursor] Closing  cursor ${current._1.reply.cursorID}, cleanup")
-                mongoConnection.send(RequestMaker(KillCursors(Set(current._1.reply.cursorID))))
-              } else logger.trace(s"[Tailable Cursor] Cursor exhausted (${current._1.reply.cursorID})"))
-        }).map(_._1)
+    @inline
+    private def killCursors(cursorID: Long, logCat: String): Unit =
+      if (cursorID != 0) {
+        logger.debug(s"[$logCat] Clean up ${cursorID}, sending KillCursor")
+        mongoConnection.send(RequestMaker(KillCursors(Set(cursorID))))
+      } else logger.trace(s"[$logCat] Cursor exhausted (${cursorID})")
+
+    def foldResponses[T](z: => T, maxDocs: Int = Int.MaxValue)(suc: (T, Response) => State[T], err: (T, Throwable) => State[T])(implicit ctx: ExecutionContext): Future[T] = new FoldResponses(z, maxDocs, suc, err)(ctx)()    
+
+    def foldBulks[T](z: => T, maxDocs: Int = Int.MaxValue)(suc: (T, Iterator[A]) => State[T], err: (T, Throwable) => State[T])(implicit ctx: ExecutionContext): Future[T] = foldResponses(z, maxDocs)({ (s, r) =>
+      Try(makeIterator(r)) match {
+        case Success(it) => suc(s, it)
+        case Failure(e) => Fail(e)
       }
+    }, err)
+
+    def foldWhile[T](z: => T, maxDocs: Int = Int.MaxValue)(suc: (T, A) => State[T], err: (T, Throwable) => State[T])(implicit ctx: ExecutionContext): Future[T] = {
+      def process(cur: T, st: State[T])(op: T => State[T]): State[T] =
+        st match {
+          case Cont(v)  => op(v)
+          case f @ Fail(_) => f
+          case _ => st
+        }
+
+      def go(it: Iterator[A])(v: T): State[T] =
+        if (!it.hasNext) Cont(v)
+        else Try(it.next) match {
+          case Failure(x @ ReplyDocumentIteratorExhaustedException(_)) =>
+            Fail(x)
+          case Failure(e) => process(v, err(v, e))(go(it))
+          case Success(a) => process(v, suc(v, a))(go(it))
+        }
+
+      foldBulks(z, maxDocs)({ (cur, it) => go(it)(cur) }, err)
+    }
+
+    def simpleCursorEnumerateResponses(maxDocs: Int = Int.MaxValue)(implicit ctx: ExecutionContext): Enumerator[Response] =
+      Enumerator.flatten(makeRequest.map(new CustomEnumerator.SEnumerator(_)(
+        next = response =>
+        if (hasNext(response, maxDocs)) next(response) else None,
+        cleanUp = { resp => killCursors(resp.reply.cursorID, "Cursor") })))
+
+    def tailableCursorEnumerateResponses(maxDocs: Int = Int.MaxValue)(implicit ctx: ExecutionContext): Enumerator[Response] =
+      Enumerator.flatten(makeRequest.map { response =>
+        new CustomEnumerator.SEnumerator(response -> 0)(
+          next = { current =>
+            val (r, c) = current
+            if (c < maxDocs) {
+              tailResponse(r, maxDocs).map(_.map((_, c+r.reply.numberReturned)))
+            } else None
+          },
+          cleanUp = { current =>
+            val (r, _) = current
+            killCursors(r.reply.cursorID, "Tailable Cursor")
+          }).map(_._1)
+      })
 
       def rawEnumerateResponses(maxDocs: Int = Int.MaxValue)(implicit ctx: ExecutionContext): Enumerator[Response] =
         if (isTailable) tailableCursorEnumerateResponses(maxDocs) else simpleCursorEnumerateResponses(maxDocs)
@@ -277,7 +373,7 @@ object DefaultCursor {
         }
 
       def enumerateBulks(maxDocs: Int = Int.MaxValue, stopOnError: Boolean = false)(implicit ctx: ExecutionContext): Enumerator[Iterator[A]] =
-        enumerateResponses(maxDocs, stopOnError) &> Enumeratee.map(response => ReplyDocumentIterator(pack)(response.reply, response.documents))
+        enumerateResponses(maxDocs, stopOnError) &> Enumeratee.map(makeIterator)
 
       def enumerate(maxDocs: Int = Int.MaxValue, stopOnError: Boolean = false)(implicit ctx: ExecutionContext): Enumerator[A] = {
         @tailrec
@@ -291,15 +387,13 @@ object DefaultCursor {
         }
         enumerateResponses(maxDocs, stopOnError) &> Enumeratee.mapFlatten { response =>
           val iterator = ReplyDocumentIterator(pack)(response.reply, response.documents)
-          if(!iterator.hasNext)
-            Enumerator.empty
-          else
-            CustomEnumerator.SEnumerator(iterator.next) { _ =>
-              next(iterator, stopOnError).map {
-                case Success(mt) => Future.successful(mt)
-                case Failure(e)  => Future.failed(e)
-              }
+          if (!iterator.hasNext) Enumerator.empty
+          else CustomEnumerator.SEnumerator(iterator.next) { _ =>
+            next(iterator, stopOnError).map {
+              case Success(mt) => Future.successful(mt)
+              case Failure(e)  => Future.failed(e)
             }
+          }
         }
       }
 
@@ -321,7 +415,45 @@ object DefaultCursor {
           builder ++= iterator
         }).map(_.result)
       }
+
+    private class FoldResponses[T](z: => T, maxDocs: Int,
+      suc: (T, Response) => State[T], err: (T, Throwable) => State[T])(
+      implicit ctx: ExecutionContext) {
+
+      val nextResponse: (Response, Int) => Option[Future[Response]] =
+        if (!isTailable) { (r: Response, maxDocs: Int) =>
+          if (!hasNext(r, maxDocs)) Option.empty[Future[Response]]
+          else next(r)
+        } else (r: Response, maxDocs: Int) => tailResponse(r, maxDocs)
+
+      def process(cur: T, st: State[T])(op: T => Future[T]): Future[T] =
+        st match {
+          case Done(v) => Future.successful(v)
+          case Cont(v) => op(v)
+          case Fail(x) => Future.failed[T](x)
+        }
+
+      def go(r: Response, c: Int)(v: T): Future[T] = nextResponse(r, c).
+        fold(Future successful v)(procResponses(_, v, c))
+
+      def procResponses(done: Future[Response], cur: T, c: Int): Future[T] =
+        done flatMap { r =>
+          val st = suc(cur, r) match {
+            case end @ (Done(_) | Fail(_)) => {
+              // Releases cursor before ending
+              killCursors(r.reply.cursorID, "FoldResponses")
+              end
+            }
+            case Cont(v) if (c == maxDocs) => Done(v)
+            case state @ _ => state
+          }
+
+          process(cur, st)(go(r, c + r.reply.numberReturned))
+        }
+
+      def apply(): Future[T] = procResponses(makeRequest, z, 0)
     }
+  }
 }
 
 /** Allows to enrich a base cursor. */

@@ -15,4 +15,8 @@ object Common {
     Await.ready(_db.drop, timeout)
     _db
   }
+
+  def closeDriver(): Unit = try {
+    driver.close()
+  } catch { case _: Throwable => () }
 }

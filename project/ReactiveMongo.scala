@@ -19,6 +19,7 @@ object BuildSettings {
     crossScalaVersions  := Seq("2.11.2", "2.10.4"),
     crossVersion := CrossVersion.binary,
     javaOptions in test ++= Seq("-Xmx512m", "-XX:MaxPermSize=512m"),
+    //fork in Test := true, // Don't share executioncontext between SBT CLI/tests
     scalacOptions ++= Seq("-unchecked", "-deprecation", "-target:jvm-1.6"),
     scalacOptions in (Compile, doc) ++= Seq("-unchecked", "-deprecation", "-diagrams", "-implicits", "-skip-packages", "samples"),
     scalacOptions in (Compile, doc) ++= Opts.doc.title("ReactiveMongo API"),
@@ -128,10 +129,16 @@ object Dependencies {
 
   val iteratees = "com.typesafe.play" %% "play-iteratees" % "2.3.5"
 
-  val specs = "org.specs2" %% "specs2-core" % "2.3.11" % "test"
+  val specs = "org.specs2" %% "specs2-core" % "2.4.9" % "test"
 
   val log4jVersion = "2.0.2"
   val log4j = Seq("org.apache.logging.log4j" % "log4j-api" % log4jVersion, "org.apache.logging.log4j" % "log4j-core" % log4jVersion)
+
+  val shapelessTest = "com.chuusai" % "shapeless" % "2.0.0" %
+  Test cross CrossVersion.binaryMapped {
+    case "2.10" => "2.10.4"
+    case x => x
+  }
 }
 
 object ReactiveMongoBuild extends Build {
@@ -159,7 +166,15 @@ object ReactiveMongoBuild extends Build {
         netty,
         akkaActor,
         iteratees,
-        specs) ++ log4j)).dependsOn(bsonmacros)
+        shapelessTest,
+        specs) ++ log4j,
+      testOptions in Test += Tests.Cleanup(cl => {
+        import scala.language.reflectiveCalls
+        val c = cl.loadClass("Common$")
+        type M = { def closeDriver(): Unit }
+        val m: M = c.getField("MODULE$").get(null).asInstanceOf[M]
+        m.closeDriver()
+      }))).dependsOn(bsonmacros)
 
   lazy val bson = Project(
     s"$projectPrefix-BSON",
@@ -171,7 +186,8 @@ object ReactiveMongoBuild extends Build {
     s"$projectPrefix-BSON-Macros",
     file("macros"),
     settings = buildSettings ++ Seq(
-      libraryDependencies += "org.scala-lang" % "scala-compiler" % scalaVersion.value
+      libraryDependencies +=
+        "org.scala-lang" % "scala-compiler" % scalaVersion.value
     )).
     settings(libraryDependencies += Dependencies.specs).
     dependsOn(bson)

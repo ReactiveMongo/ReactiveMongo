@@ -352,7 +352,7 @@ object ReplyDocumentIterator  {
            * If this happens, the buffer is exhausted, and there is probably a bug.
            * It may happen if an enumerator relying on it is concurrently applied to many iteratees – which should not be done!
            */
-          throw new ReplyDocumentIteratorExhaustedException(e)
+          throw ReplyDocumentIteratorExhaustedException(e)
       }
   }
 }

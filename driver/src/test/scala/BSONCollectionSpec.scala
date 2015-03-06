@@ -1,8 +1,9 @@
+import scala.util.{ Failure, Success }
 import reactivemongo.api._
 import reactivemongo.bson._
 import reactivemongo.core.commands.Count
 import scala.concurrent._
-import org.specs2.mutable._
+import org.specs2.mutable.Specification
 import play.api.libs.iteratee.Iteratee
 
 class BSONCollectionSpec extends Specification {
@@ -18,7 +19,8 @@ class BSONCollectionSpec extends Specification {
   case class CustomException(msg: String) extends Exception(msg)
 
   object BuggyPersonWriter extends BSONDocumentWriter[Person] {
-    def write(p: Person): BSONDocument = throw CustomException("PersonWrite error")
+    def write(p: Person): BSONDocument =
+      throw CustomException("PersonWrite error")
   }
 
   object BuggyPersonReader extends BSONDocumentReader[Person] {
@@ -36,8 +38,10 @@ class BSONCollectionSpec extends Specification {
   }
 
   object PersonWriter extends BSONDocumentWriter[Person] {
-    def write(p: Person): BSONDocument = BSONDocument("age" -> p.age, "name" -> p.name)
+    def write(p: Person): BSONDocument =
+      BSONDocument("age" -> p.age, "name" -> p.name)
   }
+
   object PersonReader extends BSONDocumentReader[Person] {
     def read(doc: BSONDocument): Person = Person(doc.getAs[String]("name").get, doc.getAs[Int]("age").get)
   }
@@ -59,37 +63,95 @@ class BSONCollectionSpec extends Specification {
     }
 
     "read empty cursor" >> {
-      @inline def col = collection.find(BSONDocument("plop" -> "plop"))
+      @inline def cursor: Cursor[BSONDocument] =
+        collection.find(BSONDocument("plop" -> "plop")).cursor[BSONDocument]
 
       "with success using collect" in {
-        val list = col.cursor[BSONDocument].collect[Vector](10)
+        val list = cursor.collect[Vector](10)
         Await.result(list, timeout).length mustEqual 0
       }
 
       "with success using enumerate" in {
-        val enumerator = col.cursor[BSONDocument].enumerate(10)
+        val enumerator = cursor.enumerate(10)
         val n = enumerator |>>> Iteratee.fold(0) { (r, doc) =>
           r + 1
         }
         Await.result(n, timeout) mustEqual 0
       }
 
+      "with success using foldResponses" in {
+        cursor.foldResponses(0)(
+          (i, _) => Cursor.Cont(i+1), (_, e) => Cursor.Fail(e)).
+          aka("result") must beEqualTo(1/* one empty response */).
+          await(timeoutMillis)
+
+      }
+
+      "with success using foldBulks" in {
+        cursor.foldBulks(0)(
+          (i, _) => Cursor.Cont(i+1), (_, e) => Cursor.Fail(e)).
+          aka("result") must beEqualTo(1/* one empty response */).
+          await(timeoutMillis)
+
+      }
+
+      "with success using foldWhile" in {
+        cursor.foldWhile(0)(
+          (i, _) => Cursor.Cont(i+1), (_, e) => Cursor.Fail(e)).
+          aka("result") must beEqualTo(0).await(timeoutMillis)
+
+      }
+
       "with success as option" in {
-        col.cursor[BSONDocument].headOption must beNone.await(timeoutMillis)
-      }      
+        cursor.headOption must beNone.await(timeoutMillis)
+      }
     }
 
     "read a doc with success" in {
       implicit val reader = PersonReader
       Await.result(collection.find(BSONDocument()).one[Person], timeout).get mustEqual person
     }
-    "read all with success" in {
+
+    "read all with success" >> {
       implicit val reader = PersonReader
       @inline def cursor = collection.find(BSONDocument()).cursor[Person]
-      cursor.collect[List]() must beEqualTo(List(
-        person, person2, person3, person4, person5)).await(timeoutMillis) and (
-        cursor.headOption must beSome(person).await(timeoutMillis))
+      val persons = Seq(person, person2, person3, person4, person5)
+
+      "as list" in {
+        (cursor.collect[List]() must beEqualTo(persons).await(timeoutMillis)).
+          and(cursor.headOption must beSome(person).await(timeoutMillis))
+      }
+
+      "using foldResponses" in {
+        cursor.foldResponses(0)({ (s, _) => Cursor.Cont(s + 1) },
+          (_, e) => Cursor.Fail(e)) must beEqualTo(1).await(timeoutMillis)
+
+      }
+
+      "using foldBulks" in {
+        cursor.foldBulks(1)({ (s, _) => Cursor.Cont(s + 1) },
+          (_, e) => Cursor.Fail(e)) must beEqualTo(2).await(timeoutMillis)
+
+      }
+
+      "using foldWhile" in {
+        cursor.foldWhile(Nil: Seq[Person])((s, p) => Cursor.Cont(s :+ p),
+          (_, e) => Cursor.Fail(e)) must beEqualTo(persons).await(timeoutMillis)
+
+      }
     }
+
+    "read until John" in {
+      implicit val reader = PersonReader
+      @inline def cursor = collection.find(BSONDocument()).cursor[Person]
+      val persons = Seq(person, person2, person3)
+
+      cursor.foldWhile(Nil: Seq[Person])({ (s, p) =>
+        if (p.name == "John") Cursor.Done(s :+ p)
+        else Cursor.Cont(s :+ p)
+      }, (_, e) => Cursor.Fail(e)) must beEqualTo(persons).await(timeoutMillis)
+    }
+
     "read a doc with error" in {
       implicit val reader = BuggyPersonReader
       val future = collection.find(BSONDocument()).one[Person].map(_ => 0).recover {
@@ -102,18 +164,38 @@ class BSONCollectionSpec extends Specification {
       println(s"read a doc with error: $r")
       Await.result(future, timeout) mustEqual -1
     }
-    "read docs with error" in {
+
+    "read docs with error" >> {
       implicit val reader = new SometimesBuggyPersonReader
-      val future = collection.find(BSONDocument()).cursor[Person].collect[Vector]().map(_.size).recover {
-        case e if e.getMessage == "hey hey hey" => -1
-        case e =>
-          e.printStackTrace()
-          -2
+      @inline def cursor = collection.find(BSONDocument()).cursor[Person]
+      
+      "using collect" in {
+        val collect = cursor.collect[Vector]().map(_.size).recover {
+          case e if e.getMessage == "hey hey hey" => -1
+          case e => e.printStackTrace(); -2
+        }
+
+        collect aka "first collect" must not(throwA[Exception]).
+          await(timeoutMillis) and (collect must beEqualTo(-1).
+          await(timeoutMillis))
       }
-      val r = Await.result(future, timeout)
-      println(s"read docs with error: $r")
-      Await.result(future, timeout) mustEqual -1
+
+      "using foldWhile" in {
+        Await.result(cursor.foldWhile(0)((i, _) => Cursor.Cont(i+1),
+          (_, e) => Cursor.Fail(e)), timeout) must throwA[CustomException]
+      }
+
+      "fallbacking to final value using foldWhile" in {
+        cursor.foldWhile(0)((i, _) => Cursor.Cont(i+1),
+          (_, e) => Cursor.Done(-1)) must beEqualTo(-1).await(timeoutMillis)
+      }
+
+      "skiping failure using foldWhile" in {
+        cursor.foldWhile(0)((i, _) => Cursor.Cont(i+1),
+          (_, e) => Cursor.Cont(-3)) must beEqualTo(-2).await(timeoutMillis)
+      }
     }
+
     "read docs until error" in {
       implicit val reader = new SometimesBuggyPersonReader
       val enumerator = collection.find(BSONDocument()).cursor[Person].enumerate(stopOnError = true)
@@ -126,6 +208,7 @@ class BSONCollectionSpec extends Specification {
       println(s"read $r/5 docs (expected 3/5)")
       r mustEqual 3
     }
+
     "read docs skipping errors" in {
       implicit val reader = new SometimesBuggyPersonReader
       val enumerator = collection.find(BSONDocument()).cursor[Person].enumerate(stopOnError = false)
@@ -144,18 +227,19 @@ class BSONCollectionSpec extends Specification {
       println(s"(read docs skipping errors using collect) got result $result")
       result.length mustEqual 4
     }
+
     "write a doc with error" in {
       implicit val writer = BuggyPersonWriter
-      Await.result(
-        collection.insert(person).map { lastError =>
-          println(s"person write succeed??  $lastError")
-          0
-        }.recover {
-          case ce: CustomException => -1
-          case e =>
-            e.printStackTrace()
-            -2
-        }, timeout) mustEqual -1
+
+      collection.insert(person).map { lastError =>
+        println(s"person write succeed??  $lastError")
+        0
+      }.recover {
+        case ce: CustomException => -1
+        case e =>
+          e.printStackTrace()
+          -2
+      } aka "write result" must beEqualTo(-1).await(timeoutMillis)
     }
   }
 }
