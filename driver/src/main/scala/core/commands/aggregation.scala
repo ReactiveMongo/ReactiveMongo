@@ -157,44 +157,58 @@ sealed trait GroupFunction {
   def makeFunction: BSONValue
 }
 
+/** Factory to declare custom call to a group function. */
+object GroupFunction {
+  /**
+   * Creates a call to specified group function with given argument. 
+   * 
+   * @param name The name of the group function (e.g. `$sum`)
+   * @param arg The group function argument
+   * @return A group function call defined as `{ '$name': arg }`
+   */
+  def apply(name: String, arg: BSONValue): GroupFunction = new GroupFunction {
+    val makeFunction = BSONDocument(name -> arg)
+  }
+}
+
 case class AddToSet(field: String) extends GroupFunction {
-  def makeFunction = BSONDocument("$addToSet" -> BSONString("$" + field))
+  val makeFunction = BSONDocument("$addToSet" -> BSONString("$" + field))
 }
 
 case class First(field: String) extends GroupFunction {
-  def makeFunction = BSONDocument("$first" -> BSONString("$" + field))
+  val makeFunction = BSONDocument("$first" -> BSONString("$" + field))
 }
 
 case class Last(field: String) extends GroupFunction {
-  def makeFunction = BSONDocument("$last" -> BSONString("$" + field))
+  val makeFunction = BSONDocument("$last" -> BSONString("$" + field))
 }
 
 case class Max(field: String) extends GroupFunction {
-  def makeFunction = BSONDocument("$max" -> BSONString("$" + field))
+  val makeFunction = BSONDocument("$max" -> BSONString("$" + field))
 }
 
 case class Min(field: String) extends GroupFunction {
-  def makeFunction = BSONDocument("$min" -> BSONString("$" + field))
+  val makeFunction = BSONDocument("$min" -> BSONString("$" + field))
 }
 
 case class Avg(field: String) extends GroupFunction {
-  def makeFunction = BSONDocument("$avg" -> BSONString("$" + field))
+  val makeFunction = BSONDocument("$avg" -> BSONString("$" + field))
 }
 
 case class Push(field: String) extends GroupFunction {
-  def makeFunction = BSONDocument("$push" -> BSONString("$" + field))
+  val makeFunction = BSONDocument("$push" -> BSONString("$" + field))
 }
 
 case class PushMulti(fields: (String, String)*) extends GroupFunction {
-  def makeFunction = BSONDocument("$push" -> BSONDocument(
+  val makeFunction = BSONDocument("$push" -> BSONDocument(
     fields.map(field => field._1 -> BSONString("$"+field._2))
   ))
 }
 
 case class SumField(field: String) extends GroupFunction {
-  def makeFunction = BSONDocument("$sum" -> BSONString("$" + field))
+  val makeFunction = BSONDocument("$sum" -> BSONString("$" + field))
 }
 
 case class SumValue(value: Int) extends GroupFunction {
-  def makeFunction = BSONDocument("$sum" -> BSONInteger(value))
+  val makeFunction = BSONDocument("$sum" -> BSONInteger(value))
 }
