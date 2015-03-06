@@ -53,9 +53,7 @@ object `package` {
     }
 
     /** Write the contents of the given [[reactivemongo.core.protocol.ChannelBufferWritable]]. */
-    def write(writable: ChannelBufferWritable) {
-      writable writeTo buffer
-    }
+    def write(writable: ChannelBufferWritable) = writable writeTo buffer
 
     /** Reads a UTF-8 String. */
     def readString(): String = {
@@ -221,13 +219,12 @@ object Request {
    * @param op $op
    * @param documents $documentsA
    */
-  def apply(requestID: Int, responseTo: Int, op: RequestOp, documents: Array[Byte]): Request = {
-    Request(
-      requestID,
-      responseTo,
-      op,
-      BufferSequence(ChannelBuffers.wrappedBuffer(ByteOrder.LITTLE_ENDIAN, documents)))
-  }
+  def apply(requestID: Int, responseTo: Int, op: RequestOp, documents: Array[Byte]): Request = Request(
+    requestID,
+    responseTo,
+    op,
+    BufferSequence(ChannelBuffers.wrappedBuffer(ByteOrder.LITTLE_ENDIAN, documents)))
+
   /**
    * Create a request.
    *
@@ -235,14 +232,18 @@ object Request {
    * @param op $op
    * @param documents $documentsA
    */
-  def apply(requestID: Int, op: RequestOp, documents: Array[Byte]): Request = Request.apply(requestID, 0, op, documents)
+  def apply(requestID: Int, op: RequestOp, documents: Array[Byte]): Request =
+    Request.apply(requestID, 0, op, documents)
+
   /**
    * Create a request.
    *
    * @param requestID $requestID
    * @param op $op
    */
-  def apply(requestID: Int, op: RequestOp): Request = Request.apply(requestID, op, new Array[Byte](0))
+  def apply(requestID: Int, op: RequestOp): Request =
+    Request.apply(requestID, op, new Array[Byte](0))
+
 }
 
 /**
@@ -286,19 +287,15 @@ object Response {
  * Response meta information.
  *
  * @param channelId the id of the channel that carried this response.
- * @param localAddress string representation of the local address of the channel
- * @param remoteAddress string representation of the remote address of the channel
  */
-case class ResponseInfo(
-  channelId: Int)
-
+case class ResponseInfo(channelId: Int)
 
 sealed trait MongoWireVersion extends Ordered[MongoWireVersion] {
   def value: Int
 
   final def compare(x: MongoWireVersion): Int =
-    if(value == x.value) 0
-    else if(value < x.value) -1
+    if (value == x.value) 0
+    else if (value < x.value) -1
     else 1
 }
 
@@ -327,7 +324,7 @@ object MongoWireVersion {
 // protocol handlers for netty.
 private[reactivemongo] class RequestEncoder extends OneToOneEncoder {
   import RequestEncoder._
-  def encode(ctx: ChannelHandlerContext, channel: Channel, obj: Object) = {
+  def encode(ctx: ChannelHandlerContext, channel: Channel, obj: Object) = 
     obj match {
       case message: Request => {
         val buffer: ChannelBuffer = ChannelBuffers.buffer(ByteOrder.LITTLE_ENDIAN, message.size) //ChannelBuffers.dynamicBuffer(ByteOrder.LITTLE_ENDIAN, 1000)
@@ -339,7 +336,7 @@ private[reactivemongo] class RequestEncoder extends OneToOneEncoder {
         obj
       }
     }
-  }
+
 }
 
 object ReplyDocumentIterator  {
@@ -377,7 +374,8 @@ object ReplyDocumentIterator  {
     }
 }*/
 
-case class ReplyDocumentIteratorExhaustedException(val cause: Exception) extends Exception(cause)
+case class ReplyDocumentIteratorExhaustedException(
+  val cause: Exception) extends Exception(cause)
 
 private[reactivemongo] object RequestEncoder {
   val logger = LazyLogger("reactivemongo.core.protocol.RequestEncoder")
@@ -406,8 +404,7 @@ private[reactivemongo] class ResponseDecoder extends OneToOneDecoder {
     val header = MessageHeader(buffer)
     val reply = Reply(buffer)
 
-    Response(header, reply, buffer,
-      ResponseInfo(channel.getId))
+    Response(header, reply, buffer, ResponseInfo(channel.getId))
   }
 }
 
@@ -443,6 +440,7 @@ private[reactivemongo] class MongoHandler(receiver: ActorRef) extends SimpleChan
   override def exceptionCaught(ctx: org.jboss.netty.channel.ChannelHandlerContext, e: org.jboss.netty.channel.ExceptionEvent) {
     log(e, "CHANNEL ERROR: " + e.getCause)
   }
+
   def log(e: ChannelEvent, s: String) = logger.trace("(channel=" + e.getChannel.getId + ") " + s)
 }
 

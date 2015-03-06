@@ -424,6 +424,8 @@ object MongoConnection {
         kv match {
           case ("authSource", v)           => unsupportedKeys -> result.copy(authSource = Some(v))
           case ("connectTimeoutMS", v)     => unsupportedKeys -> result.copy(connectTimeoutMS = v.toInt)
+          case ("sslEnabled", v)           => unsupportedKeys -> result.copy(sslEnabled = v.toBoolean)
+          case ("sslAllowsInvalidCert", v) => unsupportedKeys -> result.copy(sslAllowsInvalidCert = v.toBoolean)            
 
           case ("rm.tcpNoDelay", v)        => unsupportedKeys -> result.copy(tcpNoDelay = v.toBoolean)
           case ("rm.keepAlive", v)         => unsupportedKeys -> result.copy(keepAlive = v.toBoolean)
@@ -460,6 +462,8 @@ object MongoConnection {
  *
  * @param connectTimeoutMS The number of milliseconds to wait for a connection to be established before giving up.
  * @param authSource The database source for authentication credentials.
+ * @param sslEnabled Enable SSL connection (required to be accepted on server-side).
+ * @param sslAllowsInvalidCert If `sslEnabled` is true, this one indicates whether to accept invalid certificates (e.g. self-signed).
  * @param tcpNoDelay TCPNoDelay flag (ReactiveMongo-specific option).
  * @param keepAlive TCP KeepAlive flag (ReactiveMongo-specific option).
  * @param nbChannelsPerNode Number of channels (connections) per node (ReactiveMongo-specific option).
@@ -469,6 +473,8 @@ case class MongoConnectionOptions(
   connectTimeoutMS: Int = 0,
   // canonical options - authentication options
   authSource: Option[String] = None,
+  sslEnabled: Boolean = false,
+  sslAllowsInvalidCert: Boolean = false,
 
   // reactivemongo specific options
   tcpNoDelay: Boolean = true,

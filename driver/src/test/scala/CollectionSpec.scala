@@ -1,12 +1,11 @@
-import reactivemongo.api._
-import reactivemongo.bson._
-import scala.concurrent._
-import scala.util.{Try, Success, Failure}
-import org.specs2.mutable._
+import reactivemongo.bson.{ BSONDocument, BSONString }
+import scala.concurrent.Await
+import scala.util.{ Try, Success, Failure }
+import org.specs2.mutable.{ Specification, Tags }
 import reactivemongo.api.commands.bson.BSONCountCommand._
 import reactivemongo.api.commands.bson.BSONCountCommandImplicits._
 
-class CollectionSpec extends Specification with Tags {
+object CollectionSpec extends Specification with Tags {
   import Common._
 
   sequential
@@ -15,11 +14,13 @@ class CollectionSpec extends Specification with Tags {
 
   "ReactiveMongo" should {
     "create a collection" in {
-      Await.result(collection.create(), timeout) mustEqual (())
+      Await.result(collection.create(), timeout) mustEqual(())
     }
+
     "convert to capped" in {
       Await.result(collection.convertToCapped(2 * 1024 * 1024, None), timeout) mustEqual (())
     }
+
     "check if it's capped" in {
       // convertToCapped is async. Let's wait a little while before checking if it's done
       Await.result(reactivemongo.utils.ExtendedFutures.DelayedFuture(4000, connection.actorSystem), timeout)
@@ -28,6 +29,7 @@ class CollectionSpec extends Specification with Tags {
       println(stats)
       stats.capped mustEqual true
     }
+
     "insert some docs then test lastError result and finally count" in {
       val lastError = Await.result(collection.insert(BSONDocument("name" -> BSONString("Jack"))), timeout)
       lastError.ok mustEqual true
