@@ -125,7 +125,7 @@ trait CollectionMetaCommands {
   import BSONCollStatsImplicits._
   import BSONRenameCollectionImplicits._
   import BSONConvertToCappedImplicits._
-  import reactivemongo.api.indexes.{ CollectionIndexesManager, IndexesManager }
+  import reactivemongo.api.indexes.CollectionIndexesManager
 
   /**
    * Creates this collection.
@@ -197,5 +197,6 @@ trait CollectionMetaCommands {
     Command.run(BSONSerializationPack)(self, CollStats(Some(scale)))
 
   /** Returns an index manager for this collection. */
-  def indexesManager(implicit ec: ExecutionContext): CollectionIndexesManager = new IndexesManager(self.db).onCollection(name)
+  def indexesManager(implicit ec: ExecutionContext): CollectionIndexesManager =
+    CollectionIndexesManager(self.db, name)
 }

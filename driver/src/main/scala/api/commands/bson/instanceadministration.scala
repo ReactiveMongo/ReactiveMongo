@@ -127,3 +127,66 @@ object BSONDropIndexesImplicits {
       DropIndexesResult(doc.getAs[BSONNumberLike]("nIndexesWas").map(_.toInt).getOrElse(0))
   }
 }
+
+object BSONListIndexesImplicits {
+  import scala.util.{ Failure, Success, Try }
+  import reactivemongo.api.indexes.{ Index, IndexesManager }
+  
+  implicit object BSONListIndexesWriter extends BSONDocumentWriter[ResolvedCollectionCommand[ListIndexes]] {
+    def write(command: ResolvedCollectionCommand[ListIndexes]): BSONDocument = 
+      BSONDocument("listIndexes" -> command.collection)
+  }
+
+  implicit object BSONIndexListReader extends BSONDocumentReader[List[Index]] {
+    @annotation.tailrec
+    def readBatch(batch: List[BSONDocument], indexes: List[Index]): Try[List[Index]] = batch match {
+      case d :: ds => d.asTry[Index](IndexesManager.IndexReader) match {
+        case Success(i) => readBatch(ds, i :: indexes)
+        case Failure(e) => Failure(e)
+      }
+      case _ => Success(indexes)
+    }
+
+    def read(doc: BSONDocument): List[Index] = (for {
+      _ <- doc.getAs[BSONNumberLike]("ok").fold[Option[Unit]](
+        throw new Exception("the result of listIndexes must be ok")) { ok =>
+        if (ok.toInt == 1) Some(())
+        else throw new Exception(doc.getAs[String]("errmsg").fold(
+          "the result of listIndexes must be ok")(
+          e => s"fails to create index: $e"))
+      }
+      a <- doc.getAs[BSONDocument]("cursor")
+      b <- a.getAs[List[BSONDocument]]("firstBatch")
+    } yield b).fold[List[Index]](throw new Exception(
+      "the cursor and firstBatch must be defined"))(readBatch(_, Nil).get)
+  }  
+}
+
+object BSONCreateIndexesImplicits {
+  import reactivemongo.api.commands.WriteResult
+
+  implicit object BSONCreateIndexesWriter extends BSONDocumentWriter[ResolvedCollectionCommand[CreateIndexes]] {
+    import reactivemongo.api.indexes.{ IndexesManager, NSIndex }
+    implicit val nsIndexWriter = IndexesManager.NSIndexWriter
+
+    def write(cmd: ResolvedCollectionCommand[CreateIndexes]): BSONDocument = {
+      BSONDocument("createIndexes" -> cmd.collection,
+        "indexes" -> cmd.command.indexes.map(NSIndex(
+          cmd.command.db + "." + cmd.collection, _)))
+    }
+  }
+
+  implicit object BSONCreateIndexesResultReader
+      extends BSONDocumentReader[WriteResult] {
+
+    import reactivemongo.api.commands.DefaultWriteResult
+
+    def read(doc: BSONDocument): WriteResult =
+      doc.getAs[BSONNumberLike]("ok").map(_.toInt).fold[WriteResult](
+        throw new Exception("the count must be defined")) { n =>
+        doc.getAs[String]("errmsg").fold[WriteResult](
+          DefaultWriteResult(true, n, Nil, None, None, None))(
+          err => DefaultWriteResult(false, n, Nil, None, None, Some(err)))
+      }
+  }
+}
