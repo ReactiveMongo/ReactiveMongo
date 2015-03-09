@@ -24,10 +24,8 @@ class DatabaseCollectionNameReadSpec extends Specification {
         ns <- db2.collectionNames.map(_.toSet)
       } yield ns
 
-      // TODO: Fix with WT
-      Await.result(collectionNames, DurationInt(30) second).
-        aka("collection names") must_== Set(
-          "system.indexes", "collection_one", "collection_two")
+      collectionNames.map(_.filterNot(_ startsWith "system.")) must beEqualTo(
+        Set("collection_one", "collection_two")).await(10000)
     }
 
     "remove db..." in {

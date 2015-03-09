@@ -199,7 +199,7 @@ class MakableCommand(val db: String, val command: Command[_]) {
 
 @deprecated("consider using reactivemongo.api.commands.RawCommand instead", "0.11.0")
 case class RawCommand(bson: BSONDocument) extends Command[BSONDocument] {
-  def makeDocuments = bson
+  val makeDocuments = bson
 
   object ResultMaker extends BSONCommandResultMaker[BSONDocument] {
     def apply(document: BSONDocument) = CommandError.checkOk(document, None).toLeft(document)

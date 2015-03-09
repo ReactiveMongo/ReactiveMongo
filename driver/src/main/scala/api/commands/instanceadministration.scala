@@ -65,3 +65,8 @@ case class CollStatsResult(
 case class DropIndexes(index: String) extends CollectionCommand with CommandWithResult[DropIndexesResult]
 
 case class DropIndexesResult(value: Int) extends BoxedAnyVal[Int]
+
+case class CollectionNames(names: List[String])
+
+/** List names of the DB collections. */
+object ListCollectionNames extends Command with CommandWithResult[CollectionNames]

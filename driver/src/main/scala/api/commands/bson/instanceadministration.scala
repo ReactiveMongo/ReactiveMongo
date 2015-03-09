@@ -10,6 +10,32 @@ object BSONDropDatabaseImplicits {
   }
 }
 
+object BSONListCollectionNamesImplicits {
+  implicit object ListCollectionNamesWriter extends BSONDocumentWriter[ListCollectionNames.type] {
+    def write(ls: ListCollectionNames.type): BSONDocument =
+      BSONDocument("listCollections" -> 1)
+  }
+
+  implicit object BSONCollectionNameReaders extends BSONDocumentReader[CollectionNames] {
+    def read(doc: BSONDocument): CollectionNames = (for {
+      _  <- doc.getAs[BSONNumberLike]("ok").map(_.toInt).filter(_ == 1)
+      cr <- doc.getAs[BSONDocument]("cursor")
+      fb <- cr.getAs[List[BSONDocument]]("firstBatch")
+      ns <- wtColNames(fb, Nil)
+    } yield CollectionNames(ns)).getOrElse[CollectionNames](throw new Exception(
+      "Fails to read collection names"))
+  }
+
+  @annotation.tailrec
+  private def wtColNames(meta: List[BSONDocument], ns: List[String]): Option[List[String]] = meta match {
+    case d :: ds => d.getAs[String]("name") match {
+      case Some(n) => wtColNames(ds, n :: ns)
+      case _       => None // error
+    }
+    case _       => Some(ns.reverse)
+  }  
+}
+
 object BSONDropImplicits {
   implicit object DropWriter extends BSONDocumentWriter[ResolvedCollectionCommand[Drop.type]] {
     def write(command: ResolvedCollectionCommand[Drop.type]): BSONDocument =
