@@ -1,13 +1,15 @@
 import util.control.NonFatal
 import org.specs2.mutable._
 import reactivemongo.api.indexes._
-import reactivemongo.api.indexes.IndexType.{Hashed, Geo2D, Geo2DSpherical}
+import reactivemongo.api.indexes.IndexType.{ Hashed, Geo2D, Geo2DSpherical }
 import reactivemongo.bson._
 import reactivemongo.core.errors.DatabaseException
 import scala.concurrent.Future
 import scala.concurrent.Await
 
-class IndexesSpec extends Specification with Tags {
+object IndexesSpec extends Specification with Tags {
+  "Indexes management" title
+
   sequential
 
   import Common._
@@ -18,23 +20,21 @@ class IndexesSpec extends Specification with Tags {
     "insert some points" in {
       val futs = for(i <- 1 until 10)
       yield geo.insert(BSONDocument("loc" -> BSONArray( BSONDouble(i + 2), BSONDouble(i * 2) )))
-      val fut = Future.sequence(futs)
-      Await.result(fut, timeout)
-      success
+
+      Future.sequence(futs) must not(throwA[Throwable]).await(timeoutMillis)
     }
+
     "make index" in {
-      val created = geo.indexesManager.ensure(
-        Index(
-          List("loc" -> Geo2D),
-          options = BSONDocument(
-            "min" -> BSONInteger(-95),
-            "max" -> BSONInteger(95),
-            "bits" -> BSONInteger(28)
-          )
+      geo.indexesManager.ensure(Index(
+        List("loc" -> Geo2D),
+        options = BSONDocument(
+          "min" -> BSONInteger(-95),
+          "max" -> BSONInteger(95),
+          "bits" -> BSONInteger(28)
         )
-      )
-      Await.result(created, timeout) mustEqual true
+      )) aka "index" must beTrue.await(timeoutMillis)
     }
+
     "fail to insert some points out of range" in {
       val future = geo.insert(BSONDocument("loc" -> BSONArray( BSONDouble(27.88), BSONDouble(97.21) )))
       try {
@@ -48,7 +48,6 @@ class IndexesSpec extends Specification with Tags {
     }
 
     "retrieve indexes" in {
-      // TODO: Fix with WT
       val future = geo.indexesManager.list().map {
         _.filter(_.name.get == "loc_2d")
       }.filter(!_.isEmpty).map(_.apply(0))
@@ -120,23 +119,24 @@ class IndexesSpec extends Specification with Tags {
   val hashed = db("hashed")
 
   "ReactiveMongo Hashed indexes" should {
+    "insert some data" in { // With WiredTiger, collection must exist before
+      val futs = for(i <- 1 until 10)
+      yield hashed.insert(BSONDocument("field" -> s"data-$i"))
+
+      Future.sequence(futs) must not(throwA[Throwable]).await(timeoutMillis)
+    }
+    
     "make index" in {
-      val created = hashed.indexesManager.ensure(
-        Index(
-          List("field" -> Hashed)
-        )
-      )
-      Await.result(created, timeout) mustEqual true
+      hashed.indexesManager.ensure(Index(List("field" -> Hashed))).
+        aka("index") must beTrue.await(timeoutMillis)
     }
 
     "retrieve indexes" in {
-      // TODO: Fix with WT
-      val future = hashed.indexesManager.list().map {
+      val index = hashed.indexesManager.list().map {
         _.filter(_.name.get == "field_hashed")
       }.filter(!_.isEmpty).map(_.apply(0))
-      val index = Await.result(future, timeout)
-      index.key(0)._1 mustEqual "field"
-      index.key(0)._2 mustEqual Hashed
+
+      index.map(_.key(0)) must beEqualTo("field" -> Hashed).await(timeoutMillis)
     }
   }
 

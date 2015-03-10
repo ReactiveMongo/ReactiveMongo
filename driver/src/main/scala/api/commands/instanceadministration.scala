@@ -68,5 +68,24 @@ case class DropIndexesResult(value: Int) extends BoxedAnyVal[Int]
 
 case class CollectionNames(names: List[String])
 
-/** List names of the DB collections. */
+/** List the names of DB collections. */
 object ListCollectionNames extends Command with CommandWithResult[CollectionNames]
+
+import reactivemongo.api.indexes.Index
+
+/**
+ * Lists the indexes of the specified collection.
+ * 
+ * @param db the database name
+ */
+case class ListIndexes(db: String) extends CollectionCommand
+    with CommandWithResult[List[Index]]
+
+/**
+ * Creates the given indexes on the specified collection.
+ * 
+ * @param db the database name
+ * @param indexes the indexes to be created
+ */
+case class CreateIndexes(db: String, indexes: List[Index])
+    extends CollectionCommand with CommandWithResult[WriteResult]

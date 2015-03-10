@@ -129,7 +129,7 @@ trait DBMetaCommands {
     Command.run(BSONSerializationPack).unboxed(self, DropDatabase)
 
   /** Returns an index manager for this database. */
-  def indexesManager(implicit ec: ExecutionContext) = new IndexesManager(self)
+  def indexesManager(implicit ec: ExecutionContext) = IndexesManager(self)
 
   private lazy val collectionNameReader =
     new BSONDocumentReader[String] {
