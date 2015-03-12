@@ -258,12 +258,15 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
         case Some(metadata) if metadata.maxWireVersion >= MongoWireVersion.V26 =>
           import reactivemongo.api.commands._
           import BatchCommands.UpdateCommand.{ Update, UpdateElement }
-          runCommand(Update(UpdateElement(selector, update))).flatMap { wr =>
-            val flattened = wr.flatten
-            if(!flattened.ok) // was ordered, with one doc => fail if has an error
-              Future.failed(flattened)
-            else Future.successful(wr)
-          }
+          runCommand(Update(UpdateElement(selector, update, upsert, multi))).
+            flatMap { wr =>
+              val flattened = wr.flatten
+              if (!flattened.ok) {
+                // was ordered, with one doc => fail if has an error
+                Future.failed(flattened)
+              } else Future.successful(wr)
+            }
+
         case Some(_) =>
           val flags = 0 | (if (upsert) UpdateFlags.Upsert else 0) | (if (multi) UpdateFlags.MultiUpdate else 0)
           val op = Update(fullCollectionName, flags)
