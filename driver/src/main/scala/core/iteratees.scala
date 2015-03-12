@@ -86,7 +86,7 @@ object CustomEnumerator {
       def loop(current: C, iteratee: Iteratee[C, A]): Future[Iteratee[C, A]] = {
         iteratee.fold {
           case step @ Step.Cont(ƒ) => {
-        	next(current) match {
+            next(current) match {
               case Some(future) => {
                 future.flatMap { nnx => loop(nnx, ƒ(Input.El(nnx))) }
               }
@@ -99,8 +99,8 @@ object CustomEnumerator {
           case Step.Done(a, e) =>
             val done = Done(a, e)
             cleanUp(current)
-
             Future.successful(done)
+
           case Step.Error(msg, e) =>
             val error = Error(msg, e)
             cleanUp(current)

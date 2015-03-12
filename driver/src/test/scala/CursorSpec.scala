@@ -1,10 +1,11 @@
+import java.util.concurrent.TimeoutException
 import org.specs2.mutable._
 import reactivemongo.bson._
 import DefaultBSONHandlers._
-import scala.concurrent.Future
-import scala.concurrent.Await
+import scala.concurrent.{ Await, Future }
 import scala.concurrent.duration._
 import play.api.libs.iteratee.Iteratee
+import reactivemongo.api.{ Cursor, QueryOpts }
 
 class CursorSpec  extends Specification {
   sequential
@@ -39,10 +40,77 @@ class CursorSpec  extends Specification {
       //println("size is " + res.size)
       i mustEqual 16517
     }
+
     "get 10 first docs" in {
-      println("\n\n\n\n\tGET FIRST 10 docs\n")
-      //Await.result(coll.find(BSONDocument()).cursor.toListByStream(10), timeout).size mustEqual 10
-      Await.result(coll.find(BSONDocument()).cursor.toList(10), timeout).size mustEqual 10
+      coll.find(BSONDocument()).cursor.collect[List](10).map(_.size).
+        aka("result size") must beEqualTo(10).await(timeoutMillis)
+    }
+  }
+
+  "BSON Cursor" should {
+    object IdReader extends BSONDocumentReader[Int] {
+      def read(doc: BSONDocument): Int = doc.getAs[Int]("id").get
+    }
+
+    val expectedList = List(9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
+    @inline def toList =
+      Iteratee.fold[Int, List[Int]](List.empty[Int]) { (l, i) => i :: l }
+
+    "read from collection" >> {
+      def collection(n: String) = {
+        val col = db(s"somecollection_$n")
+
+        Future.sequence((0 until 10) map { id =>
+          col.insert(BSONDocument("id" -> id))
+        }) map { _ =>
+          println(s"-- all documents inserted in test collection $n")
+          col
+        }
+      }
+
+      @inline def cursor(n: String) = {
+        implicit val reader = IdReader
+        Cursor.flatten(collection(n).map(_.find(BSONDocument()).
+          sort(BSONDocument("id" -> 1)).cursor[Int]))
+      }
+
+      "successfully using cursor" in {
+        (cursor("senum1").enumerate(10) |>>> toList).
+          aka("enumerated") must beEqualTo(expectedList).await(timeoutMillis)
+      }
+    }
+
+    "read from capped collection" >> {
+      def collection(n: String) = {
+        val col = db(s"somecollection_captail_$n")
+        col.createCapped(4096, Some(10))
+
+        Future {
+          (0 until 10).foreach { id =>
+            col.insert(BSONDocument("id" -> id))
+            Thread.sleep(500)
+          }
+          println(s"-- all documents inserted in test collection $n")
+        }
+
+        col
+      }
+
+      @inline def tailable(n: String) = {
+        implicit val reader = IdReader
+        collection(n).find(BSONDocument()).options(
+          QueryOpts().tailable).cursor[Int]
+      }
+
+      "successfully using tailable enumerator with maxDocs" in {
+        (tailable("tenum1").enumerate(10) |>>> toList).
+          aka("enumerated") must beEqualTo(expectedList).await(timeoutMillis)
+      }
+
+      "with timeout using tailable enumerator w/o maxDocs" in {
+        Await.result(tailable("tenum2").enumerate() |>>> toList, timeout).
+          aka("enumerated") must throwA[TimeoutException]
+      }
     }
   }
 }
