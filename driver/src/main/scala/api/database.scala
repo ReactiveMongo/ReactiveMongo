@@ -151,7 +151,8 @@ trait DBMetaCommands {
     } else collection("system.namespaces").as[BSONCollection]()
       .find(BSONDocument(
         "name" -> BSONRegex("^[^\\$]+$", "") // strip off any indexes
-      )).cursor(collectionNameReader, ec).collect[List]()
+      )).cursor(collectionNameReader, ec, CursorProducer.defaultCursorProducer).
+      collect[List]()
   }
 
 /* // TODO
