@@ -269,7 +269,7 @@ object BSONIterator {
           case array: BSONArray => prefix + elem._1 + ": [\n" + pretty(i + 1, array.iterator) + "\n" + prefix + "]"
           case _ => prefix + elem._1 + ": " + elem._2.toString
         }
-        case Failure(e) => prefix + s"ERROR[${e.getMessage()}]"
+        case Failure(e) => s"${prefix}ERROR[${e.getMessage()}]"
       }
     }).mkString(",\n")
   }

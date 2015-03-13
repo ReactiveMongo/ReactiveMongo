@@ -55,8 +55,7 @@ class LowLevelBsonDocReader[A <: ReadableBuffer](rbuf: A) {
     val buf = slice
     buf.index = buf.index + 4
 
-    def skipCString(): Unit =
-      while(buf.readByte != 0x00) {}
+    @inline def skipCString(): Unit = while(buf.readByte != 0x00) {}
 
     @inline def move(diff: Int): Unit =
       buf.index = buf.index + diff
