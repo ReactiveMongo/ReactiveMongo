@@ -117,7 +117,7 @@ object BSONUpdateCommandImplicits {
     def write(update: ResolvedCollectionCommand[Update]) = {
       BSONDocument(
         "update" -> update.collection,
-        "updates" -> BSONArray(update.command.documents),
+        "updates" -> update.command.documents,
         "ordered" -> update.command.ordered,
         "writeConcern" -> update.command.writeConcern
       )
@@ -136,11 +136,11 @@ object BSONUpdateCommandImplicits {
         ok = doc.getAs[Int]("ok").exists(_ != 0),
         n = doc.getAs[Int]("n").getOrElse(0),
         nModified = doc.getAs[Int]("nModified").getOrElse(0),
-        upserted = doc.getAs[Seq[Upserted]]("writeErrors").getOrElse(Seq.empty),
+        upserted = doc.getAs[Seq[Upserted]]("upserted").getOrElse(Seq.empty),
         writeErrors = doc.getAs[Seq[WriteError]]("writeErrors").getOrElse(Seq.empty),
         writeConcernError = doc.getAs[WriteConcernError]("writeConcernError"),
-        code = doc.getAs[Int]("code"),
-        errmsg = doc.getAs[String]("errmsg")
+        code = doc.getAs[Int]("code"), //FIXME There is no corresponding official docs.
+        errmsg = doc.getAs[String]("errmsg") //FIXME There is no corresponding official docs.
       )
     }
   }
