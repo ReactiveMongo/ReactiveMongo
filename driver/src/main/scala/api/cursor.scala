@@ -206,17 +206,18 @@ object DefaultCursor {
 
       def tailableCursorEnumerateResponses(maxDocs: Int = Int.MaxValue)(implicit ctx: ExecutionContext): Enumerator[Response] = {
         Enumerator.flatten(makeRequest.map { response =>
-          new CustomEnumerator.SEnumerator((response, maxDocs))(
+          new CustomEnumerator.SEnumerator(response -> 0)(
             next = current => {
-              if (maxDocs - current._1.reply.numberReturned > 0) {
+              val (r, c) = current
+              if (c < maxDocs) {
                 val nextResponse =
-                  if (hasNext(current._1)) {
-                    next(current._1)
+                  if (hasNext(r)) {
+                    next(r)
                   } else {
                     logger.debug("[Tailable Cursor] Current cursor exhausted, renewing...")
                     Some(DelayedFuture(500, mongoConnection.actorSystem).flatMap(_ => makeRequest))
                   }
-                nextResponse.map(_.map((_, maxDocs - current._1.reply.numberReturned)))
+                nextResponse.map(_.map((_, c + r.reply.numberReturned)))
               } else None
             },
             cleanUp = current =>
