@@ -464,8 +464,8 @@ object MongoConnection {
  * @param authSource The database source for authentication credentials.
  * @param sslEnabled Enable SSL connection (required to be accepted on server-side).
  * @param sslAllowsInvalidCert If `sslEnabled` is true, this one indicates whether to accept invalid certificates (e.g. self-signed).
- * @param tcpNoDelay TCPNoDelay flag (ReactiveMongo-specific option).
- * @param keepAlive TCP KeepAlive flag (ReactiveMongo-specific option).
+ * @param tcpNoDelay TCPNoDelay flag (ReactiveMongo-specific option). The default value is false (see [[java.net.StandardSocketOptions#TCP_NODELAY]]).
+ * @param keepAlive TCP KeepAlive flag (ReactiveMongo-specific option). The default value is false (see [[java.net.StandardSocketOptions#SO_KEEPALIVE]]).
  * @param nbChannelsPerNode Number of channels (connections) per node (ReactiveMongo-specific option).
  */
 case class MongoConnectionOptions(
@@ -477,8 +477,8 @@ case class MongoConnectionOptions(
   sslAllowsInvalidCert: Boolean = false,
 
   // reactivemongo specific options
-  tcpNoDelay: Boolean = true,
-  keepAlive: Boolean = true,
+  tcpNoDelay: Boolean = false,
+  keepAlive: Boolean = false,
   nbChannelsPerNode: Int = 10
 )
 
