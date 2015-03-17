@@ -136,9 +136,7 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
    *
    * @tparam S The type of the selector document. An implicit `Writer[S]` must be in the scope.
    */ // TODO More generic deserializers ?
-  def find[S, T <: ReadFile[_]](selector: S)(implicit sWriter: pack.Writer[S], readFileReader: pack.Reader[T], ctx: ExecutionContext): Cursor[T] = {
-    files.find(selector).cursor
-  }
+  def find[S, T <: ReadFile[_]](selector: S)(implicit sWriter: pack.Writer[S], readFileReader: pack.Reader[T], ctx: ExecutionContext, cp: CursorProducer[T]): cp.ProducedCursor = files.find(selector).cursor
 
   /**
    * Saves the content provided by the given enumerator with the given metadata.

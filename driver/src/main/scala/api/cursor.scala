@@ -141,6 +141,30 @@ class FlattenedCursor[T](cursor: Future[Cursor[T]]) extends Cursor[T] {
     Enumerator.flatten(cursor.map(_.rawEnumerateResponses(maxDocs)))
 }
 
+/**
+ * Cursor wrapper, to help to define custom cursor classes.
+ * @see CursorProducer
+ */
+trait WrappedCursor[T] extends Cursor[T] {
+  /** The underlying cursor */
+  def wrappee: Cursor[T]
+
+  def enumerate(maxDocs: Int = Int.MaxValue, stopOnError: Boolean = false)(implicit ctx: ExecutionContext): Enumerator[T] =
+    wrappee.enumerate(maxDocs, stopOnError)
+
+  def enumerateBulks(maxDocs: Int = Int.MaxValue, stopOnError: Boolean = false)(implicit ctx: ExecutionContext): Enumerator[Iterator[T]] =
+    wrappee.enumerateBulks(maxDocs, stopOnError)
+
+  def enumerateResponses(maxDocs: Int = Int.MaxValue, stopOnError: Boolean = false)(implicit ctx: ExecutionContext): Enumerator[Response] =
+    wrappee.enumerateResponses(maxDocs, stopOnError)
+
+  def collect[M[_]](upTo: Int, stopOnError: Boolean)(implicit cbf: CanBuildFrom[M[_], T, M[T]], ec: ExecutionContext): Future[M[T]] =
+    wrappee.collect[M](upTo, stopOnError)
+
+  def rawEnumerateResponses(maxDocs: Int = Int.MaxValue)(implicit ctx: ExecutionContext): Enumerator[Response] = wrappee.rawEnumerateResponses(maxDocs)
+  
+}
+
 object Cursor {
   private[api] val logger = LazyLogger("reactivemongo.api.Cursor")
 
@@ -297,5 +321,21 @@ object DefaultCursor {
           builder ++= iterator
         }).map(_.result)
       }
+    }
+}
+
+/** Allows to enrich a base cursor. */
+trait CursorProducer[T] {
+  type ProducedCursor <: Cursor[T]
+
+  /** Produces a custom cursor from the `base` one. */
+  def produce(base: Cursor[T]): ProducedCursor
+}
+
+object CursorProducer {
+  implicit def defaultCursorProducer[T]: CursorProducer[T] =
+    new CursorProducer[T] {
+      type ProducedCursor = Cursor[T]
+      def produce(base: Cursor[T]) = base
     }
 }

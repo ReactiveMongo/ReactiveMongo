@@ -64,19 +64,12 @@ trait GenericQueryBuilder[P <: SerializationPack] {
 
   /**
    * Sends this query and gets a [[Cursor]] of instances of `T`.
-   *
+   * 
    * An implicit `Reader[T]` must be present in the scope.
    */
-  def cursor[T](implicit reader: pack.Reader[T], ec: ExecutionContext): Cursor[T] = cursor(ReadPreference.primary)
+  def cursor[T](implicit reader: pack.Reader[T], ec: ExecutionContext, cp: CursorProducer[T]): cp.ProducedCursor = cursor(ReadPreference.primary)
 
-  /**
-   * Makes a [[Cursor]] of this query, which can be enumerated.
-   *
-   * An implicit `Reader[T]` must be present in the scope.
-   *
-   * @param readPreference The ReadPreference for this request. If the ReadPreference implies that this request might be run on a Secondary, the slaveOk flag will be set.
-   */
-  def cursor[T](readPreference: ReadPreference, isMongo26WriteOp: Boolean = false)(implicit reader: pack.Reader[T], ec: ExecutionContext): Cursor[T] = {
+  private def defaultCursor[T](readPreference: ReadPreference, isMongo26WriteOp: Boolean = false)(implicit reader: pack.Reader[T], ec: ExecutionContext): Cursor[T] = {
     val documents = BufferSequence {
       val buffer = write(merge(readPreference), ChannelBufferWritableBuffer())
       projectionOption.map { projection =>
@@ -92,11 +85,21 @@ trait GenericQueryBuilder[P <: SerializationPack] {
   }
 
   /**
+   * Makes a [[Cursor]] of this query, which can be enumerated.
+   *
+   * An implicit `Reader[T]` must be present in the scope.
+   *
+   * @param readPreference The ReadPreference for this request. If the ReadPreference implies that this request might be run on a Secondary, the slaveOk flag will be set.
+   */
+  private def cursor[T](readPreference: ReadPreference, isMongo26WriteOp: Boolean = false)(implicit reader: pack.Reader[T], ec: ExecutionContext, cp: CursorProducer[T]): cp.ProducedCursor = cp.produce(defaultCursor[T](readPreference, isMongo26WriteOp))
+
+  /**
    * Sends this query and gets a future `Option[T]`.
    *
    * An implicit `Reader[T]` must be present in the scope.
    */
-  def one[T](implicit reader: pack.Reader[T], ec: ExecutionContext): Future[Option[T]] = copy(options = options.batchSize(1)).cursor(reader, ec).headOption
+  def one[T](implicit reader: pack.Reader[T], ec: ExecutionContext): Future[Option[T]] = copy(options = options.batchSize(1)).
+    defaultCursor(ReadPreference.primary)(reader, ec).headOption
 
   /**
    * Sends this query and gets a future `Option[T]`.
@@ -105,7 +108,7 @@ trait GenericQueryBuilder[P <: SerializationPack] {
    *
    * @param readPreference The ReadPreference for this request. If the ReadPreference implies that this request might be run on a Secondary, the slaveOk flag will be set.
    */
-  def one[T](readPreference: ReadPreference)(implicit reader: pack.Reader[T], ec: ExecutionContext): Future[Option[T]] = copy(options = options.batchSize(1)).cursor(readPreference)(reader, ec).headOption
+  def one[T](readPreference: ReadPreference)(implicit reader: pack.Reader[T], ec: ExecutionContext): Future[Option[T]] = copy(options = options.batchSize(1)).defaultCursor(readPreference)(reader, ec).headOption
 
   /**
    * Sets the query (the selector document).

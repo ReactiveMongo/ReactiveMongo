@@ -5,7 +5,7 @@ import DefaultBSONHandlers._
 import scala.concurrent.{ Await, Future }
 import scala.concurrent.duration._
 import play.api.libs.iteratee.Iteratee
-import reactivemongo.api.{ Cursor, QueryOpts }
+import reactivemongo.api.{ Cursor, CursorProducer, QueryOpts, WrappedCursor }
 
 class CursorSpec  extends Specification {
   sequential
@@ -45,6 +45,15 @@ class CursorSpec  extends Specification {
       coll.find(BSONDocument()).cursor.collect[List](10).map(_.size).
         aka("result size") must beEqualTo(10).await(timeoutMillis)
     }
+
+    "produce a custom cursor for the results" in {
+      implicit def fooProducer[T] = new CursorProducer[T] {
+        type ProducedCursor = FooCursor[T]
+        def produce(base: Cursor[T]) = new FooCursor(base)
+      }
+
+      coll.find(BSONDocument()).cursor.foo must_== "Bar"
+    }    
   }
 
   "BSON Cursor" should {
@@ -112,5 +121,9 @@ class CursorSpec  extends Specification {
           aka("enumerated") must throwA[TimeoutException]
       }
     }
+  }
+
+  class FooCursor[T](val wrappee: Cursor[T]) extends WrappedCursor[T] {
+    val foo = "Bar"
   }
 }
