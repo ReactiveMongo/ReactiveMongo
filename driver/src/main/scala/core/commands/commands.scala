@@ -592,7 +592,7 @@ case class DeleteIndex(
 
   object ResultMaker extends BSONCommandResultMaker[Int] {
     def apply(document: BSONDocument) =
-      CommandError.checkOk(document, Some("deleteIndexes")).toLeft(document.getAs[BSONDouble]("nIndexesWas").map(_.value.toInt).get) }
+      CommandError.checkOk(document, Some("deleteIndexes")).toLeft(document.getAs[BSONNumberLike]("nIndexesWas").map(_.toInt).get) }
 }
 
 /** eval command */
