@@ -205,6 +205,24 @@ ReactiveMongo makes a heavy usage of the [Iteratee](http://www.playframework.com
 
 Used in conjunction with stream-aware frameworks, like Play!, you can easily stream the data stored in MongoDB. For Play, there is a [ReactiveMongo Plugin](https://github.com/ReactiveMongo/Play-ReactiveMongo) that brings some cool stuff, like JSON-specialized collection and helpers for GridFS. See the examples and get convinced!
 
+## Build ReactiveMongo from source
+
+To benefit from the latest improvements and fixes, you may want to compile ReactiveMongo from source. You will need a [Git client](http://git-scm.com/) and [SBT](http://www.scala-sbt.org).
+
+From the shell, first checkout the source:
+
+```
+$ git clone git@github.com:ReactiveMongo/ReactiveMongo.git
+```
+
+Then go to the `ReactiveMongo` directory and launch the SBT build console:
+
+```
+$ cd ReactiveMongo
+$ sbt
+> +publish-local
+```
+
 ### Samples
 
 These sample applications are kept up to date with the latest driver version. They are built upon Play 2.2.
