@@ -33,4 +33,33 @@ class Types extends Specification {
       BSONObjectID.generate must beAnInstanceOf[BSONObjectID]
     }
   }
+
+  "BSON document" should {
+    "be empty" in {
+      BSONDocument().elements must beEmpty and (
+        BSONDocument.empty.elements must beEmpty) and (
+        document.elements must beEmpty) and (
+        document().elements must beEmpty)
+    }
+
+    "be created with a new element " in {
+      val doc = BSONDocument.empty ++ ("foo" -> 1)
+      doc must_== BSONDocument("foo" -> 1)
+    }
+  }
+
+  "BSON array" should {
+    "be empty" in {
+      BSONArray().values must beEmpty and (
+        BSONArray.empty.values must beEmpty) and (
+        array.values must beEmpty) and (
+        array().values must beEmpty)
+
+    }
+
+    "be created with a new element " in {
+      val arr = BSONArray.empty ++ ("foo", "bar")
+      arr must_== BSONArray("foo", "bar")
+    }
+  }
 }
