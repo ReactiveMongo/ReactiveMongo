@@ -200,6 +200,7 @@ object Travis {
   val travisCommand = Command.command("publishSnapshotsFromTravis") { state =>
     val extracted = Project extract state
     import extracted._
+    import scala.util.Properties.isJavaAtLeast
 
     val thisRef = extracted.get(thisProjectRef)
 
@@ -207,6 +208,7 @@ object Travis {
     val isTravisEnabled = sys.env.get("TRAVIS").exists(_ == "true")
     val isNotPR = sys.env.get("TRAVIS_PULL_REQUEST").exists(_ == "false")
     val isBranchAcceptable = sys.env.get("TRAVIS_BRANCH").exists(branch => getOpt(travisSnapshotBranches).exists(_.contains(branch)))
+    val isJavaVersion = !isJavaAtLeast("1.7")
 
     if (isSnapshot && isTravisEnabled && isNotPR && isBranchAcceptable) {
       println(s"publishing $thisRef from travis...")

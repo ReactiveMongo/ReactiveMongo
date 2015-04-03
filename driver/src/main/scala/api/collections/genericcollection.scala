@@ -164,43 +164,39 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
     }.getOrElse(Future.failed(ConnectionNotInitialized.MissingMetadata))
 
   def bulkInsert(documents: Stream[pack.Document], ordered: Boolean, writeConcern: WriteConcern = WriteConcern.Default, bulkSize: Int, bulkByteSize: Int)(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] = watchFailure {
-    def createBulk[R, A <: BulkMaker[R, A]](docs: Stream[pack.Document], command: A with BulkMaker[R, A]): Future[List[R]] =  {
+    def createBulk[R, A <: BulkMaker[R, A]](docs: Stream[pack.Document], command: A with BulkMaker[R, A]): Future[List[R]] = {
       val (tail, nc) = command.fill(docs)
-      command.send().
-        flatMap { wr =>
-          if(nc.isDefined)
-            createBulk(tail, nc.get).map(wr2 => wr :: wr2)
-          else // done
-            Future.successful(List(wr))
-        }
+      command.send().flatMap { wr =>
+        if (nc.isDefined) createBulk(tail, nc.get).map(wr2 => wr :: wr2)
+        else Future.successful(List(wr)) // done
+      }
     }
     val metadata = db.connection.metadata
-    if(!documents.isEmpty) {
+    if (!documents.isEmpty) {
       val havingMetadata = Failover2(db.connection, failoverStrategy) { () =>
         metadata.map(Future.successful).getOrElse(Future.failed(ConnectionNotInitialized.MissingMetadata))
       }.future
       havingMetadata.flatMap { metadata =>
-        if(metadata.maxWireVersion >= MongoWireVersion.V26) {
+        if (metadata.maxWireVersion >= MongoWireVersion.V26) {
           createBulk(documents, Mongo26WriteCommand.insert(ordered, writeConcern, metadata)).map { list =>
             list.foldLeft(MultiBulkWriteResult())( (r, w) => r.merge(w) )}
         } else {
+          // Mongo 2.4 // TODO: Deprecate/remove
           createBulk(documents, new Mongo24BulkInsert(Insert(0, fullCollectionName), writeConcern, metadata)).map { list =>
             list.foldLeft(MultiBulkWriteResult())( (r, w) => r.merge(w) )}
         }
       }
-    } else {
-      Future.successful(MultiBulkWriteResult(
-        ok = true,
-        n = 0,
-        nModified = 0,
-        upserted = Seq.empty,
-        writeErrors = Seq.empty,
-        writeConcernError = None,
-        code = None,
-        errmsg = None,
-        totalN = 0
-      ))
-    }
+    } else Future.successful(MultiBulkWriteResult(
+      ok = true,
+      n = 0,
+      nModified = 0,
+      upserted = Seq.empty,
+      writeErrors = Seq.empty,
+      writeConcernError = None,
+      code = None,
+      errmsg = None,
+      totalN = 0
+    ))
   }
 
   /**
@@ -217,17 +213,17 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    */
   def insert[T](document: T, writeConcern: WriteConcern = WriteConcern.Default)(implicit writer: pack.Writer[T], ec: ExecutionContext): Future[WriteResult] = {
     Failover2(db.connection, failoverStrategy) { () =>
-      import MongoWireVersion._
       db.connection.metadata match {
         case Some(metadata) if metadata.maxWireVersion >= MongoWireVersion.V26 =>
-          import reactivemongo.api.commands._
-          runCommand(BatchCommands.InsertCommand.Insert(document)).flatMap { wr =>
+          runCommand(BatchCommands.InsertCommand.Insert(
+            writeConcern = writeConcern)(document)).flatMap { wr =>
             val flattened = wr.flatten
-            if(!flattened.ok) // was ordered, with one doc => fail if has an error
+            if (!flattened.ok) {
+              // was ordered, with one doc => fail if has an error
               Future.failed(flattened)
-            else Future.successful(wr)
+            } else Future.successful(wr)
           }
-        case Some(_) =>
+        case Some(_) => // Mongo < 2.6 // TODO: Deprecates/remove
           val op = Insert(0, fullCollectionName)
           val bson = writeDoc(document, writer)
           val checkedWriteRequest = CheckedWriteRequest(op, BufferSequence(bson), writeConcern)
@@ -256,18 +252,17 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
     Failover2(db.connection, failoverStrategy) { () =>
       db.connection.metadata match {
         case Some(metadata) if metadata.maxWireVersion >= MongoWireVersion.V26 =>
-          import reactivemongo.api.commands._
           import BatchCommands.UpdateCommand.{ Update, UpdateElement }
-          runCommand(Update(UpdateElement(selector, update, upsert, multi))).
-            flatMap { wr =>
-              val flattened = wr.flatten
-              if (!flattened.ok) {
-                // was ordered, with one doc => fail if has an error
-                Future.failed(flattened)
-              } else Future.successful(wr)
-            }
+          runCommand(Update(writeConcern = writeConcern)(
+            UpdateElement(selector, update, upsert, multi))).flatMap { wr =>
+            val flattened = wr.flatten
+            if (!flattened.ok) {
+              // was ordered, with one doc => fail if has an error
+              Future.failed(flattened)
+            } else Future.successful(wr)
+          }
 
-        case Some(_) =>
+        case Some(_) => // Mongo < 2.6 // TODO: Deprecate/remove
           val flags = 0 | (if (upsert) UpdateFlags.Upsert else 0) | (if (multi) UpdateFlags.MultiUpdate else 0)
           val op = Update(fullCollectionName, flags)
           val bson = writeDoc(selector, selectorWriter)
@@ -296,16 +291,17 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
     Failover2(db.connection, failoverStrategy) { () =>
       db.connection.metadata match {
         case Some(metadata) if metadata.maxWireVersion >= MongoWireVersion.V26 =>
-          import reactivemongo.api.commands._
           import BatchCommands.DeleteCommand.{ Delete, DeleteElement }
           val limit = if (firstMatchOnly) 1 else 0
-          runCommand(Delete(DeleteElement(query, limit))).flatMap { wr =>
+          runCommand(Delete(writeConcern = writeConcern)(
+            DeleteElement(query, limit))).flatMap { wr =>
             val flattened = wr.flatten
-            if(!flattened.ok) // was ordered, with one doc => fail if has an error
+            if (!flattened.ok) {
+              // was ordered, with one doc => fail if has an error
               Future.failed(flattened)
-            else Future.successful(wr)
+            } else Future.successful(wr)
           }
-        case Some(_) =>
+        case Some(_) => // Mongo < 2.6 // TODO: Deprecate/remove
           val op = Delete(fullCollectionName, if (firstMatchOnly) 1 else 0)
           val bson = writeDoc(query, writer)
           val checkedWriteRequest = CheckedWriteRequest(op, BufferSequence(bson), writeConcern)
@@ -378,24 +374,20 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
 
   protected object Mongo26WriteCommand {
     def insert(ordered: Boolean, writeConcern: WriteConcern, metadata: ProtocolMetadata): Mongo26WriteCommand = new Mongo26WriteCommand("insert", ordered, writeConcern, metadata)
+    /* TODO: Remove
     def update(ordered: Boolean, writeConcern: WriteConcern, metadata: ProtocolMetadata): Mongo26WriteCommand = new Mongo26WriteCommand("update", ordered, writeConcern, metadata)
     def delete(ordered: Boolean, writeConcern: WriteConcern, metadata: ProtocolMetadata): Mongo26WriteCommand = new Mongo26WriteCommand("delete", ordered, writeConcern, metadata)
+     */
   }
-
-  import reactivemongo.bson._
-  import reactivemongo.bson.lowlevel.LowLevelBsonDocWriter
-  import reactivemongo.core.netty.ChannelBufferWritableBuffer
 
   protected sealed trait BulkMaker[R, S <: BulkMaker[R, S]] {
     def fill(docs: Stream[pack.Document]): (Stream[pack.Document], Option[S]) = {
-      @scala.annotation.tailrec
+      @annotation.tailrec
       def loop(docs: Stream[pack.Document]): (Stream[pack.Document], Option[S]) = {
-        if(docs.isEmpty)
-          Stream.empty -> None
+        if (docs.isEmpty) Stream.empty -> None
         else {
           val res = putOrIssueNewCommand(docs.head)
-          if(res.isDefined)
-            docs.tail -> res
+          if (res.isDefined) docs.tail -> res
           else loop(docs.tail)
         }
       }
@@ -407,6 +399,8 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
   }
 
   protected class Mongo26WriteCommand private(tpe: String, ordered: Boolean, writeConcern: WriteConcern, metadata: ProtocolMetadata) extends BulkMaker[WriteResult, Mongo26WriteCommand] {
+    import reactivemongo.bson.lowlevel.LowLevelBsonDocWriter
+
     private var done = false
     private var docsN = 0
     private val buf = ChannelBufferWritableBuffer()
@@ -453,7 +447,9 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
 
     // TODO remove
     def _debug(): Unit = {
-      import reactivemongo.bson.buffer.DefaultBufferHandler
+      import reactivemongo.bson.{ BSONDocument, buffer },
+        buffer.DefaultBufferHandler
+
       val rix = buf.buffer.readerIndex
       val wix = buf.buffer.writerIndex
       val doc = DefaultBufferHandler.BSONDocumentBufferHandler.read(new ChannelBufferReadableBuffer(buf.buffer))
@@ -484,7 +480,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
     }
 
     private def closeIfNecessary(): Unit =
-      if(!done) {
+      if (!done) {
         done = true
         writer.close // array
         writer.close // doc
@@ -508,11 +504,9 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
         case GetLastError.WaitForAknowledgments(n) => writer.putInt("w", n)
       }
 
-      if(writeConcern.j)
-        writer.putBoolean("j", true)
+      if (writeConcern.j) writer.putBoolean("j", true)
 
-      if(writeConcern.wtimeout.isDefined)
-        writer.putInt("wtimeout", writeConcern.wtimeout.get)
+      writeConcern.wtimeout foreach { writer.putInt("wtimeout", _) }
 
       writer.close
     }
@@ -528,9 +522,9 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
     val thresholdBytes = metadata.maxBsonSize - (4 * 4 + 4 + 124)
 
     def putOrIssueNewCommand(doc: pack.Document): Option[Mongo24BulkInsert] = {
-      if(done)
+      if (done)
         throw new RuntimeException("violated assertion: Mongo24BulkInsert should not be used again after it is done")
-      if(docsN >= thresholdDocs) {
+      if (docsN >= thresholdDocs) {
         val nextBulk = new Mongo24BulkInsert(op, writeConcern, metadata)
         nextBulk.putOrIssueNewCommand(doc)
         Some(nextBulk)
