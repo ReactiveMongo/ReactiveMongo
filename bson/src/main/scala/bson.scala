@@ -20,16 +20,16 @@ object `package` extends DefaultBSONHandlers {
 }
 
 sealed trait Producer[T] {
-  private[bson] def produce: Option[T]
+  def produce: Option[T]
 }
 
 object Producer {
   case class NameOptionValueProducer(private val element: (String, Option[BSONValue])) extends Producer[(String, BSONValue)] {
-    private[bson] def produce = element._2.map(value => element._1 -> value)
+    def produce = element._2.map(value => element._1 -> value)
   }
 
   case class OptionValueProducer(private val element: Option[BSONValue]) extends Producer[BSONValue] {
-    private[bson] def produce = element
+    def produce = element
   }
 
   implicit def nameValue2Producer[T](element: (String, T))(implicit writer: BSONWriter[T, _ <: BSONValue]) =
