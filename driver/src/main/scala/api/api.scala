@@ -26,7 +26,7 @@ import reactivemongo.core.actors._
 import reactivemongo.core.nodeset.Authenticate
 import reactivemongo.core.protocol._
 import reactivemongo.core.commands.SuccessfulAuthentication
-import reactivemongo.utils.LazyLogger
+import reactivemongo.utils.{ LazyLogger, Timer }
 import scala.collection.mutable
 import scala.concurrent.{Await, ExecutionContext, Future, Promise}
 import scala.concurrent.duration._
@@ -66,7 +66,7 @@ class Failover[T](message: T, connection: MongoConnection, strategy: FailoverStr
           val delayFactor = strategy.delayFactor(`try`)
           val delay = Duration.unapply(strategy.initialDelay * delayFactor).map(t => FiniteDuration(t._1, t._2)).getOrElse(strategy.initialDelay)
           logger.debug("Got an error, retrying... (try #" + `try` + " is scheduled in " + delay.toMillis + " ms)", e)
-          connection.actorSystem.scheduler.scheduleOnce(delay)(send(`try`))
+          Timer.schedule(delay.toMillis)(send(`try`))
         } else {
           // generally that means that the primary is not available or the nodeset is unreachable
           logger.error("Got an error, no more attempts to do. Completing with a failure...", e)
@@ -110,7 +110,7 @@ class Failover2[A](producer: () => Future[A], connection: MongoConnection, strat
           val delayFactor = strategy.delayFactor(`try`)
           val delay = Duration.unapply(strategy.initialDelay * delayFactor).map(t => FiniteDuration(t._1, t._2)).getOrElse(strategy.initialDelay)
           logger.debug("Got an error, retrying... (try #" + `try` + " is scheduled in " + delay.toMillis + " ms)", e)
-          connection.actorSystem.scheduler.scheduleOnce(delay)(send(`try`))
+          Timer.schedule(delay.toMillis)(send(`try`))
         } else {
           // generally that means that the primary is not available or the nodeset is unreachable
           logger.error("Got an error, no more attempts to do. Completing with a failure...", e)
@@ -594,18 +594,14 @@ class MongoDriver(config: Option[Config] = None) {
       case CloseWithTimeout(timeout) =>
         if (isEmpty) {
           context.stop(self)
-        } else {
-          context.become(closing(timeout))
-        }
+        } else context become closing
       case Close =>
         if (isEmpty) {
           context.stop(self)
-        } else {
-          context.become(closing(0.seconds))
-        }
+        } else context become closing
     }
 
-    def closing(shutdownTimeout: FiniteDuration) : Receive = {
+    val closing: Receive = {
       case ac: AddConnection =>
         logger.warn("Refusing to add connection while MongoDriver is closing.")
       case Terminated(actor) =>

@@ -19,7 +19,6 @@ import collections.bson.BSONCollection
 import reactivemongo.api.indexes.IndexesManager
 import reactivemongo.bson._
 import reactivemongo.core.commands.{ Update => UpdateCommand, _ }
-import reactivemongo.utils.EitherMappableFuture._
 
 import scala.concurrent.{ ExecutionContext, Future }
 import scala.concurrent.duration._
@@ -73,9 +72,11 @@ trait DB {
    * @return a future containing the result of the command.
    */
   @deprecated("consider using reactivemongo.api.commands along with `GenericDB.runCommand` methods", "0.11.0")
-  def command[T](command: Command[T], readPreference: ReadPreference = ReadPreference.primary)(implicit ec: ExecutionContext): Future[T] = {
-    Failover(command.apply(name).maker(readPreference), connection, failoverStrategy).future.mapEither(command.ResultMaker(_))
-  }
+  def command[T](command: Command[T], readPreference: ReadPreference = ReadPreference.primary)(implicit ec: ExecutionContext): Future[T] = 
+    Failover(command.apply(name).
+      maker(readPreference), connection, failoverStrategy).future.
+      flatMap(command.ResultMaker(_).fold(
+        Future.failed(_), Future.successful(_)))
 
   /** Authenticates the connection on this database. */
   def authenticate(user: String, password: String)(implicit timeout: FiniteDuration): Future[SuccessfulAuthentication] = connection.authenticate(name, user, password)
