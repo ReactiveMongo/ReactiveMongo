@@ -71,28 +71,26 @@ object CustomEnumerator {
   private[iteratees] def intermediatePromise[A](future: Future[A])(implicit ec: ExecutionContext) = {
     val promise = Promise[A]()
     future.onComplete {
-      case Success(s) => promise.success(s)
-      case Failure(f) => promise.failure(f)
+      case Success(s) =>
+        promise.success(s)
+      case Failure(f) =>
+        promise.failure(f)
     }
     promise.future
   }
 
-  class SEnumerator[C](zero: C)(next: C => Option[Future[C]], cleanUp: C => Unit)(implicit ec: ExecutionContext) extends Enumerator[C] {
+  class SEnumerator[C](zero: C)(next: C => Future[Option[C]], cleanUp: C => Unit)(implicit ec: ExecutionContext) extends Enumerator[C] {
     
     def apply[A](iteratee: Iteratee[C, A]): Future[Iteratee[C, A]] = {
 
-      def loop(current: C, iteratee: Iteratee[C, A]): Future[Iteratee[C, A]] = {
+      def loop(current: C, iteratee: Iteratee[C, A]): Future[Iteratee[C, A]] =
         iteratee.fold {
-          case step @ Step.Cont(ƒ) => {
-            next(current) match {
-              case Some(future) => {
-                future.flatMap { nnx => loop(nnx, ƒ(Input.El(nnx))) }
-              }
-              case None =>
-                val it = ƒ(Input.Empty)
-                cleanUp(current)
-                Future.successful(it)
-            }
+          case step @ Step.Cont(ƒ) => next(current) flatMap {
+            case Some(nnx) => loop(nnx, ƒ(Input.El(nnx)))
+            case _ =>
+              val it = ƒ(Input.Empty)
+              cleanUp(current)
+              Future.successful(it)
           }
           case Step.Done(a, e) =>
             val done = Done(a, e)
@@ -104,7 +102,6 @@ object CustomEnumerator {
             cleanUp(current)
             Future.successful(error)
         }
-      }
 
       iteratee fold {
         case Step.Cont(ƒ) =>
@@ -119,9 +116,9 @@ object CustomEnumerator {
 
     }
   }
-
+  
   object SEnumerator {
-    def apply[C](zero: C)(next: C => Option[Future[C]])(implicit ec: ExecutionContext) = new SEnumerator(zero)(next, _ => ())
+    def apply[C](zero: C)(next: C => Future[Option[C]])(implicit ec: ExecutionContext) = new SEnumerator(zero)(next, _ => ())
   }
 
   /*

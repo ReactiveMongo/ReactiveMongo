@@ -287,6 +287,11 @@ class MongoConnection(
   /** Closes this MongoConnection (closes all the channels and ends the actors) */
   def close(): Unit = monitor ! Close
 
+  private[api] def killed: Future[Boolean] = {
+    val p = Promise[Boolean]()
+    monitor ! IsKilled(p)
+    p.future
+  }
 
   import akka.actor._
   import reactivemongo.core.nodeset.ProtocolMetadata
@@ -294,6 +299,8 @@ class MongoConnection(
   val monitor = actorSystem.actorOf(Props(new MonitorActor), "Monitor-" + MongoDriver.nextCounter)
 
   @volatile private[reactivemongo] var metadata: Option[ProtocolMetadata] = None
+
+  private case class IsKilled(result: Promise[Boolean])
 
   private class MonitorActor extends Actor {
     import MonitorActor._
@@ -342,6 +349,7 @@ class MongoConnection(
         logger.debug(s"Monitor $self closed, stopping...")
         waitingForClose.dequeueAll(_ => true).foreach(_ ! Closed)
         context.stop(self)
+      case IsKilled(result) => result success killed
     }
 
     override def postStop {
@@ -494,7 +502,7 @@ class MongoDriver(config: Option[Config] = None) {
     ActorSystem("reactivemongo", cfg.getConfig("mongo-async-driver"))
   }
 
-  private val supervisorActor = system.actorOf(Props(new SupervisorActor(this)),"Supervisor-" + MongoDriver.nextCounter)
+  private val supervisorActor = system.actorOf(Props(new SupervisorActor(this)),s"Supervisor-${MongoDriver.nextCounter}")
 
   private val connectionMonitors = mutable.Map.empty[ActorRef,MongoConnection]
 

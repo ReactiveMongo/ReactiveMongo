@@ -249,16 +249,16 @@ object DefaultCursor {
     mongoConnection: MongoConnection,
     failoverStrategy: FailoverStrategy,
     isMongo26WriteOp: Boolean)(implicit reader: pack.Reader[A]): Cursor[A] = new Cursor[A] {
-      private def next(response: Response)(implicit ctx: ExecutionContext): Option[Future[Response]] = {
+      private def next(response: Response)(implicit ctx: ExecutionContext): Future[Option[Response]] = {
         if (response.reply.cursorID != 0) {
           val op = GetMore(query.fullCollectionName, query.numberToReturn, response.reply.cursorID)
           logger.trace("[Cursor] Calling next on " + response.reply.cursorID + ", op=" + op)
-          Some(Failover2(mongoConnection, failoverStrategy) { () =>
+          Failover2(mongoConnection, failoverStrategy) { () =>
             mongoConnection.sendExpectingResponse(RequestMaker(op).copy(channelIdHint = Some(response.info.channelId)), isMongo26WriteOp)
-          }.future)
+          }.future.map(Some(_))
         } else {
           logger.error("[Cursor] Call to next() but cursorID is 0, there is probably a bug")
-          None
+          Future.successful(Option.empty[Response])
         }
       }
 
@@ -283,13 +283,19 @@ object DefaultCursor {
       (query.flags & QueryFlags.TailableCursor) == QueryFlags.TailableCursor
 
     /** Returns next response using tailable mode */
-    private def tailResponse(current: Response, maxDocs: Int)(implicit context: ExecutionContext): Option[Future[Response]] =
-      if (hasNext(current)) next(current)
-      else {
-        logger.debug("[Tailable Cursor] Current cursor exhausted, renewing...")
-        Some(DelayedFuture(500, mongoConnection.actorSystem).
-          flatMap(_ => makeRequest))
-      }
+    private def tailResponse(current: Response, maxDocs: Int)(implicit context: ExecutionContext): Future[Option[Response]] = mongoConnection.killed flatMap {
+      case true =>
+        logger.warn("[tailResponse] Connection is killed")
+        Future.successful(Option.empty[Response])
+
+      case _ =>
+        if (hasNext(current)) next(current)
+        else {
+          logger.debug("[tailResponse] Current cursor exhausted, renewing...")
+          DelayedFuture(500, mongoConnection.actorSystem).
+            flatMap(_ => makeRequest.map(Some(_)))
+        }
+    }
 
     @inline
     private def killCursors(cursorID: Long, logCat: String): Unit =
@@ -329,9 +335,10 @@ object DefaultCursor {
 
     def simpleCursorEnumerateResponses(maxDocs: Int = Int.MaxValue)(implicit ctx: ExecutionContext): Enumerator[Response] =
       Enumerator.flatten(makeRequest.map(new CustomEnumerator.SEnumerator(_)(
-        next = response =>
-        if (hasNext(response, maxDocs)) next(response) else None,
-        cleanUp = { resp => killCursors(resp.reply.cursorID, "Cursor") })))
+        next = response => {
+          if (hasNext(response, maxDocs)) next(response)
+          else Future.successful(Option.empty[Response])
+        }, cleanUp = { resp => killCursors(resp.reply.cursorID, "Cursor") })))
 
     def tailableCursorEnumerateResponses(maxDocs: Int = Int.MaxValue)(implicit ctx: ExecutionContext): Enumerator[Response] =
       Enumerator.flatten(makeRequest.map { response =>
@@ -340,7 +347,7 @@ object DefaultCursor {
             val (r, c) = current
             if (c < maxDocs) {
               tailResponse(r, maxDocs).map(_.map((_, c+r.reply.numberReturned)))
-            } else None
+            } else Future.successful(Option.empty[(Response, Int)])
           },
           cleanUp = { current =>
             val (r, _) = current
@@ -389,10 +396,11 @@ object DefaultCursor {
           val iterator = ReplyDocumentIterator(pack)(response.reply, response.documents)
           if (!iterator.hasNext) Enumerator.empty
           else CustomEnumerator.SEnumerator(iterator.next) { _ =>
-            next(iterator, stopOnError).map {
-              case Success(mt) => Future.successful(mt)
-              case Failure(e)  => Future.failed(e)
-            }
+            next(iterator, stopOnError).
+              fold(Future.successful(Option.empty[A])) {
+                case Success(mt) => Future.successful(Some(mt))
+                case Failure(e)  => Future.failed(e)
+              }
           }
         }
       }
@@ -420,9 +428,9 @@ object DefaultCursor {
       suc: (T, Response) => State[T], err: (T, Throwable) => State[T])(
       implicit ctx: ExecutionContext) {
 
-      val nextResponse: (Response, Int) => Option[Future[Response]] =
+      val nextResponse: (Response, Int) => Future[Option[Response]] =
         if (!isTailable) { (r: Response, maxDocs: Int) =>
-          if (!hasNext(r, maxDocs)) Option.empty[Future[Response]]
+          if (!hasNext(r, maxDocs)) Future.successful(Option.empty[Response])
           else next(r)
         } else (r: Response, maxDocs: Int) => tailResponse(r, maxDocs)
 
@@ -433,8 +441,9 @@ object DefaultCursor {
           case Fail(x) => Future.failed[T](x)
         }
 
-      def go(r: Response, c: Int)(v: T): Future[T] = nextResponse(r, c).
-        fold(Future successful v)(procResponses(_, v, c))
+      def go(r: Response, c: Int)(v: T): Future[T] = nextResponse(r, c).flatMap(
+        _.fold(Future successful v)(x =>
+          procResponses(Future.successful(x), v, c)))
 
       def procResponses(done: Future[Response], cur: T, c: Int): Future[T] =
         done flatMap { r =>
