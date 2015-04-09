@@ -23,16 +23,15 @@ object BSONCountCommandImplicits {
       BSONDocument(
         "count" -> count.collection,
         "query" ->  count.command.query,
-        "limit" -> option(count.command.limit != 0, count.command.limit),
-        "skip" -> option(count.command.skip != 0, count.command.skip),
+        "limit" -> count.command.limit,
+        "skip" -> count.command.skip,
         "hint" -> count.command.hint
       )
   }
 
   implicit object CountResultReader extends DealingWithGenericCommandErrorsReader[CountResult] {
-    def readResult(doc: BSONDocument): CountResult = {
-      println(BSONDocument.pretty(doc))
+    def readResult(doc: BSONDocument): CountResult =
       CountResult(doc.getAs[BSONNumberLike]("n").map(_.toInt).getOrElse(0))
-    }
+
   }
 }

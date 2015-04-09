@@ -115,8 +115,7 @@ trait GenericQueryBuilder[P <: SerializationPack] {
    *
    * @tparam Qry The type of the query. An implicit `Writer[Qry]` typeclass for handling it has to be in the scope.
    */
-  def query[Qry](selector: Qry)(implicit writer: pack.Writer[Qry]): Self = copy(queryOption = Some(
-    pack.serialize(selector, writer)))
+  def query[Qry](selector: Qry)(implicit writer: pack.Writer[Qry]): Self = copy(queryOption = Some(pack.serialize(selector, writer)))
 
   /** Sets the query (the selector document). */
   def query(selector: pack.Document): Self = copy(queryOption = Some(selector))
@@ -142,9 +141,9 @@ trait GenericQueryBuilder[P <: SerializationPack] {
   })*/
 
   /**
-   * Sets the projection document (for [[http://www.mongodb.org/display/DOCS/Retrieving+a+Subset+of+Fields retrieving only a subset of fields]]).
+   * Sets the projection document (for [[http://docs.mongodb.org/manual/core/read-operations-introduction/ retrieving only a subset of fields]]).
    *
-   * @tparam Pjn The type of the projection. An implicit `Writer][Pjn]` typeclass for handling it has to be in the scope.
+   * @tparam Pjn The type of the projection. An implicit `Writer[Pjn]` typeclass for handling it has to be in the scope.
    */
   def projection[Pjn](p: Pjn)(implicit writer: pack.Writer[Pjn]): Self = copy(projectionOption = Some(
     pack.serialize(p, writer)))

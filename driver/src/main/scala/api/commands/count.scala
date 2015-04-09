@@ -10,9 +10,9 @@ trait CountCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] {
     limit: Int,
     skip: Int,
     hint: Option[Hint]) extends CollectionCommand with CommandWithPack[pack.type] with CommandWithResult[CountResult]
+
   object Count {
-    def apply(doc: ImplicitlyDocumentProducer, limit: Int = 0, skip: Int = 0, hint: Option[Hint] = None): Count =
-      Count(Some(doc.produce), limit, skip, hint)
+    def apply(doc: ImplicitlyDocumentProducer, limit: Int = 0, skip: Int = 0, hint: Option[Hint] = None): Count = Count(Some(doc.produce), limit, skip, hint)
   }
 
   sealed trait Hint

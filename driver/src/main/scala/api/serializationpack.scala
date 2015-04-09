@@ -32,6 +32,14 @@ trait SerializationPack { self: Singleton =>
   }
 
   def writer[A](f: A => Document): Writer[A]
+
+  trait Selector extends (() => Document)
+
+  object Selector {
+    implicit class DocumentSelector(doc: Document) extends Selector {
+      val apply = doc
+    }
+  }
 }
 
 object BSONSerializationPack extends SerializationPack {

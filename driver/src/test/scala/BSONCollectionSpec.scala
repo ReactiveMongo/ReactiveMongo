@@ -1,7 +1,6 @@
 import scala.util.{ Failure, Success }
 import reactivemongo.api._
 import reactivemongo.bson._
-import reactivemongo.core.commands.Count
 import scala.concurrent._
 import org.specs2.mutable.Specification
 import play.api.libs.iteratee.Iteratee

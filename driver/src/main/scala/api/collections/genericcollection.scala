@@ -20,7 +20,7 @@ import scala.util.Try
 import scala.util.control.NonFatal
 import org.jboss.netty.buffer.ChannelBuffer
 import reactivemongo.api._
-import reactivemongo.api.commands.{ LastError, WriteConcern }
+import reactivemongo.api.commands.{ CountCommand, LastError, WriteConcern }
 import reactivemongo.bson.buffer.{ ReadableBuffer, WritableBuffer }
 import reactivemongo.core.nodeset.ProtocolMetadata
 import reactivemongo.core.protocol._
@@ -53,9 +53,13 @@ trait GenericCollectionWithCommands[P <: SerializationPack with Singleton] { sel
 }
 
 trait BatchCommands[P <: SerializationPack] {
-  import reactivemongo.api.commands.{ InsertCommand => IC, UpdateCommand => UC, DeleteCommand => DC, DefaultWriteResult, LastError, ResolvedCollectionCommand }
+  import reactivemongo.api.commands.{ CountCommand => CC, InsertCommand => IC, UpdateCommand => UC, DeleteCommand => DC, DefaultWriteResult, LastError, ResolvedCollectionCommand }
 
   val pack: P
+
+  val CountCommand: CC[pack.type]
+  implicit def CountWriter: pack.Writer[ResolvedCollectionCommand[CountCommand.Count]]
+  implicit def CountResultReader: pack.Reader[CountCommand.CountResult]
 
   val InsertCommand: IC[pack.type]
   implicit def InsertWriter: pack.Writer[ResolvedCollectionCommand[InsertCommand.Insert]]
@@ -127,20 +131,37 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
   /**
    * Find the documents matching the given criteria.
    *
-   * This method accepts any query and projection object, provided that there is an implicit `Writer[S]` typeclass for handling them in the scope.
+   * This method accepts any selector and projection object, provided that there is an implicit `Writer[S]` typeclass for handling them in the scope.
    *
    * Please take a look to the [[http://www.mongodb.org/display/DOCS/Querying mongodb documentation]] to know how querying works.
    *
    * @tparam S the type of the selector (the query). An implicit `Writer[S]` typeclass for handling it has to be in the scope.
    * @tparam P the type of the projection object. An implicit `Writer[P]` typeclass for handling it has to be in the scope.
    *
-   * @param query The selector query.
+   * @param selector The query selector.
    * @param projection Get only a subset of each matched documents. Defaults to None.
    *
    * @return a [[GenericQueryBuilder]] that you can use to to customize the query. You can obtain a cursor by calling the method [[reactivemongo.api.Cursor]] on this query builder.
    */
   def find[S, P](selector: S, projection: P)(implicit swriter: pack.Writer[S], pwriter: pack.Writer[P]): GenericQueryBuilder[pack.type] =
     genericQueryBuilder.query(selector).projection(projection)
+
+  /**
+   * Count the documents matching the given criteria.
+   * 
+   * This method accepts any query or hint, the scope provides instances of appropriate typeclasses.
+   * 
+   * Please take a look to the [[http://www.mongodb.org/display/DOCS/Querying mongodb documentation]] to know how querying works.
+   * 
+   * @tparam S the type of the selector (the query). An implicit `Writer[S]` typeclass for handling it has to be in the scope.
+   * @tparam H the type of hint. An implicit `H => Hint` conversion has to be in the scope.
+   * 
+   * @param selector the query selector
+   * @param limit the maximum number of matching documents to count
+   * @param skip the number of matching documents to skip before counting
+   * @param hint the index to use (either the index name or the index document)
+   */
+  def count[S, H](selector: Option[S] = None, limit: Int = 0, skip: Int = 0, hint: Option[H] = None)(implicit ser: S => pack.Selector, h: H => CountCommand.Hint, ec: ExecutionContext): Future[Int] = runValueCommand(CountCommand.Count(query = selector.map(ser(_).apply()), limit, skip, hint.map(h)))
 
   def bulkInsert(ordered: Boolean)(documents: ImplicitlyDocumentProducer*)(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] =
     db.connection.metadata.map { metadata =>

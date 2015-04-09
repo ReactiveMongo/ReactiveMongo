@@ -2,8 +2,6 @@ import reactivemongo.bson.{ BSONDocument, BSONString }
 import scala.concurrent.Await
 import scala.util.{ Try, Success, Failure }
 import org.specs2.mutable.{ Specification, Tags }
-import reactivemongo.api.commands.bson.BSONCountCommand._
-import reactivemongo.api.commands.bson.BSONCountCommandImplicits._
 
 object CollectionSpec extends Specification with Tags {
   import Common._
@@ -14,11 +12,12 @@ object CollectionSpec extends Specification with Tags {
 
   "ReactiveMongo" should {
     "create a collection" in {
-      Await.result(collection.create(), timeout) mustEqual(())
+      collection.create() must beEqualTo(()).await(timeoutMillis)
     }
 
     "convert to capped" in {
-      Await.result(collection.convertToCapped(2 * 1024 * 1024, None), timeout) mustEqual (())
+      collection.convertToCapped(2 * 1024 * 1024, None) must beEqualTo(()).
+        await(timeoutMillis)
     }
 
     "check if it's capped" in {
@@ -41,7 +40,12 @@ object CollectionSpec extends Specification with Tags {
       //lastError.getTry("ok") mustEqual Success(BSONDouble(1))
       //lastError.getAs[BSONDouble]("ok") mustEqual Some(BSONDouble(1))
 
-      Await.result(collection.runValueCommand(Count(BSONDocument())), timeout) mustEqual 1
+      collection.count() must beEqualTo(1).await(timeoutMillis) and (
+        collection.count(skip = 1) must beEqualTo(0).await(timeoutMillis)) and (
+        collection.count(selector = Some(BSONDocument("name" -> "Jack"))).
+          aka ("matching count") must beEqualTo(1).await(timeoutMillis)) and (
+        collection.count(selector = Some(BSONDocument("name" -> "Foo"))).
+          aka("not matching count") must beEqualTo(0).await(timeoutMillis))
     }
 
     // Empty capped need to be enabled with enableTestCommands
@@ -52,7 +56,7 @@ object CollectionSpec extends Specification with Tags {
     } tag ("testCommands")*/
 
     "drop it" in {
-      Await.result(collection.drop(), timeout) mustEqual (())
+      collection.drop() must beEqualTo(()).await(timeoutMillis)
     }
   }
 }
