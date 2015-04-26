@@ -15,22 +15,20 @@
  */
 package reactivemongo.core.protocol
 
-import akka.actor.ActorRef
 import java.nio.ByteOrder
+
+import akka.actor.ActorRef
 import org.jboss.netty.buffer._
-import org.jboss.netty.bootstrap._
 import org.jboss.netty.channel._
-import org.jboss.netty.channel.socket.nio._
-import org.jboss.netty.handler.codec.oneone._
 import org.jboss.netty.handler.codec.frame.FrameDecoder
-import reactivemongo.core.actors.{ ChannelConnected, ChannelClosed, ChannelDisconnected }
-import reactivemongo.api.SerializationPack
+import org.jboss.netty.handler.codec.oneone._
+import reactivemongo.api.{ReadPreference, SerializationPack}
 import reactivemongo.api.commands.GetLastError
+import reactivemongo.core.actors.{ChannelClosed, ChannelConnected, ChannelDisconnected}
 import reactivemongo.core.errors._
 import reactivemongo.core.netty._
+import reactivemongo.core.protocol.BufferAccessors._
 import reactivemongo.utils.LazyLogger
-import BufferAccessors._
-import reactivemongo.api.ReadPreference
 
 object `package` {
   implicit class RichBuffer(val buffer: ChannelBuffer) extends AnyVal {
@@ -397,7 +395,6 @@ private[reactivemongo] class ResponseFrameDecoder extends FrameDecoder {
 }
 
 private[reactivemongo] class ResponseDecoder extends OneToOneDecoder {
-  import java.net.InetSocketAddress
 
   def decode(ctx: ChannelHandlerContext, channel: Channel, obj: Object) = {
     val buffer = obj.asInstanceOf[ChannelBuffer]
