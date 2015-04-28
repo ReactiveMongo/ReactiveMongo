@@ -503,7 +503,7 @@ class MongoDriver(config: Option[Config] = None) {
 
   def numConnections: Int = connectionMonitors.size
 
-  def close(timeout: FiniteDuration = 0.seconds) = {
+  def close(timeout: FiniteDuration = 1.seconds) = {
     // Terminate actors used by MongoConnections
     connections.foreach { connection =>
       connection.monitor ! Close
