@@ -147,8 +147,6 @@ trait ReadableBuffer {
   }
 }
 
-trait BSONBuffer extends ReadableBuffer with WritableBuffer
-
 import java.nio.ByteBuffer
 import java.nio.ByteOrder._
 
