@@ -47,7 +47,8 @@ import scala.util.control.NonFatal
  * @param strategy The Failover strategy.
  * @param expectingResponseMaker A function that takes a message of type `T` and wraps it into an ExpectingResponse message.
  */
-class Failover[T](message: T, connection: MongoConnection, strategy: FailoverStrategy)(expectingResponseMaker: T => ExpectingResponse)(implicit ec: ExecutionContext) {
+class Failover[T](message: T, connection: MongoConnection, strategy: FailoverStrategy)(expectingResponseMaker: T => ExpectingResponse)
+                 (implicit ec: ExecutionContext) {
   import Failover.logger
   import reactivemongo.core.errors._
   import reactivemongo.core.actors.Exceptions._
@@ -206,13 +207,21 @@ class MongoConnection(
     val options: MongoConnectionOptions) {
   import akka.pattern.{ ask => akkaAsk }
   import akka.util.Timeout
+  import akka.actor._
+  import reactivemongo.core.nodeset.ProtocolMetadata
+
+  val monitor = actorSystem.actorOf(Props(new MonitorActor), "Monitor-" + MongoDriver.nextCounter)
+
+  @volatile private[reactivemongo] var metadata: Option[ProtocolMetadata] = None
+
   /**
    * Returns a DefaultDB reference using this connection.
    *
    * @param name The database name.
    * @param failoverStrategy a failover strategy for sending requests.
    */
-  def apply(name: String, failoverStrategy: FailoverStrategy = FailoverStrategy())(implicit context: ExecutionContext): DefaultDB = DefaultDB(name, this, failoverStrategy)
+  def apply(name: String, failoverStrategy: FailoverStrategy = FailoverStrategy())
+           (implicit context: ExecutionContext): DefaultDB = DefaultDB(name, this, failoverStrategy)
 
   /**
    * Returns a DefaultDB reference using this connection (alias for the `apply` method).
@@ -220,7 +229,8 @@ class MongoConnection(
    * @param name The database name.
    * @param failoverStrategy a failover strategy for sending requests.
    */
-  def db(name: String, failoverStrategy: FailoverStrategy = FailoverStrategy())(implicit context: ExecutionContext): DefaultDB = apply(name, failoverStrategy)
+  def db(name: String, failoverStrategy: FailoverStrategy = FailoverStrategy())
+        (implicit context: ExecutionContext): DefaultDB = apply(name, failoverStrategy)
 
   /**
    * Get a future that will be successful when a primary node is available or times out.
@@ -288,13 +298,9 @@ class MongoConnection(
   def close(): Unit = monitor ! Close
 
 
-  import akka.actor._
-  import reactivemongo.core.nodeset.ProtocolMetadata
-
-  val monitor = actorSystem.actorOf(Props(new MonitorActor), "Monitor-" + MongoDriver.nextCounter)
-
-  @volatile private[reactivemongo] var metadata: Option[ProtocolMetadata] = None
-
+  /**
+   * Actor that monitor a connection and notifies awaiting Actors about changes
+   */
   private class MonitorActor extends Actor {
     import MonitorActor._
     import scala.collection.mutable.Queue
@@ -302,7 +308,6 @@ class MongoConnection(
     mongosystem ! RegisterMonitor
 
     private val waitingForPrimary = Queue[ActorRef]()
-
     var primaryAvailable = false
 
     private val waitingForClose = Queue[ActorRef]()
@@ -529,7 +534,8 @@ class MongoDriver(config: Option[Config] = None) {
    * @param name The name of the newly created [[reactivemongo.core.actors.MongoDBSystem]] actor, if needed.
    * @param options Options for the new connection pool.
    */
-  def connection(nodes: Seq[String], options: MongoConnectionOptions = MongoConnectionOptions(), authentications: Seq[Authenticate] = Seq.empty, nbChannelsPerNode: Int = 10, name: Option[String] = None): MongoConnection = {
+  def connection(nodes: Seq[String], options: MongoConnectionOptions = MongoConnectionOptions(), authentications: Seq[Authenticate] = Seq.empty,
+                 nbChannelsPerNode: Int = 10, name: Option[String] = None): MongoConnection = {
     val props = Props(new MongoDBSystem(nodes, authentications, options)())
     val mongosystem = name match {
       case Some(nm) => system.actorOf(props, nm);

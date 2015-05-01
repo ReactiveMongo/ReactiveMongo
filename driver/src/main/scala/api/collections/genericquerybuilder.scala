@@ -69,7 +69,8 @@ trait GenericQueryBuilder[P <: SerializationPack] {
    */
   def cursor[T](implicit reader: pack.Reader[T], ec: ExecutionContext, cp: CursorProducer[T]): cp.ProducedCursor = cursor(ReadPreference.primary)
 
-  private def defaultCursor[T](readPreference: ReadPreference, isMongo26WriteOp: Boolean = false)(implicit reader: pack.Reader[T], ec: ExecutionContext): Cursor[T] = {
+  private def defaultCursor[T](readPreference: ReadPreference, isMongo26WriteOp: Boolean = false)
+                              (implicit reader: pack.Reader[T], ec: ExecutionContext): Cursor[T] = {
     val documents = BufferSequence {
       val buffer = write(merge(readPreference), ChannelBufferWritableBuffer())
       projectionOption.map { projection =>
