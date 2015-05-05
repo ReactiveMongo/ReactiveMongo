@@ -41,10 +41,7 @@ case class BSONDocument(stream: Stream[Try[BSONElement]]) extends BSONValue {
    * If the key is not found or the matching value cannot be deserialized, returns `None`.
    */
   def get(key: String): Option[BSONValue] = {
-    stream.find {
-      case Success(element) => element._1 == key
-      case Failure(e)       => false
-    }.map(_.get._2)
+    stream.collectFirst { case Success(element) if element._1 == key => element._2 }
   }
 
   /**
@@ -53,11 +50,11 @@ case class BSONDocument(stream: Stream[Try[BSONElement]]) extends BSONValue {
    * If the key is not found or the matching value cannot be deserialized, returns a `Failure`.
    * The `Failure` holds a [[exceptions.DocumentKeyNotFound]] if the key could not be found.
    */
-  def getTry(key: String): Try[BSONValue] = Try {
-    stream.find {
-      case Success(element) => element._1 == key
-      case Failure(e)       => throw e
-    }.map(_.get._2).getOrElse(throw DocumentKeyNotFound(key))
+  def getTry(key: String): Try[BSONValue] = {
+    stream.collectFirst {
+      case Success(element) if element._1 == key => Success(element._2)
+      case Failure(e) => Failure(e)
+    }.getOrElse(Failure(DocumentKeyNotFound(key)))
   }
 
   /**
