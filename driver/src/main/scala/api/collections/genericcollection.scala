@@ -298,7 +298,8 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
         case Some(metadata) if metadata.maxWireVersion >= MongoWireVersion.V26 =>
           import reactivemongo.api.commands._
           import BatchCommands.DeleteCommand.{ Delete, DeleteElement }
-          runCommand(Delete(DeleteElement(query, 1))).flatMap { wr =>
+          val limit = if (firstMatchOnly) 1 else 0
+          runCommand(Delete(DeleteElement(query, limit))).flatMap { wr =>
             val flattened = wr.flatten
             if(!flattened.ok) // was ordered, with one doc => fail if has an error
               Future.failed(flattened)
