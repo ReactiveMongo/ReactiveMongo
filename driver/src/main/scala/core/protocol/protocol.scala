@@ -18,6 +18,7 @@ package reactivemongo.core.protocol
 import java.nio.ByteOrder
 
 import akka.actor.ActorRef
+import akka.util.ByteStringBuilder
 import org.jboss.netty.buffer._
 import org.jboss.netty.channel._
 import org.jboss.netty.handler.codec.frame.FrameDecoder
@@ -28,6 +29,7 @@ import reactivemongo.core.actors.{ChannelClosed, ChannelConnected, ChannelDiscon
 import reactivemongo.core.errors._
 import reactivemongo.core.netty._
 import reactivemongo.core.protocol.BufferAccessors._
+import reactivemongo.core.protocol.ByteStringBuilderHelper._
 import reactivemongo.utils.LazyLogger
 
 object `package` {
@@ -87,6 +89,10 @@ object `package` {
   }
 }
 
+trait ByteStringBuffer {
+  def append() : ByteStringBuilder => Unit
+}
+
 // traits
 /**
  * Something that can be written into a [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]].
@@ -123,9 +129,14 @@ case class MessageHeader(
     messageLength: Int,
     requestID: Int,
     responseTo: Int,
-    opCode: Int) extends ChannelBufferWritable {
+    opCode: Int) extends ChannelBufferWritable with ByteStringBuffer {
   override val writeTo = writeTupleToBuffer4((messageLength, requestID, responseTo, opCode)) _
   override def size = 4 + 4 + 4 + 4
+
+  override val append  = { builder: ByteStringBuilder =>
+      import ByteStringBuilderHelper._
+      write(messageLength, requestID, responseTo, opCode)(builder)
+  }
 }
 
 /** Header deserializer from a [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]]. */
@@ -163,6 +174,7 @@ case class Request(
     buffer write op
     buffer writeBytes documents.merged
   }
+
   override def size = 16 + op.size + documents.merged.writerIndex
   /** Header of this request */
   lazy val header = MessageHeader(size, requestID, responseTo, op.code)
@@ -222,26 +234,6 @@ object Request {
     responseTo,
     op,
     BufferSequence(ChannelBuffers.wrappedBuffer(ByteOrder.LITTLE_ENDIAN, documents)))
-
-  /**
-   * Create a request.
-   *
-   * @param requestID $requestID
-   * @param op $op
-   * @param documents $documentsA
-   */
-  def apply(requestID: Int, op: RequestOp, documents: Array[Byte]): Request =
-    Request.apply(requestID, 0, op, documents)
-
-  /**
-   * Create a request.
-   *
-   * @param requestID $requestID
-   * @param op $op
-   */
-  def apply(requestID: Int, op: RequestOp): Request =
-    Request.apply(requestID, op, new Array[Byte](0))
-
 }
 
 /**

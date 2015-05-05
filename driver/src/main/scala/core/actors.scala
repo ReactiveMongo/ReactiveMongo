@@ -16,7 +16,9 @@
 package reactivemongo.core.actors
 
 import akka.actor._
+import akka.pattern._
 import org.jboss.netty.channel.group._
+import reactivemongo.core.{ConnectionManager, SocketHandler}
 import reactivemongo.core.errors._
 import reactivemongo.core.protocol._
 import reactivemongo.utils.LazyLogger
@@ -107,6 +109,8 @@ class MongoDBSystem(
 
   val requestIds = new RequestIds
 
+  val connectionBuilder = context.actorOf(Props(classOf[ConnectionManager], classOf[SocketHandler]))
+
   private val awaitingResponses = scala.collection.mutable.LinkedHashMap[Int, AwaitingResponse]()
 
   private val monitors = scala.collection.mutable.ListBuffer[ActorRef]()
@@ -151,7 +155,7 @@ class MongoDBSystem(
   def updateNodeSetOnDisconnect(channelId: Int): NodeSet =
     updateNodeSet(nodeSet.updateNodeByChannelId(channelId) { node =>
       val connections = node.connections.map { connection =>
-        if (connection.channel.getId() == channelId)
+        if (connection.port == channelId)
           connection.copy(status = ConnectionStatus.Disconnected)
         else connection
       }
@@ -175,7 +179,7 @@ class MongoDBSystem(
     case msg @ ChannelClosed(channelId) =>
       updateNodeSet(nodeSet.updateNodeByChannelId(channelId) { node =>
         val connections = node.connections.filter { connection =>
-          connection.channel.getId() != channelId
+          connection.port != channelId
         }
         node.copy(
           status = NodeStatus.Unknown,
@@ -286,7 +290,10 @@ class MongoDBSystem(
 
     // monitor
     case ConnectAll => {
-      updateNodeSet(nodeSet.createNeededChannels(self, options.nbChannelsPerNode))
+
+      connectionBuilder.ask()
+      updateNodeSet(nodeSet.createNeededChannels(self, connectionBuilder.ask(ConnectionManager.AddConnection).wait(),
+        options.nbChannelsPerNode))
       logger.debug("ConnectAll Job running... Status: " + nodeSet.nodes.map(_.toShortString).mkString(" | "))
       connectAll(nodeSet)
     }
@@ -630,15 +637,15 @@ class MongoDBSystem(
       node
     }
   }
-
-  def allChannelGroup(nodeSet: NodeSet) = {
-    val result = new DefaultChannelGroup
-    for (node <- nodeSet.nodes) {
-      for (connection <- node.connections)
-        result.add(connection.channel)
-    }
-    result
-  }
+//
+//  def allChannelGroup(nodeSet: NodeSet) = {
+//    val result = new DefaultChannelGroup
+//    for (node <- nodeSet.nodes) {
+//      for (connection <- node.connections)
+//        result.add(connection.channel)
+//    }
+//    result
+//  }
 
   // Auth Methods
   object AuthRequestsManager {

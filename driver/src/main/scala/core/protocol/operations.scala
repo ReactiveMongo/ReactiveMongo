@@ -15,8 +15,56 @@
  */
 package reactivemongo.core.protocol
 
+import java.nio.ByteOrder
+
+import akka.util.ByteStringBuilder
 import org.jboss.netty.channel._
 import org.jboss.netty.buffer._
+
+private[core] object ByteStringBuilderHelper {
+  implicit val byteOrder = ByteOrder.LITTLE_ENDIAN
+
+  sealed trait TypeWriter[T] {
+    def apply(builder: ByteStringBuilder, t:T): Unit
+  }
+
+  implicit object IntWriter extends TypeWriter[Int] {
+    override def apply(builder: ByteStringBuilder, t:Int): Unit = builder.putInt(t)
+  }
+
+  implicit object LongWriter extends TypeWriter[Long] {
+    override def apply(builder: ByteStringBuilder, t: Long): Unit = builder.putLong(t)
+  }
+
+  implicit object StringWriter extends TypeWriter[String] {
+    override def apply(builder: ByteStringBuilder, t: String): Unit = {
+      val bytes = t.getBytes("utf-8")
+      builder.putBytes(bytes)
+      builder.putByte(0)
+    }
+  }
+
+  def write[A](a: A)(builder: ByteStringBuilder)(implicit w1: TypeWriter[A]) : Unit = w1(builder, a)
+
+  def write[A,B](a: A, b: B)(builder: ByteStringBuilder)(implicit w1: TypeWriter[A], w2: TypeWriter[B]) : Unit = {
+    w1(builder, a);
+    w2(builder, b);
+  }
+
+
+  def write[A,B,C](a: A, b: B, c: C)(builder: ByteStringBuilder)(implicit w1: TypeWriter[A], w2: TypeWriter[B], w3: TypeWriter[C]) : Unit = {
+    w1(builder, a);
+    w2(builder, b);
+    w3(builder, c);
+  }
+
+  def write[A,B,C,E](a: A, b: B, c: C, e: E)(builder: ByteStringBuilder)(implicit w1: TypeWriter[A], w2: TypeWriter[B], w3: TypeWriter[C], w4: TypeWriter[E]) : Unit = {
+    w1(builder, a);
+    w2(builder, b);
+    w3(builder, c);
+    w4(builder, e);
+  }
+}
 
 /**
  * Helper methods to write tuples of supported types into a [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]].
@@ -85,6 +133,7 @@ private[protocol] object BufferAccessors {
 }
 
 import BufferAccessors._
+import ByteStringBuilderHelper._
 
 /** A Mongo Wire Protocol operation */
 sealed trait Op {
@@ -97,7 +146,7 @@ sealed trait Op {
  *
  * Actually, all operations excepted Reply are requests.
  */
-sealed trait RequestOp extends Op with ChannelBufferWritable {
+sealed trait RequestOp extends Op with ChannelBufferWritable with ByteStringBuffer {
   /** States if this request expects a response. */
   val expectsResponse: Boolean = false
   /** States if this request has to be run on a primary. */
@@ -166,6 +215,8 @@ case class Update(
   override val writeTo = writeTupleToBuffer3((0, fullCollectionName, flags)) _
   override def size = 4 /* int32 = ZERO */ + 4 + fullCollectionName.length + 1
   override val requiresPrimary = true
+
+  override val append = write(0, fullCollectionName, flags) _
 }
 
 object UpdateFlags {
@@ -184,9 +235,12 @@ case class Insert(
     flags: Int,
     fullCollectionName: String) extends WriteRequestOp {
   override val code = 2002
+
   override val writeTo = writeTupleToBuffer2((flags, fullCollectionName)) _
   override def size = 4 + fullCollectionName.length + 1
   override val requiresPrimary = true
+
+  override def append = write(flags, fullCollectionName) _
 }
 
 /**
@@ -205,6 +259,8 @@ case class Query(
   override val code = 2004
   override val writeTo = writeTupleToBuffer4((flags, fullCollectionName, numberToSkip, numberToReturn)) _
   override def size = 4 + fullCollectionName.length + 1 + 4 + 4
+
+  override val append = write(flags, fullCollectionName, numberToSkip, numberToReturn) _
 }
 
 /**
@@ -245,6 +301,8 @@ case class GetMore(
   override val code = 2005
   override val writeTo = writeTupleToBuffer4((0, fullCollectionName, numberToReturn, cursorID)) _
   override def size = 4 /* int32 ZERO */ + fullCollectionName.length + 1 + 4 + 8
+
+  override def append = write(0, fullCollectionName, numberToReturn, cursorID)
 }
 
 /**
@@ -259,6 +317,8 @@ case class Delete(
   override val writeTo = writeTupleToBuffer3((0, fullCollectionName, flags)) _
   override def size = 4 /* int32 ZERO */ + fullCollectionName.length + 1 + 4
   override val requiresPrimary = true
+
+  override def append = write(0, fullCollectionName, flags)
 }
 
 /**
@@ -277,4 +337,10 @@ case class KillCursors(
     }
   }
   override def size = 4 /* int32 ZERO */ + 4 + cursorIDs.size * 8
+
+  override def append = { builder: ByteStringBuilder =>
+    write(0, cursorIDs.size)(builder)
+    for (cursorID <- cursorIDs)
+      write(cursorID)(builder)
+  }
 }

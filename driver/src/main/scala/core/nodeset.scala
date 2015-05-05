@@ -79,7 +79,7 @@ case class NodeSet(
   def updateByChannelId(id: Int)(ƒc: Connection => Connection)(ƒn: Node => Node) = {
     copy(nodes = nodes.map { node =>
       val (connections, updated) = utils.update(node.connections) {
-        case conn if (conn.channel.getId == id) => ƒc(conn)
+        case conn if (conn.port == id) => ƒc(conn)
       }
       if (updated) ƒn(node.copy(connections = connections))
       else node
@@ -88,7 +88,7 @@ case class NodeSet(
 
   def pickByChannelId(id: Int): Option[(Node, Connection)] = 
     nodes.view.map(node =>
-      node -> node.connections.find(_.channel.getId == id)).collectFirst {
+      node -> node.connections.find(_.port == id)).collectFirst {
       case (node, Some(con)) if (
         con.status == ConnectionStatus.Connected) => node -> con
     }
@@ -119,10 +119,11 @@ case class NodeSet(
     }
   }
 
-  def createNeededChannels(receiver: ActorRef, upTo: Int)(implicit channelFactory: ChannelFactory): NodeSet = 
+  def createNeededChannels(receiver: ActorRef, connectionBuilder: => ActorRef, upTo: Int): NodeSet =
     copy(nodes = nodes.foldLeft(Vector.empty[Node]) { (nodes, node) =>
-      nodes :+ node.createNeededChannels(receiver, upTo)
+      nodes :+ node.createNeededChannels(receiver, connectionBuilder,  upTo)
     })
+
 
   def toShortString =
     s"{{NodeSet $name ${nodes.map(_.toShortString).mkString(" | ")} }}"
@@ -153,14 +154,18 @@ case class Node(
     authenticated.exists(_ == auth)
   }))
 
-  def createNeededChannels(receiver: ActorRef, upTo: Int)(implicit channelFactory: ChannelFactory): Node = {
+  def createNeededChannels(receiver: ActorRef, connectionBuilder: => ActorRef, upTo: Int): Node = {
     if (connections.size < upTo) {
       copy(connections = connections.++(
         for (i <- 0 until (upTo - connections.size))
-          yield Connection(channelFactory.create(host, port, receiver), ConnectionStatus.Disconnected, Set.empty, None))
-      )
+          yield Connection(connectionBuilder, ConnectionStatus.Disconnected, Set.empty, None)))
     } else this
   }
+
+  def establishConnections(receiver: ActorRef, builder: ActorRef, upTo: Int): Unit ={
+
+  }
+
 
   def toShortString = s"Node[$name: $status (${connected.size}/${connections.size} available connections), latency=${pingInfo.ping}], auth=${authenticated}"
 }
@@ -177,17 +182,23 @@ object ProtocolMetadata {
 }
 
 case class Connection(
-  channel: Channel,
-  status: ConnectionStatus,
-  authenticated: Set[Authenticated],
-  authenticating: Option[Authenticating]) {
+      client: ActorRef,
+      //channel: Channel,
+      status: ConnectionStatus,
+      authenticated: Set[Authenticated],
+      authenticating: Option[Authenticating],
+      port: Int = 0) {
 
   def send(message: Request, writeConcern: Request) {
-    channel.write(message)
-    channel.write(writeConcern)
+    //channel.write(message)
+    //channel.write(writeConcern)
   }
 
-  def send(message: Request) = channel.write(message)
+  def send(message: Request) = {
+
+
+    //channel.write(message)
+  }
 
   def isAuthenticated(db: String, user: String) =
     authenticated.exists(auth => auth.user == user && auth.db == db)
