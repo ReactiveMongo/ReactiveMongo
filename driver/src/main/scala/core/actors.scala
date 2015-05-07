@@ -281,8 +281,9 @@ class MongoDBSystem(
 
     // monitor
     case ConnectAll => {
+      logger.debug("Connecting...")
       updateNodeSet(nodeSet.createNeededChannels(connectionHandler, connectionManager, options.nbChannelsPerNode))
-      logger.debug("ConnectAll Job running... Status: " + nodeSet.nodes.map(_.toShortString).mkString(" | "))
+      logger.debug("Connected to all nodes")
       connectAll(nodeSet)
     }
     case RefreshAllNodes => {
@@ -575,12 +576,12 @@ class MongoDBSystem(
   def broadcastMonitors(message: AnyRef) = monitors.foreach(_ ! message)
 
   def connectAll(nodeSet: NodeSet) = {
-    for {
-      node <- nodeSet.nodes
-      connection <- node.connections if !connection.isConnected
-    } yield connection.connect(
-      new InetSocketAddress(node.host, node.port))
-    nodeSet
+//    for {
+//      node <- nodeSet.nodes
+//      connection <- node.connections if !connection.isConnected
+//    } yield connection.connect(
+//      new InetSocketAddress(node.host, node.port))
+//    nodeSet
   }
 
   def sendIsMaster(node: Node, id: Int) = {

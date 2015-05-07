@@ -158,11 +158,14 @@ case class Node(
   }))
 
   def createNeededChannels(receiver: => ActorRef, connectionManager: => ActorRef, upTo: Int): Node = {
-    if (connections.size < upTo) {
+    import java.net.InetSocketAddress
+
       copy(connections = connections.++(
-        for (i <- 0 until (upTo - connections.size))
-          yield Connection(receiver, connectionManager, ConnectionStatus.Disconnected, Set.empty, None)))
-    } else this
+        for( i <- 0 until upTo;
+          port <- connectionManager.ask(ConnectionManager.AddConnection(new InetSocketAddress(host, port), receiver)).mapTo[Int])
+          yield {
+            Connection(receiver, connectionManager, ConnectionStatus.Disconnected, Set.empty, None, port)
+          }))
   }
 
   def establishConnections(receiver: ActorRef, builder: ActorRef, upTo: Int): Unit ={
@@ -191,10 +194,6 @@ case class Connection(
       authenticated: Set[Authenticated],
       authenticating: Option[Authenticating],
       port: Int = 0) {
-
-  def connect(address: InetSocketAddress) = connectionManager.ask(ConnectionManager.AddConnection(address, client))
-
-  def isConnected = port != 0
 
   def send(message: Request, writeConcern: Request) {
     //channel.write(message)
