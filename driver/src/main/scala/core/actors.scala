@@ -103,13 +103,15 @@ class MongoDBSystem(
     (channelFactory: ChannelFactory = new ChannelFactory(options)) extends Actor {
   import MongoDBSystem._
 
-  private implicit val cFactory = channelFactory
+  def connectionManager = context.actorOf(Props(classOf[ConnectionManager]))
+
+  def connectionHandler = context.actorOf(Props(classOf[SocketHandler]))
 
   import scala.concurrent.duration._
 
   val requestIds = new RequestIds
 
-  val connectionBuilder = context.actorOf(Props(classOf[ConnectionManager], classOf[SocketHandler]))
+
 
   private val awaitingResponses = scala.collection.mutable.LinkedHashMap[Int, AwaitingResponse]()
 
@@ -231,17 +233,6 @@ class MongoDBSystem(
       connectAllJob.cancel
       refreshAllJob.cancel
 
-      // close all connections
-      val listener = new ChannelGroupFutureListener {
-        val factory = channelFactory
-        val monitorActors = monitors
-        def operationComplete(future: ChannelGroupFuture): Unit = {
-          logger.debug("Netty says all channels are closed.")
-          factory.channelFactory.releaseExternalResources
-        }
-      }
-      allChannelGroup(nodeSet).close.addListener(listener)
-
       // fail all requests waiting for a response
       awaitingResponses.foreach(
         _._2.promise.failure(Exceptions.ClosedException))
@@ -290,10 +281,7 @@ class MongoDBSystem(
 
     // monitor
     case ConnectAll => {
-
-      connectionBuilder.ask()
-      updateNodeSet(nodeSet.createNeededChannels(self, connectionBuilder.ask(ConnectionManager.AddConnection).wait(),
-        options.nbChannelsPerNode))
+      updateNodeSet(nodeSet.createNeededChannels(connectionHandler, connectionManager, options.nbChannelsPerNode))
       logger.debug("ConnectAll Job running... Status: " + nodeSet.nodes.map(_.toShortString).mkString(" | "))
       connectAll(nodeSet)
     }
@@ -322,7 +310,7 @@ class MongoDBSystem(
         case _: ChannelClosed =>
           updateNodeSet(nodeSet.updateNodeByChannelId(channelId) { node =>
             val connections = node.connections.filter { connection =>
-              connection.channel.getId() != channelId
+              connection.port != channelId
             }
             node.copy(
               status = NodeStatus.Unknown,
@@ -388,37 +376,9 @@ class MongoDBSystem(
         connectAll {
           ns.copy(nodes = ns.nodes ++ isMaster.replicaSet.toSeq.flatMap(_.hosts).collect {
             case host if !ns.nodes.exists(_.name == host) => Node(host, NodeStatus.Uninitialized, Vector.empty, Set.empty, None, ProtocolMetadata.Default)
-          }).createNeededChannels(self, options.nbChannelsPerNode)
+          }).createNeededChannels(connectionHandler, connectionManager, options.nbChannelsPerNode)
         }
       }
-      /*IsMaster.ResultMaker(response).fold(
-        e => {
-          logger.error(s"error while processing isMaster response #${response.header.responseTo}", e)
-        },
-        isMaster => {
-          val ns = nodeSet.updateNodeByChannelId(response.info.channelId) { node =>
-            val pingInfo =
-              if (node.pingInfo.lastIsMasterId == response.header.responseTo)
-                node.pingInfo.copy(ping = System.currentTimeMillis() - node.pingInfo.lastIsMasterTime, lastIsMasterTime = 0, lastIsMasterId = -1)
-              else node.pingInfo
-            val authenticating = isMaster.status match {
-              case _: QueryableNodeStatus => authenticateNode(node, nodeSet.authenticates.toSeq)
-              case _                      => node
-            }
-            authenticating.copy(status = isMaster.status, pingInfo = pingInfo, name = isMaster.me.getOrElse(node.name), tags = isMaster.tags)
-          }
-          updateNodeSet {
-            connectAll {
-              (if (isMaster.hosts.isDefined) {
-                ns.copy(nodes = ns.nodes ++ isMaster.hosts.get.collect {
-                  case host if !ns.nodes.exists(_.name == host) => Node(host, NodeStatus.Uninitialized, Vector.empty, Set.empty, None)
-                })
-              } else {
-                ns
-              }).createNeededChannels(self, options.nbChannelsPerNode)
-            }
-          }
-        })*/
       if(!nodeSetWasReachable && nodeSet.isReachable) {
         broadcastMonitors(new SetAvailable(nodeSet.protocolMetadata))
         logger.info("The node set is now available")
@@ -558,7 +518,7 @@ class MongoDBSystem(
 
   // monitor -->
   var nodeSet: NodeSet = NodeSet(None, None, seeds.map(seed => Node(seed, NodeStatus.Unknown,
-    Vector.empty, Set.empty, None, ProtocolMetadata.Default).createNeededChannels(self, 1)).toVector,
+    Vector.empty, Set.empty, None, ProtocolMetadata.Default).createNeededChannels(connectionHandler, connectionManager, 1)).toVector,
     initialAuthenticates.toSet)
   connectAll(nodeSet)
   // <-- monitor
@@ -603,7 +563,7 @@ class MongoDBSystem(
         factory.channelFactory.releaseExternalResources
       }
     }
-    allChannelGroup(nodeSet).close.addListener(listener)
+//    allChannelGroup(nodeSet).close.addListener(listener)
 
     // fail all requests waiting for a response
     awaitingResponses.foreach(_._2.promise.failure(Exceptions.ClosedException))
@@ -617,8 +577,8 @@ class MongoDBSystem(
   def connectAll(nodeSet: NodeSet) = {
     for {
       node <- nodeSet.nodes
-      connection <- node.connections if !connection.channel.isConnected()
-    } yield connection.channel.connect(
+      connection <- node.connections if !connection.isConnected
+    } yield connection.connect(
       new InetSocketAddress(node.host, node.port))
     nodeSet
   }
@@ -637,7 +597,7 @@ class MongoDBSystem(
       node
     }
   }
-//
+
 //  def allChannelGroup(nodeSet: NodeSet) = {
 //    val result = new DefaultChannelGroup
 //    for (node <- nodeSet.nodes) {

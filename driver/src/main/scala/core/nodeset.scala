@@ -1,13 +1,16 @@
 package reactivemongo.core.nodeset
 
+import java.net.InetSocketAddress
 import java.util.concurrent.{Executor, Executors}
 
+import akka.pattern.ask
 import akka.actor.ActorRef
 import org.jboss.netty.buffer.HeapChannelBufferFactory
 import org.jboss.netty.channel.socket.nio.NioClientSocketChannelFactory
 import org.jboss.netty.channel.{Channel, ChannelPipeline, Channels}
 import reactivemongo.api.{MongoConnectionOptions, ReadPreference}
 import reactivemongo.bson._
+import reactivemongo.core.ConnectionManager
 import reactivemongo.core.protocol.{Request, _}
 import reactivemongo.utils.LazyLogger
 
@@ -119,9 +122,9 @@ case class NodeSet(
     }
   }
 
-  def createNeededChannels(receiver: ActorRef, connectionBuilder: => ActorRef, upTo: Int): NodeSet =
+  def createNeededChannels(receiver: => ActorRef, connectionManager: => ActorRef, upTo: Int): NodeSet =
     copy(nodes = nodes.foldLeft(Vector.empty[Node]) { (nodes, node) =>
-      nodes :+ node.createNeededChannels(receiver, connectionBuilder,  upTo)
+      nodes :+ node.createNeededChannels(receiver, connectionManager,  upTo)
     })
 
 
@@ -154,11 +157,11 @@ case class Node(
     authenticated.exists(_ == auth)
   }))
 
-  def createNeededChannels(receiver: ActorRef, connectionBuilder: => ActorRef, upTo: Int): Node = {
+  def createNeededChannels(receiver: => ActorRef, connectionManager: => ActorRef, upTo: Int): Node = {
     if (connections.size < upTo) {
       copy(connections = connections.++(
         for (i <- 0 until (upTo - connections.size))
-          yield Connection(connectionBuilder, ConnectionStatus.Disconnected, Set.empty, None)))
+          yield Connection(receiver, connectionManager, ConnectionStatus.Disconnected, Set.empty, None)))
     } else this
   }
 
@@ -183,11 +186,15 @@ object ProtocolMetadata {
 
 case class Connection(
       client: ActorRef,
-      //channel: Channel,
+      connectionManager: ActorRef,
       status: ConnectionStatus,
       authenticated: Set[Authenticated],
       authenticating: Option[Authenticating],
       port: Int = 0) {
+
+  def connect(address: InetSocketAddress) = connectionManager.ask(ConnectionManager.AddConnection(address, client))
+
+  def isConnected = port != 0
 
   def send(message: Request, writeConcern: Request) {
     //channel.write(message)
