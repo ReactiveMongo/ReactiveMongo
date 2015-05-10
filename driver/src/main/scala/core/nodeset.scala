@@ -4,7 +4,7 @@ import java.net.InetSocketAddress
 import java.util.concurrent.{Executor, Executors}
 
 import akka.actor.Actor.Receive
-import akka.io.Tcp.{Connected, Connect}
+import akka.io.Tcp.{Register, Connected, Connect}
 import akka.io.{Tcp, IO}
 import akka.pattern.ask
 import akka.actor._
@@ -15,7 +15,7 @@ import org.jboss.netty.channel.socket.nio.NioClientSocketChannelFactory
 import org.jboss.netty.channel.{Channel, ChannelPipeline, Channels}
 import reactivemongo.api.{MongoConnectionOptions, ReadPreference}
 import reactivemongo.bson._
-import reactivemongo.core.ConnectionManager
+import reactivemongo.core.{SocketHandler, ConnectionManager}
 import reactivemongo.core.protocol.{Request, _}
 import reactivemongo.utils.LazyLogger
 
@@ -55,9 +55,14 @@ class NodeSet(
      var nodes: Vector[ActorRef],
      val authenticates: Set[Authenticate]) extends Actor with ActorLogging {
   import NodeSet._
+  import RandomPick._
 
-  /*
+  var channelsMapping = Map.empty[Int, ActorRef]
+  var mongosConnections = Map.empty[Int, ActorRef]
+
+
   val mongos: Option[Node] = nodes.find(_.isMongos)
+  /*
   val primary: Option[Node] = nodes.find(_.status == NodeStatus.Primary)
   val secondaries = new RoundRobiner(nodes.filter(_.status == NodeStatus.Secondary))
   val queryable = secondaries.subject ++ primary
@@ -87,12 +92,14 @@ class NodeSet(
 //    })
 //  }
 
-  def pickByChannelId(id: Int): Option[(Node, Connection)] = 
+  def pickByChannelId(id: Int): Option[(Node, Connection)] =
     nodes.view.map(node =>
       node -> node.connections.find(_.chanel == id)).collectFirst {
       case (node, Some(con)) if (
         con.status == ConnectionStatus.Connected) => node -> con
     }
+
+  def pickConnection(channel: Int) = channelsMapping.get(channel)
 
 //  def pickForWrite: Option[(Node, Connection)] =
 //    primary.view.map(node => node -> node.authenticatedConnections.subject.headOption).collectFirst {
@@ -107,18 +114,24 @@ class NodeSet(
     filter.fold(fallback)(f =>
       roundRobiner.pickWithFilter(_.tags.fold(false)(f)))
 
-  // http://docs.mongodb.org/manual/reference/read-preference/
-  def pick(preference: ReadPreference): Option[(Node, Connection)] = {
-    if (mongos.isDefined) {
-      pickConnectionAndFlatten(mongos)
-    } else preference match {
-      case ReadPreference.Primary                    => pickConnectionAndFlatten(primary)
-      case ReadPreference.PrimaryPreferred(filter)   => pickConnectionAndFlatten(primary.orElse(pickFromGroupWithFilter(secondaries, filter, secondaries.pick)))
-      case ReadPreference.Secondary(filter)          => pickConnectionAndFlatten(pickFromGroupWithFilter(secondaries, filter, secondaries.pick))
-      case ReadPreference.SecondaryPreferred(filter) => pickConnectionAndFlatten(pickFromGroupWithFilter(secondaries, filter, secondaries.pick).orElse(primary))
-      case ReadPreference.Nearest(filter)            => pickConnectionAndFlatten(pickFromGroupWithFilter(nearestGroup, filter, nearest))
-    }
+  def pick(preference: ReadPreference): Option[ActorRef] = if(mongosConnections.isEmpty){
+
+  } else {
+    mongosConnections.getRandom._2
   }
+
+  // http://docs.mongodb.org/manual/reference/read-preference/
+//  def pick(preference: ReadPreference): Option[(Node, Connection)] = {
+//    if (mongos.isDefined) {
+//      pickConnectionAndFlatten(mongos)
+//    } else preference match {
+//      case ReadPreference.Primary                    => pickConnectionAndFlatten(primary)
+//      case ReadPreference.PrimaryPreferred(filter)   => pickConnectionAndFlatten(primary.orElse(pickFromGroupWithFilter(secondaries, filter, secondaries.pick)))
+//      case ReadPreference.Secondary(filter)          => pickConnectionAndFlatten(pickFromGroupWithFilter(secondaries, filter, secondaries.pick))
+//      case ReadPreference.SecondaryPreferred(filter) => pickConnectionAndFlatten(pickFromGroupWithFilter(secondaries, filter, secondaries.pick).orElse(primary))
+//      case ReadPreference.Nearest(filter)            => pickConnectionAndFlatten(pickFromGroupWithFilter(nearestGroup, filter, nearest))
+//    }
+//  }
 
   def createNeededChannels(receiver: => ActorRef, connectionManager: => ActorRef, upTo: Int): NodeSet =
     copy(nodes = nodes.foldLeft(Vector.empty[Node]) { (nodes, node) =>
@@ -155,10 +168,13 @@ object ProtocolMetadata {
 }
 
 case class Connection(
-      client: ActorRef,
+      connection: ActorRef,
       authenticated: Set[Authenticated],
       authenticating: Option[Authenticating],
       chanel: Int) extends Actor {
+
+  val socketHandler = context.actorOf(Props(classOf[SocketHandler], connection))
+  connection ! Register(socketHandler, keepOpenOnPeerClosed = true)
 
   def send(message: Request, writeConcern: Request) {
     //channel.write(message)
@@ -251,6 +267,18 @@ case class Authenticating(db: String, user: String, password: String, nonce: Opt
     s"Authenticating($db, $user, ${nonce.map(_ => "<nonce>").getOrElse("<>")})"
 }
 case class Authenticated(db: String, user: String) extends Authentication
+
+object RandomPick {
+  import scala.util.Random
+
+  implicit class IterableExt[A](val coll: Iterable[A]) {
+    def getRandom() : A ={
+      val rnd = new Random(coll.hashCode())
+      val next = rnd.nextInt(coll.size)
+      coll.drop(next).head
+    }
+  }
+}
 
 class ContinuousIterator[A](iterable: Iterable[A], private var toDrop: Int = 0) extends Iterator[A] {
   private var iterator = iterable.iterator

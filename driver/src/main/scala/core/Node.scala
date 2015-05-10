@@ -26,10 +26,10 @@ class Node(
   var isMongos: Boolean = false
   var protocolMetadata: ProtocolMetadata = null
   var tags: Option[BSONDocument] = None
-  //
-  //  val authenticatedConnections = new RoundRobiner(connected.filter(_.authenticated.forall { auth =>
-  //    authenticated.exists(_ == auth)
-  //  }))
+
+//    val authenticatedConnections = new RoundRobiner(connected.filter(_.authenticated.forall { auth =>
+//      authenticated.exists(_ == auth)
+//    }))
   //
   //  def createNeededChannels(receiver: => ActorRef, connectionManager: => ActorRef, upTo: Int)
   //                          (implicit timeout: Timeout): Node = {
@@ -50,18 +50,19 @@ class Node(
       val manager = IO(Tcp)
       manager ! Connect(address)
     } else
-      log.warning("All connections have already established.")
+      log.warning("All connections have been already established.")
   }
 
   private def connecting: Receive = {
     case Connected(remote, local) =>
       log.info("Connected from {} to {}", local, remote)
-      val socketHandler = context.actorOf(Props(classOf[SocketHandler], sender()))
-      val connection = context.actorOf(Props(classOf[Connection], authenticated, None, Node.nextChanel))
-      sender() ! Register(socketHandler , keepOpenOnPeerClosed = true)
+      val connection = context.actorOf(Props(classOf[Connection], sender(), authenticated, None, Node.nextChannel))
       connections = connection +: connections
       if(connections.length == nbOfConnections) context.become(connected)
-      else self ! EstablishConnections
+      else{
+        context.unbecome()
+        self ! EstablishConnections
+      }
     case CommandFailed(_: Connected) => {
       log.error("Unable to establish Connection")
       context stop self
@@ -73,9 +74,11 @@ class Node(
   }
 }
 
+case class ConnectionState(isMongos: Boolean, isPrimary: Boolean, channel: Int, authenticated: Boolean)
+
 object Node{
   object EstablishConnections
 
   private val _counter = new AtomicInteger(1)
-  def nextChanel = _counter.getAndIncrement
+  def nextChannel = _counter.getAndIncrement
 }

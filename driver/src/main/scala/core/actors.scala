@@ -262,7 +262,8 @@ class MongoDBSystem(
         case Success((node, connection)) =>
           logger.debug("Sending request expecting response " + request + " by connection " + connection + " of node " + node.name)
           if (request.op.expectsResponse) {
-            awaitingResponses += request.requestID -> AwaitingResponse(request.requestID, connection.channel.getId(), req.promise, isGetLastError = false, isMongo26WriteOp = req.isMongo26WriteOp)
+            awaitingResponses += request.requestID -> AwaitingResponse(request.requestID, connection.channel.getId(),
+              req.promise, isGetLastError = false, isMongo26WriteOp = req.isMongo26WriteOp)
             logger.trace("registering awaiting response for requestID " + request.requestID + ", awaitingResponses: " + awaitingResponses)
           } else logger.trace("NOT registering awaiting response for requestID " + request.requestID)
           connection.send(request)
@@ -543,6 +544,11 @@ class MongoDBSystem(
     if (request.channelIdHint.isDefined)
       nodeSet.pickByChannelId(request.channelIdHint.get).map(Success(_)).getOrElse(Failure(Exceptions.ChannelNotFound))
     else nodeSet.pick(request.readPreference).map(Success(_)).getOrElse(Failure(Exceptions.PrimaryUnavailableException))
+  }
+
+  def pickConnection(request: Request) : Try[ActorRef] = request.channelIdHint match {
+    case Some(id) => nodeSet.pickConnection(id).map(Success(_)).getOrElse(Failure(Exceptions.ChannelNotFound))
+    case None => nodeSet.pick()
   }
 
   override def postStop() {

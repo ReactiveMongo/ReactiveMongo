@@ -186,7 +186,8 @@ trait InsertCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] /*
   object Insert {
     def apply(firstDoc: ImplicitlyDocumentProducer, otherDocs: ImplicitlyDocumentProducer*): Insert =
       apply()(firstDoc, otherDocs: _*)
-    def apply(ordered: Boolean = true, writeConcern: WriteConcern = WriteConcern.Default)(firstDoc: ImplicitlyDocumentProducer, otherDocs: ImplicitlyDocumentProducer*): Insert =
+    def apply(ordered: Boolean = true, writeConcern: WriteConcern = WriteConcern.Default)
+             (firstDoc: ImplicitlyDocumentProducer, otherDocs: ImplicitlyDocumentProducer*): Insert =
       new Insert(firstDoc.produce #:: otherDocs.toStream.map(_.produce), ordered, writeConcern)
   }
 }
