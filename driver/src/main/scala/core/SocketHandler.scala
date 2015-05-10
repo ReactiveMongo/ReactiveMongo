@@ -9,30 +9,14 @@ import scala.collection.immutable.HashMap
 /**
  * Created by sh1ng on 03/05/15.
  */
-class SocketHandler() extends Actor with ActorLogging{
-  import SocketHandler._
-
-  var connection: ActorRef = null
-
+class SocketHandler(val connection: ActorRef) extends Actor with ActorLogging{
 
   //var perdingResponses = new HashMap[Int, ]
 
   override def receive: Receive = {
-    case RegisterConnection(conn) =>
-      connection = conn
-      context.become(connected)
     case _  @msg =>
       log.error("Unable to handle message {}", msg)
   }
-
-  def connected: Receive ={
-    case Write(msg, nak) =>
-
-  }
-}
-
-object SocketHandler {
-  case class RegisterConnection(connection: ActorRef)
 }
 
 

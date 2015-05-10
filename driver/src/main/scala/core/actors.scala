@@ -103,20 +103,26 @@ class MongoDBSystem(
     (channelFactory: ChannelFactory = new ChannelFactory(options)) extends Actor {
   import MongoDBSystem._
 
+  // monitor -->
+  var nodeSet: NodeSet = NodeSet(None, None, seeds.map(seed => Node(seed, NodeStatus.Unknown,
+    Vector.empty, Set.empty, None, ProtocolMetadata.Default).createNeededChannels(connectionHandler, connectionManager, 1)).toVector,
+    initialAuthenticates.toSet)
+  connectAll(nodeSet)
+  // <-- monitor
+
+  val requestIds = new RequestIds
+
   def connectionManager = context.actorOf(Props(classOf[ConnectionManager]))
 
   def connectionHandler = context.actorOf(Props(classOf[SocketHandler]))
 
   import scala.concurrent.duration._
 
-  val requestIds = new RequestIds
-
-
-
   private val awaitingResponses = scala.collection.mutable.LinkedHashMap[Int, AwaitingResponse]()
 
   private val monitors = scala.collection.mutable.ListBuffer[ActorRef]()
   implicit val ec = context.system.dispatcher
+
   private val connectAllJob = context.system.scheduler.schedule(MongoDBSystem.DefaultConnectionRetryInterval milliseconds,
     MongoDBSystem.DefaultConnectionRetryInterval milliseconds,
     self,
@@ -154,19 +160,19 @@ class MongoDBSystem(
     })
   }
 
-  def updateNodeSetOnDisconnect(channelId: Int): NodeSet =
-    updateNodeSet(nodeSet.updateNodeByChannelId(channelId) { node =>
-      val connections = node.connections.map { connection =>
-        if (connection.port == channelId)
-          connection.copy(status = ConnectionStatus.Disconnected)
-        else connection
-      }
-
-      node.copy(
-        status = NodeStatus.Unknown,
-        connections = connections,
-        authenticated = if (connections.isEmpty) Set.empty else node.authenticated)
-    })
+//  def updateNodeSetOnDisconnect(channelId: Int): NodeSet =
+//    updateNodeSet(nodeSet.updateNodeByChannelId(channelId) { node =>
+//      val connections = node.connections.map { connection =>
+//        if (connection.chanel == channelId)
+//          connection.copy(status = ConnectionStatus.Disconnected)
+//        else connection
+//      }
+//
+//      node.copy(
+//        status = NodeStatus.Unknown,
+//        connections = connections,
+//        authenticated = if (connections.isEmpty) Set.empty else node.authenticated)
+//    })
 
   val closing: Receive = {
     case req: RequestMaker =>
@@ -178,46 +184,46 @@ class MongoDBSystem(
       logger.debug(s"Received an expecting response request during closing process: $req, completing its promise with a failure")
       req.promise.failure(Exceptions.ClosedException)
 
-    case msg @ ChannelClosed(channelId) =>
-      updateNodeSet(nodeSet.updateNodeByChannelId(channelId) { node =>
-        val connections = node.connections.filter { connection =>
-          connection.port != channelId
-        }
-        node.copy(
-          status = NodeStatus.Unknown,
-          connections = connections,
-          authenticated = if (connections.isEmpty) Set.empty else node.authenticated)
-      })
-      val remainingConnections = nodeSet.nodes.foldLeft(0) { (open, node) =>
-        open + node.connections.size
-      }
-      if(logger.logger.isDebugEnabled()) {
-        val disconnected = nodeSet.nodes.foldLeft(0) { (open, node) =>
-          open + node.connections.count(_.status == ConnectionStatus.Disconnected)
-        }
-        logger.debug(s"(State: Closing) Received $msg, remainingConnections = $remainingConnections, disconnected = $disconnected, connected = ${remainingConnections - disconnected}")
-      }
-      if(remainingConnections == 0) {
-        monitors foreach (_ ! Closed)
-        logger.info(s"MongoDBSystem $self is stopping.")
-        context.stop(self)
-      }
+//    case msg @ ChannelClosed(channelId) =>
+//      updateNodeSet(nodeSet.updateNodeByChannelId(channelId) { node =>
+//        val connections = node.connections.filter { connection =>
+//          connection.chanel != channelId
+//        }
+//        node.copy(
+//          status = NodeStatus.Unknown,
+//          connections = connections,
+//          authenticated = if (connections.isEmpty) Set.empty else node.authenticated)
+//      })
+//      val remainingConnections = nodeSet.nodes.foldLeft(0) { (open, node) =>
+//        open + node.connections.size
+//      }
+//      if(logger.logger.isDebugEnabled()) {
+//        val disconnected = nodeSet.nodes.foldLeft(0) { (open, node) =>
+//          open + node.connections.count(_.status == ConnectionStatus.Disconnected)
+//        }
+//        logger.debug(s"(State: Closing) Received $msg, remainingConnections = $remainingConnections, disconnected = $disconnected, connected = ${remainingConnections - disconnected}")
+//      }
+//      if(remainingConnections == 0) {
+//        monitors foreach (_ ! Closed)
+//        logger.info(s"MongoDBSystem $self is stopping.")
+//        context.stop(self)
+//      }
 
-    case msg @ ChannelDisconnected(channelId) =>
-      updateNodeSetOnDisconnect(channelId)
-      if(logger.logger.isDebugEnabled()) {
-        val remainingConnections = nodeSet.nodes.foldLeft(0) { (open, node) =>
-          open + node.connections.size
-        }
-        val disconnected = nodeSet.nodes.foldLeft(0) { (open, node) =>
-          open + node.connections.count(_.status == ConnectionStatus.Disconnected)
-        }
-        logger.debug(s"(State: Closing) Received $msg, remainingConnections = $remainingConnections, disconnected = $disconnected, connected = ${remainingConnections - disconnected}")
-      }
+//    case msg @ ChannelDisconnected(channelId) =>
+//      updateNodeSetOnDisconnect(channelId)
+//      if(logger.logger.isDebugEnabled()) {
+//        val remainingConnections = nodeSet.nodes.foldLeft(0) { (open, node) =>
+//          open + node.connections.size
+//        }
+//        val disconnected = nodeSet.nodes.foldLeft(0) { (open, node) =>
+//          open + node.connections.count(_.status == ConnectionStatus.Disconnected)
+//        }
+//        logger.debug(s"(State: Closing) Received $msg, remainingConnections = $remainingConnections, disconnected = $disconnected, connected = ${remainingConnections - disconnected}")
+//      }
 
     case msg @ ChannelConnected(channelId) =>
       logger.warn(s"(State: Closing) SPURIOUS $msg (ignored, channel closed)")
-      updateNodeSetOnDisconnect(channelId)
+      //updateNodeSetOnDisconnect(channelId)
 
     case other =>
       logger.error(s"(State: Closing) UNHANDLED MESSAGE: $other")
@@ -287,107 +293,102 @@ class MongoDBSystem(
       connectAll(nodeSet)
     }
     case RefreshAllNodes => {
-      nodeSet.nodes.foreach { node =>
-        logger.trace("try to refresh " + node.name)
-        updateNodeSet(nodeSet.updateAll { node =>
-          sendIsMaster(node, requestIds.isMaster.next)
-        })
-      }
-      logger.debug("RefreshAllNodes Job running... Status: " + nodeSet.toShortString)
+      // TODO: rewrite to ping per node
+      nodeSet.self ! NodeSet.IsMaster(requestIds.isMaster.next)
     }
     case ChannelConnected(channelId) => {
-      updateNodeSet(nodeSet.updateByChannelId(channelId) { connection =>
-        connection.copy(status = ConnectionStatus.Connected)
-      } { node =>
-        sendIsMaster(node, requestIds.isMaster.next)
-      })
-      logger.trace(s"Channel #$channelId connected. NodeSet status: ${nodeSet.toShortString}")
+//      updateNodeSet(nodeSet.updateByChannelId(channelId) { connection =>
+//        connection.copy(status = ConnectionStatus.Connected)
+//      } { node =>
+//        sendIsMaster(node, requestIds.isMaster.next)
+//      })
+//      logger.trace(s"Channel #$channelId connected. NodeSet status: ${nodeSet.toString}")
     }
     case channelUnavailable @ ChannelUnavailable(channelId) => {
-      logger.debug(s"Channel #$channelId unavailable ($channelUnavailable).")
-      val nodeSetWasReachable = nodeSet.isReachable
-      val primaryWasAvailable = nodeSet.primary.isDefined
-      channelUnavailable match {
-        case _: ChannelClosed =>
-          updateNodeSet(nodeSet.updateNodeByChannelId(channelId) { node =>
-            val connections = node.connections.filter { connection =>
-              connection.port != channelId
-            }
-            node.copy(
-              status = NodeStatus.Unknown,
-              connections = connections,
-              authenticated = if (connections.isEmpty) Set.empty else node.authenticated)
-          })
-        case _: ChannelDisconnected =>
-          updateNodeSetOnDisconnect(channelId)
-      }
-      awaitingResponses.retain { (_, awaitingResponse) =>
-        if (awaitingResponse.channelID == channelId) {
-          logger.debug("completing promise " + awaitingResponse.promise + " with error='socket disconnected'")
-          awaitingResponse.promise.failure(GenericDriverException("socket disconnected"))
-          false
-        } else true
-      }
-      if (!nodeSet.isReachable) {
-        if (nodeSetWasReachable) {
-          logger.error("The entire node set is unreachable, is there a network problem?")
-          broadcastMonitors(SetUnavailable)
-        }
-        else logger.debug("The entire node set is still unreachable, is there a network problem?")
-      } else if (!nodeSet.primary.isDefined) {
-        if (primaryWasAvailable) {
-          logger.error("The primary is unavailable, is there a network problem?")
-          broadcastMonitors(PrimaryUnavailable)
-        }
-        else logger.debug(
-          "The primary is still unavailable, is there a network problem?")
-      }
-      logger.debug(channelId + " is disconnected")
+//      logger.debug(s"Channel #$channelId unavailable ($channelUnavailable).")
+//      val nodeSetWasReachable = nodeSet.isReachable
+//      val primaryWasAvailable = nodeSet.primary.isDefined
+//      channelUnavailable match {
+//        case _: ChannelClosed =>
+//          updateNodeSet(nodeSet.updateNodeByChannelId(channelId) { node =>
+//            val connections = node.connections.filter { connection =>
+//              connection.chanel != channelId
+//            }
+//            node.copy(
+//              status = NodeStatus.Unknown,
+//              connections = connections,
+//              authenticated = if (connections.isEmpty) Set.empty else node.authenticated)
+//          })
+//        case _: ChannelDisconnected =>
+//          updateNodeSetOnDisconnect(channelId)
+//      }
+//      awaitingResponses.retain { (_, awaitingResponse) =>
+//        if (awaitingResponse.channelID == channelId) {
+//          logger.debug("completing promise " + awaitingResponse.promise + " with error='socket disconnected'")
+//          awaitingResponse.promise.failure(GenericDriverException("socket disconnected"))
+//          false
+//        } else true
+//      }
+//      if (!nodeSet.isReachable) {
+//        if (nodeSetWasReachable) {
+//          logger.error("The entire node set is unreachable, is there a network problem?")
+//          broadcastMonitors(SetUnavailable)
+//        }
+//        else logger.debug("The entire node set is still unreachable, is there a network problem?")
+//      } else if (!nodeSet.primary.isDefined) {
+//        if (primaryWasAvailable) {
+//          logger.error("The primary is unavailable, is there a network problem?")
+//          broadcastMonitors(PrimaryUnavailable)
+//        }
+//        else logger.debug(
+//          "The primary is still unavailable, is there a network problem?")
+//      }
+//      logger.debug(channelId + " is disconnected")
     }
     // isMaster response
     case response: Response if requestIds.isMaster accepts response =>
-      val nodeSetWasReachable = nodeSet.isReachable
-      val primaryWasAvailable = nodeSet.primary.isDefined
-      // TODO
-      import reactivemongo.api.BSONSerializationPack
-      import reactivemongo.api.commands.bson.BSONIsMasterCommandImplicits
-      import reactivemongo.api.commands.Command
-
-      // TODO
-      val isMaster = Command.deserialize(BSONSerializationPack, response)(BSONIsMasterCommandImplicits.IsMasterResultReader)
-
-      val ns = nodeSet.updateNodeByChannelId(response.info.channelId) { node =>
-        val pingInfo =
-          if (node.pingInfo.lastIsMasterId == response.header.responseTo)
-            node.pingInfo.copy(ping = System.currentTimeMillis() - node.pingInfo.lastIsMasterTime, lastIsMasterTime = 0, lastIsMasterId = -1)
-          else node.pingInfo
-        val authenticating = isMaster.status match {
-          case _: QueryableNodeStatus => authenticateNode(node, nodeSet.authenticates.toSeq)
-          case _                      => node
-        }
-        authenticating.copy(
-          status = isMaster.status,
-          pingInfo = pingInfo,
-          name = isMaster.replicaSet.map(_.me).getOrElse(node.name),
-          tags = isMaster.replicaSet.flatMap(_.tags),
-          protocolMetadata = ProtocolMetadata(MongoWireVersion(isMaster.minWireVersion), MongoWireVersion(isMaster.maxWireVersion), isMaster.maxBsonObjectSize, isMaster.maxMessageSizeBytes, isMaster.maxWriteBatchSize),
-          isMongos = isMaster.isMongos)
-      }
-      updateNodeSet {
-        connectAll {
-          ns.copy(nodes = ns.nodes ++ isMaster.replicaSet.toSeq.flatMap(_.hosts).collect {
-            case host if !ns.nodes.exists(_.name == host) => Node(host, NodeStatus.Uninitialized, Vector.empty, Set.empty, None, ProtocolMetadata.Default)
-          }).createNeededChannels(connectionHandler, connectionManager, options.nbChannelsPerNode)
-        }
-      }
-      if(!nodeSetWasReachable && nodeSet.isReachable) {
-        broadcastMonitors(new SetAvailable(nodeSet.protocolMetadata))
-        logger.info("The node set is now available")
-      }
-      if(!primaryWasAvailable && nodeSet.primary.isDefined) {
-        broadcastMonitors(new PrimaryAvailable(nodeSet.protocolMetadata))
-        logger.info("The primary is now available")
-      }
+//      val nodeSetWasReachable = nodeSet.isReachable
+//      val primaryWasAvailable = nodeSet.primary.isDefined
+//      // TODO
+//      import reactivemongo.api.BSONSerializationPack
+//      import reactivemongo.api.commands.bson.BSONIsMasterCommandImplicits
+//      import reactivemongo.api.commands.Command
+//
+//      // TODO
+//      val isMaster = Command.deserialize(BSONSerializationPack, response)(BSONIsMasterCommandImplicits.IsMasterResultReader)
+//
+//      val ns = nodeSet.updateNodeByChannelId(response.info.channelId) { node =>
+//        val pingInfo =
+//          if (node.pingInfo.lastIsMasterId == response.header.responseTo)
+//            node.pingInfo.copy(ping = System.currentTimeMillis() - node.pingInfo.lastIsMasterTime, lastIsMasterTime = 0, lastIsMasterId = -1)
+//          else node.pingInfo
+//        val authenticating = isMaster.status match {
+//          case _: QueryableNodeStatus => authenticateNode(node, nodeSet.authenticates.toSeq)
+//          case _                      => node
+//        }
+//        authenticating.copy(
+//          status = isMaster.status,
+//          pingInfo = pingInfo,
+//          name = isMaster.replicaSet.map(_.me).getOrElse(node.name),
+//          tags = isMaster.replicaSet.flatMap(_.tags),
+//          protocolMetadata = ProtocolMetadata(MongoWireVersion(isMaster.minWireVersion), MongoWireVersion(isMaster.maxWireVersion), isMaster.maxBsonObjectSize, isMaster.maxMessageSizeBytes, isMaster.maxWriteBatchSize),
+//          isMongos = isMaster.isMongos)
+//      }
+//      updateNodeSet {
+//        connectAll {
+//          ns.copy(nodes = ns.nodes ++ isMaster.replicaSet.toSeq.flatMap(_.hosts).collect {
+//            case host if !ns.nodes.exists(_.name == host) => Node(host, NodeStatus.Uninitialized, Vector.empty, Set.empty, None, ProtocolMetadata.Default)
+//          }).createNeededChannels(connectionHandler, connectionManager, options.nbChannelsPerNode)
+//        }
+//      }
+//      if(!nodeSetWasReachable && nodeSet.isReachable) {
+//        broadcastMonitors(new SetAvailable(nodeSet.protocolMetadata))
+//        logger.info("The node set is now available")
+//      }
+//      if(!primaryWasAvailable && nodeSet.primary.isDefined) {
+//        broadcastMonitors(new PrimaryAvailable(nodeSet.protocolMetadata))
+//        logger.info("The primary is now available")
+//      }
 
     case request @ AuthRequest(authenticate, _) => {
       // TODO warn auth ok
@@ -395,49 +396,49 @@ class MongoDBSystem(
       updateNodeSet(authenticateNodeSet(nodeSet.copy(authenticates = nodeSet.authenticates + authenticate)))
     }
     // getnonce response
-    case response: Response if requestIds.getNonce accepts response =>
-      Getnonce.ResultMaker(response).fold(
-        e =>
-          logger.error(s"error while processing getNonce response #${response.header.responseTo}", e),
-        nonce => {
-          logger.debug("AUTH: got nonce for channel " + response.info.channelId + ": " + nonce)
-          updateNodeSet(nodeSet.updateConnectionByChannelId(response.info.channelId) { connection =>
-            connection.authenticating match {
-              case Some(authenticating) =>
-                connection.send(AuthenticateCommand(authenticating.user, authenticating.password, nonce)(authenticating.db).maker(requestIds.authenticate.next))
-                connection.copy(authenticating = Some(authenticating.copy(nonce = Some(nonce))))
-              case _ => connection
-            }
-          })
-        })
+//    case response: Response if requestIds.getNonce accepts response =>
+//      Getnonce.ResultMaker(response).fold(
+//        e =>
+//          logger.error(s"error while processing getNonce response #${response.header.responseTo}", e),
+//        nonce => {
+//          logger.debug("AUTH: got nonce for channel " + response.info.channelId + ": " + nonce)
+//          updateNodeSet(nodeSet.updateConnectionByChannelId(response.info.channelId) { connection =>
+//            connection.authenticating match {
+//              case Some(authenticating) =>
+//                connection.send(AuthenticateCommand(authenticating.user, authenticating.password, nonce)(authenticating.db).maker(requestIds.authenticate.next))
+//                connection.copy(authenticating = Some(authenticating.copy(nonce = Some(nonce))))
+//              case _ => connection
+//            }
+//          })
+//        })
 
     // authenticate response
     case response: Response if requestIds.authenticate accepts response => {
-      logger.debug("AUTH: got authenticated response! " + response.info.channelId)
-      val auth = nodeSet.pickByChannelId(response.info.channelId).flatMap(_._2.authenticating)
-      updateNodeSet(auth match {
-        case Some(authenticating) =>
-          val originalAuthenticate = Authenticate(authenticating.db, authenticating.user, authenticating.password)
-          val authenticated = AuthenticateCommand(response) match {
-            case Right(successfulAuthentication) =>
-              AuthRequestsManager.handleAuthResult(originalAuthenticate, successfulAuthentication)
-              Some(Authenticated(authenticating.db, authenticating.user))
-            case Left(error) =>
-              AuthRequestsManager.handleAuthResult(originalAuthenticate, error)
-              None
-          }
-          val ns = nodeSet.updateByChannelId(response.info.channelId) { connection =>
-            authenticateConnection(connection.copy(
-              authenticated = authenticated.map(connection.authenticated + _).getOrElse(connection.authenticated),
-              authenticating = None), nodeSet.authenticates.toSeq)
-          } { node =>
-            node.copy(authenticated = authenticated.map(node.authenticated + _).getOrElse(node.authenticated))
-          }
-          if (!authenticated.isDefined)
-            ns.copy(authenticates = ns.authenticates.-(originalAuthenticate))
-          else ns
-        case _ => nodeSet
-      })
+//      logger.debug("AUTH: got authenticated response! " + response.info.channelId)
+//      val auth = nodeSet.pickByChannelId(response.info.channelId).flatMap(_._2.authenticating)
+//      updateNodeSet(auth match {
+//        case Some(authenticating) =>
+//          val originalAuthenticate = Authenticate(authenticating.db, authenticating.user, authenticating.password)
+//          val authenticated = AuthenticateCommand(response) match {
+//            case Right(successfulAuthentication) =>
+//              AuthRequestsManager.handleAuthResult(originalAuthenticate, successfulAuthentication)
+//              Some(Authenticated(authenticating.db, authenticating.user))
+//            case Left(error) =>
+//              AuthRequestsManager.handleAuthResult(originalAuthenticate, error)
+//              None
+//          }
+//          val ns = nodeSet.updateByChannelId(response.info.channelId) { connection =>
+//            authenticateConnection(connection.copy(
+//              authenticated = authenticated.map(connection.authenticated + _).getOrElse(connection.authenticated),
+//              authenticating = None), nodeSet.authenticates.toSeq)
+//          } { node =>
+//            node.copy(authenticated = authenticated.map(node.authenticated + _).getOrElse(node.authenticated))
+//          }
+//          if (!authenticated.isDefined)
+//            ns.copy(authenticates = ns.authenticates.-(originalAuthenticate))
+//          else ns
+//        case _ => nodeSet
+//      })
     }
 
     // any other response
@@ -517,16 +518,12 @@ class MongoDBSystem(
     case a @ _ => logger.error("not supported " + a)
   }
 
-  // monitor -->
-  var nodeSet: NodeSet = NodeSet(None, None, seeds.map(seed => Node(seed, NodeStatus.Unknown,
-    Vector.empty, Set.empty, None, ProtocolMetadata.Default).createNeededChannels(connectionHandler, connectionManager, 1)).toVector,
-    initialAuthenticates.toSet)
-  connectAll(nodeSet)
-  // <-- monitor
 
   def onPrimaryUnavailable() {
     self ! RefreshAllNodes
-    updateNodeSet(nodeSet.updateAll(node => if (node.status == NodeStatus.Primary) node.copy(status = NodeStatus.Unknown) else node))
+    //TODO: reqrite
+    nodeSet.self ! NodeSet.PrimaryUnavaliable
+    //updateNodeSet(nodeSet.updateAll(node => if (node.status == NodeStatus.Primary) node.copy(status = NodeStatus.Unknown) else node))
     broadcastMonitors(PrimaryUnavailable)
   }
 

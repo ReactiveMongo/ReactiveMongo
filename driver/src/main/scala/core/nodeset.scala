@@ -3,8 +3,13 @@ package reactivemongo.core.nodeset
 import java.net.InetSocketAddress
 import java.util.concurrent.{Executor, Executors}
 
+import akka.actor.Actor.Receive
+import akka.io.Tcp.{Connected, Connect}
+import akka.io.{Tcp, IO}
 import akka.pattern.ask
-import akka.actor.ActorRef
+import akka.actor._
+import akka.util.Timeout
+import scala.concurrent.ExecutionContext.Implicits.global
 import org.jboss.netty.buffer.HeapChannelBufferFactory
 import org.jboss.netty.channel.socket.nio.NioClientSocketChannelFactory
 import org.jboss.netty.channel.{Channel, ChannelPipeline, Channels}
@@ -44,11 +49,14 @@ package object utils {
   }
 }
 
-case class NodeSet(
-    name: Option[String],
-    version: Option[Long],
-    nodes: Vector[Node],
-    authenticates: Set[Authenticate]) {
+class NodeSet(
+     val name: Option[String],
+     val version: Option[Long],
+     var nodes: Vector[ActorRef],
+     val authenticates: Set[Authenticate]) extends Actor with ActorLogging {
+  import NodeSet._
+
+  /*
   val mongos: Option[Node] = nodes.find(_.isMongos)
   val primary: Option[Node] = nodes.find(_.status == NodeStatus.Primary)
   val secondaries = new RoundRobiner(nodes.filter(_.status == NodeStatus.Secondary))
@@ -56,50 +64,40 @@ case class NodeSet(
   val nearestGroup = new RoundRobiner(queryable.sortWith { _.pingInfo.ping < _.pingInfo.ping })
   val nearest = nearestGroup.subject.headOption
   val protocolMetadata = primary.orElse(secondaries.subject.headOption).map(_.protocolMetadata).getOrElse(ProtocolMetadata.Default)
+  */
 
   def primary(authenticated: Authenticated): Option[Node] =
     primary.filter(_.authenticated.exists(_ == authenticated))
 
   def isReachable = !primary.isEmpty || !secondaries.subject.isEmpty
+//
+//  def updateNodeByChannelId(id: Int)(ƒ: Node => Node) =
+//    updateByChannelId(id)(identity)(ƒ)
+//
+//  def updateConnectionByChannelId(id: Int)(ƒ: Connection => Connection) =
+//    updateByChannelId(id)(ƒ)(identity)
 
-  def updateOrAddNode(ƒ: PartialFunction[Node, Node], default: Node) = {
-    val (maybeUpdatedNodes, updated) = utils.update(nodes)(ƒ)
-    if (!updated) copy(nodes = default +: nodes)
-    else copy(nodes = maybeUpdatedNodes)
-  }
-
-  def updateOrAddNodes(ƒ: PartialFunction[Node, Node], nodes: Seq[Node]) =
-    nodes.foldLeft(this)(_.updateOrAddNode(ƒ, _))
-
-  def updateAll(ƒ: Node => Node) = copy(nodes = nodes.map(ƒ))
-
-  def updateNodeByChannelId(id: Int)(ƒ: Node => Node) =
-    updateByChannelId(id)(identity)(ƒ)
-
-  def updateConnectionByChannelId(id: Int)(ƒ: Connection => Connection) =
-    updateByChannelId(id)(ƒ)(identity)
-
-  def updateByChannelId(id: Int)(ƒc: Connection => Connection)(ƒn: Node => Node) = {
-    copy(nodes = nodes.map { node =>
-      val (connections, updated) = utils.update(node.connections) {
-        case conn if (conn.port == id) => ƒc(conn)
-      }
-      if (updated) ƒn(node.copy(connections = connections))
-      else node
-    })
-  }
+//  def updateByChannelId(id: Int)(ƒc: Connection => Connection)(ƒn: Node => Node) = {
+//    copy(nodes = nodes.map { node =>
+//      val (connections, updated) = utils.update(node.connections) {
+//        case conn if (conn.chanel == id) => ƒc(conn)
+//      }
+//      if (updated) ƒn(node.copy(connections = connections))
+//      else node
+//    })
+//  }
 
   def pickByChannelId(id: Int): Option[(Node, Connection)] = 
     nodes.view.map(node =>
-      node -> node.connections.find(_.port == id)).collectFirst {
+      node -> node.connections.find(_.chanel == id)).collectFirst {
       case (node, Some(con)) if (
         con.status == ConnectionStatus.Connected) => node -> con
     }
 
-  def pickForWrite: Option[(Node, Connection)] =
-    primary.view.map(node => node -> node.authenticatedConnections.subject.headOption).collectFirst {
-      case (node, Some(connection)) => node -> connection
-    }
+//  def pickForWrite: Option[(Node, Connection)] =
+//    primary.view.map(node => node -> node.authenticatedConnections.subject.headOption).collectFirst {
+//      case (node, Some(connection)) => node -> connection
+//    }
 
   private val pickConnectionAndFlatten: Option[Node] => Option[(Node, Connection)] = _.map(node => node -> node.authenticatedConnections.pick).collect {
     case (node, Some(connection)) => (node, connection)
@@ -127,54 +125,22 @@ case class NodeSet(
       nodes :+ node.createNeededChannels(receiver, connectionManager,  upTo)
     })
 
-
-  def toShortString =
-    s"{{NodeSet $name ${nodes.map(_.toShortString).mkString(" | ")} }}"
+  override def receive: Receive = {
+    case AddNode(address) => {
+      log.info("Adding Node to NodeSet with address {}", address)
+      val node = context.actorOf(Props(classOf[Node]))
+        nodes = node +: nodes
+    }
+  }
 }
 
-case class Node(
-    name: String,
-    status: NodeStatus,
-    connections: Vector[Connection],
-    authenticated: Set[Authenticated],
-    tags: Option[BSONDocument],
-    protocolMetadata: ProtocolMetadata,
-    pingInfo: PingInfo = PingInfo(),
-    isMongos: Boolean = false) {
-
-  val (host: String, port: Int) = {
-    val splitted = name.span(_ != ':')
-    splitted._1 -> (try {
-      splitted._2.drop(1).toInt
-    } catch {
-      case _: Throwable => 27017
-    })
-  }
-
-  val connected = connections.filter(_.status == ConnectionStatus.Connected)
-
-  val authenticatedConnections = new RoundRobiner(connected.filter(_.authenticated.forall { auth =>
-    authenticated.exists(_ == auth)
-  }))
-
-  def createNeededChannels(receiver: => ActorRef, connectionManager: => ActorRef, upTo: Int): Node = {
-    import java.net.InetSocketAddress
-
-      copy(connections = connections.++(
-        for( i <- 0 until upTo;
-          port <- connectionManager.ask(ConnectionManager.AddConnection(new InetSocketAddress(host, port), receiver)).mapTo[Int])
-          yield {
-            Connection(receiver, connectionManager, ConnectionStatus.Disconnected, Set.empty, None, port)
-          }))
-  }
-
-  def establishConnections(receiver: ActorRef, builder: ActorRef, upTo: Int): Unit ={
-
-  }
-
-
-  def toShortString = s"Node[$name: $status (${connected.size}/${connections.size} available connections), latency=${pingInfo.ping}], auth=${authenticated}"
+object NodeSet {
+  case class AddNode(address: InetSocketAddress)
+  case class IsMaster(id: Int)
+  case class OnDisconnect(chanel: Int)
+  object PrimaryUnavaliable
 }
+
 
 case class ProtocolMetadata(
   minWireVersion: MongoWireVersion,
@@ -183,17 +149,16 @@ case class ProtocolMetadata(
   maxBsonSize: Int,
   maxBulkSize: Int
 )
+
 object ProtocolMetadata {
   val Default = ProtocolMetadata(MongoWireVersion.V24AndBefore, MongoWireVersion.V24AndBefore, 48000000, 16 * 1024 * 1024, 1000)
 }
 
 case class Connection(
       client: ActorRef,
-      connectionManager: ActorRef,
-      status: ConnectionStatus,
       authenticated: Set[Authenticated],
       authenticating: Option[Authenticating],
-      port: Int = 0) {
+      chanel: Int) extends Actor {
 
   def send(message: Request, writeConcern: Request) {
     //channel.write(message)
@@ -208,6 +173,8 @@ case class Connection(
 
   def isAuthenticated(db: String, user: String) =
     authenticated.exists(auth => auth.user == user && auth.db == db)
+
+  override def receive: Actor.Receive = ???
 }
 
 case class PingInfo(
