@@ -1,8 +1,7 @@
 package reactivemongo.api.commands
 
-import concurrent.Future
+import scala.concurrent.Future
 import reactivemongo.api.{ BSONSerializationPack, Cursor, SerializationPack }
-
 
 trait CountCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] {
   case class Count(

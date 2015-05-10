@@ -1,8 +1,7 @@
 package reactivemongo.api.commands
 
-import concurrent.Future
+import scala.concurrent.Future
 import reactivemongo.api.{ BSONSerializationPack, Cursor, SerializationPack }
-
 
 trait FindAndModifyCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] {
   import pack._
@@ -39,8 +38,7 @@ trait FindAndModifyCommand[P <: SerializationPack] extends ImplicitCommandHelper
     fetchNewObject: Boolean) extends Modify
 
   object Update {
-    def apply(update: ImplicitlyDocumentProducer, fetchNewObject: Boolean = false): Update =
-      Update(update.produce, fetchNewObject)
+    def apply(update: ImplicitlyDocumentProducer, fetchNewObject: Boolean = false): Update = Update(update.produce, fetchNewObject)
   }
 
   /** Remove (part of a FindAndModify command). */

@@ -117,18 +117,17 @@ case class UpdateWriteResult(
   code: Option[Int],
   errmsg: Option[String]
 ) extends WriteResult {
-  def flatten =
-    if(!writeErrors.isEmpty)
-      UpdateWriteResult(
-        ok = false,
-        n = n,
-        nModified = nModified,
-        upserted = upserted,
-        writeErrors = writeErrors,
-        writeConcernError = writeConcernError,
-        code = code.orElse(Some(writeErrors.head.code)),
-        errmsg = errmsg.orElse(Some(writeErrors.head.errmsg)))
-    else this
+  def flatten = if (!writeErrors.isEmpty) {
+    UpdateWriteResult(
+      ok = false,
+      n = n,
+      nModified = nModified,
+      upserted = upserted,
+      writeErrors = writeErrors,
+      writeConcernError = writeConcernError,
+      code = code.orElse(Some(writeErrors.head.code)),
+      errmsg = errmsg.orElse(Some(writeErrors.head.errmsg)))
+  } else this
 }
 
 object MultiBulkWriteResult {

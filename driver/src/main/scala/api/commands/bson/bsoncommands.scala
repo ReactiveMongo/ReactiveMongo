@@ -10,18 +10,6 @@ object CommonImplicits {
   }
 }
 
-object BSONRawCommand extends RawCommand[BSONSerializationPack.type] {
-  val pack: BSONSerializationPack.type = BSONSerializationPack
-}
-
-object BSONRawCommandImplicits {
-  import BSONRawCommand.Raw
-
-  implicit object BSONRawWriter extends BSONDocumentWriter[Raw] {
-    def write(raw: Raw): BSONDocument = raw.doc.produce
-  }
-}
-
 trait BSONCommandError extends CommandError {
   def originalDocument: BSONDocument
 }
@@ -38,11 +26,10 @@ private[bson] trait DealingWithGenericCommandErrorsReader[A] extends BSONDocumen
   def readResult(doc: BSONDocument): A
 
   final def read(doc: BSONDocument): A =
-    if(!doc.getAs[BSONBooleanLike]("ok").exists(_.toBoolean))
+    if (!doc.getAs[BSONBooleanLike]("ok").exists(_.toBoolean)) {
       throw new DefaultBSONCommandError(
         code = doc.getAs[Int]("code"),
         errmsg = doc.getAs[String]("errmsg"),
-        originalDocument = doc
-      )
-    else readResult(doc)
+        originalDocument = doc)
+    } else readResult(doc)
 }
