@@ -104,12 +104,12 @@ def listDocs() = {
   // Select only the documents which field 'firstName' equals 'Jack'
   val query = BSONDocument("firstName" -> "Jack")
   // select only the fields 'lastName' and '_id'
-  val filter = BSONDocument(
+  val fields = BSONDocument(
     "lastName" -> 1,
     "_id" -> 1)
 
   // Get a cursor of BSONDocuments
-  val cursor = collection.find(query, filter).cursor[BSONDocument]
+  val cursor = collection.find(query, fields).cursor[BSONDocument]
   /* Let's enumerate this cursor and print a readable
    * representation of each document in the response */
   cursor.enumerate().apply(Iteratee.foreach { doc =>
@@ -117,7 +117,7 @@ def listDocs() = {
   })
 
   // Or, the same with getting a list
-  val cursor2 = collection.find(query, filter).cursor[BSONDocument]
+  val cursor2 = collection.find(query, fields).cursor[BSONDocument]
   val futureList: Future[List[BSONDocument]] = cursor.collect[List]()
   futureList.map { list =>
     list.foreach { doc =>
