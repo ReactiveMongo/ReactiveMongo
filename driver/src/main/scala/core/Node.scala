@@ -3,7 +3,7 @@ package reactivemongo.core
 import java.net.InetSocketAddress
 import java.util.concurrent.atomic.AtomicInteger
 
-import akka.actor.{ActorRef, Props, ActorLogging, Actor}
+import akka.actor._
 import akka.io.Tcp._
 import akka.io.{Tcp, IO}
 import reactivemongo.bson.BSONDocument
@@ -19,6 +19,7 @@ class Node(
             var nbOfConnections: Int
             ) extends Actor with ActorLogging {
   import Node._
+  import context.system
 
   val connectionManager = context.actorOf(Props(classOf[ConnectionManager]))
   var connections: Vector[ActorRef] = Vector.empty
@@ -46,6 +47,7 @@ class Node(
   //
   //  }
   override def receive: Receive = {
+
     case EstablishConnections => if(connections.length < nbOfConnections) {
       val manager = IO(Tcp)
       manager ! Connect(address)
@@ -74,7 +76,7 @@ class Node(
   }
 }
 
-case class ConnectionState(isMongos: Boolean, isPrimary: Boolean, channel: Int, authenticated: Boolean)
+case class ConnectionState(isMongos: Boolean, isPrimary: Boolean, channel: Int, authenticated: Boolean, ping: PingInfo)
 
 object Node{
   object EstablishConnections

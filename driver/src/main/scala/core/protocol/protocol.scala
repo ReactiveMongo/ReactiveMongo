@@ -18,7 +18,7 @@ package reactivemongo.core.protocol
 import java.nio.ByteOrder
 
 import akka.actor.ActorRef
-import akka.util.ByteStringBuilder
+import akka.util.{ByteString, ByteStringBuilder}
 import org.jboss.netty.buffer._
 import org.jboss.netty.channel._
 import org.jboss.netty.handler.codec.frame.FrameDecoder
@@ -90,7 +90,7 @@ object `package` {
 }
 
 trait ByteStringBuffer {
-  def append() : ByteStringBuilder => Unit
+  def append : ByteStringBuilder => Unit
 }
 
 // traits
@@ -166,18 +166,26 @@ case class Request(
     requestID: Int,
     responseTo: Int, // TODO remove, nothing to do here.
     op: RequestOp,
-    documents: BufferSequence,
+    documents: ByteString,
     readPreference: ReadPreference = ReadPreference.primary,
-    channelIdHint: Option[Int] = None) extends ChannelBufferWritable {
+    channelIdHint: Option[Int] = None) extends ChannelBufferWritable with ByteStringBuffer {
+  import ByteStringBuilderHelper._
+
   override val writeTo = { buffer: ChannelBuffer =>
-    buffer write header
-    buffer write op
-    buffer writeBytes documents.merged
+//    buffer write header
+//    buffer write op
+//    buffer writeBytes documents.merged
   }
 
-  override def size = 16 + op.size + documents.merged.writerIndex
+  override def size = 16 + op.size + documents.size
   /** Header of this request */
   lazy val header = MessageHeader(size, requestID, responseTo, op.code)
+
+  override def append = (builder: ByteStringBuilder) => {
+    header append builder
+    op append builder
+    builder.append(documents)
+  }
 }
 
 /**
@@ -209,7 +217,7 @@ case class CheckedWriteRequest(
  */
 case class RequestMaker(
     op: RequestOp,
-    documents: BufferSequence = BufferSequence.empty,
+    documents: ByteString = ByteString.empty,
     readPreference: ReadPreference = ReadPreference.primary,
     channelIdHint: Option[Int] = None) {
   def apply(id: Int) = Request(id, 0, op, documents, readPreference, channelIdHint)

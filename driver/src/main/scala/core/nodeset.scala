@@ -9,6 +9,8 @@ import akka.io.{Tcp, IO}
 import akka.pattern.ask
 import akka.actor._
 import akka.util.Timeout
+import reactivemongo.core.actors.{AwaitingResponse, RequestMakerExpectingResponse}
+import scala.collection.immutable.HashMap
 import scala.concurrent.ExecutionContext.Implicits.global
 import org.jboss.netty.buffer.HeapChannelBufferFactory
 import org.jboss.netty.channel.socket.nio.NioClientSocketChannelFactory
@@ -59,6 +61,10 @@ class NodeSet(
 
   var channelsMapping = Map.empty[Int, ActorRef]
   var mongosConnections = Map.empty[Int, ActorRef]
+  var statusConnections = Map.empty[NodeStatus, List[(Int, ActorRef)]]
+
+  def primary : Option[ActorRef] = statusConnections.get(NodeStatus.Primary).map(_.getRandom()._2)
+  def secondary : Option[ActorRef] = statusConnections.get(NodeStatus.Secondary).map(_.getRandom()._2)
 
 
   val mongos: Option[Node] = nodes.find(_.isMongos)
@@ -109,13 +115,15 @@ class NodeSet(
   private val pickConnectionAndFlatten: Option[Node] => Option[(Node, Connection)] = _.map(node => node -> node.authenticatedConnections.pick).collect {
     case (node, Some(connection)) => (node, connection)
   }
-
-  private def pickFromGroupWithFilter(roundRobiner: RoundRobiner[Node, Vector], filter: Option[BSONDocument => Boolean], fallback: => Option[Node]) = 
-    filter.fold(fallback)(f =>
-      roundRobiner.pickWithFilter(_.tags.fold(false)(f)))
+//
+//  private def pickFromGroupWithFilter(roundRobiner: RoundRobiner[Node, Vector], filter: Option[BSONDocument => Boolean], fallback: => Option[Node]) =
+//    filter.fold(fallback)(f =>
+//      roundRobiner.pickWithFilter(_.tags.fold(false)(f)))
 
   def pick(preference: ReadPreference): Option[ActorRef] = if(mongosConnections.isEmpty){
-
+    preference match {
+      case ReadPreference.Primary => primary
+    }
   } else {
     mongosConnections.getRandom._2
   }
@@ -171,7 +179,9 @@ case class Connection(
       connection: ActorRef,
       authenticated: Set[Authenticated],
       authenticating: Option[Authenticating],
-      chanel: Int) extends Actor {
+      channel: Int) extends Actor {
+
+  private var awaitingResponses = HashMap[Int, AwaitingResponse]()
 
   val socketHandler = context.actorOf(Props(classOf[SocketHandler], connection))
   connection ! Register(socketHandler, keepOpenOnPeerClosed = true)
@@ -190,7 +200,16 @@ case class Connection(
   def isAuthenticated(db: String, user: String) =
     authenticated.exists(auth => auth.user == user && auth.db == db)
 
-  override def receive: Actor.Receive = ???
+  override def receive: Actor.Receive = {
+    case Connection.RequestExpectingResponse(request, req) =>{
+      awaitingResponses = awaitingResponses + (request.requestID -> AwaitingResponse(request.requestID, channel,
+        req.promise, isGetLastError = false, isMongo26WriteOp = req.isMongo26WriteOp))
+    }
+  }
+}
+
+object Connection {
+  case class RequestExpectingResponse(request: Request, req: RequestMakerExpectingResponse)
 }
 
 case class PingInfo(

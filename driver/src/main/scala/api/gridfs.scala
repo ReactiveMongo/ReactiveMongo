@@ -208,7 +208,8 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
           files.as[BSONCollection]().insert(bson).map { _ =>
             val buf = ChannelBufferWritableBuffer()
             BSONSerializationPack.writeToBuffer(buf, bson)
-            pack.readAndDeserialize(buf.toReadableBuffer, readFileReader)
+            // TODO: fix
+            //pack.readAndDeserialize(buf.toReadableBuffer, readFileReader)
           }
         }
       }

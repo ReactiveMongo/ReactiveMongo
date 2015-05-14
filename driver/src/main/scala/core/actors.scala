@@ -38,7 +38,7 @@ import reactivemongo.api.{ MongoConnectionOptions, ReadPreference }
  * The future can be used to get the error or the successful response.
  */
 sealed trait ExpectingResponse {
-  private[actors] val promise: Promise[Response] = Promise()
+  private[core] val promise: Promise[Response] = Promise()
   /** The future response of this request. */
   val future: Future[Response] = promise.future
 }
@@ -103,6 +103,8 @@ class MongoDBSystem(
     (channelFactory: ChannelFactory = new ChannelFactory(options)) extends Actor {
   import MongoDBSystem._
 
+  private val awaitingResponses = scala.collection.mutable.LinkedHashMap[Int, AwaitingResponse]()
+
   // monitor -->
   var nodeSet: NodeSet = NodeSet(None, None, seeds.map(seed => Node(seed, NodeStatus.Unknown,
     Vector.empty, Set.empty, None, ProtocolMetadata.Default).createNeededChannels(connectionHandler, connectionManager, 1)).toVector,
@@ -118,7 +120,7 @@ class MongoDBSystem(
 
   import scala.concurrent.duration._
 
-  private val awaitingResponses = scala.collection.mutable.LinkedHashMap[Int, AwaitingResponse]()
+
 
   private val monitors = scala.collection.mutable.ListBuffer[ActorRef]()
   implicit val ec = context.system.dispatcher
@@ -648,7 +650,7 @@ object MongoDBSystem {
   private val logger = LazyLogger("reactivemongo.core.actors.MongoDBSystem")
 }
 
-private[actors] case class AwaitingResponse(
+private[core] case class AwaitingResponse(
   requestID: Int,
   channelID: Int,
   promise: Promise[Response],

@@ -15,13 +15,16 @@
  */
 package reactivemongo.api.collections
 
+import akka.util.ByteStringBuilder
+import core.ByteStringBuilderWritableBuffer
+
 import scala.concurrent.{ ExecutionContext, Future }
 import scala.util.Try
 import scala.util.control.NonFatal
 import org.jboss.netty.buffer.ChannelBuffer
 import reactivemongo.api._
 import reactivemongo.api.commands.{ LastError, WriteConcern }
-import reactivemongo.bson.buffer.{ ReadableBuffer, WritableBuffer }
+import reactivemongo.bson.buffer.{ReadableBuffer, WritableBuffer}
 import reactivemongo.core.nodeset.ProtocolMetadata
 import reactivemongo.core.protocol._
 import reactivemongo.core.netty._
@@ -100,9 +103,9 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
   }
 
   private def writeDoc[T](doc: T, writer: pack.Writer[T]) = {
-    val buffer = ChannelBufferWritableBuffer()
+    val buffer = ByteStringBuilderWritableBuffer(new ByteStringBuilder())
     pack.serializeAndWrite(buffer, doc, writer)
-    buffer.buffer
+    buffer.builder.result()
   }
 
   protected def watchFailure[T](future: => Future[T]): Future[T] = Try(future).recover { case NonFatal(e) => Future.failed(e) }.get
@@ -333,8 +336,8 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
   def uncheckedRemove[T](query: T, firstMatchOnly: Boolean = false)(implicit writer: pack.Writer[T], ec: ExecutionContext): Unit = {
     val op = Delete(fullCollectionName, if (firstMatchOnly) 1 else 0)
     val bson = writeDoc(query, writer)
-    val message = RequestMaker(op, BufferSequence(bson))
-    db.connection.send(message)
+    //val message = RequestMaker(op, BufferSequence(bson))
+    //db.connection.send(message)
   }
 
   /**
@@ -354,9 +357,9 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
     val flags = 0 | (if (upsert) UpdateFlags.Upsert else 0) | (if (multi) UpdateFlags.MultiUpdate else 0)
     val op = Update(fullCollectionName, flags)
     val bson = writeDoc(selector, selectorWriter)
-    bson.writeBytes(writeDoc(update, updateWriter))
-    val message = RequestMaker(op, BufferSequence(bson))
-    db.connection.send(message)
+//    bson.writeBytes(writeDoc(update, updateWriter))
+//    val message = RequestMaker(op, BufferSequence(bson))
+//    db.connection.send(message)
   }
 
   /**
@@ -370,9 +373,9 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    */
   def uncheckedInsert[T](document: T)(implicit writer: pack.Writer[T]): Unit = {
     val op = Insert(0, fullCollectionName)
-    val bson = writeDoc(document, writer)
-    val message = RequestMaker(op, BufferSequence(bson))
-    db.connection.send(message)
+//    val bson = writeDoc(document, writer)
+//    val message = RequestMaker(op, BufferSequence(bson))
+//    db.connection.send(message)
   }
 
   protected object Mongo26WriteCommand {

@@ -15,7 +15,10 @@
  */
 package reactivemongo.bson.buffer
 
+
 import scala.collection.mutable.ArrayBuffer
+
+
 
 /**
  * A writable buffer.
@@ -57,8 +60,6 @@ trait WritableBuffer {
 
   /** Writes the given `Double` into this buffer. */
   def writeDouble(double: Double): WritableBuffer
-
-  def toReadableBuffer(): ReadableBuffer
 
   /** Write a UTF-8 encoded C-Style String. */
   def writeCString(s: String): WritableBuffer = {
@@ -104,8 +105,6 @@ trait ReadableBuffer {
 
   /** Returns the number of readable remaining bytes of this buffer. */
   def readable(): Int
-
-  def toWritableBuffer: WritableBuffer
 
   /**
    * Returns a new instance of ReadableBuffer which starts at the current index and contains `n` bytes.
@@ -250,3 +249,4 @@ class ArrayBSONBuffer protected[buffer] (protected val buffer: ArrayBuffer[Byte]
     this
   }
 }
+
