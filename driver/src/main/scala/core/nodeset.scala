@@ -8,6 +8,7 @@ import akka.io.Tcp.{Register, Connected, Connect}
 import akka.io.{Tcp, IO}
 import akka.pattern.ask
 import akka.actor._
+import akka.routing.{RoundRobinRoutingLogic, Router}
 import akka.util.Timeout
 import reactivemongo.core.actors.{AwaitingResponse, RequestMakerExpectingResponse}
 import scala.collection.immutable.HashMap
@@ -54,18 +55,17 @@ package object utils {
 
 class NodeSet(
      val name: Option[String],
-     val authenticates: Set[Authenticate]) extends Actor with ActorLogging {
+     val authenticates: Set[Authenticate]) {
   import NodeSet._
   import RandomPick._
 
   var nodes: Vector[ActorRef] = Vector.empty[ActorRef]
   var version: Option[Long] = None
-  var channelsMapping = Map.empty[Int, ActorRef]
-  var mongosConnections = Map.empty[Int, ActorRef]
-  var statusConnections = Map.empty[NodeStatus, List[(Int, ActorRef)]]
 
-  def primary = statusConnections.get(NodeStatus.Primary).map(_.getRandom()._2)
-  def secondary = statusConnections.get(NodeStatus.Secondary).map(_.getRandom()._2)
+  var primaries : Router = null
+  var secondaries : Router = null
+  var mongos : Router = null
+  var primaryPrefered : Router = null
 
 
   //val mongos: Option[Node] = nodes.find(_.isMongos)
@@ -77,11 +77,11 @@ class NodeSet(
   val nearest = nearestGroup.subject.headOption
   val protocolMetadata = primary.orElse(secondaries.subject.headOption).map(_.protocolMetadata).getOrElse(ProtocolMetadata.Default)
   */
-
-  def primary(authenticated: Authenticated): Option[Node] =
-    primary.filter(_.authenticated.exists(_ == authenticated))
-
-  def isReachable = !primary.isEmpty || !secondaries.subject.isEmpty
+//
+//  def primary(authenticated: Authenticated): Option[Node] =
+//    primary.filter(_.authenticated.exists(_ == authenticated))
+//
+//  def isReachable = !primary.isEmpty || !secondaries.subject.isEmpty
 //
 //  def updateNodeByChannelId(id: Int)(ƒ: Node => Node) =
 //    updateByChannelId(id)(identity)(ƒ)
@@ -142,14 +142,16 @@ class NodeSet(
 //      nodes :+ node.createNeededChannels(receiver, connectionManager,  upTo)
 //    })
 
-  override def receive: Receive = {
-    case AddNode(address) => {
-      log.info("Adding Node to NodeSet with address {}", address)
-      val node = context.actorOf(Props(classOf[Node]))
-        nodes = node +: nodes
-    }
+//  override def receive: Receive = {
+//    case AddNode(address) => {
+//      log.info("Adding Node to NodeSet with address {}", address)
+//      val node = context.actorOf(Props(classOf[Node]))
+//        nodes = node +: nodes
+//    }
+//
+//  }
 
-  }
+  def createChannel(seed: )
 }
 
 object NodeSet {
