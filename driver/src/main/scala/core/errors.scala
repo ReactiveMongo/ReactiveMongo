@@ -67,6 +67,11 @@ object ConnectionNotInitialized {
   def MissingMetadata = ConnectionNotInitialized("Connection is missing metadata (like protocol version, etc.) The connection pool is probably being initialized.")
 }
 
+case class UnsupportedVersionOfMongo(message: String) extends DriverException
+object UnsupportedVersionOfMongo {
+  def UnsupportedVersion = UnsupportedVersionOfMongo("Current driver does not support mongodb bellow 2.6")
+}
+
 case class ConnectionException(message: String) extends DriverException
 
 /** A generic error thrown by a MongoDB node. */

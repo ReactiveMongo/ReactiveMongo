@@ -180,16 +180,11 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
     val metadata = db.connection.metadata
     if(!documents.isEmpty) {
       val havingMetadata = Failover2(db.connection, failoverStrategy) { () =>
-        metadata.map(Future.successful).getOrElse(Future.failed(ConnectionNotInitialized.MissingMetadata))
+        metadata.filter(_.maxWireVersion >= MongoWireVersion.V26).map(Future.successful).getOrElse(Future.failed(ConnectionNotInitialized.MissingMetadata))
       }.future
       havingMetadata.flatMap { metadata =>
-        if(metadata.maxWireVersion >= MongoWireVersion.V26) {
           createBulk(documents, Mongo26WriteCommand.insert(ordered, writeConcern, metadata)).map { list =>
             list.foldLeft(MultiBulkWriteResult())( (r, w) => r.merge(w) )}
-        } else {
-          createBulk(documents, new Mongo24BulkInsert(Insert(0, fullCollectionName), writeConcern, metadata)).map { list =>
-            list.foldLeft(MultiBulkWriteResult())( (r, w) => r.merge(w) )}
-        }
       }
     } else {
       Future.successful(MultiBulkWriteResult(
@@ -230,11 +225,11 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
               Future.failed(flattened)
             else Future.successful(wr)
           }
-        case Some(_) =>
-          val op = Insert(0, fullCollectionName)
-          val bson = writeDoc(document, writer)
-          val checkedWriteRequest = CheckedWriteRequest(op, BufferSequence(bson), writeConcern)
-          db.connection.sendExpectingResponse(checkedWriteRequest).map(pack.readAndDeserialize(_, LastErrorReader))
+//        case Some(_) =>
+//          val op = Insert(0, fullCollectionName)
+//          val bson = writeDoc(document, writer)
+//          val checkedWriteRequest = CheckedWriteRequest(op, bson, writeConcern)
+//          db.connection.sendExpectingResponse(checkedWriteRequest).map(pack.readAndDeserialize(_, LastErrorReader))
         case None =>
           Future.failed(ConnectionNotInitialized.MissingMetadata)
       }
@@ -269,14 +264,14 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
                 Future.failed(flattened)
               } else Future.successful(wr)
             }
-
-        case Some(_) =>
-          val flags = 0 | (if (upsert) UpdateFlags.Upsert else 0) | (if (multi) UpdateFlags.MultiUpdate else 0)
-          val op = Update(fullCollectionName, flags)
-          val bson = writeDoc(selector, selectorWriter)
-          bson.writeBytes(writeDoc(update, updateWriter))
-          val checkedWriteRequest = CheckedWriteRequest(op, BufferSequence(bson), writeConcern)
-          db.connection.sendExpectingResponse(checkedWriteRequest).map(pack.readAndDeserialize(_, LastErrorReader))
+//
+//        case Some(_) =>
+//          val flags = 0 | (if (upsert) UpdateFlags.Upsert else 0) | (if (multi) UpdateFlags.MultiUpdate else 0)
+//          val op = Update(fullCollectionName, flags)
+//          val bson = writeDoc(selector, selectorWriter)
+//          bson.writeBytes(writeDoc(update, updateWriter))
+//          val checkedWriteRequest = CheckedWriteRequest(op, BufferSequence(bson), writeConcern)
+//          db.connection.sendExpectingResponse(checkedWriteRequest).map(pack.readAndDeserialize(_, LastErrorReader))
         case None =>
           Future.failed(ConnectionNotInitialized.MissingMetadata)
       }
@@ -307,11 +302,11 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
               Future.failed(flattened)
             else Future.successful(wr)
           }
-        case Some(_) =>
-          val op = Delete(fullCollectionName, if (firstMatchOnly) 1 else 0)
-          val bson = writeDoc(query, writer)
-          val checkedWriteRequest = CheckedWriteRequest(op, BufferSequence(bson), writeConcern)
-          db.connection.sendExpectingResponse(checkedWriteRequest).map(pack.readAndDeserialize(_, LastErrorReader))
+//        case Some(_) =>
+//          val op = Delete(fullCollectionName, if (firstMatchOnly) 1 else 0)
+//          val bson = writeDoc(query, writer)
+//          val checkedWriteRequest = CheckedWriteRequest(op, BufferSequence(bson), writeConcern)
+//          db.connection.sendExpectingResponse(checkedWriteRequest).map(pack.readAndDeserialize(_, LastErrorReader))
         case None =>
           Future.failed(ConnectionNotInitialized.MissingMetadata)
       }
@@ -520,54 +515,54 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
     }
   }
 
-  protected class Mongo24BulkInsert(op: Insert, writeConcern: WriteConcern, metadata: ProtocolMetadata) extends BulkMaker[LastError, Mongo24BulkInsert] {
-    private var done = false
-    private var docsN = 0
-    private val buf = ChannelBufferWritableBuffer()
-
-    val thresholdDocs = metadata.maxBulkSize
-    // max size for docs is max bson size minus 16 bytes for header, 4 bytes for flags, and 124 bytes max for fullCollectionName
-    val thresholdBytes = metadata.maxBsonSize - (4 * 4 + 4 + 124)
-
-    def putOrIssueNewCommand(doc: pack.Document): Option[Mongo24BulkInsert] = {
-      if(done)
-        throw new RuntimeException("violated assertion: Mongo24BulkInsert should not be used again after it is done")
-      if(docsN >= thresholdDocs) {
-        val nextBulk = new Mongo24BulkInsert(op, writeConcern, metadata)
-        nextBulk.putOrIssueNewCommand(doc)
-        Some(nextBulk)
-      } else {
-        val start = buf.index
-        pack.writeToBuffer(buf, doc)
-        if(buf.index > thresholdBytes) {
-          if(docsN == 0) // first and already out of bound
-            throw new RuntimeException("Mongo24BulkInsert could not accept doc of size = ${buf.index - start} bytes")
-          val nextBulk = new Mongo24BulkInsert(op, writeConcern, metadata)
-          nextBulk.buf.buffer.writeBytes(buf.buffer, start, buf.index - start)
-          nextBulk.docsN = 1
-          buf.buffer.readerIndex(0)
-          buf.buffer.writerIndex(start)
-          done = true
-          Some(nextBulk)
-        } else {
-          docsN += 1
-          None
-        }
-      }
-    }
-
-    def result(): ChannelBuffer = {
-      done = true
-      buf.buffer
-    }
-
-    def resultAsCheckedWriteRequest(op: Insert, writeConcern: WriteConcern) = {
-      CheckedWriteRequest(op, BufferSequence(result()), writeConcern)
-    }
-
-    def send()(implicit ec: ExecutionContext): Future[LastError] = {
-      val f = () => db.connection.sendExpectingResponse(resultAsCheckedWriteRequest(op, writeConcern))
-      Failover2(db.connection, failoverStrategy)(f).future.map(pack.readAndDeserialize(_, LastErrorReader))
-    }
-  }
+//  protected class Mongo24BulkInsert(op: Insert, writeConcern: WriteConcern, metadata: ProtocolMetadata) extends BulkMaker[LastError, Mongo24BulkInsert] {
+//    private var done = false
+//    private var docsN = 0
+//    private val buf = ChannelBufferWritableBuffer()
+//
+//    val thresholdDocs = metadata.maxBulkSize
+//    // max size for docs is max bson size minus 16 bytes for header, 4 bytes for flags, and 124 bytes max for fullCollectionName
+//    val thresholdBytes = metadata.maxBsonSize - (4 * 4 + 4 + 124)
+//
+//    def putOrIssueNewCommand(doc: pack.Document): Option[Mongo24BulkInsert] = {
+//      if(done)
+//        throw new RuntimeException("violated assertion: Mongo24BulkInsert should not be used again after it is done")
+//      if(docsN >= thresholdDocs) {
+//        val nextBulk = new Mongo24BulkInsert(op, writeConcern, metadata)
+//        nextBulk.putOrIssueNewCommand(doc)
+//        Some(nextBulk)
+//      } else {
+//        val start = buf.index
+//        pack.writeToBuffer(buf, doc)
+//        if(buf.index > thresholdBytes) {
+//          if(docsN == 0) // first and already out of bound
+//            throw new RuntimeException("Mongo24BulkInsert could not accept doc of size = ${buf.index - start} bytes")
+//          val nextBulk = new Mongo24BulkInsert(op, writeConcern, metadata)
+//          nextBulk.buf.buffer.writeBytes(buf.buffer, start, buf.index - start)
+//          nextBulk.docsN = 1
+//          buf.buffer.readerIndex(0)
+//          buf.buffer.writerIndex(start)
+//          done = true
+//          Some(nextBulk)
+//        } else {
+//          docsN += 1
+//          None
+//        }
+//      }
+//    }
+//
+//    def result(): ChannelBuffer = {
+//      done = true
+//      buf.buffer
+//    }
+//
+//    def resultAsCheckedWriteRequest(op: Insert, writeConcern: WriteConcern) = {
+//      CheckedWriteRequest(op, BufferSequence(result()), writeConcern)
+//    }
+//
+//    def send()(implicit ec: ExecutionContext): Future[LastError] = {
+//      val f = () => db.connection.sendExpectingResponse(resultAsCheckedWriteRequest(op, writeConcern))
+//      Failover2(db.connection, failoverStrategy)(f).future.map(pack.readAndDeserialize(_, LastErrorReader))
+//    }
+//  }
 }

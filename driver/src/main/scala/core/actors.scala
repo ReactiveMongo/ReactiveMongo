@@ -105,11 +105,13 @@ class MongoDBSystem(
 
   private val awaitingResponses = scala.collection.mutable.LinkedHashMap[Int, AwaitingResponse]()
 
+  // todo: fix
   // monitor -->
-  var nodeSet: NodeSet = NodeSet(None, None, seeds.map(seed => Node(seed, NodeStatus.Unknown,
-    Vector.empty, Set.empty, None, ProtocolMetadata.Default).createNeededChannels(connectionHandler, connectionManager, 1)).toVector,
-    initialAuthenticates.toSet)
-  connectAll(nodeSet)
+  var nodeSet = context.actorOf(Props(classOf[NodeSet], None, initialAuthenticates))
+//    NodeSet(None, None, seeds.map(seed => Node(seed, NodeStatus.Unknown,
+//    Vector.empty, Set.empty, None, ProtocolMetadata.Default).createNeededChannels(connectionHandler, connectionManager, 1)).toVector,
+//    initialAuthenticates.toSet)
+//  connectAll(nodeSet)
   // <-- monitor
 
   val requestIds = new RequestIds
@@ -148,19 +150,21 @@ class MongoDBSystem(
     } else connection
   }
 
-  final def authenticateNode(node: Node, auths: Seq[Authenticate]): Node = {
-    node.copy(connections = node.connections.map {
-      case connection if connection.status == ConnectionStatus.Connected => authenticateConnection(connection, auths)
-      case connection => connection
-    })
-  }
-
-  final def authenticateNodeSet(nodeSet: NodeSet): NodeSet = {
-    nodeSet.copy(nodes = nodeSet.nodes.map {
-      case node @ Node(_, _: QueryableNodeStatus, _, _, _, _, _, _) => authenticateNode(node, nodeSet.authenticates.toSeq)
-      case node => node
-    })
-  }
+  // todo: fix authentication
+//
+//  final def authenticateNode(node: Node, auths: Seq[Authenticate]): Node = {
+//    node.copy(connections = node.connections.map {
+//      case connection if connection.status == ConnectionStatus.Connected => authenticateConnection(connection, auths)
+//      case connection => connection
+//    })
+//  }
+//
+//  final def authenticateNodeSet(nodeSet: NodeSet): NodeSet = {
+//    nodeSet.copy(nodes = nodeSet.nodes.map {
+//      case node @ Node(_, _: QueryableNodeStatus, _, _, _, _, _, _) => authenticateNode(node, nodeSet.authenticates.toSeq)
+//      case node => node
+//    })
+//  }
 
 //  def updateNodeSetOnDisconnect(channelId: Int): NodeSet =
 //    updateNodeSet(nodeSet.updateNodeByChannelId(channelId) { node =>
@@ -252,7 +256,7 @@ class MongoDBSystem(
     case req: RequestMaker =>
       logger.debug("WARNING received a request")
       val r = req(requestIds.common.next)
-      pickChannel(r).map(_._2.send(r))
+      pickChannel(r).map(_.send(r))
 
     case req: RequestMakerExpectingResponse =>
       logger.debug("received a request expecting a response")
@@ -283,7 +287,7 @@ class MongoDBSystem(
         case Failure(error) => req.promise.failure(error)
         case Success((node, connection)) =>
           logger.debug("Sending request expecting response " + request + " by connection " + connection + " of node " + node.name)
-          awaitingResponses += requestId -> AwaitingResponse(requestId, connection.channel.getId(), req.promise, isGetLastError = true, isMongo26WriteOp = false)
+          awaitingResponses += requestId -> AwaitingResponse(requestId, connection, req.promise, isGetLastError = true, isMongo26WriteOp = false)
           logger.trace("registering writeConcern-awaiting response for requestID " + requestId + ", awaitingResponses: " + awaitingResponses)
           connection.send(request, writeConcern)
       }
@@ -297,7 +301,7 @@ class MongoDBSystem(
     }
     case RefreshAllNodes => {
       // TODO: rewrite to ping per node
-      nodeSet.self ! NodeSet.IsMaster(requestIds.isMaster.next)
+      //nodeSet.self ! NodeSet.IsMaster(requestIds.isMaster.next)
     }
     case ChannelConnected(channelId) => {
 //      updateNodeSet(nodeSet.updateByChannelId(channelId) { connection =>
@@ -393,11 +397,11 @@ class MongoDBSystem(
 //        logger.info("The primary is now available")
 //      }
 
-    case request @ AuthRequest(authenticate, _) => {
-      // TODO warn auth ok
-      AuthRequestsManager.addAuthRequest(request)
-      updateNodeSet(authenticateNodeSet(nodeSet.copy(authenticates = nodeSet.authenticates + authenticate)))
-    }
+//    case request @ AuthRequest(authenticate, _) => {
+//      // TODO warn auth ok
+//      AuthRequestsManager.addAuthRequest(request)
+//      updateNodeSet(authenticateNodeSet(nodeSet.copy(authenticates = nodeSet.authenticates + authenticate)))
+//    }
     // getnonce response
 //    case response: Response if requestIds.getNonce accepts response =>
 //      Getnonce.ResultMaker(response).fold(
@@ -524,7 +528,8 @@ class MongoDBSystem(
 
   def onPrimaryUnavailable() {
     self ! RefreshAllNodes
-    //TODO: reqrite
+    //TODO: rewrite
+
     nodeSet.self ! NodeSet.PrimaryUnavaliable
     //updateNodeSet(nodeSet.updateAll(node => if (node.status == NodeStatus.Primary) node.copy(status = NodeStatus.Unknown) else node))
     broadcastMonitors(PrimaryUnavailable)
@@ -542,7 +547,7 @@ class MongoDBSystem(
     case _              => false
   })
 
-  def pickChannel(request: Request): Try[(Node, Connection)] = {
+  def pickChannel(request: Request): Try[ActorRef] = {
     if (request.channelIdHint.isDefined)
       nodeSet.pickByChannelId(request.channelIdHint.get).map(Success(_)).getOrElse(Failure(Exceptions.ChannelNotFound))
     else nodeSet.pick(request.readPreference).map(Success(_)).getOrElse(Failure(Exceptions.PrimaryUnavailableException))
@@ -550,7 +555,7 @@ class MongoDBSystem(
 
   def pickConnection(request: Request) : Try[ActorRef] = request.channelIdHint match {
     case Some(id) => nodeSet.pickConnection(id).map(Success(_)).getOrElse(Failure(Exceptions.ChannelNotFound))
-    case None => nodeSet.pick()
+    case None => nodeSet.pick(request.readPreference).map(Success(_)).getOrElse(Failure(Exceptions.NodeSetNotReachable))
   }
 
   override def postStop() {

@@ -197,7 +197,7 @@ case class Request(
  */
 case class CheckedWriteRequest(
     op: WriteRequestOp,
-    documents: BufferSequence,
+    documents: ByteString,
     getLastError: GetLastError) {
   def apply(): (RequestMaker, RequestMaker) = {
     import reactivemongo.api.BSONSerializationPack
@@ -241,7 +241,7 @@ object Request {
     requestID,
     responseTo,
     op,
-    BufferSequence(ChannelBuffers.wrappedBuffer(ByteOrder.LITTLE_ENDIAN, documents)))
+    ByteString(documents))
 }
 
 /**

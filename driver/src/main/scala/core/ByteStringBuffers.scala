@@ -8,6 +8,8 @@ import reactivemongo.bson.buffer.{ReadableBuffer, WritableBuffer}
  */
 
 case class ByteStringBuilderWritableBuffer(builder: ByteStringBuilder) extends WritableBuffer{
+  implicit val byteOrder = java.nio.ByteOrder.LITTLE_ENDIAN
+
   /** Returns the current write index of this buffer. */
   override def index: Int = builder.length
 
@@ -22,8 +24,6 @@ case class ByteStringBuilderWritableBuffer(builder: ByteStringBuilder) extends W
     builder.putInt(int)
     this
   }
-
-  override def toReadableBuffer(): ReadableBuffer = ???
 
   /** Writes the bytes stored in the given `array` into this buffer. */
   override def writeBytes(array: Array[Byte]): WritableBuffer = {

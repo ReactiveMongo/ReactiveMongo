@@ -1,5 +1,8 @@
 package reactivemongo.api.commands
 
+import akka.util.ByteStringBuilder
+import core.ByteStringBuilderWritableBuffer
+
 import concurrent.{ ExecutionContext, Future }
 import util.control.NoStackTrace
 import reactivemongo.api.{ BSONSerializationPack, Cursor, SerializationPack, SerializationPackObject, DB, Collection }
@@ -135,15 +138,16 @@ object Command {
   }
 
   private def buildRequestMaker[P <: SerializationPack, A](pack: P)(command: A, writer: pack.Writer[A], readPreference: ReadPreference, db: String): (RequestMaker, Boolean) = {
-    val buffer = ChannelBufferWritableBuffer()
+    val buffer = ByteStringBuilderWritableBuffer(new ByteStringBuilder())
     pack.serializeAndWrite(buffer, command, writer)
-    val documents = BufferSequence(buffer.buffer)
+
+    //val documents = BufferSequence(buffer.buffer)
     val query = Query(0, db + ".$cmd", 0, 1)
     val mongo26WriteCommand = command match {
       case _: Mongo26WriteCommand => true
       case _ => false
     }
-    RequestMaker(query, documents, readPreference) -> mongo26WriteCommand
+    RequestMaker(query, buffer.builder.result(), readPreference) -> mongo26WriteCommand
   }
 
   private[reactivemongo] case class CommandWithPackMaker[P <: SerializationPack](pack: P) {

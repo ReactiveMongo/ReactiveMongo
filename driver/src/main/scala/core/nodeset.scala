@@ -17,6 +17,7 @@ import org.jboss.netty.channel.socket.nio.NioClientSocketChannelFactory
 import org.jboss.netty.channel.{Channel, ChannelPipeline, Channels}
 import reactivemongo.api.{MongoConnectionOptions, ReadPreference}
 import reactivemongo.bson._
+import reactivemongo.core._
 import reactivemongo.core.{SocketHandler, ConnectionManager}
 import reactivemongo.core.protocol.{Request, _}
 import reactivemongo.utils.LazyLogger
@@ -53,21 +54,21 @@ package object utils {
 
 class NodeSet(
      val name: Option[String],
-     val version: Option[Long],
-     var nodes: Vector[ActorRef],
      val authenticates: Set[Authenticate]) extends Actor with ActorLogging {
   import NodeSet._
   import RandomPick._
 
+  var nodes: Vector[ActorRef] = Vector.empty[ActorRef]
+  var version: Option[Long] = None
   var channelsMapping = Map.empty[Int, ActorRef]
   var mongosConnections = Map.empty[Int, ActorRef]
   var statusConnections = Map.empty[NodeStatus, List[(Int, ActorRef)]]
 
-  def primary : Option[ActorRef] = statusConnections.get(NodeStatus.Primary).map(_.getRandom()._2)
-  def secondary : Option[ActorRef] = statusConnections.get(NodeStatus.Secondary).map(_.getRandom()._2)
+  def primary = statusConnections.get(NodeStatus.Primary).map(_.getRandom()._2)
+  def secondary = statusConnections.get(NodeStatus.Secondary).map(_.getRandom()._2)
 
 
-  val mongos: Option[Node] = nodes.find(_.isMongos)
+  //val mongos: Option[Node] = nodes.find(_.isMongos)
   /*
   val primary: Option[Node] = nodes.find(_.status == NodeStatus.Primary)
   val secondaries = new RoundRobiner(nodes.filter(_.status == NodeStatus.Secondary))
@@ -98,12 +99,7 @@ class NodeSet(
 //    })
 //  }
 
-  def pickByChannelId(id: Int): Option[(Node, Connection)] =
-    nodes.view.map(node =>
-      node -> node.connections.find(_.chanel == id)).collectFirst {
-      case (node, Some(con)) if (
-        con.status == ConnectionStatus.Connected) => node -> con
-    }
+  def pickByChannelId(id: Int) = channelsMapping.get(id)
 
   def pickConnection(channel: Int) = channelsMapping.get(channel)
 
@@ -140,11 +136,11 @@ class NodeSet(
 //      case ReadPreference.Nearest(filter)            => pickConnectionAndFlatten(pickFromGroupWithFilter(nearestGroup, filter, nearest))
 //    }
 //  }
-
-  def createNeededChannels(receiver: => ActorRef, connectionManager: => ActorRef, upTo: Int): NodeSet =
-    copy(nodes = nodes.foldLeft(Vector.empty[Node]) { (nodes, node) =>
-      nodes :+ node.createNeededChannels(receiver, connectionManager,  upTo)
-    })
+//
+//  def createNeededChannels(receiver: => ActorRef, connectionManager: => ActorRef, upTo: Int): NodeSet =
+//    copy(nodes = nodes.foldLeft(Vector.empty[Node]) { (nodes, node) =>
+//      nodes :+ node.createNeededChannels(receiver, connectionManager,  upTo)
+//    })
 
   override def receive: Receive = {
     case AddNode(address) => {
@@ -152,6 +148,7 @@ class NodeSet(
       val node = context.actorOf(Props(classOf[Node]))
         nodes = node +: nodes
     }
+
   }
 }
 
