@@ -56,11 +56,11 @@ private object MacroImpl {
     lazy val readBody: c.Expr[A] = {
       val writer = unionTypes map { types =>
         val cases = types map { typ =>
-          val pattern = Literal(Constant(typ.typeSymbol.fullName)) //todo
-        val body = readBodyFromImplicit(typ)
+          val pattern = Literal(Constant(typ.typeSymbol.name.decodedName.toString))
+          val body = readBodyFromImplicit(typ)
           CaseDef(pattern, body)
         }
-        val className = c.parse("""document.getAs[String]("className").get""")
+        val className = c.parse("""document.getAs[String]("className").get.split("\\.").last""")
         Match(className, cases)
       } getOrElse readBodyConstruct(A)
 
@@ -235,7 +235,7 @@ private object MacroImpl {
 
     private def classNameTree(A: c.Type) = {
       val className = if (hasOption[Macros.Options.SaveClassName]) Some {
-        val name = c.literal(A.typeSymbol.fullName)
+        val name = c.literal(A.typeSymbol.name.decodedName.toString)
         reify {
           ("className", BSONStringHandler.write(name.splice))
         }.tree
