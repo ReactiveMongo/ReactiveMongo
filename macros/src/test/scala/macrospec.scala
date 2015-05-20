@@ -179,7 +179,7 @@ class Macros extends Specification {
       val person = Person("john", "doe")
       val format = Macros.handlerOpts[Person, Macros.Options.SaveClassName]
       val doc = format write person
-      doc.getAs[String]("className") mustEqual Some("Macros.Person")
+      doc.getAs[String]("className") mustEqual Some("Person")
       roundtrip(person, format)
     }
 
@@ -273,6 +273,23 @@ class Macros extends Specification {
           e.getMessage must contain(classOf[BSONDouble].getName)
           e.getMessage must contain(classOf[BSONInteger].getName)
       }
+    }
+
+    "correctly handle fully-qualified classNames" in {
+      import Union._
+      import Macros.Options._
+      val a = UA(1)
+      val b = UB("hai")
+      val format = Macros.handlerOpts[UT, UnionType[UA \/ UB \/ UC \/ UD]]
+
+      val serializedA = format.write(a).add("className" -> "Macros.Union.UA")
+      val serializedB = format.write(b).add("className" -> "Macros.Union.UA")
+
+      val deserializedA = format.read(serializedA)
+      val deserializedB = format.read(serializedB)
+
+      deserializedA mustEqual a
+      deserializedB mustEqual b
     }
   }
 
