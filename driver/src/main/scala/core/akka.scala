@@ -14,7 +14,7 @@ class AkkaReadableBuffer(buffer: ByteString) extends ReadableBuffer {
 
 
   /** Returns the current read index of this buffer. */
-  override def index: Int = byteBuffer.arrayOffset()
+  override def index: Int = byteBuffer.position()
 
   /** Reads a `Long` from this buffer. */
   override def readLong(): Long = byteBuffer.getLong()
