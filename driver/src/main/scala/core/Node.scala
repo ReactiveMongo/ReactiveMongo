@@ -3,30 +3,45 @@ package reactivemongo.core
 import java.net.InetSocketAddress
 import java.util.concurrent.atomic.AtomicInteger
 
+import akka.actor.Actor.Receive
 import akka.actor._
 import akka.io.Tcp._
 import akka.io.{Tcp, IO}
 import reactivemongo.bson.BSONDocument
+import reactivemongo.core.actors.RequestIds
 import reactivemongo.core.nodeset._
 
 /**
  * Created by sh1ng on 10/05/15.
  */
 
-class Node(
-            address: InetSocketAddress,
-            authenticated: Set[Authenticated],
+case class Node(
+            address: String,
+            authenticated: Set[Authenticate],
             var nbOfConnections: Int
             ) extends Actor with ActorLogging {
   import Node._
   import context.system
 
-  val connectionManager = context.actorOf(Props(classOf[ConnectionManager]))
-  var connections: Vector[ActorRef] = Vector.empty
+  val requestIds = new RequestIds
+
+  var connections: List[ActorRef] = List.empty
   var pingInfo: PingInfo = PingInfo()
   var isMongos: Boolean = false
   var protocolMetadata: ProtocolMetadata = null
   var tags: Option[BSONDocument] = None
+  var awaitingConnections = 0
+
+
+
+  val (host: String, port: Int) = {
+    val splitted = address.span(_ != ':')
+    splitted._1 -> (try {
+      splitted._2.drop(1).toInt
+    } catch {
+      case _: Throwable => 27017
+    })
+  }
 
 //    val authenticatedConnections = new RoundRobiner(connected.filter(_.authenticated.forall { auth =>
 //      authenticated.exists(_ == auth)
@@ -47,40 +62,30 @@ class Node(
   //
   //  }
   override def receive: Receive = {
-
-    case EstablishConnections => if(connections.length < nbOfConnections) {
+    case ConnectAll => {
+      awaitingConnections = nbOfConnections
       val manager = IO(Tcp)
-      manager ! Connect(address)
-    } else
-      log.warning("All connections have been already established.")
-  }
-
-  private def connecting: Receive = {
-    case Connected(remote, local) =>
-      log.info("Connected from {} to {}", local, remote)
-      val connection = context.actorOf(Props(classOf[Connection], sender(), authenticated, None, Node.nextChannel))
+      for(i <- 0 until nbOfConnections)
+        yield manager ! Connect(new InetSocketAddress(host, port))
+    }
+    case Connected(remote, local) => {
+      val connection = system.actorOf(Props(classOf[Connection], sender()))
+      awaitingConnections = awaitingConnections - 1;
       connections = connection +: connections
-      if(connections.length == nbOfConnections) context.become(connected)
-      else{
-        context.unbecome()
-        self ! EstablishConnections
-      }
-    case CommandFailed(_: Connected) => {
-      log.error("Unable to establish Connection")
-      context stop self
+      if(awaitingConnections == 0)
+        context.become(connected)
     }
   }
 
-  private def connected: Receive ={
-    case _ =>
+  private def connected: Receive = {
+
   }
+
+}
+
+object Node {
+  object ConnectAll
+  case class Connected(connections: List[ActorRef])
 }
 
 case class ConnectionState(isMongos: Boolean, isPrimary: Boolean, channel: Int, authenticated: Boolean, ping: PingInfo)
-
-object Node{
-  object EstablishConnections
-
-  private val _counter = new AtomicInteger(1)
-  def nextChannel = _counter.getAndIncrement
-}

@@ -16,6 +16,8 @@
 package reactivemongo.core.netty
 
 import java.nio.ByteOrder._
+import akka.util.{ByteString, ByteStringBuilder}
+import core.ByteStringBuilderWritableBuffer
 import reactivemongo.bson.BSONDocument
 import reactivemongo.bson.buffer.{ ReadableBuffer, WritableBuffer }
 import org.jboss.netty.buffer._
@@ -139,6 +141,21 @@ object `package` {
   }
 
   protected[reactivemongo] implicit class BSONDocumentNettyReadable(val buffer: ChannelBuffer) extends AnyVal {
+    def makeDocument = {
+      val bf = ChannelBufferReadableBuffer(buffer)
+      BSONDocument.read(bf) // TODO handle errors
+    }
+  }
+
+  protected[reactivemongo] implicit class BSONDocumentByteStringWritable(val doc: BSONDocument) extends AnyVal {
+    def makeBuffer = {
+      val buffer = ByteStringBuilderWritableBuffer(new ByteStringBuilder)
+      BSONDocument.write(doc, buffer)
+      buffer.builder.result()
+    }
+  }
+
+  protected[reactivemongo] implicit class BSONDocumentByteStringReadable(val buffer: ByteString) extends AnyVal {
     def makeDocument = {
       val bf = ChannelBufferReadableBuffer(buffer)
       BSONDocument.read(bf) // TODO handle errors

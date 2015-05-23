@@ -17,8 +17,9 @@ package reactivemongo.core.actors
 
 import akka.actor._
 import akka.pattern._
+import akka.routing.Router
 import org.jboss.netty.channel.group._
-import reactivemongo.core.{ConnectionManager, SocketHandler}
+import reactivemongo.core.{Node, ConnectionManager, SocketHandler}
 import reactivemongo.core.errors._
 import reactivemongo.core.protocol._
 import reactivemongo.utils.LazyLogger
@@ -99,15 +100,28 @@ case object GetLastMetadata
 class MongoDBSystem(
     seeds: Seq[String],
     initialAuthenticates: Seq[Authenticate],
-    options: MongoConnectionOptions)
-    (channelFactory: ChannelFactory = new ChannelFactory(options)) extends Actor {
+    options: MongoConnectionOptions,
+    system: ActorSystem) {
   import MongoDBSystem._
+
+
+  var primaries : Router = null
+  var secondaries : Router = null
+  var mongos : Router = null
+  var primaryPrefered : Router = null
 
   private val awaitingResponses = scala.collection.mutable.LinkedHashMap[Int, AwaitingResponse]()
 
+  private val nodeSetActor = system.actorOf(Props(classOf[NodeSet]))
+
   // todo: fix
   // monitor -->
-  var nodeSet = context.actorOf(Props(classOf[NodeSet], None, initialAuthenticates))
+  //val nodeSet = NodeSet(None, seeds.map(Node(_, initialAuthenticates.toSet, options.nbChannelsPerNode)).toVector)
+
+
+
+
+   //context.actorOf(Props(classOf[NodeSet], None, initialAuthenticates))
 //    NodeSet(None, None, seeds.map(seed => Node(seed, NodeStatus.Unknown,
 //    Vector.empty, Set.empty, None, ProtocolMetadata.Default).createNeededChannels(connectionHandler, connectionManager, 1)).toVector,
 //    initialAuthenticates.toSet)
@@ -123,11 +137,21 @@ class MongoDBSystem(
   import scala.concurrent.duration._
 
 
+  private def addConnection(status: ConnectionStatus) : Unit = {
+
+  }
+
+  private def removeConnection(connection: ActorRef) : Unit = {
+
+  }
+
+  def connect() = nodeSetActor ? NodeSet.ConnectAll
 
   private val monitors = scala.collection.mutable.ListBuffer[ActorRef]()
   implicit val ec = context.system.dispatcher
 
-  private val connectAllJob = context.system.scheduler.schedule(MongoDBSystem.DefaultConnectionRetryInterval milliseconds,
+  private val connectAllJob =
+    context.system.scheduler.schedule(MongoDBSystem.DefaultConnectionRetryInterval milliseconds,
     MongoDBSystem.DefaultConnectionRetryInterval milliseconds,
     self,
     ConnectAll)
@@ -683,7 +707,7 @@ object Exceptions {
   }
 }
 
-private[actors] class RequestIds {
+private[core] class RequestIds {
   // all requestIds [0, 1000[ are for isMaster messages
   val isMaster = RequestIdGenerator(0, 999)
   // all requestIds [1000, 2000[ are for getnonce messages

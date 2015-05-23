@@ -536,13 +536,11 @@ class MongoDriver(config: Option[Config] = None) {
    */
   def connection(nodes: Seq[String], options: MongoConnectionOptions = MongoConnectionOptions(), authentications: Seq[Authenticate] = Seq.empty,
                  nbChannelsPerNode: Int = 10, name: Option[String] = None): MongoConnection = {
-    val props = Props(new MongoDBSystem(nodes, authentications, options)())
-    val mongosystem = name match {
-      case Some(nm) => system.actorOf(props, nm);
-      case None => system.actorOf(props, "Connection-" +  + MongoDriver.nextCounter)
-    }
-    val connection = (supervisorActor ? AddConnection(options, mongosystem))(Timeout(10, TimeUnit.SECONDS))
-    Await.result(connection.mapTo[MongoConnection], Duration.Inf)
+    //val props = Props(new MongoDBSystem(nodes, authentications, options)())
+    val mongosystem = new MongoDBSystem(nodes, authentications, options, system)
+
+    //val connection = (supervisorActor ? AddConnection(options, mongosystem))(Timeout(10, TimeUnit.SECONDS))
+    Await.result(mongosystem.connect(), Duration.Inf)
   }
 
   /**

@@ -11,6 +11,7 @@ import akka.actor._
 import akka.routing.{RoundRobinRoutingLogic, Router}
 import akka.util.Timeout
 import reactivemongo.core.actors.{AwaitingResponse, RequestMakerExpectingResponse}
+import reactivemongo.core.nodeset.NodeSet.ConnectAll
 import scala.collection.immutable.HashMap
 import scala.concurrent.ExecutionContext.Implicits.global
 import org.jboss.netty.buffer.HeapChannelBufferFactory
@@ -53,19 +54,11 @@ package object utils {
   }
 }
 
-class NodeSet(
-     val name: Option[String],
-     val authenticates: Set[Authenticate]) {
-  import NodeSet._
-  import RandomPick._
+ case class NodeSet(onAddConnection: ConnectionState => Unit, onRemove: ActorRef => Unit)
+   extends Actor with ActorLogging {
 
-  var nodes: Vector[ActorRef] = Vector.empty[ActorRef]
+   var nodes: Vector[ActorRef] = Vector.empty
   var version: Option[Long] = None
-
-  var primaries : Router = null
-  var secondaries : Router = null
-  var mongos : Router = null
-  var primaryPrefered : Router = null
 
 
   //val mongos: Option[Node] = nodes.find(_.isMongos)
@@ -142,23 +135,25 @@ class NodeSet(
 //      nodes :+ node.createNeededChannels(receiver, connectionManager,  upTo)
 //    })
 
-//  override def receive: Receive = {
-//    case AddNode(address) => {
-//      log.info("Adding Node to NodeSet with address {}", address)
-//      val node = context.actorOf(Props(classOf[Node]))
-//        nodes = node +: nodes
-//    }
-//
-//  }
+  override def receive: Receive = {
+    case ConnectAll(hosts, initialAuthenticates, count) => {
+      log.info("Connection to initial nodes")
+      nodes = hosts.map(address => {
+        val node = context.actorOf(Props(classOf[Node], address, initialAuthenticates, count))
+        node ! Node.ConnectAll
+        node
+      }).toVector
+    }
+    case Node.Connected(connections) =>{
+      nodes = sender() +: nodes
 
-  def createChannel(seed: )
+    }
+  }
+
 }
 
-object NodeSet {
-  case class AddNode(address: InetSocketAddress)
-  case class IsMaster(id: Int)
-  case class OnDisconnect(chanel: Int)
-  object PrimaryUnavaliable
+object  NodeSet {
+  case class ConnectAll(hosts: Seq[String], initialAuthenticates: Seq[Authenticate], connectionsPerNode: Int)
 }
 
 
@@ -175,10 +170,10 @@ object ProtocolMetadata {
 }
 
 case class Connection(
-      connection: ActorRef,
-      authenticated: Set[Authenticated],
-      authenticating: Option[Authenticating],
-      channel: Int) extends Actor {
+      connection: ActorRef //,
+      //authenticated: Set[Authenticated],
+      //authenticating: Option[Authenticating],
+      ) extends Actor {
 
   private var awaitingResponses = HashMap[Int, AwaitingResponse]()
 
@@ -207,8 +202,10 @@ case class Connection(
   }
 }
 
+
 object Connection {
   case class RequestExpectingResponse(request: Request, req: RequestMakerExpectingResponse)
+  case class ConnectionStatus(isMongos: Boolean, isPrimary: Boolean, connection: ActorRef)
 }
 
 case class PingInfo(
