@@ -15,8 +15,8 @@
  */
 package reactivemongo.api.collections
 
-import akka.util.ByteStringBuilder
-import core.ByteStringBuilderWritableBuffer
+import akka.util.{ByteString, ByteStringBuilder}
+import core.AkkaByteStringWritableBuffer
 
 import scala.concurrent.{ ExecutionContext, Future }
 import scala.util.Try
@@ -103,7 +103,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
   }
 
   private def writeDoc[T](doc: T, writer: pack.Writer[T]) = {
-    val buffer = ByteStringBuilderWritableBuffer(new ByteStringBuilder())
+    val buffer = AkkaByteStringWritableBuffer(new ByteStringBuilder())
     pack.serializeAndWrite(buffer, doc, writer)
     buffer.builder.result()
   }
@@ -403,10 +403,11 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
     def send()(implicit ec: ExecutionContext): Future[R]
   }
 
-  protected class Mongo26WriteCommand private(tpe: String, ordered: Boolean, writeConcern: WriteConcern, metadata: ProtocolMetadata) extends BulkMaker[WriteResult, Mongo26WriteCommand] {
+  protected class Mongo26WriteCommand private(tpe: String, ordered: Boolean, writeConcern: WriteConcern, metadata: ProtocolMetadata)
+      extends BulkMaker[WriteResult, Mongo26WriteCommand] {
     private var done = false
     private var docsN = 0
-    private val buf = ChannelBufferWritableBuffer()
+    private val buf = new AkkaByteStringWritableBuffer(new ByteStringBuilder())
     private val writer = new LowLevelBsonDocWriter(buf)
 
     val thresholdDocs = metadata.maxBulkSize
@@ -433,13 +434,17 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
           if(buf.index > thresholdBytes && docsN == 0) // first and already out of bound
             throw new RuntimeException("Mongo26WriteCommand could not accept doc of size = ${buf.index - start} bytes")
           else if(buf.index > thresholdBytes) {
+            val buffer = buf.builder.result()
             val nextCommand = new Mongo26WriteCommand(tpe, ordered, writeConcern, metadata)
             nextCommand.buf.writeByte(0x03)
             nextCommand.buf.writeCString("0")
-            nextCommand.buf.buffer.writeBytes(buf.buffer, start2, buf.index - start2)
+            // todo: efficient slicing
+            nextCommand.buf.writeBytes(buffer.slice(start2, buf.index - start2).toArray)
             nextCommand.docsN = 1
-            buf.buffer.readerIndex(0)
-            buf.buffer.writerIndex(start)
+
+            // todo: fix
+            //buf.buffer.readerIndex(0)
+            //buf.buffer.writerIndex(start)
             closeIfNecessary()
             Some(nextCommand)
           } else None
@@ -450,23 +455,23 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
 
     // TODO remove
     def _debug(): Unit = {
-      import reactivemongo.bson.buffer.DefaultBufferHandler
-      val rix = buf.buffer.readerIndex
-      val wix = buf.buffer.writerIndex
-      val doc = DefaultBufferHandler.BSONDocumentBufferHandler.read(new ChannelBufferReadableBuffer(buf.buffer))
-      println(doc)
-      println(BSONDocument.pretty(doc))
-      buf.buffer.readerIndex(rix)
-      buf.buffer.writerIndex(wix)
+//      import reactivemongo.bson.buffer.DefaultBufferHandler
+//      val rix = buf.buffer.readerIndex
+//      val wix = buf.buffer.writerIndex
+//      val doc = DefaultBufferHandler.BSONDocumentBufferHandler.read(new ChannelBufferReadableBuffer(buf.buffer))
+//      println(doc)
+//      println(BSONDocument.pretty(doc))
+//      buf.buffer.readerIndex(rix)
+//      buf.buffer.writerIndex(wix)
     }
 
-    def result(): ChannelBuffer = {
+    def result(): ByteString  = {
       closeIfNecessary()
-      buf.buffer
+      buf.builder.result()
     }
 
     def send()(implicit ec: ExecutionContext): Future[WriteResult] = {
-      val documents = BufferSequence(result())
+      val documents = result()
 
       val op = Query(0, db.name + ".$cmd", 0, 1)
 

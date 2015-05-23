@@ -7,7 +7,7 @@ import reactivemongo.bson.buffer.{ReadableBuffer, WritableBuffer}
  * Created by sh1ng on 14/05/15.
  */
 
-case class ByteStringBuilderWritableBuffer(builder: ByteStringBuilder) extends WritableBuffer{
+case class AkkaByteStringWritableBuffer(builder: ByteStringBuilder = new ByteStringBuilder()) extends WritableBuffer{
   implicit val byteOrder = java.nio.ByteOrder.LITTLE_ENDIAN
 
   /** Returns the current write index of this buffer. */

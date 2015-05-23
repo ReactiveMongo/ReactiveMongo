@@ -68,7 +68,7 @@ case class Node(
       for(i <- 0 until nbOfConnections)
         yield manager ! Connect(new InetSocketAddress(host, port))
     }
-    case Connected(remote, local) => {
+    case Tcp.Connected(remote, local) => {
       val connection = system.actorOf(Props(classOf[Connection], sender()))
       awaitingConnections = awaitingConnections - 1;
       connections = connection +: connections
@@ -78,7 +78,7 @@ case class Node(
   }
 
   private def connected: Receive = {
-
+    case _ =>
   }
 
 }

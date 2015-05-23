@@ -15,6 +15,7 @@
  */
 package reactivemongo.api
 
+import akka.util.ByteString
 import play.api.libs.iteratee._
 import reactivemongo.core.iteratees.{ CustomEnumeratee, CustomEnumerator }
 import reactivemongo.core.netty.BufferSequence
@@ -180,7 +181,7 @@ object DefaultCursor {
   def apply[P <: SerializationPack, A](
     pack: P,
     query: Query,
-    documents: BufferSequence,
+    documents: ByteString,
     readPreference: ReadPreference,
     mongoConnection: MongoConnection,
     failoverStrategy: FailoverStrategy,

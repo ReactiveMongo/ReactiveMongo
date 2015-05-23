@@ -17,10 +17,11 @@ package reactivemongo.core.netty
 
 import java.nio.ByteOrder._
 import akka.util.{ByteString, ByteStringBuilder}
-import core.ByteStringBuilderWritableBuffer
+import core.AkkaByteStringWritableBuffer
 import reactivemongo.bson.BSONDocument
 import reactivemongo.bson.buffer.{ ReadableBuffer, WritableBuffer }
 import org.jboss.netty.buffer._
+import reactivemongo.core.AkkaReadableBuffer
 
 class ChannelBufferReadableBuffer(protected[netty] val buffer: ChannelBuffer) extends ReadableBuffer {
   def size = buffer.capacity()
@@ -132,24 +133,24 @@ object BufferSequence {
 }
 
 object `package` {
-  protected[reactivemongo] implicit class BSONDocumentNettyWritable(val doc: BSONDocument) extends AnyVal {
-    def makeBuffer = {
-      val buffer = ChannelBufferWritableBuffer()
-      BSONDocument.write(doc, buffer)
-      buffer.buffer
-    }
-  }
-
-  protected[reactivemongo] implicit class BSONDocumentNettyReadable(val buffer: ChannelBuffer) extends AnyVal {
-    def makeDocument = {
-      val bf = ChannelBufferReadableBuffer(buffer)
-      BSONDocument.read(bf) // TODO handle errors
-    }
-  }
+//  protected[reactivemongo] implicit class BSONDocumentNettyWritable(val doc: BSONDocument) extends AnyVal {
+//    def makeBuffer = {
+//      val buffer = ChannelBufferWritableBuffer()
+//      BSONDocument.write(doc, buffer)
+//      buffer.buffer
+//    }
+//  }
+//
+//  protected[reactivemongo] implicit class BSONDocumentNettyReadable(val buffer: ChannelBuffer) extends AnyVal {
+//    def makeDocument = {
+//      val bf = ChannelBufferReadableBuffer(buffer)
+//      BSONDocument.read(bf) // TODO handle errors
+//    }
+//  }
 
   protected[reactivemongo] implicit class BSONDocumentByteStringWritable(val doc: BSONDocument) extends AnyVal {
     def makeBuffer = {
-      val buffer = ByteStringBuilderWritableBuffer(new ByteStringBuilder)
+      val buffer = AkkaByteStringWritableBuffer()
       BSONDocument.write(doc, buffer)
       buffer.builder.result()
     }
@@ -157,7 +158,7 @@ object `package` {
 
   protected[reactivemongo] implicit class BSONDocumentByteStringReadable(val buffer: ByteString) extends AnyVal {
     def makeDocument = {
-      val bf = ChannelBufferReadableBuffer(buffer)
+      val bf = new AkkaReadableBuffer(buffer)
       BSONDocument.read(bf) // TODO handle errors
     }
   }

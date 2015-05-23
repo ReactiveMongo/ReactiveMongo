@@ -15,9 +15,12 @@
  */
 package reactivemongo.api.collections
 
+import akka.util.ByteStringBuilder
+import core.AkkaByteStringWritableBuffer
+
 import scala.concurrent.{ ExecutionContext, Future }
 import reactivemongo.api._
-import reactivemongo.bson.buffer.ReadableBuffer
+import reactivemongo.bson.buffer.{WritableBuffer, ReadableBuffer}
 import reactivemongo.core.protocol.{ Query, QueryFlags }
 import reactivemongo.core.netty.{ BufferSequence, ChannelBufferWritableBuffer }
 
@@ -57,7 +60,7 @@ trait GenericQueryBuilder[P <: SerializationPack] {
     options: QueryOpts = options,
     failover: FailoverStrategy = failover): Self
 
-  private def write(document: pack.Document, buffer: ChannelBufferWritableBuffer = ChannelBufferWritableBuffer()): ChannelBufferWritableBuffer = {
+  private def write(document: pack.Document, buffer: WritableBuffer = ChannelBufferWritableBuffer()): WritableBuffer = {
     pack.writeToBuffer(buffer, document)
     buffer
   }
@@ -71,18 +74,22 @@ trait GenericQueryBuilder[P <: SerializationPack] {
 
   private def defaultCursor[T](readPreference: ReadPreference, isMongo26WriteOp: Boolean = false)
                               (implicit reader: pack.Reader[T], ec: ExecutionContext): Cursor[T] = {
-    val documents = BufferSequence {
-      val buffer = write(merge(readPreference), ChannelBufferWritableBuffer())
-      projectionOption.map { projection =>
-        write(projection, buffer)
-      }.getOrElse(buffer).buffer
-    }
+    val docs = new ByteStringBuilder()
+    val documents = new AkkaByteStringWritableBuffer()
+    write(merge(readPreference), documents)
+    projectionOption.map(projection => write(projection, documents))
+//      BufferSequence {
+//      val buffer = write(merge(readPreference), ChannelBufferWritableBuffer())
+//      projectionOption.map { projection =>
+//        write(projection, buffer)
+//      }.getOrElse(buffer).buffer
+//    }
 
     val flags = if (readPreference.slaveOk) options.flagsN | QueryFlags.SlaveOk else options.flagsN
 
     val op = Query(flags, collection.fullCollectionName, options.skipN, options.batchSizeN)
 
-    DefaultCursor(pack, op, documents, readPreference, collection.db.connection, failover, isMongo26WriteOp)(reader)
+    DefaultCursor(pack, op, documents.builder.result(), readPreference, collection.db.connection, failover, isMongo26WriteOp)(reader)
   }
 
   /**

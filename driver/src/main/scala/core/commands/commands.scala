@@ -182,7 +182,7 @@ class MakableCommand(val db: String, val command: Command[_]) {
   /**
    * Returns the [[reactivemongo.core.protocol.RequestMaker]] for the given command.
    */
-  def maker = RequestMaker(makeQuery, BufferSequence(command.makeDocuments.makeBuffer))
+  def maker = RequestMaker(makeQuery, command.makeDocuments.makeBuffer)
 
   /**
    * Returns the [[reactivemongo.core.protocol.RequestMaker]] for the given command, using the given ReadPreference.
@@ -193,7 +193,7 @@ class MakableCommand(val db: String, val command: Command[_]) {
       if(readPreference.slaveOk)
         query.flags | QueryFlags.SlaveOk
       else query.flags
-    RequestMaker(query.copy(flags = flags), BufferSequence(command.makeDocuments.makeBuffer), readPreference)
+    RequestMaker(query.copy(flags = flags), command.makeDocuments.makeBuffer, readPreference)
   }
 }
 

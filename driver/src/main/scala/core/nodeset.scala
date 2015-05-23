@@ -91,31 +91,31 @@ package object utils {
 //      else node
 //    })
 //  }
-
-  def pickByChannelId(id: Int) = channelsMapping.get(id)
-
-  def pickConnection(channel: Int) = channelsMapping.get(channel)
+//
+//  def pickByChannelId(id: Int) = channelsMapping.get(id)
+//
+//  def pickConnection(channel: Int) = channelsMapping.get(channel)
 
 //  def pickForWrite: Option[(Node, Connection)] =
 //    primary.view.map(node => node -> node.authenticatedConnections.subject.headOption).collectFirst {
 //      case (node, Some(connection)) => node -> connection
 //    }
-
-  private val pickConnectionAndFlatten: Option[Node] => Option[(Node, Connection)] = _.map(node => node -> node.authenticatedConnections.pick).collect {
-    case (node, Some(connection)) => (node, connection)
-  }
+//
+//  private val pickConnectionAndFlatten: Option[Node] => Option[(Node, Connection)] = _.map(node => node -> node.authenticatedConnections.pick).collect {
+//    case (node, Some(connection)) => (node, connection)
+//  }
 //
 //  private def pickFromGroupWithFilter(roundRobiner: RoundRobiner[Node, Vector], filter: Option[BSONDocument => Boolean], fallback: => Option[Node]) =
 //    filter.fold(fallback)(f =>
 //      roundRobiner.pickWithFilter(_.tags.fold(false)(f)))
-
-  def pick(preference: ReadPreference): Option[ActorRef] = if(mongosConnections.isEmpty){
-    preference match {
-      case ReadPreference.Primary => primary
-    }
-  } else {
-    mongosConnections.getRandom._2
-  }
+//
+//  def pick(preference: ReadPreference): Option[ActorRef] = if(mongosConnections.isEmpty){
+//    preference match {
+//      case ReadPreference.Primary => primary
+//    }
+//  } else {
+//    mongosConnections.getRandom._2
+//  }
 
   // http://docs.mongodb.org/manual/reference/read-preference/
 //  def pick(preference: ReadPreference): Option[(Node, Connection)] = {
@@ -190,16 +190,16 @@ case class Connection(
 
     //channel.write(message)
   }
-
-  def isAuthenticated(db: String, user: String) =
-    authenticated.exists(auth => auth.user == user && auth.db == db)
-
-  override def receive: Actor.Receive = {
-    case Connection.RequestExpectingResponse(request, req) =>{
-      awaitingResponses = awaitingResponses + (request.requestID -> AwaitingResponse(request.requestID, channel,
-        req.promise, isGetLastError = false, isMongo26WriteOp = req.isMongo26WriteOp))
-    }
-  }
+//
+//  def isAuthenticated(db: String, user: String) =
+//    authenticated.exists(auth => auth.user == user && auth.db == db)
+//
+//  override def receive: Actor.Receive = {
+//    case Connection.RequestExpectingResponse(request, req) =>{
+//      awaitingResponses = awaitingResponses + (request.requestID -> AwaitingResponse(request.requestID, channel,
+//        req.promise, isGetLastError = false, isMongo26WriteOp = req.isMongo26WriteOp))
+//    }
+//  }
 }
 
 

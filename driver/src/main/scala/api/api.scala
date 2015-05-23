@@ -59,7 +59,8 @@ class Failover[T](message: T, connection: MongoConnection, strategy: FailoverStr
 
   private def send(n: Int) {
     val expectingResponse = expectingResponseMaker(message)
-    connection.mongosystem ! expectingResponse
+    connection.mongosystem.send(expectingResponse)
+    //connection.mongosystem ! expectingResponse
     expectingResponse.future.onComplete {
       case Failure(e) if isRetryable(e) =>
         if (n < strategy.retries) {
@@ -203,7 +204,7 @@ case class FailoverStrategy(
  */
 class MongoConnection(
     val actorSystem: ActorSystem,
-    val mongosystem: ActorRef,
+    val mongosystem: MongoDBSystem,
     val options: MongoConnectionOptions) {
   import akka.pattern.{ ask => akkaAsk }
   import akka.util.Timeout
@@ -247,7 +248,7 @@ class MongoConnection(
    */
   def ask(message: RequestMaker, isMongo26WriteOp: Boolean): Future[Response] = {
     val msg = RequestMakerExpectingResponse(message, isMongo26WriteOp)
-    mongosystem ! msg
+    mongosystem.send(msg)
     msg.future
   }
 
@@ -260,7 +261,7 @@ class MongoConnection(
    */
   def ask(checkedWriteRequest: CheckedWriteRequest) = {
     val msg = CheckedWriteRequestExpectingResponse(checkedWriteRequest)
-    mongosystem ! msg
+    mongosystem.send(msg)
     msg.future
   }
 
@@ -269,24 +270,24 @@ class MongoConnection(
    *
    * @param message The request maker.
    */
-  def send(message: RequestMaker): Unit = mongosystem ! message
+  def send(message: RequestMaker): Unit = mongosystem.send(message)
 
   def sendExpectingResponse(checkedWriteRequest: CheckedWriteRequest)(implicit ec: ExecutionContext): Future[Response] = {
     val expectingResponse = CheckedWriteRequestExpectingResponse(checkedWriteRequest)
-    mongosystem ! expectingResponse
+    mongosystem.send(expectingResponse)
     expectingResponse.future
   }
 
   def sendExpectingResponse(requestMaker: RequestMaker, isMongo26WriteOp: Boolean)(implicit ec: ExecutionContext): Future[Response] = {
     val expectingResponse = RequestMakerExpectingResponse(requestMaker, isMongo26WriteOp)
-    mongosystem ! expectingResponse
+    mongosystem.send(expectingResponse)
     expectingResponse.future
   }
 
   /** Authenticates the connection on the given database. */
   def authenticate(db: String, user: String, password: String): Future[SuccessfulAuthentication] = {
     val req = AuthRequest(Authenticate(db, user, password))
-    mongosystem ! req
+    mongosystem.send(req)
     req.future
   }
 
@@ -305,7 +306,8 @@ class MongoConnection(
     import MonitorActor._
     import scala.collection.mutable.Queue
 
-    mongosystem ! RegisterMonitor
+    // todo: fix
+    //mongosystem ! RegisterMonitor
 
     private val waitingForPrimary = Queue[ActorRef]()
     var primaryAvailable = false
@@ -340,7 +342,8 @@ class MongoConnection(
       case Close =>
         logger.debug("Monitor received Close")
         killed = true
-        mongosystem ! Close
+        //todo: fix
+        //mongosystem ! Close
         waitingForClose += sender
         waitingForPrimary.dequeueAll(_ => true).foreach(_ ! Failure(new RuntimeException("MongoDBSystem actor shutting down or no longer active")))
       case Closed =>
@@ -539,8 +542,8 @@ class MongoDriver(config: Option[Config] = None) {
     //val props = Props(new MongoDBSystem(nodes, authentications, options)())
     val mongosystem = new MongoDBSystem(nodes, authentications, options, system)
 
-    //val connection = (supervisorActor ? AddConnection(options, mongosystem))(Timeout(10, TimeUnit.SECONDS))
-    Await.result(mongosystem.connect(), Duration.Inf)
+    val connection = (supervisorActor ? AddConnection(options, mongosystem))(Timeout(10, TimeUnit.SECONDS))
+    Await.result(connection.mapTo[MongoConnection], Duration.Inf)
   }
 
   /**
@@ -579,7 +582,7 @@ class MongoDriver(config: Option[Config] = None) {
   def connection(parsedURI: MongoConnection.ParsedURI): MongoConnection =
     connection(parsedURI, 10, None)
 
-  private case class AddConnection(options: MongoConnectionOptions, mongosystem: ActorRef)
+  private case class AddConnection(options: MongoConnectionOptions, mongosystem: MongoDBSystem)
   private case class CloseWithTimeout(timeout: FiniteDuration)
 
   private case class SupervisorActor(driver: MongoDriver) extends Actor {

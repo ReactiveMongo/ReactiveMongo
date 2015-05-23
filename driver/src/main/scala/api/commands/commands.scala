@@ -1,7 +1,7 @@
 package reactivemongo.api.commands
 
 import akka.util.ByteStringBuilder
-import core.ByteStringBuilderWritableBuffer
+import core.AkkaByteStringWritableBuffer
 
 import concurrent.{ ExecutionContext, Future }
 import util.control.NoStackTrace
@@ -82,9 +82,9 @@ object Command {
     def one[A](implicit reader: pack.Reader[A], ec: ExecutionContext): Future[A] = one[A](ReadPreference.primary)
 
     def cursor[A](readPreference: ReadPreference)(implicit reader: pack.Reader[A]): Cursor[A] = {
-      val buffer = ChannelBufferWritableBuffer()
+      val buffer = new AkkaByteStringWritableBuffer()
       pack.serializeAndWrite(buffer, command, writer)
-      val bs = BufferSequence(buffer.buffer)
+      val bs = buffer.builder.result()
       val op = Query(0, db.name + ".$cmd", 0, 1)
       val mongo26WriteCommand = command match {
         case _: Mongo26WriteCommand => true
@@ -138,7 +138,7 @@ object Command {
   }
 
   private def buildRequestMaker[P <: SerializationPack, A](pack: P)(command: A, writer: pack.Writer[A], readPreference: ReadPreference, db: String): (RequestMaker, Boolean) = {
-    val buffer = ByteStringBuilderWritableBuffer(new ByteStringBuilder())
+    val buffer = AkkaByteStringWritableBuffer(new ByteStringBuilder())
     pack.serializeAndWrite(buffer, command, writer)
 
     //val documents = BufferSequence(buffer.buffer)
