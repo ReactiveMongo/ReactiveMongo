@@ -399,7 +399,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
       loop(docs)
     }
     def putOrIssueNewCommand(doc: pack.Document): Option[S]
-    def result(): ChannelBuffer
+    def result(): ByteString
     def send()(implicit ec: ExecutionContext): Future[R]
   }
 

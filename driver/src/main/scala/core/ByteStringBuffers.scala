@@ -44,5 +44,13 @@ case class AkkaByteStringWritableBuffer(builder: ByteStringBuilder = new ByteStr
   }
 
   /** Replaces 4 bytes at the given `index` by the given `value` */
-  override def setInt(index: Int, value: Int): WritableBuffer = ???
+  override def setInt(index: Int, value: Int): WritableBuffer = {
+    // todo: optimize
+    val oldValue = builder.result().splitAt(index)
+    builder.clear()
+    builder.append(oldValue._1)
+    builder.putInt(value)
+    builder.append(oldValue._2.drop(4))
+    this
+  }
 }

@@ -1,6 +1,7 @@
 package reactivemongo
 
 import java.util.Arrays
+import akka.util.ByteString
 import org.specs2.mutable._
 
 import reactivemongo.bson._
@@ -42,6 +43,7 @@ class BsonSpec extends Specification {
           BSONString("awesome"),
           BSONDouble(5.05),
           BSONDouble(1986))).makeBuffer
+      embeddingArray.length mustEqual buffer.size
       val buffer2 = buffer.makeDocument.makeBuffer
       compare(embeddingArray, buffer2)
     }
@@ -105,21 +107,19 @@ class BsonSpec extends Specification {
     }
   }
 
-  def compare(origin: Array[Byte], buffer: org.jboss.netty.buffer.ChannelBuffer) = {
-    val array = new Array[Byte](buffer.writerIndex)
-    buffer.readBytes(array)
+  def compare(origin: Array[Byte], buffer: ByteString) = {
+    val array = buffer.toArray
     val result = array.corresponds(origin)(_ == _)
 
     if (!result) {
-      log(origin, array, buffer)
+      log(origin, array)
       failure
     } else success
   }
 
-  def log(origin: Array[Byte], test: Array[Byte], buffer: org.jboss.netty.buffer.ChannelBuffer) = {
+  def log(origin: Array[Byte], test: Array[Byte]) = {
     println(Arrays.toString(origin))
     println(Arrays.toString(test))
-    println(Arrays.toString(buffer.array()))
   }
 }
 

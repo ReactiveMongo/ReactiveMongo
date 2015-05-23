@@ -27,7 +27,7 @@ class AkkaReadableBuffer(buffer: ByteString) extends ReadableBuffer {
   /** Returns the number of readable remaining bytes of this buffer. */
   override def readable(): Int = byteBuffer.remaining()
 
-  override def size: Int = byteBuffer.capacity()
+  override def size: Int = buffer.size
 
   /** Sets the read index to `index + n` (in other words, skips `n` bytes). */
   override def discard(n: Int): Unit = byteBuffer.position(byteBuffer.position() + n)

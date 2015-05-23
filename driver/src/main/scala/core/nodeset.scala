@@ -193,13 +193,10 @@ case class Connection(
 //
 //  def isAuthenticated(db: String, user: String) =
 //    authenticated.exists(auth => auth.user == user && auth.db == db)
-//
-//  override def receive: Actor.Receive = {
-//    case Connection.RequestExpectingResponse(request, req) =>{
-//      awaitingResponses = awaitingResponses + (request.requestID -> AwaitingResponse(request.requestID, channel,
-//        req.promise, isGetLastError = false, isMongo26WriteOp = req.isMongo26WriteOp))
-//    }
-//  }
+
+  override def receive: Actor.Receive = {
+    case _ =>
+  }
 }
 
 

@@ -17,10 +17,12 @@ package reactivemongo.api.gridfs
 
 import java.io._
 import java.util.Arrays
+import core.AkkaByteStringWritableBuffer
 import play.api.libs.iteratee._
 import reactivemongo.api._
 import reactivemongo.bson._
 import reactivemongo.api.commands.WriteResult
+import reactivemongo.core.AkkaReadableBuffer
 import reactivemongo.utils._
 import scala.concurrent.{ ExecutionContext, Future }
 import reactivemongo.core.netty.ChannelBufferWritableBuffer
@@ -206,10 +208,10 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
             "contentType" -> file.contentType.map(BSONString(_)),
             "metadata" -> option(!file.metadata.isEmpty, file.metadata))
           files.as[BSONCollection]().insert(bson).map { _ =>
-            val buf = ChannelBufferWritableBuffer()
+            val buf = AkkaByteStringWritableBuffer()
             BSONSerializationPack.writeToBuffer(buf, bson)
             // TODO: fix
-            //pack.readAndDeserialize(buf.toReadableBuffer, readFileReader)
+            pack.readAndDeserialize(new AkkaReadableBuffer(buf.builder.result()), readFileReader)
           }
         }
       }
