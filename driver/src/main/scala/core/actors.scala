@@ -112,7 +112,7 @@ class MongoDBSystem(
 
   private val awaitingResponses = scala.collection.mutable.LinkedHashMap[Int, AwaitingResponse]()
 
-  private val nodeSetActor = system.actorOf(Props(classOf[NodeSet]))
+  private val nodeSetActor = system.actorOf(Props(classOf[NodeSet], addConnection, removeConnection))
 
   def send(req: RequestMakerExpectingResponse) = ???
 
@@ -143,11 +143,11 @@ class MongoDBSystem(
   import scala.concurrent.duration._
 
 
-  private def addConnection(status: ConnectionStatus) : Unit = {
+  private def addConnection = (status: ConnectionStatus)  => {
 
   }
 
-  private def removeConnection(connection: ActorRef) : Unit = {
+  private def removeConnection = (actor: ActorRef) => {
 
   }
 
