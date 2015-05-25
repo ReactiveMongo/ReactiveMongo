@@ -57,6 +57,9 @@ package object utils {
  case class NodeSet(onAddConnection: ConnectionState => Unit, onRemove: ActorRef => Unit)
    extends Actor with ActorLogging {
 
+   var initialAuthenticates: Seq[Authenticate] = Seq.empty
+   var connectionsPerNode: Int = 10
+   var existingHosts : Set[String] = Set.empty
    var nodes: Vector[ActorRef] = Vector.empty
   var version: Option[Long] = None
 
@@ -136,17 +139,30 @@ package object utils {
 //    })
 
   override def receive: Receive = {
-    case ConnectAll(hosts, initialAuthenticates, count) => {
+    case ConnectAll(hosts, auth, count) => {
       log.info("Connection to initial nodes")
+      this.connectionsPerNode = count
+      this.initialAuthenticates = auth
+      existingHosts = hosts ++: existingHosts
       nodes = hosts.map(address => {
-        val node = context.actorOf(Props(classOf[Node], address, initialAuthenticates, count))
+        val node = context.actorOf(Props(classOf[Node], address, initialAuthenticates, connectionsPerNode))
         node ! Node.ConnectAll
         node
       }).toVector
     }
-    case Node.Connected(connections) =>{
+    case Node.Connected(connections) => {
+      log.info("node connected")
       nodes = sender() +: nodes
-
+    }
+    case Node.DiscoveredNodes(hosts) => {
+      log.info("nodes descovered")
+      val discovered = hosts.filter(!existingHosts.contains(_))
+      existingHosts = discovered ++: existingHosts
+      nodes = existingHosts.map(address => {
+        val node = context.actorOf(Props(classOf[Node], address, initialAuthenticates, connectionsPerNode))
+        node ! Node.ConnectAll
+        node
+      }) ++: nodes
     }
   }
 

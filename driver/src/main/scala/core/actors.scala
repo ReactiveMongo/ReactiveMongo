@@ -29,7 +29,7 @@ import scala.concurrent.{ Future, Promise }
 import scala.util.{ Failure, Success, Try }
 import reactivemongo.core.nodeset._
 import java.net.InetSocketAddress
-import reactivemongo.api.{ MongoConnectionOptions, ReadPreference }
+import reactivemongo.api.{MongoConnection, MongoConnectionOptions, ReadPreference}
 
 // messages
 
@@ -151,7 +151,9 @@ class MongoDBSystem(
 
   }
 
-  def connect() = (nodeSetActor ? NodeSet.ConnectAll)(10.seconds)
+  def connect() : Future[MongoConnection] = {
+    (nodeSetActor ? NodeSet.ConnectAll)(10.seconds)
+  }
 
   private val monitors = scala.collection.mutable.ListBuffer[ActorRef]()
   //implicit val ec = context.system.dispatcher

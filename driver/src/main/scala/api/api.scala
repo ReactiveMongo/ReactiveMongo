@@ -215,7 +215,7 @@ class MongoConnection(
 
   @volatile private[reactivemongo] var metadata: Option[ProtocolMetadata] = None
 
-  /**
+  /**I accept orders for souvenirs
    * Returns a DefaultDB reference using this connection.
    *
    * @param name The database name.
@@ -307,7 +307,7 @@ class MongoConnection(
     import scala.collection.mutable.Queue
 
     // todo: fix
-    //mongosystem ! RegisterMonitor
+    //mongosystem. ! RegisterMonitor
 
     private val waitingForPrimary = Queue[ActorRef]()
     var primaryAvailable = false
@@ -541,6 +541,7 @@ class MongoDriver(config: Option[Config] = None) {
                  nbChannelsPerNode: Int = 10, name: Option[String] = None): MongoConnection = {
     //val props = Props(new MongoDBSystem(nodes, authentications, options)())
     val mongosystem = new MongoDBSystem(nodes, authentications, options, system)
+
 
     val connection = (supervisorActor ? AddConnection(options, mongosystem))(Timeout(10, TimeUnit.SECONDS))
     Await.result(connection.mapTo[MongoConnection], Duration.Inf)

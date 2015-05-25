@@ -72,13 +72,18 @@ case class Node(
       val connection = system.actorOf(Props(classOf[Connection], sender()))
       awaitingConnections = awaitingConnections - 1;
       connections = connection +: connections
-      if(awaitingConnections == 0)
+      if(awaitingConnections == 0){
+        context.parent ! Node.Connected(connections)
         context.become(connected)
+      }
+
     }
   }
 
   private def connected: Receive = {
-    case _ =>
+    case _ => {
+
+    }
   }
 
 }
@@ -86,6 +91,7 @@ case class Node(
 object Node {
   object ConnectAll
   case class Connected(connections: List[ActorRef])
+  case class DiscoveredNodes(hosts: Seq[String])
 }
 
 case class ConnectionState(isMongos: Boolean, isPrimary: Boolean, channel: Int, authenticated: Boolean, ping: PingInfo)
