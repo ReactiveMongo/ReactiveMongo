@@ -20,7 +20,7 @@ import org.jboss.netty.channel.{Channel, ChannelPipeline, Channels}
 import reactivemongo.api.{MongoConnectionOptions, ReadPreference}
 import reactivemongo.bson._
 import reactivemongo.core._
-import reactivemongo.core.{SocketHandler, ConnectionManager}
+import reactivemongo.core.{SocketReader, ConnectionManager}
 import reactivemongo.core.protocol.{Request, _}
 import reactivemongo.utils.LazyLogger
 
@@ -193,7 +193,7 @@ case class Connection(
 
   private var awaitingResponses = HashMap[Int, AwaitingResponse]()
 
-  val socketHandler = context.actorOf(Props(classOf[SocketHandler], connection))
+  val socketHandler = context.actorOf(Props(classOf[SocketReader], connection))
   connection ! Register(socketHandler, keepOpenOnPeerClosed = true)
 
   def send(message: Request, writeConcern: Request) {

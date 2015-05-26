@@ -19,7 +19,7 @@ import akka.actor._
 import akka.pattern._
 import akka.routing.Router
 import org.jboss.netty.channel.group._
-import reactivemongo.core.{Node, ConnectionManager, SocketHandler}
+import reactivemongo.core.{Node, ConnectionManager, SocketReader}
 import reactivemongo.core.errors._
 import reactivemongo.core.protocol._
 import reactivemongo.utils.LazyLogger

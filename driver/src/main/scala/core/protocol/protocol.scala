@@ -25,6 +25,7 @@ import org.jboss.netty.handler.codec.frame.FrameDecoder
 import org.jboss.netty.handler.codec.oneone._
 import reactivemongo.api.{ReadPreference, SerializationPack}
 import reactivemongo.api.commands.GetLastError
+import reactivemongo.bson.buffer.ReadableBuffer
 import reactivemongo.core.actors.{ChannelClosed, ChannelConnected, ChannelDisconnected}
 import reactivemongo.core.errors._
 import reactivemongo.core.netty._
@@ -104,6 +105,7 @@ trait ChannelBufferWritable {
   def size: Int
 }
 
+
 /**
  * A constructor of T instances from a [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]].
  *
@@ -115,6 +117,14 @@ trait ChannelBufferReadable[T] {
   /** @see readFrom */
   def apply(buffer: ChannelBuffer): T = readFrom(buffer)
 }
+
+trait BufferReadable[T] {
+  /** Makes an instance of T from the data from the given buffer. */
+  def readFrom(buffer: ReadableBuffer): T
+  /** @see readFrom */
+  def apply(buffer: ReadableBuffer): T = readFrom(buffer)
+}
+
 
 // concrete classes
 /**
@@ -140,11 +150,24 @@ case class MessageHeader(
 }
 
 /** Header deserializer from a [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]]. */
-object MessageHeader extends ChannelBufferReadable[MessageHeader] {
+object MessageHeader extends ChannelBufferReadable[MessageHeader] with BufferReadable[MessageHeader] {
   override def readFrom(buffer: ChannelBuffer) = {
     val messageLength = buffer.readInt
     val requestID = buffer.readInt
     val responseTo = buffer.readInt
+    val opCode = buffer.readInt
+    MessageHeader(
+      messageLength,
+      requestID,
+      responseTo,
+      opCode)
+  }
+
+  /** Makes an instance of T from the data from the given buffer. */
+  override def readFrom(buffer: ReadableBuffer) = {
+    val messageLength = buffer.size
+    val requestID = buffer.readInt
+x    val responseTo = buffer.readInt
     val opCode = buffer.readInt
     MessageHeader(
       messageLength,

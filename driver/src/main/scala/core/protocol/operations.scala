@@ -20,6 +20,7 @@ import java.nio.ByteOrder
 import akka.util.ByteStringBuilder
 import org.jboss.netty.channel._
 import org.jboss.netty.buffer._
+import reactivemongo.bson.buffer.ReadableBuffer
 
 private[core] object ByteStringBuilderHelper {
   implicit val byteOrder = ByteOrder.LITTLE_ENDIAN
@@ -195,12 +196,19 @@ case class Reply(
   lazy val stringify = toString + " [" + str(cursorNotFound, "CursorNotFound;") + str(queryFailure, "QueryFailure;") + str(awaitCapable, "AwaitCapable") + "]"
 }
 
-object Reply extends ChannelBufferReadable[Reply] {
+object Reply extends ChannelBufferReadable[Reply] with BufferReadable[Reply] {
   def readFrom(buffer: ChannelBuffer) = Reply(
     buffer.readInt,
     buffer.readLong,
     buffer.readInt,
     buffer.readInt)
+
+  override def readFrom(buffer: ReadableBuffer) = Reply(
+    buffer.readInt,
+    buffer.readLong,
+    buffer.readInt,
+    buffer.readInt
+  )
 }
 
 /**
