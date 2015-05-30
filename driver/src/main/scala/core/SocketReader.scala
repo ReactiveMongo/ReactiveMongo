@@ -6,6 +6,7 @@ import akka.actor.{ActorRef, ActorLogging, Actor}
 import akka.io.Tcp._
 import akka.util.{ByteString, ByteStringBuilder}
 
+import scala.annotation.tailrec
 import scala.collection.immutable.{Queue, HashMap}
 
 /**
@@ -25,7 +26,8 @@ class SocketReader(val connection: ActorRef) extends Actor with ActorLogging {
       log.error("Unable to handle message {}", msg)
   }
 
-  def process(data: ByteString): ByteString ={
+  @tailrec
+  private def process(data: ByteString): ByteString ={
     if(data.length < 4) data
     val l = data.iterator.getInt
     if(data.length < l) data

@@ -151,9 +151,10 @@ class MongoDBSystem(
 
   }
 
-  def connect() : Future[MongoConnection] = {
-    (nodeSetActor ? NodeSet.ConnectAll)(10.seconds)
-  }
+  def connect() : Future[MongoConnection] = ???
+//  {
+//    (nodeSetActor ? NodeSet.ConnectAll)(10.seconds)
+//  }
 
   private val monitors = scala.collection.mutable.ListBuffer[ActorRef]()
   //implicit val ec = context.system.dispatcher
@@ -734,4 +735,13 @@ private[actors] case class RequestIdGenerator(
   def next = iterator.next
   def accepts(id: Int): Boolean = id >= lower && id <= upper
   def accepts(response: Response): Boolean = accepts(response.header.responseTo)
+}
+
+class RequestId(min: Int = Int.MinValue, max: Int = Int.MaxValue){
+  private var value = min
+  def next = {
+    val result = value
+    value = if(value == max) min else value + 1
+    result
+  }
 }

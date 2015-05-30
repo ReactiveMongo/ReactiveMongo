@@ -26,6 +26,7 @@ import org.jboss.netty.handler.codec.oneone._
 import reactivemongo.api.{ReadPreference, SerializationPack}
 import reactivemongo.api.commands.GetLastError
 import reactivemongo.bson.buffer.ReadableBuffer
+import reactivemongo.core.AkkaReadableBuffer
 import reactivemongo.core.actors.{ChannelClosed, ChannelConnected, ChannelDisconnected}
 import reactivemongo.core.errors._
 import reactivemongo.core.netty._
@@ -167,7 +168,7 @@ object MessageHeader extends ChannelBufferReadable[MessageHeader] with BufferRea
   override def readFrom(buffer: ReadableBuffer) = {
     val messageLength = buffer.size
     val requestID = buffer.readInt
-x    val responseTo = buffer.readInt
+    val responseTo = buffer.readInt
     val opCode = buffer.readInt
     MessageHeader(
       messageLength,
@@ -278,7 +279,7 @@ object Request {
 case class Response(
     header: MessageHeader,
     reply: Reply,
-    documents: ChannelBuffer,
+    documents: ByteString,
     info: ResponseInfo) {
   /**
    * if this response is in error, explain this error.
@@ -361,11 +362,17 @@ private[reactivemongo] class RequestEncoder extends OneToOneEncoder {
 }
 
 object ReplyDocumentIterator  {
-  def apply[P <: SerializationPack, A](pack: P)(reply: Reply, buffer: ChannelBuffer)(implicit reader: pack.Reader[A]): Iterator[A] = new Iterator[A] {
-    override def hasNext = buffer.readable
+  def apply[P <: SerializationPack, A](pack: P)(reply: Reply, buffer: ByteString)(implicit reader: pack.Reader[A]): Iterator[A] = new Iterator[A] {
+    implicit val byteOrder = ByteOrder.LITTLE_ENDIAN
+    private var tail = buffer
+    override def hasNext = tail.size > 4
     override def next =
       try {
-        val cbrb = ChannelBufferReadableBuffer(buffer.readBytes(buffer.getInt(buffer.readerIndex)))
+        val splitted = tail.splitAt(4)
+        val l = splitted._1.iterator.getInt
+        val splitted2 = splitted._2.splitAt(l - 4)
+        tail = splitted2._2
+        val cbrb = new AkkaReadableBuffer(splitted2._1) //ChannelBufferReadableBuffer(buffer.readBytes(buffer.getInt(buffer.readerIndex)))
         pack.readAndDeserialize(cbrb, reader)
       } catch {
         case e: IndexOutOfBoundsException =>
@@ -417,16 +424,16 @@ private[reactivemongo] class ResponseFrameDecoder extends FrameDecoder {
   }
 }
 
-private[reactivemongo] class ResponseDecoder extends OneToOneDecoder {
-
-  def decode(ctx: ChannelHandlerContext, channel: Channel, obj: Object) = {
-    val buffer = obj.asInstanceOf[ChannelBuffer]
-    val header = MessageHeader(buffer)
-    val reply = Reply(buffer)
-
-    Response(header, reply, buffer, ResponseInfo(channel.getId))
-  }
-}
+//private[reactivemongo] class ResponseDecoder extends OneToOneDecoder {
+//
+//  def decode(ctx: ChannelHandlerContext, channel: Channel, obj: Object) = {
+//    val buffer = obj.asInstanceOf[ChannelBuffer]
+//    val header = MessageHeader(buffer)
+//    val reply = Reply(buffer)
+//
+//    Response(header, reply, buffer, ResponseInfo(channel.getId))
+//  }
+//}
 
 private[reactivemongo] class MongoHandler(receiver: ActorRef) extends SimpleChannelHandler {
   import MongoHandler._

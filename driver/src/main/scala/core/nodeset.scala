@@ -9,8 +9,9 @@ import akka.io.{Tcp, IO}
 import akka.pattern.ask
 import akka.actor._
 import akka.routing.{RoundRobinRoutingLogic, Router}
-import akka.util.Timeout
-import reactivemongo.core.actors.{AwaitingResponse, RequestMakerExpectingResponse}
+import akka.util.{ByteString, ByteStringBuilder, Timeout}
+import core.SocketWriter
+import reactivemongo.core.actors._
 import reactivemongo.core.nodeset.NodeSet.ConnectAll
 import scala.collection.immutable.HashMap
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -191,10 +192,13 @@ case class Connection(
       //authenticating: Option[Authenticating],
       ) extends Actor {
 
-  private var awaitingResponses = HashMap[Int, AwaitingResponse]()
+  private var awaitingResponses = HashMap[Int, ActorRef]()
+  val requestIds = new RequestId
+  val socketReader = context.actorOf(Props(classOf[SocketReader], connection))
+  val socketWriter = context.actorOf(Props(classOf[SocketWriter], context))
+  connection ! Register(socketReader, keepOpenOnPeerClosed = true)
 
-  val socketHandler = context.actorOf(Props(classOf[SocketReader], connection))
-  connection ! Register(socketHandler, keepOpenOnPeerClosed = true)
+
 
   def send(message: Request, writeConcern: Request) {
     //channel.write(message)
@@ -211,7 +215,16 @@ case class Connection(
 //    authenticated.exists(auth => auth.user == user && auth.db == db)
 
   override def receive: Actor.Receive = {
-    case _ =>
+    case req : RequestMakerExpectingResponse => {
+      val requestId = requestIds.next
+      val request = req.requestMaker(requestId)
+      val builder = new ByteStringBuilder()
+      request.append(builder)
+      socketWriter ! builder.result()
+    }
+    case data : ByteString => {
+
+    }
   }
 }
 

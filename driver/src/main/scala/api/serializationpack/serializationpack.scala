@@ -1,6 +1,9 @@
 package reactivemongo.api
 
+import java.nio.ByteOrder
+
 import reactivemongo.bson.buffer.{ ReadableBuffer, WritableBuffer }
+import reactivemongo.core.AkkaReadableBuffer
 
 trait SerializationPack { self: Singleton =>
   type Document
@@ -26,9 +29,11 @@ trait SerializationPack { self: Singleton =>
   import reactivemongo.core.netty.ChannelBufferReadableBuffer
 
   final def readAndDeserialize[A](response: Response, reader: Reader[A]): A = {
-    val buf = response.documents
-    val channelBuf = ChannelBufferReadableBuffer(buf.readBytes(buf.getInt(buf.readerIndex)))
-    readAndDeserialize(channelBuf, reader)
+    implicit val order = ByteOrder.LITTLE_ENDIAN
+    val buf = response.documents.splitAt(4)
+    val byteStringBuffer = new AkkaReadableBuffer(buf._2.splitAt(buf._1.iterator.getInt)._2)
+    //val channelBuf = ChannelBufferReadableBuffer(buf.readBytes(buf.getInt(buf.readerIndex)))
+    readAndDeserialize(byteStringBuffer, reader)
   }
 }
 

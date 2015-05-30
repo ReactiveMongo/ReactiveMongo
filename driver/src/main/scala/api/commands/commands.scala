@@ -2,6 +2,7 @@ package reactivemongo.api.commands
 
 import akka.util.ByteStringBuilder
 import core.AkkaByteStringWritableBuffer
+import reactivemongo.core.AkkaReadableBuffer
 
 import concurrent.{ ExecutionContext, Future }
 import util.control.NoStackTrace
@@ -74,7 +75,7 @@ object Command {
       Failover2(db.connection, failover) { () =>
         db.connection.sendExpectingResponse(requestMaker, mongo26WriteCommand).map { response =>
           pack.readAndDeserialize(
-            LoweLevelDocumentIterator(ChannelBufferReadableBuffer(response.documents)).next, reader)
+            LoweLevelDocumentIterator(new AkkaReadableBuffer(response.documents)).next, reader)
         }
       }.future
     }
