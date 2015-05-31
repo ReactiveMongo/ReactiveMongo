@@ -15,6 +15,8 @@
  */
 package reactivemongo.core.commands
 
+import reactivemongo.core.actors.RequestMakerExpectingResponse
+
 import scala.util.{ Try, Failure }
 import reactivemongo.api.ReadPreference
 import reactivemongo.bson._
@@ -182,7 +184,7 @@ class MakableCommand(val db: String, val command: Command[_]) {
   /**
    * Returns the [[reactivemongo.core.protocol.RequestMaker]] for the given command.
    */
-  def maker = RequestMaker(makeQuery, command.makeDocuments.makeBuffer)
+  def maker = RequestMakerExpectingResponse(RequestMaker(makeQuery, command.makeDocuments.makeBuffer), false)
 
   /**
    * Returns the [[reactivemongo.core.protocol.RequestMaker]] for the given command, using the given ReadPreference.

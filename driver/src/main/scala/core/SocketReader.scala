@@ -5,6 +5,7 @@ import java.nio.ByteOrder
 import akka.actor.{ActorRef, ActorLogging, Actor}
 import akka.io.Tcp._
 import akka.util.{ByteString, ByteStringBuilder}
+import reactivemongo.core.protocol.{ResponseInfo, Response, Reply, MessageHeader}
 
 import scala.annotation.tailrec
 import scala.collection.immutable.{Queue, HashMap}
@@ -31,9 +32,14 @@ class SocketReader(val connection: ActorRef) extends Actor with ActorLogging {
     if(data.length < 4) data
     val l = data.iterator.getInt
     if(data.length < l) data
-    val splitted = data.splitAt(l)
-    context.parent ! splitted._1.drop(4)
-    process(splitted._2)
+    val splittedResponse = data.splitAt(l)
+    val splittedHeader = splittedResponse._1.splitAt(MessageHeader.size)
+    val splittedReply = splittedHeader._2.splitAt(Reply.size)
+    val header = MessageHeader(splittedHeader._1)
+    val reply = Reply(splittedReply._1)
+    val response = Response(header, reply, splittedReply._2, ResponseInfo(-1))
+    context.parent ! response
+    process(splittedResponse._2)
   }
 }
 

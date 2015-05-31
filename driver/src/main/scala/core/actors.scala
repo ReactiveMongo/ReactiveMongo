@@ -15,11 +15,13 @@
  */
 package reactivemongo.core.actors
 
+import java.util.concurrent.atomic.AtomicInteger
+
 import akka.actor._
 import akka.pattern._
 import akka.routing.Router
 import org.jboss.netty.channel.group._
-import reactivemongo.core.{Node, ConnectionManager, SocketReader}
+import reactivemongo.core.{ConnectionState, Node, ConnectionManager, SocketReader}
 import reactivemongo.core.errors._
 import reactivemongo.core.protocol._
 import reactivemongo.utils.LazyLogger
@@ -104,6 +106,8 @@ class MongoDBSystem(
     system: ActorSystem) {
   import MongoDBSystem._
 
+  private var channel = new AtomicInteger(0)
+
 
   var primaries : Router = null
   var secondaries : Router = null
@@ -113,6 +117,8 @@ class MongoDBSystem(
   private val awaitingResponses = scala.collection.mutable.LinkedHashMap[Int, AwaitingResponse]()
 
   private val nodeSetActor = system.actorOf(Props(classOf[NodeSet], addConnection, removeConnection))
+
+  def nextChannel = channel.incrementAndGet()
 
   def send(req: RequestMakerExpectingResponse) = ???
 
@@ -143,7 +149,7 @@ class MongoDBSystem(
   import scala.concurrent.duration._
 
 
-  private def addConnection = (status: ConnectionStatus)  => {
+  private def addConnection = (status: ConnectionState)  => {
 
   }
 
@@ -693,7 +699,8 @@ private[core] case class AwaitingResponse(
   channelID: Int,
   promise: Promise[Response],
   isGetLastError: Boolean,
-  isMongo26WriteOp: Boolean)
+  isMongo26WriteOp: Boolean,
+  handler : (Response) => Unit)
 
 /** A message to send to a MonitorActor to be warned when a primary has been discovered. */
 case object WaitForPrimary

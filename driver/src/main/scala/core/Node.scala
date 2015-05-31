@@ -1,19 +1,15 @@
 package reactivemongo.core
 
 import java.net.InetSocketAddress
-import java.util.concurrent.atomic.AtomicInteger
 
-import akka.actor.Actor.Receive
+import scala.concurrent.ExecutionContext.Implicits.global
 import akka.actor._
 import akka.io.Tcp._
-import akka.io.{Tcp, IO}
-import reactivemongo.api.commands.bson.BSONIsMasterCommand
+import akka.io.{IO, Tcp}
+import akka.pattern.pipe
 import reactivemongo.bson.BSONDocument
-import reactivemongo.core.actors.RequestIds
+import reactivemongo.core.commands.IsMaster
 import reactivemongo.core.nodeset._
-import reactivemongo.api.commands.IsMasterCommand
-
-import scala.collection.immutable.HashMap
 
 /**
  * Created by sh1ng on 10/05/15.
@@ -76,12 +72,18 @@ case class Node(
       awaitingConnections = awaitingConnections - 1;
       connections = connection +: connections
       if(awaitingConnections == 0){
-        connections.head ! Node.IsMater
+        sendIsMaster()
         //context.parent ! Node.Connected(connections)
         //context.become(connected)
       }
     }
     //case IsMasterResult =>
+  }
+
+  private def sendIsMaster() = {
+    val request = IsMaster().maker
+    connections.head ! request
+    request.future pipeTo context.parent
   }
 
   private def connected: Receive = {
@@ -96,6 +98,7 @@ object Node {
   object ConnectAll
   case class Connected(connections: List[ActorRef])
   case class DiscoveredNodes(hosts: Seq[String])
+  object PrimaryUnavailable
   object IsMater
 }
 

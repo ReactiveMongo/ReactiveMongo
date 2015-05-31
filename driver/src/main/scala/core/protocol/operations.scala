@@ -17,7 +17,7 @@ package reactivemongo.core.protocol
 
 import java.nio.ByteOrder
 
-import akka.util.ByteStringBuilder
+import akka.util.{ByteString, ByteStringBuilder}
 import org.jboss.netty.channel._
 import org.jboss.netty.buffer._
 import reactivemongo.bson.buffer.ReadableBuffer
@@ -181,6 +181,7 @@ case class Reply(
     numberReturned: Int) extends Op {
   override val code = 1
 
+  val size = 4 + 8 + 4 + 4
   /** States whether the cursor given in the request was found */
   lazy val cursorNotFound = (flags & 0x01) != 0
   /** States if the request encountered an error */
@@ -196,7 +197,9 @@ case class Reply(
   lazy val stringify = toString + " [" + str(cursorNotFound, "CursorNotFound;") + str(queryFailure, "QueryFailure;") + str(awaitCapable, "AwaitCapable") + "]"
 }
 
-object Reply extends ChannelBufferReadable[Reply] with BufferReadable[Reply] {
+object Reply extends ChannelBufferReadable[Reply] with BufferReadable[Reply] with ReadableFrom[ByteString, Reply] {
+  val size = 4 + 8 + 4 + 4
+
   def readFrom(buffer: ChannelBuffer) = Reply(
     buffer.readInt,
     buffer.readLong,
@@ -209,6 +212,16 @@ object Reply extends ChannelBufferReadable[Reply] with BufferReadable[Reply] {
     buffer.readInt,
     buffer.readInt
   )
+
+  override def readFrom(buffer: ByteString): Reply = {
+    val iterator = buffer.iterator
+    Reply(
+      iterator.getInt,
+      iterator.getLong,
+      iterator.getInt,
+      iterator.getInt
+    )
+  }
 }
 
 /**

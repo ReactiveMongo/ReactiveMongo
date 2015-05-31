@@ -12,6 +12,7 @@ import akka.routing.{RoundRobinRoutingLogic, Router}
 import akka.util.{ByteString, ByteStringBuilder, Timeout}
 import core.SocketWriter
 import reactivemongo.core.actors._
+import reactivemongo.core.commands.LastError
 import reactivemongo.core.nodeset.NodeSet.ConnectAll
 import scala.collection.immutable.HashMap
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -190,9 +191,9 @@ case class Connection(
       connection: ActorRef //,
       //authenticated: Set[Authenticated],
       //authenticating: Option[Authenticating],
-      ) extends Actor {
+      ) extends Actor with ActorLogging {
 
-  private var awaitingResponses = HashMap[Int, ActorRef]()
+  private var awaitingResponses = HashMap[Int, AwaitingResponse]()
   val requestIds = new RequestId
   val socketReader = context.actorOf(Props(classOf[SocketReader], connection))
   val socketWriter = context.actorOf(Props(classOf[SocketWriter], context))
@@ -220,11 +221,86 @@ case class Connection(
       val request = req.requestMaker(requestId)
       val builder = new ByteStringBuilder()
       request.append(builder)
+
       socketWriter ! builder.result()
     }
-    case data : ByteString => {
+    case response : Response => {
 
     }
+  }
+
+  private def processResponse(response: Response) = {
+      awaitingResponses.get(response.header.responseTo) match {
+        case Some(AwaitingResponse(_, _, promise, isGetLastError, isMongo26WriteOp)) => {
+          log.debug("Got a response from " + response.info.channelId + "! Will give back message=" + response + " to promise " + promise)
+          awaitingResponses -= response.header.responseTo
+          if (response.error.isDefined) {
+            log.debug("{" + response.header.responseTo + "} sending a failure... (" + response.error.get + ")")
+            if (response.error.get.isNotAPrimaryError) context.parent ! Node.PrimaryUnavailable
+            promise.failure(response.error.get)
+          } else if (isGetLastError) {
+            log.debug("{" + response.header.responseTo + "} it's a getlasterror")
+            // todo, for now rewinding buffer at original index
+            val ridx = response.documents.readerIndex
+            LastError(response).fold(e => {
+              log.error(s"Error deserializing LastError message #${response.header.responseTo}", e)
+              promise.failure(new RuntimeException(s"Error deserializing LastError message #${response.header.responseTo}", e))
+            },
+              lastError => {
+                if (lastError.inError) {
+                  log.debug("{" + response.header.responseTo + "} sending a failure (lasterror is not ok)")
+                  if (lastError.isNotAPrimaryError) context.parent ! Node.PrimaryUnavailable
+                  promise.failure(lastError)
+                } else {
+                  log.debug("{" + response.header.responseTo + "} sending a success (lasterror is ok)")
+                  response.documents.readerIndex(ridx)
+                  promise.success(response)
+                }
+              })
+          } else if (isMongo26WriteOp) {
+            // TODO - logs, bson
+            // MongoDB 26 Write Protocol errors
+            log.debug("received a response to a MongoDB2.6 Write Op")
+            import reactivemongo.bson.lowlevel._
+            import reactivemongo.core.netty.ChannelBufferReadableBuffer
+            val reader = new LowLevelBsonDocReader(new AkkaReadableBuffer(response.documents))
+            val fields = reader.fieldStream
+            val okField = fields.find(_.name == "ok")
+            log.debug(s"{${response.header.responseTo}} ok field is: $okField")
+            val processedOk = okField.collect {
+              case BooleanField(_, v) => v
+              case IntField(_, v) => v != 0
+              case DoubleField(_, v) => v != 0
+            }.getOrElse(false)
+
+            if (processedOk) {
+              log.debug(s"{${response.header.responseTo}} [MongoDB26 Write Op response] sending a success!")
+              promise.success(response)
+            } else {
+              log.debug(s"{${response.header.responseTo}} [MongoDB26 Write Op response] processedOk is false! sending an error")
+              val notAPrimary = fields.find(_.name == "errmsg").exists {
+                case errmsg @ LazyField(0x02, _, buf) =>
+                  log.debug(s"{${response.header.responseTo}} [MongoDB26 Write Op response] errmsg is $errmsg!")
+                  buf.readString == "not a primary"
+                case errmsg =>
+                  log.debug(s"{${response.header.responseTo}} [MongoDB26 Write Op response] errmsg is $errmsg but not interesting!")
+                  false
+              }
+              if(notAPrimary) {
+                log.debug(s"{${response.header.responseTo}} [MongoDB26 Write Op response] not a primary error!")
+                context.parent ! Node.PrimaryUnavailable
+              }
+              promise.failure(new RuntimeException("not ok"))
+            }
+          } else {
+            log.debug(s"{${response.header.responseTo}} [MongoDB26 Write Op response] sending a success!")
+            promise.success(response)
+          }
+        }
+        case None => {
+          log.error("oups. " + response.header.responseTo + " not found! complete message is " + response)
+        }
+      }
   }
 }
 

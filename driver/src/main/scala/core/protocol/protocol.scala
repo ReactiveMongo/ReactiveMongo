@@ -126,6 +126,11 @@ trait BufferReadable[T] {
   def apply(buffer: ReadableBuffer): T = readFrom(buffer)
 }
 
+trait ReadableFrom[B, T] {
+  def readFrom(buffer: B) : T
+  def apply(buffer: B) : T =  readFrom(buffer)
+}
+
 
 // concrete classes
 /**
@@ -151,7 +156,8 @@ case class MessageHeader(
 }
 
 /** Header deserializer from a [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]]. */
-object MessageHeader extends ChannelBufferReadable[MessageHeader] with BufferReadable[MessageHeader] {
+object MessageHeader extends ChannelBufferReadable[MessageHeader] with ReadableFrom[ByteString, MessageHeader] {
+  val size = 4 + 4 + 4 + 4
   override def readFrom(buffer: ChannelBuffer) = {
     val messageLength = buffer.readInt
     val requestID = buffer.readInt
@@ -165,16 +171,24 @@ object MessageHeader extends ChannelBufferReadable[MessageHeader] with BufferRea
   }
 
   /** Makes an instance of T from the data from the given buffer. */
-  override def readFrom(buffer: ReadableBuffer) = {
-    val messageLength = buffer.size
-    val requestID = buffer.readInt
-    val responseTo = buffer.readInt
-    val opCode = buffer.readInt
+//  override def readFrom(buffer: ReadableBuffer) = {
+//    val messageLength = buffer.size
+//    val requestID = buffer.readInt
+//    val responseTo = buffer.readInt
+//    val opCode = buffer.readInt
+//    MessageHeader(
+//      messageLength,
+//      requestID,
+//      responseTo,
+//      opCode)
+//  }
+  override def readFrom(buffer: ByteString): MessageHeader = {
+    val iterator = buffer.iterator
     MessageHeader(
-      messageLength,
-      requestID,
-      responseTo,
-      opCode)
+      iterator.getInt,
+      iterator.getInt,
+      iterator.getInt,
+      iterator.getInt)
   }
 }
 
