@@ -2,6 +2,8 @@ package reactivemongo.core
 
 import java.net.InetSocketAddress
 
+import reactivemongo.api.commands.bson.BSONIsMasterCommand
+
 import scala.concurrent.ExecutionContext.Implicits.global
 import akka.actor._
 import akka.io.Tcp._
@@ -73,17 +75,37 @@ case class Node(
       connections = connection +: connections
       if(awaitingConnections == 0){
         sendIsMaster()
-        //context.parent ! Node.Connected(connections)
-        //context.become(connected)
       }
     }
-    //case IsMasterResult =>
+    case Node.IsMater => sendIsMaster()
+    case IsMasterInfo(isMaster, ping) => {
+      log.debug(isMaster.toString)
+      if(pingInfo.lastIsMasterTime < ping.lastIsMasterTime)
+        pingInfo = ping
+      else
+        self ! Node.IsMater
+
+      isMaster.replicaSet match {
+        case Some(replica) => {
+          context.parent ! Node.DiscoveredNodes(replica.hosts)
+        }
+      }
+      val state = ConnectionState(isMaster.isMongos, isMaster.isMaster, -1, false, ping)
+      context.parent ! Node.Connected(connections.map((_, state)))
+    }
   }
 
   private def sendIsMaster() = {
+    val initialInfo = PingInfo(Int.MaxValue, System.currentTimeMillis())
     val request = IsMaster().maker
     connections.head ! request
-    request.future pipeTo context.parent
+    request.future.map(response => {
+      import reactivemongo.api.BSONSerializationPack
+      import reactivemongo.api.commands.bson.BSONIsMasterCommandImplicits
+      import reactivemongo.api.commands.Command
+      val isMaster = Command.deserialize(BSONSerializationPack, response)(BSONIsMasterCommandImplicits.IsMasterResultReader)
+      IsMasterInfo(isMaster, initialInfo.copy(ping = System.currentTimeMillis() - initialInfo.lastIsMasterTime ))
+    }) pipeTo self
   }
 
   private def connected: Receive = {
@@ -96,10 +118,11 @@ case class Node(
 
 object Node {
   object ConnectAll
-  case class Connected(connections: List[ActorRef])
+  case class Connected(connections: List[(ActorRef, ConnectionState)])
   case class DiscoveredNodes(hosts: Seq[String])
   object PrimaryUnavailable
   object IsMater
+  case class IsMasterInfo(response: BSONIsMasterCommand.IsMasterResult, ping: PingInfo)
 }
 
 case class ConnectionState(isMongos: Boolean, isPrimary: Boolean, channel: Int, authenticated: Boolean, ping: PingInfo)

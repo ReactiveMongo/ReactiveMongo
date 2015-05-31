@@ -104,7 +104,7 @@ class MongoDBSystem(
     initialAuthenticates: Seq[Authenticate],
     options: MongoConnectionOptions,
     system: ActorSystem) {
-  import MongoDBSystem._
+  import scala.concurrent.ExecutionContext.Implicits.global
 
   private var channel = new AtomicInteger(0)
 
@@ -149,18 +149,17 @@ class MongoDBSystem(
   import scala.concurrent.duration._
 
 
-  private def addConnection = (status: ConnectionState)  => {
+  private def addConnection : (ActorRef, ConnectionState) => Unit = (connection, state )  => {
 
   }
 
-  private def removeConnection = (actor: ActorRef) => {
+  private def removeConnection : Unit = (actor: ActorRef) => {
 
   }
 
-  def connect() : Future[MongoConnection] = ???
-//  {
-//    (nodeSetActor ? NodeSet.ConnectAll)(10.seconds)
-//  }
+  def connect() : Future[MongoConnection] = {
+    (nodeSetActor ? NodeSet.ConnectAll)(10.seconds).map(p => new MongoConnection(system, this, options))
+  }
 
   private val monitors = scala.collection.mutable.ListBuffer[ActorRef]()
   //implicit val ec = context.system.dispatcher
@@ -699,8 +698,7 @@ private[core] case class AwaitingResponse(
   channelID: Int,
   promise: Promise[Response],
   isGetLastError: Boolean,
-  isMongo26WriteOp: Boolean,
-  handler : (Response) => Unit)
+  isMongo26WriteOp: Boolean)
 
 /** A message to send to a MonitorActor to be warned when a primary has been discovered. */
 case object WaitForPrimary

@@ -56,92 +56,19 @@ package object utils {
   }
 }
 
- case class NodeSet(onAddConnection: ConnectionState => Unit, onRemove: ActorRef => Unit)
+ case class NodeSet(onAddConnection: ((ActorRef, ConnectionState)) => Unit, onRemove: ActorRef => Unit)
    extends Actor with ActorLogging {
 
    var initialAuthenticates: Seq[Authenticate] = Seq.empty
    var connectionsPerNode: Int = 10
    var existingHosts : Set[String] = Set.empty
    var nodes: Vector[ActorRef] = Vector.empty
-  var version: Option[Long] = None
-
-
-  //val mongos: Option[Node] = nodes.find(_.isMongos)
-  /*
-  val primary: Option[Node] = nodes.find(_.status == NodeStatus.Primary)
-  val secondaries = new RoundRobiner(nodes.filter(_.status == NodeStatus.Secondary))
-  val queryable = secondaries.subject ++ primary
-  val nearestGroup = new RoundRobiner(queryable.sortWith { _.pingInfo.ping < _.pingInfo.ping })
-  val nearest = nearestGroup.subject.headOption
-  val protocolMetadata = primary.orElse(secondaries.subject.headOption).map(_.protocolMetadata).getOrElse(ProtocolMetadata.Default)
-  */
-//
-//  def primary(authenticated: Authenticated): Option[Node] =
-//    primary.filter(_.authenticated.exists(_ == authenticated))
-//
-//  def isReachable = !primary.isEmpty || !secondaries.subject.isEmpty
-//
-//  def updateNodeByChannelId(id: Int)(ƒ: Node => Node) =
-//    updateByChannelId(id)(identity)(ƒ)
-//
-//  def updateConnectionByChannelId(id: Int)(ƒ: Connection => Connection) =
-//    updateByChannelId(id)(ƒ)(identity)
-
-//  def updateByChannelId(id: Int)(ƒc: Connection => Connection)(ƒn: Node => Node) = {
-//    copy(nodes = nodes.map { node =>
-//      val (connections, updated) = utils.update(node.connections) {
-//        case conn if (conn.chanel == id) => ƒc(conn)
-//      }
-//      if (updated) ƒn(node.copy(connections = connections))
-//      else node
-//    })
-//  }
-//
-//  def pickByChannelId(id: Int) = channelsMapping.get(id)
-//
-//  def pickConnection(channel: Int) = channelsMapping.get(channel)
-
-//  def pickForWrite: Option[(Node, Connection)] =
-//    primary.view.map(node => node -> node.authenticatedConnections.subject.headOption).collectFirst {
-//      case (node, Some(connection)) => node -> connection
-//    }
-//
-//  private val pickConnectionAndFlatten: Option[Node] => Option[(Node, Connection)] = _.map(node => node -> node.authenticatedConnections.pick).collect {
-//    case (node, Some(connection)) => (node, connection)
-//  }
-//
-//  private def pickFromGroupWithFilter(roundRobiner: RoundRobiner[Node, Vector], filter: Option[BSONDocument => Boolean], fallback: => Option[Node]) =
-//    filter.fold(fallback)(f =>
-//      roundRobiner.pickWithFilter(_.tags.fold(false)(f)))
-//
-//  def pick(preference: ReadPreference): Option[ActorRef] = if(mongosConnections.isEmpty){
-//    preference match {
-//      case ReadPreference.Primary => primary
-//    }
-//  } else {
-//    mongosConnections.getRandom._2
-//  }
-
-  // http://docs.mongodb.org/manual/reference/read-preference/
-//  def pick(preference: ReadPreference): Option[(Node, Connection)] = {
-//    if (mongos.isDefined) {
-//      pickConnectionAndFlatten(mongos)
-//    } else preference match {
-//      case ReadPreference.Primary                    => pickConnectionAndFlatten(primary)
-//      case ReadPreference.PrimaryPreferred(filter)   => pickConnectionAndFlatten(primary.orElse(pickFromGroupWithFilter(secondaries, filter, secondaries.pick)))
-//      case ReadPreference.Secondary(filter)          => pickConnectionAndFlatten(pickFromGroupWithFilter(secondaries, filter, secondaries.pick))
-//      case ReadPreference.SecondaryPreferred(filter) => pickConnectionAndFlatten(pickFromGroupWithFilter(secondaries, filter, secondaries.pick).orElse(primary))
-//      case ReadPreference.Nearest(filter)            => pickConnectionAndFlatten(pickFromGroupWithFilter(nearestGroup, filter, nearest))
-//    }
-//  }
-//
-//  def createNeededChannels(receiver: => ActorRef, connectionManager: => ActorRef, upTo: Int): NodeSet =
-//    copy(nodes = nodes.foldLeft(Vector.empty[Node]) { (nodes, node) =>
-//      nodes :+ node.createNeededChannels(receiver, connectionManager,  upTo)
-//    })
+   var version: Option[Long] = None
+   var replyTo: ActorRef = null
 
   override def receive: Receive = {
     case ConnectAll(hosts, auth, count) => {
+      replyTo = sender()
       log.info("Connection to initial nodes")
       this.connectionsPerNode = count
       this.initialAuthenticates = auth
@@ -155,12 +82,14 @@ package object utils {
     case Node.Connected(connections) => {
       log.info("node connected")
       nodes = sender() +: nodes
+      connections.foreach(onAddConnection(_))
+      if(connections.exists(p => p._2.isMongos || p._2.isPrimary)) replyTo ! Unit
     }
     case Node.DiscoveredNodes(hosts) => {
       log.info("nodes descovered")
       val discovered = hosts.filter(!existingHosts.contains(_))
       existingHosts = discovered ++: existingHosts
-      nodes = existingHosts.map(address => {
+      nodes = discovered.map(address => {
         val node = context.actorOf(Props(classOf[Node], address, initialAuthenticates, connectionsPerNode))
         node ! Node.ConnectAll
         node
@@ -306,14 +235,13 @@ case class Connection(
 
 
 object Connection {
-  case class RequestExpectingResponse(request: Request, req: RequestMakerExpectingResponse)
+  case class RequestMakerWithDeserialization(requestMaker: RequestMakerExpectingResponse)
   case class ConnectionStatus(isMongos: Boolean, isPrimary: Boolean, connection: ActorRef)
 }
 
 case class PingInfo(
   ping: Long = 0,
-  lastIsMasterTime: Long = 0,
-  lastIsMasterId: Int = -1)
+  lastIsMasterTime: Long = 0)
 
 object PingInfo {
   val pingTimeout = 60 * 1000
