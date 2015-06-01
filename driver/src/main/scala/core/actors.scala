@@ -19,7 +19,7 @@ import java.util.concurrent.atomic.AtomicInteger
 
 import akka.actor._
 import akka.pattern._
-import akka.routing.Router
+import akka.routing.{RoundRobinRoutingLogic, Router}
 import org.jboss.netty.channel.group._
 import reactivemongo.core.{ConnectionState, Node, ConnectionManager, SocketReader}
 import reactivemongo.core.errors._
@@ -109,10 +109,10 @@ class MongoDBSystem(
   private var channel = new AtomicInteger(0)
 
 
-  var primaries : Router = null
-  var secondaries : Router = null
-  var mongos : Router = null
-  var primaryPrefered : Router = null
+  var primaries : Router = Router(RoundRobinRoutingLogic())
+  var secondaries : Router = Router(RoundRobinRoutingLogic())
+  var mongos : Router = Router(RoundRobinRoutingLogic())
+  var primaryPrefered : Router = Router(RoundRobinRoutingLogic())
 
   private val awaitingResponses = scala.collection.mutable.LinkedHashMap[Int, AwaitingResponse]()
 
@@ -120,15 +120,15 @@ class MongoDBSystem(
 
   def nextChannel = channel.incrementAndGet()
 
-  def send(req: RequestMakerExpectingResponse) = ???
+  def send(req: RequestMakerExpectingResponse) = primaries.route(req, Actor.noSender)
 
-  def send(req: ExpectingResponse) = ???
+  def send(req: ExpectingResponse) = primaries.route(req, Actor.noSender)
 
-  def send(req: CheckedWriteRequestExpectingResponse) = ???
+  def send(req: CheckedWriteRequestExpectingResponse) = primaries.route(req, Actor.noSender)
 
-  def send(req: RequestMaker) = ???
+  def send(req: RequestMaker) = primaries.route(req, Actor.noSender)
 
-  def send(req: AuthRequest) = ???
+  def send(req: AuthRequest) = primaries.route(req, Actor.noSender)
 
   // todo: fix
   // monitor -->
@@ -150,7 +150,7 @@ class MongoDBSystem(
 
 
   private def addConnection : (ActorRef, ConnectionState) => Unit = (connection, state )  => {
-
+    nodeSetActor ! "aaa"
   }
 
   private def removeConnection : Unit = (actor: ActorRef) => {

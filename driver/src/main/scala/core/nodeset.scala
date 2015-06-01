@@ -170,7 +170,6 @@ case class Connection(
           } else if (isGetLastError) {
             log.debug("{" + response.header.responseTo + "} it's a getlasterror")
             // todo, for now rewinding buffer at original index
-            val ridx = response.documents.readerIndex
             LastError(response).fold(e => {
               log.error(s"Error deserializing LastError message #${response.header.responseTo}", e)
               promise.failure(new RuntimeException(s"Error deserializing LastError message #${response.header.responseTo}", e))
@@ -182,7 +181,6 @@ case class Connection(
                   promise.failure(lastError)
                 } else {
                   log.debug("{" + response.header.responseTo + "} sending a success (lasterror is ok)")
-                  response.documents.readerIndex(ridx)
                   promise.success(response)
                 }
               })
