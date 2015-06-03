@@ -24,7 +24,6 @@ import reactivemongo.bson._
 import reactivemongo.core._
 import reactivemongo.core.{SocketReader, ConnectionManager}
 import reactivemongo.core.protocol.{Request, _}
-import reactivemongo.utils.LazyLogger
 
 import scala.collection.generic.CanBuildFrom
 
@@ -370,11 +369,9 @@ class RoundRobiner[A, M[T] <: Iterable[T]](val subject: M[A], startAtIndex: Int 
 class ChannelFactory(options: MongoConnectionOptions, bossExecutor: Executor = Executors.newCachedThreadPool, workerExecutor: Executor = Executors.newCachedThreadPool) {
   import javax.net.ssl.SSLContext
 
-  private val logger = LazyLogger("reactivemongo.core.nodeset.ChannelFactory")
 
   def create(host: String = "localhost", port: Int = 27017, receiver: ActorRef) = {
     val channel = makeChannel(receiver)
-    logger.trace("created a new channel: " + channel)
     channel
   }
 

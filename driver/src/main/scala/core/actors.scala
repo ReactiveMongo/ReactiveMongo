@@ -24,7 +24,6 @@ import org.jboss.netty.channel.group._
 import reactivemongo.core._
 import reactivemongo.core.errors._
 import reactivemongo.core.protocol._
-import reactivemongo.utils.LazyLogger
 import reactivemongo.core.commands.{ Authenticate => AuthenticateCommand, _ }
 import scala.annotation.tailrec
 import scala.concurrent.{ Future, Promise }
@@ -209,7 +208,6 @@ case class AuthRequest(authenticate: Authenticate, promise: Promise[SuccessfulAu
 
 object MongoDBSystem {
   private[actors] val DefaultConnectionRetryInterval: Int = 2000 // milliseconds
-  private val logger = LazyLogger("reactivemongo.core.actors.MongoDBSystem")
 }
 
 private[core] case class AwaitingResponse(

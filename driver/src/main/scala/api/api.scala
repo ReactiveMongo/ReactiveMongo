@@ -26,7 +26,6 @@ import reactivemongo.core.actors._
 import reactivemongo.core.nodeset.Authenticate
 import reactivemongo.core.protocol._
 import reactivemongo.core.commands.SuccessfulAuthentication
-import reactivemongo.utils.LazyLogger
 import scala.collection.mutable
 import scala.concurrent.{Await, ExecutionContext, Future, Promise}
 import scala.concurrent.duration._
@@ -49,7 +48,6 @@ import scala.util.control.NonFatal
  */
 class Failover[T](message: T, connection: MongoConnection, strategy: FailoverStrategy)(expectingResponseMaker: T => ExpectingResponse)
                  (implicit ec: ExecutionContext) {
-  import Failover.logger
   import reactivemongo.core.errors._
   import reactivemongo.core.actors.Exceptions._
   private val promise = Promise[Response]()
@@ -67,18 +65,14 @@ class Failover[T](message: T, connection: MongoConnection, strategy: FailoverStr
           val `try` = n + 1
           val delayFactor = strategy.delayFactor(`try`)
           val delay = Duration.unapply(strategy.initialDelay * delayFactor).map(t => FiniteDuration(t._1, t._2)).getOrElse(strategy.initialDelay)
-          logger.debug("Got an error, retrying... (try #" + `try` + " is scheduled in " + delay.toMillis + " ms)", e)
           connection.actorSystem.scheduler.scheduleOnce(delay)(send(`try`))
         } else {
           // generally that means that the primary is not available or the nodeset is unreachable
-          logger.error("Got an error, no more attempts to do. Completing with a failure...", e)
           promise.failure(e)
         }
       case Failure(e) =>
-        logger.trace("Got an non retryable error, completing with a failure...", e)
         promise.failure(e)
       case Success(response) =>
-        logger.trace("Got a successful result, completing...")
         promise.success(response)
     }
   }
@@ -95,7 +89,6 @@ class Failover[T](message: T, connection: MongoConnection, strategy: FailoverStr
 }
 
 class Failover2[A](producer: () => Future[A], connection: MongoConnection, strategy: FailoverStrategy)(implicit ec: ExecutionContext) {
-  import Failover2.logger
   import reactivemongo.core.errors._
   import reactivemongo.core.actors.Exceptions._
 
@@ -111,18 +104,14 @@ class Failover2[A](producer: () => Future[A], connection: MongoConnection, strat
           val `try` = n + 1
           val delayFactor = strategy.delayFactor(`try`)
           val delay = Duration.unapply(strategy.initialDelay * delayFactor).map(t => FiniteDuration(t._1, t._2)).getOrElse(strategy.initialDelay)
-          logger.debug("Got an error, retrying... (try #" + `try` + " is scheduled in " + delay.toMillis + " ms)", e)
           connection.actorSystem.scheduler.scheduleOnce(delay)(send(`try`))
         } else {
           // generally that means that the primary is not available or the nodeset is unreachable
-          logger.error("Got an error, no more attempts to do. Completing with a failure...", e)
           promise.failure(e)
         }
       case Failure(e) =>
-        logger.trace("Got an non retryable error, completing with a failure...", e)
         promise.failure(e)
       case Success(response) =>
-        logger.trace("Got a successful result, completing...")
         promise.success(response)
     }
   }
@@ -139,14 +128,12 @@ class Failover2[A](producer: () => Future[A], connection: MongoConnection, strat
 }
 
 object Failover2 {
-  private val logger = LazyLogger("reactivemongo.api.Failover2")
 
   def apply[A](connection: MongoConnection, strategy: FailoverStrategy)(producer: () => Future[A])(implicit ec: ExecutionContext): Failover2[A] =
     new Failover2(producer, connection, strategy)
 }
 
 object Failover {
-  private val logger = LazyLogger("reactivemongo.api.Failover")
   /**
    * Produces a [[reactivemongo.api.Failover]] holding a future reference that is completed with a result, after 1 or more attempts (specified in the given strategy).
    *
@@ -317,48 +304,47 @@ class MongoConnection(
 
     override def receive = {
       case pa: PrimaryAvailable =>
-        logger.debug("set: a primary is available")
+//        logger.debug("set: a primary is available")
         primaryAvailable = true
         metadata = Some(pa.metadata)
         waitingForPrimary.dequeueAll(_ => true).foreach(_ ! pa)
       case PrimaryUnavailable =>
-        logger.debug("set: no primary available")
+//        logger.debug("set: no primary available")
         primaryAvailable = false
       case sa: SetAvailable =>
-        logger.debug("set: a node is available")
+//        logger.debug("set: a node is available")
         metadata = Some(sa.metadata)
       case SetUnavailable =>
-        logger.debug("set: no node seems to be available")
+//        logger.debug("set: no node seems to be available")
       case WaitForPrimary =>
         if (killed)
           sender ! Failure(new RuntimeException("MongoDBSystem actor shutting down or no longer active"))
         else if (primaryAvailable && metadata.isDefined) {
-          logger.debug(sender + " is waiting for a primary... available right now, go!")
+//          logger.debug(sender + " is waiting for a primary... available right now, go!")
           sender ! PrimaryAvailable(metadata.get)
         } else {
-          logger.debug(sender + " is waiting for a primary...  not available, warning as soon a primary is available.")
+//          logger.debug(sender + " is waiting for a primary...  not available, warning as soon a primary is available.")
           waitingForPrimary += sender
         }
       case Close =>
-        logger.debug("Monitor received Close")
+//        logger.debug("Monitor received Close")
         killed = true
         //todo: fix
         //mongosystem ! Close
         waitingForClose += sender
         waitingForPrimary.dequeueAll(_ => true).foreach(_ ! Failure(new RuntimeException("MongoDBSystem actor shutting down or no longer active")))
       case Closed =>
-        logger.debug(s"Monitor $self closed, stopping...")
+//        logger.debug(s"Monitor $self closed, stopping...")
         waitingForClose.dequeueAll(_ => true).foreach(_ ! Closed)
         context.stop(self)
     }
 
     override def postStop {
-      logger.debug(s"Monitor $self stopped.")
+//      logger.debug(s"Monitor $self stopped.")
     }
   }
 
   object MonitorActor {
-    private val logger = LazyLogger("reactivemongo.core.actors.MonitorActor")
   }
 }
 
@@ -491,15 +477,19 @@ case class MongoConnectionOptions(
 )
 
 class MongoDriver(config: Option[Config] = None) {
-  import MongoDriver.logger
 
   /* MongoDriver always uses its own ActorSystem so it can have complete control separate from other
    * Actor Systems in the application
    */
   val system = {
     import com.typesafe.config.ConfigFactory
-    val cfg = config match { case Some(c) => c; case None => ConfigFactory.load() }
-    ActorSystem("reactivemongo", cfg.getConfig("mongo-async-driver"))
+    val debugConfig = ConfigFactory.parseString("akka.loglevel = DEBUG")
+    val cfg = config match {
+      case Some(c) => c;
+      case None => ConfigFactory.load()
+    }
+    //ActorSystem("reactivemongo", cfg.getConfig("mongo-async-driver"))
+    ActorSystem("reactivemongo", debugConfig)
   }
 
   private val supervisorActor = system.actorOf(Props(new SupervisorActor(this)),"Supervisor-" + MongoDriver.nextCounter)
@@ -555,8 +545,9 @@ class MongoDriver(config: Option[Config] = None) {
    * @param name The name of the newly created [[reactivemongo.core.actors.MongoDBSystem]] actor, if needed.
    */
   def connection(parsedURI: MongoConnection.ParsedURI, nbChannelsPerNode: Int, name: Option[String]): MongoConnection = {
-    if(!parsedURI.ignoredOptions.isEmpty)
-      logger.warn(s"Some options were ignored because they are not supported (yet): ${parsedURI.ignoredOptions.mkString(", ")}")
+    if(!parsedURI.ignoredOptions.isEmpty){
+      //logger.warn(s"Some options were ignored because they are not supported (yet): ${parsedURI.ignoredOptions.mkString(", ")}")
+    }
     connection(parsedURI.hosts.map(h => h._1 + ':' + h._2), parsedURI.options, parsedURI.authenticate.toSeq, nbChannelsPerNode, name)
   }
 
@@ -613,16 +604,16 @@ class MongoDriver(config: Option[Config] = None) {
 
     def closing(shutdownTimeout: FiniteDuration) : Receive = {
       case ac: AddConnection =>
-        logger.warn("Refusing to add connection while MongoDriver is closing.")
+//        logger.warn("Refusing to add connection while MongoDriver is closing.")
       case Terminated(actor) =>
         driver.connectionMonitors.remove(actor)
         if (isEmpty) {
           context.stop(self)
         }
       case CloseWithTimeout(timeout) =>
-        logger.warn("CloseWithTimeout ignored, already closing.")
+//        logger.warn("CloseWithTimeout ignored, already closing.")
       case Close =>
-        logger.warn("Close ignored, already closing.")
+//        logger.warn("Close ignored, already closing.")
     }
 
     override def postStop {
@@ -632,7 +623,6 @@ class MongoDriver(config: Option[Config] = None) {
 }
 
 object MongoDriver {
-  private val logger = LazyLogger("reactivemongo.api.MongoDriver")
 
   /** Creates a new MongoDriver with a new ActorSystem. */
   def apply() = new MongoDriver

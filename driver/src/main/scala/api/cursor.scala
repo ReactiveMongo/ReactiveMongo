@@ -21,7 +21,6 @@ import reactivemongo.core.iteratees.{ CustomEnumeratee, CustomEnumerator }
 import reactivemongo.core.netty.BufferSequence
 import reactivemongo.core.protocol._
 import reactivemongo.utils.ExtendedFutures.DelayedFuture
-import reactivemongo.utils.LazyLogger
 import scala.annotation.tailrec
 import scala.collection.generic.CanBuildFrom
 import scala.concurrent.{ ExecutionContext, Future }
@@ -167,7 +166,6 @@ trait WrappedCursor[T] extends Cursor[T] {
 }
 
 object Cursor {
-  private[api] val logger = LazyLogger("reactivemongo.api.Cursor")
 
   /**
    * Flattens the given future [[reactivemongo.api.Cursor]] to a [[reactivemongo.api.FlattenedCursor]].
@@ -176,7 +174,6 @@ object Cursor {
 }
 
 object DefaultCursor {
-  import Cursor.logger
 
   def apply[P <: SerializationPack, A](
     pack: P,
@@ -189,12 +186,12 @@ object DefaultCursor {
       private def next(response: Response)(implicit ctx: ExecutionContext): Option[Future[Response]] = {
         if (response.reply.cursorID != 0) {
           val op = GetMore(query.fullCollectionName, query.numberToReturn, response.reply.cursorID)
-          logger.trace("[Cursor] Calling next on " + response.reply.cursorID + ", op=" + op)
+          //logger.trace("[Cursor] Calling next on " + response.reply.cursorID + ", op=" + op)
           Some(Failover2(mongoConnection, failoverStrategy) { () =>
             mongoConnection.sendExpectingResponse(RequestMaker(op).copy(channelIdHint = Some(response.info.channelId)), isMongo26WriteOp)
           }.future)
         } else {
-          logger.error("[Cursor] Call to next() but cursorID is 0, there is probably a bug")
+//          logger.error("[Cursor] Call to next() but cursorID is 0, there is probably a bug")
           None
         }
       }
@@ -224,9 +221,12 @@ object DefaultCursor {
           next = response => if (hasNext(response, maxDocs)) next(response) else None,
           cleanUp = response =>
             if (response.reply.cursorID != 0) {
-              logger.debug(s"[Cursor] Clean up ${response.reply.cursorID}, sending KillCursor")
+//              logger.debug(s"[Cursor] Clean up ${response.reply.cursorID}, sending KillCursor")
               mongoConnection.send(RequestMaker(KillCursors(Set(response.reply.cursorID))))
-            } else logger.trace(s"[Cursor] Cursor exhausted (${response.reply.cursorID})"))))
+            } else {
+//              logger.trace(s"[Cursor] Cursor exhausted (${response.reply.cursorID})")
+            }
+            )))
       }
 
       def tailableCursorEnumerateResponses(maxDocs: Int = Int.MaxValue)(implicit ctx: ExecutionContext): Enumerator[Response] = {
@@ -239,7 +239,7 @@ object DefaultCursor {
                   if (hasNext(r)) {
                     next(r)
                   } else {
-                    logger.debug("[Tailable Cursor] Current cursor exhausted, renewing...")
+//                    logger.debug("[Tailable Cursor] Current cursor exhausted, renewing...")
                     Some(DelayedFuture(500, mongoConnection.actorSystem).flatMap(_ => makeRequest))
                   }
                 nextResponse.map(_.map((_, c + r.reply.numberReturned)))
@@ -247,9 +247,11 @@ object DefaultCursor {
             },
             cleanUp = current =>
               if (current._1.reply.cursorID != 0) {
-                logger.debug(s"[Tailable Cursor] Closing  cursor ${current._1.reply.cursorID}, cleanup")
+//                logger.debug(s"[Tailable Cursor] Closing  cursor ${current._1.reply.cursorID}, cleanup")
                 mongoConnection.send(RequestMaker(KillCursors(Set(current._1.reply.cursorID))))
-              } else logger.trace(s"[Tailable Cursor] Cursor exhausted (${current._1.reply.cursorID})"))
+              } else{
+//                logger.trace(s"[Tailable Cursor] Cursor exhausted (${current._1.reply.cursorID})")
+              })
         }).map(_._1)
       }
 
@@ -267,10 +269,10 @@ object DefaultCursor {
                   val errstr = "ReplyDocumentIterator exhausted! " +
                     "Was this enumerator applied to many iteratees concurrently? " +
                     "Stopping to prevent infinite recovery."
-                  logger.error(errstr, e)
+//                  logger.error(errstr, e)
                   Error(errstr, input)
                 case e =>
-                  logger.debug("There was an exception during the stream, dropping it since stopOnError is false", e)
+//                  logger.debug("There was an exception during the stream, dropping it since stopOnError is false", e)
                   continue()
               }
             }
@@ -309,7 +311,7 @@ object DefaultCursor {
 
           def tried[A](it: Iterator[A]) = new Iterator[Try[A]] { def hasNext = it.hasNext; def next = Try(it.next) }
 
-          logger.trace(s"[collect] got response $response")
+//          logger.trace(s"[collect] got response $response")
 
           val filteredIterator =
             if (!stopOnError)

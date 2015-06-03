@@ -30,7 +30,6 @@ import reactivemongo.api.collections.GenericCollectionProducer
 import reactivemongo.api.collections.GenericCollection
 
 object `package` {
-  private[gridfs] val logger = LazyLogger("reactivemongo.api.gridfs")
 }
 
 object Implicits {
@@ -177,7 +176,7 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
 
         val normalizedChunkNumber = wholeChunk.length / chunkSize
 
-        logger.debug("wholeChunk size is " + wholeChunk.length + " => " + normalizedChunkNumber)
+//        logger.debug("wholeChunk size is " + wholeChunk.length + " => " + normalizedChunkNumber)
 
         val zipped = for (i <- 0 until normalizedChunkNumber) yield Arrays.copyOfRange(wholeChunk, i * chunkSize, (i + 1) * chunkSize) -> i
 
@@ -186,7 +185,7 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
         Future.traverse(zipped) { ci =>
           writeChunk(n + ci._2, ci._1)
         }.map { _ =>
-          logger.debug("all futures for the last given chunk are redeemed.")
+//          logger.debug("all futures for the last given chunk are redeemed.")
           Chunk(
             if (left.isEmpty) Array.empty else left,
             n + normalizedChunkNumber,
@@ -196,7 +195,7 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
       }
       def finish(): Future[ReadFile[Id]] = {
         import DefaultBSONHandlers._
-        logger.debug("writing last chunk (n=" + n + ")!")
+//        logger.debug("writing last chunk (n=" + n + ")!")
         val uploadDate = file.uploadDate.getOrElse(System.currentTimeMillis)
         writeChunk(n, previous).flatMap { f =>
           val bson = BSONDocument(
@@ -216,7 +215,7 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
         }
       }
       def writeChunk(n: Int, array: Array[Byte]) = {
-        logger.debug("writing chunk " + n)
+//        logger.debug("writing chunk " + n)
         val bson = {
           import DefaultBSONHandlers._
           BSONDocument(
@@ -229,7 +228,7 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
     }
 
     Iteratee.foldM(Chunk()) { (previous, chunk: Array[Byte]) =>
-      logger.debug("processing new enumerated chunk from n=" + previous.n + "...\n")
+//      logger.debug("processing new enumerated chunk from n=" + previous.n + "...\n")
       previous.feed(chunk)
     }.map(_.finish)
   }
@@ -256,7 +255,7 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
         }
         case _ => None
       }.getOrElse {
-        logger.error("not a chunk! failed assertion: data field is missing")
+//        logger.error("not a chunk! failed assertion: data field is missing")
         throw new RuntimeException("not a chunk! failed assertion: data field is missing")
       }
     }

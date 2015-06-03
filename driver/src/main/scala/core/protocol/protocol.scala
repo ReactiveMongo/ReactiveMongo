@@ -32,7 +32,6 @@ import reactivemongo.core.errors._
 import reactivemongo.core.netty._
 import reactivemongo.core.protocol.BufferAccessors._
 import reactivemongo.core.protocol.ByteStringBuilderHelper._
-import reactivemongo.utils.LazyLogger
 
 object `package` {
   implicit class RichBuffer(val buffer: ChannelBuffer) extends AnyVal {
@@ -368,7 +367,7 @@ private[reactivemongo] class RequestEncoder extends OneToOneEncoder {
         buffer
       }
       case _ => {
-        logger.error("weird... do not know how to encode this object: " + obj)
+//        logger.error("weird... do not know how to encode this object: " + obj)
         obj
       }
     }
@@ -420,7 +419,6 @@ case class ReplyDocumentIteratorExhaustedException(
   val cause: Exception) extends Exception(cause)
 
 private[reactivemongo] object RequestEncoder {
-  val logger = LazyLogger("reactivemongo.core.protocol.RequestEncoder")
 }
 
 private[reactivemongo] class ResponseFrameDecoder extends FrameDecoder {
@@ -482,9 +480,8 @@ private[reactivemongo] class MongoHandler(receiver: ActorRef) extends SimpleChan
     log(e, "CHANNEL ERROR: " + e.getCause)
   }
 
-  def log(e: ChannelEvent, s: String) = logger.trace("(channel=" + e.getChannel.getId + ") " + s)
+  def log(e: ChannelEvent, s: String) = {}//logger.trace("(channel=" + e.getChannel.getId + ") " + s)
 }
 
 private[reactivemongo] object MongoHandler {
-  private val logger = LazyLogger("reactivemongo.core.protocol.MongoHandler")
 }
