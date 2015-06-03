@@ -66,9 +66,9 @@ package object utils {
    var replyTo: ActorRef = null
 
   override def receive: Receive = {
-    case ConnectAll(hosts, auth, count) => {
+    case NodeSet.ConnectAll(hosts, auth, count) => {
+      log.debug("Connection to initial nodes")
       replyTo = sender()
-      log.info("Connection to initial nodes")
       this.connectionsPerNode = count
       this.initialAuthenticates = auth
       existingHosts = hosts ++: existingHosts

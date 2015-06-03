@@ -149,7 +149,7 @@ class MongoDBSystem(
 
 
   private def addConnection : (ActorRef, ConnectionState) => Unit = (connection, state )  => {
-    nodeSetActor ! "aaa"
+
   }
 
   private def removeConnection : ActorRef => Unit = (actor: ActorRef) => {
@@ -157,7 +157,8 @@ class MongoDBSystem(
   }
 
   def connect() : Future[MongoConnection] = {
-    (nodeSetActor ? NodeSet.ConnectAll)(5.seconds).map(p => new MongoConnection(system, this, options))
+    system.log.debug("connecting...")
+    (nodeSetActor ? NodeSet.ConnectAll(seeds, initialAuthenticates, options.nbChannelsPerNode))(6.seconds).map(p => new MongoConnection(system, this, options))
   }
 
   private val monitors = scala.collection.mutable.ListBuffer[ActorRef]()
