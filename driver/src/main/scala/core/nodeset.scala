@@ -74,7 +74,7 @@ package object utils {
       existingHosts = hosts ++: existingHosts
       nodes = hosts.map(address => {
         val node = context.actorOf(Props(classOf[Node], address, initialAuthenticates, connectionsPerNode))
-        node ! Node.ConnectAll
+        node ! Node.Connect
         node
       }).toVector
     }
@@ -90,7 +90,7 @@ package object utils {
       existingHosts = discovered ++: existingHosts
       nodes = discovered.map(address => {
         val node = context.actorOf(Props(classOf[Node], address, initialAuthenticates, connectionsPerNode))
-        node ! Node.ConnectAll
+        node ! Node.Connect
         node
       }) ++: nodes
     }
@@ -124,7 +124,7 @@ case class Connection(
   private var awaitingResponses = HashMap[Int, AwaitingResponse]()
   val requestIds = new RequestId
   val socketReader = context.actorOf(Props(classOf[SocketReader], connection))
-  val socketWriter = context.actorOf(Props(classOf[SocketWriter], context))
+  val socketWriter = context.actorOf(Props(classOf[SocketWriter], connection))
   connection ! Register(socketReader, keepOpenOnPeerClosed = true)
 
 

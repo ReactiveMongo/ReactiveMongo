@@ -19,7 +19,7 @@ import reactivemongo.core.nodeset._
 
 case class Node(
             address: String,
-            authenticated: Set[Authenticate],
+            authenticated: Seq[Authenticate],
             var nbOfConnections: Int
             ) extends Actor with ActorLogging {
   import Node._
@@ -63,13 +63,14 @@ case class Node(
   //
   //  }
   override def receive: Receive = {
-    case ConnectAll => {
+    case Node.Connect => {
       awaitingConnections = nbOfConnections
       val manager = IO(Tcp)
       for(i <- 0 until nbOfConnections)
-        yield manager ! Connect(new InetSocketAddress(host, port))
+        yield manager ! Tcp.Connect(new InetSocketAddress(host, port))
     }
     case Tcp.Connected(remote, local) => {
+      log.info("Connected from {} to {}", local, remote)
       val connection = system.actorOf(Props(classOf[Connection], sender()))
       awaitingConnections = awaitingConnections - 1;
       connections = connection +: connections
@@ -98,6 +99,7 @@ case class Node(
   private def sendIsMaster() = {
     val initialInfo = PingInfo(Int.MaxValue, System.currentTimeMillis())
     val request = IsMaster().maker
+    log.debug("send IsMaster to {}", connections.head)
     connections.head ! request
     request.future.map(response => {
       import reactivemongo.api.BSONSerializationPack
@@ -117,7 +119,7 @@ case class Node(
 }
 
 object Node {
-  object ConnectAll
+  object Connect
   case class Connected(connections: List[(ActorRef, ConnectionState)])
   case class DiscoveredNodes(hosts: Seq[String])
   object PrimaryUnavailable
