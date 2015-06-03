@@ -542,9 +542,7 @@ class MongoDriver(config: Option[Config] = None) {
     //val props = Props(new MongoDBSystem(nodes, authentications, options)())
     val mongosystem = new MongoDBSystem(nodes, authentications, options, system)
 
-
-    val connection = (supervisorActor ? AddConnection(options, mongosystem))(Timeout(10, TimeUnit.SECONDS))
-    Await.result(connection.mapTo[MongoConnection], Duration.Inf)
+    Await.result(mongosystem.connect(), Duration.Inf)
   }
 
   /**
