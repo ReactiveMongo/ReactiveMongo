@@ -20,6 +20,7 @@ class SocketReader(val connection: ActorRef) extends Actor with ActorLogging {
 
   override def receive: Receive = {
     case Received(data) => {
+      log.debug("Received {} bytes", data.size)
       buffer = buffer ++ data
       buffer = process(buffer)
     }
@@ -28,10 +29,16 @@ class SocketReader(val connection: ActorRef) extends Actor with ActorLogging {
   }
 
   @tailrec
-  private def process(data: ByteString): ByteString ={
-    if(data.length < 4) data
+  private def process(data: ByteString): ByteString = {
+    log.debug("length {}", data.size)
+    if(data.length < 4) {
+      return data
+    }
     val l = data.iterator.getInt
-    if(data.length < l) data
+    log.debug("message length {}", l)
+    if(data.length < l) {
+      return data
+    }
     val splittedResponse = data.splitAt(l)
     val splittedHeader = splittedResponse._1.splitAt(MessageHeader.size)
     val splittedReply = splittedHeader._2.splitAt(Reply.size)

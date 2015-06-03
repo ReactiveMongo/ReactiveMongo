@@ -153,7 +153,7 @@ case class Connection(
       socketWriter ! builder.result()
     }
     case response : Response => {
-
+      log.debug("got response")
     }
   }
 
