@@ -82,7 +82,7 @@ package object utils {
       log.info("node connected")
       nodes = sender() +: nodes
       connections.foreach(onAddConnection(_))
-      if(connections.exists(p => p._2.isMongos || p._2.isPrimary)) replyTo ! Unit
+      if(connections.exists(p => p._2.status.queryable)) replyTo ! Unit
     }
     case Node.DiscoveredNodes(hosts) => {
       log.info("nodes descovered")

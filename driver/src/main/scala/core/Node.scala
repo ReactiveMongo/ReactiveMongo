@@ -69,8 +69,9 @@ case class Node(
         self ! Node.IsMater
 
       isMaster.replicaSet.map(_.hosts).map(context.parent ! Node.DiscoveredNodes(_))
-      
-      val state = ConnectionState(isMaster.isMongos, isMaster.isMaster, -1, false, ping)
+
+      isMaster.status
+      val state = ConnectionState(isMaster.status, -1, false, ping)
       context.parent ! Node.Connected(connections.map((_, state)))
     }
   }
@@ -111,4 +112,4 @@ object Node {
   case class IsMasterInfo(response: BSONIsMasterCommand.IsMasterResult, ping: PingInfo)
 }
 
-case class ConnectionState(isMongos: Boolean, isPrimary: Boolean, channel: Int, authenticated: Boolean, ping: PingInfo)
+case class ConnectionState(status: NodeStatus, channel: Int, authenticated: Boolean, ping: PingInfo)

@@ -107,10 +107,13 @@ class MongoDBSystem(
 
   private var channel = new AtomicInteger(0)
 
-
+  @volatile
   var primaries : Router = Router(RoundRobinRoutingLogic())
+  @volatile
   var secondaries : Router = Router(RoundRobinRoutingLogic())
+  @volatile
   var mongos : Router = Router(RoundRobinRoutingLogic())
+  @volatile
   var primaryPrefered : Router = Router(RoundRobinRoutingLogic())
 
   private val awaitingResponses = scala.collection.mutable.LinkedHashMap[Int, AwaitingResponse]()
@@ -149,7 +152,11 @@ class MongoDBSystem(
 
 
   private def addConnection : (ActorRef, ConnectionState) => Unit = (connection, state )  => {
-
+    state.status match {
+      case NodeStatus.Primary => primaries = primaries.addRoutee(connection)
+      case NodeStatus.Secondary => secondaries = secondaries.addRoutee(connection)
+      case _ =>
+    }
   }
 
   private def removeConnection : ActorRef => Unit = (actor: ActorRef) => {

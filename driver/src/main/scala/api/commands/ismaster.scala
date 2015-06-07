@@ -32,6 +32,9 @@ trait IsMasterCommand[P <: SerializationPack] {
     msg: Option[String] // Contains the value isdbgrid when isMaster returns from a mongos instance.
   ) {
     def isMongos: Boolean = msg.isDefined
-    def status: NodeStatus = if (isMaster) NodeStatus.Primary else if (replicaSet.exists(_.isSecondary)) NodeStatus.Secondary else NodeStatus.NonQueryableUnknownStatus
+    def status: NodeStatus =
+      if (isMaster) NodeStatus.Primary
+      else if (replicaSet.exists(_.isSecondary)) NodeStatus.Secondary
+      else NodeStatus.NonQueryableUnknownStatus
   }
 }

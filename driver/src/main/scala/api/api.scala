@@ -226,18 +226,6 @@ class MongoConnection(
   def waitForPrimary(implicit waitForAvailability: FiniteDuration): Future[_] =
     akkaAsk(monitor, reactivemongo.core.actors.WaitForPrimary)(Timeout(waitForAvailability))
 
-  /**
-   * Writes a request and wait for a response.
-   *
-   * @param message The request maker.
-   *
-   * @return The future response.
-   */
-  def ask(message: RequestMaker, isMongo26WriteOp: Boolean): Future[Response] = {
-    val msg = RequestMakerExpectingResponse(message, isMongo26WriteOp)
-    mongosystem.send(msg)
-    msg.future
-  }
 
   /**
    * Writes a checked write request and wait for a response.
