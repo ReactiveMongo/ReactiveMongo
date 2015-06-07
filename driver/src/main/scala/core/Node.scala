@@ -44,24 +44,6 @@ case class Node(
     })
   }
 
-//    val authenticatedConnections = new RoundRobiner(connected.filter(_.authenticated.forall { auth =>
-//      authenticated.exists(_ == auth)
-//    }))
-  //
-  //  def createNeededChannels(receiver: => ActorRef, connectionManager: => ActorRef, upTo: Int)
-  //                          (implicit timeout: Timeout): Node = {
-  //    import java.net.InetSocketAddress
-  //
-  //      copy(connections = connections.++(
-  //        for( i <- 0 until upTo;
-  //          port <- connectionManager.ask(ConnectionManager.AddConnection(new InetSocketAddress(host, port), receiver)).mapTo[Int])
-  //          yield Connection(receiver, connectionManager, ConnectionStatus.Connected, Set.empty, None, port)
-  //          ))
-  //  }
-
-  //  def establishConnections(receiver: ActorRef, builder: ActorRef, upTo: Int): Unit ={
-  //
-  //  }
   override def receive: Receive = {
     case Node.Connect => {
       awaitingConnections = nbOfConnections
@@ -86,11 +68,8 @@ case class Node(
       else
         self ! Node.IsMater
 
-      isMaster.replicaSet match {
-        case Some(replica) => {
-          context.parent ! Node.DiscoveredNodes(replica.hosts)
-        }
-      }
+      isMaster.replicaSet.map(_.hosts).map(context.parent ! Node.DiscoveredNodes(_))
+      
       val state = ConnectionState(isMaster.isMongos, isMaster.isMaster, -1, false, ping)
       context.parent ! Node.Connected(connections.map((_, state)))
     }
@@ -100,14 +79,19 @@ case class Node(
     val initialInfo = PingInfo(Int.MaxValue, System.currentTimeMillis())
     val request = IsMaster().maker
     log.debug("send IsMaster to {}", connections.head)
-    connections.head ! request
     request.future.map(response => {
       import reactivemongo.api.BSONSerializationPack
       import reactivemongo.api.commands.bson.BSONIsMasterCommandImplicits
       import reactivemongo.api.commands.Command
-      val isMaster = Command.deserialize(BSONSerializationPack, response)(BSONIsMasterCommandImplicits.IsMasterResultReader)
-      IsMasterInfo(isMaster, initialInfo.copy(ping = System.currentTimeMillis() - initialInfo.lastIsMasterTime ))
+      try{
+        val isMaster = Command.deserialize(BSONSerializationPack, response)(BSONIsMasterCommandImplicits.IsMasterResultReader)
+        IsMasterInfo(isMaster, initialInfo.copy(ping = System.currentTimeMillis() - initialInfo.lastIsMasterTime ))
+      } catch{
+        case th: Throwable => log.error(th, "")
+        case e: Exception => log.error(e.toString)
+      }
     }) pipeTo self
+    connections.head ! request
   }
 
   private def connected: Receive = {

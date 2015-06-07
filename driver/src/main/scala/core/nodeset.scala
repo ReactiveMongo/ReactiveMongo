@@ -67,7 +67,7 @@ package object utils {
 
   override def receive: Receive = {
     case NodeSet.ConnectAll(hosts, auth, count) => {
-      log.debug("Connection to initial nodes")
+      log.info("Connection to initial nodes")
       replyTo = sender()
       this.connectionsPerNode = count
       this.initialAuthenticates = auth
@@ -128,32 +128,27 @@ case class Connection(
   connection ! Register(socketReader, keepOpenOnPeerClosed = true)
 
 
-
-  def send(message: Request, writeConcern: Request) {
-    //channel.write(message)
-    //channel.write(writeConcern)
-  }
-
-  def send(message: Request) = {
-
-
-    //channel.write(message)
-  }
-//
-//  def isAuthenticated(db: String, user: String) =
-//    authenticated.exists(auth => auth.user == user && auth.db == db)
-
   override def receive: Actor.Receive = {
     case req : RequestMakerExpectingResponse => {
       val requestId = requestIds.next
       val request = req.requestMaker(requestId)
       val builder = new ByteStringBuilder()
       request.append(builder)
-
+      log.debug("Send request with a header {}", request.header)
+      awaitingResponses += request.requestID -> AwaitingResponse(request.requestID, 0, req.promise, isGetLastError = false, isMongo26WriteOp = req.isMongo26WriteOp)
       socketWriter ! builder.result()
     }
     case response : Response => {
-      log.debug("got response")
+      awaitingResponses.get(response.header.responseTo) match {
+        case Some(AwaitingResponse(_, _, promise, _, _)) =>{
+          log.debug("Got a response from " + response.info.channelId + "! Will give back message=" + response + " to promise " + promise)
+          awaitingResponses -= response.header.responseTo
+          promise.success(response)
+        }
+        case None => {
+          log.error("oups. " + response.header.responseTo + " not found! complete message is " + response)
+        }
+      }
     }
   }
 

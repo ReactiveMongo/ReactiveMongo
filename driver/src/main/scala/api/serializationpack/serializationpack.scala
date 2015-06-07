@@ -30,9 +30,7 @@ trait SerializationPack { self: Singleton =>
 
   final def readAndDeserialize[A](response: Response, reader: Reader[A]): A = {
     implicit val order = ByteOrder.LITTLE_ENDIAN
-    val buf = response.documents.splitAt(4)
-    val byteStringBuffer = new AkkaReadableBuffer(buf._2.splitAt(buf._1.iterator.getInt)._2)
-    //val channelBuf = ChannelBufferReadableBuffer(buf.readBytes(buf.getInt(buf.readerIndex)))
+    val byteStringBuffer = new AkkaReadableBuffer(response.documents)
     readAndDeserialize(byteStringBuffer, reader)
   }
 }
