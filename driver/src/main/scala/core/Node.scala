@@ -53,20 +53,19 @@ case class Node(
     }
     case Tcp.Connected(remote, local) => {
       log.info("Connected from {} to {}", local, remote)
-      val connection = system.actorOf(Props(classOf[Connection], sender()))
+      val connection = context.actorOf(Props(classOf[Connection], sender()))
       awaitingConnections = awaitingConnections - 1;
       connections = connection +: connections
       if(awaitingConnections == 0){
-        sendIsMaster()
+        connections.head ! Node.IsMaster
       }
     }
-    case Node.IsMater => sendIsMaster()
     case IsMasterInfo(isMaster, ping) => {
       log.debug(isMaster.toString)
       if(pingInfo.lastIsMasterTime < ping.lastIsMasterTime)
         pingInfo = ping
       else
-        self ! Node.IsMater
+        connections.head ! Node.IsMaster
 
       isMaster.replicaSet.map(_.hosts).map(context.parent ! Node.DiscoveredNodes(_))
 
@@ -75,31 +74,26 @@ case class Node(
       context.parent ! Node.Connected(connections.map((_, state)))
     }
   }
-
-  private def sendIsMaster() = {
-    val initialInfo = PingInfo(Int.MaxValue, System.currentTimeMillis())
-    val request = IsMaster().maker
-    log.debug("send IsMaster to {}", connections.head)
-    request.future.map(response => {
-      import reactivemongo.api.BSONSerializationPack
-      import reactivemongo.api.commands.bson.BSONIsMasterCommandImplicits
-      import reactivemongo.api.commands.Command
-      try{
-        val isMaster = Command.deserialize(BSONSerializationPack, response)(BSONIsMasterCommandImplicits.IsMasterResultReader)
-        IsMasterInfo(isMaster, initialInfo.copy(ping = System.currentTimeMillis() - initialInfo.lastIsMasterTime ))
-      } catch{
-        case th: Throwable => log.error(th, "")
-        case e: Exception => log.error(e.toString)
-      }
-    }) pipeTo self
-    connections.head ! request
-  }
-
-  private def connected: Receive = {
-    case _ => {
-
-    }
-  }
+//
+//  private def sendIsMaster() = {
+//    val initialInfo = PingInfo(Int.MaxValue, System.currentTimeMillis())
+//    val request = IsMaster().maker
+//    log.debug("send IsMaster to {}", connections.head)
+//    request.future.map(response => {
+//      import reactivemongo.api.BSONSerializationPack
+//      import reactivemongo.api.commands.bson.BSONIsMasterCommandImplicits
+//      import reactivemongo.api.commands.Command
+//      try{
+//        val isMaster = Command.deserialize(BSONSerializationPack, response)(BSONIsMasterCommandImplicits.IsMasterResultReader)
+//        IsMasterInfo(isMaster, initialInfo.copy(ping = System.currentTimeMillis() - initialInfo.lastIsMasterTime ))
+//      } catch{
+//        case th: Throwable => log.error(th, "")
+//        case e: Exception => log.error(e.toString)
+//      }
+//    }) pipeTo self
+//
+//    connections.head ! request
+//  }
 
 }
 
@@ -108,7 +102,7 @@ object Node {
   case class Connected(connections: List[(ActorRef, ConnectionState)])
   case class DiscoveredNodes(hosts: Seq[String])
   object PrimaryUnavailable
-  object IsMater
+  object IsMaster
   case class IsMasterInfo(response: BSONIsMasterCommand.IsMasterResult, ping: PingInfo)
 }
 

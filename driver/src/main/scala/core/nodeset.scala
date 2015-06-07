@@ -12,7 +12,7 @@ import akka.routing.{RoundRobinRoutingLogic, Router}
 import akka.util.{ByteString, ByteStringBuilder, Timeout}
 import core.SocketWriter
 import reactivemongo.core.actors._
-import reactivemongo.core.commands.LastError
+import reactivemongo.core.commands.{IsMaster, LastError}
 import reactivemongo.core.nodeset.NodeSet.ConnectAll
 import scala.collection.immutable.HashMap
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -116,21 +116,33 @@ object ProtocolMetadata {
 }
 
 case class Connection(
-      connection: ActorRef //,
+      socketManager: ActorRef //,
       //authenticated: Set[Authenticated],
       //authenticating: Option[Authenticating],
       ) extends Actor with ActorLogging {
 
+  private var pendingIsMaster : (Int, PingInfo) = null
   private var awaitingResponses = HashMap[Int, AwaitingResponse]()
-  val requestIds = new RequestId
-  val socketReader = context.actorOf(Props(classOf[SocketReader], connection))
-  val socketWriter = context.actorOf(Props(classOf[SocketWriter], connection))
-  connection ! Register(socketReader, keepOpenOnPeerClosed = true)
+  val requestIds = new RequestIds
+  val socketReader = context.actorOf(Props(classOf[SocketReader], socketManager))
+  val socketWriter = context.actorOf(Props(classOf[SocketWriter], socketManager))
+  socketManager ! Register(socketReader, keepOpenOnPeerClosed = true)
 
 
   override def receive: Actor.Receive = {
-    case req : RequestMakerExpectingResponse => {
-      val requestId = requestIds.next
+    case Node.IsMaster => {
+      val initialInfo = PingInfo(Int.MaxValue, System.currentTimeMillis())
+      val request = IsMaster().maker(requestIds.isMaster.next)
+      val builder = new ByteStringBuilder
+      request.append(builder)
+      pendingIsMaster = (request.requestID, initialInfo)
+      socketWriter ! builder.result()
+    }
+    case req: Request => {
+
+    }
+    case req: RequestMakerExpectingResponse => {
+      val requestId = requestIds.common.next
       val request = req.requestMaker(requestId)
       val builder = new ByteStringBuilder()
       request.append(builder)
@@ -138,16 +150,22 @@ case class Connection(
       awaitingResponses += request.requestID -> AwaitingResponse(request.requestID, 0, req.promise, isGetLastError = false, isMongo26WriteOp = req.isMongo26WriteOp)
       socketWriter ! builder.result()
     }
-    case response : Response => {
-      awaitingResponses.get(response.header.responseTo) match {
-        case Some(AwaitingResponse(_, _, promise, _, _)) =>{
-          log.debug("Got a response from " + response.info.channelId + "! Will give back message=" + response + " to promise " + promise)
-          awaitingResponses -= response.header.responseTo
-          promise.success(response)
+    case response: Response => {
+      if (requestIds.isMaster accepts response) {
+        if (pendingIsMaster._1 == response.header.responseTo) {
+          import reactivemongo.api.BSONSerializationPack
+          import reactivemongo.api.commands.bson.BSONIsMasterCommandImplicits
+          import reactivemongo.api.commands.Command
+          val initialInfo = pendingIsMaster._2
+          val isMaster = Command.deserialize(BSONSerializationPack, response)(BSONIsMasterCommandImplicits.IsMasterResultReader)
+          log.debug("received isMaster {}", isMaster)
+          context.parent ! Node.IsMasterInfo(isMaster, initialInfo.copy(ping = System.currentTimeMillis() - initialInfo.lastIsMasterTime))
+        } else {
+          // prevent race condition
+          self ! Node.IsMaster
         }
-        case None => {
-          log.error("oups. " + response.header.responseTo + " not found! complete message is " + response)
-        }
+      } else {
+        processResponse(response)
       }
     }
   }

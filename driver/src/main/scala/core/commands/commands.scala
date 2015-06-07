@@ -184,7 +184,7 @@ class MakableCommand(val db: String, val command: Command[_]) {
   /**
    * Returns the [[reactivemongo.core.protocol.RequestMaker]] for the given command.
    */
-  def maker = RequestMakerExpectingResponse(RequestMaker(makeQuery, command.makeDocuments.makeBuffer), false)
+  def maker = RequestMaker(makeQuery, command.makeDocuments.makeBuffer)
 
   /**
    * Returns the [[reactivemongo.core.protocol.RequestMaker]] for the given command, using the given ReadPreference.
