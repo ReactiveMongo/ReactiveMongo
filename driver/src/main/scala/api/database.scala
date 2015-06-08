@@ -163,6 +163,7 @@ trait DBMetaCommands {
    * @param ec execution context
    * @return operation result as BSONValue
    */
+  @deprecated(since = "0.11", message = "Deprecated since MongoDB 3")
   def eval(javascript: String, nolock: Boolean)(implicit ec: ExecutionContext): Future[Option[BSONValue]] = command(new EvalCommand(javascript, nolock)) */
 }
 
