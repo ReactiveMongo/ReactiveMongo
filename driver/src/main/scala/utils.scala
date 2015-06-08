@@ -55,27 +55,10 @@ object LazyLogger {
   def apply(logger: String): LazyLogger = LazyLogger(org.apache.logging.log4j.LogManager.getLogger(logger))
 }
 
-case class EitherMappableFuture[A](future: Future[A]) {
-  def mapEither[E <: Throwable, B](f: A => Either[E, B])(implicit ec: ExecutionContext) = {
-    future.flatMap(
-      f(_) match {
-        case Left(e) => Future.failed(e)
-        case Right(b) => Future.successful(b)
-      })
-  }
-}
-object EitherMappableFuture {
-  implicit def futureToEitherMappable[A](future: Future[A]): EitherMappableFuture[A] = EitherMappableFuture(future)
-}
+object Timer {
+  private val timer = new java.util.Timer("ReactiveMongo")
 
-object ExtendedFutures {
-  import akka.actor.{ ActorSystem, Scheduler }
-
-  // better way to this?
-  def DelayedFuture(millis: Long, system: ActorSystem): Future[Unit] = {
-    implicit val ec = system.dispatcher
-    val promise = Promise[Unit]()
-    system.scheduler.scheduleOnce(Duration.apply(millis, "millis"))(promise.success(()))
-    promise.future
-  }
+  /** Schedule function `f` after given `delay`. */
+  def schedule(delay: Long)(f: => Unit): Unit = timer.schedule(
+    new java.util.TimerTask { def run = f }, delay)
 }

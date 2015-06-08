@@ -19,9 +19,7 @@ import play.api.libs.iteratee._
 import reactivemongo.core.iteratees.{ CustomEnumeratee, CustomEnumerator }
 import reactivemongo.core.netty.BufferSequence
 import reactivemongo.core.protocol._
-import reactivemongo.utils.ExtendedFutures.DelayedFuture
-import reactivemongo.utils.LazyLogger
-import scala.annotation.tailrec
+import reactivemongo.utils.{ LazyLogger, Timer }
 import scala.collection.generic.CanBuildFrom
 import scala.concurrent.{ ExecutionContext, Future }
 import scala.util._
@@ -228,6 +226,12 @@ object DefaultCursor {
             } else logger.trace(s"[Cursor] Cursor exhausted (${response.reply.cursorID})"))))
       }
 
+    @inline def after(millis: Long): Future[Unit] = {
+      val promise = scala.concurrent.Promise[Unit]()
+      Timer.schedule(millis)(promise.success(()))
+      promise.future
+    }
+
       def tailableCursorEnumerateResponses(maxDocs: Int = Int.MaxValue)(implicit ctx: ExecutionContext): Enumerator[Response] = {
         Enumerator.flatten(makeRequest.map { response =>
           new CustomEnumerator.SEnumerator(response -> 0)(
@@ -239,7 +243,7 @@ object DefaultCursor {
                     next(r)
                   } else {
                     logger.debug("[Tailable Cursor] Current cursor exhausted, renewing...")
-                    Some(DelayedFuture(500, mongoConnection.actorSystem).flatMap(_ => makeRequest))
+                    Some(after(500).flatMap(_ => makeRequest))
                   }
                 nextResponse.map(_.map((_, c + r.reply.numberReturned)))
               } else None
@@ -280,7 +284,7 @@ object DefaultCursor {
         enumerateResponses(maxDocs, stopOnError) &> Enumeratee.map(response => ReplyDocumentIterator(pack)(response.reply, response.documents))
 
       def enumerate(maxDocs: Int = Int.MaxValue, stopOnError: Boolean = false)(implicit ctx: ExecutionContext): Enumerator[A] = {
-        @tailrec
+        @annotation.tailrec
         def next(it: Iterator[A], stopOnError: Boolean): Option[Try[A]] = {
           if (it.hasNext) {
             val tried = Try(it.next)
