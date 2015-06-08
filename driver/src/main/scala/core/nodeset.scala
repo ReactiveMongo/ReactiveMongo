@@ -116,9 +116,7 @@ object ProtocolMetadata {
 }
 
 case class Connection(
-      socketManager: ActorRef //,
-      //authenticated: Set[Authenticated],
-      //authenticating: Option[Authenticating],
+      socketManager: ActorRef
       ) extends Actor with ActorLogging {
 
   private var pendingIsMaster : (Int, PingInfo) = null
