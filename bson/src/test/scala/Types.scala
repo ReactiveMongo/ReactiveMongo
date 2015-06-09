@@ -62,4 +62,13 @@ class Types extends Specification {
       arr must_== BSONArray("foo", "bar")
     }
   }
+
+  "BSONBinary" should {
+    "be read as byte array" in {
+      val bytes = Array[Byte](1,2,3)
+      val bson = BSONBinary(bytes, Subtype.GenericBinarySubtype)
+
+      bson.byteArray must_== bytes
+    }
+  }
 }

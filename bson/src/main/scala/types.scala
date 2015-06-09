@@ -289,7 +289,13 @@ object BSONArray {
  * @param value The binary content.
  * @param subtype The type of the binary content.
  */
-case class BSONBinary(value: ReadableBuffer, subtype: Subtype) extends BSONValue { val code = 0x05.toByte } // TODO
+case class BSONBinary(value: ReadableBuffer, subtype: Subtype)
+    extends BSONValue {
+  val code = 0x05.toByte
+
+  /** Returns the whole binary content as array. */
+  def byteArray: Array[Byte] = value.readArray(value.size)
+} // TODO
 
 object BSONBinary {
   def apply(value: Array[Byte], subtype: Subtype): BSONBinary =
