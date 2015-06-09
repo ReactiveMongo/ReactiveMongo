@@ -165,7 +165,8 @@ class MongoDBSystem(
 
   def connect() : Future[MongoConnection] = {
     system.log.debug("connecting...")
-    (nodeSetActor ? NodeSet.ConnectAll(seeds, initialAuthenticates, options.nbChannelsPerNode))(6.seconds).map(p => new MongoConnection(system, this, options))
+    val connection = new MongoConnection(system, this, options)
+    (nodeSetActor ? NodeSet.ConnectAll(seeds, initialAuthenticates, options.nbChannelsPerNode, value => connection.metadata = value))(6.seconds).map(p => connection)
   }
 
   private val monitors = scala.collection.mutable.ListBuffer[ActorRef]()

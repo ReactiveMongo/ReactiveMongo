@@ -200,6 +200,9 @@ class MongoConnection(
 
   val monitor = actorSystem.actorOf(Props(new MonitorActor), "Monitor-" + MongoDriver.nextCounter)
 
+  /**
+   * Primary or mode set metadata
+   */
   @volatile private[reactivemongo] var metadata: Option[ProtocolMetadata] = None
 
   /**I accept orders for souvenirs

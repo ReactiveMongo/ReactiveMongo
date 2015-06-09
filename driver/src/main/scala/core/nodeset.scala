@@ -64,10 +64,12 @@ package object utils {
    var nodes: Vector[ActorRef] = Vector.empty
    var version: Option[Long] = None
    var replyTo: ActorRef = null
+   var updateMetadata : Option[ProtocolMetadata] => Unit = null
 
   override def receive: Receive = {
-    case NodeSet.ConnectAll(hosts, auth, count) => {
+    case NodeSet.ConnectAll(hosts, auth, count, update) => {
       log.info("Connection to initial nodes")
+      updateMetadata = update
       replyTo = sender()
       this.connectionsPerNode = count
       this.initialAuthenticates = auth
@@ -82,6 +84,7 @@ package object utils {
       log.info("node connected")
       nodes = sender() +: nodes
       connections.foreach(onAddConnection(_))
+
       if(connections.exists(p => p._2.status.queryable)) replyTo ! Unit
     }
     case Node.DiscoveredNodes(hosts) => {
@@ -94,12 +97,12 @@ package object utils {
         node
       }) ++: nodes
     }
+    case Node.UpdateMetadata(metadata) => updateMetadata(Some(metadata))
   }
-
 }
 
 object  NodeSet {
-  case class ConnectAll(hosts: Seq[String], initialAuthenticates: Seq[Authenticate], connectionsPerNode: Int)
+  case class ConnectAll(hosts: Seq[String], initialAuthenticates: Seq[Authenticate], connectionsPerNode: Int, updateMetadata: Option[ProtocolMetadata] => Unit)
 }
 
 
@@ -119,6 +122,7 @@ case class Connection(
       socketManager: ActorRef
       ) extends Actor with ActorLogging {
 
+  private var protocolMetadata: Option[ProtocolMetadata] = None
   private var pendingIsMaster : (Int, PingInfo) = null
   private var awaitingResponses = HashMap[Int, AwaitingResponse]()
   val requestIds = new RequestIds
@@ -144,7 +148,7 @@ case class Connection(
       val request = req.requestMaker(requestId)
       val builder = new ByteStringBuilder()
       request.append(builder)
-      log.debug("Send request with a header {}", request.header)
+      log.debug("Send request expecting response with a header {}", request.header)
       awaitingResponses += request.requestID -> AwaitingResponse(request.requestID, 0, req.promise, isGetLastError = false, isMongo26WriteOp = req.isMongo26WriteOp)
       socketWriter ! builder.result()
     }

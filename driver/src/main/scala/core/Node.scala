@@ -3,6 +3,7 @@ package reactivemongo.core
 import java.net.InetSocketAddress
 
 import reactivemongo.api.commands.bson.BSONIsMasterCommand
+import reactivemongo.core.protocol.MongoWireVersion
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import akka.actor._
@@ -69,8 +70,10 @@ case class Node(
 
       isMaster.replicaSet.map(_.hosts).map(context.parent ! Node.DiscoveredNodes(_))
 
-      isMaster.status
       val state = ConnectionState(isMaster.status, -1, false, ping)
+      val protocolMetadata = ProtocolMetadata(MongoWireVersion(isMaster.minWireVersion), MongoWireVersion(isMaster.maxWireVersion), isMaster.maxBsonObjectSize, isMaster.maxMessageSizeBytes, isMaster.maxWriteBatchSize)
+      context.parent ! UpdateMetadata(protocolMetadata)
+      connections.foreach(_ ! UpdateMetadata(protocolMetadata))
       context.parent ! Node.Connected(connections.map((_, state)))
     }
   }
@@ -83,6 +86,7 @@ object Node {
   object PrimaryUnavailable
   object IsMaster
   case class IsMasterInfo(response: BSONIsMasterCommand.IsMasterResult, ping: PingInfo)
+  case class UpdateMetadata(metadata: ProtocolMetadata)
 }
 
 case class ConnectionState(status: NodeStatus, channel: Int, authenticated: Boolean, ping: PingInfo)
