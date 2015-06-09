@@ -15,6 +15,7 @@
  */
 package reactivemongo.api
 
+import akka.event.LoggingReceive
 import akka.util.ByteString
 import play.api.libs.iteratee._
 import reactivemongo.core.iteratees.{ CustomEnumeratee, CustomEnumerator }
@@ -309,7 +310,10 @@ object DefaultCursor {
       def collect[M[_]](upTo: Int = Int.MaxValue, stopOnError: Boolean = true)(implicit cbf: CanBuildFrom[M[_], A, M[A]], ctx: ExecutionContext): Future[M[A]] = {
         (enumerateResponses(upTo, stopOnError) |>>> Iteratee.fold(cbf.apply) { (builder, response) =>
 
-          def tried[A](it: Iterator[A]) = new Iterator[Try[A]] { def hasNext = it.hasNext; def next = Try(it.next) }
+          def tried[A](it: Iterator[A]) = new Iterator[Try[A]] {
+            def hasNext = it.hasNext;
+            def next = Try(it.next)
+          }
 
 //          logger.trace(s"[collect] got response $response")
 

@@ -168,6 +168,7 @@ case class Connection(
         processResponse(response)
       }
     }
+    case a : Any => log.warning("unhandled messsage {}", a)
   }
 
   private def processResponse(response: Response) = {

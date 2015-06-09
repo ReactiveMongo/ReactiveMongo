@@ -80,6 +80,8 @@ class BSONCollectionSpec extends Specification {
     }
 
     "read a doc with success" in {
+      implicit val writer = PersonWriter
+      Await.result(collection.insert(person), timeout).ok mustEqual true
       implicit val reader = PersonReader
       Await.result(collection.find(BSONDocument()).one[Person], timeout).get mustEqual person
     }

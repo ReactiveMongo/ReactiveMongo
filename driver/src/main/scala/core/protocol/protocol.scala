@@ -381,12 +381,12 @@ object ReplyDocumentIterator  {
     override def hasNext = tail.size > 4
     override def next =
       try {
-        val splitted = tail.splitAt(4)
-        val l = splitted._1.iterator.getInt
-        val splitted2 = splitted._2.splitAt(l - 4)
+        val l = tail.iterator.getInt
+        val splitted2 = tail.splitAt(l)
         tail = splitted2._2
         val cbrb = new AkkaReadableBuffer(splitted2._1) //ChannelBufferReadableBuffer(buffer.readBytes(buffer.getInt(buffer.readerIndex)))
-        pack.readAndDeserialize(cbrb, reader)
+        val item = pack.readAndDeserialize(cbrb, reader)
+        item
       } catch {
         case e: IndexOutOfBoundsException =>
           /*
