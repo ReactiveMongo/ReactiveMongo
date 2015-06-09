@@ -12,3 +12,10 @@ before_install:
   - "echo 'deb http://downloads-distro.mongodb.org/repo/ubuntu-upstart dist 10gen' | sudo tee /etc/apt/sources.list.d/mongodb.list"
   - "sudo apt-get update"
   - "sudo apt-get install mongodb-org-server"
+  
+env:
+  global:
+  - secure: "ieKAXIZ3xjQMfzFIEJA+XWTCarF2mhe/8PYSLzx/U8mLFOHaGBDffJ+cdUZQbPtHXcfocX0ZWum7nB8W3o+NfS2QCn/haI1051LdQ4Vqmk/3YqmSb5qoVLjweLiSUHCcISp7V5R1Y+1GkJfN4rdk9L0GagjfpKLjhr0CogVaJO4="
+
+after_success:
+- .travis_scripts/publishSnapshots.sh
