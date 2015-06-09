@@ -23,7 +23,7 @@ import akka.pattern._
 import akka.util.Timeout
 import com.typesafe.config.Config
 import reactivemongo.core.actors._
-import reactivemongo.core.nodeset.Authenticate
+import reactivemongo.core.nodeset.{ProtocolMetadata, Authenticate}
 import reactivemongo.core.protocol._
 import reactivemongo.core.commands.SuccessfulAuthentication
 import scala.collection.mutable
@@ -189,21 +189,22 @@ case class FailoverStrategy(
  *
  * @param mongosystem A reference to a [[reactivemongo.core.actors.MongoDBSystem]] Actor.
  */
-class MongoConnection(
-    val actorSystem: ActorSystem,
-    val mongosystem: MongoDBSystem,
-    val options: MongoConnectionOptions) {
+case class MongoConnection(
+    actorSystem: ActorSystem,
+    mongosystem: MongoDBSystem,
+    options: MongoConnectionOptions,
+    metadata: ProtocolMetadata) {
   import akka.pattern.{ ask => akkaAsk }
   import akka.util.Timeout
   import akka.actor._
   import reactivemongo.core.nodeset.ProtocolMetadata
 
-  val monitor = actorSystem.actorOf(Props(new MonitorActor), "Monitor-" + MongoDriver.nextCounter)
+  //val monitor = actorSystem.actorOf(Props(new MonitorActor), "Monitor-" + MongoDriver.nextCounter)
 
   /**
    * Primary or mode set metadata
    */
-  @volatile private[reactivemongo] var metadata: Option[ProtocolMetadata] = None
+  //@volatile private[reactivemongo] var metadata: Option[ProtocolMetadata] = None
 
   /**I accept orders for souvenirs
    * Returns a DefaultDB reference using this connection.
@@ -223,11 +224,6 @@ class MongoConnection(
   def db(name: String, failoverStrategy: FailoverStrategy = FailoverStrategy())
         (implicit context: ExecutionContext): DefaultDB = apply(name, failoverStrategy)
 
-  /**
-   * Get a future that will be successful when a primary node is available or times out.
-   */
-  def waitForPrimary(implicit waitForAvailability: FiniteDuration): Future[_] =
-    akkaAsk(monitor, reactivemongo.core.actors.WaitForPrimary)(Timeout(waitForAvailability))
 
 
   /**
@@ -270,73 +266,72 @@ class MongoConnection(
   }
 
   /** Closes this MongoConnection (closes all the channels and ends the actors) */
-  def askClose()(implicit timeout: FiniteDuration): Future[_] =
-    akkaAsk(monitor, Close)(Timeout(timeout))
+  def askClose()(implicit timeout: FiniteDuration): Future[_] = ???
 
   /** Closes this MongoConnection (closes all the channels and ends the actors) */
-  def close(): Unit = monitor ! Close
+  def close(): Unit = ???
 
 
   /**
    * Actor that monitor a connection and notifies awaiting Actors about changes
    */
-  private class MonitorActor extends Actor {
-    import MonitorActor._
-    import scala.collection.mutable.Queue
-
-    // todo: fix
-    //mongosystem. ! RegisterMonitor
-
-    private val waitingForPrimary = Queue[ActorRef]()
-    var primaryAvailable = false
-
-    private val waitingForClose = Queue[ActorRef]()
-    var killed = false
-
-    override def receive = {
-      case pa: PrimaryAvailable =>
-//        logger.debug("set: a primary is available")
-        primaryAvailable = true
-        metadata = Some(pa.metadata)
-        waitingForPrimary.dequeueAll(_ => true).foreach(_ ! pa)
-      case PrimaryUnavailable =>
-//        logger.debug("set: no primary available")
-        primaryAvailable = false
-      case sa: SetAvailable =>
-//        logger.debug("set: a node is available")
-        metadata = Some(sa.metadata)
-      case SetUnavailable =>
-//        logger.debug("set: no node seems to be available")
-      case WaitForPrimary =>
-        if (killed)
-          sender ! Failure(new RuntimeException("MongoDBSystem actor shutting down or no longer active"))
-        else if (primaryAvailable && metadata.isDefined) {
-//          logger.debug(sender + " is waiting for a primary... available right now, go!")
-          sender ! PrimaryAvailable(metadata.get)
-        } else {
-//          logger.debug(sender + " is waiting for a primary...  not available, warning as soon a primary is available.")
-          waitingForPrimary += sender
-        }
-      case Close =>
-//        logger.debug("Monitor received Close")
-        killed = true
-        //todo: fix
-        //mongosystem ! Close
-        waitingForClose += sender
-        waitingForPrimary.dequeueAll(_ => true).foreach(_ ! Failure(new RuntimeException("MongoDBSystem actor shutting down or no longer active")))
-      case Closed =>
-//        logger.debug(s"Monitor $self closed, stopping...")
-        waitingForClose.dequeueAll(_ => true).foreach(_ ! Closed)
-        context.stop(self)
-    }
-
-    override def postStop {
-//      logger.debug(s"Monitor $self stopped.")
-    }
-  }
-
-  object MonitorActor {
-  }
+//  private class MonitorActor extends Actor {
+//    import MonitorActor._
+//    import scala.collection.mutable.Queue
+//
+//    // todo: fix
+//    //mongosystem. ! RegisterMonitor
+//
+//    private val waitingForPrimary = Queue[ActorRef]()
+//    var primaryAvailable = false
+//
+//    private val waitingForClose = Queue[ActorRef]()
+//    var killed = false
+//
+//    override def receive = {
+//      case pa: PrimaryAvailable =>
+////        logger.debug("set: a primary is available")
+//        primaryAvailable = true
+//        metadata = Some(pa.metadata)
+//        waitingForPrimary.dequeueAll(_ => true).foreach(_ ! pa)
+//      case PrimaryUnavailable =>
+////        logger.debug("set: no primary available")
+//        primaryAvailable = false
+//      case sa: SetAvailable =>
+////        logger.debug("set: a node is available")
+//        metadata = Some(sa.metadata)
+//      case SetUnavailable =>
+////        logger.debug("set: no node seems to be available")
+//      case WaitForPrimary =>
+//        if (killed)
+//          sender ! Failure(new RuntimeException("MongoDBSystem actor shutting down or no longer active"))
+//        else if (primaryAvailable && metadata.isDefined) {
+////          logger.debug(sender + " is waiting for a primary... available right now, go!")
+//          sender ! PrimaryAvailable(metadata.get)
+//        } else {
+////          logger.debug(sender + " is waiting for a primary...  not available, warning as soon a primary is available.")
+//          waitingForPrimary += sender
+//        }
+//      case Close =>
+////        logger.debug("Monitor received Close")
+//        killed = true
+//        //todo: fix
+//        //mongosystem ! Close
+//        waitingForClose += sender
+//        waitingForPrimary.dequeueAll(_ => true).foreach(_ ! Failure(new RuntimeException("MongoDBSystem actor shutting down or no longer active")))
+//      case Closed =>
+////        logger.debug(s"Monitor $self closed, stopping...")
+//        waitingForClose.dequeueAll(_ => true).foreach(_ ! Closed)
+//        context.stop(self)
+//    }
+//
+//    override def postStop {
+////      logger.debug(s"Monitor $self stopped.")
+//    }
+//  }
+//
+//  object MonitorActor {
+//  }
 }
 
 object MongoConnection {
@@ -483,7 +478,7 @@ class MongoDriver(config: Option[Config] = None) {
     ActorSystem("reactivemongo", debugConfig)
   }
 
-  private val supervisorActor = system.actorOf(Props(new SupervisorActor(this)),"Supervisor-" + MongoDriver.nextCounter)
+  //private val supervisorActor = system.actorOf(Props(new SupervisorActor(this)),"Supervisor-" + MongoDriver.nextCounter)
 
   private val connectionMonitors = mutable.Map.empty[ActorRef,MongoConnection]
 
@@ -492,20 +487,21 @@ class MongoDriver(config: Option[Config] = None) {
 
   def numConnections: Int = connectionMonitors.size
 
-  def close(timeout: FiniteDuration = 0.seconds) = {
-    // Terminate actors used by MongoConnections
-    connections.foreach { connection =>
-      connection.monitor ! Close
-    }
-
-    // Tell the supervisor to close. It will shut down all the connections and monitors
-    // and then shut down the ActorSystem as it is exiting.
-    supervisorActor ! Close
-
-    // When the actorSystem is shutdown, it means that supervisorActor has exited (run its postStop)
-    // So, wait for that event.
-    system.awaitTermination(timeout)
-  }
+  def close(timeout: FiniteDuration = 0.seconds) : Unit = ???
+//  {
+//    // Terminate actors used by MongoConnections
+//    connections.foreach { connection =>
+//      connection.monitor ! Close
+//    }
+//
+//    // Tell the supervisor to close. It will shut down all the connections and monitors
+//    // and then shut down the ActorSystem as it is exiting.
+//    supervisorActor ! Close
+//
+//    // When the actorSystem is shutdown, it means that supervisorActor has exited (run its postStop)
+//    // So, wait for that event.
+//    system.awaitTermination(timeout)
+//  }
 
   /**
    * Creates a new MongoConnection.
@@ -566,51 +562,51 @@ class MongoDriver(config: Option[Config] = None) {
   private case class AddConnection(options: MongoConnectionOptions, mongosystem: MongoDBSystem)
   private case class CloseWithTimeout(timeout: FiniteDuration)
 
-  private case class SupervisorActor(driver: MongoDriver) extends Actor {
-
-    def isEmpty = driver.connectionMonitors.isEmpty
-
-    override def receive = {
-      case ac: AddConnection =>
-        val connection = new MongoConnection(driver.system, ac.mongosystem, ac.options)
-        driver.connectionMonitors.put(connection.monitor, connection)
-        val actor = connection.monitor
-        context.watch(actor)
-        sender ! connection
-      case Terminated(actor) =>
-        driver.connectionMonitors.remove(actor)
-      case CloseWithTimeout(timeout) =>
-        if (isEmpty) {
-          context.stop(self)
-        } else {
-          context.become(closing(timeout))
-        }
-      case Close =>
-        if (isEmpty) {
-          context.stop(self)
-        } else {
-          context.become(closing(0.seconds))
-        }
-    }
-
-    def closing(shutdownTimeout: FiniteDuration) : Receive = {
-      case ac: AddConnection =>
-//        logger.warn("Refusing to add connection while MongoDriver is closing.")
-      case Terminated(actor) =>
-        driver.connectionMonitors.remove(actor)
-        if (isEmpty) {
-          context.stop(self)
-        }
-      case CloseWithTimeout(timeout) =>
-//        logger.warn("CloseWithTimeout ignored, already closing.")
-      case Close =>
-//        logger.warn("Close ignored, already closing.")
-    }
-
-    override def postStop {
-      driver.system.shutdown()
-    }
-  }
+//  private case class SupervisorActor(driver: MongoDriver) extends Actor {
+//
+//    def isEmpty = driver.connectionMonitors.isEmpty
+//
+//    override def receive = {
+//      case ac: AddConnection =>
+//        val connection = new MongoConnection(driver.system, ac.mongosystem, ac.options)
+//        driver.connectionMonitors.put(connection.monitor, connection)
+//        val actor = connection.monitor
+//        context.watch(actor)
+//        sender ! connection
+//      case Terminated(actor) =>
+//        driver.connectionMonitors.remove(actor)
+//      case CloseWithTimeout(timeout) =>
+//        if (isEmpty) {
+//          context.stop(self)
+//        } else {
+//          context.become(closing(timeout))
+//        }
+//      case Close =>
+//        if (isEmpty) {
+//          context.stop(self)
+//        } else {
+//          context.become(closing(0.seconds))
+//        }
+//    }
+//
+//    def closing(shutdownTimeout: FiniteDuration) : Receive = {
+//      case ac: AddConnection =>
+////        logger.warn("Refusing to add connection while MongoDriver is closing.")
+//      case Terminated(actor) =>
+//        driver.connectionMonitors.remove(actor)
+//        if (isEmpty) {
+//          context.stop(self)
+//        }
+//      case CloseWithTimeout(timeout) =>
+////        logger.warn("CloseWithTimeout ignored, already closing.")
+//      case Close =>
+////        logger.warn("Close ignored, already closing.")
+//    }
+//
+//    override def postStop {
+//      driver.system.shutdown()
+//    }
+//  }
 }
 
 object MongoDriver {

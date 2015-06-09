@@ -418,9 +418,7 @@ object CollectionIndexesManager {
    * @param collectionName the collection name
    */
   def apply(db: DB, collectionName: String)(implicit context: ExecutionContext): CollectionIndexesManager = {
-    val wireVer = db.connection.metadata.map(_.maxWireVersion)
-
-    if (wireVer.exists(_ == MongoWireVersion.V30)) {
+    if (db.connection.metadata.maxWireVersion == MongoWireVersion.V30) {
       new DefaultCollectionIndexesManager(db, collectionName)
     } else new LegacyCollectionIndexesManager(db.name, collectionName,
       new LegacyIndexesManager(db))
@@ -434,9 +432,7 @@ object IndexesManager {
    * @param db the database
    */
   def apply(db: DB with DBMetaCommands)(implicit context: ExecutionContext): IndexesManager = {
-    val wireVer = db.connection.metadata.map(_.maxWireVersion)
-
-    if (wireVer.exists(_ == MongoWireVersion.V30)) new DefaultIndexesManager(db)
+    if (db.connection.metadata.maxWireVersion == MongoWireVersion.V30) new DefaultIndexesManager(db)
     else new LegacyIndexesManager(db)
   }
   

@@ -144,9 +144,7 @@ trait DBMetaCommands {
 
   /** Returns the names of the collections in this database. */
   def collectionNames(implicit ec: ExecutionContext): Future[List[String]] = {
-    val wireVer = connection.metadata.map(_.maxWireVersion)
-
-    if (wireVer.exists(_ == MongoWireVersion.V30)) {
+    if (connection.metadata.maxWireVersion == MongoWireVersion.V30) {
       Command.run(BSONSerializationPack)(self, ListCollectionNames).map(_.names)
     } else collection("system.namespaces").as[BSONCollection]()
       .find(BSONDocument(

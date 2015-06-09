@@ -64,12 +64,10 @@ package object utils {
    var nodes: Vector[ActorRef] = Vector.empty
    var version: Option[Long] = None
    var replyTo: ActorRef = null
-   var updateMetadata : Option[ProtocolMetadata] => Unit = null
 
   override def receive: Receive = {
-    case NodeSet.ConnectAll(hosts, auth, count, update) => {
+    case NodeSet.ConnectAll(hosts, auth, count) => {
       log.info("Connection to initial nodes")
-      updateMetadata = update
       replyTo = sender()
       this.connectionsPerNode = count
       this.initialAuthenticates = auth
@@ -80,12 +78,13 @@ package object utils {
         node
       }).toVector
     }
-    case Node.Connected(connections) => {
-      log.info("node connected")
+    case Node.Connected(connections, metadata) => {
+      log.info("node connected metadata {}", metadata)
       nodes = sender() +: nodes
       connections.foreach(onAddConnection(_))
 
-      if(connections.exists(p => p._2.status.queryable)) replyTo ! Unit
+      if(connections.exists(p => p._2.isPrimary || p._2.isMongos))
+        replyTo ! metadata
     }
     case Node.DiscoveredNodes(hosts) => {
       log.info("nodes descovered")
@@ -97,12 +96,11 @@ package object utils {
         node
       }) ++: nodes
     }
-    case Node.UpdateMetadata(metadata) => updateMetadata(Some(metadata))
   }
 }
 
 object  NodeSet {
-  case class ConnectAll(hosts: Seq[String], initialAuthenticates: Seq[Authenticate], connectionsPerNode: Int, updateMetadata: Option[ProtocolMetadata] => Unit)
+  case class ConnectAll(hosts: Seq[String], initialAuthenticates: Seq[Authenticate], connectionsPerNode: Int)
 }
 
 

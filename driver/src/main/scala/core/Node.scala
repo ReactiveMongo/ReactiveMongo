@@ -34,8 +34,6 @@ case class Node(
   var tags: Option[BSONDocument] = None
   var awaitingConnections = 0
 
-
-
   val (host: String, port: Int) = {
     val splitted = address.span(_ != ':')
     splitted._1 -> (try {
@@ -70,23 +68,20 @@ case class Node(
 
       isMaster.replicaSet.map(_.hosts).map(context.parent ! Node.DiscoveredNodes(_))
 
-      val state = ConnectionState(isMaster.status, -1, false, ping)
+      val state = ConnectionState(isMaster.status, isMaster.isMaster, isMaster.isMongos, -1, false, ping)
       val protocolMetadata = ProtocolMetadata(MongoWireVersion(isMaster.minWireVersion), MongoWireVersion(isMaster.maxWireVersion), isMaster.maxBsonObjectSize, isMaster.maxMessageSizeBytes, isMaster.maxWriteBatchSize)
-      context.parent ! UpdateMetadata(protocolMetadata)
-      connections.foreach(_ ! UpdateMetadata(protocolMetadata))
-      context.parent ! Node.Connected(connections.map((_, state)))
+      context.parent ! Node.Connected(connections.map((_, state)), protocolMetadata)
     }
   }
 }
 
 object Node {
   object Connect
-  case class Connected(connections: List[(ActorRef, ConnectionState)])
+  case class Connected(connections: List[(ActorRef, ConnectionState)], metadata: ProtocolMetadata)
   case class DiscoveredNodes(hosts: Seq[String])
   object PrimaryUnavailable
   object IsMaster
   case class IsMasterInfo(response: BSONIsMasterCommand.IsMasterResult, ping: PingInfo)
-  case class UpdateMetadata(metadata: ProtocolMetadata)
 }
 
-case class ConnectionState(status: NodeStatus, channel: Int, authenticated: Boolean, ping: PingInfo)
+case class ConnectionState(status: NodeStatus, isPrimary: Boolean, isMongos: Boolean,  channel: Int, authenticated: Boolean, ping: PingInfo)
