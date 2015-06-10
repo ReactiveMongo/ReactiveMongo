@@ -1,4 +1,3 @@
-import java.util.concurrent.TimeoutException
 import org.specs2.mutable._
 import reactivemongo.bson._
 import DefaultBSONHandlers._
@@ -7,7 +6,7 @@ import scala.concurrent.duration._
 import play.api.libs.iteratee.Iteratee
 import reactivemongo.api.{ Cursor, CursorProducer, QueryOpts, WrappedCursor }
 
-class CursorSpec  extends Specification {
+class CursorSpec extends Specification {
   sequential
 
   import Common._
@@ -33,12 +32,8 @@ class CursorSpec  extends Specification {
         i += 1
         println("fetched " + doc)
         doc
-      }.runLast*/
-      val res = Await.result(future, DurationInt(21).seconds)
-      println("ran. " + res)
-      //res  mustEqual ()
-      //println("size is " + res.size)
-      i mustEqual 16517
+       }.runLast*/
+      future.map(_ => i) must beEqualTo(16517).await(21000/*21s*/)
     }
 
     "get 10 first docs" in {
@@ -77,7 +72,7 @@ class CursorSpec  extends Specification {
         }
       }
 
-      @inline def cursor(n: String) = {
+      @inline def cursor(n: String): Cursor[Int] = {
         implicit val reader = IdReader
         Cursor.flatten(collection(n).map(_.find(BSONDocument()).
           sort(BSONDocument("id" -> 1)).cursor[Int]))
@@ -118,7 +113,21 @@ class CursorSpec  extends Specification {
 
       "with timeout using tailable enumerator w/o maxDocs" in {
         Await.result(tailable("tenum2").enumerate() |>>> toList, timeout).
-          aka("enumerated") must throwA[TimeoutException]
+          aka("enumerated") must throwA[Exception]
+      }
+
+      "using tailable foldWhile" in {
+        tailable("foldw1").foldWhile(List.empty[Int], 5)(
+          (s, i) => Cursor.Cont(i :: s),
+          (_, e) => Cursor.Fail(e)) must beEqualTo(List(
+            4, 3, 2, 1, 0)).await(1000)
+      }
+
+      "with timeout using tailable foldWhile w/o maxDocs" in {
+        Await.result(tailable("foldw2").foldWhile(List.empty[Int])(
+          (s, i) => Cursor.Cont(i :: s),
+          (_, e) => Cursor.Fail(e)), timeout) must throwA[Exception]
+
       }
     }
   }

@@ -82,7 +82,7 @@ object QueryAndWriteCommands extends org.specs2.mutable.Specification {
           BSONDocument("bulk" -> true, "i" -> i, "plop" -> -3)
         } else BSONDocument("bulk" -> true, "i" -> i, "plop" -> i)
       }
-      val res = Try(Await.result(coll.bulkInsert(docs, false), DurationInt(60).seconds))
+      val res = Try(Await.result(coll.bulkInsert(docs, false), DurationInt(100).seconds))
       println(res)
       if (res.isFailure) {
         throw res.failed.get
@@ -94,4 +94,5 @@ object QueryAndWriteCommands extends org.specs2.mutable.Specification {
       count mustEqual (nDocs - 3) // all docs minus errors
     } tag ("mongo2_6")
   }
+
 }

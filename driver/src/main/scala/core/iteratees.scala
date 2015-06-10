@@ -71,10 +71,8 @@ object CustomEnumerator {
   private[iteratees] def intermediatePromise[A](future: Future[A])(implicit ec: ExecutionContext) = {
     val promise = Promise[A]()
     future.onComplete {
-      case Success(s) =>
-        promise.success(s)
-      case Failure(f) =>
-        promise.failure(f)
+      case Success(s) => promise.success(s)
+      case Failure(f) => promise.failure(f)
     }
     promise.future
   }
@@ -121,6 +119,7 @@ object CustomEnumerator {
 
     }
   }
+
   object SEnumerator {
     def apply[C](zero: C)(next: C => Option[Future[C]])(implicit ec: ExecutionContext) = new SEnumerator(zero)(next, _ => ())
   }

@@ -142,6 +142,8 @@ trait CollectionMetaCommands {
    *
    * The returned future will be completed with an error if this collection already exists.
    *
+   * @param size the byte size of the collections.
+   * @param maxDocuments the maximum number of documents.
    * @param autoIndexId States if should automatically add an index on the _id field. By default, capped collections will NOT have an indexed _id field, in contrast to regular collections.
    */
   def createCapped(size: Long, maxDocuments: Option[Int], autoIndexId: Boolean = false)(implicit ec: ExecutionContext): Future[Unit] =

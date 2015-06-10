@@ -21,8 +21,7 @@ class FindAndModifySpec extends Specification {
   case class Person(
     firstName: String,
     lastName: String,
-    age: Int
-  )
+    age: Int)
 
   implicit object PersonReader extends BSONDocumentReader[Person] {
     def read(doc: BSONDocument): Person =
