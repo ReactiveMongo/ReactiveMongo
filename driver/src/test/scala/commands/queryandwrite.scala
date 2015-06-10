@@ -1,5 +1,4 @@
-import org.specs2.mutable._
-import play.api.libs.iteratee.Enumerator
+//import play.api.libs.iteratee.Enumerator
 import scala.concurrent._
 import scala.util.{ Try, Failure }
 
@@ -17,7 +16,7 @@ import BSONIsMasterCommandImplicits._
 //import InsertCommandImplicits._
 //import BSONGetLastErrorImplicits.LastErrorReader
 
-class QueryAndWriteCommands extends Specification {
+object QueryAndWriteCommands extends org.specs2.mutable.Specification {
   import Common._
 
   sequential
@@ -40,7 +39,7 @@ class QueryAndWriteCommands extends Specification {
 
       val ismaster = Await.result(Command.run(BSONSerializationPack)(db, IsMaster), timeout)
       println(ismaster)
-      true mustEqual true
+      ok
     } tag ("mongo2_6")
     "insert 1 doc with collection.insert and retrieve it" in {
       val doc = BSONDocument("name" -> "joe", "plop" -> -2)
@@ -70,21 +69,22 @@ class QueryAndWriteCommands extends Specification {
       println(list)
       list.size mustEqual 1
     }
-    s"insert $nDocs in bulks (including 3 duplicate errors)" in {
+
+    s"Insert $nDocs in bulks (including 3 duplicate errors)" in {
       import reactivemongo.api.indexes._
-      import reactivemongo.api.indexes.IndexType.{Ascending}
+      import reactivemongo.api.indexes.IndexType.Ascending
       val created = collection.indexesManager.ensure(Index(List("plop" -> Ascending), unique = true))
       Await.result(created, timeout)
       val start = System.currentTimeMillis
       val coll = BSONCollection(db, "queryandwritecommandsspec", collection.failoverStrategy)
       val docs = (0 until nDocs).toStream.map { i =>
-        if(i == 0 || i == 1529 || i == 3026 || i == 19862)
+        if (i == 0 || i == 1529 || i == 3026 || i == 19862) {
           BSONDocument("bulk" -> true, "i" -> i, "plop" -> -3)
-        else BSONDocument("bulk" -> true, "i" -> i, "plop" -> i)
+        } else BSONDocument("bulk" -> true, "i" -> i, "plop" -> i)
       }
       val res = Try(Await.result(coll.bulkInsert(docs, false), DurationInt(60).seconds))
       println(res)
-      if(res.isFailure) {
+      if (res.isFailure) {
         throw res.failed.get
       }
       //println(s"writeErrors: ${res.get.map(_.writeErrors)}")
@@ -94,5 +94,4 @@ class QueryAndWriteCommands extends Specification {
       count mustEqual (nDocs - 3) // all docs minus errors
     } tag ("mongo2_6")
   }
-
 }

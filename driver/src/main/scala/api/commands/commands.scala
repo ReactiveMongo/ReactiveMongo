@@ -46,10 +46,6 @@ trait ImplicitCommandHelpers[P <: SerializationPack] {
   }
 }
 
-trait RawCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] {
-  case class Raw(doc: ImplicitlyDocumentProducer) extends Command with CommandWithPack[P]
-}
-
 object UnitBox extends BoxedAnyVal[Unit] {
   def value: Unit = ()
 }
@@ -124,14 +120,36 @@ object Command {
       (collection: Collection, command: C with CommandWithResult[R with BoxedAnyVal[A]])
       (implicit writer: pack.Writer[ResolvedCollectionCommand[C]], reader: pack.Reader[R], ec: ExecutionContext): Future[A] =
         defaultCursorFetcher(collection.db, pack, ResolvedCollectionCommand(collection.name, command), failover).one[R].map(_.value)
+
+    def rawCommand[T](input: T)(implicit writer: pack.Writer[T]): RawCommand =
+      RawCommand(pack.serialize(input, writer))
+
+    case class RawCommand(document: pack.Document) extends Command
+
+    object RawCommand {
+      implicit val writer: pack.Writer[RawCommand] = pack.writer(_.document)
+    }
   }
 
-  def run[P <: SerializationPack](pack: P): CommandWithPackRunner[pack.type] = CommandWithPackRunner(pack)
+  /**
+   * Returns a command runner.
+   * 
+   * @param pack the serialization pack
+   * 
+   * {{{
+   * import reactivemongo.bson.BSONDocument
+   * import reactivemongo.api.BSONSerializationPack
+   * import reactivemongo.api.commands.{ Command, Count }
+   * 
+   * Command.run(BSONSerializationPack).
+   *   unboxed(aCollection, Count(BSONDocument("bulk" -> true)))
+   * }}}
+   */
+  def run[P <: SerializationPack](pack: P): CommandWithPackRunner[pack.type] =
+    CommandWithPackRunner(pack)
 
-
-  private[reactivemongo] def deserialize[P <: SerializationPack, A](pack: P, response: Response)(implicit reader: pack.Reader[A]): A = {
+  private[reactivemongo] def deserialize[P <: SerializationPack, A](pack: P, response: Response)(implicit reader: pack.Reader[A]): A =
     pack.readAndDeserialize(response, reader)
-  }
 
   private def buildRequestMaker[P <: SerializationPack, A](pack: P)(command: A, writer: pack.Writer[A], readPreference: ReadPreference, db: String): (RequestMaker, Boolean) = {
     val buffer = ChannelBufferWritableBuffer()
@@ -148,8 +166,10 @@ object Command {
   private[reactivemongo] case class CommandWithPackMaker[P <: SerializationPack](pack: P) {
     def apply[C <: Command](db: DB, command: C, readPreference: ReadPreference)(implicit writer: pack.Writer[C]): RequestMakerExpectingResponse =
       onDatabase(db.name, command, readPreference)
+
     def apply[C <: Command with Mongo26WriteCommand](db: DB, command: C)(implicit writer: pack.Writer[C]): RequestMakerExpectingResponse =
       onDatabase(db.name, command)
+
     def apply[C <: CollectionCommand](collection: Collection, command: C, readPreference: ReadPreference)(implicit writer: pack.Writer[ResolvedCollectionCommand[C]]): RequestMakerExpectingResponse =
       onCollection(collection.db.name, collection.name, command, readPreference)
     def apply[C <: CollectionCommand with Mongo26WriteCommand](collection: Collection, command: C)(implicit writer: pack.Writer[ResolvedCollectionCommand[C]]): RequestMakerExpectingResponse =
@@ -159,14 +179,17 @@ object Command {
       val (requestMaker, mongo26WriteCommand) = buildRequestMaker(pack)(command, writer, readPreference, db)
       RequestMakerExpectingResponse(requestMaker, mongo26WriteCommand)
     }
+
     def onDatabase[C <: Command with Mongo26WriteCommand](db: String, command: C)(implicit writer: pack.Writer[C]): RequestMakerExpectingResponse = {
       val requestMaker = buildRequestMaker(pack)(command, writer, ReadPreference.primary, db)._1
       RequestMakerExpectingResponse(requestMaker, true)
     }
+
     def onCollection[C <: CollectionCommand](db: String, collection: String, command: C, readPreference: ReadPreference)(implicit writer: pack.Writer[ResolvedCollectionCommand[C]]): RequestMakerExpectingResponse = {
       val (requestMaker, mongo26WriteCommand) = buildRequestMaker(pack)(ResolvedCollectionCommand(collection, command), writer, readPreference, db)
       RequestMakerExpectingResponse(requestMaker, mongo26WriteCommand)
     }
+
     def onCollection[C <: CollectionCommand with Mongo26WriteCommand](db: String, collection: String, command: C)(implicit writer: pack.Writer[ResolvedCollectionCommand[C]]): RequestMakerExpectingResponse = {
       val requestMaker = buildRequestMaker(pack)(ResolvedCollectionCommand(collection, command), writer, ReadPreference.primary, db)._1
       RequestMakerExpectingResponse(requestMaker, true)
@@ -177,12 +200,9 @@ object Command {
     CommandWithPackMaker(pack)
 }
 
-final case class ResolvedCollectionCommand[
-  C <: CollectionCommand
-] (
+final case class ResolvedCollectionCommand[C <: CollectionCommand](
   collection: String,
-  command: C
-) extends Command
+  command: C) extends Command
 
 
 object `package` {

@@ -1,6 +1,6 @@
 package reactivemongo.api.commands
 
-import concurrent.Future
+import scala.concurrent.Future
 import reactivemongo.api.{ BSONSerializationPack, Cursor, SerializationPack }
 
 trait AggregationFramework[P <: SerializationPack] {

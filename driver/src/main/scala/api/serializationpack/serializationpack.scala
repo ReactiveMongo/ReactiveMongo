@@ -30,6 +30,8 @@ trait SerializationPack { self: Singleton =>
     val channelBuf = ChannelBufferReadableBuffer(buf.readBytes(buf.getInt(buf.readerIndex)))
     readAndDeserialize(channelBuf, reader)
   }
+
+  def writer[A](f: A => Document): Writer[A]
 }
 
 object BSONSerializationPack extends SerializationPack {
@@ -48,13 +50,17 @@ object BSONSerializationPack extends SerializationPack {
     def write(document: Document): Document = document
   }
 
-  def serialize[A](a: A, writer: Writer[A]): Document =
-    writer.write(a)
+  def serialize[A](a: A, writer: Writer[A]): Document = writer.write(a)
+
   def deserialize[A](document: Document, reader: Reader[A]): A =
     reader.read(document)
 
-  def writeToBuffer(buffer: WritableBuffer, document: Document): WritableBuffer =
-    DefaultBufferHandler.writeDocument(document, buffer)
+  def writeToBuffer(buffer: WritableBuffer, document: Document): WritableBuffer = DefaultBufferHandler.writeDocument(document, buffer)
+
   def readFromBuffer(buffer: ReadableBuffer): Document =
     DefaultBufferHandler.readDocument(buffer).get
+
+  def writer[A](f: A => Document): Writer[A] = new BSONDocumentWriter[A] {
+    def write(input: A): Document = f(input)
+  }
 }
