@@ -21,13 +21,11 @@ import core.AkkaByteStringWritableBuffer
 import scala.concurrent.{ ExecutionContext, Future }
 import scala.util.Try
 import scala.util.control.NonFatal
-import org.jboss.netty.buffer.ChannelBuffer
 import reactivemongo.api._
 import reactivemongo.api.commands.{ LastError, WriteConcern }
 import reactivemongo.bson.buffer.{ReadableBuffer, WritableBuffer}
 import reactivemongo.core.nodeset.ProtocolMetadata
 import reactivemongo.core.protocol._
-import reactivemongo.core.netty._
 import reactivemongo.core.errors.{UnsupportedVersionOfMongo, ConnectionNotInitialized}
 
 trait GenericCollectionProducer[P <: SerializationPack with Singleton, +C <: GenericCollection[P]] extends CollectionProducer[C]
