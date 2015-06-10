@@ -3,6 +3,7 @@ package reactivemongo.core
 import java.net.InetSocketAddress
 
 import akka.actor._
+import akka.event.Logging
 import akka.io.{IO, Tcp}
 import reactivemongo.api.commands.bson.BSONIsMasterCommand
 import reactivemongo.bson.BSONDocument
@@ -42,6 +43,7 @@ case class Node(
   override def receive: Receive = {
     case Close => {
       connections.foreach(_ ! Close)
+      context.become(closing)
     }
     case Node.Connect => {
       awaitingConnections = nbOfConnections
@@ -52,7 +54,7 @@ case class Node(
     case Tcp.Connected(remote, local) => {
       log.info("Connected from {} to {}", local, remote)
       val connection = context.actorOf(Props(classOf[Connection], sender()))
-      awaitingConnections = awaitingConnections - 1;
+      awaitingConnections -= 1;
       connections = connection +: connections
       if(awaitingConnections == 0){
         connections.head ! Node.IsMaster
@@ -82,6 +84,7 @@ case class Node(
       awaitingConnections -= 1
     }
     case Closed => {
+      log.info("Closed connection to node")
       connections = connections diff List(sender())
       if (connections.isEmpty && awaitingConnections == 0)
         context.parent ! Closed

@@ -564,9 +564,14 @@ class MongoDriver(config: Option[Config] = None) {
         context.watch(actor)
         sender ! ac.connection
       case Terminated(actor) =>
+        log.info("actor {} terminated", actor)
         connections = connections diff List(actor)
       case Close =>
-        connections.foreach(_ ! Close)
+        log.info("get close message")
+        if(connections.isEmpty)
+          context.stop(self)
+        else
+          connections.foreach(_ ! Close)
         context.become(closing)
     }
 

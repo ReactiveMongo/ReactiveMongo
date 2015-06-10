@@ -98,8 +98,10 @@ package object utils {
      }
      case Closed => {
       connectedNodes = connectedNodes diff List(sender())
-       if(connectedNodes.isEmpty && connectingNodes.isEmpty)
-         context.parent ! Closed
+       if(connectedNodes.isEmpty && connectingNodes.isEmpty) {
+         self ! PoisonPill
+         log.debug("all connections to a nodeset are closed")
+       }
      }
      case Node.DiscoveredNodes(hosts) => {
        log.info("nodes descovered but nodeSet in closing state")
@@ -178,6 +180,7 @@ case class Connection(
     }
     case Close => {
       socketManager ! akka.io.Tcp.Close
+      context.become(closing)
     }
     case a : Any => log.warning("unhandled messsage {}", a)
   }
@@ -186,9 +189,8 @@ case class Connection(
 
   private def waitClose: Receive = {
     case akka.io.Tcp.Closed => {
-      log.info("connection closed")
+      log.info("connection is closed")
       context.parent ! Closed
-      self ! PoisonPill
     }
     case Close => log.warning("closing connection multiple times")
   }
