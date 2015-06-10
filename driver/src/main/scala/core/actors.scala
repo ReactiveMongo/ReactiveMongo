@@ -118,7 +118,7 @@ class MongoDBSystem(
 
   private val awaitingResponses = scala.collection.mutable.LinkedHashMap[Int, AwaitingResponse]()
 
-  private val nodeSetActor = system.actorOf(Props(classOf[NodeSet], addConnection.tupled, removeConnection))
+  val nodeSetActor = system.actorOf(Props(classOf[NodeSet], addConnection.tupled, removeConnection))
 
   def nextChannel = channel.incrementAndGet()
 

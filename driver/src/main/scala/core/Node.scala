@@ -3,11 +3,11 @@ package reactivemongo.core
 import java.net.InetSocketAddress
 
 import reactivemongo.api.commands.bson.BSONIsMasterCommand
+import reactivemongo.core.actors.{Closed, Close}
 import reactivemongo.core.protocol.MongoWireVersion
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import akka.actor._
-import akka.io.Tcp._
 import akka.io.{IO, Tcp}
 import akka.pattern.pipe
 import reactivemongo.bson.BSONDocument
@@ -27,7 +27,7 @@ case class Node(
   import context.system
 
 
-  var connections: List[ActorRef] = List.empty
+  var connections: Vector[ActorRef] = Vector.empty
   var pingInfo: PingInfo = PingInfo()
   var isMongos: Boolean = false
   var protocolMetadata: ProtocolMetadata = null
@@ -44,6 +44,9 @@ case class Node(
   }
 
   override def receive: Receive = {
+    case Close => {
+      connections.foreach(_ ! Close)
+    }
     case Node.Connect => {
       awaitingConnections = nbOfConnections
       val manager = IO(Tcp)
@@ -73,11 +76,27 @@ case class Node(
       context.parent ! Node.Connected(connections.map((_, state)), protocolMetadata)
     }
   }
+
+  private def closing: Receive = {
+    case Tcp.Connected(remote, local) => {
+      log.info("Connected from {} to {} will be closed", local, remote)
+      val connection = context.actorOf(Props(classOf[Connection], sender()))
+      connections = connection +: connections
+      connection ! Close
+      awaitingConnections -= 1
+    }
+    case Closed => {
+      connections = connections diff List(sender())
+      if (connections.isEmpty && awaitingConnections == 0)
+        context.parent ! Closed
+    }
+    case _ => log.info("Connection in closing state, all messages are ignored")
+  }
 }
 
 object Node {
   object Connect
-  case class Connected(connections: List[(ActorRef, ConnectionState)], metadata: ProtocolMetadata)
+  case class Connected(connections: Seq[(ActorRef, ConnectionState)], metadata: ProtocolMetadata)
   case class DiscoveredNodes(hosts: Seq[String])
   object PrimaryUnavailable
   object IsMaster

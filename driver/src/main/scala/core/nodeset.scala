@@ -1,31 +1,22 @@
 package reactivemongo.core.nodeset
 
-import java.net.InetSocketAddress
 import java.util.concurrent.{Executor, Executors}
 
-import akka.actor.Actor.Receive
-import akka.io.Tcp.{Register, Connected, Connect}
-import akka.io.{Tcp, IO}
-import akka.pattern.ask
 import akka.actor._
-import akka.routing.{RoundRobinRoutingLogic, Router}
-import akka.util.{ByteString, ByteStringBuilder, Timeout}
+import akka.io.Tcp.Register
+import akka.util.ByteStringBuilder
 import core.SocketWriter
-import reactivemongo.core.actors._
-import reactivemongo.core.commands.{IsMaster, LastError}
-import reactivemongo.core.nodeset.NodeSet.ConnectAll
-import scala.collection.immutable.HashMap
-import scala.concurrent.ExecutionContext.Implicits.global
 import org.jboss.netty.buffer.HeapChannelBufferFactory
 import org.jboss.netty.channel.socket.nio.NioClientSocketChannelFactory
 import org.jboss.netty.channel.{Channel, ChannelPipeline, Channels}
-import reactivemongo.api.{MongoConnectionOptions, ReadPreference}
-import reactivemongo.bson._
-import reactivemongo.core._
-import reactivemongo.core.{SocketReader, ConnectionManager}
+import reactivemongo.api.MongoConnectionOptions
+import reactivemongo.core.{SocketReader, _}
+import reactivemongo.core.actors._
+import reactivemongo.core.commands.{IsMaster, LastError}
 import reactivemongo.core.protocol.{Request, _}
 
 import scala.collection.generic.CanBuildFrom
+import scala.collection.immutable.HashMap
 
 package object utils {
   def updateFirst[A, M[T] <: Iterable[T]](coll: M[A])(ƒ: A => Option[A])(implicit cbf: CanBuildFrom[M[_], A, M[A]]): M[A] = {
@@ -61,7 +52,8 @@ package object utils {
    var initialAuthenticates: Seq[Authenticate] = Seq.empty
    var connectionsPerNode: Int = 10
    var existingHosts : Set[String] = Set.empty
-   var nodes: Vector[ActorRef] = Vector.empty
+   var connectingNodes: Vector[ActorRef] = Vector.empty
+   var connectedNodes: Vector[ActorRef] = Vector.empty
    var version: Option[Long] = None
    var replyTo: ActorRef = null
 
@@ -71,8 +63,8 @@ package object utils {
       replyTo = sender()
       this.connectionsPerNode = count
       this.initialAuthenticates = auth
-      existingHosts = hosts ++: existingHosts
-      nodes = hosts.map(address => {
+      existingHosts = hosts.toSet
+      connectingNodes = hosts.map(address => {
         val node = context.actorOf(Props(classOf[Node], address, initialAuthenticates, connectionsPerNode))
         node ! Node.Connect
         node
@@ -80,7 +72,8 @@ package object utils {
     }
     case Node.Connected(connections, metadata) => {
       log.info("node connected metadata {}", metadata)
-      nodes = sender() +: nodes
+      connectingNodes = connectingNodes diff List(sender())
+      connectedNodes = sender() +: connectedNodes
       connections.foreach(onAddConnection(_))
 
       if(connections.exists(p => p._2.isPrimary || p._2.isMongos))
@@ -90,13 +83,34 @@ package object utils {
       log.info("nodes descovered")
       val discovered = hosts.filter(!existingHosts.contains(_))
       existingHosts = discovered ++: existingHosts
-      nodes = discovered.map(address => {
+      connectingNodes = discovered.map(address => {
         val node = context.actorOf(Props(classOf[Node], address, initialAuthenticates, connectionsPerNode))
         node ! Node.Connect
         node
-      }) ++: nodes
+      }) ++: connectingNodes
+    }
+    case Close => {
+      connectedNodes.foreach(_ ! Close)
+      context.become(closing)
     }
   }
+
+   private def closing: Receive = {
+     case Node.Connected(connections, metadata) => {
+       log.info("node connected metadata {} but nodeSet in closing state", metadata)
+       connectingNodes = connectingNodes diff List(sender())
+       connectedNodes = sender() +: connectedNodes
+       sender() ! Close
+     }
+     case Closed => {
+      connectedNodes = connectedNodes diff List(sender())
+       if(connectedNodes.isEmpty && connectingNodes.isEmpty)
+         context.parent ! Closed
+     }
+     case Node.DiscoveredNodes(hosts) => {
+       log.info("nodes descovered but nodeSet in closing state")
+     }
+   }
 }
 
 object  NodeSet {
@@ -154,8 +168,8 @@ case class Connection(
       if (requestIds.isMaster accepts response) {
         if (pendingIsMaster._1 == response.header.responseTo) {
           import reactivemongo.api.BSONSerializationPack
-          import reactivemongo.api.commands.bson.BSONIsMasterCommandImplicits
           import reactivemongo.api.commands.Command
+          import reactivemongo.api.commands.bson.BSONIsMasterCommandImplicits
           val initialInfo = pendingIsMaster._2
           val isMaster = Command.deserialize(BSONSerializationPack, response)(BSONIsMasterCommandImplicits.IsMasterResultReader)
           log.debug("received isMaster {}", isMaster)
@@ -168,7 +182,21 @@ case class Connection(
         processResponse(response)
       }
     }
+    case Close => {
+      socketManager ! akka.io.Tcp.Close
+    }
     case a : Any => log.warning("unhandled messsage {}", a)
+  }
+
+  private def closing = waitClose orElse receive
+
+  private def waitClose: Receive = {
+    case akka.io.Tcp.Closed => {
+      log.info("connection closed")
+      context.parent ! Closed
+      self ! PoisonPill
+    }
+    case Close => log.warning("closing connection multiple times")
   }
 
   private def processResponse(response: Response) = {
@@ -202,7 +230,6 @@ case class Connection(
             // MongoDB 26 Write Protocol errors
             log.debug("received a response to a MongoDB2.6 Write Op")
             import reactivemongo.bson.lowlevel._
-            import reactivemongo.core.netty.ChannelBufferReadableBuffer
             val reader = new LowLevelBsonDocReader(new AkkaReadableBuffer(response.documents))
             val fields = reader.fieldStream
             val okField = fields.find(_.name == "ok")

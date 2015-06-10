@@ -15,7 +15,6 @@
  */
 package reactivemongo.api
 
-import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
 
 import akka.actor._
@@ -23,11 +22,11 @@ import akka.pattern._
 import akka.util.Timeout
 import com.typesafe.config.Config
 import reactivemongo.core.actors._
-import reactivemongo.core.nodeset.{ProtocolMetadata, Authenticate}
+import reactivemongo.core.nodeset.{NodeSet, ProtocolMetadata, Authenticate}
 import reactivemongo.core.protocol._
 import reactivemongo.core.commands.SuccessfulAuthentication
-import scala.collection.mutable
 import scala.concurrent.{Await, ExecutionContext, Future, Promise}
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.util.{ Try, Failure, Success }
 import scala.util.control.NoStackTrace
@@ -266,10 +265,10 @@ case class MongoConnection(
   }
 
   /** Closes this MongoConnection (closes all the channels and ends the actors) */
-  def askClose()(implicit timeout: FiniteDuration): Future[_] = ???
+  def askClose()(implicit timeout: FiniteDuration): Future[_] = (mongosystem.nodeSetActor ? Close)(timeout)
 
   /** Closes this MongoConnection (closes all the channels and ends the actors) */
-  def close(): Unit = ???
+  def close(): Unit = mongosystem.nodeSetActor ! Close
 
 
   /**
@@ -478,30 +477,24 @@ class MongoDriver(config: Option[Config] = None) {
     ActorSystem("reactivemongo", debugConfig)
   }
 
-  //private val supervisorActor = system.actorOf(Props(new SupervisorActor(this)),"Supervisor-" + MongoDriver.nextCounter)
+  private val supervisorActor = system.actorOf(Props(new SupervisorActor(this)),"Supervisor-" + MongoDriver.nextCounter)
 
-  private val connectionMonitors = mutable.Map.empty[ActorRef,MongoConnection]
+  private var connections = Vector.empty[ActorRef]
 
   /** Keep a list of all connections so that we can terminate the actors */
-  def connections: Iterable[MongoConnection] = connectionMonitors.values
+  //def connections: Iterable[MongoConnection] = connectionMonitors.values
 
-  def numConnections: Int = connectionMonitors.size
+  def numConnections: Int = connections.size
 
-  def close(timeout: FiniteDuration = 0.seconds) : Unit = ???
-//  {
-//    // Terminate actors used by MongoConnections
-//    connections.foreach { connection =>
-//      connection.monitor ! Close
-//    }
-//
-//    // Tell the supervisor to close. It will shut down all the connections and monitors
-//    // and then shut down the ActorSystem as it is exiting.
-//    supervisorActor ! Close
-//
-//    // When the actorSystem is shutdown, it means that supervisorActor has exited (run its postStop)
-//    // So, wait for that event.
-//    system.awaitTermination(timeout)
-//  }
+  def close(timeout: FiniteDuration = 0.seconds) : Unit = {
+    // Tell the supervisor to close. It will shut down all the connections and monitors
+    // and then shut down the ActorSystem as it is exiting.
+    supervisorActor ! Close
+
+    // When the actorSystem is shutdown, it means that supervisorActor has exited (run its postStop)
+    // So, wait for that event.
+    system.awaitTermination(timeout)
+  }
 
   /**
    * Creates a new MongoConnection.
@@ -517,9 +510,10 @@ class MongoDriver(config: Option[Config] = None) {
   def connection(nodes: Seq[String], options: MongoConnectionOptions = MongoConnectionOptions(), authentications: Seq[Authenticate] = Seq.empty,
                  nbChannelsPerNode: Int = 10, name: Option[String] = None): MongoConnection = {
     //val props = Props(new MongoDBSystem(nodes, authentications, options)())
+    implicit val duration : Timeout = 5 second
     val mongosystem = new MongoDBSystem(nodes, authentications, options, system)
-
-    Await.result(mongosystem.connect(), Duration.Inf)
+    val future = mongosystem.connect().flatMap(supervisorActor ? AddConnection(_)).mapTo[MongoConnection]
+    Await.result(future, duration.duration)
   }
 
   /**
@@ -559,54 +553,37 @@ class MongoDriver(config: Option[Config] = None) {
   def connection(parsedURI: MongoConnection.ParsedURI): MongoConnection =
     connection(parsedURI, 10, None)
 
-  private case class AddConnection(options: MongoConnectionOptions, mongosystem: MongoDBSystem)
-  private case class CloseWithTimeout(timeout: FiniteDuration)
+  private case class AddConnection(connection: MongoConnection)
 
-//  private case class SupervisorActor(driver: MongoDriver) extends Actor {
-//
-//    def isEmpty = driver.connectionMonitors.isEmpty
-//
-//    override def receive = {
-//      case ac: AddConnection =>
-//        val connection = new MongoConnection(driver.system, ac.mongosystem, ac.options)
-//        driver.connectionMonitors.put(connection.monitor, connection)
-//        val actor = connection.monitor
-//        context.watch(actor)
-//        sender ! connection
-//      case Terminated(actor) =>
-//        driver.connectionMonitors.remove(actor)
-//      case CloseWithTimeout(timeout) =>
-//        if (isEmpty) {
-//          context.stop(self)
-//        } else {
-//          context.become(closing(timeout))
-//        }
-//      case Close =>
-//        if (isEmpty) {
-//          context.stop(self)
-//        } else {
-//          context.become(closing(0.seconds))
-//        }
-//    }
-//
-//    def closing(shutdownTimeout: FiniteDuration) : Receive = {
-//      case ac: AddConnection =>
-////        logger.warn("Refusing to add connection while MongoDriver is closing.")
-//      case Terminated(actor) =>
-//        driver.connectionMonitors.remove(actor)
-//        if (isEmpty) {
-//          context.stop(self)
-//        }
-//      case CloseWithTimeout(timeout) =>
-////        logger.warn("CloseWithTimeout ignored, already closing.")
-//      case Close =>
-////        logger.warn("Close ignored, already closing.")
-//    }
-//
-//    override def postStop {
-//      driver.system.shutdown()
-//    }
-//  }
+  private case class SupervisorActor(driver: MongoDriver) extends Actor with ActorLogging {
+
+    override def receive = {
+      case ac: AddConnection =>
+        val actor = ac.connection.mongosystem.nodeSetActor
+        driver.connections = actor +: driver.connections
+        context.watch(actor)
+        sender ! ac.connection
+      case Terminated(actor) =>
+        connections = connections diff List(actor)
+      case Close =>
+        connections.foreach(_ ! Close)
+        context.become(closing)
+    }
+
+    def closing() : Receive = {
+      case ac: AddConnection => log.warning("Refusing to add connection while MongoDriver is closing.")
+      case Terminated(actor) =>
+        connections = connections diff List(actor)
+        if (connections.isEmpty) {
+          context.stop(self)
+        }
+      case Close => log.warning("Close ignored, already closing.")
+    }
+
+    override def postStop {
+      driver.system.shutdown()
+    }
+  }
 }
 
 object MongoDriver {
