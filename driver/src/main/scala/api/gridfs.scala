@@ -25,7 +25,6 @@ import reactivemongo.api.commands.WriteResult
 import reactivemongo.core.AkkaReadableBuffer
 import reactivemongo.utils._
 import scala.concurrent.{ ExecutionContext, Future }
-import reactivemongo.core.netty.ChannelBufferWritableBuffer
 import reactivemongo.api.collections.GenericCollectionProducer
 import reactivemongo.api.collections.GenericCollection
 

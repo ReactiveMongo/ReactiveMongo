@@ -15,11 +15,9 @@
  */
 package reactivemongo.api
 
-import akka.event.LoggingReceive
 import akka.util.ByteString
 import play.api.libs.iteratee._
 import reactivemongo.core.iteratees.{ CustomEnumeratee, CustomEnumerator }
-import reactivemongo.core.netty.BufferSequence
 import reactivemongo.core.protocol._
 import reactivemongo.utils.ExtendedFutures.DelayedFuture
 import scala.annotation.tailrec

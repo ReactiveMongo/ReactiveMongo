@@ -26,7 +26,6 @@ trait SerializationPack { self: Singleton =>
 
 
   import reactivemongo.core.protocol.Response
-  import reactivemongo.core.netty.ChannelBufferReadableBuffer
 
   final def readAndDeserialize[A](response: Response, reader: Reader[A]): A = {
     implicit val order = ByteOrder.LITTLE_ENDIAN

@@ -450,7 +450,6 @@ object IndexesManager {
   }
 
   implicit object NSIndexWriter extends BSONDocumentWriter[NSIndex] {
-    import org.jboss.netty.buffer._
     def write(nsIndex: NSIndex): BSONDocument = {
       if (nsIndex.index.key.isEmpty)
         throw new RuntimeException("the key should not be empty!")
