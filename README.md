@@ -102,9 +102,9 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 def listDocs() = {
   // Select only the documents which field 'firstName' equals 'Jack'
-  val query = BSONDocument("firstName" -> "Jack")
+  val query = document("firstName" -> "Jack")
   // select only the fields 'lastName' and '_id'
-  val fields = BSONDocument(
+  val fields = document(
     "lastName" -> 1,
     "_id" -> 1)
 
