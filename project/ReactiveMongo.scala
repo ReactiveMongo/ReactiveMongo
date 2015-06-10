@@ -15,8 +15,8 @@ object BuildSettings {
   val buildSettings = Defaults.coreDefaultSettings ++ Seq(
     organization := "org.reactivemongo",
     version := buildVersion,
-    scalaVersion := "2.11.2",
-    crossScalaVersions  := Seq("2.11.2", "2.10.4"),
+    scalaVersion := "2.11.6",
+    crossScalaVersions  := Seq("2.11.6", "2.10.5"),
     crossVersion := CrossVersion.binary,
     javaOptions in test ++= Seq("-Xmx512m", "-XX:MaxPermSize=512m"),
     scalacOptions ++= Seq("-unchecked", "-deprecation", "-target:jvm-1.6"),
@@ -121,9 +121,9 @@ object Resolvers {
 
 object Dependencies {
 
-  val akkaActor = "com.typesafe.akka" %% "akka-actor" % "2.3.6"
+  val akkaActor = "com.typesafe.akka" %% "akka-actor" % "2.3.11"
 
-  val iteratees = "com.typesafe.play" %% "play-iteratees" % "2.3.5"
+  val iteratees = "com.typesafe.play" %% "play-iteratees" % "2.3.7"
 
   val specs = "org.specs2" %% "specs2-core" % "2.3.11" % "test"
 }
