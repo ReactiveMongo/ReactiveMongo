@@ -22,7 +22,6 @@ import scala.concurrent.{ ExecutionContext, Future }
 import reactivemongo.api._
 import reactivemongo.bson.buffer.{WritableBuffer, ReadableBuffer}
 import reactivemongo.core.protocol.{ Query, QueryFlags }
-import reactivemongo.core.netty.{ BufferSequence, ChannelBufferWritableBuffer }
 
 /**
  * A builder that helps to make a fine-tuned query to MongoDB.
@@ -60,7 +59,7 @@ trait GenericQueryBuilder[P <: SerializationPack] {
     options: QueryOpts = options,
     failover: FailoverStrategy = failover): Self
 
-  private def write(document: pack.Document, buffer: WritableBuffer = ChannelBufferWritableBuffer()): WritableBuffer = {
+  private def write(document: pack.Document, buffer: WritableBuffer): WritableBuffer = {
     pack.writeToBuffer(buffer, document)
     buffer
   }

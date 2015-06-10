@@ -96,12 +96,6 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
   import reactivemongo.api.commands.{ MultiBulkWriteResult, UpdateWriteResult, WriteResult }
 
 
-  private def writeDoc(doc: pack.Document): ChannelBuffer = {
-    val buffer = ChannelBufferWritableBuffer()
-    pack.writeToBuffer(buffer, doc)
-    buffer.buffer
-  }
-
   private def writeDoc[T](doc: T, writer: pack.Writer[T]) = {
     val buffer = AkkaByteStringWritableBuffer(new ByteStringBuilder())
     pack.serializeAndWrite(buffer, doc, writer)
@@ -343,9 +337,8 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
     def delete(ordered: Boolean, writeConcern: WriteConcern, metadata: ProtocolMetadata): Mongo26WriteCommand = new Mongo26WriteCommand("delete", ordered, writeConcern, metadata)
   }
 
-  import reactivemongo.bson._
   import reactivemongo.bson.lowlevel.LowLevelBsonDocWriter
-  import reactivemongo.core.netty.ChannelBufferWritableBuffer
+
 
   protected sealed trait BulkMaker[R, S <: BulkMaker[R, S]] {
     def fill(docs: Stream[pack.Document]): (Stream[pack.Document], Option[S]) = {
