@@ -4,7 +4,7 @@ import DefaultBSONHandlers._
 import scala.concurrent.{ Await, Future }
 import scala.concurrent.duration._
 import play.api.libs.iteratee.Iteratee
-import reactivemongo.api.{ Cursor, CursorProducer, QueryOpts, WrappedCursor }
+import reactivemongo.api.{ Cursor, DB, CursorProducer, QueryOpts, WrappedCursor }
 
 class CursorSpec extends Specification {
   sequential
@@ -85,14 +85,13 @@ class CursorSpec extends Specification {
     }
 
     "read from capped collection" >> {
-      def collection(n: String) = {
-        val col = db(s"somecollection_captail_$n")
-        col.createCapped(4096, Some(10))
+      def collection(n: String, database: DB) = {
+        val col = database(s"somecollection_captail_$n")
 
-        Future {
+        col.createCapped(4096, Some(10)) map { _ =>
           (0 until 10).foreach { id =>
             col.insert(BSONDocument("id" -> id))
-            Thread.sleep(500)
+            Thread.sleep(200)
           }
           println(s"-- all documents inserted in test collection $n")
         }
@@ -100,9 +99,9 @@ class CursorSpec extends Specification {
         col
       }
 
-      @inline def tailable(n: String) = {
+      @inline def tailable(n: String, database: DB = db) = {
         implicit val reader = IdReader
-        collection(n).find(BSONDocument()).options(
+        collection(n, database).find(BSONDocument()).options(
           QueryOpts().tailable).cursor[Int]
       }
 
@@ -116,18 +115,33 @@ class CursorSpec extends Specification {
           aka("enumerated") must throwA[Exception]
       }
 
-      "using tailable foldWhile" in {
-        tailable("foldw1").foldWhile(List.empty[Int], 5)(
-          (s, i) => Cursor.Cont(i :: s),
-          (_, e) => Cursor.Fail(e)) must beEqualTo(List(
-            4, 3, 2, 1, 0)).await(1000)
-      }
+      "using tailable foldWhile" >> {
+        "successfully" in {
+          tailable("foldw1").foldWhile(List.empty[Int], 5)(
+            (s, i) => Cursor.Cont(i :: s),
+            (_, e) => Cursor.Fail(e)) must beEqualTo(List(
+              4, 3, 2, 1, 0)).await(2500)
+        }
 
-      "with timeout using tailable foldWhile w/o maxDocs" in {
-        Await.result(tailable("foldw2").foldWhile(List.empty[Int])(
-          (s, i) => Cursor.Cont(i :: s),
-          (_, e) => Cursor.Fail(e)), timeout) must throwA[Exception]
+        "leading to timeout w/o maxDocs" in {
+          Await.result(tailable("foldw2").foldWhile(List.empty[Int])(
+            (s, i) => Cursor.Cont(i :: s),
+            (_, e) => Cursor.Fail(e)), timeout) must throwA[Exception]
 
+        }
+
+        "gracefully stop at connection close w/o maxDocs" in {
+          val con = driver.connection(List("localhost:27017"))
+          tailable("foldw3", con("specs2-test-reactivemongo")).
+            foldWhile(List.empty[Int])((s, i) => {
+              if (i == 1) con.close() // Force connection close
+              Cursor.Cont(i :: s)
+            }, (_, e) => Cursor.Fail(e)) must beLike[List[Int]] {
+              case is => is.reverse must beLike[List[Int]] {
+                case 0 :: 1 :: _ => ok
+              }
+            }.await(1500)
+        }
       }
     }
   }
