@@ -18,8 +18,6 @@ package reactivemongo.core.protocol
 import java.nio.ByteOrder
 
 import akka.util.{ByteString, ByteStringBuilder}
-import org.jboss.netty.channel._
-import org.jboss.netty.buffer._
 import reactivemongo.bson.buffer.ReadableBuffer
 
 private[core] object ByteStringBuilderHelper {
@@ -67,73 +65,6 @@ private[core] object ByteStringBuilderHelper {
   }
 }
 
-/**
- * Helper methods to write tuples of supported types into a [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]].
- */
-private[protocol] object BufferAccessors {
-  /**
-   * Typeclass for types that can be written into a [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]]
-   * via writeTupleToBufferN methods.
-   *
-   * @tparam T type to be written via BufferAccessors.writeTupleToBufferN(...) methods.
-   */
-  sealed trait BufferInteroperable[T] {
-    def apply(buffer: ChannelBuffer, t: T): Unit
-  }
-
-  implicit object IntChannelInteroperable extends BufferInteroperable[Int] {
-    def apply(buffer: ChannelBuffer, i: Int) = buffer writeInt i
-  }
-
-  implicit object LongChannelInteroperable extends BufferInteroperable[Long] {
-    def apply(buffer: ChannelBuffer, l: Long) = buffer writeLong l
-  }
-
-  implicit object StringChannelInteroperable extends BufferInteroperable[String] {
-    def apply(buffer: ChannelBuffer, s: String) = buffer writeCString s
-  }
-
-  /**
-   * Write the given tuple into the given [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]].
-   *
-   * @tparam A type that have an implicit typeclass [[reactivemongo.core.protocol.BufferAccessors.BufferInteroperable]].
-   * @tparam B type that have an implicit typeclass [[reactivemongo.core.protocol.BufferAccessors.BufferInteroperable]].
-   */
-  def writeTupleToBuffer2[A, B](t: (A, B))(buffer: ChannelBuffer)(implicit i1: BufferInteroperable[A], i2: BufferInteroperable[B]): Unit = {
-    i1(buffer, t._1)
-    i2(buffer, t._2)
-  }
-
-  /**
-   * Write the given tuple into the given [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]].
-   *
-   * @tparam A type that have an implicit typeclass [[reactivemongo.core.protocol.BufferAccessors.BufferInteroperable]].
-   * @tparam B type that have an implicit typeclass [[reactivemongo.core.protocol.BufferAccessors.BufferInteroperable]].
-   * @tparam C type that have an implicit typeclass [[reactivemongo.core.protocol.BufferAccessors.BufferInteroperable]].
-   */
-  def writeTupleToBuffer3[A, B, C](t: (A, B, C))(buffer: ChannelBuffer)(implicit i1: BufferInteroperable[A], i2: BufferInteroperable[B], i3: BufferInteroperable[C]): Unit = {
-    i1(buffer, t._1)
-    i2(buffer, t._2)
-    i3(buffer, t._3)
-  }
-
-  /**
-   * Write the given tuple into the given [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]].
-   *
-   * @tparam A type that have an implicit typeclass [[reactivemongo.core.protocol.BufferAccessors.BufferInteroperable]].
-   * @tparam B type that have an implicit typeclass [[reactivemongo.core.protocol.BufferAccessors.BufferInteroperable]].
-   * @tparam C type that have an implicit typeclass [[reactivemongo.core.protocol.BufferAccessors.BufferInteroperable]].
-   * @tparam D type that have an implicit typeclass [[reactivemongo.core.protocol.BufferAccessors.BufferInteroperable]].
-   */
-  def writeTupleToBuffer4[A, B, C, D](t: (A, B, C, D))(buffer: ChannelBuffer)(implicit i1: BufferInteroperable[A], i2: BufferInteroperable[B], i3: BufferInteroperable[C], i4: BufferInteroperable[D]): Unit = {
-    i1(buffer, t._1)
-    i2(buffer, t._2)
-    i3(buffer, t._3)
-    i4(buffer, t._4)
-  }
-}
-
-import BufferAccessors._
 import ByteStringBuilderHelper._
 
 /** A Mongo Wire Protocol operation */
@@ -147,7 +78,7 @@ sealed trait Op {
  *
  * Actually, all operations excepted Reply are requests.
  */
-sealed trait RequestOp extends Op with ChannelBufferWritable with ByteStringBuffer {
+sealed trait RequestOp extends Op with ByteStringBuffer {
   /** States if this request expects a response. */
   val expectsResponse: Boolean = false
   /** States if this request has to be run on a primary. */
@@ -197,14 +128,9 @@ case class Reply(
   lazy val stringify = toString + " [" + str(cursorNotFound, "CursorNotFound;") + str(queryFailure, "QueryFailure;") + str(awaitCapable, "AwaitCapable") + "]"
 }
 
-object Reply extends ChannelBufferReadable[Reply] with BufferReadable[Reply] with ReadableFrom[ByteString, Reply] {
+object Reply extends BufferReadable[Reply] with ReadableFrom[ByteString, Reply] {
   val size = 4 + 8 + 4 + 4
 
-  def readFrom(buffer: ChannelBuffer) = Reply(
-    buffer.readInt,
-    buffer.readLong,
-    buffer.readInt,
-    buffer.readInt)
 
   override def readFrom(buffer: ReadableBuffer) = Reply(
     buffer.readInt,
@@ -233,7 +159,6 @@ case class Update(
     fullCollectionName: String,
     flags: Int) extends WriteRequestOp {
   override val code = 2001
-  override val writeTo = writeTupleToBuffer3((0, fullCollectionName, flags)) _
   override def size = 4 /* int32 = ZERO */ + 4 + fullCollectionName.length + 1
   override val requiresPrimary = true
 
@@ -256,8 +181,6 @@ case class Insert(
     flags: Int,
     fullCollectionName: String) extends WriteRequestOp {
   override val code = 2002
-
-  override val writeTo = writeTupleToBuffer2((flags, fullCollectionName)) _
   override def size = 4 + fullCollectionName.length + 1
   override val requiresPrimary = true
 
@@ -278,7 +201,6 @@ case class Query(
     numberToReturn: Int) extends CollectionAwareRequestOp {
   override val expectsResponse = true
   override val code = 2004
-  override val writeTo = writeTupleToBuffer4((flags, fullCollectionName, numberToSkip, numberToReturn)) _
   override def size = 4 + fullCollectionName.length + 1 + 4 + 4
 
   override val append = write(flags, fullCollectionName, numberToSkip, numberToReturn) _
@@ -320,7 +242,6 @@ case class GetMore(
     cursorID: Long) extends CollectionAwareRequestOp {
   override val expectsResponse = true
   override val code = 2005
-  override val writeTo = writeTupleToBuffer4((0, fullCollectionName, numberToReturn, cursorID)) _
   override def size = 4 /* int32 ZERO */ + fullCollectionName.length + 1 + 4 + 8
 
   override def append = write(0, fullCollectionName, numberToReturn, cursorID)
@@ -335,7 +256,6 @@ case class Delete(
     fullCollectionName: String,
     flags: Int) extends WriteRequestOp {
   override val code = 2006
-  override val writeTo = writeTupleToBuffer3((0, fullCollectionName, flags)) _
   override def size = 4 /* int32 ZERO */ + fullCollectionName.length + 1 + 4
   override val requiresPrimary = true
 
@@ -350,13 +270,6 @@ case class Delete(
 case class KillCursors(
     cursorIDs: Set[Long]) extends RequestOp {
   override val code = 2007
-  override val writeTo = { buffer: ChannelBuffer =>
-    buffer writeInt 0
-    buffer writeInt cursorIDs.size
-    for (cursorID <- cursorIDs) {
-      buffer writeLong cursorID
-    }
-  }
   override def size = 4 /* int32 ZERO */ + 4 + cursorIDs.size * 8
 
   override def append = { builder: ByteStringBuilder =>

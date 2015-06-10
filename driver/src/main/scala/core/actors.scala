@@ -20,17 +20,14 @@ import java.util.concurrent.atomic.AtomicInteger
 import akka.actor._
 import akka.pattern._
 import akka.routing.{RoundRobinRoutingLogic, Router}
-import org.jboss.netty.channel.group._
+import reactivemongo.api.{MongoConnection, MongoConnectionOptions}
 import reactivemongo.core._
+import reactivemongo.core.commands.{Authenticate => AuthenticateCommand, _}
 import reactivemongo.core.errors._
-import reactivemongo.core.protocol._
-import reactivemongo.core.commands.{ Authenticate => AuthenticateCommand, _ }
-import scala.annotation.tailrec
-import scala.concurrent.{ Future, Promise }
-import scala.util.{ Failure, Success, Try }
 import reactivemongo.core.nodeset._
-import java.net.InetSocketAddress
-import reactivemongo.api.{MongoConnection, MongoConnectionOptions, ReadPreference}
+import reactivemongo.core.protocol._
+
+import scala.concurrent.{Future, Promise}
 
 // messages
 

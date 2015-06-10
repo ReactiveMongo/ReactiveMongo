@@ -1,9 +1,8 @@
-import reactivemongo.api._
-import reactivemongo.bson._
-import reactivemongo.core.commands.Count
-import scala.concurrent._
 import org.specs2.mutable._
 import play.api.libs.iteratee.Iteratee
+import reactivemongo.bson._
+
+import scala.concurrent._
 
 class BSONCollectionSpec extends Specification {
   import Common._

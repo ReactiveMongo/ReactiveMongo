@@ -1,19 +1,13 @@
 package reactivemongo.core.nodeset
 
-import java.util.concurrent.{Executor, Executors}
-
 import akka.actor._
 import akka.io.Tcp.Register
 import akka.util.ByteStringBuilder
 import core.SocketWriter
-import org.jboss.netty.buffer.HeapChannelBufferFactory
-import org.jboss.netty.channel.socket.nio.NioClientSocketChannelFactory
-import org.jboss.netty.channel.{Channel, ChannelPipeline, Channels}
-import reactivemongo.api.MongoConnectionOptions
-import reactivemongo.core.{SocketReader, _}
 import reactivemongo.core.actors._
 import reactivemongo.core.commands.{IsMaster, LastError}
 import reactivemongo.core.protocol.{Request, _}
+import reactivemongo.core.{SocketReader, _}
 
 import scala.collection.generic.CanBuildFrom
 import scala.collection.immutable.HashMap
@@ -386,84 +380,3 @@ class ContinuousIterator[A](iterable: Iterable[A], private var toDrop: Int = 0) 
   def nextIndex = i
 }
 
-class RoundRobiner[A, M[T] <: Iterable[T]](val subject: M[A], startAtIndex: Int = 0) {
-  private val iterator = new ContinuousIterator(subject)
-  private val length = subject.size
-
-  def pick: Option[A] = if (iterator.hasNext) Some(iterator.next) else None
-
-  def pickWithFilter(filter: A => Boolean): Option[A] = pickWithFilter(filter, 0)
-
-  @scala.annotation.tailrec
-  private def pickWithFilter(filter: A => Boolean, tested: Int): Option[A] =
-    if (length > 0 && tested < length) {
-      val a = pick
-      if (!a.isDefined) None
-      else if (filter(a.get)) a
-      else pickWithFilter(filter, tested + 1)
-    } else None
-
-  def copy(subject: M[A], startAtIndex: Int = iterator.nextIndex) =
-    new RoundRobiner(subject, startAtIndex)
-}
-
-class ChannelFactory(options: MongoConnectionOptions, bossExecutor: Executor = Executors.newCachedThreadPool, workerExecutor: Executor = Executors.newCachedThreadPool) {
-  import javax.net.ssl.SSLContext
-
-
-  def create(host: String = "localhost", port: Int = 27017, receiver: ActorRef) = {
-    val channel = makeChannel(receiver)
-    channel
-  }
-
-  val channelFactory = new NioClientSocketChannelFactory(bossExecutor, workerExecutor)
-
-  private val bufferFactory = new HeapChannelBufferFactory(java.nio.ByteOrder.LITTLE_ENDIAN)
-
-  private def makePipeline(receiver: ActorRef): ChannelPipeline = {
-    val pipeline = Channels.pipeline(new ResponseFrameDecoder(),
-      new ResponseDecoder(), new RequestEncoder(), new MongoHandler(receiver))
-
-    if (options.sslEnabled) {
-      val sslCtx = {
-        val tm: Array[javax.net.ssl.TrustManager] =
-          if (options.sslAllowsInvalidCert) Array(TrustAny) else null
-
-        val ctx = SSLContext.getInstance("SSL")
-        ctx.init(null, tm, new java.security.SecureRandom())
-        ctx
-      }
-
-      val sslEng = {
-        val engine = sslCtx.createSSLEngine()
-        engine.setUseClientMode(true)
-        engine
-      }
-
-      val sslHandler =
-        new org.jboss.netty.handler.ssl.SslHandler(sslEng, false/* TLS */)
-      
-      pipeline.addFirst("ssl", sslHandler)
-    }
-
-    pipeline
-  }
-
-  private def makeChannel(receiver: ActorRef): Channel = {
-    val channel = channelFactory.newChannel(makePipeline(receiver))
-    val config = channel.getConfig
-    config.setTcpNoDelay(options.tcpNoDelay)
-    config.setBufferFactory(bufferFactory)
-    config.setKeepAlive(options.keepAlive)
-    config.setConnectTimeoutMillis(options.connectTimeoutMS)
-    channel
-  }
-
-  private object TrustAny extends javax.net.ssl.X509TrustManager {
-    import java.security.cert.X509Certificate
-
-    override def checkClientTrusted(cs: Array[X509Certificate], a: String) = {}
-    override def checkServerTrusted(cs: Array[X509Certificate], a: String) = {}
-    override def getAcceptedIssuers(): Array[X509Certificate] = null
-  }
-}

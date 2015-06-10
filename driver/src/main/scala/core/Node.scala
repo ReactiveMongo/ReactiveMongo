@@ -2,17 +2,13 @@ package reactivemongo.core
 
 import java.net.InetSocketAddress
 
-import reactivemongo.api.commands.bson.BSONIsMasterCommand
-import reactivemongo.core.actors.{Closed, Close}
-import reactivemongo.core.protocol.MongoWireVersion
-
-import scala.concurrent.ExecutionContext.Implicits.global
 import akka.actor._
 import akka.io.{IO, Tcp}
-import akka.pattern.pipe
+import reactivemongo.api.commands.bson.BSONIsMasterCommand
 import reactivemongo.bson.BSONDocument
-import reactivemongo.core.commands.IsMaster
+import reactivemongo.core.actors.{Close, Closed}
 import reactivemongo.core.nodeset._
+import reactivemongo.core.protocol.MongoWireVersion
 
 /**
  * Created by sh1ng on 10/05/15.

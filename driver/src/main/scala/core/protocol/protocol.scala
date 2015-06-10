@@ -17,105 +17,17 @@ package reactivemongo.core.protocol
 
 import java.nio.ByteOrder
 
-import akka.actor.ActorRef
 import akka.util.{ByteString, ByteStringBuilder}
-import org.jboss.netty.buffer._
-import org.jboss.netty.channel._
-import org.jboss.netty.handler.codec.frame.FrameDecoder
-import org.jboss.netty.handler.codec.oneone._
-import reactivemongo.api.{ReadPreference, SerializationPack}
 import reactivemongo.api.commands.GetLastError
+import reactivemongo.api.{ReadPreference, SerializationPack}
 import reactivemongo.bson.buffer.ReadableBuffer
 import reactivemongo.core.AkkaReadableBuffer
-import reactivemongo.core.actors.{ChannelClosed, ChannelConnected, ChannelDisconnected}
 import reactivemongo.core.errors._
-import reactivemongo.core.netty._
-import reactivemongo.core.protocol.BufferAccessors._
 import reactivemongo.core.protocol.ByteStringBuilderHelper._
-
-object `package` {
-  implicit class RichBuffer(val buffer: ChannelBuffer) extends AnyVal {
-    import scala.collection.mutable.ArrayBuffer
-    /** Write a UTF-8 encoded C-Style String. */
-    def writeCString(s: String): ChannelBuffer = {
-      val bytes = s.getBytes("utf-8")
-      buffer writeBytes bytes
-      buffer writeByte 0
-      buffer
-    }
-
-    /** Write a UTF-8 encoded String. */
-    def writeString(s: String): ChannelBuffer = {
-      val bytes = s.getBytes("utf-8")
-      buffer writeInt (bytes.size + 1)
-      buffer writeBytes bytes
-      buffer writeByte 0
-      buffer
-    }
-
-    /** Write the contents of the given [[reactivemongo.core.protocol.ChannelBufferWritable]]. */
-    def write(writable: ChannelBufferWritable) = writable writeTo buffer
-
-    /** Reads a UTF-8 String. */
-    def readString(): String = {
-      val bytes = new Array[Byte](buffer.readInt - 1)
-      buffer.readBytes(bytes)
-      buffer.readByte
-      new String(bytes, "UTF-8")
-    }
-
-    /**
-     * Reads an array of Byte of the given length.
-     *
-     * @param length Length of the newly created array.
-     */
-    def readArray(length: Int): Array[Byte] = {
-      val bytes = new Array[Byte](length)
-      buffer.readBytes(bytes)
-      bytes
-    }
-
-    /** Reads a UTF-8 C-Style String. */
-    def readCString(): String = {
-      @scala.annotation.tailrec
-      def readCString(array: ArrayBuffer[Byte]): String = {
-        val byte = buffer.readByte
-        if (byte == 0x00)
-          new String(array.toArray, "UTF-8")
-        else readCString(array += byte)
-      }
-      readCString(new ArrayBuffer[Byte](16))
-    }
-
-  }
-}
 
 trait ByteStringBuffer {
   def append : ByteStringBuilder => Unit
-}
-
-// traits
-/**
- * Something that can be written into a [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]].
- */
-trait ChannelBufferWritable {
-  /** Write this instance into the given [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]]. */
-  def writeTo: ChannelBuffer => Unit
-  /** Size of the content that would be written. */
   def size: Int
-}
-
-
-/**
- * A constructor of T instances from a [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]].
- *
- * @tparam T type which instances can be constructed with this.
- */
-trait ChannelBufferReadable[T] {
-  /** Makes an instance of T from the data from the given buffer. */
-  def readFrom(buffer: ChannelBuffer): T
-  /** @see readFrom */
-  def apply(buffer: ChannelBuffer): T = readFrom(buffer)
 }
 
 trait BufferReadable[T] {
@@ -144,8 +56,7 @@ case class MessageHeader(
     messageLength: Int,
     requestID: Int,
     responseTo: Int,
-    opCode: Int) extends ChannelBufferWritable with ByteStringBuffer {
-  override val writeTo = writeTupleToBuffer4((messageLength, requestID, responseTo, opCode)) _
+    opCode: Int) extends ByteStringBuffer {
   override def size = 4 + 4 + 4 + 4
 
   override val append  = { builder: ByteStringBuilder =>
@@ -155,32 +66,9 @@ case class MessageHeader(
 }
 
 /** Header deserializer from a [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]]. */
-object MessageHeader extends ChannelBufferReadable[MessageHeader] with ReadableFrom[ByteString, MessageHeader] {
+object MessageHeader extends ReadableFrom[ByteString, MessageHeader] {
   val size = 4 + 4 + 4 + 4
-  override def readFrom(buffer: ChannelBuffer) = {
-    val messageLength = buffer.readInt
-    val requestID = buffer.readInt
-    val responseTo = buffer.readInt
-    val opCode = buffer.readInt
-    MessageHeader(
-      messageLength,
-      requestID,
-      responseTo,
-      opCode)
-  }
 
-  /** Makes an instance of T from the data from the given buffer. */
-//  override def readFrom(buffer: ReadableBuffer) = {
-//    val messageLength = buffer.size
-//    val requestID = buffer.readInt
-//    val responseTo = buffer.readInt
-//    val opCode = buffer.readInt
-//    MessageHeader(
-//      messageLength,
-//      requestID,
-//      responseTo,
-//      opCode)
-//  }
   override def readFrom(buffer: ByteString): MessageHeader = {
     val iterator = buffer.iterator
     MessageHeader(
@@ -205,14 +93,8 @@ case class Request(
     op: RequestOp,
     documents: ByteString,
     readPreference: ReadPreference = ReadPreference.primary,
-    channelIdHint: Option[Int] = None) extends ChannelBufferWritable with ByteStringBuffer {
-  import ByteStringBuilderHelper._
+    channelIdHint: Option[Int] = None) extends ByteStringBuffer {
 
-  override val writeTo = { buffer: ChannelBuffer =>
-//    buffer write header
-//    buffer write op
-//    buffer writeBytes documents.merged
-  }
 
   override def size = 16 + op.size + documents.size
   /** Header of this request */
@@ -356,23 +238,6 @@ object MongoWireVersion {
   def unapply(v: MongoWireVersion): Option[Int] = Some(v.value)
 }
 
-// protocol handlers for netty.
-private[reactivemongo] class RequestEncoder extends OneToOneEncoder {
-  import RequestEncoder._
-  def encode(ctx: ChannelHandlerContext, channel: Channel, obj: Object) = 
-    obj match {
-      case message: Request => {
-        val buffer: ChannelBuffer = ChannelBuffers.buffer(ByteOrder.LITTLE_ENDIAN, message.size) //ChannelBuffers.dynamicBuffer(ByteOrder.LITTLE_ENDIAN, 1000)
-        message writeTo buffer
-        buffer
-      }
-      case _ => {
-//        logger.error("weird... do not know how to encode this object: " + obj)
-        obj
-      }
-    }
-
-}
 
 object ReplyDocumentIterator  {
   def apply[P <: SerializationPack, A](pack: P)(reply: Reply, buffer: ByteString)(implicit reader: pack.Reader[A]): Iterator[A] = new Iterator[A] {
@@ -398,90 +263,6 @@ object ReplyDocumentIterator  {
   }
 }
 
-/*private[reactivemongo] case class ReplyDocumentIterator[P <: SerializationPack, T](pack: P, private val reply: Reply, private val buffer: ChannelBuffer)(implicit reader: P#Reader[T]) extends Iterator[T] {
-  def hasNext = buffer.readable
-  def next =
-    try {
-      val cbrb = ChannelBufferReadableBuffer(buffer.readBytes(buffer.getInt(buffer.readerIndex)))
-      pack.readAndDeserialize(cbrb, reader)
-      reader.read(ChannelBufferReadableBuffer(buffer.readBytes(buffer.getInt(buffer.readerIndex))))
-    } catch {
-      case e: IndexOutOfBoundsException =>
-        /*
-         * If this happens, the buffer is exhausted, and there is probably a bug.
-         * It may happen if an enumerator relying on it is concurrently applied to many iteratees – which should not be done!
-         */
-        throw new ReplyDocumentIteratorExhaustedException(e)
-    }
-}*/
-
 case class ReplyDocumentIteratorExhaustedException(
   val cause: Exception) extends Exception(cause)
 
-private[reactivemongo] object RequestEncoder {
-}
-
-private[reactivemongo] class ResponseFrameDecoder extends FrameDecoder {
-  override def decode(context: ChannelHandlerContext, channel: Channel, buffer: ChannelBuffer) = {
-    val readableBytes = buffer.readableBytes
-    if (readableBytes < 4) null
-    else {
-      buffer.markReaderIndex
-      val length = buffer.readInt
-      buffer.resetReaderIndex
-      if (length <= readableBytes && length > 0)
-        buffer.readBytes(length)
-      else null
-    }
-  }
-}
-
-//private[reactivemongo] class ResponseDecoder extends OneToOneDecoder {
-//
-//  def decode(ctx: ChannelHandlerContext, channel: Channel, obj: Object) = {
-//    val buffer = obj.asInstanceOf[ChannelBuffer]
-//    val header = MessageHeader(buffer)
-//    val reply = Reply(buffer)
-//
-//    Response(header, reply, buffer, ResponseInfo(channel.getId))
-//  }
-//}
-
-private[reactivemongo] class MongoHandler(receiver: ActorRef) extends SimpleChannelHandler {
-  import MongoHandler._
-  override def messageReceived(ctx: ChannelHandlerContext, e: MessageEvent) {
-    val response = e.getMessage.asInstanceOf[Response]
-    log(e, "messageReceived " + response + " will be send to " + receiver)
-    receiver ! response
-    super.messageReceived(ctx, e)
-  }
-  override def writeComplete(ctx: ChannelHandlerContext, e: WriteCompletionEvent) {
-    log(e, "a write is complete!")
-    super.writeComplete(ctx, e)
-  }
-  override def writeRequested(ctx: ChannelHandlerContext, e: MessageEvent) {
-    log(e, "a write is requested!")
-    super.writeRequested(ctx, e)
-  }
-  override def channelConnected(ctx: ChannelHandlerContext, e: ChannelStateEvent) {
-    log(e, "connected")
-    receiver ! ChannelConnected(e.getChannel.getId)
-    super.channelConnected(ctx, e)
-  }
-  override def channelDisconnected(ctx: ChannelHandlerContext, e: ChannelStateEvent) {
-    log(e, "disconnected")
-    receiver ! ChannelDisconnected(e.getChannel.getId)
-  }
-  override def channelClosed(ctx: ChannelHandlerContext, e: ChannelStateEvent) {
-    log(e, "closed")
-    receiver ! ChannelClosed(e.getChannel.getId)
-  }
-  override def exceptionCaught(ctx: org.jboss.netty.channel.ChannelHandlerContext, e: org.jboss.netty.channel.ExceptionEvent) {
-    log(e, "CHANNEL ERROR: " + e.getCause)
-  }
-
-  def log(e: ChannelEvent, s: String) = {}//logger.trace("(channel=" + e.getChannel.getId + ") " + s)
-}
-
-private[reactivemongo] object MongoHandler {
-}
