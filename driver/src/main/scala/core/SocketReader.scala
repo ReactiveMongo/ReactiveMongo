@@ -3,8 +3,9 @@ package reactivemongo.core
 import java.nio.ByteOrder
 
 import akka.actor.{ActorRef, ActorLogging, Actor}
-import akka.io.Tcp._
+import akka.io.Tcp.Received
 import akka.util.{ByteString, ByteStringBuilder}
+import reactivemongo.core.actors.{Close, Closed}
 import reactivemongo.core.protocol.{ResponseInfo, Response, Reply, MessageHeader}
 
 import scala.annotation.tailrec
@@ -24,8 +25,13 @@ class SocketReader(val connection: ActorRef) extends Actor with ActorLogging {
       buffer = buffer ++ data
       buffer = process(buffer)
     }
+    case Close => context.become(awaitingClosed orElse receive)
     case _  @msg =>
       log.error("Unable to handle message {}", msg)
+  }
+
+  private def awaitingClosed: Receive = {
+    case akka.io.Tcp.Closed => log.info("socket reader is closed")
   }
 
   @tailrec

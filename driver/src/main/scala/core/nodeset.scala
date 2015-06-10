@@ -180,6 +180,7 @@ case class Connection(
     }
     case Close => {
       socketManager ! akka.io.Tcp.Close
+      socketReader ! Close
       context.become(closing)
     }
     case a : Any => log.warning("unhandled messsage {}", a)
