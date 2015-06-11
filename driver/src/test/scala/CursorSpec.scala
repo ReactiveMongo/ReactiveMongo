@@ -4,7 +4,9 @@ import DefaultBSONHandlers._
 import scala.concurrent.{ Await, Future }
 import scala.concurrent.duration._
 import play.api.libs.iteratee.Iteratee
-import reactivemongo.api.{ Cursor, DB, CursorProducer, QueryOpts, WrappedCursor }
+import reactivemongo.api.{
+  Cursor, CursorFlattener, CursorProducer, DB, QueryOpts, WrappedCursor
+}
 
 class CursorSpec extends Specification {
   sequential
@@ -44,10 +46,18 @@ class CursorSpec extends Specification {
     "produce a custom cursor for the results" in {
       implicit def fooProducer[T] = new CursorProducer[T] {
         type ProducedCursor = FooCursor[T]
-        def produce(base: Cursor[T]) = new FooCursor(base)
+        def produce(base: Cursor[T]) = new DefaultFooCursor(base)
       }
 
-      coll.find(BSONDocument()).cursor.foo must_== "Bar"
+      implicit object fooFlattener extends CursorFlattener[FooCursor] {
+        def flatten[T](future: Future[FooCursor[T]]) =
+          new FlattenedFooCursor(future)
+      }
+
+      val cursor = coll.find(BSONDocument()).cursor
+
+      cursor.foo must_== "Bar" and (
+        Cursor.flatten(Future.successful(cursor)).foo must_== "raB")
     }    
   }
 
@@ -146,7 +156,16 @@ class CursorSpec extends Specification {
     }
   }
 
-  class FooCursor[T](val wrappee: Cursor[T]) extends WrappedCursor[T] {
+  trait FooCursor[T] extends Cursor[T] { def foo: String }
+
+  class DefaultFooCursor[T](val wrappee: Cursor[T])
+      extends FooCursor[T] with WrappedCursor[T] {
     val foo = "Bar"
+  }
+
+  class FlattenedFooCursor[T](cursor: Future[FooCursor[T]])
+      extends reactivemongo.api.FlattenedCursor[T](cursor) with FooCursor[T] {
+
+    val foo = "raB"
   }
 }

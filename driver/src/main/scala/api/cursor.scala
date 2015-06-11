@@ -224,7 +224,7 @@ object Cursor {
   /**
    * Flattens the given future [[reactivemongo.api.Cursor]] to a [[reactivemongo.api.FlattenedCursor]].
    */
-  def flatten[T](future: Future[Cursor[T]]) = new FlattenedCursor(future)
+  def flatten[T, C[_] <: Cursor[_]](future: Future[C[T]])(implicit fs: CursorFlattener[C]): C[T] = fs.flatten(future)
 
   sealed trait State[A]
 
@@ -479,4 +479,18 @@ object CursorProducer {
       type ProducedCursor = Cursor[T]
       def produce(base: Cursor[T]) = base
     }
+}
+
+/** Flattening strategy for cursor. */
+trait CursorFlattener[C[_] <: Cursor[_]] {
+  /** Flatten a future of cursor as cursor. */
+  def flatten[T](future: Future[C[T]]): C[T]
+}
+
+/** Flatteners helper */
+object CursorFlattener {
+  implicit object defaultCursorFlattener extends CursorFlattener[Cursor] {
+    def flatten[T](future: Future[Cursor[T]]): Cursor[T] = 
+      new FlattenedCursor(future)
+  }
 }
