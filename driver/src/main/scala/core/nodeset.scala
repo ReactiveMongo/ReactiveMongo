@@ -127,14 +127,14 @@ object ProtocolMetadata {
 }
 
 case class Connection(
-      socketManager: ActorRef
-      ) extends Actor with ActorLogging {
+      socketManager: ActorRef,
+      port: Int) extends Actor with ActorLogging {
 
   private var protocolMetadata: Option[ProtocolMetadata] = None
   private var pendingIsMaster : (Int, PingInfo) = null
   private var awaitingResponses = HashMap[Int, AwaitingResponse]()
   val requestIds = new RequestIds
-  val socketReader = context.actorOf(Props(classOf[SocketReader], socketManager))
+  val socketReader = context.actorOf(Props(classOf[SocketReader], socketManager, port))
   val socketWriter = context.actorOf(Props(classOf[SocketWriter], socketManager))
   socketManager ! Register(socketReader, keepOpenOnPeerClosed = true)
 
@@ -157,7 +157,7 @@ case class Connection(
       val builder = new ByteStringBuilder()
       request.append(builder)
       log.debug("Send request expecting response with a header {}", request.header)
-      awaitingResponses += request.requestID -> AwaitingResponse(request.requestID, 0, req.promise, isGetLastError = false, isMongo26WriteOp = req.isMongo26WriteOp)
+      awaitingResponses += request.requestID -> AwaitingResponse(request.requestID, port, req.promise, isGetLastError = false, isMongo26WriteOp = req.isMongo26WriteOp)
       socketWriter ! builder.result()
     }
     case response: Response => {
@@ -199,7 +199,7 @@ case class Connection(
   private def processResponse(response: Response) = {
       awaitingResponses.get(response.header.responseTo) match {
         case Some(AwaitingResponse(_, _, promise, isGetLastError, isMongo26WriteOp)) => {
-          log.debug("Got a response from " + response.info.channelId + "! Will give back message=" + response + " to promise " + promise)
+          log.debug("Got a response from " + response.channelId + "! Will give back message=" + response + " to promise " + promise)
           awaitingResponses -= response.header.responseTo
           if (response.error.isDefined) {
             log.debug("{" + response.header.responseTo + "} sending a failure... (" + response.error.get + ")")

@@ -18,7 +18,7 @@ import reactivemongo.core.protocol.MongoWireVersion
 case class Node(
             address: String,
             authenticated: Seq[Authenticate],
-            var nbOfConnections: Int
+            nbOfConnections: Int
             ) extends Actor with ActorLogging {
   import Node._
   import context.system
@@ -30,6 +30,7 @@ case class Node(
   var protocolMetadata: ProtocolMetadata = null
   var tags: Option[BSONDocument] = None
   var awaitingConnections = 0
+  var localPort = -1
 
   val (host: String, port: Int) = {
     val splitted = address.span(_ != ':')
@@ -53,7 +54,8 @@ case class Node(
     }
     case Tcp.Connected(remote, local) => {
       log.info("Connected from {} to {}", local, remote)
-      val connection = context.actorOf(Props(classOf[Connection], sender()))
+      localPort = local.getPort
+      val connection = context.actorOf(Props(classOf[Connection], sender(), localPort))
       awaitingConnections -= 1;
       connections = connection +: connections
       if(awaitingConnections == 0){
@@ -69,7 +71,7 @@ case class Node(
 
       isMaster.replicaSet.map(_.hosts).map(context.parent ! Node.DiscoveredNodes(_))
 
-      val state = ConnectionState(isMaster.status, isMaster.isMaster, isMaster.isMongos, -1, false, ping)
+      val state = ConnectionState(isMaster.status, isMaster.isMaster, isMaster.isMongos, localPort, false, ping)
       val protocolMetadata = ProtocolMetadata(MongoWireVersion(isMaster.minWireVersion), MongoWireVersion(isMaster.maxWireVersion), isMaster.maxBsonObjectSize, isMaster.maxMessageSizeBytes, isMaster.maxWriteBatchSize)
       context.parent ! Node.Connected(connections.map((_, state)), protocolMetadata)
     }

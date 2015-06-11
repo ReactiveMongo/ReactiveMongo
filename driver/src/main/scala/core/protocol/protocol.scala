@@ -169,13 +169,13 @@ object Request {
  * @param header header of this response.
  * @param reply the reply operation contained in this response.
  * @param documents body of this response, a [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]] containing 0, 1, or many documents.
- * @param info some meta information about this response, see [[reactivemongo.core.protocol.ResponseInfo]].
+ * @param channelId chennelId(actualy port number) through which the [[Response]]] was received.
  */
 case class Response(
     header: MessageHeader,
     reply: Reply,
     documents: ByteString,
-    info: ResponseInfo) {
+    channelId: Int) {
   /**
    * if this response is in error, explain this error.
    */
@@ -199,13 +199,6 @@ object Response {
   def parse(response: Response): Iterator[BSONDocument] =
     ReplyDocumentIterator(BSONSerializationPack)(response.reply, response.documents)(BSONDocumentIdentity)
 }
-
-/**
- * Response meta information.
- *
- * @param channelId the id of the channel that carried this response.
- */
-case class ResponseInfo(channelId: Int)
 
 sealed trait MongoWireVersion extends Ordered[MongoWireVersion] {
   def value: Int

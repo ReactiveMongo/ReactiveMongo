@@ -187,7 +187,7 @@ object DefaultCursor {
           val op = GetMore(query.fullCollectionName, query.numberToReturn, response.reply.cursorID)
           //logger.trace("[Cursor] Calling next on " + response.reply.cursorID + ", op=" + op)
           Some(Failover2(mongoConnection, failoverStrategy) { () =>
-            mongoConnection.sendExpectingResponse(RequestMaker(op).copy(channelIdHint = Some(response.info.channelId)), isMongo26WriteOp)
+            mongoConnection.sendExpectingResponse(RequestMaker(op).copy(channelIdHint = Some(response.channelId)), isMongo26WriteOp)
           }.future)
         } else {
 //          logger.error("[Cursor] Call to next() but cursorID is 0, there is probably a bug")
