@@ -4,6 +4,7 @@ import akka.actor._
 import akka.io.Tcp.Register
 import akka.util.ByteStringBuilder
 import core.SocketWriter
+import reactivemongo.core.actors.ConnectionManager.Add
 import reactivemongo.core.actors._
 import reactivemongo.core.commands.{IsMaster, LastError}
 import reactivemongo.core.protocol.{Request, _}
@@ -40,7 +41,7 @@ package object utils {
   }
 }
 
- case class NodeSet(onAddConnection: ((ActorRef, ConnectionState)) => Unit, onRemove: ActorRef => Unit)
+ case class NodeSet(connectionManager: ActorRef)
    extends Actor with ActorLogging {
 
    var initialAuthenticates: Seq[Authenticate] = Seq.empty
@@ -68,7 +69,7 @@ package object utils {
       log.info("node connected metadata {}", metadata)
       connectingNodes = connectingNodes diff List(sender())
       connectedNodes = sender() +: connectedNodes
-      connections.foreach(onAddConnection(_))
+      connections.foreach(p => connectionManager ! Add(p._1, p._2))
 
       if(connections.exists(p => p._2.isPrimary || p._2.isMongos))
         replyTo ! metadata

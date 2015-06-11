@@ -17,6 +17,7 @@ package reactivemongo.core.actors
 
 import java.util.concurrent.atomic.AtomicInteger
 
+import akka.actor.Actor.Receive
 import akka.actor._
 import akka.pattern._
 import akka.routing.{RoundRobinRoutingLogic, Router}
@@ -102,22 +103,19 @@ class MongoDBSystem(
     system: ActorSystem) {
   import scala.concurrent.ExecutionContext.Implicits.global
 
-  private var channel = new AtomicInteger(0)
-
+  @volatile
+  var channels = Map.empty[Int, ActorRef]
   @volatile
   var primaries : Router = Router(RoundRobinRoutingLogic())
   @volatile
   var secondaries : Router = Router(RoundRobinRoutingLogic())
   @volatile
   var mongos : Router = Router(RoundRobinRoutingLogic())
-  @volatile
-  var primaryPrefered : Router = Router(RoundRobinRoutingLogic())
 
-  private val awaitingResponses = scala.collection.mutable.LinkedHashMap[Int, AwaitingResponse]()
 
-  val nodeSetActor = system.actorOf(Props(classOf[NodeSet], addConnection.tupled, removeConnection))
+  val connectionManager = system.actorOf(Props(new ConnectionManager))
 
-  def nextChannel = channel.incrementAndGet()
+  val nodeSetActor = system.actorOf(Props(classOf[NodeSet], connectionManager))
 
   def send(req: RequestMakerExpectingResponse) = primaries.route(req, Actor.noSender)
 
@@ -129,26 +127,11 @@ class MongoDBSystem(
 
   def send(req: AuthRequest) = primaries.route(req, Actor.noSender)
 
-  // todo: fix
-  // monitor -->
-  //val nodeSet = NodeSet(None, seeds.map(Node(_, initialAuthenticates.toSet, options.nbChannelsPerNode)).toVector)
-
-
-
-
-   //context.actorOf(Props(classOf[NodeSet], None, initialAuthenticates))
-//    NodeSet(None, None, seeds.map(seed => Node(seed, NodeStatus.Unknown,
-//    Vector.empty, Set.empty, None, ProtocolMetadata.Default).createNeededChannels(connectionHandler, connectionManager, 1)).toVector,
-//    initialAuthenticates.toSet)
-//  connectAll(nodeSet)
-  // <-- monitor
-
-  val requestIds = new RequestIds
-
   import scala.concurrent.duration._
 
 
   private def addConnection : (ActorRef, ConnectionState) => Unit = (connection, state )  => {
+    channels = channels + ((state.channel, connection))
     state.status match {
       case NodeStatus.Primary => primaries = primaries.addRoutee(connection)
       case NodeStatus.Secondary => secondaries = secondaries.addRoutee(connection)
@@ -166,19 +149,12 @@ class MongoDBSystem(
       .mapTo[ProtocolMetadata].map(MongoConnection(system, this, options, _))
   }
 
-  private val monitors = scala.collection.mutable.ListBuffer[ActorRef]()
-
-
   def secondaryOK(message: Request) = !message.op.requiresPrimary && (message.op match {
     case query: Query   => (query.flags & QueryFlags.SlaveOk) != 0
     case _: KillCursors => true
     case _: GetMore     => true
     case _              => false
   })
-
-
-  def broadcastMonitors(message: AnyRef) = monitors.foreach(_ ! message)
-
 
   // Auth Methods
   object AuthRequestsManager {
@@ -206,6 +182,32 @@ class MongoDBSystem(
     }
   }
 
+  private class ConnectionManager() extends Actor with ActorLogging {
+    import ConnectionManager._
+
+    override def receive: Receive = {
+      case Add(conn, state) => {
+        channels = channels + ((state.channel, conn))
+        if(state.isMongos)
+          mongos = mongos.addRoutee(conn)
+        else if(state.isPrimary)
+          primaries = primaries.addRoutee(conn)
+        else
+          secondaries = secondaries.addRoutee(conn)
+      }
+      case Remove(conn) => {
+        channels = channels.filter(_._2 != conn)
+        mongos = mongos.removeRoutee(conn)
+        primaries = primaries.removeRoutee(conn)
+        secondaries = primaries.removeRoutee(conn)
+      }
+    }
+  }
+}
+
+object ConnectionManager {
+  case class Add(connection: ActorRef, state: ConnectionState)
+  case class Remove(connection: ActorRef)
 }
 
 case class AuthRequest(authenticate: Authenticate, promise: Promise[SuccessfulAuthentication] = Promise()) {
