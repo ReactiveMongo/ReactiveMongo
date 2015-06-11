@@ -22,7 +22,7 @@ import akka.pattern._
 import akka.util.Timeout
 import com.typesafe.config.Config
 import reactivemongo.core.actors._
-import reactivemongo.core.nodeset.{NodeSet, ProtocolMetadata, Authenticate}
+import reactivemongo.core.nodeset.{ProtocolMetadata, Authenticate}
 import reactivemongo.core.protocol._
 import reactivemongo.core.commands.SuccessfulAuthentication
 import scala.concurrent.{Await, ExecutionContext, Future, Promise}

@@ -23,6 +23,7 @@ import akka.pattern._
 import akka.routing.{RoundRobinRoutingLogic, Router}
 import reactivemongo.api.{MongoConnection, MongoConnectionOptions}
 import reactivemongo.core._
+import reactivemongo.core.actors.ConnectionManager.{Remove, Add}
 import reactivemongo.core.commands.{Authenticate => AuthenticateCommand, _}
 import reactivemongo.core.errors._
 import reactivemongo.core.nodeset._
@@ -112,10 +113,7 @@ class MongoDBSystem(
   @volatile
   var mongos : Router = Router(RoundRobinRoutingLogic())
 
-
-  val connectionManager = system.actorOf(Props(new ConnectionManager))
-
-  val nodeSetActor = system.actorOf(Props(classOf[NodeSet], connectionManager))
+  val nodeSetActor = system.actorOf(Props(new NodeSet()))
 
   def send(req: RequestMakerExpectingResponse) = primaries.route(req, Actor.noSender)
 
@@ -182,26 +180,94 @@ class MongoDBSystem(
     }
   }
 
-  private class ConnectionManager() extends Actor with ActorLogging {
-    import ConnectionManager._
+
+  class NodeSet extends Actor with ActorLogging {
+
+    var initialAuthenticates: Seq[Authenticate] = Seq.empty
+    var connectionsPerNode: Int = 10
+    var existingHosts : Set[String] = Set.empty
+    var connectingNodes: Vector[ActorRef] = Vector.empty
+    var connectedNodes: Vector[ActorRef] = Vector.empty
+    var version: Option[Long] = None
+    var replyTo: ActorRef = null
 
     override def receive: Receive = {
-      case Add(conn, state) => {
-        channels = channels + ((state.channel, conn))
-        if(state.isMongos)
-          mongos = mongos.addRoutee(conn)
-        else if(state.isPrimary)
-          primaries = primaries.addRoutee(conn)
-        else
-          secondaries = secondaries.addRoutee(conn)
+      case NodeSet.ConnectAll(hosts, auth, count) => {
+        log.info("Connection to initial nodes")
+        replyTo = sender()
+        this.connectionsPerNode = count
+        this.initialAuthenticates = auth
+        existingHosts = hosts.toSet
+        connectingNodes = hosts.map(address => {
+          val node = context.actorOf(Props(classOf[Node], address, initialAuthenticates, connectionsPerNode))
+          node ! Node.Connect
+          node
+        }).toVector
       }
-      case Remove(conn) => {
+      case Node.Connected(connections, metadata) => {
+        log.info("node connected metadata {}", metadata)
+        connectingNodes = connectingNodes diff List(sender())
+        connectedNodes = sender() +: connectedNodes
+        connections.foreach(p => add(p._1, p._2))
+
+        if(connections.exists(p => p._2.isPrimary || p._2.isMongos))
+          replyTo ! metadata
+      }
+      case Node.DiscoveredNodes(hosts) => {
+        log.info("nodes descovered")
+        val discovered = hosts.filter(!existingHosts.contains(_))
+        existingHosts = discovered ++: existingHosts
+        connectingNodes = discovered.map(address => {
+          val node = context.actorOf(Props(classOf[Node], address, initialAuthenticates, connectionsPerNode))
+          node ! Node.Connect
+          node
+        }) ++: connectingNodes
+      }
+      case Close => {
+        connectedNodes.foreach(_ ! Close)
+        context.become(closing)
+      }
+    }
+
+    private def closing: Receive = {
+      case Node.Connected(connections, metadata) => {
+        log.info("node connected metadata {} but nodeSet in closing state", metadata)
+        connectingNodes = connectingNodes diff List(sender())
+        connectedNodes = sender() +: connectedNodes
+        sender() ! Close
+      }
+      case Closed => {
+        connectedNodes = connectedNodes diff List(sender())
+        if(connectedNodes.isEmpty && connectingNodes.isEmpty) {
+          self ! PoisonPill
+          log.debug("all connections to a nodeset are closed")
+        }
+      }
+      case Node.DiscoveredNodes(hosts) => {
+        log.info("nodes descovered but nodeSet in closing state")
+      }
+    }
+
+    private def add(connection: ActorRef, state: ConnectionState) = {
+      channels = channels + ((state.channel, connection))
+      if(state.isMongos)
+        mongos = mongos.addRoutee(connection)
+      else if(state.isPrimary)
+        primaries = primaries.addRoutee(connection)
+      else
+        secondaries = secondaries.addRoutee(connection)
+    }
+
+    private def remove(conn: ActorRef) = {
         channels = channels.filter(_._2 != conn)
         mongos = mongos.removeRoutee(conn)
         primaries = primaries.removeRoutee(conn)
         secondaries = primaries.removeRoutee(conn)
       }
-    }
+  }
+
+  object  NodeSet {
+    case class ConnectAll(hosts: Seq[String], initialAuthenticates: Seq[Authenticate], connectionsPerNode: Int)
   }
 }
 
