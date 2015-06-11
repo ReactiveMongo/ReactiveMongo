@@ -19,9 +19,7 @@ import reactivemongo.core.protocol.MongoWireVersion
 import reactivemongo.api._
 import reactivemongo.bson._
 import DefaultBSONHandlers._
-import reactivemongo.api.commands.WriteResult
-import reactivemongo.api.commands.DropIndexes
-import reactivemongo.api.commands.bson.BSONDropIndexesImplicits._
+import reactivemongo.api.commands.{ DropIndexes, LastError, WriteResult }
 import reactivemongo.utils.option
 import reactivemongo.core.netty._
 import scala.concurrent.{ Future, ExecutionContext }
@@ -218,8 +216,8 @@ final class LegacyIndexesManager(db: DB)(
       "ns" -> BSONString(nsIndex.namespace),
       "name" -> BSONString(nsIndex.index.eventualName))
 
-    collection.find(query).one.flatMap { opt =>
-      if (!opt.isDefined)
+    collection.find(query).one.flatMap { idx =>
+      if (!idx.isDefined)
         create(nsIndex).map(_ => true)
       // there is a match, returning a future ok. TODO
       else Future(false)
@@ -231,7 +229,10 @@ final class LegacyIndexesManager(db: DB)(
     collection.insert(nsIndex)
   }
 
-  def drop(collectionName: String, indexName: String): Future[Int] = db.collection(collectionName).runValueCommand(DropIndexes(indexName))
+  def drop(collectionName: String, indexName: String): Future[Int] = {
+    import reactivemongo.api.commands.bson.BSONDropIndexesImplicits._
+    db.collection(collectionName).runValueCommand(DropIndexes(indexName))
+  }
 
   def dropAll(collectionName: String): Future[Int] = drop(collectionName, "*")
 
@@ -259,7 +260,7 @@ final class DefaultIndexesManager(db: DB with DBMetaCommands)(
   def list(): Future[List[NSIndex]] = 
     db.collectionNames.flatMap(listIndexes(_, Nil))
 
-  def ensure(nsIndex: NSIndex): Future[Boolean] = 
+  def ensure(nsIndex: NSIndex): Future[Boolean] =
     onCollection(nsIndex.collectionName).ensure(nsIndex.index)
 
   def create(nsIndex: NSIndex): Future[WriteResult] =
@@ -380,7 +381,12 @@ private class DefaultCollectionIndexesManager(db: DB, collectionName: String)(
   private lazy val listCommand = ListIndexes(db.name)
 
   def list(): Future[List[Index]] = 
-    Command.run(BSONSerializationPack)(collection, listCommand)
+    Command.run(BSONSerializationPack)(collection, listCommand) recoverWith {
+      case err: WriteResult if err.code.exists(_ == 26/* no database */) =>
+        Future.successful(List.empty[Index])
+
+      case err => Future.failed(err)
+    }
 
   def ensure(index: Index): Future[Boolean] = for {
     is <- list().map(_.dropWhile(_.key != index.key).headOption.isDefined)
@@ -398,13 +404,18 @@ private class DefaultCollectionIndexesManager(db: DB, collectionName: String)(
   def delete(name: String) = drop(name)
 
   @deprecated("Use [[IndexesManager.drop]]", "0.11.0")
-  def drop(nsIndex: NSIndex): Future[Int] = Command.run(BSONSerializationPack)(
+  def drop(nsIndex: NSIndex): Future[Int] = {
+    import reactivemongo.api.commands.bson.BSONDropIndexesImplicits._
+    Command.run(BSONSerializationPack)(
     db(nsIndex.collectionName), DropIndexes(nsIndex.index.eventualName)).
-    map(_.value)
+      map(_.value)
+  }
 
-  def drop(indexName: String): Future[Int] =
+  def drop(indexName: String): Future[Int] = {
+    import reactivemongo.api.commands.bson.BSONDropIndexesImplicits._
     Command.run(BSONSerializationPack)(collection, DropIndexes(indexName)).
       map(_.value)
+  }
 
   @inline def dropAll(): Future[Int] = drop("*")
 }

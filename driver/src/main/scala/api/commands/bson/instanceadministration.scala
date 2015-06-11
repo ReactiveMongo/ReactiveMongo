@@ -147,18 +147,29 @@ object BSONListIndexesImplicits {
       case _ => Success(indexes)
     }
 
+    implicit object LastErrorReader extends BSONDocumentReader[WriteResult] {
+      def read(doc: BSONDocument): WriteResult = (for {
+        ok <- doc.getAs[BSONBooleanLike]("ok").map(_.toBoolean)
+        n = doc.getAs[BSONNumberLike]("n").fold(0)(_.toInt)
+        msg <- doc.getAs[String]("errmsg")
+        code <- doc.getAs[BSONNumberLike]("code").map(_.toInt)
+      } yield DefaultWriteResult(
+        ok, n, Nil, None, Some(code), Some(msg))).get
+    }
+
     def read(doc: BSONDocument): List[Index] = (for {
       _ <- doc.getAs[BSONNumberLike]("ok").fold[Option[Unit]](
         throw new Exception("the result of listIndexes must be ok")) { ok =>
+
         if (ok.toInt == 1) Some(())
-        else throw new Exception(doc.getAs[String]("errmsg").fold(
-          "the result of listIndexes must be ok")(
-          e => s"fails to create index: $e"))
+        else throw doc.asOpt[WriteResult].getOrElse(
+          new Exception(s"fails to create index: ${BSONDocument pretty doc}"))
       }
       a <- doc.getAs[BSONDocument]("cursor")
       b <- a.getAs[List[BSONDocument]]("firstBatch")
     } yield b).fold[List[Index]](throw new Exception(
       "the cursor and firstBatch must be defined"))(readBatch(_, Nil).get)
+
   }  
 }
 

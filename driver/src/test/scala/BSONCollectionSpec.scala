@@ -242,4 +242,22 @@ class BSONCollectionSpec extends Specification {
       } aka "write result" must beEqualTo(-1).await(timeoutMillis)
     }
   }
+
+  "Index" should {
+    import reactivemongo.api.indexes._
+    val col = db(s"indexed_col_${hashCode}")
+
+    "be first created" in {
+      col.indexesManager.ensure(Index(
+        Seq("token" -> IndexType.Ascending), unique = true)).
+        aka("index creation") must beTrue.await(timeoutMillis)
+    }
+
+    "not be created if already exists" in {
+      col.indexesManager.ensure(Index(
+        Seq("token" -> IndexType.Ascending), unique = true)).
+        aka("index creation") must beFalse.await(timeoutMillis)
+      
+    }
+  }
 }
