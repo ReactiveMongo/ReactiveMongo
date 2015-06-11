@@ -15,15 +15,11 @@
  */
 package reactivemongo.core.actors
 
-import java.util.concurrent.atomic.AtomicInteger
-
-import akka.actor.Actor.Receive
 import akka.actor._
 import akka.pattern._
 import akka.routing.{RoundRobinRoutingLogic, Router}
 import reactivemongo.api.{MongoConnection, MongoConnectionOptions}
 import reactivemongo.core._
-import reactivemongo.core.actors.ConnectionManager.{Remove, Add}
 import reactivemongo.core.commands.{Authenticate => AuthenticateCommand, _}
 import reactivemongo.core.errors._
 import reactivemongo.core.nodeset._

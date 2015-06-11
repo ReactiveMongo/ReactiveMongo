@@ -4,7 +4,6 @@ import akka.actor._
 import akka.io.Tcp.Register
 import akka.util.ByteStringBuilder
 import core.SocketWriter
-import reactivemongo.core.actors.ConnectionManager.Add
 import reactivemongo.core.actors._
 import reactivemongo.core.commands.{IsMaster, LastError}
 import reactivemongo.core.protocol.{Request, _}

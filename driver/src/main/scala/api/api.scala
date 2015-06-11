@@ -270,67 +270,6 @@ case class MongoConnection(
   /** Closes this MongoConnection (closes all the channels and ends the actors) */
   def close(): Unit = mongosystem.nodeSetActor ! Close
 
-
-  /**
-   * Actor that monitor a connection and notifies awaiting Actors about changes
-   */
-//  private class MonitorActor extends Actor {
-//    import MonitorActor._
-//    import scala.collection.mutable.Queue
-//
-//    // todo: fix
-//    //mongosystem. ! RegisterMonitor
-//
-//    private val waitingForPrimary = Queue[ActorRef]()
-//    var primaryAvailable = false
-//
-//    private val waitingForClose = Queue[ActorRef]()
-//    var killed = false
-//
-//    override def receive = {
-//      case pa: PrimaryAvailable =>
-////        logger.debug("set: a primary is available")
-//        primaryAvailable = true
-//        metadata = Some(pa.metadata)
-//        waitingForPrimary.dequeueAll(_ => true).foreach(_ ! pa)
-//      case PrimaryUnavailable =>
-////        logger.debug("set: no primary available")
-//        primaryAvailable = false
-//      case sa: SetAvailable =>
-////        logger.debug("set: a node is available")
-//        metadata = Some(sa.metadata)
-//      case SetUnavailable =>
-////        logger.debug("set: no node seems to be available")
-//      case WaitForPrimary =>
-//        if (killed)
-//          sender ! Failure(new RuntimeException("MongoDBSystem actor shutting down or no longer active"))
-//        else if (primaryAvailable && metadata.isDefined) {
-////          logger.debug(sender + " is waiting for a primary... available right now, go!")
-//          sender ! PrimaryAvailable(metadata.get)
-//        } else {
-////          logger.debug(sender + " is waiting for a primary...  not available, warning as soon a primary is available.")
-//          waitingForPrimary += sender
-//        }
-//      case Close =>
-////        logger.debug("Monitor received Close")
-//        killed = true
-//        //todo: fix
-//        //mongosystem ! Close
-//        waitingForClose += sender
-//        waitingForPrimary.dequeueAll(_ => true).foreach(_ ! Failure(new RuntimeException("MongoDBSystem actor shutting down or no longer active")))
-//      case Closed =>
-////        logger.debug(s"Monitor $self closed, stopping...")
-//        waitingForClose.dequeueAll(_ => true).foreach(_ ! Closed)
-//        context.stop(self)
-//    }
-//
-//    override def postStop {
-////      logger.debug(s"Monitor $self stopped.")
-//    }
-//  }
-//
-//  object MonitorActor {
-//  }
 }
 
 object MongoConnection {

@@ -3,7 +3,6 @@ package reactivemongo.core
 import java.net.InetSocketAddress
 
 import akka.actor._
-import akka.event.Logging
 import akka.io.{IO, Tcp}
 import reactivemongo.api.commands.bson.BSONIsMasterCommand
 import reactivemongo.bson.BSONDocument
