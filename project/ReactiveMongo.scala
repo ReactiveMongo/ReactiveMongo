@@ -229,7 +229,7 @@ object Travis {
 
       println(s"published $thisRef from travis")
     } else {
-      println(s"not publishing $thisRef to Sonatype : isSnapshot=$isSnapshot, isTravisEnabled=$isTravisEnabled, isNotPR=$isNotPR, isBranchAcceptable=$isBranchAcceptable")
+      println(s"not publishing $thisRef to Sonatype: isSnapshot=$isSnapshot, isTravisEnabled=$isTravisEnabled, isNotPR=$isNotPR, isBranchAcceptable=$isBranchAcceptable, javaVersionLessThen_1_7=$isJavaVersion")
     }
 
     state

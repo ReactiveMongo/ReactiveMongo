@@ -2,7 +2,7 @@
 
 echo -e "Starting publish to Sonatype...\n"
 
-sbt ";project ReactiveMongo-BSON ;publishSnapshotsFromTravis ;project ReactiveMongo ;publishSnapshotsFromTravis ;project ReactiveMongo-BSON-Macros; publishSnapshotsFromTravis"
+sbt ";project ReactiveMongo-BSON ;+publishSnapshotsFromTravis ;project ReactiveMongo ;+publishSnapshotsFromTravis ;project ReactiveMongo-BSON-Macros; +publishSnapshotsFromTravis"
 RETVAL=$?
 
 if [ $RETVAL -eq 0 ]; then
