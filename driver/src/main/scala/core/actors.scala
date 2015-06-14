@@ -17,15 +17,17 @@ package reactivemongo.core.actors
 
 import akka.actor._
 import akka.pattern._
-import akka.routing.{RoundRobinRoutingLogic, Router}
-import reactivemongo.api.{MongoConnection, MongoConnectionOptions}
+import akka.routing.{ActorRefRoutee, RoundRobinRoutingLogic, Router}
+import reactivemongo.api.{ReadPreference, MongoConnection, MongoConnectionOptions}
 import reactivemongo.core._
 import reactivemongo.core.commands.{Authenticate => AuthenticateCommand, _}
 import reactivemongo.core.errors._
 import reactivemongo.core.nodeset._
 import reactivemongo.core.protocol._
 
+import scala.collection.immutable.SortedMap
 import scala.concurrent.{Future, Promise}
+import scala.util.{Failure, Try}
 
 // messages
 
@@ -100,18 +102,34 @@ class MongoDBSystem(
     system: ActorSystem) {
   import scala.concurrent.ExecutionContext.Implicits.global
 
+  private def routingLogic = RoundRobinRoutingLogic()
+
+  private var invertedIndex = Map.empty[ActorRef, ConnectionState]
+
   @volatile
   var channels = Map.empty[Int, ActorRef]
   @volatile
-  var primaries : Router = Router(RoundRobinRoutingLogic())
+  var primaries : Router = Router(routingLogic)
   @volatile
-  var secondaries : Router = Router(RoundRobinRoutingLogic())
+  var secondaries : Router = Router(routingLogic)
   @volatile
-  var mongos : Router = Router(RoundRobinRoutingLogic())
+  var mongos : Router = Router(routingLogic)
+  @volatile
+  var nearestConnections = SortedMap.empty[Long, Router]
+  @volatile
+  private var isMongos = false
 
   val nodeSetActor = system.actorOf(Props(new NodeSet()))
 
-  def send(req: RequestMakerExpectingResponse) = primaries.route(req, Actor.noSender)
+  def send(req: RequestMakerExpectingResponse) = if(req.requestMaker.channelIdHint.isDefined){
+    channels.get(req.requestMaker.channelIdHint.get) match {
+      case Some(connection) => connection ! req
+      case None => req.promise.failure(Failure(Exceptions.ChannelNotFound).exception)
+    }
+  } else pick(req.requestMaker.readPreference) match {
+    case Some(routee) => routee.route(req, Actor.noSender)
+    case None => req.promise.failure(Failure(Exceptions.PrimaryUnavailableException).exception)
+  }
 
   def send(req: ExpectingResponse) = primaries.route(req, Actor.noSender)
 
@@ -121,8 +139,20 @@ class MongoDBSystem(
 
   def send(req: AuthRequest) = primaries.route(req, Actor.noSender)
 
-  import scala.concurrent.duration._
+  private def pick(preference: ReadPreference) = {
+    if (isMongos) {
+      List(mongos)
+    } else preference match {
+        // todo: support filter
+      case ReadPreference.Primary                    => List(primaries)
+      case ReadPreference.PrimaryPreferred(filter)   => List(primaries, secondaries)
+      case ReadPreference.Secondary(filter)          => List(secondaries)
+      case ReadPreference.SecondaryPreferred(filter) => List(secondaries)
+      case ReadPreference.Nearest(filter)            => List(nearestConnections.head._2)
+    }
+  }.find(!_.routees.isEmpty)
 
+  import scala.concurrent.duration._
 
   private def addConnection : (ActorRef, ConnectionState) => Unit = (connection, state )  => {
     channels = channels + ((state.channel, connection))
@@ -205,7 +235,6 @@ class MongoDBSystem(
         connectingNodes = connectingNodes diff List(sender())
         connectedNodes = sender() +: connectedNodes
         connections.foreach(p => add(p._1, p._2))
-
         if(connections.exists(p => p._2.isPrimary || p._2.isMongos))
           replyTo ! metadata
       }
@@ -244,10 +273,44 @@ class MongoDBSystem(
       }
     }
 
+    private def removeRoutee(data: SortedMap[Long, Router], connection: ActorRef, value: Long) = {
+      data.get(value) match {
+        case Some(items) => {
+          val newRoutee = items.removeRoutee(connection)
+          if(newRoutee.routees.isEmpty)
+            data - value
+          else
+            data.updated(value, newRoutee)
+        }
+        case None => {
+          log.warning("Connection was already removed, might be a bug")
+          data
+        }
+      }
+    }
+
+    private def addRoutee(data: SortedMap[Long, Router], connection: ActorRef, value: Long) = {
+      data.get(value) match {
+        case Some(items) => data + ((value, items.addRoutee(connection)))
+        case None => data + ((value, Router(routingLogic, routees = List(ActorRefRoutee(connection)).toIndexedSeq)))
+      }
+    }
+
     private def add(connection: ActorRef, state: ConnectionState) = {
+      invertedIndex.get(connection) match {
+        case Some(oldState) => if(oldState.ping.ping != state.ping.ping)
+          nearestConnections = addRoutee(removeRoutee(nearestConnections, connection, oldState.ping.ping), connection, state.ping.ping)
+        case None => {
+          nearestConnections = addRoutee(nearestConnections, connection, state.ping.ping)
+        }
+      }
+      log.debug("adding channel {}", state.channel)
+      invertedIndex = invertedIndex + ((connection, state))
       channels = channels + ((state.channel, connection))
-      if(state.isMongos)
+      if(state.isMongos) {
+        isMongos = true
         mongos = mongos.addRoutee(connection)
+      }
       else if(state.isPrimary)
         primaries = primaries.addRoutee(connection)
       else
@@ -260,6 +323,12 @@ class MongoDBSystem(
         primaries = primaries.removeRoutee(conn)
         secondaries = primaries.removeRoutee(conn)
       }
+  }
+
+  case class ConnectionWithPing(connetion: ActorRef, ping: PingInfo)
+
+  implicit object PingOrdering extends Ordering[ConnectionWithPing]{
+    override def compare(x: ConnectionWithPing, y: ConnectionWithPing): Int = (x.ping.ping - y.ping.ping).toInt
   }
 
   object  NodeSet {

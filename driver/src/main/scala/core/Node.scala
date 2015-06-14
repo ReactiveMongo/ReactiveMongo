@@ -22,14 +22,13 @@ case class Node(
   import Node._
   import context.system
 
-
-  var connections: Vector[ActorRef] = Vector.empty
+  //var connections: Vector[ActorRef] = Vector.empty
+  var connections = Map.empty[ActorRef, Int]
   var pingInfo: PingInfo = PingInfo()
   var isMongos: Boolean = false
   var protocolMetadata: ProtocolMetadata = null
   var tags: Option[BSONDocument] = None
   var awaitingConnections = 0
-  var localPort = -1
 
   val (host: String, port: Int) = {
     val splitted = address.span(_ != ':')
@@ -42,7 +41,7 @@ case class Node(
 
   override def receive: Receive = {
     case Close => {
-      connections.foreach(_ ! Close)
+      connections.foreach(_._1 ! Close)
       context.become(closing)
     }
     case Node.Connect => {
@@ -53,12 +52,11 @@ case class Node(
     }
     case Tcp.Connected(remote, local) => {
       log.info("Connected from {} to {}", local, remote)
-      localPort = local.getPort
-      val connection = context.actorOf(Props(classOf[Connection], sender(), localPort))
+      val connection = context.actorOf(Props(classOf[Connection], sender(), local.getPort))
       awaitingConnections -= 1;
-      connections = connection +: connections
+      connections = connections + ((connection, local.getPort))
       if(awaitingConnections == 0){
-        connections.head ! Node.IsMaster
+        connections.head._1 ! Node.IsMaster
       }
     }
     case IsMasterInfo(isMaster, ping) => {
@@ -66,13 +64,11 @@ case class Node(
       if(pingInfo.lastIsMasterTime < ping.lastIsMasterTime)
         pingInfo = ping
       else
-        connections.head ! Node.IsMaster
+        connections.head._1 ! Node.IsMaster
 
       isMaster.replicaSet.map(_.hosts).map(context.parent ! Node.DiscoveredNodes(_))
-
-      val state = ConnectionState(isMaster.status, isMaster.isMaster, isMaster.isMongos, localPort, false, ping)
       val protocolMetadata = ProtocolMetadata(MongoWireVersion(isMaster.minWireVersion), MongoWireVersion(isMaster.maxWireVersion), isMaster.maxBsonObjectSize, isMaster.maxMessageSizeBytes, isMaster.maxWriteBatchSize)
-      context.parent ! Node.Connected(connections.map((_, state)), protocolMetadata)
+      context.parent ! Node.Connected(connections.map(p=> ((p._1, ConnectionState(isMaster.status, isMaster.isMaster, isMaster.isMongos, p._2, false, ping)))), protocolMetadata)
     }
   }
 
@@ -80,13 +76,13 @@ case class Node(
     case Tcp.Connected(remote, local) => {
       log.info("Connected from {} to {} will be closed", local, remote)
       val connection = context.actorOf(Props(classOf[Connection], sender()))
-      connections = connection +: connections
+      connections = connections + ((connection, local.getPort))
       connection ! Close
       awaitingConnections -= 1
     }
     case Closed => {
       log.info("Closed connection to node")
-      connections = connections diff List(sender())
+      connections = connections - sender()
       if (connections.isEmpty && awaitingConnections == 0)
         context.parent ! Closed
     }
@@ -96,7 +92,7 @@ case class Node(
 
 object Node {
   object Connect
-  case class Connected(connections: Seq[(ActorRef, ConnectionState)], metadata: ProtocolMetadata)
+  case class Connected(connections: Iterable[(ActorRef, ConnectionState)], metadata: ProtocolMetadata)
   case class DiscoveredNodes(hosts: Seq[String])
   object PrimaryUnavailable
   object IsMaster
