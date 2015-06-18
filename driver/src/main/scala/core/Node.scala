@@ -6,9 +6,11 @@ import akka.actor._
 import akka.io.{IO, Tcp}
 import reactivemongo.api.commands.bson.BSONIsMasterCommand
 import reactivemongo.bson.BSONDocument
-import reactivemongo.core.actors.{Close, Closed}
+import reactivemongo.core.actors.{AuthRequest, Close, Closed}
 import reactivemongo.core.nodeset._
 import reactivemongo.core.protocol.MongoWireVersion
+
+import scala.concurrent.Future
 
 /**
  * Created by sh1ng on 10/05/15.
@@ -16,7 +18,6 @@ import reactivemongo.core.protocol.MongoWireVersion
 
 case class Node(
             address: String,
-            authenticated: Seq[Authenticate],
             nbOfConnections: Int
             ) extends Actor with ActorLogging {
   import Node._
@@ -59,6 +60,13 @@ case class Node(
         connections.head._1 ! Node.IsMaster
       }
     }
+    case auth: AuthRequest => {
+      auth.promise completeWith connections.map(_._1).map(connection => {
+        val authRequest = AuthRequest(auth.authenticate)
+        connection ! authRequest
+        authRequest.future
+      }).reduce((a,b) => b)
+    }
     case IsMasterInfo(isMaster, ping) => {
       log.debug(isMaster.toString)
       if(pingInfo.lastIsMasterTime < ping.lastIsMasterTime)
@@ -96,6 +104,7 @@ object Node {
   case class DiscoveredNodes(hosts: Seq[String])
   object PrimaryUnavailable
   object IsMaster
+  object Authenticated
   case class IsMasterInfo(response: BSONIsMasterCommand.IsMasterResult, ping: PingInfo)
 }
 

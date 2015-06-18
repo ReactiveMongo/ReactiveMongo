@@ -428,7 +428,7 @@ object Getnonce extends Command[String] {
  * @param password user's password
  * @param nonce the previous nonce given by the server
  */
-case class Authenticate(user: String, password: String, nonce: String) extends Command[SuccessfulAuthentication] {
+case class AuthenticateCommand(user: String, password: String, nonce: String) extends Command[SuccessfulAuthentication] {
   import Converters._
   /** the computed digest of the password */
   lazy val pwdDigest = md5Hex(user + ":mongo:" + password)
@@ -437,11 +437,11 @@ case class Authenticate(user: String, password: String, nonce: String) extends C
 
   override def makeDocuments = BSONDocument("authenticate" -> BSONInteger(1), "user" -> BSONString(user), "nonce" -> BSONString(nonce), "key" -> BSONString(key))
 
-  val ResultMaker = Authenticate
+  val ResultMaker = AuthenticateCommand
 }
 
 /** Authentication command's response deserializer. */
-object Authenticate extends BSONCommandResultMaker[SuccessfulAuthentication] {
+object AuthenticateCommand extends BSONCommandResultMaker[SuccessfulAuthentication] {
   def apply(document: BSONDocument) = {
     CommandError.checkOk(document, Some("authenticate"), (doc, name) => {
       FailedAuthentication(doc.getAs[BSONString]("errmsg").map(_.value).getOrElse(""), Some(doc))

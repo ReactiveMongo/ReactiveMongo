@@ -5,9 +5,9 @@ import akka.io.Tcp.Register
 import akka.util.ByteStringBuilder
 import core.SocketWriter
 import reactivemongo.core.actors._
-import reactivemongo.core.commands.{IsMaster, LastError}
 import reactivemongo.core.protocol.{Request, _}
 import reactivemongo.core.{SocketReader, _}
+import reactivemongo.core.commands._
 
 import scala.collection.generic.CanBuildFrom
 import scala.collection.immutable.HashMap
@@ -61,6 +61,8 @@ case class Connection(
   private var protocolMetadata: Option[ProtocolMetadata] = None
   private var pendingIsMaster : (Int, PingInfo) = null
   private var awaitingResponses = HashMap[Int, AwaitingResponse]()
+  private var awaitingAuth = List.empty[AuthRequest]
+  private var authenticating: Option[Authenticating] = None
   val requestIds = new RequestIds
   val socketReader = context.actorOf(Props(classOf[SocketReader], socketManager, port))
   val socketWriter = context.actorOf(Props(classOf[SocketWriter], socketManager))
@@ -79,14 +81,45 @@ case class Connection(
     case req: Request => {
 
     }
+    case auth: AuthRequest => {
+      log.debug("get AuthRequest, sending getnonce")
+      authenticating match {
+        case None => {
+          authenticating = Some(Authenticating(auth, None))
+          val getNonceRequest = Getnonce(auth.authenticate.db).maker(requestIds.getNonce.next)
+          socketWriter ! getNonceRequest.message
+        }
+        case _ => awaitingAuth = auth +: awaitingAuth
+      }
+    }
     case req: RequestMakerExpectingResponse => {
       val requestId = requestIds.common.next
       val request = req.requestMaker(requestId)
-      val builder = new ByteStringBuilder()
-      request.append(builder)
       log.debug("Send request expecting response with a header {}", request.header)
       awaitingResponses += request.requestID -> AwaitingResponse(request.requestID, port, req.promise, isGetLastError = false, isMongo26WriteOp = req.isMongo26WriteOp)
-      socketWriter ! builder.result()
+      socketWriter ! request.message
+    }
+    // getnonce response
+    case response: Response if requestIds.getNonce accepts response =>
+      Getnonce.ResultMaker(response).fold(
+        e =>
+          log.error(s"error while processing getNonce response #${response.header.responseTo}", e),
+        nonce => {
+          log.debug("AUTH: got nonce for channel " + response.channelId + ": " + nonce)
+          authenticating = Some(authenticating.get.copy(nonce = Some(nonce)))
+          val builder = new ByteStringBuilder
+          val authRequest = AuthenticateCommand(authenticating.get.user, authenticating.get.authRequest.authenticate.password, authenticating.get.nonce.get)(authenticating.get.db)
+            .maker(requestIds.authenticate.next).message
+
+        })
+    case response: Response if requestIds.authenticate accepts response => {
+      log.debug("AUTH: got authenticated response! " + response.channelId)
+      AuthenticateCommand(response) match {
+        case Right(successfulAuthentication) => authenticating.get.authRequest.promise.success(successfulAuthentication)
+        case Left(error) => authenticating.get.authRequest.promise.failure(error)
+      }
+      authenticating = None
+      awaitingAuth.headOption.map(self ! _)
     }
     case response: Response => {
       if (requestIds.isMaster accepts response) {
@@ -270,9 +303,13 @@ sealed trait Authentication {
 case class Authenticate(db: String, user: String, password: String) extends Authentication {
   override def toString: String = "Authenticate(" + db + ", " + user + ")"
 }
-case class Authenticating(db: String, user: String, password: String, nonce: Option[String]) extends Authentication {
+case class Authenticating(authRequest: AuthRequest, nonce: Option[String]) extends Authentication {
   override def toString: String =
     s"Authenticating($db, $user, ${nonce.map(_ => "<nonce>").getOrElse("<>")})"
+
+  override def user: String = authRequest.authenticate.user
+
+  override def db: String = authRequest.authenticate.db
 }
 case class Authenticated(db: String, user: String) extends Authentication
 

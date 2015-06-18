@@ -28,6 +28,11 @@ import reactivemongo.core.protocol.ByteStringBuilderHelper._
 trait ByteStringBuffer {
   def append : ByteStringBuilder => Unit
   def size: Int
+  def message = {
+    val builder = new ByteStringBuilder
+    append(builder)
+    builder.result()
+  }
 }
 
 trait BufferReadable[T] {

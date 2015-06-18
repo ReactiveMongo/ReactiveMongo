@@ -20,7 +20,7 @@ import akka.pattern._
 import akka.routing.{ActorRefRoutee, RoundRobinRoutingLogic, Router}
 import reactivemongo.api.{ReadPreference, MongoConnection, MongoConnectionOptions}
 import reactivemongo.core._
-import reactivemongo.core.commands.{Authenticate => AuthenticateCommand, _}
+import reactivemongo.core.commands.{AuthenticateCommand$ => AuthenticateCommand, _}
 import reactivemongo.core.errors._
 import reactivemongo.core.nodeset._
 import reactivemongo.core.protocol._
@@ -137,7 +137,7 @@ class MongoDBSystem(
 
   def send(req: RequestMaker) = primaries.route(req, Actor.noSender)
 
-  def send(req: AuthRequest) = primaries.route(req, Actor.noSender)
+  def send(req: AuthRequest) = nodeSetActor ! req
 
   private def pick(preference: ReadPreference) = {
     if (isMongos) {
@@ -208,7 +208,6 @@ class MongoDBSystem(
 
 
   class NodeSet extends Actor with ActorLogging {
-
     var initialAuthenticates: Seq[Authenticate] = Seq.empty
     var connectionsPerNode: Int = 10
     var existingHosts : Set[String] = Set.empty
@@ -225,7 +224,7 @@ class MongoDBSystem(
         this.initialAuthenticates = auth
         existingHosts = hosts.toSet
         connectingNodes = hosts.map(address => {
-          val node = context.actorOf(Props(classOf[Node], address, initialAuthenticates, connectionsPerNode))
+          val node = context.actorOf(Props(classOf[Node], address, connectionsPerNode))
           node ! Node.Connect
           node
         }).toVector
@@ -234,6 +233,7 @@ class MongoDBSystem(
         log.info("node connected metadata {}", metadata)
         connectingNodes = connectingNodes diff List(sender())
         connectedNodes = sender() +: connectedNodes
+        initialAuthenticates.foreach(p => sender ! AuthRequest(Authenticate(p.db, p.user, p.password)))
         connections.foreach(p => add(p._1, p._2))
         if(connections.exists(p => p._2.isPrimary || p._2.isMongos))
           replyTo ! metadata
@@ -243,10 +243,17 @@ class MongoDBSystem(
         val discovered = hosts.filter(!existingHosts.contains(_))
         existingHosts = discovered ++: existingHosts
         connectingNodes = discovered.map(address => {
-          val node = context.actorOf(Props(classOf[Node], address, initialAuthenticates, connectionsPerNode))
+          val node = context.actorOf(Props(classOf[Node], address, connectionsPerNode))
           node ! Node.Connect
           node
         }) ++: connectingNodes
+      }
+      case auth: AuthRequest => {
+        auth.promise completeWith connectedNodes.map(node => {
+          val authNode = AuthRequest(auth.authenticate)
+          node ! authNode
+          authNode.future
+        }).reduce((a,b) => b)
       }
       case Close => {
         connectedNodes.foreach(_ ! Close)
