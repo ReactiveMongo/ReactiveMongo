@@ -11,6 +11,7 @@ import reactivemongo.core.commands._
 
 import scala.collection.generic.CanBuildFrom
 import scala.collection.immutable.HashMap
+import scala.util.{Failure, Success}
 
 package object utils {
   def updateFirst[A, M[T] <: Iterable[T]](coll: M[A])(ƒ: A => Option[A])(implicit cbf: CanBuildFrom[M[_], A, M[A]]): M[A] = {
@@ -82,14 +83,17 @@ case class Connection(
 
     }
     case auth: AuthRequest => {
-      log.debug("get AuthRequest, sending getnonce")
       authenticating match {
         case None => {
+          log.debug("get AuthRequest, sending getnonce")
           authenticating = Some(Authenticating(auth, None))
           val getNonceRequest = Getnonce(auth.authenticate.db).maker(requestIds.getNonce.next)
           socketWriter ! getNonceRequest.message
         }
-        case _ => awaitingAuth = auth +: awaitingAuth
+        case _ => {
+          log.debug("get AuthRequest, put it buffer")
+          awaitingAuth = auth +: awaitingAuth
+        }
       }
     }
     case req: RequestMakerExpectingResponse => {
@@ -103,7 +107,7 @@ case class Connection(
     case response: Response if requestIds.getNonce accepts response =>
       Getnonce.ResultMaker(response).fold(
         e =>
-          log.error(s"error while processing getNonce response #${response.header.responseTo}", e),
+          log.error(e, "error while processing getNonce response {}", response),
         nonce => {
           log.debug("AUTH: got nonce for channel " + response.channelId + ": " + nonce)
           authenticating = Some(authenticating.get.copy(nonce = Some(nonce)))
@@ -116,7 +120,10 @@ case class Connection(
       log.debug("AUTH: got authenticated response! " + response.channelId)
       AuthenticateCommand(response) match {
         case Right(successfulAuthentication) => authenticating.get.authRequest.promise.success(successfulAuthentication)
-        case Left(error) => authenticating.get.authRequest.promise.failure(error)
+        case Left(error) => {
+          log.error(error, "Unable to authenticate with credential {}", authenticating.get)
+          authenticating.get.authRequest.promise.failure(error)
+        }
       }
       authenticating = None
       awaitingAuth.headOption.map(self ! _)

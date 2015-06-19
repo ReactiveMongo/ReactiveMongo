@@ -27,7 +27,7 @@ import reactivemongo.core.protocol._
 
 import scala.collection.immutable.SortedMap
 import scala.concurrent.{Future, Promise}
-import scala.util.{Failure, Try}
+import scala.util.{Success, Failure, Try}
 
 // messages
 
@@ -208,7 +208,7 @@ class MongoDBSystem(
 
 
   class NodeSet extends Actor with ActorLogging {
-    var initialAuthenticates: Seq[Authenticate] = Seq.empty
+    var authenticates: Seq[Authenticate] = Seq.empty
     var connectionsPerNode: Int = 10
     var existingHosts : Set[String] = Set.empty
     var connectingNodes: Vector[ActorRef] = Vector.empty
@@ -221,7 +221,7 @@ class MongoDBSystem(
         log.info("Connection to initial nodes")
         replyTo = sender()
         this.connectionsPerNode = count
-        this.initialAuthenticates = auth
+        this.authenticates = auth
         existingHosts = hosts.toSet
         connectingNodes = hosts.map(address => {
           val node = context.actorOf(Props(classOf[Node], address, connectionsPerNode))
@@ -233,7 +233,7 @@ class MongoDBSystem(
         log.info("node connected metadata {}", metadata)
         connectingNodes = connectingNodes diff List(sender())
         connectedNodes = sender() +: connectedNodes
-        initialAuthenticates.foreach(p => sender ! AuthRequest(Authenticate(p.db, p.user, p.password)))
+        authenticates.map(AuthRequest(_)).foreach(authenticate(_))
         connections.foreach(p => add(p._1, p._2))
         if(connections.exists(p => p._2.isPrimary || p._2.isMongos))
           replyTo ! metadata
@@ -249,11 +249,16 @@ class MongoDBSystem(
         }) ++: connectingNodes
       }
       case auth: AuthRequest => {
-        auth.promise completeWith connectedNodes.map(node => {
-          val authNode = AuthRequest(auth.authenticate)
-          node ! authNode
-          authNode.future
-        }).reduce((a,b) => b)
+        authenticates = auth.authenticate +: authenticates
+        authenticate(auth)
+      }
+      case authResult: NodeSet.Authenticated => authResult.result match {
+        case Success(value) => {
+          log.info("Authenticated with {}", authResult.authenticate)
+        }
+        case Failure(error) => {
+          log.error(error, "Unable to authenticate with credential for {}", authResult.authenticate)
+        }
       }
       case Close => {
         connectedNodes.foreach(_ ! Close)
@@ -278,6 +283,15 @@ class MongoDBSystem(
       case Node.DiscoveredNodes(hosts) => {
         log.info("nodes descovered but nodeSet in closing state")
       }
+    }
+
+    private def authenticate(authReq: AuthRequest) = {
+      authReq.future.onComplete(self ! NodeSet.Authenticated(authReq.authenticate, _))
+      authReq.promise completeWith connectedNodes.map(node => {
+        val authNode = AuthRequest(authReq.authenticate)
+        node ! authNode
+        authNode.future
+      }).reduce((a,b) => b)
     }
 
     private def removeRoutee(data: SortedMap[Long, Router], connection: ActorRef, value: Long) = {
@@ -340,6 +354,7 @@ class MongoDBSystem(
 
   object  NodeSet {
     case class ConnectAll(hosts: Seq[String], initialAuthenticates: Seq[Authenticate], connectionsPerNode: Int)
+    case class Authenticated(authenticate: Authenticate, result: Try[SuccessfulAuthentication])
   }
 }
 
