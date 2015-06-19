@@ -46,6 +46,13 @@ class Types extends Specification {
       val doc = BSONDocument.empty ++ ("foo" -> 1)
       doc must_== BSONDocument("foo" -> 1)
     }
+
+    "remove specified elements" in {
+      val doc = BSONDocument("Foo" -> 1, "Bar" -> 2, "Lorem" -> 3)
+
+      doc.remove("Bar", "Lorem") must_== BSONDocument("Foo" -> 1) and (
+        doc -- ("Foo", "Bar") must_== BSONDocument("Lorem" -> 3))
+    }
   }
 
   "BSON array" should {

@@ -110,16 +110,25 @@ case class BSONDocument(stream: Stream[Try[BSONElement]]) extends BSONValue {
   def add(doc: BSONDocument): BSONDocument = new BSONDocument(stream ++ doc.stream)
 
   /** Creates a new [[BSONDocument]] containing all the elements of this one and the given `elements`. */
-  def add(elements: Producer[(String, BSONValue)]*): BSONDocument = new BSONDocument(
-    stream ++ elements.flatMap { el =>
+  def add(elements: Producer[(String, BSONValue)]*): BSONDocument =
+    new BSONDocument(stream ++ elements.flatMap { el =>
       el.produce.map(value => Seq(Try(value))).getOrElse(Seq.empty)
     }.toStream)
+
+  /** Creates a new [[BSONDocument]] without the elements corresponding the given `names`. */
+  def remove(names: String*): BSONDocument = new BSONDocument(stream.filter {
+    case Success((name, _)) if (names contains name) => false
+    case _ => true
+  })
 
   /** Alias for `add(doc: BSONDocument): BSONDocument` */
   def ++(doc: BSONDocument): BSONDocument = add(doc)
 
   /** Alias for `add(elements: Producer[(String, BSONValue)]*): BSONDocument` */
   def ++(elements: Producer[(String, BSONValue)]*): BSONDocument = add(elements: _*)
+
+  /** Alias for `remove(names: String*)` */
+  def --(names: String*): BSONDocument = remove(names: _*)
 
   /** Returns a `Stream` for all the elements of this `BSONDocument`. */
   def elements: Stream[BSONElement] = stream.filter(_.isSuccess).map(_.get)
