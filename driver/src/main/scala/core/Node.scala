@@ -3,14 +3,14 @@ package reactivemongo.core
 import java.net.InetSocketAddress
 
 import akka.actor._
+import akka.io.Tcp.SO
 import akka.io.{IO, Tcp}
+import reactivemongo.api.MongoConnectionOptions
 import reactivemongo.api.commands.bson.BSONIsMasterCommand
 import reactivemongo.bson.BSONDocument
 import reactivemongo.core.actors.{AuthRequest, Close, Closed}
 import reactivemongo.core.nodeset._
 import reactivemongo.core.protocol.MongoWireVersion
-
-import scala.concurrent.Future
 
 /**
  * Created by sh1ng on 10/05/15.
@@ -18,7 +18,7 @@ import scala.concurrent.Future
 
 case class Node(
             address: String,
-            nbOfConnections: Int
+            options: MongoConnectionOptions
             ) extends Actor with ActorLogging {
   import Node._
   import context.system
@@ -46,10 +46,11 @@ case class Node(
       context.become(closing)
     }
     case Node.Connect => {
-      awaitingConnections = nbOfConnections
+      awaitingConnections = options.nbChannelsPerNode
       val manager = IO(Tcp)
-      for(i <- 0 until nbOfConnections)
-        yield manager ! Tcp.Connect(new InetSocketAddress(host, port))
+      for(i <- 0 until options.nbChannelsPerNode)
+        yield manager ! Tcp.Connect(new InetSocketAddress(host, port), options = List(SO.KeepAlive(options.keepAlive), SO.TcpNoDelay(options.tcpNoDelay)),
+          timeout = options.timeoutDuration)
     }
     case Tcp.Connected(remote, local) => {
       log.info("Connected from {} to {}", local, remote)

@@ -15,6 +15,7 @@
  */
 package reactivemongo.api
 
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
 
 import akka.actor._
@@ -397,8 +398,10 @@ case class MongoConnectionOptions(
   // reactivemongo specific options
   tcpNoDelay: Boolean = false,
   keepAlive: Boolean = false,
-  nbChannelsPerNode: Int = 10
-)
+  nbChannelsPerNode: Int = 10){
+
+  def timeoutDuration = if(connectTimeoutMS == 0) None else Some(FiniteDuration(connectTimeoutMS.toLong, TimeUnit.MILLISECONDS))
+}
 
 class MongoDriver(config: Option[Config] = None) {
 

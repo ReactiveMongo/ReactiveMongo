@@ -118,7 +118,7 @@ class MongoDBSystem(
   @volatile
   private var isMongos = false
 
-  val nodeSetActor = system.actorOf(Props(new NodeSet()))
+  val nodeSetActor = system.actorOf(Props(new NodeSet(options)))
 
   def send(req: RequestMakerExpectingResponse) = if(req.requestMaker.channelIdHint.isDefined){
     channels.get(req.requestMaker.channelIdHint.get) match {
@@ -168,7 +168,7 @@ class MongoDBSystem(
 
   def connect() : Future[MongoConnection] = {
     system.log.debug("connecting...")
-    (nodeSetActor ? NodeSet.ConnectAll(seeds, initialAuthenticates, options.nbChannelsPerNode))(6.seconds)
+    (nodeSetActor ? NodeSet.ConnectAll(seeds, initialAuthenticates))(6.seconds)
       .mapTo[ProtocolMetadata].map(MongoConnection(system, this, options, _))
   }
 
@@ -205,9 +205,8 @@ class MongoDBSystem(
     }
   }
 
-  class NodeSet extends Actor with ActorLogging {
+  class NodeSet(options: MongoConnectionOptions) extends Actor with ActorLogging {
     var authenticates: Seq[Authenticate] = Seq.empty
-    var connectionsPerNode: Int = 10
     var existingHosts : Set[String] = Set.empty
     var connectingNodes: Vector[ActorRef] = Vector.empty
     var connectedNodes: Vector[ActorRef] = Vector.empty
@@ -215,14 +214,13 @@ class MongoDBSystem(
     var replyTo: ActorRef = null
 
     override def receive: Receive = {
-      case NodeSet.ConnectAll(hosts, auth, count) => {
+      case NodeSet.ConnectAll(hosts, auth) => {
         log.info("Connection to initial nodes")
         replyTo = sender()
-        this.connectionsPerNode = count
         this.authenticates = auth
         existingHosts = hosts.toSet
         connectingNodes = hosts.map(address => {
-          val node = context.actorOf(Props(classOf[Node], address, connectionsPerNode))
+          val node = context.actorOf(Props(classOf[Node], address, options))
           node ! Node.Connect
           node
         }).toVector
@@ -244,7 +242,7 @@ class MongoDBSystem(
         val discovered = hosts.filter(!existingHosts.contains(_))
         existingHosts = discovered ++: existingHosts
         connectingNodes = discovered.map(address => {
-          val node = context.actorOf(Props(classOf[Node], address, connectionsPerNode))
+          val node = context.actorOf(Props(classOf[Node], address, options))
           node ! Node.Connect
           node
         }) ++: connectingNodes
@@ -351,7 +349,7 @@ class MongoDBSystem(
   }
 
   object  NodeSet {
-    case class ConnectAll(hosts: Seq[String], initialAuthenticates: Seq[Authenticate], connectionsPerNode: Int)
+    case class ConnectAll(hosts: Seq[String], initialAuthenticates: Seq[Authenticate])
     case class Authenticated(authenticate: Authenticate, result: Try[SuccessfulAuthentication])
   }
 }

@@ -4,12 +4,11 @@ import java.nio.ByteOrder
 
 import akka.actor.{ActorRef, ActorLogging, Actor}
 import akka.io.Tcp.Received
-import akka.util.{ByteString, ByteStringBuilder}
-import reactivemongo.core.actors.{Close, Closed}
+import akka.util.ByteString
+import reactivemongo.core.actors.Close
 import reactivemongo.core.protocol.{ Response, Reply, MessageHeader}
 
 import scala.annotation.tailrec
-import scala.collection.immutable.{Queue, HashMap}
 
 /**
  * Created by sh1ng on 03/05/15.
