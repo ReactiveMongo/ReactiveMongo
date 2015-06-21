@@ -498,7 +498,7 @@ class MongoDriver(config: Option[Config] = None) {
    */
   val system = {
     import com.typesafe.config.ConfigFactory
-    val cfg = config match { case Some(c) => c; case None => ConfigFactory.load() }
+    val cfg = config getOrElse ConfigFactory.load()
     ActorSystem("reactivemongo", cfg.getConfig("mongo-async-driver"))
   }
 

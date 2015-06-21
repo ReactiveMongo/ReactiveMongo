@@ -596,8 +596,13 @@ class MongoDBSystem(
     }
     allChannelGroup(nodeSet).close.addListener(listener)
 
-    // fail all requests waiting for a response
-    awaitingResponses.foreach(_._2.promise.failure(Exceptions.ClosedException))
+    awaitingResponses.foreach {
+      case (_, r) if (!r.promise.isCompleted) =>
+        // fail all requests waiting for a response
+        r.promise.failure(Exceptions.ClosedException)
+      case _ => (/* already completed */)
+    }
+
     awaitingResponses.empty
 
     logger.warn(s"MongoDBSystem $self stopped.")
