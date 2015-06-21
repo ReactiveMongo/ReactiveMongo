@@ -106,22 +106,26 @@ case class Connection(
     // getnonce response
     case response: Response if requestIds.getNonce accepts response =>
       Getnonce.ResultMaker(response).fold(
-        e =>
-          log.error(e, "error while processing getNonce response {}", response),
+        e => {
+          log.error(e, "error while processing getNonce response {}", response)
+          authenticating = None
+          awaitingAuth.headOption.map(self ! _)
+        },
         nonce => {
           log.debug("AUTH: got nonce for channel " + response.channelId + ": " + nonce)
           authenticating = Some(authenticating.get.copy(nonce = Some(nonce)))
-          val builder = new ByteStringBuilder
-          val authRequest = AuthenticateCommand(authenticating.get.user, authenticating.get.authRequest.authenticate.password, authenticating.get.nonce.get)(authenticating.get.db)
+          socketWriter ! AuthenticateCommand(authenticating.get.user, authenticating.get.authRequest.authenticate.password, authenticating.get.nonce.get)(authenticating.get.db)
             .maker(requestIds.authenticate.next).message
-
         })
     case response: Response if requestIds.authenticate accepts response => {
-      log.debug("AUTH: got authenticated response! " + response.channelId)
+      log.info("AUTH: got authenticated response! " + response.channelId)
       AuthenticateCommand(response) match {
-        case Right(successfulAuthentication) => authenticating.get.authRequest.promise.success(successfulAuthentication)
+        case Right(successfulAuthentication) => {
+          log.info("AUTH: successful authentication on channel {}", port)
+          authenticating.get.authRequest.promise.success(successfulAuthentication)
+        }
         case Left(error) => {
-          log.error(error, "Unable to authenticate with credential {}", authenticating.get)
+          log.error(error, "Unable to authenticate with credential {} on channel {}", authenticating.get, port)
           authenticating.get.authRequest.promise.failure(error)
         }
       }

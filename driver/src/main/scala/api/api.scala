@@ -407,7 +407,7 @@ class MongoDriver(config: Option[Config] = None) {
    */
   val system = {
     import com.typesafe.config.ConfigFactory
-    val debugConfig = ConfigFactory.parseString("akka.loglevel = DEBUG")
+    val debugConfig = ConfigFactory.parseString("akka.loglevel = INFO")
     val cfg = config match {
       case Some(c) => c;
       case None => ConfigFactory.load()
