@@ -78,7 +78,7 @@ trait DB {
   }
 
   /** Authenticates the connection on this database. */
-  def authenticate(user: String, password: String)(implicit timeout: FiniteDuration): Future[SuccessfulAuthentication] = connection.authenticate(name, user, password)
+  def authenticate(user: String, password: String): Future[SuccessfulAuthentication] = connection.authenticate(name, user, password)
 
   /** Returns the database of the given name on the same MongoConnection. */
   @deprecated("Consider using `sibling` instead", "0.10")

@@ -20,7 +20,7 @@ import akka.pattern._
 import akka.routing.{ActorRefRoutee, RoundRobinRoutingLogic, Router}
 import reactivemongo.api.{ReadPreference, MongoConnection, MongoConnectionOptions}
 import reactivemongo.core._
-import reactivemongo.core.commands.{AuthenticateCommand$ => AuthenticateCommand, _}
+import reactivemongo.core.commands.SuccessfulAuthentication
 import reactivemongo.core.errors._
 import reactivemongo.core.nodeset._
 import reactivemongo.core.protocol._
@@ -29,7 +29,6 @@ import scala.collection.immutable.SortedMap
 import scala.concurrent.{Future, Promise}
 import scala.util.{Success, Failure, Try}
 
-// messages
 
 /**
  * A message expecting a response from database.
@@ -206,7 +205,6 @@ class MongoDBSystem(
     }
   }
 
-
   class NodeSet extends Actor with ActorLogging {
     var authenticates: Seq[Authenticate] = Seq.empty
     var connectionsPerNode: Int = 10
@@ -233,7 +231,10 @@ class MongoDBSystem(
         log.info("node connected metadata {}", metadata)
         connectingNodes = connectingNodes diff List(sender())
         connectedNodes = sender() +: connectedNodes
-        authenticates.map(AuthRequest(_)).foreach(authenticate(_))
+        authenticates.map(AuthRequest(_)).foreach(req => {
+          req.future.onComplete(self ! NodeSet.Authenticated(req.authenticate, _))
+          authenticate(req)
+        })
         connections.foreach(p => add(p._1, p._2))
         if(connections.exists(p => p._2.isPrimary || p._2.isMongos))
           replyTo ! metadata
@@ -285,14 +286,11 @@ class MongoDBSystem(
       }
     }
 
-    private def authenticate(authReq: AuthRequest) = {
-      authReq.future.onComplete(self ! NodeSet.Authenticated(authReq.authenticate, _))
-      authReq.promise completeWith connectedNodes.map(node => {
+    private def authenticate(authReq: AuthRequest) = authReq.promise completeWith connectedNodes.map(node => {
         val authNode = AuthRequest(authReq.authenticate)
         node ! authNode
         authNode.future
       }).reduce((a,b) => b)
-    }
 
     private def removeRoutee(data: SortedMap[Long, Router], connection: ActorRef, value: Long) = {
       data.get(value) match {

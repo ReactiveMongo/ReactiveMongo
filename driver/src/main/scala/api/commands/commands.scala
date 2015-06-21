@@ -63,7 +63,6 @@ object Command {
   import reactivemongo.core.actors.RequestMakerExpectingResponse
   import reactivemongo.bson.lowlevel.LoweLevelDocumentIterator
   import reactivemongo.bson.buffer.{ ReadableBuffer, WritableBuffer }
-  import reactivemongo.core.netty._
   import reactivemongo.core.protocol.{ RequestMaker, Query, QueryFlags, Response }
 
   def defaultCursorFetcher[P <: SerializationPack, A](db: DB, p: P, command: A, failover: FailoverStrategy)

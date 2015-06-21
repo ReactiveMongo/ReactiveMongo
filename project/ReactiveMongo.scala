@@ -115,7 +115,8 @@ object ShellPrompt {
 object Resolvers {
   val typesafe = Seq(
     "Typesafe repository snapshots" at "http://repo.typesafe.com/typesafe/snapshots/",
-    "Typesafe repository releases" at "http://repo.typesafe.com/typesafe/releases/")
+    "Typesafe repository releases" at "http://repo.typesafe.com/typesafe/releases/",
+    "scalaz-bintray" at "http://dl.bintray.com/scalaz/releases")
   val resolversList = typesafe
 }
 
@@ -125,7 +126,7 @@ object Dependencies {
 
   val iteratees = "com.typesafe.play" %% "play-iteratees" % "2.3.7"
 
-  val specs = "org.specs2" %% "specs2-core" % "2.3.11" % "test"
+  val specs = "org.specs2" %% "specs2-core" % "3.6.1" % "test"
 }
 
 object ReactiveMongoBuild extends Build {
