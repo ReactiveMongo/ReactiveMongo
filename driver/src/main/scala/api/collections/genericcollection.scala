@@ -153,7 +153,6 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    * 
    * Please take a look to the [[http://www.mongodb.org/display/DOCS/Querying mongodb documentation]] to know how querying works.
    * 
-   * @tparam S the type of the selector (the query). An implicit `Writer[S]` typeclass for handling it has to be in the scope.
    * @tparam H the type of hint. An implicit `H => Hint` conversion has to be in the scope.
    * 
    * @param selector the query selector
@@ -161,7 +160,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    * @param skip the number of matching documents to skip before counting
    * @param hint the index to use (either the index name or the index document)
    */
-  def count[S, H](selector: Option[S] = None, limit: Int = 0, skip: Int = 0, hint: Option[H] = None)(implicit ser: S => pack.Selector, h: H => CountCommand.Hint, ec: ExecutionContext): Future[Int] = runValueCommand(CountCommand.Count(query = selector.map(ser(_).apply()), limit, skip, hint.map(h)))
+  def count[H](selector: Option[pack.Document] = None, limit: Int = 0, skip: Int = 0, hint: Option[H] = None)(implicit h: H => CountCommand.Hint, ec: ExecutionContext): Future[Int] = runValueCommand(CountCommand.Count(query = selector, limit, skip, hint.map(h)))
 
   def bulkInsert(ordered: Boolean)(documents: ImplicitlyDocumentProducer*)(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] =
     db.connection.metadata.map { metadata =>
