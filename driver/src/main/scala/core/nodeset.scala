@@ -79,8 +79,11 @@ case class Connection(
       pendingIsMaster = (request.requestID, initialInfo)
       socketWriter ! builder.result()
     }
-    case req: Request => {
-
+    case req: RequestMaker => {
+      val requestId = requestIds.common.next
+      val request = req(requestId)
+      log.debug("Send request expecting response with a header {}", request.header)
+      socketWriter ! request.message
     }
     case auth: AuthRequest => {
       authenticating match {

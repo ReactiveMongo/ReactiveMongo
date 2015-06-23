@@ -127,7 +127,7 @@ class MongoDBSystem(
 
   def send(req: CheckedWriteRequestExpectingResponse) = primaries.route(req, Actor.noSender)
 
-  def send(req: RequestMaker) = primaries.route(req, Actor.noSender)
+  def send(req: RequestMaker) = sendToChannel(req).map(_ apply req)
 
   def send(req: AuthRequest) = nodeSetActor ! req
 
