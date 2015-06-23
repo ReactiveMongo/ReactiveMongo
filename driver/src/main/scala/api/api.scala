@@ -380,6 +380,7 @@ object MongoConnection {
  * Options for MongoConnection.
  *
  * @param connectTimeoutMS The number of milliseconds to wait for a connection to be established before giving up.
+ * @param pingInterval The number of milliseconds between ping each node in a nodeset.
  * @param authSource The database source for authentication credentials.
  * @param sslEnabled Enable SSL connection (required to be accepted on server-side).
  * @param sslAllowsInvalidCert If `sslEnabled` is true, this one indicates whether to accept invalid certificates (e.g. self-signed).
@@ -390,6 +391,7 @@ object MongoConnection {
 case class MongoConnectionOptions(
   // canonical options - connection
   connectTimeoutMS: Int = 0,
+  pingInterval: Int = 10000,
   // canonical options - authentication options
   authSource: Option[String] = None,
   sslEnabled: Boolean = false,

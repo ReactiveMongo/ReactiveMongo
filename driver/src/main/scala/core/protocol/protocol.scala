@@ -47,6 +47,11 @@ trait ReadableFrom[B, T] {
   def apply(buffer: B) : T =  readFrom(buffer)
 }
 
+trait ChannelAffinity{
+  def readPreference: ReadPreference
+  def channelIdHint: Option[Int]
+}
+
 
 // concrete classes
 /**
@@ -143,7 +148,7 @@ case class RequestMaker(
     op: RequestOp,
     documents: ByteString = ByteString.empty,
     readPreference: ReadPreference = ReadPreference.primary,
-    channelIdHint: Option[Int] = None) {
+    channelIdHint: Option[Int] = None) extends ChannelAffinity {
   def apply(id: Int) = Request(id, 0, op, documents, readPreference, channelIdHint)
 }
 

@@ -120,15 +120,8 @@ class MongoDBSystem(
 
   val nodeSetActor = system.actorOf(Props(new NodeSet(options)))
 
-  def send(req: RequestMakerExpectingResponse) = if(req.requestMaker.channelIdHint.isDefined){
-    channels.get(req.requestMaker.channelIdHint.get) match {
-      case Some(connection) => connection ! req
-      case None => req.promise.failure(Failure(Exceptions.ChannelNotFound).exception)
-    }
-  } else pick(req.requestMaker.readPreference) match {
-    case Some(routee) => routee.route(req, Actor.noSender)
-    case None => req.promise.failure(Failure(Exceptions.PrimaryUnavailableException).exception)
-  }
+  def send(req: RequestMakerExpectingResponse) = sendToChannel(req.requestMaker).map(_ apply req)
+    .getOrElse(req.promise.failure(Failure(Exceptions.PrimaryUnavailableException).exception))
 
   def send(req: ExpectingResponse) = primaries.route(req, Actor.noSender)
 
@@ -137,6 +130,17 @@ class MongoDBSystem(
   def send(req: RequestMaker) = primaries.route(req, Actor.noSender)
 
   def send(req: AuthRequest) = nodeSetActor ! req
+
+  def sendToChannel(requestMaker: ChannelAffinity): Option[Any => Unit] = requestMaker.channelIdHint match {
+    case Some(channelId) => channels.get(channelId) match {
+      case Some(connection) => Some((message: Any) => connection.tell(message, Actor.noSender))
+      case None => None
+    }
+    case None => pick(requestMaker.readPreference) match {
+      case Some(routee) => Some((message: Any) => routee.route(message, Actor.noSender))
+      case None => None
+    }
+  }
 
   private def pick(preference: ReadPreference) = {
     if (isMongos) {
