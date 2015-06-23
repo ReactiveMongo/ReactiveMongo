@@ -220,7 +220,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
   }
 
   /**
-   * Inserts a document into the collection and wait for the [[reactivemongo.core.commands.LastError]] result.
+   * Inserts a document into the collection and wait for the [[reactivemongo.api.commands.WriteResult]].
    *
    * Please read the documentation about [[reactivemongo.core.commands.GetLastError]] to know how to use it properly.
    *
@@ -229,7 +229,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    * @param document the document to insert.
    * @param writeConcern the [[reactivemongo.core.commands.GetLastError]] command message to send in order to control how the document is inserted. Defaults to GetLastError().
    *
-   * @return a future [[reactivemongo.core.commands.LastError]] that can be used to check whether the insertion was successful.
+   * @return a future [[reactivemongo.api.commands.WriteResult]] that can be used to check whether the insertion was successful.
    */
   def insert[T](document: T, writeConcern: WriteConcern = WriteConcern.Default)(implicit writer: pack.Writer[T], ec: ExecutionContext): Future[WriteResult] = {
     Failover2(db.connection, failoverStrategy) { () =>
@@ -266,7 +266,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    * @param upsert states whether the update objet should be inserted if no match found. Defaults to false.
    * @param multi states whether the update may be done on all the matching documents.
    *
-   * @return a future [[reactivemongo.core.commands.LastError]] that can be used to check whether the update was successful.
+   * @return a future [[reactivemongo.api.commands.WriteResult]] that can be used to check whether the update was successful.
    */
   def update[S, U](selector: S, update: U, writeConcern: WriteConcern = WriteConcern.Default, upsert: Boolean = false, multi: Boolean = false)(implicit selectorWriter: pack.Writer[S], updateWriter: pack.Writer[U], ec: ExecutionContext): Future[WriteResult] =
     Failover2(db.connection, failoverStrategy) { () =>
@@ -295,7 +295,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
     }.future
 
   /**
-   * Remove the matched document(s) from the collection and wait for the [[reactivemongo.core.commands.LastError]] result.
+   * Remove the matched document(s) from the collection and wait for the [[reactivemongo.api.commands.WriteResult]] result.
    *
    * Please read the documentation about [[reactivemongo.core.commands.GetLastError]] to know how to use it properly.
    *
@@ -305,7 +305,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    * @param writeConcern the [[reactivemongo.core.commands.GetLastError]] command message to send in order to control how the documents are removed. Defaults to GetLastError().
    * @param firstMatchOnly states whether only the first matched documents has to be removed from this collection.
    *
-   * @return a future [[reactivemongo.core.commands.LastError]] that can be used to check whether the removal was successful.
+   * @return a future [[reactivemongo.api.commands.WriteResult]] that can be used to check whether the removal was successful.
    */
   def remove[T](query: T, writeConcern: WriteConcern = WriteConcern.Default, firstMatchOnly: Boolean = false)(implicit writer: pack.Writer[T], ec: ExecutionContext): Future[WriteResult] =
     Failover2(db.connection, failoverStrategy) { () =>
