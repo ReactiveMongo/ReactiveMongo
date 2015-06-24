@@ -88,13 +88,13 @@ case class Connection(
     case auth: AuthRequest => {
       authenticating match {
         case None => {
-          log.debug("get AuthRequest, sending getnonce")
+          log.info("get AuthRequest, sending getnonce {}", port)
           authenticating = Some(Authenticating(auth, None))
           val getNonceRequest = Getnonce(auth.authenticate.db).maker(requestIds.getNonce.next)
           socketWriter ! getNonceRequest.message
         }
         case _ => {
-          log.debug("get AuthRequest, put it buffer")
+          log.info("get AuthRequest, put it buffer {}", port)
           awaitingAuth = auth +: awaitingAuth
         }
       }
@@ -111,8 +111,7 @@ case class Connection(
       Getnonce.ResultMaker(response).fold(
         e => {
           log.error(e, "error while processing getNonce response {}", response)
-          authenticating = None
-          awaitingAuth.headOption.map(self ! _)
+          authenticateNext()
         },
         nonce => {
           log.debug("AUTH: got nonce for channel " + response.channelId + ": " + nonce)
@@ -121,19 +120,19 @@ case class Connection(
             .maker(requestIds.authenticate.next).message
         })
     case response: Response if requestIds.authenticate accepts response => {
-      log.info("AUTH: got authenticated response! " + response.channelId)
       AuthenticateCommand(response) match {
         case Right(successfulAuthentication) => {
           log.info("AUTH: successful authentication on channel {}", port)
-          authenticating.get.authRequest.promise.success(successfulAuthentication)
+          if(!authenticating.get.authRequest.promise.trySuccess(successfulAuthentication))
+            log.warning("AUTH promise already completed")
         }
         case Left(error) => {
           log.error(error, "Unable to authenticate with credential {} on channel {}", authenticating.get, port)
-          authenticating.get.authRequest.promise.failure(error)
+          if(!authenticating.get.authRequest.promise.tryFailure(error))
+            log.warning("AUTH promise already completed")
         }
       }
-      authenticating = None
-      awaitingAuth.headOption.map(self ! _)
+      authenticateNext()
     }
     case response: Response => {
       if (requestIds.isMaster accepts response) {
@@ -159,6 +158,14 @@ case class Connection(
       context.become(closing)
     }
     case a : Any => log.warning("unhandled messsage {}", a)
+  }
+
+  private def authenticateNext() = {
+    authenticating = None
+    awaitingAuth.headOption.map(req => {
+      awaitingAuth = awaitingAuth.tail
+      self ! req
+    })
   }
 
   private def closing = waitClose orElse receive
