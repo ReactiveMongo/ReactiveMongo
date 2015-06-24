@@ -2,11 +2,12 @@
 <configuration status="INFO">
   <appenders>
     <Console name="Console" target="SYSTEM_OUT">
-      <!-- <PatternLayout pattern="%d{HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n"/> -->
       <PatternLayout pattern="%d{HH:mm:ss.SSS} ReactiveMongo %-5level [%logger{1.}] :: %msg%n" />
     </Console>
   </appenders>
   <loggers>
+    <logger name="reactivemongo" level="WARN" />
+    <logger name="akka://reactivemongo" level="WARN" />
     <root level="INFO">
       <appender-ref ref="Console"/>
     </root>
