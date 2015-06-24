@@ -7,3 +7,5 @@ resolvers += "jgit-repo" at "http://download.eclipse.org/jgit/maven"
 addSbtPlugin("com.typesafe.sbt" % "sbt-git" % "0.6.4")
 
 addSbtPlugin("com.eed3si9n" % "sbt-unidoc" % "0.3.1")
+
+libraryDependencies += "commons-codec" % "commons-codec" % "1.10"

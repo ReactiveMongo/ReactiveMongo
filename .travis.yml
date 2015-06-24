@@ -1,5 +1,5 @@
 language: scala
-script: sbt ++$TRAVIS_SCALA_VERSION "testOnly * -- -exclude testCommands --"
+script: echo "AVAIL=$TRAVIS_SECURE_ENV_VARS / SONATYPE_USER=$SONATYPE_USER / FOO=$FOO"
 scala:
 - 2.11.6
 - 2.10.4
@@ -13,9 +13,8 @@ before_install:
   sudo tee /etc/apt/sources.list.d/mongodb.list
 - sudo apt-get update
 - sudo apt-get install mongodb-org-server
-after_success:
-- .travis_scripts/publishSnapshots.sh
 env:
   global:
-  - secure: AHBkdpd7+WwsSlyeDSt3dyM+hadpjbVDuImvWpWTOBdgCwUI6aOSUc0bwHNmEMrmZ/tY2bPEOT8lebPL7av4kBYYEk/K/lORHLWinrB8THjRwvi4/mtzTBs2Wdo3gj8BNuThEJhTwFtVF/HiuxG0yyIODFb8Ubp7Vp5ySgpdCto=
-  - secure: mL+CDHYec/SQXPjF4+EPHVTYkzFScTtlZWpt+4u2puZoG7aYRvsvSAyL5cA9AOPYNlnamZjelu5zRHb9AWfZwA6EAcBOdA836isdqS2Lm9Y2AIl/iu0ZRDJoUkIG2eWu8nCU01ANoV/qpqj4Zw8K1w5si8xaxPjLgmMcPM2tHrY=
+  - FOO=Bar
+  - secure: Dje2rrcpcep3NrrsnuUP0MysE7y160t6FkDRSAQjbXpXeituV6EreWSz6zgb7zqJZ0RqPgv0lNDFBMR6d43blUr3wiD29Sz41CBHbKf56DfekyMvtNjUwn07A3m14rmkN3l21SvJeWOhPBsgx+B77cBbJMKSBllqgMeF9jEXo+8=
+  - secure: rvMBvAMogpTPBT7O7CgNmMylcDZ/Wdsc6++8wc5tNJWZMXNp6z7TMLrR9roCsIKk6i47WQmWlK8vJNWWUlMNdCS+4ZKFtzBbG1gX3aHFWYJ8l0dDZlQFdu4wmDCxolJqMTs9QVTCQsF3iotXFT71oS8fYplPcYPSBKdkU4NJ3GQ=
