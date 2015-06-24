@@ -69,7 +69,9 @@ trait GenericQueryBuilder[P <: SerializationPack] {
    * 
    * An implicit `Reader[T]` must be present in the scope.
    */
-  def cursor[T](implicit reader: pack.Reader[T], ec: ExecutionContext, cp: CursorProducer[T]): cp.ProducedCursor = cursor(ReadPreference.primary)
+  def cursor[T](implicit reader: pack.Reader[T], ec: ExecutionContext, cp: CursorProducer[T]): cp.ProducedCursor = cursorInternal(ReadPreference.primary)
+
+  def cursor[T](readPreference: ReadPreference)(implicit reader: pack.Reader[T], ec: ExecutionContext, cp: CursorProducer[T]): cp.ProducedCursor = cursorInternal(readPreference)
 
   private def defaultCursor[T](readPreference: ReadPreference, isMongo26WriteOp: Boolean = false)
                               (implicit reader: pack.Reader[T], ec: ExecutionContext): Cursor[T] = {
@@ -98,7 +100,7 @@ trait GenericQueryBuilder[P <: SerializationPack] {
    *
    * @param readPreference The ReadPreference for this request. If the ReadPreference implies that this request might be run on a Secondary, the slaveOk flag will be set.
    */
-  private def cursor[T](readPreference: ReadPreference, isMongo26WriteOp: Boolean = false)(implicit reader: pack.Reader[T], ec: ExecutionContext, cp: CursorProducer[T]): cp.ProducedCursor = cp.produce(defaultCursor[T](readPreference, isMongo26WriteOp))
+  private def cursorInternal[T](readPreference: ReadPreference, isMongo26WriteOp: Boolean = false)(implicit reader: pack.Reader[T], ec: ExecutionContext, cp: CursorProducer[T]): cp.ProducedCursor = cp.produce(defaultCursor[T](readPreference, isMongo26WriteOp))
 
   /**
    * Sends this query and gets a future `Option[T]`.

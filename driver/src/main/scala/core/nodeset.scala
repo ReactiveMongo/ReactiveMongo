@@ -145,7 +145,7 @@ case class Connection(
           log.debug("received isMaster {}", isMaster)
           context.parent ! Node.IsMasterInfo(isMaster, initialInfo.copy(ping = System.currentTimeMillis() - initialInfo.lastIsMasterTime))
         } else {
-          // prevent race condition
+          // todo: prevent race condition
           self ! Node.IsMaster
         }
       } else {
