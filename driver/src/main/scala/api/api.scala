@@ -498,8 +498,13 @@ class MongoDriver(config: Option[Config] = None) {
    */
   val system = {
     import com.typesafe.config.ConfigFactory
-    val cfg = config getOrElse ConfigFactory.load()
-    ActorSystem("reactivemongo", cfg.getConfig("mongo-async-driver"))
+    val reference = config getOrElse ConfigFactory.load()
+    val cfg = if (!reference.hasPath("mongo-async-driver")) {
+      logger.warn("No mongo-async-driver configuration found")
+      ConfigFactory.empty()
+    } else reference.getConfig("mongo-async-driver")
+    
+    ActorSystem("reactivemongo", cfg)
   }
 
   private val supervisorActor = system.actorOf(Props(new SupervisorActor(this)),s"Supervisor-${MongoDriver.nextCounter}")

@@ -67,7 +67,18 @@ trait GenericQueryBuilder[P <: SerializationPack] {
    * 
    * An implicit `Reader[T]` must be present in the scope.
    */
+  @deprecated(message = "Use [[cursor]] function with read preference.",
+    since = "0.11.0")
   def cursor[T](implicit reader: pack.Reader[T], ec: ExecutionContext, cp: CursorProducer[T]): cp.ProducedCursor = cursor(ReadPreference.primary)
+
+  /**
+   * Makes a [[Cursor]] of this query, which can be enumerated.
+   *
+   * An implicit `Reader[T]` must be present in the scope.
+   *
+   * @param readPreference The ReadPreference for this request. If the ReadPreference implies that this request might be run on a Secondary, the slaveOk flag will be set.
+   */
+  def cursor[T](readPreference: ReadPreference = ReadPreference.primary, isMongo26WriteOp: Boolean = false)(implicit reader: pack.Reader[T], ec: ExecutionContext, cp: CursorProducer[T]): cp.ProducedCursor = cp.produce(defaultCursor[T](readPreference, isMongo26WriteOp))  
 
   private def defaultCursor[T](readPreference: ReadPreference, isMongo26WriteOp: Boolean = false)(implicit reader: pack.Reader[T], ec: ExecutionContext): Cursor[T] = {
     val documents = BufferSequence {
@@ -83,15 +94,6 @@ trait GenericQueryBuilder[P <: SerializationPack] {
 
     DefaultCursor(pack, op, documents, readPreference, collection.db.connection, failover, isMongo26WriteOp)(reader)
   }
-
-  /**
-   * Makes a [[Cursor]] of this query, which can be enumerated.
-   *
-   * An implicit `Reader[T]` must be present in the scope.
-   *
-   * @param readPreference The ReadPreference for this request. If the ReadPreference implies that this request might be run on a Secondary, the slaveOk flag will be set.
-   */
-  private def cursor[T](readPreference: ReadPreference, isMongo26WriteOp: Boolean = false)(implicit reader: pack.Reader[T], ec: ExecutionContext, cp: CursorProducer[T]): cp.ProducedCursor = cp.produce(defaultCursor[T](readPreference, isMongo26WriteOp))
 
   /**
    * Sends this query and gets a future `Option[T]`.
