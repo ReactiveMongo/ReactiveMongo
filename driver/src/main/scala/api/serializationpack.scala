@@ -3,7 +3,9 @@ package reactivemongo.api
 import reactivemongo.bson.buffer.{ ReadableBuffer, WritableBuffer }
 
 trait SerializationPack { self: Singleton =>
-  type Document
+  type Value
+  type ElementProducer
+  type Document <: Value
   type Writer[A]
   type Reader[A]
 
@@ -16,11 +18,10 @@ trait SerializationPack { self: Singleton =>
   def writeToBuffer(buffer: WritableBuffer, document: Document): WritableBuffer
   def readFromBuffer(buffer: ReadableBuffer): Document
 
-  def serializeAndWrite[A](buffer: WritableBuffer, document: A, writer: Writer[A]): WritableBuffer =
-    writeToBuffer(buffer, serialize(document, writer))
+  def serializeAndWrite[A](buffer: WritableBuffer, document: A, writer: Writer[A]): WritableBuffer = writeToBuffer(buffer, serialize(document, writer))
+
   def readAndDeserialize[A](buffer: ReadableBuffer, reader: Reader[A]): A =
     deserialize(readFromBuffer(buffer), reader)
-
 
   import reactivemongo.core.protocol.Response
   import reactivemongo.core.netty.ChannelBufferReadableBuffer
@@ -32,12 +33,16 @@ trait SerializationPack { self: Singleton =>
   }
 
   def writer[A](f: A => Document): Writer[A]
+
+  def isEmpty(document: Document): Boolean
 }
 
 object BSONSerializationPack extends SerializationPack {
   import reactivemongo.bson._
   import reactivemongo.bson.buffer.DefaultBufferHandler
 
+  type Value = BSONValue
+  type ElementProducer = Producer[BSONElement]
   type Document = BSONDocument
   type Writer[A] = BSONDocumentWriter[A]
   type Reader[A] = BSONDocumentReader[A]
@@ -63,4 +68,6 @@ object BSONSerializationPack extends SerializationPack {
   def writer[A](f: A => Document): Writer[A] = new BSONDocumentWriter[A] {
     def write(input: A): Document = f(input)
   }
+
+  def isEmpty(document: Document) = document.isEmpty
 }

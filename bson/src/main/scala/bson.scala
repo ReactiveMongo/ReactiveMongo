@@ -117,8 +117,10 @@ object BSON {
    * Prefer `writeDocument` over this one if you want to serialize `T` instances.
    */
   def write[T, B <: BSONValue](t: T)(implicit writer: BSONWriter[T, B]): B = writer.write(t)
+
   /** Produces a `T` instance of the given `BSONDocument`, if there is an implicit `BSONReader[BSONDocument, T]` in the scope. */
   def readDocument[T](doc: BSONDocument)(implicit reader: BSONReader[BSONDocument, T]): T = reader.read(doc)
+
   /** Produces a `BSONDocument` of the given `T` instance, if there is an implicit `BSONWriter[T, BSONDocument]` in the scope. */
   def writeDocument[T](t: T)(implicit writer: BSONWriter[T, BSONDocument]): BSONDocument = writer.write(t)
 }
