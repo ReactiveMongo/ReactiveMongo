@@ -201,6 +201,6 @@ object Macros {
      * Ignores a field
      */
     @meta.param
-    case class Ignore() extends StaticAnnotation
+    case class Ignore(value: Any = null) extends StaticAnnotation
   }
 }
