@@ -16,13 +16,16 @@
 package reactivemongo.api
 
 /**
- * A MongoDB Collection. You should consider the default implementation, [[reactivemongo.api.collections.default.BSONCollection]].
+ * A MongoDB Collection. You should consider the default BSON implementation.
  *
- * Example using the default implementation (BSONCollection):
+ * Example using the default implementation:
  *
  * {{{
+ * import reactivemongo.bson._
+ * import reactivemongo.api.collections.bson.BSONCollection
+ * 
  * object Samples {
- *
+ * 
  *   val connection = MongoConnection(List("localhost"))
  *
  *   // Gets a reference to the database "plugin"
@@ -30,7 +33,7 @@ package reactivemongo.api
  *
  *   // Gets a reference to the collection "acoll"
  *   // By default, you get a BSONCollection.
- *   val collection = db("acoll")
+ *   val collection = db[BSONCollection]("acoll")
  *
  *   def listDocs() = {
  *     // Select only the documents which field 'firstName' equals 'Jack'

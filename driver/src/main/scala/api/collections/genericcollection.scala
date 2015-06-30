@@ -74,14 +74,12 @@ trait BatchCommands[P <: SerializationPack] {
 }
 
 /**
- * A Collection that provides default methods using a `Structure` (like [[reactivemongo.bson.BSONDocument]], or a Json document, etc.).
+ * A Collection that provides default methods using a `SerializationPack` 
+ * (e.g. the default [[reactivemongo.api.BSONSerializationPack]]).
  *
- * Some methods of this collection accept instances of `Reader[T]` and `Writer[T]`, that transform any `T` instance into a `Structure` and vice-versa.
- * The default implementation of [[Collection]], [[reactivemongo.api.collections.default.BSONCollection]], extends this trait.
+ * Some methods of this collection accept instances of `Reader[T]` and `Writer[T]`, that transform any `T` instance into a document, compatible with the selected serialization pack, and vice-versa.
  *
- * @tparam Structure The structure that will be turned into BSON (and vice versa), usually a [[reactivemongo.bson.BSONDocument]] or a Json document.
- * @tparam Reader A `Reader[T]` that produces a `T` instance from a `Structure`.
- * @tparam Writer A `Writer[T]` that produces a `Structure` instance from a `T`.
+ * @tparam P the serialization pack
  */
 trait GenericCollection[P <: SerializationPack with Singleton] extends Collection with GenericCollectionWithCommands[P] with CollectionMetaCommands with reactivemongo.api.commands.ImplicitCommandHelpers[P] { self =>
   val pack: P
