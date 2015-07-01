@@ -57,10 +57,22 @@ class BSONCollectionSpec extends Specification {
       Await.result(collection.insert(person4), timeout).ok mustEqual true
       Await.result(collection.insert(person5), timeout).ok mustEqual true
     }
+
     "read empty cursor with success using collect" in {
       val list = collection.find(BSONDocument("plop" -> "plop")).cursor[BSONDocument].collect[Vector](10)
       Await.result(list, timeout).length mustEqual 0
     }
+
+    "read empty cursor with success using collect" in {
+      collection.find(
+        BSONDocument("age" -> 25), BSONDocument("name" -> 1)).
+        one[BSONDocument] must beSome[BSONDocument].like({
+          case doc =>
+            doc.elements.size must_== 2/* _id+name */ and (
+              doc.getAs[String]("name") aka "name" must beSome("Jack"))
+        }).await(5000)
+    }
+
     "read empty cursor with success using enumerate" in {
       val enumerator = collection.find(BSONDocument("plop" -> "plop")).cursor[BSONDocument].enumerate(10)
       val n = enumerator |>>> Iteratee.fold(0) { (r, doc) =>
