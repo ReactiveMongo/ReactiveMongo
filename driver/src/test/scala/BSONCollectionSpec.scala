@@ -251,6 +251,15 @@ class BSONCollectionSpec extends Specification {
           -2
       } aka "write result" must beEqualTo(-1).await(timeoutMillis)
     }
+
+    "write a JavaScript value" in {
+      collection.insert(BSONDocument("age" -> 101,
+        "name" -> BSONJavaScript("db.getName()"))).flatMap { _ =>
+        implicit val reader = PersonReader
+        collection.find(BSONDocument("age" -> 101)).one[BSONDocument].map(
+          _.flatMap(_.getAs[BSONJavaScript]("name")).map(_.value))
+      } aka "inserted" must beSome("db.getName()").await(timeoutMillis)
+    }
   }
 
   "Index" should {
