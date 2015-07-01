@@ -52,13 +52,27 @@ class BSONCollectionSpec extends Specification {
   val person5 = Person("Joline", 34)
 
   "BSONCollection" should {
-    "write five docs with success" in {
+    "write five docs with success" >> {
+      sequential
+
       implicit val writer = PersonWriter
-      Await.result(collection.insert(person), timeout).ok mustEqual true
-      Await.result(collection.insert(person2), timeout).ok mustEqual true
-      Await.result(collection.insert(person3), timeout).ok mustEqual true
-      Await.result(collection.insert(person4), timeout).ok mustEqual true
-      Await.result(collection.insert(person5), timeout).ok mustEqual true
+
+      "with insert" in {
+        Await.result(collection.insert(person), timeout).ok must beTrue and (
+          Await.result(collection.insert(person2), timeout).ok must beTrue)
+      }
+
+      "with bulkInsert" in {
+        val persons =
+          Seq[collection.ImplicitlyDocumentProducer](person3, person4, person5)
+        /* OR
+        val persons = Seq(person3, person4, person5).
+          map(implicitly[collection.ImplicitlyDocumentProducer](_))
+         */
+
+        collection.bulkInsert(true)(persons: _*).map(_.ok).
+          aka("insertion") must beTrue.await(timeoutMillis)
+      }
     }
 
     "read empty cursor" >> {
