@@ -78,4 +78,14 @@ class Types extends Specification {
       bson.byteArray must_== bytes
     }
   }
+
+  "BSONTimestamp" should {
+    "extract time and ordinal values" in {
+      val ts = BSONTimestamp(6065270725701271558L)
+
+      ts.value aka "raw value" must_== 6065270725701271558L and (
+        ts.time aka "time" must_== 1412180887L) and (
+        ts.ordinal aka "ordinal" must_== 6)
+    }
+  }
 }
