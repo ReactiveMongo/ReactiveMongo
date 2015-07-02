@@ -51,7 +51,7 @@ object Implicits { // TODO: Move in a `ReadFile` companion object?
       doc.getAs[BSONString]("filename").map(_.value).get,
       doc.getAs[BSONNumberLike]("uploadDate").map(_.toLong),
       doc.getAs[BSONNumberLike]("chunkSize").map(_.toInt).get,
-      doc.getAs[BSONNumberLike]("length").map(_.toInt).get,
+      doc.getAs[BSONNumberLike]("length").map(_.toLong).get,
       doc.getAs[BSONString]("md5").map(_.value),
       doc.getAs[BSONDocument]("metadata").getOrElse(BSONDocument()),
       doc)
@@ -61,7 +61,7 @@ object Implicits { // TODO: Move in a `ReadFile` companion object?
 /** Metadata that cannot be customized. */
 trait ComputedMetadata {
   /** Length of the file. */
-  def length: Int
+  def length: Long
 
   /** Size of the chunks of this file. */
   def chunkSize: Int
@@ -126,7 +126,7 @@ case class DefaultReadFile(
   filename: String,
   uploadDate: Option[Long],
   chunkSize: Int,
-  length: Int,
+  length: Long,
   md5: Option[String],
   metadata: BSONDocument,
   original: BSONDocument) extends ReadFile[BSONSerializationPack.type, BSONValue] {
@@ -231,7 +231,7 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
           val bson = BSONDocument(idProducer("_id" -> file.id)) ++ (
             "filename" -> BSONString(file.filename),
             "chunkSize" -> BSONInteger(chunkSize),
-            "length" -> BSONInteger(length),
+            "length" -> BSONLong(length),
             "uploadDate" -> BSONDateTime(uploadDate),
             "contentType" -> file.contentType.map(BSONString(_)),
             "metadata" -> option(!pack.isEmpty(file.metadata), file.metadata))
@@ -275,7 +275,7 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
       "$query" -> (BSONDocument(idProducer("files_id" -> file.id)) ++ (
         "n" -> BSONDocument(
           "$gte" -> BSONInteger(0),
-          "$lte" -> BSONInteger(file.length / file.chunkSize + (
+          "$lte" -> BSONLong(file.length / file.chunkSize + (
             if (file.length % file.chunkSize > 0) 1 else 0))))),
       "$orderby" -> BSONDocument("n" -> BSONInteger(1)))
 
