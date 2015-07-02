@@ -183,6 +183,14 @@ class Macros extends Specification {
       roundtrip(person, format)
     }
 
+    "persist simple class name on demand" in {
+      val person = Person("john", "doe")
+      val format = Macros.handlerOpts[Person, Macros.Options.SaveSimpleName]
+      val doc = format write person
+      doc.getAs[String]("className") mustEqual Some("Person")
+      roundtrip(person, format)
+    }
+
     "handle union types(ADT)" in {
       import Union._
       import Macros.Options._
@@ -191,10 +199,29 @@ class Macros extends Specification {
       val format = Macros.handlerOpts[UT, UnionType[UA \/ UB \/ UC \/ UD]]
       println(BSONDocument pretty (format write a))
       println(BSONDocument pretty (format write b))
+
+      format.write(a).getAs[String]("className") mustEqual Some("Macros.Union.UA")
+      format.write(b).getAs[String]("className") mustEqual Some("Macros.Union.UB")
+
       roundtrip(a, format)
       roundtrip(b, format)
     }
 
+    "handle union types(ADT) with simple names" in {
+      import Union._
+      import Macros.Options._
+      val a = UA(1)
+      val b = UB("hai")
+      val format = Macros.handlerOpts[UT, SimpleUnionType[UA \/ UB \/ UC \/ UD]]
+      println(BSONDocument pretty (format write a))
+      println(BSONDocument pretty (format write b))
+
+      format.write(a).getAs[String]("className") mustEqual Some("UA")
+      format.write(b).getAs[String]("className") mustEqual Some("UB")
+
+      roundtrip(a, format)
+      roundtrip(b, format)
+    }
     "handle recursive structure" in {
       import TreeModule._
       //handlers defined at tree module
@@ -232,6 +259,10 @@ class Macros extends Specification {
       import Macros.Options._
       import Union._
       implicit val format = Macros.handlerOpts[UT, AllImplementations]
+
+      format.write(UA(1)).getAs[String]("className") mustEqual Some("Macros.Union.UA")
+      format.write(UB("buzz")).getAs[String]("className") mustEqual Some("Macros.Union.UB")
+
       roundtripImp[UT](UA(17))
       roundtripImp[UT](UB("foo"))
       roundtripImp[UT](UC("bar"))
@@ -242,6 +273,37 @@ class Macros extends Specification {
       import Macros.Options._
       import InheritanceModule._
       implicit val format = Macros.handlerOpts[T, AllImplementations]
+
+      format.write(A()).getAs[String]("className") mustEqual Some("Macros.InheritanceModule.A")
+      format.write(B).getAs[String]("className") mustEqual Some("Macros.InheritanceModule.B")
+
+      roundtripImp[T](A())
+      roundtripImp[T](B)
+      roundtripImp[T](C())
+    }
+
+    "automate Union on sealed traits with simple name" in {
+      import Macros.Options._
+      import Union._
+      implicit val format = Macros.handlerOpts[UT, SimpleAllImplementations]
+
+      format.write(UA(1)).getAs[String]("className") mustEqual Some("UA")
+      format.write(UB("buzz")).getAs[String]("className") mustEqual Some("UB")
+
+      roundtripImp[UT](UA(17))
+      roundtripImp[UT](UB("foo"))
+      roundtripImp[UT](UC("bar"))
+      roundtripImp[UT](UD("baz"))
+    }
+
+    "support automatic implementations search with nested traits with simple name" in {
+      import Macros.Options._
+      import InheritanceModule._
+      implicit val format = Macros.handlerOpts[T, SimpleAllImplementations]
+
+      format.write(A()).getAs[String]("className") mustEqual Some("A")
+      format.write(B).getAs[String]("className") mustEqual Some("B")
+
       roundtripImp[T](A())
       roundtripImp[T](B)
       roundtripImp[T](C())
