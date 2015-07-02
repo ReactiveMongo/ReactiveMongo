@@ -544,8 +544,16 @@ case class BSONJavaScriptWS(value: String) extends BSONValue { val code = 0x0F.t
 /** BSON Integer value */
 case class BSONInteger(value: Int) extends BSONValue { val code = 0x10.toByte }
 
-/** BSON Timestamp value. TODO */
-case class BSONTimestamp(value: Long) extends BSONValue { val code = 0x11.toByte }
+/** BSON Timestamp value */
+case class BSONTimestamp(value: Long) extends BSONValue {
+  val code = 0x11.toByte
+
+  /** Seconds since the Unix epoch */
+  val time = value >>> 32
+
+  /** Ordinal (with the second) */
+  val ordinal = value.toInt
+}
 
 /** BSON Long value */
 case class BSONLong(value: Long) extends BSONValue { val code = 0x12.toByte }
