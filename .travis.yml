@@ -1,5 +1,5 @@
 language: scala
-script: sbt ++$TRAVIS_SCALA_VERSION "testOnly * -- -exclude testCommands --"
+script: ./.travis_scripts/validate.sh
 scala:
 - 2.11.6
 - 2.10.4

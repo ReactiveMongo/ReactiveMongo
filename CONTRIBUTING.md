@@ -18,6 +18,7 @@ This is the process for a contributor (that is, a non ReactiveMongo core develop
     1. Live up to the current code standard:
         - Not violate [DRY](http://programmer.97things.oreilly.com/wiki/index.php/Don%27t_Repeat_Yourself).
         - [Boy Scout Rule](http://programmer.97things.oreilly.com/wiki/index.php/The_Boy_Scout_Rule) needs to have been applied.
+        - Code convention: make sure to run `sbt scalariformFormat test:scalariformFormat` before creating a commit.
     2. Regardless if the code introduces new features or fixes bugs or regressions, it must have comprehensive tests.
     3. The code must be well documented in the ReactiveMongo standard documentation format (see the ‘Documentation’ section below). Each API change must have the corresponding documentation change.
     4. Implementation-wise, the following things should be avoided as much as possible:
