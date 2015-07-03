@@ -4,7 +4,7 @@ import reactivemongo.bson.exceptions.DocumentKeyNotFound
 import reactivemongo.bson.Macros.Annotations.Key
 
 class Macros extends Specification {
-  type Handler[A] = BSONDocumentReader[A] with BSONDocumentWriter[A]  with BSONHandler[BSONDocument, A]
+  type Handler[A] = BSONDocumentReader[A] with BSONDocumentWriter[A] with BSONHandler[BSONDocument, A]
 
   def roundtrip[A](original: A, format: BSONReader[BSONDocument, A] with BSONWriter[A, BSONDocument]) = {
     val serialized = format write original
@@ -12,7 +12,7 @@ class Macros extends Specification {
     original mustEqual deserialized
   }
 
-  def roundtripImp[A](data:A)(implicit format: BSONReader[BSONDocument, A] with BSONWriter[A, BSONDocument]) = roundtrip(data, format)
+  def roundtripImp[A](data: A)(implicit format: BSONReader[BSONDocument, A] with BSONWriter[A, BSONDocument]) = roundtrip(data, format)
 
   case class Person(firstName: String, lastName: String)
   case class Pet(name: String, owner: Person)
@@ -67,7 +67,7 @@ class Macros extends Specification {
     }
   }
 
-  object TreeCustom{
+  object TreeCustom {
     sealed trait Tree
     case class Node(left: Tree, right: Tree) extends Tree
     case class Leaf(data: String) extends Tree
@@ -91,7 +91,7 @@ class Macros extends Specification {
     case class Cons(head: Int, tail: IntList) extends IntList
     case object Tail extends IntList
 
-    object IntList{
+    object IntList {
       import Macros.Options._
       implicit val bson: Handler[IntList] = Macros.handlerOpts[IntList, UnionType[Cons \/ Tail.type]]
     }
@@ -129,8 +129,7 @@ class Macros extends Specification {
     "support seq" in {
       roundtrip(
         WordLover("john", Seq("hello", "world")),
-        Macros.handler[WordLover]
-      )
+        Macros.handler[WordLover])
     }
 
     "support single member case classes" in {
@@ -207,7 +206,7 @@ class Macros extends Specification {
       val tree: Tree = Node(Leaf("hi"), Node(Leaf("hello"), Leaf("world")))
       val serialized = BSON writeDocument tree
       val deserialized = BSON.readDocument[Tree](serialized)
-      val expected = Node(Leaf("hai"), Node(Leaf("hai"),Leaf("hai")))
+      val expected = Node(Leaf("hai"), Node(Leaf("hai"), Leaf("hai")))
       deserialized mustEqual expected
     }
 

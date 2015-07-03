@@ -97,8 +97,7 @@ case object GetLastMetadata
 class MongoDBSystem(
     seeds: Seq[String],
     initialAuthenticates: Seq[Authenticate],
-    options: MongoConnectionOptions)
-    (channelFactory: ChannelFactory = new ChannelFactory(options)) extends Actor {
+    options: MongoConnectionOptions)(channelFactory: ChannelFactory = new ChannelFactory(options)) extends Actor {
   import MongoDBSystem._
 
   private implicit val cFactory = channelFactory
@@ -131,7 +130,8 @@ class MongoDBSystem(
         connection.send(Getnonce(nextAuth.db).maker(requestIds.getNonce.next))
         connection.copy(authenticating = Some(Authenticating(nextAuth.db, nextAuth.user, nextAuth.password, None)))
       }
-    } else connection
+    }
+    else connection
   }
 
   final def authenticateNode(node: Node, auths: Seq[Authenticate]): Node = {
@@ -185,13 +185,13 @@ class MongoDBSystem(
       val remainingConnections = nodeSet.nodes.foldLeft(0) { (open, node) =>
         open + node.connections.size
       }
-      if(logger.logger.isDebugEnabled()) {
+      if (logger.logger.isDebugEnabled()) {
         val disconnected = nodeSet.nodes.foldLeft(0) { (open, node) =>
           open + node.connections.count(_.status == ConnectionStatus.Disconnected)
         }
         logger.debug(s"(State: Closing) Received $msg, remainingConnections = $remainingConnections, disconnected = $disconnected, connected = ${remainingConnections - disconnected}")
       }
-      if(remainingConnections == 0) {
+      if (remainingConnections == 0) {
         monitors foreach (_ ! Closed)
         logger.info(s"MongoDBSystem $self is stopping.")
         context.stop(self)
@@ -199,7 +199,7 @@ class MongoDBSystem(
 
     case msg @ ChannelDisconnected(channelId) =>
       updateNodeSetOnDisconnect(channelId)
-      if(logger.logger.isDebugEnabled()) {
+      if (logger.logger.isDebugEnabled()) {
         val remainingConnections = nodeSet.nodes.foldLeft(0) { (open, node) =>
           open + node.connections.size
         }
@@ -263,7 +263,8 @@ class MongoDBSystem(
           if (request.op.expectsResponse) {
             awaitingResponses += request.requestID -> AwaitingResponse(request.requestID, connection.channel.getId(), req.promise, isGetLastError = false, isMongo26WriteOp = req.isMongo26WriteOp)
             logger.trace("registering awaiting response for requestID " + request.requestID + ", awaitingResponses: " + awaitingResponses)
-          } else logger.trace("NOT registering awaiting response for requestID " + request.requestID)
+          }
+          else logger.trace("NOT registering awaiting response for requestID " + request.requestID)
           connection.send(request)
       }
 
@@ -330,7 +331,8 @@ class MongoDBSystem(
           logger.debug("completing promise " + awaitingResponse.promise + " with error='socket disconnected'")
           awaitingResponse.promise.failure(GenericDriverException("socket disconnected"))
           false
-        } else true
+        }
+        else true
       }
       if (!nodeSet.isReachable) {
         if (nodeSetWasReachable) {
@@ -338,7 +340,8 @@ class MongoDBSystem(
           broadcastMonitors(SetUnavailable)
         }
         else logger.debug("The entire node set is still unreachable, is there a network problem?")
-      } else if (!nodeSet.primary.isDefined) {
+      }
+      else if (!nodeSet.primary.isDefined) {
         if (primaryWasAvailable) {
           logger.error("The primary is unavailable, is there a network problem?")
           broadcastMonitors(PrimaryUnavailable)
@@ -412,11 +415,11 @@ class MongoDBSystem(
             }
           }
         })*/
-      if(!nodeSetWasReachable && nodeSet.isReachable) {
+      if (!nodeSetWasReachable && nodeSet.isReachable) {
         broadcastMonitors(new SetAvailable(nodeSet.protocolMetadata))
         logger.info("The node set is now available")
       }
-      if(!primaryWasAvailable && nodeSet.primary.isDefined) {
+      if (!primaryWasAvailable && nodeSet.primary.isDefined) {
         broadcastMonitors(new PrimaryAvailable(nodeSet.protocolMetadata))
         logger.info("The primary is now available")
       }
@@ -482,7 +485,8 @@ class MongoDBSystem(
             logger.debug("{" + response.header.responseTo + "} sending a failure... (" + response.error.get + ")")
             if (response.error.get.isNotAPrimaryError) onPrimaryUnavailable()
             promise.failure(response.error.get)
-          } else if (isGetLastError) {
+          }
+          else if (isGetLastError) {
             logger.debug("{" + response.header.responseTo + "} it's a getlasterror")
             // todo, for now rewinding buffer at original index
             val ridx = response.documents.readerIndex
@@ -495,13 +499,15 @@ class MongoDBSystem(
                   logger.debug("{" + response.header.responseTo + "} sending a failure (lasterror is not ok)")
                   if (lastError.isNotAPrimaryError) onPrimaryUnavailable()
                   promise.failure(lastError)
-                } else {
+                }
+                else {
                   logger.trace("{" + response.header.responseTo + "} sending a success (lasterror is ok)")
                   response.documents.readerIndex(ridx)
                   promise.success(response)
                 }
               })
-          } else if (isMongo26WriteOp) {
+          }
+          else if (isMongo26WriteOp) {
             // TODO - logs, bson
             // MongoDB 26 Write Protocol errors
             logger.trace("received a response to a MongoDB2.6 Write Op")
@@ -513,14 +519,15 @@ class MongoDBSystem(
             logger.trace(s"{${response.header.responseTo}} ok field is: $okField")
             val processedOk = okField.collect {
               case BooleanField(_, v) => v
-              case IntField(_, v) => v != 0
-              case DoubleField(_, v) => v != 0
+              case IntField(_, v)     => v != 0
+              case DoubleField(_, v)  => v != 0
             }.getOrElse(false)
 
             if (processedOk) {
               logger.trace(s"{${response.header.responseTo}} [MongoDB26 Write Op response] sending a success!")
               promise.success(response)
-            } else {
+            }
+            else {
               logger.debug(s"{${response.header.responseTo}} [MongoDB26 Write Op response] processedOk is false! sending an error")
               val notAPrimary = fields.find(_.name == "errmsg").exists {
                 case errmsg @ LazyField(0x02, _, buf) =>
@@ -530,13 +537,14 @@ class MongoDBSystem(
                   logger.debug(s"{${response.header.responseTo}} [MongoDB26 Write Op response] errmsg is $errmsg but not interesting!")
                   false
               }
-              if(notAPrimary) {
+              if (notAPrimary) {
                 logger.debug(s"{${response.header.responseTo}} [MongoDB26 Write Op response] not a primary error!")
                 onPrimaryUnavailable()
               }
               promise.failure(new RuntimeException("not ok"))
             }
-          } else {
+          }
+          else {
             logger.trace(s"{${response.header.responseTo}} [MongoDB26 Write Op response] sending a success!")
             promise.success(response)
           }
@@ -600,7 +608,7 @@ class MongoDBSystem(
       case (_, r) if (!r.promise.isCompleted) =>
         // fail all requests waiting for a response
         r.promise.failure(Exceptions.ClosedException)
-      case _ => (/* already completed */)
+      case _ => ( /* already completed */ )
     }
 
     awaitingResponses.empty
@@ -624,9 +632,11 @@ class MongoDBSystem(
       channel.send(IsMaster().maker(id))
       if (node.pingInfo.lastIsMasterId == -1) {
         node.copy(pingInfo = node.pingInfo.copy(lastIsMasterTime = System.currentTimeMillis(), lastIsMasterId = id))
-      } else if (node.pingInfo.lastIsMasterId >= PingInfo.pingTimeout) {
+      }
+      else if (node.pingInfo.lastIsMasterId >= PingInfo.pingTimeout) {
         node.copy(pingInfo = node.pingInfo.copy(lastIsMasterTime = System.currentTimeMillis(), lastIsMasterId = id, ping = Long.MaxValue))
-      } else {
+      }
+      else {
         node
       }
     }.getOrElse {

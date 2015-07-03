@@ -15,12 +15,11 @@ case class Create(
   capped: Option[Capped] = None, // if set, "capped" -> true, size -> <int>, max -> <int>
   autoIndexId: Boolean = true, // optional
   flags: Int = 1 // defaults to 1
-) extends CollectionCommand with CommandWithResult[UnitBox.type]
+  ) extends CollectionCommand with CommandWithResult[UnitBox.type]
 
 case class Capped(
   size: Long,
-  max: Option[Int] = None
-)
+  max: Option[Int] = None)
 
 case class ConvertToCapped(
   capped: Capped) extends CollectionCommand with CommandWithResult[UnitBox.type]
@@ -75,17 +74,17 @@ import reactivemongo.api.indexes.Index
 
 /**
  * Lists the indexes of the specified collection.
- * 
+ *
  * @param db the database name
  */
 case class ListIndexes(db: String) extends CollectionCommand
-    with CommandWithResult[List[Index]]
+  with CommandWithResult[List[Index]]
 
 /**
  * Creates the given indexes on the specified collection.
- * 
+ *
  * @param db the database name
  * @param indexes the indexes to be created
  */
 case class CreateIndexes(db: String, indexes: List[Index])
-    extends CollectionCommand with CommandWithResult[WriteResult]
+  extends CollectionCommand with CommandWithResult[WriteResult]

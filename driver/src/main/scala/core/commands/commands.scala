@@ -28,7 +28,7 @@ import reactivemongo.bson.utils.Converters
 import reactivemongo.core.nodeset.NodeStatus
 
 @deprecated("consider using reactivemongo.api.commands instead", "0.11.0")
-object `package` { }
+object `package` {}
 
 /**
  * A MongoDB Command.
@@ -79,7 +79,8 @@ trait BSONCommandResultMaker[Result] extends CommandResultMaker[Result] {
     val document = Response.parse(response).next()
     try {
       apply(document)
-    } catch {
+    }
+    catch {
       case e: CommandError => Left(e)
       case e: Throwable =>
         val error = CommandError("exception while deserializing this command's result!", Some(document))
@@ -190,7 +191,7 @@ class MakableCommand(val db: String, val command: Command[_]) {
   def maker(readPreference: ReadPreference) = {
     val query = makeQuery
     val flags =
-      if(readPreference.slaveOk)
+      if (readPreference.slaveOk)
         query.flags | QueryFlags.SlaveOk
       else query.flags
     RequestMaker(query.copy(flags = flags), BufferSequence(command.makeDocuments.makeBuffer), readPreference)
@@ -608,5 +609,6 @@ case class DeleteIndex(
 
   object ResultMaker extends BSONCommandResultMaker[Int] {
     def apply(document: BSONDocument) =
-      CommandError.checkOk(document, Some("deleteIndexes")).toLeft(document.getAs[BSONNumberLike]("nIndexesWas").map(_.toInt).get) }
+      CommandError.checkOk(document, Some("deleteIndexes")).toLeft(document.getAs[BSONNumberLike]("nIndexesWas").map(_.toInt).get)
+  }
 }

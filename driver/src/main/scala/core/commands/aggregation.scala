@@ -10,8 +10,8 @@ import reactivemongo.bson._
  * @param pipeline Sequence of MongoDB aggregation operations.
  */
 case class Aggregate(
-      collectionName: String,
-      pipeline: Seq[PipelineOperator]) extends Command[Stream[BSONDocument]] {
+    collectionName: String,
+    pipeline: Seq[PipelineOperator]) extends Command[Stream[BSONDocument]] {
   override def makeDocuments =
     BSONDocument(
       "aggregate" -> BSONString(collectionName),
@@ -42,8 +42,7 @@ sealed trait PipelineOperator {
  */
 case class Project(fields: (String, BSONValue)*) extends PipelineOperator {
   override val makePipe = BSONDocument("$project" -> BSONDocument(
-    { for (field <- fields) yield field._1 -> field._2 }.toStream
-  ))
+    { for (field <- fields) yield field._1 -> field._2 }.toStream))
 }
 
 /**
@@ -105,8 +104,7 @@ case class GroupMulti(idField: (String, String)*)(ops: (String, GroupFunction)*)
   override val makePipe = Group(BSONDocument(
     idField.map {
       case (alias, attribute) => alias -> BSONString("$" + attribute)
-    }.toStream
-  ))(ops: _*).makePipe
+    }.toStream))(ops: _*).makePipe
 }
 
 /**
@@ -136,7 +134,7 @@ case class Group(identifiers: BSONValue)(ops: (String, GroupFunction)*) extends 
  */
 case class Sort(fields: Seq[SortOrder]) extends PipelineOperator {
   override val makePipe = BSONDocument("$sort" -> BSONDocument(fields.map {
-    case Ascending(field) => field -> BSONInteger(1)
+    case Ascending(field)  => field -> BSONInteger(1)
     case Descending(field) => field -> BSONInteger(-1)
   }.toStream))
 }
@@ -160,8 +158,8 @@ sealed trait GroupFunction {
 /** Factory to declare custom call to a group function. */
 object GroupFunction {
   /**
-   * Creates a call to specified group function with given argument. 
-   * 
+   * Creates a call to specified group function with given argument.
+   *
    * @param name The name of the group function (e.g. `$sum`)
    * @param arg The group function argument
    * @return A group function call defined as `{ '$name': arg }`
@@ -201,8 +199,7 @@ case class Push(field: String) extends GroupFunction {
 
 case class PushMulti(fields: (String, String)*) extends GroupFunction {
   val makeFunction = BSONDocument("$push" -> BSONDocument(
-    fields.map(field => field._1 -> BSONString("$"+field._2))
-  ))
+    fields.map(field => field._1 -> BSONString("$" + field._2))))
 }
 
 case class SumField(field: String) extends GroupFunction {

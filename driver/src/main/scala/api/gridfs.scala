@@ -23,14 +23,19 @@ import play.api.libs.iteratee.{ Enumeratee, Enumerator, Iteratee }
 
 import reactivemongo.bson._
 import reactivemongo.api.{
-  CursorProducer, DB, DBMetaCommands, BSONSerializationPack, SerializationPack
+  CursorProducer,
+  DB,
+  DBMetaCommands,
+  BSONSerializationPack,
+  SerializationPack
 }
 import reactivemongo.api.commands.WriteResult
 import reactivemongo.utils._
 import reactivemongo.core.netty.ChannelBufferWritableBuffer
 
 import reactivemongo.api.collections.{
-  GenericCollection, GenericCollectionProducer
+  GenericCollection,
+  GenericCollectionProducer
 }
 import reactivemongo.api.collections.bson.BSONCollectionProducer
 
@@ -121,15 +126,15 @@ trait ReadFile[P <: SerializationPack with Singleton, +Id] extends BasicMetadata
 
 /** A BSON implementation of `ReadFile`. */
 case class DefaultReadFile(
-  id: BSONValue,
-  contentType: Option[String],
-  filename: String,
-  uploadDate: Option[Long],
-  chunkSize: Int,
-  length: Long,
-  md5: Option[String],
-  metadata: BSONDocument,
-  original: BSONDocument) extends ReadFile[BSONSerializationPack.type, BSONValue] {
+    id: BSONValue,
+    contentType: Option[String],
+    filename: String,
+    uploadDate: Option[Long],
+    chunkSize: Int,
+    length: Long,
+    md5: Option[String],
+    metadata: BSONDocument,
+    original: BSONDocument) extends ReadFile[BSONSerializationPack.type, BSONValue] {
   val pack = BSONSerializationPack
 }
 
@@ -184,10 +189,10 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
     import java.security.MessageDigest
 
     case class Chunk(
-      previous: Array[Byte] = new Array(0),
-      n: Int = 0,
-      md: MessageDigest = MessageDigest.getInstance("MD5"),
-      length: Int = 0) {
+        previous: Array[Byte] = new Array(0),
+        n: Int = 0,
+        md: MessageDigest = MessageDigest.getInstance("MD5"),
+        length: Int = 0) {
 
       def feed(chunk: Array[Byte]): Future[Chunk] = {
         val wholeChunk = concat(previous, chunk)
@@ -198,7 +203,7 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
 
         val zipped =
           for (i <- 0 until normalizedChunkNumber)
-          yield Arrays.copyOfRange(
+            yield Arrays.copyOfRange(
             wholeChunk, i * chunkSize, (i + 1) * chunkSize) -> i
 
         val left = Arrays.copyOfRange(
@@ -217,7 +222,8 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
       }
 
       import reactivemongo.api.collections.bson.{
-        BSONCollection, BSONCollectionProducer
+        BSONCollection,
+        BSONCollectionProducer
       }
 
       def finish(): Future[ReadFile[P, Id]] = {
@@ -267,7 +273,8 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
   /** Produces an enumerator of chunks of bytes from the `chunks` collection matching the given file metadata. */
   def enumerate[Id <: pack.Value](file: ReadFile[P, Id])(implicit ctx: ExecutionContext, idProducer: IdProducer[Id]): Enumerator[Array[Byte]] = {
     import reactivemongo.api.collections.bson.{
-      BSONCollection, BSONCollectionProducer
+      BSONCollection,
+      BSONCollectionProducer
     }
     import DefaultBSONHandlers._
 
@@ -317,7 +324,8 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
    */
   def remove[Id <: pack.Value](id: Id)(implicit ctx: ExecutionContext, idProducer: IdProducer[Id]): Future[WriteResult] = {
     import reactivemongo.api.collections.bson.{
-      BSONCollection, BSONCollectionProducer
+      BSONCollection,
+      BSONCollectionProducer
     }
     import DefaultBSONHandlers._
 

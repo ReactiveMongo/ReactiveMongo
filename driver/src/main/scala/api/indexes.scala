@@ -68,18 +68,18 @@ object IndexType {
   }
 
   def apply(value: BSONValue) = value match {
-    case BSONInteger(i) if i > 0 => Ascending
-    case BSONInteger(i) if i < 0 => Descending
-    case BSONDouble(i) if i > 0 => Ascending
-    case BSONDouble(i) if i < 0 => Descending
-    case BSONLong(i) if i > 0 => Ascending
-    case BSONLong(i) if i < 0 => Descending
-    case BSONString(s) if s == "2d" => Geo2D
-    case BSONString(s) if s == "2dsphere" => Geo2DSpherical
+    case BSONInteger(i) if i > 0             => Ascending
+    case BSONInteger(i) if i < 0             => Descending
+    case BSONDouble(i) if i > 0              => Ascending
+    case BSONDouble(i) if i < 0              => Descending
+    case BSONLong(i) if i > 0                => Ascending
+    case BSONLong(i) if i < 0                => Descending
+    case BSONString(s) if s == "2d"          => Geo2D
+    case BSONString(s) if s == "2dsphere"    => Geo2DSpherical
     case BSONString(s) if s == "geoHaystack" => GeoHaystack
-    case BSONString(s) if s == "hashed" => Hashed
-    case BSONString(s) if s == "text" => Text
-    case _ => throw new IllegalArgumentException("unsupported index type")
+    case BSONString(s) if s == "hashed"      => Hashed
+    case BSONString(s) if s == "text"        => Text
+    case _                                   => throw new IllegalArgumentException("unsupported index type")
   }
 }
 
@@ -98,15 +98,15 @@ object IndexType {
  * @param options Optional parameters for this index (typically specific to an IndexType like Geo2D).
  */
 case class Index(
-  key: Seq[(String, IndexType)],
-  name: Option[String] = None,
-  unique: Boolean = false,
-  background: Boolean = false,
-  dropDups: Boolean = false, // Deprecated since 2.6, TODO: Remove
-  sparse: Boolean = false,
-  version: Option[Int] = None, // let MongoDB decide
-  // TODO: storageEngine (new for Mongo3)
-  options: BSONDocument = BSONDocument()) {
+    key: Seq[(String, IndexType)],
+    name: Option[String] = None,
+    unique: Boolean = false,
+    background: Boolean = false,
+    dropDups: Boolean = false, // Deprecated since 2.6, TODO: Remove
+    sparse: Boolean = false,
+    version: Option[Int] = None, // let MongoDB decide
+    // TODO: storageEngine (new for Mongo3)
+    options: BSONDocument = BSONDocument()) {
   /** The name of the index (a default one is computed if none). */
   lazy val eventualName: String = name.getOrElse(key.foldLeft("") { (name, kv) =>
     name + (if (name.length > 0) "_" else "") + kv._1 + "_" + kv._2.valueStr
@@ -205,7 +205,7 @@ sealed trait IndexesManager {
  * @param db The subject database.
  */
 final class LegacyIndexesManager(db: DB)(
-  implicit context: ExecutionContext) extends IndexesManager {
+    implicit context: ExecutionContext) extends IndexesManager {
 
   val collection = db("system.indexes")
 
@@ -236,7 +236,7 @@ final class LegacyIndexesManager(db: DB)(
 
   def dropAll(collectionName: String): Future[Int] = drop(collectionName, "*")
 
-  def onCollection(name: String): CollectionIndexesManager = 
+  def onCollection(name: String): CollectionIndexesManager =
     new LegacyCollectionIndexesManager(db.name, name, this)
 }
 
@@ -246,7 +246,7 @@ final class LegacyIndexesManager(db: DB)(
  * @param db The subject database.
  */
 final class DefaultIndexesManager(db: DB with DBMetaCommands)(
-  implicit context: ExecutionContext) extends IndexesManager {
+    implicit context: ExecutionContext) extends IndexesManager {
 
   import reactivemongo.api.commands.ListIndexes
   import reactivemongo.api.commands.bson.BSONListIndexesImplicits._
@@ -257,7 +257,7 @@ final class DefaultIndexesManager(db: DB with DBMetaCommands)(
     case _ => Future.successful(indexes)
   }
 
-  def list(): Future[List[NSIndex]] = 
+  def list(): Future[List[NSIndex]] =
     db.collectionNames.flatMap(listIndexes(_, Nil))
 
   def ensure(nsIndex: NSIndex): Future[Boolean] =
@@ -272,7 +272,7 @@ final class DefaultIndexesManager(db: DB with DBMetaCommands)(
   def dropAll(collectionName: String): Future[Int] =
     onCollection(collectionName).dropAll()
 
-  def onCollection(name: String): CollectionIndexesManager = 
+  def onCollection(name: String): CollectionIndexesManager =
     new DefaultCollectionIndexesManager(db, name)
 }
 
@@ -339,12 +339,12 @@ sealed trait CollectionIndexesManager {
 }
 
 private class LegacyCollectionIndexesManager(
-  db: String, collectionName: String, legacy: LegacyIndexesManager)(
-  implicit context: ExecutionContext) extends CollectionIndexesManager {
+    db: String, collectionName: String, legacy: LegacyIndexesManager)(
+        implicit context: ExecutionContext) extends CollectionIndexesManager {
 
   val fqName = db + "." + collectionName
 
-  def list(): Future[List[Index]] = 
+  def list(): Future[List[Index]] =
     legacy.list.map(_.filter(_.namespace == fqName).map(_.index))
 
   def ensure(index: Index): Future[Boolean] =
@@ -359,7 +359,7 @@ private class LegacyCollectionIndexesManager(
   @deprecated("Use drop instead", "0.11.0")
   def delete(name: String) = drop(name)
 
-  @deprecated("Use [[IndexesManager.drop]]", "0.11.0")  
+  @deprecated("Use [[IndexesManager.drop]]", "0.11.0")
   def drop(nsIndex: NSIndex): Future[Int] = legacy.drop(nsIndex)
 
   def drop(indexName: String): Future[Int] =
@@ -369,10 +369,12 @@ private class LegacyCollectionIndexesManager(
 }
 
 private class DefaultCollectionIndexesManager(db: DB, collectionName: String)(
-  implicit context: ExecutionContext) extends CollectionIndexesManager {
+    implicit context: ExecutionContext) extends CollectionIndexesManager {
 
   import reactivemongo.api.commands.{
-    CreateIndexes, Command, ListIndexes
+    CreateIndexes,
+    Command,
+    ListIndexes
   }
   import reactivemongo.api.commands.bson.BSONListIndexesImplicits._
   import reactivemongo.api.commands.bson.BSONCreateIndexesImplicits._
@@ -380,9 +382,9 @@ private class DefaultCollectionIndexesManager(db: DB, collectionName: String)(
   private lazy val collection = db(collectionName)
   private lazy val listCommand = ListIndexes(db.name)
 
-  def list(): Future[List[Index]] = 
+  def list(): Future[List[Index]] =
     Command.run(BSONSerializationPack)(collection, listCommand) recoverWith {
-      case err: WriteResult if err.code.exists(_ == 26/* no database */) =>
+      case err: WriteResult if err.code.exists(_ == 26 /* no database */ ) =>
         Future.successful(List.empty[Index])
 
       case err => Future.failed(err)
@@ -407,7 +409,7 @@ private class DefaultCollectionIndexesManager(db: DB, collectionName: String)(
   def drop(nsIndex: NSIndex): Future[Int] = {
     import reactivemongo.api.commands.bson.BSONDropIndexesImplicits._
     Command.run(BSONSerializationPack)(
-    db(nsIndex.collectionName), DropIndexes(nsIndex.index.eventualName)).
+      db(nsIndex.collectionName), DropIndexes(nsIndex.index.eventualName)).
       map(_.value)
   }
 
@@ -424,7 +426,7 @@ private class DefaultCollectionIndexesManager(db: DB, collectionName: String)(
 object CollectionIndexesManager {
   /**
    * Returns an indexes manager for specified collection.
-   * 
+   *
    * @param db the database
    * @param collectionName the collection name
    */
@@ -433,7 +435,8 @@ object CollectionIndexesManager {
 
     if (wireVer.exists(_ == MongoWireVersion.V30)) {
       new DefaultCollectionIndexesManager(db, collectionName)
-    } else new LegacyCollectionIndexesManager(db.name, collectionName,
+    }
+    else new LegacyCollectionIndexesManager(db.name, collectionName,
       new LegacyIndexesManager(db))
   }
 }
@@ -441,7 +444,7 @@ object CollectionIndexesManager {
 object IndexesManager {
   /**
    * Returns an indexes manager for specified database.
-   * 
+   *
    * @param db the database
    */
   def apply(db: DB with DBMetaCommands)(implicit context: ExecutionContext): IndexesManager = {
@@ -450,7 +453,7 @@ object IndexesManager {
     if (wireVer.exists(_ == MongoWireVersion.V30)) new DefaultIndexesManager(db)
     else new LegacyIndexesManager(db)
   }
-  
+
   protected def toBSONDocument(nsIndex: NSIndex) = {
     BSONDocument(
       "ns" -> BSONString(nsIndex.namespace),
@@ -479,9 +482,9 @@ object IndexesManager {
       fold[Index](throw new Exception("the key must be defined")) { key =>
         val options = doc.elements.filterNot { element =>
           element._1 == "ns" || element._1 == "key" || element._1 == "name" ||
-          element._1 == "unique" || element._1 == "background" ||
-          element._1 == "dropDups" || element._1 == "sparse" ||
-          element._1 == "v"
+            element._1 == "unique" || element._1 == "background" ||
+            element._1 == "dropDups" || element._1 == "sparse" ||
+            element._1 == "v"
         }.toSeq
 
         Index(key,
@@ -492,7 +495,7 @@ object IndexesManager {
           doc.getAs[BSONBoolean]("dropDups").map(_.value).getOrElse(false),
           doc.getAs[BSONBoolean]("sparse").map(_.value).getOrElse(false),
           doc.getAs[BSONNumberLike]("v").map(_.toInt),
-          BSONDocument(options.toStream))        
+          BSONDocument(options.toStream))
       }
   }
 
@@ -500,6 +503,6 @@ object IndexesManager {
     def read(doc: BSONDocument): NSIndex =
       doc.getAs[BSONString]("ns").map(_.value).fold[NSIndex](
         throw new Exception("the namespace ns must be defined"))(
-        NSIndex(_, doc.as[Index]))
+          NSIndex(_, doc.as[Index]))
   }
 }

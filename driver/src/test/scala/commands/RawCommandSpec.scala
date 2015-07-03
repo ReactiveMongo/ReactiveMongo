@@ -5,7 +5,7 @@ import reactivemongo.api.commands.Command
 
 object RawCommandSpec extends org.specs2.mutable.Specification {
   "Raw command" title
-  
+
   import Common._
 
   sequential

@@ -54,16 +54,16 @@ case class BSONCollection(val db: DB, val name: String, val failoverStrategy: Fa
 }
 
 case class BSONQueryBuilder(
-  collection: Collection,
-  failover: FailoverStrategy,
-  queryOption: Option[BSONDocument] = None,
-  sortOption: Option[BSONDocument] = None,
-  projectionOption: Option[BSONDocument] = None,
-  hintOption: Option[BSONDocument] = None,
-  explainFlag: Boolean = false,
-  snapshotFlag: Boolean = false,
-  commentString: Option[String] = None,
-  options: QueryOpts = QueryOpts()) extends GenericQueryBuilder[BSONSerializationPack.type] {
+    collection: Collection,
+    failover: FailoverStrategy,
+    queryOption: Option[BSONDocument] = None,
+    sortOption: Option[BSONDocument] = None,
+    projectionOption: Option[BSONDocument] = None,
+    hintOption: Option[BSONDocument] = None,
+    explainFlag: Boolean = false,
+    snapshotFlag: Boolean = false,
+    commentString: Option[String] = None,
+    options: QueryOpts = QueryOpts()) extends GenericQueryBuilder[BSONSerializationPack.type] {
   import reactivemongo.utils.option
 
   type Self = BSONQueryBuilder
@@ -97,8 +97,7 @@ case class BSONQueryBuilder(
       commentString.map { "$comment" -> BSONString(_) },
       option(explainFlag, "$explain" -> BSONBoolean(true)),
       option(snapshotFlag, "$snapshot" -> BSONBoolean(true)),
-      readPreferenceDocument.map { "$readPreference" -> _ }
-    ).flatten
+      readPreferenceDocument.map { "$readPreference" -> _ }).flatten
     val query = queryOption.getOrElse(BSONDocument())
     if (optionalFields.isEmpty)
       query

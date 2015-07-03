@@ -23,9 +23,9 @@ package reactivemongo.api
  * {{{
  * import reactivemongo.bson._
  * import reactivemongo.api.collections.bson.BSONCollection
- * 
+ *
  * object Samples {
- * 
+ *
  *   val connection = MongoConnection(List("localhost"))
  *
  *   // Gets a reference to the database "plugin"

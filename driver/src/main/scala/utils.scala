@@ -59,7 +59,7 @@ case class EitherMappableFuture[A](future: Future[A]) {
   def mapEither[E <: Throwable, B](f: A => Either[E, B])(implicit ec: ExecutionContext) = {
     future.flatMap(
       f(_) match {
-        case Left(e) => Future.failed(e)
+        case Left(e)  => Future.failed(e)
         case Right(b) => Future.successful(b)
       })
   }

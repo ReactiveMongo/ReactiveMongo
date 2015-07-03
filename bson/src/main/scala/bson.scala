@@ -20,7 +20,7 @@ package reactivemongo.bson
  * // { "name": "Johny", "surname": "Doe", "age": 28, "months": [1, 2, 3] }
  * document ++ ("name" -> "Johny") ++ ("surname" -> "Doe") ++
  * ("age" -> 28) ++ ("months" -> array(1, 2, 3))
- * 
+ *
  * // { "_id": generatedId, "name": "Jane", "surname": "Doe", "age": 28,
  * //   "months": [1, 2, 3], "details": { "salary": 12345,
  * //   "inventory": ["foo", 7.8, 0, false] } }

@@ -18,8 +18,8 @@ object IndexesSpec extends Specification with Tags {
 
   "ReactiveMongo Geo Indexes" should {
     "insert some points" in {
-      val futs = for(i <- 1 until 10)
-      yield geo.insert(BSONDocument("loc" -> BSONArray( BSONDouble(i + 2), BSONDouble(i * 2) )))
+      val futs = for (i <- 1 until 10)
+        yield geo.insert(BSONDocument("loc" -> BSONArray(BSONDouble(i + 2), BSONDouble(i * 2))))
 
       Future.sequence(futs) must not(throwA[Throwable]).await(timeoutMillis)
     }
@@ -30,17 +30,16 @@ object IndexesSpec extends Specification with Tags {
         options = BSONDocument(
           "min" -> BSONInteger(-95),
           "max" -> BSONInteger(95),
-          "bits" -> BSONInteger(28)
-        )
-      )) aka "index" must beTrue.await(timeoutMillis)
+          "bits" -> BSONInteger(28)))) aka "index" must beTrue.await(timeoutMillis)
     }
 
     "fail to insert some points out of range" in {
-      val future = geo.insert(BSONDocument("loc" -> BSONArray( BSONDouble(27.88), BSONDouble(97.21) )))
+      val future = geo.insert(BSONDocument("loc" -> BSONArray(BSONDouble(27.88), BSONDouble(97.21))))
       try {
         Await.result(future, timeout)
         failure
-      } catch {
+      }
+      catch {
         case e: DatabaseException =>
           e.code mustEqual Some(13027) // MongoError['point not in interval of [ -95, 95 )' (code = 13027)]
       }
@@ -65,11 +64,10 @@ object IndexesSpec extends Specification with Tags {
   "ReactiveMongo Geo2D indexes" should {
 
     "insert some points" in {
-      val futs = for(i <- 1 until 10)
-      yield geo2DSpherical.insert(BSONDocument("loc" -> BSONDocument(
-          "type" -> BSONString("Point"),
-          "coordinates" -> BSONArray( BSONDouble(i + 2), BSONDouble(i * 2) )
-        )))
+      val futs = for (i <- 1 until 10)
+        yield geo2DSpherical.insert(BSONDocument("loc" -> BSONDocument(
+        "type" -> BSONString("Point"),
+        "coordinates" -> BSONArray(BSONDouble(i + 2), BSONDouble(i * 2)))))
       val fut = Future.sequence(futs)
       Await.result(fut, timeout)
       success
@@ -78,26 +76,24 @@ object IndexesSpec extends Specification with Tags {
     "make index" in {
       val created = geo2DSpherical.indexesManager.ensure(
         Index(
-          List("loc" -> Geo2DSpherical)
-        )
-      )
+          List("loc" -> Geo2DSpherical)))
       Await.result(created, timeout) mustEqual true
     }
 
     "fail to insert a point out of range" in {
       val future = geo2DSpherical.insert(BSONDocument("loc" -> BSONDocument(
         "type" -> BSONString("Point"),
-        "coordinates" -> BSONArray( BSONDouble(-195), BSONDouble(25) )
-      )))
+        "coordinates" -> BSONArray(BSONDouble(-195), BSONDouble(25)))))
       try {
         val result = Await.result(future, timeout)
         println(s"\n\n \tPOOR: $result \n\n")
         failure
-      } catch {
+      }
+      catch {
         case e: DatabaseException =>
           e.code.exists(code => code == 16572 || code == 16755) mustEqual true
-          // MongoError['Can't extract geo keys from object, malformed geometry?' (code = 16572)] (< 2.4)
-          // 16755 Can't extract geo keys from object, malformed geometry? (2.6)
+        // MongoError['Can't extract geo keys from object, malformed geometry?' (code = 16572)] (< 2.4)
+        // 16755 Can't extract geo keys from object, malformed geometry? (2.6)
         case NonFatal(e) =>
           e.printStackTrace()
           throw e
@@ -120,12 +116,12 @@ object IndexesSpec extends Specification with Tags {
 
   "ReactiveMongo Hashed indexes" should {
     "insert some data" in { // With WiredTiger, collection must exist before
-      val futs = for(i <- 1 until 10)
-      yield hashed.insert(BSONDocument("field" -> s"data-$i"))
+      val futs = for (i <- 1 until 10)
+        yield hashed.insert(BSONDocument("field" -> s"data-$i"))
 
       Future.sequence(futs) must not(throwA[Throwable]).await(timeoutMillis)
     }
-    
+
     "make index" in {
       hashed.indexesManager.ensure(Index(List("field" -> Hashed))).
         aka("index") must beTrue.await(timeoutMillis)

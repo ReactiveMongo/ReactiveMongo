@@ -11,8 +11,7 @@ case class GetLastError(
   w: GetLastError.W,
   j: Boolean,
   fsync: Boolean,
-  wtimeout: Option[Int] = None
-) extends Command with CommandWithResult[LastError]
+  wtimeout: Option[Int] = None) extends Command with CommandWithResult[LastError]
 object GetLastError {
   sealed trait W
   case object Majority extends W
@@ -30,26 +29,25 @@ object GetLastError {
   val Journaled: GetLastError =
     GetLastError(WaitForAknowledgments(1), true, false, None)
   def ReplicaAcknowledged(n: Int, timeout: Int, journaled: Boolean): GetLastError =
-    GetLastError(WaitForAknowledgments(if(n < 2) 2 else n), journaled, false, (if(timeout <= 0) None else Some(timeout)))
+    GetLastError(WaitForAknowledgments(if (n < 2) 2 else n), journaled, false, (if (timeout <= 0) None else Some(timeout)))
   def TagReplicaAcknowledged(tag: String, timeout: Int, journaled: Boolean): GetLastError =
-    GetLastError(TagSet(tag), journaled, false, (if(timeout <= 0) None else Some(timeout)))
+    GetLastError(TagSet(tag), journaled, false, (if (timeout <= 0) None else Some(timeout)))
 
   def Default: GetLastError = Acknowledged
 }
 case class LastError(
-  ok: Boolean,
-  err: Option[String],
-  code: Option[Int],
-  lastOp: Option[Long],
-  n: Int,
-  singleShard: Option[String], // string?
-  updatedExisting: Boolean,
-  upserted: Option[BSONObjectID],
-  wnote: Option[WriteConcern.W],
-  wtimeout: Boolean,
-  waited: Option[Int],
-  wtime: Option[Int]
-) extends WriteResult {
+    ok: Boolean,
+    err: Option[String],
+    code: Option[Int],
+    lastOp: Option[Long],
+    n: Int,
+    singleShard: Option[String], // string?
+    updatedExisting: Boolean,
+    upserted: Option[BSONObjectID],
+    wnote: Option[WriteConcern.W],
+    wtimeout: Boolean,
+    waited: Option[Int],
+    wtime: Option[Int]) extends WriteResult {
   def writeErrors: Seq[WriteError] = Seq.empty
   def writeConcernError: Option[WriteConcernError] = None
   def errmsg = err
@@ -84,15 +82,14 @@ case class WriteConcernError(
   errmsg: String)
 
 case class DefaultWriteResult(
-  ok: Boolean,
-  n: Int,
-  writeErrors: Seq[WriteError],
-  writeConcernError: Option[WriteConcernError],
-  code: Option[Int],
-  errmsg: Option[String]
-) extends WriteResult {
+    ok: Boolean,
+    n: Int,
+    writeErrors: Seq[WriteError],
+    writeConcernError: Option[WriteConcernError],
+    code: Option[Int],
+    errmsg: Option[String]) extends WriteResult {
   def flatten =
-    if(!writeErrors.isEmpty)
+    if (!writeErrors.isEmpty)
       DefaultWriteResult(
         ok = false,
         n = n,
@@ -108,15 +105,14 @@ case class Upserted(
   _id: Any) // TODO
 
 case class UpdateWriteResult(
-  ok: Boolean,
-  n: Int,
-  nModified: Int,
-  upserted: Seq[Upserted],
-  writeErrors: Seq[WriteError],
-  writeConcernError: Option[WriteConcernError],
-  code: Option[Int],
-  errmsg: Option[String]
-) extends WriteResult {
+    ok: Boolean,
+    n: Int,
+    nModified: Int,
+    upserted: Seq[Upserted],
+    writeErrors: Seq[WriteError],
+    writeConcernError: Option[WriteConcernError],
+    code: Option[Int],
+    errmsg: Option[String]) extends WriteResult {
   def flatten = if (!writeErrors.isEmpty) {
     UpdateWriteResult(
       ok = false,
@@ -127,7 +123,8 @@ case class UpdateWriteResult(
       writeConcernError = writeConcernError,
       code = code.orElse(Some(writeErrors.head.code)),
       errmsg = errmsg.orElse(Some(writeErrors.head.errmsg)))
-  } else this
+  }
+  else this
 }
 
 object MultiBulkWriteResult {
@@ -138,27 +135,26 @@ object MultiBulkWriteResult {
 }
 
 case class MultiBulkWriteResult(
-  ok: Boolean,
-  n: Int,
-  nModified: Int,
-  upserted: Seq[Upserted],
-  writeErrors: Seq[WriteError],
-  writeConcernError: Option[WriteConcernError], // TODO ?
-  code: Option[Int],
-  errmsg: Option[String],
-  totalN: Int
-) {
+    ok: Boolean,
+    n: Int,
+    nModified: Int,
+    upserted: Seq[Upserted],
+    writeErrors: Seq[WriteError],
+    writeConcernError: Option[WriteConcernError], // TODO ?
+    code: Option[Int],
+    errmsg: Option[String],
+    totalN: Int) {
   def merge(wr: WriteResult): MultiBulkWriteResult = wr match {
     case wr: UpdateWriteResult => MultiBulkWriteResult(
-        ok = ok && wr.ok,
-        n = n + wr.n,
-        writeErrors = writeErrors ++ wr.writeErrors.map(e => e.copy(index = e.index + totalN)),
-        writeConcernError = writeConcernError.orElse(wr.writeConcernError),
-        code = code.orElse(wr.code),
-        errmsg = errmsg.orElse(wr.errmsg),
-        nModified = wr.nModified,
-        upserted = wr.upserted,
-        totalN = totalN + wr.n + wr.writeErrors.size)
+      ok = ok && wr.ok,
+      n = n + wr.n,
+      writeErrors = writeErrors ++ wr.writeErrors.map(e => e.copy(index = e.index + totalN)),
+      writeConcernError = writeConcernError.orElse(wr.writeConcernError),
+      code = code.orElse(wr.code),
+      errmsg = errmsg.orElse(wr.errmsg),
+      nModified = wr.nModified,
+      upserted = wr.upserted,
+      totalN = totalN + wr.n + wr.writeErrors.size)
     case _ =>
       MultiBulkWriteResult(
         ok = ok && wr.ok,

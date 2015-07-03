@@ -38,8 +38,8 @@ class Types extends Specification {
     "be empty" in {
       BSONDocument().elements must beEmpty and (
         BSONDocument.empty.elements must beEmpty) and (
-        document.elements must beEmpty) and (
-        document().elements must beEmpty)
+          document.elements must beEmpty) and (
+            document().elements must beEmpty)
     }
 
     "be created with a new element " in {
@@ -59,8 +59,8 @@ class Types extends Specification {
     "be empty" in {
       BSONArray().values must beEmpty and (
         BSONArray.empty.values must beEmpty) and (
-        array.values must beEmpty) and (
-        array().values must beEmpty)
+          array.values must beEmpty) and (
+            array().values must beEmpty)
 
     }
 
@@ -72,7 +72,7 @@ class Types extends Specification {
 
   "BSONBinary" should {
     "be read as byte array" in {
-      val bytes = Array[Byte](1,2,3)
+      val bytes = Array[Byte](1, 2, 3)
       val bson = BSONBinary(bytes, Subtype.GenericBinarySubtype)
 
       bson.byteArray must_== bytes
@@ -85,7 +85,7 @@ class Types extends Specification {
 
       ts.value aka "raw value" must_== 6065270725701271558L and (
         ts.time aka "time" must_== 1412180887L) and (
-        ts.ordinal aka "ordinal" must_== 6)
+          ts.ordinal aka "ordinal" must_== 6)
     }
   }
 }

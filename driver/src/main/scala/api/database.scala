@@ -95,19 +95,13 @@ trait GenericDB[P <: SerializationPack with Singleton] { self: DB =>
 
   def runner = Command.run(pack)
 
-  def runCommand[R, C <: Command with CommandWithResult[R]]
-    (command: C with CommandWithResult[R])
-    (implicit writer: pack.Writer[C], reader: pack.Reader[R], ec: ExecutionContext): Future[R] =
+  def runCommand[R, C <: Command with CommandWithResult[R]](command: C with CommandWithResult[R])(implicit writer: pack.Writer[C], reader: pack.Reader[R], ec: ExecutionContext): Future[R] =
     runner(self, command)
 
-  def runCommand[C <: Command]
-    (command: C)
-    (implicit writer: pack.Writer[C]): CursorFetcher[pack.type, Cursor] =
+  def runCommand[C <: Command](command: C)(implicit writer: pack.Writer[C]): CursorFetcher[pack.type, Cursor] =
     runner(self, command)
 
-  def runValueCommand[A <: AnyVal, R <: BoxedAnyVal[A], C <: Command with CommandWithResult[R]]
-    (command: C with CommandWithResult[R with BoxedAnyVal[A]])
-    (implicit writer: pack.Writer[C], reader: pack.Reader[R], ec: ExecutionContext): Future[A] =
+  def runValueCommand[A <: AnyVal, R <: BoxedAnyVal[A], C <: Command with CommandWithResult[R]](command: C with CommandWithResult[R with BoxedAnyVal[A]])(implicit writer: pack.Writer[C], reader: pack.Reader[R], ec: ExecutionContext): Future[A] =
     runner.unboxed(self, command)
 }
 
@@ -117,7 +111,9 @@ trait DBMetaCommands {
 
   import reactivemongo.core.protocol.MongoWireVersion
   import reactivemongo.api.commands.{
-    Command, DropDatabase, ListCollectionNames
+    Command,
+    DropDatabase,
+    ListCollectionNames
   }
   import reactivemongo.api.commands.bson.{ CommonImplicits, BSONDropDatabaseImplicits }
   import reactivemongo.api.commands.bson.BSONListCollectionNamesImplicits._
@@ -148,14 +144,15 @@ trait DBMetaCommands {
 
     if (wireVer.exists(_ == MongoWireVersion.V30)) {
       Command.run(BSONSerializationPack)(self, ListCollectionNames).map(_.names)
-    } else collection("system.namespaces").as[BSONCollection]()
+    }
+    else collection("system.namespaces").as[BSONCollection]()
       .find(BSONDocument(
         "name" -> BSONRegex("^[^\\$]+$", "") // strip off any indexes
-      )).cursor(collectionNameReader, ec, CursorProducer.defaultCursorProducer).
+        )).cursor(collectionNameReader, ec, CursorProducer.defaultCursorProducer).
       collect[List]()
   }
 
-/* // TODO
+  /* // TODO
   /**
    * Execute MongoDB eval command and return the result
    * @param javascript javascript code for evaluation
@@ -169,9 +166,9 @@ trait DBMetaCommands {
 
 /** The default DB implementation, that mixes in the database traits. */
 case class DefaultDB(
-  name: String,
-  connection: MongoConnection,
-  failoverStrategy: FailoverStrategy = FailoverStrategy()) extends DB with DBMetaCommands with GenericDB[BSONSerializationPack.type] {
+    name: String,
+    connection: MongoConnection,
+    failoverStrategy: FailoverStrategy = FailoverStrategy()) extends DB with DBMetaCommands with GenericDB[BSONSerializationPack.type] {
 
   val pack: BSONSerializationPack.type = BSONSerializationPack
 }

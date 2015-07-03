@@ -269,7 +269,8 @@ case class Response(
       if (bson.hasNext)
         Some(ReactiveMongoException(bson.next))
       else None
-    } else None
+    }
+    else None
   }
 }
 
@@ -313,7 +314,7 @@ object MongoWireVersion {
   object V26 extends MongoWireVersion { val value = 2 }
   object V30 extends MongoWireVersion { val value = 3 }
 
-  def apply(v: Int): MongoWireVersion = 
+  def apply(v: Int): MongoWireVersion =
     if (v >= V30.value) V30
     else if (v >= V26.value) V26
     else V24AndBefore
@@ -324,7 +325,7 @@ object MongoWireVersion {
 // protocol handlers for netty.
 private[reactivemongo] class RequestEncoder extends OneToOneEncoder {
   import RequestEncoder._
-  def encode(ctx: ChannelHandlerContext, channel: Channel, obj: Object) = 
+  def encode(ctx: ChannelHandlerContext, channel: Channel, obj: Object) =
     obj match {
       case message: Request => {
         val buffer: ChannelBuffer = ChannelBuffers.buffer(ByteOrder.LITTLE_ENDIAN, message.size) //ChannelBuffers.dynamicBuffer(ByteOrder.LITTLE_ENDIAN, 1000)
@@ -339,14 +340,15 @@ private[reactivemongo] class RequestEncoder extends OneToOneEncoder {
 
 }
 
-object ReplyDocumentIterator  {
+object ReplyDocumentIterator {
   def apply[P <: SerializationPack, A](pack: P)(reply: Reply, buffer: ChannelBuffer)(implicit reader: pack.Reader[A]): Iterator[A] = new Iterator[A] {
     override def hasNext = buffer.readable
     override def next =
       try {
         val cbrb = ChannelBufferReadableBuffer(buffer.readBytes(buffer.getInt(buffer.readerIndex)))
         pack.readAndDeserialize(cbrb, reader)
-      } catch {
+      }
+      catch {
         case e: IndexOutOfBoundsException =>
           /*
            * If this happens, the buffer is exhausted, and there is probably a bug.

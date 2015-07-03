@@ -18,5 +18,6 @@ object Common {
 
   def closeDriver(): Unit = try {
     driver.close()
-  } catch { case _: Throwable => () }
+  }
+  catch { case _: Throwable => () }
 }

@@ -37,7 +37,7 @@ trait AggregationFramework[P <: SerializationPack] {
   trait DocumentStage { self: PipelineStage =>
     def document: P#Document
   }
-  trait DocumentStageCompanion[D <: DocumentStage] extends (P#Document => D) { self: Singleton  =>
+  trait DocumentStageCompanion[D <: DocumentStage] extends (P#Document => D) { self: Singleton =>
     def apply(doc: P#Document): D
     def apply[A](a: A)(implicit writer: P#Writer[A]): D = apply(??? : P#Document)
   }
@@ -52,7 +52,7 @@ trait AggregationFramework[P <: SerializationPack] {
   }
   object Match extends DocumentStageCompanion[Match]
 
-  case class Redact(document: P#Document) extends PipelineStage with DocumentStage {  // mongo 2.6
+  case class Redact(document: P#Document) extends PipelineStage with DocumentStage { // mongo 2.6
     final def name = "$redact"
   }
   object Redact extends DocumentStageCompanion[Redact]
@@ -63,12 +63,12 @@ trait AggregationFramework[P <: SerializationPack] {
 
   class Unwind(field: String) extends PipelineStage {
     final def name = "$unwind"
-    val prefixedField = if(field.startsWith("$")) field else ("$" + field)
+    val prefixedField = if (field.startsWith("$")) field else ("$" + field)
     override def equals(any: Any) = any match {
       case Unwind(p) => p == prefixedField
-      case _ => false
+      case _         => false
     }
-    override def hashCode =  41 * (41 + prefixedField.hashCode)
+    override def hashCode = 41 * (41 + prefixedField.hashCode)
   }
   object Unwind {
     def apply(field: String): Unwind = new Unwind(field)

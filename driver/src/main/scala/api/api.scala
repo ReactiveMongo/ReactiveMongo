@@ -28,7 +28,7 @@ import reactivemongo.core.protocol._
 import reactivemongo.core.commands.SuccessfulAuthentication
 import reactivemongo.utils.LazyLogger
 import scala.collection.mutable
-import scala.concurrent.{Await, ExecutionContext, Future, Promise}
+import scala.concurrent.{ Await, ExecutionContext, Future, Promise }
 import scala.concurrent.duration._
 import scala.util.{ Try, Failure, Success }
 import scala.util.control.NoStackTrace
@@ -67,7 +67,8 @@ class Failover[T](message: T, connection: MongoConnection, strategy: FailoverStr
           val delay = Duration.unapply(strategy.initialDelay * delayFactor).map(t => FiniteDuration(t._1, t._2)).getOrElse(strategy.initialDelay)
           logger.debug("Got an error, retrying... (try #" + `try` + " is scheduled in " + delay.toMillis + " ms)", e)
           connection.actorSystem.scheduler.scheduleOnce(delay)(send(`try`))
-        } else {
+        }
+        else {
           // generally that means that the primary is not available or the nodeset is unreachable
           logger.error("Got an error, no more attempts to do. Completing with a failure...", e)
           promise.failure(e)
@@ -111,7 +112,8 @@ class Failover2[A](producer: () => Future[A], connection: MongoConnection, strat
           val delay = Duration.unapply(strategy.initialDelay * delayFactor).map(t => FiniteDuration(t._1, t._2)).getOrElse(strategy.initialDelay)
           logger.debug("Got an error, retrying... (try #" + `try` + " is scheduled in " + delay.toMillis + " ms)", e)
           connection.actorSystem.scheduler.scheduleOnce(delay)(send(`try`))
-        } else {
+        }
+        else {
           // generally that means that the primary is not available or the nodeset is unreachable
           logger.error("Got an error, no more attempts to do. Completing with a failure...", e)
           promise.failure(e)
@@ -335,7 +337,8 @@ class MongoConnection(
         else if (primaryAvailable && metadata.isDefined) {
           logger.debug(sender + " is waiting for a primary... available right now, go!")
           sender ! PrimaryAvailable(metadata.get)
-        } else {
+        }
+        else {
           logger.debug(sender + " is waiting for a primary...  not available, warning as soon a primary is available.")
           waitingForPrimary += sender
         }
@@ -400,7 +403,8 @@ object MongoConnection {
               if (p > 0 && p < 65536)
                 p
               else throw new URIParsingException(s"Could not parse URI '$uri': invalid port '$port'")
-            } catch {
+            }
+            catch {
               case _: NumberFormatException => throw new URIParsingException(s"Could not parse URI '$uri': invalid port '$port'")
               case NonFatal(e)              => throw e
             }
@@ -418,29 +422,30 @@ object MongoConnection {
     }
     def parseOptions(uriAndOptions: String): Map[String, String] = {
       uriAndOptions.split('?').toList match {
-        case uri :: options :: Nil => options.split("&").map{ option =>
+        case uri :: options :: Nil => options.split("&").map { option =>
           option.split("=").toList match {
             case key :: value :: Nil => (key -> value)
-            case _ => throw new URIParsingException(s"Could not parse URI '$uri': invalid options '$options'")
+            case _                   => throw new URIParsingException(s"Could not parse URI '$uri': invalid options '$options'")
           }
         }.toMap
         case _ => Map.empty
       }
     }
     def makeOptions(opts: Map[String, String]): (List[String], MongoConnectionOptions) = {
-      opts.iterator.foldLeft(List.empty[String] -> MongoConnectionOptions()) { case ((unsupportedKeys, result), kv) =>
-        kv match {
-          case ("authSource", v)           => unsupportedKeys -> result.copy(authSource = Some(v))
-          case ("connectTimeoutMS", v)     => unsupportedKeys -> result.copy(connectTimeoutMS = v.toInt)
-          case ("sslEnabled", v)           => unsupportedKeys -> result.copy(sslEnabled = v.toBoolean)
-          case ("sslAllowsInvalidCert", v) => unsupportedKeys -> result.copy(sslAllowsInvalidCert = v.toBoolean)            
+      opts.iterator.foldLeft(List.empty[String] -> MongoConnectionOptions()) {
+        case ((unsupportedKeys, result), kv) =>
+          kv match {
+            case ("authSource", v)           => unsupportedKeys -> result.copy(authSource = Some(v))
+            case ("connectTimeoutMS", v)     => unsupportedKeys -> result.copy(connectTimeoutMS = v.toInt)
+            case ("sslEnabled", v)           => unsupportedKeys -> result.copy(sslEnabled = v.toBoolean)
+            case ("sslAllowsInvalidCert", v) => unsupportedKeys -> result.copy(sslAllowsInvalidCert = v.toBoolean)
 
-          case ("rm.tcpNoDelay", v)        => unsupportedKeys -> result.copy(tcpNoDelay = v.toBoolean)
-          case ("rm.keepAlive", v)         => unsupportedKeys -> result.copy(keepAlive = v.toBoolean)
-          case ("rm.nbChannelsPerNode", v) => unsupportedKeys -> result.copy(nbChannelsPerNode = v.toInt    )
+            case ("rm.tcpNoDelay", v)        => unsupportedKeys -> result.copy(tcpNoDelay = v.toBoolean)
+            case ("rm.keepAlive", v)         => unsupportedKeys -> result.copy(keepAlive = v.toBoolean)
+            case ("rm.nbChannelsPerNode", v) => unsupportedKeys -> result.copy(nbChannelsPerNode = v.toInt)
 
-          case (k, _) => (k :: unsupportedKeys) -> result
-        }
+            case (k, _)                      => (k :: unsupportedKeys) -> result
+          }
       }
     }
 
@@ -487,8 +492,7 @@ case class MongoConnectionOptions(
   // reactivemongo specific options
   tcpNoDelay: Boolean = false,
   keepAlive: Boolean = false,
-  nbChannelsPerNode: Int = 10
-)
+  nbChannelsPerNode: Int = 10)
 
 class MongoDriver(config: Option[Config] = None) {
   import MongoDriver.logger
@@ -502,14 +506,15 @@ class MongoDriver(config: Option[Config] = None) {
     val cfg = if (!reference.hasPath("mongo-async-driver")) {
       logger.warn("No mongo-async-driver configuration found")
       ConfigFactory.empty()
-    } else reference.getConfig("mongo-async-driver")
-    
+    }
+    else reference.getConfig("mongo-async-driver")
+
     ActorSystem("reactivemongo", cfg)
   }
 
-  private val supervisorActor = system.actorOf(Props(new SupervisorActor(this)),s"Supervisor-${MongoDriver.nextCounter}")
+  private val supervisorActor = system.actorOf(Props(new SupervisorActor(this)), s"Supervisor-${MongoDriver.nextCounter}")
 
-  private val connectionMonitors = mutable.Map.empty[ActorRef,MongoConnection]
+  private val connectionMonitors = mutable.Map.empty[ActorRef, MongoConnection]
 
   /** Keep a list of all connections so that we can terminate the actors */
   def connections: Iterable[MongoConnection] = connectionMonitors.values
@@ -546,7 +551,7 @@ class MongoDriver(config: Option[Config] = None) {
     val props = Props(new MongoDBSystem(nodes, authentications, options)())
     val mongosystem = name match {
       case Some(nm) => system.actorOf(props, nm);
-      case None => system.actorOf(props, "Connection-" +  + MongoDriver.nextCounter)
+      case None     => system.actorOf(props, "Connection-" + +MongoDriver.nextCounter)
     }
     val connection = (supervisorActor ? AddConnection(options, mongosystem))(Timeout(10, TimeUnit.SECONDS))
     Await.result(connection.mapTo[MongoConnection], Duration.Inf)
@@ -562,7 +567,7 @@ class MongoDriver(config: Option[Config] = None) {
    * @param name The name of the newly created [[reactivemongo.core.actors.MongoDBSystem]] actor, if needed.
    */
   def connection(parsedURI: MongoConnection.ParsedURI, nbChannelsPerNode: Int, name: Option[String]): MongoConnection = {
-    if(!parsedURI.ignoredOptions.isEmpty)
+    if (!parsedURI.ignoredOptions.isEmpty)
       logger.warn(s"Some options were ignored because they are not supported (yet): ${parsedURI.ignoredOptions.mkString(", ")}")
     connection(parsedURI.hosts.map(h => h._1 + ':' + h._2), parsedURI.options, parsedURI.authenticate.toSeq, nbChannelsPerNode, name)
   }
@@ -607,18 +612,20 @@ class MongoDriver(config: Option[Config] = None) {
       case CloseWithTimeout(timeout) =>
         if (isEmpty) {
           context.stop(self)
-        } else {
+        }
+        else {
           context.become(closing(timeout))
         }
       case Close =>
         if (isEmpty) {
           context.stop(self)
-        } else {
+        }
+        else {
           context.become(closing(0.seconds))
         }
     }
 
-    def closing(shutdownTimeout: FiniteDuration) : Receive = {
+    def closing(shutdownTimeout: FiniteDuration): Receive = {
       case ac: AddConnection =>
         logger.warn("Refusing to add connection while MongoDriver is closing.")
       case Terminated(actor) =>
@@ -647,5 +654,5 @@ object MongoDriver {
   def apply(config: Config) = new MongoDriver(Some(config))
 
   private[api] val _counter = new AtomicLong(0)
-  private[api] def nextCounter : Long = _counter.incrementAndGet()
+  private[api] def nextCounter: Long = _counter.incrementAndGet()
 }

@@ -26,7 +26,7 @@ object QueryAndWriteCommands extends org.specs2.mutable.Specification {
   "ReactiveMongo" should {
     "insert 1 doc and retrieve it" in {
       val doc = BSONDocument("_id" -> BSONNull, "name" -> "jack", "plop" -> -1)
-      val lastError = Await.result(Command.run(BSONSerializationPack)(collection,Insert(doc, doc)), timeout)
+      val lastError = Await.result(Command.run(BSONSerializationPack)(collection, Insert(doc, doc)), timeout)
       println(lastError)
       lastError.ok mustEqual true
       /*val lastError2 = Await.result(Command.run(BSONSerializationPack)(collection,Insert(true)(doc)), timeout)
@@ -34,7 +34,7 @@ object QueryAndWriteCommands extends org.specs2.mutable.Specification {
       lastError2.ok mustEqual true*/
       val found = Await.result(collection.find(doc).cursor[BSONDocument].collect[List](), timeout)
       found.size mustEqual 1
-      val count = Await.result(Command.run(BSONSerializationPack).unboxed(collection,Count(BSONDocument())), timeout)
+      val count = Await.result(Command.run(BSONSerializationPack).unboxed(collection, Count(BSONDocument())), timeout)
       count mustEqual 1
 
       val ismaster = Await.result(Command.run(BSONSerializationPack)(db, IsMaster), timeout)
@@ -80,7 +80,8 @@ object QueryAndWriteCommands extends org.specs2.mutable.Specification {
       val docs = (0 until nDocs).toStream.map { i =>
         if (i == 0 || i == 1529 || i == 3026 || i == 19862) {
           BSONDocument("bulk" -> true, "i" -> i, "plop" -> -3)
-        } else BSONDocument("bulk" -> true, "i" -> i, "plop" -> i)
+        }
+        else BSONDocument("bulk" -> true, "i" -> i, "plop" -> i)
       }
       val res = Try(Await.result(coll.bulkInsert(docs, false), DurationInt(100).seconds))
       println(res)
@@ -90,7 +91,7 @@ object QueryAndWriteCommands extends org.specs2.mutable.Specification {
       //println(s"writeErrors: ${res.get.map(_.writeErrors)}")
       //println(s"writeConcernError: ${res.get.map(_.writeConcernError)}")
       println(s"took ${System.currentTimeMillis - start} ms")
-      val count = Await.result(Command.run(BSONSerializationPack).unboxed(collection,Count(BSONDocument("bulk" -> true))), timeout)
+      val count = Await.result(Command.run(BSONSerializationPack).unboxed(collection, Count(BSONDocument("bulk" -> true))), timeout)
       count mustEqual (nDocs - 3) // all docs minus errors
     } tag ("mongo2_6")
   }

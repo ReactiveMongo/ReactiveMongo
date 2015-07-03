@@ -15,10 +15,9 @@ trait BSONCommandError extends CommandError {
 }
 
 case class DefaultBSONCommandError(
-  code: Option[Int],
-  errmsg: Option[String],
-  originalDocument: BSONDocument
-) extends BSONCommandError {
+    code: Option[Int],
+    errmsg: Option[String],
+    originalDocument: BSONDocument) extends BSONCommandError {
   override def getMessage = s"CommandError[code=${code.getOrElse("<unknown>")}, errmsg=${errmsg.getOrElse("<unknown>")}, doc: ${BSONDocument.pretty(originalDocument)}]"
 }
 
@@ -31,5 +30,6 @@ private[bson] trait DealingWithGenericCommandErrorsReader[A] extends BSONDocumen
         code = doc.getAs[Int]("code"),
         errmsg = doc.getAs[String]("errmsg"),
         originalDocument = doc)
-    } else readResult(doc)
+    }
+    else readResult(doc)
 }

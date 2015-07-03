@@ -28,7 +28,7 @@ object BuildSettings {
     mappings in (Compile, packageBin) ~= filter,
     mappings in (Compile, packageSrc) ~= filter,
     mappings in (Compile, packageDoc) ~= filter) ++
-  Publish.settings ++ Travis.settings // ++ Format.settings
+  Publish.settings ++ Travis.settings ++ Format.settings
 }
 
 object Publish {
@@ -73,7 +73,7 @@ object Format {
     FormattingPreferences().
       setPreference(AlignParameters, true).
       setPreference(AlignSingleLineCaseStatements, true).
-      setPreference(CompactControlReadability, false).
+      setPreference(CompactControlReadability, true).
       setPreference(CompactStringConcatenation, false).
       setPreference(DoubleIndentClassDeclaration, true).
       setPreference(FormatXml, true).

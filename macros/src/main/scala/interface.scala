@@ -83,13 +83,13 @@ object Macros {
   def writer[A]: BSONDocumentWriter[A] = macro MacroImpl.writer[A, Options.Default]
 
   /** Creates an instance of BSONWriter for case class A and takes additional options */
-  def writerOpts[A, Opts <: Options.Default]:BSONDocumentWriter[A] = macro MacroImpl.writer[A, Opts]
+  def writerOpts[A, Opts <: Options.Default]: BSONDocumentWriter[A] = macro MacroImpl.writer[A, Opts]
 
   /** Creates an instance of BSONReader and BSONWriter for case class A */
   def handler[A]: BSONDocumentReader[A] with BSONDocumentWriter[A] with BSONHandler[BSONDocument, A] = macro MacroImpl.handler[A, Options.Default]
 
   /**Creates an instance of BSONReader and BSONWriter for case class A and takes additional options */
-  def handlerOpts[A, Opts <: Options.Default]: BSONDocumentReader[A] with BSONDocumentWriter[A]  with BSONHandler[BSONDocument, A] = macro MacroImpl.handler[A, Opts]
+  def handlerOpts[A, Opts <: Options.Default]: BSONDocumentReader[A] with BSONDocumentWriter[A] with BSONHandler[BSONDocument, A] = macro MacroImpl.handler[A, Opts]
 
   /**
    * Methods with 'Opts' postfix will take additional options in the form of
@@ -178,7 +178,7 @@ object Macros {
    * Annotations to use on case classes that are being processed by macros
    */
   object Annotations {
-    import scala.annotation.{StaticAnnotation, meta}
+    import scala.annotation.{ StaticAnnotation, meta }
 
     /**
      * Specify a key different from field name in your case class.
@@ -197,7 +197,7 @@ object Macros {
     @meta.param
     case class Key(key: String) extends StaticAnnotation
 
-     /**
+    /**
      * Ignores a field
      */
     @meta.param

@@ -30,8 +30,7 @@ class UpdateSpec extends Specification {
       BSONDocument(
         "firstName" -> person.firstName,
         "lastName" -> person.lastName,
-        "age" -> person.age
-      )
+        "age" -> person.age)
   }
 
   "Update" should {
@@ -42,15 +41,13 @@ class UpdateSpec extends Specification {
           q = jack,
           u = BSONDocument("$set" -> BSONDocument("age" -> 33)),
           upsert = true))),
-        timeout
-      )
+        timeout)
 
       result.upserted must have size (1)
 
       val upserted = Await.result(
         collection.find(BSONDocument("_id" -> result.upserted(0)._id.asInstanceOf[Option[BSONObjectID]])).one[Person],
-        timeout
-      )
+        timeout)
 
       upserted must beSome
       upserted.get.firstName mustEqual "Jack"
@@ -64,15 +61,13 @@ class UpdateSpec extends Specification {
         collection.runCommand(Update(UpdateElement(
           q = jack,
           u = BSONDocument("$set" -> BSONDocument("age" -> 66))))),
-        timeout
-      )
+        timeout)
 
       result.nModified mustEqual 1
 
       val updated = Await.result(
         collection.find(BSONDocument("age" -> 66)).one[Person],
-        timeout
-      )
+        timeout)
 
       updated must beSome
       updated.get.firstName mustEqual "Jack"

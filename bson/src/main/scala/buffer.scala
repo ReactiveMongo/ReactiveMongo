@@ -39,7 +39,8 @@ trait WritableBuffer {
       if (buffer.readable > 1024) {
         writeBytes(buffer.readArray(1024))
         write(buffer)
-      } else {
+      }
+      else {
         writeBytes(buffer.readArray(buffer.readable))
       }
     }

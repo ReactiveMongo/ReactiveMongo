@@ -23,7 +23,8 @@ package object utils {
         if (updated.isDefined) {
           builder += updated.get
           builder ++= iterator
-        } else builder += e
+        }
+        else builder += e
       }
     }
     builder.result
@@ -86,7 +87,7 @@ case class NodeSet(
     })
   }
 
-  def pickByChannelId(id: Int): Option[(Node, Connection)] = 
+  def pickByChannelId(id: Int): Option[(Node, Connection)] =
     nodes.view.map(node =>
       node -> node.connections.find(_.channel.getId == id)).collectFirst {
       case (node, Some(con)) if (
@@ -102,7 +103,7 @@ case class NodeSet(
     case (node, Some(connection)) => (node, connection)
   }
 
-  private def pickFromGroupWithFilter(roundRobiner: RoundRobiner[Node, Vector], filter: Option[BSONDocument => Boolean], fallback: => Option[Node]) = 
+  private def pickFromGroupWithFilter(roundRobiner: RoundRobiner[Node, Vector], filter: Option[BSONDocument => Boolean], fallback: => Option[Node]) =
     filter.fold(fallback)(f =>
       roundRobiner.pickWithFilter(_.tags.fold(false)(f)))
 
@@ -110,7 +111,8 @@ case class NodeSet(
   def pick(preference: ReadPreference): Option[(Node, Connection)] = {
     if (mongos.isDefined) {
       pickConnectionAndFlatten(mongos)
-    } else preference match {
+    }
+    else preference match {
       case ReadPreference.Primary                    => pickConnectionAndFlatten(primary)
       case ReadPreference.PrimaryPreferred(filter)   => pickConnectionAndFlatten(primary.orElse(pickFromGroupWithFilter(secondaries, filter, secondaries.pick)))
       case ReadPreference.Secondary(filter)          => pickConnectionAndFlatten(pickFromGroupWithFilter(secondaries, filter, secondaries.pick))
@@ -119,7 +121,7 @@ case class NodeSet(
     }
   }
 
-  def createNeededChannels(receiver: ActorRef, upTo: Int)(implicit channelFactory: ChannelFactory): NodeSet = 
+  def createNeededChannels(receiver: ActorRef, upTo: Int)(implicit channelFactory: ChannelFactory): NodeSet =
     copy(nodes = nodes.foldLeft(Vector.empty[Node]) { (nodes, node) =>
       nodes :+ node.createNeededChannels(receiver, upTo)
     })
@@ -142,7 +144,8 @@ case class Node(
     val splitted = name.span(_ != ':')
     splitted._1 -> (try {
       splitted._2.drop(1).toInt
-    } catch {
+    }
+    catch {
       case _: Throwable => 27017
     })
   }
@@ -156,7 +159,8 @@ case class Node(
   def createNeededChannels(receiver: ActorRef, upTo: Int)(implicit channelFactory: ChannelFactory): Node = {
     if (connections.size < upTo) {
       copy(connections = connections.++(for (i <- 0 until (upTo - connections.size)) yield Connection(channelFactory.create(host, port, receiver), ConnectionStatus.Disconnected, Set.empty, None)))
-    } else this
+    }
+    else this
   }
 
   def toShortString = s"Node[$name: $status (${connected.size}/${connections.size} available connections), latency=${pingInfo.ping}], auth=${authenticated}"
@@ -167,17 +171,16 @@ case class ProtocolMetadata(
   maxWireVersion: MongoWireVersion,
   maxMessageSizeBytes: Int,
   maxBsonSize: Int,
-  maxBulkSize: Int
-)
+  maxBulkSize: Int)
 object ProtocolMetadata {
   val Default = ProtocolMetadata(MongoWireVersion.V24AndBefore, MongoWireVersion.V24AndBefore, 48000000, 16 * 1024 * 1024, 1000)
 }
 
 case class Connection(
-  channel: Channel,
-  status: ConnectionStatus,
-  authenticated: Set[Authenticated],
-  authenticating: Option[Authenticating]) {
+    channel: Channel,
+    status: ConnectionStatus,
+    authenticated: Set[Authenticated],
+    authenticating: Option[Authenticating]) {
 
   def send(message: Request, writeConcern: Request) {
     channel.write(message)
@@ -303,7 +306,8 @@ class RoundRobiner[A, M[T] <: Iterable[T]](val subject: M[A], startAtIndex: Int 
       if (!a.isDefined) None
       else if (filter(a.get)) a
       else pickWithFilter(filter, tested + 1)
-    } else None
+    }
+    else None
 
   def copy(subject: M[A], startAtIndex: Int = iterator.nextIndex) =
     new RoundRobiner(subject, startAtIndex)
@@ -345,8 +349,8 @@ class ChannelFactory(options: MongoConnectionOptions, bossExecutor: Executor = E
       }
 
       val sslHandler =
-        new org.jboss.netty.handler.ssl.SslHandler(sslEng, false/* TLS */)
-      
+        new org.jboss.netty.handler.ssl.SslHandler(sslEng, false /* TLS */ )
+
       pipeline.addFirst("ssl", sslHandler)
     }
 

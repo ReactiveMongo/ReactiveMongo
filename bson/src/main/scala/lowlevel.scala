@@ -56,7 +56,7 @@ class LowLevelBsonDocReader[A <: ReadableBuffer](rbuf: A) {
     buf.index = buf.index + 4
 
     def skipCString(): Unit =
-      while(buf.readByte != 0x00) {}
+      while (buf.readByte != 0x00) {}
 
     @inline def move(diff: Int): Unit =
       buf.index = buf.index + diff
@@ -85,7 +85,7 @@ class LowLevelBsonDocReader[A <: ReadableBuffer](rbuf: A) {
           val res = LazyField(tpe, name, buf.slice(length))
           buf.index = buf.index + length
           res
-          //buf.index = buf.index + buf.readInt + 5
+        //buf.index = buf.index + buf.readInt + 5
         case 0x0B =>
           val now = buf.index
           skipCString(); skipCString()
@@ -117,7 +117,7 @@ class LowLevelBsonDocReader[A <: ReadableBuffer](rbuf: A) {
           NoValue(tpe, name)
         case x => throw new RuntimeException(s"unexpected type $x")
       }
-      if(buf.readable > 1)
+      if (buf.readable > 1)
         field #:: stream()
       else Stream(field)
     }
@@ -272,7 +272,7 @@ class LowLevelBsonDocWriter[A <: WritableBuffer](buf: A) {
 
   def close(): this.type = {
     val (pos, tpe) = popMark
-    if(tpe == 0x05)
+    if (tpe == 0x05)
       buf.setInt(pos, buf.index - pos - 1) // no trailing nul, excluding binary type byte
     else {
       buf.setInt(pos, buf.index - pos + 1)
