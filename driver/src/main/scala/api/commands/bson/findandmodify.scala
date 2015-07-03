@@ -18,11 +18,9 @@ object BSONFindAndModifyImplicits {
             updatedExisting = doc.getAs[Boolean]("updatedExisting").getOrElse(false),
             n = doc.getAs[Int]("n").getOrElse(0),
             err = doc.getAs[String]("err"),
-            upsertedId = doc.getAs[BSONValue]("upserted")
-          )
+            upsertedId = doc.getAs[BSONValue]("upserted"))
         },
-        result.getAs[BSONDocument]("value")
-      )
+        result.getAs[BSONDocument]("value"))
   }
   implicit object FindAndModifyWriter extends BSONDocumentWriter[ResolvedCollectionCommand[FindAndModify]] {
     def write(command: ResolvedCollectionCommand[FindAndModify]): BSONDocument =
@@ -31,15 +29,13 @@ object BSONFindAndModifyImplicits {
         "query" -> command.command.query,
         "sort" -> command.command.sort,
         "fields" -> command.command.fields,
-        "upsert" -> (if(command.command.upsert) Some(true) else None)
-      ) ++ (command.command.modify match {
-        case Update(document, fetchNewObject) =>
-          BSONDocument(
-            "update" -> document,
-            "new" -> fetchNewObject
-          )
-        case Remove =>
-          BSONDocument("remove" -> true)
-      })
+        "upsert" -> (if (command.command.upsert) Some(true) else None)) ++ (command.command.modify match {
+          case Update(document, fetchNewObject) =>
+            BSONDocument(
+              "update" -> document,
+              "new" -> fetchNewObject)
+          case Remove =>
+            BSONDocument("remove" -> true)
+        })
   }
 }

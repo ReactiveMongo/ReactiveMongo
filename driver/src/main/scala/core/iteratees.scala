@@ -20,7 +20,7 @@ import play.api.libs.iteratee.Enumeratee.CheckDone
 import scala.concurrent._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{ Failure, Success }
-import scala.util.control.NonFatal 
+import scala.util.control.NonFatal
 
 object CustomEnumeratee {
   trait RecoverFromErrorFunction {
@@ -48,7 +48,7 @@ object CustomEnumeratee {
                 val n = k(in)
                 n.pureFlatFold[E, Iteratee[E, A]] {
                   case Step.Cont(k) => Cont(step(n))
-                  case _ => Done(n, Input.Empty)
+                  case _            => Done(n, Input.Empty)
                 }
               case other => Done(other.it, in)
             }.unflatten.map({ s =>
@@ -80,7 +80,7 @@ object CustomEnumerator {
   }
 
   class SEnumerator[C](zero: C)(next: C => Future[Option[C]], cleanUp: C => Unit)(implicit ec: ExecutionContext) extends Enumerator[C] {
-    
+
     def apply[A](iteratee: Iteratee[C, A]): Future[Iteratee[C, A]] = {
 
       def loop(current: C, iteratee: Iteratee[C, A]): Future[Iteratee[C, A]] =
@@ -116,7 +116,7 @@ object CustomEnumerator {
 
     }
   }
-  
+
   object SEnumerator {
     def apply[C](zero: C)(next: C => Future[Option[C]])(implicit ec: ExecutionContext) = new SEnumerator(zero)(next, _ => ())
   }

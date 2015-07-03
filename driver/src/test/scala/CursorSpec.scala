@@ -5,7 +5,12 @@ import scala.concurrent.{ Await, Future }
 import scala.concurrent.duration._
 import play.api.libs.iteratee.Iteratee
 import reactivemongo.api.{
-  Cursor, CursorFlattener, CursorProducer, DB, QueryOpts, WrappedCursor
+  Cursor,
+  CursorFlattener,
+  CursorProducer,
+  DB,
+  QueryOpts,
+  WrappedCursor
 }
 
 class CursorSpec extends Specification {
@@ -17,7 +22,7 @@ class CursorSpec extends Specification {
 
   "ReactiveMongo" should {
     "insert 16,517 records" in {
-      val futs = for(i <- 0 until 16517)
+      val futs = for (i <- 0 until 16517)
         yield coll.insert(BSONDocument("i" -> BSONInteger(i), "record" -> BSONString("record" + i)))
       val fut = Future.sequence(futs)
       Await.result(fut, DurationInt(20).seconds)
@@ -35,7 +40,7 @@ class CursorSpec extends Specification {
         println("fetched " + doc)
         doc
        }.runLast*/
-      future.map(_ => i) must beEqualTo(16517).await(21000/*21s*/)
+      future.map(_ => i) must beEqualTo(16517).await(21000 /*21s*/ )
     }
 
     "get 10 first docs" in {
@@ -58,7 +63,7 @@ class CursorSpec extends Specification {
 
       cursor.foo must_== "Bar" and (
         Cursor.flatten(Future.successful(cursor)).foo must_== "raB")
-    }    
+    }
   }
 
   "BSON Cursor" should {

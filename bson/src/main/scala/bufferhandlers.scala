@@ -107,7 +107,8 @@ object DefaultBufferHandler extends BufferHandler {
           val name = buffer.readCString
           val elem = Try(name -> DefaultBufferHandler.handlersByCode.get(code).map(_.read(buffer)).get)
           elem #:: makeStream
-        } else Stream.empty
+        }
+        else Stream.empty
       }
       val stream = makeStream
       stream.force // TODO remove
@@ -138,7 +139,8 @@ object DefaultBufferHandler extends BufferHandler {
           val name = buffer.readCString
           val elem = Try(DefaultBufferHandler.handlersByCode.get(code).map(_.read(buffer)).get)
           elem #:: makeStream
-        } else Stream.empty
+        }
+        else Stream.empty
       }
       val stream = makeStream
       stream.force // TODO remove
@@ -230,7 +232,8 @@ object DefaultBufferHandler extends BufferHandler {
     if (buffer.readable > 0) {
       val code = buffer.readByte
       buffer.readString -> handlersByCode.get(code).map(_.read(buffer)).get
-    } else throw new NoSuchElementException("buffer can not be read, end of buffer reached")
+    }
+    else throw new NoSuchElementException("buffer can not be read, end of buffer reached")
   }
 
   def readDocument(buffer: ReadableBuffer): Try[BSONDocument] = Try {
@@ -266,8 +269,8 @@ object BSONIterator {
       tryElem match {
         case Success(elem) => elem._2 match {
           case doc: BSONDocument => prefix + elem._1 + ": {\n" + pretty(i + 1, doc.stream.iterator) + "\n" + prefix + "}"
-          case array: BSONArray => prefix + elem._1 + ": [\n" + pretty(i + 1, array.iterator) + "\n" + prefix + "]"
-          case _ => prefix + elem._1 + ": " + elem._2.toString
+          case array: BSONArray  => prefix + elem._1 + ": [\n" + pretty(i + 1, array.iterator) + "\n" + prefix + "]"
+          case _                 => prefix + elem._1 + ": " + elem._2.toString
         }
         case Failure(e) => prefix + s"ERROR[${e.getMessage()}]"
       }

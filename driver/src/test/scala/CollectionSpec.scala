@@ -42,10 +42,10 @@ object CollectionSpec extends Specification with Tags {
 
       collection.count() must beEqualTo(1).await(timeoutMillis) and (
         collection.count(skip = 1) must beEqualTo(0).await(timeoutMillis)) and (
-        collection.count(selector = Some(BSONDocument("name" -> "Jack"))).
-          aka ("matching count") must beEqualTo(1).await(timeoutMillis)) and (
-        collection.count(selector = Some(BSONDocument("name" -> "Foo"))).
-          aka("not matching count") must beEqualTo(0).await(timeoutMillis))
+          collection.count(selector = Some(BSONDocument("name" -> "Jack"))).
+          aka("matching count") must beEqualTo(1).await(timeoutMillis)) and (
+            collection.count(selector = Some(BSONDocument("name" -> "Foo"))).
+            aka("not matching count") must beEqualTo(0).await(timeoutMillis))
     }
 
     // Empty capped need to be enabled with enableTestCommands

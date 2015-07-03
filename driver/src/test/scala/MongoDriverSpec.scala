@@ -15,7 +15,7 @@ class MongoDriverSpec extends Specification {
       val md = MongoDriver()
 
       md.numConnections must_== 0 and (
-        md.close(FiniteDuration(500,"milliseconds")) must not(
+        md.close(FiniteDuration(500, "milliseconds")) must not(
           throwA[Throwable]))
 
     }
@@ -23,16 +23,16 @@ class MongoDriverSpec extends Specification {
     "start and close with one connection open" in {
       val md = MongoDriver()
       val connection = md.connection(hosts)
-      md.close(FiniteDuration(5,"seconds"))
+      md.close(FiniteDuration(5, "seconds"))
       success
     }
 
     "start and close with multiple connections open" in {
       val md = MongoDriver()
-      val connection1 = md.connection(hosts,name=Some("Connection1"))
+      val connection1 = md.connection(hosts, name = Some("Connection1"))
       val connection2 = md.connection(hosts)
       val connection3 = md.connection(hosts)
-      md.close(FiniteDuration(5,"seconds"))
+      md.close(FiniteDuration(5, "seconds"))
       success
     }
   }

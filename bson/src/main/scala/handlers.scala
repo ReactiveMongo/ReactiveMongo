@@ -142,11 +142,11 @@ trait DefaultBSONHandlers {
 
   class BSONNumberLikeReader[B <: BSONValue] extends BSONReader[B, BSONNumberLike] {
     def read(bson: B) = bson match {
-      case int: BSONInteger => BSONIntegerNumberLike(int)
-      case long: BSONLong => BSONLongNumberLike(long)
+      case int: BSONInteger   => BSONIntegerNumberLike(int)
+      case long: BSONLong     => BSONLongNumberLike(long)
       case double: BSONDouble => BSONDoubleNumberLike(double)
-      case dt: BSONDateTime => BSONDateTimeNumberLike(dt)
-      case _ => throw new UnsupportedOperationException()
+      case dt: BSONDateTime   => BSONDateTimeNumberLike(dt)
+      case _                  => throw new UnsupportedOperationException()
     }
   }
 
@@ -158,13 +158,13 @@ trait DefaultBSONHandlers {
 
   class BSONBooleanLikeReader[B <: BSONValue] extends BSONReader[B, BSONBooleanLike] {
     def read(bson: B) = bson match {
-      case int: BSONInteger => BSONIntegerBooleanLike(int)
-      case double: BSONDouble => BSONDoubleBooleanLike(double)
-      case long: BSONLong => BSONLongBooleanLike(long)
-      case boolean: BSONBoolean => BSONBooleanBooleanLike(boolean)
-      case nll: BSONNull.type => BSONNullBooleanLike(BSONNull)
+      case int: BSONInteger        => BSONIntegerBooleanLike(int)
+      case double: BSONDouble      => BSONDoubleBooleanLike(double)
+      case long: BSONLong          => BSONLongBooleanLike(long)
+      case boolean: BSONBoolean    => BSONBooleanBooleanLike(boolean)
+      case nll: BSONNull.type      => BSONNullBooleanLike(BSONNull)
       case udf: BSONUndefined.type => BSONUndefinedBooleanLike(BSONUndefined)
-      case _ => throw new UnsupportedOperationException()
+      case _                       => throw new UnsupportedOperationException()
     }
   }
 

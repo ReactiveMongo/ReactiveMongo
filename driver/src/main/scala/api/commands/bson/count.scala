@@ -14,7 +14,7 @@ object BSONCountCommandImplicits {
   implicit object HintWriter extends BSONWriter[Hint, BSONValue] {
     def write(hint: Hint): BSONValue =
       hint match {
-        case HintString(s) => BSONString(s)
+        case HintString(s)     => BSONString(s)
         case HintDocument(doc) => doc
       }
   }
@@ -22,11 +22,10 @@ object BSONCountCommandImplicits {
     def write(count: ResolvedCollectionCommand[Count]): BSONDocument =
       BSONDocument(
         "count" -> count.collection,
-        "query" ->  count.command.query,
+        "query" -> count.command.query,
         "limit" -> count.command.limit,
         "skip" -> count.command.skip,
-        "hint" -> count.command.hint
-      )
+        "hint" -> count.command.hint)
   }
 
   implicit object CountResultReader extends DealingWithGenericCommandErrorsReader[CountResult] {

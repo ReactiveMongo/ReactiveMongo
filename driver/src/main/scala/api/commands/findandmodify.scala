@@ -11,8 +11,7 @@ trait FindAndModifyCommand[P <: SerializationPack] extends ImplicitCommandHelper
     modify: Modify,
     upsert: Boolean,
     sort: Option[Document],
-    fields: Option[Document]
-  ) extends CollectionCommand with CommandWithPack[P] with CommandWithResult[FindAndModifyResult]
+    fields: Option[Document]) extends CollectionCommand with CommandWithPack[P] with CommandWithResult[FindAndModifyResult]
 
   object FindAndModify {
     def apply(query: ImplicitlyDocumentProducer, modify: Modify, upsert: Boolean = false, sort: Option[ImplicitlyDocumentProducer] = None, fields: Option[ImplicitlyDocumentProducer] = None): FindAndModify =
@@ -48,12 +47,11 @@ trait FindAndModifyCommand[P <: SerializationPack] extends ImplicitCommandHelper
     updatedExisting: Boolean,
     upsertedId: Option[Any], // TODO. It is the id of the upserted value
     n: Int,
-    err: Option[String]
-  )
+    err: Option[String])
 
   case class FindAndModifyResult(
-    lastError: Option[UpdateLastError],
-    value: Option[Document]) {
+      lastError: Option[UpdateLastError],
+      value: Option[Document]) {
     def result[R](implicit reader: Reader[R]): Option[R] =
       value.map(pack.deserialize(_, reader))
   }

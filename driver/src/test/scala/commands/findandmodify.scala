@@ -36,8 +36,7 @@ class FindAndModifySpec extends Specification {
       BSONDocument(
         "firstName" -> person.firstName,
         "lastName" -> person.lastName,
-        "age" -> person.age
-      )
+        "age" -> person.age)
   }
 
   "FindAndModify" should {

@@ -80,9 +80,9 @@ object Command {
       val op = Query(0, db.name + ".$cmd", 0, 1)
       val mongo26WriteCommand = command match {
         case _: Mongo26WriteCommand => true
-        case _ => false
+        case _                      => false
       }
-      DefaultCursor(pack, op, bs, if(mongo26WriteCommand) ReadPreference.primary else readPreference, db.connection, failover, mongo26WriteCommand)
+      DefaultCursor(pack, op, bs, if (mongo26WriteCommand) ReadPreference.primary else readPreference, db.connection, failover, mongo26WriteCommand)
     }
 
     def cursor[A](implicit reader: pack.Reader[A]): Cursor[A] = cursor(ReadPreference.primary)
@@ -90,36 +90,24 @@ object Command {
 
   case class CommandWithPackRunner[P <: SerializationPack](pack: P, failover: FailoverStrategy = FailoverStrategy()) {
     // database
-    def apply[R, C <: Command with CommandWithResult[R]]
-      (db: DB, command: C with CommandWithResult[R])
-      (implicit writer: pack.Writer[C], reader: pack.Reader[R], ec: ExecutionContext): Future[R] =
-        defaultCursorFetcher(db, pack, command, failover).one[R]
+    def apply[R, C <: Command with CommandWithResult[R]](db: DB, command: C with CommandWithResult[R])(implicit writer: pack.Writer[C], reader: pack.Reader[R], ec: ExecutionContext): Future[R] =
+      defaultCursorFetcher(db, pack, command, failover).one[R]
 
-    def apply[C <: Command]
-      (db: DB, command: C)
-      (implicit writer: pack.Writer[C]): CursorFetcher[pack.type, Cursor] =
-        defaultCursorFetcher(db, pack, command, failover)
+    def apply[C <: Command](db: DB, command: C)(implicit writer: pack.Writer[C]): CursorFetcher[pack.type, Cursor] =
+      defaultCursorFetcher(db, pack, command, failover)
 
-    def unboxed[A <: AnyVal, R <: BoxedAnyVal[A], C <: Command with CommandWithResult[R]]
-      (db: DB, command: C with CommandWithResult[R with BoxedAnyVal[A]])
-      (implicit writer: pack.Writer[C], reader: pack.Reader[R], ec: ExecutionContext): Future[A] =
-        defaultCursorFetcher(db, pack, command, failover).one[R].map(_.value)
+    def unboxed[A <: AnyVal, R <: BoxedAnyVal[A], C <: Command with CommandWithResult[R]](db: DB, command: C with CommandWithResult[R with BoxedAnyVal[A]])(implicit writer: pack.Writer[C], reader: pack.Reader[R], ec: ExecutionContext): Future[A] =
+      defaultCursorFetcher(db, pack, command, failover).one[R].map(_.value)
 
     // collection
-    def apply[R, C <: CollectionCommand with CommandWithResult[R]]
-      (collection: Collection, command: C with CommandWithResult[R])
-      (implicit writer: pack.Writer[ResolvedCollectionCommand[C]], reader: pack.Reader[R], ec: ExecutionContext): Future[R] =
-        defaultCursorFetcher(collection.db, pack, ResolvedCollectionCommand(collection.name, command), failover).one[R]
+    def apply[R, C <: CollectionCommand with CommandWithResult[R]](collection: Collection, command: C with CommandWithResult[R])(implicit writer: pack.Writer[ResolvedCollectionCommand[C]], reader: pack.Reader[R], ec: ExecutionContext): Future[R] =
+      defaultCursorFetcher(collection.db, pack, ResolvedCollectionCommand(collection.name, command), failover).one[R]
 
-    def apply[C <: CollectionCommand]
-      (collection: Collection, command: C)
-      (implicit writer: pack.Writer[ResolvedCollectionCommand[C]]): CursorFetcher[pack.type, Cursor] =
-        defaultCursorFetcher(collection.db, pack, ResolvedCollectionCommand(collection.name, command), failover)
+    def apply[C <: CollectionCommand](collection: Collection, command: C)(implicit writer: pack.Writer[ResolvedCollectionCommand[C]]): CursorFetcher[pack.type, Cursor] =
+      defaultCursorFetcher(collection.db, pack, ResolvedCollectionCommand(collection.name, command), failover)
 
-    def unboxed[A <: AnyVal, R <: BoxedAnyVal[A], C <: CollectionCommand with CommandWithResult[R]]
-      (collection: Collection, command: C with CommandWithResult[R with BoxedAnyVal[A]])
-      (implicit writer: pack.Writer[ResolvedCollectionCommand[C]], reader: pack.Reader[R], ec: ExecutionContext): Future[A] =
-        defaultCursorFetcher(collection.db, pack, ResolvedCollectionCommand(collection.name, command), failover).one[R].map(_.value)
+    def unboxed[A <: AnyVal, R <: BoxedAnyVal[A], C <: CollectionCommand with CommandWithResult[R]](collection: Collection, command: C with CommandWithResult[R with BoxedAnyVal[A]])(implicit writer: pack.Writer[ResolvedCollectionCommand[C]], reader: pack.Reader[R], ec: ExecutionContext): Future[A] =
+      defaultCursorFetcher(collection.db, pack, ResolvedCollectionCommand(collection.name, command), failover).one[R].map(_.value)
 
     def rawCommand[T](input: T)(implicit writer: pack.Writer[T]): RawCommand =
       RawCommand(pack.serialize(input, writer))
@@ -133,14 +121,14 @@ object Command {
 
   /**
    * Returns a command runner.
-   * 
+   *
    * @param pack the serialization pack
-   * 
+   *
    * {{{
    * import reactivemongo.bson.BSONDocument
    * import reactivemongo.api.BSONSerializationPack
    * import reactivemongo.api.commands.{ Command, Count }
-   * 
+   *
    * Command.run(BSONSerializationPack).
    *   unboxed(aCollection, Count(BSONDocument("bulk" -> true)))
    * }}}
@@ -158,7 +146,7 @@ object Command {
     val query = Query(0, db + ".$cmd", 0, 1)
     val mongo26WriteCommand = command match {
       case _: Mongo26WriteCommand => true
-      case _ => false
+      case _                      => false
     }
     RequestMaker(query, documents, readPreference) -> mongo26WriteCommand
   }
@@ -203,7 +191,6 @@ object Command {
 final case class ResolvedCollectionCommand[C <: CollectionCommand](
   collection: String,
   command: C) extends Command
-
 
 object `package` {
   type WriteConcern = GetLastError

@@ -82,9 +82,9 @@ trait Cursor[T] {
   def collect[M[_]](upTo: Int = Int.MaxValue, stopOnError: Boolean = true)(implicit cbf: CanBuildFrom[M[_], T, M[T]], ec: ExecutionContext): Future[M[T]]
 
   /**
-   * Applies a binary operator to a start value and all responses handled  
+   * Applies a binary operator to a start value and all responses handled
    * by this cursor, going first to last.
-   * 
+   *
    * @tparam A the result type of the binary operator.
    * @param z the start value.
    * @param maxDocs the maximum number of documents to be read.
@@ -96,27 +96,27 @@ trait Cursor[T] {
   /**
    * Applies a binary operator to a start value and all bulks of documents
    * retrieved by this cursor, going first to last.
-   * 
+   *
    * @tparam A the result type of the binary operator.
    * @param z the start value.
    * @param maxDocs the maximum number of documents to be read.
    * @param suc the binary operator to be applied when the next response is successfully read.
    * @param err the binary operator to be applied when failing to get the next response.
-    */
+   */
   def foldBulks[A](z: => A, maxDocs: Int = Int.MaxValue)(suc: (A, Iterator[T]) => Cursor.State[A], err: (A, Throwable) => Cursor.State[A])(implicit ctx: ExecutionContext): Future[A]
 
   /**
-   * Applies a binary operator to a start value and all elements retrieved 
+   * Applies a binary operator to a start value and all elements retrieved
    * by this cursor, going first to last.
-   * 
+   *
    * @tparam A the result type of the binary operator.
    * @param z the start value.
    * @param maxDocs the maximum number of documents to be read.
    * @param suc the binary operator to be applied when the next document is successfully read.
    * @param err the binary operator to be applied when failing to read the next document.
-   * 
+   *
    * {{{
-   * cursor.foldWhile(Nil: Seq[Person])((s, p) => Cursor.Cont(s :+ p), 
+   * cursor.foldWhile(Nil: Seq[Person])((s, p) => Cursor.Cont(s :+ p),
    *   { (l, e) => println("last valid value: " + l); Cursor.Fail(e) })
    * }}}
    */
@@ -215,7 +215,7 @@ trait WrappedCursor[T] extends Cursor[T] {
   def foldBulks[A](z: => A, maxDocs: Int = Int.MaxValue)(suc: (A, Iterator[T]) => Cursor.State[A], err: (A, Throwable) => Cursor.State[A])(implicit ctx: ExecutionContext): Future[A] = wrappee.foldBulks(z, maxDocs)(suc, err)
 
   def foldWhile[A](z: => A, maxDocs: Int = Int.MaxValue)(suc: (A, T) => Cursor.State[A], err: (A, Throwable) => Cursor.State[A])(implicit ctx: ExecutionContext): Future[A] = wrappee.foldWhile(z, maxDocs)(suc, err)
-  
+
 }
 
 object Cursor {
@@ -249,28 +249,29 @@ object DefaultCursor {
     mongoConnection: MongoConnection,
     failoverStrategy: FailoverStrategy,
     isMongo26WriteOp: Boolean)(implicit reader: pack.Reader[A]): Cursor[A] = new Cursor[A] {
-      private def next(response: Response)(implicit ctx: ExecutionContext): Future[Option[Response]] = {
-        if (response.reply.cursorID != 0) {
-          val op = GetMore(query.fullCollectionName, query.numberToReturn, response.reply.cursorID)
-          logger.trace("[Cursor] Calling next on " + response.reply.cursorID + ", op=" + op)
-          Failover2(mongoConnection, failoverStrategy) { () =>
-            mongoConnection.sendExpectingResponse(RequestMaker(op).copy(channelIdHint = Some(response.info.channelId)), isMongo26WriteOp)
-          }.future.map(Some(_))
-        } else {
-          logger.error("[Cursor] Call to next() but cursorID is 0, there is probably a bug")
-          Future.successful(Option.empty[Response])
-        }
+    private def next(response: Response)(implicit ctx: ExecutionContext): Future[Option[Response]] = {
+      if (response.reply.cursorID != 0) {
+        val op = GetMore(query.fullCollectionName, query.numberToReturn, response.reply.cursorID)
+        logger.trace("[Cursor] Calling next on " + response.reply.cursorID + ", op=" + op)
+        Failover2(mongoConnection, failoverStrategy) { () =>
+          mongoConnection.sendExpectingResponse(RequestMaker(op).copy(channelIdHint = Some(response.info.channelId)), isMongo26WriteOp)
+        }.future.map(Some(_))
       }
+      else {
+        logger.error("[Cursor] Call to next() but cursorID is 0, there is probably a bug")
+        Future.successful(Option.empty[Response])
+      }
+    }
 
-      @inline
-      private def hasNext(response: Response): Boolean = response.reply.cursorID != 0
+    @inline
+    private def hasNext(response: Response): Boolean = response.reply.cursorID != 0
 
-      @inline
-      private def hasNext(response: Response, maxDocs: Int): Boolean =
-        hasNext(response) && (response.reply.numberReturned + response.reply.startingFrom) < maxDocs
+    @inline
+    private def hasNext(response: Response, maxDocs: Int): Boolean =
+      hasNext(response) && (response.reply.numberReturned + response.reply.startingFrom) < maxDocs
 
-      @inline
-      private def makeIterator(response: Response) = ReplyDocumentIterator(pack)(response.reply, response.documents)
+    @inline
+    private def makeIterator(response: Response) = ReplyDocumentIterator(pack)(response.reply, response.documents)
 
     @inline
     private def makeRequest(implicit ctx: ExecutionContext): Future[Response] =
@@ -302,23 +303,24 @@ object DefaultCursor {
       if (cursorID != 0) {
         logger.debug(s"[$logCat] Clean up ${cursorID}, sending KillCursor")
         mongoConnection.send(RequestMaker(KillCursors(Set(cursorID))))
-      } else logger.trace(s"[$logCat] Cursor exhausted (${cursorID})")
+      }
+      else logger.trace(s"[$logCat] Cursor exhausted (${cursorID})")
 
-    def foldResponses[T](z: => T, maxDocs: Int = Int.MaxValue)(suc: (T, Response) => State[T], err: (T, Throwable) => State[T])(implicit ctx: ExecutionContext): Future[T] = new FoldResponses(z, maxDocs, suc, err)(ctx)()    
+    def foldResponses[T](z: => T, maxDocs: Int = Int.MaxValue)(suc: (T, Response) => State[T], err: (T, Throwable) => State[T])(implicit ctx: ExecutionContext): Future[T] = new FoldResponses(z, maxDocs, suc, err)(ctx)()
 
     def foldBulks[T](z: => T, maxDocs: Int = Int.MaxValue)(suc: (T, Iterator[A]) => State[T], err: (T, Throwable) => State[T])(implicit ctx: ExecutionContext): Future[T] = foldResponses(z, maxDocs)({ (s, r) =>
       Try(makeIterator(r)) match {
         case Success(it) => suc(s, it)
-        case Failure(e) => Fail(e)
+        case Failure(e)  => Fail(e)
       }
     }, err)
 
     def foldWhile[T](z: => T, maxDocs: Int = Int.MaxValue)(suc: (T, A) => State[T], err: (T, Throwable) => State[T])(implicit ctx: ExecutionContext): Future[T] = {
       def process(cur: T, st: State[T])(op: T => State[T]): State[T] =
         st match {
-          case Cont(v)  => op(v)
+          case Cont(v)     => op(v)
           case f @ Fail(_) => f
-          case _ => st
+          case _           => st
         }
 
       def go(it: Iterator[A])(v: T): State[T] =
@@ -346,8 +348,9 @@ object DefaultCursor {
           next = { current =>
             val (r, c) = current
             if (c < maxDocs) {
-              tailResponse(r, maxDocs).map(_.map((_, c+r.reply.numberReturned)))
-            } else Future.successful(Option.empty[(Response, Int)])
+              tailResponse(r, maxDocs).map(_.map((_, c + r.reply.numberReturned)))
+            }
+            else Future.successful(Option.empty[(Response, Int)])
           },
           cleanUp = { current =>
             val (r, _) = current
@@ -355,84 +358,86 @@ object DefaultCursor {
           }).map(_._1)
       })
 
-      def rawEnumerateResponses(maxDocs: Int = Int.MaxValue)(implicit ctx: ExecutionContext): Enumerator[Response] =
-        if (isTailable) tailableCursorEnumerateResponses(maxDocs) else simpleCursorEnumerateResponses(maxDocs)
+    def rawEnumerateResponses(maxDocs: Int = Int.MaxValue)(implicit ctx: ExecutionContext): Enumerator[Response] =
+      if (isTailable) tailableCursorEnumerateResponses(maxDocs) else simpleCursorEnumerateResponses(maxDocs)
 
-      def enumerateResponses(maxDocs: Int = Int.MaxValue, stopOnError: Boolean = false)(implicit ctx: ExecutionContext): Enumerator[Response] =
-        rawEnumerateResponses(maxDocs) &> {
-          if (stopOnError)
-            CustomEnumeratee.stopOnError
-          else CustomEnumeratee.recover {
-            new CustomEnumeratee.RecoverFromErrorFunction {
-              def apply[E, A](throwable: Throwable, input: Input[E], continue: () => Iteratee[E, A]): Iteratee[E, A] = throwable match {
-                case e: ReplyDocumentIteratorExhaustedException =>
-                  val errstr = "ReplyDocumentIterator exhausted! " +
-                    "Was this enumerator applied to many iteratees concurrently? " +
-                    "Stopping to prevent infinite recovery."
-                  logger.error(errstr, e)
-                  Error(errstr, input)
-                case e =>
-                  logger.debug("There was an exception during the stream, dropping it since stopOnError is false", e)
-                  continue()
-              }
+    def enumerateResponses(maxDocs: Int = Int.MaxValue, stopOnError: Boolean = false)(implicit ctx: ExecutionContext): Enumerator[Response] =
+      rawEnumerateResponses(maxDocs) &> {
+        if (stopOnError)
+          CustomEnumeratee.stopOnError
+        else CustomEnumeratee.recover {
+          new CustomEnumeratee.RecoverFromErrorFunction {
+            def apply[E, A](throwable: Throwable, input: Input[E], continue: () => Iteratee[E, A]): Iteratee[E, A] = throwable match {
+              case e: ReplyDocumentIteratorExhaustedException =>
+                val errstr = "ReplyDocumentIterator exhausted! " +
+                  "Was this enumerator applied to many iteratees concurrently? " +
+                  "Stopping to prevent infinite recovery."
+                logger.error(errstr, e)
+                Error(errstr, input)
+              case e =>
+                logger.debug("There was an exception during the stream, dropping it since stopOnError is false", e)
+                continue()
             }
           }
         }
-
-      def enumerateBulks(maxDocs: Int = Int.MaxValue, stopOnError: Boolean = false)(implicit ctx: ExecutionContext): Enumerator[Iterator[A]] =
-        enumerateResponses(maxDocs, stopOnError) &> Enumeratee.map(makeIterator)
-
-      def enumerate(maxDocs: Int = Int.MaxValue, stopOnError: Boolean = false)(implicit ctx: ExecutionContext): Enumerator[A] = {
-        @tailrec
-        def next(it: Iterator[A], stopOnError: Boolean): Option[Try[A]] = {
-          if (it.hasNext) {
-            val tried = Try(it.next)
-            if (tried.isFailure && !stopOnError)
-              next(it, stopOnError)
-            else Some(tried)
-          } else None
-        }
-        enumerateResponses(maxDocs, stopOnError) &> Enumeratee.mapFlatten { response =>
-          val iterator = ReplyDocumentIterator(pack)(response.reply, response.documents)
-          if (!iterator.hasNext) Enumerator.empty
-          else CustomEnumerator.SEnumerator(iterator.next) { _ =>
-            next(iterator, stopOnError).
-              fold(Future.successful(Option.empty[A])) {
-                case Success(mt) => Future.successful(Some(mt))
-                case Failure(e)  => Future.failed(e)
-              }
-          }
-        }
       }
 
-      def collect[M[_]](upTo: Int = Int.MaxValue, stopOnError: Boolean = true)(implicit cbf: CanBuildFrom[M[_], A, M[A]], ctx: ExecutionContext): Future[M[A]] = {
-        (enumerateResponses(upTo, stopOnError) |>>> Iteratee.fold(cbf.apply) { (builder, response) =>
+    def enumerateBulks(maxDocs: Int = Int.MaxValue, stopOnError: Boolean = false)(implicit ctx: ExecutionContext): Enumerator[Iterator[A]] =
+      enumerateResponses(maxDocs, stopOnError) &> Enumeratee.map(makeIterator)
 
-          def tried[A](it: Iterator[A]) = new Iterator[Try[A]] { def hasNext = it.hasNext; def next = Try(it.next) }
-
-          logger.trace(s"[collect] got response $response")
-
-          val filteredIterator =
-            if (!stopOnError)
-              tried(makeIterator(response)).filter(_.isSuccess).map(_.get)
-            else makeIterator(response)
-          val iterator =
-            if (upTo < response.reply.numberReturned + response.reply.startingFrom)
-              filteredIterator.take(upTo - response.reply.startingFrom)
-            else filteredIterator
-          builder ++= iterator
-        }).map(_.result)
+    def enumerate(maxDocs: Int = Int.MaxValue, stopOnError: Boolean = false)(implicit ctx: ExecutionContext): Enumerator[A] = {
+      @tailrec
+      def next(it: Iterator[A], stopOnError: Boolean): Option[Try[A]] = {
+        if (it.hasNext) {
+          val tried = Try(it.next)
+          if (tried.isFailure && !stopOnError)
+            next(it, stopOnError)
+          else Some(tried)
+        }
+        else None
       }
+      enumerateResponses(maxDocs, stopOnError) &> Enumeratee.mapFlatten { response =>
+        val iterator = ReplyDocumentIterator(pack)(response.reply, response.documents)
+        if (!iterator.hasNext) Enumerator.empty
+        else CustomEnumerator.SEnumerator(iterator.next) { _ =>
+          next(iterator, stopOnError).
+            fold(Future.successful(Option.empty[A])) {
+              case Success(mt) => Future.successful(Some(mt))
+              case Failure(e)  => Future.failed(e)
+            }
+        }
+      }
+    }
+
+    def collect[M[_]](upTo: Int = Int.MaxValue, stopOnError: Boolean = true)(implicit cbf: CanBuildFrom[M[_], A, M[A]], ctx: ExecutionContext): Future[M[A]] = {
+      (enumerateResponses(upTo, stopOnError) |>>> Iteratee.fold(cbf.apply) { (builder, response) =>
+
+        def tried[A](it: Iterator[A]) = new Iterator[Try[A]] { def hasNext = it.hasNext; def next = Try(it.next) }
+
+        logger.trace(s"[collect] got response $response")
+
+        val filteredIterator =
+          if (!stopOnError)
+            tried(makeIterator(response)).filter(_.isSuccess).map(_.get)
+          else makeIterator(response)
+        val iterator =
+          if (upTo < response.reply.numberReturned + response.reply.startingFrom)
+            filteredIterator.take(upTo - response.reply.startingFrom)
+          else filteredIterator
+        builder ++= iterator
+      }).map(_.result)
+    }
 
     private class FoldResponses[T](z: => T, maxDocs: Int,
-      suc: (T, Response) => State[T], err: (T, Throwable) => State[T])(
-      implicit ctx: ExecutionContext) {
+                                   suc: (T, Response) => State[T], err: (T, Throwable) => State[T])(
+                                       implicit ctx: ExecutionContext) {
 
       val nextResponse: (Response, Int) => Future[Option[Response]] =
         if (!isTailable) { (r: Response, maxDocs: Int) =>
           if (!hasNext(r, maxDocs)) Future.successful(Option.empty[Response])
           else next(r)
-        } else (r: Response, maxDocs: Int) => tailResponse(r, maxDocs)
+        }
+        else (r: Response, maxDocs: Int) => tailResponse(r, maxDocs)
 
       def process(cur: T, st: State[T])(op: T => Future[T]): Future[T] =
         st match {
@@ -454,7 +459,7 @@ object DefaultCursor {
               end
             }
             case Cont(v) if (c == maxDocs) => Done(v)
-            case state @ _ => state
+            case state @ _                 => state
           }
 
           process(cur, st)(go(r, c + r.reply.numberReturned))
@@ -490,7 +495,7 @@ trait CursorFlattener[C[_] <: Cursor[_]] {
 /** Flatteners helper */
 object CursorFlattener {
   implicit object defaultCursorFlattener extends CursorFlattener[Cursor] {
-    def flatten[T](future: Future[Cursor[T]]): Cursor[T] = 
+    def flatten[T](future: Future[Cursor[T]]): Cursor[T] =
       new FlattenedCursor(future)
   }
 }

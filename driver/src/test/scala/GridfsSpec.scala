@@ -1,7 +1,7 @@
 import org.specs2.mutable._
 import play.api.libs.iteratee._
 import reactivemongo.api._
-import reactivemongo.api.gridfs.{ReadFile, DefaultFileToSave, GridFS}
+import reactivemongo.api.gridfs.{ ReadFile, DefaultFileToSave, GridFS }
 import reactivemongo.api.gridfs.Implicits._
 import reactivemongo.bson._
 import scala.concurrent._
@@ -29,8 +29,8 @@ class GridfsSpec extends Specification {
       val futureFile = gfs.find(BSONDocument("filename" -> "somefile")).collect[List]()
       val actual = Await.result(futureFile, timeout).head
       (actual.filename mustEqual file.filename) and
-      (actual.uploadDate must beSome) and
-      (actual.contentType mustEqual file.contentType)
+        (actual.uploadDate must beSome) and
+        (actual.contentType mustEqual file.contentType)
       import scala.collection.mutable.ArrayBuilder
       val res = Await.result(gfs.enumerate(actual) |>>> Iteratee.fold(ArrayBuilder.make[Byte]()) { (result, arr) =>
         result ++= arr

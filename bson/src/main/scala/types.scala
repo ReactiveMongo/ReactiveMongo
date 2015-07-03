@@ -53,7 +53,7 @@ case class BSONDocument(stream: Stream[Try[BSONElement]]) extends BSONValue {
   def getTry(key: String): Try[BSONValue] = {
     stream.collectFirst {
       case Success(element) if element._1 == key => Success(element._2)
-      case Failure(e) => Failure(e)
+      case Failure(e)                            => Failure(e)
     }.getOrElse(Failure(DocumentKeyNotFound(key)))
   }
 
@@ -77,8 +77,8 @@ case class BSONDocument(stream: Stream[Try[BSONElement]]) extends BSONValue {
   def getAs[T](s: String)(implicit reader: BSONReader[_ <: BSONValue, T]): Option[T] = {
     get(s).flatMap { element =>
       reader match {
-        case r: BSONReader[BSONValue, T]@unchecked => r.readOpt(element)
-        case _ => None
+        case r: BSONReader[BSONValue, T] @unchecked => r.readOpt(element)
+        case _                                      => None
       }
     }
   }
@@ -327,7 +327,7 @@ class BSONObjectID private (private val raw: Array[Byte]) extends BSONValue with
 
   override def toString = "BSONObjectID(\"" + stringify + "\")"
 
-  override def canEqual(that: Any) : Boolean = that.isInstanceOf[BSONObjectID]
+  override def canEqual(that: Any): Boolean = that.isInstanceOf[BSONObjectID]
 
   override def equals(that: Any): Boolean = {
     canEqual(that) && Arrays.equals(this.raw, that.asInstanceOf[BSONObjectID].raw)
@@ -390,7 +390,8 @@ object BSONObjectID {
         .map(_.getHardwareAddress)
         .getOrElse(InetAddress.getLocalHost.getHostName.getBytes)
       Converters.md5(ha).take(3)
-    } else {
+    }
+    else {
       val threadId = Thread.currentThread.getId.toInt
       val arr = new Array[Byte](3)
 
@@ -416,7 +417,7 @@ object BSONObjectID {
   }
 
   def apply(array: Array[Byte]): BSONObjectID = {
-    if(array.length != 12)
+    if (array.length != 12)
       throw new IllegalArgumentException(s"wrong byte array for an ObjectId (size ${array.length})")
     new BSONObjectID(java.util.Arrays.copyOf(array, 12))
   }
@@ -514,12 +515,12 @@ case class BSONDBPointer(value: String, id: Array[Byte]) extends BSONValue {
   /** The BSONObjectID representation of this reference. */
   val objectId = BSONObjectID(id)
 
-  override def canEqual(that: Any) : Boolean = that.isInstanceOf[BSONDBPointer]
-  override def equals(that: Any) : Boolean = {
+  override def canEqual(that: Any): Boolean = that.isInstanceOf[BSONDBPointer]
+  override def equals(that: Any): Boolean = {
     canEqual(that) && {
       val other = that.asInstanceOf[BSONDBPointer]
       this.value.equals(other.value) &&
-      java.util.Arrays.equals(this.id,other.id)
+        java.util.Arrays.equals(this.id, other.id)
     }
   }
 }

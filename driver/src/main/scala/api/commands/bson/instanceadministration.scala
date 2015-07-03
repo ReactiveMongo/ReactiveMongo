@@ -18,7 +18,7 @@ object BSONListCollectionNamesImplicits {
 
   implicit object BSONCollectionNameReaders extends BSONDocumentReader[CollectionNames] {
     def read(doc: BSONDocument): CollectionNames = (for {
-      _  <- doc.getAs[BSONNumberLike]("ok").map(_.toInt).filter(_ == 1)
+      _ <- doc.getAs[BSONNumberLike]("ok").map(_.toInt).filter(_ == 1)
       cr <- doc.getAs[BSONDocument]("cursor")
       fb <- cr.getAs[List[BSONDocument]]("firstBatch")
       ns <- wtColNames(fb, Nil)
@@ -32,8 +32,8 @@ object BSONListCollectionNamesImplicits {
       case Some(n) => wtColNames(ds, n :: ns)
       case _       => None // error
     }
-    case _       => Some(ns.reverse)
-  }  
+    case _ => Some(ns.reverse)
+  }
 }
 
 object BSONDropImplicits {
@@ -70,9 +70,9 @@ object BSONCreateImplicits {
   implicit object CreateWriter extends BSONDocumentWriter[ResolvedCollectionCommand[Create]] {
     def write(command: ResolvedCollectionCommand[Create]): BSONDocument =
       BSONDocument(
-      "create" -> command.collection,
-      "autoIndexId" -> command.command.autoIndexId) ++ command.command.capped.map( capped =>
-        CappedWriter.write(capped) ++ ("capped" -> true)).getOrElse(BSONDocument())
+        "create" -> command.collection,
+        "autoIndexId" -> command.command.autoIndexId) ++ command.command.capped.map(capped =>
+          CappedWriter.write(capped) ++ ("capped" -> true)).getOrElse(BSONDocument())
   }
 }
 
@@ -99,7 +99,7 @@ object BSONCollStatsImplicits {
       doc.getAs[BSONNumberLike]("totalIndexSize").map(_.toInt).get,
       {
         val indexSizes = doc.getAs[BSONDocument]("indexSizes").get
-          (for (kv <- indexSizes.elements) yield kv._1 -> kv._2.asInstanceOf[BSONInteger].value).toArray
+        (for (kv <- indexSizes.elements) yield kv._1 -> kv._2.asInstanceOf[BSONInteger].value).toArray
       },
       doc.getAs[BSONBooleanLike]("capped").fold(false)(_.toBoolean),
       doc.getAs[BSONNumberLike]("max").map(_.toLong))
@@ -118,8 +118,7 @@ object BSONDropIndexesImplicits {
     def write(command: ResolvedCollectionCommand[DropIndexes]): BSONDocument =
       BSONDocument(
         "dropIndexes" -> command.collection,
-        "index" -> command.command.index
-      )
+        "index" -> command.command.index)
   }
 
   implicit object BSONDropIndexesReader extends DealingWithGenericCommandErrorsReader[DropIndexesResult] {
@@ -131,9 +130,9 @@ object BSONDropIndexesImplicits {
 object BSONListIndexesImplicits {
   import scala.util.{ Failure, Success, Try }
   import reactivemongo.api.indexes.{ Index, IndexesManager }
-  
+
   implicit object BSONListIndexesWriter extends BSONDocumentWriter[ResolvedCollectionCommand[ListIndexes]] {
-    def write(command: ResolvedCollectionCommand[ListIndexes]): BSONDocument = 
+    def write(command: ResolvedCollectionCommand[ListIndexes]): BSONDocument =
       BSONDocument("listIndexes" -> command.collection)
   }
 
@@ -161,16 +160,16 @@ object BSONListIndexesImplicits {
       _ <- doc.getAs[BSONNumberLike]("ok").fold[Option[Unit]](
         throw new Exception("the result of listIndexes must be ok")) { ok =>
 
-        if (ok.toInt == 1) Some(())
-        else throw doc.asOpt[WriteResult].getOrElse(
-          new Exception(s"fails to create index: ${BSONDocument pretty doc}"))
-      }
+          if (ok.toInt == 1) Some(())
+          else throw doc.asOpt[WriteResult].getOrElse(
+            new Exception(s"fails to create index: ${BSONDocument pretty doc}"))
+        }
       a <- doc.getAs[BSONDocument]("cursor")
       b <- a.getAs[List[BSONDocument]]("firstBatch")
     } yield b).fold[List[Index]](throw new Exception(
       "the cursor and firstBatch must be defined"))(readBatch(_, Nil).get)
 
-  }  
+  }
 }
 
 object BSONCreateIndexesImplicits {
@@ -195,9 +194,9 @@ object BSONCreateIndexesImplicits {
     def read(doc: BSONDocument): WriteResult =
       doc.getAs[BSONNumberLike]("ok").map(_.toInt).fold[WriteResult](
         throw new Exception("the count must be defined")) { n =>
-        doc.getAs[String]("errmsg").fold[WriteResult](
-          DefaultWriteResult(true, n, Nil, None, None, None))(
-          err => DefaultWriteResult(false, n, Nil, None, None, Some(err)))
-      }
+          doc.getAs[String]("errmsg").fold[WriteResult](
+            DefaultWriteResult(true, n, Nil, None, None, None))(
+              err => DefaultWriteResult(false, n, Nil, None, None, Some(err)))
+        }
   }
 }

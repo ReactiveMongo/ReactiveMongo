@@ -30,7 +30,7 @@ class BSONCollectionSpec extends Specification {
     var i = 0
     def read(doc: BSONDocument): Person = {
       i += 1
-      if(i % 4 == 0)
+      if (i % 4 == 0)
         throw CustomException("hey hey hey")
       else Person(doc.getAs[String]("name").get, doc.getAs[Int]("age").get)
     }
@@ -89,7 +89,7 @@ class BSONCollectionSpec extends Specification {
           BSONDocument("age" -> 25), BSONDocument("name" -> 1)).
           one[BSONDocument] must beSome[BSONDocument].like({
             case doc =>
-              doc.elements.size must_== 2/* _id+name */ and (
+              doc.elements.size must_== 2 /* _id+name */ and (
                 doc.getAs[String]("name") aka "name" must beSome("Jack"))
           }).await(5000)
       }
@@ -104,23 +104,23 @@ class BSONCollectionSpec extends Specification {
 
       "with success using foldResponses" in {
         cursor.foldResponses(0)(
-          (i, _) => Cursor.Cont(i+1), (_, e) => Cursor.Fail(e)).
-          aka("result") must beEqualTo(1/* one empty response */).
+          (i, _) => Cursor.Cont(i + 1), (_, e) => Cursor.Fail(e)).
+          aka("result") must beEqualTo(1 /* one empty response */ ).
           await(timeoutMillis)
 
       }
 
       "with success using foldBulks" in {
         cursor.foldBulks(0)(
-          (i, _) => Cursor.Cont(i+1), (_, e) => Cursor.Fail(e)).
-          aka("result") must beEqualTo(1/* one empty response */).
+          (i, _) => Cursor.Cont(i + 1), (_, e) => Cursor.Fail(e)).
+          aka("result") must beEqualTo(1 /* one empty response */ ).
           await(timeoutMillis)
 
       }
 
       "with success using foldWhile" in {
         cursor.foldWhile(0)(
-          (i, _) => Cursor.Cont(i+1), (_, e) => Cursor.Fail(e)).
+          (i, _) => Cursor.Cont(i + 1), (_, e) => Cursor.Fail(e)).
           aka("result") must beEqualTo(0).await(timeoutMillis)
 
       }
@@ -191,30 +191,30 @@ class BSONCollectionSpec extends Specification {
     "read docs with error" >> {
       implicit val reader = new SometimesBuggyPersonReader
       @inline def cursor = collection.find(BSONDocument()).cursor[Person]
-      
+
       "using collect" in {
         val collect = cursor.collect[Vector]().map(_.size).recover {
           case e if e.getMessage == "hey hey hey" => -1
-          case e => e.printStackTrace(); -2
+          case e                                  => e.printStackTrace(); -2
         }
 
         collect aka "first collect" must not(throwA[Exception]).
           await(timeoutMillis) and (collect must beEqualTo(-1).
-          await(timeoutMillis))
+            await(timeoutMillis))
       }
 
       "using foldWhile" in {
-        Await.result(cursor.foldWhile(0)((i, _) => Cursor.Cont(i+1),
+        Await.result(cursor.foldWhile(0)((i, _) => Cursor.Cont(i + 1),
           (_, e) => Cursor.Fail(e)), timeout) must throwA[CustomException]
       }
 
       "fallbacking to final value using foldWhile" in {
-        cursor.foldWhile(0)((i, _) => Cursor.Cont(i+1),
+        cursor.foldWhile(0)((i, _) => Cursor.Cont(i + 1),
           (_, e) => Cursor.Done(-1)) must beEqualTo(-1).await(timeoutMillis)
       }
 
       "skiping failure using foldWhile" in {
-        cursor.foldWhile(0)((i, _) => Cursor.Cont(i+1),
+        cursor.foldWhile(0)((i, _) => Cursor.Cont(i + 1),
           (_, e) => Cursor.Cont(-3)) must beEqualTo(-2).await(timeoutMillis)
       }
     }
@@ -226,7 +226,7 @@ class BSONCollectionSpec extends Specification {
       val future = enumerator |>>> Iteratee.foreach { doc =>
         i += 1
         println(s"\tgot doc: $doc")
-      } map(_ => -1)
+      } map (_ => -1)
       val r = Await.result(future.recover { case e => i }, timeout)
       println(s"read $r/5 docs (expected 3/5)")
       r mustEqual 3
@@ -289,7 +289,7 @@ class BSONCollectionSpec extends Specification {
       col.indexesManager.ensure(Index(
         Seq("token" -> IndexType.Ascending), unique = true)).
         aka("index creation") must beFalse.await(timeoutMillis)
-      
+
     }
   }
 }

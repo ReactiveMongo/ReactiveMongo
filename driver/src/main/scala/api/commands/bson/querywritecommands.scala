@@ -9,11 +9,11 @@ object BSONGetLastErrorImplicits {
     def write(wc: GetLastError): BSONDocument = BSONDocument(
       "getlasterror" -> 1,
       "w" -> ((wc.w match {
-        case GetLastError.Majority => BSONString("majority")
-        case GetLastError.TagSet(tagSet) => BSONString(tagSet)
+        case GetLastError.Majority                 => BSONString("majority")
+        case GetLastError.TagSet(tagSet)           => BSONString(tagSet)
         case GetLastError.WaitForAknowledgments(n) => BSONInteger(n)
       }): BSONValue),
-      "j" -> (if(wc.j) Some(true) else None),
+      "j" -> (if (wc.j) Some(true) else None),
       "wtimeout" -> wc.wtimeout)
   }
   implicit object LastErrorReader extends DealingWithGenericCommandErrorsReader[LastError] {
@@ -29,13 +29,12 @@ object BSONGetLastErrorImplicits {
         upserted = doc.getAs[BSONObjectID]("upserted"),
         wnote = doc.get("wnote").map {
           case BSONString("majority") => GetLastError.Majority
-          case BSONString(tagSet) => GetLastError.TagSet(tagSet)
-          case BSONInteger(acks) => GetLastError.WaitForAknowledgments(acks)
+          case BSONString(tagSet)     => GetLastError.TagSet(tagSet)
+          case BSONInteger(acks)      => GetLastError.WaitForAknowledgments(acks)
         },
         wtimeout = doc.getAs[Boolean]("wtimeout").getOrElse(false),
         waited = doc.getAs[Int]("waited"),
-        wtime = doc.getAs[Int]("wtime")
-      )
+        wtime = doc.getAs[Int]("wtime"))
   }
 }
 
@@ -43,11 +42,11 @@ object BSONCommonWriteCommandsImplicits {
   implicit object WriteConcernWriter extends BSONDocumentWriter[WriteConcern] {
     def write(wc: WriteConcern): BSONDocument = BSONDocument(
       "w" -> ((wc.w match {
-        case GetLastError.Majority => BSONString("majority")
-        case GetLastError.TagSet(tagSet) => BSONString(tagSet)
+        case GetLastError.Majority                 => BSONString("majority")
+        case GetLastError.TagSet(tagSet)           => BSONString(tagSet)
         case GetLastError.WaitForAknowledgments(n) => BSONInteger(n)
       }): BSONValue),
-      "j" -> (if(wc.j) Some(true) else None),
+      "j" -> (if (wc.j) Some(true) else None),
       "wtimeout" -> wc.wtimeout)
   }
   implicit object WriteErrorReader extends BSONDocumentReader[WriteError] {
@@ -90,8 +89,7 @@ object BSONInsertCommandImplicits {
         "insert" -> command.collection,
         "documents" -> BSONArray(command.command.documents),
         "ordered" -> command.command.ordered,
-        "writeConcern" -> command.command.writeConcern
-      )
+        "writeConcern" -> command.command.writeConcern)
     }
   }
 }
@@ -110,8 +108,7 @@ object BSONUpdateCommandImplicits {
         "q" -> element.q,
         "u" -> element.u,
         "upsert" -> element.upsert,
-        "multi" -> element.multi
-      )
+        "multi" -> element.multi)
   }
   implicit object UpdateWriter extends BSONDocumentWriter[ResolvedCollectionCommand[Update]] {
     def write(update: ResolvedCollectionCommand[Update]) = {
@@ -119,8 +116,7 @@ object BSONUpdateCommandImplicits {
         "update" -> update.collection,
         "updates" -> update.command.documents,
         "ordered" -> update.command.ordered,
-        "writeConcern" -> update.command.writeConcern
-      )
+        "writeConcern" -> update.command.writeConcern)
     }
   }
   implicit object UpsertedReader extends BSONDocumentReader[Upserted] {
@@ -141,7 +137,7 @@ object BSONUpdateCommandImplicits {
         writeConcernError = doc.getAs[WriteConcernError]("writeConcernError"),
         code = doc.getAs[Int]("code"), //FIXME There is no corresponding official docs.
         errmsg = doc.getAs[String]("errmsg") //FIXME There is no corresponding official docs.
-      )
+        )
     }
   }
 }

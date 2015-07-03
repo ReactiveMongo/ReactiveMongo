@@ -38,7 +38,7 @@ object BSONIsMasterCommandImplicits {
         maxWireVersion = doc.getAs[Int]("maxWireVersion").getOrElse(0), // int? mongod >= 2.6
         replicaSet = rs, // flattened in the result
         msg = doc.getAs[String]("msg") // Contains the value isdbgrid when isMaster returns from a mongos instance.
-      )
+        )
     }
 
   }
