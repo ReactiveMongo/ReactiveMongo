@@ -53,7 +53,7 @@ trait GenericCollectionWithCommands[P <: SerializationPack with Singleton] { sel
 }
 
 trait BatchCommands[P <: SerializationPack] {
-  import reactivemongo.api.commands.{ CountCommand => CC, InsertCommand => IC, UpdateCommand => UC, DeleteCommand => DC, DefaultWriteResult, LastError, ResolvedCollectionCommand }
+  import reactivemongo.api.commands.{ CountCommand => CC, InsertCommand => IC, UpdateCommand => UC, DeleteCommand => DC, DefaultWriteResult, LastError, ResolvedCollectionCommand, FindAndModifyCommand => FMC }
 
   val pack: P
 
@@ -63,11 +63,18 @@ trait BatchCommands[P <: SerializationPack] {
 
   val InsertCommand: IC[pack.type]
   implicit def InsertWriter: pack.Writer[ResolvedCollectionCommand[InsertCommand.Insert]]
+
   val UpdateCommand: UC[pack.type]
   implicit def UpdateWriter: pack.Writer[ResolvedCollectionCommand[UpdateCommand.Update]]
   implicit def UpdateReader: pack.Reader[UpdateCommand.UpdateResult]
+
   val DeleteCommand: DC[pack.type]
   implicit def DeleteWriter: pack.Writer[ResolvedCollectionCommand[DeleteCommand.Delete]]
+
+  val FindAndModifyCommand: FMC[pack.type]
+  implicit def FindAndModifyWriter: pack.Writer[ResolvedCollectionCommand[FindAndModifyCommand.FindAndModify]]
+  implicit def FindAndModifyReader: pack.Reader[FindAndModifyCommand.FindAndModifyResult]
+
   implicit def DefaultWriteResultReader: pack.Reader[DefaultWriteResult]
 
   implicit def LastErrorReader: pack.Reader[LastError]
@@ -136,7 +143,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    * @tparam S the type of the selector (the query). An implicit `Writer[S]` typeclass for handling it has to be in the scope.
    * @tparam P the type of the projection object. An implicit `Writer[P]` typeclass for handling it has to be in the scope.
    *
-   * @param selector The query selector.
+   * @param selector the query selector.
    * @param projection Get only a subset of each matched documents. Defaults to None.
    *
    * @return a [[GenericQueryBuilder]] that you can use to to customize the query. You can obtain a cursor by calling the method [[reactivemongo.api.Cursor]] on this query builder.
@@ -293,6 +300,82 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
     }.future
 
   /**
+   * Returns an update modifier, to be used with [[findAndModify]].
+   *
+   * @param update the update to be applied
+   * @param fetchNewObject the command result must be the new object instead of the old one.
+   * @param upsert if true, creates a new document if no document matches the query, or if documents match the query, findAndModify performs an update
+   */
+  def updateModifier[U](update: U, fetchNewObject: Boolean = false, upsert: Boolean = false)(implicit updateWriter: pack.Writer[U]): BatchCommands.FindAndModifyCommand.Update = BatchCommands.FindAndModifyCommand.Update(update, fetchNewObject, upsert)
+
+  /** Returns a removal modifier, to be used with [[findAndModify]]. */
+  lazy val removeModifier = BatchCommands.FindAndModifyCommand.Remove
+
+  /**
+   * Applies a [[http://docs.mongodb.org/manual/reference/command/findAndModify/ findAndModify]] operation. See [[findAndUpdate]] and [[findAndRemove]] convenient functions.
+   *
+   * {{{
+   * val updateOp = collection.updateModifier(
+   *   BSONDocument("$set" -> BSONDocument("age" -> 35)))
+   *
+   * val personBeforeUpdate: Future[Person] =
+   *   collection.findAndModify(BSONDocument("name" -> "Joline"), updateOp).
+   *   map(_.result[Person])
+   *
+   * val removedPerson: Future[Person] = collection.findAndModify(
+   *   BSONDocument("name" -> "Jack"), collection.removeModifier)
+   * }}}
+   *
+   * @param selector the query selector
+   * @param modifier the modify operator to be applied
+   * @param sort the optional document possibly indicating the sort criterias
+   */
+  def findAndModify[Q](selector: Q, modifier: BatchCommands.FindAndModifyCommand.Modify, sort: Option[pack.Document] = None)(implicit selectorWriter: pack.Writer[Q], ec: ExecutionContext): Future[BatchCommands.FindAndModifyCommand.FindAndModifyResult] = {
+    val command = BatchCommands.FindAndModifyCommand.FindAndModify(
+      query = selector,
+      modify = modifier,
+      sort = sort.map(implicitly[FindAndModifyCommand.ImplicitlyDocumentProducer](_)))
+
+    runCommand(command)
+  }
+
+  /**
+   * Finds some matching document, and updates it (using [[findAndModify]]).
+   *
+   * {{{
+   * val person: Future[BSONDocument] = collection.findAndUpdate(
+   *   BSONDocument("name" -> "James"),
+   *   BSONDocument("$set" -> BSONDocument("age" -> 17)),
+   *   fetchNewObject = true) // on success, return the update document:
+   *                          // { "age": 17 }
+   * }}}
+   *
+   * @param selector the query selector
+   * @param update the update to be applied
+   * @param fetchNewObject the command result must be the new object instead of the old one.
+   * @param upsert if true, creates a new document if no document matches the query, or if documents match the query, findAndModify performs an update
+   * @param sort the optional document possibly indicating the sort criterias
+   */
+  def findAndUpdate[Q, U](selector: Q, update: U, fetchNewObject: Boolean = false, upsert: Boolean = false, sort: Option[pack.Document] = None)(implicit selectorWriter: pack.Writer[Q], updateWriter: pack.Writer[U], ec: ExecutionContext): Future[BatchCommands.FindAndModifyCommand.FindAndModifyResult] = {
+    val updateOp = updateModifier(update, fetchNewObject, upsert)
+    findAndModify(selector, updateOp, sort)
+  }
+
+  /**
+   * Finds some matching document, and removes it (using [[findAndModify]]).
+   *
+   * {{{
+   * val removed: Future[Person] = collection.findAndRemove(
+   *   BSONDocument("name" -> "Foo")).map(_.result[Person])
+   * }}}
+   *
+   * @param selector the query selector
+   * @param modifier the modify operator to be applied
+   * @param sort the optional document possibly indicating the sort criterias
+   */
+  def findAndRemove[Q](selector: Q, sort: Option[pack.Document] = None)(implicit selectorWriter: pack.Writer[Q], ec: ExecutionContext): Future[BatchCommands.FindAndModifyCommand.FindAndModifyResult] = findAndModify[Q](selector, removeModifier, sort)
+
+  /**
    * Remove the matched document(s) from the collection and wait for the [[reactivemongo.api.commands.WriteResult]] result.
    *
    * Please read the documentation about [[reactivemongo.core.commands.GetLastError]] to know how to use it properly.
@@ -328,12 +411,6 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
           Future.failed(ConnectionNotInitialized.MissingMetadata)
       }
     }.future
-
-  /*def bulkInsert2[T](enumerator: Enumerator[T], bulkSize: Int = bulk.MaxDocs, bulkByteSize: Int = bulk.MaxBulkSize)(implicit writer: pack.Writer[T], ec: ExecutionContext): Future[Int] =
-    enumerator |>>> bulkInsertIteratee2(bulkSize, bulkByteSize)
-
-  def bulkInsertIteratee2[T](bulkSize: Int = bulk.MaxDocs, bulkByteSize: Int = bulk.MaxBulkSize)(implicit writer: pack.Writer[T], ec: ExecutionContext): Iteratee[T, Int] =
-    Enumeratee.map { doc: T => writeDoc(doc, writer) } &>> bulk.iteratee(this, bulkSize, bulkByteSize)*/
 
   /**
    * Remove the matched document(s) from the collection without writeConcern.
@@ -392,10 +469,6 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
 
   protected object Mongo26WriteCommand {
     def insert(ordered: Boolean, writeConcern: WriteConcern, metadata: ProtocolMetadata): Mongo26WriteCommand = new Mongo26WriteCommand("insert", ordered, writeConcern, metadata)
-    /* TODO: Remove
-    def update(ordered: Boolean, writeConcern: WriteConcern, metadata: ProtocolMetadata): Mongo26WriteCommand = new Mongo26WriteCommand("update", ordered, writeConcern, metadata)
-    def delete(ordered: Boolean, writeConcern: WriteConcern, metadata: ProtocolMetadata): Mongo26WriteCommand = new Mongo26WriteCommand("delete", ordered, writeConcern, metadata)
-     */
   }
 
   protected sealed trait BulkMaker[R, S <: BulkMaker[R, S]] {

@@ -273,6 +273,51 @@ class BSONCollectionSpec extends Specification {
           _.flatMap(_.getAs[BSONJavaScript]("name")).map(_.value))
       } aka "inserted" must beSome("db.getName()").await(timeoutMillis)
     }
+
+    "find and update" >> {
+      implicit val reader = PersonReader
+      implicit val writer = PersonWriter
+
+      "by updating age of 'Joline', & returns the old document" in {
+        val updateOp = collection.updateModifier(
+          BSONDocument("$set" -> BSONDocument("age" -> 35)))
+
+        collection.findAndModify(BSONDocument("name" -> "Joline"), updateOp).
+          map(_.result[Person]) must beSome(person5).await(timeoutMillis)
+      }
+
+      "by updating age of 'James', & returns the updated document" in {
+        collection.findAndUpdate(
+          BSONDocument("name" -> "James"), person2.copy(age = 17),
+          fetchNewObject = true).map(_.result[Person]).
+          aka("result") must beSome(person2.copy(age = 17)).await(timeoutMillis)
+      }
+
+      "by inserting a new 'Foo' person (with upsert = true)" in {
+        val fooPerson = Person("Foo", -1)
+
+        collection.findAndUpdate(fooPerson, fooPerson,
+          fetchNewObject = true, upsert = true).
+          map(_.result[Person]) must beSome(fooPerson).await(timeoutMillis)
+      }
+    }
+
+    "find and remove" >> {
+      implicit val reader = PersonReader
+
+      "'Joline' using findAndModify" in {
+        collection.findAndModify(BSONDocument("name" -> "Joline"),
+          collection.removeModifier).map(_.result[Person]).
+          aka("removed person") must beSome(person5.copy(age = 35)).
+          await(timeoutMillis)
+      }
+
+      "'Foo' using findAndRemove" in {
+        collection.findAndRemove(BSONDocument("name" -> "Foo")).
+          map(_.result[Person]) aka "removed" must beSome(Person("Foo", -1)).
+          await(timeoutMillis)
+      }
+    }
   }
 
   "Index" should {

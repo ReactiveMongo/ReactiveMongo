@@ -100,8 +100,7 @@ trait GenericQueryBuilder[P <: SerializationPack] {
    *
    * An implicit `Reader[T]` must be present in the scope.
    */
-  def one[T](implicit reader: pack.Reader[T], ec: ExecutionContext): Future[Option[T]] = copy(options = options.batchSize(1)).
-    defaultCursor(ReadPreference.primary)(reader, ec).headOption
+  def one[T](implicit reader: pack.Reader[T], ec: ExecutionContext): Future[Option[T]] = one(ReadPreference.primary)
 
   /**
    * Sends this query and gets a future `Option[T]`.

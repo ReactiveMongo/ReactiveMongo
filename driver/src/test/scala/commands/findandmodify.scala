@@ -24,61 +24,75 @@ class FindAndModifySpec extends Specification {
     age: Int)
 
   implicit object PersonReader extends BSONDocumentReader[Person] {
-    def read(doc: BSONDocument): Person =
-      Person(
-        doc.getAs[String]("firstName").getOrElse(""),
-        doc.getAs[String]("lastName").getOrElse(""),
-        doc.getAs[Int]("age").getOrElse(0))
+    def read(doc: BSONDocument): Person = Person(
+      doc.getAs[String]("firstName").getOrElse(""),
+      doc.getAs[String]("lastName").getOrElse(""),
+      doc.getAs[Int]("age").getOrElse(0))
   }
 
   implicit object PersonWriter extends BSONDocumentWriter[Person] {
-    def write(person: Person): BSONDocument =
-      BSONDocument(
-        "firstName" -> person.firstName,
-        "lastName" -> person.lastName,
-        "age" -> person.age
-      )
+    def write(person: Person): BSONDocument = BSONDocument(
+      "firstName" -> person.firstName,
+      "lastName" -> person.lastName,
+      "age" -> person.age)
   }
 
   "FindAndModify" should {
     "upsert a doc and fetch it" in {
       val jack = Person("Jack", "London", 27)
-      val future = collection.runCommand(FindAndModify(jack, Update(BSONDocument("$set" -> BSONDocument("age" -> 40)), fetchNewObject = true), upsert = true))
+      val upsertOp = Update(BSONDocument("$set" -> BSONDocument("age" -> 40)), fetchNewObject = true, upsert = true)
+      val future = collection.runCommand(FindAndModify(jack, upsertOp))
+
+      /* TODO: Remove
       val result = Await.result(future, timeout)
+
       println(s"FAM(upsert) result is $result")
       println(result.value.map(BSONDocument.pretty))
-      result.lastError.exists(_.upsertedId.isDefined) mustEqual true
-      val upserted = result.result[Person]
-      upserted.isDefined mustEqual true
-      upserted.get.firstName mustEqual "Jack"
-      upserted.get.lastName mustEqual "London"
-      upserted.get.age mustEqual 40
+       */
+
+      future must (beLike[FindAndModifyResult] {
+        case result =>
+          result.lastError.exists(_.upsertedId.isDefined) must beTrue and (
+            result.result[Person] aka "upserted" must beSome[Person].like {
+              case Person("Jack", "London", 40) => ok
+            })
+      }).await(timeoutMillis)
     }
+
     "modify a doc and fetch its previous value" in {
       val jack = Person("Jack", "London", 40)
-      val future = collection.runCommand(FindAndModify(jack, Update(BSONDocument("$inc" -> BSONDocument("age" -> 1)))))
+      val incrementAge = Update(BSONDocument(
+        "$inc" -> BSONDocument("age" -> 1)))
+
+      val future = collection.runCommand(FindAndModify(jack, incrementAge))
+
+      /*
       val result = Await.result(future, timeout)
       println(s"FAM(modify) result is $result")
-      result.lastError.exists(_.upsertedId.isEmpty) mustEqual true
-      val previousValue = result.result[Person]
-      previousValue.isDefined mustEqual true
-      previousValue.get.firstName mustEqual "Jack"
-      previousValue.get.lastName mustEqual "London"
-      previousValue.get.age mustEqual 40
-      Await.result(collection.find(jack.copy(age = jack.age + 1)).one[Person], timeout).exists(_.age == 41) mustEqual true
+      result.lastError.exists(_.upsertedId.isEmpty) must beTrue
+       */
+
+      future must (beLike[FindAndModifyResult] {
+        case result =>
+          result.result[Person] aka "previous value" must beSome.like {
+            case Person("Jack", "London", 40) =>
+              collection.find(jack.copy(age = jack.age + 1)).
+                one[Person].map(_.map(_.age)) must beSome(41).
+                await(timeoutMillis)
+          }
+      }).await(timeoutMillis)
     }
+
     "make a failing FindAndModify" in {
       val query = BSONDocument()
-      val future =
-        collection.
-          runCommand(FindAndModify(query, Update(BSONDocument("$inc" -> "age")))).
-          map(_ => None).
-          recover {
-            case e: CommandError =>
-              e.printStackTrace
-              Some(e)
-          }
-      Await.result(future, timeout).isDefined mustEqual true
+      val future = collection.runCommand(
+        FindAndModify(query, Update(BSONDocument("$inc" -> "age"))))
+
+      future.map(_ => Option.empty[Int]).recover {
+        case e: CommandError =>
+          //e.printStackTrace
+          e.code
+      } must beSome( /*code = */ 9).await(timeoutMillis)
     }
   }
 }

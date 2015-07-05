@@ -1,16 +1,21 @@
 package reactivemongo.api.commands.bson
 
 import reactivemongo.api.BSONSerializationPack
-import reactivemongo.api.commands._
-import reactivemongo.bson._
+import reactivemongo.api.commands.{
+  FindAndModifyCommand,
+  ResolvedCollectionCommand
+}
+import reactivemongo.bson.{ BSONDocument, BSONDocumentWriter, BSONValue }
 
-object BSONFindAndModifyCommand extends FindAndModifyCommand[BSONSerializationPack.type] {
+object BSONFindAndModifyCommand
+    extends FindAndModifyCommand[BSONSerializationPack.type] {
   val pack: BSONSerializationPack.type = BSONSerializationPack
 }
 
 object BSONFindAndModifyImplicits {
   import BSONFindAndModifyCommand._
   implicit object FindAndModifyResultReader extends DealingWithGenericCommandErrorsReader[FindAndModifyResult] {
+
     def readResult(result: BSONDocument): FindAndModifyResult =
       FindAndModifyResult(
         result.getAs[BSONDocument]("lastErrorObject").map { doc =>
@@ -18,28 +23,27 @@ object BSONFindAndModifyImplicits {
             updatedExisting = doc.getAs[Boolean]("updatedExisting").getOrElse(false),
             n = doc.getAs[Int]("n").getOrElse(0),
             err = doc.getAs[String]("err"),
-            upsertedId = doc.getAs[BSONValue]("upserted")
-          )
+            upsertedId = doc.getAs[BSONValue]("upserted"))
         },
-        result.getAs[BSONDocument]("value")
-      )
+        result.getAs[BSONDocument]("value"))
   }
-  implicit object FindAndModifyWriter extends BSONDocumentWriter[ResolvedCollectionCommand[FindAndModify]] {
-    def write(command: ResolvedCollectionCommand[FindAndModify]): BSONDocument =
+
+  implicit object FindAndModifyWriter
+      extends BSONDocumentWriter[ResolvedCollectionCommand[FindAndModify]] {
+
+    def write(cmd: ResolvedCollectionCommand[FindAndModify]): BSONDocument =
       BSONDocument(
-        "findAndModify" -> command.collection,
-        "query" -> command.command.query,
-        "sort" -> command.command.sort,
-        "fields" -> command.command.fields,
-        "upsert" -> (if(command.command.upsert) Some(true) else None)
-      ) ++ (command.command.modify match {
-        case Update(document, fetchNewObject) =>
-          BSONDocument(
-            "update" -> document,
-            "new" -> fetchNewObject
-          )
-        case Remove =>
-          BSONDocument("remove" -> true)
-      })
+        "findAndModify" -> cmd.collection,
+        "query" -> cmd.command.query,
+        "sort" -> cmd.command.sort,
+        "fields" -> cmd.command.fields) ++
+        (cmd.command.modify match {
+          case Update(document, fetchNewObject, upsert) =>
+            BSONDocument(
+              "upsert" -> upsert,
+              "update" -> document,
+              "new" -> fetchNewObject)
+          case Remove => BSONDocument("remove" -> true)
+        })
   }
 }
