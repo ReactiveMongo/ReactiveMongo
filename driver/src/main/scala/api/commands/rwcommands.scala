@@ -170,7 +170,7 @@ case class MultiBulkWriteResult(
 
 }
 
-trait InsertCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] /*with WriteCommandsCommon[P]*/ {
+trait InsertCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] {
   case class Insert(
     documents: Seq[P#Document],
     ordered: Boolean,
