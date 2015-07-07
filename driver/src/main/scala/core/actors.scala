@@ -127,6 +127,7 @@ class MongoDBSystem(
       if (connection.isAuthenticated(nextAuth.db, nextAuth.user))
         authenticateConnection(connection, auths.tail)
       else {
+        // TODO: SCRAM-SHA1
         connection.send(Getnonce(nextAuth.db).maker(requestIds.getNonce.next))
         connection.copy(authenticating = Some(Authenticating(nextAuth.db, nextAuth.user, nextAuth.password, None)))
       }
@@ -217,7 +218,7 @@ class MongoDBSystem(
       logger.error(s"(State: Closing) UNHANDLED MESSAGE: $other")
   }
 
-  override def receive = {
+  private val processing: Receive = {
     case RegisterMonitor => monitors += sender
 
     case Close =>
@@ -351,6 +352,7 @@ class MongoDBSystem(
       }
       logger.debug(channelId + " is disconnected")
     }
+
     // isMaster response
     case response: Response if requestIds.isMaster accepts response =>
       val nodeSetWasReachable = nodeSet.isReachable
@@ -387,34 +389,6 @@ class MongoDBSystem(
           }).createNeededChannels(self, options.nbChannelsPerNode)
         }
       }
-      /*IsMaster.ResultMaker(response).fold(
-        e => {
-          logger.error(s"error while processing isMaster response #${response.header.responseTo}", e)
-        },
-        isMaster => {
-          val ns = nodeSet.updateNodeByChannelId(response.info.channelId) { node =>
-            val pingInfo =
-              if (node.pingInfo.lastIsMasterId == response.header.responseTo)
-                node.pingInfo.copy(ping = System.currentTimeMillis() - node.pingInfo.lastIsMasterTime, lastIsMasterTime = 0, lastIsMasterId = -1)
-              else node.pingInfo
-            val authenticating = isMaster.status match {
-              case _: QueryableNodeStatus => authenticateNode(node, nodeSet.authenticates.toSeq)
-              case _                      => node
-            }
-            authenticating.copy(status = isMaster.status, pingInfo = pingInfo, name = isMaster.me.getOrElse(node.name), tags = isMaster.tags)
-          }
-          updateNodeSet {
-            connectAll {
-              (if (isMaster.hosts.isDefined) {
-                ns.copy(nodes = ns.nodes ++ isMaster.hosts.get.collect {
-                  case host if !ns.nodes.exists(_.name == host) => Node(host, NodeStatus.Uninitialized, Vector.empty, Set.empty, None)
-                })
-              } else {
-                ns
-              }).createNeededChannels(self, options.nbChannelsPerNode)
-            }
-          }
-        })*/
       if (!nodeSetWasReachable && nodeSet.isReachable) {
         broadcastMonitors(new SetAvailable(nodeSet.protocolMetadata))
         logger.info("The node set is now available")
@@ -423,13 +397,15 @@ class MongoDBSystem(
         broadcastMonitors(new PrimaryAvailable(nodeSet.protocolMetadata))
         logger.info("The primary is now available")
       }
+  } //.orElse(authentication).orElse(fallback)
 
-    case request @ AuthRequest(authenticate, _) => {
-      // TODO warn auth ok
+  private val authentication: Receive = {
+    case request @ AuthRequest(authenticate, _) => // TODO warn auth ok
       AuthRequestsManager.addAuthRequest(request)
-      updateNodeSet(authenticateNodeSet(nodeSet.copy(authenticates = nodeSet.authenticates + authenticate)))
-    }
-    // getnonce response
+      updateNodeSet(authenticateNodeSet(nodeSet.
+        copy(authenticates = nodeSet.authenticates + authenticate)))
+
+    // getnonce response, TODO: SCRAM-SHA1
     case response: Response if requestIds.getNonce accepts response =>
       Getnonce.ResultMaker(response).fold(
         e =>
@@ -474,7 +450,9 @@ class MongoDBSystem(
         case _ => nodeSet
       })
     }
+  }
 
+  private val fallback: Receive = {
     // any other response
     case response: Response if requestIds.common accepts response => {
       awaitingResponses.get(response.header.responseTo) match {
@@ -554,8 +532,12 @@ class MongoDBSystem(
         }
       }
     }
-    case a @ _ => logger.error("not supported " + a)
+
+    case a => logger.error(s"not supported $a")
   }
+
+  override val receive: Receive =
+    processing.orElse(authentication).orElse(fallback)
 
   // monitor -->
   var nodeSet: NodeSet = NodeSet(None, None, seeds.map(seed => Node(seed, NodeStatus.Unknown, Vector.empty, Set.empty, None, ProtocolMetadata.Default).createNeededChannels(self, 1)).toVector, initialAuthenticates.toSet)
@@ -721,10 +703,13 @@ object Exceptions {
 private[actors] class RequestIds {
   // all requestIds [0, 1000[ are for isMaster messages
   val isMaster = RequestIdGenerator(0, 999)
+
   // all requestIds [1000, 2000[ are for getnonce messages
-  val getNonce = RequestIdGenerator(1000, 1999)
+  val getNonce = RequestIdGenerator(1000, 1999) // CR auth
+
   // all requestIds [2000, 3000[ are for authenticate messages
   val authenticate = RequestIdGenerator(2000, 2999)
+
   // all requestIds [3000[ are for common messages
   val common = RequestIdGenerator(3000, Int.MaxValue - 1)
 }
