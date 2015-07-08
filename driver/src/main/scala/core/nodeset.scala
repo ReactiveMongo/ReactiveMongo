@@ -1,25 +1,35 @@
 package reactivemongo.core.nodeset
 
-import reactivemongo.core.protocol.Request
-import akka.actor.ActorRef
-import scala.annotation.tailrec
-import scala.collection.generic.CanBuildFrom
 import java.util.concurrent.{ Executor, Executors }
-import reactivemongo.utils.LazyLogger
+
+import scala.collection.generic.CanBuildFrom
+
 import org.jboss.netty.channel.socket.nio.NioClientSocketChannelFactory
 import org.jboss.netty.buffer.HeapChannelBufferFactory
 import org.jboss.netty.channel.{ Channel, ChannelPipeline, Channels }
-import reactivemongo.core.protocol._
+
+import akka.actor.ActorRef
+
+import reactivemongo.utils.LazyLogger
+import reactivemongo.core.protocol.Request
+
+import reactivemongo.bson.BSONDocument
+import reactivemongo.core.protocol.{
+  MongoHandler,
+  MongoWireVersion,
+  RequestEncoder,
+  ResponseDecoder,
+  ResponseFrameDecoder
+}
 import reactivemongo.api.{ MongoConnectionOptions, ReadPreference }
-import reactivemongo.bson._
 
 package object utils {
-  def updateFirst[A, M[T] <: Iterable[T]](coll: M[A])(ƒ: A => Option[A])(implicit cbf: CanBuildFrom[M[_], A, M[A]]): M[A] = {
+  def updateFirst[A, M[T] <: Iterable[T]](coll: M[A])(f: A => Option[A])(implicit cbf: CanBuildFrom[M[_], A, M[A]]): M[A] = {
     val builder = cbf.apply
     def run(iterator: Iterator[A]): Unit = {
       while (iterator.hasNext) {
         val e = iterator.next
-        val updated = ƒ(e)
+        val updated = f(e)
         if (updated.isDefined) {
           builder += updated.get
           builder ++= iterator
@@ -60,29 +70,30 @@ case class NodeSet(
 
   def isReachable = !primary.isEmpty || !secondaries.subject.isEmpty
 
-  def updateOrAddNode(ƒ: PartialFunction[Node, Node], default: Node) = {
-    val (maybeUpdatedNodes, updated) = utils.update(nodes)(ƒ)
+  def updateOrAddNode(f: PartialFunction[Node, Node], default: Node) = {
+    val (maybeUpdatedNodes, updated) = utils.update(nodes)(f)
     if (!updated) copy(nodes = default +: nodes)
     else copy(nodes = maybeUpdatedNodes)
   }
 
-  def updateOrAddNodes(ƒ: PartialFunction[Node, Node], nodes: Seq[Node]) =
-    nodes.foldLeft(this)(_.updateOrAddNode(ƒ, _))
+  def updateOrAddNodes(f: PartialFunction[Node, Node], nodes: Seq[Node]) =
+    nodes.foldLeft(this)(_.updateOrAddNode(f, _))
 
-  def updateAll(ƒ: Node => Node) = copy(nodes = nodes.map(ƒ))
+  def updateAll(f: Node => Node) = copy(nodes = nodes.map(f))
 
-  def updateNodeByChannelId(id: Int)(ƒ: Node => Node) =
-    updateByChannelId(id)(identity)(ƒ)
+  def updateNodeByChannelId(id: Int)(f: Node => Node) =
+    updateByChannelId(id)(identity)(f)
 
-  def updateConnectionByChannelId(id: Int)(ƒ: Connection => Connection) =
-    updateByChannelId(id)(ƒ)(identity)
+  def updateConnectionByChannelId(id: Int)(f: Connection => Connection) =
+    updateByChannelId(id)(f)(identity)
 
-  def updateByChannelId(id: Int)(ƒc: Connection => Connection)(ƒn: Node => Node) = {
+  def updateByChannelId(id: Int)(fc: Connection => Connection)(fn: Node => Node) = {
     copy(nodes = nodes.map { node =>
       val (connections, updated) = utils.update(node.connections) {
-        case conn if (conn.channel.getId == id) => ƒc(conn)
+        case conn if (conn.channel.getId == id) => fc(conn)
       }
-      if (updated) ƒn(node.copy(connections = connections))
+
+      if (updated) fn(node.copy(connections = connections))
       else node
     })
   }
@@ -158,7 +169,7 @@ case class Node(
 
   def createNeededChannels(receiver: ActorRef, upTo: Int)(implicit channelFactory: ChannelFactory): Node = {
     if (connections.size < upTo) {
-      copy(connections = connections.++(for (i <- 0 until (upTo - connections.size)) yield Connection(channelFactory.create(host, port, receiver), ConnectionStatus.Disconnected, Set.empty, None)))
+      copy(connections = connections.++(for (i ← 0 until (upTo - connections.size)) yield Connection(channelFactory.create(host, port, receiver), ConnectionStatus.Disconnected, Set.empty, None)))
     }
     else this
   }
@@ -217,18 +228,25 @@ object NodeStatus {
   object Secondary extends NodeStatus with QueryableNodeStatus with CanonicalNodeStatus { override def toString = "Secondary" }
   /** Can vote. Members either perform startup self-checks, or transition from completing a rollback or resync. */
   object Recovering extends NodeStatus with CanonicalNodeStatus { override def toString = "Recovering" }
+
   /** Cannot vote. Has encountered an unrecoverable error. */
   object Fatal extends NodeStatus with CanonicalNodeStatus { override def toString = "Fatal" }
+
   /** Cannot vote. Forks replication and election threads before becoming a secondary. */
   object Startup2 extends NodeStatus with CanonicalNodeStatus { override def toString = "Startup2" }
+
   /** Cannot vote. Has never connected to the replica set. */
   object Unknown extends NodeStatus with CanonicalNodeStatus { override def toString = "Unknown" }
+
   /** Can vote. Arbiters do not replicate data and exist solely to participate in elections. */
   object Arbiter extends NodeStatus with CanonicalNodeStatus { override def toString = "Arbiter" }
+
   /** Cannot vote. Is not accessible to the set. */
   object Down extends NodeStatus with CanonicalNodeStatus { override def toString = "Down" }
+
   /** Can vote. Performs a rollback. */
   object Rollback extends NodeStatus with CanonicalNodeStatus { override def toString = "Rollback" }
+
   /** Shunned. */
   object Shunned extends NodeStatus with CanonicalNodeStatus { override def toString = "Shunned" }
 
@@ -260,12 +278,39 @@ sealed trait Authentication {
 }
 
 case class Authenticate(db: String, user: String, password: String) extends Authentication {
-  override def toString: String = "Authenticate(" + db + ", " + user + ")"
+  override def toString: String = s"Authenticate($db, $user)"
 }
-case class Authenticating(db: String, user: String, password: String, nonce: Option[String]) extends Authentication {
+
+sealed trait Authenticating extends Authentication {
+  def password: String
+}
+
+case class CrAuthenticating(db: String, user: String, password: String, nonce: Option[String]) extends Authenticating {
   override def toString: String =
     s"Authenticating($db, $user, ${nonce.map(_ => "<nonce>").getOrElse("<>")})"
 }
+
+case class ScramSha1Authenticating(
+  db: String, user: String, password: String,
+  randomPrefix: String, saslStart: String,
+  conversationId: Option[Int] = None,
+  serverSignature: Option[Array[Byte]] = None,
+  step: Int = 0) extends Authenticating
+
+object Authenticating {
+  def unapply(auth: Authenticating): Option[(String, String, String)] =
+    auth match {
+      case CrAuthenticating(db, user, pass, _) =>
+        Some((db, user, pass))
+
+      case ScramSha1Authenticating(db, user, pass, _, _, _, _, _) =>
+        Some((db, user, pass))
+
+      case _ =>
+        None
+    }
+}
+
 case class Authenticated(db: String, user: String) extends Authentication
 
 class ContinuousIterator[A](iterable: Iterable[A], private var toDrop: Int = 0) extends Iterator[A] {
@@ -360,10 +405,12 @@ class ChannelFactory(options: MongoConnectionOptions, bossExecutor: Executor = E
   private def makeChannel(receiver: ActorRef): Channel = {
     val channel = channelFactory.newChannel(makePipeline(receiver))
     val config = channel.getConfig
+
     config.setTcpNoDelay(options.tcpNoDelay)
     config.setBufferFactory(bufferFactory)
     config.setKeepAlive(options.keepAlive)
     config.setConnectTimeoutMillis(options.connectTimeoutMS)
+
     channel
   }
 

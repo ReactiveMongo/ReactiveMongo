@@ -359,23 +359,6 @@ object ReplyDocumentIterator {
   }
 }
 
-/*private[reactivemongo] case class ReplyDocumentIterator[P <: SerializationPack, T](pack: P, private val reply: Reply, private val buffer: ChannelBuffer)(implicit reader: P#Reader[T]) extends Iterator[T] {
-  def hasNext = buffer.readable
-  def next =
-    try {
-      val cbrb = ChannelBufferReadableBuffer(buffer.readBytes(buffer.getInt(buffer.readerIndex)))
-      pack.readAndDeserialize(cbrb, reader)
-      reader.read(ChannelBufferReadableBuffer(buffer.readBytes(buffer.getInt(buffer.readerIndex))))
-    } catch {
-      case e: IndexOutOfBoundsException =>
-        /*
-         * If this happens, the buffer is exhausted, and there is probably a bug.
-         * It may happen if an enumerator relying on it is concurrently applied to many iteratees – which should not be done!
-         */
-        throw new ReplyDocumentIteratorExhaustedException(e)
-    }
-}*/
-
 case class ReplyDocumentIteratorExhaustedException(
   val cause: Exception) extends Exception(cause)
 
@@ -412,12 +395,14 @@ private[reactivemongo] class ResponseDecoder extends OneToOneDecoder {
 
 private[reactivemongo] class MongoHandler(receiver: ActorRef) extends SimpleChannelHandler {
   import MongoHandler._
+
   override def messageReceived(ctx: ChannelHandlerContext, e: MessageEvent) {
     val response = e.getMessage.asInstanceOf[Response]
-    log(e, "messageReceived " + response + " will be send to " + receiver)
+    log(e, s"messageReceived $response will be send to $receiver")
     receiver ! response
     super.messageReceived(ctx, e)
   }
+
   override def writeComplete(ctx: ChannelHandlerContext, e: WriteCompletionEvent) {
     log(e, "a write is complete!")
     super.writeComplete(ctx, e)
@@ -440,10 +425,11 @@ private[reactivemongo] class MongoHandler(receiver: ActorRef) extends SimpleChan
     receiver ! ChannelClosed(e.getChannel.getId)
   }
   override def exceptionCaught(ctx: org.jboss.netty.channel.ChannelHandlerContext, e: org.jboss.netty.channel.ExceptionEvent) {
-    log(e, "CHANNEL ERROR: " + e.getCause)
+    log(e, s"CHANNEL ERROR: ${e.getCause}")
   }
 
-  def log(e: ChannelEvent, s: String) = logger.trace("(channel=" + e.getChannel.getId + ") " + s)
+  def log(e: ChannelEvent, s: String) =
+    logger.trace(s"(channel=${e.getChannel.getId}) $s")
 }
 
 private[reactivemongo] object MongoHandler {

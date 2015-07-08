@@ -136,6 +136,12 @@ trait DefaultBSONHandlers {
     def write(boolean: Boolean) = BSONBoolean(boolean)
   }
 
+  implicit object BSONByteArrayReader
+      extends BSONReader[BSONBinary, Array[Byte]] {
+
+    def read(bin: BSONBinary): Array[Byte] = bin.byteArray
+  }
+
   // Typeclasses Handlers
   import BSONNumberLike._
   import BSONBooleanLike._

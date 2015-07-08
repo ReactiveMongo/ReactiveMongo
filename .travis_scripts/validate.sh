@@ -14,4 +14,4 @@ git diff --exit-code || (
   false
 )
 
-sbt ++$TRAVIS_SCALA_VERSION "testOnly * -- -exclude testCommands --"
+sbt ++$TRAVIS_SCALA_VERSION "testOnly -- exclude mongo3"

@@ -24,7 +24,11 @@ import reactivemongo.api.commands.{ CountCommand, LastError, WriteConcern }
 import reactivemongo.bson.buffer.{ ReadableBuffer, WritableBuffer }
 import reactivemongo.core.nodeset.ProtocolMetadata
 import reactivemongo.core.protocol._
-import reactivemongo.core.netty._
+import reactivemongo.core.netty.{
+  BufferSequence,
+  ChannelBufferReadableBuffer,
+  ChannelBufferWritableBuffer
+}
 import reactivemongo.core.errors.ConnectionNotInitialized
 
 trait GenericCollectionProducer[P <: SerializationPack with Singleton, +C <: GenericCollection[P]] extends CollectionProducer[C]

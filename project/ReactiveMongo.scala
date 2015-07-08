@@ -139,6 +139,8 @@ object Dependencies {
     case "2.10" => "2.10.4"
     case x => x
   }
+
+  val commonsCodec = "commons-codec" % "commons-codec" % "1.10"
 }
 
 object ReactiveMongoBuild extends Build {
@@ -166,6 +168,7 @@ object ReactiveMongoBuild extends Build {
         netty,
         akkaActor,
         iteratees,
+        commonsCodec,
         shapelessTest,
         specs) ++ log4j,
       testOptions in Test += Tests.Cleanup(cl => {
@@ -180,7 +183,7 @@ object ReactiveMongoBuild extends Build {
     s"$projectPrefix-BSON",
     file("bson"),
     settings = buildSettings).
-    settings(libraryDependencies += Dependencies.specs)
+    settings(libraryDependencies += specs)
 
   lazy val bsonmacros = Project(
     s"$projectPrefix-BSON-Macros",
@@ -189,7 +192,7 @@ object ReactiveMongoBuild extends Build {
       libraryDependencies +=
         "org.scala-lang" % "scala-compiler" % scalaVersion.value
     )).
-    settings(libraryDependencies += Dependencies.specs).
+    settings(libraryDependencies += specs).
     dependsOn(bson)
 }
 
