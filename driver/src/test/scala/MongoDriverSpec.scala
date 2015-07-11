@@ -8,7 +8,12 @@ import reactivemongo.core.commands.{
   SuccessfulAuthentication
 }
 
-import reactivemongo.api.{ BSONSerializationPack, MongoDriver }
+import reactivemongo.api.{
+  BSONSerializationPack,
+  MongoConnectionOptions,
+  MongoDriver,
+  ScramSha1Authentication
+}
 import reactivemongo.api.commands.Command
 
 /** A Test Suite For MongoDriver */
@@ -46,11 +51,13 @@ object MongoDriverSpec extends org.specs2.mutable.Specification {
     }
   }
 
-  "Authentication" should {
+  "CR Authentication" should {
     import Common.{ timeout, timeoutMillis }
 
-    lazy val driver = new MongoDriver
-    lazy val connection = driver.connection(List("localhost:27017"))
+    lazy val driver = MongoDriver()
+    lazy val connection = driver.connection(
+      List("localhost:27017"), options = MongoConnectionOptions(nbChannelsPerNode = 1))
+
     lazy val db = {
       val _db = connection("specs2-test-reactivemongo-auth")
       Await.ready(_db.drop, timeout)
@@ -58,7 +65,9 @@ object MongoDriverSpec extends org.specs2.mutable.Specification {
     }
     val id = System.identityHashCode(driver)
 
-    "not be successful with wrong credentials" in {
+    "be the default mode" in (ok)
+
+    "create a user" in {
       val runner = Command.run(BSONSerializationPack)
       val createUser = BSONDocument("createUser" -> s"test-$id",
         "pwd" -> s"password-$id", // TODO: create a command
@@ -66,21 +75,81 @@ object MongoDriverSpec extends org.specs2.mutable.Specification {
         "roles" -> BSONArray(
           BSONDocument("role" -> "readWrite", "db" -> db.name)))
 
-      runner.apply(db, runner.rawCommand(createUser)).
-        one[BSONDocument] must beLike[BSONDocument] {
+      runner.apply(db, runner.rawCommand(createUser)).one[BSONDocument].
+        aka("creation") must (beLike[BSONDocument] {
           case doc => doc.getAs[BSONBooleanLike]("ok").
             exists(_.toBoolean == true) must beTrue
+        }).await(timeoutMillis)
+    } tag ("mongo2")
 
-        }.await(timeoutMillis) and (Await.result(
-          connection.authenticate(db.name, "foo", "bar"), timeout).
-          aka("authentication") must throwA[FailedAuthentication])
+    "not be successful with wrong credentials" in {
+      Await.result(connection.authenticate(db.name, "foo", "bar"), timeout).
+        aka("authentication") must throwA[FailedAuthentication]
 
-    }
+    } tag ("mongo2")
 
     "be successful with right credentials" in {
       connection.authenticate(db.name, s"test-$id", s"password-$id").
         aka("authentication") must beLike[SuccessfulAuthentication](
-          { case _ => ok }).await(timeoutMillis)
+          { case _ => ok }).await(timeoutMillis) and (
+            db("testcol").insert(BSONDocument("foo" -> "bar")).
+            map(_ => {}) must beEqualTo({}).await(timeoutMillis))
+
+    } tag ("mongo2")
+
+    "driver shutdown" in { // mainly to ensure the test driver is closed
+      driver.close() must not(throwA[Exception])
+    } tag ("mongo2")
+  }
+
+  "Authentication SCRAM-SHA1" should {
+    import Common.{ timeout, timeoutMillis }
+
+    lazy val driver = MongoDriver()
+    lazy val connection = driver.connection(
+      List("localhost:27017"), options = MongoConnectionOptions(authenticationMode = ScramSha1Authentication, nbChannelsPerNode = 1))
+
+    lazy val db = {
+      val _db = connection("specs2-test-reactivemongo-auth")
+      Await.ready(_db.drop, timeout)
+      _db
     }
+    val id = System.identityHashCode(driver)
+
+    "work only if configured" in (ok)
+
+    "create a user" in {
+      val runner = Command.run(BSONSerializationPack)
+      val createUser = BSONDocument("createUser" -> s"test-$id",
+        "pwd" -> s"password-$id", // TODO: create a command
+        "customData" -> BSONDocument.empty,
+        "roles" -> BSONArray(
+          BSONDocument("role" -> "readWrite", "db" -> db.name)))
+
+      runner.apply(db, runner.rawCommand(createUser)).one[BSONDocument].
+        aka("creation") must (beLike[BSONDocument] {
+          case doc => doc.getAs[BSONBooleanLike]("ok").
+            exists(_.toBoolean == true) must beTrue
+        }).await(timeoutMillis)
+    } tag ("mongo3")
+
+    "not be successful with wrong credentials" in {
+      Await.result(connection.authenticate(db.name, "foo", "bar"), timeout).
+        aka("authentication") must throwA[FailedAuthentication]
+
+    } tag ("mongo3")
+
+    "be successful with right credentials" in {
+      connection.authenticate(db.name, s"test-$id", s"password-$id").
+        aka("authentication") must beLike[SuccessfulAuthentication](
+          { case _ => ok }).await(timeoutMillis) and (
+            db("testcol").insert(BSONDocument("foo" -> "bar")).
+            map(_ => {}) must beEqualTo({}).await(timeoutMillis))
+
+    } tag ("mongo3")
+
+    "driver shutdown" in { // mainly to ensure the test driver is closed
+      driver.close() must not(throwA[Exception])
+    } tag ("mongo3")
   }
 }

@@ -61,6 +61,7 @@ class Handlers extends Specification {
       doc.get("name").get.seeAsTry[Int].isFailure mustEqual true
       doc.get("name").get.seeAsOpt[String] mustEqual Some("James")
     }
+
     "have a score == 3.88" in {
       doc.getTry("score") mustEqual Success(BSONDouble(3.88))
       doc.getAsTry[BSONDouble]("score") mustEqual Success(BSONDouble(3.88))
@@ -201,6 +202,17 @@ class Handlers extends Specification {
         "Cowgirl in the Sand")
       ny2 mustEqual neilYoung
       success
+    }
+  }
+
+  "BSONBinary" should {
+    import reactivemongo.bson.buffer.ArrayReadableBuffer
+
+    "be read as byte array" in {
+      val bytes = Array[Byte](1, 3, 5, 7)
+
+      BSONBinary(ArrayReadableBuffer(bytes), Subtype.GenericBinarySubtype).
+        as[Array[Byte]] must_== bytes
     }
   }
 }

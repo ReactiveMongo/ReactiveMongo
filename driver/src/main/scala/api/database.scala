@@ -60,9 +60,7 @@ trait DB {
    *
    * @param name The name of the collection to open.
    */
-  def collection[C <: Collection](name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit producer: CollectionProducer[C] = collections.bson.BSONCollectionProducer): C = {
-    producer.apply(this, name, failoverStrategy)
-  }
+  def collection[C <: Collection](name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit producer: CollectionProducer[C] = collections.bson.BSONCollectionProducer): C = producer.apply(this, name, failoverStrategy)
 
   /**
    * Sends a command and get the future result of the command.
