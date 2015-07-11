@@ -8,9 +8,11 @@ In your `project/Build.scala`:
 
 ```scala
 libraryDependencies ++= Seq(
-  "org.reactivemongo" %% "play2-reactivemongo" % "0.11.0"
+  "org.reactivemongo" %% "reactivemongo" % "VERSION"
 )
 ```
+
+[![Maven Central](https://maven-badges.herokuapp.com/maven-central/org.reactivemongo/reactivemongo_2.11/badge.svg)](https://maven-badges.herokuapp.com/maven-central/org.reactivemongo/reactivemongo_2.11/)
 
 ## Build manually
 
