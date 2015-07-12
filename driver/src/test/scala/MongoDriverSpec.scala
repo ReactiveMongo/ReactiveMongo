@@ -107,7 +107,7 @@ object MongoDriverSpec extends org.specs2.mutable.Specification {
 
     lazy val driver = MongoDriver()
     lazy val connection = driver.connection(
-      List("localhost:27017"), options = MongoConnectionOptions(authenticationMode = ScramSha1Authentication, nbChannelsPerNode = 1))
+      List("localhost:27017"), options = MongoConnectionOptions(authMode = ScramSha1Authentication, nbChannelsPerNode = 1))
 
     lazy val db = {
       val _db = connection("specs2-test-reactivemongo-auth")

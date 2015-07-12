@@ -425,6 +425,7 @@ object MongoConnection {
         case _                      => throw new URIParsingException(s"Could not parse URI '$uri'")
       }
     }
+
     def parseOptions(uriAndOptions: String): Map[String, String] = {
       uriAndOptions.split('?').toList match {
         case uri :: options :: Nil => options.split("&").map { option =>
@@ -436,11 +437,16 @@ object MongoConnection {
         case _ => Map.empty
       }
     }
+
     def makeOptions(opts: Map[String, String]): (List[String], MongoConnectionOptions) = {
       opts.iterator.foldLeft(List.empty[String] -> MongoConnectionOptions()) {
         case ((unsupportedKeys, result), kv) =>
           kv match {
             case ("authSource", v)           => unsupportedKeys -> result.copy(authSource = Some(v))
+
+            case ("authMode", "scram-sha1")  => unsupportedKeys -> result.copy(authMode = ScramSha1Authentication)
+            case ("authMode", _)             => unsupportedKeys -> result.copy(authMode = CrAuthentication)
+
             case ("connectTimeoutMS", v)     => unsupportedKeys -> result.copy(connectTimeoutMS = v.toInt)
             case ("sslEnabled", v)           => unsupportedKeys -> result.copy(sslEnabled = v.toBoolean)
             case ("sslAllowsInvalidCert", v) => unsupportedKeys -> result.copy(sslAllowsInvalidCert = v.toBoolean)
@@ -486,7 +492,7 @@ case object ScramSha1Authentication extends AuthenticationMode
  * @param authSource The database source for authentication credentials.
  * @param sslEnabled Enable SSL connection (required to be accepted on server-side).
  * @param sslAllowsInvalidCert If `sslEnabled` is true, this one indicates whether to accept invalid certificates (e.g. self-signed).
- * @param authenticationMode Either [[CrAuthentication]] or [[ScramSha1Authentication]]
+ * @param authMode Either [[CrAuthentication]] or [[ScramSha1Authentication]]
  * @param tcpNoDelay TCPNoDelay flag (ReactiveMongo-specific option). The default value is false (see [[java.net.StandardSocketOptions#TCP_NODELAY]]).
  * @param keepAlive TCP KeepAlive flag (ReactiveMongo-specific option). The default value is false (see [[java.net.StandardSocketOptions#SO_KEEPALIVE]]).
  * @param nbChannelsPerNode Number of channels (connections) per node (ReactiveMongo-specific option).
@@ -498,7 +504,7 @@ case class MongoConnectionOptions(
   authSource: Option[String] = None,
   sslEnabled: Boolean = false,
   sslAllowsInvalidCert: Boolean = false,
-  authenticationMode: AuthenticationMode = CrAuthentication,
+  authMode: AuthenticationMode = CrAuthentication,
 
   // reactivemongo specific options
   tcpNoDelay: Boolean = false,
@@ -557,7 +563,7 @@ class MongoDriver(config: Option[Config] = None) {
    * @param options Options for the new connection pool.
    */
   def connection(nodes: Seq[String], options: MongoConnectionOptions = MongoConnectionOptions(), authentications: Seq[Authenticate] = Seq.empty, nbChannelsPerNode: Int = 10, name: Option[String] = None): MongoConnection = {
-    def dbsystem: MongoDBSystem = options.authenticationMode match {
+    def dbsystem: MongoDBSystem = options.authMode match {
       case ScramSha1Authentication =>
         new StandardDBSystem(nodes, authentications, options)()
 
