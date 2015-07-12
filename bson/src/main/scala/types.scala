@@ -304,7 +304,7 @@ case class BSONBinary(value: ReadableBuffer, subtype: Subtype)
 
   /** Returns the whole binary content as array. */
   def byteArray: Array[Byte] = value.readArray(value.size)
-} // TODO
+}
 
 object BSONBinary {
   def apply(value: Array[Byte], subtype: Subtype): BSONBinary =

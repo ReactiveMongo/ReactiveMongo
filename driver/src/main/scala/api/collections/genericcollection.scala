@@ -317,7 +317,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    *
    * {{{
    * val updateOp = collection.updateModifier(
-   *   BSONDocument("$set" -> BSONDocument("age" -> 35)))
+   *   BSONDocument("\$set" -> BSONDocument("age" -> 35)))
    *
    * val personBeforeUpdate: Future[Person] =
    *   collection.findAndModify(BSONDocument("name" -> "Joline"), updateOp).
@@ -346,7 +346,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    * {{{
    * val person: Future[BSONDocument] = collection.findAndUpdate(
    *   BSONDocument("name" -> "James"),
-   *   BSONDocument("$set" -> BSONDocument("age" -> 17)),
+   *   BSONDocument("\$set" -> BSONDocument("age" -> 17)),
    *   fetchNewObject = true) // on success, return the update document:
    *                          // { "age": 17 }
    * }}}
@@ -522,7 +522,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
         pack.writeToBuffer(buf, doc)
         val result =
           if (buf.index > thresholdBytes && docsN == 0) // first and already out of bound
-            throw new RuntimeException("Mongo26WriteCommand could not accept doc of size = ${buf.index - start} bytes")
+            throw new RuntimeException(s"Mongo26WriteCommand could not accept doc of size = ${buf.index - start} bytes")
           else if (buf.index > thresholdBytes) {
             val nextCommand = new Mongo26WriteCommand(tpe, ordered, writeConcern, metadata)
             nextCommand.buf.writeByte(0x03)
