@@ -160,9 +160,9 @@ object GroupFunction {
   /**
    * Creates a call to specified group function with given argument.
    *
-   * @param name The name of the group function (e.g. `$sum`)
+   * @param name The name of the group function (e.g. `\$sum`)
    * @param arg The group function argument
-   * @return A group function call defined as `{ '$name': arg }`
+   * @return A group function call defined as `{ name: arg }`
    */
   def apply(name: String, arg: BSONValue): GroupFunction = new GroupFunction {
     val makeFunction = BSONDocument(name -> arg)

@@ -102,7 +102,6 @@ object IndexesSpec extends Specification with Tags {
     } tag ("mongo2_4")
 
     "retrieve indexes" in {
-      // TODO: Fix with WT      
       val future = geo2DSpherical.indexesManager.list().map {
         _.filter(_.name.get == "loc_2dsphere")
       }.filter(!_.isEmpty).map(_.apply(0))
