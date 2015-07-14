@@ -8,13 +8,7 @@ jdk:
 - openjdk7
 - openjdk6
 before_install:
-- sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv 7F0CEB10
-- echo 'deb http://downloads-distro.mongodb.org/repo/ubuntu-upstart dist 10gen' |
-  sudo tee /etc/apt/sources.list.d/mongodb.list
-- sudo apt-get update
-- sudo apt-get install mongodb-org-server
-after_success:
-- .travis_scripts/publishSnapshots.sh
+- sudo ./.travis_scripts/beforeInstall.sh $TRAVIS_SCALA_VERSION
 env:
   global:
   - secure: AHBkdpd7+WwsSlyeDSt3dyM+hadpjbVDuImvWpWTOBdgCwUI6aOSUc0bwHNmEMrmZ/tY2bPEOT8lebPL7av4kBYYEk/K/lORHLWinrB8THjRwvi4/mtzTBs2Wdo3gj8BNuThEJhTwFtVF/HiuxG0yyIODFb8Ubp7Vp5ySgpdCto=
