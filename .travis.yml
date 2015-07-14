@@ -1,16 +1,12 @@
 language: scala
+script: ./.travis_scripts/validate.sh
 scala:
 - 2.11.6
-- 2.10.4
 jdk:
 - oraclejdk7
-- openjdk7
-- openjdk6
 before_install:
 - sudo ./.travis_scripts/beforeInstall.sh $TRAVIS_SCALA_VERSION $MONGO_SSL
 script: ./.travis_scripts/validate.sh
 after_success: ./.travis_scripts/afterSuccess.sh
 env:
-  matrix:
-  - MONGO_SSL=true
-  - MONGO_SSL=false
+- MONGO_SSL=true
