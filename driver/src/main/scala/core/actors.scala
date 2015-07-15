@@ -36,7 +36,6 @@ import reactivemongo.core.protocol.{
 import reactivemongo.utils.LazyLogger
 import reactivemongo.core.commands.{
   CommandError,
-  IsMaster,
   LastError,
   SuccessfulAuthentication
 }
@@ -414,13 +413,13 @@ trait MongoDBSystem extends Actor {
     case response: Response if RequestId.isMaster accepts response => {
       val nodeSetWasReachable = nodeSet.isReachable
       val primaryWasAvailable = nodeSet.primary.isDefined
-      // TODO
+
       import reactivemongo.api.BSONSerializationPack
       import reactivemongo.api.commands.bson.BSONIsMasterCommandImplicits
       import reactivemongo.api.commands.Command
 
-      // TODO
-      val isMaster = Command.deserialize(BSONSerializationPack, response)(BSONIsMasterCommandImplicits.IsMasterResultReader)
+      val isMaster = Command.deserialize(BSONSerializationPack, response)(
+        BSONIsMasterCommandImplicits.IsMasterResultReader)
 
       val ns = nodeSet.updateNodeByChannelId(response.info.channelId) { node =>
         val pingInfo =
@@ -685,22 +684,31 @@ trait MongoDBSystem extends Actor {
     nodeSet
   }
 
-  def sendIsMaster(node: Node, id: Int) = {
+  def sendIsMaster(node: Node, id: Int) =
     node.connected.headOption.map { channel =>
-      channel.send(IsMaster().maker(id))
+      import reactivemongo.api.BSONSerializationPack
+      import reactivemongo.api.commands.bson.{
+        BSONIsMasterCommandImplicits,
+        BSONIsMasterCommand
+      }, BSONIsMasterCommand.IsMaster
+      import reactivemongo.api.commands.Command
+
+      val (isMaster, _) = Command.buildRequestMaker(BSONSerializationPack)(
+        IsMaster,
+        BSONIsMasterCommandImplicits.IsMasterWriter,
+        ReadPreference.primaryPreferred,
+        "admin") // only "admin" DB for the admin command
+
+      channel.send(isMaster(id))
+
       if (node.pingInfo.lastIsMasterId == -1) {
         node.copy(pingInfo = node.pingInfo.copy(lastIsMasterTime = System.currentTimeMillis(), lastIsMasterId = id))
       }
       else if (node.pingInfo.lastIsMasterId >= PingInfo.pingTimeout) {
         node.copy(pingInfo = node.pingInfo.copy(lastIsMasterTime = System.currentTimeMillis(), lastIsMasterId = id, ping = Long.MaxValue))
       }
-      else {
-        node
-      }
-    }.getOrElse {
-      node
-    }
-  }
+      else node
+    }.getOrElse(node)
 
   def allChannelGroup(nodeSet: NodeSet) = {
     val result = new DefaultChannelGroup
