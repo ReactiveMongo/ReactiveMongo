@@ -17,12 +17,16 @@ object ReadPreference {
     override def slaveOk = false
     override def filterTag = None
   }
+
   /** Read from the primary if it is available, or secondaries if it is not. */
   case class PrimaryPreferred(filterTag: Option[BSONDocument => Boolean]) extends ReadPreference
+
   /** Read only from any secondary. */
   case class Secondary(filterTag: Option[BSONDocument => Boolean]) extends ReadPreference
+
   /** Read from any secondary, or from the primary if they are not available. */
   case class SecondaryPreferred(filterTag: Option[BSONDocument => Boolean]) extends ReadPreference
+
   /**
    * Read from the faster node (ie the node which replies faster than all others), regardless its status
    * (primary or secondary).
