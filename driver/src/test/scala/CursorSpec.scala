@@ -29,22 +29,19 @@ class CursorSpec extends Specification {
       println("inserted 16,517 records")
       success
     }
+
     "get all the 16,517 documents" in {
       var i = 0
-      val future = coll.find(BSONDocument()).cursor.enumerate() |>>> (Iteratee.foreach({ e =>
+      val future = coll.find(BSONDocument()).cursor().enumerate() |>>> (Iteratee.foreach({ e =>
         //println(s"doc $i => $e")
         i += 1
       }))
-      /*val future = coll.find(BSONDocument()).cursor.documentStream.map { doc =>
-        i += 1
-        println("fetched " + doc)
-        doc
-       }.runLast*/
+
       future.map(_ => i) must beEqualTo(16517).await(21000 /*21s*/ )
     }
 
     "get 10 first docs" in {
-      coll.find(BSONDocument()).cursor.collect[List](10).map(_.size).
+      coll.find(BSONDocument()).cursor().collect[List](10).map(_.size).
         aka("result size") must beEqualTo(10).await(timeoutMillis)
     }
 
@@ -59,7 +56,7 @@ class CursorSpec extends Specification {
           new FlattenedFooCursor(future)
       }
 
-      val cursor = coll.find(BSONDocument()).cursor
+      val cursor = coll.find(BSONDocument()).cursor()
 
       cursor.foo must_== "Bar" and (
         Cursor.flatten(Future.successful(cursor)).foo must_== "raB")
@@ -90,7 +87,7 @@ class CursorSpec extends Specification {
       @inline def cursor(n: String): Cursor[Int] = {
         implicit val reader = IdReader
         Cursor.flatten(collection(n).map(_.find(BSONDocument()).
-          sort(BSONDocument("id" -> 1)).cursor[Int]))
+          sort(BSONDocument("id" -> 1)).cursor[Int]()))
       }
 
       "successfully using cursor" in {
@@ -117,7 +114,7 @@ class CursorSpec extends Specification {
       @inline def tailable(n: String, database: DB = db) = {
         implicit val reader = IdReader
         collection(n, database).find(BSONDocument()).options(
-          QueryOpts().tailable).cursor[Int]
+          QueryOpts().tailable).cursor[Int]()
       }
 
       "successfully using tailable enumerator with maxDocs" in {

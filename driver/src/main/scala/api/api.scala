@@ -426,7 +426,7 @@ object MongoConnection {
       }
     }
 
-    def parseOptions(uriAndOptions: String): Map[String, String] = {
+    def parseOptions(uriAndOptions: String): Map[String, String] =
       uriAndOptions.split('?').toList match {
         case uri :: options :: Nil => options.split("&").map { option =>
           option.split("=").toList match {
@@ -434,9 +434,9 @@ object MongoConnection {
             case _                   => throw new URIParsingException(s"Could not parse URI '$uri': invalid options '$options'")
           }
         }.toMap
+
         case _ => Map.empty
       }
-    }
 
     def makeOptions(opts: Map[String, String]): (List[String], MongoConnectionOptions) = {
       opts.iterator.foldLeft(List.empty[String] -> MongoConnectionOptions()) {
@@ -562,7 +562,20 @@ class MongoDriver(config: Option[Config] = None) {
    * @param name The name of the newly created [[reactivemongo.core.actors.MongoDBSystem]] actor, if needed.
    * @param options Options for the new connection pool.
    */
-  def connection(nodes: Seq[String], options: MongoConnectionOptions = MongoConnectionOptions(), authentications: Seq[Authenticate] = Seq.empty, nbChannelsPerNode: Int = 10, name: Option[String] = None): MongoConnection = {
+  @deprecated(message = "Must you [[connection]] with `nbChannelsPerNode` set in the `options`.", since = "0.11.3")
+  def connection(nodes: Seq[String], options: MongoConnectionOptions, authentications: Seq[Authenticate], nbChannelsPerNode: Int, name: Option[String]): MongoConnection = connection(nodes, options, authentications, name)
+
+  /**
+   * Creates a new MongoConnection.
+   *
+   * See [[http://docs.mongodb.org/manual/reference/connection-string/ the MongoDB URI documentation]] for more information.
+   *
+   * @param nodes A list of node names, like ''node1.foo.com:27017''. Port is optional, it is 27017 by default.
+   * @param authentications A list of Authenticates.
+   * @param name The name of the newly created [[reactivemongo.core.actors.MongoDBSystem]] actor, if needed.
+   * @param options Options for the new connection pool.
+   */
+  def connection(nodes: Seq[String], options: MongoConnectionOptions = MongoConnectionOptions(), authentications: Seq[Authenticate] = Seq.empty, name: Option[String] = None): MongoConnection = {
     def dbsystem: MongoDBSystem = options.authMode match {
       case ScramSha1Authentication =>
         new StandardDBSystem(nodes, authentications, options)()
@@ -590,10 +603,21 @@ class MongoDriver(config: Option[Config] = None) {
    * @param nbChannelsPerNode Number of channels to open per node.
    * @param name The name of the newly created [[reactivemongo.core.actors.MongoDBSystem]] actor, if needed.
    */
-  def connection(parsedURI: MongoConnection.ParsedURI, nbChannelsPerNode: Int, name: Option[String]): MongoConnection = {
+  @deprecated(message = "Must you [[connection]] with `nbChannelsPerNode` set in the options of the `parsedURI`.", since = "0.11.3")
+  def connection(parsedURI: MongoConnection.ParsedURI, nbChannelsPerNode: Int, name: Option[String]): MongoConnection = connection(parsedURI, name)
+
+  /**
+   * Creates a new MongoConnection from URI.
+   *
+   * See [[http://docs.mongodb.org/manual/reference/connection-string/ the MongoDB URI documentation]] for more information.
+   *
+   * @param parsedURI The URI parsed by [[reactivemongo.api.MongoConnection.parseURI]]
+   * @param name The name of the newly created [[reactivemongo.core.actors.MongoDBSystem]] actor, if needed.
+   */
+  def connection(parsedURI: MongoConnection.ParsedURI, name: Option[String]): MongoConnection = {
     if (!parsedURI.ignoredOptions.isEmpty)
       logger.warn(s"Some options were ignored because they are not supported (yet): ${parsedURI.ignoredOptions.mkString(", ")}")
-    connection(parsedURI.hosts.map(h => h._1 + ':' + h._2), parsedURI.options, parsedURI.authenticate.toSeq, nbChannelsPerNode, name)
+    connection(parsedURI.hosts.map(h => h._1 + ':' + h._2), parsedURI.options, parsedURI.authenticate.toSeq, name)
   }
 
   /**
@@ -604,8 +628,8 @@ class MongoDriver(config: Option[Config] = None) {
    * @param parsedURI The URI parsed by [[reactivemongo.api.MongoConnection.parseURI]]
    * @param nbChannelsPerNode Number of channels to open per node.
    */
-  def connection(parsedURI: MongoConnection.ParsedURI, nbChannelsPerNode: Int): MongoConnection =
-    connection(parsedURI, nbChannelsPerNode, None)
+  @deprecated(message = "Must you [[connection]] with `nbChannelsPerNode` set in the options of the `parsedURI`.", since = "0.11.3")
+  def connection(parsedURI: MongoConnection.ParsedURI, nbChannelsPerNode: Int): MongoConnection = connection(parsedURI)
 
   /**
    * Creates a new MongoConnection from URI.
@@ -615,9 +639,10 @@ class MongoDriver(config: Option[Config] = None) {
    * @param parsedURI The URI parsed by [[reactivemongo.api.MongoConnection.parseURI]]
    */
   def connection(parsedURI: MongoConnection.ParsedURI): MongoConnection =
-    connection(parsedURI, 10, None)
+    connection(parsedURI, None)
 
   private case class AddConnection(options: MongoConnectionOptions, mongosystem: ActorRef)
+
   private case class CloseWithTimeout(timeout: FiniteDuration)
 
   private case class SupervisorActor(driver: MongoDriver) extends Actor {
