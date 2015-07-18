@@ -53,7 +53,7 @@ object Implicits { // TODO: Move in a `ReadFile` companion object?
     def read(doc: BSONDocument) = DefaultReadFile(
       doc.getAs[BSONValue]("_id").get,
       doc.getAs[BSONString]("contentType").map(_.value),
-      doc.getAs[BSONString]("filename").map(_.value).get,
+      doc.getAs[BSONString]("filename").map(_.value),
       doc.getAs[BSONNumberLike]("uploadDate").map(_.toLong),
       doc.getAs[BSONNumberLike]("chunkSize").map(_.toInt).get,
       doc.getAs[BSONNumberLike]("length").map(_.toLong).get,
@@ -84,7 +84,7 @@ trait BasicMetadata[+Id] {
   def id: Id
 
   /** Name of this file. */
-  def filename: String
+  def filename: Option[String]
 
   /** Date when this file was uploaded. */
   def uploadDate: Option[Long]
@@ -108,14 +108,48 @@ trait CustomMetadata[P <: SerializationPack with Singleton] {
 trait FileToSave[P <: SerializationPack with Singleton, +Id] extends BasicMetadata[Id] with CustomMetadata[P]
 
 /** A BSON implementation of `FileToSave`. */
-case class DefaultFileToSave(
-  filename: String,
-  contentType: Option[String] = None,
-  uploadDate: Option[Long] = None,
-  metadata: BSONDocument = BSONDocument(),
-  id: BSONValue = BSONObjectID.generate)
+class DefaultFileToSave(
+  val filename: Option[String] = None,
+  val contentType: Option[String] = None,
+  val uploadDate: Option[Long] = None,
+  val metadata: BSONDocument = BSONDocument(),
+  val id: BSONValue = BSONObjectID.generate)
     extends FileToSave[BSONSerializationPack.type, BSONValue] {
   val pack = BSONSerializationPack
+}
+
+/** Factory of [[DefaultFileToSave]]. */
+object DefaultFileToSave {
+  /** For backward compatibility. */
+  sealed trait FileName[T] extends (T => Option[String]) {
+    def apply(name: T): Option[String]
+  }
+
+  object FileName {
+    @deprecated(message = "The filename is now optional, pass it as an `Option[String]`.", since = "0.11.3")
+    implicit object StringFileName extends FileName[String] {
+      def apply(name: String) = Some(name)
+    }
+
+    implicit object OptionalFileName extends FileName[Option[String]] {
+      def apply(name: Option[String]) = name
+    }
+
+    implicit object SomeFileName extends FileName[Some[String]] {
+      def apply(name: Some[String]) = name
+    }
+
+    implicit object NoFileName extends FileName[None.type] {
+      def apply(name: None.type) = Option.empty[String]
+    }
+  }
+
+  def apply[N](filename: N,
+               contentType: Option[String] = None,
+               uploadDate: Option[Long] = None,
+               metadata: BSONDocument = BSONDocument.empty,
+               id: BSONValue = BSONObjectID.generate)(implicit naming: FileName[N]): DefaultFileToSave = new DefaultFileToSave(naming(filename), contentType, uploadDate, metadata, id)
+
 }
 
 /**
@@ -128,7 +162,7 @@ trait ReadFile[P <: SerializationPack with Singleton, +Id] extends BasicMetadata
 case class DefaultReadFile(
     id: BSONValue,
     contentType: Option[String],
-    filename: String,
+    filename: Option[String],
     uploadDate: Option[Long],
     chunkSize: Int,
     length: Long,
@@ -235,7 +269,7 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
 
         writeChunk(n, previous).flatMap { f =>
           val bson = BSONDocument(idProducer("_id" -> file.id)) ++ (
-            "filename" -> BSONString(file.filename),
+            "filename" -> file.filename.map(BSONString(_)),
             "chunkSize" -> BSONInteger(chunkSize),
             "length" -> BSONLong(length),
             "uploadDate" -> BSONDateTime(uploadDate),

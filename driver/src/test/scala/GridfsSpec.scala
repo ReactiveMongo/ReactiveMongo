@@ -1,4 +1,3 @@
-import org.specs2.mutable._
 import play.api.libs.iteratee._
 import reactivemongo.api._
 import reactivemongo.api.gridfs.{ ReadFile, DefaultFileToSave, GridFS }
@@ -8,21 +7,22 @@ import scala.concurrent._
 import reactivemongo.api.gridfs
 import scala.concurrent.duration._
 
-class GridfsSpec extends Specification {
+object GridfsSpec extends org.specs2.mutable.Specification {
+  "GridFS" title
+
   import Common._
 
   sequential
 
   lazy val gfs = GridFS(db)
 
-  lazy val file = DefaultFileToSave("somefile", Some("application/file"))
+  lazy val file = DefaultFileToSave(Some("somefile"), Some("application/file"))
   lazy val fileContent = Enumerator((1 to 100).view.map(_.toByte).toArray)
 
   "ReactiveMongo" should {
-
     "store a file in gridfs" in {
-      val actual = Await.result(gfs.save(fileContent, file), timeout)
-      actual.filename mustEqual "somefile"
+      gfs.save(fileContent, file).map(_.filename).
+        aka("filename") must beSome("somefile").await(timeoutMillis)
     }
 
     "find this file in gridfs" in {
@@ -39,8 +39,7 @@ class GridfsSpec extends Specification {
     }
 
     "delete this file from gridfs" in {
-      val actual = Await.result(gfs.remove(file.id), timeout)
-      actual.n mustEqual 1
+      gfs.remove(file.id).map(_.n) must beEqualTo(1).await(timeoutMillis)
     }
   }
 }
