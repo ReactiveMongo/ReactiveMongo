@@ -16,11 +16,22 @@
 package reactivemongo.core.commands
 
 import scala.util.{ Try, Failure }
+
 import reactivemongo.api.ReadPreference
-import reactivemongo.bson._
+import reactivemongo.bson.{
+  BSONArray,
+  BSONBoolean,
+  BSONDocument,
+  BSONDouble,
+  BSONElement,
+  BSONInteger,
+  BSONNumberLike,
+  BSONReader,
+  BSONString,
+  BSONValue
+}
 import reactivemongo.bson.exceptions.DocumentKeyNotFound
-import DefaultBSONHandlers._
-import reactivemongo.core.errors._
+import reactivemongo.core.errors.{ DatabaseException, ReactiveMongoException }
 import reactivemongo.core.protocol.{ RequestMaker, Query, QueryFlags, Response }
 import reactivemongo.core.netty._
 import reactivemongo.utils.option
@@ -115,7 +126,7 @@ trait CommandError extends ReactiveMongoException {
   /** error code */
   val code: Option[Int]
 
-  override def getMessage: String = "CommandError['" + message + "'" + code.map(c => " (code = " + c + ")").getOrElse("") + "]"
+  override def getMessage: String = s"CommandError['$message'" + code.map(c => " (code = " + c + ")").getOrElse("") + "]"
 }
 
 /** A command error that optionally holds the original TraversableBSONDocument */
@@ -123,7 +134,7 @@ trait BSONCommandError extends CommandError {
   val originalDocument: Option[BSONDocument]
 
   override def getMessage: String =
-    "BSONCommandError['" + message + "'" + code.map(c => " (code = " + c + ")").getOrElse("") + "]" +
+    s"BSONCommandError['$message'" + code.map(c => " (code = " + c + ")").getOrElse("") + "]" +
       originalDocument.map(doc => " with original doc " + BSONDocument.pretty(doc)).getOrElse("")
 }
 
@@ -247,7 +258,7 @@ case class GetLastError(
  * @param updated The number of documents affected by last command, 0 if none
  * @param updatedExisting When true, the last update operation resulted in change of existing documents
  */
-@deprecated("consider using reactivemongo.api.commands.LastError instead", "0.11.0")
+@deprecated("consider using reactivemongo.api.commands.WriteResult instead", "0.11.0")
 case class LastError(
     ok: Boolean,
     err: Option[String],
@@ -258,7 +269,7 @@ case class LastError(
     updatedExisting: Boolean) extends DatabaseException {
   /** States if the last operation ended up with an error */
   lazy val inError: Boolean = !ok || err.isDefined
-  lazy val stringify: String = toString + " [inError: " + inError + "]"
+  lazy val stringify: String = s"toString [inError: $inError]"
 
   lazy val message = err.orElse(errMsg).getOrElse("empty lastError message")
 

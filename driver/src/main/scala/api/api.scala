@@ -18,6 +18,12 @@ package reactivemongo.api
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
 
+import scala.util.{ Try, Failure, Success }
+import scala.util.control.{ NonFatal, NoStackTrace }
+
+import scala.concurrent.{ Await, ExecutionContext, Future, Promise }
+import scala.concurrent.duration._
+
 import akka.actor._
 import akka.pattern._
 import akka.util.Timeout
@@ -27,12 +33,6 @@ import reactivemongo.core.nodeset.Authenticate
 import reactivemongo.core.protocol._
 import reactivemongo.core.commands.SuccessfulAuthentication
 import reactivemongo.utils.LazyLogger
-import scala.collection.mutable
-import scala.concurrent.{ Await, ExecutionContext, Future, Promise }
-import scala.concurrent.duration._
-import scala.util.{ Try, Failure, Success }
-import scala.util.control.NoStackTrace
-import scala.util.control.NonFatal
 
 /**
  * A helper that sends the given message to the given actor, following a failover strategy.
@@ -378,6 +378,12 @@ object MongoConnection {
     override def getMessage() = message
   }
 
+  /**
+   * @param hosts the hosts of the servers of the MongoDB replica set
+   * @param options the connection options
+   * @param db the name of the database
+   * @param authentication the authenticate information (see [[MongoConnectionOptions.authMode]])
+   */
   final case class ParsedURI(
     hosts: List[(String, Int)],
     options: MongoConnectionOptions,
@@ -388,101 +394,105 @@ object MongoConnection {
   /**
    * Parses a MongoURI.
    *
-   * See [[http://docs.mongodb.org/manual/reference/connection-string/ the MongoDB URI documentation]] for more information.
-   * Please note that as of 0.10.0, options are ignored.
+   * @param uri the connection URI (see [[http://docs.mongodb.org/manual/reference/connection-string/ the MongoDB URI documentation]] for more information)
    */
   def parseURI(uri: String): Try[ParsedURI] = {
     val prefix = "mongodb://"
-    def parseAuth(usernameAndPassword: String): (String, String) = {
-      usernameAndPassword.split(":").toList match {
-        case username :: password :: Nil => username -> password
-        case _                           => throw new URIParsingException(s"Could not parse URI '$uri': invalid authentication '$usernameAndPassword'")
-      }
-    }
-    def parseHosts(hosts: String) =
-      hosts.split(",").toList.map { host =>
-        host.split(':').toList match {
-          case host :: port :: Nil => host -> {
-            try {
-              val p = port.toInt
-              if (p > 0 && p < 65536)
-                p
-              else throw new URIParsingException(s"Could not parse URI '$uri': invalid port '$port'")
-            }
-            catch {
-              case _: NumberFormatException => throw new URIParsingException(s"Could not parse URI '$uri': invalid port '$port'")
-              case NonFatal(e)              => throw e
-            }
-          }
-          case host :: Nil => host -> DefaultPort
-          case _           => throw new URIParsingException(s"Could not parse URI '$uri': invalid host definition '$hosts'")
-        }
-      }
-    def parseHostsAndDbName(hostsPortAndDbName: String): (Option[String], List[(String, Int)]) = {
-      hostsPortAndDbName.split("/").toList match {
-        case hosts :: Nil           => None -> parseHosts(hosts.takeWhile(_ != '?'))
-        case hosts :: dbName :: Nil => Some(dbName.takeWhile(_ != '?')) -> parseHosts(hosts)
-        case _                      => throw new URIParsingException(s"Could not parse URI '$uri'")
-      }
-    }
-
-    def parseOptions(uriAndOptions: String): Map[String, String] = {
-      uriAndOptions.split('?').toList match {
-        case uri :: options :: Nil => options.split("&").map { option =>
-          option.split("=").toList match {
-            case key :: value :: Nil => (key -> value)
-            case _                   => throw new URIParsingException(s"Could not parse URI '$uri': invalid options '$options'")
-          }
-        }.toMap
-        case _ => Map.empty
-      }
-    }
-
-    def makeOptions(opts: Map[String, String]): (List[String], MongoConnectionOptions) = {
-      opts.iterator.foldLeft(List.empty[String] -> MongoConnectionOptions()) {
-        case ((unsupportedKeys, result), kv) =>
-          kv match {
-            case ("authSource", v)           => unsupportedKeys -> result.copy(authSource = Some(v))
-
-            case ("authMode", "scram-sha1")  => unsupportedKeys -> result.copy(authMode = ScramSha1Authentication)
-            case ("authMode", _)             => unsupportedKeys -> result.copy(authMode = CrAuthentication)
-
-            case ("connectTimeoutMS", v)     => unsupportedKeys -> result.copy(connectTimeoutMS = v.toInt)
-            case ("sslEnabled", v)           => unsupportedKeys -> result.copy(sslEnabled = v.toBoolean)
-            case ("sslAllowsInvalidCert", v) => unsupportedKeys -> result.copy(sslAllowsInvalidCert = v.toBoolean)
-
-            case ("rm.tcpNoDelay", v)        => unsupportedKeys -> result.copy(tcpNoDelay = v.toBoolean)
-            case ("rm.keepAlive", v)         => unsupportedKeys -> result.copy(keepAlive = v.toBoolean)
-            case ("rm.nbChannelsPerNode", v) => unsupportedKeys -> result.copy(nbChannelsPerNode = v.toInt)
-
-            case (k, _)                      => (k :: unsupportedKeys) -> result
-          }
-      }
-    }
 
     Try {
       val useful = uri.replace(prefix, "")
       def opts = makeOptions(parseOptions(useful))
-      useful.split("@").toList match {
-        case hostsPortsAndDbName :: Nil =>
-          val (db, hosts) = parseHostsAndDbName(hostsPortsAndDbName)
-          val (unsupportedKeys, options) = opts
-          ParsedURI(hosts, options, unsupportedKeys, db, None)
-        case usernamePasswd :: hostsPortsAndDbName :: Nil =>
-          val (db, hosts) = parseHostsAndDbName(hostsPortsAndDbName)
-          if (!db.isDefined)
-            throw new URIParsingException(s"Could not parse URI '$uri': authentication information found but no database name in URI")
-          val (unsupportedKeys, options) = opts
-          val authenticate = parseAuth(usernamePasswd)
-          ParsedURI(hosts, options, unsupportedKeys, db, Some(Authenticate.apply(options.authSource.getOrElse(db.get), authenticate._1, authenticate._2)))
-        case _ => throw new URIParsingException(s"Could not parse URI '$uri'")
+
+      if (useful.indexOf("@") == -1) {
+        val (db, hosts) = parseHostsAndDbName(useful)
+        val (unsupportedKeys, options) = opts
+        ParsedURI(hosts, options, unsupportedKeys, db, None)
+      }
+      else {
+        val WithAuth = """([^:]+):([^@]*)@(.+)""".r
+
+        useful match {
+          case WithAuth(user, pass, hostsPortsAndDbName) => {
+            val (db, hosts) = parseHostsAndDbName(hostsPortsAndDbName)
+
+            db.fold[ParsedURI](throw new URIParsingException(s"Could not parse URI '$uri': authentication information found but no database name in URI")) { database =>
+              val (unsupportedKeys, options) = opts
+
+              ParsedURI(hosts, options, unsupportedKeys, Some(database), Some(Authenticate.apply(options.authSource.getOrElse(database), user, pass)))
+            }
+          }
+
+          case _ => throw new URIParsingException(s"Could not parse URI '$uri'")
+        }
       }
     }
   }
+
+  private def parseHosts(hosts: String) = hosts.split(",").toList.map { host =>
+    host.split(':').toList match {
+      case host :: port :: Nil => host -> {
+        try {
+          val p = port.toInt
+          if (p > 0 && p < 65536) p
+          else throw new URIParsingException(s"Could not parse hosts '$hosts' from URI: invalid port '$port'")
+        }
+        catch {
+          case _: NumberFormatException => throw new URIParsingException(s"Could not parse hosts '$hosts' from URI: invalid port '$port'")
+          case NonFatal(e)              => throw e
+        }
+      }
+      case host :: Nil => host -> DefaultPort
+      case _           => throw new URIParsingException(s"Could not parse hosts from URI: invalid definition '$hosts'")
+    }
+  }
+
+  private def parseHostsAndDbName(hostsPortAndDbName: String): (Option[String], List[(String, Int)]) = hostsPortAndDbName.split("/").toList match {
+    case hosts :: Nil           => None -> parseHosts(hosts.takeWhile(_ != '?'))
+    case hosts :: dbName :: Nil => Some(dbName.takeWhile(_ != '?')) -> parseHosts(hosts)
+    case _ =>
+      throw new URIParsingException(s"Could not parse hosts and database from URI: '$hostsPortAndDbName'")
+  }
+
+  private def parseOptions(uriAndOptions: String): Map[String, String] =
+    uriAndOptions.split('?').toList match {
+      case uri :: options :: Nil => options.split("&").map { option =>
+        option.split("=").toList match {
+          case key :: value :: Nil => (key -> value)
+          case _                   => throw new URIParsingException(s"Could not parse URI '$uri': invalid options '$options'")
+        }
+      }.toMap
+      case _ => Map.empty
+    }
+
+  private def makeOptions(opts: Map[String, String]): (List[String], MongoConnectionOptions) =
+    opts.iterator.foldLeft(List.empty[String] -> MongoConnectionOptions()) {
+      case ((unsupportedKeys, result), kv) => kv match {
+        case ("authSource", v)           => unsupportedKeys -> result.copy(authSource = Some(v))
+
+        case ("authMode", "scram-sha1")  => unsupportedKeys -> result.copy(authMode = ScramSha1Authentication)
+        case ("authMode", _)             => unsupportedKeys -> result.copy(authMode = CrAuthentication)
+
+        case ("connectTimeoutMS", v)     => unsupportedKeys -> result.copy(connectTimeoutMS = v.toInt)
+        case ("sslEnabled", v)           => unsupportedKeys -> result.copy(sslEnabled = v.toBoolean)
+        case ("sslAllowsInvalidCert", v) => unsupportedKeys -> result.copy(sslAllowsInvalidCert = v.toBoolean)
+
+        case ("rm.tcpNoDelay", v)        => unsupportedKeys -> result.copy(tcpNoDelay = v.toBoolean)
+        case ("rm.keepAlive", v)         => unsupportedKeys -> result.copy(keepAlive = v.toBoolean)
+        case ("rm.nbChannelsPerNode", v) => unsupportedKeys -> result.copy(nbChannelsPerNode = v.toInt)
+
+        case (k, _)                      => (k :: unsupportedKeys) -> result
+      }
+    }
+
 }
 
+/** Then mode of authentication against the replica set. */
 sealed trait AuthenticationMode
+
+/** MongoDB-CR authentication */
 case object CrAuthentication extends AuthenticationMode
+
+/** SCRAM-SHA-1 authentication (see MongoDB 3.0) */
 case object ScramSha1Authentication extends AuthenticationMode
 
 /**
@@ -512,6 +522,8 @@ case class MongoConnectionOptions(
   nbChannelsPerNode: Int = 10)
 
 class MongoDriver(config: Option[Config] = None) {
+  import scala.collection.mutable.{ Map => MutableMap }
+
   import MongoDriver.logger
 
   /* MongoDriver always uses its own ActorSystem so it can have complete control separate from other
@@ -531,7 +543,7 @@ class MongoDriver(config: Option[Config] = None) {
 
   private val supervisorActor = system.actorOf(Props(new SupervisorActor(this)), s"Supervisor-${MongoDriver.nextCounter}")
 
-  private val connectionMonitors = mutable.Map.empty[ActorRef, MongoConnection]
+  private val connectionMonitors = MutableMap.empty[ActorRef, MongoConnection]
 
   /** Keep a list of all connections so that we can terminate the actors */
   def connections: Iterable[MongoConnection] = connectionMonitors.values
@@ -562,7 +574,20 @@ class MongoDriver(config: Option[Config] = None) {
    * @param name The name of the newly created [[reactivemongo.core.actors.MongoDBSystem]] actor, if needed.
    * @param options Options for the new connection pool.
    */
-  def connection(nodes: Seq[String], options: MongoConnectionOptions = MongoConnectionOptions(), authentications: Seq[Authenticate] = Seq.empty, nbChannelsPerNode: Int = 10, name: Option[String] = None): MongoConnection = {
+  @deprecated(message = "Must you [[connection]] with `nbChannelsPerNode` set in the `options`.", since = "0.11.3")
+  def connection(nodes: Seq[String], options: MongoConnectionOptions, authentications: Seq[Authenticate], nbChannelsPerNode: Int, name: Option[String]): MongoConnection = connection(nodes, options, authentications, name)
+
+  /**
+   * Creates a new MongoConnection.
+   *
+   * See [[http://docs.mongodb.org/manual/reference/connection-string/ the MongoDB URI documentation]] for more information.
+   *
+   * @param nodes A list of node names, like ''node1.foo.com:27017''. Port is optional, it is 27017 by default.
+   * @param authentications A list of Authenticates.
+   * @param name The name of the newly created [[reactivemongo.core.actors.MongoDBSystem]] actor, if needed.
+   * @param options Options for the new connection pool.
+   */
+  def connection(nodes: Seq[String], options: MongoConnectionOptions = MongoConnectionOptions(), authentications: Seq[Authenticate] = Seq.empty, name: Option[String] = None): MongoConnection = {
     def dbsystem: MongoDBSystem = options.authMode match {
       case ScramSha1Authentication =>
         new StandardDBSystem(nodes, authentications, options)()
@@ -590,10 +615,21 @@ class MongoDriver(config: Option[Config] = None) {
    * @param nbChannelsPerNode Number of channels to open per node.
    * @param name The name of the newly created [[reactivemongo.core.actors.MongoDBSystem]] actor, if needed.
    */
-  def connection(parsedURI: MongoConnection.ParsedURI, nbChannelsPerNode: Int, name: Option[String]): MongoConnection = {
+  @deprecated(message = "Must you [[connection]] with `nbChannelsPerNode` set in the options of the `parsedURI`.", since = "0.11.3")
+  def connection(parsedURI: MongoConnection.ParsedURI, nbChannelsPerNode: Int, name: Option[String]): MongoConnection = connection(parsedURI, name)
+
+  /**
+   * Creates a new MongoConnection from URI.
+   *
+   * See [[http://docs.mongodb.org/manual/reference/connection-string/ the MongoDB URI documentation]] for more information.
+   *
+   * @param parsedURI The URI parsed by [[reactivemongo.api.MongoConnection.parseURI]]
+   * @param name The name of the newly created [[reactivemongo.core.actors.MongoDBSystem]] actor, if needed.
+   */
+  def connection(parsedURI: MongoConnection.ParsedURI, name: Option[String]): MongoConnection = {
     if (!parsedURI.ignoredOptions.isEmpty)
       logger.warn(s"Some options were ignored because they are not supported (yet): ${parsedURI.ignoredOptions.mkString(", ")}")
-    connection(parsedURI.hosts.map(h => h._1 + ':' + h._2), parsedURI.options, parsedURI.authenticate.toSeq, nbChannelsPerNode, name)
+    connection(parsedURI.hosts.map(h => h._1 + ':' + h._2), parsedURI.options, parsedURI.authenticate.toSeq, name)
   }
 
   /**
@@ -604,8 +640,8 @@ class MongoDriver(config: Option[Config] = None) {
    * @param parsedURI The URI parsed by [[reactivemongo.api.MongoConnection.parseURI]]
    * @param nbChannelsPerNode Number of channels to open per node.
    */
-  def connection(parsedURI: MongoConnection.ParsedURI, nbChannelsPerNode: Int): MongoConnection =
-    connection(parsedURI, nbChannelsPerNode, None)
+  @deprecated(message = "Must you [[connection]] with `nbChannelsPerNode` set in the options of the `parsedURI`.", since = "0.11.3")
+  def connection(parsedURI: MongoConnection.ParsedURI, nbChannelsPerNode: Int): MongoConnection = connection(parsedURI)
 
   /**
    * Creates a new MongoConnection from URI.
@@ -615,9 +651,10 @@ class MongoDriver(config: Option[Config] = None) {
    * @param parsedURI The URI parsed by [[reactivemongo.api.MongoConnection.parseURI]]
    */
   def connection(parsedURI: MongoConnection.ParsedURI): MongoConnection =
-    connection(parsedURI, 10, None)
+    connection(parsedURI, None)
 
   private case class AddConnection(options: MongoConnectionOptions, mongosystem: ActorRef)
+
   private case class CloseWithTimeout(timeout: FiniteDuration)
 
   private case class SupervisorActor(driver: MongoDriver) extends Actor {

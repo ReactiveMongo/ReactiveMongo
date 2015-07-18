@@ -1,8 +1,16 @@
 package reactivemongo.api.commands
 
-import concurrent.{ ExecutionContext, Future }
-import util.control.NoStackTrace
-import reactivemongo.api.{ BSONSerializationPack, Cursor, SerializationPack, SerializationPackObject, DB, Collection }
+import scala.concurrent.{ ExecutionContext, Future }
+import scala.util.control.NoStackTrace
+
+import reactivemongo.api.{
+  BSONSerializationPack,
+  Cursor,
+  SerializationPack,
+  SerializationPackObject,
+  DB,
+  Collection
+}
 import reactivemongo.bson.{ BSONDocumentReader, BSONDocumentWriter }
 
 sealed trait AbstractCommand
@@ -51,12 +59,26 @@ object UnitBox extends BoxedAnyVal[Unit] {
 }
 
 object Command {
-  import reactivemongo.api.{ DefaultCursor, Failover2, FailoverStrategy, ReadPreference }
+  import reactivemongo.api.{
+    DefaultCursor,
+    Failover2,
+    FailoverStrategy,
+    ReadPreference
+  }
   import reactivemongo.core.actors.RequestMakerExpectingResponse
   import reactivemongo.bson.lowlevel.LoweLevelDocumentIterator
   import reactivemongo.bson.buffer.{ ReadableBuffer, WritableBuffer }
-  import reactivemongo.core.netty._
-  import reactivemongo.core.protocol.{ RequestMaker, Query, QueryFlags, Response }
+  import reactivemongo.core.netty.{
+    BufferSequence,
+    ChannelBufferReadableBuffer,
+    ChannelBufferWritableBuffer
+  }
+  import reactivemongo.core.protocol.{
+    RequestMaker,
+    Query,
+    QueryFlags,
+    Response
+  }
 
   def defaultCursorFetcher[P <: SerializationPack, A](db: DB, p: P, command: A, failover: FailoverStrategy)(implicit writer: p.Writer[A]): CursorFetcher[p.type, Cursor] = new CursorFetcher[p.type, Cursor] {
     val pack: p.type = p
@@ -77,7 +99,8 @@ object Command {
       val buffer = ChannelBufferWritableBuffer()
       pack.serializeAndWrite(buffer, command, writer)
       val bs = BufferSequence(buffer.buffer)
-      val op = Query(0, db.name + ".$cmd", 0, 1)
+      val flags = if (readPreference.slaveOk) QueryFlags.SlaveOk else 0
+      val op = Query(flags, db.name + ".$cmd", 0, 1)
       val mongo26WriteCommand = command match {
         case _: Mongo26WriteCommand => true
         case _                      => false
@@ -139,11 +162,12 @@ object Command {
   private[reactivemongo] def deserialize[P <: SerializationPack, A](pack: P, response: Response)(implicit reader: pack.Reader[A]): A =
     pack.readAndDeserialize(response, reader)
 
-  private def buildRequestMaker[P <: SerializationPack, A](pack: P)(command: A, writer: pack.Writer[A], readPreference: ReadPreference, db: String): (RequestMaker, Boolean) = {
+  private[reactivemongo] def buildRequestMaker[P <: SerializationPack, A](pack: P)(command: A, writer: pack.Writer[A], readPreference: ReadPreference, db: String): (RequestMaker, Boolean) = {
     val buffer = ChannelBufferWritableBuffer()
     pack.serializeAndWrite(buffer, command, writer)
     val documents = BufferSequence(buffer.buffer)
-    val query = Query(0, db + ".$cmd", 0, 1)
+    val flags = if (readPreference.slaveOk) QueryFlags.SlaveOk else 0
+    val query = Query(flags, db + ".$cmd", 0, 1)
     val mongo26WriteCommand = command match {
       case _: Mongo26WriteCommand => true
       case _                      => false
@@ -184,10 +208,13 @@ object Command {
     }
   }
 
-  private[reactivemongo] def requestMaker[P <: SerializationPack](pack: P): CommandWithPackMaker[P] =
-    CommandWithPackMaker(pack)
+  private[reactivemongo] def requestMaker[P <: SerializationPack](pack: P): CommandWithPackMaker[P] = CommandWithPackMaker(pack)
 }
 
+/**
+ * @param collection the name of the collection against which the command is executed
+ * @param command the executed command
+ */
 final case class ResolvedCollectionCommand[C <: CollectionCommand](
   collection: String,
   command: C) extends Command

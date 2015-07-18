@@ -213,19 +213,25 @@ case class Query(
 object QueryFlags {
   /** Makes the cursor not to close after all the data is consumed. */
   val TailableCursor = 0x02
+
   /** The query is might be run on a secondary. */
   val SlaveOk = 0x04
+
   /** OplogReplay */
   val OplogReplay = 0x08
+
   /** The cursor will not expire automatically */
   val NoCursorTimeout = 0x10
+
   /**
    * Block a little while waiting for more data instead of returning immediately if no data.
    * Use along with TailableCursor.
    */
   val AwaitData = 0x20
+
   /** Exhaust */
   val Exhaust = 0x40
+
   /** The response can be partial - if a shard is down, no error will be thrown. */
   val Partial = 0x80
 }

@@ -96,6 +96,7 @@ object `package` {
 trait ChannelBufferWritable {
   /** Write this instance into the given [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]]. */
   def writeTo: ChannelBuffer => Unit
+
   /** Size of the content that would be written. */
   def size: Int
 }
@@ -278,7 +279,6 @@ object Response {
   import reactivemongo.api.BSONSerializationPack
   import reactivemongo.bson.BSONDocument
   import reactivemongo.bson.DefaultBSONHandlers.BSONDocumentIdentity
-  //import reactivemongo.api.collections.default.BSONDocumentReaderAsBufferReader
 
   def parse(response: Response): Iterator[BSONDocument] =
     ReplyDocumentIterator(BSONSerializationPack)(response.reply, response.documents)(BSONDocumentIdentity)
