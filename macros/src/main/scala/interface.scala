@@ -113,6 +113,12 @@ object Macros {
     trait SaveClassName extends Default
 
     /**
+     * Same as [[SaveClassName]] but using the class’ simple name, io.
+     * the fully-qualified name.
+     */
+    trait SaveSimpleName extends SaveClassName with Default
+
+    /**
      * Use type parameter `A` as static type but use pattern matching to handle
      * different possible subtypes. This makes it easy to persist algebraic
      * data types(pattern where you have a sealed trait and several implementing
@@ -144,6 +150,13 @@ object Macros {
     trait UnionType[Types <: \/[_, _]] extends SaveClassName with Default
 
     /**
+     * Same as [[UnionType]] but saving the class’ simple name io. the
+     * fully-qualified name.
+     * @tparam Types to use in pattern matching. Listed in a "type list" \/
+     */
+    trait SimpleUnionType[Types <: \/[_, _]] extends UnionType[Types] with SaveSimpleName with Default
+
+    /**
      * Type for making type-level lists for UnionType.
      * If second parameter is another \/ it will be flattend out into a list
      * and so on. Using infix notation makes much more sense since it then
@@ -172,6 +185,11 @@ object Macros {
      * }}}
      */
     trait AllImplementations extends SaveClassName with Default
+
+    /**
+     * Same as [[AllImplementations]] but saving the simple name io. the fully-qualified name.
+     */
+    trait SimpleAllImplementations extends AllImplementations with SaveSimpleName with Default
   }
 
   /**
