@@ -202,6 +202,15 @@ trait DefaultBSONHandlers {
     new BSONArrayCollectionReader
   }
 
+  implicit def bsonCodecSeq[A, B <: BSONValue](implicit handler: BSONHandler[B, A], tt: ClassTag[B]): BSONHandler[BSONArray, Seq[A]] =
+    BSONHandler(
+      arr => arr.values.toSeq.map {
+        case x: B => handler.read(x)
+        case x => sys.error(s"Was expecting value of type ${tt.runtimeClass.getSimpleName} but got '$x'")
+      },
+      xs => BSONArray(xs.map(x => handler.write(x)))
+    )
+
   abstract class IdentityBSONConverter[T <: BSONValue](implicit m: Manifest[T]) extends BSONReader[T, T] with BSONWriter[T, T] {
     override def write(t: T): T = m.runtimeClass.cast(t).asInstanceOf[T]
     override def writeOpt(t: T): Option[T] = if (m.runtimeClass.isInstance(t)) Some(t.asInstanceOf[T]) else None
