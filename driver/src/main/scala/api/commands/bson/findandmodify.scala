@@ -14,7 +14,8 @@ object BSONFindAndModifyCommand
 
 object BSONFindAndModifyImplicits {
   import BSONFindAndModifyCommand._
-  implicit object FindAndModifyResultReader extends DealingWithGenericCommandErrorsReader[FindAndModifyResult] {
+  implicit object FindAndModifyResultReader
+      extends DealingWithGenericCommandErrorsReader[FindAndModifyResult] {
 
     def readResult(result: BSONDocument): FindAndModifyResult =
       FindAndModifyResult(

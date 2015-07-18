@@ -335,9 +335,9 @@ class MongoConnection(
         logger.debug("set: no primary available")
         primaryAvailable = false
 
-      case sa: SetAvailable =>
-        logger.debug("set: a node is available")
-        metadata = Some(sa.metadata)
+      case SetAvailable(meta) =>
+        logger.debug(s"set: a node is available: $meta")
+        metadata = Some(meta)
 
       case SetUnavailable =>
         logger.debug("set: no node seems to be available")
@@ -366,6 +366,7 @@ class MongoConnection(
         logger.debug(s"Monitor $self closed, stopping...")
         waitingForClose.dequeueAll(_ => true).foreach(_ ! Closed)
         context.stop(self)
+
       case IsKilled(result) => result success killed
     }
 
@@ -733,8 +734,8 @@ class MongoDriver(config: Option[Config] = None) {
     def isEmpty = driver.connectionMonitors.isEmpty
 
     override def receive = {
-      case ac: AddConnection =>
-        val connection = new MongoConnection(driver.system, ac.mongosystem, ac.options)
+      case AddConnection(opts, sys) =>
+        val connection = new MongoConnection(driver.system, sys, opts)
         driver.connectionMonitors.put(connection.monitor, connection)
         context.watch(connection.monitor)
         sender ! connection

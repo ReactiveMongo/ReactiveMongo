@@ -29,12 +29,16 @@ sealed trait BSONNumberLikeClass[B <: BSONValue] extends BSONNumberLike
  */
 sealed trait BSONNumberLike { self: BSONNumberLikeClass[_] =>
   private[bson] def underlying: BSONValue
+
   /** Converts this number into an `Int`. */
   def toInt: Int
+
   /** Converts this number into a `Long`. */
   def toLong: Long
+
   /** Converts this number into a `Float`. */
   def toFloat: Float
+
   /** Converts this number into a `Double`. */
   def toDouble: Double
 }
