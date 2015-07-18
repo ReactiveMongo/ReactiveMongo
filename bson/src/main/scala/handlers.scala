@@ -136,10 +136,9 @@ trait DefaultBSONHandlers {
     def write(boolean: Boolean) = BSONBoolean(boolean)
   }
 
-  implicit object BSONByteArrayReader
-      extends BSONReader[BSONBinary, Array[Byte]] {
-
-    def read(bin: BSONBinary): Array[Byte] = bin.byteArray
+  implicit object BSONBinaryHandler extends BSONHandler[BSONBinary, Array[Byte]] {
+    def read(bin: BSONBinary) = bin.value.readArray(bin.value.size)
+    def write(xs: Array[Byte]) = BSONBinary(xs, Subtype.GenericBinarySubtype)
   }
 
   // Typeclasses Handlers
