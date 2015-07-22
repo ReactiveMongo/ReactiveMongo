@@ -83,6 +83,9 @@ object Command {
   def defaultCursorFetcher[P <: SerializationPack, A](db: DB, p: P, command: A, failover: FailoverStrategy)(implicit writer: p.Writer[A]): CursorFetcher[p.type, Cursor] = new CursorFetcher[p.type, Cursor] {
     val pack: p.type = p
 
+    @inline private def defaultReadPreference: ReadPreference =
+      db.connection.options.readPreference
+
     def one[A](readPreference: ReadPreference)(implicit reader: pack.Reader[A], ec: ExecutionContext): Future[A] = {
       val (requestMaker, mongo26WriteCommand) = buildRequestMaker(pack)(command, writer, readPreference, db.name)
       Failover2(db.connection, failover) { () =>
@@ -93,7 +96,7 @@ object Command {
       }.future
     }
 
-    def one[A](implicit reader: pack.Reader[A], ec: ExecutionContext): Future[A] = one[A](ReadPreference.primary)
+    def one[A](implicit reader: pack.Reader[A], ec: ExecutionContext): Future[A] = one[A](defaultReadPreference)
 
     def cursor[A](readPreference: ReadPreference)(implicit reader: pack.Reader[A]): Cursor[A] = {
       val buffer = ChannelBufferWritableBuffer()
@@ -108,7 +111,7 @@ object Command {
       DefaultCursor(pack, op, bs, if (mongo26WriteCommand) ReadPreference.primary else readPreference, db.connection, failover, mongo26WriteCommand)
     }
 
-    def cursor[A](implicit reader: pack.Reader[A]): Cursor[A] = cursor(ReadPreference.primary)
+    def cursor[A](implicit reader: pack.Reader[A]): Cursor[A] = cursor(defaultReadPreference)
   }
 
   case class CommandWithPackRunner[P <: SerializationPack](pack: P, failover: FailoverStrategy = FailoverStrategy()) {

@@ -24,14 +24,21 @@ import scala.util.control.{ NonFatal, NoStackTrace }
 import scala.concurrent.{ Await, ExecutionContext, Future, Promise }
 import scala.concurrent.duration._
 
-import akka.actor._
+import com.typesafe.config.Config
+
+import akka.actor.{ Actor, ActorRef, ActorSystem, Props, Terminated }
 import akka.pattern._
 import akka.util.Timeout
-import com.typesafe.config.Config
+
 import reactivemongo.core.actors._
 import reactivemongo.core.nodeset.Authenticate
-import reactivemongo.core.protocol._
+import reactivemongo.core.protocol.{
+  CheckedWriteRequest,
+  RequestMaker,
+  Response
+}
 import reactivemongo.core.commands.SuccessfulAuthentication
+import reactivemongo.api.commands.WriteConcern
 import reactivemongo.utils.LazyLogger
 
 /**
@@ -480,7 +487,36 @@ object MongoConnection {
         case ("rm.keepAlive", v)         => unsupportedKeys -> result.copy(keepAlive = v.toBoolean)
         case ("rm.nbChannelsPerNode", v) => unsupportedKeys -> result.copy(nbChannelsPerNode = v.toInt)
 
-        case (k, _)                      => (k :: unsupportedKeys) -> result
+        case ("writeConcern", "unacknowledged") => unsupportedKeys -> result.
+          copy(writeConcern = WriteConcern.Unacknowledged)
+
+        case ("writeConcern", "acknowledged") => unsupportedKeys -> result.
+          copy(writeConcern = WriteConcern.Acknowledged)
+
+        case ("writeConcern", "journaled") => unsupportedKeys -> result.
+          copy(writeConcern = WriteConcern.Journaled)
+
+        case ("writeConcern", "default") => unsupportedKeys -> result.
+          copy(writeConcern = WriteConcern.Default)
+
+        case ("readPreference", "primary") => unsupportedKeys -> result.
+          copy(readPreference = ReadPreference.primary)
+
+        case ("readPreference", "primaryPreferred") =>
+          unsupportedKeys -> result.copy(
+            readPreference = ReadPreference.primaryPreferred)
+
+        case ("readPreference", "secondary") => unsupportedKeys -> result.copy(
+          readPreference = ReadPreference.secondary)
+
+        case ("readPreference", "secondaryPreferred") =>
+          unsupportedKeys -> result.copy(
+            readPreference = ReadPreference.secondaryPreferred)
+
+        case ("readPreference", "nearest") => unsupportedKeys -> result.copy(
+          readPreference = ReadPreference.nearest)
+
+        case (k, _) => (k :: unsupportedKeys) -> result
       }
     }
 
@@ -506,6 +542,8 @@ case object ScramSha1Authentication extends AuthenticationMode
  * @param tcpNoDelay TCPNoDelay flag (ReactiveMongo-specific option). The default value is false (see [[http://docs.oracle.com/javase/8/docs/api/java/net/StandardSocketOptions.html#TCP_NODELAY TCP_NODELAY]]).
  * @param keepAlive TCP KeepAlive flag (ReactiveMongo-specific option). The default value is false (see [[http://docs.oracle.com/javase/8/docs/api/java/net/StandardSocketOptions.html#SO_KEEPALIVE SO_KEEPALIVE]]).
  * @param nbChannelsPerNode Number of channels (connections) per node (ReactiveMongo-specific option).
+ * @param writeConcern the default write concern
+ * @param readPreference the default read preference
  */
 case class MongoConnectionOptions(
   // canonical options - connection
@@ -519,7 +557,11 @@ case class MongoConnectionOptions(
   // reactivemongo specific options
   tcpNoDelay: Boolean = false,
   keepAlive: Boolean = false,
-  nbChannelsPerNode: Int = 10)
+  nbChannelsPerNode: Int = 10,
+
+  // read and write preferences
+  writeConcern: WriteConcern = WriteConcern.Default,
+  readPreference: ReadPreference = ReadPreference.primary)
 
 class MongoDriver(config: Option[Config] = None) {
   import scala.collection.mutable.{ Map => MutableMap }
