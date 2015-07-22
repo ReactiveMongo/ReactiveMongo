@@ -77,7 +77,7 @@ class BSONCollectionSpec extends Specification {
 
     "read empty cursor" >> {
       @inline def cursor: Cursor[BSONDocument] =
-        collection.find(BSONDocument("plop" -> "plop")).cursor[BSONDocument]
+        collection.find(BSONDocument("plop" -> "plop")).cursor[BSONDocument]()
 
       "with success using collect" in {
         val list = cursor.collect[Vector](10)
@@ -137,7 +137,7 @@ class BSONCollectionSpec extends Specification {
 
     "read all with success" >> {
       implicit val reader = PersonReader
-      @inline def cursor = collection.find(BSONDocument()).cursor[Person]
+      @inline def cursor = collection.find(BSONDocument()).cursor[Person]()
       val persons = Seq(person, person2, person3, person4, person5)
 
       "as list" in {
@@ -166,7 +166,7 @@ class BSONCollectionSpec extends Specification {
 
     "read until John" in {
       implicit val reader = PersonReader
-      @inline def cursor = collection.find(BSONDocument()).cursor[Person]
+      @inline def cursor = collection.find(BSONDocument()).cursor[Person]()
       val persons = Seq(person, person2, person3)
 
       cursor.foldWhile(Nil: Seq[Person])({ (s, p) =>
@@ -190,7 +190,7 @@ class BSONCollectionSpec extends Specification {
 
     "read docs with error" >> {
       implicit val reader = new SometimesBuggyPersonReader
-      @inline def cursor = collection.find(BSONDocument()).cursor[Person]
+      @inline def cursor = collection.find(BSONDocument()).cursor[Person]()
 
       "using collect" in {
         val collect = cursor.collect[Vector]().map(_.size).recover {
@@ -221,7 +221,9 @@ class BSONCollectionSpec extends Specification {
 
     "read docs until error" in {
       implicit val reader = new SometimesBuggyPersonReader
-      val enumerator = collection.find(BSONDocument()).cursor[Person].enumerate(stopOnError = true)
+      val enumerator = collection.find(BSONDocument()).
+        cursor[Person]().enumerate(stopOnError = true)
+
       var i = 0
       val future = enumerator |>>> Iteratee.foreach { doc =>
         i += 1
@@ -234,7 +236,9 @@ class BSONCollectionSpec extends Specification {
 
     "read docs skipping errors" in {
       implicit val reader = new SometimesBuggyPersonReader
-      val enumerator = collection.find(BSONDocument()).cursor[Person].enumerate(stopOnError = false)
+      val enumerator = collection.find(BSONDocument()).
+        cursor[Person]().enumerate(stopOnError = false)
+
       var i = 0
       val future = enumerator |>>> Iteratee.foreach { doc =>
         i += 1
@@ -246,8 +250,10 @@ class BSONCollectionSpec extends Specification {
     }
     "read docs skipping errors using collect" in {
       implicit val reader = new SometimesBuggyPersonReader
-      val result = Await.result(collection.find(BSONDocument()).cursor[Person].collect[Vector](stopOnError = false), timeout)
-      println(s"(read docs skipping errors using collect) got result $result")
+      val result = Await.result(collection.find(BSONDocument()).
+        cursor[Person]().collect[Vector](stopOnError = false), timeout)
+
+      //println(s"(read docs skipping errors using collect) got result $result")
       result.length mustEqual 4
     }
 

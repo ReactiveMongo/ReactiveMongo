@@ -330,12 +330,15 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    * @param selector the query selector
    * @param modifier the modify operator to be applied
    * @param sort the optional document possibly indicating the sort criterias
+   * @param fields the field [[http://docs.mongodb.org/manual/tutorial/project-fields-from-query-results/#read-operations-projection projection]]
    */
-  def findAndModify[Q](selector: Q, modifier: BatchCommands.FindAndModifyCommand.Modify, sort: Option[pack.Document] = None)(implicit selectorWriter: pack.Writer[Q], ec: ExecutionContext): Future[BatchCommands.FindAndModifyCommand.FindAndModifyResult] = {
+  def findAndModify[Q](selector: Q, modifier: BatchCommands.FindAndModifyCommand.Modify, sort: Option[pack.Document] = None, fields: Option[pack.Document] = None)(implicit selectorWriter: pack.Writer[Q], ec: ExecutionContext): Future[BatchCommands.FindAndModifyCommand.FindAndModifyResult] = {
+    import FindAndModifyCommand.{ ImplicitlyDocumentProducer => DP }
     val command = BatchCommands.FindAndModifyCommand.FindAndModify(
       query = selector,
       modify = modifier,
-      sort = sort.map(implicitly[FindAndModifyCommand.ImplicitlyDocumentProducer](_)))
+      sort = sort.map(implicitly[DP](_)),
+      fields = fields.map(implicitly[DP](_)))
 
     runCommand(command)
   }
@@ -356,10 +359,11 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    * @param fetchNewObject the command result must be the new object instead of the old one.
    * @param upsert if true, creates a new document if no document matches the query, or if documents match the query, findAndModify performs an update
    * @param sort the optional document possibly indicating the sort criterias
+   * @param fields the field [[http://docs.mongodb.org/manual/tutorial/project-fields-from-query-results/#read-operations-projection projection]]
    */
-  def findAndUpdate[Q, U](selector: Q, update: U, fetchNewObject: Boolean = false, upsert: Boolean = false, sort: Option[pack.Document] = None)(implicit selectorWriter: pack.Writer[Q], updateWriter: pack.Writer[U], ec: ExecutionContext): Future[BatchCommands.FindAndModifyCommand.FindAndModifyResult] = {
+  def findAndUpdate[Q, U](selector: Q, update: U, fetchNewObject: Boolean = false, upsert: Boolean = false, sort: Option[pack.Document] = None, fields: Option[pack.Document] = None)(implicit selectorWriter: pack.Writer[Q], updateWriter: pack.Writer[U], ec: ExecutionContext): Future[BatchCommands.FindAndModifyCommand.FindAndModifyResult] = {
     val updateOp = updateModifier(update, fetchNewObject, upsert)
-    findAndModify(selector, updateOp, sort)
+    findAndModify(selector, updateOp, sort, fields)
   }
 
   /**
@@ -373,8 +377,9 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    * @param selector the query selector
    * @param modifier the modify operator to be applied
    * @param sort the optional document possibly indicating the sort criterias
+   * @param fields the field [[http://docs.mongodb.org/manual/tutorial/project-fields-from-query-results/#read-operations-projection projection]]
    */
-  def findAndRemove[Q](selector: Q, sort: Option[pack.Document] = None)(implicit selectorWriter: pack.Writer[Q], ec: ExecutionContext): Future[BatchCommands.FindAndModifyCommand.FindAndModifyResult] = findAndModify[Q](selector, removeModifier, sort)
+  def findAndRemove[Q](selector: Q, sort: Option[pack.Document] = None, fields: Option[pack.Document] = None)(implicit selectorWriter: pack.Writer[Q], ec: ExecutionContext): Future[BatchCommands.FindAndModifyCommand.FindAndModifyResult] = findAndModify[Q](selector, removeModifier, sort, fields)
 
   /**
    * Remove the matched document(s) from the collection and wait for the [[reactivemongo.api.commands.WriteResult]] result.
