@@ -32,7 +32,7 @@ object QueryAndWriteCommands extends org.specs2.mutable.Specification {
       /*val lastError2 = Await.result(Command.run(BSONSerializationPack)(collection,Insert(true)(doc)), timeout)
       println(lastError2)
       lastError2.ok mustEqual true*/
-      val found = Await.result(collection.find(doc).cursor[BSONDocument].collect[List](), timeout)
+      val found = Await.result(collection.find(doc).cursor[BSONDocument]().collect[List](), timeout)
       found.size mustEqual 1
       val count = Await.result(Command.run(BSONSerializationPack).unboxed(collection, Count(BSONDocument())), timeout)
       count mustEqual 1
@@ -49,7 +49,7 @@ object QueryAndWriteCommands extends org.specs2.mutable.Specification {
       /*val lastError2 = Await.result(Command.run(BSONSerializationPack)(collection,Insert(true)(doc)), timeout)
       println(lastError2)
       lastError2.ok mustEqual true*/
-      val found = Await.result(collection.find(doc).cursor[BSONDocument].collect[List](), timeout)
+      val found = Await.result(collection.find(doc).cursor[BSONDocument]().collect[List](), timeout)
       found.size mustEqual 1
     }
   }
@@ -65,7 +65,7 @@ object QueryAndWriteCommands extends org.specs2.mutable.Specification {
       val lastError = Await.result(coll.insert(doc), timeout)
       println(lastError)
       lastError.ok mustEqual true
-      val list = Await.result(coll.find(doc).cursor[BSONDocument].collect[List](), timeout)
+      val list = Await.result(coll.find(doc).cursor[BSONDocument]().collect[List](), timeout)
       println(list)
       list.size mustEqual 1
     }

@@ -41,14 +41,7 @@ class FindAndModifySpec extends Specification {
     "upsert a doc and fetch it" in {
       val jack = Person("Jack", "London", 27)
       val upsertOp = Update(BSONDocument("$set" -> BSONDocument("age" -> 40)), fetchNewObject = true, upsert = true)
-      val future = collection.runCommand(FindAndModify(jack, upsertOp))
-
-      /* TODO: Remove
-      val result = Await.result(future, timeout)
-
-      println(s"FAM(upsert) result is $result")
-      println(result.value.map(BSONDocument.pretty))
-       */
+      def future = collection.runCommand(FindAndModify(jack, upsertOp))
 
       future must (beLike[FindAndModifyResult] {
         case result =>
@@ -64,13 +57,7 @@ class FindAndModifySpec extends Specification {
       val incrementAge = Update(BSONDocument(
         "$inc" -> BSONDocument("age" -> 1)))
 
-      val future = collection.runCommand(FindAndModify(jack, incrementAge))
-
-      /*
-      val result = Await.result(future, timeout)
-      println(s"FAM(modify) result is $result")
-      result.lastError.exists(_.upsertedId.isEmpty) must beTrue
-       */
+      def future = collection.runCommand(FindAndModify(jack, incrementAge))
 
       future must (beLike[FindAndModifyResult] {
         case result =>

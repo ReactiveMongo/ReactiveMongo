@@ -62,16 +62,19 @@ trait DB {
    */
   def collection[C <: Collection](name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit producer: CollectionProducer[C] = collections.bson.BSONCollectionProducer): C = producer.apply(this, name, failoverStrategy)
 
+  @inline def defaultReadPreference: ReadPreference =
+    connection.options.readPreference
+
   /**
    * Sends a command and get the future result of the command.
    *
    * @param command The command to send.
-   * @param readPreference The ReadPreference to use for this command (defaults to ReadPreference.primary).
+   * @param readPreference The ReadPreference to use for this command (defaults to [[MongoConnectionOptions.readPreference]]).
    *
    * @return a future containing the result of the command.
    */
   @deprecated("consider using reactivemongo.api.commands along with `GenericDB.runCommand` methods", "0.11.0")
-  def command[T](command: Command[T], readPreference: ReadPreference = ReadPreference.primary)(implicit ec: ExecutionContext): Future[T] = {
+  def command[T](command: Command[T], readPreference: ReadPreference = defaultReadPreference)(implicit ec: ExecutionContext): Future[T] = {
     Failover(command.apply(name).maker(readPreference), connection, failoverStrategy).future.mapEither(command.ResultMaker(_))
   }
 
@@ -96,11 +99,9 @@ trait GenericDB[P <: SerializationPack with Singleton] { self: DB =>
   def runCommand[R, C <: Command with CommandWithResult[R]](command: C with CommandWithResult[R])(implicit writer: pack.Writer[C], reader: pack.Reader[R], ec: ExecutionContext): Future[R] =
     runner(self, command)
 
-  def runCommand[C <: Command](command: C)(implicit writer: pack.Writer[C]): CursorFetcher[pack.type, Cursor] =
-    runner(self, command)
+  def runCommand[C <: Command](command: C)(implicit writer: pack.Writer[C]): CursorFetcher[pack.type, Cursor] = runner(self, command)
 
-  def runValueCommand[A <: AnyVal, R <: BoxedAnyVal[A], C <: Command with CommandWithResult[R]](command: C with CommandWithResult[R with BoxedAnyVal[A]])(implicit writer: pack.Writer[C], reader: pack.Reader[R], ec: ExecutionContext): Future[A] =
-    runner.unboxed(self, command)
+  def runValueCommand[A <: AnyVal, R <: BoxedAnyVal[A], C <: Command with CommandWithResult[R]](command: C with CommandWithResult[R with BoxedAnyVal[A]])(implicit writer: pack.Writer[C], reader: pack.Reader[R], ec: ExecutionContext): Future[A] = runner.unboxed(self, command)
 }
 
 /** A mixin that provides commands about this database itself. */
@@ -143,11 +144,12 @@ trait DBMetaCommands {
     if (wireVer.exists(_ == MongoWireVersion.V30)) {
       Command.run(BSONSerializationPack)(self, ListCollectionNames).map(_.names)
     }
-    else collection("system.namespaces").as[BSONCollection]()
-      .find(BSONDocument(
+    else collection("system.namespaces").as[BSONCollection]().
+      find(BSONDocument(
         "name" -> BSONRegex("^[^\\$]+$", "") // strip off any indexes
-        )).cursor(collectionNameReader, ec, CursorProducer.defaultCursorProducer).
-      collect[List]()
+        )).cursor(defaultReadPreference)(
+        collectionNameReader, ec, CursorProducer.defaultCursorProducer).
+        collect[List]()
   }
 
   /* // TODO

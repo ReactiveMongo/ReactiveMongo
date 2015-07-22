@@ -1,6 +1,6 @@
 package reactivemongo.api
 
-import reactivemongo.bson._
+import reactivemongo.bson.{ BSONArray, BSONDocument, BSONDocumentWriter }
 
 /**
  * MongoDB Read Preferences enable to read from primary or secondaries

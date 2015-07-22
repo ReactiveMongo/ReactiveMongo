@@ -27,6 +27,7 @@ import reactivemongo.api.{
   DB,
   DBMetaCommands,
   BSONSerializationPack,
+  ReadPreference,
   SerializationPack
 }
 import reactivemongo.api.commands.WriteResult
@@ -189,6 +190,9 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
 
   val pack: files.pack.type = files.pack
 
+  @inline def defaultReadPreference: ReadPreference =
+    db.connection.options.readPreference
+
   /**
    * Finds the files matching the given selector.
    *
@@ -196,7 +200,7 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
    *
    * @tparam S The type of the selector document. An implicit `Writer[S]` must be in the scope.
    */
-  def find[S, T <: ReadFile[P, _]](selector: S)(implicit sWriter: pack.Writer[S], readFileReader: pack.Reader[T], ctx: ExecutionContext, cp: CursorProducer[T]): cp.ProducedCursor = files.find(selector).cursor()
+  def find[S, T <: ReadFile[P, _]](selector: S)(implicit sWriter: pack.Writer[S], readFileReader: pack.Reader[T], ctx: ExecutionContext, cp: CursorProducer[T]): cp.ProducedCursor = files.find(selector).cursor(defaultReadPreference)
 
   /**
    * Saves the content provided by the given enumerator with the given metadata.
@@ -320,7 +324,9 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
             if (file.length % file.chunkSize > 0) 1 else 0))))),
       "$orderby" -> BSONDocument("n" -> BSONInteger(1)))
 
-    val cursor = chunks.as[BSONCollection]().find(selector).cursor()
+    @inline def cursor = chunks.as[BSONCollection]().
+      find(selector).cursor(defaultReadPreference)
+
     cursor.enumerate() &> Enumeratee.map { doc =>
       doc.get("data").flatMap {
         case BSONBinary(data, _) => {
