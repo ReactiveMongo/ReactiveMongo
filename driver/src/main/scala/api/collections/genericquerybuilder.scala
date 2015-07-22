@@ -44,8 +44,6 @@ trait GenericQueryBuilder[P <: SerializationPack] {
 
   def merge(readPreference: ReadPreference): pack.Document
 
-  //def structureReader: pack.Reader[pack.Document]
-
   def copy(
     queryOption: Option[pack.Document] = queryOption,
     sortOption: Option[pack.Document] = sortOption,

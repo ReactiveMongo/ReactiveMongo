@@ -97,7 +97,11 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
   def genericQueryBuilder: GenericQueryBuilder[pack.type]
 
   import BatchCommands._
-  import reactivemongo.api.commands.{ MultiBulkWriteResult, UpdateWriteResult, WriteResult }
+  import reactivemongo.api.commands.{
+    MultiBulkWriteResult,
+    UpdateWriteResult,
+    WriteResult
+  }
 
   private def writeDoc(doc: pack.Document): ChannelBuffer = {
     val buffer = ChannelBufferWritableBuffer()
@@ -111,7 +115,8 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
     buffer.buffer
   }
 
-  protected def watchFailure[T](future: => Future[T]): Future[T] = Try(future).recover { case NonFatal(e) => Future.failed(e) }.get
+  protected def watchFailure[T](future: => Future[T]): Future[T] =
+    Try(future).recover { case NonFatal(e) => Future.failed(e) }.get
 
   /**
    * Find the documents matching the given criteria.
@@ -126,8 +131,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    *
    * @return a [[GenericQueryBuilder]] that you can use to to customize the query. You can obtain a cursor by calling the method [[reactivemongo.api.Cursor]] on this query builder.
    */
-  def find[S](selector: S)(implicit swriter: pack.Writer[S]): GenericQueryBuilder[pack.type] =
-    genericQueryBuilder.query(selector)
+  def find[S](selector: S)(implicit swriter: pack.Writer[S]): GenericQueryBuilder[pack.type] = genericQueryBuilder.query(selector)
 
   /**
    * Find the documents matching the given criteria.
@@ -163,9 +167,11 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    */
   def count[H](selector: Option[pack.Document] = None, limit: Int = 0, skip: Int = 0, hint: Option[H] = None)(implicit h: H => CountCommand.Hint, ec: ExecutionContext): Future[Int] = runValueCommand(CountCommand.Count(query = selector, limit, skip, hint.map(h)))
 
+  @inline private def defaultWriteConcern = db.connection.options.writeConcern
+
   def bulkInsert(ordered: Boolean)(documents: ImplicitlyDocumentProducer*)(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] =
     db.connection.metadata.map { metadata =>
-      bulkInsert(documents.toStream.map(_.produce), ordered, WriteConcern.Default, metadata.maxBulkSize, metadata.maxBsonSize)
+      bulkInsert(documents.toStream.map(_.produce), ordered, defaultWriteConcern, metadata.maxBulkSize, metadata.maxBsonSize)
     }.getOrElse(Future.failed(ConnectionNotInitialized.MissingMetadata))
 
   def bulkInsert(ordered: Boolean, writeConcern: WriteConcern)(documents: ImplicitlyDocumentProducer*)(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] =
@@ -177,14 +183,14 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
     bulkInsert(documents.toStream.map(_.produce), ordered, writeConcern, bulkSize, bulkByteSize)
 
   def bulkInsert(documents: Stream[pack.Document], ordered: Boolean)(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] =
-    bulkInsert(documents, ordered, WriteConcern.Default)
+    bulkInsert(documents, ordered, defaultWriteConcern)
 
   def bulkInsert(documents: Stream[pack.Document], ordered: Boolean, writeConcern: WriteConcern)(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] =
     db.connection.metadata.map { metadata =>
       bulkInsert(documents, ordered, writeConcern, metadata.maxBulkSize, metadata.maxBsonSize)
     }.getOrElse(Future.failed(ConnectionNotInitialized.MissingMetadata))
 
-  def bulkInsert(documents: Stream[pack.Document], ordered: Boolean, writeConcern: WriteConcern = WriteConcern.Default, bulkSize: Int, bulkByteSize: Int)(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] = watchFailure {
+  def bulkInsert(documents: Stream[pack.Document], ordered: Boolean, writeConcern: WriteConcern = defaultWriteConcern, bulkSize: Int, bulkByteSize: Int)(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] = watchFailure {
     def createBulk[R, A <: BulkMaker[R, A]](docs: Stream[pack.Document], command: A with BulkMaker[R, A]): Future[List[R]] = {
       val (tail, nc) = command.fill(docs)
       command.send().flatMap { wr =>
@@ -235,7 +241,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    *
    * @return a future [[reactivemongo.api.commands.WriteResult]] that can be used to check whether the insertion was successful.
    */
-  def insert[T](document: T, writeConcern: WriteConcern = WriteConcern.Default)(implicit writer: pack.Writer[T], ec: ExecutionContext): Future[WriteResult] = {
+  def insert[T](document: T, writeConcern: WriteConcern = defaultWriteConcern)(implicit writer: pack.Writer[T], ec: ExecutionContext): Future[WriteResult] = {
     Failover2(db.connection, failoverStrategy) { () =>
       db.connection.metadata match {
         case Some(metadata) if metadata.maxWireVersion >= MongoWireVersion.V26 =>
@@ -273,7 +279,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    *
    * @return a future [[reactivemongo.api.commands.WriteResult]] that can be used to check whether the update was successful.
    */
-  def update[S, U](selector: S, update: U, writeConcern: WriteConcern = WriteConcern.Default, upsert: Boolean = false, multi: Boolean = false)(implicit selectorWriter: pack.Writer[S], updateWriter: pack.Writer[U], ec: ExecutionContext): Future[WriteResult] =
+  def update[S, U](selector: S, update: U, writeConcern: WriteConcern = defaultWriteConcern, upsert: Boolean = false, multi: Boolean = false)(implicit selectorWriter: pack.Writer[S], updateWriter: pack.Writer[U], ec: ExecutionContext): Future[WriteResult] =
     Failover2(db.connection, failoverStrategy) { () =>
       db.connection.metadata match {
         case Some(metadata) if metadata.maxWireVersion >= MongoWireVersion.V26 =>
@@ -394,7 +400,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    *
    * @return a future [[reactivemongo.api.commands.WriteResult]] that can be used to check whether the removal was successful.
    */
-  def remove[T](query: T, writeConcern: WriteConcern = WriteConcern.Default, firstMatchOnly: Boolean = false)(implicit writer: pack.Writer[T], ec: ExecutionContext): Future[WriteResult] =
+  def remove[T](query: T, writeConcern: WriteConcern = defaultWriteConcern, firstMatchOnly: Boolean = false)(implicit writer: pack.Writer[T], ec: ExecutionContext): Future[WriteResult] =
     Failover2(db.connection, failoverStrategy) { () =>
       db.connection.metadata match {
         case Some(metadata) if metadata.maxWireVersion >= MongoWireVersion.V26 =>

@@ -11,7 +11,9 @@ case class GetLastError(
   w: GetLastError.W,
   j: Boolean,
   fsync: Boolean,
-  wtimeout: Option[Int] = None) extends Command with CommandWithResult[LastError]
+  wtimeout: Option[Int] = None) extends Command
+    with CommandWithResult[LastError]
+
 object GetLastError {
   sealed trait W
   case object Majority extends W
@@ -24,17 +26,20 @@ object GetLastError {
 
   val Unacknowledged: GetLastError =
     GetLastError(WaitForAknowledgments(0), false, false, None)
+
   val Acknowledged: GetLastError =
     GetLastError(WaitForAknowledgments(1), false, false, None)
+
   val Journaled: GetLastError =
     GetLastError(WaitForAknowledgments(1), true, false, None)
-  def ReplicaAcknowledged(n: Int, timeout: Int, journaled: Boolean): GetLastError =
-    GetLastError(WaitForAknowledgments(if (n < 2) 2 else n), journaled, false, (if (timeout <= 0) None else Some(timeout)))
-  def TagReplicaAcknowledged(tag: String, timeout: Int, journaled: Boolean): GetLastError =
-    GetLastError(TagSet(tag), journaled, false, (if (timeout <= 0) None else Some(timeout)))
+
+  def ReplicaAcknowledged(n: Int, timeout: Int, journaled: Boolean): GetLastError = GetLastError(WaitForAknowledgments(if (n < 2) 2 else n), journaled, false, (if (timeout <= 0) None else Some(timeout)))
+
+  def TagReplicaAcknowledged(tag: String, timeout: Int, journaled: Boolean): GetLastError = GetLastError(TagSet(tag), journaled, false, (if (timeout <= 0) None else Some(timeout)))
 
   def Default: GetLastError = Acknowledged
 }
+
 case class LastError(
     ok: Boolean,
     err: Option[String],
@@ -179,10 +184,9 @@ trait InsertCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] {
   type InsertResult = DefaultWriteResult // for simplified imports
 
   object Insert {
-    def apply(firstDoc: ImplicitlyDocumentProducer, otherDocs: ImplicitlyDocumentProducer*): Insert =
-      apply()(firstDoc, otherDocs: _*)
-    def apply(ordered: Boolean = true, writeConcern: WriteConcern = WriteConcern.Default)(firstDoc: ImplicitlyDocumentProducer, otherDocs: ImplicitlyDocumentProducer*): Insert =
-      new Insert(firstDoc.produce #:: otherDocs.toStream.map(_.produce), ordered, writeConcern)
+    def apply(firstDoc: ImplicitlyDocumentProducer, otherDocs: ImplicitlyDocumentProducer*): Insert = apply()(firstDoc, otherDocs: _*)
+
+    def apply(ordered: Boolean = true, writeConcern: WriteConcern = WriteConcern.Default)(firstDoc: ImplicitlyDocumentProducer, otherDocs: ImplicitlyDocumentProducer*): Insert = new Insert(firstDoc.produce #:: otherDocs.toStream.map(_.produce), ordered, writeConcern)
   }
 }
 
