@@ -4,6 +4,9 @@ set -e
 
 DIR=`dirname $0`
 
+rm -rf $HOME/.sbt
+rm -rf $HOME/.ivy2
+
 cd "$DIR/.."
 
 sbt ++$TRAVIS_SCALA_VERSION scalariformFormat test:scalariformFormat

@@ -7,6 +7,9 @@ import reactivemongo.core.errors.DatabaseException
 
 trait Mongo26WriteCommand
 
+/**
+ * @param wtimeout the [[http://docs.mongodb.org/manual/reference/write-concern/#wtimeout time limit]]
+ */
 case class GetLastError(
   w: GetLastError.W,
   j: Boolean,
@@ -17,7 +20,7 @@ case class GetLastError(
 object GetLastError {
   sealed trait W
   case object Majority extends W
-  case class TagSet(s: String) extends W
+  case class TagSet(tag: String) extends W
   case class WaitForAknowledgments(i: Int) extends W
   object W {
     implicit def strToTagSet(s: String): W = TagSet(s)

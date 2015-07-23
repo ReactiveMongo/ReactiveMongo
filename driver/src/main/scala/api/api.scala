@@ -471,55 +471,85 @@ object MongoConnection {
       case _ => Map.empty
     }
 
-  private def makeOptions(opts: Map[String, String]): (List[String], MongoConnectionOptions) =
-    opts.iterator.foldLeft(List.empty[String] -> MongoConnectionOptions()) {
-      case ((unsupportedKeys, result), kv) => kv match {
-        case ("authSource", v)           => unsupportedKeys -> result.copy(authSource = Some(v))
+  val IntRe = "^([0-9]+)$".r
 
-        case ("authMode", "scram-sha1")  => unsupportedKeys -> result.copy(authMode = ScramSha1Authentication)
-        case ("authMode", _)             => unsupportedKeys -> result.copy(authMode = CrAuthentication)
+  private def makeOptions(opts: Map[String, String]): (List[String], MongoConnectionOptions) = {
+    val (remOpts, step1) = opts.iterator.foldLeft(
+      Map.empty[String, String] -> MongoConnectionOptions()) {
+        case ((unsupported, result), kv) => kv match {
+          case ("authSource", v)           => unsupported -> result.copy(authSource = Some(v))
 
-        case ("connectTimeoutMS", v)     => unsupportedKeys -> result.copy(connectTimeoutMS = v.toInt)
-        case ("sslEnabled", v)           => unsupportedKeys -> result.copy(sslEnabled = v.toBoolean)
-        case ("sslAllowsInvalidCert", v) => unsupportedKeys -> result.copy(sslAllowsInvalidCert = v.toBoolean)
+          case ("authMode", "scram-sha1")  => unsupported -> result.copy(authMode = ScramSha1Authentication)
+          case ("authMode", _)             => unsupported -> result.copy(authMode = CrAuthentication)
 
-        case ("rm.tcpNoDelay", v)        => unsupportedKeys -> result.copy(tcpNoDelay = v.toBoolean)
-        case ("rm.keepAlive", v)         => unsupportedKeys -> result.copy(keepAlive = v.toBoolean)
-        case ("rm.nbChannelsPerNode", v) => unsupportedKeys -> result.copy(nbChannelsPerNode = v.toInt)
+          case ("connectTimeoutMS", v)     => unsupported -> result.copy(connectTimeoutMS = v.toInt)
+          case ("sslEnabled", v)           => unsupported -> result.copy(sslEnabled = v.toBoolean)
+          case ("sslAllowsInvalidCert", v) => unsupported -> result.copy(sslAllowsInvalidCert = v.toBoolean)
 
-        case ("writeConcern", "unacknowledged") => unsupportedKeys -> result.
-          copy(writeConcern = WriteConcern.Unacknowledged)
+          case ("rm.tcpNoDelay", v)        => unsupported -> result.copy(tcpNoDelay = v.toBoolean)
+          case ("rm.keepAlive", v)         => unsupported -> result.copy(keepAlive = v.toBoolean)
+          case ("rm.nbChannelsPerNode", v) => unsupported -> result.copy(nbChannelsPerNode = v.toInt)
 
-        case ("writeConcern", "acknowledged") => unsupportedKeys -> result.
-          copy(writeConcern = WriteConcern.Acknowledged)
+          case ("writeConcern", "unacknowledged") => unsupported -> result.
+            copy(writeConcern = WriteConcern.Unacknowledged)
 
-        case ("writeConcern", "journaled") => unsupportedKeys -> result.
-          copy(writeConcern = WriteConcern.Journaled)
+          case ("writeConcern", "acknowledged") => unsupported -> result.
+            copy(writeConcern = WriteConcern.Acknowledged)
 
-        case ("writeConcern", "default") => unsupportedKeys -> result.
-          copy(writeConcern = WriteConcern.Default)
+          case ("writeConcern", "journaled") => unsupported -> result.
+            copy(writeConcern = WriteConcern.Journaled)
 
-        case ("readPreference", "primary") => unsupportedKeys -> result.
-          copy(readPreference = ReadPreference.primary)
+          case ("writeConcern", "default") => unsupported -> result.
+            copy(writeConcern = WriteConcern.Default)
 
-        case ("readPreference", "primaryPreferred") =>
-          unsupportedKeys -> result.copy(
-            readPreference = ReadPreference.primaryPreferred)
+          case ("readPreference", "primary") => unsupported -> result.
+            copy(readPreference = ReadPreference.primary)
 
-        case ("readPreference", "secondary") => unsupportedKeys -> result.copy(
-          readPreference = ReadPreference.secondary)
+          case ("readPreference", "primaryPreferred") =>
+            unsupported -> result.copy(
+              readPreference = ReadPreference.primaryPreferred)
 
-        case ("readPreference", "secondaryPreferred") =>
-          unsupportedKeys -> result.copy(
-            readPreference = ReadPreference.secondaryPreferred)
+          case ("readPreference", "secondary") => unsupported -> result.copy(
+            readPreference = ReadPreference.secondary)
 
-        case ("readPreference", "nearest") => unsupportedKeys -> result.copy(
-          readPreference = ReadPreference.nearest)
+          case ("readPreference", "secondaryPreferred") =>
+            unsupported -> result.copy(
+              readPreference = ReadPreference.secondaryPreferred)
 
-        case (k, _) => (k :: unsupportedKeys) -> result
+          case ("readPreference", "nearest") => unsupported -> result.copy(
+            readPreference = ReadPreference.nearest)
+
+          case kv => (unsupported + kv) -> result
+        }
+      }
+
+    // Overriding options
+    remOpts.iterator.foldLeft(List.empty[String] -> step1) {
+      case ((unsupported, result), kv) => kv match {
+        case ("writeConcernW", "majority") => unsupported -> result.
+          copy(writeConcern = result.writeConcern.
+            copy(w = WriteConcern.Majority))
+
+        case ("writeConcernW", IntRe(str)) => unsupported -> result.
+          copy(writeConcern = result.writeConcern.
+            copy(w = WriteConcern.WaitForAknowledgments(str.toInt)))
+
+        case ("writeConcernW", tag) => unsupported -> result.
+          copy(writeConcern = result.writeConcern.
+            copy(w = WriteConcern.TagSet(tag)))
+
+        case ("writeConcernJ", journaled) => unsupported -> result.
+          copy(writeConcern = result.writeConcern.
+            copy(j = journaled.toBoolean))
+
+        case ("writeConcernTimeout", t @ IntRe(ms)) => unsupported -> result.
+          copy(writeConcern = result.writeConcern.
+            copy(wtimeout = Some(ms.toInt)))
+
+        case (k, _) => (k :: unsupported) -> result
       }
     }
-
+  }
 }
 
 /** Then mode of authentication against the replica set. */
