@@ -16,25 +16,25 @@ object BSONGetLastErrorImplicits {
       "j" -> (if (wc.j) Some(true) else None),
       "wtimeout" -> wc.wtimeout)
   }
+
   implicit object LastErrorReader extends DealingWithGenericCommandErrorsReader[LastError] {
-    def readResult(doc: BSONDocument): LastError =
-      LastError(
-        ok = doc.getAs[BSONBooleanLike]("ok").map(_.toBoolean).getOrElse(false),
-        err = doc.getAs[String]("err"),
-        code = doc.getAs[Int]("code"),
-        lastOp = doc.getAs[BSONNumberLike]("lastOp").map(_.toLong),
-        n = doc.getAs[Int]("n").getOrElse(0),
-        singleShard = doc.getAs[String]("singleShard"),
-        updatedExisting = doc.getAs[BSONBooleanLike]("updatedExisting").map(_.toBoolean).getOrElse(false),
-        upserted = doc.getAs[BSONObjectID]("upserted"),
-        wnote = doc.get("wnote").map {
-          case BSONString("majority") => GetLastError.Majority
-          case BSONString(tagSet)     => GetLastError.TagSet(tagSet)
-          case BSONInteger(acks)      => GetLastError.WaitForAknowledgments(acks)
-        },
-        wtimeout = doc.getAs[Boolean]("wtimeout").getOrElse(false),
-        waited = doc.getAs[Int]("waited"),
-        wtime = doc.getAs[Int]("wtime"))
+    def readResult(doc: BSONDocument): LastError = LastError(
+      ok = doc.getAs[BSONBooleanLike]("ok").map(_.toBoolean).getOrElse(false),
+      err = doc.getAs[String]("err"),
+      code = doc.getAs[Int]("code"),
+      lastOp = doc.getAs[BSONNumberLike]("lastOp").map(_.toLong),
+      n = doc.getAs[Int]("n").getOrElse(0),
+      singleShard = doc.getAs[String]("singleShard"),
+      updatedExisting = doc.getAs[BSONBooleanLike]("updatedExisting").map(_.toBoolean).getOrElse(false),
+      upserted = doc.getAs[BSONObjectID]("upserted"),
+      wnote = doc.get("wnote").map {
+        case BSONString("majority") => GetLastError.Majority
+        case BSONString(tagSet)     => GetLastError.TagSet(tagSet)
+        case BSONInteger(acks)      => GetLastError.WaitForAknowledgments(acks)
+      },
+      wtimeout = doc.getAs[Boolean]("wtimeout").getOrElse(false),
+      waited = doc.getAs[Int]("waited"),
+      wtime = doc.getAs[Int]("wtime"))
   }
 }
 
