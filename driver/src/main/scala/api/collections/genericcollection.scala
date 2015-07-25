@@ -51,7 +51,7 @@ trait GenericCollectionWithCommands[P <: SerializationPack with Singleton] { sel
 }
 
 trait BatchCommands[P <: SerializationPack] {
-  import reactivemongo.api.commands.{ CountCommand => CC, InsertCommand => IC, UpdateCommand => UC, DeleteCommand => DC, DefaultWriteResult, LastError, ResolvedCollectionCommand, FindAndModifyCommand => FMC }
+  import reactivemongo.api.commands.{ AggregationFramework => AC, CountCommand => CC, InsertCommand => IC, UpdateCommand => UC, DeleteCommand => DC, DefaultWriteResult, LastError, ResolvedCollectionCommand, FindAndModifyCommand => FMC }
 
   val pack: P
 
@@ -73,6 +73,10 @@ trait BatchCommands[P <: SerializationPack] {
   implicit def FindAndModifyWriter: pack.Writer[ResolvedCollectionCommand[FindAndModifyCommand.FindAndModify]]
   implicit def FindAndModifyReader: pack.Reader[FindAndModifyCommand.FindAndModifyResult]
 
+  val AggregationFramework: AC[pack.type]
+  implicit def AggregateWriter: pack.Writer[ResolvedCollectionCommand[AggregationFramework.Aggregate]]
+  implicit def AggregateReader: pack.Reader[AggregationFramework.AggregationResult]
+
   implicit def DefaultWriteResultReader: pack.Reader[DefaultWriteResult]
 
   implicit def LastErrorReader: pack.Reader[LastError]
@@ -89,6 +93,9 @@ trait BatchCommands[P <: SerializationPack] {
 trait GenericCollection[P <: SerializationPack with Singleton] extends Collection with GenericCollectionWithCommands[P] with CollectionMetaCommands with reactivemongo.api.commands.ImplicitCommandHelpers[P] { self =>
   val pack: P
   protected val BatchCommands: BatchCommands[pack.type]
+
+  /** Alias for [[BatchCommands.AggregationFramework.PipelineOperator]] */
+  type PipelineOperator = BatchCommands.AggregationFramework.PipelineOperator
 
   implicit def PackIdentityReader: pack.Reader[pack.Document] = pack.IdentityReader
   implicit def PackIdentityWriter: pack.Writer[pack.Document] = pack.IdentityWriter
@@ -386,6 +393,41 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    * @param fields the field [[http://docs.mongodb.org/manual/tutorial/project-fields-from-query-results/#read-operations-projection projection]]
    */
   def findAndRemove[Q](selector: Q, sort: Option[pack.Document] = None, fields: Option[pack.Document] = None)(implicit selectorWriter: pack.Writer[Q], ec: ExecutionContext): Future[BatchCommands.FindAndModifyCommand.FindAndModifyResult] = findAndModify[Q](selector, removeModifier, sort, fields)
+
+  /**
+   * [[http://docs.mongodb.org/manual/reference/command/aggregate/ Aggregates]] the matching documents.
+   *
+   * {{{
+   * import scala.concurrent.Future
+   * import scala.concurrent.ExecutionContext.Implicits.global
+   *
+   * import reactivemongo.bson._
+   * import reactivemongo.api.collections.bson.BSONCollection
+   *
+   * def populatedStates(cities: BSONCollection): Future[List[BSONDocument]] = {
+   *   import cities.BatchCommands.AggregationFramework
+   *   import AggregationFramework.{ Group, Match, SumField }
+   *
+   *   cities.aggregate(Group(BSONString("$state"))(
+   *     "totalPop" -> SumField("population")), List(
+   *       Match(document("totalPop" ->
+   *         document("$gte" -> 10000000L))))).map(_.documents)
+   * }
+   * }}}
+   *
+   * @param firstOperator the first operator of the pipeline
+   * @param otherOperators the sequence of MongoDB aggregation operations
+   * @param explain specifies to return the information on the processing of the pipeline
+   * @param allowDiskUse enables writing to temporary files
+   * @param cursor the cursor object for aggregation
+   */
+  def aggregate(firstOperator: PipelineOperator, otherOperators: List[PipelineOperator] = Nil, explain: Boolean = false, allowDiskUse: Boolean = false, cursor: Option[BatchCommands.AggregationFramework.Cursor] = None)(implicit ec: ExecutionContext): Future[BatchCommands.AggregationFramework.AggregationResult] = {
+    import BatchCommands.AggregationFramework.Aggregate
+    import BatchCommands.{ AggregateWriter, AggregateReader }
+
+    runCommand(Aggregate(
+      firstOperator :: otherOperators, explain, allowDiskUse, cursor))
+  }
 
   /**
    * Remove the matched document(s) from the collection and wait for the [[reactivemongo.api.commands.WriteResult]] result.

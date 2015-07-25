@@ -9,6 +9,9 @@ import reactivemongo.bson._
  * @param collectionName Collection to aggregate against
  * @param pipeline Sequence of MongoDB aggregation operations.
  */
+@deprecated(
+  message = "Use [[reactivemongo.api.collections.bson.BSONCollection.aggregate]]",
+  since = "0.11.4")
 case class Aggregate(
     collectionName: String,
     pipeline: Seq[PipelineOperator]) extends Command[Stream[BSONDocument]] {

@@ -31,6 +31,7 @@ package reactivemongo.bson
  * }}}
  */
 object `package` extends DefaultBSONHandlers {
+  /** Type of element for the BSON documents. */
   type BSONElement = (String, BSONValue)
 
   // DSL helpers:

@@ -27,18 +27,12 @@ class ChannelBufferReadableBuffer(protected[netty] val buffer: ChannelBuffer) ex
 
   def index_=(i: Int) = buffer.readerIndex(i)
 
-  def discard(n: Int) = {
-    buffer.readerIndex(buffer.readerIndex + n)
-  }
+  def discard(n: Int) = buffer.readerIndex(buffer.readerIndex + n)
 
-  def slice(n: Int) = {
-    val b2 = buffer.slice(buffer.readerIndex(), n)
-    new ChannelBufferReadableBuffer(b2)
-  }
+  def slice(n: Int) =
+    new ChannelBufferReadableBuffer(buffer.slice(buffer.readerIndex(), n))
 
-  def readBytes(array: Array[Byte]): Unit = {
-    buffer.readBytes(array)
-  }
+  def readBytes(array: Array[Byte]): Unit = buffer.readBytes(array)
 
   def readByte() = buffer.readByte()
 
@@ -77,14 +71,13 @@ class ChannelBufferWritableBuffer(val buffer: ChannelBuffer = ChannelBuffers.dyn
     this
   }
 
-  override def writeBytes(buf: ReadableBuffer) = {
-    buf match {
-      case nettyBuffer: ChannelBufferReadableBuffer =>
-        val readable = nettyBuffer.buffer.slice()
-        buffer.writeBytes(readable)
-        this
-      case _ => super.writeBytes(buf)
-    }
+  override def writeBytes(buf: ReadableBuffer) = buf match {
+    case nettyBuffer: ChannelBufferReadableBuffer =>
+      val readable = nettyBuffer.buffer.slice()
+      buffer.writeBytes(readable)
+      this
+
+    case _ => super.writeBytes(buf)
   }
 
   def writeBytes(buf: ChannelBuffer) = {

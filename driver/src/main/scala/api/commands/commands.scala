@@ -47,6 +47,7 @@ trait ImplicitCommandHelpers[P <: SerializationPack] {
   trait ImplicitlyDocumentProducer {
     def produce: pack.Document
   }
+
   object ImplicitlyDocumentProducer {
     implicit def producer[A](a: A)(implicit writer: pack.Writer[A]): ImplicitlyDocumentProducer = new ImplicitlyDocumentProducer {
       def produce = pack.serialize(a, writer)
