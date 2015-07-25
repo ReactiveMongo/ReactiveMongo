@@ -2,12 +2,9 @@
 
 set -e
 
-DIR=`dirname $0`
+SCRIPT_DIR=`dirname $0 | sed -e "s|^\./|$PWD/|"`
 
-rm -rf $HOME/.sbt
-rm -rf $HOME/.ivy2
-
-cd "$DIR/.."
+cd "SCRIPT_DIR/.."
 
 sbt ++$TRAVIS_SCALA_VERSION scalariformFormat test:scalariformFormat
 git diff --exit-code || (
@@ -25,15 +22,30 @@ mongod --version | head -n 1 | sed -e 's/.* v//'
 
 if [ `mongod --version | head -n 1 | grep v3 | wc -l` -eq 1 ]; then
     MONGODB_VER="3"
+    SHELL_OPTS=""
 
+    if [ "$MONGO_SSL" = "true" ]; then
+        SHELL_OPTS="--ssl --sslAllowInvalidCertificates"
+    fi
+
+    SHELL_OPTS="$SHELL_OPTS --eval"
+
+    echo -n "- security: "
+    mongo $SHELL_OPTS 'var s=db.serverStatus();var x=s["security"];(!x)?"_DISABLED_":x["SSLServerSubjectName"];'
+    
     echo -n "- storage engine: "
-    mongo --eval 'var s=db.serverStatus();JSON.stringify(s["storageEngine"]);' | grep '"name"' | cut -d '"' -f 4
+    mongo $SHELL_OPTS 'var s=db.serverStatus();JSON.stringify(s["storageEngine"]);' | grep '"name"' | cut -d '"' -f 4
 fi
 
 TEST_OPTS="exclude mongo3"
+SBT_OPTS="++$TRAVIS_SCALA_VERSION"
 
 if [ "$MONGODB_VER" = "3" ]; then
     TEST_OPTS="exclude mongo2"
+    
+    if [ "$MONGO_SSL" = "true" ]; then
+        SBT_OPTS="$SBT_OPTS -Dtest.enableSSL=true"
+    fi
 fi
 
-sbt ++$TRAVIS_SCALA_VERSION "testOnly -- $TEST_OPTS"
+sbt $SBT_OPTS "testOnly -- $TEST_OPTS"

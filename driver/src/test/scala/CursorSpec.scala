@@ -143,7 +143,7 @@ class CursorSpec extends Specification {
         }
 
         "gracefully stop at connection close w/o maxDocs" in {
-          val con = driver.connection(List("localhost:27017"))
+          val con = driver.connection(List("localhost:27017"), DefaultOptions)
           tailable("foldw3", con("specs2-test-reactivemongo")).
             foldWhile(List.empty[Int])((s, i) => {
               if (i == 1) con.close() // Force connection close

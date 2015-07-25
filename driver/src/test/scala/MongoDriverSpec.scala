@@ -10,7 +10,6 @@ import reactivemongo.core.commands.{
 
 import reactivemongo.api.{
   BSONSerializationPack,
-  MongoConnectionOptions,
   MongoDriver,
   ScramSha1Authentication
 }
@@ -52,11 +51,12 @@ object MongoDriverSpec extends org.specs2.mutable.Specification {
   }
 
   "CR Authentication" should {
-    import Common.{ timeout, timeoutMillis }
+    import Common.{ DefaultOptions, timeout, timeoutMillis }
 
     lazy val driver = MongoDriver()
     lazy val connection = driver.connection(
-      List("localhost:27017"), options = MongoConnectionOptions(nbChannelsPerNode = 1))
+      List("localhost:27017"),
+      options = DefaultOptions.copy(nbChannelsPerNode = 1))
 
     lazy val db = {
       val _db = connection("specs2-test-reactivemongo-auth")
@@ -103,11 +103,12 @@ object MongoDriverSpec extends org.specs2.mutable.Specification {
   }
 
   "Authentication SCRAM-SHA1" should {
-    import Common.{ timeout, timeoutMillis }
+    import Common.{ DefaultOptions, timeout, timeoutMillis }
 
     lazy val driver = MongoDriver()
     lazy val connection = driver.connection(
-      List("localhost:27017"), options = MongoConnectionOptions(authMode = ScramSha1Authentication, nbChannelsPerNode = 1))
+      List("localhost:27017"),
+      options = DefaultOptions.copy(authMode = ScramSha1Authentication, nbChannelsPerNode = 1))
 
     lazy val db = {
       val _db = connection("specs2-test-reactivemongo-auth")
