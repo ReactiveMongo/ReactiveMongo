@@ -16,17 +16,15 @@
 package reactivemongo.api
 
 import org.jboss.netty.buffer.ChannelBuffer
-import reactivemongo.bson._
-import DefaultBSONHandlers._
 import reactivemongo.core.protocol.QueryFlags
-import reactivemongo.utils._
-import reactivemongo.core.netty._
 
+/* TODO: Remove?
 sealed trait SortOrder
 object SortOrder {
   case object Ascending extends SortOrder
   case object Descending extends SortOrder
 }
+ */
 
 /**
  * A helper to make the query options.

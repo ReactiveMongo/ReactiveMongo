@@ -15,12 +15,15 @@
  */
 package reactivemongo.core.actors
 
+import java.net.InetSocketAddress
+
 import akka.actor.{ Actor, ActorRef }
 import org.jboss.netty.channel.group.{
   ChannelGroupFuture,
   ChannelGroupFutureListener,
   DefaultChannelGroup
 }
+import reactivemongo.utils.LazyLogger
 import reactivemongo.core.errors.{ DriverException, GenericDriverException }
 import reactivemongo.core.protocol.{
   CheckedWriteRequest,
@@ -33,10 +36,8 @@ import reactivemongo.core.protocol.{
   RequestMaker,
   Response
 }
-import reactivemongo.utils.LazyLogger
 import reactivemongo.core.commands.{
   CommandError,
-  LastError,
   SuccessfulAuthentication
 }
 import scala.concurrent.{ Future, Promise }
@@ -55,8 +56,8 @@ import reactivemongo.core.nodeset.{
   PingInfo,
   ProtocolMetadata
 }
-import java.net.InetSocketAddress
 import reactivemongo.api.{ MongoConnectionOptions, ReadPreference }
+import reactivemongo.api.commands.LastError
 
 // messages
 
@@ -121,6 +122,7 @@ case object GetLastMetadata
 /** Main actor that processes the requests. */
 trait MongoDBSystem extends Actor {
   import scala.concurrent.duration._
+  import reactivemongo.bson.BSONDocument
   import MongoDBSystem._
 
   /**
@@ -467,12 +469,22 @@ trait MongoDBSystem extends Actor {
     }
   }
 
+  private def lastError(response: Response): Either[Throwable, LastError] = {
+    import reactivemongo.api.commands.bson.
+      BSONGetLastErrorImplicits.LastErrorReader
+
+    Response.parse(response).next().asTry[LastError] match {
+      case Failure(err) => Left(err)
+      case Success(err) => Right(err)
+    }
+  }
+
   private val fallback: Receive = {
     // any other response
     case response: Response if RequestId.common accepts response => {
       awaitingResponses.get(response.header.responseTo) match {
         case Some(AwaitingResponse(_, _, promise, isGetLastError, isMongo26WriteOp)) => {
-          logger.debug("Got a response from " + response.info.channelId + "! Will give back message=" + response + " to promise " + promise)
+          logger.debug(s"Got a response from ${response.info.channelId}! Will give back message=$response to promise $promise")
           awaitingResponses -= response.header.responseTo
 
           if (response.error.isDefined) {
@@ -481,10 +493,10 @@ trait MongoDBSystem extends Actor {
             promise.failure(response.error.get)
           }
           else if (isGetLastError) {
-            logger.debug("{" + response.header.responseTo + "} it's a getlasterror")
+            logger.debug(s"{${response.header.responseTo}} it's a getlasterror")
             // todo, for now rewinding buffer at original index
-            val ridx = response.documents.readerIndex
-            LastError(response).fold(e => {
+            import reactivemongo.api.commands.bson.BSONGetLastErrorImplicits.LastErrorReader
+            lastError(response).fold(e => {
               logger.error(s"Error deserializing LastError message #${response.header.responseTo}", e)
               promise.failure(new RuntimeException(s"Error deserializing LastError message #${response.header.responseTo}", e))
             },
@@ -495,8 +507,8 @@ trait MongoDBSystem extends Actor {
                   promise.failure(lastError)
                 }
                 else {
-                  logger.trace("{" + response.header.responseTo + "} sending a success (lasterror is ok)")
-                  response.documents.readerIndex(ridx)
+                  logger.trace(s"{${response.header.responseTo}} sending a success (lasterror is ok)")
+                  response.documents.readerIndex(response.documents.readerIndex)
                   promise.success(response)
                 }
               })
