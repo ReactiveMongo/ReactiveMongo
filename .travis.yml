@@ -1,5 +1,4 @@
 language: scala
-script: ./.travis_scripts/validate.sh
 scala:
 - 2.11.6
 - 2.10.4
@@ -8,8 +7,12 @@ jdk:
 - openjdk7
 - openjdk6
 before_install:
-- sudo ./.travis_scripts/beforeInstall.sh $TRAVIS_SCALA_VERSION
+- sudo ./.travis_scripts/beforeInstall.sh $TRAVIS_SCALA_VERSION $MONGO_SSL
+script: ./.travis_scripts/validate.sh
 env:
   global:
   - secure: AHBkdpd7+WwsSlyeDSt3dyM+hadpjbVDuImvWpWTOBdgCwUI6aOSUc0bwHNmEMrmZ/tY2bPEOT8lebPL7av4kBYYEk/K/lORHLWinrB8THjRwvi4/mtzTBs2Wdo3gj8BNuThEJhTwFtVF/HiuxG0yyIODFb8Ubp7Vp5ySgpdCto=
   - secure: mL+CDHYec/SQXPjF4+EPHVTYkzFScTtlZWpt+4u2puZoG7aYRvsvSAyL5cA9AOPYNlnamZjelu5zRHb9AWfZwA6EAcBOdA836isdqS2Lm9Y2AIl/iu0ZRDJoUkIG2eWu8nCU01ANoV/qpqj4Zw8K1w5si8xaxPjLgmMcPM2tHrY=
+  matrix:
+  - MONGO_SSL=true
+  - MONGO_SSL=false

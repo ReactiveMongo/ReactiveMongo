@@ -141,13 +141,13 @@ case class BSONDocument(stream: Stream[Try[BSONElement]]) extends BSONValue {
 
 object BSONDocument {
   /** Creates a new [[BSONDocument]] containing all the given `elements`. */
-  def apply(elements: Producer[(String, BSONValue)]*): BSONDocument = new BSONDocument(
+  def apply(elements: Producer[BSONElement]*): BSONDocument = new BSONDocument(
     elements.flatMap { el =>
       el.produce.map(value => Seq(Try(value))).getOrElse(Seq.empty)
     }.toStream)
 
   /** Creates a new [[BSONDocument]] containing all the `elements` in the given `Traversable`. */
-  def apply(elements: Traversable[(String, BSONValue)]): BSONDocument = {
+  def apply(elements: Traversable[BSONElement]): BSONDocument = {
     new BSONDocument(elements.toStream.map(Success(_)))
   }
 

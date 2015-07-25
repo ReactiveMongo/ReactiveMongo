@@ -173,19 +173,19 @@ class Handlers extends Specification {
     "produce the expected BSONDocument" in {
       val doc = BSON.write(neilYoung)
       BSONDocument.pretty(doc) mustEqual """{
-  name: BSONString(Neil Young),
+  name: "Neil Young",
   albums: [
     0: {
-      name: BSONString(Everybody Knows this is Nowhere),
+      name: "Everybody Knows this is Nowhere",
       releaseYear: BSONInteger(1969),
       tracks: [
-        0: BSONString(Cinnamon Girl),
-        1: BSONString(Everybody Knows this is Nowhere),
-        2: BSONString(Round & Round (it Won't Be Long)),
-        3: BSONString(Down By the River),
-        4: BSONString(Losing End (When You're On)),
-        5: BSONString(Running Dry (Requiem For the Rockets)),
-        6: BSONString(Cowgirl in the Sand)
+        0: "Cinnamon Girl",
+        1: "Everybody Knows this is Nowhere",
+        2: "Round & Round (it Won't Be Long)",
+        3: "Down By the River",
+        4: "Losing End (When You're On)",
+        5: "Running Dry (Requiem For the Rockets)",
+        6: "Cowgirl in the Sand"
       ]
     }
   ]

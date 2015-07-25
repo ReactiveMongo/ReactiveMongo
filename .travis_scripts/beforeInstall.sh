@@ -1,6 +1,8 @@
 #! /bin/sh
 
+SCRIPT_DIR=`dirname $0 | sed -e "s|^\./|$PWD/|"`
 SCALA_VER="$1"
+MONGO_SSL="$2"
 MONGODB_VER="2_6"
 
 if [ `echo "$JAVA_HOME" | grep java-7-oracle | wc -l` -eq 1 ]; then
@@ -39,6 +41,19 @@ EOF
     chmod -R u+w /tmp/mongo3wt
 
     sed -e 's|dbpath=/var/lib/mongodb|dbpath=/tmp/mongo3wt|' < /etc/mongod.conf > /tmp/mongod.conf && (cat /tmp/mongod.conf > /etc/mongod.conf)
+
 fi
+
+if [ "$MONGODB_VER" = "3" -a "$MONGO_SSL" = "true" ]; then
+    cat >> /etc/mongod.conf <<EOF
+
+sslMode=requireSSL
+sslPEMKeyFile=$SCRIPT_DIR/server.pem
+sslAllowInvalidCertificates=true
+EOF
+
+fi
+
+cat /etc/mongod.conf
 
 service mongod start

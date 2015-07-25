@@ -37,6 +37,7 @@ trait SerializationPack { self: Singleton =>
   def isEmpty(document: Document): Boolean
 }
 
+/** The default serialization pack. */
 object BSONSerializationPack extends SerializationPack {
   import reactivemongo.bson._
   import reactivemongo.bson.buffer.DefaultBufferHandler

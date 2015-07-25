@@ -15,9 +15,20 @@
  */
 package reactivemongo.api.collections.bson
 
-import reactivemongo.api.{ Collection, DB, FailoverStrategy, QueryOpts, ReadPreference }
+import reactivemongo.api.{
+  Collection,
+  DB,
+  FailoverStrategy,
+  QueryOpts,
+  ReadPreference
+}
 import reactivemongo.api.commands.bson._
-import reactivemongo.api.collections.{ BatchCommands, GenericCollection, GenericCollectionProducer, GenericQueryBuilder }
+import reactivemongo.api.collections.{
+  BatchCommands,
+  GenericCollection,
+  GenericCollectionProducer,
+  GenericQueryBuilder
+}
 import reactivemongo.api.BSONSerializationPack
 import reactivemongo.bson._
 
@@ -49,6 +60,11 @@ object BSONBatchCommands extends BatchCommands[BSONSerializationPack.type] {
   val FindAndModifyCommand = BSONFindAndModifyCommand
   implicit def FindAndModifyWriter = BSONFindAndModifyImplicits.FindAndModifyWriter
   implicit def FindAndModifyReader = BSONFindAndModifyImplicits.FindAndModifyResultReader
+
+  val AggregationFramework = BSONAggregationFramework
+  implicit def AggregateWriter = BSONAggregationImplicits.AggregateWriter
+  implicit def AggregateReader =
+    BSONAggregationImplicits.AggregationResultReader
 
   implicit def LastErrorReader = BSONGetLastErrorImplicits.LastErrorReader
 }

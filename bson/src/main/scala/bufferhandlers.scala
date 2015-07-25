@@ -268,11 +268,16 @@ object BSONIterator {
     (for (tryElem <- it) yield {
       tryElem match {
         case Success(elem) => elem._2 match {
-          case doc: BSONDocument => prefix + elem._1 + ": {\n" + pretty(i + 1, doc.stream.iterator) + "\n" + prefix + "}"
           case array: BSONArray  => prefix + elem._1 + ": [\n" + pretty(i + 1, array.iterator) + "\n" + prefix + "]"
-          case _                 => prefix + elem._1 + ": " + elem._2.toString
+
+          case doc: BSONDocument => prefix + elem._1 + ": {\n" + pretty(i + 1, doc.stream.iterator) + "\n" + prefix + "}"
+
+          case BSONString(s) =>
+            prefix + elem._1 + ": \"" + s.replaceAll("\"", "\\\"") + '"'
+
+          case _ => prefix + elem._1 + ": " + elem._2.toString
         }
-        case Failure(e) => prefix + s"ERROR[${e.getMessage()}]"
+        case Failure(e) => s"${prefix}ERROR[${e.getMessage()}]"
       }
     }).mkString(",\n")
   }
