@@ -1,5 +1,3 @@
-import Common._
-import org.specs2.mutable._
 import reactivemongo.api.collections.bson.BSONCollection
 import reactivemongo.api.commands.bson.BSONUpdateCommand._
 import reactivemongo.api.commands.bson.BSONUpdateCommandImplicits._
@@ -7,9 +5,12 @@ import reactivemongo.bson._
 
 import scala.concurrent._
 
-class UpdateSpec extends Specification {
+object UpdateSpec extends org.specs2.mutable.Specification {
+  "Update" title
 
   sequential
+
+  import Common._
 
   val collection: BSONCollection = db("UpdateSpec")
 
@@ -37,22 +38,14 @@ class UpdateSpec extends Specification {
     "upsert a doc" in {
       val jack = Person("Jack", "London", 27)
       val result = Await.result(
-        collection.runCommand(Update(UpdateElement(
-          q = jack,
-          u = BSONDocument("$set" -> BSONDocument("age" -> 33)),
-          upsert = true))),
-        timeout)
+        collection.update(jack,
+          BSONDocument("$set" -> BSONDocument("age" -> 33)),
+          upsert = true), timeout)
 
       result.upserted must have size (1)
 
-      val upserted = Await.result(
-        collection.find(BSONDocument("_id" -> result.upserted(0)._id.asInstanceOf[Option[BSONObjectID]])).one[Person],
-        timeout)
-
-      upserted must beSome
-      upserted.get.firstName mustEqual "Jack"
-      upserted.get.lastName mustEqual "London"
-      upserted.get.age mustEqual 33
+      collection.find(BSONDocument("_id" -> result.upserted(0)._id.asInstanceOf[BSONObjectID])).one[Person] must beSome(jack.copy(age = 33)).
+        await(timeoutMillis)
     }
 
     "update a doc" in {
@@ -65,13 +58,8 @@ class UpdateSpec extends Specification {
 
       result.nModified mustEqual 1
 
-      val updated = Await.result(
-        collection.find(BSONDocument("age" -> 66)).one[Person],
-        timeout)
-
-      updated must beSome
-      updated.get.firstName mustEqual "Jack"
-      updated.get.lastName mustEqual "London"
+      collection.find(BSONDocument("age" -> 66)).one[Person].
+        aka("updated") must beSome(jack.copy(age = 66)).await(timeoutMillis)
     }
   }
 }
