@@ -1,9 +1,10 @@
 package reactivemongo.api.commands
 
 import scala.util.control.NoStackTrace
-import reactivemongo.api.{ BSONSerializationPack, Cursor, SerializationPack }
-import reactivemongo.bson.BSONObjectID
+
+import reactivemongo.bson.{ BSONObjectID, BSONValue }
 import reactivemongo.core.errors.DatabaseException
+import reactivemongo.api.{ Cursor, SerializationPack }
 
 trait Mongo26WriteCommand
 
@@ -108,9 +109,7 @@ case class DefaultWriteResult(
     else this
 }
 
-case class Upserted(
-  index: Int,
-  _id: Any) // TODO
+case class Upserted(index: Int, _id: BSONValue)
 
 case class UpdateWriteResult(
     ok: Boolean,

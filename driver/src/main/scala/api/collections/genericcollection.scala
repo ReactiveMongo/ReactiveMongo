@@ -107,6 +107,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
   import reactivemongo.api.commands.{
     MultiBulkWriteResult,
     UpdateWriteResult,
+    Upserted,
     WriteResult
   }
 
@@ -286,32 +287,41 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    *
    * @return a future [[reactivemongo.api.commands.WriteResult]] that can be used to check whether the update was successful.
    */
-  def update[S, U](selector: S, update: U, writeConcern: WriteConcern = defaultWriteConcern, upsert: Boolean = false, multi: Boolean = false)(implicit selectorWriter: pack.Writer[S], updateWriter: pack.Writer[U], ec: ExecutionContext): Future[WriteResult] =
-    Failover2(db.connection, failoverStrategy) { () =>
-      db.connection.metadata match {
-        case Some(metadata) if metadata.maxWireVersion >= MongoWireVersion.V26 =>
-          import BatchCommands.UpdateCommand.{ Update, UpdateElement }
-          runCommand(Update(writeConcern = writeConcern)(
-            UpdateElement(selector, update, upsert, multi))).flatMap { wr =>
-            val flattened = wr.flatten
-            if (!flattened.ok) {
-              // was ordered, with one doc => fail if has an error
-              Future.failed(flattened)
-            }
-            else Future.successful(wr)
-          }
+  def update[S, U](selector: S, update: U, writeConcern: WriteConcern = defaultWriteConcern, upsert: Boolean = false, multi: Boolean = false)(implicit selectorWriter: pack.Writer[S], updateWriter: pack.Writer[U], ec: ExecutionContext): Future[UpdateWriteResult] = Failover2(db.connection, failoverStrategy) { () =>
+    db.connection.metadata match {
+      case Some(metadata) if (
+        metadata.maxWireVersion >= MongoWireVersion.V26) => {
+        import BatchCommands.UpdateCommand.{ Update, UpdateElement }
 
-        case Some(_) => // Mongo < 2.6 // TODO: Deprecate/remove
-          val flags = 0 | (if (upsert) UpdateFlags.Upsert else 0) | (if (multi) UpdateFlags.MultiUpdate else 0)
-          val op = Update(fullCollectionName, flags)
-          val bson = writeDoc(selector, selectorWriter)
-          bson.writeBytes(writeDoc(update, updateWriter))
-          val checkedWriteRequest = CheckedWriteRequest(op, BufferSequence(bson), writeConcern)
-          db.connection.sendExpectingResponse(checkedWriteRequest).map(pack.readAndDeserialize(_, LastErrorReader))
-        case None =>
-          Future.failed(ConnectionNotInitialized.MissingMetadata)
+        runCommand(Update(writeConcern = writeConcern)(
+          UpdateElement(selector, update, upsert, multi))).flatMap { wr =>
+          val flattened = wr.flatten
+          if (!flattened.ok) {
+            // was ordered, with one doc => fail if has an error
+            Future.failed(flattened)
+          }
+          else Future.successful(wr)
+        }
       }
-    }.future
+
+      case Some(_) => { // Mongo < 2.6 // TODO: Deprecate/remove
+        val flags = 0 | (if (upsert) UpdateFlags.Upsert else 0) | (if (multi) UpdateFlags.MultiUpdate else 0)
+        val op = Update(fullCollectionName, flags)
+        val bson = writeDoc(selector, selectorWriter)
+        bson.writeBytes(writeDoc(update, updateWriter))
+        val checkedWriteRequest = CheckedWriteRequest(op, BufferSequence(bson), writeConcern)
+        db.connection.sendExpectingResponse(checkedWriteRequest).map { r =>
+          val res = pack.readAndDeserialize(r, LastErrorReader)
+          UpdateWriteResult(res.ok, res.n, res.n,
+            res.upserted.map(Upserted(-1, _)).toSeq,
+            Nil, None, res.code, res.err)
+
+        }
+      }
+
+      case None => Future.failed(ConnectionNotInitialized.MissingMetadata)
+    }
+  }.future
 
   /**
    * Returns an update modifier, to be used with [[findAndModify]].
