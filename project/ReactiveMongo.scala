@@ -3,7 +3,7 @@ import sbt.Keys._
 import scala.language.postfixOps
 
 object BuildSettings {
-  val buildVersion = "0.11.4"
+  val buildVersion = "0.11.5"
 
   val filter = { (ms: Seq[(File, String)]) =>
     ms filter {
@@ -123,7 +123,7 @@ object Resolvers {
 }
 
 object Dependencies {
-  val netty = "io.netty" % "netty" % "3.8.2.Final" cross CrossVersion.Disabled
+  val netty = "io.netty" % "netty" % "3.9.4.Final" cross CrossVersion.Disabled
 
   val akkaActor = "com.typesafe.akka" %% "akka-actor" % "2.3.6"
 

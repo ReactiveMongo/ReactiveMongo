@@ -37,6 +37,8 @@ object AggregationSpec extends org.specs2.mutable.Specification {
           Location(48.0077, 0.1984)))
         _ <- collection.insert(ZipCode("JP-13", "TOKYO", "JP", 13185502L,
           Location(35.683333, 139.683333)))
+        _ <- collection.insert(ZipCode("AO", "AOGASHIMA", "JP", 200L,
+          Location(32.457, 139.767)))
       } yield ()
 
       res must beEqualTo({}).await(timeoutMillis)
@@ -44,7 +46,7 @@ object AggregationSpec extends org.specs2.mutable.Specification {
 
     "return states with populations above 10000000" in {
       // http://docs.mongodb.org/manual/tutorial/aggregation-zip-code-data-set/#return-states-with-populations-above-10-million
-      val expected = List(document("_id" -> "JP", "totalPop" -> 13185502L),
+      val expected = List(document("_id" -> "JP", "totalPop" -> 13185702L),
         document("_id" -> "NY", "totalPop" -> 19746227L))
 
       collection.aggregate(Group(BSONString("$state"))(
@@ -58,7 +60,7 @@ object AggregationSpec extends org.specs2.mutable.Specification {
       // See http://docs.mongodb.org/manual/tutorial/aggregation-zip-code-data-set/#return-average-city-population-by-state
       val expected = List(document("_id" -> "NY", "avgCityPop" -> 19746227D),
         document("_id" -> "FR", "avgCityPop" -> 148169D),
-        document("_id" -> "JP", "avgCityPop" -> 13185502D))
+        document("_id" -> "JP", "avgCityPop" -> 6592851D))
 
       collection.aggregate(
         Group(document("state" -> "$state", "city" -> "$city"))(
@@ -85,7 +87,7 @@ object AggregationSpec extends org.specs2.mutable.Specification {
           "biggestCity" -> document(
             "name" -> "TOKYO", "population" -> 13185502L),
           "smallestCity" -> document(
-            "name" -> "TOKYO", "population" -> 13185502L),
+            "name" -> "AOGASHIMA", "population" -> 200L),
           "state" -> "JP"))
 
       collection.aggregate(

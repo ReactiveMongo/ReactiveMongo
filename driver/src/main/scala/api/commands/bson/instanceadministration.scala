@@ -5,15 +5,15 @@ import reactivemongo.bson._
 
 object BSONDropDatabaseImplicits {
   implicit object DropDatabaseWriter extends BSONDocumentWriter[DropDatabase.type] {
-    def write(dd: DropDatabase.type): BSONDocument =
-      BSONDocument("dropDatabase" -> 1)
+    val command = BSONDocument("dropDatabase" -> 1)
+    def write(dd: DropDatabase.type): BSONDocument = command
   }
 }
 
 object BSONListCollectionNamesImplicits {
   implicit object ListCollectionNamesWriter extends BSONDocumentWriter[ListCollectionNames.type] {
-    def write(ls: ListCollectionNames.type): BSONDocument =
-      BSONDocument("listCollections" -> 1)
+    val command = BSONDocument("listCollections" -> 1)
+    def write(ls: ListCollectionNames.type): BSONDocument = command
   }
 
   implicit object BSONCollectionNameReaders extends BSONDocumentReader[CollectionNames] {
@@ -198,5 +198,79 @@ object BSONCreateIndexesImplicits {
             DefaultWriteResult(true, n, Nil, None, None, None))(
               err => DefaultWriteResult(false, n, Nil, None, None, Some(err)))
         }
+  }
+}
+
+object BSONReplSetGetStatusImplicits {
+  implicit object ReplSetGetStatusWriter
+      extends BSONDocumentWriter[ReplSetGetStatus.type] {
+
+    val bsonCmd = BSONDocument("replSetGetStatus" -> 1)
+    def write(command: ReplSetGetStatus.type): BSONDocument = bsonCmd
+  }
+
+  implicit object ReplSetMemberReader
+      extends BSONDocumentReader[ReplSetMember] {
+
+    def read(doc: BSONDocument): ReplSetMember = (for {
+      id <- doc.getAs[BSONNumberLike]("_id").map(_.toLong)
+      name <- doc.getAs[String]("name")
+      health <- doc.getAs[BSONNumberLike]("health").map(_.toInt)
+      state <- doc.getAs[BSONNumberLike]("state").map(_.toInt)
+      stateStr <- doc.getAs[String]("stateStr")
+      uptime <- doc.getAs[BSONNumberLike]("uptime").map(_.toLong)
+      optime <- doc.getAs[BSONNumberLike]("optimeDate").map(_.toLong)
+      lastHeartbeat <- doc.getAs[BSONNumberLike]("lastHeartbeat").map(_.toLong)
+      lastHeartbeatRecv <- doc.getAs[BSONNumberLike](
+        "lastHeartbeatRecv").map(_.toLong)
+    } yield ReplSetMember(id, name, health, state, stateStr, uptime, optime,
+      lastHeartbeat, lastHeartbeatRecv,
+      doc.getAs[String]("lastHeartbeatMessage"),
+      doc.getAs[BSONNumberLike]("electionTime").map(_.toLong),
+      doc.getAs[BSONBooleanLike]("self").fold(false)(_.toBoolean),
+      doc.getAs[BSONNumberLike]("pingMs").map(_.toLong),
+      doc.getAs[String]("syncingTo"),
+      doc.getAs[BSONNumberLike]("configVersion").map(_.toInt))).get
+
+  }
+
+  implicit object ReplSetStatusReader
+      extends DealingWithGenericCommandErrorsReader[ReplSetStatus] {
+
+    def readResult(doc: BSONDocument): ReplSetStatus = (for {
+      name <- doc.getAs[String]("set")
+      time <- doc.getAs[BSONNumberLike]("date").map(_.toLong)
+      myState <- doc.getAs[BSONNumberLike]("myState").map(_.toInt)
+      members <- doc.getAs[List[ReplSetMember]]("members")
+    } yield ReplSetStatus(name, time, myState, members)).get
+  }
+}
+
+object BSONServerStatusImplicits {
+  implicit object BSONServerStatusWriter
+      extends BSONDocumentWriter[ServerStatus.type] {
+
+    val bsonCmd = BSONDocument("serverStatus" -> 1)
+    def write(command: ServerStatus.type) = bsonCmd
+  }
+
+  implicit object BSONServerStatusResultReader
+      extends DealingWithGenericCommandErrorsReader[ServerStatusResult] {
+
+    def readResult(doc: BSONDocument): ServerStatusResult = (for {
+      host <- doc.getAs[String]("host")
+      version <- doc.getAs[String]("version")
+      process <- doc.getAs[String]("process").map[ServerProcess] {
+        case "mongos" => MongosProcess
+        case _        => MongodProcess
+      }
+      pid <- doc.getAs[BSONNumberLike]("pid").map(_.toLong)
+      uptime <- doc.getAs[BSONNumberLike]("uptime").map(_.toLong)
+      uptimeMillis <- doc.getAs[BSONNumberLike]("uptimeMillis").map(_.toLong)
+      uptimeEstimate <- doc.getAs[BSONNumberLike](
+        "uptimeEstimate").map(_.toLong)
+      localTime <- doc.getAs[BSONNumberLike]("localTime").map(_.toLong)
+    } yield ServerStatusResult(host, version, process, pid,
+      uptime, uptimeMillis, uptimeEstimate, localTime)).get
   }
 }

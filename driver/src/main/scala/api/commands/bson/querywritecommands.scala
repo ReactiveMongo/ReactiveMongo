@@ -110,6 +110,7 @@ object BSONUpdateCommandImplicits {
         "upsert" -> element.upsert,
         "multi" -> element.multi)
   }
+
   implicit object UpdateWriter extends BSONDocumentWriter[ResolvedCollectionCommand[Update]] {
     def write(update: ResolvedCollectionCommand[Update]) = {
       BSONDocument(
@@ -119,13 +120,15 @@ object BSONUpdateCommandImplicits {
         "writeConcern" -> update.command.writeConcern)
     }
   }
+
   implicit object UpsertedReader extends BSONDocumentReader[Upserted] {
     def read(doc: BSONDocument): Upserted = {
       Upserted(
         index = doc.getAs[Int]("index").get,
-        _id = doc.get("_id"))
+        _id = doc.get("_id").get)
     }
   }
+
   implicit object UpdateResultReader extends DealingWithGenericCommandErrorsReader[UpdateResult] {
     def readResult(doc: BSONDocument): UpdateResult = {
       UpdateWriteResult(
