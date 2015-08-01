@@ -88,3 +88,58 @@ case class ListIndexes(db: String) extends CollectionCommand
  */
 case class CreateIndexes(db: String, indexes: List[Index])
   extends CollectionCommand with CommandWithResult[WriteResult]
+
+/**
+ * Replica set member.
+ *
+ * @param name the member name (e.g. "host:port")
+ * @param health the health indicator for this member
+ * @param state the [[http://docs.mongodb.org/manual/reference/replica-states/ state code]] of the member
+ * @param stateStr the string representation of the state
+ * @param uptime the number of seconds that this member has been online
+ * @param optime information regarding the last operation from the operation log that this member has applied
+ * @param lastHeartbeat the time of the transmission time of last heartbeat received from this member
+ * @param lastHeartbeatRecv the time that the last heartbeat was received from this member
+ * @param lastHeartbeatMessage an optional message from the last heartbeat
+ * @param electionTime if the member is the primary, the time it was elected as
+ * @param self indicates which replica set member processed the replSetGetStatus command
+ * @param pingMs the number of milliseconds (ms) that a round-trip packet takes to travel between the remote member and the local instance (does not appear for the member that returns the `rs.status()` data)
+ * @param syncingTo the hostname of the member from which this instance is syncing (only present on the output of `rs.status()` on secondary and recovering members)
+ * @param configVersion the configuration version (since MongoDB 3.0)
+ */
+case class ReplSetMember(
+  _id: Long,
+  name: String,
+  health: Int,
+  state: Int,
+  stateStr: String,
+  uptime: Long,
+  optime: Long,
+  lastHeartbeat: Long,
+  lastHeartbeatRecv: Long,
+  lastHeartbeatMessage: Option[String],
+  electionTime: Option[Long],
+  self: Boolean,
+  pingMs: Option[Long],
+  syncingTo: Option[String],
+  configVersion: Option[Int])
+
+/**
+ * Result from the [[http://docs.mongodb.org/manual/reference/command/replSetGetStatus/ replSetGetStatus]].
+ *
+ * @param name the name of the replica set
+ * @param time the current server time
+ * @param state the [[http://docs.mongodb.org/manual/reference/replica-states/ state code]] of the current member
+ * @param members the list of the members of this replicate set
+ */
+case class ReplSetStatus(
+  name: String,
+  time: Long,
+  myState: Int,
+  members: List[ReplSetMember])
+
+/**
+ * The command [[[[http://docs.mongodb.org/manual/reference/command/replSetGetStatus/ replSetGetStatus]]
+ */
+case object ReplSetGetStatus
+  extends Command with CommandWithResult[ReplSetStatus]
