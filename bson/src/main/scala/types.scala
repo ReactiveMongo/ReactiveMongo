@@ -325,7 +325,7 @@ class BSONObjectID private (private val raw: Array[Byte]) extends BSONValue with
   /** ObjectId hexadecimal String representation */
   lazy val stringify = Converters.hex2Str(raw)
 
-  override def toString = "BSONObjectID(\"" + stringify + "\")"
+  override def toString = s"""BSONObjectID("${stringify}")"""
 
   override def canEqual(that: Any): Boolean = that.isInstanceOf[BSONObjectID]
 

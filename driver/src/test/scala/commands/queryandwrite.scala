@@ -1,4 +1,3 @@
-//import play.api.libs.iteratee.Enumerator
 import scala.concurrent._
 import scala.util.{ Try, Failure }
 
@@ -13,8 +12,6 @@ import BSONCountCommand._
 import BSONCountCommandImplicits._
 import BSONIsMasterCommand._
 import BSONIsMasterCommandImplicits._
-//import InsertCommandImplicits._
-//import BSONGetLastErrorImplicits.LastErrorReader
 
 object QueryAndWriteCommands extends org.specs2.mutable.Specification {
   import Common._
@@ -27,28 +24,24 @@ object QueryAndWriteCommands extends org.specs2.mutable.Specification {
     "insert 1 doc and retrieve it" in {
       val doc = BSONDocument("_id" -> BSONNull, "name" -> "jack", "plop" -> -1)
       val lastError = Await.result(Command.run(BSONSerializationPack)(collection, Insert(doc, doc)), timeout)
-      println(lastError)
+      //println(lastError)
       lastError.ok mustEqual true
-      /*val lastError2 = Await.result(Command.run(BSONSerializationPack)(collection,Insert(true)(doc)), timeout)
-      println(lastError2)
-      lastError2.ok mustEqual true*/
+
       val found = Await.result(collection.find(doc).cursor[BSONDocument]().collect[List](), timeout)
       found.size mustEqual 1
       val count = Await.result(Command.run(BSONSerializationPack).unboxed(collection, Count(BSONDocument())), timeout)
       count mustEqual 1
 
       val ismaster = Await.result(Command.run(BSONSerializationPack)(db, IsMaster), timeout)
-      println(ismaster)
+      //println(ismaster)
       ok
     } tag ("mongo2_6")
     "insert 1 doc with collection.insert and retrieve it" in {
       val doc = BSONDocument("name" -> "joe", "plop" -> -2)
       val lastError = Await.result(collection.insert(doc), timeout)
-      println(lastError)
+      //println(lastError)
       lastError.ok mustEqual true
-      /*val lastError2 = Await.result(Command.run(BSONSerializationPack)(collection,Insert(true)(doc)), timeout)
-      println(lastError2)
-      lastError2.ok mustEqual true*/
+
       val found = Await.result(collection.find(doc).cursor[BSONDocument]().collect[List](), timeout)
       found.size mustEqual 1
     }
@@ -63,11 +56,11 @@ object QueryAndWriteCommands extends org.specs2.mutable.Specification {
       val coll = BSONCollection(db, "queryandwritecommandsspec", collection.failoverStrategy)
       val doc = BSONDocument("name" -> "Stephane")
       val lastError = Await.result(coll.insert(doc), timeout)
-      println(lastError)
+      //println(lastError)
       lastError.ok mustEqual true
-      val list = Await.result(coll.find(doc).cursor[BSONDocument]().collect[List](), timeout)
-      println(list)
-      list.size mustEqual 1
+
+      coll.find(doc).cursor[BSONDocument]().collect[List]().map(_.size).
+        aka("result size") must beEqualTo(1).await(timeoutMillis)
     }
 
     s"Insert $nDocs in bulks (including 3 duplicate errors)" in {
@@ -84,13 +77,13 @@ object QueryAndWriteCommands extends org.specs2.mutable.Specification {
         else BSONDocument("bulk" -> true, "i" -> i, "plop" -> i)
       }
       val res = Try(Await.result(coll.bulkInsert(docs, false), DurationInt(100).seconds))
-      println(res)
+      //println(res)
+
       if (res.isFailure) {
         throw res.failed.get
       }
-      //println(s"writeErrors: ${res.get.map(_.writeErrors)}")
-      //println(s"writeConcernError: ${res.get.map(_.writeConcernError)}")
-      println(s"took ${System.currentTimeMillis - start} ms")
+      //println(s"took ${System.currentTimeMillis - start} ms")
+
       val count = Await.result(Command.run(BSONSerializationPack).unboxed(collection, Count(BSONDocument("bulk" -> true))), timeout)
       count mustEqual (nDocs - 3) // all docs minus errors
     } tag ("mongo2_6")
