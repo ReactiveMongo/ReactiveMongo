@@ -21,7 +21,9 @@ case class DefaultBSONCommandError(
   override def getMessage = s"CommandError[code=${code.getOrElse("<unknown>")}, errmsg=${errmsg.getOrElse("<unknown>")}, doc: ${BSONDocument.pretty(originalDocument)}]"
 }
 
-private[bson] trait DealingWithGenericCommandErrorsReader[A] extends BSONDocumentReader[A] {
+/** Helper to read a command result, with error handling. */
+trait DealingWithGenericCommandErrorsReader[A] extends BSONDocumentReader[A] {
+  /** Results the successful result (only if `ok` is true). */
   def readResult(doc: BSONDocument): A
 
   final def read(doc: BSONDocument): A =

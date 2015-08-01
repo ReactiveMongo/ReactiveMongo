@@ -394,6 +394,8 @@ object Count extends BSONCommandResultMaker[Int] {
  *
  * Returns the state of the Replica Set from the target server's point of view.
  */
+@deprecated(
+  "consider using reactivemongo.api.commands.ReplSetGetStatus", "0.11.5")
 object ReplStatus extends AdminCommand[Map[String, BSONValue]] {
   override def makeDocuments = BSONDocument("replSetGetStatus" -> BSONInteger(1))
 
