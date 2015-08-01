@@ -105,19 +105,24 @@ trait GenericDB[P <: SerializationPack with Singleton] { self: DB =>
 }
 
 /** A mixin that provides commands about this database itself. */
-trait DBMetaCommands {
-  self: DB =>
-
+trait DBMetaCommands { self: DB =>
   import reactivemongo.core.protocol.MongoWireVersion
   import reactivemongo.api.commands.{
     Command,
     DropDatabase,
-    ListCollectionNames
+    ListCollectionNames,
+    ServerStatus,
+    ServerStatusResult
   }
-  import reactivemongo.api.commands.bson.{ CommonImplicits, BSONDropDatabaseImplicits }
+  import reactivemongo.api.commands.bson.{
+    CommonImplicits,
+    BSONDropDatabaseImplicits,
+    BSONServerStatusImplicits
+  }
   import reactivemongo.api.commands.bson.BSONListCollectionNamesImplicits._
   import CommonImplicits._
   import BSONDropDatabaseImplicits._
+  import BSONServerStatusImplicits._
 
   /** Drops this database. */
   def drop()(implicit ec: ExecutionContext): Future[Unit] =
@@ -152,16 +157,9 @@ trait DBMetaCommands {
         collect[List]()
   }
 
-  /* // TODO
-  /**
-   * Execute MongoDB eval command and return the result
-   * @param javascript javascript code for evaluation
-   * @param nolock donn't get global lock for the operation
-   * @param ec execution context
-   * @return operation result as BSONValue
-   */
-  @deprecated(since = "0.11", message = "Deprecated since MongoDB 3")
-  def eval(javascript: String, nolock: Boolean)(implicit ec: ExecutionContext): Future[Option[BSONValue]] = command(new EvalCommand(javascript, nolock)) */
+  /** Returns the server status. */
+  def serverStatus(implicit ec: ExecutionContext): Future[ServerStatusResult] =
+    Command.run(BSONSerializationPack)(self, ServerStatus)
 }
 
 /** The default DB implementation, that mixes in the database traits. */

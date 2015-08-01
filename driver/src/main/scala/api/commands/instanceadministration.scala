@@ -143,3 +143,25 @@ case class ReplSetStatus(
  */
 case object ReplSetGetStatus
   extends Command with CommandWithResult[ReplSetStatus]
+
+sealed trait ServerProcess
+case object MongodProcess extends ServerProcess {
+  override val toString = "mongod"
+}
+case object MongosProcess extends ServerProcess {
+  override val toString = "mongos"
+}
+
+case class ServerStatusResult(
+  host: String,
+  version: String,
+  process: ServerProcess,
+  pid: Long,
+  uptime: Long,
+  uptimeMillis: Long,
+  uptimeEstimate: Long,
+  localTime: Long)
+
+/** Server [[http://docs.mongodb.org/manual/reference/server-status/ status]] */
+case object ServerStatus
+  extends Command with CommandWithResult[ServerStatusResult]
