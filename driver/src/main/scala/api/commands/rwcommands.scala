@@ -52,7 +52,7 @@ case class LastError(
     n: Int,
     singleShard: Option[String], // string?
     updatedExisting: Boolean,
-    upserted: Option[BSONObjectID],
+    upserted: Option[BSONValue],
     wnote: Option[WriteConcern.W],
     wtimeout: Boolean,
     waited: Option[Int],

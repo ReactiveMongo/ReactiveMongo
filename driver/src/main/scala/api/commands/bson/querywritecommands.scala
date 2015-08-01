@@ -26,7 +26,7 @@ object BSONGetLastErrorImplicits {
       n = doc.getAs[Int]("n").getOrElse(0),
       singleShard = doc.getAs[String]("singleShard"),
       updatedExisting = doc.getAs[BSONBooleanLike]("updatedExisting").map(_.toBoolean).getOrElse(false),
-      upserted = doc.getAs[BSONObjectID]("upserted"),
+      upserted = doc.getAs[BSONValue]("upserted"),
       wnote = doc.get("wnote").map {
         case BSONString("majority") => GetLastError.Majority
         case BSONString(tagSet)     => GetLastError.TagSet(tagSet)
