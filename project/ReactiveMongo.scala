@@ -123,7 +123,7 @@ object Resolvers {
 }
 
 object Dependencies {
-  val netty = "io.netty" % "netty" % "3.9.4.Final" cross CrossVersion.Disabled
+  val netty = "io.netty" % "netty" % "3.10.4.Final" cross CrossVersion.Disabled
 
   val akkaActor = "com.typesafe.akka" %% "akka-actor" % "2.3.6"
 
