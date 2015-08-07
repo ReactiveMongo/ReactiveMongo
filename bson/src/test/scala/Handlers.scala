@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+import java.util.Date
 import org.specs2.mutable._
 import reactivemongo.bson._
 import scala.util._
@@ -100,7 +101,7 @@ class Handlers extends Specification {
       array.get(1).get mustEqual BSONInteger(1)
       array.getAs[Int](1) mustEqual Some(1)
     }
-    "get bsondocunment at index 3" in {
+    "get bsondocument at index 3" in {
       val maybedoc = array.getAs[BSONDocument](3)
       maybedoc.isDefined mustEqual true
       val maybename = maybedoc.get.getAs[String]("name")
@@ -119,6 +120,33 @@ class Handlers extends Specification {
       val booleanlike = tarray.get.getAs[BSONBooleanLike](0)
       booleanlike.isDefined mustEqual true
       booleanlike.get.toBoolean mustEqual false
+    }
+  }
+
+  "BSONDateTime" should {
+    val time = System.currentTimeMillis()
+    val bson = BSONDateTime(time)
+    val date = new Date(time)
+    val handler = implicitly[BSONHandler[BSONDateTime, Date]]
+
+    "be read as date" in {
+      handler.read(bson) must_== date
+    }
+
+    "be written from a date" in {
+      handler.write(date) must_== bson
+    }
+  }
+
+  "BSONNumberLike" should {
+    val reader = implicitly[BSONReader[BSONValue, BSONNumberLike]]
+
+    "read BSONTimestamp" in {
+      val time = System.currentTimeMillis()
+      val num = time / 1000L
+      val bson = BSONTimestamp(num)
+
+      reader.readOpt(bson).map(_.toLong) must beSome(num * 1000L)
     }
   }
 
