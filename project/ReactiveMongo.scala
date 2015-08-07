@@ -28,25 +28,24 @@ object BuildSettings {
     mappings in (Compile, packageBin) ~= filter,
     mappings in (Compile, packageSrc) ~= filter,
     mappings in (Compile, packageDoc) ~= filter) ++
-  Publish.settings ++ Travis.settings ++ Format.settings
+  Publish.settings ++ Format.settings
 }
 
 object Publish {
+  @inline def env(n: String): String = sys.env.get(n).getOrElse(n)
 
-  def targetRepository: Def.Initialize[Option[Resolver]] = Def.setting {
-    val nexus = "https://oss.sonatype.org/"
-    val snapshotsR = "snapshots" at nexus + "content/repositories/snapshots"
-    val releasesR  = "releases"  at nexus + "service/local/staging/deploy/maven2"
-    val resolver = if (isSnapshot.value) snapshotsR else releasesR
-    Some(resolver)
-  }
+  private val repoName = env("PUBLISH_REPO_NAME")
+  private val repoUrl = env("PUBLISH_REPO_URL")
 
   lazy val settings = Seq(
     publishMavenStyle := true,
-    publishTo := targetRepository.value,
     publishArtifact in Test := false,
+    publishTo := Some(repoUrl).map(repoName at _),
+    credentials += Credentials(repoName, env("PUBLISH_REPO_ID"),
+      env("PUBLISH_USER"), env("PUBLISH_PASS")),
     pomIncludeRepository := { _ => false },
-    licenses := Seq("Apache 2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0")),
+    licenses := Seq("Apache 2.0" ->
+      url("http://www.apache.org/licenses/LICENSE-2.0")),
     homepage := Some(url("http://reactivemongo.org")),
     pomExtra := (
       <scm>
@@ -194,52 +193,4 @@ object ReactiveMongoBuild extends Build {
     )).
     settings(libraryDependencies += specs).
     dependsOn(bson)
-}
-
-object Travis {
-  val travisSnapshotBranches =
-    SettingKey[Seq[String]]("branches that can be published on sonatype")
-
-  val travisCommand = Command.command("publishSnapshotsFromTravis") { state =>
-    val extracted = Project extract state
-    import extracted._
-    import scala.util.Properties.isJavaAtLeast
-
-    val thisRef = extracted.get(thisProjectRef)
-
-    val isSnapshot = getOpt(version).exists(_.endsWith("SNAPSHOT"))
-    val isTravisEnabled = sys.env.get("TRAVIS").exists(_ == "true")
-    val isNotPR = sys.env.get("TRAVIS_PULL_REQUEST").exists(_ == "false")
-    val isBranchAcceptable = sys.env.get("TRAVIS_BRANCH").exists(branch => getOpt(travisSnapshotBranches).exists(_.contains(branch)))
-    val isJavaVersion = !isJavaAtLeast("1.7")
-
-    if (isSnapshot && isTravisEnabled && isNotPR && isBranchAcceptable) {
-      println(s"publishing $thisRef from travis...")
-
-      val newState = append(
-        Seq(
-          publishTo := Some("Sonatype Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots/"),
-          credentials := Seq(Credentials(
-            "Sonatype Nexus Repository Manager",
-            "oss.sonatype.org",
-            sys.env.get("SONATYPE_USER").getOrElse(throw new RuntimeException("no SONATYPE_USER defined")),
-            sys.env.get("SONATYPE_PASSWORD").getOrElse(throw new RuntimeException("no SONATYPE_PASSWORD defined"))
-          ))),
-        state
-      )
-
-      runTask(publish in thisRef, newState)
-
-      println(s"published $thisRef from travis")
-    } else {
-      println(s"not publishing $thisRef to Sonatype: isSnapshot=$isSnapshot, isTravisEnabled=$isTravisEnabled, isNotPR=$isNotPR, isBranchAcceptable=$isBranchAcceptable, javaVersionLessThen_1_7=$isJavaVersion")
-    }
-
-    state
-  }
-
-  val settings = Seq(
-    Travis.travisSnapshotBranches := Seq("master"),
-    commands += Travis.travisCommand)
-  
 }
