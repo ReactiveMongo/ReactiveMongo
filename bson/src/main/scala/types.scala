@@ -556,6 +556,18 @@ case class BSONTimestamp(value: Long) extends BSONValue {
   val ordinal = value.toInt
 }
 
+/** Timestamp companion */
+object BSONTimestamp {
+  /**
+   * Returns the timestamp corresponding to the given `time` and `ordinal`.
+   *
+   * @param time the 32bits time value (seconds since the Unix epoch)
+   * @param ordinal an incrementing ordinal for operations within a same second
+   */
+  def apply(time: Long, ordinal: Int): BSONTimestamp =
+    BSONTimestamp((time << 32) ^ ordinal)
+}
+
 /** BSON Long value */
 case class BSONLong(value: Long) extends BSONValue { val code = 0x12.toByte }
 
