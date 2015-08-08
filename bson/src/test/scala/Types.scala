@@ -87,5 +87,9 @@ class Types extends Specification {
         ts.time aka "time" must_== 1412180887L) and (
           ts.ordinal aka "ordinal" must_== 6)
     }
+
+    "be created from the time and ordinal values" in {
+      BSONTimestamp(1412180887L, 6) must_== BSONTimestamp(6065270725701271558L)
+    }
   }
 }

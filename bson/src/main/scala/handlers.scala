@@ -99,18 +99,28 @@ class VariantBSONReaderWrapper[B <: BSONValue, T](reader: VariantBSONReader[B, T
   def read(b: B) = reader.read(b)
 }
 
-trait BSONHandler[B <: BSONValue, T] extends BSONReader[B, T] with BSONWriter[T, B] { self =>
-  def as[R](to: T => R, from: R => T): BSONHandler[B, R] = new BSONHandler[B, R] {
-    def write(r: R) = self.write(from(r))
-    def read(b: B) = to(self.read(b))
-  }
+trait BSONHandler[B <: BSONValue, T] extends BSONReader[B, T] with BSONWriter[T, B] {
+  def as[R](to: T => R, from: R => T): BSONHandler[B, R] =
+    new BSONHandler.MappedHandler(this, to, from)
 }
 
 object BSONHandler {
-  def apply[B <: BSONValue, T](read: B => T, write: T => B) = new BSONHandler[B, T] {
-    override def read(x: B): T = read(x)
-    override def write(x: T): B = write(x)
+  private[bson] class MappedHandler[B <: BSONValue, T, U](
+      parent: BSONHandler[B, T],
+      to: T => U,
+      from: U => T) extends BSONHandler[B, U] {
+    def write(u: U) = parent.write(from(u))
+    def read(b: B) = to(parent.read(b))
   }
+
+  private[bson] class DefaultHandler[B <: BSONValue, T](r: B => T, w: T => B)
+      extends BSONHandler[B, T] {
+    def read(x: B): T = r(x)
+    def write(x: T): B = w(x)
+  }
+
+  def apply[B <: BSONValue, T](read: B => T, write: T => B): BSONHandler[B, T] =
+    new DefaultHandler(read, write)
 }
 
 trait DefaultBSONHandlers {
@@ -141,6 +151,13 @@ trait DefaultBSONHandlers {
     def write(xs: Array[Byte]) = BSONBinary(xs, Subtype.GenericBinarySubtype)
   }
 
+  import java.util.Date
+
+  implicit object BSONDateTimeHandler extends BSONHandler[BSONDateTime, Date] {
+    def read(bson: BSONDateTime) = new Date(bson.value)
+    def write(date: Date) = BSONDateTime(date.getTime)
+  }
+
   // Typeclasses Handlers
   import BSONNumberLike._
   import BSONBooleanLike._
@@ -151,6 +168,7 @@ trait DefaultBSONHandlers {
       case long: BSONLong     => BSONLongNumberLike(long)
       case double: BSONDouble => BSONDoubleNumberLike(double)
       case dt: BSONDateTime   => BSONDateTimeNumberLike(dt)
+      case ts: BSONTimestamp  => BSONTimestampNumberLike(ts)
       case _                  => throw new UnsupportedOperationException()
     }
   }
@@ -240,16 +258,6 @@ trait DefaultBSONHandlers {
     def read(b: BSONJavaScript) = b
     def write(b: BSONJavaScript) = b
   }
-
-  /*// Generic Handlers
-  class BSONValueIdentity[B <: BSONValue] extends BSONWriter[B, B] with BSONReader[B, B] {
-    def write(b: B): B = b
-    def readTry(b: B): Try[B] = Try(b.asInstanceOf[B])
-  }
-
-  implicit def findIdentityWriter[B <: BSONValue]: BSONWriter[B, B] = /*new VariantBSONWriterWrapper(*/new BSONValueIdentity[B]//)
-
-  implicit def findIdentityReader[B <: BSONValue]: BSONReader[B, B] = /*new VariantBSONReaderWrapper(*/new BSONValueIdentity[B]//)*/
 
   implicit def findWriter[T](implicit writer: VariantBSONWriter[T, _ <: BSONValue]): BSONWriter[T, _ <: BSONValue] =
     new VariantBSONWriterWrapper(writer)
