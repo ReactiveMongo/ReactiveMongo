@@ -2,12 +2,11 @@
 
 SCRIPT_DIR=`dirname $0`
 JAVA_COMPAT=`javac -version 2>&1 | grep 1.6 | wc -l`
-SCALA_COMPAT=`echo "$TRAVIS_SCALA_VERSION" | grep "2.11" | wc -l`
 
 # TRAVIS_BRANCH
 #  -o "$TRAVIS_BRANCH" != "master"
-if [ "$MONGO_SSL" = "false" -o "$SONATYPE_USER" = "" -o "$SONATYPE_PASS" = "" -o $JAVA_COMPAT -ne 1 -o $SCALA_COMPAT -ne 1 ]; then
-    echo "skip the snapshot publication: $JAVA_COMPAT $SCALA_COMPAT"
+if [ "$MONGO_SSL" = "false" -o "$SONATYPE_USER" = "" -o "$SONATYPE_PASS" = "" -o $JAVA_COMPAT -ne 1 ]; then
+    echo "skip the snapshot publication: $JAVA_COMPAT"
     exit 0
 fi
 
