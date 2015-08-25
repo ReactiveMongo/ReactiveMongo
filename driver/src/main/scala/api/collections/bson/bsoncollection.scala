@@ -85,7 +85,8 @@ case class BSONQueryBuilder(
     explainFlag: Boolean = false,
     snapshotFlag: Boolean = false,
     commentString: Option[String] = None,
-    options: QueryOpts = QueryOpts()) extends GenericQueryBuilder[BSONSerializationPack.type] {
+    options: QueryOpts = QueryOpts(),
+    maxTimeMsOption: Option[Long] = None) extends GenericQueryBuilder[BSONSerializationPack.type] {
   import reactivemongo.utils.option
 
   type Self = BSONQueryBuilder
@@ -100,8 +101,9 @@ case class BSONQueryBuilder(
     snapshotFlag: Boolean = snapshotFlag,
     commentString: Option[String] = commentString,
     options: QueryOpts = options,
-    failover: FailoverStrategy = failover): BSONQueryBuilder =
-    BSONQueryBuilder(collection, failover, queryOption, sortOption, projectionOption, hintOption, explainFlag, snapshotFlag, commentString, options)
+    failover: FailoverStrategy = failover,
+    maxTimeMsOption: Option[Long] = maxTimeMsOption): BSONQueryBuilder =
+    BSONQueryBuilder(collection, failover, queryOption, sortOption, projectionOption, hintOption, explainFlag, snapshotFlag, commentString, options, maxTimeMsOption)
 
   def merge(readPreference: ReadPreference): BSONDocument = {
     // Primary and SecondaryPreferred are encoded as the slaveOk flag;
@@ -116,6 +118,7 @@ case class BSONQueryBuilder(
     val optionalFields = List(
       sortOption.map { "$orderby" -> _ },
       hintOption.map { "$hint" -> _ },
+      maxTimeMsOption.map { "$maxTimeMS" -> BSONLong(_) },
       commentString.map { "$comment" -> BSONString(_) },
       option(explainFlag, "$explain" -> BSONBoolean(true)),
       option(snapshotFlag, "$snapshot" -> BSONBoolean(true)),

@@ -1,6 +1,7 @@
 import org.specs2.mutable._
 import reactivemongo.bson._
 import DefaultBSONHandlers._
+import reactivemongo.core.errors.DetailedDatabaseException
 import scala.concurrent.{ Await, Future }
 import scala.concurrent.duration._
 import play.api.libs.iteratee.Iteratee
@@ -61,6 +62,19 @@ class CursorSpec extends Specification {
       cursor.foo must_== "Bar" and (
         Cursor.flatten(Future.successful(cursor)).foo must_== "raB")
     }
+
+    "throws exception when maxTimeout reached" in {
+
+      val futs = for (i <- 0 until 16517)
+        yield coll.insert(BSONDocument("i" -> BSONInteger(i), "record" -> BSONString("record" + i)))
+      val fut = Future.sequence(futs)
+      Await.result(fut, DurationInt(20).seconds)
+      println("inserted 16,517 records")
+      Await.result(coll.find(BSONDocument("record" -> "asd")).maxTimeMs(1).cursor().collect[List](10), DurationInt(20).seconds) must throwA[DetailedDatabaseException]
+
+      success
+    }
+
   }
 
   "BSON Cursor" should {
