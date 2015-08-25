@@ -64,15 +64,14 @@ class CursorSpec extends Specification {
     }
 
     "throws exception when maxTimeout reached" in {
-
       val futs = for (i <- 0 until 16517)
         yield coll.insert(BSONDocument("i" -> BSONInteger(i), "record" -> BSONString("record" + i)))
       val fut = Future.sequence(futs)
       Await.result(fut, DurationInt(20).seconds)
       println("inserted 16,517 records")
-      Await.result(coll.find(BSONDocument("record" -> "asd")).maxTimeMs(1).cursor().collect[List](10), DurationInt(20).seconds) must throwA[DetailedDatabaseException]
 
-      success
+      val fut2 = coll.find(BSONDocument("record" -> "asd")).maxTimeMs(1).cursor().collect[List](10)
+      fut2 must throwA[DetailedDatabaseException].await(timeout = DurationInt(1).seconds)
     }
 
   }
