@@ -74,8 +74,7 @@ object ScramSha1Initiate extends BSONCommandResultMaker[ScramSha1Challenge] {
       if (i == chars.length) {
         i = 1
         chars(0)
-      }
-      else {
+      } else {
         i += 1
         chars(i - 1)
       }
@@ -188,8 +187,7 @@ case class ScramSha1StartNegociation(
               ArrayReadableBuffer(ByteString(message).toArray[Byte]),
               Subtype.GenericBinarySubtype)))).right
 
-      }
-      catch {
+      } catch {
         case err: Throwable => Left(CommandError(
           s"fails to negociate SCRAM-SHA1: ${err.getMessage}")).right
       }
@@ -217,11 +215,9 @@ object ScramSha1StartNegociation extends BSONCommandResultMaker[Either[Successfu
       Left(CommandError(bson.getAs[String]("errmsg").
         getOrElse("SCRAM-SHA1 authentication failure")))
 
-    }
-    else if (bson.getAs[BSONBooleanLike]("done").fold(false)(_.toBoolean)) {
+    } else if (bson.getAs[BSONBooleanLike]("done").fold(false)(_.toBoolean)) {
       Right(Left(SilentSuccessfulAuthentication))
-    }
-    else bson.getAs[Array[Byte]]("payload").fold[ResType](
+    } else bson.getAs[Array[Byte]]("payload").fold[ResType](
       Left(CommandError("missing SCRAM-SHA1 payload")))(
         bytes => Right(Right(bytes)))
   }

@@ -107,8 +107,7 @@ object DefaultBufferHandler extends BufferHandler {
           val name = buffer.readCString
           val elem = Try(name -> DefaultBufferHandler.handlersByCode.get(code).map(_.read(buffer)).get)
           elem #:: makeStream
-        }
-        else Stream.empty
+        } else Stream.empty
       }
       val stream = makeStream
       stream.force // TODO remove
@@ -139,8 +138,7 @@ object DefaultBufferHandler extends BufferHandler {
           val name = buffer.readCString
           val elem = Try(DefaultBufferHandler.handlersByCode.get(code).map(_.read(buffer)).get)
           elem #:: makeStream
-        }
-        else Stream.empty
+        } else Stream.empty
       }
       val stream = makeStream
       stream.force // TODO remove
@@ -232,8 +230,7 @@ object DefaultBufferHandler extends BufferHandler {
     if (buffer.readable > 0) {
       val code = buffer.readByte
       buffer.readString -> handlersByCode.get(code).map(_.read(buffer)).get
-    }
-    else throw new NoSuchElementException("buffer can not be read, end of buffer reached")
+    } else throw new NoSuchElementException("buffer can not be read, end of buffer reached")
   }
 
   def readDocument(buffer: ReadableBuffer): Try[BSONDocument] = Try {

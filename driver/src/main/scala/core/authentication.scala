@@ -162,8 +162,7 @@ private[reactivemongo] trait MongoScramSha1Authentication {
                   _ => Left(FailedAuthentication(msg)))
 
                 con
-              }
-              else {
+              } else {
                 val negociation = ScramSha1FinalNegociation(cid, payload)
 
                 con.send(negociation(db).maker(RequestId.authenticate.next))

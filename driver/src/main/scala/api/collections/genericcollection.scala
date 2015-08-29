@@ -216,16 +216,14 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
           createBulk(documents, Mongo26WriteCommand.insert(ordered, writeConcern, metadata)).map { list =>
             list.foldLeft(MultiBulkWriteResult())((r, w) => r.merge(w))
           }
-        }
-        else {
+        } else {
           // Mongo 2.4 // TODO: Deprecate/remove
           createBulk(documents, new Mongo24BulkInsert(Insert(0, fullCollectionName), writeConcern, metadata)).map { list =>
             list.foldLeft(MultiBulkWriteResult())((r, w) => r.merge(w))
           }
         }
       }
-    }
-    else Future.successful(MultiBulkWriteResult(
+    } else Future.successful(MultiBulkWriteResult(
       ok = true,
       n = 0,
       nModified = 0,
@@ -259,8 +257,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
             if (!flattened.ok) {
               // was ordered, with one doc => fail if has an error
               Future.failed(flattened)
-            }
-            else Future.successful(wr)
+            } else Future.successful(wr)
           }
         case Some(_) => // Mongo < 2.6 // TODO: Deprecates/remove
           val op = Insert(0, fullCollectionName)
@@ -299,8 +296,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
           if (!flattened.ok) {
             // was ordered, with one doc => fail if has an error
             Future.failed(flattened)
-          }
-          else Future.successful(wr)
+          } else Future.successful(wr)
         }
       }
 
@@ -464,8 +460,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
             if (!flattened.ok) {
               // was ordered, with one doc => fail if has an error
               Future.failed(flattened)
-            }
-            else Future.successful(wr)
+            } else Future.successful(wr)
           }
         case Some(_) => // Mongo < 2.6 // TODO: Deprecate/remove
           val op = Delete(fullCollectionName, if (firstMatchOnly) 1 else 0)
@@ -576,8 +571,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
         val nextCommand = new Mongo26WriteCommand(tpe, ordered, writeConcern, metadata)
         nextCommand.putOrIssueNewCommand(doc)
         Some(nextCommand)
-      }
-      else {
+      } else {
         val start = buf.index
         buf.writeByte(0x03)
         buf.writeCString(docsN.toString)
@@ -596,8 +590,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
             buf.buffer.writerIndex(start)
             closeIfNecessary()
             Some(nextCommand)
-          }
-          else None
+          } else None
         docsN += 1
         result
       }
@@ -685,8 +678,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
         val nextBulk = new Mongo24BulkInsert(op, writeConcern, metadata)
         nextBulk.putOrIssueNewCommand(doc)
         Some(nextBulk)
-      }
-      else {
+      } else {
         val start = buf.index
         pack.writeToBuffer(buf, doc)
         if (buf.index > thresholdBytes) {
@@ -699,8 +691,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
           buf.buffer.writerIndex(start)
           done = true
           Some(nextBulk)
-        }
-        else {
+        } else {
           docsN += 1
           None
         }

@@ -39,8 +39,7 @@ trait WritableBuffer {
       if (buffer.readable > 1024) {
         writeBytes(buffer.readArray(1024))
         write(buffer)
-      }
-      else {
+      } else {
         writeBytes(buffer.readArray(buffer.readable))
       }
     }
@@ -115,6 +114,7 @@ trait ReadableBuffer {
    */
   def slice(n: Int): ReadableBuffer
 
+  /** Returns the buffer size. */
   def size: Int
 
   /** Reads a UTF-8 String. */
@@ -142,19 +142,23 @@ trait ReadableBuffer {
   @scala.annotation.tailrec
   private def readCString(array: ArrayBuffer[Byte]): String = {
     val byte = this.readByte
-    if (byte == 0x00)
+
+    if (byte == 0x00) {
       new String(array.toArray, "UTF-8")
-    else readCString(array += byte)
+    } else readCString(array += byte)
   }
+
+  def duplicate(): ReadableBuffer
 }
 
 trait BSONBuffer extends ReadableBuffer with WritableBuffer
 
-import java.nio.ByteBuffer
-import java.nio.ByteOrder._
+import java.nio.{ ByteBuffer, ByteOrder }, ByteOrder._
 
 /** An array-backed readable buffer. */
-case class ArrayReadableBuffer private (bytebuffer: ByteBuffer) extends ReadableBuffer {
+case class ArrayReadableBuffer private (
+    bytebuffer: ByteBuffer) extends ReadableBuffer {
+
   bytebuffer.order(LITTLE_ENDIAN)
 
   def size = bytebuffer.limit()
@@ -172,8 +176,7 @@ case class ArrayReadableBuffer private (bytebuffer: ByteBuffer) extends Readable
     new ArrayReadableBuffer(nb)
   }
 
-  def readBytes(array: Array[Byte]): Unit =
-    bytebuffer.get(array)
+  def readBytes(array: Array[Byte]): Unit = bytebuffer.get(array)
 
   def readByte() = bytebuffer.get()
 
@@ -189,6 +192,8 @@ case class ArrayReadableBuffer private (bytebuffer: ByteBuffer) extends Readable
     val buf = new ArrayBSONBuffer()
     buf.writeBytes(this)
   }
+
+  def duplicate() = new ArrayReadableBuffer(bytebuffer.duplicate())
 }
 
 object ArrayReadableBuffer {

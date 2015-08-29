@@ -89,8 +89,7 @@ trait BSONCommandResultMaker[Result] extends CommandResultMaker[Result] {
     val document = Response.parse(response).next()
     try {
       apply(document)
-    }
-    catch {
+    } catch {
       case e: CommandError => Left(e)
       case e: Throwable =>
         val error = CommandError("exception while deserializing this command's result!", Some(document))

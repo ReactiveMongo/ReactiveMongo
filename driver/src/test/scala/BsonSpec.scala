@@ -113,8 +113,7 @@ object BsonSpec extends Specification {
     if (!result) {
       log(origin, array, buffer)
       failure
-    }
-    else success
+    } else success
   }
 
   def log(origin: Array[Byte], test: Array[Byte], buffer: org.jboss.netty.buffer.ChannelBuffer) = {

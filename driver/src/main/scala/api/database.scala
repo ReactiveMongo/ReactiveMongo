@@ -148,8 +148,7 @@ trait DBMetaCommands { self: DB =>
 
     if (wireVer.exists(_ == MongoWireVersion.V30)) {
       Command.run(BSONSerializationPack)(self, ListCollectionNames).map(_.names)
-    }
-    else collection("system.namespaces").as[BSONCollection]().
+    } else collection("system.namespaces").as[BSONCollection]().
       find(BSONDocument(
         "name" -> BSONRegex("^[^\\$]+$", "") // strip off any indexes
         )).cursor(defaultReadPreference)(

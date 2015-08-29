@@ -33,8 +33,7 @@ package object utils {
         if (updated.isDefined) {
           builder += updated.get
           builder ++= iterator
-        }
-        else builder += e
+        } else builder += e
       }
     }
     builder.result
@@ -122,8 +121,7 @@ case class NodeSet(
   def pick(preference: ReadPreference): Option[(Node, Connection)] = {
     if (mongos.isDefined) {
       pickConnectionAndFlatten(mongos)
-    }
-    else preference match {
+    } else preference match {
       case ReadPreference.Primary                    => pickConnectionAndFlatten(primary)
       case ReadPreference.PrimaryPreferred(filter)   => pickConnectionAndFlatten(primary.orElse(pickFromGroupWithFilter(secondaries, filter, secondaries.pick)))
       case ReadPreference.Secondary(filter)          => pickConnectionAndFlatten(pickFromGroupWithFilter(secondaries, filter, secondaries.pick))
@@ -155,8 +153,7 @@ case class Node(
     val splitted = name.span(_ != ':')
     splitted._1 -> (try {
       splitted._2.drop(1).toInt
-    }
-    catch {
+    } catch {
       case _: Throwable => 27017
     })
   }
@@ -170,8 +167,7 @@ case class Node(
   def createNeededChannels(receiver: ActorRef, upTo: Int)(implicit channelFactory: ChannelFactory): Node = {
     if (connections.size < upTo) {
       copy(connections = connections.++(for (i ← 0 until (upTo - connections.size)) yield Connection(channelFactory.create(host, port, receiver), ConnectionStatus.Disconnected, Set.empty, None)))
-    }
-    else this
+    } else this
   }
 
   def toShortString = s"Node[$name: $status (${connected.size}/${connections.size} available connections), latency=${pingInfo.ping}], auth=${authenticated}"
@@ -351,8 +347,7 @@ class RoundRobiner[A, M[T] <: Iterable[T]](val subject: M[A], startAtIndex: Int 
       if (!a.isDefined) None
       else if (filter(a.get)) a
       else pickWithFilter(filter, tested + 1)
-    }
-    else None
+    } else None
 
   def copy(subject: M[A], startAtIndex: Int = iterator.nextIndex) =
     new RoundRobiner(subject, startAtIndex)
