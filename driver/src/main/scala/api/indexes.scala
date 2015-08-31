@@ -434,8 +434,7 @@ object CollectionIndexesManager {
 
     if (wireVer.exists(_ == MongoWireVersion.V30)) {
       new DefaultCollectionIndexesManager(db, collectionName)
-    }
-    else new LegacyCollectionIndexesManager(db.name, collectionName,
+    } else new LegacyCollectionIndexesManager(db.name, collectionName,
       new LegacyIndexesManager(db))
   }
 }

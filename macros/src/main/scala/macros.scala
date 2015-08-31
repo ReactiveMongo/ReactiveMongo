@@ -134,8 +134,7 @@ private object MacroImpl {
                 Select(Ident("document"), "getAs"),
                 List(TypeTree(typ))),
               List(Literal(Constant(paramName(param)))))
-          }
-          else {
+          } else {
             val getter = Apply(
               TypeApply(
                 Select(Ident("document"), "getAsTry"),
@@ -161,8 +160,7 @@ private object MacroImpl {
             docE.splice ++ BSONDocument(Seq((nameE.splice)))
           }.tree
         } getOrElse doc
-      }
-      else
+      } else
         writeBodyConstruct(A)
     }
 
@@ -233,8 +231,7 @@ private object MacroImpl {
 
       if (values.length + appends.length > 0) {
         Block((tupleDef :: writer): _*)
-      }
-      else {
+      } else {
         writer.head
       }
     }
@@ -266,8 +263,7 @@ private object MacroImpl {
           tree match {
             case TypeRef(_, _, List(a, b)) => parseUnionTree(a) ::: parseUnionTree(b)
           }
-        }
-        else List(tree)
+        } else List(tree)
       }
 
       val tree = Opts match {
@@ -286,8 +282,7 @@ private object MacroImpl {
       val allOption = typeOf[Macros.Options.AllImplementations]
       if (Opts <:< allOption) {
         Some(allImplementations(A).toList)
-      }
-      else {
+      } else {
         None
       }
     }

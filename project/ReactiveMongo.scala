@@ -15,8 +15,8 @@ object BuildSettings {
   val buildSettings = Defaults.coreDefaultSettings ++ Seq(
     organization := "org.reactivemongo",
     version := buildVersion,
-    scalaVersion := "2.11.6",
-    crossScalaVersions  := Seq("2.11.6", "2.10.4"),
+    scalaVersion := "2.11.7",
+    crossScalaVersions  := Seq("2.11.7", "2.10.4"),
     crossVersion := CrossVersion.binary,
     javaOptions in test ++= Seq("-Xmx512m", "-XX:MaxPermSize=512m"),
     //fork in Test := true, // Don't share executioncontext between SBT CLI/tests
@@ -72,7 +72,7 @@ object Format {
     FormattingPreferences().
       setPreference(AlignParameters, true).
       setPreference(AlignSingleLineCaseStatements, true).
-      setPreference(CompactControlReadability, true).
+      setPreference(CompactControlReadability, false).
       setPreference(CompactStringConcatenation, false).
       setPreference(DoubleIndentClassDeclaration, true).
       setPreference(FormatXml, true).

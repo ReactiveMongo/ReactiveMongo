@@ -167,8 +167,7 @@ trait MongoDBSystem extends Actor {
       case Some(nextAuth) =>
         if (connection.isAuthenticated(nextAuth.db, nextAuth.user)) {
           authenticateConnection(connection, auths.tail)
-        }
-        else sendAuthenticate(connection, nextAuth)
+        } else sendAuthenticate(connection, nextAuth)
 
       case _ => connection
     }
@@ -313,8 +312,7 @@ trait MongoDBSystem extends Actor {
           if (request.op.expectsResponse) {
             awaitingResponses += request.requestID -> AwaitingResponse(request.requestID, connection.channel.getId(), req.promise, isGetLastError = false, isMongo26WriteOp = req.isMongo26WriteOp)
             logger.trace(s"registering awaiting response for requestID ${request.requestID}, awaitingResponses: $awaitingResponses")
-          }
-          else logger.trace(s"NOT registering awaiting response for requestID ${request.requestID}")
+          } else logger.trace(s"NOT registering awaiting response for requestID ${request.requestID}")
 
           connection.send(request)
         }
@@ -389,23 +387,19 @@ trait MongoDBSystem extends Actor {
           logger.debug(s"completing promise ${awaitingResponse.promise} with error='socket disconnected'")
           awaitingResponse.promise.failure(GenericDriverException("socket disconnected"))
           false
-        }
-        else true
+        } else true
       }
 
       if (!nodeSet.isReachable) {
         if (nodeSetWasReachable) {
           logger.error("The entire node set is unreachable, is there a network problem?")
           broadcastMonitors(SetUnavailable)
-        }
-        else logger.debug("The entire node set is still unreachable, is there a network problem?")
-      }
-      else if (!nodeSet.primary.isDefined) {
+        } else logger.debug("The entire node set is still unreachable, is there a network problem?")
+      } else if (!nodeSet.primary.isDefined) {
         if (primaryWasAvailable) {
           logger.error("The primary is unavailable, is there a network problem?")
           broadcastMonitors(PrimaryUnavailable)
-        }
-        else logger.debug(
+        } else logger.debug(
           "The primary is still unavailable, is there a network problem?")
       }
       logger.debug(s"$channelId is disconnected")
@@ -430,8 +424,7 @@ trait MongoDBSystem extends Actor {
               System.currentTimeMillis() - node.pingInfo.lastIsMasterTime,
               lastIsMasterTime = 0, lastIsMasterId = -1)
 
-          }
-          else node.pingInfo
+          } else node.pingInfo
 
         val authenticating = isMaster.status match {
           case _: QueryableNodeStatus =>
@@ -491,8 +484,7 @@ trait MongoDBSystem extends Actor {
             logger.debug(s"{${response.header.responseTo}} sending a failure... (${response.error.get})")
             if (response.error.get.isNotAPrimaryError) onPrimaryUnavailable()
             promise.failure(response.error.get)
-          }
-          else if (isGetLastError) {
+          } else if (isGetLastError) {
             logger.debug(s"{${response.header.responseTo}} it's a getlasterror")
             // todo, for now rewinding buffer at original index
             import reactivemongo.api.commands.bson.BSONGetLastErrorImplicits.LastErrorReader
@@ -505,15 +497,13 @@ trait MongoDBSystem extends Actor {
                   logger.debug(s"{${response.header.responseTo}} sending a failure (lasterror is not ok)")
                   if (lastError.isNotAPrimaryError) onPrimaryUnavailable()
                   promise.failure(lastError)
-                }
-                else {
+                } else {
                   logger.trace(s"{${response.header.responseTo}} sending a success (lasterror is ok)")
                   response.documents.readerIndex(response.documents.readerIndex)
                   promise.success(response)
                 }
               })
-          }
-          else if (isMongo26WriteOp) {
+          } else if (isMongo26WriteOp) {
             // TODO - logs, bson
             // MongoDB 26 Write Protocol errors
             logger.trace("received a response to a MongoDB2.6 Write Op")
@@ -532,8 +522,7 @@ trait MongoDBSystem extends Actor {
             if (processedOk) {
               logger.trace(s"{${response.header.responseTo}} [MongoDB26 Write Op response] sending a success!")
               promise.success(response)
-            }
-            else {
+            } else {
               logger.debug(s"{${response.header.responseTo}} [MongoDB26 Write Op response] processedOk is false! sending an error")
               val notAPrimary = fields.find(_.name == "errmsg").exists {
                 case errmsg @ LazyField(0x02, _, buf) =>
@@ -549,8 +538,7 @@ trait MongoDBSystem extends Actor {
               }
               promise.failure(new RuntimeException("not ok"))
             }
-          }
-          else {
+          } else {
             logger.trace(s"{${response.header.responseTo}} [MongoDB26 Write Op response] sending a success!")
             promise.success(response)
           }
@@ -715,11 +703,9 @@ trait MongoDBSystem extends Actor {
 
       if (node.pingInfo.lastIsMasterId == -1) {
         node.copy(pingInfo = node.pingInfo.copy(lastIsMasterTime = System.currentTimeMillis(), lastIsMasterId = id))
-      }
-      else if (node.pingInfo.lastIsMasterId >= PingInfo.pingTimeout) {
+      } else if (node.pingInfo.lastIsMasterId >= PingInfo.pingTimeout) {
         node.copy(pingInfo = node.pingInfo.copy(lastIsMasterTime = System.currentTimeMillis(), lastIsMasterId = id, ping = Long.MaxValue))
-      }
-      else node
+      } else node
     }.getOrElse(node)
 
   def allChannelGroup(nodeSet: NodeSet) = {

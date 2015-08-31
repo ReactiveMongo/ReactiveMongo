@@ -73,8 +73,7 @@ object QueryAndWriteCommands extends org.specs2.mutable.Specification {
       val docs = (0 until nDocs).toStream.map { i =>
         if (i == 0 || i == 1529 || i == 3026 || i == 19862) {
           BSONDocument("bulk" -> true, "i" -> i, "plop" -> -3)
-        }
-        else BSONDocument("bulk" -> true, "i" -> i, "plop" -> i)
+        } else BSONDocument("bulk" -> true, "i" -> i, "plop" -> i)
       }
       val res = Try(Await.result(coll.bulkInsert(docs, false), DurationInt(100).seconds))
       //println(res)

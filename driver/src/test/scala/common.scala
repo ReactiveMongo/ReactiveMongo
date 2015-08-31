@@ -12,8 +12,7 @@ object Common {
 
     if (Option(System getProperty "test.enableSSL").exists(_ == "true")) {
       opts.copy(sslEnabled = true, sslAllowsInvalidCert = true)
-    }
-    else opts
+    } else opts
   }
 
   lazy val driver = new MongoDriver
@@ -28,6 +27,5 @@ object Common {
 
   def closeDriver(): Unit = try {
     driver.close()
-  }
-  catch { case _: Throwable => () }
+  } catch { case _: Throwable => () }
 }

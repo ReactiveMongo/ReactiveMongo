@@ -18,7 +18,8 @@ import org.specs2.mutable._
 import reactivemongo.bson._
 import scala.util._
 
-class Types extends Specification {
+object Types extends Specification {
+  "BSON types" title
 
   "Generating BSONObjectID" should {
     "not throw a SocketException" in {
@@ -75,7 +76,8 @@ class Types extends Specification {
       val bytes = Array[Byte](1, 2, 3)
       val bson = BSONBinary(bytes, Subtype.GenericBinarySubtype)
 
-      bson.byteArray must_== bytes
+      bson.byteArray aka "read #1" must_== bytes and (
+        bson.byteArray aka "read #2" must_== bytes)
     }
   }
 

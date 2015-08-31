@@ -32,6 +32,5 @@ trait DealingWithGenericCommandErrorsReader[A] extends BSONDocumentReader[A] {
         code = doc.getAs[Int]("code"),
         errmsg = doc.getAs[String]("errmsg"),
         originalDocument = doc)
-    }
-    else readResult(doc)
+    } else readResult(doc)
 }

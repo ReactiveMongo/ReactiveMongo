@@ -147,25 +147,22 @@ object BSONDocument {
     }.toStream)
 
   /** Creates a new [[BSONDocument]] containing all the `elements` in the given `Traversable`. */
-  def apply(elements: Traversable[BSONElement]): BSONDocument = {
+  def apply(elements: Traversable[BSONElement]): BSONDocument =
     new BSONDocument(elements.toStream.map(Success(_)))
-  }
 
   /** Returns a String representing the given [[BSONDocument]]. */
   def pretty(doc: BSONDocument) = BSONIterator.pretty(doc.stream.iterator)
 
   /** Writes the `document` into the `buffer`. */
-  def write(value: BSONDocument, buffer: WritableBuffer)(implicit bufferHandler: BufferHandler = DefaultBufferHandler): WritableBuffer = {
+  def write(value: BSONDocument, buffer: WritableBuffer)(implicit bufferHandler: BufferHandler = DefaultBufferHandler): WritableBuffer =
     bufferHandler.writeDocument(value, buffer)
-  }
+
   /**
    * Reads a `document` from the `buffer`.
    *
    * Note that the buffer's readerIndex must be set on the start of a document, or it will fail.
    */
-  def read(buffer: ReadableBuffer)(implicit bufferHandler: BufferHandler = DefaultBufferHandler): BSONDocument = {
-    bufferHandler.readDocument(buffer).get
-  }
+  def read(buffer: ReadableBuffer)(implicit bufferHandler: BufferHandler = DefaultBufferHandler): BSONDocument = bufferHandler.readDocument(buffer).get
 
   /** An empty BSONDocument. */
   val empty: BSONDocument = BSONDocument()
@@ -303,7 +300,7 @@ case class BSONBinary(value: ReadableBuffer, subtype: Subtype)
   val code = 0x05.toByte
 
   /** Returns the whole binary content as array. */
-  def byteArray: Array[Byte] = value.readArray(value.size)
+  def byteArray: Array[Byte] = value.duplicate().readArray(value.size)
 }
 
 object BSONBinary {
@@ -390,8 +387,7 @@ object BSONObjectID {
         .map(_.getHardwareAddress)
         .getOrElse(InetAddress.getLocalHost.getHostName.getBytes)
       Converters.md5(ha).take(3)
-    }
-    else {
+    } else {
       val threadId = Thread.currentThread.getId.toInt
       val arr = new Array[Byte](3)
 

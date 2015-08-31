@@ -28,8 +28,7 @@ class SerializationSpecs extends Specification {
   def compare(a1: Array[Byte], a2: Array[Byte]) = {
     if (Arrays.equals(a1, a2)) {
       success
-    }
-    else {
+    } else {
       println(s"\texpected:\n${Arrays.toString(a1)},\n\tgot:\n${Arrays.toString(a2)}")
       failure
     }
@@ -99,8 +98,7 @@ class SerializationSpecs extends Specification {
                 println(s"l=$length, subtype=$subtype, readable=${b.readable}")
                 val contents = b.readArray(length)
                 println(s"${f.name} -> binary (l=$length, subtype=$subtype, hex=${utils.Converters.hex2Str(contents)} contents=${contents.mkString(", ")})")
-              }
-              else println(s"${f.name} -> <${b.readable} bytes>")
+              } else println(s"${f.name} -> <${b.readable} bytes>")
             case v: ValueField[_] =>
               println(s"${f.name} -> ${v.value}")
             case NoValue(tpe, _) =>

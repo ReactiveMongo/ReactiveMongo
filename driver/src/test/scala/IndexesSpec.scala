@@ -38,8 +38,7 @@ object IndexesSpec extends Specification with Tags {
       try {
         Await.result(future, timeout)
         failure
-      }
-      catch {
+      } catch {
         case e: DatabaseException =>
           e.code mustEqual Some(13027) // MongoError['point not in interval of [ -95, 95 )' (code = 13027)]
       }
@@ -88,8 +87,7 @@ object IndexesSpec extends Specification with Tags {
         val result = Await.result(future, timeout)
         println(s"\n\n \tPOOR: $result \n\n")
         failure
-      }
-      catch {
+      } catch {
         case e: DatabaseException =>
           e.code.exists(code => code == 16572 || code == 16755) mustEqual true
         // MongoError['Can't extract geo keys from object, malformed geometry?' (code = 16572)] (< 2.4)
