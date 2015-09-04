@@ -256,8 +256,7 @@ object DefaultCursor {
         Failover2(mongoConnection, failoverStrategy) { () =>
           mongoConnection.sendExpectingResponse(RequestMaker(op).copy(channelIdHint = Some(response.info.channelId)), isMongo26WriteOp)
         }.future.map(Some(_))
-      }
-      else {
+      } else {
         logger.error("[Cursor] Call to next() but cursorID is 0, there is probably a bug")
         Future.successful(Option.empty[Response])
       }
@@ -303,8 +302,7 @@ object DefaultCursor {
       if (cursorID != 0) {
         logger.debug(s"[$logCat] Clean up ${cursorID}, sending KillCursor")
         mongoConnection.send(RequestMaker(KillCursors(Set(cursorID))))
-      }
-      else logger.trace(s"[$logCat] Cursor exhausted (${cursorID})")
+      } else logger.trace(s"[$logCat] Cursor exhausted (${cursorID})")
 
     def foldResponses[T](z: => T, maxDocs: Int = Int.MaxValue)(suc: (T, Response) => State[T], err: (T, Throwable) => State[T])(implicit ctx: ExecutionContext): Future[T] = new FoldResponses(z, maxDocs, suc, err)(ctx)()
 
@@ -349,8 +347,7 @@ object DefaultCursor {
             val (r, c) = current
             if (c < maxDocs) {
               tailResponse(r, maxDocs).map(_.map((_, c + r.reply.numberReturned)))
-            }
-            else Future.successful(Option.empty[(Response, Int)])
+            } else Future.successful(Option.empty[(Response, Int)])
           },
           cleanUp = { current =>
             val (r, _) = current
@@ -393,8 +390,7 @@ object DefaultCursor {
           if (tried.isFailure && !stopOnError)
             next(it, stopOnError)
           else Some(tried)
-        }
-        else None
+        } else None
       }
       enumerateResponses(maxDocs, stopOnError) &> Enumeratee.mapFlatten { response =>
         val iterator = ReplyDocumentIterator(pack)(response.reply, response.documents)
@@ -436,8 +432,7 @@ object DefaultCursor {
         if (!isTailable) { (r: Response, maxDocs: Int) =>
           if (!hasNext(r, maxDocs)) Future.successful(Option.empty[Response])
           else next(r)
-        }
-        else (r: Response, maxDocs: Int) => tailResponse(r, maxDocs)
+        } else (r: Response, maxDocs: Int) => tailResponse(r, maxDocs)
 
       def process(cur: T, st: State[T])(op: T => Future[T]): Future[T] =
         st match {

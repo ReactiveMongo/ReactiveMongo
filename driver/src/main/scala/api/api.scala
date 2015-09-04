@@ -74,8 +74,7 @@ class Failover[T](message: T, connection: MongoConnection, strategy: FailoverStr
           val delay = Duration.unapply(strategy.initialDelay * delayFactor).map(t => FiniteDuration(t._1, t._2)).getOrElse(strategy.initialDelay)
           logger.debug("Got an error, retrying... (try #" + `try` + " is scheduled in " + delay.toMillis + " ms)", e)
           connection.actorSystem.scheduler.scheduleOnce(delay)(send(`try`))
-        }
-        else {
+        } else {
           // generally that means that the primary is not available or the nodeset is unreachable
           logger.error("Got an error, no more attempts to do. Completing with a failure...", e)
           promise.failure(e)
@@ -119,8 +118,7 @@ class Failover2[A](producer: () => Future[A], connection: MongoConnection, strat
           val delay = Duration.unapply(strategy.initialDelay * delayFactor).map(t => FiniteDuration(t._1, t._2)).getOrElse(strategy.initialDelay)
           logger.debug("Got an error, retrying... (try #" + `try` + " is scheduled in " + delay.toMillis + " ms)", e)
           connection.actorSystem.scheduler.scheduleOnce(delay)(send(`try`))
-        }
-        else {
+        } else {
           // generally that means that the primary is not available or the nodeset is unreachable
           logger.error("Got an error, no more attempts to do. Completing with a failure...", e)
           promise.failure(e)
@@ -348,8 +346,7 @@ class MongoConnection(
         else if (primaryAvailable && metadata.isDefined) {
           logger.debug(s"$sender is waiting for a primary... available right now, go!")
           sender ! PrimaryAvailable(metadata.get)
-        }
-        else {
+        } else {
           logger.debug(s"$sender is waiting for a primary...  not available, warning as soon a primary is available.")
           waitingForPrimary += sender
         }
@@ -415,8 +412,7 @@ object MongoConnection {
         val (db, hosts) = parseHostsAndDbName(useful)
         val (unsupportedKeys, options) = opts
         ParsedURI(hosts, options, unsupportedKeys, db, None)
-      }
-      else {
+      } else {
         val WithAuth = """([^:]+):([^@]*)@(.+)""".r
 
         useful match {
@@ -443,8 +439,7 @@ object MongoConnection {
           val p = port.toInt
           if (p > 0 && p < 65536) p
           else throw new URIParsingException(s"Could not parse hosts '$hosts' from URI: invalid port '$port'")
-        }
-        catch {
+        } catch {
           case _: NumberFormatException => throw new URIParsingException(s"Could not parse hosts '$hosts' from URI: invalid port '$port'")
           case NonFatal(e)              => throw e
         }
@@ -567,8 +562,7 @@ class MongoDriver(config: Option[Config] = None) {
     val cfg = if (!reference.hasPath("mongo-async-driver")) {
       logger.warn("No mongo-async-driver configuration found")
       ConfigFactory.empty()
-    }
-    else reference.getConfig("mongo-async-driver")
+    } else reference.getConfig("mongo-async-driver")
 
     ActorSystem("reactivemongo", cfg)
   }

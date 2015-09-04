@@ -270,8 +270,7 @@ case class Response(
       if (bson.hasNext)
         Some(ReactiveMongoException(bson.next))
       else None
-    }
-    else None
+    } else None
   }
 }
 
@@ -347,8 +346,7 @@ object ReplyDocumentIterator {
       try {
         val cbrb = ChannelBufferReadableBuffer(buffer.readBytes(buffer.getInt(buffer.readerIndex)))
         pack.readAndDeserialize(cbrb, reader)
-      }
-      catch {
+      } catch {
         case e: IndexOutOfBoundsException =>
           /*
            * If this happens, the buffer is exhausted, and there is probably a bug.

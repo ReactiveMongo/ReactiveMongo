@@ -130,8 +130,7 @@ case class UpdateWriteResult(
       writeConcernError = writeConcernError,
       code = code.orElse(Some(writeErrors.head.code)),
       errmsg = errmsg.orElse(Some(writeErrors.head.errmsg)))
-  }
-  else this
+  } else this
 }
 
 object MultiBulkWriteResult {

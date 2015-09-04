@@ -48,6 +48,8 @@ class ChannelBufferReadableBuffer(protected[netty] val buffer: ChannelBuffer) ex
     val buf = new ChannelBufferWritableBuffer
     buf.writeBytes(buffer)
   }
+
+  def duplicate() = new ChannelBufferReadableBuffer(buffer.duplicate())
 }
 
 object ChannelBufferReadableBuffer {

@@ -41,6 +41,7 @@ trait GenericQueryBuilder[P <: SerializationPack] {
   def options: QueryOpts
   def failover: FailoverStrategy
   def collection: Collection
+  def maxTimeMsOption: Option[Long]
 
   def merge(readPreference: ReadPreference): pack.Document
 
@@ -53,7 +54,8 @@ trait GenericQueryBuilder[P <: SerializationPack] {
     snapshotFlag: Boolean = snapshotFlag,
     commentString: Option[String] = commentString,
     options: QueryOpts = options,
-    failover: FailoverStrategy = failover): Self
+    failover: FailoverStrategy = failover,
+    maxTimeMsOption: Option[Long] = maxTimeMsOption): Self
 
   private def write(document: pack.Document, buffer: ChannelBufferWritableBuffer = ChannelBufferWritableBuffer()): ChannelBufferWritableBuffer = {
     pack.writeToBuffer(buffer, document)
@@ -162,4 +164,8 @@ trait GenericQueryBuilder[P <: SerializationPack] {
 
   /** Adds a comment to this query, that may appear in the MongoDB logs. */
   def comment(message: String): Self = copy(commentString = Some(message))
+
+  /** Adds maxTimeMs to query https://docs.mongodb.org/v3.0/reference/operator/meta/maxTimeMS/ */
+  def maxTimeMs(p: Long): Self = copy(maxTimeMsOption = Some(p))
+
 }
