@@ -107,5 +107,10 @@ object AggregationSpec extends org.specs2.mutable.Specification {
         map(_.documents) aka "results" must beEqualTo(expected).
         await(timeoutMillis)
     }
+
+    "return distinct states" in {
+      val expected: List[BSONValue] = List("NY", "FR", "JP").map(BSONString.apply)
+      collection.distinct("state").aka("results") must beEqualTo(expected).await(timeoutMillis)
+    }
   }
 }
