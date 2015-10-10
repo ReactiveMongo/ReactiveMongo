@@ -50,10 +50,12 @@ object Publish {
     publishArtifact in Test := false,
     publishTo := Some(repoUrl).map(repoName at _),
     credentials += Credentials(repoName, env("PUBLISH_REPO_ID"),
-      env("PUBLISH_USER"), env("PUBLISH_PASS")),
+        env("PUBLISH_USER"), env("PUBLISH_PASS")),
     pomIncludeRepository := { _ => false },
-    licenses := Seq("Apache 2.0" ->
-      url("http://www.apache.org/licenses/LICENSE-2.0")),
+    licenses := {
+      Seq("Apache 2.0" ->
+        url("http://www.apache.org/licenses/LICENSE-2.0"))
+    },
     homepage := Some(url("http://reactivemongo.org")),
     pomExtra := (
       <scm>

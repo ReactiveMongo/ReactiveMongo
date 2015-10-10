@@ -65,8 +65,10 @@ package reactivemongo.api
 trait Collection {
   /** The database which this collection belong to. */
   def db: DB
+
   /** The name of the collection. */
   def name: String
+
   /** The default failover strategy for the methods of this collection. */
   def failoverStrategy: FailoverStrategy
 
