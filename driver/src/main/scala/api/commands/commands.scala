@@ -34,6 +34,7 @@ trait CommandError extends Exception with NoStackTrace {
   override def getMessage = s"CommandError[code=${code.getOrElse("<unknown>")}, errmsg=${errmsg.getOrElse("<unknown>")}]"
 }
 
+// TODO: move to package `api`
 trait CursorFetcher[P <: SerializationPack, C[A] <: Cursor[A]] {
   val pack: P
   def one[A](implicit reader: pack.Reader[A], ec: ExecutionContext): Future[A]

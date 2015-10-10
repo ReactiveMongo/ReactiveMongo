@@ -40,27 +40,37 @@ import scala.concurrent.duration._
  * val collection2 = db2.collection("plugin")
  * }}}
  */
-trait DB {
+sealed trait DB {
   /** The [[reactivemongo.api.MongoConnection]] that will be used to query this database. */
   def connection: MongoConnection
+
   /** This database name. */
   def name: String
+
   /** A failover strategy for sending requests. */
   def failoverStrategy: FailoverStrategy
 
   /**
-   * Gets a [[reactivemongo.api.Collection]] from this database (alias for the `collection` method).
+   * Returns a [[reactivemongo.api.Collection]] from this database
+   * (alias for the `collection` method).
    *
-   * @param name The name of the collection to open.
+   * @param name the name of the collection to open
    */
   def apply[C <: Collection](name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit producer: CollectionProducer[C] = collections.bson.BSONCollectionProducer): C = collection(name, failoverStrategy)
 
   /**
-   * Gets a [[reactivemongo.api.Collection]] from this database.
+   * Returns a [[reactivemongo.api.Collection]] from this database.
    *
-   * @param name The name of the collection to open.
+   * @param name the name of the collection to open
    */
-  def collection[C <: Collection](name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit producer: CollectionProducer[C] = collections.bson.BSONCollectionProducer): C = producer.apply(this, name, failoverStrategy)
+  def collection[C <: Collection](name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit producer: CollectionProducer[C] = collections.bson.BSONCollectionProducer): C = producer(this, name, failoverStrategy)
+
+  /**
+   * Returns a [[reactivemongo.api.Collection]] from this database, when ready.
+   *
+   * @param name the name of the collection to open
+   */
+  def coll[C <: Collection](name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit ec: ExecutionContext, producer: CollectionProducer[C] = collections.bson.BSONCollectionProducer): Future[C] = connection.waitIsAvailable(failoverStrategy).map(_ => producer(this, name, failoverStrategy))
 
   @inline def defaultReadPreference: ReadPreference =
     connection.options.readPreference
@@ -73,20 +83,21 @@ trait DB {
    *
    * @return a future containing the result of the command.
    */
-  @deprecated("consider using reactivemongo.api.commands along with `GenericDB.runCommand` methods", "0.11.0")
-  def command[T](command: Command[T], readPreference: ReadPreference = defaultReadPreference)(implicit ec: ExecutionContext): Future[T] = {
-    Failover(command.apply(name).maker(readPreference), connection, failoverStrategy).future.mapEither(command.ResultMaker(_))
-  }
+  @deprecated("Consider using reactivemongo.api.commands along with `GenericDB.runCommand` methods", "0.11.0")
+  def command[T](command: Command[T], readPreference: ReadPreference = defaultReadPreference)(implicit ec: ExecutionContext): Future[T] =
+    Failover(command.apply(name).maker(readPreference),
+      connection, failoverStrategy).future.mapEither(command.ResultMaker(_))
 
   /** Authenticates the connection on this database. */
   def authenticate(user: String, password: String)(implicit timeout: FiniteDuration): Future[SuccessfulAuthentication] = connection.authenticate(name, user, password)
 
   /** Returns the database of the given name on the same MongoConnection. */
   @deprecated("Consider using `sibling` instead", "0.10")
-  def sister(name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit ec: ExecutionContext) = sibling(name, failoverStrategy)
+  def sister(name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit ec: ExecutionContext): DefaultDB = sibling(name, failoverStrategy)
 
   /** Returns the database of the given name on the same MongoConnection. */
-  def sibling(name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit ec: ExecutionContext) = connection.db(name, failoverStrategy)
+  def sibling(name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit ec: ExecutionContext): DefaultDB = connection.db(name, failoverStrategy)
+
 }
 
 trait GenericDB[P <: SerializationPack with Singleton] { self: DB =>
@@ -96,8 +107,7 @@ trait GenericDB[P <: SerializationPack with Singleton] { self: DB =>
 
   def runner = Command.run(pack)
 
-  def runCommand[R, C <: Command with CommandWithResult[R]](command: C with CommandWithResult[R])(implicit writer: pack.Writer[C], reader: pack.Reader[R], ec: ExecutionContext): Future[R] =
-    runner(self, command)
+  def runCommand[R, C <: Command with CommandWithResult[R]](command: C with CommandWithResult[R])(implicit writer: pack.Writer[C], reader: pack.Reader[R], ec: ExecutionContext): Future[R] = runner(self, command)
 
   def runCommand[C <: Command](command: C)(implicit writer: pack.Writer[C]): CursorFetcher[pack.type, Cursor] = runner(self, command)
 
@@ -130,17 +140,17 @@ trait DBMetaCommands { self: DB =>
 
   /** Returns an index manager for this database. */
   def indexesManager(implicit ec: ExecutionContext) = IndexesManager(self)
+  // TODO: Wait is available
 
-  private lazy val collectionNameReader =
-    new BSONDocumentReader[String] {
-      val prefixLength = name.size + 1
+  private lazy val collectionNameReader = new BSONDocumentReader[String] {
+    val prefixLength = name.size + 1
 
-      def read(bson: BSONDocument) =
-        bson
-          .get("name")
-          .collect { case bsonStr: BSONString => bsonStr.value.substring(prefixLength) }
-          .getOrElse(throw new Exception("name is expected on system.namespaces query"))
-    }
+    def read(bson: BSONDocument) = bson.get("name").collect {
+      case BSONString(value) => value.substring(prefixLength)
+    }.getOrElse(throw new Exception(
+      "name is expected on system.namespaces query"))
+
+  }
 
   /** Returns the names of the collections in this database. */
   def collectionNames(implicit ec: ExecutionContext): Future[List[String]] = {
@@ -172,5 +182,6 @@ case class DefaultDB(
 
 object DB {
   def apply(name: String, connection: MongoConnection, failoverStrategy: FailoverStrategy = FailoverStrategy()) = DefaultDB(name, connection, failoverStrategy)
+  // TODO: Wait is available
 
 }

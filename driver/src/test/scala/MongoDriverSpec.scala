@@ -10,6 +10,7 @@ import reactivemongo.core.commands.{
 
 import reactivemongo.api.{
   BSONSerializationPack,
+  FailoverStrategy,
   MongoDriver,
   ScramSha1Authentication
 }
@@ -22,6 +23,7 @@ object MongoDriverSpec extends org.specs2.mutable.Specification {
   sequential
 
   val hosts = Seq("localhost")
+  import Common.{ DefaultOptions, timeout, timeoutMillis }
 
   "Connection pool" should {
     "start and close cleanly with no connections" in {
@@ -51,8 +53,6 @@ object MongoDriverSpec extends org.specs2.mutable.Specification {
   }
 
   "CR Authentication" should {
-    import Common.{ DefaultOptions, timeout, timeoutMillis }
-
     lazy val driver = MongoDriver()
     lazy val connection = driver.connection(
       List("localhost:27017"),
@@ -152,5 +152,26 @@ object MongoDriverSpec extends org.specs2.mutable.Specification {
     "driver shutdown" in { // mainly to ensure the test driver is closed
       driver.close() must not(throwA[Exception])
     } tag ("mongo3")
+  }
+
+  "Database" should {
+    "be resolved from connection according the failover strategy" >> {
+      "successfully" in {
+        Common.connection.database(Common.db.name).map(_ => {}).
+          aka("database resolution") must beEqualTo({}).await(timeoutMillis)
+      }
+
+      "with failure" in {
+        lazy val con = Common.driver.connection(List("unavailable:27017"))
+        val ws = scala.collection.mutable.ListBuffer.empty[Int]
+        val expected = List(2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40, 42)
+        val fos = FailoverStrategy(FiniteDuration(50, "ms"), 20,
+          { n => val w = n * 2; ws += w; w })
+
+        con.database("foo", fos).map(_ => List.empty[Int]).
+          recover({ case _ => ws.result() }) must beEqualTo(expected).
+          await(timeoutMillis)
+      }
+    }
   }
 }
