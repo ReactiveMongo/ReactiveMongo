@@ -51,13 +51,17 @@ trait GenericCollectionWithCommands[P <: SerializationPack with Singleton] { sel
 }
 
 trait BatchCommands[P <: SerializationPack] {
-  import reactivemongo.api.commands.{ AggregationFramework => AC, CountCommand => CC, InsertCommand => IC, UpdateCommand => UC, DeleteCommand => DC, DefaultWriteResult, LastError, ResolvedCollectionCommand, FindAndModifyCommand => FMC }
+  import reactivemongo.api.commands.{ AggregationFramework => AC, CountCommand => CC, DistinctCommand => DistC, InsertCommand => IC, UpdateCommand => UC, DeleteCommand => DC, DefaultWriteResult, LastError, ResolvedCollectionCommand, FindAndModifyCommand => FMC }
 
   val pack: P
 
   val CountCommand: CC[pack.type]
   implicit def CountWriter: pack.Writer[ResolvedCollectionCommand[CountCommand.Count]]
   implicit def CountResultReader: pack.Reader[CountCommand.CountResult]
+
+  val DistinctCommand: DistC[pack.type]
+  implicit def DistinctWriter: pack.Writer[ResolvedCollectionCommand[DistinctCommand.Distinct]]
+  implicit def DistinctResultReader: pack.Reader[DistinctCommand.DistinctResult]
 
   val InsertCommand: IC[pack.type]
   implicit def InsertWriter: pack.Writer[ResolvedCollectionCommand[InsertCommand.Insert]]
@@ -174,6 +178,15 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    * @param hint the index to use (either the index name or the index document)
    */
   def count[H](selector: Option[pack.Document] = None, limit: Int = 0, skip: Int = 0, hint: Option[H] = None)(implicit h: H => CountCommand.Hint, ec: ExecutionContext): Future[Int] = runValueCommand(CountCommand.Count(query = selector, limit, skip, hint.map(h)))
+
+  /**
+   * Returns the distinct values for a specified field across a single collection and returns the results in an array.
+   * @param key the field for which to return distinct values
+   * @param selector the query selector that specifies the documents from which to retrieve the distinct values.
+   */
+  def distinct(key: String, selector: Option[pack.Document] = None)(implicit ec: ExecutionContext): Future[List[pack.Value]] = {
+    runCommand(DistinctCommand.Distinct(keyString = key, query = selector)).map(_.values)
+  }
 
   @inline private def defaultWriteConcern = db.connection.options.writeConcern
 
