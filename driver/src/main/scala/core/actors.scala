@@ -193,6 +193,25 @@ trait MongoDBSystem extends Actor {
     connections = connections,
     authenticated = if (connections.isEmpty) Set.empty else node.authenticated)
 
+  def stopWhenDisconnected(state: String, msg: AnyRef): Unit = {
+    val remainingConnections = nodeSet.nodes.foldLeft(0)(
+      { (open, node) => open + node.connections.size })
+
+    if (logger.logger.isDebugEnabled()) {
+      val disconnected = nodeSet.nodes.foldLeft(0) { (open, node) =>
+        open + node.connections.count(_.status == ConnectionStatus.Disconnected)
+      }
+
+      logger.debug(s"(State: $state) Received $msg remainingConnections = $remainingConnections, disconnected = $disconnected, connected = ${remainingConnections - disconnected}")
+    }
+
+    if (remainingConnections == 0) {
+      monitors foreach (_ ! Closed)
+      logger.info(s"MongoDBSystem $self is stopping.")
+      context.stop(self)
+    }
+  }
+
   def updateNodeSetOnDisconnect(channelId: Int): NodeSet =
     updateNodeSet(nodeSet.updateNodeByChannelId(channelId) { node =>
       val connections = node.connections.map { connection =>
@@ -222,22 +241,7 @@ trait MongoDBSystem extends Actor {
           filter(_.channel.getId != channelId))
       })
 
-      val remainingConnections = nodeSet.nodes.foldLeft(0)(
-        { (open, node) => open + node.connections.size })
-
-      if (logger.logger.isDebugEnabled()) {
-        val disconnected = nodeSet.nodes.foldLeft(0) { (open, node) =>
-          open + node.connections.count(_.status == ConnectionStatus.Disconnected)
-        }
-
-        logger.debug(s"(State: Closing) Received $msg, remainingConnections = $remainingConnections, disconnected = $disconnected, connected = ${remainingConnections - disconnected}")
-      }
-
-      if (remainingConnections == 0) {
-        monitors.foreach(_ ! Closed)
-        logger.info(s"MongoDBSystem $self is stopping.")
-        context.stop(self)
-      }
+      stopWhenDisconnected("Closing", msg)
     }
 
     case msg @ ChannelDisconnected(channelId) => {
@@ -291,6 +295,8 @@ trait MongoDBSystem extends Actor {
 
       // moving to closing state
       context become closing
+
+      stopWhenDisconnected("Processing", Close)
     }
 
     case req: RequestMaker =>
