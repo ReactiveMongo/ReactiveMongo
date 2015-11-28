@@ -17,10 +17,12 @@ git diff --exit-code || (
 MONGODB_VER="2_6"
 
 # Print version information
-echo -n "MongoDB: "
-mongod --version | head -n 1 | sed -e 's/.* v//'
+MV=`mongod --version | head -n 1`
 
-if [ `mongod --version | head -n 1 | grep v3 | wc -l` -eq 1 ]; then
+echo -n "MongoDB ($MV): "
+echo "$MV" | sed -e 's/.* v//'
+
+if [ `echo "$MV" | grep v3 | wc -l` -eq 1 ]; then
     MONGODB_VER="3"
     SHELL_OPTS=""
 

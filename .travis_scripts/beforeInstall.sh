@@ -9,6 +9,11 @@ if [ `echo "$JAVA_HOME" | grep java-7-oracle | wc -l` -eq 1 ]; then
     MONGODB_VER="3"
 fi
 
+cat > /dev/stdout <<EOF
+MongoDB major version: $MONGODB_VER
+Scala version: $SCALA_VER
+EOF
+
 ###
 # JAVA_HOME     | SCALA_VER || MONGODB_VER | WiredTiger 
 # java-7-oracle | 2.11.6    || 3           | true
@@ -31,29 +36,45 @@ service mongod stop
 
 # wiredTiger
 if [ "$MONGODB_VER" = "3" -a "$SCALA_VER" = "2.11.6" ]; then
-    cat >> /etc/mongod.conf <<EOF
-storageEngine = wiredTiger
-EOF
+    echo "Prepare MongoDB 3 configuration"
 
     mkdir /tmp/mongo3wt
     chown -R mongodb:mongodb /tmp/mongo3wt
     chmod -R ug+r /tmp/mongo3wt
     chmod -R u+w /tmp/mongo3wt
 
-    sed -e 's|dbpath=/var/lib/mongodb|dbpath=/tmp/mongo3wt|' < /etc/mongod.conf > /tmp/mongod.conf && (cat /tmp/mongod.conf > /etc/mongod.conf)
+    cat > /etc/mongod.conf <<EOF
+storage:
+  engine: wiredTiger
+  dbPath: /tmp/mongo3wt
+  journal:
+    enabled: true
+
+systemLog:
+  destination: file
+  logAppend: true
+  path: /tmp/mongo3wt.log
+
+net:
+  port: 27017
+  bindIp: 127.0.0.1
+EOF
 
 fi
 
 if [ "$MONGODB_VER" = "3" -a "$MONGO_SSL" = "true" ]; then
     cat >> /etc/mongod.conf <<EOF
-
-sslMode=requireSSL
-sslPEMKeyFile=$SCRIPT_DIR/server.pem
-sslAllowInvalidCertificates=true
+  ssl:
+    mode: requireSSL
+    PEMKeyFile: $SCRIPT_DIR/server.pem
+    allowInvalidCertificates: true
 EOF
 
 fi
 
+echo "# Configuration:"
 cat /etc/mongod.conf
 
-service mongod start
+service mongod start && ps axx | grep mongod
+#cat /var/log/mongodb/mongod.log
+
