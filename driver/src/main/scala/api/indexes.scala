@@ -219,7 +219,7 @@ final class LegacyIndexesManager(db: DB)(
       if (!idx.isDefined)
         create(nsIndex).map(_ => true)
       // there is a match, returning a future ok. TODO
-      else Future(false)
+      else Future.successful(false)
     }
   }
 
