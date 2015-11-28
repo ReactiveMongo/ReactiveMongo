@@ -121,6 +121,17 @@ trait AggregationFramework[P <: SerializationPack] extends ImplicitCommandHelper
   }
 
   /**
+   * Randomly selects the specified number of documents from its input.
+   * https://docs.mongodb.org/master/reference/operator/aggregation/sample/
+   * @param size the number of documents to return
+   */
+  case class Sample(size: Int) extends PipelineOperator {
+    val makePipe: pack.Document =
+      makeDocument(Seq(elementProducer("$sample",
+        makeDocument(Seq(elementProducer("size", intValue(size)))))))
+  }
+
+  /**
    * Turns a document with an array into multiple documents,
    * one document for each element in the array.
    * http://docs.mongodb.org/manual/reference/aggregation/unwind/#_S_unwind

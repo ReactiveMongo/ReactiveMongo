@@ -14,7 +14,6 @@ import reactivemongo.core.nodeset.{
   Authenticating,
   CrAuthenticating,
   Connection,
-  QueryableNodeStatus,
   Node,
   NodeSet,
   ScramSha1Authenticating

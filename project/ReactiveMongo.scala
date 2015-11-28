@@ -16,14 +16,22 @@ object BuildSettings {
     organization := "org.reactivemongo",
     version := buildVersion,
     scalaVersion := "2.11.7",
-    crossScalaVersions  := Seq("2.11.7", "2.10.4"),
+    crossScalaVersions := Seq("2.11.7", "2.10.4"),
     crossVersion := CrossVersion.binary,
     javaOptions in test ++= Seq("-Xmx512m", "-XX:MaxPermSize=512m"),
     //fork in Test := true, // Don't share executioncontext between SBT CLI/tests
-    scalacOptions ++= Seq("-unchecked", "-deprecation", "-target:jvm-1.6"),
+    scalacOptions in Compile ++= Seq(
+      "-unchecked", "-deprecation", "-target:jvm-1.6", "-Ywarn-unused-import"),
     scalacOptions in (Compile, doc) ++= Seq("-unchecked", "-deprecation", "-diagrams", "-implicits", "-skip-packages", "samples"),
     scalacOptions in (Compile, doc) ++= Opts.doc.title("ReactiveMongo API"),
     scalacOptions in (Compile, doc) ++= Opts.doc.version(buildVersion),
+    scalacOptions in Compile := {
+      val opts = (scalacOptions in Compile).value
+
+      if (scalaVersion.value != "2.11.7") {
+        opts.filter(_ != "-Ywarn-unused-import")
+      } else opts
+    },
     shellPrompt := ShellPrompt.buildShellPrompt,
     mappings in (Compile, packageBin) ~= filter,
     mappings in (Compile, packageSrc) ~= filter,

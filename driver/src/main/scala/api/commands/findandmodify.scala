@@ -1,7 +1,6 @@
 package reactivemongo.api.commands
 
-import scala.concurrent.Future
-import reactivemongo.api.{ BSONSerializationPack, Cursor, SerializationPack }
+import reactivemongo.api.SerializationPack
 
 trait FindAndModifyCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] {
   import pack._

@@ -1,6 +1,5 @@
 package reactivemongo.bson.lowlevel
 
-import reactivemongo.bson._
 import reactivemongo.bson.buffer._
 
 sealed trait Field {

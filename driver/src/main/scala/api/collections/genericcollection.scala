@@ -20,7 +20,7 @@ import scala.util.Try
 import scala.util.control.NonFatal
 import org.jboss.netty.buffer.ChannelBuffer
 import reactivemongo.api._
-import reactivemongo.api.commands.{ CountCommand, LastError, WriteConcern }
+import reactivemongo.api.commands.{ LastError, WriteConcern }
 import reactivemongo.bson.buffer.{ ReadableBuffer, WritableBuffer }
 import reactivemongo.core.nodeset.ProtocolMetadata
 import reactivemongo.core.protocol._

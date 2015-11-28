@@ -20,7 +20,6 @@ import reactivemongo.api._
 import reactivemongo.bson._
 import reactivemongo.api.commands.{ DropIndexes, LastError, WriteResult }
 import reactivemongo.utils.option
-import reactivemongo.core.netty._
 import scala.concurrent.{ Future, ExecutionContext }
 
 /** Type of Index */
@@ -248,7 +247,6 @@ final class DefaultIndexesManager(db: DB with DBMetaCommands)(
     implicit context: ExecutionContext) extends IndexesManager {
 
   import reactivemongo.api.commands.ListIndexes
-  import reactivemongo.api.commands.bson.BSONListIndexesImplicits._
 
   private def listIndexes(collections: List[String], indexes: List[NSIndex]): Future[List[NSIndex]] = collections match {
     case c :: cs => onCollection(c).list().flatMap(ix =>
@@ -466,7 +464,6 @@ object IndexesManager {
   }
 
   implicit object NSIndexWriter extends BSONDocumentWriter[NSIndex] {
-    import org.jboss.netty.buffer._
     def write(nsIndex: NSIndex): BSONDocument = {
       if (nsIndex.index.key.isEmpty)
         throw new RuntimeException("the key should not be empty!")

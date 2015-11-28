@@ -1,17 +1,15 @@
 import org.specs2.mutable._
 import play.api.libs.iteratee.Enumerator
-import scala.concurrent._
 import scala.util.{ Try, Failure }
 import scala.util.control.NonFatal
 
-import reactivemongo.api._
 import reactivemongo.bson._
 import reactivemongo.api.commands.{ Command, CommandError }
 import reactivemongo.api.commands.bson._
 import BSONFindAndModifyCommand._
 import BSONFindAndModifyImplicits._
 
-class FindAndModifySpec extends Specification {
+object FindAndModifySpec extends Specification {
   import Common._
 
   sequential
