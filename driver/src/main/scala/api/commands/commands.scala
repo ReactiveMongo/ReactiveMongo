@@ -7,7 +7,6 @@ import reactivemongo.api.{
   BSONSerializationPack,
   Cursor,
   SerializationPack,
-  SerializationPackObject,
   DB,
   Collection
 }

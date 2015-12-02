@@ -1,3 +1,5 @@
+import scala.concurrent.Future
+
 import reactivemongo.bson._
 
 object AggregationSpec extends org.specs2.mutable.Specification {
@@ -17,6 +19,7 @@ object AggregationSpec extends org.specs2.mutable.Specification {
     Project,
     Sort,
     Ascending,
+    Sample,
     SumField
   }
 
@@ -28,20 +31,22 @@ object AggregationSpec extends org.specs2.mutable.Specification {
   implicit val locationHandler = Macros.handler[Location]
   implicit val zipCodeHandler = Macros.handler[ZipCode]
 
+  private val zipCodes = List(
+    ZipCode("10280", "NEW YORK", "NY", 19746227L,
+      Location(-74.016323, 40.710537)),
+    ZipCode("72000", "LE MANS", "FR", 148169L, Location(48.0077, 0.1984)),
+    ZipCode("JP-13", "TOKYO", "JP", 13185502L,
+      Location(35.683333, 139.683333)),
+    ZipCode("AO", "AOGASHIMA", "JP", 200L, Location(32.457, 139.767)))
+
   "Zip codes" should {
     "be inserted" in {
-      val res = for {
-        _ <- collection.insert(ZipCode("10280", "NEW YORK", "NY", 19746227L,
-          Location(-74.016323, 40.710537)))
-        _ <- collection.insert(ZipCode("72000", "LE MANS", "FR", 148169L,
-          Location(48.0077, 0.1984)))
-        _ <- collection.insert(ZipCode("JP-13", "TOKYO", "JP", 13185502L,
-          Location(35.683333, 139.683333)))
-        _ <- collection.insert(ZipCode("AO", "AOGASHIMA", "JP", 200L,
-          Location(32.457, 139.767)))
-      } yield ()
+      def insert(data: List[ZipCode]): Future[Unit] = data.headOption match {
+        case Some(zip) => collection.insert(zip).flatMap(_ => insert(data.tail))
+        case _         => Future.successful({})
+      }
 
-      res must beEqualTo({}).await(timeoutMillis)
+      insert(zipCodes) must beEqualTo({}).await(timeoutMillis)
     }
 
     "return states with populations above 10000000" in {
@@ -109,8 +114,16 @@ object AggregationSpec extends org.specs2.mutable.Specification {
     }
 
     "return distinct states" in {
-      val expected: List[BSONValue] = List("NY", "FR", "JP").map(BSONString.apply)
-      collection.distinct("state").aka("results") must beEqualTo(expected).await(timeoutMillis)
+      val expected: List[BSONValue] = List("NY", "FR", "JP").
+        map(BSONString.apply)
+
+      collection.distinct("state").
+        aka("results") must beEqualTo(expected).await(timeoutMillis)
     }
+
+    "return a random sample" in {
+      collection.aggregate(Sample(2)).map(_.result[ZipCode].
+        filter(zipCodes.contains).size) must beEqualTo(2).await(timeoutMillis)
+    } tag ("mongo3")
   }
 }

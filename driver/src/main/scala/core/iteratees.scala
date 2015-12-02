@@ -16,7 +16,6 @@
 package reactivemongo.core.iteratees
 
 import play.api.libs.iteratee._
-import play.api.libs.iteratee.Enumeratee.CheckDone
 import scala.concurrent._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{ Failure, Success }
