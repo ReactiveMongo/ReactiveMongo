@@ -160,9 +160,10 @@ case class Node(
 
   val connected = connections.filter(_.status == ConnectionStatus.Connected)
 
-  val authenticatedConnections = new RoundRobiner(connected.filter(_.authenticated.forall { auth =>
-    authenticated.exists(_ == auth)
-  }))
+  val authenticatedConnections =
+    new RoundRobiner(connected.filter(_.authenticated.forall { auth =>
+      authenticated.exists(_ == auth)
+    }))
 
   def createNeededChannels(receiver: ActorRef, upTo: Int)(implicit channelFactory: ChannelFactory): Node = {
     if (connections.size < upTo) {

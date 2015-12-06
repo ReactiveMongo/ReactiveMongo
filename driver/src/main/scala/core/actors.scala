@@ -148,10 +148,12 @@ trait MongoDBSystem extends Actor {
 
   private val monitors = scala.collection.mutable.ListBuffer[ActorRef]()
   implicit val ec = context.system.dispatcher
+
   private val connectAllJob = context.system.scheduler.schedule(MongoDBSystem.DefaultConnectionRetryInterval milliseconds,
     MongoDBSystem.DefaultConnectionRetryInterval milliseconds,
     self,
     ConnectAll)
+
   // for tests only
   private val refreshAllJob = context.system.scheduler.schedule(MongoDBSystem.DefaultConnectionRetryInterval * 5 milliseconds,
     MongoDBSystem.DefaultConnectionRetryInterval * 5 milliseconds,
@@ -193,7 +195,7 @@ trait MongoDBSystem extends Actor {
     connections = connections,
     authenticated = if (connections.isEmpty) Set.empty else node.authenticated)
 
-  def stopWhenDisconnected(state: String, msg: AnyRef): Unit = {
+  private def stopWhenDisconnected[T](state: String, msg: T): Unit = {
     val remainingConnections = nodeSet.nodes.foldLeft(0)(
       { (open, node) => open + node.connections.size })
 
@@ -206,7 +208,7 @@ trait MongoDBSystem extends Actor {
     }
 
     if (remainingConnections == 0) {
-      monitors foreach (_ ! Closed)
+      monitors.foreach(_ ! Closed)
       logger.info(s"MongoDBSystem $self is stopping.")
       context.stop(self)
     }
@@ -295,10 +297,13 @@ trait MongoDBSystem extends Actor {
       }
       awaitingResponses.empty
 
-      // moving to closing state
+      val connectedCon = nodeSet.nodes.foldLeft(0) { _ + _.connected.size }
+
       context become closing
 
-      stopWhenDisconnected("Processing", Close)
+      if (connectedCon == 0) {
+        stopWhenDisconnected("Processing", Close)
+      }
     }
 
     case req: RequestMaker =>
