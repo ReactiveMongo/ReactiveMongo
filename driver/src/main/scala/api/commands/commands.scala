@@ -87,12 +87,17 @@ object Command {
       db.connection.options.readPreference
 
     def one[A](readPreference: ReadPreference)(implicit reader: pack.Reader[A], ec: ExecutionContext): Future[A] = {
-      val (requestMaker, mongo26WriteCommand) = buildRequestMaker(pack)(command, writer, readPreference, db.name)
+      val (requestMaker, mongo26WriteCommand) =
+        buildRequestMaker(pack)(command, writer, readPreference, db.name)
+
       Failover2(db.connection, failover) { () =>
-        db.connection.sendExpectingResponse(requestMaker, mongo26WriteCommand).map { response =>
-          pack.readAndDeserialize(
-            LoweLevelDocumentIterator(ChannelBufferReadableBuffer(response.documents)).next, reader)
-        }
+        db.connection.sendExpectingResponse(
+          requestMaker, mongo26WriteCommand).map { response =>
+            pack.readAndDeserialize(
+              LoweLevelDocumentIterator(ChannelBufferReadableBuffer(
+                response.documents)).next, reader)
+
+          }
       }.future
     }
 

@@ -1,9 +1,26 @@
 import reactivemongo.api.commands._
 
-object ReplSetGetStatusSpec extends org.specs2.mutable.Specification {
-  "replSetGetStatus" title
+import org.specs2.mutable.Specification
 
-  import Common._
+import Common._
+
+object RenameCollectionSpec extends Specification {
+  "renameCollection" title
+
+  val adminDb = connection("admin")
+
+  "Collection" should {
+    val col = adminDb(s"foo_${System identityHashCode adminDb}")
+
+    "be renamed" in {
+      col.create().map(_ => col.rename("renamed")).map(_ => {}).
+        aka("renaming") must beEqualTo({}).await(timeoutMillis)
+    }
+  }
+}
+
+object ReplSetGetStatusSpec extends Specification {
+  "replSetGetStatus" title
 
   val adminDb = connection("admin")
 
@@ -18,10 +35,8 @@ object ReplSetGetStatusSpec extends org.specs2.mutable.Specification {
   }
 }
 
-object ServerStatusSpec extends org.specs2.mutable.Specification {
+object ServerStatusSpec extends Specification {
   "serverStatus" title
-
-  import Common._
 
   "BSON command" should {
     "be successful" in {
