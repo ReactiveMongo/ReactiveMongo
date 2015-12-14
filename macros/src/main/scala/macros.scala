@@ -185,7 +185,7 @@ private object MacroImpl {
       val constructorParams = constructor.paramss.head
 
       val tuple = Ident(newTermName("tuple"))
-      val (optional, required) = constructorParams.filterNot(ignoreField).zipWithIndex zip types partition (t => isOptionalType(t._2))
+      val (optional, required) = constructorParams.filterNot(ignoreField).zipWithIndex zip types partition (t => isOptionalType(t._2)) //constructorParams.zipWithIndex.filterNot(p => ignoreField(p._1)) zip types partition (t => isOptionalType(t._2))
       val values = required map {
         case ((param, i), typ) => {
           val neededType = appliedType(writerType, List(typ))

@@ -1,7 +1,7 @@
 import reactivemongo.bson._
 import org.specs2.mutable._
 import reactivemongo.bson.exceptions.DocumentKeyNotFound
-import reactivemongo.bson.Macros.Annotations.Key
+import reactivemongo.bson.Macros.Annotations.{ Key, Ignore }
 
 class Macros extends Specification {
   type Handler[A] = BSONDocumentReader[A] with BSONDocumentWriter[A] with BSONHandler[BSONDocument, A]
@@ -104,6 +104,10 @@ class Macros extends Specification {
     sealed trait TT extends T
     case class C() extends TT
   }
+
+  case class Pair(@Ignore left: String, right: String)
+
+  val pairHandler = Macros.handler[Pair]
 
   "Formatter" should {
     "handle primitives" in {
@@ -317,6 +321,14 @@ class Macros extends Specification {
       println(BSONDocument.pretty(serialized))
       serialized mustEqual BSONDocument("_id" -> doc.myID, "value" -> doc.value)
       format.read(serialized) mustEqual doc
+    }
+
+    "skip ignored fields" in {
+      val doc = pairHandler.write(Pair(left = "left", right = "right"))
+
+      println("pairHandler.write: " + BSONDocument.pretty(doc))
+      doc.isEmpty must beFalse
+      doc.aka(BSONDocument.pretty(doc)) mustEqual BSONDocument("right" -> "right")
     }
   }
 
