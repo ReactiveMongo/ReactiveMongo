@@ -326,6 +326,7 @@ class Macros extends Specification {
     "skip ignored fields" in {
       val doc = pairHandler.write(Pair(left = "left", right = "right"))
 
+      println("pairHandler.write: " + BSONDocument.pretty(doc))
       doc.isEmpty must beFalse
       doc.aka(BSONDocument.pretty(doc)) mustEqual BSONDocument("right" -> "right")
     }
