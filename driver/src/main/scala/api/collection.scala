@@ -137,8 +137,7 @@ trait CollectionMetaCommands {
    *
    * @param autoIndexId States if should automatically add an index on the _id field. By default, regular collections will have an indexed _id field, in contrast to capped collections.
    */
-  def create(autoIndexId: Boolean = true)(implicit ec: ExecutionContext): Future[Unit] =
-    Command.run(BSONSerializationPack).unboxed(self, Create(None, autoIndexId))
+  def create(autoIndexId: Boolean = true)(implicit ec: ExecutionContext): Future[Unit] = Command.run(BSONSerializationPack).unboxed(self, Create(None, autoIndexId))
 
   /**
    * Creates this collection as a capped one.

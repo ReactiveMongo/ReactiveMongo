@@ -7,6 +7,7 @@ import play.api.libs.iteratee.Iteratee
 
 class BSONCollectionSpec extends Specification {
   import Common._
+  import reactivemongo.api.commands.bson.DefaultBSONCommandError
 
   sequential
 
@@ -51,7 +52,7 @@ class BSONCollectionSpec extends Specification {
   val person4 = Person("Jane", 24)
   val person5 = Person("Joline", 34)
 
-  "BSONCollection" should {
+  "BSON collection" should {
     "write five docs with success" >> {
       sequential
 
@@ -180,12 +181,10 @@ class BSONCollectionSpec extends Specification {
       val future = collection.find(BSONDocument()).one[Person].map(_ => 0).recover {
         case e if e.getMessage == "hey hey hey" => -1
         case e =>
-          e.printStackTrace()
-          -2
+          /* e.printStackTrace() */ -2
       }
-      val r = Await.result(future, timeout)
-      println(s"read a doc with error: $r")
-      Await.result(future, timeout) mustEqual -1
+
+      future must beEqualTo(-1).await(timeoutMillis)
     }
 
     "read docs with error" >> {
@@ -195,7 +194,8 @@ class BSONCollectionSpec extends Specification {
       "using collect" in {
         val collect = cursor.collect[Vector]().map(_.size).recover {
           case e if e.getMessage == "hey hey hey" => -1
-          case e                                  => e.printStackTrace(); -2
+          case e =>
+            /* e.printStackTrace() */ -2
         }
 
         collect aka "first collect" must not(throwA[Exception]).
@@ -227,11 +227,10 @@ class BSONCollectionSpec extends Specification {
       var i = 0
       val future = enumerator |>>> Iteratee.foreach { doc =>
         i += 1
-        println(s"\tgot doc: $doc")
+        //println(s"\tgot doc: $doc")
       } map (_ => -1)
-      val r = Await.result(future.recover { case e => i }, timeout)
-      println(s"read $r/5 docs (expected 3/5)")
-      r mustEqual 3
+
+      future.recover({ case e => i }) must beEqualTo(3).await(timeoutMillis)
     }
 
     "read docs skipping errors" in {
@@ -242,12 +241,12 @@ class BSONCollectionSpec extends Specification {
       var i = 0
       val future = enumerator |>>> Iteratee.foreach { doc =>
         i += 1
-        println(s"\t(skipping [$i]) got doc: $doc")
+        //println(s"\t(skipping [$i]) got doc: $doc")
       }
-      val r = Await.result(future, timeout)
-      println(s"read $i/5 docs (expected 4/5)")
-      i mustEqual 4
+
+      future.map(_ => i) must beEqualTo(4).await(timeoutMillis)
     }
+
     "read docs skipping errors using collect" in {
       implicit val reader = new SometimesBuggyPersonReader
       val result = Await.result(collection.find(BSONDocument()).
@@ -261,7 +260,7 @@ class BSONCollectionSpec extends Specification {
       implicit val writer = BuggyPersonWriter
 
       collection.insert(person).map { lastError =>
-        println(s"person write succeed??  $lastError")
+        //println(s"person write succeed??  $lastError")
         0
       }.recover {
         case ce: CustomException => -1
@@ -322,6 +321,17 @@ class BSONCollectionSpec extends Specification {
         collection.findAndRemove(BSONDocument("name" -> "Foo")).
           map(_.result[Person]) aka "removed" must beSome(Person("Foo", -1)).
           await(timeoutMillis)
+      }
+    }
+
+    "be renamed" >> {
+      "with failure" in {
+        db(s"foo_${System identityHashCode collection}").
+          rename("renamed").map(_ => false).recover({
+            case DefaultBSONCommandError(Some(13), Some(msg), _) if (
+              msg contains "renameCollection ") => true
+            case _ => false
+          }) must beTrue.await(timeoutMillis)
       }
     }
   }
