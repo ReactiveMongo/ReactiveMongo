@@ -285,8 +285,10 @@ trait MongoDBSystem extends Actor {
       allChannelGroup(nodeSet).close.addListener(listener)
 
       // fail all requests waiting for a response
-      awaitingResponses.foreach(
-        _._2.promise.failure(Exceptions.ClosedException))
+      awaitingResponses.foreach { pair =>
+        val promise = pair._2.promise
+        if (!promise.isCompleted) promise.failure(Exceptions.ClosedException)
+      }
       awaitingResponses.empty
 
       // moving to closing state
