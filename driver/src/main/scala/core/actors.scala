@@ -100,21 +100,31 @@ case object Close
 private[reactivemongo] case object ConnectAll
 private[reactivemongo] case object RefreshAllNodes
 private[reactivemongo] case class ChannelConnected(channelId: Int)
+
 private[reactivemongo] sealed trait ChannelUnavailable { def channelId: Int }
-private[reactivemongo] object ChannelUnavailable { def unapply(cu: ChannelUnavailable): Option[Int] = Some(cu.channelId) }
+
+private[reactivemongo] object ChannelUnavailable {
+  def unapply(cu: ChannelUnavailable): Option[Int] = Some(cu.channelId)
+}
+
 private[reactivemongo] case class ChannelDisconnected(channelId: Int) extends ChannelUnavailable
 private[reactivemongo] case class ChannelClosed(channelId: Int) extends ChannelUnavailable
 
 /** Message sent when the primary has been discovered. */
 case class PrimaryAvailable(metadata: ProtocolMetadata)
+
 /** Message sent when the primary has been lost. */
 case object PrimaryUnavailable
+
 // TODO
 case class SetAvailable(metadata: ProtocolMetadata)
+
 // TODO
 case object SetUnavailable
+
 /** Register a monitor. */
 case object RegisterMonitor
+
 /** MongoDBSystem has been shut down. */
 case object Closed
 case object GetLastMetadata
@@ -136,7 +146,8 @@ trait MongoDBSystem extends Actor {
   def initialAuthenticates: Seq[Authenticate]
 
   /**
-   * MongoConnectionOption instance (used for tweaking connection flags and pool size).
+   * MongoConnectionOption instance
+   * (used for tweaking connection flags and pool size).
    */
   def options: MongoConnectionOptions
 
@@ -144,14 +155,18 @@ trait MongoDBSystem extends Actor {
 
   private implicit val cFactory = channelFactory
 
-  private val awaitingResponses = scala.collection.mutable.LinkedHashMap[Int, AwaitingResponse]()
+  private val awaitingResponses =
+    scala.collection.mutable.LinkedHashMap[Int, AwaitingResponse]()
 
   private val monitors = scala.collection.mutable.ListBuffer[ActorRef]()
+
   implicit val ec = context.system.dispatcher
+
   private val connectAllJob = context.system.scheduler.schedule(MongoDBSystem.DefaultConnectionRetryInterval milliseconds,
     MongoDBSystem.DefaultConnectionRetryInterval milliseconds,
     self,
     ConnectAll)
+
   // for tests only
   private val refreshAllJob = context.system.scheduler.schedule(MongoDBSystem.DefaultConnectionRetryInterval * 5 milliseconds,
     MongoDBSystem.DefaultConnectionRetryInterval * 5 milliseconds,
@@ -161,7 +176,7 @@ trait MongoDBSystem extends Actor {
   protected def sendAuthenticate(connection: Connection, authentication: Authenticate): Connection
 
   @annotation.tailrec
-  protected final def authenticateConnection(connection: Connection, auths: Seq[Authenticate]): Connection =
+  protected final def authenticateConnection(connection: Connection, auths: Seq[Authenticate]): Connection = {
     if (!connection.authenticating.isEmpty) connection
     else auths.headOption match {
       case Some(nextAuth) =>
@@ -171,16 +186,16 @@ trait MongoDBSystem extends Actor {
 
       case _ => connection
     }
+  }
 
-  final def authenticateNode(node: Node, auths: Seq[Authenticate]): Node =
-    node.copy(connections = node.connections.map {
-      case connection if connection.status == ConnectionStatus.Connected =>
-        authenticateConnection(connection, auths)
+  private final def authenticateNode(node: Node, auths: Seq[Authenticate]): Node = node.copy(connections = node.connections.map {
+    case connection if connection.status == ConnectionStatus.Connected =>
+      authenticateConnection(connection, auths)
 
-      case connection => connection
-    })
+    case connection => connection
+  })
 
-  final def authenticateNodeSet(nodeSet: NodeSet): NodeSet =
+  private final def authenticateNodeSet(nodeSet: NodeSet): NodeSet =
     nodeSet.copy(nodes = nodeSet.nodes.map {
       case node @ Node(_, _: QueryableNodeStatus, _, _, _, _, _, _) =>
         authenticateNode(node, nodeSet.authenticates.toSeq)
@@ -227,7 +242,8 @@ trait MongoDBSystem extends Actor {
 
       if (logger.logger.isDebugEnabled()) {
         val disconnected = nodeSet.nodes.foldLeft(0) { (open, node) =>
-          open + node.connections.count(_.status == ConnectionStatus.Disconnected)
+          open + node.connections.count(
+            _.status == ConnectionStatus.Disconnected)
         }
 
         logger.debug(s"(State: Closing) Received $msg, remainingConnections = $remainingConnections, disconnected = $disconnected, connected = ${remainingConnections - disconnected}")
@@ -248,7 +264,8 @@ trait MongoDBSystem extends Actor {
           open + node.connections.size
         }
         val disconnected = nodeSet.nodes.foldLeft(0) { (open, node) =>
-          open + node.connections.count(_.status == ConnectionStatus.Disconnected)
+          open + node.connections.count(
+            _.status == ConnectionStatus.Disconnected)
         }
 
         logger.debug(s"(State: Closing) Received $msg, remainingConnections = $remainingConnections, disconnected = $disconnected, connected = ${remainingConnections - disconnected}")
@@ -295,18 +312,22 @@ trait MongoDBSystem extends Actor {
       context become closing
     }
 
-    case req: RequestMaker =>
+    case req: RequestMaker => {
       logger.debug("WARNING received a request")
+
       val r = req(RequestId.common.next)
       pickChannel(r).map(_._2.send(r))
+    }
 
     case req: RequestMakerExpectingResponse => {
       logger.debug("received a request expecting a response")
       val request = req.requestMaker(RequestId.common.next)
+
       pickChannel(request) match {
-        case Failure(error) =>
+        case Failure(error) => {
           logger.debug(s"NO CHANNEL, error with promise ${req.promise}")
           req.promise.failure(error)
+        }
 
         case Success((node, connection)) => {
           logger.debug(s"Sending request expecting response $request by connection $connection of node ${node.name}")
@@ -333,18 +354,22 @@ trait MongoDBSystem extends Actor {
 
       pickChannel(request) match {
         case Failure(error) => req.promise.failure(error)
-        case Success((node, connection)) =>
+
+        case Success((node, connection)) => {
           logger.debug(s"Sending request expecting response $request by connection $connection of node ${node.name}")
 
           awaitingResponses += requestId -> AwaitingResponse(requestId, connection.channel.getId(), req.promise, isGetLastError = true, isMongo26WriteOp = false)
           logger.trace(s"registering writeConcern-awaiting response for requestID $requestId, awaitingResponses: $awaitingResponses")
           connection.send(request, writeConcern)
+        }
       }
     }
 
     // monitor
     case ConnectAll => {
-      updateNodeSet(nodeSet.createNeededChannels(self, options.nbChannelsPerNode))
+      updateNodeSet(nodeSet.createNeededChannels(
+        self, options.nbChannelsPerNode))
+
       logger.debug("ConnectAll Job running... Status: " + nodeSet.nodes.map(_.toShortString).mkString(" | "))
       connectAll(nodeSet)
     }
@@ -387,7 +412,10 @@ trait MongoDBSystem extends Actor {
       awaitingResponses.retain { (_, awaitingResponse) =>
         if (awaitingResponse.channelID == channelId) {
           logger.debug(s"completing promise ${awaitingResponse.promise} with error='socket disconnected'")
-          awaitingResponse.promise.failure(GenericDriverException("socket disconnected"))
+
+          awaitingResponse.promise.
+            failure(GenericDriverException("socket disconnected"))
+
           false
         } else true
       }
@@ -404,6 +432,7 @@ trait MongoDBSystem extends Actor {
         } else logger.debug(
           "The primary is still unavailable, is there a network problem?")
       }
+
       logger.debug(s"$channelId is disconnected")
     }
 
@@ -438,7 +467,7 @@ trait MongoDBSystem extends Actor {
         authenticating.copy(
           status = isMaster.status,
           pingInfo = pingInfo,
-          name = isMaster.replicaSet.map(_.me).getOrElse(node.name),
+          name = isMaster.replicaSet.fold(node.name)(_.me),
           tags = isMaster.replicaSet.flatMap(_.tags),
           protocolMetadata = ProtocolMetadata(MongoWireVersion(isMaster.minWireVersion), MongoWireVersion(isMaster.maxWireVersion), isMaster.maxBsonObjectSize, isMaster.maxMessageSizeBytes, isMaster.maxWriteBatchSize),
           isMongos = isMaster.isMongos)
@@ -453,12 +482,12 @@ trait MongoDBSystem extends Actor {
       }
 
       if (!nodeSetWasReachable && nodeSet.isReachable) {
-        broadcastMonitors(new SetAvailable(nodeSet.protocolMetadata))
+        broadcastMonitors(SetAvailable(nodeSet.protocolMetadata))
         logger.info("The node set is now available")
       }
 
       if (!primaryWasAvailable && nodeSet.primary.isDefined) {
-        broadcastMonitors(new PrimaryAvailable(nodeSet.protocolMetadata))
+        broadcastMonitors(PrimaryAvailable(nodeSet.protocolMetadata))
         logger.info("The primary is now available")
       }
     }
@@ -565,7 +594,7 @@ trait MongoDBSystem extends Actor {
     processing.orElse(authReceive).orElse(fallback)
 
   // monitor -->
-  var nodeSet: NodeSet = NodeSet(None, None, seeds.map(seed => Node(seed, NodeStatus.Unknown, Vector.empty, Set.empty, None, ProtocolMetadata.Default).createNeededChannels(self, 1)).toVector, initialAuthenticates.toSet)
+  private var nodeSet: NodeSet = NodeSet(None, None, seeds.map(seed => Node(seed, NodeStatus.Unknown, Vector.empty, Set.empty, None, ProtocolMetadata.Default).createNeededChannels(self, 1)).toVector, initialAuthenticates.toSet)
   connectAll(nodeSet)
   // <-- monitor
 
@@ -575,7 +604,7 @@ trait MongoDBSystem extends Actor {
     broadcastMonitors(PrimaryUnavailable)
   }
 
-  def updateNodeSet(nodeSet: NodeSet): NodeSet = {
+  private def updateNodeSet(nodeSet: NodeSet): NodeSet = {
     this.nodeSet = nodeSet
     nodeSet
   }
@@ -606,14 +635,16 @@ trait MongoDBSystem extends Actor {
       case Some(Authenticating(db, user, pass)) => {
         val originalAuthenticate = Authenticate(db, user, pass)
         val authenticated = check(response) match {
-          case Right(successfulAuthentication) =>
+          case Right(successfulAuthentication) => {
             AuthRequestsManager.handleAuthResult(
               originalAuthenticate, successfulAuthentication)
             Some(Authenticated(db, user))
+          }
 
-          case Left(error) =>
+          case Left(error) => {
             AuthRequestsManager.handleAuthResult(originalAuthenticate, error)
             None
+          }
         }
 
         updateAuthenticate(
@@ -624,25 +655,27 @@ trait MongoDBSystem extends Actor {
     })
   }
 
-  def secondaryOK(message: Request) = !message.op.requiresPrimary && (message.op match {
-    case Query(flags, _, _, _) => (flags & QueryFlags.SlaveOk) != 0
-    case KillCursors(_)        => true
-    case GetMore(_, _, _)      => true
-    case _                     => false
-  })
+  private def secondaryOK(message: Request): Boolean =
+    !message.op.requiresPrimary && (message.op match {
+      case Query(flags, _, _, _) => (flags & QueryFlags.SlaveOk) != 0
+      case KillCursors(_)        => true
+      case GetMore(_, _, _)      => true
+      case _                     => false
+    })
 
-  def pickChannel(request: Request): Try[(Node, Connection)] = {
-    if (request.channelIdHint.isDefined)
-      nodeSet.pickByChannelId(request.channelIdHint.get).map(Success(_)).getOrElse(Failure(Exceptions.ChannelNotFound))
-    else nodeSet.pick(request.readPreference).map(Success(_)).getOrElse(Failure(Exceptions.PrimaryUnavailableException))
+  private def pickChannel(request: Request): Try[(Node, Connection)] = {
+    if (request.channelIdHint.isDefined) {
+      nodeSet.pickByChannelId(request.channelIdHint.get).map(Success(_)).
+        getOrElse(Failure(Exceptions.ChannelNotFound))
+
+    } else nodeSet.pick(request.readPreference).map(Success(_)).
+      getOrElse(Failure(Exceptions.PrimaryUnavailableException))
   }
 
   private[actors] def whenAuthenticating(channelId: Int)(f: Tuple2[Connection, Authenticating] => Connection): NodeSet = updateNodeSet(
     nodeSet.updateConnectionByChannelId(channelId) { connection =>
-      connection.authenticating match {
-        case Some(authenticating) => f(connection -> authenticating)
-        case _                    => connection
-      }
+      connection.authenticating.fold(connection)(authenticating =>
+        f(connection -> authenticating))
     })
 
   override def postStop() {
@@ -675,14 +708,15 @@ trait MongoDBSystem extends Actor {
     logger.warn(s"MongoDBSystem $self stopped.")
   }
 
-  def broadcastMonitors(message: AnyRef) = monitors.foreach(_ ! message)
+  private def broadcastMonitors(message: AnyRef) = monitors.foreach(_ ! message)
 
-  def connectAll(nodeSet: NodeSet) = {
+  private def connectAll(nodeSet: NodeSet): NodeSet = {
     for {
       node <- nodeSet.nodes
       connection <- node.connections if !connection.channel.isConnected()
     } yield connection.channel.connect(
       new InetSocketAddress(node.host, node.port))
+
     nodeSet
   }
 
@@ -720,8 +754,9 @@ trait MongoDBSystem extends Actor {
   }
 
   // Auth Methods
-  object AuthRequestsManager {
-    private var authRequests: Map[Authenticate, List[Promise[SuccessfulAuthentication]]] = Map.empty
+  private object AuthRequestsManager {
+    var authRequests =
+      Map.empty[Authenticate, List[Promise[SuccessfulAuthentication]]]
 
     def addAuthRequest(request: AuthRequest): Map[Authenticate, List[Promise[SuccessfulAuthentication]]] = {
       val found = authRequests.get(request.authenticate)
@@ -733,7 +768,7 @@ trait MongoDBSystem extends Actor {
       val found = authRequests.get(authenticate)
       if (found.isDefined) {
         found.get.foreach { _.success(result) }
-        authRequests = authRequests.-(authenticate)
+        authRequests = authRequests - authenticate
       }
       authRequests
     }
@@ -784,13 +819,16 @@ object Exceptions {
   object PrimaryUnavailableException extends DriverException {
     val message = "No primary node is available!"
   }
+
   /** An exception thrown when the entire node set is unavailable. The application may not have access to the network anymore. */
   object NodeSetNotReachable extends DriverException {
     val message = "The node set can not be reached! Please check your network connectivity."
   }
+
   object ChannelNotFound extends DriverException {
     val message = "ChannelNotFound"
   }
+
   object ClosedException extends DriverException {
     val message = "This MongoConnection is closed"
   }

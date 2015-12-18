@@ -427,10 +427,10 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    *   import cities.BatchCommands.AggregationFramework
    *   import AggregationFramework.{ Group, Match, SumField }
    *
-   *   cities.aggregate(Group(BSONString("$state"))(
+   *   cities.aggregate(Group(BSONString("\$state"))(
    *     "totalPop" -> SumField("population")), List(
    *       Match(document("totalPop" ->
-   *         document("$gte" -> 10000000L))))).map(_.documents)
+   *         document("\$gte" -> 10000000L))))).map(_.documents)
    * }
    * }}}
    *

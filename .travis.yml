@@ -6,6 +6,7 @@ jdk:
 - oraclejdk7
 - openjdk7
 - openjdk6
+jdk:
 before_install:
 - sudo ./.travis_scripts/beforeInstall.sh $TRAVIS_SCALA_VERSION $MONGO_SSL
 script: ./.travis_scripts/validate.sh
