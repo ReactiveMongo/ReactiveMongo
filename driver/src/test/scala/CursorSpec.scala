@@ -73,7 +73,6 @@ class CursorSpec extends Specification {
       val fut2 = coll.find(BSONDocument("record" -> "asd")).maxTimeMs(1).cursor().collect[List](10)
       fut2 must throwA[DetailedDatabaseException].await(timeout = DurationInt(1).seconds)
     }
-
   }
 
   "BSON Cursor" should {
@@ -92,7 +91,7 @@ class CursorSpec extends Specification {
         Future.sequence((0 until 10) map { id =>
           col.insert(BSONDocument("id" -> id))
         }) map { _ =>
-          println(s"-- all documents inserted in test collection $n")
+          //println(s"-- all documents inserted in test collection $n")
           col
         }
       }
@@ -113,12 +112,12 @@ class CursorSpec extends Specification {
       def collection(n: String, database: DB) = {
         val col = database(s"somecollection_captail_$n")
 
-        col.createCapped(4096, Some(10)) map { _ =>
-          (0 until 10).foreach { id =>
-            col.insert(BSONDocument("id" -> id))
-            Thread.sleep(200)
-          }
-          println(s"-- all documents inserted in test collection $n")
+        col.createCapped(4096, Some(10)).flatMap { _ =>
+          (0 until 10).foldLeft(Future successful {}) { (f, id) =>
+            f.flatMap(_ => col.insert(BSONDocument("id" -> id)).map(_ =>
+              Thread.sleep(200)))
+          }.map(_ =>
+            println(s"-- all documents inserted in test collection $n"))
         }
 
         col

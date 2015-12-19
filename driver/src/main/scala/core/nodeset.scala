@@ -6,7 +6,12 @@ import scala.collection.generic.CanBuildFrom
 
 import org.jboss.netty.channel.socket.nio.NioClientSocketChannelFactory
 import org.jboss.netty.buffer.HeapChannelBufferFactory
-import org.jboss.netty.channel.{ Channel, ChannelPipeline, Channels }
+import org.jboss.netty.channel.{
+  Channel,
+  ChannelFuture,
+  ChannelPipeline,
+  Channels
+}
 
 import akka.actor.ActorRef
 
@@ -26,6 +31,7 @@ import reactivemongo.api.{ MongoConnectionOptions, ReadPreference }
 package object utils {
   def updateFirst[A, M[T] <: Iterable[T]](coll: M[A])(f: A => Option[A])(implicit cbf: CanBuildFrom[M[_], A, M[A]]): M[A] = {
     val builder = cbf.apply
+
     def run(iterator: Iterator[A]): Unit = {
       while (iterator.hasNext) {
         val e = iterator.next
@@ -36,6 +42,7 @@ package object utils {
         } else builder += e
       }
     }
+
     builder.result
   }
 
@@ -43,10 +50,12 @@ package object utils {
     val builder = cbf.apply
     val (head, tail) = coll.span(!f.isDefinedAt(_))
     builder ++= head
+
     if (!tail.isEmpty) {
       builder += f(tail.head)
       builder ++= tail.drop(1)
     }
+
     builder.result -> !tail.isEmpty
   }
 }
@@ -56,6 +65,7 @@ case class NodeSet(
     version: Option[Long],
     nodes: Vector[Node],
     authenticates: Set[Authenticate]) {
+
   val mongos: Option[Node] = nodes.find(_.isMongos)
   val primary: Option[Node] = nodes.find(_.status == NodeStatus.Primary)
   val secondaries = new RoundRobiner(nodes.filter(_.status == NodeStatus.Secondary))
@@ -86,16 +96,14 @@ case class NodeSet(
   def updateConnectionByChannelId(id: Int)(f: Connection => Connection) =
     updateByChannelId(id)(f)(identity)
 
-  def updateByChannelId(id: Int)(fc: Connection => Connection)(fn: Node => Node) = {
-    copy(nodes = nodes.map { node =>
-      val (connections, updated) = utils.update(node.connections) {
-        case conn if (conn.channel.getId == id) => fc(conn)
-      }
+  def updateByChannelId(id: Int)(fc: Connection => Connection)(fn: Node => Node) = copy(nodes = nodes.map { node =>
+    val (connections, updated) = utils.update(node.connections) {
+      case conn if (conn.channel.getId == id) => fc(conn)
+    }
 
-      if (updated) fn(node.copy(connections = connections))
-      else node
-    })
-  }
+    if (updated) fn(node.copy(connections = connections))
+    else node
+  })
 
   def pickByChannelId(id: Int): Option[(Node, Connection)] =
     nodes.view.map(node =>
@@ -104,14 +112,12 @@ case class NodeSet(
         con.status == ConnectionStatus.Connected) => node -> con
     }
 
-  def pickForWrite: Option[(Node, Connection)] =
-    primary.view.map(node => node -> node.authenticatedConnections.subject.headOption).collectFirst {
-      case (node, Some(connection)) => node -> connection
-    }
-
-  private val pickConnectionAndFlatten: Option[Node] => Option[(Node, Connection)] = _.map(node => node -> node.authenticatedConnections.pick).collect {
-    case (node, Some(connection)) => (node, connection)
+  def pickForWrite: Option[(Node, Connection)] = primary.view.map(node =>
+    node -> node.authenticatedConnections.subject.headOption).collectFirst {
+    case (node, Some(connection)) => node -> connection
   }
+
+  private val pickConnectionAndFlatten: Option[Node] => Option[(Node, Connection)] = _.flatMap(node => node.authenticatedConnections.pick.map(node -> _))
 
   private def pickFromGroupWithFilter(roundRobiner: RoundRobiner[Node, Vector], filter: Option[BSONDocument => Boolean], fallback: => Option[Node]) =
     filter.fold(fallback)(f =>
@@ -122,11 +128,24 @@ case class NodeSet(
     if (mongos.isDefined) {
       pickConnectionAndFlatten(mongos)
     } else preference match {
-      case ReadPreference.Primary                    => pickConnectionAndFlatten(primary)
-      case ReadPreference.PrimaryPreferred(filter)   => pickConnectionAndFlatten(primary.orElse(pickFromGroupWithFilter(secondaries, filter, secondaries.pick)))
-      case ReadPreference.Secondary(filter)          => pickConnectionAndFlatten(pickFromGroupWithFilter(secondaries, filter, secondaries.pick))
-      case ReadPreference.SecondaryPreferred(filter) => pickConnectionAndFlatten(pickFromGroupWithFilter(secondaries, filter, secondaries.pick).orElse(primary))
-      case ReadPreference.Nearest(filter)            => pickConnectionAndFlatten(pickFromGroupWithFilter(nearestGroup, filter, nearest))
+      case ReadPreference.Primary =>
+        pickConnectionAndFlatten(primary)
+
+      case ReadPreference.PrimaryPreferred(filter) =>
+        pickConnectionAndFlatten(primary.orElse(
+          pickFromGroupWithFilter(secondaries, filter, secondaries.pick)))
+
+      case ReadPreference.Secondary(filter) =>
+        pickConnectionAndFlatten(pickFromGroupWithFilter(
+          secondaries, filter, secondaries.pick))
+
+      case ReadPreference.SecondaryPreferred(filter) =>
+        pickConnectionAndFlatten(pickFromGroupWithFilter(
+          secondaries, filter, secondaries.pick).orElse(primary))
+
+      case ReadPreference.Nearest(filter) =>
+        pickConnectionAndFlatten(pickFromGroupWithFilter(
+          nearestGroup, filter, nearest))
     }
   }
 
@@ -158,7 +177,8 @@ case class Node(
     })
   }
 
-  val connected = connections.filter(_.status == ConnectionStatus.Connected)
+  val connected: Vector[Connection] =
+    connections.filter(_.status == ConnectionStatus.Connected)
 
   val authenticatedConnections =
     new RoundRobiner(connected.filter(_.authenticated.forall { auth =>
@@ -171,7 +191,7 @@ case class Node(
     } else this
   }
 
-  def toShortString = s"Node[$name: $status (${connected.size}/${connections.size} available connections), latency=${pingInfo.ping}], auth=${authenticated}"
+  def toShortString = s"Node[$name: $status (${connected.size}/${connections.size} available connections), latency=${pingInfo.ping}], auth=$authenticated"
 }
 
 case class ProtocolMetadata(
@@ -180,6 +200,7 @@ case class ProtocolMetadata(
   maxMessageSizeBytes: Int,
   maxBsonSize: Int,
   maxBulkSize: Int)
+
 object ProtocolMetadata {
   val Default = ProtocolMetadata(MongoWireVersion.V24AndBefore, MongoWireVersion.V24AndBefore, 48000000, 16 * 1024 * 1024, 1000)
 }
@@ -195,9 +216,10 @@ case class Connection(
     channel.write(writeConcern)
   }
 
-  def send(message: Request) = channel.write(message)
+  def send(message: Request): ChannelFuture = channel.write(message)
 
-  def isAuthenticated(db: String, user: String) =
+  /** Returns whether the `user` is authenticated against the `db`. */
+  def isAuthenticated(db: String, user: String): Boolean =
     authenticated.exists(auth => auth.user == user && auth.db == db)
 }
 
@@ -219,10 +241,13 @@ object NodeStatus {
 
   /** Cannot vote. All members start up in this state. The mongod parses the replica set configuration document while in STARTUP. */
   object Startup extends NodeStatus with CanonicalNodeStatus { override def toString = "Startup" }
+
   /** Can vote. The primary is the only member to accept write operations. */
   object Primary extends NodeStatus with QueryableNodeStatus with CanonicalNodeStatus { override def toString = "Primary" }
+
   /** Can vote. The secondary replicates the data store. */
   object Secondary extends NodeStatus with QueryableNodeStatus with CanonicalNodeStatus { override def toString = "Secondary" }
+
   /** Can vote. Members either perform startup self-checks, or transition from completing a rollback or resync. */
   object Recovering extends NodeStatus with CanonicalNodeStatus { override def toString = "Recovering" }
 
@@ -265,8 +290,13 @@ object NodeStatus {
 
 sealed trait ConnectionStatus
 object ConnectionStatus {
-  object Disconnected extends ConnectionStatus { override def toString = "Disconnected" }
-  object Connected extends ConnectionStatus { override def toString = "Connected" }
+  object Disconnected extends ConnectionStatus {
+    override def toString = "Disconnected"
+  }
+
+  object Connected extends ConnectionStatus {
+    override def toString = "Connected"
+  }
 }
 
 sealed trait Authentication {
@@ -274,7 +304,9 @@ sealed trait Authentication {
   def db: String
 }
 
-case class Authenticate(db: String, user: String, password: String) extends Authentication {
+case class Authenticate(
+    db: String, user: String, password: String) extends Authentication {
+
   override def toString: String = s"Authenticate($db, $user)"
 }
 
@@ -341,7 +373,7 @@ class RoundRobiner[A, M[T] <: Iterable[T]](val subject: M[A], startAtIndex: Int 
 
   def pickWithFilter(filter: A => Boolean): Option[A] = pickWithFilter(filter, 0)
 
-  @scala.annotation.tailrec
+  @annotation.tailrec
   private def pickWithFilter(filter: A => Boolean, tested: Int): Option[A] =
     if (length > 0 && tested < length) {
       val a = pick
@@ -359,15 +391,17 @@ class ChannelFactory(options: MongoConnectionOptions, bossExecutor: Executor = E
 
   private val logger = LazyLogger("reactivemongo.core.nodeset.ChannelFactory")
 
-  def create(host: String = "localhost", port: Int = 27017, receiver: ActorRef) = {
+  def create(host: String = "localhost", port: Int = 27017, receiver: ActorRef): Channel = {
     val channel = makeChannel(receiver)
-    logger.trace("created a new channel: " + channel)
+    logger.trace(s"created a new channel: $channel")
     channel
   }
 
-  val channelFactory = new NioClientSocketChannelFactory(bossExecutor, workerExecutor)
+  val channelFactory = new NioClientSocketChannelFactory(
+    bossExecutor, workerExecutor)
 
-  private val bufferFactory = new HeapChannelBufferFactory(java.nio.ByteOrder.LITTLE_ENDIAN)
+  private val bufferFactory = new HeapChannelBufferFactory(
+    java.nio.ByteOrder.LITTLE_ENDIAN)
 
   private def makePipeline(receiver: ActorRef): ChannelPipeline = {
     val pipeline = Channels.pipeline(new ResponseFrameDecoder(),
