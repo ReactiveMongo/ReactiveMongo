@@ -15,8 +15,7 @@ import reactivemongo.api.{
 }
 import reactivemongo.api.commands.Command
 
-/** A Test Suite For MongoDriver */
-object MongoDriverSpec extends org.specs2.mutable.Specification {
+object DriverSpec extends org.specs2.mutable.Specification {
   "Driver" title
 
   sequential

@@ -21,7 +21,11 @@ import org.jboss.netty.buffer._
 import org.jboss.netty.channel._
 import org.jboss.netty.handler.codec.oneone._
 import org.jboss.netty.handler.codec.frame.FrameDecoder
-import reactivemongo.core.actors.{ ChannelConnected, ChannelClosed, ChannelDisconnected }
+import reactivemongo.core.actors.{
+  ChannelConnected,
+  ChannelClosed,
+  ChannelDisconnected
+}
 import reactivemongo.api.SerializationPack
 import reactivemongo.api.commands.GetLastError
 import reactivemongo.core.errors._
@@ -403,23 +407,28 @@ private[reactivemongo] class MongoHandler(receiver: ActorRef) extends SimpleChan
     log(e, "a write is complete!")
     super.writeComplete(ctx, e)
   }
+
   override def writeRequested(ctx: ChannelHandlerContext, e: MessageEvent) {
     log(e, "a write is requested!")
     super.writeRequested(ctx, e)
   }
+
   override def channelConnected(ctx: ChannelHandlerContext, e: ChannelStateEvent) {
     log(e, "connected")
     receiver ! ChannelConnected(e.getChannel.getId)
     super.channelConnected(ctx, e)
   }
+
   override def channelDisconnected(ctx: ChannelHandlerContext, e: ChannelStateEvent) {
     log(e, "disconnected")
     receiver ! ChannelDisconnected(e.getChannel.getId)
   }
+
   override def channelClosed(ctx: ChannelHandlerContext, e: ChannelStateEvent) {
     log(e, "closed")
     receiver ! ChannelClosed(e.getChannel.getId)
   }
+
   override def exceptionCaught(ctx: org.jboss.netty.channel.ChannelHandlerContext, e: org.jboss.netty.channel.ExceptionEvent) {
     log(e, s"CHANNEL ERROR: ${e.getCause}")
   }

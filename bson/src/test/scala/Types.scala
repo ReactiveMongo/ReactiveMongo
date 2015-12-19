@@ -16,7 +16,6 @@
  */
 import org.specs2.mutable._
 import reactivemongo.bson._
-import scala.util._
 
 object Types extends Specification {
   "BSON types" title

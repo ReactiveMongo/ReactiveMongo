@@ -352,17 +352,22 @@ class MongoConnection(
         }
       }
 
-      case Close =>
+      case Close => {
         logger.debug("Monitor received Close")
+
         killed = true
         mongosystem ! Close
         waitingForClose += sender
-        waitingForPrimary.dequeueAll(_ => true).foreach(_ ! Failure(new RuntimeException("MongoDBSystem actor shutting down or no longer active")))
+        waitingForPrimary.dequeueAll(_ => true).foreach(
+          _ ! Failure(new RuntimeException(
+            "MongoDBSystem actor shutting down or no longer active")))
+      }
 
-      case Closed =>
+      case Closed => {
         logger.debug(s"Monitor $self closed, stopping...")
         waitingForClose.dequeueAll(_ => true).foreach(_ ! Closed)
         context.stop(self)
+      }
 
       case IsKilled(result) => result success killed
     }
@@ -576,15 +581,17 @@ class MongoDriver(config: Option[Config] = None) {
 
   def numConnections: Int = connectionMonitors.size
 
-  def close(timeout: FiniteDuration = 1.seconds) = {
+  def close(timeout: FiniteDuration = 1.seconds): Unit = {
     // Terminate actors used by MongoConnections
-    connections.foreach { _.monitor ! Close }
+    connections.foreach(_.monitor ! Close)
 
-    // Tell the supervisor to close. It will shut down all the connections and monitors
+    // Tell the supervisor to close.
+    // It will shut down all the connections and monitors
     // and then shut down the ActorSystem as it is exiting.
     supervisorActor ! Close
 
-    // When the actorSystem is shutdown, it means that supervisorActor has exited (run its postStop)
+    // When the actorSystem is shutdown,
+    // it means that supervisorActor has exited (run its postStop).
     // So, wait for that event.
     system.awaitTermination(timeout)
   }
