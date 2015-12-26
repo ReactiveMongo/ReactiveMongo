@@ -207,7 +207,7 @@ class MakableCommand(val db: String, val command: Command[_]) {
   }
 }
 
-@deprecated("consider using reactivemongo.api.commands.RawCommand instead", "0.11.0")
+@deprecated("consider using `rawCommand` on [[reactivemongo.api.collections.GenericCollection.runner]] instead", "0.11.0")
 case class RawCommand(bson: BSONDocument) extends Command[BSONDocument] {
   val makeDocuments = bson
 
