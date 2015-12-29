@@ -1,5 +1,7 @@
 package reactivemongo.api.commands.bson
 
+import scala.util.{ Failure, Success }
+
 import reactivemongo.api.commands._
 import reactivemongo.bson._
 
@@ -36,10 +38,31 @@ object BSONListCollectionNamesImplicits {
   }
 }
 
+@deprecated("Use [[BSONDropCollectionImplicits]]", "0.12.0")
 object BSONDropImplicits {
   implicit object DropWriter extends BSONDocumentWriter[ResolvedCollectionCommand[Drop.type]] {
     def write(command: ResolvedCollectionCommand[Drop.type]): BSONDocument =
       BSONDocument("drop" -> command.collection)
+  }
+}
+
+object BSONDropCollectionImplicits {
+  implicit object DropCollectionWriter extends BSONDocumentWriter[ResolvedCollectionCommand[DropCollection.type]] {
+    def write(command: ResolvedCollectionCommand[DropCollection.type]): BSONDocument = BSONDocument("drop" -> command.collection)
+  }
+
+  implicit object DropCollectionResultReader
+      extends BSONDocumentReader[DropCollectionResult] {
+    def read(doc: BSONDocument): DropCollectionResult =
+      CommonImplicits.UnitBoxReader.readTry(doc).transform(
+        { _ => Success(true) }, { error =>
+          if (doc.getAs[BSONNumberLike]("code"). // code == 26
+            map(_.toInt).exists(_ == 26) ||
+            doc.getAs[String]("errmsg").
+            exists(_ startsWith "ns not found")) {
+            Success(false) // code not avail. before 3.x
+          } else Failure(error)
+        }).map(DropCollectionResult(_)).get
   }
 }
 

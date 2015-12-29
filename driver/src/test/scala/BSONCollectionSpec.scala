@@ -1,17 +1,20 @@
 import scala.util.{ Failure, Success }
-import reactivemongo.api._
-import reactivemongo.bson._
 import scala.concurrent._
-import org.specs2.mutable.Specification
+
 import play.api.libs.iteratee.Iteratee
 
-class BSONCollectionSpec extends Specification {
-  import Common._
+import reactivemongo.api._
+import reactivemongo.bson._
+import reactivemongo.core.errors.GenericDatabaseException
+
+object BSONCollectionSpec extends org.specs2.mutable.Specification {
+  "BSON collection" title
+
   import reactivemongo.api.commands.bson.DefaultBSONCommandError
+  import reactivemongo.api.collections.bson._
+  import Common._
 
   sequential
-
-  import reactivemongo.api.collections.bson._
 
   lazy val collection = db("somecollection_bsoncollectionspec")
 
@@ -332,6 +335,37 @@ class BSONCollectionSpec extends Specification {
               msg contains "renameCollection ") => true
             case _ => false
           }) must beTrue.await(timeoutMillis)
+      }
+    }
+
+    "be dropped" >> {
+      "successfully if exists (deprecated)" in {
+        val col = db(s"foo_${System identityHashCode collection}")
+
+        col.create().flatMap(_ => col.drop()).
+          aka("legacy drop") must beEqualTo({}).await(timeoutMillis)
+      }
+
+      "with failure if doesn't exist (deprecated)" in {
+        val col = db(s"foo_${System identityHashCode collection}")
+
+        Await.result(col.drop(), timeout).
+          aka("legacy drop") must throwA[Exception].like {
+            case GenericDatabaseException(_, Some(26)) => ok
+          }
+      }
+
+      "successfully if exist" in {
+        val col = db(s"foo_${System identityHashCode collection}")
+
+        col.create().flatMap(_ => col.drop(false)).
+          aka("drop") must beFalse.await(timeoutMillis)
+      }
+
+      "successfully if doesn't exist" in {
+        val col = db(s"foo_${System identityHashCode collection}")
+
+        col.drop(false) aka "drop" must beFalse.await(timeoutMillis)
       }
     }
   }
