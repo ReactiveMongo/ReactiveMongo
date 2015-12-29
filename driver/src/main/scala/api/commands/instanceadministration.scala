@@ -2,14 +2,24 @@ package reactivemongo.api.commands
 
 object DropDatabase extends Command with CommandWithResult[UnitBox.type]
 
+@deprecated("Use [[DropCollection]]", "0.12.0")
 object Drop extends CollectionCommand with CommandWithResult[UnitBox.type]
+
+/**
+ * @param dropped true if the collection existed and was dropped
+ */
+case class DropCollectionResult(dropped: Boolean)
+
+object DropCollection extends CollectionCommand
+  with CommandWithResult[DropCollectionResult]
 
 object EmptyCapped extends CollectionCommand with CommandWithResult[UnitBox.type]
 
 case class RenameCollection(
   fullyQualifiedCollectionName: String,
   fullyQualifiedTargetName: String,
-  dropTarget: Boolean = false) extends Command with CommandWithResult[UnitBox.type]
+  dropTarget: Boolean = false)
+    extends Command with CommandWithResult[UnitBox.type]
 
 case class Create(
   capped: Option[Capped] = None, // if set, "capped" -> true, size -> <int>, max -> <int>
