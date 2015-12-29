@@ -19,9 +19,10 @@ import play.api.libs.iteratee._
 import reactivemongo.core.iteratees.{ CustomEnumeratee, CustomEnumerator }
 import reactivemongo.core.netty.BufferSequence
 import reactivemongo.core.protocol._
-import reactivemongo.utils.ExtendedFutures.DelayedFuture
-import reactivemongo.utils.LazyLogger
-import scala.annotation.tailrec
+import reactivemongo.util.{
+  ExtendedFutures,
+  LazyLogger
+}, ExtendedFutures.DelayedFuture
 import scala.collection.generic.CanBuildFrom
 import scala.concurrent.{ ExecutionContext, Future }
 import scala.util.{ Failure, Success, Try }
@@ -383,7 +384,7 @@ object DefaultCursor {
       enumerateResponses(maxDocs, stopOnError) &> Enumeratee.map(makeIterator)
 
     def enumerate(maxDocs: Int = Int.MaxValue, stopOnError: Boolean = false)(implicit ctx: ExecutionContext): Enumerator[A] = {
-      @tailrec
+      @annotation.tailrec
       def next(it: Iterator[A], stopOnError: Boolean): Option[Try[A]] = {
         if (it.hasNext) {
           val tried = Try(it.next)

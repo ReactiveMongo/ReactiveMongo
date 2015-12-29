@@ -140,8 +140,11 @@ object Dependencies {
 
   val specs = "org.specs2" %% "specs2-core" % "2.4.9" % Test
 
-  val log4jVersion = "2.0.2"
-  val log4j = Seq("org.apache.logging.log4j" % "log4j-api" % log4jVersion, "org.apache.logging.log4j" % "log4j-core" % log4jVersion)
+  val logApiVersion = "1.7.12"
+  val logApi = Seq(
+    "org.slf4j" % "slf4j-api" % logApiVersion % "provided",
+    "org.apache.logging.log4j" % "log4j-api" % "2.0.2" // deprecated
+  )
 
   val shapelessTest = "com.chuusai" % "shapeless" % "2.0.0" %
   Test cross CrossVersion.binaryMapped {
@@ -179,7 +182,7 @@ object ReactiveMongoBuild extends Build {
         iteratees,
         commonsCodec,
         shapelessTest,
-        specs) ++ log4j,
+        specs) ++ logApi,
       testOptions in Test += Tests.Cleanup(cl => {
         import scala.language.reflectiveCalls
         val c = cl.loadClass("Common$")

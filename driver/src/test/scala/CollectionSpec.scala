@@ -22,7 +22,7 @@ object CollectionSpec extends Specification with Tags {
 
     "check if it's capped" in {
       // convertToCapped is async. Let's wait a little while before checking if it's done
-      Await.result(reactivemongo.utils.ExtendedFutures.DelayedFuture(4000, connection.actorSystem), timeout)
+      Await.result(reactivemongo.util.ExtendedFutures.DelayedFuture(4000, connection.actorSystem), timeout)
       println("\n\n\t***** CHECKING \n\n")
       val stats = Await.result(collection.stats, timeout)
       println(stats)

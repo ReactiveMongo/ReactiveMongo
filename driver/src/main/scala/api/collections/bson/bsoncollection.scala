@@ -91,7 +91,7 @@ case class BSONQueryBuilder(
     commentString: Option[String] = None,
     options: QueryOpts = QueryOpts(),
     maxTimeMsOption: Option[Long] = None) extends GenericQueryBuilder[BSONSerializationPack.type] {
-  import reactivemongo.utils.option
+  import reactivemongo.util.option
 
   type Self = BSONQueryBuilder
   val pack = BSONSerializationPack

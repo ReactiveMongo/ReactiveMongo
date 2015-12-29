@@ -18,8 +18,10 @@ package reactivemongo.utils
 import scala.concurrent._
 import scala.concurrent.duration._
 
+@deprecated(message = "Use [[reactivemongo.util]]", since = "0.12.0")
 object `package` {
   /** Concats two array - fast way */
+  @deprecated(message = "Use array concat operation", since = "0.12.0")
   def concat[T](a1: Array[T], a2: Array[T])(implicit m: Manifest[T]): Array[T] = {
     var i, j = 0
     val result = new Array[T](a1.length + a2.length)
@@ -35,9 +37,12 @@ object `package` {
   }
 
   /** Makes an option of the value matching the condition. */
+  @deprecated(message = "Use [[reactivemongo.util.option]]", since = "0.12.0")
   def option[T](cond: => Boolean, value: => T): Option[T] = (if (cond) Some(value) else None)
 }
 
+@deprecated(
+  message = "Use [[reactivemongo.util.LazyLogger]]", since = "0.12.0")
 case class LazyLogger(logger: org.apache.logging.log4j.Logger) {
   def trace(s: => String) { if (logger.isTraceEnabled) logger.trace(s) }
   def trace(s: => String, e: => Throwable) { if (logger.isTraceEnabled) logger.trace(s, e) }
@@ -51,10 +56,15 @@ case class LazyLogger(logger: org.apache.logging.log4j.Logger) {
   def error(s: => String, e: => Throwable) { if (logger.isErrorEnabled) logger.error(s, e) }
 }
 
+@deprecated(
+  message = "Use [[reactivemongo.util.LazyLogger]]", since = "0.12.0")
 object LazyLogger {
-  def apply(logger: String): LazyLogger = LazyLogger(org.apache.logging.log4j.LogManager.getLogger(logger))
+  def apply(logger: String): LazyLogger =
+    LazyLogger(org.apache.logging.log4j.LogManager.getLogger(logger))
 }
 
+@deprecated(
+  message = "Use [[reactivemongo.util.EitherMappableFuture]]", since = "0.12.0")
 case class EitherMappableFuture[A](future: Future[A]) {
   def mapEither[E <: Throwable, B](f: A => Either[E, B])(implicit ec: ExecutionContext) = {
     future.flatMap(
@@ -64,10 +74,15 @@ case class EitherMappableFuture[A](future: Future[A]) {
       })
   }
 }
+
+@deprecated(
+  message = "Use [[reactivemongo.util.EitherMappableFuture]]", since = "0.12.0")
 object EitherMappableFuture {
   implicit def futureToEitherMappable[A](future: Future[A]): EitherMappableFuture[A] = EitherMappableFuture(future)
 }
 
+@deprecated(
+  message = "Use [[reactivemongo.util.ExtendedFutures]]", since = "0.12.0")
 object ExtendedFutures {
   import akka.actor.{ ActorSystem, Scheduler }
 

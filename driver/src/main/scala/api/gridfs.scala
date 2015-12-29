@@ -31,7 +31,7 @@ import reactivemongo.api.{
   SerializationPack
 }
 import reactivemongo.api.commands.WriteResult
-import reactivemongo.utils._
+import reactivemongo.util._
 import reactivemongo.core.netty.ChannelBufferWritableBuffer
 
 import reactivemongo.api.collections.{
@@ -178,7 +178,7 @@ case class DefaultReadFile(
  * @param db The database where this store is located.
  * @param prefix The prefix of this store. The `files` and `chunks` collections will be actually named `prefix.files` and `prefix.chunks`.
  */
-class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, prefix: String = "fs")(implicit producer: GenericCollectionProducer[P, GenericCollection[P]] = BSONCollectionProducer) {
+class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, prefix: String = "fs")(implicit producer: GenericCollectionProducer[P, GenericCollection[P]] = BSONCollectionProducer) { self =>
   import reactivemongo.api.indexes.Index
   import reactivemongo.api.indexes.IndexType.Ascending
 
@@ -213,6 +213,21 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
    */
   def save[Id <: pack.Value](enumerator: Enumerator[Array[Byte]], file: FileToSave[pack.type, Id], chunkSize: Int = 262144)(implicit readFileReader: pack.Reader[ReadFile[P, Id]], ctx: ExecutionContext, idProducer: IdProducer[Id], docWriter: BSONDocumentWriter[file.pack.Document]): Future[ReadFile[P, Id]] = (enumerator |>>> iteratee(file, chunkSize)).flatMap(f => f)
 
+  /** Concats two array - fast way */
+  private def concat[T](a1: Array[T], a2: Array[T])(implicit m: Manifest[T]): Array[T] = {
+    var i, j = 0
+    val result = new Array[T](a1.length + a2.length)
+    while (i < a1.length) {
+      result(i) = a1(i)
+      i = i + 1
+    }
+    while (j < a2.length) {
+      result(i + j) = a2(j)
+      j = j + 1
+    }
+    result
+  }
+
   /**
    * Gets an `Iteratee` that will consume data to put into a GridFS store.
    * @param file Metadata of the file to store.
@@ -233,7 +248,7 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
         length: Int = 0) {
 
       def feed(chunk: Array[Byte]): Future[Chunk] = {
-        val wholeChunk = concat(previous, chunk)
+        val wholeChunk = self.concat(previous, chunk)
 
         val normalizedChunkNumber = wholeChunk.length / chunkSize
 
