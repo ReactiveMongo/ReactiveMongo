@@ -30,7 +30,7 @@ import reactivemongo.api.SerializationPack
 import reactivemongo.api.commands.GetLastError
 import reactivemongo.core.errors._
 import reactivemongo.core.netty._
-import reactivemongo.utils.LazyLogger
+import reactivemongo.util.LazyLogger
 import BufferAccessors._
 import reactivemongo.api.ReadPreference
 

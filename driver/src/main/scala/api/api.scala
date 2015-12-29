@@ -39,7 +39,7 @@ import reactivemongo.core.protocol.{
 }
 import reactivemongo.core.commands.SuccessfulAuthentication
 import reactivemongo.api.commands.WriteConcern
-import reactivemongo.utils.LazyLogger
+import reactivemongo.util.LazyLogger
 
 /**
  * A helper that sends the given message to the given actor,

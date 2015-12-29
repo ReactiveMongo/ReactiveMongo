@@ -19,7 +19,6 @@ import reactivemongo.core.protocol.MongoWireVersion
 import reactivemongo.api._
 import reactivemongo.bson._
 import reactivemongo.api.commands.{ DropIndexes, LastError, WriteResult }
-import reactivemongo.utils.option
 import scala.concurrent.{ Future, ExecutionContext }
 
 /** Type of Index */
@@ -438,6 +437,8 @@ object CollectionIndexesManager {
 }
 
 object IndexesManager {
+  import reactivemongo.util.option
+
   /**
    * Returns an indexes manager for specified database.
    *

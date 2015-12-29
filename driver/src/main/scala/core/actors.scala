@@ -23,7 +23,7 @@ import org.jboss.netty.channel.group.{
   ChannelGroupFutureListener,
   DefaultChannelGroup
 }
-import reactivemongo.utils.LazyLogger
+import reactivemongo.util.LazyLogger
 import reactivemongo.core.errors.{ DriverException, GenericDriverException }
 import reactivemongo.core.protocol.{
   CheckedWriteRequest,
@@ -212,7 +212,7 @@ trait MongoDBSystem extends Actor {
     val remainingConnections = nodeSet.nodes.foldLeft(0)(
       { (open, node) => open + node.connections.size })
 
-    if (logger.logger.isDebugEnabled()) {
+    if (logger.isDebugEnabled) {
       val disconnected = nodeSet.nodes.foldLeft(0) { (open, node) =>
         open + node.connections.count(_.status == ConnectionStatus.Disconnected)
       }
@@ -262,7 +262,7 @@ trait MongoDBSystem extends Actor {
     case msg @ ChannelDisconnected(channelId) => {
       updateNodeSetOnDisconnect(channelId)
 
-      if (logger.logger.isDebugEnabled()) {
+      if (logger.isDebugEnabled) {
         val remainingConnections = nodeSet.nodes.foldLeft(0) { (open, node) =>
           open + node.connections.size
         }

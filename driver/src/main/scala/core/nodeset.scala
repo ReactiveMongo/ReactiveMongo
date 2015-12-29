@@ -15,7 +15,7 @@ import org.jboss.netty.channel.{
 
 import akka.actor.ActorRef
 
-import reactivemongo.utils.LazyLogger
+import reactivemongo.util.LazyLogger
 import reactivemongo.core.protocol.Request
 
 import reactivemongo.bson.BSONDocument
