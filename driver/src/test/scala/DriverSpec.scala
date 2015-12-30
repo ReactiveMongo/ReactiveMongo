@@ -79,13 +79,13 @@ object DriverSpec extends org.specs2.mutable.Specification {
           case doc => doc.getAs[BSONBooleanLike]("ok").
             exists(_.toBoolean == true) must beTrue
         }).await(timeoutMillis)
-    } tag ("mongo2")
+    } tag ("mongo2", "mongo26")
 
     "not be successful with wrong credentials" in {
       Await.result(connection.authenticate(db.name, "foo", "bar"), timeout).
         aka("authentication") must throwA[FailedAuthentication]
 
-    } tag ("mongo2")
+    } tag ("mongo2", "mongo26")
 
     "be successful with right credentials" in {
       connection.authenticate(db.name, s"test-$id", s"password-$id").
@@ -94,11 +94,11 @@ object DriverSpec extends org.specs2.mutable.Specification {
             db("testcol").insert(BSONDocument("foo" -> "bar")).
             map(_ => {}) must beEqualTo({}).await(timeoutMillis))
 
-    } tag ("mongo2")
+    } tag ("mongo2", "mongo26")
 
     "driver shutdown" in { // mainly to ensure the test driver is closed
       driver.close() must not(throwA[Exception])
-    } tag ("mongo2")
+    } tag ("mongo2", "mongo26")
   }
 
   "Authentication SCRAM-SHA1" should {
@@ -131,13 +131,13 @@ object DriverSpec extends org.specs2.mutable.Specification {
           case doc => doc.getAs[BSONBooleanLike]("ok").
             exists(_.toBoolean == true) must beTrue
         }).await(timeoutMillis)
-    } tag ("mongo3")
+    } tag ("mongo3", "not_mongo26")
 
     "not be successful with wrong credentials" in {
       Await.result(connection.authenticate(db.name, "foo", "bar"), timeout).
         aka("authentication") must throwA[FailedAuthentication]
 
-    } tag ("mongo3")
+    } tag ("mongo3", "not_mongo26")
 
     "be successful with right credentials" in {
       connection.authenticate(db.name, s"test-$id", s"password-$id").
@@ -146,11 +146,11 @@ object DriverSpec extends org.specs2.mutable.Specification {
             db("testcol").insert(BSONDocument("foo" -> "bar")).
             map(_ => {}) must beEqualTo({}).await(timeoutMillis))
 
-    } tag ("mongo3")
+    } tag ("mongo3", "not_mongo26")
 
     "driver shutdown" in { // mainly to ensure the test driver is closed
       driver.close() must not(throwA[Exception])
-    } tag ("mongo3")
+    } tag ("mongo3", "not_mongo26")
   }
 
   "Database" should {
@@ -172,5 +172,17 @@ object DriverSpec extends org.specs2.mutable.Specification {
           await(timeoutMillis)
       }
     }
+
+    "fail with MongoDB < 2.6" in {
+      import reactivemongo.core.errors.ConnectionException
+
+      Await.result(Common.connection.database(Common.db.name).map(_ => {}),
+        timeout) aka "database resolution" must (
+          throwA[ConnectionException]("unsupported MongoDB version")) and (
+            Common.connection.db(Common.db.name).
+            aka("database") must throwA[ConnectionException](
+              "unsupported MongoDB version"))
+
+    } tag ("mongo2", "mongo24", "not_mongo26")
   }
 }

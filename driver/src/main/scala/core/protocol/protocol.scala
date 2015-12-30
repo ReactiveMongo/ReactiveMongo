@@ -15,8 +15,10 @@
  */
 package reactivemongo.core.protocol
 
-import akka.actor.ActorRef
 import java.nio.ByteOrder
+
+import akka.actor.ActorRef
+
 import org.jboss.netty.buffer._
 import org.jboss.netty.channel._
 import org.jboss.netty.handler.codec.oneone._
@@ -78,7 +80,7 @@ object `package` {
 
     /** Reads a UTF-8 C-Style String. */
     def readCString(): String = {
-      @scala.annotation.tailrec
+      @annotation.tailrec
       def readCString(array: ArrayBuffer[Byte]): String = {
         val byte = buffer.readByte
         if (byte == 0x00)
@@ -293,6 +295,7 @@ object Response {
 case class ResponseInfo(channelId: Int)
 
 sealed trait MongoWireVersion extends Ordered[MongoWireVersion] {
+  /** The numeric representation */
   def value: Int
 
   final def compare(x: MongoWireVersion): Int =

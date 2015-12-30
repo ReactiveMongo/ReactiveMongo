@@ -124,6 +124,6 @@ object AggregationSpec extends org.specs2.mutable.Specification {
     "return a random sample" in {
       collection.aggregate(Sample(2)).map(_.result[ZipCode].
         filter(zipCodes.contains).size) must beEqualTo(2).await(timeoutMillis)
-    } tag ("mongo3")
+    } tag ("mongo3", "not_mongo26")
   }
 }

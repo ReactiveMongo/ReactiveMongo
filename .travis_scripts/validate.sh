@@ -39,7 +39,7 @@ if [ `echo "$MV" | grep v3 | wc -l` -eq 1 ]; then
     mongo $SHELL_OPTS 'var s=db.serverStatus();JSON.stringify(s["storageEngine"]);' | grep '"name"' | cut -d '"' -f 4
 fi
 
-TEST_OPTS="exclude mongo3"
+TEST_OPTS="exclude not_mongo26"
 SBT_OPTS="++$TRAVIS_SCALA_VERSION"
 
 if [ "$MONGODB_VER" = "3" ]; then

@@ -31,9 +31,10 @@ import akka.util.Timeout
 
 import reactivemongo.core.actors._
 import reactivemongo.core.errors.ConnectionException
-import reactivemongo.core.nodeset.Authenticate
+import reactivemongo.core.nodeset.{ Authenticate, ProtocolMetadata }
 import reactivemongo.core.protocol.{
   CheckedWriteRequest,
+  MongoWireVersion,
   RequestMaker,
   Response
 }
@@ -224,7 +225,16 @@ class MongoConnection(
    * @param name the database name
    * @param failoverStrategy the failover strategy for sending requests.
    */
-  def apply(name: String, failoverStrategy: FailoverStrategy = FailoverStrategy())(implicit context: ExecutionContext): DefaultDB = DefaultDB(name, this, failoverStrategy)
+  def apply(name: String, failoverStrategy: FailoverStrategy = FailoverStrategy())(implicit context: ExecutionContext): DefaultDB = {
+    metadata.foreach {
+      case ProtocolMetadata(_, MongoWireVersion.V24AndBefore, _, _, _) =>
+        throw ConnectionException("unsupported MongoDB version < 2.6")
+
+      case meta => ()
+    }
+
+    DefaultDB(name, this, failoverStrategy)
+  }
 
   /**
    * Returns a DefaultDB reference using this connection
@@ -287,7 +297,20 @@ class MongoConnection(
       }
     }
 
-    wait(0, 1 + failoverStrategy.retries, failoverStrategy.initialDelay)
+    wait(0, 1 + failoverStrategy.retries, failoverStrategy.initialDelay).
+      flatMap { _ =>
+        metadata match {
+          case Some(ProtocolMetadata(
+            _, MongoWireVersion.V24AndBefore, _, _, _)) =>
+            Future.failed[Unit](ConnectionException(
+              "unsupported MongoDB version < 2.6"))
+
+          case Some(_) => Future successful {}
+          case _ => Future.failed[Unit](ConnectionException(
+            "protocol metadata not available"))
+        }
+      }
+
   }
 
   /**
@@ -381,8 +404,6 @@ class MongoConnection(
     p.future
   }
 
-  import reactivemongo.core.nodeset.ProtocolMetadata
-
   private[api] val monitor = actorSystem.actorOf(
     Props(new MonitorActor), "Monitor-" + MongoDriver.nextCounter)
 
@@ -413,10 +434,11 @@ class MongoConnection(
         logger.debug("set: no primary available")
         primaryAvailable = false
 
-      case SetAvailable(meta) =>
+      case SetAvailable(meta) => {
         logger.debug(s"set: a node is available: $meta")
         setAvailable = true
         metadata = Some(meta)
+      }
 
       case SetUnavailable =>
         setAvailable = false
