@@ -98,6 +98,32 @@ object BSONCollectionSpec extends org.specs2.mutable.Specification {
           }).await(5000)
       }
 
+      "explain query result" >> {
+        "when MongoDB > 2.6" in {
+          collection.find(BSONDocument.empty).explain().one[BSONDocument].
+            aka("explanation") must beSome[BSONDocument].which { result =>
+              result.getAs[BSONDocument]("queryPlanner").
+                aka("queryPlanner") must beSome and (
+                  result.getAs[BSONDocument]("executionStats").
+                  aka("stats") must beSome) and (
+                    result.getAs[BSONDocument]("serverInfo").
+                    aka("serverInfo") must beSome)
+
+            }.await(timeoutMillis)
+        } tag ("mongo3", "not_mongo26")
+
+        "when MongoDB = 2.6" in {
+          collection.find(BSONDocument.empty).explain().one[BSONDocument].
+            aka("explanation") must beSome[BSONDocument].which { result =>
+              result.getAs[List[BSONDocument]]("allPlans").
+                aka("plans") must beSome[List[BSONDocument]] and (
+                  result.getAs[String]("server").
+                  aka("server") must beSome[String])
+
+            }.await(timeoutMillis)
+        } tag ("mongo2", "mongo26")
+      }
+
       "with success using enumerate" in {
         val enumerator = cursor.enumerate(10)
         val n = enumerator |>>> Iteratee.fold(0) { (r, doc) =>
