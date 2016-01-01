@@ -13,7 +13,8 @@ case class DropCollectionResult(dropped: Boolean)
 object DropCollection extends CollectionCommand
   with CommandWithResult[DropCollectionResult]
 
-object EmptyCapped extends CollectionCommand with CommandWithResult[UnitBox.type]
+object EmptyCapped extends CollectionCommand
+  with CommandWithResult[UnitBox.type]
 
 case class RenameCollection(
   fullyQualifiedCollectionName: String,
@@ -78,7 +79,8 @@ case class DropIndexesResult(value: Int) extends BoxedAnyVal[Int]
 case class CollectionNames(names: List[String])
 
 /** List the names of DB collections. */
-object ListCollectionNames extends Command with CommandWithResult[CollectionNames]
+object ListCollectionNames
+  extends Command with CommandWithResult[CollectionNames]
 
 import reactivemongo.api.indexes.Index
 
@@ -149,7 +151,7 @@ case class ReplSetStatus(
   members: List[ReplSetMember])
 
 /**
- * The command [[[[http://docs.mongodb.org/manual/reference/command/replSetGetStatus/ replSetGetStatus]]
+ * The command [[http://docs.mongodb.org/manual/reference/command/replSetGetStatus/ replSetGetStatus]]
  */
 case object ReplSetGetStatus
   extends Command with CommandWithResult[ReplSetStatus]
@@ -175,3 +177,12 @@ case class ServerStatusResult(
 /** Server [[http://docs.mongodb.org/manual/reference/server-status/ status]] */
 case object ServerStatus
   extends Command with CommandWithResult[ServerStatusResult]
+
+object ResyncResult extends BoxedAnyVal[Unit] {
+  val value = {}
+}
+
+/**
+ * The command [[https://docs.mongodb.org/manual/reference/command/resync/ resync]]
+ */
+object Resync extends Command with CommandWithResult[ResyncResult.type]
