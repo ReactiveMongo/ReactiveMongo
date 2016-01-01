@@ -348,6 +348,7 @@ private[reactivemongo] class RequestEncoder extends OneToOneEncoder {
 
 object ReplyDocumentIterator {
   def apply[P <: SerializationPack, A](pack: P)(reply: Reply, buffer: ChannelBuffer)(implicit reader: pack.Reader[A]): Iterator[A] = new Iterator[A] {
+    override val isTraversableAgain = false // TODO: Add test
     override def hasNext = buffer.readable
     override def next =
       try {

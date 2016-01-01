@@ -868,7 +868,10 @@ private[actors] case class AwaitingResponse(
   isGetLastError: Boolean,
   isMongo26WriteOp: Boolean)
 
-/** A message to send to a MonitorActor to be warned when a primary has been discovered. */
+/**
+ * A message to send to a MonitorActor to be warned when a primary has been discovered.
+ */
+@deprecated(message = "Wil be removed", since = "0.11.10")
 case object WaitForPrimary
 
 // exceptions

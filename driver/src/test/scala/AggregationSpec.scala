@@ -90,12 +90,10 @@ object AggregationSpec extends org.specs2.mutable.Specification {
             await(timeoutMillis)
         }
 
-        /* TODO: (after cursor fix)
         "with limit (maxDocs)" in {
           collect(2) aka "cursor result" must beEqualTo(expected take 2).
             await(timeoutMillis)
         }
-         */
       }
     }
 

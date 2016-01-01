@@ -1,8 +1,6 @@
 import scala.util.{ Failure, Success }
 import scala.concurrent._
 
-import play.api.libs.iteratee.Iteratee
-
 import reactivemongo.api._
 import reactivemongo.bson._
 import reactivemongo.core.errors.GenericDatabaseException
@@ -124,14 +122,6 @@ object BSONCollectionSpec extends org.specs2.mutable.Specification {
         } tag ("mongo2", "mongo26")
       }
 
-      "with success using enumerate" in {
-        val enumerator = cursor.enumerate(10)
-        val n = enumerator |>>> Iteratee.fold(0) { (r, doc) =>
-          r + 1
-        }
-        Await.result(n, timeout) mustEqual 0
-      }
-
       "with success using foldResponses" in {
         cursor.foldResponses(0)(
           (i, _) => Cursor.Cont(i + 1), (_, e) => Cursor.Fail(e)).
@@ -160,7 +150,7 @@ object BSONCollectionSpec extends org.specs2.mutable.Specification {
       }
     }
 
-    "read a doc with success" in {
+    "read a document with success" in {
       implicit val reader = PersonReader
       Await.result(collection.find(BSONDocument()).one[Person], timeout).get mustEqual person
     }
@@ -205,7 +195,7 @@ object BSONCollectionSpec extends org.specs2.mutable.Specification {
       }, (_, e) => Cursor.Fail(e)) must beEqualTo(persons).await(timeoutMillis)
     }
 
-    "read a doc with error" in {
+    "read a document with error" in {
       implicit val reader = BuggyPersonReader
       val future = collection.find(BSONDocument()).one[Person].map(_ => 0).recover {
         case e if e.getMessage == "hey hey hey" => -1
@@ -216,7 +206,7 @@ object BSONCollectionSpec extends org.specs2.mutable.Specification {
       future must beEqualTo(-1).await(timeoutMillis)
     }
 
-    "read docs with error" >> {
+    "read documents with error" >> {
       implicit val reader = new SometimesBuggyPersonReader
       @inline def cursor = collection.find(BSONDocument()).cursor[Person]()
 
@@ -246,34 +236,6 @@ object BSONCollectionSpec extends org.specs2.mutable.Specification {
         cursor.foldWhile(0)((i, _) => Cursor.Cont(i + 1),
           (_, e) => Cursor.Cont(-3)) must beEqualTo(-2).await(timeoutMillis)
       }
-    }
-
-    "read docs until error" in {
-      implicit val reader = new SometimesBuggyPersonReader
-      val enumerator = collection.find(BSONDocument()).
-        cursor[Person]().enumerate(stopOnError = true)
-
-      var i = 0
-      val future = enumerator |>>> Iteratee.foreach { doc =>
-        i += 1
-        //println(s"\tgot doc: $doc")
-      } map (_ => -1)
-
-      future.recover({ case e => i }) must beEqualTo(3).await(timeoutMillis)
-    }
-
-    "read docs skipping errors" in {
-      implicit val reader = new SometimesBuggyPersonReader
-      val enumerator = collection.find(BSONDocument()).
-        cursor[Person]().enumerate(stopOnError = false)
-
-      var i = 0
-      val future = enumerator |>>> Iteratee.foreach { doc =>
-        i += 1
-        //println(s"\t(skipping [$i]) got doc: $doc")
-      }
-
-      future.map(_ => i) must beEqualTo(4).await(timeoutMillis)
     }
 
     "read docs skipping errors using collect" in {
@@ -368,8 +330,8 @@ object BSONCollectionSpec extends org.specs2.mutable.Specification {
       "successfully if exists (deprecated)" in {
         val col = db(s"foo_${System identityHashCode collection}")
 
-        col.create().flatMap(_ => col.drop()).
-          aka("legacy drop") must beEqualTo({}).await(timeoutMillis)
+        col.create().flatMap(_ => col.drop(false)).
+          aka("legacy drop") must beTrue.await(timeoutMillis)
       }
 
       "with failure if doesn't exist (deprecated)" in {

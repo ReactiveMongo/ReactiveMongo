@@ -66,7 +66,7 @@ object CollectionSpec extends Specification with Tags {
     } tag ("testCommands")*/
 
     "drop it" in {
-      collection.drop() must beEqualTo(()).await(timeoutMillis)
+      collection.drop(false) must beTrue.await(timeoutMillis)
     }
   }
 }

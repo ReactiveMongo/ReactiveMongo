@@ -29,7 +29,7 @@ class SerializationSpecs extends Specification {
     if (Arrays.equals(a1, a2)) {
       success
     } else {
-      println(s"\texpected:\n${Arrays.toString(a1)},\n\tgot:\n${Arrays.toString(a2)}")
+      //println(s"\texpected:\n${Arrays.toString(a1)},\n\tgot:\n${Arrays.toString(a2)}")
       failure
     }
   }
@@ -80,29 +80,36 @@ class SerializationSpecs extends Specification {
           "adress" -> BSONString("coucou")),
         "lastSeen" -> BSONLong(1360512704747L))
       val buffer = new ArrayBSONBuffer
-      DefaultBufferHandler.write(buffer, doc)*/
+       DefaultBufferHandler.write(buffer, doc)*/
+
       def listAll[A <: ReadableBuffer](buf: LowLevelBsonDocReader[A], spaces: Int = 0): Unit = {
         //val buf = new LowLevelBsonDocReader(b)
         buf.fieldStream.map { f =>
-          print(" " * spaces)
+          //print(" " * spaces)
+
           f match {
             case StructureField(_, _, b) =>
-              println(f.name)
+              //println(f.name)
               listAll(b, spaces + 2)
             case LazyField(tpe, _, b) =>
-              if (tpe == 0x02 || tpe == 0x0D || tpe == 0x0E)
-                println(s"${f.name} -> ${b.readString}")
-              else if (tpe == 0x05) {
+              if (tpe == 0x02 || tpe == 0x0D || tpe == 0x0E) {
+                //println(s"${f.name} -> ${b.readString}")
+              } else if (tpe == 0x05) {
                 val length = b.readInt
                 val subtype = b.readByte
-                println(s"l=$length, subtype=$subtype, readable=${b.readable}")
+                //println(s"l=$length, subtype=$subtype, readable=${b.readable}")
                 val contents = b.readArray(length)
-                println(s"${f.name} -> binary (l=$length, subtype=$subtype, hex=${utils.Converters.hex2Str(contents)} contents=${contents.mkString(", ")})")
-              } else println(s"${f.name} -> <${b.readable} bytes>")
-            case v: ValueField[_] =>
-              println(s"${f.name} -> ${v.value}")
-            case NoValue(tpe, _) =>
-              println(s"${f.name} -> <singleton $tpe>")
+                //println(s"${f.name} -> binary (l=$length, subtype=$subtype, hex=${utils.Converters.hex2Str(contents)} contents=${contents.mkString(", ")})")
+              } else {
+                //println(s"${f.name} -> <${b.readable} bytes>")
+              }
+            case v: ValueField[_] => {
+              //println(s"${f.name} -> ${v.value}")
+            }
+
+            case NoValue(tpe, _) => {
+              //println(s"${f.name} -> <singleton $tpe>")
+            }
           }
           //if(f.tpe == 0x03 || f.tpe == 0x04)
           //  listAll(f.value, spaces + 2)
@@ -207,9 +214,7 @@ class SerializationSpecs extends Specification {
     "deserialize a complex document" in {
       val buffer = ArrayReadableBuffer(expectedWholeDocumentBytes)
       val doc = DefaultBufferHandler.readDocument(buffer)
-      doc.recover {
-        case e => e.printStackTrace()
-      }
+
       doc.isSuccess mustEqual true
     }
   }

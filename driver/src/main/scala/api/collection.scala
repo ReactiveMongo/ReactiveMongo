@@ -182,7 +182,7 @@ trait CollectionMetaCommands {
     import BSONDropCollectionImplicits._
 
     Command.run(BSONSerializationPack)(self, DropCollection).flatMap {
-      case DropCollectionResult(false) if (failIfNotFound) =>
+      case DropCollectionResult(false) if failIfNotFound =>
         Future.failed[Boolean](GenericDatabaseException(
           s"fails to drop collection: $name", Some(26)))
 

@@ -258,6 +258,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
     }
     val metadata = db.connection.metadata
     if (!documents.isEmpty) {
+      // TODO: Await maxTimeout?
       val havingMetadata = Failover2(db.connection, failoverStrategy) { () =>
         metadata.map(Future.successful).getOrElse(Future.failed(ConnectionNotInitialized.MissingMetadata))
       }.future
@@ -298,6 +299,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    * @return a future [[reactivemongo.api.commands.WriteResult]] that can be used to check whether the insertion was successful.
    */
   def insert[T](document: T, writeConcern: WriteConcern = defaultWriteConcern)(implicit writer: pack.Writer[T], ec: ExecutionContext): Future[WriteResult] = {
+    // TODO: Await maxTimeout
     Failover2(db.connection, failoverStrategy) { () =>
       db.connection.metadata match {
         case Some(metadata) if metadata.maxWireVersion >= MongoWireVersion.V26 =>
@@ -342,6 +344,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    * @return a future [[reactivemongo.api.commands.WriteResult]] that can be used to check whether the update was successful.
    */
   def update[S, U](selector: S, update: U, writeConcern: WriteConcern = defaultWriteConcern, upsert: Boolean = false, multi: Boolean = false)(implicit selectorWriter: pack.Writer[S], updateWriter: pack.Writer[U], ec: ExecutionContext): Future[UpdateWriteResult] = Failover2(db.connection, failoverStrategy) { () =>
+    // TODO: Await maxTimeout
     db.connection.metadata match {
       case Some(metadata) if (
         metadata.maxWireVersion >= MongoWireVersion.V26) => {
@@ -587,6 +590,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    */
   def remove[T](query: T, writeConcern: WriteConcern = defaultWriteConcern, firstMatchOnly: Boolean = false)(implicit writer: pack.Writer[T], ec: ExecutionContext): Future[WriteResult] =
     Failover2(db.connection, failoverStrategy) { () =>
+      // TODO: Await maxTimeout
       db.connection.metadata match {
         case Some(metadata) if (
           metadata.maxWireVersion >= MongoWireVersion.V26) => {

@@ -32,23 +32,21 @@ object QueryAndWriteCommands extends org.specs2.mutable.Specification {
       val count = Await.result(Command.run(BSONSerializationPack).unboxed(collection, Count(BSONDocument())), timeout)
       count mustEqual 1
 
-      val ismaster = Await.result(Command.run(BSONSerializationPack)(db, IsMaster), timeout)
-      //println(ismaster)
-      ok
-    } tag ("mongo2_6")
+      Command.run(BSONSerializationPack)(db, IsMaster).map(_ => {}).
+        aka("isMaster") must beEqualTo({}).await(timeoutMillis)
+    }
+
     "insert 1 doc with collection.insert and retrieve it" in {
       val doc = BSONDocument("name" -> "joe", "plop" -> -2)
-      val lastError = Await.result(collection.insert(doc), timeout)
-      //println(lastError)
-      lastError.ok mustEqual true
 
-      val found = Await.result(collection.find(doc).cursor[BSONDocument]().collect[List](), timeout)
-      found.size mustEqual 1
+      collection.insert(doc).map(_.ok) must beTrue.await(timeoutMillis) and {
+        collection.find(doc).cursor[BSONDocument]().collect[List]().map(_.size).
+          aka("result count") must beEqualTo(1).await(timeoutMillis)
+      }
     }
   }
 
   import reactivemongo.api.collections.bson._
-  import scala.concurrent.duration._
 
   val nDocs = 1000000
   "ReactiveMongo with new colls" should {
@@ -63,29 +61,28 @@ object QueryAndWriteCommands extends org.specs2.mutable.Specification {
         aka("result size") must beEqualTo(1).await(timeoutMillis)
     }
 
-    s"Insert $nDocs in bulks (including 3 duplicate errors)" in {
+    s"insert $nDocs in bulks (including 3 duplicate errors)" in {
       import reactivemongo.api.indexes._
       import reactivemongo.api.indexes.IndexType.Ascending
-      val created = collection.indexesManager.ensure(Index(List("plop" -> Ascending), unique = true))
+
+      val created = collection.indexesManager.
+        ensure(Index(List("plop" -> Ascending), unique = true))
       Await.result(created, timeout)
-      val start = System.currentTimeMillis
+
       val coll = BSONCollection(db, "queryandwritecommandsspec", collection.failoverStrategy)
       val docs = (0 until nDocs).toStream.map { i =>
         if (i == 0 || i == 1529 || i == 3026 || i == 19862) {
           BSONDocument("bulk" -> true, "i" -> i, "plop" -> -3)
         } else BSONDocument("bulk" -> true, "i" -> i, "plop" -> i)
       }
-      val res = Try(Await.result(coll.bulkInsert(docs, false), DurationInt(100).seconds))
-      //println(res)
 
-      if (res.isFailure) {
-        throw res.failed.get
-      }
-      //println(s"took ${System.currentTimeMillis - start} ms")
-
-      val count = Await.result(Command.run(BSONSerializationPack).unboxed(collection, Count(BSONDocument("bulk" -> true))), timeout)
-      count mustEqual (nDocs - 3) // all docs minus errors
-    } tag ("mongo2_6")
+      coll.bulkInsert(docs, false).map(_ => {}).
+        aka("bulk insert") must beEqualTo({}).await(100000 /* 100s */ ) and {
+          Command.run(BSONSerializationPack).unboxed(
+            coll, Count(BSONDocument("bulk" -> true))).
+            aka("count") must beEqualTo(nDocs - 3).await(timeoutMillis)
+          // all docs minus errors
+        }
+    }
   }
-
 }

@@ -91,12 +91,14 @@ sealed trait DB {
   /** Authenticates the connection on this database. */
   def authenticate(user: String, password: String)(implicit timeout: FiniteDuration): Future[SuccessfulAuthentication] = connection.authenticate(name, user, password)
 
-  /** Returns the database of the given name on the same MongoConnection. */
-  @deprecated("Consider using `sibling` instead", "0.10")
-  def sister(name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit ec: ExecutionContext): DefaultDB = sibling(name, failoverStrategy)
+  /**
+   * Returns the database of the given name on the same MongoConnection.
+   * @see [[sibling1]]
+   */
+  def sibling(name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit ec: ExecutionContext): DefaultDB = connection(name, failoverStrategy)
 
   /** Returns the database of the given name on the same MongoConnection. */
-  def sibling(name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit ec: ExecutionContext): DefaultDB = connection.db(name, failoverStrategy)
+  def sibling1(name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit ec: ExecutionContext): Future[DefaultDB] = connection.database(name, failoverStrategy)
 
 }
 

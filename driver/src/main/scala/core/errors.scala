@@ -25,7 +25,7 @@ trait ReactiveMongoException extends Exception {
   /** explanation message */
   def message: String
 
-  override def getMessage: String = "MongoError['" + message + "']"
+  override def getMessage: String = s"MongoError['$message']"
 }
 
 object ReactiveMongoException {
