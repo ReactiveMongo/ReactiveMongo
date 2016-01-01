@@ -29,7 +29,10 @@ import reactivemongo.core.netty.{
   ChannelBufferReadableBuffer,
   ChannelBufferWritableBuffer
 }
-import reactivemongo.core.errors.ConnectionNotInitialized
+import reactivemongo.core.errors.{
+  ConnectionNotInitialized,
+  GenericDriverException
+}
 
 trait GenericCollectionProducer[P <: SerializationPack with Singleton, +C <: GenericCollection[P]] extends CollectionProducer[C]
 
@@ -269,7 +272,10 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
             val flattened = wr.flatten
             if (!flattened.ok) {
               // was ordered, with one doc => fail if has an error
-              Future.failed(flattened)
+              Future.failed(WriteResult.lastError(flattened).
+                getOrElse[Exception](GenericDriverException(
+                  s"fails to insert: $document")))
+
             } else Future.successful(wr)
           }
         case Some(_) => // Mongo < 2.6 // TODO: Deprecates/remove
@@ -308,7 +314,10 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
           val flattened = wr.flatten
           if (!flattened.ok) {
             // was ordered, with one doc => fail if has an error
-            Future.failed(flattened)
+            Future.failed(WriteResult.lastError(flattened).
+              getOrElse[Exception](GenericDriverException(
+                s"fails to update: $update")))
+
           } else Future.successful(wr)
         }
       }
@@ -318,7 +327,9 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
         val op = Update(fullCollectionName, flags)
         val bson = writeDoc(selector, selectorWriter)
         bson.writeBytes(writeDoc(update, updateWriter))
-        val checkedWriteRequest = CheckedWriteRequest(op, BufferSequence(bson), writeConcern)
+        val checkedWriteRequest =
+          CheckedWriteRequest(op, BufferSequence(bson), writeConcern)
+
         db.connection.sendExpectingResponse(checkedWriteRequest).map { r =>
           val res = pack.readAndDeserialize(r, LastErrorReader)
           UpdateWriteResult(res.ok, res.n, res.n,
@@ -464,7 +475,8 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
   def remove[T](query: T, writeConcern: WriteConcern = defaultWriteConcern, firstMatchOnly: Boolean = false)(implicit writer: pack.Writer[T], ec: ExecutionContext): Future[WriteResult] =
     Failover2(db.connection, failoverStrategy) { () =>
       db.connection.metadata match {
-        case Some(metadata) if metadata.maxWireVersion >= MongoWireVersion.V26 =>
+        case Some(metadata) if (
+          metadata.maxWireVersion >= MongoWireVersion.V26) => {
           import BatchCommands.DeleteCommand.{ Delete, DeleteElement }
           val limit = if (firstMatchOnly) 1 else 0
           runCommand(Delete(writeConcern = writeConcern)(
@@ -472,9 +484,13 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
             val flattened = wr.flatten
             if (!flattened.ok) {
               // was ordered, with one doc => fail if has an error
-              Future.failed(flattened)
+              Future.failed(WriteResult.lastError(flattened).
+                getOrElse[Exception](GenericDriverException(
+                  s"fails to remove: $query")))
             } else Future.successful(wr)
           }
+        }
+
         case Some(_) => // Mongo < 2.6 // TODO: Deprecate/remove
           val op = Delete(fullCollectionName, if (firstMatchOnly) 1 else 0)
           val bson = writeDoc(query, writer)
@@ -635,10 +651,14 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
       val cursor = DefaultCursor(pack, op, documents, ReadPreference.primary, db.connection, failoverStrategy, true)(BatchCommands.DefaultWriteResultReader) //(Mongo26WriteCommand.DefaultWriteResultBufferReader)
 
       cursor.headOption.flatMap {
-        case Some(wr) if wr.inError              => Future.failed(wr)
-        case Some(wr) if wr.hasErrors && ordered => Future.failed(wr)
-        case Some(wr)                            => Future.successful(wr)
-        case None                                => Future.failed(new RuntimeException("no write result ?"))
+        case Some(wr) if (wr.inError || (wr.hasErrors && ordered)) => {
+          Future.failed(WriteResult.lastError(wr).
+            getOrElse[Exception](GenericDriverException(
+              s"write failure: $wr")))
+        }
+        case Some(wr) => Future.successful(wr)
+        case None => Future.failed(
+          new GenericDriverException("no write result ?"))
       }
     }
 
