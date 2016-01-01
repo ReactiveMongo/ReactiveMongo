@@ -8,7 +8,7 @@ jdk:
 - openjdk6
 before_install:
 - sudo ./.travis_scripts/beforeInstall.sh $TRAVIS_SCALA_VERSION $MONGO_SSL
-script: ./.travis_scripts/validate.sh
+script: ./.travis_scripts/retry.sh 3 ./.travis_scripts/validate.sh
 after_success: ./.travis_scripts/afterSuccess.sh
 env:
   matrix:
