@@ -4,7 +4,7 @@ set -e
 
 SCRIPT_DIR=`dirname $0 | sed -e "s|^\./|$PWD/|"`
 
-cd "SCRIPT_DIR/.."
+cd "$SCRIPT_DIR/.."
 
 sbt ++$TRAVIS_SCALA_VERSION scalariformFormat test:scalariformFormat
 git diff --exit-code || (
