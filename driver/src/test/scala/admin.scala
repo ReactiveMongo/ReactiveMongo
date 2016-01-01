@@ -72,3 +72,18 @@ object ResyncSpec extends Specification {
     }
   }
 }
+
+object ReplSetMaintenanceSpec extends Specification {
+  "ReplSetMaintenance" title
+
+  val db = connection("admin")
+
+  "BSON command" should {
+    import bson.BSONReplSetMaintenanceImplicits._
+
+    "fail outside replicaSet" in {
+      db.runCommand(ReplSetMaintenance(true)) must throwA[CommandError].
+        await(timeoutMillis)
+    }
+  }
+}

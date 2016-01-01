@@ -354,3 +354,17 @@ object BSONResyncImplicits {
     def write(dd: Resync.type): BSONDocument = command
   }
 }
+
+/**
+ *
+ */
+object BSONReplSetMaintenanceImplicits {
+  implicit val ReplSetMaintenanceReader = CommonImplicits.UnitBoxReader
+
+  implicit object ReplSetMaintenanceWriter
+      extends BSONDocumentWriter[ReplSetMaintenance] {
+
+    def write(command: ReplSetMaintenance) =
+      BSONDocument("replSetMaintenance" -> command.enable)
+  }
+}

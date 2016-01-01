@@ -186,3 +186,12 @@ object ResyncResult extends BoxedAnyVal[Unit] {
  * The command [[https://docs.mongodb.org/manual/reference/command/resync/ resync]]
  */
 object Resync extends Command with CommandWithResult[ResyncResult.type]
+
+/**
+ * The [[https://docs.mongodb.org/manual/reference/command/replSetMaintenance/ replSetMaintenance]] command.
+ * It must be executed against the `admin` database.
+ *
+ * @param enable if true the the member enters the `RECOVERING` state
+ */
+case class ReplSetMaintenance(enable: Boolean = true) extends Command
+  with CommandWithResult[UnitBox.type]
