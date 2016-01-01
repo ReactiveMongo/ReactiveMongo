@@ -6,21 +6,20 @@ import reactivemongo.bson._
 
 object BSONGetLastErrorImplicits {
   implicit object GetLastErrorWriter extends BSONDocumentWriter[GetLastError] {
-    def write(wc: GetLastError): BSONDocument = BSONDocument(
-      "getlasterror" -> 1,
-      "w" -> ((wc.w match {
-        case GetLastError.Majority                 => BSONString("majority")
-        case GetLastError.TagSet(tagSet)           => BSONString(tagSet)
-        case GetLastError.WaitForAknowledgments(n) => BSONInteger(n)
-      }): BSONValue),
-      "j" -> (if (wc.j) Some(true) else None),
-      "wtimeout" -> wc.wtimeout)
+    def write(wc: GetLastError): BSONDocument = {
+      val w = BSONCommonWriteCommandsImplicits.GetLastErrorWWriter.write(wc.w)
+      BSONDocument(
+        "getlasterror" -> 1,
+        "w" -> w,
+        "j" -> (if (wc.j) Some(true) else None),
+        "wtimeout" -> wc.wtimeout)
+    }
   }
 
   implicit object LastErrorReader extends DealingWithGenericCommandErrorsReader[LastError] {
     def readResult(doc: BSONDocument): LastError = LastError(
       ok = doc.getAs[BSONBooleanLike]("ok").map(_.toBoolean).getOrElse(false),
-      err = doc.getAs[String]("err"),
+      errmsg = doc.getAs[String]("err"),
       code = doc.getAs[Int]("code"),
       lastOp = doc.getAs[BSONNumberLike]("lastOp").map(_.toLong),
       n = doc.getAs[Int]("n").getOrElse(0),
@@ -39,16 +38,22 @@ object BSONGetLastErrorImplicits {
 }
 
 object BSONCommonWriteCommandsImplicits {
+  implicit object GetLastErrorWWriter
+      extends BSONWriter[GetLastError.W, BSONValue] {
+    def write(w: GetLastError.W): BSONValue = w match {
+      case GetLastError.Majority                 => BSONString("majority")
+      case GetLastError.TagSet(tagSet)           => BSONString(tagSet)
+      case GetLastError.WaitForAknowledgments(n) => BSONInteger(n)
+    }
+  }
+
   implicit object WriteConcernWriter extends BSONDocumentWriter[WriteConcern] {
     def write(wc: WriteConcern): BSONDocument = BSONDocument(
-      "w" -> ((wc.w match {
-        case GetLastError.Majority                 => BSONString("majority")
-        case GetLastError.TagSet(tagSet)           => BSONString(tagSet)
-        case GetLastError.WaitForAknowledgments(n) => BSONInteger(n)
-      }): BSONValue),
+      "w" -> wc.w,
       "j" -> (if (wc.j) Some(true) else None),
       "wtimeout" -> wc.wtimeout)
   }
+
   implicit object WriteErrorReader extends BSONDocumentReader[WriteError] {
     def read(doc: BSONDocument): WriteError =
       WriteError(
@@ -56,13 +61,17 @@ object BSONCommonWriteCommandsImplicits {
         code = doc.getAs[Int]("code").get,
         errmsg = doc.getAs[String]("errmsg").get)
   }
-  implicit object WriteConcernErrorReader extends BSONDocumentReader[WriteConcernError] {
+
+  implicit object WriteConcernErrorReader
+      extends BSONDocumentReader[WriteConcernError] {
     def read(doc: BSONDocument): WriteConcernError =
       WriteConcernError(
         code = doc.getAs[Int]("code").get,
         errmsg = doc.getAs[String]("errmsg").get)
   }
-  implicit object DefaultWriteResultReader extends DealingWithGenericCommandErrorsReader[DefaultWriteResult] {
+
+  implicit object DefaultWriteResultReader
+      extends DealingWithGenericCommandErrorsReader[DefaultWriteResult] {
     def readResult(doc: BSONDocument): DefaultWriteResult = {
       DefaultWriteResult(
         ok = doc.getAs[Int]("ok").exists(_ != 0),

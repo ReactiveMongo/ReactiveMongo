@@ -5,6 +5,8 @@ import scala.util.{ Failure, Success }
 import reactivemongo.api.commands._
 import reactivemongo.bson._
 
+import reactivemongo.core.errors.GenericDriverException
+
 object BSONDropDatabaseImplicits {
   implicit object DropDatabaseWriter extends BSONDocumentWriter[DropDatabase.type] {
     val command = BSONDocument("dropDatabase" -> 1)
@@ -24,8 +26,8 @@ object BSONListCollectionNamesImplicits {
       cr <- doc.getAs[BSONDocument]("cursor")
       fb <- cr.getAs[List[BSONDocument]]("firstBatch")
       ns <- wtColNames(fb, Nil)
-    } yield CollectionNames(ns)).getOrElse[CollectionNames](throw new Exception(
-      "Fails to read collection names"))
+    } yield CollectionNames(ns)).getOrElse[CollectionNames](
+      throw GenericDriverException("fails to read collection names"))
   }
 
   @annotation.tailrec
@@ -181,15 +183,18 @@ object BSONListIndexesImplicits {
 
     def read(doc: BSONDocument): List[Index] = (for {
       _ <- doc.getAs[BSONNumberLike]("ok").fold[Option[Unit]](
-        throw new Exception("the result of listIndexes must be ok")) { ok =>
-
-          if (ok.toInt == 1) Some(())
-          else throw doc.asOpt[WriteResult].getOrElse(
-            new Exception(s"fails to create index: ${BSONDocument pretty doc}"))
+        throw GenericDriverException(
+          "the result of listIndexes must be ok")) { ok =>
+          if (ok.toInt == 1) Some(()) else {
+            throw doc.asOpt[WriteResult].
+              flatMap[Exception](WriteResult.lastError).
+              getOrElse(new GenericDriverException(
+                s"fails to create index: ${BSONDocument pretty doc}"))
+          }
         }
       a <- doc.getAs[BSONDocument]("cursor")
       b <- a.getAs[List[BSONDocument]]("firstBatch")
-    } yield b).fold[List[Index]](throw new Exception(
+    } yield b).fold[List[Index]](throw GenericDriverException(
       "the cursor and firstBatch must be defined"))(readBatch(_, Nil).get)
 
   }
@@ -216,7 +221,7 @@ object BSONCreateIndexesImplicits {
 
     def read(doc: BSONDocument): WriteResult =
       doc.getAs[BSONNumberLike]("ok").map(_.toInt).fold[WriteResult](
-        throw new Exception("the count must be defined")) { n =>
+        throw GenericDriverException("the count must be defined")) { n =>
           doc.getAs[String]("errmsg").fold[WriteResult](
             DefaultWriteResult(true, n, Nil, None, None, None))(
               err => DefaultWriteResult(false, n, Nil, None, None, Some(err)))
