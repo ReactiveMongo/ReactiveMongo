@@ -58,3 +58,17 @@ object ServerStatusSpec extends Specification {
     }
   }
 }
+
+object ResyncSpec extends Specification {
+  "Resync" title
+
+  val db = connection("admin")
+
+  "BSON command" should {
+    import bson.BSONResyncImplicits._
+
+    "be successful" in {
+      db.runCommand(Resync) must not(throwA[CommandError]).await(timeoutMillis)
+    }
+  }
+}

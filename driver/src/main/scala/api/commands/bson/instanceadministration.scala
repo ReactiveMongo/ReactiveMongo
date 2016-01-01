@@ -8,19 +8,22 @@ import reactivemongo.bson._
 import reactivemongo.core.errors.GenericDriverException
 
 object BSONDropDatabaseImplicits {
-  implicit object DropDatabaseWriter extends BSONDocumentWriter[DropDatabase.type] {
+  implicit object DropDatabaseWriter
+      extends BSONDocumentWriter[DropDatabase.type] {
     val command = BSONDocument("dropDatabase" -> 1)
     def write(dd: DropDatabase.type): BSONDocument = command
   }
 }
 
 object BSONListCollectionNamesImplicits {
-  implicit object ListCollectionNamesWriter extends BSONDocumentWriter[ListCollectionNames.type] {
+  implicit object ListCollectionNamesWriter
+      extends BSONDocumentWriter[ListCollectionNames.type] {
     val command = BSONDocument("listCollections" -> 1)
     def write(ls: ListCollectionNames.type): BSONDocument = command
   }
 
-  implicit object BSONCollectionNameReaders extends BSONDocumentReader[CollectionNames] {
+  implicit object BSONCollectionNameReaders
+      extends BSONDocumentReader[CollectionNames] {
     def read(doc: BSONDocument): CollectionNames = (for {
       _ <- doc.getAs[BSONNumberLike]("ok").map(_.toInt).filter(_ == 1)
       cr <- doc.getAs[BSONDocument]("cursor")
@@ -70,8 +73,7 @@ object BSONDropCollectionImplicits {
 
 object BSONEmptyCappedImplicits {
   implicit object EmptyCappedWriter extends BSONDocumentWriter[ResolvedCollectionCommand[EmptyCapped.type]] {
-    def write(command: ResolvedCollectionCommand[EmptyCapped.type]): BSONDocument =
-      BSONDocument("emptyCapped" -> command.collection)
+    def write(command: ResolvedCollectionCommand[EmptyCapped.type]): BSONDocument = BSONDocument("emptyCapped" -> command.collection)
   }
 }
 
@@ -229,6 +231,14 @@ object BSONCreateIndexesImplicits {
   }
 }
 
+/**
+ * {{{
+ * import reactivemongo.api.commands.ReplSetGetStatus
+ * import reactivemongo.api.commands.bson.BSONReplSetGetStatusImplicits._
+ *
+ * adminDb.runCommand(ReplSetGetStatus)
+ * }}}
+ */
 object BSONReplSetGetStatusImplicits {
   implicit object ReplSetGetStatusWriter
       extends BSONDocumentWriter[ReplSetGetStatus.type] {
@@ -274,6 +284,14 @@ object BSONReplSetGetStatusImplicits {
   }
 }
 
+/**
+ * {{{
+ * import reactivemongo.api.commands.ServerStatus
+ * import reactivemongo.api.commands.bson.BSONServerStatusImplicits._
+ *
+ * db.runCommand(ServerStatus)
+ * }}}
+ */
 object BSONServerStatusImplicits {
   implicit object BSONServerStatusWriter
       extends BSONDocumentWriter[ServerStatus.type] {
@@ -300,5 +318,39 @@ object BSONServerStatusImplicits {
       localTime <- doc.getAs[BSONNumberLike]("localTime").map(_.toLong)
     } yield ServerStatusResult(host, version, process, pid,
       uptime, uptimeMillis, uptimeEstimate, localTime)).get
+  }
+}
+
+/**
+ * {{{
+ * import reactivemongo.api.commands.Resync
+ * import reactivemongo.api.commands.bson.BSONResyncImplicits._
+ *
+ * db.runCommand(Resync)
+ * }}}
+ */
+object BSONResyncImplicits {
+  private val logger =
+    reactivemongo.util.LazyLogger("reactivemongo.api.commands.bson.Resync")
+
+  implicit object ResyncReader extends BSONDocumentReader[ResyncResult.type] {
+    @inline def notDeadWarn(err: BSONCommandError) =
+      err.code.exists(_ == 125) || err.errmsg.exists(_ startsWith "not dead")
+
+    def read(doc: BSONDocument): ResyncResult.type = try {
+      CommonImplicits.UnitBoxReader.read(doc)
+      ResyncResult
+    } catch {
+      case err: BSONCommandError if (notDeadWarn(err)) => {
+        logger.warn(s"no resync done: ${err.errmsg mkString ""}")
+        ResyncResult
+      }
+      case error: Throwable => throw error
+    }
+  }
+
+  implicit object ResyncWriter extends BSONDocumentWriter[Resync.type] {
+    val command = BSONDocument("resync" -> 1)
+    def write(dd: Resync.type): BSONDocument = command
   }
 }
