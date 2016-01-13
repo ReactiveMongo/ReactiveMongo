@@ -92,7 +92,7 @@ trait GenericQueryBuilder[P <: SerializationPack] {
 
     val op = Query(flags, collection.fullCollectionName, options.skipN, options.batchSizeN)
 
-    DefaultCursor(pack, op, documents, readPreference, collection.db.connection, failover, isMongo26WriteOp)(reader)
+    DefaultCursor.query(pack, op, documents, readPreference, collection.db.connection, failover, isMongo26WriteOp)(reader)
   }
 
   /**
@@ -116,7 +116,8 @@ trait GenericQueryBuilder[P <: SerializationPack] {
    *
    * @tparam Qry The type of the query. An implicit `Writer[Qry]` typeclass for handling it has to be in the scope.
    */
-  def query[Qry](selector: Qry)(implicit writer: pack.Writer[Qry]): Self = copy(queryOption = Some(pack.serialize(selector, writer)))
+  def query[Qry](selector: Qry)(implicit writer: pack.Writer[Qry]): Self =
+    copy(queryOption = Some(pack.serialize(selector, writer)))
 
   /** Sets the query (the selector document). */
   def query(selector: pack.Document): Self = copy(queryOption = Some(selector))
@@ -131,8 +132,8 @@ trait GenericQueryBuilder[P <: SerializationPack] {
    *
    * @tparam Pjn The type of the projection. An implicit `Writer[Pjn]` typeclass for handling it has to be in the scope.
    */
-  def projection[Pjn](p: Pjn)(implicit writer: pack.Writer[Pjn]): Self = copy(projectionOption = Some(
-    pack.serialize(p, writer)))
+  def projection[Pjn](p: Pjn)(implicit writer: pack.Writer[Pjn]): Self =
+    copy(projectionOption = Some(pack.serialize(p, writer)))
 
   def projection(p: pack.Document): Self = copy(projectionOption = Some(p))
 

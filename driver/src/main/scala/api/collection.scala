@@ -18,7 +18,9 @@ package reactivemongo.api
 import reactivemongo.core.errors.GenericDatabaseException
 
 /**
- * A MongoDB Collection. You should consider the default BSON implementation.
+ * A MongoDB Collection.
+ * You should consider the generic API ([[api.GenericCollection]])
+ * and the default BSON implementation.
  *
  * Example using the default implementation:
  *

@@ -11,6 +11,9 @@ import reactivemongo.api.{
   Collection
 }
 import reactivemongo.bson.{ BSONDocumentReader, BSONDocumentWriter }
+import reactivemongo.core.netty.BufferSequence
+import reactivemongo.core.protocol.Response
+import reactivemongo.core.errors.ReactiveMongoException
 
 sealed trait AbstractCommand
 
@@ -19,27 +22,47 @@ trait CollectionCommand extends AbstractCommand
 
 trait CommandWithResult[R] { self: AbstractCommand => }
 trait CommandWithPack[P <: SerializationPack] { self: AbstractCommand => }
-trait CursorCommand { self: AbstractCommand =>
-  def needsCursor: Boolean
-}
 
 trait BoxedAnyVal[A <: AnyVal] {
   def value: A
 }
 
+/**
+ * @param response the response associated with the result
+ * @param numberToReturn the number of documents to return
+ * @param value the value parsed from the response
+ */
+case class ResponseResult[R](
+  response: Response,
+  numberToReturn: Int,
+  value: R)
+
 trait CommandError extends Exception with NoStackTrace {
+  /** The error code */
   def code: Option[Int]
+
+  /** The error message */
   def errmsg: Option[String]
 
   override def getMessage = s"CommandError[code=${code.getOrElse("<unknown>")}, errmsg=${errmsg.getOrElse("<unknown>")}]"
 }
 
-// TODO: move to package `api`
-trait CursorFetcher[P <: SerializationPack, C[A] <: Cursor[A]] {
+/**
+ * Fetches a cursor from MongoDB results.
+ * @tparam P the type of the serialization pack
+ * @tparam C the type of the cursor implementation
+ */
+trait CursorFetcher[P <: SerializationPack, +C[_] <: Cursor[_]] {
   val pack: P
   def one[A](implicit reader: pack.Reader[A], ec: ExecutionContext): Future[A]
   def cursor[A](implicit reader: pack.Reader[A]): C[A]
 }
+
+/**
+ * @param cursorId the ID of the cursor
+ * @param fullCollectionName the namespace of the collection
+ */
+case class ResultCursor(cursorId: Long, fullCollectionName: String)
 
 trait ImplicitCommandHelpers[P <: SerializationPack] {
   val pack: P
@@ -77,11 +100,10 @@ object Command {
   import reactivemongo.core.protocol.{
     RequestMaker,
     Query,
-    QueryFlags,
-    Response
+    QueryFlags
   }
 
-  def defaultCursorFetcher[P <: SerializationPack, A](db: DB, p: P, command: A, failover: FailoverStrategy)(implicit writer: p.Writer[A]): CursorFetcher[p.type, Cursor] = new CursorFetcher[p.type, Cursor] {
+  def defaultCursorFetcher[P <: SerializationPack, A](db: DB, p: P, command: A, failover: FailoverStrategy)(implicit writer: p.Writer[A]): CursorFetcher[p.type, DefaultCursor.Impl] = new CursorFetcher[p.type, DefaultCursor.Impl] {
     val pack: p.type = p
 
     @inline private def defaultReadPreference: ReadPreference =
@@ -104,9 +126,10 @@ object Command {
 
     def one[A](implicit reader: pack.Reader[A], ec: ExecutionContext): Future[A] = one[A](defaultReadPreference)
 
-    def cursor[A](readPreference: ReadPreference)(implicit reader: pack.Reader[A]): Cursor[A] = {
+    def cursor[A](readPreference: ReadPreference)(implicit reader: pack.Reader[A]): DefaultCursor.Impl[A] = {
       val buffer = ChannelBufferWritableBuffer()
       pack.serializeAndWrite(buffer, command, writer)
+
       val bs = BufferSequence(buffer.buffer)
       val flags = if (readPreference.slaveOk) QueryFlags.SlaveOk else 0
       val op = Query(flags, db.name + ".$cmd", 0, 1)
@@ -114,29 +137,44 @@ object Command {
         case _: Mongo26WriteCommand => true
         case _                      => false
       }
-      DefaultCursor(pack, op, bs, if (mongo26WriteCommand) ReadPreference.primary else readPreference, db.connection, failover, mongo26WriteCommand)
+
+      DefaultCursor.query(pack, op, bs,
+        if (mongo26WriteCommand) ReadPreference.primary else readPreference,
+        db.connection, failover, mongo26WriteCommand)
+
     }
 
-    def cursor[A](implicit reader: pack.Reader[A]): Cursor[A] = cursor(defaultReadPreference)
+    def cursor[A](implicit reader: pack.Reader[A]): DefaultCursor.Impl[A] =
+      cursor(defaultReadPreference)
   }
 
   case class CommandWithPackRunner[P <: SerializationPack](pack: P, failover: FailoverStrategy = FailoverStrategy()) {
     // database
-    def apply[R, C <: Command with CommandWithResult[R]](db: DB, command: C with CommandWithResult[R])(implicit writer: pack.Writer[C], reader: pack.Reader[R], ec: ExecutionContext): Future[R] =
-      defaultCursorFetcher(db, pack, command, failover).one[R]
+    def apply[R, C <: Command with CommandWithResult[R]](db: DB, command: C with CommandWithResult[R])(implicit writer: pack.Writer[C], reader: pack.Reader[R], ec: ExecutionContext): Future[R] = defaultCursorFetcher(db, pack, command, failover).one[R]
 
-    def apply[C <: Command](db: DB, command: C)(implicit writer: pack.Writer[C]): CursorFetcher[pack.type, Cursor] =
-      defaultCursorFetcher(db, pack, command, failover)
+    def apply[C <: Command](db: DB, command: C)(implicit writer: pack.Writer[C]): CursorFetcher[pack.type, Cursor] = defaultCursorFetcher(db, pack, command, failover)
 
-    def unboxed[A <: AnyVal, R <: BoxedAnyVal[A], C <: Command with CommandWithResult[R]](db: DB, command: C with CommandWithResult[R with BoxedAnyVal[A]])(implicit writer: pack.Writer[C], reader: pack.Reader[R], ec: ExecutionContext): Future[A] =
-      defaultCursorFetcher(db, pack, command, failover).one[R].map(_.value)
+    def unboxed[A <: AnyVal, R <: BoxedAnyVal[A], C <: Command with CommandWithResult[R]](db: DB, command: C with CommandWithResult[R with BoxedAnyVal[A]])(implicit writer: pack.Writer[C], reader: pack.Reader[R], ec: ExecutionContext): Future[A] = defaultCursorFetcher(db, pack, command, failover).one[R].map(_.value)
 
     // collection
-    def apply[R, C <: CollectionCommand with CommandWithResult[R]](collection: Collection, command: C with CommandWithResult[R])(implicit writer: pack.Writer[ResolvedCollectionCommand[C]], reader: pack.Reader[R], ec: ExecutionContext): Future[R] =
-      defaultCursorFetcher(collection.db, pack, ResolvedCollectionCommand(collection.name, command), failover).one[R]
+    def apply[R, C <: CollectionCommand with CommandWithResult[R]](collection: Collection, command: C with CommandWithResult[R])(implicit writer: pack.Writer[ResolvedCollectionCommand[C]], reader: pack.Reader[R], ec: ExecutionContext): Future[R] = defaultCursorFetcher(collection.db, pack, ResolvedCollectionCommand(collection.name, command), failover).one[R]
 
-    def apply[C <: CollectionCommand](collection: Collection, command: C)(implicit writer: pack.Writer[ResolvedCollectionCommand[C]]): CursorFetcher[pack.type, Cursor] =
-      defaultCursorFetcher(collection.db, pack, ResolvedCollectionCommand(collection.name, command), failover)
+    def apply[C <: CollectionCommand](collection: Collection, command: C)(implicit writer: pack.Writer[ResolvedCollectionCommand[C]]): CursorFetcher[pack.type, Cursor] = defaultCursorFetcher(collection.db, pack, ResolvedCollectionCommand(collection.name, command), failover)
+
+    /**
+     * Executes the `command` and returns its result
+     * along with the MongoDB response.
+     */
+    def withResponse[R, C <: CollectionCommand with CommandWithResult[R]](collection: Collection, command: C)(implicit writer: pack.Writer[ResolvedCollectionCommand[C]], reader: pack.Reader[R], ec: ExecutionContext): Future[ResponseResult[R]] = {
+      val cursor = defaultCursorFetcher(collection.db, pack,
+        ResolvedCollectionCommand(collection.name, command), failover).cursor[R]
+
+      for {
+        firstResponse <- cursor.makeRequest
+        result <- cursor.headOption.flatMap(_.fold(Future.failed[R](
+          ReactiveMongoException("missing result")))(Future.successful(_)))
+      } yield ResponseResult(firstResponse, cursor.numberToReturn, result)
+    }
 
     def unboxed[A <: AnyVal, R <: BoxedAnyVal[A], C <: CollectionCommand with CommandWithResult[R]](collection: Collection, command: C with CommandWithResult[R with BoxedAnyVal[A]])(implicit writer: pack.Writer[ResolvedCollectionCommand[C]], reader: pack.Reader[R], ec: ExecutionContext): Future[A] =
       defaultCursorFetcher(collection.db, pack, ResolvedCollectionCommand(collection.name, command), failover).one[R].map(_.value)
@@ -181,6 +219,7 @@ object Command {
       case _: Mongo26WriteCommand => true
       case _                      => false
     }
+
     RequestMaker(query, documents, readPreference) -> mongo26WriteCommand
   }
 
@@ -193,6 +232,7 @@ object Command {
 
     def apply[C <: CollectionCommand](collection: Collection, command: C, readPreference: ReadPreference)(implicit writer: pack.Writer[ResolvedCollectionCommand[C]]): RequestMakerExpectingResponse =
       onCollection(collection.db.name, collection.name, command, readPreference)
+
     def apply[C <: CollectionCommand with Mongo26WriteCommand](collection: Collection, command: C)(implicit writer: pack.Writer[ResolvedCollectionCommand[C]]): RequestMakerExpectingResponse =
       onCollection(collection.db.name, collection.name, command)
 

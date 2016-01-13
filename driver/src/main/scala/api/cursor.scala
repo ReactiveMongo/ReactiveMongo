@@ -16,9 +16,22 @@
 package reactivemongo.api
 
 import play.api.libs.iteratee._
+
+import org.jboss.netty.buffer.ChannelBuffer
+
 import reactivemongo.core.iteratees.{ CustomEnumeratee, CustomEnumerator }
 import reactivemongo.core.netty.BufferSequence
-import reactivemongo.core.protocol._
+import reactivemongo.core.protocol.{
+  GetMore,
+  KillCursors,
+  Query,
+  QueryFlags,
+  RequestMaker,
+  Reply,
+  Response,
+  ReplyDocumentIterator,
+  ReplyDocumentIteratorExhaustedException
+}
 import reactivemongo.util.{
   ExtendedFutures,
   LazyLogger
@@ -27,6 +40,9 @@ import scala.collection.generic.CanBuildFrom
 import scala.concurrent.{ ExecutionContext, Future }
 import scala.util.{ Failure, Success, Try }
 
+/**
+ * @tparam T the type parsed from each result document
+ */
 trait Cursor[T] {
   /**
    * Produces an Enumerator of documents.
@@ -219,6 +235,7 @@ trait WrappedCursor[T] extends Cursor[T] {
 
 }
 
+/** Cursor companion object */
 object Cursor {
   private[api] val logger = LazyLogger("reactivemongo.api.Cursor")
 
@@ -226,6 +243,8 @@ object Cursor {
    * Flattens the given future [[reactivemongo.api.Cursor]] to a [[reactivemongo.api.FlattenedCursor]].
    */
   def flatten[T, C[_] <: Cursor[_]](future: Future[C[T]])(implicit fs: CursorFlattener[C]): C[T] = fs.flatten(future)
+
+  // ---
 
   sealed trait State[A]
 
@@ -241,21 +260,116 @@ object Cursor {
 
 object DefaultCursor {
   import Cursor.{ State, Cont, Done, Fail, logger }
+  import reactivemongo.api.commands.ResultCursor
 
+  @deprecated(message = "Use [[query]]", since = "0.11.10")
   def apply[P <: SerializationPack, A](
     pack: P,
     query: Query,
     documents: BufferSequence,
     readPreference: ReadPreference,
     mongoConnection: MongoConnection,
-    failoverStrategy: FailoverStrategy,
-    isMongo26WriteOp: Boolean)(implicit reader: pack.Reader[A]): Cursor[A] = new Cursor[A] {
+    failover: FailoverStrategy,
+    isMongo26WriteOp: Boolean)(implicit reader: pack.Reader[A]): Cursor[A] =
+    DefaultCursor.query[P, A](pack, query, documents, readPreference,
+      mongoConnection, failover, isMongo26WriteOp)
+
+  def query[P <: SerializationPack, A](
+    pack: P,
+    query: Query,
+    requestBuffer: BufferSequence,
+    readPreference: ReadPreference,
+    mongoConnection: MongoConnection,
+    failover: FailoverStrategy,
+    isMongo26WriteOp: Boolean)(implicit reader: pack.Reader[A]) = new Impl[A] {
+    val connection = mongoConnection
+    val failoverStrategy = failover
+    val mongo26WriteOp = isMongo26WriteOp
+    val fullCollectionName = query.fullCollectionName
+    val numberToReturn = query.numberToReturn
+    val tailable = (query.flags &
+      QueryFlags.TailableCursor) == QueryFlags.TailableCursor
+
+    val documentIterator =
+      ReplyDocumentIterator(pack)(_: Reply, _: ChannelBuffer)(reader)
+
+    @inline
+    def makeRequest(implicit ctx: ExecutionContext): Future[Response] =
+      Failover2(connection, failoverStrategy) { () =>
+        connection.sendExpectingResponse(
+          RequestMaker(query, requestBuffer, readPreference), mongo26WriteOp)
+      }.future
+  }
+
+  /**
+   * @param channelId the ID of the current channel
+   * @param toReturn the number to return
+   */
+  def getMore[P <: SerializationPack, A](
+    pack: P,
+    preload: => Response,
+    result: ResultCursor,
+    toReturn: Int,
+    readPreference: ReadPreference,
+    mongoConnection: MongoConnection,
+    failover: FailoverStrategy,
+    isMongo26WriteOp: Boolean)(implicit reader: pack.Reader[A]) = new Impl[A] {
+    val connection = mongoConnection
+    val failoverStrategy = failover
+    val mongo26WriteOp = isMongo26WriteOp
+    val fullCollectionName = result.fullCollectionName
+    val numberToReturn = toReturn
+    val tailable = false // ??
+
+    private lazy val response = preload
+
+    val documentIterator =
+      ReplyDocumentIterator(pack)(_: Reply, _: ChannelBuffer)(reader)
+
+    private var req: ExecutionContext => Future[Response] = { implicit ec =>
+      this.req = makeReq
+      Future.successful(response)
+    }
+
+    private val op = GetMore(fullCollectionName, toReturn, result.cursorId)
+    private lazy val reqMaker =
+      RequestMaker(op).copy(channelIdHint = Some(response.info.channelId))
+
+    private val makeReq = { implicit ctx: ExecutionContext =>
+      logger.trace(s"[Cursor] Calling next on ${result.cursorId}, op=$op")
+
+      Failover2(connection, failoverStrategy) { () =>
+        connection.sendExpectingResponse(reqMaker, mongo26WriteOp)
+      }.future
+    }
+
+    def makeRequest(implicit ctx: ExecutionContext): Future[Response] = req(ctx)
+  }
+
+  private[reactivemongo] trait Impl[A] extends Cursor[A] {
+    def connection: MongoConnection
+
+    def failoverStrategy: FailoverStrategy
+
+    def mongo26WriteOp: Boolean
+
+    def fullCollectionName: String
+
+    def numberToReturn: Int
+
+    def tailable: Boolean
+
+    /** Sends the initial request. */
+    def makeRequest(implicit ctx: ExecutionContext): Future[Response]
+
+    def documentIterator: (Reply, ChannelBuffer) => Iterator[A]
+
     private def next(response: Response)(implicit ctx: ExecutionContext): Future[Option[Response]] = {
       if (response.reply.cursorID != 0) {
-        val op = GetMore(query.fullCollectionName, query.numberToReturn, response.reply.cursorID)
+        val op = GetMore(fullCollectionName, numberToReturn, response.reply.cursorID)
         logger.trace("[Cursor] Calling next on " + response.reply.cursorID + ", op=" + op)
-        Failover2(mongoConnection, failoverStrategy) { () =>
-          mongoConnection.sendExpectingResponse(RequestMaker(op).copy(channelIdHint = Some(response.info.channelId)), isMongo26WriteOp)
+        Failover2(connection, failoverStrategy) { () =>
+          connection.sendExpectingResponse(RequestMaker(op).copy(channelIdHint = Some(response.info.channelId)), mongo26WriteOp)
         }.future.map(Some(_))
       } else {
         logger.error("[Cursor] Call to next() but cursorID is 0, there is probably a bug")
@@ -271,20 +385,10 @@ object DefaultCursor {
       hasNext(response) && (response.reply.numberReturned + response.reply.startingFrom) < maxDocs
 
     @inline
-    private def makeIterator(response: Response) = ReplyDocumentIterator(pack)(response.reply, response.documents)
-
-    @inline
-    private def makeRequest(implicit ctx: ExecutionContext): Future[Response] =
-      Failover2(mongoConnection, failoverStrategy) { () =>
-        mongoConnection.sendExpectingResponse(RequestMaker(query, documents, readPreference), isMongo26WriteOp)
-      }.future
-
-    @inline
-    private def isTailable =
-      (query.flags & QueryFlags.TailableCursor) == QueryFlags.TailableCursor
+    private def makeIterator(response: Response) = documentIterator(response.reply, response.documents)
 
     /** Returns next response using tailable mode */
-    private def tailResponse(current: Response, maxDocs: Int)(implicit context: ExecutionContext): Future[Option[Response]] = mongoConnection.killed flatMap {
+    private def tailResponse(current: Response, maxDocs: Int)(implicit context: ExecutionContext): Future[Option[Response]] = connection.killed flatMap {
       case true =>
         logger.warn("[tailResponse] Connection is killed")
         Future.successful(Option.empty[Response])
@@ -293,7 +397,7 @@ object DefaultCursor {
         if (hasNext(current)) next(current)
         else {
           logger.debug("[tailResponse] Current cursor exhausted, renewing...")
-          DelayedFuture(500, mongoConnection.actorSystem).
+          DelayedFuture(500, connection.actorSystem).
             flatMap(_ => makeRequest.map(Some(_)))
         }
     }
@@ -302,7 +406,7 @@ object DefaultCursor {
     private def killCursors(cursorID: Long, logCat: String): Unit =
       if (cursorID != 0) {
         logger.debug(s"[$logCat] Clean up ${cursorID}, sending KillCursor")
-        mongoConnection.send(RequestMaker(KillCursors(Set(cursorID))))
+        connection.send(RequestMaker(KillCursors(Set(cursorID))))
       } else logger.trace(s"[$logCat] Cursor exhausted (${cursorID})")
 
     def foldResponses[T](z: => T, maxDocs: Int = Int.MaxValue)(suc: (T, Response) => State[T], err: (T, Throwable) => State[T])(implicit ctx: ExecutionContext): Future[T] = new FoldResponses(z, maxDocs, suc, err)(ctx)()
@@ -357,7 +461,7 @@ object DefaultCursor {
       })
 
     def rawEnumerateResponses(maxDocs: Int = Int.MaxValue)(implicit ctx: ExecutionContext): Enumerator[Response] =
-      if (isTailable) tailableCursorEnumerateResponses(maxDocs) else simpleCursorEnumerateResponses(maxDocs)
+      if (tailable) tailableCursorEnumerateResponses(maxDocs) else simpleCursorEnumerateResponses(maxDocs)
 
     def enumerateResponses(maxDocs: Int = Int.MaxValue, stopOnError: Boolean = false)(implicit ctx: ExecutionContext): Enumerator[Response] =
       rawEnumerateResponses(maxDocs) &> {
@@ -394,7 +498,7 @@ object DefaultCursor {
         } else None
       }
       enumerateResponses(maxDocs, stopOnError) &> Enumeratee.mapFlatten { response =>
-        val iterator = ReplyDocumentIterator(pack)(response.reply, response.documents)
+        val iterator = documentIterator(response.reply, response.documents)
         if (!iterator.hasNext) Enumerator.empty
         else CustomEnumerator.SEnumerator(iterator.next) { _ =>
           next(iterator, stopOnError).
@@ -430,7 +534,7 @@ object DefaultCursor {
                                        implicit ctx: ExecutionContext) {
 
       val nextResponse: (Response, Int) => Future[Option[Response]] =
-        if (!isTailable) { (r: Response, maxDocs: Int) =>
+        if (!tailable) { (r: Response, maxDocs: Int) =>
           if (!hasNext(r, maxDocs)) Future.successful(Option.empty[Response])
           else next(r)
         } else (r: Response, maxDocs: Int) => tailResponse(r, maxDocs)
