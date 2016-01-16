@@ -1,10 +1,12 @@
 import org.specs2.mutable._
 import reactivemongo.bson._
 import DefaultBSONHandlers._
-import reactivemongo.core.errors.DetailedDatabaseException
+
 import scala.concurrent.{ Await, Future }
 import scala.concurrent.duration._
 import play.api.libs.iteratee.Iteratee
+
+import reactivemongo.core.errors.DetailedDatabaseException
 import reactivemongo.api.{
   Cursor,
   CursorFlattener,
@@ -14,7 +16,7 @@ import reactivemongo.api.{
   WrappedCursor
 }
 
-class CursorSpec extends Specification {
+object CursorSpec extends Specification {
   sequential
 
   import Common._
@@ -169,6 +171,8 @@ class CursorSpec extends Specification {
       }
     }
   }
+
+  // ---
 
   trait FooCursor[T] extends Cursor[T] { def foo: String }
 

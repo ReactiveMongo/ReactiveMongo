@@ -328,9 +328,12 @@ trait MongoDBSystem extends Actor {
       pickChannel(r).map(_._2.send(r))
     }
 
-    case req: RequestMakerExpectingResponse => {
-      logger.debug("received a request expecting a response")
-      val request = req.requestMaker(RequestId.common.next)
+    case req @ RequestMakerExpectingResponse(maker, _) => {
+      val reqId = RequestId.common.next
+
+      logger.debug(s"received a request expecting a response ($reqId): $req")
+
+      val request = maker(reqId)
 
       pickChannel(request) match {
         case Failure(error) => {
@@ -342,9 +345,10 @@ trait MongoDBSystem extends Actor {
           logger.debug(s"Sending request expecting response $request by connection $connection of node ${node.name}")
 
           if (request.op.expectsResponse) {
-            awaitingResponses += request.requestID -> AwaitingResponse(request.requestID, connection.channel.getId(), req.promise, isGetLastError = false, isMongo26WriteOp = req.isMongo26WriteOp)
-            logger.trace(s"registering awaiting response for requestID ${request.requestID}, awaitingResponses: $awaitingResponses")
-          } else logger.trace(s"NOT registering awaiting response for requestID ${request.requestID}")
+            awaitingResponses += request.requestID -> AwaitingResponse(reqId, connection.channel.getId(), req.promise, isGetLastError = false, isMongo26WriteOp = req.isMongo26WriteOp)
+
+            logger.trace(s"registering awaiting response for requestID $reqId, awaitingResponses: $awaitingResponses")
+          } else logger.trace(s"NOT registering awaiting response for requestID $reqId")
 
           connection.send(request)
         }
@@ -564,6 +568,7 @@ trait MongoDBSystem extends Actor {
               promise.success(response)
             } else {
               logger.debug(s"{${response.header.responseTo}} [MongoDB26 Write Op response] processedOk is false! sending an error")
+
               val notAPrimary = fields.find(_.name == "errmsg").exists {
                 case errmsg @ LazyField(0x02, _, buf) =>
                   logger.debug(s"{${response.header.responseTo}} [MongoDB26 Write Op response] errmsg is $errmsg!")
@@ -572,20 +577,21 @@ trait MongoDBSystem extends Actor {
                   logger.debug(s"{${response.header.responseTo}} [MongoDB26 Write Op response] errmsg is $errmsg but not interesting!")
                   false
               }
+
               if (notAPrimary) {
                 logger.debug(s"{${response.header.responseTo}} [MongoDB26 Write Op response] not a primary error!")
                 onPrimaryUnavailable()
               }
-              promise.failure(new RuntimeException("not ok"))
+
+              promise.failure(GenericDriverException("not ok"))
             }
           } else {
             logger.trace(s"{${response.header.responseTo}} [MongoDB26 Write Op response] sending a success!")
             promise.success(response)
           }
         }
-        case None => {
-          logger.error(s"oups. ${response.header.responseTo} not found! complete message is $response")
-        }
+
+        case None => logger.error(s"oups. ${response.header.responseTo} not found! complete message is $response")
       }
     }
 

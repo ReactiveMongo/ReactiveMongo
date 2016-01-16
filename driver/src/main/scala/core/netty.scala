@@ -15,12 +15,20 @@
  */
 package reactivemongo.core.netty
 
-import java.nio.ByteOrder._
+import java.nio.ByteOrder.LITTLE_ENDIAN
+
+import org.jboss.netty.buffer.{
+  ChannelBuffer,
+  ChannelBuffers,
+  LittleEndianHeapChannelBuffer
+}
+
 import reactivemongo.bson.BSONDocument
 import reactivemongo.bson.buffer.{ ReadableBuffer, WritableBuffer }
-import org.jboss.netty.buffer._
 
-class ChannelBufferReadableBuffer(protected[netty] val buffer: ChannelBuffer) extends ReadableBuffer {
+class ChannelBufferReadableBuffer(
+    protected[netty] val buffer: ChannelBuffer) extends ReadableBuffer {
+
   def size = buffer.capacity()
 
   def index = buffer.readerIndex()
@@ -64,16 +72,15 @@ class ChannelBufferWritableBuffer(val buffer: ChannelBuffer = ChannelBuffers.dyn
     this
   }
 
-  def toReadableBuffer = {
+  def toReadableBuffer =
     ChannelBufferReadableBuffer(buffer.duplicate())
-  }
 
-  def writeBytes(array: Array[Byte]): WritableBuffer = {
+  def writeBytes(array: Array[Byte]): this.type = {
     buffer writeBytes array
     this
   }
 
-  override def writeBytes(buf: ReadableBuffer) = buf match {
+  override def writeBytes(buf: ReadableBuffer): this.type = buf match {
     case nettyBuffer: ChannelBufferReadableBuffer =>
       val readable = nettyBuffer.buffer.slice()
       buffer.writeBytes(readable)

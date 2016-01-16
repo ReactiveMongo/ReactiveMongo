@@ -88,3 +88,15 @@ object ReadPreference {
   def nearest[T](tag: T)(implicit writer: BSONDocumentWriter[T]): Nearest =
     new Nearest(Some(doc => doc.contains(writer.write(tag))))
 }
+
+sealed trait ReadConcern {
+  /** The read concern level */
+  def level: String
+
+  override def toString = s"ReadConcern($level)"
+}
+
+object ReadConcern {
+  object Majority extends ReadConcern { val level = "majority" }
+  object Local extends ReadConcern { val level = "local" }
+}

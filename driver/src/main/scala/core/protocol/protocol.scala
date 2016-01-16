@@ -270,9 +270,8 @@ case class Response(
   lazy val error: Option[DatabaseException] = {
     if (reply.inError) {
       val bson = Response.parse(this)
-      //val bson = ReplyDocumentIterator(reply, documents)
-      if (bson.hasNext)
-        Some(ReactiveMongoException(bson.next))
+
+      if (bson.hasNext) Some(ReactiveMongoException(bson.next))
       else None
     } else None
   }
@@ -317,11 +316,14 @@ object MongoWireVersion {
   object V24AndBefore extends MongoWireVersion { val value = 0 }
   object V26 extends MongoWireVersion { val value = 2 }
   object V30 extends MongoWireVersion { val value = 3 }
+  object V32 extends MongoWireVersion { val value = 4 }
 
-  def apply(v: Int): MongoWireVersion =
-    if (v >= V30.value) V30
+  def apply(v: Int): MongoWireVersion = {
+    if (v >= V32.value) V32
+    else if (v >= V30.value) V30
     else if (v >= V26.value) V26
     else V24AndBefore
+  }
 
   def unapply(v: MongoWireVersion): Option[Int] = Some(v.value)
 }
@@ -387,7 +389,7 @@ private[reactivemongo] class ResponseFrameDecoder extends FrameDecoder {
 private[reactivemongo] class ResponseDecoder extends OneToOneDecoder {
   import java.net.InetSocketAddress
 
-  def decode(ctx: ChannelHandlerContext, channel: Channel, obj: Object) = {
+  def decode(ctx: ChannelHandlerContext, channel: Channel, obj: Object): Response = {
     val buffer = obj.asInstanceOf[ChannelBuffer]
     val header = MessageHeader(buffer)
     val reply = Reply(buffer)

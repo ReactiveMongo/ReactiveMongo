@@ -72,7 +72,7 @@ case class LastError(
   @deprecated("Use [[errmsg]]", "0.12.0")
   val err = errmsg
 
-  override def inError: Boolean = !ok || err.isDefined
+  override def inError: Boolean = !ok || errmsg.isDefined
   //def stringify: String = toString + " [inError: " + inError + "]"
 }
 

@@ -1,13 +1,24 @@
 package reactivemongo.api.commands.bson
 
-import reactivemongo.api.BSONSerializationPack
-import reactivemongo.api.commands.{ CommandError, UnitBox }
-import reactivemongo.bson.{ BSONBooleanLike, BSONDocument, BSONDocumentReader }
+import reactivemongo.api.{ BSONSerializationPack, ReadConcern }
+import reactivemongo.api.commands.{ CommandError, ResponseResult, UnitBox }
+import reactivemongo.bson.{
+  BSONBooleanLike,
+  BSONDocument,
+  BSONDocumentReader,
+  BSONString,
+  BSONWriter
+}
 
 object CommonImplicits {
   implicit object UnitBoxReader
       extends DealingWithGenericCommandErrorsReader[UnitBox.type] {
     def readResult(doc: BSONDocument): UnitBox.type = UnitBox
+  }
+
+  implicit object ReadConcernWriter
+      extends BSONWriter[ReadConcern, BSONString] {
+    def write(concern: ReadConcern) = BSONString(concern.level)
   }
 }
 

@@ -216,7 +216,7 @@ class MongoConnection(
     val actorSystem: ActorSystem,
     val mongosystem: ActorRef,
     val options: MongoConnectionOptions) {
-  import akka.pattern.{ ask => akkaAsk }
+  import akka.pattern.ask
   import akka.util.Timeout
 
   /**
@@ -310,33 +310,6 @@ class MongoConnection(
             "protocol metadata not available"))
         }
       }
-
-  }
-
-  /**
-   * Writes a request and wait for a response.
-   *
-   * @param message The request maker.
-   *
-   * @return The future response.
-   */
-  private def ask(message: RequestMaker, isMongo26WriteOp: Boolean): Future[Response] = {
-    val msg = RequestMakerExpectingResponse(message, isMongo26WriteOp)
-    mongosystem ! msg
-    msg.future
-  }
-
-  /**
-   * Writes a checked write request and wait for a response.
-   *
-   * @param checkedWriteRequest The request maker.
-   *
-   * @return The future response.
-   */
-  private def ask(checkedWriteRequest: CheckedWriteRequest): Future[Response] = {
-    val msg = CheckedWriteRequestExpectingResponse(checkedWriteRequest)
-    mongosystem ! msg
-    msg.future
   }
 
   /**
@@ -373,9 +346,12 @@ class MongoConnection(
    * Closes this MongoConnection (closes all the channels and ends the actors).
    */
   def askClose()(implicit timeout: FiniteDuration): Future[_] =
-    akkaAsk(monitor, Close)(Timeout(timeout))
+    ask(monitor, Close)(Timeout(timeout))
 
-  /** Closes this MongoConnection (closes all the channels and ends the actors) */
+  /**
+   * Closes this MongoConnection
+   * (closes all the channels and ends the actors)
+   */
   def close(): Unit = monitor ! Close
 
   private case class IsKilled(result: Promise[Boolean])
