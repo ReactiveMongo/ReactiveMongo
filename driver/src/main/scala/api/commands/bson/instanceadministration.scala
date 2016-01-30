@@ -129,7 +129,8 @@ object BSONCollStatsImplicits {
         (for (kv <- indexSizes.elements) yield kv._1 -> kv._2.asInstanceOf[BSONInteger].value).toArray
       },
       doc.getAs[BSONBooleanLike]("capped").fold(false)(_.toBoolean),
-      doc.getAs[BSONNumberLike]("max").map(_.toLong))
+      doc.getAs[BSONNumberLike]("max").map(_.toLong),
+      doc.getAs[BSONNumberLike]("maxSize").map(_.toDouble))
   }
 }
 

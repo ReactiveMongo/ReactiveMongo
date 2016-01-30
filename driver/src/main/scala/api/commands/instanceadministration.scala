@@ -54,6 +54,7 @@ case class CollStats(scale: Option[Int] = None) extends CollectionCommand with C
  * @param indexSizes Size of specific indexes in bytes.
  * @param capped States if this collection is capped.
  * @param max The maximum number of documents of this collection, if capped.
+ * @param maxSize The maximum size in bytes (or in bytes / scale, if any) of this collection, if capped.
  */
 case class CollStatsResult(
   ns: String,
@@ -70,7 +71,8 @@ case class CollStatsResult(
   totalIndexSize: Int,
   indexSizes: Array[(String, Int)],
   capped: Boolean,
-  max: Option[Long])
+  max: Option[Long],
+  maxSize: Option[Double])
 
 case class DropIndexes(index: String) extends CollectionCommand with CommandWithResult[DropIndexesResult]
 
