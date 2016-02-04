@@ -257,6 +257,12 @@ object ScramSha1FinalNegociation
 
 // --- MongoDB CR authentication ---
 
+@deprecated(message = "See [[GetCrNonce]]", since = "0.11.10")
+object Getnonce extends Command[String] {
+  override def makeDocuments = GetCrNonce.makeDocuments
+  val ResultMaker = GetCrNonce.ResultMaker
+}
+
 /**
  * Getnonce Command for Mongo CR authentication.
  *
@@ -270,6 +276,29 @@ object GetCrNonce extends Command[String] {
       CommandError.checkOk(document, Some("getnonce")).
         toLeft(document.getAs[BSONString]("nonce").get.value)
   }
+}
+
+@deprecated(message = "See [[CrAuthenticate]]", since = "0.11.10")
+case class Authenticate(user: String, password: String, nonce: String)
+    extends Command[SuccessfulAuthentication] {
+
+  private val underlying = CrAuthenticate(user, password, nonce)
+
+  @deprecated(message =
+    "See [[CrAuthenticate.makeDocuments]]", since = "0.11.10")
+  override def makeDocuments = underlying.makeDocuments
+
+  @deprecated(message =
+    "See [[CrAuthenticate.ResultMaker]]", since = "0.11.10")
+  val ResultMaker = underlying.ResultMaker
+
+  @deprecated(message =
+    "See [[CrAuthenticate.pwdDigest]]", since = "0.11.10")
+  def pwdDigest = underlying.pwdDigest
+
+  @deprecated(message =
+    "See [[CrAuthenticate.key]]", since = "0.11.10")
+  def key = underlying.key
 }
 
 /**

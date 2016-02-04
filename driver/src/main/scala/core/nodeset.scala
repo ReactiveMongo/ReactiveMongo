@@ -314,19 +314,10 @@ sealed trait Authenticating extends Authentication {
   def password: String
 }
 
-case class CrAuthenticating(db: String, user: String, password: String, nonce: Option[String]) extends Authenticating {
-  override def toString: String =
-    s"Authenticating($db, $user, ${nonce.map(_ => "<nonce>").getOrElse("<>")})"
-}
-
-case class ScramSha1Authenticating(
-  db: String, user: String, password: String,
-  randomPrefix: String, saslStart: String,
-  conversationId: Option[Int] = None,
-  serverSignature: Option[Array[Byte]] = None,
-  step: Int = 0) extends Authenticating
-
 object Authenticating {
+  @deprecated(message = "Use [[CrAuthenticating.apply]]", since = "0.11.10")
+  def apply(db: String, user: String, password: String, nonce: Option[String]): Authenticating = CrAuthenticating(db, user, password, nonce)
+
   def unapply(auth: Authenticating): Option[(String, String, String)] =
     auth match {
       case CrAuthenticating(db, user, pass, _) =>
@@ -339,6 +330,18 @@ object Authenticating {
         None
     }
 }
+
+case class CrAuthenticating(db: String, user: String, password: String, nonce: Option[String]) extends Authenticating {
+  override def toString: String =
+    s"Authenticating($db, $user, ${nonce.map(_ => "<nonce>").getOrElse("<>")})"
+}
+
+case class ScramSha1Authenticating(
+  db: String, user: String, password: String,
+  randomPrefix: String, saslStart: String,
+  conversationId: Option[Int] = None,
+  serverSignature: Option[Array[Byte]] = None,
+  step: Int = 0) extends Authenticating
 
 case class Authenticated(db: String, user: String) extends Authentication
 

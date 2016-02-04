@@ -113,14 +113,25 @@ class DefaultFileToSave(
   val filename: Option[String] = None,
   val contentType: Option[String] = None,
   val uploadDate: Option[Long] = None,
-  val metadata: BSONDocument = BSONDocument(),
+  val metadata: BSONDocument = BSONDocument.empty,
   val id: BSONValue = BSONObjectID.generate)
-    extends FileToSave[BSONSerializationPack.type, BSONValue] {
+    extends FileToSave[BSONSerializationPack.type, BSONValue] with Equals {
+
   val pack = BSONSerializationPack
+
+  def canEqual(that: Any): Boolean = that match {
+    case _: DefaultFileToSave => true
+    case _                    => false
+  }
+
+  def copy(filename: Option[String] = this.filename, contentType: Option[String] = this.contentType, uploadDate: Option[Long] = this.uploadDate, metadata: BSONDocument = this.metadata, id: BSONValue = this.id) = new DefaultFileToSave(filename, contentType, uploadDate, metadata, id)
+
 }
 
 /** Factory of [[DefaultFileToSave]]. */
 object DefaultFileToSave {
+  def unapply(that: DefaultFileToSave): Option[(Option[String], Option[String], Option[Long], BSONDocument, BSONValue)] = Some((that.filename, that.contentType, that.uploadDate, that.metadata, that.id))
+
   /** For backward compatibility. */
   sealed trait FileName[T] extends (T => Option[String]) {
     def apply(name: T): Option[String]

@@ -18,13 +18,14 @@ package reactivemongo.api
 import org.jboss.netty.buffer.ChannelBuffer
 import reactivemongo.core.protocol.QueryFlags
 
-/* TODO: Remove?
+@deprecated(message = "Will be removed", since = "0.11.10")
 sealed trait SortOrder
+
+@deprecated(message = "Will be removed", since = "0.11.10")
 object SortOrder {
   case object Ascending extends SortOrder
   case object Descending extends SortOrder
 }
- */
 
 /**
  * A helper to make the query options.
