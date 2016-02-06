@@ -49,5 +49,5 @@ if [ "$MONGODB_VER" = "3" ]; then
         SBT_OPTS="$SBT_OPTS -Dtest.enableSSL=true"
     fi
 fi
-
-sbt $SBT_OPTS "testOnly -- $TEST_OPTS"
+sbt ++$TRAVIS_SCALA_VERSION 
+sbt $SBT_OPTS ";mimaReportBinaryIssues ;testOnly -- $TEST_OPTS"

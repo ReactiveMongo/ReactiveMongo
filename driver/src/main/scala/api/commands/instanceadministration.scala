@@ -57,22 +57,45 @@ case class CollStats(scale: Option[Int] = None) extends CollectionCommand with C
  * @param maxSize The maximum size in bytes (or in bytes / scale, if any) of this collection, if capped.
  */
 case class CollStatsResult(
-  ns: String,
-  count: Int,
-  size: Double,
-  averageObjectSize: Option[Double],
-  storageSize: Double,
-  numExtents: Option[Int],
-  nindexes: Int,
-  lastExtentSize: Option[Int],
-  paddingFactor: Option[Double],
-  systemFlags: Option[Int],
-  userFlags: Option[Int],
-  totalIndexSize: Int,
-  indexSizes: Array[(String, Int)],
-  capped: Boolean,
-  max: Option[Long],
-  maxSize: Option[Double])
+    ns: String,
+    count: Int,
+    size: Double,
+    averageObjectSize: Option[Double],
+    storageSize: Double,
+    numExtents: Option[Int],
+    nindexes: Int,
+    lastExtentSize: Option[Int],
+    paddingFactor: Option[Double],
+    systemFlags: Option[Int],
+    userFlags: Option[Int],
+    totalIndexSize: Int,
+    indexSizes: Array[(String, Int)],
+    capped: Boolean,
+    max: Option[Long],
+    maxSize: Option[Double] = None) {
+
+  @deprecated(message = "Use [[copy]] with [[maxSize]]", since = "0.11.10")
+  def copy(
+    ns: String = this.ns,
+    count: Int = this.count,
+    size: Double = this.size,
+    averageObjectSize: Option[Double] = this.averageObjectSize,
+    storageSize: Double = this.storageSize,
+    numExtents: Option[Int] = this.numExtents,
+    nindexes: Int = this.nindexes,
+    lastExtentSize: Option[Int] = this.lastExtentSize,
+    paddingFactor: Option[Double] = this.paddingFactor,
+    systemFlags: Option[Int] = this.systemFlags,
+    userFlags: Option[Int] = this.userFlags,
+    totalIndexSize: Int = this.totalIndexSize,
+    indexSizes: Array[(String, Int)] = this.indexSizes,
+    capped: Boolean = this.capped,
+    max: Option[Long] = this.max): CollStatsResult = CollStatsResult(
+    ns, count, size, averageObjectSize, storageSize, numExtents, nindexes,
+    lastExtentSize, paddingFactor, systemFlags, userFlags, totalIndexSize,
+    indexSizes, capped, max)
+
+}
 
 case class DropIndexes(index: String) extends CollectionCommand with CommandWithResult[DropIndexesResult]
 
