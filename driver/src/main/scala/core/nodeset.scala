@@ -1,18 +1,16 @@
 package reactivemongo.core.nodeset
 
-import java.util.concurrent.{ Executor, Executors }
+import java.util.concurrent.{ TimeUnit, Executor, Executors }
+
+import org.jboss.netty.handler.timeout.IdleStateHandler
+import org.jboss.netty.util.HashedWheelTimer
 
 import scala.collection.generic.CanBuildFrom
 import scala.collection.immutable.Set
 
 import org.jboss.netty.channel.socket.nio.NioClientSocketChannelFactory
 import org.jboss.netty.buffer.HeapChannelBufferFactory
-import org.jboss.netty.channel.{
-  Channel,
-  ChannelFuture,
-  ChannelPipeline,
-  Channels
-}
+import org.jboss.netty.channel._
 
 import akka.actor.ActorRef
 
@@ -430,9 +428,10 @@ class RoundRobiner[A, M[T] <: Iterable[T]](val subject: M[A], startAtIndex: Int 
 }
 
 class ChannelFactory(options: MongoConnectionOptions, bossExecutor: Executor = Executors.newCachedThreadPool, workerExecutor: Executor = Executors.newCachedThreadPool) {
-  import javax.net.ssl.{ KeyManager, SSLContext }
+  import javax.net.ssl.SSLContext
 
   private val logger = LazyLogger("reactivemongo.core.nodeset.ChannelFactory")
+  private val timer = new HashedWheelTimer()
 
   def create(host: String = "localhost", port: Int = 27017, receiver: ActorRef): Channel = {
     val channel = makeChannel(receiver)
@@ -446,8 +445,10 @@ class ChannelFactory(options: MongoConnectionOptions, bossExecutor: Executor = E
   private val bufferFactory = new HeapChannelBufferFactory(
     java.nio.ByteOrder.LITTLE_ENDIAN)
 
-  private def makePipeline(receiver: ActorRef): ChannelPipeline = {
-    val pipeline = Channels.pipeline(new ResponseFrameDecoder(),
+  private def makePipeline(timeoutMS: Int, receiver: ActorRef): ChannelPipeline = {
+    val idleHandler = new IdleStateHandler(timer, timeoutMS, timeoutMS, 0, TimeUnit.MILLISECONDS)
+
+    val pipeline = Channels.pipeline(idleHandler, new ResponseFrameDecoder(),
       new ResponseDecoder(), new RequestEncoder(), new MongoHandler(receiver))
 
     if (options.sslEnabled) {
@@ -476,7 +477,7 @@ class ChannelFactory(options: MongoConnectionOptions, bossExecutor: Executor = E
   }
 
   private def makeChannel(receiver: ActorRef): Channel = {
-    val channel = channelFactory.newChannel(makePipeline(receiver))
+    val channel = channelFactory.newChannel(makePipeline(options.socketTimeoutMS, receiver))
     val config = channel.getConfig
 
     config.setTcpNoDelay(options.tcpNoDelay)

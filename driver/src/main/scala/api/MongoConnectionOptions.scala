@@ -24,6 +24,7 @@ case object ScramSha1Authentication extends AuthenticationMode
  * @param nbChannelsPerNode Number of channels (connections) per node (ReactiveMongo-specific option).
  * @param writeConcern the default write concern
  * @param readPreference the default read preference
+ * @param socketTimeoutMS The number of milliseconds a socket can be idle before it is closed
  */
 case class MongoConnectionOptions(
   // canonical options - connection
@@ -41,4 +42,5 @@ case class MongoConnectionOptions(
 
   // read and write preferences
   writeConcern: WriteConcern = WriteConcern.Default,
-  readPreference: ReadPreference = ReadPreference.primary)
+  readPreference: ReadPreference = ReadPreference.primary,
+  socketTimeoutMS: Int = 0)
