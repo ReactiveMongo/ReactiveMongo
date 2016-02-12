@@ -640,6 +640,7 @@ object MongoConnection {
           case ("authMode", _)             => unsupported -> result.copy(authMode = CrAuthentication)
 
           case ("connectTimeoutMS", v)     => unsupported -> result.copy(connectTimeoutMS = v.toInt)
+          case ("socketTimeoutMS", v)      => unsupported -> result.copy(socketTimeoutMS = v.toInt)
           case ("sslEnabled", v)           => unsupported -> result.copy(sslEnabled = v.toBoolean)
           case ("sslAllowsInvalidCert", v) => unsupported -> result.copy(sslAllowsInvalidCert = v.toBoolean)
 

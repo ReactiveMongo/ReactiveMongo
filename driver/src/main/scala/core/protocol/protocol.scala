@@ -23,6 +23,8 @@ import shaded.netty.buffer._
 import shaded.netty.channel._
 import shaded.netty.handler.codec.oneone._
 import shaded.netty.handler.codec.frame.FrameDecoder
+import shaded.netty.handler.timeout.{ IdleState, IdleStateEvent, IdleStateAwareChannelHandler }
+
 import reactivemongo.core.actors.{
   ChannelConnected,
   ChannelClosed,
@@ -403,7 +405,7 @@ private[reactivemongo] class ResponseDecoder extends OneToOneDecoder {
   }
 }
 
-private[reactivemongo] class MongoHandler(receiver: ActorRef) extends SimpleChannelHandler {
+private[reactivemongo] class MongoHandler(receiver: ActorRef) extends IdleStateAwareChannelHandler {
   import MongoHandler._
 
   override def messageReceived(ctx: ChannelHandlerContext, e: MessageEvent) {
@@ -444,6 +446,13 @@ private[reactivemongo] class MongoHandler(receiver: ActorRef) extends SimpleChan
   }
 
   override def exceptionCaught(ctx: ChannelHandlerContext, e: shaded.netty.channel.ExceptionEvent) = log(e, s"CHANNEL ERROR: ${e.getCause}")
+
+  override def channelIdle(ctx: ChannelHandlerContext, e: IdleStateEvent) = {
+    log(e, s"channel timeout")
+    e.getChannel.close()
+
+    super.channelIdle(ctx, e)
+  }
 
   def log(e: ChannelEvent, s: String) =
     logger.trace(s"(channel=${e.getChannel}) $s")

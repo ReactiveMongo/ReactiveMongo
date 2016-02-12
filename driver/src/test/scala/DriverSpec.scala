@@ -126,7 +126,8 @@ object DriverSpec extends org.specs2.mutable.Specification {
 
       Await.result(con.database(
         Common.db.name, failoverStrategy), timeout).
-        aka("database resulution") must throwA[NodeSetNotReachable.type]
+        aka("database resolution") must throwA[NodeSetNotReachable.type]
+
     } tag "mongo2"
   }
 
@@ -221,6 +222,7 @@ object DriverSpec extends org.specs2.mutable.Specification {
       Await.result(con.database(
         Common.db.name, failoverStrategy), timeout).
         aka("database resolution") must throwA[NodeSetNotReachable.type]
+
     } tag "not_mongo26"
   }
 

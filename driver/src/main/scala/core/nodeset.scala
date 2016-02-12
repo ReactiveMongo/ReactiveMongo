@@ -1,18 +1,20 @@
 package reactivemongo.core.nodeset
 
-import java.util.concurrent.{ Executor, Executors }
+import java.util.concurrent.{ TimeUnit, Executor, Executors }
 
 import scala.collection.generic.CanBuildFrom
 import scala.collection.immutable.Set
 
-import shaded.netty.channel.socket.nio.NioClientSocketChannelFactory
+import shaded.netty.util.HashedWheelTimer
 import shaded.netty.buffer.HeapChannelBufferFactory
+import shaded.netty.channel.socket.nio.NioClientSocketChannelFactory
 import shaded.netty.channel.{
   Channel,
   ChannelFuture,
   ChannelPipeline,
   Channels
 }
+import shaded.netty.handler.timeout.IdleStateHandler
 
 import akka.actor.ActorRef
 
@@ -440,6 +442,7 @@ final class ChannelFactory(
   import javax.net.ssl.{ KeyManager, SSLContext }
 
   private val logger = LazyLogger("reactivemongo.core.nodeset.ChannelFactory")
+  private val timer = new HashedWheelTimer()
 
   def create(host: String = "localhost", port: Int = 27017, receiver: ActorRef): Channel = {
     val channel = makeChannel(receiver)
@@ -453,8 +456,10 @@ final class ChannelFactory(
   private val bufferFactory = new HeapChannelBufferFactory(
     java.nio.ByteOrder.LITTLE_ENDIAN)
 
-  private def makePipeline(receiver: ActorRef): ChannelPipeline = {
-    val pipeline = Channels.pipeline(new ResponseFrameDecoder(),
+  private def makePipeline(timeoutMS: Int, receiver: ActorRef): ChannelPipeline = {
+    val idleHandler = new IdleStateHandler(timer, timeoutMS, timeoutMS, 0, TimeUnit.MILLISECONDS)
+
+    val pipeline = Channels.pipeline(idleHandler, new ResponseFrameDecoder(),
       new ResponseDecoder(), new RequestEncoder(), new MongoHandler(receiver))
 
     if (options.sslEnabled) {
@@ -483,7 +488,7 @@ final class ChannelFactory(
   }
 
   private def makeChannel(receiver: ActorRef): Channel = {
-    val channel = channelFactory.newChannel(makePipeline(receiver))
+    val channel = channelFactory.newChannel(makePipeline(options.socketTimeoutMS, receiver))
     val config = channel.getConfig
 
     config.setTcpNoDelay(options.tcpNoDelay)
