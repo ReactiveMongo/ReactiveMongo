@@ -17,7 +17,7 @@ package reactivemongo.core.netty
 
 import java.nio.ByteOrder.LITTLE_ENDIAN
 
-import org.jboss.netty.buffer.{
+import shaded.netty.buffer.{
   ChannelBuffer,
   ChannelBuffers,
   LittleEndianHeapChannelBuffer

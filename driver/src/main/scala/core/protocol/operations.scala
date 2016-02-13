@@ -15,7 +15,7 @@
  */
 package reactivemongo.core.protocol
 
-import org.jboss.netty.buffer._
+import shaded.netty.buffer._
 
 /**
  * Helper methods to write tuples of supported types into a [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]].

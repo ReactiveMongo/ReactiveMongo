@@ -24,7 +24,7 @@ import scala.collection.generic.CanBuildFrom
 
 import scala.concurrent.{ ExecutionContext, Future }
 
-import org.jboss.netty.buffer.ChannelBuffer
+import shaded.netty.buffer.ChannelBuffer
 
 import reactivemongo.api._
 import reactivemongo.api.commands.{

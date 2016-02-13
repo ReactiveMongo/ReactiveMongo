@@ -117,7 +117,7 @@ object BsonSpec extends Specification {
     }
   }
 
-  def compare(origin: Array[Byte], buffer: org.jboss.netty.buffer.ChannelBuffer) = {
+  def compare(origin: Array[Byte], buffer: shaded.netty.buffer.ChannelBuffer) = {
     val array = new Array[Byte](buffer.writerIndex)
     buffer.readBytes(array)
     val result = array.corresponds(origin)(_ == _)
@@ -128,7 +128,7 @@ object BsonSpec extends Specification {
     } else success
   }
 
-  def log(origin: Array[Byte], test: Array[Byte], buffer: org.jboss.netty.buffer.ChannelBuffer) = {
+  def log(origin: Array[Byte], test: Array[Byte], buffer: shaded.netty.buffer.ChannelBuffer) = {
     println(Arrays.toString(origin))
     println(Arrays.toString(test))
     println(Arrays.toString(buffer.array()))

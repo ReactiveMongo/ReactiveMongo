@@ -19,10 +19,10 @@ import java.nio.ByteOrder
 
 import akka.actor.ActorRef
 
-import org.jboss.netty.buffer._
-import org.jboss.netty.channel._
-import org.jboss.netty.handler.codec.oneone._
-import org.jboss.netty.handler.codec.frame.FrameDecoder
+import shaded.netty.buffer._
+import shaded.netty.channel._
+import shaded.netty.handler.codec.oneone._
+import shaded.netty.handler.codec.frame.FrameDecoder
 import reactivemongo.core.actors.{
   ChannelConnected,
   ChannelClosed,
@@ -443,7 +443,7 @@ private[reactivemongo] class MongoHandler(receiver: ActorRef) extends SimpleChan
     super.channelClosed(ctx, e)
   }
 
-  override def exceptionCaught(ctx: ChannelHandlerContext, e: org.jboss.netty.channel.ExceptionEvent) = log(e, s"CHANNEL ERROR: ${e.getCause}")
+  override def exceptionCaught(ctx: ChannelHandlerContext, e: shaded.netty.channel.ExceptionEvent) = log(e, s"CHANNEL ERROR: ${e.getCause}")
 
   def log(e: ChannelEvent, s: String) =
     logger.trace(s"(channel=${e.getChannel}) $s")
