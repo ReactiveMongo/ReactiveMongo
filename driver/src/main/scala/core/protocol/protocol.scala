@@ -427,19 +427,21 @@ private[reactivemongo] class MongoHandler(receiver: ActorRef) extends SimpleChan
   override def channelDisconnected(ctx: ChannelHandlerContext, e: ChannelStateEvent) {
     log(e, "disconnected")
     receiver ! ChannelDisconnected(e.getChannel.getId)
+    super.channelDisconnected(ctx, e)
   }
 
   override def channelClosed(ctx: ChannelHandlerContext, e: ChannelStateEvent) {
-    log(e, "closed")
+    if (e.getChannel.getRemoteAddress != null) log(e, "closed")
+
     receiver ! ChannelClosed(e.getChannel.getId)
+
+    super.channelClosed(ctx, e)
   }
 
-  override def exceptionCaught(ctx: org.jboss.netty.channel.ChannelHandlerContext, e: org.jboss.netty.channel.ExceptionEvent) {
-    log(e, s"CHANNEL ERROR: ${e.getCause}")
-  }
+  override def exceptionCaught(ctx: ChannelHandlerContext, e: org.jboss.netty.channel.ExceptionEvent) = log(e, s"CHANNEL ERROR: ${e.getCause}")
 
   def log(e: ChannelEvent, s: String) =
-    logger.trace(s"(channel=${e.getChannel.getId}) $s")
+    logger.trace(s"(channel=${e.getChannel}) $s")
 }
 
 private[reactivemongo] object MongoHandler {

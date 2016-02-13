@@ -107,8 +107,11 @@ private[reactivemongo] object ChannelUnavailable {
   def unapply(cu: ChannelUnavailable): Option[Int] = Some(cu.channelId)
 }
 
-private[reactivemongo] case class ChannelDisconnected(channelId: Int) extends ChannelUnavailable
-private[reactivemongo] case class ChannelClosed(channelId: Int) extends ChannelUnavailable
+private[reactivemongo] case class ChannelDisconnected(
+  channelId: Int) extends ChannelUnavailable
+
+private[reactivemongo] case class ChannelClosed(
+  channelId: Int) extends ChannelUnavailable
 
 /** Message sent when the primary has been discovered. */
 case class PrimaryAvailable(metadata: ProtocolMetadata)
@@ -378,12 +381,11 @@ trait MongoDBSystem extends Actor {
       }
     }
 
-    // monitor
-    case ConnectAll => {
+    case ConnectAll => { // monitor
       updateNodeSet(nodeSet.createNeededChannels(
         self, options.nbChannelsPerNode))
 
-      logger.debug("ConnectAll Job running... Status: " + nodeSet.nodes.map(_.toShortString).mkString(" | "))
+      logger.trace("ConnectAll Job running... Status: " + nodeSet.nodes.map(_.toShortString).mkString(" | "))
       connectAll(nodeSet)
     }
 
@@ -394,7 +396,9 @@ trait MongoDBSystem extends Actor {
           sendIsMaster(node, RequestId.isMaster.next)
         })
       }
-      logger.debug(s"RefreshAllNodes Job running... Status: ${nodeSet.toShortString}")
+
+      logger.trace(
+        s"RefreshAllNodes Job running... Status: ${nodeSet.toShortString}")
     }
 
     case ChannelConnected(channelId) => {
@@ -407,19 +411,19 @@ trait MongoDBSystem extends Actor {
     }
 
     case channelUnavailable @ ChannelUnavailable(channelId) => {
-      logger.debug(s"Channel #$channelId unavailable ($channelUnavailable).")
+      logger.trace(s"Channel #$channelId unavailable ($channelUnavailable).")
 
       val nodeSetWasReachable = nodeSet.isReachable
       val primaryWasAvailable = nodeSet.primary.isDefined
 
       channelUnavailable match {
-        case _: ChannelClosed => updateNodeSet(
+        case ChannelClosed(_) => updateNodeSet(
           nodeSet.updateNodeByChannelId(channelId) { node =>
             unauthenticate(node, node.connections.
               filter(_.channel.getId != channelId))
           })
 
-        case _: ChannelDisconnected => updateNodeSetOnDisconnect(channelId)
+        case ChannelDisconnected(_) => updateNodeSetOnDisconnect(channelId)
       }
 
       awaitingResponses.retain { (_, awaitingResponse) =>
@@ -446,11 +450,12 @@ trait MongoDBSystem extends Actor {
           "The primary is still unavailable, is there a network problem?")
       }
 
-      logger.debug(s"$channelId is disconnected")
+      logger.trace(s"Channel #$channelId is released")
     }
 
-    // isMaster response
-    case response: Response if RequestId.isMaster accepts response => {
+    case response @ Response(_, _, _, _) if ( // isMaster response
+      RequestId.isMaster accepts response) => {
+
       val nodeSetWasReachable = nodeSet.isReachable
       val primaryWasAvailable = nodeSet.primary.isDefined
 
@@ -470,27 +475,32 @@ trait MongoDBSystem extends Actor {
 
           } else node.pingInfo
 
-        val authenticating = isMaster.status match {
-          case _: QueryableNodeStatus =>
-            authenticateNode(node, nodeSet.authenticates.toSeq)
+        val authenticating =
+          if (!isMaster.status.queryable) node
+          else authenticateNode(node, nodeSet.authenticates.toSeq)
 
-          case _ => node
-        }
-
-        authenticating.copy(
+        val an = authenticating.copy(
           status = isMaster.status,
           pingInfo = pingInfo,
-          name = isMaster.replicaSet.fold(node.name)(_.me),
           tags = isMaster.replicaSet.flatMap(_.tags),
           protocolMetadata = ProtocolMetadata(MongoWireVersion(isMaster.minWireVersion), MongoWireVersion(isMaster.maxWireVersion), isMaster.maxBsonObjectSize, isMaster.maxMessageSizeBytes, isMaster.maxWriteBatchSize),
           isMongos = isMaster.isMongos)
+
+        isMaster.replicaSet.fold(an)(rs => an.withAlias(rs.me))
       }
 
       updateNodeSet {
         connectAll {
-          ns.copy(nodes = ns.nodes ++ isMaster.replicaSet.toSeq.flatMap(_.hosts).collect {
-            case host if !ns.nodes.exists(_.name == host) => Node(host, NodeStatus.Uninitialized, Vector.empty, Set.empty, None, ProtocolMetadata.Default)
-          }).createNeededChannels(self, options.nbChannelsPerNode)
+          val upNodes = isMaster.replicaSet.toSeq.flatMap { rs =>
+            rs.hosts.collect {
+              case host if !ns.nodes.exists(_.names contains host) =>
+                Node(host, NodeStatus.Uninitialized,
+                  Vector.empty, Set.empty, None, ProtocolMetadata.Default)
+            }
+          }
+
+          ns.copy(nodes = ns.nodes ++ upNodes).
+            createNeededChannels(self, options.nbChannelsPerNode)
         }
       }
 
@@ -637,8 +647,7 @@ trait MongoDBSystem extends Actor {
         getOrElse(node.authenticated))
     }
 
-    if (!auth.isDefined)
-      ns.copy(authenticates = ns.authenticates - replyTo)
+    if (!auth.isDefined) ns.copy(authenticates = ns.authenticates - replyTo)
     else ns
   }
 
@@ -735,7 +744,8 @@ trait MongoDBSystem extends Actor {
     nodeSet
   }
 
-  def sendIsMaster(node: Node, id: Int) =
+  @deprecated(message = "Will be made private", since = "0.11.10")
+  def sendIsMaster(node: Node, id: Int): Node =
     node.connected.headOption.map { channel =>
       import reactivemongo.api.BSONSerializationPack
       import reactivemongo.api.commands.bson.{
@@ -753,12 +763,22 @@ trait MongoDBSystem extends Actor {
       channel.send(isMaster(id))
 
       if (node.pingInfo.lastIsMasterId == -1) {
-        node.copy(pingInfo = node.pingInfo.copy(lastIsMasterTime = System.currentTimeMillis(), lastIsMasterId = id))
+        node.copy(
+          pingInfo = node.pingInfo.copy(
+            lastIsMasterTime = System.currentTimeMillis(),
+            lastIsMasterId = id))
+
       } else if (node.pingInfo.lastIsMasterId >= PingInfo.pingTimeout) {
-        node.copy(pingInfo = node.pingInfo.copy(lastIsMasterTime = System.currentTimeMillis(), lastIsMasterId = id, ping = Long.MaxValue))
+        node.copy(
+          pingInfo = node.pingInfo.copy(
+            lastIsMasterTime = System.currentTimeMillis(),
+            lastIsMasterId = id,
+            ping = Long.MaxValue))
+
       } else node
     }.getOrElse(node)
 
+  @deprecated(message = "Will be made private", since = "0.11.10")
   def allChannelGroup(nodeSet: NodeSet) = {
     val result = new DefaultChannelGroup
     for (node <- nodeSet.nodes) {
