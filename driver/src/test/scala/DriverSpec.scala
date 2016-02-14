@@ -3,6 +3,7 @@ import scala.concurrent.duration.FiniteDuration
 
 import reactivemongo.bson.{ BSONArray, BSONBooleanLike, BSONDocument }
 
+import reactivemongo.core.nodeset.Authenticate
 import reactivemongo.core.commands.{
   FailedAuthentication,
   SuccessfulAuthentication
@@ -105,9 +106,11 @@ object DriverSpec extends org.specs2.mutable.Specification {
     import Common.{ DefaultOptions, timeout, timeoutMillis }
 
     lazy val driver = MongoDriver()
+    val conOpts = DefaultOptions.copy(
+      authMode = ScramSha1Authentication,
+      nbChannelsPerNode = 1)
     lazy val connection = driver.connection(
-      List("localhost:27017"),
-      options = DefaultOptions.copy(authMode = ScramSha1Authentication, nbChannelsPerNode = 1))
+      List("localhost:27017"), options = conOpts)
 
     lazy val db = {
       val _db = connection("specs2-test-reactivemongo-auth")
@@ -139,13 +142,27 @@ object DriverSpec extends org.specs2.mutable.Specification {
 
     } tag ("mongo3", "not_mongo26")
 
-    "be successful with right credentials" in {
+    "be successful on existing connection with right credentials" in {
       connection.authenticate(db.name, s"test-$id", s"password-$id").
         aka("authentication") must beLike[SuccessfulAuthentication](
           { case _ => ok }).await(timeoutMillis) and (
             db("testcol").insert(BSONDocument("foo" -> "bar")).
             map(_ => {}) must beEqualTo({}).await(timeoutMillis))
 
+    } tag ("mongo3", "not_mongo26")
+
+    "be successful with right credentials" in {
+      val auth = Authenticate(db.name, s"test-$id", s"password-$id")
+      val con = driver.connection(
+        List("localhost:27017"),
+        options = conOpts,
+        authentications = Seq(auth))
+
+      (for {
+        rdb <- con.database("testcol")
+        col <- rdb.coll("testcol")
+        _ <- col.insert(BSONDocument("foo" -> "bar"))
+      } yield ()) must beEqualTo({}).await(timeoutMillis)
     } tag ("mongo3", "not_mongo26")
 
     "driver shutdown" in { // mainly to ensure the test driver is closed

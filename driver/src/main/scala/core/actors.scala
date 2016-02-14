@@ -68,8 +68,17 @@ import reactivemongo.api.commands.LastError
  */
 sealed trait ExpectingResponse {
   private[actors] val promise: Promise[Response] = Promise()
+
   /** The future response of this request. */
   val future: Future[Response] = promise.future
+}
+
+object ExpectingResponse {
+  def unapply(that: Any): Option[Promise[Response]] = that match {
+    case req @ RequestMakerExpectingResponse(_, _) => Some(req.promise)
+    case req @ CheckedWriteRequestExpectingResponse(_) => Some(req.promise)
+    case _ => None
+  }
 }
 
 /**
@@ -244,14 +253,15 @@ trait MongoDBSystem extends Actor {
   protected def authReceive: Receive
 
   val closing: Receive = {
-    case req: RequestMaker =>
+    case req @ RequestMaker(_, _, _, _) =>
       logger.error(s"Received a non-expecting response request during closing process: $req")
 
     case RegisterMonitor => monitors += sender
 
-    case req: ExpectingResponse =>
+    case req @ ExpectingResponse(promise) => {
       logger.debug(s"Received an expecting response request during closing process: $req, completing its promise with a failure")
-      req.promise.failure(Exceptions.ClosedException)
+      promise.failure(Exceptions.ClosedException)
+    }
 
     case msg @ ChannelClosed(channelId) => {
       updateNodeSet(nodeSet.updateNodeByChannelId(channelId) { node =>
@@ -319,13 +329,11 @@ trait MongoDBSystem extends Actor {
       // moving to closing state
       context become closing
 
-      if (connectedCon == 0) {
-        stopWhenDisconnected("Processing", Close)
-      }
+      if (connectedCon == 0) stopWhenDisconnected("Processing", Close)
     }
 
-    case req: RequestMaker => {
-      logger.debug("WARNING received a request")
+    case req @ RequestMaker(_, _, _, _) => {
+      logger.debug(s"Transmiting a request: $req")
 
       val r = req(RequestId.common.next)
       pickChannel(r).map(_._2.send(r))
@@ -358,7 +366,7 @@ trait MongoDBSystem extends Actor {
       }
     }
 
-    case req: CheckedWriteRequestExpectingResponse => {
+    case req @ CheckedWriteRequestExpectingResponse(_) => {
       logger.debug("received a checked write request")
 
       val checkedWriteRequest = req.checkedWriteRequest
@@ -504,14 +512,18 @@ trait MongoDBSystem extends Actor {
         }
       }
 
-      if (!nodeSetWasReachable && nodeSet.isReachable) {
-        broadcastMonitors(SetAvailable(nodeSet.protocolMetadata))
-        logger.info("The node set is now available")
-      }
+      if (!nodeSet.authenticates.isEmpty) {
+        logger.debug("The node set is available; Waiting authentication")
+      } else {
+        if (!nodeSetWasReachable && nodeSet.isReachable) {
+          broadcastMonitors(SetAvailable(nodeSet.protocolMetadata))
+          logger.info("The node set is now available")
+        }
 
-      if (!primaryWasAvailable && nodeSet.primary.isDefined) {
-        broadcastMonitors(PrimaryAvailable(nodeSet.protocolMetadata))
-        logger.info("The primary is now available")
+        if (!primaryWasAvailable && nodeSet.primary.isDefined) {
+          broadcastMonitors(PrimaryAvailable(nodeSet.protocolMetadata))
+          logger.info("The primary is now available")
+        }
       }
     }
   }
@@ -662,6 +674,17 @@ trait MongoDBSystem extends Actor {
           case Right(successfulAuthentication) => {
             AuthRequestsManager.handleAuthResult(
               originalAuthenticate, successfulAuthentication)
+
+            if (nodeSet.isReachable) {
+              broadcastMonitors(SetAvailable(nodeSet.protocolMetadata))
+              logger.info("The node set is now authenticated")
+            }
+
+            if (nodeSet.primary.isDefined) {
+              broadcastMonitors(PrimaryAvailable(nodeSet.protocolMetadata))
+              logger.info("The primary is now authenticated")
+            }
+
             Some(Authenticated(db, user))
           }
 

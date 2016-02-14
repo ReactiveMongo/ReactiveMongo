@@ -118,7 +118,14 @@ case class NodeSet(
     case (node, Some(connection)) => node -> connection
   }
 
-  private val pickConnectionAndFlatten: Option[Node] => Option[(Node, Connection)] = _.flatMap(node => node.authenticatedConnections.pick.map(node -> _))
+  private val pickConnectionAndFlatten: Option[Node] => Option[(Node, Connection)] = {
+    val p: RoundRobiner[Connection, Vector] => Option[Connection] =
+      if (authenticates.isEmpty) _.pick
+      else _.pickWithFilter(c =>
+        !c.authenticating.isDefined && !c.authenticated.isEmpty)
+
+    _.flatMap(node => p(node.authenticatedConnections).map(node -> _))
+  }
 
   private def pickFromGroupWithFilter(roundRobiner: RoundRobiner[Node, Vector], filter: Option[BSONDocument => Boolean], fallback: => Option[Node]) =
     filter.fold(fallback)(f =>
@@ -160,7 +167,7 @@ case class NodeSet(
 }
 
 /**
- * @name the main name of the node
+ * @param name the main name of the node
  */
 @deprecated(message = "Will be made private", since = "0.11.10")
 case class Node(
@@ -175,6 +182,7 @@ case class Node(
 
   private val aliases = Set.newBuilder[String]
 
+  // TODO: Refactor as immutable once private
   def withAlias(as: String): Node = {
     aliases += as
     this
@@ -323,8 +331,15 @@ sealed trait Authentication {
   def db: String
 }
 
+/**
+ * @param db the name of the database
+ * @param user the name of the user
+ * @param password the password for the [[user]]
+ */
 case class Authenticate(
-    db: String, user: String, password: String) extends Authentication {
+    db: String,
+    user: String,
+    password: String) extends Authentication {
 
   override def toString: String = s"Authenticate($db, $user)"
 }
@@ -356,11 +371,15 @@ case class CrAuthenticating(db: String, user: String, password: String, nonce: O
 }
 
 case class ScramSha1Authenticating(
-  db: String, user: String, password: String,
-  randomPrefix: String, saslStart: String,
-  conversationId: Option[Int] = None,
-  serverSignature: Option[Array[Byte]] = None,
-  step: Int = 0) extends Authenticating
+    db: String, user: String, password: String,
+    randomPrefix: String, saslStart: String,
+    conversationId: Option[Int] = None,
+    serverSignature: Option[Array[Byte]] = None,
+    step: Int = 0) extends Authenticating {
+
+  override def toString: String =
+    s"Authenticating($db, $user})"
+}
 
 case class Authenticated(db: String, user: String) extends Authentication
 
@@ -387,13 +406,15 @@ class ContinuousIterator[A](iterable: Iterable[A], private var toDrop: Int = 0) 
   def nextIndex = i
 }
 
+@deprecated(message = "Will be made private", since = "0.11.10")
 class RoundRobiner[A, M[T] <: Iterable[T]](val subject: M[A], startAtIndex: Int = 0) {
   private val iterator = new ContinuousIterator(subject)
   private val length = subject.size
 
   def pick: Option[A] = if (iterator.hasNext) Some(iterator.next) else None
 
-  def pickWithFilter(filter: A => Boolean): Option[A] = pickWithFilter(filter, 0)
+  def pickWithFilter(filter: A => Boolean): Option[A] =
+    pickWithFilter(filter, 0)
 
   @annotation.tailrec
   private def pickWithFilter(filter: A => Boolean, tested: Int): Option[A] =
