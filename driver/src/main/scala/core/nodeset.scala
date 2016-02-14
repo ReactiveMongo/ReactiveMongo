@@ -118,7 +118,14 @@ case class NodeSet(
     case (node, Some(connection)) => node -> connection
   }
 
-  private val pickConnectionAndFlatten: Option[Node] => Option[(Node, Connection)] = _.flatMap(node => node.authenticatedConnections.pick.map(node -> _))
+  private val pickConnectionAndFlatten: Option[Node] => Option[(Node, Connection)] = {
+    val p: RoundRobiner[Connection, Vector] => Option[Connection] =
+      if (authenticates.isEmpty) _.pick
+      else _.pickWithFilter(c =>
+        !c.authenticating.isDefined && !c.authenticated.isEmpty)
+
+    _.flatMap(node => p(node.authenticatedConnections).map(node -> _))
+  }
 
   private def pickFromGroupWithFilter(roundRobiner: RoundRobiner[Node, Vector], filter: Option[BSONDocument => Boolean], fallback: => Option[Node]) =
     filter.fold(fallback)(f =>
@@ -387,13 +394,15 @@ class ContinuousIterator[A](iterable: Iterable[A], private var toDrop: Int = 0) 
   def nextIndex = i
 }
 
+@deprecated(message = "Will be made private", since = "0.11.10")
 class RoundRobiner[A, M[T] <: Iterable[T]](val subject: M[A], startAtIndex: Int = 0) {
   private val iterator = new ContinuousIterator(subject)
   private val length = subject.size
 
   def pick: Option[A] = if (iterator.hasNext) Some(iterator.next) else None
 
-  def pickWithFilter(filter: A => Boolean): Option[A] = pickWithFilter(filter, 0)
+  def pickWithFilter(filter: A => Boolean): Option[A] =
+    pickWithFilter(filter, 0)
 
   @annotation.tailrec
   private def pickWithFilter(filter: A => Boolean, tested: Int): Option[A] =
