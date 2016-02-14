@@ -3,6 +3,7 @@ package reactivemongo.core.nodeset
 import java.util.concurrent.{ Executor, Executors }
 
 import scala.collection.generic.CanBuildFrom
+import scala.collection.immutable.Set
 
 import org.jboss.netty.channel.socket.nio.NioClientSocketChannelFactory
 import org.jboss.netty.buffer.HeapChannelBufferFactory
@@ -158,6 +159,10 @@ case class NodeSet(
     s"{{NodeSet $name ${nodes.map(_.toShortString).mkString(" | ")} }}"
 }
 
+/**
+ * @name the main name of the node
+ */
+@deprecated(message = "Will be made private", since = "0.11.10")
 case class Node(
     name: String,
     status: NodeStatus,
@@ -167,6 +172,16 @@ case class Node(
     protocolMetadata: ProtocolMetadata,
     pingInfo: PingInfo = PingInfo(),
     isMongos: Boolean = false) {
+
+  private val aliases = Set.newBuilder[String]
+
+  def withAlias(as: String): Node = {
+    aliases += as
+    this
+  }
+
+  /** All the node names (including its aliases) */
+  def names: Set[String] = aliases.result() + name
 
   val (host: String, port: Int) = {
     val splitted = name.span(_ != ':')
@@ -233,7 +248,11 @@ object PingInfo {
 }
 
 sealed trait NodeStatus { def queryable = false }
-sealed trait QueryableNodeStatus { self: NodeStatus => override def queryable = true }
+
+sealed trait QueryableNodeStatus { self: NodeStatus =>
+  override def queryable = true
+}
+
 sealed trait CanonicalNodeStatus { self: NodeStatus => }
 object NodeStatus {
   object Uninitialized extends NodeStatus { override def toString = "Uninitialized" }

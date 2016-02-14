@@ -23,7 +23,7 @@ trait AggregationFramework[P <: SerializationPack] extends ImplicitCommandHelper
    * @param explain specifies to return the information on the processing of the pipeline
    * @param allowDiskUse enables writing to temporary files
    * @param cursor the cursor object for aggregation
-   * @param bypassDocumentValidation available only if you specify the $out aggregation operator
+   * @param bypassDocumentValidation available only if you specify the \$out aggregation operator
    * @param readConcern the read concern (since MongoDB 3.2)
    */
   case class Aggregate(
