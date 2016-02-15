@@ -167,7 +167,7 @@ case class NodeSet(
 }
 
 /**
- * @name the main name of the node
+ * @param name the main name of the node
  */
 @deprecated(message = "Will be made private", since = "0.11.10")
 case class Node(
@@ -182,6 +182,7 @@ case class Node(
 
   private val aliases = Set.newBuilder[String]
 
+  // TODO: Refactor as immutable once private
   def withAlias(as: String): Node = {
     aliases += as
     this
@@ -330,8 +331,15 @@ sealed trait Authentication {
   def db: String
 }
 
+/**
+ * @param db the name of the database
+ * @param user the name of the user
+ * @param password the password for the [[user]]
+ */
 case class Authenticate(
-    db: String, user: String, password: String) extends Authentication {
+    db: String,
+    user: String,
+    password: String) extends Authentication {
 
   override def toString: String = s"Authenticate($db, $user)"
 }
@@ -363,11 +371,15 @@ case class CrAuthenticating(db: String, user: String, password: String, nonce: O
 }
 
 case class ScramSha1Authenticating(
-  db: String, user: String, password: String,
-  randomPrefix: String, saslStart: String,
-  conversationId: Option[Int] = None,
-  serverSignature: Option[Array[Byte]] = None,
-  step: Int = 0) extends Authenticating
+    db: String, user: String, password: String,
+    randomPrefix: String, saslStart: String,
+    conversationId: Option[Int] = None,
+    serverSignature: Option[Array[Byte]] = None,
+    step: Int = 0) extends Authenticating {
+
+  override def toString: String =
+    s"Authenticating($db, $user})"
+}
 
 case class Authenticated(db: String, user: String) extends Authentication
 
