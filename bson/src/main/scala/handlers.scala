@@ -34,8 +34,10 @@ trait BSONReader[B <: BSONValue, T] { self =>
    * If used outside a reader, one should consider `readTry(bson: B): Try[T]` or `readOpt(bson: B): Option[T]`.
    */
   def read(bson: B): T
+
   /** Tries to produce an instance of `T` from the `bson` value, returns `None` if an error occurred. */
   def readOpt(bson: B): Option[T] = readTry(bson).toOption
+
   /** Tries to produce an instance of `T` from the `bson` value. */
   def readTry(bson: B): Try[T] = Try(read(bson))
 
@@ -81,8 +83,10 @@ trait VariantBSONReader[-B <: BSONValue, +T] {
    * If used outside a reader, one should consider `readTry(bson: B): Try[T]` or `readOpt(bson: B): Option[T]`.
    */
   def read(bson: B): T
+
   /** Tries to produce an instance of `T` from the `bson` value, returns `None` if an error occurred. */
   def readOpt(bson: B): Option[T] = readTry(bson).toOption
+
   /** Tries to produce an instance of `T` from the `bson` value. */
   def readTry(bson: B): Try[T] = Try(read(bson))
 }

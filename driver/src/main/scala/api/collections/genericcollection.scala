@@ -15,9 +15,10 @@
  */
 package reactivemongo.api.collections
 
-import scala.concurrent.{ ExecutionContext, Future }
-import scala.util.Try
+import scala.util.{ Failure, Success, Try }
 import scala.util.control.NonFatal
+
+import scala.concurrent.{ ExecutionContext, Future }
 
 import org.jboss.netty.buffer.ChannelBuffer
 
@@ -222,8 +223,18 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    * Returns the distinct values for a specified field across a single collection and returns the results in an array.
    * @param key the field for which to return distinct values
    * @param selector the query selector that specifies the documents from which to retrieve the distinct values.
+   * @param readConcern the read concern
    */
-  def distinct(key: String, selector: Option[pack.Document] = None)(implicit ec: ExecutionContext): Future[List[pack.Value]] = runCommand(DistinctCommand.Distinct(keyString = key, query = selector)).map(_.values)
+  def distinct[T](key: String, selector: Option[pack.Document] = None, readConcern: ReadConcern = ReadConcern.Local)(implicit reader: pack.NarrowValueReader[T], ec: ExecutionContext): Future[List[T]] = {
+    implicit val widenReader = pack.widenReader(reader)
+
+    runCommand(DistinctCommand.Distinct(key, selector)).flatMap { r =>
+      r.result[T] match {
+        case Failure(cause)  => Future.failed[List[T]](cause)
+        case Success(result) => Future.successful(result)
+      }
+    }
+  }
 
   @inline private def defaultWriteConcern = db.connection.options.writeConcern
 
