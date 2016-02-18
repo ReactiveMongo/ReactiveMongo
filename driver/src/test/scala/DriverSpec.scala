@@ -173,8 +173,11 @@ object DriverSpec extends org.specs2.mutable.Specification {
   "Database" should {
     "be resolved from connection according the failover strategy" >> {
       "successfully" in {
-        Common.connection.database(Common.db.name).map(_ => {}).
-          aka("database resolution") must beEqualTo({}).await(timeoutMillis)
+        val fos = FailoverStrategy(FiniteDuration(50, "ms"), 20, _ * 2)
+
+        Common.connection.database(Common.db.name, fos).
+          map(_ => {}) must beEqualTo({}).await(timeoutMillis)
+
       }
 
       "with failure" in {
@@ -183,10 +186,14 @@ object DriverSpec extends org.specs2.mutable.Specification {
         val expected = List(2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40, 42)
         val fos = FailoverStrategy(FiniteDuration(50, "ms"), 20,
           { n => val w = n * 2; ws += w; w })
+        val before = System.currentTimeMillis()
 
         con.database("foo", fos).map(_ => List.empty[Int]).
           recover({ case _ => ws.result() }) must beEqualTo(expected).
-          await(timeoutMillis)
+          await(timeoutMillis) and ((before + fos.maxTimeout.toMillis).
+            aka("estimated end") must beLessThanOrEqualTo(
+              System.currentTimeMillis()))
+
       }
     }
 
@@ -196,7 +203,7 @@ object DriverSpec extends org.specs2.mutable.Specification {
       Await.result(Common.connection.database(Common.db.name).map(_ => {}),
         timeout) aka "database resolution" must (
           throwA[ConnectionException]("unsupported MongoDB version")) and (
-            Common.connection.db(Common.db.name).
+            Common.connection(Common.db.name).
             aka("database") must throwA[ConnectionException](
               "unsupported MongoDB version"))
 

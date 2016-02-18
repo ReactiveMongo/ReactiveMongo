@@ -19,10 +19,31 @@ import java.io.{ InputStream, OutputStream }
 import java.util.Arrays
 import scala.concurrent.{ ExecutionContext, Future }
 
-import play.api.libs.iteratee.{ Enumeratee, Enumerator, Iteratee }
+import play.api.libs.iteratee.{
+  Concurrent,
+  Enumeratee,
+  Enumerator,
+  Iteratee
+}
 
-import reactivemongo.bson._
+import reactivemongo.bson.{
+  BSONBinary,
+  BSONDateTime,
+  BSONDocument,
+  BSONDocumentReader,
+  BSONDocumentWriter,
+  BSONElement,
+  BSONInteger,
+  BSONLong,
+  BSONNumberLike,
+  BSONObjectID,
+  BSONString,
+  BSONValue,
+  Producer,
+  Subtype
+}
 import reactivemongo.api.{
+  Cursor,
   CursorProducer,
   DB,
   DBMetaCommands,
@@ -32,6 +53,7 @@ import reactivemongo.api.{
 }
 import reactivemongo.api.commands.WriteResult
 import reactivemongo.util._
+import reactivemongo.core.errors.ReactiveMongoException
 import reactivemongo.core.netty.ChannelBufferWritableBuffer
 
 import reactivemongo.api.collections.{
@@ -49,8 +71,6 @@ object `package` {
 object Implicits { // TODO: Move in a `ReadFile` companion object?
   /** A default `BSONReader` for `ReadFile`. */
   implicit object DefaultReadFileReader extends BSONDocumentReader[ReadFile[BSONSerializationPack.type, BSONValue]] {
-    import DefaultBSONHandlers._
-
     def read(doc: BSONDocument) = DefaultReadFile(
       doc.getAs[BSONValue]("_id").get,
       doc.getAs[BSONString]("contentType").map(_.value),
@@ -291,8 +311,6 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
       }
 
       def finish(): Future[ReadFile[P, Id]] = {
-        import DefaultBSONHandlers._
-
         logger.debug(s"writing last chunk (n=$n)!")
 
         val uploadDate = file.uploadDate.getOrElse(System.currentTimeMillis)
@@ -317,13 +335,11 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
       def writeChunk(n: Int, array: Array[Byte]) = {
         logger.debug(s"writing chunk $n")
 
-        val bson = {
-          import DefaultBSONHandlers._
-          BSONDocument(
-            "files_id" -> file.id,
-            "n" -> BSONInteger(n),
-            "data" -> BSONBinary(array, Subtype.GenericBinarySubtype))
-        }
+        val bson = BSONDocument(
+          "files_id" -> file.id,
+          "n" -> BSONInteger(n),
+          "data" -> BSONBinary(array, Subtype.GenericBinarySubtype))
+
         chunks.as[BSONCollection]().insert(bson)
       }
     }
@@ -334,13 +350,17 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
     }.map(_.finish)
   }
 
-  /** Produces an enumerator of chunks of bytes from the `chunks` collection matching the given file metadata. */
+  /**
+   * Produces an enumerator of chunks of bytes from the `chunks` collection
+   * matching the given file metadata.
+   *
+   * @param file the file to be read
+   */
   def enumerate[Id <: pack.Value](file: ReadFile[P, Id])(implicit ctx: ExecutionContext, idProducer: IdProducer[Id]): Enumerator[Array[Byte]] = {
     import reactivemongo.api.collections.bson.{
       BSONCollection,
       BSONCollectionProducer
     }
-    import DefaultBSONHandlers._
 
     val selector = BSONDocument(
       "$query" -> (BSONDocument(idProducer("files_id" -> file.id)) ++ (
@@ -351,20 +371,27 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
       "$orderby" -> BSONDocument("n" -> BSONInteger(1)))
 
     @inline def cursor = chunks.as[BSONCollection]().
-      find(selector).cursor(defaultReadPreference)
+      find(selector).cursor[BSONDocument](defaultReadPreference)
 
-    cursor.enumerate() &> Enumeratee.map { doc =>
-      doc.get("data").flatMap {
-        case BSONBinary(data, _) => {
-          val array = new Array[Byte](data.readable)
-          data.slice(data.readable).readBytes(array)
-          Some(array)
-        }
-        case _ => None
-      }.getOrElse {
-        logger.error("not a chunk! failed assertion: data field is missing")
-        throw new RuntimeException("not a chunk! failed assertion: data field is missing")
+    @inline def pushChunk(chan: Concurrent.Channel[Array[Byte]], doc: BSONDocument): Cursor.State[Unit] = doc.get("data") match {
+      case Some(BSONBinary(data, _)) => {
+        val array = new Array[Byte](data.readable)
+        data.slice(data.readable).readBytes(array)
+        Cursor.Cont(chan push array)
       }
+
+      case _ => {
+        val errmsg = "not a chunk! failed assertion: data field is missing: ${BSONDocument pretty doc}"
+
+        logger.error(errmsg)
+        Cursor.Fail(ReactiveMongoException(errmsg))
+      }
+    }
+
+    Concurrent.unicast[Array[Byte]] { chan =>
+      cursor.foldWhile({})(
+        (_, doc) => pushChunk(chan, doc),
+        Cursor.FailOnError()).onComplete { case _ => chan.eofAndEnd() }
     }
   }
 
@@ -393,7 +420,6 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
       BSONCollection,
       BSONCollectionProducer
     }
-    import DefaultBSONHandlers._
 
     chunks.as[BSONCollection]().
       remove(BSONDocument(idProducer("files_id" -> id))).flatMap { _ =>

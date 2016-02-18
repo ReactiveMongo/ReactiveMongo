@@ -16,15 +16,14 @@ object BuildSettings {
     organization := "org.reactivemongo",
     version := buildVersion,
     scalaVersion := "2.11.7",
-    crossScalaVersions := Seq("2.11.7", "2.10.4"),
+    crossScalaVersions := Seq("2.11.7", "2.10.5"),
     crossVersion := CrossVersion.binary,
     javaOptions in test ++= Seq("-Xmx512m", "-XX:MaxPermSize=512m"),
     //fork in Test := true, // Don't share executioncontext between SBT CLI/tests
     scalacOptions in Compile ++= Seq(
       "-unchecked", "-deprecation", "-target:jvm-1.6", "-Ywarn-unused-import"),
-    scalacOptions in (Compile, doc) ++= Seq(
-      "-unchecked", "-deprecation", "-diagrams", "-implicits",
-      "-skip-packages", "samples"),
+    scalacOptions in (Compile, doc) ++= Seq("-unchecked", "-deprecation",
+      "-diagrams", "-implicits", "-skip-packages", "samples"),
     scalacOptions in (Compile, doc) ++= Opts.doc.title("ReactiveMongo API"),
     scalacOptions in (Compile, doc) ++= Opts.doc.version(buildVersion),
     scalacOptions in Compile := {
@@ -164,7 +163,7 @@ object Dependencies {
 
   val akkaActor = "com.typesafe.akka" %% "akka-actor" % "2.3.6"
 
-  val iteratees = "com.typesafe.play" %% "play-iteratees" % "2.3.10"
+  val playIteratees = "com.typesafe.play" %% "play-iteratees" % "2.3.10"
 
   val specs = "org.specs2" %% "specs2-core" % "2.4.9" % Test
 
@@ -176,7 +175,7 @@ object Dependencies {
 
   val shapelessTest = "com.chuusai" % "shapeless" % "2.0.0" %
   Test cross CrossVersion.binaryMapped {
-    case "2.10" => "2.10.4"
+    case "2.10" => "2.10.5"
     case x => x
   }
 
@@ -212,7 +211,7 @@ object ReactiveMongoBuild extends Build {
       libraryDependencies ++= Seq(
         netty,
         akkaActor,
-        iteratees,
+        playIteratees,
         commonsCodec,
         shapelessTest,
         specs) ++ logApi,
@@ -423,7 +422,11 @@ object ReactiveMongoBuild extends Build {
           mtp("reactivemongo.core.nodeset.Authenticating$"),
           mmp("reactivemongo.api.commands.AggregationFramework#Project.apply"),
           mmp(
-            "reactivemongo.api.commands.AggregationFramework#Redact.document"))
+            "reactivemongo.api.commands.AggregationFramework#Redact.document"),
+          mmp("reactivemongo.api.DefaultDB.sister"),
+          mmp("reactivemongo.api.DB.sister"))
+
+
       },
       testOptions in Test += Tests.Cleanup(cl => {
         import scala.language.reflectiveCalls
@@ -452,4 +455,28 @@ object ReactiveMongoBuild extends Build {
     )).
     settings(libraryDependencies += specs).
     dependsOn(bson)
+
+  lazy val iteratees = Project( // TODO: Move in separate repo
+    s"$projectPrefix-Iteratees",
+    file("iteratees"),
+    settings = buildSettings).
+    settings(
+      previousArtifacts := Set.empty,
+      compile in Compile <<= (compile in Compile).
+        dependsOn(compile in (driver, Compile)),
+      unmanagedJars in Compile += (
+        (packageBin in (driver, Compile)).value),
+      testOptions in Test += Tests.Cleanup(cl => {
+        import scala.language.reflectiveCalls
+        val c = cl.loadClass("Common$")
+        type M = { def closeDriver(): Unit }
+        val m: M = c.getField("MODULE$").get(null).asInstanceOf[M]
+        m.closeDriver()
+      }),
+      libraryDependencies ++= Seq(
+        "org.reactivemongo" %% "reactivemongo" % buildVersion % "provided",
+        playIteratees, specs) ++ logApi
+    ).
+    settings(net.virtualvoid.sbt.graph.Plugin.graphSettings: _*)
+
 }

@@ -113,6 +113,7 @@ object Command {
       val (requestMaker, mongo26WriteCommand) =
         buildRequestMaker(pack)(command, writer, readPreference, db.name)
 
+      // TODO: Await maxTimeout?
       Failover2(db.connection, failover) { () =>
         db.connection.sendExpectingResponse(
           requestMaker, mongo26WriteCommand).map { response =>
@@ -170,7 +171,7 @@ object Command {
         ResolvedCollectionCommand(collection.name, command), failover).cursor[R]
 
       for {
-        firstResponse <- cursor.makeRequest
+        firstResponse <- cursor.makeRequest(cursor.numberToReturn)
         result <- cursor.headOption.flatMap(_.fold(Future.failed[R](
           ReactiveMongoException("missing result")))(Future.successful(_)))
       } yield ResponseResult(firstResponse, cursor.numberToReturn, result)

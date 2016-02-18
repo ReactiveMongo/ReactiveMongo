@@ -59,9 +59,10 @@ import reactivemongo.util.LazyLogger
  * @param expectingResponseMaker A function that takes a message of type `T` and wraps it into an ExpectingResponse message.
  */
 class Failover[T](message: T, connection: MongoConnection, strategy: FailoverStrategy)(expectingResponseMaker: T => ExpectingResponse)(implicit ec: ExecutionContext) {
-  import Failover.logger
+  import Failover2.logger
   import reactivemongo.core.errors._
   import reactivemongo.core.actors.Exceptions._
+
   private val promise = Promise[Response]()
 
   /** A future that is completed with a response, after 1 or more attempts (specified in the given strategy). */
@@ -76,7 +77,7 @@ class Failover[T](message: T, connection: MongoConnection, strategy: FailoverStr
           val `try` = n + 1
           val delayFactor = strategy.delayFactor(`try`)
           val delay = Duration.unapply(strategy.initialDelay * delayFactor).map(t => FiniteDuration(t._1, t._2)).getOrElse(strategy.initialDelay)
-          logger.debug("Got an error, retrying... (try #" + `try` + " is scheduled in " + delay.toMillis + " ms)", e)
+          logger.debug(s"Got an error, retrying... (try #${`try`} is scheduled in ${delay.toMillis} ms)", e)
           connection.actorSystem.scheduler.scheduleOnce(delay)(send(`try`))
         } else {
           // generally that means that the primary is not available or the nodeset is unreachable
@@ -110,31 +111,44 @@ class Failover2[A](producer: () => Future[A], connection: MongoConnection, strat
 
   private val promise = Promise[A]()
 
-  /** A future that is completed with a response, after 1 or more attempts (specified in the given strategy). */
+  /**
+   * A future that is completed with a response,
+   * after 1 or more attempts (specified in the given strategy).
+   */
   val future: Future[A] = promise.future
 
-  private def send(n: Int): Unit = {
+  private def send(n: Int): Unit =
     Future(producer()).flatMap(identity).onComplete {
-      case Failure(e) if isRetryable(e) =>
+      case Failure(e) if isRetryable(e) => {
         if (n < strategy.retries) {
           val `try` = n + 1
           val delayFactor = strategy.delayFactor(`try`)
-          val delay = Duration.unapply(strategy.initialDelay * delayFactor).map(t => FiniteDuration(t._1, t._2)).getOrElse(strategy.initialDelay)
+          val delay = Duration.unapply(strategy.initialDelay * delayFactor).
+            fold(strategy.initialDelay)(t => FiniteDuration(t._1, t._2))
+
           logger.debug(s"Got an error, retrying... (try #${`try`} is scheduled in ${delay.toMillis} ms)", e)
+
           connection.actorSystem.scheduler.scheduleOnce(delay)(send(`try`))
         } else {
-          // generally that means that the primary is not available or the nodeset is unreachable
+          // generally that means that the primary is not available
+          // or the nodeset is unreachable
           logger.error("Got an error, no more attempts to do. Completing with a failure...", e)
+
           promise.failure(e)
         }
-      case Failure(e) =>
-        logger.trace("Got an non retryable error, completing with a failure...", e)
+      }
+
+      case Failure(e) => {
+        logger.trace(
+          "Got an non retryable error, completing with a failure...", e)
         promise.failure(e)
-      case Success(response) =>
+      }
+
+      case Success(response) => {
         logger.trace("Got a successful result, completing...")
         promise.success(response)
+      }
     }
-  }
 
   private def isRetryable(throwable: Throwable) = throwable match {
     case PrimaryUnavailableException | NodeSetNotReachable => true
@@ -148,15 +162,14 @@ class Failover2[A](producer: () => Future[A], connection: MongoConnection, strat
 }
 
 object Failover2 {
-  private val logger = LazyLogger("reactivemongo.api.Failover2")
+  private[api] val logger = LazyLogger("reactivemongo.api.Failover2")
 
   def apply[A](connection: MongoConnection, strategy: FailoverStrategy)(producer: () => Future[A])(implicit ec: ExecutionContext): Failover2[A] =
     new Failover2(producer, connection, strategy)
 }
 
+@deprecated(message = "Unused", since = "0.11.10")
 object Failover {
-  private val logger = LazyLogger("reactivemongo.api.Failover")
-
   /**
    * Produces a [[reactivemongo.api.Failover]] holding a future reference that is completed with a result, after 1 or more attempts (specified in the given strategy).
    *
@@ -164,6 +177,7 @@ object Failover {
    * @param connection The reference to the MongoConnection the given message will be sent to.
    * @param strategy The Failover strategy.
    */
+  @deprecated(message = "Unused", since = "0.11.10")
   def apply(checkedWriteRequest: CheckedWriteRequest, connection: MongoConnection, strategy: FailoverStrategy)(implicit ec: ExecutionContext): Failover[CheckedWriteRequest] =
     new Failover(checkedWriteRequest, connection, strategy)(CheckedWriteRequestExpectingResponse.apply)
 
@@ -174,6 +188,7 @@ object Failover {
    * @param connection The reference to the MongoConnection actor the given message will be sent to.
    * @param strategy The Failover strategy.
    */
+  @deprecated(message = "Unused", since = "0.11.10")
   def apply(requestMaker: RequestMaker, connection: MongoConnection, strategy: FailoverStrategy)(implicit ec: ExecutionContext): Failover[RequestMaker] =
     new Failover(requestMaker, connection, strategy)(RequestMakerExpectingResponse(_, false))
 }
@@ -186,9 +201,16 @@ object Failover {
  * @param delayFactor a function that takes the current iteration and returns a factor to be applied to the initialDelay.
  */
 case class FailoverStrategy(
-  initialDelay: FiniteDuration = FiniteDuration(500, "ms"),
-  retries: Int = 5,
-  delayFactor: Int => Double = n => 1)
+    initialDelay: FiniteDuration = FiniteDuration(500, "ms"),
+    retries: Int = 5,
+    delayFactor: Int => Double = _ => 1) {
+
+  /** The maximum timeout, including all the retried */
+  lazy val maxTimeout: FiniteDuration =
+    (1 to retries).foldLeft(initialDelay) { (d, i) =>
+      d + (initialDelay * delayFactor(i).toLong)
+    }
+}
 
 /**
  * A Mongo Connection.
@@ -267,28 +289,29 @@ class MongoConnection(
     def wait(iteration: Int, attempt: Int, timeout: Duration): Future[Unit] = {
       if (attempt == 0) Future.failed(Exceptions.NodeSetNotReachable)
       else {
-        val p = Promise[Boolean]()
-
         Future {
+          val ms = timeout.toMillis
+
           try {
-            val ms = timeout.toMillis
             val before = System.currentTimeMillis
             val result = Await.result(isAvailable, timeout)
             val duration = System.currentTimeMillis - before
 
-            if (result) p success true
+            if (result) true
             else {
               Thread.sleep(ms - duration)
-              p success false
+              false
             }
           } catch {
-            case e: Throwable => p failure e
+            case e: Throwable =>
+              Thread.sleep(ms)
+              throw e
           }
-        }
+        }.flatMap {
+          case false if (attempt > 0) => Future.failed[Unit](
+            new scala.RuntimeException("Got an error, no more attempt to do."))
 
-        p.future.flatMap {
-          case false => Future.failed(Exceptions.NodeSetNotReachable)
-          case _     => Future.successful({})
+          case _ => Future.successful({})
         }.recoverWith {
           case error =>
             val nextIt = iteration + 1
@@ -420,6 +443,7 @@ class MongoConnection(
         setAvailable = false
         logger.debug("set: no node seems to be available")
 
+      /* TODO: Remove 
       case WaitForPrimary => {
         if (killed) {
           sender ! Failure(ConnectionException(
@@ -433,6 +457,7 @@ class MongoConnection(
           waitingForPrimary += sender
         }
       }
+         */
 
       case Close => {
         logger.debug("Monitor received Close")
