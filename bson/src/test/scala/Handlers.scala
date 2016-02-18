@@ -1,3 +1,5 @@
+package reactivemongo.bson
+
 /*
  * Copyright 2013 Stephane Godbillon
  * @sgodbillon
@@ -16,7 +18,7 @@
  */
 import java.util.Date
 import org.specs2.mutable._
-import reactivemongo.bson._
+
 import scala.util._
 
 class Handlers extends Specification {
@@ -108,6 +110,7 @@ class Handlers extends Specification {
       maybename.isDefined mustEqual true
       maybename.get mustEqual "Joe"
     }
+
     "get bsonarray at index 4" in {
       val tdoc = array.getAsTry[BSONDocument](4)
       tdoc.isFailure mustEqual true
@@ -130,7 +133,13 @@ class Handlers extends Specification {
     val handler = implicitly[BSONHandler[BSONDateTime, Date]]
 
     "be read as date" in {
-      handler.read(bson) must_== date
+      handler.read(bson) must_== date and (
+        handler.widenReader.readTry(bson: BSONValue).
+        aka("widen read") must beSuccessfulTry(date)) and (
+          handler.widenReader.readTry {
+            val str: BSONValue = BSONString("foo")
+            str
+          } must beFailedTry)
     }
 
     "be written from a date" in {
@@ -146,7 +155,13 @@ class Handlers extends Specification {
       val num = time / 1000L
       val bson = BSONTimestamp(num)
 
-      reader.readOpt(bson).map(_.toLong) must beSome(num * 1000L)
+      reader.readOpt(bson).map(_.toLong) must beSome(num * 1000L) and (
+        reader.widenReader.readTry(bson: BSONValue).
+        map(_.toLong) must beSuccessfulTry(num * 1000L)) and (
+          reader.widenReader.readTry {
+            val l: BSONValue = BSONArray(1L)
+            l
+          } must beFailedTry)
     }
   }
 
@@ -192,9 +207,9 @@ class Handlers extends Specification {
         "name" -> artist.name,
         "albums" -> artist.albums)
 
-    def read(doc: BSONDocument) = {
-      Artist(doc.getAs[String]("name").get, doc.getAs[List[Album]]("albums").get)
-    }
+    def read(doc: BSONDocument) = Artist(
+      doc.getAs[String]("name").get,
+      doc.getAs[List[Album]]("albums").get)
   }
 
   "Neil Young" should {

@@ -18,10 +18,15 @@ package reactivemongo.bson
 import scala.collection.generic.CanBuildFrom
 import scala.util.{ Failure, Success, Try }
 
+sealed trait UnsafeBSONReader[T] {
+  def readTry(value: BSONValue): Try[T]
+}
+
 /**
  * A reader that produces an instance of `T` from a subtype of [[BSONValue]].
  */
-trait BSONReader[B <: BSONValue, T] {
+trait BSONReader[B <: BSONValue, T] { self =>
+
   /**
    * Reads a BSON value and produce an instance of `T`.
    *
@@ -33,6 +38,17 @@ trait BSONReader[B <: BSONValue, T] {
   def readOpt(bson: B): Option[T] = readTry(bson).toOption
   /** Tries to produce an instance of `T` from the `bson` value. */
   def readTry(bson: B): Try[T] = Try(read(bson))
+
+  private[reactivemongo] def widenReader[U >: T]: UnsafeBSONReader[U] =
+    new UnsafeBSONReader[U] {
+      def readTry(value: BSONValue): Try[U] =
+        Try(value.asInstanceOf[B]) match {
+          case Failure(_) => Failure(exceptions.TypeDoesNotMatch(
+            s"Cannot convert $value: ${value.getClass} with ${self.getClass}"))
+
+          case Success(bson) => self.readTry(bson)
+        }
+    }
 }
 
 /**
@@ -46,8 +62,10 @@ trait BSONWriter[T, B <: BSONValue] {
    * If used outside a reader, one should consider `writeTry(bson: B): Try[T]` or `writeOpt(bson: B): Option[T]`.
    */
   def write(t: T): B
+
   /** Tries to produce a BSON value from an instance of `T`, returns `None` if an error occurred. */
   def writeOpt(t: T): Option[B] = writeTry(t).toOption
+
   /** Tries to produce a BSON value from an instance of `T`. */
   def writeTry(t: T): Try[B] = Try(write(t))
 }
