@@ -21,9 +21,13 @@ import buffer._
 import utils.Converters
 
 /** A BSON Double. */
-case class BSONDouble(value: Double) extends BSONValue { val code = 0x01.toByte }
+case class BSONDouble(value: Double) extends BSONValue {
+  val code = 0x01.toByte
+}
 
-case class BSONString(value: String) extends BSONValue { val code = 0x02.toByte }
+case class BSONString(value: String) extends BSONValue {
+  val code = 0x02.toByte
+}
 
 /**
  * A `BSONDocument` structure (BSON type `0x03`).

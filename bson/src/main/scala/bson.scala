@@ -84,16 +84,20 @@ object Producer {
     OptionValueProducer(None)
 }
 
+import scala.reflect.ClassTag
+
 trait BSONValue {
   val code: Byte
 }
 
 object BSONValue {
   import scala.util.Try
+
   implicit class ExtendedBSONValue[B <: BSONValue](val bson: B) extends AnyVal {
     def asTry[T](implicit reader: BSONReader[B, T]): Try[T] = {
       reader.readTry(bson)
     }
+
     def asOpt[T](implicit reader: BSONReader[B, T]): Option[T] = asTry(reader).toOption
     def as[T](implicit reader: BSONReader[B, T]): T = asTry(reader).get
 
@@ -103,6 +107,9 @@ object BSONValue {
     def seeAsOpt[T](implicit reader: BSONReader[_ <: BSONValue, T]): Option[T] =
       seeAsTry[T].toOption
   }
+
+  final def narrow[T <: BSONValue](v: BSONValue)(implicit tag: ClassTag[T]): Option[T] = tag.unapply(v)
+
 }
 
 object BSON {

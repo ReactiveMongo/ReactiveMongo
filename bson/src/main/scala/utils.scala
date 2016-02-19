@@ -17,7 +17,7 @@ package reactivemongo.bson.utils
 
 /** Common functions */
 object Converters {
-  private val HEX_CHARS: Array[Char] = "0123456789abcdef".toCharArray();
+  private val HEX_CHARS: Array[Char] = "0123456789abcdef".toCharArray
 
   /** Turns an array of Byte into a String representation in hexadecimal. */
   def hex2Str(bytes: Array[Byte]): String = {
