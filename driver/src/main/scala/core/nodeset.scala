@@ -3,6 +3,7 @@ package reactivemongo.core.nodeset
 import java.util.concurrent.{ Executor, Executors }
 
 import scala.collection.generic.CanBuildFrom
+import scala.collection.immutable.Set
 
 import org.jboss.netty.channel.socket.nio.NioClientSocketChannelFactory
 import org.jboss.netty.buffer.HeapChannelBufferFactory
@@ -15,7 +16,7 @@ import org.jboss.netty.channel.{
 
 import akka.actor.ActorRef
 
-import reactivemongo.utils.LazyLogger
+import reactivemongo.util.LazyLogger
 import reactivemongo.core.protocol.Request
 
 import reactivemongo.bson.BSONDocument
@@ -117,7 +118,14 @@ case class NodeSet(
     case (node, Some(connection)) => node -> connection
   }
 
-  private val pickConnectionAndFlatten: Option[Node] => Option[(Node, Connection)] = _.flatMap(node => node.authenticatedConnections.pick.map(node -> _))
+  private val pickConnectionAndFlatten: Option[Node] => Option[(Node, Connection)] = {
+    val p: RoundRobiner[Connection, Vector] => Option[Connection] =
+      if (authenticates.isEmpty) _.pick
+      else _.pickWithFilter(c =>
+        !c.authenticating.isDefined && !c.authenticated.isEmpty)
+
+    _.flatMap(node => p(node.authenticatedConnections).map(node -> _))
+  }
 
   private def pickFromGroupWithFilter(roundRobiner: RoundRobiner[Node, Vector], filter: Option[BSONDocument => Boolean], fallback: => Option[Node]) =
     filter.fold(fallback)(f =>
@@ -158,6 +166,10 @@ case class NodeSet(
     s"{{NodeSet $name ${nodes.map(_.toShortString).mkString(" | ")} }}"
 }
 
+/**
+ * @param name the main name of the node
+ */
+@deprecated(message = "Will be made private", since = "0.11.10")
 case class Node(
     name: String,
     status: NodeStatus,
@@ -167,6 +179,17 @@ case class Node(
     protocolMetadata: ProtocolMetadata,
     pingInfo: PingInfo = PingInfo(),
     isMongos: Boolean = false) {
+
+  private val aliases = Set.newBuilder[String]
+
+  // TODO: Refactor as immutable once private
+  def withAlias(as: String): Node = {
+    aliases += as
+    this
+  }
+
+  /** All the node names (including its aliases) */
+  def names: Set[String] = aliases.result() + name
 
   val (host: String, port: Int) = {
     val splitted = name.span(_ != ':')
@@ -233,7 +256,11 @@ object PingInfo {
 }
 
 sealed trait NodeStatus { def queryable = false }
-sealed trait QueryableNodeStatus { self: NodeStatus => override def queryable = true }
+
+sealed trait QueryableNodeStatus { self: NodeStatus =>
+  override def queryable = true
+}
+
 sealed trait CanonicalNodeStatus { self: NodeStatus => }
 object NodeStatus {
   object Uninitialized extends NodeStatus { override def toString = "Uninitialized" }
@@ -304,8 +331,15 @@ sealed trait Authentication {
   def db: String
 }
 
+/**
+ * @param db the name of the database
+ * @param user the name of the user
+ * @param password the password for the [[user]]
+ */
 case class Authenticate(
-    db: String, user: String, password: String) extends Authentication {
+    db: String,
+    user: String,
+    password: String) extends Authentication {
 
   override def toString: String = s"Authenticate($db, $user)"
 }
@@ -314,19 +348,10 @@ sealed trait Authenticating extends Authentication {
   def password: String
 }
 
-case class CrAuthenticating(db: String, user: String, password: String, nonce: Option[String]) extends Authenticating {
-  override def toString: String =
-    s"Authenticating($db, $user, ${nonce.map(_ => "<nonce>").getOrElse("<>")})"
-}
-
-case class ScramSha1Authenticating(
-  db: String, user: String, password: String,
-  randomPrefix: String, saslStart: String,
-  conversationId: Option[Int] = None,
-  serverSignature: Option[Array[Byte]] = None,
-  step: Int = 0) extends Authenticating
-
 object Authenticating {
+  @deprecated(message = "Use [[CrAuthenticating.apply]]", since = "0.11.10")
+  def apply(db: String, user: String, password: String, nonce: Option[String]): Authenticating = CrAuthenticating(db, user, password, nonce)
+
   def unapply(auth: Authenticating): Option[(String, String, String)] =
     auth match {
       case CrAuthenticating(db, user, pass, _) =>
@@ -338,6 +363,22 @@ object Authenticating {
       case _ =>
         None
     }
+}
+
+case class CrAuthenticating(db: String, user: String, password: String, nonce: Option[String]) extends Authenticating {
+  override def toString: String =
+    s"Authenticating($db, $user, ${nonce.map(_ => "<nonce>").getOrElse("<>")})"
+}
+
+case class ScramSha1Authenticating(
+    db: String, user: String, password: String,
+    randomPrefix: String, saslStart: String,
+    conversationId: Option[Int] = None,
+    serverSignature: Option[Array[Byte]] = None,
+    step: Int = 0) extends Authenticating {
+
+  override def toString: String =
+    s"Authenticating($db, $user})"
 }
 
 case class Authenticated(db: String, user: String) extends Authentication
@@ -365,13 +406,15 @@ class ContinuousIterator[A](iterable: Iterable[A], private var toDrop: Int = 0) 
   def nextIndex = i
 }
 
+@deprecated(message = "Will be made private", since = "0.11.10")
 class RoundRobiner[A, M[T] <: Iterable[T]](val subject: M[A], startAtIndex: Int = 0) {
   private val iterator = new ContinuousIterator(subject)
   private val length = subject.size
 
   def pick: Option[A] = if (iterator.hasNext) Some(iterator.next) else None
 
-  def pickWithFilter(filter: A => Boolean): Option[A] = pickWithFilter(filter, 0)
+  def pickWithFilter(filter: A => Boolean): Option[A] =
+    pickWithFilter(filter, 0)
 
   @annotation.tailrec
   private def pickWithFilter(filter: A => Boolean, tested: Int): Option[A] =

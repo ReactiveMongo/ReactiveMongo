@@ -92,7 +92,7 @@ trait GenericQueryBuilder[P <: SerializationPack] {
 
     val op = Query(flags, collection.fullCollectionName, options.skipN, options.batchSizeN)
 
-    DefaultCursor(pack, op, documents, readPreference, collection.db.connection, failover, isMongo26WriteOp)(reader)
+    DefaultCursor.query(pack, op, documents, readPreference, collection.db.connection, failover, isMongo26WriteOp)(reader)
   }
 
   /**
@@ -116,7 +116,8 @@ trait GenericQueryBuilder[P <: SerializationPack] {
    *
    * @tparam Qry The type of the query. An implicit `Writer[Qry]` typeclass for handling it has to be in the scope.
    */
-  def query[Qry](selector: Qry)(implicit writer: pack.Writer[Qry]): Self = copy(queryOption = Some(pack.serialize(selector, writer)))
+  def query[Qry](selector: Qry)(implicit writer: pack.Writer[Qry]): Self =
+    copy(queryOption = Some(pack.serialize(selector, writer)))
 
   /** Sets the query (the selector document). */
   def query(selector: pack.Document): Self = copy(queryOption = Some(selector))
@@ -126,28 +127,13 @@ trait GenericQueryBuilder[P <: SerializationPack] {
 
   def options(options: QueryOpts): Self = copy(options = options)
 
-  /* TODO /** Sets the sorting document. */
-  def sort(sorters: (String, SortOrder)*): Self = copy(sortDoc = {
-    if (sorters.size == 0)
-      None
-    else {
-      val bson = BSONDocument(
-        (for (sorter <- sorters) yield sorter._1 -> BSONInteger(
-          sorter._2 match {
-            case SortOrder.Ascending => 1
-            case SortOrder.Descending => -1
-          })).toStream)
-      Some(bson)
-    }
-  })*/
-
   /**
    * Sets the projection document (for [[http://docs.mongodb.org/manual/core/read-operations-introduction/ retrieving only a subset of fields]]).
    *
    * @tparam Pjn The type of the projection. An implicit `Writer[Pjn]` typeclass for handling it has to be in the scope.
    */
-  def projection[Pjn](p: Pjn)(implicit writer: pack.Writer[Pjn]): Self = copy(projectionOption = Some(
-    pack.serialize(p, writer)))
+  def projection[Pjn](p: Pjn)(implicit writer: pack.Writer[Pjn]): Self =
+    copy(projectionOption = Some(pack.serialize(p, writer)))
 
   def projection(p: pack.Document): Self = copy(projectionOption = Some(p))
 
@@ -157,9 +143,10 @@ trait GenericQueryBuilder[P <: SerializationPack] {
   /** Sets the hint document (a document that declares the index MongoDB should use for this query). */
   // TODO def hint(indexName: String): Self = copy(hintOption = Some(BSONDocument(indexName -> BSONInteger(1))))
 
-  //TODO def explain(flag: Boolean = true) :QueryBuilder = copy(explainFlag=flag)
+  /** Toggles [[https://docs.mongodb.org/manual/reference/method/cursor.explain/#cursor.explain explain mode]]. */
+  def explain(flag: Boolean = true): Self = copy(explainFlag = flag)
 
-  /** Toggles [[http://www.mongodb.org/display/DOCS/How+to+do+Snapshotted+Queries+in+the+Mongo+Database snapshot mode]]. */
+  /** Toggles [[https://docs.mongodb.org/manual/faq/developers/#faq-developers-isolate-cursors snapshot mode]]. */
   def snapshot(flag: Boolean = true): Self = copy(snapshotFlag = flag)
 
   /** Adds a comment to this query, that may appear in the MongoDB logs. */

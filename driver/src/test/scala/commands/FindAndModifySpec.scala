@@ -1,5 +1,4 @@
 import org.specs2.mutable._
-import play.api.libs.iteratee.Enumerator
 import scala.util.{ Try, Failure }
 import scala.util.control.NonFatal
 

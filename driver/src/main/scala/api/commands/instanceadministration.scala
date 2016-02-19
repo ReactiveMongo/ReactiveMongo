@@ -2,14 +2,25 @@ package reactivemongo.api.commands
 
 object DropDatabase extends Command with CommandWithResult[UnitBox.type]
 
+@deprecated("Use [[DropCollection]]", "0.12.0")
 object Drop extends CollectionCommand with CommandWithResult[UnitBox.type]
 
-object EmptyCapped extends CollectionCommand with CommandWithResult[UnitBox.type]
+/**
+ * @param dropped true if the collection existed and was dropped
+ */
+case class DropCollectionResult(dropped: Boolean)
+
+object DropCollection extends CollectionCommand
+  with CommandWithResult[DropCollectionResult]
+
+object EmptyCapped extends CollectionCommand
+  with CommandWithResult[UnitBox.type]
 
 case class RenameCollection(
   fullyQualifiedCollectionName: String,
   fullyQualifiedTargetName: String,
-  dropTarget: Boolean = false) extends Command with CommandWithResult[UnitBox.type]
+  dropTarget: Boolean = false)
+    extends Command with CommandWithResult[UnitBox.type]
 
 case class Create(
   capped: Option[Capped] = None, // if set, "capped" -> true, size -> <int>, max -> <int>
@@ -43,23 +54,48 @@ case class CollStats(scale: Option[Int] = None) extends CollectionCommand with C
  * @param indexSizes Size of specific indexes in bytes.
  * @param capped States if this collection is capped.
  * @param max The maximum number of documents of this collection, if capped.
+ * @param maxSize The maximum size in bytes (or in bytes / scale, if any) of this collection, if capped.
  */
 case class CollStatsResult(
-  ns: String,
-  count: Int,
-  size: Double,
-  averageObjectSize: Option[Double],
-  storageSize: Double,
-  numExtents: Option[Int],
-  nindexes: Int,
-  lastExtentSize: Option[Int],
-  paddingFactor: Option[Double],
-  systemFlags: Option[Int],
-  userFlags: Option[Int],
-  totalIndexSize: Int,
-  indexSizes: Array[(String, Int)],
-  capped: Boolean,
-  max: Option[Long])
+    ns: String,
+    count: Int,
+    size: Double,
+    averageObjectSize: Option[Double],
+    storageSize: Double,
+    numExtents: Option[Int],
+    nindexes: Int,
+    lastExtentSize: Option[Int],
+    paddingFactor: Option[Double],
+    systemFlags: Option[Int],
+    userFlags: Option[Int],
+    totalIndexSize: Int,
+    indexSizes: Array[(String, Int)],
+    capped: Boolean,
+    max: Option[Long],
+    maxSize: Option[Double] = None) {
+
+  @deprecated(message = "Use [[copy]] with [[maxSize]]", since = "0.11.10")
+  def copy(
+    ns: String = this.ns,
+    count: Int = this.count,
+    size: Double = this.size,
+    averageObjectSize: Option[Double] = this.averageObjectSize,
+    storageSize: Double = this.storageSize,
+    numExtents: Option[Int] = this.numExtents,
+    nindexes: Int = this.nindexes,
+    lastExtentSize: Option[Int] = this.lastExtentSize,
+    paddingFactor: Option[Double] = this.paddingFactor,
+    systemFlags: Option[Int] = this.systemFlags,
+    userFlags: Option[Int] = this.userFlags,
+    totalIndexSize: Int = this.totalIndexSize,
+    indexSizes: Array[(String, Int)] = this.indexSizes,
+    capped: Boolean = this.capped,
+    max: Option[Long] = this.max): CollStatsResult = CollStatsResult(
+    ns, count, size, averageObjectSize, storageSize, numExtents, nindexes,
+    lastExtentSize, paddingFactor, systemFlags, userFlags, totalIndexSize,
+    indexSizes, capped, max)
+
+}
 
 case class DropIndexes(index: String) extends CollectionCommand with CommandWithResult[DropIndexesResult]
 
@@ -68,7 +104,8 @@ case class DropIndexesResult(value: Int) extends BoxedAnyVal[Int]
 case class CollectionNames(names: List[String])
 
 /** List the names of DB collections. */
-object ListCollectionNames extends Command with CommandWithResult[CollectionNames]
+object ListCollectionNames
+  extends Command with CommandWithResult[CollectionNames]
 
 import reactivemongo.api.indexes.Index
 
@@ -139,7 +176,7 @@ case class ReplSetStatus(
   members: List[ReplSetMember])
 
 /**
- * The command [[[[http://docs.mongodb.org/manual/reference/command/replSetGetStatus/ replSetGetStatus]]
+ * The command [[http://docs.mongodb.org/manual/reference/command/replSetGetStatus/ replSetGetStatus]]
  */
 case object ReplSetGetStatus
   extends Command with CommandWithResult[ReplSetStatus]
@@ -165,3 +202,21 @@ case class ServerStatusResult(
 /** Server [[http://docs.mongodb.org/manual/reference/server-status/ status]] */
 case object ServerStatus
   extends Command with CommandWithResult[ServerStatusResult]
+
+object ResyncResult extends BoxedAnyVal[Unit] {
+  val value = {}
+}
+
+/**
+ * The command [[https://docs.mongodb.org/manual/reference/command/resync/ resync]]
+ */
+object Resync extends Command with CommandWithResult[ResyncResult.type]
+
+/**
+ * The [[https://docs.mongodb.org/manual/reference/command/replSetMaintenance/ replSetMaintenance]] command.
+ * It must be executed against the `admin` database.
+ *
+ * @param enable if true the the member enters the `RECOVERING` state
+ */
+case class ReplSetMaintenance(enable: Boolean = true) extends Command
+  with CommandWithResult[UnitBox.type]

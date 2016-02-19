@@ -19,10 +19,31 @@ import java.io.{ InputStream, OutputStream }
 import java.util.Arrays
 import scala.concurrent.{ ExecutionContext, Future }
 
-import play.api.libs.iteratee.{ Enumeratee, Enumerator, Iteratee }
+import play.api.libs.iteratee.{
+  Concurrent,
+  Enumeratee,
+  Enumerator,
+  Iteratee
+}
 
-import reactivemongo.bson._
+import reactivemongo.bson.{
+  BSONBinary,
+  BSONDateTime,
+  BSONDocument,
+  BSONDocumentReader,
+  BSONDocumentWriter,
+  BSONElement,
+  BSONInteger,
+  BSONLong,
+  BSONNumberLike,
+  BSONObjectID,
+  BSONString,
+  BSONValue,
+  Producer,
+  Subtype
+}
 import reactivemongo.api.{
+  Cursor,
   CursorProducer,
   DB,
   DBMetaCommands,
@@ -31,7 +52,8 @@ import reactivemongo.api.{
   SerializationPack
 }
 import reactivemongo.api.commands.WriteResult
-import reactivemongo.utils._
+import reactivemongo.util._
+import reactivemongo.core.errors.ReactiveMongoException
 import reactivemongo.core.netty.ChannelBufferWritableBuffer
 
 import reactivemongo.api.collections.{
@@ -49,8 +71,6 @@ object `package` {
 object Implicits { // TODO: Move in a `ReadFile` companion object?
   /** A default `BSONReader` for `ReadFile`. */
   implicit object DefaultReadFileReader extends BSONDocumentReader[ReadFile[BSONSerializationPack.type, BSONValue]] {
-    import DefaultBSONHandlers._
-
     def read(doc: BSONDocument) = DefaultReadFile(
       doc.getAs[BSONValue]("_id").get,
       doc.getAs[BSONString]("contentType").map(_.value),
@@ -113,14 +133,25 @@ class DefaultFileToSave(
   val filename: Option[String] = None,
   val contentType: Option[String] = None,
   val uploadDate: Option[Long] = None,
-  val metadata: BSONDocument = BSONDocument(),
+  val metadata: BSONDocument = BSONDocument.empty,
   val id: BSONValue = BSONObjectID.generate)
-    extends FileToSave[BSONSerializationPack.type, BSONValue] {
+    extends FileToSave[BSONSerializationPack.type, BSONValue] with Equals {
+
   val pack = BSONSerializationPack
+
+  def canEqual(that: Any): Boolean = that match {
+    case _: DefaultFileToSave => true
+    case _                    => false
+  }
+
+  def copy(filename: Option[String] = this.filename, contentType: Option[String] = this.contentType, uploadDate: Option[Long] = this.uploadDate, metadata: BSONDocument = this.metadata, id: BSONValue = this.id) = new DefaultFileToSave(filename, contentType, uploadDate, metadata, id)
+
 }
 
 /** Factory of [[DefaultFileToSave]]. */
 object DefaultFileToSave {
+  def unapply(that: DefaultFileToSave): Option[(Option[String], Option[String], Option[Long], BSONDocument, BSONValue)] = Some((that.filename, that.contentType, that.uploadDate, that.metadata, that.id))
+
   /** For backward compatibility. */
   sealed trait FileName[T] extends (T => Option[String]) {
     def apply(name: T): Option[String]
@@ -178,7 +209,7 @@ case class DefaultReadFile(
  * @param db The database where this store is located.
  * @param prefix The prefix of this store. The `files` and `chunks` collections will be actually named `prefix.files` and `prefix.chunks`.
  */
-class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, prefix: String = "fs")(implicit producer: GenericCollectionProducer[P, GenericCollection[P]] = BSONCollectionProducer) {
+class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, prefix: String = "fs")(implicit producer: GenericCollectionProducer[P, GenericCollection[P]] = BSONCollectionProducer) { self =>
   import reactivemongo.api.indexes.Index
   import reactivemongo.api.indexes.IndexType.Ascending
 
@@ -213,6 +244,21 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
    */
   def save[Id <: pack.Value](enumerator: Enumerator[Array[Byte]], file: FileToSave[pack.type, Id], chunkSize: Int = 262144)(implicit readFileReader: pack.Reader[ReadFile[P, Id]], ctx: ExecutionContext, idProducer: IdProducer[Id], docWriter: BSONDocumentWriter[file.pack.Document]): Future[ReadFile[P, Id]] = (enumerator |>>> iteratee(file, chunkSize)).flatMap(f => f)
 
+  /** Concats two array - fast way */
+  private def concat[T](a1: Array[T], a2: Array[T])(implicit m: Manifest[T]): Array[T] = {
+    var i, j = 0
+    val result = new Array[T](a1.length + a2.length)
+    while (i < a1.length) {
+      result(i) = a1(i)
+      i = i + 1
+    }
+    while (j < a2.length) {
+      result(i + j) = a2(j)
+      j = j + 1
+    }
+    result
+  }
+
   /**
    * Gets an `Iteratee` that will consume data to put into a GridFS store.
    * @param file Metadata of the file to store.
@@ -233,7 +279,7 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
         length: Int = 0) {
 
       def feed(chunk: Array[Byte]): Future[Chunk] = {
-        val wholeChunk = concat(previous, chunk)
+        val wholeChunk = self.concat(previous, chunk)
 
         val normalizedChunkNumber = wholeChunk.length / chunkSize
 
@@ -265,8 +311,6 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
       }
 
       def finish(): Future[ReadFile[P, Id]] = {
-        import DefaultBSONHandlers._
-
         logger.debug(s"writing last chunk (n=$n)!")
 
         val uploadDate = file.uploadDate.getOrElse(System.currentTimeMillis)
@@ -291,13 +335,11 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
       def writeChunk(n: Int, array: Array[Byte]) = {
         logger.debug(s"writing chunk $n")
 
-        val bson = {
-          import DefaultBSONHandlers._
-          BSONDocument(
-            "files_id" -> file.id,
-            "n" -> BSONInteger(n),
-            "data" -> BSONBinary(array, Subtype.GenericBinarySubtype))
-        }
+        val bson = BSONDocument(
+          "files_id" -> file.id,
+          "n" -> BSONInteger(n),
+          "data" -> BSONBinary(array, Subtype.GenericBinarySubtype))
+
         chunks.as[BSONCollection]().insert(bson)
       }
     }
@@ -308,13 +350,17 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
     }.map(_.finish)
   }
 
-  /** Produces an enumerator of chunks of bytes from the `chunks` collection matching the given file metadata. */
+  /**
+   * Produces an enumerator of chunks of bytes from the `chunks` collection
+   * matching the given file metadata.
+   *
+   * @param file the file to be read
+   */
   def enumerate[Id <: pack.Value](file: ReadFile[P, Id])(implicit ctx: ExecutionContext, idProducer: IdProducer[Id]): Enumerator[Array[Byte]] = {
     import reactivemongo.api.collections.bson.{
       BSONCollection,
       BSONCollectionProducer
     }
-    import DefaultBSONHandlers._
 
     val selector = BSONDocument(
       "$query" -> (BSONDocument(idProducer("files_id" -> file.id)) ++ (
@@ -325,20 +371,27 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
       "$orderby" -> BSONDocument("n" -> BSONInteger(1)))
 
     @inline def cursor = chunks.as[BSONCollection]().
-      find(selector).cursor(defaultReadPreference)
+      find(selector).cursor[BSONDocument](defaultReadPreference)
 
-    cursor.enumerate() &> Enumeratee.map { doc =>
-      doc.get("data").flatMap {
-        case BSONBinary(data, _) => {
-          val array = new Array[Byte](data.readable)
-          data.slice(data.readable).readBytes(array)
-          Some(array)
-        }
-        case _ => None
-      }.getOrElse {
-        logger.error("not a chunk! failed assertion: data field is missing")
-        throw new RuntimeException("not a chunk! failed assertion: data field is missing")
+    @inline def pushChunk(chan: Concurrent.Channel[Array[Byte]], doc: BSONDocument): Cursor.State[Unit] = doc.get("data") match {
+      case Some(BSONBinary(data, _)) => {
+        val array = new Array[Byte](data.readable)
+        data.slice(data.readable).readBytes(array)
+        Cursor.Cont(chan push array)
       }
+
+      case _ => {
+        val errmsg = "not a chunk! failed assertion: data field is missing: ${BSONDocument pretty doc}"
+
+        logger.error(errmsg)
+        Cursor.Fail(ReactiveMongoException(errmsg))
+      }
+    }
+
+    Concurrent.unicast[Array[Byte]] { chan =>
+      cursor.foldWhile({})(
+        (_, doc) => pushChunk(chan, doc),
+        Cursor.FailOnError()).onComplete { case _ => chan.eofAndEnd() }
     }
   }
 
@@ -367,7 +420,6 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
       BSONCollection,
       BSONCollectionProducer
     }
-    import DefaultBSONHandlers._
 
     chunks.as[BSONCollection]().
       remove(BSONDocument(idProducer("files_id" -> id))).flatMap { _ =>

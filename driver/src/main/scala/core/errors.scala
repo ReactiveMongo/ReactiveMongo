@@ -15,6 +15,8 @@
  */
 package reactivemongo.core.errors
 
+import scala.util.control.NoStackTrace
+
 import reactivemongo.bson._
 import DefaultBSONHandlers._
 
@@ -23,13 +25,15 @@ trait ReactiveMongoException extends Exception {
   /** explanation message */
   def message: String
 
-  override def getMessage: String = "MongoError['" + message + "']"
+  override def getMessage: String = s"MongoError['$message']"
 }
 
 object ReactiveMongoException {
-  def apply(message: String): ReactiveMongoException = GenericDriverException(message)
+  def apply(message: String): ReactiveMongoException =
+    GenericDriverException(message)
 
-  def apply(doc: BSONDocument): DatabaseException = new DetailedDatabaseException(doc)
+  def apply(doc: BSONDocument): DatabaseException =
+    new DetailedDatabaseException(doc)
 }
 
 /** An error thrown by a MongoDB node. */
@@ -60,7 +64,7 @@ trait DriverException extends ReactiveMongoException
 
 /** A generic driver error. */
 case class GenericDriverException(
-  message: String) extends DriverException
+  message: String) extends DriverException with NoStackTrace
 
 case class ConnectionNotInitialized(message: String) extends DriverException
 object ConnectionNotInitialized {
@@ -78,9 +82,9 @@ case class GenericDatabaseException(
 
 /** An error thrown by a MongoDB node (containing the original document of the error). */
 class DetailedDatabaseException(
-    doc: BSONDocument) extends DatabaseException {
+    doc: BSONDocument) extends DatabaseException with NoStackTrace {
+
   val originalDocument = Some(doc)
   lazy val message = doc.getAs[BSONString]("$err").map(_.value).getOrElse("$err is not present, unknown error")
   lazy val code = doc.getAs[BSONInteger]("code").map(_.value)
 }
-

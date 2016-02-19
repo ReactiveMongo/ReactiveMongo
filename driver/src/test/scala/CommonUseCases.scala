@@ -1,5 +1,4 @@
 import org.specs2.mutable._
-import play.api.libs.iteratee.Enumerator
 import reactivemongo.api._
 import reactivemongo.bson._
 import reactivemongo.api.commands.bson.BSONCountCommand._
@@ -16,8 +15,9 @@ class CommonUseCases extends Specification {
 
   "ReactiveMongo" should {
     "create a collection" in {
-      Await.result(collection.create(), timeout) mustEqual (())
+      collection.create() must beEqualTo({}).await(timeoutMillis)
     }
+
     // TODO !!!
     /*
     "insert some docs from an enumerator of docs" in {
@@ -29,37 +29,54 @@ class CommonUseCases extends Specification {
       val enum = Enumerator[BSONDocument]()
       Await.result(collection.bulkInsert(enum, 100), timeout) mustEqual 0
     }*/
+
     "insert some docs from a seq of docs" in {
-      val docs = (18 to 60).toStream.map(i => BSONDocument("age" -> BSONInteger(i), "name" -> BSONString("Jack" + i)))
-      val result = Await.result(collection.bulkInsert(docs, ordered = true), timeout)
-      Await.result(collection.runValueCommand(Count(BSONDocument("age" -> BSONDocument("$gte" -> 18, "$lte" -> 60)))), timeout) mustEqual 43
+      val docs = (18 to 60).toStream.map(i => BSONDocument(
+        "age" -> BSONInteger(i), "name" -> BSONString("Jack" + i)))
+
+      (for {
+        result <- collection.bulkInsert(docs, ordered = true)
+        count <- collection.runValueCommand(Count(BSONDocument(
+          "age" -> BSONDocument("$gte" -> 18, "$lte" -> 60))))
+      } yield count) must beEqualTo(43).await(timeoutMillis)
     }
+
     "insert from an empty enumerator of docs" in {
       val docs = Stream.empty[BSONDocument]
-      val result = Await.result(collection.bulkInsert(docs, ordered = true), timeout)
-      result.n mustEqual 0
+
+      collection.bulkInsert(docs, ordered = true).map(_.n) must beEqualTo(0).
+        await(timeoutMillis)
     }
+
     "find them" in {
       // batchSize (>1) allows us to test cursors ;)
       val it = collection.find(BSONDocument()).options(QueryOpts().batchSize(2)).cursor[BSONDocument]()
       Await.result(it.collect[List](), timeout).map(_.getAs[BSONInteger]("age").get.value).mkString("") mustEqual (18 to 60).mkString("")
     }
+
     "find by regexp" in {
-      Await.result(collection.find(BSONDocument("name" -> BSONRegex("ack2", ""))).cursor[BSONDocument]().collect[List](), timeout).size mustEqual 10
+      collection.find(BSONDocument("name" -> BSONRegex("ack2", ""))).
+        cursor[BSONDocument]().collect[List]().map(_.size).
+        aka("size") must beEqualTo(10).await(timeoutMillis)
     }
+
     "find by regexp with flag" in {
-      val q =
+      val query =
         BSONDocument(
           "$or" -> BSONArray(
             BSONDocument("name" -> BSONRegex("^jack2", "i")),
             BSONDocument("name" -> BSONRegex("^jack3", "i"))))
-      Await.result(collection.find(q).cursor[BSONDocument]().collect[List](), timeout).size mustEqual 20
+
+      collection.find(query).cursor[BSONDocument]().collect[List]().
+        map(_.size) aka "size" must beEqualTo(20).await(timeoutMillis)
     }
+
     "find them with a projection" in {
       val pjn = BSONDocument("name" -> BSONInteger(1), "age" -> BSONInteger(1), "something" -> BSONInteger(1))
       val it = collection.find(BSONDocument(), pjn).options(QueryOpts().batchSize(2)).cursor[BSONDocument]()
       Await.result(it.collect[List](), timeout).map(_.getAs[BSONInteger]("age").get.value).mkString("") mustEqual (18 to 60).mkString("")
     }
+
     "insert a document containing a merged array of objects, fetch and check it" in {
       val array = BSONArray(
         BSONDocument(
@@ -86,22 +103,24 @@ class CommonUseCases extends Specification {
       }.mkString(",")
       contactsString mustEqual "telephone:+331234567890,mail:joe@plop.com"
     }
+
     "insert a weird doc" in {
       val doc = BSONDocument("coucou" -> BSONString("coucou"), "plop" -> BSONInteger(1), "plop" -> BSONInteger(2))
-      val result = Await.result(collection.insert(doc), timeout)
-      println("\n" + result + "\n")
-      result.ok mustEqual true
+
+      collection.insert(doc).map(_.ok) must beTrue.await(timeoutMillis)
     }
+
     "find this weird doc" in {
-      val doc = Await.result(collection.find(BSONDocument("coucou" -> BSONString("coucou"))).one[BSONDocument], timeout)
-      println("\n" + doc.map(BSONDocument.pretty(_)) + "\n")
-      doc.isDefined mustEqual true
+      collection.find(BSONDocument("coucou" -> BSONString("coucou"))).
+        one[BSONDocument] must beSome.await(timeoutMillis)
     }
+
     "fail with this error" in {
-      val query = BSONDocument("$and" -> BSONDocument("name" -> BSONString("toto")))
-      val future = collection.find(query).one[BSONDocument]
-      Await.ready(future, timeout)
-      (future.value.get match { case Failure(e) => e.printStackTrace(); true; case _ => false }) mustEqual true
+      val query = BSONDocument("$and" ->
+        BSONDocument("name" -> BSONString("toto")))
+
+      Await.result(collection.find(query).one[BSONDocument], timeout).
+        aka("findOne") must throwA[Exception]
     }
   }
 }

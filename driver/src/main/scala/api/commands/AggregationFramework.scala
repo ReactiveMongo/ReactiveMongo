@@ -1,7 +1,13 @@
 package reactivemongo.api.commands
 
 import scala.concurrent.Future
-import reactivemongo.api.{ BSONSerializationPack, Cursor, SerializationPack }
+
+import reactivemongo.api.{
+  BSONSerializationPack,
+  ReadConcern,
+  SerializationPack
+}
+import reactivemongo.core.protocol.MongoWireVersion
 
 /**
  * Implements the [[http://docs.mongodb.org/manual/applications/aggregation/ Aggregation Framework]].
@@ -17,18 +23,40 @@ trait AggregationFramework[P <: SerializationPack] extends ImplicitCommandHelper
    * @param explain specifies to return the information on the processing of the pipeline
    * @param allowDiskUse enables writing to temporary files
    * @param cursor the cursor object for aggregation
+   * @param bypassDocumentValidation available only if you specify the \$out aggregation operator
+   * @param readConcern the read concern (since MongoDB 3.2)
    */
   case class Aggregate(
     pipeline: Seq[PipelineOperator],
     explain: Boolean = false,
-    allowDiskUse: Boolean = false,
-    cursor: Option[Cursor] = None)
-      extends CollectionCommand with CommandWithPack[pack.type]
-      with CommandWithResult[AggregationResult]
+    allowDiskUse: Boolean,
+    cursor: Option[Cursor],
+    wireVersion: MongoWireVersion,
+    bypassDocumentValidation: Boolean,
+    readConcern: Option[ReadConcern])
+      extends CollectionCommand
+      with CommandWithPack[pack.type] with CommandWithResult[AggregationResult]
 
-  case class AggregationResult(documents: List[pack.Document]) {
-    def result[T](implicit reader: pack.Reader[T]): List[T] =
-      documents.map(pack.deserialize(_, reader))
+  /**
+   * @param firstBatch the documents of the first batch
+   * @param cursor the cursor from the result, if any
+   * @see [[Cursor]]
+   */
+  case class AggregationResult(
+      firstBatch: List[pack.Document],
+      cursor: Option[ResultCursor] = None) {
+
+    @deprecated(message = "Use [[firstBatch]]", since = "0.11.10")
+    def documents = firstBatch
+
+    @deprecated(message = "Use [[head]]", since = "0.11.10")
+    def result[T](implicit reader: pack.Reader[T]): List[T] = head[T]
+
+    /**
+     * Returns the first batch as a list, using the given `reader`.
+     */
+    def head[T](implicit reader: pack.Reader[T]): List[T] =
+      firstBatch.map(pack.deserialize(_, reader))
 
   }
 

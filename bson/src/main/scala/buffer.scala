@@ -22,7 +22,7 @@ import scala.collection.mutable.ArrayBuffer
  *
  * The implementation '''MUST''' ensure it stores data in little endian when needed.
  */
-trait WritableBuffer {
+trait WritableBuffer { self =>
   /** Returns the current write index of this buffer. */
   def index: Int
 
@@ -30,19 +30,18 @@ trait WritableBuffer {
   def setInt(index: Int, value: Int): WritableBuffer
 
   /** Writes the bytes stored in the given `array` into this buffer. */
-  def writeBytes(array: Array[Byte]): WritableBuffer
+  def writeBytes(array: Array[Byte]): self.type
 
   /** Writes the bytes stored in the given `buffer` into this buffer. */
-  def writeBytes(buffer: ReadableBuffer): WritableBuffer = {
-    @scala.annotation.tailrec
-    def write(buffer: ReadableBuffer): WritableBuffer = {
+  def writeBytes(buffer: ReadableBuffer): self.type = {
+    @annotation.tailrec
+    def write(buffer: ReadableBuffer): self.type = {
       if (buffer.readable > 1024) {
         writeBytes(buffer.readArray(1024))
         write(buffer)
-      } else {
-        writeBytes(buffer.readArray(buffer.readable))
-      }
+      } else writeBytes(buffer.readArray(buffer.readable))
     }
+
     write(buffer.slice(buffer.readable))
   }
 
@@ -227,7 +226,7 @@ class ArrayBSONBuffer protected[buffer] (protected val buffer: ArrayBuffer[Byte]
 
   def toReadableBuffer = ArrayReadableBuffer(array)
 
-  def writeBytes(array: Array[Byte]): WritableBuffer = {
+  def writeBytes(array: Array[Byte]): this.type = {
     buffer ++= array
     //index += array.length
     this

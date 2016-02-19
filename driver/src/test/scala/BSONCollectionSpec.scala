@@ -1,17 +1,18 @@
 import scala.util.{ Failure, Success }
+import scala.concurrent._
+
 import reactivemongo.api._
 import reactivemongo.bson._
-import scala.concurrent._
-import org.specs2.mutable.Specification
-import play.api.libs.iteratee.Iteratee
+import reactivemongo.core.errors.GenericDatabaseException
 
-class BSONCollectionSpec extends Specification {
-  import Common._
+object BSONCollectionSpec extends org.specs2.mutable.Specification {
+  "BSON collection" title
+
   import reactivemongo.api.commands.bson.DefaultBSONCommandError
+  import reactivemongo.api.collections.bson._
+  import Common._
 
   sequential
-
-  import reactivemongo.api.collections.bson._
 
   lazy val collection = db("somecollection_bsoncollectionspec")
 
@@ -95,12 +96,30 @@ class BSONCollectionSpec extends Specification {
           }).await(5000)
       }
 
-      "with success using enumerate" in {
-        val enumerator = cursor.enumerate(10)
-        val n = enumerator |>>> Iteratee.fold(0) { (r, doc) =>
-          r + 1
-        }
-        Await.result(n, timeout) mustEqual 0
+      "explain query result" >> {
+        "when MongoDB > 2.6" in {
+          collection.find(BSONDocument.empty).explain().one[BSONDocument].
+            aka("explanation") must beSome[BSONDocument].which { result =>
+              result.getAs[BSONDocument]("queryPlanner").
+                aka("queryPlanner") must beSome and (
+                  result.getAs[BSONDocument]("executionStats").
+                  aka("stats") must beSome) and (
+                    result.getAs[BSONDocument]("serverInfo").
+                    aka("serverInfo") must beSome)
+
+            }.await(timeoutMillis)
+        } tag ("mongo3", "not_mongo26")
+
+        "when MongoDB = 2.6" in {
+          collection.find(BSONDocument.empty).explain().one[BSONDocument].
+            aka("explanation") must beSome[BSONDocument].which { result =>
+              result.getAs[List[BSONDocument]]("allPlans").
+                aka("plans") must beSome[List[BSONDocument]] and (
+                  result.getAs[String]("server").
+                  aka("server") must beSome[String])
+
+            }.await(timeoutMillis)
+        } tag ("mongo2", "mongo26")
       }
 
       "with success using foldResponses" in {
@@ -131,7 +150,7 @@ class BSONCollectionSpec extends Specification {
       }
     }
 
-    "read a doc with success" in {
+    "read a document with success" in {
       implicit val reader = PersonReader
       Await.result(collection.find(BSONDocument()).one[Person], timeout).get mustEqual person
     }
@@ -176,7 +195,7 @@ class BSONCollectionSpec extends Specification {
       }, (_, e) => Cursor.Fail(e)) must beEqualTo(persons).await(timeoutMillis)
     }
 
-    "read a doc with error" in {
+    "read a document with error" in {
       implicit val reader = BuggyPersonReader
       val future = collection.find(BSONDocument()).one[Person].map(_ => 0).recover {
         case e if e.getMessage == "hey hey hey" => -1
@@ -187,7 +206,7 @@ class BSONCollectionSpec extends Specification {
       future must beEqualTo(-1).await(timeoutMillis)
     }
 
-    "read docs with error" >> {
+    "read documents with error" >> {
       implicit val reader = new SometimesBuggyPersonReader
       @inline def cursor = collection.find(BSONDocument()).cursor[Person]()
 
@@ -217,34 +236,6 @@ class BSONCollectionSpec extends Specification {
         cursor.foldWhile(0)((i, _) => Cursor.Cont(i + 1),
           (_, e) => Cursor.Cont(-3)) must beEqualTo(-2).await(timeoutMillis)
       }
-    }
-
-    "read docs until error" in {
-      implicit val reader = new SometimesBuggyPersonReader
-      val enumerator = collection.find(BSONDocument()).
-        cursor[Person]().enumerate(stopOnError = true)
-
-      var i = 0
-      val future = enumerator |>>> Iteratee.foreach { doc =>
-        i += 1
-        //println(s"\tgot doc: $doc")
-      } map (_ => -1)
-
-      future.recover({ case e => i }) must beEqualTo(3).await(timeoutMillis)
-    }
-
-    "read docs skipping errors" in {
-      implicit val reader = new SometimesBuggyPersonReader
-      val enumerator = collection.find(BSONDocument()).
-        cursor[Person]().enumerate(stopOnError = false)
-
-      var i = 0
-      val future = enumerator |>>> Iteratee.foreach { doc =>
-        i += 1
-        //println(s"\t(skipping [$i]) got doc: $doc")
-      }
-
-      future.map(_ => i) must beEqualTo(4).await(timeoutMillis)
     }
 
     "read docs skipping errors using collect" in {
@@ -332,6 +323,37 @@ class BSONCollectionSpec extends Specification {
               msg contains "renameCollection ") => true
             case _ => false
           }) must beTrue.await(timeoutMillis)
+      }
+    }
+
+    "be dropped" >> {
+      "successfully if exists (deprecated)" in {
+        val col = db(s"foo_${System identityHashCode collection}")
+
+        col.create().flatMap(_ => col.drop(false)).
+          aka("legacy drop") must beTrue.await(timeoutMillis)
+      }
+
+      "with failure if doesn't exist (deprecated)" in {
+        val col = db(s"foo_${System identityHashCode collection}")
+
+        Await.result(col.drop(), timeout).
+          aka("legacy drop") must throwA[Exception].like {
+            case GenericDatabaseException(_, Some(26)) => ok
+          }
+      }
+
+      "successfully if exist" in {
+        val col = db(s"foo_${System identityHashCode collection}")
+
+        col.create().flatMap(_ => col.drop(false)).
+          aka("drop") must beFalse.await(timeoutMillis)
+      }
+
+      "successfully if doesn't exist" in {
+        val col = db(s"foo_${System identityHashCode collection}")
+
+        col.drop(false) aka "drop" must beFalse.await(timeoutMillis)
       }
     }
   }

@@ -15,8 +15,12 @@
  */
 package reactivemongo.api
 
+import reactivemongo.core.errors.GenericDatabaseException
+
 /**
- * A MongoDB Collection. You should consider the default BSON implementation.
+ * A MongoDB Collection.
+ * You should consider the generic API ([[api.GenericCollection]])
+ * and the default BSON implementation.
  *
  * Example using the default implementation:
  *
@@ -125,7 +129,6 @@ trait CollectionMetaCommands {
   import reactivemongo.api.commands.bson._
   import CommonImplicits._
   import BSONCreateImplicits._
-  import BSONDropImplicits._
   import BSONEmptyCappedImplicits._
   import BSONCollStatsImplicits._
   import BSONRenameCollectionImplicits._
@@ -151,15 +154,41 @@ trait CollectionMetaCommands {
    * @param autoIndexId States if should automatically add an index on the _id field. By default, capped collections will NOT have an indexed _id field, in contrast to regular collections.
    */
   def createCapped(size: Long, maxDocuments: Option[Int], autoIndexId: Boolean = false)(implicit ec: ExecutionContext): Future[Unit] =
-    Command.run(BSONSerializationPack).unboxed(self, Create(Some(Capped(size, maxDocuments)), autoIndexId))
+    Command.run(BSONSerializationPack).
+      unboxed(self, Create(Some(Capped(size, maxDocuments)), autoIndexId))
 
   /**
    * Drops this collection.
    *
-   * The returned future will be completed with an error if this collection does not exist.
+   * The returned future will be completed with an error
+   * if this collection does not exist.
    */
+  @deprecated("Use [[drop(Boolean)]]", "0.12.0")
   def drop()(implicit ec: ExecutionContext): Future[Unit] =
-    Command.run(BSONSerializationPack).unboxed(self, Drop)
+    drop(true).map(_ => {})
+
+  /**
+   * Drops this collection.
+   *
+   * If the collection existed and is successfully dropped,
+   * the returned future will be completed with true.
+   *
+   * If `failIfNotFound` is false and the collection doesn't exist,
+   * the returned future will be completed with false.
+   *
+   * Otherwise in case, the future will be completed with the encountered error.
+   */
+  def drop(failIfNotFound: Boolean)(implicit ec: ExecutionContext): Future[Boolean] = {
+    import BSONDropCollectionImplicits._
+
+    Command.run(BSONSerializationPack)(self, DropCollection).flatMap {
+      case DropCollectionResult(false) if failIfNotFound =>
+        Future.failed[Boolean](GenericDatabaseException(
+          s"fails to drop collection: $name", Some(26)))
+
+      case _ => Future.successful(true)
+    }
+  }
 
   /**
    * If this collection is capped, removes all the documents it contains.

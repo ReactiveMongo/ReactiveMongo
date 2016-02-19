@@ -34,7 +34,7 @@ import reactivemongo.bson.exceptions.DocumentKeyNotFound
 import reactivemongo.core.errors.{ DatabaseException, ReactiveMongoException }
 import reactivemongo.core.protocol.{ RequestMaker, Query, QueryFlags, Response }
 import reactivemongo.core.netty._
-import reactivemongo.utils.option
+import reactivemongo.util.option
 import reactivemongo.core.nodeset.NodeStatus
 
 @deprecated("consider using reactivemongo.api.commands instead", "0.11.0")
@@ -207,7 +207,7 @@ class MakableCommand(val db: String, val command: Command[_]) {
   }
 }
 
-@deprecated("consider using reactivemongo.api.commands.RawCommand instead", "0.11.0")
+@deprecated("consider using `rawCommand` on [[reactivemongo.api.collections.GenericCollection.runner]] instead", "0.11.0")
 case class RawCommand(bson: BSONDocument) extends Command[BSONDocument] {
   val makeDocuments = bson
 

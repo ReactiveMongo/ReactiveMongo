@@ -15,33 +15,62 @@
  */
 package reactivemongo.api.collections
 
-import scala.concurrent.{ ExecutionContext, Future }
-import scala.util.Try
+import scala.util.{ Failure, Success, Try }
 import scala.util.control.NonFatal
+
+import scala.concurrent.{ ExecutionContext, Future }
+
 import org.jboss.netty.buffer.ChannelBuffer
+
 import reactivemongo.api._
-import reactivemongo.api.commands.{ LastError, WriteConcern }
+import reactivemongo.api.commands.{
+  CursorFetcher,
+  LastError,
+  ResponseResult,
+  WriteConcern
+}
 import reactivemongo.bson.buffer.{ ReadableBuffer, WritableBuffer }
 import reactivemongo.core.nodeset.ProtocolMetadata
-import reactivemongo.core.protocol._
+import reactivemongo.core.protocol.{
+  CheckedWriteRequest,
+  Delete,
+  Query,
+  Insert,
+  MongoWireVersion,
+  RequestMaker,
+  Update,
+  UpdateFlags
+}
 import reactivemongo.core.netty.{
   BufferSequence,
   ChannelBufferReadableBuffer,
   ChannelBufferWritableBuffer
 }
-import reactivemongo.core.errors.ConnectionNotInitialized
+import reactivemongo.core.errors.{
+  ConnectionNotInitialized,
+  GenericDriverException
+}
 
 trait GenericCollectionProducer[P <: SerializationPack with Singleton, +C <: GenericCollection[P]] extends CollectionProducer[C]
 
 trait GenericCollectionWithCommands[P <: SerializationPack with Singleton] { self: GenericCollection[P] =>
   val pack: P
 
-  import reactivemongo.api.commands._
+  import reactivemongo.api.commands.{
+    BoxedAnyVal,
+    CollectionCommand,
+    Command,
+    CommandWithResult,
+    ResponseResult,
+    ResolvedCollectionCommand
+  }
 
   def runner = Command.run(pack)
 
   def runCommand[R, C <: CollectionCommand with CommandWithResult[R]](command: C with CommandWithResult[R])(implicit writer: pack.Writer[ResolvedCollectionCommand[C]], reader: pack.Reader[R], ec: ExecutionContext): Future[R] =
     runner(self, command)
+
+  def runWithResponse[R, C <: CollectionCommand with CommandWithResult[R]](command: C with CommandWithResult[R])(implicit writer: pack.Writer[ResolvedCollectionCommand[C]], reader: pack.Reader[R], ec: ExecutionContext): Future[ResponseResult[R]] = runner.withResponse(self, command)
 
   def runCommand[C <: CollectionCommand](command: C)(implicit writer: pack.Writer[ResolvedCollectionCommand[C]]): CursorFetcher[pack.type, Cursor] =
     runner(self, command)
@@ -51,7 +80,18 @@ trait GenericCollectionWithCommands[P <: SerializationPack with Singleton] { sel
 }
 
 trait BatchCommands[P <: SerializationPack] {
-  import reactivemongo.api.commands.{ AggregationFramework => AC, CountCommand => CC, DistinctCommand => DistC, InsertCommand => IC, UpdateCommand => UC, DeleteCommand => DC, DefaultWriteResult, LastError, ResolvedCollectionCommand, FindAndModifyCommand => FMC }
+  import reactivemongo.api.commands.{
+    AggregationFramework => AC,
+    CountCommand => CC,
+    DistinctCommand => DistC,
+    InsertCommand => IC,
+    UpdateCommand => UC,
+    DeleteCommand => DC,
+    DefaultWriteResult,
+    LastError,
+    ResolvedCollectionCommand,
+    FindAndModifyCommand => FMC
+  }
 
   val pack: P
 
@@ -183,9 +223,17 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    * Returns the distinct values for a specified field across a single collection and returns the results in an array.
    * @param key the field for which to return distinct values
    * @param selector the query selector that specifies the documents from which to retrieve the distinct values.
+   * @param readConcern the read concern
    */
-  def distinct(key: String, selector: Option[pack.Document] = None)(implicit ec: ExecutionContext): Future[List[pack.Value]] = {
-    runCommand(DistinctCommand.Distinct(keyString = key, query = selector)).map(_.values)
+  def distinct[T](key: String, selector: Option[pack.Document] = None, readConcern: ReadConcern = ReadConcern.Local)(implicit reader: pack.NarrowValueReader[T], ec: ExecutionContext): Future[List[T]] = {
+    implicit val widenReader = pack.widenReader(reader)
+
+    runCommand(DistinctCommand.Distinct(key, selector)).flatMap { r =>
+      r.result[T] match {
+        case Failure(cause)  => Future.failed[List[T]](cause)
+        case Success(result) => Future.successful(result)
+      }
+    }
   }
 
   @inline private def defaultWriteConcern = db.connection.options.writeConcern
@@ -221,6 +269,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
     }
     val metadata = db.connection.metadata
     if (!documents.isEmpty) {
+      // TODO: Await maxTimeout?
       val havingMetadata = Failover2(db.connection, failoverStrategy) { () =>
         metadata.map(Future.successful).getOrElse(Future.failed(ConnectionNotInitialized.MissingMetadata))
       }.future
@@ -261,6 +310,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    * @return a future [[reactivemongo.api.commands.WriteResult]] that can be used to check whether the insertion was successful.
    */
   def insert[T](document: T, writeConcern: WriteConcern = defaultWriteConcern)(implicit writer: pack.Writer[T], ec: ExecutionContext): Future[WriteResult] = {
+    // TODO: Await maxTimeout
     Failover2(db.connection, failoverStrategy) { () =>
       db.connection.metadata match {
         case Some(metadata) if metadata.maxWireVersion >= MongoWireVersion.V26 =>
@@ -269,14 +319,21 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
             val flattened = wr.flatten
             if (!flattened.ok) {
               // was ordered, with one doc => fail if has an error
-              Future.failed(flattened)
+              Future.failed(WriteResult.lastError(flattened).
+                getOrElse[Exception](GenericDriverException(
+                  s"fails to insert: $document")))
+
             } else Future.successful(wr)
           }
-        case Some(_) => // Mongo < 2.6 // TODO: Deprecates/remove
+
+        case Some(_) => { // Mongo < 2.6 // TODO: Deprecates/remove
           val op = Insert(0, fullCollectionName)
           val bson = writeDoc(document, writer)
           val checkedWriteRequest = CheckedWriteRequest(op, BufferSequence(bson), writeConcern)
-          db.connection.sendExpectingResponse(checkedWriteRequest).map(pack.readAndDeserialize(_, LastErrorReader))
+          db.connection.sendExpectingResponse(checkedWriteRequest).
+            map(pack.readAndDeserialize(_, LastErrorReader))
+        }
+
         case None =>
           Future.failed(ConnectionNotInitialized.MissingMetadata)
       }
@@ -298,6 +355,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    * @return a future [[reactivemongo.api.commands.WriteResult]] that can be used to check whether the update was successful.
    */
   def update[S, U](selector: S, update: U, writeConcern: WriteConcern = defaultWriteConcern, upsert: Boolean = false, multi: Boolean = false)(implicit selectorWriter: pack.Writer[S], updateWriter: pack.Writer[U], ec: ExecutionContext): Future[UpdateWriteResult] = Failover2(db.connection, failoverStrategy) { () =>
+    // TODO: Await maxTimeout
     db.connection.metadata match {
       case Some(metadata) if (
         metadata.maxWireVersion >= MongoWireVersion.V26) => {
@@ -308,7 +366,10 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
           val flattened = wr.flatten
           if (!flattened.ok) {
             // was ordered, with one doc => fail if has an error
-            Future.failed(flattened)
+            Future.failed(WriteResult.lastError(flattened).
+              getOrElse[Exception](GenericDriverException(
+                s"fails to update: $update")))
+
           } else Future.successful(wr)
         }
       }
@@ -318,12 +379,14 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
         val op = Update(fullCollectionName, flags)
         val bson = writeDoc(selector, selectorWriter)
         bson.writeBytes(writeDoc(update, updateWriter))
-        val checkedWriteRequest = CheckedWriteRequest(op, BufferSequence(bson), writeConcern)
+        val checkedWriteRequest =
+          CheckedWriteRequest(op, BufferSequence(bson), writeConcern)
+
         db.connection.sendExpectingResponse(checkedWriteRequest).map { r =>
           val res = pack.readAndDeserialize(r, LastErrorReader)
           UpdateWriteResult(res.ok, res.n, res.n,
             res.upserted.map(Upserted(-1, _)).toSeq,
-            Nil, None, res.code, res.err)
+            Nil, None, res.code, res.errmsg)
 
         }
       }
@@ -438,14 +501,89 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    * @param otherOperators the sequence of MongoDB aggregation operations
    * @param explain specifies to return the information on the processing of the pipeline
    * @param allowDiskUse enables writing to temporary files
-   * @param cursor the cursor object for aggregation
+   * @param bypassDocumentValidation enables to bypass document validation during the operation
+   * @param readConcern the read concern
    */
-  def aggregate(firstOperator: PipelineOperator, otherOperators: List[PipelineOperator] = Nil, explain: Boolean = false, allowDiskUse: Boolean = false, cursor: Option[BatchCommands.AggregationFramework.Cursor] = None)(implicit ec: ExecutionContext): Future[BatchCommands.AggregationFramework.AggregationResult] = {
+  def aggregate(firstOperator: PipelineOperator, otherOperators: List[PipelineOperator] = Nil, explain: Boolean = false, allowDiskUse: Boolean = false, bypassDocumentValidation: Boolean = false, readConcern: Option[ReadConcern] = None)(implicit ec: ExecutionContext): Future[BatchCommands.AggregationFramework.AggregationResult] = {
     import BatchCommands.AggregationFramework.Aggregate
     import BatchCommands.{ AggregateWriter, AggregateReader }
 
-    runCommand(Aggregate(
-      firstOperator :: otherOperators, explain, allowDiskUse, cursor))
+    def ver = db.connection.metadata.fold[MongoWireVersion](
+      MongoWireVersion.V26)(_.maxWireVersion)
+
+    runWithResponse(Aggregate(
+      firstOperator :: otherOperators, explain, allowDiskUse, None,
+      ver, bypassDocumentValidation, readConcern)).map(_.value)
+  }
+
+  /**
+   * [[http://docs.mongodb.org/manual/reference/command/aggregate/ Aggregates]] the matching documents.
+   *
+   * {{{
+   * import scala.concurrent.Future
+   * import scala.concurrent.ExecutionContext.Implicits.global
+   *
+   * import reactivemongo.bson._
+   * import reactivemongo.api.Cursor
+   * import reactivemongo.api.collections.bson.BSONCollection
+   *
+   * def populatedStates(col: BSONCollection): Future[Cursor[BSONDocument]] = {
+   *   import cities.BatchCommands.AggregationFramework
+   *   import AggregationFramework.{ Group, Match, SumField }
+   *
+   *   col.aggregate1[BSONDocument](Group(BSONString("\$state"))(
+   *     "totalPop" -> SumField("population")), List(
+   *       Match(document("totalPop" ->
+   *         document("\$gte" -> 10000000L)))))
+   * }
+   * }}}
+   *
+   * @tparam T the result type
+   * @param firstOperator the first operator of the pipeline
+   * @param otherOperators the sequence of MongoDB aggregation operations
+   * @param cursor the cursor object for aggregation
+   * @param explain specifies to return the information on the processing of the pipeline
+   * @param allowDiskUse enables writing to temporary files
+   * @param bypassDocumentValidation enables to bypass document validation during the operation
+   * @param readConcern the read concern of the aggregation
+   * @param readPreference the read preference for the result cursor
+   *
+   */
+  def aggregate1[T](firstOperator: PipelineOperator, otherOperators: List[PipelineOperator], cursor: BatchCommands.AggregationFramework.Cursor, explain: Boolean = false, allowDiskUse: Boolean = false, bypassDocumentValidation: Boolean = false, readConcern: Option[ReadConcern] = None, readPreference: ReadPreference = ReadPreference.primary)(implicit ec: ExecutionContext, r: pack.Reader[T]): Future[Cursor[T]] = {
+    import BatchCommands.AggregationFramework.{ Aggregate, AggregationResult }
+    import BatchCommands.{ AggregateWriter, AggregateReader }
+
+    import reactivemongo.core.netty.ChannelBufferWritableBuffer
+    import reactivemongo.bson.buffer.WritableBuffer
+    import reactivemongo.core.protocol.{ Reply, Response }
+
+    def ver = db.connection.metadata.fold[MongoWireVersion](
+      MongoWireVersion.V26)(_.maxWireVersion)
+
+    runWithResponse(Aggregate(
+      firstOperator :: otherOperators, explain, allowDiskUse, Some(cursor),
+      ver, bypassDocumentValidation, readConcern)).flatMap[Cursor[T]] {
+      case ResponseResult(response, numToReturn,
+        AggregationResult(firstBatch, Some(resultCursor))) => Future {
+
+        def docs = new ChannelBufferWritableBuffer().writeBytes(
+          firstBatch.foldLeft[WritableBuffer](
+            new ChannelBufferWritableBuffer())(pack.writeToBuffer).
+            toReadableBuffer).buffer
+
+        def resp = Response(response.header,
+          Reply(0, resultCursor.cursorId, 0, firstBatch.size),
+          docs, response.info)
+
+        DefaultCursor.getMore[P, T](pack, resp,
+          resultCursor, numToReturn, readPreference, db.
+            connection, failoverStrategy, false)
+      }
+
+      case ResponseResult(response, _, _) => Future.failed[Cursor[T]](
+        GenericDriverException(s"missing cursor: $response"))
+
+    }
   }
 
   /**
@@ -463,8 +601,10 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    */
   def remove[T](query: T, writeConcern: WriteConcern = defaultWriteConcern, firstMatchOnly: Boolean = false)(implicit writer: pack.Writer[T], ec: ExecutionContext): Future[WriteResult] =
     Failover2(db.connection, failoverStrategy) { () =>
+      // TODO: Await maxTimeout
       db.connection.metadata match {
-        case Some(metadata) if metadata.maxWireVersion >= MongoWireVersion.V26 =>
+        case Some(metadata) if (
+          metadata.maxWireVersion >= MongoWireVersion.V26) => {
           import BatchCommands.DeleteCommand.{ Delete, DeleteElement }
           val limit = if (firstMatchOnly) 1 else 0
           runCommand(Delete(writeConcern = writeConcern)(
@@ -472,14 +612,21 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
             val flattened = wr.flatten
             if (!flattened.ok) {
               // was ordered, with one doc => fail if has an error
-              Future.failed(flattened)
+              Future.failed(WriteResult.lastError(flattened).
+                getOrElse[Exception](GenericDriverException(
+                  s"fails to remove: $query")))
             } else Future.successful(wr)
           }
-        case Some(_) => // Mongo < 2.6 // TODO: Deprecate/remove
+        }
+
+        case Some(_) => { // Mongo < 2.6 // TODO: Deprecate/remove
           val op = Delete(fullCollectionName, if (firstMatchOnly) 1 else 0)
           val bson = writeDoc(query, writer)
           val checkedWriteRequest = CheckedWriteRequest(op, BufferSequence(bson), writeConcern)
-          db.connection.sendExpectingResponse(checkedWriteRequest).map(pack.readAndDeserialize(_, LastErrorReader))
+          db.connection.sendExpectingResponse(checkedWriteRequest).
+            map(pack.readAndDeserialize(_, LastErrorReader))
+        }
+
         case None =>
           Future.failed(ConnectionNotInitialized.MissingMetadata)
       }
@@ -609,19 +756,6 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
       }
     }
 
-    // TODO remove
-    def _debug(): Unit = {
-      import reactivemongo.bson.{ BSONDocument, buffer }, buffer.DefaultBufferHandler
-
-      val rix = buf.buffer.readerIndex
-      val wix = buf.buffer.writerIndex
-      val doc = DefaultBufferHandler.BSONDocumentBufferHandler.read(new ChannelBufferReadableBuffer(buf.buffer))
-      println(doc)
-      println(BSONDocument.pretty(doc))
-      buf.buffer.readerIndex(rix)
-      buf.buffer.writerIndex(wix)
-    }
-
     def result(): ChannelBuffer = {
       closeIfNecessary()
       buf.buffer
@@ -632,13 +766,17 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
 
       val op = Query(0, db.name + ".$cmd", 0, 1)
 
-      val cursor = DefaultCursor(pack, op, documents, ReadPreference.primary, db.connection, failoverStrategy, true)(BatchCommands.DefaultWriteResultReader) //(Mongo26WriteCommand.DefaultWriteResultBufferReader)
+      val cursor = DefaultCursor.query(pack, op, documents, ReadPreference.primary, db.connection, failoverStrategy, true)(BatchCommands.DefaultWriteResultReader) //(Mongo26WriteCommand.DefaultWriteResultBufferReader)
 
       cursor.headOption.flatMap {
-        case Some(wr) if wr.inError              => Future.failed(wr)
-        case Some(wr) if wr.hasErrors && ordered => Future.failed(wr)
-        case Some(wr)                            => Future.successful(wr)
-        case None                                => Future.failed(new RuntimeException("no write result ?"))
+        case Some(wr) if (wr.inError || (wr.hasErrors && ordered)) => {
+          Future.failed(WriteResult.lastError(wr).
+            getOrElse[Exception](GenericDriverException(
+              s"write failure: $wr")))
+        }
+        case Some(wr) => Future.successful(wr)
+        case None => Future.failed(
+          new GenericDriverException("no write result ?"))
       }
     }
 
@@ -721,8 +859,11 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
     }
 
     def send()(implicit ec: ExecutionContext): Future[LastError] = {
-      val f = () => db.connection.sendExpectingResponse(resultAsCheckedWriteRequest(op, writeConcern))
-      Failover2(db.connection, failoverStrategy)(f).future.map(pack.readAndDeserialize(_, LastErrorReader))
+      val f = () => db.connection.sendExpectingResponse(
+        resultAsCheckedWriteRequest(op, writeConcern))
+
+      Failover2(db.connection, failoverStrategy)(f).future.
+        map(pack.readAndDeserialize(_, LastErrorReader))
     }
   }
 }

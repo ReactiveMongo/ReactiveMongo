@@ -4,7 +4,7 @@ set -e
 
 SCRIPT_DIR=`dirname $0 | sed -e "s|^\./|$PWD/|"`
 
-cd "SCRIPT_DIR/.."
+cd "$SCRIPT_DIR/.."
 
 sbt ++$TRAVIS_SCALA_VERSION scalariformFormat test:scalariformFormat
 git diff --exit-code || (
@@ -39,7 +39,7 @@ if [ `echo "$MV" | grep v3 | wc -l` -eq 1 ]; then
     mongo $SHELL_OPTS 'var s=db.serverStatus();JSON.stringify(s["storageEngine"]);' | grep '"name"' | cut -d '"' -f 4
 fi
 
-TEST_OPTS="exclude mongo3"
+TEST_OPTS="exclude not_mongo26"
 SBT_OPTS="++$TRAVIS_SCALA_VERSION"
 
 if [ "$MONGODB_VER" = "3" ]; then
@@ -49,5 +49,5 @@ if [ "$MONGODB_VER" = "3" ]; then
         SBT_OPTS="$SBT_OPTS -Dtest.enableSSL=true"
     fi
 fi
-
-sbt $SBT_OPTS "testOnly -- $TEST_OPTS"
+sbt ++$TRAVIS_SCALA_VERSION 
+sbt $SBT_OPTS ";mimaReportBinaryIssues ;testOnly -- $TEST_OPTS"

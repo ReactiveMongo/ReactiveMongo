@@ -19,7 +19,6 @@ import reactivemongo.core.protocol.MongoWireVersion
 import reactivemongo.api._
 import reactivemongo.bson._
 import reactivemongo.api.commands.{ DropIndexes, LastError, WriteResult }
-import reactivemongo.utils.option
 import scala.concurrent.{ Future, ExecutionContext }
 
 /** Type of Index */
@@ -430,7 +429,7 @@ object CollectionIndexesManager {
   def apply(db: DB, collectionName: String)(implicit context: ExecutionContext): CollectionIndexesManager = {
     val wireVer = db.connection.metadata.map(_.maxWireVersion)
 
-    if (wireVer.exists(_ == MongoWireVersion.V30)) {
+    if (wireVer.exists(_ >= MongoWireVersion.V30)) {
       new DefaultCollectionIndexesManager(db, collectionName)
     } else new LegacyCollectionIndexesManager(db.name, collectionName,
       new LegacyIndexesManager(db))
@@ -438,6 +437,8 @@ object CollectionIndexesManager {
 }
 
 object IndexesManager {
+  import reactivemongo.util.option
+
   /**
    * Returns an indexes manager for specified database.
    *
@@ -446,7 +447,7 @@ object IndexesManager {
   def apply(db: DB with DBMetaCommands)(implicit context: ExecutionContext): IndexesManager = {
     val wireVer = db.connection.metadata.map(_.maxWireVersion)
 
-    if (wireVer.exists(_ == MongoWireVersion.V30)) new DefaultIndexesManager(db)
+    if (wireVer.exists(_ >= MongoWireVersion.V30)) new DefaultIndexesManager(db)
     else new LegacyIndexesManager(db)
   }
 

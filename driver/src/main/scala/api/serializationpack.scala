@@ -1,5 +1,7 @@
 package reactivemongo.api
 
+import scala.util.Try
+
 import reactivemongo.bson.buffer.{ ReadableBuffer, WritableBuffer }
 
 trait SerializationPack { self: Singleton =>
@@ -8,6 +10,8 @@ trait SerializationPack { self: Singleton =>
   type Document <: Value
   type Writer[A]
   type Reader[A]
+  type NarrowValueReader[A]
+  private[reactivemongo]type WidenValueReader[A]
 
   def IdentityWriter: Writer[Document]
   def IdentityReader: Reader[Document]
@@ -35,18 +39,23 @@ trait SerializationPack { self: Singleton =>
   def writer[A](f: A => Document): Writer[A]
 
   def isEmpty(document: Document): Boolean
+
+  def widenReader[T](r: NarrowValueReader[T]): WidenValueReader[T]
+
+  def readValue[A](value: Value, reader: WidenValueReader[A]): Try[A]
 }
 
 /** The default serialization pack. */
 object BSONSerializationPack extends SerializationPack {
-  import reactivemongo.bson._
-  import reactivemongo.bson.buffer.DefaultBufferHandler
+  import reactivemongo.bson._, buffer.DefaultBufferHandler
 
   type Value = BSONValue
   type ElementProducer = Producer[BSONElement]
   type Document = BSONDocument
   type Writer[A] = BSONDocumentWriter[A]
   type Reader[A] = BSONDocumentReader[A]
+  type NarrowValueReader[A] = BSONReader[_ <: BSONValue, A]
+  private[reactivemongo]type WidenValueReader[A] = UnsafeBSONReader[A]
 
   object IdentityReader extends Reader[Document] {
     def read(document: Document): Document = document
@@ -71,4 +80,10 @@ object BSONSerializationPack extends SerializationPack {
   }
 
   def isEmpty(document: Document) = document.isEmpty
+
+  def widenReader[T](r: NarrowValueReader[T]): WidenValueReader[T] =
+    r.widenReader
+
+  def readValue[A](value: Value, reader: WidenValueReader[A]): Try[A] =
+    reader.readTry(value)
 }
