@@ -6,8 +6,7 @@ import reactivemongo.bson.{
   BSONBooleanLike,
   BSONDocument,
   BSONDocumentReader,
-  BSONString,
-  BSONWriter
+  BSONDocumentWriter
 }
 
 object CommonImplicits {
@@ -16,9 +15,8 @@ object CommonImplicits {
     def readResult(doc: BSONDocument): UnitBox.type = UnitBox
   }
 
-  implicit object ReadConcernWriter
-      extends BSONWriter[ReadConcern, BSONString] {
-    def write(concern: ReadConcern) = BSONString(concern.level)
+  implicit object ReadConcernWriter extends BSONDocumentWriter[ReadConcern] {
+    def write(concern: ReadConcern) = BSONDocument("level" -> concern.level)
   }
 }
 
