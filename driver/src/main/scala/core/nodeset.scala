@@ -349,7 +349,7 @@ sealed trait Authenticating extends Authentication {
 }
 
 object Authenticating {
-  @deprecated(message = "Use [[CrAuthenticating.apply]]", since = "0.11.10")
+  @deprecated(message = "Use [[reactivemongo.core.nodeset.CrAuthenticating]]", since = "0.11.10")
   def apply(db: String, user: String, password: String, nonce: Option[String]): Authenticating = CrAuthenticating(db, user, password, nonce)
 
   def unapply(auth: Authenticating): Option[(String, String, String)] =

@@ -17,7 +17,7 @@ sealed trait PlayIterateesCursor[T] extends Cursor[T] {
    * Produces an Enumerator of documents.
    *
    * @param maxDocs Enumerate up to `maxDocs` documents.
-   * @param err The binary operator to be applied when failing to get the next response. Exception or [[Fail]] raised within the `suc` function cannot be recovered by this error handler. Only the errors when reading the inputs from the DB will be handle: if then an `Iteratee` is failing to process, the error is out of this mechanism scope.
+   * @param err The binary operator to be applied when failing to get the next response. Exception or [[reactivemongo.api.Cursor$.Fail Fail]] raised within the `suc` function cannot be recovered by this error handler. Only the errors when reading the inputs from the DB will be handle: if then an `Iteratee` is failing to process, the error is out of this mechanism scope.
    *
    * @return an Enumerator of documents.
    */
@@ -27,7 +27,7 @@ sealed trait PlayIterateesCursor[T] extends Cursor[T] {
    * Produces an Enumerator of Iterator of documents.
    *
    * @param maxDocs Enumerate up to `maxDocs` documents.
-   * @param err The binary operator to be applied when failing to get the next response. Exception or [[Fail]] raised within the `suc` function cannot be recovered by this error handler. Only the errors when reading the inputs from the DB will be handle: if then an `Iteratee` is failing to process, the error is out of this mechanism scope.
+   * @param err The binary operator to be applied when failing to get the next response. Exception or [[reactivemongo.api.Cursor$.Fail Fail]] raised within the `suc` function cannot be recovered by this error handler. Only the errors when reading the inputs from the DB will be handle: if then an `Iteratee` is failing to process, the error is out of this mechanism scope.
    *
    * @return an Enumerator of Iterators of documents.
    */
@@ -37,7 +37,7 @@ sealed trait PlayIterateesCursor[T] extends Cursor[T] {
    * Produces an Enumerator of responses from the database.
    *
    * @param maxDocs Enumerate up to `maxDocs` documents.
-   * @param err The binary operator to be applied when failing to get the next response. Exception or [[Fail]] raised within the `suc` function cannot be recovered by this error handler. Only the errors when reading the inputs from the DB will be handle: if then an `Iteratee` is failing to process, the error is out of this mechanism scope.
+   * @param err The binary operator to be applied when failing to get the next response. Exception or [[reactivemongo.api.Cursor$.Fail Fail]] raised within the `suc` function cannot be recovered by this error handler. Only the errors when reading the inputs from the DB will be handle: if then an `Iteratee` is failing to process, the error is out of this mechanism scope.
    *
    * @return an Enumerator of Responses.
    */

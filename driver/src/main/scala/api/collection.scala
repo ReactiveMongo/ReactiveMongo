@@ -19,10 +19,9 @@ import reactivemongo.core.errors.GenericDatabaseException
 
 /**
  * A MongoDB Collection.
- * You should consider the generic API ([[api.GenericCollection]])
- * and the default BSON implementation.
- *
- * Example using the default implementation:
+ * You should consider the generic API
+ * ([[reactivemongo.api.collections.GenericCollection]])
+ * and the default [[reactivemongo.api.collections.bson.BSONCollection]].
  *
  * {{{
  * import reactivemongo.bson._
@@ -163,7 +162,7 @@ trait CollectionMetaCommands {
    * The returned future will be completed with an error
    * if this collection does not exist.
    */
-  @deprecated("Use [[drop(Boolean)]]", "0.12.0")
+  @deprecated("Use `drop(Boolean)`", "0.12.0")
   def drop()(implicit ec: ExecutionContext): Future[Unit] =
     drop(true).map(_ => {})
 

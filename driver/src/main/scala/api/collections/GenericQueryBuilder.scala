@@ -67,7 +67,7 @@ trait GenericQueryBuilder[P <: SerializationPack] {
    *
    * An implicit `Reader[T]` must be present in the scope.
    */
-  @deprecated(message = "Use [[cursor]] function with read preference.",
+  @deprecated(message = "Use `cursor` function with read preference.",
     since = "0.11.0")
   def cursor[T](implicit reader: pack.Reader[T], ec: ExecutionContext, cp: CursorProducer[T]): cp.ProducedCursor = cursor(ReadPreference.primary)
 
@@ -97,6 +97,7 @@ trait GenericQueryBuilder[P <: SerializationPack] {
 
   /**
    * Sends this query and gets a future `Option[T]`.
+   * Alias for `.cursor[T]().headOption`.
    *
    * An implicit `Reader[T]` must be present in the scope.
    */
@@ -104,6 +105,7 @@ trait GenericQueryBuilder[P <: SerializationPack] {
 
   /**
    * Sends this query and gets a future `Option[T]`.
+   * Alias for `.cursor[T](readPreference).headOption`.
    *
    * An implicit `Reader[T]` must be present in the scope.
    *
