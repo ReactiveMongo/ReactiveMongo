@@ -41,6 +41,8 @@ trait BSONReader[B <: BSONValue, T] { self =>
   /** Tries to produce an instance of `T` from the `bson` value. */
   def readTry(bson: B): Try[T] = Try(read(bson))
 
+  def map[U](f: T => U): BSONReader[B, U] = BSONReader[B, U]((read _) andThen f)
+
   private[reactivemongo] def widenReader[U >: T]: UnsafeBSONReader[U] =
     new UnsafeBSONReader[U] {
       def readTry(value: BSONValue): Try[U] =
@@ -51,6 +53,16 @@ trait BSONReader[B <: BSONValue, T] { self =>
           case Success(bson) => self.readTry(bson)
         }
     }
+}
+
+object BSONReader {
+  private class Default[B <: BSONValue, T](
+      _read: B => T) extends BSONReader[B, T] {
+    def read(bson: B): T = _read(bson)
+  }
+
+  def apply[B <: BSONValue, T](read: B => T): BSONReader[B, T] =
+    new Default[B, T](read)
 }
 
 /**

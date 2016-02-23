@@ -17,11 +17,8 @@ package reactivemongo.bson
  * limitations under the License.
  */
 import java.util.Date
-import org.specs2.mutable._
 
-import scala.util._
-
-class Handlers extends Specification {
+object Handlers extends org.specs2.mutable.Specification {
   val doc = BSONDocument(
     "name" -> "James",
     "age" -> 27,
@@ -48,49 +45,59 @@ class Handlers extends Specification {
     BSONArray(0L),
     "pp[4]")
 
+  "BSONBinary" should {
+    import reactivemongo.bson.buffer.ArrayReadableBuffer
+
+    "be read as byte array" in {
+      val bytes = Array[Byte](1, 3, 5, 7)
+
+      BSONBinary(ArrayReadableBuffer(bytes), Subtype.GenericBinarySubtype).
+        as[Array[Byte]] must_== bytes
+    }
+  }
+
   "Complex Document" should {
     "have a name == 'James'" in {
-      doc.getTry("name") mustEqual Success(BSONString("James"))
-      doc.getAsTry[BSONString]("name") mustEqual Success(BSONString("James"))
-      doc.getAsTry[String]("name") mustEqual Success("James")
+      doc.getTry("name") must beSuccessfulTry(BSONString("James"))
+      doc.getAsTry[BSONString]("name") must beSuccessfulTry(BSONString("James"))
+      doc.getAsTry[String]("name") must beSuccessfulTry("James")
 
-      doc.getAsTry[BSONInteger]("name").isFailure mustEqual true
-      doc.getAs[BSONInteger]("name") mustEqual None
-      doc.getAsTry[Int]("name").isFailure mustEqual true
-      doc.getAs[Int]("name") mustEqual None
-      doc.getAsTry[BSONNumberLike]("name").isFailure mustEqual true
+      doc.getAsTry[BSONInteger]("name") must beFailedTry
+      doc.getAs[BSONInteger]("name") must beNone
+      doc.getAsTry[Int]("name") must beFailedTry
+      doc.getAs[Int]("name") must beNone
+      doc.getAsTry[BSONNumberLike]("name") must beFailedTry
 
-      doc.get("name").get.seeAsTry[String] mustEqual Success("James")
-      doc.get("name").get.seeAsTry[Int].isFailure mustEqual true
-      doc.get("name").get.seeAsOpt[String] mustEqual Some("James")
+      doc.get("name").get.seeAsTry[String] must beSuccessfulTry("James")
+      doc.get("name").get.seeAsTry[Int] must beFailedTry
+      doc.get("name").get.seeAsOpt[String] must beSome("James")
     }
 
     "have a score == 3.88" in {
-      doc.getTry("score") mustEqual Success(BSONDouble(3.88))
-      doc.getAsTry[BSONDouble]("score") mustEqual Success(BSONDouble(3.88))
-      doc.getAsTry[Double]("score") mustEqual Success(3.88)
+      doc.getTry("score") must beSuccessfulTry(BSONDouble(3.88))
+      doc.getAsTry[BSONDouble]("score") must beSuccessfulTry(BSONDouble(3.88))
+      doc.getAsTry[Double]("score") must beSuccessfulTry(3.88)
 
-      doc.getAsTry[BSONInteger]("score").isFailure mustEqual true
-      doc.getAsTry[Int]("score").isFailure mustEqual true
+      doc.getAsTry[BSONInteger]("score") must beFailedTry
+      doc.getAsTry[Int]("score") must beFailedTry
 
-      doc.getAsUnflattenedTry[BSONInteger]("score").isFailure mustEqual true
-      doc.getAsUnflattenedTry[BSONDouble]("score").get.isDefined mustEqual true
+      doc.getAsUnflattenedTry[BSONInteger]("score") must beFailedTry
+      doc.getAsUnflattenedTry[BSONDouble]("score").get.isDefined must beTrue
 
-      val tryNumberLike = doc.getAsTry[BSONNumberLike]("score")
-      tryNumberLike.isSuccess mustEqual true
-      tryNumberLike.get.toDouble mustEqual 3.88
-      tryNumberLike.get.toFloat mustEqual 3.88f
-      tryNumberLike.get.toLong mustEqual 3
-      tryNumberLike.get.toInt mustEqual 3
+      doc.getAsTry[BSONNumberLike]("score") must beSuccessfulTry.like {
+        case num =>
+          num.toDouble mustEqual 3.88 and (num.toFloat mustEqual 3.88f) and (
+            num.toLong mustEqual 3) and (num.toInt mustEqual 3)
+      }
 
       val tryBooleanLike = doc.getAsTry[BSONBooleanLike]("score")
-      tryBooleanLike.isSuccess mustEqual true
-      tryBooleanLike.get.toBoolean mustEqual true
+      tryBooleanLike.isSuccess must beTrue
+      tryBooleanLike.get.toBoolean must beTrue
     }
+
     "should not have a surname2" in {
-      doc.getTry("surname2").isFailure mustEqual true
-      doc.getUnflattenedTry("surname2").isSuccess mustEqual true
-      doc.getUnflattenedTry("surname2").get.isDefined mustEqual false
+      doc.getTry("surname2") must beFailedTry and (
+        doc.getUnflattenedTry("surname2") must beSuccessfulTry(None))
     }
   }
 
@@ -98,31 +105,28 @@ class Handlers extends Specification {
     "be of size = 6" in {
       array.length mustEqual 6
     }
+
     "have a an int = 2 at index 2" in {
-      array.get(1).isDefined mustEqual true
-      array.get(1).get mustEqual BSONInteger(1)
-      array.getAs[Int](1) mustEqual Some(1)
+      array.get(1) must beSome(BSONInteger(1)) and (
+        array.getAs[Int](1) must beSome(1))
     }
+
     "get bsondocument at index 3" in {
-      val maybedoc = array.getAs[BSONDocument](3)
-      maybedoc.isDefined mustEqual true
-      val maybename = maybedoc.get.getAs[String]("name")
-      maybename.isDefined mustEqual true
-      maybename.get mustEqual "Joe"
+      array.getAs[BSONDocument](3) must beSome.which {
+        _.getAs[String]("name") must beSome("Joe")
+      }
     }
 
     "get bsonarray at index 4" in {
       val tdoc = array.getAsTry[BSONDocument](4)
-      tdoc.isFailure mustEqual true
+      tdoc must beFailedTry
       tdoc.failed.get.isInstanceOf[exceptions.DocumentKeyNotFound] mustEqual false
-      val tarray = array.getAsTry[BSONArray](4)
-      tarray.isSuccess mustEqual true
-      val olong = tarray.get.getAs[BSONLong](0)
-      olong.isDefined mustEqual true
-      olong.get mustEqual BSONLong(0L)
-      val booleanlike = tarray.get.getAs[BSONBooleanLike](0)
-      booleanlike.isDefined mustEqual true
-      booleanlike.get.toBoolean mustEqual false
+      array.getAsTry[BSONArray](4) must beSuccessfulTry.like {
+        case tarray =>
+          tarray.getAs[BSONLong](0) must beSome(BSONLong(0L)) and (
+            tarray.getAs[BSONBooleanLike](0).
+            map(_.toBoolean) must beSome(false))
+      }
     }
   }
 
@@ -164,6 +168,17 @@ class Handlers extends Specification {
           } must beFailedTry)
     }
   }
+
+  "BSONString" should {
+    "be read" in {
+      val reader = BSONReader { bson: BSONString => "foo" }
+
+      reader.map(_ => 1).readTry(BSONString("lorem")).
+        aka("mapped BSON") must beSuccessfulTry(1)
+    }
+  }
+
+  // ---
 
   case class Album(
     name: String,
@@ -245,17 +260,6 @@ class Handlers extends Specification {
         "Cowgirl in the Sand")
       ny2 mustEqual neilYoung
       success
-    }
-  }
-
-  "BSONBinary" should {
-    import reactivemongo.bson.buffer.ArrayReadableBuffer
-
-    "be read as byte array" in {
-      val bytes = Array[Byte](1, 3, 5, 7)
-
-      BSONBinary(ArrayReadableBuffer(bytes), Subtype.GenericBinarySubtype).
-        as[Array[Byte]] must_== bytes
     }
   }
 }
