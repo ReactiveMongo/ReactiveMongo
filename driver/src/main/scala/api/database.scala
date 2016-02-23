@@ -27,6 +27,8 @@ import scala.concurrent.duration._
 /**
  * A Mongo Database.
  *
+ * You should consider the provided [[reactivemongo.api.DefaultDB]] implementation.
+ *
  * Example:
  * {{{
  * import reactivemongo.api._

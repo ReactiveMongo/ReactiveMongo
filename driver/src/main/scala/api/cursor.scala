@@ -43,10 +43,12 @@ import reactivemongo.util.{
 }, ExtendedFutures.DelayedFuture
 
 /**
+ * Cursor over results from MongoDB.
+ *
  * @tparam T the type parsed from each result document
  */
-// TODO: maxDocs; 0 for unlimited maxDocs
 trait Cursor[T] {
+  // TODO: maxDocs; 0 for unlimited maxDocs
   import Cursor.{ ContOnError, ErrorHandler, FailOnError }
 
   /**
@@ -95,7 +97,7 @@ trait Cursor[T] {
    * are dropped, so the result may contain a little less than `maxDocs` even if `maxDocs` documents were processed.
    *
    * @param maxDocs Collect up to `maxDocs` documents.
-   * @param err The binary operator to be applied when failing to get the next response. Exception or [[Fail]] raised within the `suc` function cannot be recovered by this error handler.
+   * @param err The binary operator to be applied when failing to get the next response. Exception or [[reactivemongo.api.Cursor$.Fail Fail]] raised within the `suc` function cannot be recovered by this error handler.
    *
    * Example:
    * {{{
@@ -136,7 +138,7 @@ trait Cursor[T] {
    * @param z the start value.
    * @param maxDocs the maximum number of documents to be read.
    * @param suc the binary operator to be applied when the next response is successfully read.
-   * @param err The binary operator to be applied when failing to get the next response. Exception or [[Fail]] raised within the `suc` function cannot be recovered by this error handler.
+   * @param err The binary operator to be applied when failing to get the next response. Exception or [[reactivemongo.api.Cursor$.Fail Fail]] raised within the `suc` function cannot be recovered by this error handler.
    */
   def foldResponses[A](z: => A, maxDocs: Int = Int.MaxValue)(suc: (A, Response) => Cursor.State[A], err: ErrorHandler[A] = FailOnError[A]())(implicit ctx: ExecutionContext): Future[A]
 
@@ -299,33 +301,33 @@ object Cursor {
 
   /**
    * @tparam A the state type
-   * @see [[foldWhile]]
+   * @see [[Cursor.foldWhile]]
    */
   type ErrorHandler[A] = (A, Throwable) => State[A]
 
   /**
-   * Error handler to fail on error (see [[Cursor.foldWhile]] and [[Fail]]).
+   * Error handler to fail on error (see [[Cursor.foldWhile]] and [[reactivemongo.api.Cursor$.Fail Fail]]).
    *
    * @param callback the callback function applied on last (possibily initial) value and the encountered error
    */
   def FailOnError[A](callback: (A, Throwable) => Unit = (_: A, _: Throwable) => {}): ErrorHandler[A] = (v: A, e: Throwable) => { callback(v, e); Fail(e): State[A] }
 
   /**
-   * Error handler to end on error (see [[Cursor.foldWhile]] and [[Done]]).
+   * Error handler to end on error (see [[Cursor.foldWhile]] and [[reactivemongo.api.Cursor$.Done Done]]).
    *
    * @param callback the callback function applied on last (possibily initial) value and the encountered error
    */
   def DoneOnError[A](callback: (A, Throwable) => Unit = (_: A, _: Throwable) => {}): ErrorHandler[A] = (v: A, e: Throwable) => { callback(v, e); Done(v): State[A] }
 
   /**
-   * Error handler to continue on error (see [[Cursor.foldWhile]] and [[Cont]]).
+   * Error handler to continue on error (see [[Cursor.foldWhile]] and [[reactivemongo.api.Cursor$.Cont Cont]]).
    *
    * @param callback the callback function applied on last (possibily initial) value and the encountered error
    */
   def ContOnError[A](callback: (A, Throwable) => Unit = (_: A, _: Throwable) => {}): ErrorHandler[A] = (v: A, e: Throwable) => { callback(v, e); Cont(v): State[A] }
 
   /**
-   * Value handler, ignoring the values (see [[Cursor.foldWhile]] and [[Cont]]).
+   * Value handler, ignoring the values (see [[Cursor.foldWhile]] and [[reactivemongo.api.Cursor$.Cont Cont]]).
    *
    * @param callback the callback function applied on each value.
    */

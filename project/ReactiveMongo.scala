@@ -23,7 +23,7 @@ object BuildSettings {
     scalacOptions in Compile ++= Seq(
       "-unchecked", "-deprecation", "-target:jvm-1.6", "-Ywarn-unused-import"),
     scalacOptions in (Compile, doc) ++= Seq("-unchecked", "-deprecation",
-      "-diagrams", "-implicits", "-skip-packages", "samples"),
+      /*"-diagrams", */"-implicits", "-skip-packages", "samples"),
     scalacOptions in (Compile, doc) ++= Opts.doc.title("ReactiveMongo API"),
     scalacOptions in (Compile, doc) ++= Opts.doc.version(buildVersion),
     scalacOptions in Compile := {

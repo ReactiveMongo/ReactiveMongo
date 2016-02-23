@@ -213,26 +213,21 @@ case class FailoverStrategy(
 }
 
 /**
- * A Mongo Connection.
+ * A pool of MongoDB connections.
  *
- * This is a wrapper around a reference to a [[reactivemongo.core.actors.MongoDBSystem]] Actor.
- * Connection here does not mean that there is one open channel to the server.
- * Behind the scene, many connections (channels) are open on all the available servers in the replica set.
+ * Connection here does not mean that there is one open channel to the server:
+ * behind the scene, many connections (channels) are open on all the available servers in the replica set.
  *
  * Example:
  * {{{
  * import reactivemongo.api._
  *
- * val connection = MongoConnection( List( "localhost" ) )
- * val db = connection("plugin")
- * val collection = db("acoll")
- *
- * // more explicit way
- * val db2 = connection.db("plugin")
- * val collection2 = db2.collection("plugin")
+ * val connection = MongoConnection(List("localhost"))
+ * val db = connection.database("plugin")
+ * val collection = db.map(_.("acoll"))
  * }}}
  *
- * @param mongosystem the reference to a [[reactivemongo.core.actors.MongoDBSystem]] Actor.
+ * @param mongosystem the reference to the internal [[reactivemongo.core.actors.MongoDBSystem]] Actor.
  */
 class MongoConnection(
     val actorSystem: ActorSystem,
@@ -717,7 +712,7 @@ class MongoDriver(config: Option[Config] = None) {
    * @param name The name of the newly created [[reactivemongo.core.actors.MongoDBSystem]] actor, if needed.
    * @param options Options for the new connection pool.
    */
-  @deprecated(message = "Must use [[connection]] with `nbChannelsPerNode` set in the `options`.", since = "0.11.3")
+  @deprecated(message = "Must use `connection` with `nbChannelsPerNode` set in the `options`.", since = "0.11.3")
   def connection(nodes: Seq[String], options: MongoConnectionOptions, authentications: Seq[Authenticate], nbChannelsPerNode: Int, name: Option[String]): MongoConnection = connection(nodes, options, authentications, name)
 
   /**
@@ -758,7 +753,7 @@ class MongoDriver(config: Option[Config] = None) {
    * @param nbChannelsPerNode Number of channels to open per node.
    * @param name The name of the newly created [[reactivemongo.core.actors.MongoDBSystem]] actor, if needed.
    */
-  @deprecated(message = "Must you [[connection]] with `nbChannelsPerNode` set in the options of the `parsedURI`.", since = "0.11.3")
+  @deprecated(message = "Must you reactivemongo.api.MongoDriver.connection(reactivemongo.api.MongoConnection.ParsedURI,Option[String]):reactivemongo.api.MongoConnection connection(..)]] with `nbChannelsPerNode` set in the `parsedURI`.", since = "0.11.3")
   def connection(parsedURI: MongoConnection.ParsedURI, nbChannelsPerNode: Int, name: Option[String]): MongoConnection = connection(parsedURI, name)
 
   /**
@@ -783,7 +778,7 @@ class MongoDriver(config: Option[Config] = None) {
    * @param parsedURI The URI parsed by [[reactivemongo.api.MongoConnection.parseURI]]
    * @param nbChannelsPerNode Number of channels to open per node.
    */
-  @deprecated(message = "Must you [[connection]] with `nbChannelsPerNode` set in the options of the `parsedURI`.", since = "0.11.3")
+  @deprecated(message = "Must you `connection` with `nbChannelsPerNode` set in the options of the `parsedURI`.", since = "0.11.3")
   def connection(parsedURI: MongoConnection.ParsedURI, nbChannelsPerNode: Int): MongoConnection = connection(parsedURI)
 
   /**
