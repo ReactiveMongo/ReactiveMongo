@@ -173,8 +173,20 @@ object Handlers extends org.specs2.mutable.Specification {
     "be read" in {
       val reader = BSONReader { bson: BSONString => "foo" }
 
-      reader.map(_ => 1).readTry(BSONString("lorem")).
+      reader.afterRead(_ => 1).readTry(BSONString("lorem")).
         aka("mapped BSON") must beSuccessfulTry(1)
+    }
+
+    val writer = BSONWriter { str: String => BSONString(str) }
+
+    "be writen #1" in {
+      writer.afterWrite(bs => BSONInteger(bs.value.length)).write("foo").
+        aka("mapped BSON") must_== BSONInteger(3)
+    }
+
+    "be writen #2" in {
+      writer.beforeWrite((_: (Int, Int)).toString).write(1 -> 2).
+        aka("mapped BSON") must_== BSONString("(1,2)")
     }
   }
 
