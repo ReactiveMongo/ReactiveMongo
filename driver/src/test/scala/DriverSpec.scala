@@ -8,6 +8,7 @@ import reactivemongo.core.commands.{
   FailedAuthentication,
   SuccessfulAuthentication
 }
+import reactivemongo.core.actors.Exceptions.NodeSetNotReachable
 
 import reactivemongo.api.{
   BSONSerializationPack,
@@ -100,6 +101,19 @@ object DriverSpec extends org.specs2.mutable.Specification {
     "driver shutdown" in { // mainly to ensure the test driver is closed
       driver.close() must not(throwA[Exception])
     } tag ("mongo2", "mongo26")
+
+    "fail on DB without authentication" in {
+      val auth = Authenticate(Common.db.name, "test", "password")
+      val conOpts = DefaultOptions.copy(nbChannelsPerNode = 1)
+
+      def con = Common.driver.connection(
+        List("localhost:27017"),
+        options = conOpts,
+        authentications = Seq(auth))
+
+      Await.result(con.database(Common.db.name), timeout).
+        aka("database resulution") must throwA[NodeSetNotReachable.type]
+    } tag ("mongo2", "mongo26")
   }
 
   "Authentication SCRAM-SHA1" should {
@@ -167,6 +181,21 @@ object DriverSpec extends org.specs2.mutable.Specification {
 
     "driver shutdown" in { // mainly to ensure the test driver is closed
       driver.close() must not(throwA[Exception])
+    } tag ("mongo3", "not_mongo26")
+
+    "fail on DB without authentication" in {
+      val auth = Authenticate(Common.db.name, "test", "password")
+      val conOpts = DefaultOptions.copy(
+        authMode = ScramSha1Authentication,
+        nbChannelsPerNode = 1)
+
+      def con = Common.driver.connection(
+        List("localhost:27017"),
+        options = conOpts,
+        authentications = Seq(auth))
+
+      Await.result(con.database(Common.db.name), timeout).
+        aka("database resulution") must throwA[NodeSetNotReachable.type]
     } tag ("mongo3", "not_mongo26")
   }
 

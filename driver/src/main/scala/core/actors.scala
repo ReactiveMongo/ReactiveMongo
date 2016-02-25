@@ -668,7 +668,7 @@ trait MongoDBSystem extends Actor {
       response.info.channelId).flatMap(_._2.authenticating)
 
     updateNodeSet(auth match {
-      case Some(Authenticating(db, user, pass)) => {
+      case Some(a @ Authenticating(db, user, pass)) => {
         val originalAuthenticate = Authenticate(db, user, pass)
         val authenticated = check(response) match {
           case Right(successfulAuthentication) => {
@@ -833,6 +833,9 @@ trait MongoDBSystem extends Actor {
 
     def handleAuthResult(authenticate: Authenticate, result: Throwable): Map[Authenticate, List[Promise[SuccessfulAuthentication]]] = {
       val found = authRequests.get(authenticate)
+
+      logger.error(s"authentication failure", result)
+
       if (found.isDefined) {
         found.get.foreach { _.failure(result) }
         authRequests = authRequests - authenticate
