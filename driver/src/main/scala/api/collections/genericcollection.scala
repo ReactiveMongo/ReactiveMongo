@@ -226,6 +226,10 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    * @param key the field for which to return distinct values
    * @param selector the query selector that specifies the documents from which to retrieve the distinct values.
    * @param readConcern the read concern
+   *
+   * {{{
+   * val distinctStates = collection.distinct[String]("state")
+   * }}}
    */
   def distinct[T](key: String, selector: Option[pack.Document] = None, readConcern: ReadConcern = ReadConcern.Local)(implicit reader: pack.NarrowValueReader[T], ec: ExecutionContext): Future[ListSet[T]] = {
     implicit val widenReader = pack.widenReader(reader)
@@ -532,15 +536,21 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    * import reactivemongo.api.Cursor
    * import reactivemongo.api.collections.bson.BSONCollection
    *
-   * def populatedStates(col: BSONCollection): Future[Cursor[BSONDocument]] = {
-   *   import cities.BatchCommands.AggregationFramework
-   *   import AggregationFramework.{ Group, Match, SumField }
+   * def populatedStates(cities: BSONCollection): Future[Cursor[BSONDocument]] =
+   *   {
+   *     import cities.BatchCommands.AggregationFramework
+   *     import AggregationFramework.{
+   *       Cursor => AggCursor, Group, Match, SumField
+   *     }
    *
-   *   col.aggregate1[BSONDocument](Group(BSONString("\$state"))(
-   *     "totalPop" -> SumField("population")), List(
-   *       Match(document("totalPop" ->
-   *         document("\$gte" -> 10000000L)))))
-   * }
+   *     val cursor = AggCursor(batchSize = 1) // initial batch size
+   *
+   *     cities.aggregate1[BSONDocument](Group(BSONString("\$state"))(
+   *       "totalPop" -> SumField("population")), List(
+   *         Match(document("totalPop" ->
+   *           document("\$gte" -> 10000000L)))),
+   *       cursor)
+   *   }
    * }}}
    *
    * @tparam T the result type
