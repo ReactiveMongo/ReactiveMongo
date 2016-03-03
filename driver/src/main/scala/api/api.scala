@@ -195,20 +195,23 @@ object Failover {
 
 /**
  * A failover strategy for sending requests.
+ * The default uses 7 retries: 125ms, 250ms, 375ms, 500ms, 625ms, 750ms, 875ms.
  *
  * @param initialDelay the initial delay between the first failed attempt and the next one.
  * @param retries the number of retries to do before giving up.
  * @param delayFactor a function that takes the current iteration and returns a factor to be applied to the initialDelay.
  */
 case class FailoverStrategy(
-    initialDelay: FiniteDuration = FiniteDuration(500, "ms"),
-    retries: Int = 5,
-    delayFactor: Int => Double = _ => 1) {
+    initialDelay: FiniteDuration = FiniteDuration(100, "ms"),
+    retries: Int = 7,
+    delayFactor: Int => Double = _ * 1.25D) {
+
+  private val timeoutFactor = 1.2D // TODO: configurable
 
   /** The maximum timeout, including all the retried */
   lazy val maxTimeout: FiniteDuration =
     (1 to retries).foldLeft(initialDelay) { (d, i) =>
-      d + (initialDelay * delayFactor(i).toLong)
+      d + (initialDelay * ((timeoutFactor * delayFactor(i)).toLong))
     }
 }
 
