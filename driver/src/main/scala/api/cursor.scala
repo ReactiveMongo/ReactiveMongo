@@ -254,7 +254,9 @@ object DefaultCursor {
         val op = GetMore(query.fullCollectionName, query.numberToReturn, response.reply.cursorID)
         logger.trace("[Cursor] Calling next on " + response.reply.cursorID + ", op=" + op)
         Failover2(mongoConnection, failoverStrategy) { () =>
-          mongoConnection.sendExpectingResponse(RequestMaker(op).copy(channelIdHint = Some(response.info.channelId)), isMongo26WriteOp)
+          mongoConnection.sendExpectingResponse(RequestMaker(op,
+            readPreference = readPreference,
+            channelIdHint = Some(response.info.channelId)), isMongo26WriteOp)
         }.future.map(Some(_))
       } else {
         logger.error("[Cursor] Call to next() but cursorID is 0, there is probably a bug")
@@ -298,11 +300,19 @@ object DefaultCursor {
     }
 
     @inline
-    private def killCursors(cursorID: Long, logCat: String): Unit =
+    private def killCursors(r: Response, logCat: String): Unit = {
+      val cursorID = r.reply.cursorID
+
       if (cursorID != 0) {
         logger.debug(s"[$logCat] Clean up ${cursorID}, sending KillCursor")
-        mongoConnection.send(RequestMaker(KillCursors(Set(cursorID))))
+
+        val killReq = RequestMaker(KillCursors(Set(cursorID)),
+          readPreference = readPreference,
+          channelIdHint = Some(r.info.channelId))
+
+        mongoConnection.send(killReq)
       } else logger.trace(s"[$logCat] Cursor exhausted (${cursorID})")
+    }
 
     def foldResponses[T](z: => T, maxDocs: Int = Int.MaxValue)(suc: (T, Response) => State[T], err: (T, Throwable) => State[T])(implicit ctx: ExecutionContext): Future[T] = new FoldResponses(z, maxDocs, suc, err)(ctx)()
 
@@ -338,7 +348,7 @@ object DefaultCursor {
         next = response => {
           if (hasNext(response, maxDocs)) next(response)
           else Future.successful(Option.empty[Response])
-        }, cleanUp = { resp => killCursors(resp.reply.cursorID, "Cursor") })))
+        }, cleanUp = { resp => killCursors(resp, "Cursor") })))
 
     def tailableCursorEnumerateResponses(maxDocs: Int = Int.MaxValue)(implicit ctx: ExecutionContext): Enumerator[Response] =
       Enumerator.flatten(makeRequest.map { response =>
@@ -351,7 +361,7 @@ object DefaultCursor {
           },
           cleanUp = { current =>
             val (r, _) = current
-            killCursors(r.reply.cursorID, "Tailable Cursor")
+            killCursors(r, "Tailable Cursor")
           }).map(_._1)
       })
 
@@ -450,7 +460,7 @@ object DefaultCursor {
           val st = suc(cur, r) match {
             case end @ (Done(_) | Fail(_)) => {
               // Releases cursor before ending
-              killCursors(r.reply.cursorID, "FoldResponses")
+              killCursors(r, "FoldResponses")
               end
             }
             case Cont(v) if (c == maxDocs) => Done(v)
