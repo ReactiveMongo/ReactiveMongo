@@ -447,12 +447,12 @@ trait MongoDBSystem extends Actor {
 
       if (!nodeSet.isReachable) {
         if (nodeSetWasReachable) {
-          logger.error("The entire node set is unreachable, is there a network problem?")
+          logger.warn("The entire node set is unreachable, is there a network problem?")
           broadcastMonitors(SetUnavailable)
         } else logger.debug("The entire node set is still unreachable, is there a network problem?")
       } else if (!nodeSet.primary.isDefined) {
         if (primaryWasAvailable) {
-          logger.error("The primary is unavailable, is there a network problem?")
+          logger.warn("The primary is unavailable, is there a network problem?")
           broadcastMonitors(PrimaryUnavailable)
         } else logger.debug(
           "The primary is still unavailable, is there a network problem?")
