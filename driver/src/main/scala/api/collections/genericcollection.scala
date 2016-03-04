@@ -67,7 +67,7 @@ trait GenericCollectionWithCommands[P <: SerializationPack with Singleton] { sel
     ResolvedCollectionCommand
   }
 
-  def runner = Command.run(pack)
+  def runner = Command.run(pack, self.failoverStrategy)
 
   def runCommand[R, C <: CollectionCommand with CommandWithResult[R]](command: C with CommandWithResult[R])(implicit writer: pack.Writer[ResolvedCollectionCommand[C]], reader: pack.Reader[R], ec: ExecutionContext): Future[R] =
     runner(self, command)
