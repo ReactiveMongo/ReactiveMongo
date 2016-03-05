@@ -18,7 +18,9 @@ package reactivemongo.api.collections
 import scala.util.{ Failure, Success, Try }
 import scala.util.control.NonFatal
 
+import scala.collection.Set
 import scala.collection.immutable.ListSet
+import scala.collection.generic.CanBuildFrom
 
 import scala.concurrent.{ ExecutionContext, Future }
 
@@ -223,23 +225,26 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
 
   /**
    * Returns the distinct values for a specified field across a single collection and returns the results in an array.
+   *
+   * @tparam T the element type of the distinct values
+   * @tparam M the container, that must be a [[Set]]
    * @param key the field for which to return distinct values
    * @param selector the query selector that specifies the documents from which to retrieve the distinct values.
    * @param readConcern the read concern
    *
    * {{{
-   * val distinctStates = collection.distinct[String]("state")
+   * val distinctStates = collection.distinct[String, Set]("state")
    * }}}
    */
-  def distinct[T](key: String, selector: Option[pack.Document] = None, readConcern: ReadConcern = ReadConcern.Local)(implicit reader: pack.NarrowValueReader[T], ec: ExecutionContext): Future[ListSet[T]] = {
+  def distinct[T, M[_] <: Set[_]](key: String, selector: Option[pack.Document] = None, readConcern: ReadConcern = ReadConcern.Local)(implicit reader: pack.NarrowValueReader[T], ec: ExecutionContext, cbf: CanBuildFrom[M[_], T, M[T]]): Future[M[T]] = {
     implicit val widenReader = pack.widenReader(reader)
     val version = db.connection.metadata.
       fold[MongoWireVersion](MongoWireVersion.V30)(_.maxWireVersion)
 
     runCommand(DistinctCommand.Distinct(
       key, selector, readConcern, version)).flatMap {
-      _.result[T] match {
-        case Failure(cause)  => Future.failed[ListSet[T]](cause)
+      _.result[T, M] match {
+        case Failure(cause)  => Future.failed[M[T]](cause)
         case Success(result) => Future.successful(result)
       }
     }

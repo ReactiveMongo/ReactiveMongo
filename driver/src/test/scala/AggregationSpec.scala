@@ -1,3 +1,5 @@
+import scala.collection.immutable.ListSet
+
 import scala.concurrent.Future
 
 import reactivemongo.bson._
@@ -136,8 +138,8 @@ object AggregationSpec extends org.specs2.mutable.Specification {
     }
 
     "return distinct states" in {
-      collection.distinct[String]("state").
-        aka("states") must beEqualTo(List("NY", "FR", "JP")).
+      collection.distinct[String, ListSet]("state").
+        aka("states") must beEqualTo(ListSet("NY", "FR", "JP")).
         await(timeoutMillis)
     }
 
