@@ -190,10 +190,15 @@ object Command {
     }
   }
 
+  @deprecated(message = "Unused", since = "0.11.11")
+  def run[P <: SerializationPack](pack: P): CommandWithPackRunner[pack.type] =
+    CommandWithPackRunner(pack, FailoverStrategy())
+
   /**
    * Returns a command runner.
    *
    * @param pack the serialization pack
+   * @param failover the failover strategy
    *
    * {{{
    * import reactivemongo.bson.BSONDocument
@@ -204,8 +209,7 @@ object Command {
    *   unboxed(aCollection, Count(BSONDocument("bulk" -> true)))
    * }}}
    */
-  def run[P <: SerializationPack](pack: P): CommandWithPackRunner[pack.type] =
-    CommandWithPackRunner(pack)
+  def run[P <: SerializationPack](pack: P, failover: FailoverStrategy): CommandWithPackRunner[pack.type] = CommandWithPackRunner(pack, failover)
 
   private[reactivemongo] def deserialize[P <: SerializationPack, A](pack: P, response: Response)(implicit reader: pack.Reader[A]): A =
     pack.readAndDeserialize(response, reader)

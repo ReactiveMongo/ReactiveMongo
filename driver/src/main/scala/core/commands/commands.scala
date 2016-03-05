@@ -282,14 +282,14 @@ case class LastError(
   def elements: Stream[BSONElement] = originalDocument.map(_.elements).getOrElse(Stream.empty[BSONElement])
 
   /**
-   * Returns the [[reactivemongo.bson.BSONValue BSONValue]] associated with the given `key` of the [[reactivemongo.core.commands.LastError#originalDocument originalDocument]].
+   * Returns the [[reactivemongo.bson.BSONValue]] associated with the given `key` of the [[reactivemongo.core.commands.LastError#originalDocument originalDocument]].
    *
    * If the key is not found or the matching value cannot be deserialized, returns `None`.
    */
   def get(key: String): Option[BSONValue] = originalDocument.flatMap(_.get(key))
 
   /**
-   * Returns the [[reactivemongo.bson.BSONValue BSONValue BSONValue]] associated with the given `key` of the [[reactivemongo.core.commands.LastError#originalDocument originalDocument]].
+   * Returns the [[reactivemongo.bson.BSONValue]] associated with the given `key` of the [[reactivemongo.core.commands.LastError#originalDocument originalDocument]].
    *
    * If the key is not found or the matching value cannot be deserialized, returns a `Failure`.
    * The `Failure` holds a [[reactivemongo.bson.exceptions.DocumentKeyNotFound DocumentKeyNotFound]] if the key could not be found.
@@ -297,7 +297,7 @@ case class LastError(
   def getTry(key: String): Try[BSONValue] = originalDocument.map(_.getTry(key)).getOrElse(Failure(DocumentKeyNotFound(key)))
 
   /**
-   * Returns the [[reactivemongo.bson.BSONValue BSONValue]] associated with the given `key` of the [[reactivemongo.core.commands.LastError#originalDocument originalDocument]].
+   * Returns the [[reactivemongo.bson.BSONValue]] associated with the given `key` of the [[reactivemongo.core.commands.LastError#originalDocument originalDocument]].
    *
    * If the key could not be found, the resulting option will be `None`.
    * If the matching value could not be deserialized, returns a `Failure`.
@@ -305,7 +305,7 @@ case class LastError(
   def getUnflattenedTry(key: String): Try[Option[BSONValue]] = originalDocument.map(_.getUnflattenedTry(key)).getOrElse(Failure(DocumentKeyNotFound(key)))
 
   /**
-   * Returns the [[reactivemongo.bson.BSONValue BSONValue]] associated with the given `key` of the [[reactivemongo.core.commands.LastError#originalDocument originalDocument]],
+   * Returns the [[reactivemongo.bson.BSONValue]] associated with the given `key` of the [[reactivemongo.core.commands.LastError#originalDocument originalDocument]],
    * and converts it with the given implicit [[reactivemongo.bson.BSONReader BSONReader]].
    *
    * If there is no matching value, or the value could not be deserialized or converted, returns a `None`.
@@ -313,7 +313,7 @@ case class LastError(
   def getAs[T](s: String)(implicit reader: BSONReader[_ <: BSONValue, T]): Option[T] = originalDocument.flatMap(_.getAs[T](s))
 
   /**
-   * Returns the [[reactivemongo.bson.BSONValue BSONValue]] associated with the given `key` of the [[reactivemongo.core.commands.LastError#originalDocument originalDocument]],
+   * Returns the [[reactivemongo.bson.BSONValue]] associated with the given `key` of the [[reactivemongo.core.commands.LastError#originalDocument originalDocument]],
    * and converts it with the given implicit [[reactivemongo.bson.BSONReader BSONReader]].
    *
    * If there is no matching value, or the value could not be deserialized or converted, returns a `Failure`.
@@ -322,7 +322,7 @@ case class LastError(
   def getAsTry[T](s: String)(implicit reader: BSONReader[_ <: BSONValue, T]): Try[T] = originalDocument.map(_.getAsTry[T](s)).getOrElse(Failure(DocumentKeyNotFound(s)))
 
   /**
-   * Returns the [[reactivemongo.bson.BSONValue BSONValue]] associated with the given `key` of the [[reactivemongo.core.commands.LastError#originalDocument originalDocument]],
+   * Returns the [[reactivemongo.bson.BSONValue]] associated with the given `key` of the [[reactivemongo.core.commands.LastError#originalDocument originalDocument]],
    * and converts it with the given implicit [[reactivemongo.bson.BSONReader BSONReader]].
    *
    * If there is no matching value, returns a `Success` holding `None`.
