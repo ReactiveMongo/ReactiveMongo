@@ -382,6 +382,7 @@ object DefaultCursor {
     mongoConnection: MongoConnection,
     failover: FailoverStrategy,
     isMongo26WriteOp: Boolean)(implicit reader: pack.Reader[A]) = new Impl[A] {
+    val preference = readPreference
     val connection = mongoConnection
     val failoverStrategy = failover
     val mongo26WriteOp = isMongo26WriteOp
@@ -419,6 +420,7 @@ object DefaultCursor {
     mongoConnection: MongoConnection,
     failover: FailoverStrategy,
     isMongo26WriteOp: Boolean)(implicit reader: pack.Reader[A]) = new Impl[A] {
+    val preference = readPreference
     val connection = mongoConnection
     val failoverStrategy = failover
     val mongo26WriteOp = isMongo26WriteOp
@@ -456,6 +458,9 @@ object DefaultCursor {
   }
 
   private[reactivemongo] trait Impl[A] extends Cursor[A] {
+    /** The read preference */
+    def preference: ReadPreference
+
     def connection: MongoConnection
 
     def failoverStrategy: FailoverStrategy
@@ -486,8 +491,9 @@ object DefaultCursor {
 
         logger.trace(s"[Cursor] Calling next on ${response.reply.cursorID}, op=$op")
         awaitFailover(Failover2(connection, failoverStrategy) { () =>
-          connection.sendExpectingResponse(RequestMaker(op).
-            copy(channelIdHint = Some(response.info.channelId)),
+          connection.sendExpectingResponse(RequestMaker(op,
+            readPreference = preference,
+            channelIdHint = Some(response.info.channelId)),
             mongo26WriteOp)
 
         }.future).map(Some(_))
@@ -524,11 +530,19 @@ object DefaultCursor {
     }
 
     @inline
-    private def killCursors(cursorID: Long, logCat: String): Unit =
+    private def killCursors(r: Response, logCat: String): Unit = {
+      val cursorID = r.reply.cursorID
+
       if (cursorID != 0) {
-        logger.debug(s"[$logCat] Clean up ${cursorID}, sending KillCursor")
-        connection.send(RequestMaker(KillCursors(Set(cursorID))))
+        logger.debug(s"[$logCat] Clean up ${cursorID}, sending KillCursors")
+
+        val killReq = RequestMaker(KillCursors(Set(cursorID)),
+          readPreference = preference,
+          channelIdHint = Some(r.info.channelId))
+
+        connection.send(killReq)
       } else logger.trace(s"[$logCat] Cursor exhausted (${cursorID})")
+    }
 
     def foldResponses[T](z: => T, maxDocs: Int = Int.MaxValue)(suc: (T, Response) => State[T], err: (T, Throwable) => State[T])(implicit ctx: ExecutionContext): Future[T] = new FoldResponses(z, maxDocs, suc, err)(ctx)()
 
@@ -578,7 +592,7 @@ object DefaultCursor {
           next = response => {
             if (hasNext(response, maxDocs)) next(response, maxDocs)
             else Future.successful(Option.empty[Response])
-          }, cleanUp = { resp => killCursors(resp.reply.cursorID, "Cursor") })))
+          }, cleanUp = { resp => killCursors(resp, "Cursor") })))
 
     @deprecated(message = "Only for internal use", since = "0.11.10")
     def tailableCursorEnumerateResponses(maxDocs: Int = Int.MaxValue)(implicit ctx: ExecutionContext): Enumerator[Response] =
@@ -594,7 +608,7 @@ object DefaultCursor {
           },
           cleanUp = { current =>
             val (r, _) = current
-            killCursors(r.reply.cursorID, "Tailable Cursor")
+            killCursors(r, "Tailable Cursor")
           }).map(_._1)
       })
 
@@ -675,12 +689,12 @@ object DefaultCursor {
 
       @inline def ok(r: Response, v: T) = {
         // Releases cursor before ending
-        killCursors(r.reply.cursorID, "FoldResponses")
+        killCursors(r, "FoldResponses")
         Future.successful(v)
       }
 
       @inline def kill(r: Response, f: Throwable) = {
-        killCursors(r.reply.cursorID, "FoldResponses")
+        killCursors(r, "FoldResponses")
         Future.failed[T](f)
       }
 
@@ -688,7 +702,7 @@ object DefaultCursor {
         logger.trace(s"Process response: $resp")
 
         Future(suc(cur, resp)).transform(resp -> _, { error =>
-          killCursors(resp.reply.cursorID, "FoldResponses")
+          killCursors(resp, "FoldResponses")
           error
         }).flatMap {
           case (r, next) =>
