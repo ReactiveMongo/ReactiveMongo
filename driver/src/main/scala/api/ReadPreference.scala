@@ -16,22 +16,36 @@ object ReadPreference {
   object Primary extends ReadPreference {
     override def slaveOk = false
     override def filterTag = None
+
+    override def toString = "Primary"
   }
 
   /** Read from the primary if it is available, or secondaries if it is not. */
-  case class PrimaryPreferred(filterTag: Option[BSONDocument => Boolean]) extends ReadPreference
+  case class PrimaryPreferred(
+      filterTag: Option[BSONDocument => Boolean]) extends ReadPreference {
+    override def toString = s"PrimaryPreferred($filterTag)"
+  }
 
   /** Read only from any secondary. */
-  case class Secondary(filterTag: Option[BSONDocument => Boolean]) extends ReadPreference
+  case class Secondary(
+      filterTag: Option[BSONDocument => Boolean]) extends ReadPreference {
+    override def toString = s"Secondary($filterTag)"
+  }
 
   /** Read from any secondary, or from the primary if they are not available. */
-  case class SecondaryPreferred(filterTag: Option[BSONDocument => Boolean]) extends ReadPreference
+  case class SecondaryPreferred(
+      filterTag: Option[BSONDocument => Boolean]) extends ReadPreference {
+    override def toString = s"SecondaryPreferred($filterTag)"
+  }
 
   /**
    * Read from the faster node (ie the node which replies faster than all others), regardless its status
    * (primary or secondary).
    */
-  case class Nearest(filterTag: Option[BSONDocument => Boolean]) extends ReadPreference
+  case class Nearest(
+      filterTag: Option[BSONDocument => Boolean]) extends ReadPreference {
+    override def toString = s"Nearest($filterTag)"
+  }
 
   private implicit class BSONDocumentWrapper(val underlying: BSONDocument) extends AnyVal {
     def contains(doc: BSONDocument): Boolean = {

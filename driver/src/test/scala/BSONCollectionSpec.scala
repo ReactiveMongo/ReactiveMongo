@@ -238,7 +238,7 @@ object BSONCollectionSpec extends org.specs2.mutable.Specification {
       }
     }
 
-    "read docs skipping errors using collect" in {
+    "read documents skipping errors using collect" in {
       implicit val reader = new SometimesBuggyPersonReader
       val result = Await.result(collection.find(BSONDocument()).
         cursor[Person]().collect[Vector](stopOnError = false), timeout)
@@ -247,7 +247,7 @@ object BSONCollectionSpec extends org.specs2.mutable.Specification {
       result.length mustEqual 4
     }
 
-    "write a doc with error" in {
+    "write a document with error" in {
       implicit val writer = BuggyPersonWriter
 
       collection.insert(person).map { lastError =>

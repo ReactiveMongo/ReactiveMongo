@@ -27,42 +27,45 @@ object CursorSpec extends org.specs2.mutable.Specification {
   val delayedTimeout = (timeoutMillis * 1.25).toInt
 
   "ReactiveMongo" should {
-    "insert 16,517 records" in {
-      val futs = for (i <- 0 until 16517)
-        yield coll.insert(BSONDocument(
-        "i" -> BSONInteger(i), "record" -> BSONString("record" + i)))
+    val nDocs = 16517
+    s"insert $nDocs records" in {
+      val futs = for (i <- 0 until nDocs) yield {
+        coll.insert(BSONDocument(
+          "i" -> BSONInteger(i), "record" -> BSONString("record" + i)))
+      }
 
       Future.sequence(futs).map { _ =>
-        println("inserted 16,517 records")
+        println(s"inserted $nDocs records")
       } aka "fixtures" must beEqualTo({}).await(timeoutMillis)
     }
 
     "get 10 first docs" in {
-      coll.find(BSONDocument.empty).cursor().collect[List](10).map(_.size).
+      coll.find(matchAll("cursorspec1")).cursor().collect[List](10).map(_.size).
         aka("result size") must beEqualTo(10).await(timeoutMillis)
     }
 
     "fold" >> {
       "all the documents" in {
-        coll.find(BSONDocument.empty).cursor().fold(0)((st, _) => st + 1).
+        coll.find(matchAll("cursorspec2")).cursor().fold(0)((st, _) => st + 1).
           aka("result size") must beEqualTo(16517).await(timeoutMillis)
       }
 
       "only 1024 documents" in {
-        coll.find(BSONDocument.empty).cursor().fold(0, 1024)((st, _) => st + 1).
+        coll.find(matchAll("cursorspec3")).cursor().
+          fold(0, 1024)((st, _) => st + 1).
           aka("result size") must beEqualTo(1024).await(timeoutMillis)
       }
     }
 
     "fold while successful" >> {
       "all the documents" in {
-        coll.find(BSONDocument.empty).cursor().foldWhile(0)(
+        coll.find(matchAll("cursorspec4")).cursor().foldWhile(0)(
           (st, _) => Cursor.Cont(st + 1)).
           aka("result size") must beEqualTo(16517).await(timeoutMillis)
       }
 
       "only 1024 documents" in {
-        coll.find(BSONDocument.empty).cursor().foldWhile(0, 1024)(
+        coll.find(matchAll("cursorspec5")).cursor().foldWhile(0, 1024)(
           (st, _) => Cursor.Cont(st + 1)).
           aka("result size") must beEqualTo(1024).await(timeoutMillis)
       }
@@ -70,13 +73,13 @@ object CursorSpec extends org.specs2.mutable.Specification {
 
     "fold the bulks" >> {
       "for all the documents" in {
-        coll.find(BSONDocument.empty).cursor().foldBulks(0)(
+        coll.find(matchAll("cursorspec6")).cursor().foldBulks(0)(
           (st, bulk) => Cursor.Cont(st + bulk.size)).
           aka("result size") must beEqualTo(16517).await(timeoutMillis)
       }
 
       "for 1024 documents" in {
-        coll.find(BSONDocument.empty).cursor().foldBulks(0, 1024)(
+        coll.find(matchAll("cursorspec7")).cursor().foldBulks(0, 1024)(
           (st, bulk) => Cursor.Cont(st + bulk.size)).
           aka("result size") must beEqualTo(1024).await(timeoutMillis)
       }
@@ -84,13 +87,13 @@ object CursorSpec extends org.specs2.mutable.Specification {
 
     "fold the responses" >> {
       "for all the documents" in {
-        coll.find(BSONDocument.empty).cursor().foldResponses(0)(
+        coll.find(matchAll("cursorspec8")).cursor().foldResponses(0)(
           (st, resp) => Cursor.Cont(st + resp.reply.numberReturned)).
           aka("result size") must beEqualTo(16517).await(timeoutMillis)
       }
 
       "for 1024 documents" in {
-        coll.find(BSONDocument.empty).cursor().foldResponses(0, 1024)(
+        coll.find(matchAll("cursorspec9")).cursor().foldResponses(0, 1024)(
           (st, resp) => Cursor.Cont(st + resp.reply.numberReturned)).
           aka("result size") must beEqualTo(1024).await(timeoutMillis)
       }
@@ -107,7 +110,7 @@ object CursorSpec extends org.specs2.mutable.Specification {
           new FlattenedFooCursor(future)
       }
 
-      val cursor = coll.find(BSONDocument.empty).cursor()
+      val cursor = coll.find(matchAll("cursorspec10")).cursor()
 
       cursor.foo must_== "Bar" and (
         Cursor.flatten(Future.successful(cursor)).foo must_== "raB")
@@ -129,17 +132,20 @@ object CursorSpec extends org.specs2.mutable.Specification {
     "stop on error" >> {
       val drv = new MongoDriver
       def con = drv.connection(List(primaryHost), DefaultOptions)
-      def scol(n: String = coll.name) = Await.result(for {
-        d <- con.database(db.name, failoverStrategy)
-        c <- d.coll(n)
-      } yield c, timeout)
+      def scol(n: String = coll.name) = {
+        //println(s"resolve collection $n")
+        Await.result(for {
+          d <- con.database(db.name, failoverStrategy)
+          c <- d.coll(n)
+        } yield c, timeout)
+      }
 
       "when folding responses" >> {
         "if fails while processing with existing documents" in {
           var count = 0
           def onError(last: Unit, e: Throwable): Unit = { count = count + 1 }
           val c = scol()
-          val cursor = c.find(BSONDocument.empty).cursor()
+          val cursor = c.find(matchAll("cursorspec11")).cursor()
 
           cursor.foldResponses({}, 128)(
             { (_, _) => sys.error("Foo"): Cursor.State[Unit] },
@@ -151,7 +157,7 @@ object CursorSpec extends org.specs2.mutable.Specification {
           var count = 0
           def onError(last: Unit, e: Throwable): Unit = { count = count + 1 }
           val c = scol(System.identityHashCode(onError _).toString)
-          val cursor = c.find(BSONDocument.empty).cursor()
+          val cursor = c.find(matchAll("cursorspec12")).cursor()
 
           cursor.foldResponses({}, 128)(
             { (_, _) => sys.error("Foo"): Cursor.State[Unit] },
@@ -163,7 +169,7 @@ object CursorSpec extends org.specs2.mutable.Specification {
           var count = 0
           def onError(last: Unit, e: Throwable): Unit = { count = count + 1 }
           val c = scol(System.identityHashCode(onError _).toString)
-          val cursor = c.find(BSONDocument.empty).cursor()
+          val cursor = c.find(matchAll("cursorspec13")).cursor()
 
           cursor.foldResponses[Unit](sys.error("Foo"), 128)(
             (_, _) => Cursor.Cont({}), Cursor.FailOnError[Unit](onError)).
@@ -174,7 +180,7 @@ object CursorSpec extends org.specs2.mutable.Specification {
           var count = 0
           def onError(last: Unit, e: Throwable): Unit = { count = count + 1 }
           val c = scol()
-          val cursor = c.find(BSONDocument.empty).cursor()
+          val cursor = c.find(matchAll("cursorspec14")).cursor()
 
           c.db.connection.close()
           // Close connection to make the related cursor erroneous
@@ -194,7 +200,7 @@ object CursorSpec extends org.specs2.mutable.Specification {
             count = count + 1
           }
           val c = scol()
-          val cursor = c.find(BSONDocument.empty).options(
+          val cursor = c.find(matchAll("cursorspec15")).options(
             QueryOpts(batchSizeN = 2)).cursor()
 
           (cursor.enumerateResponses(10, true) |>>> inc).
@@ -209,7 +215,7 @@ object CursorSpec extends org.specs2.mutable.Specification {
             sys.error("Foo")
           }
           val c = scol(System.identityHashCode(inc).toString)
-          val cursor = c.find(BSONDocument.empty).options(
+          val cursor = c.find(matchAll("cursorspec16")).options(
             QueryOpts(batchSizeN = 2)).cursor()
 
           (cursor.enumerateResponses(10, true) |>>> inc).
@@ -220,7 +226,7 @@ object CursorSpec extends org.specs2.mutable.Specification {
           var count = 0
           val inc = Iteratee.foreach[Response] { _ => count = count + 1 }
           val c = scol()
-          val cursor = c.find(BSONDocument.empty).cursor()
+          val cursor = c.find(matchAll("cursorspec17")).cursor()
 
           c.db.connection.close()
           // Close connection to make the related cursor erroneous
@@ -235,7 +241,7 @@ object CursorSpec extends org.specs2.mutable.Specification {
           var count = 0
           def onError(last: Unit, e: Throwable): Unit = { count = count + 1 }
           val c = scol()
-          val cursor = c.find(BSONDocument.empty).options(
+          val cursor = c.find(matchAll("cursorspec18")).options(
             QueryOpts(batchSizeN = 64)).cursor()
 
           cursor.foldBulks({}, 128)(
@@ -248,7 +254,7 @@ object CursorSpec extends org.specs2.mutable.Specification {
           var count = 0
           def onError(last: Unit, e: Throwable): Unit = { count = count + 1 }
           val c = scol(System.identityHashCode(onError _).toString)
-          val cursor = c.find(BSONDocument.empty).options(
+          val cursor = c.find(matchAll("cursorspec19")).options(
             QueryOpts(batchSizeN = 64)).cursor()
 
           cursor.foldBulks({}, 128)(
@@ -261,7 +267,7 @@ object CursorSpec extends org.specs2.mutable.Specification {
           var count = 0
           def onError(last: Unit, e: Throwable): Unit = { count = count + 1 }
           val c = scol(System.identityHashCode(onError _).toString)
-          val cursor = c.find(BSONDocument.empty).options(
+          val cursor = c.find(matchAll("cursorspec20")).options(
             QueryOpts(batchSizeN = 64)).cursor()
 
           cursor.foldBulks[Unit](sys.error("Foo"), 128)(
@@ -273,7 +279,7 @@ object CursorSpec extends org.specs2.mutable.Specification {
           var count = 0
           def onError(last: Unit, e: Throwable): Unit = { count = count + 1 }
           val c = scol()
-          val cursor = c.find(BSONDocument.empty).options(
+          val cursor = c.find(matchAll("cursorspec21")).options(
             QueryOpts(batchSizeN = 64)).cursor()
 
           c.db.connection.close()
@@ -294,7 +300,7 @@ object CursorSpec extends org.specs2.mutable.Specification {
             count = count + 1
           }
           val c = scol()
-          val cursor = c.find(BSONDocument.empty).options(
+          val cursor = c.find(matchAll("cursorspec22")).options(
             QueryOpts(batchSizeN = 2)).cursor()
 
           (cursor.enumerateBulks(10, true) |>>> inc).
@@ -309,7 +315,7 @@ object CursorSpec extends org.specs2.mutable.Specification {
             sys.error("Foo")
           }
           val c = scol(System.identityHashCode(inc).toString)
-          val cursor = c.find(BSONDocument.empty).options(
+          val cursor = c.find(matchAll("cursorspec23")).options(
             QueryOpts(batchSizeN = 2)).cursor()
 
           (cursor.enumerateBulks(10, true) |>>> inc).
@@ -322,7 +328,7 @@ object CursorSpec extends org.specs2.mutable.Specification {
             count = count + 1
           }
           val c = scol()
-          val cursor = c.find(BSONDocument.empty).cursor()
+          val cursor = c.find(matchAll("cursorspec24")).cursor()
 
           c.db.connection.close()
           // Close connection to make the related cursor erroneous
@@ -337,7 +343,7 @@ object CursorSpec extends org.specs2.mutable.Specification {
           var count = 0
           def onError(last: Unit, e: Throwable): Unit = { count = count + 1 }
           val c = scol()
-          val cursor = c.find(BSONDocument.empty).cursor()
+          val cursor = c.find(matchAll("cursorspec25")).cursor()
 
           cursor.foldWhile({}, 128)(
             { (_, _) => sys.error("Foo"): Cursor.State[Unit] },
@@ -349,7 +355,7 @@ object CursorSpec extends org.specs2.mutable.Specification {
           var count = 0
           def onError(last: Unit, e: Throwable): Unit = { count = count + 1 }
           val c = scol()
-          val cursor = c.find(BSONDocument.empty).cursor()
+          val cursor = c.find(matchAll("cursorspec26")).cursor()
 
           cursor.foldWhile[Unit](sys.error("Foo"), 128)(
             (_, _) => Cursor.Cont({}), Cursor.FailOnError[Unit](onError)).
@@ -360,7 +366,7 @@ object CursorSpec extends org.specs2.mutable.Specification {
           var count = 0
           def onError(last: Unit, e: Throwable): Unit = { count = count + 1 }
           val c = scol()
-          val cursor = c.find(BSONDocument.empty).cursor()
+          val cursor = c.find(matchAll("cursorspec27")).cursor()
 
           c.db.connection.close()
           // Close connection to make the related cursor erroneous
@@ -380,7 +386,7 @@ object CursorSpec extends org.specs2.mutable.Specification {
             count = count + 1
           }
           val c = scol()
-          val cursor = c.find(BSONDocument.empty).cursor()
+          val cursor = c.find(matchAll("cursorspec28")).cursor()
 
           (cursor.enumerate(10, true) |>>> inc).recover({ case _ => count }).
             aka("enumerating") must beEqualTo(5).await(timeoutMillis)
@@ -390,7 +396,7 @@ object CursorSpec extends org.specs2.mutable.Specification {
           var count = 0
           val inc = Iteratee.foreach[BSONDocument] { _ => count = count + 1 }
           val c = scol()
-          val cursor = c.find(BSONDocument.empty).cursor()
+          val cursor = c.find(matchAll("cursorspec29")).cursor()
 
           c.db.connection.close()
           // Close connection to make the related cursor erroneous
@@ -418,7 +424,7 @@ object CursorSpec extends org.specs2.mutable.Specification {
           var count = 0
           def onError(last: Unit, e: Throwable): Unit = { count = count + 1 }
           val c = scol()
-          val cursor = c.find(BSONDocument.empty).cursor()
+          val cursor = c.find(matchAll("cursorspec30")).cursor()
 
           // retry on the initial failure - until the max (128) is reached
           cursor.foldResponses({}, 128)(
@@ -432,7 +438,7 @@ object CursorSpec extends org.specs2.mutable.Specification {
           var count = 0
           def onError(last: Unit, e: Throwable): Unit = { count = count + 1 }
           val c = scol(System.identityHashCode(onError _).toString)
-          val cursor = c.find(BSONDocument.empty).cursor()
+          val cursor = c.find(matchAll("cursorspec31")).cursor()
 
           cursor.foldResponses({}, 64)(
             { (_, _) => sys.error("Foo"): Cursor.State[Unit] },
@@ -444,7 +450,7 @@ object CursorSpec extends org.specs2.mutable.Specification {
           var count = 0
           def onError(last: Unit, e: Throwable): Unit = { count = count + 1 }
           val c = scol(System.identityHashCode(onError _).toString)
-          val cursor = c.find(BSONDocument.empty).cursor()
+          val cursor = c.find(matchAll("cursorspec32")).cursor()
 
           cursor.foldResponses[Unit](sys.error("Foo"), 128)(
             (_, _) => Cursor.Cont({}), Cursor.ContOnError[Unit](onError)).
@@ -456,7 +462,7 @@ object CursorSpec extends org.specs2.mutable.Specification {
           var count = 0
           def onError(last: Unit, e: Throwable): Unit = { count = count + 1 }
           val c = scol()
-          val cursor = c.find(BSONDocument.empty).cursor()
+          val cursor = c.find(matchAll("cursorspec33")).cursor()
 
           c.db.connection.close()
           // Close connection to make the related cursor erroneous
@@ -478,7 +484,7 @@ object CursorSpec extends org.specs2.mutable.Specification {
             count = count + 1
           }
           val c = scol()
-          val cursor = c.find(BSONDocument.empty).options(QueryOpts(
+          val cursor = c.find(matchAll("cursorspec34")).options(QueryOpts(
             batchSizeN = 4)).cursor()
 
           (cursor.enumerateResponses(128, false) |>>> inc).map(_ => count).
@@ -493,7 +499,7 @@ object CursorSpec extends org.specs2.mutable.Specification {
             sys.error("Foo")
           }
           val c = scol(System.identityHashCode(inc).toString)
-          val cursor = c.find(BSONDocument.empty).
+          val cursor = c.find(matchAll("cursorspec35")).
             options(QueryOpts(batchSizeN = 2)).cursor()
 
           (cursor.enumerateResponses(64, false) |>>> inc).map(_ => count).
@@ -505,7 +511,7 @@ object CursorSpec extends org.specs2.mutable.Specification {
           var count = 0
           val inc = Iteratee.foreach[Response] { _ => count = count + 1 }
           val c = scol()
-          val cursor = c.find(BSONDocument.empty).cursor()
+          val cursor = c.find(matchAll("cursorspec36")).cursor()
 
           c.db.connection.close()
           // Close connection to make the related cursor erroneous
@@ -520,7 +526,7 @@ object CursorSpec extends org.specs2.mutable.Specification {
           var count = 0
           def onError(last: Unit, e: Throwable): Unit = { count = count + 1 }
           val c = scol()
-          val cursor = c.find(BSONDocument.empty).options(
+          val cursor = c.find(matchAll("cursorspec37")).options(
             QueryOpts(batchSizeN = 64)).cursor()
 
           cursor.foldBulks({}, 128)(
@@ -534,7 +540,7 @@ object CursorSpec extends org.specs2.mutable.Specification {
           var count = 0
           def onError(last: Unit, e: Throwable): Unit = { count = count + 1 }
           val c = scol(System.identityHashCode(onError _).toString)
-          val cursor = c.find(BSONDocument.empty).options(
+          val cursor = c.find(matchAll("cursorspec38")).options(
             QueryOpts(batchSizeN = 64)).cursor()
 
           cursor.foldBulks({}, 64)(
@@ -548,7 +554,7 @@ object CursorSpec extends org.specs2.mutable.Specification {
           var count = 0
           def onError(last: Unit, e: Throwable): Unit = { count = count + 1 }
           val c = scol(System.identityHashCode(onError _).toString)
-          val cursor = c.find(BSONDocument.empty).options(
+          val cursor = c.find(matchAll("cursorspec39")).options(
             QueryOpts(batchSizeN = 64)).cursor()
 
           cursor.foldBulks[Unit](sys.error("Foo"), 128)(
@@ -561,7 +567,7 @@ object CursorSpec extends org.specs2.mutable.Specification {
           var count = 0
           def onError(last: Unit, e: Throwable): Unit = { count = count + 1 }
           val c = scol()
-          val cursor = c.find(BSONDocument.empty).options(
+          val cursor = c.find(matchAll("cursorspec40")).options(
             QueryOpts(batchSizeN = 64)).cursor()
 
           c.db.connection.close()
@@ -583,7 +589,7 @@ object CursorSpec extends org.specs2.mutable.Specification {
             count = count + 1
           }
           val c = scol()
-          val cursor = c.find(BSONDocument.empty).options(QueryOpts(
+          val cursor = c.find(matchAll("cursorspec41")).options(QueryOpts(
             batchSizeN = 4)).cursor()
 
           (cursor.enumerateBulks(128, false) |>>> inc).map(_ => count).
@@ -597,7 +603,7 @@ object CursorSpec extends org.specs2.mutable.Specification {
             sys.error("Foo")
           }
           val c = scol(System.identityHashCode(inc).toString)
-          val cursor = c.find(BSONDocument.empty).
+          val cursor = c.find(matchAll("cursorspec42")).
             options(QueryOpts(batchSizeN = 2)).cursor()
 
           (cursor.enumerateBulks(64, false) |>>> inc).map(_ => count).
@@ -610,7 +616,7 @@ object CursorSpec extends org.specs2.mutable.Specification {
             _ => count = count + 1
           }
           val c = scol()
-          val cursor = c.find(BSONDocument.empty).cursor()
+          val cursor = c.find(matchAll("cursorspec43")).cursor()
 
           c.db.connection.close()
           // Close connection to make the related cursor erroneous
@@ -625,7 +631,7 @@ object CursorSpec extends org.specs2.mutable.Specification {
           var count = 0
           def onError(last: Unit, e: Throwable): Unit = { count = count + 1 }
           val c = scol()
-          val cursor = c.find(BSONDocument.empty).cursor()
+          val cursor = c.find(matchAll("cursorspec44")).cursor()
 
           cursor.foldWhile({}, 128)(
             { (_, _) => sys.error("Foo"): Cursor.State[Unit] },
@@ -637,7 +643,7 @@ object CursorSpec extends org.specs2.mutable.Specification {
           var count = 0
           def onError(last: Unit, e: Throwable): Unit = { count = count + 1 }
           val c = scol()
-          val cursor = c.find(BSONDocument.empty).cursor()
+          val cursor = c.find(matchAll("cursorspec45")).cursor()
 
           cursor.foldWhile[Unit](sys.error("Foo"), 128)(
             (_, _) => Cursor.Cont({}), Cursor.ContOnError[Unit](onError)).
@@ -649,7 +655,7 @@ object CursorSpec extends org.specs2.mutable.Specification {
           var count = 0
           def onError(last: Unit, e: Throwable): Unit = { count = count + 1 }
           val c = scol()
-          val cursor = c.find(BSONDocument.empty).cursor()
+          val cursor = c.find(matchAll("cursorspec46")).cursor()
 
           c.db.connection.close()
           // Close connection to make the related cursor erroneous
@@ -670,7 +676,7 @@ object CursorSpec extends org.specs2.mutable.Specification {
             count = count + 1
           }
           val c = scol()
-          val cursor = c.find(BSONDocument.empty).options(QueryOpts(
+          val cursor = c.find(matchAll("cursorspec47")).options(QueryOpts(
             batchSizeN = 4)).cursor()
 
           (cursor.enumerate(128, false) |>>> inc).map(_ => count).
@@ -684,7 +690,7 @@ object CursorSpec extends org.specs2.mutable.Specification {
             sys.error("Foo")
           }
           val c = scol(System.identityHashCode(inc).toString)
-          val cursor = c.find(BSONDocument.empty).
+          val cursor = c.find(matchAll("cursorspec48")).
             options(QueryOpts(batchSizeN = 2)).cursor()
 
           (cursor.enumerate(64, false) |>>> inc).map(_ => count).
@@ -697,7 +703,7 @@ object CursorSpec extends org.specs2.mutable.Specification {
             _ => count = count + 1
           }
           val c = scol()
-          val cursor = c.find(BSONDocument.empty).cursor()
+          val cursor = c.find(matchAll("cursorspec49")).cursor()
 
           c.db.connection.close()
           // Close connection to make the related cursor erroneous
@@ -735,7 +741,7 @@ object CursorSpec extends org.specs2.mutable.Specification {
 
       @inline def tailable(n: String, database: DB = db) = {
         implicit val reader = IdReader
-        collection(n, database).find(BSONDocument.empty).options(
+        collection(n, database).find(matchAll("cursorspec50")).options(
           QueryOpts().tailable).cursor[Int]()
       }
 
@@ -790,6 +796,10 @@ object CursorSpec extends org.specs2.mutable.Specification {
   }
 
   // ---
+
+  /* A selector matching all the documents, with an unique content for debug. */
+  @inline def matchAll(name: String) =
+    BSONDocument(name -> BSONDocument("$exists" -> false))
 
   trait FooCursor[T] extends Cursor[T] { def foo: String }
 

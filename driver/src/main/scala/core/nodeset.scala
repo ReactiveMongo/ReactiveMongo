@@ -67,8 +67,11 @@ case class NodeSet(
     nodes: Vector[Node],
     authenticates: Set[Authenticate]) {
 
-  val mongos: Option[Node] = nodes.find(_.isMongos)
+  /** The node which is the current primary one. */
   val primary: Option[Node] = nodes.find(_.status == NodeStatus.Primary)
+
+  val mongos: Option[Node] = nodes.find(_.isMongos)
+
   val secondaries = new RoundRobiner(nodes.filter(_.status == NodeStatus.Secondary))
   val queryable = secondaries.subject ++ primary
   val nearestGroup = new RoundRobiner(queryable.sortWith { _.pingInfo.ping < _.pingInfo.ping })

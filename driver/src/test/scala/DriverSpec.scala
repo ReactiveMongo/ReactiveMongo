@@ -120,7 +120,7 @@ object DriverSpec extends org.specs2.mutable.Specification {
       Await.result(con.database(
         Common.db.name, failoverStrategy), timeout).
         aka("database resulution") must throwA[NodeSetNotReachable.type]
-    } tag ("wip", "mongo2", "mongo26")
+    } tag ("mongo2", "mongo26")
   }
 
   "Authentication SCRAM-SHA1" should {
