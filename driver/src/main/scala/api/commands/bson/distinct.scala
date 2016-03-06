@@ -36,7 +36,7 @@ object BSONDistinctCommandImplicits {
 
     def readResult(doc: BSONDocument): DistinctResult =
       DistinctResult(doc.getAs[BSONArray]("values").
-        fold(ListSet.empty[BSONValue]) { ListSet.empty ++ _.values.toList })
+        fold(Stream.empty[BSONValue])(_.values))
 
   }
 }

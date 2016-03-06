@@ -2,7 +2,10 @@ package reactivemongo.api.commands
 
 import scala.util.{ Failure, Success, Try }
 
-import scala.collection.immutable.ListSet
+import scala.collection.Set
+import scala.collection.immutable.Seq
+import scala.collection.generic.CanBuildFrom
+import scala.collection.mutable.Builder
 
 import reactivemongo.core.protocol.MongoWireVersion
 import reactivemongo.api.{ ReadConcern, SerializationPack }
@@ -21,17 +24,20 @@ trait DistinctCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] 
     version: MongoWireVersion = MongoWireVersion.V30) extends CollectionCommand
       with CommandWithPack[pack.type] with CommandWithResult[DistinctResult]
 
-  case class DistinctResult(values: ListSet[pack.Value]) {
+  /**
+   * @param values the raw values (should not contain duplicate)
+   */
+  case class DistinctResult(values: Traversable[pack.Value]) {
     @annotation.tailrec
-    private def result[T](values: ListSet[pack.Value], reader: pack.WidenValueReader[T], out: ListSet[T]): Try[ListSet[T]] = values.headOption match {
-      case Some(t) => pack.readValue(t, reader) match {
-        case Failure(e) => Failure(e)
-        case Success(v) => result(values.tail, reader, out + v)
+    private def result[T, M[_]](values: Traversable[pack.Value], reader: pack.WidenValueReader[T], out: Builder[T, M[T]]): Try[M[T]] =
+      values.headOption match {
+        case Some(t) => pack.readValue(t, reader) match {
+          case Failure(e) => Failure(e)
+          case Success(v) => result(values.tail, reader, out += v)
+        }
+        case _ => Success(out.result())
       }
-      case _ => Success(out)
-    }
 
-    def result[T](implicit reader: pack.WidenValueReader[T]): Try[ListSet[T]] =
-      result(values, reader, ListSet.empty)
+    def result[T, M[_] <: Set[_]](implicit reader: pack.WidenValueReader[T], cbf: CanBuildFrom[M[_], T, M[T]]): Try[M[T]] = result(values, reader, cbf())
   }
 }
