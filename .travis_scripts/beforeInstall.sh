@@ -11,6 +11,13 @@ SCALA_VER="$1"
 MONGO_SSL="$2"
 MONGODB_VER="2_6"
 
+# Network latency
+if [ `echo "$JAVA_HOME" | grep java-7-openjdk | wc -l` -eq 1 -a "$MONGO_SSL" = "false" ]; then
+    echo "Add 500ms to the network latency"
+    tc qdisc add dev lo root netem delay 500ms
+    ping -c 5 localhost
+fi
+
 if [ `echo "$JAVA_HOME" | grep java-8-oracle | wc -l` -eq 1 ]; then
     MONGODB_VER="3"
 fi
@@ -22,7 +29,7 @@ EOF
 
 ###
 # JAVA_HOME     | SCALA_VER || MONGODB_VER | WiredTiger 
-# java-7-oracle | 2.11.6    || 3           | true
+# java-7-oracle | 2.11.7    || 3           | true
 # java-7-oracle | -         || 3           | false
 # -             | _         || 2.6         | false
 ##
@@ -41,7 +48,7 @@ apt-get install mongodb-org-shell
 service mongod stop
 
 # wiredTiger
-if [ "$MONGODB_VER" = "3" -a "$SCALA_VER" = "2.11.6" ]; then
+if [ "$MONGODB_VER" = "3" -a "$SCALA_VER" = "2.11.7" ]; then
     echo "Prepare MongoDB 3 configuration"
 
     mkdir /tmp/mongo3wt

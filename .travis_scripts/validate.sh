@@ -49,5 +49,12 @@ if [ "$MONGODB_VER" = "3" ]; then
         SBT_OPTS="$SBT_OPTS -Dtest.enableSSL=true"
     fi
 fi
-sbt ++$TRAVIS_SCALA_VERSION 
-sbt $SBT_OPTS ";mimaReportBinaryIssues ;testOnly -- $TEST_OPTS"
+
+if [ `echo "$JAVA_HOME" | grep java-7-openjdk | wc -l` -eq 1 -a "$MONGO_SSL" = "false" ]; then
+  # Network latency
+  SBT_OPTS="$SBT_OPTS -Dtest.failoverRetries=16"
+fi
+
+echo "- SBT options: $SBT_OPTS"
+
+sbt ++$TRAVIS_SCALA_VERSION $SBT_OPTS ";mimaReportBinaryIssues ;testOnly -- $TEST_OPTS"

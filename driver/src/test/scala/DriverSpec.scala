@@ -23,8 +23,14 @@ object DriverSpec extends org.specs2.mutable.Specification {
 
   sequential
 
-  val hosts = Seq("localhost")
-  import Common.{ DefaultOptions, timeout, timeoutMillis }
+  import Common.{
+    DefaultOptions,
+    failoverStrategy,
+    primaryHost,
+    timeout,
+    timeoutMillis
+  }
+  val hosts = Seq(primaryHost)
 
   "Connection pool" should {
     "start and close cleanly with no connections" in {
@@ -56,13 +62,13 @@ object DriverSpec extends org.specs2.mutable.Specification {
   "CR Authentication" should {
     lazy val driver = MongoDriver()
     lazy val connection = driver.connection(
-      List("localhost:27017"),
+      List(primaryHost),
       options = DefaultOptions.copy(nbChannelsPerNode = 1))
 
     lazy val db = {
-      val _db = connection("specs2-test-reactivemongo-auth")
-      Await.ready(_db.drop, timeout)
-      _db
+      val _db = connection.database(
+        "specs2-test-reactivemongo-auth", failoverStrategy)
+      Await.result(_db.flatMap(d => d.drop.map(_ => d)), timeout)
     }
     val id = System.identityHashCode(driver)
 
@@ -107,13 +113,14 @@ object DriverSpec extends org.specs2.mutable.Specification {
       val conOpts = DefaultOptions.copy(nbChannelsPerNode = 1)
 
       def con = Common.driver.connection(
-        List("localhost:27017"),
+        List(primaryHost),
         options = conOpts,
         authentications = Seq(auth))
 
-      Await.result(con.database(Common.db.name), timeout).
+      Await.result(con.database(
+        Common.db.name, failoverStrategy), timeout).
         aka("database resulution") must throwA[NodeSetNotReachable.type]
-    } tag ("mongo2", "mongo26")
+    } tag ("wip", "mongo2", "mongo26")
   }
 
   "Authentication SCRAM-SHA1" should {
@@ -124,7 +131,7 @@ object DriverSpec extends org.specs2.mutable.Specification {
       authMode = ScramSha1Authentication,
       nbChannelsPerNode = 1)
     lazy val connection = driver.connection(
-      List("localhost:27017"), options = conOpts)
+      List(primaryHost), options = conOpts)
 
     lazy val db = {
       val _db = connection("specs2-test-reactivemongo-auth")
@@ -168,12 +175,14 @@ object DriverSpec extends org.specs2.mutable.Specification {
     "be successful with right credentials" in {
       val auth = Authenticate(db.name, s"test-$id", s"password-$id")
       val con = driver.connection(
-        List("localhost:27017"),
+        List(primaryHost),
         options = conOpts,
         authentications = Seq(auth))
 
+      val before = System.currentTimeMillis()
+
       (for {
-        rdb <- con.database("testcol")
+        rdb <- con.database("testcol", Common.failoverStrategy)
         col <- rdb.coll("testcol")
         _ <- col.insert(BSONDocument("foo" -> "bar"))
       } yield ()) must beEqualTo({}).await(timeoutMillis)
@@ -190,12 +199,13 @@ object DriverSpec extends org.specs2.mutable.Specification {
         nbChannelsPerNode = 1)
 
       def con = Common.driver.connection(
-        List("localhost:27017"),
+        List(primaryHost),
         options = conOpts,
         authentications = Seq(auth))
 
-      Await.result(con.database(Common.db.name), timeout).
-        aka("database resulution") must throwA[NodeSetNotReachable.type]
+      Await.result(con.database(
+        Common.db.name, failoverStrategy), timeout).
+        aka("database resolution") must throwA[NodeSetNotReachable.type]
     } tag ("mongo3", "not_mongo26")
   }
 
@@ -205,7 +215,7 @@ object DriverSpec extends org.specs2.mutable.Specification {
         val fos = FailoverStrategy(FiniteDuration(50, "ms"), 20, _ * 2)
 
         Common.connection.database(Common.db.name, fos).
-          map(_ => {}) must beEqualTo({}).await(timeoutMillis)
+          map(_ => {}) must beEqualTo({}).await(fos.maxTimeout.toMillis.toInt)
 
       }
 
@@ -219,18 +229,18 @@ object DriverSpec extends org.specs2.mutable.Specification {
 
         con.database("foo", fos).map(_ => List.empty[Int]).
           recover({ case _ => ws.result() }) must beEqualTo(expected).
-          await(timeoutMillis) and ((before + fos.maxTimeout.toMillis).
-            aka("estimated end") must beLessThanOrEqualTo(
+          await(timeoutMillis * 2) and (
+            (before + fos.maxTimeout.toMillis) must beGreaterThanOrEqualTo(
               System.currentTimeMillis()))
-
       }
     }
 
     "fail with MongoDB < 2.6" in {
       import reactivemongo.core.errors.ConnectionException
 
-      Await.result(Common.connection.database(Common.db.name).map(_ => {}),
-        timeout) aka "database resolution" must (
+      Await.result(Common.connection.database(
+        Common.db.name, failoverStrategy).map(_ => {}), timeout).
+        aka("database resolution") must (
           throwA[ConnectionException]("unsupported MongoDB version")) and (
             Common.connection(Common.db.name).
             aka("database") must throwA[ConnectionException](

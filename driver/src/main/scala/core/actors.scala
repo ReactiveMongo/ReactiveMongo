@@ -677,12 +677,12 @@ trait MongoDBSystem extends Actor {
 
             if (nodeSet.isReachable) {
               broadcastMonitors(SetAvailable(nodeSet.protocolMetadata))
-              logger.info("The node set is now authenticated")
+              logger.debug("The node set is now authenticated")
             }
 
             if (nodeSet.primary.isDefined) {
               broadcastMonitors(PrimaryAvailable(nodeSet.protocolMetadata))
-              logger.info("The primary is now authenticated")
+              logger.debug("The primary is now authenticated")
             }
 
             Some(Authenticated(db, user))

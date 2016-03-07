@@ -44,7 +44,8 @@ object ServerStatusSpec extends Specification {
 
       db.runCommand(ServerStatus) must beLike[ServerStatusResult]({
         case status @ ServerStatusResult(_, _, MongodProcess, _, _, _, _, _) =>
-          println(s"Server status: $status"); ok
+          //println(s"Server status: $status")
+          ok
       }).await(timeoutMillis)
     }
   }
