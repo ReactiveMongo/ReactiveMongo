@@ -224,10 +224,10 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
   def count[H](selector: Option[pack.Document] = None, limit: Int = 0, skip: Int = 0, hint: Option[H] = None)(implicit h: H => CountCommand.Hint, ec: ExecutionContext): Future[Int] = runValueCommand(CountCommand.Count(query = selector, limit, skip, hint.map(h)))
 
   /**
-   * Returns the distinct values for a specified field across a single collection and returns the results in an array.
+   * Returns the distinct values for a specified field across a single collection.
    *
    * @tparam T the element type of the distinct values
-   * @tparam M the container, that must be a [[Set]]
+   * @tparam M the container, that must be a [[Iterable]]
    * @param key the field for which to return distinct values
    * @param selector the query selector that specifies the documents from which to retrieve the distinct values.
    * @param readConcern the read concern
@@ -236,7 +236,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    * val distinctStates = collection.distinct[String, Set]("state")
    * }}}
    */
-  def distinct[T, M[_] <: Set[_]](key: String, selector: Option[pack.Document] = None, readConcern: ReadConcern = ReadConcern.Local)(implicit reader: pack.NarrowValueReader[T], ec: ExecutionContext, cbf: CanBuildFrom[M[_], T, M[T]]): Future[M[T]] = {
+  def distinct[T, M[_] <: Iterable[_]](key: String, selector: Option[pack.Document] = None, readConcern: ReadConcern = ReadConcern.Local)(implicit reader: pack.NarrowValueReader[T], ec: ExecutionContext, cbf: CanBuildFrom[M[_], T, M[T]]): Future[M[T]] = {
     implicit val widenReader = pack.widenReader(reader)
     val version = db.connection.metadata.
       fold[MongoWireVersion](MongoWireVersion.V30)(_.maxWireVersion)

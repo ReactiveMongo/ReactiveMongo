@@ -38,6 +38,6 @@ trait DistinctCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] 
         case _ => Success(out.result())
       }
 
-    def result[T, M[_] <: Set[_]](implicit reader: pack.WidenValueReader[T], cbf: CanBuildFrom[M[_], T, M[T]]): Try[M[T]] = result(values, reader, cbf())
+    def result[T, M[_] <: Iterable[_]](implicit reader: pack.WidenValueReader[T], cbf: CanBuildFrom[M[_], T, M[T]]): Try[M[T]] = result(values, reader, cbf())
   }
 }
