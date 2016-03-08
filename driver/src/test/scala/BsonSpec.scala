@@ -127,20 +127,20 @@ object BSONObjectIDSpec extends Specification {
   "BSONObjectID" should {
 
     "equal when created with string" in {
-      val objectID = BSONObjectID.generate
+      val objectID = BSONObjectID.generate()
       val sameObjectID = BSONObjectID(objectID.stringify)
       objectID.valueAsArray must equalTo(sameObjectID.valueAsArray)
     }
 
     "equal another instance of BSONObjectID with the same value" in {
-      val objectID = BSONObjectID.generate
+      val objectID = BSONObjectID.generate()
       val sameObjectID = BSONObjectID(objectID.stringify)
       objectID must equalTo(sameObjectID)
     }
 
     "not equal another newly generated instance of BSONObjectID" in {
-      val objectID = BSONObjectID.generate
-      val nextObjectID = BSONObjectID(BSONObjectID.generate.stringify)
+      val objectID = BSONObjectID.generate()
+      val nextObjectID = BSONObjectID(BSONObjectID.generate().stringify)
       objectID must not equalTo (nextObjectID)
     }
 
@@ -156,7 +156,7 @@ object BSONObjectIDSpec extends Specification {
     }
 
     "bytes generated equal bytes converted from string" in {
-      val objectID = BSONObjectID.generate
+      val objectID = BSONObjectID.generate()
       val bytes = Converters.str2Hex(objectID.stringify)
       objectID.valueAsArray must equalTo(bytes)
     }

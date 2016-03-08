@@ -438,7 +438,7 @@ object BSONObjectID {
    * The returned BSONObjectID contains a timestamp set to the current time (in seconds),
    * with the `machine identifier`, `thread identifier` and `increment` properly set.
    */
-  def generate: BSONObjectID = fromTime(System.currentTimeMillis, false)
+  def generate(): BSONObjectID = fromTime(System.currentTimeMillis, false)
 
   /**
    * Generates a new BSON ObjectID from the given timestamp in milliseconds.

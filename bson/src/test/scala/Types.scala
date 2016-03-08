@@ -30,7 +30,7 @@ object Types extends Specification {
        *   ip -6 addr add 2001:DB8::`printf %04x $i`/128 dev tun$i
        * done
        */
-      BSONObjectID.generate must beAnInstanceOf[BSONObjectID]
+      BSONObjectID.generate() must beAnInstanceOf[BSONObjectID]
     }
   }
 

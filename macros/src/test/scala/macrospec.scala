@@ -21,11 +21,11 @@ class Macros extends Specification {
   case class Single(value: String)
   case class OptionalSingle(value: Option[String])
   case class SingleTuple(value: (String, String))
-  case class User(_id: BSONObjectID = BSONObjectID.generate, name: String)
+  case class User(_id: BSONObjectID = BSONObjectID.generate(), name: String)
   case class WordLover(name: String, words: Seq[String])
   case class Empty()
   object EmptyObject
-  case class RenamedId(@Key("_id") myID: BSONObjectID = BSONObjectID.generate, @CustomAnnotation value: String)
+  case class RenamedId(@Key("_id") myID: BSONObjectID = BSONObjectID.generate(), @CustomAnnotation value: String)
 
   object Nest {
     case class Nested(name: String)
