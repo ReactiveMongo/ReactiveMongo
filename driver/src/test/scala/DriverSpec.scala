@@ -1,4 +1,10 @@
-import scala.concurrent.Await
+import java.io.IOException
+import java.net.ServerSocket
+import java.util.concurrent.TimeUnit
+
+import reactivemongo.core.errors.GenericDriverException
+
+import scala.concurrent.{ Future, Await }
 import scala.concurrent.duration.FiniteDuration
 
 import reactivemongo.bson.{ BSONArray, BSONBooleanLike, BSONDocument }
@@ -10,13 +16,10 @@ import reactivemongo.core.commands.{
 }
 import reactivemongo.core.actors.Exceptions.NodeSetNotReachable
 
-import reactivemongo.api.{
-  BSONSerializationPack,
-  FailoverStrategy,
-  MongoDriver,
-  ScramSha1Authentication
-}
+import reactivemongo.api._
 import reactivemongo.api.commands.Command
+
+import scala.util.{ Failure, Success }
 
 object DriverSpec extends org.specs2.mutable.Specification {
   "Driver" title
