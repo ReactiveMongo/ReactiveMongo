@@ -13,8 +13,8 @@ object UpdateSpec extends org.specs2.mutable.Specification {
 
   import Common._
 
-  val col1: BSONCollection = db("UpdateSpec")
-  val col2: BSONCollection = db("UpdateSpec2")
+  lazy val col1: BSONCollection = db("UpdateSpec")
+  lazy val col2: BSONCollection = db("UpdateSpec2")
 
   case class Person(firstName: String,
                     lastName: String,
@@ -41,8 +41,7 @@ object UpdateSpec extends org.specs2.mutable.Specification {
       "a person" in { implicit ee: EE =>
         val jack = Person("Jack", "London", 27)
 
-        col1.update(jack,
-          BSONDocument("$set" -> BSONDocument("age" -> 33)),
+        col1.update(jack, BSONDocument("$set" -> BSONDocument("age" -> 33)),
           upsert = true) must beLike[UpdateWriteResult]({
             case result => result.upserted.toList must beLike[List[Upserted]] {
               case Upserted(0, id: BSONObjectID) :: Nil =>

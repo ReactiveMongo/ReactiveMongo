@@ -1,13 +1,21 @@
 language: scala
+sudo: false
+cache:
+  directories:
+  - $HOME/.ivy2
+  - $HOME/.sbt
+  - $HOME/ssl
+  - $HOME/mongodb-linux-x86_64-2.6.12
+  - $HOME/mongodb-linux-x86_64-amazon-3.2.4
 scala:
 - 2.11.7
 - 2.10.5
 jdk:
 - oraclejdk8
 - oraclejdk7
-sudo: required
+sudo: false
 before_install:
-- sudo ./.travis_scripts/beforeInstall.sh $TRAVIS_SCALA_VERSION $MONGO_SSL
+- ./.travis_scripts/beforeInstall.sh $TRAVIS_SCALA_VERSION $MONGO_SSL
 script: ./.travis_scripts/retry.sh 3 ./.travis_scripts/validate.sh
 after_success: ./.travis_scripts/afterSuccess.sh
 env:

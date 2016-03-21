@@ -25,17 +25,19 @@ object QueryAndWriteCommands extends org.specs2.mutable.Specification {
   "ReactiveMongo" should {
     "insert 1 doc and retrieve it" in { implicit ee: EE =>
       val doc = BSONDocument("_id" -> BSONNull, "name" -> "jack", "plop" -> -1)
-      val lastError = Await.result(Command.run(BSONSerializationPack)(collection, Insert(doc, doc)), timeout)
-      //println(lastError)
-      lastError.ok mustEqual true
 
-      val found = Await.result(collection.find(doc).cursor[BSONDocument]().collect[List](), timeout)
-      found.size mustEqual 1
-      val count = Await.result(Command.run(BSONSerializationPack).unboxed(collection, Count(BSONDocument())), timeout)
-      count mustEqual 1
-
-      Command.run(BSONSerializationPack)(db, IsMaster).map(_ => {}).
-        aka("isMaster") must beEqualTo({}).await(1, timeout)
+      Command.run(BSONSerializationPack)(collection, Insert(doc, doc)).
+        map(_.ok) aka "inserted" must beTrue.await(1, timeout) and {
+          collection.find(doc).cursor[BSONDocument]().
+            collect[List]().map(_.size) must beEqualTo(1).await(1, timeout)
+        } and {
+          Command.run(BSONSerializationPack).
+            unboxed(collection, Count(BSONDocument())) must beEqualTo(1).
+            await(1, timeout)
+        } and {
+          Command.run(BSONSerializationPack)(db, IsMaster).map(_ => {}).
+            aka("isMaster") must beEqualTo({}).await(1, timeout)
+        }
     }
 
     "insert 1 doc with collection.insert and retrieve it" in { implicit ee: EE =>

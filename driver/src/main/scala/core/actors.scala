@@ -177,16 +177,18 @@ trait MongoDBSystem extends Actor {
 
   implicit val ec = context.system.dispatcher
 
-  private val connectAllJob = context.system.scheduler.schedule(MongoDBSystem.DefaultConnectionRetryInterval milliseconds,
-    MongoDBSystem.DefaultConnectionRetryInterval milliseconds,
-    self,
-    ConnectAll)
+  /** The interval between executions of the [[ConnectAll]] job. */
+  protected def connectAllInterval: FiniteDuration = MongoDBSystem.DefaultConnectionRetryInterval milliseconds
+
+  /** The interval between executions of the [[RefreshAll]] job. */
+  protected def refreshAllInterval: FiniteDuration = MongoDBSystem.DefaultConnectionRetryInterval * 5 milliseconds
+
+  private val connectAllJob = context.system.scheduler.
+    schedule(connectAllInterval, connectAllInterval, self, ConnectAll)
 
   // for tests only
-  private val refreshAllJob = context.system.scheduler.schedule(MongoDBSystem.DefaultConnectionRetryInterval * 5 milliseconds,
-    MongoDBSystem.DefaultConnectionRetryInterval * 5 milliseconds,
-    self,
-    RefreshAllNodes)
+  private val refreshAllJob = context.system.scheduler.
+    schedule(refreshAllInterval, refreshAllInterval, self, RefreshAllNodes)
 
   protected def sendAuthenticate(connection: Connection, authentication: Authenticate): Connection
 
@@ -315,7 +317,13 @@ trait MongoDBSystem extends Actor {
         val monitorActors = monitors
         def operationComplete(future: ChannelGroupFuture): Unit = {
           logger.debug("Netty says all channels are closed.")
-          factory.channelFactory.releaseExternalResources
+
+          try {
+            factory.channelFactory.releaseExternalResources
+          } catch {
+            case err: Throwable =>
+              logger.debug("fails to release channel resources", err)
+          }
         }
       }
       allChannelGroup(nodeSet).close.addListener(listener)
@@ -655,7 +663,9 @@ trait MongoDBSystem extends Actor {
 
   // monitor -->
   private var nodeSet: NodeSet = NodeSet(None, None, seeds.map(seed => Node(seed, NodeStatus.Unknown, Vector.empty, Set.empty, None, ProtocolMetadata.Default).createNeededChannels(self, 1)).toVector, initialAuthenticates.toSet)
+
   connectAll(nodeSet)
+  self ! RefreshAllNodes
   // <-- monitor
 
   def onPrimaryUnavailable() {
@@ -916,9 +926,11 @@ private[actors] object RequestId {
   val common = RequestIdGenerator(3000, Int.MaxValue - 1)
 }
 
-private[actors] case class RequestIdGenerator(
-    lower: Int,
-    upper: Int) {
+/**
+ * @param lower the lower bound
+ * @param upper the upper bound
+ */
+private[actors] case class RequestIdGenerator(lower: Int, upper: Int) {
   private val iterator = Iterator.iterate(lower)(i => if (i == upper) lower else i + 1)
 
   def next = iterator.next
@@ -929,12 +941,12 @@ private[actors] case class RequestIdGenerator(
 // exceptions
 object Exceptions {
   /** An exception thrown when a request needs a non available primary. */
-  object PrimaryUnavailableException extends DriverException {
+  case object PrimaryUnavailableException extends DriverException {
     val message = "No primary node is available!"
   }
 
   /** An exception thrown when the entire node set is unavailable. The application may not have access to the network anymore. */
-  object NodeSetNotReachable extends DriverException {
+  case object NodeSetNotReachable extends DriverException {
     val message = "The node set can not be reached! Please check your network connectivity."
   }
 

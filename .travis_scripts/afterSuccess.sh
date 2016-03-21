@@ -3,6 +3,8 @@
 SCRIPT_DIR=`dirname $0`
 JAVA_COMPAT=`javac -version 2>&1 | grep 1.6 | wc -l`
 
+killall -9 mongod
+
 # TRAVIS_BRANCH
 #  -o "$TRAVIS_BRANCH" != "master"
 if [ "$MONGO_SSL" = "false" -o "$SONATYPE_USER" = "" -o "$SONATYPE_PASS" = "" -o $JAVA_COMPAT -ne 1 ]; then

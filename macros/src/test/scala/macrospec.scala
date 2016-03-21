@@ -194,7 +194,7 @@ class Macros extends Specification {
       roundtrip(person, format)
     }
 
-    "handle union types(ADT)" in {
+    "handle union types (ADT)" in {
       import Union._
       import Macros.Options._
       val a = UA(1)
@@ -210,7 +210,7 @@ class Macros extends Specification {
       roundtrip(b, format)
     }
 
-    "handle union types(ADT) with simple names" in {
+    "handle union types (ADT) with simple names" in {
       import Union._
       import Macros.Options._
       val a = UA(1)

@@ -154,14 +154,14 @@ object BSONCollectionSpec extends org.specs2.mutable.Specification {
 
     "read a document with success" in { implicit ee: EE =>
       implicit val reader = PersonReader
-      collection.find(BSONDocument()).one[Person] must beSome(person).
+      collection.find(BSONDocument.empty).one[Person] must beSome(person).
         await(1, timeout)
     }
 
     "read all with success" >> {
       implicit val reader = PersonReader
       @inline def cursor(implicit ec: ExecutionContext) =
-        collection.find(BSONDocument()).cursor[Person]()
+        collection.find(BSONDocument.empty).cursor[Person]()
 
       val persons = Seq(person, person2, person3, person4, person5)
 
@@ -191,7 +191,7 @@ object BSONCollectionSpec extends org.specs2.mutable.Specification {
 
     "read until John" in { implicit ee: EE =>
       implicit val reader = PersonReader
-      @inline def cursor = collection.find(BSONDocument()).cursor[Person]()
+      @inline def cursor = collection.find(BSONDocument.empty).cursor[Person]()
       val persons = Seq(person, person2, person3)
 
       cursor.foldWhile(Nil: Seq[Person])({ (s, p) =>
@@ -202,7 +202,7 @@ object BSONCollectionSpec extends org.specs2.mutable.Specification {
 
     "read a document with error" in { implicit ee: EE =>
       implicit val reader = BuggyPersonReader
-      val future = collection.find(BSONDocument()).one[Person].map(_ => 0).recover {
+      val future = collection.find(BSONDocument.empty).one[Person].map(_ => 0).recover {
         case e if e.getMessage == "hey hey hey" => -1
         case e =>
           /* e.printStackTrace() */ -2
@@ -214,7 +214,7 @@ object BSONCollectionSpec extends org.specs2.mutable.Specification {
     "read documents with error" >> {
       implicit val reader = new SometimesBuggyPersonReader
       @inline def cursor(implicit ec: ExecutionContext) =
-        collection.find(BSONDocument()).cursor[Person]()
+        collection.find(BSONDocument.empty).cursor[Person]()
 
       "using collect" in { implicit ee: EE =>
         val collect = cursor.collect[Vector]().map(_.size).recover {
@@ -246,7 +246,7 @@ object BSONCollectionSpec extends org.specs2.mutable.Specification {
 
     "read documents skipping errors using collect" in { implicit ee: EE =>
       implicit val reader = new SometimesBuggyPersonReader
-      val result = Await.result(collection.find(BSONDocument()).
+      val result = Await.result(collection.find(BSONDocument.empty).
         cursor[Person]().collect[Vector](stopOnError = false), timeout)
 
       //println(s"(read docs skipping errors using collect) got result $result")
@@ -327,14 +327,13 @@ object BSONCollectionSpec extends org.specs2.mutable.Specification {
     }
 
     "be renamed" >> {
-      "with failure" in {
-        implicit ee: EE =>
-          db(s"foo_${System identityHashCode collection}").
-            rename("renamed").map(_ => false).recover({
-              case DefaultBSONCommandError(Some(13), Some(msg), _) if (
-                msg contains "renameCollection ") => true
-              case _ => false
-            }) must beTrue.await(1, timeout)
+      "with failure" in { implicit ee: EE =>
+        db(s"foo_${System identityHashCode collection}").
+          rename("renamed").map(_ => false).recover({
+            case DefaultBSONCommandError(Some(13), Some(msg), _) if (
+              msg contains "renameCollection ") => true
+            case _ => false
+          }) must beTrue.await(1, timeout)
       }
     }
 
@@ -372,7 +371,7 @@ object BSONCollectionSpec extends org.specs2.mutable.Specification {
 
   "Index" should {
     import reactivemongo.api.indexes._
-    val col = db(s"indexed_col_${hashCode}")
+    lazy val col = db(s"indexed_col_${hashCode}")
 
     "be first created" in { implicit ee: EE =>
       col.indexesManager.ensure(Index(

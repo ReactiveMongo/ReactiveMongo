@@ -442,9 +442,9 @@ object ReactiveMongoBuild extends Build {
       testOptions in Test += Tests.Cleanup(cl => {
         import scala.language.reflectiveCalls
         val c = cl.loadClass("Common$")
-        type M = { def closeDriver(): Unit }
+        type M = { def close(): Unit }
         val m: M = c.getField("MODULE$").get(null).asInstanceOf[M]
-        m.closeDriver()
+        m.close()
       }))).dependsOn(bsonmacros)
 
   lazy val bson = Project(

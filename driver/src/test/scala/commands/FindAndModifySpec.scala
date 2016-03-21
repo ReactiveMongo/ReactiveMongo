@@ -15,7 +15,7 @@ object FindAndModifySpec extends Specification {
 
   sequential
 
-  val collection = db("FindAndModifySpec")
+  lazy val collection = db("FindAndModifySpec")
 
   case class Person(
     firstName: String,

@@ -188,7 +188,6 @@ object Command {
     }
   }
 
-  @deprecated(message = "Unused", since = "0.11.11")
   def run[P <: SerializationPack](pack: P): CommandWithPackRunner[pack.type] =
     CommandWithPackRunner(pack, FailoverStrategy())
 

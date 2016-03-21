@@ -33,11 +33,12 @@ object GridfsSpec extends org.specs2.mutable.Specification {
         (actual.contentType mustEqual file.contentType)
 
       import scala.collection.mutable.ArrayBuilder
-      val res = Await.result(gfs.enumerate(actual) |>>> Iteratee.fold(ArrayBuilder.make[Byte]()) { (result, arr) =>
+      def res = gfs.enumerate(actual) |>>> Iteratee.fold(ArrayBuilder.make[Byte]()) { (result, arr) =>
         result ++= arr
-      }, timeout)
+      }
 
-      res.result mustEqual ((1 to 100).map(_.toByte).toArray)
+      res.map(_.result()) must beEqualTo((1 to 100).map(_.toByte).toArray).
+        await(1, timeout)
     }
 
     "delete this file from gridfs" in { implicit ee: EE =>
