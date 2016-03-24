@@ -167,6 +167,8 @@ object Dependencies {
 
   val specs = "org.specs2" %% "specs2-core" % "2.4.9" % Test
 
+  val specsJunit = "org.specs2" %% "specs2-junit" % "2.4.9" % Test
+
   val logApiVersion = "1.7.12"
   val logApi = Seq(
     "org.slf4j" % "slf4j-api" % logApiVersion % "provided",
@@ -214,7 +216,8 @@ object ReactiveMongoBuild extends Build {
         playIteratees,
         commonsCodec,
         shapelessTest,
-        specs) ++ logApi,
+        specs,
+        specsJunit) ++ logApi,
       binaryIssueFilters ++= {
         import ProblemFilters.{ exclude => x }
         @inline def mmp(s: String) = x[MissingMethodProblem](s)
@@ -428,6 +431,7 @@ object ReactiveMongoBuild extends Build {
 
 
       },
+      testOptions in Test += Tests.Argument("junitxml"),
       testOptions in Test += Tests.Cleanup(cl => {
         import scala.language.reflectiveCalls
         val c = cl.loadClass("Common$")

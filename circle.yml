@@ -1,0 +1,21 @@
+machine:
+  java:
+    version: openjdk7
+  environment:
+    TRAVIS_SCALA_VERSION: 2.11.7
+    MONGO_SSL: true
+
+dependencies:
+  pre:
+    - sudo ./.travis_scripts/beforeInstall.sh $TRAVIS_SCALA_VERSION $MONGO_SSL
+  cache_directories:
+    - $HOME/.sbt
+    - $HOME/.ivy2
+
+test:
+  override:
+    - env
+    - ./.travis_scripts/validate.sh
+  post:
+    - mkdir -p $CIRCLE_TEST_REPORTS/junit/
+    - find . -path '*/test-reports/*' -type f -name '*.xml' -exec cp {} $CIRCLE_TEST_REPORTS/junit/ \;
