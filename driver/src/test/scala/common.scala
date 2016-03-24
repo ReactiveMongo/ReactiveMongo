@@ -7,8 +7,6 @@ import reactivemongo.api.{
 }
 
 object Common {
-  implicit val ec = ExecutionContext.Implicits.global
-
   val DefaultOptions = {
     val opts = MongoConnectionOptions()
 
@@ -27,7 +25,7 @@ object Common {
 
   val failoverStrategy = FailoverStrategy(retries = failoverRetries)
 
-  val timeout = {
+  val timeout: FiniteDuration = {
     if (failoverStrategy.maxTimeout < 10.seconds) 10.seconds
     else failoverStrategy.maxTimeout
   }
@@ -35,6 +33,7 @@ object Common {
   val timeoutMillis = timeout.toMillis.toInt
 
   lazy val db = {
+    import ExecutionContext.Implicits.global
     val _db = connection.database("specs2-test-reactivemongo", failoverStrategy)
     Await.result(_db.flatMap { d => d.drop.map(_ => d) }, timeout)
   }

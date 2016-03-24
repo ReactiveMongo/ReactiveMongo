@@ -1,17 +1,20 @@
 import concurrent.Await
 import org.specs2.mutable.Specification
-import concurrent.duration._
+//import scala.concurrent.duration._
 import reactivemongo.bson.{ BSONString, BSONDocument }
 
-class DatabaseCollectionNameReadSpec extends Specification {
+import org.specs2.concurrent.{ ExecutionEnv => EE }
+
+object DatabaseCollectionNameReadSpec extends Specification {
   sequential
 
   import Common._
 
   "ReactiveMongo db" should {
-    val db2 = db.sibling("specs2-test-reactivemongo-DatabaseCollectionNameReadSpec")
+    val dbName = "specs2-test-reactivemongo-DatabaseCollectionNameReadSpec"
 
-    "query names of collection from database" in {
+    "query names of collection from database" in { implicit ee: EE =>
+      val db2 = db.sibling(dbName)
       val collectionNames = for {
         _ <- {
           val c1 = db2("collection_one")
@@ -25,11 +28,11 @@ class DatabaseCollectionNameReadSpec extends Specification {
       } yield ns
 
       collectionNames.map(_.filterNot(_ startsWith "system.")) must beEqualTo(
-        Set("collection_one", "collection_two")).await(10000)
+        Set("collection_one", "collection_two")).await(2, timeout)
     }
 
-    "remove db..." in {
-      Await.result(db2.drop, DurationInt(10) second) mustEqual (())
+    "remove db..." in { implicit ee: EE =>
+      db.sibling(dbName).drop must beEqualTo({}).await(2, timeout)
     }
   }
 }

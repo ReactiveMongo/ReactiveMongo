@@ -165,7 +165,7 @@ object Dependencies {
 
   val playIteratees = "com.typesafe.play" %% "play-iteratees" % "2.3.10"
 
-  val specs = "org.specs2" %% "specs2-core" % "2.4.9" % Test
+  val specs = "org.specs2" %% "specs2-core" % "3.7.2" % Test
 
   val logApiVersion = "1.7.12"
   val logApi = Seq(

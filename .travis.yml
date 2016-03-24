@@ -4,12 +4,8 @@ scala:
 - 2.10.5
 jdk:
 - oraclejdk8
-- openjdk7
+- oraclejdk7
 sudo: required
-cache:
-  directories:
-  - $HOME/.sbt
-  - $HOME/.ivy2
 before_install:
 - sudo ./.travis_scripts/beforeInstall.sh $TRAVIS_SCALA_VERSION $MONGO_SSL
 script: ./.travis_scripts/retry.sh 3 ./.travis_scripts/validate.sh

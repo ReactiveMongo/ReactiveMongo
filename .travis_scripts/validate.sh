@@ -50,7 +50,7 @@ if [ "$MONGODB_VER" = "3" ]; then
     fi
 fi
 
-if [ `echo "$JAVA_HOME" | grep java-7-openjdk | wc -l` -eq 1 -a "$MONGO_SSL" = "false" ]; then
+if [ `echo "$JAVA_HOME" | grep java-7-oracle | wc -l` -eq 1 -a "$MONGO_SSL" = "false" ]; then
   # Network latency
   SBT_OPTS="$SBT_OPTS -Dtest.failoverRetries=12"
 fi

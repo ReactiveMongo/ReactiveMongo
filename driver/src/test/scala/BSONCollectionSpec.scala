@@ -5,6 +5,8 @@ import reactivemongo.api._
 import reactivemongo.bson._
 import reactivemongo.core.errors.GenericDatabaseException
 
+import org.specs2.concurrent.{ ExecutionEnv => EE }
+
 object BSONCollectionSpec extends org.specs2.mutable.Specification {
   "BSON collection" title
 
@@ -59,12 +61,12 @@ object BSONCollectionSpec extends org.specs2.mutable.Specification {
 
       implicit val writer = PersonWriter
 
-      "with insert" in {
-        Await.result(collection.insert(person), timeout).ok must beTrue and (
-          Await.result(collection.insert(person2), timeout).ok must beTrue)
+      "with insert" in { implicit ee: EE =>
+        collection.insert(person).map(_.ok) must beTrue.await(1, timeout) and (
+          collection.insert(person2).map(_.ok) must beTrue.await(1, timeout))
       }
 
-      "with bulkInsert" in {
+      "with bulkInsert" in { implicit ee: EE =>
         val persons =
           Seq[collection.ImplicitlyDocumentProducer](person3, person4, person5)
         /* OR
@@ -73,31 +75,31 @@ object BSONCollectionSpec extends org.specs2.mutable.Specification {
          */
 
         collection.bulkInsert(true)(persons: _*).map(_.ok).
-          aka("insertion") must beTrue.await(timeoutMillis)
+          aka("insertion") must beTrue.await(1, timeout)
       }
     }
 
     "read empty cursor" >> {
-      @inline def cursor: Cursor[BSONDocument] =
+      @inline def cursor(implicit ec: ExecutionContext): Cursor[BSONDocument] =
         collection.find(BSONDocument("plop" -> "plop")).cursor[BSONDocument]()
 
-      "with success using collect" in {
-        val list = cursor.collect[Vector](10)
-        Await.result(list, timeout).length mustEqual 0
+      "with success using collect" in { implicit ee: EE =>
+        cursor.collect[Vector](10).map(_.length) must beEqualTo(0).
+          await(1, timeout)
       }
 
-      "read empty cursor with success using collect" in {
+      "read empty cursor with success using collect" in { implicit ee: EE =>
         collection.find(
           BSONDocument("age" -> 25), BSONDocument("name" -> 1)).
           one[BSONDocument] must beSome[BSONDocument].like({
             case doc =>
               doc.elements.size must_== 2 /* _id+name */ and (
                 doc.getAs[String]("name") aka "name" must beSome("Jack"))
-          }).await(5000)
+          }).await(2, timeout)
       }
 
       "explain query result" >> {
-        "when MongoDB > 2.6" in {
+        "when MongoDB > 2.6" in { implicit ee: EE =>
           collection.find(BSONDocument.empty).explain().one[BSONDocument].
             aka("explanation") must beSome[BSONDocument].which { result =>
               result.getAs[BSONDocument]("queryPlanner").
@@ -107,10 +109,10 @@ object BSONCollectionSpec extends org.specs2.mutable.Specification {
                     result.getAs[BSONDocument]("serverInfo").
                     aka("serverInfo") must beSome)
 
-            }.await(timeoutMillis)
-        } tag ("mongo3", "not_mongo26")
+            }.await(1, timeout)
+        } tag "not_mongo26"
 
-        "when MongoDB = 2.6" in {
+        "when MongoDB = 2.6" in { implicit ee: EE =>
           collection.find(BSONDocument.empty).explain().one[BSONDocument].
             aka("explanation") must beSome[BSONDocument].which { result =>
               result.getAs[List[BSONDocument]]("allPlans").
@@ -118,73 +120,76 @@ object BSONCollectionSpec extends org.specs2.mutable.Specification {
                   result.getAs[String]("server").
                   aka("server") must beSome[String])
 
-            }.await(timeoutMillis)
-        } tag ("mongo2", "mongo26")
+            }.await(1, timeout)
+        } tag "mongo2"
       }
 
-      "with success using foldResponses" in {
+      "with success using foldResponses" in { implicit ee: EE =>
         cursor.foldResponses(0)(
           (i, _) => Cursor.Cont(i + 1), (_, e) => Cursor.Fail(e)).
           aka("result") must beEqualTo(1 /* one empty response */ ).
-          await(timeoutMillis)
+          await(1, timeout)
 
       }
 
-      "with success using foldBulks" in {
+      "with success using foldBulks" in { implicit ee: EE =>
         cursor.foldBulks(0)(
           (i, _) => Cursor.Cont(i + 1), (_, e) => Cursor.Fail(e)).
           aka("result") must beEqualTo(1 /* one empty response */ ).
-          await(timeoutMillis)
+          await(1, timeout)
 
       }
 
-      "with success using foldWhile" in {
+      "with success using foldWhile" in { implicit ee: EE =>
         cursor.foldWhile(0)(
           (i, _) => Cursor.Cont(i + 1), (_, e) => Cursor.Fail(e)).
-          aka("result") must beEqualTo(0).await(timeoutMillis)
+          aka("result") must beEqualTo(0).await(1, timeout)
 
       }
 
-      "with success as option" in {
-        cursor.headOption must beNone.await(timeoutMillis)
+      "with success as option" in { implicit ee: EE =>
+        cursor.headOption must beNone.await(1, timeout)
       }
     }
 
-    "read a document with success" in {
+    "read a document with success" in { implicit ee: EE =>
       implicit val reader = PersonReader
-      Await.result(collection.find(BSONDocument()).one[Person], timeout).get mustEqual person
+      collection.find(BSONDocument()).one[Person] must beSome(person).
+        await(1, timeout)
     }
 
     "read all with success" >> {
       implicit val reader = PersonReader
-      @inline def cursor = collection.find(BSONDocument()).cursor[Person]()
+      @inline def cursor(implicit ec: ExecutionContext) =
+        collection.find(BSONDocument()).cursor[Person]()
+
       val persons = Seq(person, person2, person3, person4, person5)
 
-      "as list" in {
-        (cursor.collect[List]() must beEqualTo(persons).await(timeoutMillis)).
-          and(cursor.headOption must beSome(person).await(timeoutMillis))
+      "as list" in { implicit ee: EE =>
+        (cursor.collect[List]() must beEqualTo(persons).await(1, timeout)).
+          and(cursor.headOption must beSome(person).await(1, timeout))
       }
 
-      "using foldResponses" in {
+      "using foldResponses" in { implicit ee: EE =>
         cursor.foldResponses(0)({ (s, _) => Cursor.Cont(s + 1) },
-          (_, e) => Cursor.Fail(e)) must beEqualTo(1).await(timeoutMillis)
+          (_, e) => Cursor.Fail(e)) must beEqualTo(1).await(1, timeout)
 
       }
 
-      "using foldBulks" in {
+      "using foldBulks" in { implicit ee: EE =>
         cursor.foldBulks(1)({ (s, _) => Cursor.Cont(s + 1) },
-          (_, e) => Cursor.Fail(e)) must beEqualTo(2).await(timeoutMillis)
+          (_, e) => Cursor.Fail(e)) must beEqualTo(2).await(1, timeout)
 
       }
 
-      "using foldWhile" in {
+      "using foldWhile" in { implicit ee: EE =>
         cursor.foldWhile(Nil: Seq[Person])((s, p) => Cursor.Cont(s :+ p),
-          (_, e) => Cursor.Fail(e)) must beEqualTo(persons).await(timeoutMillis)
+          (_, e) => Cursor.Fail(e)) must beEqualTo(persons).await(1, timeout)
 
       }
     }
 
-    "read until John" in {
+    "read until John" in { implicit ee: EE =>
       implicit val reader = PersonReader
       @inline def cursor = collection.find(BSONDocument()).cursor[Person]()
       val persons = Seq(person, person2, person3)
@@ -192,10 +197,10 @@ object BSONCollectionSpec extends org.specs2.mutable.Specification {
       cursor.foldWhile(Nil: Seq[Person])({ (s, p) =>
         if (p.name == "John") Cursor.Done(s :+ p)
         else Cursor.Cont(s :+ p)
-      }, (_, e) => Cursor.Fail(e)) must beEqualTo(persons).await(timeoutMillis)
+      }, (_, e) => Cursor.Fail(e)) must beEqualTo(persons).await(1, timeout)
     }
 
-    "read a document with error" in {
+    "read a document with error" in { implicit ee: EE =>
       implicit val reader = BuggyPersonReader
       val future = collection.find(BSONDocument()).one[Person].map(_ => 0).recover {
         case e if e.getMessage == "hey hey hey" => -1
@@ -203,14 +208,15 @@ object BSONCollectionSpec extends org.specs2.mutable.Specification {
           /* e.printStackTrace() */ -2
       }
 
-      future must beEqualTo(-1).await(timeoutMillis)
+      future must beEqualTo(-1).await(1, timeout)
     }
 
     "read documents with error" >> {
       implicit val reader = new SometimesBuggyPersonReader
-      @inline def cursor = collection.find(BSONDocument()).cursor[Person]()
+      @inline def cursor(implicit ec: ExecutionContext) =
+        collection.find(BSONDocument()).cursor[Person]()
 
-      "using collect" in {
+      "using collect" in { implicit ee: EE =>
         val collect = cursor.collect[Vector]().map(_.size).recover {
           case e if e.getMessage == "hey hey hey" => -1
           case e =>
@@ -218,27 +224,27 @@ object BSONCollectionSpec extends org.specs2.mutable.Specification {
         }
 
         collect aka "first collect" must not(throwA[Exception]).
-          await(timeoutMillis) and (collect must beEqualTo(-1).
-            await(timeoutMillis))
+          await(1, timeout) and (collect must beEqualTo(-1).
+            await(1, timeout))
       }
 
-      "using foldWhile" in {
+      "using foldWhile" in { implicit ee: EE =>
         Await.result(cursor.foldWhile(0)((i, _) => Cursor.Cont(i + 1),
           (_, e) => Cursor.Fail(e)), timeout) must throwA[CustomException]
       }
 
-      "fallbacking to final value using foldWhile" in {
+      "fallbacking to final value using foldWhile" in { implicit ee: EE =>
         cursor.foldWhile(0)((i, _) => Cursor.Cont(i + 1),
-          (_, e) => Cursor.Done(-1)) must beEqualTo(-1).await(timeoutMillis)
+          (_, e) => Cursor.Done(-1)) must beEqualTo(-1).await(1, timeout)
       }
 
-      "skiping failure using foldWhile" in {
+      "skiping failure using foldWhile" in { implicit ee: EE =>
         cursor.foldWhile(0)((i, _) => Cursor.Cont(i + 1),
-          (_, e) => Cursor.Cont(-3)) must beEqualTo(-2).await(timeoutMillis)
+          (_, e) => Cursor.Cont(-3)) must beEqualTo(-2).await(1, timeout)
       }
     }
 
-    "read documents skipping errors using collect" in {
+    "read documents skipping errors using collect" in { implicit ee: EE =>
       implicit val reader = new SometimesBuggyPersonReader
       val result = Await.result(collection.find(BSONDocument()).
         cursor[Person]().collect[Vector](stopOnError = false), timeout)
@@ -247,7 +253,7 @@ object BSONCollectionSpec extends org.specs2.mutable.Specification {
       result.length mustEqual 4
     }
 
-    "write a document with error" in {
+    "write a document with error" in { implicit ee: EE =>
       implicit val writer = BuggyPersonWriter
 
       collection.insert(person).map { lastError =>
@@ -258,16 +264,16 @@ object BSONCollectionSpec extends org.specs2.mutable.Specification {
         case e =>
           e.printStackTrace()
           -2
-      } aka "write result" must beEqualTo(-1).await(timeoutMillis)
+      } aka "write result" must beEqualTo(-1).await(1, timeout)
     }
 
-    "write a JavaScript value" in {
+    "write a JavaScript value" in { implicit ee: EE =>
       collection.insert(BSONDocument("age" -> 101,
         "name" -> BSONJavaScript("db.getName()"))).flatMap { _ =>
         implicit val reader = PersonReader
         collection.find(BSONDocument("age" -> 101)).one[BSONDocument].map(
           _.flatMap(_.getAs[BSONJavaScript]("name")).map(_.value))
-      } aka "inserted" must beSome("db.getName()").await(timeoutMillis)
+      } aka "inserted" must beSome("db.getName()").await(1, timeout)
     }
 
     "find and update" >> {
@@ -275,26 +281,29 @@ object BSONCollectionSpec extends org.specs2.mutable.Specification {
       implicit val writer = PersonWriter
 
       "by updating age of 'Joline', & returns the old document" in {
-        val updateOp = collection.updateModifier(
-          BSONDocument("$set" -> BSONDocument("age" -> 35)))
+        implicit ee: EE =>
+          val updateOp = collection.updateModifier(
+            BSONDocument("$set" -> BSONDocument("age" -> 35)))
 
-        collection.findAndModify(BSONDocument("name" -> "Joline"), updateOp).
-          map(_.result[Person]) must beSome(person5).await(timeoutMillis)
+          collection.findAndModify(BSONDocument("name" -> "Joline"), updateOp).
+            map(_.result[Person]) must beSome(person5).await(1, timeout)
       }
 
       "by updating age of 'James', & returns the updated document" in {
-        collection.findAndUpdate(
-          BSONDocument("name" -> "James"), person2.copy(age = 17),
-          fetchNewObject = true).map(_.result[Person]).
-          aka("result") must beSome(person2.copy(age = 17)).await(timeoutMillis)
+        implicit ee: EE =>
+          collection.findAndUpdate(
+            BSONDocument("name" -> "James"), person2.copy(age = 17),
+            fetchNewObject = true).map(_.result[Person]).
+            aka("result") must beSome(person2.copy(age = 17)).await(1, timeout)
       }
 
       "by inserting a new 'Foo' person (with upsert = true)" in {
-        val fooPerson = Person("Foo", -1)
+        implicit ee: EE =>
+          val fooPerson = Person("Foo", -1)
 
-        collection.findAndUpdate(fooPerson, fooPerson,
-          fetchNewObject = true, upsert = true).
-          map(_.result[Person]) must beSome(fooPerson).await(timeoutMillis)
+          collection.findAndUpdate(fooPerson, fooPerson,
+            fetchNewObject = true, upsert = true).
+            map(_.result[Person]) must beSome(fooPerson).await(1, timeout)
       }
     }
 
@@ -302,39 +311,42 @@ object BSONCollectionSpec extends org.specs2.mutable.Specification {
       implicit val reader = PersonReader
 
       "'Joline' using findAndModify" in {
-        collection.findAndModify(BSONDocument("name" -> "Joline"),
-          collection.removeModifier).map(_.result[Person]).
-          aka("removed person") must beSome(person5.copy(age = 35)).
-          await(timeoutMillis)
+        implicit ee: EE =>
+          collection.findAndModify(BSONDocument("name" -> "Joline"),
+            collection.removeModifier).map(_.result[Person]).
+            aka("removed person") must beSome(person5.copy(age = 35)).
+            await(1, timeout)
       }
 
       "'Foo' using findAndRemove" in {
-        collection.findAndRemove(BSONDocument("name" -> "Foo")).
-          map(_.result[Person]) aka "removed" must beSome(Person("Foo", -1)).
-          await(timeoutMillis)
+        implicit ee: EE =>
+          collection.findAndRemove(BSONDocument("name" -> "Foo")).
+            map(_.result[Person]) aka "removed" must beSome(Person("Foo", -1)).
+            await(1, timeout)
       }
     }
 
     "be renamed" >> {
       "with failure" in {
-        db(s"foo_${System identityHashCode collection}").
-          rename("renamed").map(_ => false).recover({
-            case DefaultBSONCommandError(Some(13), Some(msg), _) if (
-              msg contains "renameCollection ") => true
-            case _ => false
-          }) must beTrue.await(timeoutMillis)
+        implicit ee: EE =>
+          db(s"foo_${System identityHashCode collection}").
+            rename("renamed").map(_ => false).recover({
+              case DefaultBSONCommandError(Some(13), Some(msg), _) if (
+                msg contains "renameCollection ") => true
+              case _ => false
+            }) must beTrue.await(1, timeout)
       }
     }
 
     "be dropped" >> {
-      "successfully if exists (deprecated)" in {
+      "successfully if exists (deprecated)" in { implicit ee: EE =>
         val col = db(s"foo_${System identityHashCode collection}")
 
         col.create().flatMap(_ => col.drop(false)).
-          aka("legacy drop") must beTrue.await(timeoutMillis)
+          aka("legacy drop") must beTrue.await(1, timeout)
       }
 
-      "with failure if doesn't exist (deprecated)" in {
+      "with failure if doesn't exist (deprecated)" in { implicit ee: EE =>
         val col = db(s"foo_${System identityHashCode collection}")
 
         Await.result(col.drop(), timeout).
@@ -343,17 +355,17 @@ object BSONCollectionSpec extends org.specs2.mutable.Specification {
           }
       }
 
-      "successfully if exist" in {
-        val col = db(s"foo_${System identityHashCode collection}")
+      "successfully if exist" in { implicit ee: EE =>
+        val col = db(s"foo1_${System identityHashCode collection}")
 
         col.create().flatMap(_ => col.drop(false)).
-          aka("drop") must beFalse.await(timeoutMillis)
+          aka("drop") must beTrue.await(1, timeout)
       }
 
-      "successfully if doesn't exist" in {
-        val col = db(s"foo_${System identityHashCode collection}")
+      "successfully if doesn't exist" in { implicit ee: EE =>
+        val col = db(s"foo2_${System identityHashCode collection}")
 
-        col.drop(false) aka "drop" must beFalse.await(timeoutMillis)
+        col.drop(false) aka "drop" must beFalse.await(1, timeout)
       }
     }
   }
@@ -362,16 +374,16 @@ object BSONCollectionSpec extends org.specs2.mutable.Specification {
     import reactivemongo.api.indexes._
     val col = db(s"indexed_col_${hashCode}")
 
-    "be first created" in {
+    "be first created" in { implicit ee: EE =>
       col.indexesManager.ensure(Index(
         Seq("token" -> IndexType.Ascending), unique = true)).
-        aka("index creation") must beTrue.await(timeoutMillis)
+        aka("index creation") must beTrue.await(1, timeout)
     }
 
-    "not be created if already exists" in {
+    "not be created if already exists" in { implicit ee: EE =>
       col.indexesManager.ensure(Index(
         Seq("token" -> IndexType.Ascending), unique = true)).
-        aka("index creation") must beFalse.await(timeoutMillis)
+        aka("index creation") must beFalse.await(1, timeout)
 
     }
   }
