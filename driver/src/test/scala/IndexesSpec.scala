@@ -7,7 +7,9 @@ import reactivemongo.core.errors.DatabaseException
 import scala.concurrent.Future
 import scala.concurrent.Await
 
-object IndexesSpec extends Specification with Tags {
+import org.specs2.concurrent.{ ExecutionEnv => EE }
+
+object IndexesSpec extends Specification {
   "Indexes management" title
 
   sequential
@@ -17,24 +19,26 @@ object IndexesSpec extends Specification with Tags {
   val geo = db("geo")
 
   "ReactiveMongo Geo Indexes" should {
-    "insert some points" in {
-      val futs = for (i <- 1 until 10)
-        yield geo.insert(BSONDocument("loc" -> BSONArray(BSONDouble(i + 2), BSONDouble(i * 2))))
+    "insert some points" in { implicit ee: EE =>
+      val futs: Seq[Future[Unit]] = for (i <- 1 until 10)
+        yield geo.insert(BSONDocument("loc" -> BSONArray(BSONDouble(i + 2), BSONDouble(i * 2)))).map(_ => {})
 
-      Future.sequence(futs) must not(throwA[Throwable]).await(timeoutMillis)
+      Future.sequence(futs) must not(throwA[Throwable]).await(1, timeout)
     }
 
-    "make index" in {
+    "make index" in { implicit ee: EE =>
       geo.indexesManager.ensure(Index(
         List("loc" -> Geo2D),
         options = BSONDocument(
           "min" -> BSONInteger(-95),
           "max" -> BSONInteger(95),
-          "bits" -> BSONInteger(28)))) aka "index" must beTrue.await(timeoutMillis)
+          "bits" -> BSONInteger(28)))) aka "index" must beTrue.await(1, timeout)
     }
 
-    "fail to insert some points out of range" in {
-      val future = geo.insert(BSONDocument("loc" -> BSONArray(BSONDouble(27.88), BSONDouble(97.21))))
+    "fail to insert some points out of range" in { implicit ee: EE =>
+      val future = geo.insert(
+        BSONDocument("loc" -> BSONArray(BSONDouble(27.88), BSONDouble(97.21))))
+
       try {
         Await.result(future, timeout)
         failure
@@ -45,7 +49,7 @@ object IndexesSpec extends Specification with Tags {
       success
     }
 
-    "retrieve indexes" in {
+    "retrieve indexes" in { implicit ee: EE =>
       val future = geo.indexesManager.list().map {
         _.filter(_.name.get == "loc_2d")
       }.filter(!_.isEmpty).map(_.apply(0))
@@ -62,24 +66,24 @@ object IndexesSpec extends Specification with Tags {
 
   "ReactiveMongo Geo2D indexes" should {
 
-    "insert some points" in {
-      val futs = for (i <- 1 until 10)
-        yield geo2DSpherical.insert(BSONDocument("loc" -> BSONDocument(
-        "type" -> BSONString("Point"),
-        "coordinates" -> BSONArray(BSONDouble(i + 2), BSONDouble(i * 2)))))
-      val fut = Future.sequence(futs)
-      Await.result(fut, timeout)
-      success
+    "insert some points" in { implicit ee: EE =>
+      val futs: Seq[Future[Unit]] = for (i <- 1 until 10)
+        yield geo2DSpherical.insert(
+        BSONDocument("loc" -> BSONDocument(
+          "type" -> "Point",
+          "coordinates" -> BSONArray(i + 2D, i * 2D)))).map(_ => {})
+
+      Future.sequence(futs) must not(throwA[Throwable]).await(1, timeout)
     }
 
-    "make index" in {
-      val created = geo2DSpherical.indexesManager.ensure(
-        Index(
-          List("loc" -> Geo2DSpherical)))
-      Await.result(created, timeout) mustEqual true
+    "make index" in { implicit ee: EE =>
+      geo2DSpherical.indexesManager.ensure(
+        Index(List("loc" -> Geo2DSpherical))) must beTrue.await(1, timeout)
     }
 
-    "fail to insert a point out of range" in {
+    "fail to insert a point out of range" in { implicit ee: EE =>
+      tag("mongo2_4")
+
       val future = geo2DSpherical.insert(BSONDocument("loc" -> BSONDocument(
         "type" -> BSONString("Point"),
         "coordinates" -> BSONArray(BSONDouble(-195), BSONDouble(25)))))
@@ -97,45 +101,45 @@ object IndexesSpec extends Specification with Tags {
           throw e
       }
       success
-    } tag ("mongo2_4")
+    }
 
-    "retrieve indexes" in {
-      val future = geo2DSpherical.indexesManager.list().map {
+    "retrieve indexes" in { implicit ee: EE =>
+      geo2DSpherical.indexesManager.list().map {
         _.filter(_.name.get == "loc_2dsphere")
-      }.filter(!_.isEmpty).map(_.apply(0))
-      val index = Await.result(future, timeout)
-      index.key(0)._1 mustEqual "loc"
-      index.key(0)._2 mustEqual Geo2DSpherical
+      }.filter(!_.isEmpty).map(_.apply(0)).map(_.key(0)).
+        aka("index") must beEqualTo("loc" -> Geo2DSpherical).await(1, timeout)
     }
   }
 
   val hashed = db("hashed")
 
   "ReactiveMongo Hashed indexes" should {
-    "insert some data" in { // With WiredTiger, collection must exist before
-      val futs = for (i <- 1 until 10)
-        yield hashed.insert(BSONDocument("field" -> s"data-$i"))
+    "insert some data" in { implicit ee: EE =>
+      // With WiredTiger, collection must exist before
+      val futs: Seq[Future[Unit]] = for (i <- 1 until 10)
+        yield hashed.insert(BSONDocument("field" -> s"data-$i")).map(_ => {})
 
-      Future.sequence(futs) must not(throwA[Throwable]).await(timeoutMillis)
+      Future.sequence(futs) must not(throwA[Throwable]).await(1, timeout)
     }
 
-    "make index" in {
+    "make index" in { implicit ee: EE =>
       hashed.indexesManager.ensure(Index(List("field" -> Hashed))).
-        aka("index") must beTrue.await(timeoutMillis)
+        aka("index") must beTrue.await(1, timeout)
     }
 
-    "retrieve indexes" in {
+    "retrieve indexes" in { implicit ee: EE =>
       val index = hashed.indexesManager.list().map {
         _.filter(_.name.get == "field_hashed")
       }.filter(!_.isEmpty).map(_.apply(0))
 
-      index.map(_.key(0)) must beEqualTo("field" -> Hashed).await(timeoutMillis)
+      index.map(_.key(0)) must beEqualTo("field" -> Hashed).await(1, timeout)
     }
   }
 
   "ReactiveMongo index manager" should {
-    "drop all indexes in db.geo" in {
-      Await.result(geo.indexesManager.dropAll(), timeout) mustEqual 2 // _id and loc
+    "drop all indexes in db.geo" in { implicit ee: EE =>
+      geo.indexesManager.dropAll() must beEqualTo(2 /* _id and loc */ ).
+        await(1, timeout)
     }
   }
 }

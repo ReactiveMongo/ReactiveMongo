@@ -12,7 +12,7 @@ MONGO_SSL="$2"
 MONGODB_VER="2_6"
 
 # Network latency
-if [ `echo "$JAVA_HOME" | grep java-7-openjdk | wc -l` -eq 1 -a "$MONGO_SSL" = "false" ]; then
+if [ `echo "$JAVA_HOME" | grep java-7-oracle | wc -l` -eq 1 -a "$MONGO_SSL" = "false" ]; then
     echo "Add 250ms to the network latency"
     tc qdisc add dev lo root netem delay 250ms
     ping -c 5 localhost

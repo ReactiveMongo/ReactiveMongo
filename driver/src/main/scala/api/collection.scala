@@ -185,7 +185,7 @@ trait CollectionMetaCommands {
         Future.failed[Boolean](GenericDatabaseException(
           s"fails to drop collection: $name", Some(26)))
 
-      case _ => Future.successful(true)
+      case DropCollectionResult(dropped) => Future.successful(dropped)
     }
   }
 
