@@ -171,8 +171,12 @@ case class Request(
     buffer writeBytes documents.merged
   }
   override def size = 16 + op.size + documents.merged.writerIndex
+
   /** Header of this request */
   lazy val header = MessageHeader(size, requestID, responseTo, op.code)
+
+  override def toString =
+    s"Request($requestID, $responseTo, $op, $readPreference, $channelIdHint)"
 }
 
 /**

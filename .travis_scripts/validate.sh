@@ -6,7 +6,7 @@ SCRIPT_DIR=`dirname $0 | sed -e "s|^\./|$PWD/|"`
 
 cd "$SCRIPT_DIR/.."
 
-sbt ++$TRAVIS_SCALA_VERSION scalariformFormat test:scalariformFormat
+sbt ++$TRAVIS_SCALA_VERSION error scalariformFormat test:scalariformFormat
 git diff --exit-code || (
   echo "ERROR: Scalariform check failed, see differences above."
   echo "To fix, format your sources using ./build scalariformFormat test:scalariformFormat before submitting a pull request."
@@ -52,9 +52,10 @@ fi
 
 if [ `echo "$JAVA_HOME" | grep java-7-openjdk | wc -l` -eq 1 -a "$MONGO_SSL" = "false" ]; then
   # Network latency
-  SBT_OPTS="$SBT_OPTS -Dtest.failoverRetries=16"
+  SBT_OPTS="$SBT_OPTS -Dtest.failoverRetries=12"
 fi
 
 echo "- SBT options: $SBT_OPTS"
 
-sbt ++$TRAVIS_SCALA_VERSION $SBT_OPTS ";mimaReportBinaryIssues ;testOnly -- $TEST_OPTS"
+sbt ++$TRAVIS_SCALA_VERSION $SBT_OPTS ";error ;mimaReportBinaryIssues ;test:compile" || exit 2
+sbt ++$TRAVIS_SCALA_VERSION $SBT_OPTS "testOnly -- $TEST_OPTS"

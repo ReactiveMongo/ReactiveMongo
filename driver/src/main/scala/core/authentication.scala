@@ -48,7 +48,7 @@ private[reactivemongo] trait MongoCrAuthentication { system: MongoDBSystem =>
             case (connection, auth) => {
               val msg = s"unexpected authentication: $auth"
 
-              logger.warn(s"AUTH: msg")
+              logger.warn(s"AUTH: $msg")
               authenticationResponse(response)(
                 _ => Left(FailedAuthentication(msg)))
 

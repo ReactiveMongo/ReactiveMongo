@@ -110,19 +110,17 @@ object Command {
       db.connection.options.readPreference
 
     def one[A](readPreference: ReadPreference)(implicit reader: pack.Reader[A], ec: ExecutionContext): Future[A] = {
-      val (requestMaker, mongo26WriteCommand) =
+      val (requestMaker, m26WriteCommand) =
         buildRequestMaker(pack)(command, writer, readPreference, db.name)
 
-      // TODO: Await maxTimeout?
       Failover2(db.connection, failover) { () =>
-        db.connection.sendExpectingResponse(
-          requestMaker, mongo26WriteCommand).map { response =>
-            pack.readAndDeserialize(
-              LoweLevelDocumentIterator(ChannelBufferReadableBuffer(
-                response.documents)).next, reader)
+        db.connection.sendExpectingResponse(requestMaker, m26WriteCommand)
+      }.future.map { response =>
+        pack.readAndDeserialize(
+          LoweLevelDocumentIterator(ChannelBufferReadableBuffer(
+            response.documents)).next, reader)
 
-          }
-      }.future
+      }
     }
 
     def one[A](implicit reader: pack.Reader[A], ec: ExecutionContext): Future[A] = one[A](defaultReadPreference)

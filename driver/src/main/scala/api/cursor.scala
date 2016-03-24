@@ -18,12 +18,13 @@ package reactivemongo.api
 import scala.util.{ Failure, Success, Try }
 import scala.collection.generic.CanBuildFrom
 import scala.collection.mutable.Builder
-import scala.concurrent.{ Await, ExecutionContext, Promise, Future }
+import scala.concurrent.{ ExecutionContext, Future }
 
-import play.api.libs.iteratee._
+import play.api.libs.iteratee.{ Enumerator, Enumeratee, Error, Input, Iteratee }
 
 import org.jboss.netty.buffer.ChannelBuffer
 
+import reactivemongo.core.actors.Exceptions
 import reactivemongo.core.iteratees.{ CustomEnumeratee, CustomEnumerator }
 import reactivemongo.core.netty.BufferSequence
 import reactivemongo.core.protocol.{
@@ -395,7 +396,9 @@ object DefaultCursor {
       ReplyDocumentIterator(pack)(_: Reply, _: ChannelBuffer)(reader)
 
     @inline
-    def makeRequest(maxDocs: Int)(implicit ctx: ExecutionContext): Future[Response] = awaitFailover(Failover2(mongoConnection, failoverStrategy) { () =>
+    def makeRequest(maxDocs: Int)(implicit ctx: ExecutionContext): Future[Response] = Failover2(mongoConnection, failoverStrategy) { () =>
+      import reactivemongo.core.netty.ChannelBufferReadableBuffer
+
       val nrt = query.numberToReturn
       val q = { // normalize the number of docs to return
         if (nrt > 0 && nrt <= maxDocs) query
@@ -404,7 +407,7 @@ object DefaultCursor {
 
       mongoConnection.sendExpectingResponse(
         RequestMaker(q, requestBuffer, readPreference), isMongo26WriteOp)
-    }.future)
+    }.future
   }
 
   /**
@@ -448,9 +451,9 @@ object DefaultCursor {
       { implicit ctx: ExecutionContext =>
         logger.trace(s"[Cursor] Calling next on ${result.cursorId}, op=$op")
 
-        awaitFailover(Failover2(connection, failoverStrategy) { () =>
+        Failover2(connection, failoverStrategy) { () =>
           connection.sendExpectingResponse(reqMaker, mongo26WriteOp)
-        }.future)
+        }.future
       }
     }
 
@@ -478,8 +481,6 @@ object DefaultCursor {
 
     def documentIterator: (Reply, ChannelBuffer) => Iterator[A]
 
-    @inline protected def awaitFailover[T](f: => Future[T])(implicit ec: ExecutionContext): Future[T] = Future(Await.ready(f, failoverStrategy.maxTimeout)).flatMap(identity)
-
     private def next(response: Response, maxDocs: Int)(implicit ctx: ExecutionContext): Future[Option[Response]] = {
       if (response.reply.cursorID != 0) {
         val toReturn =
@@ -490,13 +491,14 @@ object DefaultCursor {
         val op = GetMore(fullCollectionName, toReturn, response.reply.cursorID)
 
         logger.trace(s"[Cursor] Calling next on ${response.reply.cursorID}, op=$op")
-        awaitFailover(Failover2(connection, failoverStrategy) { () =>
+
+        Failover2(connection, failoverStrategy) { () =>
           connection.sendExpectingResponse(RequestMaker(op,
             readPreference = preference,
             channelIdHint = Some(response.info.channelId)),
             mongo26WriteOp)
 
-        }.future).map(Some(_))
+        }.future.map(Some(_))
       } else {
         logger.error("[Cursor] Call to next() but cursorID is 0, there is probably a bug")
         Future.successful(Option.empty[Response])
@@ -513,18 +515,25 @@ object DefaultCursor {
       documentIterator(response.reply, response.documents)
 
     /** Returns next response using tailable mode */
-    private def tailResponse(current: Response, maxDocs: Int)(implicit context: ExecutionContext): Future[Option[Response]] = connection.killed flatMap {
-      case true => Future.successful {
-        logger.warn("[tailResponse] Connection is killed")
-        Option.empty[Response]
-      }
+    private def tailResponse(current: Response, maxDocs: Int)(implicit context: ExecutionContext): Future[Option[Response]] = {
+      {
+        @inline def closed = Future.successful {
+          logger.warn("[tailResponse] Connection is closed")
+          Option.empty[Response]
+        }
 
-      case _ => {
-        if (hasNext(current, maxDocs)) next(current, maxDocs)
+        if (connection.killed) closed
         else {
-          logger.debug("[tailResponse] Current cursor exhausted, renewing...")
-          DelayedFuture(500, connection.actorSystem).
-            flatMap(_ => makeRequest(maxDocs).map(Some(_)))
+          if (hasNext(current, maxDocs)) {
+            next(current, maxDocs).recoverWith {
+              case Exceptions.ClosedException => closed
+              case err                        => Future.failed[Option[Response]](err)
+            }
+          } else {
+            logger.debug("[tailResponse] Current cursor exhausted, renewing...")
+            DelayedFuture(500, connection.actorSystem).
+              flatMap { _ => makeRequest(maxDocs).map(Some(_)) }
+          }
         }
       }
     }
@@ -536,9 +545,9 @@ object DefaultCursor {
       if (cursorID != 0) {
         logger.debug(s"[$logCat] Clean up ${cursorID}, sending KillCursors")
 
-        val killReq = RequestMaker(KillCursors(Set(cursorID)),
-          readPreference = preference,
-          channelIdHint = Some(r.info.channelId))
+        val killReq = RequestMaker(
+          KillCursors(Set(cursorID)),
+          readPreference = preference)
 
         connection.send(killReq)
       } else logger.trace(s"[$logCat] Cursor exhausted (${cursorID})")
@@ -720,8 +729,7 @@ object DefaultCursor {
                 })
             }
         }.recoverWith {
-          case Unrecoverable(e) =>
-            println(s"e = $e"); Future.failed(e)
+          case Unrecoverable(e) => Future.failed(e)
           case e =>
             val nc = c + 1 // resp.reply.numberReturned
 
@@ -735,28 +743,25 @@ object DefaultCursor {
         }
       }
 
-      def procResponses(done: Future[Response], cur: T, c: Int): Future[T] = {
-        val proc = Promise[T]()
+      def procResponses(done: Future[Response], cur: T, c: Int): Future[T] =
+        done.map[Try[Response]](Success(_)).
+          recover { case err => Failure(err) }.flatMap {
+            case Success(r) => procResp(r, cur, c)
+            case Failure(error) => {
+              logger.error("fails to send request", error)
 
-        done.onComplete {
-          case Failure(error) => {
-            logger.error("fails to send request", error)
+              err(cur, error) match {
+                case Done(v) => Future.successful(v)
+                case Fail(e) => Future.failed(e)
+                case Cont(v) => {
+                  logger.warn(
+                    "cannot continue after fatal request error", error)
 
-            err(cur, error) match {
-              case Done(v) => proc.success(v)
-              case Fail(e) => proc.failure(e)
-              case Cont(v) => {
-                logger.warn("cannot continue after fatal request error", error)
-                proc.success(v)
+                  Future.successful(v)
+                }
               }
             }
           }
-
-          case Success(resp) => proc.completeWith(procResp(resp, cur, c))
-        }
-
-        proc.future
-      }
 
       def apply(): Future[T] =
         Future(z).flatMap(v => procResponses(makeRequest(maxDocs), v, 0))

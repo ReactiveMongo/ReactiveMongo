@@ -15,12 +15,18 @@
  */
 package reactivemongo.api
 
-import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.{ TimeoutException, atomic }, atomic.AtomicLong
 
 import scala.util.{ Try, Failure, Success }
 import scala.util.control.{ NonFatal, NoStackTrace }
 
-import scala.concurrent.{ Await, ExecutionContext, Future, Promise }
+import scala.concurrent.{
+  Await,
+  ExecutionContext,
+  Future,
+  Promise,
+  blocking
+}
 import scala.concurrent.duration.{ Duration, FiniteDuration, SECONDS }
 
 import com.typesafe.config.Config
@@ -29,7 +35,23 @@ import akka.actor.{ Actor, ActorRef, ActorSystem, Props, Terminated }
 import akka.pattern._
 import akka.util.Timeout
 
-import reactivemongo.core.actors._
+import reactivemongo.core.actors.{
+  AuthRequest,
+  CheckedWriteRequestExpectingResponse,
+  Close,
+  Closed,
+  Exceptions,
+  ExpectingResponse,
+  LegacyDBSystem,
+  MongoDBSystem,
+  PrimaryAvailable,
+  PrimaryUnavailable,
+  RegisterMonitor,
+  RequestMakerExpectingResponse,
+  SetAvailable,
+  SetUnavailable,
+  StandardDBSystem
+}
 import reactivemongo.core.errors.ConnectionException
 import reactivemongo.core.nodeset.{ Authenticate, ProtocolMetadata }
 import reactivemongo.core.protocol.{
@@ -104,21 +126,32 @@ class Failover[T](message: T, connection: MongoConnection, strategy: FailoverStr
   send(0)
 }
 
+@deprecated(message = "Will be made private", since = "0.11.11")
 class Failover2[A](producer: () => Future[A], connection: MongoConnection, strategy: FailoverStrategy)(implicit ec: ExecutionContext) {
-  import Failover2.logger
+  import Failover2.logger, logger.trace
   import reactivemongo.core.errors._
   import reactivemongo.core.actors.Exceptions._
-
-  private val promise = Promise[A]()
 
   /**
    * A future that is completed with a response,
    * after 1 or more attempts (specified in the given strategy).
    */
-  val future: Future[A] = promise.future
+  val future: Future[A] = send(0) //promise.future
 
-  private def send(n: Int): Unit =
-    Future(producer()).flatMap(identity).onComplete {
+  // Wraps any exception from the producer
+  // as a result Future.failed that can be recovered.
+  private def next(): Future[A] = try {
+    producer()
+  } catch {
+    case producerErr: Throwable => Future.failed[A](producerErr)
+  }
+
+  private def _next(): Future[A] = producer()
+
+  private def send(n: Int): Future[A] =
+    next().map[Try[A]](Success(_)).recover[Try[A]] {
+      case err => Failure(err)
+    }.flatMap {
       case Failure(e) if isRetryable(e) => {
         if (n < strategy.retries) {
           val `try` = n + 1
@@ -128,25 +161,33 @@ class Failover2[A](producer: () => Future[A], connection: MongoConnection, strat
 
           logger.debug(s"Got an error, retrying... (try #${`try`} is scheduled in ${delay.toMillis} ms)", e)
 
-          connection.actorSystem.scheduler.scheduleOnce(delay)(send(`try`))
+          val lock = new AnyRef {}
+
+          connection.actorSystem.scheduler.scheduleOnce(delay) {
+            lock.synchronized(lock.notify)
+          }
+
+          lock.synchronized {
+            lock.wait()
+            send(`try`)
+          }
         } else {
           // generally that means that the primary is not available
           // or the nodeset is unreachable
-          logger.error("Got an error, no more attempts to do. Completing with a failure...", e)
+          logger.error("Got an error, no more attempts to do. Completing with a failure... ", e)
 
-          promise.failure(e)
+          Future.failed(e)
         }
       }
 
       case Failure(e) => {
-        logger.trace(
-          "Got an non retryable error, completing with a failure...", e)
-        promise.failure(e)
+        trace("Got an non retryable error, completing with a failure... ", e)
+        Future.failed(e)
       }
 
       case Success(response) => {
-        logger.trace("Got a successful result, completing...")
-        promise.success(response)
+        trace("Got a successful result, completing...")
+        Future.successful(response)
       }
     }
 
@@ -158,7 +199,7 @@ class Failover2[A](producer: () => Future[A], connection: MongoConnection, strat
     case _ => false
   }
 
-  send(0)
+  //send(0)
 }
 
 object Failover2 {
@@ -206,13 +247,13 @@ case class FailoverStrategy(
     retries: Int = 7,
     delayFactor: Int => Double = _ * 1.25D) {
 
-  private val timeoutFactor = 1.2D // TODO: configurable
+  private val timeoutFactor = 1.2D // TODO: Remove
 
   /** The maximum timeout, including all the retried */
   lazy val maxTimeout: FiniteDuration =
     (1 to retries).foldLeft(initialDelay) { (d, i) =>
       d + (initialDelay * ((timeoutFactor * delayFactor(i)).toLong))
-    }
+    } // TODO: Remove
 }
 
 /**
@@ -236,8 +277,11 @@ class MongoConnection(
     val actorSystem: ActorSystem,
     val mongosystem: ActorRef,
     val options: MongoConnectionOptions) {
+
   import akka.pattern.ask
   import akka.util.Timeout
+
+  private[api] val logger = LazyLogger("reactivemongo.api.Failover2")
 
   /**
    * Returns a DefaultDB reference using this connection.
@@ -287,7 +331,7 @@ class MongoConnection(
     def wait(iteration: Int, attempt: Int, timeout: Duration): Future[Unit] = {
       if (attempt == 0) Future.failed(Exceptions.NodeSetNotReachable)
       else {
-        Future {
+        Future { // TODO: Refactor
           val ms = timeout.toMillis
 
           try {
@@ -340,7 +384,14 @@ class MongoConnection(
    */
   private[api] def send(message: RequestMaker): Unit = mongosystem ! message
 
-  private[api] def sendExpectingResponse(checkedWriteRequest: CheckedWriteRequest)(implicit ec: ExecutionContext): Future[Response] = {
+  private def whenActive[T](f: => Future[T]): Future[T] = {
+    if (killed) {
+      logger.debug("cannot send request when the connection is killed")
+      Future.failed(Exceptions.ClosedException)
+    } else f
+  }
+
+  private[api] def sendExpectingResponse(checkedWriteRequest: CheckedWriteRequest)(implicit ec: ExecutionContext): Future[Response] = whenActive {
     val expectingResponse =
       CheckedWriteRequestExpectingResponse(checkedWriteRequest)
 
@@ -348,8 +399,8 @@ class MongoConnection(
     expectingResponse.future
   }
 
-  private[api] def sendExpectingResponse(requestMaker: RequestMaker, isMongo26WriteOp: Boolean)(implicit ec: ExecutionContext): Future[Response] = {
-    val expectingResponse =
+  private[api] def sendExpectingResponse(requestMaker: RequestMaker, isMongo26WriteOp: Boolean)(implicit ec: ExecutionContext): Future[Response] = whenActive {
+    lazy val expectingResponse =
       RequestMakerExpectingResponse(requestMaker, isMongo26WriteOp)
 
     mongosystem ! expectingResponse
@@ -357,7 +408,7 @@ class MongoConnection(
   }
 
   /** Authenticates the connection on the given database. */
-  def authenticate(db: String, user: String, password: String): Future[SuccessfulAuthentication] = {
+  def authenticate(db: String, user: String, password: String): Future[SuccessfulAuthentication] = whenActive {
     val req = AuthRequest(Authenticate(db, user, password))
     mongosystem ! req
     req.future
@@ -367,7 +418,7 @@ class MongoConnection(
    * Closes this MongoConnection (closes all the channels and ends the actors).
    */
   def askClose()(implicit timeout: FiniteDuration): Future[_] =
-    ask(monitor, Close)(Timeout(timeout))
+    whenActive { ask(monitor, Close)(Timeout(timeout)) }
 
   /**
    * Closes this MongoConnection
@@ -375,13 +426,7 @@ class MongoConnection(
    */
   def close(): Unit = monitor ! Close
 
-  private case class IsKilled(result: Promise[Boolean])
-
-  private[api] def killed: Future[Boolean] = {
-    val p = Promise[Boolean]()
-    monitor ! IsKilled(p)
-    p.future
-  }
+  @volatile private[api] var killed: Boolean = false
 
   private case class IsAvailable(result: Promise[Boolean]) {
     override val toString = "IsAvailable?"
@@ -391,14 +436,17 @@ class MongoConnection(
   }
 
   private def isAvailable: Future[Boolean] = {
-    val p = Promise[Boolean]()
-    val check = {
-      if (options.readPreference.slaveOk) IsAvailable(p)
-      else IsPrimaryAvailable(p)
-    }
+    if (killed) Future.successful(false)
+    else {
+      val p = Promise[Boolean]()
+      val check = {
+        if (options.readPreference.slaveOk) IsAvailable(p)
+        else IsPrimaryAvailable(p)
+      }
 
-    monitor ! check
-    p.future
+      monitor ! check
+      p.future
+    }
   }
 
   private[api] val monitor = actorSystem.actorOf(
@@ -407,7 +455,6 @@ class MongoConnection(
   @volatile private[api] var metadata: Option[ProtocolMetadata] = None
 
   private class MonitorActor extends Actor {
-    import MonitorActor._
     import scala.collection.mutable.Queue
 
     mongosystem ! RegisterMonitor
@@ -416,7 +463,6 @@ class MongoConnection(
     private var primaryAvailable = false
 
     private val waitingForClose = Queue[ActorRef]()
-    private var killed = false
 
     private var setAvailable = false
 
@@ -461,10 +507,13 @@ class MongoConnection(
         logger.debug("Monitor received Close")
 
         killed = true
+        primaryAvailable = false
+        setAvailable = false
+
         mongosystem ! Close
         waitingForClose += sender
         waitingForPrimary.dequeueAll(_ => true).foreach(
-          _ ! Failure(new RuntimeException(
+          _ ! Failure(new scala.RuntimeException(
             "MongoDBSystem actor shutting down or no longer active")))
       }
 
@@ -474,7 +523,6 @@ class MongoConnection(
         context.stop(self)
       }
 
-      case IsKilled(result)           => result success killed
       case IsAvailable(result)        => result success setAvailable
       case IsPrimaryAvailable(result) => result success primaryAvailable
     }
@@ -691,7 +739,7 @@ class MongoDriver(config: Option[Config] = None) {
 
   def close(timeout: FiniteDuration = FiniteDuration(1, SECONDS)) = {
     // Terminate actors used by MongoConnections
-    connections.foreach(_.monitor ! Close)
+    connections.foreach(_.close())
 
     // Tell the supervisor to close.
     // It will shut down all the connections and monitors

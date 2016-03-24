@@ -13,8 +13,8 @@ MONGODB_VER="2_6"
 
 # Network latency
 if [ `echo "$JAVA_HOME" | grep java-7-openjdk | wc -l` -eq 1 -a "$MONGO_SSL" = "false" ]; then
-    echo "Add 500ms to the network latency"
-    tc qdisc add dev lo root netem delay 500ms
+    echo "Add 250ms to the network latency"
+    tc qdisc add dev lo root netem delay 250ms
     ping -c 5 localhost
 fi
 
@@ -90,4 +90,3 @@ cat /etc/mongod.conf
 
 service mongod start && ps axx | grep mongod
 #cat /var/log/mongodb/mongod.log
-

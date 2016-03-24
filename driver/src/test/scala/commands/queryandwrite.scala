@@ -48,38 +48,35 @@ object QueryAndWriteCommands extends org.specs2.mutable.Specification {
 
   import reactivemongo.api.collections.bson._
 
-  val nDocs = 1000000
-  "ReactiveMongo with new colls" should {
+  "ReactiveMongo with new collections" should {
     "insert 1 doc and retrieve it" in {
-      val coll = BSONCollection(db, "queryandwritecommandsspec", collection.failoverStrategy)
+      val coll = db.collection("queryandwritecommandsspec")
       val doc = BSONDocument("name" -> "Stephane")
-      val lastError = Await.result(coll.insert(doc), timeout)
-      //println(lastError)
-      lastError.ok mustEqual true
 
-      coll.find(doc).cursor[BSONDocument]().collect[List]().map(_.size).
-        aka("result size") must beEqualTo(1).await(timeoutMillis)
+      coll.insert(doc).map(_.ok) must beTrue.await(timeoutMillis) and (
+        coll.find(doc).cursor[BSONDocument]().collect[List]().map(_.size).
+        aka("result size") must beEqualTo(1).await(timeoutMillis))
     }
 
+    val nDocs = 1000000
     s"insert $nDocs in bulks (including 3 duplicate errors)" in {
       import reactivemongo.api.indexes._
       import reactivemongo.api.indexes.IndexType.Ascending
 
-      val created = collection.indexesManager.
-        ensure(Index(List("plop" -> Ascending), unique = true))
+      val coll = db.collection("queryandwritecommandsspec4")
+      val created = coll.indexesManager.ensure(
+        Index(List("plop" -> Ascending), unique = true))
       Await.result(created, timeout)
 
-      val coll = BSONCollection(db, "queryandwritecommandsspec", collection.failoverStrategy)
       val docs = (0 until nDocs).toStream.map { i =>
         if (i == 0 || i == 1529 || i == 3026 || i == 19862) {
           BSONDocument("bulk" -> true, "i" -> i, "plop" -> -3)
         } else BSONDocument("bulk" -> true, "i" -> i, "plop" -> i)
       }
 
-      coll.bulkInsert(docs, false).map(_ => {}).
-        aka("bulk insert") must beEqualTo({}).await(100000 /* 100s */ ) and {
-          Command.run(BSONSerializationPack).unboxed(
-            coll, Count(BSONDocument("bulk" -> true))).
+      Await.result(coll.bulkInsert(docs, false).map(_ => {}),
+        timeout * (nDocs / 2D)) must beEqualTo({}) and {
+          coll.count(Some(BSONDocument("bulk" -> true))).
             aka("count") must beEqualTo(nDocs - 3).await(timeoutMillis)
           // all docs minus errors
         }

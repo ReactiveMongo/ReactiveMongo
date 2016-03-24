@@ -62,6 +62,10 @@ class ChannelBufferReadableBuffer(
 
 object ChannelBufferReadableBuffer {
   def apply(buffer: ChannelBuffer) = new ChannelBufferReadableBuffer(buffer)
+
+  def document(buffer: ChannelBuffer): BSONDocument =
+    BSONDocument.read(ChannelBufferReadableBuffer(buffer))
+
 }
 
 class ChannelBufferWritableBuffer(val buffer: ChannelBuffer = ChannelBuffers.dynamicBuffer(LITTLE_ENDIAN, 32)) extends WritableBuffer {
@@ -117,7 +121,15 @@ class ChannelBufferWritableBuffer(val buffer: ChannelBuffer = ChannelBuffers.dyn
 }
 
 object ChannelBufferWritableBuffer {
+  /** Returns a new writable channel buffer. */
   def apply() = new ChannelBufferWritableBuffer()
+
+  /** Returns a new channel buffer with the give `document` written on. */
+  private[reactivemongo] def single(document: BSONDocument): ChannelBuffer = {
+    val buffer = ChannelBufferWritableBuffer()
+    BSONDocument.write(document, buffer)
+    buffer.buffer
+  }
 }
 
 case class BufferSequence(private val head: ChannelBuffer, private val tail: ChannelBuffer*) {
@@ -128,22 +140,11 @@ case class BufferSequence(private val head: ChannelBuffer, private val tail: Cha
 }
 
 object BufferSequence {
+  /** Returns an empty buffer sequence. */
   val empty = BufferSequence(new LittleEndianHeapChannelBuffer(0))
-}
 
-object `package` {
-  protected[reactivemongo] implicit class BSONDocumentNettyWritable(val doc: BSONDocument) extends AnyVal {
-    def makeBuffer = {
-      val buffer = ChannelBufferWritableBuffer()
-      BSONDocument.write(doc, buffer)
-      buffer.buffer
-    }
-  }
+  /** Returns a new channel buffer with the give `document` written on. */
+  private[reactivemongo] def single(document: BSONDocument): BufferSequence =
+    BufferSequence(ChannelBufferWritableBuffer single document)
 
-  protected[reactivemongo] implicit class BSONDocumentNettyReadable(val buffer: ChannelBuffer) extends AnyVal {
-    def makeDocument = {
-      val bf = ChannelBufferReadableBuffer(buffer)
-      BSONDocument.read(bf) // TODO handle errors
-    }
-  }
 }
