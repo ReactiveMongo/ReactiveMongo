@@ -168,8 +168,12 @@ class Failover2[A](producer: () => Future[A], connection: MongoConnection, strat
           }
 
           lock.synchronized {
-            lock.wait()
-            send(`try`)
+            try {
+              lock.wait()
+              send(`try`)
+            } catch {
+              case we: Throwable => Future.failed(we)
+            }
           }
         } else {
           // generally that means that the primary is not available
