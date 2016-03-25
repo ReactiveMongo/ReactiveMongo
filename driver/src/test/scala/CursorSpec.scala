@@ -800,15 +800,19 @@ object CursorSpec extends org.specs2.mutable.Specification {
         }
 
         "gracefully stop at connection close w/o maxDocs" in { implicit ee: EE =>
-          val con = driver.connection(List(primaryHost), DefaultOptions)
+          val drv = new MongoDriver
+          val con = drv.connection(List(primaryHost), DefaultOptions)
 
           con.database(
             "specs2-test-reactivemongo", failoverStrategy).flatMap { d =>
               tailable("foldw3", d).foldWhile(List.empty[Int])((s, i) => {
-                if (i == 1) con.close() // Force connection close
+                if (i == 1) {
+                  // Force connection close
+                  Await.result(con.askClose()(timeout), timeout)
+                }
                 Cursor.Cont(i :: s)
               }, (_, e) => Cursor.Fail(e))
-            } must beLike[List[Int]] {
+            }.andThen { case _ => drv.close() } must beLike[List[Int]] {
               case is => is.reverse must beLike[List[Int]] {
                 case 0 :: 1 :: _ => ok
               }

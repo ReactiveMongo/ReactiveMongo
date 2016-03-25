@@ -82,7 +82,7 @@ object ReplSetMaintenanceSpec extends Specification {
     "fail outside replicaSet" in { implicit ee: EE =>
       connection("admin").runCommand(
         ReplSetMaintenance(true)) must throwA[CommandError].
-        await(1, timeout)
+        await(2, timeout)
     }
   }
 }
