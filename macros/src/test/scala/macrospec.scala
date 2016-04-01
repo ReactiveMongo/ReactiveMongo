@@ -33,9 +33,7 @@ class Macros extends Specification {
 
   case class OverloadedApply(string: String)
   object OverloadedApply {
-    def apply(n: Int) {
-      println(n)
-    }
+    def apply(n: Int) = { /* println(n) */ }
 
     def apply(seq: Seq[String]): OverloadedApply = OverloadedApply(seq mkString " ")
   }
@@ -82,7 +80,10 @@ class Macros extends Specification {
 
     object Tree {
       import Macros.Options._
-      implicit val bson: Handler[Tree] = Macros.handlerOpts[Tree, UnionType[Node \/ Leaf] with Verbose]
+
+      implicit val bson: Handler[Tree] =
+        Macros.handlerOpts[Tree, UnionType[Node \/ Leaf]]
+      //Macros.handlerOpts[Tree, UnionType[Node \/ Leaf] with Verbose]
     }
   }
 
@@ -92,7 +93,8 @@ class Macros extends Specification {
     case object Tail extends IntList
 
     object IntList {
-      import Macros.Options._
+      import Macros.Options.{ UnionType, \/ }
+
       implicit val bson: Handler[IntList] = Macros.handlerOpts[IntList, UnionType[Cons \/ Tail.type]]
     }
   }
@@ -200,11 +202,14 @@ class Macros extends Specification {
       val a = UA(1)
       val b = UB("hai")
       val format = Macros.handlerOpts[UT, UnionType[UA \/ UB \/ UC \/ UD]]
+
+      /* TODO: Remove
       println(BSONDocument pretty (format write a))
       println(BSONDocument pretty (format write b))
+       */
 
-      format.write(a).getAs[String]("className") mustEqual Some("Macros.Union.UA")
-      format.write(b).getAs[String]("className") mustEqual Some("Macros.Union.UB")
+      format.write(a).getAs[String]("className") must beSome("Macros.Union.UA")
+      format.write(b).getAs[String]("className") must beSome("Macros.Union.UB")
 
       roundtrip(a, format)
       roundtrip(b, format)
@@ -216,11 +221,14 @@ class Macros extends Specification {
       val a = UA(1)
       val b = UB("hai")
       val format = Macros.handlerOpts[UT, SimpleUnionType[UA \/ UB \/ UC \/ UD]]
+
+      /* TODO: Remove
       println(BSONDocument pretty (format write a))
       println(BSONDocument pretty (format write b))
+       */
 
-      format.write(a).getAs[String]("className") mustEqual Some("UA")
-      format.write(b).getAs[String]("className") mustEqual Some("UB")
+      format.write(a).getAs[String]("className") must beSome("UA")
+      format.write(b).getAs[String]("className") must beSome("UB")
 
       roundtrip(a, format)
       roundtrip(b, format)
@@ -264,8 +272,8 @@ class Macros extends Specification {
       import Union._
       implicit val format = Macros.handlerOpts[UT, AllImplementations]
 
-      format.write(UA(1)).getAs[String]("className") mustEqual Some("Macros.Union.UA")
-      format.write(UB("buzz")).getAs[String]("className") mustEqual Some("Macros.Union.UB")
+      format.write(UA(1)).getAs[String]("className") must beSome("Macros.Union.UA")
+      format.write(UB("buzz")).getAs[String]("className") must beSome("Macros.Union.UB")
 
       roundtripImp[UT](UA(17))
       roundtripImp[UT](UB("foo"))
@@ -278,8 +286,8 @@ class Macros extends Specification {
       import InheritanceModule._
       implicit val format = Macros.handlerOpts[T, AllImplementations]
 
-      format.write(A()).getAs[String]("className") mustEqual Some("Macros.InheritanceModule.A")
-      format.write(B).getAs[String]("className") mustEqual Some("Macros.InheritanceModule.B")
+      format.write(A()).getAs[String]("className") must beSome("Macros.InheritanceModule.A")
+      format.write(B).getAs[String]("className") must beSome("Macros.InheritanceModule.B")
 
       roundtripImp[T](A())
       roundtripImp[T](B)
@@ -291,8 +299,8 @@ class Macros extends Specification {
       import Union._
       implicit val format = Macros.handlerOpts[UT, SimpleAllImplementations]
 
-      format.write(UA(1)).getAs[String]("className") mustEqual Some("UA")
-      format.write(UB("buzz")).getAs[String]("className") mustEqual Some("UB")
+      format.write(UA(1)).getAs[String]("className") must beSome("UA")
+      format.write(UB("buzz")).getAs[String]("className") must beSome("UB")
 
       roundtripImp[UT](UA(17))
       roundtripImp[UT](UB("foo"))
@@ -305,8 +313,8 @@ class Macros extends Specification {
       import InheritanceModule._
       implicit val format = Macros.handlerOpts[T, SimpleAllImplementations]
 
-      format.write(A()).getAs[String]("className") mustEqual Some("A")
-      format.write(B).getAs[String]("className") mustEqual Some("B")
+      format.write(A()).getAs[String]("className") must beSome("A")
+      format.write(B).getAs[String]("className") must beSome("B")
 
       roundtripImp[T](A())
       roundtripImp[T](B)
@@ -317,8 +325,12 @@ class Macros extends Specification {
       implicit val format = Macros.handler[RenamedId]
       val doc = RenamedId(value = "some value")
       val serialized = format write doc
+
+      /* TODO: Remove
       println("renaming")
       println(BSONDocument.pretty(serialized))
+       */
+
       serialized mustEqual BSONDocument("_id" -> doc.myID, "value" -> doc.value)
       format.read(serialized) mustEqual doc
     }
@@ -348,5 +360,4 @@ class Macros extends Specification {
       }
     }
   }
-
 }

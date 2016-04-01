@@ -260,7 +260,7 @@ case class ProtocolMetadata(
   maxBulkSize: Int)
 
 object ProtocolMetadata {
-  val Default = ProtocolMetadata(MongoWireVersion.V24AndBefore, MongoWireVersion.V24AndBefore, 48000000, 16 * 1024 * 1024, 1000)
+  val Default = ProtocolMetadata(MongoWireVersion.V26, MongoWireVersion.V26, 48000000, 16 * 1024 * 1024, 1000)
 }
 
 case class Connection(
@@ -418,6 +418,7 @@ case class ScramSha1Authenticating(
 
 case class Authenticated(db: String, user: String) extends Authentication
 
+@deprecated("Internal class: will be made private", "0.11.14")
 class ContinuousIterator[A](iterable: Iterable[A], private var toDrop: Int = 0) extends Iterator[A] {
   private var iterator = iterable.iterator
   private var i = 0
@@ -464,10 +465,32 @@ class RoundRobiner[A, M[T] <: Iterable[T]](val subject: M[A], startAtIndex: Int 
     new RoundRobiner(subject, startAtIndex)
 }
 
-final class ChannelFactory(
+/**
+ * @param supervisor the name of the driver supervisor
+ * @param connection the name of the connection pool
+ */
+@deprecated("Internal class: will be made private", "0.11.14")
+final class ChannelFactory private[core] (
+    supervisor: String,
+    connection: String,
     options: MongoConnectionOptions,
     bossExecutor: Executor = Executors.newCachedThreadPool,
     workerExecutor: Executor = Executors.newCachedThreadPool) {
+
+  @deprecated("Initialize with related mongosystem", "0.11.14")
+  def this(opts: MongoConnectionOptions) =
+    this(s"unknown-${System identityHashCode opts}",
+      s"unknown-${System identityHashCode opts}", opts)
+
+  @deprecated("Initialize with related mongosystem", "0.11.14")
+  def this(opts: MongoConnectionOptions, bossEx: Executor) =
+    this(s"unknown-${System identityHashCode opts}",
+      s"unknown-${System identityHashCode opts}", opts, bossEx)
+
+  @deprecated("Initialize with related mongosystem", "0.11.14")
+  def this(opts: MongoConnectionOptions, bossEx: Executor, workerEx: Executor) =
+    this(s"unknown-${System identityHashCode opts}",
+      s"unknown-${System identityHashCode opts}", opts, bossEx, workerEx)
 
   import javax.net.ssl.{ KeyManager, SSLContext }
 
@@ -476,7 +499,7 @@ final class ChannelFactory(
 
   def create(host: String = "localhost", port: Int = 27017, receiver: ActorRef): Channel = {
     val channel = makeChannel(receiver)
-    logger.trace(s"created a new channel: $channel")
+    logger.trace(s"[$supervisor/$connection] Created a new channel: $channel")
     channel
   }
 
@@ -490,7 +513,8 @@ final class ChannelFactory(
     val idleHandler = new IdleStateHandler(timer, timeoutMS, timeoutMS, 0, TimeUnit.MILLISECONDS)
 
     val pipeline = Channels.pipeline(idleHandler, new ResponseFrameDecoder(),
-      new ResponseDecoder(), new RequestEncoder(), new MongoHandler(receiver))
+      new ResponseDecoder(), new RequestEncoder(),
+      new MongoHandler(supervisor, connection, receiver))
 
     if (options.sslEnabled) {
       val sslCtx = {

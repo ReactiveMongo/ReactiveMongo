@@ -319,10 +319,25 @@ object MongoWireVersion {
    *
    * But wireProtocol=1 is virtually non-existent; Mongo 2.4 was 0 and Mongo 2.6 is 2.
    */
-  object V24AndBefore extends MongoWireVersion { val value = 0 }
-  object V26 extends MongoWireVersion { val value = 2 }
-  object V30 extends MongoWireVersion { val value = 3 }
-  object V32 extends MongoWireVersion { val value = 4 }
+  object V24AndBefore extends MongoWireVersion {
+    val value = 0
+    override val toString = "<=2.4"
+  }
+
+  object V26 extends MongoWireVersion {
+    val value = 2
+    override val toString = "2.6"
+  }
+
+  object V30 extends MongoWireVersion {
+    val value = 3
+    override val toString = "3.0"
+  }
+
+  object V32 extends MongoWireVersion {
+    val value = 4
+    override val toString = "3.2"
+  }
 
   def apply(v: Int): MongoWireVersion = {
     if (v >= V32.value) V32
@@ -405,57 +420,61 @@ private[reactivemongo] class ResponseDecoder extends OneToOneDecoder {
   }
 }
 
-private[reactivemongo] class MongoHandler(receiver: ActorRef) extends IdleStateAwareChannelHandler {
-  import MongoHandler._
+private[reactivemongo] class MongoHandler(
+  supervisor: String, connection: String, receiver: ActorRef)
+    extends IdleStateAwareChannelHandler {
 
   override def messageReceived(ctx: ChannelHandlerContext, e: MessageEvent) {
     val response = e.getMessage.asInstanceOf[Response]
-    log(e, s"messageReceived $response will be send to $receiver")
+    log(e, s"messageReceived: $response will be send to $receiver")
     receiver ! response
     super.messageReceived(ctx, e)
   }
 
   override def writeComplete(ctx: ChannelHandlerContext, e: WriteCompletionEvent) {
-    log(e, "a write is complete!")
+    log(e, "A write is complete!")
     super.writeComplete(ctx, e)
   }
 
   override def writeRequested(ctx: ChannelHandlerContext, e: MessageEvent) {
-    log(e, "a write is requested!")
+    log(e, "A write is requested!")
     super.writeRequested(ctx, e)
   }
 
   override def channelConnected(ctx: ChannelHandlerContext, e: ChannelStateEvent) {
-    log(e, "connected")
+    log(e, "Channel is connected")
     receiver ! ChannelConnected(e.getChannel.getId)
     super.channelConnected(ctx, e)
   }
 
   override def channelDisconnected(ctx: ChannelHandlerContext, e: ChannelStateEvent) {
-    log(e, "disconnected")
+    log(e, "Channel is disconnected")
     receiver ! ChannelDisconnected(e.getChannel.getId)
     super.channelDisconnected(ctx, e)
   }
 
   override def channelClosed(ctx: ChannelHandlerContext, e: ChannelStateEvent) {
-    if (e.getChannel.getRemoteAddress != null) log(e, "closed")
+    if (e.getChannel.getRemoteAddress != null) log(e, "Channel is closed")
 
     receiver ! ChannelClosed(e.getChannel.getId)
 
     super.channelClosed(ctx, e)
   }
 
-  override def exceptionCaught(ctx: ChannelHandlerContext, e: shaded.netty.channel.ExceptionEvent) = log(e, s"CHANNEL ERROR: ${e.getCause}")
+  override def exceptionCaught(ctx: ChannelHandlerContext, e: shaded.netty.channel.ExceptionEvent) = log(e, "Channel error", e.getCause)
 
   override def channelIdle(ctx: ChannelHandlerContext, e: IdleStateEvent) = {
-    log(e, s"channel timeout")
+    log(e, "Channel timeout")
     e.getChannel.close()
 
     super.channelIdle(ctx, e)
   }
 
-  def log(e: ChannelEvent, s: String) =
-    logger.trace(s"(channel=${e.getChannel}) $s")
+  @inline def log(e: ChannelEvent, s: String) = MongoHandler.
+    logger.trace(s"[$supervisor/$connection @ ${e.getChannel}] $s")
+
+  @inline def log(e: ChannelEvent, s: String, cause: Throwable) = MongoHandler.
+    logger.trace(s"[$supervisor/$connection @ ${e.getChannel}] $s", cause)
 }
 
 private[reactivemongo] object MongoHandler {

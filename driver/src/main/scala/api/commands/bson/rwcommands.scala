@@ -112,45 +112,38 @@ object BSONUpdateCommandImplicits {
   import BSONCommonWriteCommandsImplicits._
 
   implicit object UpdateElementWriter extends BSONDocumentWriter[UpdateElement] {
-    def write(element: UpdateElement) =
-      BSONDocument(
-        "q" -> element.q,
-        "u" -> element.u,
-        "upsert" -> element.upsert,
-        "multi" -> element.multi)
+    def write(element: UpdateElement) = BSONDocument(
+      "q" -> element.q,
+      "u" -> element.u,
+      "upsert" -> element.upsert,
+      "multi" -> element.multi)
   }
 
   implicit object UpdateWriter extends BSONDocumentWriter[ResolvedCollectionCommand[Update]] {
-    def write(update: ResolvedCollectionCommand[Update]) = {
-      BSONDocument(
-        "update" -> update.collection,
-        "updates" -> update.command.documents,
-        "ordered" -> update.command.ordered,
-        "writeConcern" -> update.command.writeConcern)
-    }
+    def write(update: ResolvedCollectionCommand[Update]) = BSONDocument(
+      "update" -> update.collection,
+      "updates" -> update.command.documents,
+      "ordered" -> update.command.ordered,
+      "writeConcern" -> update.command.writeConcern)
   }
 
   implicit object UpsertedReader extends BSONDocumentReader[Upserted] {
-    def read(doc: BSONDocument): Upserted = {
-      Upserted(
-        index = doc.getAs[Int]("index").get,
-        _id = doc.get("_id").get)
-    }
+    def read(doc: BSONDocument) = Upserted(
+      index = doc.getAs[Int]("index").get,
+      _id = doc.get("_id").get)
   }
 
   implicit object UpdateResultReader extends DealingWithGenericCommandErrorsReader[UpdateResult] {
-    def readResult(doc: BSONDocument): UpdateResult = {
-      UpdateWriteResult(
-        ok = doc.getAs[Int]("ok").exists(_ != 0),
-        n = doc.getAs[Int]("n").getOrElse(0),
-        nModified = doc.getAs[Int]("nModified").getOrElse(0),
-        upserted = doc.getAs[Seq[Upserted]]("upserted").getOrElse(Seq.empty),
-        writeErrors = doc.getAs[Seq[WriteError]]("writeErrors").getOrElse(Seq.empty),
-        writeConcernError = doc.getAs[WriteConcernError]("writeConcernError"),
-        code = doc.getAs[Int]("code"), //FIXME There is no corresponding official docs.
-        errmsg = doc.getAs[String]("errmsg") //FIXME There is no corresponding official docs.
-        )
-    }
+    def readResult(doc: BSONDocument) = UpdateWriteResult(
+      ok = doc.getAs[Int]("ok").exists(_ != 0),
+      n = doc.getAs[Int]("n").getOrElse(0),
+      nModified = doc.getAs[Int]("nModified").getOrElse(0),
+      upserted = doc.getAs[Seq[Upserted]]("upserted").getOrElse(Seq.empty),
+      writeErrors = doc.getAs[Seq[WriteError]]("writeErrors").getOrElse(Seq.empty),
+      writeConcernError = doc.getAs[WriteConcernError]("writeConcernError"),
+      code = doc.getAs[Int]("code"), //FIXME There is no corresponding official docs.
+      errmsg = doc.getAs[String]("errmsg") //FIXME There is no corresponding official docs.
+      )
   }
 }
 

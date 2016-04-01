@@ -1,36 +1,31 @@
+import scala.util.Failure
+
+import scala.concurrent._
+import scala.concurrent.duration.FiniteDuration
+
 import org.specs2.mutable._
+
 import reactivemongo.api._
 import reactivemongo.bson._
+import reactivemongo.api.collections.bson.BSONCollection
 import reactivemongo.api.commands.bson.BSONCountCommand._
 import reactivemongo.api.commands.bson.BSONCountCommandImplicits._
-import scala.concurrent._
-import scala.util.Failure
 
 import org.specs2.concurrent.{ ExecutionEnv => EE }
 
-object CommonUseCases extends Specification {
+class CommonUseCases extends Specification {
   import Common._
 
   sequential
 
-  lazy val collection = db("somecollection_commonusecases")
+  val colName = s"commonusecases${System identityHashCode this}"
+  lazy val collection = db(colName)
+  lazy val slowColl = slowDb(colName)
 
   "ReactiveMongo" should {
     "create a collection" in { implicit ee: EE =>
       collection.create() must beEqualTo({}).await(1, timeout)
     }
-
-    // TODO !!!
-    /*
-    "insert some docs from an enumerator of docs" in {
-      val enum = Enumerator((18 to 60).map(i => BSONDocument("age" -> BSONInteger(i), "name" -> BSONString("Jack" + i))): _*)
-      //Await.result(collection.bulkInsert(enum, 100), timeout) mustEqual 43
-      Await.result(collection.bulkInsert(enum, 100), timeout) mustEqual 43
-    }
-    "insert from an empty enumerator of docs" in {
-      val enum = Enumerator[BSONDocument]()
-      Await.result(collection.bulkInsert(enum, 100), timeout) mustEqual 0
-    }*/
 
     "insert some docs from a seq of docs" in { implicit ee: EE =>
       val docs = (18 to 60).toStream.map(i => BSONDocument(
@@ -41,13 +36,6 @@ object CommonUseCases extends Specification {
         count <- collection.runValueCommand(Count(BSONDocument(
           "age" -> BSONDocument("$gte" -> 18, "$lte" -> 60))))
       } yield count) must beEqualTo(43).await(1, timeout)
-    }
-
-    "insert from an empty enumerator of docs" in { implicit ee: EE =>
-      val docs = Stream.empty[BSONDocument]
-
-      collection.bulkInsert(docs, ordered = true).map(_.n) must beEqualTo(0).
-        await(1, timeout)
     }
 
     "find them" in { implicit ee: EE =>
@@ -77,14 +65,29 @@ object CommonUseCases extends Specification {
         map(_.size) aka "size" must beEqualTo(20).await(1, timeout)
     }
 
-    "find them with a projection" in { implicit ee: EE =>
-      val pjn = BSONDocument("name" -> BSONInteger(1), "age" -> BSONInteger(1), "something" -> BSONInteger(1))
-      def it = collection.find(BSONDocument(), pjn).options(QueryOpts().batchSize(2)).cursor[BSONDocument]()
+    "find them with a projection" >> {
+      def findSpec(c: BSONCollection, timeout: FiniteDuration)(implicit ee: EE) = {
+        val pjn = BSONDocument(
+          "name" -> BSONInteger(1),
+          "age" -> BSONInteger(1),
+          "something" -> BSONInteger(1))
 
-      it.collect[List]().map(_.map(
-        _.getAs[BSONInteger]("age").get.value).mkString("")).
-        aka("all") must beEqualTo((18 to 60).mkString("")).
-        await(1, timeout * 2)
+        def it = c.find(BSONDocument(), pjn).
+          options(QueryOpts().batchSize(2)).cursor[BSONDocument]()
+
+        it.collect[List]().map(_.map(
+          _.getAs[BSONInteger]("age").get.value).mkString("")).
+          aka("all") must beEqualTo((18 to 60).mkString("")).
+          await(1, timeout * 2)
+      }
+
+      "with the default connection" in { implicit ee: EE =>
+        findSpec(collection, timeout)
+      }
+
+      "with the slow connection" in { implicit ee: EE =>
+        findSpec(slowColl, slowTimeout)
+      }
     }
 
     "insert a document containing a merged array of objects, fetch and check it" in { implicit ee: EE =>
