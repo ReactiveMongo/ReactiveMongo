@@ -1,28 +1,30 @@
 import scala.collection.immutable.ListSet
 
-import scala.concurrent.{ Await, ExecutionContext, Future }
+import scala.concurrent.{ ExecutionContext, Future }
+import scala.concurrent.duration.FiniteDuration
 
 import reactivemongo.bson._
 import reactivemongo.api.collections.bson.BSONCollection
 
 import org.specs2.concurrent.{ ExecutionEnv => EE }
 
-object AggregationSpec extends org.specs2.mutable.Specification {
+class AggregationSpec extends org.specs2.mutable.Specification {
   "Aggregation framework" title
 
   import Common._
 
   sequential
 
-  val colName = s"zipcodes${System identityHashCode this}"
+  val zipColName = s"zipcodes${System identityHashCode this}"
   lazy val coll = {
     import ExecutionContext.Implicits.global
     import reactivemongo.api.indexes._, IndexType._
 
-    val c = db(colName)
-    Await.result(c.indexesManager.ensure(Index(
+    val c = db(zipColName)
+    scala.concurrent.Await.result(c.indexesManager.ensure(Index(
       List("city" -> Text, "state" -> Text))).map(_ => c), timeout * 2)
   }
+  lazy val slowColl = slowDb(zipColName)
 
   case class Location(lon: Double, lat: Double)
 
@@ -32,13 +34,16 @@ object AggregationSpec extends org.specs2.mutable.Specification {
   implicit val locationHandler = Macros.handler[Location]
   implicit val zipCodeHandler = Macros.handler[ZipCode]
 
-  private val zipCodes = List(
-    ZipCode("10280", "NEW YORK", "NY", 19746227L,
-      Location(-74.016323, 40.710537)),
-    ZipCode("72000", "LE MANS", "FR", 148169L, Location(48.0077, 0.1984)),
+  private val jpCodes = List(
     ZipCode("JP 13", "TOKYO", "JP", 13185502L,
       Location(35.683333, 139.683333)),
     ZipCode("AO", "AOGASHIMA", "JP", 200L, Location(32.457, 139.767)))
+
+  private val zipCodes = List(
+    ZipCode("10280", "NEW YORK", "NY", 19746227L,
+      Location(-74.016323, 40.710537)),
+    ZipCode("72000", "LE MANS", "FR", 148169L,
+      Location(48.0077, 0.1984))) ++ jpCodes
 
   "Zip codes collection" should {
     "be inserted" in { implicit ee: EE =>
@@ -47,22 +52,39 @@ object AggregationSpec extends org.specs2.mutable.Specification {
         case _         => Future.successful({})
       }
 
-      insert(zipCodes) must beEqualTo({}).await(1, timeout)
+      insert(zipCodes) aka "insert" must beEqualTo({}).await(1, timeout) and (
+        coll.count() aka "count #1" must beEqualTo(4).await(1, slowTimeout)).
+        and(slowColl.count() aka "count #2" must beEqualTo(4).
+          await(1, slowTimeout))
+
     }
 
-    "return states with populations above 10000000" in { implicit ee: EE =>
+    "return states with populations above 10000000" >> {
       // http://docs.mongodb.org/manual/tutorial/aggregation-zip-code-data-set/#return-states-with-populations-above-10-million
       val expected = List(document("_id" -> "JP", "totalPop" -> 13185702L),
         document("_id" -> "NY", "totalPop" -> 19746227L))
 
-      import coll.BatchCommands.AggregationFramework
-      import AggregationFramework.{ Group, Match, SumField }
+      def withRes[T](c: BSONCollection)(f: Future[List[BSONDocument]] => T)(implicit ec: ExecutionContext) = {
+        import c.BatchCommands.AggregationFramework
+        import AggregationFramework.{ Group, Match, SumField }
 
-      coll.aggregate(Group(BSONString("$state"))(
-        "totalPop" -> SumField("population")), List(
-        Match(document("totalPop" ->
-          document("$gte" -> 10000000L))))).map(_.firstBatch).
-        aka("results") must beEqualTo(expected).await(1, timeout)
+        f(c.aggregate(Group(BSONString("$state"))(
+          "totalPop" -> SumField("population")), List(
+          Match(document("totalPop" ->
+            document("$gte" -> 10000000L))))).map(_.firstBatch))
+      }
+
+      "with the default connection" in { implicit ee: EE =>
+        withRes(coll) {
+          _ aka "results" must beEqualTo(expected).await(1, timeout)
+        }
+      }
+
+      "with the slow connection" in { implicit ee: EE =>
+        withRes(slowColl) {
+          _ aka "results" must beEqualTo(expected).await(1, slowTimeout)
+        }
+      }
     }
 
     "explain simple result" in { implicit ee: EE =>
@@ -129,6 +151,7 @@ object AggregationSpec extends org.specs2.mutable.Specification {
         "with metadata sort" in { implicit ee: EE =>
           import coll.BatchCommands.AggregationFramework
           import AggregationFramework.{
+            Descending,
             Cursor,
             Match,
             MetadataSort,
@@ -139,29 +162,11 @@ object AggregationSpec extends org.specs2.mutable.Specification {
           val firstOp = Match(BSONDocument(
             "$text" -> BSONDocument("$search" -> "JP")))
 
-          val pipeline = List(Sort(MetadataSort("score", TextScore)))
-          val expected = List(BSONDocument(
-            "_id" -> "JP 13",
-            "city" -> "TOKYO",
-            "state" -> "JP",
-            "population" -> 13185502L,
-            "location" -> BSONDocument(
-              "lon" -> 35.683333D,
-              "lat" -> 139.683333D)),
-            BSONDocument(
-              "_id" -> "AO",
-              "city" -> "AOGASHIMA",
-              "state" -> "JP",
-              "population" -> 200L,
-              "location" -> BSONDocument(
-                "lon" -> 32.457D,
-                "lat" -> 139.767D)))
+          val pipeline = List(Sort(
+            MetadataSort("score", TextScore), Descending("city")))
 
-          coll.aggregate1[BSONDocument](firstOp, pipeline, Cursor(1)).
-            flatMap(_.collect[List](4)).andThen {
-              case scala.util.Success(res) =>
-                println(s"========> [[[[ ${res.map(BSONDocument.pretty)} ]]]]")
-            } must beEqualTo(expected).
+          coll.aggregate1[ZipCode](firstOp, pipeline, Cursor(1)).
+            flatMap(_.collect[List](4)) must beEqualTo(jpCodes).
             await(1, timeout)
 
         }
@@ -218,10 +223,18 @@ object AggregationSpec extends org.specs2.mutable.Specification {
         await(1, timeout)
     }
 
-    "return distinct states" in { implicit ee: EE =>
-      coll.distinct[String, ListSet]("state").
+    "return distinct states" >> {
+      def distinctSpec(c: BSONCollection, timeout: FiniteDuration)(implicit ee: EE) = c.distinct[String, ListSet]("state").
         aka("states") must beEqualTo(ListSet("NY", "FR", "JP")).
         await(1, timeout)
+
+      "with the default connection" in { implicit ee: EE =>
+        distinctSpec(coll, timeout)
+      }
+
+      "with the slow connection" in { implicit ee: EE =>
+        distinctSpec(slowColl, slowTimeout)
+      }
     }
 
     "return a random sample" in { implicit ee: EE =>

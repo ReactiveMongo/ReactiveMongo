@@ -36,7 +36,7 @@ final class NettyProxy(
     remoteAddress: InetSocketAddress,
     delay: Option[Long] = None) {
 
-  private val log = LazyLogger("reactivemongo")
+  private val log = LazyLogger("reactivemongo.netty-test-proxy")
 
   private val beforeProxy: () => Unit = delay.fold(() => {})(d => { () =>
     try {
@@ -186,20 +186,17 @@ final class NettyProxy(
     }
   }
 
-  def stop(): Unit = {
-    if (!started.get) {}
-    else {
-      try {
-        srvChannelFactory.releaseExternalResources()
-      } catch {
-        case e: Throwable => e.printStackTrace()
-      }
+  def stop(): Unit = if (started.get) {
+    try {
+      srvChannelFactory.releaseExternalResources()
+    } catch {
+      case e: Throwable => log.warn("fails to stop the server factory", e)
+    }
 
-      try {
-        clientSocketChannelFactory.releaseExternalResources()
-      } catch {
-        case e: Throwable => e.printStackTrace()
-      }
+    try {
+      clientSocketChannelFactory.releaseExternalResources()
+    } catch {
+      case e: Throwable => log.warn("fails to stop client socket", e)
     }
   }
 }

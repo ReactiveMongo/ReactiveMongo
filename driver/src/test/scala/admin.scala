@@ -1,3 +1,8 @@
+import scala.concurrent.Future
+import scala.concurrent.duration.FiniteDuration
+
+import reactivemongo.api.MongoConnection
+import reactivemongo.api.collections.bson.BSONCollection
 import reactivemongo.api.commands._
 
 import org.specs2.mutable.Specification
@@ -6,22 +11,31 @@ import Common._
 
 import org.specs2.concurrent.{ ExecutionEnv => EE }
 
-object RenameCollectionSpec extends Specification {
+class RenameCollectionSpec extends Specification {
   "renameCollection" title
 
   "Collection" should {
+    def spec(c: MongoConnection, timeout: FiniteDuration)(f: MongoConnection => Future[BSONCollection])(implicit ee: EE) = (for {
+      coll <- f(c)
+      _ <- coll.create()
+      _ <- coll.rename(s"renamed${System identityHashCode c}")
+    } yield ()) aka "renaming" must beEqualTo({}).await(1, timeout)
 
-    "be renamed" in { implicit ee: EE =>
-      val adminDb = connection("admin")
-      val col = adminDb(s"foo_${System identityHashCode adminDb}")
+    "be renamed using the default connection" in { implicit ee: EE =>
+      spec(connection, timeout) {
+        _.database("admin").map(_(s"foo_${System identityHashCode db}"))
+      }
+    }
 
-      col.create().map(_ => col.rename("renamed")).map(_ => {}).
-        aka("renaming") must beEqualTo({}).await(1, timeout)
+    "be renamed using the slow connection" in { implicit ee: EE =>
+      spec(slowConnection, slowTimeout) {
+        _.database("admin").map(_(s"foo_${System identityHashCode slowDb}"))
+      }
     }
   }
 }
 
-object ReplSetGetStatusSpec extends Specification {
+class ReplSetGetStatusSpec extends Specification {
   "replSetGetStatus" title
 
   "BSON command" should {
@@ -35,7 +49,7 @@ object ReplSetGetStatusSpec extends Specification {
   }
 }
 
-object ServerStatusSpec extends Specification {
+class ServerStatusSpec extends Specification {
   "serverStatus" title
 
   "BSON command" should {
@@ -61,7 +75,7 @@ object ServerStatusSpec extends Specification {
   }
 }
 
-object ResyncSpec extends Specification {
+class ResyncSpec extends Specification {
   "Resync" title
 
   "BSON command" should {
@@ -74,7 +88,7 @@ object ResyncSpec extends Specification {
   }
 }
 
-object ReplSetMaintenanceSpec extends Specification {
+class ReplSetMaintenanceSpec extends Specification {
   "ReplSetMaintenance" title
 
   "BSON command" should {

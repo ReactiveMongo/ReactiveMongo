@@ -6,9 +6,12 @@
     </Console>
   </appenders>
   <loggers>
+    <logger name="shaded" level="OFF" />
     <logger name="reactivemongo" level="OFF" />
     <logger name="akka://reactivemongo" level="OFF" />
-    <root level="WARN">
+    <logger name="tests" level="WARN" />
+
+    <root level="TRACE">
       <appender-ref ref="Console"/>
     </root>
   </loggers>

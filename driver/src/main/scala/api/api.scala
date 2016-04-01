@@ -90,7 +90,10 @@ class Failover[T](message: T, connection: MongoConnection, strategy: FailoverStr
 
   private val promise = Promise[Response]()
 
-  /** A future that is completed with a response, after 1 or more attempts (specified in the given strategy). */
+  /**
+   * A future that is completed with a response,
+   * after 1 or more attempts (specified in the given strategy).
+   */
   val future: Future[Response] = promise.future
 
   private def send(n: Int) {
@@ -102,19 +105,26 @@ class Failover[T](message: T, connection: MongoConnection, strategy: FailoverStr
           val `try` = n + 1
           val delayFactor = strategy.delayFactor(`try`)
           val delay = Duration.unapply(strategy.initialDelay * delayFactor).map(t => FiniteDuration(t._1, t._2)).getOrElse(strategy.initialDelay)
+
           logger.debug(s"Got an error, retrying... (try #${`try`} is scheduled in ${delay.toMillis} ms)", e)
+
           connection.actorSystem.scheduler.scheduleOnce(delay)(send(`try`))
         } else {
           // generally that means that the primary is not available or the nodeset is unreachable
           logger.error("Got an error, no more attempts to do. Completing with a failure...", e)
           promise.failure(e)
         }
-      case Failure(e) =>
-        logger.trace("Got an non retryable error, completing with a failure...", e)
+
+      case Failure(e) => {
+        logger.trace(
+          "Got an non retryable error, completing with a failure...", e)
         promise.failure(e)
-      case Success(response) =>
+      }
+
+      case Success(response) => {
         logger.trace("Got a successful result, completing...")
         promise.success(response)
+      }
     }
   }
 
@@ -135,6 +145,8 @@ class Failover2[A](producer: () => Future[A], connection: MongoConnection, strat
   import reactivemongo.core.errors._
   import reactivemongo.core.actors.Exceptions._
 
+  val call = new Throwable()
+
   /**
    * A future that is completed with a response,
    * after 1 or more attempts (specified in the given strategy).
@@ -147,14 +159,6 @@ class Failover2[A](producer: () => Future[A], connection: MongoConnection, strat
     producer()
   } catch {
     case producerErr: Throwable => Future.failed[A](producerErr)
-  }
-
-  private def _next(): Future[A] = producer()
-
-  private val mutex = {
-    val sem = new java.util.concurrent.Semaphore(1, true)
-    sem.drainPermits()
-    sem
   }
 
   private def send(n: Int): Future[A] =
@@ -191,9 +195,9 @@ class Failover2[A](producer: () => Future[A], connection: MongoConnection, strat
       }
     }
 
-  private def isRetryable(throwable: Throwable) = throwable match {
+  private def isRetryable(throwable: Throwable): Boolean = throwable match {
     case PrimaryUnavailableException | NodeSetNotReachable => true
-    case e: DatabaseException if e.isNotAPrimaryError || e.isUnauthorized => true
+    case e: DatabaseException => (e.isNotAPrimaryError || e.isUnauthorized)
     case _: ConnectionException => true
     case _: ConnectionNotInitialized => true
     case _ => false
@@ -244,9 +248,12 @@ object Failover {
  * @param delayFactor a function that takes the current iteration and returns a factor to be applied to the initialDelay.
  */
 case class FailoverStrategy(
-  initialDelay: FiniteDuration = FiniteDuration(100, "ms"),
-  retries: Int = 8,
-  delayFactor: Int => Double = _ * 1.25D)
+    initialDelay: FiniteDuration = FiniteDuration(100, "ms"),
+    retries: Int = 8,
+    delayFactor: Int => Double = _ * 1.25D) {
+
+  override lazy val toString = s"FailoverStrategy($initialDelay, $retries)"
+}
 
 object FailoverStrategy {
   /** The default strategy */
@@ -271,14 +278,25 @@ object FailoverStrategy {
  * val collection = db.map(_.("acoll"))
  * }}}
  *
+ * @param supervisor the name of the supervisor
+ * @param name the unique name for the connection pool
  * @param mongosystem the reference to the internal [[reactivemongo.core.actors.MongoDBSystem]] Actor.
  */
 class MongoConnection(
+    val supervisor: String,
+    val name: String,
     val actorSystem: ActorSystem,
     val mongosystem: ActorRef,
     val options: MongoConnectionOptions) {
 
+  @deprecated("Create with an explicit supervisor and connection names", "0.11.14")
+  def this(actorSys: ActorSystem, mongoSys: ActorRef, opts: MongoConnectionOptions) = this(s"unknown-${System identityHashCode mongoSys}", s"unknown-${System identityHashCode mongoSys}", actorSys, mongoSys, opts)
+
   private[api] val logger = LazyLogger("reactivemongo.api.Failover2")
+
+  private val lnm = s"$supervisor/$name" // log name
+
+  @volatile private[api] var killed: Boolean = false
 
   /**
    * Returns a DefaultDB reference using this connection.
@@ -287,16 +305,7 @@ class MongoConnection(
    * @param failoverStrategy the failover strategy for sending requests.
    */
   @deprecated(message = "Use [[database]]", since = "0.11.8")
-  def apply(name: String, failoverStrategy: FailoverStrategy = options.failoverStrategy)(implicit context: ExecutionContext): DefaultDB = {
-    metadata.foreach {
-      case ProtocolMetadata(_, MongoWireVersion.V24AndBefore, _, _, _) =>
-        throw ConnectionException("unsupported MongoDB version < 2.6")
-
-      case meta => ()
-    }
-
-    DefaultDB(name, this, failoverStrategy)
-  }
+  def apply(name: String, failoverStrategy: FailoverStrategy = options.failoverStrategy)(implicit context: ExecutionContext): DefaultDB = DefaultDB(name, this, failoverStrategy)
 
   /**
    * Returns a DefaultDB reference using this connection
@@ -321,6 +330,8 @@ class MongoConnection(
 
   /** Returns a future that will be successful when node set is available. */
   private[api] def waitIsAvailable(failoverStrategy: FailoverStrategy)(implicit ec: ExecutionContext): Future[Unit] = {
+    logger.debug(s"[$lnm] Waiting is available...")
+
     @inline def nextTimeout(i: Int): FiniteDuration = {
       val delayFactor: Double = failoverStrategy.delayFactor(i)
 
@@ -331,8 +342,12 @@ class MongoConnection(
     type Retry = (FiniteDuration, Throwable)
 
     def wait(iteration: Int, attempt: Int, timeout: FiniteDuration): Future[Unit] = {
-      if (attempt == 0) Future.failed(Exceptions.NodeSetNotReachable)
-      else {
+      logger.trace(
+        s"[$lnm] Wait is available: $attempt @ ${System.currentTimeMillis}")
+
+      if (attempt == 0) {
+        Future.failed(new Exceptions.NodeSetNotReachable(this))
+      } else {
         @inline def res: Either[Retry, Unit] = try {
           val before = System.currentTimeMillis
           val result = Await.result(isAvailable, timeout)
@@ -355,7 +370,7 @@ class MongoConnection(
           case Right(_)            => Future.successful({})
           case Left((delay, null)) => doRetry(delay)
           case Left((delay, error)) =>
-            logger.warn("Got an error, retrying", error)
+            logger.warn(s"[$lnm] Got an error, retrying", error)
             doRetry(delay)
         }
       }
@@ -367,13 +382,20 @@ class MongoConnection(
           case Some(ProtocolMetadata(
             _, MongoWireVersion.V24AndBefore, _, _, _)) =>
             Future.failed[Unit](ConnectionException(
-              "unsupported MongoDB version < 2.6"))
+              s"unsupported MongoDB version < 2.6 ($lnm)"))
 
           case Some(_) => Future successful {}
           case _ => Future.failed[Unit](ConnectionException(
-            "protocol metadata not available"))
+            s"protocol metadata not available ($lnm)"))
         }
       }
+  }
+
+  private def whenActive[T](f: => Future[T]): Future[T] = {
+    if (killed) {
+      logger.debug(s"[$lnm] Cannot send request when the connection is killed")
+      Future.failed(new Exceptions.ClosedException(supervisor, name))
+    } else f
   }
 
   /**
@@ -381,13 +403,9 @@ class MongoConnection(
    *
    * @param message The request maker.
    */
-  private[api] def send(message: RequestMaker): Unit = mongosystem ! message
-
-  private def whenActive[T](f: => Future[T]): Future[T] = {
-    if (killed) {
-      logger.debug("cannot send request when the connection is killed")
-      Future.failed(Exceptions.ClosedException)
-    } else f
+  private[api] def send(message: RequestMaker): Unit = {
+    if (killed) throw new Exceptions.ClosedException(supervisor, name)
+    else mongosystem ! message
   }
 
   private[api] def sendExpectingResponse(checkedWriteRequest: CheckedWriteRequest)(implicit ec: ExecutionContext): Future[Response] = whenActive {
@@ -425,8 +443,6 @@ class MongoConnection(
    */
   def close(): Unit = monitor ! Close
 
-  @volatile private[api] var killed: Boolean = false
-
   private case class IsAvailable(result: Promise[Boolean]) {
     override val toString = "IsAvailable?"
   }
@@ -434,7 +450,7 @@ class MongoConnection(
     override val toString = "IsPrimaryAvailable?"
   }
 
-  private def isAvailable: Future[Boolean] = {
+  private[api] def isAvailable: Future[Boolean] = {
     if (killed) Future.successful(false)
     else {
       val p = Promise[Boolean]()
@@ -449,7 +465,7 @@ class MongoConnection(
   }
 
   private[api] val monitor = actorSystem.actorOf(
-    Props(new MonitorActor), "Monitor-" + MongoDriver.nextCounter)
+    Props(new MonitorActor), s"Monitor-$name")
 
   @volatile private[api] var metadata: Option[ProtocolMetadata] = None
 
@@ -467,24 +483,25 @@ class MongoConnection(
 
     override val receive: Receive = {
       case pa @ PrimaryAvailable(metadata) => {
-        logger.debug("set: a primary is available")
+        logger.debug(s"[$lnm] A primary is available")
         primaryAvailable = true
         waitingForPrimary.dequeueAll(_ => true).foreach(_ ! pa)
       }
 
-      case PrimaryUnavailable =>
-        logger.debug("set: no primary available")
+      case PrimaryUnavailable => {
+        logger.debug(s"[$lnm] There is no primary available")
         primaryAvailable = false
+      }
 
       case SetAvailable(meta) => {
-        logger.debug(s"set: a node is available: $meta")
+        logger.debug(s"[$lnm] A node is available: $meta")
         setAvailable = true
         metadata = Some(meta)
       }
 
       case SetUnavailable =>
         setAvailable = false
-        logger.debug("set: no node seems to be available")
+        logger.debug(s"[$lnm] No node seems to be available")
 
       /* TODO: Remove 
       case WaitForPrimary => {
@@ -503,7 +520,7 @@ class MongoConnection(
          */
 
       case Close => {
-        logger.debug("Monitor received Close")
+        logger.debug(s"[$lnm] Monitor received Close")
 
         killed = true
         primaryAvailable = false
@@ -513,11 +530,11 @@ class MongoConnection(
         waitingForClose += sender
         waitingForPrimary.dequeueAll(_ => true).foreach(
           _ ! Failure(new scala.RuntimeException(
-            "MongoDBSystem actor shutting down or no longer active")))
+            s"MongoDBSystem actor shutting down or no longer active ($lnm)")))
       }
 
       case Closed => {
-        logger.debug(s"Monitor $self closed, stopping...")
+        logger.debug(s"Monitor $self closed, stopping... ($lnm)")
         waitingForClose.dequeueAll(_ => true).foreach(_ ! Closed)
         context.stop(self)
       }
@@ -526,7 +543,7 @@ class MongoConnection(
       case IsPrimaryAvailable(result) => result success primaryAvailable
     }
 
-    override def postStop = logger.debug(s"Monitor $self stopped.")
+    override def postStop = logger.debug(s"Monitor $self stopped ($lnm)")
   }
 
   object MonitorActor {
@@ -743,20 +760,23 @@ class MongoDriver(config: Option[Config] = None) {
 
   import MongoDriver.logger
 
-  /* MongoDriver always uses its own ActorSystem so it can have complete control separate from other
+  /* MongoDriver always uses its own ActorSystem 
+   * so it can have complete control separate from other
    * Actor Systems in the application
    */
   val system = {
     import com.typesafe.config.ConfigFactory
     val reference = config getOrElse ConfigFactory.load()
+    val cfg = if (!reference.hasPath("mongo-async-driver")) {
+      logger.info("No mongo-async-driver configuration found")
+      ConfigFactory.empty()
+    } else reference.getConfig("mongo-async-driver")
 
-    if (!reference.hasPath("mongo-async-driver")) {
-      ActorSystem("reactivemongo")
-    } else ActorSystem("reactivemongo",
-      reference.getConfig("mongo-async-driver"))
+    ActorSystem("reactivemongo", cfg)
   }
 
-  private val supervisorActor = system.actorOf(Props(new SupervisorActor(this)), s"Supervisor-${MongoDriver.nextCounter}")
+  private val supervisorName = s"Supervisor-${MongoDriver.nextCounter}"
+  private val supervisorActor = system.actorOf(Props(new SupervisorActor(this)), supervisorName)
 
   private val connectionMonitors = MutableMap.empty[ActorRef, MongoConnection]
 
@@ -816,21 +836,22 @@ class MongoDriver(config: Option[Config] = None) {
    * @param options Options for the new connection pool.
    */
   def connection(nodes: Seq[String], options: MongoConnectionOptions = MongoConnectionOptions(), authentications: Seq[Authenticate] = Seq.empty, name: Option[String] = None): MongoConnection = {
+    val nm = name.getOrElse(s"Connection-${+MongoDriver.nextCounter}")
+
     def dbsystem: MongoDBSystem = options.authMode match {
-      case ScramSha1Authentication =>
-        new StandardDBSystem(nodes, authentications, options)()
+      case ScramSha1Authentication => new StandardDBSystem(
+        supervisorName, nm, nodes, authentications, options)()
 
-      case _ =>
-        new LegacyDBSystem(nodes, authentications, options)()
+      case _ => new LegacyDBSystem(
+        supervisorName, nm, nodes, authentications, options)()
     }
 
-    val props = Props(dbsystem)
-    val mongosystem = name match {
-      case Some(nm) => system.actorOf(props, nm);
-      case None =>
-        system.actorOf(props, s"Connection-${+MongoDriver.nextCounter}")
-    }
-    val connection = (supervisorActor ? AddConnection(options, mongosystem))(Timeout(10, SECONDS))
+    val mongosystem = system.actorOf(Props(dbsystem), nm)
+    def connection = (supervisorActor ? AddConnection(
+      nm, nodes, options, mongosystem))(Timeout(10, SECONDS))
+
+    logger.info(s"[$supervisorName] Creating connection: $nm")
+
     Await.result(connection.mapTo[MongoConnection], Duration.Inf)
     // TODO: Returns Future[MongoConnection]
   }
@@ -882,7 +903,11 @@ class MongoDriver(config: Option[Config] = None) {
   def connection(parsedURI: MongoConnection.ParsedURI): MongoConnection =
     connection(parsedURI, None)
 
-  private case class AddConnection(options: MongoConnectionOptions, mongosystem: ActorRef)
+  private case class AddConnection(
+    name: String,
+    nodes: Seq[String],
+    options: MongoConnectionOptions,
+    mongosystem: ActorRef)
 
   //private case class CloseWithTimeout(timeout: FiniteDuration)
 
@@ -890,11 +915,18 @@ class MongoDriver(config: Option[Config] = None) {
     def isEmpty = driver.connectionMonitors.isEmpty
 
     override def receive = {
-      case AddConnection(opts, sys) =>
-        val connection = new MongoConnection(driver.system, sys, opts)
+      case AddConnection(name, nodes, opts, sys) => {
+        logger.debug(
+          s"[$supervisorName] Add connection to the supervisor: $name")
+
+        val connection = new MongoConnection(
+          supervisorName, name, driver.system, sys, opts)
+        //connection.nodes = nodes
+
         driver.connectionMonitors.put(connection.monitor, connection)
         context.watch(connection.monitor)
         sender ! connection
+      }
 
       case Terminated(actor) => driver.connectionMonitors.remove(actor)
 
@@ -904,32 +936,40 @@ class MongoDriver(config: Option[Config] = None) {
         else context.become(closing(timeout))
          */
 
-      case Close =>
+      case Close => {
+        logger.debug(s"[$supervisorName] Close the supervisor")
+
         if (isEmpty) context.stop(self)
         else context.become(closing(Duration.Zero))
+      }
     }
 
     def closing(shutdownTimeout: FiniteDuration): Receive = {
-      case AddConnection(_, _) =>
-        logger.warn("Refusing to add connection while MongoDriver is closing.")
+      case AddConnection(name, _, _, _) =>
+        logger.warn(s"[$supervisorName] Refusing to add connection while MongoDriver is closing: $name")
 
-      case Terminated(actor) => {
-        driver.connectionMonitors.remove(actor)
-        if (isEmpty) context.stop(self)
-      }
+      case Terminated(actor) =>
+        driver.connectionMonitors.remove(actor).foreach { con =>
+          logger.debug(
+            s"[$supervisorName] Connection is terminated: ${con.name}")
+
+          if (isEmpty) context.stop(self)
+        }
 
       /*
       case CloseWithTimeout(timeout) =>
         logger.warn("CloseWithTimeout ignored, already closing.")
          */
 
-      case Close => logger.warn("Close ignored, already closing.")
+      case Close =>
+        logger.warn(s"[$supervisorName] Close ignored, already closing.")
     }
 
     override def postStop: Unit = driver.system.shutdown()
   }
 }
 
+/** The driver factory */
 object MongoDriver {
   private val logger = LazyLogger("reactivemongo.api.MongoDriver")
 

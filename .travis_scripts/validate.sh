@@ -46,11 +46,7 @@ fi
 TEST_OPTS="exclude not_mongo26"
 SBT_OPTS="++$TRAVIS_SCALA_VERSION -Dtest.primaryHost=$PRIMARY_HOST"
 
-echo "Backend: $PRIMARY_BACKEND"
-
-if [ ! "$PRIMARY_BACKEND" = "no" ]; then
-    SBT_OPTS="$SBT_OPTS -Dtest.primaryBackend=$PRIMARY_BACKEND -Dtest.proxyDelay=300"
-fi
+SBT_OPTS="$SBT_OPTS -Dtest.slowPrimaryHost=$PRIMARY_SLOW_PROXY -Dtest.slowProxyDelay=300 -Dtest.slowFailoverRetries=12"
 
 if [ "$MONGODB_VER" = "3" ]; then
     TEST_OPTS="exclude mongo2"
@@ -60,13 +56,14 @@ if [ "$MONGODB_VER" = "3" ]; then
     fi
 fi
 
-if [ `echo "$JAVA_HOME" | grep java-7-oracle | wc -l` -eq 1 -a "$MONGO_SSL" = "false" ]; then
-  # Network latency
-  SBT_OPTS="$SBT_OPTS -Dtest.failoverRetries=12"
-fi
-
 echo "- SBT options: $SBT_OPTS"
 
-#sbt ++$TRAVIS_SCALA_VERSION $SBT_OPTS ";error ;mimaReportBinaryIssues ;test:compile" || exit 2
-sbt ++$TRAVIS_SCALA_VERSION $SBT_OPTS ";error ;test:compile" || exit 2
+sbt ++$TRAVIS_SCALA_VERSION $SBT_OPTS ";error ;mimaReportBinaryIssues ;test:compile" || exit 2
 sbt ++$TRAVIS_SCALA_VERSION $SBT_OPTS "testOnly -- $TEST_OPTS"
+SBT_ST="$?"
+
+if [ ! $SBT_ST -eq 0 ]; then
+    tail -n 100 /tmp/mongod.log
+fi
+
+exit $SBT_ST
