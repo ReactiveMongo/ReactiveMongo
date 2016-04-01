@@ -100,7 +100,3 @@ object Common {
     tcpProxy.foreach(_.stop())
   }
 }
-
-package object tests {
-  val utility = Common
-}

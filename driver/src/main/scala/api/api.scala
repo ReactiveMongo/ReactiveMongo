@@ -248,6 +248,14 @@ case class FailoverStrategy(
   retries: Int = 8,
   delayFactor: Int => Double = _ * 1.25D)
 
+object FailoverStrategy {
+  /** The default strategy */
+  val default = FailoverStrategy()
+
+  /** The strategy when the MongoDB nodes are remote */
+  val remote = FailoverStrategy(retries = 16)
+}
+
 /**
  * A pool of MongoDB connections.
  *
@@ -281,7 +289,7 @@ class MongoConnection(
    * @param name the database name
    * @param failoverStrategy the failover strategy for sending requests.
    */
-  def apply(name: String, failoverStrategy: FailoverStrategy = FailoverStrategy())(implicit context: ExecutionContext): DefaultDB = {
+  def apply(name: String, failoverStrategy: FailoverStrategy = options.failoverStrategy)(implicit context: ExecutionContext): DefaultDB = {
     metadata.foreach {
       case ProtocolMetadata(_, MongoWireVersion.V24AndBefore, _, _, _) =>
         throw ConnectionException("unsupported MongoDB version < 2.6")
@@ -300,7 +308,7 @@ class MongoConnection(
    * @param failoverStrategy the failover strategy for sending requests.
    */
   @deprecated(message = "Must use [[apply]]", since = "0.11.8")
-  def db(name: String, failoverStrategy: FailoverStrategy = FailoverStrategy())(implicit context: ExecutionContext): DefaultDB = apply(name, failoverStrategy)
+  def db(name: String, failoverStrategy: FailoverStrategy = options.failoverStrategy)(implicit context: ExecutionContext): DefaultDB = apply(name, failoverStrategy)
 
   /**
    * Returns a DefaultDB reference using this connection.
@@ -310,7 +318,7 @@ class MongoConnection(
    * @param name the database name
    * @param failoverStrategy the failover strategy for sending requests.
    */
-  def database(name: String, failoverStrategy: FailoverStrategy = FailoverStrategy())(implicit context: ExecutionContext): Future[DefaultDB] =
+  def database(name: String, failoverStrategy: FailoverStrategy = options.failoverStrategy)(implicit context: ExecutionContext): Future[DefaultDB] =
     waitIsAvailable(failoverStrategy).map(_ => apply(name, failoverStrategy))
 
   /** Returns a future that will be successful when node set is available. */
@@ -621,6 +629,7 @@ object MongoConnection {
     }
 
   val IntRe = "^([0-9]+)$".r
+  val FailoverRe = "^([^:]+):([0-9]+)x([0-9.]+)$".r
 
   private def makeOptions(opts: Map[String, String]): (List[String], MongoConnectionOptions) = {
     val (remOpts, step1) = opts.iterator.foldLeft(
@@ -668,6 +677,22 @@ object MongoConnection {
           case ("readPreference", "nearest") => unsupported -> result.copy(
             readPreference = ReadPreference.nearest)
 
+          case ("rm.failover", "default") => unsupported -> result
+          case ("rm.failover", "remote") => unsupported -> result.copy(
+            failoverStrategy = FailoverStrategy.remote)
+
+          case ("rm.failover", opt @ FailoverRe(d, r, f)) => (for {
+            (time, unit) <- Try(Duration(d)).toOption.flatMap(Duration.unapply)
+            delay <- Some(FiniteDuration(time, unit))
+            retry <- Try(r.toInt).toOption
+            factor <- Try(f.toDouble).toOption
+          } yield FailoverStrategy(delay, retry, _ * factor)) match {
+            case Some(strategy) =>
+              unsupported -> result.copy(failoverStrategy = strategy)
+
+            case _ => (unsupported + ("rm.failover" -> opt)) -> result
+          }
+
           case kv => (unsupported + kv) -> result
         }
       }
@@ -712,12 +737,11 @@ class MongoDriver(config: Option[Config] = None) {
   val system = {
     import com.typesafe.config.ConfigFactory
     val reference = config getOrElse ConfigFactory.load()
-    val cfg = if (!reference.hasPath("mongo-async-driver")) {
-      logger.warn("No mongo-async-driver configuration found")
-      ConfigFactory.empty()
-    } else reference.getConfig("mongo-async-driver")
 
-    ActorSystem("reactivemongo", cfg)
+    if (!reference.hasPath("mongo-async-driver")) {
+      ActorSystem("reactivemongo")
+    } else ActorSystem("reactivemongo",
+      reference.getConfig("mongo-async-driver"))
   }
 
   private val supervisorActor = system.actorOf(Props(new SupervisorActor(this)), s"Supervisor-${MongoDriver.nextCounter}")
@@ -785,6 +809,7 @@ class MongoDriver(config: Option[Config] = None) {
     }
     val connection = (supervisorActor ? AddConnection(options, mongosystem))(Timeout(10, SECONDS))
     Await.result(connection.mapTo[MongoConnection], Duration.Inf)
+    // TODO: Returns Future[MongoConnection]
   }
 
   /**
