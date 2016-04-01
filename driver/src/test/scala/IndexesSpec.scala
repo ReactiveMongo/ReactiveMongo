@@ -16,7 +16,7 @@ object IndexesSpec extends Specification {
 
   import Common._
 
-  val geo = db("geo")
+  lazy val geo = db("geo")
 
   "ReactiveMongo Geo Indexes" should {
     "insert some points" in { implicit ee: EE =>
@@ -62,7 +62,7 @@ object IndexesSpec extends Specification {
     }
   }
 
-  val geo2DSpherical = db("geo2d")
+  lazy val geo2DSpherical = db("geo2d")
 
   "ReactiveMongo Geo2D indexes" should {
 
@@ -111,7 +111,7 @@ object IndexesSpec extends Specification {
     }
   }
 
-  val hashed = db("hashed")
+  lazy val hashed = db("hashed")
 
   "ReactiveMongo Hashed indexes" should {
     "insert some data" in { implicit ee: EE =>

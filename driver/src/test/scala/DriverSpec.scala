@@ -12,6 +12,7 @@ import reactivemongo.core.actors.Exceptions.NodeSetNotReachable
 
 import reactivemongo.api.{
   BSONSerializationPack,
+  DefaultDB,
   FailoverStrategy,
   MongoDriver,
   ScramSha1Authentication
@@ -30,24 +31,24 @@ object DriverSpec extends org.specs2.mutable.Specification {
     failoverStrategy,
     primaryHost,
     timeout,
-    timeoutMillis
+    timeoutMillis,
+    estTimeout
   }
   val hosts = Seq(primaryHost)
 
   "Connection pool" should {
-    "start and close cleanly with no connections" in {
+    "cleanly start and close with no connections" in {
       val md = MongoDriver()
 
       md.numConnections must_== 0 and (
-        md.close(FiniteDuration(500, "milliseconds")) must not(
-          throwA[Throwable]))
+        md.close(timeout) must not(throwA[Throwable]))
 
     }
 
     "start and close with one connection open" in {
       val md = MongoDriver()
       val connection = md.connection(hosts)
-      md.close(FiniteDuration(5, "seconds"))
+      md.close(timeout)
       success
     }
 
@@ -56,7 +57,7 @@ object DriverSpec extends org.specs2.mutable.Specification {
       val connection1 = md.connection(hosts, name = Some("Connection1"))
       val connection2 = md.connection(hosts)
       val connection3 = md.connection(hosts)
-      md.close(FiniteDuration(5, "seconds"))
+      md.close(timeout)
       success
     }
   }
@@ -67,49 +68,51 @@ object DriverSpec extends org.specs2.mutable.Specification {
       List(primaryHost),
       options = DefaultOptions.copy(nbChannelsPerNode = 1))
 
-    def db_(implicit ec: ExecutionContext) = {
-      val _db = connection.database(
-        "specs2-test-reactivemongo-auth", failoverStrategy)
-      Await.result(_db.flatMap(d => d.drop.map(_ => d)), timeout)
-    }
+    val dbName = "specs2-test-cr-auth"
+    def db_(implicit ec: ExecutionContext) =
+      connection.database(dbName, failoverStrategy)
+
     val id = System.identityHashCode(driver)
 
-    "be the default mode" in (ok) tag "mongo2"
+    "be the default mode" in { implicit ee: EE =>
+      db_.flatMap(_.drop()).map(_ => {}) must beEqualTo({}).await(1, timeout)
+    } tag "mongo2"
 
     "create a user" in { implicit ee: EE =>
-      val db = db_
       val runner = Command.run(BSONSerializationPack)
       val createUser = BSONDocument("createUser" -> s"test-$id",
         "pwd" -> s"password-$id", // TODO: create a command
         "customData" -> BSONDocument.empty,
         "roles" -> BSONArray(
-          BSONDocument("role" -> "readWrite", "db" -> db.name)))
+          BSONDocument("role" -> "readWrite", "db" -> dbName)))
 
-      runner.apply(db, runner.rawCommand(createUser)).one[BSONDocument].
-        aka("creation") must (beLike[BSONDocument] {
-          case doc => doc.getAs[BSONBooleanLike]("ok").
-            exists(_.toBoolean == true) must beTrue
-        }).await(1, timeout)
+      db_.flatMap {
+        runner.apply(_, runner.rawCommand(createUser)).one[BSONDocument]
+      } aka "creation" must (beLike[BSONDocument] {
+        case doc => doc.getAs[BSONBooleanLike]("ok").
+          exists(_.toBoolean == true) must beTrue
+      }).await(1, timeout * 2)
     } tag "mongo2"
 
     "not be successful with wrong credentials" in { implicit ee: EE =>
-      Await.result(connection.authenticate(db_.name, "foo", "bar"), timeout).
-        aka("authentication") must throwA[FailedAuthentication]
+      connection.authenticate(dbName, "foo", "bar").
+        aka("authentication") must throwA[FailedAuthentication].
+        await(1, timeout)
 
     } tag "mongo2"
 
     "be successful with right credentials" in { implicit ee: EE =>
-      val db = db_
-      connection.authenticate(db.name, s"test-$id", s"password-$id").
+      connection.authenticate(dbName, s"test-$id", s"password-$id").
         aka("authentication") must beLike[SuccessfulAuthentication](
-          { case _ => ok }).await(1, timeout) and (
-            db("testcol").insert(BSONDocument("foo" -> "bar")).
-            map(_ => {}) must beEqualTo({}).await(1, timeout))
-
+          { case _ => ok }).await(1, timeout) and {
+            db_.flatMap {
+              _("testcol").insert(BSONDocument("foo" -> "bar")).map(_ => {})
+            } must beEqualTo({}).await(1, timeout)
+          }
     } tag "mongo2"
 
     "driver shutdown" in { // mainly to ensure the test driver is closed
-      driver.close() must not(throwA[Exception])
+      driver.close(timeout) must not(throwA[Exception])
     } tag "mongo2"
 
     "fail on DB without authentication" in { implicit ee: EE =>
@@ -137,51 +140,54 @@ object DriverSpec extends org.specs2.mutable.Specification {
     lazy val connection = driver.connection(
       List(primaryHost), options = conOpts)
 
-    def db_(implicit ee: ExecutionContext) = {
-      val _db = connection("specs2-test-reactivemongo-auth")
-      Await.ready(_db.drop, timeout)
-      _db
-    }
+    val dbName = "specs2-test-scramsha1-auth"
+    def db_(implicit ee: ExecutionContext) =
+      connection.database(dbName, failoverStrategy)
+
     val id = System.identityHashCode(driver)
 
-    "work only if configured" in (ok) tag "not_mongo26"
+    "work only if configured" in { implicit ee: EE =>
+      db_.flatMap(_.drop()).map(_ => {}) must beEqualTo({}).
+        await(1, timeout * 2)
+    } tag "not_mongo26"
 
     "create a user" in { implicit ee: EE =>
-      val db = db_
       val runner = Command.run(BSONSerializationPack)
       val createUser = BSONDocument("createUser" -> s"test-$id",
         "pwd" -> s"password-$id", // TODO: create a command
         "customData" -> BSONDocument.empty,
         "roles" -> BSONArray(
-          BSONDocument("role" -> "readWrite", "db" -> db.name)))
+          BSONDocument("role" -> "readWrite", "db" -> dbName)))
 
-      runner.apply(db, runner.rawCommand(createUser)).one[BSONDocument].
-        aka("creation") must (beLike[BSONDocument] {
-          case doc => doc.getAs[BSONBooleanLike]("ok").
-            exists(_.toBoolean == true) must beTrue
-        }).await(1, timeout)
+      db_.flatMap {
+        runner.apply(_, runner.rawCommand(createUser)).one[BSONDocument]
+      } aka "creation" must (beLike[BSONDocument] {
+        case doc => doc.getAs[BSONBooleanLike]("ok").
+          exists(_.toBoolean == true) must beTrue
+      }).await(1, timeout)
     } tag "not_mongo26"
 
     "not be successful with wrong credentials" in { implicit ee: EE =>
-      Await.result(connection.authenticate(db_.name, "foo", "bar"), timeout).
-        aka("authentication") must throwA[FailedAuthentication]
+      connection.authenticate(dbName, "foo", "bar").
+        aka("authentication") must throwA[FailedAuthentication].
+        await(1, timeout)
 
     } tag "not_mongo26"
 
     "be successful on existing connection with right credentials" in {
       implicit ee: EE =>
-        val db = db_
-        connection.authenticate(db.name, s"test-$id", s"password-$id").
+        connection.authenticate(dbName, s"test-$id", s"password-$id").
           aka("authentication") must beLike[SuccessfulAuthentication](
-            { case _ => ok }).await(1, timeout) and (
-              db("testcol").insert(BSONDocument("foo" -> "bar")).
-              map(_ => {}) must beEqualTo({}).await(1, timeout))
+            { case _ => ok }).await(1, timeout) and {
+              db_.flatMap {
+                _("testcol").insert(BSONDocument("foo" -> "bar"))
+              }.map(_ => {}) must beEqualTo({}).await(1, timeout * 2)
+            }
 
     } tag "not_mongo26"
 
     "be successful with right credentials" in { implicit ee: EE =>
-      val db = db_
-      val auth = Authenticate(db.name, s"test-$id", s"password-$id")
+      val auth = Authenticate(dbName, s"test-$id", s"password-$id")
       val con = driver.connection(
         List(primaryHost),
         options = conOpts,
@@ -189,15 +195,16 @@ object DriverSpec extends org.specs2.mutable.Specification {
 
       val before = System.currentTimeMillis()
 
-      (for {
-        rdb <- con.database("testcol", Common.failoverStrategy)
-        col <- rdb.coll("testcol")
-        _ <- col.insert(BSONDocument("foo" -> "bar"))
-      } yield ()) must beEqualTo({}).await(1, timeout)
+      con.database(dbName, Common.failoverStrategy).
+        aka("authed DB") must beLike[DefaultDB] {
+          case rdb => rdb.coll("testcol").flatMap(
+            _.insert(BSONDocument("foo" -> "bar"))).
+            map(_ => {}) aka "insertion" must beEqualTo({}).await(1, timeout)
+        }.await(1, timeout)
     } tag "not_mongo26"
 
     "driver shutdown" in { // mainly to ensure the test driver is closed
-      driver.close() must not(throwA[Exception])
+      driver.close(timeout) must not(throwA[Exception])
     } tag "not_mongo26"
 
     "fail on DB without authentication" in { implicit ee: EE =>
@@ -223,7 +230,7 @@ object DriverSpec extends org.specs2.mutable.Specification {
         val fos = FailoverStrategy(FiniteDuration(50, "ms"), 20, _ * 2)
 
         Common.connection.database(Common.db.name, fos).
-          map(_ => {}) must beEqualTo({}).await(1, fos.maxTimeout)
+          map(_ => {}) must beEqualTo({}).await(1, estTimeout(fos))
 
       }
 
@@ -238,7 +245,7 @@ object DriverSpec extends org.specs2.mutable.Specification {
         con.database("foo", fos).map(_ => List.empty[Int]).
           recover({ case _ => ws.result() }) must beEqualTo(expected).
           await(1, timeout * 2) and (
-            (before + fos.maxTimeout.toMillis) must beGreaterThanOrEqualTo(
+            (before + estTimeout(fos).toMillis) must beGreaterThanOrEqualTo(
               System.currentTimeMillis()))
       }
     }

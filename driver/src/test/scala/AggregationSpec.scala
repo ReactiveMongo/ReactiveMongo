@@ -3,6 +3,7 @@ import scala.collection.immutable.ListSet
 import scala.concurrent.{ ExecutionContext, Future }
 
 import reactivemongo.bson._
+import reactivemongo.api.collections.bson.BSONCollection
 
 import org.specs2.concurrent.{ ExecutionEnv => EE }
 
@@ -13,20 +14,7 @@ object AggregationSpec extends org.specs2.mutable.Specification {
 
   sequential
 
-  val coll = db("zipcodes")
-  import coll.BatchCommands.AggregationFramework
-  import AggregationFramework.{
-    Cursor,
-    First,
-    Group,
-    Last,
-    Match,
-    Project,
-    Sort,
-    Ascending,
-    Sample,
-    SumField
-  }
+  lazy val coll = db("zipcodes")
 
   case class Location(lon: Double, lat: Double)
 
@@ -59,6 +47,9 @@ object AggregationSpec extends org.specs2.mutable.Specification {
       val expected = List(document("_id" -> "JP", "totalPop" -> 13185702L),
         document("_id" -> "NY", "totalPop" -> 19746227L))
 
+      import coll.BatchCommands.AggregationFramework
+      import AggregationFramework.{ Group, Match, SumField }
+
       coll.aggregate(Group(BSONString("$state"))(
         "totalPop" -> SumField("population")), List(
         Match(document("totalPop" ->
@@ -72,30 +63,41 @@ object AggregationSpec extends org.specs2.mutable.Specification {
         document("_id" -> "FR", "avgCityPop" -> 148169D),
         document("_id" -> "JP", "avgCityPop" -> 6592851D))
 
-      val firstOp = Group(document("state" -> "$state", "city" -> "$city"))(
-        "pop" -> SumField("population"))
+      def withCtx[T](c: BSONCollection)(f: (c.BatchCommands.AggregationFramework.Group, List[c.PipelineOperator]) => T): T = {
+        import c.BatchCommands.AggregationFramework
+        import AggregationFramework.{ Cursor, Group, SumField }
 
-      val pipeline = List(
-        Group(BSONString("$_id.state"))("avgCityPop" ->
-          AggregationFramework.Avg("pop")))
+        val firstOp = Group(document("state" -> "$state", "city" -> "$city"))(
+          "pop" -> SumField("population"))
+
+        val pipeline = List(
+          Group(BSONString("$_id.state"))("avgCityPop" ->
+            AggregationFramework.Avg("pop")))
+
+        f(firstOp, pipeline)
+      }
 
       "successfully as a single batch" in { implicit ee: EE =>
-        coll.aggregate(firstOp, pipeline).map(_.firstBatch).
-          aka("results") must beEqualTo(expected).await(1, timeout)
+        withCtx(coll) { (firstOp, pipeline) =>
+          coll.aggregate(firstOp, pipeline).map(_.firstBatch).
+            aka("results") must beEqualTo(expected).await(1, timeout)
+        }
       }
 
       "with cursor" >> {
-        def collect(upTo: Int = Int.MaxValue)(implicit ec: ExecutionContext) =
-          coll.aggregate1[BSONDocument](firstOp, pipeline, Cursor(1)).
+        def collect(c: BSONCollection, upTo: Int = Int.MaxValue)(implicit ec: ExecutionContext) = withCtx(c) { (firstOp, pipeline) =>
+          c.aggregate1[BSONDocument](firstOp, pipeline,
+            c.BatchCommands.AggregationFramework.Cursor(1)).
             flatMap(_.collect[List](upTo))
+        }
 
         "without limit (maxDocs)" in { implicit ee: EE =>
-          collect() aka "cursor result" must beEqualTo(expected).
+          collect(coll) aka "cursor result" must beEqualTo(expected).
             await(1, timeout)
         }
 
         "with limit (maxDocs)" in { implicit ee: EE =>
-          collect(2) aka "cursor result" must beEqualTo(expected take 2).
+          collect(coll, 2) aka "cursor result" must beEqualTo(expected take 2).
             await(1, timeout)
         }
       }
@@ -103,6 +105,18 @@ object AggregationSpec extends org.specs2.mutable.Specification {
 
     "return largest and smallest cities by state" in { implicit ee: EE =>
       // See http://docs.mongodb.org/manual/tutorial/aggregation-zip-code-data-set/#return-largest-and-smallest-cities-by-state
+      import coll.BatchCommands.AggregationFramework
+      import AggregationFramework.{
+        First,
+        Group,
+        Last,
+        Project,
+        Sort,
+        Ascending,
+        Sample,
+        SumField
+      }
+
       val expected = List(document(
         "biggestCity" -> document(
           "name" -> "NEW YORK", "population" -> 19746227L),
@@ -146,7 +160,9 @@ object AggregationSpec extends org.specs2.mutable.Specification {
     }
 
     "return a random sample" in { implicit ee: EE =>
-      coll.aggregate(Sample(2)).map(_.head[ZipCode].
+      import coll.BatchCommands.AggregationFramework
+
+      coll.aggregate(AggregationFramework.Sample(2)).map(_.head[ZipCode].
         filter(zipCodes.contains).size) must beEqualTo(2).await(1, timeout)
     } tag "not_mongo26"
   }
