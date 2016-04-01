@@ -1,13 +1,13 @@
 import java.net.InetSocketAddress
 import java.util.concurrent.Executors
 
-import org.jboss.netty.bootstrap.{ ClientBootstrap, ServerBootstrap }
+import shaded.netty.bootstrap.{ ClientBootstrap, ServerBootstrap }
 
-import org.jboss.netty.util.Version
-import org.jboss.netty.logging.{ InternalLoggerFactory, Slf4JLoggerFactory }
-import org.jboss.netty.buffer.ChannelBuffers
+import shaded.netty.util.Version
+import shaded.netty.logging.{ InternalLoggerFactory, Slf4JLoggerFactory }
+import shaded.netty.buffer.ChannelBuffers
 
-import org.jboss.netty.channel.{
+import shaded.netty.channel.{
   Channel,
   ChannelFuture,
   ChannelFutureListener,
@@ -20,11 +20,11 @@ import org.jboss.netty.channel.{
   MessageEvent,
   SimpleChannelUpstreamHandler
 }
-import org.jboss.netty.channel.socket.nio.{
+import shaded.netty.channel.socket.nio.{
   NioClientSocketChannelFactory,
   NioServerSocketChannelFactory
 }
-import org.jboss.netty.channel.socket.ClientSocketChannelFactory
+import shaded.netty.channel.socket.ClientSocketChannelFactory
 
 import reactivemongo.util.LazyLogger
 

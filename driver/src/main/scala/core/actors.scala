@@ -21,7 +21,7 @@ import scala.concurrent.{ Future, Promise }
 import scala.util.{ Failure, Success, Try }
 
 import akka.actor.{ Actor, ActorRef }
-import org.jboss.netty.channel.group.{
+import shaded.netty.channel.group.{
   ChannelGroupFuture,
   ChannelGroupFutureListener,
   DefaultChannelGroup

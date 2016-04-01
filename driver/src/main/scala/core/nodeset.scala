@@ -5,9 +5,9 @@ import java.util.concurrent.{ Executor, Executors }
 import scala.collection.generic.CanBuildFrom
 import scala.collection.immutable.Set
 
-import org.jboss.netty.channel.socket.nio.NioClientSocketChannelFactory
-import org.jboss.netty.buffer.HeapChannelBufferFactory
-import org.jboss.netty.channel.{
+import shaded.netty.channel.socket.nio.NioClientSocketChannelFactory
+import shaded.netty.buffer.HeapChannelBufferFactory
+import shaded.netty.channel.{
   Channel,
   ChannelFuture,
   ChannelPipeline,
@@ -432,7 +432,11 @@ class RoundRobiner[A, M[T] <: Iterable[T]](val subject: M[A], startAtIndex: Int 
     new RoundRobiner(subject, startAtIndex)
 }
 
-class ChannelFactory(options: MongoConnectionOptions, bossExecutor: Executor = Executors.newCachedThreadPool, workerExecutor: Executor = Executors.newCachedThreadPool) {
+final class ChannelFactory(
+    options: MongoConnectionOptions,
+    bossExecutor: Executor = Executors.newCachedThreadPool,
+    workerExecutor: Executor = Executors.newCachedThreadPool) {
+
   import javax.net.ssl.{ KeyManager, SSLContext }
 
   private val logger = LazyLogger("reactivemongo.core.nodeset.ChannelFactory")
@@ -459,7 +463,7 @@ class ChannelFactory(options: MongoConnectionOptions, bossExecutor: Executor = E
           if (options.sslAllowsInvalidCert) Array(TrustAny) else null
 
         val ctx = SSLContext.getInstance("SSL")
-        ctx.init(null, tm, new java.security.SecureRandom())
+        ctx.init(null, tm, new java.security.SecureRandom()) // TODO: seed
         ctx
       }
 
@@ -470,7 +474,7 @@ class ChannelFactory(options: MongoConnectionOptions, bossExecutor: Executor = E
       }
 
       val sslHandler =
-        new org.jboss.netty.handler.ssl.SslHandler(sslEng, false /* TLS */ )
+        new shaded.netty.handler.ssl.SslHandler(sslEng, false /* TLS */ )
 
       pipeline.addFirst("ssl", sslHandler)
     }

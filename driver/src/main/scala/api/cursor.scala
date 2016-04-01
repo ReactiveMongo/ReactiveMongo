@@ -22,7 +22,7 @@ import scala.concurrent.{ ExecutionContext, Future }
 
 import play.api.libs.iteratee.{ Enumerator, Enumeratee, Error, Input, Iteratee }
 
-import org.jboss.netty.buffer.ChannelBuffer
+import shaded.netty.buffer.ChannelBuffer
 
 import reactivemongo.core.actors.Exceptions
 import reactivemongo.core.iteratees.{ CustomEnumeratee, CustomEnumerator }
