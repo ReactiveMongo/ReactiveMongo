@@ -24,8 +24,7 @@ import scala.concurrent.{
   Await,
   ExecutionContext,
   Future,
-  Promise,
-  blocking
+  Promise
 }
 import scala.concurrent.duration.{ Duration, FiniteDuration, SECONDS }
 
@@ -692,6 +691,9 @@ object MongoConnection {
 
             case _ => (unsupported + ("rm.failover" -> opt)) -> result
           }
+
+          case ("rm.monitorRefreshMS", IntRe(ms)) => unsupported -> result.copy(
+            monitorRefreshMS = ms.toInt)
 
           case kv => (unsupported + kv) -> result
         }

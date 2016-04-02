@@ -7,13 +7,6 @@ import reactivemongo.api.{
 }
 
 object Common {
-  val DefaultOptions = {
-    val opts = MongoConnectionOptions()
-
-    if (Option(System getProperty "test.enableSSL").exists(_ == "true")) {
-      opts.copy(sslEnabled = true, sslAllowsInvalidCert = true)
-    } else opts
-  }
   val primaryHost =
     Option(System getProperty "test.primaryHost").getOrElse("localhost:27017")
 
@@ -21,9 +14,18 @@ object Common {
     flatMap(r => scala.util.Try(r.toInt).toOption).getOrElse(7)
 
   lazy val driver = new MongoDriver
-  lazy val connection = driver.connection(List(primaryHost), DefaultOptions)
 
   val failoverStrategy = FailoverStrategy(retries = failoverRetries)
+
+  val DefaultOptions = {
+    val opts = MongoConnectionOptions(failoverStrategy = failoverStrategy)
+
+    if (Option(System getProperty "test.enableSSL").exists(_ == "true")) {
+      opts.copy(sslEnabled = true, sslAllowsInvalidCert = true)
+    } else opts
+  }
+
+  lazy val connection = driver.connection(List(primaryHost), DefaultOptions)
 
   private val timeoutFactor = 1.2D
   def estTimeout(fos: FailoverStrategy): FiniteDuration =

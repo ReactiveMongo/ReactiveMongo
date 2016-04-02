@@ -177,18 +177,18 @@ trait MongoDBSystem extends Actor {
 
   implicit val ec = context.system.dispatcher
 
-  /** The interval between executions of the [[ConnectAll]] job. */
-  protected def connectAllInterval: FiniteDuration = MongoDBSystem.DefaultConnectionRetryInterval milliseconds
+  private val connectAllJob = {
+    val interval = options.monitorRefreshMS milliseconds
 
-  /** The interval between executions of the [[RefreshAll]] job. */
-  protected def refreshAllInterval: FiniteDuration = MongoDBSystem.DefaultConnectionRetryInterval * 5 milliseconds
-
-  private val connectAllJob = context.system.scheduler.
-    schedule(connectAllInterval, connectAllInterval, self, ConnectAll)
+    context.system.scheduler.schedule(interval, interval, self, ConnectAll)
+  }
 
   // for tests only
-  private val refreshAllJob = context.system.scheduler.
-    schedule(refreshAllInterval, refreshAllInterval, self, RefreshAllNodes)
+  private val refreshAllJob = {
+    val interval = options.monitorRefreshMS milliseconds
+
+    context.system.scheduler.schedule(interval, interval, self, RefreshAllNodes)
+  }
 
   protected def sendAuthenticate(connection: Connection, authentication: Authenticate): Connection
 
@@ -895,8 +895,8 @@ final class StandardDBSystem(
     extends MongoDBSystem with MongoScramSha1Authentication
 
 object MongoDBSystem {
-  private[actors] val DefaultConnectionRetryInterval: Int = 2000 // milliseconds
-  private[actors] val logger = LazyLogger("reactivemongo.core.actors.MongoDBSystem")
+  private[actors] val logger =
+    LazyLogger("reactivemongo.core.actors.MongoDBSystem")
 }
 
 private[actors] case class AwaitingResponse(

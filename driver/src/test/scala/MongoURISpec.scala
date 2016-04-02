@@ -254,6 +254,23 @@ class MongoURISpec extends org.specs2.mutable.Specification {
         case uri => uri.ignoredOptions.headOption must beSome("rm.failover")
       }
     }
+
+    val monRefMS = "mongodb://host1?rm.monitorRefreshMS=456&rm.failover=123ms:4x5"
+
+    s"parse $monRefMS with success" in {
+      parseURI(monRefMS) must beSuccessfulTry[ParsedURI].like {
+        case uri => uri.options.monitorRefreshMS must_== 456
+      }
+    }
+
+    val invalidMonRef = "mongodb://host1?rm.monitorRefreshMS=A"
+
+    s"fail to parse $invalidMonRef" in {
+      parseURI(invalidMonRef) must beSuccessfulTry[ParsedURI].like {
+        case uri =>
+          uri.ignoredOptions.headOption must beSome("rm.monitorRefreshMS")
+      }
+    }
   }
 
   // ---
