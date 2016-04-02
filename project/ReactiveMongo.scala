@@ -206,13 +206,13 @@ object ReactiveMongoBuild extends Build {
       settings = buildSettings ++ (publishArtifact := false) ).
       settings(UnidocPlugin.unidocSettings: _*).
       settings(previousArtifacts := Set.empty).
-      aggregate(driver, bson, bsonmacros)
+      aggregate(bson, bsonmacros, shadedDeps, driver)
 
   lazy val shadedDeps = 
     Project(
       s"$projectPrefix-Shaded",
       file("shaded"),
-      settings = baseSettings).settings(
+      settings = baseSettings ++ Publish.settings).settings(
         previousArtifacts := Set.empty,
         crossPaths := false,
         autoScalaLibrary := false,
@@ -474,7 +474,7 @@ object ReactiveMongoBuild extends Build {
         type M = { def close(): Unit }
         val m: M = c.getField("MODULE$").get(null).asInstanceOf[M]
         m.close()
-      }))).dependsOn(bsonmacros)
+      }))).dependsOn(bsonmacros, shadedDeps)
 
   lazy val bson = Project(
     s"$projectPrefix-BSON",
