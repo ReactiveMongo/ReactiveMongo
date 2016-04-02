@@ -4,7 +4,7 @@ import reactivemongo.api.{
   MongoConnection,
   MongoConnectionOptions,
   ScramSha1Authentication
-}, MongoConnection.ParsedURI
+}, MongoConnection.{ ParsedURI, parseURI }
 import reactivemongo.core.nodeset.Authenticate
 import reactivemongo.api.commands.WriteConcern
 
@@ -15,7 +15,7 @@ class MongoURISpec extends org.specs2.mutable.Specification {
     val simplest = "mongodb://host1"
 
     s"parse $simplest with success" in {
-      MongoConnection.parseURI(simplest) mustEqual Success(
+      parseURI(simplest) must beSuccessfulTry(
         ParsedURI(
           hosts = List("host1" -> 27017),
           db = None,
@@ -27,7 +27,7 @@ class MongoURISpec extends org.specs2.mutable.Specification {
     val withOpts = "mongodb://host1?foo=bar"
 
     s"parse $withOpts with success" in {
-      MongoConnection.parseURI(withOpts) mustEqual Success(
+      parseURI(withOpts) must beSuccessfulTry(
         ParsedURI(
           hosts = List("host1" -> 27017),
           db = None,
@@ -38,7 +38,7 @@ class MongoURISpec extends org.specs2.mutable.Specification {
 
     val withPort = "mongodb://host1:27018"
     s"parse $withPort with success" in {
-      MongoConnection.parseURI(withPort) mustEqual Success(
+      parseURI(withPort) must beSuccessfulTry(
         ParsedURI(
           hosts = List("host1" -> 27018),
           db = None,
@@ -49,17 +49,17 @@ class MongoURISpec extends org.specs2.mutable.Specification {
 
     val withWrongPort = "mongodb://host1:68903"
     s"parse $withWrongPort with failure" in {
-      MongoConnection.parseURI(withWrongPort).isFailure must beTrue
+      parseURI(withWrongPort).isFailure must beTrue
     }
 
     val withWrongPort2 = "mongodb://host1:kqjbce"
     s"parse $withWrongPort2 with failure" in {
-      MongoConnection.parseURI(withWrongPort2).isFailure must beTrue
+      parseURI(withWrongPort2).isFailure must beTrue
     }
 
     val withDb = "mongodb://host1/somedb"
     s"parse $withDb with success" in {
-      MongoConnection.parseURI(withDb) mustEqual Success(
+      parseURI(withDb) must beSuccessfulTry(
         ParsedURI(
           hosts = List("host1" -> 27017),
           db = Some("somedb"),
@@ -70,7 +70,7 @@ class MongoURISpec extends org.specs2.mutable.Specification {
 
     val withAuth = "mongodb://user123:passwd123@host1/somedb"
     s"parse $withAuth with success" in {
-      MongoConnection.parseURI(withAuth) mustEqual Success(
+      parseURI(withAuth) must beSuccessfulTry(
         ParsedURI(
           hosts = List("host1" -> 27017),
           db = Some("somedb"),
@@ -81,13 +81,13 @@ class MongoURISpec extends org.specs2.mutable.Specification {
 
     val wrongWithAuth = "mongodb://user123:passwd123@host1"
     s"parse $wrongWithAuth with failure" in {
-      MongoConnection.parseURI(wrongWithAuth).isFailure must beTrue
+      parseURI(wrongWithAuth).isFailure must beTrue
     }
 
     val fullFeatured = "mongodb://user123:passwd123@host1:27018,host2:27019,host3:27020/somedb?foo=bar&authMode=scram-sha1"
 
     s"parse $fullFeatured with success" in {
-      MongoConnection.parseURI(fullFeatured) mustEqual Success(
+      parseURI(fullFeatured) must beSuccessfulTry(
         ParsedURI(
           hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
           db = Some("somedb"),
@@ -99,7 +99,7 @@ class MongoURISpec extends org.specs2.mutable.Specification {
     val withAuthParamAndSource = "mongodb://user123:;qGu:je/LX}nN\\8@host1:27018,host2:27019,host3:27020/somedb?foo=bar&authSource=authdb"
 
     s"parse $withAuthParamAndSource with success" in {
-      MongoConnection.parseURI(withAuthParamAndSource) mustEqual Success(
+      parseURI(withAuthParamAndSource) must beSuccessfulTry(
         ParsedURI(
           hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
           db = Some("somedb"),
@@ -112,7 +112,7 @@ class MongoURISpec extends org.specs2.mutable.Specification {
     val withWriteConcern = "mongodb://user123:passwd123@host1:27018,host2:27019,host3:27020/somedb?writeConcern=journaled"
 
     s"parse $withWriteConcern with success" in {
-      MongoConnection.parseURI(withWriteConcern) must_== Success(ParsedURI(
+      parseURI(withWriteConcern) must beSuccessfulTry(ParsedURI(
         hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
         db = Some("somedb"),
         authenticate = Some(Authenticate("somedb", "user123", "passwd123")),
@@ -125,7 +125,7 @@ class MongoURISpec extends org.specs2.mutable.Specification {
     val withWriteConcernWMaj = "mongodb://user123:passwd123@host1:27018,host2:27019,host3:27020/somedb?writeConcernW=majority"
 
     s"parse $withWriteConcernWMaj with success" in {
-      MongoConnection.parseURI(withWriteConcernWMaj) must_== Success(ParsedURI(
+      parseURI(withWriteConcernWMaj) must beSuccessfulTry(ParsedURI(
         hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
         db = Some("somedb"),
         authenticate = Some(Authenticate("somedb", "user123", "passwd123")),
@@ -138,7 +138,7 @@ class MongoURISpec extends org.specs2.mutable.Specification {
     val withWriteConcernWTag = "mongodb://user123:passwd123@host1:27018,host2:27019,host3:27020/somedb?writeConcernW=anyTag"
 
     s"parse $withWriteConcernWTag with success" in {
-      MongoConnection.parseURI(withWriteConcernWTag) must_== Success(ParsedURI(
+      parseURI(withWriteConcernWTag) must beSuccessfulTry(ParsedURI(
         hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
         db = Some("somedb"),
         authenticate = Some(Authenticate("somedb", "user123", "passwd123")),
@@ -152,7 +152,7 @@ class MongoURISpec extends org.specs2.mutable.Specification {
     val withWriteConcernWAck = "mongodb://user123:passwd123@host1:27018,host2:27019,host3:27020/somedb?writeConcernW=5"
 
     s"parse $withWriteConcernWAck with success" in {
-      MongoConnection.parseURI(withWriteConcernWAck) must_== Success(ParsedURI(
+      parseURI(withWriteConcernWAck) must beSuccessfulTry(ParsedURI(
         hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
         db = Some("somedb"),
         authenticate = Some(Authenticate("somedb", "user123", "passwd123")),
@@ -166,7 +166,7 @@ class MongoURISpec extends org.specs2.mutable.Specification {
     val withWriteConcernJournaled = "mongodb://user123:passwd123@host1:27018,host2:27019,host3:27020/somedb?writeConcernJ=true"
 
     s"parse $withWriteConcernJournaled with success" in {
-      MongoConnection.parseURI(withWriteConcernJournaled) must_== Success(
+      parseURI(withWriteConcernJournaled) must beSuccessfulTry(
         ParsedURI(
           hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
           db = Some("somedb"),
@@ -180,7 +180,7 @@ class MongoURISpec extends org.specs2.mutable.Specification {
     val withWriteConcernNJ = "mongodb://user123:passwd123@host1:27018,host2:27019,host3:27020/somedb?writeConcernJ=false&writeConcern=journaled"
 
     s"parse $withWriteConcernNJ with success" in {
-      MongoConnection.parseURI(withWriteConcernNJ) must_== Success(
+      parseURI(withWriteConcernNJ) must beSuccessfulTry(
         ParsedURI(
           hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
           db = Some("somedb"),
@@ -194,7 +194,7 @@ class MongoURISpec extends org.specs2.mutable.Specification {
     val withWriteConcernTmout = "mongodb://user123:passwd123@host1:27018,host2:27019,host3:27020/somedb?writeConcernTimeout=1543"
 
     s"parse $withWriteConcernTmout with success" in {
-      MongoConnection.parseURI(withWriteConcernTmout) must_== Success(
+      parseURI(withWriteConcernTmout) must beSuccessfulTry(
         ParsedURI(
           hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
           db = Some("somedb"),
@@ -204,5 +204,66 @@ class MongoURISpec extends org.specs2.mutable.Specification {
           ignoredOptions = Nil))
 
     }
+
+    val defaultFo = "mongodb://host1?rm.failover=default"
+
+    s"parse $defaultFo with success" in {
+      parseURI(defaultFo) must beSuccessfulTry[ParsedURI].like {
+        case uri => strategyStr(uri) must_== "100 milliseconds100 milliseconds200 milliseconds300 milliseconds500 milliseconds600 milliseconds700 milliseconds800 milliseconds1000 milliseconds"
+      }
+    }
+
+    val remoteFo = "mongodb://host1?rm.failover=remote&writeConcernJ=true"
+
+    s"parse $remoteFo with success" in {
+      parseURI(remoteFo) must beSuccessfulTry[ParsedURI].like {
+        case uri =>
+          strategyStr(uri) must_== "100 milliseconds100 milliseconds200 milliseconds300 milliseconds500 milliseconds600 milliseconds700 milliseconds800 milliseconds1000 milliseconds1100 milliseconds1200 milliseconds1300 milliseconds1500 milliseconds1600 milliseconds1700 milliseconds1800 milliseconds2000 milliseconds"
+      }
+    }
+
+    val customFo = "mongodb://host1?rm.failover=123ms:4x5&writeConcernJ=true"
+
+    s"parse $customFo with success" in {
+      parseURI(customFo) must beSuccessfulTry[ParsedURI].like {
+        case uri =>
+          strategyStr(uri) must_== "123 milliseconds615 milliseconds1230 milliseconds1845 milliseconds2460 milliseconds"
+      }
+    }
+
+    val foInvalidDelay = "mongodb://host1?rm.failover=123ko:4x5"
+
+    s"fail to parse $foInvalidDelay" in {
+      parseURI(foInvalidDelay) must beSuccessfulTry[ParsedURI].like {
+        case uri => uri.ignoredOptions.headOption must beSome("rm.failover")
+      }
+    }
+
+    val foInvalidRetry = "mongodb://host1?rm.failover=123ms:Ax5"
+
+    s"fail to parse $foInvalidRetry" in {
+      parseURI(foInvalidRetry) must beSuccessfulTry[ParsedURI].like {
+        case uri => uri.ignoredOptions.headOption must beSome("rm.failover")
+      }
+    }
+
+    val foInvalidFactor = "mongodb://host1?rm.failover=123ms:2xO"
+
+    s"fail to parse $foInvalidFactor" in {
+      parseURI(foInvalidFactor) must beSuccessfulTry[ParsedURI].like {
+        case uri => uri.ignoredOptions.headOption must beSome("rm.failover")
+      }
+    }
+  }
+
+  // ---
+
+  def strategyStr(uri: ParsedURI): String = {
+    val fos = uri.options.failoverStrategy
+
+    (1 to fos.retries).foldLeft(
+      StringBuilder.newBuilder ++= fos.initialDelay.toString) { (d, i) =>
+        d ++= (fos.initialDelay * ((fos.delayFactor(i)).toLong)).toString
+      }.result()
   }
 }

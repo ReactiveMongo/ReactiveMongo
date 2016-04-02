@@ -24,6 +24,7 @@ case object ScramSha1Authentication extends AuthenticationMode
  * @param nbChannelsPerNode Number of channels (connections) per node (ReactiveMongo-specific option).
  * @param writeConcern the default write concern
  * @param readPreference the default read preference
+ * @param failoverStrategy the default failover strategy
  */
 case class MongoConnectionOptions(
   // canonical options - connection
@@ -41,4 +42,6 @@ case class MongoConnectionOptions(
 
   // read and write preferences
   writeConcern: WriteConcern = WriteConcern.Default,
-  readPreference: ReadPreference = ReadPreference.primary)
+  readPreference: ReadPreference = ReadPreference.primary,
+
+  failoverStrategy: FailoverStrategy = FailoverStrategy.default)
