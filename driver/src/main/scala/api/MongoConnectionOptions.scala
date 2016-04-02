@@ -25,6 +25,7 @@ case object ScramSha1Authentication extends AuthenticationMode
  * @param writeConcern the default write concern
  * @param readPreference the default read preference
  * @param failoverStrategy the default failover strategy
+ * @param monitorRefreshMS the interval in milliseconds used by monitor to refresh the node set
  */
 case class MongoConnectionOptions(
   // canonical options - connection
@@ -44,4 +45,6 @@ case class MongoConnectionOptions(
   writeConcern: WriteConcern = WriteConcern.Default,
   readPreference: ReadPreference = ReadPreference.primary,
 
-  failoverStrategy: FailoverStrategy = FailoverStrategy.default)
+  failoverStrategy: FailoverStrategy = FailoverStrategy.default,
+
+  monitorRefreshMS: Int = 2000)
