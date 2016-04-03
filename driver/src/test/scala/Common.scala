@@ -49,7 +49,7 @@ object Common {
     Await.result(_db.flatMap { d => d.drop.map(_ => d) }, timeout)
   }
 
-  val tcpProxy: Option[NettyProxy] =
+  val slowProxy: Option[NettyProxy] =
     Option(System getProperty "test.primaryBackend").flatMap { backend =>
       import java.net.InetSocketAddress
 
@@ -99,6 +99,6 @@ object Common {
 
   def close(): Unit = {
     driver.close()
-    tcpProxy.foreach(_.stop())
+    slowProxy.foreach(_.stop())
   }
 }

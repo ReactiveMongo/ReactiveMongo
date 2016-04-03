@@ -640,6 +640,7 @@ object MongoConnection {
           case ("authMode", _)             => unsupported -> result.copy(authMode = CrAuthentication)
 
           case ("connectTimeoutMS", v)     => unsupported -> result.copy(connectTimeoutMS = v.toInt)
+          case ("socketTimeoutMS", v)      => unsupported -> result.copy(socketTimeoutMS = v.toInt)
           case ("sslEnabled", v)           => unsupported -> result.copy(sslEnabled = v.toBoolean)
           case ("sslAllowsInvalidCert", v) => unsupported -> result.copy(sslAllowsInvalidCert = v.toBoolean)
 
@@ -692,8 +693,13 @@ object MongoConnection {
             case _ => (unsupported + ("rm.failover" -> opt)) -> result
           }
 
-          case ("rm.monitorRefreshMS", IntRe(ms)) => unsupported -> result.copy(
-            monitorRefreshMS = ms.toInt)
+          case ("rm.monitorRefreshMS", opt @ IntRe(ms)) =>
+            Try(ms.toInt).filter(_ >= 100 /* ms */ ).toOption match {
+              case Some(interval) => unsupported -> result.copy(
+                monitorRefreshMS = interval)
+
+              case _ => (unsupported + ("rm.monitorRefreshMS" -> opt)) -> result
+            }
 
           case kv => (unsupported + kv) -> result
         }
