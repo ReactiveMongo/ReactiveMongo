@@ -178,7 +178,10 @@ trait MongoDBSystem extends Actor {
   implicit val ec = context.system.dispatcher
 
   private val connectAllJob = {
-    val interval = options.monitorRefreshMS milliseconds
+    val ms = options.monitorRefreshMS / 5
+    val interval =
+      if (ms < 100) 100 milliseconds
+      else options.monitorRefreshMS milliseconds
 
     context.system.scheduler.schedule(interval, interval, self, ConnectAll)
   }

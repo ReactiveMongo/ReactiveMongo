@@ -692,8 +692,13 @@ object MongoConnection {
             case _ => (unsupported + ("rm.failover" -> opt)) -> result
           }
 
-          case ("rm.monitorRefreshMS", IntRe(ms)) => unsupported -> result.copy(
-            monitorRefreshMS = ms.toInt)
+          case ("rm.monitorRefreshMS", opt @ IntRe(ms)) =>
+            Try(ms.toInt).filter(_ >= 100 /* ms */ ).toOption match {
+              case Some(interval) => unsupported -> result.copy(
+                monitorRefreshMS = interval)
+
+              case _ => (unsupported + ("rm.monitorRefreshMS" -> opt)) -> result
+            }
 
           case kv => (unsupported + kv) -> result
         }
