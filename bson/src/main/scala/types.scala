@@ -56,8 +56,8 @@ case class BSONDocument(stream: Stream[Try[BSONElement]]) extends BSONValue {
    */
   def getTry(key: String): Try[BSONValue] = {
     stream.collectFirst {
-      case Success(element) if element._1 == key => Success(element._2)
-      case Failure(e)                            => Failure(e)
+      case Success((k, cause)) if k == key => Success(cause)
+      case Failure(e)                      => Failure(e)
     }.getOrElse(Failure(DocumentKeyNotFound(key)))
   }
 
@@ -68,7 +68,7 @@ case class BSONDocument(stream: Stream[Try[BSONElement]]) extends BSONValue {
    * If the matching value could not be deserialized, returns a `Failure`.
    */
   def getUnflattenedTry(key: String): Try[Option[BSONValue]] = getTry(key) match {
-    case Failure(e: DocumentKeyNotFound) => Success(None)
+    case Failure(DocumentKeyNotFound(_)) => Success(None)
     case Failure(e)                      => Failure(e)
     case Success(e)                      => Success(Some(e))
   }
@@ -77,13 +77,13 @@ case class BSONDocument(stream: Stream[Try[BSONElement]]) extends BSONValue {
    * Returns the [[BSONValue]] associated with the given `key`, and converts it with the given implicit [[BSONReader]].
    *
    * If there is no matching value, or the value could not be deserialized or converted, returns a `None`.
+   *
+   * @note When implementing a [[http://reactivemongo.org/releases/latest/documentation/bson/typeclasses.html custom reader]], [[getAsTry]] must be preferred.
    */
-  def getAs[T](s: String)(implicit reader: BSONReader[_ <: BSONValue, T]): Option[T] = {
-    get(s).flatMap { element =>
-      reader match {
-        case r: BSONReader[BSONValue, T] @unchecked => r.readOpt(element)
-        case _                                      => None
-      }
+  def getAs[T](s: String)(implicit reader: BSONReader[_ <: BSONValue, T]): Option[T] = get(s).flatMap { element =>
+    reader match {
+      case r: BSONReader[BSONValue, T] @unchecked => r.readOpt(element)
+      case _                                      => None
     }
   }
 
@@ -438,7 +438,7 @@ object BSONObjectID {
    * The returned BSONObjectID contains a timestamp set to the current time (in seconds),
    * with the `machine identifier`, `thread identifier` and `increment` properly set.
    */
-  def generate: BSONObjectID = fromTime(System.currentTimeMillis, false)
+  def generate(): BSONObjectID = fromTime(System.currentTimeMillis, false)
 
   /**
    * Generates a new BSON ObjectID from the given timestamp in milliseconds.

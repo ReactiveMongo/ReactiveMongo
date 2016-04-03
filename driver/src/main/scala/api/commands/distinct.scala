@@ -2,6 +2,12 @@ package reactivemongo.api.commands
 
 import scala.util.{ Failure, Success, Try }
 
+import scala.collection.Set
+import scala.collection.immutable.Seq
+import scala.collection.generic.CanBuildFrom
+import scala.collection.mutable.Builder
+
+import reactivemongo.core.protocol.MongoWireVersion
 import reactivemongo.api.{ ReadConcern, SerializationPack }
 
 /** The [[https://docs.mongodb.org/manual/reference/command/distinct/ distinct]] command. */
@@ -14,19 +20,24 @@ trait DistinctCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] 
   case class Distinct(
     keyString: String,
     query: Option[pack.Document],
-    readConcern: ReadConcern = ReadConcern.Local) extends CollectionCommand
+    readConcern: ReadConcern = ReadConcern.Local,
+    version: MongoWireVersion = MongoWireVersion.V30) extends CollectionCommand
       with CommandWithPack[pack.type] with CommandWithResult[DistinctResult]
 
-  case class DistinctResult(values: List[pack.Value]) {
+  /**
+   * @param values the raw values (should not contain duplicate)
+   */
+  case class DistinctResult(values: Traversable[pack.Value]) {
     @annotation.tailrec
-    private def result[T](list: List[Try[T]], out: List[T]): Try[List[T]] =
-      list match {
-        case Failure(e) :: _  => Failure(e)
-        case Success(v) :: vs => result(vs, v :: out)
-        case _                => Success(out.reverse)
+    private def result[T, M[_]](values: Traversable[pack.Value], reader: pack.WidenValueReader[T], out: Builder[T, M[T]]): Try[M[T]] =
+      values.headOption match {
+        case Some(t) => pack.readValue(t, reader) match {
+          case Failure(e) => Failure(e)
+          case Success(v) => result(values.tail, reader, out += v)
+        }
+        case _ => Success(out.result())
       }
 
-    def result[T](implicit reader: pack.WidenValueReader[T]): Try[List[T]] =
-      result(values.map(v => pack.readValue(v, reader)), Nil)
+    def result[T, M[_] <: Iterable[_]](implicit reader: pack.WidenValueReader[T], cbf: CanBuildFrom[M[_], T, M[T]]): Try[M[T]] = result(values, reader, cbf())
   }
 }

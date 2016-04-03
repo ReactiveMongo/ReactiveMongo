@@ -17,8 +17,11 @@ package reactivemongo.core.actors
 
 import java.net.InetSocketAddress
 
+import scala.concurrent.{ Future, Promise }
+import scala.util.{ Failure, Success, Try }
+
 import akka.actor.{ Actor, ActorRef }
-import org.jboss.netty.channel.group.{
+import shaded.netty.channel.group.{
   ChannelGroupFuture,
   ChannelGroupFutureListener,
   DefaultChannelGroup
@@ -40,8 +43,6 @@ import reactivemongo.core.commands.{
   CommandError,
   SuccessfulAuthentication
 }
-import scala.concurrent.{ Future, Promise }
-import scala.util.{ Failure, Success, Try }
 import reactivemongo.core.nodeset.{
   Authenticate,
   Authenticated,
@@ -84,10 +85,12 @@ object ExpectingResponse {
 /**
  * A request expecting a response.
  *
- * @param requestMaker The request maker.
+ * @param requestMaker the request maker
+ * @param isMongo26WriteOp true if the operation is a MongoDB 2.6 write one
  */
 case class RequestMakerExpectingResponse(
-  requestMaker: RequestMaker, isMongo26WriteOp: Boolean) extends ExpectingResponse
+  requestMaker: RequestMaker,
+  isMongo26WriteOp: Boolean) extends ExpectingResponse
 
 /**
  * A checked write request expecting a response.
@@ -174,16 +177,21 @@ trait MongoDBSystem extends Actor {
 
   implicit val ec = context.system.dispatcher
 
-  private val connectAllJob = context.system.scheduler.schedule(MongoDBSystem.DefaultConnectionRetryInterval milliseconds,
-    MongoDBSystem.DefaultConnectionRetryInterval milliseconds,
-    self,
-    ConnectAll)
+  private val connectAllJob = {
+    val ms = options.monitorRefreshMS / 5
+    val interval =
+      if (ms < 100) 100 milliseconds
+      else options.monitorRefreshMS milliseconds
+
+    context.system.scheduler.schedule(interval, interval, self, ConnectAll)
+  }
 
   // for tests only
-  private val refreshAllJob = context.system.scheduler.schedule(MongoDBSystem.DefaultConnectionRetryInterval * 5 milliseconds,
-    MongoDBSystem.DefaultConnectionRetryInterval * 5 milliseconds,
-    self,
-    RefreshAllNodes)
+  private val refreshAllJob = {
+    val interval = options.monitorRefreshMS milliseconds
+
+    context.system.scheduler.schedule(interval, interval, self, RefreshAllNodes)
+  }
 
   protected def sendAuthenticate(connection: Connection, authentication: Authenticate): Connection
 
@@ -234,7 +242,7 @@ trait MongoDBSystem extends Actor {
 
     if (remainingConnections == 0) {
       monitors.foreach(_ ! Closed)
-      logger.info(s"MongoDBSystem $self is stopping.")
+      logger.info(s"$self is stopping")
       context.stop(self)
     }
   }
@@ -259,7 +267,7 @@ trait MongoDBSystem extends Actor {
     case RegisterMonitor => monitors += sender
 
     case req @ ExpectingResponse(promise) => {
-      logger.debug(s"Received an expecting response request during closing process: $req, completing its promise with a failure")
+      logger.trace(s"Received an expecting response request during closing process: $req, completing its promise with a failure")
       promise.failure(Exceptions.ClosedException)
     }
 
@@ -312,7 +320,13 @@ trait MongoDBSystem extends Actor {
         val monitorActors = monitors
         def operationComplete(future: ChannelGroupFuture): Unit = {
           logger.debug("Netty says all channels are closed.")
-          factory.channelFactory.releaseExternalResources
+
+          try {
+            factory.channelFactory.releaseExternalResources
+          } catch {
+            case err: Throwable =>
+              logger.debug("fails to release channel resources", err)
+          }
         }
       }
       allChannelGroup(nodeSet).close.addListener(listener)
@@ -320,7 +334,9 @@ trait MongoDBSystem extends Actor {
       // fail all requests waiting for a response
       awaitingResponses.foreach { pair =>
         val promise = pair._2.promise
-        if (!promise.isCompleted) promise.failure(Exceptions.ClosedException)
+        if (!promise.isCompleted) {
+          promise.failure(Exceptions.ClosedException)
+        }
       }
       awaitingResponses.empty
 
@@ -342,21 +358,24 @@ trait MongoDBSystem extends Actor {
     case req @ RequestMakerExpectingResponse(maker, _) => {
       val reqId = RequestId.common.next
 
-      logger.debug(s"received a request expecting a response ($reqId): $req")
+      logger.trace(s"Received a request expecting a response ($reqId): $req")
 
       val request = maker(reqId)
 
       pickChannel(request) match {
         case Failure(error) => {
-          logger.debug(s"NO CHANNEL, error with promise ${req.promise}")
+          logger.trace(s"No channel, error with promise ${req.promise}")
           req.promise.failure(error)
         }
 
         case Success((node, connection)) => {
-          logger.debug(s"Sending request expecting response $request by connection $connection of node ${node.name}")
+          logger.trace(s"Sending request ($reqId) expecting response by connection $connection of node ${node.name}: $request")
 
           if (request.op.expectsResponse) {
-            awaitingResponses += request.requestID -> AwaitingResponse(reqId, connection.channel.getId(), req.promise, isGetLastError = false, isMongo26WriteOp = req.isMongo26WriteOp)
+            awaitingResponses += request.requestID -> AwaitingResponse(
+              reqId, connection.channel.getId, req.promise,
+              isGetLastError = false,
+              isMongo26WriteOp = req.isMongo26WriteOp)
 
             logger.trace(s"registering awaiting response for requestID $reqId, awaitingResponses: $awaitingResponses")
           } else logger.trace(s"NOT registering awaiting response for requestID $reqId")
@@ -367,7 +386,7 @@ trait MongoDBSystem extends Actor {
     }
 
     case req @ CheckedWriteRequestExpectingResponse(_) => {
-      logger.debug("received a checked write request")
+      logger.trace("Received a checked write request")
 
       val checkedWriteRequest = req.checkedWriteRequest
       val requestId = RequestId.common.next
@@ -380,10 +399,10 @@ trait MongoDBSystem extends Actor {
         case Failure(error) => req.promise.failure(error)
 
         case Success((node, connection)) => {
-          logger.debug(s"Sending request expecting response $request by connection $connection of node ${node.name}")
+          logger.trace(s"Sending request expecting response $request by connection $connection of node ${node.name}")
 
           awaitingResponses += requestId -> AwaitingResponse(requestId, connection.channel.getId(), req.promise, isGetLastError = true, isMongo26WriteOp = false)
-          logger.trace(s"registering writeConcern-awaiting response for requestID $requestId, awaitingResponses: $awaitingResponses")
+          logger.trace(s"registering awaiting response for requestID $requestId, awaitingResponses: $awaitingResponses")
           connection.send(request, writeConcern)
         }
       }
@@ -447,12 +466,12 @@ trait MongoDBSystem extends Actor {
 
       if (!nodeSet.isReachable) {
         if (nodeSetWasReachable) {
-          logger.error("The entire node set is unreachable, is there a network problem?")
+          logger.warn("The entire node set is unreachable, is there a network problem?")
           broadcastMonitors(SetUnavailable)
         } else logger.debug("The entire node set is still unreachable, is there a network problem?")
       } else if (!nodeSet.primary.isDefined) {
         if (primaryWasAvailable) {
-          logger.error("The primary is unavailable, is there a network problem?")
+          logger.warn("The primary is unavailable, is there a network problem?")
           broadcastMonitors(PrimaryUnavailable)
         } else logger.debug(
           "The primary is still unavailable, is there a network problem?")
@@ -465,16 +484,19 @@ trait MongoDBSystem extends Actor {
       RequestId.isMaster accepts response) => {
 
       val nodeSetWasReachable = nodeSet.isReachable
-      val primaryWasAvailable = nodeSet.primary.isDefined
+      val wasPrimary = nodeSet.primary.toSeq.flatMap(_.names)
 
       import reactivemongo.api.BSONSerializationPack
       import reactivemongo.api.commands.bson.BSONIsMasterCommandImplicits
       import reactivemongo.api.commands.Command
 
+      @volatile var chanNode = Option.empty[Node]
       val isMaster = Command.deserialize(BSONSerializationPack, response)(
         BSONIsMasterCommandImplicits.IsMasterResultReader)
 
       val ns = nodeSet.updateNodeByChannelId(response.info.channelId) { node =>
+        chanNode = Some(node)
+
         val pingInfo =
           if (node.pingInfo.lastIsMasterId == response.header.responseTo) {
             node.pingInfo.copy(ping =
@@ -484,14 +506,21 @@ trait MongoDBSystem extends Actor {
           } else node.pingInfo
 
         val authenticating =
-          if (!isMaster.status.queryable) node
+          if (!isMaster.status.queryable || nodeSet.authenticates.isEmpty) node
           else authenticateNode(node, nodeSet.authenticates.toSeq)
+
+        val meta = ProtocolMetadata(
+          MongoWireVersion(isMaster.minWireVersion),
+          MongoWireVersion(isMaster.maxWireVersion),
+          isMaster.maxBsonObjectSize,
+          isMaster.maxMessageSizeBytes,
+          isMaster.maxWriteBatchSize)
 
         val an = authenticating.copy(
           status = isMaster.status,
           pingInfo = pingInfo,
           tags = isMaster.replicaSet.flatMap(_.tags),
-          protocolMetadata = ProtocolMetadata(MongoWireVersion(isMaster.minWireVersion), MongoWireVersion(isMaster.maxWireVersion), isMaster.maxBsonObjectSize, isMaster.maxMessageSizeBytes, isMaster.maxWriteBatchSize),
+          protocolMetadata = meta,
           isMongos = isMaster.isMongos)
 
         isMaster.replicaSet.fold(an)(rs => an.withAlias(rs.me))
@@ -512,17 +541,19 @@ trait MongoDBSystem extends Actor {
         }
       }
 
-      if (!nodeSet.authenticates.isEmpty) {
-        logger.debug("The node set is available; Waiting authentication")
-      } else {
-        if (!nodeSetWasReachable && nodeSet.isReachable) {
-          broadcastMonitors(SetAvailable(nodeSet.protocolMetadata))
-          logger.info("The node set is now available")
-        }
+      chanNode.foreach { node =>
+        if (!nodeSet.authenticates.isEmpty && node.authenticated.isEmpty) {
+          logger.debug(s"The node set is available (${node.names}); Waiting authentication: ${node.authenticated}")
+        } else {
+          if (!nodeSetWasReachable && nodeSet.isReachable) {
+            broadcastMonitors(SetAvailable(nodeSet.protocolMetadata))
+            logger.info("The node set is now available")
+          }
 
-        if (!primaryWasAvailable && nodeSet.primary.isDefined) {
-          broadcastMonitors(PrimaryAvailable(nodeSet.protocolMetadata))
-          logger.info("The primary is now available")
+          if (nodeSet.primary.exists(n => !wasPrimary.contains(n.name))) {
+            broadcastMonitors(PrimaryAvailable(nodeSet.protocolMetadata))
+            logger.info(s"The primary is now available: ${node.names}")
+          }
         }
       }
     }
@@ -543,15 +574,17 @@ trait MongoDBSystem extends Actor {
     case response: Response if RequestId.common accepts response => {
       awaitingResponses.get(response.header.responseTo) match {
         case Some(AwaitingResponse(_, _, promise, isGetLastError, isMongo26WriteOp)) => {
-          logger.debug(s"Got a response from ${response.info.channelId}! Will give back message=$response to promise $promise")
+          logger.trace(s"Got a response from ${response.info.channelId} to ${response.header.responseTo}! Will give back message=$response to promise ${System.identityHashCode(promise)}")
           awaitingResponses -= response.header.responseTo
 
           if (response.error.isDefined) {
             logger.debug(s"{${response.header.responseTo}} sending a failure... (${response.error.get})")
+
             if (response.error.get.isNotAPrimaryError) onPrimaryUnavailable()
             promise.failure(response.error.get)
           } else if (isGetLastError) {
             logger.debug(s"{${response.header.responseTo}} it's a getlasterror")
+
             // todo, for now rewinding buffer at original index
             import reactivemongo.api.commands.bson.BSONGetLastErrorImplicits.LastErrorReader
             lastError(response).fold(e => {
@@ -572,7 +605,8 @@ trait MongoDBSystem extends Actor {
           } else if (isMongo26WriteOp) {
             // TODO - logs, bson
             // MongoDB 26 Write Protocol errors
-            logger.trace("received a response to a MongoDB2.6 Write Op")
+            logger.trace("Received a response to a MongoDB2.6 Write Op")
+
             import reactivemongo.bson.lowlevel._
             import reactivemongo.core.netty.ChannelBufferReadableBuffer
             val reader = new LowLevelBsonDocReader(new ChannelBufferReadableBuffer(response.documents))
@@ -618,13 +652,13 @@ trait MongoDBSystem extends Actor {
     }
 
     case request @ AuthRequest(authenticate, _) => {
-      logger.info(s"AUTH: new request $authenticate")
+      logger.info(s"New authenticate request $authenticate")
       AuthRequestsManager.addAuthRequest(request)
       updateNodeSet(authenticateNodeSet(nodeSet.
         copy(authenticates = nodeSet.authenticates + authenticate)))
     }
 
-    case a => logger.error(s"not supported $a")
+    case a => logger.error(s"not supported: $a")
   }
 
   override lazy val receive: Receive =
@@ -632,7 +666,9 @@ trait MongoDBSystem extends Actor {
 
   // monitor -->
   private var nodeSet: NodeSet = NodeSet(None, None, seeds.map(seed => Node(seed, NodeStatus.Unknown, Vector.empty, Set.empty, None, ProtocolMetadata.Default).createNeededChannels(self, 1)).toVector, initialAuthenticates.toSet)
+
   connectAll(nodeSet)
+  self ! RefreshAllNodes
   // <-- monitor
 
   def onPrimaryUnavailable() {
@@ -668,7 +704,7 @@ trait MongoDBSystem extends Actor {
       response.info.channelId).flatMap(_._2.authenticating)
 
     updateNodeSet(auth match {
-      case Some(Authenticating(db, user, pass)) => {
+      case Some(a @ Authenticating(db, user, pass)) => {
         val originalAuthenticate = Authenticate(db, user, pass)
         val authenticated = check(response) match {
           case Right(successfulAuthentication) => {
@@ -677,12 +713,12 @@ trait MongoDBSystem extends Actor {
 
             if (nodeSet.isReachable) {
               broadcastMonitors(SetAvailable(nodeSet.protocolMetadata))
-              logger.info("The node set is now authenticated")
+              logger.debug("The node set is now authenticated")
             }
 
             if (nodeSet.primary.isDefined) {
               broadcastMonitors(PrimaryAvailable(nodeSet.protocolMetadata))
-              logger.info("The primary is now authenticated")
+              logger.debug("The primary is now authenticated")
             }
 
             Some(Authenticated(db, user))
@@ -698,7 +734,9 @@ trait MongoDBSystem extends Actor {
           response.info.channelId, originalAuthenticate, authenticated)
       }
 
-      case _ => nodeSet
+      case res =>
+        logger.warn(s"Authentication result: $res")
+        nodeSet
     })
   }
 
@@ -833,6 +871,9 @@ trait MongoDBSystem extends Actor {
 
     def handleAuthResult(authenticate: Authenticate, result: Throwable): Map[Authenticate, List[Promise[SuccessfulAuthentication]]] = {
       val found = authRequests.get(authenticate)
+
+      logger.error(s"authentication failure", result)
+
       if (found.isDefined) {
         found.get.foreach { _.failure(result) }
         authRequests = authRequests - authenticate
@@ -857,8 +898,8 @@ final class StandardDBSystem(
     extends MongoDBSystem with MongoScramSha1Authentication
 
 object MongoDBSystem {
-  private[actors] val DefaultConnectionRetryInterval: Int = 2000 // milliseconds
-  private[actors] val logger = LazyLogger("reactivemongo.core.actors.MongoDBSystem")
+  private[actors] val logger =
+    LazyLogger("reactivemongo.core.actors.MongoDBSystem")
 }
 
 private[actors] case class AwaitingResponse(
@@ -874,27 +915,6 @@ private[actors] case class AwaitingResponse(
 @deprecated(message = "Wil be removed", since = "0.11.10")
 case object WaitForPrimary
 
-// exceptions
-object Exceptions {
-  /** An exception thrown when a request needs a non available primary. */
-  object PrimaryUnavailableException extends DriverException {
-    val message = "No primary node is available!"
-  }
-
-  /** An exception thrown when the entire node set is unavailable. The application may not have access to the network anymore. */
-  object NodeSetNotReachable extends DriverException {
-    val message = "The node set can not be reached! Please check your network connectivity."
-  }
-
-  object ChannelNotFound extends DriverException {
-    val message = "ChannelNotFound"
-  }
-
-  object ClosedException extends DriverException {
-    val message = "This MongoConnection is closed"
-  }
-}
-
 private[actors] object RequestId {
   // all requestIds [0, 1000[ are for isMaster messages
   val isMaster = RequestIdGenerator(0, 999)
@@ -909,12 +929,35 @@ private[actors] object RequestId {
   val common = RequestIdGenerator(3000, Int.MaxValue - 1)
 }
 
-private[actors] case class RequestIdGenerator(
-    lower: Int,
-    upper: Int) {
+/**
+ * @param lower the lower bound
+ * @param upper the upper bound
+ */
+private[actors] case class RequestIdGenerator(lower: Int, upper: Int) {
   private val iterator = Iterator.iterate(lower)(i => if (i == upper) lower else i + 1)
 
   def next = iterator.next
   def accepts(id: Int): Boolean = id >= lower && id <= upper
   def accepts(response: Response): Boolean = accepts(response.header.responseTo)
+}
+
+// exceptions
+object Exceptions {
+  /** An exception thrown when a request needs a non available primary. */
+  case object PrimaryUnavailableException extends DriverException {
+    val message = "No primary node is available!"
+  }
+
+  /** An exception thrown when the entire node set is unavailable. The application may not have access to the network anymore. */
+  case object NodeSetNotReachable extends DriverException {
+    val message = "The node set can not be reached! Please check your network connectivity."
+  }
+
+  object ChannelNotFound extends DriverException {
+    val message = "ChannelNotFound"
+  }
+
+  object ClosedException extends DriverException {
+    val message = "This MongoConnection is closed"
+  }
 }

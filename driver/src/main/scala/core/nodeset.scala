@@ -1,18 +1,20 @@
 package reactivemongo.core.nodeset
 
-import java.util.concurrent.{ Executor, Executors }
+import java.util.concurrent.{ TimeUnit, Executor, Executors }
 
 import scala.collection.generic.CanBuildFrom
 import scala.collection.immutable.Set
 
-import org.jboss.netty.channel.socket.nio.NioClientSocketChannelFactory
-import org.jboss.netty.buffer.HeapChannelBufferFactory
-import org.jboss.netty.channel.{
+import shaded.netty.util.HashedWheelTimer
+import shaded.netty.buffer.HeapChannelBufferFactory
+import shaded.netty.channel.socket.nio.NioClientSocketChannelFactory
+import shaded.netty.channel.{
   Channel,
   ChannelFuture,
   ChannelPipeline,
   Channels
 }
+import shaded.netty.handler.timeout.IdleStateHandler
 
 import akka.actor.ActorRef
 
@@ -67,8 +69,11 @@ case class NodeSet(
     nodes: Vector[Node],
     authenticates: Set[Authenticate]) {
 
-  val mongos: Option[Node] = nodes.find(_.isMongos)
+  /** The node which is the current primary one. */
   val primary: Option[Node] = nodes.find(_.status == NodeStatus.Primary)
+
+  val mongos: Option[Node] = nodes.find(_.isMongos)
+
   val secondaries = new RoundRobiner(nodes.filter(_.status == NodeStatus.Secondary))
   val queryable = secondaries.subject ++ primary
   val nearestGroup = new RoundRobiner(queryable.sortWith { _.pingInfo.ping < _.pingInfo.ping })
@@ -349,7 +354,7 @@ sealed trait Authenticating extends Authentication {
 }
 
 object Authenticating {
-  @deprecated(message = "Use [[CrAuthenticating.apply]]", since = "0.11.10")
+  @deprecated(message = "Use [[reactivemongo.core.nodeset.CrAuthenticating]]", since = "0.11.10")
   def apply(db: String, user: String, password: String, nonce: Option[String]): Authenticating = CrAuthenticating(db, user, password, nonce)
 
   def unapply(auth: Authenticating): Option[(String, String, String)] =
@@ -429,10 +434,15 @@ class RoundRobiner[A, M[T] <: Iterable[T]](val subject: M[A], startAtIndex: Int 
     new RoundRobiner(subject, startAtIndex)
 }
 
-class ChannelFactory(options: MongoConnectionOptions, bossExecutor: Executor = Executors.newCachedThreadPool, workerExecutor: Executor = Executors.newCachedThreadPool) {
+final class ChannelFactory(
+    options: MongoConnectionOptions,
+    bossExecutor: Executor = Executors.newCachedThreadPool,
+    workerExecutor: Executor = Executors.newCachedThreadPool) {
+
   import javax.net.ssl.{ KeyManager, SSLContext }
 
   private val logger = LazyLogger("reactivemongo.core.nodeset.ChannelFactory")
+  private val timer = new HashedWheelTimer()
 
   def create(host: String = "localhost", port: Int = 27017, receiver: ActorRef): Channel = {
     val channel = makeChannel(receiver)
@@ -446,8 +456,10 @@ class ChannelFactory(options: MongoConnectionOptions, bossExecutor: Executor = E
   private val bufferFactory = new HeapChannelBufferFactory(
     java.nio.ByteOrder.LITTLE_ENDIAN)
 
-  private def makePipeline(receiver: ActorRef): ChannelPipeline = {
-    val pipeline = Channels.pipeline(new ResponseFrameDecoder(),
+  private def makePipeline(timeoutMS: Int, receiver: ActorRef): ChannelPipeline = {
+    val idleHandler = new IdleStateHandler(timer, timeoutMS, timeoutMS, 0, TimeUnit.MILLISECONDS)
+
+    val pipeline = Channels.pipeline(idleHandler, new ResponseFrameDecoder(),
       new ResponseDecoder(), new RequestEncoder(), new MongoHandler(receiver))
 
     if (options.sslEnabled) {
@@ -456,7 +468,7 @@ class ChannelFactory(options: MongoConnectionOptions, bossExecutor: Executor = E
           if (options.sslAllowsInvalidCert) Array(TrustAny) else null
 
         val ctx = SSLContext.getInstance("SSL")
-        ctx.init(null, tm, new java.security.SecureRandom())
+        ctx.init(null, tm, new java.security.SecureRandom()) // TODO: seed
         ctx
       }
 
@@ -467,7 +479,7 @@ class ChannelFactory(options: MongoConnectionOptions, bossExecutor: Executor = E
       }
 
       val sslHandler =
-        new org.jboss.netty.handler.ssl.SslHandler(sslEng, false /* TLS */ )
+        new shaded.netty.handler.ssl.SslHandler(sslEng, false /* TLS */ )
 
       pipeline.addFirst("ssl", sslHandler)
     }
@@ -476,7 +488,7 @@ class ChannelFactory(options: MongoConnectionOptions, bossExecutor: Executor = E
   }
 
   private def makeChannel(receiver: ActorRef): Channel = {
-    val channel = channelFactory.newChannel(makePipeline(receiver))
+    val channel = channelFactory.newChannel(makePipeline(options.socketTimeoutMS, receiver))
     val config = channel.getConfig
 
     config.setTcpNoDelay(options.tcpNoDelay)

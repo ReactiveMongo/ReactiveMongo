@@ -41,6 +41,15 @@ trait BSONReader[B <: BSONValue, T] { self =>
   /** Tries to produce an instance of `T` from the `bson` value. */
   def readTry(bson: B): Try[T] = Try(read(bson))
 
+  /**
+   * Returns a BSON reader that returns the result of applying `f`
+   * on the result of this reader.
+   *
+   * @param f the function to apply
+   */
+  final def afterRead[U](f: T => U): BSONReader[B, U] =
+    BSONReader[B, U]((read _) andThen f)
+
   private[reactivemongo] def widenReader[U >: T]: UnsafeBSONReader[U] =
     new UnsafeBSONReader[U] {
       def readTry(value: BSONValue): Try[U] =
@@ -51,6 +60,16 @@ trait BSONReader[B <: BSONValue, T] { self =>
           case Success(bson) => self.readTry(bson)
         }
     }
+}
+
+object BSONReader {
+  private class Default[B <: BSONValue, T](
+      _read: B => T) extends BSONReader[B, T] {
+    def read(bson: B): T = _read(bson)
+  }
+
+  def apply[B <: BSONValue, T](read: B => T): BSONReader[B, T] =
+    new Default[B, T](read)
 }
 
 /**
@@ -70,6 +89,28 @@ trait BSONWriter[T, B <: BSONValue] {
 
   /** Tries to produce a BSON value from an instance of `T`. */
   def writeTry(t: T): Try[B] = Try(write(t))
+
+  /**
+   * Returns a BSON writer that returns the result of applying `f`
+   * on the BSON value from this writer.
+   *
+   * @param f the function to apply
+   */
+  final def afterWrite[U <: BSONValue](f: B => U): BSONWriter[T, U] =
+    BSONWriter[T, U]((write _) andThen f)
+
+  final def beforeWrite[U](f: U => T): BSONWriter[U, B] =
+    BSONWriter[U, B](f andThen (write _))
+}
+
+object BSONWriter {
+  private class Default[T, B <: BSONValue](
+      _write: T => B) extends BSONWriter[T, B] {
+    def write(value: T): B = _write(value)
+  }
+
+  def apply[T, B <: BSONValue](write: T => B): BSONWriter[T, B] =
+    new Default[T, B](write)
 }
 
 /**

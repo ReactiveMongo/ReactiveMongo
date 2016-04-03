@@ -8,12 +8,14 @@ import reactivemongo.api.commands.bson._
 import BSONFindAndModifyCommand._
 import BSONFindAndModifyImplicits._
 
+import org.specs2.concurrent.{ ExecutionEnv => EE }
+
 object FindAndModifySpec extends Specification {
   import Common._
 
   sequential
 
-  val collection = db("FindAndModifySpec")
+  lazy val collection = db("FindAndModifySpec")
 
   case class Person(
     firstName: String,
@@ -35,7 +37,7 @@ object FindAndModifySpec extends Specification {
   }
 
   "FindAndModify" should {
-    "upsert a doc and fetch it" in {
+    "upsert a doc and fetch it" in { implicit ee: EE =>
       val jack = Person("Jack", "London", 27)
       val upsertOp = Update(BSONDocument("$set" -> BSONDocument("age" -> 40)), fetchNewObject = true, upsert = true)
       def future = collection.runCommand(FindAndModify(jack, upsertOp))
@@ -46,10 +48,10 @@ object FindAndModifySpec extends Specification {
             result.result[Person] aka "upserted" must beSome[Person].like {
               case Person("Jack", "London", 40) => ok
             })
-      }).await(timeoutMillis)
+      }).await(1, timeout)
     }
 
-    "modify a doc and fetch its previous value" in {
+    "modify a doc and fetch its previous value" in { implicit ee: EE =>
       val jack = Person("Jack", "London", 40)
       val incrementAge = Update(BSONDocument(
         "$inc" -> BSONDocument("age" -> 1)))
@@ -62,12 +64,12 @@ object FindAndModifySpec extends Specification {
             case Person("Jack", "London", 40) =>
               collection.find(jack.copy(age = jack.age + 1)).
                 one[Person].map(_.map(_.age)) must beSome(41).
-                await(timeoutMillis)
+                await(1, timeout)
           }
-      }).await(timeoutMillis)
+      }).await(1, timeout)
     }
 
-    "make a failing FindAndModify" in {
+    "make a failing FindAndModify" in { implicit ee: EE =>
       val query = BSONDocument()
       val future = collection.runCommand(
         FindAndModify(query, Update(BSONDocument("$inc" -> "age"))))
@@ -76,7 +78,7 @@ object FindAndModifySpec extends Specification {
         case e: CommandError =>
           //e.printStackTrace
           e.code
-      } must beSome( /*code = */ 9).await(timeoutMillis)
+      } must beSome( /*code = */ 9).await(1, timeout)
     }
   }
 }

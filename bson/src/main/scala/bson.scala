@@ -49,7 +49,7 @@ object `package` extends DefaultBSONHandlers {
   def array(values: Producer[BSONValue]*) = BSONArray(values: _*)
 
   /** Returns a newly generated object ID. */
-  def generateId = BSONObjectID.generate
+  def generateId = BSONObjectID.generate()
 }
 
 sealed trait Producer[T] {

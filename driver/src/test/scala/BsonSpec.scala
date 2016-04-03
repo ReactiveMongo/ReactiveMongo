@@ -6,7 +6,9 @@ import org.specs2.mutable._
 import reactivemongo.bson._
 import reactivemongo.bson.BSONObjectID
 import reactivemongo.bson.utils.Converters
-import reactivemongo.core.netty._
+import reactivemongo.core.netty._, ChannelBufferWritableBuffer.{
+  single => makeBuffer
+}, ChannelBufferReadableBuffer.{ document => makeDocument }
 
 object BsonSpec extends Specification {
   val simple = Array[Byte](0x16, 0x00, 0x00, 0x00, 0x02, 'h', 'e', 'l', 'l', 'o', 0x00, 0x06, 0x00, 0x00, 0x00, 'w', 'o', 'r', 'l', 'd', 0x00, 0x00)
@@ -18,33 +20,38 @@ object BsonSpec extends Specification {
   "ReactiveMongo" should {
     "produce a simple doc" in {
       val doc = BSONDocument("hello" -> BSONString("world"))
-      val buffer = doc.makeBuffer
-      compare(simple, buffer)
+
+      compare(simple, makeBuffer(doc))
     }
+
     "produce a simple doc through a traversable" in {
-      val buffer = BSONDocument("hello" -> BSONString("world")).makeBuffer
-      val buffer2 = buffer.makeDocument.makeBuffer
-      compare(simple, buffer2)
+      val buffer = makeBuffer(BSONDocument("hello" -> BSONString("world")))
+
+      compare(simple, makeBuffer(makeDocument(buffer)))
     }
+
     "produce a document embedding an array" in {
-      val buffer = BSONDocument(
+      val doc = BSONDocument(
         "_id" -> BSONObjectID("503792c1984587971b14530e"),
         "BSON" -> BSONArray(
           BSONString("awesome"),
           BSONDouble(5.05),
-          BSONDouble(1986))).makeBuffer
-      compare(embeddingArray, buffer)
+          BSONDouble(1986)))
+
+      compare(embeddingArray, makeBuffer(doc))
     }
+
     "produce a document embedding an array through traversable" in {
-      val buffer = BSONDocument(
+      val buffer = makeBuffer(BSONDocument(
         "_id" -> BSONObjectID("503792c1984587971b14530e"),
         "BSON" -> BSONArray(
           BSONString("awesome"),
           BSONDouble(5.05),
-          BSONDouble(1986))).makeBuffer
-      val buffer2 = buffer.makeDocument.makeBuffer
-      compare(embeddingArray, buffer2)
+          BSONDouble(1986))))
+
+      compare(embeddingArray, makeBuffer(makeDocument(buffer)))
     }
+
     "nested subdocuments and arrays" in {
       val expected = Array[Byte](72, 0, 0, 0, 3, 112, 117, 115, 104, 65, 108, 108, 0, 58, 0, 0, 0, 4, 99, 111, 110, 102, 105, 103, 0, 45, 0, 0, 0, 3, 48, 0, 37, 0, 0, 0, 2, 110, 97, 109, 101, 0, 7, 0, 0, 0, 102, 111, 111, 98, 97, 114, 0, 2, 118, 97, 108, 117, 101, 0, 4, 0, 0, 0, 98, 97, 114, 0, 0, 0, 0, 0)
       // {"pushAll":{"config":[{"name":"foobar","value":"bar"}]}}
@@ -53,8 +60,9 @@ object BsonSpec extends Specification {
       val subdoc = BSONDocument("config" -> arr)
       val doc = BSONDocument("pushAll" -> subdoc)
 
-      compare(expected, doc.makeBuffer)
+      compare(expected, makeBuffer(doc))
     }
+
     "concat two arrays" in {
       val array1 = BSONArray(BSONInteger(1), BSONInteger(2))
       val array2 = BSONArray(BSONString("a"), BSONString("b"))
@@ -64,8 +72,10 @@ object BsonSpec extends Specification {
         case BSONInteger(value) => value.toString
         case _                  => "NOELEM"
       }.mkString(",")
+
       str must equalTo("1,2,a,b")
     }
+
     "build arrays with mixed values and optional values" in {
       val array = BSONArray(
         BSONInteger(1),
@@ -76,8 +86,10 @@ object BsonSpec extends Specification {
         case BSONInteger(value) => value.toString
         case _                  => "NOELEM"
       }.mkString(",")
+
       str mustEqual "1,2,4"
     }
+
     val docLike = BSONDocument(
       "likeFalseInt" -> BSONInteger(0),
       "likeFalseLong" -> BSONLong(0),
@@ -105,7 +117,7 @@ object BsonSpec extends Specification {
     }
   }
 
-  def compare(origin: Array[Byte], buffer: org.jboss.netty.buffer.ChannelBuffer) = {
+  def compare(origin: Array[Byte], buffer: shaded.netty.buffer.ChannelBuffer) = {
     val array = new Array[Byte](buffer.writerIndex)
     buffer.readBytes(array)
     val result = array.corresponds(origin)(_ == _)
@@ -116,7 +128,7 @@ object BsonSpec extends Specification {
     } else success
   }
 
-  def log(origin: Array[Byte], test: Array[Byte], buffer: org.jboss.netty.buffer.ChannelBuffer) = {
+  def log(origin: Array[Byte], test: Array[Byte], buffer: shaded.netty.buffer.ChannelBuffer) = {
     println(Arrays.toString(origin))
     println(Arrays.toString(test))
     println(Arrays.toString(buffer.array()))
@@ -127,20 +139,20 @@ object BSONObjectIDSpec extends Specification {
   "BSONObjectID" should {
 
     "equal when created with string" in {
-      val objectID = BSONObjectID.generate
+      val objectID = BSONObjectID.generate()
       val sameObjectID = BSONObjectID(objectID.stringify)
       objectID.valueAsArray must equalTo(sameObjectID.valueAsArray)
     }
 
     "equal another instance of BSONObjectID with the same value" in {
-      val objectID = BSONObjectID.generate
+      val objectID = BSONObjectID.generate()
       val sameObjectID = BSONObjectID(objectID.stringify)
       objectID must equalTo(sameObjectID)
     }
 
     "not equal another newly generated instance of BSONObjectID" in {
-      val objectID = BSONObjectID.generate
-      val nextObjectID = BSONObjectID(BSONObjectID.generate.stringify)
+      val objectID = BSONObjectID.generate()
+      val nextObjectID = BSONObjectID(BSONObjectID.generate().stringify)
       objectID must not equalTo (nextObjectID)
     }
 
@@ -156,7 +168,7 @@ object BSONObjectIDSpec extends Specification {
     }
 
     "bytes generated equal bytes converted from string" in {
-      val objectID = BSONObjectID.generate
+      val objectID = BSONObjectID.generate()
       val bytes = Converters.str2Hex(objectID.stringify)
       objectID.valueAsArray must equalTo(bytes)
     }

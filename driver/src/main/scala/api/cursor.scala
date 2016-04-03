@@ -18,12 +18,13 @@ package reactivemongo.api
 import scala.util.{ Failure, Success, Try }
 import scala.collection.generic.CanBuildFrom
 import scala.collection.mutable.Builder
-import scala.concurrent.{ Await, ExecutionContext, Promise, Future }
+import scala.concurrent.{ ExecutionContext, Future }
 
-import play.api.libs.iteratee._
+import play.api.libs.iteratee.{ Enumerator, Enumeratee, Error, Input, Iteratee }
 
-import org.jboss.netty.buffer.ChannelBuffer
+import shaded.netty.buffer.ChannelBuffer
 
+import reactivemongo.core.actors.Exceptions
 import reactivemongo.core.iteratees.{ CustomEnumeratee, CustomEnumerator }
 import reactivemongo.core.netty.BufferSequence
 import reactivemongo.core.protocol.{
@@ -43,10 +44,12 @@ import reactivemongo.util.{
 }, ExtendedFutures.DelayedFuture
 
 /**
+ * Cursor over results from MongoDB.
+ *
  * @tparam T the type parsed from each result document
  */
-// TODO: maxDocs; 0 for unlimited maxDocs
 trait Cursor[T] {
+  // TODO: maxDocs; 0 for unlimited maxDocs
   import Cursor.{ ContOnError, ErrorHandler, FailOnError }
 
   /**
@@ -95,7 +98,7 @@ trait Cursor[T] {
    * are dropped, so the result may contain a little less than `maxDocs` even if `maxDocs` documents were processed.
    *
    * @param maxDocs Collect up to `maxDocs` documents.
-   * @param err The binary operator to be applied when failing to get the next response. Exception or [[Fail]] raised within the `suc` function cannot be recovered by this error handler.
+   * @param err The binary operator to be applied when failing to get the next response. Exception or [[reactivemongo.api.Cursor$.Fail Fail]] raised within the `suc` function cannot be recovered by this error handler.
    *
    * Example:
    * {{{
@@ -136,7 +139,7 @@ trait Cursor[T] {
    * @param z the start value.
    * @param maxDocs the maximum number of documents to be read.
    * @param suc the binary operator to be applied when the next response is successfully read.
-   * @param err The binary operator to be applied when failing to get the next response. Exception or [[Fail]] raised within the `suc` function cannot be recovered by this error handler.
+   * @param err The binary operator to be applied when failing to get the next response. Exception or [[reactivemongo.api.Cursor$.Fail Fail]] raised within the `suc` function cannot be recovered by this error handler.
    */
   def foldResponses[A](z: => A, maxDocs: Int = Int.MaxValue)(suc: (A, Response) => Cursor.State[A], err: ErrorHandler[A] = FailOnError[A]())(implicit ctx: ExecutionContext): Future[A]
 
@@ -299,33 +302,33 @@ object Cursor {
 
   /**
    * @tparam A the state type
-   * @see [[foldWhile]]
+   * @see [[Cursor.foldWhile]]
    */
   type ErrorHandler[A] = (A, Throwable) => State[A]
 
   /**
-   * Error handler to fail on error (see [[Cursor.foldWhile]] and [[Fail]]).
+   * Error handler to fail on error (see [[Cursor.foldWhile]] and [[reactivemongo.api.Cursor$.Fail Fail]]).
    *
    * @param callback the callback function applied on last (possibily initial) value and the encountered error
    */
   def FailOnError[A](callback: (A, Throwable) => Unit = (_: A, _: Throwable) => {}): ErrorHandler[A] = (v: A, e: Throwable) => { callback(v, e); Fail(e): State[A] }
 
   /**
-   * Error handler to end on error (see [[Cursor.foldWhile]] and [[Done]]).
+   * Error handler to end on error (see [[Cursor.foldWhile]] and [[reactivemongo.api.Cursor$.Done Done]]).
    *
    * @param callback the callback function applied on last (possibily initial) value and the encountered error
    */
   def DoneOnError[A](callback: (A, Throwable) => Unit = (_: A, _: Throwable) => {}): ErrorHandler[A] = (v: A, e: Throwable) => { callback(v, e); Done(v): State[A] }
 
   /**
-   * Error handler to continue on error (see [[Cursor.foldWhile]] and [[Cont]]).
+   * Error handler to continue on error (see [[Cursor.foldWhile]] and [[reactivemongo.api.Cursor$.Cont Cont]]).
    *
    * @param callback the callback function applied on last (possibily initial) value and the encountered error
    */
   def ContOnError[A](callback: (A, Throwable) => Unit = (_: A, _: Throwable) => {}): ErrorHandler[A] = (v: A, e: Throwable) => { callback(v, e); Cont(v): State[A] }
 
   /**
-   * Value handler, ignoring the values (see [[Cursor.foldWhile]] and [[Cont]]).
+   * Value handler, ignoring the values (see [[Cursor.foldWhile]] and [[reactivemongo.api.Cursor$.Cont Cont]]).
    *
    * @param callback the callback function applied on each value.
    */
@@ -380,6 +383,7 @@ object DefaultCursor {
     mongoConnection: MongoConnection,
     failover: FailoverStrategy,
     isMongo26WriteOp: Boolean)(implicit reader: pack.Reader[A]) = new Impl[A] {
+    val preference = readPreference
     val connection = mongoConnection
     val failoverStrategy = failover
     val mongo26WriteOp = isMongo26WriteOp
@@ -392,7 +396,9 @@ object DefaultCursor {
       ReplyDocumentIterator(pack)(_: Reply, _: ChannelBuffer)(reader)
 
     @inline
-    def makeRequest(maxDocs: Int)(implicit ctx: ExecutionContext): Future[Response] = awaitFailover(Failover2(mongoConnection, failoverStrategy) { () =>
+    def makeRequest(maxDocs: Int)(implicit ctx: ExecutionContext): Future[Response] = Failover2(mongoConnection, failoverStrategy) { () =>
+      import reactivemongo.core.netty.ChannelBufferReadableBuffer
+
       val nrt = query.numberToReturn
       val q = { // normalize the number of docs to return
         if (nrt > 0 && nrt <= maxDocs) query
@@ -401,7 +407,7 @@ object DefaultCursor {
 
       mongoConnection.sendExpectingResponse(
         RequestMaker(q, requestBuffer, readPreference), isMongo26WriteOp)
-    }.future)
+    }.future
   }
 
   /**
@@ -417,6 +423,7 @@ object DefaultCursor {
     mongoConnection: MongoConnection,
     failover: FailoverStrategy,
     isMongo26WriteOp: Boolean)(implicit reader: pack.Reader[A]) = new Impl[A] {
+    val preference = readPreference
     val connection = mongoConnection
     val failoverStrategy = failover
     val mongo26WriteOp = isMongo26WriteOp
@@ -444,9 +451,9 @@ object DefaultCursor {
       { implicit ctx: ExecutionContext =>
         logger.trace(s"[Cursor] Calling next on ${result.cursorId}, op=$op")
 
-        awaitFailover(Failover2(connection, failoverStrategy) { () =>
+        Failover2(connection, failoverStrategy) { () =>
           connection.sendExpectingResponse(reqMaker, mongo26WriteOp)
-        }.future)
+        }.future
       }
     }
 
@@ -454,6 +461,9 @@ object DefaultCursor {
   }
 
   private[reactivemongo] trait Impl[A] extends Cursor[A] {
+    /** The read preference */
+    def preference: ReadPreference
+
     def connection: MongoConnection
 
     def failoverStrategy: FailoverStrategy
@@ -471,8 +481,6 @@ object DefaultCursor {
 
     def documentIterator: (Reply, ChannelBuffer) => Iterator[A]
 
-    @inline protected def awaitFailover[T](f: => Future[T])(implicit ec: ExecutionContext): Future[T] = Future(Await.ready(f, failoverStrategy.maxTimeout)).flatMap(identity)
-
     private def next(response: Response, maxDocs: Int)(implicit ctx: ExecutionContext): Future[Option[Response]] = {
       if (response.reply.cursorID != 0) {
         val toReturn =
@@ -483,12 +491,14 @@ object DefaultCursor {
         val op = GetMore(fullCollectionName, toReturn, response.reply.cursorID)
 
         logger.trace(s"[Cursor] Calling next on ${response.reply.cursorID}, op=$op")
-        awaitFailover(Failover2(connection, failoverStrategy) { () =>
-          connection.sendExpectingResponse(RequestMaker(op).
-            copy(channelIdHint = Some(response.info.channelId)),
+
+        Failover2(connection, failoverStrategy) { () =>
+          connection.sendExpectingResponse(RequestMaker(op,
+            readPreference = preference,
+            channelIdHint = Some(response.info.channelId)),
             mongo26WriteOp)
 
-        }.future).map(Some(_))
+        }.future.map(Some(_))
       } else {
         logger.error("[Cursor] Call to next() but cursorID is 0, there is probably a bug")
         Future.successful(Option.empty[Response])
@@ -505,28 +515,43 @@ object DefaultCursor {
       documentIterator(response.reply, response.documents)
 
     /** Returns next response using tailable mode */
-    private def tailResponse(current: Response, maxDocs: Int)(implicit context: ExecutionContext): Future[Option[Response]] = connection.killed flatMap {
-      case true => Future.successful {
-        logger.warn("[tailResponse] Connection is killed")
-        Option.empty[Response]
-      }
+    private def tailResponse(current: Response, maxDocs: Int)(implicit context: ExecutionContext): Future[Option[Response]] = {
+      {
+        @inline def closed = Future.successful {
+          logger.warn("[tailResponse] Connection is closed")
+          Option.empty[Response]
+        }
 
-      case _ => {
-        if (hasNext(current, maxDocs)) next(current, maxDocs)
+        if (connection.killed) closed
         else {
-          logger.debug("[tailResponse] Current cursor exhausted, renewing...")
-          DelayedFuture(500, connection.actorSystem).
-            flatMap(_ => makeRequest(maxDocs).map(Some(_)))
+          if (hasNext(current, maxDocs)) {
+            next(current, maxDocs).recoverWith {
+              case Exceptions.ClosedException => closed
+              case err                        => Future.failed[Option[Response]](err)
+            }
+          } else {
+            logger.debug("[tailResponse] Current cursor exhausted, renewing...")
+            DelayedFuture(500, connection.actorSystem).
+              flatMap { _ => makeRequest(maxDocs).map(Some(_)) }
+          }
         }
       }
     }
 
     @inline
-    private def killCursors(cursorID: Long, logCat: String): Unit =
+    private def killCursors(r: Response, logCat: String): Unit = {
+      val cursorID = r.reply.cursorID
+
       if (cursorID != 0) {
-        logger.debug(s"[$logCat] Clean up ${cursorID}, sending KillCursor")
-        connection.send(RequestMaker(KillCursors(Set(cursorID))))
+        logger.debug(s"[$logCat] Clean up ${cursorID}, sending KillCursors")
+
+        val killReq = RequestMaker(
+          KillCursors(Set(cursorID)),
+          readPreference = preference)
+
+        connection.send(killReq)
       } else logger.trace(s"[$logCat] Cursor exhausted (${cursorID})")
+    }
 
     def foldResponses[T](z: => T, maxDocs: Int = Int.MaxValue)(suc: (T, Response) => State[T], err: (T, Throwable) => State[T])(implicit ctx: ExecutionContext): Future[T] = new FoldResponses(z, maxDocs, suc, err)(ctx)()
 
@@ -576,7 +601,7 @@ object DefaultCursor {
           next = response => {
             if (hasNext(response, maxDocs)) next(response, maxDocs)
             else Future.successful(Option.empty[Response])
-          }, cleanUp = { resp => killCursors(resp.reply.cursorID, "Cursor") })))
+          }, cleanUp = { resp => killCursors(resp, "Cursor") })))
 
     @deprecated(message = "Only for internal use", since = "0.11.10")
     def tailableCursorEnumerateResponses(maxDocs: Int = Int.MaxValue)(implicit ctx: ExecutionContext): Enumerator[Response] =
@@ -592,7 +617,7 @@ object DefaultCursor {
           },
           cleanUp = { current =>
             val (r, _) = current
-            killCursors(r.reply.cursorID, "Tailable Cursor")
+            killCursors(r, "Tailable Cursor")
           }).map(_._1)
       })
 
@@ -673,12 +698,12 @@ object DefaultCursor {
 
       @inline def ok(r: Response, v: T) = {
         // Releases cursor before ending
-        killCursors(r.reply.cursorID, "FoldResponses")
+        killCursors(r, "FoldResponses")
         Future.successful(v)
       }
 
       @inline def kill(r: Response, f: Throwable) = {
-        killCursors(r.reply.cursorID, "FoldResponses")
+        killCursors(r, "FoldResponses")
         Future.failed[T](f)
       }
 
@@ -686,7 +711,7 @@ object DefaultCursor {
         logger.trace(s"Process response: $resp")
 
         Future(suc(cur, resp)).transform(resp -> _, { error =>
-          killCursors(resp.reply.cursorID, "FoldResponses")
+          killCursors(resp, "FoldResponses")
           error
         }).flatMap {
           case (r, next) =>
@@ -704,8 +729,7 @@ object DefaultCursor {
                 })
             }
         }.recoverWith {
-          case Unrecoverable(e) =>
-            println(s"e = $e"); Future.failed(e)
+          case Unrecoverable(e) => Future.failed(e)
           case e =>
             val nc = c + 1 // resp.reply.numberReturned
 
@@ -719,28 +743,25 @@ object DefaultCursor {
         }
       }
 
-      def procResponses(done: Future[Response], cur: T, c: Int): Future[T] = {
-        val proc = Promise[T]()
+      def procResponses(done: Future[Response], cur: T, c: Int): Future[T] =
+        done.map[Try[Response]](Success(_)).
+          recover { case err => Failure(err) }.flatMap {
+            case Success(r) => procResp(r, cur, c)
+            case Failure(error) => {
+              logger.error("fails to send request", error)
 
-        done.onComplete {
-          case Failure(error) => {
-            logger.error("fails to send request", error)
+              err(cur, error) match {
+                case Done(v) => Future.successful(v)
+                case Fail(e) => Future.failed(e)
+                case Cont(v) => {
+                  logger.warn(
+                    "cannot continue after fatal request error", error)
 
-            err(cur, error) match {
-              case Done(v) => proc.success(v)
-              case Fail(e) => proc.failure(e)
-              case Cont(v) => {
-                logger.warn("cannot continue after fatal request error", error)
-                proc.success(v)
+                  Future.successful(v)
+                }
               }
             }
           }
-
-          case Success(resp) => proc.completeWith(procResp(resp, cur, c))
-        }
-
-        proc.future
-      }
 
       def apply(): Future[T] =
         Future(z).flatMap(v => procResponses(makeRequest(maxDocs), v, 0))

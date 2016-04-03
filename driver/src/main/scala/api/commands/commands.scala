@@ -110,19 +110,17 @@ object Command {
       db.connection.options.readPreference
 
     def one[A](readPreference: ReadPreference)(implicit reader: pack.Reader[A], ec: ExecutionContext): Future[A] = {
-      val (requestMaker, mongo26WriteCommand) =
+      val (requestMaker, m26WriteCommand) =
         buildRequestMaker(pack)(command, writer, readPreference, db.name)
 
-      // TODO: Await maxTimeout?
       Failover2(db.connection, failover) { () =>
-        db.connection.sendExpectingResponse(
-          requestMaker, mongo26WriteCommand).map { response =>
-            pack.readAndDeserialize(
-              LoweLevelDocumentIterator(ChannelBufferReadableBuffer(
-                response.documents)).next, reader)
+        db.connection.sendExpectingResponse(requestMaker, m26WriteCommand)
+      }.future.map { response =>
+        pack.readAndDeserialize(
+          LoweLevelDocumentIterator(ChannelBufferReadableBuffer(
+            response.documents)).next, reader)
 
-          }
-      }.future
+      }
     }
 
     def one[A](implicit reader: pack.Reader[A], ec: ExecutionContext): Future[A] = one[A](defaultReadPreference)
@@ -190,10 +188,14 @@ object Command {
     }
   }
 
+  def run[P <: SerializationPack](pack: P): CommandWithPackRunner[pack.type] =
+    CommandWithPackRunner(pack, FailoverStrategy())
+
   /**
    * Returns a command runner.
    *
    * @param pack the serialization pack
+   * @param failover the failover strategy
    *
    * {{{
    * import reactivemongo.bson.BSONDocument
@@ -204,8 +206,7 @@ object Command {
    *   unboxed(aCollection, Count(BSONDocument("bulk" -> true)))
    * }}}
    */
-  def run[P <: SerializationPack](pack: P): CommandWithPackRunner[pack.type] =
-    CommandWithPackRunner(pack)
+  def run[P <: SerializationPack](pack: P, failover: FailoverStrategy): CommandWithPackRunner[pack.type] = CommandWithPackRunner(pack, failover)
 
   private[reactivemongo] def deserialize[P <: SerializationPack, A](pack: P, response: Response)(implicit reader: pack.Reader[A]): A =
     pack.readAndDeserialize(response, reader)

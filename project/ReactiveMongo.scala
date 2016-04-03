@@ -3,27 +3,30 @@ import sbt.Keys._
 import scala.language.postfixOps
 
 object BuildSettings {
-  val buildVersion = "0.11.10"
+  val buildVersion = "0.11.11"
 
   val filter = { (ms: Seq[(File, String)]) =>
     ms filter {
       case (file, path) =>
-        path != "logback.xml" && !path.startsWith("toignore") && !path.startsWith("samples")
+        path != "logback.xml" && !path.startsWith("toignore") &&
+        !path.startsWith("samples")
     }
   }
 
-  val buildSettings = Defaults.coreDefaultSettings ++ Seq(
+  val baseSettings = Seq(
     organization := "org.reactivemongo",
     version := buildVersion,
+    shellPrompt := ShellPrompt.buildShellPrompt)
+
+  val buildSettings = Defaults.coreDefaultSettings ++ baseSettings ++ Seq(
     scalaVersion := "2.11.7",
     crossScalaVersions := Seq("2.11.7", "2.10.5"),
     crossVersion := CrossVersion.binary,
-    javaOptions in test ++= Seq("-Xmx512m", "-XX:MaxPermSize=512m"),
     //fork in Test := true, // Don't share executioncontext between SBT CLI/tests
     scalacOptions in Compile ++= Seq(
       "-unchecked", "-deprecation", "-target:jvm-1.6", "-Ywarn-unused-import"),
     scalacOptions in (Compile, doc) ++= Seq("-unchecked", "-deprecation",
-      "-diagrams", "-implicits", "-skip-packages", "samples"),
+      /*"-diagrams", */"-implicits", "-skip-packages", "samples"),
     scalacOptions in (Compile, doc) ++= Opts.doc.title("ReactiveMongo API"),
     scalacOptions in (Compile, doc) ++= Opts.doc.version(buildVersion),
     scalacOptions in Compile := {
@@ -33,7 +36,6 @@ object BuildSettings {
         opts.filter(_ != "-Ywarn-unused-import")
       } else opts
     },
-    shellPrompt := ShellPrompt.buildShellPrompt,
     mappings in (Compile, packageBin) ~= filter,
     mappings in (Compile, packageSrc) ~= filter,
     mappings in (Compile, packageDoc) ~= filter) ++
@@ -159,13 +161,13 @@ object Resolvers {
 }
 
 object Dependencies {
-  val netty = "io.netty" % "netty" % "3.10.4.Final" cross CrossVersion.Disabled
+  val netty = "io.netty" % "netty" % "3.10.5.Final" cross CrossVersion.Disabled
 
   val akkaActor = "com.typesafe.akka" %% "akka-actor" % "2.3.6"
 
   val playIteratees = "com.typesafe.play" %% "play-iteratees" % "2.3.10"
 
-  val specs = "org.specs2" %% "specs2-core" % "2.4.9" % Test
+  val specs = "org.specs2" %% "specs2-core" % "3.7.2" % Test
 
   val logApiVersion = "1.7.12"
   val logApi = Seq(
@@ -187,6 +189,9 @@ object ReactiveMongoBuild extends Build {
   import Resolvers._
   import Dependencies._
   import sbtunidoc.{ Plugin => UnidocPlugin }
+  import sbtassembly.{
+    AssemblyKeys, MergeStrategy, PathList, ShadeRule
+  }, AssemblyKeys._
   import com.typesafe.tools.mima.core._, ProblemFilters._, Problem.ClassVersion
   import com.typesafe.tools.mima.plugin.MimaKeys.{
     binaryIssueFilters, previousArtifacts
@@ -201,15 +206,39 @@ object ReactiveMongoBuild extends Build {
       settings = buildSettings ++ (publishArtifact := false) ).
       settings(UnidocPlugin.unidocSettings: _*).
       settings(previousArtifacts := Set.empty).
-    aggregate(driver, bson, bsonmacros)
+      aggregate(bson, bsonmacros, shadedDeps, driver)
+
+  lazy val shadedDeps = 
+    Project(
+      s"$projectPrefix-Shaded",
+      file("shaded"),
+      settings = baseSettings ++ Publish.settings).settings(
+        previousArtifacts := Set.empty,
+        crossPaths := false,
+        autoScalaLibrary := false,
+        libraryDependencies ++= Seq(netty),
+        assemblyShadeRules in assembly := Seq(
+          ShadeRule.rename("org.jboss.netty.**" -> "shaded.netty.@1").inAll
+        ),
+        publish in Compile := publish.dependsOn(assembly),
+        publishLocal in Compile := publishLocal.dependsOn(assembly),
+        packageBin in Compile := target.value / (
+          assemblyJarName in assembly).value)
 
   lazy val driver = Project(
     projectPrefix,
     file("driver"),
     settings = buildSettings ++ Seq(
       resolvers := resolversList,
+      compile in Compile <<= (
+        compile in Compile).dependsOn(assembly in shadedDeps),
+      unmanagedJars in Compile := {
+        val shadedDir = (target in shadedDeps).value
+        val shadedJar = (assemblyJarName in (shadedDeps, assembly)).value
+
+        Seq(Attributed(shadedDir / shadedJar)(AttributeMap.empty))
+      },
       libraryDependencies ++= Seq(
-        netty,
         akkaActor,
         playIteratees,
         commonsCodec,
@@ -250,12 +279,22 @@ object ReactiveMongoBuild extends Build {
             "reactivemongo.api.collections.BatchCommands.DistinctCommand"),
           mmp(
             "reactivemongo.api.collections.BatchCommands.AggregateReader"),
+          mmp("reactivemongo.bson.BSONTimestamp.toString"),
           irt("reactivemongo.api.commands.Upserted._id"),
           imt("reactivemongo.api.commands.Upserted.this"),
           imt("reactivemongo.api.commands.Upserted.copy"),
           irt("reactivemongo.api.Cursor.logger"),
+          mcp("reactivemongo.core.netty.package"),
+          mcp("reactivemongo.core.netty.package$"),
+          mcp("reactivemongo.core.netty.package$BSONDocumentNettyWritable"),
+          mcp("reactivemongo.core.netty.package$BSONDocumentNettyWritable$"),
+          mcp("reactivemongo.core.netty.package$BSONDocumentNettyReadable"),
+          mcp("reactivemongo.core.netty.package$BSONDocumentNettyReadable$"),
+          mcp("reactivemongo.api.MongoConnection$IsKilled"),
+          mcp("reactivemongo.api.MongoConnection$IsKilled$"),
           mcp("reactivemongo.api.commands.tst2"),
           mcp("reactivemongo.api.commands.tst2$"),
+          mcp("reactivemongo.api.collections.GenericCollection$Mongo24BulkInsert"),
           mtp("reactivemongo.api.commands.DefaultWriteResult"),
           mmp("reactivemongo.api.commands.DefaultWriteResult.fillInStackTrace"),
           mmp("reactivemongo.api.commands.DefaultWriteResult.isUnauthorized"),
@@ -263,6 +302,7 @@ object ReactiveMongoBuild extends Build {
           irt("reactivemongo.api.commands.DefaultWriteResult.originalDocument"),
           irt("reactivemongo.core.commands.Getnonce.ResultMaker"),
           irt("reactivemongo.core.protocol.RequestEncoder.logger"),
+          irt("reactivemongo.api.MongoConnection.killed"),
           mmp("reactivemongo.api.MongoConnection#MonitorActor.killed_="),
           mmp("reactivemongo.api.MongoConnection#MonitorActor.primaryAvailable_="),
           mmp("reactivemongo.api.MongoConnection#MonitorActor.killed"),
@@ -431,10 +471,10 @@ object ReactiveMongoBuild extends Build {
       testOptions in Test += Tests.Cleanup(cl => {
         import scala.language.reflectiveCalls
         val c = cl.loadClass("Common$")
-        type M = { def closeDriver(): Unit }
+        type M = { def close(): Unit }
         val m: M = c.getField("MODULE$").get(null).asInstanceOf[M]
-        m.closeDriver()
-      }))).dependsOn(bsonmacros)
+        m.close()
+      }))).dependsOn(bsonmacros, shadedDeps)
 
   lazy val bson = Project(
     s"$projectPrefix-BSON",
@@ -451,7 +491,7 @@ object ReactiveMongoBuild extends Build {
     file("macros"),
     settings = buildSettings ++ Seq(
       libraryDependencies +=
-        "org.scala-lang" % "scala-compiler" % scalaVersion.value
+        "org.scala-lang" % "scala-compiler" % scalaVersion.value % "provided"
     )).
     settings(libraryDependencies += specs).
     dependsOn(bson)
@@ -476,7 +516,6 @@ object ReactiveMongoBuild extends Build {
       libraryDependencies ++= Seq(
         "org.reactivemongo" %% "reactivemongo" % buildVersion % "provided",
         playIteratees, specs) ++ logApi
-    ).
-    settings(net.virtualvoid.sbt.graph.Plugin.graphSettings: _*)
+    )
 
 }

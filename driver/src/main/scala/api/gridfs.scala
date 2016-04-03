@@ -134,7 +134,7 @@ class DefaultFileToSave(
   val contentType: Option[String] = None,
   val uploadDate: Option[Long] = None,
   val metadata: BSONDocument = BSONDocument.empty,
-  val id: BSONValue = BSONObjectID.generate)
+  val id: BSONValue = BSONObjectID.generate())
     extends FileToSave[BSONSerializationPack.type, BSONValue] with Equals {
 
   val pack = BSONSerializationPack
@@ -180,7 +180,7 @@ object DefaultFileToSave {
                contentType: Option[String] = None,
                uploadDate: Option[Long] = None,
                metadata: BSONDocument = BSONDocument.empty,
-               id: BSONValue = BSONObjectID.generate)(implicit naming: FileName[N]): DefaultFileToSave = new DefaultFileToSave(naming(filename), contentType, uploadDate, metadata, id)
+               id: BSONValue = BSONObjectID.generate())(implicit naming: FileName[N]): DefaultFileToSave = new DefaultFileToSave(naming(filename), contentType, uploadDate, metadata, id)
 
 }
 

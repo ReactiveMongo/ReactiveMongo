@@ -1,11 +1,9 @@
 package reactivemongo.api.commands.bson
 
-import reactivemongo.bson.{
-  BSONArray,
-  BSONDocument,
-  BSONDocumentWriter,
-  BSONValue
-}
+import scala.collection.immutable.ListSet
+
+import reactivemongo.core.protocol.MongoWireVersion
+import reactivemongo.bson._
 import reactivemongo.api.{ BSONSerializationPack, ReadConcern }
 import reactivemongo.api.commands.{ DistinctCommand, ResolvedCollectionCommand }
 
@@ -19,11 +17,18 @@ object BSONDistinctCommandImplicits {
   implicit object DistinctWriter
       extends BSONDocumentWriter[ResolvedCollectionCommand[Distinct]] {
 
-    def write(distinct: ResolvedCollectionCommand[Distinct]): BSONDocument =
-      BSONDocument(
+    import CommonImplicits.ReadConcernWriter
+
+    def write(distinct: ResolvedCollectionCommand[Distinct]): BSONDocument = {
+      val cmd = BSONDocument(
         "distinct" -> distinct.collection,
         "key" -> distinct.command.keyString,
         "query" -> distinct.command.query)
+
+      if (distinct.command.version >= MongoWireVersion.V32) {
+        cmd ++ ("readConcern" -> distinct.command.readConcern)
+      } else cmd
+    }
   }
 
   implicit object DistinctResultReader
@@ -31,7 +36,7 @@ object BSONDistinctCommandImplicits {
 
     def readResult(doc: BSONDocument): DistinctResult =
       DistinctResult(doc.getAs[BSONArray]("values").
-        fold(List.empty[BSONValue])(_.values.toList))
+        fold(Stream.empty[BSONValue])(_.values))
 
   }
 }
