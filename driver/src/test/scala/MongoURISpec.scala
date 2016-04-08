@@ -2,7 +2,7 @@ import reactivemongo.api.{
   MongoConnection,
   MongoConnectionOptions,
   ScramSha1Authentication
-}, MongoConnection.{ ParsedURI, parseURI }
+}, MongoConnection.{ ParsedURI, URIParsingException, parseURI }
 
 import reactivemongo.core.nodeset.Authenticate
 import reactivemongo.api.commands.WriteConcern
@@ -237,6 +237,14 @@ class MongoURISpec extends org.specs2.mutable.Specification {
         case uri =>
           strategyStr(uri) must_== "123 milliseconds615 milliseconds1230 milliseconds1845 milliseconds2460 milliseconds"
       }
+    }
+
+    val invalidNoNodes = "mongodb://?writeConcern=journaled"
+
+    s"fail to parse $invalidNoNodes" in {
+      parseURI(invalidNoNodes) must beFailedTry.
+        withThrowable[URIParsingException]("No valid host in the URI: ''")
+
     }
 
     val foInvalidDelay = "mongodb://host1?rm.failover=123ko:4x5"

@@ -45,9 +45,9 @@ private[reactivemongo] trait MongoScramSha1Authentication {
 
           authenticationResponse(response)(_ => Left(FailedAuthentication(msg)))
         }, { challenge =>
-          logger.debug(s"[$lnm] Got challenge for channel ${response.info.channelId}: $challenge")
+          logger.debug(s"[$lnm] Got challenge for channel ${response.info._channelId}: $challenge")
 
-          whenAuthenticating(response.info.channelId) {
+          whenAuthenticating(response.info._channelId) {
             case (con, a @ ScramSha1Authenticating(
               db, user, pwd, rand, msg, _, _, step)) => {
               val negociation = ScramSha1StartNegociation(user, pwd,
@@ -83,7 +83,7 @@ private[reactivemongo] trait MongoScramSha1Authentication {
 
     case response: Response if RequestId.authenticate accepts response => {
       logger.debug(
-        s"[$lnm] Got authenticated response! ${response.info.channelId}")
+        s"[$lnm] Got authenticated response! ${response.info._channelId}")
 
       @inline def resp: Either[Either[CommandError, SuccessfulAuthentication], Array[Byte]] = ScramSha1StartNegociation.parseResponse(response) match {
         case Left(err)             => Left(Left(err))
@@ -96,7 +96,7 @@ private[reactivemongo] trait MongoScramSha1Authentication {
         { payload: Array[Byte] =>
           logger.debug("2-phase SCRAM-SHA1 negotiation")
 
-          whenAuthenticating(response.info.channelId) {
+          whenAuthenticating(response.info._channelId) {
             case (con, a @ ScramSha1Authenticating(
               db, _, _, _, _, Some(cid), Some(sig),
               1 /* step; TODO: more retry? */ )) => {

@@ -79,6 +79,8 @@ class DriverSpec(implicit ee: ExecutionEnv)
     }
 
     "notify a monitor after the NodeSet is started" in {
+      // TODO: Move to MonitorSpec
+
       val con = driver.connection(List(primaryHost), DefaultOptions)
       val setAvailable = Promise[ProtocolMetadata]()
       val priAvailable = Promise[ProtocolMetadata]()

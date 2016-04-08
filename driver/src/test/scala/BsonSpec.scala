@@ -17,6 +17,7 @@ class BsonSpec extends org.specs2.mutable.Specification {
   val bsonArray = Array[Byte](42, 0, 0, 0, 2, 48, 0, 8, 0, 0, 0, 97, 119, 101, 115, 111, 109, 101, 0, 1, 49, 0, 51, 51, 51, 51, 51, 51, 20, 64, 1, 50, 0, 0, 0, 0, 0, 0, 8, -97, 64, 0)
 
   section("unit")
+
   "BSON codec" should {
     "produce a simple document" in {
       val doc = BSONDocument("hello" -> BSONString("world"))
@@ -118,11 +119,57 @@ class BsonSpec extends org.specs2.mutable.Specification {
       docLike.getAs[BSONNumberLike]("aDouble").get.toDouble mustEqual 9876543210.98
     }
   }
+
+  "Serialization pack" should {
+    import shaded.netty.channel.DefaultChannelId
+    import reactivemongo.api.tests._
+
+    val doc = BSONDocument("foo" -> 1, "bar" -> "LOREM")
+
+    "parse a simple document" in {
+      def buf = ChannelBufferReadableBuffer(channelBuffer(doc))
+
+      val ser = reactivemongo.api.BSONSerializationPack
+
+      BSONDocument.read(buf) must_== doc and {
+        ser.readAndDeserialize(buf, ser.IdentityReader) must_== doc
+      }
+    }
+
+    "parse a message" in {
+      def message = ChannelBufferReadableBuffer(bufferSeq(doc).merged)
+
+      val ser = reactivemongo.api.BSONSerializationPack
+
+      BSONDocument.read(message) must_== doc and {
+        ser.readAndDeserialize(message, ser.IdentityReader) must_== doc
+      }
+    }
+
+    "parse a response" in {
+      val resp = fakeResponse(
+        doc,
+        reqID = isMasterReqId,
+        respTo = 1,
+        chanId = DefaultChannelId.newInstance())
+
+      val ser = reactivemongo.api.BSONSerializationPack
+
+      ser.readAndDeserialize(resp, ser.IdentityReader) must_== doc
+    }
+  }
+
   section("unit")
 
-  def compare(origin: Array[Byte], buffer: shaded.netty.buffer.ChannelBuffer) = {
+  // ---
+
+  import shaded.netty.buffer.ByteBuf
+
+  def compare(origin: Array[Byte], buffer: ByteBuf) = {
     val array = new Array[Byte](buffer.writerIndex)
+
     buffer.readBytes(array)
+
     val result = array.corresponds(origin)(_ == _)
 
     if (!result) {
@@ -131,7 +178,7 @@ class BsonSpec extends org.specs2.mutable.Specification {
     } else success
   }
 
-  def log(origin: Array[Byte], test: Array[Byte], buffer: shaded.netty.buffer.ChannelBuffer) = {
+  def log(origin: Array[Byte], test: Array[Byte], buffer: ByteBuf) = {
     println(Arrays.toString(origin))
     println(Arrays.toString(test))
     println(Arrays.toString(buffer.array()))

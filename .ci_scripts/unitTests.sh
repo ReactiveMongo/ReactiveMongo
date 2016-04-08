@@ -5,7 +5,7 @@ if [ `git grep localhost | grep 'src/test' | grep -vi 'Common.scala' | wc -l` -n
   exit 1
 fi 
 
-if [ "$SCALA_VERSION" = "2.10.5" -a `javac -version 2>&1 | grep 1.7 | wc -l` -eq 1 ]; then
+if [ "$SCALA_VERSION" = "2.11.11" -a `javac -version 2>&1 | grep 1.7 | wc -l` -eq 1 ]; then
     echo "[INFO] Check the source format and backward compatibility"
 
     sbt ++$SCALA_VERSION scalariformFormat test:scalariformFormat > /dev/null

@@ -38,14 +38,17 @@ class NodeSetSpec(implicit val ee: ExecutionEnv)
   @inline def timeout = Common.timeout
   lazy val md = Common.newDriver()
   lazy val actorSystem = md.system
-  val nodes = Seq("node1:27017", "node2:27017")
+
+  protected val nodes = Seq(
+    "nodesetspec.node1:27017", "nodesetspec.node2:27017")
 
   section("unit")
   "Node set" should {
     "not be available" >> {
       "if the entire node set is not available" in {
-        withConAndSys(md) { (con, _) => isAvailable(con, timeout) }.
-          aka("is available") must beFalse.await(1, timeout)
+        scala.concurrent.Await.result(withConAndSys(md) {
+          (con, _) => isAvailable(con, timeout)
+        }, timeout) must throwA[java.util.concurrent.TimeoutException]
       }
 
       "if the primary is not available if default preference" in {
@@ -67,18 +70,19 @@ class NodeSetSpec(implicit val ee: ExecutionEnv)
         withCon() { (con, name) =>
           withConMon(name) { conMon =>
             def test = (for {
-              before <- isAvailable(con, timeout)
-              _ = {
+              _ <- {
                 conMon ! SetAvailable(ProtocolMetadata.Default)
                 conMon ! PrimaryAvailable(ProtocolMetadata.Default)
+
+                waitIsAvailable(con, failoverStrategy)
               }
-              _ <- waitIsAvailable(con, failoverStrategy)
+
               after <- isAvailable(con, timeout)
-            } yield before -> after).flatMap { res =>
+            } yield after).flatMap { res =>
               con.askClose()(timeout).recover { case _ => () }.map(_ => res)
             }
 
-            test must beEqualTo(false -> true).await(1, timeout)
+            test must beTrue.await(1, timeout)
           }
         }
       }
@@ -92,15 +96,16 @@ class NodeSetSpec(implicit val ee: ExecutionEnv)
               withCon(opts) { (con, name) =>
                 withConMon(name) { conMon =>
                   def test = (for {
-                    before <- isAvailable(con, timeout)
-                    _ = conMon ! SetAvailable(ProtocolMetadata.Default)
-                    _ <- waitIsAvailable(con, failoverStrategy)
+                    _ <- {
+                      conMon ! SetAvailable(ProtocolMetadata.Default)
+                      waitIsAvailable(con, failoverStrategy)
+                    }
                     after <- isAvailable(con, timeout)
-                  } yield before -> after).flatMap { res =>
+                  } yield after).flatMap { res =>
                     con.askClose()(timeout).recover { case _ => () }.map(_ => res)
                   }
 
-                  test must beEqualTo(false -> true).await(1, timeout)
+                  test must beTrue.await(1, timeout)
                 }
               }
             }
@@ -183,12 +188,13 @@ class NodeSetSpec(implicit val ee: ExecutionEnv)
 
   // ---
 
-  def withConAndSys[T](drv: MongoDriver, options: MongoConnectionOptions = MongoConnectionOptions(nbChannelsPerNode = 1))(f: (MongoConnection, TestActorRef[StandardDBSystem]) => Future[T]): Future[T] = {
+  def withConAndSys[T](drv: MongoDriver, options: MongoConnectionOptions = MongoConnectionOptions(nbChannelsPerNode = 1), _nodes: Seq[String] = nodes)(f: (MongoConnection, TestActorRef[StandardDBSystem]) => Future[T]): Future[T] = {
     // See MongoDriver#connection
     val supervisorName = s"withConAndSys-sup-${System identityHashCode ee}"
     val poolName = s"withConAndSys-con-${System identityHashCode f}"
 
     @inline implicit def sys = drv.system
+    @inline implicit def tmout = timeout
 
     val auths = Seq(Authenticate(Common.commonDb, "test", "password"))
     lazy val mongosystem = TestActorRef[StandardDBSystem](
@@ -196,7 +202,7 @@ class NodeSetSpec(implicit val ee: ExecutionEnv)
       poolName)
 
     def connection = addConnection(
-      drv, poolName, nodes, options, mongosystem).mapTo[MongoConnection]
+      drv, poolName, _nodes, options, mongosystem).mapTo[MongoConnection]
 
     connection.flatMap { con =>
       f(con, mongosystem).flatMap { res =>

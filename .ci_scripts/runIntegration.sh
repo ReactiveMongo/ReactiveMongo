@@ -28,6 +28,10 @@ if [ "$MONGO_PROFILE" = "rs" ]; then
     SBT_ARGS="$SBT_ARGS -Dtest.replicaSet=true"
 fi
 
+# Netty
+SBT_ARGS="$SBT_ARGS -Dshaded.netty.leakDetection.level=paranoid"
+SBT_ARGS="$SBT_ARGS -Dshaded.netty.leakDetection.acquireAndReleaseOnly=true"
+
 source "$SCRIPT_DIR/jvmopts.sh"
 
 cat > /dev/stdout <<EOF

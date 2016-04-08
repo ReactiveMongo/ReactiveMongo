@@ -42,22 +42,6 @@ object Common {
 
   val failoverStrategy = FailoverStrategy(retries = failoverRetries)
 
-  val DefaultOptions = {
-    val a = MongoConnectionOptions(
-      failoverStrategy = failoverStrategy,
-      nbChannelsPerNode = 20)
-
-    val b = {
-      if (Option(System getProperty "test.enableSSL").exists(_ == "true")) {
-        a.copy(sslEnabled = true, sslAllowsInvalidCert = true)
-      } else a
-    }
-
-    crMode.fold(b) { mode => b.copy(authMode = mode) }
-  }
-
-  lazy val connection = driver.connection(List(primaryHost), DefaultOptions)
-
   private val timeoutFactor = 1.25D
   def estTimeout(fos: FailoverStrategy): FiniteDuration =
     (1 to fos.retries).foldLeft(fos.initialDelay) { (d, i) =>
@@ -71,6 +55,23 @@ object Common {
     else maxTimeout
   }
 
+  val DefaultOptions = {
+    val a = MongoConnectionOptions(
+      failoverStrategy = failoverStrategy,
+      nbChannelsPerNode = 20,
+      monitorRefreshMS = (timeout.toMillis / 2).toInt)
+
+    val b = {
+      if (Option(System getProperty "test.enableSSL").exists(_ == "true")) {
+        a.copy(sslEnabled = true, sslAllowsInvalidCert = true)
+      } else a
+    }
+
+    crMode.fold(b) { mode => b.copy(authMode = mode) }
+  }
+
+  lazy val connection = driver.connection(List(primaryHost), DefaultOptions)
+
   val commonDb = "specs2-test-reactivemongo"
 
   // ---
@@ -82,9 +83,6 @@ object Common {
     failoverStrategy.copy(retries = retries)
   }
 
-  val SlowOptions = DefaultOptions.copy(
-    failoverStrategy = slowFailover)
-
   val slowPrimary = Option(
     System getProperty "test.slowPrimaryHost").getOrElse("localhost:27019")
 
@@ -95,42 +93,25 @@ object Common {
     else maxTimeout
   }
 
+  val SlowOptions = DefaultOptions.copy(
+    failoverStrategy = slowFailover,
+    monitorRefreshMS = (slowTimeout.toMillis / 2).toInt)
+
   val slowProxy: NettyProxy = {
     import java.net.InetSocketAddress
 
     val delay = Option(System getProperty "test.slowProxyDelay").
       fold(500L /* ms */ )(_.toLong)
 
-    val AddressPort = """^(.*):(.*)$""".r
-    def localAddr: InetSocketAddress = slowPrimary match {
-      case AddressPort(addr, p) => try {
-        val port = p.toInt
-        new InetSocketAddress(addr, port)
-      } catch {
-        case e: Throwable =>
-          logger.error(s"fails to prepare local address: $e")
-          throw e
-      }
+    import NettyProxy.InetAddress
+    import ExecutionContext.Implicits.global
 
-      case _ => sys.error(s"invalid local address: $slowPrimary")
-    }
-
-    def remoteAddr: InetSocketAddress = primaryHost.span(_ != ':') match {
-      case (host, p) => try {
-        val port = p.drop(1).toInt
-        new InetSocketAddress(host, port)
-      } catch {
-        case e: Throwable =>
-          logger.error(s"fails to prepare remote address: $e")
-          throw e
-      }
-
-      case _ => sys.error(s"invalid remote address: $primaryHost")
-    }
+    def localAddr: InetSocketAddress = InetAddress.unapply(slowPrimary).get
+    def remoteAddr: InetSocketAddress = InetAddress.unapply(primaryHost).get
 
     val proxy = new NettyProxy(Seq(localAddr), remoteAddr, Some(delay))
-    proxy.start()
-    proxy
+
+    Await.result(proxy.start().map(_ => proxy), slowTimeout)
   }
 
   lazy val slowConnection = driver.connection(List(slowPrimary), SlowOptions)

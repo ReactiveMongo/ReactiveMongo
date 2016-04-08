@@ -2,6 +2,8 @@ package reactivemongo.core.nodeset
 
 import scala.collection.immutable.Set
 
+import shaded.netty.channel.ChannelId
+
 import akka.actor.ActorRef
 
 import reactivemongo.bson.BSONDocument
@@ -52,13 +54,16 @@ case class Node(
   @deprecated(message = "Use `createNeededChannels` with an explicit `channelFactory`", since = "0.12-RC1")
   def createNeededChannels(receiver: ActorRef, upTo: Int)(implicit channelFactory: ChannelFactory): Node = createNeededChannels(channelFactory, receiver, upTo)
 
-  private[core] def createNeededChannels(channelFactory: ChannelFactory, receiver: ActorRef, upTo: Int): Node = {
+  private[core] def createNeededChannels(
+    channelFactory: ChannelFactory,
+    receiver: ActorRef,
+    upTo: Int): Node = {
     if (connections.size < upTo) {
       _copy(connections = connections ++ (for {
-        i ← 0 until (upTo - connections.size)
+        _ ← 0 until (upTo - connections.size)
       } yield Connection(
         channelFactory.create(host, port, receiver),
-        ConnectionStatus.Disconnected, Set.empty, None)))
+        ConnectionStatus.Connecting, Set.empty, None)))
     } else this
   }
 
@@ -82,7 +87,16 @@ case class Node(
     node
   }
 
-  def toShortString = s"Node[$name: $status (${connected.size}/${connections.size} available connections), latency=${pingInfo.ping}, authenticated=$authenticated]"
+  private[core] def updateByChannelId(id: ChannelId)(fc: Connection => Connection)(fn: Node => Node): Node = {
+    val (updCons, updated) = utils.update(connections) {
+      case conn if (conn.channel.id == id) => fc(conn)
+    }
+
+    if (updated) fn(_copy(connections = updCons))
+    else this
+  }
+
+  def toShortString = s"""Node[$name: $status (${connected.size}/${connections.size} available connections), latency=${pingInfo.ping}, authenticated={${authenticated mkString ", "}}]"""
 
   /** Returns the read-only information about this node. */
   def info = NodeInfo(name, aliases.result(), host, port, status,

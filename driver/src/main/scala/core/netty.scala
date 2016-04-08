@@ -15,40 +15,34 @@
  */
 package reactivemongo.core.netty
 
-import java.nio.ByteOrder.LITTLE_ENDIAN
-
-import shaded.netty.buffer.{
-  ChannelBuffer,
-  ChannelBuffers,
-  LittleEndianHeapChannelBuffer
-}
+import shaded.netty.buffer.{ ByteBuf, Unpooled }
 
 import reactivemongo.bson.BSONDocument
 import reactivemongo.bson.buffer.{ ReadableBuffer, WritableBuffer }
 
 class ChannelBufferReadableBuffer(
-  protected[netty] val buffer: ChannelBuffer) extends ReadableBuffer {
+  protected[netty] val buffer: ByteBuf) extends ReadableBuffer {
 
   def size = buffer.capacity()
 
   def index = buffer.readerIndex()
 
-  def index_=(i: Int) = buffer.readerIndex(i)
+  def index_=(i: Int) = { buffer.readerIndex(i); () }
 
-  def discard(n: Int) = buffer.readerIndex(buffer.readerIndex + n)
+  def discard(n: Int) = { buffer.readerIndex(buffer.readerIndex + n); () }
 
   def slice(n: Int) =
-    new ChannelBufferReadableBuffer(buffer.slice(buffer.readerIndex(), n))
+    new ChannelBufferReadableBuffer(buffer.slice(buffer.readerIndex, n))
 
-  def readBytes(array: Array[Byte]): Unit = buffer.readBytes(array)
+  def readBytes(array: Array[Byte]): Unit = { buffer.readBytes(array); () }
 
   def readByte() = buffer.readByte()
 
-  def readInt() = buffer.readInt()
+  def readInt() = buffer.readIntLE()
 
-  def readLong() = buffer.readLong()
+  def readLong() = buffer.readLongLE()
 
-  def readDouble() = buffer.readDouble()
+  def readDouble() = buffer.readDoubleLE()
 
   def readable() = buffer.readableBytes()
 
@@ -61,18 +55,20 @@ class ChannelBufferReadableBuffer(
 }
 
 object ChannelBufferReadableBuffer {
-  def apply(buffer: ChannelBuffer) = new ChannelBufferReadableBuffer(buffer)
+  def apply(buffer: ByteBuf) = new ChannelBufferReadableBuffer(buffer)
 
-  def document(buffer: ChannelBuffer): BSONDocument =
+  def document(buffer: ByteBuf): BSONDocument =
     BSONDocument.read(ChannelBufferReadableBuffer(buffer))
 
 }
 
-class ChannelBufferWritableBuffer(val buffer: ChannelBuffer = ChannelBuffers.dynamicBuffer(LITTLE_ENDIAN, 32)) extends WritableBuffer {
+class ChannelBufferWritableBuffer(
+  val buffer: ByteBuf = Unpooled.buffer(32)) extends WritableBuffer {
+
   def index = buffer.writerIndex
 
   def setInt(index: Int, value: Int) = {
-    buffer.setInt(index, value)
+    buffer.setIntLE(index, value)
     this
   }
 
@@ -93,7 +89,7 @@ class ChannelBufferWritableBuffer(val buffer: ChannelBuffer = ChannelBuffers.dyn
     case _ => super.writeBytes(buf)
   }
 
-  def writeBytes(buf: ChannelBuffer) = {
+  def writeBytes(buf: ByteBuf) = {
     val readable = buf.slice()
     buffer.writeBytes(readable)
     this
@@ -105,17 +101,17 @@ class ChannelBufferWritableBuffer(val buffer: ChannelBuffer = ChannelBuffers.dyn
   }
 
   def writeInt(int: Int): WritableBuffer = {
-    buffer writeInt int
+    buffer writeIntLE int
     this
   }
 
   def writeLong(long: Long): WritableBuffer = {
-    buffer writeLong long
+    buffer writeLongLE long
     this
   }
 
   def writeDouble(double: Double): WritableBuffer = {
-    buffer writeDouble double
+    buffer writeDoubleLE double
     this
   }
 }
@@ -125,7 +121,7 @@ object ChannelBufferWritableBuffer {
   def apply() = new ChannelBufferWritableBuffer()
 
   /** Returns a new channel buffer with the give `document` written on. */
-  private[reactivemongo] def single(document: BSONDocument): ChannelBuffer = {
+  private[reactivemongo] def single(document: BSONDocument): ByteBuf = {
     val buffer = ChannelBufferWritableBuffer()
     BSONDocument.write(document, buffer)
     buffer.buffer
@@ -133,17 +129,18 @@ object ChannelBufferWritableBuffer {
 }
 
 case class BufferSequence(
-  private val head: ChannelBuffer,
-  private val tail: ChannelBuffer*) {
-  def merged: ChannelBuffer = mergedBuffer.duplicate()
+  private val head: ByteBuf,
+  private val tail: ByteBuf*) {
+
+  def merged: ByteBuf = mergedBuffer.duplicate()
 
   private lazy val mergedBuffer =
-    ChannelBuffers.wrappedBuffer((head +: tail): _*)
+    Unpooled.wrappedBuffer((head +: tail): _*)
 }
 
 object BufferSequence {
   /** Returns an empty buffer sequence. */
-  val empty = BufferSequence(new LittleEndianHeapChannelBuffer(0))
+  val empty: BufferSequence = BufferSequence(Unpooled.EMPTY_BUFFER)
 
   /** Returns a new channel buffer with the give `document` written on. */
   private[reactivemongo] def single(document: BSONDocument): BufferSequence =

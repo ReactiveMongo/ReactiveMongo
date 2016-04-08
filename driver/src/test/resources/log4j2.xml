@@ -2,18 +2,21 @@
 <configuration status="INFO">
   <appenders>
     <Console name="Console" target="SYSTEM_OUT">
-      <PatternLayout pattern="%d{HH:mm:ss.SSS} ReactiveMongo %-5level [%logger{1.}] :: %msg%n" />
+      <PatternLayout pattern="%d{HH:mm:ss.SSS} %-5level [%logger{1.}] :: %msg%n" />
     </Console>
   </appenders>
   <loggers>
-    <logger name="shaded.netty" level="ERROR" />
     <logger name="reactivemongo.api.commands" level="ERROR" />
     <logger name="reactivemongo.api.Cursor" level="OFF" />
     <logger name="reactivemongo.api.Failover2" level="OFF" />
     <logger name="reactivemongo.api.MongoConnection" level="OFF" />
 
-    <logger name="reactivemongo.test.NettyProxy" level="ERROR" />
+    <logger name="reactivemongo.test.NettyProxy" level="WARN" />
     <logger name="reactivemongo.core" level="OFF" />
+
+    <logger name="shaded.netty" level="WARN" />
+    <logger name="shaded.netty.util.ResourceLeakDetector" level="TRACE" />
+    <logger name="shaded.netty.channel.DefaultChannelPipeline" level="DEBUG" />
 
     <root level="WARN">
       <appender-ref ref="Console"/>

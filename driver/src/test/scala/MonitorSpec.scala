@@ -1,6 +1,8 @@
 import akka.actor.Actor
 import akka.testkit.TestActorRef
 
+import shaded.netty.channel.ChannelId
+
 import scala.concurrent.Future
 
 import org.specs2.concurrent.ExecutionEnv
@@ -44,14 +46,14 @@ class MonitorSpec(implicit ee: ExecutionEnv)
           val authCon1 = primary1.toVector.flatMap {
             _.authenticatedConnections.subject
           }
-          var chanId1 = -1
+          var chanId1: ChannelId = null
 
           // #1
           history1 aka "history #1" must not(beEmpty) and {
             primary1 aka "primary #1" must beSome[Node]
           } and {
             authCon1.size aka "authed connections #1" must beLike[Int] {
-              case number => number must beGreaterThan(1) and (
+              case number => number must be_>=(1) and (
                 number must beLessThanOrEqualTo(opts.nbChannelsPerNode))
             }
           } and { // #2
@@ -69,7 +71,7 @@ class MonitorSpec(implicit ee: ExecutionEnv)
                       primary1.get.name)
                   } and {
                     // After one connection is picked up...
-                    chanId1 = chan.channel.getId
+                    chanId1 = chan.channel.id
 
                     authCon2.size aka "authed connections #2" must beLike[Int] {
                       case number => number must beGreaterThan(1) and (
@@ -78,7 +80,7 @@ class MonitorSpec(implicit ee: ExecutionEnv)
                   }
               }
           } and { // #3
-            chanId1 aka "channel ID #1" must not(beEqualTo(-1)) and {
+            chanId1 aka "channel ID #1" must not(beNull) and {
               dbsystem.receive(channelClosed(chanId1)) must_== {}
             } and {
               val nodeSet3 = nodeSet(dbsystem)
@@ -89,7 +91,7 @@ class MonitorSpec(implicit ee: ExecutionEnv)
                   nodeSet3.pick(ReadPreference.Primary).
                     aka("channel #2") must beSome[(Node, Connection)].like {
                       case (_, chan) =>
-                        val chanId2 = chan.channel.getId
+                        val chanId2 = chan.channel.id
 
                         chanId2 must not(beEqualTo(-1)) and (
                           chanId2 must not(beEqualTo(chanId1)))
@@ -145,12 +147,15 @@ class MonitorSpec(implicit ee: ExecutionEnv)
           } and { // #3
             // Akka Restart on unhandled exception (see issue 558)
             tryUntil[Traversable[(Long, String)]](
-              List(125, 250, 500, 1000, 2125))(
-                history(dbsystem), _.exists(_._2.startsWith("Restart("))) aka "history #3" must beTrue
+              List(125, 250, 500, 1000, 2125, 4096))(
+                history(dbsystem), _.exists(_._2 startsWith "Restart")).
+                aka("history #3") must beTrue
 
           } and { // #4 (see issue 558)
             tryUntil[Option[Node]](List(125, 250, 500, 1000, 2125))(
-              nodeSet(dbsystem).primary, _.isDefined) aka "primary #4" must beTrue
+              nodeSet(dbsystem).primary, _.isDefined).
+              aka("primary #4") must beTrue
+
           } and { // #5
             val nodeSet5 = nodeSet(dbsystem)
             val primary5 = nodeSet5.primary

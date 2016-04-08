@@ -94,6 +94,7 @@ object Resolvers {
   val typesafe = Seq(
     "Typesafe repository snapshots" at "http://repo.typesafe.com/typesafe/snapshots/",
     "Typesafe repository releases" at "http://repo.typesafe.com/typesafe/releases/")
+
   val resolversList = typesafe
 }
 
@@ -119,8 +120,14 @@ object Dependencies {
     "com.typesafe.play" %% "play-iteratees" % ver
   }
 
-  val specsVer = "3.8.6" // TODO: 3.9.4, 4.x
-  val specs = "org.specs2" %% "specs2-core" % specsVer % Test
+  val specsVer = Def.setting[String] {
+    if (scalaVersion.value startsWith "2.10") "3.9.5" // 4.0.1 not avail
+    else "4.0.1"
+  }
+
+  val specs = Def.setting[ModuleID] {
+    "org.specs2" %% "specs2-core" % specsVer.value % Test
+  }
 
   val slf4jVer = "1.7.12"
   val log4jVer = "2.5"
@@ -317,14 +324,19 @@ object ReactiveMongoBuild extends Build {
       mimaPreviousArtifacts := Set.empty,
       crossPaths := false,
       autoScalaLibrary := false,
+      resolvers += Resolver.mavenLocal,
       libraryDependencies ++= Seq(
-        "io.netty" % "netty" % "3.10.6.Final" cross CrossVersion.Disabled,
+        "io.netty" % "netty-handler" % "4.1.17.Final" cross CrossVersion.Disabled,
         "com.google.guava" % "guava" % "19.0" cross CrossVersion.Disabled
       ),
       assemblyShadeRules in assembly := Seq(
-        ShadeRule.rename("org.jboss.netty.**" -> "shaded.netty.@1").inAll,
+        ShadeRule.rename("io.netty.**" -> "shaded.netty.@1").inAll,
         ShadeRule.rename("com.google.**" -> "shaded.google.@1").inAll
       ),
+      assemblyMergeStrategy in assembly := {
+        case "META-INF/io.netty.versions.properties" => MergeStrategy.last
+        case x => (assemblyMergeStrategy in assembly).value(x)
+      },
       pomPostProcess := transformPomDependencies { _ => None },
       makePom := makePom.dependsOn(assembly).value,
       packageBin in Compile := target.value / (
@@ -353,9 +365,9 @@ object ReactiveMongoBuild extends Build {
     s"$projectPrefix-BSON",
     file("bson"),
     settings = buildSettings ++ Findbugs.settings ++ Seq(
-      libraryDependencies ++= Seq(specs,
-        "org.specs2" %% "specs2-scalacheck" % specsVer % Test,
-        "org.typelevel" %% "discipline" % "0.7.2" % Test,
+      libraryDependencies ++= Seq(specs.value,
+        "org.specs2" %% "specs2-scalacheck" % specsVer.value % Test,
+        "org.typelevel" %% "discipline" % "0.8" % Test,
         "org.spire-math" %% "spire-laws" % "0.13.0" % Test),
       mimaBinaryIssueFilters ++= {
         import ProblemFilters.{ exclude => x }
@@ -384,7 +396,7 @@ object ReactiveMongoBuild extends Build {
     s"$projectPrefix-BSON-Macros",
     file("macros"),
     settings = buildSettings ++ Findbugs.settings ++ Seq(
-      libraryDependencies ++= Seq(specs,
+      libraryDependencies ++= Seq(specs.value,
         "org.scala-lang" % "scala-compiler" % scalaVersion.value % Provided,
         shapelessTest % Test
       )
@@ -447,7 +459,7 @@ object Version {
       },
       libraryDependencies ++= akka.value ++ Seq(
         playIteratees.value, commonsCodec,
-        shapelessTest % Test, specs) ++ logApi,
+        shapelessTest % Test, specs.value) ++ logApi,
       findbugsAnalyzedPath += target.value / "external",
       mimaBinaryIssueFilters ++= {
         import ProblemFilters.{ exclude => x }
@@ -500,6 +512,21 @@ object Version {
           fcp("reactivemongo.core.nodeset.ChannelFactory"),
           mcp("reactivemongo.core.actors.RefreshAllNodes"),
           mcp("reactivemongo.core.actors.RefreshAllNodes$"),
+          imt("reactivemongo.core.actors.ChannelConnected.apply"), // private
+          mcp("reactivemongo.core.actors.ChannelUnavailable$"), // private
+          mcp("reactivemongo.core.actors.ChannelUnavailable"), // private
+          mtp("reactivemongo.core.actors.ChannelDisconnected"), // private
+          imt("reactivemongo.core.actors.ChannelDisconnected.copy"), // private
+          imt("reactivemongo.core.actors.ChannelDisconnected.this"), // private
+          irt("reactivemongo.core.actors.ChannelDisconnected.channelId"), // prv
+          mcp("reactivemongo.core.actors.ChannelClosed$"), // private
+          mcp("reactivemongo.core.actors.ChannelClosed"), // private
+          imt("reactivemongo.core.actors.AwaitingResponse.copy"), // private
+          irt("reactivemongo.core.actors.AwaitingResponse.channelID"), // priv
+          imt("reactivemongo.core.actors.ChannelConnected.copy"), // private
+          imt("reactivemongo.core.actors.ChannelConnected.this"), // private
+          irt("reactivemongo.core.actors.ChannelConnected.channelId"), // priv
+          imt("reactivemongo.core.actors.ChannelDisconnected.apply"), // private
           mmp("reactivemongo.core.actors.MongoDBSystem.DefaultConnectionRetryInterval"),
           imt("reactivemongo.core.netty.ChannelBufferReadableBuffer.apply"),
           irt("reactivemongo.core.netty.ChannelBufferReadableBuffer.buffer"),
@@ -512,6 +539,7 @@ object Version {
           imt("reactivemongo.core.netty.BufferSequence.this"),
           imt("reactivemongo.core.netty.BufferSequence.apply"),
           imt("reactivemongo.core.protocol.package.RichBuffer"),
+          mcp("reactivemongo.core.protocol.RequestEncoder$"), // private
           imt(
             "reactivemongo.core.protocol.BufferAccessors.writeTupleToBuffer2"),
           imt(
@@ -930,7 +958,7 @@ object Version {
     settings = buildSettings ++ Findbugs.settings ++ Seq(
       mimaPreviousArtifacts := Set.empty,
       testOptions in Test += Tests.Cleanup(commonCleanup),
-      libraryDependencies ++= Seq(specs) ++ logApi,
+      libraryDependencies ++= Seq(specs.value) ++ logApi,
       pomPostProcess := providedInternalDeps
     )).enablePlugins(CpdPlugin).
     dependsOn(driver)

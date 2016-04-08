@@ -9,8 +9,8 @@ object BSONIsMasterCommand extends IsMasterCommand[BSONSerializationPack.type]
 object BSONIsMasterCommandImplicits {
   import BSONIsMasterCommand._
 
-  implicit object IsMasterWriter extends BSONDocumentWriter[IsMaster.type] {
-    def write(im: IsMaster.type) = BSONDocument("ismaster" -> 1)
+  implicit def IsMasterWriter[T <: IsMaster] = BSONDocumentWriter[T] { im: T =>
+    BSONDocument("ismaster" -> 1, f"$$comment" -> im.comment)
   }
 
   implicit object IsMasterResultReader extends DealingWithGenericCommandErrorsReader[IsMasterResult] {

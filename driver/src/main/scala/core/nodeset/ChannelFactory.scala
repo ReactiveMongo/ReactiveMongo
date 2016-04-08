@@ -1,16 +1,17 @@
-package reactivemongo.core.nodeset // TODO: Move to `netty` package?
+package reactivemongo.core.nodeset // TODO: Move to `netty` package
 
-import java.util.concurrent.{ TimeUnit, Executor, Executors }
+import java.lang.{ Boolean => JBool }
 
-import shaded.netty.util.HashedWheelTimer
-import shaded.netty.buffer.HeapChannelBufferFactory
-import shaded.netty.channel.socket.nio.NioClientSocketChannelFactory
-import shaded.netty.channel.{
-  Channel,
-  ChannelPipeline,
-  Channels
-}
-import shaded.netty.handler.timeout.IdleStateHandler
+import scala.concurrent.Promise
+
+import shaded.netty.util.concurrent.{ Future, GenericFutureListener }
+
+import shaded.netty.bootstrap.Bootstrap
+import shaded.netty.channel.{ Channel, ChannelOption, EventLoopGroup }
+
+import shaded.netty.channel.ChannelInitializer
+import shaded.netty.channel.nio.NioEventLoopGroup
+import shaded.netty.channel.socket.nio.NioSocketChannel
 
 import akka.actor.ActorRef
 
@@ -19,9 +20,10 @@ import reactivemongo.util.LazyLogger
 import reactivemongo.core.protocol.{
   MongoHandler,
   RequestEncoder,
-  ResponseDecoder,
-  ResponseFrameDecoder
+  ResponseFrameDecoder,
+  ResponseDecoder
 }
+
 import reactivemongo.api.MongoConnectionOptions
 
 /**
@@ -33,65 +35,83 @@ final class ChannelFactory private[reactivemongo] (
   supervisor: String,
   connection: String,
   options: MongoConnectionOptions,
-  bossExecutor: Executor = Executors.newCachedThreadPool,
-  workerExecutor: Executor = Executors.newCachedThreadPool) {
-
-  @deprecated("Initialize with related mongosystem", "0.11.14")
-  def this(opts: MongoConnectionOptions) =
-    this(
-      s"unknown-${System identityHashCode opts}",
-      s"unknown-${System identityHashCode opts}", opts)
-
-  @deprecated("Initialize with related mongosystem", "0.11.14")
-  def this(opts: MongoConnectionOptions, bossEx: Executor) =
-    this(
-      s"unknown-${System identityHashCode opts}",
-      s"unknown-${System identityHashCode opts}", opts, bossEx)
-
-  @deprecated("Initialize with related mongosystem", "0.11.14")
-  def this(opts: MongoConnectionOptions, bossEx: Executor, workerEx: Executor) =
-    this(
-      s"unknown-${System identityHashCode opts}",
-      s"unknown-${System identityHashCode opts}", opts, bossEx, workerEx)
+  @deprecatedName('bossExecutor) parentGroup: EventLoopGroup = new NioEventLoopGroup(),
+  @deprecatedName('workerExecutor) childGroup: EventLoopGroup = new NioEventLoopGroup()) extends ChannelInitializer[NioSocketChannel] {
 
   private val logger = LazyLogger("reactivemongo.core.nodeset.ChannelFactory")
-  private val timer = new HashedWheelTimer()
 
-  def create(host: String = "localhost", port: Int = 27017, receiver: ActorRef): Channel = {
-    val channel = makeChannel(host, port, receiver)
+  import ChannelOption.{ CONNECT_TIMEOUT_MILLIS, SO_KEEPALIVE, TCP_NODELAY }
 
-    logger.trace(s"[$supervisor/$connection] Created a new channel to ${host}:${port}: $channel")
+  private lazy val channelFactory = new Bootstrap().
+    group(parentGroup).
+    channel(classOf[NioSocketChannel]).
+    option(TCP_NODELAY, new JBool(options.tcpNoDelay)).
+    option(SO_KEEPALIVE, new JBool(options.keepAlive)).
+    option(CONNECT_TIMEOUT_MILLIS, new Integer(options.connectTimeoutMS)).
+    handler(this)
+  //childHandler(new shaded.netty.channel.ChannelHandlerAdapter {})
+  //config.setBufferFactory(bufferFactory)
+
+  private[reactivemongo] def create(
+    host: String = "localhost",
+    port: Int = 27017,
+    receiver: ActorRef): Channel = {
+    val resolution = channelFactory.connect(host, port)
+    val channel = resolution.channel.asInstanceOf[NioSocketChannel]
+
+    trace(s"Created new channel #${channel.id} to ${host}:${port} (registered = ${channel.isRegistered})")
+
+    if (channel.isRegistered) {
+      initChannel(channel, host, port, receiver)
+    } else {
+      // Set state as attributes so available for the coming init
+      channel.attr(ChannelFactory.hostKey).set(host)
+      channel.attr(ChannelFactory.portKey).set(port)
+      channel.attr(ChannelFactory.actorRefKey).set(receiver)
+    }
 
     channel
   }
 
-  val channelFactory = new NioClientSocketChannelFactory(
-    bossExecutor, workerExecutor)
+  def initChannel(channel: NioSocketChannel) {
+    val host = channel.attr(ChannelFactory.hostKey).get
 
-  private val bufferFactory = new HeapChannelBufferFactory(
-    java.nio.ByteOrder.LITTLE_ENDIAN)
+    if (host == null) {
+      warn("Skip channel init as host is null")
+    } else {
+      val port = channel.attr(ChannelFactory.portKey).get
+      val receiver = channel.attr(ChannelFactory.actorRefKey).get
 
-  private def makePipeline(
-    timeoutMS: Long,
-    host: String,
-    port: Int,
-    receiver: ActorRef): ChannelPipeline = {
-    val idleHandler = new IdleStateHandler(
-      timer, 0, 0, timeoutMS, TimeUnit.MILLISECONDS)
+      initChannel(channel, host, port, receiver)
+    }
+  }
 
-    val pipeline = Channels.pipeline(idleHandler, new ResponseFrameDecoder(),
-      new ResponseDecoder(), new RequestEncoder(),
-      new MongoHandler(supervisor, connection, receiver))
+  private[reactivemongo] def initChannel(
+    channel: Channel,
+    host: String, port: Int,
+    receiver: ActorRef) {
+    trace(s"Initializing channel ${channel.id} to ${host}:${port} ($receiver)")
+
+    val pipeline = channel.pipeline
 
     if (options.sslEnabled) {
-      val sslEng = reactivemongo.core.SSL.createEngine(sslContext, host, port)
+      val sslEng = reactivemongo.core.SSL.
+        createEngine(sslContext, host, port)
+
       val sslHandler =
         new shaded.netty.handler.ssl.SslHandler(sslEng, false /* TLS */ )
 
       pipeline.addFirst("ssl", sslHandler)
     }
 
-    pipeline
+    val mongoHandler = new MongoHandler(
+      supervisor, connection, receiver, options.maxIdleTimeMS.toLong)
+
+    pipeline.addLast(
+      new ResponseFrameDecoder(), new ResponseDecoder(),
+      new RequestEncoder(), mongoHandler)
+
+    trace(s"Netty channel configuration:\n- connectTimeoutMS: ${options.connectTimeoutMS}\n- maxIdleTimeMS: ${options.maxIdleTimeMS}ms\n- tcpNoDelay: ${options.tcpNoDelay}\n- keepAlive: ${options.keepAlive}\n- sslEnabled: ${options.sslEnabled}")
   }
 
   private def sslContext = {
@@ -117,7 +137,9 @@ final class ChannelFactory private[reactivemongo] (
       }
 
       val kmf = {
-        val res = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm)
+        val res = KeyManagerFactory.getInstance(
+          KeyManagerFactory.getDefaultAlgorithm)
+
         res.init(ks, password.toCharArray)
         res
       }
@@ -143,24 +165,29 @@ final class ChannelFactory private[reactivemongo] (
     sslCtx
   }
 
-  private def makeChannel(
-    host: String,
-    port: Int,
-    receiver: ActorRef): Channel = {
+  private[reactivemongo] def release(callback: Promise[Unit]): Unit = {
+    parentGroup.shutdownGracefully().
+      addListener(new GenericFutureListener[Future[Any]] {
+        def operationComplete(f: Future[Any]) {
+          childGroup.shutdownGracefully().
+            addListener(new GenericFutureListener[Future[Any]] {
+              def operationComplete(f: Future[Any]) {
+                callback.success({}); ()
+              }
+            })
 
-    val channel = channelFactory.newChannel(makePipeline(
-      options.maxIdleTimeMS.toLong, host, port, receiver))
-    val config = channel.getConfig
+          ()
+        }
+      })
 
-    config.setTcpNoDelay(options.tcpNoDelay)
-    config.setBufferFactory(bufferFactory)
-    config.setKeepAlive(options.keepAlive)
-    config.setConnectTimeoutMillis(options.connectTimeoutMS)
-
-    logger.trace(s"Netty channel configuration:\n- connectTimeoutMS: ${options.connectTimeoutMS}\n- maxIdleTimeMS: ${options.maxIdleTimeMS}ms\n- tcpNoDelay: ${options.tcpNoDelay}\n- keepAlive: ${options.keepAlive}\n- sslEnabled: ${options.sslEnabled}")
-
-    channel
+    ()
   }
+
+  @inline private def trace(msg: => String) =
+    logger.trace(s"[$supervisor/$connection] ${msg}")
+
+  @inline private def warn(msg: => String) =
+    logger.warn(s"[$supervisor/$connection] ${msg}")
 
   private object TrustAny extends javax.net.ssl.X509TrustManager {
     import java.security.cert.X509Certificate
@@ -169,4 +196,14 @@ final class ChannelFactory private[reactivemongo] (
     override def checkServerTrusted(cs: Array[X509Certificate], a: String) = {}
     override def getAcceptedIssuers(): Array[X509Certificate] = null
   }
+}
+
+private[reactivemongo] object ChannelFactory {
+  import shaded.netty.util.AttributeKey
+
+  val hostKey = AttributeKey.newInstance[String]("mongoHost")
+
+  val portKey = AttributeKey.newInstance[Int]("mongoPort")
+
+  val actorRefKey = AttributeKey.newInstance[ActorRef]("actorRef")
 }

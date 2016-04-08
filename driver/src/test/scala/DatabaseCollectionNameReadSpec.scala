@@ -40,7 +40,7 @@ class DatabaseCollectionNameReadSpec(implicit ee: ExecutionEnv)
 
       "with the slow connection" in {
         dbSpec(slowConnection, slowTimeout)
-      }
+      } tag "wip"
     }
 
     {

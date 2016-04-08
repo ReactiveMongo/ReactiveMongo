@@ -45,6 +45,7 @@ private[collections] trait Aggregator[P <: SerializationPack with Singleton]
     val context: AggregatorContext[T],
     val cp: CursorProducer.Aux[T, AC]) {
 
+/* TODO: Remove
     import context._
 
     @inline private def readPreference = context.readPreference

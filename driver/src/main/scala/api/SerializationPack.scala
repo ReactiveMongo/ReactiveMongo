@@ -34,8 +34,7 @@ trait SerializationPack { self: Singleton =>
   import reactivemongo.core.netty.ChannelBufferReadableBuffer
 
   final def readAndDeserialize[A](response: Response, reader: Reader[A]): A = {
-    val buf = response.documents
-    val channelBuf = ChannelBufferReadableBuffer(buf)
+    val channelBuf = ChannelBufferReadableBuffer(response.documents)
     readAndDeserialize(channelBuf, reader)
   }
 

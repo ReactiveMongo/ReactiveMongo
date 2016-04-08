@@ -120,7 +120,7 @@ private[api] trait Driver {
     } else {
       // Tell the supervisor to close.
       // It will shut down all the connections and monitors
-      (supervisorActor ? Close)(Timeout(timeout)).recover {
+      (supervisorActor ? Close("Driver.askClose"))(Timeout(timeout)).recover {
         case err =>
           err.setStackTrace(callerSTE)
 
@@ -141,7 +141,7 @@ private[api] trait Driver {
    * @param options $optionsParam
    */
   protected final def askConnection(
-    nodes: Seq[String],
+    nodes: Seq[String], // TODO: Check nodes is empty
     options: MongoConnectionOptions,
     authentications: Seq[Authenticate],
     name: Option[String]): Future[MongoConnection] = {
@@ -214,8 +214,8 @@ private[api] trait Driver {
         ()
       }
 
-      case Close => {
-        logger.debug(s"[$supervisorName] Close the supervisor")
+      case Close(src) => {
+        logger.debug(s"[$supervisorName] Close the supervisor for $src")
 
         if (isEmpty) {
           context.stop(self)
@@ -245,13 +245,15 @@ private[api] trait Driver {
             }
           }
 
-        case Close if isEmpty => {
-          logger.debug(s"[$supervisorName] Close the supervisor")
+        case Close(src) if isEmpty => {
+          //logger.debug
+          println(s"[$supervisorName] Close the supervisor for $src")
           sender ! Closed
         }
 
-        case Close => {
-          logger.warn(s"[$supervisorName] Close received but already closing.")
+        case Close(src) => {
+          //logger.warn
+          println(s"[$supervisorName] Close request received from $src, but already closing.")
           waitingForClose += sender
           ()
         }
