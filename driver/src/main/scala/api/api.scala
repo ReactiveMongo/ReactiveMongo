@@ -30,9 +30,9 @@ import scala.concurrent.duration.{ Duration, FiniteDuration, SECONDS }
 
 import com.typesafe.config.Config
 
-import akka.actor.{ Actor, ActorRef, ActorSystem, Props, Terminated }
-import akka.pattern._
 import akka.util.Timeout
+import akka.actor.{ Actor, ActorRef, ActorSystem, Props, Terminated }
+import akka.pattern.ask
 
 import reactivemongo.core.actors.{
   AuthRequest,
@@ -276,9 +276,6 @@ class MongoConnection(
     val actorSystem: ActorSystem,
     val mongosystem: ActorRef,
     val options: MongoConnectionOptions) {
-
-  import akka.pattern.ask
-  import akka.util.Timeout
 
   private[api] val logger = LazyLogger("reactivemongo.api.Failover2")
 
@@ -761,7 +758,11 @@ class MongoDriver(config: Option[Config] = None) {
 
   def numConnections: Int = connectionMonitors.size
 
-  def close(timeout: FiniteDuration = FiniteDuration(1, SECONDS)) = {
+  /**
+   * Closes this driver (and all its connections and resources).
+   * Awaits the termination until the timeout is expired.
+   */
+  def close(timeout: FiniteDuration = FiniteDuration(2, SECONDS)): Unit = {
     // Terminate actors used by MongoConnections
     connections.foreach(_.close())
 
@@ -770,10 +771,17 @@ class MongoDriver(config: Option[Config] = None) {
     // and then shut down the ActorSystem as it is exiting.
     supervisorActor ! Close
 
-    // When the actorSystem is shutdown,
-    // it means that supervisorActor has exited (run its postStop).
-    // So, wait for that event.
-    system.awaitTermination(timeout)
+    if (!system.isTerminated) {
+      // When the actorSystem is shutdown,
+      // it means that supervisorActor has exited (run its postStop).
+      // So, wait for that event.
+
+      try {
+        system.awaitTermination(timeout)
+      } catch {
+        case e: Throwable if !system.isTerminated => throw e
+      }
+    }
   }
 
   /**
@@ -869,7 +877,7 @@ class MongoDriver(config: Option[Config] = None) {
 
   private case class AddConnection(options: MongoConnectionOptions, mongosystem: ActorRef)
 
-  private case class CloseWithTimeout(timeout: FiniteDuration)
+  //private case class CloseWithTimeout(timeout: FiniteDuration)
 
   private case class SupervisorActor(driver: MongoDriver) extends Actor {
     def isEmpty = driver.connectionMonitors.isEmpty
@@ -883,9 +891,11 @@ class MongoDriver(config: Option[Config] = None) {
 
       case Terminated(actor) => driver.connectionMonitors.remove(actor)
 
+      /*
       case CloseWithTimeout(timeout) =>
         if (isEmpty) context.stop(self)
         else context.become(closing(timeout))
+         */
 
       case Close =>
         if (isEmpty) context.stop(self)
@@ -893,16 +903,18 @@ class MongoDriver(config: Option[Config] = None) {
     }
 
     def closing(shutdownTimeout: FiniteDuration): Receive = {
-      case ac: AddConnection =>
+      case AddConnection(_, _) =>
         logger.warn("Refusing to add connection while MongoDriver is closing.")
-      case Terminated(actor) =>
-        driver.connectionMonitors.remove(actor)
-        if (isEmpty) {
-          context.stop(self)
-        }
 
+      case Terminated(actor) => {
+        driver.connectionMonitors.remove(actor)
+        if (isEmpty) context.stop(self)
+      }
+
+      /*
       case CloseWithTimeout(timeout) =>
         logger.warn("CloseWithTimeout ignored, already closing.")
+         */
 
       case Close => logger.warn("Close ignored, already closing.")
     }
