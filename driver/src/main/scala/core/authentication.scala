@@ -94,7 +94,8 @@ private[reactivemongo] trait MongoScramSha1Authentication {
         { e =>
           val msg = s"error while processing getNonce response #${response.header.responseTo}"
 
-          logger.warn(s"AUTH: $msg")
+          //logger.warn
+          println(s"AUTH: $msg")
           logger.debug("SCRAM-SHA1 getNonce failure", e)
           authenticationResponse(response)(_ => Left(FailedAuthentication(msg)))
         }, { challenge =>

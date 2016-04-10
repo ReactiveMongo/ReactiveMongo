@@ -163,17 +163,20 @@ object Resolvers {
 object Dependencies {
   val netty = "io.netty" % "netty" % "3.10.5.Final" cross CrossVersion.Disabled
 
-  val akkaActor = "com.typesafe.akka" %% "akka-actor" % "2.3.6"
+  // TODO: Update
+  val akkaActor = "com.typesafe.akka" %% "akka-actor" % "2.3.13"
 
   val playIteratees = "com.typesafe.play" %% "play-iteratees" % "2.3.10"
 
   val specs = "org.specs2" %% "specs2-core" % "3.7.2" % Test
 
-  val logApiVersion = "1.7.12"
+  val slf4jVer = "1.7.12"
+  val log4jVer = "2.5"
   val logApi = Seq(
-    "org.slf4j" % "slf4j-api" % logApiVersion % "provided",
-    "org.apache.logging.log4j" % "log4j-api" % "2.0.2" // deprecated
-  )
+    "org.slf4j" % "slf4j-api" % slf4jVer % "provided",
+    "org.apache.logging.log4j" % "log4j-api" % log4jVer // deprecated
+  ) ++ Seq("log4j-core", "log4j-slf4j-impl").map(
+    "org.apache.logging.log4j" % _ % log4jVer % Test)
 
   val shapelessTest = "com.chuusai" % "shapeless" % "2.0.0" %
   Test cross CrossVersion.binaryMapped {

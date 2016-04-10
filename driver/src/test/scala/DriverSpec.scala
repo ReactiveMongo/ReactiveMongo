@@ -37,7 +37,15 @@ object DriverSpec extends org.specs2.mutable.Specification {
   val hosts = Seq(primaryHost)
 
   "Connection pool" should {
-    "cleanly start and close with no connections" in {
+    "cleanly start and close with no connections #1" in {
+      val md = MongoDriver()
+
+      md.numConnections must_== 0 and (
+        md.close() must not(throwA[Throwable]))
+
+    }
+
+    "cleanly start and close with no connections #2" in {
       val md = MongoDriver()
 
       md.numConnections must_== 0 and (
