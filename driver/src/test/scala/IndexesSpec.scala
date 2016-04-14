@@ -4,8 +4,7 @@ import reactivemongo.api.indexes._
 import reactivemongo.api.indexes.IndexType.{ Hashed, Geo2D, Geo2DSpherical }
 import reactivemongo.bson._
 import reactivemongo.core.errors.DatabaseException
-import scala.concurrent.Future
-import scala.concurrent.Await
+import scala.concurrent.{ Await, Future }
 
 import org.specs2.concurrent.{ ExecutionEnv => EE }
 
