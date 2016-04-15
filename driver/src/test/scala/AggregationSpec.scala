@@ -1,6 +1,6 @@
 import scala.collection.immutable.ListSet
 
-import scala.concurrent.{ ExecutionContext, Future }
+import scala.concurrent.{ Await, ExecutionContext, Future }
 
 import reactivemongo.bson._
 import reactivemongo.api.collections.bson.BSONCollection
@@ -14,7 +14,15 @@ object AggregationSpec extends org.specs2.mutable.Specification {
 
   sequential
 
-  lazy val coll = db("zipcodes")
+  val colName = s"zipcodes${System identityHashCode this}"
+  lazy val coll = {
+    import ExecutionContext.Implicits.global
+    import reactivemongo.api.indexes._, IndexType._
+
+    val c = db(colName)
+    Await.result(c.indexesManager.ensure(Index(
+      List("city" -> Text, "state" -> Text))).map(_ => c), timeout * 2)
+  }
 
   case class Location(lon: Double, lat: Double)
 
@@ -99,6 +107,43 @@ object AggregationSpec extends org.specs2.mutable.Specification {
         "with limit (maxDocs)" in { implicit ee: EE =>
           collect(coll, 2) aka "cursor result" must beEqualTo(expected take 2).
             await(1, timeout)
+        }
+
+        "with metadata sort" in { implicit ee: EE =>
+          import coll.BatchCommands.AggregationFramework
+          import AggregationFramework.{
+            Cursor,
+            Match,
+            MetadataSort,
+            Sort,
+            TextScore
+          }
+
+          val firstOp = Match(BSONDocument(
+            "$text" -> BSONDocument("$search" -> "JP")))
+
+          val pipeline = List(Sort(MetadataSort("score", TextScore)))
+          val expected = List(BSONDocument(
+            "_id" -> "JP-13",
+            "city" -> "TOKYO",
+            "state" -> "JP",
+            "population" -> 13185502L,
+            "location" -> BSONDocument(
+              "lon" -> 35.683333D,
+              "lat" -> 139.683333D)),
+            BSONDocument(
+              "_id" -> "AO",
+              "city" -> "AOGASHIMA",
+              "state" -> "JP",
+              "population" -> 200L,
+              "location" -> BSONDocument(
+                "lon" -> 32.457D,
+                "lat" -> 139.767D)))
+
+          coll.aggregate1[BSONDocument](firstOp, pipeline, Cursor(1)).
+            flatMap(_.collect[List](4)) must beEqualTo(expected).
+            await(1, timeout)
+
         }
       }
     }
