@@ -17,7 +17,7 @@
 import org.specs2.mutable._
 import reactivemongo.bson._
 
-object Types extends Specification {
+class Types extends Specification {
   "BSON types" title
 
   "Generating BSONObjectID" should {
@@ -39,12 +39,15 @@ object Types extends Specification {
       BSONDocument().elements must beEmpty and (
         BSONDocument.empty.elements must beEmpty) and (
           document.elements must beEmpty) and (
-            document().elements must beEmpty)
+            document().elements must beEmpty) and (
+              BSONDocument.empty.contains("foo") must beFalse)
     }
 
     "be created with a new element " in {
       val doc = BSONDocument.empty ++ ("foo" -> 1)
-      doc must_== BSONDocument("foo" -> 1)
+
+      doc must_== BSONDocument("foo" -> 1) and (
+        doc.contains("foo") must beTrue)
     }
 
     "remove specified elements" in {

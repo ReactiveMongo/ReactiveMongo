@@ -71,14 +71,16 @@ object BSONAggregationImplicits {
   implicit object AggregationResultReader
       extends DealingWithGenericCommandErrorsReader[AggregationResult] {
     def readResult(doc: BSONDocument): AggregationResult =
-      doc.getAs[List[BSONDocument]]("result") match {
-        case Some(docs) => AggregationResult(docs, None)
-        case _ => (for {
-          cursor <- doc.getAsTry[BSONDocument]("cursor")
-          id <- cursor.getAsTry[BSONNumberLike]("id").map(_.toLong)
-          ns <- cursor.getAsTry[String]("ns")
-          firstBatch <- cursor.getAsTry[List[BSONDocument]]("firstBatch")
-        } yield AggregationResult(firstBatch, Some(ResultCursor(id, ns)))).get
+      if (doc contains "stages") AggregationResult(List(doc), None) else {
+        doc.getAs[List[BSONDocument]]("result") match {
+          case Some(docs) => AggregationResult(docs, None)
+          case _ => (for {
+            cursor <- doc.getAsTry[BSONDocument]("cursor")
+            id <- cursor.getAsTry[BSONNumberLike]("id").map(_.toLong)
+            ns <- cursor.getAsTry[String]("ns")
+            firstBatch <- cursor.getAsTry[List[BSONDocument]]("firstBatch")
+          } yield AggregationResult(firstBatch, Some(ResultCursor(id, ns)))).get
+        }
       }
   }
 }

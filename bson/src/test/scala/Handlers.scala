@@ -18,7 +18,7 @@ package reactivemongo.bson
  */
 import java.util.Date
 
-object Handlers extends org.specs2.mutable.Specification {
+class Handlers extends org.specs2.mutable.Specification {
   val doc = BSONDocument(
     "name" -> "James",
     "age" -> 27,
