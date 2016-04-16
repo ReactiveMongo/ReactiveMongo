@@ -40,7 +40,7 @@ object AggregationSpec extends org.specs2.mutable.Specification {
       Location(35.683333, 139.683333)),
     ZipCode("AO", "AOGASHIMA", "JP", 200L, Location(32.457, 139.767)))
 
-  "Zip codes" should {
+  "Zip codes collection" should {
     "be inserted" in { implicit ee: EE =>
       def insert(data: List[ZipCode]): Future[Unit] = data.headOption match {
         case Some(zip) => coll.insert(zip).flatMap(_ => insert(data.tail))
@@ -63,6 +63,23 @@ object AggregationSpec extends org.specs2.mutable.Specification {
         Match(document("totalPop" ->
           document("$gte" -> 10000000L))))).map(_.firstBatch).
         aka("results") must beEqualTo(expected).await(1, timeout)
+    }
+
+    "explain simple result" in { implicit ee: EE =>
+      val expected = List(document("_id" -> "JP", "totalPop" -> 13185702L),
+        document("_id" -> "NY", "totalPop" -> 19746227L))
+
+      import coll.BatchCommands.AggregationFramework
+      import AggregationFramework.{ Group, Match, SumField }
+
+      coll.aggregate(Group(BSONString("$state"))(
+        "totalPop" -> SumField("population")), List(
+        Match(document("totalPop" ->
+          document("$gte" -> 10000000L)))), explain = true).map(_.firstBatch).
+        aka("results") must beLike[List[BSONDocument]] {
+          case explainResult :: Nil =>
+            explainResult.getAs[BSONArray]("stages") must beSome
+        }.await(1, timeout)
     }
 
     "return average city population by state" >> {
