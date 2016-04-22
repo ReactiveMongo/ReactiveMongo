@@ -44,7 +44,7 @@ trait DatabaseException extends ReactiveMongoException {
   /** error code */
   def code: Option[Int]
 
-  override def getMessage: String = "DatabaseException['$message'" + code.map(c => s" (code = $c)").getOrElse("") + "]"
+  override def getMessage: String = s"DatabaseException['$message'" + code.map(c => s" (code = $c)").getOrElse("") + "]"
 
   /** Tells if this error is due to a write on a secondary node. */
   def isNotAPrimaryError: Boolean = code.map {
