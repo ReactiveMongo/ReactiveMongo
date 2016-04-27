@@ -246,7 +246,9 @@ object ReactiveMongoBuild extends Build {
         playIteratees,
         commonsCodec,
         shapelessTest,
-        specs) ++ logApi,
+        specs,
+        ("org.reactivemongo" % "reactivemongo-shaded" % version.value).
+          exclude("io.netty", "netty")) ++ logApi,
       binaryIssueFilters ++= {
         import ProblemFilters.{ exclude => x }
         @inline def mmp(s: String) = x[MissingMethodProblem](s)
@@ -468,7 +470,6 @@ object ReactiveMongoBuild extends Build {
             "reactivemongo.api.commands.AggregationFramework#Redact.document"),
           mmp("reactivemongo.api.DefaultDB.sister"),
           mmp("reactivemongo.api.DB.sister"))
-
 
       },
       testOptions in Test += Tests.Cleanup(cl => {
