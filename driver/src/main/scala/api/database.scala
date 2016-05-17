@@ -34,12 +34,8 @@ import scala.concurrent.duration._
  * import reactivemongo.api._
  *
  * val connection = MongoConnection( List( "localhost:27016" ) )
- * val db = connection("plugin")
+ * val db = connection.database("plugin")
  * val collection = db("acoll")
- *
- * // more explicit way
- * val db2 = connection.db("plugin")
- * val collection2 = db2.collection("plugin")
  * }}}
  */
 sealed trait DB {

@@ -685,16 +685,22 @@ object DefaultCursor {
           err(b.result(), t).map[Builder[A, M[A]]](_ => b)
         }).map(_.result())
 
+    private[reactivemongo] def nextResponse(maxDocs: Int): (ExecutionContext, Response) => Future[Option[Response]] = {
+      if (!tailable) { (ec: ExecutionContext, r: Response) =>
+        if (!hasNext(r, maxDocs)) Future.successful(Option.empty[Response])
+        else next(r, maxDocs)(ec)
+      } else { (ec: ExecutionContext, r: Response) =>
+        tailResponse(r, maxDocs)(ec)
+      }
+    }
+
     private class FoldResponses[T](
         z: => T, maxDocs: Int,
         suc: (T, Response) => State[T],
         err: ErrorHandler[T])(implicit ctx: ExecutionContext) {
 
-      private val nextResponse: Response => Future[Option[Response]] =
-        if (!tailable) { (r: Response) =>
-          if (!hasNext(r, maxDocs)) Future.successful(Option.empty[Response])
-          else next(r, maxDocs)
-        } else tailResponse(_: Response, maxDocs)
+      private val nextResp: Response => Future[Option[Response]] =
+        nextResponse(maxDocs)(ctx, _: Response)
 
       @inline def ok(r: Response, v: T) = {
         // Releases cursor before ending
@@ -724,7 +730,7 @@ object DefaultCursor {
                 /* already marked recoverable */ kill(r, u)
               case Fail(f) => kill(r, Unrecoverable(f))
               case Cont(v) =>
-                nextResponse(r).flatMap(_.fold(Future successful v) { x =>
+                nextResp(r).flatMap(_.fold(Future successful v) { x =>
                   procResponses(Future.successful(x), v, nc)
                 })
             }
