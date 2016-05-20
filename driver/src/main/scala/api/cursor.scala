@@ -233,6 +233,13 @@ trait Cursor[T] {
    */
   @deprecated(message = "Use the Play Iteratee modules", since = "0.11.10")
   def rawEnumerateResponses(maxDocs: Int = Int.MaxValue)(implicit ctx: ExecutionContext): Enumerator[Response]
+
+  // ---
+
+  private[reactivemongo] def makeRequest(maxDocs: Int)(implicit ctx: ExecutionContext): Future[Response]
+
+  private[reactivemongo] def nextResponse(maxDocs: Int): (ExecutionContext, Response) => Future[Option[Response]]
+
 }
 
 class FlattenedCursor[T](cursor: Future[Cursor[T]]) extends Cursor[T] {
@@ -259,6 +266,14 @@ class FlattenedCursor[T](cursor: Future[Cursor[T]]) extends Cursor[T] {
   @deprecated(message = "Use the Play Iteratee modules", since = "0.11.10")
   def rawEnumerateResponses(maxDocs: Int = Int.MaxValue)(implicit ctx: ExecutionContext): Enumerator[Response] =
     Enumerator.flatten(cursor.map(_.rawEnumerateResponses(maxDocs)))
+
+  def makeRequest(maxDocs: Int)(implicit ctx: ExecutionContext): Future[Response] = cursor.flatMap(_.makeRequest(maxDocs))
+
+  def nextResponse(maxDocs: Int): (ExecutionContext, Response) => Future[Option[Response]] = { (ec, response) =>
+    implicit def executionContext = ec
+
+    cursor.flatMap(_.nextResponse(maxDocs)(ec, response))
+  }
 }
 
 /**
@@ -294,6 +309,9 @@ trait WrappedCursor[T] extends Cursor[T] {
 
   def foldWhile[A](z: => A, maxDocs: Int = Int.MaxValue)(suc: (A, T) => Cursor.State[A], err: Cursor.ErrorHandler[A])(implicit ctx: ExecutionContext): Future[A] = wrappee.foldWhile(z, maxDocs)(suc, err)
 
+  def makeRequest(maxDocs: Int)(implicit ctx: ExecutionContext): Future[Response] = wrappee.makeRequest(maxDocs)
+
+  def nextResponse(maxDocs: Int): (ExecutionContext, Response) => Future[Option[Response]] = wrappee.nextResponse(maxDocs)
 }
 
 /** Cursor companion object */
@@ -395,8 +413,7 @@ object DefaultCursor {
     val documentIterator =
       ReplyDocumentIterator(pack)(_: Reply, _: ChannelBuffer)(reader)
 
-    @inline
-    def makeRequest(maxDocs: Int)(implicit ctx: ExecutionContext): Future[Response] = Failover2(mongoConnection, failoverStrategy) { () =>
+    @inline def makeRequest(maxDocs: Int)(implicit ctx: ExecutionContext): Future[Response] = Failover2(mongoConnection, failoverStrategy) { () =>
       import reactivemongo.core.netty.ChannelBufferReadableBuffer
 
       val nrt = query.numberToReturn
@@ -685,7 +702,7 @@ object DefaultCursor {
           err(b.result(), t).map[Builder[A, M[A]]](_ => b)
         }).map(_.result())
 
-    private[reactivemongo] def nextResponse(maxDocs: Int): (ExecutionContext, Response) => Future[Option[Response]] = {
+    def nextResponse(maxDocs: Int): (ExecutionContext, Response) => Future[Option[Response]] = {
       if (!tailable) { (ec: ExecutionContext, r: Response) =>
         if (!hasNext(r, maxDocs)) Future.successful(Option.empty[Response])
         else next(r, maxDocs)(ec)
