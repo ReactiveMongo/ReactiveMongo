@@ -147,6 +147,12 @@ class Failover2[A](producer: () => Future[A], connection: MongoConnection, strat
 
   private def _next(): Future[A] = producer()
 
+  private val mutex = {
+    val sem = new java.util.concurrent.Semaphore(1, true)
+    sem.drainPermits()
+    sem
+  }
+
   private def send(n: Int): Future[A] =
     next().map[Try[A]](Success(_)).recover[Try[A]] {
       case err => Failure(err)
@@ -160,16 +166,15 @@ class Failover2[A](producer: () => Future[A], connection: MongoConnection, strat
 
           logger.debug(s"Got an error, retrying... (try #${`try`} is scheduled in ${delay.toMillis} ms)", e)
 
-          val lock = new AnyRef {}
-
           connection.actorSystem.scheduler.scheduleOnce(delay) {
-            lock.synchronized(lock.notify)
+            mutex.release()
           }
 
-          lock.synchronized {
-            lock.wait()
-            send(`try`)
-          }
+          if (!mutex.tryAcquire(delay.length, delay.unit)) {
+            Future.failed[A](new InterruptedException(
+              s"fails to retry ${`try`}"))
+
+          } else send(`try`)
         } else {
           // generally that means that the primary is not available
           // or the nodeset is unreachable
@@ -285,6 +290,7 @@ class MongoConnection(
    * @param name the database name
    * @param failoverStrategy the failover strategy for sending requests.
    */
+  @deprecated(message = "Use [[database]]", since = "0.11.8")
   def apply(name: String, failoverStrategy: FailoverStrategy = options.failoverStrategy)(implicit context: ExecutionContext): DefaultDB = {
     metadata.foreach {
       case ProtocolMetadata(_, MongoWireVersion.V24AndBefore, _, _, _) =>
@@ -543,8 +549,9 @@ object MongoConnection {
   /**
    * @param hosts the hosts of the servers of the MongoDB replica set
    * @param options the connection options
+   * @param ignoredOptions the options ignored from the parsed URI
    * @param db the name of the database
-   * @param authentication the authenticate information (see [[MongoConnectionOptions.authMode]])
+   * @param authenticate the authenticate information (see [[MongoConnectionOptions.authMode]])
    */
   final case class ParsedURI(
     hosts: List[(String, Int)],
@@ -731,6 +738,9 @@ object MongoConnection {
   }
 }
 
+/**
+ * @param config a custom configuration (otherwise the default options are used)
+ */
 class MongoDriver(config: Option[Config] = None) {
   import scala.collection.mutable.{ Map => MutableMap }
 
