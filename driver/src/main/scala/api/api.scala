@@ -32,7 +32,7 @@ import com.typesafe.config.Config
 
 import akka.util.Timeout
 import akka.actor.{ Actor, ActorRef, ActorSystem, Props, Terminated }
-import akka.pattern.ask
+import akka.pattern.{ after, ask }
 
 import reactivemongo.core.actors.{
   AuthRequest,
@@ -166,15 +166,7 @@ class Failover2[A](producer: () => Future[A], connection: MongoConnection, strat
 
           logger.debug(s"Got an error, retrying... (try #${`try`} is scheduled in ${delay.toMillis} ms)", e)
 
-          connection.actorSystem.scheduler.scheduleOnce(delay) {
-            mutex.release()
-          }
-
-          if (!mutex.tryAcquire(delay.length, delay.unit)) {
-            Future.failed[A](new InterruptedException(
-              s"fails to retry ${`try`}"))
-
-          } else send(`try`)
+          after(delay, connection.actorSystem.scheduler)(send(`try`))
         } else {
           // generally that means that the primary is not available
           // or the nodeset is unreachable
