@@ -268,8 +268,9 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
    *
    * @return An `Iteratee` that will consume data to put into a GridFS store.
    */
+  @deprecated("Will be moved to the separate iteratee module", "0.12.0")
   def iteratee[Id <: pack.Value](file: FileToSave[pack.type, Id], chunkSize: Int = 262144)(implicit readFileReader: pack.Reader[ReadFile[P, Id]], ctx: ExecutionContext, idProducer: IdProducer[Id], docWriter: BSONDocumentWriter[file.pack.Document]): Iteratee[Array[Byte], Future[ReadFile[P, Id]]] = {
-    implicit val ec = db.connection.actorSystem
+    implicit def ec = db.connection.actorSystem
     import java.security.MessageDigest
 
     case class Chunk(
