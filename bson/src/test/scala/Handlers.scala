@@ -90,14 +90,23 @@ class Handlers extends org.specs2.mutable.Specification {
             num.toLong mustEqual 3) and (num.toInt mustEqual 3)
       }
 
-      val tryBooleanLike = doc.getAsTry[BSONBooleanLike]("score")
-      tryBooleanLike.isSuccess must beTrue
-      tryBooleanLike.get.toBoolean must beTrue
+      doc.getAsTry[BSONBooleanLike]("score").
+        map(_.toBoolean) must beSuccessfulTry(true)
     }
 
     "should not have a surname2" in {
       doc.getTry("surname2") must beFailedTry and (
         doc.getUnflattenedTry("surname2") must beSuccessfulTry(None))
+    }
+
+    "should be read" in {
+      BSONDocumentReader(_.getAsTry[String]("name").get).read(doc).
+        aka("name") must_== "James"
+    }
+
+    "be written" in {
+      BSONDocumentWriter { s: String => BSONDocument("$foo" -> s) }.
+        write("bar") must_== BSONDocument("$foo" -> "bar")
     }
   }
 

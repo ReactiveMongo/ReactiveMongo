@@ -143,14 +143,40 @@ trait VariantBSONWriter[-T, +B <: BSONValue] {
    * If used outside a reader, one should consider `writeTry(bson: B): Try[T]` or `writeOpt(bson: B): Option[T]`.
    */
   def write(t: T): B
+
   /** Tries to produce a BSON value from an instance of `T`, returns `None` if an error occurred. */
   def writeOpt(t: T): Option[B] = writeTry(t).toOption
+
   /** Tries to produce a BSON value from an instance of `T`. */
   def writeTry(t: T): Try[B] = Try(write(t))
 }
 
 trait BSONDocumentReader[T] extends BSONReader[BSONDocument, T]
+
+object BSONDocumentReader {
+  private class Default[T](
+      _read: BSONDocument => T) extends BSONDocumentReader[T] {
+
+    def read(value: BSONDocument): T = _read(value)
+  }
+
+  def apply[T](read: BSONDocument => T): BSONDocumentReader[T] =
+    new Default[T](read)
+}
+
 trait BSONDocumentWriter[T] extends BSONWriter[T, BSONDocument]
+
+object BSONDocumentWriter {
+  private class Default[T](
+      _write: T => BSONDocument) extends BSONDocumentWriter[T] {
+
+    def write(value: T): BSONDocument = _write(value)
+  }
+
+  def apply[T](write: T => BSONDocument): BSONDocumentWriter[T] =
+    new Default[T](write)
+}
+
 trait VariantBSONDocumentReader[+T] extends VariantBSONReader[BSONDocument, T]
 trait VariantBSONDocumentWriter[-T] extends VariantBSONWriter[T, BSONDocument]
 
