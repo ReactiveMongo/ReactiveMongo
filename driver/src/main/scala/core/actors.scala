@@ -791,7 +791,7 @@ trait MongoDBSystem extends Actor {
       case _ => ( /* already completed */ )
     }
 
-    awaitingResponses.empty
+    awaitingResponses.clear()
 
     ns
   }
