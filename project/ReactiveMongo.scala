@@ -168,7 +168,7 @@ object Dependencies {
 
   val playIteratees = "com.typesafe.play" %% "play-iteratees" % "2.3.10"
 
-  val specs = "org.specs2" %% "specs2-core" % "3.7.2" % Test
+  val specs = "org.specs2" %% "specs2-core" % "3.8.2" % Test
 
   val slf4jVer = "1.7.12"
   val log4jVer = "2.5"
@@ -254,11 +254,77 @@ object ReactiveMongoBuild extends Build {
         @inline def mmp(s: String) = x[MissingMethodProblem](s)
         @inline def imt(s: String) = x[IncompatibleMethTypeProblem](s)
         @inline def fmp(s: String) = x[FinalMethodProblem](s)
+        @inline def fcp(s: String) = x[FinalClassProblem](s)
         @inline def irt(s: String) = x[IncompatibleResultTypeProblem](s)
         @inline def mtp(s: String) = x[MissingTypesProblem](s)
         @inline def mcp(s: String) = x[MissingClassProblem](s)
 
         Seq(
+          fcp("reactivemongo.core.nodeset.ChannelFactory"),
+          mcp("reactivemongo.core.actors.RefreshAllNodes"),
+          mcp("reactivemongo.core.actors.RefreshAllNodes$"),
+          mmp("reactivemongo.core.actors.MongoDBSystem.DefaultConnectionRetryInterval"),
+          imt("reactivemongo.core.netty.ChannelBufferReadableBuffer.apply"),
+          irt("reactivemongo.core.netty.ChannelBufferReadableBuffer.buffer"),
+          imt("reactivemongo.core.netty.ChannelBufferReadableBuffer.this"),
+          irt("reactivemongo.core.netty.ChannelBufferWritableBuffer.buffer"),
+          imt(
+            "reactivemongo.core.netty.ChannelBufferWritableBuffer.writeBytes"),
+          imt("reactivemongo.core.netty.ChannelBufferWritableBuffer.this"),
+          irt("reactivemongo.core.netty.BufferSequence.merged"),
+          imt("reactivemongo.core.netty.BufferSequence.this"),
+          imt("reactivemongo.core.netty.BufferSequence.apply"),
+          imt("reactivemongo.core.protocol.package.RichBuffer"),
+          imt(
+            "reactivemongo.core.protocol.BufferAccessors.writeTupleToBuffer2"),
+          imt(
+            "reactivemongo.core.protocol.BufferAccessors.writeTupleToBuffer4"),
+          imt(
+            "reactivemongo.core.protocol.BufferAccessors.writeTupleToBuffer3"),
+          mtp("reactivemongo.core.protocol.MongoHandler"),
+          imt("reactivemongo.core.protocol.MongoHandler.exceptionCaught"),
+          imt("reactivemongo.core.protocol.MongoHandler.channelConnected"),
+          imt("reactivemongo.core.protocol.MongoHandler.writeComplete"),
+          imt("reactivemongo.core.protocol.MongoHandler.log"),
+          imt("reactivemongo.core.protocol.MongoHandler.writeRequested"),
+          imt("reactivemongo.core.protocol.MongoHandler.messageReceived"),
+          imt("reactivemongo.core.protocol.MongoHandler.channelClosed"),
+          imt("reactivemongo.core.protocol.MongoHandler.channelDisconnected"),
+          mtp("reactivemongo.core.protocol.ResponseDecoder"),
+          imt("reactivemongo.core.protocol.ResponseDecoder.decode"),
+          mtp("reactivemongo.core.protocol.ResponseFrameDecoder"),
+          imt("reactivemongo.core.protocol.ResponseFrameDecoder.decode"),
+          imt("reactivemongo.core.protocol.BufferAccessors#BufferInteroperable.apply"),
+          mtp("reactivemongo.core.protocol.RequestEncoder"),
+          imt("reactivemongo.core.protocol.RequestEncoder.encode"),
+          mmp("reactivemongo.core.protocol.ChannelBufferReadable.apply"),
+          imt("reactivemongo.core.protocol.ChannelBufferReadable.readFrom"),
+          imt("reactivemongo.core.protocol.MessageHeader.readFrom"),
+          imt("reactivemongo.core.protocol.MessageHeader.apply"),
+          imt("reactivemongo.core.protocol.Response.copy"),
+          irt("reactivemongo.core.protocol.Response.documents"),
+          imt("reactivemongo.core.protocol.Response.this"),
+          imt("reactivemongo.core.protocol.ReplyDocumentIterator.apply"),
+          imt("reactivemongo.core.protocol.Response.apply"),
+          irt("reactivemongo.core.protocol.package#RichBuffer.writeString"),
+          irt("reactivemongo.core.protocol.package#RichBuffer.buffer"),
+          irt("reactivemongo.core.protocol.package#RichBuffer.writeCString"),
+          imt("reactivemongo.core.protocol.package#RichBuffer.this"),
+          imt("reactivemongo.core.protocol.Reply.readFrom"),
+          imt("reactivemongo.core.protocol.Reply.apply"),
+          imt("reactivemongo.core.nodeset.Connection.apply"),
+          imt("reactivemongo.core.nodeset.Connection.copy"),
+          irt("reactivemongo.core.nodeset.Connection.send"),
+          irt("reactivemongo.core.nodeset.Connection.channel"),
+          imt("reactivemongo.core.nodeset.Connection.this"),
+          irt("reactivemongo.core.nodeset.ChannelFactory.channelFactory"),
+          irt("reactivemongo.core.nodeset.ChannelFactory.create"),
+          mcp("reactivemongo.api.MongoDriver$CloseWithTimeout"),
+          mcp("reactivemongo.api.MongoDriver$CloseWithTimeout$"),
+          mtp("reactivemongo.api.FailoverStrategy$"),
+          irt(
+            "reactivemongo.api.collections.GenericCollection#BulkMaker.result"),
+          irt("reactivemongo.api.collections.GenericCollection#Mongo26WriteCommand.result"),
           x[IncompatibleTemplateDefProblem](
             "reactivemongo.core.actors.MongoDBSystem"),
           mcp("reactivemongo.core.actors.RequestIds"),

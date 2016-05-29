@@ -72,12 +72,18 @@ case class NodeSet(
   /** The node which is the current primary one. */
   val primary: Option[Node] = nodes.find(_.status == NodeStatus.Primary)
 
+  /** The `mongos` node, if any. */
   val mongos: Option[Node] = nodes.find(_.isMongos)
 
   val secondaries = new RoundRobiner(nodes.filter(_.status == NodeStatus.Secondary))
   val queryable = secondaries.subject ++ primary
+
+  /** See the [[https://docs.mongodb.com/manual/reference/read-preference/#nearest nearest]] read preference. */
   val nearestGroup = new RoundRobiner(queryable.sortWith { _.pingInfo.ping < _.pingInfo.ping })
+
+  /** The first node from the [[nearestGroup]]. */
   val nearest = nearestGroup.subject.headOption
+
   val protocolMetadata = primary.orElse(secondaries.subject.headOption).map(_.protocolMetadata).getOrElse(ProtocolMetadata.Default)
 
   def primary(authenticated: Authenticated): Option[Node] =

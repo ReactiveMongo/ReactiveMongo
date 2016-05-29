@@ -1,13 +1,17 @@
 import play.api.libs.iteratee._
-import reactivemongo.api.gridfs.{ ReadFile, DefaultFileToSave, GridFS }
-import reactivemongo.api.gridfs.Implicits._
+
+import reactivemongo.api.BSONSerializationPack
+import reactivemongo.api.gridfs.{
+  DefaultFileToSave,
+  GridFS,
+  Implicits,
+  ReadFile
+}, Implicits._
 import reactivemongo.bson._
-import scala.concurrent._
-import reactivemongo.api.gridfs
 
 import org.specs2.concurrent.{ ExecutionEnv => EE }
 
-object GridfsSpec extends org.specs2.mutable.Specification {
+class GridfsSpec extends org.specs2.mutable.Specification {
   "GridFS" title
 
   import Common._
@@ -17,7 +21,8 @@ object GridfsSpec extends org.specs2.mutable.Specification {
   lazy val gfs = GridFS(db)
 
   lazy val file = DefaultFileToSave(Some("somefile"), Some("application/file"))
-  lazy val fileContent = Enumerator((1 to 100).view.map(_.toByte).toArray)
+  lazy val bytes = (1 to 100).view.map(_.toByte).toArray
+  def fileContent = Enumerator(bytes)
 
   "ReactiveMongo" should {
     "store a file in gridfs" in { implicit ee: EE =>
@@ -26,19 +31,21 @@ object GridfsSpec extends org.specs2.mutable.Specification {
     }
 
     "find this file in gridfs" in { implicit ee: EE =>
-      val futureFile = gfs.find(BSONDocument("filename" -> "somefile")).collect[List]()
-      val actual = Await.result(futureFile, timeout).head
-      (actual.filename mustEqual file.filename) and
-        (actual.uploadDate must beSome) and
-        (actual.contentType mustEqual file.contentType)
+      gfs.find(BSONDocument("filename" -> "somefile")).
+        headOption must beSome[ReadFile[BSONSerializationPack.type, BSONValue]].
+        which { actual =>
+          (actual.filename must_== file.filename) and
+            (actual.uploadDate must beSome) and
+            (actual.contentType must_== file.contentType) and
+            (actual.length must_== 100) and {
+              import scala.collection.mutable.ArrayBuilder
+              def res = gfs.enumerate(actual) |>>> Iteratee.fold(ArrayBuilder.make[Byte]()) { (result, arr) =>
+                result ++= arr
+              }
 
-      import scala.collection.mutable.ArrayBuilder
-      def res = gfs.enumerate(actual) |>>> Iteratee.fold(ArrayBuilder.make[Byte]()) { (result, arr) =>
-        result ++= arr
-      }
-
-      res.map(_.result()) must beEqualTo((1 to 100).map(_.toByte).toArray).
-        await(1, timeout)
+              res.map(_.result()) must beEqualTo(bytes).await(1, timeout)
+            }
+        }.await(1, timeout)
     }
 
     "delete this file from gridfs" in { implicit ee: EE =>
