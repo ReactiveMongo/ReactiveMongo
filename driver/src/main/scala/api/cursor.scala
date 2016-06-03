@@ -92,8 +92,8 @@ trait Cursor[T] {
 
   /**
    * Collects all the documents into a collection of type `M[T]`.
-   * Given the `stopOnError` parameter (which defaults to true), the resulting Future may fail if any
-   * non-fatal exception occurs. If set to false, all the documents that caused exceptions are skipped.
+   * Given the `stopOnError` parameter (which defaults to true), the resulting Future may fail if any non-fatal exception occurs.
+   * If set to false, all the documents that caused exceptions are skipped.
    * Up to `maxDocs` returned by the database may be processed. If `stopOnError` is false, then documents that cause error
    * are dropped, so the result may contain a little less than `maxDocs` even if `maxDocs` documents were processed.
    *
@@ -144,6 +144,18 @@ trait Cursor[T] {
   def foldResponses[A](z: => A, maxDocs: Int = Int.MaxValue)(suc: (A, Response) => Cursor.State[A], err: ErrorHandler[A] = FailOnError[A]())(implicit ctx: ExecutionContext): Future[A]
 
   /**
+   * Applies a binary operator to a start value and all responses handled
+   * by this cursor, going first to last.
+   *
+   * @tparam A the result type of the binary operator.
+   * @param z the start value.
+   * @param maxDocs the maximum number of documents to be read.
+   * @param suc The binary operator to be applied when the next response is successfully read. This must be safe, and any error must be returned as `Future.failed[State[A]]`.
+   * @param err The binary operator to be applied when failing to get the next response. Exception or [[reactivemongo.api.Cursor$.Fail Fail]] raised within the `suc` function cannot be recovered by this error handler.
+   */
+  def foldResponsesM[A](z: => A, maxDocs: Int = Int.MaxValue)(suc: (A, Response) => Future[Cursor.State[A]], err: ErrorHandler[A] = FailOnError[A]())(implicit ctx: ExecutionContext): Future[A]
+
+  /**
    * Applies a binary operator to a start value and all bulks of documents
    * retrieved by this cursor, going first to last.
    *
@@ -156,13 +168,25 @@ trait Cursor[T] {
   def foldBulks[A](z: => A, maxDocs: Int = Int.MaxValue)(suc: (A, Iterator[T]) => Cursor.State[A], err: ErrorHandler[A] = FailOnError[A]())(implicit ctx: ExecutionContext): Future[A]
 
   /**
+   * Applies a binary operator to a start value and all bulks of documents
+   * retrieved by this cursor, going first to last.
+   *
+   * @tparam A the result type of the binary operator.
+   * @param z the start value.
+   * @param maxDocs the maximum number of documents to be read.
+   * @param suc the binary operator to be applied when the next response is successfully read. This must be safe, and any error must be returned as `Future.failed[State[A]]`.
+   * @param err the binary operator to be applied when failing to get the next response
+   */
+  def foldBulksM[A](z: => A, maxDocs: Int = Int.MaxValue)(suc: (A, Iterator[T]) => Future[Cursor.State[A]], err: ErrorHandler[A] = FailOnError[A]())(implicit ctx: ExecutionContext): Future[A]
+
+  /**
    * Applies a binary operator to a start value and all elements retrieved
    * by this cursor, going first to last.
    *
    * @tparam A the result type of the binary operator.
    * @param z the start value.
    * @param maxDocs the maximum number of documents to be read.
-   * @param suc the binary operator to be applied when the next document is successfully read.
+   * @param suc The binary operator to be applied when the next document is successfully read.
    * @param err the binary operator to be applied when failing to read the next document.
    *
    * {{{
@@ -171,6 +195,23 @@ trait Cursor[T] {
    * }}}
    */
   def foldWhile[A](z: => A, maxDocs: Int = Int.MaxValue)(suc: (A, T) => Cursor.State[A], err: ErrorHandler[A] = FailOnError[A]())(implicit ctx: ExecutionContext): Future[A]
+
+  /**
+   * Applies a binary operator to a start value and all elements retrieved
+   * by this cursor, going first to last.
+   *
+   * @tparam A the result type of the binary operator.
+   * @param z the start value.
+   * @param maxDocs the maximum number of documents to be read.
+   * @param suc The binary operator to be applied when the next document is successfully read. This must be safe, and any error must be returned as `Future.failed[State[A]]`.
+   * @param err the binary operator to be applied when failing to read the next document.
+   *
+   * {{{
+   * cursor.foldWhile(Nil: Seq[Person])((s, p) => Cursor.Cont(s :+ p),
+   *   { (l, e) => println("last valid value: " + l); Cursor.Fail(e) })
+   * }}}
+   */
+  def foldWhileM[A](z: => A, maxDocs: Int = Int.MaxValue)(suc: (A, T) => Future[Cursor.State[A]], err: ErrorHandler[A] = FailOnError[A]())(implicit ctx: ExecutionContext): Future[A]
 
   /**
    * Applies a binary operator to a start value and all elements retrieved
@@ -259,9 +300,15 @@ class FlattenedCursor[T](cursor: Future[Cursor[T]]) extends Cursor[T] {
 
   def foldResponses[A](z: => A, maxDocs: Int = Int.MaxValue)(suc: (A, Response) => Cursor.State[A], err: Cursor.ErrorHandler[A])(implicit ctx: ExecutionContext): Future[A] = cursor.flatMap(_.foldResponses(z, maxDocs)(suc, err))
 
+  def foldResponsesM[A](z: => A, maxDocs: Int = Int.MaxValue)(suc: (A, Response) => Future[Cursor.State[A]], err: Cursor.ErrorHandler[A])(implicit ctx: ExecutionContext): Future[A] = cursor.flatMap(_.foldResponsesM(z, maxDocs)(suc, err))
+
   def foldBulks[A](z: => A, maxDocs: Int = Int.MaxValue)(suc: (A, Iterator[T]) => Cursor.State[A], err: Cursor.ErrorHandler[A])(implicit ctx: ExecutionContext): Future[A] = cursor.flatMap(_.foldBulks(z, maxDocs)(suc, err))
 
+  def foldBulksM[A](z: => A, maxDocs: Int = Int.MaxValue)(suc: (A, Iterator[T]) => Future[Cursor.State[A]], err: Cursor.ErrorHandler[A])(implicit ctx: ExecutionContext): Future[A] = cursor.flatMap(_.foldBulksM(z, maxDocs)(suc, err))
+
   def foldWhile[A](z: => A, maxDocs: Int = Int.MaxValue)(suc: (A, T) => Cursor.State[A], err: Cursor.ErrorHandler[A])(implicit ctx: ExecutionContext): Future[A] = cursor.flatMap(_.foldWhile(z, maxDocs)(suc, err))
+
+  def foldWhileM[A](z: => A, maxDocs: Int = Int.MaxValue)(suc: (A, T) => Future[Cursor.State[A]], err: Cursor.ErrorHandler[A])(implicit ctx: ExecutionContext): Future[A] = cursor.flatMap(_.foldWhileM(z, maxDocs)(suc, err))
 
   @deprecated(message = "Use the Play Iteratee modules", since = "0.11.10")
   def rawEnumerateResponses(maxDocs: Int = Int.MaxValue)(implicit ctx: ExecutionContext): Enumerator[Response] =
@@ -305,9 +352,15 @@ trait WrappedCursor[T] extends Cursor[T] {
 
   def foldResponses[A](z: => A, maxDocs: Int = Int.MaxValue)(suc: (A, Response) => Cursor.State[A], err: Cursor.ErrorHandler[A])(implicit ctx: ExecutionContext): Future[A] = wrappee.foldResponses(z, maxDocs)(suc, err)
 
+  def foldResponsesM[A](z: => A, maxDocs: Int = Int.MaxValue)(suc: (A, Response) => Future[Cursor.State[A]], err: Cursor.ErrorHandler[A])(implicit ctx: ExecutionContext): Future[A] = wrappee.foldResponsesM(z, maxDocs)(suc, err)
+
   def foldBulks[A](z: => A, maxDocs: Int = Int.MaxValue)(suc: (A, Iterator[T]) => Cursor.State[A], err: Cursor.ErrorHandler[A])(implicit ctx: ExecutionContext): Future[A] = wrappee.foldBulks(z, maxDocs)(suc, err)
 
+  def foldBulksM[A](z: => A, maxDocs: Int = Int.MaxValue)(suc: (A, Iterator[T]) => Future[Cursor.State[A]], err: Cursor.ErrorHandler[A])(implicit ctx: ExecutionContext): Future[A] = wrappee.foldBulksM(z, maxDocs)(suc, err)
+
   def foldWhile[A](z: => A, maxDocs: Int = Int.MaxValue)(suc: (A, T) => Cursor.State[A], err: Cursor.ErrorHandler[A])(implicit ctx: ExecutionContext): Future[A] = wrappee.foldWhile(z, maxDocs)(suc, err)
+
+  def foldWhileM[A](z: => A, maxDocs: Int = Int.MaxValue)(suc: (A, T) => Future[Cursor.State[A]], err: Cursor.ErrorHandler[A])(implicit ctx: ExecutionContext): Future[A] = wrappee.foldWhileM(z, maxDocs)(suc, err)
 
   def makeRequest(maxDocs: Int)(implicit ctx: ExecutionContext): Future[Response] = wrappee.makeRequest(maxDocs)
 
@@ -570,12 +623,19 @@ object DefaultCursor {
       } else logger.trace(s"[$logCat] Cursor exhausted (${cursorID})")
     }
 
-    def foldResponses[T](z: => T, maxDocs: Int = Int.MaxValue)(suc: (T, Response) => State[T], err: (T, Throwable) => State[T])(implicit ctx: ExecutionContext): Future[T] = new FoldResponses(z, maxDocs, suc, err)(ctx)()
+    @inline
+    private def syncSuccess[A, B](f: (A, B) => State[A])(implicit ec: ExecutionContext): (A, B) => Future[State[A]] = { (a: A, b: B) => Future(f(a, b)) }
 
-    def foldBulks[T](z: => T, maxDocs: Int = Int.MaxValue)(suc: (T, Iterator[A]) => State[T], err: (T, Throwable) => State[T])(implicit ctx: ExecutionContext): Future[T] = foldResponses(z, maxDocs)({ (s, r) =>
+    def foldResponses[T](z: => T, maxDocs: Int = Int.MaxValue)(suc: (T, Response) => State[T], err: (T, Throwable) => State[T])(implicit ctx: ExecutionContext): Future[T] = new FoldResponses(z, maxDocs, syncSuccess(suc), err)(ctx)()
+
+    def foldResponsesM[T](z: => T, maxDocs: Int = Int.MaxValue)(suc: (T, Response) => Future[State[T]], err: (T, Throwable) => State[T])(implicit ctx: ExecutionContext): Future[T] = new FoldResponses(z, maxDocs, suc, err)(ctx)()
+
+    def foldBulks[T](z: => T, maxDocs: Int = Int.MaxValue)(suc: (T, Iterator[A]) => State[T], err: (T, Throwable) => State[T])(implicit ctx: ExecutionContext): Future[T] = foldBulksM[T](z, maxDocs)(syncSuccess[T, Iterator[A]](suc), err)
+
+    def foldBulksM[T](z: => T, maxDocs: Int = Int.MaxValue)(suc: (T, Iterator[A]) => Future[State[T]], err: (T, Throwable) => State[T])(implicit ctx: ExecutionContext): Future[T] = foldResponsesM(z, maxDocs)({ (s, r) =>
       Try(makeIterator(r)) match {
         case Success(it) => suc(s, it)
-        case Failure(e)  => Fail(e)
+        case Failure(e)  => Future.successful[State[T]](Fail(e))
       }
     }, err)
 
@@ -585,30 +645,32 @@ object DefaultCursor {
       extends scala.RuntimeException(cause)
       with scala.util.control.NoStackTrace
 
-    def foldWhile[T](z: => T, maxDocs: Int = Int.MaxValue)(suc: (T, A) => State[T], err: (T, Throwable) => State[T])(implicit ctx: ExecutionContext): Future[T] = {
-      @annotation.tailrec
-      def go(v: T, it: Iterator[A]): State[T] =
-        if (!it.hasNext) Cont(v)
+    def foldWhile[T](z: => T, maxDocs: Int = Int.MaxValue)(suc: (T, A) => State[T], err: (T, Throwable) => State[T])(implicit ctx: ExecutionContext): Future[T] = foldWhileM[T](z, maxDocs)(syncSuccess[T, A](suc), err)
+
+    def foldWhileM[T](z: => T, maxDocs: Int = Int.MaxValue)(suc: (T, A) => Future[State[T]], err: (T, Throwable) => State[T])(implicit ctx: ExecutionContext): Future[T] = {
+      def go(v: T, it: Iterator[A]): Future[State[T]] =
+        if (!it.hasNext) Future.successful(Cont(v))
         else Try(it.next) match {
           case Failure(
-            x @ ReplyDocumentIteratorExhaustedException(_)) => Fail(x)
+            x @ ReplyDocumentIteratorExhaustedException(_)) =>
+            Future.successful(Fail(x))
 
           case Failure(e) => err(v, e) match {
-            case Cont(suc) => go(suc, it)
+            case Cont(cv) => go(cv, it)
             case f @ Fail(Unrecoverable(_)) =>
-              /* already marked unrecoverable */ f
-            case Fail(u) => Fail(Unrecoverable(u))
-            case st      => st
+              /* already marked unrecoverable */ Future.successful(f)
+            case Fail(u) => Future.successful(Fail(Unrecoverable(u)))
+            case st      => Future.successful(st)
           }
 
-          case Success(a) => suc(v, a) match {
-            case Cont(suc)   => go(suc, it)
-            case f @ Fail(_) => f
-            case st          => st
+          case Success(a) => suc(v, a).flatMap {
+            case Cont(cv)    => go(cv, it)
+            case f @ Fail(_) => Future.successful(f)
+            case st          => Future.successful(st)
           }
         }
 
-      foldBulks(z, maxDocs)(go, err)
+      foldBulksM(z, maxDocs)(go, err)
     }
 
     @deprecated(message = "Only for internal use", since = "0.11.10")
@@ -713,7 +775,7 @@ object DefaultCursor {
 
     private class FoldResponses[T](
         z: => T, maxDocs: Int,
-        suc: (T, Response) => State[T],
+        suc: (T, Response) => Future[State[T]],
         err: ErrorHandler[T])(implicit ctx: ExecutionContext) {
 
       private val nextResp: Response => Future[Option[Response]] =
@@ -733,7 +795,7 @@ object DefaultCursor {
       def procResp(resp: Response, cur: T, c: Int): Future[T] = {
         logger.trace(s"Process response: $resp")
 
-        Future(suc(cur, resp)).transform(resp -> _, { error =>
+        suc(cur, resp).transform(resp -> _, { error =>
           killCursors(resp, "FoldResponses")
           error
         }).flatMap {
