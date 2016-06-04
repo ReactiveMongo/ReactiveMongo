@@ -36,7 +36,7 @@ object AggregationSpec extends org.specs2.mutable.Specification {
     ZipCode("10280", "NEW YORK", "NY", 19746227L,
       Location(-74.016323, 40.710537)),
     ZipCode("72000", "LE MANS", "FR", 148169L, Location(48.0077, 0.1984)),
-    ZipCode("JP-13", "TOKYO", "JP", 13185502L,
+    ZipCode("JP 13", "TOKYO", "JP", 13185502L,
       Location(35.683333, 139.683333)),
     ZipCode("AO", "AOGASHIMA", "JP", 200L, Location(32.457, 139.767)))
 
@@ -141,7 +141,7 @@ object AggregationSpec extends org.specs2.mutable.Specification {
 
           val pipeline = List(Sort(MetadataSort("score", TextScore)))
           val expected = List(BSONDocument(
-            "_id" -> "JP-13",
+            "_id" -> "JP 13",
             "city" -> "TOKYO",
             "state" -> "JP",
             "population" -> 13185502L,
@@ -158,7 +158,10 @@ object AggregationSpec extends org.specs2.mutable.Specification {
                 "lat" -> 139.767D)))
 
           coll.aggregate1[BSONDocument](firstOp, pipeline, Cursor(1)).
-            flatMap(_.collect[List](4)) must beEqualTo(expected).
+            flatMap(_.collect[List](4)).andThen {
+              case scala.util.Success(res) =>
+                println(s"========> [[[[ ${res.map(BSONDocument.pretty)} ]]]]")
+            } must beEqualTo(expected).
             await(1, timeout)
 
         }

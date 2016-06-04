@@ -210,8 +210,9 @@ case class DefaultReadFile(
  * @param prefix The prefix of this store. The `files` and `chunks` collections will be actually named `prefix.files` and `prefix.chunks`.
  */
 class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, prefix: String = "fs")(implicit producer: GenericCollectionProducer[P, GenericCollection[P]] = BSONCollectionProducer) { self =>
-  import reactivemongo.api.indexes.Index
-  import reactivemongo.api.indexes.IndexType.Ascending
+  import reactivemongo.api.indexes.{ Index, IndexType }, IndexType.Ascending
+
+  type ReadFile[Id <: pack.Value] = reactivemongo.api.gridfs.ReadFile[P, Id]
 
   /** The `files` collection */
   val files = db(prefix + ".files")(producer)
@@ -231,7 +232,7 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
    *
    * @tparam S The type of the selector document. An implicit `Writer[S]` must be in the scope.
    */
-  def find[S, T <: ReadFile[P, _]](selector: S)(implicit sWriter: pack.Writer[S], readFileReader: pack.Reader[T], ctx: ExecutionContext, cp: CursorProducer[T]): cp.ProducedCursor = files.find(selector).cursor(defaultReadPreference)
+  def find[S, T <: ReadFile[_]](selector: S)(implicit sWriter: pack.Writer[S], readFileReader: pack.Reader[T], ctx: ExecutionContext, cp: CursorProducer[T]): cp.ProducedCursor = files.find(selector).cursor(defaultReadPreference)
 
   /**
    * Saves the content provided by the given enumerator with the given metadata.
@@ -242,7 +243,7 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
    *
    * @return A future of a ReadFile[Id].
    */
-  def save[Id <: pack.Value](enumerator: Enumerator[Array[Byte]], file: FileToSave[pack.type, Id], chunkSize: Int = 262144)(implicit readFileReader: pack.Reader[ReadFile[P, Id]], ctx: ExecutionContext, idProducer: IdProducer[Id], docWriter: BSONDocumentWriter[file.pack.Document]): Future[ReadFile[P, Id]] = (enumerator |>>> iteratee(file, chunkSize)).flatMap(f => f)
+  def save[Id <: pack.Value](enumerator: Enumerator[Array[Byte]], file: FileToSave[pack.type, Id], chunkSize: Int = 262144)(implicit readFileReader: pack.Reader[ReadFile[Id]], ctx: ExecutionContext, idProducer: IdProducer[Id], docWriter: BSONDocumentWriter[file.pack.Document]): Future[ReadFile[Id]] = (enumerator |>>> iteratee(file, chunkSize)).flatMap(f => f)
 
   /** Concats two array - fast way */
   private def concat[T](a1: Array[T], a2: Array[T])(implicit m: Manifest[T]): Array[T] = {
@@ -269,7 +270,7 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
    * @return An `Iteratee` that will consume data to put into a GridFS store.
    */
   @deprecated("Will be moved to the separate iteratee module", "0.12.0")
-  def iteratee[Id <: pack.Value](file: FileToSave[pack.type, Id], chunkSize: Int = 262144)(implicit readFileReader: pack.Reader[ReadFile[P, Id]], ctx: ExecutionContext, idProducer: IdProducer[Id], docWriter: BSONDocumentWriter[file.pack.Document]): Iteratee[Array[Byte], Future[ReadFile[P, Id]]] = {
+  def iteratee[Id <: pack.Value](file: FileToSave[pack.type, Id], chunkSize: Int = 262144)(implicit readFileReader: pack.Reader[ReadFile[Id]], ctx: ExecutionContext, idProducer: IdProducer[Id], docWriter: BSONDocumentWriter[file.pack.Document]): Iteratee[Array[Byte], Future[ReadFile[Id]]] = {
     implicit def ec = db.connection.actorSystem
     import java.security.MessageDigest
 
@@ -311,7 +312,7 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
         BSONCollectionProducer
       }
 
-      def finish(): Future[ReadFile[P, Id]] = {
+      def finish(): Future[ReadFile[Id]] = {
         logger.debug(s"writing last chunk (n=$n)!")
 
         val uploadDate = file.uploadDate.getOrElse(System.currentTimeMillis)
@@ -357,22 +358,20 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
    *
    * @param file the file to be read
    */
-  def enumerate[Id <: pack.Value](file: ReadFile[P, Id])(implicit ctx: ExecutionContext, idProducer: IdProducer[Id]): Enumerator[Array[Byte]] = {
+  def enumerate[Id <: pack.Value](file: ReadFile[Id])(implicit ctx: ExecutionContext, idProducer: IdProducer[Id]): Enumerator[Array[Byte]] = {
     import reactivemongo.api.collections.bson.{
       BSONCollection,
       BSONCollectionProducer
     }
 
-    val selector = BSONDocument(
-      "$query" -> (BSONDocument(idProducer("files_id" -> file.id)) ++ (
-        "n" -> BSONDocument(
-          "$gte" -> BSONInteger(0),
-          "$lte" -> BSONLong(file.length / file.chunkSize + (
-            if (file.length % file.chunkSize > 0) 1 else 0))))),
-      "$orderby" -> BSONDocument("n" -> BSONInteger(1)))
+    def selector = BSONDocument(idProducer("files_id" -> file.id)) ++ (
+      "n" -> BSONDocument(
+        "$gte" -> 0,
+        "$lte" -> BSONLong(file.length / file.chunkSize + (
+          if (file.length % file.chunkSize > 0) 1 else 0))))
 
-    @inline def cursor = chunks.as[BSONCollection]().
-      find(selector).cursor[BSONDocument](defaultReadPreference)
+    @inline def cursor = chunks.as[BSONCollection]().find(selector).
+      sort(BSONDocument("n" -> 1)).cursor[BSONDocument](defaultReadPreference)
 
     @inline def pushChunk(chan: Concurrent.Channel[Array[Byte]], doc: BSONDocument): Cursor.State[Unit] = doc.get("data") match {
       case Some(BSONBinary(data, _)) => {
@@ -397,10 +396,10 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
   }
 
   /** Reads the given file and writes its contents to the given OutputStream */
-  def readToOutputStream[Id <: pack.Value](file: ReadFile[P, Id], out: OutputStream)(implicit ctx: ExecutionContext, idProducer: IdProducer[Id]): Future[Unit] = enumerate(file) |>>> Iteratee.foreach { out.write(_) }
+  def readToOutputStream[Id <: pack.Value](file: ReadFile[Id], out: OutputStream)(implicit ctx: ExecutionContext, idProducer: IdProducer[Id]): Future[Unit] = enumerate(file) |>>> Iteratee.foreach { out.write(_) }
 
   /** Writes the data provided by the given InputStream to the given file. */
-  def writeFromInputStream[Id <: pack.Value](file: FileToSave[pack.type, Id], input: InputStream, chunkSize: Int = 262144)(implicit readFileReader: pack.Reader[ReadFile[P, Id]], ctx: ExecutionContext, idProducer: IdProducer[Id], docWriter: BSONDocumentWriter[file.pack.Document]): Future[ReadFile[P, Id]] = save(Enumerator.fromStream(input, chunkSize), file)
+  def writeFromInputStream[Id <: pack.Value](file: FileToSave[pack.type, Id], input: InputStream, chunkSize: Int = 262144)(implicit readFileReader: pack.Reader[ReadFile[Id]], ctx: ExecutionContext, idProducer: IdProducer[Id], docWriter: BSONDocumentWriter[file.pack.Document]): Future[ReadFile[Id]] = save(Enumerator.fromStream(input, chunkSize), file)
 
   /**
    * Removes a file from this store.
