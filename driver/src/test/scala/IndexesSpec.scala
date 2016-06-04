@@ -4,12 +4,11 @@ import reactivemongo.api.indexes._
 import reactivemongo.api.indexes.IndexType.{ Hashed, Geo2D, Geo2DSpherical }
 import reactivemongo.bson._
 import reactivemongo.core.errors.DatabaseException
-import scala.concurrent.Future
-import scala.concurrent.Await
+import scala.concurrent.{ Await, Future }
 
 import org.specs2.concurrent.{ ExecutionEnv => EE }
 
-object IndexesSpec extends Specification {
+class IndexesSpec extends Specification {
   "Indexes management" title
 
   sequential
@@ -36,11 +35,11 @@ object IndexesSpec extends Specification {
     }
 
     "fail to insert some points out of range" in { implicit ee: EE =>
-      val future = geo.insert(
+      def insert = geo.insert(
         BSONDocument("loc" -> BSONArray(BSONDouble(27.88), BSONDouble(97.21))))
 
       try {
-        Await.result(future, timeout)
+        Await.result(insert, timeout)
         failure
       } catch {
         case e: DatabaseException =>
@@ -50,10 +49,12 @@ object IndexesSpec extends Specification {
     }
 
     "retrieve indexes" in { implicit ee: EE =>
-      val future = geo.indexesManager.list().map {
+      def list = geo.indexesManager.list().map {
         _.filter(_.name.get == "loc_2d")
       }.filter(!_.isEmpty).map(_.apply(0))
-      val index = Await.result(future, timeout)
+
+      val index = Await.result(list, timeout)
+
       index.key(0)._1 mustEqual "loc"
       index.key(0)._2 mustEqual Geo2D
       index.options.getAs[BSONInteger]("min").get.value mustEqual -95
@@ -65,7 +66,6 @@ object IndexesSpec extends Specification {
   lazy val geo2DSpherical = db("geo2d")
 
   "ReactiveMongo Geo2D indexes" should {
-
     "insert some points" in { implicit ee: EE =>
       val futs: Seq[Future[Unit]] = for (i <- 1 until 10)
         yield geo2DSpherical.insert(
@@ -113,7 +113,7 @@ object IndexesSpec extends Specification {
 
   lazy val hashed = db("hashed")
 
-  "ReactiveMongo Hashed indexes" should {
+  "Hashed indexes" should {
     "insert some data" in { implicit ee: EE =>
       // With WiredTiger, collection must exist before
       val futs: Seq[Future[Unit]] = for (i <- 1 until 10)
@@ -141,5 +141,57 @@ object IndexesSpec extends Specification {
       geo.indexesManager.dropAll() must beEqualTo(2 /* _id and loc */ ).
         await(1, timeout)
     }
+  }
+
+  lazy val partial = db(s"partial${System identityHashCode this}")
+
+  "Index with partial filter" should {
+    // See https://docs.mongodb.com/manual/core/index-partial/#partial-index-with-unique-constraints
+
+    val fixtures = List(
+      BSONDocument("username" -> "david", "age" -> 29),
+      BSONDocument("username" -> "amanda", "age" -> 35),
+      BSONDocument("username" -> "rajiv", "age" -> 57))
+
+    @inline def fixturesInsert(implicit ee: EE) =
+      fixtures.map { partial.insert(_) }
+
+    "have fixtures" in { implicit ee: EE =>
+      Future.sequence(fixturesInsert).
+        map(_ => {}) must beEqualTo({}).await(0, timeout)
+
+    } tag "not_mongo26"
+
+    "be created" in { implicit ee: EE =>
+      partial.indexesManager.create(Index(
+        key = Seq("username" -> IndexType.Ascending),
+        unique = true,
+        partialFilter = Some(BSONDocument(
+          "age" -> BSONDocument("$gte" -> 21))))).
+        map(_.ok) must beTrue.await(0, timeout)
+    } tag "not_mongo26"
+
+    "not have duplicate fixtures" in { implicit ee: EE =>
+      Future.fold(fixturesInsert)(false) { (inserted, res) =>
+        if (res.ok) true else inserted
+      }.recover {
+        case err: DatabaseException => !err.code.exists(_ == 11000)
+        case _                      => true
+      } aka "inserted" must beFalse.await(0, timeout)
+    } tag "not_mongo26"
+
+    "allow duplicate if the filter doesn't match" in { implicit ee: EE =>
+      def insertAndCount = for {
+        a <- partial.count()
+        _ <- partial.insert(BSONDocument("username" -> "david", "age" -> 20))
+        _ <- partial.insert(BSONDocument("username" -> "amanda"))
+        _ <- partial.insert(BSONDocument(
+          "username" -> "rajiv", "age" -> BSONNull))
+
+        b <- partial.count()
+      } yield a -> b
+
+      insertAndCount must beEqualTo(3 -> 6).await(0, timeout)
+    } tag "not_mongo26"
   }
 }

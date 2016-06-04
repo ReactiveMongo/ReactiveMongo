@@ -72,12 +72,18 @@ case class NodeSet(
   /** The node which is the current primary one. */
   val primary: Option[Node] = nodes.find(_.status == NodeStatus.Primary)
 
+  /** The `mongos` node, if any. */
   val mongos: Option[Node] = nodes.find(_.isMongos)
 
   val secondaries = new RoundRobiner(nodes.filter(_.status == NodeStatus.Secondary))
   val queryable = secondaries.subject ++ primary
+
+  /** See the [[https://docs.mongodb.com/manual/reference/read-preference/#nearest nearest]] read preference. */
   val nearestGroup = new RoundRobiner(queryable.sortWith { _.pingInfo.ping < _.pingInfo.ping })
+
+  /** The first node from the [[nearestGroup]]. */
   val nearest = nearestGroup.subject.headOption
+
   val protocolMetadata = primary.orElse(secondaries.subject.headOption).map(_.protocolMetadata).getOrElse(ProtocolMetadata.Default)
 
   def primary(authenticated: Authenticated): Option[Node] =
@@ -107,7 +113,7 @@ case class NodeSet(
       case conn if (conn.channel.getId == id) => fc(conn)
     }
 
-    if (updated) fn(node.copy(connections = connections))
+    if (updated) fn(node._copy(connections = connections))
     else node
   })
 
@@ -163,8 +169,8 @@ case class NodeSet(
   }
 
   def createNeededChannels(receiver: ActorRef, upTo: Int)(implicit channelFactory: ChannelFactory): NodeSet =
-    copy(nodes = nodes.foldLeft(Vector.empty[Node]) { (nodes, node) =>
-      nodes :+ node.createNeededChannels(receiver, upTo)
+    copy(nodes = nodes.foldLeft(Vector.empty[Node]) {
+      _ :+ _.createNeededChannels(receiver, upTo)
     })
 
   def toShortString =
@@ -185,7 +191,7 @@ case class Node(
     pingInfo: PingInfo = PingInfo(),
     isMongos: Boolean = false) {
 
-  private val aliases = Set.newBuilder[String]
+  private[nodeset] val aliases = Set.newBuilder[String]
 
   // TODO: Refactor as immutable once private
   def withAlias(as: String): Node = {
@@ -215,8 +221,32 @@ case class Node(
 
   def createNeededChannels(receiver: ActorRef, upTo: Int)(implicit channelFactory: ChannelFactory): Node = {
     if (connections.size < upTo) {
-      copy(connections = connections.++(for (i ← 0 until (upTo - connections.size)) yield Connection(channelFactory.create(host, port, receiver), ConnectionStatus.Disconnected, Set.empty, None)))
+      _copy(connections = connections ++ (for {
+        i ← 0 until (upTo - connections.size)
+      } yield Connection(channelFactory.create(host, port, receiver),
+        ConnectionStatus.Disconnected, Set.empty, None)))
+
     } else this
+  }
+
+  // TODO: Remove when aliases is refactored
+  private[reactivemongo] def _copy(
+    name: String = this.name,
+    status: NodeStatus = this.status,
+    connections: Vector[Connection] = this.connections,
+    authenticated: Set[Authenticated] = this.authenticated,
+    tags: Option[BSONDocument] = this.tags,
+    protocolMetadata: ProtocolMetadata = this.protocolMetadata,
+    pingInfo: PingInfo = this.pingInfo,
+    isMongos: Boolean = this.isMongos,
+    aliases: Set[String] = this.aliases.result()): Node = {
+
+    val node = copy(name, status, connections, authenticated, tags,
+      protocolMetadata, pingInfo, isMongos)
+
+    node.aliases ++= this.aliases.result()
+
+    node
   }
 
   def toShortString = s"Node[$name: $status (${connected.size}/${connections.size} available connections), latency=${pingInfo.ping}], auth=$authenticated"

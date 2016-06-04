@@ -35,17 +35,28 @@ case class BSONString(value: String) extends BSONValue {
  * A `BSONDocument` is basically a stream of tuples `(String, BSONValue)`.
  * It is completely lazy. The stream it wraps is a `Stream[Try[(String, BSONValue)]]` since
  * we cannot be sure that a not yet deserialized value will be processed without error.
+ *
+ * @define keyParam the key to be found in the document
  */
 case class BSONDocument(stream: Stream[Try[BSONElement]]) extends BSONValue {
   val code = 0x03.toByte
 
   /**
-   * Returns the [[BSONValue]] associated with the given `key`.
+   * Checks whether the given key is found in the document.
    *
-   * If the key is not found or the matching value cannot be deserialized, returns `None`.
+   * @param key $keyParam
+   * @return true if the key is found
    */
-  def get(key: String): Option[BSONValue] = {
-    stream.collectFirst { case Success(element) if element._1 == key => element._2 }
+  def contains(key: String): Boolean = elements.exists(_._1 == key)
+
+  /**
+   * Returns the [[BSONValue]] associated with the given `key`.
+   * If the key is not found or the matching value cannot be deserialized, returns `None`.
+   *
+   * @param key $keyParam
+   */
+  def get(key: String): Option[BSONValue] = elements.collectFirst {
+    case (`key`, value) => value
   }
 
   /**
@@ -53,19 +64,21 @@ case class BSONDocument(stream: Stream[Try[BSONElement]]) extends BSONValue {
    *
    * If the key is not found or the matching value cannot be deserialized, returns a `Failure`.
    * The `Failure` holds a [[exceptions.DocumentKeyNotFound]] if the key could not be found.
+   *
+   * @param key $keyParam
    */
-  def getTry(key: String): Try[BSONValue] = {
-    stream.collectFirst {
-      case Success((k, cause)) if k == key => Success(cause)
-      case Failure(e)                      => Failure(e)
-    }.getOrElse(Failure(DocumentKeyNotFound(key)))
-  }
+  def getTry(key: String): Try[BSONValue] = stream.collectFirst {
+    case Success((k, cause)) if k == key => Success(cause)
+    case Failure(e)                      => Failure(e)
+  }.getOrElse(Failure(DocumentKeyNotFound(key)))
 
   /**
    * Returns the [[BSONValue]] associated with the given `key`.
    *
    * If the key could not be found, the resulting option will be `None`.
    * If the matching value could not be deserialized, returns a `Failure`.
+   *
+   * @param key $keyParam
    */
   def getUnflattenedTry(key: String): Try[Option[BSONValue]] = getTry(key) match {
     case Failure(DocumentKeyNotFound(_)) => Success(None)
@@ -78,9 +91,11 @@ case class BSONDocument(stream: Stream[Try[BSONElement]]) extends BSONValue {
    *
    * If there is no matching value, or the value could not be deserialized or converted, returns a `None`.
    *
+   * @param key $keyParam
+   *
    * @note When implementing a [[http://reactivemongo.org/releases/latest/documentation/bson/typeclasses.html custom reader]], [[getAsTry]] must be preferred.
    */
-  def getAs[T](s: String)(implicit reader: BSONReader[_ <: BSONValue, T]): Option[T] = get(s).flatMap { element =>
+  def getAs[T](key: String)(implicit reader: BSONReader[_ <: BSONValue, T]): Option[T] = get(key).flatMap { element =>
     reader match {
       case r: BSONReader[BSONValue, T] @unchecked => r.readOpt(element)
       case _                                      => None
@@ -92,9 +107,11 @@ case class BSONDocument(stream: Stream[Try[BSONElement]]) extends BSONValue {
    *
    * If there is no matching value, or the value could not be deserialized or converted, returns a `Failure`.
    * The `Failure` holds a [[exceptions.DocumentKeyNotFound]] if the key could not be found.
+   *
+   * @param key $keyParam
    */
-  def getAsTry[T](s: String)(implicit reader: BSONReader[_ <: BSONValue, T]): Try[T] = {
-    val tt = getTry(s)
+  def getAsTry[T](key: String)(implicit reader: BSONReader[_ <: BSONValue, T]): Try[T] = {
+    val tt = getTry(key)
     tt.flatMap { element => Try(reader.asInstanceOf[BSONReader[BSONValue, T]].read(element)) }
   }
 
@@ -104,7 +121,7 @@ case class BSONDocument(stream: Stream[Try[BSONElement]]) extends BSONValue {
    * If there is no matching value, returns a `Success` holding `None`.
    * If the value could not be deserialized or converted, returns a `Failure`.
    */
-  def getAsUnflattenedTry[T](s: String)(implicit reader: BSONReader[_ <: BSONValue, T]): Try[Option[T]] = getAsTry(s)(reader) match {
+  def getAsUnflattenedTry[T](key: String)(implicit reader: BSONReader[_ <: BSONValue, T]): Try[Option[T]] = getAsTry(key)(reader) match {
     case Failure(e: DocumentKeyNotFound) => Success(None)
     case Failure(e)                      => Failure(e)
     case Success(e)                      => Success(Some(e))
@@ -119,10 +136,10 @@ case class BSONDocument(stream: Stream[Try[BSONElement]]) extends BSONValue {
       el.produce.map(value => Seq(Try(value))).getOrElse(Seq.empty)
     }.toStream)
 
-  /** Creates a new [[BSONDocument]] without the elements corresponding the given `names`. */
-  def remove(names: String*): BSONDocument = new BSONDocument(stream.filter {
-    case Success((name, _)) if (names contains name) => false
-    case _ => true
+  /** Creates a new [[BSONDocument]] without the elements corresponding the given `keys`. */
+  def remove(keys: String*): BSONDocument = new BSONDocument(stream.filter {
+    case Success((key, _)) if (keys contains key) => false
+    case _                                        => true
   })
 
   /** Alias for `add(doc: BSONDocument): BSONDocument` */
@@ -132,10 +149,10 @@ case class BSONDocument(stream: Stream[Try[BSONElement]]) extends BSONValue {
   def ++(elements: Producer[(String, BSONValue)]*): BSONDocument = add(elements: _*)
 
   /** Alias for `remove(names: String*)` */
-  def --(names: String*): BSONDocument = remove(names: _*)
+  def --(keys: String*): BSONDocument = remove(keys: _*)
 
   /** Returns a `Stream` for all the elements of this `BSONDocument`. */
-  def elements: Stream[BSONElement] = stream.filter(_.isSuccess).map(_.get)
+  lazy val elements: Stream[BSONElement] = stream.filter(_.isSuccess).map(_.get)
 
   /** Is this document empty? */
   def isEmpty: Boolean = stream.isEmpty

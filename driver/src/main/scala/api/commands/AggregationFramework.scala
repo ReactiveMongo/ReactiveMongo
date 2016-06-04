@@ -242,10 +242,26 @@ trait AggregationFramework[P <: SerializationPack] extends ImplicitCommandHelper
   }
 
   /**
+   * [[https://docs.mongodb.org/v3.0/reference/operator/aggregation/meta/#exp._S_meta Keyword of metadata]].
+   */
+  sealed trait MetadataKeyword {
+    /** Keyword name */
+    def name: String
+  }
+
+  /** References the score associated with the corresponding [[https://docs.mongodb.org/v3.0/reference/operator/query/text/#op._S_text `\$text`]] query for each matching document. */
+  case object TextScore extends MetadataKeyword {
+    val name = "textScore"
+  }
+
+  /**
    * Represents that a field should be sorted on, as well as whether it
    * should be ascending or descending.
    */
-  sealed trait SortOrder
+  sealed trait SortOrder {
+    /** The name of the field to be used to sort. */
+    def field: String
+  }
 
   /** Ascending sort order */
   case class Ascending(field: String) extends SortOrder
@@ -254,15 +270,29 @@ trait AggregationFramework[P <: SerializationPack] extends ImplicitCommandHelper
   case class Descending(field: String) extends SortOrder
 
   /**
+   * [[https://docs.mongodb.org/v3.0/reference/operator/aggregation/sort/#sort-pipeline-metadata Metadata sort]] order.
+   *
+   * @param keyword the metadata keyword to sort by
+   */
+  case class MetadataSort(
+    field: String, keyword: MetadataKeyword) extends SortOrder
+
+  /**
    * Sorts the stream based on the given fields.
    * http://docs.mongodb.org/manual/reference/aggregation/sort/#_S_sort
-   * @param fields Fields to sort by.
+   * @param fields the fields to sort by
    */
   case class Sort(fields: SortOrder*) extends PipelineOperator {
     val makePipe = makeDocument(Seq(
       elementProducer("$sort", makeDocument(fields.map {
         case Ascending(field)  => elementProducer(field, intValue(1))
         case Descending(field) => elementProducer(field, intValue(-1))
+        case MetadataSort(field, keyword) => {
+          val meta = makeDocument(Seq(
+            elementProducer("$meta", stringValue(keyword.name))))
+
+          elementProducer(field, meta)
+        }
       }))))
   }
 

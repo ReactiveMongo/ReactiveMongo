@@ -1,6 +1,6 @@
 import scala.collection.immutable.ListSet
 
-import scala.concurrent.{ ExecutionContext, Future }
+import scala.concurrent.{ Await, ExecutionContext, Future }
 
 import reactivemongo.bson._
 import reactivemongo.api.collections.bson.BSONCollection
@@ -14,7 +14,15 @@ object AggregationSpec extends org.specs2.mutable.Specification {
 
   sequential
 
-  lazy val coll = db("zipcodes")
+  val colName = s"zipcodes${System identityHashCode this}"
+  lazy val coll = {
+    import ExecutionContext.Implicits.global
+    import reactivemongo.api.indexes._, IndexType._
+
+    val c = db(colName)
+    Await.result(c.indexesManager.ensure(Index(
+      List("city" -> Text, "state" -> Text))).map(_ => c), timeout * 2)
+  }
 
   case class Location(lon: Double, lat: Double)
 
@@ -28,11 +36,11 @@ object AggregationSpec extends org.specs2.mutable.Specification {
     ZipCode("10280", "NEW YORK", "NY", 19746227L,
       Location(-74.016323, 40.710537)),
     ZipCode("72000", "LE MANS", "FR", 148169L, Location(48.0077, 0.1984)),
-    ZipCode("JP-13", "TOKYO", "JP", 13185502L,
+    ZipCode("JP 13", "TOKYO", "JP", 13185502L,
       Location(35.683333, 139.683333)),
     ZipCode("AO", "AOGASHIMA", "JP", 200L, Location(32.457, 139.767)))
 
-  "Zip codes" should {
+  "Zip codes collection" should {
     "be inserted" in { implicit ee: EE =>
       def insert(data: List[ZipCode]): Future[Unit] = data.headOption match {
         case Some(zip) => coll.insert(zip).flatMap(_ => insert(data.tail))
@@ -55,6 +63,23 @@ object AggregationSpec extends org.specs2.mutable.Specification {
         Match(document("totalPop" ->
           document("$gte" -> 10000000L))))).map(_.firstBatch).
         aka("results") must beEqualTo(expected).await(1, timeout)
+    }
+
+    "explain simple result" in { implicit ee: EE =>
+      val expected = List(document("_id" -> "JP", "totalPop" -> 13185702L),
+        document("_id" -> "NY", "totalPop" -> 19746227L))
+
+      import coll.BatchCommands.AggregationFramework
+      import AggregationFramework.{ Group, Match, SumField }
+
+      coll.aggregate(Group(BSONString("$state"))(
+        "totalPop" -> SumField("population")), List(
+        Match(document("totalPop" ->
+          document("$gte" -> 10000000L)))), explain = true).map(_.firstBatch).
+        aka("results") must beLike[List[BSONDocument]] {
+          case explainResult :: Nil =>
+            explainResult.getAs[BSONArray]("stages") must beSome
+        }.await(1, timeout)
     }
 
     "return average city population by state" >> {
@@ -99,6 +124,46 @@ object AggregationSpec extends org.specs2.mutable.Specification {
         "with limit (maxDocs)" in { implicit ee: EE =>
           collect(coll, 2) aka "cursor result" must beEqualTo(expected take 2).
             await(1, timeout)
+        }
+
+        "with metadata sort" in { implicit ee: EE =>
+          import coll.BatchCommands.AggregationFramework
+          import AggregationFramework.{
+            Cursor,
+            Match,
+            MetadataSort,
+            Sort,
+            TextScore
+          }
+
+          val firstOp = Match(BSONDocument(
+            "$text" -> BSONDocument("$search" -> "JP")))
+
+          val pipeline = List(Sort(MetadataSort("score", TextScore)))
+          val expected = List(BSONDocument(
+            "_id" -> "JP 13",
+            "city" -> "TOKYO",
+            "state" -> "JP",
+            "population" -> 13185502L,
+            "location" -> BSONDocument(
+              "lon" -> 35.683333D,
+              "lat" -> 139.683333D)),
+            BSONDocument(
+              "_id" -> "AO",
+              "city" -> "AOGASHIMA",
+              "state" -> "JP",
+              "population" -> 200L,
+              "location" -> BSONDocument(
+                "lon" -> 32.457D,
+                "lat" -> 139.767D)))
+
+          coll.aggregate1[BSONDocument](firstOp, pipeline, Cursor(1)).
+            flatMap(_.collect[List](4)).andThen {
+              case scala.util.Success(res) =>
+                println(s"========> [[[[ ${res.map(BSONDocument.pretty)} ]]]]")
+            } must beEqualTo(expected).
+            await(1, timeout)
+
         }
       }
     }

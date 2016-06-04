@@ -7,44 +7,185 @@ import reactivemongo.bson.{ BSONArray, BSONDocument, BSONDocumentWriter }
  * with a predefined strategy.
  */
 sealed trait ReadPreference {
+  /** Indicates whether a slave member is ok. */
   def slaveOk: Boolean = true
+
   def filterTag: Option[BSONDocument => Boolean]
 }
 
 object ReadPreference {
-  /** Read only from the primary. This is the default choice. */
+  /** Reads only from the primary. This is the default choice. */
   object Primary extends ReadPreference {
-    override def slaveOk = false
-    override def filterTag = None
+    override val slaveOk = false
+    val filterTag = None
 
-    override def toString = "Primary"
+    override val toString = "Primary"
   }
 
-  /** Read from the primary if it is available, or secondaries if it is not. */
-  case class PrimaryPreferred(
-      filterTag: Option[BSONDocument => Boolean]) extends ReadPreference {
-    override def toString = s"PrimaryPreferred($filterTag)"
+  private def TagFilter(tagSet: Seq[Map[String, String]]): Option[BSONDocument => Boolean] = if (tagSet.isEmpty) None else Some { doc: BSONDocument =>
+    val matching = tagSet.find(_.foldLeft(Map.empty[String, String]) {
+      case (ms, (k, v)) =>
+        doc.getAs[String](k).filter(_ == v) match {
+          case None => ms + (k -> v)
+          case _    => ms
+        }
+    }.isEmpty)
+
+    matching.isDefined
   }
 
-  /** Read only from any secondary. */
-  case class Secondary(
-      filterTag: Option[BSONDocument => Boolean]) extends ReadPreference {
-    override def toString = s"Secondary($filterTag)"
+  private def TagFilter(tagSet: Seq[BSONDocument]): Option[BSONDocument => Boolean] = if (tagSet.isEmpty) None else Some { doc =>
+    tagSet.exists(doc.contains(_))
   }
 
-  /** Read from any secondary, or from the primary if they are not available. */
-  case class SecondaryPreferred(
-      filterTag: Option[BSONDocument => Boolean]) extends ReadPreference {
-    override def toString = s"SecondaryPreferred($filterTag)"
+  @deprecated("For legacy purpose only", "0.11.12")
+  sealed trait Taggable extends scala.Serializable with java.io.Serializable
+      with Product with Equals { self: ReadPreference =>
+
+    /** Returns the tags to be used. */
+    def tags: List[Map[String, String]]
+
+    def canEqual(that: Any): Boolean = that match {
+      case _: PrimaryPreferred => true
+      case _                   => false
+    }
+
+    val productArity = 1
+    def productElement(n: Int): Any =
+      if (n == 0) filterTag else throw new IndexOutOfBoundsException()
+
+  }
+
+  /** Extractor for taggable read preference. */
+  object Taggable {
+    def unapply(pref: ReadPreference): Option[List[Map[String, String]]] =
+      pref match {
+        case p: Taggable => Some(p.tags)
+        case _           => None
+      }
+  }
+
+  /** Reads from the primary if it is available, or secondaries if it is not. */
+  class PrimaryPreferred @deprecated("Use `primaryPreferred(List)`", "0.11.12") (val filterTag: Option[BSONDocument => Boolean])
+      extends ReadPreference with Taggable {
+
+    private var _tags = List.empty[Map[String, String]]
+    def tags = _tags
+
+    private[api] def this(tags: List[Map[String, String]]) = {
+      this(TagFilter(tags))
+      _tags = tags
+    }
+
+    def copy(filter: Option[BSONDocument => Boolean]): PrimaryPreferred =
+      new PrimaryPreferred(filter)
+
+    override val toString = s"PrimaryPreferred(${_tags})"
+  }
+
+  /** Factory for the [[PrimaryPreferred]] read preference. */
+  object PrimaryPreferred extends scala.runtime.AbstractFunction1[Option[BSONDocument => Boolean], PrimaryPreferred] {
+    private[api] def apply(tags: List[Map[String, String]]): PrimaryPreferred =
+      new PrimaryPreferred(tags)
+
+    def apply(filterTag: Option[BSONDocument => Boolean]): PrimaryPreferred =
+      new PrimaryPreferred(filterTag)
+
+    def unapply(that: PrimaryPreferred): Option[Option[BSONDocument => Boolean]] = Some(that.filterTag)
+
+  }
+
+  /** Reads only from any secondary. */
+  class Secondary @deprecated("Use `secondary(List)`", "0.11.12") (val filterTag: Option[BSONDocument => Boolean])
+      extends ReadPreference with Taggable {
+
+    private var _tags = List.empty[Map[String, String]]
+    def tags = _tags
+
+    private[api] def this(tags: List[Map[String, String]]) = {
+      this(TagFilter(tags))
+      _tags = tags
+    }
+
+    def copy(filter: Option[BSONDocument => Boolean]): Secondary =
+      new Secondary(filter)
+
+    override val toString = s"Secondary(${_tags})"
+  }
+
+  /** Factory for the [[Secondary]] read preference. */
+  object Secondary extends scala.runtime.AbstractFunction1[Option[BSONDocument => Boolean], Secondary] {
+    private[api] def apply(tags: List[Map[String, String]]): Secondary =
+      new Secondary(tags)
+
+    def apply(filterTag: Option[BSONDocument => Boolean]): Secondary =
+      new Secondary(filterTag)
+
+    def unapply(that: Secondary): Option[Option[BSONDocument => Boolean]] = Some(that.filterTag)
+
+  }
+
+  /** Reads from any secondary, or from the primary if they are not available. */
+  class SecondaryPreferred @deprecated("Use `secondaryPreferred(List)`", "0.11.12") (val filterTag: Option[BSONDocument => Boolean])
+      extends ReadPreference with Taggable {
+
+    private var _tags = List.empty[Map[String, String]]
+    def tags = _tags
+
+    private[api] def this(tags: List[Map[String, String]]) = {
+      this(TagFilter(tags))
+      _tags = tags
+    }
+
+    def copy(filter: Option[BSONDocument => Boolean]): SecondaryPreferred =
+      new SecondaryPreferred(filter)
+
+    override val toString = s"SecondaryPreferred(${_tags})"
+  }
+
+  /** Factory for the [[SecondaryPreferred]] read preference. */
+  object SecondaryPreferred extends scala.runtime.AbstractFunction1[Option[BSONDocument => Boolean], SecondaryPreferred] {
+    private[api] def apply(tags: List[Map[String, String]]): SecondaryPreferred =
+      new SecondaryPreferred(tags)
+
+    def apply(filterTag: Option[BSONDocument => Boolean]): SecondaryPreferred =
+      new SecondaryPreferred(filterTag)
+
+    def unapply(that: SecondaryPreferred): Option[Option[BSONDocument => Boolean]] = Some(that.filterTag)
+
   }
 
   /**
-   * Read from the faster node (ie the node which replies faster than all others), regardless its status
-   * (primary or secondary).
+   * Reads from the faster node (e.g. the node which replies faster than
+   * all others), regardless its status (primary or secondary).
    */
-  case class Nearest(
-      filterTag: Option[BSONDocument => Boolean]) extends ReadPreference {
-    override def toString = s"Nearest($filterTag)"
+  class Nearest @deprecated("Use `nearest(List)`", "0.11.12") (val filterTag: Option[BSONDocument => Boolean])
+      extends ReadPreference with Taggable {
+
+    private var _tags = List.empty[Map[String, String]]
+    def tags = _tags
+
+    private[api] def this(tags: List[Map[String, String]]) = {
+      this(TagFilter(tags))
+      _tags = tags
+    }
+
+    def copy(filter: Option[BSONDocument => Boolean]): Nearest =
+      new Nearest(filter)
+
+    override val toString = s"Nearest(${_tags})"
+  }
+
+  /** Factory for the [[Nearest]] read preference. */
+  object Nearest extends scala.runtime.AbstractFunction1[Option[BSONDocument => Boolean], Nearest] {
+    private[api] def apply(tags: List[Map[String, String]]): Nearest =
+      new Nearest(tags)
+
+    def apply(filterTag: Option[BSONDocument => Boolean]): Nearest =
+      new Nearest(filterTag)
+
+    def unapply(that: Nearest): Option[Option[BSONDocument => Boolean]] = Some(that.filterTag)
+
   }
 
   private implicit class BSONDocumentWrapper(val underlying: BSONDocument) extends AnyVal {
@@ -63,44 +204,75 @@ object ReadPreference {
     }
   }
 
-  private val defaultFilterTag = (doc: BSONDocument) => true
+  private val defaultFilterTag = (_: BSONDocument) => true
 
-  /** Read only from the primary. This is the default choice. */
+  /** Reads only from the primary. This is the default choice. */
   def primary: Primary.type = Primary
 
-  /** Read from the primary if it is available, or secondaries if it is not. */
-  def primaryPreferred: PrimaryPreferred = new PrimaryPreferred(None)
+  /** Reads from the primary if it is available, or secondaries if it is not. */
+  val primaryPreferred: PrimaryPreferred = new PrimaryPreferred(None)
 
-  /**  Read from any node that has the given `tag` in the replica set (preferably the primary). */
-  def primaryPreferred[T](tag: T)(implicit writer: BSONDocumentWriter[T]): PrimaryPreferred =
-    new PrimaryPreferred(Some(doc => doc.contains(writer.write(tag))))
+  /** Reads from any node that has the given `tag` in the replica set (preferably the primary). */
+  @deprecated("Use `primaryPreferred(T*)`", "0.11.12")
+  def primaryPreferred[T](tag: T)(implicit writer: BSONDocumentWriter[T]): PrimaryPreferred = new PrimaryPreferred(TagFilter(List(writer.write(tag))))
 
-  /** Read only from any secondary. */
-  def secondary: Secondary = new Secondary(None)
+  /** Reads from any node that has the given `tagSet` in the replica set (preferably the primary). */
+  def primaryPreferred[T](tagSet: T*)(implicit writer: BSONDocumentWriter[T]): PrimaryPreferred = new PrimaryPreferred(TagFilter(tagSet.map(writer.write(_))))
 
-  /**  Read from a secondary that has the given `tag` in the replica set. */
+  /** Reads from any node that has the given `tagSet` in the replica set (preferably the primary). */
+  def primaryPreferred[T](tagSet: List[Map[String, String]]): PrimaryPreferred =
+    new PrimaryPreferred(TagFilter(tagSet))
+
+  /** Reads only from any secondary. */
+  val secondary: Secondary = new Secondary(None)
+
+  /** Reads from a secondary that has the given `tag` in the replica set. */
+  @deprecated("Use `secondary(T*)`", "0.11.12")
   def secondary[T](tag: T)(implicit writer: BSONDocumentWriter[T]): Secondary =
-    new Secondary(Some(doc => doc.contains(writer.write(tag))))
+    new Secondary(TagFilter(List(writer.write(tag))))
 
-  /** Read from any secondary, or from the primary if they are not available. */
-  def secondaryPreferred: SecondaryPreferred = new SecondaryPreferred(None)
+  /** Reads from a secondary that has the given `tagSet` in the replica set. */
+  def secondary[T](tagSet: T*)(implicit writer: BSONDocumentWriter[T]): PrimaryPreferred = new PrimaryPreferred(TagFilter(tagSet.map(writer.write(_))))
 
-  /**  Read from any node that has the given `tag` in the replica set (preferably a secondary). */
-  def secondaryPreferred[T](tag: T)(implicit writer: BSONDocumentWriter[T]): SecondaryPreferred =
-    new SecondaryPreferred(Some(doc => doc.contains(writer.write(tag))))
+  /** Reads from a secondary that has the given `tagSet` in the replica set. */
+  def secondary[T](tagSet: List[Map[String, String]]): PrimaryPreferred =
+    new PrimaryPreferred(TagFilter(tagSet))
+
+  /** Reads from any secondary, or from the primary if they are not available. */
+  val secondaryPreferred: SecondaryPreferred = new SecondaryPreferred(None)
+
+  /** Reads from any node that has the given `tag` in the replica set (preferably a secondary). */
+  @deprecated("Use `secondaryPreferred(T*)`", "0.11.12")
+  def secondaryPreferred[T](tag: T)(implicit writer: BSONDocumentWriter[T]): SecondaryPreferred = new SecondaryPreferred(TagFilter(List(writer.write(tag))))
+
+  /** Reads from any node that has the given `tagSet` in the replica set (preferably a secondary). */
+  def secondaryPreferred[T](tagSet: T*)(implicit writer: BSONDocumentWriter[T]): PrimaryPreferred = new PrimaryPreferred(TagFilter(tagSet.map(writer.write(_))))
+
+  /** Reads from any node that has the given `tagSet` in the replica set (preferably a secondary). */
+  def secondaryPreferred[T](tagSet: List[Map[String, String]]): PrimaryPreferred = new PrimaryPreferred(TagFilter(tagSet))
 
   /**
-   * Read from the fastest node (ie the node which replies faster than all others), regardless its status
+   * Reads from the fastest node (ie the node which replies faster than all others), regardless its status
    * (primary or secondary).
    */
-  def nearest: Nearest = new Nearest(None)
+  val nearest: Nearest = new Nearest(None)
 
   /**
-   * Read from the fastest node (ie the node which replies faster than all others) that has the given `tag`,
-   * regardless its status (primary or secondary).
+   * Reads from the fastest node (e.g. the node which replies faster than all others) that has the given `tag`, regardless its status (primary or secondary).
    */
+  @deprecated("Use `secondaryPreferred(T*)`", "0.11.12")
   def nearest[T](tag: T)(implicit writer: BSONDocumentWriter[T]): Nearest =
-    new Nearest(Some(doc => doc.contains(writer.write(tag))))
+    new Nearest(TagFilter(List(writer.write(tag))))
+
+  /**
+   * Reads from the fastest node (e.g. the node which replies faster than all others) that has the given `tagSet`, regardless its status (primary or secondary).
+   */
+  def nearest[T](tagSet: T*)(implicit writer: BSONDocumentWriter[T]): PrimaryPreferred = new PrimaryPreferred(TagFilter(tagSet.map(writer.write(_))))
+
+  /**
+   * Reads from the fastest node (e.g. the node which replies faster than all others) that has the given `tagSet`, regardless its status (primary or secondary).
+   */
+  def nearest[T](tagSet: List[Map[String, String]]): PrimaryPreferred = new PrimaryPreferred(TagFilter(tagSet))
 }
 
 sealed trait ReadConcern {

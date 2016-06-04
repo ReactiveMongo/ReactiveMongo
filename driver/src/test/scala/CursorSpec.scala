@@ -61,7 +61,7 @@ object CursorSpec extends org.specs2.mutable.Specification {
       }
     }
 
-    "fold while successful" >> {
+    "fold while successfully" >> {
       "all the documents" in { implicit ee: EE =>
         coll.find(matchAll("cursorspec4")).cursor().foldWhile(0)(
           (st, _) => Cursor.Cont(st + 1)).
@@ -71,6 +71,20 @@ object CursorSpec extends org.specs2.mutable.Specification {
       "only 1024 documents" in { implicit ee: EE =>
         coll.find(matchAll("cursorspec5")).cursor().foldWhile(0, 1024)(
           (st, _) => Cursor.Cont(st + 1)).
+          aka("result size") must beEqualTo(1024).await(1, timeout)
+      }
+    }
+
+    "fold while successfully with async function" >> {
+      "all the documents" in { implicit ee: EE =>
+        coll.find(matchAll("cursorspec4")).cursor().foldWhileM(0)(
+          (st, _) => Future(Cursor.Cont(st + 1))).
+          aka("result size") must beEqualTo(16517).await(1, timeout)
+      }
+
+      "only 1024 documents" in { implicit ee: EE =>
+        coll.find(matchAll("cursorspec5")).cursor().foldWhileM(0, 1024)(
+          (st, _) => Future.successful(Cursor.Cont(st + 1))).
           aka("result size") must beEqualTo(1024).await(1, timeout)
       }
     }
@@ -89,6 +103,20 @@ object CursorSpec extends org.specs2.mutable.Specification {
       }
     }
 
+    "fold the bulks with async function" >> {
+      "for all the documents" in { implicit ee: EE =>
+        coll.find(matchAll("cursorspec6")).cursor().foldBulksM(0)(
+          (st, bulk) => Future(Cursor.Cont(st + bulk.size))).
+          aka("result size") must beEqualTo(16517).await(1, timeout)
+      }
+
+      "for 1024 documents" in { implicit ee: EE =>
+        coll.find(matchAll("cursorspec7")).cursor().foldBulksM(0, 1024)(
+          (st, bulk) => Future.successful(Cursor.Cont(st + bulk.size))).
+          aka("result size") must beEqualTo(1024).await(1, timeout)
+      }
+    }
+
     "fold the responses" >> {
       "for all the documents" in { implicit ee: EE =>
         coll.find(matchAll("cursorspec8")).cursor().foldResponses(0)(
@@ -99,6 +127,20 @@ object CursorSpec extends org.specs2.mutable.Specification {
       "for 1024 documents" in { implicit ee: EE =>
         coll.find(matchAll("cursorspec9")).cursor().foldResponses(0, 1024)(
           (st, resp) => Cursor.Cont(st + resp.reply.numberReturned)).
+          aka("result size") must beEqualTo(1024).await(1, timeout)
+      }
+    }
+
+    "fold the responses with async function" >> {
+      "for all the documents" in { implicit ee: EE =>
+        coll.find(matchAll("cursorspec8")).cursor().foldResponsesM(0)(
+          (st, resp) => Future(Cursor.Cont(st + resp.reply.numberReturned))).
+          aka("result size") must beEqualTo(16517).await(1, timeout)
+      }
+
+      "for 1024 documents" in { implicit ee: EE =>
+        coll.find(matchAll("cursorspec9")).cursor().foldResponsesM(0, 1024)(
+          (st, resp) => Future(Cursor.Cont(st + resp.reply.numberReturned))).
           aka("result size") must beEqualTo(1024).await(1, timeout)
       }
     }
@@ -150,10 +192,11 @@ object CursorSpec extends org.specs2.mutable.Specification {
           val c = scol()
           val cursor = c.find(matchAll("cursorspec11")).cursor()
 
-          cursor.foldResponses({}, 128)(
-            { (_, _) => sys.error("Foo"): Cursor.State[Unit] },
+          cursor.foldResponsesM({}, 128)(
+            { (_, _) => Future[Cursor.State[Unit]](sys.error("Foo")) },
             Cursor.FailOnError[Unit](onError)).recover({ case _ => count }).
             aka("folding") must beEqualTo(1).await(1, timeout)
+
         }
 
         "if fails while processing w/o documents" in { implicit ee: EE =>
@@ -188,7 +231,7 @@ object CursorSpec extends org.specs2.mutable.Specification {
           // Close connection to make the related cursor erroneous
           c.db.connection.askClose()(timeout).
             map(_ => {}) must beEqualTo({}).await(1, timeout) and {
-              cursor.foldResponses({}, 128)((_, _) => Cursor.Cont({}),
+              cursor.foldResponsesM({}, 128)((_, _) => Future(Cursor.Cont({})),
                 Cursor.FailOnError[Unit](onError)).recover({ case _ => count }).
                 aka("folding") must beEqualTo(1).await(1, timeout)
             }
@@ -242,17 +285,20 @@ object CursorSpec extends org.specs2.mutable.Specification {
       }
 
       "when folding bulks" >> {
-        "if fails while processing with existing documents" in { implicit ee: EE =>
-          @volatile var count = 0
-          def onError(last: Unit, e: Throwable): Unit = { count = count + 1 }
-          val c = scol()
-          val cursor = c.find(matchAll("cursorspec18")).options(
-            QueryOpts(batchSizeN = 64)).cursor()
+        "if fails while processing with existing documents" in {
+          implicit ee: EE =>
 
-          cursor.foldBulks({}, 128)(
-            { (_, _) => sys.error("Foo"): Cursor.State[Unit] },
-            Cursor.FailOnError[Unit](onError)).recover({ case _ => count }).
-            aka("folding") must beEqualTo(1).await(1, timeout)
+            @volatile var count = 0
+            def onError(last: Unit, e: Throwable): Unit = { count = count + 1 }
+            val c = scol()
+            val cursor = c.find(matchAll("cursorspec18")).options(
+              QueryOpts(batchSizeN = 64)).cursor()
+
+            cursor.foldBulksM({}, 128)(
+              { (_, _) => Future[Cursor.State[Unit]](sys.error("Foo")) },
+              Cursor.FailOnError[Unit](onError)).recover({ case _ => count }).
+              aka("folding") must beEqualTo(1).await(1, timeout)
+
         }
 
         "if fails while processing w/o documents" in { implicit ee: EE =>
@@ -275,9 +321,11 @@ object CursorSpec extends org.specs2.mutable.Specification {
           val cursor = c.find(matchAll("cursorspec20")).options(
             QueryOpts(batchSizeN = 64)).cursor()
 
-          cursor.foldBulks[Unit](sys.error("Foo"), 128)(
-            (_, _) => Cursor.Cont({}), Cursor.FailOnError[Unit](onError)).
+          cursor.foldBulksM[Unit](sys.error("Foo"), 128)(
+            (_, _) => Future(Cursor.Cont({})),
+            Cursor.FailOnError[Unit](onError)).
             recover({ case _ => count }) must beEqualTo(0).await(1, timeout)
+
         }
 
         "if fails to send request" in { implicit ee: EE =>
@@ -354,11 +402,11 @@ object CursorSpec extends org.specs2.mutable.Specification {
           val c = scol()
           val cursor = c.find(matchAll("cursorspec25")).cursor()
 
-          cursor.foldWhile({}, 128)(
-            { (_, _) => sys.error("Foo"): Cursor.State[Unit] },
+          cursor.foldWhileM({}, 128)(
+            { (_, _) => Future[Cursor.State[Unit]](sys.error("Foo")) },
             Cursor.FailOnError[Unit](onError)).recover({ case _ => count }).
-            aka("folding") must beEqualTo(1).
-            await(1, timeout)
+            aka("folding") must beEqualTo(1).await(1, timeout)
+
         }
 
         "if fails with initial value" in { implicit ee: EE =>
@@ -382,7 +430,7 @@ object CursorSpec extends org.specs2.mutable.Specification {
           // Close connection to make the related cursor erroneous
           c.db.connection.askClose()(timeout).
             map(_ => {}) must beEqualTo({}).await(1, timeout) and {
-              cursor.foldWhile({}, 128)((_, _) => Cursor.Cont({}),
+              cursor.foldWhileM({}, 128)((_, _) => Future(Cursor.Cont({})),
                 Cursor.FailOnError[Unit](onError)).recover({ case _ => count }).
                 aka("folding") must beEqualTo(1).await(1, timeout)
             }
@@ -441,8 +489,8 @@ object CursorSpec extends org.specs2.mutable.Specification {
             val cursor = scol().find(matchAll("cursorspec30")).cursor()
 
             // retry on the initial failure - until the max (128) is reached
-            cursor.foldResponses({}, 128)(
-              { (_, _) => sys.error("Foo"): Cursor.State[Unit] },
+            cursor.foldResponsesM({}, 128)(
+              { (_, _) => Future[Cursor.State[Unit]](sys.error("Foo")) },
               Cursor.ContOnError[Unit](onError)).map(_ => count).
               aka("folding") must beEqualTo(128).await(2, delayedTimeout)
 
@@ -466,10 +514,12 @@ object CursorSpec extends org.specs2.mutable.Specification {
           val c = scol(System.identityHashCode(onError _).toString)
           val cursor = c.find(matchAll("cursorspec32")).cursor()
 
-          cursor.foldResponses[Unit](sys.error("Foo"), 128)(
-            (_, _) => Cursor.Cont({}), Cursor.ContOnError[Unit](onError)).
+          cursor.foldResponsesM[Unit](sys.error("Foo"), 128)(
+            (_, _) => Future(Cursor.Cont({})),
+            Cursor.ContOnError[Unit](onError)).
             recover({ case _ => count }) must beEqualTo(0).
             await(2, delayedTimeout)
+
         }
 
         "if fails to send request" in { implicit ee: EE =>
@@ -556,10 +606,11 @@ object CursorSpec extends org.specs2.mutable.Specification {
           val cursor = c.find(matchAll("cursorspec38")).options(
             QueryOpts(batchSizeN = 64)).cursor()
 
-          cursor.foldBulks({}, 64)(
-            { (_, _) => sys.error("Foo"): Cursor.State[Unit] },
+          cursor.foldBulksM({}, 64)(
+            { (_, _) => Future[Cursor.State[Unit]](sys.error("Foo")) },
             Cursor.ContOnError[Unit](onError)).map(_ => count).
             aka("folding") must beEqualTo(64).await(2, delayedTimeout)
+
         }
 
         "if fails with initial value" in { implicit ee: EE =>
@@ -648,8 +699,8 @@ object CursorSpec extends org.specs2.mutable.Specification {
           def onError(last: Unit, e: Throwable): Unit = { count = count + 1 }
           val cursor = scol().find(matchAll("cursorspec44")).cursor()
 
-          cursor.foldWhile({}, 128)(
-            { (_, _) => sys.error("Foo"): Cursor.State[Unit] },
+          cursor.foldWhileM({}, 128)(
+            { (_, _) => Future[Cursor.State[Unit]](sys.error("Foo")) },
             Cursor.ContOnError[Unit](onError)).map(_ => count).
             aka("folding") must beEqualTo(128).await(2, delayedTimeout)
         }
@@ -675,7 +726,7 @@ object CursorSpec extends org.specs2.mutable.Specification {
           // Close connection to make the related cursor erroneous
           c.db.connection.askClose()(timeout).
             map(_ => {}) must beEqualTo({}).await(1, timeout) and {
-              cursor.foldWhile({}, 64)((_, _) => Cursor.Cont({}),
+              cursor.foldWhileM({}, 64)((_, _) => Future(Cursor.Cont({})),
                 Cursor.ContOnError[Unit](onError)).map(_ => count).
                 aka("folding") must beEqualTo(1).await(1, timeout)
             }
@@ -771,15 +822,28 @@ object CursorSpec extends org.specs2.mutable.Specification {
             val bulk = Response.parse(resp).flatMap(_.asOpt[Int].toList)
 
             Cursor.Cont(s ++ bulk)
-          } must beEqualTo(List(0, 1, 2, 3, 4, 5)).
-            await(1, timeout)
+          } must beEqualTo(List(0, 1, 2, 3, 4, 5)).await(1, timeout)
+        }
+
+        "to fold responses with async function" in { implicit ee: EE =>
+          implicit val reader = IdReader
+          tailable("foldr0").foldResponsesM(List.empty[Int], 6) { (s, resp) =>
+            val bulk = Response.parse(resp).flatMap(_.asOpt[Int].toList)
+
+            Future.successful(Cursor.Cont(s ++ bulk))
+          } must beEqualTo(List(0, 1, 2, 3, 4, 5)).await(1, timeout)
         }
 
         "to fold bulks" in { implicit ee: EE =>
           tailable("foldw0").foldBulks(List.empty[Int], 6)(
             (s, bulk) => Cursor.Cont(s ++ bulk)) must beEqualTo(List(
-              0, 1, 2, 3, 4, 5)).
-            await(1, timeout)
+              0, 1, 2, 3, 4, 5)).await(1, timeout)
+        }
+
+        "to fold bulks with async function" in { implicit ee: EE =>
+          tailable("foldw0").foldBulksM(List.empty[Int], 6)(
+            (s, bulk) => Future(Cursor.Cont(s ++ bulk))) must beEqualTo(List(
+              0, 1, 2, 3, 4, 5)).await(1, timeout)
         }
       }
 
@@ -787,6 +851,12 @@ object CursorSpec extends org.specs2.mutable.Specification {
         "successfully" in { implicit ee: EE =>
           tailable("foldw1").foldWhile(List.empty[Int], 5)(
             (s, i) => Cursor.Cont(i :: s)) must beEqualTo(List(
+              4, 3, 2, 1, 0)).await(1, timeout)
+        }
+
+        "successfully with async function" in { implicit ee: EE =>
+          tailable("foldw1").foldWhileM(List.empty[Int], 5)(
+            (s, i) => Future(Cursor.Cont(i :: s))) must beEqualTo(List(
               4, 3, 2, 1, 0)).await(1, timeout)
         }
 

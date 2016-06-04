@@ -38,7 +38,8 @@ object `package` {
 
   /** Makes an option of the value matching the condition. */
   @deprecated(message = "Use [[reactivemongo.util.option]]", since = "0.12.0")
-  def option[T](cond: => Boolean, value: => T): Option[T] = (if (cond) Some(value) else None)
+  def option[T](cond: => Boolean, value: => T): Option[T] =
+    if (cond) Some(value) else None
 }
 
 @deprecated(

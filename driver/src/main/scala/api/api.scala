@@ -30,9 +30,9 @@ import scala.concurrent.duration.{ Duration, FiniteDuration, SECONDS }
 
 import com.typesafe.config.Config
 
-import akka.actor.{ Actor, ActorRef, ActorSystem, Props, Terminated }
-import akka.pattern._
 import akka.util.Timeout
+import akka.actor.{ Actor, ActorRef, ActorSystem, Props, Terminated }
+import akka.pattern.{ after, ask }
 
 import reactivemongo.core.actors.{
   AuthRequest,
@@ -147,6 +147,12 @@ class Failover2[A](producer: () => Future[A], connection: MongoConnection, strat
 
   private def _next(): Future[A] = producer()
 
+  private val mutex = {
+    val sem = new java.util.concurrent.Semaphore(1, true)
+    sem.drainPermits()
+    sem
+  }
+
   private def send(n: Int): Future[A] =
     next().map[Try[A]](Success(_)).recover[Try[A]] {
       case err => Failure(err)
@@ -160,16 +166,7 @@ class Failover2[A](producer: () => Future[A], connection: MongoConnection, strat
 
           logger.debug(s"Got an error, retrying... (try #${`try`} is scheduled in ${delay.toMillis} ms)", e)
 
-          val lock = new AnyRef {}
-
-          connection.actorSystem.scheduler.scheduleOnce(delay) {
-            lock.synchronized(lock.notify)
-          }
-
-          lock.synchronized {
-            lock.wait()
-            send(`try`)
-          }
+          after(delay, connection.actorSystem.scheduler)(send(`try`))
         } else {
           // generally that means that the primary is not available
           // or the nodeset is unreachable
@@ -277,9 +274,6 @@ class MongoConnection(
     val mongosystem: ActorRef,
     val options: MongoConnectionOptions) {
 
-  import akka.pattern.ask
-  import akka.util.Timeout
-
   private[api] val logger = LazyLogger("reactivemongo.api.Failover2")
 
   /**
@@ -288,6 +282,7 @@ class MongoConnection(
    * @param name the database name
    * @param failoverStrategy the failover strategy for sending requests.
    */
+  @deprecated(message = "Use [[database]]", since = "0.11.8")
   def apply(name: String, failoverStrategy: FailoverStrategy = options.failoverStrategy)(implicit context: ExecutionContext): DefaultDB = {
     metadata.foreach {
       case ProtocolMetadata(_, MongoWireVersion.V24AndBefore, _, _, _) =>
@@ -546,8 +541,9 @@ object MongoConnection {
   /**
    * @param hosts the hosts of the servers of the MongoDB replica set
    * @param options the connection options
+   * @param ignoredOptions the options ignored from the parsed URI
    * @param db the name of the database
-   * @param authentication the authenticate information (see [[MongoConnectionOptions.authMode]])
+   * @param authenticate the authenticate information (see [[MongoConnectionOptions.authMode]])
    */
   final case class ParsedURI(
     hosts: List[(String, Int)],
@@ -734,6 +730,9 @@ object MongoConnection {
   }
 }
 
+/**
+ * @param config a custom configuration (otherwise the default options are used)
+ */
 class MongoDriver(config: Option[Config] = None) {
   import scala.collection.mutable.{ Map => MutableMap }
 
@@ -761,7 +760,11 @@ class MongoDriver(config: Option[Config] = None) {
 
   def numConnections: Int = connectionMonitors.size
 
-  def close(timeout: FiniteDuration = FiniteDuration(1, SECONDS)) = {
+  /**
+   * Closes this driver (and all its connections and resources).
+   * Awaits the termination until the timeout is expired.
+   */
+  def close(timeout: FiniteDuration = FiniteDuration(2, SECONDS)): Unit = {
     // Terminate actors used by MongoConnections
     connections.foreach(_.close())
 
@@ -770,10 +773,17 @@ class MongoDriver(config: Option[Config] = None) {
     // and then shut down the ActorSystem as it is exiting.
     supervisorActor ! Close
 
-    // When the actorSystem is shutdown,
-    // it means that supervisorActor has exited (run its postStop).
-    // So, wait for that event.
-    system.awaitTermination(timeout)
+    if (!system.isTerminated) {
+      // When the actorSystem is shutdown,
+      // it means that supervisorActor has exited (run its postStop).
+      // So, wait for that event.
+
+      try {
+        system.awaitTermination(timeout)
+      } catch {
+        case e: Throwable if !system.isTerminated => throw e
+      }
+    }
   }
 
   /**
@@ -869,7 +879,7 @@ class MongoDriver(config: Option[Config] = None) {
 
   private case class AddConnection(options: MongoConnectionOptions, mongosystem: ActorRef)
 
-  private case class CloseWithTimeout(timeout: FiniteDuration)
+  //private case class CloseWithTimeout(timeout: FiniteDuration)
 
   private case class SupervisorActor(driver: MongoDriver) extends Actor {
     def isEmpty = driver.connectionMonitors.isEmpty
@@ -883,9 +893,11 @@ class MongoDriver(config: Option[Config] = None) {
 
       case Terminated(actor) => driver.connectionMonitors.remove(actor)
 
+      /*
       case CloseWithTimeout(timeout) =>
         if (isEmpty) context.stop(self)
         else context.become(closing(timeout))
+         */
 
       case Close =>
         if (isEmpty) context.stop(self)
@@ -893,16 +905,18 @@ class MongoDriver(config: Option[Config] = None) {
     }
 
     def closing(shutdownTimeout: FiniteDuration): Receive = {
-      case ac: AddConnection =>
+      case AddConnection(_, _) =>
         logger.warn("Refusing to add connection while MongoDriver is closing.")
-      case Terminated(actor) =>
-        driver.connectionMonitors.remove(actor)
-        if (isEmpty) {
-          context.stop(self)
-        }
 
+      case Terminated(actor) => {
+        driver.connectionMonitors.remove(actor)
+        if (isEmpty) context.stop(self)
+      }
+
+      /*
       case CloseWithTimeout(timeout) =>
         logger.warn("CloseWithTimeout ignored, already closing.")
+         */
 
       case Close => logger.warn("Close ignored, already closing.")
     }

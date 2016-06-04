@@ -96,6 +96,7 @@ private[reactivemongo] trait MongoScramSha1Authentication {
 
           logger.warn(s"AUTH: $msg")
           logger.debug("SCRAM-SHA1 getNonce failure", e)
+
           authenticationResponse(response)(_ => Left(FailedAuthentication(msg)))
         }, { challenge =>
           logger.debug(s"AUTH: got challenge for channel ${response.info.channelId}: $challenge")

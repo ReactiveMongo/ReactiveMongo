@@ -21,6 +21,10 @@ import scala.concurrent.{ Future, Promise }
 import scala.util.{ Failure, Success, Try }
 
 import akka.actor.{ Actor, ActorRef }
+import akka.pattern.ask
+import akka.util.Timeout
+
+import shaded.netty.channel.{ ChannelFuture, ChannelFutureListener }
 import shaded.netty.channel.group.{
   ChannelGroupFuture,
   ChannelGroupFutureListener,
@@ -50,7 +54,6 @@ import reactivemongo.core.nodeset.{
   ChannelFactory,
   Connection,
   ConnectionStatus,
-  QueryableNodeStatus,
   Node,
   NodeSet,
   NodeStatus,
@@ -110,7 +113,7 @@ case object Close
  * Message to send in order to get warned the next time a primary is found.
  */
 private[reactivemongo] case object ConnectAll
-private[reactivemongo] case object RefreshAllNodes
+private[reactivemongo] case object RefreshAll
 private[reactivemongo] case class ChannelConnected(channelId: Int)
 
 private[reactivemongo] sealed trait ChannelUnavailable { def channelId: Int }
@@ -190,7 +193,7 @@ trait MongoDBSystem extends Actor {
   private val refreshAllJob = {
     val interval = options.monitorRefreshMS milliseconds
 
-    context.system.scheduler.schedule(interval, interval, self, RefreshAllNodes)
+    context.system.scheduler.schedule(interval, interval, self, RefreshAll)
   }
 
   protected def sendAuthenticate(connection: Connection, authentication: Authenticate): Connection
@@ -208,7 +211,7 @@ trait MongoDBSystem extends Actor {
     }
   }
 
-  private final def authenticateNode(node: Node, auths: Seq[Authenticate]): Node = node.copy(connections = node.connections.map {
+  private final def authenticateNode(node: Node, auths: Seq[Authenticate]): Node = node._copy(connections = node.connections.map {
     case connection if connection.status == ConnectionStatus.Connected =>
       authenticateConnection(connection, auths)
 
@@ -217,20 +220,21 @@ trait MongoDBSystem extends Actor {
 
   private final def authenticateNodeSet(nodeSet: NodeSet): NodeSet =
     nodeSet.copy(nodes = nodeSet.nodes.map {
-      case node @ Node(_, _: QueryableNodeStatus, _, _, _, _, _, _) =>
+      case node @ Node(_, status, _, _, _, _, _, _) if status.queryable =>
         authenticateNode(node, nodeSet.authenticates.toSeq)
 
       case node => node
     })
 
-  private def unauthenticate(node: Node, connections: Vector[Connection]): Node = node.copy(
+  private def unauthenticate(node: Node, connections: Vector[Connection]): Node = node._copy(
     status = NodeStatus.Unknown,
     connections = connections,
     authenticated = if (connections.isEmpty) Set.empty else node.authenticated)
 
   private def stopWhenDisconnected[T](state: String, msg: T): Unit = {
-    val remainingConnections = nodeSet.nodes.foldLeft(0)(
-      { (open, node) => open + node.connections.size })
+    val remainingConnections = nodeSet.nodes.foldLeft(0) {
+      _ + _.connected.size
+    }
 
     if (logger.isDebugEnabled) {
       val disconnected = nodeSet.nodes.foldLeft(0) { (open, node) =>
@@ -310,37 +314,8 @@ trait MongoDBSystem extends Actor {
     case Close => {
       logger.info("Received Close message, going to close connections and moving on stage Closing")
 
-      // cancel all jobs
-      connectAllJob.cancel
-      refreshAllJob.cancel
-
-      // close all connections
-      val listener = new ChannelGroupFutureListener {
-        val factory = channelFactory
-        val monitorActors = monitors
-        def operationComplete(future: ChannelGroupFuture): Unit = {
-          logger.debug("Netty says all channels are closed.")
-
-          try {
-            factory.channelFactory.releaseExternalResources
-          } catch {
-            case err: Throwable =>
-              logger.debug("fails to release channel resources", err)
-          }
-        }
-      }
-      allChannelGroup(nodeSet).close.addListener(listener)
-
-      // fail all requests waiting for a response
-      awaitingResponses.foreach { pair =>
-        val promise = pair._2.promise
-        if (!promise.isCompleted) {
-          promise.failure(Exceptions.ClosedException)
-        }
-      }
-      awaitingResponses.empty
-
-      val connectedCon = nodeSet.nodes.foldLeft(0) { _ + _.connected.size }
+      val ns = close()
+      val connectedCon = ns.nodes.foldLeft(0) { _ + _.connected.size }
 
       // moving to closing state
       context become closing
@@ -416,7 +391,7 @@ trait MongoDBSystem extends Actor {
       connectAll(nodeSet)
     }
 
-    case RefreshAllNodes => {
+    case RefreshAll => {
       nodeSet.nodes.foreach { node =>
         logger.trace(s"try to refresh ${node.name}")
         updateNodeSet(nodeSet.updateAll { node =>
@@ -425,7 +400,7 @@ trait MongoDBSystem extends Actor {
       }
 
       logger.trace(
-        s"RefreshAllNodes Job running... Status: ${nodeSet.toShortString}")
+        s"RefreshAll Job running... Status: ${nodeSet.toShortString}")
     }
 
     case ChannelConnected(channelId) => {
@@ -483,6 +458,8 @@ trait MongoDBSystem extends Actor {
     case response @ Response(_, _, _, _) if ( // isMaster response
       RequestId.isMaster accepts response) => {
 
+      logger.trace(s"IsMaster response: $response")
+
       val nodeSetWasReachable = nodeSet.isReachable
       val wasPrimary = nodeSet.primary.toSeq.flatMap(_.names)
 
@@ -495,8 +472,6 @@ trait MongoDBSystem extends Actor {
         BSONIsMasterCommandImplicits.IsMasterResultReader)
 
       val ns = nodeSet.updateNodeByChannelId(response.info.channelId) { node =>
-        chanNode = Some(node)
-
         val pingInfo =
           if (node.pingInfo.lastIsMasterId == response.header.responseTo) {
             node.pingInfo.copy(ping =
@@ -516,29 +491,32 @@ trait MongoDBSystem extends Actor {
           isMaster.maxMessageSizeBytes,
           isMaster.maxWriteBatchSize)
 
-        val an = authenticating.copy(
+        val an = authenticating._copy(
           status = isMaster.status,
           pingInfo = pingInfo,
           tags = isMaster.replicaSet.flatMap(_.tags),
           protocolMetadata = meta,
           isMongos = isMaster.isMongos)
 
-        isMaster.replicaSet.fold(an)(rs => an.withAlias(rs.me))
+        val n = isMaster.replicaSet.fold(an)(rs => an.withAlias(rs.me))
+        chanNode = Some(n)
+
+        n
       }
 
       updateNodeSet {
-        connectAll {
-          val upNodes = isMaster.replicaSet.toSeq.flatMap { rs =>
-            rs.hosts.collect {
-              case host if !ns.nodes.exists(_.names contains host) =>
-                Node(host, NodeStatus.Uninitialized,
-                  Vector.empty, Set.empty, None, ProtocolMetadata.Default)
-            }
+        val discoveredNodes = isMaster.replicaSet.toSeq.flatMap { rs =>
+          rs.hosts.collect {
+            case host if (!ns.nodes.exists(_.names contains host)) =>
+              // Prepare node for newly discovered host in the RS
+              Node(host, NodeStatus.Uninitialized,
+                Vector.empty, Set.empty, None, ProtocolMetadata.Default)
           }
-
-          ns.copy(nodes = ns.nodes ++ upNodes).
-            createNeededChannels(self, options.nbChannelsPerNode)
         }
+
+        logger.trace(s"Discovered nodes: $discoveredNodes")
+
+        ns.copy(nodes = ns.nodes ++ discoveredNodes)
       }
 
       chanNode.foreach { node =>
@@ -556,6 +534,11 @@ trait MongoDBSystem extends Actor {
           }
         }
       }
+
+      context.system.scheduler.scheduleOnce(Duration.Zero) {
+        connectAll(nodeSet.
+          createNeededChannels(self, options.nbChannelsPerNode))
+      }
     }
   }
 
@@ -569,8 +552,8 @@ trait MongoDBSystem extends Actor {
     }
   }
 
+  // any other response
   private val fallback: Receive = {
-    // any other response
     case response: Response if RequestId.common accepts response => {
       awaitingResponses.get(response.header.responseTo) match {
         case Some(AwaitingResponse(_, _, promise, isGetLastError, isMongo26WriteOp)) => {
@@ -647,7 +630,7 @@ trait MongoDBSystem extends Actor {
           }
         }
 
-        case None => logger.error(s"oups. ${response.header.responseTo} not found! complete message is $response")
+        case _ => logger.error(s"oups. ${response.header.responseTo} not found! complete message is $response")
       }
     }
 
@@ -667,13 +650,19 @@ trait MongoDBSystem extends Actor {
   // monitor -->
   private var nodeSet: NodeSet = NodeSet(None, None, seeds.map(seed => Node(seed, NodeStatus.Unknown, Vector.empty, Set.empty, None, ProtocolMetadata.Default).createNeededChannels(self, 1)).toVector, initialAuthenticates.toSet)
 
-  connectAll(nodeSet)
-  self ! RefreshAllNodes
+  connectAll(nodeSet, { (node, chan) =>
+    chan.addListener(new ChannelFutureListener {
+      def operationComplete(chan: ChannelFuture) =
+        sendIsMaster(node, RequestId.isMaster.next)
+    })
+
+    chan
+  })
   // <-- monitor
 
   def onPrimaryUnavailable() {
-    self ! RefreshAllNodes
-    updateNodeSet(nodeSet.updateAll(node => if (node.status == NodeStatus.Primary) node.copy(status = NodeStatus.Unknown) else node))
+    self ! RefreshAll
+    updateNodeSet(nodeSet.updateAll(node => if (node.status == NodeStatus.Primary) node._copy(status = NodeStatus.Unknown) else node))
     broadcastMonitors(PrimaryUnavailable)
   }
 
@@ -691,7 +680,7 @@ trait MongoDBSystem extends Actor {
         nodeSet.authenticates.toSeq)
 
     } { node =>
-      node.copy(authenticated = auth.map(node.authenticated + _).
+      node._copy(authenticated = auth.map(node.authenticated + _).
         getOrElse(node.authenticated))
     }
 
@@ -704,7 +693,7 @@ trait MongoDBSystem extends Actor {
       response.info.channelId).flatMap(_._2.authenticating)
 
     updateNodeSet(auth match {
-      case Some(a @ Authenticating(db, user, pass)) => {
+      case Some(Authenticating(db, user, pass)) => {
         val originalAuthenticate = Authenticate(db, user, pass)
         val authenticated = check(response) match {
           case Right(successfulAuthentication) => {
@@ -719,6 +708,8 @@ trait MongoDBSystem extends Actor {
             if (nodeSet.primary.isDefined) {
               broadcastMonitors(PrimaryAvailable(nodeSet.protocolMetadata))
               logger.debug("The primary is now authenticated")
+            } else if (nodeSet.isReachable) {
+              logger.warn(s"""The node set is authenticated, but the primary is not available: ${nodeSet.name} -> ${nodeSet.nodes.map(_.names) mkString ", "}""")
             }
 
             Some(Authenticated(db, user))
@@ -763,9 +754,7 @@ trait MongoDBSystem extends Actor {
         f(connection -> authenticating))
     })
 
-  override def postStop() {
-    // COPY OF CLOSING CODE FROM LINE 218
-
+  private def close(): NodeSet = {
     // cancel all jobs
     connectAllJob.cancel
     refreshAllJob.cancel
@@ -773,14 +762,28 @@ trait MongoDBSystem extends Actor {
     // close all connections
     val listener = new ChannelGroupFutureListener {
       val factory = channelFactory
-      val monitorActors = monitors
       def operationComplete(future: ChannelGroupFuture): Unit = {
         logger.debug("Netty says all channels are closed.")
-        factory.channelFactory.releaseExternalResources
+
+        try {
+          factory.channelFactory.releaseExternalResources()
+        } catch {
+          case err: Throwable =>
+            logger.debug("fails to release channel resources", err)
+        }
       }
     }
-    allChannelGroup(nodeSet).close.addListener(listener)
 
+    val ns = updateNodeSet(nodeSet.copy(nodes = nodeSet.nodes.map { node =>
+      node._copy(connections = node.connected)
+      // Only keep already connected connection:
+      // - prevent to activate other connection
+      // - know which connections to be closed
+    }))
+
+    allChannelGroup(ns).close().addListener(listener)
+
+    // fail all requests waiting for a response
     awaitingResponses.foreach {
       case (_, r) if (!r.promise.isCompleted) =>
         // fail all requests waiting for a response
@@ -788,19 +791,25 @@ trait MongoDBSystem extends Actor {
       case _ => ( /* already completed */ )
     }
 
-    awaitingResponses.empty
+    awaitingResponses.clear()
 
+    ns
+  }
+
+  override def postStop() {
+    close()
     logger.warn(s"MongoDBSystem $self stopped.")
   }
 
   private def broadcastMonitors(message: AnyRef) = monitors.foreach(_ ! message)
 
-  private def connectAll(nodeSet: NodeSet): NodeSet = {
+  private def connectAll(nodeSet: NodeSet, connected: (Node, ChannelFuture) => ChannelFuture = { (_, chan) => chan }): NodeSet = {
     for {
       node <- nodeSet.nodes
       connection <- node.connections if !connection.channel.isConnected()
-    } yield connection.channel.connect(
-      new InetSocketAddress(node.host, node.port))
+    } yield connected(node,
+      connection.channel.connect(
+        new InetSocketAddress(node.host, node.port)))
 
     nodeSet
   }
@@ -824,13 +833,13 @@ trait MongoDBSystem extends Actor {
       channel.send(isMaster(id))
 
       if (node.pingInfo.lastIsMasterId == -1) {
-        node.copy(
+        node._copy(
           pingInfo = node.pingInfo.copy(
             lastIsMasterTime = System.currentTimeMillis(),
             lastIsMasterId = id))
 
       } else if (node.pingInfo.lastIsMasterId >= PingInfo.pingTimeout) {
-        node.copy(
+        node._copy(
           pingInfo = node.pingInfo.copy(
             lastIsMasterTime = System.currentTimeMillis(),
             lastIsMasterId = id,
@@ -840,12 +849,13 @@ trait MongoDBSystem extends Actor {
     }.getOrElse(node)
 
   @deprecated(message = "Will be made private", since = "0.11.10")
-  def allChannelGroup(nodeSet: NodeSet) = {
+  def allChannelGroup(nodeSet: NodeSet): DefaultChannelGroup = {
     val result = new DefaultChannelGroup
+
     for (node <- nodeSet.nodes) {
-      for (connection <- node.connections)
-        result.add(connection.channel)
+      for (connection <- node.connections) result.add(connection.channel)
     }
+
     result
   }
 

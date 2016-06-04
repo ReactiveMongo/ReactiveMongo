@@ -15,7 +15,15 @@
  */
 package reactivemongo.api.collections.bson
 
-import reactivemongo.bson.{ BSONBoolean, BSONDocument, BSONLong, BSONString }
+import reactivemongo.bson.{
+  BSONArray,
+  BSONBoolean,
+  BSONDocument,
+  BSONElement,
+  BSONLong,
+  BSONString,
+  Producer
+}
 
 import reactivemongo.api.{
   Collection,
@@ -60,26 +68,36 @@ case class BSONQueryBuilder(
   def merge(readPreference: ReadPreference): BSONDocument = {
     // Primary and SecondaryPreferred are encoded as the slaveOk flag;
     // the others are encoded as $readPreference field.
-    val readPreferenceDocument = readPreference match {
-      case ReadPreference.Primary                    => None
-      case ReadPreference.PrimaryPreferred(filter)   => Some(BSONDocument("mode" -> "primaryPreferred"))
-      case ReadPreference.Secondary(filter)          => Some(BSONDocument("mode" -> "secondary"))
-      case ReadPreference.SecondaryPreferred(filter) => None
-      case ReadPreference.Nearest(filter)            => Some(BSONDocument("mode" -> "nearest"))
+
+    def pref = {
+      val mode = readPreference match {
+        case ReadPreference.Primary                    => "primary"
+        case ReadPreference.PrimaryPreferred(filter)   => "primaryPreferred"
+        case ReadPreference.Secondary(filter)          => "secondary"
+        case ReadPreference.SecondaryPreferred(filter) => "secondaryPreferred"
+        case ReadPreference.Nearest(filter)            => "nearest"
+      }
+      val base = Seq[BSONElement]("mode" -> BSONString(mode))
+
+      BSONDocument(readPreference match {
+        case ReadPreference.Taggable(tagSet) => base :+ ("tags" -> BSONArray(
+          tagSet.map(tags => BSONDocument(tags.toList.map {
+            case (k, v) => k -> BSONString(v)
+          }))))
+
+        case _ => base
+      })
     }
 
-    val optionalFields = List(
+    val optional = List(
+      queryOption.map { "$query" -> _ },
       sortOption.map { "$orderby" -> _ },
       hintOption.map { "$hint" -> _ },
       maxTimeMsOption.map { "$maxTimeMS" -> BSONLong(_) },
       commentString.map { "$comment" -> BSONString(_) },
       option(explainFlag, "$explain" -> BSONBoolean(true)),
-      option(snapshotFlag, "$snapshot" -> BSONBoolean(true)),
-      readPreferenceDocument.map { "$readPreference" -> _ }).flatten
+      option(snapshotFlag, "$snapshot" -> BSONBoolean(true))).flatten
 
-    val query = queryOption.getOrElse(BSONDocument.empty)
-
-    if (optionalFields.isEmpty) query
-    else BSONDocument(("$query" -> query) :: optionalFields)
+    BSONDocument(optional :+ ("$readPreference" -> pref))
   }
 }
