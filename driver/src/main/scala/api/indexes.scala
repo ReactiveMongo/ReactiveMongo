@@ -93,6 +93,7 @@ object IndexType {
  * @param sparse States if the index to build should only consider the documents that have the indexed fields. See [[http://www.mongodb.org/display/DOCS/Indexes#Indexes-sparse%3Atrue the documentation]] on the consequences of such an index.
  * @param version Indicates the [[http://www.mongodb.org/display/DOCS/Index+Versions version]] of the index (1 for >= 2.0, else 0). You should let MongoDB decide.
  * @param options Optional parameters for this index (typically specific to an IndexType like Geo2D).
+ * @param partialFilter Optional [[https://docs.mongodb.com/manual/core/index-partial/#partial-index-with-unique-constraints partial filter]] (since MongoDB 3.2)
  */
 case class Index(
     key: Seq[(String, IndexType)],
@@ -103,7 +104,9 @@ case class Index(
     sparse: Boolean = false,
     version: Option[Int] = None, // let MongoDB decide
     // TODO: storageEngine (new for Mongo3)
+    partialFilter: Option[BSONDocument] = None,
     options: BSONDocument = BSONDocument()) {
+
   /** The name of the index (a default one is computed if none). */
   lazy val eventualName: String = name.getOrElse(key.foldLeft("") { (name, kv) =>
     name + (if (name.length > 0) "_" else "") + kv._1 + "_" + kv._2.valueStr
@@ -461,7 +464,8 @@ object IndexesManager {
       "background" -> option(nsIndex.index.background, BSONBoolean(true)),
       "dropDups" -> option(nsIndex.index.dropDups, BSONBoolean(true)),
       "sparse" -> option(nsIndex.index.sparse, BSONBoolean(true)),
-      "unique" -> option(nsIndex.index.unique, BSONBoolean(true))) ++ nsIndex.index.options
+      "unique" -> option(nsIndex.index.unique, BSONBoolean(true)),
+      "partialFilterExpression" -> nsIndex.index.partialFilter) ++ nsIndex.index.options
   }
 
   implicit object NSIndexWriter extends BSONDocumentWriter[NSIndex] {
@@ -480,18 +484,30 @@ object IndexesManager {
           element._1 == "ns" || element._1 == "key" || element._1 == "name" ||
             element._1 == "unique" || element._1 == "background" ||
             element._1 == "dropDups" || element._1 == "sparse" ||
-            element._1 == "v"
+            element._1 == "v" || element._1 == "partialFilterExpression"
         }.toSeq
 
-        Index(key,
-          // TODO: read storageEngine property (since MongoDB 3)
-          doc.getAs[BSONString]("name").map(_.value),
-          doc.getAs[BSONBoolean]("unique").map(_.value).getOrElse(false),
-          doc.getAs[BSONBoolean]("background").map(_.value).getOrElse(false),
-          doc.getAs[BSONBoolean]("dropDups").map(_.value).getOrElse(false),
-          doc.getAs[BSONBoolean]("sparse").map(_.value).getOrElse(false),
-          doc.getAs[BSONNumberLike]("v").map(_.toInt),
-          BSONDocument(options.toStream))
+        (for {
+          name <- doc.getAsUnflattenedTry[String]("name")
+          unique <- doc.getAsUnflattenedTry[BSONBooleanLike]("unique").
+            map(_.fold(false)(_.toBoolean))
+
+          background <- doc.getAsUnflattenedTry[BSONBooleanLike]("background").
+            map(_.fold(false)(_.toBoolean))
+
+          dropDups <- doc.getAsUnflattenedTry[BSONBooleanLike]("dropDups").
+            map(_.fold(false)(_.toBoolean))
+
+          sparse <- doc.getAsUnflattenedTry[BSONBooleanLike]("sparse").
+            map(_.fold(false)(_.toBoolean))
+
+          version <- doc.getAsUnflattenedTry[BSONNumberLike]("v").
+            map(_.map(_.toInt))
+
+          partialFilter <- doc.getAsUnflattenedTry[BSONDocument](
+            "partialFilterExpression")
+        } yield Index(key, name, unique, background, dropDups,
+          sparse, version, partialFilter, BSONDocument(options))).get
       }
   }
 
