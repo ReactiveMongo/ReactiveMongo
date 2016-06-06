@@ -232,11 +232,11 @@ object ReadPreference {
     new Secondary(TagFilter(List(writer.write(tag))))
 
   /** Reads from a secondary that has the given `tagSet` in the replica set. */
-  def secondary[T](tagSet: T*)(implicit writer: BSONDocumentWriter[T]): PrimaryPreferred = new PrimaryPreferred(TagFilter(tagSet.map(writer.write(_))))
+  def secondary[T](tagSet: T*)(implicit writer: BSONDocumentWriter[T]): Secondary = new Secondary(TagFilter(tagSet.map(writer.write(_))))
 
   /** Reads from a secondary that has the given `tagSet` in the replica set. */
-  def secondary[T](tagSet: List[Map[String, String]]): PrimaryPreferred =
-    new PrimaryPreferred(TagFilter(tagSet))
+  def secondary[T](tagSet: List[Map[String, String]]): Secondary =
+    new Secondary(TagFilter(tagSet))
 
   /** Reads from any secondary, or from the primary if they are not available. */
   val secondaryPreferred: SecondaryPreferred = new SecondaryPreferred(None)
@@ -246,10 +246,10 @@ object ReadPreference {
   def secondaryPreferred[T](tag: T)(implicit writer: BSONDocumentWriter[T]): SecondaryPreferred = new SecondaryPreferred(TagFilter(List(writer.write(tag))))
 
   /** Reads from any node that has the given `tagSet` in the replica set (preferably a secondary). */
-  def secondaryPreferred[T](tagSet: T*)(implicit writer: BSONDocumentWriter[T]): PrimaryPreferred = new PrimaryPreferred(TagFilter(tagSet.map(writer.write(_))))
+  def secondaryPreferred[T](tagSet: T*)(implicit writer: BSONDocumentWriter[T]): SecondaryPreferred = new SecondaryPreferred(TagFilter(tagSet.map(writer.write(_))))
 
   /** Reads from any node that has the given `tagSet` in the replica set (preferably a secondary). */
-  def secondaryPreferred[T](tagSet: List[Map[String, String]]): PrimaryPreferred = new PrimaryPreferred(TagFilter(tagSet))
+  def secondaryPreferred[T](tagSet: List[Map[String, String]]): SecondaryPreferred = new SecondaryPreferred(TagFilter(tagSet))
 
   /**
    * Reads from the fastest node (ie the node which replies faster than all others), regardless its status
@@ -267,12 +267,12 @@ object ReadPreference {
   /**
    * Reads from the fastest node (e.g. the node which replies faster than all others) that has the given `tagSet`, regardless its status (primary or secondary).
    */
-  def nearest[T](tagSet: T*)(implicit writer: BSONDocumentWriter[T]): PrimaryPreferred = new PrimaryPreferred(TagFilter(tagSet.map(writer.write(_))))
+  def nearest[T](tagSet: T*)(implicit writer: BSONDocumentWriter[T]): Nearest = new Nearest(TagFilter(tagSet.map(writer.write(_))))
 
   /**
    * Reads from the fastest node (e.g. the node which replies faster than all others) that has the given `tagSet`, regardless its status (primary or secondary).
    */
-  def nearest[T](tagSet: List[Map[String, String]]): PrimaryPreferred = new PrimaryPreferred(TagFilter(tagSet))
+  def nearest[T](tagSet: List[Map[String, String]]): Nearest = new Nearest(TagFilter(tagSet))
 }
 
 sealed trait ReadConcern {
