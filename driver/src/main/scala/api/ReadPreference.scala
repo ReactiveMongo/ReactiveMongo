@@ -77,8 +77,11 @@ object ReadPreference {
       _tags = tags
     }
 
-    def copy(filter: Option[BSONDocument => Boolean]): PrimaryPreferred =
-      new PrimaryPreferred(filter)
+    def copy(filter: Option[BSONDocument => Boolean]): PrimaryPreferred = {
+      val pref = new PrimaryPreferred(filter)
+      pref._tags = this._tags
+      pref
+    }
 
     override val toString = s"PrimaryPreferred(${_tags})"
   }
@@ -107,8 +110,11 @@ object ReadPreference {
       _tags = tags
     }
 
-    def copy(filter: Option[BSONDocument => Boolean]): Secondary =
-      new Secondary(filter)
+    def copy(filter: Option[BSONDocument => Boolean]): Secondary = {
+      val pref = new Secondary(filter)
+      pref._tags = this._tags
+      pref
+    }
 
     override val toString = s"Secondary(${_tags})"
   }
@@ -137,8 +143,11 @@ object ReadPreference {
       _tags = tags
     }
 
-    def copy(filter: Option[BSONDocument => Boolean]): SecondaryPreferred =
-      new SecondaryPreferred(filter)
+    def copy(filter: Option[BSONDocument => Boolean]): SecondaryPreferred = {
+      val pref = new SecondaryPreferred(filter)
+      pref._tags = this._tags
+      pref
+    }
 
     override val toString = s"SecondaryPreferred(${_tags})"
   }
@@ -170,8 +179,11 @@ object ReadPreference {
       _tags = tags
     }
 
-    def copy(filter: Option[BSONDocument => Boolean]): Nearest =
-      new Nearest(filter)
+    def copy(filter: Option[BSONDocument => Boolean]): Nearest = {
+      val pref = new Nearest(filter)
+      pref._tags = this._tags
+      pref
+    }
 
     override val toString = s"Nearest(${_tags})"
   }
