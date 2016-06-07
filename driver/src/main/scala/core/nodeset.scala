@@ -498,7 +498,11 @@ final class ChannelFactory(
           if (options.sslAllowsInvalidCert) Array(TrustAny) else null
 
         val ctx = SSLContext.getInstance("SSL")
-        ctx.init(null, tm, new java.security.SecureRandom()) // TODO: seed
+        val rand = new scala.util.Random(System.identityHashCode(tm))
+        val seed = Array.ofDim[Byte](128)
+        rand.nextBytes(seed)
+
+        ctx.init(null, tm, new java.security.SecureRandom(seed))
         ctx
       }
 

@@ -140,7 +140,6 @@ trait DBMetaCommands { self: DB =>
 
   /** Returns an index manager for this database. */
   def indexesManager(implicit ec: ExecutionContext) = IndexesManager(self)
-  // TODO: Wait is available
 
   private lazy val collectionNameReader = new BSONDocumentReader[String] {
     val prefixLength = name.size + 1
@@ -181,7 +180,7 @@ case class DefaultDB(
 }
 
 object DB {
+  @deprecated("Use [[MongoConnection.database]]", "0.12.0")
   def apply(name: String, connection: MongoConnection, failoverStrategy: FailoverStrategy = FailoverStrategy()) = DefaultDB(name, connection, failoverStrategy)
-  // TODO: Wait is available
 
 }

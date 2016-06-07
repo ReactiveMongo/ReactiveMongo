@@ -77,8 +77,11 @@ object ReadPreference {
       _tags = tags
     }
 
-    def copy(filter: Option[BSONDocument => Boolean]): PrimaryPreferred =
-      new PrimaryPreferred(filter)
+    def copy(filter: Option[BSONDocument => Boolean]): PrimaryPreferred = {
+      val pref = new PrimaryPreferred(filter)
+      pref._tags = this._tags
+      pref
+    }
 
     override val toString = s"PrimaryPreferred(${_tags})"
   }
@@ -107,8 +110,11 @@ object ReadPreference {
       _tags = tags
     }
 
-    def copy(filter: Option[BSONDocument => Boolean]): Secondary =
-      new Secondary(filter)
+    def copy(filter: Option[BSONDocument => Boolean]): Secondary = {
+      val pref = new Secondary(filter)
+      pref._tags = this._tags
+      pref
+    }
 
     override val toString = s"Secondary(${_tags})"
   }
@@ -137,8 +143,11 @@ object ReadPreference {
       _tags = tags
     }
 
-    def copy(filter: Option[BSONDocument => Boolean]): SecondaryPreferred =
-      new SecondaryPreferred(filter)
+    def copy(filter: Option[BSONDocument => Boolean]): SecondaryPreferred = {
+      val pref = new SecondaryPreferred(filter)
+      pref._tags = this._tags
+      pref
+    }
 
     override val toString = s"SecondaryPreferred(${_tags})"
   }
@@ -170,8 +179,11 @@ object ReadPreference {
       _tags = tags
     }
 
-    def copy(filter: Option[BSONDocument => Boolean]): Nearest =
-      new Nearest(filter)
+    def copy(filter: Option[BSONDocument => Boolean]): Nearest = {
+      val pref = new Nearest(filter)
+      pref._tags = this._tags
+      pref
+    }
 
     override val toString = s"Nearest(${_tags})"
   }
@@ -220,8 +232,7 @@ object ReadPreference {
   def primaryPreferred[T](tagSet: T*)(implicit writer: BSONDocumentWriter[T]): PrimaryPreferred = new PrimaryPreferred(TagFilter(tagSet.map(writer.write(_))))
 
   /** Reads from any node that has the given `tagSet` in the replica set (preferably the primary). */
-  def primaryPreferred[T](tagSet: List[Map[String, String]]): PrimaryPreferred =
-    new PrimaryPreferred(TagFilter(tagSet))
+  def primaryPreferred[T](tagSet: List[Map[String, String]]): PrimaryPreferred = new PrimaryPreferred(tagSet)
 
   /** Reads only from any secondary. */
   val secondary: Secondary = new Secondary(None)
@@ -235,8 +246,7 @@ object ReadPreference {
   def secondary[T](tagSet: T*)(implicit writer: BSONDocumentWriter[T]): Secondary = new Secondary(TagFilter(tagSet.map(writer.write(_))))
 
   /** Reads from a secondary that has the given `tagSet` in the replica set. */
-  def secondary[T](tagSet: List[Map[String, String]]): Secondary =
-    new Secondary(TagFilter(tagSet))
+  def secondary[T](tagSet: List[Map[String, String]]): Secondary = new Secondary(tagSet)
 
   /** Reads from any secondary, or from the primary if they are not available. */
   val secondaryPreferred: SecondaryPreferred = new SecondaryPreferred(None)
@@ -249,7 +259,7 @@ object ReadPreference {
   def secondaryPreferred[T](tagSet: T*)(implicit writer: BSONDocumentWriter[T]): SecondaryPreferred = new SecondaryPreferred(TagFilter(tagSet.map(writer.write(_))))
 
   /** Reads from any node that has the given `tagSet` in the replica set (preferably a secondary). */
-  def secondaryPreferred[T](tagSet: List[Map[String, String]]): SecondaryPreferred = new SecondaryPreferred(TagFilter(tagSet))
+  def secondaryPreferred[T](tagSet: List[Map[String, String]]): SecondaryPreferred = new SecondaryPreferred(tagSet)
 
   /**
    * Reads from the fastest node (ie the node which replies faster than all others), regardless its status
@@ -272,7 +282,7 @@ object ReadPreference {
   /**
    * Reads from the fastest node (e.g. the node which replies faster than all others) that has the given `tagSet`, regardless its status (primary or secondary).
    */
-  def nearest[T](tagSet: List[Map[String, String]]): Nearest = new Nearest(TagFilter(tagSet))
+  def nearest[T](tagSet: List[Map[String, String]]): Nearest = new Nearest(tagSet)
 }
 
 sealed trait ReadConcern {
