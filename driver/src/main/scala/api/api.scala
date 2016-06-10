@@ -15,7 +15,11 @@
  */
 package reactivemongo.api
 
-import java.util.concurrent.{ TimeoutException, atomic }, atomic.AtomicLong
+import java.util.concurrent.{
+  TimeoutException,
+  TimeUnit,
+  atomic
+}, TimeUnit.MILLISECONDS, atomic.AtomicLong
 
 import scala.util.{ Try, Failure, Success }
 import scala.util.control.{ NonFatal, NoStackTrace }
@@ -317,41 +321,42 @@ class MongoConnection(
 
   /** Returns a future that will be successful when node set is available. */
   private[api] def waitIsAvailable(failoverStrategy: FailoverStrategy)(implicit ec: ExecutionContext): Future[Unit] = {
-    @inline def nextTimeout(i: Int): Duration = {
-      val delayFactor = failoverStrategy.delayFactor(i)
-      failoverStrategy.initialDelay * delayFactor
+    @inline def nextTimeout(i: Int): FiniteDuration = {
+      val delayFactor: Double = failoverStrategy.delayFactor(i)
+
+      Duration.unapply(failoverStrategy.initialDelay * delayFactor).
+        fold(failoverStrategy.initialDelay)(t => FiniteDuration(t._1, t._2))
     }
 
-    def wait(iteration: Int, attempt: Int, timeout: Duration): Future[Unit] = {
+    type Retry = (FiniteDuration, Throwable)
+
+    def wait(iteration: Int, attempt: Int, timeout: FiniteDuration): Future[Unit] = {
       if (attempt == 0) Future.failed(Exceptions.NodeSetNotReachable)
       else {
-        Future { // TODO: Refactor
-          val ms = timeout.toMillis
+        @inline def res: Either[Retry, Unit] = try {
+          val before = System.currentTimeMillis
+          val result = Await.result(isAvailable, timeout)
+          val duration = System.currentTimeMillis - before
 
-          try {
-            val before = System.currentTimeMillis
-            val result = Await.result(isAvailable, timeout)
-            val duration = System.currentTimeMillis - before
+          if (result) Right({})
+          else Left(FiniteDuration(
+            timeout.toMillis - duration, MILLISECONDS) -> null)
 
-            if (result) true
-            else {
-              Thread.sleep(ms - duration)
-              false
-            }
-          } catch {
-            case e: Throwable =>
-              Thread.sleep(ms)
-              throw e
-          }
-        }.flatMap {
-          case false if (attempt > 0) => Future.failed[Unit](
-            new scala.RuntimeException("Got an error, no more attempt to do."))
+        } catch {
+          case e: Throwable => Left(timeout -> e)
+        }
 
-          case _ => Future.successful({})
-        }.recoverWith {
-          case error =>
-            val nextIt = iteration + 1
-            wait(nextIt, attempt - 1, nextTimeout(nextIt))
+        @inline def doRetry(delay: FiniteDuration): Future[Unit] = after(delay, actorSystem.scheduler) {
+          val nextIt = iteration + 1
+          wait(nextIt, attempt - 1, nextTimeout(nextIt))
+        }
+
+        res match {
+          case Right(_)            => Future.successful({})
+          case Left((delay, null)) => doRetry(delay)
+          case Left((delay, error)) =>
+            logger.warn("Got an error, retrying", error)
+            doRetry(delay)
         }
       }
     }

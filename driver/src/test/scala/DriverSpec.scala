@@ -254,9 +254,10 @@ object DriverSpec extends org.specs2.mutable.Specification {
 
         con.database("foo", fos).map(_ => List.empty[Int]).
           recover({ case _ => ws.result() }) must beEqualTo(expected).
-          await(1, timeout * 2) and (
-            (before + estTimeout(fos).toMillis) must beGreaterThanOrEqualTo(
-              System.currentTimeMillis()))
+          await(1, timeout * 2) and {
+            (before + estTimeout(fos).toMillis) must be ~ (
+              System.currentTimeMillis() +/- 10000)
+          }
       }
     }
 
