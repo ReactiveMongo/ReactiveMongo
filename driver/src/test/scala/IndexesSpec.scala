@@ -1,65 +1,95 @@
-import util.control.NonFatal
-import org.specs2.mutable._
-import reactivemongo.api.indexes._
-import reactivemongo.api.indexes.IndexType.{ Hashed, Geo2D, Geo2DSpherical }
-import reactivemongo.bson._
+import scala.concurrent.Future
+import scala.concurrent.duration.FiniteDuration
+
+import reactivemongo.bson.{ BSONArray, BSONDocument, BSONDouble, BSONInteger }
+import reactivemongo.api.indexes.{ Index, IndexType }, IndexType.{
+  Hashed,
+  Geo2D,
+  Geo2DSpherical
+}
+import reactivemongo.api.collections.bson.BSONCollection
 import reactivemongo.core.errors.DatabaseException
-import scala.concurrent.{ Await, Future }
 
 import org.specs2.concurrent.{ ExecutionEnv => EE }
 
-class IndexesSpec extends Specification {
+class IndexesSpec extends org.specs2.mutable.Specification {
   "Indexes management" title
 
   sequential
 
   import Common._
 
-  lazy val geo = db("geo")
+  lazy val geo = db(s"geo${System identityHashCode this}")
+  lazy val slowGeo = slowDb(s"geo${System identityHashCode slowDb}")
 
   "ReactiveMongo Geo Indexes" should {
-    "insert some points" in { implicit ee: EE =>
-      val futs: Seq[Future[Unit]] = for (i <- 1 until 10)
-        yield geo.insert(BSONDocument("loc" -> BSONArray(BSONDouble(i + 2), BSONDouble(i * 2)))).map(_ => {})
+    {
+      def spec(c: BSONCollection, timeout: FiniteDuration)(implicit ee: EE) = {
+        val futs: Seq[Future[Unit]] = for (i <- 1 until 10)
+          yield c.insert(BSONDocument(
+          "loc" -> BSONArray(i + 2D, i * 2D))).map(_ => {})
 
-      Future.sequence(futs) must not(throwA[Throwable]).await(1, timeout)
+        Future.sequence(futs) must not(throwA[Throwable]).await(1, timeout)
+      }
+
+      "insert some points with the default connection" in { implicit ee: EE =>
+        spec(geo, timeout)
+      }
+
+      "insert some points with the default connection" in { implicit ee: EE =>
+        spec(slowGeo, slowTimeout)
+      }
     }
 
-    "make index" in { implicit ee: EE =>
-      geo.indexesManager.ensure(Index(
-        List("loc" -> Geo2D),
-        options = BSONDocument(
-          "min" -> BSONInteger(-95),
-          "max" -> BSONInteger(95),
-          "bits" -> BSONInteger(28)))) aka "index" must beTrue.await(1, timeout)
+    {
+      def spec(c: BSONCollection, timeout: FiniteDuration)(implicit ee: EE) =
+        c.indexesManager.ensure(Index(
+          List("loc" -> Geo2D),
+          options = BSONDocument("min" -> -95, "max" -> 95, "bits" -> 28))).
+          aka("index") must beTrue.await(1, timeout * 2)
+
+      "be created with the default connection" in { implicit ee: EE =>
+        spec(geo, timeout)
+      }
+
+      "be created with the slow connection" in { implicit ee: EE =>
+        spec(slowGeo, slowTimeout)
+      }
     }
 
     "fail to insert some points out of range" in { implicit ee: EE =>
-      def insert = geo.insert(
-        BSONDocument("loc" -> BSONArray(BSONDouble(27.88), BSONDouble(97.21))))
+      geo.insert(
+        BSONDocument("loc" -> BSONArray(27.88D, 97.21D))).
+        map(_ => false).recover {
+          case e: DatabaseException =>
+            // MongoError['point not in interval of [ -95, 95 )' (code = 13027)]
+            e.code.exists(_ == 13027)
 
-      try {
-        Await.result(insert, timeout)
-        failure
-      } catch {
-        case e: DatabaseException =>
-          e.code mustEqual Some(13027) // MongoError['point not in interval of [ -95, 95 )' (code = 13027)]
-      }
-      success
+          case _ => false
+        } must beTrue.await(1, timeout)
     }
 
-    "retrieve indexes" in { implicit ee: EE =>
-      def list = geo.indexesManager.list().map {
-        _.filter(_.name.get == "loc_2d")
-      }.filter(!_.isEmpty).map(_.apply(0))
+    {
+      def spec(c: BSONCollection, timeout: FiniteDuration)(implicit ee: EE) = {
+        def future = c.indexesManager.list().map {
+          _.filter(_.name.get == "loc_2d")
+        }.filter(!_.isEmpty).map(_.apply(0))
 
-      val index = Await.result(list, timeout)
+        future must beLike[Index] {
+          case i @ Index(("loc", Geo2D) :: _, _, _, _, _, _, _, _, opts) =>
+            opts.getAs[BSONInteger]("min").get.value mustEqual -95 and (
+              opts.getAs[BSONInteger]("max").get.value mustEqual 95) and (
+                opts.getAs[BSONInteger]("bits").get.value mustEqual 28)
+        }.await(1, timeout)
+      }
 
-      index.key(0)._1 mustEqual "loc"
-      index.key(0)._2 mustEqual Geo2D
-      index.options.getAs[BSONInteger]("min").get.value mustEqual -95
-      index.options.getAs[BSONInteger]("max").get.value mustEqual 95
-      index.options.getAs[BSONInteger]("bits").get.value mustEqual 28
+      "retrieve indexes with the default connection" in { implicit ee: EE =>
+        spec(geo, timeout)
+      }
+
+      "retrieve indexes with the default connection" in { implicit ee: EE =>
+        spec(slowGeo, slowTimeout)
+      }
     }
   }
 
@@ -78,29 +108,7 @@ class IndexesSpec extends Specification {
 
     "make index" in { implicit ee: EE =>
       geo2DSpherical.indexesManager.ensure(
-        Index(List("loc" -> Geo2DSpherical))) must beTrue.await(1, timeout)
-    }
-
-    "fail to insert a point out of range" in { implicit ee: EE =>
-      tag("mongo2_4")
-
-      val future = geo2DSpherical.insert(BSONDocument("loc" -> BSONDocument(
-        "type" -> BSONString("Point"),
-        "coordinates" -> BSONArray(BSONDouble(-195), BSONDouble(25)))))
-      try {
-        val result = Await.result(future, timeout)
-        println(s"\n\n \tPOOR: $result \n\n")
-        failure
-      } catch {
-        case e: DatabaseException =>
-          e.code.exists(code => code == 16572 || code == 16755) mustEqual true
-        // MongoError['Can't extract geo keys from object, malformed geometry?' (code = 16572)] (< 2.4)
-        // 16755 Can't extract geo keys from object, malformed geometry? (2.6)
-        case NonFatal(e) =>
-          e.printStackTrace()
-          throw e
-      }
-      success
+        Index(List("loc" -> Geo2DSpherical))) must beTrue.await(1, timeout * 2)
     }
 
     "retrieve indexes" in { implicit ee: EE =>
@@ -136,10 +144,28 @@ class IndexesSpec extends Specification {
     }
   }
 
-  "ReactiveMongo index manager" should {
+  "Index manager" should {
     "drop all indexes in db.geo" in { implicit ee: EE =>
       geo.indexesManager.dropAll() must beEqualTo(2 /* _id and loc */ ).
         await(1, timeout)
+    }
+  }
+
+  "Index" should {
+    import reactivemongo.api.indexes._
+    lazy val col = db(s"indexed_col_${hashCode}")
+
+    "be first created" in { implicit ee: EE =>
+      col.indexesManager.ensure(Index(
+        Seq("token" -> IndexType.Ascending), unique = true)).
+        aka("index creation") must beTrue.await(1, timeout * 2)
+    }
+
+    "not be created if already exists" in { implicit ee: EE =>
+      col.indexesManager.ensure(Index(
+        Seq("token" -> IndexType.Ascending), unique = true)).
+        aka("index creation") must beFalse.await(1, timeout * 2)
+
     }
   }
 
@@ -186,7 +212,7 @@ class IndexesSpec extends Specification {
         _ <- partial.insert(BSONDocument("username" -> "david", "age" -> 20))
         _ <- partial.insert(BSONDocument("username" -> "amanda"))
         _ <- partial.insert(BSONDocument(
-          "username" -> "rajiv", "age" -> BSONNull))
+          "username" -> "rajiv", "age" -> Option.empty[Int]))
 
         b <- partial.count()
       } yield a -> b

@@ -1,10 +1,9 @@
-import scala.util.{ Failure, Success, Try }
-
 import reactivemongo.api.{
   MongoConnection,
   MongoConnectionOptions,
   ScramSha1Authentication
 }, MongoConnection.{ ParsedURI, parseURI }
+
 import reactivemongo.core.nodeset.Authenticate
 import reactivemongo.api.commands.WriteConcern
 

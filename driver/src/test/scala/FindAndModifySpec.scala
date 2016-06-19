@@ -1,21 +1,22 @@
-import org.specs2.mutable._
-import scala.util.{ Try, Failure }
-import scala.util.control.NonFatal
+import scala.concurrent.duration.FiniteDuration
 
 import reactivemongo.bson._
 import reactivemongo.api.commands.{ Command, CommandError }
+import reactivemongo.api.collections.bson.BSONCollection
 import reactivemongo.api.commands.bson._
 import BSONFindAndModifyCommand._
 import BSONFindAndModifyImplicits._
 
 import org.specs2.concurrent.{ ExecutionEnv => EE }
 
-object FindAndModifySpec extends Specification {
+class FindAndModifySpec extends org.specs2.mutable.Specification {
   import Common._
 
   sequential
 
-  lazy val collection = db("FindAndModifySpec")
+  val colName = s"FindAndModifySpec${System identityHashCode this}"
+  lazy val collection = db(colName)
+  lazy val slowColl = slowDb(colName)
 
   case class Person(
     firstName: String,
@@ -37,18 +38,28 @@ object FindAndModifySpec extends Specification {
   }
 
   "FindAndModify" should {
-    "upsert a doc and fetch it" in { implicit ee: EE =>
+    "upsert a doc and fetch it" >> {
       val jack = Person("Jack", "London", 27)
-      val upsertOp = Update(BSONDocument("$set" -> BSONDocument("age" -> 40)), fetchNewObject = true, upsert = true)
-      def future = collection.runCommand(FindAndModify(jack, upsertOp))
+      val upsertOp = Update(BSONDocument(
+        "$set" -> BSONDocument("age" -> 40)),
+        fetchNewObject = true, upsert = true)
 
-      future must (beLike[FindAndModifyResult] {
-        case result =>
-          result.lastError.exists(_.upsertedId.isDefined) must beTrue and (
-            result.result[Person] aka "upserted" must beSome[Person].like {
-              case Person("Jack", "London", 40) => ok
-            })
-      }).await(1, timeout)
+      def upsertAndFetch(c: BSONCollection, timeout: FiniteDuration)(implicit ee: EE) = c.runCommand(FindAndModify(jack, upsertOp)).
+        aka("result") must (beLike[FindAndModifyResult] {
+          case result =>
+            result.lastError.exists(_.upsertedId.isDefined) must beTrue and (
+              result.result[Person] aka "upserted" must beSome[Person].like {
+                case Person("Jack", "London", 40) => ok
+              })
+        }).await(1, timeout)
+
+      "with the default connection" in { implicit ee: EE =>
+        upsertAndFetch(collection, timeout)
+      }
+
+      "with the slow connection" in { implicit ee: EE =>
+        upsertAndFetch(slowColl, slowTimeout)
+      }
     }
 
     "modify a doc and fetch its previous value" in { implicit ee: EE =>

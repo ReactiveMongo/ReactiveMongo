@@ -4,21 +4,21 @@ import java.util.Arrays
 import org.specs2.mutable._
 
 import reactivemongo.bson._
-import reactivemongo.bson.BSONObjectID
-import reactivemongo.bson.utils.Converters
 import reactivemongo.core.netty._, ChannelBufferWritableBuffer.{
   single => makeBuffer
 }, ChannelBufferReadableBuffer.{ document => makeDocument }
 
-object BsonSpec extends Specification {
+class BsonSpec extends Specification {
+  "BSON serialization" title
+
   val simple = Array[Byte](0x16, 0x00, 0x00, 0x00, 0x02, 'h', 'e', 'l', 'l', 'o', 0x00, 0x06, 0x00, 0x00, 0x00, 'w', 'o', 'r', 'l', 'd', 0x00, 0x00)
 
   val embeddingArray = Array[Byte](70, 0, 0, 0, 7, 95, 105, 100, 0, 80, 55, -110, -63, -104, 69, -121, -105, 27, 20, 83, 14, 4, 66, 83, 79, 78, 0, 42, 0, 0, 0, 2, 48, 0, 8, 0, 0, 0, 97, 119, 101, 115, 111, 109, 101, 0, 1, 49, 0, 51, 51, 51, 51, 51, 51, 20, 64, 1, 50, 0, 0, 0, 0, 0, 0, 8, -97, 64, 0, 0)
 
   val bsonArray = Array[Byte](42, 0, 0, 0, 2, 48, 0, 8, 0, 0, 0, 97, 119, 101, 115, 111, 109, 101, 0, 1, 49, 0, 51, 51, 51, 51, 51, 51, 20, 64, 1, 50, 0, 0, 0, 0, 0, 0, 8, -97, 64, 0)
 
-  "ReactiveMongo" should {
-    "produce a simple doc" in {
+  "BSON codec" should {
+    "produce a simple document" in {
       val doc = BSONDocument("hello" -> BSONString("world"))
 
       compare(simple, makeBuffer(doc))
@@ -132,46 +132,5 @@ object BsonSpec extends Specification {
     println(Arrays.toString(origin))
     println(Arrays.toString(test))
     println(Arrays.toString(buffer.array()))
-  }
-}
-
-object BSONObjectIDSpec extends Specification {
-  "BSONObjectID" should {
-
-    "equal when created with string" in {
-      val objectID = BSONObjectID.generate()
-      val sameObjectID = BSONObjectID(objectID.stringify)
-      objectID.valueAsArray must equalTo(sameObjectID.valueAsArray)
-    }
-
-    "equal another instance of BSONObjectID with the same value" in {
-      val objectID = BSONObjectID.generate()
-      val sameObjectID = BSONObjectID(objectID.stringify)
-      objectID must equalTo(sameObjectID)
-    }
-
-    "not equal another newly generated instance of BSONObjectID" in {
-      val objectID = BSONObjectID.generate()
-      val nextObjectID = BSONObjectID(BSONObjectID.generate().stringify)
-      objectID must not equalTo (nextObjectID)
-    }
-
-  }
-
-  "Converters" should {
-
-    "strings equal each other" in {
-      val objectID = "506fff5bb8f6b133007b5bcf"
-      val hex = Converters.str2Hex(objectID)
-      val string = Converters.hex2Str(hex)
-      string must equalTo(objectID)
-    }
-
-    "bytes generated equal bytes converted from string" in {
-      val objectID = BSONObjectID.generate()
-      val bytes = Converters.str2Hex(objectID.stringify)
-      objectID.valueAsArray must equalTo(bytes)
-    }
-
   }
 }

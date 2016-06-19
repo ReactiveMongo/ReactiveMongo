@@ -1,9 +1,11 @@
-import scala.concurrent.{ Await, ExecutionContext }
+import scala.concurrent.{ Await, ExecutionContext, Future }
 import scala.concurrent.duration.FiniteDuration
+
+import akka.actor.ActorRef
 
 import reactivemongo.bson.{ BSONArray, BSONBooleanLike, BSONDocument }
 
-import reactivemongo.core.nodeset.Authenticate
+import reactivemongo.core.nodeset.{ Authenticate, ProtocolMetadata }
 import reactivemongo.core.commands.{
   FailedAuthentication,
   SuccessfulAuthentication
@@ -14,26 +16,24 @@ import reactivemongo.api.{
   BSONSerializationPack,
   DefaultDB,
   FailoverStrategy,
+  MongoConnection,
+  MongoConnectionOptions,
   MongoDriver,
+  ReadPreference,
   ScramSha1Authentication
 }
 import reactivemongo.api.commands.Command
 
+import org.specs2.matcher.MatchResult
 import org.specs2.concurrent.{ ExecutionEnv => EE }
 
-object DriverSpec extends org.specs2.mutable.Specification {
+class DriverSpec extends org.specs2.mutable.Specification {
   "Driver" title
 
   sequential
 
-  import Common.{
-    DefaultOptions,
-    failoverStrategy,
-    primaryHost,
-    timeout,
-    timeoutMillis,
-    estTimeout
-  }
+  import Common._
+
   val hosts = Seq(primaryHost)
 
   "Connection pool" should {
@@ -56,8 +56,8 @@ object DriverSpec extends org.specs2.mutable.Specification {
     "start and close with one connection open" in {
       val md = MongoDriver()
       val connection = md.connection(hosts)
-      md.close(timeout)
-      success
+
+      md.close(timeout) must not(throwA[Exception])
     }
 
     "start and close with multiple connections open" in {
@@ -65,14 +65,14 @@ object DriverSpec extends org.specs2.mutable.Specification {
       val connection1 = md.connection(hosts, name = Some("Connection1"))
       val connection2 = md.connection(hosts)
       val connection3 = md.connection(hosts)
-      md.close(timeout)
-      success
+
+      md.close(timeout) must not(throwA[Exception])
     }
   }
 
   "CR Authentication" should {
-    lazy val driver = MongoDriver()
-    lazy val connection = driver.connection(
+    lazy val drv = MongoDriver()
+    lazy val connection = drv.connection(
       List(primaryHost),
       options = DefaultOptions.copy(nbChannelsPerNode = 1))
 
@@ -80,7 +80,7 @@ object DriverSpec extends org.specs2.mutable.Specification {
     def db_(implicit ec: ExecutionContext) =
       connection.database(dbName, failoverStrategy)
 
-    val id = System.identityHashCode(driver)
+    val id = System.identityHashCode(drv)
 
     "be the default mode" in { implicit ee: EE =>
       db_.flatMap(_.drop()).map(_ => {}) must beEqualTo({}).await(1, timeout)
@@ -89,7 +89,7 @@ object DriverSpec extends org.specs2.mutable.Specification {
     "create a user" in { implicit ee: EE =>
       val runner = Command.run(BSONSerializationPack)
       val createUser = BSONDocument("createUser" -> s"test-$id",
-        "pwd" -> s"password-$id", // TODO: create a command
+        "pwd" -> s"password-$id",
         "customData" -> BSONDocument.empty,
         "roles" -> BSONArray(
           BSONDocument("role" -> "readWrite", "db" -> dbName)))
@@ -120,11 +120,11 @@ object DriverSpec extends org.specs2.mutable.Specification {
     } tag "mongo2"
 
     "driver shutdown" in { // mainly to ensure the test driver is closed
-      driver.close(timeout) must not(throwA[Exception])
+      drv.close(timeout) must not(throwA[Exception])
     } tag "mongo2"
 
     "fail on DB without authentication" in { implicit ee: EE =>
-      val auth = Authenticate(Common.db.name, "test", "password")
+      val auth = Authenticate(Common.commonDb, "test", "password")
       val conOpts = DefaultOptions.copy(nbChannelsPerNode = 1)
 
       def con = Common.driver.connection(
@@ -133,27 +133,29 @@ object DriverSpec extends org.specs2.mutable.Specification {
         authentications = Seq(auth))
 
       Await.result(con.database(
-        Common.db.name, failoverStrategy), timeout).
-        aka("database resolution") must throwA[NodeSetNotReachable.type]
-
+        Common.commonDb, failoverStrategy), timeout).
+        aka("database resulution") must throwA[NodeSetNotReachable]
     } tag "mongo2"
   }
 
   "Authentication SCRAM-SHA1" should {
     import Common.{ DefaultOptions, timeout, timeoutMillis }
 
-    lazy val driver = MongoDriver()
+    lazy val drv = MongoDriver()
     val conOpts = DefaultOptions.copy(
       authMode = ScramSha1Authentication,
       nbChannelsPerNode = 1)
-    lazy val connection = driver.connection(
+    lazy val connection = drv.connection(
       List(primaryHost), options = conOpts)
+    val slowOpts = SlowOptions.copy(
+      authMode = ScramSha1Authentication, nbChannelsPerNode = 1)
+    lazy val slowConnection = drv.connection(List(slowPrimary), slowOpts)
 
     val dbName = "specs2-test-scramsha1-auth"
     def db_(implicit ee: ExecutionContext) =
       connection.database(dbName, failoverStrategy)
 
-    val id = System.identityHashCode(driver)
+    val id = System.identityHashCode(drv)
 
     "work only if configured" in { implicit ee: EE =>
       db_.flatMap(_.drop()).map(_ => {}) must beEqualTo({}).
@@ -163,7 +165,7 @@ object DriverSpec extends org.specs2.mutable.Specification {
     "create a user" in { implicit ee: EE =>
       val runner = Command.run(BSONSerializationPack)
       val createUser = BSONDocument("createUser" -> s"test-$id",
-        "pwd" -> s"password-$id", // TODO: create a command
+        "pwd" -> s"password-$id",
         "customData" -> BSONDocument.empty,
         "roles" -> BSONArray(
           BSONDocument("role" -> "readWrite", "db" -> dbName)))
@@ -176,15 +178,24 @@ object DriverSpec extends org.specs2.mutable.Specification {
       }).await(1, timeout)
     } tag "not_mongo26"
 
-    "not be successful with wrong credentials" in { implicit ee: EE =>
-      connection.authenticate(dbName, "foo", "bar").
-        aka("authentication") must throwA[FailedAuthentication].
-        await(1, timeout)
+    "not be successful with wrong credentials" >> {
+      "with the default connection" in { implicit ee: EE =>
+        connection.authenticate(dbName, "foo", "bar").
+          aka("authentication") must throwA[FailedAuthentication].
+          await(1, timeout)
 
-    } tag "not_mongo26"
+      } tag "not_mongo26"
 
-    "be successful on existing connection with right credentials" in {
-      implicit ee: EE =>
+      "with the slow connection" in { implicit ee: EE =>
+        slowConnection.authenticate(dbName, "foo", "bar").
+          aka("authentication") must throwA[FailedAuthentication].
+          await(1, slowTimeout)
+
+      } tag "not_mongo26"
+    }
+
+    "be successful on existing connection with right credentials" >> {
+      "with the default connection" in { implicit ee: EE =>
         connection.authenticate(dbName, s"test-$id", s"password-$id").
           aka("authentication") must beLike[SuccessfulAuthentication](
             { case _ => ok }).await(1, timeout) and {
@@ -193,45 +204,75 @@ object DriverSpec extends org.specs2.mutable.Specification {
               }.map(_ => {}) must beEqualTo({}).await(1, timeout * 2)
             }
 
-    } tag "not_mongo26"
+      } tag "not_mongo26"
 
-    "be successful with right credentials" in { implicit ee: EE =>
+      "with the slow connection" in { implicit ee: EE =>
+        slowConnection.authenticate(dbName, s"test-$id", s"password-$id").
+          aka("authentication") must beLike[SuccessfulAuthentication](
+            { case _ => ok }).await(1, slowTimeout)
+
+      } tag "not_mongo26"
+    }
+
+    "be successful with right credentials" >> {
       val auth = Authenticate(dbName, s"test-$id", s"password-$id")
-      val con = driver.connection(
-        List(primaryHost),
-        options = conOpts,
-        authentications = Seq(auth))
 
-      val before = System.currentTimeMillis()
+      "with the default connection" in { implicit ee: EE =>
+        val con = drv.connection(
+          List(primaryHost), options = conOpts, authentications = Seq(auth))
 
-      con.database(dbName, Common.failoverStrategy).
-        aka("authed DB") must beLike[DefaultDB] {
-          case rdb => rdb.coll("testcol").flatMap(
-            _.insert(BSONDocument("foo" -> "bar"))).
-            map(_ => {}) aka "insertion" must beEqualTo({}).await(1, timeout)
-        }.await(1, timeout)
-    } tag "not_mongo26"
+        con.database(dbName, Common.failoverStrategy).
+          aka("authed DB") must beLike[DefaultDB] {
+            case rdb => rdb.coll("testcol").flatMap(
+              _.insert(BSONDocument("foo" -> "bar"))).map(_ => {}).
+              aka("insertion") must beEqualTo({}).await(1, timeout)
+
+          }.await(1, timeout) and {
+            con.askClose()(timeout) must not(throwA[Exception]).
+              await(1, timeout)
+          }
+      } tag "not_mongo26"
+
+      "with the slow connection" in { implicit ee: EE =>
+        val con = drv.connection(
+          List(slowPrimary), options = slowOpts, authentications = Seq(auth))
+
+        con.database(dbName, slowFailover).
+          aka("authed DB") must beLike[DefaultDB] { case _ => ok }.
+          await(1, slowTimeout) and {
+            con.askClose()(slowTimeout) must not(throwA[Exception]).
+              await(1, slowTimeout)
+          }
+      } tag "not_mongo26"
+    }
 
     "driver shutdown" in { // mainly to ensure the test driver is closed
-      driver.close(timeout) must not(throwA[Exception])
+      drv.close(timeout) must not(throwA[Exception])
     } tag "not_mongo26"
 
-    "fail on DB without authentication" in { implicit ee: EE =>
-      val auth = Authenticate(Common.db.name, "test", "password")
-      val conOpts = DefaultOptions.copy(
-        authMode = ScramSha1Authentication,
-        nbChannelsPerNode = 1)
+    "fail on DB without authentication" >> {
+      val auth = Authenticate(Common.commonDb, "test", "password")
 
-      def con = Common.driver.connection(
-        List(primaryHost),
-        options = conOpts,
-        authentications = Seq(auth))
+      "with the default connection" in { implicit ee: EE =>
+        def con = Common.driver.connection(
+          List(primaryHost), options = conOpts, authentications = Seq(auth))
 
-      Await.result(con.database(
-        Common.db.name, failoverStrategy), timeout).
-        aka("database resolution") must throwA[NodeSetNotReachable.type]
+        con.database(Common.commonDb, failoverStrategy).
+          aka("database resolution") must throwA[NodeSetNotReachable].
+          await(1, timeout)
 
-    } tag "not_mongo26"
+      } tag "not_mongo26"
+
+      "with the slow connection" in { implicit ee: EE =>
+        def con = Common.driver.connection(
+          List(slowPrimary), options = slowOpts, authentications = Seq(auth))
+
+        con.database(Common.commonDb, slowFailover).
+          aka("database resolution") must throwA[NodeSetNotReachable].
+          await(1, slowTimeout)
+
+      } tag "not_mongo26"
+    }
   }
 
   "Database" should {
@@ -239,7 +280,7 @@ object DriverSpec extends org.specs2.mutable.Specification {
       "successfully" in { implicit ee: EE =>
         val fos = FailoverStrategy(FiniteDuration(50, "ms"), 20, _ * 2)
 
-        Common.connection.database(Common.db.name, fos).
+        Common.connection.database(Common.commonDb, fos).
           map(_ => {}) must beEqualTo({}).await(1, estTimeout(fos))
 
       }
@@ -266,15 +307,160 @@ object DriverSpec extends org.specs2.mutable.Specification {
 
       import reactivemongo.core.errors.ConnectionException
 
-      Await.result(Common.connection.database(
-        Common.db.name, failoverStrategy).map(_ => {}), timeout).
-        aka("database resolution") must (
-          throwA[ConnectionException]("unsupported MongoDB version")) and (
-            Common.connection(Common.db.name).
+      Common.connection.database(Common.commonDb, failoverStrategy).
+        map(_ => {}) aka "database resolution" must (
+          throwA[ConnectionException]("unsupported MongoDB version")).
+          await(1, timeout) and (Await.result(
+            Common.connection.database(Common.commonDb), timeout).
             aka("database") must throwA[ConnectionException](
               "unsupported MongoDB version"))
 
     }
     section("mongo2", "mongo24", "not_mongo26")
+  }
+
+  "Node set" should {
+    import akka.pattern.ask
+    import reactivemongo.api.tests._
+    import reactivemongo.core.actors.{
+      PrimaryAvailable,
+      PrimaryUnavailable,
+      SetAvailable,
+      SetUnavailable
+    }
+
+    lazy val md = MongoDriver()
+    lazy val actorSystem = md.system
+
+    def withConMon[T](name: String)(f: ActorRef => MatchResult[T])(implicit ee: EE): MatchResult[Future[ActorRef]] =
+      actorSystem.actorSelection(s"/user/Monitor-$name").
+        resolveOne(timeout) aka "actor ref" must beLike[ActorRef] {
+          case ref => f(ref)
+        }.await(1, timeout)
+
+    def withCon[T](opts: MongoConnectionOptions = MongoConnectionOptions())(f: (MongoConnection, String) => T): T = {
+      val name = s"con-${System identityHashCode opts}"
+      val con = md.connection(Seq("node1:27017", "node2:27017"),
+        authentications = Seq(Authenticate(
+          Common.commonDb, "test", "password")),
+        options = opts,
+        name = Some(name))
+
+      f(con, name)
+    }
+
+    "not be available" >> {
+      "if the entire node set is not available" in { implicit ee: EE =>
+        withCon() { (con, name) =>
+          isAvailable(con) must beFalse.await(1, timeout) and {
+            con.askClose()(timeout).map(_ => {}) must beEqualTo({}).
+              await(1, timeout)
+          }
+        }
+      }
+
+      "if the primary is not available if default preference" in {
+        implicit ee: EE =>
+          withCon() { (con, name) =>
+            withConMon(name) { conMon =>
+              conMon ! SetAvailable(ProtocolMetadata.Default)
+
+              waitIsAvailable(con, failoverStrategy).map(_ => true).recover {
+                case reason: NodeSetNotReachable if (
+                  reason.getMessage.indexOf(name) != -1) => false
+              } must beFalse.await(1, timeout)
+            }
+          }
+      }
+    }
+
+    "be available" >> {
+      "with the primary if default preference" in { implicit ee: EE =>
+        withCon() { (con, name) =>
+          withConMon(name) { conMon =>
+            def test = (for {
+              before <- isAvailable(con)
+              _ = {
+                conMon ! SetAvailable(ProtocolMetadata.Default)
+                conMon ! PrimaryAvailable(ProtocolMetadata.Default)
+              }
+              _ <- waitIsAvailable(con, failoverStrategy)
+              after <- isAvailable(con)
+            } yield before -> after).andThen { case _ => con.close() }
+
+            test must beEqualTo(false -> true).await(1, timeout)
+          }
+        }
+      }
+
+      "without the primary if slave ok" in { implicit ee: EE =>
+        val opts = MongoConnectionOptions(
+          readPreference = ReadPreference.primaryPreferred)
+
+        withCon(opts) { (con, name) =>
+          withConMon(name) { conMon =>
+            def test = (for {
+              before <- isAvailable(con)
+              _ = conMon ! SetAvailable(ProtocolMetadata.Default)
+              _ <- waitIsAvailable(con, failoverStrategy)
+              after <- isAvailable(con)
+            } yield before -> after).andThen { case _ => con.close() }
+
+            test must beEqualTo(false -> true).await(1, timeout)
+          }
+        }
+      }
+    }
+
+    "be unavailable" >> {
+      "with the primary unavailable if default preference" in {
+        implicit ee: EE =>
+          withCon() { (con, name) =>
+            withConMon(name) { conMon =>
+              conMon ! SetAvailable(ProtocolMetadata.Default)
+              conMon ! PrimaryAvailable(ProtocolMetadata.Default)
+
+              def test = (for {
+                _ <- waitIsAvailable(con, failoverStrategy)
+                before <- isAvailable(con)
+                _ = conMon ! PrimaryUnavailable
+                after <- waitIsAvailable(
+                  con, failoverStrategy).map(_ => true).recover {
+                    case _ => false
+                  }
+              } yield before -> after).andThen { case _ => con.close() }
+
+              test must beEqualTo(true -> false).await(1, timeout)
+            }
+          }
+      }
+
+      "without the primary if slave ok" in { implicit ee: EE =>
+        val opts = MongoConnectionOptions(
+          readPreference = ReadPreference.primaryPreferred)
+
+        withCon(opts) { (con, name) =>
+          withConMon(name) { conMon =>
+            conMon ! SetAvailable(ProtocolMetadata.Default)
+
+            def test = (for {
+              _ <- waitIsAvailable(con, failoverStrategy)
+              before <- isAvailable(con)
+              _ = conMon ! SetUnavailable
+              after <- waitIsAvailable(
+                con, failoverStrategy).map(_ => true).recover {
+                  case _ => false
+                }
+            } yield before -> after).andThen { case _ => con.close() }
+
+            test must beEqualTo(true -> false).await(1, timeout)
+          }
+        }
+      }
+    }
+
+    "be closed" in {
+      md.close(timeout) must not(throwA[Exception])
+    }
   }
 }
