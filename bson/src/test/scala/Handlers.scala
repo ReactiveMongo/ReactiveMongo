@@ -50,9 +50,11 @@ class Handlers extends org.specs2.mutable.Specification {
 
     "be read as byte array" in {
       val bytes = Array[Byte](1, 3, 5, 7)
+      val bin = BSONBinary(
+        ArrayReadableBuffer(bytes), Subtype.GenericBinarySubtype)
 
-      BSONBinary(ArrayReadableBuffer(bytes), Subtype.GenericBinarySubtype).
-        as[Array[Byte]] must_== bytes
+      bin.as[Array[Byte]] aka "read #1" must_== bytes and (
+        bin.as[Array[Byte]] aka "read #2" must_== bytes)
     }
   }
 

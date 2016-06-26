@@ -47,6 +47,11 @@ import reactivemongo.util.{
  * Cursor over results from MongoDB.
  *
  * @tparam T the type parsed from each result document
+ * @define maxDocsParam The maximum number of documents to be retrieved
+ * @define maxDocsWarning The actual document count can exceed this, when this maximum devided by the batch size given a non-zero remainder
+ * @define stopOnErrorParam States if may stop on non-fatal exception (default: true). If set to false, the exceptions are skipped, trying to get the next result.
+ * @define errorHandlerParam The binary operator to be applied when failing to get the next response. Exception or [[reactivemongo.api.Cursor$.Fail Fail]] raised within the `suc` function cannot be recovered by this error handler.
+ * @define zeroParam the initial value
  */
 trait Cursor[T] {
   // TODO: maxDocs; 0 for unlimited maxDocs
@@ -58,8 +63,8 @@ trait Cursor[T] {
    * The returned enumerator may process up to `maxDocs`. If `stopOnError` is false, then documents that cause error
    * are dropped, so the enumerator may emit a little less than `maxDocs` even if it processes `maxDocs` documents.
    *
-   * @param maxDocs Enumerate up to `maxDocs` documents.
-   * @param stopOnError States if the produced Enumerator may stop on non-fatal exception.
+   * @param maxDocs $maxDocsParam.
+   * @param stopOnError $stopOnErrorParam.
    *
    * @return an Enumerator of documents.
    */
@@ -70,8 +75,8 @@ trait Cursor[T] {
    * Produces an Enumerator of Iterator of documents.
    * Given the `stopOnError` parameter, this Enumerator may stop on any non-fatal exception, or skip and continue.
    *
-   * @param maxDocs Enumerate up to `maxDocs` documents.
-   * @param stopOnError States if the produced Enumerator may stop on non-fatal exception.
+   * @param maxDocs $maxDocsParam. $maxDocsWarning.
+   * @param stopOnError $stopOnErrorParam.
    *
    * @return an Enumerator of Iterators of documents.
    */
@@ -82,8 +87,8 @@ trait Cursor[T] {
    * Produces an Enumerator of responses from the database.
    * Given the `stopOnError` parameter, this Enumerator may stop on any non-fatal exception, or skip and continue.
    *
-   * @param maxDocs Enumerate up to `maxDocs` documents.
-   * @param stopOnError States if the produced Enumerator may stop on non-fatal exception.
+   * @param maxDocs $maxDocsParam. $maxDocsWarning.
+   * @param stopOnError $stopOnErrorParam.
    *
    * @return an Enumerator of Responses.
    */
@@ -92,13 +97,9 @@ trait Cursor[T] {
 
   /**
    * Collects all the documents into a collection of type `M[T]`.
-   * Given the `stopOnError` parameter (which defaults to true), the resulting Future may fail if any non-fatal exception occurs.
-   * If set to false, all the documents that caused exceptions are skipped.
-   * Up to `maxDocs` returned by the database may be processed. If `stopOnError` is false, then documents that cause error
-   * are dropped, so the result may contain a little less than `maxDocs` even if `maxDocs` documents were processed.
    *
-   * @param maxDocs Collect up to `maxDocs` documents.
-   * @param err The binary operator to be applied when failing to get the next response. Exception or [[reactivemongo.api.Cursor$.Fail Fail]] raised within the `suc` function cannot be recovered by this error handler.
+   * @param maxDocs $maxDocsParam.
+   * @param err $errorHandlerParam
    *
    * Example:
    * {{{
@@ -111,13 +112,9 @@ trait Cursor[T] {
 
   /**
    * Collects all the documents into a collection of type `M[T]`.
-   * Given the `stopOnError` parameter (which defaults to true), the resulting Future may fail if any
-   * non-fatal exception occurs. If set to false, all the documents that caused exceptions are skipped.
-   * Up to `maxDocs` returned by the database may be processed. If `stopOnError` is false, then documents that cause error
-   * are dropped, so the result may contain a little less than `maxDocs` even if `maxDocs` documents were processed.
    *
-   * @param maxDocs Collect up to `maxDocs` documents.
-   * @param stopOnError States if the Future should fail if any non-fatal exception occurs.
+   * @param maxDocs $maxDocsParam.
+   * @param stopOnError $stopOnErrorParam.
    *
    * Example:
    * {{{
@@ -136,10 +133,10 @@ trait Cursor[T] {
    * by this cursor, going first to last.
    *
    * @tparam A the result type of the binary operator.
-   * @param z the start value.
-   * @param maxDocs the maximum number of documents to be read.
+   * @param z $zeroParam
+   * @param maxDocs $maxDocsParam. $maxDocsWarning.
    * @param suc the binary operator to be applied when the next response is successfully read.
-   * @param err The binary operator to be applied when failing to get the next response. Exception or [[reactivemongo.api.Cursor$.Fail Fail]] raised within the `suc` function cannot be recovered by this error handler.
+   * @param err $errorHandlerParam
    */
   def foldResponses[A](z: => A, maxDocs: Int = Int.MaxValue)(suc: (A, Response) => Cursor.State[A], err: ErrorHandler[A] = FailOnError[A]())(implicit ctx: ExecutionContext): Future[A]
 
@@ -148,10 +145,10 @@ trait Cursor[T] {
    * by this cursor, going first to last.
    *
    * @tparam A the result type of the binary operator.
-   * @param z the start value.
-   * @param maxDocs the maximum number of documents to be read.
+   * @param z $zeroParam
+   * @param maxDocs $maxDocsParam. $maxDocsWarning.
    * @param suc The binary operator to be applied when the next response is successfully read. This must be safe, and any error must be returned as `Future.failed[State[A]]`.
-   * @param err The binary operator to be applied when failing to get the next response. Exception or [[reactivemongo.api.Cursor$.Fail Fail]] raised within the `suc` function cannot be recovered by this error handler.
+   * @param err $errorHandlerParam
    */
   def foldResponsesM[A](z: => A, maxDocs: Int = Int.MaxValue)(suc: (A, Response) => Future[Cursor.State[A]], err: ErrorHandler[A] = FailOnError[A]())(implicit ctx: ExecutionContext): Future[A]
 
@@ -160,10 +157,10 @@ trait Cursor[T] {
    * retrieved by this cursor, going first to last.
    *
    * @tparam A the result type of the binary operator.
-   * @param z the start value.
-   * @param maxDocs the maximum number of documents to be read.
+   * @param z $zeroParam
+   * @param maxDocs $maxDocsParam. $maxDocsWarning.
    * @param suc the binary operator to be applied when the next response is successfully read.
-   * @param err the binary operator to be applied when failing to get the next response
+   * @param err $errorHandlerParam
    */
   def foldBulks[A](z: => A, maxDocs: Int = Int.MaxValue)(suc: (A, Iterator[T]) => Cursor.State[A], err: ErrorHandler[A] = FailOnError[A]())(implicit ctx: ExecutionContext): Future[A]
 
@@ -172,10 +169,10 @@ trait Cursor[T] {
    * retrieved by this cursor, going first to last.
    *
    * @tparam A the result type of the binary operator.
-   * @param z the start value.
-   * @param maxDocs the maximum number of documents to be read.
+   * @param z $zeroParam
+   * @param maxDocs $maxDocsParam. $maxDocsWarning.
    * @param suc the binary operator to be applied when the next response is successfully read. This must be safe, and any error must be returned as `Future.failed[State[A]]`.
-   * @param err the binary operator to be applied when failing to get the next response
+   * @param err $errorHandlerParam
    */
   def foldBulksM[A](z: => A, maxDocs: Int = Int.MaxValue)(suc: (A, Iterator[T]) => Future[Cursor.State[A]], err: ErrorHandler[A] = FailOnError[A]())(implicit ctx: ExecutionContext): Future[A]
 
@@ -184,10 +181,10 @@ trait Cursor[T] {
    * by this cursor, going first to last.
    *
    * @tparam A the result type of the binary operator.
-   * @param z the start value.
-   * @param maxDocs the maximum number of documents to be read.
+   * @param z $zeroParam
+   * @param maxDocs $maxDocsParam.
    * @param suc The binary operator to be applied when the next document is successfully read.
-   * @param err the binary operator to be applied when failing to read the next document.
+   * @param err $errorHandlerParam
    *
    * {{{
    * cursor.foldWhile(Nil: Seq[Person])((s, p) => Cursor.Cont(s :+ p),
@@ -201,14 +198,18 @@ trait Cursor[T] {
    * by this cursor, going first to last.
    *
    * @tparam A the result type of the binary operator.
-   * @param z the start value.
-   * @param maxDocs the maximum number of documents to be read.
+   * @param z $zeroParam
+   * @param maxDocs $maxDocsParam.
    * @param suc The binary operator to be applied when the next document is successfully read. This must be safe, and any error must be returned as `Future.failed[State[A]]`.
-   * @param err the binary operator to be applied when failing to read the next document.
+   * @param err $errorHandlerParam
    *
    * {{{
-   * cursor.foldWhile(Nil: Seq[Person])((s, p) => Cursor.Cont(s :+ p),
-   *   { (l, e) => println("last valid value: " + l); Cursor.Fail(e) })
+   * cursor.foldWhileM(Nil: Seq[Person])(
+   *   (s, p) => Future.successful(Cursor.Cont(s :+ p)),
+   *   { (l, e) => Future {
+   *     println("last valid value: " + l)
+   *     Cursor.Fail(e)
+   *   })
    * }}}
    */
   def foldWhileM[A](z: => A, maxDocs: Int = Int.MaxValue)(suc: (A, T) => Future[Cursor.State[A]], err: ErrorHandler[A] = FailOnError[A]())(implicit ctx: ExecutionContext): Future[A]
@@ -218,10 +219,10 @@ trait Cursor[T] {
    * by this cursor, going first to last.
    *
    * @tparam A the result type of the binary operator.
-   * @param z the start value.
-   * @param maxDocs the maximum number of documents to be read.
+   * @param z $zeroParam
+   * @param maxDocs $maxDocsParam.
    * @param suc the binary operator to be applied when the next document is successfully read.
-   * @param err the binary operator to be applied when failing to read the next document.
+   * @param err $errorHandlerParam
    *
    * {{{
    * cursor.foldWhile(Nil: Seq[Person])((s, p) => Cursor.Cont(s :+ p),
@@ -231,27 +232,12 @@ trait Cursor[T] {
   def fold[A](z: => A, maxDocs: Int = Int.MaxValue)(suc: (A, T) => A)(implicit ctx: ExecutionContext): Future[A] = foldWhile[A](z, maxDocs)(
     { (st, v) => Cursor.Cont[A](suc(st, v)) }, FailOnError[A]())
 
-  /**
-   * Collects all the documents into a `List[T]`.
-   * Given the `stopOnError` parameter (which defaults to true), the resulting Future may fail if any
-   * non-fatal exception occurs. If set to false, all the documents that caused exceptions are skipped.
-   *
-   * @param maxDocs Collect up to `maxDocs` documents.
-   * @param stopOnError States if the Future should fail if any non-fatal exception occurs.
-   *
-   * Example:
-   * {{{
-   * val cursor = collection.find(query, filter).cursor[BSONDocument]
-   * // return the 3 first documents in a list.
-   * val list = cursor.toList(3)
-   * }}}
-   */
+  /** Returns the list of the matching documents. */
   @deprecated("consider using collect[List] instead", "0.10.0")
   def toList(maxDocs: Int = Int.MaxValue, stopOnError: Boolean = true)(implicit ctx: ExecutionContext): Future[List[T]] = collect[List](maxDocs, stopOnError)
 
   /**
-   * Gets the first document matching the query, if any.
-   * The resulting Future may fail if any exception occurs (for example, while deserializing the document).
+   * Returns the first document matching the query, if any.
    *
    * Example:
    * {{{
@@ -268,19 +254,23 @@ trait Cursor[T] {
    * An Enumeratee for error handling should be used to prevent silent failures.
    * Consider using `enumerateResponses` instead.
    *
-   * @param maxDocs Enumerate up to `maxDocs` documents.
-   *
-   * @return an Enumerator of Responses.
+   * @param maxDocs $maxDocsParam
    */
   @deprecated(message = "Use the Play Iteratee modules", since = "0.11.10")
   def rawEnumerateResponses(maxDocs: Int = Int.MaxValue)(implicit ctx: ExecutionContext): Enumerator[Response]
 
   // ---
 
+  /** Sends the initial request. */
   private[reactivemongo] def makeRequest(maxDocs: Int)(implicit ctx: ExecutionContext): Future[Response]
 
   private[reactivemongo] def nextResponse(maxDocs: Int): (ExecutionContext, Response) => Future[Option[Response]]
 
+  /**
+   * Returns an iterator to read the response documents,
+   * according the provided read for the element type `T`.
+   */
+  private[reactivemongo] def documentIterator(response: Response)(implicit ec: ExecutionContext): Future[Iterator[T]]
 }
 
 class FlattenedCursor[T](cursor: Future[Cursor[T]]) extends Cursor[T] {
@@ -321,6 +311,8 @@ class FlattenedCursor[T](cursor: Future[Cursor[T]]) extends Cursor[T] {
 
     cursor.flatMap(_.nextResponse(maxDocs)(ec, response))
   }
+
+  def documentIterator(response: Response)(implicit ec: ExecutionContext): Future[Iterator[T]] = cursor.flatMap(_.documentIterator(response))
 }
 
 /**
@@ -365,6 +357,8 @@ trait WrappedCursor[T] extends Cursor[T] {
   def makeRequest(maxDocs: Int)(implicit ctx: ExecutionContext): Future[Response] = wrappee.makeRequest(maxDocs)
 
   def nextResponse(maxDocs: Int): (ExecutionContext, Response) => Future[Option[Response]] = wrappee.nextResponse(maxDocs)
+
+  def documentIterator(response: Response)(implicit ec: ExecutionContext): Future[Iterator[T]] = wrappee.documentIterator(response)
 }
 
 /** Cursor companion object */
@@ -410,7 +404,11 @@ object Cursor {
    */
   def flatten[T, C[_] <: Cursor[_]](future: Future[C[T]])(implicit fs: CursorFlattener[C]): C[T] = fs.flatten(future)
 
+  /** A state of the cursor processing. */
   sealed trait State[T] {
+    /**
+     * @param f the function applied on the statue value
+     */
     def map[U](f: T => U): State[U]
   }
 
@@ -463,8 +461,9 @@ object DefaultCursor {
     val tailable = (query.flags &
       QueryFlags.TailableCursor) == QueryFlags.TailableCursor
 
-    val documentIterator =
-      ReplyDocumentIterator(pack)(_: Reply, _: ChannelBuffer)(reader)
+    val makeIterator = { response: Response =>
+      ReplyDocumentIterator(pack)(response.reply, response.documents)(reader)
+    }
 
     @inline def makeRequest(maxDocs: Int)(implicit ctx: ExecutionContext): Future[Response] = Failover2(mongoConnection, failoverStrategy) { () =>
       import reactivemongo.core.netty.ChannelBufferReadableBuffer
@@ -503,8 +502,9 @@ object DefaultCursor {
 
     private lazy val response = preload
 
-    val documentIterator =
-      ReplyDocumentIterator(pack)(_: Reply, _: ChannelBuffer)(reader)
+    val makeIterator = { response: Response =>
+      ReplyDocumentIterator(pack)(response.reply, response.documents)(reader)
+    }
 
     private var req: Int => ExecutionContext => Future[Response] = { maxDocs =>
       { implicit ec =>
@@ -546,10 +546,9 @@ object DefaultCursor {
 
     def tailable: Boolean
 
-    /** Sends the initial request. */
-    def makeRequest(maxDocs: Int)(implicit ctx: ExecutionContext): Future[Response]
+    def makeIterator: Response => Iterator[A]
 
-    def documentIterator: (Reply, ChannelBuffer) => Iterator[A]
+    def documentIterator(response: Response)(implicit ec: ExecutionContext): Future[Iterator[A]] = Future(makeIterator(response))
 
     private def next(response: Response, maxDocs: Int)(implicit ctx: ExecutionContext): Future[Option[Response]] = {
       if (response.reply.cursorID != 0) {
@@ -580,10 +579,6 @@ object DefaultCursor {
       (response.reply.cursorID != 0) && (
         response.reply.numberReturned + response.reply.startingFrom) < maxDocs
 
-    @inline
-    private def makeIterator(response: Response) =
-      documentIterator(response.reply, response.documents)
-
     /** Returns next response using tailable mode */
     private def tailResponse(current: Response, maxDocs: Int)(implicit context: ExecutionContext): Future[Option[Response]] = {
       {
@@ -608,8 +603,7 @@ object DefaultCursor {
       }
     }
 
-    @inline
-    private def killCursors(r: Response, logCat: String): Unit = {
+    @inline private def killCursors(r: Response, logCat: String): Unit = {
       val cursorID = r.reply.cursorID
 
       if (cursorID != 0) {
@@ -623,8 +617,7 @@ object DefaultCursor {
       } else logger.trace(s"[$logCat] Cursor exhausted (${cursorID})")
     }
 
-    @inline
-    private def syncSuccess[A, B](f: (A, B) => State[A])(implicit ec: ExecutionContext): (A, B) => Future[State[A]] = { (a: A, b: B) => Future(f(a, b)) }
+    @inline private def syncSuccess[A, B](f: (A, B) => State[A])(implicit ec: ExecutionContext): (A, B) => Future[State[A]] = { (a: A, b: B) => Future(f(a, b)) }
 
     def foldResponses[T](z: => T, maxDocs: Int = Int.MaxValue)(suc: (T, Response) => State[T], err: (T, Throwable) => State[T])(implicit ctx: ExecutionContext): Future[T] = new FoldResponses(z, maxDocs, syncSuccess(suc), err)(ctx)()
 
@@ -745,7 +738,8 @@ object DefaultCursor {
 
       enumerateResponses(maxDocs, stopOnError) &>
         Enumeratee.mapFlatten { response =>
-          val iterator = documentIterator(response.reply, response.documents)
+          val iterator = makeIterator(response)
+
           if (!iterator.hasNext) Enumerator.empty
           else CustomEnumerator.SEnumerator(iterator.next) { _ =>
             _next(iterator, stopOnError).
