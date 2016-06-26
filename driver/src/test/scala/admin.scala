@@ -43,8 +43,8 @@ class ReplSetGetStatusSpec extends Specification {
       import bson.BSONReplSetGetStatusImplicits._
 
       // TODO: Setup a successful replica set
-      connection("admin").runCommand(
-        ReplSetGetStatus) must throwA[CommandError].await(1, timeout)
+      connection.database("admin").flatMap(_.runCommand(
+        ReplSetGetStatus)) must throwA[CommandError].await(1, timeout)
     }
   }
 }
@@ -82,7 +82,7 @@ class ResyncSpec extends Specification {
     import bson.BSONResyncImplicits._
 
     "be successful" in { implicit ee: EE =>
-      connection("admin").runCommand(Resync) must not(
+      connection.database("admin").flatMap(_.runCommand(Resync)) must not(
         throwA[CommandError]).await(1, timeout)
     }
   }
@@ -95,8 +95,8 @@ class ReplSetMaintenanceSpec extends Specification {
     import bson.BSONReplSetMaintenanceImplicits._
 
     "fail outside replicaSet" in { implicit ee: EE =>
-      connection("admin").runCommand(
-        ReplSetMaintenance(true)) must throwA[CommandError].
+      connection.database("admin").flatMap(_.runCommand(
+        ReplSetMaintenance(true))) must throwA[CommandError].
         await(1, timeout)
     }
   }

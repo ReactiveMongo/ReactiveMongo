@@ -236,7 +236,7 @@ trait DefaultBSONHandlers {
   }
 
   implicit object BSONBinaryHandler extends BSONHandler[BSONBinary, Array[Byte]] {
-    def read(bin: BSONBinary) = bin.value.readArray(bin.value.size)
+    def read(bin: BSONBinary) = bin.value.duplicate().readArray(bin.value.size)
     def write(xs: Array[Byte]) = BSONBinary(xs, Subtype.GenericBinarySubtype)
   }
 
