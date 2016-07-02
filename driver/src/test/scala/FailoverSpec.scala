@@ -64,8 +64,8 @@ class FailoverSpec extends org.specs2.mutable.Specification {
       }.aka("duration") must beLike[Long] {
         case duration =>
           (duration must be_>=(1465655000000L)) and (
-            duration must be_<(1467000000000L))
-      }.await(1, 1467000000000L.milliseconds) and {
+            duration must be_<(1468000000000L))
+      }.await(1, 1468000000000L.milliseconds) and {
         con.askClose()(timeout) must not(throwA[Exception]).await(1, timeout)
       }
     }
