@@ -100,7 +100,7 @@ case class NodeSet(
   def updateOrAddNodes(f: PartialFunction[Node, Node], nodes: Seq[Node]) =
     nodes.foldLeft(this)(_.updateOrAddNode(f, _))
 
-  def updateAll(f: Node => Node) = copy(nodes = nodes.map(f))
+  def updateAll(f: Node => Node): NodeSet = copy(nodes = nodes.map(f))
 
   def updateNodeByChannelId(id: Int)(f: Node => Node) =
     updateByChannelId(id)(identity)(f)
@@ -168,10 +168,7 @@ case class NodeSet(
     }
   }
 
-  def createNeededChannels(receiver: ActorRef, upTo: Int)(implicit channelFactory: ChannelFactory): NodeSet =
-    copy(nodes = nodes.foldLeft(Vector.empty[Node]) {
-      _ :+ _.createNeededChannels(receiver, upTo)
-    })
+  def createNeededChannels(receiver: ActorRef, upTo: Int)(implicit channelFactory: ChannelFactory): NodeSet = updateAll(_.createNeededChannels(receiver, upTo))
 
   def toShortString =
     s"{{NodeSet $name ${nodes.map(_.toShortString).mkString(" | ")} }}"
@@ -223,9 +220,10 @@ case class Node(
     if (connections.size < upTo) {
       _copy(connections = connections ++ (for {
         i ← 0 until (upTo - connections.size)
-      } yield Connection(channelFactory.create(host, port, receiver),
-        ConnectionStatus.Disconnected, Set.empty, None)))
-
+      } yield {
+        Connection(channelFactory.create(host, port, receiver),
+          ConnectionStatus.Disconnected, Set.empty, None)
+      }))
     } else this
   }
 

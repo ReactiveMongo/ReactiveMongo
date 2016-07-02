@@ -28,7 +28,7 @@ object Common {
   val DefaultOptions = {
     val opts = MongoConnectionOptions(
       failoverStrategy = failoverStrategy,
-      nbChannelsPerNode = 10)
+      nbChannelsPerNode = 20)
 
     if (Option(System getProperty "test.enableSSL").exists(_ == "true")) {
       opts.copy(sslEnabled = true, sslAllowsInvalidCert = true)
