@@ -417,7 +417,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
       }.future
     }
 
-    case None => Future.failed(ConnectionNotInitialized.MissingMetadata)
+    case _ => Future.failed(ConnectionNotInitialized.MissingMetadata)
   }
 
   /**

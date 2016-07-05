@@ -173,8 +173,11 @@ object Dependencies {
 
   val slf4jVer = "1.7.12"
   val log4jVer = "2.5"
+
+  val slf4j = "org.slf4j" % "slf4j-api" % slf4jVer
+
   val logApi = Seq(
-    "org.slf4j" % "slf4j-api" % slf4jVer % "provided",
+    slf4j % "provided",
     "org.apache.logging.log4j" % "log4j-api" % log4jVer // deprecated
   ) ++ Seq("log4j-core", "log4j-slf4j-impl").map(
     "org.apache.logging.log4j" % _ % log4jVer % Test)
@@ -210,24 +213,52 @@ object ReactiveMongoBuild extends Build {
       settings = buildSettings ++ (publishArtifact := false) ).
       settings(UnidocPlugin.unidocSettings: _*).
       settings(previousArtifacts := Set.empty).
-      aggregate(bson, bsonmacros, shadedDeps, driver)
+      aggregate(bson, bsonmacros, shaded, driver)
 
-  lazy val shadedDeps =
-    Project(
-      s"$projectPrefix-Shaded",
-      file("shaded"),
-      settings = baseSettings ++ Publish.settings).settings(
-        previousArtifacts := Set.empty,
-        crossPaths := false,
-        autoScalaLibrary := false,
-        libraryDependencies ++= Seq(netty),
-        assemblyShadeRules in assembly := Seq(
-          ShadeRule.rename("org.jboss.netty.**" -> "shaded.netty.@1").inAll
-        ),
-        publish in Compile := publish.dependsOn(assembly),
-        publishLocal in Compile := publishLocal.dependsOn(assembly),
-        packageBin in Compile := target.value / (
-          assemblyJarName in assembly).value)
+  private lazy val shadedDeps = Seq(netty)
+
+  lazy val shaded = Project(
+    s"$projectPrefix-Shaded",
+    file("shaded"),
+    settings = baseSettings ++ Publish.settings).
+    settings(
+      previousArtifacts := Set.empty,
+      crossPaths := false,
+      autoScalaLibrary := false,
+      libraryDependencies ++= shadedDeps,
+      assemblyShadeRules in assembly := Seq(
+        ShadeRule.rename("org.jboss.netty.**" -> "shaded.netty.@1").inAll
+      ),
+      publish in Compile := publish.dependsOn(assembly),
+      publishLocal in Compile := publishLocal.dependsOn(assembly),
+      packageBin in Compile := target.value / (
+        assemblyJarName in assembly).value,
+      pomPostProcess := { node: scala.xml.Node =>
+        import scala.xml.{ Elem, Node, NodeSeq, XML }
+        import scala.xml.transform.{ RewriteRule, RuleTransformer }
+
+        val pom = new RuleTransformer(new RewriteRule {
+          override def transform(node: Node): NodeSeq = node match {
+            case e: Elem if e.label == "dependency" =>
+              NodeSeq.Empty
+
+            case _ => node
+          }
+        }).transform(node).headOption match {
+          case Some(transformed) => transformed
+          case _ => sys.error("Fails to transform the POM")
+        }
+
+        pom
+      }
+    )
+
+  private val driverFilter: Seq[(File, String)] => Seq[(File, String)] = {
+    (_: Seq[(File, String)]).filter {
+      case (file, name) =>
+        !(name endsWith "reactivemongo/core/StaticListenerBinder.class")
+    }
+  } andThen BuildSettings.filter
 
   lazy val driver = Project(
     projectPrefix,
@@ -235,21 +266,27 @@ object ReactiveMongoBuild extends Build {
     settings = buildSettings ++ Seq(
       resolvers := resolversList,
       compile in Compile <<= (
-        compile in Compile).dependsOn(assembly in shadedDeps),
+        compile in Compile).dependsOn(assembly in shaded),
       unmanagedJars in Compile := {
-        val shadedDir = (target in shadedDeps).value
-        val shadedJar = (assemblyJarName in (shadedDeps, assembly)).value
+        val shadedDir = (target in shaded).value
+        val shadedJar = (assemblyJarName in (shaded, assembly)).value
 
         Seq(Attributed(shadedDir / shadedJar)(AttributeMap.empty))
       },
-      libraryDependencies ++= Seq(
-        akkaActor,
-        playIteratees,
-        commonsCodec,
-        shapelessTest,
-        specs,
-        ("org.reactivemongo" % "reactivemongo-shaded" % version.value).
-          exclude("io.netty", "netty")) ++ logApi,
+      libraryDependencies ++= {
+        val rmShaded = shadedDeps.foldLeft(
+          "org.reactivemongo" % "reactivemongo-shaded" % version.value) {
+          (dep, x) => dep.exclude(x.organization, x.name)
+        }
+
+        Seq(
+          akkaActor,
+          playIteratees,
+          commonsCodec,
+          shapelessTest,
+          specs,
+          rmShaded) ++ logApi
+      },
       binaryIssueFilters ++= {
         import ProblemFilters.{ exclude => x }
         @inline def mmp(s: String) = x[MissingMethodProblem](s)
@@ -261,6 +298,8 @@ object ReactiveMongoBuild extends Build {
         @inline def mcp(s: String) = x[MissingClassProblem](s)
 
         Seq(
+          imt("reactivemongo.core.actors.AwaitingResponse.apply"), // private
+          imt("reactivemongo.core.actors.AwaitingResponse.this"), // private
           mmp("reactivemongo.core.protocol.MongoHandler.this"), // private
           fcp("reactivemongo.core.nodeset.ChannelFactory"),
           mcp("reactivemongo.core.actors.RefreshAllNodes"),
@@ -625,13 +664,28 @@ object ReactiveMongoBuild extends Build {
           mtp("reactivemongo.api.indexes.Index$"),
           mmp("reactivemongo.api.indexes.Index.apply"))
       },
-      testOptions in Test += Tests.Cleanup(cl => {
-        import scala.language.reflectiveCalls
-        val c = cl.loadClass("Common$")
-        type M = { def close(): Unit }
-        val m: M = c.getField("MODULE$").get(null).asInstanceOf[M]
-        m.close()
-      }))).dependsOn(bsonmacros, shadedDeps)
+      testOptions in Test ++= Seq(
+        Tests.Setup(() => {
+          val classDir = (classDirectory in Compile).value
+          val listenerClass = classDir / "reactivemongo" / "core" / (
+            "StaticListenerBinder.class")
+
+          streams.value.log(s"Cleanup $listenerClass ...")
+
+          listenerClass.delete()
+        }),
+        Tests.Cleanup(cl => {
+          import scala.language.reflectiveCalls
+          val c = cl.loadClass("Common$")
+          type M = { def close(): Unit }
+          val m: M = c.getField("MODULE$").get(null).asInstanceOf[M]
+          m.close()
+        })
+      ),
+      mappings in (Compile, packageBin) ~= driverFilter,
+      //mappings in (Compile, packageDoc) ~= driverFilter,
+      mappings in (Compile, packageSrc) ~= driverFilter
+    )).dependsOn(bsonmacros, shaded)
 
   lazy val bson = Project(
     s"$projectPrefix-BSON",
@@ -675,4 +729,26 @@ object ReactiveMongoBuild extends Build {
         playIteratees, specs) ++ logApi
     )
 
+  lazy val jmx = Project(
+    s"$projectPrefix-JMX",
+    file("jmx"),
+    settings = buildSettings).
+    settings(
+      previousArtifacts := Set.empty,
+      compile in Compile <<= (compile in Compile).
+        dependsOn(compile in (driver, Compile)),
+      unmanagedJars in Compile += (
+        (packageBin in (driver, Compile)).value),
+      testOptions in Test += Tests.Cleanup(cl => {
+        import scala.language.reflectiveCalls
+        val c = cl.loadClass("Common$")
+        type M = { def closeDriver(): Unit }
+        val m: M = c.getField("MODULE$").get(null).asInstanceOf[M]
+        m.closeDriver()
+      }),
+      libraryDependencies ++= Seq(
+        "org.reactivemongo" %% "reactivemongo" % buildVersion % "provided",
+        slf4j % "provided",
+        specs) ++ Seq("org.slf4j" % "slf4j-simple" % "1.7.13").map(_ % Test)
+    )
 }

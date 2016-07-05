@@ -30,7 +30,9 @@ import shaded.netty.channel.group.{
   ChannelGroupFutureListener,
   DefaultChannelGroup
 }
+
 import reactivemongo.util.LazyLogger
+import reactivemongo.core.ConnectionListener
 import reactivemongo.core.errors.{ DriverException, GenericDriverException }
 import reactivemongo.core.protocol.{
   CheckedWriteRequest,
@@ -56,6 +58,7 @@ import reactivemongo.core.nodeset.{
   ConnectionStatus,
   Node,
   NodeSet,
+  NodeSetInfo,
   NodeStatus,
   PingInfo,
   ProtocolMetadata
@@ -180,6 +183,12 @@ trait MongoDBSystem extends Actor {
 
   private val lnm = s"$supervisor/$name" // log naming
 
+  private val listener: Option[ConnectionListener] = {
+    val cl = reactivemongo.core.ConnectionListener()
+    cl.foreach(_.poolCreated(options, supervisor, name))
+    cl
+  }
+
   private implicit val cFactory = channelFactory
 
   private val awaitingResponses =
@@ -270,51 +279,39 @@ trait MongoDBSystem extends Actor {
       unauthenticate(node, connections)
     })
 
-  protected def authReceive: Receive
+  private def lastError(response: Response): Either[Throwable, LastError] = {
+    import reactivemongo.api.commands.bson.
+      BSONGetLastErrorImplicits.LastErrorReader
 
-  val closing: Receive = {
-    case req @ RequestMaker(_, _, _, _) =>
-      logger.error(s"[$lnm] Received a non-expecting response request during closing process: $req")
-
-    case RegisterMonitor => monitors += sender
-
-    case req @ ExpectingResponse(promise) => {
-      logger.debug(s"[$lnm] Received an expecting response request during closing process: $req, completing its promise with a failure")
-      promise.failure(new Exceptions.ClosedException(supervisor, name))
+    Response.parse(response).next().asTry[LastError] match {
+      case Failure(err) => Left(err)
+      case Success(err) => Right(err)
     }
-
-    case msg @ ChannelClosed(channelId) => {
-      updateNodeSet(_.updateNodeByChannelId(channelId) { node =>
-        unauthenticate(node, node.connections.
-          filter(_.channel.getId != channelId))
-      })
-
-      stopWhenDisconnected("Closing", msg)
-    }
-
-    case msg @ ChannelDisconnected(channelId) => {
-      updateNodeSetOnDisconnect(channelId)
-
-      if (logger.isDebugEnabled) {
-        val remainingConnections = _nodeSet.nodes.foldLeft(0) { (open, node) =>
-          open + node.connections.size
-        }
-        val disconnected = _nodeSet.nodes.foldLeft(0) { (open, node) =>
-          open + node.connections.count(
-            _.status == ConnectionStatus.Disconnected)
-        }
-
-        logger.debug(s"[$lnm$$Closing] Received $msg, remainingConnections = $remainingConnections, disconnected = $disconnected, connected = ${remainingConnections - disconnected}")
-      }
-    }
-
-    case msg @ ChannelConnected(channelId) =>
-      logger.warn(s"[$lnm$$Closing] SPURIOUS $msg (ignored, channel closed)")
-      updateNodeSetOnDisconnect(channelId)
-
-    case other =>
-      logger.error(s"[$lnm$$Closing] Unhandled message: $other")
   }
+
+  // TODO: Specific option?
+  @inline private def requestRetries = options.failoverStrategy.retries
+
+  private def retry(req: AwaitingResponse): Option[AwaitingResponse] =
+    req.retriable(requestRetries).flatMap { newReq =>
+      foldNodeConnection(req.request)({ error =>
+        req.promise.failure(error)
+        None
+      }, { (node, con) =>
+        val reqId = req.requestID
+        val awaiting = newReq(con.channel.getId)
+
+        awaitingResponses += reqId -> awaiting
+
+        awaiting.getWriteConcern.fold(con.send(awaiting.request)) { wc =>
+          con.send(awaiting.request, wc)
+        }
+
+        Some(awaiting)
+      })
+    }
+
+  protected def authReceive: Receive
 
   private val processing: Receive = {
     case RegisterMonitor => monitors += sender
@@ -346,50 +343,40 @@ trait MongoDBSystem extends Actor {
 
       val request = maker(reqId)
 
-      pickChannel(request) match {
-        case Failure(error) => {
-          logger.trace(s"[$lnm] No channel, error with promise ${req.promise}")
-          req.promise.failure(error)
-        }
+      foldNodeConnection(request)(req.promise.failure(_), { (node, con) =>
+        if (request.op.expectsResponse) {
+          awaitingResponses += reqId -> AwaitingResponse(
+            request, con.channel.getId, req.promise,
+            isGetLastError = false,
+            isMongo26WriteOp = req.isMongo26WriteOp)
 
-        case Success((node, connection)) => {
-          logger.trace(s"[$lnm] Sending request ($reqId) expecting response by connection $connection of node ${node.name}: $request")
+          logger.trace(s"[$lnm] Registering awaiting response for requestID $reqId, awaitingResponses: $awaitingResponses")
+        } else logger.trace(s"[$lnm] NOT registering awaiting response for requestID $reqId")
 
-          if (request.op.expectsResponse) {
-            awaitingResponses += request.requestID -> AwaitingResponse(
-              reqId, connection.channel.getId, req.promise,
-              isGetLastError = false,
-              isMongo26WriteOp = req.isMongo26WriteOp)
-
-            logger.trace(s"[$lnm] Registering awaiting response for requestID $reqId, awaitingResponses: $awaitingResponses")
-          } else logger.trace(s"[$lnm] NOT registering awaiting response for requestID $reqId")
-
-          connection.send(request)
-        }
-      }
+        con.send(request)
+      })
     }
 
     case req @ CheckedWriteRequestExpectingResponse(_) => {
       logger.debug(s"[$lnm] Received a checked write request")
 
       val checkedWriteRequest = req.checkedWriteRequest
-      val requestId = RequestId.common.next
+      val reqId = RequestId.common.next
       val (request, writeConcern) = {
         val tuple = checkedWriteRequest()
-        tuple._1(requestId) -> tuple._2(requestId)
+        tuple._1(reqId) -> tuple._2(reqId)
       }
 
-      pickChannel(request) match {
-        case Failure(error) => req.promise.failure(error)
+      foldNodeConnection(request)(req.promise.failure(_), { (node, con) =>
+        awaitingResponses += reqId -> AwaitingResponse(
+          request, con.channel.getId(), req.promise,
+          isGetLastError = true, isMongo26WriteOp = false).
+          withWriteConcern(writeConcern)
 
-        case Success((node, connection)) => {
-          logger.trace(s"[$lnm] Sending request expecting response $request by connection $connection of node ${node.name}")
+        logger.trace(s"[$lnm] Registering awaiting response for requestID $reqId, awaitingResponses: $awaitingResponses")
 
-          awaitingResponses += requestId -> AwaitingResponse(requestId, connection.channel.getId(), req.promise, isGetLastError = true, isMongo26WriteOp = false)
-          logger.trace(s"[$lnm] Registering awaiting response for requestID $requestId, awaitingResponses: $awaitingResponses")
-          connection.send(request, writeConcern)
-        }
-      }
+        con.send(request, writeConcern)
+      })
     }
 
     case ConnectAll => { // monitor
@@ -421,7 +408,7 @@ trait MongoDBSystem extends Actor {
 
     case channelUnavailable @ ChannelUnavailable(channelId) => {
       logger.trace(
-        s"[$lnm] Channel #$channelId unavailable ($channelUnavailable).")
+        s"[$lnm] Channel #$channelId is unavailable ($channelUnavailable).")
 
       val nodeSetWasReachable = _nodeSet.isReachable
       val primaryWasAvailable = _nodeSet.primary.isDefined
@@ -436,16 +423,30 @@ trait MongoDBSystem extends Actor {
         case ChannelDisconnected(_) => updateNodeSetOnDisconnect(channelId)
       }
 
+      val retried = Map.newBuilder[Int, AwaitingResponse]
+
       awaitingResponses.retain { (_, awaitingResponse) =>
         if (awaitingResponse.channelID == channelId) {
-          logger.debug(s"[$lnm] Completing promise ${awaitingResponse.promise} with error='socket disconnected'")
+          retry(awaitingResponse) match {
+            case Some(awaiting) => {
+              logger.trace(s"[$lnm] Retrying to await response for requestID ${awaiting.requestID}: $awaiting")
+              retried += channelId -> awaiting
+            }
 
-          awaitingResponse.promise.
-            failure(GenericDriverException(s"Socket disconnected ($lnm)"))
+            case _ => {
+              logger.debug(s"[$lnm] Completing promise ${awaitingResponse.promise} with error='socket disconnected'")
+
+              awaitingResponse.promise.
+                failure(GenericDriverException(s"Socket disconnected ($lnm)"))
+
+            }
+          }
 
           false
         } else true
       }
+
+      awaitingResponses ++= retried.result()
 
       if (!_nodeSet.isReachable) {
         if (nodeSetWasReachable) {
@@ -483,7 +484,6 @@ trait MongoDBSystem extends Actor {
 
         val prepared =
           nodeSet.updateNodeByChannelId(response.info.channelId) { node =>
-
             val pingInfo =
               if (node.pingInfo.lastIsMasterId == response.header.responseTo) {
                 node.pingInfo.copy(ping =
@@ -557,14 +557,51 @@ trait MongoDBSystem extends Actor {
     }
   }
 
-  private def lastError(response: Response): Either[Throwable, LastError] = {
-    import reactivemongo.api.commands.bson.
-      BSONGetLastErrorImplicits.LastErrorReader
+  val closing: Receive = {
+    case req @ RequestMaker(_, _, _, _) =>
+      logger.error(s"[$lnm] Received a non-expecting response request during closing process: $req")
 
-    Response.parse(response).next().asTry[LastError] match {
-      case Failure(err) => Left(err)
-      case Success(err) => Right(err)
+    case RegisterMonitor => monitors += sender
+
+    case req @ ExpectingResponse(promise) => {
+      logger.debug(s"[$lnm] Received an expecting response request during closing process: $req, completing its promise with a failure")
+      promise.failure(new Exceptions.ClosedException(supervisor, name))
     }
+
+    case msg @ ChannelClosed(channelId) => {
+      updateNodeSet(_.updateNodeByChannelId(channelId) { node =>
+        unauthenticate(node, node.connections.
+          filter(_.channel.getId != channelId))
+      })
+
+      stopWhenDisconnected("Closing", msg)
+    }
+
+    case msg @ ChannelDisconnected(channelId) => {
+      updateNodeSetOnDisconnect(channelId)
+
+      if (logger.isDebugEnabled) {
+        val remainingConnections = _nodeSet.nodes.foldLeft(0) { (open, node) =>
+          open + node.connections.size
+        }
+        val disconnected = _nodeSet.nodes.foldLeft(0) { (open, node) =>
+          open + node.connections.count(
+            _.status == ConnectionStatus.Disconnected)
+        }
+
+        logger.debug(s"[$lnm$$Closing] Received $msg, remainingConnections = $remainingConnections, disconnected = $disconnected, connected = ${remainingConnections - disconnected}")
+      }
+    }
+
+    case msg @ ChannelConnected(channelId) =>
+      logger.warn(s"[$lnm$$Closing] SPURIOUS $msg (ignored, channel closed)")
+      updateNodeSetOnDisconnect(channelId)
+
+    case Close =>
+      logger.warn(s"[$lnm$$Closing] Already closing ... ignore Close message")
+
+    case other =>
+      logger.error(s"[$lnm$$Closing] Unhandled message: $other")
   }
 
   // any other response
@@ -656,6 +693,7 @@ trait MongoDBSystem extends Actor {
       logger.debug(s"[$lnm] New authenticate request $authenticate")
 
       AuthRequestsManager.addAuthRequest(request)
+
       updateNodeSet { ns =>
         authenticateNodeSet(ns.
           copy(authenticates = ns.authenticates + authenticate))
@@ -668,9 +706,21 @@ trait MongoDBSystem extends Actor {
   override lazy val receive: Receive =
     processing.orElse(authReceive).orElse(fallback)
 
+  private type NodeSetHandler = (NodeSetInfo, NodeSet) => Unit
+  private val nodeSetUpdated: NodeSetHandler =
+    listener.fold[NodeSetHandler]((_, _) => {}) { l =>
+      { (previous: NodeSetInfo, updated: NodeSet) =>
+        context.system.scheduler.scheduleOnce(1.second) {
+          _setInfo = updated.info
+          l.nodeSetUpdated(previous, _setInfo)
+        }
+      }
+    }
+
   // monitor -->
   private val nodeSetLock = new Object {}
   private var _nodeSet: NodeSet = NodeSet(None, None, seeds.map(seed => Node(seed, NodeStatus.Unknown, Vector.empty, Set.empty, None, ProtocolMetadata.Default).createNeededChannels(self, 1)).toVector, initialAuthenticates.toSet)
+  private var _setInfo: NodeSetInfo = _nodeSet.info
 
   connectAll(_nodeSet, { (node, chan) =>
     chan.addListener(new ChannelFutureListener {
@@ -680,6 +730,8 @@ trait MongoDBSystem extends Actor {
 
     chan
   })
+
+  nodeSetUpdated(null, _nodeSet)
   // <-- monitor
 
   def onPrimaryUnavailable() {
@@ -693,12 +745,21 @@ trait MongoDBSystem extends Actor {
     broadcastMonitors(PrimaryUnavailable)
   }
 
-  private def updateNodeSet(f: NodeSet => NodeSet): NodeSet =
+  private def updateNodeSet(f: NodeSet => NodeSet): NodeSet = {
+    var previous: NodeSetInfo = null
+    var updated: NodeSet = null
+
     nodeSetLock.synchronized {
-      val updated = f(this._nodeSet)
+      previous = this._setInfo
+      updated = f(this._nodeSet)
+
       this._nodeSet = updated
-      updated
     }
+
+    nodeSetUpdated(previous, updated)
+
+    updated
+  }
 
   private def updateAuthenticate(nodeSet: NodeSet, channelId: Int, replyTo: Authenticate, auth: Option[Authenticated]): NodeSet = {
     val ns = nodeSet.updateByChannelId(channelId) { con =>
@@ -779,6 +840,19 @@ trait MongoDBSystem extends Actor {
       getOrElse(Failure(Exceptions.PrimaryUnavailableException))
   }
 
+  private def foldNodeConnection[T](request: Request)(e: Throwable => T, f: (Node, Connection) => T): T = pickChannel(request) match {
+    case Failure(error) => {
+      logger.trace(s"[$lnm] No channel for request: $request")
+      e(error)
+    }
+
+    case Success((node, connection)) => {
+      logger.trace(s"[$lnm] Sending request (${request.requestID}) expecting response by connection $connection of node ${node.name}: $request")
+
+      f(node, connection)
+    }
+  }
+
   private[actors] def whenAuthenticating(channelId: Int)(f: Tuple2[Connection, Authenticating] => Connection): NodeSet = updateNodeSet(
     _.updateConnectionByChannelId(channelId) { connection =>
       connection.authenticating.fold(connection)(authenticating =>
@@ -833,7 +907,10 @@ trait MongoDBSystem extends Actor {
 
   override def postStop() {
     close()
+
     logger.info(s"[$lnm] MongoDBSystem $self stopped.")
+
+    listener.foreach(_.poolShutdown(supervisor, name))
   }
 
   private def broadcastMonitors(message: AnyRef) = monitors.foreach(_ ! message)
@@ -842,9 +919,16 @@ trait MongoDBSystem extends Actor {
     for {
       node <- nodeSet.nodes
       connection <- node.connections if !connection.channel.isConnected()
-    } yield connected(node,
-      connection.channel.connect(
-        new InetSocketAddress(node.host, node.port)))
+    } yield {
+      try {
+        connected(node, connection.channel.connect(
+          new InetSocketAddress(node.host, node.port)))
+
+      } catch {
+        case reason: Throwable =>
+          logger.warn(s"[$lnm] Fails to connect node: ${node.toShortString}")
+      }
+    }
 
     nodeSet
   }
@@ -970,16 +1054,67 @@ object MongoDBSystem {
 }
 
 private[actors] case class AwaitingResponse(
-  requestID: Int,
-  channelID: Int,
-  promise: Promise[Response],
-  isGetLastError: Boolean,
-  isMongo26WriteOp: Boolean)
+    request: Request,
+    channelID: Int,
+    promise: Promise[Response],
+    isGetLastError: Boolean,
+    isMongo26WriteOp: Boolean) {
+
+  @inline def requestID: Int = request.requestID
+
+  private var _retry = 0 // TODO: Refactor as property
+
+  // TODO: Refactor as Property
+  var _writeConcern: Option[Request] = None
+  def withWriteConcern(wc: Request): AwaitingResponse = {
+    _writeConcern = Some(wc)
+    this
+  }
+  def getWriteConcern: Option[Request] = _writeConcern
+
+  def retriable(max: Int): Option[Int => AwaitingResponse] =
+    if (_retry >= max) None else Some({ chanId: Int =>
+      val req = copy(this.request, channelID = chanId)
+
+      req._retry = _retry + 1
+      req._writeConcern = _writeConcern
+
+      req
+    })
+
+  def copy(
+    request: Request = this.request,
+    channelID: Int = this.channelID,
+    promise: Promise[Response] = this.promise,
+    isGetLastError: Boolean = this.isGetLastError,
+    isMongo26WriteOp: Boolean = this.isMongo26WriteOp): AwaitingResponse =
+    AwaitingResponse(request, channelID, promise,
+      isGetLastError, isMongo26WriteOp)
+
+  @deprecated(message = "Use [[copy]] with `Request`", since = "0.12.0-RC1")
+  def copy(
+    requestID: Int,
+    channelID: Int,
+    promise: Promise[Response],
+    isGetLastError: Boolean,
+    isMongo26WriteOp: Boolean): AwaitingResponse = {
+    val req = copy(this.request,
+      channelID = channelID,
+      promise = promise,
+      isGetLastError = isGetLastError,
+      isMongo26WriteOp = isMongo26WriteOp)
+
+    req._retry = this._retry
+    req._writeConcern = this._writeConcern
+
+    req
+  }
+}
 
 /**
  * A message to send to a MonitorActor to be warned when a primary has been discovered.
  */
-@deprecated(message = "Wil be removed", since = "0.11.10")
+@deprecated(message = "Will be removed", since = "0.11.10")
 case object WaitForPrimary
 
 private[actors] object RequestId {

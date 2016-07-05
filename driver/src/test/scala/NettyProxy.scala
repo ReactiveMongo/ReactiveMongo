@@ -36,7 +36,7 @@ final class NettyProxy(
     remoteAddress: InetSocketAddress,
     delay: Option[Long] = None) {
 
-  private val log = LazyLogger("reactivemongo.netty-test-proxy")
+  private val log = LazyLogger("reactivemongo.test.NettyProxy")
 
   private val beforeProxy: () => Unit = delay.fold(() => {})(d => { () =>
     try {

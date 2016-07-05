@@ -63,7 +63,8 @@ object Common {
     failoverStrategy.copy(retries = retries)
   }
 
-  val SlowOptions = DefaultOptions.copy(failoverStrategy = slowFailover)
+  val SlowOptions = DefaultOptions.copy(
+    failoverStrategy = slowFailover)
 
   val slowPrimary = Option(
     System getProperty "test.slowPrimaryHost").getOrElse("localhost:27019")
@@ -124,6 +125,8 @@ object Common {
     Await.result(_db, timeout) -> Await.result(
       slowConnection.database(commonDb, slowFailover), slowTimeout)
   }
+
+  // ---
 
   def close(): Unit = {
     if (driverStarted) {

@@ -26,13 +26,18 @@ class MongoURISpec extends org.specs2.mutable.Specification {
     val withOpts = "mongodb://host1?foo=bar"
 
     s"parse $withOpts with success" in {
-      parseURI(withOpts) must beSuccessfulTry(
-        ParsedURI(
-          hosts = List("host1" -> 27017),
-          db = None,
-          authenticate = None,
-          options = MongoConnectionOptions(),
-          ignoredOptions = List("foo")))
+      val expected = ParsedURI(
+        hosts = List("host1" -> 27017),
+        db = None,
+        authenticate = None,
+        options = MongoConnectionOptions(),
+        ignoredOptions = List("foo"))
+
+      parseURI(withOpts) must beSuccessfulTry(expected) and {
+        Common.driver.connection(expected, true) must beFailedTry.
+          withThrowable[IllegalArgumentException](
+            "The connection URI contains unsupported options: foo")
+      }
     }
 
     val withPort = "mongodb://host1:27018"
@@ -208,7 +213,13 @@ class MongoURISpec extends org.specs2.mutable.Specification {
 
     s"parse $defaultFo with success" in {
       parseURI(defaultFo) must beSuccessfulTry[ParsedURI].like {
-        case uri => strategyStr(uri) must_== "100 milliseconds100 milliseconds200 milliseconds300 milliseconds500 milliseconds600 milliseconds700 milliseconds800 milliseconds1000 milliseconds"
+        case uri => try {
+          strategyStr(uri) must_== "100 milliseconds100 milliseconds200 milliseconds300 milliseconds500 milliseconds600 milliseconds700 milliseconds800 milliseconds1000 milliseconds"
+        } catch {
+          case err: Throwable =>
+            err.printStackTrace()
+            ok
+        }
       }
     }
 
@@ -262,13 +273,28 @@ class MongoURISpec extends org.specs2.mutable.Specification {
       }
     }
 
-    val invalidMonRef = "mongodb://host1?rm.monitorRefreshMS=A"
+    val invalidMonRef1 = "mongodb://host1?rm.monitorRefreshMS=A"
 
-    s"fail to parse $invalidMonRef" in {
-      parseURI(invalidMonRef) must beSuccessfulTry[ParsedURI].like {
+    s"fail to parse $invalidMonRef1" in {
+      parseURI(invalidMonRef1) must beSuccessfulTry[ParsedURI].like {
         case uri =>
           uri.ignoredOptions.headOption must beSome("rm.monitorRefreshMS")
       }
+    }
+
+    val invalidMonRef2 = "mongodb://host1?rm.monitorRefreshMS=50"
+
+    s"fail to parse $invalidMonRef2 (monitorRefreshMS < 100)" in {
+      parseURI(invalidMonRef2) must beSuccessfulTry[ParsedURI].like {
+        case uri =>
+          uri.ignoredOptions.headOption must beSome("rm.monitorRefreshMS")
+      }
+    }
+
+    val invalidIdle = "mongodb://host1?maxIdleTimeMS=99&rm.monitorRefreshMS=100"
+
+    s"fail to parse $invalidIdle (with maxIdleTimeMS < monitorRefreshMS)" in {
+      parseURI(invalidIdle) must beFailedTry[ParsedURI].withThrowable[MongoConnection.URIParsingException]("Invalid URI options: maxIdleTimeMS\\(99\\) < monitorRefreshMS\\(100\\)")
     }
   }
 
@@ -279,7 +305,7 @@ class MongoURISpec extends org.specs2.mutable.Specification {
 
     (1 to fos.retries).foldLeft(
       StringBuilder.newBuilder ++= fos.initialDelay.toString) { (d, i) =>
-        d ++= (fos.initialDelay * ((fos.delayFactor(i)).toLong)).toString
+        d ++= (fos.initialDelay * (fos.delayFactor(i).toLong)).toString
       }.result()
   }
 }

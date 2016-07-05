@@ -258,9 +258,10 @@ trait Cursor[T] {
    */
   @deprecated(message = "Use the Play Iteratee modules", since = "0.11.10")
   def rawEnumerateResponses(maxDocs: Int = Int.MaxValue)(implicit ctx: ExecutionContext): Enumerator[Response]
+}
 
-  // ---
-
+/** Internal cursor operations. */
+sealed trait CursorOps[T] { cursor: Cursor[T] =>
   /** Sends the initial request. */
   private[reactivemongo] def makeRequest(maxDocs: Int)(implicit ctx: ExecutionContext): Future[Response]
 
@@ -270,7 +271,19 @@ trait Cursor[T] {
    * Returns an iterator to read the response documents,
    * according the provided read for the element type `T`.
    */
-  private[reactivemongo] def documentIterator(response: Response)(implicit ec: ExecutionContext): Future[Iterator[T]]
+  private[reactivemongo] def documentIterator(response: Response)(implicit ec: ExecutionContext): Iterator[T]
+
+}
+
+object CursorOps {
+  /**
+   * Wraps exception that has already been passed to the current error handler
+   * and should not be recovered.
+   */
+  private[reactivemongo] case class Unrecoverable(cause: Throwable)
+    extends scala.RuntimeException(cause)
+    with scala.util.control.NoStackTrace
+
 }
 
 class FlattenedCursor[T](cursor: Future[Cursor[T]]) extends Cursor[T] {
@@ -304,15 +317,6 @@ class FlattenedCursor[T](cursor: Future[Cursor[T]]) extends Cursor[T] {
   def rawEnumerateResponses(maxDocs: Int = Int.MaxValue)(implicit ctx: ExecutionContext): Enumerator[Response] =
     Enumerator.flatten(cursor.map(_.rawEnumerateResponses(maxDocs)))
 
-  def makeRequest(maxDocs: Int)(implicit ctx: ExecutionContext): Future[Response] = cursor.flatMap(_.makeRequest(maxDocs))
-
-  def nextResponse(maxDocs: Int): (ExecutionContext, Response) => Future[Option[Response]] = { (ec, response) =>
-    implicit def executionContext = ec
-
-    cursor.flatMap(_.nextResponse(maxDocs)(ec, response))
-  }
-
-  def documentIterator(response: Response)(implicit ec: ExecutionContext): Future[Iterator[T]] = cursor.flatMap(_.documentIterator(response))
 }
 
 /**
@@ -354,11 +358,6 @@ trait WrappedCursor[T] extends Cursor[T] {
 
   def foldWhileM[A](z: => A, maxDocs: Int = Int.MaxValue)(suc: (A, T) => Future[Cursor.State[A]], err: Cursor.ErrorHandler[A])(implicit ctx: ExecutionContext): Future[A] = wrappee.foldWhileM(z, maxDocs)(suc, err)
 
-  def makeRequest(maxDocs: Int)(implicit ctx: ExecutionContext): Future[Response] = wrappee.makeRequest(maxDocs)
-
-  def nextResponse(maxDocs: Int): (ExecutionContext, Response) => Future[Option[Response]] = wrappee.nextResponse(maxDocs)
-
-  def documentIterator(response: Response)(implicit ec: ExecutionContext): Future[Iterator[T]] = wrappee.documentIterator(response)
 }
 
 /** Cursor companion object */
@@ -431,6 +430,7 @@ object Cursor {
 object DefaultCursor {
   import Cursor.{ ErrorHandler, FailOnError, State, Cont, Done, Fail, logger }
   import reactivemongo.api.commands.ResultCursor
+  import CursorOps.Unrecoverable
 
   @deprecated(message = "Use [[query]]", since = "0.11.10")
   def apply[P <: SerializationPack, A](
@@ -452,6 +452,7 @@ object DefaultCursor {
     mongoConnection: MongoConnection,
     failover: FailoverStrategy,
     isMongo26WriteOp: Boolean)(implicit reader: pack.Reader[A]) = new Impl[A] {
+
     val preference = readPreference
     val connection = mongoConnection
     val failoverStrategy = failover
@@ -530,7 +531,7 @@ object DefaultCursor {
     def makeRequest(maxDocs: Int)(implicit ctx: ExecutionContext): Future[Response] = req(maxDocs)(ctx)
   }
 
-  private[reactivemongo] trait Impl[A] extends Cursor[A] {
+  private[reactivemongo] trait Impl[A] extends Cursor[A] with CursorOps[A] {
     /** The read preference */
     def preference: ReadPreference
 
@@ -548,7 +549,7 @@ object DefaultCursor {
 
     def makeIterator: Response => Iterator[A]
 
-    def documentIterator(response: Response)(implicit ec: ExecutionContext): Future[Iterator[A]] = Future(makeIterator(response))
+    def documentIterator(response: Response)(implicit ec: ExecutionContext): Iterator[A] = makeIterator(response)
 
     private def next(response: Response, maxDocs: Int)(implicit ctx: ExecutionContext): Future[Option[Response]] = {
       if (response.reply.cursorID != 0) {
@@ -631,12 +632,6 @@ object DefaultCursor {
         case Failure(e)  => Future.successful[State[T]](Fail(e))
       }
     }, err)
-
-    // Wraps exception that has already been passed to the current error handler
-    // and should not be recovered
-    private case class Unrecoverable(cause: Throwable)
-      extends scala.RuntimeException(cause)
-      with scala.util.control.NoStackTrace
 
     def foldWhile[T](z: => T, maxDocs: Int = Int.MaxValue)(suc: (T, A) => State[T], err: (T, Throwable) => State[T])(implicit ctx: ExecutionContext): Future[T] = foldWhileM[T](z, maxDocs)(syncSuccess[T, A](suc), err)
 
@@ -853,6 +848,7 @@ trait CursorProducer[T] {
   type ProducedCursor <: Cursor[T]
 
   /** Produces a custom cursor from the `base` one. */
+  @deprecated("The `base` cursor will require [[CursorOps]].", "0.11.15")
   def produce(base: Cursor[T]): ProducedCursor
 }
 

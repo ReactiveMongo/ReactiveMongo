@@ -99,6 +99,7 @@ sealed trait Op {
 sealed trait RequestOp extends Op with ChannelBufferWritable {
   /** States if this request expects a response. */
   val expectsResponse: Boolean = false
+
   /** States if this request has to be run on a primary. */
   val requiresPrimary: Boolean = false
 }
@@ -132,8 +133,10 @@ case class Reply(
 
   /** States whether the cursor given in the request was found */
   lazy val cursorNotFound = (flags & 0x01) != 0
+
   /** States if the request encountered an error */
   lazy val queryFailure = (flags & 0x02) != 0
+
   /** States if the answering server supports the AwaitData query option */
   lazy val awaitCapable = (flags & 0x08) != 0
 

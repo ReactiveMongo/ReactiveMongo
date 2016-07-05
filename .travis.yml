@@ -1,12 +1,19 @@
 language: scala
 sudo: false
+addons:
+  apt:
+    packages:
+    - numactl
+    - libnuma1
+    - libnuma-dev
+    - libnuma-dbg
 cache:
   directories:
   - $HOME/.ivy2
   - $HOME/.sbt
   - $HOME/ssl
   - $HOME/mongodb-linux-x86_64-2.6.12
-  - $HOME/mongodb-linux-x86_64-amazon-3.2.4
+  - $HOME/mongodb-linux-x86_64-amazon-3.2.8
 scala:
 - 2.11.7
 - 2.10.5

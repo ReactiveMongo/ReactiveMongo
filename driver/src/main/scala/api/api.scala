@@ -239,31 +239,6 @@ object Failover {
 }
 
 /**
- * A failover strategy for sending requests.
- * The default uses 8 retries:
- * 125ms, 250ms, 375ms, 500ms, 625ms, 750ms, 875ms, 1s
- *
- * @param initialDelay the initial delay between the first failed attempt and the next one.
- * @param retries the number of retries to do before giving up.
- * @param delayFactor a function that takes the current iteration and returns a factor to be applied to the initialDelay.
- */
-case class FailoverStrategy(
-    initialDelay: FiniteDuration = FiniteDuration(100, "ms"),
-    retries: Int = 8,
-    delayFactor: Int => Double = _ * 1.25D) {
-
-  override lazy val toString = s"FailoverStrategy($initialDelay, $retries)"
-}
-
-object FailoverStrategy {
-  /** The default strategy */
-  val default = FailoverStrategy()
-
-  /** The strategy when the MongoDB nodes are remote */
-  val remote = FailoverStrategy(retries = 16)
-}
-
-/**
  * A pool of MongoDB connections.
  *
  * Connection here does not mean that there is one open channel to the server:
@@ -573,6 +548,7 @@ object MongoConnection {
     ignoredOptions: List[String],
     db: Option[String],
     authenticate: Option[Authenticate])
+  // TODO: Type for URI with required DB name
 
   /**
    * Parses a MongoURI.
@@ -586,9 +562,18 @@ object MongoConnection {
       val useful = uri.replace(prefix, "")
       def opts = makeOptions(parseOptions(useful))
 
+      if (opts._2.maxIdleTimeMS != 0 &&
+        opts._2.maxIdleTimeMS < opts._2.monitorRefreshMS) {
+
+        throw new URIParsingException(s"Invalid URI options: maxIdleTimeMS(${opts._2.maxIdleTimeMS}) < monitorRefreshMS(${opts._2.monitorRefreshMS})")
+      }
+
+      // ---
+
       if (useful.indexOf("@") == -1) {
         val (db, hosts) = parseHostsAndDbName(useful)
         val (unsupportedKeys, options) = opts
+
         ParsedURI(hosts, options, unsupportedKeys, db, None)
       } else {
         val WithAuth = """([^:]+):([^@]*)@(.+)""".r
@@ -631,7 +616,8 @@ object MongoConnection {
     case hosts :: Nil           => None -> parseHosts(hosts.takeWhile(_ != '?'))
     case hosts :: dbName :: Nil => Some(dbName.takeWhile(_ != '?')) -> parseHosts(hosts)
     case _ =>
-      throw new URIParsingException(s"Could not parse hosts and database from URI: '$hostsPortAndDbName'")
+      throw new URIParsingException(
+        s"Could not parse hosts and database from URI: '$hostsPortAndDbName'")
   }
 
   private def parseOptions(uriAndOptions: String): Map[String, String] =
@@ -639,9 +625,11 @@ object MongoConnection {
       case uri :: options :: Nil => options.split("&").map { option =>
         option.split("=").toList match {
           case key :: value :: Nil => (key -> value)
-          case _                   => throw new URIParsingException(s"Could not parse URI '$uri': invalid options '$options'")
+          case _ => throw new URIParsingException(
+            s"Could not parse URI '$uri': invalid options '$options'")
         }
       }.toMap
+
       case _ => Map.empty
     }
 
@@ -652,19 +640,35 @@ object MongoConnection {
     val (remOpts, step1) = opts.iterator.foldLeft(
       Map.empty[String, String] -> MongoConnectionOptions()) {
         case ((unsupported, result), kv) => kv match {
-          case ("authSource", v)           => unsupported -> result.copy(authSource = Some(v))
+          case ("authSource", v) => unsupported -> result.
+            copy(authSource = Some(v))
 
-          case ("authMode", "scram-sha1")  => unsupported -> result.copy(authMode = ScramSha1Authentication)
-          case ("authMode", _)             => unsupported -> result.copy(authMode = CrAuthentication)
+          case ("authMode", "scram-sha1") => unsupported -> result.
+            copy(authMode = ScramSha1Authentication)
 
-          case ("connectTimeoutMS", v)     => unsupported -> result.copy(connectTimeoutMS = v.toInt)
-          case ("socketTimeoutMS", v)      => unsupported -> result.copy(socketTimeoutMS = v.toInt)
-          case ("sslEnabled", v)           => unsupported -> result.copy(sslEnabled = v.toBoolean)
-          case ("sslAllowsInvalidCert", v) => unsupported -> result.copy(sslAllowsInvalidCert = v.toBoolean)
+          case ("authMode", _) => unsupported -> result.
+            copy(authMode = CrAuthentication)
 
-          case ("rm.tcpNoDelay", v)        => unsupported -> result.copy(tcpNoDelay = v.toBoolean)
-          case ("rm.keepAlive", v)         => unsupported -> result.copy(keepAlive = v.toBoolean)
-          case ("rm.nbChannelsPerNode", v) => unsupported -> result.copy(nbChannelsPerNode = v.toInt)
+          case ("connectTimeoutMS", v) => unsupported -> result.
+            copy(connectTimeoutMS = v.toInt)
+
+          case ("maxIdleTimeMS", v) => unsupported -> result.
+            copy(maxIdleTimeMS = v.toInt)
+
+          case ("sslEnabled", v) => unsupported -> result.
+            copy(sslEnabled = v.toBoolean)
+
+          case ("sslAllowsInvalidCert", v) => unsupported -> result.
+            copy(sslAllowsInvalidCert = v.toBoolean)
+
+          case ("rm.tcpNoDelay", v) => unsupported -> result.
+            copy(tcpNoDelay = v.toBoolean)
+
+          case ("rm.keepAlive", v) => unsupported -> result.
+            copy(keepAlive = v.toBoolean)
+
+          case ("rm.nbChannelsPerNode", v) => unsupported -> result.
+            copy(nbChannelsPerNode = v.toInt)
 
           case ("writeConcern", "unacknowledged") => unsupported -> result.
             copy(writeConcern = WriteConcern.Unacknowledged)
@@ -754,6 +758,14 @@ object MongoConnection {
 
 /**
  * @param config a custom configuration (otherwise the default options are used)
+ *
+ * @define parsedURIParam the URI parsed by [[reactivemongo.api.MongoConnection.parseURI]]
+ * @define connectionNameParam the name for the connection pool
+ * @define strictUriParam if true the parsed URI must be strict, without ignored/unsupported options (default: false)
+ * @define nbChannelsParam the number of channels to open per node
+ * @define optionsParam the options for the new connection pool
+ * @define nodesParam The list of node names (e.g. ''node1.foo.com:27017''); Port is optional (27017 is used by default)
+ * @define authParam the list of authentication instructions
  */
 class MongoDriver(config: Option[Config] = None) {
   import scala.collection.mutable.{ Map => MutableMap }
@@ -816,11 +828,11 @@ class MongoDriver(config: Option[Config] = None) {
    *
    * See [[http://docs.mongodb.org/manual/reference/connection-string/ the MongoDB URI documentation]] for more information.
    *
-   * @param nodes A list of node names, like ''node1.foo.com:27017''. Port is optional, it is 27017 by default.
-   * @param authentications A list of Authenticates.
-   * @param nbChannelsPerNode Number of channels to open per node. Defaults to 10.
-   * @param name The name of the newly created [[reactivemongo.core.actors.MongoDBSystem]] actor, if needed.
-   * @param options Options for the new connection pool.
+   * @param nodes $nodesParam
+   * @param authentications $authParam
+   * @param nbChannelsPerNode $nbChannelsParam
+   * @param name $connectionNameParam
+   * @param options $optionsParam
    */
   @deprecated(message = "Must use `connection` with `nbChannelsPerNode` set in the `options`.", since = "0.11.3")
   def connection(nodes: Seq[String], options: MongoConnectionOptions, authentications: Seq[Authenticate], nbChannelsPerNode: Int, name: Option[String]): MongoConnection = connection(nodes, options, authentications, name)
@@ -830,10 +842,10 @@ class MongoDriver(config: Option[Config] = None) {
    *
    * See [[http://docs.mongodb.org/manual/reference/connection-string/ the MongoDB URI documentation]] for more information.
    *
-   * @param nodes A list of node names, like ''node1.foo.com:27017''. Port is optional, it is 27017 by default.
-   * @param authentications A list of Authenticates.
-   * @param name The name of the newly created [[reactivemongo.core.actors.MongoDBSystem]] actor, if needed.
-   * @param options Options for the new connection pool.
+   * @param nodes $nodesParam
+   * @param authentications $authParam
+   * @param name $connectionNameParam
+   * @param options $optionsParam
    */
   def connection(nodes: Seq[String], options: MongoConnectionOptions = MongoConnectionOptions(), authentications: Seq[Authenticate] = Seq.empty, name: Option[String] = None): MongoConnection = {
     val nm = name.getOrElse(s"Connection-${+MongoDriver.nextCounter}")
@@ -861,9 +873,9 @@ class MongoDriver(config: Option[Config] = None) {
    *
    * See [[http://docs.mongodb.org/manual/reference/connection-string/ the MongoDB URI documentation]] for more information.
    *
-   * @param parsedURI The URI parsed by [[reactivemongo.api.MongoConnection.parseURI]]
-   * @param nbChannelsPerNode Number of channels to open per node.
-   * @param name The name of the newly created [[reactivemongo.core.actors.MongoDBSystem]] actor, if needed.
+   * @param parsedURI $parsedURIParam
+   * @param nbChannelsPerNode $nbChannelsParam
+   * @param name $connectionNameParam
    */
   @deprecated(message = "Must you reactivemongo.api.MongoDriver.connection(reactivemongo.api.MongoConnection.ParsedURI,Option[String]):reactivemongo.api.MongoConnection connection(..)]] with `nbChannelsPerNode` set in the `parsedURI`.", since = "0.11.3")
   def connection(parsedURI: MongoConnection.ParsedURI, nbChannelsPerNode: Int, name: Option[String]): MongoConnection = connection(parsedURI, name)
@@ -873,13 +885,29 @@ class MongoDriver(config: Option[Config] = None) {
    *
    * See [[http://docs.mongodb.org/manual/reference/connection-string/ the MongoDB URI documentation]] for more information.
    *
-   * @param parsedURI The URI parsed by [[reactivemongo.api.MongoConnection.parseURI]]
-   * @param name The name of the newly created [[reactivemongo.core.actors.MongoDBSystem]] actor, if needed.
+   * @param parsedURI $parsedURIParam
+   * @param name $connectionNameParam
    */
-  def connection(parsedURI: MongoConnection.ParsedURI, name: Option[String]): MongoConnection = {
-    if (!parsedURI.ignoredOptions.isEmpty)
-      logger.warn(s"Some options were ignored because they are not supported (yet): ${parsedURI.ignoredOptions.mkString(", ")}")
-    connection(parsedURI.hosts.map(h => h._1 + ':' + h._2), parsedURI.options, parsedURI.authenticate.toSeq, name)
+  def connection(parsedURI: MongoConnection.ParsedURI, name: Option[String]): MongoConnection = connection(parsedURI, name, strictUri = false).get // Unsafe
+
+  /**
+   * Creates a new MongoConnection from URI.
+   *
+   * See [[http://docs.mongodb.org/manual/reference/connection-string/ the MongoDB URI documentation]] for more information.
+   *
+   * @param parsedURI The URI parsed by [[reactivemongo.api.MongoConnection.parseURI]]
+   * @param name $connectionNameParam
+   * @param strictUri $strictUriParam
+   */
+  def connection(parsedURI: MongoConnection.ParsedURI, name: Option[String], strictUri: Boolean): Try[MongoConnection] = {
+
+    if (!parsedURI.ignoredOptions.isEmpty && strictUri) {
+      Failure(new IllegalArgumentException(s"The connection URI contains unsupported options: ${parsedURI.ignoredOptions.mkString(", ")}"))
+    } else {
+      if (!parsedURI.ignoredOptions.isEmpty) logger.warn(s"Some options were ignored because they are not supported (yet): ${parsedURI.ignoredOptions.mkString(", ")}")
+
+      Success(connection(parsedURI.hosts.map(h => h._1 + ':' + h._2), parsedURI.options, parsedURI.authenticate.toSeq, name))
+    }
   }
 
   /**
@@ -887,21 +915,31 @@ class MongoDriver(config: Option[Config] = None) {
    *
    * See [[http://docs.mongodb.org/manual/reference/connection-string/ the MongoDB URI documentation]] for more information.
    *
-   * @param parsedURI The URI parsed by [[reactivemongo.api.MongoConnection.parseURI]]
-   * @param nbChannelsPerNode Number of channels to open per node.
+   * @param parsedURI $parsedURIParam
+   * @param nbChannelsPerNode $nbChannelsParam
    */
   @deprecated(message = "Must you `connection` with `nbChannelsPerNode` set in the options of the `parsedURI`.", since = "0.11.3")
-  def connection(parsedURI: MongoConnection.ParsedURI, nbChannelsPerNode: Int): MongoConnection = connection(parsedURI)
+  def connection(parsedURI: MongoConnection.ParsedURI, nbChannelsPerNode: Int): MongoConnection = connection(parsedURI, None, false).get // Unsafe
 
   /**
    * Creates a new MongoConnection from URI.
    *
    * See [[http://docs.mongodb.org/manual/reference/connection-string/ the MongoDB URI documentation]] for more information.
    *
-   * @param parsedURI The URI parsed by [[reactivemongo.api.MongoConnection.parseURI]]
+   * @param parsedURI $parsedURIParam
+   * @param strictUri $strictUriParam
+   */
+  def connection(parsedURI: MongoConnection.ParsedURI, strictUri: Boolean): Try[MongoConnection] = connection(parsedURI, None, strictUri)
+
+  /**
+   * Creates a new MongoConnection from URI.
+   *
+   * See [[http://docs.mongodb.org/manual/reference/connection-string/ the MongoDB URI documentation]] for more information.
+   *
+   * @param parsedURI $parsedURIParam
    */
   def connection(parsedURI: MongoConnection.ParsedURI): MongoConnection =
-    connection(parsedURI, None)
+    connection(parsedURI, None, false).get // Unsafe
 
   private case class AddConnection(
     name: String,
