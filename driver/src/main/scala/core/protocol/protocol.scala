@@ -464,7 +464,10 @@ private[reactivemongo] class MongoHandler(
   override def exceptionCaught(ctx: ChannelHandlerContext, e: shaded.netty.channel.ExceptionEvent) = log(e, "Channel error", e.getCause)
 
   override def channelIdle(ctx: ChannelHandlerContext, e: IdleStateEvent) = {
-    log(e, "Channel timeout")
+    val now = System.currentTimeMillis()
+    val last = e.getLastActivityTimeMillis
+
+    log(e, s"Channel has been inactive for ${now - last} (last = $last)")
     e.getChannel.close()
 
     super.channelIdle(ctx, e)

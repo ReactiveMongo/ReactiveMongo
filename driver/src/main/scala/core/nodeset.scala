@@ -172,6 +172,27 @@ case class NodeSet(
 
   def toShortString =
     s"{{NodeSet $name ${nodes.map(_.toShortString).mkString(" | ")} }}"
+
+  /** Returns the read-only information about this node. */
+  def info = {
+    val ns = nodes.map(_.info)
+
+    NodeSetInfo(name, version, ns, primary.map(_.info),
+      mongos.map(_.info), ns.filter(_.status == NodeStatus.Secondary),
+      nearest.map(_.info))
+  }
+}
+
+case class NodeSetInfo(
+    name: Option[String],
+    version: Option[Long],
+    nodes: Vector[NodeInfo],
+    primary: Option[NodeInfo],
+    mongos: Option[NodeInfo],
+    secondaries: Vector[NodeInfo],
+    nearest: Option[NodeInfo]) {
+
+  override lazy val toString = s"{{NodeSet $name ${nodes.mkString(" | ")} }}"
 }
 
 /**
@@ -248,6 +269,38 @@ case class Node(
   }
 
   def toShortString = s"Node[$name: $status (${connected.size}/${connections.size} available connections), latency=${pingInfo.ping}], auth=$authenticated"
+
+  /** Returns the read-only information about this node. */
+  def info = NodeInfo(name, aliases.result(), host, port, status,
+    connections.size, connections.count(_.status == ConnectionStatus.Connected),
+    authenticatedConnections.subject.size, tags,
+    protocolMetadata, pingInfo, isMongos)
+
+}
+
+/**
+ * @param connections the number of all the node connections
+ * @param connected the number of established connections for this node
+ * @param authenticated the number of authenticated connections
+ */
+case class NodeInfo(
+    name: String,
+    aliases: Set[String],
+    host: String,
+    port: Int,
+    status: NodeStatus,
+    connections: Int,
+    connected: Int,
+    authenticated: Int,
+    tags: Option[BSONDocument],
+    protocolMetadata: ProtocolMetadata,
+    pingInfo: PingInfo,
+    isMongos: Boolean) {
+
+  /** All the node names (including its aliases) */
+  def names: Set[String] = aliases + name
+
+  override lazy val toString = s"Node[$name: $status ($connected/$connections available connections), latency=${pingInfo.ping}], auth=$authenticated"
 }
 
 case class ProtocolMetadata(
@@ -267,7 +320,7 @@ case class Connection(
     authenticated: Set[Authenticated],
     authenticating: Option[Authenticating]) {
 
-  def send(message: Request, writeConcern: Request) {
+  def send(message: Request, writeConcern: Request): ChannelFuture = {
     channel.write(message)
     channel.write(writeConcern)
   }
@@ -296,8 +349,13 @@ sealed trait QueryableNodeStatus { self: NodeStatus =>
 
 sealed trait CanonicalNodeStatus { self: NodeStatus => }
 object NodeStatus {
-  object Uninitialized extends NodeStatus { override def toString = "Uninitialized" }
-  object NonQueryableUnknownStatus extends NodeStatus { override def toString = "NonQueryableUnknownStatus" }
+  object Uninitialized extends NodeStatus {
+    override def toString = "Uninitialized"
+  }
+
+  object NonQueryableUnknownStatus extends NodeStatus {
+    override def toString = "NonQueryableUnknownStatus"
+  }
 
   /** Cannot vote. All members start up in this state. The mongod parses the replica set configuration document while in STARTUP. */
   object Startup extends NodeStatus with CanonicalNodeStatus { override def toString = "Startup" }
@@ -508,7 +566,8 @@ final class ChannelFactory private[core] (
     java.nio.ByteOrder.LITTLE_ENDIAN)
 
   private def makePipeline(timeoutMS: Int, receiver: ActorRef): ChannelPipeline = {
-    val idleHandler = new IdleStateHandler(timer, timeoutMS, timeoutMS, 0, TimeUnit.MILLISECONDS)
+    val idleHandler = new IdleStateHandler(
+      timer, 0, 0, timeoutMS, TimeUnit.MILLISECONDS)
 
     val pipeline = Channels.pipeline(idleHandler, new ResponseFrameDecoder(),
       new ResponseDecoder(), new RequestEncoder(),
@@ -544,13 +603,16 @@ final class ChannelFactory private[core] (
   }
 
   private def makeChannel(receiver: ActorRef): Channel = {
-    val channel = channelFactory.newChannel(makePipeline(options.socketTimeoutMS, receiver))
+    val channel = channelFactory.newChannel(makePipeline(
+      options.maxIdleTimeMS, receiver))
     val config = channel.getConfig
 
     config.setTcpNoDelay(options.tcpNoDelay)
     config.setBufferFactory(bufferFactory)
     config.setKeepAlive(options.keepAlive)
     config.setConnectTimeoutMillis(options.connectTimeoutMS)
+
+    logger.debug(s"Netty channel configuration:\n- connectTimeoutMS: ${options.connectTimeoutMS}\n- maxIdleTimeMS: ${options.maxIdleTimeMS}ms\n- tcpNoDelay: ${options.tcpNoDelay}\n- keepAlive: ${options.keepAlive}\n- sslEnabled: ${options.sslEnabled}")
 
     channel
   }

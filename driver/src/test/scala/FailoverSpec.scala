@@ -1,5 +1,5 @@
 import scala.concurrent.Future
-import scala.concurrent.duration._
+import scala.concurrent.duration.FiniteDuration
 
 import org.specs2.concurrent.{ ExecutionEnv => EE }
 
@@ -38,36 +38,6 @@ class FailoverSpec extends org.specs2.mutable.Specification {
 
     "Asynchronous failover on the slow connection" should {
       spec(slowConnection, slowTimeout)
-    }
-  }
-
-  "Connection" should {
-    "use the failover strategy defined in the options" in { implicit ee: EE =>
-      lazy val con = driver.connection(List(primaryHost),
-        DefaultOptions.copy(failoverStrategy = FailoverStrategy.remote))
-
-      con.database(commonDb).map(_.failoverStrategy).
-        aka("strategy") must beTypedEqualTo(FailoverStrategy.remote).
-        await(1, timeout) and {
-          con.askClose()(timeout) must not(throwA[Exception]).await(1, timeout)
-        }
-    }
-
-    "fail within expected timeout interval" in { implicit ee: EE =>
-      lazy val con = driver.connection(List("foo:123"),
-        DefaultOptions.copy(failoverStrategy = FailoverStrategy.remote))
-
-      val before = System.currentTimeMillis()
-
-      con.database(commonDb).map(_ => -1L).recover {
-        case _ => System.currentTimeMillis()
-      }.aka("duration") must beLike[Long] {
-        case duration =>
-          (duration must be_>=(1465655000000L)) and (
-            duration must be_<(1468000000000L))
-      }.await(1, 1468000000000L.milliseconds) and {
-        con.askClose()(timeout) must not(throwA[Exception]).await(1, timeout)
-      }
     }
   }
 }

@@ -26,7 +26,7 @@ case object ScramSha1Authentication extends AuthenticationMode
  * @param readPreference the default read preference
  * @param failoverStrategy the default failover strategy
  * @param monitorRefreshMS the interval in milliseconds used by monitor to refresh the node set (default: 10000)
- * @param socketTimeoutMS the time in milliseconds to attempt a send or receive on a socket before the attempt times out (default: 0 for no timeout)
+ * @param maxIdleTimeMS the maximum number of milliseconds that a [[https://docs.mongodb.com/manual/reference/connection-string/#urioption.maxIdleTimeMS channel can remain idle]] in the connection pool before being removed and closed (default: 0 to disable, as implemented using [[https://docs.jboss.org/netty/3.2/api/org/jboss/netty/handler/timeout/IdleStateHandler.html Netty IdleStateHandler]]); If not 0, must be greater or equal to [[#monitorRefreshMS]]
  */
 case class MongoConnectionOptions(
   // canonical options - connection
@@ -49,4 +49,23 @@ case class MongoConnectionOptions(
   failoverStrategy: FailoverStrategy = FailoverStrategy.default,
 
   monitorRefreshMS: Int = 10000,
-  socketTimeoutMS: Int = 0)
+  maxIdleTimeMS: Int = 0)
+
+object MongoConnectionOptions {
+  @inline private def ms(duration: Int): String = s"${duration}ms"
+
+  private[reactivemongo] def toStrings(options: MongoConnectionOptions): List[(String, String)] = options.authSource.toList.map(
+    "authSource" -> _.toString) ++ List(
+      "authMode" -> options.authMode.toString,
+      "nbChannelsPerNode" -> options.nbChannelsPerNode.toString,
+      "monitorRefreshMS" -> ms(options.monitorRefreshMS),
+      "connectTimeoutMS" -> ms(options.connectTimeoutMS),
+      "maxIdleTimeMS" -> ms(options.maxIdleTimeMS), // TODO: Review
+      "tcpNoDelay" -> options.tcpNoDelay.toString,
+      "keepAlive" -> options.keepAlive.toString,
+      "sslEnabled" -> options.sslEnabled.toString,
+      "sslAllowsInvalidCert" -> options.sslAllowsInvalidCert.toString,
+      "writeConcern" -> options.writeConcern.toString,
+      "readPreference" -> options.readPreference.toString)
+
+}

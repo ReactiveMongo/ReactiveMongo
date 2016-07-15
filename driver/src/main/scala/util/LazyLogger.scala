@@ -27,6 +27,8 @@ object LazyLogger {
     new LazyLogger(LoggerFactory getLogger name)
 
   final class LazyLogger(logger: Logger) {
+    @inline private[reactivemongo] def underlying = logger
+
     def trace(s: => String) { if (logger.isTraceEnabled) logger.trace(s) }
     def trace(s: => String, e: => Throwable) {
       if (logger.isTraceEnabled) logger.trace(s, e)

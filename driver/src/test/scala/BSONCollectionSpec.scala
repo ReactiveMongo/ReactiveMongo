@@ -16,7 +16,7 @@ class BSONCollectionSpec extends org.specs2.mutable.Specification {
 
   sequential
 
-  val colName = s"bsoncollectionspec${System identityHashCode this}"
+  val colName = s"bsoncoll${System identityHashCode this}"
   lazy val collection = db(colName)
   lazy val slowColl = slowDb(colName)
 

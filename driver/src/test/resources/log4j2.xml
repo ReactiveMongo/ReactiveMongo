@@ -6,12 +6,15 @@
     </Console>
   </appenders>
   <loggers>
-    <logger name="shaded" level="OFF" />
-    <logger name="reactivemongo" level="OFF" />
-    <logger name="akka://reactivemongo" level="OFF" />
-    <logger name="tests" level="WARN" />
+    <logger name="shaded.netty" level="ERROR" />
+    <logger name="reactivemongo.api.Cursor" level="OFF" />
+    <logger name="reactivemongo.api.Failover2" level="OFF" />
+    <logger name="reactivemongo.api.MongoConnection" level="OFF" />
 
-    <root level="TRACE">
+    <logger name="reactivemongo.test.NettyProxy" level="ERROR" />
+    <logger name="reactivemongo.core" level="OFF" />
+
+    <root level="WARN">
       <appender-ref ref="Console"/>
     </root>
   </loggers>

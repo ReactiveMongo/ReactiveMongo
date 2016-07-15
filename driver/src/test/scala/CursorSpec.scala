@@ -683,9 +683,8 @@ class CursorSpec extends org.specs2.mutable.Specification
               debug(s"continueOnError: foldBulks (#1): $count")
               count = count + 1
             }
-            val cursor = scol(driver = drv).
-              find(matchAll("cursorspec37")).options(
-                QueryOpts(batchSizeN = 64)).cursor()
+            val cursor = scol(driver = drv).find(matchAll("cursorspec37")).
+              options(QueryOpts(batchSizeN = 64)).cursor()
 
             cursor.foldBulks({}, 128)(
               { (_, _) => sys.error("Foo"): Cursor.State[Unit] },

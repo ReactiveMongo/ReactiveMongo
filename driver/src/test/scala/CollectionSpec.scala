@@ -13,8 +13,8 @@ class CollectionSpec extends org.specs2.mutable.Specification {
 
   sequential
 
-  lazy val collection = db(s"collectionspec${System identityHashCode db}")
-  lazy val slowColl = slowDb(s"collectionspec${System identityHashCode slowDb}")
+  lazy val collection = db(s"collspec${System identityHashCode db}")
+  lazy val slowColl = slowDb(s"collspec${System identityHashCode slowDb}")
 
   val cappedMaxSize = 2 * 1024 * 1024
 
