@@ -159,10 +159,8 @@ class CursorSpec extends org.specs2.mutable.Specification {
     "stop on error" >> {
       val drv = new MongoDriver
       def con = drv.connection(List(primaryHost), DefaultOptions)
-      def scol(n: String = coll2.name) = Await.result(for {
-        d <- con.database(db.name)
-        c <- d.coll(n)
-      } yield c, timeout)
+      def scol(n: String = coll2.name) =
+        Await.result(con.database(db.name).map(_.collection(n)), timeout)
 
       "when enumerating responses" >> {
         "if fails while processing with existing documents (#1)" in {
@@ -248,7 +246,8 @@ class CursorSpec extends org.specs2.mutable.Specification {
             // Close connection to make the related cursor erroneous
 
             (cursor.responseEnumerator(10, FailOnError[Unit]()) |>>> inc).
-              recover({ case _ => count }) must beEqualTo(0).await(0, timeout)
+              map(_ => count).recover({ case _ => count }).
+              aka("count") must beEqualTo(0).await(0, timeout)
         }
       }
 

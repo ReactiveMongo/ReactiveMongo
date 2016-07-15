@@ -589,17 +589,16 @@ object DefaultCursor {
         }
 
         if (connection.killed) closed
-        else {
-          if (hasNext(current, maxDocs)) {
-            next(current, maxDocs).recoverWith {
-              case _: Exceptions.ClosedException => closed
-              case err                           => Future.failed[Option[Response]](err)
-            }
-          } else {
-            logger.debug("[tailResponse] Current cursor exhausted, renewing...")
-            DelayedFuture(500, connection.actorSystem).
-              flatMap { _ => makeRequest(maxDocs).map(Some(_)) }
+        else if (hasNext(current, maxDocs)) {
+          next(current, maxDocs).recoverWith {
+            case _: Exceptions.ClosedException => closed
+            case err =>
+              Future.failed[Option[Response]](err)
           }
+        } else {
+          logger.debug("[tailResponse] Current cursor exhausted, renewing...")
+          DelayedFuture(500, connection.actorSystem).
+            flatMap { _ => makeRequest(maxDocs).map(Some(_)) }
         }
       }
     }

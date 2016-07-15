@@ -63,13 +63,6 @@ sealed trait DB {
    */
   def collection[C <: Collection](name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit producer: CollectionProducer[C] = collections.bson.BSONCollectionProducer): C = producer(this, name, failoverStrategy)
 
-  /**
-   * Returns a [[reactivemongo.api.Collection]] from this database, when ready.
-   *
-   * @param name the name of the collection to open
-   */
-  def coll[C <: Collection](name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit ec: ExecutionContext, producer: CollectionProducer[C] = collections.bson.BSONCollectionProducer): Future[C] = connection.waitIsAvailable(failoverStrategy).map(_ => producer(this, name, failoverStrategy))
-
   @inline def defaultReadPreference: ReadPreference =
     connection.options.readPreference
 

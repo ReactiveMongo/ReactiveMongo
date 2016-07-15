@@ -8,7 +8,7 @@ import reactivemongo.core.commands.{
   FailedAuthentication,
   SuccessfulAuthentication
 }
-import reactivemongo.core.actors.Exceptions.NodeSetNotReachable
+import reactivemongo.core.actors.Exceptions, Exceptions.PrimaryUnavailableException
 
 import reactivemongo.api.{
   BSONSerializationPack,
@@ -84,15 +84,27 @@ class DriverSpec extends org.specs2.mutable.Specification {
 
       val before = System.currentTimeMillis()
 
-      con.database(commonDb).map(_ => -1L).recover {
-        case _ => System.currentTimeMillis()
-      }.aka("duration") must beLike[Long] {
-        case duration =>
-          (duration must be_>=(1465655000000L)) and (
-            duration must be_<(1468800000000L))
-      }.await(1, 1468800000000L.milliseconds) and {
-        con.askClose()(timeout) must not(throwA[Exception]).await(1, timeout)
-      }
+      con.database(commonDb).
+        map(_ => Option.empty[Throwable] -> -1L).recover {
+          case reason => Some(reason) -> System.currentTimeMillis()
+        }.aka("duration") must beLike[(Option[Throwable], Long)] {
+          case (Some(reason), duration) => reason.getStackTrace.headOption.
+            aka("most recent") must beSome[StackTraceElement].like {
+              case mostRecent =>
+                mostRecent.getClassName aka "class" must beEqualTo(
+                  "reactivemongo.api.MongoConnection") and (
+                    mostRecent.getMethodName aka "method" must_== "database")
+            } and {
+              Option(reason.getCause) aka "cause" must beSome[Throwable].like {
+                case _: Exceptions.InternalState => ok
+              }
+            } and {
+              (duration must be_>=(1465655000000L)) and (
+                duration must be_<(1468900000000L))
+            }
+        }.await(1, 1468900000000L.milliseconds) and {
+          con.askClose()(timeout) must not(throwA[Exception]).await(1, timeout)
+        }
     }
   }
 
@@ -160,7 +172,7 @@ class DriverSpec extends org.specs2.mutable.Specification {
 
       Await.result(con.database(
         Common.commonDb, failoverStrategy), timeout).
-        aka("database resulution") must throwA[NodeSetNotReachable]
+        aka("database resolution") must throwA[PrimaryUnavailableException]
     } tag "mongo2"
   }
 
@@ -249,8 +261,8 @@ class DriverSpec extends org.specs2.mutable.Specification {
 
         con.database(dbName, Common.failoverStrategy).
           aka("authed DB") must beLike[DefaultDB] {
-            case rdb => rdb.coll("testcol").flatMap(
-              _.insert(BSONDocument("foo" -> "bar"))).map(_ => {}).
+            case rdb => rdb.collection("testcol").insert(
+              BSONDocument("foo" -> "bar")).map(_ => {}).
               aka("insertion") must beEqualTo({}).await(1, timeout)
 
           }.await(1, timeout) and {
@@ -284,8 +296,20 @@ class DriverSpec extends org.specs2.mutable.Specification {
           List(primaryHost), options = conOpts, authentications = Seq(auth))
 
         con.database(Common.commonDb, failoverStrategy).
-          aka("database resolution") must throwA[NodeSetNotReachable].
-          await(1, timeout)
+          aka("DB resolution") must throwA[PrimaryUnavailableException].like {
+            case reason => reason.getStackTrace.headOption.
+              aka("most recent") must beSome[StackTraceElement].like {
+                case mostRecent =>
+                  mostRecent.getClassName aka "class" must beEqualTo(
+                    "reactivemongo.api.MongoConnection") and (
+                      mostRecent.getMethodName aka "method" must_== "database")
+              } and {
+                Option(reason.getCause).
+                  aka("cause") must beSome[Throwable].like {
+                    case _: Exceptions.InternalState => ok
+                  }
+              }
+          }.await(1, timeout)
 
       } tag "not_mongo26"
 
@@ -294,7 +318,7 @@ class DriverSpec extends org.specs2.mutable.Specification {
           List(slowPrimary), options = slowOpts, authentications = Seq(auth))
 
         con.database(Common.commonDb, slowFailover).
-          aka("database resolution") must throwA[NodeSetNotReachable].
+          aka("database resolution") must throwA[PrimaryUnavailableException].
           await(1, slowTimeout)
 
       } tag "not_mongo26"

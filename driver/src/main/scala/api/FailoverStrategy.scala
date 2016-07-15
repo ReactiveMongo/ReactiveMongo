@@ -31,6 +31,9 @@ object FailoverStrategy {
   /** The strategy when the MongoDB nodes are remote (with 16 retries) */
   val remote = FailoverStrategy(retries = 16)
 
+  /** A more strict strategy: same as default but with less retries (=5). */
+  val strict = FailoverStrategy(retries = 5)
+
   /** A factor function using simple multiplication. */
   case class FactorFun(multiplier: Double) extends (Int => Double) {
     /**
@@ -44,6 +47,7 @@ object FailoverStrategy {
     override lazy val toString = s"× $multiplier"
   }
 
-  /** The default factor function: × 1.25 */
+  /** The factor function for the default strategy: × 1.25 */
   @inline def defaultFactor = FactorFun(1.25)
+  // 'def' instead of 'val' as used in defaults of the case class
 }

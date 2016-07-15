@@ -18,7 +18,7 @@ package object tests {
   // Test alias
   def _failover2[A](c: MongoConnection, s: FailoverStrategy)(p: () => Future[A])(implicit ec: ExecutionContext): Failover2[A] = Failover2.apply(c, s)(p)(ec)
 
-  def isAvailable(con: MongoConnection): Future[Boolean] = con.isAvailable
+  def isAvailable(con: MongoConnection)(implicit ec: ExecutionContext): Future[Boolean] = con.probe.map(_.isEmpty)
 
   def waitIsAvailable(con: MongoConnection, failoverStrategy: FailoverStrategy)(implicit ec: ExecutionContext): Future[Unit] = con.waitIsAvailable(failoverStrategy)
 
@@ -33,7 +33,10 @@ package object tests {
     d.supervisorActor ? message
   }
 
-  //TODO: def history(sys: MongoDBSystem): Traversable[(Long, String)] = sys.history
+  def history(sys: MongoDBSystem): Traversable[(Long, String)] =
+    sys.history.toArray.toList.collect {
+      case (time: Long, event: String) => time -> event
+    }
 
   def nodeSet(sys: MongoDBSystem): NodeSet = sys.getNodeSet
 

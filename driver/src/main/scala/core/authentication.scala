@@ -10,7 +10,6 @@ import reactivemongo.core.commands.{
 import reactivemongo.core.protocol.Response
 import reactivemongo.core.nodeset.{
   Authenticate,
-  Authenticated,
   Authenticating,
   CrAuthenticating,
   Connection,

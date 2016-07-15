@@ -60,7 +60,10 @@ trait DatabaseException extends ReactiveMongoException {
 }
 
 /** A driver-specific error */
-trait DriverException extends ReactiveMongoException
+trait DriverException extends ReactiveMongoException {
+  protected def cause: Throwable = null
+  override def getCause = cause
+}
 
 /** A generic driver error. */
 case class GenericDriverException(
