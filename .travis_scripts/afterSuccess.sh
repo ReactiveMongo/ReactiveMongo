@@ -7,9 +7,7 @@ killall -9 mongod
 
 rm -rf "$HOME/.ivy2/cache/org.reactivemongo/"
 
-# TRAVIS_BRANCH
-#  -o "$TRAVIS_BRANCH" != "master"
-if [ "$MONGO_SSL" = "false" -o "x$SONATYPE_USER" = "x" -o "x$SONATYPE_PASS" = "x" -o $JAVA_COMPAT -ne 1 ]; then
+if [ "$MONGO_SSL" = "false" -o "x$SONATYPE_USER" = "x" -o "x$SONATYPE_PASS" = "x" -o $JAVA_COMPAT -ne 1 -o ! "$TRAVIS_SCALA_VERSION" = "2.10.5" ]; then
     echo -n "\nINFO: Skip the snapshot publication: $JAVA_COMPAT\n"
     exit 0
 fi

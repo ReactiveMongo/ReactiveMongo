@@ -788,7 +788,7 @@ class MongoDriver(config: Option[Config] = None) {
   }
 
   private val supervisorName = s"Supervisor-${MongoDriver.nextCounter}"
-  private val supervisorActor = system.actorOf(Props(new SupervisorActor(this)), supervisorName)
+  private[reactivemongo] val supervisorActor = system.actorOf(Props(new SupervisorActor(this)), supervisorName)
 
   private val connectionMonitors = MutableMap.empty[ActorRef, MongoConnection]
 
@@ -941,7 +941,7 @@ class MongoDriver(config: Option[Config] = None) {
   def connection(parsedURI: MongoConnection.ParsedURI): MongoConnection =
     connection(parsedURI, None, false).get // Unsafe
 
-  private case class AddConnection(
+  private[reactivemongo] case class AddConnection(
     name: String,
     nodes: Seq[String],
     options: MongoConnectionOptions,

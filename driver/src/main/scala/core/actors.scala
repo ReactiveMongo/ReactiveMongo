@@ -244,10 +244,20 @@ trait MongoDBSystem extends Actor {
       case node => node
     }
 
-  private def unauthenticate(node: Node, connections: Vector[Connection]): Node = node._copy(
-    status = NodeStatus.Unknown,
-    connections = connections,
-    authenticated = if (connections.isEmpty) Set.empty else node.authenticated)
+  private def collectConnections(node: Node)(collector: PartialFunction[Connection, Connection]): Node = {
+    val connections = node.connections.collect(collector)
+
+    if (connections.isEmpty) {
+      logger.debug(
+        s"[$lnm] No longer connected node; Fallback to Unknown status")
+
+      node._copy(
+        status = NodeStatus.Unknown,
+        connections = Vector.empty,
+        authenticated = Set.empty)
+
+    } else node._copy(connections = connections)
+  }
 
   private def stopWhenDisconnected[T](state: String, msg: T): Unit = {
     val remainingConnections = _nodeSet.nodes.foldLeft(0) {
@@ -271,12 +281,12 @@ trait MongoDBSystem extends Actor {
 
   def updateNodeSetOnDisconnect(channelId: Int): NodeSet =
     updateNodeSet(_.updateNodeByChannelId(channelId) { node =>
-      val connections = node.connections.map { connection =>
-        if (connection.channel.getId() != channelId) connection
-        else connection.copy(status = ConnectionStatus.Disconnected)
-      }
+      collectConnections(node) {
+        case other if (other.channel.getId != channelId) =>
+          other // keep connections for other channels unchanged
 
-      unauthenticate(node, connections)
+        case con => con.copy(status = ConnectionStatus.Disconnected)
+      }
     })
 
   private def lastError(response: Response): Either[Throwable, LastError] = {
@@ -416,8 +426,9 @@ trait MongoDBSystem extends Actor {
       channelUnavailable match {
         case ChannelClosed(_) => updateNodeSet(
           _.updateNodeByChannelId(channelId) { node =>
-            unauthenticate(node, node.connections.
-              filter(_.channel.getId != channelId))
+            collectConnections(node) {
+              case other if (other.channel.getId != channelId) => other
+            }
           })
 
         case ChannelDisconnected(_) => updateNodeSetOnDisconnect(channelId)
@@ -570,8 +581,9 @@ trait MongoDBSystem extends Actor {
 
     case msg @ ChannelClosed(channelId) => {
       updateNodeSet(_.updateNodeByChannelId(channelId) { node =>
-        unauthenticate(node, node.connections.
-          filter(_.channel.getId != channelId))
+        collectConnections(node) {
+          case other if (other.channel.getId != channelId) => other
+        }
       })
 
       stopWhenDisconnected("Closing", msg)
@@ -733,6 +745,8 @@ trait MongoDBSystem extends Actor {
 
   nodeSetUpdated(null, _nodeSet)
   // <-- monitor
+
+  private[reactivemongo] def getNodeSet = _nodeSet
 
   def onPrimaryUnavailable() {
     self ! RefreshAll
