@@ -39,7 +39,7 @@ object Common {
     Await.result(_db.flatMap { d => d.drop.map(_ => d) }, timeout)
   }
 
-  def closeDriver(): Unit = try {
+  def close(): Unit = try {
     driver.close()
   } catch { case _: Throwable => () }
 }

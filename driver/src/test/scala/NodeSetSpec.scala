@@ -200,8 +200,11 @@ history1 aka "history #1" must not(beEmpty) and {
           } and 
            */
           {
-            authCon1.size aka "auth'ed connections #1" must beEqualTo(
-              opts.nbChannelsPerNode)
+            authCon1.size aka "auth'ed connections #1" must beLike[Int] {
+              case number => number must beGreaterThan(1) and (
+                number must beLessThanOrEqualTo(opts.nbChannelsPerNode))
+
+            }
           } and { // #2
             nodeset1.pick(ReadPreference.Primary).
               aka("channel #1") must beSome[(Node, Connection)].like {

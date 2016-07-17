@@ -1,27 +1,26 @@
 #! /bin/bash
 
+# Clean cache
+rm -rf "$HOME/.ivy2/local/org.reactivemongo"
+
+CATEGORY="$1"
+MONGO_VER="$2"
+MONGO_SSL="$3"
+
+if [ "$CATEGORY" = "UNIT_TESTS" ]; then
+    echo "Skip integration env"
+    exit 0
+fi
+
+# Prepare integration env
+
 SCRIPT_DIR=`dirname $0 | sed -e "s|^\./|$PWD/|"`
-SCALA_VER="$1"
-MONGO_SSL="$2"
-MONGODB_VER="2_6"
 PRIMARY_HOST="localhost:27018"
 PRIMARY_SLOW_PROXY="localhost:27019"
 
-if [ `echo "$JAVA_HOME" | grep java-8-oracle | wc -l` -eq 1 ]; then
-    MONGODB_VER="3"
-fi
-
 cat > /dev/stdout <<EOF
-MongoDB major version: $MONGODB_VER
-Scala version: $SCALA_VER
+MongoDB major version: $MONGO_VER
 EOF
-
-###
-# JAVA_HOME     | SCALA_VER || MONGODB_VER | WiredTiger 
-# java-7-oracle | 2.11.7    || 3           | true
-# java-7-oracle | -         || 3           | false
-# -             | _         || 2.6         | false
-##
 
 MAX_CON=`ulimit -n`
 
@@ -30,9 +29,6 @@ if [ $MAX_CON -gt 1024 ]; then
 fi
 
 echo "Max connection: $MAX_CON"
-
-# Clean cache
-rm -rf "$HOME/.ivy2/local/org.reactivemongo"
 
 # OpenSSL
 if [ ! -L "$HOME/ssl/lib/libssl.so.1.0.0" ]; then
@@ -53,7 +49,7 @@ ln -s "$HOME/ssl/lib/libcrypto.so.1.0.0" "$HOME/ssl/lib/libcrypto.so.10"
 export LD_LIBRARY_PATH="$HOME/ssl/lib:$LD_LIBRARY_PATH"
 
 # Build MongoDB
-if [ "$MONGODB_VER" = "3" ]; then
+if [ "$MONGO_VER" = "3" ]; then
     if [ ! -x "$HOME/mongodb-linux-x86_64-amazon-3.2.8/bin/mongod" ]; then
         curl -s -o /tmp/mongodb.tgz https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-amazon-3.2.8.tgz
         cd "$HOME" && rm -rf mongodb-linux-x86_64-amazon-3.2.8
@@ -83,7 +79,7 @@ fi
 
 mkdir /tmp/mongodb
 
-if [ "$MONGODB_VER" = "3" -a "$MONGO_SSL" = "true" ]; then
+if [ "$MONGO_VER" = "3" -a "$MONGO_SSL" = "true" ]; then
     cat >> /tmp/mongod.conf << EOF
   ssl:
     mode: requireSSL
@@ -103,6 +99,7 @@ MONGOD_ST="$?"
 
 if [ ! $MONGOD_ST -eq 0 ]; then
     echo -e "\nERROR: Fails to start the custom 'mongod' instance" > /dev/stderr
+
     mongod --version
     PID=`ps -ao pid,comm | grep 'mongod$' | cut -d ' ' -f 1`
 
@@ -115,10 +112,10 @@ if [ ! $MONGOD_ST -eq 0 ]; then
     exit $MONGOD_ST
 fi
 
-# Check Mongo connection
+# Check MongoDB connection
 MONGOSHELL_OPTS="$PRIMARY_HOST/FOO"
 
-if [ "$MONGO_SSL" = "true" -a ! "$MONGODB_VER" = "2_6" ]; then
+if [ "$MONGO_SSL" = "true" -a ! "$MONGO_VER" = "2_6" ]; then
     MONGOSHELL_OPTS="$MONGOSHELL_OPTS --ssl --sslAllowInvalidCertificates"
 fi
 
@@ -132,7 +129,7 @@ if [ ! "x$MONGODB_NAME" = "xFOO" ]; then
     exit 2
 fi
 
-##
+# Check MongoDB runtime
 
 echo -n "- security: "
 mongo $MONGOSHELL_OPTS 'var s=db.serverStatus();var x=s["security"];(!x)?"_DISABLED_":x["SSLServerSubjectName"];' 2>/dev/null | tail -n 1
@@ -140,9 +137,9 @@ mongo $MONGOSHELL_OPTS 'var s=db.serverStatus();var x=s["security"];(!x)?"_DISAB
 echo -n "- storage engine: "
 mongo $MONGOSHELL_OPTS 'var s=db.serverStatus();JSON.stringify(s["storageEngine"]);' 2>/dev/null | grep '"name"' | cut -d '"' -f 4
 
-##
+# Export environment for integration tests
 
-cat > /tmp/validate-env.sh <<EOF
+cat > /tmp/integration-env.sh <<EOF
 PATH="$PATH"
 LD_LIBRARY_PATH="$LD_LIBRARY_PATH"
 PRIMARY_HOST="$PRIMARY_HOST"

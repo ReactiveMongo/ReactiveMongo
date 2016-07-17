@@ -165,7 +165,10 @@ object Dependencies {
   val netty = "io.netty" % "netty" % "3.10.5.Final" cross CrossVersion.Disabled
 
   // TODO: Update
-  val akkaActor = "com.typesafe.akka" %% "akka-actor" % "2.3.13"
+  val akkaActor = {
+    val ver = sys.env.get("AKKA_VERSION").getOrElse("2.3.13")
+    "com.typesafe.akka" %% "akka-actor" % ver
+  }
 
   val playIteratees = "com.typesafe.play" %% "play-iteratees" % "2.3.10"
 
@@ -175,6 +178,7 @@ object Dependencies {
   val log4jVer = "2.5"
 
   val slf4j = "org.slf4j" % "slf4j-api" % slf4jVer
+  val slf4jSimple = "org.slf4j" % "slf4j-simple" % slf4jVer
 
   val logApi = Seq(
     slf4j % "provided",
@@ -204,6 +208,8 @@ object ReactiveMongoBuild extends Build {
     binaryIssueFilters, previousArtifacts
   }
 
+  val travisEnv = taskKey[Unit]("Print Travis CI env")
+
   val projectPrefix = "ReactiveMongo"
 
   lazy val reactivemongo =
@@ -212,10 +218,59 @@ object ReactiveMongoBuild extends Build {
       file("."),
       settings = buildSettings ++ (publishArtifact := false) ).
       settings(UnidocPlugin.unidocSettings: _*).
-      settings(previousArtifacts := Set.empty).
-      aggregate(bson, bsonmacros, shaded, driver)
+      settings(
+        previousArtifacts := Set.empty,
+        travisEnv in Test := { // test:travisEnv from SBT CLI
+          val specs = List[(String, List[String])](
+            "MONGO_VER" -> List("2_6", "3"),
+            "MONGO_SSL" -> List("true", "false"),
+            "AKKA_VERSION" -> List("2.3.13", "2.4.8")
+          )
+
+          def integrationMatrix = specs.flatMap {
+            case (key, values) => values.map(key -> _)
+          }.combinations(specs.size).filterNot { flags =>
+            flags.contains("MONGO_VER" -> "2_6") && flags.
+              contains("MONGO_SSL" -> "true")
+          }.collect {
+            case flags if (flags.map(_._1).toSet.size == specs.size) =>
+              "CI_CATEGORY=INTEGRATION_TESTS" :: flags.sortBy(_._1).map({
+                case (k, v) => s"$k=$v"
+              })
+          }.map { c => s"""  - ${c mkString " "}""" }
+
+          def matrix = (Iterator.single("  - CI_CATEGORY=UNIT_TESTS") ++ (
+            integrationMatrix)).mkString("\r\n")
+
+          println(s"Travis CI env:\r\n$matrix")
+        }
+      ).aggregate(bson, bsonmacros, shaded, driver)
 
   private lazy val shadedDeps = Seq(netty)
+
+  import scala.xml.{ Elem => XmlElem, Node => XmlNode }
+  private def transformPomDependencies(tx: XmlElem => Option[XmlNode]): XmlNode => XmlNode = { node: XmlNode =>
+    import scala.xml.{ NodeSeq, XML }
+    import scala.xml.transform.{ RewriteRule, RuleTransformer }
+
+    val tr = new RuleTransformer(new RewriteRule {
+      override def transform(node: XmlNode): NodeSeq = node match {
+        case e: XmlElem if e.label == "dependency" => tx(e) match {
+          case Some(n) => n
+          case _ => NodeSeq.Empty
+        }
+
+        case _ => node
+      }
+    })
+
+    val pom = tr.transform(node).headOption match {
+      case Some(transformed) => transformed
+      case _ => sys.error("Fails to transform the POM")
+    }
+
+    pom
+  }
 
   lazy val shaded = Project(
     s"$projectPrefix-Shaded",
@@ -233,24 +288,7 @@ object ReactiveMongoBuild extends Build {
       publishLocal in Compile := publishLocal.dependsOn(assembly),
       packageBin in Compile := target.value / (
         assemblyJarName in assembly).value,
-      pomPostProcess := { node: scala.xml.Node =>
-        import scala.xml.{ Elem, Node, NodeSeq, XML }
-        import scala.xml.transform.{ RewriteRule, RuleTransformer }
-
-        val pom = new RuleTransformer(new RewriteRule {
-          override def transform(node: Node): NodeSeq = node match {
-            case e: Elem if e.label == "dependency" =>
-              NodeSeq.Empty
-
-            case _ => node
-          }
-        }).transform(node).headOption match {
-          case Some(transformed) => transformed
-          case _ => sys.error("Fails to transform the POM")
-        }
-
-        pom
-      }
+      pomPostProcess := transformPomDependencies { Some(_) }
     )
 
   private val driverFilter: Seq[(File, String)] => Seq[(File, String)] = {
@@ -260,13 +298,34 @@ object ReactiveMongoBuild extends Build {
     }
   } andThen BuildSettings.filter
 
+  private val commonCleanup: ClassLoader => Unit = { cl =>
+    import scala.language.reflectiveCalls
+
+    val c = cl.loadClass("Common$")
+    type M = { def close(): Unit }
+    val m: M = c.getField("MODULE$").get(null).asInstanceOf[M]
+
+    m.close()
+  }
+
+  val driverCleanup = taskKey[Unit]("Driver compilation cleanup")
+
   lazy val driver = Project(
     projectPrefix,
     file("driver"),
     settings = buildSettings ++ Seq(
       resolvers := resolversList,
-      compile in Compile <<= (
-        compile in Compile).dependsOn(assembly in shaded),
+      compile in Compile <<= (compile in Compile).dependsOn(assembly in shaded),
+      driverCleanup := {
+        val classDir = (classDirectory in Compile).value
+        val listenerClass = classDir / "reactivemongo" / "core" / (
+          "StaticListenerBinder.class")
+
+        streams.value.log(s"Cleanup $listenerClass ...")
+
+        listenerClass.delete()
+      },
+      driverCleanup <<= driverCleanup.triggeredBy(compile in Compile),
       unmanagedJars in Compile := {
         val shadedDir = (target in shaded).value
         val shadedJar = (assemblyJarName in (shaded, assembly)).value
@@ -664,24 +723,7 @@ object ReactiveMongoBuild extends Build {
           mtp("reactivemongo.api.indexes.Index$"),
           mmp("reactivemongo.api.indexes.Index.apply"))
       },
-      testOptions in Test ++= Seq(
-        Tests.Setup(() => {
-          val classDir = (classDirectory in Compile).value
-          val listenerClass = classDir / "reactivemongo" / "core" / (
-            "StaticListenerBinder.class")
-
-          streams.value.log(s"Cleanup $listenerClass ...")
-
-          listenerClass.delete()
-        }),
-        Tests.Cleanup(cl => {
-          import scala.language.reflectiveCalls
-          val c = cl.loadClass("Common$")
-          type M = { def close(): Unit }
-          val m: M = c.getField("MODULE$").get(null).asInstanceOf[M]
-          m.close()
-        })
-      ),
+      testOptions in Test += Tests.Cleanup(commonCleanup),
       mappings in (Compile, packageBin) ~= driverFilter,
       //mappings in (Compile, packageDoc) ~= driverFilter,
       mappings in (Compile, packageSrc) ~= driverFilter
@@ -707,27 +749,39 @@ object ReactiveMongoBuild extends Build {
     settings(libraryDependencies += specs).
     dependsOn(bson)
 
+  private val providedInternalDeps: XmlNode => XmlNode = {
+    import scala.xml.NodeSeq
+    import scala.xml.transform.{ RewriteRule, RuleTransformer }
+
+    val asProvided = new RuleTransformer(new RewriteRule {
+      override def transform(node: XmlNode): NodeSeq = node match {
+        case e: XmlElem if e.label == "scope" =>
+          NodeSeq.Empty
+
+        case _ => node
+      }
+    })
+
+    transformPomDependencies { dep: scala.xml.Elem =>
+      if ((dep \ "groupId").text == "org.reactivemongo") {
+        asProvided.transform(dep).headOption.collectFirst {
+          case e: XmlElem => e.copy(
+            child = e.child :+ <scope>provided</scope>)
+        }
+      } else Some(dep)
+    }
+  }
+
   lazy val iteratees = Project( // TODO: Move in separate repo
     s"$projectPrefix-Iteratees",
     file("iteratees"),
     settings = buildSettings).
     settings(
       previousArtifacts := Set.empty,
-      compile in Compile <<= (compile in Compile).
-        dependsOn(compile in (driver, Compile)),
-      unmanagedJars in Compile += (
-        (packageBin in (driver, Compile)).value),
-      testOptions in Test += Tests.Cleanup(cl => {
-        import scala.language.reflectiveCalls
-        val c = cl.loadClass("Common$")
-        type M = { def closeDriver(): Unit }
-        val m: M = c.getField("MODULE$").get(null).asInstanceOf[M]
-        m.closeDriver()
-      }),
-      libraryDependencies ++= Seq(
-        "org.reactivemongo" %% "reactivemongo" % buildVersion % "provided",
-        playIteratees, specs) ++ logApi
-    )
+      testOptions in Test += Tests.Cleanup(commonCleanup),
+      libraryDependencies ++= Seq(playIteratees, specs) ++ logApi,
+      pomPostProcess := providedInternalDeps      
+    ).dependsOn(driver)
 
   lazy val jmx = Project(
     s"$projectPrefix-JMX",
@@ -735,20 +789,8 @@ object ReactiveMongoBuild extends Build {
     settings = buildSettings).
     settings(
       previousArtifacts := Set.empty,
-      compile in Compile <<= (compile in Compile).
-        dependsOn(compile in (driver, Compile)),
-      unmanagedJars in Compile += (
-        (packageBin in (driver, Compile)).value),
-      testOptions in Test += Tests.Cleanup(cl => {
-        import scala.language.reflectiveCalls
-        val c = cl.loadClass("Common$")
-        type M = { def closeDriver(): Unit }
-        val m: M = c.getField("MODULE$").get(null).asInstanceOf[M]
-        m.closeDriver()
-      }),
-      libraryDependencies ++= Seq(
-        "org.reactivemongo" %% "reactivemongo" % buildVersion % "provided",
-        slf4j % "provided",
-        specs) ++ Seq("org.slf4j" % "slf4j-simple" % "1.7.13").map(_ % Test)
-    )
+      testOptions in Test += Tests.Cleanup(commonCleanup),
+      libraryDependencies ++= Seq(specs) ++ logApi,
+      pomPostProcess := providedInternalDeps
+    ).dependsOn(driver)
 }
