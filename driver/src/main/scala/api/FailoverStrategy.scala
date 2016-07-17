@@ -4,8 +4,8 @@ import scala.concurrent.duration.FiniteDuration
 
 /**
  * A failover strategy for sending requests.
- * The default uses 8 retries:
- * 125ms, 250ms, 375ms, 500ms, 625ms, 750ms, 875ms, 1s
+ * The default uses 10 retries:
+ * 125ms, 250ms, 375ms, 500ms, 625ms, 750ms, 875ms, 1s, 1125ms, 1250ms
  *
  * @param initialDelay the initial delay between the first failed attempt and the next one.
  * @param retries the number of retries to do before giving up.
@@ -13,7 +13,7 @@ import scala.concurrent.duration.FiniteDuration
  */
 case class FailoverStrategy(
     initialDelay: FiniteDuration = FiniteDuration(100, "ms"),
-    retries: Int = 8,
+    retries: Int = 10,
     delayFactor: Int => Double = FailoverStrategy.defaultFactor) {
 
   override lazy val toString = delayFactor match {
