@@ -8,6 +8,7 @@
   <loggers>
     <logger name="shaded.netty" level="ERROR" />
     <logger name="reactivemongo.api" level="ERROR" />
+    <logger name="reactivemongo.api.Cursor" level="OFF" />
     <logger name="reactivemongo.core" level="OFF" />
 
     <root level="WARN">

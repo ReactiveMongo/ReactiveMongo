@@ -158,7 +158,7 @@ class CursorSpec extends org.specs2.mutable.Specification {
 
     "stop on error" >> {
       val drv = new MongoDriver
-      def con = drv.connection(List("localhost:27017"), DefaultOptions)
+      def con = drv.connection(List(primaryHost), DefaultOptions)
       def scol(n: String = coll2.name) = Await.result(for {
         d <- con.database(db.name)
         c <- d.coll(n)
@@ -179,8 +179,9 @@ class CursorSpec extends org.specs2.mutable.Specification {
               QueryOpts(batchSizeN = 2)).cursor()
 
             (cursor.responseEnumerator(10, FailOnError[Unit]()) |>>> inc).
-              recover({ case _ => count }).
+              map(_ => count).recover({ case _ => count }).
               aka("enumerating") must beEqualTo(1).await(0, timeout)
+
         }
 
         "if fails while processing with existing documents (#2)" in {
@@ -378,8 +379,9 @@ class CursorSpec extends org.specs2.mutable.Specification {
 
     "continue on error" >> {
       val drv = new MongoDriver
-      def con = drv.connection(List("localhost:27017"), DefaultOptions)
-      def scol(n: String = coll2.name) = { val d = con(db.name); d(n) }
+      def con = drv.connection(List(primaryHost), DefaultOptions)
+      def scol(n: String = coll2.name) =
+        Await.result(con.database(db.name).map(_(n)), timeout)
 
       "when enumerating responses" >> {
         "if fails to send request" in {
@@ -492,7 +494,7 @@ class CursorSpec extends org.specs2.mutable.Specification {
         Future.sequence((0 until 10) map { id =>
           col.insert(BSONDocument("id" -> id))
         }) map { _ =>
-          println(s"-- all documents inserted in test collection $n")
+          logger.debug(s"-- all documents inserted in test collection $n")
           col
         }
       }
@@ -531,7 +533,7 @@ class CursorSpec extends org.specs2.mutable.Specification {
             f.flatMap(_ => col.insert(BSONDocument("id" -> id)).map(_ =>
               Thread.sleep(200)))
           }.map(_ =>
-            println(s"-- all documents inserted in test collection $n"))
+            logger.debug(s"-- all documents inserted in test collection $n"))
         }
 
         col

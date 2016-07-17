@@ -7,6 +7,8 @@ object Common {
     MongoConnectionOptions
   }
 
+  val logger = reactivemongo.util.LazyLogger("tests")
+
   implicit val ec = ExecutionContext.Implicits.global
 
   val DefaultOptions = {
