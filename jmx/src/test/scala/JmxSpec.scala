@@ -108,16 +108,19 @@ class JmxSpec extends org.specs2.mutable.Specification {
 
                 Try(nodeAttrs.collect {
                   case (name, _, _, _) if (!exAttr.contains(name)) =>
-                    mbs.getAttribute(on, name)
-                }) must beSuccessfulTry(List(
+                    mbs.getAttribute(on, name) match {
+                      case null => null.asInstanceOf[String]
+                      case v    => v.toString
+                    }
+                }) must beSuccessfulTry[List[String]](List(
                   Common.connection.name,
                   s"$host:$port", // name
                   "", // aliases
                   host,
-                  port,
+                  port.toString,
                   null.asInstanceOf[String], // tags
                   "minWireVersion = 2.6, maxWireVersion = 2.6, maxMessageSizeBytes = 48000000, maxBsonSize = 16777216, maxBulkSize = 1000", // protocol metadata
-                  false // mongos
+                  "false" // mongos
                   ))
               }
           }.await(1, 5.seconds)
@@ -157,11 +160,17 @@ class JmxSpec extends org.specs2.mutable.Specification {
     }
   }
 
+  @inline def fromTry[T](`try`: Try[T]): Future[T] = // for Scala 2.10.5 compat
+    `try` match {
+      case Success(v) => Future.successful[T](v)
+      case Failure(e) => Future.failed[T](e)
+    }
+
   def waitNodeMBean(implicit ee: EE): Future[ObjectInstance] = {
     val mbeans = mbs.queryMBeans(new ObjectName(
       "org.reactivemongo.Supervisor-*:type=NodeSet,*"), null)
 
-    Future.fromTry(Try(mbeans.iterator.next())).flatMap { ns =>
+    fromTry(Try(mbeans.iterator.next())).flatMap { ns =>
       val filter = new javax.management.NotificationFilter {
         def isNotificationEnabled(n: Notification) = n.getType == "nodeAdded"
       }
@@ -176,7 +185,7 @@ class JmxSpec extends org.specs2.mutable.Specification {
       objName.future.flatMap { n =>
         val mbeans = mbs.queryMBeans(n, null)
 
-        Future.fromTry(Try(mbeans.iterator.next()))
+        fromTry(Try(mbeans.iterator.next()))
       }
     }
   }

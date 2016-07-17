@@ -313,8 +313,7 @@ class CursorSpec extends org.specs2.mutable.Specification
               QueryOpts(batchSizeN = 2)).cursor()
 
             (cursor.enumerateBulks(10, true) |>>> inc).
-              recover({ case _ => count }).
-              aka("enumerating") must beEqualTo(1).await(1, timeout)
+              recover({ case _ => count }) must beEqualTo(1).await(1, timeout)
         }
 
         "if fails while processing w/o documents" in { implicit ee: EE =>
@@ -434,8 +433,8 @@ class CursorSpec extends org.specs2.mutable.Specification
               val c = defaultColl(ee.ec)
               val cursor = c.find(matchAll("cursorspec28")).cursor()
 
-              (cursor.enumerate(10, true) |>>> inc).recover({ case _ => count }).
-                aka("enumerating") must beEqualTo(5).await(1, timeout)
+              (cursor.enumerate(10, true) |>>> inc).
+                recover({ case _ => count }) must beEqualTo(5).await(1, timeout)
           }
 
           "if fails to send request" in { implicit ee: EE =>
@@ -617,8 +616,7 @@ class CursorSpec extends org.specs2.mutable.Specification
                 batchSizeN = 4)).cursor()
 
               (cursor.enumerateResponses(128, false) |>>> inc).map(_ => count).
-                aka("enumerating") must beEqualTo(16).
-                await(2, delayedTimeout)
+                aka("enumerating") must beEqualTo(16).await(2, delayedTimeout)
           }
 
           "if fails while processing w/o documents" in { implicit ee: EE =>
@@ -761,7 +759,7 @@ class CursorSpec extends org.specs2.mutable.Specification
               if (i % 2 == 0) sys.error("Foo")
               count = count + 1
             }
-            val c = scol(driver = drv)
+            val c = scol(driver = drv, failover = slowFailover)
             val cursor = c.find(matchAll("cursorspec41")).options(QueryOpts(
               batchSizeN = 4)).cursor()
 

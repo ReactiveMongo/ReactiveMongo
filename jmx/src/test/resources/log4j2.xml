@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<configuration status="INFO">
+<configuration status="WARN">
   <appenders>
     <Console name="Console" target="SYSTEM_OUT">
       <PatternLayout pattern="%d{HH:mm:ss.SSS} ReactiveMongo %-5level [%logger{1.}] :: %msg%n" />
@@ -7,12 +7,7 @@
   </appenders>
   <loggers>
     <logger name="shaded.netty" level="ERROR" />
-    <logger name="reactivemongo.api.commands" level="ERROR" />
-    <logger name="reactivemongo.api.Cursor" level="OFF" />
-    <logger name="reactivemongo.api.Failover2" level="OFF" />
-    <logger name="reactivemongo.api.MongoConnection" level="OFF" />
-
-    <logger name="reactivemongo.test.NettyProxy" level="ERROR" />
+    <logger name="reactivemongo.api" level="ERROR" />
     <logger name="reactivemongo.core" level="OFF" />
 
     <root level="WARN">

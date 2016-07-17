@@ -28,12 +28,18 @@ object Common {
 
   val failoverStrategy = FailoverStrategy(retries = failoverRetries)
 
+  private val timeoutFactor = 1.2D
+  def estTimeout(fos: FailoverStrategy): FiniteDuration =
+    (1 to fos.retries).foldLeft(fos.initialDelay) { (d, i) =>
+      d + (fos.initialDelay * ((timeoutFactor * fos.delayFactor(i)).toLong))
+    }
+
   val timeout = {
-    if (failoverStrategy.maxTimeout < 10.seconds) 10.seconds
-    else failoverStrategy.maxTimeout
+    val maxTimeout = estTimeout(failoverStrategy)
+    if (maxTimeout < 10.seconds) 10.seconds else maxTimeout
   }
 
-  val timeoutMillis = timeout.toMillis.toInt
+  //val timeoutMillis = timeout.toMillis.toInt
 
   lazy val db = {
     val _db = connection.database(
@@ -42,7 +48,7 @@ object Common {
     Await.result(_db.flatMap { d => d.drop.map(_ => d) }, timeout)
   }
 
-  def closeDriver(): Unit = try {
+  def close(): Unit = try {
     driver.close()
   } catch { case _: Throwable => () }
 }
