@@ -7,17 +7,20 @@ trait IsMasterCommand[P <: SerializationPack] {
   object IsMaster extends Command with CommandWithResult[IsMasterResult] with CommandWithPack[P]
 
   case class ReplicaSet(
-    setName: String,
-    me: String,
-    primary: Option[String],
-    hosts: Seq[String],
-    passives: Seq[String],
-    arbiters: Seq[String],
-    isSecondary: Boolean, // `secondary`
-    isArbiterOnly: Boolean, // `arbiterOnly`
-    isPassive: Boolean, // `passive`
-    isHidden: Boolean, // `hidden`
-    tags: Option[P#Document])
+      setName: String,
+      me: String,
+      primary: Option[String],
+      hosts: Seq[String],
+      passives: Seq[String],
+      arbiters: Seq[String],
+      isSecondary: Boolean, // `secondary`
+      isArbiterOnly: Boolean, // `arbiterOnly`
+      isPassive: Boolean, // `passive`
+      isHidden: Boolean, // `hidden`
+      tags: Option[P#Document]) {
+
+    override lazy val toString = s"""ReplicaSet($setName, primary = $primary, me = $me, hosts = ${hosts.mkString("[", ",", "]")})"""
+  }
 
   case class IsMasterResult(
       isMaster: Boolean, // `ismaster`

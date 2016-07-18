@@ -213,13 +213,8 @@ class MongoURISpec extends org.specs2.mutable.Specification {
 
     s"parse $defaultFo with success" in {
       parseURI(defaultFo) must beSuccessfulTry[ParsedURI].like {
-        case uri => try {
-          strategyStr(uri) must_== "100 milliseconds100 milliseconds200 milliseconds300 milliseconds500 milliseconds600 milliseconds700 milliseconds800 milliseconds1000 milliseconds"
-        } catch {
-          case err: Throwable =>
-            err.printStackTrace()
-            ok
-        }
+        case uri =>
+          strategyStr(uri) must_== "100 milliseconds100 milliseconds200 milliseconds300 milliseconds500 milliseconds600 milliseconds700 milliseconds800 milliseconds1000 milliseconds1100 milliseconds1200 milliseconds"
       }
     }
 
@@ -229,6 +224,15 @@ class MongoURISpec extends org.specs2.mutable.Specification {
       parseURI(remoteFo) must beSuccessfulTry[ParsedURI].like {
         case uri =>
           strategyStr(uri) must_== "100 milliseconds100 milliseconds200 milliseconds300 milliseconds500 milliseconds600 milliseconds700 milliseconds800 milliseconds1000 milliseconds1100 milliseconds1200 milliseconds1300 milliseconds1500 milliseconds1600 milliseconds1700 milliseconds1800 milliseconds2000 milliseconds"
+      }
+    }
+
+    val strictFo = "mongodb://host1?rm.failover=strict&writeConcernJ=true"
+
+    s"parse $strictFo with success" in {
+      parseURI(strictFo) must beSuccessfulTry[ParsedURI].like {
+        case uri =>
+          strategyStr(uri) must_== "100 milliseconds100 milliseconds200 milliseconds300 milliseconds500 milliseconds600 milliseconds"
       }
     }
 

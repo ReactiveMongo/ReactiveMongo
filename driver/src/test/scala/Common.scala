@@ -37,7 +37,7 @@ object Common {
 
   lazy val connection = driver.connection(List(primaryHost), DefaultOptions)
 
-  private val timeoutFactor = 1.2D
+  private val timeoutFactor = 1.25D
   def estTimeout(fos: FailoverStrategy): FiniteDuration =
     (1 to fos.retries).foldLeft(fos.initialDelay) { (d, i) =>
       d + (fos.initialDelay * ((timeoutFactor * fos.delayFactor(i)).toLong))

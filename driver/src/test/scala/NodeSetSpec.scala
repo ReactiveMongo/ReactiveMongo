@@ -27,7 +27,7 @@ import reactivemongo.core.actors.{
   SetAvailable,
   SetUnavailable
 }
-import reactivemongo.core.actors.Exceptions.NodeSetNotReachable
+import reactivemongo.core.actors.Exceptions.PrimaryUnavailableException
 import reactivemongo.api.tests._
 
 class NodeSetSpec extends org.specs2.mutable.Specification {
@@ -75,7 +75,7 @@ class NodeSetSpec extends org.specs2.mutable.Specification {
               conMon ! SetAvailable(ProtocolMetadata.Default)
 
               waitIsAvailable(con, failoverStrategy).map(_ => true).recover {
-                case reason: NodeSetNotReachable if (
+                case reason: PrimaryUnavailableException if (
                   reason.getMessage.indexOf(name) != -1) => false
               } must beFalse.await(1, timeout)
             }
@@ -185,7 +185,7 @@ class NodeSetSpec extends org.specs2.mutable.Specification {
         waitIsAvailable(con, Common.failoverStrategy).map { _ =>
           Thread.sleep(750)
 
-          //TODO:val history1 = history(dbsystem)
+          val history1 = history(dbsystem)
           val nodeset1 = nodeSet(dbsystem)
           val primary1 = nodeset1.primary
           val authCon1 = primary1.toVector.flatMap {
@@ -194,16 +194,12 @@ class NodeSetSpec extends org.specs2.mutable.Specification {
           var chanId1 = -1
 
           // #1
-          /*TODO:
-history1 aka "history #1" must not(beEmpty) and {
+          history1 aka "history #1" must not(beEmpty) and {
             primary1 aka "primary #1" must beSome[Node]
-          } and 
-           */
-          {
-            authCon1.size aka "auth'ed connections #1" must beLike[Int] {
+          } and {
+            authCon1.size aka "authed connections #1" must beLike[Int] {
               case number => number must beGreaterThan(1) and (
                 number must beLessThanOrEqualTo(opts.nbChannelsPerNode))
-
             }
           } and { // #2
             nodeset1.pick(ReadPreference.Primary).
@@ -222,8 +218,10 @@ history1 aka "history #1" must not(beEmpty) and {
                     // After one connection is picked up...
                     chanId1 = chan.channel.getId
 
-                    authCon2.size aka "auth'ed connections #2" must beEqualTo(
-                      opts.nbChannelsPerNode)
+                    authCon2.size aka "authed connections #2" must beLike[Int] {
+                      case number => number must beGreaterThan(1) and (
+                        number must beLessThanOrEqualTo(opts.nbChannelsPerNode))
+                    }
                   }
               }
           } and { // #3
@@ -238,9 +236,6 @@ history1 aka "history #1" must not(beEmpty) and {
 
               primary3.map(_.name) aka "primary #3 (after ChannelClosed)" must (
                 beSome(primary1.get.name)) and {
-                  authCon3.size aka "auth'ed connections #3" must beEqualTo(
-                    opts.nbChannelsPerNode - 1) // after channel is closed
-                } and {
                   nodeSet3.pick(ReadPreference.Primary).
                     aka("channel #2") must beSome[(Node, Connection)].like {
                       case (_, chan) =>

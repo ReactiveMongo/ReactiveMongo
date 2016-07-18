@@ -129,11 +129,13 @@ class Failover[T](message: T, connection: MongoConnection, strategy: FailoverStr
   }
 
   private def isRetryable(throwable: Throwable) = throwable match {
-    case PrimaryUnavailableException | NodeSetNotReachable => true
-    case e: DatabaseException if e.isNotAPrimaryError || e.isUnauthorized => true
-    case _: ConnectionException => true
-    case _: ConnectionNotInitialized => true
-    case _ => false
+    case e: ChannelNotFound             => e.retriable
+    case _: PrimaryUnavailableException => true
+    case _: NodeSetNotReachable         => true
+    case _: ConnectionException         => true
+    case _: ConnectionNotInitialized    => true
+    case e: DatabaseException           => e.isNotAPrimaryError || e.isUnauthorized
+    case _                              => false
   }
 
   send(0)
@@ -145,7 +147,7 @@ class Failover2[A](producer: () => Future[A], connection: MongoConnection, strat
   import reactivemongo.core.errors._
   import reactivemongo.core.actors.Exceptions._
 
-  val call = new Throwable()
+  // TODO: Pass an explicit stack trace, to be able to raise with possible err
 
   /**
    * A future that is completed with a response,
@@ -195,12 +197,14 @@ class Failover2[A](producer: () => Future[A], connection: MongoConnection, strat
       }
     }
 
-  private def isRetryable(throwable: Throwable): Boolean = throwable match {
-    case PrimaryUnavailableException | NodeSetNotReachable => true
-    case e: DatabaseException => (e.isNotAPrimaryError || e.isUnauthorized)
-    case _: ConnectionException => true
-    case _: ConnectionNotInitialized => true
-    case _ => false
+  private def isRetryable(throwable: Throwable) = throwable match {
+    case e: ChannelNotFound             => e.retriable
+    case _: PrimaryUnavailableException => true
+    case _: NodeSetNotReachable         => true
+    case _: ConnectionException         => true
+    case _: ConnectionNotInitialized    => true
+    case e: DatabaseException           => e.isNotAPrimaryError || e.isUnauthorized
+    case _                              => false
   }
 
   //send(0)
@@ -264,12 +268,17 @@ class MongoConnection(
     val mongosystem: ActorRef,
     val options: MongoConnectionOptions) {
 
+  import Exceptions._
+
   @deprecated("Create with an explicit supervisor and connection names", "0.11.14")
   def this(actorSys: ActorSystem, mongoSys: ActorRef, opts: MongoConnectionOptions) = this(s"unknown-${System identityHashCode mongoSys}", s"unknown-${System identityHashCode mongoSys}", actorSys, mongoSys, opts)
 
   private[api] val logger = LazyLogger("reactivemongo.api.Failover2")
 
   private val lnm = s"$supervisor/$name" // log name
+
+  // TODO: Review
+  private[api] var history = () => new InternalState(null)
 
   @volatile private[api] var killed: Boolean = false
 
@@ -303,6 +312,9 @@ class MongoConnection(
   def database(name: String, failoverStrategy: FailoverStrategy = options.failoverStrategy)(implicit context: ExecutionContext): Future[DefaultDB] =
     waitIsAvailable(failoverStrategy).map(_ => apply(name, failoverStrategy))
 
+  private val databaseSTE = new StackTraceElement(
+    "reactivemongo.api.MongoConnection", "database", "api.scala", -1)
+
   /** Returns a future that will be successful when node set is available. */
   private[api] def waitIsAvailable(failoverStrategy: FailoverStrategy)(implicit ec: ExecutionContext): Future[Unit] = {
     logger.debug(s"[$lnm] Waiting is available...")
@@ -316,37 +328,53 @@ class MongoConnection(
 
     type Retry = (FiniteDuration, Throwable)
 
-    def wait(iteration: Int, attempt: Int, timeout: FiniteDuration): Future[Unit] = {
+    @inline def finalErr(lastErr: Throwable): Throwable = {
+      val error = if (lastErr == null) {
+        new NodeSetNotReachable(supervisor, name, history())
+      } else lastErr
+
+      error.setStackTrace(databaseSTE +: error.getStackTrace)
+
+      error
+    }
+
+    def wait(iteration: Int, attempt: Int, timeout: FiniteDuration, lastErr: Throwable = null): Future[Unit] = {
       logger.trace(
         s"[$lnm] Wait is available: $attempt @ ${System.currentTimeMillis}")
 
       if (attempt == 0) {
-        Future.failed(new Exceptions.NodeSetNotReachable(this))
+        Future.failed(finalErr(lastErr))
       } else {
         @inline def res: Either[Retry, Unit] = try {
           val before = System.currentTimeMillis
-          val result = Await.result(isAvailable, timeout)
+          val unavail = Await.result(probe, timeout)
           val duration = System.currentTimeMillis - before
 
-          if (result) Right({})
-          else Left(FiniteDuration(
-            timeout.toMillis - duration, MILLISECONDS) -> null)
+          unavail match {
+            case Some(reason) => Left(FiniteDuration(
+              timeout.toMillis - duration, MILLISECONDS) -> reason)
 
+            case _ => Right({})
+          }
         } catch {
           case e: Throwable => Left(timeout -> e)
         }
 
-        @inline def doRetry(delay: FiniteDuration): Future[Unit] = after(delay, actorSystem.scheduler) {
+        @inline def doRetry(delay: FiniteDuration, reason: Throwable): Future[Unit] = after(delay, actorSystem.scheduler) {
           val nextIt = iteration + 1
-          wait(nextIt, attempt - 1, nextTimeout(nextIt))
+          wait(nextIt, attempt - 1, nextTimeout(nextIt), reason)
         }
 
         res match {
-          case Right(_)            => Future.successful({})
-          case Left((delay, null)) => doRetry(delay)
-          case Left((delay, error)) =>
+          case Left((delay, error)) => {
             logger.warn(s"[$lnm] Got an error, retrying", error)
-            doRetry(delay)
+            // TODO: Keep an explicit stacktrace accross the retries
+            // TODO: Transform error into a single StackTraceElement to add it
+
+            doRetry(delay, error)
+          }
+
+          case _ => Future.successful({})
         }
       }
     }
@@ -369,7 +397,7 @@ class MongoConnection(
   private def whenActive[T](f: => Future[T]): Future[T] = {
     if (killed) {
       logger.debug(s"[$lnm] Cannot send request when the connection is killed")
-      Future.failed(new Exceptions.ClosedException(supervisor, name))
+      Future.failed(new ClosedException(supervisor, name, history()))
     } else f
   }
 
@@ -379,7 +407,7 @@ class MongoConnection(
    * @param message The request maker.
    */
   private[api] def send(message: RequestMaker): Unit = {
-    if (killed) throw new Exceptions.ClosedException(supervisor, name)
+    if (killed) throw new ClosedException(supervisor, name, history())
     else mongosystem ! message
   }
 
@@ -425,17 +453,32 @@ class MongoConnection(
     override val toString = "IsPrimaryAvailable?"
   }
 
-  private[api] def isAvailable: Future[Boolean] = {
-    if (killed) Future.successful(false)
-    else {
-      val p = Promise[Boolean]()
-      val check = {
-        if (options.readPreference.slaveOk) IsAvailable(p)
-        else IsPrimaryAvailable(p)
-      }
+  /**
+   * Checks whether is unavailable.
+   *
+   * @return Future(None) if available
+   */
+  private[api] def probe: Future[Option[Exception]] = whenActive {
+    val p = Promise[Boolean]()
+    val check = {
+      if (options.readPreference.slaveOk) IsAvailable(p)
+      else IsPrimaryAvailable(p)
+    }
 
-      monitor ! check
-      p.future
+    monitor ! check
+
+    import actorSystem.dispatcher
+
+    p.future.map {
+      case true => Option.empty[Exception] // is available - no error
+
+      case _ => {
+        if (options.readPreference.slaveOk) {
+          Some(new NodeSetNotReachable(supervisor, name, history()))
+        } else {
+          Some(new PrimaryUnavailableException(supervisor, name, history()))
+        }
+      }
     }
   }
 
@@ -449,7 +492,7 @@ class MongoConnection(
 
     mongosystem ! RegisterMonitor
 
-    private val waitingForPrimary = Queue[ActorRef]()
+    //private val waitingForPrimary = Queue[ActorRef]()
     private var primaryAvailable = false
 
     private val waitingForClose = Queue[ActorRef]()
@@ -460,7 +503,7 @@ class MongoConnection(
       case pa @ PrimaryAvailable(metadata) => {
         logger.debug(s"[$lnm] A primary is available")
         primaryAvailable = true
-        waitingForPrimary.dequeueAll(_ => true).foreach(_ ! pa)
+        //waitingForPrimary.dequeueAll(_ => true).foreach(_ ! pa)
       }
 
       case PrimaryUnavailable => {
@@ -503,9 +546,12 @@ class MongoConnection(
 
         mongosystem ! Close
         waitingForClose += sender
+
+        /*
         waitingForPrimary.dequeueAll(_ => true).foreach(
           _ ! Failure(new scala.RuntimeException(
             s"MongoDBSystem actor shutting down or no longer active ($lnm)")))
+         */
       }
 
       case Closed => {
@@ -703,6 +749,9 @@ object MongoConnection {
           case ("rm.failover", "remote") => unsupported -> result.copy(
             failoverStrategy = FailoverStrategy.remote)
 
+          case ("rm.failover", "strict") => unsupported -> result.copy(
+            failoverStrategy = FailoverStrategy.strict)
+
           case ("rm.failover", opt @ FailoverRe(d, r, f)) => (for {
             (time, unit) <- Try(Duration(d)).toOption.flatMap(Duration.unapply)
             delay <- Some(FiniteDuration(time, unit))
@@ -766,6 +815,7 @@ object MongoConnection {
  * @define optionsParam the options for the new connection pool
  * @define nodesParam The list of node names (e.g. ''node1.foo.com:27017''); Port is optional (27017 is used by default)
  * @define authParam the list of authentication instructions
+ * @define seeConnectDBTutorial See [[http://reactivemongo.org/releases/0.12/documentation/tutorial/connect-database.html how to connect to the database]]
  */
 class MongoDriver(config: Option[Config] = None) {
   import scala.collection.mutable.{ Map => MutableMap }
@@ -788,7 +838,8 @@ class MongoDriver(config: Option[Config] = None) {
   }
 
   private val supervisorName = s"Supervisor-${MongoDriver.nextCounter}"
-  private[reactivemongo] val supervisorActor = system.actorOf(Props(new SupervisorActor(this)), supervisorName)
+  private[reactivemongo] val supervisorActor =
+    system.actorOf(Props(new SupervisorActor(this)), supervisorName)
 
   private val connectionMonitors = MutableMap.empty[ActorRef, MongoConnection]
 
@@ -826,7 +877,7 @@ class MongoDriver(config: Option[Config] = None) {
   /**
    * Creates a new MongoConnection.
    *
-   * See [[http://docs.mongodb.org/manual/reference/connection-string/ the MongoDB URI documentation]] for more information.
+   * $seeConnectDBTutorial
    *
    * @param nodes $nodesParam
    * @param authentications $authParam
@@ -840,7 +891,7 @@ class MongoDriver(config: Option[Config] = None) {
   /**
    * Creates a new MongoConnection.
    *
-   * See [[http://docs.mongodb.org/manual/reference/connection-string/ the MongoDB URI documentation]] for more information.
+   * $seeConnectDBTutorial
    *
    * @param nodes $nodesParam
    * @param authentications $authParam
@@ -850,7 +901,8 @@ class MongoDriver(config: Option[Config] = None) {
   def connection(nodes: Seq[String], options: MongoConnectionOptions = MongoConnectionOptions(), authentications: Seq[Authenticate] = Seq.empty, name: Option[String] = None): MongoConnection = {
     val nm = name.getOrElse(s"Connection-${+MongoDriver.nextCounter}")
 
-    def dbsystem: MongoDBSystem = options.authMode match {
+    // TODO: Passing ref to MongoDBSystem.history to AddConnection
+    lazy val dbsystem: MongoDBSystem = options.authMode match {
       case ScramSha1Authentication => new StandardDBSystem(
         supervisorName, nm, nodes, authentications, options)()
 
@@ -864,14 +916,20 @@ class MongoDriver(config: Option[Config] = None) {
 
     logger.info(s"[$supervisorName] Creating connection: $nm")
 
-    Await.result(connection.mapTo[MongoConnection], Duration.Inf)
+    import system.dispatcher
+
+    Await.result(connection.mapTo[MongoConnection].map { c =>
+      // TODO: Review
+      c.history = () => dbsystem.internalState
+      c
+    }, Duration.Inf)
     // TODO: Returns Future[MongoConnection]
   }
 
   /**
    * Creates a new MongoConnection from URI.
    *
-   * See [[http://docs.mongodb.org/manual/reference/connection-string/ the MongoDB URI documentation]] for more information.
+   * $seeConnectDBTutorial
    *
    * @param parsedURI $parsedURIParam
    * @param nbChannelsPerNode $nbChannelsParam
@@ -883,7 +941,7 @@ class MongoDriver(config: Option[Config] = None) {
   /**
    * Creates a new MongoConnection from URI.
    *
-   * See [[http://docs.mongodb.org/manual/reference/connection-string/ the MongoDB URI documentation]] for more information.
+   * $seeConnectDBTutorial
    *
    * @param parsedURI $parsedURIParam
    * @param name $connectionNameParam
@@ -893,7 +951,7 @@ class MongoDriver(config: Option[Config] = None) {
   /**
    * Creates a new MongoConnection from URI.
    *
-   * See [[http://docs.mongodb.org/manual/reference/connection-string/ the MongoDB URI documentation]] for more information.
+   * $seeConnectDBTutorial
    *
    * @param parsedURI The URI parsed by [[reactivemongo.api.MongoConnection.parseURI]]
    * @param name $connectionNameParam
@@ -913,7 +971,7 @@ class MongoDriver(config: Option[Config] = None) {
   /**
    * Creates a new MongoConnection from URI.
    *
-   * See [[http://docs.mongodb.org/manual/reference/connection-string/ the MongoDB URI documentation]] for more information.
+   * $seeConnectDBTutorial
    *
    * @param parsedURI $parsedURIParam
    * @param nbChannelsPerNode $nbChannelsParam
@@ -924,7 +982,7 @@ class MongoDriver(config: Option[Config] = None) {
   /**
    * Creates a new MongoConnection from URI.
    *
-   * See [[http://docs.mongodb.org/manual/reference/connection-string/ the MongoDB URI documentation]] for more information.
+   * $seeConnectDBTutorial
    *
    * @param parsedURI $parsedURIParam
    * @param strictUri $strictUriParam
@@ -934,7 +992,7 @@ class MongoDriver(config: Option[Config] = None) {
   /**
    * Creates a new MongoConnection from URI.
    *
-   * See [[http://docs.mongodb.org/manual/reference/connection-string/ the MongoDB URI documentation]] for more information.
+   * $seeConnectDBTutorial
    *
    * @param parsedURI $parsedURIParam
    */

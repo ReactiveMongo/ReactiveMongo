@@ -7,8 +7,17 @@ export LD_LIBRARY_PATH
 # Print version information
 MV=`mongod --version 2>/dev/null | head -n 1`
 
-echo -n "MongoDB ($MV): "
+echo -n "INFO: Installed MongoDB ($MV): "
 echo "$MV" | sed -e 's/.* v//'
+
+ps axx | grep 'mongod$' | awk '{ printf("%s\n", $1); }'
+
+MONGOD_PID=`ps -o pid,comm -u $USER | grep 'mongod$' | awk '{ printf("%s\n", $1); }'`
+
+if [ "x$MONGOD_PID" = "x" ]; then
+    echo "ERROR: MongoDB process not found" > /dev/stderr
+    exit 1
+fi
 
 # JVM/SBT setup
 TEST_OPTS="exclude not_mongo26"
@@ -38,13 +47,7 @@ TEST_ARGS="$TEST_ARGS ;project ReactiveMongo-Iteratees ;testOnly -- $TEST_OPTS"
 TEST_ARGS="$TEST_ARGS ;project ReactiveMongo-JMX ;testOnly -- $TEST_OPTS"
 
 sbt ++$TRAVIS_SCALA_VERSION $SBT_ARGS "$TEST_ARGS" || (
-    PID=`ps -ao pid,comm | grep 'mongod$' | cut -d ' ' -f 1`
-    
-    if [ ! "x$PID" = "x" ]; then
-        pid -p $PID
-    fi
-    
-    tail -n 10000 /tmp/mongod.log | grep -v ' end connection ' | grep -v 'connection accepted' | grep -v 'killcursors: found 0 of 1' | tail -n 100
+    #tail -n 10000 /tmp/mongod.log | grep -v ' end connection ' | grep -v 'connection accepted' | grep -v 'killcursors: found 0 of 1' | tail -n 100
 
     false
 )

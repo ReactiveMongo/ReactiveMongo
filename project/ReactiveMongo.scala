@@ -162,8 +162,6 @@ object Resolvers {
 }
 
 object Dependencies {
-  val netty = "io.netty" % "netty" % "3.10.5.Final" cross CrossVersion.Disabled
-
   // TODO: Update
   val akkaActor = {
     val ver = sys.env.get("AKKA_VERSION").getOrElse("2.3.13")
@@ -246,8 +244,6 @@ object ReactiveMongoBuild extends Build {
         }
       ).aggregate(bson, bsonmacros, shaded, driver)
 
-  private lazy val shadedDeps = Seq(netty)
-
   import scala.xml.{ Elem => XmlElem, Node => XmlNode }
   private def transformPomDependencies(tx: XmlElem => Option[XmlNode]): XmlNode => XmlNode = { node: XmlNode =>
     import scala.xml.{ NodeSeq, XML }
@@ -280,15 +276,19 @@ object ReactiveMongoBuild extends Build {
       previousArtifacts := Set.empty,
       crossPaths := false,
       autoScalaLibrary := false,
-      libraryDependencies ++= shadedDeps,
+      libraryDependencies ++= Seq(
+        "io.netty" % "netty" % "3.10.5.Final" cross CrossVersion.Disabled,
+        "com.google.guava" % "guava" % "19.0" cross CrossVersion.Disabled
+      ),
       assemblyShadeRules in assembly := Seq(
-        ShadeRule.rename("org.jboss.netty.**" -> "shaded.netty.@1").inAll
+        ShadeRule.rename("org.jboss.netty.**" -> "shaded.netty.@1").inAll,
+        ShadeRule.rename("com.google.**" -> "shaded.google.@1").inAll
       ),
       publish in Compile := publish.dependsOn(assembly),
       publishLocal in Compile := publishLocal.dependsOn(assembly),
       packageBin in Compile := target.value / (
         assemblyJarName in assembly).value,
-      pomPostProcess := transformPomDependencies { Some(_) }
+      pomPostProcess := transformPomDependencies { _ => None }
     )
 
   private val driverFilter: Seq[(File, String)] => Seq[(File, String)] = {
@@ -332,20 +332,8 @@ object ReactiveMongoBuild extends Build {
 
         Seq(Attributed(shadedDir / shadedJar)(AttributeMap.empty))
       },
-      libraryDependencies ++= {
-        val rmShaded = shadedDeps.foldLeft(
-          "org.reactivemongo" % "reactivemongo-shaded" % version.value) {
-          (dep, x) => dep.exclude(x.organization, x.name)
-        }
-
-        Seq(
-          akkaActor,
-          playIteratees,
-          commonsCodec,
-          shapelessTest,
-          specs,
-          rmShaded) ++ logApi
-      },
+      libraryDependencies ++= Seq(
+        akkaActor, playIteratees, commonsCodec, shapelessTest, specs) ++ logApi,
       binaryIssueFilters ++= {
         import ProblemFilters.{ exclude => x }
         @inline def mmp(s: String) = x[MissingMethodProblem](s)

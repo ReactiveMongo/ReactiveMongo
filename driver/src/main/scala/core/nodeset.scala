@@ -75,16 +75,21 @@ case class NodeSet(
   /** The `mongos` node, if any. */
   val mongos: Option[Node] = nodes.find(_.isMongos)
 
-  val secondaries = new RoundRobiner(nodes.filter(_.status == NodeStatus.Secondary))
+  val secondaries = new RoundRobiner(
+    nodes.filter(_.status == NodeStatus.Secondary))
+
   val queryable = secondaries.subject ++ primary
 
   /** See the [[https://docs.mongodb.com/manual/reference/read-preference/#nearest nearest]] read preference. */
-  val nearestGroup = new RoundRobiner(queryable.sortWith { _.pingInfo.ping < _.pingInfo.ping })
+  val nearestGroup = new RoundRobiner(
+    queryable.sortWith { _.pingInfo.ping < _.pingInfo.ping })
 
   /** The first node from the [[nearestGroup]]. */
   val nearest = nearestGroup.subject.headOption
 
-  val protocolMetadata = primary.orElse(secondaries.subject.headOption).map(_.protocolMetadata).getOrElse(ProtocolMetadata.Default)
+  val protocolMetadata: ProtocolMetadata =
+    primary.orElse(secondaries.subject.headOption).
+      fold(ProtocolMetadata.Default)(_.protocolMetadata)
 
   def primary(authenticated: Authenticated): Option[Node] =
     primary.filter(_.authenticated.exists(_ == authenticated))
@@ -124,6 +129,7 @@ case class NodeSet(
         con.status == ConnectionStatus.Connected) => node -> con
     }
 
+  @deprecated(message = "Unused", since = "0.12-RC0")
   def pickForWrite: Option[(Node, Connection)] = primary.view.map(node =>
     node -> node.authenticatedConnections.subject.headOption).collectFirst {
     case (node, Some(connection)) => node -> connection
@@ -168,6 +174,10 @@ case class NodeSet(
     }
   }
 
+  /**
+   * Returns a NodeSet with channels created to `upTo` given maximum,
+   * per each member of the set.
+   */
   def createNeededChannels(receiver: ActorRef, upTo: Int)(implicit channelFactory: ChannelFactory): NodeSet = updateAll(_.createNeededChannels(receiver, upTo))
 
   def toShortString =
@@ -232,8 +242,8 @@ case class Node(
   val connected: Vector[Connection] =
     connections.filter(_.status == ConnectionStatus.Connected)
 
-  val authenticatedConnections =
-    new RoundRobiner(connected.filter(_.authenticated.forall { auth =>
+  val authenticatedConnections = new RoundRobiner(
+    connected.filter(_.authenticated.forall { auth =>
       authenticated.exists(_ == auth)
     }))
 
@@ -432,7 +442,7 @@ case class Authenticate(
     user: String,
     password: String) extends Authentication {
 
-  override def toString: String = s"Authenticate($db, $user)"
+  override def toString = s"Authenticate($db, $user)"
 }
 
 sealed trait Authenticating extends Authentication {
@@ -526,7 +536,7 @@ class RoundRobiner[A, M[T] <: Iterable[T]](val subject: M[A], startAtIndex: Int 
  * @param connection the name of the connection pool
  */
 @deprecated("Internal class: will be made private", "0.11.14")
-final class ChannelFactory private[core] (
+final class ChannelFactory private[reactivemongo] (
     supervisor: String,
     connection: String,
     options: MongoConnectionOptions,
