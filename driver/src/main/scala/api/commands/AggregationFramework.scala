@@ -33,7 +33,8 @@ trait AggregationFramework[P <: SerializationPack] extends ImplicitCommandHelper
     cursor: Option[Cursor],
     wireVersion: MongoWireVersion,
     bypassDocumentValidation: Boolean,
-    readConcern: Option[ReadConcern])
+    readConcern: Option[ReadConcern]
+  )
       extends CollectionCommand
       with CommandWithPack[pack.type] with CommandWithResult[AggregationResult]
 
@@ -44,7 +45,8 @@ trait AggregationFramework[P <: SerializationPack] extends ImplicitCommandHelper
    */
   case class AggregationResult(
       firstBatch: List[pack.Document],
-      cursor: Option[ResultCursor] = None) {
+      cursor: Option[ResultCursor] = None
+  ) {
 
     @deprecated(message = "Use [[firstBatch]]", since = "0.11.10")
     def documents = firstBatch
@@ -151,13 +153,18 @@ trait AggregationFramework[P <: SerializationPack] extends ImplicitCommandHelper
       from: String,
       localField: String,
       foreignField: String,
-      as: String) extends PipelineOperator {
+      as: String
+  ) extends PipelineOperator {
 
-    val makePipe: pack.Document = makeDocument(Seq(elementProducer("$lookup",
-      makeDocument(Seq(elementProducer("from", stringValue(from)),
+    val makePipe: pack.Document = makeDocument(Seq(elementProducer(
+      "$lookup",
+      makeDocument(Seq(
+        elementProducer("from", stringValue(from)),
         elementProducer("localField", stringValue(localField)),
         elementProducer("foreignField", stringValue(foreignField)),
-        elementProducer("as", stringValue(as)))))))
+        elementProducer("as", stringValue(as))
+      ))
+    )))
 
   }
 
@@ -178,8 +185,10 @@ trait AggregationFramework[P <: SerializationPack] extends ImplicitCommandHelper
    */
   case class Sample(size: Int) extends PipelineOperator {
     val makePipe: pack.Document =
-      makeDocument(Seq(elementProducer("$sample",
-        makeDocument(Seq(elementProducer("size", intValue(size)))))))
+      makeDocument(Seq(elementProducer(
+        "$sample",
+        makeDocument(Seq(elementProducer("size", intValue(size))))
+      )))
   }
 
   /**
@@ -229,7 +238,8 @@ trait AggregationFramework[P <: SerializationPack] extends ImplicitCommandHelper
       extends PipelineOperator {
     val makePipe: pack.Document =
       makeDocument(Seq(elementProducer("$group", makeDocument(Seq(
-        elementProducer("_id", identifiers)) ++
+        elementProducer("_id", identifiers)
+      ) ++
         ops.map({
           case (field, op) => elementProducer(field, op.makeFunction)
         })))))
@@ -257,7 +267,8 @@ trait AggregationFramework[P <: SerializationPack] extends ImplicitCommandHelper
    * @param ops the sequence of operators specifying aggregate calculation
    */
   case class GroupMulti(idFields: (String, String)*)(
-      ops: (String, GroupFunction)*) extends PipelineOperator {
+      ops: (String, GroupFunction)*
+  ) extends PipelineOperator {
     val makePipe = Group(makeDocument(idFields.map {
       case (alias, attribute) =>
         elementProducer(alias, stringValue("$" + attribute))
@@ -298,7 +309,8 @@ trait AggregationFramework[P <: SerializationPack] extends ImplicitCommandHelper
    * @param keyword the metadata keyword to sort by
    */
   case class MetadataSort(
-    field: String, keyword: MetadataKeyword) extends SortOrder
+    field: String, keyword: MetadataKeyword
+  ) extends SortOrder
 
   /**
    * Sorts the stream based on the given fields.
@@ -312,11 +324,13 @@ trait AggregationFramework[P <: SerializationPack] extends ImplicitCommandHelper
         case Descending(field) => elementProducer(field, intValue(-1))
         case MetadataSort(field, keyword) => {
           val meta = makeDocument(Seq(
-            elementProducer("$meta", stringValue(keyword.name))))
+            elementProducer("$meta", stringValue(keyword.name))
+          ))
 
           elementProducer(field, meta)
         }
-      }))))
+      }))
+    ))
   }
 
   /**
@@ -336,17 +350,20 @@ trait AggregationFramework[P <: SerializationPack] extends ImplicitCommandHelper
     def makePipe =
       makeDocument(Seq(elementProducer("$geoNear", makeDocument(Seq(
         elementProducer("spherical", booleanValue(spherical)),
-        elementProducer("limit", longValue(limit))) ++ Seq(
+        elementProducer("limit", longValue(limit))
+      ) ++ Seq(
           maxDistance.map(l => elementProducer("maxDistance", longValue(l))),
           selector.map(s => elementProducer("query", s)),
           distanceMultiplier.map(d => elementProducer(
-            "distanceMultiplier", doubleValue(d))),
+            "distanceMultiplier", doubleValue(d)
+          )),
           Some(elementProducer("uniqueDocs", booleanValue(uniqueDocs))),
           near.map(n => elementProducer("near", n)),
           distanceField.map(s =>
             elementProducer("distanceField", stringValue(s))),
           includeLocs.map(s =>
-            elementProducer("includeLocs", stringValue(s)))).
+            elementProducer("includeLocs", stringValue(s)))
+        ).
           flatten))))
 
   }
@@ -363,52 +380,63 @@ trait AggregationFramework[P <: SerializationPack] extends ImplicitCommandHelper
 
   case class SumField(field: String) extends GroupFunction {
     val makeFunction = makeDocument(Seq(elementProducer(
-      "$sum", stringValue("$" + field))))
+      "$sum", stringValue("$" + field)
+    )))
   }
 
   case class SumValue(value: Int) extends GroupFunction {
     val makeFunction = makeDocument(Seq(elementProducer(
-      "$sum", intValue(value))))
+      "$sum", intValue(value)
+    )))
   }
 
   case class Avg(field: String) extends GroupFunction {
     val makeFunction = makeDocument(Seq(elementProducer(
-      "$avg", stringValue("$" + field))))
+      "$avg", stringValue("$" + field)
+    )))
   }
 
   case class First(field: String) extends GroupFunction {
     val makeFunction = makeDocument(Seq(elementProducer(
-      "$first", stringValue("$" + field))))
+      "$first", stringValue("$" + field)
+    )))
   }
 
   case class Last(field: String) extends GroupFunction {
     val makeFunction = makeDocument(Seq(elementProducer(
-      "$last", stringValue("$" + field))))
+      "$last", stringValue("$" + field)
+    )))
   }
 
   case class Max(field: String) extends GroupFunction {
     val makeFunction = makeDocument(Seq(elementProducer(
-      "$max", stringValue("$" + field))))
+      "$max", stringValue("$" + field)
+    )))
   }
 
   case class Min(field: String) extends GroupFunction {
     val makeFunction = makeDocument(Seq(elementProducer(
-      "$min", stringValue("$" + field))))
+      "$min", stringValue("$" + field)
+    )))
   }
 
   case class Push(field: String) extends GroupFunction {
     val makeFunction = makeDocument(Seq(elementProducer(
-      "$push", stringValue("$" + field))))
+      "$push", stringValue("$" + field)
+    )))
   }
 
   case class PushMulti(fields: (String, String)*) extends GroupFunction {
-    val makeFunction = makeDocument(Seq(elementProducer("$push",
+    val makeFunction = makeDocument(Seq(elementProducer(
+      "$push",
       makeDocument(fields.map(field =>
-        elementProducer(field._1, stringValue("$" + field._2)))))))
+        elementProducer(field._1, stringValue("$" + field._2))))
+    )))
   }
 
   case class AddToSet(field: String) extends GroupFunction {
     val makeFunction = makeDocument(Seq(elementProducer(
-      "$addToSet", stringValue("$" + field))))
+      "$addToSet", stringValue("$" + field)
+    )))
   }
 }

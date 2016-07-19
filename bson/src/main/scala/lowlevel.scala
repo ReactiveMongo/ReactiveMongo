@@ -45,7 +45,7 @@ class LowLevelBsonDocReader[A <: ReadableBuffer](rbuf: A) {
   private val end = start + length
   private def slice = rbuf.slice(length)
 
-  type ->[A, B] = (A, B)
+  type -> [A, B] = (A, B)
 
   def lookup(name: String): Option[Field] =
     fieldStream.find(_.name == name)

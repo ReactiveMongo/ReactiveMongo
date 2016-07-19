@@ -55,7 +55,8 @@ trait GenericQueryBuilder[P <: SerializationPack] {
     commentString: Option[String] = commentString,
     options: QueryOpts = options,
     failover: FailoverStrategy = failover,
-    maxTimeMsOption: Option[Long] = maxTimeMsOption): Self
+    maxTimeMsOption: Option[Long] = maxTimeMsOption
+  ): Self
 
   private def write(document: pack.Document, buffer: ChannelBufferWritableBuffer = ChannelBufferWritableBuffer()): ChannelBufferWritableBuffer = {
     pack.writeToBuffer(buffer, document)
@@ -67,8 +68,10 @@ trait GenericQueryBuilder[P <: SerializationPack] {
    *
    * An implicit `Reader[T]` must be present in the scope.
    */
-  @deprecated(message = "Use `cursor` function with read preference.",
-    since = "0.11.0")
+  @deprecated(
+    message = "Use `cursor` function with read preference.",
+    since = "0.11.0"
+  )
   def cursor[T](implicit reader: pack.Reader[T], ec: ExecutionContext, cp: CursorProducer[T]): cp.ProducedCursor = cursor(ReadPreference.primary)
 
   /**

@@ -230,7 +230,8 @@ trait Cursor[T] {
    * }}}
    */
   def fold[A](z: => A, maxDocs: Int = Int.MaxValue)(suc: (A, T) => A)(implicit ctx: ExecutionContext): Future[A] = foldWhile[A](z, maxDocs)(
-    { (st, v) => Cursor.Cont[A](suc(st, v)) }, FailOnError[A]())
+    { (st, v) => Cursor.Cont[A](suc(st, v)) }, FailOnError[A]()
+  )
 
   /** Returns the list of the matching documents. */
   @deprecated("consider using collect[List] instead", "0.10.0")
@@ -440,7 +441,8 @@ object DefaultCursor {
     readPreference: ReadPreference,
     mongoConnection: MongoConnection,
     failover: FailoverStrategy,
-    isMongo26WriteOp: Boolean)(implicit reader: pack.Reader[A]): Cursor[A] =
+    isMongo26WriteOp: Boolean
+  )(implicit reader: pack.Reader[A]): Cursor[A] =
     DefaultCursor.query[P, A](pack, query, documents, readPreference,
       mongoConnection, failover, isMongo26WriteOp)
 
@@ -451,7 +453,8 @@ object DefaultCursor {
     readPreference: ReadPreference,
     mongoConnection: MongoConnection,
     failover: FailoverStrategy,
-    isMongo26WriteOp: Boolean)(implicit reader: pack.Reader[A]) = new Impl[A] {
+    isMongo26WriteOp: Boolean
+  )(implicit reader: pack.Reader[A]) = new Impl[A] {
 
     val preference = readPreference
     val connection = mongoConnection
@@ -476,7 +479,8 @@ object DefaultCursor {
       }
 
       mongoConnection.sendExpectingResponse(
-        RequestMaker(q, requestBuffer, readPreference), isMongo26WriteOp)
+        RequestMaker(q, requestBuffer, readPreference), isMongo26WriteOp
+      )
     }.future
   }
 
@@ -492,7 +496,8 @@ object DefaultCursor {
     readPreference: ReadPreference,
     mongoConnection: MongoConnection,
     failover: FailoverStrategy,
-    isMongo26WriteOp: Boolean)(implicit reader: pack.Reader[A]) = new Impl[A] {
+    isMongo26WriteOp: Boolean
+  )(implicit reader: pack.Reader[A]) = new Impl[A] {
     val preference = readPreference
     val connection = mongoConnection
     val failoverStrategy = failover
@@ -556,17 +561,22 @@ object DefaultCursor {
         val toReturn =
           if (numberToReturn > 0) numberToReturn
           else maxDocs - (
-            response.reply.numberReturned + response.reply.startingFrom)
+            response.reply.numberReturned + response.reply.startingFrom
+          )
 
         val op = GetMore(fullCollectionName, toReturn, response.reply.cursorID)
 
         logger.trace(s"[Cursor] Calling next on ${response.reply.cursorID}, op=$op")
 
         Failover2(connection, failoverStrategy) { () =>
-          connection.sendExpectingResponse(RequestMaker(op,
-            readPreference = preference,
-            channelIdHint = Some(response.info.channelId)),
-            mongo26WriteOp)
+          connection.sendExpectingResponse(
+            RequestMaker(
+              op,
+              readPreference = preference,
+              channelIdHint = Some(response.info.channelId)
+            ),
+            mongo26WriteOp
+          )
 
         }.future.map(Some(_))
       } else {
@@ -578,7 +588,8 @@ object DefaultCursor {
     @inline
     private def hasNext(response: Response, maxDocs: Int): Boolean =
       (response.reply.cursorID != 0) && (
-        response.reply.numberReturned + response.reply.startingFrom) < maxDocs
+        response.reply.numberReturned + response.reply.startingFrom
+      ) < maxDocs
 
     /** Returns next response using tailable mode */
     private def tailResponse(current: Response, maxDocs: Int)(implicit context: ExecutionContext): Future[Option[Response]] = {
@@ -611,7 +622,8 @@ object DefaultCursor {
 
         val killReq = RequestMaker(
           KillCursors(Set(cursorID)),
-          readPreference = preference)
+          readPreference = preference
+        )
 
         connection.send(killReq)
       } else logger.trace(s"[$logCat] Cursor exhausted (${cursorID})")
@@ -665,26 +677,28 @@ object DefaultCursor {
       Enumerator.flatten(makeRequest(maxDocs).
         map(new CustomEnumerator.SEnumerator(_)(
           next = response => {
-            if (hasNext(response, maxDocs)) next(response, maxDocs)
-            else Future.successful(Option.empty[Response])
-          }, cleanUp = { resp => killCursors(resp, "Cursor") })))
+          if (hasNext(response, maxDocs)) next(response, maxDocs)
+          else Future.successful(Option.empty[Response])
+        }, cleanUp = { resp => killCursors(resp, "Cursor") }
+        )))
 
     @deprecated(message = "Only for internal use", since = "0.11.10")
     def tailableCursorEnumerateResponses(maxDocs: Int = Int.MaxValue)(implicit ctx: ExecutionContext): Enumerator[Response] =
       Enumerator.flatten(makeRequest(maxDocs).map { response =>
         new CustomEnumerator.SEnumerator(response -> 0)(
           next = { current =>
-            val (r, c) = current
-            if (c < maxDocs) {
-              tailResponse(r, maxDocs).
-                map(_.map((_, c + r.reply.numberReturned)))
+          val (r, c) = current
+          if (c < maxDocs) {
+            tailResponse(r, maxDocs).
+              map(_.map((_, c + r.reply.numberReturned)))
 
-            } else Future.successful(Option.empty[(Response, Int)])
-          },
+          } else Future.successful(Option.empty[(Response, Int)])
+        },
           cleanUp = { current =>
-            val (r, _) = current
-            killCursors(r, "Tailable Cursor")
-          }).map(_._1)
+          val (r, _) = current
+          killCursors(r, "Tailable Cursor")
+        }
+        ).map(_._1)
       })
 
     @deprecated(message = "Use the Play Iteratee modules", since = "0.11.10")
@@ -750,7 +764,8 @@ object DefaultCursor {
         { (builder, a) => Cont(builder += a) },
         { (b: Builder[A, M[A]], t: Throwable) =>
           err(b.result(), t).map[Builder[A, M[A]]](_ => b)
-        }).map(_.result())
+        }
+      ).map(_.result())
 
     def nextResponse(maxDocs: Int): (ExecutionContext, Response) => Future[Option[Response]] = {
       if (!tailable) { (ec: ExecutionContext, r: Response) =>
@@ -764,7 +779,8 @@ object DefaultCursor {
     private class FoldResponses[T](
         z: => T, maxDocs: Int,
         suc: (T, Response) => Future[State[T]],
-        err: ErrorHandler[T])(implicit ctx: ExecutionContext) {
+        err: ErrorHandler[T]
+    )(implicit ctx: ExecutionContext) {
 
       private val nextResp: Response => Future[Option[Response]] =
         nextResponse(maxDocs)(ctx, _: Response)
@@ -828,7 +844,8 @@ object DefaultCursor {
                 case Fail(e) => Future.failed(e)
                 case Cont(v) => {
                   logger.warn(
-                    "cannot continue after fatal request error", error)
+                    "cannot continue after fatal request error", error
+                  )
 
                   Future.successful(v)
                 }

@@ -115,7 +115,8 @@ class Macros extends Specification {
     "handle primitives" in {
       roundtrip(
         Primitives(1.2, "hai", true, 42, Long.MaxValue),
-        Macros.handler[Primitives])
+        Macros.handler[Primitives]
+      )
     }
 
     "support nesting" in {
@@ -135,13 +136,15 @@ class Macros extends Specification {
     "support seq" in {
       roundtrip(
         WordLover("john", Seq("hello", "world")),
-        Macros.handler[WordLover])
+        Macros.handler[WordLover]
+      )
     }
 
     "support single member case classes" in {
       roundtrip(
         Single("Foo"),
-        Macros.handler[Single])
+        Macros.handler[Single]
+      )
     }
 
     "support single member options" in {

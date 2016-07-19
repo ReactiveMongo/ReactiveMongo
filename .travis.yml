@@ -20,7 +20,6 @@ scala:
 jdk:
 - oraclejdk8
 - oraclejdk7
-sudo: false
 env:
   - CI_CATEGORY=UNIT_TESTS
   - CI_CATEGORY=INTEGRATION_TESTS AKKA_VERSION=2.3.13 MONGO_SSL=false MONGO_VER=2_6

@@ -20,12 +20,12 @@ if [ "x$MONGOD_PID" = "x" ]; then
 fi
 
 # JVM/SBT setup
-TEST_OPTS="exclude not_mongo26"
+TEST_OPTS="exclude not_mongo26,unit"
 SBT_ARGS="-Dtest.primaryHost=$PRIMARY_HOST"
 SBT_ARGS="$SBT_ARGS -Dtest.slowPrimaryHost=$PRIMARY_SLOW_PROXY -Dtest.slowProxyDelay=300 -Dtest.slowFailoverRetries=12"
 
 if [ "$MONGO_VER" = "3" ]; then
-    TEST_OPTS="exclude mongo2"
+    TEST_OPTS="exclude mongo2,unit"
     
     if [ "$MONGO_SSL" = "true" ]; then
         SBT_ARGS="$SBT_ARGS -Dtest.enableSSL=true"

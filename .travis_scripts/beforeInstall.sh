@@ -102,7 +102,7 @@ if [ "x$MONGOD_PID" = "x" ]; then
     echo -e "\nERROR: Fails to start the custom 'mongod' instance" > /dev/stderr
 
     mongod --version
-    PID=`ps -ao pid,comm | grep 'mongod$' | awk '{ printf("%s\n", $1); }'`
+    PID=`ps -o pid,comm -u $USER | grep 'mongod$' | awk '{ printf("%s\n", $1); }'`
 
     if [ ! "x$PID" = "x" ]; then
         pid -p $PID

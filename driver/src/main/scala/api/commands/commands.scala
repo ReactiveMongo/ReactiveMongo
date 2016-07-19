@@ -35,7 +35,8 @@ trait BoxedAnyVal[A <: AnyVal] {
 case class ResponseResult[R](
   response: Response,
   numberToReturn: Int,
-  value: R)
+  value: R
+)
 
 trait CommandError extends Exception with NoStackTrace {
   /** The error code */
@@ -118,7 +119,9 @@ object Command {
       }.future.map { response =>
         pack.readAndDeserialize(
           LoweLevelDocumentIterator(ChannelBufferReadableBuffer(
-            response.documents)).next, reader)
+          response.documents
+        )).next, reader
+        )
 
       }
     }
@@ -171,7 +174,8 @@ object Command {
       for {
         firstResponse <- cursor.makeRequest(cursor.numberToReturn)
         result <- cursor.headOption.flatMap(_.fold(Future.failed[R](
-          ReactiveMongoException("missing result")))(Future.successful(_)))
+          ReactiveMongoException("missing result")
+        ))(Future.successful(_)))
       } yield ResponseResult(firstResponse, cursor.numberToReturn, result)
     }
 
@@ -268,7 +272,8 @@ object Command {
  */
 final case class ResolvedCollectionCommand[C <: CollectionCommand](
   collection: String,
-  command: C) extends Command
+  command: C
+) extends Command
 
 object `package` {
   type WriteConcern = GetLastError

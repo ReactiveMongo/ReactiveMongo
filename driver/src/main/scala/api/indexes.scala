@@ -105,7 +105,8 @@ case class Index(
     version: Option[Int] = None, // let MongoDB decide
     // TODO: storageEngine (new for Mongo3)
     partialFilter: Option[BSONDocument] = None,
-    options: BSONDocument = BSONDocument()) {
+    options: BSONDocument = BSONDocument()
+) {
 
   /** The name of the index (a default one is computed if none). */
   lazy val eventualName: String = name.getOrElse(key.foldLeft("") { (name, kv) =>
@@ -205,7 +206,9 @@ sealed trait IndexesManager {
  * @param db The subject database.
  */
 final class LegacyIndexesManager(db: DB)(
-    implicit context: ExecutionContext) extends IndexesManager {
+    implicit
+    context: ExecutionContext
+) extends IndexesManager {
 
   val collection = db("system.indexes")
 
@@ -214,7 +217,8 @@ final class LegacyIndexesManager(db: DB)(
   def ensure(nsIndex: NSIndex): Future[Boolean] = {
     val query = BSONDocument(
       "ns" -> BSONString(nsIndex.namespace),
-      "name" -> BSONString(nsIndex.index.eventualName))
+      "name" -> BSONString(nsIndex.index.eventualName)
+    )
 
     collection.find(query).one.flatMap { idx =>
       if (!idx.isDefined)
@@ -246,7 +250,9 @@ final class LegacyIndexesManager(db: DB)(
  * @param db The subject database.
  */
 final class DefaultIndexesManager(db: DB with DBMetaCommands)(
-    implicit context: ExecutionContext) extends IndexesManager {
+    implicit
+    context: ExecutionContext
+) extends IndexesManager {
 
   import reactivemongo.api.commands.ListIndexes
 
@@ -338,8 +344,11 @@ sealed trait CollectionIndexesManager {
 }
 
 private class LegacyCollectionIndexesManager(
-    db: String, collectionName: String, legacy: LegacyIndexesManager)(
-        implicit context: ExecutionContext) extends CollectionIndexesManager {
+    db: String, collectionName: String, legacy: LegacyIndexesManager
+)(
+    implicit
+    context: ExecutionContext
+) extends CollectionIndexesManager {
 
   val fqName = db + "." + collectionName
 
@@ -368,7 +377,9 @@ private class LegacyCollectionIndexesManager(
 }
 
 private class DefaultCollectionIndexesManager(db: DB, collectionName: String)(
-    implicit context: ExecutionContext) extends CollectionIndexesManager {
+    implicit
+    context: ExecutionContext
+) extends CollectionIndexesManager {
 
   import reactivemongo.api.commands.{
     CreateIndexes,
@@ -395,8 +406,10 @@ private class DefaultCollectionIndexesManager(db: DB, collectionName: String)(
   } yield cr
 
   def create(index: Index): Future[WriteResult] =
-    Command.run(BSONSerializationPack)(collection,
-      CreateIndexes(db.name, List(index)))
+    Command.run(BSONSerializationPack)(
+      collection,
+      CreateIndexes(db.name, List(index))
+    )
 
   @deprecated("Use drop instead", "0.11.0")
   def delete(index: Index) = drop(index.eventualName)
@@ -408,7 +421,8 @@ private class DefaultCollectionIndexesManager(db: DB, collectionName: String)(
   def drop(nsIndex: NSIndex): Future[Int] = {
     import reactivemongo.api.commands.bson.BSONDropIndexesImplicits._
     Command.run(BSONSerializationPack)(
-      db(nsIndex.collectionName), DropIndexes(nsIndex.index.eventualName)).
+      db(nsIndex.collectionName), DropIndexes(nsIndex.index.eventualName)
+    ).
       map(_.value)
   }
 
@@ -460,12 +474,14 @@ object IndexesManager {
       "name" -> BSONString(nsIndex.index.eventualName),
       "key" -> BSONDocument(
         (for (kv <- nsIndex.index.key)
-          yield kv._1 -> kv._2.value).toStream),
+        yield kv._1 -> kv._2.value).toStream
+      ),
       "background" -> option(nsIndex.index.background, BSONBoolean(true)),
       "dropDups" -> option(nsIndex.index.dropDups, BSONBoolean(true)),
       "sparse" -> option(nsIndex.index.sparse, BSONBoolean(true)),
       "unique" -> option(nsIndex.index.unique, BSONBoolean(true)),
-      "partialFilterExpression" -> nsIndex.index.partialFilter) ++ nsIndex.index.options
+      "partialFilterExpression" -> nsIndex.index.partialFilter
+    ) ++ nsIndex.index.options
   }
 
   implicit object NSIndexWriter extends BSONDocumentWriter[NSIndex] {
@@ -478,7 +494,8 @@ object IndexesManager {
 
   implicit object IndexReader extends BSONDocumentReader[Index] {
     def read(doc: BSONDocument): Index = doc.getAs[BSONDocument]("key").map(
-      _.elements.map { elem => elem._1 -> IndexType(elem._2) }.toList).
+      _.elements.map { elem => elem._1 -> IndexType(elem._2) }.toList
+    ).
       fold[Index](throw new Exception("the key must be defined")) { key =>
         val options = doc.elements.filterNot { element =>
           element._1 == "ns" || element._1 == "key" || element._1 == "name" ||
@@ -505,7 +522,8 @@ object IndexesManager {
             map(_.map(_.toInt))
 
           partialFilter <- doc.getAsUnflattenedTry[BSONDocument](
-            "partialFilterExpression")
+            "partialFilterExpression"
+          )
         } yield Index(key, name, unique, background, dropDups,
           sparse, version, partialFilter, BSONDocument(options))).get
       }
@@ -514,7 +532,9 @@ object IndexesManager {
   implicit object NSIndexReader extends BSONDocumentReader[NSIndex] {
     def read(doc: BSONDocument): NSIndex =
       doc.getAs[BSONString]("ns").map(_.value).fold[NSIndex](
-        throw new Exception("the namespace ns must be defined"))(
-          NSIndex(_, doc.as[Index]))
+        throw new Exception("the namespace ns must be defined")
+      )(
+          NSIndex(_, doc.as[Index])
+        )
   }
 }

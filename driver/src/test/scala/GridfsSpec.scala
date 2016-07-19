@@ -47,8 +47,10 @@ class GridFSSpec extends org.specs2.mutable.Specification {
 
       f must beSome[GFile].which { actual =>
         actual.filename mustEqual file.filename and (
-          actual.uploadDate must beSome) and (
-            actual.contentType mustEqual file.contentType) and {
+          actual.uploadDate must beSome
+        ) and (
+            actual.contentType mustEqual file.contentType
+          ) and {
               import scala.collection.mutable.ArrayBuilder
               def res = gfs.enumerate(actual) |>>>
                 Iteratee.fold(ArrayBuilder.make[Byte]()) { (result, arr) =>
@@ -56,7 +58,8 @@ class GridFSSpec extends org.specs2.mutable.Specification {
                 }
 
               res.map(_.result()) must beEqualTo(
-                (1 to 100).map(_.toByte).toArray).await(1, timeout)
+                (1 to 100).map(_.toByte).toArray
+              ).await(1, timeout)
             }
       }.await(1, timeout)
     }

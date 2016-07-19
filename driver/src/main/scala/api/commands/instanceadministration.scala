@@ -19,21 +19,24 @@ object EmptyCapped extends CollectionCommand
 case class RenameCollection(
   fullyQualifiedCollectionName: String,
   fullyQualifiedTargetName: String,
-  dropTarget: Boolean = false)
+  dropTarget: Boolean = false
+)
     extends Command with CommandWithResult[UnitBox.type]
 
 case class Create(
   capped: Option[Capped] = None, // if set, "capped" -> true, size -> <int>, max -> <int>
   autoIndexId: Boolean = true, // optional
   flags: Int = 1 // defaults to 1
-  ) extends CollectionCommand with CommandWithResult[UnitBox.type]
+) extends CollectionCommand with CommandWithResult[UnitBox.type]
 
 case class Capped(
   size: Long,
-  max: Option[Int] = None)
+  max: Option[Int] = None
+)
 
 case class ConvertToCapped(
-  capped: Capped) extends CollectionCommand with CommandWithResult[UnitBox.type]
+  capped: Capped
+) extends CollectionCommand with CommandWithResult[UnitBox.type]
 
 case class CollStats(scale: Option[Int] = None) extends CollectionCommand with CommandWithResult[CollStatsResult]
 
@@ -72,7 +75,8 @@ case class CollStatsResult(
     indexSizes: Array[(String, Int)],
     capped: Boolean,
     max: Option[Long],
-    maxSize: Option[Double] = None) {
+    maxSize: Option[Double] = None
+) {
 
   @deprecated(message = "Use [[copy]] with [[maxSize]]", since = "0.11.10")
   def copy(
@@ -90,10 +94,12 @@ case class CollStatsResult(
     totalIndexSize: Int = this.totalIndexSize,
     indexSizes: Array[(String, Int)] = this.indexSizes,
     capped: Boolean = this.capped,
-    max: Option[Long] = this.max): CollStatsResult = CollStatsResult(
+    max: Option[Long] = this.max
+  ): CollStatsResult = CollStatsResult(
     ns, count, size, averageObjectSize, storageSize, numExtents, nindexes,
     lastExtentSize, paddingFactor, systemFlags, userFlags, totalIndexSize,
-    indexSizes, capped, max)
+    indexSizes, capped, max
+  )
 
 }
 
@@ -159,7 +165,8 @@ case class ReplSetMember(
   self: Boolean,
   pingMs: Option[Long],
   syncingTo: Option[String],
-  configVersion: Option[Int])
+  configVersion: Option[Int]
+)
 
 /**
  * Result from the [[http://docs.mongodb.org/manual/reference/command/replSetGetStatus/ replSetGetStatus]].
@@ -173,7 +180,8 @@ case class ReplSetStatus(
   name: String,
   time: Long,
   myState: Int,
-  members: List[ReplSetMember])
+  members: List[ReplSetMember]
+)
 
 /**
  * The command [[http://docs.mongodb.org/manual/reference/command/replSetGetStatus/ replSetGetStatus]]
@@ -197,7 +205,8 @@ case class ServerStatusResult(
   uptime: Long,
   uptimeMillis: Long,
   uptimeEstimate: Long,
-  localTime: Long)
+  localTime: Long
+)
 
 /** Server [[http://docs.mongodb.org/manual/reference/server-status/ status]] */
 case object ServerStatus

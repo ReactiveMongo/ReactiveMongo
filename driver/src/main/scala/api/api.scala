@@ -117,7 +117,8 @@ class Failover[T](message: T, connection: MongoConnection, strategy: FailoverStr
 
       case Failure(e) => {
         logger.trace(
-          "Got an non retryable error, completing with a failure...", e)
+          "Got an non retryable error, completing with a failure...", e
+        )
         promise.failure(e)
       }
 
@@ -174,7 +175,7 @@ class Failover2[A](producer: () => Future[A], connection: MongoConnection, strat
           val delay = Duration.unapply(strategy.initialDelay * delayFactor).
             fold(strategy.initialDelay)(t => FiniteDuration(t._1, t._2))
 
-          logger.debug(s"Got an error, retrying... (try #${`try`} is scheduled in ${delay.toMillis} ms)", e)
+          trace(s"Got an error, retrying... (try #${`try`} is scheduled in ${delay.toMillis} ms)", e)
 
           after(delay, connection.actorSystem.scheduler)(send(`try`))
         } else {
@@ -266,7 +267,8 @@ class MongoConnection(
     val name: String,
     val actorSystem: ActorSystem,
     val mongosystem: ActorRef,
-    val options: MongoConnectionOptions) {
+    val options: MongoConnectionOptions
+) {
 
   import Exceptions._
 
@@ -313,7 +315,8 @@ class MongoConnection(
     waitIsAvailable(failoverStrategy).map(_ => apply(name, failoverStrategy))
 
   private val databaseSTE = new StackTraceElement(
-    "reactivemongo.api.MongoConnection", "database", "api.scala", -1)
+    "reactivemongo.api.MongoConnection", "database", "api.scala", -1
+  )
 
   /** Returns a future that will be successful when node set is available. */
   private[api] def waitIsAvailable(failoverStrategy: FailoverStrategy)(implicit ec: ExecutionContext): Future[Unit] = {
@@ -340,7 +343,8 @@ class MongoConnection(
 
     def wait(iteration: Int, attempt: Int, timeout: FiniteDuration, lastErr: Throwable = null): Future[Unit] = {
       logger.trace(
-        s"[$lnm] Wait is available: $attempt @ ${System.currentTimeMillis}")
+        s"[$lnm] Wait is available: $attempt @ ${System.currentTimeMillis}"
+      )
 
       if (attempt == 0) {
         Future.failed(finalErr(lastErr))
@@ -352,7 +356,8 @@ class MongoConnection(
 
           unavail match {
             case Some(reason) => Left(FiniteDuration(
-              timeout.toMillis - duration, MILLISECONDS) -> reason)
+              timeout.toMillis - duration, MILLISECONDS
+            ) -> reason)
 
             case _ => Right({})
           }
@@ -367,7 +372,7 @@ class MongoConnection(
 
         res match {
           case Left((delay, error)) => {
-            logger.warn(s"[$lnm] Got an error, retrying", error)
+            logger.trace(s"[$lnm] Got an error, retrying", error)
             // TODO: Keep an explicit stacktrace accross the retries
             // TODO: Transform error into a single StackTraceElement to add it
 
@@ -385,11 +390,13 @@ class MongoConnection(
           case Some(ProtocolMetadata(
             _, MongoWireVersion.V24AndBefore, _, _, _)) =>
             Future.failed[Unit](ConnectionException(
-              s"unsupported MongoDB version < 2.6 ($lnm)"))
+              s"unsupported MongoDB version < 2.6 ($lnm)"
+            ))
 
           case Some(_) => Future successful {}
           case _ => Future.failed[Unit](ConnectionException(
-            s"protocol metadata not available ($lnm)"))
+            s"protocol metadata not available ($lnm)"
+          ))
         }
       }
   }
@@ -483,7 +490,8 @@ class MongoConnection(
   }
 
   private[api] val monitor = actorSystem.actorOf(
-    Props(new MonitorActor), s"Monitor-$name")
+    Props(new MonitorActor), s"Monitor-$name"
+  )
 
   @volatile private[api] var metadata: Option[ProtocolMetadata] = None
 
@@ -500,8 +508,9 @@ class MongoConnection(
     private var setAvailable = false
 
     override val receive: Receive = {
-      case pa @ PrimaryAvailable(metadata) => {
-        logger.debug(s"[$lnm] A primary is available")
+      case pa @ PrimaryAvailable(meta) => {
+        logger.debug(s"[$lnm] A primary is available: $meta")
+        metadata = Some(meta)
         primaryAvailable = true
         //waitingForPrimary.dequeueAll(_ => true).foreach(_ ! pa)
       }
@@ -513,8 +522,8 @@ class MongoConnection(
 
       case SetAvailable(meta) => {
         logger.debug(s"[$lnm] A node is available: $meta")
-        setAvailable = true
         metadata = Some(meta)
+        setAvailable = true
       }
 
       case SetUnavailable =>
@@ -593,7 +602,8 @@ object MongoConnection {
     options: MongoConnectionOptions,
     ignoredOptions: List[String],
     db: Option[String],
-    authenticate: Option[Authenticate])
+    authenticate: Option[Authenticate]
+  )
   // TODO: Type for URI with required DB name
 
   /**
@@ -663,7 +673,8 @@ object MongoConnection {
     case hosts :: dbName :: Nil => Some(dbName.takeWhile(_ != '?')) -> parseHosts(hosts)
     case _ =>
       throw new URIParsingException(
-        s"Could not parse hosts and database from URI: '$hostsPortAndDbName'")
+        s"Could not parse hosts and database from URI: '$hostsPortAndDbName'"
+      )
   }
 
   private def parseOptions(uriAndOptions: String): Map[String, String] =
@@ -672,7 +683,8 @@ object MongoConnection {
         option.split("=").toList match {
           case key :: value :: Nil => (key -> value)
           case _ => throw new URIParsingException(
-            s"Could not parse URI '$uri': invalid options '$options'")
+            s"Could not parse URI '$uri': invalid options '$options'"
+          )
         }
       }.toMap
 
@@ -684,7 +696,8 @@ object MongoConnection {
 
   private def makeOptions(opts: Map[String, String]): (List[String], MongoConnectionOptions) = {
     val (remOpts, step1) = opts.iterator.foldLeft(
-      Map.empty[String, String] -> MongoConnectionOptions()) {
+      Map.empty[String, String] -> MongoConnectionOptions()
+    ) {
         case ((unsupported, result), kv) => kv match {
           case ("authSource", v) => unsupported -> result.
             copy(authSource = Some(v))
@@ -733,24 +746,30 @@ object MongoConnection {
 
           case ("readPreference", "primaryPreferred") =>
             unsupported -> result.copy(
-              readPreference = ReadPreference.primaryPreferred)
+              readPreference = ReadPreference.primaryPreferred
+            )
 
           case ("readPreference", "secondary") => unsupported -> result.copy(
-            readPreference = ReadPreference.secondary)
+            readPreference = ReadPreference.secondary
+          )
 
           case ("readPreference", "secondaryPreferred") =>
             unsupported -> result.copy(
-              readPreference = ReadPreference.secondaryPreferred)
+              readPreference = ReadPreference.secondaryPreferred
+            )
 
           case ("readPreference", "nearest") => unsupported -> result.copy(
-            readPreference = ReadPreference.nearest)
+            readPreference = ReadPreference.nearest
+          )
 
           case ("rm.failover", "default") => unsupported -> result
           case ("rm.failover", "remote") => unsupported -> result.copy(
-            failoverStrategy = FailoverStrategy.remote)
+            failoverStrategy = FailoverStrategy.remote
+          )
 
           case ("rm.failover", "strict") => unsupported -> result.copy(
-            failoverStrategy = FailoverStrategy.strict)
+            failoverStrategy = FailoverStrategy.strict
+          )
 
           case ("rm.failover", opt @ FailoverRe(d, r, f)) => (for {
             (time, unit) <- Try(Duration(d)).toOption.flatMap(Duration.unapply)
@@ -767,7 +786,8 @@ object MongoConnection {
           case ("rm.monitorRefreshMS", opt @ IntRe(ms)) =>
             Try(ms.toInt).filter(_ >= 100 /* ms */ ).toOption match {
               case Some(interval) => unsupported -> result.copy(
-                monitorRefreshMS = interval)
+                monitorRefreshMS = interval
+              )
 
               case _ => (unsupported + ("rm.monitorRefreshMS" -> opt)) -> result
             }
@@ -904,15 +924,18 @@ class MongoDriver(config: Option[Config] = None) {
     // TODO: Passing ref to MongoDBSystem.history to AddConnection
     lazy val dbsystem: MongoDBSystem = options.authMode match {
       case ScramSha1Authentication => new StandardDBSystem(
-        supervisorName, nm, nodes, authentications, options)()
+        supervisorName, nm, nodes, authentications, options
+      )()
 
       case _ => new LegacyDBSystem(
-        supervisorName, nm, nodes, authentications, options)()
+        supervisorName, nm, nodes, authentications, options
+      )()
     }
 
     val mongosystem = system.actorOf(Props(dbsystem), nm)
     def connection = (supervisorActor ? AddConnection(
-      nm, nodes, options, mongosystem))(Timeout(10, SECONDS))
+      nm, nodes, options, mongosystem
+    ))(Timeout(10, SECONDS))
 
     logger.info(s"[$supervisorName] Creating connection: $nm")
 
@@ -1003,7 +1026,8 @@ class MongoDriver(config: Option[Config] = None) {
     name: String,
     nodes: Seq[String],
     options: MongoConnectionOptions,
-    mongosystem: ActorRef)
+    mongosystem: ActorRef
+  )
 
   //private case class CloseWithTimeout(timeout: FiniteDuration)
 
@@ -1013,10 +1037,12 @@ class MongoDriver(config: Option[Config] = None) {
     override def receive = {
       case AddConnection(name, nodes, opts, sys) => {
         logger.debug(
-          s"[$supervisorName] Add connection to the supervisor: $name")
+          s"[$supervisorName] Add connection to the supervisor: $name"
+        )
 
         val connection = new MongoConnection(
-          supervisorName, name, driver.system, sys, opts)
+          supervisorName, name, driver.system, sys, opts
+        )
         //connection.nodes = nodes
 
         driver.connectionMonitors.put(connection.monitor, connection)
@@ -1047,7 +1073,8 @@ class MongoDriver(config: Option[Config] = None) {
       case Terminated(actor) =>
         driver.connectionMonitors.remove(actor).foreach { con =>
           logger.debug(
-            s"[$supervisorName] Connection is terminated: ${con.name}")
+            s"[$supervisorName] Connection is terminated: ${con.name}"
+          )
 
           if (isEmpty) context.stop(self)
         }

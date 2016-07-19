@@ -67,7 +67,8 @@ case class NodeSet(
     name: Option[String],
     version: Option[Long],
     nodes: Vector[Node],
-    authenticates: Set[Authenticate]) {
+    authenticates: Set[Authenticate]
+) {
 
   /** The node which is the current primary one. */
   val primary: Option[Node] = nodes.find(_.status == NodeStatus.Primary)
@@ -76,13 +77,15 @@ case class NodeSet(
   val mongos: Option[Node] = nodes.find(_.isMongos)
 
   val secondaries = new RoundRobiner(
-    nodes.filter(_.status == NodeStatus.Secondary))
+    nodes.filter(_.status == NodeStatus.Secondary)
+  )
 
   val queryable = secondaries.subject ++ primary
 
   /** See the [[https://docs.mongodb.com/manual/reference/read-preference/#nearest nearest]] read preference. */
   val nearestGroup = new RoundRobiner(
-    queryable.sortWith { _.pingInfo.ping < _.pingInfo.ping })
+    queryable.sortWith { _.pingInfo.ping < _.pingInfo.ping }
+  )
 
   /** The first node from the [[nearestGroup]]. */
   val nearest = nearestGroup.subject.headOption
@@ -126,7 +129,8 @@ case class NodeSet(
     nodes.view.map(node =>
       node -> node.connections.find(_.channel.getId == id)).collectFirst {
       case (node, Some(con)) if (
-        con.status == ConnectionStatus.Connected) => node -> con
+        con.status == ConnectionStatus.Connected
+      ) => node -> con
     }
 
   @deprecated(message = "Unused", since = "0.12-RC0")
@@ -158,19 +162,23 @@ case class NodeSet(
 
       case ReadPreference.PrimaryPreferred(filter) =>
         pickConnectionAndFlatten(primary.orElse(
-          pickFromGroupWithFilter(secondaries, filter, secondaries.pick)))
+          pickFromGroupWithFilter(secondaries, filter, secondaries.pick)
+        ))
 
       case ReadPreference.Secondary(filter) =>
         pickConnectionAndFlatten(pickFromGroupWithFilter(
-          secondaries, filter, secondaries.pick))
+          secondaries, filter, secondaries.pick
+        ))
 
       case ReadPreference.SecondaryPreferred(filter) =>
         pickConnectionAndFlatten(pickFromGroupWithFilter(
-          secondaries, filter, secondaries.pick).orElse(primary))
+          secondaries, filter, secondaries.pick
+        ).orElse(primary))
 
       case ReadPreference.Nearest(filter) =>
         pickConnectionAndFlatten(pickFromGroupWithFilter(
-          nearestGroup, filter, nearest))
+          nearestGroup, filter, nearest
+        ))
     }
   }
 
@@ -200,7 +208,8 @@ case class NodeSetInfo(
     primary: Option[NodeInfo],
     mongos: Option[NodeInfo],
     secondaries: Vector[NodeInfo],
-    nearest: Option[NodeInfo]) {
+    nearest: Option[NodeInfo]
+) {
 
   override lazy val toString = s"{{NodeSet $name ${nodes.mkString(" | ")} }}"
 }
@@ -217,7 +226,8 @@ case class Node(
     tags: Option[BSONDocument],
     protocolMetadata: ProtocolMetadata,
     pingInfo: PingInfo = PingInfo(),
-    isMongos: Boolean = false) {
+    isMongos: Boolean = false
+) {
 
   private[nodeset] val aliases = Set.newBuilder[String]
 
@@ -245,15 +255,18 @@ case class Node(
   val authenticatedConnections = new RoundRobiner(
     connected.filter(_.authenticated.forall { auth =>
       authenticated.exists(_ == auth)
-    }))
+    })
+  )
 
   def createNeededChannels(receiver: ActorRef, upTo: Int)(implicit channelFactory: ChannelFactory): Node = {
     if (connections.size < upTo) {
       _copy(connections = connections ++ (for {
         i ← 0 until (upTo - connections.size)
       } yield {
-        Connection(channelFactory.create(host, port, receiver),
-          ConnectionStatus.Disconnected, Set.empty, None)
+        Connection(
+          channelFactory.create(host, port, receiver),
+          ConnectionStatus.Disconnected, Set.empty, None
+        )
       }))
     } else this
   }
@@ -268,7 +281,8 @@ case class Node(
     protocolMetadata: ProtocolMetadata = this.protocolMetadata,
     pingInfo: PingInfo = this.pingInfo,
     isMongos: Boolean = this.isMongos,
-    aliases: Set[String] = this.aliases.result()): Node = {
+    aliases: Set[String] = this.aliases.result()
+  ): Node = {
 
     val node = copy(name, status, connections, authenticated, tags,
       protocolMetadata, pingInfo, isMongos)
@@ -305,7 +319,8 @@ case class NodeInfo(
     tags: Option[BSONDocument],
     protocolMetadata: ProtocolMetadata,
     pingInfo: PingInfo,
-    isMongos: Boolean) {
+    isMongos: Boolean
+) {
 
   /** All the node names (including its aliases) */
   def names: Set[String] = aliases + name
@@ -314,11 +329,15 @@ case class NodeInfo(
 }
 
 case class ProtocolMetadata(
-  minWireVersion: MongoWireVersion,
-  maxWireVersion: MongoWireVersion,
-  maxMessageSizeBytes: Int,
-  maxBsonSize: Int,
-  maxBulkSize: Int)
+    minWireVersion: MongoWireVersion,
+    maxWireVersion: MongoWireVersion,
+    maxMessageSizeBytes: Int,
+    maxBsonSize: Int,
+    maxBulkSize: Int
+) {
+  override lazy val toString =
+    s"ProtocolMetadata($minWireVersion, $maxWireVersion)"
+}
 
 object ProtocolMetadata {
   val Default = ProtocolMetadata(MongoWireVersion.V26, MongoWireVersion.V26, 48000000, 16 * 1024 * 1024, 1000)
@@ -328,7 +347,8 @@ case class Connection(
     channel: Channel,
     status: ConnectionStatus,
     authenticated: Set[Authenticated],
-    authenticating: Option[Authenticating]) {
+    authenticating: Option[Authenticating]
+) {
 
   def send(message: Request, writeConcern: Request): ChannelFuture = {
     channel.write(message)
@@ -345,7 +365,8 @@ case class Connection(
 case class PingInfo(
   ping: Long = 0,
   lastIsMasterTime: Long = 0,
-  lastIsMasterId: Int = -1)
+  lastIsMasterId: Int = -1
+)
 
 object PingInfo {
   val pingTimeout = 60 * 1000
@@ -440,7 +461,8 @@ sealed trait Authentication {
 case class Authenticate(
     db: String,
     user: String,
-    password: String) extends Authentication {
+    password: String
+) extends Authentication {
 
   override def toString = s"Authenticate($db, $user)"
 }
@@ -476,7 +498,8 @@ case class ScramSha1Authenticating(
     randomPrefix: String, saslStart: String,
     conversationId: Option[Int] = None,
     serverSignature: Option[Array[Byte]] = None,
-    step: Int = 0) extends Authenticating {
+    step: Int = 0
+) extends Authenticating {
 
   override def toString: String =
     s"Authenticating($db, $user})"
@@ -541,22 +564,29 @@ final class ChannelFactory private[reactivemongo] (
     connection: String,
     options: MongoConnectionOptions,
     bossExecutor: Executor = Executors.newCachedThreadPool,
-    workerExecutor: Executor = Executors.newCachedThreadPool) {
+    workerExecutor: Executor = Executors.newCachedThreadPool
+) {
 
   @deprecated("Initialize with related mongosystem", "0.11.14")
   def this(opts: MongoConnectionOptions) =
-    this(s"unknown-${System identityHashCode opts}",
-      s"unknown-${System identityHashCode opts}", opts)
+    this(
+      s"unknown-${System identityHashCode opts}",
+      s"unknown-${System identityHashCode opts}", opts
+    )
 
   @deprecated("Initialize with related mongosystem", "0.11.14")
   def this(opts: MongoConnectionOptions, bossEx: Executor) =
-    this(s"unknown-${System identityHashCode opts}",
-      s"unknown-${System identityHashCode opts}", opts, bossEx)
+    this(
+      s"unknown-${System identityHashCode opts}",
+      s"unknown-${System identityHashCode opts}", opts, bossEx
+    )
 
   @deprecated("Initialize with related mongosystem", "0.11.14")
   def this(opts: MongoConnectionOptions, bossEx: Executor, workerEx: Executor) =
-    this(s"unknown-${System identityHashCode opts}",
-      s"unknown-${System identityHashCode opts}", opts, bossEx, workerEx)
+    this(
+      s"unknown-${System identityHashCode opts}",
+      s"unknown-${System identityHashCode opts}", opts, bossEx, workerEx
+    )
 
   import javax.net.ssl.{ KeyManager, SSLContext }
 
@@ -570,14 +600,17 @@ final class ChannelFactory private[reactivemongo] (
   }
 
   val channelFactory = new NioClientSocketChannelFactory(
-    bossExecutor, workerExecutor)
+    bossExecutor, workerExecutor
+  )
 
   private val bufferFactory = new HeapChannelBufferFactory(
-    java.nio.ByteOrder.LITTLE_ENDIAN)
+    java.nio.ByteOrder.LITTLE_ENDIAN
+  )
 
   private def makePipeline(timeoutMS: Int, receiver: ActorRef): ChannelPipeline = {
     val idleHandler = new IdleStateHandler(
-      timer, 0, 0, timeoutMS, TimeUnit.MILLISECONDS)
+      timer, 0, 0, timeoutMS, TimeUnit.MILLISECONDS
+    )
 
     val pipeline = Channels.pipeline(idleHandler, new ResponseFrameDecoder(),
       new ResponseDecoder(), new RequestEncoder(),
@@ -614,7 +647,8 @@ final class ChannelFactory private[reactivemongo] (
 
   private def makeChannel(receiver: ActorRef): Channel = {
     val channel = channelFactory.newChannel(makePipeline(
-      options.maxIdleTimeMS, receiver))
+      options.maxIdleTimeMS, receiver
+    ))
     val config = channel.getConfig
 
     config.setTcpNoDelay(options.tcpNoDelay)

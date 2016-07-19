@@ -27,7 +27,8 @@ import reactivemongo.bson.BSONDocument
 import reactivemongo.bson.buffer.{ ReadableBuffer, WritableBuffer }
 
 class ChannelBufferReadableBuffer(
-    protected[netty] val buffer: ChannelBuffer) extends ReadableBuffer {
+    protected[netty] val buffer: ChannelBuffer
+) extends ReadableBuffer {
 
   def size = buffer.capacity()
 

@@ -183,7 +183,8 @@ trait CollectionMetaCommands {
     Command.run(BSONSerializationPack)(self, DropCollection).flatMap {
       case DropCollectionResult(false) if failIfNotFound =>
         Future.failed[Boolean](GenericDatabaseException(
-          s"fails to drop collection: $name", Some(26)))
+          s"fails to drop collection: $name", Some(26)
+        ))
 
       case DropCollectionResult(dropped) => Future.successful(dropped)
     }
@@ -212,6 +213,8 @@ trait CollectionMetaCommands {
    *
    * @param to The new name of this collection.
    * @param dropExisting If a collection of name `to` already exists, then drops that collection before renaming this one.
+   *
+   * @return a failure if the dropExisting option is false and the target collection already exists
    */
   def rename(to: String, dropExisting: Boolean = false)(implicit ec: ExecutionContext): Future[Unit] =
     Command.run(BSONSerializationPack).unboxed(self.db, RenameCollection(db.name + "." + name, db.name + "." + to, dropExisting))

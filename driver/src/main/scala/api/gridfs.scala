@@ -80,7 +80,8 @@ object Implicits { // TODO: Move in a `ReadFile` companion object?
       doc.getAs[BSONNumberLike]("length").map(_.toLong).get,
       doc.getAs[BSONString]("md5").map(_.value),
       doc.getAs[BSONDocument]("metadata").getOrElse(BSONDocument()),
-      doc)
+      doc
+    )
   }
 }
 
@@ -134,7 +135,8 @@ class DefaultFileToSave(
   val contentType: Option[String] = None,
   val uploadDate: Option[Long] = None,
   val metadata: BSONDocument = BSONDocument.empty,
-  val id: BSONValue = BSONObjectID.generate())
+  val id: BSONValue = BSONObjectID.generate()
+)
     extends FileToSave[BSONSerializationPack.type, BSONValue] with Equals {
 
   val pack = BSONSerializationPack
@@ -176,11 +178,13 @@ object DefaultFileToSave {
     }
   }
 
-  def apply[N](filename: N,
-               contentType: Option[String] = None,
-               uploadDate: Option[Long] = None,
-               metadata: BSONDocument = BSONDocument.empty,
-               id: BSONValue = BSONObjectID.generate())(implicit naming: FileName[N]): DefaultFileToSave = new DefaultFileToSave(naming(filename), contentType, uploadDate, metadata, id)
+  def apply[N](
+    filename: N,
+    contentType: Option[String] = None,
+    uploadDate: Option[Long] = None,
+    metadata: BSONDocument = BSONDocument.empty,
+    id: BSONValue = BSONObjectID.generate()
+  )(implicit naming: FileName[N]): DefaultFileToSave = new DefaultFileToSave(naming(filename), contentType, uploadDate, metadata, id)
 
 }
 
@@ -200,7 +204,8 @@ case class DefaultReadFile(
     length: Long,
     md5: Option[String],
     metadata: BSONDocument,
-    original: BSONDocument) extends ReadFile[BSONSerializationPack.type, BSONValue] {
+    original: BSONDocument
+) extends ReadFile[BSONSerializationPack.type, BSONValue] {
   val pack = BSONSerializationPack
 }
 
@@ -278,7 +283,8 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
         previous: Array[Byte] = new Array(0),
         n: Int = 0,
         md: MessageDigest = MessageDigest.getInstance("MD5"),
-        length: Int = 0) {
+        length: Int = 0
+    ) {
 
       def feed(chunk: Array[Byte]): Future[Chunk] = {
         val wholeChunk = self.concat(previous, chunk)
@@ -290,10 +296,12 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
         val zipped =
           for (i <- 0 until normalizedChunkNumber)
             yield Arrays.copyOfRange(
-            wholeChunk, i * chunkSize, (i + 1) * chunkSize) -> i
+            wholeChunk, i * chunkSize, (i + 1) * chunkSize
+          ) -> i
 
         val left = Arrays.copyOfRange(
-          wholeChunk, normalizedChunkNumber * chunkSize, wholeChunk.length)
+          wholeChunk, normalizedChunkNumber * chunkSize, wholeChunk.length
+        )
 
         Future.traverse(zipped) { ci =>
           writeChunk(n + ci._2, ci._1)
@@ -303,7 +311,8 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
             if (left.isEmpty) Array.empty else left,
             n + normalizedChunkNumber,
             md, //{ md.update(chunk) ; md },
-            length + chunk.length)
+            length + chunk.length
+          )
         }
       }
 
@@ -324,7 +333,8 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
             "length" -> BSONLong(length),
             "uploadDate" -> BSONDateTime(uploadDate),
             "contentType" -> file.contentType.map(BSONString(_)),
-            "metadata" -> option(!pack.isEmpty(file.metadata), file.metadata))
+            "metadata" -> option(!pack.isEmpty(file.metadata), file.metadata)
+          )
 
           files.as[BSONCollection]().insert(bson).map { _ =>
             val buf = ChannelBufferWritableBuffer()
@@ -340,7 +350,8 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
         val bson = BSONDocument(
           "files_id" -> file.id,
           "n" -> BSONInteger(n),
-          "data" -> BSONBinary(array, Subtype.GenericBinarySubtype))
+          "data" -> BSONBinary(array, Subtype.GenericBinarySubtype)
+        )
 
         chunks.as[BSONCollection]().insert(bson)
       }
@@ -368,7 +379,10 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
       "n" -> BSONDocument(
         "$gte" -> 0,
         "$lte" -> BSONLong(file.length / file.chunkSize + (
-          if (file.length % file.chunkSize > 0) 1 else 0))))
+          if (file.length % file.chunkSize > 0) 1 else 0
+        ))
+      )
+    )
 
     @inline def cursor = chunks.as[BSONCollection]().find(selector).
       sort(BSONDocument("n" -> 1)).cursor[BSONDocument](defaultReadPreference)
@@ -391,7 +405,8 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
     Concurrent.unicast[Array[Byte]] { chan =>
       cursor.foldWhile({})(
         (_, doc) => pushChunk(chan, doc),
-        Cursor.FailOnError()).onComplete { case _ => chan.eofAndEnd() }
+        Cursor.FailOnError()
+      ).onComplete { case _ => chan.eofAndEnd() }
     }
   }
 

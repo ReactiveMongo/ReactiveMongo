@@ -38,7 +38,8 @@ object SortOrder {
 case class QueryOpts(
     skipN: Int = 0,
     batchSizeN: Int = 0,
-    flagsN: Int = 0) {
+    flagsN: Int = 0
+) {
 
   /** Sets the number of documents to skip. */
   def skip(n: Int) = copy(skipN = n)

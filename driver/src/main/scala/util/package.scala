@@ -33,7 +33,8 @@ package object util {
         f(_) match {
           case Left(e)  => Future.failed(e)
           case Right(b) => Future.successful(b)
-        })
+        }
+      )
     }
   }
   object EitherMappableFuture {

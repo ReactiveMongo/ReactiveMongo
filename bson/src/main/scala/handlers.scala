@@ -55,7 +55,8 @@ trait BSONReader[B <: BSONValue, T] { self =>
       def readTry(value: BSONValue): Try[U] =
         Try(value.asInstanceOf[B]) match {
           case Failure(_) => Failure(exceptions.TypeDoesNotMatch(
-            s"Cannot convert $value: ${value.getClass} with ${self.getClass}"))
+            s"Cannot convert $value: ${value.getClass} with ${self.getClass}"
+          ))
 
           case Success(bson) => self.readTry(bson)
         }
@@ -64,7 +65,8 @@ trait BSONReader[B <: BSONValue, T] { self =>
 
 object BSONReader {
   private class Default[B <: BSONValue, T](
-      _read: B => T) extends BSONReader[B, T] {
+      _read: B => T
+  ) extends BSONReader[B, T] {
     def read(bson: B): T = _read(bson)
   }
 
@@ -105,7 +107,8 @@ trait BSONWriter[T, B <: BSONValue] {
 
 object BSONWriter {
   private class Default[T, B <: BSONValue](
-      _write: T => B) extends BSONWriter[T, B] {
+      _write: T => B
+  ) extends BSONWriter[T, B] {
     def write(value: T): B = _write(value)
   }
 
@@ -155,7 +158,8 @@ trait BSONDocumentReader[T] extends BSONReader[BSONDocument, T]
 
 object BSONDocumentReader {
   private class Default[T](
-      _read: BSONDocument => T) extends BSONDocumentReader[T] {
+      _read: BSONDocument => T
+  ) extends BSONDocumentReader[T] {
 
     def read(value: BSONDocument): T = _read(value)
   }
@@ -168,7 +172,8 @@ trait BSONDocumentWriter[T] extends BSONWriter[T, BSONDocument]
 
 object BSONDocumentWriter {
   private class Default[T](
-      _write: T => BSONDocument) extends BSONDocumentWriter[T] {
+      _write: T => BSONDocument
+  ) extends BSONDocumentWriter[T] {
 
     def write(value: T): BSONDocument = _write(value)
   }
@@ -197,7 +202,8 @@ object BSONHandler {
   private[bson] class MappedHandler[B <: BSONValue, T, U](
       parent: BSONHandler[B, T],
       to: T => U,
-      from: U => T) extends BSONHandler[B, U] {
+      from: U => T
+  ) extends BSONHandler[B, U] {
     def write(u: U) = parent.write(from(u))
     def read(b: B) = to(parent.read(b))
   }

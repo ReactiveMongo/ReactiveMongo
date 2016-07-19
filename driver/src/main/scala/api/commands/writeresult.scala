@@ -48,7 +48,8 @@ object WriteResult {
       None, // waited,
       None, // wtime,
       result.writeErrors,
-      result.writeConcernError))
+      result.writeConcernError
+    ))
   }
 }
 
@@ -66,7 +67,8 @@ case class LastError(
   waited: Option[Int],
   wtime: Option[Int],
   writeErrors: Seq[WriteError] = Nil,
-  writeConcernError: Option[WriteConcernError] = None)
+  writeConcernError: Option[WriteConcernError] = None
+)
     extends DatabaseException with WriteResult with NoStackTrace {
 
   @deprecated("Use [[errmsg]]", "0.12.0")
@@ -83,7 +85,8 @@ case class LastError(
 case class WriteError(
   index: Int,
   code: Int,
-  errmsg: String)
+  errmsg: String
+)
 
 /**
  * @param code the error code
@@ -97,7 +100,8 @@ case class DefaultWriteResult(
     writeErrors: Seq[WriteError],
     writeConcernError: Option[WriteConcernError],
     code: Option[Int],
-    errmsg: Option[String]) extends WriteResult {
+    errmsg: Option[String]
+) extends WriteResult {
   def flatten = writeErrors.headOption.fold(this) { firstError =>
     DefaultWriteResult(
       ok = false,
@@ -105,7 +109,8 @@ case class DefaultWriteResult(
       writeErrors = writeErrors,
       writeConcernError = writeConcernError,
       code = code.orElse(Some(firstError.code)),
-      errmsg = errmsg.orElse(Some(firstError.errmsg)))
+      errmsg = errmsg.orElse(Some(firstError.errmsg))
+    )
   }
 }
 
@@ -119,7 +124,8 @@ case class UpdateWriteResult(
     writeErrors: Seq[WriteError],
     writeConcernError: Option[WriteConcernError],
     code: Option[Int],
-    errmsg: Option[String]) extends WriteResult {
+    errmsg: Option[String]
+) extends WriteResult {
   def flatten = writeErrors.headOption.fold(this) { firstError =>
     UpdateWriteResult(
       ok = false,
@@ -129,6 +135,7 @@ case class UpdateWriteResult(
       writeErrors = writeErrors,
       writeConcernError = writeConcernError,
       code = code.orElse(Some(firstError.code)),
-      errmsg = errmsg.orElse(Some(firstError.errmsg)))
+      errmsg = errmsg.orElse(Some(firstError.errmsg))
+    )
   }
 }
