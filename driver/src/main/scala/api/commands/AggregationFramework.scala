@@ -139,6 +139,29 @@ trait AggregationFramework[P <: SerializationPack] extends ImplicitCommandHelper
   }
 
   /**
+   * _Since MongoDB 3.2:_ Performs a left outer join to an unsharded collection in the same database to filter in documents from the "joined" collection for processing.
+   * https://docs.mongodb.com/v3.2/reference/operator/aggregation/lookup/#pipe._S_lookup
+   *
+   * @param from the collection to perform the join with
+   * @param localField the field from the documents input
+   * @param foreignField the field from the documents in the `from` collection
+   * @param as the name of the new array field to add to the input documents
+   */
+  case class Lookup(
+      from: String,
+      localField: String,
+      foreignField: String,
+      as: String) extends PipelineOperator {
+
+    val makePipe: pack.Document = makeDocument(Seq(elementProducer("$lookup",
+      makeDocument(Seq(elementProducer("from", stringValue(from)),
+        elementProducer("localField", stringValue(localField)),
+        elementProducer("foreignField", stringValue(foreignField)),
+        elementProducer("as", stringValue(as)))))))
+
+  }
+
+  /**
    * Skips over a number of documents before passing all further documents along the stream.
    * http://docs.mongodb.org/manual/reference/aggregation/skip/#_S_skip
    * @param skip the number of documents to skip
