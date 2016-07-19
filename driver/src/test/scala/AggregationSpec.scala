@@ -24,12 +24,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
     scala.concurrent.Await.result(c.indexesManager.ensure(Index(
       List("city" -> Text, "state" -> Text))).map(_ => c), timeout * 2)
   }
-  lazy val slowColl = slowDb(zipColName)
-
-  case class Location(lon: Double, lat: Double)
-
-  case class ZipCode(_id: String, city: String, state: String,
-                     population: Long, location: Location)
+  lazy val slowZipColl = slowDb(zipColName)
 
   implicit val locationHandler = Macros.handler[Location]
   implicit val zipCodeHandler = Macros.handler[ZipCode]
@@ -45,6 +40,8 @@ class AggregationSpec extends org.specs2.mutable.Specification {
     ZipCode("72000", "LE MANS", "FR", 148169L,
       Location(48.0077, 0.1984))) ++ jpCodes
 
+  // ---
+
   "Zip codes collection" should {
     "be inserted" in { implicit ee: EE =>
       def insert(data: List[ZipCode]): Future[Unit] = data.headOption match {
@@ -54,7 +51,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
 
       insert(zipCodes) aka "insert" must beEqualTo({}).await(1, timeout) and (
         coll.count() aka "count #1" must beEqualTo(4).await(1, slowTimeout)).
-        and(slowColl.count() aka "count #2" must beEqualTo(4).
+        and(slowZipColl.count() aka "count #2" must beEqualTo(4).
           await(1, slowTimeout))
 
     }
@@ -81,7 +78,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
       }
 
       "with the slow connection" in { implicit ee: EE =>
-        withRes(slowColl) {
+        withRes(slowZipColl) {
           _ aka "results" must beEqualTo(expected).await(1, slowTimeout)
         }
       }
@@ -233,7 +230,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
       }
 
       "with the slow connection" in { implicit ee: EE =>
-        distinctSpec(slowColl, slowTimeout)
+        distinctSpec(slowZipColl, slowTimeout)
       }
     }
 
@@ -241,7 +238,131 @@ class AggregationSpec extends org.specs2.mutable.Specification {
       import coll.BatchCommands.AggregationFramework
 
       coll.aggregate(AggregationFramework.Sample(2)).map(_.head[ZipCode].
-        filter(zipCodes.contains).size) must beEqualTo(2).await(1, timeout)
+        filter(zipCodes.contains).size) must beEqualTo(2).await(0, timeout)
+    } tag "not_mongo26"
+
+    "perform simple lookup" >> {
+      val orders = db.collection(s"agg-orders-1-${System identityHashCode this}")
+      val inventory = db.collection(
+        s"agg-inv-1-${System identityHashCode orders}")
+
+      "when fixtures are successfully inserted" in { implicit ee: EE =>
+        (for {
+          // orders
+          _ <- orders.insert(BSONDocument(
+            "_id" -> 1, "item" -> "abc", "price" -> 12, "quantity" -> 2))
+          _ <- orders.insert(BSONDocument(
+            "_id" -> 2, "item" -> "jkl", "price" -> 20, "quantity" -> 1))
+          _ <- orders.insert(BSONDocument("_id" -> 3))
+
+          // inventory
+          _ <- inventory.insert(BSONDocument("_id" -> 1, "sku" -> "abc",
+            "description" -> "product 1", "instock" -> 120))
+          _ <- inventory.insert(BSONDocument("_id" -> 2, "sku" -> "def",
+            "description" -> "product 2", "instock" -> 80))
+          _ <- inventory.insert(BSONDocument("_id" -> 3, "sku" -> "ijk",
+            "description" -> "product 3", "instock" -> 60))
+          _ <- inventory.insert(BSONDocument("_id" -> 4, "sku" -> "jkl",
+            "description" -> "product 4", "instock" -> 70))
+          _ <- inventory.insert(BSONDocument("_id" -> 5,
+            "sku" -> Option.empty[String], "description" -> "Incomplete"))
+          _ <- inventory.insert(BSONDocument("_id" -> 6))
+        } yield ()) must beEqualTo({}).await(0, timeout)
+      } tag "not_mongo26"
+
+      implicit val productHandler = Macros.handler[Product]
+      implicit val invReportHandler = Macros.handler[InventoryReport]
+
+      "so the joined documents are returned" in { implicit ee: EE =>
+        import orders.BatchCommands.AggregationFramework.Lookup
+
+        def expected = List(
+          InventoryReport(1, Some("abc"), Some(12), Some(2),
+            List(Product(1, Some("abc"), Some("product 1"), Some(120)))),
+          InventoryReport(2, Some("jkl"), Some(20), Some(1),
+            List(Product(4, Some("jkl"), Some("product 4"), Some(70)))),
+          InventoryReport(3, docs = List(
+            Product(5, None, Some("Incomplete")), Product(6))))
+
+        orders.aggregate(Lookup(inventory.name, "item", "sku", "docs")).
+          map(_.head[InventoryReport].toList) must beEqualTo(expected).
+          await(0, timeout)
+
+      } tag "not_mongo26"
+    }
+  }
+
+  "perform lookup with array" >> {
+    val orders = db.collection(s"agg-order-2-${System identityHashCode this}")
+    val inventory = db.collection(
+      s"agg-inv-2-${System identityHashCode orders}")
+
+    "when fixtures are successfully inserted" in { implicit ee: EE =>
+      (for {
+        // orders
+        _ <- orders.insert(BSONDocument(
+          "_id" -> 1, "item" -> "MON1003", "price" -> 350, "quantity" -> 2,
+          "specs" -> BSONArray("27 inch", "Retina display", "1920x1080"),
+          "type" -> "Monitor"))
+
+        // inventory
+        _ <- inventory.insert(BSONDocument("_id" -> 1, "sku" -> "MON1003",
+          "type" -> "Monitor", "instock" -> 120, "size" -> "27 inch",
+          "resolution" -> "1920x1080"))
+        _ <- inventory.insert(BSONDocument("_id" -> 2, "sku" -> "MON1012",
+          "type" -> "Monitor", "instock" -> 85, "size" -> "23 inch",
+          "resolution" -> "1920x1080"))
+        _ <- inventory.insert(BSONDocument("_id" -> 3, "sku" -> "MON1031",
+          "type" -> "Monitor", "instock" -> 60, "size" -> "23 inch",
+          "displayType" -> "LED"))
+      } yield ()) must beEqualTo({}).await(0, timeout)
+    } tag "not_mongo26"
+
+    "so the joined documents are returned" in { implicit ee: EE =>
+      import orders.BatchCommands.AggregationFramework
+      import AggregationFramework.{ Lookup, Match, Unwind }
+
+      def expected = document(
+        "_id" -> 1,
+        "item" -> "MON1003",
+        "price" -> 350,
+        "quantity" -> 2,
+        "specs" -> "27 inch",
+        "type" -> "Monitor",
+        "docs" -> BSONArray(document(
+          "_id" -> BSONInteger(1),
+          "sku" -> "MON1003",
+          "type" -> "Monitor",
+          "instock" -> BSONInteger(120),
+          "size" -> "27 inch",
+          "resolution" -> "1920x1080")))
+
+      orders.aggregate(Unwind("specs"), List(
+        Lookup(inventory.name, "specs", "size", "docs"),
+        Match(document("docs" -> document("$ne" -> BSONArray()))))).
+        map(_.head[BSONDocument].toList) must beEqualTo(List(expected)).
+        await(0, timeout)
+
     } tag "not_mongo26"
   }
+
+  // ---
+
+  case class Location(lon: Double, lat: Double)
+
+  case class ZipCode(
+    _id: String, city: String, state: String,
+    population: Long, location: Location)
+
+  case class Product(
+    _id: Int, sku: Option[String] = None,
+    description: Option[String] = None,
+    instock: Option[Int] = None)
+
+  case class InventoryReport(
+    _id: Int,
+    item: Option[String] = None,
+    price: Option[Int] = None,
+    quantity: Option[Int] = None,
+    docs: List[Product] = Nil)
 }

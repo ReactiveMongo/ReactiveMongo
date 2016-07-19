@@ -100,9 +100,9 @@ class DriverSpec extends org.specs2.mutable.Specification {
               }
             } and {
               (duration must be_>=(1465655000000L)) and (
-                duration must be_<(1468900000000L))
+                duration must be_<(1469000000000L))
             }
-        }.await(1, 1468900000000L.milliseconds) and {
+        }.await(1, 1469000000000L.milliseconds) and {
           con.askClose()(timeout) must not(throwA[Exception]).await(1, timeout)
         }
     }
