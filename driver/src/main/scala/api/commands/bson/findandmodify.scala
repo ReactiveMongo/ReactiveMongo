@@ -24,9 +24,11 @@ object BSONFindAndModifyImplicits {
             updatedExisting = doc.getAs[Boolean]("updatedExisting").getOrElse(false),
             n = doc.getAs[Int]("n").getOrElse(0),
             err = doc.getAs[String]("err"),
-            upsertedId = doc.getAs[BSONValue]("upserted"))
+            upsertedId = doc.getAs[BSONValue]("upserted")
+          )
         },
-        result.getAs[BSONDocument]("value"))
+        result.getAs[BSONDocument]("value")
+      )
   }
 
   implicit object FindAndModifyWriter
@@ -37,13 +39,15 @@ object BSONFindAndModifyImplicits {
         "findAndModify" -> cmd.collection,
         "query" -> cmd.command.query,
         "sort" -> cmd.command.sort,
-        "fields" -> cmd.command.fields) ++
+        "fields" -> cmd.command.fields
+      ) ++
         (cmd.command.modify match {
           case Update(document, fetchNewObject, upsert) =>
             BSONDocument(
               "upsert" -> upsert,
               "update" -> document,
-              "new" -> fetchNewObject)
+              "new" -> fetchNewObject
+            )
           case Remove => BSONDocument("remove" -> true)
         })
   }

@@ -45,7 +45,8 @@ case class BSONQueryBuilder(
   snapshotFlag: Boolean = false,
   commentString: Option[String] = None,
   options: QueryOpts = QueryOpts(),
-  maxTimeMsOption: Option[Long] = None)
+  maxTimeMsOption: Option[Long] = None
+)
     extends GenericQueryBuilder[BSONSerializationPack.type] {
   import reactivemongo.util.option
 
@@ -62,7 +63,8 @@ case class BSONQueryBuilder(
     commentString: Option[String] = commentString,
     options: QueryOpts = options,
     failover: FailoverStrategy = failover,
-    maxTimeMsOption: Option[Long] = maxTimeMsOption): BSONQueryBuilder =
+    maxTimeMsOption: Option[Long] = maxTimeMsOption
+  ): BSONQueryBuilder =
     BSONQueryBuilder(collection, failover, queryOption, sortOption, projectionOption, hintOption, explainFlag, snapshotFlag, commentString, options, maxTimeMsOption)
 
   def merge(readPreference: ReadPreference): BSONDocument = {
@@ -83,7 +85,8 @@ case class BSONQueryBuilder(
         case ReadPreference.Taggable(tagSet) => base :+ ("tags" -> BSONArray(
           tagSet.map(tags => BSONDocument(tags.toList.map {
             case (k, v) => k -> BSONString(v)
-          }))))
+          }))
+        ))
 
         case _ => base
       })
@@ -96,7 +99,8 @@ case class BSONQueryBuilder(
       maxTimeMsOption.map { "$maxTimeMS" -> BSONLong(_) },
       commentString.map { "$comment" -> BSONString(_) },
       option(explainFlag, "$explain" -> BSONBoolean(true)),
-      option(snapshotFlag, "$snapshot" -> BSONBoolean(true))).flatten
+      option(snapshotFlag, "$snapshot" -> BSONBoolean(true))
+    ).flatten
 
     BSONDocument(optional :+ ("$readPreference" -> pref))
   }

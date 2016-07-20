@@ -65,7 +65,8 @@ class BSONCollectionSpec extends org.specs2.mutable.Specification {
 
       "with insert" in { implicit ee: EE =>
         collection.insert(person).map(_.ok) must beTrue.await(1, timeout) and (
-          collection.insert(person2).map(_.ok) must beTrue.await(1, timeout))
+          collection.insert(person2).map(_.ok) must beTrue.await(1, timeout)
+        )
       }
 
       "with bulkInsert" in { implicit ee: EE =>
@@ -97,7 +98,8 @@ class BSONCollectionSpec extends org.specs2.mutable.Specification {
           collection.find(BSONDocument("age" -> 25), BSONDocument("name" -> 1)).
             one[BSONDocument] must beSome[BSONDocument].which { doc =>
               doc.elements.size must_== 2 /* _id+name */ and (
-                doc.getAs[String]("name") aka "name" must beSome("Jack"))
+                doc.getAs[String]("name") aka "name" must beSome("Jack")
+              )
             }.await(2, timeout)
       }
 
@@ -108,9 +110,11 @@ class BSONCollectionSpec extends org.specs2.mutable.Specification {
               result.getAs[BSONDocument]("queryPlanner").
                 aka("queryPlanner") must beSome and (
                   result.getAs[BSONDocument]("executionStats").
-                  aka("stats") must beSome) and (
+                  aka("stats") must beSome
+                ) and (
                     result.getAs[BSONDocument]("serverInfo").
-                    aka("serverInfo") must beSome)
+                    aka("serverInfo") must beSome
+                  )
 
             }.await(1, timeout)
         } tag "not_mongo26"
@@ -121,7 +125,8 @@ class BSONCollectionSpec extends org.specs2.mutable.Specification {
               result.getAs[List[BSONDocument]]("allPlans").
                 aka("plans") must beSome[List[BSONDocument]] and (
                   result.getAs[String]("server").
-                  aka("server") must beSome[String])
+                  aka("server") must beSome[String]
+                )
 
             }.await(1, timeout)
         } tag "mongo2"
@@ -168,19 +173,25 @@ class BSONCollectionSpec extends org.specs2.mutable.Specification {
         }
 
         "using foldWhile" in { implicit ee: EE =>
-          cursor.foldWhile(0)((i, _) => Cursor.Cont(i + 1),
-            (_, e) => Cursor.Fail(e)) must throwA[CustomException].
+          cursor.foldWhile(0)(
+            (i, _) => Cursor.Cont(i + 1),
+            (_, e) => Cursor.Fail(e)
+          ) must throwA[CustomException].
             await(1, timeout)
         }
 
         "fallbacking to final value using foldWhile" in { implicit ee: EE =>
-          cursor.foldWhile(0)((i, _) => Cursor.Cont(i + 1),
-            (_, e) => Cursor.Done(-1)) must beEqualTo(-1).await(1, timeout)
+          cursor.foldWhile(0)(
+            (i, _) => Cursor.Cont(i + 1),
+            (_, e) => Cursor.Done(-1)
+          ) must beEqualTo(-1).await(1, timeout)
         }
 
         "skiping failure using foldWhile" in { implicit ee: EE =>
-          cursor.foldWhile(0)((i, _) => Cursor.Cont(i + 1),
-            (_, e) => Cursor.Cont(-3)) must beEqualTo(-2).await(1, timeout)
+          cursor.foldWhile(0)(
+            (i, _) => Cursor.Cont(i + 1),
+            (_, e) => Cursor.Cont(-3)
+          ) must beEqualTo(-2).await(1, timeout)
         }
       }
 
@@ -229,11 +240,14 @@ class BSONCollectionSpec extends org.specs2.mutable.Specification {
     }
 
     "write a JavaScript value" in { implicit ee: EE =>
-      collection.insert(BSONDocument("age" -> 101,
-        "name" -> BSONJavaScript("db.getName()"))).flatMap { _ =>
+      collection.insert(BSONDocument(
+        "age" -> 101,
+        "name" -> BSONJavaScript("db.getName()")
+      )).flatMap { _ =>
         implicit val reader = PersonReader
         collection.find(BSONDocument("age" -> 101)).one[BSONDocument].map(
-          _.flatMap(_.getAs[BSONJavaScript]("name")).map(_.value))
+          _.flatMap(_.getAs[BSONJavaScript]("name")).map(_.value)
+        )
       } aka "inserted" must beSome("db.getName()").await(1, timeout)
     }
 
@@ -245,7 +259,8 @@ class BSONCollectionSpec extends org.specs2.mutable.Specification {
         "by updating age of 'Joline', & returns the old document" in {
           implicit ee: EE =>
             val updateOp = c.updateModifier(
-              BSONDocument("$set" -> BSONDocument("age" -> 35)))
+              BSONDocument("$set" -> BSONDocument("age" -> 35))
+            )
 
             c.findAndModify(BSONDocument("name" -> "Joline"), updateOp).
               map(_.result[Person]) must beSome(five).await(1, timeout)
@@ -255,7 +270,8 @@ class BSONCollectionSpec extends org.specs2.mutable.Specification {
           implicit ee: EE =>
             c.findAndUpdate(
               BSONDocument("name" -> "James"), person2.copy(age = 17),
-              fetchNewObject = true).map(_.result[Person]).
+              fetchNewObject = true
+            ).map(_.result[Person]).
               aka("result") must beSome(person2.copy(age = 17)).await(1, timeout)
         }
 
@@ -283,8 +299,10 @@ class BSONCollectionSpec extends org.specs2.mutable.Specification {
 
       "with default connection" >> {
         "find and remove 'Joline' using findAndModify" in { implicit ee: EE =>
-          collection.findAndModify(BSONDocument("name" -> "Joline"),
-            collection.removeModifier).map(_.result[Person]).
+          collection.findAndModify(
+            BSONDocument("name" -> "Joline"),
+            collection.removeModifier
+          ).map(_.result[Person]).
             aka("removed person") must beSome(person5.copy(age = 35)).
             await(1, timeout)
         }
@@ -298,8 +316,10 @@ class BSONCollectionSpec extends org.specs2.mutable.Specification {
 
       "with slow connection" >> {
         "find and remove 'Joline' using findAndModify" in { implicit ee: EE =>
-          collection.findAndModify(BSONDocument("name" -> "Joline"),
-            collection.removeModifier).map(_.result[Person]).
+          collection.findAndModify(
+            BSONDocument("name" -> "Joline"),
+            collection.removeModifier
+          ).map(_.result[Person]).
             aka("removed person") must beNone.await(1, timeout)
         }
 
@@ -316,7 +336,8 @@ class BSONCollectionSpec extends org.specs2.mutable.Specification {
           _db(s"foo_${System identityHashCode _db}").
             rename("renamed").map(_ => false).recover({
               case DefaultBSONCommandError(Some(13), Some(msg), _) if (
-                msg contains "renameCollection ") => true
+                msg contains "renameCollection "
+              ) => true
               case _ => false
             }) must beTrue.await(1, timeout)
         }

@@ -14,7 +14,8 @@ trait Cursor1Spec { spec: CursorSpec =>
     s"insert $nDocs records" in { implicit ee: EE =>
       val futs: Seq[Future[Unit]] = for (i <- 0 until nDocs) yield {
         coll.insert(BSONDocument(
-          "i" -> i, "record" -> s"record$i")).map(_ => {})
+          "i" -> i, "record" -> s"record$i"
+        )).map(_ => {})
       }
 
       Future.sequence(futs).map { _ =>
@@ -58,7 +59,8 @@ trait Cursor1Spec { spec: CursorSpec =>
       { // .fold
         "fold all the documents" in { implicit ee: EE =>
           c.find(matchAll("cursorspec2")).cursor().fold(0)(
-            { (st, _) => debug(s"fold: $st"); st + 1 }).
+            { (st, _) => debug(s"fold: $st"); st + 1 }
+          ).
             aka("result size") must beEqualTo(16517).await(1, timeout)
         }
 
@@ -72,26 +74,30 @@ trait Cursor1Spec { spec: CursorSpec =>
       { // .foldWhile
         "fold while all the documents" in { implicit ee: EE =>
           c.find(matchAll("cursorspec4a")).cursor().foldWhile(0)(
-            { (st, _) => debug(s"foldWhile: $st"); Cursor.Cont(st + 1) }).
+            { (st, _) => debug(s"foldWhile: $st"); Cursor.Cont(st + 1) }
+          ).
             aka("result size") must beEqualTo(16517).await(1, timeout)
         }
 
         "fold while only 1024 documents" in { implicit ee: EE =>
           c.find(matchAll("cursorspec5a")).cursor().foldWhile(0, 1024)(
-            (st, _) => Cursor.Cont(st + 1)).
+            (st, _) => Cursor.Cont(st + 1)
+          ).
             aka("result size") must beEqualTo(1024).await(1, timeout)
         }
 
         "fold while successfully with async function" >> {
           "all the documents" in { implicit ee: EE =>
             coll.find(matchAll("cursorspec4b")).cursor().foldWhileM(0)(
-              (st, _) => Future(Cursor.Cont(st + 1))).
+              (st, _) => Future(Cursor.Cont(st + 1))
+            ).
               aka("result size") must beEqualTo(16517).await(1, timeout)
           }
 
           "only 1024 documents" in { implicit ee: EE =>
             coll.find(matchAll("cursorspec5b")).cursor().foldWhileM(0, 1024)(
-              (st, _) => Future.successful(Cursor.Cont(st + 1))).
+              (st, _) => Future.successful(Cursor.Cont(st + 1))
+            ).
               aka("result size") must beEqualTo(1024).await(1, timeout)
           }
         }
@@ -107,20 +113,23 @@ trait Cursor1Spec { spec: CursorSpec =>
 
         "fold the bulks for 1024 documents" in { implicit ee: EE =>
           c.find(matchAll("cursorspec7a")).cursor().foldBulks(0, 1024)(
-            (st, bulk) => Cursor.Cont(st + bulk.size)).
+            (st, bulk) => Cursor.Cont(st + bulk.size)
+          ).
             aka("result size") must beEqualTo(1024).await(1, timeout)
         }
 
         "fold the bulks with async function" >> {
           "for all the documents" in { implicit ee: EE =>
             coll.find(matchAll("cursorspec6b")).cursor().foldBulksM(0)(
-              (st, bulk) => Future(Cursor.Cont(st + bulk.size))).
+              (st, bulk) => Future(Cursor.Cont(st + bulk.size))
+            ).
               aka("result size") must beEqualTo(16517).await(1, timeout)
           }
 
           "for 1024 documents" in { implicit ee: EE =>
             coll.find(matchAll("cursorspec7b")).cursor().foldBulksM(0, 1024)(
-              (st, bulk) => Future.successful(Cursor.Cont(st + bulk.size))).
+              (st, bulk) => Future.successful(Cursor.Cont(st + bulk.size))
+            ).
               aka("result size") must beEqualTo(1024).await(1, timeout)
           }
         }
@@ -132,19 +141,22 @@ trait Cursor1Spec { spec: CursorSpec =>
             { (st, resp) =>
               debug(s"foldResponses: $st")
               Cursor.Cont(st + resp.reply.numberReturned)
-            }) aka "result size" must beEqualTo(16517).await(1, timeout)
+            }
+          ) aka "result size" must beEqualTo(16517).await(1, timeout)
         }
 
         "fold the responses for 1024 documents" in { implicit ee: EE =>
           c.find(matchAll("cursorspec9a")).cursor().foldResponses(0, 1024)(
-            (st, resp) => Cursor.Cont(st + resp.reply.numberReturned)).
+            (st, resp) => Cursor.Cont(st + resp.reply.numberReturned)
+          ).
             aka("result size") must beEqualTo(1024).await(1, timeout)
         }
 
         "fold the responses with async function" >> {
           "for all the documents" in { implicit ee: EE =>
             coll.find(matchAll("cursorspec8b")).cursor().foldResponsesM(0)(
-              (st, resp) => Future(Cursor.Cont(st + resp.reply.numberReturned))).
+              (st, resp) => Future(Cursor.Cont(st + resp.reply.numberReturned))
+            ).
               aka("result size") must beEqualTo(16517).await(1, timeout)
           }
 
@@ -152,7 +164,9 @@ trait Cursor1Spec { spec: CursorSpec =>
             coll.find(matchAll("cursorspec9b")).cursor().
               foldResponsesM(0, 1024)(
                 (st, resp) => Future(
-                  Cursor.Cont(st + resp.reply.numberReturned))).
+                  Cursor.Cont(st + resp.reply.numberReturned)
+                )
+              ).
                 aka("result size") must beEqualTo(1024).await(1, timeout)
           }
         }
@@ -170,13 +184,15 @@ trait Cursor1Spec { spec: CursorSpec =>
     "fold the responses with async function" >> {
       "for all the documents" in { implicit ee: EE =>
         coll.find(matchAll("cursorspec8")).cursor().foldResponsesM(0)(
-          (st, resp) => Future(Cursor.Cont(st + resp.reply.numberReturned))).
+          (st, resp) => Future(Cursor.Cont(st + resp.reply.numberReturned))
+        ).
           aka("result size") must beEqualTo(16517).await(1, timeout)
       }
 
       "for 1024 documents" in { implicit ee: EE =>
         coll.find(matchAll("cursorspec9")).cursor().foldResponsesM(0, 1024)(
-          (st, resp) => Future(Cursor.Cont(st + resp.reply.numberReturned))).
+          (st, resp) => Future(Cursor.Cont(st + resp.reply.numberReturned))
+        ).
           aka("result size") must beEqualTo(1024).await(1, timeout)
       }
     }
@@ -195,17 +211,20 @@ trait Cursor1Spec { spec: CursorSpec =>
       val cursor = coll.find(matchAll("cursorspec10")).cursor()
 
       cursor.foo must_== "Bar" and (
-        Cursor.flatten(Future.successful(cursor)).foo must_== "raB")
+        Cursor.flatten(Future.successful(cursor)).foo must_== "raB"
+      )
     }
 
     "throw exception when maxTimeout reached" >> {
       def timeoutSpec(c: BSONCollection, timeout: FiniteDuration)(implicit ee: EE) = {
         def delayedTimeout = FiniteDuration(
-          (timeout.toMillis * 1.25D).toLong, MILLISECONDS)
+          (timeout.toMillis * 1.25D).toLong, MILLISECONDS
+        )
 
         def futs: Seq[Future[Unit]] = for (i <- 0 until 16517)
           yield c.insert(BSONDocument(
-          "i" -> i, "record" -> s"record$i")).
+          "i" -> i, "record" -> s"record$i"
+        )).
           map(_ => debug(s"fixture #$i inserted (${c.name})"))
 
         Future.sequence(futs).map(_ => {}).

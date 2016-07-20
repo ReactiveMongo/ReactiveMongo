@@ -49,13 +49,15 @@ case class MongoConnectionOptions(
   failoverStrategy: FailoverStrategy = FailoverStrategy.default,
 
   monitorRefreshMS: Int = 10000,
-  maxIdleTimeMS: Int = 0)
+  maxIdleTimeMS: Int = 0
+)
 
 object MongoConnectionOptions {
   @inline private def ms(duration: Int): String = s"${duration}ms"
 
   private[reactivemongo] def toStrings(options: MongoConnectionOptions): List[(String, String)] = options.authSource.toList.map(
-    "authSource" -> _.toString) ++ List(
+    "authSource" -> _.toString
+  ) ++ List(
       "authMode" -> options.authMode.toString,
       "nbChannelsPerNode" -> options.nbChannelsPerNode.toString,
       "monitorRefreshMS" -> ms(options.monitorRefreshMS),
@@ -66,6 +68,7 @@ object MongoConnectionOptions {
       "sslEnabled" -> options.sslEnabled.toString,
       "sslAllowsInvalidCert" -> options.sslAllowsInvalidCert.toString,
       "writeConcern" -> options.writeConcern.toString,
-      "readPreference" -> options.readPreference.toString)
+      "readPreference" -> options.readPreference.toString
+    )
 
 }

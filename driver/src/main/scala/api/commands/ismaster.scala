@@ -17,7 +17,8 @@ trait IsMasterCommand[P <: SerializationPack] {
       isArbiterOnly: Boolean, // `arbiterOnly`
       isPassive: Boolean, // `passive`
       isHidden: Boolean, // `hidden`
-      tags: Option[P#Document]) {
+      tags: Option[P#Document]
+  ) {
 
     override lazy val toString = s"""ReplicaSet($setName, primary = $primary, me = $me, hosts = ${hosts.mkString("[", ",", "]")})"""
   }
@@ -32,7 +33,7 @@ trait IsMasterCommand[P <: SerializationPack] {
       maxWireVersion: Int, // int? mongod >= 2.6
       replicaSet: Option[ReplicaSet], // flattened in the result
       msg: Option[String] // Contains the value isdbgrid when isMaster returns from a mongos instance.
-      ) {
+  ) {
     def isMongos: Boolean = msg.isDefined
     def status: NodeStatus = if (isMaster) NodeStatus.Primary else if (replicaSet.exists(_.isSecondary)) NodeStatus.Secondary else NodeStatus.NonQueryableUnknownStatus
   }

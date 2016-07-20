@@ -28,7 +28,8 @@ object Common {
   val DefaultOptions = {
     val opts = MongoConnectionOptions(
       failoverStrategy = failoverStrategy,
-      nbChannelsPerNode = 20)
+      nbChannelsPerNode = 20
+    )
 
     if (Option(System getProperty "test.enableSSL").exists(_ == "true")) {
       opts.copy(sslEnabled = true, sslAllowsInvalidCert = true)
@@ -50,8 +51,6 @@ object Common {
     else maxTimeout
   }
 
-  val timeoutMillis = timeout.toMillis.toInt
-
   val commonDb = "specs2-test-reactivemongo"
 
   // ---
@@ -64,10 +63,12 @@ object Common {
   }
 
   val SlowOptions = DefaultOptions.copy(
-    failoverStrategy = slowFailover)
+    failoverStrategy = slowFailover
+  )
 
   val slowPrimary = Option(
-    System getProperty "test.slowPrimaryHost").getOrElse("localhost:27019")
+    System getProperty "test.slowPrimaryHost"
+  ).getOrElse("localhost:27019")
 
   val slowTimeout: FiniteDuration = {
     val maxTimeout = estTimeout(slowFailover)
@@ -123,7 +124,8 @@ object Common {
     Await.result(_db.flatMap { d => d.drop.map(_ => d) }, timeout)
 
     Await.result(_db, timeout) -> Await.result(
-      slowConnection.database(commonDb, slowFailover), slowTimeout)
+      slowConnection.database(commonDb, slowFailover), slowTimeout
+    )
   }
 
   // ---

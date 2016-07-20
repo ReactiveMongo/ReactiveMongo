@@ -156,7 +156,8 @@ import java.nio.{ ByteBuffer, ByteOrder }, ByteOrder._
 
 /** An array-backed readable buffer. */
 case class ArrayReadableBuffer private (
-    bytebuffer: ByteBuffer) extends ReadableBuffer {
+    bytebuffer: ByteBuffer
+) extends ReadableBuffer {
 
   bytebuffer.order(LITTLE_ENDIAN)
 

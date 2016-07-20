@@ -49,11 +49,14 @@ class NodeSetSpec extends org.specs2.mutable.Specification {
 
     def withCon[T](opts: MongoConnectionOptions = MongoConnectionOptions())(f: (MongoConnection, String) => T): T = {
       val name = s"con-${System identityHashCode opts}"
-      val con = md.connection(Seq("node1:27017", "node2:27017"),
+      val con = md.connection(
+        Seq("node1:27017", "node2:27017"),
         authentications = Seq(Authenticate(
-          Common.commonDb, "test", "password")),
+          Common.commonDb, "test", "password"
+        )),
         options = opts,
-        name = Some(name))
+        name = Some(name)
+      )
 
       f(con, name)
     }
@@ -76,7 +79,8 @@ class NodeSetSpec extends org.specs2.mutable.Specification {
 
               waitIsAvailable(con, failoverStrategy).map(_ => true).recover {
                 case reason: PrimaryUnavailableException if (
-                  reason.getMessage.indexOf(name) != -1) => false
+                  reason.getMessage.indexOf(name) != -1
+                ) => false
               } must beFalse.await(1, timeout)
             }
           }
@@ -104,7 +108,8 @@ class NodeSetSpec extends org.specs2.mutable.Specification {
 
       "without the primary if slave ok" in { implicit ee: EE =>
         val opts = MongoConnectionOptions(
-          readPreference = ReadPreference.primaryPreferred)
+          readPreference = ReadPreference.primaryPreferred
+        )
 
         withCon(opts) { (con, name) =>
           withConMon(name) { conMon =>
@@ -134,9 +139,10 @@ class NodeSetSpec extends org.specs2.mutable.Specification {
                 before <- isAvailable(con)
                 _ = conMon ! PrimaryUnavailable
                 after <- waitIsAvailable(
-                  con, failoverStrategy).map(_ => true).recover {
-                    case _ => false
-                  }
+                  con, failoverStrategy
+                ).map(_ => true).recover {
+                  case _ => false
+                }
               } yield before -> after).andThen { case _ => con.close() }
 
               test must beEqualTo(true -> false).await(1, timeout)
@@ -146,7 +152,8 @@ class NodeSetSpec extends org.specs2.mutable.Specification {
 
       "without the primary if slave ok" in { implicit ee: EE =>
         val opts = MongoConnectionOptions(
-          readPreference = ReadPreference.primaryPreferred)
+          readPreference = ReadPreference.primaryPreferred
+        )
 
         withCon(opts) { (con, name) =>
           withConMon(name) { conMon =>
@@ -157,9 +164,10 @@ class NodeSetSpec extends org.specs2.mutable.Specification {
               before <- isAvailable(con)
               _ = conMon ! SetUnavailable
               after <- waitIsAvailable(
-                con, failoverStrategy).map(_ => true).recover {
-                  case _ => false
-                }
+                con, failoverStrategy
+              ).map(_ => true).recover {
+                case _ => false
+              }
             } yield before -> after).andThen { case _ => con.close() }
 
             test must beEqualTo(true -> false).await(1, timeout)
@@ -179,7 +187,7 @@ class NodeSetSpec extends org.specs2.mutable.Specification {
       val opts = Common.DefaultOptions.copy(
         nbChannelsPerNode = 3,
         monitorRefreshMS = 3600000 // disable refreshAll/connectAll during test
-        )
+      )
 
       withConAndSys(options = opts) { (con, dbsystem) =>
         waitIsAvailable(con, Common.failoverStrategy).map { _ =>
@@ -199,7 +207,8 @@ class NodeSetSpec extends org.specs2.mutable.Specification {
           } and {
             authCon1.size aka "authed connections #1" must beLike[Int] {
               case number => number must beGreaterThan(1) and (
-                number must beLessThanOrEqualTo(opts.nbChannelsPerNode))
+                number must beLessThanOrEqualTo(opts.nbChannelsPerNode)
+              )
             }
           } and { // #2
             nodeset1.pick(ReadPreference.Primary).
@@ -213,14 +222,16 @@ class NodeSetSpec extends org.specs2.mutable.Specification {
                   node.name aka "node #1" must_== Common.primaryHost and {
                     // After one node is picked up
                     primary2.map(_.name) aka "primary #2" must beSome(
-                      primary1.get.name)
+                      primary1.get.name
+                    )
                   } and {
                     // After one connection is picked up...
                     chanId1 = chan.channel.getId
 
                     authCon2.size aka "authed connections #2" must beLike[Int] {
                       case number => number must beGreaterThan(1) and (
-                        number must beLessThanOrEqualTo(opts.nbChannelsPerNode))
+                        number must beLessThanOrEqualTo(opts.nbChannelsPerNode)
+                      )
                     }
                   }
               }
@@ -235,14 +246,16 @@ class NodeSetSpec extends org.specs2.mutable.Specification {
               }
 
               primary3.map(_.name) aka "primary #3 (after ChannelClosed)" must (
-                beSome(primary1.get.name)) and {
+                beSome(primary1.get.name)
+              ) and {
                   nodeSet3.pick(ReadPreference.Primary).
                     aka("channel #2") must beSome[(Node, Connection)].like {
                       case (_, chan) =>
                         val chanId2 = chan.channel.getId
 
                         chanId2 must not(beEqualTo(-1)) and (
-                          chanId2 must not(beEqualTo(chanId1)))
+                          chanId2 must not(beEqualTo(chanId1))
+                        )
                     }
                 }
             }
@@ -275,11 +288,14 @@ class NodeSetSpec extends org.specs2.mutable.Specification {
     val poolName = s"Connection-${System identityHashCode supervisorName}"
     val nodes = Seq(host)
     lazy val dbsystem = standardDBSystem(
-      supervisorName, poolName, nodes, authentications, options)
+      supervisorName, poolName, nodes, authentications, options
+    )
 
     def mongosystem = drv.system.actorOf(Props(dbsystem), poolName)
-    def connection = addConnection(drv,
-      poolName, nodes, options, mongosystem).mapTo[MongoConnection]
+    def connection = addConnection(
+      drv,
+      poolName, nodes, options, mongosystem
+    ).mapTo[MongoConnection]
 
     connection.flatMap { con =>
       f(con, dbsystem).andThen { case _ => con.close() }

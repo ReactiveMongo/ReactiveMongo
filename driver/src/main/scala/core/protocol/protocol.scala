@@ -132,7 +132,8 @@ case class MessageHeader(
     messageLength: Int,
     requestID: Int,
     responseTo: Int,
-    opCode: Int) extends ChannelBufferWritable {
+    opCode: Int
+) extends ChannelBufferWritable {
   override val writeTo = writeTupleToBuffer4((messageLength, requestID, responseTo, opCode)) _
   override def size = 4 + 4 + 4 + 4
 }
@@ -148,7 +149,8 @@ object MessageHeader extends ChannelBufferReadable[MessageHeader] {
       messageLength,
       requestID,
       responseTo,
-      opCode)
+      opCode
+    )
   }
 }
 
@@ -166,7 +168,8 @@ case class Request(
     op: RequestOp,
     documents: BufferSequence,
     readPreference: ReadPreference = ReadPreference.primary,
-    channelIdHint: Option[Int] = None) extends ChannelBufferWritable {
+    channelIdHint: Option[Int] = None
+) extends ChannelBufferWritable {
   override val writeTo = { buffer: ChannelBuffer =>
     buffer write header
     buffer write op
@@ -191,7 +194,8 @@ case class Request(
 case class CheckedWriteRequest(
     op: WriteRequestOp,
     documents: BufferSequence,
-    getLastError: GetLastError) {
+    getLastError: GetLastError
+) {
   def apply(): (RequestMaker, RequestMaker) = {
     import reactivemongo.api.BSONSerializationPack
     import reactivemongo.api.commands.Command
@@ -212,7 +216,8 @@ case class RequestMaker(
     op: RequestOp,
     documents: BufferSequence = BufferSequence.empty,
     readPreference: ReadPreference = ReadPreference.primary,
-    channelIdHint: Option[Int] = None) {
+    channelIdHint: Option[Int] = None
+) {
   def apply(id: Int) = Request(id, 0, op, documents, readPreference, channelIdHint)
 }
 
@@ -234,7 +239,8 @@ object Request {
     requestID,
     responseTo,
     op,
-    BufferSequence(ChannelBuffers.wrappedBuffer(ByteOrder.LITTLE_ENDIAN, documents)))
+    BufferSequence(ChannelBuffers.wrappedBuffer(ByteOrder.LITTLE_ENDIAN, documents))
+  )
 
   /**
    * Create a request.
@@ -269,7 +275,8 @@ case class Response(
     header: MessageHeader,
     reply: Reply,
     documents: ChannelBuffer,
-    info: ResponseInfo) {
+    info: ResponseInfo
+) {
   /**
    * if this response is in error, explain this error.
    */
@@ -387,7 +394,8 @@ object ReplyDocumentIterator {
 }
 
 case class ReplyDocumentIteratorExhaustedException(
-  val cause: Exception) extends Exception(cause)
+  val cause: Exception
+) extends Exception(cause)
 
 private[reactivemongo] object RequestEncoder {
   val logger = LazyLogger("reactivemongo.core.protocol.RequestEncoder")
@@ -421,7 +429,8 @@ private[reactivemongo] class ResponseDecoder extends OneToOneDecoder {
 }
 
 private[reactivemongo] class MongoHandler(
-  supervisor: String, connection: String, receiver: ActorRef)
+  supervisor: String, connection: String, receiver: ActorRef
+)
     extends IdleStateAwareChannelHandler {
 
   override def messageReceived(ctx: ChannelHandlerContext, e: MessageEvent) {

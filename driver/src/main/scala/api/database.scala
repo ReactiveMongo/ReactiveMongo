@@ -76,8 +76,10 @@ sealed trait DB {
    */
   @deprecated("Consider using reactivemongo.api.commands along with `GenericDB.runCommand` methods", "0.11.0")
   def command[T](command: Command[T], readPreference: ReadPreference = defaultReadPreference)(implicit ec: ExecutionContext): Future[T] =
-    Failover(command.apply(name).maker(readPreference),
-      connection, failoverStrategy).future.mapEither(command.ResultMaker(_))
+    Failover(
+      command.apply(name).maker(readPreference),
+      connection, failoverStrategy
+    ).future.mapEither(command.ResultMaker(_))
 
   /** Authenticates the connection on this database. */
   def authenticate(user: String, password: String)(implicit timeout: FiniteDuration): Future[SuccessfulAuthentication] = connection.authenticate(name, user, password)
@@ -140,7 +142,8 @@ trait DBMetaCommands { self: DB =>
     def read(bson: BSONDocument) = bson.get("name").collect {
       case BSONString(value) => value.substring(prefixLength)
     }.getOrElse(throw new Exception(
-      "name is expected on system.namespaces query"))
+      "name is expected on system.namespaces query"
+    ))
 
   }
 
@@ -153,9 +156,10 @@ trait DBMetaCommands { self: DB =>
     } else collection("system.namespaces").as[BSONCollection]().
       find(BSONDocument(
         "name" -> BSONRegex("^[^\\$]+$", "") // strip off any indexes
-        )).cursor(defaultReadPreference)(
-        collectionNameReader, ec, CursorProducer.defaultCursorProducer).
-        collect[List]()
+      )).cursor(defaultReadPreference)(
+        collectionNameReader, ec, CursorProducer.defaultCursorProducer
+      ).
+      collect[List]()
   }
 
   /** Returns the server status. */
@@ -167,7 +171,8 @@ trait DBMetaCommands { self: DB =>
 case class DefaultDB(
     name: String,
     connection: MongoConnection,
-    failoverStrategy: FailoverStrategy = FailoverStrategy()) extends DB with DBMetaCommands with GenericDB[BSONSerializationPack.type] {
+    failoverStrategy: FailoverStrategy = FailoverStrategy()
+) extends DB with DBMetaCommands with GenericDB[BSONSerializationPack.type] {
 
   val pack: BSONSerializationPack.type = BSONSerializationPack
 }

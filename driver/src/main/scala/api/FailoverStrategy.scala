@@ -14,7 +14,8 @@ import scala.concurrent.duration.FiniteDuration
 case class FailoverStrategy(
     initialDelay: FiniteDuration = FiniteDuration(100, "ms"),
     retries: Int = 10,
-    delayFactor: Int => Double = FailoverStrategy.defaultFactor) {
+    delayFactor: Int => Double = FailoverStrategy.defaultFactor
+) {
 
   override lazy val toString = delayFactor match {
     case fn @ FailoverStrategy.FactorFun(_) =>

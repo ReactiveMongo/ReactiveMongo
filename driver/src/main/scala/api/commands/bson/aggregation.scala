@@ -55,14 +55,17 @@ object BSONAggregationImplicits {
       val cmd = BSONDocument(
         "aggregate" -> BSONString(agg.collection),
         "pipeline" -> BSONArray(
-          { for (pipe <- agg.command.pipeline) yield pipe.makePipe }.toStream),
+          { for (pipe <- agg.command.pipeline) yield pipe.makePipe }.toStream
+        ),
         "explain" -> BSONBoolean(agg.command.explain),
         "allowDiskUse" -> BSONBoolean(agg.command.allowDiskUse),
-        "cursor" -> agg.command.cursor.map(CursorWriter.write(_)))
+        "cursor" -> agg.command.cursor.map(CursorWriter.write(_))
+      )
 
       if (agg.command.wireVersion < MongoWireVersion.V32) cmd else {
         cmd ++ ("bypassDocumentValidation" -> BSONBoolean(
-          agg.command.bypassDocumentValidation),
+          agg.command.bypassDocumentValidation
+        ),
           "readConcern" -> agg.command.readConcern)
       }
     }

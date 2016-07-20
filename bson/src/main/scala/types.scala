@@ -164,8 +164,9 @@ object BSONDocument {
   /** Creates a new [[BSONDocument]] containing all the given `elements`. */
   def apply(elements: Producer[BSONElement]*): BSONDocument = new BSONDocument(
     elements.flatMap { el =>
-      el.produce.map(value => Seq(Try(value))).getOrElse(Seq.empty)
-    }.toStream)
+    el.produce.map(value => Seq(Try(value))).getOrElse(Seq.empty)
+  }.toStream
+  )
 
   /** Creates a new [[BSONDocument]] containing all the `elements` in the given `Traversable`. */
   def apply(elements: Traversable[BSONElement]): BSONDocument =
@@ -269,7 +270,8 @@ case class BSONArray(stream: Stream[Try[BSONValue]]) extends BSONValue {
   def add(elements: Producer[BSONValue]*): BSONArray = new BSONArray(
     stream ++ elements.flatMap { el =>
       el.produce.map(value => Seq(Try(value))).getOrElse(Seq.empty)
-    }.toStream)
+    }.toStream
+  )
 
   /** Alias for `add(arr: BSONArray): BSONArray` */
   def ++(array: BSONArray): BSONArray = add(array)
@@ -295,8 +297,9 @@ object BSONArray {
   /** Creates a new [[BSONArray]] containing all the given `elements`. */
   def apply(elements: Producer[BSONValue]*): BSONArray = new BSONArray(
     elements.flatMap { el =>
-      el.produce.map(value => Seq(Try(value))).getOrElse(Seq.empty)
-    }.toStream)
+    el.produce.map(value => Seq(Try(value))).getOrElse(Seq.empty)
+  }.toStream
+  )
 
   /** Creates a new [[BSONArray]] containing all the `elements` in the given `Traversable`. */
   def apply(elements: Traversable[BSONValue]): BSONArray = {

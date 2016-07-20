@@ -40,7 +40,9 @@ case class ScramSha1Initiate(user: String) extends Command[ScramSha1Challenge] {
     "mechanism" -> "SCRAM-SHA-1",
     "payload" -> BSONBinary(
       ArrayReadableBuffer(ByteString(message).toArray[Byte]),
-      Subtype.GenericBinarySubtype))
+      Subtype.GenericBinarySubtype
+    )
+  )
 
   val ResultMaker = ScramSha1Initiate
 }
@@ -96,7 +98,8 @@ object ScramSha1Initiate extends BSONCommandResultMaker[ScramSha1Challenge] {
  */
 case class ScramSha1Negociation(
   serverSignature: Array[Byte],
-  request: BSONDocument)
+  request: BSONDocument
+)
 
 object ScramSha1Negociation {
   /**
@@ -132,7 +135,8 @@ case class ScramSha1StartNegociation(
   conversationId: Int,
   payload: Array[Byte],
   randomPrefix: String,
-  startMessage: String)
+  startMessage: String
+)
     extends Command[Either[SuccessfulAuthentication, Array[Byte]]] {
 
   import javax.crypto.spec.{ PBEKeySpec, SecretKeySpec }
@@ -185,11 +189,15 @@ case class ScramSha1StartNegociation(
             "saslContinue" -> 1, "conversationId" -> conversationId,
             "payload" -> BSONBinary(
               ArrayReadableBuffer(ByteString(message).toArray[Byte]),
-              Subtype.GenericBinarySubtype)))).right
+              Subtype.GenericBinarySubtype
+            )
+          )
+        )).right
 
       } catch {
         case err: Throwable => Left(CommandError(
-          s"fails to negociate SCRAM-SHA1: ${err.getMessage}")).right
+          s"fails to negociate SCRAM-SHA1: ${err.getMessage}"
+        )).right
       }
     } yield nego
   }
@@ -218,8 +226,10 @@ object ScramSha1StartNegociation extends BSONCommandResultMaker[Either[Successfu
     } else if (bson.getAs[BSONBooleanLike]("done").fold(false)(_.toBoolean)) {
       Right(Left(SilentSuccessfulAuthentication))
     } else bson.getAs[Array[Byte]]("payload").fold[ResType](
-      Left(CommandError("missing SCRAM-SHA1 payload")))(
-        bytes => Right(Right(bytes)))
+      Left(CommandError("missing SCRAM-SHA1 payload"))
+    )(
+        bytes => Right(Right(bytes))
+      )
   }
 
   private[commands] val ClientKeySeed = // "Client Key" bytes
@@ -237,14 +247,17 @@ object ScramSha1StartNegociation extends BSONCommandResultMaker[Either[Successfu
  */
 case class ScramSha1FinalNegociation(
     conversationId: Int,
-    payload: Array[Byte]) extends Command[SuccessfulAuthentication] {
+    payload: Array[Byte]
+) extends Command[SuccessfulAuthentication] {
 
   import reactivemongo.bson.buffer.ArrayReadableBuffer
 
   override def makeDocuments = BSONDocument(
     "saslContinue" -> 1, "conversationId" -> conversationId,
     "payload" -> BSONBinary(
-      ArrayReadableBuffer(payload), Subtype.GenericBinarySubtype))
+      ArrayReadableBuffer(payload), Subtype.GenericBinarySubtype
+    )
+  )
 
   val ResultMaker = ScramSha1FinalNegociation
 }
@@ -333,7 +346,8 @@ object CrAuthenticate extends BSONCommandResultMaker[SuccessfulAuthentication] {
       case Some(BSONString(dbname)) => VerboseSuccessfulAuthentication(
         dbname,
         document.getAs[String]("user").get,
-        document.getAs[Boolean]("readOnly").getOrElse(false))
+        document.getAs[Boolean]("readOnly").getOrElse(false)
+      )
       case _ => SilentSuccessfulAuthentication
     })
   }
@@ -360,7 +374,8 @@ object SilentSuccessfulAuthentication extends SuccessfulAuthentication
 case class VerboseSuccessfulAuthentication(
   db: String,
   user: String,
-  readOnly: Boolean) extends SuccessfulAuthentication
+  readOnly: Boolean
+) extends SuccessfulAuthentication
 
 /**
  * A failed authentication result
@@ -369,6 +384,7 @@ case class VerboseSuccessfulAuthentication(
  */
 case class FailedAuthentication(
     message: String,
-    originalDocument: Option[BSONDocument] = None) extends BSONCommandError with AuthenticationResult {
+    originalDocument: Option[BSONDocument] = None
+) extends BSONCommandError with AuthenticationResult {
   val code = None
 }

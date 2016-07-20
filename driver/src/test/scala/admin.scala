@@ -44,7 +44,8 @@ class ReplSetGetStatusSpec extends Specification {
 
       // TODO: Setup a successful replica set
       connection.database("admin").flatMap(_.runCommand(
-        ReplSetGetStatus)) must throwA[CommandError].await(1, timeout)
+        ReplSetGetStatus
+      )) must throwA[CommandError].await(1, timeout)
     }
   }
 }
@@ -83,7 +84,8 @@ class ResyncSpec extends Specification {
 
     "be successful" in { implicit ee: EE =>
       connection.database("admin").flatMap(_.runCommand(Resync)) must not(
-        throwA[CommandError]).await(1, timeout)
+        throwA[CommandError]
+      ).await(1, timeout)
     }
   }
 }
@@ -96,7 +98,8 @@ class ReplSetMaintenanceSpec extends Specification {
 
     "fail outside replicaSet" in { implicit ee: EE =>
       connection.database("admin").flatMap(_.runCommand(
-        ReplSetMaintenance(true))) must throwA[CommandError].
+        ReplSetMaintenance(true)
+      )) must throwA[CommandError].
         await(1, timeout)
     }
   }

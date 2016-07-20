@@ -23,7 +23,8 @@ object BSONDistinctCommandImplicits {
       val cmd = BSONDocument(
         "distinct" -> distinct.collection,
         "key" -> distinct.command.keyString,
-        "query" -> distinct.command.query)
+        "query" -> distinct.command.query
+      )
 
       if (distinct.command.version >= MongoWireVersion.V32) {
         cmd ++ ("readConcern" -> distinct.command.readConcern)

@@ -110,7 +110,7 @@ object Format {
   lazy val formattingPreferences = {
     import scalariform.formatter.preferences._
     FormattingPreferences().
-      setPreference(AlignParameters, true).
+      setPreference(AlignParameters, false).
       setPreference(AlignSingleLineCaseStatements, true).
       setPreference(CompactControlReadability, false).
       setPreference(CompactStringConcatenation, false).
@@ -121,10 +121,11 @@ object Format {
       setPreference(IndentSpaces, 2).
       setPreference(MultilineScaladocCommentsStartOnFirstLine, false).
       setPreference(PreserveSpaceBeforeArguments, false).
-      setPreference(PreserveDanglingCloseParenthesis, false).
+      setPreference(PreserveDanglingCloseParenthesis, true).
       setPreference(RewriteArrowSymbols, false).
       setPreference(SpaceBeforeColon, false).
       setPreference(SpaceInsideBrackets, false).
+      setPreference(SpacesAroundMultiImports, true).
       setPreference(SpacesWithinPatternBinders, true)
   }
 }
