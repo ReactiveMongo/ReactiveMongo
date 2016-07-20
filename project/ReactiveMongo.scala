@@ -121,7 +121,6 @@ object Format {
       setPreference(IndentSpaces, 2).
       setPreference(MultilineScaladocCommentsStartOnFirstLine, false).
       setPreference(PreserveSpaceBeforeArguments, false).
-      setPreference(PreserveDanglingCloseParenthesis, true).
       setPreference(RewriteArrowSymbols, false).
       setPreference(SpaceBeforeColon, false).
       setPreference(SpaceInsideBrackets, false).
