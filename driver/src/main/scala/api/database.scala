@@ -25,7 +25,7 @@ import scala.concurrent.{ ExecutionContext, Future }
 import scala.concurrent.duration._
 
 /**
- * A Mongo Database.
+ * A MongoDB database, obtained from a [[reactivemongo.api.MongoConnection]].
  *
  * You should consider the provided [[reactivemongo.api.DefaultDB]] implementation.
  *
@@ -74,7 +74,7 @@ sealed trait DB {
    *
    * @return a future containing the result of the command.
    */
-  @deprecated("Consider using reactivemongo.api.commands along with `GenericDB.runCommand` methods", "0.11.0")
+  @deprecated("Consider using reactivemongo.api.commands along with `DefaultDB.runCommand` methods", "0.11.0")
   def command[T](command: Command[T], readPreference: ReadPreference = defaultReadPreference)(implicit ec: ExecutionContext): Future[T] =
     Failover(
       command.apply(name).maker(readPreference),
@@ -95,6 +95,7 @@ sealed trait DB {
 
 }
 
+@deprecated(message = "Will be made sealed", since = "0.12-RC0")
 trait GenericDB[P <: SerializationPack with Singleton] { self: DB =>
   val pack: P
 

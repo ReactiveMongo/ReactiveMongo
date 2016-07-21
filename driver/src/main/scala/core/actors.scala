@@ -474,7 +474,7 @@ trait MongoDBSystem extends Actor {
               retried += channelId -> awaiting
             }
 
-            case _ => {
+            case _ if (!awaitingResponse.promise.isCompleted) => {
               logger.debug(s"[$lnm] Completing promise ${awaitingResponse.promise} with error='socket disconnected'")
 
               awaitingResponse.promise.
