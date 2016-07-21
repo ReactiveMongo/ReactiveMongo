@@ -135,8 +135,10 @@ class Failover[T](message: T, connection: MongoConnection, strategy: FailoverStr
     case _: NodeSetNotReachable         => true
     case _: ConnectionException         => true
     case _: ConnectionNotInitialized    => true
-    case e: DatabaseException           => e.isNotAPrimaryError || e.isUnauthorized
-    case _                              => false
+    case e: DatabaseException =>
+      e.isNotAPrimaryError || e.isUnauthorized
+
+    case _ => false
   }
 
   send(0)
@@ -204,8 +206,10 @@ class Failover2[A](producer: () => Future[A], connection: MongoConnection, strat
     case _: NodeSetNotReachable         => true
     case _: ConnectionException         => true
     case _: ConnectionNotInitialized    => true
-    case e: DatabaseException           => e.isNotAPrimaryError || e.isUnauthorized
-    case _                              => false
+    case e: DatabaseException =>
+      e.isNotAPrimaryError || e.isUnauthorized
+
+    case _ => false
   }
 
   //send(0)

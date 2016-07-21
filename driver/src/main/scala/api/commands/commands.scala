@@ -192,6 +192,7 @@ object Command {
     }
   }
 
+  @deprecated(message = "Use `run` with the `failoverStrategy` parameter", since = "0.12-RC0")
   def run[P <: SerializationPack](pack: P): CommandWithPackRunner[pack.type] =
     CommandWithPackRunner(pack, FailoverStrategy())
 
