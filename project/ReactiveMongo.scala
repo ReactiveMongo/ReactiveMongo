@@ -39,7 +39,8 @@ object BuildSettings {
     },
     mappings in (Compile, packageBin) ~= filter,
     mappings in (Compile, packageSrc) ~= filter,
-    mappings in (Compile, packageDoc) ~= filter) ++
+    mappings in (Compile, packageDoc) ~= filter,
+    autoAPIMappings := true) ++
   Publish.settings ++ Format.settings ++ Publish.mimaSettings
 
 }
@@ -197,7 +198,10 @@ object ReactiveMongoBuild extends Build {
   import BuildSettings._
   import Resolvers._
   import Dependencies._
-  import sbtunidoc.{ Plugin => UnidocPlugin }
+
+  import sbtunidoc.{ Plugin => UnidocPlugin },
+    UnidocPlugin.UnidocKeys._, UnidocPlugin.ScalaUnidoc
+
   import sbtassembly.{
     AssemblyKeys, MergeStrategy, PathList, ShadeRule
   }, AssemblyKeys._
@@ -218,6 +222,9 @@ object ReactiveMongoBuild extends Build {
       settings(UnidocPlugin.unidocSettings: _*).
       settings(
         previousArtifacts := Set.empty,
+        unidocProjectFilter in (ScalaUnidoc, unidoc) := {
+          inAnyProject -- inProjects(shaded, jmx)
+        },
         travisEnv in Test := { // test:travisEnv from SBT CLI
           val specs = List[(String, List[String])](
             "MONGO_VER" -> List("2_6", "3"),
