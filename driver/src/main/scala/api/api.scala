@@ -248,7 +248,7 @@ object Failover {
 }
 
 /**
- * A pool of MongoDB connections.
+ * A pool of MongoDB connections, obtained from a [[reactivemongo.api.MongoDriver]].
  *
  * Connection here does not mean that there is one open channel to the server:
  * behind the scene, many connections (channels) are open on all the available servers in the replica set.
@@ -868,8 +868,10 @@ class MongoDriver(config: Option[Config] = None) {
   private val connectionMonitors = MutableMap.empty[ActorRef, MongoConnection]
 
   /** Keep a list of all connections so that we can terminate the actors */
+  @deprecated(message = "Will be made private", since = "0.12-RC1")
   def connections: Iterable[MongoConnection] = connectionMonitors.values
 
+  @deprecated(message = "Will be made private", since = "0.12-RC1")
   def numConnections: Int = connectionMonitors.size
 
   /**

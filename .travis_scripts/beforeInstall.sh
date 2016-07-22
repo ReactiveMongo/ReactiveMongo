@@ -1,16 +1,16 @@
 #! /bin/bash
 
-# Clean cache
+echo "[INFO] Clean some IVY cache"
 rm -rf "$HOME/.ivy2/local/org.reactivemongo"
-
-CATEGORY="$1"
-MONGO_VER="$2"
-MONGO_SSL="$3"
 
 if [ "$CATEGORY" = "UNIT_TESTS" ]; then
     echo "Skip integration env"
     exit 0
 fi
+
+CATEGORY="$1"
+MONGO_VER="$2"
+MONGO_SSL="$3"
 
 # Prepare integration env
 

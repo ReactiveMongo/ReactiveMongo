@@ -448,12 +448,13 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    * val updateOp = collection.updateModifier(
    *   BSONDocument("\$set" -> BSONDocument("age" -> 35)))
    *
-   * val personBeforeUpdate: Future[Person] =
+   * val personBeforeUpdate: Future[Option[Person]] =
    *   collection.findAndModify(BSONDocument("name" -> "Joline"), updateOp).
    *   map(_.result[Person])
    *
-   * val removedPerson: Future[Person] = collection.findAndModify(
-   *   BSONDocument("name" -> "Jack"), collection.removeModifier)
+   * val removedPerson: Future[Option[Person]] = collection.findAndModify(
+   *   BSONDocument("name" -> "Jack"), collection.removeModifier).
+   *   map(_.result[Person])
    * }}}
    *
    * @param selector the query selector
