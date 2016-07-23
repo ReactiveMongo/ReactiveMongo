@@ -834,12 +834,13 @@ object MongoConnection {
  *
  * @define parsedURIParam the URI parsed by [[reactivemongo.api.MongoConnection.parseURI]]
  * @define connectionNameParam the name for the connection pool
- * @define strictUriParam if true the parsed URI must be strict, without ignored/unsupported options (default: false)
+ * @define strictUriParam if true the parsed URI must be strict, without ignored/unsupported options
  * @define nbChannelsParam the number of channels to open per node
  * @define optionsParam the options for the new connection pool
  * @define nodesParam The list of node names (e.g. ''node1.foo.com:27017''); Port is optional (27017 is used by default)
  * @define authParam the list of authentication instructions
  * @define seeConnectDBTutorial See [[http://reactivemongo.org/releases/0.12/documentation/tutorial/connect-database.html how to connect to the database]]
+ * @define uriStrictParam the strict URI, that will be parsed by [[reactivemongo.api.MongoConnection.parseURI]]
  */
 class MongoDriver(config: Option[Config] = None) {
   import scala.collection.mutable.{ Map => MutableMap }
@@ -954,6 +955,37 @@ class MongoDriver(config: Option[Config] = None) {
     }, Duration.Inf)
     // TODO: Returns Future[MongoConnection]
   }
+
+  /**
+   * Creates a new MongoConnection from URI.
+   *
+   * $seeConnectDBTutorial
+   *
+   * @param uriStrict $uriStrictParam
+   */
+  def connection(uriStrict: String): Try[MongoConnection] =
+    connection(uriStrict, name = None, strictUri = true)
+
+  /**
+   * Creates a new MongoConnection from URI.
+   *
+   * $seeConnectDBTutorial
+   *
+   * @param uriStrict $uriStrictParam
+   * @param name $connectionNameParam
+   */
+  def connection(uriStrict: String, name: Option[String]): Try[MongoConnection] = connection(uriStrict, name, strictUri = true)
+
+  /**
+   * Creates a new MongoConnection from URI.
+   *
+   * $seeConnectDBTutorial
+   *
+   * @param uri the URI to be parsed by [[reactivemongo.api.MongoConnection.parseURI]]
+   * @param name $connectionNameParam
+   * @param strictUri $strictUriParam
+   */
+  def connection(uri: String, name: Option[String], strictUri: Boolean): Try[MongoConnection] = MongoConnection.parseURI(uri).flatMap(connection(_, name, strictUri))
 
   /**
    * Creates a new MongoConnection from URI.

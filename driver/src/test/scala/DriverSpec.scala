@@ -51,9 +51,10 @@ class DriverSpec extends org.specs2.mutable.Specification {
       )
     }
 
-    "start and close with one connection open" in {
+    "start and close with one connection open (using raw URI)" in {
       val md = MongoDriver()
-      val connection = md.connection(hosts)
+      val uri = s"mongodb://$primaryHost/$commonDb"
+      val connection = md.connection(uri, Some("con1"), true)
 
       md.close(timeout) must not(throwA[Exception])
     }
