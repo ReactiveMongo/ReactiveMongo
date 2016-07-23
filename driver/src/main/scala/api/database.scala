@@ -101,7 +101,7 @@ trait GenericDB[P <: SerializationPack with Singleton] { self: DB =>
 
   import reactivemongo.api.commands._
 
-  @deprecated(message = "Either use one of the `runX` function on the DB instance, or use [[reactivemongo.api.commands.Command.run]] directly", since = "0.12-RC0")
+  @deprecated(message = "Either use one of the `runX` function on the DB instance, or use `reactivemongo.api.commands.Command.run` directly", since = "0.12-RC0")
   def runner = Command.run(pack)
 
   @deprecated(message = "Use `runCommand` with the `failoverStrategy` parameter", since = "0.12-RC0")

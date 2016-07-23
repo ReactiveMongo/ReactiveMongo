@@ -39,8 +39,7 @@ object BuildSettings {
     },
     mappings in (Compile, packageBin) ~= filter,
     mappings in (Compile, packageSrc) ~= filter,
-    mappings in (Compile, packageDoc) ~= filter,
-    autoAPIMappings := true) ++
+    mappings in (Compile, packageDoc) ~= filter) ++
   Publish.settings ++ Format.settings ++ Publish.mimaSettings
 
 }
@@ -76,6 +75,8 @@ object Publish {
     },
     binaryIssueFilters ++= Seq(missingMethodInOld))
 
+  val siteUrl = "http://reactivemongo.org"
+
   lazy val settings = Seq(
     publishMavenStyle := true,
     publishArtifact in Test := false,
@@ -87,7 +88,9 @@ object Publish {
       Seq("Apache 2.0" ->
         url("http://www.apache.org/licenses/LICENSE-2.0"))
     },
-    homepage := Some(url("http://reactivemongo.org")),
+    homepage := Some(url(siteUrl)),
+    autoAPIMappings := true,
+    apiURL := Some(url(s"$siteUrl/release/${version.value}/api/")),
     pomExtra := (
       <scm>
         <url>git://github.com/ReactiveMongo/ReactiveMongo.git</url>
