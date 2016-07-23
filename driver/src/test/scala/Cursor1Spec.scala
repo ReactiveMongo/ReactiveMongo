@@ -1,4 +1,4 @@
-import scala.concurrent.Future
+import scala.concurrent.{ Await, Future }
 import scala.concurrent.duration.{ DurationInt, FiniteDuration, MILLISECONDS }
 
 import reactivemongo.bson.{ BSONDocument, BSONDocumentReader }
@@ -45,9 +45,31 @@ trait Cursor1Spec { spec: CursorSpec =>
       }
     }
 
+    // head
+    "find first document when matching" in { implicit ee: EE =>
+      coll.find(matchAll("head1") ++ ("i" -> 0)).cursor[BSONDocument]().head.
+        map(_ -- "_id") must beEqualTo(BSONDocument(
+          "i" -> 0, "record" -> "record0"
+        )).await(1, timeout)
+    }
+
+    "find first document when not matching" in { implicit ee: EE =>
+      Await.result(
+        coll.find(BSONDocument("i" -> -1)).cursor().head,
+        timeout
+      ) must throwA[Cursor.NoSuchResultException.type]
+    }
+
+    "read one option document with success" in { implicit ee: EE =>
+      coll.find(matchAll("one1")).one[BSONDocument].
+        aka("findOne") must beSome[BSONDocument].await(0, timeout)
+    }
+
     "read one document with success" in { implicit ee: EE =>
-      coll.find(matchAll("one")).one[BSONDocument].
-        aka("findOne") must beSome[BSONDocument].await(1, timeout)
+      coll.find(matchAll("one2") ++ ("i" -> 1)).requireOne[BSONDocument].
+        map(_ -- "_id") must beEqualTo(BSONDocument(
+          "i" -> 1, "record" -> "record1"
+        )).await(0, timeout)
     }
 
     def foldSpec1(c: BSONCollection, timeout: FiniteDuration) = {

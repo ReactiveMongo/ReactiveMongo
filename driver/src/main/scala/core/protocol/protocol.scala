@@ -476,8 +476,7 @@ private[reactivemongo] class MongoHandler(
     val now = System.currentTimeMillis()
     val last = e.getLastActivityTimeMillis
 
-    //log(e, s"Channel has been inactive for ${now - last} (last = $last)")
-    println(s"Channel has been inactive for ${now - last} (last = $last)")
+    log(e, s"Channel has been inactive for ${now - last} (last = $last)")
     e.getChannel.close()
 
     super.channelIdle(ctx, e)
