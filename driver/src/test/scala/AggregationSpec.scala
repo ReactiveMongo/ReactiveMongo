@@ -74,8 +74,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
         f(c.aggregate(Group(BSONString("$state"))(
           "totalPop" -> SumField("population")
         ), List(
-          Match(document("totalPop" ->
-            document("$gte" -> 10000000L)))
+          Match(document("totalPop" -> document("$gte" -> 10000000L)))
         )).map(_.firstBatch))
       }
 
@@ -278,6 +277,8 @@ class AggregationSpec extends org.specs2.mutable.Specification {
     } tag "not_mongo26"
 
     "perform simple lookup" >> {
+      // See https://docs.mongodb.com/master/reference/operator/aggregation/lookup/#examples
+
       val orders = db.collection(s"agg-orders-1-${System identityHashCode this}")
       val inventory = db.collection(
         s"agg-inv-1-${System identityHashCode orders}"
@@ -331,6 +332,51 @@ class AggregationSpec extends org.specs2.mutable.Specification {
           map(_.head[InventoryReport].toList) must beEqualTo(expected).
           await(0, timeout)
 
+      } tag "not_mongo26"
+    }
+
+    "filter results" >> {
+      // See https://docs.mongodb.com/master/reference/operator/aggregation/filter/#example
+      val sales = db.collection(s"agg-sales-A-${System identityHashCode this}")
+      implicit val saleItemHandler = Macros.handler[SaleItem]
+      implicit val saleHandler = Macros.handler[Sale]
+
+      "when fixtures are successfully inserted" in { implicit ee: EE =>
+        def fixtures = Seq(
+          document("_id" -> 0, "items" -> array(
+            document("itemId" -> 43, "quantity" -> 2, "price" -> 10),
+            document("itemId" -> 2, "quantity" -> 1, "price" -> 240)
+          )),
+          document("_id" -> 1, "items" -> array(
+            document("itemId" -> 23, "quantity" -> 3, "price" -> 110),
+            document("itemId" -> 103, "quantity" -> 4, "price" -> 5),
+            document("itemId" -> 38, "quantity" -> 1, "price" -> 300)
+          )),
+          document("_id" -> 2, "items" -> array(
+            document("itemId" -> 4, "quantity" -> 1, "price" -> 23)
+          ))
+        )
+
+        Future.sequence(fixtures.map { doc => sales.insert(doc) }).
+          map(_ => {}) must beEqualTo({}).await(0, timeout)
+      } tag "not_mongo26"
+
+      "when using a '$project' stage" in { implicit ee: EE =>
+        import sales.BatchCommands.AggregationFramework.{ Project, Filter }
+
+        def expected = List(
+          Sale(_id = 0, items = List(SaleItem(2, 1, 240))),
+          Sale(_id = 1, items = List(
+            SaleItem(23, 3, 110), SaleItem(38, 1, 300)
+          )),
+          Sale(_id = 2, items = Nil)
+        )
+
+        sales.aggregate(Project(document("items" -> Filter(
+          input = BSONString("$items"),
+          as = "item",
+          cond = document("$gte" -> array("$$item.price", 100))
+        )))).map(_.head[Sale]) must beEqualTo(expected).await(0, timeout)
       } tag "not_mongo26"
     }
   }
@@ -416,4 +462,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
     quantity: Option[Int] = None,
     docs: List[Product] = Nil
   )
+
+  case class SaleItem(itemId: Int, quantity: Int, price: Int)
+  case class Sale(_id: Int, items: List[SaleItem])
 }
