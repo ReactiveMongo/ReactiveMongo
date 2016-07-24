@@ -224,7 +224,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    * Returns the distinct values for a specified field across a single collection.
    *
    * @tparam T the element type of the distinct values
-   * @tparam M the container, that must be a [[Iterable]]
+   * @tparam M the container, that must be a [[scala.collection.Iterable]]
    * @param key the field for which to return distinct values
    * @param selector the query selector that specifies the documents from which to retrieve the distinct values.
    * @param readConcern the read concern

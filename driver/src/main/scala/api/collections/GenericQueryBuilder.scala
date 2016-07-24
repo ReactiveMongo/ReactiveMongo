@@ -26,6 +26,11 @@ import reactivemongo.core.netty.{ BufferSequence, ChannelBufferWritableBuffer }
  *
  * When the query is ready, you can call `cursor` to get a [[Cursor]], or `one` if you want to retrieve just one document.
  *
+ * @define oneFunction Sends this query and gets a future `Option[T]` (alias for [[reactivemongo.api.Cursor.headOption]])
+ * @define readPrefParam The [[reactivemongo.api.ReadPreference]] for this query. If the `ReadPreference` implies that this query can be run on a secondary, the slaveOk flag will be set.
+ * @define readerParam the reader for the results type
+ * @define resultTParam the results type
+ * @define requireOneFunction Sends this query and gets a future `T` (alias for [[reactivemongo.api.Cursor.head]])
  */
 trait GenericQueryBuilder[P <: SerializationPack] {
   val pack: P
@@ -65,8 +70,6 @@ trait GenericQueryBuilder[P <: SerializationPack] {
 
   /**
    * Sends this query and gets a [[Cursor]] of instances of `T`.
-   *
-   * An implicit `Reader[T]` must be present in the scope.
    */
   @deprecated(
     message = "Use `cursor` function with read preference.",
@@ -77,9 +80,10 @@ trait GenericQueryBuilder[P <: SerializationPack] {
   /**
    * Makes a [[Cursor]] of this query, which can be enumerated.
    *
-   * An implicit `Reader[T]` must be present in the scope.
+   * @param readPreference $readPrefParam
+   * @param reader $readerParam
    *
-   * @param readPreference The ReadPreference for this request. If the ReadPreference implies that this request might be run on a Secondary, the slaveOk flag will be set.
+   * @tparam T $resultTParam
    */
   def cursor[T](readPreference: ReadPreference = ReadPreference.primary, isMongo26WriteOp: Boolean = false)(implicit reader: pack.Reader[T], ec: ExecutionContext, cp: CursorProducer[T]): cp.ProducedCursor = cp.produce(defaultCursor[T](readPreference, isMongo26WriteOp))
 
@@ -99,25 +103,45 @@ trait GenericQueryBuilder[P <: SerializationPack] {
   }
 
   /**
-   * Sends this query and gets a future `Option[T]`.
-   * Alias for `.cursor[T]().headOption`.
+   * $oneFunction.
    *
-   * An implicit `Reader[T]` must be present in the scope.
+   * @param reader $readerParam
+   *
+   * @tparam T $resultTParam
    */
   def one[T](implicit reader: pack.Reader[T], ec: ExecutionContext): Future[Option[T]] = one(ReadPreference.primary)
 
   /**
-   * Sends this query and gets a future `Option[T]`.
-   * Alias for `.cursor[T](readPreference).headOption`.
+   * $oneFunction.
    *
-   * An implicit `Reader[T]` must be present in the scope.
+   * @param readPreference $readPrefParam
+   * @param reader $readerParam
    *
-   * @param readPreference The ReadPreference for this request. If the ReadPreference implies that this request might be run on a Secondary, the slaveOk flag will be set.
+   * @tparam T $resultTParam
    */
   def one[T](readPreference: ReadPreference)(implicit reader: pack.Reader[T], ec: ExecutionContext): Future[Option[T]] = copy(options = options.batchSize(1)).defaultCursor(readPreference)(reader, ec).headOption
 
   /**
-   * Sets the query (the selector document).
+   * $requireOneFunction.
+   *
+   * @param reader $readerParam
+   *
+   * @tparam T $resultTParam
+   */
+  def requireOne[T](implicit reader: pack.Reader[T], ec: ExecutionContext): Future[T] = requireOne(ReadPreference.primary)
+
+  /**
+   * $requireOneFunction.
+   *
+   * @param readPreference $readPrefParam
+   * @param reader $readerParam
+   *
+   * @tparam T $resultTParam
+   */
+  def requireOne[T](readPreference: ReadPreference)(implicit reader: pack.Reader[T], ec: ExecutionContext): Future[T] = copy(options = options.batchSize(1)).defaultCursor(readPreference)(reader, ec).head
+
+  /**
+   * Sets the selector document.
    *
    * @tparam Qry The type of the query. An implicit `Writer[Qry]` typeclass for handling it has to be in the scope.
    */
@@ -140,6 +164,9 @@ trait GenericQueryBuilder[P <: SerializationPack] {
   def projection[Pjn](p: Pjn)(implicit writer: pack.Writer[Pjn]): Self =
     copy(projectionOption = Some(pack.serialize(p, writer)))
 
+  /**
+   * Sets the projection document (for [[http://docs.mongodb.org/manual/core/read-operations-introduction/ retrieving only a subset of fields]]).
+   */
   def projection(p: pack.Document): Self = copy(projectionOption = Some(p))
 
   /** Sets the hint document (a document that declares the index MongoDB should use for this query). */

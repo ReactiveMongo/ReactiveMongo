@@ -21,7 +21,6 @@ sealed trait WriteResult {
   private[reactivemongo] def hasErrors: Boolean = !writeErrors.isEmpty || !writeConcernError.isEmpty
   private[reactivemongo] def inError: Boolean = !ok || code.isDefined
 
-  /** Returns either the [[errmsg]] or `<none>`. */
   protected def message = errmsg.getOrElse("<none>")
 
   //override
