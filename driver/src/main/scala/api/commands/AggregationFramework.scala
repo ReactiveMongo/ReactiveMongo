@@ -155,7 +155,6 @@ trait AggregationFramework[P <: SerializationPack] extends ImplicitCommandHelper
       foreignField: String,
       as: String
   ) extends PipelineOperator {
-
     val makePipe: pack.Document = makeDocument(Seq(elementProducer(
       "$lookup",
       makeDocument(Seq(
@@ -165,7 +164,31 @@ trait AggregationFramework[P <: SerializationPack] extends ImplicitCommandHelper
         elementProducer("as", stringValue(as))
       ))
     )))
+  }
 
+  /**
+   * The [[https://docs.mongodb.com/master/reference/operator/aggregation/filter/ \$filter]] aggregation stage.
+   *
+   * @param input the expression that resolves to an array
+   * @param as The variable name for the element in the input array. The as expression accesses each element in the input array by this variable.
+   * @param cond the expression that determines whether to include the element in the resulting array
+   */
+  case class Filter(input: pack.Value, as: String, cond: pack.Document)
+      extends PipelineOperator {
+
+    val makePipe: pack.Document = makeDocument(Seq(elementProducer(
+      "$filter", makeDocument(Seq(
+        elementProducer("input", input),
+        elementProducer("as", stringValue(as)),
+        elementProducer("cond", cond)
+      ))
+    )))
+  }
+
+  /** Filter companion */
+  object Filter {
+    implicit val writer: pack.Writer[Filter] =
+      pack.writer[Filter] { _.makePipe }
   }
 
   /**
