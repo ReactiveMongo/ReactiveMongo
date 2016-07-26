@@ -249,16 +249,18 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
   }
 
   @inline private def defaultWriteConcern = db.connection.options.writeConcern
+  @inline private def MissingMetadata() =
+    ConnectionNotInitialized.MissingMetadata(db.connection.history())
 
   def bulkInsert(ordered: Boolean)(documents: ImplicitlyDocumentProducer*)(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] =
     db.connection.metadata.map { metadata =>
       bulkInsert(documents.toStream.map(_.produce), ordered, defaultWriteConcern, metadata.maxBulkSize, metadata.maxBsonSize)
-    }.getOrElse(Future.failed(ConnectionNotInitialized.MissingMetadata))
+    }.getOrElse(Future.failed(MissingMetadata()))
 
   def bulkInsert(ordered: Boolean, writeConcern: WriteConcern)(documents: ImplicitlyDocumentProducer*)(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] =
     db.connection.metadata.map { metadata =>
       bulkInsert(documents.toStream.map(_.produce), ordered, writeConcern, metadata.maxBulkSize, metadata.maxBsonSize)
-    }.getOrElse(Future.failed(ConnectionNotInitialized.MissingMetadata))
+    }.getOrElse(Future.failed(MissingMetadata()))
 
   def bulkInsert(ordered: Boolean, writeConcern: WriteConcern, bulkSize: Int, bulkByteSize: Int)(documents: ImplicitlyDocumentProducer*)(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] =
     bulkInsert(documents.toStream.map(_.produce), ordered, writeConcern, bulkSize, bulkByteSize)
@@ -269,7 +271,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
   def bulkInsert(documents: Stream[pack.Document], ordered: Boolean, writeConcern: WriteConcern)(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] =
     db.connection.metadata.map { metadata =>
       bulkInsert(documents, ordered, writeConcern, metadata.maxBulkSize, metadata.maxBsonSize)
-    }.getOrElse(Future.failed(ConnectionNotInitialized.MissingMetadata))
+    }.getOrElse(Future.failed(MissingMetadata()))
 
   def bulkInsert(documents: Stream[pack.Document], ordered: Boolean, writeConcern: WriteConcern = defaultWriteConcern, bulkSize: Int, bulkByteSize: Int)(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] = watchFailure {
     def createBulk[R, A <: BulkMaker[R, A]](docs: Stream[pack.Document], command: A with BulkMaker[R, A]): Future[List[R]] = {
@@ -285,7 +287,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
       /* TODO: Remove
       val metadata = db.connection.metadata
       val havingMetadata = Failover2(db.connection, failoverStrategy) { () =>
-        metadata.map(Future.successful).getOrElse(Future.failed(ConnectionNotInitialized.MissingMetadata))
+        metadata.map(Future.successful).getOrElse(Future.failed(MissingMetadata()))
       }.future
        */
 
@@ -366,8 +368,8 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
         }.future
       }
 
-      case None =>
-        Future.failed(ConnectionNotInitialized.MissingMetadata)
+      case _ =>
+        Future.failed(MissingMetadata())
     }
 
   /**
@@ -426,7 +428,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
       }.future
     }
 
-    case _ => Future.failed(ConnectionNotInitialized.MissingMetadata)
+    case _ => Future.failed(MissingMetadata())
   }
 
   /**
@@ -684,8 +686,8 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
       }.future
     }
 
-    case None =>
-      Future.failed(ConnectionNotInitialized.MissingMetadata)
+    case _ =>
+      Future.failed(MissingMetadata())
   }
 
   /**
