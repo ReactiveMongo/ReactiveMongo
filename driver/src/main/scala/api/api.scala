@@ -880,6 +880,8 @@ class MongoDriver(config: Option[Config] = None) {
    * Awaits the termination until the timeout is expired.
    */
   def close(timeout: FiniteDuration = FiniteDuration(2, SECONDS)): Unit = {
+    logger.info(s"[$supervisorName] Closing instance of ReactiveMongo driver")
+
     // Terminate actors used by MongoConnections
     connections.foreach(_.close())
 

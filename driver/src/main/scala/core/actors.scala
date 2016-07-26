@@ -1307,7 +1307,7 @@ object Exceptions {
     def this(supervisor: String, connection: String, cause: Throwable) =
       this(s"$primaryUnavailableMsg ($supervisor/$connection)", cause)
 
-    def this() = this(primaryUnavailableMsg)
+    def this() = this(primaryUnavailableMsg, null)
   }
 
   @deprecated(message = "Use constructor with details", since = "0.12-RC0")

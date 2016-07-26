@@ -10,6 +10,12 @@ import reactivemongo.api.{
 object Common {
   val logger = reactivemongo.util.LazyLogger("tests")
 
+  val replSetOn =
+    Option(System getProperty "test.replicaSet").fold(false) {
+      case "true" => true
+      case _      => false
+    }
+
   val primaryHost =
     Option(System getProperty "test.primaryHost").getOrElse("localhost:27017")
 

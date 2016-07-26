@@ -90,9 +90,9 @@ EOF
 fi
 
 if [ "$MONGO_PROFILE" = "rs" ]; then
-    cat >> /dev/mongod.conf <<EOF
-  replication:
-    replSetName: "testrs0"
+    cat >> /tmp/mongod.conf <<EOF
+replication:
+  replSetName: "testrs0"
 EOF
 fi
 
@@ -122,18 +122,18 @@ if [ "x$MONGOD_PID" = "x" ]; then
 fi
 
 # Check MongoDB connection
-MONGOSHELL_OPTS="$PRIMARY_HOST/FOO"
+MONGOSHELL_OPTS=""
 
 if [ "$MONGO_PROFILE" = "ssl" -a ! "$MONGO_VER" = "2_6" ]; then
     MONGOSHELL_OPTS="$MONGOSHELL_OPTS --ssl --sslAllowInvalidCertificates"
 fi
 
 MONGOSHELL_OPTS="$MONGOSHELL_OPTS --eval"
-MONGODB_NAME=`mongo $MONGOSHELL_OPTS 'db.getName()' 2>/dev/null | tail -n 1`
+MONGODB_NAME=`mongo "$PRIMARY_HOST/FOO" $MONGOSHELL_OPTS 'db.getName()' 2>/dev/null | tail -n 1`
 
 if [ ! "x$MONGODB_NAME" = "xFOO" ]; then
     echo -n "\nERROR: Fails to connect using the MongoShell\n"
-    mongo $MONGOSHELL_OPTS 'db.getName()'
+    mongo "$PRIMARY_HOST/FOO" $MONGOSHELL_OPTS 'db.getName()'
     tail -n 100 /tmp/mongod.log
     exit 2
 fi
@@ -141,10 +141,17 @@ fi
 # Check MongoDB runtime
 
 echo -n "- security: "
-mongo $MONGOSHELL_OPTS 'var s=db.serverStatus();var x=s["security"];(!x)?"_DISABLED_":x["SSLServerSubjectName"];' 2>/dev/null | tail -n 1
+mongo "$PRIMARY_HOST/FOO" $MONGOSHELL_OPTS 'var s=db.serverStatus();var x=s["security"];(!x)?"_DISABLED_":x["SSLServerSubjectName"];' 2>/dev/null | tail -n 1
 
 echo -n "- storage engine: "
-mongo $MONGOSHELL_OPTS 'var s=db.serverStatus();JSON.stringify(s["storageEngine"]);' 2>/dev/null | grep '"name"' | cut -d '"' -f 4
+mongo "$PRIMARY_HOST/FOO" $MONGOSHELL_OPTS 'var s=db.serverStatus();JSON.stringify(s["storageEngine"]);' 2>/dev/null | grep '"name"' | cut -d '"' -f 4
+
+if [ "$MONGO_PROFILE" = "rs" ]; then
+    mongo "$PRIMARY_HOST" $MONGOSHELL_OPTS "rs.initiate({\"_id\":\"testrs0\",\"version\":1,\"members\":[{\"_id\":0,\"host\":\"$PRIMARY_HOST\"}]});" || (
+        echo "ERROR: Fails to setup the ReplicaSet" > /dev/stderr
+        false
+    )
+fi
 
 # Export environment for integration tests
 

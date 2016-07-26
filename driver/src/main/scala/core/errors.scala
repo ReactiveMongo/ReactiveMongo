@@ -91,6 +91,15 @@ sealed class ConnectionNotInitialized(
 
   val productArity = 2
 
+  override lazy val hashCode = (message -> cause).hashCode
+
+  override def equals(that: Any): Boolean = that match {
+    case x: ConnectionNotInitialized =>
+      (message -> cause) == (x.message -> x.cause)
+
+    case _ => false
+  }
+
   def canEqual(other: Any): Boolean = other match {
     case _: ConnectionNotInitialized => true
     case _                           => false
