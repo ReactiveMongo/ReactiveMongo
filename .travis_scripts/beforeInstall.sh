@@ -10,7 +10,7 @@ fi
 
 CATEGORY="$1"
 MONGO_VER="$2"
-MONGO_SSL="$3"
+MONGO_PROFILE="$3"
 
 # Prepare integration env
 
@@ -79,7 +79,7 @@ fi
 
 mkdir /tmp/mongodb
 
-if [ "$MONGO_VER" = "3" -a "$MONGO_SSL" = "true" ]; then
+if [ "$MONGO_PROFILE" = "ssl" ]; then
     cat >> /tmp/mongod.conf << EOF
   ssl:
     mode: requireSSL
@@ -87,7 +87,13 @@ if [ "$MONGO_VER" = "3" -a "$MONGO_SSL" = "true" ]; then
     PEMKeyPassword: test
     allowInvalidCertificates: true
 EOF
+fi
 
+if [ "$MONGO_PROFILE" = "rs" ]; then
+    cat >> /dev/mongod.conf <<EOF
+  replication:
+    replSetName: "testrs0"
+EOF
 fi
 
 # MongoDB
@@ -118,7 +124,7 @@ fi
 # Check MongoDB connection
 MONGOSHELL_OPTS="$PRIMARY_HOST/FOO"
 
-if [ "$MONGO_SSL" = "true" -a ! "$MONGO_VER" = "2_6" ]; then
+if [ "$MONGO_PROFILE" = "ssl" -a ! "$MONGO_VER" = "2_6" ]; then
     MONGOSHELL_OPTS="$MONGOSHELL_OPTS --ssl --sslAllowInvalidCertificates"
 fi
 

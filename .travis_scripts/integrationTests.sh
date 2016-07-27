@@ -27,7 +27,7 @@ SBT_ARGS="$SBT_ARGS -Dtest.slowPrimaryHost=$PRIMARY_SLOW_PROXY -Dtest.slowProxyD
 if [ "$MONGO_VER" = "3" ]; then
     TEST_OPTS="exclude mongo2,unit"
     
-    if [ "$MONGO_SSL" = "true" ]; then
+    if [ "$MONGO_PROFILE" = "ssl" ]; then
         SBT_ARGS="$SBT_ARGS -Dtest.enableSSL=true"
     fi
 fi
