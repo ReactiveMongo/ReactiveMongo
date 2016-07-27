@@ -231,7 +231,7 @@ object ReactiveMongoBuild extends Build {
         travisEnv in Test := { // test:travisEnv from SBT CLI
           val specs = List[(String, List[String])](
             "MONGO_VER" -> List("2_6", "3"),
-            "MONGO_SSL" -> List("true", "false"),
+            "MONGO_PROFILE" -> List("default", "ssl", "rs"),
             "AKKA_VERSION" -> List("2.3.13", "2.4.8")
           )
 
@@ -239,7 +239,7 @@ object ReactiveMongoBuild extends Build {
             case (key, values) => values.map(key -> _)
           }.combinations(specs.size).filterNot { flags =>
             flags.contains("MONGO_VER" -> "2_6") && flags.
-              contains("MONGO_SSL" -> "true")
+              contains("MONGO_PROFILE" -> "ssl")
           }.collect {
             case flags if (flags.map(_._1).toSet.size == specs.size) =>
               "CI_CATEGORY=INTEGRATION_TESTS" :: flags.sortBy(_._1).map({
