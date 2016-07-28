@@ -32,4 +32,6 @@ export JVM_OPTS
 TEST_ARGS=";project ReactiveMongo-BSON ;test-only"
 TEST_ARGS="$TEST_ARGS ;project ReactiveMongo-BSON-Macros ;test-only"
 
+sed -e 's/"-deprecation", //' < project/ReactiveMongo.scala > .tmp && mv .tmp project/ReactiveMongo.scala
+
 sbt ++$TRAVIS_SCALA_VERSION "$TEST_ARGS"
