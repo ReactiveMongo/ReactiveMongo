@@ -362,7 +362,12 @@ class AggregationSpec extends org.specs2.mutable.Specification {
       } tag "not_mongo26"
 
       "when using a '$project' stage" in { implicit ee: EE =>
-        import sales.BatchCommands.AggregationFramework.{ Project, Filter }
+        import sales.BatchCommands.AggregationFramework.{
+          Ascending,
+          Project,
+          Filter,
+          Sort
+        }
 
         def expected = List(
           Sale(_id = 0, items = List(SaleItem(2, 1, 240))),
@@ -371,12 +376,14 @@ class AggregationSpec extends org.specs2.mutable.Specification {
           )),
           Sale(_id = 2, items = Nil)
         )
+        val sort = Sort(Ascending("_id"))
 
         sales.aggregate(Project(document("items" -> Filter(
           input = BSONString("$items"),
           as = "item",
           cond = document("$gte" -> array("$$item.price", 100))
-        )))).map(_.head[Sale]) must beEqualTo(expected).await(0, timeout)
+        ))), List(sort)).map(_.head[Sale]) must beEqualTo(expected).
+          await(0, timeout)
       } tag "not_mongo26"
     }
   }
