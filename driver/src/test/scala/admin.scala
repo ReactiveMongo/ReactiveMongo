@@ -11,6 +11,34 @@ import Common._
 
 import org.specs2.concurrent.{ ExecutionEnv => EE }
 
+class IsMasterSpec extends Specification {
+  "isMaster" title
+
+  import bson.BSONIsMasterCommand._
+
+  "BSON command" should {
+    "be successful" in { implicit ee: EE =>
+      test must beLike[IsMasterResult] {
+        case IsMasterResult(true, _, _, _, Some(_), _, _, rs, _) =>
+          if (replSetOn) {
+            rs must beSome[ReplicaSet].like {
+              case ReplicaSet(_, me, primary, _ :: _, _,
+                _, false, false, false, false, _) =>
+                primary aka "primary" must beSome(me)
+            }
+          } else {
+            rs must beNone
+          }
+      }.await(0, timeout)
+    }
+  }
+
+  private def test(implicit ee: EE) = {
+    import bson.BSONIsMasterCommandImplicits._
+    connection.database("admin").flatMap(_.runCommand(IsMaster))
+  }
+}
+
 class RenameCollectionSpec extends Specification {
   "renameCollection" title
 
@@ -19,7 +47,7 @@ class RenameCollectionSpec extends Specification {
       coll <- f(c)
       _ <- coll.create()
       _ <- coll.rename(s"renamed${System identityHashCode c}")
-    } yield ()) aka "renaming" must beEqualTo({}).await(1, timeout)
+    } yield ()) aka "renaming" must beEqualTo({}).await(0, timeout)
 
     "be renamed using the default connection" in { implicit ee: EE =>
       spec(connection, timeout) {
@@ -77,13 +105,19 @@ class ReplSetGetStatusSpec extends Specification {
 
   "BSON command" should {
     "be successful" in { implicit ee: EE =>
-      import bson.BSONReplSetGetStatusImplicits._
-
-      // TODO: Setup a successful replica set
-      connection.database("admin").flatMap(_.runCommand(
-        ReplSetGetStatus
-      )) must throwA[CommandError].await(1, timeout)
+      if (replSetOn) {
+        test must beLike[ReplSetStatus] {
+          case ReplSetStatus(_, _, _, _ :: Nil) => ok
+        }.await(0, timeout)
+      } else {
+        test must throwA[CommandError].await(0, timeout)
+      }
     }
+  }
+
+  private def test(implicit ee: EE) = {
+    import bson.BSONReplSetGetStatusImplicits._
+    connection.database("admin").flatMap(_.runCommand(ReplSetGetStatus))
   }
 }
 
@@ -98,7 +132,7 @@ class ServerStatusSpec extends Specification {
         case status @ ServerStatusResult(_, _, MongodProcess, _, _, _, _, _) =>
           //println(s"Server status: $status")
           ok
-      }).await(1, timeout)
+      }).await(0, timeout)
     }
   }
 
@@ -108,7 +142,7 @@ class ServerStatusSpec extends Specification {
         case status @ ServerStatusResult(_, _, MongodProcess, _, _, _, _, _) =>
           //println(s"Server status: $status")
           ok
-      }).await(1, timeout)
+      }).await(0, timeout)
     }
   }
 }
@@ -116,13 +150,32 @@ class ServerStatusSpec extends Specification {
 class ResyncSpec extends Specification {
   "Resync" title
 
-  "BSON command" should {
+  "Resync BSON command" should {
     import bson.BSONResyncImplicits._
 
-    "be successful" in { implicit ee: EE =>
-      connection.database("admin").flatMap(_.runCommand(Resync)) must not(
-        throwA[CommandError]
-      ).await(1, timeout)
+    if (!replSetOn) {
+      "fail outside ReplicaSet (MongoDB 3+)" in { implicit ee: EE =>
+        connection.database("admin").flatMap(_.runCommand(Resync)) must not(
+          throwA[CommandError]
+        ).await(0, timeout)
+      } tag "not_mongo26"
+    } else {
+      "be successful with ReplicaSet (MongoDB 3+)" in { implicit ee: EE =>
+        connection.database("admin").flatMap(_.runCommand(Resync)) must (
+          throwA[CommandError].like {
+            case CommandError.Code(c) => c aka "error code" must_== 95
+          }
+        ).await(0, timeout)
+      } tag "not_mongo26"
+
+      "be successful with ReplicaSet (MongoDB 2)" in { implicit ee: EE =>
+        connection.database("admin").flatMap(_.runCommand(Resync)) must (
+          throwA[CommandError].like {
+            case CommandError.Message(msg) =>
+              msg aka "error message" must_== "primaries cannot resync"
+          }
+        ).await(0, timeout)
+      } tag "mongo2"
     }
   }
 }
@@ -133,11 +186,42 @@ class ReplSetMaintenanceSpec extends Specification {
   "BSON command" should {
     import bson.BSONReplSetMaintenanceImplicits._
 
-    "fail outside replicaSet" in { implicit ee: EE =>
-      connection.database("admin").flatMap(_.runCommand(
-        ReplSetMaintenance(true)
-      )) must throwA[CommandError].
-        await(1, timeout)
+    // MongoDB 3
+    if (!replSetOn) {
+      "fail outside replicaSet (MongoDB 3+)" in { implicit ee: EE =>
+        connection.database("admin").flatMap(_.runCommand(
+          ReplSetMaintenance(true)
+        )) must throwA[CommandError].like {
+          case CommandError.Code(code) => code aka "error code" must_== 76
+        }.await(0, timeout)
+      } tag "not_mongo26"
+    } else {
+      "fail with replicaSet (MongoDB 3+)" in { implicit ee: EE =>
+        connection.database("admin").flatMap(_.runCommand(
+          ReplSetMaintenance(true)
+        )) must throwA[CommandError].like {
+          case CommandError.Code(code) => code aka "error code" must_== 95
+        }.await(0, timeout)
+      } tag "not_mongo26"
     }
+
+    // MongoDB 2.6
+    if (!replSetOn) {
+      "fail outside replicaSet (MongoDB 2.6)" in { implicit ee: EE =>
+        connection.database("admin").flatMap(_.runCommand(
+          ReplSetMaintenance(true)
+        )) must throwA[CommandError].await(0, timeout)
+      } tag "mongo2"
+    } else {
+      "fail with replicaSet (MongoDB 2.6)" in { implicit ee: EE =>
+        connection.database("admin").flatMap(_.runCommand(
+          ReplSetMaintenance(true)
+        )) must throwA[CommandError].like {
+          case CommandError.Message(msg) =>
+            msg aka "message" must_== "primaries can't modify maintenance mode"
+        }.await(0, timeout)
+      } tag "mongo2"
+    }
+
   }
 }

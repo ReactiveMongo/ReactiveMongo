@@ -38,6 +38,7 @@ case class ResponseResult[R](
   value: R
 )
 
+/** Base definition for all the errors for the command execution errors. */
 trait CommandError extends Exception with NoStackTrace {
   /** The error code */
   def code: Option[Int]
@@ -46,6 +47,40 @@ trait CommandError extends Exception with NoStackTrace {
   def errmsg: Option[String]
 
   override def getMessage = s"CommandError[code=${code.getOrElse("<unknown>")}, errmsg=${errmsg.getOrElse("<unknown>")}]"
+}
+
+object CommandError {
+  /**
+   * Pattern matching extractor for the error code.
+   *
+   * {{{
+   * import reactivemongo.api.commands.CommandError
+   *
+   * def testError(err: CommandError): String = err match {
+   *   case CommandError.Code(code) => s"hasCode: $code"
+   *   case _ => "no-code"
+   * }
+   * }}}
+   */
+  object Code {
+    def unapply(err: CommandError): Option[Int] = err.code
+  }
+
+  /**
+   * Pattern matching extractor for the error message.
+   *
+   * {{{
+   * import reactivemongo.api.commands.CommandError
+   *
+   * def testError(err: CommandError): String = err match {
+   *   case CommandError.Message(msg) => s"hasMessage: $msg"
+   *   case _ => "no-message"
+   * }
+   * }}}
+   */
+  object Message {
+    def unapply(err: CommandError): Option[String] = err.errmsg
+  }
 }
 
 /**
