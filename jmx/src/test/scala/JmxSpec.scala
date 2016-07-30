@@ -18,7 +18,7 @@ import scala.concurrent.duration._
 import org.specs2.concurrent.{ ExecutionEnv => EE }
 import org.specs2.matcher.MatchResult
 
-import reactivemongo.core.ConnectionListener
+import external.reactivemongo.ConnectionListener
 import reactivemongo.core.nodeset.NodeInfo
 
 import reactivemongo.jmx.{ Node, NodeSet }
@@ -35,7 +35,8 @@ class JmxSpec extends org.specs2.mutable.Specification {
 
     "be resolved as the default one" in {
       listener.map(_.getClass.getName) must beSome(
-        "reactivemongo.jmx.ConnectionListener")
+        "reactivemongo.jmx.ConnectionListener"
+      )
     }
   }
 
@@ -44,7 +45,8 @@ class JmxSpec extends org.specs2.mutable.Specification {
       Try(db).map(_.name) must beSuccessfulTry[String].like {
         case name => name aka "database name" must_== Common.dbName and {
           val mbeans = mbs.queryMBeans(new ObjectName(
-            "org.reactivemongo.Supervisor-*:type=NodeSet,*"), null)
+            "org.reactivemongo.Supervisor-*:type=NodeSet,*"
+          ), null)
 
           Try(mbeans.iterator.next()) must beSuccessfulTry[ObjectInstance].
             which { bi =>
@@ -52,41 +54,42 @@ class JmxSpec extends org.specs2.mutable.Specification {
 
               verifyBeanInstance(bi, "reactivemongo.jmx.NodeSet",
                 nodeSetAttrs, NodeSet.notificationInfo) and {
-                  val attrs = Promise[List[Any]]()
-                  val listener = new NotificationListener {
-                    def handleNotification(n: Notification, b: Object): Unit = {
-                      Try(mbs.getAttribute(on, "Nearest")).toOption.
-                        filter(_ => !attrs.isCompleted).foreach { _ =>
-                          Try(nodeSetAttrs.map {
-                            case (name, typ, _, _) =>
-                              val v = mbs.getAttribute(on, name)
+                val attrs = Promise[List[Any]]()
+                val listener = new NotificationListener {
+                  def handleNotification(n: Notification, b: Object): Unit = {
+                    Try(mbs.getAttribute(on, "Nearest")).toOption.
+                      filter(_ => !attrs.isCompleted).foreach { _ =>
+                        Try(nodeSetAttrs.map {
+                          case (name, typ, _, _) =>
+                            val v = mbs.getAttribute(on, name)
 
-                              if (typ == "java.lang.String" && (
-                                v != null && v.toString.startsWith("Node["))) {
+                            if (typ == "java.lang.String" && (
+                              v != null && v.toString.startsWith("Node[")
+                            )) {
 
-                                v.asInstanceOf[String].take(20)
-                              } else v
-                          }) match {
-                            case Success(_ :: _ :: _ :: _ :: null :: _) => ()
-                            case res =>
-                              attrs.tryComplete(res)
-                          }
+                              v.asInstanceOf[String].take(20)
+                            } else v
+                        }) match {
+                          case Success(_ :: _ :: _ :: _ :: null :: _) => ()
+                          case res =>
+                            attrs.tryComplete(res)
                         }
-                    }
+                      }
                   }
-
-                  mbs.addNotificationListener(on, listener, null, null)
-
-                  attrs.future must beEqualTo(List(
-                    null.asInstanceOf[String], // name
-                    -1L, // version
-                    s"Node[$host:$port", // primary
-                    null.asInstanceOf[String], // mongos
-                    s"Node[$host:$port", // nearest
-                    s"Node[$host:$port", // nodes
-                    "" // secondaries
-                    )).await(0, 5.seconds)
                 }
+
+                mbs.addNotificationListener(on, listener, null, null)
+
+                attrs.future must beEqualTo(List(
+                  null.asInstanceOf[String], // name
+                  -1L, // version
+                  s"Node[$host:$port", // primary
+                  null.asInstanceOf[String], // mongos
+                  s"Node[$host:$port", // nearest
+                  s"Node[$host:$port", // nodes
+                  "" // secondaries
+                )).await(0, 5.seconds)
+              }
             }
         }
       }
@@ -102,27 +105,27 @@ class JmxSpec extends org.specs2.mutable.Specification {
           nodeMBean aka ("Node MBean") must beLike[ObjectInstance] {
             case bi => verifyBeanInstance(bi, "reactivemongo.jmx.Node",
               nodeAttrs, Node.notificationInfo) and {
-                val on = bi.getObjectName
-                val exAttr = List("Supervisor", "Status", "PingInfo",
-                  "Connections", "Connected", "Authenticated")
+              val on = bi.getObjectName
+              val exAttr = List("Supervisor", "Status", "PingInfo",
+                "Connections", "Connected", "Authenticated")
 
-                Try(nodeAttrs.collect {
-                  case (name, _, _, _) if (!exAttr.contains(name)) =>
-                    mbs.getAttribute(on, name) match {
-                      case null => null.asInstanceOf[String]
-                      case v    => v.toString
-                    }
-                }) must beSuccessfulTry[List[String]](List(
-                  Common.connection.name,
-                  s"$host:$port", // name
-                  "", // aliases
-                  host,
-                  port.toString,
-                  null.asInstanceOf[String], // tags
-                  "minWireVersion = 2.6, maxWireVersion = 2.6, maxMessageSizeBytes = 48000000, maxBsonSize = 16777216, maxBulkSize = 1000", // protocol metadata
-                  "false" // mongos
-                  ))
-              }
+              Try(nodeAttrs.collect {
+                case (name, _, _, _) if (!exAttr.contains(name)) =>
+                  mbs.getAttribute(on, name) match {
+                    case null => null.asInstanceOf[String]
+                    case v    => v.toString
+                  }
+              }) must beSuccessfulTry[List[String]](List(
+                Common.connection.name,
+                s"$host:$port", // name
+                "", // aliases
+                host,
+                port.toString,
+                null.asInstanceOf[String], // tags
+                "minWireVersion = 2.6, maxWireVersion = 2.6, maxMessageSizeBytes = 48000000, maxBsonSize = 16777216, maxBulkSize = 1000", // protocol metadata
+                "false" // mongos
+              ))
+            }
           }.await(1, 5.seconds)
         }
       }
@@ -133,7 +136,8 @@ class JmxSpec extends org.specs2.mutable.Specification {
     like {
       case bi => Option(bi.getObjectName).flatMap(
         _.toString.drop(18).takeWhile(_ != ':').
-          split("\\.").reverse.headOption).
+        split("\\.").reverse.headOption
+      ).
         aka("connection fragment") must beSome(Common.connection.name) and {
           bi.getClassName must_== beanType
         } and {
@@ -152,7 +156,8 @@ class JmxSpec extends org.specs2.mutable.Specification {
 
   def nodeMBean(implicit ee: EE): Future[ObjectInstance] = {
     val mbeans = mbs.queryMBeans(new ObjectName(
-      "org.reactivemongo.Supervisor-*:type=Node,*"), null)
+      "org.reactivemongo.Supervisor-*:type=Node,*"
+    ), null)
 
     Try(mbeans.iterator.next()) match {
       case Success(node) => Future.successful(node)
@@ -168,7 +173,8 @@ class JmxSpec extends org.specs2.mutable.Specification {
 
   def waitNodeMBean(implicit ee: EE): Future[ObjectInstance] = {
     val mbeans = mbs.queryMBeans(new ObjectName(
-      "org.reactivemongo.Supervisor-*:type=NodeSet,*"), null)
+      "org.reactivemongo.Supervisor-*:type=NodeSet,*"
+    ), null)
 
     fromTry(Try(mbeans.iterator.next())).flatMap { ns =>
       val filter = new javax.management.NotificationFilter {
@@ -206,7 +212,8 @@ class JmxSpec extends org.specs2.mutable.Specification {
     ("Mongos", "java.lang.String", true, false),
     ("Nearest", "java.lang.String", true, false),
     ("Nodes", "java.lang.String", true, false),
-    ("Secondaries", "java.lang.String", true, false))
+    ("Secondaries", "java.lang.String", true, false)
+  )
 
   val nodeAttrs = List[AttrDef](
     ("Supervisor", "java.lang.String", true, false),
@@ -222,7 +229,8 @@ class JmxSpec extends org.specs2.mutable.Specification {
     ("Tags", "java.lang.String", true, false),
     ("ProtocolMetadata", "java.lang.String", true, false),
     ("PingInfo", "java.lang.String", true, false),
-    ("Mongos", "boolean", true, false))
+    ("Mongos", "boolean", true, false)
+  )
 
   lazy val mbs: MBeanServer = ManagementFactory.getPlatformMBeanServer()
 }

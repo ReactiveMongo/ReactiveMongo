@@ -26,8 +26,9 @@ object LazyLogger {
   def apply(name: String): LazyLogger =
     new LazyLogger(LoggerFactory getLogger name)
 
-  final class LazyLogger(logger: Logger) {
-    @inline private[reactivemongo] def underlying = logger
+  final class LazyLogger private[reactivemongo] (logger: Logger) {
+    /** Returns the corresponding SLF4J logger. */
+    def slf4j = logger
 
     def trace(s: => String) { if (logger.isTraceEnabled) logger.trace(s) }
     def trace(s: => String, e: => Throwable) {

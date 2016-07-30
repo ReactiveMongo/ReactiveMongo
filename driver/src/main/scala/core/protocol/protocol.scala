@@ -115,6 +115,7 @@ trait ChannelBufferWritable {
 trait ChannelBufferReadable[T] {
   /** Makes an instance of T from the data from the given buffer. */
   def readFrom(buffer: ChannelBuffer): T
+
   /** @see readFrom */
   def apply(buffer: ChannelBuffer): T = readFrom(buffer)
 }

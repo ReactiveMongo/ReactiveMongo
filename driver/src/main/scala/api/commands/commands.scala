@@ -57,7 +57,7 @@ object CommandError {
    * import reactivemongo.api.commands.CommandError
    *
    * def testError(err: CommandError): String = err match {
-   *   case CommandError.Code(code) => s"hasCode: $code"
+   *   case CommandError.Code(code) => s"hasCode: \$code"
    *   case _ => "no-code"
    * }
    * }}}
@@ -73,7 +73,7 @@ object CommandError {
    * import reactivemongo.api.commands.CommandError
    *
    * def testError(err: CommandError): String = err match {
-   *   case CommandError.Message(msg) => s"hasMessage: $msg"
+   *   case CommandError.Message(msg) => s"hasMessage: \$msg"
    *   case _ => "no-message"
    * }
    * }}}

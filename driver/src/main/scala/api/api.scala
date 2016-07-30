@@ -152,6 +152,8 @@ class Failover2[A](producer: () => Future[A], connection: MongoConnection, strat
 
   // TODO: Pass an explicit stack trace, to be able to raise with possible err
 
+  private val lnm = s"${connection.supervisor}/${connection.name}" // log name
+
   /**
    * A future that is completed with a response,
    * after 1 or more attempts (specified in the given strategy).
@@ -177,25 +179,25 @@ class Failover2[A](producer: () => Future[A], connection: MongoConnection, strat
           val delay = Duration.unapply(strategy.initialDelay * delayFactor).
             fold(strategy.initialDelay)(t => FiniteDuration(t._1, t._2))
 
-          trace(s"Got an error, retrying... (try #${`try`} is scheduled in ${delay.toMillis} ms)", e)
+          trace(s"[$lnm] Got an error, retrying... (try #${`try`} is scheduled in ${delay.toMillis} ms)", e)
 
           after(delay, connection.actorSystem.scheduler)(send(`try`))
         } else {
           // generally that means that the primary is not available
           // or the nodeset is unreachable
-          logger.error("Got an error, no more attempts to do. Completing with a failure... ", e)
+          logger.error(s"[$lnm] Got an error, no more attempts to do. Completing with a failure... ", e)
 
           Future.failed(e)
         }
       }
 
       case Failure(e) => {
-        trace("Got an non retryable error, completing with a failure... ", e)
+        trace(s"[$lnm] Got an non retryable error, completing with a failure... ", e)
         Future.failed(e)
       }
 
       case Success(response) => {
-        trace("Got a successful result, completing...")
+        trace(s"[$lnm] Got a successful result, completing...")
         Future.successful(response)
       }
     }
@@ -284,7 +286,7 @@ class MongoConnection(
   private val lnm = s"$supervisor/$name" // log name
 
   // TODO: Review
-  private[api] var history = () => new InternalState(null)
+  private[api] var history = () => InternalState.empty
 
   @volatile private[api] var killed: Boolean = false
 
@@ -568,7 +570,8 @@ class MongoConnection(
       }
 
       case Closed => {
-        logger.debug(s"Monitor $self closed, stopping... ($lnm)")
+        logger.debug(s"[$lnm] Monitor ${self.path} is now closed")
+
         waitingForClose.dequeueAll(_ => true).foreach(_ ! Closed)
         context.stop(self)
       }
@@ -934,11 +937,11 @@ class MongoDriver(config: Option[Config] = None) {
     lazy val dbsystem: MongoDBSystem = options.authMode match {
       case ScramSha1Authentication => new StandardDBSystem(
         supervisorName, nm, nodes, authentications, options
-      )()
+      )
 
       case _ => new LegacyDBSystem(
         supervisorName, nm, nodes, authentications, options
-      )()
+      )
     }
 
     val mongosystem = system.actorOf(Props(dbsystem), nm)
@@ -1090,7 +1093,13 @@ class MongoDriver(config: Option[Config] = None) {
         sender ! connection
       }
 
-      case Terminated(actor) => driver.connectionMonitors.remove(actor)
+      case Terminated(actor) => {
+        logger.debug(
+          s"[$supervisorName] Pool actor is terminated: ${actor.path}"
+        )
+
+        driver.connectionMonitors.remove(actor)
+      }
 
       /*
       case CloseWithTimeout(timeout) =>
@@ -1128,7 +1137,11 @@ class MongoDriver(config: Option[Config] = None) {
         logger.warn(s"[$supervisorName] Close ignored, already closing.")
     }
 
-    override def postStop: Unit = driver.system.shutdown()
+    override def postStop: Unit = {
+      logger.info(s"[$supervisorName] Stopping the monitor")
+
+      driver.system.shutdown()
+    }
   }
 }
 

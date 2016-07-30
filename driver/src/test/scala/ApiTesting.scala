@@ -13,6 +13,7 @@ import reactivemongo.core.actors.{
   MongoDBSystem,
   StandardDBSystem
 }
+import reactivemongo.api.commands.bson.BSONIsMasterCommand.IsMasterResult
 
 package object tests {
   // Test alias
@@ -22,7 +23,7 @@ package object tests {
 
   def waitIsAvailable(con: MongoConnection, failoverStrategy: FailoverStrategy)(implicit ec: ExecutionContext): Future[Unit] = con.waitIsAvailable(failoverStrategy)
 
-  def standardDBSystem(supervisor: String, name: String, nodes: Seq[String], authenticates: Seq[Authenticate], options: MongoConnectionOptions) = new StandardDBSystem(supervisor, name, nodes, authenticates, options)()
+  def standardDBSystem(supervisor: String, name: String, nodes: Seq[String], authenticates: Seq[Authenticate], options: MongoConnectionOptions) = new StandardDBSystem(supervisor, name, nodes, authenticates, options)
 
   def addConnection(d: MongoDriver, name: String, nodes: Seq[String], options: MongoConnectionOptions, mongosystem: ActorRef): Future[Any] = {
     import akka.pattern.ask
@@ -41,6 +42,4 @@ package object tests {
   def nodeSet(sys: MongoDBSystem): NodeSet = sys.getNodeSet
 
   def channelClosed(id: Int) = ChannelClosed(id)
-
-  def connectAll = ConnectAll
 }
