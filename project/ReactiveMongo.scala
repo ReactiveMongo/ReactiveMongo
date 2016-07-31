@@ -167,9 +167,12 @@ object Resolvers {
 
 object Dependencies {
   // TODO: Update
-  val akkaActor = {
+  val akka = {
     val ver = sys.env.get("AKKA_VERSION").getOrElse("2.3.13")
-    "com.typesafe.akka" %% "akka-actor" % ver
+
+    Seq(
+      "com.typesafe.akka" %% "akka-actor" % ver,
+      "com.typesafe.akka" %% "akka-testkit" % ver % Test)
   }
 
   val playIteratees = "com.typesafe.play" %% "play-iteratees" % "2.3.10"
@@ -252,7 +255,7 @@ object ReactiveMongoBuild extends Build {
 
           println(s"Travis CI env:\r\n$matrix")
         }
-      ).aggregate(bson, bsonmacros, shaded, driver)
+      ).aggregate(bson, shaded, driver, bsonmacros)
 
   import scala.xml.{ Elem => XmlElem, Node => XmlNode }
   private def transformPomDependencies(tx: XmlElem => Option[XmlNode]): XmlNode => XmlNode = { node: XmlNode =>
@@ -318,6 +321,26 @@ object ReactiveMongoBuild extends Build {
     m.close()
   }
 
+  lazy val bson = Project(
+    s"$projectPrefix-BSON",
+    file("bson"),
+    settings = buildSettings).
+    settings(
+      libraryDependencies += specs,
+      binaryIssueFilters ++= Seq(
+        ProblemFilters.exclude[MissingTypesProblem](
+          "reactivemongo.bson.BSONTimestamp$")))
+
+  lazy val bsonmacros = Project(
+    s"$projectPrefix-BSON-Macros",
+    file("macros"),
+    settings = buildSettings ++ Seq(
+      libraryDependencies +=
+        "org.scala-lang" % "scala-compiler" % scalaVersion.value % "provided"
+    )).
+    settings(libraryDependencies += specs).
+    dependsOn(bson)
+
   val driverCleanup = taskKey[Unit]("Driver compilation cleanup")
 
   lazy val driver = Project(
@@ -342,8 +365,8 @@ object ReactiveMongoBuild extends Build {
 
         Seq(Attributed(shadedDir / shadedJar)(AttributeMap.empty))
       },
-      libraryDependencies ++= Seq(
-        akkaActor, playIteratees, commonsCodec, shapelessTest, specs) ++ logApi,
+      libraryDependencies ++= akka ++ Seq(
+        playIteratees, commonsCodec, shapelessTest, specs) ++ logApi,
       binaryIssueFilters ++= {
         import ProblemFilters.{ exclude => x }
         @inline def mmp(s: String) = x[MissingMethodProblem](s)
@@ -726,26 +749,6 @@ object ReactiveMongoBuild extends Build {
       //mappings in (Compile, packageDoc) ~= driverFilter,
       mappings in (Compile, packageSrc) ~= driverFilter
     )).dependsOn(bsonmacros, shaded)
-
-  lazy val bson = Project(
-    s"$projectPrefix-BSON",
-    file("bson"),
-    settings = buildSettings).
-    settings(
-      libraryDependencies += specs,
-      binaryIssueFilters ++= Seq(
-        ProblemFilters.exclude[MissingTypesProblem](
-          "reactivemongo.bson.BSONTimestamp$")))
-
-  lazy val bsonmacros = Project(
-    s"$projectPrefix-BSON-Macros",
-    file("macros"),
-    settings = buildSettings ++ Seq(
-      libraryDependencies +=
-        "org.scala-lang" % "scala-compiler" % scalaVersion.value % "provided"
-    )).
-    settings(libraryDependencies += specs).
-    dependsOn(bson)
 
   private val providedInternalDeps: XmlNode => XmlNode = {
     import scala.xml.NodeSeq

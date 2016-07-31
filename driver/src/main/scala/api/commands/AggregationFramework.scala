@@ -34,9 +34,8 @@ trait AggregationFramework[P <: SerializationPack] extends ImplicitCommandHelper
     wireVersion: MongoWireVersion,
     bypassDocumentValidation: Boolean,
     readConcern: Option[ReadConcern]
-  )
-      extends CollectionCommand
-      with CommandWithPack[pack.type] with CommandWithResult[AggregationResult]
+  ) extends CollectionCommand with CommandWithPack[pack.type]
+      with CommandWithResult[AggregationResult]
 
   /**
    * @param firstBatch the documents of the first batch

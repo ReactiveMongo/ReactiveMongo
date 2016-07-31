@@ -152,7 +152,9 @@ object Common {
       try {
         driver.close()
       } catch {
-        case e: Throwable => logger.warn("fails to stop the default driver", e)
+        case e: Throwable =>
+          logger.warn(s"Fails to stop the default driver: $e")
+          logger.debug("Fails to stop the default driver", e)
       }
     }
 
