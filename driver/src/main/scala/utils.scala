@@ -91,7 +91,7 @@ object EitherMappableFuture {
   message = "Use [[reactivemongo.util.ExtendedFutures]]", since = "0.12.0"
 )
 object ExtendedFutures {
-  import akka.actor.{ ActorSystem, Scheduler }
+  import akka.actor.ActorSystem
 
   // better way to this?
   def DelayedFuture(millis: Long, system: ActorSystem): Future[Unit] = {

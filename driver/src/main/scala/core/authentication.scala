@@ -10,17 +10,12 @@ import reactivemongo.core.commands.{
 import reactivemongo.core.protocol.Response
 import reactivemongo.core.nodeset.{
   Authenticate,
-  Authenticating,
   CrAuthenticating,
   Connection,
-  Node,
-  NodeSet,
   ScramSha1Authenticating
 }
 
 private[reactivemongo] trait MongoCrAuthentication { system: MongoDBSystem =>
-  import reactivemongo.bson.{ BSONDocument, BSONInteger, BSONString }
-  import reactivemongo.bson.utils.Converters
   import reactivemongo.core.commands.{ CrAuthenticate, GetCrNonce }
   import MongoDBSystem.logger
 

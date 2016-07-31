@@ -17,7 +17,6 @@ package reactivemongo.api.collections
 
 import scala.concurrent.{ ExecutionContext, Future }
 import reactivemongo.api._
-import reactivemongo.bson.buffer.ReadableBuffer
 import reactivemongo.core.protocol.{ Query, QueryFlags }
 import reactivemongo.core.netty.{ BufferSequence, ChannelBufferWritableBuffer }
 

@@ -21,8 +21,7 @@ import reactivemongo.bson.{
   BSONDocument,
   BSONElement,
   BSONLong,
-  BSONString,
-  Producer
+  BSONString
 }
 
 import reactivemongo.api.{

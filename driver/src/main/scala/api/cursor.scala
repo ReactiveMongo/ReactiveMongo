@@ -22,8 +22,6 @@ import scala.concurrent.{ ExecutionContext, Future }
 
 import play.api.libs.iteratee.{ Enumerator, Enumeratee, Error, Input, Iteratee }
 
-import shaded.netty.buffer.ChannelBuffer
-
 import reactivemongo.core.actors.Exceptions
 import reactivemongo.core.iteratees.{ CustomEnumeratee, CustomEnumerator }
 import reactivemongo.core.netty.BufferSequence
@@ -33,7 +31,6 @@ import reactivemongo.core.protocol.{
   Query,
   QueryFlags,
   RequestMaker,
-  Reply,
   Response,
   ReplyDocumentIterator,
   ReplyDocumentIteratorExhaustedException
@@ -453,7 +450,7 @@ object Cursor {
 }
 
 object DefaultCursor {
-  import Cursor.{ ErrorHandler, FailOnError, State, Cont, Done, Fail, logger }
+  import Cursor.{ ErrorHandler, State, Cont, Done, Fail, logger }
   import reactivemongo.api.commands.ResultCursor
   import CursorOps.Unrecoverable
 
@@ -494,8 +491,6 @@ object DefaultCursor {
     }
 
     @inline def makeRequest(maxDocs: Int)(implicit ctx: ExecutionContext): Future[Response] = Failover2(mongoConnection, failoverStrategy) { () =>
-      import reactivemongo.core.netty.ChannelBufferReadableBuffer
-
       val nrt = query.numberToReturn
       val q = { // normalize the number of docs to return
         if (nrt > 0 && nrt <= maxDocs) query

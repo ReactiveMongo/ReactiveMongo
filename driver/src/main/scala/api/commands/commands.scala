@@ -4,14 +4,11 @@ import scala.concurrent.{ ExecutionContext, Future }
 import scala.util.control.NoStackTrace
 
 import reactivemongo.api.{
-  BSONSerializationPack,
   Cursor,
   SerializationPack,
   DB,
   Collection
 }
-import reactivemongo.bson.{ BSONDocumentReader, BSONDocumentWriter }
-import reactivemongo.core.netty.BufferSequence
 import reactivemongo.core.protocol.Response
 import reactivemongo.core.errors.ReactiveMongoException
 
@@ -127,7 +124,6 @@ object Command {
   }
   import reactivemongo.core.actors.RequestMakerExpectingResponse
   import reactivemongo.bson.lowlevel.LoweLevelDocumentIterator
-  import reactivemongo.bson.buffer.{ ReadableBuffer, WritableBuffer }
   import reactivemongo.core.netty.{
     BufferSequence,
     ChannelBufferReadableBuffer,

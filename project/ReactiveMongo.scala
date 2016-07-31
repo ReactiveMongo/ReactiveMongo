@@ -19,8 +19,8 @@ object BuildSettings {
     shellPrompt := ShellPrompt.buildShellPrompt)
 
   val buildSettings = Defaults.coreDefaultSettings ++ baseSettings ++ Seq(
-    scalaVersion := "2.11.7",
-    crossScalaVersions := Seq("2.11.7", "2.10.5"),
+    scalaVersion := "2.11.8",
+    crossScalaVersions := Seq("2.11.8", "2.10.5"),
     crossVersion := CrossVersion.binary,
     //parallelExecution in Test := false,
     //fork in Test := true, // Don't share executioncontext between SBT CLI/tests
@@ -33,7 +33,7 @@ object BuildSettings {
     scalacOptions in Compile := {
       val opts = (scalacOptions in Compile).value
 
-      if (scalaVersion.value != "2.11.7") {
+      if (scalaVersion.value != "2.11.8") {
         opts.filter(_ != "-Ywarn-unused-import")
       } else opts
     },
@@ -255,7 +255,8 @@ object ReactiveMongoBuild extends Build {
 
           println(s"Travis CI env:\r\n$matrix")
         }
-      ).aggregate(bson, shaded, driver, bsonmacros)
+      ).aggregate(bson, bsonmacros, shaded, driver,
+        iteratees, jmx)
 
   import scala.xml.{ Elem => XmlElem, Node => XmlNode }
   private def transformPomDependencies(tx: XmlElem => Option[XmlNode]): XmlNode => XmlNode = { node: XmlNode =>
@@ -297,11 +298,11 @@ object ReactiveMongoBuild extends Build {
         ShadeRule.rename("org.jboss.netty.**" -> "shaded.netty.@1").inAll,
         ShadeRule.rename("com.google.**" -> "shaded.google.@1").inAll
       ),
-      publish in Compile := publish.dependsOn(assembly),
-      publishLocal in Compile := publishLocal.dependsOn(assembly),
+      pomPostProcess := transformPomDependencies { _ => None },
+      publish := publish.dependsOn(assembly),
+      publishLocal := publishLocal.dependsOn(assembly),
       packageBin in Compile := target.value / (
-        assemblyJarName in assembly).value,
-      pomPostProcess := transformPomDependencies { _ => None }
+        assemblyJarName in assembly).value
     )
 
   private val driverFilter: Seq[(File, String)] => Seq[(File, String)] = {

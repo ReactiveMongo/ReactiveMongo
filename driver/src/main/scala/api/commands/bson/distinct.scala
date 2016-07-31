@@ -1,10 +1,8 @@
 package reactivemongo.api.commands.bson
 
-import scala.collection.immutable.ListSet
-
 import reactivemongo.core.protocol.MongoWireVersion
 import reactivemongo.bson._
-import reactivemongo.api.{ BSONSerializationPack, ReadConcern }
+import reactivemongo.api.BSONSerializationPack
 import reactivemongo.api.commands.{ DistinctCommand, ResolvedCollectionCommand }
 
 object BSONDistinctCommand extends DistinctCommand[BSONSerializationPack.type] {

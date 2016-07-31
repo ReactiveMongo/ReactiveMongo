@@ -15,14 +15,24 @@
  */
 package reactivemongo.api
 
-import collections.bson.BSONCollection
-import reactivemongo.api.indexes.IndexesManager
-import reactivemongo.bson._
-import reactivemongo.core.commands.{ Update => UpdateCommand, _ }
-import reactivemongo.utils.EitherMappableFuture._
-
 import scala.concurrent.{ ExecutionContext, Future }
-import scala.concurrent.duration._
+import scala.concurrent.duration.FiniteDuration
+
+import reactivemongo.core.commands.{
+  Command => CoreCommand,
+  SuccessfulAuthentication
+}
+
+import reactivemongo.api.indexes.IndexesManager
+import reactivemongo.bson.{
+  BSONDocument,
+  BSONDocumentReader,
+  BSONRegex,
+  BSONString
+}
+import reactivemongo.utils.EitherMappableFuture.futureToEitherMappable
+
+import reactivemongo.api.collections.bson.BSONCollection
 
 /**
  * A MongoDB database, obtained from a [[reactivemongo.api.MongoConnection]].
@@ -75,7 +85,7 @@ sealed trait DB {
    * @return a future containing the result of the command.
    */
   @deprecated("Consider using reactivemongo.api.commands along with `DefaultDB.runCommand` methods", "0.11.0")
-  def command[T](command: Command[T], readPreference: ReadPreference = defaultReadPreference)(implicit ec: ExecutionContext): Future[T] =
+  def command[T](command: CoreCommand[T], readPreference: ReadPreference = defaultReadPreference)(implicit ec: ExecutionContext): Future[T] =
     Failover(
       command.apply(name).maker(readPreference),
       connection, failoverStrategy

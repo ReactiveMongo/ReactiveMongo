@@ -9,7 +9,7 @@ import reactivemongo.bson.{
 }
 
 import reactivemongo.core.protocol.MongoWireVersion
-import reactivemongo.api.{ BSONSerializationPack, ReadConcern }
+import reactivemongo.api.BSONSerializationPack
 import reactivemongo.api.commands.{ AggregationFramework, ResultCursor }
 import reactivemongo.api.commands.bson.CommonImplicits.ReadConcernWriter
 
@@ -39,9 +39,7 @@ object BSONAggregationImplicits {
   import reactivemongo.bson.{
     BSONArray,
     BSONBoolean,
-    BSONDocumentReader,
     BSONDocumentWriter,
-    BSONInteger,
     BSONString
   }
 
