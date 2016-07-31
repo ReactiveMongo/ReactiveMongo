@@ -304,7 +304,7 @@ object ReactiveMongoBuild extends Build {
   private val driverFilter: Seq[(File, String)] => Seq[(File, String)] = {
     (_: Seq[(File, String)]).filter {
       case (file, name) =>
-        !(name endsWith "reactivemongo/core/StaticListenerBinder.class")
+        !(name endsWith "external/reactivemongo/StaticListenerBinder.class")
     }
   } andThen BuildSettings.filter
 
@@ -328,7 +328,7 @@ object ReactiveMongoBuild extends Build {
       compile in Compile <<= (compile in Compile).dependsOn(assembly in shaded),
       driverCleanup := {
         val classDir = (classDirectory in Compile).value
-        val listenerClass = classDir / "reactivemongo" / "core" / (
+        val listenerClass = classDir / "external" / "reactivemongo" / (
           "StaticListenerBinder.class")
 
         streams.value.log(s"Cleanup $listenerClass ...")

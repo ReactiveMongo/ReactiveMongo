@@ -134,6 +134,17 @@ object Common {
     )
   }
 
+  @annotation.tailrec
+  def tryUntil[T](retries: List[Int])(f: => T, test: T => Boolean): Boolean =
+    if (test(f)) true else retries match {
+      case delay :: next => {
+        Thread.sleep(delay)
+        tryUntil(next)(f, test)
+      }
+
+      case _ => false
+    }
+
   // ---
 
   def close(): Unit = {

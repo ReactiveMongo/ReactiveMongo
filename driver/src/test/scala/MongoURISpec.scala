@@ -11,7 +11,6 @@ class MongoURISpec extends org.specs2.mutable.Specification {
   "Mongo URI" title
 
   section("unit")
-
   "MongoConnection URI parser" should {
     val simplest = "mongodb://host1"
 
@@ -142,7 +141,6 @@ class MongoURISpec extends org.specs2.mutable.Specification {
         ),
         ignoredOptions = Nil
       ))
-
     }
 
     val withWriteConcernWMaj = "mongodb://user123:passwd123@host1:27018,host2:27019,host3:27020/somedb?writeConcernW=majority"
@@ -157,7 +155,6 @@ class MongoURISpec extends org.specs2.mutable.Specification {
         ),
         ignoredOptions = Nil
       ))
-
     }
 
     val withWriteConcernWTag = "mongodb://user123:passwd123@host1:27018,host2:27019,host3:27020/somedb?writeConcernW=anyTag"
@@ -174,7 +171,6 @@ class MongoURISpec extends org.specs2.mutable.Specification {
         ),
         ignoredOptions = Nil
       ))
-
     }
 
     val withWriteConcernWAck = "mongodb://user123:passwd123@host1:27018,host2:27019,host3:27020/somedb?writeConcernW=5"
@@ -191,7 +187,6 @@ class MongoURISpec extends org.specs2.mutable.Specification {
         ),
         ignoredOptions = Nil
       ))
-
     }
 
     val withWriteConcernJournaled = "mongodb://user123:passwd123@host1:27018,host2:27019,host3:27020/somedb?writeConcernJ=true"
@@ -208,7 +203,6 @@ class MongoURISpec extends org.specs2.mutable.Specification {
           ignoredOptions = Nil
         )
       )
-
     }
 
     val withWriteConcernNJ = "mongodb://user123:passwd123@host1:27018,host2:27019,host3:27020/somedb?writeConcernJ=false&writeConcern=journaled"
@@ -225,7 +219,6 @@ class MongoURISpec extends org.specs2.mutable.Specification {
           ignoredOptions = Nil
         )
       )
-
     }
 
     val withWriteConcernTmout = "mongodb://user123:passwd123@host1:27018,host2:27019,host3:27020/somedb?writeConcernTimeout=1543"
@@ -242,7 +235,6 @@ class MongoURISpec extends org.specs2.mutable.Specification {
           ignoredOptions = Nil
         )
       )
-
     }
 
     val defaultFo = "mongodb://host1?rm.failover=default"
@@ -337,6 +329,7 @@ class MongoURISpec extends org.specs2.mutable.Specification {
       parseURI(invalidIdle) must beFailedTry[ParsedURI].withThrowable[MongoConnection.URIParsingException]("Invalid URI options: maxIdleTimeMS\\(99\\) < monitorRefreshMS\\(100\\)")
     }
   }
+  section("unit")
 
   // ---
 

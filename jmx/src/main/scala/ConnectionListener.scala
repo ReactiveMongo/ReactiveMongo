@@ -18,7 +18,9 @@ import reactivemongo.api.MongoConnectionOptions
 import reactivemongo.core.nodeset.{ NodeSetInfo, NodeInfo }
 
 /** Listener definition for the connection events. */
-final class ConnectionListener extends reactivemongo.core.ConnectionListener {
+final class ConnectionListener
+    extends external.reactivemongo.ConnectionListener {
+
   import java.lang.management.ManagementFactory
   import javax.management.MBeanServer
 

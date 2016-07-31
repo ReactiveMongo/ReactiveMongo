@@ -4,6 +4,7 @@ import reactivemongo.bson.utils.Converters
 class BSONObjectIDSpec extends org.specs2.mutable.Specification {
   "BSONObjectID" title
 
+  section("unit")
   "Object ID" should {
     "equal when created with string" in {
       val objectID = BSONObjectID.generate()
@@ -43,4 +44,5 @@ class BSONObjectIDSpec extends org.specs2.mutable.Specification {
       objectID.valueAsArray must_== bytes
     }
   }
+  section("unit")
 }

@@ -1,4 +1,4 @@
-package reactivemongo.core
+package external.reactivemongo
 
 import scala.util.{ Failure, Success, Try }
 
@@ -8,7 +8,7 @@ import reactivemongo.core.nodeset.NodeSetInfo
 /** Listener definition for the connection events. */
 trait ConnectionListener {
   /** Logger available for the listener implementation. */
-  lazy val logger: org.slf4j.Logger = ConnectionListener.logger.underlying
+  lazy val logger: org.slf4j.Logger = ConnectionListener.logger.slf4j
 
   /**
    * The connection pool is initialized.
@@ -41,9 +41,9 @@ object ConnectionListener {
   import java.net.URL
 
   val staticListenerBinderPath =
-    "reactivemongo/core/StaticListenerBinder.class";
+    "external/reactivemongo/StaticListenerBinder.class";
 
-  private[core] val logger =
+  private[reactivemongo] val logger =
     reactivemongo.util.LazyLogger("reactivemongo.core.ConnectionListener")
 
   /** Optionally creates a listener according the available binding. */

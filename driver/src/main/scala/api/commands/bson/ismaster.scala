@@ -15,7 +15,7 @@ object BSONIsMasterCommandImplicits {
 
   implicit object IsMasterResultReader extends DealingWithGenericCommandErrorsReader[IsMasterResult] {
     def readResult(doc: BSONDocument): IsMasterResult = {
-      val rs = doc.getAs[String]("me").map { me =>
+      def rs = doc.getAs[String]("me").map { me =>
         new ReplicaSet(
           setName = doc.getAs[String]("setName").get,
           setVersion = doc.getAs[BSONNumberLike]("setVersion").
@@ -40,6 +40,7 @@ object BSONIsMasterCommandImplicits {
           electionId = doc.getAs[BSONNumberLike]("electionId").fold(-1)(_.toInt)
         )
       }
+
       IsMasterResult(
         isMaster = doc.getAs[BSONBooleanLike](
           "ismaster"

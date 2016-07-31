@@ -1,4 +1,4 @@
-package reactivemongo.core
+package external.reactivemongo
 
 final class StaticListenerBinder {
   def connectionListener(): ConnectionListener =
