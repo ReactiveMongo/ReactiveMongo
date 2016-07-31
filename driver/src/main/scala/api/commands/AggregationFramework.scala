@@ -6,7 +6,9 @@ import reactivemongo.core.protocol.MongoWireVersion
 /**
  * Implements the [[http://docs.mongodb.org/manual/applications/aggregation/ Aggregation Framework]].
  */
-trait AggregationFramework[P <: SerializationPack] extends ImplicitCommandHelpers[P] {
+trait AggregationFramework[P <: SerializationPack]
+    extends ImplicitCommandHelpers[P] {
+
   /**
    * @param batchSize the initial batch size for the cursor
    */
@@ -298,6 +300,38 @@ trait AggregationFramework[P <: SerializationPack] extends ImplicitCommandHelper
     /** Keyword name */
     def name: String
   }
+
+  /**
+   * Since MongoDB 3.2
+   * https://docs.mongodb.com/manual/reference/operator/aggregation/indexStats/
+   */
+  case object IndexStats extends PipelineOperator {
+    val makePipe = makeDocument(Seq(
+      elementProducer("$indexStats", makeDocument(Nil))
+    ))
+  }
+
+  /**
+   * @param ops the number of operations that used the index
+   * @param since the time from which MongoDB gathered the statistics
+   */
+  case class IndexStatAccesses(
+    ops: Long,
+    since: java.util.Date
+  )
+
+  /**
+   * @param name the index name
+   * @param key the key specification
+   * @param host the hostname and port of the mongod
+   * @param accesses the index statistics
+   */
+  case class IndexStatsResult(
+    name: String,
+    key: pack.Document,
+    host: String,
+    accesses: IndexStatAccesses
+  )
 
   /** References the score associated with the corresponding [[https://docs.mongodb.org/v3.0/reference/operator/query/text/#op._S_text `\$text`]] query for each matching document. */
   case object TextScore extends MetadataKeyword {
