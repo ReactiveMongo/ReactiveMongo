@@ -1,4 +1,5 @@
 import akka.actor.{ Actor, ActorRef, Props }
+import akka.testkit.TestActorRef
 
 import scala.concurrent.{ Await, Future }
 
@@ -6,7 +7,7 @@ import org.specs2.concurrent.{ ExecutionEnv => EE }
 
 import reactivemongo.bson.BSONDocument
 
-import reactivemongo.core.actors.MongoDBSystem
+import reactivemongo.core.actors.StandardDBSystem
 import reactivemongo.core.nodeset.{ Authenticate, Connection, Node, NodeStatus }
 import reactivemongo.core.protocol.{ MongoWireVersion, Response }
 
@@ -25,8 +26,6 @@ import reactivemongo.api.commands.bson.BSONIsMasterCommand.{
 class MonitorSpec extends org.specs2.mutable.Specification {
   "Monitor" title
 
-  sequential
-
   import reactivemongo.api.tests._
   import Common.{ timeout, tryUntil }
 
@@ -38,7 +37,9 @@ class MonitorSpec extends org.specs2.mutable.Specification {
         monitorRefreshMS = 3600000 // disable refreshAll/connectAll during test
       )
 
-      withConAndSys(options = opts) { (con, dbsystem, _) =>
+      withConAndSys(options = opts) { (con, sysRef) =>
+        @inline def dbsystem = sysRef.underlyingActor
+
         waitIsAvailable(con, Common.failoverStrategy).map { _ =>
           Thread.sleep(250)
 
@@ -120,7 +121,9 @@ class MonitorSpec extends org.specs2.mutable.Specification {
         monitorRefreshMS = 3600000 // disable refreshAll/connectAll during test
       )
 
-      withConAndSys(options = opts) { (con, dbsystem, sysRef) =>
+      withConAndSys(options = opts) { (con, sysRef) =>
+        @inline def dbsystem = sysRef.underlyingActor
+
         waitIsAvailable(con, Common.failoverStrategy).map { _ =>
           Thread.sleep(250)
 
@@ -176,24 +179,25 @@ class MonitorSpec extends org.specs2.mutable.Specification {
 
   // ---
 
-  def withConAndSys[T](nodes: Seq[String] = Seq(Common.primaryHost), options: MongoConnectionOptions = Common.DefaultOptions, drv: MongoDriver = Common.driver, authentications: Seq[Authenticate] = Seq.empty[Authenticate])(f: (MongoConnection, MongoDBSystem, ActorRef) => Future[T])(implicit ee: EE): Future[T] = {
-    import reactivemongo.core.actors.StandardDBSystem
-
+  def withConAndSys[T](nodes: Seq[String] = Seq(Common.primaryHost), options: MongoConnectionOptions = Common.DefaultOptions, drv: MongoDriver = Common.driver, authentications: Seq[Authenticate] = Seq.empty[Authenticate])(f: (MongoConnection, TestActorRef[StandardDBSystem]) => Future[T])(implicit ee: EE): Future[T] = {
     // See MongoDriver#connection
     val supervisorName = s"Supervisor-${System identityHashCode ee}"
     val poolName = s"Connection-${System identityHashCode f}"
-    lazy val dbsystem = standardDBSystem(
-      supervisorName, poolName, nodes, authentications, options
+
+    implicit def sys: akka.actor.ActorSystem = drv.system
+    lazy val mongosystem = TestActorRef[StandardDBSystem](
+      standardDBSystem(
+        supervisorName, poolName, nodes, authentications, options
+      ), poolName
     )
 
-    lazy val mongosystem = drv.system.actorOf(Props(dbsystem), poolName)
     def connection = addConnection(
       drv,
       poolName, nodes, options, mongosystem
     ).mapTo[MongoConnection]
 
     connection.flatMap { con =>
-      f(con, dbsystem, mongosystem).andThen { case _ => con.close() }
+      f(con, mongosystem).andThen { case _ => con.close() }
     }
   }
 }
