@@ -669,6 +669,115 @@ class AggregationSpec extends org.specs2.mutable.Specification {
     } tag "not_mongo26"
   }
 
+  "Geo-indexed documents" >> {
+    // https://docs.mongodb.com/manual/reference/operator/aggregation/geoNear/#example
+
+    val places = db(s"places${System identityHashCode this}")
+
+    {
+      import ExecutionContext.Implicits.global
+      import reactivemongo.api.indexes._, IndexType._
+
+      // db.place.createIndex({'loc':"2dsphere"})
+      scala.concurrent.Await.result(places.indexesManager.ensure(Index(
+        List("loc" -> Geo2DSpherical)
+      )).map(_ => {}), timeout * 2)
+    }
+
+    "must be inserted" in { implicit ee: EE =>
+      /*
+       {
+         "type": "public",
+         "loc": {
+           "type": "Point", "coordinates": [-73.97, 40.77]
+         },
+         "name": "Central Park",
+         "category": "Parks"
+       },
+       {
+         "type": "public",
+         "loc": {
+           "type": "Point", "coordinates": [-73.88, 40.78]
+         },
+         "name": "La Guardia Airport",
+         "category": "Airport"
+       }
+       */
+
+      Future.sequence(Seq(
+        document(
+          "type" -> "public",
+          "loc" -> document(
+            "type" -> "Point", "coordinates" -> array(-73.97, 40.77)
+          ),
+          "name" -> "Central Park",
+          "category" -> "Parks"
+        ),
+        document(
+          "type" -> "public",
+          "loc" -> document(
+            "type" -> "Point", "coordinates" -> array(-73.88, 40.78)
+          ),
+          "name" -> "La Guardia Airport",
+          "category" -> "Airport"
+        )
+      ).map { doc => places.insert(doc) }).map(_ => {}) must beEqualTo({}).
+        await(0, timeout)
+    } tag "wip"
+
+    "and aggregated using $geoNear" in { implicit ee: EE =>
+      import places.BatchCommands.AggregationFramework.GeoNear
+
+      /*
+       db.places.aggregate([{
+         $geoNear: {
+           near: { type: "Point", coordinates: [ -73.9667, 40.78 ] },
+           distanceField: "dist.calculated",
+           minDistance: 1000,
+           maxDistance: 5000,
+           query: { type: "public" },
+           includeLocs: "dist.location",
+           num: 5,
+           spherical: true
+         }
+       }])
+       */
+
+      implicit val pointReader = Macros.reader[GeoPoint]
+      implicit val distanceReader = BSONDocumentReader[GeoDistance] { doc =>
+        (for {
+          calc <- doc.getAsTry[BSONNumberLike]("calculated").map(_.toInt)
+          loc <- doc.getAsTry[GeoPoint]("loc")
+        } yield GeoDistance(calc, loc)).get
+      }
+      implicit val placeReader = Macros.reader[GeoPlace]
+
+      places.aggregate(GeoNear(document(
+        "type" -> "Point",
+        "coordinates" -> array(-73.9667, 40.78)
+      ), distanceField = Some("dist.calculated"),
+        minDistance = Some(1000),
+        maxDistance = Some(5000),
+        query = Some(document("type" -> "public")),
+        includeLocs = Some("dist.loc"),
+        limit = 5,
+        spherical = true)).map(_.head[GeoPlace]).
+        aka("places") must beEqualTo(List(
+          GeoPlace(
+            loc = GeoPoint(List(-73.97D, 40.77D)),
+            name = "Central Park",
+            category = "Parks",
+            dist = GeoDistance(
+              calculated = 1147,
+              loc = GeoPoint(List(-73.97D, 40.77D))
+            )
+          )
+        )).await(0, timeout)
+
+      // { "type" : "public", "loc" : { "type" : "Point", "coordinates" : [ -73.97, 40.77 ] }, "name" : "Central Park", "category" : "Parks", "dist" : { "calculated" : 1147.4220523120696, "loc" : { "type" : "Point", "coordinates" : [ -73.97, 40.77 ] } } }
+    } tag "wip"
+  }
+
   // ---
 
   case class Location(lon: Double, lat: Double)
@@ -696,4 +805,13 @@ class AggregationSpec extends org.specs2.mutable.Specification {
   case class Sale(_id: Int, items: List[SaleItem])
 
   case class QuizStdDev(_id: Int, stdDev: Double)
+
+  case class GeoPoint(coordinates: List[Double])
+  case class GeoDistance(calculated: Int, loc: GeoPoint)
+  case class GeoPlace(
+    loc: GeoPoint,
+    name: String,
+    category: String,
+    dist: GeoDistance
+  )
 }
