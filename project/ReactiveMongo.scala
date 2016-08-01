@@ -299,8 +299,7 @@ object ReactiveMongoBuild extends Build {
         ShadeRule.rename("com.google.**" -> "shaded.google.@1").inAll
       ),
       pomPostProcess := transformPomDependencies { _ => None },
-      publish := publish.dependsOn(assembly),
-      publishLocal := publishLocal.dependsOn(assembly),
+      makePom <<= makePom.dependsOn(assembly),
       packageBin in Compile := target.value / (
         assemblyJarName in assembly).value
     )
