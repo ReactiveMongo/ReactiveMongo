@@ -15,10 +15,28 @@
  */
 package reactivemongo.api.indexes
 
+import reactivemongo.bson.{
+  BSONBoolean,
+  BSONBooleanLike,
+  BSONDocument,
+  BSONDocumentReader,
+  BSONDocumentWriter,
+  BSONDouble,
+  BSONInteger,
+  BSONLong,
+  BSONNumberLike,
+  BSONString,
+  BSONValue
+}
+
 import reactivemongo.core.protocol.MongoWireVersion
-import reactivemongo.api._
-import reactivemongo.bson._
-import reactivemongo.api.commands.{ DropIndexes, LastError, WriteResult }
+import reactivemongo.api.{
+  DB,
+  DBMetaCommands,
+  BSONSerializationPack,
+  CursorProducer
+}
+import reactivemongo.api.commands.{ DropIndexes, WriteResult }
 import scala.concurrent.{ Future, ExecutionContext }
 
 /** Type of Index */
@@ -253,8 +271,6 @@ final class DefaultIndexesManager(db: DB with DBMetaCommands)(
     implicit
     context: ExecutionContext
 ) extends IndexesManager {
-
-  import reactivemongo.api.commands.ListIndexes
 
   private def listIndexes(collections: List[String], indexes: List[NSIndex]): Future[List[NSIndex]] = collections match {
     case c :: cs => onCollection(c).list().flatMap(ix =>

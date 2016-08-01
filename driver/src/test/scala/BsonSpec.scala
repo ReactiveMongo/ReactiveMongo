@@ -17,6 +17,7 @@ class BsonSpec extends Specification {
 
   val bsonArray = Array[Byte](42, 0, 0, 0, 2, 48, 0, 8, 0, 0, 0, 97, 119, 101, 115, 111, 109, 101, 0, 1, 49, 0, 51, 51, 51, 51, 51, 51, 20, 64, 1, 50, 0, 0, 0, 0, 0, 0, 8, -97, 64, 0)
 
+  section("unit")
   "BSON codec" should {
     "produce a simple document" in {
       val doc = BSONDocument("hello" -> BSONString("world"))
@@ -58,6 +59,7 @@ class BsonSpec extends Specification {
 
     "nested subdocuments and arrays" in {
       val expected = Array[Byte](72, 0, 0, 0, 3, 112, 117, 115, 104, 65, 108, 108, 0, 58, 0, 0, 0, 4, 99, 111, 110, 102, 105, 103, 0, 45, 0, 0, 0, 3, 48, 0, 37, 0, 0, 0, 2, 110, 97, 109, 101, 0, 7, 0, 0, 0, 102, 111, 111, 98, 97, 114, 0, 2, 118, 97, 108, 117, 101, 0, 4, 0, 0, 0, 98, 97, 114, 0, 0, 0, 0, 0)
+
       // {"pushAll":{"config":[{"name":"foobar","value":"bar"}]}}
       val subsubdoc = BSONDocument("name" -> BSONString("foobar"), "value" -> BSONString("bar"))
       val arr = BSONArray(subsubdoc)
@@ -122,6 +124,7 @@ class BsonSpec extends Specification {
       docLike.getAs[BSONNumberLike]("aDouble").get.toDouble mustEqual 9876543210.98
     }
   }
+  section("unit")
 
   def compare(origin: Array[Byte], buffer: shaded.netty.buffer.ChannelBuffer) = {
     val array = new Array[Byte](buffer.writerIndex)

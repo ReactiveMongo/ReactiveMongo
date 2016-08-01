@@ -2,7 +2,6 @@ package reactivemongo.api.commands.bson
 
 import reactivemongo.api.BSONSerializationPack
 import reactivemongo.api.commands._
-import reactivemongo.util.option
 
 object BSONCountCommand extends CountCommand[BSONSerializationPack.type] {
   val pack = BSONSerializationPack

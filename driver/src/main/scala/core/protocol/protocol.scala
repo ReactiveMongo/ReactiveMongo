@@ -23,7 +23,10 @@ import shaded.netty.buffer._
 import shaded.netty.channel._
 import shaded.netty.handler.codec.oneone._
 import shaded.netty.handler.codec.frame.FrameDecoder
-import shaded.netty.handler.timeout.{ IdleState, IdleStateEvent, IdleStateAwareChannelHandler }
+import shaded.netty.handler.timeout.{
+  IdleStateEvent,
+  IdleStateAwareChannelHandler
+}
 
 import reactivemongo.core.actors.{
   ChannelConnected,
@@ -115,6 +118,7 @@ trait ChannelBufferWritable {
 trait ChannelBufferReadable[T] {
   /** Makes an instance of T from the data from the given buffer. */
   def readFrom(buffer: ChannelBuffer): T
+
   /** @see readFrom */
   def apply(buffer: ChannelBuffer): T = readFrom(buffer)
 }
@@ -417,8 +421,6 @@ private[reactivemongo] class ResponseFrameDecoder extends FrameDecoder {
 }
 
 private[reactivemongo] class ResponseDecoder extends OneToOneDecoder {
-  import java.net.InetSocketAddress
-
   def decode(ctx: ChannelHandlerContext, channel: Channel, obj: Object): Response = {
     val buffer = obj.asInstanceOf[ChannelBuffer]
     val header = MessageHeader(buffer)
@@ -476,8 +478,7 @@ private[reactivemongo] class MongoHandler(
     val now = System.currentTimeMillis()
     val last = e.getLastActivityTimeMillis
 
-    //log(e, s"Channel has been inactive for ${now - last} (last = $last)")
-    println(s"Channel has been inactive for ${now - last} (last = $last)")
+    log(e, s"Channel has been inactive for ${now - last} (last = $last)")
     e.getChannel.close()
 
     super.channelIdle(ctx, e)

@@ -1,9 +1,6 @@
 package reactivemongo.api.commands
 
-import scala.util.control.NoStackTrace
-
-import reactivemongo.bson.{ BSONObjectID, BSONValue }
-import reactivemongo.api.{ Cursor, SerializationPack }
+import reactivemongo.api.SerializationPack
 
 trait Mongo26WriteCommand
 

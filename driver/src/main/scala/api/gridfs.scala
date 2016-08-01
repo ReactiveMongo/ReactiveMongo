@@ -19,12 +19,7 @@ import java.io.{ InputStream, OutputStream }
 import java.util.Arrays
 import scala.concurrent.{ ExecutionContext, Future }
 
-import play.api.libs.iteratee.{
-  Concurrent,
-  Enumeratee,
-  Enumerator,
-  Iteratee
-}
+import play.api.libs.iteratee.{ Concurrent, Enumerator, Iteratee }
 
 import reactivemongo.bson.{
   BSONBinary,

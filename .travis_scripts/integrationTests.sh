@@ -26,10 +26,14 @@ SBT_ARGS="$SBT_ARGS -Dtest.slowPrimaryHost=$PRIMARY_SLOW_PROXY -Dtest.slowProxyD
 
 if [ "$MONGO_VER" = "3" ]; then
     TEST_OPTS="exclude mongo2,unit"
-    
-    if [ "$MONGO_SSL" = "true" ]; then
-        SBT_ARGS="$SBT_ARGS -Dtest.enableSSL=true"
-    fi
+fi
+
+if [ "$MONGO_PROFILE" = "ssl" ]; then
+    SBT_ARGS="$SBT_ARGS -Dtest.enableSSL=true"
+fi
+
+if [ "$MONGO_PROFILE" = "rs" ]; then
+    SBT_ARGS="$SBT_ARGS -Dtest.replicaSet=true"
 fi
 
 source "$SCRIPT_DIR/jvmopts.sh"
@@ -45,6 +49,8 @@ export JVM_OPTS
 TEST_ARGS=";project ReactiveMongo ;testOnly -- $TEST_OPTS"
 TEST_ARGS="$TEST_ARGS ;project ReactiveMongo-Iteratees ;testOnly -- $TEST_OPTS"
 TEST_ARGS="$TEST_ARGS ;project ReactiveMongo-JMX ;testOnly -- $TEST_OPTS"
+
+sed -e 's/"-deprecation", //' < project/ReactiveMongo.scala > .tmp && mv .tmp project/ReactiveMongo.scala
 
 sbt ++$TRAVIS_SCALA_VERSION $SBT_ARGS "$TEST_ARGS" || (
     #tail -n 10000 /tmp/mongod.log | grep -v ' end connection ' | grep -v 'connection accepted' | grep -v 'killcursors: found 0 of 1' | tail -n 100

@@ -10,6 +10,12 @@ import reactivemongo.api.{
 object Common {
   val logger = reactivemongo.util.LazyLogger("tests")
 
+  val replSetOn =
+    Option(System getProperty "test.replicaSet").fold(false) {
+      case "true" => true
+      case _      => false
+    }
+
   val primaryHost =
     Option(System getProperty "test.primaryHost").getOrElse("localhost:27017")
 
@@ -128,6 +134,17 @@ object Common {
     )
   }
 
+  @annotation.tailrec
+  def tryUntil[T](retries: List[Int])(f: => T, test: T => Boolean): Boolean =
+    if (test(f)) true else retries match {
+      case delay :: next => {
+        Thread.sleep(delay)
+        tryUntil(next)(f, test)
+      }
+
+      case _ => false
+    }
+
   // ---
 
   def close(): Unit = {
@@ -135,7 +152,9 @@ object Common {
       try {
         driver.close()
       } catch {
-        case e: Throwable => logger.warn("fails to stop the default driver", e)
+        case e: Throwable =>
+          logger.warn(s"Fails to stop the default driver: $e")
+          logger.debug("Fails to stop the default driver", e)
       }
     }
 

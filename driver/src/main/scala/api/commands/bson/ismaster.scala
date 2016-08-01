@@ -15,9 +15,11 @@ object BSONIsMasterCommandImplicits {
 
   implicit object IsMasterResultReader extends DealingWithGenericCommandErrorsReader[IsMasterResult] {
     def readResult(doc: BSONDocument): IsMasterResult = {
-      val rs = doc.getAs[String]("me").map { me =>
-        ReplicaSet(
+      def rs = doc.getAs[String]("me").map { me =>
+        new ReplicaSet(
           setName = doc.getAs[String]("setName").get,
+          setVersion = doc.getAs[BSONNumberLike]("setVersion").
+            fold(-1)(_.toInt),
           me = me,
           primary = doc.getAs[String]("primary"),
           hosts = doc.getAs[Seq[String]]("hosts").getOrElse(Seq.empty),
@@ -34,9 +36,11 @@ object BSONIsMasterCommandImplicits {
           ).fold(false)(_.toBoolean),
           isHidden = doc.getAs[BSONBooleanLike]("hidden").
             fold(false)(_.toBoolean),
-          tags = doc.getAs[BSONDocument]("tags")
+          tags = doc.getAs[BSONDocument]("tags"),
+          electionId = doc.getAs[BSONNumberLike]("electionId").fold(-1)(_.toInt)
         )
       }
+
       IsMasterResult(
         isMaster = doc.getAs[BSONBooleanLike](
           "ismaster"
@@ -56,6 +60,5 @@ object BSONIsMasterCommandImplicits {
         msg = doc.getAs[String]("msg") // Contains the value isdbgrid when isMaster returns from a mongos instance.
       )
     }
-
   }
 }

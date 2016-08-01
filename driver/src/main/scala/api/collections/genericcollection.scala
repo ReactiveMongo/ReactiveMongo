@@ -18,8 +18,6 @@ package reactivemongo.api.collections
 import scala.util.{ Failure, Success, Try }
 import scala.util.control.NonFatal
 
-import scala.collection.Set
-import scala.collection.immutable.ListSet
 import scala.collection.generic.CanBuildFrom
 
 import scala.concurrent.{ ExecutionContext, Future }
@@ -29,11 +27,9 @@ import shaded.netty.buffer.ChannelBuffer
 import reactivemongo.api._
 import reactivemongo.api.commands.{
   CursorFetcher,
-  LastError,
   ResponseResult,
   WriteConcern
 }
-import reactivemongo.bson.buffer.{ ReadableBuffer, WritableBuffer }
 import reactivemongo.core.nodeset.ProtocolMetadata
 import reactivemongo.core.protocol.{
   CheckedWriteRequest,
@@ -45,11 +41,7 @@ import reactivemongo.core.protocol.{
   Update,
   UpdateFlags
 }
-import reactivemongo.core.netty.{
-  BufferSequence,
-  ChannelBufferReadableBuffer,
-  ChannelBufferWritableBuffer
-}
+import reactivemongo.core.netty.{ BufferSequence, ChannelBufferWritableBuffer }
 import reactivemongo.core.errors.{
   ConnectionNotInitialized,
   GenericDriverException
@@ -224,7 +216,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    * Returns the distinct values for a specified field across a single collection.
    *
    * @tparam T the element type of the distinct values
-   * @tparam M the container, that must be a [[Iterable]]
+   * @tparam M the container, that must be a [[scala.collection.Iterable]]
    * @param key the field for which to return distinct values
    * @param selector the query selector that specifies the documents from which to retrieve the distinct values.
    * @param readConcern the read concern
@@ -249,16 +241,18 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
   }
 
   @inline private def defaultWriteConcern = db.connection.options.writeConcern
+  @inline private def MissingMetadata() =
+    ConnectionNotInitialized.MissingMetadata(db.connection.history())
 
   def bulkInsert(ordered: Boolean)(documents: ImplicitlyDocumentProducer*)(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] =
     db.connection.metadata.map { metadata =>
       bulkInsert(documents.toStream.map(_.produce), ordered, defaultWriteConcern, metadata.maxBulkSize, metadata.maxBsonSize)
-    }.getOrElse(Future.failed(ConnectionNotInitialized.MissingMetadata))
+    }.getOrElse(Future.failed(MissingMetadata()))
 
   def bulkInsert(ordered: Boolean, writeConcern: WriteConcern)(documents: ImplicitlyDocumentProducer*)(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] =
     db.connection.metadata.map { metadata =>
       bulkInsert(documents.toStream.map(_.produce), ordered, writeConcern, metadata.maxBulkSize, metadata.maxBsonSize)
-    }.getOrElse(Future.failed(ConnectionNotInitialized.MissingMetadata))
+    }.getOrElse(Future.failed(MissingMetadata()))
 
   def bulkInsert(ordered: Boolean, writeConcern: WriteConcern, bulkSize: Int, bulkByteSize: Int)(documents: ImplicitlyDocumentProducer*)(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] =
     bulkInsert(documents.toStream.map(_.produce), ordered, writeConcern, bulkSize, bulkByteSize)
@@ -269,7 +263,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
   def bulkInsert(documents: Stream[pack.Document], ordered: Boolean, writeConcern: WriteConcern)(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] =
     db.connection.metadata.map { metadata =>
       bulkInsert(documents, ordered, writeConcern, metadata.maxBulkSize, metadata.maxBsonSize)
-    }.getOrElse(Future.failed(ConnectionNotInitialized.MissingMetadata))
+    }.getOrElse(Future.failed(MissingMetadata()))
 
   def bulkInsert(documents: Stream[pack.Document], ordered: Boolean, writeConcern: WriteConcern = defaultWriteConcern, bulkSize: Int, bulkByteSize: Int)(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] = watchFailure {
     def createBulk[R, A <: BulkMaker[R, A]](docs: Stream[pack.Document], command: A with BulkMaker[R, A]): Future[List[R]] = {
@@ -285,7 +279,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
       /* TODO: Remove
       val metadata = db.connection.metadata
       val havingMetadata = Failover2(db.connection, failoverStrategy) { () =>
-        metadata.map(Future.successful).getOrElse(Future.failed(ConnectionNotInitialized.MissingMetadata))
+        metadata.map(Future.successful).getOrElse(Future.failed(MissingMetadata()))
       }.future
        */
 
@@ -366,8 +360,8 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
         }.future
       }
 
-      case None =>
-        Future.failed(ConnectionNotInitialized.MissingMetadata)
+      case _ =>
+        Future.failed(MissingMetadata())
     }
 
   /**
@@ -426,7 +420,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
       }.future
     }
 
-    case _ => Future.failed(ConnectionNotInitialized.MissingMetadata)
+    case _ => Future.failed(MissingMetadata())
   }
 
   /**
@@ -448,12 +442,13 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    * val updateOp = collection.updateModifier(
    *   BSONDocument("\$set" -> BSONDocument("age" -> 35)))
    *
-   * val personBeforeUpdate: Future[Person] =
+   * val personBeforeUpdate: Future[Option[Person]] =
    *   collection.findAndModify(BSONDocument("name" -> "Joline"), updateOp).
    *   map(_.result[Person])
    *
-   * val removedPerson: Future[Person] = collection.findAndModify(
-   *   BSONDocument("name" -> "Jack"), collection.removeModifier)
+   * val removedPerson: Future[Option[Person]] = collection.findAndModify(
+   *   BSONDocument("name" -> "Jack"), collection.removeModifier).
+   *   map(_.result[Person])
    * }}}
    *
    * @param selector the query selector
@@ -683,8 +678,8 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
       }.future
     }
 
-    case None =>
-      Future.failed(ConnectionNotInitialized.MissingMetadata)
+    case _ =>
+      Future.failed(MissingMetadata())
   }
 
   /**

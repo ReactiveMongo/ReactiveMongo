@@ -22,8 +22,6 @@ import scala.concurrent.{ ExecutionContext, Future }
 
 import play.api.libs.iteratee.{ Enumerator, Enumeratee, Error, Input, Iteratee }
 
-import shaded.netty.buffer.ChannelBuffer
-
 import reactivemongo.core.actors.Exceptions
 import reactivemongo.core.iteratees.{ CustomEnumeratee, CustomEnumerator }
 import reactivemongo.core.netty.BufferSequence
@@ -33,7 +31,6 @@ import reactivemongo.core.protocol.{
   Query,
   QueryFlags,
   RequestMaker,
-  Reply,
   Response,
   ReplyDocumentIterator,
   ReplyDocumentIteratorExhaustedException
@@ -52,6 +49,15 @@ import reactivemongo.util.{
  * @define stopOnErrorParam States if may stop on non-fatal exception (default: true). If set to false, the exceptions are skipped, trying to get the next result.
  * @define errorHandlerParam The binary operator to be applied when failing to get the next response. Exception or [[reactivemongo.api.Cursor$.Fail Fail]] raised within the `suc` function cannot be recovered by this error handler.
  * @define zeroParam the initial value
+ * @define getHead Returns the first document matching the query
+ * @define collect Collects all the documents into a collection of type `M[T]`
+ * @define resultTParam the result type of the binary operator
+ * @define sucRespParam The binary operator to be applied when the next response is successfully read
+ * @define foldResp Applies a binary operator to a start value and all responses handled by this cursor, going first to last.
+ * @define sucSafeWarning This must be safe, and any error must be returned as `Future.failed[State[A]]`
+ * @define foldBulks Applies a binary operator to a start value and all bulks of documents retrieved by this cursor, going first to last.
+ * @define foldWhile Applies a binary operator to a start value and all elements retrieved by this cursor, going first to last.
+ * @define sucDocParam The binary operator to be applied when the next document is successfully read
  */
 trait Cursor[T] {
   // TODO: maxDocs; 0 for unlimited maxDocs
@@ -59,16 +65,16 @@ trait Cursor[T] {
 
   /**
    * Produces an Enumerator of documents.
-   * Given the `stopOnError` parameter, this Enumerator may stop on any non-fatal exception, or skip and continue.
-   * The returned enumerator may process up to `maxDocs`. If `stopOnError` is false, then documents that cause error
-   * are dropped, so the enumerator may emit a little less than `maxDocs` even if it processes `maxDocs` documents.
+   * The returned enumerator may process up to `maxDocs`.
+   * If `stopOnError` is false, then documents that cause error are dropped,
+   * so the enumerator may emit a little less than `maxDocs`,
+   * even if it processes `maxDocs` documents.
    *
    * @param maxDocs $maxDocsParam.
    * @param stopOnError $stopOnErrorParam.
-   *
-   * @return an Enumerator of documents.
+   * @return an [[play.api.libs.iteratee.Enumerator]] of documents
    */
-  @deprecated(message = "Use `.enumerator` from Play Iteratee modules", since = "0.11.10")
+  @deprecated(message = "Use `.enumerator` from Play Iteratees module", since = "0.11.10")
   def enumerate(maxDocs: Int = Int.MaxValue, stopOnError: Boolean = false)(implicit ctx: ExecutionContext): Enumerator[T]
 
   /**
@@ -77,10 +83,9 @@ trait Cursor[T] {
    *
    * @param maxDocs $maxDocsParam. $maxDocsWarning.
    * @param stopOnError $stopOnErrorParam.
-   *
-   * @return an Enumerator of Iterators of documents.
+   * @return an [[play.api.libs.iteratee.Enumerator]] of Iterators of documents
    */
-  @deprecated(message = "Use `.bulkEnumerator` from the Play Iteratee modules", since = "0.11.10")
+  @deprecated(message = "Use `.bulkEnumerator` from the Play Iteratees module", since = "0.11.10")
   def enumerateBulks(maxDocs: Int = Int.MaxValue, stopOnError: Boolean = false)(implicit ctx: ExecutionContext): Enumerator[Iterator[T]]
 
   /**
@@ -89,19 +94,17 @@ trait Cursor[T] {
    *
    * @param maxDocs $maxDocsParam. $maxDocsWarning.
    * @param stopOnError $stopOnErrorParam.
-   *
-   * @return an Enumerator of Responses.
+   * @return an [[play.api.libs.iteratee.Enumerator]] of Responses.
    */
-  @deprecated(message = "Use `.responseEnumerator` from the Play Iteratee modules", since = "0.11.10")
+  @deprecated(message = "Use `.responseEnumerator` from the Play Iteratees module", since = "0.11.10")
   def enumerateResponses(maxDocs: Int = Int.MaxValue, stopOnError: Boolean = false)(implicit ctx: ExecutionContext): Enumerator[Response]
 
   /**
-   * Collects all the documents into a collection of type `M[T]`.
+   * $collect.
    *
    * @param maxDocs $maxDocsParam.
    * @param err $errorHandlerParam
    *
-   * Example:
    * {{{
    * val cursor = collection.find(query, filter).cursor[BSONDocument]
    * // return the 3 first documents in a Vector[BSONDocument].
@@ -111,80 +114,75 @@ trait Cursor[T] {
   def collect[M[_]](maxDocs: Int, err: ErrorHandler[M[T]])(implicit cbf: CanBuildFrom[M[_], T, M[T]], ec: ExecutionContext): Future[M[T]]
 
   /**
-   * Collects all the documents into a collection of type `M[T]`.
+   * $collect.
    *
    * @param maxDocs $maxDocsParam.
    * @param stopOnError $stopOnErrorParam.
    *
-   * Example:
    * {{{
    * val cursor = collection.find(query, filter).cursor[BSONDocument]
    * // return the 3 first documents in a Vector[BSONDocument].
    * val vector = cursor.collect[Vector](3)
    * }}}
    */
+  @deprecated(message = "Use `collect` with an [[Cursor.ErrorHandler]].", since = "0.12-RC1")
   def collect[M[_]](maxDocs: Int = Int.MaxValue, stopOnError: Boolean = true)(implicit cbf: CanBuildFrom[M[_], T, M[T]], ec: ExecutionContext): Future[M[T]] = {
     val err = if (stopOnError) FailOnError[M[T]]() else ContOnError[M[T]]()
     collect[M](maxDocs, err)
   }
 
   /**
-   * Applies a binary operator to a start value and all responses handled
-   * by this cursor, going first to last.
+   * $foldResp
    *
-   * @tparam A the result type of the binary operator.
    * @param z $zeroParam
    * @param maxDocs $maxDocsParam. $maxDocsWarning.
-   * @param suc the binary operator to be applied when the next response is successfully read.
+   * @param suc $sucRespParam.
    * @param err $errorHandlerParam
+   * @tparam A $resultTParam
    */
   def foldResponses[A](z: => A, maxDocs: Int = Int.MaxValue)(suc: (A, Response) => Cursor.State[A], err: ErrorHandler[A] = FailOnError[A]())(implicit ctx: ExecutionContext): Future[A]
 
   /**
-   * Applies a binary operator to a start value and all responses handled
-   * by this cursor, going first to last.
+   * $foldResp
    *
-   * @tparam A the result type of the binary operator.
    * @param z $zeroParam
    * @param maxDocs $maxDocsParam. $maxDocsWarning.
-   * @param suc The binary operator to be applied when the next response is successfully read. This must be safe, and any error must be returned as `Future.failed[State[A]]`.
+   * @param suc $sucRespParam. $sucSafeWarning.
    * @param err $errorHandlerParam
+   * @tparam A $resultTParam
    */
   def foldResponsesM[A](z: => A, maxDocs: Int = Int.MaxValue)(suc: (A, Response) => Future[Cursor.State[A]], err: ErrorHandler[A] = FailOnError[A]())(implicit ctx: ExecutionContext): Future[A]
 
   /**
-   * Applies a binary operator to a start value and all bulks of documents
-   * retrieved by this cursor, going first to last.
+   * $foldBulks
    *
-   * @tparam A the result type of the binary operator.
    * @param z $zeroParam
    * @param maxDocs $maxDocsParam. $maxDocsWarning.
-   * @param suc the binary operator to be applied when the next response is successfully read.
+   * @param suc $sucRespParam.
    * @param err $errorHandlerParam
+   * @tparam A $resultTParam
    */
   def foldBulks[A](z: => A, maxDocs: Int = Int.MaxValue)(suc: (A, Iterator[T]) => Cursor.State[A], err: ErrorHandler[A] = FailOnError[A]())(implicit ctx: ExecutionContext): Future[A]
 
   /**
-   * Applies a binary operator to a start value and all bulks of documents
-   * retrieved by this cursor, going first to last.
+   * $foldBulks
    *
-   * @tparam A the result type of the binary operator.
    * @param z $zeroParam
    * @param maxDocs $maxDocsParam. $maxDocsWarning.
-   * @param suc the binary operator to be applied when the next response is successfully read. This must be safe, and any error must be returned as `Future.failed[State[A]]`.
+   * @param suc $sucRespParam. $sucSafeWarning.
    * @param err $errorHandlerParam
+   * @tparam A $resultTParam
    */
   def foldBulksM[A](z: => A, maxDocs: Int = Int.MaxValue)(suc: (A, Iterator[T]) => Future[Cursor.State[A]], err: ErrorHandler[A] = FailOnError[A]())(implicit ctx: ExecutionContext): Future[A]
 
   /**
-   * Applies a binary operator to a start value and all elements retrieved
-   * by this cursor, going first to last.
+   * $foldWhile
    *
-   * @tparam A the result type of the binary operator.
    * @param z $zeroParam
    * @param maxDocs $maxDocsParam.
-   * @param suc The binary operator to be applied when the next document is successfully read.
+   * @param suc $sucDocParam.
    * @param err $errorHandlerParam
+   * @tparam A $resultTParam
    *
    * {{{
    * cursor.foldWhile(Nil: Seq[Person])((s, p) => Cursor.Cont(s :+ p),
@@ -194,14 +192,13 @@ trait Cursor[T] {
   def foldWhile[A](z: => A, maxDocs: Int = Int.MaxValue)(suc: (A, T) => Cursor.State[A], err: ErrorHandler[A] = FailOnError[A]())(implicit ctx: ExecutionContext): Future[A]
 
   /**
-   * Applies a binary operator to a start value and all elements retrieved
-   * by this cursor, going first to last.
+   * $foldWhile
    *
-   * @tparam A the result type of the binary operator.
    * @param z $zeroParam
    * @param maxDocs $maxDocsParam.
-   * @param suc The binary operator to be applied when the next document is successfully read. This must be safe, and any error must be returned as `Future.failed[State[A]]`.
+   * @param suc $sucDocParam. $sucSafeWarning.
    * @param err $errorHandlerParam
+   * @tparam A $resultTParam
    *
    * {{{
    * cursor.foldWhileM(Nil: Seq[Person])(
@@ -215,14 +212,13 @@ trait Cursor[T] {
   def foldWhileM[A](z: => A, maxDocs: Int = Int.MaxValue)(suc: (A, T) => Future[Cursor.State[A]], err: ErrorHandler[A] = FailOnError[A]())(implicit ctx: ExecutionContext): Future[A]
 
   /**
-   * Applies a binary operator to a start value and all elements retrieved
-   * by this cursor, going first to last.
+   * $foldWhile
    *
-   * @tparam A the result type of the binary operator.
    * @param z $zeroParam
    * @param maxDocs $maxDocsParam.
-   * @param suc the binary operator to be applied when the next document is successfully read.
+   * @param suc $sucDocParam.
    * @param err $errorHandlerParam
+   * @tparam A $resultTParam
    *
    * {{{
    * cursor.foldWhile(Nil: Seq[Person])((s, p) => Cursor.Cont(s :+ p),
@@ -238,26 +234,35 @@ trait Cursor[T] {
   def toList(maxDocs: Int = Int.MaxValue, stopOnError: Boolean = true)(implicit ctx: ExecutionContext): Future[List[T]] = collect[List](maxDocs, stopOnError)
 
   /**
-   * Returns the first document matching the query, if any.
+   * $getHead, or fails with [[Cursor.NoSuchResultException]] if none.
    *
-   * Example:
    * {{{
    * val cursor = collection.find(query, filter).cursor[BSONDocument]
    * // return option of the first element.
-   * val first: Future[Option[BSONDocument]] = cursor.headOption
+   * val first: Future[BSONDocument] = cursor.head
+   * }}}
+   */
+  def head(implicit ctx: ExecutionContext): Future[T]
+
+  /**
+   * $getHead, if any.
+   *
+   * {{{
+   * val cursor = collection.find(query, filter).cursor[BSONDocument]
+   * // return option of the first element.
+   * val maybeFirst: Future[Option[BSONDocument]] = cursor.headOption
    * }}}
    */
   def headOption(implicit ctx: ExecutionContext): Future[Option[T]] =
-    collect[Iterable](1, true).map(_.headOption)
+    Future.successful(Option.empty[T]) // TODO: Remove body
 
   /**
    * Produces an Enumerator of responses from the database.
    * An Enumeratee for error handling should be used to prevent silent failures.
-   * Consider using `enumerateResponses` instead.
    *
    * @param maxDocs $maxDocsParam
    */
-  @deprecated(message = "Use the Play Iteratee modules", since = "0.11.10")
+  @deprecated(message = "Use the Play Iteratees module", since = "0.11.10")
   def rawEnumerateResponses(maxDocs: Int = Int.MaxValue)(implicit ctx: ExecutionContext): Enumerator[Response]
 }
 
@@ -272,8 +277,7 @@ sealed trait CursorOps[T] { cursor: Cursor[T] =>
    * Returns an iterator to read the response documents,
    * according the provided read for the element type `T`.
    */
-  private[reactivemongo] def documentIterator(response: Response)(implicit ec: ExecutionContext): Iterator[T]
-
+  private[reactivemongo] def documentIterator(response: Response): Iterator[T]
 }
 
 object CursorOps {
@@ -288,17 +292,23 @@ object CursorOps {
 }
 
 class FlattenedCursor[T](cursor: Future[Cursor[T]]) extends Cursor[T] {
-  @deprecated(message = "Use the Play Iteratee modules", since = "0.11.10")
+  @deprecated(message = "Use the Play Iteratees module", since = "0.11.10")
   def enumerate(maxDocs: Int = Int.MaxValue, stopOnError: Boolean = false)(implicit ctx: ExecutionContext): Enumerator[T] =
     Enumerator.flatten(cursor.map(_.enumerate(maxDocs, stopOnError)))
 
-  @deprecated(message = "Use the Play Iteratee modules", since = "0.11.10")
+  @deprecated(message = "Use the Play Iteratees module", since = "0.11.10")
   def enumerateBulks(maxDocs: Int = Int.MaxValue, stopOnError: Boolean = false)(implicit ctx: ExecutionContext): Enumerator[Iterator[T]] =
     Enumerator.flatten(cursor.map(_.enumerateBulks(maxDocs, stopOnError)))
 
-  @deprecated(message = "Use the Play Iteratee modules", since = "0.11.10")
+  @deprecated(message = "Use the Play Iteratees module", since = "0.11.10")
   def enumerateResponses(maxDocs: Int = Int.MaxValue, stopOnError: Boolean = false)(implicit ctx: ExecutionContext): Enumerator[Response] =
     Enumerator.flatten(cursor.map(_.enumerateResponses(maxDocs, stopOnError)))
+
+  def head(implicit ctx: ExecutionContext): Future[T] = cursor.flatMap(_.head)
+
+  // TODO: Remove override
+  override def headOption(implicit ctx: ExecutionContext): Future[Option[T]] =
+    cursor.flatMap(_.headOption)
 
   def collect[M[_]](maxDocs: Int, err: Cursor.ErrorHandler[M[T]])(implicit cbf: CanBuildFrom[M[_], T, M[T]], ec: ExecutionContext): Future[M[T]] = cursor.flatMap(_.collect[M](maxDocs, err))
 
@@ -314,7 +324,7 @@ class FlattenedCursor[T](cursor: Future[Cursor[T]]) extends Cursor[T] {
 
   def foldWhileM[A](z: => A, maxDocs: Int = Int.MaxValue)(suc: (A, T) => Future[Cursor.State[A]], err: Cursor.ErrorHandler[A])(implicit ctx: ExecutionContext): Future[A] = cursor.flatMap(_.foldWhileM(z, maxDocs)(suc, err))
 
-  @deprecated(message = "Use the Play Iteratee modules", since = "0.11.10")
+  @deprecated(message = "Use the Play Iteratees module", since = "0.11.10")
   def rawEnumerateResponses(maxDocs: Int = Int.MaxValue)(implicit ctx: ExecutionContext): Enumerator[Response] =
     Enumerator.flatten(cursor.map(_.rawEnumerateResponses(maxDocs)))
 
@@ -328,23 +338,24 @@ trait WrappedCursor[T] extends Cursor[T] {
   /** The underlying cursor */
   def wrappee: Cursor[T]
 
-  @deprecated(message = "Use the Play Iteratee modules", since = "0.11.10")
+  @deprecated(message = "Use the Play Iteratees module", since = "0.11.10")
   def enumerate(maxDocs: Int = Int.MaxValue, stopOnError: Boolean = false)(implicit ctx: ExecutionContext): Enumerator[T] =
     wrappee.enumerate(maxDocs, stopOnError)
 
-  @deprecated(message = "Use the Play Iteratee modules", since = "0.11.10")
+  @deprecated(message = "Use the Play Iteratees module", since = "0.11.10")
   def enumerateBulks(maxDocs: Int = Int.MaxValue, stopOnError: Boolean = false)(implicit ctx: ExecutionContext): Enumerator[Iterator[T]] =
     wrappee.enumerateBulks(maxDocs, stopOnError)
 
-  @deprecated(message = "Use the Play Iteratee modules", since = "0.11.10")
+  @deprecated(message = "Use the Play Iteratees module", since = "0.11.10")
   def enumerateResponses(maxDocs: Int = Int.MaxValue, stopOnError: Boolean = false)(implicit ctx: ExecutionContext): Enumerator[Response] =
     wrappee.enumerateResponses(maxDocs, stopOnError)
 
   def collect[M[_]](maxDocs: Int, err: Cursor.ErrorHandler[M[T]])(implicit cbf: CanBuildFrom[M[_], T, M[T]], ec: ExecutionContext): Future[M[T]] = wrappee.collect[M](maxDocs, err)
 
+  // TODO: Remove
   override def collect[M[_]](maxDocs: Int = Int.MaxValue, stopOnError: Boolean = true)(implicit cbf: CanBuildFrom[M[_], T, M[T]], ec: ExecutionContext): Future[M[T]] = wrappee.collect[M](maxDocs, stopOnError)
 
-  @deprecated(message = "Use the Play Iteratee modules", since = "0.11.10")
+  @deprecated(message = "Use the Play Iteratees module", since = "0.11.10")
   def rawEnumerateResponses(maxDocs: Int = Int.MaxValue)(implicit ctx: ExecutionContext): Enumerator[Response] = wrappee.rawEnumerateResponses(maxDocs)
 
   def foldResponses[A](z: => A, maxDocs: Int = Int.MaxValue)(suc: (A, Response) => Cursor.State[A], err: Cursor.ErrorHandler[A])(implicit ctx: ExecutionContext): Future[A] = wrappee.foldResponses(z, maxDocs)(suc, err)
@@ -359,6 +370,11 @@ trait WrappedCursor[T] extends Cursor[T] {
 
   def foldWhileM[A](z: => A, maxDocs: Int = Int.MaxValue)(suc: (A, T) => Future[Cursor.State[A]], err: Cursor.ErrorHandler[A])(implicit ctx: ExecutionContext): Future[A] = wrappee.foldWhileM(z, maxDocs)(suc, err)
 
+  def head(implicit ctx: ExecutionContext): Future[T] = wrappee.head
+
+  // TODO: Remove override
+  override def headOption(implicit ctx: ExecutionContext): Future[Option[T]] =
+    wrappee.headOption
 }
 
 /** Cursor companion object */
@@ -426,10 +442,15 @@ object Cursor {
   case class Fail[T](cause: Throwable) extends State[T] {
     def map[U](f: T => U): State[U] = Fail[U](cause)
   }
+
+  /** Indicates that a required result cannot be found. */
+  case object NoSuchResultException
+    extends java.util.NoSuchElementException()
+    with scala.util.control.NoStackTrace
 }
 
 object DefaultCursor {
-  import Cursor.{ ErrorHandler, FailOnError, State, Cont, Done, Fail, logger }
+  import Cursor.{ ErrorHandler, State, Cont, Done, Fail, logger }
   import reactivemongo.api.commands.ResultCursor
   import CursorOps.Unrecoverable
 
@@ -470,8 +491,6 @@ object DefaultCursor {
     }
 
     @inline def makeRequest(maxDocs: Int)(implicit ctx: ExecutionContext): Future[Response] = Failover2(mongoConnection, failoverStrategy) { () =>
-      import reactivemongo.core.netty.ChannelBufferReadableBuffer
-
       val nrt = query.numberToReturn
       val q = { // normalize the number of docs to return
         if (nrt > 0 && nrt <= maxDocs) query
@@ -554,7 +573,8 @@ object DefaultCursor {
 
     def makeIterator: Response => Iterator[A]
 
-    def documentIterator(response: Response)(implicit ec: ExecutionContext): Iterator[A] = makeIterator(response)
+    def documentIterator(response: Response): Iterator[A] =
+      makeIterator(response)
 
     private def next(response: Response, maxDocs: Int)(implicit ctx: ExecutionContext): Future[Option[Response]] = {
       if (response.reply.cursorID != 0) {
@@ -629,6 +649,25 @@ object DefaultCursor {
       } else logger.trace(s"[$logCat] Cursor exhausted (${cursorID})")
     }
 
+    def head(implicit ctx: ExecutionContext): Future[A] =
+      makeRequest(1).flatMap { response =>
+        val result = documentIterator(response)
+
+        if (!result.hasNext) {
+          Future.failed[A](Cursor.NoSuchResultException)
+        } else Future(result.next())
+      }
+
+    // TODO: Remove override
+    override def headOption(implicit ctx: ExecutionContext): Future[Option[A]] =
+      makeRequest(1).flatMap { response =>
+        val result = documentIterator(response)
+
+        if (!result.hasNext) {
+          Future.successful(Option.empty[A])
+        } else Future(result.next()).map(Some(_))
+      }
+
     @inline private def syncSuccess[A, B](f: (A, B) => State[A])(implicit ec: ExecutionContext): (A, B) => Future[State[A]] = { (a: A, b: B) => Future(f(a, b)) }
 
     def foldResponses[T](z: => T, maxDocs: Int = Int.MaxValue)(suc: (T, Response) => State[T], err: (T, Throwable) => State[T])(implicit ctx: ExecutionContext): Future[T] = new FoldResponses(z, maxDocs, syncSuccess(suc), err)(ctx)()
@@ -701,12 +740,12 @@ object DefaultCursor {
         ).map(_._1)
       })
 
-    @deprecated(message = "Use the Play Iteratee modules", since = "0.11.10")
+    @deprecated(message = "Use the Play Iteratees module", since = "0.11.10")
     def rawEnumerateResponses(maxDocs: Int = Int.MaxValue)(implicit ctx: ExecutionContext): Enumerator[Response] =
       if (tailable) tailableCursorEnumerateResponses(maxDocs)
       else simpleCursorEnumerateResponses(maxDocs)
 
-    @deprecated(message = "Use the Play Iteratee modules", since = "0.11.10")
+    @deprecated(message = "Use the Play Iteratees module", since = "0.11.10")
     def enumerateResponses(maxDocs: Int = Int.MaxValue, stopOnError: Boolean = false)(implicit ctx: ExecutionContext): Enumerator[Response] =
       rawEnumerateResponses(maxDocs) &> {
         if (stopOnError)
@@ -728,11 +767,11 @@ object DefaultCursor {
         }
       }
 
-    @deprecated(message = "Use the Play Iteratee modules", since = "0.11.10")
+    @deprecated(message = "Use the Play Iteratees module", since = "0.11.10")
     def enumerateBulks(maxDocs: Int = Int.MaxValue, stopOnError: Boolean = false)(implicit ctx: ExecutionContext): Enumerator[Iterator[A]] =
       enumerateResponses(maxDocs, stopOnError) &> Enumeratee.map(makeIterator)
 
-    @deprecated(message = "Use the Play Iteratee modules", since = "0.11.10")
+    @deprecated(message = "Use the Play Iteratees module", since = "0.11.10")
     def enumerate(maxDocs: Int = Int.MaxValue, stopOnError: Boolean = false)(implicit ctx: ExecutionContext): Enumerator[A] = {
       @annotation.tailrec
       def _next(it: Iterator[A], stopOnError: Boolean): Option[Try[A]] = {

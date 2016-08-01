@@ -16,7 +16,6 @@
 package reactivemongo.api
 
 import java.util.concurrent.{
-  TimeoutException,
   TimeUnit,
   atomic
 }, TimeUnit.MILLISECONDS, atomic.AtomicLong
@@ -135,8 +134,10 @@ class Failover[T](message: T, connection: MongoConnection, strategy: FailoverStr
     case _: NodeSetNotReachable         => true
     case _: ConnectionException         => true
     case _: ConnectionNotInitialized    => true
-    case e: DatabaseException           => e.isNotAPrimaryError || e.isUnauthorized
-    case _                              => false
+    case e: DatabaseException =>
+      e.isNotAPrimaryError || e.isUnauthorized
+
+    case _ => false
   }
 
   send(0)
@@ -149,6 +150,8 @@ class Failover2[A](producer: () => Future[A], connection: MongoConnection, strat
   import reactivemongo.core.actors.Exceptions._
 
   // TODO: Pass an explicit stack trace, to be able to raise with possible err
+
+  private val lnm = s"${connection.supervisor}/${connection.name}" // log name
 
   /**
    * A future that is completed with a response,
@@ -175,25 +178,25 @@ class Failover2[A](producer: () => Future[A], connection: MongoConnection, strat
           val delay = Duration.unapply(strategy.initialDelay * delayFactor).
             fold(strategy.initialDelay)(t => FiniteDuration(t._1, t._2))
 
-          trace(s"Got an error, retrying... (try #${`try`} is scheduled in ${delay.toMillis} ms)", e)
+          trace(s"[$lnm] Got an error, retrying... (try #${`try`} is scheduled in ${delay.toMillis} ms)", e)
 
           after(delay, connection.actorSystem.scheduler)(send(`try`))
         } else {
           // generally that means that the primary is not available
           // or the nodeset is unreachable
-          logger.error("Got an error, no more attempts to do. Completing with a failure... ", e)
+          logger.error(s"[$lnm] Got an error, no more attempts to do. Completing with a failure... ", e)
 
           Future.failed(e)
         }
       }
 
       case Failure(e) => {
-        trace("Got an non retryable error, completing with a failure... ", e)
+        trace(s"[$lnm] Got an non retryable error, completing with a failure... ", e)
         Future.failed(e)
       }
 
       case Success(response) => {
-        trace("Got a successful result, completing...")
+        trace(s"[$lnm] Got a successful result, completing...")
         Future.successful(response)
       }
     }
@@ -204,8 +207,10 @@ class Failover2[A](producer: () => Future[A], connection: MongoConnection, strat
     case _: NodeSetNotReachable         => true
     case _: ConnectionException         => true
     case _: ConnectionNotInitialized    => true
-    case e: DatabaseException           => e.isNotAPrimaryError || e.isUnauthorized
-    case _                              => false
+    case e: DatabaseException =>
+      e.isNotAPrimaryError || e.isUnauthorized
+
+    case _ => false
   }
 
   //send(0)
@@ -244,7 +249,7 @@ object Failover {
 }
 
 /**
- * A pool of MongoDB connections.
+ * A pool of MongoDB connections, obtained from a [[reactivemongo.api.MongoDriver]].
  *
  * Connection here does not mean that there is one open channel to the server:
  * behind the scene, many connections (channels) are open on all the available servers in the replica set.
@@ -280,7 +285,7 @@ class MongoConnection(
   private val lnm = s"$supervisor/$name" // log name
 
   // TODO: Review
-  private[api] var history = () => new InternalState(null)
+  private[api] var history = () => InternalState.empty
 
   @volatile private[api] var killed: Boolean = false
 
@@ -564,7 +569,8 @@ class MongoConnection(
       }
 
       case Closed => {
-        logger.debug(s"Monitor $self closed, stopping... ($lnm)")
+        logger.debug(s"[$lnm] Monitor ${self.path} is now closed")
+
         waitingForClose.dequeueAll(_ => true).foreach(_ ! Closed)
         context.stop(self)
       }
@@ -830,12 +836,13 @@ object MongoConnection {
  *
  * @define parsedURIParam the URI parsed by [[reactivemongo.api.MongoConnection.parseURI]]
  * @define connectionNameParam the name for the connection pool
- * @define strictUriParam if true the parsed URI must be strict, without ignored/unsupported options (default: false)
+ * @define strictUriParam if true the parsed URI must be strict, without ignored/unsupported options
  * @define nbChannelsParam the number of channels to open per node
  * @define optionsParam the options for the new connection pool
  * @define nodesParam The list of node names (e.g. ''node1.foo.com:27017''); Port is optional (27017 is used by default)
  * @define authParam the list of authentication instructions
  * @define seeConnectDBTutorial See [[http://reactivemongo.org/releases/0.12/documentation/tutorial/connect-database.html how to connect to the database]]
+ * @define uriStrictParam the strict URI, that will be parsed by [[reactivemongo.api.MongoConnection.parseURI]]
  */
 class MongoDriver(config: Option[Config] = None) {
   import scala.collection.mutable.{ Map => MutableMap }
@@ -864,8 +871,10 @@ class MongoDriver(config: Option[Config] = None) {
   private val connectionMonitors = MutableMap.empty[ActorRef, MongoConnection]
 
   /** Keep a list of all connections so that we can terminate the actors */
+  @deprecated(message = "Will be made private", since = "0.12-RC1")
   def connections: Iterable[MongoConnection] = connectionMonitors.values
 
+  @deprecated(message = "Will be made private", since = "0.12-RC1")
   def numConnections: Int = connectionMonitors.size
 
   /**
@@ -873,6 +882,8 @@ class MongoDriver(config: Option[Config] = None) {
    * Awaits the termination until the timeout is expired.
    */
   def close(timeout: FiniteDuration = FiniteDuration(2, SECONDS)): Unit = {
+    logger.info(s"[$supervisorName] Closing instance of ReactiveMongo driver")
+
     // Terminate actors used by MongoConnections
     connections.foreach(_.close())
 
@@ -925,11 +936,11 @@ class MongoDriver(config: Option[Config] = None) {
     lazy val dbsystem: MongoDBSystem = options.authMode match {
       case ScramSha1Authentication => new StandardDBSystem(
         supervisorName, nm, nodes, authentications, options
-      )()
+      )
 
       case _ => new LegacyDBSystem(
         supervisorName, nm, nodes, authentications, options
-      )()
+      )
     }
 
     val mongosystem = system.actorOf(Props(dbsystem), nm)
@@ -948,6 +959,37 @@ class MongoDriver(config: Option[Config] = None) {
     }, Duration.Inf)
     // TODO: Returns Future[MongoConnection]
   }
+
+  /**
+   * Creates a new MongoConnection from URI.
+   *
+   * $seeConnectDBTutorial
+   *
+   * @param uriStrict $uriStrictParam
+   */
+  def connection(uriStrict: String): Try[MongoConnection] =
+    connection(uriStrict, name = None, strictUri = true)
+
+  /**
+   * Creates a new MongoConnection from URI.
+   *
+   * $seeConnectDBTutorial
+   *
+   * @param uriStrict $uriStrictParam
+   * @param name $connectionNameParam
+   */
+  def connection(uriStrict: String, name: Option[String]): Try[MongoConnection] = connection(uriStrict, name, strictUri = true)
+
+  /**
+   * Creates a new MongoConnection from URI.
+   *
+   * $seeConnectDBTutorial
+   *
+   * @param uri the URI to be parsed by [[reactivemongo.api.MongoConnection.parseURI]]
+   * @param name $connectionNameParam
+   * @param strictUri $strictUriParam
+   */
+  def connection(uri: String, name: Option[String], strictUri: Boolean): Try[MongoConnection] = MongoConnection.parseURI(uri).flatMap(connection(_, name, strictUri))
 
   /**
    * Creates a new MongoConnection from URI.
@@ -1050,7 +1092,13 @@ class MongoDriver(config: Option[Config] = None) {
         sender ! connection
       }
 
-      case Terminated(actor) => driver.connectionMonitors.remove(actor)
+      case Terminated(actor) => {
+        logger.debug(
+          s"[$supervisorName] Pool actor is terminated: ${actor.path}"
+        )
+
+        driver.connectionMonitors.remove(actor)
+      }
 
       /*
       case CloseWithTimeout(timeout) =>
@@ -1088,7 +1136,11 @@ class MongoDriver(config: Option[Config] = None) {
         logger.warn(s"[$supervisorName] Close ignored, already closing.")
     }
 
-    override def postStop: Unit = driver.system.shutdown()
+    override def postStop: Unit = {
+      logger.info(s"[$supervisorName] Stopping the monitor")
+
+      driver.system.shutdown()
+    }
   }
 }
 

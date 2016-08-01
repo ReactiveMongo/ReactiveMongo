@@ -1,18 +1,14 @@
 package reactivemongo.api.commands
 
-import scala.concurrent.Future
-
-import reactivemongo.api.{
-  BSONSerializationPack,
-  ReadConcern,
-  SerializationPack
-}
+import reactivemongo.api.{ ReadConcern, SerializationPack }
 import reactivemongo.core.protocol.MongoWireVersion
 
 /**
  * Implements the [[http://docs.mongodb.org/manual/applications/aggregation/ Aggregation Framework]].
  */
-trait AggregationFramework[P <: SerializationPack] extends ImplicitCommandHelpers[P] {
+trait AggregationFramework[P <: SerializationPack]
+    extends ImplicitCommandHelpers[P] {
+
   /**
    * @param batchSize the initial batch size for the cursor
    */
@@ -34,9 +30,8 @@ trait AggregationFramework[P <: SerializationPack] extends ImplicitCommandHelper
     wireVersion: MongoWireVersion,
     bypassDocumentValidation: Boolean,
     readConcern: Option[ReadConcern]
-  )
-      extends CollectionCommand
-      with CommandWithPack[pack.type] with CommandWithResult[AggregationResult]
+  ) extends CollectionCommand with CommandWithPack[pack.type]
+      with CommandWithResult[AggregationResult]
 
   /**
    * @param firstBatch the documents of the first batch
@@ -155,7 +150,6 @@ trait AggregationFramework[P <: SerializationPack] extends ImplicitCommandHelper
       foreignField: String,
       as: String
   ) extends PipelineOperator {
-
     val makePipe: pack.Document = makeDocument(Seq(elementProducer(
       "$lookup",
       makeDocument(Seq(
@@ -165,7 +159,31 @@ trait AggregationFramework[P <: SerializationPack] extends ImplicitCommandHelper
         elementProducer("as", stringValue(as))
       ))
     )))
+  }
 
+  /**
+   * The [[https://docs.mongodb.com/master/reference/operator/aggregation/filter/ \$filter]] aggregation stage.
+   *
+   * @param input the expression that resolves to an array
+   * @param as The variable name for the element in the input array. The as expression accesses each element in the input array by this variable.
+   * @param cond the expression that determines whether to include the element in the resulting array
+   */
+  case class Filter(input: pack.Value, as: String, cond: pack.Document)
+      extends PipelineOperator {
+
+    val makePipe: pack.Document = makeDocument(Seq(elementProducer(
+      "$filter", makeDocument(Seq(
+        elementProducer("input", input),
+        elementProducer("as", stringValue(as)),
+        elementProducer("cond", cond)
+      ))
+    )))
+  }
+
+  /** Filter companion */
+  object Filter {
+    implicit val writer: pack.Writer[Filter] =
+      pack.writer[Filter] { _.makePipe }
   }
 
   /**
@@ -282,6 +300,38 @@ trait AggregationFramework[P <: SerializationPack] extends ImplicitCommandHelper
     /** Keyword name */
     def name: String
   }
+
+  /**
+   * Since MongoDB 3.2
+   * https://docs.mongodb.com/manual/reference/operator/aggregation/indexStats/
+   */
+  case object IndexStats extends PipelineOperator {
+    val makePipe = makeDocument(Seq(
+      elementProducer("$indexStats", makeDocument(Nil))
+    ))
+  }
+
+  /**
+   * @param ops the number of operations that used the index
+   * @param since the time from which MongoDB gathered the statistics
+   */
+  case class IndexStatAccesses(
+    ops: Long,
+    since: java.util.Date
+  )
+
+  /**
+   * @param name the index name
+   * @param key the key specification
+   * @param host the hostname and port of the mongod
+   * @param accesses the index statistics
+   */
+  case class IndexStatsResult(
+    name: String,
+    key: pack.Document,
+    host: String,
+    accesses: IndexStatAccesses
+  )
 
   /** References the score associated with the corresponding [[https://docs.mongodb.org/v3.0/reference/operator/query/text/#op._S_text `\$text`]] query for each matching document. */
   case object TextScore extends MetadataKeyword {

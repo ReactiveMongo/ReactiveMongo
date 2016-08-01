@@ -2,12 +2,11 @@ package reactivemongo.play.iteratees
 
 import scala.concurrent.{ ExecutionContext, Future }
 
-import play.api.libs.iteratee.{ Concurrent, Enumerator, Iteratee }
+import play.api.libs.iteratee.{ Concurrent, Enumerator }
 
 import reactivemongo.core.protocol.Response
 import reactivemongo.api.{
   Cursor,
-  CursorProducer,
   FlattenedCursor,
   WrappedCursor
 }, Cursor.{ ErrorHandler, FailOnError }

@@ -14,6 +14,9 @@ while [ "$RETRY_COUNT" -lt "$RETRY_MAX" ]; do
   RETRY_COUNT=`expr $RETRY_COUNT + 1`
 
   if [ "$RES" -eq 0 ]; then
+    grep -r '<error' */target/test-reports/
+    grep -r '<failure' */target/test-reports/
+
     exit 0
   fi
 done

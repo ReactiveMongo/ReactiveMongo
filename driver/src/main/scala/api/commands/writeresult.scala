@@ -16,13 +16,12 @@ sealed trait WriteResult {
   def code: Option[Int]
 
   /** If the result is a failure, the error message */
-  def errmsg: Option[String]
+  private[commands] def errmsg: Option[String]
 
-  def hasErrors: Boolean = !writeErrors.isEmpty || !writeConcernError.isEmpty
-  def inError: Boolean = !ok || code.isDefined
+  private[reactivemongo] def hasErrors: Boolean = !writeErrors.isEmpty || !writeConcernError.isEmpty
+  private[reactivemongo] def inError: Boolean = !ok || code.isDefined
 
-  /** Returns either the [[errmsg]] or `<none>`. */
-  def message = errmsg.getOrElse("<none>")
+  protected def message = errmsg.getOrElse("<none>")
 
   //override
   def originalDocument = Option.empty[reactivemongo.bson.BSONDocument] // TODO
@@ -76,6 +75,8 @@ case class LastError(
 
   override def inError: Boolean = !ok || errmsg.isDefined
   //def stringify: String = toString + " [inError: " + inError + "]"
+
+  override lazy val message = errmsg.getOrElse("<none>")
 }
 
 /**

@@ -271,19 +271,16 @@ object BSONReplSetGetStatusImplicits {
       extends BSONDocumentReader[ReplSetMember] {
 
     def read(doc: BSONDocument): ReplSetMember = (for {
-      id <- doc.getAs[BSONNumberLike]("_id").map(_.toLong)
-      name <- doc.getAs[String]("name")
-      health <- doc.getAs[BSONNumberLike]("health").map(_.toInt)
-      state <- doc.getAs[BSONNumberLike]("state").map(_.toInt)
-      stateStr <- doc.getAs[String]("stateStr")
-      uptime <- doc.getAs[BSONNumberLike]("uptime").map(_.toLong)
-      optime <- doc.getAs[BSONNumberLike]("optimeDate").map(_.toLong)
-      lastHeartbeat <- doc.getAs[BSONNumberLike]("lastHeartbeat").map(_.toLong)
-      lastHeartbeatRecv <- doc.getAs[BSONNumberLike](
-        "lastHeartbeatRecv"
-      ).map(_.toLong)
+      id <- doc.getAsTry[BSONNumberLike]("_id").map(_.toLong)
+      name <- doc.getAsTry[String]("name")
+      health <- doc.getAsTry[BSONNumberLike]("health").map(_.toInt)
+      state <- doc.getAsTry[BSONNumberLike]("state").map(_.toInt)
+      stateStr <- doc.getAsTry[String]("stateStr")
+      uptime <- doc.getAsTry[BSONNumberLike]("uptime").map(_.toLong)
+      optime <- doc.getAsTry[BSONNumberLike]("optimeDate").map(_.toLong)
     } yield ReplSetMember(id, name, health, state, stateStr, uptime, optime,
-      lastHeartbeat, lastHeartbeatRecv,
+      doc.getAs[BSONNumberLike]("lastHeartbeat").map(_.toLong),
+      doc.getAs[BSONNumberLike]("lastHeartbeatRecv").map(_.toLong),
       doc.getAs[String]("lastHeartbeatMessage"),
       doc.getAs[BSONNumberLike]("electionTime").map(_.toLong),
       doc.getAs[BSONBooleanLike]("self").fold(false)(_.toBoolean),
@@ -297,10 +294,10 @@ object BSONReplSetGetStatusImplicits {
       extends DealingWithGenericCommandErrorsReader[ReplSetStatus] {
 
     def readResult(doc: BSONDocument): ReplSetStatus = (for {
-      name <- doc.getAs[String]("set")
-      time <- doc.getAs[BSONNumberLike]("date").map(_.toLong)
-      myState <- doc.getAs[BSONNumberLike]("myState").map(_.toInt)
-      members <- doc.getAs[List[ReplSetMember]]("members")
+      name <- doc.getAsTry[String]("set")
+      time <- doc.getAsTry[BSONNumberLike]("date").map(_.toLong)
+      myState <- doc.getAsTry[BSONNumberLike]("myState").map(_.toInt)
+      members <- doc.getAsTry[List[ReplSetMember]]("members")
     } yield ReplSetStatus(name, time, myState, members)).get
   }
 }

@@ -15,17 +15,27 @@
  */
 package reactivemongo.api
 
-import collections.bson.BSONCollection
-import reactivemongo.api.indexes.IndexesManager
-import reactivemongo.bson._
-import reactivemongo.core.commands.{ Update => UpdateCommand, _ }
-import reactivemongo.utils.EitherMappableFuture._
-
 import scala.concurrent.{ ExecutionContext, Future }
-import scala.concurrent.duration._
+import scala.concurrent.duration.FiniteDuration
+
+import reactivemongo.core.commands.{
+  Command => CoreCommand,
+  SuccessfulAuthentication
+}
+
+import reactivemongo.api.indexes.IndexesManager
+import reactivemongo.bson.{
+  BSONDocument,
+  BSONDocumentReader,
+  BSONRegex,
+  BSONString
+}
+import reactivemongo.utils.EitherMappableFuture.futureToEitherMappable
+
+import reactivemongo.api.collections.bson.BSONCollection
 
 /**
- * A Mongo Database.
+ * A MongoDB database, obtained from a [[reactivemongo.api.MongoConnection]].
  *
  * You should consider the provided [[reactivemongo.api.DefaultDB]] implementation.
  *
@@ -74,8 +84,8 @@ sealed trait DB {
    *
    * @return a future containing the result of the command.
    */
-  @deprecated("Consider using reactivemongo.api.commands along with `GenericDB.runCommand` methods", "0.11.0")
-  def command[T](command: Command[T], readPreference: ReadPreference = defaultReadPreference)(implicit ec: ExecutionContext): Future[T] =
+  @deprecated("Consider using reactivemongo.api.commands along with `DefaultDB.runCommand` methods", "0.11.0")
+  def command[T](command: CoreCommand[T], readPreference: ReadPreference = defaultReadPreference)(implicit ec: ExecutionContext): Future[T] =
     Failover(
       command.apply(name).maker(readPreference),
       connection, failoverStrategy
@@ -95,18 +105,29 @@ sealed trait DB {
 
 }
 
+@deprecated(message = "Will be made sealed", since = "0.12-RC0")
 trait GenericDB[P <: SerializationPack with Singleton] { self: DB =>
   val pack: P
 
   import reactivemongo.api.commands._
 
+  @deprecated(message = "Either use one of the `runX` function on the DB instance, or use `reactivemongo.api.commands.Command.run` directly", since = "0.12-RC0")
   def runner = Command.run(pack)
 
-  def runCommand[R, C <: Command with CommandWithResult[R]](command: C with CommandWithResult[R])(implicit writer: pack.Writer[C], reader: pack.Reader[R], ec: ExecutionContext): Future[R] = runner(self, command)
+  @deprecated(message = "Use `runCommand` with the `failoverStrategy` parameter", since = "0.12-RC0")
+  def runCommand[R, C <: Command with CommandWithResult[R]](command: C with CommandWithResult[R])(implicit writer: pack.Writer[C], reader: pack.Reader[R], ec: ExecutionContext): Future[R] = runCommand[R, C](command, failoverStrategy)
 
-  def runCommand[C <: Command](command: C)(implicit writer: pack.Writer[C]): CursorFetcher[pack.type, Cursor] = runner(self, command)
+  def runCommand[R, C <: Command with CommandWithResult[R]](command: C with CommandWithResult[R], failoverStrategy: FailoverStrategy)(implicit writer: pack.Writer[C], reader: pack.Reader[R], ec: ExecutionContext): Future[R] = Command.run(pack, failoverStrategy).apply(self, command)
 
-  def runValueCommand[A <: AnyVal, R <: BoxedAnyVal[A], C <: Command with CommandWithResult[R]](command: C with CommandWithResult[R with BoxedAnyVal[A]])(implicit writer: pack.Writer[C], reader: pack.Reader[R], ec: ExecutionContext): Future[A] = runner.unboxed(self, command)
+  @deprecated(message = "Use `runCommand` with the `failoverStrategy` parameter", since = "0.12-RC0")
+  def runCommand[C <: Command](command: C)(implicit writer: pack.Writer[C]): CursorFetcher[pack.type, Cursor] = runCommand[C](command, failoverStrategy)
+
+  def runCommand[C <: Command](command: C, failoverStrategy: FailoverStrategy)(implicit writer: pack.Writer[C]): CursorFetcher[pack.type, Cursor] = Command.run(pack, failoverStrategy).apply(self, command)
+
+  @deprecated(message = "Use `runValueCommand` with the `failoverStrategy` parameter", since = "0.12-RC0")
+  def runValueCommand[A <: AnyVal, R <: BoxedAnyVal[A], C <: Command with CommandWithResult[R]](command: C with CommandWithResult[R with BoxedAnyVal[A]])(implicit writer: pack.Writer[C], reader: pack.Reader[R], ec: ExecutionContext): Future[A] = runValueCommand[A, R, C](command, failoverStrategy)
+
+  def runValueCommand[A <: AnyVal, R <: BoxedAnyVal[A], C <: Command with CommandWithResult[R]](command: C with CommandWithResult[R with BoxedAnyVal[A]], failoverStrategy: FailoverStrategy)(implicit writer: pack.Writer[C], reader: pack.Reader[R], ec: ExecutionContext): Future[A] = Command.run(pack, failoverStrategy).unboxed(self, command)
 }
 
 /** A mixin that provides commands about this database itself. */
@@ -160,6 +181,26 @@ trait DBMetaCommands { self: DB =>
         collectionNameReader, ec, CursorProducer.defaultCursorProducer
       ).
       collect[List]()
+  }
+
+  /**
+   * [[https://docs.mongodb.com/manual/reference/command/renameCollection/ Renames a collection]].
+   * Can only be executed if the this database reference is the `admin` one.
+   *
+   * @param db the name of the database where the collection exists with the `current` name
+   * @param current the current name of the collection, in the specified `db`
+   * @param to the new name of this collection (inside the same `db`)
+   * @param dropExisting If a collection of name `to` already exists, then drops that collection before renaming this one.
+   *
+   * @return a failure if the dropExisting option is false and the target collection already exists
+   */
+  def renameCollection[C <: Collection](db: String, from: String, to: String, dropExisting: Boolean = false, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit ec: ExecutionContext, producer: CollectionProducer[C] = collections.bson.BSONCollectionProducer): Future[C] = {
+    import reactivemongo.api.commands.RenameCollection
+    import reactivemongo.api.commands.bson.BSONRenameCollectionImplicits._
+
+    Command.run(BSONSerializationPack, failoverStrategy).unboxed(
+      self, RenameCollection(s"${db}.$from", s"${db}.$to", dropExisting)
+    ).map(_ => self.collection(to))
   }
 
   /** Returns the server status. */

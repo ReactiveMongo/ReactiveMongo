@@ -3,7 +3,7 @@ import sbt.Keys._
 import scala.language.postfixOps
 
 object BuildSettings {
-  val buildVersion = "0.12-RC0"
+  val buildVersion = "0.12-RC1"
 
   val filter = { (ms: Seq[(File, String)]) =>
     ms filter {
@@ -19,8 +19,8 @@ object BuildSettings {
     shellPrompt := ShellPrompt.buildShellPrompt)
 
   val buildSettings = Defaults.coreDefaultSettings ++ baseSettings ++ Seq(
-    scalaVersion := "2.11.7",
-    crossScalaVersions := Seq("2.11.7", "2.10.5"),
+    scalaVersion := "2.11.8",
+    crossScalaVersions := Seq("2.11.8", "2.10.5"),
     crossVersion := CrossVersion.binary,
     //parallelExecution in Test := false,
     //fork in Test := true, // Don't share executioncontext between SBT CLI/tests
@@ -33,7 +33,7 @@ object BuildSettings {
     scalacOptions in Compile := {
       val opts = (scalacOptions in Compile).value
 
-      if (scalaVersion.value != "2.11.7") {
+      if (scalaVersion.value != "2.11.8") {
         opts.filter(_ != "-Ywarn-unused-import")
       } else opts
     },
@@ -75,6 +75,8 @@ object Publish {
     },
     binaryIssueFilters ++= Seq(missingMethodInOld))
 
+  val siteUrl = "http://reactivemongo.org"
+
   lazy val settings = Seq(
     publishMavenStyle := true,
     publishArtifact in Test := false,
@@ -86,7 +88,9 @@ object Publish {
       Seq("Apache 2.0" ->
         url("http://www.apache.org/licenses/LICENSE-2.0"))
     },
-    homepage := Some(url("http://reactivemongo.org")),
+    homepage := Some(url(siteUrl)),
+    autoAPIMappings := true,
+    apiURL := Some(url(s"$siteUrl/release/${version.value}/api/")),
     pomExtra := (
       <scm>
         <url>git://github.com/ReactiveMongo/ReactiveMongo.git</url>
@@ -121,7 +125,6 @@ object Format {
       setPreference(IndentSpaces, 2).
       setPreference(MultilineScaladocCommentsStartOnFirstLine, false).
       setPreference(PreserveSpaceBeforeArguments, false).
-      setPreference(PreserveDanglingCloseParenthesis, true).
       setPreference(RewriteArrowSymbols, false).
       setPreference(SpaceBeforeColon, false).
       setPreference(SpaceInsideBrackets, false).
@@ -164,9 +167,12 @@ object Resolvers {
 
 object Dependencies {
   // TODO: Update
-  val akkaActor = {
+  val akka = {
     val ver = sys.env.get("AKKA_VERSION").getOrElse("2.3.13")
-    "com.typesafe.akka" %% "akka-actor" % ver
+
+    Seq(
+      "com.typesafe.akka" %% "akka-actor" % ver,
+      "com.typesafe.akka" %% "akka-testkit" % ver % Test)
   }
 
   val playIteratees = "com.typesafe.play" %% "play-iteratees" % "2.3.10"
@@ -198,7 +204,10 @@ object ReactiveMongoBuild extends Build {
   import BuildSettings._
   import Resolvers._
   import Dependencies._
-  import sbtunidoc.{ Plugin => UnidocPlugin }
+
+  import sbtunidoc.{ Plugin => UnidocPlugin },
+    UnidocPlugin.UnidocKeys._, UnidocPlugin.ScalaUnidoc
+
   import sbtassembly.{
     AssemblyKeys, MergeStrategy, PathList, ShadeRule
   }, AssemblyKeys._
@@ -219,10 +228,13 @@ object ReactiveMongoBuild extends Build {
       settings(UnidocPlugin.unidocSettings: _*).
       settings(
         previousArtifacts := Set.empty,
+        unidocProjectFilter in (ScalaUnidoc, unidoc) := {
+          inAnyProject -- inProjects(shaded, jmx)
+        },
         travisEnv in Test := { // test:travisEnv from SBT CLI
           val specs = List[(String, List[String])](
             "MONGO_VER" -> List("2_6", "3"),
-            "MONGO_SSL" -> List("true", "false"),
+            "MONGO_PROFILE" -> List("default", "ssl", "rs"),
             "AKKA_VERSION" -> List("2.3.13", "2.4.8")
           )
 
@@ -230,7 +242,7 @@ object ReactiveMongoBuild extends Build {
             case (key, values) => values.map(key -> _)
           }.combinations(specs.size).filterNot { flags =>
             flags.contains("MONGO_VER" -> "2_6") && flags.
-              contains("MONGO_SSL" -> "true")
+              contains("MONGO_PROFILE" -> "ssl")
           }.collect {
             case flags if (flags.map(_._1).toSet.size == specs.size) =>
               "CI_CATEGORY=INTEGRATION_TESTS" :: flags.sortBy(_._1).map({
@@ -243,7 +255,8 @@ object ReactiveMongoBuild extends Build {
 
           println(s"Travis CI env:\r\n$matrix")
         }
-      ).aggregate(bson, bsonmacros, shaded, driver)
+      ).aggregate(bson, bsonmacros, shaded, driver,
+        iteratees, jmx)
 
   import scala.xml.{ Elem => XmlElem, Node => XmlNode }
   private def transformPomDependencies(tx: XmlElem => Option[XmlNode]): XmlNode => XmlNode = { node: XmlNode =>
@@ -285,17 +298,17 @@ object ReactiveMongoBuild extends Build {
         ShadeRule.rename("org.jboss.netty.**" -> "shaded.netty.@1").inAll,
         ShadeRule.rename("com.google.**" -> "shaded.google.@1").inAll
       ),
-      publish in Compile := publish.dependsOn(assembly),
-      publishLocal in Compile := publishLocal.dependsOn(assembly),
+      pomPostProcess := transformPomDependencies { _ => None },
+      publish := publish.dependsOn(assembly),
+      publishLocal := publishLocal.dependsOn(assembly),
       packageBin in Compile := target.value / (
-        assemblyJarName in assembly).value,
-      pomPostProcess := transformPomDependencies { _ => None }
+        assemblyJarName in assembly).value
     )
 
   private val driverFilter: Seq[(File, String)] => Seq[(File, String)] = {
     (_: Seq[(File, String)]).filter {
       case (file, name) =>
-        !(name endsWith "reactivemongo/core/StaticListenerBinder.class")
+        !(name endsWith "external/reactivemongo/StaticListenerBinder.class")
     }
   } andThen BuildSettings.filter
 
@@ -309,6 +322,26 @@ object ReactiveMongoBuild extends Build {
     m.close()
   }
 
+  lazy val bson = Project(
+    s"$projectPrefix-BSON",
+    file("bson"),
+    settings = buildSettings).
+    settings(
+      libraryDependencies += specs,
+      binaryIssueFilters ++= Seq(
+        ProblemFilters.exclude[MissingTypesProblem](
+          "reactivemongo.bson.BSONTimestamp$")))
+
+  lazy val bsonmacros = Project(
+    s"$projectPrefix-BSON-Macros",
+    file("macros"),
+    settings = buildSettings ++ Seq(
+      libraryDependencies +=
+        "org.scala-lang" % "scala-compiler" % scalaVersion.value % "provided"
+    )).
+    settings(libraryDependencies += specs).
+    dependsOn(bson)
+
   val driverCleanup = taskKey[Unit]("Driver compilation cleanup")
 
   lazy val driver = Project(
@@ -319,7 +352,7 @@ object ReactiveMongoBuild extends Build {
       compile in Compile <<= (compile in Compile).dependsOn(assembly in shaded),
       driverCleanup := {
         val classDir = (classDirectory in Compile).value
-        val listenerClass = classDir / "reactivemongo" / "core" / (
+        val listenerClass = classDir / "external" / "reactivemongo" / (
           "StaticListenerBinder.class")
 
         streams.value.log(s"Cleanup $listenerClass ...")
@@ -333,8 +366,8 @@ object ReactiveMongoBuild extends Build {
 
         Seq(Attributed(shadedDir / shadedJar)(AttributeMap.empty))
       },
-      libraryDependencies ++= Seq(
-        akkaActor, playIteratees, commonsCodec, shapelessTest, specs) ++ logApi,
+      libraryDependencies ++= akka ++ Seq(
+        playIteratees, commonsCodec, shapelessTest, specs) ++ logApi,
       binaryIssueFilters ++= {
         import ProblemFilters.{ exclude => x }
         @inline def mmp(s: String) = x[MissingMethodProblem](s)
@@ -717,26 +750,6 @@ object ReactiveMongoBuild extends Build {
       //mappings in (Compile, packageDoc) ~= driverFilter,
       mappings in (Compile, packageSrc) ~= driverFilter
     )).dependsOn(bsonmacros, shaded)
-
-  lazy val bson = Project(
-    s"$projectPrefix-BSON",
-    file("bson"),
-    settings = buildSettings).
-    settings(
-      libraryDependencies += specs,
-      binaryIssueFilters ++= Seq(
-        ProblemFilters.exclude[MissingTypesProblem](
-          "reactivemongo.bson.BSONTimestamp$")))
-
-  lazy val bsonmacros = Project(
-    s"$projectPrefix-BSON-Macros",
-    file("macros"),
-    settings = buildSettings ++ Seq(
-      libraryDependencies +=
-        "org.scala-lang" % "scala-compiler" % scalaVersion.value % "provided"
-    )).
-    settings(libraryDependencies += specs).
-    dependsOn(bson)
 
   private val providedInternalDeps: XmlNode => XmlNode = {
     import scala.xml.NodeSeq

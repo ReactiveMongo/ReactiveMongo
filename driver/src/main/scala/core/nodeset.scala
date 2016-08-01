@@ -186,7 +186,14 @@ case class NodeSet(
    * Returns a NodeSet with channels created to `upTo` given maximum,
    * per each member of the set.
    */
-  def createNeededChannels(receiver: ActorRef, upTo: Int)(implicit channelFactory: ChannelFactory): NodeSet = updateAll(_.createNeededChannels(receiver, upTo))
+  @deprecated(message = "Use `createNeededChannels` with the explicit `channelFactory`", since = "0.12-RC1")
+  def createNeededChannels(receiver: ActorRef, upTo: Int)(implicit channelFactory: ChannelFactory): NodeSet = createNeededChannels(channelFactory, receiver, upTo)
+
+  /**
+   * Returns a NodeSet with channels created to `upTo` given maximum,
+   * per each member of the set.
+   */
+  private[core] def createNeededChannels(channelFactory: ChannelFactory, receiver: ActorRef, upTo: Int): NodeSet = updateAll(_.createNeededChannels(channelFactory, receiver, upTo))
 
   def toShortString =
     s"{{NodeSet $name ${nodes.map(_.toShortString).mkString(" | ")} }}"
@@ -258,16 +265,26 @@ case class Node(
     })
   )
 
+  @deprecated(message = "Use `createNeededChannels` with an explicit `channelFactory`", since = "0.12-RC1")
   def createNeededChannels(receiver: ActorRef, upTo: Int)(implicit channelFactory: ChannelFactory): Node = {
     if (connections.size < upTo) {
       _copy(connections = connections ++ (for {
         i ← 0 until (upTo - connections.size)
-      } yield {
-        Connection(
-          channelFactory.create(host, port, receiver),
-          ConnectionStatus.Disconnected, Set.empty, None
-        )
-      }))
+      } yield Connection(
+        channelFactory.create(host, port, receiver),
+        ConnectionStatus.Disconnected, Set.empty, None
+      )))
+    } else this
+  }
+
+  private[core] def createNeededChannels(channelFactory: ChannelFactory, receiver: ActorRef, upTo: Int): Node = {
+    if (connections.size < upTo) {
+      _copy(connections = connections ++ (for {
+        i ← 0 until (upTo - connections.size)
+      } yield Connection(
+        channelFactory.create(host, port, receiver),
+        ConnectionStatus.Disconnected, Set.empty, None
+      )))
     } else this
   }
 
@@ -588,7 +605,7 @@ final class ChannelFactory private[reactivemongo] (
       s"unknown-${System identityHashCode opts}", opts, bossEx, workerEx
     )
 
-  import javax.net.ssl.{ KeyManager, SSLContext }
+  import javax.net.ssl.SSLContext
 
   private val logger = LazyLogger("reactivemongo.core.nodeset.ChannelFactory")
   private val timer = new HashedWheelTimer()
