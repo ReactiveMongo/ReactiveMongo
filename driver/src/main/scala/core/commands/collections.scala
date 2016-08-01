@@ -17,7 +17,6 @@ package reactivemongo.core.commands
 
 import reactivemongo.bson._
 import DefaultBSONHandlers._
-import reactivemongo.core.protocol.Response
 
 case class CappedOptions(
     size: Long,

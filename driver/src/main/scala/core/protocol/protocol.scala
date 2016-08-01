@@ -23,7 +23,10 @@ import shaded.netty.buffer._
 import shaded.netty.channel._
 import shaded.netty.handler.codec.oneone._
 import shaded.netty.handler.codec.frame.FrameDecoder
-import shaded.netty.handler.timeout.{ IdleState, IdleStateEvent, IdleStateAwareChannelHandler }
+import shaded.netty.handler.timeout.{
+  IdleStateEvent,
+  IdleStateAwareChannelHandler
+}
 
 import reactivemongo.core.actors.{
   ChannelConnected,
@@ -418,8 +421,6 @@ private[reactivemongo] class ResponseFrameDecoder extends FrameDecoder {
 }
 
 private[reactivemongo] class ResponseDecoder extends OneToOneDecoder {
-  import java.net.InetSocketAddress
-
   def decode(ctx: ChannelHandlerContext, channel: Channel, obj: Object): Response = {
     val buffer = obj.asInstanceOf[ChannelBuffer]
     val header = MessageHeader(buffer)

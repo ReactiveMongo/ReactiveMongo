@@ -139,7 +139,7 @@ case class ScramSha1StartNegociation(
 )
     extends Command[Either[SuccessfulAuthentication, Array[Byte]]] {
 
-  import javax.crypto.spec.{ PBEKeySpec, SecretKeySpec }
+  import javax.crypto.spec.PBEKeySpec
   import org.apache.commons.codec.binary.Base64
   import org.apache.commons.codec.digest.{ DigestUtils, HmacUtils }
   import akka.util.ByteString
@@ -211,7 +211,6 @@ case class ScramSha1StartNegociation(
 }
 
 object ScramSha1StartNegociation extends BSONCommandResultMaker[Either[SuccessfulAuthentication, Array[Byte]]] {
-  import scala.util.{ Failure, Success, Try }
   import reactivemongo.bson.BSONBooleanLike
 
   type ResType = Either[CommandError, Either[SuccessfulAuthentication, Array[Byte]]]

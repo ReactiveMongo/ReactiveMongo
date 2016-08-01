@@ -36,7 +36,8 @@ class CursorSpec extends org.specs2.mutable.Specification {
         Person("James", 16),
         Person("John", 34),
         Person("Jane", 24),
-        Person("Joline", 34))
+        Person("Joline", 34)
+      )
 
       "with insert" in { implicit ee: EE =>
         implicit val writer = PersonWriter
@@ -88,7 +89,8 @@ class CursorSpec extends org.specs2.mutable.Specification {
     "insert 16,517 records" in { implicit ee: EE =>
       val futs = for (i <- 0 until 16517)
         yield coll2.insert(BSONDocument(
-        "i" -> BSONInteger(i), "record" -> BSONString("record" + i)))
+        "i" -> BSONInteger(i), "record" -> BSONString("record" + i)
+      ))
 
       Future.sequence(futs).map(_ => {}) must beEqualTo({}).
         await(0, 20.seconds)
@@ -101,7 +103,8 @@ class CursorSpec extends org.specs2.mutable.Specification {
           Iteratee.foreach { e: BSONDocument =>
             //println(s"doc $i => $e")
             i += 1
-          }).map(_ => i) must beEqualTo(16517).await(0, 21.seconds)
+          }
+        ).map(_ => i) must beEqualTo(16517).await(0, 21.seconds)
       }
 
       "only 1024 documents" in { implicit ee: EE =>
@@ -122,7 +125,8 @@ class CursorSpec extends org.specs2.mutable.Specification {
             Iteratee.foreach { it: Iterator[BSONDocument] =>
               //println(s"doc $i => $e")
               i += it.size
-            }).map(_ => i) must beEqualTo(16517).await(0, 21.seconds)
+            }
+          ).map(_ => i) must beEqualTo(16517).await(0, 21.seconds)
       }
 
       "for only 1024 documents" in { implicit ee: EE =>
@@ -132,7 +136,8 @@ class CursorSpec extends org.specs2.mutable.Specification {
             Iteratee.foreach { it: Iterator[BSONDocument] =>
               //println(s"doc $i => $e")
               i += it.size
-            }).map(_ => i) must beEqualTo(1024).await(0, timeout)
+            }
+          ).map(_ => i) must beEqualTo(1024).await(0, timeout)
       }
     }
 
@@ -174,7 +179,8 @@ class CursorSpec extends org.specs2.mutable.Specification {
             }
             val c = scol()
             val cursor = c.find(BSONDocument.empty).options(
-              QueryOpts(batchSizeN = 2)).cursor()
+              QueryOpts(batchSizeN = 2)
+            ).cursor()
 
             (cursor.responseEnumerator(10, FailOnError[Unit]()) |>>> inc).
               map(_ => count).recover({ case _ => count }).
@@ -195,7 +201,8 @@ class CursorSpec extends org.specs2.mutable.Specification {
             }
             val c = scol()
             val cursor = c.find(BSONDocument.empty).options(QueryOpts(
-              batchSizeN = 4)).cursor()
+              batchSizeN = 4
+            )).cursor()
 
             (cursor.responseEnumerator(128, ContOnError[Unit]()) |>>> inc).
               recover({ case _ => count }) must beEqualTo(1).await(0, timeout)
@@ -211,7 +218,8 @@ class CursorSpec extends org.specs2.mutable.Specification {
             }
             val c = scol(System.identityHashCode(inc).toString)
             val cursor = c.find(BSONDocument.empty).options(
-              QueryOpts(batchSizeN = 2)).cursor()
+              QueryOpts(batchSizeN = 2)
+            ).cursor()
 
             (cursor.responseEnumerator(10, FailOnError[Unit]()) |>>> inc).
               recover({ case _ => count }) must beEqualTo(1).await(0, timeout)
@@ -263,7 +271,8 @@ class CursorSpec extends org.specs2.mutable.Specification {
             }
             val c = scol()
             val cursor = c.find(BSONDocument.empty).options(
-              QueryOpts(batchSizeN = 2)).cursor()
+              QueryOpts(batchSizeN = 2)
+            ).cursor()
 
             (cursor.bulkEnumerator(10, FailOnError[Unit]()) |>>> inc).
               recover({ case _ => count }).
@@ -282,7 +291,8 @@ class CursorSpec extends org.specs2.mutable.Specification {
             }
             val c = scol()
             val cursor = c.find(BSONDocument.empty).options(QueryOpts(
-              batchSizeN = 4)).cursor()
+              batchSizeN = 4
+            )).cursor()
 
             (cursor.bulkEnumerator(128, ContOnError[Unit]()) |>>> inc).
               recover({ case _ => count }) must beEqualTo(1).await(0, timeout)
@@ -298,7 +308,8 @@ class CursorSpec extends org.specs2.mutable.Specification {
             }
             val c = scol(System.identityHashCode(inc).toString)
             val cursor = c.find(BSONDocument.empty).options(
-              QueryOpts(batchSizeN = 2)).cursor()
+              QueryOpts(batchSizeN = 2)
+            ).cursor()
 
             (cursor.bulkEnumerator(10, FailOnError[Unit]()) |>>> inc).
               recover({ case _ => count }) must beEqualTo(1).await(0, timeout)
@@ -431,7 +442,8 @@ class CursorSpec extends org.specs2.mutable.Specification {
             }
             val c = scol()
             val cursor = c.find(BSONDocument.empty).options(QueryOpts(
-              batchSizeN = 4)).cursor()
+              batchSizeN = 4
+            )).cursor()
 
             (cursor.enumerator(128, ContOnError[Unit]()) |>>> inc).
               recover({ case _ => count }) must beEqualTo(1).await(0, timeout)
@@ -515,7 +527,8 @@ class CursorSpec extends org.specs2.mutable.Specification {
           implicit ee: EE =>
 
             val collect = Iteratee.fold[Iterator[Int], List[Int]](
-              List.empty[Int]) { _ ++ _ }
+              List.empty[Int]
+            ) { _ ++ _ }
 
             (cursor("senum2").bulkEnumerator(10) |>>> collect).map(_.reverse).
               aka("enumerated") must beEqualTo(expectedList).await(0, timeout)
@@ -541,7 +554,8 @@ class CursorSpec extends org.specs2.mutable.Specification {
       @inline def tailable(n: String, database: DB = db) = {
         implicit val reader = IdReader
         collection(n, database).find(BSONDocument()).options(
-          QueryOpts().tailable).cursor[Int]()
+          QueryOpts().tailable
+        ).cursor[Int]()
       }
 
       "successfully using tailable enumerator with maxDocs" in {

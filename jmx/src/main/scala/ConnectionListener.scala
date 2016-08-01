@@ -5,10 +5,7 @@ import javax.management.{
   AttributeChangeNotification,
   MBeanNotificationInfo,
   Notification,
-  NotificationBroadcaster,
   NotificationBroadcasterSupport,
-  NotificationFilter,
-  NotificationListener,
   ObjectName
 }
 
@@ -206,8 +203,6 @@ sealed trait NotificationSupport { self: NotificationBroadcasterSupport =>
 
 final class NodeSet private[jmx] () extends NotificationBroadcasterSupport
     with NodeSetMBean with NotificationSupport {
-
-  import javax.management.AttributeChangeNotification
 
   private var options: String = null
   private var supervisor: String = null

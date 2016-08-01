@@ -21,8 +21,6 @@ import scala.concurrent.{ Future, Promise }
 import scala.util.{ Failure, Success, Try }
 
 import akka.actor.{ Actor, ActorRef, Cancellable }
-import akka.pattern.ask
-import akka.util.Timeout
 
 import shaded.netty.channel.{ ChannelFuture, ChannelFutureListener }
 import shaded.netty.channel.group.{
@@ -158,7 +156,6 @@ case object GetLastMetadata
 @deprecated("Internal class: will be made private", "0.11.14")
 trait MongoDBSystem extends Actor {
   import scala.concurrent.duration._
-  import reactivemongo.bson.BSONDocument
   import Exceptions._
   import MongoDBSystem._
 
@@ -850,7 +847,7 @@ trait MongoDBSystem extends Actor {
             logger.debug(s"[$lnm] {${response.header.responseTo}} it's a getlasterror")
 
             // todo, for now rewinding buffer at original index
-            import reactivemongo.api.commands.bson.BSONGetLastErrorImplicits.LastErrorReader
+            //import reactivemongo.api.commands.bson.BSONGetLastErrorImplicits.LastErrorReader
 
             lastError(response).fold(e => {
               logger.error(s"[$lnm] Error deserializing LastError message #${response.header.responseTo}", e)

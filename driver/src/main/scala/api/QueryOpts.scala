@@ -15,7 +15,6 @@
  */
 package reactivemongo.api
 
-import shaded.netty.buffer.ChannelBuffer
 import reactivemongo.core.protocol.QueryFlags
 
 @deprecated(message = "Will be removed", since = "0.11.10")

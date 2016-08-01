@@ -18,8 +18,6 @@ package reactivemongo.api.collections
 import scala.util.{ Failure, Success, Try }
 import scala.util.control.NonFatal
 
-import scala.collection.Set
-import scala.collection.immutable.ListSet
 import scala.collection.generic.CanBuildFrom
 
 import scala.concurrent.{ ExecutionContext, Future }
@@ -29,11 +27,9 @@ import shaded.netty.buffer.ChannelBuffer
 import reactivemongo.api._
 import reactivemongo.api.commands.{
   CursorFetcher,
-  LastError,
   ResponseResult,
   WriteConcern
 }
-import reactivemongo.bson.buffer.{ ReadableBuffer, WritableBuffer }
 import reactivemongo.core.nodeset.ProtocolMetadata
 import reactivemongo.core.protocol.{
   CheckedWriteRequest,
@@ -45,11 +41,7 @@ import reactivemongo.core.protocol.{
   Update,
   UpdateFlags
 }
-import reactivemongo.core.netty.{
-  BufferSequence,
-  ChannelBufferReadableBuffer,
-  ChannelBufferWritableBuffer
-}
+import reactivemongo.core.netty.{ BufferSequence, ChannelBufferWritableBuffer }
 import reactivemongo.core.errors.{
   ConnectionNotInitialized,
   GenericDriverException

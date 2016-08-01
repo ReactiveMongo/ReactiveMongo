@@ -1,12 +1,6 @@
 package reactivemongo.api.commands
 
-import scala.concurrent.Future
-
-import reactivemongo.api.{
-  BSONSerializationPack,
-  ReadConcern,
-  SerializationPack
-}
+import reactivemongo.api.{ ReadConcern, SerializationPack }
 import reactivemongo.core.protocol.MongoWireVersion
 
 /**

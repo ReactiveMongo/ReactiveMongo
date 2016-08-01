@@ -1,7 +1,7 @@
 package reactivemongo.api.commands.bson
 
-import reactivemongo.api.{ BSONSerializationPack, ReadConcern }
-import reactivemongo.api.commands.{ CommandError, ResponseResult, UnitBox }
+import reactivemongo.api.ReadConcern
+import reactivemongo.api.commands.{ CommandError, UnitBox }
 import reactivemongo.bson.{
   BSONBooleanLike,
   BSONDocument,

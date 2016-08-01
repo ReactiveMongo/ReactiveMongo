@@ -2,8 +2,6 @@ package reactivemongo.api.commands
 
 import scala.util.{ Failure, Success, Try }
 
-import scala.collection.Set
-import scala.collection.immutable.Seq
 import scala.collection.generic.CanBuildFrom
 import scala.collection.mutable.Builder
 

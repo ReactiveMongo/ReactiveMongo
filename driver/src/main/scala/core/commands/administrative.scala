@@ -17,7 +17,6 @@ package reactivemongo.core.commands
 
 import reactivemongo.bson._
 import DefaultBSONHandlers._
-import reactivemongo.core.protocol.Response
 
 /** Drop a database. */
 @deprecated("consider using reactivemongo.api.commands.DropDatabase instead", "0.11.0")

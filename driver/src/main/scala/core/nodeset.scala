@@ -605,7 +605,7 @@ final class ChannelFactory private[reactivemongo] (
       s"unknown-${System identityHashCode opts}", opts, bossEx, workerEx
     )
 
-  import javax.net.ssl.{ KeyManager, SSLContext }
+  import javax.net.ssl.SSLContext
 
   private val logger = LazyLogger("reactivemongo.core.nodeset.ChannelFactory")
   private val timer = new HashedWheelTimer()

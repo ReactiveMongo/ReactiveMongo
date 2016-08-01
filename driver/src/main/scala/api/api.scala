@@ -16,7 +16,6 @@
 package reactivemongo.api
 
 import java.util.concurrent.{
-  TimeoutException,
   TimeUnit,
   atomic
 }, TimeUnit.MILLISECONDS, atomic.AtomicLong
