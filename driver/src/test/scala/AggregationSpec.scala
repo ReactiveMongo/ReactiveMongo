@@ -4,7 +4,6 @@ import scala.concurrent.{ ExecutionContext, Future }
 import scala.concurrent.duration.FiniteDuration
 
 import reactivemongo.bson._
-import reactivemongo.api.Cursor
 import reactivemongo.api.collections.bson.BSONCollection
 
 import org.specs2.concurrent.{ ExecutionEnv => EE }
@@ -47,6 +46,41 @@ class AggregationSpec extends org.specs2.mutable.Specification {
   // ---
 
   "Zip codes collection" should {
+    "expose the index stats" in { implicit ee: EE =>
+      import coll.BatchCommands.AggregationFramework.{
+        Ascending,
+        IndexStats,
+        Sort
+      }
+      import reactivemongo.api.commands.{ bson => bsoncommands }
+      import bsoncommands.BSONAggregationFramework.{
+        IndexStatsResult,
+        IndexStatAccesses
+      }
+      import bsoncommands.BSONAggregationResultImplicits.BSONIndexStatsReader
+
+      val expected = IndexStatsResult(
+        name = null,
+        key = BSONDocument.empty,
+        host = "foo",
+        accesses = IndexStatAccesses(
+          ops = 1L,
+          since = new java.util.Date()
+        )
+      )
+
+      coll.aggregate(IndexStats, List(Sort(Ascending("name")))).
+        map(_.head[IndexStatsResult]) must beLike[List[IndexStatsResult]] {
+          case IndexStatsResult("_id_", k1, _, _) ::
+            IndexStatsResult("city_text_state_text", k2, _, _) :: Nil =>
+            k1.getAs[BSONNumberLike]("_id").map(_.toInt) must beSome(1) and {
+              k2.getAs[String]("_fts") must beSome("text")
+            } and {
+              k2.getAs[BSONNumberLike]("_ftsx").map(_.toInt) must beSome(1)
+            }
+        }.await(0, timeout)
+    } tag "not_mongo26"
+
     "be inserted" in { implicit ee: EE =>
       def insert(data: List[ZipCode]): Future[Unit] = data.headOption match {
         case Some(zip) => coll.insert(zip).flatMap(_ => insert(data.tail))
@@ -148,9 +182,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
         def collect(c: BSONCollection, upTo: Int = Int.MaxValue)(implicit ec: ExecutionContext) = withCtx(c) { (firstOp, pipeline) =>
           c.aggregate1[BSONDocument](firstOp, pipeline,
             c.BatchCommands.AggregationFramework.Cursor(1)).
-            flatMap(_.collect[List](
-              upTo, Cursor.FailOnError[List[BSONDocument]]()
-            ))
+            flatMap(_.collect[List](upTo))
         }
 
         "without limit (maxDocs)" in { implicit ee: EE =>
@@ -167,7 +199,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
           import coll.BatchCommands.AggregationFramework
           import AggregationFramework.{
             Descending,
-            Cursor => AggCursor,
+            Cursor,
             Match,
             MetadataSort,
             Sort,
@@ -182,10 +214,8 @@ class AggregationSpec extends org.specs2.mutable.Specification {
             MetadataSort("score", TextScore), Descending("city")
           ))
 
-          coll.aggregate1[ZipCode](firstOp, pipeline, AggCursor(1)).
-            flatMap(_.collect[List](
-              4, Cursor.FailOnError[List[ZipCode]]()
-            )) must beEqualTo(jpCodes).
+          coll.aggregate1[ZipCode](firstOp, pipeline, Cursor(1)).
+            flatMap(_.collect[List](4)) must beEqualTo(jpCodes).
             await(1, timeout)
 
         }
@@ -450,71 +480,6 @@ class AggregationSpec extends org.specs2.mutable.Specification {
         await(0, timeout)
 
     } tag "not_mongo26"
-  }
-
-  "Aggregation result" >> {
-    // https://docs.mongodb.com/master/reference/operator/aggregation/out/#example
-
-    val books = db.collection(s"books-1-${System identityHashCode this}")
-
-    "with valid fixtures" in { implicit ee: EE =>
-      val fixtures = Seq(
-        BSONDocument(
-          "_id" -> 8751, "title" -> "The Banquet",
-          "author" -> "Dante", "copies" -> 2
-        ),
-        BSONDocument(
-          "_id" -> 8752, "title" -> "Divine Comedy",
-          "author" -> "Dante", "copies" -> 1
-        ),
-        BSONDocument(
-          "_id" -> 8645, "title" -> "Eclogues",
-          "author" -> "Dante", "copies" -> 2
-        ),
-        BSONDocument(
-          "_id" -> 7000, "title" -> "The Odyssey",
-          "author" -> "Homer", "copies" -> 10
-        ),
-        BSONDocument(
-          "_id" -> 7020, "title" -> "Iliad",
-          "author" -> "Homer", "copies" -> 10
-        )
-      )
-
-      Future.sequence(fixtures.map { doc => books.insert(doc) }).map(_ => {}).
-        aka("fixtures") must beEqualTo({}).await(0, timeout)
-    }
-
-    "should be outputed to collection" in { implicit ee: EE =>
-      import books.BatchCommands.AggregationFramework
-      import AggregationFramework.{ Ascending, Group, Push, Out, Sort }
-
-      val outColl = s"authors-1-${System identityHashCode this}"
-
-      type Author = (String, List[String])
-      implicit val authorReader = BSONDocumentReader[Author] { doc =>
-        (for {
-          id <- doc.getAsTry[String]("_id")
-          books <- doc.getAsTry[List[String]]("books")
-        } yield id -> books).get
-      }
-
-      books.aggregate(
-        Sort(Ascending("title")),
-        List(Group(BSONString("$author"))(
-          "books" -> Push("title")
-        ), Out(outColl))
-      ).map(_ => {}).
-        aka("$out aggregation") must beEqualTo({}).await(0, timeout) and {
-          db.collection(outColl).find(BSONDocument.empty).cursor[Author]().
-            collect[List](3, Cursor.FailOnError[List[Author]]()) must beEqualTo(
-              List(
-                "Homer" -> List("Iliad", "The Odyssey"),
-                "Dante" -> List("Divine Comedy", "Eclogues", "The Banquet")
-              )
-            ).await(0, timeout)
-        }
-    }
   }
 
   // ---

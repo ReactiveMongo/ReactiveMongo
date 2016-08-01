@@ -2,6 +2,7 @@ package reactivemongo.api.commands.bson
 
 import reactivemongo.bson.{
   BSONDocument,
+  BSONDocumentReader,
   BSONElement,
   BSONNumberLike,
   BSONValue,
@@ -83,5 +84,29 @@ object BSONAggregationImplicits {
           } yield AggregationResult(firstBatch, Some(ResultCursor(id, ns)))).get
         }
       }
+  }
+}
+
+object BSONAggregationResultImplicits {
+  import BSONAggregationFramework.{ IndexStatsResult, IndexStatAccesses }
+
+  implicit object BSONIndexStatAccessesReader
+      extends BSONDocumentReader[IndexStatAccesses] {
+
+    def read(doc: BSONDocument): IndexStatAccesses = (for {
+      ops <- doc.getAsTry[BSONNumberLike]("ops").map(_.toLong)
+      since <- doc.getAsTry[java.util.Date]("since")
+    } yield IndexStatAccesses(ops, since)).get
+  }
+
+  implicit object BSONIndexStatsReader
+      extends BSONDocumentReader[IndexStatsResult] {
+
+    def read(doc: BSONDocument): IndexStatsResult = (for {
+      name <- doc.getAsTry[String]("name")
+      key <- doc.getAsTry[BSONDocument]("key")
+      host <- doc.getAsTry[String]("host")
+      acc <- doc.getAsTry[IndexStatAccesses]("accesses")
+    } yield IndexStatsResult(name, key, host, acc)).get
   }
 }
