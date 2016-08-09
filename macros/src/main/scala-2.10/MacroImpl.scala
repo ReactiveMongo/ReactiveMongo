@@ -5,11 +5,6 @@ import reactivemongo.bson.Macros.Options.SaveSimpleName
 
 import scala.reflect.macros.Context
 
-/**
-  * User: andraz
-  * Date: 2/21/13
-  * Time: 6:51 PM
-  */
 private object MacroImpl {
   def reader[A: c.WeakTypeTag, Opts: c.WeakTypeTag](c: Context): c.Expr[BSONDocumentReader[A]] =
     c.universe.reify(
@@ -115,27 +110,31 @@ private object MacroImpl {
     private def readBodyConstructClass(implicit A: c.Type) = {
       val (constructor, _) = matchingApplyUnapply
 
-      val values = constructor.paramss.head map {
-        param =>
-          val sig = param.typeSignature
-          val optTyp = optionTypeParameter(sig)
-          val typ = optTyp getOrElse sig
+      val TypeRef(_, _, tpeArgs) = A
+      val boundTypes = constructor.typeParams.zip(tpeArgs).map {
+        case (sym, ty) => sym.fullName -> ty
+      }.toMap
 
-          if (optTyp.isDefined) {
-            Apply(
-              TypeApply(
-                Select(Ident("document"), "getAs"),
-                List(TypeTree(typ))),
-              List(Literal(Constant(paramName(param)))))
-          } else {
-            val getter = Apply(
-              TypeApply(
-                Select(Ident("document"), "getAsTry"),
-                List(TypeTree(typ))),
-              List(Literal(Constant(paramName(param)))))
-            Select(getter, "get")
-          }
+      val values = constructor.paramss.head.map { param =>
+        val t = param.typeSignature
+        val sig = boundTypes.lift(t.typeSymbol.fullName).getOrElse(t)
+        val optTyp = optionTypeParameter(sig)
+        val typ = optTyp getOrElse sig
 
+        if (optTyp.isDefined) {
+          Apply(
+            TypeApply(
+              Select(Ident("document"), "getAs"),
+              List(TypeTree(typ))),
+            List(Literal(Constant(paramName(param)))))
+        } else {
+          val getter = Apply(
+            TypeApply(
+              Select(Ident("document"), "getAsTry"),
+              List(TypeTree(typ))),
+            List(Literal(Constant(paramName(param)))))
+          Select(getter, "get")
+        }
       }
 
       val constructorTree = Select(Ident(companion.name.toString), "apply")
@@ -253,32 +252,32 @@ private object MacroImpl {
           lst.headOption
 
         case RefinedType(types, _) =>
-          types.filter(_ <:< unionOption).flatMap { case TypeRef(_, _, args) => args }.headOption
+          types.filter(_ <:< unionOption).flatMap {
+            case TypeRef(_, _, args) => args
+          }.headOption
 
         case _ => None
       }
       tree map { t => parseUnionTree(t) }
     }
 
-    private def parseAllImplementationTypes: Option[List[Type]] = {
+    private def parseAllImplementationTypes: Option[List[Type]] =
       if (Opts <:< typeOf[Macros.Options.AllImplementations]) {
-        Some(allImplementations(A).toList)
+        Some(allSubclasses(Set(A.typeSymbol)).toList)
       } else None
-    }
 
     private def hasOption[O: c.TypeTag]: Boolean = Opts <:< typeOf[O]
 
     private def unapplyReturnTypes(deconstructor: c.universe.MethodSymbol): List[c.Type] = {
       val opt = deconstructor.returnType match {
         case TypeRef(_, _, Nil) => Some(Nil)
-        case TypeRef(_, _, args) =>
-          args.head match {
-            case t @ TypeRef(_, _, Nil) => Some(List(t))
-            case typ @ TypeRef(_, t, args) =>
-              Some(
-                if (t.name.toString.matches("Tuple\\d\\d?")) args else List(typ))
-            case _ => None
-          }
+        case TypeRef(_, _, args) => args.head match {
+          case t @ TypeRef(_, _, Nil) => Some(List(t))
+          case typ @ TypeRef(_, t, args) =>
+            Some(
+              if (t.name.toString.matches("Tuple\\d\\d?")) args else List(typ))
+          case _ => None
+        }
         case _ => None
       }
       opt getOrElse c.abort(c.enclosingPosition, "something wrong with unapply type")
@@ -315,15 +314,28 @@ private object MacroImpl {
       param.annotations.exists(ann =>
         ann.tpe =:= typeOf[Ignore] || ann.tpe =:= typeOf[transient])
 
-    private def allSubclasses(A: Symbol): Set[Symbol] = {
-      val sub = A.asClass.knownDirectSubclasses
-      val subsub = sub flatMap allSubclasses
-      subsub ++ sub + A
-    }
+    @annotation.tailrec
+    private def allSubclasses(parent: Set[Symbol], subclasses: Set[Type] = Set.empty): Set[Type] = parent.headOption match {
+      case Some(cls: ClassSymbol) => {
+        val subsub = cls.owner.typeSignature.declarations.collect {
+          case c: ClassSymbol if (
+            cls != c && c.selfType.baseClasses.contains(cls)
+          ) => c
 
-    private def allImplementations(A: Type) =
-      allSubclasses(A.typeSymbol).map(_.asClass).
-        filterNot(_.isAbstractClass).map(_.toType)
+          case o: ModuleSymbol if (o.companionSymbol == NoSymbol) => o
+        }
+
+        val isAbstract = cls.isTrait || cls.isAbstractClass
+        val up = if (!isAbstract) subclasses + cls.toType else subclasses
+
+        allSubclasses(parent.tail ++ subsub, up)
+      }
+
+      case Some(o: ModuleSymbol) =>
+        allSubclasses(parent.tail, subclasses + o.typeSignature)
+
+      case _ => subclasses
+    }
 
     private def applyMethod(implicit A: c.Type): c.universe.Symbol =
       companion(A).typeSignature.declaration(stringToTermName("apply")) match {
@@ -338,15 +350,31 @@ private object MacroImpl {
       }
 
     private def matchingApplyUnapply(implicit A: c.Type): (c.universe.MethodSymbol, c.universe.MethodSymbol) = {
+      import c.universe._
+
       val applySymbol = applyMethod(A)
       val unapply = unapplyMethod(A)
-
-      val alternatives = applySymbol.asTerm.alternatives map (_.asMethod)
+      val alternatives = applySymbol.asTerm.alternatives.map(_.asMethod)
       val u = unapplyReturnTypes(unapply)
-      val applys = alternatives filter { alt =>
-        val sig = alt.paramss.head.map(_.typeSignature)
-        sig.size == u.size && sig.zip(u).forall {
-          case (left, right) => left =:= right
+
+      val applys = alternatives.filter { alt =>
+        alt.paramss match {
+          case params :: Nil => {
+            val sig = params.map(_.typeSignature)
+
+            sig.size == u.size && sig.zip(u).forall {
+              case (TypeRef(NoPrefix, left, _), TypeRef(NoPrefix, right, _)) =>
+                left.fullName == right.fullName
+
+              case (left, right) => left =:= right
+            }
+          }
+
+          case _ => {
+            warn(c.enclosingPosition, s"""Constructor with multiple parameter lists is not supported: ${A.typeSymbol.name}${alt.typeSignature}""")
+
+            false
+          }
         }
       }
 
@@ -364,5 +392,8 @@ private object MacroImpl {
     private def readerType: c.Type = typeOf[Reader[_]].typeConstructor
 
     private def companion(implicit A: c.Type): c.Symbol = A.typeSymbol.companionSymbol
+
+    private def warn(pos: c.universe.Position, msg: String): Unit =
+      if (hasOption[Macros.Options.Verbose]) c.echo(pos, msg)
   }
 }

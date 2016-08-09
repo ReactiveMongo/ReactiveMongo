@@ -88,7 +88,10 @@ object Macros {
   /** Creates an instance of BSONReader and BSONWriter for case class A */
   def handler[A]: BSONDocumentReader[A] with BSONDocumentWriter[A] with BSONHandler[BSONDocument, A] = macro MacroImpl.handler[A, Options.Default]
 
-  /**Creates an instance of BSONReader and BSONWriter for case class A and takes additional options */
+  /**
+   * Creates an instance of BSONReader and BSONWriter for case class A,
+   * and takes additional options.
+   */
   def handlerOpts[A, Opts <: Options.Default]: BSONDocumentReader[A] with BSONDocumentWriter[A] with BSONHandler[BSONDocument, A] = macro MacroImpl.handler[A, Opts]
 
   /**
