@@ -489,4 +489,18 @@ trait AggregationFramework[P <: SerializationPack]
       "$addToSet", stringValue("$" + field)
     )))
   }
+
+  /** The [[https://docs.mongodb.com/manual/reference/operator/aggregation/stdDevPop/ \$stdDevPop]] group accumulator (since MongoDB 3.2) */
+  case class StdDevPop(expression: pack.Value) extends GroupFunction {
+    val makeFunction = makeDocument(Seq(elementProducer(
+      "$stdDevPop", expression
+    )))
+  }
+
+  /** The [[https://docs.mongodb.com/manual/reference/operator/aggregation/stdDevSamp/ \$stdDevSamp]] group accumulator (since MongoDB 3.2) */
+  case class StdDevSamp(expression: pack.Value) extends GroupFunction {
+    val makeFunction = makeDocument(Seq(elementProducer(
+      "$stdDevSamp", expression
+    )))
+  }
 }

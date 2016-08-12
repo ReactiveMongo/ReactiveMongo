@@ -158,7 +158,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
 
       def withCtx[T](c: BSONCollection)(f: (c.BatchCommands.AggregationFramework.Group, List[c.PipelineOperator]) => T): T = {
         import c.BatchCommands.AggregationFramework
-        import AggregationFramework.{ Cursor, Group, SumField }
+        import AggregationFramework.{ Group, SumField }
 
         val firstOp = Group(document("state" -> "$state", "city" -> "$city"))(
           "pop" -> SumField("population")
@@ -237,7 +237,6 @@ class AggregationSpec extends org.specs2.mutable.Specification {
         Project,
         Sort,
         Ascending,
-        Sample,
         SumField
       }
 
@@ -487,7 +486,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
     } tag "not_mongo26"
   }
 
-  "Aggregation result" >> {
+  "Aggregation result for '$out'" >> {
     // https://docs.mongodb.com/master/reference/operator/aggregation/out/#example
 
     val books = db.collection(s"books-1-${System identityHashCode this}")
@@ -552,6 +551,124 @@ class AggregationSpec extends org.specs2.mutable.Specification {
     }
   }
 
+  "Aggregation result for '$stdDevPop'" >> {
+    // https://docs.mongodb.com/manual/reference/operator/aggregation/stdDevPop/#examples
+
+    val contest = db.collection(s"contest-1-${System identityHashCode this}")
+
+    "with valid fixtures" in { implicit ee: EE =>
+      /*
+       { "_id" : 1, "name" : "dave123", "quiz" : 1, "score" : 85 }
+       { "_id" : 2, "name" : "dave2", "quiz" : 1, "score" : 90 }
+       { "_id" : 3, "name" : "ahn", "quiz" : 1, "score" : 71 }
+       { "_id" : 4, "name" : "li", "quiz" : 2, "score" : 96 }
+       { "_id" : 5, "name" : "annT", "quiz" : 2, "score" : 77 }
+       { "_id" : 6, "name" : "ty", "quiz" : 2, "score" : 82 }
+       */
+      val fixtures = Seq(
+        BSONDocument(
+          "_id" -> 1,
+          "name" -> "dave123", "quiz" -> 1, "score" -> 85
+        ),
+        BSONDocument(
+          "_id" -> 2,
+          "name" -> "dave2", "quiz" -> 1, "score" -> 90
+        ),
+        BSONDocument(
+          "_id" -> 3,
+          "name" -> "ahn", "quiz" -> 1, "score" -> 71
+        ),
+        BSONDocument(
+          "_id" -> 4,
+          "name" -> "li", "quiz" -> 2, "score" -> 96
+        ),
+        BSONDocument(
+          "_id" -> 5,
+          "name" -> "annT", "quiz" -> 2, "score" -> 77
+        ),
+        BSONDocument(
+          "_id" -> 6,
+          "name" -> "ty", "quiz" -> 2, "score" -> 82
+        )
+      )
+
+      Future.sequence(fixtures.map { doc => contest.insert(doc) }).map(_ => {}).
+        aka("fixtures") must beEqualTo({}).await(0, timeout)
+    } tag "not_mongo26"
+
+    "return the standard deviation of each quiz" in { implicit ee: EE =>
+      import contest.BatchCommands.AggregationFramework.{
+        Ascending,
+        Group,
+        Sort,
+        StdDevPop
+      }
+
+      implicit val reader = Macros.reader[QuizStdDev]
+
+      /*
+       db.contest.aggregate([
+         { $group: { _id: "$quiz", stdDev: { $stdDevPop: "$score" } } }
+       ])
+      */
+      contest.aggregate(Group(BSONString("$quiz"))(
+        "stdDev" -> StdDevPop(BSONString("$score"))
+      ), List(Sort(Ascending("_id")))).map(_.head[QuizStdDev]).
+        aka("$stdDevPop results") must beEqualTo(List(
+          QuizStdDev(1, 8.04155872120988D), QuizStdDev(2, 8.04155872120988D)
+        )).await(0, timeout)
+      /*
+       { "_id" : 1, "stdDev" : 8.04155872120988 }
+       { "_id" : 2, "stdDev" : 8.04155872120988 }
+       */
+    } tag "not_mongo26"
+  }
+
+  "Aggregation result '$stdDevSamp'" >> {
+    // https://docs.mongodb.com/manual/reference/operator/aggregation/stdDevSamp/#example
+
+    val contest = db.collection(s"contest-2-${System identityHashCode this}")
+
+    "with valid fixtures" in { implicit ee: EE =>
+      /*
+       {_id: 0, username: "user0", age: 20}
+       {_id: 1, username: "user1", age: 42}
+       {_id: 2, username: "user2", age: 28}
+       */
+      val fixtures = Seq(
+        BSONDocument("_id" -> 0, "username" -> "user0", "age" -> 20),
+        BSONDocument("_id" -> 1, "username" -> "user1", "age" -> 42),
+        BSONDocument("_id" -> 2, "username" -> "user2", "age" -> 28)
+      )
+
+      Future.sequence(fixtures.map { doc => contest.insert(doc) }).map(_ => {}).
+        aka("fixtures") must beEqualTo({}).await(0, timeout)
+    } tag "not_mongo26"
+
+    "return the standard deviation of each quiz" in { implicit ee: EE =>
+      import contest.BatchCommands.AggregationFramework.{
+        Group,
+        Sample,
+        StdDevSamp
+      }
+
+      implicit val reader = Macros.reader[QuizStdDev]
+
+      /*
+       db.users.aggregate([
+         { $sample: { size: 100 } },
+         { $group: { _id: null, ageStdDev: { $stdDevSamp: "$age" } } }
+       ])
+      */
+      contest.aggregate(Sample(100), List(Group(BSONNull)(
+        "ageStdDev" -> StdDevSamp(BSONString("$age"))
+      ))).map(_.firstBatch) must beEqualTo(List(
+        BSONDocument("_id" -> BSONNull, "ageStdDev" -> 11.135528725660043D)
+      )).await(0, timeout)
+      /* { "_id" : null, "ageStdDev" : 11.135528725660043 } */
+    } tag "not_mongo26"
+  }
+
   // ---
 
   case class Location(lon: Double, lat: Double)
@@ -577,4 +694,6 @@ class AggregationSpec extends org.specs2.mutable.Specification {
 
   case class SaleItem(itemId: Int, quantity: Int, price: Int)
   case class Sale(_id: Int, items: List[SaleItem])
+
+  case class QuizStdDev(_id: Int, stdDev: Double)
 }
