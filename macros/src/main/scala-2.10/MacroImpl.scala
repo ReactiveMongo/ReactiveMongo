@@ -172,15 +172,29 @@ private object MacroImpl {
     private def writeBodyConstructClass(A: c.Type): c.Tree = {
       val (constructor, deconstructor) = matchingApplyUnapply(A)
       val types = unapplyReturnTypes(deconstructor)
+
+      if (constructor.paramss.size > 1) {
+        c.abort(c.enclosingPosition, s"Constructor with multiple parameter lists is not supported: ${A.typeSymbol.name}${constructor.typeSignature}")
+      }
+
       val constructorParams = constructor.paramss.head
+      val TypeRef(_, _, tpeArgs) = A
+      val boundTypes = constructor.typeParams.zip(tpeArgs).map {
+        case (sym, ty) => sym.fullName -> ty
+      }.toMap
 
       val tuple = Ident(newTermName("tuple"))
       val (optional, required) = constructorParams.zipWithIndex.filterNot(p => ignoreField(p._1)) zip types partition (t => isOptionalType(t._2))
       val values = required map {
-        case ((param, i), typ) =>
+        case ((param, i), sig) =>
+          val typ = boundTypes.lift(sig.typeSymbol.fullName).getOrElse(sig)
           val neededType = appliedType(writerType, List(typ))
           val writer = c.inferImplicitValue(neededType)
-          if (writer.isEmpty) c.abort(c.enclosingPosition, s"Implicit $typ for '$param' not found")
+
+          if (writer.isEmpty) {
+            c.abort(c.enclosingPosition, s"Implicit ${classOf[Writer[_]].getName}[${A.typeSymbol.name}] for '${param.name}' not found")
+          }
+
           val tuple_i = if (types.length == 1) tuple else Select(tuple, "_" + (i + 1))
           val bs_value = c.Expr[BSONValue](Apply(Select(writer, "write"), List(tuple_i)))
           val name = c.literal(paramName(param))
@@ -189,10 +203,15 @@ private object MacroImpl {
 
       val appends = optional map {
         case ((param, i), optType) =>
-          val typ = optionTypeParameter(optType).get
+          val sig = optionTypeParameter(optType).get
+          val typ = boundTypes.lift(sig.typeSymbol.fullName).getOrElse(sig)
           val neededType = appliedType(writerType, List(typ))
           val writer = c.inferImplicitValue(neededType)
-          if (writer.isEmpty) c.abort(c.enclosingPosition, s"Implicit $typ for '$param' not found")
+
+          if (writer.isEmpty) {
+            c.abort(c.enclosingPosition, s"Implicit ${classOf[Writer[_]].getName}[${A.typeSymbol.name}] for '${param.name}' not found")
+          }
+
           val tuple_i = if (types.length == 1) tuple else Select(tuple, "_" + (i + 1))
           val bs_value = c.Expr[BSONValue](Apply(Select(writer, "write"), List(Select(tuple_i, "get"))))
           val name = c.literal(paramName(param))
@@ -239,13 +258,21 @@ private object MacroImpl {
       val unionOption = c.typeOf[Macros.Options.UnionType[_]]
       val union = c.typeOf[Macros.Options.\/[_, _]]
 
-      def parseUnionTree(tree: Type): List[Type] = {
-        if (tree <:< union) {
-          tree match {
-            case TypeRef(_, _, List(a, b)) => parseUnionTree(a) ::: parseUnionTree(b)
-          }
-        } else List(tree)
-      }
+      @annotation.tailrec
+      def parseUnionTree(trees: List[Type], found: List[Type]): List[Type] =
+        trees match {
+          case tree :: rem => if (tree <:< union) {
+            tree match {
+              case TypeRef(_, _, List(a, b)) =>
+                parseUnionTree(a :: b :: rem, found)
+
+              case _ => c.abort(c.enclosingPosition,
+                "Union type parameters expected: $tree")
+            }
+          } else parseUnionTree(rem, tree :: found)
+
+          case _ => found
+        }
 
       val tree = Opts match {
         case t @ TypeRef(_, _, lst) if t <:< unionOption =>
@@ -258,13 +285,16 @@ private object MacroImpl {
 
         case _ => None
       }
-      tree map { t => parseUnionTree(t) }
+      tree map { t => parseUnionTree(List(t), Nil) }
     }
 
-    private def parseAllImplementationTypes: Option[List[Type]] =
-      if (Opts <:< typeOf[Macros.Options.AllImplementations]) {
-        Some(allSubclasses(Set(A.typeSymbol)).toList)
+    private def parseAllImplementationTypes: Option[List[Type]] = {
+      val tpeSym = A.typeSymbol.asClass
+
+      if (tpeSym.isSealed && (tpeSym.isTrait || tpeSym.isAbstractClass)) {
+        Some(allSubclasses(Set(tpeSym)).toList)
       } else None
+    }
 
     private def hasOption[O: c.TypeTag]: Boolean = Opts <:< typeOf[O]
 
