@@ -25,6 +25,7 @@ class MacroSpec extends org.specs2.mutable.Specification {
     "support nesting" in {
       implicit val personFormat = Macros.handler[Person]
       val doc = Pet("woof", Person("john", "doe"))
+
       roundtrip(doc, Macros.handler[Pet])
     }
 
@@ -32,8 +33,8 @@ class MacroSpec extends org.specs2.mutable.Specification {
       val format = Macros.handler[Optional]
       val some = Optional("some", Some("value"))
       val none = Optional("none", None)
-      roundtrip(some, format)
-      roundtrip(none, format)
+
+      roundtrip(some, format) and roundtrip(none, format)
     }
 
     "support seq" in {
@@ -52,13 +53,16 @@ class MacroSpec extends org.specs2.mutable.Specification {
 
     "support single member options" in {
       val f = Macros.handler[OptionalSingle]
-      roundtrip(OptionalSingle(Some("foo")), f)
-      roundtrip(OptionalSingle(None), f)
+
+      roundtrip(OptionalSingle(Some("foo")), f) and {
+        roundtrip(OptionalSingle(None), f)
+      }
     }
 
-    "support case class definitions inside an object" in {
-      import Nest._
-      roundtrip(Nested("foo"), Macros.handler[Nested])
+    "support generated case class" in {
+      implicit def singleHandler = Macros.handler[Single]
+
+      roundtrip(Foo(Single("A"), "ipsum"), Macros.handler[Foo[Single]])
     }
 
     "handle overloaded apply correctly" in {
@@ -289,6 +293,18 @@ class MacroSpec extends org.specs2.mutable.Specification {
         "bar" -> BSONDocument("value" -> "A"),
         "lorem" -> "ipsum"
       )) must_== Foo(Single("A"), "ipsum")
+    }
+  }
+
+  "Writer" should {
+    "be generated for a generated case class" in {
+      implicit def singleWriter = Macros.writer[Single]
+      val r = Macros.writer[Foo[Single]]
+
+      r.write(Foo(Single("A"), "ipsum")) must_== BSONDocument(
+        "bar" -> BSONDocument("value" -> "A"),
+        "lorem" -> "ipsum"
+      )
     }
   }
 
