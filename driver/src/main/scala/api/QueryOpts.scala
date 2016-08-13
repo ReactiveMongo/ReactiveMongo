@@ -66,6 +66,7 @@ case class QueryOpts(
    * Use along with TailableCursor.
    */
   def awaitData = copy(flagsN = flagsN ^ QueryFlags.AwaitData)
+
   /** Toggles Exhaust */
   def exhaust = copy(flagsN = flagsN ^ QueryFlags.Exhaust)
   /** Toggles Partial: The response can be partial - if a shard is down, no error will be thrown. */

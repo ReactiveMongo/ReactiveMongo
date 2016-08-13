@@ -278,9 +278,6 @@ sealed trait CursorOps[T] { cursor: Cursor[T] =>
    * according the provided read for the element type `T`.
    */
   private[reactivemongo] def documentIterator(response: Response): Iterator[T]
-
-  /** Returns true if this cursor is tailable. */
-  def tailable: Boolean
 }
 
 object CursorOps {
