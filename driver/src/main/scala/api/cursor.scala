@@ -278,6 +278,13 @@ sealed trait CursorOps[T] { cursor: Cursor[T] =>
    * according the provided read for the element type `T`.
    */
   private[reactivemongo] def documentIterator(response: Response): Iterator[T]
+
+  /**
+   * Kills the server resources associated with the specified cursor.
+   *
+   * @param cursorID the cursor ID
+   */
+  def kill(cursorID: Long): Unit
 }
 
 object CursorOps {
@@ -634,9 +641,9 @@ object DefaultCursor {
       }
     }
 
-    @inline private def killCursors(r: Response, logCat: String): Unit = {
-      val cursorID = r.reply.cursorID
+    def kill(cursorID: Long): Unit = killCursors(cursorID, "Cursor")
 
+    private def killCursors(cursorID: Long, logCat: String): Unit = {
       if (cursorID != 0) {
         logger.debug(s"[$logCat] Clean up ${cursorID}, sending KillCursors")
 
@@ -718,7 +725,7 @@ object DefaultCursor {
           next = response => {
           if (hasNext(response, maxDocs)) next(response, maxDocs)
           else Future.successful(Option.empty[Response])
-        }, cleanUp = { resp => killCursors(resp, "Cursor") }
+        }, cleanUp = { resp => killCursors(resp.reply.cursorID, "Cursor") }
         )))
 
     @deprecated(message = "Only for internal use", since = "0.11.10")
@@ -735,7 +742,7 @@ object DefaultCursor {
         },
           cleanUp = { current =>
           val (r, _) = current
-          killCursors(r, "Tailable Cursor")
+          killCursors(r.reply.cursorID, "Tailable Cursor")
         }
         ).map(_._1)
       })
@@ -826,12 +833,12 @@ object DefaultCursor {
 
       @inline def ok(r: Response, v: T) = {
         // Releases cursor before ending
-        killCursors(r, "FoldResponses")
+        killCursors(r.reply.cursorID, "FoldResponses")
         Future.successful(v)
       }
 
       @inline def kill(r: Response, f: Throwable) = {
-        killCursors(r, "FoldResponses")
+        killCursors(r.reply.cursorID, "FoldResponses")
         Future.failed[T](f)
       }
 
@@ -839,7 +846,7 @@ object DefaultCursor {
         logger.trace(s"Process response: $resp")
 
         suc(cur, resp).transform(resp -> _, { error =>
-          killCursors(resp, "FoldResponses")
+          killCursors(resp.reply.cursorID, "FoldResponses")
           error
         }).flatMap {
           case (r, next) =>

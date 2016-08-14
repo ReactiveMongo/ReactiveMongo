@@ -9,11 +9,9 @@ import akka.actor.ActorRef
 import reactivemongo.core.nodeset.{ Authenticate, NodeSet }
 import reactivemongo.core.actors.{
   ChannelClosed,
-  ConnectAll,
   MongoDBSystem,
   StandardDBSystem
 }
-import reactivemongo.api.commands.bson.BSONIsMasterCommand.IsMasterResult
 
 package object tests {
   // Test alias

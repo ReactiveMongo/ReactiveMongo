@@ -1,9 +1,9 @@
-import scala.concurrent.{ Await, ExecutionContext, Future }
+import scala.concurrent.{ Await, ExecutionContext }
 import scala.concurrent.duration._
 
-import reactivemongo.bson.{ BSONArray, BSONBooleanLike, BSONDocument }
+import reactivemongo.bson.BSONDocument
 
-import reactivemongo.core.nodeset.{ Authenticate, ProtocolMetadata }
+import reactivemongo.core.nodeset.Authenticate
 import reactivemongo.core.commands.{
   FailedAuthentication,
   SuccessfulAuthentication
@@ -11,18 +11,13 @@ import reactivemongo.core.commands.{
 import reactivemongo.core.actors.Exceptions, Exceptions.PrimaryUnavailableException
 
 import reactivemongo.api.{
-  BSONSerializationPack,
   DefaultDB,
   FailoverStrategy,
-  MongoConnection,
-  MongoConnectionOptions,
   MongoDriver,
-  ReadPreference,
   ScramSha1Authentication
 }
-import reactivemongo.api.commands.Command
+import reactivemongo.api.commands.DBUserRole
 
-import org.specs2.matcher.MatchResult
 import org.specs2.concurrent.{ ExecutionEnv => EE }
 
 class DriverSpec extends org.specs2.mutable.Specification {
@@ -132,22 +127,9 @@ class DriverSpec extends org.specs2.mutable.Specification {
     } tag "mongo2"
 
     "create a user" in { implicit ee: EE =>
-      val runner = Command.run(BSONSerializationPack)
-      val createUser = BSONDocument(
-        "createUser" -> s"test-$id",
-        "pwd" -> s"password-$id",
-        "customData" -> BSONDocument.empty,
-        "roles" -> BSONArray(
-          BSONDocument("role" -> "readWrite", "db" -> dbName)
-        )
-      )
-
-      db_.flatMap {
-        runner.apply(_, runner.rawCommand(createUser)).one[BSONDocument]
-      } aka "creation" must (beLike[BSONDocument] {
-        case doc => doc.getAs[BSONBooleanLike]("ok").
-          exists(_.toBoolean == true) must beTrue
-      }).await(1, timeout * 2)
+      db_.flatMap(_.createUser(s"test-$id", Some(s"password-$id"),
+        roles = List(DBUserRole("readWrite", dbName)))).
+        aka("creation") must beEqualTo({}).await(0, timeout)
     } tag "mongo2"
 
     "not be successful with wrong credentials" in { implicit ee: EE =>
@@ -213,26 +195,13 @@ class DriverSpec extends org.specs2.mutable.Specification {
 
     "work only if configured" in { implicit ee: EE =>
       db_.flatMap(_.drop()).map(_ => {}) must beEqualTo({}).
-        await(1, timeout * 2)
+        await(0, timeout * 2)
     } tag "not_mongo26"
 
     "create a user" in { implicit ee: EE =>
-      val runner = Command.run(BSONSerializationPack)
-      val createUser = BSONDocument(
-        "createUser" -> s"test-$id",
-        "pwd" -> s"password-$id",
-        "customData" -> BSONDocument.empty,
-        "roles" -> BSONArray(
-          BSONDocument("role" -> "readWrite", "db" -> dbName)
-        )
-      )
-
-      db_.flatMap {
-        runner.apply(_, runner.rawCommand(createUser)).one[BSONDocument]
-      } aka "creation" must (beLike[BSONDocument] {
-        case doc => doc.getAs[BSONBooleanLike]("ok").
-          exists(_.toBoolean == true) must beTrue
-      }).await(1, timeout)
+      db_.flatMap(_.createUser(s"test-$id", Some(s"password-$id"),
+        roles = List(DBUserRole("readWrite", dbName)))).
+        aka("creation") must beEqualTo({}).await(0, timeout)
     } tag "not_mongo26"
 
     "not be successful with wrong credentials" >> {

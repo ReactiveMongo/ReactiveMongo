@@ -120,11 +120,15 @@ trait CollectionProducer[+C <: Collection] {
   def apply(db: DB, name: String, failoverStrategy: FailoverStrategy = FailoverStrategy()): C
 }
 
-/** A mixin that provides commands about this Collection itself. */
-trait CollectionMetaCommands {
-  self: Collection =>
-
-  import concurrent.{ ExecutionContext, Future }
+/**
+ * A mixin that provides commands about this Collection itself.
+ *
+ * @define autoIndexIdParam If true should automatically add an index on the `_id` field. By default, regular collections will have an indexed `_id` field, in contrast to capped collections. This MongoDB option is deprecated and will be removed in a future release.
+ * @define cappedSizeParam the size of the collection (number of bytes)
+ * @define cappedMaxParam the maximum number of documents this capped collection can contain
+ */
+trait CollectionMetaCommands { self: Collection =>
+  import scala.concurrent.{ ExecutionContext, Future }
   import reactivemongo.api.commands._
   import reactivemongo.api.commands.bson._
   import CommonImplicits._
@@ -140,7 +144,7 @@ trait CollectionMetaCommands {
    *
    * The returned future will be completed with an error if this collection already exists.
    *
-   * @param autoIndexId States if should automatically add an index on the _id field. By default, regular collections will have an indexed _id field, in contrast to capped collections.
+   * @param autoIndexId $autoIndexIdParam
    */
   def create(autoIndexId: Boolean = true)(implicit ec: ExecutionContext): Future[Unit] = Command.run(BSONSerializationPack).unboxed(self, Create(None, autoIndexId))
 
@@ -149,9 +153,9 @@ trait CollectionMetaCommands {
    *
    * The returned future will be completed with an error if this collection already exists.
    *
-   * @param size the byte size of the collections.
-   * @param maxDocuments the maximum number of documents.
-   * @param autoIndexId States if should automatically add an index on the _id field. By default, capped collections will NOT have an indexed _id field, in contrast to regular collections.
+   * @param size $cappedSizeParam
+   * @param maxDocuments $cappedMaxParam
+   * @param autoIndexId $autoIndexIdParam
    */
   def createCapped(size: Long, maxDocuments: Option[Int], autoIndexId: Boolean = false)(implicit ec: ExecutionContext): Future[Unit] =
     Command.run(BSONSerializationPack).
@@ -203,11 +207,10 @@ trait CollectionMetaCommands {
   /**
    * Converts this collection to a capped one.
    *
-   * @param size The size of this capped collection, in bytes.
-   * @param maxDocuments The maximum number of documents this capped collection can contain.
+   * @param size $cappedSizeParam
+   * @param maxDocuments $cappedMaxParam
    */
-  def convertToCapped(size: Long, maxDocuments: Option[Int])(implicit ec: ExecutionContext): Future[Unit] =
-    Command.run(BSONSerializationPack).unboxed(self, ConvertToCapped(Capped(size, maxDocuments)))
+  def convertToCapped(size: Long, maxDocuments: Option[Int])(implicit ec: ExecutionContext): Future[Unit] = Command.run(BSONSerializationPack).unboxed(self, ConvertToCapped(Capped(size, maxDocuments)))
 
   /**
    * Renames this collection.
@@ -231,8 +234,7 @@ trait CollectionMetaCommands {
    *
    * @param scale A scale factor (for example, to get all the sizes in kilobytes).
    */
-  def stats(scale: Int)(implicit ec: ExecutionContext): Future[CollStatsResult] =
-    Command.run(BSONSerializationPack)(self, CollStats(Some(scale)))
+  def stats(scale: Int)(implicit ec: ExecutionContext): Future[CollStatsResult] = Command.run(BSONSerializationPack)(self, CollStats(Some(scale)))
 
   /** Returns an index manager for this collection. */
   def indexesManager(implicit ec: ExecutionContext): CollectionIndexesManager =

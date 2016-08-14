@@ -1,5 +1,3 @@
-import scala.util.Failure
-
 import scala.concurrent._
 import scala.concurrent.duration.FiniteDuration
 

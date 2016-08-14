@@ -1,7 +1,7 @@
 import scala.concurrent.duration.FiniteDuration
 
 import reactivemongo.bson._
-import reactivemongo.api.commands.{ Command, CommandError }
+import reactivemongo.api.commands.CommandError
 import reactivemongo.api.collections.bson.BSONCollection
 import reactivemongo.api.commands.bson._
 import BSONFindAndModifyCommand._

@@ -1,24 +1,18 @@
-import scala.concurrent.{ Await, Future }
+import scala.concurrent.Future
 
 import akka.actor.ActorRef
-import akka.pattern.ask
 
 import org.specs2.matcher.MatchResult
 import org.specs2.concurrent.{ ExecutionEnv => EE }
 
 import reactivemongo.api.{
-  FailoverStrategy,
   MongoConnection,
   MongoConnectionOptions,
   MongoDriver,
   ReadPreference
 }
 
-import reactivemongo.core.nodeset.{
-  Authenticate,
-  Connection,
-  ProtocolMetadata
-}
+import reactivemongo.core.nodeset.{ Authenticate, ProtocolMetadata }
 import reactivemongo.core.actors.{
   PrimaryAvailable,
   PrimaryUnavailable,
