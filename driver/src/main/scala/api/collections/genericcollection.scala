@@ -168,7 +168,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    *
    * This method accepts any query and projection object, provided that there is an implicit `Writer[S]` typeclass for handling them in the scope.
    *
-   * Please take a look to the [[http://www.mongodb.org/display/DOCS/Querying mongodb documentation]] to know how querying works.
+   * Please take a look at the [[http://www.mongodb.org/display/DOCS/Querying mongodb documentation]] to know how querying works.
    *
    * @tparam S the type of the selector (the query). An implicit `Writer[S]` typeclass for handling it has to be in the scope.
    *
@@ -183,7 +183,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    *
    * This method accepts any selector and projection object, provided that there is an implicit `Writer[S]` typeclass for handling them in the scope.
    *
-   * Please take a look to the [[http://www.mongodb.org/display/DOCS/Querying mongodb documentation]] to know how querying works.
+   * Please take a look at the [[http://www.mongodb.org/display/DOCS/Querying mongodb documentation]] to know how querying works.
    *
    * @tparam S the type of the selector (the query). An implicit `Writer[S]` typeclass for handling it has to be in the scope.
    * @tparam P the type of the projection object. An implicit `Writer[P]` typeclass for handling it has to be in the scope.
@@ -201,7 +201,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    *
    * This method accepts any query or hint, the scope provides instances of appropriate typeclasses.
    *
-   * Please take a look to the [[http://www.mongodb.org/display/DOCS/Querying mongodb documentation]] to know how querying works.
+   * Please take a look at the [[http://www.mongodb.org/display/DOCS/Querying mongodb documentation]] to know how querying works.
    *
    * @tparam H the type of hint. An implicit `H => Hint` conversion has to be in the scope.
    *

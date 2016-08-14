@@ -103,8 +103,9 @@ object BSONCreateImplicits {
       BSONDocument(
         "create" -> command.collection,
         "autoIndexId" -> command.command.autoIndexId
-      ) ++ command.command.capped.map(capped =>
-          CappedWriter.write(capped) ++ ("capped" -> true)).getOrElse(BSONDocument())
+      ) ++ command.command.capped.fold(BSONDocument.empty)(capped => {
+          CappedWriter.write(capped) ++ ("capped" -> true)
+        })
   }
 }
 
@@ -112,7 +113,8 @@ object BSONCollStatsImplicits {
   implicit object CollStatsWriter extends BSONDocumentWriter[ResolvedCollectionCommand[CollStats]] {
     def write(command: ResolvedCollectionCommand[CollStats]): BSONDocument =
       BSONDocument(
-        "collStats" -> command.collection, "scale" -> command.command.scale
+        "collStats" -> command.collection,
+        "scale" -> command.command.scale
       )
   }
 
@@ -374,9 +376,6 @@ object BSONResyncImplicits {
   }
 }
 
-/**
- *
- */
 object BSONReplSetMaintenanceImplicits {
   implicit val ReplSetMaintenanceReader = CommonImplicits.UnitBoxReader
 
@@ -385,5 +384,33 @@ object BSONReplSetMaintenanceImplicits {
 
     def write(command: ReplSetMaintenance) =
       BSONDocument("replSetMaintenance" -> command.enable)
+  }
+}
+
+import reactivemongo.api.BSONSerializationPack
+
+object BSONCreateUserCommand
+    extends CreateUserCommand[BSONSerializationPack.type] {
+
+  import BSONCommonWriteCommandsImplicits.WriteConcernWriter
+
+  val pack = BSONSerializationPack
+
+  implicit object UserRoleWriter extends BSONWriter[UserRole, BSONValue] {
+    def write(role: UserRole): BSONValue = role match {
+      case DBUserRole(name, dbn) => BSONDocument("role" -> name, "db" -> dbn)
+      case _                     => BSONString(role.name)
+    }
+  }
+
+  implicit object CreateUserWriter extends BSONDocumentWriter[CreateUser] {
+    def write(create: CreateUser) = BSONDocument(
+      "createUser" -> create.name,
+      "pwd" -> create.pwd,
+      "customData" -> create.customData,
+      "roles" -> create.roles,
+      "digestPassword" -> create.digestPassword,
+      "writeConcern" -> create.writeConcern
+    )
   }
 }

@@ -385,37 +385,38 @@ trait AggregationFramework[P <: SerializationPack]
 
   /**
    * Outputs documents in order of nearest to farthest from a specified point.
+   *
    * http://docs.mongodb.org/manual/reference/operator/aggregation/geoNear/#pipe._S_geoNear
+   * @param near the point for which to find the closest documents
    * @param spherical if using a 2dsphere index
    * @param limit the maximum number of documents to return
    * @param maxDistance the maximum distance from the center point that the documents can be
-   * @param selector limits the results to the matching documents
+   * @param query limits the results to the matching documents
    * @param distanceMultiplier the factor to multiply all distances returned by the query
    * @param uniqueDocs if this value is true, the query returns a matching document once
-   * @param near the point for which to find the closest documents
    * @param distanceField the output field that contains the calculated distance
    * @param includeLocs this specifies the output field that identifies the location used to calculate the distance
    */
-  case class GeoNear(spherical: Boolean = false, limit: Long = 100, maxDistance: Option[Long] = None, selector: Option[pack.Document] = None, distanceMultiplier: Option[Double] = None, uniqueDocs: Boolean = false, near: Option[pack.Value] = None, distanceField: Option[String] = None, includeLocs: Option[String] = None) extends PipelineOperator {
-    def makePipe =
-      makeDocument(Seq(elementProducer("$geoNear", makeDocument(Seq(
+  case class GeoNear(near: pack.Value, spherical: Boolean = false, limit: Long = 100, minDistance: Option[Long] = None, maxDistance: Option[Long] = None, query: Option[pack.Document] = None, distanceMultiplier: Option[Double] = None, uniqueDocs: Boolean = false, distanceField: Option[String] = None, includeLocs: Option[String] = None) extends PipelineOperator {
+    def makePipe = makeDocument(
+      Seq(elementProducer("$geoNear", makeDocument(Seq(
+        elementProducer("near", near),
         elementProducer("spherical", booleanValue(spherical)),
         elementProducer("limit", longValue(limit))
       ) ++ Seq(
+          minDistance.map(l => elementProducer("minDistance", longValue(l))),
           maxDistance.map(l => elementProducer("maxDistance", longValue(l))),
-          selector.map(s => elementProducer("query", s)),
+          query.map(s => elementProducer("query", s)),
           distanceMultiplier.map(d => elementProducer(
             "distanceMultiplier", doubleValue(d)
           )),
           Some(elementProducer("uniqueDocs", booleanValue(uniqueDocs))),
-          near.map(n => elementProducer("near", n)),
           distanceField.map(s =>
             elementProducer("distanceField", stringValue(s))),
           includeLocs.map(s =>
             elementProducer("includeLocs", stringValue(s)))
-        ).
-          flatten))))
-
+        ).flatten)))
+    )
   }
 
   /**
@@ -487,6 +488,20 @@ trait AggregationFramework[P <: SerializationPack]
   case class AddToSet(field: String) extends GroupFunction {
     val makeFunction = makeDocument(Seq(elementProducer(
       "$addToSet", stringValue("$" + field)
+    )))
+  }
+
+  /** The [[https://docs.mongodb.com/manual/reference/operator/aggregation/stdDevPop/ \$stdDevPop]] group accumulator (since MongoDB 3.2) */
+  case class StdDevPop(expression: pack.Value) extends GroupFunction {
+    val makeFunction = makeDocument(Seq(elementProducer(
+      "$stdDevPop", expression
+    )))
+  }
+
+  /** The [[https://docs.mongodb.com/manual/reference/operator/aggregation/stdDevSamp/ \$stdDevSamp]] group accumulator (since MongoDB 3.2) */
+  case class StdDevSamp(expression: pack.Value) extends GroupFunction {
+    val makeFunction = makeDocument(Seq(elementProducer(
+      "$stdDevSamp", expression
     )))
   }
 }

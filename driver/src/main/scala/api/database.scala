@@ -35,18 +35,20 @@ import reactivemongo.utils.EitherMappableFuture.futureToEitherMappable
 import reactivemongo.api.collections.bson.BSONCollection
 
 /**
- * A MongoDB database, obtained from a [[reactivemongo.api.MongoConnection]].
+ * The reference to a MongoDB database, obtained from a [[reactivemongo.api.MongoConnection]].
  *
  * You should consider the provided [[reactivemongo.api.DefaultDB]] implementation.
  *
- * Example:
  * {{{
  * import reactivemongo.api._
  *
- * val connection = MongoConnection( List( "localhost:27016" ) )
+ * val connection = MongoConnection(List("localhost:27017"))
  * val db = connection.database("plugin")
- * val collection = db("acoll")
+ * val collection = db.map(_("acoll"))
  * }}}
+ *
+ * @define resolveDescription Returns a [[reactivemongo.api.Collection]] from this database
+ * @define nameParam the name of the collection to resolve
  */
 sealed trait DB {
   /** The [[reactivemongo.api.MongoConnection]] that will be used to query this database. */
@@ -59,17 +61,16 @@ sealed trait DB {
   def failoverStrategy: FailoverStrategy
 
   /**
-   * Returns a [[reactivemongo.api.Collection]] from this database
-   * (alias for the `collection` method).
+   * $resolveDescription (alias for the `collection` method).
    *
-   * @param name the name of the collection to open
+   * @param name $nameParam
    */
   def apply[C <: Collection](name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit producer: CollectionProducer[C] = collections.bson.BSONCollectionProducer): C = collection(name, failoverStrategy)
 
   /**
-   * Returns a [[reactivemongo.api.Collection]] from this database.
+   * $resolveDescription.
    *
-   * @param name the name of the collection to open
+   * @param name $nameParam
    */
   def collection[C <: Collection](name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit producer: CollectionProducer[C] = collections.bson.BSONCollectionProducer): C = producer(this, name, failoverStrategy)
 
@@ -138,12 +139,15 @@ trait DBMetaCommands { self: DB =>
     DropDatabase,
     ListCollectionNames,
     ServerStatus,
-    ServerStatusResult
+    ServerStatusResult,
+    UserRole,
+    WriteConcern
   }
   import reactivemongo.api.commands.bson.{
     CommonImplicits,
     BSONDropDatabaseImplicits,
-    BSONServerStatusImplicits
+    BSONServerStatusImplicits,
+    BSONCreateUserCommand
   }
   import reactivemongo.api.commands.bson.BSONListCollectionNamesImplicits._
   import CommonImplicits._
@@ -179,8 +183,7 @@ trait DBMetaCommands { self: DB =>
         "name" -> BSONRegex("^[^\\$]+$", "") // strip off any indexes
       )).cursor(defaultReadPreference)(
         collectionNameReader, ec, CursorProducer.defaultCursorProducer
-      ).
-      collect[List]()
+      ).collect[List]()
   }
 
   /**
@@ -206,6 +209,33 @@ trait DBMetaCommands { self: DB =>
   /** Returns the server status. */
   def serverStatus(implicit ec: ExecutionContext): Future[ServerStatusResult] =
     Command.run(BSONSerializationPack)(self, ServerStatus)
+
+  /**
+   * Create the specified user.
+   *
+   * @param name the name of the user to be created
+   * @param pwd the user password (not required if the database uses external credentials)
+   * @param roles the roles granted to the user, possibly an empty to create users without roles
+   * @param digestPassword when true, the mongod instance will create the hash of the user password (default: `true`)
+   * @param writeConcern the optional level of [[https://docs.mongodb.com/manual/reference/write-concern/ write concern]]
+   * @param customData the custom data to associate with the user account
+   *
+   * @see https://docs.mongodb.com/manual/reference/command/createUser/
+   */
+  def createUser(
+    name: String,
+    pwd: Option[String],
+    roles: List[UserRole],
+    digestPassword: Boolean = true,
+    writeConcern: WriteConcern = connection.options.writeConcern,
+    customData: Option[BSONDocument] = None
+  )(implicit ec: ExecutionContext): Future[Unit] = {
+    val command = BSONCreateUserCommand.CreateUser(
+      name, pwd, roles, digestPassword, Some(writeConcern), customData
+    )
+
+    Command.run(BSONSerializationPack)(self, command).map(_ => {})
+  }
 }
 
 /** The default DB implementation, that mixes in the database traits. */

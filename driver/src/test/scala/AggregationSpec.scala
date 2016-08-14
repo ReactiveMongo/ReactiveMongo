@@ -4,6 +4,7 @@ import scala.concurrent.{ ExecutionContext, Future }
 import scala.concurrent.duration.FiniteDuration
 
 import reactivemongo.bson._
+import reactivemongo.api.Cursor
 import reactivemongo.api.collections.bson.BSONCollection
 
 import org.specs2.concurrent.{ ExecutionEnv => EE }
@@ -157,7 +158,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
 
       def withCtx[T](c: BSONCollection)(f: (c.BatchCommands.AggregationFramework.Group, List[c.PipelineOperator]) => T): T = {
         import c.BatchCommands.AggregationFramework
-        import AggregationFramework.{ Cursor, Group, SumField }
+        import AggregationFramework.{ Group, SumField }
 
         val firstOp = Group(document("state" -> "$state", "city" -> "$city"))(
           "pop" -> SumField("population")
@@ -182,7 +183,9 @@ class AggregationSpec extends org.specs2.mutable.Specification {
         def collect(c: BSONCollection, upTo: Int = Int.MaxValue)(implicit ec: ExecutionContext) = withCtx(c) { (firstOp, pipeline) =>
           c.aggregate1[BSONDocument](firstOp, pipeline,
             c.BatchCommands.AggregationFramework.Cursor(1)).
-            flatMap(_.collect[List](upTo))
+            flatMap(_.collect[List](
+              upTo, Cursor.FailOnError[List[BSONDocument]]()
+            ))
         }
 
         "without limit (maxDocs)" in { implicit ee: EE =>
@@ -199,7 +202,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
           import coll.BatchCommands.AggregationFramework
           import AggregationFramework.{
             Descending,
-            Cursor,
+            Cursor => AggCursor,
             Match,
             MetadataSort,
             Sort,
@@ -214,8 +217,10 @@ class AggregationSpec extends org.specs2.mutable.Specification {
             MetadataSort("score", TextScore), Descending("city")
           ))
 
-          coll.aggregate1[ZipCode](firstOp, pipeline, Cursor(1)).
-            flatMap(_.collect[List](4)) must beEqualTo(jpCodes).
+          coll.aggregate1[ZipCode](firstOp, pipeline, AggCursor(1)).
+            flatMap(_.collect[List](
+              4, Cursor.FailOnError[List[ZipCode]]()
+            )) must beEqualTo(jpCodes).
             await(1, timeout)
 
         }
@@ -232,7 +237,6 @@ class AggregationSpec extends org.specs2.mutable.Specification {
         Project,
         Sort,
         Ascending,
-        Sample,
         SumField
       }
 
@@ -482,6 +486,298 @@ class AggregationSpec extends org.specs2.mutable.Specification {
     } tag "not_mongo26"
   }
 
+  "Aggregation result for '$out'" >> {
+    // https://docs.mongodb.com/master/reference/operator/aggregation/out/#example
+
+    val books = db.collection(s"books-1-${System identityHashCode this}")
+
+    "with valid fixtures" in { implicit ee: EE =>
+      val fixtures = Seq(
+        BSONDocument(
+          "_id" -> 8751, "title" -> "The Banquet",
+          "author" -> "Dante", "copies" -> 2
+        ),
+        BSONDocument(
+          "_id" -> 8752, "title" -> "Divine Comedy",
+          "author" -> "Dante", "copies" -> 1
+        ),
+        BSONDocument(
+          "_id" -> 8645, "title" -> "Eclogues",
+          "author" -> "Dante", "copies" -> 2
+        ),
+        BSONDocument(
+          "_id" -> 7000, "title" -> "The Odyssey",
+          "author" -> "Homer", "copies" -> 10
+        ),
+        BSONDocument(
+          "_id" -> 7020, "title" -> "Iliad",
+          "author" -> "Homer", "copies" -> 10
+        )
+      )
+
+      Future.sequence(fixtures.map { doc => books.insert(doc) }).map(_ => {}).
+        aka("fixtures") must beEqualTo({}).await(0, timeout)
+    }
+
+    "should be outputed to collection" in { implicit ee: EE =>
+      import books.BatchCommands.AggregationFramework
+      import AggregationFramework.{ Ascending, Group, Push, Out, Sort }
+
+      val outColl = s"authors-1-${System identityHashCode this}"
+
+      type Author = (String, List[String])
+      implicit val authorReader = BSONDocumentReader[Author] { doc =>
+        (for {
+          id <- doc.getAsTry[String]("_id")
+          books <- doc.getAsTry[List[String]]("books")
+        } yield id -> books).get
+      }
+
+      books.aggregate(
+        Sort(Ascending("title")),
+        List(Group(BSONString("$author"))(
+          "books" -> Push("title")
+        ), Out(outColl))
+      ).map(_ => {}).
+        aka("$out aggregation") must beEqualTo({}).await(0, timeout) and {
+          db.collection(outColl).find(BSONDocument.empty).cursor[Author]().
+            collect[List](3, Cursor.FailOnError[List[Author]]()) must beEqualTo(
+              List(
+                "Homer" -> List("Iliad", "The Odyssey"),
+                "Dante" -> List("Divine Comedy", "Eclogues", "The Banquet")
+              )
+            ).await(0, timeout)
+        }
+    }
+  }
+
+  "Aggregation result for '$stdDevPop'" >> {
+    // https://docs.mongodb.com/manual/reference/operator/aggregation/stdDevPop/#examples
+
+    val contest = db.collection(s"contest-1-${System identityHashCode this}")
+
+    "with valid fixtures" in { implicit ee: EE =>
+      /*
+       { "_id" : 1, "name" : "dave123", "quiz" : 1, "score" : 85 }
+       { "_id" : 2, "name" : "dave2", "quiz" : 1, "score" : 90 }
+       { "_id" : 3, "name" : "ahn", "quiz" : 1, "score" : 71 }
+       { "_id" : 4, "name" : "li", "quiz" : 2, "score" : 96 }
+       { "_id" : 5, "name" : "annT", "quiz" : 2, "score" : 77 }
+       { "_id" : 6, "name" : "ty", "quiz" : 2, "score" : 82 }
+       */
+      val fixtures = Seq(
+        BSONDocument(
+          "_id" -> 1,
+          "name" -> "dave123", "quiz" -> 1, "score" -> 85
+        ),
+        BSONDocument(
+          "_id" -> 2,
+          "name" -> "dave2", "quiz" -> 1, "score" -> 90
+        ),
+        BSONDocument(
+          "_id" -> 3,
+          "name" -> "ahn", "quiz" -> 1, "score" -> 71
+        ),
+        BSONDocument(
+          "_id" -> 4,
+          "name" -> "li", "quiz" -> 2, "score" -> 96
+        ),
+        BSONDocument(
+          "_id" -> 5,
+          "name" -> "annT", "quiz" -> 2, "score" -> 77
+        ),
+        BSONDocument(
+          "_id" -> 6,
+          "name" -> "ty", "quiz" -> 2, "score" -> 82
+        )
+      )
+
+      Future.sequence(fixtures.map { doc => contest.insert(doc) }).map(_ => {}).
+        aka("fixtures") must beEqualTo({}).await(0, timeout)
+    } tag "not_mongo26"
+
+    "return the standard deviation of each quiz" in { implicit ee: EE =>
+      import contest.BatchCommands.AggregationFramework.{
+        Ascending,
+        Group,
+        Sort,
+        StdDevPop
+      }
+
+      implicit val reader = Macros.reader[QuizStdDev]
+
+      /*
+       db.contest.aggregate([
+         { $group: { _id: "$quiz", stdDev: { $stdDevPop: "$score" } } }
+       ])
+      */
+      contest.aggregate(Group(BSONString("$quiz"))(
+        "stdDev" -> StdDevPop(BSONString("$score"))
+      ), List(Sort(Ascending("_id")))).map(_.head[QuizStdDev]).
+        aka("$stdDevPop results") must beEqualTo(List(
+          QuizStdDev(1, 8.04155872120988D), QuizStdDev(2, 8.04155872120988D)
+        )).await(0, timeout)
+      /*
+       { "_id" : 1, "stdDev" : 8.04155872120988 }
+       { "_id" : 2, "stdDev" : 8.04155872120988 }
+       */
+    } tag "not_mongo26"
+  }
+
+  "Aggregation result '$stdDevSamp'" >> {
+    // https://docs.mongodb.com/manual/reference/operator/aggregation/stdDevSamp/#example
+
+    val contest = db.collection(s"contest-2-${System identityHashCode this}")
+
+    "with valid fixtures" in { implicit ee: EE =>
+      /*
+       {_id: 0, username: "user0", age: 20}
+       {_id: 1, username: "user1", age: 42}
+       {_id: 2, username: "user2", age: 28}
+       */
+      val fixtures = Seq(
+        BSONDocument("_id" -> 0, "username" -> "user0", "age" -> 20),
+        BSONDocument("_id" -> 1, "username" -> "user1", "age" -> 42),
+        BSONDocument("_id" -> 2, "username" -> "user2", "age" -> 28)
+      )
+
+      Future.sequence(fixtures.map { doc => contest.insert(doc) }).map(_ => {}).
+        aka("fixtures") must beEqualTo({}).await(0, timeout)
+    } tag "not_mongo26"
+
+    "return the standard deviation of each quiz" in { implicit ee: EE =>
+      import contest.BatchCommands.AggregationFramework.{
+        Group,
+        Sample,
+        StdDevSamp
+      }
+
+      implicit val reader = Macros.reader[QuizStdDev]
+
+      /*
+       db.users.aggregate([
+         { $sample: { size: 100 } },
+         { $group: { _id: null, ageStdDev: { $stdDevSamp: "$age" } } }
+       ])
+      */
+      contest.aggregate(Sample(100), List(Group(BSONNull)(
+        "ageStdDev" -> StdDevSamp(BSONString("$age"))
+      ))).map(_.firstBatch) must beEqualTo(List(
+        BSONDocument("_id" -> BSONNull, "ageStdDev" -> 11.135528725660043D)
+      )).await(0, timeout)
+      /* { "_id" : null, "ageStdDev" : 11.135528725660043 } */
+    } tag "not_mongo26"
+  }
+
+  "Geo-indexed documents" >> {
+    // https://docs.mongodb.com/manual/reference/operator/aggregation/geoNear/#example
+
+    val places = db(s"places${System identityHashCode this}")
+
+    {
+      import ExecutionContext.Implicits.global
+      import reactivemongo.api.indexes._, IndexType._
+
+      // db.place.createIndex({'loc':"2dsphere"})
+      scala.concurrent.Await.result(places.indexesManager.ensure(Index(
+        List("loc" -> Geo2DSpherical)
+      )).map(_ => {}), timeout * 2)
+    }
+
+    "must be inserted" in { implicit ee: EE =>
+      /*
+       {
+         "type": "public",
+         "loc": {
+           "type": "Point", "coordinates": [-73.97, 40.77]
+         },
+         "name": "Central Park",
+         "category": "Parks"
+       },
+       {
+         "type": "public",
+         "loc": {
+           "type": "Point", "coordinates": [-73.88, 40.78]
+         },
+         "name": "La Guardia Airport",
+         "category": "Airport"
+       }
+       */
+
+      Future.sequence(Seq(
+        document(
+          "type" -> "public",
+          "loc" -> document(
+            "type" -> "Point", "coordinates" -> array(-73.97, 40.77)
+          ),
+          "name" -> "Central Park",
+          "category" -> "Parks"
+        ),
+        document(
+          "type" -> "public",
+          "loc" -> document(
+            "type" -> "Point", "coordinates" -> array(-73.88, 40.78)
+          ),
+          "name" -> "La Guardia Airport",
+          "category" -> "Airport"
+        )
+      ).map { doc => places.insert(doc) }).map(_ => {}) must beEqualTo({}).
+        await(0, timeout)
+    } tag "wip"
+
+    "and aggregated using $geoNear" in { implicit ee: EE =>
+      import places.BatchCommands.AggregationFramework.GeoNear
+
+      /*
+       db.places.aggregate([{
+         $geoNear: {
+           near: { type: "Point", coordinates: [ -73.9667, 40.78 ] },
+           distanceField: "dist.calculated",
+           minDistance: 1000,
+           maxDistance: 5000,
+           query: { type: "public" },
+           includeLocs: "dist.location",
+           num: 5,
+           spherical: true
+         }
+       }])
+       */
+
+      implicit val pointReader = Macros.reader[GeoPoint]
+      implicit val distanceReader = BSONDocumentReader[GeoDistance] { doc =>
+        (for {
+          calc <- doc.getAsTry[BSONNumberLike]("calculated").map(_.toInt)
+          loc <- doc.getAsTry[GeoPoint]("loc")
+        } yield GeoDistance(calc, loc)).get
+      }
+      implicit val placeReader = Macros.reader[GeoPlace]
+
+      places.aggregate(GeoNear(document(
+        "type" -> "Point",
+        "coordinates" -> array(-73.9667, 40.78)
+      ), distanceField = Some("dist.calculated"),
+        minDistance = Some(1000),
+        maxDistance = Some(5000),
+        query = Some(document("type" -> "public")),
+        includeLocs = Some("dist.loc"),
+        limit = 5,
+        spherical = true)).map(_.head[GeoPlace]).
+        aka("places") must beEqualTo(List(
+          GeoPlace(
+            loc = GeoPoint(List(-73.97D, 40.77D)),
+            name = "Central Park",
+            category = "Parks",
+            dist = GeoDistance(
+              calculated = 1147,
+              loc = GeoPoint(List(-73.97D, 40.77D))
+            )
+          )
+        )).await(0, timeout)
+
+      // { "type" : "public", "loc" : { "type" : "Point", "coordinates" : [ -73.97, 40.77 ] }, "name" : "Central Park", "category" : "Parks", "dist" : { "calculated" : 1147.4220523120696, "loc" : { "type" : "Point", "coordinates" : [ -73.97, 40.77 ] } } }
+    } tag "wip"
+  }
+
   // ---
 
   case class Location(lon: Double, lat: Double)
@@ -507,4 +803,15 @@ class AggregationSpec extends org.specs2.mutable.Specification {
 
   case class SaleItem(itemId: Int, quantity: Int, price: Int)
   case class Sale(_id: Int, items: List[SaleItem])
+
+  case class QuizStdDev(_id: Int, stdDev: Double)
+
+  case class GeoPoint(coordinates: List[Double])
+  case class GeoDistance(calculated: Int, loc: GeoPoint)
+  case class GeoPlace(
+    loc: GeoPoint,
+    name: String,
+    category: String,
+    dist: GeoDistance
+  )
 }

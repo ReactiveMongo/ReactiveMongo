@@ -3,7 +3,6 @@ import scala.concurrent.duration._
 import reactivemongo.api.{
   FailoverStrategy,
   MongoDriver,
-  MongoConnection,
   MongoConnectionOptions
 }
 

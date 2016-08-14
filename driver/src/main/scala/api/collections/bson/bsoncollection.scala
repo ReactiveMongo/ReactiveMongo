@@ -26,8 +26,7 @@ import reactivemongo.api.BSONSerializationPack
 
 object `package` {
   implicit object BSONCollectionProducer extends GenericCollectionProducer[BSONSerializationPack.type, BSONCollection] {
-    def apply(db: DB, name: String, failoverStrategy: FailoverStrategy = FailoverStrategy()): BSONCollection =
-      BSONCollection(db, name, failoverStrategy)
+    def apply(db: DB, name: String, failoverStrategy: FailoverStrategy = FailoverStrategy()): BSONCollection = new BSONCollection(db, name, failoverStrategy)
   }
 }
 
@@ -65,8 +64,49 @@ object BSONBatchCommands extends BatchCommands[BSONSerializationPack.type] {
   implicit def LastErrorReader = BSONGetLastErrorImplicits.LastErrorReader
 }
 
-case class BSONCollection(val db: DB, val name: String, val failoverStrategy: FailoverStrategy) extends GenericCollection[BSONSerializationPack.type] {
+final class BSONCollection(
+  val db: DB,
+  val name: String,
+  val failoverStrategy: FailoverStrategy
+) extends Product with GenericCollection[BSONSerializationPack.type]
+    with scala.Serializable with java.io.Serializable {
+
   val pack = BSONSerializationPack
   val BatchCommands = BSONBatchCommands
   def genericQueryBuilder = BSONQueryBuilder(this, failoverStrategy)
+
+  override lazy val toString =
+    s"BSONCollection('${db.name}'.'$name', $failoverStrategy)"
+
+  @deprecated(message = "No longer a case class", since = "0.12-RC2")
+  def canEqual(that: Any): Boolean = that match {
+    case _: BSONCollection => true
+    case _                 => false
+  }
+
+  @deprecated(message = "No longer a case class", since = "0.12-RC2")
+  val productArity = 3
+
+  @deprecated(message = "No longer a case class", since = "0.12-RC2")
+  def productElement(n: Int) = n match {
+    case 0 => db
+    case 1 => name
+    case _ => failoverStrategy
+  }
+
+  @deprecated(message = "No longer a case class", since = "0.12-RC2")
+  def copy(
+    db: DB = this.db,
+    name: String = this.name,
+    failoverStrategy: FailoverStrategy = this.failoverStrategy
+  ): BSONCollection = new BSONCollection(db, name, failoverStrategy)
+}
+
+/** Factory and extractors */
+object BSONCollection extends scala.runtime.AbstractFunction3[DB, String, FailoverStrategy, BSONCollection] {
+
+  @deprecated(message = "Use the class constructor", since = "0.12-RC2")
+  def apply(db: DB, name: String, failoverStrategy: FailoverStrategy): BSONCollection = new BSONCollection(db, name, failoverStrategy)
+
+  def unapply(c: BSONCollection): Option[(DB, String, FailoverStrategy)] = Some((c.db, c.name, c.failoverStrategy))
 }

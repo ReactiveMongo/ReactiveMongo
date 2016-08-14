@@ -1,4 +1,3 @@
-import scala.util.{ Failure, Success }
 import scala.concurrent._, duration.FiniteDuration
 
 import reactivemongo.api._, collections.bson.BSONCollection

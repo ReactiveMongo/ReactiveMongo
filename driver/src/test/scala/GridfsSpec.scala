@@ -7,7 +7,6 @@ import reactivemongo.api.BSONSerializationPack
 import reactivemongo.api.gridfs.{ ReadFile, DefaultFileToSave, GridFS }
 import reactivemongo.api.gridfs.Implicits._
 import reactivemongo.bson._
-import reactivemongo.api.gridfs
 
 import org.specs2.concurrent.{ ExecutionEnv => EE }
 
