@@ -1,4 +1,3 @@
-import scala.util.{ Try, Success, Failure }
 import scala.concurrent.duration.FiniteDuration
 
 import reactivemongo.bson.{ BSONDocument, BSONString }

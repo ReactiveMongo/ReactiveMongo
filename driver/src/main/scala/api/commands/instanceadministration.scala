@@ -20,8 +20,7 @@ case class RenameCollection(
   fullyQualifiedCollectionName: String,
   fullyQualifiedTargetName: String,
   dropTarget: Boolean = false
-)
-    extends Command with CommandWithResult[UnitBox.type]
+) extends Command with CommandWithResult[UnitBox.type]
 
 case class Create(
   capped: Option[Capped] = None, // if set, "capped" -> true, size -> <int>, max -> <int>
@@ -101,6 +100,7 @@ case class CollStatsResult(
     indexSizes, capped, max
   )
 
+  override def toString = s"""CollStatsResult($ns, capped = $capped, count = $count, size = $size, avgObjSize = $averageObjectSize, storageSize = $storageSize, numExtents = $numExtents, nindexes = $nindexes, lastExtentSize = $lastExtentSize, paddingFactor = $paddingFactor, systemFlags = $systemFlags, userFlags = $userFlags, indexSizes = ${indexSizes.mkString("[ ", ", ", " ]")}, max = $max)"""
 }
 
 case class DropIndexes(index: String) extends CollectionCommand with CommandWithResult[DropIndexesResult]
@@ -229,3 +229,49 @@ object Resync extends Command with CommandWithResult[ResyncResult.type]
  */
 case class ReplSetMaintenance(enable: Boolean = true) extends Command
   with CommandWithResult[UnitBox.type]
+
+import reactivemongo.api.SerializationPack
+
+/**
+ * @param name the name of user role
+ */
+class UserRole(val name: String)
+
+/**
+ * @param db the name of the database
+ */
+case class DBUserRole(
+  override val name: String,
+  db: String
+) extends UserRole(name)
+
+/** User role extractor */
+object UserRole {
+  def apply(name: String): UserRole = new UserRole(name)
+  def unapply(role: UserRole): Option[String] = Some(role.name)
+}
+
+trait CreateUserCommand[P <: SerializationPack]
+    extends ImplicitCommandHelpers[P] {
+
+  /**
+   * The [[https://docs.mongodb.com/manual/reference/command/createUser/ createUser]] command.
+   *
+   * @param name the name of the user to be created
+   * @param pwd the user password (not required if the database uses external credentials)
+   * @param roles the roles granted to the user, possibly an empty to create users without roles
+   * @param digestPassword when true, the mongod instance will create the hash of the user password (default: `true`)
+   * @param writeConcern the optional level of [[https://docs.mongodb.com/manual/reference/write-concern/ write concern]]
+   * @param customData the custom data to associate with the user account
+   */
+  case class CreateUser(
+    name: String,
+    pwd: Option[String],
+    roles: List[UserRole],
+    digestPassword: Boolean = true,
+    writeConcern: Option[WriteConcern] = None,
+    customData: Option[pack.Document] = None
+  ) extends Command with CommandWithPack[P]
+      with CommandWithResult[UnitBox.type]
+
+}

@@ -37,7 +37,7 @@ trait DealingWithGenericCommandErrorsReader[A] extends BSONDocumentReader[A] {
   /** Results the successful result (only if `ok` is true). */
   def readResult(doc: BSONDocument): A
 
-  final def read(doc: BSONDocument): A =
+  final def read(doc: BSONDocument): A = {
     if (!doc.getAs[BSONBooleanLike]("ok").exists(_.toBoolean)) {
       throw new DefaultBSONCommandError(
         code = doc.getAs[Int]("code"),
@@ -45,4 +45,5 @@ trait DealingWithGenericCommandErrorsReader[A] extends BSONDocumentReader[A] {
         originalDocument = doc
       )
     } else readResult(doc)
+  }
 }

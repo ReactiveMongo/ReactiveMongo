@@ -5,12 +5,8 @@ import play.api.libs.iteratee.Iteratee
 
 import reactivemongo.bson._
 import reactivemongo.core.protocol.Response
-import reactivemongo.core.errors.DetailedDatabaseException
 import reactivemongo.api.{
   Cursor,
-  CursorFlattener,
-  CursorProducer,
-  DB,
   FailoverStrategy,
   QueryOpts,
   MongoConnection,

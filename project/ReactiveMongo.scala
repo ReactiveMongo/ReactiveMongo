@@ -378,6 +378,7 @@ object ReactiveMongoBuild extends Build {
         @inline def mcp(s: String) = x[MissingClassProblem](s)
 
         Seq(
+          fcp("reactivemongo.api.collections.bson.BSONCollection"),
           imt("reactivemongo.core.actors.AwaitingResponse.apply"), // private
           imt("reactivemongo.core.actors.AwaitingResponse.this"), // private
           mmp("reactivemongo.core.protocol.MongoHandler.this"), // private

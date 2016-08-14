@@ -4,7 +4,6 @@ import scala.concurrent.duration.{ FiniteDuration, MILLISECONDS }
 import reactivemongo.bson.{ BSONDocument, BSONDocumentReader }
 import reactivemongo.core.protocol.Response
 import reactivemongo.api.{ Cursor, DB, QueryOpts }
-import reactivemongo.api.collections.bson.BSONCollection
 
 import org.specs2.concurrent.{ ExecutionEnv => EE }
 

@@ -1,26 +1,19 @@
-import akka.actor.{ Actor, ActorRef, Props }
+import akka.actor.Actor
 import akka.testkit.TestActorRef
 
-import scala.concurrent.{ Await, Future }
+import scala.concurrent.Future
 
 import org.specs2.concurrent.{ ExecutionEnv => EE }
 
-import reactivemongo.bson.BSONDocument
-
 import reactivemongo.core.actors.StandardDBSystem
-import reactivemongo.core.nodeset.{ Authenticate, Connection, Node, NodeStatus }
-import reactivemongo.core.protocol.{ MongoWireVersion, Response }
+import reactivemongo.core.nodeset.{ Authenticate, Connection, Node }
+import reactivemongo.core.protocol.Response
 
 import reactivemongo.api.{
   MongoConnection,
   MongoConnectionOptions,
   MongoDriver,
   ReadPreference
-}
-
-import reactivemongo.api.commands.bson.BSONIsMasterCommand.{
-  IsMasterResult,
-  ReplicaSet
 }
 
 class MonitorSpec extends org.specs2.mutable.Specification {
