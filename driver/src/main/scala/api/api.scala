@@ -755,7 +755,7 @@ object MongoConnection {
 /**
  * @param config a custom configuration (otherwise the default options are used)
  */
-class MongoDriver(config: Option[Config] = None) {
+class MongoDriver(config: Option[Config] = None, classLoader: Option[ClassLoader] = None) {
   import scala.collection.mutable.{ Map => MutableMap }
 
   import MongoDriver.logger
@@ -772,7 +772,7 @@ class MongoDriver(config: Option[Config] = None) {
       ConfigFactory.empty()
     } else reference.getConfig("mongo-async-driver")
 
-    ActorSystem("reactivemongo", cfg)
+    ActorSystem("reactivemongo", Some(cfg), classLoader)
   }
 
   private val supervisorName = s"Supervisor-${MongoDriver.nextCounter}"
@@ -976,8 +976,10 @@ object MongoDriver {
   /** Creates a new [[MongoDriver]] with a new ActorSystem. */
   def apply(): MongoDriver = new MongoDriver
 
+  def withClassLoader(classLoader: ClassLoader) = new MongoDriver(classLoader = Some(classLoader))
+
   /** Creates a new [[MongoDriver]] with the given `config`. */
-  def apply(config: Config): MongoDriver = new MongoDriver(Some(config))
+  def apply(config: Config, classLoader: Option[ClassLoader] = None): MongoDriver = new MongoDriver(Some(config), classLoader)
 
   private[api] val _counter = new AtomicLong(0)
   private[api] def nextCounter: Long = _counter.incrementAndGet()
