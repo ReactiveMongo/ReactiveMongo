@@ -285,6 +285,9 @@ sealed trait CursorOps[T] { cursor: Cursor[T] =>
    * @param cursorID the cursor ID
    */
   def kill(cursorID: Long): Unit
+
+  /** Indicates whether the underlying cursor is taible. */
+  def tailable: Boolean
 }
 
 object CursorOps {
