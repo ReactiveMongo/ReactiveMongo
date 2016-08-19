@@ -48,11 +48,16 @@ object MacroTest {
     case class UB(s: String) extends UT
     case class UC(s: String) extends UT
     case class UD(s: String) extends UT
+    object UE extends UT
+    case object UF extends UT
+
+    case object DoNotExtendsA
+    object DoNotExtendsB
   }
 
   trait NestModule {
     case class Nested(name: String)
-    val format = Macros.handler[Nested]
+    val format: Handler[Nested] = Macros.handler[Nested]
   }
 
   object TreeModule {
@@ -78,7 +83,7 @@ object MacroTest {
     case class Leaf(data: String) extends Tree
 
     object Leaf {
-      private val helper = Macros.handler[Leaf]
+      private val helper: Handler[Leaf] = Macros.handler[Leaf]
       implicit val bson: Handler[Leaf] = new BSONDocumentReader[Leaf] with BSONDocumentWriter[Leaf] with BSONHandler[BSONDocument, Leaf] {
         def write(t: Leaf): BSONDocument = helper.write(Leaf("hai"))
         def read(bson: BSONDocument): Leaf = helper read bson
@@ -102,7 +107,8 @@ object MacroTest {
     object IntList {
       import Macros.Options.{ UnionType, \/ }
 
-      implicit val bson: Handler[IntList] = Macros.handlerOpts[IntList, UnionType[Cons \/ Tail.type]]
+      implicit val bson: Handler[IntList] =
+        Macros.handlerOpts[IntList, UnionType[Cons \/ Tail.type]]
     }
   }
 

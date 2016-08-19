@@ -1,24 +1,20 @@
 package reactivemongo.bson
 
+import scala.collection.immutable.Set
+
 import reactivemongo.bson.Macros.Annotations.{ Ignore, Key }
 import reactivemongo.bson.Macros.Options.SaveSimpleName
 
 import scala.reflect.macros.Context
 
 private object MacroImpl {
-  def reader[A: c.WeakTypeTag, Opts: c.WeakTypeTag](c: Context): c.Expr[BSONDocumentReader[A]] =
-    c.universe.reify(
-      new BSONDocumentReader[A] {
-        def read(document: BSONDocument): A =
-          Helper[A, Opts](c).readBody.splice
-      })
+  def reader[A: c.WeakTypeTag, Opts: c.WeakTypeTag](c: Context): c.Expr[BSONDocumentReader[A]] = c.universe.reify(BSONDocumentReader[A] {
+    document: BSONDocument => Helper[A, Opts](c).readBody.splice
+  })
 
-  def writer[A: c.WeakTypeTag, Opts: c.WeakTypeTag](c: Context): c.Expr[BSONDocumentWriter[A]] =
-    c.universe.reify(
-      new BSONDocumentWriter[A] {
-        def write(document: A): BSONDocument =
-          Helper[A, Opts](c).writeBody.splice
-      })
+  def writer[A: c.WeakTypeTag, Opts: c.WeakTypeTag](c: Context): c.Expr[BSONDocumentWriter[A]] = c.universe.reify(BSONDocumentWriter[A] {
+    document: A => Helper[A, Opts](c).writeBody.splice
+  })
 
   def handler[A: c.WeakTypeTag, Opts: c.WeakTypeTag](c: Context): c.Expr[BSONDocumentReader[A] with BSONDocumentWriter[A] with BSONHandler[BSONDocument, A]] = {
     val helper = Helper[A, Opts](c)
@@ -53,6 +49,7 @@ private object MacroImpl {
           CaseDef(pattern, body)
         }
         val className = c.parse("""document.getAs[String]("className").get""")
+
         Match(className, cases)
       } getOrElse readBodyConstruct(A)
 
@@ -61,6 +58,7 @@ private object MacroImpl {
       if (hasOption[Macros.Options.Verbose]) {
         c.echo(c.enclosingPosition, show(result))
       }
+
       result
     }
 
@@ -84,17 +82,14 @@ private object MacroImpl {
 
     private def readBodyFromImplicit(A: c.Type) = {
       val reader = c.inferImplicitValue(appliedType(readerType, List(A)))
-      if (!reader.isEmpty)
-        Apply(Select(reader, "read"), List(Ident("document")))
-      else
-        readBodyConstruct(A)
+
+      if (reader.isEmpty) readBodyConstruct(A)
+      else Apply(Select(reader, "read"), List(Ident("document")))
     }
 
     private def readBodyConstruct(implicit A: c.Type) = {
-      if (isSingleton(A))
-        readBodyConstructSingleton
-      else
-        readBodyConstructClass
+      if (isSingleton(A)) readBodyConstructSingleton
+      else readBodyConstructClass
     }
 
     private def readBodyConstructSingleton(implicit A: c.Type) = {
@@ -110,7 +105,10 @@ private object MacroImpl {
     private def readBodyConstructClass(implicit A: c.Type) = {
       val (constructor, _) = matchingApplyUnapply
 
-      val TypeRef(_, _, tpeArgs) = A
+      val tpeArgs: List[c.Type] = A match {
+        case TypeRef(_, _, args) => args
+        case ClassInfoType(_, _, _) => Nil
+      }
       val boundTypes = constructor.typeParams.zip(tpeArgs).map {
         case (sym, ty) => sym.fullName -> ty
       }.toMap
@@ -138,6 +136,7 @@ private object MacroImpl {
       }
 
       val constructorTree = Select(Ident(companion.name.toString), "apply")
+
       Apply(constructorTree, values)
     }
 
@@ -178,7 +177,10 @@ private object MacroImpl {
       }
 
       val constructorParams = constructor.paramss.head
-      val TypeRef(_, _, tpeArgs) = A
+      val tpeArgs: List[c.Type] = A match {
+        case TypeRef(_, _, args) => args
+        case ClassInfoType(_, _, _) => Nil
+      }
       val boundTypes = constructor.typeParams.zip(tpeArgs).map {
         case (sym, ty) => sym.fullName -> ty
       }.toMap
@@ -252,7 +254,7 @@ private object MacroImpl {
     }
 
     private lazy val unionTypes: Option[List[c.Type]] =
-      parseUnionTypes orElse parseAllImplementationTypes
+      parseUnionTypes orElse directKnownSubclasses
 
     private def parseUnionTypes: Option[List[c.Type]] = {
       val unionOption = c.typeOf[Macros.Options.UnionType[_]]
@@ -288,11 +290,52 @@ private object MacroImpl {
       tree map { t => parseUnionTree(List(t), Nil) }
     }
 
-    private def parseAllImplementationTypes: Option[List[Type]] = {
+    private def directKnownSubclasses: Option[List[c.Type]] = {
+      // Workaround for SI-7046: https://issues.scala-lang.org/browse/SI-7046
+      import c.universe._
+
       val tpeSym = A.typeSymbol.asClass
 
-      if (tpeSym.isSealed && (tpeSym.isTrait || tpeSym.isAbstractClass)) {
-        Some(allSubclasses(Set(tpeSym)).toList)
+      @annotation.tailrec
+      def allSubclasses(path: Traversable[Symbol], subclasses: Set[Type]): Set[Type] = path.headOption match {
+        case Some(cls: ClassSymbol) if (
+          tpeSym != cls && cls.selfType.baseClasses.contains(tpeSym)
+        ) => {
+          val newSub: Set[Type] = if (!cls.isCaseClass) {
+            c.warning(c.enclosingPosition, s"cannot handle class ${cls.fullName}: no case accessor")
+            Set.empty
+          } else if (!cls.typeParams.isEmpty) {
+            c.warning(c.enclosingPosition, s"cannot handle class ${cls.fullName}: type parameter not supported")
+            Set.empty
+          } else Set(cls.selfType)
+
+          allSubclasses(path.tail, subclasses ++ newSub)
+        }
+
+        case Some(o: ModuleSymbol) if (
+          o.companionSymbol == NoSymbol && // not a companion object
+            tpeSym != c && o.typeSignature.baseClasses.contains(tpeSym)
+        ) => {
+          val newSub: Set[Type] = if (!o.moduleClass.asClass.isCaseClass) {
+            c.warning(c.enclosingPosition, s"cannot handle object ${o.fullName}: no case accessor")
+            Set.empty
+          } else Set(o.typeSignature)
+
+          allSubclasses(path.tail, subclasses ++ newSub)
+        }
+
+        case Some(o: ModuleSymbol) if (
+          o.companionSymbol == NoSymbol // not a companion object
+        ) => allSubclasses(path.tail, subclasses)
+
+        case Some(_) => allSubclasses(path.tail, subclasses)
+
+        case _ => subclasses
+      }
+
+      if (tpeSym.isSealed && tpeSym.isAbstractClass) {
+        Some(allSubclasses(
+          tpeSym.owner.typeSignature.declarations, Set.empty).toList)
       } else None
     }
 
@@ -344,29 +387,6 @@ private object MacroImpl {
       param.annotations.exists(ann =>
         ann.tpe =:= typeOf[Ignore] || ann.tpe =:= typeOf[transient])
 
-    @annotation.tailrec
-    private def allSubclasses(parent: Set[Symbol], subclasses: Set[Type] = Set.empty): Set[Type] = parent.headOption match {
-      case Some(cls: ClassSymbol) => {
-        val subsub = cls.owner.typeSignature.declarations.collect {
-          case c: ClassSymbol if (
-            cls != c && c.selfType.baseClasses.contains(cls)
-          ) => c
-
-          case o: ModuleSymbol if (o.companionSymbol == NoSymbol) => o
-        }
-
-        val isAbstract = cls.isTrait || cls.isAbstractClass
-        val up = if (!isAbstract) subclasses + cls.toType else subclasses
-
-        allSubclasses(parent.tail ++ subsub, up)
-      }
-
-      case Some(o: ModuleSymbol) =>
-        allSubclasses(parent.tail, subclasses + o.typeSignature)
-
-      case _ => subclasses
-    }
-
     private def applyMethod(implicit A: c.Type): c.universe.Symbol =
       companion(A).typeSignature.declaration(stringToTermName("apply")) match {
         case NoSymbol => c.abort(c.enclosingPosition, s"No apply function found for $A")
@@ -401,7 +421,7 @@ private object MacroImpl {
           }
 
           case _ => {
-            warn(c.enclosingPosition, s"""Constructor with multiple parameter lists is not supported: ${A.typeSymbol.name}${alt.typeSignature}""")
+            c.warning(c.enclosingPosition, s"""Constructor with multiple parameter lists is not supported: ${A.typeSymbol.name}${alt.typeSignature}""")
 
             false
           }
@@ -422,8 +442,5 @@ private object MacroImpl {
     private def readerType: c.Type = typeOf[Reader[_]].typeConstructor
 
     private def companion(implicit A: c.Type): c.Symbol = A.typeSymbol.companionSymbol
-
-    private def warn(pos: c.universe.Position, msg: String): Unit =
-      if (hasOption[Macros.Options.Verbose]) c.echo(pos, msg)
   }
 }

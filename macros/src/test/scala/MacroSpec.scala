@@ -114,7 +114,7 @@ class MacroSpec extends org.specs2.mutable.Specification {
       import Macros.Options._
       val a = UA(1)
       val b = UB("hai")
-      val format = Macros.handlerOpts[UT, UnionType[UA \/ UB \/ UC \/ UD]]
+      val format = Macros.handlerOpts[UT, UnionType[UA \/ UB \/ UC \/ UD \/ UF.type]]
 
       /* TODO: Remove
       println(BSONDocument pretty (format write a))
@@ -140,10 +140,9 @@ class MacroSpec extends org.specs2.mutable.Specification {
       println(BSONDocument pretty (format write b))
        */
 
-      format.write(a).getAs[String]("className") must beSome("UA")
-      format.write(b).getAs[String]("className") must beSome("UB")
-
-      roundtrip(a, format) and roundtrip(b, format)
+      format.write(a).getAs[String]("className") must beSome("UA") and {
+        format.write(b).getAs[String]("className") must beSome("UB")
+      } and roundtrip(a, format) and roundtrip(b, format)
     }
 
     "handle recursive structure" in {
@@ -178,8 +177,9 @@ class MacroSpec extends org.specs2.mutable.Specification {
     "handle ADTs with objects" in {
       import IntListModule._
 
-      roundtripImp[IntList](Tail)
-      roundtripImp[IntList](Cons(1, Cons(2, Cons(3, Tail))))
+      roundtripImp[IntList](Tail) and {
+        roundtripImp[IntList](Cons(1, Cons(2, Cons(3, Tail))))
+      }
     }
 
     "automate Union on sealed traits" in {
@@ -193,7 +193,7 @@ class MacroSpec extends org.specs2.mutable.Specification {
             aka("class #2") must beSome("MacroTest.Union.UB")
         } and roundtripImp[UT](UA(17)) and roundtripImp[UT](UB("foo")) and {
           roundtripImp[UT](UC("bar")) and roundtripImp[UT](UD("baz"))
-        }
+        } and roundtripImp[UT](UF)
     }
 
     "support automatic implementations search with nested traits" in {
