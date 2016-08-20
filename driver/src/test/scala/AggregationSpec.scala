@@ -723,7 +723,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
         )
       ).map { doc => places.insert(doc) }).map(_ => {}) must beEqualTo({}).
         await(0, timeout)
-    } tag "wip"
+    }
 
     "and aggregated using $geoNear" in { implicit ee: EE =>
       import places.BatchCommands.AggregationFramework.GeoNear
@@ -775,7 +775,251 @@ class AggregationSpec extends org.specs2.mutable.Specification {
         )).await(0, timeout)
 
       // { "type" : "public", "loc" : { "type" : "Point", "coordinates" : [ -73.97, 40.77 ] }, "name" : "Central Park", "category" : "Parks", "dist" : { "calculated" : 1147.4220523120696, "loc" : { "type" : "Point", "coordinates" : [ -73.97, 40.77 ] } } }
-    } tag "wip"
+    }
+  }
+
+  "Forecasts" should {
+    // https://docs.mongodb.com/manual/reference/operator/aggregation/redact/
+    val forecasts = db(s"forecasts{System identityHashCode this}")
+
+    "be inserted" in { implicit ee: EE =>
+      /*
+{
+  _id: 1,
+  title: "123 Department Report",
+  tags: [ "G", "STLW" ],
+  year: 2014,
+  subsections: [
+    {
+      subtitle: "Section 1: Overview",
+      tags: [ "SI", "G" ],
+      content:  "Section 1: This is the content of section 1."
+    },
+    {
+      subtitle: "Section 2: Analysis",
+      tags: [ "STLW" ],
+      content: "Section 2: This is the content of section 2."
+    },
+    {
+      subtitle: "Section 3: Budgeting",
+      tags: [ "TK" ],
+      content: {
+        text: "Section 3: This is the content of section3.",
+        tags: [ "HCS" ]
+      }
+    }
+  ]
+}
+ */
+
+      forecasts.insert(BSONDocument(
+        "_id" -> 1,
+        "title" -> "123 Department Report",
+        "tags" -> BSONArray("G", "STLW"),
+        "year" -> 2014,
+        "subsections" -> BSONArray(
+          BSONDocument(
+            "subtitle" -> "Section 1: Overview",
+            "tags" -> BSONArray("SI", "G"),
+            "content" -> "Section 1: This is the content of section 1."
+          ),
+          BSONDocument(
+            "subtitle" -> "Section 2: Analysis",
+            "tags" -> BSONArray("STLW"),
+            "content" -> "Section 2: This is the content of section 2."
+          ),
+          BSONDocument(
+            "subtitle" -> "Section 3: Budgeting",
+            "tags" -> BSONArray("TK"),
+            "content" -> BSONDocument(
+              "text" -> "Section 3: This is the content of section3.",
+              "tags" -> BSONArray("HCS")
+            )
+          )
+        )
+      )).map(_ => {}) must beEqualTo({}).await(0, timeout)
+    }
+
+    "be redacted" in { implicit ee: EE =>
+      import forecasts.BatchCommands.AggregationFramework.{ Match, Redact }
+
+      implicit val subsectionReader = Macros.handler[Subsection]
+      implicit val reader = Macros.handler[Redaction]
+
+      /*
+var userAccess = [ "STLW", "G" ];
+db.forecasts.aggregate(
+   [
+     { $match: { year: 2014 } },
+     { $redact: {
+        $cond: {
+           if: { $gt: [ { $size: { $setIntersection: [ "$tags", userAccess ] } }, 0 ] },
+           then: "$$DESCEND",
+           else: "$$PRUNE"
+         }
+       }
+     }
+   ]
+);
+ */
+
+      val result = forecasts.aggregate(Match(document("year" -> 2014)), List(
+        Redact(document("$cond" -> document(
+          "if" -> document(
+            "$gt" -> array(document(
+              "$size" -> document("$setIntersection" -> array(
+                "$tags", array("STLW", "G")
+              ))
+            ), 0)
+          ),
+          "then" -> "$$DESCEND",
+          "else" -> "$$PRUNE"
+        )))
+      )).map(_.head[Redaction])
+
+      val expected = Redaction(
+        title = "123 Department Report",
+        tags = List("G", "STLW"),
+        year = 2014,
+        subsections = List(
+          Subsection(
+            subtitle = "Section 1: Overview",
+            tags = List("SI", "G"),
+            content = "Section 1: This is the content of section 1."
+          ),
+          Subsection(
+            subtitle = "Section 2: Analysis",
+            tags = List("STLW"),
+            content = "Section 2: This is the content of section 2."
+          )
+        )
+      )
+      /*
+{
+  "_id" : 1,
+  "title" : "123 Department Report",
+  "tags" : [ "G", "STLW" ],
+  "year" : 2014,
+  "subsections" : [
+    {
+      "subtitle" : "Section 1: Overview",
+      "tags" : [ "SI", "G" ],
+      "content" : "Section 1: This is the content of section 1."
+    },
+    {
+      "subtitle" : "Section 2: Analysis",
+      "tags" : [ "STLW" ],
+      "content" : "Section 2: This is the content of section 2."
+    }
+  ]
+}
+ */
+
+      result must beEqualTo(List(expected)).await(0, timeout)
+    }
+  }
+
+  "Customer accounts" should {
+    // https://docs.mongodb.com/manual/reference/operator/aggregation/redact/
+    val customers = db(s"customers{System identityHashCode this}")
+
+    "be inserted" in { implicit ee: EE =>
+      /*
+{
+  _id: 1,
+  level: 1,
+  acct_id: "xyz123",
+  cc: {
+    level: 5,
+    type: "yy",
+    num: 000000000000,
+    exp_date: ISODate("2015-11-01T00:00:00.000Z"),
+    billing_addr: {
+      level: 5,
+      addr1: "123 ABC Street",
+      city: "Some City"
+    },
+    shipping_addr: [
+      {
+        level: 3,
+        addr1: "987 XYZ Ave",
+        city: "Some City"
+      },
+      {
+        level: 3,
+        addr1: "PO Box 0123",
+        city: "Some City"
+      }
+    ]
+  },
+  status: "A"
+}
+*/
+      customers.insert(document(
+        "_id" -> 1,
+        "level" -> 1,
+        "acct_id" -> "xyz123",
+        "cc" -> document(
+          "level" -> 5,
+          "type" -> "yy",
+          "num" -> "000000000000",
+          "exp_date" -> "2015-11-01T00:00:00.000Z",
+          "billing_addr" -> document(
+            "level" -> 5,
+            "addr1" -> "123 ABC Street",
+            "city" -> "Some City"
+          ),
+          "shipping_addr" -> array(
+            document(
+              "level" -> 3,
+              "addr1" -> "987 XYZ Ave",
+              "city" -> "Some City"
+            ),
+            document(
+              "level" -> 3,
+              "addr1" -> "PO Box 0123",
+              "city" -> "Some City"
+            )
+          )
+        ),
+        "status" -> "A"
+      )).map(_ => {}) must beEqualTo({}).await(0, timeout)
+    }
+
+    "be redacted" in { implicit ee: EE =>
+      import customers.BatchCommands.AggregationFramework.{ Match, Redact }
+
+      /*
+db.accounts.aggregate([
+    { $match: { status: "A" } },
+    {
+      $redact: {
+        $cond: {
+          if: { $eq: [ "$level", 5 ] },
+          then: "$$PRUNE",
+          else: "$$DESCEND"
+        }
+      }
+    }
+  ])
+ */
+      val result = customers.aggregate(Match(document("status" -> "A")), List(
+        Redact(document(
+          "$cond" -> document(
+            "if" -> document("$eq" -> array("$level", 5)),
+            "then" -> "$$PRUNE",
+            "else" -> "$$DESCEND"
+          )
+        ))
+      )).map(_.head[BSONDocument])
+
+      result must beEqualTo(List(document(
+        "_id" -> 1,
+        "level" -> 1,
+        "acct_id" -> "xyz123",
+        "status" -> "A"
+      ))).await(0, timeout)
+    }
   }
 
   // ---
@@ -813,5 +1057,17 @@ class AggregationSpec extends org.specs2.mutable.Specification {
     name: String,
     category: String,
     dist: GeoDistance
+  )
+
+  case class Subsection(
+    subtitle: String,
+    tags: List[String],
+    content: String
+  )
+  case class Redaction(
+    title: String,
+    tags: List[String],
+    year: Int,
+    subsections: List[Subsection]
   )
 }
