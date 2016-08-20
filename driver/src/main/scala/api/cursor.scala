@@ -288,6 +288,12 @@ sealed trait CursorOps[T] { cursor: Cursor[T] =>
 
   /** Indicates whether the underlying cursor is taible. */
   def tailable: Boolean
+
+  /** Returns the underlying connection. */
+  def connection: MongoConnection
+
+  /** Returns the strategy to failover the cursor operations. */
+  def failoverStrategy: FailoverStrategy
 }
 
 object CursorOps {
