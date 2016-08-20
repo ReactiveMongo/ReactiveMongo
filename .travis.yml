@@ -79,6 +79,7 @@ matrix:
     - jdk: oraclejdk7
       env: CI_CATEGORY=INTEGRATION_TESTS AKKA_VERSION=2.4.8 MONGO_PROFILE=rs MONGO_VER=3
 before_install:
-- ./.travis_scripts/beforeInstall.sh $CI_CATEGORY $MONGO_VER $MONGO_PROFILE
-script: ./.travis_scripts/retry.sh 3 ./.travis_scripts/validate.sh
-after_success: ./.travis_scripts/afterSuccess.sh
+- ./.ci_scripts/beforeInstall.sh $CI_CATEGORY $MONGO_VER $MONGO_PROFILE
+- if [ "x$CI_CATEGORY" = "xINTEGRATION_TESTS" ]; then (./.ci_scripts/fork-mongod.sh); fi
+script: ./.ci_scripts/retry.sh 3 ./.ci_scripts/validate.sh
+after_success: ./.ci_scripts/afterSuccess.sh

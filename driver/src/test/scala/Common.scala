@@ -18,6 +18,8 @@ object Common {
   val primaryHost =
     Option(System getProperty "test.primaryHost").getOrElse("localhost:27017")
 
+  println(s"Primary host: $primaryHost")
+
   val failoverRetries = Option(System getProperty "test.failoverRetries").
     flatMap(r => scala.util.Try(r.toInt).toOption).getOrElse(7)
 
