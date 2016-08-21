@@ -190,27 +190,21 @@ case object ReplSetGetStatus
   extends Command with CommandWithResult[ReplSetStatus]
 
 sealed trait ServerProcess
+
+object ServerProcess {
+  def unapply(repr: String): Option[ServerProcess] = repr match {
+    case "mongos" => Some(MongosProcess)
+    case "mongod" => Some(MongodProcess)
+    case _        => None
+  }
+}
+
 case object MongodProcess extends ServerProcess {
   override val toString = "mongod"
 }
 case object MongosProcess extends ServerProcess {
   override val toString = "mongos"
 }
-
-case class ServerStatusResult(
-  host: String,
-  version: String,
-  process: ServerProcess,
-  pid: Long,
-  uptime: Long,
-  uptimeMillis: Long,
-  uptimeEstimate: Long,
-  localTime: Long
-)
-
-/** Server [[http://docs.mongodb.org/manual/reference/server-status/ status]] */
-case object ServerStatus
-  extends Command with CommandWithResult[ServerStatusResult]
 
 object ResyncResult extends BoxedAnyVal[Unit] {
   val value = {}

@@ -406,6 +406,9 @@ class MongoConnection(
       }
   }
 
+  /** Returns true if the connection has not been killed. */
+  def active: Boolean = !killed
+
   private def whenActive[T](f: => Future[T]): Future[T] = {
     if (killed) {
       logger.debug(s"[$lnm] Cannot send request when the connection is killed")

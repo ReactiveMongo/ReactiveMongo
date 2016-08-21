@@ -129,7 +129,8 @@ class ServerStatusSpec extends Specification {
       import bson.BSONServerStatusImplicits._
 
       db.runCommand(ServerStatus) must beLike[ServerStatusResult]({
-        case status @ ServerStatusResult(_, _, MongodProcess, _, _, _, _, _) =>
+        case status @ ServerStatusResult(_, _, MongodProcess,
+          _, _, _, _, _, _, _, _, _, _, _, _, _) =>
           //println(s"Server status: $status")
           ok
       }).await(0, timeout)
@@ -139,7 +140,8 @@ class ServerStatusSpec extends Specification {
   "Database operation" should {
     "be successful" in { implicit ee: EE =>
       db.serverStatus must beLike[ServerStatusResult]({
-        case status @ ServerStatusResult(_, _, MongodProcess, _, _, _, _, _) =>
+        case status @ ServerStatusResult(_, _, MongodProcess,
+          _, _, _, _, _, _, _, _, _, _, _, _, _) =>
           //println(s"Server status: $status")
           ok
       }).await(0, timeout)
