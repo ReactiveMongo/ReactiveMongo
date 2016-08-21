@@ -306,44 +306,6 @@ object BSONReplSetGetStatusImplicits {
 
 /**
  * {{{
- * import reactivemongo.api.commands.ServerStatus
- * import reactivemongo.api.commands.bson.BSONServerStatusImplicits._
- *
- * db.runCommand(ServerStatus)
- * }}}
- */
-object BSONServerStatusImplicits {
-  implicit object BSONServerStatusWriter
-      extends BSONDocumentWriter[ServerStatus.type] {
-
-    val bsonCmd = BSONDocument("serverStatus" -> 1)
-    def write(command: ServerStatus.type) = bsonCmd
-  }
-
-  implicit object BSONServerStatusResultReader
-      extends DealingWithGenericCommandErrorsReader[ServerStatusResult] {
-
-    def readResult(doc: BSONDocument): ServerStatusResult = (for {
-      host <- doc.getAs[String]("host")
-      version <- doc.getAs[String]("version")
-      process <- doc.getAs[String]("process").map[ServerProcess] {
-        case "mongos" => MongosProcess
-        case _        => MongodProcess
-      }
-      pid <- doc.getAs[BSONNumberLike]("pid").map(_.toLong)
-      uptime <- doc.getAs[BSONNumberLike]("uptime").map(_.toLong)
-      uptimeMillis <- doc.getAs[BSONNumberLike]("uptimeMillis").map(_.toLong)
-      uptimeEstimate <- doc.getAs[BSONNumberLike](
-        "uptimeEstimate"
-      ).map(_.toLong)
-      localTime <- doc.getAs[BSONNumberLike]("localTime").map(_.toLong)
-    } yield ServerStatusResult(host, version, process, pid,
-      uptime, uptimeMillis, uptimeEstimate, localTime)).get
-  }
-}
-
-/**
- * {{{
  * import reactivemongo.api.commands.Resync
  * import reactivemongo.api.commands.bson.BSONResyncImplicits._
  *
