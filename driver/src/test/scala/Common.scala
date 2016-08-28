@@ -125,8 +125,8 @@ object Common {
   lazy val (db, slowDb) = {
     import ExecutionContext.Implicits.global
 
-    val _db = connection.database(commonDb, failoverStrategy)
-    Await.result(_db.flatMap { d => d.drop.map(_ => d) }, timeout)
+    val _db = connection.database(commonDb, failoverStrategy).
+      flatMap { d => d.drop.map(_ => d) }
 
     Await.result(_db, timeout) -> Await.result(
       slowConnection.database(commonDb, slowFailover), slowTimeout

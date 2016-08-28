@@ -14,7 +14,6 @@ dependencies:
     - sudo dpkg -i "sbt-$SBT_VER.deb"
     - sudo apt-get install numactl libnuma1 libnuma-dev libnuma-dbg
     - ./.ci_scripts/beforeInstall.sh "$CI_CATEGORY" "$MONGO_VER" "$MONGO_PROFILE"
-#    - ./.ci_scripts/fork-mongod.sh
     - ./.ci_scripts/fork-mongod.sh:
         background: true
   cache_directories:
