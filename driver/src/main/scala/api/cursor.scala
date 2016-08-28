@@ -681,7 +681,7 @@ object DefaultCursor {
 
         if (!result.hasNext) {
           Future.successful(Option.empty[A])
-        } else Future(result.next()).map(Some(_))
+        } else Future(Some(result.next()))
       }
 
     @inline private def syncSuccess[A, B](f: (A, B) => State[A])(implicit ec: ExecutionContext): (A, B) => Future[State[A]] = { (a: A, b: B) => Future(f(a, b)) }
