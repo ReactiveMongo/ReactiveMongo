@@ -4,17 +4,23 @@ object Common {
   import reactivemongo.api.{
     FailoverStrategy,
     MongoDriver,
-    MongoConnectionOptions
+    MongoConnectionOptions,
+    CrAuthentication
   }
 
   implicit val ec = ExecutionContext.Implicits.global
 
-  val DefaultOptions = {
-    val opts = MongoConnectionOptions(nbChannelsPerNode = 2)
+  val crMode = Option(System getProperty "test.authMode").
+    filter(_ == "cr").map(_ => CrAuthentication)
 
-    if (Option(System getProperty "test.enableSSL").exists(_ == "true")) {
-      opts.copy(sslEnabled = true, sslAllowsInvalidCert = true)
-    } else opts
+  val DefaultOptions = {
+    val a = MongoConnectionOptions(nbChannelsPerNode = 2)
+
+    val b = if (Option(System getProperty "test.enableSSL").exists(_ == "true")) {
+      a.copy(sslEnabled = true, sslAllowsInvalidCert = true)
+    } else a
+
+    crMode.fold(b) { mode => b.copy(authMode = mode) }
   }
 
   val primaryHost =

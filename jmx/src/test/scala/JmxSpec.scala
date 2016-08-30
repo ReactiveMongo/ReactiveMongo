@@ -9,7 +9,6 @@ import javax.management.{
   ObjectName
 }
 
-import scala.collection.JavaConverters.iterableAsScalaIterableConverter
 import scala.util.{ Failure, Success, Try }
 
 import scala.concurrent.{ Future, Promise }
@@ -19,7 +18,6 @@ import org.specs2.concurrent.{ ExecutionEnv => EE }
 import org.specs2.matcher.MatchResult
 
 import external.reactivemongo.ConnectionListener
-import reactivemongo.core.nodeset.NodeInfo
 
 import reactivemongo.jmx.{ Node, NodeSet }
 
@@ -122,7 +120,7 @@ class JmxSpec extends org.specs2.mutable.Specification {
                 host,
                 port.toString,
                 null.asInstanceOf[String], // tags
-                "minWireVersion = 2.6, maxWireVersion = 2.6, maxMessageSizeBytes = 48000000, maxBsonSize = 16777216, maxBulkSize = 1000", // protocol metadata
+                "minWireVersion = 3.0, maxWireVersion = 3.0, maxMessageSizeBytes = 48000000, maxBsonSize = 16777216, maxBulkSize = 1000", // protocol metadata
                 "false" // mongos
               ))
             }

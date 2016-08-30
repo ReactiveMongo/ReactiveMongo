@@ -54,6 +54,8 @@ SBT_ARGS="$SBT_ARGS -Dtest.slowPrimaryHost=$PRIMARY_SLOW_PROXY -Dtest.slowProxyD
 
 if [ "$MONGO_VER" = "3" ]; then
     TEST_OPTS="exclude mongo2,unit"
+else
+    SBT_ARGS="$SBT_ARGS -Dtest.authMode=cr"
 fi
 
 if [ "$MONGO_PROFILE" = "ssl" ]; then
@@ -75,7 +77,6 @@ EOF
 export JVM_OPTS
 
 TEST_ARGS=";project ReactiveMongo ;testOnly -- $TEST_OPTS"
-TEST_ARGS="$TEST_ARGS ;project ReactiveMongo-Iteratees ;testOnly -- $TEST_OPTS"
 TEST_ARGS="$TEST_ARGS ;project ReactiveMongo-JMX ;testOnly -- $TEST_OPTS"
 
 sed -e 's/"-deprecation", //' < project/ReactiveMongo.scala > .tmp && mv .tmp project/ReactiveMongo.scala

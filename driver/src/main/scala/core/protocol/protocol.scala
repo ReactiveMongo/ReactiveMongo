@@ -330,6 +330,7 @@ object MongoWireVersion {
    *
    * But wireProtocol=1 is virtually non-existent; Mongo 2.4 was 0 and Mongo 2.6 is 2.
    */
+  @deprecated(message = "No longer supported", since = "0.12.0")
   object V24AndBefore extends MongoWireVersion {
     val value = 0
     override val toString = "<=2.4"
@@ -351,10 +352,9 @@ object MongoWireVersion {
   }
 
   def apply(v: Int): MongoWireVersion = {
-    if (v >= V32.value) V32
-    else if (v >= V30.value) V30
-    else if (v >= V26.value) V26
-    else V24AndBefore
+    if (v <= V26.value) V26
+    else if (v >= V32.value) V32
+    else V30
   }
 
   def unapply(v: MongoWireVersion): Option[Int] = Some(v.value)

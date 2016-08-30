@@ -357,7 +357,10 @@ case class ProtocolMetadata(
 }
 
 object ProtocolMetadata {
-  val Default = ProtocolMetadata(MongoWireVersion.V26, MongoWireVersion.V26, 48000000, 16 * 1024 * 1024, 1000)
+  val Default = ProtocolMetadata(
+    MongoWireVersion.V30, MongoWireVersion.V30,
+    48000000, 16 * 1024 * 1024, 1000
+  )
 }
 
 case class Connection(

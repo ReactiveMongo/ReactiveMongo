@@ -71,7 +71,7 @@ trait GenericQueryBuilder[P <: SerializationPack] {
    * Sends this query and gets a [[Cursor]] of instances of `T`.
    */
   @deprecated(
-    message = "Use `cursor` function with read preference.",
+    message = "Use `cursor()` or `cursor(readPreference)`",
     since = "0.11.0"
   )
   def cursor[T](implicit reader: pack.Reader[T], ec: ExecutionContext, cp: CursorProducer[T]): cp.ProducedCursor = cursor(ReadPreference.primary)
