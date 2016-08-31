@@ -10,12 +10,7 @@ import reactivemongo.core.commands.{
 }
 import reactivemongo.core.actors.Exceptions, Exceptions.PrimaryUnavailableException
 
-import reactivemongo.api.{
-  DefaultDB,
-  FailoverStrategy,
-  MongoDriver,
-  ScramSha1Authentication
-}
+import reactivemongo.api.{ DefaultDB, FailoverStrategy, MongoDriver }
 import reactivemongo.api.commands.DBUserRole
 
 import org.specs2.concurrent.{ ExecutionEnv => EE }
@@ -175,16 +170,11 @@ class DriverSpec extends org.specs2.mutable.Specification {
     import Common.{ DefaultOptions, timeout }
 
     lazy val drv = MongoDriver()
-    val conOpts = DefaultOptions.copy(
-      authMode = ScramSha1Authentication,
-      nbChannelsPerNode = 1
-    )
+    val conOpts = DefaultOptions.copy(nbChannelsPerNode = 1)
     lazy val connection = drv.connection(
       List(primaryHost), options = conOpts
     )
-    val slowOpts = SlowOptions.copy(
-      authMode = ScramSha1Authentication, nbChannelsPerNode = 1
-    )
+    val slowOpts = SlowOptions.copy(nbChannelsPerNode = 1)
     lazy val slowConnection = drv.connection(List(slowPrimary), slowOpts)
 
     val dbName = "specs2-test-scramsha1-auth"

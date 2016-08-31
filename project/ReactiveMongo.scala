@@ -255,8 +255,7 @@ object ReactiveMongoBuild extends Build {
 
           println(s"Travis CI env:\r\n$matrix")
         }
-      ).aggregate(bson, bsonmacros, shaded, driver,
-        iteratees, jmx)
+      ).aggregate(bson, bsonmacros, shaded, driver, jmx)
 
   import scala.xml.{ Elem => XmlElem, Node => XmlNode }
   private def transformPomDependencies(tx: XmlElem => Option[XmlNode]): XmlNode => XmlNode = { node: XmlNode =>
@@ -773,17 +772,6 @@ object ReactiveMongoBuild extends Build {
       } else Some(dep)
     }
   }
-
-  lazy val iteratees = Project( // TODO: Move in separate repo
-    s"$projectPrefix-Iteratees",
-    file("iteratees"),
-    settings = buildSettings).
-    settings(
-      previousArtifacts := Set.empty,
-      testOptions in Test += Tests.Cleanup(commonCleanup),
-      libraryDependencies ++= Seq(playIteratees, specs) ++ logApi,
-      pomPostProcess := providedInternalDeps      
-    ).dependsOn(driver)
 
   lazy val jmx = Project(
     s"$projectPrefix-JMX",

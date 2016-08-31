@@ -305,7 +305,7 @@ class MongoConnection(
    * @param name the database name
    * @param failoverStrategy the failover strategy for sending requests.
    */
-  @deprecated(message = "Must use [[apply]]", since = "0.11.8")
+  @deprecated(message = "Must use [[database]]", since = "0.11.8")
   def db(name: String, failoverStrategy: FailoverStrategy = options.failoverStrategy)(implicit context: ExecutionContext): DefaultDB = apply(name, failoverStrategy)
 
   /**
@@ -711,11 +711,11 @@ object MongoConnection {
           case ("authSource", v) => unsupported -> result.
             copy(authSource = Some(v))
 
-          case ("authMode", "scram-sha1") => unsupported -> result.
-            copy(authMode = ScramSha1Authentication)
+          case ("authMode", "mongocr") => unsupported -> result.
+            copy(authMode = CrAuthentication)
 
           case ("authMode", _) => unsupported -> result.
-            copy(authMode = CrAuthentication)
+            copy(authMode = ScramSha1Authentication)
 
           case ("connectTimeoutMS", v) => unsupported -> result.
             copy(connectTimeoutMS = v.toInt)
@@ -937,11 +937,11 @@ class MongoDriver(config: Option[Config] = None) {
 
     // TODO: Passing ref to MongoDBSystem.history to AddConnection
     lazy val dbsystem: MongoDBSystem = options.authMode match {
-      case ScramSha1Authentication => new StandardDBSystem(
+      case CrAuthentication => new LegacyDBSystem(
         supervisorName, nm, nodes, authentications, options
       )
 
-      case _ => new LegacyDBSystem(
+      case _ => new StandardDBSystem(
         supervisorName, nm, nodes, authentications, options
       )
     }

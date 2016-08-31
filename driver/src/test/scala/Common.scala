@@ -1,9 +1,12 @@
 import scala.concurrent.{ Await, ExecutionContext }
 import scala.concurrent.duration._
 import reactivemongo.api.{
+  AuthenticationMode,
+  CrAuthentication,
   FailoverStrategy,
   MongoDriver,
-  MongoConnectionOptions
+  MongoConnectionOptions,
+  ScramSha1Authentication
 }
 
 object Common {
@@ -14,6 +17,9 @@ object Common {
       case "true" => true
       case _      => false
     }
+
+  val crMode = Option(System getProperty "test.authMode").
+    filter(_ == "cr").map(_ => CrAuthentication)
 
   val primaryHost =
     Option(System getProperty "test.primaryHost").getOrElse("localhost:27017")
@@ -31,14 +37,18 @@ object Common {
   val failoverStrategy = FailoverStrategy(retries = failoverRetries)
 
   val DefaultOptions = {
-    val opts = MongoConnectionOptions(
+    val a = MongoConnectionOptions(
       failoverStrategy = failoverStrategy,
       nbChannelsPerNode = 20
     )
 
-    if (Option(System getProperty "test.enableSSL").exists(_ == "true")) {
-      opts.copy(sslEnabled = true, sslAllowsInvalidCert = true)
-    } else opts
+    val b = {
+      if (Option(System getProperty "test.enableSSL").exists(_ == "true")) {
+        a.copy(sslEnabled = true, sslAllowsInvalidCert = true)
+      } else a
+    }
+
+    crMode.fold(b) { mode => b.copy(authMode = mode) }
   }
 
   lazy val connection = driver.connection(List(primaryHost), DefaultOptions)

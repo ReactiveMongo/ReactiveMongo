@@ -35,7 +35,7 @@ case class MongoConnectionOptions(
   authSource: Option[String] = None,
   sslEnabled: Boolean = false,
   sslAllowsInvalidCert: Boolean = false,
-  authMode: AuthenticationMode = CrAuthentication,
+  authMode: AuthenticationMode = ScramSha1Authentication,
 
   // reactivemongo specific options
   tcpNoDelay: Boolean = false,

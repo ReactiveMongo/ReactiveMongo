@@ -32,7 +32,6 @@ import reactivemongo.api.commands.{
 }
 import reactivemongo.core.nodeset.ProtocolMetadata
 import reactivemongo.core.protocol.{
-  CheckedWriteRequest,
   Delete,
   Query,
   Insert,
@@ -144,7 +143,6 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
   import reactivemongo.api.commands.{
     MultiBulkWriteResult,
     UpdateWriteResult,
-    Upserted,
     WriteResult
   }
 
@@ -276,33 +274,17 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
     }
 
     if (!documents.isEmpty) {
-      /* TODO: Remove
-      val metadata = db.connection.metadata
-      val havingMetadata = Failover2(db.connection, failoverStrategy) { () =>
-        metadata.map(Future.successful).getOrElse(Future.failed(MissingMetadata()))
-      }.future
-       */
-
       val havingMetadata = db.connection.metadata.
-        fold(Future.failed[ProtocolMetadata](
-          ConnectionNotInitialized.MissingMetadata
-        ))(Future.successful)
+        fold(Future.failed[ProtocolMetadata](MissingMetadata()))(Future.successful)
 
       havingMetadata.flatMap { metadata =>
         if (metadata.maxWireVersion >= MongoWireVersion.V26) {
           createBulk(documents, Mongo26WriteCommand.insert(ordered, writeConcern, metadata)).map { _.foldLeft(MultiBulkWriteResult())(_ merge _) }
         } else {
           // Mongo 2.4
-
-          /* TODO: Remove
-          createBulk(documents, new Mongo24BulkInsert(Insert(0, fullCollectionName), writeConcern, metadata)).map { list =>
-            list.foldLeft(MultiBulkWriteResult())((r, w) => r.merge(w))
-          }
-           */
           Future.failed[MultiBulkWriteResult](new scala.RuntimeException(
             s"unsupported MongoDB version: $metadata"
           ))
-          // TODO: Better exception
         }
       }
     } else Future.successful(MultiBulkWriteResult(
@@ -349,16 +331,10 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
           }
         }.future
 
-      case Some(_) => { // Mongo < 2.6 // TODO: Deprecates/remove
-        val op = Insert(0, fullCollectionName)
-        val bson = writeDoc(document, writer)
-        val checkedWriteRequest = CheckedWriteRequest(op, BufferSequence(bson), writeConcern)
-
-        Failover2(db.connection, failoverStrategy) { () =>
-          db.connection.sendExpectingResponse(checkedWriteRequest).
-            map(pack.readAndDeserialize(_, LastErrorReader))
-        }.future
-      }
+      case Some(metadata) => // Mongo < 2.6
+        Future.failed[WriteResult](new scala.RuntimeException(
+          s"unsupported MongoDB version: $metadata"
+        ))
 
       case _ =>
         Future.failed(MissingMetadata())
@@ -401,24 +377,10 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
       }.future
     }
 
-    case Some(_) => { // Mongo < 2.6 // TODO: Deprecate/remove
-      val flags = 0 | (if (upsert) UpdateFlags.Upsert else 0) | (if (multi) UpdateFlags.MultiUpdate else 0)
-      val op = Update(fullCollectionName, flags)
-      val bson = writeDoc(selector, selectorWriter)
-      bson.writeBytes(writeDoc(update, updateWriter))
-      val checkedWriteRequest =
-        CheckedWriteRequest(op, BufferSequence(bson), writeConcern)
-
-      Failover2(db.connection, failoverStrategy) { () =>
-        db.connection.sendExpectingResponse(checkedWriteRequest).map { r =>
-          val res = pack.readAndDeserialize(r, LastErrorReader)
-          UpdateWriteResult(res.ok, res.n, res.n,
-            res.upserted.map(Upserted(-1, _)).toSeq,
-            Nil, None, res.code, res.errmsg)
-
-        }
-      }.future
-    }
+    case Some(metadata) => // Mongo < 2.6
+      Future.failed[UpdateWriteResult](new scala.RuntimeException(
+        s"unsupported MongoDB version: $metadata"
+      ))
 
     case _ => Future.failed(MissingMetadata())
   }
@@ -538,9 +500,8 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
     import BatchCommands.AggregationFramework.Aggregate
     import BatchCommands.{ AggregateWriter, AggregateReader }
 
-    def ver = db.connection.metadata.fold[MongoWireVersion](
-      MongoWireVersion.V26
-    )(_.maxWireVersion)
+    def ver = db.connection.metadata.
+      fold[MongoWireVersion](MongoWireVersion.V30)(_.maxWireVersion)
 
     runWithResponse(Aggregate(
       firstOperator :: otherOperators, explain, allowDiskUse, None,
@@ -595,9 +556,8 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
     import reactivemongo.bson.buffer.WritableBuffer
     import reactivemongo.core.protocol.{ Reply, Response }
 
-    def ver = db.connection.metadata.fold[MongoWireVersion](
-      MongoWireVersion.V26
-    )(_.maxWireVersion)
+    def ver = db.connection.metadata.
+      fold[MongoWireVersion](MongoWireVersion.V30)(_.maxWireVersion)
 
     runWithResponse(Aggregate(
       firstOperator :: otherOperators, explain, allowDiskUse, Some(cursor),
@@ -667,16 +627,10 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
       }.future
     }
 
-    case Some(_) => { // Mongo < 2.6 // TODO: Deprecate/remove
-      val op = Delete(fullCollectionName, if (firstMatchOnly) 1 else 0)
-      val bson = writeDoc(query, writer)
-      val checkedWriteRequest = CheckedWriteRequest(op, BufferSequence(bson), writeConcern)
-
-      Failover2(db.connection, failoverStrategy) { () =>
-        db.connection.sendExpectingResponse(checkedWriteRequest).
-          map(pack.readAndDeserialize(_, LastErrorReader))
-      }.future
-    }
+    case Some(metadata) => // Mongo < 2.6
+      Future.failed[WriteResult](new scala.RuntimeException(
+        s"unsupported MongoDB version: $metadata"
+      ))
 
     case _ =>
       Future.failed(MissingMetadata())
