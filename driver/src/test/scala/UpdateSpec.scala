@@ -1,6 +1,6 @@
 import scala.concurrent.duration.FiniteDuration
 
-import reactivemongo.api.commands.{ UpdateWriteResult, Upserted }
+import reactivemongo.api.commands.{ UpdateWriteResult, WriteResult, Upserted }
 import reactivemongo.api.collections.bson.BSONCollection
 import reactivemongo.api.commands.bson.BSONUpdateCommand._
 import reactivemongo.api.commands.bson.BSONUpdateCommandImplicits._
@@ -75,7 +75,11 @@ class UpdateSpec extends org.specs2.mutable.Specification {
             case Upserted(0, id @ BSONString("foo")) :: Nil =>
               c.find(BSONDocument("_id" -> id)).one[BSONDocument].
                 aka("found") must beSome(doc).await(1, timeout)
-          }.await(1, timeout)
+          }.await(1, timeout) and {
+            c.insert(doc).map(_ => true).recover {
+              case WriteResult.Code(11000) => false
+            } must beFalse.await(0, timeout)
+          }
       }
 
       "upsert a document with the default connection" in { implicit ee: EE =>

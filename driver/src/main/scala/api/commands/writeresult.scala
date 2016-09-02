@@ -50,25 +50,56 @@ object WriteResult {
       result.writeConcernError
     ))
   }
+
+  /**
+   * Code extractor for [[WriteResult]]
+   *
+   * {{{
+   * import reactivemongo.api.commands.WriteResult
+   *
+   * def codeOr(res: WriteResult, or: => Int): Int = res match {
+   *   case WriteResult.Code(code) => code
+   *   case _ => or
+   * }
+   * }}}
+   */
+  object Code {
+    def unapply(result: WriteResult): Option[Int] = result.code
+  }
+
+  /**
+   * Code extractor for [[WriteResult]]
+   *
+   * {{{
+   * import reactivemongo.api.commands.WriteResult
+   *
+   * def messageOr(res: WriteResult, or: => String): String = res match {
+   *   case WriteResult.Message(msg) => msg
+   *   case _ => or
+   * }
+   * }}}
+   */
+  object Message {
+    def unapply(result: WriteResult): Option[String] = result.errmsg
+  }
 }
 
 case class LastError(
-  ok: Boolean,
-  errmsg: Option[String],
-  code: Option[Int],
-  lastOp: Option[Long],
-  n: Int,
-  singleShard: Option[String], // string?
-  updatedExisting: Boolean,
-  upserted: Option[BSONValue],
-  wnote: Option[WriteConcern.W],
-  wtimeout: Boolean,
-  waited: Option[Int],
-  wtime: Option[Int],
-  writeErrors: Seq[WriteError] = Nil,
-  writeConcernError: Option[WriteConcernError] = None
-)
-    extends DatabaseException with WriteResult with NoStackTrace {
+    ok: Boolean,
+    errmsg: Option[String],
+    code: Option[Int],
+    lastOp: Option[Long],
+    n: Int,
+    singleShard: Option[String], // string?
+    updatedExisting: Boolean,
+    upserted: Option[BSONValue],
+    wnote: Option[WriteConcern.W],
+    wtimeout: Boolean,
+    waited: Option[Int],
+    wtime: Option[Int],
+    writeErrors: Seq[WriteError] = Nil,
+    writeConcernError: Option[WriteConcernError] = None
+) extends DatabaseException with WriteResult with NoStackTrace {
 
   @deprecated("Use [[errmsg]]", "0.12.0")
   val err = errmsg
