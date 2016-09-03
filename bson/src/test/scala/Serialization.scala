@@ -20,7 +20,6 @@ import buffer._
 import java.util.Arrays
 import reactivemongo.bson.DefaultBSONHandlers._
 
-import java.nio.ByteBuffer
 import java.util.Arrays
 
 class SerializationSpecs extends Specification {

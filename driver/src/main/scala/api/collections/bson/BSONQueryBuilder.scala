@@ -81,11 +81,12 @@ case class BSONQueryBuilder(
       val base = Seq[BSONElement]("mode" -> BSONString(mode))
 
       BSONDocument(readPreference match {
-        case ReadPreference.Taggable(tagSet) => base :+ ("tags" -> BSONArray(
-          tagSet.map(tags => BSONDocument(tags.toList.map {
-            case (k, v) => k -> BSONString(v)
-          }))
-        ))
+        case ReadPreference.Taggable(tagSet) =>
+          base :+ BSONElement("tags", BSONArray(
+            tagSet.map(tags => BSONDocument(tags.toList.map {
+              case (k, v) => k -> BSONString(v)
+            }))
+          ))
 
         case _ => base
       })

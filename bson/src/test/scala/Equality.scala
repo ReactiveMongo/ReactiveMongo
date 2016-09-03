@@ -65,17 +65,17 @@ class Equality extends Specification {
   "BSONDocument" should {
     "retain equality through serialization/deserialization" in {
       val b1 = BSONDocument(Seq(
-        "boolean" → BSONBoolean(value = true),
-        "int" → BSONInteger(42),
-        "long" → BSONLong(42L),
-        "double" → BSONDouble(42.0),
-        "string" → BSONString("forty-two"),
-        "datetime" → BSONDateTime(System.currentTimeMillis()),
-        "timestamp" → BSONTimestamp(System.currentTimeMillis()),
-        "binary" → BSONBinary(Array[Byte](1, 2, 3), Subtype.GenericBinarySubtype),
-        "objectid" → BSONObjectID(Array[Byte](1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12)),
-        "dbpointer" → BSONDBPointer("coll", Array[Byte](1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12)),
-        "array" → BSONArray(Seq(BSONInteger(42), BSONString("42"), BSONDouble(42.0), BSONDateTime(0)))
+        "boolean" -> BSONBoolean(value = true),
+        "int" -> BSONInteger(42),
+        "long" -> BSONLong(42L),
+        "double" -> BSONDouble(42.0),
+        "string" -> BSONString("forty-two"),
+        "datetime" -> BSONDateTime(System.currentTimeMillis()),
+        "timestamp" -> BSONTimestamp(System.currentTimeMillis()),
+        "binary" -> BSONBinary(Array[Byte](1, 2, 3), Subtype.GenericBinarySubtype),
+        "objectid" -> BSONObjectID(Array[Byte](1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12)),
+        "dbpointer" -> BSONDBPointer("coll", Array[Byte](1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12)),
+        "array" -> BSONArray(Seq(BSONInteger(42), BSONString("42"), BSONDouble(42.0), BSONDateTime(0)))
       ))
       val writeBuffer = new ArrayBSONBuffer
       DefaultBufferHandler.write(writeBuffer, b1)

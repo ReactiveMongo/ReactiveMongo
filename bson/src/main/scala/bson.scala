@@ -31,9 +31,6 @@ package reactivemongo.bson
  * }}}
  */
 object `package` extends DefaultBSONHandlers {
-  /** Type of element for the BSON documents. */
-  type BSONElement = (String, BSONValue)
-
   // DSL helpers:
 
   /** Returns an empty document. */
@@ -50,66 +47,8 @@ object `package` extends DefaultBSONHandlers {
 
   /** Returns a newly generated object ID. */
   def generateId = BSONObjectID.generate()
-}
 
-sealed trait Producer[T] {
-  private[bson] def produce: Option[T]
-}
-
-object Producer {
-  case class NameOptionValueProducer(private val element: (String, Option[BSONValue])) extends Producer[(String, BSONValue)] {
-    private[bson] def produce = element._2.map(value => element._1 -> value)
-  }
-
-  case class OptionValueProducer(private val element: Option[BSONValue]) extends Producer[BSONValue] {
-    private[bson] def produce = element
-  }
-
-  implicit def nameValue2Producer[T](element: (String, T))(implicit writer: BSONWriter[T, _ <: BSONValue]) =
-    NameOptionValueProducer(element._1, Some(writer.write(element._2)))
-
-  implicit def nameOptionValue2Producer[T](element: (String, Option[T]))(implicit writer: BSONWriter[T, _ <: BSONValue]) =
-    NameOptionValueProducer(element._1, element._2.map(value => writer.write(value)))
-
-  implicit def noneOptionValue2Producer(element: (String, None.type)) =
-    NameOptionValueProducer(element._1, None)
-
-  implicit def valueProducer[T](element: T)(implicit writer: BSONWriter[T, _ <: BSONValue]) =
-    OptionValueProducer(Some(writer.write(element)))
-
-  implicit def optionValueProducer[T](element: Option[T])(implicit writer: BSONWriter[T, _ <: BSONValue]) =
-    OptionValueProducer(element.map(writer.write(_)))
-
-  implicit def noneOptionValueProducer(element: None.type) =
-    OptionValueProducer(None)
-}
-
-import scala.reflect.ClassTag
-
-trait BSONValue {
-  val code: Byte
-}
-
-object BSONValue {
-  import scala.util.Try
-
-  implicit class ExtendedBSONValue[B <: BSONValue](val bson: B) extends AnyVal {
-    def asTry[T](implicit reader: BSONReader[B, T]): Try[T] = {
-      reader.readTry(bson)
-    }
-
-    def asOpt[T](implicit reader: BSONReader[B, T]): Option[T] = asTry(reader).toOption
-    def as[T](implicit reader: BSONReader[B, T]): T = asTry(reader).get
-
-    def seeAsTry[T](implicit reader: BSONReader[_ <: BSONValue, T]): Try[T] =
-      Try { reader.asInstanceOf[BSONReader[BSONValue, T]].readTry(bson) }.flatten
-
-    def seeAsOpt[T](implicit reader: BSONReader[_ <: BSONValue, T]): Option[T] =
-      seeAsTry[T].toOption
-  }
-
-  final def narrow[T <: BSONValue](v: BSONValue)(implicit tag: ClassTag[T]): Option[T] = tag.unapply(v)
-
+  def element(name: String, value: BSONValue) = BSONElement(name, value)
 }
 
 object BSON {

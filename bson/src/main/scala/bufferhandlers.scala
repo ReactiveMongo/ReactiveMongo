@@ -89,9 +89,9 @@ object DefaultBufferHandler extends BufferHandler {
       val now = buffer.index
       buffer.writeInt(0)
       doc.elements.foreach { e =>
-        buffer.writeByte(e._2.code.toByte)
-        buffer.writeCString(e._1)
-        serialize(e._2, buffer)
+        buffer.writeByte(e.value.code.toByte)
+        buffer.writeCString(e.name)
+        serialize(e.value, buffer)
       }
       buffer.setInt(now, (buffer.index - now + 1))
       buffer.writeByte(0)
@@ -102,11 +102,11 @@ object DefaultBufferHandler extends BufferHandler {
       val length = b.readInt
       val buffer = b.slice(length - 4)
       b.discard(length - 4)
-      def makeStream(): Stream[Try[(String, BSONValue)]] = {
+      def makeStream(): Stream[Try[BSONElement]] = {
         if (buffer.readable > 1) { // last is 0
           val code = buffer.readByte
           val name = buffer.readCString
-          val elem = Try(name -> DefaultBufferHandler.handlersByCode.get(code).map(_.read(buffer)).get)
+          val elem = Try(BSONElement(name, DefaultBufferHandler.handlersByCode.get(code).map(_.read(buffer)).get))
           elem #:: makeStream
         } else Stream.empty
       }
@@ -242,22 +242,21 @@ object DefaultBufferHandler extends BufferHandler {
     serialize(document, buffer)
 }
 
-sealed trait BSONIterator extends Iterator[BSONElement] {
+sealed trait BSONIterator extends Iterator[(String, BSONValue)] {
   val buffer: ReadableBuffer
 
   val startIndex = buffer.index
   val documentSize = buffer.readInt
 
-  def next: BSONElement = {
+  def next: (String, BSONValue) = {
     val code = buffer.readByte
     buffer.readString -> DefaultBufferHandler.handlersByCode.get(code).map(_.read(buffer)).get
   }
 
   def hasNext = buffer.index - startIndex + 1 < documentSize
 
-  def mapped: Map[String, BSONElement] = {
-    for (el <- this) yield (el._1, el)
-  }.toMap
+  def mapped: Map[String, BSONElement] =
+    (for (el <- this) yield (el._1, BSONElement(el._1, el._2))).toMap
 }
 
 object BSONIterator {
@@ -265,15 +264,15 @@ object BSONIterator {
     val prefix = (0 to i).map { i => "  " }.mkString("")
     (for (tryElem <- it) yield {
       tryElem match {
-        case Success(elem) => elem._2 match {
-          case array: BSONArray  => prefix + elem._1 + ": [\n" + pretty(i + 1, array.iterator) + "\n" + prefix + "]"
+        case Success(elem) => elem.value match {
+          case array: BSONArray  => prefix + elem.name + ": [\n" + pretty(i + 1, array.elements.map(Success(_)).iterator) + "\n" + prefix + "]"
 
-          case doc: BSONDocument => prefix + elem._1 + ": {\n" + pretty(i + 1, doc.stream.iterator) + "\n" + prefix + "}"
+          case doc: BSONDocument => prefix + elem.name + ": {\n" + pretty(i + 1, doc.stream.iterator) + "\n" + prefix + "}"
 
           case BSONString(s) =>
-            prefix + elem._1 + ": \"" + s.replaceAll("\"", "\\\"") + '"'
+            prefix + elem.name + ": \"" + s.replaceAll("\"", "\\\"") + '"'
 
-          case _ => prefix + elem._1 + ": " + elem._2.toString
+          case _ => prefix + elem.name + ": " + elem.value.toString
         }
         case Failure(e) => s"${prefix}ERROR[${e.getMessage()}]"
       }

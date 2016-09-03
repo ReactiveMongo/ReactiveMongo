@@ -415,7 +415,7 @@ object ReplStatus extends AdminCommand[Map[String, BSONValue]] {
   override def makeDocuments = BSONDocument("replSetGetStatus" -> BSONInteger(1))
 
   object ResultMaker extends BSONCommandResultMaker[Map[String, BSONValue]] {
-    def apply(document: BSONDocument) = Right(document.elements.toMap)
+    def apply(document: BSONDocument) = Right(document.toMap)
   }
 }
 
@@ -431,7 +431,7 @@ object Status extends AdminCommand[Map[String, BSONValue]] {
   override def makeDocuments = BSONDocument("serverStatus" -> BSONInteger(1))
 
   object ResultMaker extends BSONCommandResultMaker[Map[String, BSONValue]] {
-    def apply(document: BSONDocument) = Right(document.elements.toMap)
+    def apply(document: BSONDocument) = Right(document.toMap)
   }
 }
 

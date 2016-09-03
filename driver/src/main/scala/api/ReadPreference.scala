@@ -1,6 +1,11 @@
 package reactivemongo.api
 
-import reactivemongo.bson.{ BSONArray, BSONDocument, BSONDocumentWriter }
+import reactivemongo.bson.{
+  BSONArray,
+  BSONDocument,
+  BSONElement,
+  BSONDocumentWriter
+}
 
 /**
  * MongoDB Read Preferences enable to read from primary or secondaries
@@ -206,11 +211,16 @@ object ReadPreference {
       val els = underlying.elements
       doc.elements.forall { element =>
         els.find {
-          case (name, value) => element._1 == name && ((element._2, value) match {
-            case (d1: BSONDocument, d2: BSONDocument) => d1.elements == d2.elements
-            case (a1: BSONArray, a2: BSONArray)       => a1.values == a2.values
-            case (v1, v2)                             => v1 == v2
-          })
+          case BSONElement(name, value) =>
+            element._1 == name && ((element._2, value) match {
+              case (d1: BSONDocument, d2: BSONDocument) =>
+                d1.elements == d2.elements
+
+              case (a1: BSONArray, a2: BSONArray) =>
+                a1.values == a2.values
+
+              case (v1, v2) => v1 == v2
+            })
         }.isDefined
       }
     }

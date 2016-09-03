@@ -214,8 +214,28 @@ object BSONHandler {
     def write(x: T): B = w(x)
   }
 
+  /**
+   * Handler factory.
+   *
+   * {{{
+   * import reactivemongo.bson.{ BSONHandler, BSONString }
+   *
+   * case class Foo(value: String)
+   *
+   * val foo: BSONHandler[BSONString, Foo] = BSONHandler(
+   *   { read: BSONString => Foo(read.value) },
+   *   { write: Foo => BSONString(write.value)
+   * )
+   * }}}
+   */
   def apply[B <: BSONValue, T](read: B => T, write: T => B): BSONHandler[B, T] =
     new DefaultHandler(read, write)
+
+  /**
+   * Returns a BSON handler for a type `T`, provided there are
+   * a writer and a reader for it, both using the same kind of `BSONValue`.
+   */
+  implicit def provided[B <: BSONValue, T](implicit writer: BSONWriter[T, B], reader: BSONReader[B, T]): BSONHandler[B, T] = BSONHandler(reader.read _, writer.write _)
 }
 
 trait DefaultBSONHandlers {
