@@ -123,7 +123,7 @@ class Handlers extends org.specs2.mutable.Specification {
 
   "Complex Array" should {
     "be of size = 6" in {
-      array.length mustEqual 6
+      array.size mustEqual 6
     }
 
     "have a an int = 2 at index 2" in {
@@ -213,6 +213,29 @@ class Handlers extends org.specs2.mutable.Specification {
     "be writen #2" in {
       writer.beforeWrite((_: (Int, Int)).toString).write(1 -> 2).
         aka("mapped BSON") must_== BSONString("(1,2)")
+    }
+  }
+
+  "Custom class" should {
+    case class Foo(bar: String)
+    implicit val w = BSONWriter[Foo, BSONString] { f => BSONString(f.bar) }
+    implicit val r = BSONReader[BSONString, Foo] { s => Foo(s.value) }
+
+    val foo = Foo("lorem")
+    val bson = BSONString("lorem")
+
+    "be read" in {
+      w.write(foo) must_== bson
+    }
+
+    "be written" in {
+      r.read(bson) must_== foo
+    }
+
+    "be handled (provided there are reader and writer)" in {
+      val h = implicitly[BSONHandler[BSONString, Foo]]
+
+      h.write(foo) must_== bson and (h.read(bson) must_== foo)
     }
   }
 

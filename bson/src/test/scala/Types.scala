@@ -48,7 +48,7 @@ class Types extends Specification {
     }
 
     "be created with a new element " in {
-      val doc = BSONDocument.empty ++ ("foo" -> 1)
+      val doc = BSONDocument.empty :~ ("foo" -> 1)
 
       doc must_== BSONDocument("foo" -> 1) and (
         doc.contains("foo") must beTrue
@@ -64,7 +64,7 @@ class Types extends Specification {
     }
   }
 
-  "BSON array" should {
+  "BSONArray" should {
     "be empty" in {
       BSONArray().values must beEmpty and (
         BSONArray.empty.values must beEmpty
@@ -79,6 +79,10 @@ class Types extends Specification {
     "be created with a new element " in {
       val arr = BSONArray.empty ++ ("foo", "bar")
       arr must_== BSONArray("foo", "bar")
+    }
+
+    "be returned with a prepended element" in {
+      BSONString("bar") +: BSONArray("foo") must_== BSONArray("bar", "foo")
     }
   }
 

@@ -177,7 +177,8 @@ object Dependencies {
 
   val playIteratees = "com.typesafe.play" %% "play-iteratees" % "2.3.10"
 
-  val specs = "org.specs2" %% "specs2-core" % "3.8.3" % Test
+  val specsVer = "3.8.3"
+  val specs = "org.specs2" %% "specs2-core" % specsVer % Test
 
   val slf4jVer = "1.7.12"
   val log4jVer = "2.5"
@@ -325,7 +326,10 @@ object ReactiveMongoBuild extends Build {
     file("bson"),
     settings = buildSettings).
     settings(
-      libraryDependencies += specs,
+      libraryDependencies ++= Seq(specs,
+        "org.specs2" %% "specs2-scalacheck" % specsVer % Test,
+        "org.typelevel" %% "discipline" % "0.6" % Test,
+        "org.spire-math" %% "spire-laws" % "0.12.0" % Test),
       binaryIssueFilters ++= Seq(
         ProblemFilters.exclude[MissingTypesProblem](
           "reactivemongo.bson.BSONTimestamp$")))
