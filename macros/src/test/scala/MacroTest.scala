@@ -23,12 +23,16 @@ object MacroTest {
   case class Empty()
   object EmptyObject
 
+  case class WithImplicit1(pos: Int, text: String)(implicit x: Numeric[Int])
+  case class WithImplicit2[N: Numeric](ident: String, value: N)
+
   case class RenamedId(
     @Key("_id") myID: BSONObjectID = BSONObjectID.generate(),
     @CustomAnnotation value: String
   )
 
   case class Foo[T](bar: T, lorem: String)
+  case class Bar(name: String, next: Option[Bar])
 
   object Nest {
     case class Nested(name: String)

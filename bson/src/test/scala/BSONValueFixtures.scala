@@ -19,6 +19,7 @@ object BSONValueFixtures {
     BSONDocument.empty,
     BSONDocument("foo" -> "bar"),
     BSONDocument("lorem" -> 2, "ipsum" -> "value"),
+    BSONDocument("ipsum" -> "value", "foo" -> 2D),
     BSONDocument("_id" -> "unique", "values" -> BSONArray(bsonStrFixtures)),
     BSONDocument(
       "position" -> 1000,

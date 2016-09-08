@@ -138,4 +138,17 @@ object Macros {
     @meta.param
     case class Ignore() extends StaticAnnotation
   }
+
+  /** Only for internal purposes */
+  final class Placeholder private () {}
+
+  /** Only for internal purposes */
+  object Placeholder {
+    private val instance = new Placeholder()
+
+    implicit object Handler extends BSONHandler[BSONDocument, Placeholder] {
+      def read(bson: BSONDocument) = instance
+      def write(pl: Placeholder) = BSONDocument.empty
+    }
+  }
 }

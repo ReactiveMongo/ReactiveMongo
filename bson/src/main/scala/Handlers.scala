@@ -247,6 +247,7 @@ trait DefaultBSONHandlers {
     def read(long: BSONLong) = long.value
     def write(long: Long) = BSONLong(long)
   }
+
   implicit object BSONDoubleHandler extends BSONHandler[BSONDouble, Double] {
     def read(double: BSONDouble) = double.value
     def write(double: Double) = BSONDouble(double)

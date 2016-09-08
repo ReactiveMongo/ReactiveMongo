@@ -8,20 +8,24 @@ import reactivemongo.bson.Macros.Options.SaveSimpleName
 import scala.reflect.macros.Context
 
 private object MacroImpl {
-  def reader[A: c.WeakTypeTag, Opts: c.WeakTypeTag](c: Context): c.Expr[BSONDocumentReader[A]] = c.universe.reify(BSONDocumentReader[A] {
-    document: BSONDocument => Helper[A, Opts](c).readBody.splice
+  def reader[A: c.WeakTypeTag, Opts: c.WeakTypeTag](c: Context): c.Expr[BSONDocumentReader[A]] = c.universe.reify(new BSONDocumentReader[A] {
+    lazy val forwardReader = BSONDocumentReader[A](this.read _)
+    def read(document: BSONDocument) = Helper[A, Opts](c).readBody.splice
   })
 
-  def writer[A: c.WeakTypeTag, Opts: c.WeakTypeTag](c: Context): c.Expr[BSONDocumentWriter[A]] = c.universe.reify(BSONDocumentWriter[A] {
-    document: A => Helper[A, Opts](c).writeBody.splice
+  def writer[A: c.WeakTypeTag, Opts: c.WeakTypeTag](c: Context): c.Expr[BSONDocumentWriter[A]] = c.universe.reify(new BSONDocumentWriter[A] {
+    lazy val forwardWriter = BSONDocumentWriter[A](this.write _)
+    def write(document: A) = Helper[A, Opts](c).writeBody.splice
   })
 
   def handler[A: c.WeakTypeTag, Opts: c.WeakTypeTag](c: Context): c.Expr[BSONDocumentReader[A] with BSONDocumentWriter[A] with BSONHandler[BSONDocument, A]] = {
     val helper = Helper[A, Opts](c)
     c.universe.reify(
       new BSONDocumentReader[A] with BSONDocumentWriter[A] with BSONHandler[BSONDocument, A] {
-        def read(document: BSONDocument): A = helper.readBody.splice
+        lazy val forwardReader = BSONDocumentReader[A](this.read _)
+        lazy val forwardWriter = BSONDocumentWriter[A](this.write _)
 
+        def read(document: BSONDocument): A = helper.readBody.splice
         def write(document: A): BSONDocument = helper.writeBody.splice
       })
   }
@@ -31,21 +35,27 @@ private object MacroImpl {
     val Opts = c.weakTypeOf[Opts]
   }
 
-  private abstract class Helper[C <: Context, A](val c: C) {
+  private abstract class Helper[C <: Context, A](
+    val c: C
+  ) extends ImplicitResolver[C] {
     import c.universe._
 
-    protected def A: c.Type
-    protected def Opts: c.Type
+    protected def A: Type
+    protected def Opts: Type
+
+    private val writerType: Type = typeOf[Writer[_]].typeConstructor
+    private val readerType: Type = typeOf[Reader[_]].typeConstructor
 
     lazy val readBody: c.Expr[A] = {
       val writer = unionTypes map { types =>
+        val resolve = resolver(Map.empty, "Reader")(readerType)
         val cases = types map { typ =>
           val pattern = if (hasOption[SaveSimpleName])
             Literal(Constant(typ.typeSymbol.name.decodedName.toString))
           else
             Literal(Constant(typ.typeSymbol.fullName)) //todo
 
-          val body = readBodyFromImplicit(typ)
+          val body = readBodyFromImplicit(typ)(resolve)
           CaseDef(pattern, body)
         }
         val className = c.parse("""document.getAs[String]("className").get""")
@@ -64,9 +74,10 @@ private object MacroImpl {
 
     lazy val writeBody: c.Expr[BSONDocument] = {
       val writer = unionTypes map { types =>
+        val resolve = resolver(Map.empty, "Writer")(writerType)
         val cases = types map { typ =>
           val pattern = Bind(newTermName("document"), Typed(Ident(nme.WILDCARD), TypeTree(typ)))
-          val body = writeBodyFromImplicit(typ)
+          val body = writeBodyFromImplicit(typ)(resolve)
           CaseDef(pattern, body)
         }
         Match(Ident("document"), cases)
@@ -80,58 +91,65 @@ private object MacroImpl {
       result
     }
 
-    private def readBodyFromImplicit(A: c.Type) = {
-      val reader = c.inferImplicitValue(appliedType(readerType, List(A)))
+    // For member of a union
+    private def readBodyFromImplicit(tpe: Type)(r: Type => Implicit) = {
+      val (reader, _) = r(tpe)
 
-      if (reader.isEmpty) readBodyConstruct(A)
+      if (reader.isEmpty) readBodyConstruct(tpe)
       else Apply(Select(reader, "read"), List(Ident("document")))
     }
 
-    private def readBodyConstruct(implicit A: c.Type) = {
-      if (isSingleton(A)) readBodyConstructSingleton
+    private def readBodyConstruct(implicit tpe: Type) =
+      if (isSingleton(tpe)) readBodyConstructSingleton
       else readBodyConstructClass
-    }
 
-    private def readBodyConstructSingleton(implicit A: c.Type) = {
-      val sym = A match {
+    private def readBodyConstructSingleton(implicit tpe: Type) = {
+      val sym = tpe match {
         case SingleType(_, sym) => sym
         case TypeRef(_, sym, _) => sym
-        case _                  => c.abort(c.enclosingPosition, s"Something weird is going on with '$A'. Should be a singleton but can't parse it")
+        case _                  => c.abort(c.enclosingPosition, s"Something weird is going on with '$tpe'. Should be a singleton but can't parse it")
       }
-      val name = stringToTermName(sym.name.toString) //this is ugly but quite stable compared to other attempts
-      Ident(name)
+
+      //this is ugly but quite stable compared to other attempts
+      Ident(stringToTermName(sym.name.toString))
     }
 
-    private def readBodyConstructClass(implicit A: c.Type) = {
+    private def readBodyConstructClass(implicit tpe: Type) = {
       val (constructor, _) = matchingApplyUnapply
 
-      val tpeArgs: List[c.Type] = A match {
+      val tpeArgs: List[Type] = tpe match {
         case TypeRef(_, _, args) => args
         case ClassInfoType(_, _, _) => Nil
       }
       val boundTypes = constructor.typeParams.zip(tpeArgs).map {
         case (sym, ty) => sym.fullName -> ty
       }.toMap
+      val resolve = resolver(boundTypes, "Reader")(readerType)
 
       val values = constructor.paramss.head.map { param =>
         val t = param.typeSignature
         val sig = boundTypes.lift(t.typeSymbol.fullName).getOrElse(t)
-        val optTyp = optionTypeParameter(sig)
-        val typ = optTyp getOrElse sig
+        val opt = optionTypeParameter(sig)
+        val typ = opt getOrElse sig
+        val (reader, _) = resolve(sig)
+        val pname = paramName(param)
 
-        if (optTyp.isDefined) {
-          Apply(
-            TypeApply(
+        if (reader.isEmpty) {
+          c.abort(c.enclosingPosition, s"Implicit ${classOf[Reader[_]].getName}[${A.typeSymbol.name}] for '$pname' not found")
+        }
+
+        opt match {
+          case Some(_) =>
+            Apply(Apply(TypeApply(
               Select(Ident("document"), "getAs"),
               List(TypeTree(typ))),
-            List(Literal(Constant(paramName(param)))))
-        } else {
-          val getter = Apply(
+              List(Literal(Constant(pname)))), List(reader))
+
+          case _ => Select(Apply(Apply(
             TypeApply(
               Select(Ident("document"), "getAsTry"),
               List(TypeTree(typ))),
-            List(Literal(Constant(paramName(param)))))
-          Select(getter, "get")
+            List(Literal(Constant(pname)))), List(reader)), "get")
         }
       }
 
@@ -140,12 +158,13 @@ private object MacroImpl {
       Apply(constructorTree, values)
     }
 
-    private def writeBodyFromImplicit(A: c.Type) = {
-      val writer = c.inferImplicitValue(appliedType(writerType, List(A)))
+    private def writeBodyFromImplicit(tpe: Type)(r: Type => Implicit) = {
+      val (writer, _) = r(tpe)
+
       if (!writer.isEmpty) {
         val doc = Apply(Select(writer, "write"), List(Ident("document")))
 
-        classNameTree(A) map { className =>
+        classNameTree(tpe) map { className =>
           val nameE = c.Expr[(String, BSONString)](className)
           val docE = c.Expr[BSONDocument](doc)
 
@@ -153,86 +172,80 @@ private object MacroImpl {
             docE.splice ++ BSONDocument(Seq((nameE.splice)))
           }.tree
         } getOrElse doc
-      } else writeBodyConstruct(A)
+      } else writeBodyConstruct(tpe)
     }
 
-    private def writeBodyConstruct(A: c.Type): c.Tree = {
-      if (isSingleton(A)) writeBodyConstructSingleton(A)
-      else writeBodyConstructClass(A)
-    }
+    @inline private def writeBodyConstruct(tpe: Type): Tree =
+      if (isSingleton(tpe)) writeBodyConstructSingleton(tpe)
+      else writeBodyConstructClass(tpe)
 
-    private def writeBodyConstructSingleton(A: c.Type): c.Tree = (
-      classNameTree(A) map { className =>
+    private def writeBodyConstructSingleton(tpe: Type): Tree = (
+      classNameTree(tpe).map { className =>
         val nameE = c.Expr[(String, BSONString)](className)
         reify { BSONDocument(Seq((nameE.splice))) }
       } getOrElse reify { BSONDocument.empty }
       ).tree
 
-    private def writeBodyConstructClass(A: c.Type): c.Tree = {
-      val (constructor, deconstructor) = matchingApplyUnapply(A)
+    private def writeBodyConstructClass(tpe: Type): Tree = {
+      val (constructor, deconstructor) = matchingApplyUnapply(tpe)
       val types = unapplyReturnTypes(deconstructor)
 
-      if (constructor.paramss.size > 1) {
-        c.abort(c.enclosingPosition, s"Constructor with multiple parameter lists is not supported: ${A.typeSymbol.name}${constructor.typeSignature}")
-      }
-
       val constructorParams = constructor.paramss.head
-      val tpeArgs: List[c.Type] = A match {
+      val tpeArgs: List[Type] = tpe match {
         case TypeRef(_, _, args) => args
         case ClassInfoType(_, _, _) => Nil
       }
       val boundTypes = constructor.typeParams.zip(tpeArgs).map {
         case (sym, ty) => sym.fullName -> ty
       }.toMap
+      val resolve = resolver(boundTypes, "Writer")(writerType)
 
       val tuple = Ident(newTermName("tuple"))
       val (optional, required) = constructorParams.zipWithIndex.filterNot(p => ignoreField(p._1)) zip types partition (t => isOptionalType(t._2))
       val values = required map {
         case ((param, i), sig) =>
-          val typ = boundTypes.lift(sig.typeSymbol.fullName).getOrElse(sig)
-          val neededType = appliedType(writerType, List(typ))
-          val writer = c.inferImplicitValue(neededType)
+          val (writer, _) = resolve(sig)
+          val pname = paramName(param)
 
           if (writer.isEmpty) {
-            c.abort(c.enclosingPosition, s"Implicit ${classOf[Writer[_]].getName}[${A.typeSymbol.name}] for '${param.name}' not found")
+            c.abort(c.enclosingPosition, s"Implicit ${classOf[Writer[_]].getName}[${A.typeSymbol.name}] for '$pname' not found")
           }
 
           val tuple_i = if (types.length == 1) tuple else Select(tuple, "_" + (i + 1))
           val bs_value = c.Expr[BSONValue](Apply(Select(writer, "write"), List(tuple_i)))
-          val name = c.literal(paramName(param))
+          val name = c.literal(pname)
           reify((name.splice, bs_value.splice): (String, BSONValue)).tree
       }
 
       val appends = optional map {
         case ((param, i), optType) =>
           val sig = optionTypeParameter(optType).get
-          val typ = boundTypes.lift(sig.typeSymbol.fullName).getOrElse(sig)
-          val neededType = appliedType(writerType, List(typ))
-          val writer = c.inferImplicitValue(neededType)
+          val (writer, _) = resolve(sig)
+          val pname = paramName(param)
 
           if (writer.isEmpty) {
-            c.abort(c.enclosingPosition, s"Implicit ${classOf[Writer[_]].getName}[${A.typeSymbol.name}] for '${param.name}' not found")
+            c.abort(c.enclosingPosition, s"Implicit ${classOf[Writer[_]].getName}[${A.typeSymbol.name}] for '$pname' not found")
           }
 
           val tuple_i = if (types.length == 1) tuple else Select(tuple, "_" + (i + 1))
           val bs_value = c.Expr[BSONValue](Apply(Select(writer, "write"), List(Select(tuple_i, "get"))))
-          val name = c.literal(paramName(param))
+          val name = c.literal(pname)
           If(
             Select(tuple_i, "isDefined"),
             Apply(Select(Ident("buf"), "$plus$colon$eq"), List(reify((name.splice, bs_value.splice)).tree)),
             EmptyTree)
       }
 
-      val mkBSONdoc = Apply(bsonDocPath, values ++ classNameTree(A))
+      val mkBSONdoc = Apply(bsonDocPath, values ++ classNameTree(tpe))
 
       val writer = {
         if (optional.isEmpty) List(mkBSONdoc)
         else List(
           ValDef(Modifiers(), newTermName("bson"), TypeTree(), mkBSONdoc),
-          c.parse("var buf = scala.collection.immutable.Stream[(String,reactivemongo.bson.BSONValue)]()")) ++ appends :+ c.parse("bson.add(reactivemongo.bson.BSONDocument(buf))")
+          c.parse("var buf = scala.collection.immutable.Stream[(String,reactivemongo.bson.BSONValue)]()")) ++ appends :+ c.parse("bson.merge(reactivemongo.bson.BSONDocument(buf))")
       }
 
-      val unapplyTree = Select(Ident(companion(A).name.toString), "unapply")
+      val unapplyTree = Select(Ident(companion(tpe).name.toString), "unapply")
       val invokeUnapply = Select(Apply(unapplyTree, List(Ident(newTermName("document")))), "get")
       val tupleDef = ValDef(Modifiers(), newTermName("tuple"), TypeTree(), invokeUnapply)
 
@@ -241,22 +254,22 @@ private object MacroImpl {
       } else writer.head
     }
 
-    private def classNameTree(A: c.Type) = {
+    private def classNameTree(tpe: Type) = {
       if (hasOption[Macros.Options.SaveClassName]) Some {
         val name = if (hasOption[Macros.Options.SaveSimpleName])
-          c.literal(A.typeSymbol.name.decodedName.toString)
+          c.literal(tpe.typeSymbol.name.decodedName.toString)
         else
-          c.literal(A.typeSymbol.fullName)
+          c.literal(tpe.typeSymbol.fullName)
 
         reify("className", BSONStringHandler.write(name.splice)).tree
       }
       else None
     }
 
-    private lazy val unionTypes: Option[List[c.Type]] =
+    private lazy val unionTypes: Option[List[Type]] =
       parseUnionTypes orElse directKnownSubclasses
 
-    private def parseUnionTypes: Option[List[c.Type]] = {
+    private def parseUnionTypes: Option[List[Type]] = {
       val unionOption = c.typeOf[Macros.Options.UnionType[_]]
       val union = c.typeOf[Macros.Options.\/[_, _]]
 
@@ -290,10 +303,8 @@ private object MacroImpl {
       tree map { t => parseUnionTree(List(t), Nil) }
     }
 
-    private def directKnownSubclasses: Option[List[c.Type]] = {
+    private def directKnownSubclasses: Option[List[Type]] = {
       // Workaround for SI-7046: https://issues.scala-lang.org/browse/SI-7046
-      import c.universe._
-
       val tpeSym = A.typeSymbol.asClass
 
       @annotation.tailrec
@@ -339,7 +350,7 @@ private object MacroImpl {
       } else None
     }
 
-    private def hasOption[O: c.TypeTag]: Boolean = Opts <:< typeOf[O]
+    private def hasOption[O: TypeTag]: Boolean = Opts <:< typeOf[O]
 
     private def unapplyReturnTypes(deconstructor: c.universe.MethodSymbol): List[c.Type] = {
       val opt = deconstructor.returnType match {
@@ -357,68 +368,112 @@ private object MacroImpl {
     }
 
     //Some(A) for Option[A] else None
-    private def optionTypeParameter(implicit A: c.Type): Option[c.Type] = {
-      if (isOptionalType(A))
-        A match {
-          case TypeRef(_, _, args) => args.headOption
-          case _                   => None
-        }
-      else None
+    private def optionTypeParameter(implicit tpe: Type): Option[Type] = {
+      if (isOptionalType(tpe)) tpe match {
+        case TypeRef(_, _, args) => args.headOption
+        case _                   => None
+      } else None
     }
 
-    private def isOptionalType(implicit A: c.Type): Boolean =
-      (c.typeOf[Option[_]].typeConstructor == A.typeConstructor)
+    private def isOptionalType(implicit tpe: Type): Boolean =
+      c.typeOf[Option[_]].typeConstructor == tpe.typeConstructor
 
-    private def bsonDocPath: c.universe.Select = Select(Select(
+    private def bsonDocPath: Select = Select(Select(
       Ident(newTermName("reactivemongo")), "bson"), "BSONDocument")
 
-    private def paramName(param: c.Symbol): String = {
-      param.annotations.collect {
-        case ann if ann.tpe =:= typeOf[Key] =>
-          ann.scalaArgs.collect {
-            case l: Literal => l.value.value
-          }.collect {
-            case value: String => value
-          }
-      }.flatten.headOption getOrElse param.name.toString
-    }
+    private def paramName(param: Symbol): String = param.annotations.collect {
+      case ann if ann.tpe =:= typeOf[Key] => ann.scalaArgs.collect {
+        case l: Literal => l.value.value
+      }.collect {
+        case value: String => value
+      }
+    }.flatMap(identity).headOption getOrElse param.name.toString
 
-    private def ignoreField(param: c.Symbol): Boolean =
+    private def ignoreField(param: Symbol): Boolean =
       param.annotations.exists(ann =>
         ann.tpe =:= typeOf[Ignore] || ann.tpe =:= typeOf[transient])
 
-    private def applyMethod(implicit A: c.Type): c.universe.Symbol =
-      companion(A).typeSignature.declaration(stringToTermName("apply")) match {
-        case NoSymbol => c.abort(c.enclosingPosition, s"No apply function found for $A")
+    private def applyMethod(implicit tpe: Type): Symbol =
+      companion(tpe).typeSignature.declaration(stringToTermName("apply")) match {
+        case NoSymbol => c.abort(c.enclosingPosition, s"No apply function found for $tpe")
         case s        => s
       }
 
-    private def unapplyMethod(implicit A: c.Type): c.universe.MethodSymbol =
-      companion(A).typeSignature.declaration(stringToTermName("unapply")) match {
-        case NoSymbol => c.abort(c.enclosingPosition, s"No unapply function found for $A")
-        case s        => s.asMethod
+    private def unapplyMethod(implicit tpe: Type): MethodSymbol =
+      companion(tpe).typeSignature.
+        declaration(stringToTermName("unapply")) match {
+          case NoSymbol => c.abort(c.enclosingPosition,
+            s"No unapply function found for $tpe")
+
+          case s        => s.asMethod
+        }
+
+    /* Deep check for type compatibility */
+    @annotation.tailrec
+    private def conforms(types: Seq[(Type, Type)]): Boolean =
+      types.headOption match {
+        case Some((TypeRef(NoPrefix, a, _),
+          TypeRef(NoPrefix, b, _))) => { // for generic parameter
+          if (a.fullName != b.fullName) {
+            c.warning(c.enclosingPosition,
+              s"Type symbols are not compatible: $a != $b")
+
+            false
+          }
+          else conforms(types.tail)
+        }
+
+        case Some((x, y)) if (
+          x.typeSymbol == NoSymbol || y.typeSymbol == NoSymbol
+        ) => x.typeSymbol == y.typeSymbol
+
+        case Some((x, y)) => (x.typeSymbol.asType, y.typeSymbol.asType) match {
+          case (a, b) if (a.typeParams.size != b.typeParams.size) => {
+            c.warning(c.enclosingPosition,
+              s"Type parameters are not matching: $a != $b")
+
+            false
+          }
+
+          case (a, b) if a.typeParams.isEmpty =>
+            if (x =:= y) conforms(types.tail) else {
+              c.warning(c.enclosingPosition,
+                s"Types are not compatible: $a != $b")
+
+              false
+            }
+
+          case (a, b) if (x.baseClasses != y.baseClasses) => {
+            c.warning(c.enclosingPosition,
+              s"Generic types are not compatible: $a != $b")
+
+            false
+          }
+
+          case (a, b) => {
+            val sub = a.typeParams.zip(b.typeParams).map {
+              case (z, w) => z.typeSignature -> w.typeSignature
+            }
+            conforms(sub ++: types.tail)
+          }
+
+          case _ => true
+        }
+
+        case _ => true
       }
 
-    private def matchingApplyUnapply(implicit A: c.Type): (c.universe.MethodSymbol, c.universe.MethodSymbol) = {
-      import c.universe._
-
-      val applySymbol = applyMethod(A)
-      val unapply = unapplyMethod(A)
+    private def matchingApplyUnapply(implicit tpe: Type): (MethodSymbol, MethodSymbol) = {
+      val applySymbol = applyMethod(tpe)
+      val unapply = unapplyMethod(tpe)
       val alternatives = applySymbol.asTerm.alternatives.map(_.asMethod)
       val u = unapplyReturnTypes(unapply)
 
       val applys = alternatives.filter { alt =>
         alt.paramss match {
-          case params :: Nil => {
-            val sig = params.map(_.typeSignature)
-
-            sig.size == u.size && sig.zip(u).forall {
-              case (TypeRef(NoPrefix, left, _), TypeRef(NoPrefix, right, _)) =>
-                left.fullName == right.fullName
-
-              case (left, right) => left =:= right
-            }
-          }
+          case params :: ps if (ps.isEmpty || ps.headOption.flatMap(
+            _.headOption).exists(_.isImplicit)
+          ) => conforms(params.map(_.typeSignature).zip(u))
 
           case _ => {
             c.warning(c.enclosingPosition, s"""Constructor with multiple parameter lists is not supported: ${A.typeSymbol.name}${alt.typeSignature}""")
@@ -437,10 +492,139 @@ private object MacroImpl {
 
     private def isSingleton(t: Type): Boolean = t <:< typeOf[Singleton]
 
-    private def writerType: c.Type = typeOf[Writer[_]].typeConstructor
+    @inline private def companion(implicit tpe: Type): Symbol =
+      tpe.typeSymbol.companionSymbol
+  }
 
-    private def readerType: c.Type = typeOf[Reader[_]].typeConstructor
+  sealed trait ImplicitResolver[C <: Context] {
+    val c: C
 
-    private def companion(implicit A: c.Type): c.Symbol = A.typeSymbol.companionSymbol
+    import c.universe._
+
+    protected def A: Type
+
+    import Macros.Placeholder
+
+    // The placeholder type
+    private val PlaceholderType: Type = typeOf[Placeholder]
+
+    /* Refactor the input types, by replacing any type matching the `filter`,
+     * by the given `replacement`.
+     */
+    @annotation.tailrec
+    private def refactor(boundTypes: Map[String, Type])(in: List[Type], base: TypeSymbol, out: List[Type], tail: List[(List[Type], TypeSymbol, List[Type])], filter: Type => Boolean, replacement: Type, altered: Boolean): (Type, Boolean) = in match {
+      case tpe :: ts =>
+        boundTypes.getOrElse(tpe.typeSymbol.fullName, tpe) match {
+          case t if (filter(t)) =>
+            refactor(boundTypes)(ts, base, (replacement :: out), tail,
+              filter, replacement, true)
+
+          case TypeRef(_, sym, as) if as.nonEmpty =>
+            refactor(boundTypes)(
+              as, sym.asType, List.empty, (ts, base, out) :: tail,
+              filter, replacement, altered)
+
+          case t => refactor(boundTypes)(
+            ts, base, (t :: out), tail, filter, replacement, altered)
+        }
+
+      case _ => {
+        val tpe = appliedType(base.typeSignature, out.reverse)
+
+        tail match {
+          case (x, y, more) :: ts => refactor(boundTypes)(
+            x, y, (tpe :: more), ts, filter, replacement, altered)
+
+          case _ => tpe -> altered
+        }
+      }
+    }
+
+    /**
+     * Replaces any reference to the type itself by the Placeholder type. 
+     * @return the normalized type + whether any self reference has been found
+     */
+    private def normalized(boundTypes: Map[String, Type])(tpe: Type): (Type, Boolean) = boundTypes.getOrElse(tpe.typeSymbol.fullName, tpe) match {
+        case t if (t =:= A) => PlaceholderType -> true
+
+        case TypeRef(_, sym, args) if args.nonEmpty =>
+          refactor(boundTypes)(args, sym.asType, List.empty, List.empty,
+            _ =:= A, PlaceholderType, false)
+
+        case t => t -> false
+      }
+
+    /* Restores reference to the type itself when Placeholder is found. */
+    private def denormalized(boundTypes: Map[String, Type])(ptype: Type): Type =
+      ptype match {
+        case PlaceholderType => A
+
+        case TypeRef(_, sym, args) if args.nonEmpty =>
+          refactor(boundTypes)(args, sym.asType, List.empty, List.empty,
+            _ == PlaceholderType, A, false)._1
+
+        case _ => ptype
+      }
+
+    private class ImplicitTransformer(
+      boundTypes: Map[String, Type],
+      forwardSuffix: String
+    ) extends Transformer {
+      private val denorm = denormalized(boundTypes) _
+      val forwardName = newTermName(s"forward$forwardSuffix")
+
+      override def transform(tree: Tree): Tree = tree match {
+        case tt: TypeTree =>
+          super.transform(TypeTree(denorm(tt.tpe)))
+
+        case Select(Select(This(n), t), sym) if (
+          n.toString == "Macros" && t.toString == "Placeholder" &&
+            sym.toString == "Handler"
+        ) => super.transform(Ident(forwardName))
+
+        case _ => super.transform(tree)
+      }
+    }
+
+    private def createImplicit(boundTypes: Map[String, Type])(tc: Type, ptype: Type, tx: Transformer): Implicit = {
+      val tpe = ptype match {
+        case TypeRef(_, _, targ :: _) => {
+          // Option[_] needs special treatment because we need to use XXXOpt
+          if (ptype.typeConstructor <:< typeOf[Option[_]].typeConstructor) targ
+          else ptype
+        }
+
+        case SingleType(_, _) | TypeRef(_, _, _) => ptype
+      }
+
+      val (ntpe, selfRef) = normalized(boundTypes)(tpe)
+      val ptpe = boundTypes.get(ntpe.typeSymbol.fullName).getOrElse(ntpe)
+
+      // infers implicit
+      val neededImplicitType = appliedType(tc.typeConstructor, ptpe :: Nil)
+      val neededImplicit = if (!selfRef) {
+        c.inferImplicitValue(neededImplicitType)
+      } else c.resetAllAttrs(
+        // Reset the type attributes on the refactored tree for the implicit
+        tx.transform(c.inferImplicitValue(neededImplicitType))
+      )
+
+      neededImplicit -> selfRef
+    }
+
+    // To print the implicit types in the compiler messages
+    private def prettyType(boundTypes: Map[String, Type])(t: Type): String =
+      boundTypes.getOrElse(t.typeSymbol.fullName, t) match {
+        case TypeRef(_, base, args) if args.nonEmpty => s"""${base.asType.fullName}[${args.map(prettyType(boundTypes)(_)).mkString(", ")}]"""
+
+        case t => t.typeSymbol.fullName
+      }
+
+    protected def resolver(boundTypes: Map[String, Type], forwardSuffix: String)(tc: Type): Type => Implicit = {
+      val tx = new ImplicitTransformer(boundTypes, forwardSuffix)
+      createImplicit(boundTypes)(tc, _: Type, tx)
+    }
+
+    type Implicit = (Tree, Boolean)
   }
 }
