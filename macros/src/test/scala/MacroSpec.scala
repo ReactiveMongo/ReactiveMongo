@@ -1,6 +1,8 @@
 import reactivemongo.bson.{
   BSON,
   BSONDocument,
+  BSONDocumentReader,
+  BSONDocumentWriter,
   BSONDouble,
   BSONReader,
   BSONInteger,
@@ -59,7 +61,7 @@ class MacroSpec extends org.specs2.mutable.Specification {
       }
     }
 
-    "support generated case class" in {
+    "support generic case class" in {
       implicit def singleHandler = Macros.handler[Single]
 
       roundtrip(Foo(Single("A"), "ipsum"), Macros.handler[Foo[Single]])
@@ -261,6 +263,49 @@ class MacroSpec extends org.specs2.mutable.Specification {
         )
       }
     }
+
+    "be generated for class class with self reference" in {
+      val h = Macros.handler[Bar]
+      val bar1 = Bar("bar1", None)
+      val doc1 = BSONDocument("name" -> "bar1")
+
+      h.read(doc1) must_== bar1 and {
+        h.read(BSONDocument("name" -> "bar2", "next" -> doc1)).
+          aka("bar2") must_== Bar("bar2", Some(bar1))
+      } and (h.write(bar1) must_== doc1) and {
+        h.write(Bar("bar2", Some(bar1))) must_== BSONDocument(
+          "name" -> "bar2", "next" -> doc1
+        )
+      }
+    }
+
+    "handle case class with implicits" >> {
+      val doc1 = BSONDocument("pos" -> 2, "text" -> "str")
+      val doc2 = BSONDocument("ident" -> "id", "value" -> 23.456D)
+      val fixture1 = WithImplicit1(2, "str")
+      val fixture2 = WithImplicit2("id", 23.456D)
+
+      def readSpec1(r: BSONDocumentReader[WithImplicit1]) =
+        r.read(doc1) must_== fixture1
+
+      def writeSpec2(w: BSONDocumentWriter[WithImplicit2[Double]]) =
+        w.write(fixture2) must_== doc2
+
+      "to generate reader" in readSpec1(Macros.reader[WithImplicit1]) tag "wip"
+
+      "to generate writer with type parameters" in writeSpec2(
+        Macros.writer[WithImplicit2[Double]]
+      ) tag "wip"
+
+      "to generate handler" in {
+        val f1 = Macros.handler[WithImplicit1]
+        val f2 = Macros.handler[WithImplicit2[Double]]
+
+        readSpec1(f1) and (f1.write(fixture1) must_== doc1) and {
+          writeSpec2(f2) and (f2.read(doc2) must_== fixture2)
+        }
+      } tag "wip"
+    }
   }
 
   "Reader" should {
@@ -285,7 +330,7 @@ class MacroSpec extends org.specs2.mutable.Specification {
         }
     }
 
-    "be generated for a generated case class" in {
+    "be generated for a generic case class" in {
       implicit def singleReader = Macros.reader[Single]
       val r = Macros.reader[Foo[Single]]
 
@@ -294,17 +339,40 @@ class MacroSpec extends org.specs2.mutable.Specification {
         "lorem" -> "ipsum"
       )) must_== Foo(Single("A"), "ipsum")
     }
+
+    "be generated for class class with self reference" in {
+      val r = Macros.reader[Bar]
+      val bar1 = Bar("bar1", None)
+      val doc1 = BSONDocument("name" -> "bar1")
+
+      r.read(doc1) must_== bar1 and {
+        r.read(BSONDocument("name" -> "bar2", "next" -> doc1)).
+          aka("bar2") must_== Bar("bar2", Some(bar1))
+      }
+    }
   }
 
   "Writer" should {
-    "be generated for a generated case class" in {
+    "be generated for a generic case class" in {
       implicit def singleWriter = Macros.writer[Single]
-      val r = Macros.writer[Foo[Single]]
+      val w = Macros.writer[Foo[Single]]
 
-      r.write(Foo(Single("A"), "ipsum")) must_== BSONDocument(
+      w.write(Foo(Single("A"), "ipsum")) must_== BSONDocument(
         "bar" -> BSONDocument("value" -> "A"),
         "lorem" -> "ipsum"
       )
+    }
+
+    "be generated for class class with self reference" in {
+      val w = Macros.writer[Bar]
+      val bar1 = Bar("bar1", None)
+      val doc1 = BSONDocument("name" -> "bar1")
+
+      w.write(bar1) must_== doc1 and {
+        w.write(Bar("bar2", Some(bar1))) must_== BSONDocument(
+          "name" -> "bar2", "next" -> doc1
+        )
+      }
     }
   }
 
