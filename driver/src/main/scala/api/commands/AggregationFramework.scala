@@ -315,10 +315,7 @@ trait AggregationFramework[P <: SerializationPack]
    * @param ops the number of operations that used the index
    * @param since the time from which MongoDB gathered the statistics
    */
-  case class IndexStatAccesses(
-    ops: Long,
-    since: java.util.Date
-  )
+  case class IndexStatAccesses(ops: Long, since: Long)
 
   /**
    * @param name the index name

@@ -1076,7 +1076,7 @@ class MongoDriver(config: Option[Config] = None) {
 
   //private case class CloseWithTimeout(timeout: FiniteDuration)
 
-  private case class SupervisorActor(driver: MongoDriver) extends Actor {
+  private final class SupervisorActor(driver: MongoDriver) extends Actor {
     def isEmpty = driver.connectionMonitors.isEmpty
 
     override def receive = {

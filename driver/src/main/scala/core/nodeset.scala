@@ -63,11 +63,12 @@ package object utils {
   }
 }
 
+@SerialVersionUID(527078726L)
 case class NodeSet(
     name: Option[String],
     version: Option[Long],
     nodes: Vector[Node],
-    authenticates: Set[Authenticate]
+    @transient authenticates: Set[Authenticate]
 ) {
 
   /** The node which is the current primary one. */
@@ -76,14 +77,14 @@ case class NodeSet(
   /** The `mongos` node, if any. */
   val mongos: Option[Node] = nodes.find(_.isMongos)
 
-  val secondaries = new RoundRobiner(
+  @transient val secondaries = new RoundRobiner(
     nodes.filter(_.status == NodeStatus.Secondary)
   )
 
   val queryable = secondaries.subject ++ primary
 
   /** See the [[https://docs.mongodb.com/manual/reference/read-preference/#nearest nearest]] read preference. */
-  val nearestGroup = new RoundRobiner(
+  @transient val nearestGroup = new RoundRobiner(
     queryable.sortWith { _.pingInfo.ping < _.pingInfo.ping }
   )
 
@@ -225,11 +226,12 @@ case class NodeSetInfo(
  * @param name the main name of the node
  */
 @deprecated(message = "Will be made private", since = "0.11.10")
+@SerialVersionUID(440354552L)
 case class Node(
     name: String,
-    status: NodeStatus,
-    connections: Vector[Connection],
-    authenticated: Set[Authenticated],
+    @transient status: NodeStatus,
+    @transient connections: Vector[Connection],
+    @transient authenticated: Set[Authenticated],
     tags: Option[BSONDocument],
     protocolMetadata: ProtocolMetadata,
     pingInfo: PingInfo = PingInfo(),
@@ -256,10 +258,10 @@ case class Node(
     })
   }
 
-  val connected: Vector[Connection] =
+  @transient val connected: Vector[Connection] =
     connections.filter(_.status == ConnectionStatus.Connected)
 
-  val authenticatedConnections = new RoundRobiner(
+  @transient val authenticatedConnections = new RoundRobiner(
     connected.filter(_.authenticated.forall { auth =>
       authenticated.exists(_ == auth)
     })

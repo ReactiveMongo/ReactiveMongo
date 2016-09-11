@@ -52,7 +52,7 @@ import reactivemongo.api.collections.bson.BSONCollection
  */
 sealed trait DB {
   /** The [[reactivemongo.api.MongoConnection]] that will be used to query this database. */
-  def connection: MongoConnection
+  @transient def connection: MongoConnection
 
   /** This database name. */
   def name: String
@@ -161,7 +161,7 @@ trait DBMetaCommands { self: DB =>
   /** Returns an index manager for this database. */
   def indexesManager(implicit ec: ExecutionContext) = IndexesManager(self)
 
-  private lazy val collectionNameReader = new BSONDocumentReader[String] {
+  private object CollectionNameReader extends BSONDocumentReader[String] {
     val prefixLength = name.size + 1
 
     def read(bson: BSONDocument) = bson.get("name").collect {
@@ -182,7 +182,7 @@ trait DBMetaCommands { self: DB =>
       find(BSONDocument(
         "name" -> BSONRegex("^[^\\$]+$", "") // strip off any indexes
       )).cursor(defaultReadPreference)(
-        collectionNameReader, ec, CursorProducer.defaultCursorProducer
+        CollectionNameReader, ec, CursorProducer.defaultCursorProducer
       ).collect[List]()
   }
 
@@ -239,13 +239,14 @@ trait DBMetaCommands { self: DB =>
 }
 
 /** The default DB implementation, that mixes in the database traits. */
+@SerialVersionUID(235871232L)
 case class DefaultDB(
     name: String,
-    connection: MongoConnection,
+    @transient connection: MongoConnection,
     failoverStrategy: FailoverStrategy = FailoverStrategy()
 ) extends DB with DBMetaCommands with GenericDB[BSONSerializationPack.type] {
 
-  val pack: BSONSerializationPack.type = BSONSerializationPack
+  @transient val pack: BSONSerializationPack.type = BSONSerializationPack
 }
 
 object DB {

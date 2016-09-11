@@ -33,6 +33,7 @@ import reactivemongo.api.{
 }
 import reactivemongo.api.collections.GenericQueryBuilder
 
+@SerialVersionUID(1634796413L)
 case class BSONQueryBuilder(
   collection: Collection,
   failover: FailoverStrategy,
@@ -50,7 +51,7 @@ case class BSONQueryBuilder(
   import reactivemongo.util.option
 
   type Self = BSONQueryBuilder
-  val pack = BSONSerializationPack
+  @transient val pack = BSONSerializationPack
 
   def copy(
     queryOption: Option[BSONDocument] = queryOption,

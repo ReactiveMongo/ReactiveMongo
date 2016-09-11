@@ -20,7 +20,7 @@ object BuildSettings {
 
   val buildSettings = Defaults.coreDefaultSettings ++ baseSettings ++ Seq(
     scalaVersion := "2.11.8",
-    crossScalaVersions := Seq("2.11.8", "2.10.5"),
+    crossScalaVersions := Seq("2.10.5", "2.11.8"),
     crossVersion := CrossVersion.binary,
     //parallelExecution in Test := false,
     //fork in Test := true, // Don't share executioncontext between SBT CLI/tests
@@ -58,10 +58,12 @@ object Publish {
 
   val previousVersion = "0.11.0"
 
+
   val missingMethodInOld: ProblemFilter = {
     case mmp @ MissingMethodProblem(_) if (
       mmp.affectedVersion == ClassVersion.Old) => false
 
+    case MissingMethodProblem(old) => !old.isAccessible
     case _ => true
   }
 
@@ -201,6 +203,35 @@ object Dependencies {
   val commonsCodec = "commons-codec" % "commons-codec" % "1.10"
 }
 
+object Findbugs {
+  import scala.xml.{ NodeSeq, XML }, XML.{ loadFile => loadXML }
+
+  import de.johoop.findbugs4sbt.{ FindBugs, ReportType }, FindBugs.{
+    findbugsExcludeFilters, findbugsReportPath, findbugsReportType,
+    findbugsSettings
+  }
+
+  @inline def task = FindBugs.findbugs
+
+  val settings = findbugsSettings ++ Seq(
+    findbugsReportType := Some(ReportType.PlainHtml),
+    findbugsReportPath := Some(target.value / "findbugs.html"),
+    findbugsExcludeFilters := {
+      val commonFilters = loadXML(baseDirectory.value / ".." / "project" / (
+        "findbugs-exclude-filters.xml"))
+
+      val filters = {
+        val f = baseDirectory.value / "findbugs-exclude-filters.xml"
+        if (!f.exists) NodeSeq.Empty else loadXML(f).child
+      }
+
+      Some(
+        <FindBugsFilter>${commonFilters.child}${filters}</FindBugsFilter>
+      )
+    }
+  )
+}
+
 object ReactiveMongoBuild extends Build {
   import BuildSettings._
   import Resolvers._
@@ -282,6 +313,8 @@ object ReactiveMongoBuild extends Build {
     pom
   }
 
+  import de.johoop.findbugs4sbt.FindBugs.findbugsAnalyzedPath
+
   lazy val shaded = Project(
     s"$projectPrefix-Shaded",
     file("shaded"),
@@ -324,7 +357,7 @@ object ReactiveMongoBuild extends Build {
   lazy val bson = Project(
     s"$projectPrefix-BSON",
     file("bson"),
-    settings = buildSettings).
+    settings = buildSettings ++ Findbugs.settings).
     settings(
       libraryDependencies ++= Seq(specs,
         "org.specs2" %% "specs2-scalacheck" % specsVer % Test,
@@ -337,39 +370,45 @@ object ReactiveMongoBuild extends Build {
   lazy val bsonmacros = Project(
     s"$projectPrefix-BSON-Macros",
     file("macros"),
-    settings = buildSettings ++ Seq(
-      libraryDependencies +=
-        "org.scala-lang" % "scala-compiler" % scalaVersion.value % "provided"
-    )).
-    settings(libraryDependencies += specs).
-    dependsOn(bson)
+    settings = buildSettings ++ Findbugs.settings ++ Seq(
+      libraryDependencies ++= Seq(specs,
+        "org.scala-lang" % "scala-compiler" % scalaVersion.value % "provided")
+    )).dependsOn(bson)
 
   val driverCleanup = taskKey[Unit]("Driver compilation cleanup")
 
   lazy val driver = Project(
     projectPrefix,
     file("driver"),
-    settings = buildSettings ++ Seq(
+    settings = buildSettings ++ Findbugs.settings ++ Seq(
       resolvers := resolversList,
       compile in Compile <<= (compile in Compile).dependsOn(assembly in shaded),
       driverCleanup := {
         val classDir = (classDirectory in Compile).value
-        val listenerClass = classDir / "external" / "reactivemongo" / (
-          "StaticListenerBinder.class")
+        val extDir = {
+          val d = target.value / "external" / "reactivemongo"
+          d.mkdirs(); d
+        }
+
+        val classFile = "StaticListenerBinder.class"
+        val listenerClass = classDir / "external" / "reactivemongo" / classFile
 
         streams.value.log(s"Cleanup $listenerClass ...")
 
-        listenerClass.delete()
+        IO.move(listenerClass, extDir / classFile)
       },
       driverCleanup <<= driverCleanup.triggeredBy(compile in Compile),
       unmanagedJars in Compile := {
         val shadedDir = (target in shaded).value
         val shadedJar = (assemblyJarName in (shaded, assembly)).value
 
+        (shadedDir / "classes").mkdirs() // Findbugs workaround
+
         Seq(Attributed(shadedDir / shadedJar)(AttributeMap.empty))
       },
       libraryDependencies ++= akka ++ Seq(
         playIteratees, commonsCodec, shapelessTest, specs) ++ logApi,
+      findbugsAnalyzedPath += target.value / "external",
       binaryIssueFilters ++= {
         import ProblemFilters.{ exclude => x }
         @inline def mmp(s: String) = x[MissingMethodProblem](s)
@@ -381,6 +420,8 @@ object ReactiveMongoBuild extends Build {
         @inline def mcp(s: String) = x[MissingClassProblem](s)
 
         Seq(
+          fcp("reactivemongo.api.MongoDriver$SupervisorActor"), // private
+          mcp("reactivemongo.api.MongoDriver$SupervisorActor$"), // private
           fcp("reactivemongo.api.collections.bson.BSONCollection"),
           imt("reactivemongo.core.actors.AwaitingResponse.apply"), // private
           imt("reactivemongo.core.actors.AwaitingResponse.this"), // private
@@ -780,7 +821,7 @@ object ReactiveMongoBuild extends Build {
   lazy val jmx = Project(
     s"$projectPrefix-JMX",
     file("jmx"),
-    settings = buildSettings).
+    settings = buildSettings ++ Findbugs.settings).
     settings(
       previousArtifacts := Set.empty,
       testOptions in Test += Tests.Cleanup(commonCleanup),

@@ -71,11 +71,12 @@ case class CollStatsResult(
     systemFlags: Option[Int],
     userFlags: Option[Int],
     totalIndexSize: Int,
-    indexSizes: Array[(String, Int)],
+    sizePerIndex: List[(String, Int)],
     capped: Boolean,
     max: Option[Long],
     maxSize: Option[Double] = None
 ) {
+  @inline def indexSizes: Array[(String, Int)] = sizePerIndex.toArray
 
   @deprecated(message = "Use [[copy]] with [[maxSize]]", since = "0.11.10")
   def copy(
@@ -91,16 +92,16 @@ case class CollStatsResult(
     systemFlags: Option[Int] = this.systemFlags,
     userFlags: Option[Int] = this.userFlags,
     totalIndexSize: Int = this.totalIndexSize,
-    indexSizes: Array[(String, Int)] = this.indexSizes,
+    indexSizes: Array[(String, Int)] = this.sizePerIndex.toArray,
     capped: Boolean = this.capped,
     max: Option[Long] = this.max
   ): CollStatsResult = CollStatsResult(
     ns, count, size, averageObjectSize, storageSize, numExtents, nindexes,
     lastExtentSize, paddingFactor, systemFlags, userFlags, totalIndexSize,
-    indexSizes, capped, max
+    indexSizes.toList, capped, max
   )
 
-  override def toString = s"""CollStatsResult($ns, capped = $capped, count = $count, size = $size, avgObjSize = $averageObjectSize, storageSize = $storageSize, numExtents = $numExtents, nindexes = $nindexes, lastExtentSize = $lastExtentSize, paddingFactor = $paddingFactor, systemFlags = $systemFlags, userFlags = $userFlags, indexSizes = ${indexSizes.mkString("[ ", ", ", " ]")}, max = $max)"""
+  override def toString = s"""CollStatsResult($ns, capped = $capped, count = $count, size = $size, avgObjSize = $averageObjectSize, storageSize = $storageSize, numExtents = $numExtents, nindexes = $nindexes, lastExtentSize = $lastExtentSize, paddingFactor = $paddingFactor, systemFlags = $systemFlags, userFlags = $userFlags, sizePerIndex = ${sizePerIndex.mkString("[ ", ", ", " ]")}, max = $max)"""
 }
 
 case class DropIndexes(index: String) extends CollectionCommand with CommandWithResult[DropIndexesResult]

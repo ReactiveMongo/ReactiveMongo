@@ -66,7 +66,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
         host = "foo",
         accesses = IndexStatAccesses(
           ops = 1L,
-          since = new java.util.Date()
+          since = System.currentTimeMillis()
         )
       )
 
