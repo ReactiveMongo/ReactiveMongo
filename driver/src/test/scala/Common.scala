@@ -1,12 +1,10 @@
 import scala.concurrent.{ Await, ExecutionContext }
 import scala.concurrent.duration._
 import reactivemongo.api.{
-  AuthenticationMode,
   CrAuthentication,
   FailoverStrategy,
   MongoDriver,
-  MongoConnectionOptions,
-  ScramSha1Authentication
+  MongoConnectionOptions
 }
 
 object Common {

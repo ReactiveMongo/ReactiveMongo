@@ -64,6 +64,7 @@ object BSONBatchCommands extends BatchCommands[BSONSerializationPack.type] {
   implicit def LastErrorReader = BSONGetLastErrorImplicits.LastErrorReader
 }
 
+@SerialVersionUID(1382847900L)
 final class BSONCollection(
   val db: DB,
   val name: String,
@@ -71,8 +72,8 @@ final class BSONCollection(
 ) extends Product with GenericCollection[BSONSerializationPack.type]
     with scala.Serializable with java.io.Serializable {
 
-  val pack = BSONSerializationPack
-  val BatchCommands = BSONBatchCommands
+  @transient val pack = BSONSerializationPack
+  @transient val BatchCommands = BSONBatchCommands
   def genericQueryBuilder = BSONQueryBuilder(this, failoverStrategy)
 
   override lazy val toString =

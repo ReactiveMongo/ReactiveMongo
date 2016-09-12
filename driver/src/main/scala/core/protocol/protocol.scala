@@ -318,6 +318,8 @@ sealed trait MongoWireVersion extends Ordered[MongoWireVersion] {
     if (value == x.value) 0
     else if (value < x.value) -1
     else 1
+
+  override lazy val hashCode = toString.hashCode
 }
 
 object MongoWireVersion {
@@ -334,21 +336,30 @@ object MongoWireVersion {
   object V24AndBefore extends MongoWireVersion {
     val value = 0
     override val toString = "<=2.4"
+
+    override def equals(that: Any): Boolean = that == V24AndBefore
   }
 
   object V26 extends MongoWireVersion {
     val value = 2
     override val toString = "2.6"
+
+    override def equals(that: Any): Boolean =
+      that != null && that.isInstanceOf[V26.type]
   }
 
   object V30 extends MongoWireVersion {
     val value = 3
     override val toString = "3.0"
+    override def equals(that: Any): Boolean =
+      that != null && that.isInstanceOf[V30.type]
   }
 
   object V32 extends MongoWireVersion {
     val value = 4
     override val toString = "3.2"
+    override def equals(that: Any): Boolean =
+      that != null && that.isInstanceOf[V32.type]
   }
 
   def apply(v: Int): MongoWireVersion = {

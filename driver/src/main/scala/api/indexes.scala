@@ -510,14 +510,15 @@ object IndexesManager {
 
   implicit object IndexReader extends BSONDocumentReader[Index] {
     def read(doc: BSONDocument): Index = doc.getAs[BSONDocument]("key").map(
-      _.elements.map { elem => elem._1 -> IndexType(elem._2) }.toList
+      _.elements.map { elem => elem.name -> IndexType(elem.value) }.toList
     ).
       fold[Index](throw new Exception("the key must be defined")) { key =>
         val options = doc.elements.filterNot { element =>
-          element._1 == "ns" || element._1 == "key" || element._1 == "name" ||
-            element._1 == "unique" || element._1 == "background" ||
-            element._1 == "dropDups" || element._1 == "sparse" ||
-            element._1 == "v" || element._1 == "partialFilterExpression"
+          element.name == "ns" || element.name == "key" ||
+            element.name == "name" || element.name == "unique" ||
+            element.name == "background" || element.name == "dropDups" ||
+            element.name == "sparse" || element.name == "v" ||
+            element.name == "partialFilterExpression"
         }.toSeq
 
         (for {

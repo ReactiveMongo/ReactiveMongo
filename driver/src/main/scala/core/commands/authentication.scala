@@ -12,7 +12,9 @@ import reactivemongo.core.protocol.Response
 
 // --- MongoDB SCRAM-SHA1 authentication ---
 
-case class ScramSha1Challenge(conversationId: Int, payload: Array[Byte]) {
+private[core] case class ScramSha1Challenge(
+    conversationId: Int, payload: Array[Byte]
+) {
   override def toString = s"ScramSha1Challenge($conversationId)"
 }
 
@@ -21,7 +23,10 @@ case class ScramSha1Challenge(conversationId: Int, payload: Array[Byte]) {
  *
  * @param user username
  */
-case class ScramSha1Initiate(user: String) extends Command[ScramSha1Challenge] {
+private[core] case class ScramSha1Initiate(
+    user: String
+) extends Command[ScramSha1Challenge] {
+
   import akka.util.ByteString
   import reactivemongo.bson.buffer.ArrayReadableBuffer
 
@@ -96,7 +101,7 @@ object ScramSha1Initiate extends BSONCommandResultMaker[ScramSha1Challenge] {
  * @param serverSignature the SCRAM-SHA1 signature for the MongoDB server
  * @param request the next client request for the SCRAM-SHA1 authentication
  */
-case class ScramSha1Negociation(
+private[core] case class ScramSha1Negociation(
   serverSignature: Array[Byte],
   request: BSONDocument
 )
@@ -129,15 +134,14 @@ object ScramSha1Negociation {
  * @param randomPrefix
  * @param startMessage
  */
-case class ScramSha1StartNegociation(
-  user: String,
-  password: String,
-  conversationId: Int,
-  payload: Array[Byte],
-  randomPrefix: String,
-  startMessage: String
-)
-    extends Command[Either[SuccessfulAuthentication, Array[Byte]]] {
+private[core] case class ScramSha1StartNegociation(
+    user: String,
+    password: String,
+    conversationId: Int,
+    payload: Array[Byte],
+    randomPrefix: String,
+    startMessage: String
+) extends Command[Either[SuccessfulAuthentication, Array[Byte]]] {
 
   import javax.crypto.spec.PBEKeySpec
   import org.apache.commons.codec.binary.Base64
@@ -210,6 +214,7 @@ case class ScramSha1StartNegociation(
   val ResultMaker = ScramSha1StartNegociation
 }
 
+@SerialVersionUID(113814637L)
 object ScramSha1StartNegociation extends BSONCommandResultMaker[Either[SuccessfulAuthentication, Array[Byte]]] {
   import reactivemongo.bson.BSONBooleanLike
 
@@ -237,14 +242,15 @@ object ScramSha1StartNegociation extends BSONCommandResultMaker[Either[Successfu
   private[commands] val ServerKeySeed = // "Server Key" bytes
     Array[Byte](83, 101, 114, 118, 101, 114, 32, 75, 101, 121)
 
-  lazy val keyFactory =
+  @transient lazy val keyFactory =
     javax.crypto.SecretKeyFactory.getInstance("PBKDF2WithHmacSHA1")
 }
 
 /**
  * @param conversationId the ID of the SCRAM-SHA1 conversation
  */
-case class ScramSha1FinalNegociation(
+@SerialVersionUID(304027329L)
+private[core] case class ScramSha1FinalNegociation(
     conversationId: Int,
     payload: Array[Byte]
 ) extends Command[SuccessfulAuthentication] {
@@ -320,7 +326,9 @@ case class Authenticate(user: String, password: String, nonce: String)
  * @param password user's password
  * @param nonce the previous nonce given by the server
  */
-case class CrAuthenticate(user: String, password: String, nonce: String) extends Command[SuccessfulAuthentication] {
+private[core] case class CrAuthenticate(
+    user: String, password: String, nonce: String
+) extends Command[SuccessfulAuthentication] {
   import reactivemongo.bson.utils.Converters._
 
   /** the computed digest of the password */

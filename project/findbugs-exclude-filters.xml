@@ -1,0 +1,73 @@
+<FindBugsFilter>
+  <Match>
+    <Class name="~.+\.package\$.+" />
+    <Method name="equals" />
+    <Bug pattern="EQ_UNUSUAL" />
+  </Match>
+
+  <Match>
+    <Field name="~.+\$(module|[0-9]+)" />
+    <Bug pattern="SE_BAD_FIELD" />
+  </Match>
+  <Match>
+    <Field name="$outer" />
+    <Bug pattern="SE_BAD_FIELD" />
+  </Match>
+
+  <Match>
+    <Bug pattern="NM_METHOD_NAMING_CONVENTION" />
+  </Match>
+  
+  <Match>
+    <Or>
+      <Class name="~.+\$(class|apply)$" /><!-- trait -->
+      <Class name="~.+\.package[$]*" /><!-- package object -->
+      <Class name="~.+\$.+\$$" />
+    </Or>
+
+    <Bug pattern="NM_CLASS_NAMING_CONVENTION" />
+  </Match>
+  
+  <Match>
+    <Class name="~.+\$.+" /><!-- module, trait, param defaults -->
+    <Bug pattern="NP_ALWAYS_NULL" />
+  </Match>
+  
+  <Match><!-- Object module -->
+    <Field name="MODULE$" />
+    <Bug pattern="ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD" />
+  </Match>
+  
+  <Match>
+    <Class name="~.*\$\$anonfun\$.*" />
+    <Method name="apply" />
+    <Local name="~x[0-9]*\$[0-9]*" /><!-- param defaults -->
+    <Bug pattern="NP_LOAD_OF_KNOWN_NULL_VALUE" />
+  </Match>
+
+  <Match>
+    <Method name="~.+\$[0-9]+" /><!-- tailrec -->
+    <Bug pattern="SA_LOCAL_SELF_ASSIGNMENT" />
+  </Match>
+
+  <Match>
+    <Class name="~.+\$.*" />
+    <Method name="equals" />
+    <Bug pattern="RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE" />
+  </Match>
+
+  <Match>
+    <Class name="~.+\$anonfun\$.+" />
+    <Method name="isDefinedAt" />
+    <Bug pattern="DB_DUPLICATE_BRANCHES" />
+  </Match>
+
+  <Match>
+    <Class name="~.+\$.+" />
+    <Or>
+      <Method name="&lt;clinit&gt;" />
+      <Method name="&lt;init&gt;" />
+    </Or>
+    <Bug pattern="RV_RETURN_VALUE_IGNORED" />
+  </Match>
+</FindBugsFilter>

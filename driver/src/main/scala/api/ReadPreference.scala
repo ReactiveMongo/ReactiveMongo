@@ -205,9 +205,11 @@ object ReadPreference {
 
   }
 
-  private implicit class BSONDocumentWrapper(val underlying: BSONDocument) extends AnyVal {
-    def contains(doc: BSONDocument): Boolean = {
+  private implicit class BSONDocumentWrapper(
+      val underlying: BSONDocument
+  ) extends AnyVal {
 
+    def contains(doc: BSONDocument): Boolean = {
       val els = underlying.elements
       doc.elements.forall { element =>
         els.find {

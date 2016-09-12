@@ -190,6 +190,7 @@ object DefaultFileToSave {
 trait ReadFile[P <: SerializationPack with Singleton, +Id] extends BasicMetadata[Id] with CustomMetadata[P] with ComputedMetadata
 
 /** A BSON implementation of `ReadFile`. */
+@SerialVersionUID(930238403L)
 case class DefaultReadFile(
     id: BSONValue,
     contentType: Option[String],
@@ -201,7 +202,7 @@ case class DefaultReadFile(
     metadata: BSONDocument,
     original: BSONDocument
 ) extends ReadFile[BSONSerializationPack.type, BSONValue] {
-  val pack = BSONSerializationPack
+  @transient val pack = BSONSerializationPack
 }
 
 /**

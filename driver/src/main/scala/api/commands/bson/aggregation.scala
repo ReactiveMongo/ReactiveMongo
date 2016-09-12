@@ -95,7 +95,7 @@ object BSONAggregationResultImplicits {
 
     def read(doc: BSONDocument): IndexStatAccesses = (for {
       ops <- doc.getAsTry[BSONNumberLike]("ops").map(_.toLong)
-      since <- doc.getAsTry[java.util.Date]("since")
+      since <- doc.getAsTry[BSONNumberLike]("since").map(_.toLong)
     } yield IndexStatAccesses(ops, since)).get
   }
 

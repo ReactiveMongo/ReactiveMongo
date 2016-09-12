@@ -1,0 +1,81 @@
+<FindBugsFilter>
+  <Match>
+    <Or>
+      <Class name="~.+reactivemongo\$api\$DefaultCursor\$Impl\$\$tailResponse.*" />
+      <Class name="~.+reactivemongo\.api\.DefaultCursor\$Impl\$FoldResponses.+\$procResp.*" />
+    </Or>
+
+    <Bug pattern="DB_DUPLICATE_BRANCHES" />
+  </Match>
+
+  <Match>
+    <Class name="reactivemongo.core.commands.CollStatsResult" />
+    <Field name="indexSizes" /><!-- deprecated -->
+    <Or>
+      <Bug pattern="EI_EXPOSE_REP" />
+      <Bug pattern="EI_EXPOSE_REP2" />
+    </Or>
+  </Match>
+
+  <Match><!-- deprecated -->
+    <Class name="reactivemongo.core.nodeset.Node" />
+    <Or>
+      <Field name="connected" />
+      <Field name="connections" />
+    </Or>
+    <Bug pattern="SE_TRANSIENT_FIELD_NOT_RESTORED" />
+  </Match>
+
+  <Match><!-- private core -->
+    <Or>
+      <Class name="~reactivemongo\.core\.commands\.ScramSha1.+" />
+      <Class name="~reactivemongo\.core\.actors\.MongoScramSha1.+" />
+    </Or>
+    <Or>
+      <Field name="payload" />
+      <Field name="payload$1" />
+      <Field name="sig$1" />
+      <Field name="serverSignature" />
+      <Field name="salt$1" />
+      <Field name="ClientKeySeed" />
+      <Field name="ServerKeySeed" />
+    </Or>
+    <Or>
+      <Bug pattern="EI_EXPOSE_REP" />
+      <Bug pattern="EI_EXPOSE_REP2" />
+    </Or>
+  </Match>
+
+  <Match>
+    <Or>
+      <Class name="~reactivemongo\.api\.DefaultCursor\$Impl\$\$anonfun\$tailableCursorEnumerateResponses.*" />
+      <Class name="~.+MongoConnection\$\$makeOptions\$.+" />
+      <Class name="~.+CustomEnumeratee\$\$anon.+" />
+      <Class name="~.+StateEnumerator\$\$anon.+" />
+    </Or>
+    <Or>
+      <Local name="current" />
+      <Local name="kv" />
+      <Local name="x1" />
+      <Local name="x2" />
+    </Or>
+    <Bug pattern="NP_LOAD_OF_KNOWN_NULL_VALUE" />
+  </Match>
+
+  <Match><!-- private -->
+    <Class name="~reactivemongo\.api\.gridfs\.GridFS\$Chunk.*" />
+  </Match>
+
+  <Match>
+    <Or>
+      <Class name="~reactivemongo\.core\.protocol\.MongoWireVersion\$V.+\$" />
+      <Class name="reactivemongo.api.ReadPreference$BSONDocumentWrapper" />
+    </Or>
+    <Bug pattern="EQ_UNUSUAL" /><!-- Value class -->
+  </Match>
+
+  <Match>
+    <Field name="toString" />
+    <Bug pattern="IS2_INCONSISTENT_SYNC" />
+  </Match>
+</FindBugsFilter>

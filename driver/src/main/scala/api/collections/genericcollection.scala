@@ -146,12 +146,6 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
     WriteResult
   }
 
-  private def writeDoc(doc: pack.Document): ChannelBuffer = {
-    val buffer = ChannelBufferWritableBuffer()
-    pack.writeToBuffer(buffer, doc)
-    buffer.buffer
-  }
-
   private def writeDoc[T](doc: T, writer: pack.Writer[T]) = {
     val buffer = ChannelBufferWritableBuffer()
     pack.serializeAndWrite(buffer, doc, writer)
@@ -395,7 +389,8 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
   def updateModifier[U](update: U, fetchNewObject: Boolean = false, upsert: Boolean = false)(implicit updateWriter: pack.Writer[U]): BatchCommands.FindAndModifyCommand.Update = BatchCommands.FindAndModifyCommand.Update(update, fetchNewObject, upsert)
 
   /** Returns a removal modifier, to be used with [[findAndModify]]. */
-  lazy val removeModifier = BatchCommands.FindAndModifyCommand.Remove
+  @transient lazy val removeModifier =
+    BatchCommands.FindAndModifyCommand.Remove
 
   /**
    * Applies a [[http://docs.mongodb.org/manual/reference/command/findAndModify/ findAndModify]] operation. See [[findAndUpdate]] and [[findAndRemove]] convenient functions.

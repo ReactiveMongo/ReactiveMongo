@@ -18,6 +18,8 @@ EOF
     )
 
     sbt ++$TRAVIS_SCALA_VERSION ";error ;mimaReportBinaryIssues" || exit 2
+
+    sbt ++$TRAVIS_SCALA_VERSION ";project ReactiveMongo-BSON ;findbugs ;project ReactiveMongo-BSON-Macros ;findbugs ;project ReactiveMongo ;findbugs ;project ReactiveMongo-JMX ;findbugs" || exit 3
 fi
 
 # JVM/SBT setup
@@ -36,7 +38,6 @@ TEST_ARGS="$TEST_ARGS ;test-only BSONObjectID -- include unit"
 TEST_ARGS="$TEST_ARGS ;test-only MongoURISpec -- include unit"
 TEST_ARGS="$TEST_ARGS ;test-only NodeSetSpec -- include unit"
 TEST_ARGS="$TEST_ARGS ;test-only reactivemongo.BsonSpec -- include unit"
-
 TEST_ARGS="$TEST_ARGS ;project ReactiveMongo-BSON-Macros ;test-only"
 
 sed -e 's/"-deprecation", //' < project/ReactiveMongo.scala > .tmp && mv .tmp project/ReactiveMongo.scala

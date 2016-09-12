@@ -20,7 +20,10 @@ case class DoubleField(name: String, value: Double) extends Field with ValueFiel
 }
 case class NoValue(tpe: Byte, name: String) extends Field
 case class LongField(tpe: Byte, name: String, value: Long) extends Field with ValueField[Long]
-case class StructureField[A <: ReadableBuffer](tpe: Byte, name: String, reader: LowLevelBsonDocReader[A]) extends Field
+
+@SerialVersionUID(587711495L)
+case class StructureField[A <: ReadableBuffer](tpe: Byte, name: String, @transient reader: LowLevelBsonDocReader[A]) extends Field
+
 case class LazyField[A <: ReadableBuffer](tpe: Byte, name: String, buffer: A) extends Field
 
 object LoweLevelDocumentIterator extends (ReadableBuffer => Iterator[ReadableBuffer]) {
@@ -63,7 +66,8 @@ class LowLevelBsonDocReader[A <: ReadableBuffer](rbuf: A) {
     def stream(): Stream[Field] = {
       val tpe = buf.readByte
       val name = buf.readCString
-      val field = tpe match {
+
+      val field = (0xFF & tpe) match {
         case 0x01 =>
           DoubleField(name, buf.readDouble)
         case 0x09 | 0x11 | 0x12 =>
@@ -112,8 +116,10 @@ class LowLevelBsonDocReader[A <: ReadableBuffer](rbuf: A) {
         case 0x0F =>
           // TODO
           ???
+
         case 0x06 | 0x0A | 0xFF | 0x7F =>
           NoValue(tpe, name)
+
         case x => throw new RuntimeException(s"unexpected type $x")
       }
       if (buf.readable > 1)

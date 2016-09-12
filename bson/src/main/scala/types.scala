@@ -335,7 +335,7 @@ case object BSONUndefined
 }
 
 /** BSON ObjectId value. */
-@SerialVersionUID(1L)
+@SerialVersionUID(239421902L)
 class BSONObjectID private (private val raw: Array[Byte])
     extends BSONValue with Serializable with Equals {
 
@@ -351,8 +351,9 @@ class BSONObjectID private (private val raw: Array[Byte])
 
   override def canEqual(that: Any): Boolean = that.isInstanceOf[BSONObjectID]
 
-  override def equals(that: Any): Boolean = {
-    canEqual(that) && Arrays.equals(this.raw, that.asInstanceOf[BSONObjectID].raw)
+  override def equals(that: Any): Boolean = that match {
+    case BSONObjectID(other) => Arrays.equals(raw, other)
+    case _                   => false
   }
 
   override lazy val hashCode: Int = Arrays.hashCode(raw)
@@ -391,10 +392,11 @@ object BSONObjectID {
 
   private val machineId = {
     import java.net._
+    def p(n: String) = System.getProperty(n)
     val validPlatform = Try {
-      val correctVersion = System.getProperty("java.version").substring(0, 3).toFloat >= 1.8
-      val noIpv6 = System.getProperty("java.net.preferIPv4Stack") == true
-      val isLinux = System.getProperty("os.name") == "Linux"
+      val correctVersion = p("java.version").substring(0, 3).toFloat >= 1.8
+      val noIpv6 = p("java.net.preferIPv4Stack").toBoolean == true
+      val isLinux = p("os.name") == "Linux"
 
       !isLinux || correctVersion || noIpv6
     }.getOrElse(false)
@@ -410,7 +412,7 @@ object BSONObjectID {
       val networkInterfaces = scala.collection.JavaConverters.enumerationAsScalaIteratorConverter(networkInterfacesEnum).asScala
       val ha = networkInterfaces.find(ha => Try(ha.getHardwareAddress).isSuccess && ha.getHardwareAddress != null && ha.getHardwareAddress.length == 6)
         .map(_.getHardwareAddress)
-        .getOrElse(InetAddress.getLocalHost.getHostName.getBytes)
+        .getOrElse(InetAddress.getLocalHost.getHostName.getBytes("UTF-8"))
       Converters.md5(ha).take(3)
     } else {
       val threadId = Thread.currentThread.getId.toInt
@@ -542,22 +544,76 @@ case class BSONRegex(value: String, flags: String)
 }
 
 /** BSON DBPointer value. */
-case class BSONDBPointer(value: String, id: Array[Byte])
-    extends BSONValue {
-
+class BSONDBPointer private[bson] (
+    val value: String,
+    internalId: () => Array[Byte]
+) extends BSONValue with Product with Serializable with java.io.Serializable {
   val code = 0x0C.toByte
 
-  /** The BSONObjectID representation of this reference. */
-  val objectId = BSONObjectID(id)
+  @deprecated("", "0.12.0")
+  def this(value: String, id: Array[Byte]) = this(value, { () =>
+    val idCopy = Array.ofDim[Byte](id.size)
+    id.copyToArray(idCopy)
+    idCopy
+  })
 
-  override def canEqual(that: Any): Boolean = that.isInstanceOf[BSONDBPointer]
+  /** The BSONObjectID representation of this reference. */
+  val objectId = BSONObjectID(internalId())
+
+  @deprecated("Do not use", "0.12.0")
+  def id: Array[Byte] = {
+    val bytes = internalId()
+    val idCopy = Array.ofDim[Byte](bytes.size)
+    bytes.copyToArray(idCopy)
+    idCopy
+  }
+
+  private[bson] def withId[T](f: Array[Byte] => T): T = f(internalId())
+
+  // ---
+
+  def canEqual(that: Any): Boolean = that.isInstanceOf[BSONDBPointer]
+
+  @deprecated("No longer a case class", "0.12.0")
+  val productArity = 2
+
+  @deprecated("No longer a case class", "0.12.0")
+  def productElement(n: Int): Any = n match {
+    case 0 => value
+    case 1 => id
+  }
+
+  @deprecated("No longer a case class", "0.12.0")
+  def copy(value: String = this.value, id: Array[Byte] = internalId()): BSONDBPointer = BSONDBPointer(value, id)
+
   override def equals(that: Any): Boolean = {
     canEqual(that) && {
       val other = that.asInstanceOf[BSONDBPointer]
-      this.value.equals(other.value) &&
-        java.util.Arrays.equals(this.id, other.id)
+      this.value.equals(other.value) && (this.objectId == other.objectId)
     }
   }
+
+  override def hashCode: Int = (value, objectId).hashCode
+}
+
+object BSONDBPointer extends scala.runtime.AbstractFunction2[String, Array[Byte], BSONDBPointer] {
+
+  /** Returns a new DB pointer */
+  @deprecated("", "0.12.0")
+  def apply(value: String, id: Array[Byte]): BSONDBPointer = {
+    val idCopy = Array.ofDim[Byte](id.size)
+    id.copyToArray(idCopy)
+
+    new BSONDBPointer(value, () => idCopy)
+  }
+
+  /** Returns a new DB pointer */
+  def apply(value: String, id: => Array[Byte]): BSONDBPointer =
+    new BSONDBPointer(value, () => id)
+
+  /** Extractor */
+  def unapply(pointer: BSONDBPointer): Option[(String, Array[Byte])] =
+    pointer.withId { id => Some(pointer.value -> id) }
 }
 
 /**
@@ -842,7 +898,7 @@ case class BSONDocument(stream: Stream[Try[BSONElement]])
   /** Alias for `add(doc: BSONDocument): BSONDocument` */
   def ++(doc: BSONDocument): BSONDocument = merge(doc)
 
-  @deprecated("Use `merge`", "0.12.0")
+  /** Alias for `:~` or `merge` */
   def ++(elements: Producer[BSONElement]*): BSONDocument = merge(elements: _*)
 
   def :~(elements: Producer[BSONElement]*): BSONDocument = merge(elements: _*)

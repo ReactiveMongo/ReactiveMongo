@@ -42,12 +42,38 @@ object Converters {
     bytes
   }
 
-  /** Computes the MD5 hash of the given String. */
-  def md5(s: String) = java.security.MessageDigest.getInstance("MD5").digest(s.getBytes)
+  /**
+   * Returns the MD5 hash for the given UTF-8 `string`,
+   * and turns it into a hexadecimal String representation.
+   */
+  @deprecated("Use `md5Hex` with explicit encoding", "0.12.0")
+  def md5Hex(string: String): String = md5Hex(string, "UTF-8")
 
-  /** Computes the MD5 hash of the given Array of Bytes. */
-  def md5(array: Array[Byte]) = java.security.MessageDigest.getInstance("MD5").digest(array)
+  /**
+   * Returns the MD5 hash for the given `string`,
+   * and turns it into a hexadecimal String representation.
+   *
+   * @param string the string to be hashed
+   * @param encoding the string encoding/charset
+   */
+  def md5Hex(string: String, encoding: String): String =
+    hex2Str(md5(string, encoding))
 
-  /** Computes the MD5 hash of the given String and turns it into a hexadecimal String representation. */
-  def md5Hex(s: String): String = hex2Str(md5(s))
+  /** Returns the MD5 hash of the given UTF-8 `string`. */
+  @deprecated("Use `md5` with explicit encoding", "0.12.0")
+  def md5(string: String): Array[Byte] = md5(string, "UTF-8")
+
+  /**
+   * Returns the MD5 hash of the given `string`.
+   *
+   * @param string the string to be hashed
+   * @param encoding the string encoding/charset
+   */
+  def md5(string: String, encoding: String): Array[Byte] =
+    md5(string.getBytes(encoding))
+
+  /** Computes the MD5 hash of the given `bytes`. */
+  def md5(bytes: Array[Byte]): Array[Byte] =
+    java.security.MessageDigest.getInstance("MD5").digest(bytes)
+
 }

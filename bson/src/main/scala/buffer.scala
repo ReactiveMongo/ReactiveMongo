@@ -35,11 +35,11 @@ trait WritableBuffer { self =>
   /** Writes the bytes stored in the given `buffer` into this buffer. */
   def writeBytes(buffer: ReadableBuffer): self.type = {
     @annotation.tailrec
-    def write(buffer: ReadableBuffer): self.type = {
-      if (buffer.readable > 1024) {
-        writeBytes(buffer.readArray(1024))
-        write(buffer)
-      } else writeBytes(buffer.readArray(buffer.readable))
+    def write(buf: ReadableBuffer): self.type = {
+      if (buf.readable > 1024) {
+        writeBytes(buf.readArray(1024))
+        write(buf)
+      } else writeBytes(buf.readArray(buf.readable))
     }
 
     write(buffer.slice(buffer.readable))
