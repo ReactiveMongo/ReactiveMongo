@@ -1,0 +1,925 @@
+<html>
+      <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+        <title id="title">
+          api/readpreferences.scala.html
+        </title>
+        <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jquery.tablesorter/2.20.1/css/theme.default.min.css" type="text/css"/><script src="http://cdnjs.cloudflare.com/ajax/libs/jquery.tablesorter/2.20.1/js/jquery.tablesorter.min.js"></script><link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/css/bootstrap.min.css" type="text/css"/><script src="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/js/bootstrap.min.js"></script><script type="text/javascript">
+        $(document).ready(function() {$(".tablesorter").tablesorter();});
+      </script>
+        <style>
+          table.codegrid { font-family: monospace; font-size: 12px; width: auto!important; }table.statementlist { width: auto!important; font-size: 13px; } table.codegrid td { padding: 0!important; border: 0!important } table td.linenumber { width: 40px!important; } 
+        </style>
+      </head>
+      <body style="font-family: monospace;">
+        <ul class="nav nav-tabs">
+          <li>
+            <a href="#codegrid" data-toggle="tab">Codegrid</a>
+          </li>
+          <li>
+            <a href="#statementlist" data-toggle="tab">Statement List</a>
+          </li>
+        </ul>
+        <div class="tab-content">
+          <div class="tab-pane active" id="codegrid">
+            <pre style='font-size: 12pt; font-family: courier;'>1 <span style=''>package reactivemongo.api
+</span>2 <span style=''>
+</span>3 <span style=''>import reactivemongo.bson._
+</span>4 <span style=''>
+</span>5 <span style=''>/**
+</span>6 <span style=''> * MongoDB Read Preferences enable to read from primary or secondaries
+</span>7 <span style=''> * with a predefined strategy.
+</span>8 <span style=''> */
+</span>9 <span style=''>sealed trait ReadPreference {
+</span>10 <span style=''>  def slaveOk: Boolean = </span><span style='background: #F0ADAD'>true</span><span style=''>
+</span>11 <span style=''>  def filterTag: Option[BSONDocument => Boolean]
+</span>12 <span style=''>}
+</span>13 <span style=''>
+</span>14 <span style=''>object ReadPreference {
+</span>15 <span style=''>  /** Read only from the primary. This is the default choice. */
+</span>16 <span style=''>  object Primary extends ReadPreference {
+</span>17 <span style=''>    override def slaveOk = </span><span style='background: #AEF1AE'>false</span><span style=''>
+</span>18 <span style=''>    override def filterTag = </span><span style='background: #F0ADAD'>None</span><span style=''>
+</span>19 <span style=''>  }
+</span>20 <span style=''>  /** Read from the primary if it is available, or secondaries if it is not. */
+</span>21 <span style=''>  case class PrimaryPreferred(filterTag: Option[BSONDocument => Boolean]) extends ReadPreference
+</span>22 <span style=''>  /** Read only from any secondary. */
+</span>23 <span style=''>  case class Secondary(filterTag: Option[BSONDocument => Boolean]) extends ReadPreference
+</span>24 <span style=''>  /** Read from any secondary, or from the primary if they are not available. */
+</span>25 <span style=''>  case class SecondaryPreferred(filterTag: Option[BSONDocument => Boolean]) extends ReadPreference
+</span>26 <span style=''>  /**
+</span>27 <span style=''>   * Read from the faster node (ie the node which replies faster than all others), regardless its status
+</span>28 <span style=''>   * (primary or secondary).
+</span>29 <span style=''>   */
+</span>30 <span style=''>  case class Nearest(filterTag: Option[BSONDocument => Boolean]) extends ReadPreference
+</span>31 <span style=''>
+</span>32 <span style=''>  private implicit class BSONDocumentWrapper(val underlying: BSONDocument) extends AnyVal {
+</span>33 <span style=''>    def contains(doc: BSONDocument): Boolean = {
+</span>34 <span style=''>
+</span>35 <span style=''>      val els = </span><span style='background: #F0ADAD'>underlying.elements</span><span style=''>
+</span>36 <span style=''>      </span><span style='background: #F0ADAD'>doc.elements.forall { element =>
+</span>37 <span style=''></span><span style='background: #F0ADAD'>        els.find {
+</span>38 <span style=''></span><span style='background: #F0ADAD'>          case (name, value) => element._1 == name && ((element._2, value) match {
+</span>39 <span style=''></span><span style='background: #F0ADAD'>            case (d1: BSONDocument, d2: BSONDocument) => d1.elements == d2.elements
+</span>40 <span style=''></span><span style='background: #F0ADAD'>            case (a1: BSONArray, a2: BSONArray)       => a1.values == a2.values
+</span>41 <span style=''></span><span style='background: #F0ADAD'>            case (v1, v2)                             => v1 == v2
+</span>42 <span style=''></span><span style='background: #F0ADAD'>          })
+</span>43 <span style=''></span><span style='background: #F0ADAD'>        }.isDefined
+</span>44 <span style=''></span><span style='background: #F0ADAD'>      }</span><span style=''>
+</span>45 <span style=''>    }
+</span>46 <span style=''>  }
+</span>47 <span style=''>
+</span>48 <span style=''>  private val defaultFilterTag = (doc: BSONDocument) => </span><span style='background: #F0ADAD'>true</span><span style=''>
+</span>49 <span style=''>
+</span>50 <span style=''>  /** Read only from the primary. This is the default choice. */
+</span>51 <span style=''>  def primary: Primary.type = </span><span style='background: #AEF1AE'>Primary</span><span style=''>
+</span>52 <span style=''>
+</span>53 <span style=''>  /** Read from the primary if it is available, or secondaries if it is not. */
+</span>54 <span style=''>  def primaryPreferred: PrimaryPreferred = </span><span style='background: #F0ADAD'>new PrimaryPreferred(None)</span><span style=''>
+</span>55 <span style=''>
+</span>56 <span style=''>  /**  Read from any node that has the given `tag` in the replica set (preferably the primary). */
+</span>57 <span style=''>  def primaryPreferred[T](tag: T)(implicit writer: BSONDocumentWriter[T]): PrimaryPreferred =
+</span>58 <span style=''>    </span><span style='background: #F0ADAD'>new PrimaryPreferred(Some(doc => doc.contains(writer.write(tag))))</span><span style=''>
+</span>59 <span style=''>
+</span>60 <span style=''>  /** Read only from any secondary. */
+</span>61 <span style=''>  def secondary: Secondary = </span><span style='background: #F0ADAD'>new Secondary(None)</span><span style=''>
+</span>62 <span style=''>
+</span>63 <span style=''>  /**  Read from a secondary that has the given `tag` in the replica set. */
+</span>64 <span style=''>  def secondary[T](tag: T)(implicit writer: BSONDocumentWriter[T]): Secondary =
+</span>65 <span style=''>    </span><span style='background: #F0ADAD'>new Secondary(Some(doc => doc.contains(writer.write(tag))))</span><span style=''>
+</span>66 <span style=''>
+</span>67 <span style=''>  /** Read from any secondary, or from the primary if they are not available. */
+</span>68 <span style=''>  def secondaryPreferred: SecondaryPreferred = </span><span style='background: #F0ADAD'>new SecondaryPreferred(None)</span><span style=''>
+</span>69 <span style=''>
+</span>70 <span style=''>  /**  Read from any node that has the given `tag` in the replica set (preferably a secondary). */
+</span>71 <span style=''>  def secondaryPreferred[T](tag: T)(implicit writer: BSONDocumentWriter[T]): SecondaryPreferred =
+</span>72 <span style=''>    </span><span style='background: #F0ADAD'>new SecondaryPreferred(Some(doc => doc.contains(writer.write(tag))))</span><span style=''>
+</span>73 <span style=''>
+</span>74 <span style=''>  /**
+</span>75 <span style=''>   * Read from the fastest node (ie the node which replies faster than all others), regardless its status
+</span>76 <span style=''>   * (primary or secondary).
+</span>77 <span style=''>   */
+</span>78 <span style=''>  def nearest: Nearest = </span><span style='background: #F0ADAD'>new Nearest(None)</span><span style=''>
+</span>79 <span style=''>
+</span>80 <span style=''>  /**
+</span>81 <span style=''>   * Read from the fastest node (ie the node which replies faster than all others) that has the given `tag`,
+</span>82 <span style=''>   * regardless its status (primary or secondary).
+</span>83 <span style=''>   */
+</span>84 <span style=''>  def nearest[T](tag: T)(implicit writer: BSONDocumentWriter[T]): Nearest =
+</span>85 <span style=''>    </span><span style='background: #F0ADAD'>new Nearest(Some(doc => doc.contains(writer.write(tag))))</span><span style=''>
+</span>86 <span style=''>}
+</span></pre>
+          </div>
+          <div class="tab-pane" id="statementlist">
+            <table cellspacing="0" cellpadding="0" class="table statementlist">
+      <tr>
+        <th>Line</th>
+        <th>Stmt Id</th>
+        <th>Pos</th>
+        <th>Tree</th>
+        <th>Symbol</th>
+        <th>Code</th>
+      </tr><tr>
+        <td>
+          10
+        </td>
+        <td>
+          19337
+        </td>
+        <td>
+          221
+          -
+          225
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          17
+        </td>
+        <td>
+          17713
+        </td>
+        <td>
+          436
+          -
+          441
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          18
+        </td>
+        <td>
+          18566
+        </td>
+        <td>
+          471
+          -
+          475
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          35
+        </td>
+        <td>
+          17288
+        </td>
+        <td>
+          1359
+          -
+          1378
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          36
+        </td>
+        <td>
+          15666
+        </td>
+        <td>
+          1385
+          -
+          1790
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          38
+        </td>
+        <td>
+          14071
+        </td>
+        <td>
+          1469
+          -
+          1762
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          39
+        </td>
+        <td>
+          18952
+        </td>
+        <td>
+          1577
+          -
+          1603
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          39
+        </td>
+        <td>
+          19392
+        </td>
+        <td>
+          1592
+          -
+          1603
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          40
+        </td>
+        <td>
+          17956
+        </td>
+        <td>
+          1661
+          -
+          1683
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          40
+        </td>
+        <td>
+          16200
+        </td>
+        <td>
+          1674
+          -
+          1683
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          41
+        </td>
+        <td>
+          17716
+        </td>
+        <td>
+          1741
+          -
+          1749
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          43
+        </td>
+        <td>
+          15774
+        </td>
+        <td>
+          1426
+          -
+          1782
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          48
+        </td>
+        <td>
+          15855
+        </td>
+        <td>
+          1858
+          -
+          1862
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          51
+        </td>
+        <td>
+          17299
+        </td>
+        <td>
+          1959
+          -
+          1966
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          54
+        </td>
+        <td>
+          18847
+        </td>
+        <td>
+          2091
+          -
+          2117
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          54
+        </td>
+        <td>
+          19110
+        </td>
+        <td>
+          2112
+          -
+          2116
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          58
+        </td>
+        <td>
+          15113
+        </td>
+        <td>
+          2316
+          -
+          2382
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          58
+        </td>
+        <td>
+          14694
+        </td>
+        <td>
+          2349
+          -
+          2380
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          58
+        </td>
+        <td>
+          16868
+        </td>
+        <td>
+          2337
+          -
+          2381
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          58
+        </td>
+        <td>
+          17352
+        </td>
+        <td>
+          2362
+          -
+          2379
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          61
+        </td>
+        <td>
+          14139
+        </td>
+        <td>
+          2452
+          -
+          2471
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          61
+        </td>
+        <td>
+          15611
+        </td>
+        <td>
+          2466
+          -
+          2470
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          65
+        </td>
+        <td>
+          16932
+        </td>
+        <td>
+          2634
+          -
+          2693
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          65
+        </td>
+        <td>
+          17436
+        </td>
+        <td>
+          2648
+          -
+          2692
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          65
+        </td>
+        <td>
+          19033
+        </td>
+        <td>
+          2660
+          -
+          2691
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          65
+        </td>
+        <td>
+          15842
+        </td>
+        <td>
+          2673
+          -
+          2690
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          68
+        </td>
+        <td>
+          17417
+        </td>
+        <td>
+          2846
+          -
+          2850
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          68
+        </td>
+        <td>
+          18628
+        </td>
+        <td>
+          2823
+          -
+          2851
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          72
+        </td>
+        <td>
+          18903
+        </td>
+        <td>
+          3054
+          -
+          3122
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          72
+        </td>
+        <td>
+          16856
+        </td>
+        <td>
+          3102
+          -
+          3119
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          72
+        </td>
+        <td>
+          15621
+        </td>
+        <td>
+          3089
+          -
+          3120
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          72
+        </td>
+        <td>
+          15160
+        </td>
+        <td>
+          3077
+          -
+          3121
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          78
+        </td>
+        <td>
+          18556
+        </td>
+        <td>
+          3308
+          -
+          3312
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          78
+        </td>
+        <td>
+          19097
+        </td>
+        <td>
+          3296
+          -
+          3313
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          85
+        </td>
+        <td>
+          17426
+        </td>
+        <td>
+          3604
+          -
+          3621
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          85
+        </td>
+        <td>
+          15168
+        </td>
+        <td>
+          3591
+          -
+          3622
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          85
+        </td>
+        <td>
+          15392
+        </td>
+        <td>
+          3567
+          -
+          3624
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          85
+        </td>
+        <td>
+          17306
+        </td>
+        <td>
+          3579
+          -
+          3623
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr>
+    </table>
+          </div>
+        </div>
+      </body>
+    </html>

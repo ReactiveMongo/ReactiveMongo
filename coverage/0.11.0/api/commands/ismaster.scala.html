@@ -1,0 +1,308 @@
+<html>
+      <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+        <title id="title">
+          api/commands/ismaster.scala.html
+        </title>
+        <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jquery.tablesorter/2.20.1/css/theme.default.min.css" type="text/css"/><script src="http://cdnjs.cloudflare.com/ajax/libs/jquery.tablesorter/2.20.1/js/jquery.tablesorter.min.js"></script><link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/css/bootstrap.min.css" type="text/css"/><script src="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/js/bootstrap.min.js"></script><script type="text/javascript">
+        $(document).ready(function() {$(".tablesorter").tablesorter();});
+      </script>
+        <style>
+          table.codegrid { font-family: monospace; font-size: 12px; width: auto!important; }table.statementlist { width: auto!important; font-size: 13px; } table.codegrid td { padding: 0!important; border: 0!important } table td.linenumber { width: 40px!important; } 
+        </style>
+      </head>
+      <body style="font-family: monospace;">
+        <ul class="nav nav-tabs">
+          <li>
+            <a href="#codegrid" data-toggle="tab">Codegrid</a>
+          </li>
+          <li>
+            <a href="#statementlist" data-toggle="tab">Statement List</a>
+          </li>
+        </ul>
+        <div class="tab-content">
+          <div class="tab-pane active" id="codegrid">
+            <pre style='font-size: 12pt; font-family: courier;'>1 <span style=''>package reactivemongo.api.commands
+</span>2 <span style=''>
+</span>3 <span style=''>import reactivemongo.api.SerializationPack
+</span>4 <span style=''>import reactivemongo.core.nodeset.NodeStatus
+</span>5 <span style=''>
+</span>6 <span style=''>trait IsMasterCommand[P <: SerializationPack] {
+</span>7 <span style=''>  object IsMaster extends Command with CommandWithResult[IsMasterResult] with CommandWithPack[P]
+</span>8 <span style=''>
+</span>9 <span style=''>  case class ReplicaSet(
+</span>10 <span style=''>    setName: String,
+</span>11 <span style=''>    me: String,
+</span>12 <span style=''>    primary: Option[String],
+</span>13 <span style=''>    hosts: Seq[String],
+</span>14 <span style=''>    passives: Seq[String],
+</span>15 <span style=''>    arbiters: Seq[String],
+</span>16 <span style=''>    isSecondary: Boolean, // `secondary`
+</span>17 <span style=''>    isArbiterOnly: Boolean, // `arbiterOnly`
+</span>18 <span style=''>    isPassive: Boolean, // `passive`
+</span>19 <span style=''>    isHidden: Boolean, // `hidden`
+</span>20 <span style=''>    tags: Option[P#Document])
+</span>21 <span style=''>
+</span>22 <span style=''>  case class IsMasterResult(
+</span>23 <span style=''>      isMaster: Boolean, // `ismaster`
+</span>24 <span style=''>      maxBsonObjectSize: Int, // default = 16 * 1024 * 1024
+</span>25 <span style=''>      maxMessageSizeBytes: Int, // default = 48000000, mongod >= 2.4
+</span>26 <span style=''>      maxWriteBatchSize: Int, // default = 1000, mongod >= 2.6
+</span>27 <span style=''>      localTime: Option[Long], // date? mongod >= 2.2
+</span>28 <span style=''>      minWireVersion: Int, // int? mongod >= 2.6
+</span>29 <span style=''>      maxWireVersion: Int, // int? mongod >= 2.6
+</span>30 <span style=''>      replicaSet: Option[ReplicaSet], // flattened in the result
+</span>31 <span style=''>      msg: Option[String] // Contains the value isdbgrid when isMaster returns from a mongos instance.
+</span>32 <span style=''>      ) {
+</span>33 <span style=''>    def isMongos: Boolean = </span><span style='background: #AEF1AE'>msg.isDefined</span><span style=''>
+</span>34 <span style=''>    def status: NodeStatus = if (</span><span style='background: #AEF1AE'>isMaster</span><span style=''>) </span><span style='background: #AEF1AE'>NodeStatus.Primary</span><span style=''> else </span><span style='background: #F0ADAD'>if (replicaSet.exists(_.isSecondary)) NodeStatus.Secondary else NodeStatus.NonQueryableUnknownStatus</span><span style=''>
+</span>35 <span style=''>  }
+</span>36 <span style=''>}
+</span></pre>
+          </div>
+          <div class="tab-pane" id="statementlist">
+            <table cellspacing="0" cellpadding="0" class="table statementlist">
+      <tr>
+        <th>Line</th>
+        <th>Stmt Id</th>
+        <th>Pos</th>
+        <th>Tree</th>
+        <th>Symbol</th>
+        <th>Code</th>
+      </tr><tr>
+        <td>
+          33
+        </td>
+        <td>
+          7969
+        </td>
+        <td>
+          1247
+          -
+          1260
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          34
+        </td>
+        <td>
+          10709
+        </td>
+        <td>
+          1294
+          -
+          1302
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          34
+        </td>
+        <td>
+          11286
+        </td>
+        <td>
+          1366
+          -
+          1386
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          34
+        </td>
+        <td>
+          5528
+        </td>
+        <td>
+          1392
+          -
+          1428
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          34
+        </td>
+        <td>
+          6766
+        </td>
+        <td>
+          1350
+          -
+          1363
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          34
+        </td>
+        <td>
+          6126
+        </td>
+        <td>
+          1366
+          -
+          1386
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          34
+        </td>
+        <td>
+          6798
+        </td>
+        <td>
+          1304
+          -
+          1322
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          34
+        </td>
+        <td>
+          8957
+        </td>
+        <td>
+          1332
+          -
+          1364
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          34
+        </td>
+        <td>
+          7979
+        </td>
+        <td>
+          1328
+          -
+          1428
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          34
+        </td>
+        <td>
+          8556
+        </td>
+        <td>
+          1392
+          -
+          1428
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          34
+        </td>
+        <td>
+          11645
+        </td>
+        <td>
+          1304
+          -
+          1322
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr>
+    </table>
+          </div>
+        </div>
+      </body>
+    </html>

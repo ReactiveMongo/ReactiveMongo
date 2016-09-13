@@ -1,0 +1,216 @@
+<html>
+      <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+        <title id="title">
+          api/commands/count.scala.html
+        </title>
+        <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jquery.tablesorter/2.20.1/css/theme.default.min.css" type="text/css"/><script src="http://cdnjs.cloudflare.com/ajax/libs/jquery.tablesorter/2.20.1/js/jquery.tablesorter.min.js"></script><link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/css/bootstrap.min.css" type="text/css"/><script src="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/js/bootstrap.min.js"></script><script type="text/javascript">
+        $(document).ready(function() {$(".tablesorter").tablesorter();});
+      </script>
+        <style>
+          table.codegrid { font-family: monospace; font-size: 12px; width: auto!important; }table.statementlist { width: auto!important; font-size: 13px; } table.codegrid td { padding: 0!important; border: 0!important } table td.linenumber { width: 40px!important; } 
+        </style>
+      </head>
+      <body style="font-family: monospace;">
+        <ul class="nav nav-tabs">
+          <li>
+            <a href="#codegrid" data-toggle="tab">Codegrid</a>
+          </li>
+          <li>
+            <a href="#statementlist" data-toggle="tab">Statement List</a>
+          </li>
+        </ul>
+        <div class="tab-content">
+          <div class="tab-pane active" id="codegrid">
+            <pre style='font-size: 12pt; font-family: courier;'>1 <span style=''>package reactivemongo.api.commands
+</span>2 <span style=''>
+</span>3 <span style=''>import reactivemongo.api.{ BSONSerializationPack, Cursor, SerializationPack }
+</span>4 <span style=''>
+</span>5 <span style=''>trait CountCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] {
+</span>6 <span style=''>  case class Count(
+</span>7 <span style=''>    //{ count: <collection>, query: <query>, limit: <limit>, skip: <skip>, hint: <hint> }
+</span>8 <span style=''>    query: Option[pack.Document],
+</span>9 <span style=''>    limit: Int,
+</span>10 <span style=''>    skip: Int,
+</span>11 <span style=''>    hint: Option[Hint]) extends CollectionCommand with CommandWithPack[pack.type] with CommandWithResult[CountResult]
+</span>12 <span style=''>
+</span>13 <span style=''>  object Count {
+</span>14 <span style=''>    def apply(doc: ImplicitlyDocumentProducer, limit: Int = 0, skip: Int = 0, hint: Option[Hint] = None): Count = </span><span style='background: #AEF1AE'>Count(Some(doc.produce), limit, skip, hint)</span><span style=''>
+</span>15 <span style=''>  }
+</span>16 <span style=''>
+</span>17 <span style=''>  sealed trait Hint
+</span>18 <span style=''>  case class HintString(s: String) extends Hint
+</span>19 <span style=''>  case class HintDocument(doc: pack.Document) extends Hint
+</span>20 <span style=''>  object Hint {
+</span>21 <span style=''>    implicit def strToHint(s: String): Hint = </span><span style='background: #F0ADAD'>HintString(s)</span><span style=''>
+</span>22 <span style=''>    implicit def docToHint(doc: ImplicitlyDocumentProducer): Hint = </span><span style='background: #F0ADAD'>HintDocument(doc.produce)</span><span style=''>
+</span>23 <span style=''>  }
+</span>24 <span style=''>
+</span>25 <span style=''>  case class CountResult(count: Int) extends BoxedAnyVal[Int] {
+</span>26 <span style=''>    def value = </span><span style='background: #AEF1AE'>count</span><span style=''>
+</span>27 <span style=''>  }
+</span>28 <span style=''>}
+</span></pre>
+          </div>
+          <div class="tab-pane" id="statementlist">
+            <table cellspacing="0" cellpadding="0" class="table statementlist">
+      <tr>
+        <th>Line</th>
+        <th>Stmt Id</th>
+        <th>Pos</th>
+        <th>Tree</th>
+        <th>Symbol</th>
+        <th>Code</th>
+      </tr><tr>
+        <td>
+          14
+        </td>
+        <td>
+          10852
+        </td>
+        <td>
+          625
+          -
+          642
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          14
+        </td>
+        <td>
+          9599
+        </td>
+        <td>
+          630
+          -
+          641
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          14
+        </td>
+        <td>
+          6275
+        </td>
+        <td>
+          619
+          -
+          662
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          21
+        </td>
+        <td>
+          9949
+        </td>
+        <td>
+          857
+          -
+          870
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          22
+        </td>
+        <td>
+          11898
+        </td>
+        <td>
+          952
+          -
+          963
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          22
+        </td>
+        <td>
+          7319
+        </td>
+        <td>
+          939
+          -
+          964
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          26
+        </td>
+        <td>
+          5612
+        </td>
+        <td>
+          1050
+          -
+          1055
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr>
+    </table>
+          </div>
+        </div>
+      </body>
+    </html>

@@ -1,0 +1,1038 @@
+<html>
+      <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+        <title id="title">
+          api/QueryOpts.scala.html
+        </title>
+        <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jquery.tablesorter/2.20.1/css/theme.default.min.css" type="text/css"/><script src="http://cdnjs.cloudflare.com/ajax/libs/jquery.tablesorter/2.20.1/js/jquery.tablesorter.min.js"></script><link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/css/bootstrap.min.css" type="text/css"/><script src="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/js/bootstrap.min.js"></script><script type="text/javascript">
+        $(document).ready(function() {$(".tablesorter").tablesorter();});
+      </script>
+        <style>
+          table.codegrid { font-family: monospace; font-size: 12px; width: auto!important; }table.statementlist { width: auto!important; font-size: 13px; } table.codegrid td { padding: 0!important; border: 0!important } table td.linenumber { width: 40px!important; } 
+        </style>
+      </head>
+      <body style="font-family: monospace;">
+        <ul class="nav nav-tabs">
+          <li>
+            <a href="#codegrid" data-toggle="tab">Codegrid</a>
+          </li>
+          <li>
+            <a href="#statementlist" data-toggle="tab">Statement List</a>
+          </li>
+        </ul>
+        <div class="tab-content">
+          <div class="tab-pane active" id="codegrid">
+            <pre style='font-size: 12pt; font-family: courier;'>1 <span style=''>/*
+</span>2 <span style=''> * Copyright 2012-2013 Stephane Godbillon (@sgodbillon) and Zenexity
+</span>3 <span style=''> *
+</span>4 <span style=''> * Licensed under the Apache License, Version 2.0 (the "License");
+</span>5 <span style=''> * you may not use this file except in compliance with the License.
+</span>6 <span style=''> * You may obtain a copy of the License at
+</span>7 <span style=''> *
+</span>8 <span style=''> *   http://www.apache.org/licenses/LICENSE-2.0
+</span>9 <span style=''> *
+</span>10 <span style=''> * Unless required by applicable law or agreed to in writing, software
+</span>11 <span style=''> * distributed under the License is distributed on an "AS IS" BASIS,
+</span>12 <span style=''> * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+</span>13 <span style=''> * See the License for the specific language governing permissions and
+</span>14 <span style=''> * limitations under the License.
+</span>15 <span style=''> */
+</span>16 <span style=''>package reactivemongo.api
+</span>17 <span style=''>
+</span>18 <span style=''>import shaded.netty.buffer.ChannelBuffer
+</span>19 <span style=''>import reactivemongo.core.protocol.QueryFlags
+</span>20 <span style=''>
+</span>21 <span style=''>@deprecated(message = "Will be removed", since = "0.11.10")
+</span>22 <span style=''>sealed trait SortOrder
+</span>23 <span style=''>
+</span>24 <span style=''>@deprecated(message = "Will be removed", since = "0.11.10")
+</span>25 <span style=''>object SortOrder {
+</span>26 <span style=''>  case object Ascending extends SortOrder
+</span>27 <span style=''>  case object Descending extends SortOrder
+</span>28 <span style=''>}
+</span>29 <span style=''>
+</span>30 <span style=''>/**
+</span>31 <span style=''> * A helper to make the query options.
+</span>32 <span style=''> * You may use the methods to set the fields of this class, or set them directly.
+</span>33 <span style=''> *
+</span>34 <span style=''> * @param skipN the number of documents to skip.
+</span>35 <span style=''> * @param batchSizeN the upper limit on the number of documents to retrieve per batch.
+</span>36 <span style=''> * @param flagsN the query flags
+</span>37 <span style=''> */
+</span>38 <span style=''>case class QueryOpts(
+</span>39 <span style=''>    skipN: Int = 0,
+</span>40 <span style=''>    batchSizeN: Int = 0,
+</span>41 <span style=''>    flagsN: Int = 0) {
+</span>42 <span style=''>
+</span>43 <span style=''>  /** Sets the number of documents to skip. */
+</span>44 <span style=''>  def skip(n: Int) = </span><span style='background: #F0ADAD'>copy(skipN = n)</span><span style=''>
+</span>45 <span style=''>
+</span>46 <span style=''>  /** Sets an upper limit on the number of documents to retrieve per batch. Defaults to 0 (meaning no upper limit - MongoDB decides). */
+</span>47 <span style=''>  def batchSize(n: Int) = </span><span style='background: #AEF1AE'>copy(batchSizeN = n)</span><span style=''>
+</span>48 <span style=''>
+</span>49 <span style=''>  /** Sets the query flags. */
+</span>50 <span style=''>  def flags(n: Int) = </span><span style='background: #F0ADAD'>copy(flagsN = n)</span><span style=''>
+</span>51 <span style=''>
+</span>52 <span style=''>  /** Toggles TailableCursor: Makes the cursor not to close after all the data is consumed. */
+</span>53 <span style=''>  def tailable = </span><span style='background: #AEF1AE'>copy(flagsN = flagsN ^ QueryFlags.TailableCursor)</span><span style=''>
+</span>54 <span style=''>
+</span>55 <span style=''>  /** Toggles SlaveOk: The query is might be run on a secondary. */
+</span>56 <span style=''>  def slaveOk = </span><span style='background: #F0ADAD'>copy(flagsN = flagsN ^ QueryFlags.SlaveOk)</span><span style=''>
+</span>57 <span style=''>
+</span>58 <span style=''>  /** Toggles OplogReplay */
+</span>59 <span style=''>  def oplogReplay = </span><span style='background: #F0ADAD'>copy(flagsN = flagsN ^ QueryFlags.OplogReplay)</span><span style=''>
+</span>60 <span style=''>
+</span>61 <span style=''>  /** Toggles NoCursorTimeout: The cursor will not expire automatically */
+</span>62 <span style=''>  def noCursorTimeout = </span><span style='background: #F0ADAD'>copy(flagsN = flagsN ^ QueryFlags.NoCursorTimeout)</span><span style=''>
+</span>63 <span style=''>
+</span>64 <span style=''>  /**
+</span>65 <span style=''>   * Toggles AwaitData: Block a little while waiting for more data instead of returning immediately if no data.
+</span>66 <span style=''>   * Use along with TailableCursor.
+</span>67 <span style=''>   */
+</span>68 <span style=''>  def awaitData = </span><span style='background: #F0ADAD'>copy(flagsN = flagsN ^ QueryFlags.AwaitData)</span><span style=''>
+</span>69 <span style=''>  /** Toggles Exhaust */
+</span>70 <span style=''>  def exhaust = </span><span style='background: #F0ADAD'>copy(flagsN = flagsN ^ QueryFlags.Exhaust)</span><span style=''>
+</span>71 <span style=''>  /** Toggles Partial: The response can be partial - if a shard is down, no error will be thrown. */
+</span>72 <span style=''>  def partial = </span><span style='background: #F0ADAD'>copy(flagsN = flagsN ^ QueryFlags.Partial)</span><span style=''>
+</span>73 <span style=''>}
+</span></pre>
+          </div>
+          <div class="tab-pane" id="statementlist">
+            <table cellspacing="0" cellpadding="0" class="table statementlist">
+      <tr>
+        <th>Line</th>
+        <th>Stmt Id</th>
+        <th>Pos</th>
+        <th>Tree</th>
+        <th>Symbol</th>
+        <th>Code</th>
+      </tr><tr>
+        <td>
+          44
+        </td>
+        <td>
+          6456
+        </td>
+        <td>
+          1458
+          -
+          1458
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          44
+        </td>
+        <td>
+          11030
+        </td>
+        <td>
+          1458
+          -
+          1473
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          44
+        </td>
+        <td>
+          9074
+        </td>
+        <td>
+          1458
+          -
+          1458
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          47
+        </td>
+        <td>
+          10753
+        </td>
+        <td>
+          1638
+          -
+          1638
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          47
+        </td>
+        <td>
+          6066
+        </td>
+        <td>
+          1638
+          -
+          1638
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          47
+        </td>
+        <td>
+          8308
+        </td>
+        <td>
+          1638
+          -
+          1658
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          50
+        </td>
+        <td>
+          7676
+        </td>
+        <td>
+          1713
+          -
+          1713
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          50
+        </td>
+        <td>
+          6162
+        </td>
+        <td>
+          1713
+          -
+          1713
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          50
+        </td>
+        <td>
+          10749
+        </td>
+        <td>
+          1713
+          -
+          1729
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          53
+        </td>
+        <td>
+          5215
+        </td>
+        <td>
+          1843
+          -
+          1892
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          53
+        </td>
+        <td>
+          8244
+        </td>
+        <td>
+          1857
+          -
+          1891
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          53
+        </td>
+        <td>
+          5579
+        </td>
+        <td>
+          1843
+          -
+          1843
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          53
+        </td>
+        <td>
+          8800
+        </td>
+        <td>
+          1866
+          -
+          1891
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          53
+        </td>
+        <td>
+          11340
+        </td>
+        <td>
+          1843
+          -
+          1843
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          56
+        </td>
+        <td>
+          5950
+        </td>
+        <td>
+          1978
+          -
+          2020
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          56
+        </td>
+        <td>
+          10642
+        </td>
+        <td>
+          1978
+          -
+          1978
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          56
+        </td>
+        <td>
+          9006
+        </td>
+        <td>
+          2001
+          -
+          2019
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          56
+        </td>
+        <td>
+          8413
+        </td>
+        <td>
+          1992
+          -
+          2019
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          56
+        </td>
+        <td>
+          11233
+        </td>
+        <td>
+          1978
+          -
+          1978
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          59
+        </td>
+        <td>
+          7584
+        </td>
+        <td>
+          2094
+          -
+          2116
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          59
+        </td>
+        <td>
+          10399
+        </td>
+        <td>
+          2071
+          -
+          2071
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          59
+        </td>
+        <td>
+          7932
+        </td>
+        <td>
+          2071
+          -
+          2117
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          59
+        </td>
+        <td>
+          6176
+        </td>
+        <td>
+          2071
+          -
+          2071
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          59
+        </td>
+        <td>
+          10757
+        </td>
+        <td>
+          2085
+          -
+          2116
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          62
+        </td>
+        <td>
+          5488
+        </td>
+        <td>
+          2218
+          -
+          2268
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          62
+        </td>
+        <td>
+          5868
+        </td>
+        <td>
+          2218
+          -
+          2218
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          62
+        </td>
+        <td>
+          11415
+        </td>
+        <td>
+          2241
+          -
+          2267
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          62
+        </td>
+        <td>
+          8215
+        </td>
+        <td>
+          2232
+          -
+          2267
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          62
+        </td>
+        <td>
+          8816
+        </td>
+        <td>
+          2218
+          -
+          2218
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          68
+        </td>
+        <td>
+          10939
+        </td>
+        <td>
+          2471
+          -
+          2491
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          68
+        </td>
+        <td>
+          8986
+        </td>
+        <td>
+          2462
+          -
+          2491
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          68
+        </td>
+        <td>
+          8229
+        </td>
+        <td>
+          2448
+          -
+          2448
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          68
+        </td>
+        <td>
+          6252
+        </td>
+        <td>
+          2448
+          -
+          2492
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          68
+        </td>
+        <td>
+          10666
+        </td>
+        <td>
+          2448
+          -
+          2448
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          70
+        </td>
+        <td>
+          11612
+        </td>
+        <td>
+          2534
+          -
+          2534
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          70
+        </td>
+        <td>
+          10655
+        </td>
+        <td>
+          2534
+          -
+          2576
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          70
+        </td>
+        <td>
+          5857
+        </td>
+        <td>
+          2548
+          -
+          2575
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          70
+        </td>
+        <td>
+          8425
+        </td>
+        <td>
+          2534
+          -
+          2534
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          70
+        </td>
+        <td>
+          6914
+        </td>
+        <td>
+          2557
+          -
+          2575
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          72
+        </td>
+        <td>
+          11328
+        </td>
+        <td>
+          2694
+          -
+          2736
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          72
+        </td>
+        <td>
+          8406
+        </td>
+        <td>
+          2717
+          -
+          2735
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          72
+        </td>
+        <td>
+          5884
+        </td>
+        <td>
+          2694
+          -
+          2694
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          72
+        </td>
+        <td>
+          5306
+        </td>
+        <td>
+          2708
+          -
+          2735
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          72
+        </td>
+        <td>
+          10584
+        </td>
+        <td>
+          2694
+          -
+          2694
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr>
+    </table>
+          </div>
+        </div>
+      </body>
+    </html>

@@ -1,0 +1,2814 @@
+<html>
+      <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+        <title id="title">
+          handlers.scala.html
+        </title>
+        <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jquery.tablesorter/2.20.1/css/theme.default.min.css" type="text/css"/><script src="http://cdnjs.cloudflare.com/ajax/libs/jquery.tablesorter/2.20.1/js/jquery.tablesorter.min.js"></script><link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/css/bootstrap.min.css" type="text/css"/><script src="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/js/bootstrap.min.js"></script><script type="text/javascript">
+        $(document).ready(function() {$(".tablesorter").tablesorter();});
+      </script>
+        <style>
+          table.codegrid { font-family: monospace; font-size: 12px; width: auto!important; }table.statementlist { width: auto!important; font-size: 13px; } table.codegrid td { padding: 0!important; border: 0!important } table td.linenumber { width: 40px!important; } 
+        </style>
+      </head>
+      <body style="font-family: monospace;">
+        <ul class="nav nav-tabs">
+          <li>
+            <a href="#codegrid" data-toggle="tab">Codegrid</a>
+          </li>
+          <li>
+            <a href="#statementlist" data-toggle="tab">Statement List</a>
+          </li>
+        </ul>
+        <div class="tab-content">
+          <div class="tab-pane active" id="codegrid">
+            <pre style='font-size: 12pt; font-family: courier;'>1 <span style=''>/*
+</span>2 <span style=''> * Copyright 2013 Stephane Godbillon (@sgodbillon)
+</span>3 <span style=''> *
+</span>4 <span style=''> * Licensed under the Apache License, Version 2.0 (the "License");
+</span>5 <span style=''> * you may not use this file except in compliance with the License.
+</span>6 <span style=''> * You may obtain a copy of the License at
+</span>7 <span style=''> *
+</span>8 <span style=''> *   http://www.apache.org/licenses/LICENSE-2.0
+</span>9 <span style=''> *
+</span>10 <span style=''> * Unless required by applicable law or agreed to in writing, software
+</span>11 <span style=''> * distributed under the License is distributed on an "AS IS" BASIS,
+</span>12 <span style=''> * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+</span>13 <span style=''> * See the License for the specific language governing permissions and
+</span>14 <span style=''> * limitations under the License.
+</span>15 <span style=''> */
+</span>16 <span style=''>package reactivemongo.bson
+</span>17 <span style=''>
+</span>18 <span style=''>import scala.collection.generic.CanBuildFrom
+</span>19 <span style=''>import scala.util.{ Failure, Success, Try }
+</span>20 <span style=''>
+</span>21 <span style=''>sealed trait UnsafeBSONReader[T] {
+</span>22 <span style=''>  def readTry(value: BSONValue): Try[T]
+</span>23 <span style=''>}
+</span>24 <span style=''>
+</span>25 <span style=''>/**
+</span>26 <span style=''> * A reader that produces an instance of `T` from a subtype of [[BSONValue]].
+</span>27 <span style=''> */
+</span>28 <span style=''>trait BSONReader[B <: BSONValue, T] { self =>
+</span>29 <span style=''>
+</span>30 <span style=''>  /**
+</span>31 <span style=''>   * Reads a BSON value and produce an instance of `T`.
+</span>32 <span style=''>   *
+</span>33 <span style=''>   * This method may throw exceptions at runtime.
+</span>34 <span style=''>   * If used outside a reader, one should consider `readTry(bson: B): Try[T]` or `readOpt(bson: B): Option[T]`.
+</span>35 <span style=''>   */
+</span>36 <span style=''>  def read(bson: B): T
+</span>37 <span style=''>
+</span>38 <span style=''>  /** Tries to produce an instance of `T` from the `bson` value, returns `None` if an error occurred. */
+</span>39 <span style=''>  def readOpt(bson: B): Option[T] = </span><span style='background: #AEF1AE'>readTry(bson).toOption</span><span style=''>
+</span>40 <span style=''>
+</span>41 <span style=''>  /** Tries to produce an instance of `T` from the `bson` value. */
+</span>42 <span style=''>  def readTry(bson: B): Try[T] = </span><span style='background: #AEF1AE'>Try(read(bson))</span><span style=''>
+</span>43 <span style=''>
+</span>44 <span style=''>  /**
+</span>45 <span style=''>   * Returns a BSON reader that returns the result of applying `f`
+</span>46 <span style=''>   * on the result of this reader.
+</span>47 <span style=''>   *
+</span>48 <span style=''>   * @param f the function to apply
+</span>49 <span style=''>   */
+</span>50 <span style=''>  final def afterRead[U](f: T => U): BSONReader[B, U] =
+</span>51 <span style=''>    </span><span style='background: #AEF1AE'>BSONReader[B, U]((read _) andThen f)</span><span style=''>
+</span>52 <span style=''>
+</span>53 <span style=''>  private[reactivemongo] def widenReader[U >: T]: UnsafeBSONReader[U] =
+</span>54 <span style=''>    </span><span style='background: #AEF1AE'>new</span><span style=''> UnsafeBSONReader[U] {
+</span>55 <span style=''>      def readTry(value: BSONValue): Try[U] =
+</span>56 <span style=''>        </span><span style='background: #AEF1AE'>Try(value.asInstanceOf[B])</span><span style=''> match {
+</span>57 <span style=''>          case Failure(_) => </span><span style='background: #F0ADAD'>Failure(exceptions.TypeDoesNotMatch(
+</span>58 <span style=''></span><span style='background: #F0ADAD'>            s"Cannot convert $value: ${value.getClass} with ${self.getClass}"))</span><span style=''>
+</span>59 <span style=''>
+</span>60 <span style=''>          case Success(bson) => </span><span style='background: #AEF1AE'>self.readTry(bson)</span><span style=''>
+</span>61 <span style=''>        }
+</span>62 <span style=''>    }
+</span>63 <span style=''>}
+</span>64 <span style=''>
+</span>65 <span style=''>object BSONReader {
+</span>66 <span style=''>  private class Default[B <: BSONValue, T](
+</span>67 <span style=''>      _read: B => T) extends BSONReader[B, T] {
+</span>68 <span style=''>    def read(bson: B): T = </span><span style='background: #AEF1AE'>_read(bson)</span><span style=''>
+</span>69 <span style=''>  }
+</span>70 <span style=''>
+</span>71 <span style=''>  def apply[B <: BSONValue, T](read: B => T): BSONReader[B, T] =
+</span>72 <span style=''>    </span><span style='background: #AEF1AE'>new Default[B, T](read)</span><span style=''>
+</span>73 <span style=''>}
+</span>74 <span style=''>
+</span>75 <span style=''>/**
+</span>76 <span style=''> * A writer that produces a subtype of [[BSONValue]] fron an instance of `T`.
+</span>77 <span style=''> */
+</span>78 <span style=''>trait BSONWriter[T, B <: BSONValue] {
+</span>79 <span style=''>  /**
+</span>80 <span style=''>   * Writes an instance of `T` as a BSON value.
+</span>81 <span style=''>   *
+</span>82 <span style=''>   * This method may throw exceptions at runtime.
+</span>83 <span style=''>   * If used outside a reader, one should consider `writeTry(bson: B): Try[T]` or `writeOpt(bson: B): Option[T]`.
+</span>84 <span style=''>   */
+</span>85 <span style=''>  def write(t: T): B
+</span>86 <span style=''>
+</span>87 <span style=''>  /** Tries to produce a BSON value from an instance of `T`, returns `None` if an error occurred. */
+</span>88 <span style=''>  def writeOpt(t: T): Option[B] = </span><span style='background: #F0ADAD'>writeTry(t).toOption</span><span style=''>
+</span>89 <span style=''>
+</span>90 <span style=''>  /** Tries to produce a BSON value from an instance of `T`. */
+</span>91 <span style=''>  def writeTry(t: T): Try[B] = </span><span style='background: #F0ADAD'>Try(write(t))</span><span style=''>
+</span>92 <span style=''>
+</span>93 <span style=''>  /**
+</span>94 <span style=''>   * Returns a BSON writer that returns the result of applying `f`
+</span>95 <span style=''>   * on the BSON value from this writer.
+</span>96 <span style=''>   *
+</span>97 <span style=''>   * @param f the function to apply
+</span>98 <span style=''>   */
+</span>99 <span style=''>  final def afterWrite[U <: BSONValue](f: B => U): BSONWriter[T, U] =
+</span>100 <span style=''>    </span><span style='background: #AEF1AE'>BSONWriter[T, U]((write _) andThen f)</span><span style=''>
+</span>101 <span style=''>
+</span>102 <span style=''>  final def beforeWrite[U](f: U => T): BSONWriter[U, B] =
+</span>103 <span style=''>    </span><span style='background: #AEF1AE'>BSONWriter[U, B](f andThen (write _))</span><span style=''>
+</span>104 <span style=''>}
+</span>105 <span style=''>
+</span>106 <span style=''>object BSONWriter {
+</span>107 <span style=''>  private class Default[T, B <: BSONValue](
+</span>108 <span style=''>      _write: T => B) extends BSONWriter[T, B] {
+</span>109 <span style=''>    def write(value: T): B = </span><span style='background: #AEF1AE'>_write(value)</span><span style=''>
+</span>110 <span style=''>  }
+</span>111 <span style=''>
+</span>112 <span style=''>  def apply[T, B <: BSONValue](write: T => B): BSONWriter[T, B] =
+</span>113 <span style=''>    </span><span style='background: #AEF1AE'>new Default[T, B](write)</span><span style=''>
+</span>114 <span style=''>}
+</span>115 <span style=''>
+</span>116 <span style=''>/**
+</span>117 <span style=''> * A reader that produces an instance of `T` from a subtype of [[BSONValue]].
+</span>118 <span style=''> */
+</span>119 <span style=''>trait VariantBSONReader[-B <: BSONValue, +T] {
+</span>120 <span style=''>  /**
+</span>121 <span style=''>   * Reads a BSON value and produce an instance of `T`.
+</span>122 <span style=''>   *
+</span>123 <span style=''>   * This method may throw exceptions at runtime.
+</span>124 <span style=''>   * If used outside a reader, one should consider `readTry(bson: B): Try[T]` or `readOpt(bson: B): Option[T]`.
+</span>125 <span style=''>   */
+</span>126 <span style=''>  def read(bson: B): T
+</span>127 <span style=''>
+</span>128 <span style=''>  /** Tries to produce an instance of `T` from the `bson` value, returns `None` if an error occurred. */
+</span>129 <span style=''>  def readOpt(bson: B): Option[T] = </span><span style='background: #F0ADAD'>readTry(bson).toOption</span><span style=''>
+</span>130 <span style=''>
+</span>131 <span style=''>  /** Tries to produce an instance of `T` from the `bson` value. */
+</span>132 <span style=''>  def readTry(bson: B): Try[T] = </span><span style='background: #F0ADAD'>Try(read(bson))</span><span style=''>
+</span>133 <span style=''>}
+</span>134 <span style=''>
+</span>135 <span style=''>/**
+</span>136 <span style=''> * A writer that produces a subtype of [[BSONValue]] fron an instance of `T`.
+</span>137 <span style=''> */
+</span>138 <span style=''>trait VariantBSONWriter[-T, +B <: BSONValue] {
+</span>139 <span style=''>  /**
+</span>140 <span style=''>   * Writes an instance of `T` as a BSON value.
+</span>141 <span style=''>   *
+</span>142 <span style=''>   * This method may throw exceptions at runtime.
+</span>143 <span style=''>   * If used outside a reader, one should consider `writeTry(bson: B): Try[T]` or `writeOpt(bson: B): Option[T]`.
+</span>144 <span style=''>   */
+</span>145 <span style=''>  def write(t: T): B
+</span>146 <span style=''>
+</span>147 <span style=''>  /** Tries to produce a BSON value from an instance of `T`, returns `None` if an error occurred. */
+</span>148 <span style=''>  def writeOpt(t: T): Option[B] = </span><span style='background: #F0ADAD'>writeTry(t).toOption</span><span style=''>
+</span>149 <span style=''>
+</span>150 <span style=''>  /** Tries to produce a BSON value from an instance of `T`. */
+</span>151 <span style=''>  def writeTry(t: T): Try[B] = </span><span style='background: #F0ADAD'>Try(write(t))</span><span style=''>
+</span>152 <span style=''>}
+</span>153 <span style=''>
+</span>154 <span style=''>trait BSONDocumentReader[T] extends BSONReader[BSONDocument, T]
+</span>155 <span style=''>
+</span>156 <span style=''>object BSONDocumentReader {
+</span>157 <span style=''>  private class Default[T](
+</span>158 <span style=''>      _read: BSONDocument => T) extends BSONDocumentReader[T] {
+</span>159 <span style=''>
+</span>160 <span style=''>    def read(value: BSONDocument): T = </span><span style='background: #AEF1AE'>_read(value)</span><span style=''>
+</span>161 <span style=''>  }
+</span>162 <span style=''>
+</span>163 <span style=''>  def apply[T](read: BSONDocument => T): BSONDocumentReader[T] =
+</span>164 <span style=''>    </span><span style='background: #AEF1AE'>new Default[T](read)</span><span style=''>
+</span>165 <span style=''>}
+</span>166 <span style=''>
+</span>167 <span style=''>trait BSONDocumentWriter[T] extends BSONWriter[T, BSONDocument]
+</span>168 <span style=''>
+</span>169 <span style=''>object BSONDocumentWriter {
+</span>170 <span style=''>  private class Default[T](
+</span>171 <span style=''>      _write: T => BSONDocument) extends BSONDocumentWriter[T] {
+</span>172 <span style=''>
+</span>173 <span style=''>    def write(value: T): BSONDocument = </span><span style='background: #AEF1AE'>_write(value)</span><span style=''>
+</span>174 <span style=''>  }
+</span>175 <span style=''>
+</span>176 <span style=''>  def apply[T](write: T => BSONDocument): BSONDocumentWriter[T] =
+</span>177 <span style=''>    </span><span style='background: #AEF1AE'>new Default[T](write)</span><span style=''>
+</span>178 <span style=''>}
+</span>179 <span style=''>
+</span>180 <span style=''>trait VariantBSONDocumentReader[+T] extends VariantBSONReader[BSONDocument, T]
+</span>181 <span style=''>trait VariantBSONDocumentWriter[-T] extends VariantBSONWriter[T, BSONDocument]
+</span>182 <span style=''>
+</span>183 <span style=''>class VariantBSONWriterWrapper[T, B <: BSONValue](writer: VariantBSONWriter[T, B]) extends BSONWriter[T, B] {
+</span>184 <span style=''>  def write(t: T) = </span><span style='background: #AEF1AE'>writer.write(t)</span><span style=''>
+</span>185 <span style=''>}
+</span>186 <span style=''>
+</span>187 <span style=''>class VariantBSONReaderWrapper[B <: BSONValue, T](reader: VariantBSONReader[B, T]) extends BSONReader[B, T] {
+</span>188 <span style=''>  def read(b: B) = </span><span style='background: #F0ADAD'>reader.read(b)</span><span style=''>
+</span>189 <span style=''>}
+</span>190 <span style=''>
+</span>191 <span style=''>trait BSONHandler[B <: BSONValue, T] extends BSONReader[B, T] with BSONWriter[T, B] {
+</span>192 <span style=''>  def as[R](to: T => R, from: R => T): BSONHandler[B, R] =
+</span>193 <span style=''>    </span><span style='background: #F0ADAD'>new BSONHandler.MappedHandler(this, to, from)</span><span style=''>
+</span>194 <span style=''>}
+</span>195 <span style=''>
+</span>196 <span style=''>object BSONHandler {
+</span>197 <span style=''>  private[bson] class MappedHandler[B <: BSONValue, T, U](
+</span>198 <span style=''>      parent: BSONHandler[B, T],
+</span>199 <span style=''>      to: T => U,
+</span>200 <span style=''>      from: U => T) extends BSONHandler[B, U] {
+</span>201 <span style=''>    def write(u: U) = </span><span style='background: #F0ADAD'>parent.write(from(u))</span><span style=''>
+</span>202 <span style=''>    def read(b: B) = </span><span style='background: #F0ADAD'>to(parent.read(b))</span><span style=''>
+</span>203 <span style=''>  }
+</span>204 <span style=''>
+</span>205 <span style=''>  private[bson] class DefaultHandler[B <: BSONValue, T](r: B => T, w: T => B)
+</span>206 <span style=''>      extends BSONHandler[B, T] {
+</span>207 <span style=''>    def read(x: B): T = </span><span style='background: #F0ADAD'>r(x)</span><span style=''>
+</span>208 <span style=''>    def write(x: T): B = </span><span style='background: #F0ADAD'>w(x)</span><span style=''>
+</span>209 <span style=''>  }
+</span>210 <span style=''>
+</span>211 <span style=''>  def apply[B <: BSONValue, T](read: B => T, write: T => B): BSONHandler[B, T] =
+</span>212 <span style=''>    </span><span style='background: #F0ADAD'>new DefaultHandler(read, write)</span><span style=''>
+</span>213 <span style=''>}
+</span>214 <span style=''>
+</span>215 <span style=''>trait DefaultBSONHandlers {
+</span>216 <span style=''>  implicit object BSONIntegerHandler extends BSONHandler[BSONInteger, Int] {
+</span>217 <span style=''>    def read(int: BSONInteger) = </span><span style='background: #AEF1AE'>int.value</span><span style=''>
+</span>218 <span style=''>    def write(int: Int) = </span><span style='background: #AEF1AE'>BSONInteger(int)</span><span style=''>
+</span>219 <span style=''>  }
+</span>220 <span style=''>  implicit object BSONLongHandler extends BSONHandler[BSONLong, Long] {
+</span>221 <span style=''>    def read(long: BSONLong) = </span><span style='background: #AEF1AE'>long.value</span><span style=''>
+</span>222 <span style=''>    def write(long: Long) = </span><span style='background: #AEF1AE'>BSONLong(long)</span><span style=''>
+</span>223 <span style=''>  }
+</span>224 <span style=''>  implicit object BSONDoubleHandler extends BSONHandler[BSONDouble, Double] {
+</span>225 <span style=''>    def read(double: BSONDouble) = </span><span style='background: #AEF1AE'>double.value</span><span style=''>
+</span>226 <span style=''>    def write(double: Double) = </span><span style='background: #AEF1AE'>BSONDouble(double)</span><span style=''>
+</span>227 <span style=''>  }
+</span>228 <span style=''>
+</span>229 <span style=''>  implicit object BSONStringHandler extends BSONHandler[BSONString, String] {
+</span>230 <span style=''>    def read(string: BSONString) = </span><span style='background: #AEF1AE'>string.value</span><span style=''>
+</span>231 <span style=''>    def write(string: String) = </span><span style='background: #AEF1AE'>BSONString(string)</span><span style=''>
+</span>232 <span style=''>  }
+</span>233 <span style=''>  implicit object BSONBooleanHandler extends BSONHandler[BSONBoolean, Boolean] {
+</span>234 <span style=''>    def read(boolean: BSONBoolean) = </span><span style='background: #AEF1AE'>boolean.value</span><span style=''>
+</span>235 <span style=''>    def write(boolean: Boolean) = </span><span style='background: #AEF1AE'>BSONBoolean(boolean)</span><span style=''>
+</span>236 <span style=''>  }
+</span>237 <span style=''>
+</span>238 <span style=''>  implicit object BSONBinaryHandler extends BSONHandler[BSONBinary, Array[Byte]] {
+</span>239 <span style=''>    def read(bin: BSONBinary) = </span><span style='background: #AEF1AE'>bin.value.duplicate().readArray(bin.value.size)</span><span style=''>
+</span>240 <span style=''>    def write(xs: Array[Byte]) = </span><span style='background: #F0ADAD'>BSONBinary(xs, Subtype.GenericBinarySubtype)</span><span style=''>
+</span>241 <span style=''>  }
+</span>242 <span style=''>
+</span>243 <span style=''>  import java.util.Date
+</span>244 <span style=''>
+</span>245 <span style=''>  implicit object BSONDateTimeHandler extends BSONHandler[BSONDateTime, Date] {
+</span>246 <span style=''>    def read(bson: BSONDateTime) = </span><span style='background: #AEF1AE'>new Date(bson.value)</span><span style=''>
+</span>247 <span style=''>    def write(date: Date) = </span><span style='background: #AEF1AE'>BSONDateTime(date.getTime)</span><span style=''>
+</span>248 <span style=''>  }
+</span>249 <span style=''>
+</span>250 <span style=''>  // Typeclasses Handlers
+</span>251 <span style=''>  import BSONNumberLike._
+</span>252 <span style=''>  import BSONBooleanLike._
+</span>253 <span style=''>
+</span>254 <span style=''>  class BSONNumberLikeReader[B <: BSONValue] extends BSONReader[B, BSONNumberLike] {
+</span>255 <span style=''>    def read(bson: B) = bson match {
+</span>256 <span style=''>      case int: BSONInteger   => </span><span style='background: #AEF1AE'>BSONIntegerNumberLike(int)</span><span style=''>
+</span>257 <span style=''>      case long: BSONLong     => </span><span style='background: #AEF1AE'>BSONLongNumberLike(long)</span><span style=''>
+</span>258 <span style=''>      case double: BSONDouble => </span><span style='background: #AEF1AE'>BSONDoubleNumberLike(double)</span><span style=''>
+</span>259 <span style=''>      case dt: BSONDateTime   => </span><span style='background: #AEF1AE'>BSONDateTimeNumberLike(dt)</span><span style=''>
+</span>260 <span style=''>      case ts: BSONTimestamp  => </span><span style='background: #AEF1AE'>BSONTimestampNumberLike(ts)</span><span style=''>
+</span>261 <span style=''>      case _                  => </span><span style='background: #AEF1AE'>throw new UnsupportedOperationException()</span><span style=''>
+</span>262 <span style=''>    }
+</span>263 <span style=''>  }
+</span>264 <span style=''>
+</span>265 <span style=''>  implicit object BSONNumberLikeWriter extends VariantBSONWriter[BSONNumberLike, BSONValue] {
+</span>266 <span style=''>    def write(number: BSONNumberLike) = </span><span style='background: #F0ADAD'>number.underlying</span><span style=''>
+</span>267 <span style=''>  }
+</span>268 <span style=''>
+</span>269 <span style=''>  implicit def bsonNumberLikeReader[B <: BSONValue] = </span><span style='background: #AEF1AE'>new BSONNumberLikeReader[B]</span><span style=''>
+</span>270 <span style=''>
+</span>271 <span style=''>  class BSONBooleanLikeReader[B <: BSONValue] extends BSONReader[B, BSONBooleanLike] {
+</span>272 <span style=''>    def read(bson: B) = bson match {
+</span>273 <span style=''>      case int: BSONInteger        => </span><span style='background: #AEF1AE'>BSONIntegerBooleanLike(int)</span><span style=''>
+</span>274 <span style=''>      case double: BSONDouble      => </span><span style='background: #AEF1AE'>BSONDoubleBooleanLike(double)</span><span style=''>
+</span>275 <span style=''>      case long: BSONLong          => </span><span style='background: #AEF1AE'>BSONLongBooleanLike(long)</span><span style=''>
+</span>276 <span style=''>      case boolean: BSONBoolean    => </span><span style='background: #AEF1AE'>BSONBooleanBooleanLike(boolean)</span><span style=''>
+</span>277 <span style=''>      case nll: BSONNull.type      => </span><span style='background: #AEF1AE'>BSONNullBooleanLike(BSONNull)</span><span style=''>
+</span>278 <span style=''>      case udf: BSONUndefined.type => </span><span style='background: #AEF1AE'>BSONUndefinedBooleanLike(BSONUndefined)</span><span style=''>
+</span>279 <span style=''>      case _                       => </span><span style='background: #F0ADAD'>throw new UnsupportedOperationException()</span><span style=''>
+</span>280 <span style=''>    }
+</span>281 <span style=''>  }
+</span>282 <span style=''>
+</span>283 <span style=''>  implicit object BSONBooleanLikeWriter extends VariantBSONWriter[BSONBooleanLike, BSONValue] {
+</span>284 <span style=''>    def write(number: BSONBooleanLike) = </span><span style='background: #F0ADAD'>number.underlying</span><span style=''>
+</span>285 <span style=''>  }
+</span>286 <span style=''>
+</span>287 <span style=''>  implicit def bsonBooleanLikeReader[B <: BSONValue] = </span><span style='background: #AEF1AE'>new BSONBooleanLikeReader[B]</span><span style=''>
+</span>288 <span style=''>
+</span>289 <span style=''>  // Collections Handlers
+</span>290 <span style=''>  class BSONArrayCollectionReader[M[_], T](implicit cbf: CanBuildFrom[M[_], T, M[T]], reader: BSONReader[_ <: BSONValue, T]) extends BSONReader[BSONArray, M[T]] {
+</span>291 <span style=''>    def read(array: BSONArray) =
+</span>292 <span style=''>      </span><span style='background: #AEF1AE'>array.stream.filter(_.isSuccess).map { v =>
+</span>293 <span style=''></span><span style='background: #AEF1AE'>        reader.asInstanceOf[BSONReader[BSONValue, T]].read(v.get)
+</span>294 <span style=''></span><span style='background: #AEF1AE'>      }.to[M]</span><span style=''>
+</span>295 <span style=''>  }
+</span>296 <span style=''>
+</span>297 <span style=''>  class BSONArrayCollectionWriter[T, Repr <% Traversable[T]](implicit writer: BSONWriter[T, _ <: BSONValue]) extends VariantBSONWriter[Repr, BSONArray] {
+</span>298 <span style=''>    def write(repr: Repr) = {
+</span>299 <span style=''>      </span><span style='background: #AEF1AE'>new BSONArray(repr.map(s => Try(writer.write(s))).to[Stream])</span><span style=''>
+</span>300 <span style=''>    }
+</span>301 <span style=''>  }
+</span>302 <span style=''>
+</span>303 <span style=''>  implicit def collectionToBSONArrayCollectionWriter[T, Repr <% Traversable[T]](implicit writer: BSONWriter[T, _ <: BSONValue]): VariantBSONWriter[Repr, BSONArray] = {
+</span>304 <span style=''>    </span><span style='background: #AEF1AE'>new BSONArrayCollectionWriter[T, Repr]</span><span style=''>
+</span>305 <span style=''>  }
+</span>306 <span style=''>
+</span>307 <span style=''>  implicit def bsonArrayToCollectionReader[M[_], T](implicit cbf: CanBuildFrom[M[_], T, M[T]], reader: BSONReader[_ <: BSONValue, T]): BSONReader[BSONArray, M[T]] = {
+</span>308 <span style=''>    </span><span style='background: #AEF1AE'>new BSONArrayCollectionReader</span><span style=''>
+</span>309 <span style=''>  }
+</span>310 <span style=''>
+</span>311 <span style=''>  abstract class IdentityBSONConverter[T <: BSONValue](implicit m: Manifest[T]) extends BSONReader[T, T] with BSONWriter[T, T] {
+</span>312 <span style=''>    override def write(t: T): T = </span><span style='background: #AEF1AE'>m.runtimeClass.cast(t).asInstanceOf[T]</span><span style=''>
+</span>313 <span style=''>    override def writeOpt(t: T): Option[T] = if (</span><span style='background: #F0ADAD'>m.runtimeClass.isInstance(t)</span><span style=''>) </span><span style='background: #F0ADAD'>Some(t.asInstanceOf[T])</span><span style=''> else </span><span style='background: #F0ADAD'>None</span><span style=''>
+</span>314 <span style=''>    override def read(bson: T): T = </span><span style='background: #AEF1AE'>m.runtimeClass.cast(bson).asInstanceOf[T]</span><span style=''>
+</span>315 <span style=''>    override def readOpt(bson: T): Option[T] = if (</span><span style='background: #AEF1AE'>m.runtimeClass.isInstance(bson)</span><span style=''>) </span><span style='background: #AEF1AE'>Some(bson.asInstanceOf[T])</span><span style=''> else </span><span style='background: #AEF1AE'>None</span><span style=''>
+</span>316 <span style=''>  }
+</span>317 <span style=''>
+</span>318 <span style=''>  implicit object BSONStringIdentity extends IdentityBSONConverter[BSONString]
+</span>319 <span style=''>
+</span>320 <span style=''>  implicit object BSONIntegerIdentity extends IdentityBSONConverter[BSONInteger]
+</span>321 <span style=''>
+</span>322 <span style=''>  implicit object BSONArrayIdentity extends IdentityBSONConverter[BSONArray]
+</span>323 <span style=''>
+</span>324 <span style=''>  implicit object BSONDocumentIdentity extends IdentityBSONConverter[BSONDocument] with BSONDocumentReader[BSONDocument] with BSONDocumentWriter[BSONDocument]
+</span>325 <span style=''>
+</span>326 <span style=''>  implicit object BSONBooleanIdentity extends IdentityBSONConverter[BSONBoolean]
+</span>327 <span style=''>
+</span>328 <span style=''>  implicit object BSONLongIdentity extends IdentityBSONConverter[BSONLong]
+</span>329 <span style=''>
+</span>330 <span style=''>  implicit object BSONDoubleIdentity extends IdentityBSONConverter[BSONDouble]
+</span>331 <span style=''>
+</span>332 <span style=''>  implicit object BSONValueIdentity extends IdentityBSONConverter[BSONValue]
+</span>333 <span style=''>
+</span>334 <span style=''>  implicit object BSONObjectIDIdentity extends IdentityBSONConverter[BSONObjectID]
+</span>335 <span style=''>
+</span>336 <span style=''>  implicit object BSONBinaryIdentity extends IdentityBSONConverter[BSONBinary]
+</span>337 <span style=''>
+</span>338 <span style=''>  implicit object BSONDateTimeIdentity extends IdentityBSONConverter[BSONDateTime]
+</span>339 <span style=''>
+</span>340 <span style=''>  implicit object BSONNullIdentity extends IdentityBSONConverter[BSONNull.type]
+</span>341 <span style=''>
+</span>342 <span style=''>  implicit object BSONUndefinedIdentity extends IdentityBSONConverter[BSONUndefined.type]
+</span>343 <span style=''>
+</span>344 <span style=''>  implicit object BSONRegexIdentity extends IdentityBSONConverter[BSONRegex]
+</span>345 <span style=''>
+</span>346 <span style=''>  implicit object BSONJavaScriptIdentity extends BSONReader[BSONJavaScript, BSONJavaScript] with BSONWriter[BSONJavaScript, BSONJavaScript] {
+</span>347 <span style=''>    def read(b: BSONJavaScript) = b
+</span>348 <span style=''>    def write(b: BSONJavaScript) = b
+</span>349 <span style=''>  }
+</span>350 <span style=''>
+</span>351 <span style=''>  implicit def findWriter[T](implicit writer: VariantBSONWriter[T, _ <: BSONValue]): BSONWriter[T, _ <: BSONValue] =
+</span>352 <span style=''>    </span><span style='background: #AEF1AE'>new VariantBSONWriterWrapper(writer)</span><span style=''>
+</span>353 <span style=''>
+</span>354 <span style=''>  implicit def findReader[T](implicit reader: VariantBSONReader[_ <: BSONValue, T]): BSONReader[_ <: BSONValue, T] =
+</span>355 <span style=''>    </span><span style='background: #F0ADAD'>new VariantBSONReaderWrapper(reader)</span><span style=''>
+</span>356 <span style=''>}
+</span>357 <span style=''>
+</span>358 <span style=''>object DefaultBSONHandlers extends DefaultBSONHandlers
+</span></pre>
+          </div>
+          <div class="tab-pane" id="statementlist">
+            <table cellspacing="0" cellpadding="0" class="table statementlist">
+      <tr>
+        <th>Line</th>
+        <th>Stmt Id</th>
+        <th>Pos</th>
+        <th>Tree</th>
+        <th>Symbol</th>
+        <th>Code</th>
+      </tr><tr>
+        <td>
+          39
+        </td>
+        <td>
+          4457
+        </td>
+        <td>
+          1343
+          -
+          1365
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          42
+        </td>
+        <td>
+          3899
+        </td>
+        <td>
+          1472
+          -
+          1482
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          42
+        </td>
+        <td>
+          4321
+        </td>
+        <td>
+          1468
+          -
+          1483
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          51
+        </td>
+        <td>
+          4722
+        </td>
+        <td>
+          1717
+          -
+          1735
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          51
+        </td>
+        <td>
+          3965
+        </td>
+        <td>
+          1700
+          -
+          1736
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          54
+        </td>
+        <td>
+          4101
+        </td>
+        <td>
+          1814
+          -
+          1817
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          56
+        </td>
+        <td>
+          4686
+        </td>
+        <td>
+          1894
+          -
+          1920
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          56
+        </td>
+        <td>
+          4640
+        </td>
+        <td>
+          1898
+          -
+          1919
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          57
+        </td>
+        <td>
+          3902
+        </td>
+        <td>
+          1966
+          -
+          2073
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          57
+        </td>
+        <td>
+          3963
+        </td>
+        <td>
+          1958
+          -
+          2074
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          58
+        </td>
+        <td>
+          4811
+        </td>
+        <td>
+          2034
+          -
+          2048
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          58
+        </td>
+        <td>
+          4452
+        </td>
+        <td>
+          2057
+          -
+          2070
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          58
+        </td>
+        <td>
+          4760
+        </td>
+        <td>
+          2009
+          -
+          2025
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          58
+        </td>
+        <td>
+          4338
+        </td>
+        <td>
+          2071
+          -
+          2072
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          58
+        </td>
+        <td>
+          4292
+        </td>
+        <td>
+          2007
+          -
+          2072
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          58
+        </td>
+        <td>
+          4268
+        </td>
+        <td>
+          2030
+          -
+          2033
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          58
+        </td>
+        <td>
+          4857
+        </td>
+        <td>
+          2049
+          -
+          2056
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          60
+        </td>
+        <td>
+          4066
+        </td>
+        <td>
+          2108
+          -
+          2126
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          68
+        </td>
+        <td>
+          4140
+        </td>
+        <td>
+          2285
+          -
+          2296
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          72
+        </td>
+        <td>
+          4273
+        </td>
+        <td>
+          2371
+          -
+          2394
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          88
+        </td>
+        <td>
+          4545
+        </td>
+        <td>
+          2908
+          -
+          2928
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          91
+        </td>
+        <td>
+          4853
+        </td>
+        <td>
+          3029
+          -
+          3037
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          91
+        </td>
+        <td>
+          4112
+        </td>
+        <td>
+          3025
+          -
+          3038
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          100
+        </td>
+        <td>
+          4484
+        </td>
+        <td>
+          3275
+          -
+          3312
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          100
+        </td>
+        <td>
+          4059
+        </td>
+        <td>
+          3292
+          -
+          3311
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          103
+        </td>
+        <td>
+          4906
+        </td>
+        <td>
+          3393
+          -
+          3412
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          103
+        </td>
+        <td>
+          4433
+        </td>
+        <td>
+          3404
+          -
+          3409
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          103
+        </td>
+        <td>
+          4229
+        </td>
+        <td>
+          3376
+          -
+          3413
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          109
+        </td>
+        <td>
+          4060
+        </td>
+        <td>
+          3559
+          -
+          3572
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          113
+        </td>
+        <td>
+          4827
+        </td>
+        <td>
+          3648
+          -
+          3672
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          129
+        </td>
+        <td>
+          3958
+        </td>
+        <td>
+          4209
+          -
+          4231
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          132
+        </td>
+        <td>
+          4918
+        </td>
+        <td>
+          4338
+          -
+          4348
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          132
+        </td>
+        <td>
+          4528
+        </td>
+        <td>
+          4334
+          -
+          4349
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          148
+        </td>
+        <td>
+          4121
+        </td>
+        <td>
+          4872
+          -
+          4892
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          151
+        </td>
+        <td>
+          4838
+        </td>
+        <td>
+          4993
+          -
+          5001
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          151
+        </td>
+        <td>
+          4401
+        </td>
+        <td>
+          4989
+          -
+          5002
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          160
+        </td>
+        <td>
+          4333
+        </td>
+        <td>
+          5231
+          -
+          5243
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          164
+        </td>
+        <td>
+          4224
+        </td>
+        <td>
+          5318
+          -
+          5338
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          173
+        </td>
+        <td>
+          4771
+        </td>
+        <td>
+          5569
+          -
+          5582
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          177
+        </td>
+        <td>
+          4732
+        </td>
+        <td>
+          5658
+          -
+          5679
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          184
+        </td>
+        <td>
+          3918
+        </td>
+        <td>
+          5972
+          -
+          5987
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          188
+        </td>
+        <td>
+          4330
+        </td>
+        <td>
+          6120
+          -
+          6134
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          193
+        </td>
+        <td>
+          4912
+        </td>
+        <td>
+          6287
+          -
+          6332
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          201
+        </td>
+        <td>
+          4810
+        </td>
+        <td>
+          6550
+          -
+          6557
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          201
+        </td>
+        <td>
+          4558
+        </td>
+        <td>
+          6537
+          -
+          6558
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          202
+        </td>
+        <td>
+          4892
+        </td>
+        <td>
+          6583
+          -
+          6597
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          202
+        </td>
+        <td>
+          4137
+        </td>
+        <td>
+          6580
+          -
+          6598
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          207
+        </td>
+        <td>
+          4298
+        </td>
+        <td>
+          6740
+          -
+          6744
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          208
+        </td>
+        <td>
+          4689
+        </td>
+        <td>
+          6770
+          -
+          6774
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          212
+        </td>
+        <td>
+          4508
+        </td>
+        <td>
+          6865
+          -
+          6896
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          217
+        </td>
+        <td>
+          4092
+        </td>
+        <td>
+          7038
+          -
+          7047
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          218
+        </td>
+        <td>
+          4815
+        </td>
+        <td>
+          7074
+          -
+          7090
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          221
+        </td>
+        <td>
+          4674
+        </td>
+        <td>
+          7198
+          -
+          7208
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          222
+        </td>
+        <td>
+          3945
+        </td>
+        <td>
+          7237
+          -
+          7251
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          225
+        </td>
+        <td>
+          4453
+        </td>
+        <td>
+          7369
+          -
+          7381
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          226
+        </td>
+        <td>
+          4890
+        </td>
+        <td>
+          7414
+          -
+          7432
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          230
+        </td>
+        <td>
+          4928
+        </td>
+        <td>
+          7551
+          -
+          7563
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          231
+        </td>
+        <td>
+          4187
+        </td>
+        <td>
+          7596
+          -
+          7614
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          234
+        </td>
+        <td>
+          4357
+        </td>
+        <td>
+          7737
+          -
+          7750
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          235
+        </td>
+        <td>
+          3920
+        </td>
+        <td>
+          7785
+          -
+          7805
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          239
+        </td>
+        <td>
+          4691
+        </td>
+        <td>
+          7958
+          -
+          7972
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          239
+        </td>
+        <td>
+          4021
+        </td>
+        <td>
+          7926
+          -
+          7973
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          240
+        </td>
+        <td>
+          4644
+        </td>
+        <td>
+          8007
+          -
+          8051
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          240
+        </td>
+        <td>
+          4202
+        </td>
+        <td>
+          8022
+          -
+          8050
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          246
+        </td>
+        <td>
+          4182
+        </td>
+        <td>
+          8197
+          -
+          8217
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          246
+        </td>
+        <td>
+          4925
+        </td>
+        <td>
+          8206
+          -
+          8216
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          247
+        </td>
+        <td>
+          4431
+        </td>
+        <td>
+          8259
+          -
+          8271
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          247
+        </td>
+        <td>
+          4849
+        </td>
+        <td>
+          8246
+          -
+          8272
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          256
+        </td>
+        <td>
+          4671
+        </td>
+        <td>
+          8513
+          -
+          8539
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          257
+        </td>
+        <td>
+          4361
+        </td>
+        <td>
+          8573
+          -
+          8597
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          258
+        </td>
+        <td>
+          4547
+        </td>
+        <td>
+          8631
+          -
+          8659
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          259
+        </td>
+        <td>
+          4189
+        </td>
+        <td>
+          8693
+          -
+          8719
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          260
+        </td>
+        <td>
+          3908
+        </td>
+        <td>
+          8753
+          -
+          8780
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          261
+        </td>
+        <td>
+          4960
+        </td>
+        <td>
+          8814
+          -
+          8855
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          266
+        </td>
+        <td>
+          3976
+        </td>
+        <td>
+          9001
+          -
+          9018
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          269
+        </td>
+        <td>
+          4358
+        </td>
+        <td>
+          9078
+          -
+          9105
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          273
+        </td>
+        <td>
+          3996
+        </td>
+        <td>
+          9269
+          -
+          9296
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          274
+        </td>
+        <td>
+          4579
+        </td>
+        <td>
+          9335
+          -
+          9364
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          275
+        </td>
+        <td>
+          4295
+        </td>
+        <td>
+          9403
+          -
+          9428
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          276
+        </td>
+        <td>
+          4706
+        </td>
+        <td>
+          9467
+          -
+          9498
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          277
+        </td>
+        <td>
+          4366
+        </td>
+        <td>
+          9537
+          -
+          9566
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          278
+        </td>
+        <td>
+          4985
+        </td>
+        <td>
+          9605
+          -
+          9644
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          279
+        </td>
+        <td>
+          3929
+        </td>
+        <td>
+          9683
+          -
+          9724
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          284
+        </td>
+        <td>
+          4923
+        </td>
+        <td>
+          9873
+          -
+          9890
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          287
+        </td>
+        <td>
+          4721
+        </td>
+        <td>
+          9951
+          -
+          9979
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          292
+        </td>
+        <td>
+          4945
+        </td>
+        <td>
+          10246
+          -
+          10246
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          292
+        </td>
+        <td>
+          4191
+        </td>
+        <td>
+          10229
+          -
+          10240
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          293
+        </td>
+        <td>
+          5027
+        </td>
+        <td>
+          10312
+          -
+          10317
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          293
+        </td>
+        <td>
+          4734
+        </td>
+        <td>
+          10261
+          -
+          10318
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          294
+        </td>
+        <td>
+          4581
+        </td>
+        <td>
+          10329
+          -
+          10329
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          294
+        </td>
+        <td>
+          4270
+        </td>
+        <td>
+          10209
+          -
+          10332
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          299
+        </td>
+        <td>
+          4372
+        </td>
+        <td>
+          10560
+          -
+          10575
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          299
+        </td>
+        <td>
+          4040
+        </td>
+        <td>
+          10556
+          -
+          10576
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          299
+        </td>
+        <td>
+          4509
+        </td>
+        <td>
+          10550
+          -
+          10550
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          299
+        </td>
+        <td>
+          4913
+        </td>
+        <td>
+          10528
+          -
+          10589
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          299
+        </td>
+        <td>
+          4000
+        </td>
+        <td>
+          10580
+          -
+          10580
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          299
+        </td>
+        <td>
+          4774
+        </td>
+        <td>
+          10542
+          -
+          10588
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          304
+        </td>
+        <td>
+          4780
+        </td>
+        <td>
+          10773
+          -
+          10811
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          308
+        </td>
+        <td>
+          3986
+        </td>
+        <td>
+          10988
+          -
+          11017
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          312
+        </td>
+        <td>
+          3993
+        </td>
+        <td>
+          11186
+          -
+          11224
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          313
+        </td>
+        <td>
+          5000
+        </td>
+        <td>
+          11304
+          -
+          11327
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          313
+        </td>
+        <td>
+          4617
+        </td>
+        <td>
+          11333
+          -
+          11337
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          313
+        </td>
+        <td>
+          4231
+        </td>
+        <td>
+          11274
+          -
+          11302
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          313
+        </td>
+        <td>
+          3955
+        </td>
+        <td>
+          11309
+          -
+          11326
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          313
+        </td>
+        <td>
+          4385
+        </td>
+        <td>
+          11304
+          -
+          11327
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          313
+        </td>
+        <td>
+          4792
+        </td>
+        <td>
+          11333
+          -
+          11337
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          314
+        </td>
+        <td>
+          4251
+        </td>
+        <td>
+          11374
+          -
+          11415
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          315
+        </td>
+        <td>
+          4255
+        </td>
+        <td>
+          11505
+          -
+          11525
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          315
+        </td>
+        <td>
+          4793
+        </td>
+        <td>
+          11500
+          -
+          11526
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          315
+        </td>
+        <td>
+          4980
+        </td>
+        <td>
+          11532
+          -
+          11536
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          315
+        </td>
+        <td>
+          4747
+        </td>
+        <td>
+          11532
+          -
+          11536
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          315
+        </td>
+        <td>
+          3924
+        </td>
+        <td>
+          11500
+          -
+          11526
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          315
+        </td>
+        <td>
+          4360
+        </td>
+        <td>
+          11467
+          -
+          11498
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          352
+        </td>
+        <td>
+          4081
+        </td>
+        <td>
+          13097
+          -
+          13133
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          355
+        </td>
+        <td>
+          4289
+        </td>
+        <td>
+          13256
+          -
+          13292
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr>
+    </table>
+          </div>
+        </div>
+      </body>
+    </html>
