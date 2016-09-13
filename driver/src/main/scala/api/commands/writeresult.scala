@@ -23,7 +23,7 @@ sealed trait WriteResult {
 
   protected def message = errmsg.getOrElse("<none>")
 
-  //override
+  @deprecated("Use the detailed properties (e.g. `code`)", "0.12.0")
   def originalDocument = Option.empty[reactivemongo.bson.BSONDocument] // TODO
   //def stringify: String = toString + " [inError: " + inError + "]"
   //override def getMessage() = toString + " [inError: " + inError + "]"
