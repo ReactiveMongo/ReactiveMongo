@@ -1,0 +1,1404 @@
+<html>
+      <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+        <title id="title">
+          core/nodeset.scala.html
+        </title>
+        <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jquery.tablesorter/2.20.1/css/theme.default.min.css" type="text/css"/><script src="http://cdnjs.cloudflare.com/ajax/libs/jquery.tablesorter/2.20.1/js/jquery.tablesorter.min.js"></script><link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/css/bootstrap.min.css" type="text/css"/><script src="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/js/bootstrap.min.js"></script><script type="text/javascript">
+        $(document).ready(function() {$(".tablesorter").tablesorter();});
+      </script>
+        <style>
+          table.codegrid { font-family: monospace; font-size: 12px; width: auto!important; }table.statementlist { width: auto!important; font-size: 13px; } table.codegrid td { padding: 0!important; border: 0!important } table td.linenumber { width: 40px!important; } 
+        </style>
+      </head>
+      <body style="font-family: monospace;">
+        <ul class="nav nav-tabs">
+          <li>
+            <a href="#codegrid" data-toggle="tab">Codegrid</a>
+          </li>
+          <li>
+            <a href="#statementlist" data-toggle="tab">Statement List</a>
+          </li>
+        </ul>
+        <div class="tab-content">
+          <div class="tab-pane active" id="codegrid">
+            <pre style='font-size: 12pt; font-family: courier;'>1 <span style=''>package reactivemongo.core.nodeset
+</span>2 <span style=''>
+</span>3 <span style=''>import java.util.concurrent.{ TimeUnit, Executor, Executors }
+</span>4 <span style=''>
+</span>5 <span style=''>import scala.collection.generic.CanBuildFrom
+</span>6 <span style=''>import scala.collection.immutable.Set
+</span>7 <span style=''>
+</span>8 <span style=''>import shaded.netty.util.HashedWheelTimer
+</span>9 <span style=''>import shaded.netty.buffer.HeapChannelBufferFactory
+</span>10 <span style=''>import shaded.netty.channel.socket.nio.NioClientSocketChannelFactory
+</span>11 <span style=''>import shaded.netty.channel.{
+</span>12 <span style=''>  Channel,
+</span>13 <span style=''>  ChannelFuture,
+</span>14 <span style=''>  ChannelPipeline,
+</span>15 <span style=''>  Channels
+</span>16 <span style=''>}
+</span>17 <span style=''>import shaded.netty.handler.timeout.IdleStateHandler
+</span>18 <span style=''>
+</span>19 <span style=''>import akka.actor.ActorRef
+</span>20 <span style=''>
+</span>21 <span style=''>import reactivemongo.util.LazyLogger
+</span>22 <span style=''>import reactivemongo.core.protocol.Request
+</span>23 <span style=''>
+</span>24 <span style=''>import reactivemongo.bson.BSONDocument
+</span>25 <span style=''>import reactivemongo.core.protocol.{
+</span>26 <span style=''>  MongoHandler,
+</span>27 <span style=''>  MongoWireVersion,
+</span>28 <span style=''>  RequestEncoder,
+</span>29 <span style=''>  ResponseDecoder,
+</span>30 <span style=''>  ResponseFrameDecoder
+</span>31 <span style=''>}
+</span>32 <span style=''>import reactivemongo.api.{ MongoConnectionOptions, ReadPreference }
+</span>33 <span style=''>
+</span>34 <span style=''>package object utils {
+</span>35 <span style=''>  def updateFirst[A, M[T] <: Iterable[T]](coll: M[A])(f: A => Option[A])(implicit cbf: CanBuildFrom[M[_], A, M[A]]): M[A] = {
+</span>36 <span style=''>    val builder = </span><span style='background: #F0ADAD'>cbf.apply</span><span style=''>
+</span>37 <span style=''>
+</span>38 <span style=''>    def run(iterator: Iterator[A]): Unit = {
+</span>39 <span style=''>      while (</span><span style='background: #F0ADAD'>iterator.hasNext</span><span style=''>) </span><span style='background: #F0ADAD'>{
+</span>40 <span style=''></span><span style='background: #F0ADAD'>        val e = iterator.next
+</span>41 <span style=''></span><span style='background: #F0ADAD'>        val updated = f(e)
+</span>42 <span style=''></span><span style='background: #F0ADAD'>        if (updated.isDefined) {
+</span>43 <span style=''></span><span style='background: #F0ADAD'>          builder += updated.get
+</span>44 <span style=''></span><span style='background: #F0ADAD'>          builder ++= iterator
+</span>45 <span style=''></span><span style='background: #F0ADAD'>        } else builder += e
+</span>46 <span style=''></span><span style='background: #F0ADAD'>      }</span><span style=''>
+</span>47 <span style=''>    }
+</span>48 <span style=''>
+</span>49 <span style=''>    </span><span style='background: #F0ADAD'>builder.result</span><span style=''>
+</span>50 <span style=''>  }
+</span>51 <span style=''>
+</span>52 <span style=''>  def update[A, M[T] <: Iterable[T]](coll: M[A])(f: PartialFunction[A, A])(implicit cbf: CanBuildFrom[M[_], A, M[A]]): (M[A], Boolean) = {
+</span>53 <span style=''>    val builder = </span><span style='background: #AEF1AE'>cbf.apply</span><span style=''>
+</span>54 <span style=''>    val (head, tail) = coll.span(!f.isDefinedAt(_))
+</span>55 <span style=''>    </span><span style='background: #AEF1AE'>builder ++= head</span><span style=''>
+</span>56 <span style=''>
+</span>57 <span style=''>    if (</span><span style='background: #AEF1AE'>!tail.isEmpty</span><span style=''>) </span><span style='background: #AEF1AE'>{
+</span>58 <span style=''></span><span style='background: #AEF1AE'>      builder += f(tail.head)
+</span>59 <span style=''></span><span style='background: #AEF1AE'>      builder ++= tail.drop(1)
+</span>60 <span style=''></span><span style='background: #AEF1AE'>    }</span><span style=''>
+</span>61 <span style=''>
+</span>62 <span style=''>    </span><span style='background: #AEF1AE'>builder.result -> !tail.isEmpty</span><span style=''>
+</span>63 <span style=''>  }
+</span>64 <span style=''>}
+</span>65 <span style=''>
+</span>66 <span style=''>case class NodeSet(
+</span>67 <span style=''>    name: Option[String],
+</span>68 <span style=''>    version: Option[Long],
+</span>69 <span style=''>    nodes: Vector[Node],
+</span>70 <span style=''>    authenticates: Set[Authenticate]
+</span>71 <span style=''>) {
+</span>72 <span style=''>
+</span>73 <span style=''>  /** The node which is the current primary one. */
+</span>74 <span style=''>  val primary: Option[Node] = nodes.find(_.status == NodeStatus.Primary)
+</span>75 <span style=''>
+</span>76 <span style=''>  /** The `mongos` node, if any. */
+</span>77 <span style=''>  val mongos: Option[Node] = nodes.find(_.isMongos)
+</span>78 <span style=''>
+</span>79 <span style=''>  val secondaries = new RoundRobiner(
+</span>80 <span style=''>    nodes.filter(_.status == NodeStatus.Secondary)
+</span>81 <span style=''>  )
+</span>82 <span style=''>
+</span>83 <span style=''>  val queryable = secondaries.subject ++ primary
+</span>84 <span style=''>
+</span>85 <span style=''>  /** See the [[https://docs.mongodb.com/manual/reference/read-preference/#nearest nearest]] read preference. */
+</span>86 <span style=''>  val nearestGroup = new RoundRobiner(
+</span>87 <span style=''>    queryable.sortWith { _.pingInfo.ping < _.pingInfo.ping }
+</span>88 <span style=''>  )
+</span>89 <span style=''>
+</span>90 <span style=''>  /** The first node from the [[nearestGroup]]. */
+</span>91 <span style=''>  val nearest = nearestGroup.subject.headOption
+</span>92 <span style=''>
+</span>93 <span style=''>  val protocolMetadata: ProtocolMetadata =
+</span>94 <span style=''>    primary.orElse(secondaries.subject.headOption).
+</span>95 <span style=''>      fold(ProtocolMetadata.Default)(_.protocolMetadata)
+</span>96 <span style=''>
+</span>97 <span style=''>  def primary(authenticated: Authenticated): Option[Node] =
+</span>98 <span style=''>    primary.filter(_.authenticated.exists(_ == authenticated))
+</span>99 <span style=''>
+</span>100 <span style=''>  def isReachable = !primary.isEmpty || !secondaries.subject.isEmpty
+</span>101 <span style=''>
+</span>102 <span style=''>  def updateOrAddNode(f: PartialFunction[Node, Node], default: Node) = {
+</span>103 <span style=''>    val (maybeUpdatedNodes, updated) = utils.update(nodes)(f)
+</span>104 <span style=''>    if (!updated) copy(nodes = default +: nodes)
+</span>105 <span style=''>    else copy(nodes = maybeUpdatedNodes)
+</span>106 <span style=''>  }
+</span>107 <span style=''>
+</span>108 <span style=''>  def updateOrAddNodes(f: PartialFunction[Node, Node], nodes: Seq[Node]) =
+</span>109 <span style=''>    nodes.foldLeft(this)(_.updateOrAddNode(f, _))
+</span>110 <span style=''>
+</span>111 <span style=''>  def updateAll(f: Node => Node): NodeSet = copy(nodes = nodes.map(f))
+</span>112 <span style=''>
+</span>113 <span style=''>  def updateNodeByChannelId(id: Int)(f: Node => Node) =
+</span>114 <span style=''>    updateByChannelId(id)(identity)(f)
+</span>115 <span style=''>
+</span>116 <span style=''>  def updateConnectionByChannelId(id: Int)(f: Connection => Connection) =
+</span>117 <span style=''>    updateByChannelId(id)(f)(identity)
+</span>118 <span style=''>
+</span>119 <span style=''>  def updateByChannelId(id: Int)(fc: Connection => Connection)(fn: Node => Node) = copy(nodes = nodes.map { node =>
+</span>120 <span style=''>    val (connections, updated) = utils.update(node.connections) {
+</span>121 <span style=''>      case conn if (conn.channel.getId == id) => fc(conn)
+</span>122 <span style=''>    }
+</span>123 <span style=''>
+</span>124 <span style=''>    if (updated) fn(node._copy(connections = connections))
+</span>125 <span style=''>    else node
+</span>126 <span style=''>  })
+</span>127 <span style=''>
+</span>128 <span style=''>  def pickByChannelId(id: Int): Option[(Node, Connection)] =
+</span>129 <span style=''>    nodes.view.map(node =>
+</span>130 <span style=''>      node -> node.connections.find(_.channel.getId == id)).collectFirst {
+</span>131 <span style=''>      case (node, Some(con)) if (
+</span>132 <span style=''>        con.status == ConnectionStatus.Connected
+</span>133 <span style=''>      ) => node -> con
+</span>134 <span style=''>    }
+</span>135 <span style=''>
+</span>136 <span style=''>  @deprecated(message = "Unused", since = "0.12-RC0")
+</span>137 <span style=''>  def pickForWrite: Option[(Node, Connection)] = primary.view.map(node =>
+</span>138 <span style=''>    node -> node.authenticatedConnections.subject.headOption).collectFirst {
+</span>139 <span style=''>    case (node, Some(connection)) => node -> connection
+</span>140 <span style=''>  }
+</span>141 <span style=''>
+</span>142 <span style=''>  private val pickConnectionAndFlatten: Option[Node] => Option[(Node, Connection)] = {
+</span>143 <span style=''>    val p: RoundRobiner[Connection, Vector] => Option[Connection] =
+</span>144 <span style=''>      if (authenticates.isEmpty) _.pick
+</span>145 <span style=''>      else _.pickWithFilter(c =>
+</span>146 <span style=''>        !c.authenticating.isDefined && !c.authenticated.isEmpty)
+</span>147 <span style=''>
+</span>148 <span style=''>    _.flatMap(node => p(node.authenticatedConnections).map(node -> _))
+</span>149 <span style=''>  }
+</span>150 <span style=''>
+</span>151 <span style=''>  private def pickFromGroupWithFilter(roundRobiner: RoundRobiner[Node, Vector], filter: Option[BSONDocument => Boolean], fallback: => Option[Node]) =
+</span>152 <span style=''>    filter.fold(fallback)(f =>
+</span>153 <span style=''>      roundRobiner.pickWithFilter(_.tags.fold(false)(f)))
+</span>154 <span style=''>
+</span>155 <span style=''>  // http://docs.mongodb.org/manual/reference/read-preference/
+</span>156 <span style=''>  def pick(preference: ReadPreference): Option[(Node, Connection)] = {
+</span>157 <span style=''>    if (mongos.isDefined) {
+</span>158 <span style=''>      pickConnectionAndFlatten(mongos)
+</span>159 <span style=''>    } else preference match {
+</span>160 <span style=''>      case ReadPreference.Primary =>
+</span>161 <span style=''>        pickConnectionAndFlatten(primary)
+</span>162 <span style=''>
+</span>163 <span style=''>      case ReadPreference.PrimaryPreferred(filter) =>
+</span>164 <span style=''>        pickConnectionAndFlatten(primary.orElse(
+</span>165 <span style=''>          pickFromGroupWithFilter(secondaries, filter, secondaries.pick)
+</span>166 <span style=''>        ))
+</span>167 <span style=''>
+</span>168 <span style=''>      case ReadPreference.Secondary(filter) =>
+</span>169 <span style=''>        pickConnectionAndFlatten(pickFromGroupWithFilter(
+</span>170 <span style=''>          secondaries, filter, secondaries.pick
+</span>171 <span style=''>        ))
+</span>172 <span style=''>
+</span>173 <span style=''>      case ReadPreference.SecondaryPreferred(filter) =>
+</span>174 <span style=''>        pickConnectionAndFlatten(pickFromGroupWithFilter(
+</span>175 <span style=''>          secondaries, filter, secondaries.pick
+</span>176 <span style=''>        ).orElse(primary))
+</span>177 <span style=''>
+</span>178 <span style=''>      case ReadPreference.Nearest(filter) =>
+</span>179 <span style=''>        pickConnectionAndFlatten(pickFromGroupWithFilter(
+</span>180 <span style=''>          nearestGroup, filter, nearest
+</span>181 <span style=''>        ))
+</span>182 <span style=''>    }
+</span>183 <span style=''>  }
+</span>184 <span style=''>
+</span>185 <span style=''>  /**
+</span>186 <span style=''>   * Returns a NodeSet with channels created to `upTo` given maximum,
+</span>187 <span style=''>   * per each member of the set.
+</span>188 <span style=''>   */
+</span>189 <span style=''>  @deprecated(message = "Use `createNeededChannels` with the explicit `channelFactory`", since = "0.12-RC1")
+</span>190 <span style=''>  def createNeededChannels(receiver: ActorRef, upTo: Int)(implicit channelFactory: ChannelFactory): NodeSet = createNeededChannels(channelFactory, receiver, upTo)
+</span>191 <span style=''>
+</span>192 <span style=''>  /**
+</span>193 <span style=''>   * Returns a NodeSet with channels created to `upTo` given maximum,
+</span>194 <span style=''>   * per each member of the set.
+</span>195 <span style=''>   */
+</span>196 <span style=''>  private[core] def createNeededChannels(channelFactory: ChannelFactory, receiver: ActorRef, upTo: Int): NodeSet = updateAll(_.createNeededChannels(channelFactory, receiver, upTo))
+</span>197 <span style=''>
+</span>198 <span style=''>  def toShortString =
+</span>199 <span style=''>    s"{{NodeSet $name ${nodes.map(_.toShortString).mkString(" | ")} }}"
+</span>200 <span style=''>
+</span>201 <span style=''>  /** Returns the read-only information about this node. */
+</span>202 <span style=''>  def info = {
+</span>203 <span style=''>    val ns = nodes.map(_.info)
+</span>204 <span style=''>
+</span>205 <span style=''>    NodeSetInfo(name, version, ns, primary.map(_.info),
+</span>206 <span style=''>      mongos.map(_.info), ns.filter(_.status == NodeStatus.Secondary),
+</span>207 <span style=''>      nearest.map(_.info))
+</span>208 <span style=''>  }
+</span>209 <span style=''>}
+</span>210 <span style=''>
+</span>211 <span style=''>case class NodeSetInfo(
+</span>212 <span style=''>    name: Option[String],
+</span>213 <span style=''>    version: Option[Long],
+</span>214 <span style=''>    nodes: Vector[NodeInfo],
+</span>215 <span style=''>    primary: Option[NodeInfo],
+</span>216 <span style=''>    mongos: Option[NodeInfo],
+</span>217 <span style=''>    secondaries: Vector[NodeInfo],
+</span>218 <span style=''>    nearest: Option[NodeInfo]
+</span>219 <span style=''>) {
+</span>220 <span style=''>
+</span>221 <span style=''>  override lazy val toString = s"{{NodeSet $name ${nodes.mkString(" | ")} }}"
+</span>222 <span style=''>}
+</span>223 <span style=''>
+</span>224 <span style=''>/**
+</span>225 <span style=''> * @param name the main name of the node
+</span>226 <span style=''> */
+</span>227 <span style=''>@deprecated(message = "Will be made private", since = "0.11.10")
+</span>228 <span style=''>case class Node(
+</span>229 <span style=''>    name: String,
+</span>230 <span style=''>    status: NodeStatus,
+</span>231 <span style=''>    connections: Vector[Connection],
+</span>232 <span style=''>    authenticated: Set[Authenticated],
+</span>233 <span style=''>    tags: Option[BSONDocument],
+</span>234 <span style=''>    protocolMetadata: ProtocolMetadata,
+</span>235 <span style=''>    pingInfo: PingInfo = PingInfo(),
+</span>236 <span style=''>    isMongos: Boolean = false
+</span>237 <span style=''>) {
+</span>238 <span style=''>
+</span>239 <span style=''>  private[nodeset] val aliases = Set.newBuilder[String]
+</span>240 <span style=''>
+</span>241 <span style=''>  // TODO: Refactor as immutable once private
+</span>242 <span style=''>  def withAlias(as: String): Node = {
+</span>243 <span style=''>    aliases += as
+</span>244 <span style=''>    this
+</span>245 <span style=''>  }
+</span>246 <span style=''>
+</span>247 <span style=''>  /** All the node names (including its aliases) */
+</span>248 <span style=''>  def names: Set[String] = aliases.result() + name
+</span>249 <span style=''>
+</span>250 <span style=''>  val (host: String, port: Int) = {
+</span>251 <span style=''>    val splitted = name.span(_ != ':')
+</span>252 <span style=''>    splitted._1 -> (try {
+</span>253 <span style=''>      splitted._2.drop(1).toInt
+</span>254 <span style=''>    } catch {
+</span>255 <span style=''>      case _: Throwable => 27017
+</span>256 <span style=''>    })
+</span>257 <span style=''>  }
+</span>258 <span style=''>
+</span>259 <span style=''>  val connected: Vector[Connection] =
+</span>260 <span style=''>    connections.filter(_.status == ConnectionStatus.Connected)
+</span>261 <span style=''>
+</span>262 <span style=''>  val authenticatedConnections = new RoundRobiner(
+</span>263 <span style=''>    connected.filter(_.authenticated.forall { auth =>
+</span>264 <span style=''>      authenticated.exists(_ == auth)
+</span>265 <span style=''>    })
+</span>266 <span style=''>  )
+</span>267 <span style=''>
+</span>268 <span style=''>  @deprecated(message = "Use `createNeededChannels` with an explicit `channelFactory`", since = "0.12-RC1")
+</span>269 <span style=''>  def createNeededChannels(receiver: ActorRef, upTo: Int)(implicit channelFactory: ChannelFactory): Node = {
+</span>270 <span style=''>    if (connections.size < upTo) {
+</span>271 <span style=''>      _copy(connections = connections ++ (for {
+</span>272 <span style=''>        i ← 0 until (upTo - connections.size)
+</span>273 <span style=''>      } yield Connection(
+</span>274 <span style=''>        channelFactory.create(host, port, receiver),
+</span>275 <span style=''>        ConnectionStatus.Disconnected, Set.empty, None
+</span>276 <span style=''>      )))
+</span>277 <span style=''>    } else this
+</span>278 <span style=''>  }
+</span>279 <span style=''>
+</span>280 <span style=''>  private[core] def createNeededChannels(channelFactory: ChannelFactory, receiver: ActorRef, upTo: Int): Node = {
+</span>281 <span style=''>    if (connections.size < upTo) {
+</span>282 <span style=''>      _copy(connections = connections ++ (for {
+</span>283 <span style=''>        i ← 0 until (upTo - connections.size)
+</span>284 <span style=''>      } yield Connection(
+</span>285 <span style=''>        channelFactory.create(host, port, receiver),
+</span>286 <span style=''>        ConnectionStatus.Disconnected, Set.empty, None
+</span>287 <span style=''>      )))
+</span>288 <span style=''>    } else this
+</span>289 <span style=''>  }
+</span>290 <span style=''>
+</span>291 <span style=''>  // TODO: Remove when aliases is refactored
+</span>292 <span style=''>  private[reactivemongo] def _copy(
+</span>293 <span style=''>    name: String = this.name,
+</span>294 <span style=''>    status: NodeStatus = this.status,
+</span>295 <span style=''>    connections: Vector[Connection] = this.connections,
+</span>296 <span style=''>    authenticated: Set[Authenticated] = this.authenticated,
+</span>297 <span style=''>    tags: Option[BSONDocument] = this.tags,
+</span>298 <span style=''>    protocolMetadata: ProtocolMetadata = this.protocolMetadata,
+</span>299 <span style=''>    pingInfo: PingInfo = this.pingInfo,
+</span>300 <span style=''>    isMongos: Boolean = this.isMongos,
+</span>301 <span style=''>    aliases: Set[String] = this.aliases.result()
+</span>302 <span style=''>  ): Node = {
+</span>303 <span style=''>
+</span>304 <span style=''>    val node = copy(name, status, connections, authenticated, tags,
+</span>305 <span style=''>      protocolMetadata, pingInfo, isMongos)
+</span>306 <span style=''>
+</span>307 <span style=''>    node.aliases ++= this.aliases.result()
+</span>308 <span style=''>
+</span>309 <span style=''>    node
+</span>310 <span style=''>  }
+</span>311 <span style=''>
+</span>312 <span style=''>  def toShortString = s"Node[$name: $status (${connected.size}/${connections.size} available connections), latency=${pingInfo.ping}], auth=$authenticated"
+</span>313 <span style=''>
+</span>314 <span style=''>  /** Returns the read-only information about this node. */
+</span>315 <span style=''>  def info = NodeInfo(name, aliases.result(), host, port, status,
+</span>316 <span style=''>    connections.size, connections.count(_.status == ConnectionStatus.Connected),
+</span>317 <span style=''>    authenticatedConnections.subject.size, tags,
+</span>318 <span style=''>    protocolMetadata, pingInfo, isMongos)
+</span>319 <span style=''>
+</span>320 <span style=''>}
+</span>321 <span style=''>
+</span>322 <span style=''>/**
+</span>323 <span style=''> * @param connections the number of all the node connections
+</span>324 <span style=''> * @param connected the number of established connections for this node
+</span>325 <span style=''> * @param authenticated the number of authenticated connections
+</span>326 <span style=''> */
+</span>327 <span style=''>case class NodeInfo(
+</span>328 <span style=''>    name: String,
+</span>329 <span style=''>    aliases: Set[String],
+</span>330 <span style=''>    host: String,
+</span>331 <span style=''>    port: Int,
+</span>332 <span style=''>    status: NodeStatus,
+</span>333 <span style=''>    connections: Int,
+</span>334 <span style=''>    connected: Int,
+</span>335 <span style=''>    authenticated: Int,
+</span>336 <span style=''>    tags: Option[BSONDocument],
+</span>337 <span style=''>    protocolMetadata: ProtocolMetadata,
+</span>338 <span style=''>    pingInfo: PingInfo,
+</span>339 <span style=''>    isMongos: Boolean
+</span>340 <span style=''>) {
+</span>341 <span style=''>
+</span>342 <span style=''>  /** All the node names (including its aliases) */
+</span>343 <span style=''>  def names: Set[String] = aliases + name
+</span>344 <span style=''>
+</span>345 <span style=''>  override lazy val toString = s"Node[$name: $status ($connected/$connections available connections), latency=${pingInfo.ping}], auth=$authenticated"
+</span>346 <span style=''>}
+</span>347 <span style=''>
+</span>348 <span style=''>case class ProtocolMetadata(
+</span>349 <span style=''>    minWireVersion: MongoWireVersion,
+</span>350 <span style=''>    maxWireVersion: MongoWireVersion,
+</span>351 <span style=''>    maxMessageSizeBytes: Int,
+</span>352 <span style=''>    maxBsonSize: Int,
+</span>353 <span style=''>    maxBulkSize: Int
+</span>354 <span style=''>) {
+</span>355 <span style=''>  override lazy val toString =
+</span>356 <span style=''>    s"ProtocolMetadata($minWireVersion, $maxWireVersion)"
+</span>357 <span style=''>}
+</span>358 <span style=''>
+</span>359 <span style=''>object ProtocolMetadata {
+</span>360 <span style=''>  val Default = ProtocolMetadata(
+</span>361 <span style=''>    MongoWireVersion.V30, MongoWireVersion.V30,
+</span>362 <span style=''>    48000000, 16 * 1024 * 1024, 1000
+</span>363 <span style=''>  )
+</span>364 <span style=''>}
+</span>365 <span style=''>
+</span>366 <span style=''>case class Connection(
+</span>367 <span style=''>    channel: Channel,
+</span>368 <span style=''>    status: ConnectionStatus,
+</span>369 <span style=''>    authenticated: Set[Authenticated],
+</span>370 <span style=''>    authenticating: Option[Authenticating]
+</span>371 <span style=''>) {
+</span>372 <span style=''>
+</span>373 <span style=''>  def send(message: Request, writeConcern: Request): ChannelFuture = {
+</span>374 <span style=''>    channel.write(message)
+</span>375 <span style=''>    channel.write(writeConcern)
+</span>376 <span style=''>  }
+</span>377 <span style=''>
+</span>378 <span style=''>  def send(message: Request): ChannelFuture = channel.write(message)
+</span>379 <span style=''>
+</span>380 <span style=''>  /** Returns whether the `user` is authenticated against the `db`. */
+</span>381 <span style=''>  def isAuthenticated(db: String, user: String): Boolean =
+</span>382 <span style=''>    authenticated.exists(auth => auth.user == user && auth.db == db)
+</span>383 <span style=''>}
+</span>384 <span style=''>
+</span>385 <span style=''>case class PingInfo(
+</span>386 <span style=''>  ping: Long = 0,
+</span>387 <span style=''>  lastIsMasterTime: Long = 0,
+</span>388 <span style=''>  lastIsMasterId: Int = -1
+</span>389 <span style=''>)
+</span>390 <span style=''>
+</span>391 <span style=''>object PingInfo {
+</span>392 <span style=''>  val pingTimeout = 60 * 1000
+</span>393 <span style=''>}
+</span>394 <span style=''>
+</span>395 <span style=''>sealed trait NodeStatus { def queryable = false }
+</span>396 <span style=''>
+</span>397 <span style=''>sealed trait QueryableNodeStatus { self: NodeStatus =>
+</span>398 <span style=''>  override def queryable = true
+</span>399 <span style=''>}
+</span>400 <span style=''>
+</span>401 <span style=''>sealed trait CanonicalNodeStatus { self: NodeStatus => }
+</span>402 <span style=''>object NodeStatus {
+</span>403 <span style=''>  object Uninitialized extends NodeStatus {
+</span>404 <span style=''>    override def toString = "Uninitialized"
+</span>405 <span style=''>  }
+</span>406 <span style=''>
+</span>407 <span style=''>  object NonQueryableUnknownStatus extends NodeStatus {
+</span>408 <span style=''>    override def toString = "NonQueryableUnknownStatus"
+</span>409 <span style=''>  }
+</span>410 <span style=''>
+</span>411 <span style=''>  /** Cannot vote. All members start up in this state. The mongod parses the replica set configuration document while in STARTUP. */
+</span>412 <span style=''>  object Startup extends NodeStatus with CanonicalNodeStatus { override def toString = "Startup" }
+</span>413 <span style=''>
+</span>414 <span style=''>  /** Can vote. The primary is the only member to accept write operations. */
+</span>415 <span style=''>  object Primary extends NodeStatus with QueryableNodeStatus with CanonicalNodeStatus { override def toString = "Primary" }
+</span>416 <span style=''>
+</span>417 <span style=''>  /** Can vote. The secondary replicates the data store. */
+</span>418 <span style=''>  object Secondary extends NodeStatus with QueryableNodeStatus with CanonicalNodeStatus { override def toString = "Secondary" }
+</span>419 <span style=''>
+</span>420 <span style=''>  /** Can vote. Members either perform startup self-checks, or transition from completing a rollback or resync. */
+</span>421 <span style=''>  object Recovering extends NodeStatus with CanonicalNodeStatus { override def toString = "Recovering" }
+</span>422 <span style=''>
+</span>423 <span style=''>  /** Cannot vote. Has encountered an unrecoverable error. */
+</span>424 <span style=''>  object Fatal extends NodeStatus with CanonicalNodeStatus { override def toString = "Fatal" }
+</span>425 <span style=''>
+</span>426 <span style=''>  /** Cannot vote. Forks replication and election threads before becoming a secondary. */
+</span>427 <span style=''>  object Startup2 extends NodeStatus with CanonicalNodeStatus { override def toString = "Startup2" }
+</span>428 <span style=''>
+</span>429 <span style=''>  /** Cannot vote. Has never connected to the replica set. */
+</span>430 <span style=''>  object Unknown extends NodeStatus with CanonicalNodeStatus { override def toString = "Unknown" }
+</span>431 <span style=''>
+</span>432 <span style=''>  /** Can vote. Arbiters do not replicate data and exist solely to participate in elections. */
+</span>433 <span style=''>  object Arbiter extends NodeStatus with CanonicalNodeStatus { override def toString = "Arbiter" }
+</span>434 <span style=''>
+</span>435 <span style=''>  /** Cannot vote. Is not accessible to the set. */
+</span>436 <span style=''>  object Down extends NodeStatus with CanonicalNodeStatus { override def toString = "Down" }
+</span>437 <span style=''>
+</span>438 <span style=''>  /** Can vote. Performs a rollback. */
+</span>439 <span style=''>  object Rollback extends NodeStatus with CanonicalNodeStatus { override def toString = "Rollback" }
+</span>440 <span style=''>
+</span>441 <span style=''>  /** Shunned. */
+</span>442 <span style=''>  object Shunned extends NodeStatus with CanonicalNodeStatus { override def toString = "Shunned" }
+</span>443 <span style=''>
+</span>444 <span style=''>  def apply(code: Int): NodeStatus = code match {
+</span>445 <span style=''>    case 0  => Startup
+</span>446 <span style=''>    case 1  => Primary
+</span>447 <span style=''>    case 2  => Secondary
+</span>448 <span style=''>    case 3  => Recovering
+</span>449 <span style=''>    case 4  => Fatal
+</span>450 <span style=''>    case 5  => Startup2
+</span>451 <span style=''>    case 6  => Unknown
+</span>452 <span style=''>    case 7  => Arbiter
+</span>453 <span style=''>    case 8  => Down
+</span>454 <span style=''>    case 9  => Rollback
+</span>455 <span style=''>    case 10 => Shunned
+</span>456 <span style=''>    case _  => NonQueryableUnknownStatus
+</span>457 <span style=''>  }
+</span>458 <span style=''>}
+</span>459 <span style=''>
+</span>460 <span style=''>sealed trait ConnectionStatus
+</span>461 <span style=''>object ConnectionStatus {
+</span>462 <span style=''>  object Disconnected extends ConnectionStatus {
+</span>463 <span style=''>    override def toString = "Disconnected"
+</span>464 <span style=''>  }
+</span>465 <span style=''>
+</span>466 <span style=''>  object Connected extends ConnectionStatus {
+</span>467 <span style=''>    override def toString = "Connected"
+</span>468 <span style=''>  }
+</span>469 <span style=''>}
+</span>470 <span style=''>
+</span>471 <span style=''>sealed trait Authentication {
+</span>472 <span style=''>  def user: String
+</span>473 <span style=''>  def db: String
+</span>474 <span style=''>}
+</span>475 <span style=''>
+</span>476 <span style=''>/**
+</span>477 <span style=''> * @param db the name of the database
+</span>478 <span style=''> * @param user the name of the user
+</span>479 <span style=''> * @param password the password for the [[user]]
+</span>480 <span style=''> */
+</span>481 <span style=''>case class Authenticate(
+</span>482 <span style=''>    db: String,
+</span>483 <span style=''>    user: String,
+</span>484 <span style=''>    password: String
+</span>485 <span style=''>) extends Authentication {
+</span>486 <span style=''>
+</span>487 <span style=''>  override def toString = s"Authenticate($db, $user)"
+</span>488 <span style=''>}
+</span>489 <span style=''>
+</span>490 <span style=''>sealed trait Authenticating extends Authentication {
+</span>491 <span style=''>  def password: String
+</span>492 <span style=''>}
+</span>493 <span style=''>
+</span>494 <span style=''>object Authenticating {
+</span>495 <span style=''>  @deprecated(message = "Use [[reactivemongo.core.nodeset.CrAuthenticating]]", since = "0.11.10")
+</span>496 <span style=''>  def apply(db: String, user: String, password: String, nonce: Option[String]): Authenticating = CrAuthenticating(db, user, password, nonce)
+</span>497 <span style=''>
+</span>498 <span style=''>  def unapply(auth: Authenticating): Option[(String, String, String)] =
+</span>499 <span style=''>    auth match {
+</span>500 <span style=''>      case CrAuthenticating(db, user, pass, _) =>
+</span>501 <span style=''>        Some((db, user, pass))
+</span>502 <span style=''>
+</span>503 <span style=''>      case ScramSha1Authenticating(db, user, pass, _, _, _, _, _) =>
+</span>504 <span style=''>        Some((db, user, pass))
+</span>505 <span style=''>
+</span>506 <span style=''>      case _ =>
+</span>507 <span style=''>        None
+</span>508 <span style=''>    }
+</span>509 <span style=''>}
+</span>510 <span style=''>
+</span>511 <span style=''>case class CrAuthenticating(db: String, user: String, password: String, nonce: Option[String]) extends Authenticating {
+</span>512 <span style=''>  override def toString: String =
+</span>513 <span style=''>    s"Authenticating($db, $user, ${nonce.map(_ => "<nonce>").getOrElse("<>")})"
+</span>514 <span style=''>}
+</span>515 <span style=''>
+</span>516 <span style=''>case class ScramSha1Authenticating(
+</span>517 <span style=''>    db: String, user: String, password: String,
+</span>518 <span style=''>    randomPrefix: String, saslStart: String,
+</span>519 <span style=''>    conversationId: Option[Int] = None,
+</span>520 <span style=''>    serverSignature: Option[Array[Byte]] = None,
+</span>521 <span style=''>    step: Int = 0
+</span>522 <span style=''>) extends Authenticating {
+</span>523 <span style=''>
+</span>524 <span style=''>  override def toString: String =
+</span>525 <span style=''>    s"Authenticating($db, $user})"
+</span>526 <span style=''>}
+</span>527 <span style=''>
+</span>528 <span style=''>case class Authenticated(db: String, user: String) extends Authentication
+</span>529 <span style=''>
+</span>530 <span style=''>@deprecated("Internal class: will be made private", "0.11.14")
+</span>531 <span style=''>class ContinuousIterator[A](iterable: Iterable[A], private var toDrop: Int = 0) extends Iterator[A] {
+</span>532 <span style=''>  private var iterator = iterable.iterator
+</span>533 <span style=''>  private var i = 0
+</span>534 <span style=''>
+</span>535 <span style=''>  val hasNext = iterator.hasNext
+</span>536 <span style=''>
+</span>537 <span style=''>  if (hasNext) drop(toDrop)
+</span>538 <span style=''>
+</span>539 <span style=''>  def next =
+</span>540 <span style=''>    if (!hasNext) throw new NoSuchElementException("empty iterator")
+</span>541 <span style=''>    else {
+</span>542 <span style=''>      if (!iterator.hasNext) {
+</span>543 <span style=''>        iterator = iterable.iterator
+</span>544 <span style=''>        i = 0
+</span>545 <span style=''>      }
+</span>546 <span style=''>      val a = iterator.next
+</span>547 <span style=''>      i += 1
+</span>548 <span style=''>      a
+</span>549 <span style=''>    }
+</span>550 <span style=''>
+</span>551 <span style=''>  def nextIndex = i
+</span>552 <span style=''>}
+</span>553 <span style=''>
+</span>554 <span style=''>@deprecated(message = "Will be made private", since = "0.11.10")
+</span>555 <span style=''>class RoundRobiner[A, M[T] <: Iterable[T]](val subject: M[A], startAtIndex: Int = 0) {
+</span>556 <span style=''>  private val iterator = new ContinuousIterator(subject)
+</span>557 <span style=''>  private val length = subject.size
+</span>558 <span style=''>
+</span>559 <span style=''>  def pick: Option[A] = if (iterator.hasNext) Some(iterator.next) else None
+</span>560 <span style=''>
+</span>561 <span style=''>  def pickWithFilter(filter: A => Boolean): Option[A] =
+</span>562 <span style=''>    pickWithFilter(filter, 0)
+</span>563 <span style=''>
+</span>564 <span style=''>  @annotation.tailrec
+</span>565 <span style=''>  private def pickWithFilter(filter: A => Boolean, tested: Int): Option[A] =
+</span>566 <span style=''>    if (length > 0 && tested < length) {
+</span>567 <span style=''>      val a = pick
+</span>568 <span style=''>      if (!a.isDefined) None
+</span>569 <span style=''>      else if (filter(a.get)) a
+</span>570 <span style=''>      else pickWithFilter(filter, tested + 1)
+</span>571 <span style=''>    } else None
+</span>572 <span style=''>
+</span>573 <span style=''>  def copy(subject: M[A], startAtIndex: Int = iterator.nextIndex) =
+</span>574 <span style=''>    new RoundRobiner(subject, startAtIndex)
+</span>575 <span style=''>}
+</span>576 <span style=''>
+</span>577 <span style=''>/**
+</span>578 <span style=''> * @param supervisor the name of the driver supervisor
+</span>579 <span style=''> * @param connection the name of the connection pool
+</span>580 <span style=''> */
+</span>581 <span style=''>@deprecated("Internal class: will be made private", "0.11.14")
+</span>582 <span style=''>final class ChannelFactory private[reactivemongo] (
+</span>583 <span style=''>    supervisor: String,
+</span>584 <span style=''>    connection: String,
+</span>585 <span style=''>    options: MongoConnectionOptions,
+</span>586 <span style=''>    bossExecutor: Executor = Executors.newCachedThreadPool,
+</span>587 <span style=''>    workerExecutor: Executor = Executors.newCachedThreadPool
+</span>588 <span style=''>) {
+</span>589 <span style=''>
+</span>590 <span style=''>  @deprecated("Initialize with related mongosystem", "0.11.14")
+</span>591 <span style=''>  def this(opts: MongoConnectionOptions) =
+</span>592 <span style=''>    this(
+</span>593 <span style=''>      s"unknown-${System identityHashCode opts}",
+</span>594 <span style=''>      s"unknown-${System identityHashCode opts}", opts
+</span>595 <span style=''>    )
+</span>596 <span style=''>
+</span>597 <span style=''>  @deprecated("Initialize with related mongosystem", "0.11.14")
+</span>598 <span style=''>  def this(opts: MongoConnectionOptions, bossEx: Executor) =
+</span>599 <span style=''>    this(
+</span>600 <span style=''>      s"unknown-${System identityHashCode opts}",
+</span>601 <span style=''>      s"unknown-${System identityHashCode opts}", opts, bossEx
+</span>602 <span style=''>    )
+</span>603 <span style=''>
+</span>604 <span style=''>  @deprecated("Initialize with related mongosystem", "0.11.14")
+</span>605 <span style=''>  def this(opts: MongoConnectionOptions, bossEx: Executor, workerEx: Executor) =
+</span>606 <span style=''>    this(
+</span>607 <span style=''>      s"unknown-${System identityHashCode opts}",
+</span>608 <span style=''>      s"unknown-${System identityHashCode opts}", opts, bossEx, workerEx
+</span>609 <span style=''>    )
+</span>610 <span style=''>
+</span>611 <span style=''>  import javax.net.ssl.SSLContext
+</span>612 <span style=''>
+</span>613 <span style=''>  private val logger = LazyLogger("reactivemongo.core.nodeset.ChannelFactory")
+</span>614 <span style=''>  private val timer = new HashedWheelTimer()
+</span>615 <span style=''>
+</span>616 <span style=''>  def create(host: String = "localhost", port: Int = 27017, receiver: ActorRef): Channel = {
+</span>617 <span style=''>    val channel = makeChannel(receiver)
+</span>618 <span style=''>    logger.trace(s"[$supervisor/$connection] Created a new channel: $channel")
+</span>619 <span style=''>    channel
+</span>620 <span style=''>  }
+</span>621 <span style=''>
+</span>622 <span style=''>  val channelFactory = new NioClientSocketChannelFactory(
+</span>623 <span style=''>    bossExecutor, workerExecutor
+</span>624 <span style=''>  )
+</span>625 <span style=''>
+</span>626 <span style=''>  private val bufferFactory = new HeapChannelBufferFactory(
+</span>627 <span style=''>    java.nio.ByteOrder.LITTLE_ENDIAN
+</span>628 <span style=''>  )
+</span>629 <span style=''>
+</span>630 <span style=''>  private def makePipeline(timeoutMS: Int, receiver: ActorRef): ChannelPipeline = {
+</span>631 <span style=''>    val idleHandler = new IdleStateHandler(
+</span>632 <span style=''>      timer, 0, 0, timeoutMS, TimeUnit.MILLISECONDS
+</span>633 <span style=''>    )
+</span>634 <span style=''>
+</span>635 <span style=''>    val pipeline = Channels.pipeline(idleHandler, new ResponseFrameDecoder(),
+</span>636 <span style=''>      new ResponseDecoder(), new RequestEncoder(),
+</span>637 <span style=''>      new MongoHandler(supervisor, connection, receiver))
+</span>638 <span style=''>
+</span>639 <span style=''>    if (options.sslEnabled) {
+</span>640 <span style=''>      val sslCtx = {
+</span>641 <span style=''>        val tm: Array[javax.net.ssl.TrustManager] =
+</span>642 <span style=''>          if (options.sslAllowsInvalidCert) Array(TrustAny) else null
+</span>643 <span style=''>
+</span>644 <span style=''>        val ctx = SSLContext.getInstance("SSL")
+</span>645 <span style=''>        val rand = new scala.util.Random(System.identityHashCode(tm))
+</span>646 <span style=''>        val seed = Array.ofDim[Byte](128)
+</span>647 <span style=''>        rand.nextBytes(seed)
+</span>648 <span style=''>
+</span>649 <span style=''>        ctx.init(null, tm, new java.security.SecureRandom(seed))
+</span>650 <span style=''>        ctx
+</span>651 <span style=''>      }
+</span>652 <span style=''>
+</span>653 <span style=''>      val sslEng = {
+</span>654 <span style=''>        val engine = sslCtx.createSSLEngine()
+</span>655 <span style=''>        engine.setUseClientMode(true)
+</span>656 <span style=''>        engine
+</span>657 <span style=''>      }
+</span>658 <span style=''>
+</span>659 <span style=''>      val sslHandler =
+</span>660 <span style=''>        new shaded.netty.handler.ssl.SslHandler(sslEng, false /* TLS */ )
+</span>661 <span style=''>
+</span>662 <span style=''>      pipeline.addFirst("ssl", sslHandler)
+</span>663 <span style=''>    }
+</span>664 <span style=''>
+</span>665 <span style=''>    pipeline
+</span>666 <span style=''>  }
+</span>667 <span style=''>
+</span>668 <span style=''>  private def makeChannel(receiver: ActorRef): Channel = {
+</span>669 <span style=''>    val channel = channelFactory.newChannel(makePipeline(
+</span>670 <span style=''>      options.maxIdleTimeMS, receiver
+</span>671 <span style=''>    ))
+</span>672 <span style=''>    val config = channel.getConfig
+</span>673 <span style=''>
+</span>674 <span style=''>    config.setTcpNoDelay(options.tcpNoDelay)
+</span>675 <span style=''>    config.setBufferFactory(bufferFactory)
+</span>676 <span style=''>    config.setKeepAlive(options.keepAlive)
+</span>677 <span style=''>    config.setConnectTimeoutMillis(options.connectTimeoutMS)
+</span>678 <span style=''>
+</span>679 <span style=''>    logger.debug(s"Netty channel configuration:\n- connectTimeoutMS: ${options.connectTimeoutMS}\n- maxIdleTimeMS: ${options.maxIdleTimeMS}ms\n- tcpNoDelay: ${options.tcpNoDelay}\n- keepAlive: ${options.keepAlive}\n- sslEnabled: ${options.sslEnabled}")
+</span>680 <span style=''>
+</span>681 <span style=''>    channel
+</span>682 <span style=''>  }
+</span>683 <span style=''>
+</span>684 <span style=''>  private object TrustAny extends javax.net.ssl.X509TrustManager {
+</span>685 <span style=''>    import java.security.cert.X509Certificate
+</span>686 <span style=''>
+</span>687 <span style=''>    override def checkClientTrusted(cs: Array[X509Certificate], a: String) = {}
+</span>688 <span style=''>    override def checkServerTrusted(cs: Array[X509Certificate], a: String) = {}
+</span>689 <span style=''>    override def getAcceptedIssuers(): Array[X509Certificate] = null
+</span>690 <span style=''>  }
+</span>691 <span style=''>}
+</span></pre>
+          </div>
+          <div class="tab-pane" id="statementlist">
+            <table cellspacing="0" cellpadding="0" class="table statementlist">
+      <tr>
+        <th>Line</th>
+        <th>Stmt Id</th>
+        <th>Pos</th>
+        <th>Tree</th>
+        <th>Symbol</th>
+        <th>Code</th>
+      </tr><tr>
+        <td>
+          36
+        </td>
+        <td>
+          9312
+        </td>
+        <td>
+          1009
+          -
+          1018
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          39
+        </td>
+        <td>
+          6674
+        </td>
+        <td>
+          1071
+          -
+          1071
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          39
+        </td>
+        <td>
+          7335
+        </td>
+        <td>
+          1078
+          -
+          1094
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          39
+        </td>
+        <td>
+          5917
+        </td>
+        <td>
+          1071
+          -
+          1071
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          39
+        </td>
+        <td>
+          4570
+        </td>
+        <td>
+          1096
+          -
+          1096
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          39
+        </td>
+        <td>
+          4351
+        </td>
+        <td>
+          1096
+          -
+          1287
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          40
+        </td>
+        <td>
+          6230
+        </td>
+        <td>
+          1114
+          -
+          1127
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          41
+        </td>
+        <td>
+          8561
+        </td>
+        <td>
+          1150
+          -
+          1154
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          42
+        </td>
+        <td>
+          9331
+        </td>
+        <td>
+          1167
+          -
+          1184
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          42
+        </td>
+        <td>
+          3490
+        </td>
+        <td>
+          1186
+          -
+          1261
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          43
+        </td>
+        <td>
+          9972
+        </td>
+        <td>
+          1198
+          -
+          1220
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          43
+        </td>
+        <td>
+          9953
+        </td>
+        <td>
+          1209
+          -
+          1220
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          44
+        </td>
+        <td>
+          8658
+        </td>
+        <td>
+          1231
+          -
+          1251
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          45
+        </td>
+        <td>
+          3507
+        </td>
+        <td>
+          1267
+          -
+          1279
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          45
+        </td>
+        <td>
+          3894
+        </td>
+        <td>
+          1267
+          -
+          1279
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          49
+        </td>
+        <td>
+          6573
+        </td>
+        <td>
+          1299
+          -
+          1313
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          53
+        </td>
+        <td>
+          7297
+        </td>
+        <td>
+          1476
+          -
+          1485
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          54
+        </td>
+        <td>
+          7319
+        </td>
+        <td>
+          1501
+          -
+          1501
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          54
+        </td>
+        <td>
+          10186
+        </td>
+        <td>
+          1495
+          -
+          1495
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          55
+        </td>
+        <td>
+          9414
+        </td>
+        <td>
+          1542
+          -
+          1558
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          57
+        </td>
+        <td>
+          3998
+        </td>
+        <td>
+          1564
+          -
+          1564
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          57
+        </td>
+        <td>
+          5941
+        </td>
+        <td>
+          1564
+          -
+          1564
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          57
+        </td>
+        <td>
+          10043
+        </td>
+        <td>
+          1568
+          -
+          1581
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          57
+        </td>
+        <td>
+          3269
+        </td>
+        <td>
+          1583
+          -
+          1651
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          58
+        </td>
+        <td>
+          6773
+        </td>
+        <td>
+          1591
+          -
+          1614
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          58
+        </td>
+        <td>
+          10061
+        </td>
+        <td>
+          1602
+          -
+          1614
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          58
+        </td>
+        <td>
+          6657
+        </td>
+        <td>
+          1604
+          -
+          1613
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          59
+        </td>
+        <td>
+          4222
+        </td>
+        <td>
+          1621
+          -
+          1645
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          59
+        </td>
+        <td>
+          8871
+        </td>
+        <td>
+          1633
+          -
+          1645
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          62
+        </td>
+        <td>
+          3585
+        </td>
+        <td>
+          1675
+          -
+          1688
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          62
+        </td>
+        <td>
+          4660
+        </td>
+        <td>
+          1657
+          -
+          1688
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          62
+        </td>
+        <td>
+          4645
+        </td>
+        <td>
+          1657
+          -
+          1671
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr>
+    </table>
+          </div>
+        </div>
+      </body>
+    </html>

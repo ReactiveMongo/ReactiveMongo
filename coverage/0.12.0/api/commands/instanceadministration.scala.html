@@ -1,0 +1,1173 @@
+<html>
+      <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+        <title id="title">
+          api/commands/instanceadministration.scala.html
+        </title>
+        <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jquery.tablesorter/2.20.1/css/theme.default.min.css" type="text/css"/><script src="http://cdnjs.cloudflare.com/ajax/libs/jquery.tablesorter/2.20.1/js/jquery.tablesorter.min.js"></script><link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/css/bootstrap.min.css" type="text/css"/><script src="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/js/bootstrap.min.js"></script><script type="text/javascript">
+        $(document).ready(function() {$(".tablesorter").tablesorter();});
+      </script>
+        <style>
+          table.codegrid { font-family: monospace; font-size: 12px; width: auto!important; }table.statementlist { width: auto!important; font-size: 13px; } table.codegrid td { padding: 0!important; border: 0!important } table td.linenumber { width: 40px!important; } 
+        </style>
+      </head>
+      <body style="font-family: monospace;">
+        <ul class="nav nav-tabs">
+          <li>
+            <a href="#codegrid" data-toggle="tab">Codegrid</a>
+          </li>
+          <li>
+            <a href="#statementlist" data-toggle="tab">Statement List</a>
+          </li>
+        </ul>
+        <div class="tab-content">
+          <div class="tab-pane active" id="codegrid">
+            <pre style='font-size: 12pt; font-family: courier;'>1 <span style=''>package reactivemongo.api.commands
+</span>2 <span style=''>
+</span>3 <span style=''>object DropDatabase extends Command with CommandWithResult[UnitBox.type]
+</span>4 <span style=''>
+</span>5 <span style=''>@deprecated("Use [[DropCollection]]", "0.12.0")
+</span>6 <span style=''>object Drop extends CollectionCommand with CommandWithResult[UnitBox.type]
+</span>7 <span style=''>
+</span>8 <span style=''>/**
+</span>9 <span style=''> * @param dropped true if the collection existed and was dropped
+</span>10 <span style=''> */
+</span>11 <span style=''>case class DropCollectionResult(dropped: Boolean)
+</span>12 <span style=''>
+</span>13 <span style=''>object DropCollection extends CollectionCommand
+</span>14 <span style=''>  with CommandWithResult[DropCollectionResult]
+</span>15 <span style=''>
+</span>16 <span style=''>object EmptyCapped extends CollectionCommand
+</span>17 <span style=''>  with CommandWithResult[UnitBox.type]
+</span>18 <span style=''>
+</span>19 <span style=''>case class RenameCollection(
+</span>20 <span style=''>  fullyQualifiedCollectionName: String,
+</span>21 <span style=''>  fullyQualifiedTargetName: String,
+</span>22 <span style=''>  dropTarget: Boolean = false
+</span>23 <span style=''>) extends Command with CommandWithResult[UnitBox.type]
+</span>24 <span style=''>
+</span>25 <span style=''>case class Create(
+</span>26 <span style=''>  capped: Option[Capped] = None, // if set, "capped" -> true, size -> <int>, max -> <int>
+</span>27 <span style=''>  autoIndexId: Boolean = true, // optional
+</span>28 <span style=''>  flags: Int = 1 // defaults to 1
+</span>29 <span style=''>) extends CollectionCommand with CommandWithResult[UnitBox.type]
+</span>30 <span style=''>
+</span>31 <span style=''>case class Capped(
+</span>32 <span style=''>  size: Long,
+</span>33 <span style=''>  max: Option[Int] = None
+</span>34 <span style=''>)
+</span>35 <span style=''>
+</span>36 <span style=''>case class ConvertToCapped(
+</span>37 <span style=''>  capped: Capped
+</span>38 <span style=''>) extends CollectionCommand with CommandWithResult[UnitBox.type]
+</span>39 <span style=''>
+</span>40 <span style=''>case class CollStats(scale: Option[Int] = None) extends CollectionCommand with CommandWithResult[CollStatsResult]
+</span>41 <span style=''>
+</span>42 <span style=''>/**
+</span>43 <span style=''> * Various information about a collection.
+</span>44 <span style=''> *
+</span>45 <span style=''> * @param ns The fully qualified collection name.
+</span>46 <span style=''> * @param count The number of documents in this collection.
+</span>47 <span style=''> * @param size The size in bytes (or in bytes / scale, if any).
+</span>48 <span style=''> * @param averageObjectSize The average object size in bytes (or in bytes / scale, if any).
+</span>49 <span style=''> * @param storageSize Preallocated space for the collection.
+</span>50 <span style=''> * @param numExtents Number of extents (contiguously allocated chunks of datafile space, only for mmapv1 storage engine).
+</span>51 <span style=''> * @param nindexes Number of indexes.
+</span>52 <span style=''> * @param lastExtentSize Size of the most recently created extent (only for mmapv1 storage engine).
+</span>53 <span style=''> * @param paddingFactor Padding can speed up updates if documents grow (only for mmapv1 storage engine).
+</span>54 <span style=''> * @param systemFlags System flags.
+</span>55 <span style=''> * @param userFlags User flags.
+</span>56 <span style=''> * @param indexSizes Size of specific indexes in bytes.
+</span>57 <span style=''> * @param capped States if this collection is capped.
+</span>58 <span style=''> * @param max The maximum number of documents of this collection, if capped.
+</span>59 <span style=''> * @param maxSize The maximum size in bytes (or in bytes / scale, if any) of this collection, if capped.
+</span>60 <span style=''> */
+</span>61 <span style=''>case class CollStatsResult(
+</span>62 <span style=''>    ns: String,
+</span>63 <span style=''>    count: Int,
+</span>64 <span style=''>    size: Double,
+</span>65 <span style=''>    averageObjectSize: Option[Double],
+</span>66 <span style=''>    storageSize: Double,
+</span>67 <span style=''>    numExtents: Option[Int],
+</span>68 <span style=''>    nindexes: Int,
+</span>69 <span style=''>    lastExtentSize: Option[Int],
+</span>70 <span style=''>    paddingFactor: Option[Double],
+</span>71 <span style=''>    systemFlags: Option[Int],
+</span>72 <span style=''>    userFlags: Option[Int],
+</span>73 <span style=''>    totalIndexSize: Int,
+</span>74 <span style=''>    indexSizes: Array[(String, Int)],
+</span>75 <span style=''>    capped: Boolean,
+</span>76 <span style=''>    max: Option[Long],
+</span>77 <span style=''>    maxSize: Option[Double] = None
+</span>78 <span style=''>) {
+</span>79 <span style=''>
+</span>80 <span style=''>  @deprecated(message = "Use [[copy]] with [[maxSize]]", since = "0.11.10")
+</span>81 <span style=''>  def copy(
+</span>82 <span style=''>    ns: String = this.ns,
+</span>83 <span style=''>    count: Int = this.count,
+</span>84 <span style=''>    size: Double = this.size,
+</span>85 <span style=''>    averageObjectSize: Option[Double] = this.averageObjectSize,
+</span>86 <span style=''>    storageSize: Double = this.storageSize,
+</span>87 <span style=''>    numExtents: Option[Int] = this.numExtents,
+</span>88 <span style=''>    nindexes: Int = this.nindexes,
+</span>89 <span style=''>    lastExtentSize: Option[Int] = this.lastExtentSize,
+</span>90 <span style=''>    paddingFactor: Option[Double] = this.paddingFactor,
+</span>91 <span style=''>    systemFlags: Option[Int] = this.systemFlags,
+</span>92 <span style=''>    userFlags: Option[Int] = this.userFlags,
+</span>93 <span style=''>    totalIndexSize: Int = this.totalIndexSize,
+</span>94 <span style=''>    indexSizes: Array[(String, Int)] = this.indexSizes,
+</span>95 <span style=''>    capped: Boolean = this.capped,
+</span>96 <span style=''>    max: Option[Long] = this.max
+</span>97 <span style=''>  ): CollStatsResult = </span><span style='background: #F0ADAD'>CollStatsResult(
+</span>98 <span style=''></span><span style='background: #F0ADAD'>    ns, count, size, averageObjectSize, storageSize, numExtents, nindexes,
+</span>99 <span style=''></span><span style='background: #F0ADAD'>    lastExtentSize, paddingFactor, systemFlags, userFlags, totalIndexSize,
+</span>100 <span style=''></span><span style='background: #F0ADAD'>    indexSizes, capped, max
+</span>101 <span style=''></span><span style='background: #F0ADAD'>  )</span><span style=''>
+</span>102 <span style=''>
+</span>103 <span style=''>  override def toString = </span><span style='background: #AEF1AE'>s"""CollStatsResult($ns, capped = $capped, count = $count, size = $size, avgObjSize = $averageObjectSize, storageSize = $storageSize, numExtents = $numExtents, nindexes = $nindexes, lastExtentSize = $lastExtentSize, paddingFactor = $paddingFactor, systemFlags = $systemFlags, userFlags = $userFlags, indexSizes = ${indexSizes.mkString("[ ", ", ", " ]")}, max = $max)"""</span><span style=''>
+</span>104 <span style=''>}
+</span>105 <span style=''>
+</span>106 <span style=''>case class DropIndexes(index: String) extends CollectionCommand with CommandWithResult[DropIndexesResult]
+</span>107 <span style=''>
+</span>108 <span style=''>case class DropIndexesResult(value: Int) extends BoxedAnyVal[Int]
+</span>109 <span style=''>
+</span>110 <span style=''>case class CollectionNames(names: List[String])
+</span>111 <span style=''>
+</span>112 <span style=''>/** List the names of DB collections. */
+</span>113 <span style=''>object ListCollectionNames
+</span>114 <span style=''>  extends Command with CommandWithResult[CollectionNames]
+</span>115 <span style=''>
+</span>116 <span style=''>import reactivemongo.api.indexes.Index
+</span>117 <span style=''>
+</span>118 <span style=''>/**
+</span>119 <span style=''> * Lists the indexes of the specified collection.
+</span>120 <span style=''> *
+</span>121 <span style=''> * @param db the database name
+</span>122 <span style=''> */
+</span>123 <span style=''>case class ListIndexes(db: String) extends CollectionCommand
+</span>124 <span style=''>  with CommandWithResult[List[Index]]
+</span>125 <span style=''>
+</span>126 <span style=''>/**
+</span>127 <span style=''> * Creates the given indexes on the specified collection.
+</span>128 <span style=''> *
+</span>129 <span style=''> * @param db the database name
+</span>130 <span style=''> * @param indexes the indexes to be created
+</span>131 <span style=''> */
+</span>132 <span style=''>case class CreateIndexes(db: String, indexes: List[Index])
+</span>133 <span style=''>  extends CollectionCommand with CommandWithResult[WriteResult]
+</span>134 <span style=''>
+</span>135 <span style=''>/**
+</span>136 <span style=''> * Replica set member.
+</span>137 <span style=''> *
+</span>138 <span style=''> * @param name the member name (e.g. "host:port")
+</span>139 <span style=''> * @param health the health indicator for this member
+</span>140 <span style=''> * @param state the [[http://docs.mongodb.org/manual/reference/replica-states/ state code]] of the member
+</span>141 <span style=''> * @param stateStr the string representation of the state
+</span>142 <span style=''> * @param uptime the number of seconds that this member has been online
+</span>143 <span style=''> * @param optime information regarding the last operation from the operation log that this member has applied
+</span>144 <span style=''> * @param lastHeartbeat the time of the transmission time of last heartbeat received from this member
+</span>145 <span style=''> * @param lastHeartbeatRecv the time that the last heartbeat was received from this member
+</span>146 <span style=''> * @param lastHeartbeatMessage an optional message from the last heartbeat
+</span>147 <span style=''> * @param electionTime if the member is the primary, the time it was elected as
+</span>148 <span style=''> * @param self indicates which replica set member processed the replSetGetStatus command
+</span>149 <span style=''> * @param pingMs the number of milliseconds (ms) that a round-trip packet takes to travel between the remote member and the local instance (does not appear for the member that returns the `rs.status()` data)
+</span>150 <span style=''> * @param syncingTo the hostname of the member from which this instance is syncing (only present on the output of `rs.status()` on secondary and recovering members)
+</span>151 <span style=''> * @param configVersion the configuration version (since MongoDB 3.0)
+</span>152 <span style=''> */
+</span>153 <span style=''>case class ReplSetMember(
+</span>154 <span style=''>  _id: Long,
+</span>155 <span style=''>  name: String,
+</span>156 <span style=''>  health: Int,
+</span>157 <span style=''>  state: Int,
+</span>158 <span style=''>  stateStr: String,
+</span>159 <span style=''>  uptime: Long,
+</span>160 <span style=''>  optime: Long,
+</span>161 <span style=''>  lastHeartbeat: Option[Long],
+</span>162 <span style=''>  lastHeartbeatRecv: Option[Long],
+</span>163 <span style=''>  lastHeartbeatMessage: Option[String],
+</span>164 <span style=''>  electionTime: Option[Long],
+</span>165 <span style=''>  self: Boolean,
+</span>166 <span style=''>  pingMs: Option[Long],
+</span>167 <span style=''>  syncingTo: Option[String],
+</span>168 <span style=''>  configVersion: Option[Int]
+</span>169 <span style=''>)
+</span>170 <span style=''>
+</span>171 <span style=''>/**
+</span>172 <span style=''> * Result from the [[http://docs.mongodb.org/manual/reference/command/replSetGetStatus/ replSetGetStatus]].
+</span>173 <span style=''> *
+</span>174 <span style=''> * @param name the name of the replica set
+</span>175 <span style=''> * @param time the current server time
+</span>176 <span style=''> * @param state the [[http://docs.mongodb.org/manual/reference/replica-states/ state code]] of the current member
+</span>177 <span style=''> * @param members the list of the members of this replicate set
+</span>178 <span style=''> */
+</span>179 <span style=''>case class ReplSetStatus(
+</span>180 <span style=''>  name: String,
+</span>181 <span style=''>  time: Long,
+</span>182 <span style=''>  myState: Int,
+</span>183 <span style=''>  members: List[ReplSetMember]
+</span>184 <span style=''>)
+</span>185 <span style=''>
+</span>186 <span style=''>/**
+</span>187 <span style=''> * The command [[http://docs.mongodb.org/manual/reference/command/replSetGetStatus/ replSetGetStatus]]
+</span>188 <span style=''> */
+</span>189 <span style=''>case object ReplSetGetStatus
+</span>190 <span style=''>  extends Command with CommandWithResult[ReplSetStatus]
+</span>191 <span style=''>
+</span>192 <span style=''>sealed trait ServerProcess
+</span>193 <span style=''>
+</span>194 <span style=''>object ServerProcess {
+</span>195 <span style=''>  def unapply(repr: String): Option[ServerProcess] = repr match {
+</span>196 <span style=''>    case "mongos" => </span><span style='background: #F0ADAD'>Some(MongosProcess)</span><span style=''>
+</span>197 <span style=''>    case "mongod" => </span><span style='background: #AEF1AE'>Some(MongodProcess)</span><span style=''>
+</span>198 <span style=''>    case _        => </span><span style='background: #F0ADAD'>None</span><span style=''>
+</span>199 <span style=''>  }
+</span>200 <span style=''>}
+</span>201 <span style=''>
+</span>202 <span style=''>case object MongodProcess extends ServerProcess {
+</span>203 <span style=''>  override val toString = </span><span style='background: #AEF1AE'>"mongod"</span><span style=''>
+</span>204 <span style=''>}
+</span>205 <span style=''>case object MongosProcess extends ServerProcess {
+</span>206 <span style=''>  override val toString = </span><span style='background: #F0ADAD'>"mongos"</span><span style=''>
+</span>207 <span style=''>}
+</span>208 <span style=''>
+</span>209 <span style=''>object ResyncResult extends BoxedAnyVal[Unit] {
+</span>210 <span style=''>  val value = </span><span style='background: #AEF1AE'>{}</span><span style=''>
+</span>211 <span style=''>}
+</span>212 <span style=''>
+</span>213 <span style=''>/**
+</span>214 <span style=''> * The command [[https://docs.mongodb.org/manual/reference/command/resync/ resync]]
+</span>215 <span style=''> */
+</span>216 <span style=''>object Resync extends Command with CommandWithResult[ResyncResult.type]
+</span>217 <span style=''>
+</span>218 <span style=''>/**
+</span>219 <span style=''> * The [[https://docs.mongodb.org/manual/reference/command/replSetMaintenance/ replSetMaintenance]] command.
+</span>220 <span style=''> * It must be executed against the `admin` database.
+</span>221 <span style=''> *
+</span>222 <span style=''> * @param enable if true the the member enters the `RECOVERING` state
+</span>223 <span style=''> */
+</span>224 <span style=''>case class ReplSetMaintenance(enable: Boolean = true) extends Command
+</span>225 <span style=''>  with CommandWithResult[UnitBox.type]
+</span>226 <span style=''>
+</span>227 <span style=''>import reactivemongo.api.SerializationPack
+</span>228 <span style=''>
+</span>229 <span style=''>/**
+</span>230 <span style=''> * @param name the name of user role
+</span>231 <span style=''> */
+</span>232 <span style=''>class UserRole(val name: String)
+</span>233 <span style=''>
+</span>234 <span style=''>/**
+</span>235 <span style=''> * @param db the name of the database
+</span>236 <span style=''> */
+</span>237 <span style=''>case class DBUserRole(
+</span>238 <span style=''>  override val name: String,
+</span>239 <span style=''>  db: String
+</span>240 <span style=''>) extends UserRole(name)
+</span>241 <span style=''>
+</span>242 <span style=''>/** User role extractor */
+</span>243 <span style=''>object UserRole {
+</span>244 <span style=''>  def apply(name: String): UserRole = </span><span style='background: #F0ADAD'>new UserRole(name)</span><span style=''>
+</span>245 <span style=''>  def unapply(role: UserRole): Option[String] = </span><span style='background: #F0ADAD'>Some(role.name)</span><span style=''>
+</span>246 <span style=''>}
+</span>247 <span style=''>
+</span>248 <span style=''>trait CreateUserCommand[P <: SerializationPack]
+</span>249 <span style=''>    extends ImplicitCommandHelpers[P] {
+</span>250 <span style=''>
+</span>251 <span style=''>  /**
+</span>252 <span style=''>   * The [[https://docs.mongodb.com/manual/reference/command/createUser/ createUser]] command.
+</span>253 <span style=''>   *
+</span>254 <span style=''>   * @param name the name of the user to be created
+</span>255 <span style=''>   * @param pwd the user password (not required if the database uses external credentials)
+</span>256 <span style=''>   * @param roles the roles granted to the user, possibly an empty to create users without roles
+</span>257 <span style=''>   * @param digestPassword when true, the mongod instance will create the hash of the user password (default: `true`)
+</span>258 <span style=''>   * @param writeConcern the optional level of [[https://docs.mongodb.com/manual/reference/write-concern/ write concern]]
+</span>259 <span style=''>   * @param customData the custom data to associate with the user account
+</span>260 <span style=''>   */
+</span>261 <span style=''>  case class CreateUser(
+</span>262 <span style=''>    name: String,
+</span>263 <span style=''>    pwd: Option[String],
+</span>264 <span style=''>    roles: List[UserRole],
+</span>265 <span style=''>    digestPassword: Boolean = true,
+</span>266 <span style=''>    writeConcern: Option[WriteConcern] = None,
+</span>267 <span style=''>    customData: Option[pack.Document] = None
+</span>268 <span style=''>  ) extends Command with CommandWithPack[P]
+</span>269 <span style=''>      with CommandWithResult[UnitBox.type]
+</span>270 <span style=''>
+</span>271 <span style=''>}
+</span></pre>
+          </div>
+          <div class="tab-pane" id="statementlist">
+            <table cellspacing="0" cellpadding="0" class="table statementlist">
+      <tr>
+        <th>Line</th>
+        <th>Stmt Id</th>
+        <th>Pos</th>
+        <th>Tree</th>
+        <th>Symbol</th>
+        <th>Code</th>
+      </tr><tr>
+        <td>
+          97
+        </td>
+        <td>
+          7452
+        </td>
+        <td>
+          3601
+          -
+          3799
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          97
+        </td>
+        <td>
+          3814
+        </td>
+        <td>
+          3601
+          -
+          3601
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          103
+        </td>
+        <td>
+          3412
+        </td>
+        <td>
+          4116
+          -
+          4125
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          103
+        </td>
+        <td>
+          4150
+        </td>
+        <td>
+          4180
+          -
+          4189
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          103
+        </td>
+        <td>
+          10394
+        </td>
+        <td>
+          4189
+          -
+          4192
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          103
+        </td>
+        <td>
+          4565
+        </td>
+        <td>
+          3884
+          -
+          3894
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          103
+        </td>
+        <td>
+          6916
+        </td>
+        <td>
+          4073
+          -
+          4090
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          103
+        </td>
+        <td>
+          5014
+        </td>
+        <td>
+          3959
+          -
+          3975
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          103
+        </td>
+        <td>
+          7690
+        </td>
+        <td>
+          3894
+          -
+          3898
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          103
+        </td>
+        <td>
+          10319
+        </td>
+        <td>
+          4101
+          -
+          4116
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          103
+        </td>
+        <td>
+          9637
+        </td>
+        <td>
+          4007
+          -
+          4027
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          103
+        </td>
+        <td>
+          9646
+        </td>
+        <td>
+          4192
+          -
+          4196
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          103
+        </td>
+        <td>
+          10304
+        </td>
+        <td>
+          3848
+          -
+          3850
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          103
+        </td>
+        <td>
+          6805
+        </td>
+        <td>
+          3862
+          -
+          3868
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          103
+        </td>
+        <td>
+          7675
+        </td>
+        <td>
+          3898
+          -
+          3914
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          103
+        </td>
+        <td>
+          7014
+        </td>
+        <td>
+          4060
+          -
+          4073
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          103
+        </td>
+        <td>
+          9257
+        </td>
+        <td>
+          3868
+          -
+          3879
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          103
+        </td>
+        <td>
+          3428
+        </td>
+        <td>
+          4090
+          -
+          4101
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          103
+        </td>
+        <td>
+          6822
+        </td>
+        <td>
+          3975
+          -
+          3985
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          103
+        </td>
+        <td>
+          5004
+        </td>
+        <td>
+          3914
+          -
+          3931
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          103
+        </td>
+        <td>
+          10100
+        </td>
+        <td>
+          3985
+          -
+          3999
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          103
+        </td>
+        <td>
+          4163
+        </td>
+        <td>
+          3831
+          -
+          3848
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          103
+        </td>
+        <td>
+          4791
+        </td>
+        <td>
+          3931
+          -
+          3948
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          103
+        </td>
+        <td>
+          7025
+        </td>
+        <td>
+          3948
+          -
+          3959
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          103
+        </td>
+        <td>
+          9980
+        </td>
+        <td>
+          4125
+          -
+          4141
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          103
+        </td>
+        <td>
+          9343
+        </td>
+        <td>
+          3999
+          -
+          4007
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          103
+        </td>
+        <td>
+          9238
+        </td>
+        <td>
+          4041
+          -
+          4060
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          103
+        </td>
+        <td>
+          4375
+        </td>
+        <td>
+          4142
+          -
+          4179
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          103
+        </td>
+        <td>
+          7228
+        </td>
+        <td>
+          3850
+          -
+          3862
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          103
+        </td>
+        <td>
+          6836
+        </td>
+        <td>
+          3879
+          -
+          3884
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          103
+        </td>
+        <td>
+          3804
+        </td>
+        <td>
+          3827
+          -
+          4196
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          103
+        </td>
+        <td>
+          7581
+        </td>
+        <td>
+          4027
+          -
+          4041
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          196
+        </td>
+        <td>
+          4463
+        </td>
+        <td>
+          7608
+          -
+          7627
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          197
+        </td>
+        <td>
+          8471
+        </td>
+        <td>
+          7649
+          -
+          7668
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          198
+        </td>
+        <td>
+          10041
+        </td>
+        <td>
+          7690
+          -
+          7694
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          203
+        </td>
+        <td>
+          7565
+        </td>
+        <td>
+          7778
+          -
+          7786
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          206
+        </td>
+        <td>
+          9884
+        </td>
+        <td>
+          7865
+          -
+          7873
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          210
+        </td>
+        <td>
+          5080
+        </td>
+        <td>
+          7939
+          -
+          7941
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          244
+        </td>
+        <td>
+          2690
+        </td>
+        <td>
+          8806
+          -
+          8824
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          245
+        </td>
+        <td>
+          6860
+        </td>
+        <td>
+          8873
+          -
+          8888
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          245
+        </td>
+        <td>
+          8419
+        </td>
+        <td>
+          8878
+          -
+          8887
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr>
+    </table>
+          </div>
+        </div>
+      </body>
+    </html>

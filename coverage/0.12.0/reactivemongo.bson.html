@@ -1,0 +1,4016 @@
+<html>
+      <head>
+      <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+      <title id="title">Scoverage Code Coverage</title>
+      <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jquery.tablesorter/2.20.1/css/theme.default.min.css" type="text/css"/><script src="http://cdnjs.cloudflare.com/ajax/libs/jquery.tablesorter/2.20.1/js/jquery.tablesorter.min.js"></script><link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/css/bootstrap.min.css" type="text/css"/><script src="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/js/bootstrap.min.js"></script><script type="text/javascript">
+        $(document).ready(function() {$(".tablesorter").tablesorter();});
+      </script>
+      <style>
+        .meter {
+        height: 14px;
+        position: relative;
+        background: #BB2020;
+}
+
+.meter span {
+	display: block;
+	height: 100%;
+	background-color: rgb(43,194,83);
+	background-image: -webkit-gradient(
+	  linear,
+	  left bottom,
+	  left top,
+	  color-stop(0, rgb(43,194,83)),
+	  color-stop(1, rgb(84,240,84))
+	 );
+	background-image: -webkit-linear-gradient(
+	  center bottom,
+	  rgb(43,194,83) 37%,
+	  rgb(84,240,84) 69%
+	 );
+	background-image: -moz-linear-gradient(
+	  center bottom,
+	  rgb(43,194,83) 37%,
+	  rgb(84,240,84) 69%
+	 );
+	background-image: -ms-linear-gradient(
+	  center bottom,
+	  rgb(43,194,83) 37%,
+	  rgb(84,240,84) 69%
+	 );
+	background-image: -o-linear-gradient(
+	  center bottom,
+	  rgb(43,194,83) 37%,
+	  rgb(84,240,84) 69%
+	 );
+	-webkit-box-shadow:
+	  inset 0 2px 9px  rgba(255,255,255,0.3),
+	  inset 0 -2px 6px rgba(0,0,0,0.4);
+	-moz-box-shadow:
+	  inset 0 2px 9px  rgba(255,255,255,0.3),
+	  inset 0 -2px 6px rgba(0,0,0,0.4);
+	position: relative;
+	overflow: hidden;
+}
+      </style>
+    </head><body style="font-family: monospace;">
+      <table class="tablesorter table table-striped" style="font-size:13px">
+      <thead>
+        <tr>
+          <th>
+            Class
+          </th>
+          <th>
+            Source file
+          </th>
+          <th>
+            Lines
+          </th>
+          <th>
+            Methods
+          </th>
+          <th>
+            Statements
+          </th>
+          <th>
+            Invoked
+          </th>
+          <th>
+            Coverage
+          </th>
+          <th>
+          </th>
+          <th>
+            Branches
+          </th>
+          <th>
+            Invoked
+          </th>
+          <th>
+            Coverage
+          </th>
+          <th>
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+      <td>
+        <a href="types.scala.html">
+          Addition
+        </a>
+      </td>
+      <td>
+        types.scala
+      </td>
+      <td>
+        106
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        9
+      </td>
+      <td>
+        9
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="bson.scala.html">
+          BSON
+        </a>
+      </td>
+      <td>
+        bson.scala
+      </td>
+      <td>
+        72
+      </td>
+      <td>
+        4
+      </td>
+      <td>
+        4
+      </td>
+      <td>
+        3
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 75%"></span>
+        </div>
+      </td>
+      <td>
+        75,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="types.scala.html">
+          BSONArray
+        </a>
+      </td>
+      <td>
+        types.scala
+      </td>
+      <td>
+        308
+      </td>
+      <td>
+        26
+      </td>
+      <td>
+        106
+      </td>
+      <td>
+        60
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 57%"></span>
+        </div>
+      </td>
+      <td>
+        56,60
+        %
+      </td>
+      <td>
+        3
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 33%"></span>
+        </div>
+      </td>
+      <td>
+        33,33
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="Handlers.scala.html">
+          BSONArrayCollectionReader
+        </a>
+      </td>
+      <td>
+        Handlers.scala
+      </td>
+      <td>
+        321
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        6
+      </td>
+      <td>
+        6
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="Handlers.scala.html">
+          BSONArrayCollectionWriter
+        </a>
+      </td>
+      <td>
+        Handlers.scala
+      </td>
+      <td>
+        326
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        6
+      </td>
+      <td>
+        6
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="types.scala.html">
+          BSONBinary
+        </a>
+      </td>
+      <td>
+        types.scala
+      </td>
+      <td>
+        328
+      </td>
+      <td>
+        3
+      </td>
+      <td>
+        6
+      </td>
+      <td>
+        6
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="Handlers.scala.html">
+          BSONBinaryHandler
+        </a>
+      </td>
+      <td>
+        Handlers.scala
+      </td>
+      <td>
+        267
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        4
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 50%"></span>
+        </div>
+      </td>
+      <td>
+        50,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="types.scala.html">
+          BSONBoolean
+        </a>
+      </td>
+      <td>
+        types.scala
+      </td>
+      <td>
+        519
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="typeclasses.scala.html">
+          BSONBooleanBooleanLike
+        </a>
+      </td>
+      <td>
+        typeclasses.scala
+      </td>
+      <td>
+        100
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="Handlers.scala.html">
+          BSONBooleanHandler
+        </a>
+      </td>
+      <td>
+        Handlers.scala
+      </td>
+      <td>
+        262
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="Handlers.scala.html">
+          BSONBooleanLikeReader
+        </a>
+      </td>
+      <td>
+        Handlers.scala
+      </td>
+      <td>
+        306
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        7
+      </td>
+      <td>
+        6
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 86%"></span>
+        </div>
+      </td>
+      <td>
+        85,71
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="Handlers.scala.html">
+          BSONBooleanLikeWriter
+        </a>
+      </td>
+      <td>
+        Handlers.scala
+      </td>
+      <td>
+        311
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 0%"></span>
+        </div>
+      </td>
+      <td>
+        0,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 0%"></span>
+        </div>
+      </td>
+      <td>
+        0,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="types.scala.html">
+          BSONDBPointer
+        </a>
+      </td>
+      <td>
+        types.scala
+      </td>
+      <td>
+        558
+      </td>
+      <td>
+        3
+      </td>
+      <td>
+        12
+      </td>
+      <td>
+        12
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="types.scala.html">
+          BSONDateTime
+        </a>
+      </td>
+      <td>
+        types.scala
+      </td>
+      <td>
+        526
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="Handlers.scala.html">
+          BSONDateTimeHandler
+        </a>
+      </td>
+      <td>
+        Handlers.scala
+      </td>
+      <td>
+        274
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        4
+      </td>
+      <td>
+        4
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="typeclasses.scala.html">
+          BSONDateTimeNumberLike
+        </a>
+      </td>
+      <td>
+        typeclasses.scala
+      </td>
+      <td>
+        74
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        3
+      </td>
+      <td>
+        3
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="types.scala.html">
+          BSONDocument
+        </a>
+      </td>
+      <td>
+        types.scala
+      </td>
+      <td>
+        913
+      </td>
+      <td>
+        24
+      </td>
+      <td>
+        87
+      </td>
+      <td>
+        73
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 84%"></span>
+        </div>
+      </td>
+      <td>
+        83,91
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="Handlers.scala.html">
+          BSONDocumentReader
+        </a>
+      </td>
+      <td>
+        Handlers.scala
+      </td>
+      <td>
+        168
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="Handlers.scala.html">
+          BSONDocumentWriter
+        </a>
+      </td>
+      <td>
+        Handlers.scala
+      </td>
+      <td>
+        182
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="types.scala.html">
+          BSONDouble
+        </a>
+      </td>
+      <td>
+        types.scala
+      </td>
+      <td>
+        113
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="typeclasses.scala.html">
+          BSONDoubleBooleanLike
+        </a>
+      </td>
+      <td>
+        typeclasses.scala
+      </td>
+      <td>
+        112
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        3
+      </td>
+      <td>
+        3
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="Handlers.scala.html">
+          BSONDoubleHandler
+        </a>
+      </td>
+      <td>
+        Handlers.scala
+      </td>
+      <td>
+        253
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="typeclasses.scala.html">
+          BSONDoubleNumberLike
+        </a>
+      </td>
+      <td>
+        typeclasses.scala
+      </td>
+      <td>
+        68
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        3
+      </td>
+      <td>
+        3
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="types.scala.html">
+          BSONElement
+        </a>
+      </td>
+      <td>
+        types.scala
+      </td>
+      <td>
+        932
+      </td>
+      <td>
+        4
+      </td>
+      <td>
+        6
+      </td>
+      <td>
+        6
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="types.scala.html">
+          BSONElementLowPriority
+        </a>
+      </td>
+      <td>
+        types.scala
+      </td>
+      <td>
+        937
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        4
+      </td>
+      <td>
+        4
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="types.scala.html">
+          BSONElementSet
+        </a>
+      </td>
+      <td>
+        types.scala
+      </td>
+      <td>
+        723
+      </td>
+      <td>
+        4
+      </td>
+      <td>
+        16
+      </td>
+      <td>
+        6
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 38%"></span>
+        </div>
+      </td>
+      <td>
+        37,50
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="Handlers.scala.html">
+          BSONHandler
+        </a>
+      </td>
+      <td>
+        Handlers.scala
+      </td>
+      <td>
+        238
+      </td>
+      <td>
+        3
+      </td>
+      <td>
+        5
+      </td>
+      <td>
+        4
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 80%"></span>
+        </div>
+      </td>
+      <td>
+        80,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="types.scala.html">
+          BSONInteger
+        </a>
+      </td>
+      <td>
+        types.scala
+      </td>
+      <td>
+        589
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="typeclasses.scala.html">
+          BSONIntegerBooleanLike
+        </a>
+      </td>
+      <td>
+        typeclasses.scala
+      </td>
+      <td>
+        109
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        3
+      </td>
+      <td>
+        3
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="Handlers.scala.html">
+          BSONIntegerHandler
+        </a>
+      </td>
+      <td>
+        Handlers.scala
+      </td>
+      <td>
+        244
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="typeclasses.scala.html">
+          BSONIntegerNumberLike
+        </a>
+      </td>
+      <td>
+        typeclasses.scala
+      </td>
+      <td>
+        65
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        3
+      </td>
+      <td>
+        3
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="types.scala.html">
+          BSONJavaScript
+        </a>
+      </td>
+      <td>
+        types.scala
+      </td>
+      <td>
+        569
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="types.scala.html">
+          BSONJavaScriptWS
+        </a>
+      </td>
+      <td>
+        types.scala
+      </td>
+      <td>
+        584
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="types.scala.html">
+          BSONLong
+        </a>
+      </td>
+      <td>
+        types.scala
+      </td>
+      <td>
+        617
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="typeclasses.scala.html">
+          BSONLongBooleanLike
+        </a>
+      </td>
+      <td>
+        typeclasses.scala
+      </td>
+      <td>
+        115
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        3
+      </td>
+      <td>
+        3
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="Handlers.scala.html">
+          BSONLongHandler
+        </a>
+      </td>
+      <td>
+        Handlers.scala
+      </td>
+      <td>
+        248
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="typeclasses.scala.html">
+          BSONLongNumberLike
+        </a>
+      </td>
+      <td>
+        typeclasses.scala
+      </td>
+      <td>
+        71
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        3
+      </td>
+      <td>
+        3
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="types.scala.html">
+          BSONMaxKey
+        </a>
+      </td>
+      <td>
+        types.scala
+      </td>
+      <td>
+        627
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="types.scala.html">
+          BSONMinKey
+        </a>
+      </td>
+      <td>
+        types.scala
+      </td>
+      <td>
+        622
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="types.scala.html">
+          BSONNull
+        </a>
+      </td>
+      <td>
+        types.scala
+      </td>
+      <td>
+        531
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="typeclasses.scala.html">
+          BSONNullBooleanLike
+        </a>
+      </td>
+      <td>
+        typeclasses.scala
+      </td>
+      <td>
+        103
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="Handlers.scala.html">
+          BSONNumberLikeReader
+        </a>
+      </td>
+      <td>
+        Handlers.scala
+      </td>
+      <td>
+        288
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        6
+      </td>
+      <td>
+        6
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="Handlers.scala.html">
+          BSONNumberLikeWriter
+        </a>
+      </td>
+      <td>
+        Handlers.scala
+      </td>
+      <td>
+        293
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 0%"></span>
+        </div>
+      </td>
+      <td>
+        0,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 0%"></span>
+        </div>
+      </td>
+      <td>
+        0,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="types.scala.html">
+          BSONObjectID
+        </a>
+      </td>
+      <td>
+        types.scala
+      </td>
+      <td>
+        512
+      </td>
+      <td>
+        13
+      </td>
+      <td>
+        139
+      </td>
+      <td>
+        109
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 78%"></span>
+        </div>
+      </td>
+      <td>
+        78,42
+        %
+      </td>
+      <td>
+        8
+      </td>
+      <td>
+        4
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 50%"></span>
+        </div>
+      </td>
+      <td>
+        50,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="Handlers.scala.html">
+          BSONReader
+        </a>
+      </td>
+      <td>
+        Handlers.scala
+      </td>
+      <td>
+        74
+      </td>
+      <td>
+        4
+      </td>
+      <td>
+        19
+      </td>
+      <td>
+        10
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 53%"></span>
+        </div>
+      </td>
+      <td>
+        52,63
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="types.scala.html">
+          BSONRegex
+        </a>
+      </td>
+      <td>
+        types.scala
+      </td>
+      <td>
+        541
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="types.scala.html">
+          BSONString
+        </a>
+      </td>
+      <td>
+        types.scala
+      </td>
+      <td>
+        117
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="Handlers.scala.html">
+          BSONStringHandler
+        </a>
+      </td>
+      <td>
+        Handlers.scala
+      </td>
+      <td>
+        258
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="types.scala.html">
+          BSONSymbol
+        </a>
+      </td>
+      <td>
+        types.scala
+      </td>
+      <td>
+        574
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="types.scala.html">
+          BSONTimestamp
+        </a>
+      </td>
+      <td>
+        types.scala
+      </td>
+      <td>
+        612
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        6
+      </td>
+      <td>
+        6
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="typeclasses.scala.html">
+          BSONTimestampNumberLike
+        </a>
+      </td>
+      <td>
+        typeclasses.scala
+      </td>
+      <td>
+        77
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        3
+      </td>
+      <td>
+        3
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="types.scala.html">
+          BSONUndefined
+        </a>
+      </td>
+      <td>
+        types.scala
+      </td>
+      <td>
+        334
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="typeclasses.scala.html">
+          BSONUndefinedBooleanLike
+        </a>
+      </td>
+      <td>
+        typeclasses.scala
+      </td>
+      <td>
+        106
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="types.scala.html">
+          BSONValue
+        </a>
+      </td>
+      <td>
+        types.scala
+      </td>
+      <td>
+        95
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 0%"></span>
+        </div>
+      </td>
+      <td>
+        0,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 0%"></span>
+        </div>
+      </td>
+      <td>
+        0,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="Handlers.scala.html">
+          BSONWriter
+        </a>
+      </td>
+      <td>
+        Handlers.scala
+      </td>
+      <td>
+        116
+      </td>
+      <td>
+        5
+      </td>
+      <td>
+        9
+      </td>
+      <td>
+        6
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 67%"></span>
+        </div>
+      </td>
+      <td>
+        66,67
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="types.scala.html">
+          Composition
+        </a>
+      </td>
+      <td>
+        types.scala
+      </td>
+      <td>
+        968
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        5
+      </td>
+      <td>
+        4
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 80%"></span>
+        </div>
+      </td>
+      <td>
+        80,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="Handlers.scala.html">
+          Default
+        </a>
+      </td>
+      <td>
+        Handlers.scala
+      </td>
+      <td>
+        178
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        4
+      </td>
+      <td>
+        4
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="Handlers.scala.html">
+          DefaultBSONHandlers
+        </a>
+      </td>
+      <td>
+        Handlers.scala
+      </td>
+      <td>
+        382
+      </td>
+      <td>
+        6
+      </td>
+      <td>
+        6
+      </td>
+      <td>
+        5
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 83%"></span>
+        </div>
+      </td>
+      <td>
+        83,33
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="Handlers.scala.html">
+          DefaultHandler
+        </a>
+      </td>
+      <td>
+        Handlers.scala
+      </td>
+      <td>
+        214
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="types.scala.html">
+          Empty
+        </a>
+      </td>
+      <td>
+        types.scala
+      </td>
+      <td>
+        950
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 0%"></span>
+        </div>
+      </td>
+      <td>
+        0,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 0%"></span>
+        </div>
+      </td>
+      <td>
+        0,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="types.scala.html">
+          ExtendedBSONValue
+        </a>
+      </td>
+      <td>
+        types.scala
+      </td>
+      <td>
+        92
+      </td>
+      <td>
+        5
+      </td>
+      <td>
+        9
+      </td>
+      <td>
+        9
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="types.scala.html">
+          FunctionSubtype
+        </a>
+      </td>
+      <td>
+        types.scala
+      </td>
+      <td>
+        638
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="types.scala.html">
+          GenericBinarySubtype
+        </a>
+      </td>
+      <td>
+        types.scala
+      </td>
+      <td>
+        637
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="Macros.scala.html">
+          Handler
+        </a>
+      </td>
+      <td>
+        Macros.scala
+      </td>
+      <td>
+        151
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 0%"></span>
+        </div>
+      </td>
+      <td>
+        0,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 0%"></span>
+        </div>
+      </td>
+      <td>
+        0,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="MacroImpl.scala.html">
+          Helper
+        </a>
+      </td>
+      <td>
+        MacroImpl.scala
+      </td>
+      <td>
+        489
+      </td>
+      <td>
+        27
+      </td>
+      <td>
+        412
+      </td>
+      <td>
+        330
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 80%"></span>
+        </div>
+      </td>
+      <td>
+        80,10
+        %
+      </td>
+      <td>
+        44
+      </td>
+      <td>
+        39
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 89%"></span>
+        </div>
+      </td>
+      <td>
+        88,64
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="Handlers.scala.html">
+          IdentityBSONConverter
+        </a>
+      </td>
+      <td>
+        Handlers.scala
+      </td>
+      <td>
+        342
+      </td>
+      <td>
+        4
+      </td>
+      <td>
+        14
+      </td>
+      <td>
+        8
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 57%"></span>
+        </div>
+      </td>
+      <td>
+        57,14
+        %
+      </td>
+      <td>
+        4
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 50%"></span>
+        </div>
+      </td>
+      <td>
+        50,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="MacroImpl.scala.html">
+          ImplicitResolver
+        </a>
+      </td>
+      <td>
+        MacroImpl.scala
+      </td>
+      <td>
+        617
+      </td>
+      <td>
+        7
+      </td>
+      <td>
+        79
+      </td>
+      <td>
+        50
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 63%"></span>
+        </div>
+      </td>
+      <td>
+        63,29
+        %
+      </td>
+      <td>
+        4
+      </td>
+      <td>
+        4
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="MacroImpl.scala.html">
+          ImplicitTransformer
+        </a>
+      </td>
+      <td>
+        MacroImpl.scala
+      </td>
+      <td>
+        577
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        15
+      </td>
+      <td>
+        9
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 60%"></span>
+        </div>
+      </td>
+      <td>
+        60,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="typeclasses.scala.html">
+          IsBooleanLike
+        </a>
+      </td>
+      <td>
+        typeclasses.scala
+      </td>
+      <td>
+        58
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="typeclasses.scala.html">
+          IsNumeric
+        </a>
+      </td>
+      <td>
+        typeclasses.scala
+      </td>
+      <td>
+        54
+      </td>
+      <td>
+        4
+      </td>
+      <td>
+        8
+      </td>
+      <td>
+        8
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="MacroImpl.scala.html">
+          MacroImpl
+        </a>
+      </td>
+      <td>
+        MacroImpl.scala
+      </td>
+      <td>
+        35
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        3
+      </td>
+      <td>
+        3
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="Handlers.scala.html">
+          MappedHandler
+        </a>
+      </td>
+      <td>
+        Handlers.scala
+      </td>
+      <td>
+        208
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        4
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 0%"></span>
+        </div>
+      </td>
+      <td>
+        0,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 0%"></span>
+        </div>
+      </td>
+      <td>
+        0,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="types.scala.html">
+          Md5Subtype
+        </a>
+      </td>
+      <td>
+        types.scala
+      </td>
+      <td>
+        642
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 0%"></span>
+        </div>
+      </td>
+      <td>
+        0,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 0%"></span>
+        </div>
+      </td>
+      <td>
+        0,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="types.scala.html">
+          NameOptionValueProducer
+        </a>
+      </td>
+      <td>
+        types.scala
+      </td>
+      <td>
+        37
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        4
+      </td>
+      <td>
+        4
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="types.scala.html">
+          OldBinarySubtype
+        </a>
+      </td>
+      <td>
+        types.scala
+      </td>
+      <td>
+        639
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 0%"></span>
+        </div>
+      </td>
+      <td>
+        0,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 0%"></span>
+        </div>
+      </td>
+      <td>
+        0,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="types.scala.html">
+          OldUuidSubtype
+        </a>
+      </td>
+      <td>
+        types.scala
+      </td>
+      <td>
+        640
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 0%"></span>
+        </div>
+      </td>
+      <td>
+        0,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 0%"></span>
+        </div>
+      </td>
+      <td>
+        0,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="types.scala.html">
+          OptionValueProducer
+        </a>
+      </td>
+      <td>
+        types.scala
+      </td>
+      <td>
+        41
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="Macros.scala.html">
+          Placeholder
+        </a>
+      </td>
+      <td>
+        Macros.scala
+      </td>
+      <td>
+        147
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 0%"></span>
+        </div>
+      </td>
+      <td>
+        0,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 0%"></span>
+        </div>
+      </td>
+      <td>
+        0,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="types.scala.html">
+          Producer
+        </a>
+      </td>
+      <td>
+        types.scala
+      </td>
+      <td>
+        65
+      </td>
+      <td>
+        9
+      </td>
+      <td>
+        32
+      </td>
+      <td>
+        17
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 53%"></span>
+        </div>
+      </td>
+      <td>
+        53,13
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="types.scala.html">
+          Subtype
+        </a>
+      </td>
+      <td>
+        types.scala
+      </td>
+      <td>
+        653
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        8
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 13%"></span>
+        </div>
+      </td>
+      <td>
+        12,50
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="types.scala.html">
+          UserDefinedSubtype
+        </a>
+      </td>
+      <td>
+        types.scala
+      </td>
+      <td>
+        643
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 0%"></span>
+        </div>
+      </td>
+      <td>
+        0,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 0%"></span>
+        </div>
+      </td>
+      <td>
+        0,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="types.scala.html">
+          UuidSubtype
+        </a>
+      </td>
+      <td>
+        types.scala
+      </td>
+      <td>
+        641
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 0%"></span>
+        </div>
+      </td>
+      <td>
+        0,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 0%"></span>
+        </div>
+      </td>
+      <td>
+        0,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="Handlers.scala.html">
+          VariantBSONReader
+        </a>
+      </td>
+      <td>
+        Handlers.scala
+      </td>
+      <td>
+        135
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        3
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 0%"></span>
+        </div>
+      </td>
+      <td>
+        0,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 0%"></span>
+        </div>
+      </td>
+      <td>
+        0,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="Handlers.scala.html">
+          VariantBSONReaderWrapper
+        </a>
+      </td>
+      <td>
+        Handlers.scala
+      </td>
+      <td>
+        193
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 0%"></span>
+        </div>
+      </td>
+      <td>
+        0,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 0%"></span>
+        </div>
+      </td>
+      <td>
+        0,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="Handlers.scala.html">
+          VariantBSONWriter
+        </a>
+      </td>
+      <td>
+        Handlers.scala
+      </td>
+      <td>
+        154
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        3
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 0%"></span>
+        </div>
+      </td>
+      <td>
+        0,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 0%"></span>
+        </div>
+      </td>
+      <td>
+        0,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="Handlers.scala.html">
+          VariantBSONWriterWrapper
+        </a>
+      </td>
+      <td>
+        Handlers.scala
+      </td>
+      <td>
+        189
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="bson.scala.html">
+          package
+        </a>
+      </td>
+      <td>
+        bson.scala
+      </td>
+      <td>
+        51
+      </td>
+      <td>
+        4
+      </td>
+      <td>
+        6
+      </td>
+      <td>
+        4
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 67%"></span>
+        </div>
+      </td>
+      <td>
+        66,67
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr>
+      </tbody>
+    </table>
+    </body>
+    </html>

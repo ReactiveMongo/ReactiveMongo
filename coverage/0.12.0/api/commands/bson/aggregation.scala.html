@@ -1,0 +1,2505 @@
+<html>
+      <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+        <title id="title">
+          api/commands/bson/aggregation.scala.html
+        </title>
+        <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jquery.tablesorter/2.20.1/css/theme.default.min.css" type="text/css"/><script src="http://cdnjs.cloudflare.com/ajax/libs/jquery.tablesorter/2.20.1/js/jquery.tablesorter.min.js"></script><link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/css/bootstrap.min.css" type="text/css"/><script src="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/js/bootstrap.min.js"></script><script type="text/javascript">
+        $(document).ready(function() {$(".tablesorter").tablesorter();});
+      </script>
+        <style>
+          table.codegrid { font-family: monospace; font-size: 12px; width: auto!important; }table.statementlist { width: auto!important; font-size: 13px; } table.codegrid td { padding: 0!important; border: 0!important } table td.linenumber { width: 40px!important; } 
+        </style>
+      </head>
+      <body style="font-family: monospace;">
+        <ul class="nav nav-tabs">
+          <li>
+            <a href="#codegrid" data-toggle="tab">Codegrid</a>
+          </li>
+          <li>
+            <a href="#statementlist" data-toggle="tab">Statement List</a>
+          </li>
+        </ul>
+        <div class="tab-content">
+          <div class="tab-pane active" id="codegrid">
+            <pre style='font-size: 12pt; font-family: courier;'>1 <span style=''>package reactivemongo.api.commands.bson
+</span>2 <span style=''>
+</span>3 <span style=''>import reactivemongo.bson.{
+</span>4 <span style=''>  BSONDocument,
+</span>5 <span style=''>  BSONDocumentReader,
+</span>6 <span style=''>  BSONElement,
+</span>7 <span style=''>  BSONNumberLike,
+</span>8 <span style=''>  BSONValue,
+</span>9 <span style=''>  Producer
+</span>10 <span style=''>}
+</span>11 <span style=''>
+</span>12 <span style=''>import reactivemongo.core.protocol.MongoWireVersion
+</span>13 <span style=''>import reactivemongo.api.BSONSerializationPack
+</span>14 <span style=''>import reactivemongo.api.commands.{ AggregationFramework, ResultCursor }
+</span>15 <span style=''>import reactivemongo.api.commands.bson.CommonImplicits.ReadConcernWriter
+</span>16 <span style=''>
+</span>17 <span style=''>object BSONAggregationFramework
+</span>18 <span style=''>    extends AggregationFramework[BSONSerializationPack.type] {
+</span>19 <span style=''>
+</span>20 <span style=''>  import reactivemongo.bson.{ BSONBoolean, BSONDouble, BSONInteger, BSONString }
+</span>21 <span style=''>
+</span>22 <span style=''>  val pack: BSONSerializationPack.type = </span><span style='background: #AEF1AE'>BSONSerializationPack</span><span style=''>
+</span>23 <span style=''>
+</span>24 <span style=''>  protected def makeDocument(elements: Seq[Producer[BSONElement]]) =
+</span>25 <span style=''>    </span><span style='background: #AEF1AE'>BSONDocument(elements: _*)</span><span style=''>
+</span>26 <span style=''>
+</span>27 <span style=''>  protected def elementProducer(name: String, value: BSONValue) =
+</span>28 <span style=''>    </span><span style='background: #AEF1AE'>name -> value</span><span style=''>
+</span>29 <span style=''>
+</span>30 <span style=''>  protected def booleanValue(b: Boolean): BSONValue = </span><span style='background: #AEF1AE'>BSONBoolean(b)</span><span style=''>
+</span>31 <span style=''>  protected def intValue(i: Int): BSONValue = </span><span style='background: #AEF1AE'>BSONInteger(i)</span><span style=''>
+</span>32 <span style=''>  protected def longValue(l: Long): BSONValue = </span><span style='background: #AEF1AE'>BSONDouble(l)</span><span style=''>
+</span>33 <span style=''>  protected def doubleValue(d: Double): BSONValue = </span><span style='background: #F0ADAD'>BSONDouble(d)</span><span style=''>
+</span>34 <span style=''>  protected def stringValue(s: String): BSONValue = </span><span style='background: #AEF1AE'>BSONString(s)</span><span style=''>
+</span>35 <span style=''>}
+</span>36 <span style=''>
+</span>37 <span style=''>object BSONAggregationImplicits {
+</span>38 <span style=''>  import reactivemongo.api.commands.ResolvedCollectionCommand
+</span>39 <span style=''>  import BSONAggregationFramework.{ Aggregate, AggregationResult, Cursor }
+</span>40 <span style=''>  import reactivemongo.bson.{
+</span>41 <span style=''>    BSONArray,
+</span>42 <span style=''>    BSONBoolean,
+</span>43 <span style=''>    BSONDocumentWriter,
+</span>44 <span style=''>    BSONString
+</span>45 <span style=''>  }
+</span>46 <span style=''>
+</span>47 <span style=''>  implicit object CursorWriter extends BSONDocumentWriter[Cursor] {
+</span>48 <span style=''>    def write(cursor: Cursor) = </span><span style='background: #AEF1AE'>BSONDocument("batchSize" -> cursor.batchSize)</span><span style=''>
+</span>49 <span style=''>  }
+</span>50 <span style=''>
+</span>51 <span style=''>  implicit object AggregateWriter
+</span>52 <span style=''>      extends BSONDocumentWriter[ResolvedCollectionCommand[Aggregate]] {
+</span>53 <span style=''>    def write(agg: ResolvedCollectionCommand[Aggregate]) = {
+</span>54 <span style=''>      val cmd = </span><span style='background: #AEF1AE'>BSONDocument(
+</span>55 <span style=''></span><span style='background: #AEF1AE'>        "aggregate" -> BSONString(agg.collection),
+</span>56 <span style=''></span><span style='background: #AEF1AE'>        "pipeline" -> BSONArray(
+</span>57 <span style=''></span><span style='background: #AEF1AE'>          { for (pipe <- agg.command.pipeline) yield pipe.makePipe }.toStream
+</span>58 <span style=''></span><span style='background: #AEF1AE'>        ),
+</span>59 <span style=''></span><span style='background: #AEF1AE'>        "explain" -> BSONBoolean(agg.command.explain),
+</span>60 <span style=''></span><span style='background: #AEF1AE'>        "allowDiskUse" -> BSONBoolean(agg.command.allowDiskUse),
+</span>61 <span style=''></span><span style='background: #AEF1AE'>        "cursor" -> agg.command.cursor.map(CursorWriter.write(_))
+</span>62 <span style=''></span><span style='background: #AEF1AE'>      )</span><span style=''>
+</span>63 <span style=''>
+</span>64 <span style=''>      if (</span><span style='background: #AEF1AE'>agg.command.wireVersion < MongoWireVersion.V32</span><span style=''>) </span><span style='background: #F0ADAD'>cmd</span><span style=''> else {
+</span>65 <span style=''>        </span><span style='background: #AEF1AE'>cmd ++ ("bypassDocumentValidation" -> BSONBoolean(
+</span>66 <span style=''></span><span style='background: #AEF1AE'>          agg.command.bypassDocumentValidation
+</span>67 <span style=''></span><span style='background: #AEF1AE'>        ),
+</span>68 <span style=''></span><span style='background: #AEF1AE'>          "readConcern" -> agg.command.readConcern)</span><span style=''>
+</span>69 <span style=''>      }
+</span>70 <span style=''>    }
+</span>71 <span style=''>  }
+</span>72 <span style=''>
+</span>73 <span style=''>  implicit object AggregationResultReader
+</span>74 <span style=''>      extends DealingWithGenericCommandErrorsReader[AggregationResult] {
+</span>75 <span style=''>    def readResult(doc: BSONDocument): AggregationResult =
+</span>76 <span style=''>      if (</span><span style='background: #AEF1AE'>doc contains "stages"</span><span style=''>) </span><span style='background: #AEF1AE'>AggregationResult(List(doc), None)</span><span style=''> else {
+</span>77 <span style=''>        </span><span style='background: #AEF1AE'>doc.getAs[List[BSONDocument]]("result") match {
+</span>78 <span style=''></span><span style='background: #AEF1AE'>          case Some(docs) => AggregationResult(docs, None)
+</span>79 <span style=''></span><span style='background: #AEF1AE'>          case _ => (for {
+</span>80 <span style=''></span><span style='background: #AEF1AE'>            cursor <- doc.getAsTry[BSONDocument]("cursor")
+</span>81 <span style=''></span><span style='background: #AEF1AE'>            id <- cursor.getAsTry[BSONNumberLike]("id").map(_.toLong)
+</span>82 <span style=''></span><span style='background: #AEF1AE'>            ns <- cursor.getAsTry[String]("ns")
+</span>83 <span style=''></span><span style='background: #AEF1AE'>            firstBatch <- cursor.getAsTry[List[BSONDocument]]("firstBatch")
+</span>84 <span style=''></span><span style='background: #AEF1AE'>          } yield AggregationResult(firstBatch, Some(ResultCursor(id, ns)))).get
+</span>85 <span style=''></span><span style='background: #AEF1AE'>        }</span><span style=''>
+</span>86 <span style=''>      }
+</span>87 <span style=''>  }
+</span>88 <span style=''>}
+</span>89 <span style=''>
+</span>90 <span style=''>object BSONAggregationResultImplicits {
+</span>91 <span style=''>  import BSONAggregationFramework.{ IndexStatsResult, IndexStatAccesses }
+</span>92 <span style=''>
+</span>93 <span style=''>  implicit object BSONIndexStatAccessesReader
+</span>94 <span style=''>      extends BSONDocumentReader[IndexStatAccesses] {
+</span>95 <span style=''>
+</span>96 <span style=''>    def read(doc: BSONDocument): IndexStatAccesses = (</span><span style='background: #AEF1AE'>for {
+</span>97 <span style=''></span><span style='background: #AEF1AE'>      ops <- doc.getAsTry[BSONNumberLike]("ops").map(_.toLong)
+</span>98 <span style=''></span><span style='background: #AEF1AE'>      since <- doc.getAsTry[java.util.Date]("since")
+</span>99 <span style=''></span><span style='background: #AEF1AE'>    } yield IndexStatAccesses(ops, since)).get</span><span style=''>
+</span>100 <span style=''>  }
+</span>101 <span style=''>
+</span>102 <span style=''>  implicit object BSONIndexStatsReader
+</span>103 <span style=''>      extends BSONDocumentReader[IndexStatsResult] {
+</span>104 <span style=''>
+</span>105 <span style=''>    def read(doc: BSONDocument): IndexStatsResult = (</span><span style='background: #AEF1AE'>for {
+</span>106 <span style=''></span><span style='background: #AEF1AE'>      name <- doc.getAsTry[String]("name")
+</span>107 <span style=''></span><span style='background: #AEF1AE'>      key <- doc.getAsTry[BSONDocument]("key")
+</span>108 <span style=''></span><span style='background: #AEF1AE'>      host <- doc.getAsTry[String]("host")
+</span>109 <span style=''></span><span style='background: #AEF1AE'>      acc <- doc.getAsTry[IndexStatAccesses]("accesses")
+</span>110 <span style=''></span><span style='background: #AEF1AE'>    } yield IndexStatsResult(name, key, host, acc)).get</span><span style=''>
+</span>111 <span style=''>  }
+</span>112 <span style=''>}
+</span></pre>
+          </div>
+          <div class="tab-pane" id="statementlist">
+            <table cellspacing="0" cellpadding="0" class="table statementlist">
+      <tr>
+        <th>Line</th>
+        <th>Stmt Id</th>
+        <th>Pos</th>
+        <th>Tree</th>
+        <th>Symbol</th>
+        <th>Code</th>
+      </tr><tr>
+        <td>
+          22
+        </td>
+        <td>
+          2587
+        </td>
+        <td>
+          632
+          -
+          653
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          25
+        </td>
+        <td>
+          8418
+        </td>
+        <td>
+          728
+          -
+          754
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          28
+        </td>
+        <td>
+          5139
+        </td>
+        <td>
+          826
+          -
+          839
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          28
+        </td>
+        <td>
+          10507
+        </td>
+        <td>
+          826
+          -
+          839
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          30
+        </td>
+        <td>
+          3107
+        </td>
+        <td>
+          895
+          -
+          909
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          31
+        </td>
+        <td>
+          7800
+        </td>
+        <td>
+          956
+          -
+          970
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          32
+        </td>
+        <td>
+          5774
+        </td>
+        <td>
+          1019
+          -
+          1032
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          32
+        </td>
+        <td>
+          8802
+        </td>
+        <td>
+          1030
+          -
+          1031
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          33
+        </td>
+        <td>
+          4674
+        </td>
+        <td>
+          1085
+          -
+          1098
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          34
+        </td>
+        <td>
+          4685
+        </td>
+        <td>
+          1151
+          -
+          1164
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          48
+        </td>
+        <td>
+          6857
+        </td>
+        <td>
+          1558
+          -
+          1589
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          48
+        </td>
+        <td>
+          7906
+        </td>
+        <td>
+          1545
+          -
+          1590
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          48
+        </td>
+        <td>
+          9862
+        </td>
+        <td>
+          1573
+          -
+          1589
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          48
+        </td>
+        <td>
+          10339
+        </td>
+        <td>
+          1570
+          -
+          1570
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          48
+        </td>
+        <td>
+          5168
+        </td>
+        <td>
+          1558
+          -
+          1569
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          48
+        </td>
+        <td>
+          4501
+        </td>
+        <td>
+          1558
+          -
+          1589
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          54
+        </td>
+        <td>
+          5512
+        </td>
+        <td>
+          1780
+          -
+          2160
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          55
+        </td>
+        <td>
+          2565
+        </td>
+        <td>
+          1817
+          -
+          1843
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          55
+        </td>
+        <td>
+          8719
+        </td>
+        <td>
+          1828
+          -
+          1842
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          55
+        </td>
+        <td>
+          5758
+        </td>
+        <td>
+          1802
+          -
+          1813
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          55
+        </td>
+        <td>
+          2462
+        </td>
+        <td>
+          1802
+          -
+          1843
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          55
+        </td>
+        <td>
+          8628
+        </td>
+        <td>
+          1802
+          -
+          1843
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          56
+        </td>
+        <td>
+          6073
+        </td>
+        <td>
+          1853
+          -
+          1965
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          56
+        </td>
+        <td>
+          7804
+        </td>
+        <td>
+          1853
+          -
+          1965
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          56
+        </td>
+        <td>
+          7988
+        </td>
+        <td>
+          1853
+          -
+          1863
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          56
+        </td>
+        <td>
+          2868
+        </td>
+        <td>
+          1867
+          -
+          1965
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          57
+        </td>
+        <td>
+          3205
+        </td>
+        <td>
+          1890
+          -
+          1955
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          57
+        </td>
+        <td>
+          5142
+        </td>
+        <td>
+          1900
+          -
+          1900
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          57
+        </td>
+        <td>
+          5324
+        </td>
+        <td>
+          1931
+          -
+          1944
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          59
+        </td>
+        <td>
+          10496
+        </td>
+        <td>
+          1975
+          -
+          2020
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          59
+        </td>
+        <td>
+          7870
+        </td>
+        <td>
+          1975
+          -
+          1984
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          59
+        </td>
+        <td>
+          8704
+        </td>
+        <td>
+          2000
+          -
+          2019
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          59
+        </td>
+        <td>
+          5235
+        </td>
+        <td>
+          1988
+          -
+          2020
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          59
+        </td>
+        <td>
+          10313
+        </td>
+        <td>
+          1975
+          -
+          2020
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          60
+        </td>
+        <td>
+          4889
+        </td>
+        <td>
+          2060
+          -
+          2084
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          60
+        </td>
+        <td>
+          8074
+        </td>
+        <td>
+          2030
+          -
+          2044
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          60
+        </td>
+        <td>
+          4503
+        </td>
+        <td>
+          2030
+          -
+          2085
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          60
+        </td>
+        <td>
+          8689
+        </td>
+        <td>
+          2030
+          -
+          2085
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          60
+        </td>
+        <td>
+          5994
+        </td>
+        <td>
+          2048
+          -
+          2085
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          61
+        </td>
+        <td>
+          5612
+        </td>
+        <td>
+          2095
+          -
+          2103
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          61
+        </td>
+        <td>
+          8644
+        </td>
+        <td>
+          2107
+          -
+          2152
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          61
+        </td>
+        <td>
+          3629
+        </td>
+        <td>
+          2104
+          -
+          2104
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          61
+        </td>
+        <td>
+          10330
+        </td>
+        <td>
+          2095
+          -
+          2152
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          61
+        </td>
+        <td>
+          8054
+        </td>
+        <td>
+          2095
+          -
+          2152
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          61
+        </td>
+        <td>
+          2949
+        </td>
+        <td>
+          2130
+          -
+          2151
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          64
+        </td>
+        <td>
+          7889
+        </td>
+        <td>
+          2220
+          -
+          2223
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          64
+        </td>
+        <td>
+          2658
+        </td>
+        <td>
+          2172
+          -
+          2218
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          64
+        </td>
+        <td>
+          5331
+        </td>
+        <td>
+          2198
+          -
+          2218
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          65
+        </td>
+        <td>
+          5978
+        </td>
+        <td>
+          2277
+          -
+          2346
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          65
+        </td>
+        <td>
+          2860
+        </td>
+        <td>
+          2239
+          -
+          2399
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          65
+        </td>
+        <td>
+          8497
+        </td>
+        <td>
+          2247
+          -
+          2346
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          65
+        </td>
+        <td>
+          8509
+        </td>
+        <td>
+          2239
+          -
+          2399
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          65
+        </td>
+        <td>
+          5219
+        </td>
+        <td>
+          2247
+          -
+          2346
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          65
+        </td>
+        <td>
+          6262
+        </td>
+        <td>
+          2247
+          -
+          2273
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          66
+        </td>
+        <td>
+          2783
+        </td>
+        <td>
+          2300
+          -
+          2336
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          68
+        </td>
+        <td>
+          5861
+        </td>
+        <td>
+          2358
+          -
+          2398
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          68
+        </td>
+        <td>
+          7875
+        </td>
+        <td>
+          2375
+          -
+          2398
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          68
+        </td>
+        <td>
+          3541
+        </td>
+        <td>
+          2372
+          -
+          2372
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          68
+        </td>
+        <td>
+          7958
+        </td>
+        <td>
+          2358
+          -
+          2398
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          68
+        </td>
+        <td>
+          2207
+        </td>
+        <td>
+          2358
+          -
+          2371
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          76
+        </td>
+        <td>
+          2759
+        </td>
+        <td>
+          2644
+          -
+          2653
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          76
+        </td>
+        <td>
+          3529
+        </td>
+        <td>
+          2626
+          -
+          2660
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          76
+        </td>
+        <td>
+          8251
+        </td>
+        <td>
+          2603
+          -
+          2624
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          76
+        </td>
+        <td>
+          8873
+        </td>
+        <td>
+          2626
+          -
+          2660
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          76
+        </td>
+        <td>
+          9537
+        </td>
+        <td>
+          2655
+          -
+          2659
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          77
+        </td>
+        <td>
+          5505
+        </td>
+        <td>
+          2705
+          -
+          2705
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          77
+        </td>
+        <td>
+          5586
+        </td>
+        <td>
+          2705
+          -
+          2705
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          77
+        </td>
+        <td>
+          6602
+        </td>
+        <td>
+          2676
+          -
+          2715
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          77
+        </td>
+        <td>
+          4241
+        </td>
+        <td>
+          2676
+          -
+          3153
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          77
+        </td>
+        <td>
+          9453
+        </td>
+        <td>
+          2705
+          -
+          2705
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          77
+        </td>
+        <td>
+          6908
+        </td>
+        <td>
+          2706
+          -
+          2714
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          78
+        </td>
+        <td>
+          5961
+        </td>
+        <td>
+          2753
+          -
+          2782
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          78
+        </td>
+        <td>
+          8484
+        </td>
+        <td>
+          2777
+          -
+          2781
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          80
+        </td>
+        <td>
+          8586
+        </td>
+        <td>
+          2859
+          -
+          2867
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          80
+        </td>
+        <td>
+          5410
+        </td>
+        <td>
+          2858
+          -
+          2858
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          81
+        </td>
+        <td>
+          3917
+        </td>
+        <td>
+          2918
+          -
+          2918
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          81
+        </td>
+        <td>
+          3426
+        </td>
+        <td>
+          2919
+          -
+          2923
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          81
+        </td>
+        <td>
+          6155
+        </td>
+        <td>
+          2929
+          -
+          2937
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          81
+        </td>
+        <td>
+          3511
+        </td>
+        <td>
+          2881
+          -
+          3138
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          82
+        </td>
+        <td>
+          6161
+        </td>
+        <td>
+          2980
+          -
+          2980
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          82
+        </td>
+        <td>
+          4142
+        </td>
+        <td>
+          2981
+          -
+          2985
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          82
+        </td>
+        <td>
+          2832
+        </td>
+        <td>
+          2951
+          -
+          3138
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          83
+        </td>
+        <td>
+          6815
+        </td>
+        <td>
+          3049
+          -
+          3061
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          83
+        </td>
+        <td>
+          2646
+        </td>
+        <td>
+          3048
+          -
+          3048
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          83
+        </td>
+        <td>
+          8600
+        </td>
+        <td>
+          2999
+          -
+          3138
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          83
+        </td>
+        <td>
+          5491
+        </td>
+        <td>
+          3048
+          -
+          3048
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          83
+        </td>
+        <td>
+          2847
+        </td>
+        <td>
+          3048
+          -
+          3048
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          84
+        </td>
+        <td>
+          8149
+        </td>
+        <td>
+          3116
+          -
+          3136
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          84
+        </td>
+        <td>
+          9357
+        </td>
+        <td>
+          3111
+          -
+          3137
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          84
+        </td>
+        <td>
+          6243
+        </td>
+        <td>
+          3081
+          -
+          3138
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          84
+        </td>
+        <td>
+          9256
+        </td>
+        <td>
+          2804
+          -
+          3143
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          97
+        </td>
+        <td>
+          3621
+        </td>
+        <td>
+          3486
+          -
+          3486
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          97
+        </td>
+        <td>
+          4472
+        </td>
+        <td>
+          3498
+          -
+          3506
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          97
+        </td>
+        <td>
+          9361
+        </td>
+        <td>
+          3487
+          -
+          3492
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          98
+        </td>
+        <td>
+          4049
+        </td>
+        <td>
+          3514
+          -
+          3602
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          98
+        </td>
+        <td>
+          8681
+        </td>
+        <td>
+          3551
+          -
+          3551
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          98
+        </td>
+        <td>
+          7116
+        </td>
+        <td>
+          3552
+          -
+          3559
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          99
+        </td>
+        <td>
+          6711
+        </td>
+        <td>
+          3439
+          -
+          3607
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          99
+        </td>
+        <td>
+          9573
+        </td>
+        <td>
+          3573
+          -
+          3602
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          106
+        </td>
+        <td>
+          6752
+        </td>
+        <td>
+          3799
+          -
+          3799
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          106
+        </td>
+        <td>
+          10530
+        </td>
+        <td>
+          3800
+          -
+          3806
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          107
+        </td>
+        <td>
+          2508
+        </td>
+        <td>
+          3814
+          -
+          4005
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          107
+        </td>
+        <td>
+          9595
+        </td>
+        <td>
+          3847
+          -
+          3847
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          107
+        </td>
+        <td>
+          3768
+        </td>
+        <td>
+          3848
+          -
+          3853
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          108
+        </td>
+        <td>
+          4514
+        </td>
+        <td>
+          3890
+          -
+          3896
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          108
+        </td>
+        <td>
+          5181
+        </td>
+        <td>
+          3861
+          -
+          4005
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          108
+        </td>
+        <td>
+          7827
+        </td>
+        <td>
+          3889
+          -
+          3889
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          109
+        </td>
+        <td>
+          5167
+        </td>
+        <td>
+          3943
+          -
+          3953
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          109
+        </td>
+        <td>
+          10544
+        </td>
+        <td>
+          3904
+          -
+          4005
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          109
+        </td>
+        <td>
+          9613
+        </td>
+        <td>
+          3942
+          -
+          3942
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          110
+        </td>
+        <td>
+          8020
+        </td>
+        <td>
+          3759
+          -
+          4010
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          110
+        </td>
+        <td>
+          6982
+        </td>
+        <td>
+          3967
+          -
+          4005
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr>
+    </table>
+          </div>
+        </div>
+      </body>
+    </html>

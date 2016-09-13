@@ -1,0 +1,1039 @@
+<html>
+      <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+        <title id="title">
+          api/MongoConnectionOptions.scala.html
+        </title>
+        <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jquery.tablesorter/2.20.1/css/theme.default.min.css" type="text/css"/><script src="http://cdnjs.cloudflare.com/ajax/libs/jquery.tablesorter/2.20.1/js/jquery.tablesorter.min.js"></script><link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/css/bootstrap.min.css" type="text/css"/><script src="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/js/bootstrap.min.js"></script><script type="text/javascript">
+        $(document).ready(function() {$(".tablesorter").tablesorter();});
+      </script>
+        <style>
+          table.codegrid { font-family: monospace; font-size: 12px; width: auto!important; }table.statementlist { width: auto!important; font-size: 13px; } table.codegrid td { padding: 0!important; border: 0!important } table td.linenumber { width: 40px!important; } 
+        </style>
+      </head>
+      <body style="font-family: monospace;">
+        <ul class="nav nav-tabs">
+          <li>
+            <a href="#codegrid" data-toggle="tab">Codegrid</a>
+          </li>
+          <li>
+            <a href="#statementlist" data-toggle="tab">Statement List</a>
+          </li>
+        </ul>
+        <div class="tab-content">
+          <div class="tab-pane active" id="codegrid">
+            <pre style='font-size: 12pt; font-family: courier;'>1 <span style=''>package reactivemongo.api
+</span>2 <span style=''>
+</span>3 <span style=''>import reactivemongo.api.commands.WriteConcern
+</span>4 <span style=''>
+</span>5 <span style=''>/** Then mode of authentication against the replica set. */
+</span>6 <span style=''>sealed trait AuthenticationMode
+</span>7 <span style=''>
+</span>8 <span style=''>/** MongoDB-CR authentication */
+</span>9 <span style=''>case object CrAuthentication extends AuthenticationMode
+</span>10 <span style=''>
+</span>11 <span style=''>/** SCRAM-SHA-1 authentication (see MongoDB 3.0) */
+</span>12 <span style=''>case object ScramSha1Authentication extends AuthenticationMode
+</span>13 <span style=''>
+</span>14 <span style=''>/**
+</span>15 <span style=''> * Options for MongoConnection.
+</span>16 <span style=''> *
+</span>17 <span style=''> * @param connectTimeoutMS The number of milliseconds to wait for a connection to be established before giving up.
+</span>18 <span style=''> * @param authSource The database source for authentication credentials.
+</span>19 <span style=''> * @param sslEnabled Enable SSL connection (required to be accepted on server-side).
+</span>20 <span style=''> * @param sslAllowsInvalidCert If `sslEnabled` is true, this one indicates whether to accept invalid certificates (e.g. self-signed).
+</span>21 <span style=''> * @param authMode Either [[CrAuthentication]] or [[ScramSha1Authentication]]
+</span>22 <span style=''> * @param tcpNoDelay TCPNoDelay flag (ReactiveMongo-specific option). The default value is false (see [[http://docs.oracle.com/javase/8/docs/api/java/net/StandardSocketOptions.html#TCP_NODELAY TCP_NODELAY]]).
+</span>23 <span style=''> * @param keepAlive TCP KeepAlive flag (ReactiveMongo-specific option). The default value is false (see [[http://docs.oracle.com/javase/8/docs/api/java/net/StandardSocketOptions.html#SO_KEEPALIVE SO_KEEPALIVE]]).
+</span>24 <span style=''> * @param nbChannelsPerNode Number of channels (connections) per node (ReactiveMongo-specific option).
+</span>25 <span style=''> * @param writeConcern the default write concern
+</span>26 <span style=''> * @param readPreference the default read preference
+</span>27 <span style=''> * @param failoverStrategy the default failover strategy
+</span>28 <span style=''> * @param monitorRefreshMS the interval in milliseconds used by monitor to refresh the node set (default: 10000)
+</span>29 <span style=''> * @param maxIdleTimeMS the maximum number of milliseconds that a [[https://docs.mongodb.com/manual/reference/connection-string/#urioption.maxIdleTimeMS channel can remain idle]] in the connection pool before being removed and closed (default: 0 to disable, as implemented using [[https://docs.jboss.org/netty/3.2/api/org/jboss/netty/handler/timeout/IdleStateHandler.html Netty IdleStateHandler]]); If not 0, must be greater or equal to [[#monitorRefreshMS]]
+</span>30 <span style=''> */
+</span>31 <span style=''>case class MongoConnectionOptions(
+</span>32 <span style=''>  // canonical options - connection
+</span>33 <span style=''>  connectTimeoutMS: Int = 0,
+</span>34 <span style=''>  // canonical options - authentication options
+</span>35 <span style=''>  authSource: Option[String] = None,
+</span>36 <span style=''>  sslEnabled: Boolean = false,
+</span>37 <span style=''>  sslAllowsInvalidCert: Boolean = false,
+</span>38 <span style=''>  authMode: AuthenticationMode = ScramSha1Authentication,
+</span>39 <span style=''>
+</span>40 <span style=''>  // reactivemongo specific options
+</span>41 <span style=''>  tcpNoDelay: Boolean = false,
+</span>42 <span style=''>  keepAlive: Boolean = false,
+</span>43 <span style=''>  nbChannelsPerNode: Int = 10,
+</span>44 <span style=''>
+</span>45 <span style=''>  // read and write preferences
+</span>46 <span style=''>  writeConcern: WriteConcern = WriteConcern.Default,
+</span>47 <span style=''>  readPreference: ReadPreference = ReadPreference.primary,
+</span>48 <span style=''>
+</span>49 <span style=''>  failoverStrategy: FailoverStrategy = FailoverStrategy.default,
+</span>50 <span style=''>
+</span>51 <span style=''>  monitorRefreshMS: Int = 10000,
+</span>52 <span style=''>  maxIdleTimeMS: Int = 0
+</span>53 <span style=''>)
+</span>54 <span style=''>
+</span>55 <span style=''>object MongoConnectionOptions {
+</span>56 <span style=''>  @inline private def ms(duration: Int): String = </span><span style='background: #AEF1AE'>s"${duration}ms"</span><span style=''>
+</span>57 <span style=''>
+</span>58 <span style=''>  private[reactivemongo] def toStrings(options: MongoConnectionOptions): List[(String, String)] = </span><span style='background: #AEF1AE'>options.authSource.toList.map(
+</span>59 <span style=''></span><span style='background: #AEF1AE'>    </span><span style='background: #F0ADAD'>"authSource" -> _.toString</span><span style='background: #AEF1AE'>
+</span>60 <span style=''></span><span style='background: #AEF1AE'>  ) ++ List(
+</span>61 <span style=''></span><span style='background: #AEF1AE'>      "authMode" -> options.authMode.toString,
+</span>62 <span style=''></span><span style='background: #AEF1AE'>      "nbChannelsPerNode" -> options.nbChannelsPerNode.toString,
+</span>63 <span style=''></span><span style='background: #AEF1AE'>      "monitorRefreshMS" -> ms(options.monitorRefreshMS),
+</span>64 <span style=''></span><span style='background: #AEF1AE'>      "connectTimeoutMS" -> ms(options.connectTimeoutMS),
+</span>65 <span style=''></span><span style='background: #AEF1AE'>      "maxIdleTimeMS" -> ms(options.maxIdleTimeMS), // TODO: Review
+</span>66 <span style=''></span><span style='background: #AEF1AE'>      "tcpNoDelay" -> options.tcpNoDelay.toString,
+</span>67 <span style=''></span><span style='background: #AEF1AE'>      "keepAlive" -> options.keepAlive.toString,
+</span>68 <span style=''></span><span style='background: #AEF1AE'>      "sslEnabled" -> options.sslEnabled.toString,
+</span>69 <span style=''></span><span style='background: #AEF1AE'>      "sslAllowsInvalidCert" -> options.sslAllowsInvalidCert.toString,
+</span>70 <span style=''></span><span style='background: #AEF1AE'>      "writeConcern" -> options.writeConcern.toString,
+</span>71 <span style=''></span><span style='background: #AEF1AE'>      "readPreference" -> options.readPreference.toString
+</span>72 <span style=''></span><span style='background: #AEF1AE'>    )</span><span style=''>
+</span>73 <span style=''>
+</span>74 <span style=''>}
+</span></pre>
+          </div>
+          <div class="tab-pane" id="statementlist">
+            <table cellspacing="0" cellpadding="0" class="table statementlist">
+      <tr>
+        <th>Line</th>
+        <th>Stmt Id</th>
+        <th>Pos</th>
+        <th>Tree</th>
+        <th>Symbol</th>
+        <th>Code</th>
+      </tr><tr>
+        <td>
+          56
+        </td>
+        <td>
+          3040
+        </td>
+        <td>
+          2957
+          -
+          2973
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          58
+        </td>
+        <td>
+          5592
+        </td>
+        <td>
+          3102
+          -
+          3102
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          59
+        </td>
+        <td>
+          2820
+        </td>
+        <td>
+          3108
+          -
+          3120
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          59
+        </td>
+        <td>
+          10144
+        </td>
+        <td>
+          3108
+          -
+          3134
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          59
+        </td>
+        <td>
+          8236
+        </td>
+        <td>
+          3124
+          -
+          3134
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          60
+        </td>
+        <td>
+          7510
+        </td>
+        <td>
+          3139
+          -
+          3139
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          60
+        </td>
+        <td>
+          8877
+        </td>
+        <td>
+          3142
+          -
+          3784
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          60
+        </td>
+        <td>
+          4932
+        </td>
+        <td>
+          3073
+          -
+          3784
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          61
+        </td>
+        <td>
+          5792
+        </td>
+        <td>
+          3168
+          -
+          3193
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          61
+        </td>
+        <td>
+          5473
+        </td>
+        <td>
+          3154
+          -
+          3164
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          61
+        </td>
+        <td>
+          2515
+        </td>
+        <td>
+          3154
+          -
+          3193
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          62
+        </td>
+        <td>
+          8241
+        </td>
+        <td>
+          3201
+          -
+          3258
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          62
+        </td>
+        <td>
+          3141
+        </td>
+        <td>
+          3224
+          -
+          3258
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          62
+        </td>
+        <td>
+          7737
+        </td>
+        <td>
+          3201
+          -
+          3220
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          63
+        </td>
+        <td>
+          5065
+        </td>
+        <td>
+          3266
+          -
+          3316
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          63
+        </td>
+        <td>
+          2170
+        </td>
+        <td>
+          3288
+          -
+          3316
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          63
+        </td>
+        <td>
+          5914
+        </td>
+        <td>
+          3291
+          -
+          3315
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          63
+        </td>
+        <td>
+          7529
+        </td>
+        <td>
+          3266
+          -
+          3284
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          64
+        </td>
+        <td>
+          4641
+        </td>
+        <td>
+          3346
+          -
+          3374
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          64
+        </td>
+        <td>
+          3359
+        </td>
+        <td>
+          3349
+          -
+          3373
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          64
+        </td>
+        <td>
+          8218
+        </td>
+        <td>
+          3324
+          -
+          3374
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          64
+        </td>
+        <td>
+          2189
+        </td>
+        <td>
+          3324
+          -
+          3342
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          65
+        </td>
+        <td>
+          6247
+        </td>
+        <td>
+          3404
+          -
+          3425
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          65
+        </td>
+        <td>
+          7607
+        </td>
+        <td>
+          3382
+          -
+          3397
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          65
+        </td>
+        <td>
+          8953
+        </td>
+        <td>
+          3382
+          -
+          3426
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          65
+        </td>
+        <td>
+          3126
+        </td>
+        <td>
+          3401
+          -
+          3426
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          66
+        </td>
+        <td>
+          8869
+        </td>
+        <td>
+          3450
+          -
+          3493
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          66
+        </td>
+        <td>
+          10468
+        </td>
+        <td>
+          3450
+          -
+          3462
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          66
+        </td>
+        <td>
+          10261
+        </td>
+        <td>
+          3466
+          -
+          3493
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          67
+        </td>
+        <td>
+          8862
+        </td>
+        <td>
+          3501
+          -
+          3512
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          67
+        </td>
+        <td>
+          6021
+        </td>
+        <td>
+          3501
+          -
+          3542
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          67
+        </td>
+        <td>
+          4863
+        </td>
+        <td>
+          3516
+          -
+          3542
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          68
+        </td>
+        <td>
+          8256
+        </td>
+        <td>
+          3566
+          -
+          3593
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          68
+        </td>
+        <td>
+          2384
+        </td>
+        <td>
+          3550
+          -
+          3562
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          68
+        </td>
+        <td>
+          7629
+        </td>
+        <td>
+          3550
+          -
+          3593
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          69
+        </td>
+        <td>
+          5577
+        </td>
+        <td>
+          3601
+          -
+          3664
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          69
+        </td>
+        <td>
+          2401
+        </td>
+        <td>
+          3601
+          -
+          3623
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          69
+        </td>
+        <td>
+          8851
+        </td>
+        <td>
+          3627
+          -
+          3664
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          70
+        </td>
+        <td>
+          5801
+        </td>
+        <td>
+          3672
+          -
+          3686
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          70
+        </td>
+        <td>
+          4951
+        </td>
+        <td>
+          3672
+          -
+          3719
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          70
+        </td>
+        <td>
+          6236
+        </td>
+        <td>
+          3690
+          -
+          3719
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          71
+        </td>
+        <td>
+          3026
+        </td>
+        <td>
+          3727
+          -
+          3743
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          71
+        </td>
+        <td>
+          4848
+        </td>
+        <td>
+          3747
+          -
+          3778
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          71
+        </td>
+        <td>
+          3251
+        </td>
+        <td>
+          3727
+          -
+          3778
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr>
+    </table>
+          </div>
+        </div>
+      </body>
+    </html>

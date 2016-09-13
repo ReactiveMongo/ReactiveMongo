@@ -1,0 +1,324 @@
+<html>
+      <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+        <title id="title">
+          bson.scala.html
+        </title>
+        <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jquery.tablesorter/2.20.1/css/theme.default.min.css" type="text/css"/><script src="http://cdnjs.cloudflare.com/ajax/libs/jquery.tablesorter/2.20.1/js/jquery.tablesorter.min.js"></script><link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/css/bootstrap.min.css" type="text/css"/><script src="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/js/bootstrap.min.js"></script><script type="text/javascript">
+        $(document).ready(function() {$(".tablesorter").tablesorter();});
+      </script>
+        <style>
+          table.codegrid { font-family: monospace; font-size: 12px; width: auto!important; }table.statementlist { width: auto!important; font-size: 13px; } table.codegrid td { padding: 0!important; border: 0!important } table td.linenumber { width: 40px!important; } 
+        </style>
+      </head>
+      <body style="font-family: monospace;">
+        <ul class="nav nav-tabs">
+          <li>
+            <a href="#codegrid" data-toggle="tab">Codegrid</a>
+          </li>
+          <li>
+            <a href="#statementlist" data-toggle="tab">Statement List</a>
+          </li>
+        </ul>
+        <div class="tab-content">
+          <div class="tab-pane active" id="codegrid">
+            <pre style='font-size: 12pt; font-family: courier;'>1 <span style=''>/*
+</span>2 <span style=''> * Copyright 2013 Stephane Godbillon (@sgodbillon)
+</span>3 <span style=''> *
+</span>4 <span style=''> * Licensed under the Apache License, Version 2.0 (the "License");
+</span>5 <span style=''> * you may not use this file except in compliance with the License.
+</span>6 <span style=''> * You may obtain a copy of the License at
+</span>7 <span style=''> *
+</span>8 <span style=''> *   http://www.apache.org/licenses/LICENSE-2.0
+</span>9 <span style=''> *
+</span>10 <span style=''> * Unless required by applicable law or agreed to in writing, software
+</span>11 <span style=''> * distributed under the License is distributed on an "AS IS" BASIS,
+</span>12 <span style=''> * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+</span>13 <span style=''> * See the License for the specific language governing permissions and
+</span>14 <span style=''> * limitations under the License.
+</span>15 <span style=''> */
+</span>16 <span style=''>package reactivemongo.bson
+</span>17 <span style=''>
+</span>18 <span style=''>/**
+</span>19 <span style=''> * {{{
+</span>20 <span style=''> * // { "name": "Johny", "surname": "Doe", "age": 28, "months": [1, 2, 3] }
+</span>21 <span style=''> * document ++ ("name" -> "Johny") ++ ("surname" -> "Doe") ++
+</span>22 <span style=''> * ("age" -> 28) ++ ("months" -> array(1, 2, 3))
+</span>23 <span style=''> *
+</span>24 <span style=''> * // { "_id": generatedId, "name": "Jane", "surname": "Doe", "age": 28,
+</span>25 <span style=''> * //   "months": [1, 2, 3], "details": { "salary": 12345,
+</span>26 <span style=''> * //   "inventory": ["foo", 7.8, 0, false] } }
+</span>27 <span style=''> * document ++ ("_id" -> generateId, "name" -> "Jane", "surname" -> "Doe",
+</span>28 <span style=''> *   "age" -> 28, "months" -> (array ++ (1, 2) ++ 3),
+</span>29 <span style=''> *   "details" -> document(
+</span>30 <span style=''> *     "salary" -> 12345L, "inventory" -> array("foo", 7.8, 0L, false)))
+</span>31 <span style=''> * }}}
+</span>32 <span style=''> */
+</span>33 <span style=''>object `package` extends DefaultBSONHandlers {
+</span>34 <span style=''>  // DSL helpers:
+</span>35 <span style=''>
+</span>36 <span style=''>  /** Returns an empty document. */
+</span>37 <span style=''>  def document = </span><span style='background: #AEF1AE'>BSONDocument.empty</span><span style=''>
+</span>38 <span style=''>
+</span>39 <span style=''>  /** Returns a document with given elements. */
+</span>40 <span style=''>  def document(elements: Producer[BSONElement]*) = </span><span style='background: #AEF1AE'>BSONDocument(elements: _*)</span><span style=''>
+</span>41 <span style=''>
+</span>42 <span style=''>  /** Returns an empty array. */
+</span>43 <span style=''>  def array = </span><span style='background: #AEF1AE'>BSONArray.empty</span><span style=''>
+</span>44 <span style=''>
+</span>45 <span style=''>  /** Returns an array with given values. */
+</span>46 <span style=''>  def array(values: Producer[BSONValue]*) = </span><span style='background: #AEF1AE'>BSONArray(values: _*)</span><span style=''>
+</span>47 <span style=''>
+</span>48 <span style=''>  /** Returns a newly generated object ID. */
+</span>49 <span style=''>  def generateId = </span><span style='background: #F0ADAD'>BSONObjectID.generate()</span><span style=''>
+</span>50 <span style=''>
+</span>51 <span style=''>  def element(name: String, value: BSONValue) = </span><span style='background: #F0ADAD'>BSONElement(name, value)</span><span style=''>
+</span>52 <span style=''>}
+</span>53 <span style=''>
+</span>54 <span style=''>object BSON {
+</span>55 <span style=''>  /**
+</span>56 <span style=''>   * Produces a `T` instance of the given BSON value, if there is an implicit `BSONReader[B, T]` in the scope.
+</span>57 <span style=''>   *
+</span>58 <span style=''>   * Prefer `readDocument` over this one if you want to deserialize `BSONDocuments`.
+</span>59 <span style=''>   */
+</span>60 <span style=''>  def read[B <: BSONValue, T](bson: B)(implicit reader: BSONReader[B, T]): T = </span><span style='background: #F0ADAD'>reader.read(bson)</span><span style=''>
+</span>61 <span style=''>  /**
+</span>62 <span style=''>   * Produces a `BSONValue` instance of the given `T` value, if there is an implicit `BSONWriter[T, B]` in the scope.
+</span>63 <span style=''>   *
+</span>64 <span style=''>   * Prefer `writeDocument` over this one if you want to serialize `T` instances.
+</span>65 <span style=''>   */
+</span>66 <span style=''>  def write[T, B <: BSONValue](t: T)(implicit writer: BSONWriter[T, B]): B = </span><span style='background: #AEF1AE'>writer.write(t)</span><span style=''>
+</span>67 <span style=''>
+</span>68 <span style=''>  /** Produces a `T` instance of the given `BSONDocument`, if there is an implicit `BSONReader[BSONDocument, T]` in the scope. */
+</span>69 <span style=''>  def readDocument[T](doc: BSONDocument)(implicit reader: BSONReader[BSONDocument, T]): T = </span><span style='background: #AEF1AE'>reader.read(doc)</span><span style=''>
+</span>70 <span style=''>
+</span>71 <span style=''>  /** Produces a `BSONDocument` of the given `T` instance, if there is an implicit `BSONWriter[T, BSONDocument]` in the scope. */
+</span>72 <span style=''>  def writeDocument[T](t: T)(implicit writer: BSONWriter[T, BSONDocument]): BSONDocument = </span><span style='background: #AEF1AE'>writer.write(t)</span><span style=''>
+</span>73 <span style=''>}
+</span></pre>
+          </div>
+          <div class="tab-pane" id="statementlist">
+            <table cellspacing="0" cellpadding="0" class="table statementlist">
+      <tr>
+        <th>Line</th>
+        <th>Stmt Id</th>
+        <th>Pos</th>
+        <th>Tree</th>
+        <th>Symbol</th>
+        <th>Code</th>
+      </tr><tr>
+        <td>
+          37
+        </td>
+        <td>
+          1119
+        </td>
+        <td>
+          1383
+          -
+          1401
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          40
+        </td>
+        <td>
+          593
+        </td>
+        <td>
+          1503
+          -
+          1529
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          43
+        </td>
+        <td>
+          1276
+        </td>
+        <td>
+          1578
+          -
+          1593
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          46
+        </td>
+        <td>
+          1536
+        </td>
+        <td>
+          1684
+          -
+          1705
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          49
+        </td>
+        <td>
+          797
+        </td>
+        <td>
+          1772
+          -
+          1795
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          51
+        </td>
+        <td>
+          1542
+        </td>
+        <td>
+          1845
+          -
+          1869
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          60
+        </td>
+        <td>
+          1287
+        </td>
+        <td>
+          2179
+          -
+          2196
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          66
+        </td>
+        <td>
+          521
+        </td>
+        <td>
+          2491
+          -
+          2506
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          69
+        </td>
+        <td>
+          1320
+        </td>
+        <td>
+          2730
+          -
+          2746
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          72
+        </td>
+        <td>
+          752
+        </td>
+        <td>
+          2969
+          -
+          2984
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr>
+    </table>
+          </div>
+        </div>
+      </body>
+    </html>

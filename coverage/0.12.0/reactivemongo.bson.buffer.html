@@ -1,0 +1,1316 @@
+<html>
+      <head>
+      <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+      <title id="title">Scoverage Code Coverage</title>
+      <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jquery.tablesorter/2.20.1/css/theme.default.min.css" type="text/css"/><script src="http://cdnjs.cloudflare.com/ajax/libs/jquery.tablesorter/2.20.1/js/jquery.tablesorter.min.js"></script><link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/css/bootstrap.min.css" type="text/css"/><script src="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/js/bootstrap.min.js"></script><script type="text/javascript">
+        $(document).ready(function() {$(".tablesorter").tablesorter();});
+      </script>
+      <style>
+        .meter {
+        height: 14px;
+        position: relative;
+        background: #BB2020;
+}
+
+.meter span {
+	display: block;
+	height: 100%;
+	background-color: rgb(43,194,83);
+	background-image: -webkit-gradient(
+	  linear,
+	  left bottom,
+	  left top,
+	  color-stop(0, rgb(43,194,83)),
+	  color-stop(1, rgb(84,240,84))
+	 );
+	background-image: -webkit-linear-gradient(
+	  center bottom,
+	  rgb(43,194,83) 37%,
+	  rgb(84,240,84) 69%
+	 );
+	background-image: -moz-linear-gradient(
+	  center bottom,
+	  rgb(43,194,83) 37%,
+	  rgb(84,240,84) 69%
+	 );
+	background-image: -ms-linear-gradient(
+	  center bottom,
+	  rgb(43,194,83) 37%,
+	  rgb(84,240,84) 69%
+	 );
+	background-image: -o-linear-gradient(
+	  center bottom,
+	  rgb(43,194,83) 37%,
+	  rgb(84,240,84) 69%
+	 );
+	-webkit-box-shadow:
+	  inset 0 2px 9px  rgba(255,255,255,0.3),
+	  inset 0 -2px 6px rgba(0,0,0,0.4);
+	-moz-box-shadow:
+	  inset 0 2px 9px  rgba(255,255,255,0.3),
+	  inset 0 -2px 6px rgba(0,0,0,0.4);
+	position: relative;
+	overflow: hidden;
+}
+      </style>
+    </head><body style="font-family: monospace;">
+      <table class="tablesorter table table-striped" style="font-size:13px">
+      <thead>
+        <tr>
+          <th>
+            Class
+          </th>
+          <th>
+            Source file
+          </th>
+          <th>
+            Lines
+          </th>
+          <th>
+            Methods
+          </th>
+          <th>
+            Statements
+          </th>
+          <th>
+            Invoked
+          </th>
+          <th>
+            Coverage
+          </th>
+          <th>
+          </th>
+          <th>
+            Branches
+          </th>
+          <th>
+            Invoked
+          </th>
+          <th>
+            Coverage
+          </th>
+          <th>
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+      <td>
+        <a href="buffer.scala.html">
+          ArrayBSONBuffer
+        </a>
+      </td>
+      <td>
+        buffer.scala
+      </td>
+      <td>
+        256
+      </td>
+      <td>
+        11
+      </td>
+      <td>
+        34
+      </td>
+      <td>
+        32
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 94%"></span>
+        </div>
+      </td>
+      <td>
+        94,12
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="buffer.scala.html">
+          ArrayReadableBuffer
+        </a>
+      </td>
+      <td>
+        buffer.scala
+      </td>
+      <td>
+        201
+      </td>
+      <td>
+        15
+      </td>
+      <td>
+        25
+      </td>
+      <td>
+        23
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 92%"></span>
+        </div>
+      </td>
+      <td>
+        92,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="bufferhandlers.scala.html">
+          BSONArrayBufferHandler
+        </a>
+      </td>
+      <td>
+        bufferhandlers.scala
+      </td>
+      <td>
+        146
+      </td>
+      <td>
+        3
+      </td>
+      <td>
+        32
+      </td>
+      <td>
+        32
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="bufferhandlers.scala.html">
+          BSONBinaryBufferHandler
+        </a>
+      </td>
+      <td>
+        bufferhandlers.scala
+      </td>
+      <td>
+        162
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        15
+      </td>
+      <td>
+        15
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="bufferhandlers.scala.html">
+          BSONBooleanBufferHandler
+        </a>
+      </td>
+      <td>
+        bufferhandlers.scala
+      </td>
+      <td>
+        175
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        8
+      </td>
+      <td>
+        8
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="bufferhandlers.scala.html">
+          BSONDBPointerBufferHandler
+        </a>
+      </td>
+      <td>
+        bufferhandlers.scala
+      </td>
+      <td>
+        191
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        7
+      </td>
+      <td>
+        7
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="bufferhandlers.scala.html">
+          BSONDateTimeBufferHandler
+        </a>
+      </td>
+      <td>
+        bufferhandlers.scala
+      </td>
+      <td>
+        179
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        4
+      </td>
+      <td>
+        4
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="bufferhandlers.scala.html">
+          BSONDocumentBufferHandler
+        </a>
+      </td>
+      <td>
+        bufferhandlers.scala
+      </td>
+      <td>
+        115
+      </td>
+      <td>
+        3
+      </td>
+      <td>
+        32
+      </td>
+      <td>
+        32
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="bufferhandlers.scala.html">
+          BSONDoubleBufferHandler
+        </a>
+      </td>
+      <td>
+        bufferhandlers.scala
+      </td>
+      <td>
+        81
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        4
+      </td>
+      <td>
+        4
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="bufferhandlers.scala.html">
+          BSONIntegerBufferHandler
+        </a>
+      </td>
+      <td>
+        bufferhandlers.scala
+      </td>
+      <td>
+        207
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        4
+      </td>
+      <td>
+        4
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="bufferhandlers.scala.html">
+          BSONIterator
+        </a>
+      </td>
+      <td>
+        bufferhandlers.scala
+      </td>
+      <td>
+        282
+      </td>
+      <td>
+        5
+      </td>
+      <td>
+        22
+      </td>
+      <td>
+        3
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 14%"></span>
+        </div>
+      </td>
+      <td>
+        13,64
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="bufferhandlers.scala.html">
+          BSONJavaScriptBufferHandler
+        </a>
+      </td>
+      <td>
+        bufferhandlers.scala
+      </td>
+      <td>
+        195
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        4
+      </td>
+      <td>
+        4
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="bufferhandlers.scala.html">
+          BSONJavaScriptWSBufferHandler
+        </a>
+      </td>
+      <td>
+        bufferhandlers.scala
+      </td>
+      <td>
+        203
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        4
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 0%"></span>
+        </div>
+      </td>
+      <td>
+        0,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 0%"></span>
+        </div>
+      </td>
+      <td>
+        0,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="bufferhandlers.scala.html">
+          BSONLongBufferHandler
+        </a>
+      </td>
+      <td>
+        bufferhandlers.scala
+      </td>
+      <td>
+        215
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        4
+      </td>
+      <td>
+        4
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="bufferhandlers.scala.html">
+          BSONMaxKeyBufferHandler
+        </a>
+      </td>
+      <td>
+        bufferhandlers.scala
+      </td>
+      <td>
+        223
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 0%"></span>
+        </div>
+      </td>
+      <td>
+        0,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 0%"></span>
+        </div>
+      </td>
+      <td>
+        0,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="bufferhandlers.scala.html">
+          BSONMinKeyBufferHandler
+        </a>
+      </td>
+      <td>
+        bufferhandlers.scala
+      </td>
+      <td>
+        219
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 0%"></span>
+        </div>
+      </td>
+      <td>
+        0,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 0%"></span>
+        </div>
+      </td>
+      <td>
+        0,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="bufferhandlers.scala.html">
+          BSONNullBufferHandler
+        </a>
+      </td>
+      <td>
+        bufferhandlers.scala
+      </td>
+      <td>
+        183
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="bufferhandlers.scala.html">
+          BSONObjectIDBufferHandler
+        </a>
+      </td>
+      <td>
+        bufferhandlers.scala
+      </td>
+      <td>
+        171
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        4
+      </td>
+      <td>
+        4
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="bufferhandlers.scala.html">
+          BSONRegexBufferHandler
+        </a>
+      </td>
+      <td>
+        bufferhandlers.scala
+      </td>
+      <td>
+        187
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        7
+      </td>
+      <td>
+        4
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 57%"></span>
+        </div>
+      </td>
+      <td>
+        57,14
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="bufferhandlers.scala.html">
+          BSONStringBufferHandler
+        </a>
+      </td>
+      <td>
+        bufferhandlers.scala
+      </td>
+      <td>
+        85
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        4
+      </td>
+      <td>
+        4
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="bufferhandlers.scala.html">
+          BSONSymbolBufferHandler
+        </a>
+      </td>
+      <td>
+        bufferhandlers.scala
+      </td>
+      <td>
+        199
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        4
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 0%"></span>
+        </div>
+      </td>
+      <td>
+        0,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 0%"></span>
+        </div>
+      </td>
+      <td>
+        0,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="bufferhandlers.scala.html">
+          BSONTimestampBufferHandler
+        </a>
+      </td>
+      <td>
+        bufferhandlers.scala
+      </td>
+      <td>
+        211
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        4
+      </td>
+      <td>
+        4
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="bufferhandlers.scala.html">
+          BSONUndefinedBufferHandler
+        </a>
+      </td>
+      <td>
+        bufferhandlers.scala
+      </td>
+      <td>
+        167
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 0%"></span>
+        </div>
+      </td>
+      <td>
+        0,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 0%"></span>
+        </div>
+      </td>
+      <td>
+        0,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="bufferhandlers.scala.html">
+          BufferHandler
+        </a>
+      </td>
+      <td>
+        bufferhandlers.scala
+      </td>
+      <td>
+        41
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        8
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 25%"></span>
+        </div>
+      </td>
+      <td>
+        25,00
+        %
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 0%"></span>
+        </div>
+      </td>
+      <td>
+        0,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="bufferhandlers.scala.html">
+          DefaultBufferHandler
+        </a>
+      </td>
+      <td>
+        bufferhandlers.scala
+      </td>
+      <td>
+        242
+      </td>
+      <td>
+        5
+      </td>
+      <td>
+        95
+      </td>
+      <td>
+        85
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 89%"></span>
+        </div>
+      </td>
+      <td>
+        89,47
+        %
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 0%"></span>
+        </div>
+      </td>
+      <td>
+        0,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="buffer.scala.html">
+          ReadableBuffer
+        </a>
+      </td>
+      <td>
+        buffer.scala
+      </td>
+      <td>
+        147
+      </td>
+      <td>
+        3
+      </td>
+      <td>
+        18
+      </td>
+      <td>
+        18
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="buffer.scala.html">
+          WritableBuffer
+        </a>
+      </td>
+      <td>
+        buffer.scala
+      </td>
+      <td>
+        71
+      </td>
+      <td>
+        3
+      </td>
+      <td>
+        16
+      </td>
+      <td>
+        4
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 25%"></span>
+        </div>
+      </td>
+      <td>
+        25,00
+        %
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 0%"></span>
+        </div>
+      </td>
+      <td>
+        0,00
+        %
+      </td>
+    </tr>
+      </tbody>
+    </table>
+    </body>
+    </html>

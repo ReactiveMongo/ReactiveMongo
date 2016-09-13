@@ -1,0 +1,929 @@
+<html>
+      <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+        <title id="title">
+          core/listener.scala.html
+        </title>
+        <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jquery.tablesorter/2.20.1/css/theme.default.min.css" type="text/css"/><script src="http://cdnjs.cloudflare.com/ajax/libs/jquery.tablesorter/2.20.1/js/jquery.tablesorter.min.js"></script><link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/css/bootstrap.min.css" type="text/css"/><script src="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/js/bootstrap.min.js"></script><script type="text/javascript">
+        $(document).ready(function() {$(".tablesorter").tablesorter();});
+      </script>
+        <style>
+          table.codegrid { font-family: monospace; font-size: 12px; width: auto!important; }table.statementlist { width: auto!important; font-size: 13px; } table.codegrid td { padding: 0!important; border: 0!important } table td.linenumber { width: 40px!important; } 
+        </style>
+      </head>
+      <body style="font-family: monospace;">
+        <ul class="nav nav-tabs">
+          <li>
+            <a href="#codegrid" data-toggle="tab">Codegrid</a>
+          </li>
+          <li>
+            <a href="#statementlist" data-toggle="tab">Statement List</a>
+          </li>
+        </ul>
+        <div class="tab-content">
+          <div class="tab-pane active" id="codegrid">
+            <pre style='font-size: 12pt; font-family: courier;'>1 <span style=''>package external.reactivemongo
+</span>2 <span style=''>
+</span>3 <span style=''>import scala.util.Try
+</span>4 <span style=''>
+</span>5 <span style=''>import reactivemongo.api.MongoConnectionOptions
+</span>6 <span style=''>import reactivemongo.core.nodeset.NodeSetInfo
+</span>7 <span style=''>
+</span>8 <span style=''>/** Listener definition for the connection events. */
+</span>9 <span style=''>trait ConnectionListener {
+</span>10 <span style=''>  /** Logger available for the listener implementation. */
+</span>11 <span style=''>  lazy val logger: org.slf4j.Logger = </span><span style='background: #AEF1AE'>ConnectionListener.logger.slf4j</span><span style=''>
+</span>12 <span style=''>
+</span>13 <span style=''>  /**
+</span>14 <span style=''>   * The connection pool is initialized.
+</span>15 <span style=''>   *
+</span>16 <span style=''>   * @param options the connection options
+</span>17 <span style=''>   * @param supervisor the name of the pool supervisor (for logging)
+</span>18 <span style=''>   * @param connection the name of the connection pool
+</span>19 <span style=''>   */
+</span>20 <span style=''>  def poolCreated(options: MongoConnectionOptions, supervisor: String, connection: String): Unit
+</span>21 <span style=''>
+</span>22 <span style=''>  /**
+</span>23 <span style=''>   * The node set of the connection pool has been updated.
+</span>24 <span style=''>   * This is fired asynchronously.
+</span>25 <span style=''>   *
+</span>26 <span style=''>   * @param previous the previous node set
+</span>27 <span style=''>   * @param updated the new/updated node set
+</span>28 <span style=''>   */
+</span>29 <span style=''>  def nodeSetUpdated(previous: NodeSetInfo, updated: NodeSetInfo): Unit
+</span>30 <span style=''>
+</span>31 <span style=''>  /**
+</span>32 <span style=''>   * The connection is being shut down.
+</span>33 <span style=''>   *
+</span>34 <span style=''>   * @param supervisor the name of the pool supervisor (for logging)
+</span>35 <span style=''>   * @param connection the name of the connection pool
+</span>36 <span style=''>   */
+</span>37 <span style=''>  def poolShutdown(supervisor: String, connection: String): Unit
+</span>38 <span style=''>}
+</span>39 <span style=''>
+</span>40 <span style=''>object ConnectionListener {
+</span>41 <span style=''>  import java.net.URL
+</span>42 <span style=''>
+</span>43 <span style=''>  val staticListenerBinderPath =
+</span>44 <span style=''>    </span><span style='background: #AEF1AE'>"external/reactivemongo/StaticListenerBinder.class"</span><span style=''>;
+</span>45 <span style=''>
+</span>46 <span style=''>  private[reactivemongo] val logger =
+</span>47 <span style=''>    </span><span style='background: #AEF1AE'>reactivemongo.util.LazyLogger("reactivemongo.core.ConnectionListener")</span><span style=''>
+</span>48 <span style=''>
+</span>49 <span style=''>  /** Optionally creates a listener according the available binding. */
+</span>50 <span style=''>  def apply(): Option[ConnectionListener] = {
+</span>51 <span style=''>    val binderPathSet = </span><span style='background: #AEF1AE'>scala.collection.mutable.LinkedHashSet[URL]()</span><span style=''>
+</span>52 <span style=''>
+</span>53 <span style=''>    try {
+</span>54 <span style=''>      </span><span style='background: #AEF1AE'>val reactiveMongoLoader = classOf[ConnectionListener].getClassLoader
+</span>55 <span style=''></span><span style='background: #AEF1AE'>      val paths: java.util.Enumeration[URL] =
+</span>56 <span style=''></span><span style='background: #AEF1AE'>        if (reactiveMongoLoader == null) {
+</span>57 <span style=''></span><span style='background: #AEF1AE'>          </span><span style='background: #F0ADAD'>ClassLoader.getSystemResources(staticListenerBinderPath)</span><span style='background: #AEF1AE'>
+</span>58 <span style=''></span><span style='background: #AEF1AE'>        } else {
+</span>59 <span style=''></span><span style='background: #AEF1AE'>          reactiveMongoLoader.getResources(staticListenerBinderPath)
+</span>60 <span style=''></span><span style='background: #AEF1AE'>        }
+</span>61 <span style=''></span><span style='background: #AEF1AE'>
+</span>62 <span style=''></span><span style='background: #AEF1AE'>      while (paths.hasMoreElements()) binderPathSet.add(paths.nextElement())</span><span style=''>
+</span>63 <span style=''>    } catch {
+</span>64 <span style=''>      case ioe: java.io.IOException =>
+</span>65 <span style=''>        </span><span style='background: #F0ADAD'>logger.warn("Error getting resources from path", ioe)</span><span style=''>;
+</span>66 <span style=''>    }
+</span>67 <span style=''>
+</span>68 <span style=''>    </span><span style='background: #AEF1AE'>binderPathSet.headOption.flatMap { first =>
+</span>69 <span style=''></span><span style='background: #AEF1AE'>      if (!binderPathSet.tail.isEmpty) {
+</span>70 <span style=''></span><span style='background: #AEF1AE'>        </span><span style='background: #F0ADAD'>logger.warn(s"Class path contains multiple StaticListenerBinder: $first, ${binderPathSet.tail mkString ", "}")</span><span style='background: #AEF1AE'>
+</span>71 <span style=''></span><span style='background: #AEF1AE'>      }
+</span>72 <span style=''></span><span style='background: #AEF1AE'>
+</span>73 <span style=''></span><span style='background: #AEF1AE'>      val `try` = Try(new StaticListenerBinder().connectionListener())
+</span>74 <span style=''></span><span style='background: #AEF1AE'>
+</span>75 <span style=''></span><span style='background: #AEF1AE'>      `try`.failed.foreach { reason =>
+</span>76 <span style=''></span><span style='background: #AEF1AE'>        </span><span style='background: #F0ADAD'>logger.warn("Fails to create connection listener; Fallbacks to the default one", reason)</span><span style='background: #AEF1AE'>
+</span>77 <span style=''></span><span style='background: #AEF1AE'>      }
+</span>78 <span style=''></span><span style='background: #AEF1AE'>
+</span>79 <span style=''></span><span style='background: #AEF1AE'>      `try`.toOption
+</span>80 <span style=''></span><span style='background: #AEF1AE'>    }</span><span style=''>
+</span>81 <span style=''>  }
+</span>82 <span style=''>}
+</span>83 <span style=''>
+</span>84 <span style=''>final class StaticListenerBinder {
+</span>85 <span style=''>  /**
+</span>86 <span style=''>   * Returns a new listener instance;
+</span>87 <span style=''>   * At most one will be used per driver.
+</span>88 <span style=''>   */
+</span>89 <span style=''>  def connectionListener(): ConnectionListener = </span><span style='background: #F0ADAD'>???</span><span style=''>
+</span>90 <span style=''>}
+</span></pre>
+          </div>
+          <div class="tab-pane" id="statementlist">
+            <table cellspacing="0" cellpadding="0" class="table statementlist">
+      <tr>
+        <th>Line</th>
+        <th>Stmt Id</th>
+        <th>Pos</th>
+        <th>Tree</th>
+        <th>Symbol</th>
+        <th>Code</th>
+      </tr><tr>
+        <td>
+          11
+        </td>
+        <td>
+          3310
+        </td>
+        <td>
+          328
+          -
+          359
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          44
+        </td>
+        <td>
+          7067
+        </td>
+        <td>
+          1293
+          -
+          1344
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          47
+        </td>
+        <td>
+          8941
+        </td>
+        <td>
+          1389
+          -
+          1459
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          51
+        </td>
+        <td>
+          9020
+        </td>
+        <td>
+          1603
+          -
+          1648
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          53
+        </td>
+        <td>
+          3350
+        </td>
+        <td>
+          1666
+          -
+          2064
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          54
+        </td>
+        <td>
+          9372
+        </td>
+        <td>
+          1692
+          -
+          1734
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          56
+        </td>
+        <td>
+          3336
+        </td>
+        <td>
+          1793
+          -
+          1820
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          57
+        </td>
+        <td>
+          6312
+        </td>
+        <td>
+          1834
+          -
+          1890
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          57
+        </td>
+        <td>
+          4062
+        </td>
+        <td>
+          1865
+          -
+          1889
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          57
+        </td>
+        <td>
+          7358
+        </td>
+        <td>
+          1834
+          -
+          1890
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          59
+        </td>
+        <td>
+          2669
+        </td>
+        <td>
+          1918
+          -
+          1976
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          59
+        </td>
+        <td>
+          6724
+        </td>
+        <td>
+          1918
+          -
+          1976
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          59
+        </td>
+        <td>
+          9779
+        </td>
+        <td>
+          1951
+          -
+          1975
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          62
+        </td>
+        <td>
+          9144
+        </td>
+        <td>
+          2043
+          -
+          2043
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          62
+        </td>
+        <td>
+          4045
+        </td>
+        <td>
+          1994
+          -
+          1994
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          62
+        </td>
+        <td>
+          9039
+        </td>
+        <td>
+          2026
+          -
+          2064
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          62
+        </td>
+        <td>
+          7373
+        </td>
+        <td>
+          2044
+          -
+          2063
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          62
+        </td>
+        <td>
+          9771
+        </td>
+        <td>
+          2026
+          -
+          2064
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          62
+        </td>
+        <td>
+          6939
+        </td>
+        <td>
+          2001
+          -
+          2024
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          62
+        </td>
+        <td>
+          6514
+        </td>
+        <td>
+          1994
+          -
+          1994
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          65
+        </td>
+        <td>
+          6095
+        </td>
+        <td>
+          2126
+          -
+          2179
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          68
+        </td>
+        <td>
+          4272
+        </td>
+        <td>
+          2192
+          -
+          2648
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          69
+        </td>
+        <td>
+          4697
+        </td>
+        <td>
+          2242
+          -
+          2242
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          69
+        </td>
+        <td>
+          9159
+        </td>
+        <td>
+          2242
+          -
+          2242
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          69
+        </td>
+        <td>
+          3754
+        </td>
+        <td>
+          2246
+          -
+          2273
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          70
+        </td>
+        <td>
+          3935
+        </td>
+        <td>
+          2299
+          -
+          2351
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          70
+        </td>
+        <td>
+          6737
+        </td>
+        <td>
+          2360
+          -
+          2392
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          70
+        </td>
+        <td>
+          9060
+        </td>
+        <td>
+          2297
+          -
+          2394
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          70
+        </td>
+        <td>
+          3315
+        </td>
+        <td>
+          2285
+          -
+          2395
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          70
+        </td>
+        <td>
+          6081
+        </td>
+        <td>
+          2393
+          -
+          2394
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          70
+        </td>
+        <td>
+          9571
+        </td>
+        <td>
+          2356
+          -
+          2359
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          70
+        </td>
+        <td>
+          9753
+        </td>
+        <td>
+          2285
+          -
+          2395
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          73
+        </td>
+        <td>
+          6423
+        </td>
+        <td>
+          2423
+          -
+          2475
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          73
+        </td>
+        <td>
+          8922
+        </td>
+        <td>
+          2427
+          -
+          2474
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          75
+        </td>
+        <td>
+          3094
+        </td>
+        <td>
+          2483
+          -
+          2620
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          76
+        </td>
+        <td>
+          7158
+        </td>
+        <td>
+          2524
+          -
+          2612
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          79
+        </td>
+        <td>
+          6294
+        </td>
+        <td>
+          2628
+          -
+          2642
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          89
+        </td>
+        <td>
+          3951
+        </td>
+        <td>
+          2832
+          -
+          2835
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr>
+    </table>
+          </div>
+        </div>
+      </body>
+    </html>

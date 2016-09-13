@@ -1,0 +1,258 @@
+<html>
+      <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+        <title id="title">
+          Macros.scala.html
+        </title>
+        <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jquery.tablesorter/2.20.1/css/theme.default.min.css" type="text/css"/><script src="http://cdnjs.cloudflare.com/ajax/libs/jquery.tablesorter/2.20.1/js/jquery.tablesorter.min.js"></script><link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/css/bootstrap.min.css" type="text/css"/><script src="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/js/bootstrap.min.js"></script><script type="text/javascript">
+        $(document).ready(function() {$(".tablesorter").tablesorter();});
+      </script>
+        <style>
+          table.codegrid { font-family: monospace; font-size: 12px; width: auto!important; }table.statementlist { width: auto!important; font-size: 13px; } table.codegrid td { padding: 0!important; border: 0!important } table td.linenumber { width: 40px!important; } 
+        </style>
+      </head>
+      <body style="font-family: monospace;">
+        <ul class="nav nav-tabs">
+          <li>
+            <a href="#codegrid" data-toggle="tab">Codegrid</a>
+          </li>
+          <li>
+            <a href="#statementlist" data-toggle="tab">Statement List</a>
+          </li>
+        </ul>
+        <div class="tab-content">
+          <div class="tab-pane active" id="codegrid">
+            <pre style='font-size: 12pt; font-family: courier;'>1 <span style=''>package reactivemongo.bson
+</span>2 <span style=''>
+</span>3 <span style=''>/**
+</span>4 <span style=''> * Macros for generating `BSONReader` and `BSONWriter` implementations for case
+</span>5 <span style=''> * at compile time. Invoking these macros is equivalent to writing anonymous
+</span>6 <span style=''> * class implementations by hand.
+</span>7 <span style=''> *
+</span>8 <span style=''> * {{{
+</span>9 <span style=''> * case class Person(name: String, surname: String)
+</span>10 <span style=''> * implicit val personHandler = Macros.handler[Person]
+</span>11 <span style=''> * }}}
+</span>12 <span style=''> *
+</span>13 <span style=''> * @see Macros.Options for specific options
+</span>14 <span style=''> */
+</span>15 <span style=''>object Macros {
+</span>16 <span style=''>  import language.experimental.macros
+</span>17 <span style=''>
+</span>18 <span style=''>  /**
+</span>19 <span style=''>   * Creates an instance of BSONReader for case class A
+</span>20 <span style=''>   * @see Macros
+</span>21 <span style=''>   */
+</span>22 <span style=''>  def reader[A]: BSONDocumentReader[A] = macro MacroImpl.reader[A, Options.Default]
+</span>23 <span style=''>
+</span>24 <span style=''>  /** Creates an instance of BSONReader for case class A and takes additional options */
+</span>25 <span style=''>  def readerOpts[A, Opts <: Options.Default]: BSONDocumentReader[A] = macro MacroImpl.reader[A, Opts]
+</span>26 <span style=''>
+</span>27 <span style=''>  /** Creates an instance of BSONWriter for case class A */
+</span>28 <span style=''>  def writer[A]: BSONDocumentWriter[A] = macro MacroImpl.writer[A, Options.Default]
+</span>29 <span style=''>
+</span>30 <span style=''>  /** Creates an instance of BSONWriter for case class A and takes additional options */
+</span>31 <span style=''>  def writerOpts[A, Opts <: Options.Default]: BSONDocumentWriter[A] = macro MacroImpl.writer[A, Opts]
+</span>32 <span style=''>
+</span>33 <span style=''>  /** Creates an instance of BSONReader and BSONWriter for case class A */
+</span>34 <span style=''>  def handler[A]: BSONDocumentReader[A] with BSONDocumentWriter[A] with BSONHandler[BSONDocument, A] = macro MacroImpl.handler[A, Options.Default]
+</span>35 <span style=''>
+</span>36 <span style=''>  /**
+</span>37 <span style=''>   * Creates an instance of BSONReader and BSONWriter for case class A,
+</span>38 <span style=''>   * and takes additional options.
+</span>39 <span style=''>   */
+</span>40 <span style=''>  def handlerOpts[A, Opts <: Options.Default]: BSONDocumentReader[A] with BSONDocumentWriter[A] with BSONHandler[BSONDocument, A] = macro MacroImpl.handler[A, Opts]
+</span>41 <span style=''>
+</span>42 <span style=''>  /**
+</span>43 <span style=''>   * Methods with 'Opts' postfix will take additional options in the form of
+</span>44 <span style=''>   * type parameters that will customize behaviour of
+</span>45 <span style=''>   * the macros during compilation.
+</span>46 <span style=''>   */
+</span>47 <span style=''>  object Options {
+</span>48 <span style=''>
+</span>49 <span style=''>    /**
+</span>50 <span style=''>     * Default options that are implied if invoking "non-Opts" method.
+</span>51 <span style=''>     * All other options extend this.
+</span>52 <span style=''>     */
+</span>53 <span style=''>    trait Default
+</span>54 <span style=''>
+</span>55 <span style=''>    /** Print out generated code during compilation. */
+</span>56 <span style=''>    trait Verbose extends Default
+</span>57 <span style=''>
+</span>58 <span style=''>    /**
+</span>59 <span style=''>     * In `write` method also store class name(dynamic type) as a string
+</span>60 <span style=''>     * in a property named "className".
+</span>61 <span style=''>     */
+</span>62 <span style=''>    trait SaveClassName extends Default
+</span>63 <span style=''>
+</span>64 <span style=''>    /**
+</span>65 <span style=''>     * Same as [[SaveClassName]] but using the class simple name
+</span>66 <span style=''>     * (e.g. the fully-qualified name).
+</span>67 <span style=''>     */
+</span>68 <span style=''>    trait SaveSimpleName extends SaveClassName with Default
+</span>69 <span style=''>
+</span>70 <span style=''>    /**
+</span>71 <span style=''>     * Use type parameter `A` as static type but use pattern matching to handle
+</span>72 <span style=''>     * different possible subtypes. This makes it easy to persist algebraic
+</span>73 <span style=''>     * data types(pattern where you have a sealed trait and several implementing
+</span>74 <span style=''>     * case classes). When writing a case class into BSON its dynamic type
+</span>75 <span style=''>     * will be pattern matched, when reading from BSON the pattern matching
+</span>76 <span style=''>     * will be done on the `className` string. This option extends
+</span>77 <span style=''>     * [[reactivemongo.bson.Macros.Options.SaveClassName]] in to ensure class
+</span>78 <span style=''>     * names are always serialized.
+</span>79 <span style=''>     *
+</span>80 <span style=''>     * @tparam Types to use in pattern matching. Listed in a "type list" \/
+</span>81 <span style=''>     */
+</span>82 <span style=''>    trait UnionType[Types <: \/[_, _]] extends SaveClassName with Default
+</span>83 <span style=''>
+</span>84 <span style=''>    /**
+</span>85 <span style=''>     * Same as [[UnionType]] but saving the class’ simple name io. the
+</span>86 <span style=''>     * fully-qualified name.
+</span>87 <span style=''>     * @tparam Types to use in pattern matching. Listed in a "type list" \/
+</span>88 <span style=''>     */
+</span>89 <span style=''>    trait SimpleUnionType[Types <: \/[_, _]] extends UnionType[Types] with SaveSimpleName with Default
+</span>90 <span style=''>
+</span>91 <span style=''>    /**
+</span>92 <span style=''>     * Type for making type-level lists for UnionType.
+</span>93 <span style=''>     * If second parameter is another \/ it will be flattend out into a list
+</span>94 <span style=''>     * and so on. Using infix notation makes much more sense since it then
+</span>95 <span style=''>     * looks like a logical disjunction.
+</span>96 <span style=''>     *
+</span>97 <span style=''>     * `Foo \/ Bar \/ Baz` is interpreted as type Foo or type Bar or type Baz
+</span>98 <span style=''>     */
+</span>99 <span style=''>    trait \/[A, B]
+</span>100 <span style=''>
+</span>101 <span style=''>    /**
+</span>102 <span style=''>     * Similar to [[reactivemongo.bson.Macros.Options.UnionType]] but finds all
+</span>103 <span style=''>     * implementations of the top trait automatically.
+</span>104 <span style=''>     */
+</span>105 <span style=''>    @deprecated(message = "Default behaviour for sealed trait, if union types are not explicitly defined", since = "0.12-RC2")
+</span>106 <span style=''>    trait AllImplementations extends SaveClassName with Default
+</span>107 <span style=''>
+</span>108 <span style=''>    /**
+</span>109 <span style=''>     * Same as [[AllImplementations]] but saving the simple name
+</span>110 <span style=''>     * (e.g. the fully-qualified name).
+</span>111 <span style=''>     */
+</span>112 <span style=''>    @deprecated(message = "Default behaviour for sealed trait, if union types are not explicitly defined", since = "0.12-RC2")
+</span>113 <span style=''>    trait SimpleAllImplementations extends AllImplementations with SaveSimpleName with Default
+</span>114 <span style=''>  }
+</span>115 <span style=''>
+</span>116 <span style=''>  /** Annotations to use on case classes that are being processed by macros. */
+</span>117 <span style=''>  object Annotations {
+</span>118 <span style=''>    import scala.annotation.{ StaticAnnotation, meta }
+</span>119 <span style=''>
+</span>120 <span style=''>    /**
+</span>121 <span style=''>     * Specify a key different from field name in your case class.
+</span>122 <span style=''>     * Convenient to use when you'd like to leverage mongo's `_id` index
+</span>123 <span style=''>     * but don't want to actually use `_id` in your code.
+</span>124 <span style=''>     *
+</span>125 <span style=''>     * {{{
+</span>126 <span style=''>     * case class Website(@Key("_id") url: String)
+</span>127 <span style=''>     * }}}
+</span>128 <span style=''>     *
+</span>129 <span style=''>     * Generated handler will map the `url` field in your code
+</span>130 <span style=''>     * to `_id` field in BSON
+</span>131 <span style=''>     *
+</span>132 <span style=''>     * @param key the desired key to use in BSON
+</span>133 <span style=''>     */
+</span>134 <span style=''>    @meta.param
+</span>135 <span style=''>    case class Key(key: String) extends StaticAnnotation
+</span>136 <span style=''>
+</span>137 <span style=''>    /** Ignores a field */
+</span>138 <span style=''>    @meta.param
+</span>139 <span style=''>    case class Ignore() extends StaticAnnotation
+</span>140 <span style=''>  }
+</span>141 <span style=''>
+</span>142 <span style=''>  /** Only for internal purposes */
+</span>143 <span style=''>  final class Placeholder private () {}
+</span>144 <span style=''>
+</span>145 <span style=''>  /** Only for internal purposes */
+</span>146 <span style=''>  object Placeholder {
+</span>147 <span style=''>    private val instance = </span><span style='background: #F0ADAD'>new Placeholder()</span><span style=''>
+</span>148 <span style=''>
+</span>149 <span style=''>    implicit object Handler extends BSONHandler[BSONDocument, Placeholder] {
+</span>150 <span style=''>      def read(bson: BSONDocument) = </span><span style='background: #F0ADAD'>instance</span><span style=''>
+</span>151 <span style=''>      def write(pl: Placeholder) = </span><span style='background: #F0ADAD'>BSONDocument.empty</span><span style=''>
+</span>152 <span style=''>    }
+</span>153 <span style=''>  }
+</span>154 <span style=''>}
+</span></pre>
+          </div>
+          <div class="tab-pane" id="statementlist">
+            <table cellspacing="0" cellpadding="0" class="table statementlist">
+      <tr>
+        <th>Line</th>
+        <th>Stmt Id</th>
+        <th>Pos</th>
+        <th>Tree</th>
+        <th>Symbol</th>
+        <th>Code</th>
+      </tr><tr>
+        <td>
+          147
+        </td>
+        <td>
+          211
+        </td>
+        <td>
+          5488
+          -
+          5505
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          150
+        </td>
+        <td>
+          307
+        </td>
+        <td>
+          5621
+          -
+          5629
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          151
+        </td>
+        <td>
+          129
+        </td>
+        <td>
+          5665
+          -
+          5683
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr>
+    </table>
+          </div>
+        </div>
+      </body>
+    </html>

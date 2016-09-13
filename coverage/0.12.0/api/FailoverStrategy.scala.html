@@ -1,0 +1,788 @@
+<html>
+      <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+        <title id="title">
+          api/FailoverStrategy.scala.html
+        </title>
+        <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jquery.tablesorter/2.20.1/css/theme.default.min.css" type="text/css"/><script src="http://cdnjs.cloudflare.com/ajax/libs/jquery.tablesorter/2.20.1/js/jquery.tablesorter.min.js"></script><link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/css/bootstrap.min.css" type="text/css"/><script src="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/js/bootstrap.min.js"></script><script type="text/javascript">
+        $(document).ready(function() {$(".tablesorter").tablesorter();});
+      </script>
+        <style>
+          table.codegrid { font-family: monospace; font-size: 12px; width: auto!important; }table.statementlist { width: auto!important; font-size: 13px; } table.codegrid td { padding: 0!important; border: 0!important } table td.linenumber { width: 40px!important; } 
+        </style>
+      </head>
+      <body style="font-family: monospace;">
+        <ul class="nav nav-tabs">
+          <li>
+            <a href="#codegrid" data-toggle="tab">Codegrid</a>
+          </li>
+          <li>
+            <a href="#statementlist" data-toggle="tab">Statement List</a>
+          </li>
+        </ul>
+        <div class="tab-content">
+          <div class="tab-pane active" id="codegrid">
+            <pre style='font-size: 12pt; font-family: courier;'>1 <span style=''>package reactivemongo.api
+</span>2 <span style=''>
+</span>3 <span style=''>import scala.concurrent.duration.FiniteDuration
+</span>4 <span style=''>
+</span>5 <span style=''>/**
+</span>6 <span style=''> * A failover strategy for sending requests.
+</span>7 <span style=''> * The default uses 10 retries:
+</span>8 <span style=''> * 125ms, 250ms, 375ms, 500ms, 625ms, 750ms, 875ms, 1s, 1125ms, 1250ms
+</span>9 <span style=''> *
+</span>10 <span style=''> * @param initialDelay the initial delay between the first failed attempt and the next one.
+</span>11 <span style=''> * @param retries the number of retries to do before giving up.
+</span>12 <span style=''> * @param delayFactor a function that takes the current iteration and returns a factor to be applied to the initialDelay (default: [[FailoverStrategy.defaultFactor]])
+</span>13 <span style=''> */
+</span>14 <span style=''>case class FailoverStrategy(
+</span>15 <span style=''>    initialDelay: FiniteDuration = FiniteDuration(100, "ms"),
+</span>16 <span style=''>    retries: Int = 10,
+</span>17 <span style=''>    delayFactor: Int => Double = FailoverStrategy.defaultFactor
+</span>18 <span style=''>) {
+</span>19 <span style=''>
+</span>20 <span style=''>  override lazy val toString = </span><span style='background: #AEF1AE'>delayFactor</span><span style=''> match {
+</span>21 <span style=''>    case fn @ FailoverStrategy.FactorFun(_) =>
+</span>22 <span style=''>      </span><span style='background: #AEF1AE'>s"FailoverStrategy($initialDelay, $retries, $fn)"</span><span style=''>
+</span>23 <span style=''>
+</span>24 <span style=''>    case _ => </span><span style='background: #AEF1AE'>s"FailoverStrategy($initialDelay, $retries)"</span><span style=''>
+</span>25 <span style=''>  }
+</span>26 <span style=''>}
+</span>27 <span style=''>
+</span>28 <span style=''>object FailoverStrategy {
+</span>29 <span style=''>  /** The default strategy */
+</span>30 <span style=''>  val default = </span><span style='background: #AEF1AE'>FailoverStrategy()</span><span style=''>
+</span>31 <span style=''>
+</span>32 <span style=''>  /** The strategy when the MongoDB nodes are remote (with 16 retries) */
+</span>33 <span style=''>  val remote = </span><span style='background: #AEF1AE'>FailoverStrategy(retries = 16)</span><span style=''>
+</span>34 <span style=''>
+</span>35 <span style=''>  /** A more strict strategy: same as default but with less retries (=5). */
+</span>36 <span style=''>  val strict = </span><span style='background: #AEF1AE'>FailoverStrategy(retries = 5)</span><span style=''>
+</span>37 <span style=''>
+</span>38 <span style=''>  /** A factor function using simple multiplication. */
+</span>39 <span style=''>  case class FactorFun(multiplier: Double) extends (Int => Double) {
+</span>40 <span style=''>    /**
+</span>41 <span style=''>     * Returns the factor by which the initial delay must be multiplied,
+</span>42 <span style=''>     * for the current try.
+</span>43 <span style=''>     *
+</span>44 <span style=''>     * @param `try` the current number of tries
+</span>45 <span style=''>     */
+</span>46 <span style=''>    final def apply(`try`: Int): Double = </span><span style='background: #AEF1AE'>`try` * multiplier</span><span style=''>
+</span>47 <span style=''>
+</span>48 <span style=''>    override lazy val toString = </span><span style='background: #AEF1AE'>s"× $multiplier"</span><span style=''>
+</span>49 <span style=''>  }
+</span>50 <span style=''>
+</span>51 <span style=''>  /** The factor function for the default strategy: × 1.25 */
+</span>52 <span style=''>  @inline def defaultFactor = </span><span style='background: #AEF1AE'>FactorFun(1.25)</span><span style=''>
+</span>53 <span style=''>  // 'def' instead of 'val' as used in defaults of the case class
+</span>54 <span style=''>}
+</span></pre>
+          </div>
+          <div class="tab-pane" id="statementlist">
+            <table cellspacing="0" cellpadding="0" class="table statementlist">
+      <tr>
+        <th>Line</th>
+        <th>Stmt Id</th>
+        <th>Pos</th>
+        <th>Tree</th>
+        <th>Symbol</th>
+        <th>Code</th>
+      </tr><tr>
+        <td>
+          20
+        </td>
+        <td>
+          2749
+        </td>
+        <td>
+          772
+          -
+          783
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          22
+        </td>
+        <td>
+          6166
+        </td>
+        <td>
+          847
+          -
+          865
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          22
+        </td>
+        <td>
+          3521
+        </td>
+        <td>
+          845
+          -
+          894
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          22
+        </td>
+        <td>
+          3183
+        </td>
+        <td>
+          865
+          -
+          877
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          22
+        </td>
+        <td>
+          2961
+        </td>
+        <td>
+          892
+          -
+          894
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          22
+        </td>
+        <td>
+          2327
+        </td>
+        <td>
+          880
+          -
+          887
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          22
+        </td>
+        <td>
+          5120
+        </td>
+        <td>
+          887
+          -
+          890
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          22
+        </td>
+        <td>
+          5401
+        </td>
+        <td>
+          877
+          -
+          880
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          24
+        </td>
+        <td>
+          5009
+        </td>
+        <td>
+          912
+          -
+          930
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          24
+        </td>
+        <td>
+          6378
+        </td>
+        <td>
+          942
+          -
+          945
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          24
+        </td>
+        <td>
+          2308
+        </td>
+        <td>
+          952
+          -
+          954
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          24
+        </td>
+        <td>
+          3416
+        </td>
+        <td>
+          945
+          -
+          952
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          24
+        </td>
+        <td>
+          8398
+        </td>
+        <td>
+          910
+          -
+          954
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          24
+        </td>
+        <td>
+          2345
+        </td>
+        <td>
+          930
+          -
+          942
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          30
+        </td>
+        <td>
+          5628
+        </td>
+        <td>
+          1034
+          -
+          1034
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          30
+        </td>
+        <td>
+          7685
+        </td>
+        <td>
+          1034
+          -
+          1034
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          30
+        </td>
+        <td>
+          8797
+        </td>
+        <td>
+          1034
+          -
+          1034
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          30
+        </td>
+        <td>
+          3434
+        </td>
+        <td>
+          1034
+          -
+          1052
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          33
+        </td>
+        <td>
+          8590
+        </td>
+        <td>
+          1143
+          -
+          1173
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          33
+        </td>
+        <td>
+          9012
+        </td>
+        <td>
+          1143
+          -
+          1143
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          33
+        </td>
+        <td>
+          8291
+        </td>
+        <td>
+          1170
+          -
+          1172
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          33
+        </td>
+        <td>
+          7773
+        </td>
+        <td>
+          1143
+          -
+          1143
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          36
+        </td>
+        <td>
+          5735
+        </td>
+        <td>
+          1267
+          -
+          1296
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          36
+        </td>
+        <td>
+          5101
+        </td>
+        <td>
+          1294
+          -
+          1295
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          36
+        </td>
+        <td>
+          6392
+        </td>
+        <td>
+          1267
+          -
+          1267
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          36
+        </td>
+        <td>
+          7788
+        </td>
+        <td>
+          1267
+          -
+          1267
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          46
+        </td>
+        <td>
+          9055
+        </td>
+        <td>
+          1637
+          -
+          1655
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          46
+        </td>
+        <td>
+          5999
+        </td>
+        <td>
+          1645
+          -
+          1655
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          48
+        </td>
+        <td>
+          3069
+        </td>
+        <td>
+          1690
+          -
+          1706
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          48
+        </td>
+        <td>
+          3222
+        </td>
+        <td>
+          1705
+          -
+          1706
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          48
+        </td>
+        <td>
+          6642
+        </td>
+        <td>
+          1695
+          -
+          1705
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          48
+        </td>
+        <td>
+          9698
+        </td>
+        <td>
+          1692
+          -
+          1695
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          52
+        </td>
+        <td>
+          8383
+        </td>
+        <td>
+          1804
+          -
+          1819
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr>
+    </table>
+          </div>
+        </div>
+      </body>
+    </html>

@@ -1,0 +1,360 @@
+<html>
+      <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+        <title id="title">
+          api/commands/findandmodify.scala.html
+        </title>
+        <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jquery.tablesorter/2.20.1/css/theme.default.min.css" type="text/css"/><script src="http://cdnjs.cloudflare.com/ajax/libs/jquery.tablesorter/2.20.1/js/jquery.tablesorter.min.js"></script><link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/css/bootstrap.min.css" type="text/css"/><script src="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/js/bootstrap.min.js"></script><script type="text/javascript">
+        $(document).ready(function() {$(".tablesorter").tablesorter();});
+      </script>
+        <style>
+          table.codegrid { font-family: monospace; font-size: 12px; width: auto!important; }table.statementlist { width: auto!important; font-size: 13px; } table.codegrid td { padding: 0!important; border: 0!important } table td.linenumber { width: 40px!important; } 
+        </style>
+      </head>
+      <body style="font-family: monospace;">
+        <ul class="nav nav-tabs">
+          <li>
+            <a href="#codegrid" data-toggle="tab">Codegrid</a>
+          </li>
+          <li>
+            <a href="#statementlist" data-toggle="tab">Statement List</a>
+          </li>
+        </ul>
+        <div class="tab-content">
+          <div class="tab-pane active" id="codegrid">
+            <pre style='font-size: 12pt; font-family: courier;'>1 <span style=''>package reactivemongo.api.commands
+</span>2 <span style=''>
+</span>3 <span style=''>import reactivemongo.api.SerializationPack
+</span>4 <span style=''>
+</span>5 <span style=''>trait FindAndModifyCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] {
+</span>6 <span style=''>  import pack._
+</span>7 <span style=''>
+</span>8 <span style=''>  case class FindAndModify(
+</span>9 <span style=''>      query: Document,
+</span>10 <span style=''>      modify: Modify,
+</span>11 <span style=''>      sort: Option[Document],
+</span>12 <span style=''>      fields: Option[Document]
+</span>13 <span style=''>  ) extends CollectionCommand with CommandWithPack[P] with CommandWithResult[FindAndModifyResult] {
+</span>14 <span style=''>    def upsert = </span><span style='background: #F0ADAD'>modify.upsert</span><span style=''>
+</span>15 <span style=''>  }
+</span>16 <span style=''>
+</span>17 <span style=''>  object FindAndModify {
+</span>18 <span style=''>    def apply(query: ImplicitlyDocumentProducer, modify: Modify, sort: Option[ImplicitlyDocumentProducer] = None, fields: Option[ImplicitlyDocumentProducer] = None): FindAndModify =
+</span>19 <span style=''>      </span><span style='background: #AEF1AE'>FindAndModify(
+</span>20 <span style=''></span><span style='background: #AEF1AE'>        query.produce,
+</span>21 <span style=''></span><span style='background: #AEF1AE'>        modify,
+</span>22 <span style=''></span><span style='background: #AEF1AE'>        sort.map(</span><span style='background: #F0ADAD'>_.produce</span><span style='background: #AEF1AE'>),
+</span>23 <span style=''></span><span style='background: #AEF1AE'>        fields.map(</span><span style='background: #F0ADAD'>_.produce</span><span style='background: #AEF1AE'>)
+</span>24 <span style=''></span><span style='background: #AEF1AE'>      )</span><span style=''>
+</span>25 <span style=''>  }
+</span>26 <span style=''>
+</span>27 <span style=''>  /** A modify operation, part of a FindAndModify command */
+</span>28 <span style=''>  sealed trait Modify {
+</span>29 <span style=''>    /** Only for the [[Update]] modifier */
+</span>30 <span style=''>    def upsert = </span><span style='background: #F0ADAD'>false</span><span style=''>
+</span>31 <span style=''>  }
+</span>32 <span style=''>
+</span>33 <span style=''>  /**
+</span>34 <span style=''>   * Update (part of a FindAndModify command).
+</span>35 <span style=''>   *
+</span>36 <span style=''>   * @param update the modifier document.
+</span>37 <span style=''>   * @param fetchNewObject the command result must be the new object instead of the old one.
+</span>38 <span style=''>   * @param upsert if true, creates a new document if no document matches the query, or if documents match the query, findAndModify performs an update
+</span>39 <span style=''>   */
+</span>40 <span style=''>  case class Update(
+</span>41 <span style=''>    update: Document,
+</span>42 <span style=''>    fetchNewObject: Boolean,
+</span>43 <span style=''>    override val upsert: Boolean
+</span>44 <span style=''>  ) extends Modify
+</span>45 <span style=''>
+</span>46 <span style=''>  object Update {
+</span>47 <span style=''>    def apply(update: ImplicitlyDocumentProducer, fetchNewObject: Boolean = false, upsert: Boolean = false): Update = </span><span style='background: #AEF1AE'>Update(update.produce, fetchNewObject, upsert)</span><span style=''>
+</span>48 <span style=''>  }
+</span>49 <span style=''>
+</span>50 <span style=''>  /** Remove (part of a FindAndModify command). */
+</span>51 <span style=''>  object Remove extends Modify
+</span>52 <span style=''>
+</span>53 <span style=''>  case class UpdateLastError(
+</span>54 <span style=''>    updatedExisting: Boolean,
+</span>55 <span style=''>    upsertedId: Option[Any], // TODO. It is the id of the upserted value
+</span>56 <span style=''>    n: Int,
+</span>57 <span style=''>    err: Option[String]
+</span>58 <span style=''>  )
+</span>59 <span style=''>
+</span>60 <span style=''>  case class FindAndModifyResult(
+</span>61 <span style=''>      lastError: Option[UpdateLastError],
+</span>62 <span style=''>      value: Option[Document]
+</span>63 <span style=''>  ) {
+</span>64 <span style=''>    def result[R](implicit reader: Reader[R]): Option[R] =
+</span>65 <span style=''>      </span><span style='background: #AEF1AE'>value.map(pack.deserialize(_, reader))</span><span style=''>
+</span>66 <span style=''>  }
+</span>67 <span style=''>}
+</span></pre>
+          </div>
+          <div class="tab-pane" id="statementlist">
+            <table cellspacing="0" cellpadding="0" class="table statementlist">
+      <tr>
+        <th>Line</th>
+        <th>Stmt Id</th>
+        <th>Pos</th>
+        <th>Tree</th>
+        <th>Symbol</th>
+        <th>Code</th>
+      </tr><tr>
+        <td>
+          14
+        </td>
+        <td>
+          4490
+        </td>
+        <td>
+          435
+          -
+          448
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          19
+        </td>
+        <td>
+          3626
+        </td>
+        <td>
+          667
+          -
+          787
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          20
+        </td>
+        <td>
+          4052
+        </td>
+        <td>
+          690
+          -
+          703
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          22
+        </td>
+        <td>
+          10317
+        </td>
+        <td>
+          738
+          -
+          747
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          22
+        </td>
+        <td>
+          7577
+        </td>
+        <td>
+          729
+          -
+          748
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          23
+        </td>
+        <td>
+          9471
+        </td>
+        <td>
+          769
+          -
+          778
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          23
+        </td>
+        <td>
+          6959
+        </td>
+        <td>
+          758
+          -
+          779
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          30
+        </td>
+        <td>
+          4477
+        </td>
+        <td>
+          939
+          -
+          944
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          47
+        </td>
+        <td>
+          9542
+        </td>
+        <td>
+          1561
+          -
+          1607
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          47
+        </td>
+        <td>
+          9661
+        </td>
+        <td>
+          1568
+          -
+          1582
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          65
+        </td>
+        <td>
+          10213
+        </td>
+        <td>
+          2057
+          -
+          2084
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          65
+        </td>
+        <td>
+          5111
+        </td>
+        <td>
+          2047
+          -
+          2085
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr>
+    </table>
+          </div>
+        </div>
+      </body>
+    </html>

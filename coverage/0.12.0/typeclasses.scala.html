@@ -1,0 +1,914 @@
+<html>
+      <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+        <title id="title">
+          typeclasses.scala.html
+        </title>
+        <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jquery.tablesorter/2.20.1/css/theme.default.min.css" type="text/css"/><script src="http://cdnjs.cloudflare.com/ajax/libs/jquery.tablesorter/2.20.1/js/jquery.tablesorter.min.js"></script><link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/css/bootstrap.min.css" type="text/css"/><script src="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/js/bootstrap.min.js"></script><script type="text/javascript">
+        $(document).ready(function() {$(".tablesorter").tablesorter();});
+      </script>
+        <style>
+          table.codegrid { font-family: monospace; font-size: 12px; width: auto!important; }table.statementlist { width: auto!important; font-size: 13px; } table.codegrid td { padding: 0!important; border: 0!important } table td.linenumber { width: 40px!important; } 
+        </style>
+      </head>
+      <body style="font-family: monospace;">
+        <ul class="nav nav-tabs">
+          <li>
+            <a href="#codegrid" data-toggle="tab">Codegrid</a>
+          </li>
+          <li>
+            <a href="#statementlist" data-toggle="tab">Statement List</a>
+          </li>
+        </ul>
+        <div class="tab-content">
+          <div class="tab-pane active" id="codegrid">
+            <pre style='font-size: 12pt; font-family: courier;'>1 <span style=''>/*
+</span>2 <span style=''> * Copyright 2013 Stephane Godbillon (@sgodbillon)
+</span>3 <span style=''> *
+</span>4 <span style=''> * Licensed under the Apache License, Version 2.0 (the "License");
+</span>5 <span style=''> * you may not use this file except in compliance with the License.
+</span>6 <span style=''> * You may obtain a copy of the License at
+</span>7 <span style=''> *
+</span>8 <span style=''> *   http://www.apache.org/licenses/LICENSE-2.0
+</span>9 <span style=''> *
+</span>10 <span style=''> * Unless required by applicable law or agreed to in writing, software
+</span>11 <span style=''> * distributed under the License is distributed on an "AS IS" BASIS,
+</span>12 <span style=''> * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+</span>13 <span style=''> * See the License for the specific language governing permissions and
+</span>14 <span style=''> * limitations under the License.
+</span>15 <span style=''> */
+</span>16 <span style=''>package reactivemongo.bson
+</span>17 <span style=''>
+</span>18 <span style=''>import scala.math.Numeric
+</span>19 <span style=''>
+</span>20 <span style=''>sealed trait BSONNumberLikeClass[B <: BSONValue] extends BSONNumberLike
+</span>21 <span style=''>
+</span>22 <span style=''>/**
+</span>23 <span style=''> * A BSON value that can be seen as a number.
+</span>24 <span style=''> *
+</span>25 <span style=''> * Conversions:
+</span>26 <span style=''> *   - [[BSONLong]]
+</span>27 <span style=''> *   - [[BSONInteger]]
+</span>28 <span style=''> *   - [[BSONDouble]]
+</span>29 <span style=''> */
+</span>30 <span style=''>sealed trait BSONNumberLike { self: BSONNumberLikeClass[_] =>
+</span>31 <span style=''>  private[bson] def underlying: BSONValue
+</span>32 <span style=''>
+</span>33 <span style=''>  /** Converts this number into an `Int`. */
+</span>34 <span style=''>  def toInt: Int
+</span>35 <span style=''>
+</span>36 <span style=''>  /** Converts this number into a `Long`. */
+</span>37 <span style=''>  def toLong: Long
+</span>38 <span style=''>
+</span>39 <span style=''>  /** Converts this number into a `Float`. */
+</span>40 <span style=''>  def toFloat: Float
+</span>41 <span style=''>
+</span>42 <span style=''>  /** Converts this number into a `Double`. */
+</span>43 <span style=''>  def toDouble: Double
+</span>44 <span style=''>}
+</span>45 <span style=''>
+</span>46 <span style=''>private[bson] sealed trait HasNumeric[A] {
+</span>47 <span style=''>  private[bson] def number: ExtendedNumeric[A]
+</span>48 <span style=''>}
+</span>49 <span style=''>
+</span>50 <span style=''>private[bson] sealed trait IsNumeric[A] extends HasNumeric[A] {
+</span>51 <span style=''>  def toInt = </span><span style='background: #AEF1AE'>number.numeric.toInt(number.value)</span><span style=''>
+</span>52 <span style=''>  def toLong = </span><span style='background: #AEF1AE'>number.numeric.toLong(number.value)</span><span style=''>
+</span>53 <span style=''>  def toFloat = </span><span style='background: #AEF1AE'>number.numeric.toFloat(number.value)</span><span style=''>
+</span>54 <span style=''>  def toDouble = </span><span style='background: #AEF1AE'>number.numeric.toDouble(number.value)</span><span style=''>
+</span>55 <span style=''>}
+</span>56 <span style=''>
+</span>57 <span style=''>private[bson] sealed trait IsBooleanLike[A] extends HasNumeric[A] {
+</span>58 <span style=''>  def toBoolean: Boolean = </span><span style='background: #AEF1AE'>number.numeric.compare(number.value, number.numeric.zero) != 0</span><span style=''>
+</span>59 <span style=''>}
+</span>60 <span style=''>
+</span>61 <span style=''>private[bson] case class ExtendedNumeric[A](value: A)(implicit val numeric: Numeric[A]) {}
+</span>62 <span style=''>
+</span>63 <span style=''>object BSONNumberLike {
+</span>64 <span style=''>  implicit class BSONIntegerNumberLike(private[bson] val underlying: BSONInteger) extends BSONNumberLikeClass[BSONInteger] with IsNumeric[Int] {
+</span>65 <span style=''>    private[bson] lazy val number = </span><span style='background: #AEF1AE'>ExtendedNumeric(underlying.value)</span><span style=''>
+</span>66 <span style=''>  }
+</span>67 <span style=''>  implicit class BSONDoubleNumberLike(private[bson] val underlying: BSONDouble) extends BSONNumberLikeClass[BSONDouble] with IsNumeric[Double] {
+</span>68 <span style=''>    private[bson] lazy val number = </span><span style='background: #AEF1AE'>ExtendedNumeric(underlying.value)</span><span style=''>
+</span>69 <span style=''>  }
+</span>70 <span style=''>  implicit class BSONLongNumberLike(private[bson] val underlying: BSONLong) extends BSONNumberLikeClass[BSONLong] with IsNumeric[Long] {
+</span>71 <span style=''>    private[bson] lazy val number = </span><span style='background: #AEF1AE'>ExtendedNumeric(underlying.value)</span><span style=''>
+</span>72 <span style=''>  }
+</span>73 <span style=''>  implicit class BSONDateTimeNumberLike(private[bson] val underlying: BSONDateTime) extends BSONNumberLikeClass[BSONDateTime] with IsNumeric[Long] {
+</span>74 <span style=''>    private[bson] lazy val number = </span><span style='background: #AEF1AE'>ExtendedNumeric(underlying.value)</span><span style=''>
+</span>75 <span style=''>  }
+</span>76 <span style=''>  implicit class BSONTimestampNumberLike(private[bson] val underlying: BSONTimestamp) extends BSONNumberLikeClass[BSONTimestamp] with IsNumeric[Long] {
+</span>77 <span style=''>    private[bson] lazy val number = </span><span style='background: #AEF1AE'>ExtendedNumeric(underlying.value * 1000L)</span><span style=''>
+</span>78 <span style=''>  }
+</span>79 <span style=''>}
+</span>80 <span style=''>
+</span>81 <span style=''>/**
+</span>82 <span style=''> * A BSON value that can be seen as a boolean.
+</span>83 <span style=''> *
+</span>84 <span style=''> * Conversions:
+</span>85 <span style=''> *   - `number = 0 ~> false`
+</span>86 <span style=''> *   - `number != 0 ~> true`
+</span>87 <span style=''> *   - `boolean`
+</span>88 <span style=''> *   - `undefined ~> false`
+</span>89 <span style=''> *   - `null ~> false`
+</span>90 <span style=''> */
+</span>91 <span style=''>sealed trait BSONBooleanLike { self: BSONBooleanLikeClass[_] =>
+</span>92 <span style=''>  private[bson] def underlying: BSONValue
+</span>93 <span style=''>  /** Returns the boolean equivalent value */
+</span>94 <span style=''>  def toBoolean: Boolean
+</span>95 <span style=''>}
+</span>96 <span style=''>sealed trait BSONBooleanLikeClass[B <: BSONValue] extends BSONBooleanLike
+</span>97 <span style=''>
+</span>98 <span style=''>object BSONBooleanLike {
+</span>99 <span style=''>  implicit class BSONBooleanBooleanLike(private[bson] val underlying: BSONBoolean) extends BSONBooleanLikeClass[BSONBoolean] {
+</span>100 <span style=''>    def toBoolean = </span><span style='background: #AEF1AE'>underlying.value</span><span style=''>
+</span>101 <span style=''>  }
+</span>102 <span style=''>  implicit class BSONNullBooleanLike(private[bson] val underlying: BSONNull.type) extends BSONBooleanLikeClass[BSONNull.type] {
+</span>103 <span style=''>    val toBoolean = </span><span style='background: #AEF1AE'>false</span><span style=''>
+</span>104 <span style=''>  }
+</span>105 <span style=''>  implicit class BSONUndefinedBooleanLike(private[bson] val underlying: BSONUndefined.type) extends BSONBooleanLikeClass[BSONUndefined.type] {
+</span>106 <span style=''>    val toBoolean = </span><span style='background: #AEF1AE'>false</span><span style=''>
+</span>107 <span style=''>  }
+</span>108 <span style=''>  implicit class BSONIntegerBooleanLike(private[bson] val underlying: BSONInteger) extends BSONBooleanLikeClass[BSONInteger] with IsBooleanLike[Int] {
+</span>109 <span style=''>    private[bson] lazy val number = </span><span style='background: #AEF1AE'>ExtendedNumeric(underlying.value)</span><span style=''>
+</span>110 <span style=''>  }
+</span>111 <span style=''>  implicit class BSONDoubleBooleanLike(private[bson] val underlying: BSONDouble) extends BSONBooleanLikeClass[BSONDouble] with IsBooleanLike[Double] {
+</span>112 <span style=''>    private[bson] lazy val number = </span><span style='background: #AEF1AE'>ExtendedNumeric(underlying.value)</span><span style=''>
+</span>113 <span style=''>  }
+</span>114 <span style=''>  implicit class BSONLongBooleanLike(private[bson] val underlying: BSONLong) extends BSONBooleanLikeClass[BSONDouble] with IsBooleanLike[Long] {
+</span>115 <span style=''>    private[bson] lazy val number = </span><span style='background: #AEF1AE'>ExtendedNumeric(underlying.value)</span><span style=''>
+</span>116 <span style=''>  }
+</span>117 <span style=''>}
+</span></pre>
+          </div>
+          <div class="tab-pane" id="statementlist">
+            <table cellspacing="0" cellpadding="0" class="table statementlist">
+      <tr>
+        <th>Line</th>
+        <th>Stmt Id</th>
+        <th>Pos</th>
+        <th>Tree</th>
+        <th>Symbol</th>
+        <th>Code</th>
+      </tr><tr>
+        <td>
+          51
+        </td>
+        <td>
+          1294
+        </td>
+        <td>
+          1446
+          -
+          1458
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          51
+        </td>
+        <td>
+          1744
+        </td>
+        <td>
+          1425
+          -
+          1459
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          52
+        </td>
+        <td>
+          563
+        </td>
+        <td>
+          1497
+          -
+          1509
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          52
+        </td>
+        <td>
+          780
+        </td>
+        <td>
+          1475
+          -
+          1510
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          53
+        </td>
+        <td>
+          1209
+        </td>
+        <td>
+          1550
+          -
+          1562
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          53
+        </td>
+        <td>
+          924
+        </td>
+        <td>
+          1527
+          -
+          1563
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          54
+        </td>
+        <td>
+          1683
+        </td>
+        <td>
+          1605
+          -
+          1617
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          54
+        </td>
+        <td>
+          899
+        </td>
+        <td>
+          1581
+          -
+          1618
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          58
+        </td>
+        <td>
+          1698
+        </td>
+        <td>
+          1717
+          -
+          1779
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          65
+        </td>
+        <td>
+          1528
+        </td>
+        <td>
+          2095
+          -
+          2095
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          65
+        </td>
+        <td>
+          815
+        </td>
+        <td>
+          2080
+          -
+          2113
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          65
+        </td>
+        <td>
+          1298
+        </td>
+        <td>
+          2096
+          -
+          2112
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          68
+        </td>
+        <td>
+          772
+        </td>
+        <td>
+          2315
+          -
+          2331
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          68
+        </td>
+        <td>
+          1597
+        </td>
+        <td>
+          2299
+          -
+          2332
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          68
+        </td>
+        <td>
+          1280
+        </td>
+        <td>
+          2314
+          -
+          2314
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          71
+        </td>
+        <td>
+          1100
+        </td>
+        <td>
+          2525
+          -
+          2525
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          71
+        </td>
+        <td>
+          663
+        </td>
+        <td>
+          2526
+          -
+          2542
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          71
+        </td>
+        <td>
+          1633
+        </td>
+        <td>
+          2510
+          -
+          2543
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          74
+        </td>
+        <td>
+          1664
+        </td>
+        <td>
+          2733
+          -
+          2766
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          74
+        </td>
+        <td>
+          898
+        </td>
+        <td>
+          2749
+          -
+          2765
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          74
+        </td>
+        <td>
+          1340
+        </td>
+        <td>
+          2748
+          -
+          2748
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          77
+        </td>
+        <td>
+          1687
+        </td>
+        <td>
+          2974
+          -
+          2974
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          77
+        </td>
+        <td>
+          685
+        </td>
+        <td>
+          2959
+          -
+          3000
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          77
+        </td>
+        <td>
+          1166
+        </td>
+        <td>
+          2975
+          -
+          2999
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          100
+        </td>
+        <td>
+          1510
+        </td>
+        <td>
+          3634
+          -
+          3650
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          103
+        </td>
+        <td>
+          1634
+        </td>
+        <td>
+          3803
+          -
+          3808
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          106
+        </td>
+        <td>
+          1644
+        </td>
+        <td>
+          3976
+          -
+          3981
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          109
+        </td>
+        <td>
+          1655
+        </td>
+        <td>
+          4173
+          -
+          4206
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          109
+        </td>
+        <td>
+          901
+        </td>
+        <td>
+          4189
+          -
+          4205
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          109
+        </td>
+        <td>
+          1107
+        </td>
+        <td>
+          4188
+          -
+          4188
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          112
+        </td>
+        <td>
+          1669
+        </td>
+        <td>
+          4414
+          -
+          4430
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          112
+        </td>
+        <td>
+          849
+        </td>
+        <td>
+          4413
+          -
+          4413
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          112
+        </td>
+        <td>
+          1220
+        </td>
+        <td>
+          4398
+          -
+          4431
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          115
+        </td>
+        <td>
+          1730
+        </td>
+        <td>
+          4617
+          -
+          4650
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          115
+        </td>
+        <td>
+          946
+        </td>
+        <td>
+          4633
+          -
+          4649
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          115
+        </td>
+        <td>
+          1415
+        </td>
+        <td>
+          4632
+          -
+          4632
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr>
+    </table>
+          </div>
+        </div>
+      </body>
+    </html>

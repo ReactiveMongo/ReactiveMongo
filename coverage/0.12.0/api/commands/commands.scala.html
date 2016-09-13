@@ -1,0 +1,2223 @@
+<html>
+      <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+        <title id="title">
+          api/commands/commands.scala.html
+        </title>
+        <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jquery.tablesorter/2.20.1/css/theme.default.min.css" type="text/css"/><script src="http://cdnjs.cloudflare.com/ajax/libs/jquery.tablesorter/2.20.1/js/jquery.tablesorter.min.js"></script><link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/css/bootstrap.min.css" type="text/css"/><script src="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/js/bootstrap.min.js"></script><script type="text/javascript">
+        $(document).ready(function() {$(".tablesorter").tablesorter();});
+      </script>
+        <style>
+          table.codegrid { font-family: monospace; font-size: 12px; width: auto!important; }table.statementlist { width: auto!important; font-size: 13px; } table.codegrid td { padding: 0!important; border: 0!important } table td.linenumber { width: 40px!important; } 
+        </style>
+      </head>
+      <body style="font-family: monospace;">
+        <ul class="nav nav-tabs">
+          <li>
+            <a href="#codegrid" data-toggle="tab">Codegrid</a>
+          </li>
+          <li>
+            <a href="#statementlist" data-toggle="tab">Statement List</a>
+          </li>
+        </ul>
+        <div class="tab-content">
+          <div class="tab-pane active" id="codegrid">
+            <pre style='font-size: 12pt; font-family: courier;'>1 <span style=''>package reactivemongo.api.commands
+</span>2 <span style=''>
+</span>3 <span style=''>import scala.concurrent.{ ExecutionContext, Future }
+</span>4 <span style=''>import scala.util.control.NoStackTrace
+</span>5 <span style=''>
+</span>6 <span style=''>import reactivemongo.api.{
+</span>7 <span style=''>  Cursor,
+</span>8 <span style=''>  SerializationPack,
+</span>9 <span style=''>  DB,
+</span>10 <span style=''>  Collection
+</span>11 <span style=''>}
+</span>12 <span style=''>import reactivemongo.core.protocol.Response
+</span>13 <span style=''>import reactivemongo.core.errors.ReactiveMongoException
+</span>14 <span style=''>
+</span>15 <span style=''>sealed trait AbstractCommand
+</span>16 <span style=''>
+</span>17 <span style=''>trait Command extends AbstractCommand
+</span>18 <span style=''>trait CollectionCommand extends AbstractCommand
+</span>19 <span style=''>
+</span>20 <span style=''>trait CommandWithResult[R] { self: AbstractCommand => }
+</span>21 <span style=''>trait CommandWithPack[P <: SerializationPack] { self: AbstractCommand => }
+</span>22 <span style=''>
+</span>23 <span style=''>trait BoxedAnyVal[A <: AnyVal] {
+</span>24 <span style=''>  def value: A
+</span>25 <span style=''>}
+</span>26 <span style=''>
+</span>27 <span style=''>/**
+</span>28 <span style=''> * @param response the response associated with the result
+</span>29 <span style=''> * @param numberToReturn the number of documents to return
+</span>30 <span style=''> * @param value the value parsed from the response
+</span>31 <span style=''> */
+</span>32 <span style=''>case class ResponseResult[R](
+</span>33 <span style=''>  response: Response,
+</span>34 <span style=''>  numberToReturn: Int,
+</span>35 <span style=''>  value: R
+</span>36 <span style=''>)
+</span>37 <span style=''>
+</span>38 <span style=''>/** Base definition for all the errors for the command execution errors. */
+</span>39 <span style=''>trait CommandError extends Exception with NoStackTrace {
+</span>40 <span style=''>  /** The error code */
+</span>41 <span style=''>  def code: Option[Int]
+</span>42 <span style=''>
+</span>43 <span style=''>  /** The error message */
+</span>44 <span style=''>  def errmsg: Option[String]
+</span>45 <span style=''>
+</span>46 <span style=''>  override def getMessage = </span><span style='background: #F0ADAD'>s"CommandError[code=${code.getOrElse("<unknown>")}, errmsg=${errmsg.getOrElse("<unknown>")}]"</span><span style=''>
+</span>47 <span style=''>}
+</span>48 <span style=''>
+</span>49 <span style=''>object CommandError {
+</span>50 <span style=''>  /**
+</span>51 <span style=''>   * Pattern matching extractor for the error code.
+</span>52 <span style=''>   *
+</span>53 <span style=''>   * {{{
+</span>54 <span style=''>   * import reactivemongo.api.commands.CommandError
+</span>55 <span style=''>   *
+</span>56 <span style=''>   * def testError(err: CommandError): String = err match {
+</span>57 <span style=''>   *   case CommandError.Code(code) => s"hasCode: \$code"
+</span>58 <span style=''>   *   case _ => "no-code"
+</span>59 <span style=''>   * }
+</span>60 <span style=''>   * }}}
+</span>61 <span style=''>   */
+</span>62 <span style=''>  object Code {
+</span>63 <span style=''>    def unapply(err: CommandError): Option[Int] = </span><span style='background: #AEF1AE'>err.code</span><span style=''>
+</span>64 <span style=''>  }
+</span>65 <span style=''>
+</span>66 <span style=''>  /**
+</span>67 <span style=''>   * Pattern matching extractor for the error message.
+</span>68 <span style=''>   *
+</span>69 <span style=''>   * {{{
+</span>70 <span style=''>   * import reactivemongo.api.commands.CommandError
+</span>71 <span style=''>   *
+</span>72 <span style=''>   * def testError(err: CommandError): String = err match {
+</span>73 <span style=''>   *   case CommandError.Message(msg) => s"hasMessage: \$msg"
+</span>74 <span style=''>   *   case _ => "no-message"
+</span>75 <span style=''>   * }
+</span>76 <span style=''>   * }}}
+</span>77 <span style=''>   */
+</span>78 <span style=''>  object Message {
+</span>79 <span style=''>    def unapply(err: CommandError): Option[String] = </span><span style='background: #F0ADAD'>err.errmsg</span><span style=''>
+</span>80 <span style=''>  }
+</span>81 <span style=''>}
+</span>82 <span style=''>
+</span>83 <span style=''>/**
+</span>84 <span style=''> * Fetches a cursor from MongoDB results.
+</span>85 <span style=''> * @tparam P the type of the serialization pack
+</span>86 <span style=''> * @tparam C the type of the cursor implementation
+</span>87 <span style=''> */
+</span>88 <span style=''>trait CursorFetcher[P <: SerializationPack, +C[_] <: Cursor[_]] {
+</span>89 <span style=''>  val pack: P
+</span>90 <span style=''>  def one[A](implicit reader: pack.Reader[A], ec: ExecutionContext): Future[A]
+</span>91 <span style=''>  def cursor[A](implicit reader: pack.Reader[A]): C[A]
+</span>92 <span style=''>}
+</span>93 <span style=''>
+</span>94 <span style=''>/**
+</span>95 <span style=''> * @param cursorId the ID of the cursor
+</span>96 <span style=''> * @param fullCollectionName the namespace of the collection
+</span>97 <span style=''> */
+</span>98 <span style=''>case class ResultCursor(cursorId: Long, fullCollectionName: String)
+</span>99 <span style=''>
+</span>100 <span style=''>trait ImplicitCommandHelpers[P <: SerializationPack] {
+</span>101 <span style=''>  val pack: P
+</span>102 <span style=''>
+</span>103 <span style=''>  trait ImplicitlyDocumentProducer {
+</span>104 <span style=''>    def produce: pack.Document
+</span>105 <span style=''>  }
+</span>106 <span style=''>
+</span>107 <span style=''>  object ImplicitlyDocumentProducer {
+</span>108 <span style=''>    implicit def producer[A](a: A)(implicit writer: pack.Writer[A]): ImplicitlyDocumentProducer = </span><span style='background: #AEF1AE'>new</span><span style=''> ImplicitlyDocumentProducer {
+</span>109 <span style=''>      def produce = </span><span style='background: #AEF1AE'>pack.serialize(a, writer)</span><span style=''>
+</span>110 <span style=''>    }
+</span>111 <span style=''>  }
+</span>112 <span style=''>}
+</span>113 <span style=''>
+</span>114 <span style=''>object UnitBox extends BoxedAnyVal[Unit] {
+</span>115 <span style=''>  def value: Unit = </span><span style='background: #AEF1AE'>()</span><span style=''>
+</span>116 <span style=''>}
+</span>117 <span style=''>
+</span>118 <span style=''>object Command {
+</span>119 <span style=''>  import reactivemongo.api.{
+</span>120 <span style=''>    DefaultCursor,
+</span>121 <span style=''>    Failover2,
+</span>122 <span style=''>    FailoverStrategy,
+</span>123 <span style=''>    ReadPreference
+</span>124 <span style=''>  }
+</span>125 <span style=''>  import reactivemongo.core.actors.RequestMakerExpectingResponse
+</span>126 <span style=''>  import reactivemongo.bson.lowlevel.LoweLevelDocumentIterator
+</span>127 <span style=''>  import reactivemongo.core.netty.{
+</span>128 <span style=''>    BufferSequence,
+</span>129 <span style=''>    ChannelBufferReadableBuffer,
+</span>130 <span style=''>    ChannelBufferWritableBuffer
+</span>131 <span style=''>  }
+</span>132 <span style=''>  import reactivemongo.core.protocol.{
+</span>133 <span style=''>    RequestMaker,
+</span>134 <span style=''>    Query,
+</span>135 <span style=''>    QueryFlags
+</span>136 <span style=''>  }
+</span>137 <span style=''>
+</span>138 <span style=''>  def defaultCursorFetcher[P <: SerializationPack, A](db: DB, p: P, command: A, failover: FailoverStrategy)(implicit writer: p.Writer[A]): CursorFetcher[p.type, DefaultCursor.Impl] = </span><span style='background: #AEF1AE'>new</span><span style=''> CursorFetcher[p.type, DefaultCursor.Impl] {
+</span>139 <span style=''>    val pack: p.type = p
+</span>140 <span style=''>
+</span>141 <span style=''>    @inline private def defaultReadPreference: ReadPreference =
+</span>142 <span style=''>      </span><span style='background: #AEF1AE'>db.connection.options.readPreference</span><span style=''>
+</span>143 <span style=''>
+</span>144 <span style=''>    def one[A](readPreference: ReadPreference)(implicit reader: pack.Reader[A], ec: ExecutionContext): Future[A] = {
+</span>145 <span style=''>      val (requestMaker, m26WriteCommand) =
+</span>146 <span style=''>        buildRequestMaker(pack)(command, writer, readPreference, db.name)
+</span>147 <span style=''>
+</span>148 <span style=''>      </span><span style='background: #AEF1AE'>Failover2(db.connection, failover) { () =>
+</span>149 <span style=''></span><span style='background: #AEF1AE'>        db.connection.sendExpectingResponse(requestMaker, m26WriteCommand)
+</span>150 <span style=''></span><span style='background: #AEF1AE'>      }.future.map { response =>
+</span>151 <span style=''></span><span style='background: #AEF1AE'>        pack.readAndDeserialize(
+</span>152 <span style=''></span><span style='background: #AEF1AE'>          LoweLevelDocumentIterator(ChannelBufferReadableBuffer(
+</span>153 <span style=''></span><span style='background: #AEF1AE'>          response.documents
+</span>154 <span style=''></span><span style='background: #AEF1AE'>        )).next, reader
+</span>155 <span style=''></span><span style='background: #AEF1AE'>        )
+</span>156 <span style=''></span><span style='background: #AEF1AE'>
+</span>157 <span style=''></span><span style='background: #AEF1AE'>      }</span><span style=''>
+</span>158 <span style=''>    }
+</span>159 <span style=''>
+</span>160 <span style=''>    def one[A](implicit reader: pack.Reader[A], ec: ExecutionContext): Future[A] = </span><span style='background: #AEF1AE'>one[A](defaultReadPreference)</span><span style=''>
+</span>161 <span style=''>
+</span>162 <span style=''>    def cursor[A](readPreference: ReadPreference)(implicit reader: pack.Reader[A]): DefaultCursor.Impl[A] = {
+</span>163 <span style=''>      val buffer = </span><span style='background: #AEF1AE'>ChannelBufferWritableBuffer()</span><span style=''>
+</span>164 <span style=''>      </span><span style='background: #AEF1AE'>pack.serializeAndWrite(buffer, command, writer)</span><span style=''>
+</span>165 <span style=''>
+</span>166 <span style=''>      val bs = </span><span style='background: #AEF1AE'>BufferSequence(buffer.buffer)</span><span style=''>
+</span>167 <span style=''>      val flags = if (</span><span style='background: #AEF1AE'>readPreference.slaveOk</span><span style=''>) </span><span style='background: #F0ADAD'>QueryFlags.SlaveOk</span><span style=''> else </span><span style='background: #AEF1AE'>0</span><span style=''>
+</span>168 <span style=''>      val op = </span><span style='background: #AEF1AE'>Query(flags, db.name + ".$cmd", 0, 1)</span><span style=''>
+</span>169 <span style=''>      val mongo26WriteCommand = command match {
+</span>170 <span style=''>        case _: Mongo26WriteCommand => </span><span style='background: #F0ADAD'>true</span><span style=''>
+</span>171 <span style=''>        case _                      => </span><span style='background: #AEF1AE'>false</span><span style=''>
+</span>172 <span style=''>      }
+</span>173 <span style=''>
+</span>174 <span style=''>      </span><span style='background: #AEF1AE'>DefaultCursor.query(pack, op, bs,
+</span>175 <span style=''></span><span style='background: #AEF1AE'>        if (mongo26WriteCommand) ReadPreference.primary else readPreference,
+</span>176 <span style=''></span><span style='background: #AEF1AE'>        db.connection, failover, mongo26WriteCommand)</span><span style=''>
+</span>177 <span style=''>
+</span>178 <span style=''>    }
+</span>179 <span style=''>
+</span>180 <span style=''>    def cursor[A](implicit reader: pack.Reader[A]): DefaultCursor.Impl[A] =
+</span>181 <span style=''>      </span><span style='background: #AEF1AE'>cursor(defaultReadPreference)</span><span style=''>
+</span>182 <span style=''>  }
+</span>183 <span style=''>
+</span>184 <span style=''>  case class CommandWithPackRunner[P <: SerializationPack](pack: P, failover: FailoverStrategy = FailoverStrategy()) {
+</span>185 <span style=''>    // database
+</span>186 <span style=''>    def apply[R, C <: Command with CommandWithResult[R]](db: DB, command: C with CommandWithResult[R])(implicit writer: pack.Writer[C], reader: pack.Reader[R], ec: ExecutionContext): Future[R] = </span><span style='background: #AEF1AE'>defaultCursorFetcher(db, pack, command, failover).one[R]</span><span style=''>
+</span>187 <span style=''>
+</span>188 <span style=''>    def apply[C <: Command](db: DB, command: C)(implicit writer: pack.Writer[C]): CursorFetcher[pack.type, Cursor] = </span><span style='background: #AEF1AE'>defaultCursorFetcher(db, pack, command, failover)</span><span style=''>
+</span>189 <span style=''>
+</span>190 <span style=''>    def unboxed[A <: AnyVal, R <: BoxedAnyVal[A], C <: Command with CommandWithResult[R]](db: DB, command: C with CommandWithResult[R with BoxedAnyVal[A]])(implicit writer: pack.Writer[C], reader: pack.Reader[R], ec: ExecutionContext): Future[A] = </span><span style='background: #AEF1AE'>defaultCursorFetcher(db, pack, command, failover).one[R].map(_.value)</span><span style=''>
+</span>191 <span style=''>
+</span>192 <span style=''>    // collection
+</span>193 <span style=''>    def apply[R, C <: CollectionCommand with CommandWithResult[R]](collection: Collection, command: C with CommandWithResult[R])(implicit writer: pack.Writer[ResolvedCollectionCommand[C]], reader: pack.Reader[R], ec: ExecutionContext): Future[R] = </span><span style='background: #AEF1AE'>defaultCursorFetcher(collection.db, pack, ResolvedCollectionCommand(collection.name, command), failover).one[R]</span><span style=''>
+</span>194 <span style=''>
+</span>195 <span style=''>    def apply[C <: CollectionCommand](collection: Collection, command: C)(implicit writer: pack.Writer[ResolvedCollectionCommand[C]]): CursorFetcher[pack.type, Cursor] = </span><span style='background: #F0ADAD'>defaultCursorFetcher(collection.db, pack, ResolvedCollectionCommand(collection.name, command), failover)</span><span style=''>
+</span>196 <span style=''>
+</span>197 <span style=''>    /**
+</span>198 <span style=''>     * Executes the `command` and returns its result
+</span>199 <span style=''>     * along with the MongoDB response.
+</span>200 <span style=''>     */
+</span>201 <span style=''>    def withResponse[R, C <: CollectionCommand with CommandWithResult[R]](collection: Collection, command: C)(implicit writer: pack.Writer[ResolvedCollectionCommand[C]], reader: pack.Reader[R], ec: ExecutionContext): Future[ResponseResult[R]] = {
+</span>202 <span style=''>      val cursor = </span><span style='background: #AEF1AE'>defaultCursorFetcher(collection.db, pack,
+</span>203 <span style=''></span><span style='background: #AEF1AE'>        ResolvedCollectionCommand(collection.name, command), failover).cursor[R]</span><span style=''>
+</span>204 <span style=''>
+</span>205 <span style=''>      </span><span style='background: #AEF1AE'>for {
+</span>206 <span style=''></span><span style='background: #AEF1AE'>        firstResponse <- cursor.makeRequest(cursor.numberToReturn)
+</span>207 <span style=''></span><span style='background: #AEF1AE'>        result <- cursor.headOption.flatMap(_.fold(Future.failed[R](
+</span>208 <span style=''></span><span style='background: #AEF1AE'>          ReactiveMongoException("missing result")
+</span>209 <span style=''></span><span style='background: #AEF1AE'>        ))(Future.successful(_)))
+</span>210 <span style=''></span><span style='background: #AEF1AE'>      } yield ResponseResult(firstResponse, cursor.numberToReturn, result)</span><span style=''>
+</span>211 <span style=''>    }
+</span>212 <span style=''>
+</span>213 <span style=''>    def unboxed[A <: AnyVal, R <: BoxedAnyVal[A], C <: CollectionCommand with CommandWithResult[R]](collection: Collection, command: C with CommandWithResult[R with BoxedAnyVal[A]])(implicit writer: pack.Writer[ResolvedCollectionCommand[C]], reader: pack.Reader[R], ec: ExecutionContext): Future[A] =
+</span>214 <span style=''>      </span><span style='background: #AEF1AE'>defaultCursorFetcher(collection.db, pack, ResolvedCollectionCommand(collection.name, command), failover).one[R].map(_.value)</span><span style=''>
+</span>215 <span style=''>
+</span>216 <span style=''>    def rawCommand[T](input: T)(implicit writer: pack.Writer[T]): RawCommand =
+</span>217 <span style=''>      </span><span style='background: #AEF1AE'>RawCommand(pack.serialize(input, writer))</span><span style=''>
+</span>218 <span style=''>
+</span>219 <span style=''>    case class RawCommand(document: pack.Document) extends Command
+</span>220 <span style=''>
+</span>221 <span style=''>    object RawCommand {
+</span>222 <span style=''>      implicit val writer: pack.Writer[RawCommand] = </span><span style='background: #AEF1AE'>pack.writer(_.document)</span><span style=''>
+</span>223 <span style=''>    }
+</span>224 <span style=''>  }
+</span>225 <span style=''>
+</span>226 <span style=''>  @deprecated(message = "Use `run` with the `failoverStrategy` parameter", since = "0.12-RC0")
+</span>227 <span style=''>  def run[P <: SerializationPack](pack: P): CommandWithPackRunner[pack.type] =
+</span>228 <span style=''>    </span><span style='background: #AEF1AE'>CommandWithPackRunner(pack, FailoverStrategy())</span><span style=''>
+</span>229 <span style=''>
+</span>230 <span style=''>  /**
+</span>231 <span style=''>   * Returns a command runner.
+</span>232 <span style=''>   *
+</span>233 <span style=''>   * @param pack the serialization pack
+</span>234 <span style=''>   * @param failover the failover strategy
+</span>235 <span style=''>   *
+</span>236 <span style=''>   * {{{
+</span>237 <span style=''>   * import reactivemongo.bson.BSONDocument
+</span>238 <span style=''>   * import reactivemongo.api.BSONSerializationPack
+</span>239 <span style=''>   * import reactivemongo.api.commands.{ Command, Count }
+</span>240 <span style=''>   *
+</span>241 <span style=''>   * Command.run(BSONSerializationPack).
+</span>242 <span style=''>   *   unboxed(aCollection, Count(BSONDocument("bulk" -> true)))
+</span>243 <span style=''>   * }}}
+</span>244 <span style=''>   */
+</span>245 <span style=''>  def run[P <: SerializationPack](pack: P, failover: FailoverStrategy): CommandWithPackRunner[pack.type] = </span><span style='background: #AEF1AE'>CommandWithPackRunner(pack, failover)</span><span style=''>
+</span>246 <span style=''>
+</span>247 <span style=''>  private[reactivemongo] def deserialize[P <: SerializationPack, A](pack: P, response: Response)(implicit reader: pack.Reader[A]): A =
+</span>248 <span style=''>    </span><span style='background: #AEF1AE'>pack.readAndDeserialize(response, reader)</span><span style=''>
+</span>249 <span style=''>
+</span>250 <span style=''>  private[reactivemongo] def buildRequestMaker[P <: SerializationPack, A](pack: P)(command: A, writer: pack.Writer[A], readPreference: ReadPreference, db: String): (RequestMaker, Boolean) = {
+</span>251 <span style=''>    val buffer = </span><span style='background: #AEF1AE'>ChannelBufferWritableBuffer()</span><span style=''>
+</span>252 <span style=''>    </span><span style='background: #AEF1AE'>pack.serializeAndWrite(buffer, command, writer)</span><span style=''>
+</span>253 <span style=''>    val documents = </span><span style='background: #AEF1AE'>BufferSequence(buffer.buffer)</span><span style=''>
+</span>254 <span style=''>    val flags = if (</span><span style='background: #AEF1AE'>readPreference.slaveOk</span><span style=''>) </span><span style='background: #AEF1AE'>QueryFlags.SlaveOk</span><span style=''> else </span><span style='background: #AEF1AE'>0</span><span style=''>
+</span>255 <span style=''>    val query = </span><span style='background: #AEF1AE'>Query(flags, db + ".$cmd", 0, 1)</span><span style=''>
+</span>256 <span style=''>    val mongo26WriteCommand = command match {
+</span>257 <span style=''>      case _: Mongo26WriteCommand => </span><span style='background: #F0ADAD'>true</span><span style=''>
+</span>258 <span style=''>      case _                      => </span><span style='background: #AEF1AE'>false</span><span style=''>
+</span>259 <span style=''>    }
+</span>260 <span style=''>
+</span>261 <span style=''>    </span><span style='background: #AEF1AE'>RequestMaker(query, documents, readPreference) -> mongo26WriteCommand</span><span style=''>
+</span>262 <span style=''>  }
+</span>263 <span style=''>
+</span>264 <span style=''>  private[reactivemongo] case class CommandWithPackMaker[P <: SerializationPack](pack: P) {
+</span>265 <span style=''>    def apply[C <: Command](db: DB, command: C, readPreference: ReadPreference)(implicit writer: pack.Writer[C]): RequestMakerExpectingResponse =
+</span>266 <span style=''>      </span><span style='background: #F0ADAD'>onDatabase(db.name, command, readPreference)</span><span style=''>
+</span>267 <span style=''>
+</span>268 <span style=''>    def apply[C <: Command with Mongo26WriteCommand](db: DB, command: C)(implicit writer: pack.Writer[C]): RequestMakerExpectingResponse =
+</span>269 <span style=''>      </span><span style='background: #F0ADAD'>onDatabase(db.name, command)</span><span style=''>
+</span>270 <span style=''>
+</span>271 <span style=''>    def apply[C <: CollectionCommand](collection: Collection, command: C, readPreference: ReadPreference)(implicit writer: pack.Writer[ResolvedCollectionCommand[C]]): RequestMakerExpectingResponse =
+</span>272 <span style=''>      </span><span style='background: #F0ADAD'>onCollection(collection.db.name, collection.name, command, readPreference)</span><span style=''>
+</span>273 <span style=''>
+</span>274 <span style=''>    def apply[C <: CollectionCommand with Mongo26WriteCommand](collection: Collection, command: C)(implicit writer: pack.Writer[ResolvedCollectionCommand[C]]): RequestMakerExpectingResponse =
+</span>275 <span style=''>      </span><span style='background: #F0ADAD'>onCollection(collection.db.name, collection.name, command)</span><span style=''>
+</span>276 <span style=''>
+</span>277 <span style=''>    def onDatabase[C <: Command](db: String, command: C, readPreference: ReadPreference)(implicit writer: pack.Writer[C]): RequestMakerExpectingResponse = {
+</span>278 <span style=''>      val (requestMaker, mongo26WriteCommand) = buildRequestMaker(pack)(command, writer, readPreference, db)
+</span>279 <span style=''>      </span><span style='background: #F0ADAD'>RequestMakerExpectingResponse(requestMaker, mongo26WriteCommand)</span><span style=''>
+</span>280 <span style=''>    }
+</span>281 <span style=''>
+</span>282 <span style=''>    def onDatabase[C <: Command with Mongo26WriteCommand](db: String, command: C)(implicit writer: pack.Writer[C]): RequestMakerExpectingResponse = {
+</span>283 <span style=''>      val requestMaker = </span><span style='background: #F0ADAD'>buildRequestMaker(pack)(command, writer, ReadPreference.primary, db)._1</span><span style=''>
+</span>284 <span style=''>      </span><span style='background: #F0ADAD'>RequestMakerExpectingResponse(requestMaker, true)</span><span style=''>
+</span>285 <span style=''>    }
+</span>286 <span style=''>
+</span>287 <span style=''>    def onCollection[C <: CollectionCommand](db: String, collection: String, command: C, readPreference: ReadPreference)(implicit writer: pack.Writer[ResolvedCollectionCommand[C]]): RequestMakerExpectingResponse = {
+</span>288 <span style=''>      val (requestMaker, mongo26WriteCommand) = buildRequestMaker(pack)(ResolvedCollectionCommand(collection, command), writer, readPreference, db)
+</span>289 <span style=''>      </span><span style='background: #F0ADAD'>RequestMakerExpectingResponse(requestMaker, mongo26WriteCommand)</span><span style=''>
+</span>290 <span style=''>    }
+</span>291 <span style=''>
+</span>292 <span style=''>    def onCollection[C <: CollectionCommand with Mongo26WriteCommand](db: String, collection: String, command: C)(implicit writer: pack.Writer[ResolvedCollectionCommand[C]]): RequestMakerExpectingResponse = {
+</span>293 <span style=''>      val requestMaker = </span><span style='background: #F0ADAD'>buildRequestMaker(pack)(ResolvedCollectionCommand(collection, command), writer, ReadPreference.primary, db)._1</span><span style=''>
+</span>294 <span style=''>      </span><span style='background: #F0ADAD'>RequestMakerExpectingResponse(requestMaker, true)</span><span style=''>
+</span>295 <span style=''>    }
+</span>296 <span style=''>  }
+</span>297 <span style=''>
+</span>298 <span style=''>  private[reactivemongo] def requestMaker[P <: SerializationPack](pack: P): CommandWithPackMaker[P] = </span><span style='background: #F0ADAD'>CommandWithPackMaker(pack)</span><span style=''>
+</span>299 <span style=''>}
+</span>300 <span style=''>
+</span>301 <span style=''>/**
+</span>302 <span style=''> * @param collection the name of the collection against which the command is executed
+</span>303 <span style=''> * @param command the executed command
+</span>304 <span style=''> */
+</span>305 <span style=''>final case class ResolvedCollectionCommand[C <: CollectionCommand](
+</span>306 <span style=''>  collection: String,
+</span>307 <span style=''>  command: C
+</span>308 <span style=''>) extends Command
+</span>309 <span style=''>
+</span>310 <span style=''>object `package` {
+</span>311 <span style=''>  type WriteConcern = GetLastError
+</span>312 <span style=''>  val WriteConcern = GetLastError
+</span>313 <span style=''>}
+</span></pre>
+          </div>
+          <div class="tab-pane" id="statementlist">
+            <table cellspacing="0" cellpadding="0" class="table statementlist">
+      <tr>
+        <th>Line</th>
+        <th>Stmt Id</th>
+        <th>Pos</th>
+        <th>Tree</th>
+        <th>Symbol</th>
+        <th>Code</th>
+      </tr><tr>
+        <td>
+          46
+        </td>
+        <td>
+          10087
+        </td>
+        <td>
+          1192
+          -
+          1202
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          46
+        </td>
+        <td>
+          6817
+        </td>
+        <td>
+          1164
+          -
+          1191
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          46
+        </td>
+        <td>
+          3713
+        </td>
+        <td>
+          1144
+          -
+          1163
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          46
+        </td>
+        <td>
+          9440
+        </td>
+        <td>
+          1233
+          -
+          1235
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          46
+        </td>
+        <td>
+          4277
+        </td>
+        <td>
+          1203
+          -
+          1232
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          46
+        </td>
+        <td>
+          7596
+        </td>
+        <td>
+          1142
+          -
+          1235
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          63
+        </td>
+        <td>
+          3427
+        </td>
+        <td>
+          1623
+          -
+          1631
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          79
+        </td>
+        <td>
+          4488
+        </td>
+        <td>
+          2015
+          -
+          2025
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          108
+        </td>
+        <td>
+          6848
+        </td>
+        <td>
+          2856
+          -
+          2859
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          109
+        </td>
+        <td>
+          10007
+        </td>
+        <td>
+          2909
+          -
+          2934
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          115
+        </td>
+        <td>
+          4350
+        </td>
+        <td>
+          3011
+          -
+          3013
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          138
+        </td>
+        <td>
+          8822
+        </td>
+        <td>
+          3666
+          -
+          3669
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          142
+        </td>
+        <td>
+          8533
+        </td>
+        <td>
+          3810
+          -
+          3846
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          145
+        </td>
+        <td>
+          9177
+        </td>
+        <td>
+          3976
+          -
+          3976
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          145
+        </td>
+        <td>
+          4099
+        </td>
+        <td>
+          3990
+          -
+          3990
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          150
+        </td>
+        <td>
+          5668
+        </td>
+        <td>
+          4090
+          -
+          4410
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          160
+        </td>
+        <td>
+          6110
+        </td>
+        <td>
+          4501
+          -
+          4530
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          163
+        </td>
+        <td>
+          8547
+        </td>
+        <td>
+          4661
+          -
+          4690
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          164
+        </td>
+        <td>
+          4190
+        </td>
+        <td>
+          4697
+          -
+          4744
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          166
+        </td>
+        <td>
+          4081
+        </td>
+        <td>
+          4761
+          -
+          4790
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          166
+        </td>
+        <td>
+          2997
+        </td>
+        <td>
+          4776
+          -
+          4789
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          167
+        </td>
+        <td>
+          2802
+        </td>
+        <td>
+          4813
+          -
+          4835
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          167
+        </td>
+        <td>
+          3456
+        </td>
+        <td>
+          4861
+          -
+          4862
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          167
+        </td>
+        <td>
+          9891
+        </td>
+        <td>
+          4861
+          -
+          4862
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          167
+        </td>
+        <td>
+          3443
+        </td>
+        <td>
+          4837
+          -
+          4855
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          167
+        </td>
+        <td>
+          9908
+        </td>
+        <td>
+          4837
+          -
+          4855
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          168
+        </td>
+        <td>
+          9285
+        </td>
+        <td>
+          4878
+          -
+          4915
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          168
+        </td>
+        <td>
+          5782
+        </td>
+        <td>
+          4891
+          -
+          4908
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          168
+        </td>
+        <td>
+          6098
+        </td>
+        <td>
+          4913
+          -
+          4914
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          168
+        </td>
+        <td>
+          9483
+        </td>
+        <td>
+          4910
+          -
+          4911
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          170
+        </td>
+        <td>
+          5904
+        </td>
+        <td>
+          5003
+          -
+          5007
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          171
+        </td>
+        <td>
+          6760
+        </td>
+        <td>
+          5047
+          -
+          5052
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          174
+        </td>
+        <td>
+          6861
+        </td>
+        <td>
+          5068
+          -
+          5232
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          181
+        </td>
+        <td>
+          5762
+        </td>
+        <td>
+          5323
+          -
+          5352
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          186
+        </td>
+        <td>
+          9481
+        </td>
+        <td>
+          5688
+          -
+          5744
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          188
+        </td>
+        <td>
+          5441
+        </td>
+        <td>
+          5863
+          -
+          5912
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          190
+        </td>
+        <td>
+          6846
+        </td>
+        <td>
+          6162
+          -
+          6231
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          193
+        </td>
+        <td>
+          6179
+        </td>
+        <td>
+          6499
+          -
+          6610
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          195
+        </td>
+        <td>
+          4063
+        </td>
+        <td>
+          6782
+          -
+          6886
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          203
+        </td>
+        <td>
+          8531
+        </td>
+        <td>
+          7263
+          -
+          7385
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          206
+        </td>
+        <td>
+          3538
+        </td>
+        <td>
+          7393
+          -
+          7694
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          214
+        </td>
+        <td>
+          9881
+        </td>
+        <td>
+          8009
+          -
+          8133
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          217
+        </td>
+        <td>
+          5888
+        </td>
+        <td>
+          8220
+          -
+          8261
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          217
+        </td>
+        <td>
+          2787
+        </td>
+        <td>
+          8231
+          -
+          8260
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          222
+        </td>
+        <td>
+          5700
+        </td>
+        <td>
+          8408
+          -
+          8431
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          222
+        </td>
+        <td>
+          8541
+        </td>
+        <td>
+          8420
+          -
+          8430
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          228
+        </td>
+        <td>
+          8735
+        </td>
+        <td>
+          8649
+          -
+          8649
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          228
+        </td>
+        <td>
+          2785
+        </td>
+        <td>
+          8621
+          -
+          8668
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          228
+        </td>
+        <td>
+          8335
+        </td>
+        <td>
+          8649
+          -
+          8649
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          228
+        </td>
+        <td>
+          6541
+        </td>
+        <td>
+          8649
+          -
+          8667
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          228
+        </td>
+        <td>
+          3469
+        </td>
+        <td>
+          8649
+          -
+          8649
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          245
+        </td>
+        <td>
+          5439
+        </td>
+        <td>
+          9196
+          -
+          9233
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          248
+        </td>
+        <td>
+          3240
+        </td>
+        <td>
+          9374
+          -
+          9415
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          251
+        </td>
+        <td>
+          6119
+        </td>
+        <td>
+          9626
+          -
+          9655
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          252
+        </td>
+        <td>
+          6031
+        </td>
+        <td>
+          9660
+          -
+          9707
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          253
+        </td>
+        <td>
+          3371
+        </td>
+        <td>
+          9743
+          -
+          9756
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          253
+        </td>
+        <td>
+          8093
+        </td>
+        <td>
+          9728
+          -
+          9757
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          254
+        </td>
+        <td>
+          9491
+        </td>
+        <td>
+          9826
+          -
+          9827
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          254
+        </td>
+        <td>
+          8004
+        </td>
+        <td>
+          9778
+          -
+          9800
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          254
+        </td>
+        <td>
+          5348
+        </td>
+        <td>
+          9802
+          -
+          9820
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          254
+        </td>
+        <td>
+          3658
+        </td>
+        <td>
+          9826
+          -
+          9827
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          254
+        </td>
+        <td>
+          9190
+        </td>
+        <td>
+          9802
+          -
+          9820
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          255
+        </td>
+        <td>
+          8543
+        </td>
+        <td>
+          9874
+          -
+          9875
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          255
+        </td>
+        <td>
+          2702
+        </td>
+        <td>
+          9871
+          -
+          9872
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          255
+        </td>
+        <td>
+          2689
+        </td>
+        <td>
+          9857
+          -
+          9869
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          255
+        </td>
+        <td>
+          6741
+        </td>
+        <td>
+          9844
+          -
+          9876
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          257
+        </td>
+        <td>
+          6754
+        </td>
+        <td>
+          9960
+          -
+          9964
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          258
+        </td>
+        <td>
+          4076
+        </td>
+        <td>
+          10002
+          -
+          10007
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          261
+        </td>
+        <td>
+          3988
+        </td>
+        <td>
+          10019
+          -
+          10088
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #AEF1AE">
+          
+        </td>
+      </tr><tr>
+        <td>
+          266
+        </td>
+        <td>
+          3178
+        </td>
+        <td>
+          10338
+          -
+          10382
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          269
+        </td>
+        <td>
+          4532
+        </td>
+        <td>
+          10529
+          -
+          10557
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          272
+        </td>
+        <td>
+          7750
+        </td>
+        <td>
+          10764
+          -
+          10838
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          275
+        </td>
+        <td>
+          8374
+        </td>
+        <td>
+          11038
+          -
+          11096
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          278
+        </td>
+        <td>
+          8364
+        </td>
+        <td>
+          11280
+          -
+          11280
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          278
+        </td>
+        <td>
+          5285
+        </td>
+        <td>
+          11266
+          -
+          11266
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          279
+        </td>
+        <td>
+          2532
+        </td>
+        <td>
+          11370
+          -
+          11434
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          283
+        </td>
+        <td>
+          10359
+        </td>
+        <td>
+          11635
+          -
+          11639
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          283
+        </td>
+        <td>
+          5595
+        </td>
+        <td>
+          11617
+          -
+          11688
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          283
+        </td>
+        <td>
+          3161
+        </td>
+        <td>
+          11658
+          -
+          11680
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          284
+        </td>
+        <td>
+          9006
+        </td>
+        <td>
+          11695
+          -
+          11744
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          288
+        </td>
+        <td>
+          10373
+        </td>
+        <td>
+          11979
+          -
+          11979
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          288
+        </td>
+        <td>
+          4544
+        </td>
+        <td>
+          11993
+          -
+          11993
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          289
+        </td>
+        <td>
+          5606
+        </td>
+        <td>
+          12122
+          -
+          12186
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          293
+        </td>
+        <td>
+          2541
+        </td>
+        <td>
+          12508
+          -
+          12530
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          293
+        </td>
+        <td>
+          7173
+        </td>
+        <td>
+          12446
+          -
+          12450
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          293
+        </td>
+        <td>
+          5198
+        </td>
+        <td>
+          12428
+          -
+          12538
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          293
+        </td>
+        <td>
+          2727
+        </td>
+        <td>
+          12452
+          -
+          12498
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          294
+        </td>
+        <td>
+          7649
+        </td>
+        <td>
+          12545
+          -
+          12594
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr><tr>
+        <td>
+          298
+        </td>
+        <td>
+          8964
+        </td>
+        <td>
+          12708
+          -
+          12734
+        </td>
+        <td>
+          
+        </td>
+        <td>
+          
+        </td>
+        <td style="background: #F0ADAD">
+          
+        </td>
+      </tr>
+    </table>
+          </div>
+        </div>
+      </body>
+    </html>

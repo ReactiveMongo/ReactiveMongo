@@ -1,0 +1,3746 @@
+<html>
+      <head>
+      <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+      <title id="title">Scoverage Code Coverage</title>
+      <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jquery.tablesorter/2.20.1/css/theme.default.min.css" type="text/css"/><script src="http://cdnjs.cloudflare.com/ajax/libs/jquery.tablesorter/2.20.1/js/jquery.tablesorter.min.js"></script><link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/css/bootstrap.min.css" type="text/css"/><script src="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/js/bootstrap.min.js"></script><script type="text/javascript">
+        $(document).ready(function() {$(".tablesorter").tablesorter();});
+      </script>
+      <style>
+        .meter {
+        height: 14px;
+        position: relative;
+        background: #BB2020;
+}
+
+.meter span {
+	display: block;
+	height: 100%;
+	background-color: rgb(43,194,83);
+	background-image: -webkit-gradient(
+	  linear,
+	  left bottom,
+	  left top,
+	  color-stop(0, rgb(43,194,83)),
+	  color-stop(1, rgb(84,240,84))
+	 );
+	background-image: -webkit-linear-gradient(
+	  center bottom,
+	  rgb(43,194,83) 37%,
+	  rgb(84,240,84) 69%
+	 );
+	background-image: -moz-linear-gradient(
+	  center bottom,
+	  rgb(43,194,83) 37%,
+	  rgb(84,240,84) 69%
+	 );
+	background-image: -ms-linear-gradient(
+	  center bottom,
+	  rgb(43,194,83) 37%,
+	  rgb(84,240,84) 69%
+	 );
+	background-image: -o-linear-gradient(
+	  center bottom,
+	  rgb(43,194,83) 37%,
+	  rgb(84,240,84) 69%
+	 );
+	-webkit-box-shadow:
+	  inset 0 2px 9px  rgba(255,255,255,0.3),
+	  inset 0 -2px 6px rgba(0,0,0,0.4);
+	-moz-box-shadow:
+	  inset 0 2px 9px  rgba(255,255,255,0.3),
+	  inset 0 -2px 6px rgba(0,0,0,0.4);
+	position: relative;
+	overflow: hidden;
+}
+      </style>
+    </head><body style="font-family: monospace;">
+      <table class="tablesorter table table-striped" style="font-size:13px">
+      <thead>
+        <tr>
+          <th>
+            Class
+          </th>
+          <th>
+            Source file
+          </th>
+          <th>
+            Lines
+          </th>
+          <th>
+            Methods
+          </th>
+          <th>
+            Statements
+          </th>
+          <th>
+            Invoked
+          </th>
+          <th>
+            Coverage
+          </th>
+          <th>
+          </th>
+          <th>
+            Branches
+          </th>
+          <th>
+            Invoked
+          </th>
+          <th>
+            Coverage
+          </th>
+          <th>
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+      <td>
+        <a href="api/commands/bson/aggregation.scala.html">
+          AggregateWriter
+        </a>
+      </td>
+      <td>
+        aggregation.scala
+      </td>
+      <td>
+        68
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        44
+      </td>
+      <td>
+        43
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 98%"></span>
+        </div>
+      </td>
+      <td>
+        97,73
+        %
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 50%"></span>
+        </div>
+      </td>
+      <td>
+        50,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/aggregation.scala.html">
+          AggregationResultReader
+        </a>
+      </td>
+      <td>
+        aggregation.scala
+      </td>
+      <td>
+        84
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        31
+      </td>
+      <td>
+        31
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/aggregation.scala.html">
+          BSONAggregationFramework
+        </a>
+      </td>
+      <td>
+        aggregation.scala
+      </td>
+      <td>
+        34
+      </td>
+      <td>
+        8
+      </td>
+      <td>
+        10
+      </td>
+      <td>
+        9
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 90%"></span>
+        </div>
+      </td>
+      <td>
+        90,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/instanceadministration.scala.html">
+          BSONCollectionNameReaders
+        </a>
+      </td>
+      <td>
+        instanceadministration.scala
+      </td>
+      <td>
+        33
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        17
+      </td>
+      <td>
+        16
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 94%"></span>
+        </div>
+      </td>
+      <td>
+        94,12
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/count.scala.html">
+          BSONCountCommand
+        </a>
+      </td>
+      <td>
+        count.scala
+      </td>
+      <td>
+        7
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/instanceadministration.scala.html">
+          BSONCreateIndexesResultReader
+        </a>
+      </td>
+      <td>
+        instanceadministration.scala
+      </td>
+      <td>
+        250
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        20
+      </td>
+      <td>
+        13
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 65%"></span>
+        </div>
+      </td>
+      <td>
+        65,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/instanceadministration.scala.html">
+          BSONCreateIndexesWriter
+        </a>
+      </td>
+      <td>
+        instanceadministration.scala
+      </td>
+      <td>
+        232
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        20
+      </td>
+      <td>
+        20
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/instanceadministration.scala.html">
+          BSONCreateUserCommand
+        </a>
+      </td>
+      <td>
+        instanceadministration.scala
+      </td>
+      <td>
+        359
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/rwcommands.scala.html">
+          BSONDeleteCommand
+        </a>
+      </td>
+      <td>
+        rwcommands.scala
+      </td>
+      <td>
+        161
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/distinct.scala.html">
+          BSONDistinctCommand
+        </a>
+      </td>
+      <td>
+        distinct.scala
+      </td>
+      <td>
+        9
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/instanceadministration.scala.html">
+          BSONDropIndexesReader
+        </a>
+      </td>
+      <td>
+        instanceadministration.scala
+      </td>
+      <td>
+        164
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/instanceadministration.scala.html">
+          BSONDropIndexesWriter
+        </a>
+      </td>
+      <td>
+        instanceadministration.scala
+      </td>
+      <td>
+        158
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        11
+      </td>
+      <td>
+        11
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/findandmodify.scala.html">
+          BSONFindAndModifyCommand
+        </a>
+      </td>
+      <td>
+        findandmodify.scala
+      </td>
+      <td>
+        12
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/instanceadministration.scala.html">
+          BSONIndexListReader
+        </a>
+      </td>
+      <td>
+        instanceadministration.scala
+      </td>
+      <td>
+        216
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        26
+      </td>
+      <td>
+        23
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 88%"></span>
+        </div>
+      </td>
+      <td>
+        88,46
+        %
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/aggregation.scala.html">
+          BSONIndexStatAccessesReader
+        </a>
+      </td>
+      <td>
+        aggregation.scala
+      </td>
+      <td>
+        99
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        8
+      </td>
+      <td>
+        8
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/aggregation.scala.html">
+          BSONIndexStatsReader
+        </a>
+      </td>
+      <td>
+        aggregation.scala
+      </td>
+      <td>
+        110
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        13
+      </td>
+      <td>
+        13
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/rwcommands.scala.html">
+          BSONInsertCommand
+        </a>
+      </td>
+      <td>
+        rwcommands.scala
+      </td>
+      <td>
+        94
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/instanceadministration.scala.html">
+          BSONListCollectionNamesImplicits
+        </a>
+      </td>
+      <td>
+        instanceadministration.scala
+      </td>
+      <td>
+        43
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        8
+      </td>
+      <td>
+        7
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 88%"></span>
+        </div>
+      </td>
+      <td>
+        87,50
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/instanceadministration.scala.html">
+          BSONListIndexesWriter
+        </a>
+      </td>
+      <td>
+        instanceadministration.scala
+      </td>
+      <td>
+        174
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        6
+      </td>
+      <td>
+        6
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/instanceadministration.scala.html">
+          BSONReplSetMaintenanceImplicits
+        </a>
+      </td>
+      <td>
+        instanceadministration.scala
+      </td>
+      <td>
+        342
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/instanceadministration.scala.html">
+          BSONResyncImplicits
+        </a>
+      </td>
+      <td>
+        instanceadministration.scala
+      </td>
+      <td>
+        317
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/serverstatus.scala.html">
+          BSONServerStatusAssertsReader
+        </a>
+      </td>
+      <td>
+        serverstatus.scala
+      </td>
+      <td>
+        50
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        21
+      </td>
+      <td>
+        21
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/serverstatus.scala.html">
+          BSONServerStatusBackgroundFlushingReader
+        </a>
+      </td>
+      <td>
+        serverstatus.scala
+      </td>
+      <td>
+        65
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        21
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 0%"></span>
+        </div>
+      </td>
+      <td>
+        0,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 0%"></span>
+        </div>
+      </td>
+      <td>
+        0,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/serverstatus.scala.html">
+          BSONServerStatusConnections
+        </a>
+      </td>
+      <td>
+        serverstatus.scala
+      </td>
+      <td>
+        74
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        13
+      </td>
+      <td>
+        13
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/serverstatus.scala.html">
+          BSONServerStatusExtraInfo
+        </a>
+      </td>
+      <td>
+        serverstatus.scala
+      </td>
+      <td>
+        153
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        9
+      </td>
+      <td>
+        3
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 33%"></span>
+        </div>
+      </td>
+      <td>
+        33,33
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/serverstatus.scala.html">
+          BSONServerStatusGlobalLock
+        </a>
+      </td>
+      <td>
+        serverstatus.scala
+      </td>
+      <td>
+        143
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        11
+      </td>
+      <td>
+        11
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/serverstatus.scala.html">
+          BSONServerStatusJournaling
+        </a>
+      </td>
+      <td>
+        serverstatus.scala
+      </td>
+      <td>
+        116
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        28
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 0%"></span>
+        </div>
+      </td>
+      <td>
+        0,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 0%"></span>
+        </div>
+      </td>
+      <td>
+        0,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/serverstatus.scala.html">
+          BSONServerStatusJournalingTime
+        </a>
+      </td>
+      <td>
+        serverstatus.scala
+      </td>
+      <td>
+        98
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        29
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 0%"></span>
+        </div>
+      </td>
+      <td>
+        0,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 0%"></span>
+        </div>
+      </td>
+      <td>
+        0,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/serverstatus.scala.html">
+          BSONServerStatusLock
+        </a>
+      </td>
+      <td>
+        serverstatus.scala
+      </td>
+      <td>
+        134
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        13
+      </td>
+      <td>
+        13
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/serverstatus.scala.html">
+          BSONServerStatusNetwork
+        </a>
+      </td>
+      <td>
+        serverstatus.scala
+      </td>
+      <td>
+        125
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        13
+      </td>
+      <td>
+        13
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/serverstatus.scala.html">
+          BSONServerStatusResultReader
+        </a>
+      </td>
+      <td>
+        serverstatus.scala
+      </td>
+      <td>
+        187
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        62
+      </td>
+      <td>
+        61
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 98%"></span>
+        </div>
+      </td>
+      <td>
+        98,39
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/serverstatus.scala.html">
+          BSONServerStatusWriter
+        </a>
+      </td>
+      <td>
+        serverstatus.scala
+      </td>
+      <td>
+        39
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        5
+      </td>
+      <td>
+        5
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/rwcommands.scala.html">
+          BSONUpdateCommand
+        </a>
+      </td>
+      <td>
+        rwcommands.scala
+      </td>
+      <td>
+        114
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/instanceadministration.scala.html">
+          CappedWriter
+        </a>
+      </td>
+      <td>
+        instanceadministration.scala
+      </td>
+      <td>
+        98
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        11
+      </td>
+      <td>
+        11
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/instanceadministration.scala.html">
+          CollStatsResultReader
+        </a>
+      </td>
+      <td>
+        instanceadministration.scala
+      </td>
+      <td>
+        141
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        69
+      </td>
+      <td>
+        62
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 90%"></span>
+        </div>
+      </td>
+      <td>
+        89,86
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/instanceadministration.scala.html">
+          CollStatsWriter
+        </a>
+      </td>
+      <td>
+        instanceadministration.scala
+      </td>
+      <td>
+        117
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        11
+      </td>
+      <td>
+        11
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/instanceadministration.scala.html">
+          ConvertToCappedWriter
+        </a>
+      </td>
+      <td>
+        instanceadministration.scala
+      </td>
+      <td>
+        149
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        8
+      </td>
+      <td>
+        8
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/count.scala.html">
+          CountResultReader
+        </a>
+      </td>
+      <td>
+        count.scala
+      </td>
+      <td>
+        45
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/count.scala.html">
+          CountWriter
+        </a>
+      </td>
+      <td>
+        count.scala
+      </td>
+      <td>
+        37
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        26
+      </td>
+      <td>
+        26
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/instanceadministration.scala.html">
+          CreateUserWriter
+        </a>
+      </td>
+      <td>
+        instanceadministration.scala
+      </td>
+      <td>
+        375
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        34
+      </td>
+      <td>
+        34
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/instanceadministration.scala.html">
+          CreateWriter
+        </a>
+      </td>
+      <td>
+        instanceadministration.scala
+      </td>
+      <td>
+        107
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        17
+      </td>
+      <td>
+        17
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/aggregation.scala.html">
+          CursorWriter
+        </a>
+      </td>
+      <td>
+        aggregation.scala
+      </td>
+      <td>
+        48
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        6
+      </td>
+      <td>
+        6
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/bsoncommands.scala.html">
+          DealingWithGenericCommandErrorsReader
+        </a>
+      </td>
+      <td>
+        bsoncommands.scala
+      </td>
+      <td>
+        47
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        8
+      </td>
+      <td>
+        8
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/bsoncommands.scala.html">
+          DefaultBSONCommandError
+        </a>
+      </td>
+      <td>
+        bsoncommands.scala
+      </td>
+      <td>
+        32
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        9
+      </td>
+      <td>
+        9
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/rwcommands.scala.html">
+          DefaultWriteResultReader
+        </a>
+      </td>
+      <td>
+        rwcommands.scala
+      </td>
+      <td>
+        87
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        21
+      </td>
+      <td>
+        21
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/rwcommands.scala.html">
+          DeleteElementWriter
+        </a>
+      </td>
+      <td>
+        rwcommands.scala
+      </td>
+      <td>
+        172
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        10
+      </td>
+      <td>
+        10
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/rwcommands.scala.html">
+          DeleteWriter
+        </a>
+      </td>
+      <td>
+        rwcommands.scala
+      </td>
+      <td>
+        183
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        24
+      </td>
+      <td>
+        24
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/distinct.scala.html">
+          DistinctResultReader
+        </a>
+      </td>
+      <td>
+        distinct.scala
+      </td>
+      <td>
+        38
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        6
+      </td>
+      <td>
+        5
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 83%"></span>
+        </div>
+      </td>
+      <td>
+        83,33
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/distinct.scala.html">
+          DistinctWriter
+        </a>
+      </td>
+      <td>
+        distinct.scala
+      </td>
+      <td>
+        29
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        26
+      </td>
+      <td>
+        25
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 96%"></span>
+        </div>
+      </td>
+      <td>
+        96,15
+        %
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 50%"></span>
+        </div>
+      </td>
+      <td>
+        50,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/instanceadministration.scala.html">
+          DropCollectionResultReader
+        </a>
+      </td>
+      <td>
+        instanceadministration.scala
+      </td>
+      <td>
+        72
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        16
+      </td>
+      <td>
+        10
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 63%"></span>
+        </div>
+      </td>
+      <td>
+        62,50
+        %
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 50%"></span>
+        </div>
+      </td>
+      <td>
+        50,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/instanceadministration.scala.html">
+          DropCollectionWriter
+        </a>
+      </td>
+      <td>
+        instanceadministration.scala
+      </td>
+      <td>
+        57
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        6
+      </td>
+      <td>
+        6
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/instanceadministration.scala.html">
+          DropDatabaseWriter
+        </a>
+      </td>
+      <td>
+        instanceadministration.scala
+      </td>
+      <td>
+        14
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        5
+      </td>
+      <td>
+        5
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/instanceadministration.scala.html">
+          DropWriter
+        </a>
+      </td>
+      <td>
+        instanceadministration.scala
+      </td>
+      <td>
+        51
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        6
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 0%"></span>
+        </div>
+      </td>
+      <td>
+        0,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 0%"></span>
+        </div>
+      </td>
+      <td>
+        0,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/instanceadministration.scala.html">
+          EmptyCappedWriter
+        </a>
+      </td>
+      <td>
+        instanceadministration.scala
+      </td>
+      <td>
+        78
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        6
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 0%"></span>
+        </div>
+      </td>
+      <td>
+        0,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 0%"></span>
+        </div>
+      </td>
+      <td>
+        0,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/findandmodify.scala.html">
+          FindAndModifyResultReader
+        </a>
+      </td>
+      <td>
+        findandmodify.scala
+      </td>
+      <td>
+        30
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        16
+      </td>
+      <td>
+        16
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/findandmodify.scala.html">
+          FindAndModifyWriter
+        </a>
+      </td>
+      <td>
+        findandmodify.scala
+      </td>
+      <td>
+        51
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        34
+      </td>
+      <td>
+        34
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/rwcommands.scala.html">
+          GetLastErrorWWriter
+        </a>
+      </td>
+      <td>
+        rwcommands.scala
+      </td>
+      <td>
+        48
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        3
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 33%"></span>
+        </div>
+      </td>
+      <td>
+        33,33
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/rwcommands.scala.html">
+          GetLastErrorWriter
+        </a>
+      </td>
+      <td>
+        rwcommands.scala
+      </td>
+      <td>
+        15
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        22
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 0%"></span>
+        </div>
+      </td>
+      <td>
+        0,00
+        %
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 0%"></span>
+        </div>
+      </td>
+      <td>
+        0,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/count.scala.html">
+          HintWriter
+        </a>
+      </td>
+      <td>
+        count.scala
+      </td>
+      <td>
+        23
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 0%"></span>
+        </div>
+      </td>
+      <td>
+        0,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 0%"></span>
+        </div>
+      </td>
+      <td>
+        0,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/rwcommands.scala.html">
+          InsertWriter
+        </a>
+      </td>
+      <td>
+        rwcommands.scala
+      </td>
+      <td>
+        107
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        21
+      </td>
+      <td>
+        21
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/ismaster.scala.html">
+          IsMasterResultReader
+        </a>
+      </td>
+      <td>
+        ismaster.scala
+      </td>
+      <td>
+        60
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        99
+      </td>
+      <td>
+        35
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 35%"></span>
+        </div>
+      </td>
+      <td>
+        35,35
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/ismaster.scala.html">
+          IsMasterWriter
+        </a>
+      </td>
+      <td>
+        ismaster.scala
+      </td>
+      <td>
+        13
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        4
+      </td>
+      <td>
+        4
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/instanceadministration.scala.html">
+          LastErrorReader
+        </a>
+      </td>
+      <td>
+        instanceadministration.scala
+      </td>
+      <td>
+        195
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        56
+      </td>
+      <td>
+        21
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 38%"></span>
+        </div>
+      </td>
+      <td>
+        37,50
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/instanceadministration.scala.html">
+          ListCollectionNamesWriter
+        </a>
+      </td>
+      <td>
+        instanceadministration.scala
+      </td>
+      <td>
+        22
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        5
+      </td>
+      <td>
+        5
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/bsoncommands.scala.html">
+          ReadConcernWriter
+        </a>
+      </td>
+      <td>
+        bsoncommands.scala
+      </td>
+      <td>
+        19
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        6
+      </td>
+      <td>
+        6
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/instanceadministration.scala.html">
+          RenameCollectionWriter
+        </a>
+      </td>
+      <td>
+        instanceadministration.scala
+      </td>
+      <td>
+        88
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        16
+      </td>
+      <td>
+        16
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/instanceadministration.scala.html">
+          ReplSetGetStatusWriter
+        </a>
+      </td>
+      <td>
+        instanceadministration.scala
+      </td>
+      <td>
+        269
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        5
+      </td>
+      <td>
+        5
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/instanceadministration.scala.html">
+          ReplSetMaintenanceWriter
+        </a>
+      </td>
+      <td>
+        instanceadministration.scala
+      </td>
+      <td>
+        348
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        6
+      </td>
+      <td>
+        6
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/instanceadministration.scala.html">
+          ReplSetMemberReader
+        </a>
+      </td>
+      <td>
+        instanceadministration.scala
+      </td>
+      <td>
+        291
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        58
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 0%"></span>
+        </div>
+      </td>
+      <td>
+        0,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 0%"></span>
+        </div>
+      </td>
+      <td>
+        0,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/instanceadministration.scala.html">
+          ReplSetStatusReader
+        </a>
+      </td>
+      <td>
+        instanceadministration.scala
+      </td>
+      <td>
+        303
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        17
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 0%"></span>
+        </div>
+      </td>
+      <td>
+        0,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 0%"></span>
+        </div>
+      </td>
+      <td>
+        0,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/instanceadministration.scala.html">
+          ResyncReader
+        </a>
+      </td>
+      <td>
+        instanceadministration.scala
+      </td>
+      <td>
+        331
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        15
+      </td>
+      <td>
+        8
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 53%"></span>
+        </div>
+      </td>
+      <td>
+        53,33
+        %
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/instanceadministration.scala.html">
+          ResyncWriter
+        </a>
+      </td>
+      <td>
+        instanceadministration.scala
+      </td>
+      <td>
+        337
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        5
+      </td>
+      <td>
+        5
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/bsoncommands.scala.html">
+          UnitBoxReader
+        </a>
+      </td>
+      <td>
+        bsoncommands.scala
+      </td>
+      <td>
+        15
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/rwcommands.scala.html">
+          UpdateElementWriter
+        </a>
+      </td>
+      <td>
+        rwcommands.scala
+      </td>
+      <td>
+        126
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        19
+      </td>
+      <td>
+        19
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/rwcommands.scala.html">
+          UpdateResultReader
+        </a>
+      </td>
+      <td>
+        rwcommands.scala
+      </td>
+      <td>
+        155
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        28
+      </td>
+      <td>
+        28
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/rwcommands.scala.html">
+          UpdateWriter
+        </a>
+      </td>
+      <td>
+        rwcommands.scala
+      </td>
+      <td>
+        135
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        24
+      </td>
+      <td>
+        24
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/rwcommands.scala.html">
+          UpsertedReader
+        </a>
+      </td>
+      <td>
+        rwcommands.scala
+      </td>
+      <td>
+        142
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        6
+      </td>
+      <td>
+        6
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/instanceadministration.scala.html">
+          UserRoleWriter
+        </a>
+      </td>
+      <td>
+        instanceadministration.scala
+      </td>
+      <td>
+        364
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        9
+      </td>
+      <td>
+        7
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 78%"></span>
+        </div>
+      </td>
+      <td>
+        77,78
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/rwcommands.scala.html">
+          WriteConcernErrorReader
+        </a>
+      </td>
+      <td>
+        rwcommands.scala
+      </td>
+      <td>
+        74
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        7
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 0%"></span>
+        </div>
+      </td>
+      <td>
+        0,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 0%"></span>
+        </div>
+      </td>
+      <td>
+        0,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/rwcommands.scala.html">
+          WriteConcernWriter
+        </a>
+      </td>
+      <td>
+        rwcommands.scala
+      </td>
+      <td>
+        56
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        20
+      </td>
+      <td>
+        18
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 90%"></span>
+        </div>
+      </td>
+      <td>
+        90,00
+        %
+      </td>
+      <td>
+        2
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 50%"></span>
+        </div>
+      </td>
+      <td>
+        50,00
+        %
+      </td>
+    </tr><tr>
+      <td>
+        <a href="api/commands/bson/rwcommands.scala.html">
+          WriteErrorReader
+        </a>
+      </td>
+      <td>
+        rwcommands.scala
+      </td>
+      <td>
+        65
+      </td>
+      <td>
+        1
+      </td>
+      <td>
+        10
+      </td>
+      <td>
+        10
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        0
+      </td>
+      <td>
+        <div class="meter">
+          <span style="width: 100%"></span>
+        </div>
+      </td>
+      <td>
+        100,00
+        %
+      </td>
+    </tr>
+      </tbody>
+    </table>
+    </body>
+    </html>
