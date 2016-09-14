@@ -56,8 +56,8 @@ object Publish {
   private val repoName = env("PUBLISH_REPO_NAME")
   private val repoUrl = env("PUBLISH_REPO_URL")
 
+  val majorVersion = "0.12"
   val previousVersion = "0.11.0"
-
 
   val missingMethodInOld: ProblemFilter = {
     case mmp @ MissingMethodProblem(_) if (
@@ -92,7 +92,7 @@ object Publish {
     },
     homepage := Some(url(siteUrl)),
     autoAPIMappings := true,
-    apiURL := Some(url(s"$siteUrl/release/${version.value}/api/")),
+    apiURL := Some(url(s"$siteUrl/release/$majorVersion/api/")),
     pomExtra := (
       <scm>
         <url>git://github.com/ReactiveMongo/ReactiveMongo.git</url>
