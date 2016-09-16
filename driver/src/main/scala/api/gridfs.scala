@@ -122,17 +122,17 @@ trait CustomMetadata[P <: SerializationPack with Singleton] {
  * A file that will be saved in a GridFS store.
  * @tparam Id Type of the id of this file (generally `BSONObjectID` or `BSONValue`).
  */
-trait FileToSave[P <: SerializationPack with Singleton, +Id] extends BasicMetadata[Id] with CustomMetadata[P]
+trait FileToSave[P <: SerializationPack with Singleton, +Id]
+  extends BasicMetadata[Id] with CustomMetadata[P]
 
 /** A BSON implementation of `FileToSave`. */
-class DefaultFileToSave(
-  val filename: Option[String] = None,
-  val contentType: Option[String] = None,
-  val uploadDate: Option[Long] = None,
-  val metadata: BSONDocument = BSONDocument.empty,
-  val id: BSONValue = BSONObjectID.generate()
-)
-    extends FileToSave[BSONSerializationPack.type, BSONValue] with Equals {
+class DefaultFileToSave private[gridfs] (
+    val filename: Option[String] = None,
+    val contentType: Option[String] = None,
+    val uploadDate: Option[Long] = None,
+    val metadata: BSONDocument = BSONDocument.empty,
+    val id: BSONValue = BSONObjectID.generate()
+) extends FileToSave[BSONSerializationPack.type, BSONValue] with Equals {
 
   val pack = BSONSerializationPack
 
@@ -246,6 +246,18 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
    */
   def save[Id <: pack.Value](enumerator: Enumerator[Array[Byte]], file: FileToSave[pack.type, Id], chunkSize: Int = 262144)(implicit readFileReader: pack.Reader[ReadFile[Id]], ctx: ExecutionContext, idProducer: IdProducer[Id], docWriter: BSONDocumentWriter[file.pack.Document]): Future[ReadFile[Id]] = (enumerator |>>> iteratee(file, chunkSize)).flatMap(f => f)
 
+  /**
+   * Saves the content provided by the given enumerator with the given metadata,
+   * with the MD5 computed.
+   *
+   * @param enumerator Producer of content.
+   * @param file Metadata of the file to store.
+   * @param chunkSize Size of the chunks. Defaults to 256kB.
+   *
+   * @return A future of a ReadFile[Id].
+   */
+  def saveWithMD5[Id <: pack.Value](enumerator: Enumerator[Array[Byte]], file: FileToSave[pack.type, Id], chunkSize: Int = 262144)(implicit readFileReader: pack.Reader[ReadFile[Id]], ctx: ExecutionContext, idProducer: IdProducer[Id], docWriter: BSONDocumentWriter[file.pack.Document]): Future[ReadFile[Id]] = (enumerator |>>> iterateeWithMD5(file, chunkSize)).flatMap(f => f)
+
   /** Concats two array - fast way */
   private def concat[T](a1: Array[T], a2: Array[T])(implicit m: Manifest[T]): Array[T] = {
     var i, j = 0
@@ -262,26 +274,56 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
   }
 
   /**
-   * Gets an `Iteratee` that will consume data to put into a GridFS store.
-   * @param file Metadata of the file to store.
+   * Returns an `Iteratee` that will consume data to put into a GridFS store.
+   *
+   * @param file the metadata of the file to store.
    * @param chunkSize Size of the chunks. Defaults to 256kB.
    *
-   * @tparam Id Type of the id of this file (generally `BSONObjectID` or `BSONValue`).
-   *
-   * @return An `Iteratee` that will consume data to put into a GridFS store.
+   * @tparam Id the type of the id of this file (generally `BSONObjectID` or `BSONValue`).
    */
-  @deprecated("Will be moved to the separate iteratee module", "0.12.0")
-  def iteratee[Id <: pack.Value](file: FileToSave[pack.type, Id], chunkSize: Int = 262144)(implicit readFileReader: pack.Reader[ReadFile[Id]], ctx: ExecutionContext, idProducer: IdProducer[Id], docWriter: BSONDocumentWriter[file.pack.Document]): Iteratee[Array[Byte], Future[ReadFile[Id]]] = {
-    implicit def ec = db.connection.actorSystem
+  @deprecated("Use [[iterateeWithMD5]]", "0.12.0")
+  def iteratee[Id <: pack.Value](file: FileToSave[pack.type, Id], chunkSize: Int = 262144)(implicit readFileReader: pack.Reader[ReadFile[Id]], ctx: ExecutionContext, idProducer: IdProducer[Id], docWriter: BSONDocumentWriter[file.pack.Document]): Iteratee[Array[Byte], Future[ReadFile[Id]]] =
+    iterateeMaybeMD5[Id, Unit](file, {}, (_: Unit, chunk) => {},
+      { _: Unit => Future.successful(Option.empty[Array[Byte]]) }, chunkSize)
+
+  /**
+   * Returns an `Iteratee` that will consume data to put into a GridFS store,
+   * computing the MD5.
+   *
+   * @param file the metadata of the file to store.
+   * @param chunkSize Size of the chunks. Defaults to 256kB.
+   *
+   * @tparam Id the type of the id of this file (generally `BSONObjectID` or `BSONValue`).
+   */
+  @deprecated("May be moved to the separate iteratee module", "0.12.0")
+  def iterateeWithMD5[Id <: pack.Value](file: FileToSave[pack.type, Id], chunkSize: Int = 262144)(implicit readFileReader: pack.Reader[ReadFile[Id]], ctx: ExecutionContext, idProducer: IdProducer[Id], docWriter: BSONDocumentWriter[file.pack.Document]): Iteratee[Array[Byte], Future[ReadFile[Id]]] = {
     import java.security.MessageDigest
 
-    case class Chunk(
-        previous: Array[Byte] = new Array(0),
-        n: Int = 0,
-        md: MessageDigest = MessageDigest.getInstance("MD5"),
-        length: Int = 0
-    ) {
+    iterateeMaybeMD5[Id, MessageDigest](file, MessageDigest.getInstance("MD5"),
+      { (md: MessageDigest, chunk) => md.update(chunk); md },
+      { md: MessageDigest => Future(md.digest()).map(Some(_)) },
+      chunkSize)
+  }
 
+  /**
+   * Returns an `Iteratee` that will consume data to put into a GridFS store.
+   *
+   * @param file the metadata of the file to store.
+   * @param digestInit the factory for the message digest
+   * @param digestUpdate the function to update the digest
+   * @param digestFinalize the function to finalize the digest
+   * @param chunkSize Size of the chunks. Defaults to 256kB.
+   *
+   * @tparam Id the type of the id of this file (generally `BSONObjectID` or `BSONValue`).
+   * @tparam M the type of the message digest
+   */
+  private def iterateeMaybeMD5[Id <: pack.Value, M](file: FileToSave[pack.type, Id], digestInit: => M, digestUpdate: (M, Array[Byte]) => M, digestFinalize: M => Future[Option[Array[Byte]]], chunkSize: Int = 262144)(implicit readFileReader: pack.Reader[ReadFile[Id]], ctx: ExecutionContext, idProducer: IdProducer[Id], docWriter: BSONDocumentWriter[file.pack.Document]): Iteratee[Array[Byte], Future[ReadFile[Id]]] = {
+    case class Chunk(
+        previous: Array[Byte],
+        n: Int,
+        md: M,
+        length: Int
+    ) {
       def feed(chunk: Array[Byte]): Future[Chunk] = {
         val wholeChunk = self.concat(previous, chunk)
 
@@ -306,7 +348,7 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
           Chunk(
             if (left.isEmpty) Array.empty else left,
             n + normalizedChunkNumber,
-            md, //{ md.update(chunk) ; md },
+            digestUpdate(md, chunk),
             length + chunk.length
           )
         }
@@ -316,32 +358,35 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
         BSONCollection,
         BSONCollectionProducer
       }
+      import reactivemongo.bson.utils.Converters
 
       def finish(): Future[ReadFile[Id]] = {
-        logger.debug(s"writing last chunk (n=$n)!")
+        logger.debug(s"Writing last chunk #$n")
 
         val uploadDate = file.uploadDate.getOrElse(System.currentTimeMillis)
 
-        writeChunk(n, previous).flatMap { f =>
-          val bson = BSONDocument(idProducer("_id" -> file.id)) ++ (
+        for {
+          f <- writeChunk(n, previous)
+          md5 <- digestFinalize(md)
+          bson = BSONDocument(idProducer("_id" -> file.id)) ++ (
             "filename" -> file.filename.map(BSONString(_)),
             "chunkSize" -> BSONInteger(chunkSize),
             "length" -> BSONLong(length),
             "uploadDate" -> BSONDateTime(uploadDate),
             "contentType" -> file.contentType.map(BSONString(_)),
+            "md5" -> md5.map(Converters.hex2Str),
             "metadata" -> option(!pack.isEmpty(file.metadata), file.metadata)
           )
-
-          files.as[BSONCollection]().insert(bson).map { _ =>
+          res <- files.as[BSONCollection]().insert(bson).map { _ =>
             val buf = ChannelBufferWritableBuffer()
             BSONSerializationPack.writeToBuffer(buf, bson)
             pack.readAndDeserialize(buf.toReadableBuffer, readFileReader)
           }
-        }
+        } yield res
       }
 
       def writeChunk(n: Int, array: Array[Byte]) = {
-        logger.debug(s"writing chunk $n")
+        logger.debug(s"Writing chunk #$n")
 
         val bson = BSONDocument(
           "files_id" -> file.id,
@@ -353,9 +398,10 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
       }
     }
 
-    Iteratee.foldM(Chunk()) { (previous, chunk: Array[Byte]) =>
-      logger.debug(s"processing new enumerated chunk from n=${previous.n}...\n")
-      previous.feed(chunk)
+    Iteratee.foldM(Chunk(Array.empty, 0, digestInit, 0)) {
+      (previous, chunk: Array[Byte]) =>
+        logger.debug(s"Processing new enumerated chunk from n=${previous.n}...\n")
+        previous.feed(chunk)
     }.map(_.finish)
   }
 
