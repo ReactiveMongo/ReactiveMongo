@@ -327,13 +327,9 @@ trait DefaultBSONHandlers {
     }
   }
 
-  implicit def collectionToBSONArrayCollectionWriter[T, Repr <% Traversable[T]](implicit writer: BSONWriter[T, _ <: BSONValue]): VariantBSONWriter[Repr, BSONArray] = {
-    new BSONArrayCollectionWriter[T, Repr]
-  }
+  implicit def collectionToBSONArrayCollectionWriter[T, Repr <% Traversable[T]](implicit writer: BSONWriter[T, _ <: BSONValue]): VariantBSONWriter[Repr, BSONArray] = new BSONArrayCollectionWriter[T, Repr]
 
-  implicit def bsonArrayToCollectionReader[M[_], T](implicit cbf: CanBuildFrom[M[_], T, M[T]], reader: BSONReader[_ <: BSONValue, T]): BSONReader[BSONArray, M[T]] = {
-    new BSONArrayCollectionReader
-  }
+  implicit def bsonArrayToCollectionReader[M[_], T](implicit cbf: CanBuildFrom[M[_], T, M[T]], reader: BSONReader[_ <: BSONValue, T]): BSONReader[BSONArray, M[T]] = new BSONArrayCollectionReader
 
   abstract class IdentityBSONConverter[T <: BSONValue](implicit m: Manifest[T]) extends BSONReader[T, T] with BSONWriter[T, T] {
     override def write(t: T): T = m.runtimeClass.cast(t).asInstanceOf[T]
