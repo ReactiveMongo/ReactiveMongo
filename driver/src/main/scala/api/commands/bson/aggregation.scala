@@ -1,6 +1,7 @@
 package reactivemongo.api.commands.bson
 
 import reactivemongo.bson.{
+  BSONArray,
   BSONDocument,
   BSONDocumentReader,
   BSONElement,
@@ -23,6 +24,9 @@ object BSONAggregationFramework
 
   protected def makeDocument(elements: Seq[Producer[BSONElement]]) =
     BSONDocument(elements: _*)
+
+  protected def makeArray(value: BSONValue, values: Seq[BSONValue]) =
+    BSONArray(value +: values)
 
   protected def elementProducer(name: String, value: BSONValue) =
     name -> value
@@ -64,8 +68,7 @@ object BSONAggregationImplicits {
       if (agg.command.wireVersion < MongoWireVersion.V32) cmd else {
         cmd ++ ("bypassDocumentValidation" -> BSONBoolean(
           agg.command.bypassDocumentValidation
-        ),
-          "readConcern" -> agg.command.readConcern)
+        ), "readConcern" -> agg.command.readConcern)
       }
     }
   }

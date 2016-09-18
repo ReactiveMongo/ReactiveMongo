@@ -1,4 +1,4 @@
-import scala.collection.immutable.ListSet
+import scala.collection.immutable.{ ListSet, Set }
 
 import scala.concurrent.{ ExecutionContext, Future }
 import scala.concurrent.duration.FiniteDuration
@@ -90,10 +90,8 @@ class AggregationSpec extends org.specs2.mutable.Specification {
 
       insert(zipCodes) aka "insert" must beEqualTo({}).await(1, timeout) and (
         coll.count() aka "count #1" must beEqualTo(4).await(1, slowTimeout)
-      ).
-        and(slowZipColl.count() aka "count #2" must beEqualTo(4).
+      ).and(slowZipColl.count() aka "count #2" must beEqualTo(4).
           await(1, slowTimeout))
-
     }
 
     "return states with populations above 10000000" >> {
@@ -125,6 +123,18 @@ class AggregationSpec extends org.specs2.mutable.Specification {
           _ aka "results" must beEqualTo(expected).await(1, slowTimeout)
         }
       }
+
+      "with expected count" in { implicit ee: EE =>
+        import coll.BatchCommands.AggregationFramework
+        import AggregationFramework.{ Group, SumAll }
+
+        coll.aggregate(Group(BSONString("$state"))("count" -> SumAll)).
+          map(_.firstBatch.toSet) must beEqualTo(Set(
+            document("_id" -> "JP", "count" -> 2),
+            document("_id" -> "FR", "count" -> 1),
+            document("_id" -> "NY", "count" -> 1)
+          )).await(1, timeout)
+      }
     }
 
     "explain simple result" in { implicit ee: EE =>
@@ -139,8 +149,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
       coll.aggregate(Group(BSONString("$state"))(
         "totalPop" -> SumField("population")
       ), List(
-        Match(document("totalPop" ->
-          document("$gte" -> 10000000L)))
+        Match(document("totalPop" -> document("$gte" -> 10000000L)))
       ), explain = true).map(_.firstBatch).
         aka("results") must beLike[List[BSONDocument]] {
           case explainResult :: Nil =>
@@ -314,47 +323,47 @@ class AggregationSpec extends org.specs2.mutable.Specification {
       coll.aggregate(AggregationFramework.Sample(2)).map(_.head[ZipCode].
         filter(zipCodes.contains).size) must beEqualTo(2).await(0, timeout)
     } tag "not_mongo26"
+  }
 
-    "perform simple lookup" >> {
-      // See https://docs.mongodb.com/master/reference/operator/aggregation/lookup/#examples
+  "Inventory #1" should {
+    val orders = db.collection(s"agg-orders-1-${System identityHashCode this}")
+    val inventory = db.collection(
+      s"agg-inv-1-${System identityHashCode orders}"
+    )
 
-      val orders = db.collection(s"agg-orders-1-${System identityHashCode this}")
-      val inventory = db.collection(
-        s"agg-inv-1-${System identityHashCode orders}"
-      )
+    "be provided with order fixtures" in { implicit ee: EE =>
+      (for {
+        // orders
+        _ <- orders.insert(BSONDocument(
+          "_id" -> 1, "item" -> "abc", "price" -> 12, "quantity" -> 2
+        ))
+        _ <- orders.insert(BSONDocument(
+          "_id" -> 2, "item" -> "jkl", "price" -> 20, "quantity" -> 1
+        ))
+        _ <- orders.insert(BSONDocument("_id" -> 3))
 
-      "when fixtures are successfully inserted" in { implicit ee: EE =>
-        (for {
-          // orders
-          _ <- orders.insert(BSONDocument(
-            "_id" -> 1, "item" -> "abc", "price" -> 12, "quantity" -> 2
-          ))
-          _ <- orders.insert(BSONDocument(
-            "_id" -> 2, "item" -> "jkl", "price" -> 20, "quantity" -> 1
-          ))
-          _ <- orders.insert(BSONDocument("_id" -> 3))
+        // inventory
+        _ <- inventory.insert(BSONDocument("_id" -> 1, "sku" -> "abc",
+          "description" -> "product 1", "instock" -> 120))
+        _ <- inventory.insert(BSONDocument("_id" -> 2, "sku" -> "def",
+          "description" -> "product 2", "instock" -> 80))
+        _ <- inventory.insert(BSONDocument("_id" -> 3, "sku" -> "ijk",
+          "description" -> "product 3", "instock" -> 60))
+        _ <- inventory.insert(BSONDocument("_id" -> 4, "sku" -> "jkl",
+          "description" -> "product 4", "instock" -> 70))
+        _ <- inventory.insert(BSONDocument(
+          "_id" -> 5,
+          "sku" -> Option.empty[String], "description" -> "Incomplete"
+        ))
+        _ <- inventory.insert(BSONDocument("_id" -> 6))
+      } yield ()) must beEqualTo({}).await(0, timeout)
+    } tag "not_mongo26"
 
-          // inventory
-          _ <- inventory.insert(BSONDocument("_id" -> 1, "sku" -> "abc",
-            "description" -> "product 1", "instock" -> 120))
-          _ <- inventory.insert(BSONDocument("_id" -> 2, "sku" -> "def",
-            "description" -> "product 2", "instock" -> 80))
-          _ <- inventory.insert(BSONDocument("_id" -> 3, "sku" -> "ijk",
-            "description" -> "product 3", "instock" -> 60))
-          _ <- inventory.insert(BSONDocument("_id" -> 4, "sku" -> "jkl",
-            "description" -> "product 4", "instock" -> 70))
-          _ <- inventory.insert(BSONDocument(
-            "_id" -> 5,
-            "sku" -> Option.empty[String], "description" -> "Incomplete"
-          ))
-          _ <- inventory.insert(BSONDocument("_id" -> 6))
-        } yield ()) must beEqualTo({}).await(0, timeout)
-      } tag "not_mongo26"
+    "perform a simple lookup so the joined documents are returned" in {
+      implicit ee: EE => // See https://docs.mongodb.com/master/reference/operator/aggregation/lookup/#examples
 
-      implicit val productHandler = Macros.handler[Product]
-      implicit val invReportHandler = Macros.handler[InventoryReport]
-
-      "so the joined documents are returned" in { implicit ee: EE =>
+        implicit val productHandler = Macros.handler[Product]
+        implicit val invReportHandler = Macros.handler[InventoryReport]
         import orders.BatchCommands.AggregationFramework.Lookup
 
         def expected = List(
@@ -371,69 +380,67 @@ class AggregationSpec extends org.specs2.mutable.Specification {
           map(_.head[InventoryReport].toList) must beEqualTo(expected).
           await(0, timeout)
 
-      } tag "not_mongo26"
-    }
+    } tag "not_mongo26"
 
-    "filter results" >> {
+    val sales = db.collection(s"agg-sales-A-${System identityHashCode this}")
+    implicit val saleItemHandler = Macros.handler[SaleItem]
+    implicit val saleHandler = Macros.handler[Sale]
+
+    "be provided with sale fixtures" in { implicit ee: EE =>
+      def fixtures = Seq(
+        document("_id" -> 0, "items" -> array(
+          document("itemId" -> 43, "quantity" -> 2, "price" -> 10),
+          document("itemId" -> 2, "quantity" -> 1, "price" -> 240)
+        )),
+        document("_id" -> 1, "items" -> array(
+          document("itemId" -> 23, "quantity" -> 3, "price" -> 110),
+          document("itemId" -> 103, "quantity" -> 4, "price" -> 5),
+          document("itemId" -> 38, "quantity" -> 1, "price" -> 300)
+        )),
+        document("_id" -> 2, "items" -> array(
+          document("itemId" -> 4, "quantity" -> 1, "price" -> 23)
+        ))
+      )
+
+      Future.sequence(fixtures.map { doc => sales.insert(doc) }).
+        map(_ => {}) must beEqualTo({}).await(0, timeout)
+    } tag "not_mongo26"
+
+    "filter when using a '$project' stage" in { implicit ee: EE =>
       // See https://docs.mongodb.com/master/reference/operator/aggregation/filter/#example
-      val sales = db.collection(s"agg-sales-A-${System identityHashCode this}")
-      implicit val saleItemHandler = Macros.handler[SaleItem]
-      implicit val saleHandler = Macros.handler[Sale]
 
-      "when fixtures are successfully inserted" in { implicit ee: EE =>
-        def fixtures = Seq(
-          document("_id" -> 0, "items" -> array(
-            document("itemId" -> 43, "quantity" -> 2, "price" -> 10),
-            document("itemId" -> 2, "quantity" -> 1, "price" -> 240)
-          )),
-          document("_id" -> 1, "items" -> array(
-            document("itemId" -> 23, "quantity" -> 3, "price" -> 110),
-            document("itemId" -> 103, "quantity" -> 4, "price" -> 5),
-            document("itemId" -> 38, "quantity" -> 1, "price" -> 300)
-          )),
-          document("_id" -> 2, "items" -> array(
-            document("itemId" -> 4, "quantity" -> 1, "price" -> 23)
-          ))
-        )
+      import sales.BatchCommands.AggregationFramework.{
+        Ascending,
+        Project,
+        Filter,
+        Sort
+      }
 
-        Future.sequence(fixtures.map { doc => sales.insert(doc) }).
-          map(_ => {}) must beEqualTo({}).await(0, timeout)
-      } tag "not_mongo26"
+      def expected = List(
+        Sale(_id = 0, items = List(SaleItem(2, 1, 240))),
+        Sale(_id = 1, items = List(
+          SaleItem(23, 3, 110), SaleItem(38, 1, 300)
+        )),
+        Sale(_id = 2, items = Nil)
+      )
+      val sort = Sort(Ascending("_id"))
 
-      "when using a '$project' stage" in { implicit ee: EE =>
-        import sales.BatchCommands.AggregationFramework.{
-          Ascending,
-          Project,
-          Filter,
-          Sort
-        }
-
-        def expected = List(
-          Sale(_id = 0, items = List(SaleItem(2, 1, 240))),
-          Sale(_id = 1, items = List(
-            SaleItem(23, 3, 110), SaleItem(38, 1, 300)
-          )),
-          Sale(_id = 2, items = Nil)
-        )
-        val sort = Sort(Ascending("_id"))
-
-        sales.aggregate(Project(document("items" -> Filter(
-          input = BSONString("$items"),
-          as = "item",
-          cond = document("$gte" -> array("$$item.price", 100))
-        ))), List(sort)).map(_.head[Sale]) must beEqualTo(expected).
-          await(0, timeout)
-      } tag "not_mongo26"
-    }
+      sales.aggregate(Project(document("items" -> Filter(
+        input = BSONString("$items"),
+        as = "item",
+        cond = document("$gte" -> array("$$item.price", 100))
+      ))), List(sort)).map(_.head[Sale]) must beEqualTo(expected).
+        await(0, timeout)
+    } tag "not_mongo26"
   }
 
-  "perform lookup with array" >> {
+  "Inventory #2" should {
     val orders = db.collection(s"agg-order-2-${System identityHashCode this}")
     val inventory = db.collection(
       s"agg-inv-2-${System identityHashCode orders}"
     )
 
-    "when fixtures are successfully inserted" in { implicit ee: EE =>
+    "be provided the fixtures" in { implicit ee: EE =>
       (for {
         // orders
         _ <- orders.insert(BSONDocument(
@@ -521,7 +528,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
 
     "should be outputed to collection" in { implicit ee: EE =>
       import books.BatchCommands.AggregationFramework
-      import AggregationFramework.{ Ascending, Group, Push, Out, Sort }
+      import AggregationFramework.{ Ascending, Group, PushField, Out, Sort }
 
       val outColl = s"authors-1-${System identityHashCode this}"
 
@@ -536,10 +543,9 @@ class AggregationSpec extends org.specs2.mutable.Specification {
       books.aggregate(
         Sort(Ascending("title")),
         List(Group(BSONString("$author"))(
-          "books" -> Push("title")
+          "books" -> PushField("title")
         ), Out(outColl))
-      ).map(_ => {}).
-        aka("$out aggregation") must beEqualTo({}).await(0, timeout) and {
+      ).map(_ => {}) must beEqualTo({}).await(0, timeout) and {
           db.collection(outColl).find(BSONDocument.empty).cursor[Author]().
             collect[List](3, Cursor.FailOnError[List[Author]]()) must beEqualTo(
               List(
@@ -548,6 +554,33 @@ class AggregationSpec extends org.specs2.mutable.Specification {
               )
             ).await(0, timeout)
         }
+    }
+
+    "should be added to set" in { implicit ee: EE =>
+      import books.BatchCommands.AggregationFramework
+      import AggregationFramework.{ Ascending, Group, AddFieldToSet, Sort }
+
+      val outColl = s"authors-1-${System identityHashCode this}"
+
+      type Author = (String, List[String])
+      implicit val authorReader = BSONDocumentReader[Author] { doc =>
+        (for {
+          id <- doc.getAsTry[String]("_id")
+          books <- doc.getAsTry[List[String]]("books")
+        } yield id -> books).get
+      }
+
+      books.aggregate(
+        Sort(Ascending("title")),
+        List(Group(BSONString("$author"))(
+          "books" -> AddFieldToSet("title")
+        ))
+      ).map(_.firstBatch.toSet) must beEqualTo(List(
+          document("_id" -> "Homer", "books" -> List("The Odyssey", "Iliad")),
+          document("_id" -> "Dante", "books" -> List(
+            "The Banquet", "Eclogues", "Divine Comedy"
+          ))
+        )).await(1, timeout)
     }
   }
 
@@ -594,7 +627,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
 
       Future.sequence(fixtures.map { doc => contest.insert(doc) }).map(_ => {}).
         aka("fixtures") must beEqualTo({}).await(0, timeout)
-    } tag "not_mongo26"
+    }
 
     "return the standard deviation of each quiz" in { implicit ee: EE =>
       import contest.BatchCommands.AggregationFramework.{
@@ -622,6 +655,97 @@ class AggregationSpec extends org.specs2.mutable.Specification {
        { "_id" : 2, "stdDev" : 8.04155872120988 }
        */
     } tag "not_mongo26"
+
+    "return a sum as hash per quiz" in { implicit ee: EE =>
+      import contest.BatchCommands.AggregationFramework.{ Group, Sum }
+
+      contest.aggregate(Group(BSONString("$quiz"))(
+        "hash" -> Sum(document("$multiply" -> array("$_id", "$score")))
+      )).map(_.firstBatch.toSet) must beEqualTo(Set(
+        document("_id" -> 2, "hash" -> 1261),
+        document("_id" -> 1, "hash" -> 478)
+      )).await(1, timeout)
+    }
+
+    "return the maximum score per quiz" in { implicit ee: EE =>
+      import contest.BatchCommands.AggregationFramework.{ Group, MaxField }
+
+      contest.aggregate(Group(BSONString("$quiz"))(
+        "maxScore" -> MaxField("score")
+      )).map(_.firstBatch.toSet) must beEqualTo(Set(
+        document("_id" -> 2, "maxScore" -> 96),
+        document("_id" -> 1, "maxScore" -> 90)
+      )).await(1, timeout)
+    }
+
+    "return a max as hash per quiz" in { implicit ee: EE =>
+      import contest.BatchCommands.AggregationFramework.{ Group, Max }
+
+      contest.aggregate(Group(BSONString("$quiz"))(
+        "maxScore" -> Max(document("$multiply" -> array("$_id", "$score")))
+      )).map(_.firstBatch.toSet) must beEqualTo(Set(
+        document("_id" -> 2, "maxScore" -> 492),
+        document("_id" -> 1, "maxScore" -> 213)
+      )).await(1, timeout)
+    }
+
+    "return the minimum score per quiz" in { implicit ee: EE =>
+      import contest.BatchCommands.AggregationFramework.{ Group, MinField }
+
+      contest.aggregate(Group(BSONString("$quiz"))(
+        "minScore" -> MinField("score")
+      )).map(_.firstBatch.toSet) must beEqualTo(Set(
+        document("_id" -> 2, "minScore" -> 77),
+        document("_id" -> 1, "minScore" -> 71)
+      )).await(1, timeout)
+    }
+
+    "return a min as hash per quiz" in { implicit ee: EE =>
+      import contest.BatchCommands.AggregationFramework.{ Group, Min }
+
+      contest.aggregate(Group(BSONString("$quiz"))(
+        "minScore" -> Min(document("$multiply" -> array("$_id", "$score")))
+      )).map(_.firstBatch.map(x => { println(s"x = ${BSONDocument pretty x}"); x }).toSet) must beEqualTo(Set(
+        document("_id" -> 2, "minScore" -> 384),
+        document("_id" -> 1, "minScore" -> 85)
+      )).await(1, timeout)
+    }
+
+    "push name and score per quiz group" in { implicit ee: EE =>
+      import contest.BatchCommands.AggregationFramework.{ Group, Push }
+
+      val expected = Set(
+        QuizScores(2, Set(
+          Score("ty", 82), Score("annT", 77), Score("li", 96)
+        )),
+        QuizScores(1, Set(
+          Score("dave123", 85), Score("dave2", 90), Score("ahn", 71)
+        ))
+      )
+
+      contest.aggregate(Group(BSONString("$quiz"))(
+        "scores" -> Push(document("name" -> "$name", "score" -> "$score"))
+      )).map(_.head[QuizScores].toSet) must beEqualTo(expected).
+        await(1, timeout)
+    }
+
+    "add name and score to a set per quiz group" in { implicit ee: EE =>
+      import contest.BatchCommands.AggregationFramework.{ Group, AddToSet }
+
+      val expected = Set(
+        QuizScores(2, Set(
+          Score("ty", 82), Score("annT", 77), Score("li", 96)
+        )),
+        QuizScores(1, Set(
+          Score("dave123", 85), Score("dave2", 90), Score("ahn", 71)
+        ))
+      )
+
+      contest.aggregate(Group(BSONString("$quiz"))(
+        "scores" -> AddToSet(document("name" -> "$name", "score" -> "$score"))
+      )).map(_.head[QuizScores].toSet) must beEqualTo(expected).
+        await(1, timeout)
+    }
   }
 
   "Aggregation result '$stdDevSamp'" >> {
@@ -1070,4 +1194,15 @@ db.accounts.aggregate([
     year: Int,
     subsections: List[Subsection]
   )
+
+  case class Score(name: String, score: Int)
+  implicit val scoreReader = Macros.reader[Score]
+
+  case class QuizScores(_id: Int, scores: Set[Score])
+  implicit val reader = BSONDocumentReader[QuizScores] { doc =>
+    (for {
+      i <- doc.getAsTry[Int]("_id")
+      s <- doc.getAsTry[Set[Score]]("scores")
+    } yield QuizScores(i, s)).get
+  }
 }

@@ -7,7 +7,7 @@ import reactivemongo.core.protocol.MongoWireVersion
  * Implements the [[http://docs.mongodb.org/manual/applications/aggregation/ Aggregation Framework]].
  */
 trait AggregationFramework[P <: SerializationPack]
-    extends ImplicitCommandHelpers[P] {
+    extends ImplicitCommandHelpers[P] with GroupAggregation[P] {
 
   /**
    * @param batchSize the initial batch size for the cursor
@@ -60,6 +60,9 @@ trait AggregationFramework[P <: SerializationPack]
   /** Returns a document from a sequence of element producers. */
   protected def makeDocument(elements: Seq[pack.ElementProducer]): pack.Document
   // TODO: Move to SerializationPack?
+
+  /** Returns a non empty array of values */
+  protected def makeArray(value: pack.Value, values: Seq[pack.Value]): pack.Value
 
   /**
    * Returns a producer of element for the given `name` and `value`.
@@ -218,30 +221,6 @@ trait AggregationFramework[P <: SerializationPack]
   case class Unwind(field: String) extends PipelineOperator {
     val makePipe: pack.Document =
       makeDocument(Seq(elementProducer("$unwind", stringValue("$" + field))))
-  }
-
-  /**
-   * Represents one of the group operators for the "Group" Operation.
-   * This class is sealed as these are defined in the MongoDB spec,
-   * and clients should not need to customise these.
-   */
-  sealed trait GroupFunction {
-    def makeFunction: pack.Value
-  }
-
-  /** Factory to declare custom call to a group function. */
-  object GroupFunction {
-    /**
-     * Creates a call to specified group function with given argument.
-     *
-     * @param name The name of the group function (e.g. `\$sum`)
-     * @param arg The group function argument
-     * @return A group function call defined as `{ name: arg }`
-     */
-    def apply(name: String, arg: pack.Value): GroupFunction =
-      new GroupFunction {
-        val makeFunction = makeDocument(Seq(elementProducer(name, arg)))
-      }
   }
 
   /**
@@ -425,6 +404,36 @@ trait AggregationFramework[P <: SerializationPack]
     def makePipe =
       makeDocument(Seq(elementProducer("$out", stringValue(collection))))
   }
+}
+
+sealed trait GroupAggregation[P <: SerializationPack] {
+  aggregation: AggregationFramework[P] =>
+
+  /**
+   * Represents one of the group/accumulator operators,
+   * for the `\$group` aggregation. Operation.
+   * @see https://docs.mongodb.com/manual/reference/operator/aggregation/group/#accumulator-operator
+   */
+  sealed trait GroupFunction {
+    def makeFunction: pack.Value
+  }
+
+  /** Factory to declare custom call to a group function. */
+  object GroupFunction {
+    /**
+     * Creates a call to specified group function with given argument.
+     *
+     * @param name The name of the group function (e.g. `\$sum`)
+     * @param arg The group function argument
+     * @return A group function call defined as `{ name: arg }`
+     */
+    def apply(name: String, arg: pack.Value): GroupFunction =
+      new GroupFunction {
+        val makeFunction = makeDocument(Seq(elementProducer(name, arg)))
+      }
+  }
+
+  // ---
 
   case class SumField(field: String) extends GroupFunction {
     val makeFunction = makeDocument(Seq(elementProducer(
@@ -432,6 +441,21 @@ trait AggregationFramework[P <: SerializationPack]
     )))
   }
 
+  /**
+   * @param sumExpr the `\$sum` expression
+   */
+  case class Sum(sumExpr: pack.Value) extends GroupFunction {
+    val makeFunction = makeDocument(Seq(elementProducer("$sum", sumExpr)))
+  }
+
+  /** Sum operation of the form `$sum: 1` */
+  case object SumAll extends GroupFunction {
+    val makeFunction = makeDocument(Seq(elementProducer(
+      "$sum", intValue(1)
+    )))
+  }
+
+  @deprecated("Use [[SumAll]]", "0.12.0")
   case class SumValue(value: Int) extends GroupFunction {
     val makeFunction = makeDocument(Seq(elementProducer(
       "$sum", intValue(value)
@@ -456,35 +480,57 @@ trait AggregationFramework[P <: SerializationPack]
     )))
   }
 
-  case class Max(field: String) extends GroupFunction {
+  case class MaxField(field: String) extends GroupFunction {
     val makeFunction = makeDocument(Seq(elementProducer(
       "$max", stringValue("$" + field)
     )))
   }
 
-  case class Min(field: String) extends GroupFunction {
+  /**
+   * @param maxExpr the `\$max` expression
+   */
+  case class Max(maxExpr: pack.Value) extends GroupFunction {
+    val makeFunction = makeDocument(Seq(elementProducer("$max", maxExpr)))
+  }
+
+  case class MinField(field: String) extends GroupFunction {
     val makeFunction = makeDocument(Seq(elementProducer(
       "$min", stringValue("$" + field)
     )))
   }
 
-  case class Push(field: String) extends GroupFunction {
+  /**
+   * @param minExpr the `\$min` expression
+   */
+  case class Min(minExpr: pack.Value) extends GroupFunction {
+    val makeFunction = makeDocument(Seq(elementProducer("$min", minExpr)))
+  }
+
+  case class PushField(field: String) extends GroupFunction {
     val makeFunction = makeDocument(Seq(elementProducer(
       "$push", stringValue("$" + field)
     )))
   }
 
-  case class PushMulti(fields: (String, String)*) extends GroupFunction {
+  /**
+   * @param pushExpr the `\$push` expression
+   */
+  case class Push(pushExpr: pack.Value) extends GroupFunction {
+    val makeFunction = makeDocument(Seq(elementProducer("$push", pushExpr)))
+  }
+
+  case class AddFieldToSet(field: String) extends GroupFunction {
     val makeFunction = makeDocument(Seq(elementProducer(
-      "$push",
-      makeDocument(fields.map(field =>
-        elementProducer(field._1, stringValue("$" + field._2))))
+      "$addToSet", stringValue("$" + field)
     )))
   }
 
-  case class AddToSet(field: String) extends GroupFunction {
+  /**
+   * @param addToSetExpr the `\$addToSet` expression
+   */
+  case class AddToSet(addToSetExpr: pack.Value) extends GroupFunction {
     val makeFunction = makeDocument(Seq(elementProducer(
-      "$addToSet", stringValue("$" + field)
+      "$addToSet", addToSetExpr
     )))
   }
 

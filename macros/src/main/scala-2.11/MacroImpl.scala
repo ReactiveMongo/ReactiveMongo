@@ -135,7 +135,7 @@ private object MacroImpl {
         val pname = paramName(param)
 
         if (reader.isEmpty) {
-          c.abort(c.enclosingPosition, s"Implicit ${classOf[Reader[_]].getName}[${A.typeSymbol.name}] for '$pname' not found")
+          c.abort(c.enclosingPosition, s"Implicit ${classOf[Reader[_]].getName}[${sig.typeSymbol.fullName}] not found for '$pname'")
         }
 
         opt match {
