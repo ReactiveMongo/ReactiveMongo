@@ -429,15 +429,9 @@ object BSONObjectID {
   /**
    * Constructs a BSON ObjectId element from a hexadecimal String representation.
    * Throws an exception if the given argument is not a valid ObjectID.
-   *
-   * `parse(str: String): Try[BSONObjectID]` should be considered instead of this method.
    */
-  def apply(id: String): BSONObjectID = {
-    if (id.length != 24)
-      throw new IllegalArgumentException(s"wrong ObjectId: '$id'")
-    /** Constructs a BSON ObjectId element from a hexadecimal String representation */
-    new BSONObjectID(Converters.str2Hex(id))
-  }
+  @deprecated("`parse(str: String): Try[BSONObjectID]` should be considered instead of this method", "0.12.0")
+  def apply(id: String): BSONObjectID = parse(id).get
 
   def apply(array: Array[Byte]): BSONObjectID = {
     if (array.length != 12)
@@ -448,7 +442,12 @@ object BSONObjectID {
   def unapply(id: BSONObjectID): Option[Array[Byte]] = Some(id.valueAsArray)
 
   /** Tries to make a BSON ObjectId element from a hexadecimal String representation. */
-  def parse(str: String): Try[BSONObjectID] = Try(apply(str))
+  def parse(id: String): Try[BSONObjectID] = Try {
+    if (id.length != 24)
+      throw new IllegalArgumentException(s"wrong ObjectId: '$id'")
+    /** Constructs a BSON ObjectId element from a hexadecimal String representation */
+    new BSONObjectID(Converters.str2Hex(id))
+  }
 
   /**
    * Generates a new BSON ObjectID.

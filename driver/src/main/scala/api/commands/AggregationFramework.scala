@@ -462,21 +462,37 @@ sealed trait GroupAggregation[P <: SerializationPack] {
     )))
   }
 
-  case class Avg(field: String) extends GroupFunction {
+  case class AvgField(field: String) extends GroupFunction {
     val makeFunction = makeDocument(Seq(elementProducer(
       "$avg", stringValue("$" + field)
     )))
   }
 
-  case class First(field: String) extends GroupFunction {
+  case class Avg(avgExpr: pack.Value) extends GroupFunction {
+    val makeFunction = makeDocument(Seq(elementProducer("$avg", avgExpr)))
+  }
+
+  case class FirstField(field: String) extends GroupFunction {
     val makeFunction = makeDocument(Seq(elementProducer(
       "$first", stringValue("$" + field)
     )))
   }
 
-  case class Last(field: String) extends GroupFunction {
+  case class First(firstExpr: pack.Value) extends GroupFunction {
+    val makeFunction = makeDocument(Seq(elementProducer(
+      "$first", firstExpr
+    )))
+  }
+
+  case class LastField(field: String) extends GroupFunction {
     val makeFunction = makeDocument(Seq(elementProducer(
       "$last", stringValue("$" + field)
+    )))
+  }
+
+  case class Last(lastExpr: pack.Value) extends GroupFunction {
+    val makeFunction = makeDocument(Seq(elementProducer(
+      "$last", lastExpr
     )))
   }
 
@@ -541,10 +557,24 @@ sealed trait GroupAggregation[P <: SerializationPack] {
     )))
   }
 
+  /** The [[https://docs.mongodb.com/manual/reference/operator/aggregation/stdDevPop/ \$stdDevPop]] for a single field (since MongoDB 3.2) */
+  case class StdDevPopField(field: String) extends GroupFunction {
+    val makeFunction = makeDocument(Seq(elementProducer(
+      "$stdDevPop", stringValue("$" + field)
+    )))
+  }
+
   /** The [[https://docs.mongodb.com/manual/reference/operator/aggregation/stdDevSamp/ \$stdDevSamp]] group accumulator (since MongoDB 3.2) */
   case class StdDevSamp(expression: pack.Value) extends GroupFunction {
     val makeFunction = makeDocument(Seq(elementProducer(
       "$stdDevSamp", expression
+    )))
+  }
+
+  /** The [[https://docs.mongodb.com/manual/reference/operator/aggregation/stdDevSamp/ \$stdDevSamp]] for a single field (since MongoDB 3.2) */
+  case class StdDevSampField(field: String) extends GroupFunction {
+    val makeFunction = makeDocument(Seq(elementProducer(
+      "$stdDevSamp", stringValue("$" + field)
     )))
   }
 }
