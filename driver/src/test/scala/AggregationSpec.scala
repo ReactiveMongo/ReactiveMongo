@@ -175,7 +175,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
 
         val pipeline = List(
           Group(BSONString("$_id.state"))("avgCityPop" ->
-            AggregationFramework.Avg("pop"))
+            AggregationFramework.AvgField("pop"))
         )
 
         f(firstOp, pipeline)
@@ -240,9 +240,9 @@ class AggregationSpec extends org.specs2.mutable.Specification {
       // See http://docs.mongodb.org/manual/tutorial/aggregation-zip-code-data-set/#return-largest-and-smallest-cities-by-state
       import coll.BatchCommands.AggregationFramework
       import AggregationFramework.{
-        First,
+        FirstField,
         Group,
-        Last,
+        LastField,
         Project,
         Sort,
         Ascending,
@@ -285,10 +285,10 @@ class AggregationSpec extends org.specs2.mutable.Specification {
         List(
           Sort(Ascending("population")),
           Group(BSONString("$_id.state"))(
-            "biggestCity" -> Last("_id.city"),
-            "biggestPop" -> Last("pop"),
-            "smallestCity" -> First("_id.city"),
-            "smallestPop" -> First("pop")
+            "biggestCity" -> LastField("_id.city"),
+            "biggestPop" -> LastField("pop"),
+            "smallestCity" -> FirstField("_id.city"),
+            "smallestPop" -> FirstField("pop")
           ),
           Project(document("_id" -> 0, "state" -> "$_id",
             "biggestCity" -> document(
@@ -298,9 +298,9 @@ class AggregationSpec extends org.specs2.mutable.Specification {
               "name" -> "$smallestCity", "population" -> "$smallestPop"
             )))
         )
-      ).
-        map(_.firstBatch) aka "results" must beEqualTo(expected).
-        await(1, timeout)
+      ).map(_.firstBatch) aka "results" must beEqualTo(
+          expected
+        ).await(1, timeout)
     }
 
     "return distinct states" >> {
@@ -634,7 +634,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
         Ascending,
         Group,
         Sort,
-        StdDevPop
+        StdDevPopField
       }
 
       implicit val reader = Macros.reader[QuizStdDev]
@@ -645,7 +645,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
        ])
       */
       contest.aggregate(Group(BSONString("$quiz"))(
-        "stdDev" -> StdDevPop(BSONString("$score"))
+        "stdDev" -> StdDevPopField("score")
       ), List(Sort(Ascending("_id")))).map(_.head[QuizStdDev]).
         aka("$stdDevPop results") must beEqualTo(List(
           QuizStdDev(1, 8.04155872120988D), QuizStdDev(2, 8.04155872120988D)
