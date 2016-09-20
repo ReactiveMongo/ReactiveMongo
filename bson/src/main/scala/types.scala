@@ -224,13 +224,13 @@ case class BSONArray(stream: Stream[Try[BSONValue]])
     }.toStream)
 
   /**
-   * Alias for [[merge]]
+   * Alias for `merge`.
    */
   @deprecated("Use the corresponding [[merge]]", "0.12.0")
   def add(doc: BSONArray): BSONArray = merge(doc)
 
   /**
-   * Alias for [[merge]]
+   * Alias for `merge`.
    */
   def add(values: Producer[BSONValue]*): BSONArray = merge(values: _*)
 

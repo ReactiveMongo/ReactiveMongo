@@ -92,7 +92,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
         coll.count() aka "count #1" must beEqualTo(4).await(1, slowTimeout)
       ).and(slowZipColl.count() aka "count #2" must beEqualTo(4).
           await(1, slowTimeout))
-    }
+    } tag "wip"
 
     "return states with populations above 10000000" >> {
       // http://docs.mongodb.org/manual/tutorial/aggregation-zip-code-data-set/#return-states-with-populations-above-10-million
@@ -243,9 +243,11 @@ class AggregationSpec extends org.specs2.mutable.Specification {
         FirstField,
         Group,
         LastField,
+        Limit,
         Project,
         Sort,
         Ascending,
+        Skip,
         SumField
       }
 
@@ -278,30 +280,41 @@ class AggregationSpec extends org.specs2.mutable.Specification {
         )
       )
 
+      val groupPipeline = List(
+        Sort(Ascending("population")),
+        Group(BSONString("$_id.state"))(
+          "biggestCity" -> LastField("_id.city"),
+          "biggestPop" -> LastField("pop"),
+          "smallestCity" -> FirstField("_id.city"),
+          "smallestPop" -> FirstField("pop")
+        ),
+        Project(document("_id" -> 0, "state" -> "$_id",
+          "biggestCity" -> document(
+            "name" -> "$biggestCity", "population" -> "$biggestPop"
+          ),
+          "smallestCity" -> document(
+            "name" -> "$smallestCity", "population" -> "$smallestPop"
+          )))
+      )
+
       coll.aggregate(
         Group(document("state" -> "$state", "city" -> "$city"))(
           "pop" -> SumField("population")
-        ),
-        List(
-          Sort(Ascending("population")),
-          Group(BSONString("$_id.state"))(
-            "biggestCity" -> LastField("_id.city"),
-            "biggestPop" -> LastField("pop"),
-            "smallestCity" -> FirstField("_id.city"),
-            "smallestPop" -> FirstField("pop")
-          ),
-          Project(document("_id" -> 0, "state" -> "$_id",
-            "biggestCity" -> document(
-              "name" -> "$biggestCity", "population" -> "$biggestPop"
-            ),
-            "smallestCity" -> document(
-              "name" -> "$smallestCity", "population" -> "$smallestPop"
-            )))
-        )
-      ).map(_.firstBatch) aka "results" must beEqualTo(
-          expected
-        ).await(1, timeout)
-    }
+        ), groupPipeline
+      ).map(_.firstBatch) must beEqualTo(expected).await(1, timeout) and {
+          coll.aggregate(
+            Group(document("state" -> "$state", "city" -> "$city"))(
+              "pop" -> SumField("population")
+            ), Limit(2) :: groupPipeline
+          ).map(_.firstBatch) must beEqualTo(expected drop 2).await(1, timeout)
+        } and {
+          coll.aggregate(
+            Group(document("state" -> "$state", "city" -> "$city"))(
+              "pop" -> SumField("population")
+            ), Skip(2) :: groupPipeline
+          ).map(_.firstBatch) must beEqualTo(expected take 2).await(1, timeout)
+        }
+    } tag "wip"
 
     "return distinct states" >> {
       def distinctSpec(c: BSONCollection, timeout: FiniteDuration)(implicit ee: EE) = c.distinct[String, ListSet]("state").
