@@ -7,7 +7,8 @@ import reactivemongo.core.protocol.MongoWireVersion
  * Implements the [[http://docs.mongodb.org/manual/applications/aggregation/ Aggregation Framework]].
  */
 trait AggregationFramework[P <: SerializationPack]
-    extends ImplicitCommandHelpers[P] with GroupAggregation[P] {
+    extends ImplicitCommandHelpers[P]
+    with GroupAggregation[P] { //with UnwindAggregation[P] {
 
   /**
    * @param batchSize the initial batch size for the cursor
@@ -213,17 +214,6 @@ trait AggregationFramework[P <: SerializationPack]
   }
 
   /**
-   * Turns a document with an array into multiple documents,
-   * one document for each element in the array.
-   * http://docs.mongodb.org/manual/reference/aggregation/unwind/#_S_unwind
-   * @param field the name of the array to unwind
-   */
-  case class Unwind(field: String) extends PipelineOperator {
-    val makePipe: pack.Document =
-      makeDocument(Seq(elementProducer("$unwind", stringValue("$" + field))))
-  }
-
-  /**
    * Groups documents together to calulate aggregates on document collections.
    * This command aggregates on arbitrary identifiers.
    * Document fields identifier must be prefixed with `$`.
@@ -403,6 +393,94 @@ trait AggregationFramework[P <: SerializationPack]
   case class Out(collection: String) extends PipelineOperator {
     def makePipe =
       makeDocument(Seq(elementProducer("$out", stringValue(collection))))
+  }
+
+  // Unwind
+
+  class Unwind private[commands] (
+    val productArity: Int,
+    element: Int => Any,
+    operator: => pack.Document
+  ) extends PipelineOperator with Product
+      with Serializable with java.io.Serializable {
+
+    val makePipe: pack.Document = operator
+
+    final def canEqual(that: Any): Boolean = that.isInstanceOf[Unwind]
+
+    final def productElement(n: Int) = element(n)
+  }
+
+  /**
+   * Turns a document with an array into multiple documents,
+   * one document for each element in the array.
+   * http://docs.mongodb.org/manual/reference/aggregation/unwind/#_S_unwind
+   * @param field the name of the array to unwind
+   */
+  case class UnwindField(field: String) extends Unwind(1, { case 1 => field },
+    makeDocument(Seq(elementProducer("$unwind", stringValue("$" + field)))))
+
+  object Unwind {
+    /**
+     * Turns a document with an array into multiple documents,
+     * one document for each element in the array.
+     * http://docs.mongodb.org/manual/reference/aggregation/unwind/#_S_unwind
+     * @param field the name of the array to unwind
+     */
+    @deprecated("Use [[AggregationFramework#UnwindField]]", "0.12.0")
+    def apply(field: String): Unwind = UnwindField(field)
+
+    /**
+     * (Since MongoDB 3.2)
+     * Turns a document with an array into multiple documents,
+     * one document for each element in the array.
+     *
+     * @param path the field path to an array field (without the `\$` prefix)
+     * @param includeArrayIndex the name of a new field to hold the array index of the element
+     */
+    def apply(
+      path: String,
+      includeArrayIndex: Option[String],
+      preserveNullAndEmptyArrays: Option[Boolean]
+    ): Unwind = Full(path, includeArrayIndex, preserveNullAndEmptyArrays)
+
+    def unapply(that: Unwind): Option[String] = that match {
+      case UnwindField(field) => Some(field)
+      case Full(path, _, _)   => Some(path)
+    }
+
+    /**
+     * @param path the field path to an array field (without the `\$` prefix)
+     * @param includeArrayIndex the name of a new field to hold the array index of the element
+     */
+    private case class Full(
+      path: String,
+      includeArrayIndex: Option[String],
+      preserveNullAndEmptyArrays: Option[Boolean]
+    ) extends Unwind(3, {
+      case 1 => path
+      case 2 => includeArrayIndex
+      case 3 => preserveNullAndEmptyArrays
+    }, makeDocument(Seq(elementProducer(
+      "$unwind",
+      makeDocument {
+        val elms = Seq.newBuilder[pack.ElementProducer]
+
+        elms += elementProducer("path", stringValue("$" + path))
+
+        includeArrayIndex.foreach { include =>
+          elms += elementProducer("includeArrayIndex", stringValue(include))
+        }
+
+        preserveNullAndEmptyArrays.foreach { preserve =>
+          elms += elementProducer(
+            "preserveNullAndEmptyArrays", booleanValue(preserve)
+          )
+        }
+
+        elms.result()
+      }
+    ))))
   }
 }
 
