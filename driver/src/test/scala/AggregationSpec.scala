@@ -477,7 +477,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
 
     "so the joined documents are returned" in { implicit ee: EE =>
       import orders.BatchCommands.AggregationFramework
-      import AggregationFramework.{ Lookup, Match, Unwind }
+      import AggregationFramework.{ Lookup, Match, Unwind, UnwindField }
 
       def expected = document(
         "_id" -> 1,
@@ -496,13 +496,18 @@ class AggregationSpec extends org.specs2.mutable.Specification {
         ))
       )
 
-      orders.aggregate(Unwind("specs"), List(
+      val afterUnwind = List(
         Lookup(inventory.name, "specs", "size", "docs"),
         Match(document("docs" -> document("$ne" -> BSONArray())))
-      )).
-        map(_.head[BSONDocument].toList) must beEqualTo(List(expected)).
-        await(0, timeout)
+      )
 
+      orders.aggregate(UnwindField("specs"), afterUnwind).
+        map(_.head[BSONDocument].toList) must beEqualTo(List(expected)).
+        await(0, timeout) and {
+          orders.aggregate(Unwind("specs", None, Some(true)), afterUnwind).
+            map(_.head[BSONDocument].toList) must beEqualTo(List(expected)).
+            await(0, timeout)
+        }
     } tag "not_mongo26"
   }
 
