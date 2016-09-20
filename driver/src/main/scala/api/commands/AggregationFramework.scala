@@ -98,6 +98,21 @@ trait AggregationFramework[P <: SerializationPack]
   }
 
   /**
+   * Only for advanced user: Factory for stage not already provided in the API.
+   *
+   * For example for `{ \$sample: { size: 2 } }`
+   *
+   * {{{
+   * PipelineOperator(BSONDocument("\$sample" -> BSONDocument("size" -> 2)))
+   * }}}
+   */
+  object PipelineOperator {
+    def apply(pipe: => pack.Value): PipelineOperator = new PipelineOperator {
+      val makePipe = pipe
+    }
+  }
+
+  /**
    * Reshapes a document stream by renaming, adding, or removing fields.
    * Also uses [[http://docs.mongodb.org/manual/reference/aggregation/project/#_S_project Project]] to create computed values or sub-objects.
    *
