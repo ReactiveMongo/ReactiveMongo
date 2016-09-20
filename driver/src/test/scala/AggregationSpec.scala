@@ -791,10 +791,15 @@ class AggregationSpec extends org.specs2.mutable.Specification {
       import contest.BatchCommands.AggregationFramework.{
         Group,
         Sample,
-        StdDevSamp
+        StdDevSamp,
+        PipelineOperator
       }
 
       implicit val reader = Macros.reader[QuizStdDev]
+
+      val expected = List(
+        BSONDocument("_id" -> BSONNull, "ageStdDev" -> 11.135528725660043D)
+      ) // { "_id" : null, "ageStdDev" : 11.135528725660043 }
 
       /*
        db.users.aggregate([
@@ -804,10 +809,15 @@ class AggregationSpec extends org.specs2.mutable.Specification {
       */
       contest.aggregate(Sample(100), List(Group(BSONNull)(
         "ageStdDev" -> StdDevSamp(BSONString("$age"))
-      ))).map(_.firstBatch) must beEqualTo(List(
-        BSONDocument("_id" -> BSONNull, "ageStdDev" -> 11.135528725660043D)
-      )).await(0, timeout)
-      /* { "_id" : null, "ageStdDev" : 11.135528725660043 } */
+      ))).map(_.firstBatch) must beEqualTo(expected).await(0, timeout) and {
+        val sample = PipelineOperator(document(
+          "$sample" -> document("size" -> 100)
+        ))
+
+        contest.aggregate(Sample(100), List(Group(BSONNull)(
+          "ageStdDev" -> StdDevSamp(BSONString("$age"))
+        ))).map(_.firstBatch) must beEqualTo(expected).await(0, timeout)
+      }
     } tag "not_mongo26"
   }
 
