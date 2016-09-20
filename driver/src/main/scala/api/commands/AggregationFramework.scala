@@ -448,7 +448,7 @@ sealed trait GroupAggregation[P <: SerializationPack] {
     val makeFunction = makeDocument(Seq(elementProducer("$sum", sumExpr)))
   }
 
-  /** Sum operation of the form `$sum: 1` */
+  /** Sum operation of the form `\$sum: 1` */
   case object SumAll extends GroupFunction {
     val makeFunction = makeDocument(Seq(elementProducer(
       "$sum", intValue(1)
