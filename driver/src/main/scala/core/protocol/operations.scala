@@ -199,9 +199,10 @@ case class Insert(
 /**
  * Query operation.
  *
- * @param flags Operation flags.
- * @param numberToSkip number of documents to skip in the response.
- * @param numberToReturn number of documents to return in the response. 0 means the server will choose.
+ * @param flags the operation flags
+ * @param fullCollectionName the full name of the queried collection
+ * @param numberToSkip the number of documents to skip in the response.
+ * @param numberToReturn The number of documents to return in the response. 0 means the server will choose.
  */
 case class Query(
     flags: Int,

@@ -155,6 +155,10 @@ trait GenericQueryBuilder[P <: SerializationPack] {
 
   def options(options: QueryOpts): Self = copy(options = options)
 
+  /** Returns a builder with the options updated. */
+  def updateOptions(update: QueryOpts => QueryOpts): Self =
+    copy(options = update(options))
+
   /**
    * Sets the projection document (for [[http://docs.mongodb.org/manual/core/read-operations-introduction/ retrieving only a subset of fields]]).
    *

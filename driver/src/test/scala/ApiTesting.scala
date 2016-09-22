@@ -40,4 +40,6 @@ package object tests {
   def nodeSet(sys: MongoDBSystem): NodeSet = sys.getNodeSet
 
   def channelClosed(id: Int) = ChannelClosed(id)
+
+  def makeRequest[T](cursor: Cursor[T], maxDocs: Int)(implicit ec: ExecutionContext): Future[reactivemongo.core.protocol.Response] = cursor.asInstanceOf[CursorOps[T]].makeRequest(maxDocs)
 }
