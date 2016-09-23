@@ -435,16 +435,14 @@ private[reactivemongo] class ResponseDecoder extends OneToOneDecoder {
   def decode(ctx: ChannelHandlerContext, channel: Channel, obj: Object): Response = {
     val buffer = obj.asInstanceOf[ChannelBuffer]
     val header = MessageHeader(buffer)
-    val reply = Reply(buffer)
 
-    Response(header, reply, buffer, ResponseInfo(channel.getId))
+    Response(header, Reply(buffer), buffer, ResponseInfo(channel.getId))
   }
 }
 
 private[reactivemongo] class MongoHandler(
-  supervisor: String, connection: String, receiver: ActorRef
-)
-    extends IdleStateAwareChannelHandler {
+    supervisor: String, connection: String, receiver: ActorRef
+) extends IdleStateAwareChannelHandler {
 
   override def messageReceived(ctx: ChannelHandlerContext, e: MessageEvent) {
     val response = e.getMessage.asInstanceOf[Response]

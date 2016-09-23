@@ -23,6 +23,50 @@ trait Cursor1Spec { spec: CursorSpec =>
       } aka "fixtures" must beEqualTo({}).await(1, timeout)
     }
 
+    "make request for cursor query" in { implicit ee: EE =>
+      import reactivemongo.core.protocol.{ Response, Reply }
+      import reactivemongo.api.tests.{ makeRequest => req }
+
+      def cursor(batchSize: Int = Int.MaxValue) =
+        coll.find(matchAll("makeReq1")).
+          updateOptions(_.batchSize(batchSize)).cursor()
+
+      req(cursor(), 10) must beLike[Response] {
+        case Response(_, Reply(_, id, from, ret), _, _) =>
+          id aka "cursor ID #1" must not(beEqualTo(0)) and {
+            from must_== 0 and (ret must_== 10)
+          }
+      }.await(1, timeout) and {
+        req(cursor(), -2) must beLike[Response] {
+          case Response(_, Reply(_, id, from, ret), _, _) =>
+            id aka "cursor ID #2" must_== 0 and {
+              from must_== 0 and (ret must_== 16517)
+            }
+        }.await(1, timeout)
+      } and {
+        req(cursor(128), -2) must beLike[Response] {
+          case Response(_, Reply(_, id, from, ret), _, _) =>
+            id aka "cursor ID #2" must not(beEqualTo(0)) and {
+              from must_== 0 and (ret must_== 128)
+            }
+        }.await(1, timeout)
+      } and {
+        req(cursor(), 0) must beLike[Response] {
+          case Response(_, Reply(_, id, from, ret), _, _) =>
+            id aka "cursor ID #4" must not(beEqualTo(0)) and {
+              from must_== 0 and (ret must_== 101)
+            }
+        }.await(1, timeout)
+      } and {
+        req(cursor(), 1) must beLike[Response] {
+          case Response(_, Reply(_, id, from, ret), _, _) =>
+            id aka "cursor ID #5" must_== 0 and {
+              from must_== 0 and (ret must_== 1)
+            }
+        }.await(1, timeout)
+      }
+    }
+
     { // headOption
       def headOptionSpec(c: BSONCollection, timeout: FiniteDuration) = {
         "find first document when matching" in { implicit ee: EE =>
@@ -82,8 +126,11 @@ trait Cursor1Spec { spec: CursorSpec =>
         "fold all the documents" in { implicit ee: EE =>
           c.find(matchAll("cursorspec2")).cursor().fold(0)(
             { (st, _) => debug(s"fold: $st"); st + 1 }
-          ).
-            aka("result size") must beEqualTo(16517).await(1, timeout)
+          ) aka "result size" must beEqualTo(16517).await(1, timeout) and {
+              c.find(matchAll("cursorspec2")).cursor().fold(0, -1)(
+                { (st, _) => st + 1 }
+              ) aka "result size" must beEqualTo(16517).await(1, timeout)
+            }
         }
 
         "fold only 1024 documents" in { implicit ee: EE =>

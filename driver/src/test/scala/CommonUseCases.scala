@@ -36,17 +36,19 @@ class CommonUseCases extends Specification {
           "age" -> BSONDocument("$gte" -> 18, "$lte" -> 60)
         )))
       } yield count) must beEqualTo(43).await(1, timeout)
-    }
+    } tag "wip"
 
     "find them" in { implicit ee: EE =>
       // batchSize (>1) allows us to test cursors ;)
       val it = collection.find(BSONDocument()).
         options(QueryOpts().batchSize(2)).cursor[BSONDocument]()
 
+      println(s"it = ${System identityHashCode it}")
+
       it.collect[List]().map(_.map(_.getAs[BSONInteger]("age").get.value).
         mkString("")) must beEqualTo((18 to 60).mkString("")).
         await(1, timeout * 2)
-    }
+    } tag "wip"
 
     "find by regexp" in { implicit ee: EE =>
       collection.find(BSONDocument("name" -> BSONRegex("ack2", ""))).
@@ -80,8 +82,7 @@ class CommonUseCases extends Specification {
 
         it.collect[List]().map(_.map(
           _.getAs[BSONInteger]("age").get.value
-        ).mkString("")).
-          aka("all") must beEqualTo((18 to 60).mkString("")).
+        ).mkString("")) must beEqualTo((18 to 60).mkString("")).
           await(1, timeout * 2)
       }
 
