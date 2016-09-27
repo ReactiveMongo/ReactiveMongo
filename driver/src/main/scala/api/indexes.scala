@@ -34,7 +34,8 @@ import reactivemongo.api.{
   DB,
   DBMetaCommands,
   BSONSerializationPack,
-  CursorProducer
+  CursorProducer,
+  ReadPreference
 }
 import reactivemongo.api.commands.{ DropIndexes, WriteResult }
 import scala.concurrent.{ Future, ExecutionContext }
@@ -253,7 +254,8 @@ final class LegacyIndexesManager(db: DB)(
 
   def drop(collectionName: String, indexName: String): Future[Int] = {
     import reactivemongo.api.commands.bson.BSONDropIndexesImplicits._
-    db.collection(collectionName).runValueCommand(DropIndexes(indexName))
+    db.collection(collectionName).
+      runValueCommand(DropIndexes(indexName), ReadPreference.primary)
   }
 
   def dropAll(collectionName: String): Future[Int] = drop(collectionName, "*")
@@ -409,7 +411,9 @@ private class DefaultCollectionIndexesManager(db: DB, collectionName: String)(
   private lazy val listCommand = ListIndexes(db.name)
 
   def list(): Future[List[Index]] =
-    Command.run(BSONSerializationPack)(collection, listCommand) recoverWith {
+    Command.run(BSONSerializationPack)(
+      collection, listCommand, ReadPreference.primary
+    ).recoverWith {
       case err: WriteResult if err.code.exists(_ == 26 /* no database */ ) =>
         Future.successful(List.empty[Index])
 
@@ -424,7 +428,8 @@ private class DefaultCollectionIndexesManager(db: DB, collectionName: String)(
   def create(index: Index): Future[WriteResult] =
     Command.run(BSONSerializationPack)(
       collection,
-      CreateIndexes(db.name, List(index))
+      CreateIndexes(db.name, List(index)),
+      ReadPreference.primary
     )
 
   @deprecated("Use drop instead", "0.11.0")
@@ -437,15 +442,17 @@ private class DefaultCollectionIndexesManager(db: DB, collectionName: String)(
   def drop(nsIndex: NSIndex): Future[Int] = {
     import reactivemongo.api.commands.bson.BSONDropIndexesImplicits._
     Command.run(BSONSerializationPack)(
-      db(nsIndex.collectionName), DropIndexes(nsIndex.index.eventualName)
-    ).
-      map(_.value)
+      db(nsIndex.collectionName),
+      DropIndexes(nsIndex.index.eventualName),
+      ReadPreference.primary
+    ).map(_.value)
   }
 
   def drop(indexName: String): Future[Int] = {
     import reactivemongo.api.commands.bson.BSONDropIndexesImplicits._
-    Command.run(BSONSerializationPack)(collection, DropIndexes(indexName)).
-      map(_.value)
+    Command.run(BSONSerializationPack)(
+      collection, DropIndexes(indexName), ReadPreference.primary
+    ).map(_.value)
   }
 
   @inline def dropAll(): Future[Int] = drop("*")
