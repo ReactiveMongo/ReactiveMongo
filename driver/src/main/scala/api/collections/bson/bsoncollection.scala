@@ -15,7 +15,7 @@
  */
 package reactivemongo.api.collections.bson
 
-import reactivemongo.api.{ DB, FailoverStrategy }
+import reactivemongo.api.{ DB, FailoverStrategy, ReadPreference }
 import reactivemongo.api.commands.bson._
 import reactivemongo.api.collections.{
   BatchCommands,
@@ -26,7 +26,7 @@ import reactivemongo.api.BSONSerializationPack
 
 object `package` {
   implicit object BSONCollectionProducer extends GenericCollectionProducer[BSONSerializationPack.type, BSONCollection] {
-    def apply(db: DB, name: String, failoverStrategy: FailoverStrategy = FailoverStrategy()): BSONCollection = new BSONCollection(db, name, failoverStrategy)
+    def apply(db: DB, name: String, failoverStrategy: FailoverStrategy = FailoverStrategy()): BSONCollection = new BSONCollection(db, name, failoverStrategy, db.defaultReadPreference)
   }
 }
 
@@ -68,7 +68,8 @@ object BSONBatchCommands extends BatchCommands[BSONSerializationPack.type] {
 final class BSONCollection(
   val db: DB,
   val name: String,
-  val failoverStrategy: FailoverStrategy
+  val failoverStrategy: FailoverStrategy,
+  override val readPreference: ReadPreference
 ) extends Product with GenericCollection[BSONSerializationPack.type]
     with scala.Serializable with java.io.Serializable {
 
@@ -100,14 +101,19 @@ final class BSONCollection(
     db: DB = this.db,
     name: String = this.name,
     failoverStrategy: FailoverStrategy = this.failoverStrategy
-  ): BSONCollection = new BSONCollection(db, name, failoverStrategy)
+  ): BSONCollection = new BSONCollection(
+    db, name, failoverStrategy, readPreference
+  )
+
+  def withReadPreference(pref: ReadPreference): BSONCollection =
+    new BSONCollection(db, name, failoverStrategy, pref)
 }
 
 /** Factory and extractors */
 object BSONCollection extends scala.runtime.AbstractFunction3[DB, String, FailoverStrategy, BSONCollection] {
 
   @deprecated(message = "Use the class constructor", since = "0.12-RC2")
-  def apply(db: DB, name: String, failoverStrategy: FailoverStrategy): BSONCollection = new BSONCollection(db, name, failoverStrategy)
+  def apply(db: DB, name: String, failoverStrategy: FailoverStrategy): BSONCollection = new BSONCollection(db, name, failoverStrategy, db.defaultReadPreference)
 
   def unapply(c: BSONCollection): Option[(DB, String, FailoverStrategy)] = Some((c.db, c.name, c.failoverStrategy))
 }
