@@ -62,13 +62,22 @@ trait GenericCollectionWithCommands[P <: SerializationPack with Singleton] { sel
 
   def runner = Command.run(pack, self.failoverStrategy)
 
-  def runCommand[R, C <: CollectionCommand with CommandWithResult[R]](command: C with CommandWithResult[R])(implicit writer: pack.Writer[ResolvedCollectionCommand[C]], reader: pack.Reader[R], ec: ExecutionContext): Future[R] = runner(self, command)
+  def runCommand[R, C <: CollectionCommand with CommandWithResult[R]](command: C with CommandWithResult[R], readPreference: ReadPreference)(implicit writer: pack.Writer[ResolvedCollectionCommand[C]], reader: pack.Reader[R], ec: ExecutionContext): Future[R] = runner(self, command, readPreference)
 
-  def runWithResponse[R, C <: CollectionCommand with CommandWithResult[R]](command: C with CommandWithResult[R])(implicit writer: pack.Writer[ResolvedCollectionCommand[C]], reader: pack.Reader[R], ec: ExecutionContext): Future[ResponseResult[R]] = runner.withResponse(self, command)
+  @deprecated("Use the alternative with `ReadPreference`", "0.12-RC5")
+  def runCommand[R, C <: CollectionCommand with CommandWithResult[R]](command: C with CommandWithResult[R])(implicit writer: pack.Writer[ResolvedCollectionCommand[C]], reader: pack.Reader[R], ec: ExecutionContext): Future[R] = runCommand[R, C](command, ReadPreference.primary)
+
+  def runWithResponse[R, C <: CollectionCommand with CommandWithResult[R]](command: C with CommandWithResult[R], readPreference: ReadPreference)(implicit writer: pack.Writer[ResolvedCollectionCommand[C]], reader: pack.Reader[R], ec: ExecutionContext): Future[ResponseResult[R]] = runner.withResponse(self, command, readPreference)
+
+  @deprecated("Use the alternative with `ReadPreference`", "0.12-RC5")
+  def runWithResponse[R, C <: CollectionCommand with CommandWithResult[R]](command: C with CommandWithResult[R])(implicit writer: pack.Writer[ResolvedCollectionCommand[C]], reader: pack.Reader[R], ec: ExecutionContext): Future[ResponseResult[R]] = runWithResponse[R, C](command, ReadPreference.primary)
 
   def runCommand[C <: CollectionCommand](command: C)(implicit writer: pack.Writer[ResolvedCollectionCommand[C]]): CursorFetcher[pack.type, Cursor] = runner(self, command)
 
-  def runValueCommand[A <: AnyVal, R <: BoxedAnyVal[A], C <: CollectionCommand with CommandWithResult[R]](command: C with CommandWithResult[R with BoxedAnyVal[A]])(implicit writer: pack.Writer[ResolvedCollectionCommand[C]], reader: pack.Reader[R], ec: ExecutionContext): Future[A] = runner.unboxed(self, command)
+  @deprecated("Use the alternative with `ReadPreference`", "0.12-RC5")
+  def runValueCommand[A <: AnyVal, R <: BoxedAnyVal[A], C <: CollectionCommand with CommandWithResult[R]](command: C with CommandWithResult[R with BoxedAnyVal[A]])(implicit writer: pack.Writer[ResolvedCollectionCommand[C]], reader: pack.Reader[R], ec: ExecutionContext): Future[A] = runner.unboxed(self, command, ReadPreference.primary)
+
+  def runValueCommand[A <: AnyVal, R <: BoxedAnyVal[A], C <: CollectionCommand with CommandWithResult[R]](command: C with CommandWithResult[R with BoxedAnyVal[A]], rp: ReadPreference)(implicit writer: pack.Writer[ResolvedCollectionCommand[C]], reader: pack.Reader[R], ec: ExecutionContext): Future[A] = runner.unboxed(self, command, rp)
 }
 
 trait BatchCommands[P <: SerializationPack] {
@@ -134,10 +143,19 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
   type PipelineOperator = BatchCommands.AggregationFramework.PipelineOperator
 
   implicit def PackIdentityReader: pack.Reader[pack.Document] = pack.IdentityReader
+
   implicit def PackIdentityWriter: pack.Writer[pack.Document] = pack.IdentityWriter
 
   def failoverStrategy: FailoverStrategy
   def genericQueryBuilder: GenericQueryBuilder[pack.type]
+
+  def readPreference: ReadPreference = db.defaultReadPreference
+
+  /**
+   * Returns a new reference to the same collection,
+   * with the given read preference.
+   */
+  def withReadPreference(pref: ReadPreference): GenericCollection[P]
 
   import BatchCommands._
   import reactivemongo.api.commands.{
@@ -185,8 +203,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    *
    * @return a [[GenericQueryBuilder]] that you can use to to customize the query. You can obtain a cursor by calling the method [[reactivemongo.api.Cursor]] on this query builder.
    */
-  def find[S, P](selector: S, projection: P)(implicit swriter: pack.Writer[S], pwriter: pack.Writer[P]): GenericQueryBuilder[pack.type] =
-    genericQueryBuilder.query(selector).projection(projection)
+  def find[S, P](selector: S, projection: P)(implicit swriter: pack.Writer[S], pwriter: pack.Writer[P]): GenericQueryBuilder[pack.type] = genericQueryBuilder.query(selector).projection(projection)
 
   /**
    * Count the documents matching the given criteria.
@@ -202,7 +219,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    * @param skip the number of matching documents to skip before counting
    * @param hint the index to use (either the index name or the index document)
    */
-  def count[H](selector: Option[pack.Document] = None, limit: Int = 0, skip: Int = 0, hint: Option[H] = None)(implicit h: H => CountCommand.Hint, ec: ExecutionContext): Future[Int] = runValueCommand(CountCommand.Count(query = selector, limit, skip, hint.map(h)))
+  def count[H](selector: Option[pack.Document] = None, limit: Int = 0, skip: Int = 0, hint: Option[H] = None)(implicit h: H => CountCommand.Hint, ec: ExecutionContext): Future[Int] = runValueCommand(CountCommand.Count(query = selector, limit, skip, hint.map(h)), readPreference)
 
   /**
    * Returns the distinct values for a specified field across a single collection.
@@ -224,7 +241,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
 
     runCommand(DistinctCommand.Distinct(
       key, selector, readConcern, version
-    )).flatMap {
+    ), readPreference).flatMap {
       _.result[T, M] match {
         case Failure(cause)  => Future.failed[M[T]](cause)
         case Success(result) => Future.successful(result)
@@ -312,7 +329,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
         Failover2(db.connection, failoverStrategy) { () =>
           runCommand(BatchCommands.InsertCommand.Insert(
             writeConcern = writeConcern
-          )(document)).flatMap { wr =>
+          )(document), readPreference).flatMap { wr =>
             val flattened = wr.flatten
             if (!flattened.ok) {
               // was ordered, with one doc => fail if has an error
@@ -357,7 +374,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
       Failover2(db.connection, failoverStrategy) { () =>
         runCommand(Update(writeConcern = writeConcern)(
           UpdateElement(selector, update, upsert, multi)
-        )).flatMap { wr =>
+        ), readPreference).flatMap { wr =>
           val flattened = wr.flatten
           if (!flattened.ok) {
             // was ordered, with one doc => fail if has an error
@@ -422,7 +439,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
       fields = fields.map(implicitly[DP](_))
     )
 
-    runCommand(command)
+    runCommand(command, readPreference)
   }
 
   /**
@@ -501,7 +518,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
     runWithResponse(Aggregate(
       firstOperator :: otherOperators, explain, allowDiskUse, None,
       ver, bypassDocumentValidation, readConcern
-    )).map(_.value)
+    ), readPreference).map(_.value)
   }
 
   /**
@@ -557,7 +574,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
     runWithResponse(Aggregate(
       firstOperator :: otherOperators, explain, allowDiskUse, Some(cursor),
       ver, bypassDocumentValidation, readConcern
-    )).flatMap[Cursor[T]] {
+    ), readPreference).flatMap[Cursor[T]] {
       case ResponseResult(response, numToReturn,
         AggregationResult(firstBatch, Some(resultCursor))) => Future {
 
@@ -609,7 +626,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
       Failover2(db.connection, failoverStrategy) { () =>
         runCommand(Delete(writeConcern = writeConcern)(
           DeleteElement(query, limit)
-        )).flatMap { wr =>
+        ), readPreference).flatMap { wr =>
           val flattened = wr.flatten
           if (!flattened.ok) {
             // was ordered, with one doc => fail if has an error
@@ -832,68 +849,4 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
       writer.close
     }
   }
-
-  /* TODO: Remove (unused)
-  protected class Mongo24BulkInsert(op: Insert, writeConcern: WriteConcern, metadata: ProtocolMetadata) extends BulkMaker[LastError, Mongo24BulkInsert] {
-    private var done = false
-    private var docsN = 0
-    private val buf = ChannelBufferWritableBuffer()
-
-    val thresholdDocs = metadata.maxBulkSize
-    // max size for docs is max bson size minus 16 bytes for header, 4 bytes for flags, and 124 bytes max for fullCollectionName
-    val thresholdBytes = metadata.maxBsonSize - (4 * 4 + 4 + 124)
-
-    def putOrIssueNewCommand(doc: pack.Document): Option[Mongo24BulkInsert] = {
-      if (done) {
-        throw new RuntimeException("violated assertion: Mongo24BulkInsert should not be used again after it is done")
-      }
-
-      if (docsN >= thresholdDocs) {
-        val nextBulk = new Mongo24BulkInsert(op, writeConcern, metadata)
-        nextBulk.putOrIssueNewCommand(doc)
-        Some(nextBulk)
-      } else {
-        val start = buf.index
-        pack.writeToBuffer(buf, doc)
-
-        if (buf.index > thresholdBytes) {
-          if (docsN == 0) {
-            // first and already out of bound
-            throw new RuntimeException("Mongo24BulkInsert could not accept doc of size = ${buf.index - start} bytes")
-          }
-
-          val nextBulk = new Mongo24BulkInsert(op, writeConcern, metadata)
-
-          nextBulk.buf.buffer.writeBytes(buf.buffer, start, buf.index - start)
-          nextBulk.docsN = 1
-          buf.buffer.readerIndex(0)
-          buf.buffer.writerIndex(start)
-          done = true
-
-          Some(nextBulk)
-        } else {
-          docsN += 1
-          None
-        }
-      }
-    }
-
-    def result(): ChannelBuffer = {
-      done = true
-      buf.buffer
-    }
-
-    def resultAsCheckedWriteRequest(op: Insert, writeConcern: WriteConcern) = {
-      CheckedWriteRequest(op, BufferSequence(result()), writeConcern)
-    }
-
-    def send()(implicit ec: ExecutionContext): Future[LastError] = {
-      val f = () => db.connection.sendExpectingResponse(
-        resultAsCheckedWriteRequest(op, writeConcern))
-
-      Failover2(db.connection, failoverStrategy)(f).future.
-        map(pack.readAndDeserialize(_, LastErrorReader))
-    }
-  }
-   */
 }

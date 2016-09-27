@@ -35,19 +35,18 @@ import reactivemongo.api.collections.GenericQueryBuilder
 
 @SerialVersionUID(1634796413L)
 case class BSONQueryBuilder(
-  collection: Collection,
-  failover: FailoverStrategy,
-  queryOption: Option[BSONDocument] = None,
-  sortOption: Option[BSONDocument] = None,
-  projectionOption: Option[BSONDocument] = None,
-  hintOption: Option[BSONDocument] = None,
-  explainFlag: Boolean = false,
-  snapshotFlag: Boolean = false,
-  commentString: Option[String] = None,
-  options: QueryOpts = QueryOpts(),
-  maxTimeMsOption: Option[Long] = None
-)
-    extends GenericQueryBuilder[BSONSerializationPack.type] {
+    collection: Collection,
+    failover: FailoverStrategy,
+    queryOption: Option[BSONDocument] = None,
+    sortOption: Option[BSONDocument] = None,
+    projectionOption: Option[BSONDocument] = None,
+    hintOption: Option[BSONDocument] = None,
+    explainFlag: Boolean = false,
+    snapshotFlag: Boolean = false,
+    commentString: Option[String] = None,
+    options: QueryOpts = QueryOpts(),
+    maxTimeMsOption: Option[Long] = None
+) extends GenericQueryBuilder[BSONSerializationPack.type] {
   import reactivemongo.util.option
 
   type Self = BSONQueryBuilder

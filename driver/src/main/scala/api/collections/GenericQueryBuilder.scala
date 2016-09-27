@@ -47,6 +47,7 @@ trait GenericQueryBuilder[P <: SerializationPack] {
   def collection: Collection
   def maxTimeMsOption: Option[Long]
 
+  @deprecated("Will be removed from the public API", "0.12.0")
   def merge(readPreference: ReadPreference): pack.Document
 
   def copy(
@@ -70,10 +71,7 @@ trait GenericQueryBuilder[P <: SerializationPack] {
   /**
    * Sends this query and gets a [[Cursor]] of instances of `T`.
    */
-  @deprecated(
-    message = "Use `cursor()` or `cursor(readPreference)`",
-    since = "0.11.0"
-  )
+  @deprecated("Use `cursor()` or `cursor(readPreference)`", "0.11.0")
   def cursor[T](implicit reader: pack.Reader[T], ec: ExecutionContext, cp: CursorProducer[T]): cp.ProducedCursor = cursor(ReadPreference.primary)
 
   /**
