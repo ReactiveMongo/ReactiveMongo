@@ -7,8 +7,7 @@ import reactivemongo.core.protocol.MongoWireVersion
  * Implements the [[http://docs.mongodb.org/manual/applications/aggregation/ Aggregation Framework]].
  */
 trait AggregationFramework[P <: SerializationPack]
-    extends ImplicitCommandHelpers[P]
-    with GroupAggregation[P] { //with UnwindAggregation[P] {
+    extends ImplicitCommandHelpers[P] with GroupAggregation[P] {
 
   /**
    * @param batchSize the initial batch size for the cursor
