@@ -134,12 +134,52 @@ trait BatchCommands[P <: SerializationPack] {
  * Some methods of this collection accept instances of `Reader[T]` and `Writer[T]`, that transform any `T` instance into a document, compatible with the selected serialization pack, and vice-versa.
  *
  * @tparam P the serialization pack
+ *
+ * @define findDescription Finds the documents matching the given criteria (selector)
+ * @define queryLink [[http://www.mongodb.org/display/DOCS/Querying MongoDB documentation]]
+ * @define selectorParam the document selector
+ * @define swriterParam the writer for the selector
+ * @define selectorTParam The type of the selector. An implicit `Writer[S]` typeclass for handling it has to be in the scope.
+ * @define returnQueryBuilder A [[GenericQueryBuilder]] that you can use to to customize the query. You can obtain a cursor by calling the method [[reactivemongo.api.Cursor]] on this query builder.
+ * @define implicitWriterT An implicit `Writer[T]` typeclass for handling it has to be in the scope
+ * @define writeConcernParam the [[https://docs.mongodb.com/manual/reference/write-concern/ writer concern]] to be used
+ * @define writerParam the writer to create the document
+ * @define upsertParam if true, creates a new document if no document is matching, otherwise if at least one document matches, an update is applied
+ * @define returnWriteResult a future [[reactivemongo.api.commands.WriteResult]] that can be used to check whether the insertion was successful
+ * @define updateParam the update to be applied
+ * @define sortParam the document indicating the sort criteria
+ * @define fieldsParam the [[http://docs.mongodb.org/manual/tutorial/project-fields-from-query-results/#read-operations-projection projection]] fields
+ * @define modifierParam the modify operator to be applied
+ * @define readConcernParam the read concern
+ * @define firstOpParam the first [[https://docs.mongodb.com/manual/reference/operator/aggregation/ aggregation operator]] of the pipeline
+ * @define otherOpsParam the sequence of MongoDB aggregation operations
+ * @define explainParam if true indicates to return the information on the processing
+ * @define allowDiskUseParam if true enables writing to temporary files
+ * @define bypassParam if true enables to bypass document validation during the operation
+ * @define readPrefParam the read preference for the result
+ * @define aggregation [[http://docs.mongodb.org/manual/reference/command/aggregate/ Aggregates]] the matching documents
+ * @define resultTParam The type of the result elements. An implicit `Reader[T]` typeclass for handling it has to be in the scope.
+ * @define readerParam the result reader
+ * @define aggCursorParam the cursor descriptor for aggregation
+ * @define removeDescription
  */
 trait GenericCollection[P <: SerializationPack with Singleton] extends Collection with GenericCollectionWithCommands[P] with CollectionMetaCommands with reactivemongo.api.commands.ImplicitCommandHelpers[P] { self =>
   val pack: P
   protected val BatchCommands: BatchCommands[pack.type]
 
-  /** Alias for [[BatchCommands.AggregationFramework.PipelineOperator]] */
+  /**
+   * Alias for type of the aggregation framework,
+   * depending on the type of the collection.
+   *
+   * @see [[reactivemongo.api.commands.AggregationFramework]]
+   */
+  type AggregationFramework = BatchCommands.AggregationFramework.type
+
+  /**
+   * Alias for [[BatchCommands.AggregationFramework.PipelineOperator]]
+   *
+   * @see [[reactivemongo.api.commands.AggregationFramework.PipelineOperator]]
+   */
   type PipelineOperator = BatchCommands.AggregationFramework.PipelineOperator
 
   implicit def PackIdentityReader: pack.Reader[pack.Document] = pack.IdentityReader
@@ -174,47 +214,39 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
     Try(future).recover { case NonFatal(e) => Future.failed(e) }.get
 
   /**
-   * Find the documents matching the given criteria.
+   * $findDescription.
+   * @see $queryLink
    *
-   * This method accepts any query and projection object, provided that there is an implicit `Writer[S]` typeclass for handling them in the scope.
+   * @tparam S $selectorTParam
    *
-   * Please take a look at the [[http://www.mongodb.org/display/DOCS/Querying mongodb documentation]] to know how querying works.
-   *
-   * @tparam S the type of the selector (the query). An implicit `Writer[S]` typeclass for handling it has to be in the scope.
-   *
-   * @param query The selector query.
-   *
-   * @return a [[GenericQueryBuilder]] that you can use to to customize the query. You can obtain a cursor by calling the method [[reactivemongo.api.Cursor]] on this query builder.
+   * @param selector $selectorParam
+   * @param swriter $swriterParam
+   * @return $returnQueryBuilder
    */
   def find[S](selector: S)(implicit swriter: pack.Writer[S]): GenericQueryBuilder[pack.type] = genericQueryBuilder.query(selector)
 
   /**
-   * Find the documents matching the given criteria.
+   * $findDescription, with the projection applied.
+   * @see $queryLink
    *
-   * This method accepts any selector and projection object, provided that there is an implicit `Writer[S]` typeclass for handling them in the scope.
+   * @tparam S $selectorTParam
+   * @tparam P The type of the projection object. An implicit `Writer[P]` typeclass for handling it has to be in the scope.
    *
-   * Please take a look at the [[http://www.mongodb.org/display/DOCS/Querying mongodb documentation]] to know how querying works.
-   *
-   * @tparam S the type of the selector (the query). An implicit `Writer[S]` typeclass for handling it has to be in the scope.
-   * @tparam P the type of the projection object. An implicit `Writer[P]` typeclass for handling it has to be in the scope.
-   *
-   * @param selector the query selector.
-   * @param projection Get only a subset of each matched documents. Defaults to None.
-   *
-   * @return a [[GenericQueryBuilder]] that you can use to to customize the query. You can obtain a cursor by calling the method [[reactivemongo.api.Cursor]] on this query builder.
+   * @param selector $selectorParam
+   * @param projection the projection document to select only a subset of each matching documents
+   * @param swriter $swriterParam
+   * @param pwriter the writer for the projection
+   * @return $returnQueryBuilder
    */
   def find[S, P](selector: S, projection: P)(implicit swriter: pack.Writer[S], pwriter: pack.Writer[P]): GenericQueryBuilder[pack.type] = genericQueryBuilder.query(selector).projection(projection)
 
   /**
-   * Count the documents matching the given criteria.
+   * Counts the matching documents.
+   * @see $queryLink
    *
-   * This method accepts any query or hint, the scope provides instances of appropriate typeclasses.
+   * @tparam H The type of hint. An implicit `H => Hint` conversion has to be in the scope.
    *
-   * Please take a look at the [[http://www.mongodb.org/display/DOCS/Querying mongodb documentation]] to know how querying works.
-   *
-   * @tparam H the type of hint. An implicit `H => Hint` conversion has to be in the scope.
-   *
-   * @param selector the query selector
+   * @param selector $selectorParam (default: `None` to count all)
    * @param limit the maximum number of matching documents to count
    * @param skip the number of matching documents to skip before counting
    * @param hint the index to use (either the index name or the index document)
@@ -222,13 +254,15 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
   def count[H](selector: Option[pack.Document] = None, limit: Int = 0, skip: Int = 0, hint: Option[H] = None)(implicit h: H => CountCommand.Hint, ec: ExecutionContext): Future[Int] = runValueCommand(CountCommand.Count(query = selector, limit, skip, hint.map(h)), readPreference)
 
   /**
-   * Returns the distinct values for a specified field across a single collection.
+   * Returns the distinct values for a specified field
+   * across a single collection.
    *
    * @tparam T the element type of the distinct values
    * @tparam M the container, that must be a [[scala.collection.Iterable]]
+   *
    * @param key the field for which to return distinct values
-   * @param selector the query selector that specifies the documents from which to retrieve the distinct values.
-   * @param readConcern the read concern
+   * @param selector $selectorParam, that specifies the documents from which to retrieve the distinct values.
+   * @param readConcern $readConcernParam
    *
    * {{{
    * val distinctStates = collection.distinct[String, Set]("state")
@@ -312,16 +346,14 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
   }
 
   /**
-   * Inserts a document into the collection and wait for the [[reactivemongo.api.commands.WriteResult]].
+   * Inserts a document into the collection and waits for the [[reactivemongo.api.commands.WriteResult]].
    *
-   * Please read the documentation about [[reactivemongo.core.commands.GetLastError]] to know how to use it properly.
+   * @tparam T The type of the document to insert. $implicitWriterT.
    *
-   * @tparam T the type of the document to insert. An implicit `Writer[T]` typeclass for handling it has to be in the scope.
-   *
-   * @param document the document to insert.
-   * @param writeConcern the [[reactivemongo.core.commands.GetLastError]] command message to send in order to control how the document is inserted. Defaults to GetLastError().
-   *
-   * @return a future [[reactivemongo.api.commands.WriteResult]] that can be used to check whether the insertion was successful.
+   * @param document the document to insert
+   * @param writeConcern $writeConcernParam
+   * @param writer $writerParam to be inserted
+   * @return $returnWriteResult
    */
   def insert[T](document: T, writeConcern: WriteConcern = defaultWriteConcern)(implicit writer: pack.Writer[T], ec: ExecutionContext): Future[WriteResult] =
     db.connection.metadata match {
@@ -352,20 +384,23 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
     }
 
   /**
-   * Updates one or more documents matching the given selector with the given modifier or update object.
+   * Updates one or more documents matching the given selector
+   * with the given modifier or update object.
    *
-   * @tparam S the type of the selector object. An implicit `Writer[S]` typeclass for handling it has to be in the scope.
-   * @tparam U the type of the modifier or update object. An implicit `Writer[U]` typeclass for handling it has to be in the scope.
+   * @tparam S $selectorTParam
+   * @tparam T The type of the modifier or update object. $implicitWriterT.
    *
    * @param selector the selector object, for finding the documents to update.
    * @param update the modifier object (with special keys like \$set) or replacement object.
-   * @param writeConcern the [[reactivemongo.core.commands.GetLastError]] command message to send in order to control how the documents are updated. Defaults to GetLastError().
-   * @param upsert states whether the update objet should be inserted if no match found. Defaults to false.
-   * @param multi states whether the update may be done on all the matching documents.
+   * @param writeConcern $writeConcernParam
+   * @param upsert $upsertParam (defaults: `false`)
+   * @param multi states whether the update may be done on all the matching documents (default: `false`)
+   * @param swriter $swriterParam
+   * @param writer $writerParam
    *
-   * @return a future [[reactivemongo.api.commands.WriteResult]] that can be used to check whether the update was successful.
+   * @return $returnWriteResult
    */
-  def update[S, U](selector: S, update: U, writeConcern: WriteConcern = defaultWriteConcern, upsert: Boolean = false, multi: Boolean = false)(implicit selectorWriter: pack.Writer[S], updateWriter: pack.Writer[U], ec: ExecutionContext): Future[UpdateWriteResult] = db.connection.metadata match {
+  def update[S, T](selector: S, update: T, writeConcern: WriteConcern = defaultWriteConcern, upsert: Boolean = false, multi: Boolean = false)(implicit swriter: pack.Writer[S], writer: pack.Writer[T], ec: ExecutionContext): Future[UpdateWriteResult] = db.connection.metadata match {
     case Some(metadata) if (
       metadata.maxWireVersion >= MongoWireVersion.V26
     ) => {
@@ -399,9 +434,9 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
   /**
    * Returns an update modifier, to be used with [[findAndModify]].
    *
-   * @param update the update to be applied
+   * @param update $updateParam
    * @param fetchNewObject the command result must be the new object instead of the old one.
-   * @param upsert if true, creates a new document if no document matches the query, or if documents match the query, findAndModify performs an update
+   * @param upsert $upsertParam
    */
   def updateModifier[U](update: U, fetchNewObject: Boolean = false, upsert: Boolean = false)(implicit updateWriter: pack.Writer[U]): BatchCommands.FindAndModifyCommand.Update = BatchCommands.FindAndModifyCommand.Update(update, fetchNewObject, upsert)
 
@@ -425,12 +460,15 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    *   map(_.result[Person])
    * }}}
    *
-   * @param selector the query selector
-   * @param modifier the modify operator to be applied
-   * @param sort the optional document possibly indicating the sort criterias
-   * @param fields the field [[http://docs.mongodb.org/manual/tutorial/project-fields-from-query-results/#read-operations-projection projection]]
+   * @param tparam S $selectorTParam
+   *
+   * @param selector $selectorParam
+   * @param modifier $modifierParam
+   * @param sort $sortParam (default: `None`)
+   * @param fields $fieldsParam
+   * @param swriter $swriterParam
    */
-  def findAndModify[Q](selector: Q, modifier: BatchCommands.FindAndModifyCommand.Modify, sort: Option[pack.Document] = None, fields: Option[pack.Document] = None)(implicit selectorWriter: pack.Writer[Q], ec: ExecutionContext): Future[BatchCommands.FindAndModifyCommand.FindAndModifyResult] = {
+  def findAndModify[S](selector: S, modifier: BatchCommands.FindAndModifyCommand.Modify, sort: Option[pack.Document] = None, fields: Option[pack.Document] = None)(implicit swriter: pack.Writer[S], ec: ExecutionContext): Future[BatchCommands.FindAndModifyCommand.FindAndModifyResult] = {
     import FindAndModifyCommand.{ ImplicitlyDocumentProducer => DP }
     val command = BatchCommands.FindAndModifyCommand.FindAndModify(
       query = selector,
@@ -453,14 +491,18 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    *                          // { "age": 17 }
    * }}}
    *
-   * @param selector the query selector
-   * @param update the update to be applied
+   * @tparam selectorTParam
+   *
+   * @param selector $selectorParam
+   * @param update $updateParam
    * @param fetchNewObject the command result must be the new object instead of the old one.
-   * @param upsert if true, creates a new document if no document matches the query, or if documents match the query, findAndModify performs an update
-   * @param sort the optional document possibly indicating the sort criterias
-   * @param fields the field [[http://docs.mongodb.org/manual/tutorial/project-fields-from-query-results/#read-operations-projection projection]]
+   * @param upsert $upsertParam
+   * @param sort $sortParam (default: `None`)
+   * @param fields $fieldsParam
+   * @param swriter $swriterParam
+   * @param writer writerParam
    */
-  def findAndUpdate[Q, U](selector: Q, update: U, fetchNewObject: Boolean = false, upsert: Boolean = false, sort: Option[pack.Document] = None, fields: Option[pack.Document] = None)(implicit selectorWriter: pack.Writer[Q], updateWriter: pack.Writer[U], ec: ExecutionContext): Future[BatchCommands.FindAndModifyCommand.FindAndModifyResult] = {
+  def findAndUpdate[S, T](selector: S, update: T, fetchNewObject: Boolean = false, upsert: Boolean = false, sort: Option[pack.Document] = None, fields: Option[pack.Document] = None)(implicit swriter: pack.Writer[S], writer: pack.Writer[T], ec: ExecutionContext): Future[BatchCommands.FindAndModifyCommand.FindAndModifyResult] = {
     val updateOp = updateModifier(update, fetchNewObject, upsert)
     findAndModify(selector, updateOp, sort, fields)
   }
@@ -473,15 +515,18 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    *   BSONDocument("name" -> "Foo")).map(_.result[Person])
    * }}}
    *
-   * @param selector the query selector
-   * @param modifier the modify operator to be applied
-   * @param sort the optional document possibly indicating the sort criterias
-   * @param fields the field [[http://docs.mongodb.org/manual/tutorial/project-fields-from-query-results/#read-operations-projection projection]]
+   * @tparam S $selectorTParam
+   *
+   * @param selector $selectorParam
+   * @param modifier $modifierParam
+   * @param sort $sortParam
+   * @param fields $fieldsParam
+   * @param swriter $swriterParam
    */
-  def findAndRemove[Q](selector: Q, sort: Option[pack.Document] = None, fields: Option[pack.Document] = None)(implicit selectorWriter: pack.Writer[Q], ec: ExecutionContext): Future[BatchCommands.FindAndModifyCommand.FindAndModifyResult] = findAndModify[Q](selector, removeModifier, sort, fields)
+  def findAndRemove[S](selector: S, sort: Option[pack.Document] = None, fields: Option[pack.Document] = None)(implicit swriter: pack.Writer[S], ec: ExecutionContext): Future[BatchCommands.FindAndModifyCommand.FindAndModifyResult] = findAndModify[S](selector, removeModifier, sort, fields)
 
   /**
-   * [[http://docs.mongodb.org/manual/reference/command/aggregate/ Aggregates]] the matching documents.
+   * $aggregation.
    *
    * {{{
    * import scala.concurrent.Future
@@ -501,12 +546,12 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    * }
    * }}}
    *
-   * @param firstOperator the first operator of the pipeline
-   * @param otherOperators the sequence of MongoDB aggregation operations
-   * @param explain specifies to return the information on the processing of the pipeline
-   * @param allowDiskUse enables writing to temporary files
-   * @param bypassDocumentValidation enables to bypass document validation during the operation
-   * @param readConcern the read concern
+   * @param firstOperator $firstOpParam
+   * @param otherOperators $otherOpsParam
+   * @param explain $explainParam of the pipeline
+   * @param allowDiskUse $allowDiskUseParam
+   * @param bypassDocumentValidation $bypassParam
+   * @param readConcern $readConcernParam
    */
   def aggregate(firstOperator: PipelineOperator, otherOperators: List[PipelineOperator] = Nil, explain: Boolean = false, allowDiskUse: Boolean = false, bypassDocumentValidation: Boolean = false, readConcern: Option[ReadConcern] = None)(implicit ec: ExecutionContext): Future[BatchCommands.AggregationFramework.AggregationResult] = {
     import BatchCommands.AggregationFramework.Aggregate
@@ -520,6 +565,44 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
       ver, bypassDocumentValidation, readConcern
     ), readPreference).map(_.value)
   }
+
+  /**
+   * $aggregation.
+   *
+   * @tparam T $resultTParam
+   *
+   * @param explain $explainParam of the pipeline
+   * @param allowDiskUse $allowDiskUseParam
+   * @param bypassDocumentValidation $bypassParam
+   * @param readConcern $readConcernParam
+   * @param readPreference $readPrefParam (default: primary)
+   * @param f The function to create the aggregation pipeline using the aggregation framework depending on the collection type; Returns the operators and an optional batch size (for the aggregation cursor).
+   * @param reader $readerParam
+   */
+  def aggregatingWith[T](explain: Boolean = false, allowDiskUse: Boolean = false, bypassDocumentValidation: Boolean = false, readConcern: Option[ReadConcern] = None, readPreference: ReadPreference = ReadPreference.primary)(f: AggregationFramework => (PipelineOperator, List[PipelineOperator], Option[Int]))(implicit ec: ExecutionContext, reader: pack.Reader[T]): Future[Cursor[T]] = {
+    val (firstOp, otherOps, batchSize) = f(BatchCommands.AggregationFramework)
+    val aggCursor = batchSize.map(BatchCommands.AggregationFramework.Cursor(_))
+
+    aggregate[T](firstOp, otherOps, aggCursor, explain, allowDiskUse,
+      bypassDocumentValidation, readConcern, readPreference)
+  }
+
+  /**
+   * $aggregation.
+   *
+   * @tparam T $resultTParam
+   *
+   * @param firstOperator $firstOpParam
+   * @param otherOperators $otherOpsParam
+   * @param cursor $aggCursorParam
+   * @param explain $explainParam of the pipeline
+   * @param allowDiskUse $allowDiskUseParam
+   * @param bypassDocumentValidation $bypassParam
+   * @param readConcern $readConcernParam
+   * @param readPreference $readPrefParam
+   * @param reader $readerParam
+   */
+  def aggregate1[T](firstOperator: PipelineOperator, otherOperators: List[PipelineOperator], cursor: BatchCommands.AggregationFramework.Cursor, explain: Boolean = false, allowDiskUse: Boolean = false, bypassDocumentValidation: Boolean = false, readConcern: Option[ReadConcern] = None, readPreference: ReadPreference = ReadPreference.primary)(implicit ec: ExecutionContext, reader: pack.Reader[T]): Future[Cursor[T]] = aggregate[T](firstOperator, otherOperators, Some(cursor), explain, allowDiskUse, bypassDocumentValidation, readConcern, readPreference)
 
   /**
    * [[http://docs.mongodb.org/manual/reference/command/aggregate/ Aggregates]] the matching documents.
@@ -549,18 +632,19 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    *   }
    * }}}
    *
-   * @tparam T the result type
-   * @param firstOperator the first operator of the pipeline
-   * @param otherOperators the sequence of MongoDB aggregation operations
-   * @param cursor the cursor object for aggregation
-   * @param explain specifies to return the information on the processing of the pipeline
-   * @param allowDiskUse enables writing to temporary files
-   * @param bypassDocumentValidation enables to bypass document validation during the operation
-   * @param readConcern the read concern of the aggregation
-   * @param readPreference the read preference for the result cursor
+   * @tparam T $resultTParam
    *
+   * @param firstOperator $firstOpParam
+   * @param otherOperators $otherOpsParam
+   * @param cursor $aggCursorParam (optional)
+   * @param explain $explainParam of the pipeline
+   * @param allowDiskUse $allowDiskUseParam
+   * @param bypassDocumentValidation $bypassParam
+   * @param readConcern $readConcernParam
+   * @param readPreference $readPrefParam
+   * @param reader $readerParam
    */
-  def aggregate1[T](firstOperator: PipelineOperator, otherOperators: List[PipelineOperator], cursor: BatchCommands.AggregationFramework.Cursor, explain: Boolean = false, allowDiskUse: Boolean = false, bypassDocumentValidation: Boolean = false, readConcern: Option[ReadConcern] = None, readPreference: ReadPreference = ReadPreference.primary)(implicit ec: ExecutionContext, r: pack.Reader[T]): Future[Cursor[T]] = {
+  def aggregate[T](firstOperator: PipelineOperator, otherOperators: List[PipelineOperator], cursor: Option[BatchCommands.AggregationFramework.Cursor], explain: Boolean, allowDiskUse: Boolean, bypassDocumentValidation: Boolean, readConcern: Option[ReadConcern], readPreference: ReadPreference)(implicit ec: ExecutionContext, reader: pack.Reader[T]): Future[Cursor[T]] = {
     import BatchCommands.AggregationFramework.{ Aggregate, AggregationResult }
     import BatchCommands.{ AggregateWriter, AggregateReader }
 
@@ -572,18 +656,16 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
       fold[MongoWireVersion](MongoWireVersion.V30)(_.maxWireVersion)
 
     runWithResponse(Aggregate(
-      firstOperator :: otherOperators, explain, allowDiskUse, Some(cursor),
+      firstOperator :: otherOperators, explain, allowDiskUse, cursor,
       ver, bypassDocumentValidation, readConcern
     ), readPreference).flatMap[Cursor[T]] {
       case ResponseResult(response, numToReturn,
         AggregationResult(firstBatch, Some(resultCursor))) => Future {
 
-        def docs = new ChannelBufferWritableBuffer().writeBytes(
-          firstBatch.foldLeft[WritableBuffer](
-          new ChannelBufferWritableBuffer()
-        )(pack.writeToBuffer).
-          toReadableBuffer
-        ).buffer
+        def docs = new ChannelBufferWritableBuffer().
+          writeBytes(firstBatch.foldLeft[WritableBuffer](
+            new ChannelBufferWritableBuffer()
+          )(pack.writeToBuffer).toReadableBuffer).buffer
 
         def resp = Response(
           response.header,
@@ -599,24 +681,22 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
       case ResponseResult(response, _, _) => Future.failed[Cursor[T]](
         GenericDriverException(s"missing cursor: $response")
       )
-
     }
   }
 
   /**
-   * Remove the matched document(s) from the collection and wait for the [[reactivemongo.api.commands.WriteResult]] result.
+   * Removes the matching document(s).
    *
-   * Please read the documentation about [[reactivemongo.core.commands.GetLastError]] to know how to use it properly.
+   * @tparam S $selectorTParam
    *
-   * @tparam T the type of the selector of documents to remove. An implicit `Writer[T]` typeclass for handling it has to be in the scope.
-   *
-   * @param query the selector of documents to remove.
-   * @param writeConcern the [[reactivemongo.core.commands.GetLastError]] command message to send in order to control how the documents are removed. Defaults to GetLastError().
+   * @param selector $selectorParam
+   * @param writeConcern $writeConcernParam
    * @param firstMatchOnly states whether only the first matched documents has to be removed from this collection.
+   * @param swriter $swriterParam
    *
-   * @return a future [[reactivemongo.api.commands.WriteResult]] that can be used to check whether the removal was successful.
+   * @return a future [[reactivemongo.api.commands.WriteResult]] that can be used to check whether the removal was successful
    */
-  def remove[T](query: T, writeConcern: WriteConcern = defaultWriteConcern, firstMatchOnly: Boolean = false)(implicit writer: pack.Writer[T], ec: ExecutionContext): Future[WriteResult] = db.connection.metadata match {
+  def remove[S](selector: S, writeConcern: WriteConcern = defaultWriteConcern, firstMatchOnly: Boolean = false)(implicit swriter: pack.Writer[S], ec: ExecutionContext): Future[WriteResult] = db.connection.metadata match {
     case Some(metadata) if (
       metadata.maxWireVersion >= MongoWireVersion.V26
     ) => {
@@ -625,14 +705,14 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
 
       Failover2(db.connection, failoverStrategy) { () =>
         runCommand(Delete(writeConcern = writeConcern)(
-          DeleteElement(query, limit)
+          DeleteElement(selector, limit)
         ), readPreference).flatMap { wr =>
           val flattened = wr.flatten
           if (!flattened.ok) {
             // was ordered, with one doc => fail if has an error
             Future.failed(WriteResult.lastError(flattened).
               getOrElse[Exception](GenericDriverException(
-                s"fails to remove: $query"
+                s"fails to remove: $selector"
               )))
           } else Future.successful(wr)
         }
@@ -658,6 +738,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    * @param query the selector of documents to remove.
    * @param firstMatchOnly states whether only the first matched documents has to be removed from this collection.
    */
+  @deprecated("Use [[remove]]", "0.12.0")
   def uncheckedRemove[T](query: T, firstMatchOnly: Boolean = false)(implicit writer: pack.Writer[T], ec: ExecutionContext): Unit = {
     val op = Delete(fullCollectionName, if (firstMatchOnly) 1 else 0)
     val bson = writeDoc(query, writer)
@@ -678,6 +759,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    * @param upsert states whether the update objet should be inserted if no match found. Defaults to false.
    * @param multi states whether the update may be done on all the matching documents.
    */
+  @deprecated("Use [[update]]", "0.12.0")
   def uncheckedUpdate[S, U](selector: S, update: U, upsert: Boolean = false, multi: Boolean = false)(implicit selectorWriter: pack.Writer[S], updateWriter: pack.Writer[U]): Unit = {
     val flags = 0 | (if (upsert) UpdateFlags.Upsert else 0) | (if (multi) UpdateFlags.MultiUpdate else 0)
     val op = Update(fullCollectionName, flags)
@@ -696,6 +778,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    *
    * @param document the document to insert.
    */
+  @deprecated("Use [[insert]]", "0.12.0")
   def uncheckedInsert[T](document: T)(implicit writer: pack.Writer[T]): Unit = {
     val op = Insert(0, fullCollectionName)
     val bson = writeDoc(document, writer)

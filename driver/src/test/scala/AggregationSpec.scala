@@ -208,29 +208,25 @@ class AggregationSpec extends org.specs2.mutable.Specification {
         }
 
         "with metadata sort" in { implicit ee: EE =>
-          import coll.BatchCommands.AggregationFramework
-          import AggregationFramework.{
-            Descending,
-            Cursor => AggCursor,
-            Match,
-            MetadataSort,
-            Sort,
-            TextScore
-          }
+          coll.aggregatingWith[ZipCode]() { framework =>
+            import framework.{
+              Descending,
+              Match,
+              MetadataSort,
+              Sort,
+              TextScore
+            }
 
-          val firstOp = Match(BSONDocument(
-            "$text" -> BSONDocument("$search" -> "JP")
-          ))
+            val firstOp = Match(BSONDocument(
+              "$text" -> BSONDocument("$search" -> "JP")
+            ))
+            val pipeline = List(Sort(
+              MetadataSort("score", TextScore), Descending("city")
+            ))
 
-          val pipeline = List(Sort(
-            MetadataSort("score", TextScore), Descending("city")
-          ))
-
-          coll.aggregate1[ZipCode](firstOp, pipeline, AggCursor(1)).
-            flatMap(_.collect[List](
-              4, Cursor.FailOnError[List[ZipCode]]()
-            )) must beEqualTo(jpCodes).
-            await(1, timeout)
+            (firstOp, pipeline, Some(1))
+          }.flatMap(_.collect[List](4, Cursor.FailOnError[List[ZipCode]]())).
+            aka("aggregated") must beEqualTo(jpCodes).await(1, timeout)
 
         }
       }
