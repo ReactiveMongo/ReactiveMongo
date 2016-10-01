@@ -191,10 +191,9 @@ class AggregationSpec extends org.specs2.mutable.Specification {
       "with cursor" >> {
         def collect(c: BSONCollection, upTo: Int = Int.MaxValue)(implicit ec: ExecutionContext) = withCtx(c) { (firstOp, pipeline) =>
           c.aggregate1[BSONDocument](firstOp, pipeline,
-            c.BatchCommands.AggregationFramework.Cursor(1)).
-            flatMap(_.collect[List](
+            c.BatchCommands.AggregationFramework.Cursor(1)).collect[List](
               upTo, Cursor.FailOnError[List[BSONDocument]]()
-            ))
+            )
         }
 
         "without limit (maxDocs)" in { implicit ee: EE =>
@@ -225,7 +224,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
             ))
 
             (firstOp, pipeline, Some(1))
-          }.flatMap(_.collect[List](4, Cursor.FailOnError[List[ZipCode]]())).
+          }.collect[List](4, Cursor.FailOnError[List[ZipCode]]()).
             aka("aggregated") must beEqualTo(jpCodes).await(1, timeout)
 
         }
