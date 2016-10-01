@@ -42,8 +42,10 @@ import BufferAccessors._
 import reactivemongo.api.ReadPreference
 
 object `package` {
-  implicit class RichBuffer(val buffer: ChannelBuffer) extends AnyVal {
+  @deprecated("Will be removed", "0.12.0")
+  class RichBuffer(val buffer: ChannelBuffer) extends AnyVal {
     import scala.collection.mutable.ArrayBuffer
+
     /** Write a UTF-8 encoded C-Style String. */
     def writeCString(s: String): ChannelBuffer = {
       val bytes = s.getBytes("utf-8")
@@ -88,13 +90,12 @@ object `package` {
       @annotation.tailrec
       def readCString(array: ArrayBuffer[Byte]): String = {
         val byte = buffer.readByte
-        if (byte == 0x00)
-          new String(array.toArray, "UTF-8")
+        if (byte == 0x00) new String(array.toArray, "UTF-8")
         else readCString(array += byte)
       }
+
       readCString(new ArrayBuffer[Byte](16))
     }
-
   }
 }
 
@@ -139,7 +140,7 @@ case class MessageHeader(
     opCode: Int
 ) extends ChannelBufferWritable {
   override val writeTo = writeTupleToBuffer4((messageLength, requestID, responseTo, opCode)) _
-  override def size = 4 + 4 + 4 + 4
+  override val size = 4 + 4 + 4 + 4
 }
 
 /** Header deserializer from a [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]]. */
@@ -174,9 +175,12 @@ case class Request(
     readPreference: ReadPreference = ReadPreference.primary,
     channelIdHint: Option[Int] = None
 ) extends ChannelBufferWritable {
+  private def write(buffer: ChannelBuffer, writable: ChannelBufferWritable) =
+    writable writeTo buffer
+
   override val writeTo = { buffer: ChannelBuffer =>
-    buffer write header
-    buffer write op
+    write(buffer, header)
+    write(buffer, op)
     buffer writeBytes documents.merged
   }
   override def size = 16 + op.size + documents.merged.writerIndex
@@ -281,9 +285,7 @@ case class Response(
     documents: ChannelBuffer,
     info: ResponseInfo
 ) {
-  /**
-   * if this response is in error, explain this error.
-   */
+  /** If this response is in error, explain this error. */
   lazy val error: Option[DatabaseException] = {
     if (reply.inError) {
       val bson = Response.parse(this)
@@ -300,7 +302,9 @@ object Response {
   import reactivemongo.bson.DefaultBSONHandlers.BSONDocumentIdentity
 
   def parse(response: Response): Iterator[BSONDocument] =
-    ReplyDocumentIterator(BSONSerializationPack)(response.reply, response.documents)(BSONDocumentIdentity)
+    ReplyDocumentIterator(BSONSerializationPack)(
+      response.reply, response.documents
+    )(BSONDocumentIdentity)
 }
 
 /**
@@ -381,8 +385,9 @@ private[reactivemongo] class RequestEncoder extends OneToOneEncoder {
         message writeTo buffer
         buffer
       }
+
       case _ => {
-        logger.error("weird... do not know how to encode this object: " + obj)
+        logger.error(s"Weird... do not know how to encode this object: $obj")
         obj
       }
     }
@@ -393,18 +398,18 @@ object ReplyDocumentIterator {
   def apply[P <: SerializationPack, A](pack: P)(reply: Reply, buffer: ChannelBuffer)(implicit reader: pack.Reader[A]): Iterator[A] = new Iterator[A] {
     override val isTraversableAgain = false // TODO: Add test
     override def hasNext = buffer.readable
-    override def next =
-      try {
-        val cbrb = ChannelBufferReadableBuffer(buffer.readBytes(buffer.getInt(buffer.readerIndex)))
-        pack.readAndDeserialize(cbrb, reader)
-      } catch {
-        case e: IndexOutOfBoundsException =>
-          /*
-           * If this happens, the buffer is exhausted, and there is probably a bug.
-           * It may happen if an enumerator relying on it is concurrently applied to many iteratees – which should not be done!
-           */
-          throw ReplyDocumentIteratorExhaustedException(e)
-      }
+
+    override def next = try {
+      val cbrb = ChannelBufferReadableBuffer(buffer.readBytes(buffer.getInt(buffer.readerIndex)))
+      pack.readAndDeserialize(cbrb, reader)
+    } catch {
+      case e: IndexOutOfBoundsException =>
+        /*
+         * If this happens, the buffer is exhausted, and there is probably a bug.
+         * It may happen if an enumerator relying on it is concurrently applied to many iteratees – which should not be done!
+         */
+        throw ReplyDocumentIteratorExhaustedException(e)
+    }
   }
 }
 
