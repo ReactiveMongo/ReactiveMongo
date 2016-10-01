@@ -226,7 +226,7 @@ case class BSONArray(stream: Stream[Try[BSONValue]])
   /**
    * Alias for `merge`.
    */
-  @deprecated("Use the corresponding [[merge]]", "0.12.0")
+  @deprecated("Use the corresponding `merge`", "0.12.0")
   def add(doc: BSONArray): BSONArray = merge(doc)
 
   /**

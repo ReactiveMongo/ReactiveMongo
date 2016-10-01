@@ -161,7 +161,7 @@ trait BatchCommands[P <: SerializationPack] {
  * @define resultTParam The type of the result elements. An implicit `Reader[T]` typeclass for handling it has to be in the scope.
  * @define readerParam the result reader
  * @define aggCursorParam the cursor descriptor for aggregation
- * @define removeDescription
+ * @define cursorFlattenerParam the cursor flattener (by default use the builtin one)
  */
 trait GenericCollection[P <: SerializationPack with Singleton] extends Collection with GenericCollectionWithCommands[P] with CollectionMetaCommands with reactivemongo.api.commands.ImplicitCommandHelpers[P] { self =>
   val pack: P
@@ -578,8 +578,9 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    * @param readPreference $readPrefParam (default: primary)
    * @param f The function to create the aggregation pipeline using the aggregation framework depending on the collection type; Returns the operators and an optional batch size (for the aggregation cursor).
    * @param reader $readerParam
+   * @param cf $cursorFlattenerParam
    */
-  def aggregatingWith[T](explain: Boolean = false, allowDiskUse: Boolean = false, bypassDocumentValidation: Boolean = false, readConcern: Option[ReadConcern] = None, readPreference: ReadPreference = ReadPreference.primary)(f: AggregationFramework => (PipelineOperator, List[PipelineOperator], Option[Int]))(implicit ec: ExecutionContext, reader: pack.Reader[T]): Future[Cursor[T]] = {
+  def aggregatingWith[T](explain: Boolean = false, allowDiskUse: Boolean = false, bypassDocumentValidation: Boolean = false, readConcern: Option[ReadConcern] = None, readPreference: ReadPreference = ReadPreference.primary)(f: AggregationFramework => (PipelineOperator, List[PipelineOperator], Option[Int]))(implicit ec: ExecutionContext, reader: pack.Reader[T], cf: CursorFlattener[Cursor]): Cursor[T] = {
     val (firstOp, otherOps, batchSize) = f(BatchCommands.AggregationFramework)
     val aggCursor = batchSize.map(BatchCommands.AggregationFramework.Cursor(_))
 
@@ -601,8 +602,9 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    * @param readConcern $readConcernParam
    * @param readPreference $readPrefParam
    * @param reader $readerParam
+   * @param cf $cursorFlattenerParam
    */
-  def aggregate1[T](firstOperator: PipelineOperator, otherOperators: List[PipelineOperator], cursor: BatchCommands.AggregationFramework.Cursor, explain: Boolean = false, allowDiskUse: Boolean = false, bypassDocumentValidation: Boolean = false, readConcern: Option[ReadConcern] = None, readPreference: ReadPreference = ReadPreference.primary)(implicit ec: ExecutionContext, reader: pack.Reader[T]): Future[Cursor[T]] = aggregate[T](firstOperator, otherOperators, Some(cursor), explain, allowDiskUse, bypassDocumentValidation, readConcern, readPreference)
+  def aggregate1[T](firstOperator: PipelineOperator, otherOperators: List[PipelineOperator], cursor: BatchCommands.AggregationFramework.Cursor, explain: Boolean = false, allowDiskUse: Boolean = false, bypassDocumentValidation: Boolean = false, readConcern: Option[ReadConcern] = None, readPreference: ReadPreference = ReadPreference.primary)(implicit ec: ExecutionContext, reader: pack.Reader[T], cf: CursorFlattener[Cursor]): Cursor[T] = aggregate[T](firstOperator, otherOperators, Some(cursor), explain, allowDiskUse, bypassDocumentValidation, readConcern, readPreference)
 
   /**
    * [[http://docs.mongodb.org/manual/reference/command/aggregate/ Aggregates]] the matching documents.
@@ -643,8 +645,9 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    * @param readConcern $readConcernParam
    * @param readPreference $readPrefParam
    * @param reader $readerParam
+   * @param cf $cursorFlattenerParam
    */
-  def aggregate[T](firstOperator: PipelineOperator, otherOperators: List[PipelineOperator], cursor: Option[BatchCommands.AggregationFramework.Cursor], explain: Boolean, allowDiskUse: Boolean, bypassDocumentValidation: Boolean, readConcern: Option[ReadConcern], readPreference: ReadPreference)(implicit ec: ExecutionContext, reader: pack.Reader[T]): Future[Cursor[T]] = {
+  def aggregate[T](firstOperator: PipelineOperator, otherOperators: List[PipelineOperator], cursor: Option[BatchCommands.AggregationFramework.Cursor], explain: Boolean, allowDiskUse: Boolean, bypassDocumentValidation: Boolean, readConcern: Option[ReadConcern], readPreference: ReadPreference)(implicit ec: ExecutionContext, reader: pack.Reader[T], cf: CursorFlattener[Cursor]): Cursor[T] = {
     import BatchCommands.AggregationFramework.{ Aggregate, AggregationResult }
     import BatchCommands.{ AggregateWriter, AggregateReader }
 
@@ -655,7 +658,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
     def ver = db.connection.metadata.
       fold[MongoWireVersion](MongoWireVersion.V30)(_.maxWireVersion)
 
-    runWithResponse(Aggregate(
+    cf.flatten(runWithResponse(Aggregate(
       firstOperator :: otherOperators, explain, allowDiskUse, cursor,
       ver, bypassDocumentValidation, readConcern
     ), readPreference).flatMap[Cursor[T]] {
@@ -681,7 +684,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
       case ResponseResult(response, _, _) => Future.failed[Cursor[T]](
         GenericDriverException(s"missing cursor: $response")
       )
-    }
+    })
   }
 
   /**
