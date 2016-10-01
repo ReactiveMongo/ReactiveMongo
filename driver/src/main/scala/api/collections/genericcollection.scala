@@ -160,8 +160,8 @@ trait BatchCommands[P <: SerializationPack] {
  * @define aggregation [[http://docs.mongodb.org/manual/reference/command/aggregate/ Aggregates]] the matching documents
  * @define resultTParam The type of the result elements. An implicit `Reader[T]` typeclass for handling it has to be in the scope.
  * @define readerParam the result reader
- * @define aggCursorParam the cursor descriptor for aggregation
  * @define cursorFlattenerParam the cursor flattener (by default use the builtin one)
+ * @define aggBatchSizeParam the batch size (for the aggregation cursor; if `None` use the default one)
  */
 trait GenericCollection[P <: SerializationPack with Singleton] extends Collection with GenericCollectionWithCommands[P] with CollectionMetaCommands with reactivemongo.api.commands.ImplicitCommandHelpers[P] { self =>
   val pack: P
@@ -576,15 +576,17 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    * @param bypassDocumentValidation $bypassParam
    * @param readConcern $readConcernParam
    * @param readPreference $readPrefParam (default: primary)
-   * @param f The function to create the aggregation pipeline using the aggregation framework depending on the collection type; Returns the operators and an optional batch size (for the aggregation cursor).
+   * @param batchSize $aggBatchSizeParam
+   * @param f the function to create the aggregation pipeline using the aggregation framework depending on the collection type
    * @param reader $readerParam
    * @param cf $cursorFlattenerParam
    */
-  def aggregatingWith[T](explain: Boolean = false, allowDiskUse: Boolean = false, bypassDocumentValidation: Boolean = false, readConcern: Option[ReadConcern] = None, readPreference: ReadPreference = ReadPreference.primary)(f: AggregationFramework => (PipelineOperator, List[PipelineOperator], Option[Int]))(implicit ec: ExecutionContext, reader: pack.Reader[T], cf: CursorFlattener[Cursor]): Cursor[T] = {
-    val (firstOp, otherOps, batchSize) = f(BatchCommands.AggregationFramework)
-    val aggCursor = batchSize.map(BatchCommands.AggregationFramework.Cursor(_))
+  def aggregatingWith[T](explain: Boolean = false, allowDiskUse: Boolean = false, bypassDocumentValidation: Boolean = false, readConcern: Option[ReadConcern] = None, readPreference: ReadPreference = ReadPreference.primary, batchSize: Option[Int] = None)(f: AggregationFramework => (PipelineOperator, List[PipelineOperator]))(implicit ec: ExecutionContext, reader: pack.Reader[T], cf: CursorFlattener[Cursor]): Cursor[T] = {
+    val (firstOp, otherOps) = f(BatchCommands.AggregationFramework)
+    val aggCursor = BatchCommands.AggregationFramework.
+      Cursor(batchSize.getOrElse(101))
 
-    aggregate[T](firstOp, otherOps, aggCursor, explain, allowDiskUse,
+    aggregate[T](firstOp, otherOps, Some(aggCursor), explain, allowDiskUse,
       bypassDocumentValidation, readConcern, readPreference)
   }
 
@@ -595,16 +597,16 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    *
    * @param firstOperator $firstOpParam
    * @param otherOperators $otherOpsParam
-   * @param cursor $aggCursorParam
    * @param explain $explainParam of the pipeline
    * @param allowDiskUse $allowDiskUseParam
    * @param bypassDocumentValidation $bypassParam
    * @param readConcern $readConcernParam
    * @param readPreference $readPrefParam
+   * @param batchSize $aggBatchSizeParam
    * @param reader $readerParam
    * @param cf $cursorFlattenerParam
    */
-  def aggregate1[T](firstOperator: PipelineOperator, otherOperators: List[PipelineOperator], cursor: BatchCommands.AggregationFramework.Cursor, explain: Boolean = false, allowDiskUse: Boolean = false, bypassDocumentValidation: Boolean = false, readConcern: Option[ReadConcern] = None, readPreference: ReadPreference = ReadPreference.primary)(implicit ec: ExecutionContext, reader: pack.Reader[T], cf: CursorFlattener[Cursor]): Cursor[T] = aggregate[T](firstOperator, otherOperators, Some(cursor), explain, allowDiskUse, bypassDocumentValidation, readConcern, readPreference)
+  def aggregate1[T](firstOperator: PipelineOperator, otherOperators: List[PipelineOperator], explain: Boolean = false, allowDiskUse: Boolean = false, bypassDocumentValidation: Boolean = false, readConcern: Option[ReadConcern] = None, readPreference: ReadPreference = ReadPreference.primary, batchSize: Option[Int] = None)(implicit ec: ExecutionContext, reader: pack.Reader[T], cf: CursorFlattener[Cursor]): Cursor[T] = aggregate[T](firstOperator, otherOperators, batchSize.map(BatchCommands.AggregationFramework.Cursor(_)), explain, allowDiskUse, bypassDocumentValidation, readConcern, readPreference)
 
   /**
    * [[http://docs.mongodb.org/manual/reference/command/aggregate/ Aggregates]] the matching documents.
