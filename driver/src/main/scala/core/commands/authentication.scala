@@ -296,26 +296,22 @@ object GetCrNonce extends Command[String] {
   }
 }
 
-@deprecated(message = "See [[CrAuthenticate]]", since = "0.11.10")
+@deprecated("See `CrAuthenticate`", "0.11.10")
 case class Authenticate(user: String, password: String, nonce: String)
     extends Command[SuccessfulAuthentication] {
 
   private val underlying = CrAuthenticate(user, password, nonce)
 
-  @deprecated(message =
-    "See [[CrAuthenticate.makeDocuments]]", since = "0.11.10")
+  @deprecated("See `CrAuthenticate.makeDocuments`", "0.11.10")
   override def makeDocuments = underlying.makeDocuments
 
-  @deprecated(message =
-    "See [[CrAuthenticate.ResultMaker]]", since = "0.11.10")
+  @deprecated("See `CrAuthenticate.ResultMaker`", "0.11.10")
   val ResultMaker = underlying.ResultMaker
 
-  @deprecated(message =
-    "See [[CrAuthenticate.pwdDigest]]", since = "0.11.10")
+  @deprecated("See `CrAuthenticate.pwdDigest`", "0.11.10")
   def pwdDigest = underlying.pwdDigest
 
-  @deprecated(message =
-    "See [[CrAuthenticate.key]]", since = "0.11.10")
+  @deprecated("See `CrAuthenticate.key`", "0.11.10")
   def key = underlying.key
 }
 

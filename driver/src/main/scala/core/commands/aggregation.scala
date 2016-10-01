@@ -10,8 +10,8 @@ import reactivemongo.bson._
  * @param pipeline Sequence of MongoDB aggregation operations.
  */
 @deprecated(
-  message = "Use [[reactivemongo.api.collections.bson.BSONCollection.aggregate]]",
-  since = "0.11.4"
+  message = "Use [[reactivemongo.api.collections.GenericCollection.aggregatingWith]]",
+  since = "0.12-RC5"
 )
 case class Aggregate(
     collectionName: String,

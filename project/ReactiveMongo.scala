@@ -232,13 +232,34 @@ object Findbugs {
   )
 }
 
+object Documentation {
+  import sbtunidoc.{ Plugin => UnidocPlugin },
+    UnidocPlugin.UnidocKeys._, UnidocPlugin.ScalaUnidoc
+
+  def mappings(org: String, location: String, revision: String => String = identity)(names: String*) = Def.task[Map[File, URL]] {
+    (for {
+      entry: Attributed[File] <- (fullClasspath in Compile).value
+      module: ModuleID <- entry.get(moduleID.key)
+      if module.organization == org
+      if names.exists(module.name.startsWith)
+      rev = revision(module.revision)
+    } yield entry.data -> url(location.format(rev))).toMap
+  }
+
+  val settings = UnidocPlugin.unidocSettings ++ Seq(
+    unidocProjectFilter in (ScalaUnidoc, unidoc) := {
+      inAnyProject -- inProjects(
+        ReactiveMongoBuild.shaded, ReactiveMongoBuild.jmx)
+    },
+    apiMappings ++= mappings("org.scala-lang", "http://scala-lang.org/api/%s/")("scala-library").value
+  )
+}
+
 object ReactiveMongoBuild extends Build {
   import BuildSettings._
   import Resolvers._
   import Dependencies._
 
-  import sbtunidoc.{ Plugin => UnidocPlugin },
-    UnidocPlugin.UnidocKeys._, UnidocPlugin.ScalaUnidoc
 
   import sbtassembly.{
     AssemblyKeys, MergeStrategy, PathList, ShadeRule
@@ -256,13 +277,10 @@ object ReactiveMongoBuild extends Build {
     Project(
       s"$projectPrefix-Root",
       file("."),
-      settings = buildSettings ++ (publishArtifact := false) ).
-      settings(UnidocPlugin.unidocSettings: _*).
+      settings = buildSettings ++ Documentation.settings).
       settings(
+        publishArtifact := false,
         previousArtifacts := Set.empty,
-        unidocProjectFilter in (ScalaUnidoc, unidoc) := {
-          inAnyProject -- inProjects(shaded, jmx)
-        },
         travisEnv in Test := { // test:travisEnv from SBT CLI
           val specs = List[(String, List[String])](
             "MONGO_VER" -> List("2_6", "3"),
@@ -305,12 +323,10 @@ object ReactiveMongoBuild extends Build {
       }
     })
 
-    val pom = tr.transform(node).headOption match {
+    tr.transform(node).headOption match {
       case Some(transformed) => transformed
       case _ => sys.error("Fails to transform the POM")
     }
-
-    pom
   }
 
   import de.johoop.findbugs4sbt.FindBugs.findbugsAnalyzedPath
@@ -792,7 +808,8 @@ object ReactiveMongoBuild extends Build {
       testOptions in Test += Tests.Cleanup(commonCleanup),
       mappings in (Compile, packageBin) ~= driverFilter,
       //mappings in (Compile, packageDoc) ~= driverFilter,
-      mappings in (Compile, packageSrc) ~= driverFilter
+      mappings in (Compile, packageSrc) ~= driverFilter,
+      apiMappings ++= Documentation.mappings("com.typesafe.akka", "http://doc.akka.io/api/akka/%s/")("akka-actor").value ++ Documentation.mappings("com.typesafe.play", "http://playframework.com/documentation/%s/api/scala/index.html", _.replaceAll("[\\d]$", "x"))("play-iteratees").value
     )).dependsOn(bsonmacros, shaded)
 
   private val providedInternalDeps: XmlNode => XmlNode = {
