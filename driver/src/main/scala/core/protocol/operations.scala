@@ -39,8 +39,17 @@ private[protocol] object BufferAccessors {
     def apply(buffer: ChannelBuffer, l: Long) = buffer writeLong l
   }
 
-  implicit object StringChannelInteroperable extends BufferInteroperable[String] {
-    def apply(buffer: ChannelBuffer, s: String) = buffer writeCString s
+  implicit object StringChannelInteroperable
+      extends BufferInteroperable[String] {
+
+    private def writeCString(buffer: ChannelBuffer, s: String): ChannelBuffer = {
+      val bytes = s.getBytes("utf-8")
+      buffer writeBytes bytes
+      buffer writeByte 0
+      buffer
+    }
+
+    def apply(buffer: ChannelBuffer, s: String) = writeCString(buffer, s)
   }
 
   /**

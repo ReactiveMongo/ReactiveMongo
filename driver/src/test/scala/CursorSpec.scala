@@ -556,9 +556,7 @@ class CursorSpec extends org.specs2.mutable.Specification
               cursor.foldResponsesM({}, 128)(
                 { (_, _) => Future[Cursor.State[Unit]](sys.error("Foo")) },
                 Cursor.ContOnError[Unit](onError)
-              ).map(_ => count).
-                aka("folding") must beEqualTo(128).await(2, delayedTimeout)
-
+              ).map(_ => count) must beEqualTo(128).await(2, delayedTimeout)
           }
 
           "if fails while processing w/o documents" in { implicit ee: EE =>
@@ -573,8 +571,7 @@ class CursorSpec extends org.specs2.mutable.Specification
             cursor.foldResponses({}, 64)(
               { (_, _) => sys.error("Foo"): Cursor.State[Unit] },
               Cursor.ContOnError[Unit](onError)
-            ).map(_ => count).
-              aka("folding") must beEqualTo(64).await(2, delayedTimeout)
+            ).map(_ => count) must beEqualTo(64).await(2, delayedTimeout)
           }
 
           "if fails with initial value" in { implicit ee: EE =>
@@ -1010,6 +1007,44 @@ class CursorSpec extends org.specs2.mutable.Specification
         drv.close(timeout) must not(throwA[Exception])
       }
     }
+
+    /*
+    "Benchmark" in { implicit ee: EE =>
+      import reactivemongo.api.tests
+
+      def resp(reqID: Long) = tests.fakeResponse(
+        document("_id" -> reqID),
+        reqID.toInt,
+        (reqID - 1L).toInt
+      )
+
+      var i = 0L
+      val max = Int.MaxValue.toLong + 2
+
+      implicit val actorSys = akka.actor.ActorSystem(
+        "reactivemongo", defaultExecutionContext = Some(ee.executionContext)
+      )
+
+      def result = tests.foldResponses[Unit](
+        _ => Future.successful(resp(i)),
+        { (_, _) =>
+          if (i % 1000 == 0) println(s"i = $i ? ${(i < max)}")
+
+          if (i < max) {
+            i = i + 1
+            Future.successful(Some(resp(i)))
+          } else Future.successful(None)
+        },
+        (_, _) => {},
+        (),
+        Int.MaxValue,
+        (_, _) => Future.successful(Cursor.Cont({})),
+        (_, l) => Cursor.Fail[Unit](l)
+      )
+
+      result must beEqualTo({}).await(0, Int.MaxValue.seconds)
+    } tag "benchmark"
+     */
   }
 
   "Tailable cursor" should {

@@ -205,7 +205,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
         }
 
         "with metadata sort" in { implicit ee: EE =>
-          coll.aggregatingWith[ZipCode]() { framework =>
+          coll.aggregateWith[ZipCode]() { framework =>
             import framework.{
               Descending,
               Match,

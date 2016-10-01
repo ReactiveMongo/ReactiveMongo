@@ -6,6 +6,7 @@ import scala.concurrent.duration.SECONDS
 import akka.util.Timeout
 import akka.actor.ActorRef
 
+import reactivemongo.core.protocol.Response
 import reactivemongo.core.nodeset.{ Authenticate, NodeSet }
 import reactivemongo.core.actors.{
   ChannelClosed,
@@ -41,5 +42,43 @@ package object tests {
 
   def channelClosed(id: Int) = ChannelClosed(id)
 
-  def makeRequest[T](cursor: Cursor[T], maxDocs: Int)(implicit ec: ExecutionContext): Future[reactivemongo.core.protocol.Response] = cursor.asInstanceOf[CursorOps[T]].makeRequest(maxDocs)
+  def makeRequest[T](cursor: Cursor[T], maxDocs: Int)(implicit ec: ExecutionContext): Future[Response] = cursor.asInstanceOf[CursorOps[T]].makeRequest(maxDocs)
+
+  def fakeResponse(doc: reactivemongo.bson.BSONDocument, reqID: Int = 2, respTo: Int = 1): Response = {
+    val reply = reactivemongo.core.protocol.Reply(
+      flags = 1,
+      cursorID = 1,
+      startingFrom = 0,
+      numberReturned = 1
+    )
+
+    val message = reactivemongo.core.netty.BufferSequence.single(doc).merged
+
+    val header = reactivemongo.core.protocol.MessageHeader(
+      messageLength = message.capacity,
+      requestID = reqID,
+      responseTo = respTo,
+      opCode = -1
+    )
+
+    Response(
+      header,
+      reply,
+      documents = message,
+      info = reactivemongo.core.protocol.ResponseInfo(1)
+    )
+  }
+
+  def foldResponses[T](
+    makeRequest: ExecutionContext => Future[Response],
+    next: (ExecutionContext, Response) => Future[Option[Response]],
+    killCursors: (Long, String) => Unit,
+    z: => T,
+    maxDocs: Int,
+    suc: (T, Response) => Future[Cursor.State[T]],
+    err: Cursor.ErrorHandler[T]
+  )(implicit sys: akka.actor.ActorSystem, ec: ExecutionContext): Future[T] =
+    FoldResponses[T](
+      z, makeRequest, next, killCursors, suc, err, maxDocs
+    )(sys, ec)
 }

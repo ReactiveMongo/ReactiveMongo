@@ -133,7 +133,10 @@ object ChannelBufferWritableBuffer {
   }
 }
 
-case class BufferSequence(private val head: ChannelBuffer, private val tail: ChannelBuffer*) {
+case class BufferSequence(
+    private val head: ChannelBuffer,
+    private val tail: ChannelBuffer*
+) {
   def merged: ChannelBuffer = mergedBuffer.duplicate()
 
   private lazy val mergedBuffer =
