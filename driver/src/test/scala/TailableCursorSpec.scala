@@ -113,7 +113,7 @@ trait TailableCursorSpec { specs: CursorSpec =>
                   case 0 :: 1 :: _ => ok
                 }
               }.await(2, delayedTimeout)
-        }
+        } tag "wip"
       }
     }
   }
