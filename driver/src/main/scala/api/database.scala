@@ -80,8 +80,8 @@ sealed trait DB {
   /**
    * Sends a command and get the future result of the command.
    *
-   * @param command The command to send.
-   * @param readPreference The ReadPreference to use for this command (defaults to [[MongoConnectionOptions.readPreference]]).
+   * @param command the command to send
+   * @param readPreference the ReadPreference to use for this command (defaults to [[MongoConnectionOptions.readPreference]])
    *
    * @return a future containing the result of the command.
    */
@@ -97,11 +97,17 @@ sealed trait DB {
 
   /**
    * Returns the database of the given name on the same MongoConnection.
+   *
+   * @param name $nameParam
    * @see [[sibling1]]
    */
   def sibling(name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit ec: ExecutionContext): DefaultDB = connection(name, failoverStrategy)
 
-  /** Returns the database of the given name on the same MongoConnection. */
+  /**
+   * Returns the database of the given name on the same MongoConnection.
+   *
+   * @param name $nameParam
+   */
   def sibling1(name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit ec: ExecutionContext): Future[DefaultDB] = connection.database(name, failoverStrategy)
 
 }

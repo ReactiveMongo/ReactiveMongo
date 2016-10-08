@@ -399,6 +399,26 @@ object ReactiveMongoBuild extends Build {
     settings = buildSettings ++ Findbugs.settings ++ Seq(
       resolvers := resolversList,
       compile in Compile <<= (compile in Compile).dependsOn(assembly in shaded),
+      sourceGenerators in Compile <+= (version).zip(sourceManaged in Compile).map {
+        case (ver, dir) =>
+        val outdir = dir / "reactivemongo" / "api"
+        val f = outdir / "Version.scala"
+
+        outdir.mkdirs()
+
+        Seq(IO.writer[File](f, "", IO.defaultCharset, false) { w =>
+          w.append(s"""package reactivemongo.api
+object Version {
+  /** The ReactiveMongo API version */
+  override val toString = "$ver"
+
+  /** The major version (e.g. 0.12 for the release 0.12.0) */
+  val majorVersion = "${Publish.majorVersion}"
+}""")
+
+          f
+        })
+      },
       driverCleanup := {
         val classDir = (classDirectory in Compile).value
         val extDir = {

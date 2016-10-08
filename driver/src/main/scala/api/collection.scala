@@ -24,47 +24,8 @@ import reactivemongo.core.errors.GenericDatabaseException
  * ([[reactivemongo.api.collections.GenericCollection]])
  * and the default [[reactivemongo.api.collections.bson.BSONCollection]].
  *
- * {{{
- * import reactivemongo.bson._
- * import reactivemongo.api.collections.bson.BSONCollection
- *
- * object Samples {
- *
- *   val connection = MongoConnection(List("localhost"))
- *
- *   // Gets a reference to the database "plugin"
- *   val db = connection("plugin")
- *
- *   // Gets a reference to the collection "acoll"
- *   // By default, you get a BSONCollection.
- *   val collection = db[BSONCollection]("acoll")
- *
- *   def listDocs() = {
- *     // Select only the documents which field 'firstName' equals 'Jack'
- *     val query = BSONDocument("firstName" -> "Jack")
- *     // select only the field 'lastName'
- *     val filter = BSONDocument(
- *       "lastName" -> 1,
- *       "_id" -> 0)
- *
- *     // Get a cursor of BSONDocuments
- *     val cursor = collection.find(query, filter).cursor[BSONDocument]
- *     // Let's enumerate this cursor and print a readable representation of each document in the response
- *     cursor.enumerate().apply(Iteratee.foreach { doc =>
- *       println("found document: " + BSONDocument.pretty(doc))
- *     })
- *
- *     // Or, the same with getting a list
- *     val cursor2 = collection.find(query, filter).cursor[BSONDocument]
- *     val futureList = cursor.collect[List]()
- *     futureList.map { list =>
- *       list.foreach { doc =>
- *         println("found document: " + BSONDocument.pretty(doc))
- *       }
- *     }
- *   }
- * }
- * }}}
+ * @define failoverStrategy the failover strategy to override the default one
+ * @define otherName the name of another collection
  */
 trait Collection {
   /** The database which this collection belong to. */
@@ -83,7 +44,7 @@ trait Collection {
    * Gets another implementation of this collection.
    * An implicit CollectionProducer[C] must be present in the scope, or it will be the default implementation ([[reactivemongo.api.collections.bson.BSONCollection]]).
    *
-   * @param failoverStrategy Overrides the default strategy.
+   * @param failoverStrategy $failoverStrategy
    */
   def as[C <: Collection](failoverStrategy: FailoverStrategy = failoverStrategy)(implicit producer: CollectionProducer[C] = collections.bson.BSONCollectionProducer): C = {
     producer.apply(db, name, failoverStrategy)
@@ -93,8 +54,8 @@ trait Collection {
    * Gets another collection in the current database.
    * An implicit CollectionProducer[C] must be present in the scope, or it will be the default implementation ([[reactivemongo.api.collections.bson.BSONCollection]]).
    *
-   * @param name The other collection name.
-   * @param failoverStrategy Overrides the default strategy.
+   * @param name $otherName
+   * @param failoverStrategy $failoverStrategy
    */
   @deprecated("Consider using `sibling` instead", "0.10")
   def sister[C <: Collection](name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit producer: CollectionProducer[C] = collections.bson.BSONCollectionProducer): C =
@@ -104,8 +65,8 @@ trait Collection {
    * Gets another collection in the current database.
    * An implicit CollectionProducer[C] must be present in the scope, or it will be the default implementation ([[reactivemongo.api.collections.bson.BSONCollection]]).
    *
-   * @param name The other collection name.
-   * @param failoverStrategy Overrides the default strategy.
+   * @param name $otherName
+   * @param failoverStrategy $failoverStrategy
    */
   def sibling[C <: Collection](name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit producer: CollectionProducer[C] = collections.bson.BSONCollectionProducer): C =
     producer.apply(db, name, failoverStrategy)
@@ -222,8 +183,8 @@ trait CollectionMetaCommands { self: Collection =>
   /**
    * Renames this collection.
    *
-   * @param to The new name of this collection.
-   * @param dropExisting If a collection of name `to` already exists, then drops that collection before renaming this one.
+   * @param to the new name of this collection
+   * @param dropExisting if a collection of name `to` already exists, then drops that collection before renaming this one
    *
    * @return a failure if the dropExisting option is false and the target collection already exists
    */
@@ -241,7 +202,7 @@ trait CollectionMetaCommands { self: Collection =>
   /**
    * Returns various information about this collection.
    *
-   * @param scale A scale factor (for example, to get all the sizes in kilobytes).
+   * @param scale the scale factor (for example, to get all the sizes in kilobytes)
    */
   def stats(scale: Int)(implicit ec: ExecutionContext): Future[CollStatsResult] = Command.run(BSONSerializationPack)(self, CollStats(Some(scale)), ReadPreference.primary)
 
