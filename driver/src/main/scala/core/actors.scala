@@ -1327,16 +1327,16 @@ case object WaitForPrimary
 
 private[actors] object RequestId {
   // all requestIds [0, 1000[ are for isMaster messages
-  val isMaster = RequestIdGenerator(0, 999)
+  val isMaster = new RequestIdGenerator(0, 999)
 
   // all requestIds [1000, 2000[ are for getnonce messages
-  val getNonce = RequestIdGenerator(1000, 1999) // CR auth
+  val getNonce = new RequestIdGenerator(1000, 1999) // CR auth
 
   // all requestIds [2000, 3000[ are for authenticate messages
-  val authenticate = RequestIdGenerator(2000, 2999)
+  val authenticate = new RequestIdGenerator(2000, 2999)
 
   // all requestIds [3000[ are for common messages
-  val common = RequestIdGenerator(3000, Int.MaxValue - 1)
+  val common = new RequestIdGenerator(3000, Int.MaxValue - 1)
 }
 
 private[actors] object IsMasterResponse {
@@ -1348,12 +1348,53 @@ private[actors] object IsMasterResponse {
  * @param lower the lower bound
  * @param upper the upper bound
  */
-private[actors] case class RequestIdGenerator(lower: Int, upper: Int) {
-  private val iterator = Iterator.iterate(lower)(i => if (i == upper) lower else i + 1)
+private[actors] class RequestIdGenerator(val lower: Int, val upper: Int)
+    extends Product with Serializable {
 
-  def next = iterator.next
+  private val lock = new Object {}
+  private var value: Int = lower
+
+  def next: Int = lock.synchronized {
+    val v = value
+
+    if (v == upper) value = lower
+    else value = v + 1
+
+    v
+  }
+
   def accepts(id: Int): Boolean = id >= lower && id <= upper
   def accepts(response: Response): Boolean = accepts(response.header.responseTo)
+
+  override def equals(that: Any): Boolean = that match {
+    case RequestIdGenerator(l, u) => (lower == l) && (upper == u)
+    case _                        => false
+  }
+
+  override lazy val hashCode: Int = (lower, upper).hashCode
+
+  @deprecated("", "0.12-RC6")
+  def canEqual(that: Any): Boolean = that.isInstanceOf[RequestIdGenerator]
+
+  @deprecated("", "0.12-RC6")
+  val productArity = 2
+
+  @deprecated("", "0.12-RC6")
+  def productElement(n: Int): Any = n match {
+    case 0 => lower
+    case _ => upper
+  }
+}
+
+@deprecated("Use the class RequestIdGenerator", "0.12-RC6")
+object RequestIdGenerator
+    extends scala.runtime.AbstractFunction2[Int, Int, RequestIdGenerator] {
+
+  def apply(lower: Int, upper: Int): RequestIdGenerator =
+    new RequestIdGenerator(lower, upper)
+
+  def unapply(g: RequestIdGenerator): Option[(Int, Int)] =
+    Some(g.lower -> g.upper)
 }
 
 // exceptions
@@ -1367,10 +1408,9 @@ object Exceptions {
 
   /** An exception thrown when a request needs a non available primary. */
   sealed class PrimaryUnavailableException private[reactivemongo] (
-    val message: String,
-    override val cause: Throwable = null
-  )
-      extends DriverException with NoStackTrace {
+      val message: String,
+      override val cause: Throwable = null
+  ) extends DriverException with NoStackTrace {
 
     def this(supervisor: String, connection: String, cause: Throwable) =
       this(s"$primaryUnavailableMsg ($supervisor/$connection)", cause)
@@ -1386,10 +1426,9 @@ object Exceptions {
    * The application may not have access to the network anymore.
    */
   sealed class NodeSetNotReachable private[reactivemongo] (
-    val message: String,
-    override val cause: Throwable
-  )
-      extends DriverException with NoStackTrace {
+      val message: String,
+      override val cause: Throwable
+  ) extends DriverException with NoStackTrace {
 
     private[reactivemongo] def this(supervisor: String, connection: String, cause: Throwable) = this(s"$nodeSetReachableMsg ($supervisor/$connection)", cause)
 
@@ -1403,18 +1442,16 @@ object Exceptions {
     val message: String,
     val retriable: Boolean,
     override val cause: Throwable
-  )
-      extends DriverException with NoStackTrace
+  ) extends DriverException with NoStackTrace
 
   @deprecated(message = "Use constructor with details", since = "0.12-RC0")
   case object ChannelNotFound
     extends ChannelNotFound("ChannelNotFound", false, null)
 
   sealed class ClosedException private (
-    val message: String,
-    override val cause: Throwable
-  )
-      extends DriverException with NoStackTrace {
+      val message: String,
+      override val cause: Throwable
+  ) extends DriverException with NoStackTrace {
 
     private[reactivemongo] def this(supervisor: String, connection: String, cause: Throwable) = this(s"This MongoConnection is closed ($supervisor/$connection)", cause)
 

@@ -266,6 +266,9 @@ object Failover {
  * @param supervisor the name of the supervisor
  * @param name the unique name for the connection pool
  * @param mongosystem the reference to the internal [[reactivemongo.core.actors.MongoDBSystem]] Actor.
+ *
+ * @define dbName the database name
+ * @define failoverStrategy the failover strategy for sending requests
  */
 class MongoConnection(
     val supervisor: String,
@@ -292,8 +295,8 @@ class MongoConnection(
   /**
    * Returns a DefaultDB reference using this connection.
    *
-   * @param name the database name
-   * @param failoverStrategy the failover strategy for sending requests.
+   * @param name $dbName
+   * @param failoverStrategy $failoverStrategy
    */
   @deprecated(message = "Use [[database]]", since = "0.11.8")
   def apply(name: String, failoverStrategy: FailoverStrategy = options.failoverStrategy)(implicit context: ExecutionContext): DefaultDB = DefaultDB(name, this, failoverStrategy)
@@ -302,8 +305,8 @@ class MongoConnection(
    * Returns a DefaultDB reference using this connection
    * (alias for the `apply` method).
    *
-   * @param name the database name
-   * @param failoverStrategy the failover strategy for sending requests.
+   * @param name $dbName
+   * @param failoverStrategy $failoverStrategy
    */
   @deprecated(message = "Must use [[database]]", since = "0.11.8")
   def db(name: String, failoverStrategy: FailoverStrategy = options.failoverStrategy)(implicit context: ExecutionContext): DefaultDB = apply(name, failoverStrategy)
@@ -313,8 +316,8 @@ class MongoConnection(
    * The failover strategy is also used to wait for the node set to be ready,
    * before returning an available DB.
    *
-   * @param name the database name
-   * @param failoverStrategy the failover strategy for sending requests.
+   * @param name $dbName
+   * @param failoverStrategy $failoverStrategy
    */
   def database(name: String, failoverStrategy: FailoverStrategy = options.failoverStrategy)(implicit context: ExecutionContext): Future[DefaultDB] =
     waitIsAvailable(failoverStrategy).map(_ => apply(name, failoverStrategy))
@@ -442,7 +445,13 @@ class MongoConnection(
     expectingResponse.future
   }
 
-  /** Authenticates the connection on the given database. */
+  /**
+   * Authenticates the connection on the given database.
+   *
+   * @param db $dbName
+   * @param user the user name
+   * @param password the user password
+   */
   def authenticate(db: String, user: String, password: String): Future[SuccessfulAuthentication] = whenActive {
     val req = AuthRequest(Authenticate(db, user, password))
     mongosystem ! req
@@ -836,6 +845,7 @@ object MongoConnection {
 
 /**
  * @param config a custom configuration (otherwise the default options are used)
+ * @param classLoader a classloader used to load the actor system
  *
  * @define parsedURIParam the URI parsed by [[reactivemongo.api.MongoConnection.parseURI]]
  * @define connectionNameParam the name for the connection pool
@@ -847,7 +857,13 @@ object MongoConnection {
  * @define seeConnectDBTutorial See [[http://reactivemongo.org/releases/0.12/documentation/tutorial/connect-database.html how to connect to the database]]
  * @define uriStrictParam the strict URI, that will be parsed by [[reactivemongo.api.MongoConnection.parseURI]]
  */
-class MongoDriver(config: Option[Config] = None) {
+class MongoDriver(
+    config: Option[Config] = None,
+    classLoader: Option[ClassLoader] = None
+) {
+  @deprecated("Use the constructor with the classloader", "0.12-RC6")
+  def this(config: Option[Config]) = this(config, None)
+
   import scala.collection.mutable.{ Map => MutableMap }
 
   import MongoDriver.logger
@@ -864,7 +880,7 @@ class MongoDriver(config: Option[Config] = None) {
       ConfigFactory.empty()
     } else reference.getConfig("mongo-async-driver")
 
-    ActorSystem("reactivemongo", cfg)
+    ActorSystem("reactivemongo", Some(cfg), classLoader)
   }
 
   private val supervisorName = s"Supervisor-${MongoDriver.nextCounter}"
@@ -1152,10 +1168,14 @@ object MongoDriver {
   private val logger = LazyLogger("reactivemongo.api.MongoDriver")
 
   /** Creates a new [[MongoDriver]] with a new ActorSystem. */
-  def apply(): MongoDriver = new MongoDriver
+  def apply(): MongoDriver = new MongoDriver()
 
   /** Creates a new [[MongoDriver]] with the given `config`. */
-  def apply(config: Config): MongoDriver = new MongoDriver(Some(config))
+  def apply(config: Config): MongoDriver = new MongoDriver(Some(config), None)
+
+  /** Creates a new [[MongoDriver]] with the given `config`. */
+  def apply(config: Config, classLoader: ClassLoader): MongoDriver =
+    new MongoDriver(Some(config), Some(classLoader))
 
   private[api] val _counter = new AtomicLong(0)
   private[api] def nextCounter: Long = _counter.incrementAndGet()

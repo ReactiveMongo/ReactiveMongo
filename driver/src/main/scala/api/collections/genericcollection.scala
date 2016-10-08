@@ -358,6 +358,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
   def insert[T](document: T, writeConcern: WriteConcern = defaultWriteConcern)(implicit writer: pack.Writer[T], ec: ExecutionContext): Future[WriteResult] =
     db.connection.metadata match {
       case Some(metadata) if metadata.maxWireVersion >= MongoWireVersion.V26 =>
+        // TODO: ordered + bulk
         Failover2(db.connection, failoverStrategy) { () =>
           runCommand(BatchCommands.InsertCommand.Insert(
             writeConcern = writeConcern
@@ -404,6 +405,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
     case Some(metadata) if (
       metadata.maxWireVersion >= MongoWireVersion.V26
     ) => {
+      // TODO: ordered + bulk
       import BatchCommands.UpdateCommand.{ Update, UpdateElement }
 
       Failover2(db.connection, failoverStrategy) { () =>
@@ -640,7 +642,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    *
    * @param firstOperator $firstOpParam
    * @param otherOperators $otherOpsParam
-   * @param cursor $aggCursorParam (optional)
+   * @param cursor aggregation cursor option (optional)
    * @param explain $explainParam of the pipeline
    * @param allowDiskUse $allowDiskUseParam
    * @param bypassDocumentValidation $bypassParam
