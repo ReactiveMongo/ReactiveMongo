@@ -3,7 +3,8 @@ import sbt.Keys._
 import scala.language.postfixOps
 
 object BuildSettings {
-  val buildVersion = "0.12.0-SNAPSHOT"
+  val nextMajor = "0.12.0"
+  val buildVersion = s"$nextMajor-SNAPSHOT"
 
   val filter = { (ms: Seq[(File, String)]) =>
     ms filter {
@@ -29,7 +30,7 @@ object BuildSettings {
     scalacOptions in (Compile, doc) ++= Seq("-unchecked", "-deprecation",
       /*"-diagrams", */"-implicits", "-skip-packages", "samples"),
     scalacOptions in (Compile, doc) ++= Opts.doc.title("ReactiveMongo API"),
-    scalacOptions in (Compile, doc) ++= Opts.doc.version(buildVersion),
+    scalacOptions in (Compile, doc) ++= Opts.doc.version(nextMajor),
     scalacOptions in Compile := {
       val opts = (scalacOptions in Compile).value
 
