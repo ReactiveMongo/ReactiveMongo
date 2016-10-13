@@ -50,16 +50,16 @@ export LD_LIBRARY_PATH="$HOME/ssl/lib:$LD_LIBRARY_PATH"
 
 # Build MongoDB
 if [ "$MONGO_VER" = "3" ]; then
-    if [ ! -x "$HOME/mongodb-linux-x86_64-amazon-3.2.8/bin/mongod" ]; then
-        curl -s -o /tmp/mongodb.tgz https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-amazon-3.2.8.tgz
-        cd "$HOME" && rm -rf mongodb-linux-x86_64-amazon-3.2.8
+    if [ ! -x "$HOME/mongodb-linux-x86_64-amazon-3.2.10/bin/mongod" ]; then
+        curl -s -o /tmp/mongodb.tgz https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-amazon-3.2.10.tgz
+        cd "$HOME" && rm -rf mongodb-linux-x86_64-amazon-3.2.10
         tar -xzf /tmp/mongodb.tgz && rm -f /tmp/mongodb.tgz
-        chmod u+x mongodb-linux-x86_64-amazon-3.2.8/bin/mongod
+        chmod u+x mongodb-linux-x86_64-amazon-3.2.10/bin/mongod
     fi
 
-    #find "$HOME/mongodb-linux-x86_64-amazon-3.2.8" -ls
+    #find "$HOME/mongodb-linux-x86_64-amazon-3.2.10" -ls
 
-    export PATH="$HOME/mongodb-linux-x86_64-amazon-3.2.8/bin:$PATH"
+    export PATH="$HOME/mongodb-linux-x86_64-amazon-3.2.10/bin:$PATH"
     cp "$SCRIPT_DIR/mongod3.conf" /tmp/mongod.conf
 
     echo "  maxIncomingConnections: $MAX_CON" >> /tmp/mongod.conf
