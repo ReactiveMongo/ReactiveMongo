@@ -169,7 +169,6 @@ object Resolvers {
 }
 
 object Dependencies {
-  // TODO: Update
   val akka = {
     val ver = sys.env.get("AKKA_VERSION").getOrElse("2.3.13")
 
@@ -178,7 +177,11 @@ object Dependencies {
       "com.typesafe.akka" %% "akka-testkit" % ver % Test)
   }
 
-  val playIteratees = "com.typesafe.play" %% "play-iteratees" % "2.3.10"
+  val playIteratees = {
+    val ver = sys.env.get("PLAY_VERSION").getOrElse("2.3.10")
+
+    "com.typesafe.play" %% "play-iteratees" % ver
+  }
 
   val specsVer = "3.8.3"
   val specs = "org.specs2" %% "specs2-core" % specsVer % Test
@@ -261,7 +264,6 @@ object ReactiveMongoBuild extends Build {
   import Resolvers._
   import Dependencies._
 
-
   import sbtassembly.{
     AssemblyKeys, MergeStrategy, PathList, ShadeRule
   }, AssemblyKeys._
@@ -286,7 +288,8 @@ object ReactiveMongoBuild extends Build {
           val specs = List[(String, List[String])](
             "MONGO_VER" -> List("2_6", "3"),
             "MONGO_PROFILE" -> List("default", "ssl", "rs"),
-            "AKKA_VERSION" -> List("2.3.13", "2.4.8")
+            "AKKA_VERSION" -> List("2.3.13", "2.4.11"),
+            "PLAY_VERSION" -> List("2.3.10", "2.6.0")
           )
 
           def integrationMatrix = specs.flatMap {
