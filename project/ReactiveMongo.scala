@@ -4,7 +4,7 @@ import scala.language.postfixOps
 
 object BuildSettings {
   val nextMajor = "0.12.0"
-  val buildVersion = "0.12-RC6"
+  val buildVersion = nextMajor
 
   val filter = { (ms: Seq[(File, String)]) =>
     ms filter {
