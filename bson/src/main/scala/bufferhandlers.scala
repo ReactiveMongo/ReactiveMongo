@@ -97,8 +97,8 @@ object DefaultBufferHandler extends BufferHandler {
       buffer.writeByte(0)
       buffer
     }
+
     def read(b: ReadableBuffer) = {
-      val startIndex = b.index
       val length = b.readInt
       val buffer = b.slice(length - 4)
       b.discard(length - 4)
@@ -115,6 +115,7 @@ object DefaultBufferHandler extends BufferHandler {
       new BSONDocument(stream)
     }
   }
+
   object BSONArrayBufferHandler extends BufferRW[BSONArray] {
     def write(array: BSONArray, buffer: WritableBuffer) = {
       val now = buffer.index
@@ -128,15 +129,15 @@ object DefaultBufferHandler extends BufferHandler {
       buffer.writeByte(0)
       buffer
     }
+
     def read(b: ReadableBuffer) = {
-      val startIndex = b.index
       val length = b.readInt
       val buffer = b.slice(length - 4)
       b.discard(length - 4)
       def makeStream(): Stream[Try[BSONValue]] = {
         if (buffer.readable > 1) { // last is 0
           val code = buffer.readByte
-          val name = buffer.readCString
+          buffer.readCString // skip name
           val elem = Try(DefaultBufferHandler.handlersByCode.get(code).map(_.read(buffer)).get)
           elem #:: makeStream
         } else Stream.empty

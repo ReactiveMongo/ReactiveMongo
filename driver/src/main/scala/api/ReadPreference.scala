@@ -40,7 +40,7 @@ object ReadPreference {
   }
 
   private def TagFilter(tagSet: Seq[BSONDocument]): Option[BSONDocument => Boolean] = if (tagSet.isEmpty) None else Some { doc =>
-    tagSet.exists(doc.contains(_))
+    tagSet.exists(containsAll(doc, _))
   }
 
   @deprecated("For legacy purpose only", "0.11.12")
@@ -205,30 +205,25 @@ object ReadPreference {
 
   }
 
-  private implicit class BSONDocumentWrapper(
-      val underlying: BSONDocument
-  ) extends AnyVal {
+  // TODO: Move to BSON module
+  private def containsAll(target: BSONDocument, other: BSONDocument): Boolean = {
+    val els = target.elements
 
-    def contains(doc: BSONDocument): Boolean = {
-      val els = underlying.elements
-      doc.elements.forall { element =>
-        els.find {
-          case BSONElement(name, value) =>
-            element._1 == name && ((element._2, value) match {
-              case (d1: BSONDocument, d2: BSONDocument) =>
-                d1.elements == d2.elements
+    other.elements.forall { element =>
+      els.find {
+        case BSONElement(name, value) =>
+          element._1 == name && ((element._2, value) match {
+            case (d1: BSONDocument, d2: BSONDocument) =>
+              d1.elements == d2.elements
 
-              case (a1: BSONArray, a2: BSONArray) =>
-                a1.values == a2.values
+            case (a1: BSONArray, a2: BSONArray) =>
+              a1.values == a2.values
 
-              case (v1, v2) => v1 == v2
-            })
-        }.isDefined
-      }
+            case (v1, v2) => v1 == v2
+          })
+      }.isDefined
     }
   }
-
-  private val defaultFilterTag = (_: BSONDocument) => true
 
   /** Reads only from the primary. This is the default choice. */
   def primary: Primary.type = Primary

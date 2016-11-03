@@ -282,7 +282,7 @@ private object MacroImpl {
                 parseUnionTree(a :: b :: rem, found)
 
               case _ => c.abort(c.enclosingPosition,
-                "Union type parameters expected: $tree")
+                s"Union type parameters expected: $tree")
             }
           } else parseUnionTree(rem, tree :: found)
 

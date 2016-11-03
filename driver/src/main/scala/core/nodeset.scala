@@ -35,17 +35,6 @@ package object utils {
   def updateFirst[A, M[T] <: Iterable[T]](coll: M[A])(f: A => Option[A])(implicit cbf: CanBuildFrom[M[_], A, M[A]]): M[A] = {
     val builder = cbf.apply
 
-    def run(iterator: Iterator[A]): Unit = {
-      while (iterator.hasNext) {
-        val e = iterator.next
-        val updated = f(e)
-        if (updated.isDefined) {
-          builder += updated.get
-          builder ++= iterator
-        } else builder += e
-      }
-    }
-
     builder.result
   }
 

@@ -1,9 +1,11 @@
-import org.specs2.mutable._
 import reactivemongo.bson._
-import reactivemongo.bson.buffer.DefaultBufferHandler._
-import reactivemongo.bson.buffer.{ ArrayReadableBuffer, DefaultBufferHandler, ArrayBSONBuffer }
+import reactivemongo.bson.buffer.{
+  ArrayReadableBuffer,
+  DefaultBufferHandler,
+  ArrayBSONBuffer
+}, DefaultBufferHandler._
 
-class Equality extends Specification {
+class Equality extends org.specs2.mutable.Specification {
 
   "BSONDBPointer" should {
     "permit equality to work" in {
@@ -11,6 +13,7 @@ class Equality extends Specification {
       val dbp2 = dbp1.copy()
       dbp1 must beEqualTo(dbp2)
     }
+
     "retain equality through serialization/deserialization" in {
       val dbp1 = BSONDBPointer("coll", Array[Byte](1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12))
       val writeBuffer = new ArrayBSONBuffer
@@ -26,12 +29,14 @@ class Equality extends Specification {
 
   "BSONObjectID" should {
     "permit equality to work" in {
-      val boid1 = BSONObjectID("0102030405060708090a0b0c")
-      val boid2 = BSONObjectID("0102030405060708090a0b0c")
-      boid1 must beEqualTo(boid2)
+      val boid1 = BSONObjectID.parse("0102030405060708090a0b0c").get
+      val boid2 = BSONObjectID.parse("0102030405060708090a0b0c").get
+
+      boid1 must beTypedEqualTo(boid2)
     }
+
     "retain equality through serialization/deserialization" in {
-      val boid1 = BSONObjectID("0102030405060708090a0b0c")
+      val boid1 = BSONObjectID.parse("0102030405060708090a0b0c").get
       val writeBuffer = new ArrayBSONBuffer
       BSONObjectIDBufferHandler.write(boid1, writeBuffer)
       val writeBytes = writeBuffer.array
@@ -49,16 +54,22 @@ class Equality extends Specification {
       val ba2 = ba1.copy()
       ba1 must beEqualTo(ba2)
     }
+
     "retain equality through serialization/deserialization" in {
-      val ba1 = BSONArray(Seq(BSONInteger(42), BSONString("42"), BSONDouble(42.0), BSONDateTime(0)))
+      val ba1 = BSONArray(Seq(
+        BSONInteger(42), BSONString("42"), BSONDouble(42.0), BSONDateTime(0)
+      ))
+
       val writeBuffer = new ArrayBSONBuffer
       BSONArrayBufferHandler.write(ba1, writeBuffer)
+
       val writeBytes = writeBuffer.array
       val readBuffer = ArrayReadableBuffer(writeBytes)
-      val readBytes = readBuffer.slice(readBuffer.readable()).readArray(readBuffer.size)
+      val readBytes = readBuffer.slice(readBuffer.readable()).
+        readArray(readBuffer.size)
       writeBytes must beEqualTo(readBytes)
-      val ba2 = BSONArrayBufferHandler.read(readBuffer)
-      ba1 must beEqualTo(ba2)
+
+      BSONArrayBufferHandler.read(readBuffer) must beTypedEqualTo(ba1)
     }
   }
 
@@ -83,11 +94,9 @@ class Equality extends Specification {
       val readBuffer = ArrayReadableBuffer(writeBytes)
       val readBytes = readBuffer.slice(readBuffer.readable()).readArray(readBuffer.size)
       writeBytes must beEqualTo(readBytes)
-      val result = DefaultBufferHandler.readDocument(readBuffer)
-      result.isSuccess must beTrue
-      val b2 = result.get
-      b1 must beEqualTo(b2)
+
+      DefaultBufferHandler.readDocument(readBuffer).
+        aka("result") must beSuccessfulTry(b1)
     }
   }
-
 }

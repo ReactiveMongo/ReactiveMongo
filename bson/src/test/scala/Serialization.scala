@@ -94,10 +94,10 @@ class SerializationSpecs extends Specification {
               if (tpe == 0x02 || tpe == 0x0D || tpe == 0x0E) {
                 //println(s"${f.name} -> ${b.readString}")
               } else if (tpe == 0x05) {
-                val length = b.readInt
-                val subtype = b.readByte
+                //val length = b.readInt
+                //val subtype = b.readByte
                 //println(s"l=$length, subtype=$subtype, readable=${b.readable}")
-                val contents = b.readArray(length)
+                //val contents = b.readArray(length)
                 //println(s"${f.name} -> binary (l=$length, subtype=$subtype, hex=${utils.Converters.hex2Str(contents)} contents=${contents.mkString(", ")})")
               } else {
                 //println(s"${f.name} -> <${b.readable} bytes>")
@@ -113,11 +113,8 @@ class SerializationSpecs extends Specification {
           //if(f.tpe == 0x03 || f.tpe == 0x04)
           //  listAll(f.value, spaces + 2)
         }.force
-        /*val fields = buf.fieldStream.map(println(_)).force
-        for(f <- fields) {
-          if(f.tpe == 0x03 || f.tpe == 0x04)
-            new LowLevelBsonDocReader(f.value)
-        }*/
+
+        ()
       }
       listAll(new LowLevelBsonDocReader(ArrayReadableBuffer(cpxDoc)))
       //println(fields.toList)

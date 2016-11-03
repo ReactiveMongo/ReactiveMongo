@@ -49,7 +49,9 @@ private[protocol] object BufferAccessors {
       buffer
     }
 
-    def apply(buffer: ChannelBuffer, s: String) = writeCString(buffer, s)
+    def apply(buffer: ChannelBuffer, s: String) = {
+      writeCString(buffer, s); ()
+    }
   }
 
   /**

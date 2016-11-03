@@ -578,6 +578,8 @@ class MongoConnection(
           _ ! Failure(new scala.RuntimeException(
             s"MongoDBSystem actor shutting down or no longer active ($lnm)")))
          */
+
+        ()
       }
 
       case Closed => {
@@ -585,17 +587,17 @@ class MongoConnection(
 
         waitingForClose.dequeueAll(_ => true).foreach(_ ! Closed)
         context.stop(self)
+        ()
       }
 
-      case IsAvailable(result)        => result success setAvailable
-      case IsPrimaryAvailable(result) => result success primaryAvailable
+      case IsAvailable(result)        => { result success setAvailable; () }
+      case IsPrimaryAvailable(result) => { result success primaryAvailable; () }
     }
 
     override def postStop = logger.debug(s"Monitor $self stopped ($lnm)")
   }
 
   object MonitorActor {
-    private val logger = LazyLogger("reactivemongo.core.actors.MonitorActor")
   }
 }
 
@@ -1117,6 +1119,7 @@ class MongoDriver(
         )
 
         driver.connectionMonitors.remove(actor)
+        ()
       }
 
       /*

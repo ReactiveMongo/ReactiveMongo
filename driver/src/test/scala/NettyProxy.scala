@@ -59,6 +59,7 @@ final class NettyProxy(
     override def exceptionCaught(ctx: ChannelHandlerContext, e: ExceptionEvent) {
       log.warn(s"remote channel exception caught ${e.getChannel}", e.getCause)
       e.getChannel.close()
+      ()
     }
 
     override def channelClosed(ctx: ChannelHandlerContext, e: ChannelStateEvent) {
@@ -69,6 +70,7 @@ final class NettyProxy(
     override def messageReceived(ctx: ChannelHandlerContext, e: MessageEvent) {
       beforeProxy()
       clientChannel.write(e.getMessage)
+      ()
     }
   }
 
@@ -110,6 +112,7 @@ final class NettyProxy(
             log.info(s"remote channel connect failure $remoteChannel")
             clientChannel.close()
           }
+          ()
         }
       })
     }
@@ -119,6 +122,7 @@ final class NettyProxy(
 
       beforeProxy()
       e.getChannel.close
+      ()
     }
 
     override def channelClosed(ctx: ChannelHandlerContext, e: ChannelStateEvent) {
@@ -135,6 +139,7 @@ final class NettyProxy(
         beforeProxy()
         remoteChannel.write(e.getMessage)
       }
+      ()
     }
   }
 
@@ -194,6 +199,7 @@ final class NettyProxy(
     } else {
       channel.close
     }
+    ()
   }
 
   def stop(): Unit = if (started.get) {

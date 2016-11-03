@@ -165,10 +165,10 @@ case class ArrayReadableBuffer private (
 
   def index = bytebuffer.position()
 
-  def index_=(i: Int) = bytebuffer.position(i)
+  def index_=(i: Int) = { bytebuffer.position(i); () }
 
   def discard(n: Int) =
-    bytebuffer.position(bytebuffer.position() + n)
+    { bytebuffer.position(bytebuffer.position() + n); () }
 
   def slice(n: Int) = {
     val nb = bytebuffer.slice()
@@ -176,7 +176,7 @@ case class ArrayReadableBuffer private (
     new ArrayReadableBuffer(nb)
   }
 
-  def readBytes(array: Array[Byte]): Unit = bytebuffer.get(array)
+  def readBytes(array: Array[Byte]): Unit = { bytebuffer.get(array); () }
 
   def readByte() = bytebuffer.get()
 
