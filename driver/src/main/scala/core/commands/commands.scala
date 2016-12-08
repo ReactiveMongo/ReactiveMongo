@@ -21,6 +21,7 @@ import reactivemongo.api.ReadPreference
 import reactivemongo.bson.{
   BSONArray,
   BSONBoolean,
+  BSONBooleanLike,
   BSONDocument,
   BSONDouble,
   BSONElement,
@@ -350,7 +351,7 @@ case class LastError(
 object LastError extends BSONCommandResultMaker[LastError] {
   def apply(document: BSONDocument) = {
     Right(LastError(
-      document.getAs[BSONDouble]("ok").map(_.value == 1).getOrElse(true),
+      document.getAs[BSONBooleanLike]("ok").fold(true)(_.toBoolean),
       document.getAs[BSONString]("err").map(_.value),
       document.getAs[BSONInteger]("code").map(_.value),
       document.getAs[BSONString]("errmsg").map(_.value),
