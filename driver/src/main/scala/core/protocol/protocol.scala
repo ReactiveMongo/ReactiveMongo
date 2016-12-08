@@ -183,6 +183,7 @@ case class Request(
     write(buffer, op)
     buffer writeBytes documents.merged
   }
+
   override def size = 16 + op.size + documents.merged.writerIndex
 
   /** Header of this request */

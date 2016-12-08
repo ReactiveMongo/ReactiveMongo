@@ -8,9 +8,11 @@ import akka.actor.ActorRef
 
 import reactivemongo.core.protocol.Response
 import reactivemongo.core.nodeset.{ Authenticate, NodeSet }
-import reactivemongo.core.actors.{
+import reactivemongo.core.actors, actors.{
   ChannelClosed,
+  ChannelConnected,
   MongoDBSystem,
+  RequestId,
   StandardDBSystem
 }
 
@@ -46,7 +48,7 @@ package object tests {
 
   def makeRequest[T](cursor: Cursor[T], maxDocs: Int)(implicit ec: ExecutionContext): Future[Response] = cursor.asInstanceOf[CursorOps[T]].makeRequest(maxDocs)
 
-  def fakeResponse(doc: BSONDocument, reqID: Int = 2, respTo: Int = 1): Response = {
+  def fakeResponse(doc: BSONDocument, reqID: Int = 2, respTo: Int = 1, chanId: Int = 1): Response = {
     val reply = reactivemongo.core.protocol.Reply(
       flags = 1,
       cursorID = 1,
@@ -67,7 +69,7 @@ package object tests {
       header,
       reply,
       documents = message,
-      info = reactivemongo.core.protocol.ResponseInfo(1)
+      info = reactivemongo.core.protocol.ResponseInfo(chanId)
     )
   }
 
@@ -86,4 +88,12 @@ package object tests {
 
   def bsonReadPref(pref: ReadPreference): BSONDocument =
     reactivemongo.api.collections.bson.BSONReadPreference.write(pref)
+
+  @inline def RefreshAll = actors.RefreshAll
+
+  @inline def updateNodeSet(sys: StandardDBSystem, event: String)(f: NodeSet => NodeSet) = sys.updateNodeSet(event)(f)
+
+  @inline def nodeSet(sys: StandardDBSystem) = sys._nodeSet
+
+  @inline def isMasterReqId: Int = RequestId.isMaster.next
 }

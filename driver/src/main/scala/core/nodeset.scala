@@ -220,7 +220,7 @@ case class Node(
     name: String,
     @transient status: NodeStatus,
     @transient connections: Vector[Connection],
-    @transient authenticated: Set[Authenticated],
+    @transient authenticated: Set[Authenticated], // TODO: connections.authenticated
     tags: Option[BSONDocument],
     protocolMetadata: ProtocolMetadata,
     pingInfo: PingInfo = PingInfo(),
@@ -373,13 +373,19 @@ case class Connection(
     authenticated.exists(auth => auth.user == user && auth.db == db)
 }
 
+/**
+ * @param ping the response delay for the last IsMaster request (duration between request and its response, or `Long.MaxValue`)
+ * @param lastIsMasterTime the timestamp when the last IsMaster request has been sent (or 0)
+ * @param lastIsMasterId the ID of the last IsMaster request (or -1 if none)
+ */
 case class PingInfo(
-  ping: Long = 0,
+  ping: Long = Long.MaxValue,
   lastIsMasterTime: Long = 0,
   lastIsMasterId: Int = -1
 )
 
 object PingInfo {
+  // TODO: Use MongoConnectionOption (e.g. monitorRefreshMS)
   val pingTimeout = 60 * 1000
 }
 
@@ -390,6 +396,7 @@ sealed trait QueryableNodeStatus { self: NodeStatus =>
 }
 
 sealed trait CanonicalNodeStatus { self: NodeStatus => }
+
 object NodeStatus {
   object Uninitialized extends NodeStatus {
     override def toString = "Uninitialized"

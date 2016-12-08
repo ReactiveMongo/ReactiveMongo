@@ -229,7 +229,7 @@ trait MongoDBSystem extends Actor {
 
   // monitor -->
   private val nodeSetLock = new Object {}
-  private var _nodeSet: NodeSet = null
+  private[reactivemongo] var _nodeSet: NodeSet = null
   private var _setInfo: NodeSetInfo = null
 
   initNodeSet()
@@ -337,13 +337,14 @@ trait MongoDBSystem extends Actor {
     refreshAllJob = context.system.scheduler.
       schedule(refreshInterval, refreshInterval, self, RefreshAll)
 
-    connectAll(_nodeSet, { (node, chan) =>
+    _nodeSet = connectAll(_nodeSet, { (node, chan) =>
+      val req = requestIsMaster(node)
+
       chan.addListener(new ChannelFutureListener {
-        def operationComplete(chan: ChannelFuture) =
-          { sendIsMaster(node, RequestId.isMaster.next); () }
+        def operationComplete(chan: ChannelFuture) = { req.send(); () }
       })
 
-      chan
+      req.node -> chan
     })
 
     ()
@@ -591,14 +592,13 @@ trait MongoDBSystem extends Actor {
     case ConnectAll => { // monitor
       val statusInfo = _nodeSet.toShortString
 
-      updateNodeSet(s"ConnectAll($statusInfo)")(
-        _.createNeededChannels(channelFactory, self, options.nbChannelsPerNode)
-      )
+      updateNodeSet(s"ConnectAll($statusInfo)") { ns =>
+        connectAll(ns.createNeededChannels(
+          channelFactory, self, options.nbChannelsPerNode
+        ))
+      }
 
       logger.debug(s"[$lnm] ConnectAll Job running... Status: $statusInfo")
-
-      connectAll(_nodeSet)
-      ()
     }
 
     case RefreshAll => {
@@ -607,7 +607,7 @@ trait MongoDBSystem extends Actor {
       updateNodeSet(s"RefreshAll($statusInfo)")(_.updateAll { node =>
         logger.trace(s"[$lnm] Try to refresh ${node.name}")
 
-        sendIsMaster(node, RequestId.isMaster.next)
+        requestIsMaster(node).send()
       })
 
       logger.debug(s"[$lnm] RefreshAll Job running... Status: $statusInfo")
@@ -627,9 +627,7 @@ trait MongoDBSystem extends Actor {
       updateNodeSet(s"ChannelConnected($channelId, $statusInfo)")(
         _.updateByChannelId(channelId)(
           _.copy(status = ConnectionStatus.Connected)
-        ) { node =>
-            sendIsMaster(node, RequestId.isMaster.next)
-          }
+        ) { requestIsMaster(_).send() }
       )
 
       logger.trace(
@@ -706,8 +704,6 @@ trait MongoDBSystem extends Actor {
     }
 
     case IsMasterResponse(response) => {
-      logger.trace(s"[$lnm] IsMaster response: $response")
-
       import reactivemongo.api.BSONSerializationPack
       import reactivemongo.api.commands.bson.BSONIsMasterCommandImplicits
       import reactivemongo.api.commands.Command
@@ -715,6 +711,8 @@ trait MongoDBSystem extends Actor {
       val isMaster = Command.deserialize(BSONSerializationPack, response)(
         BSONIsMasterCommandImplicits.IsMasterResultReader
       )
+
+      logger.trace(s"[$lnm] IsMaster response: $isMaster")
 
       val updated = {
         val respTo = response.header.responseTo
@@ -730,16 +728,18 @@ trait MongoDBSystem extends Actor {
             nodeSet.updateNodeByChannelId(response.info.channelId) { node =>
               val pingInfo =
                 if (node.pingInfo.lastIsMasterId == respTo) {
+                  // No longer waiting response for isMaster,
+                  // reset the pending state, and update the ping time
                   node.pingInfo.copy(
                     ping =
                     System.currentTimeMillis() - node.pingInfo.lastIsMasterTime,
                     lastIsMasterTime = 0, lastIsMasterId = -1
                   )
-
                 } else node.pingInfo
 
+              val nodeStatus = isMaster.status
               val authenticating =
-                if (!isMaster.status.queryable || nodeSet.authenticates.isEmpty) {
+                if (!nodeStatus.queryable || nodeSet.authenticates.isEmpty) {
                   node
                 } else authenticateNode(node, nodeSet.authenticates.toSeq)
 
@@ -752,7 +752,7 @@ trait MongoDBSystem extends Actor {
               )
 
               val an = authenticating._copy(
-                status = isMaster.status,
+                status = nodeStatus,
                 pingInfo = pingInfo,
                 tags = isMaster.replicaSet.flatMap(_.tags),
                 protocolMetadata = meta,
@@ -994,7 +994,7 @@ trait MongoDBSystem extends Actor {
     broadcastMonitors(PrimaryUnavailable)
   }
 
-  private def updateNodeSet(event: String)(f: NodeSet => NodeSet): NodeSet = {
+  private[reactivemongo] def updateNodeSet(event: String)(f: NodeSet => NodeSet): NodeSet = {
     var previous: NodeSetInfo = null
     var updated: NodeSet = null
 
@@ -1157,28 +1157,30 @@ trait MongoDBSystem extends Actor {
 
   private def broadcastMonitors(message: AnyRef) = monitors.foreach(_ ! message)
 
-  private[reactivemongo] def connectAll(nodeSet: NodeSet, connected: (Node, ChannelFuture) => ChannelFuture = { (_, chan) => chan }): NodeSet = {
-    for {
-      node <- nodeSet.nodes
-      connection <- node.connections if !connection.channel.isConnected()
-    } yield {
-      try {
-        connected(node, connection.channel.connect(
-          new InetSocketAddress(node.host, node.port)
-        ))
-
-      } catch {
-        case reason: Throwable =>
-          logger.warn(s"[$lnm] Fails to connect node: ${node.toShortString}")
+  private[reactivemongo] def connectAll(nodeSet: NodeSet, connecting: (Node, ChannelFuture) => (Node, ChannelFuture) = { _ -> _ }): NodeSet = {
+    val nodes = nodeSet.nodes.map { node =>
+      node.connections.foldLeft(node) { (n, con) =>
+        if (con.channel.isConnected) n else try {
+          connecting(n, con.channel.connect(
+            new InetSocketAddress(node.host, node.port)
+          ))._1
+        } catch {
+          case reason: Throwable =>
+            logger.warn(s"[$lnm] Fails to connect node: ${node.toShortString}")
+            n
+        }
       }
     }
 
-    nodeSet
+    nodeSet.copy(nodes = nodes)
   }
 
-  @deprecated(message = "Will be made private", since = "0.11.10")
-  def sendIsMaster(node: Node, id: Int): Node =
-    node.connected.headOption.map { channel =>
+  private class IsMasterRequest(
+    val node: Node, f: => Unit = ()
+  ) { def send() = { f; node } }
+
+  private def requestIsMaster(node: Node): IsMasterRequest =
+    node.connected.headOption.fold(new IsMasterRequest(node)) { channel =>
       import reactivemongo.api.BSONSerializationPack
       import reactivemongo.api.commands.bson.{
         BSONIsMasterCommandImplicits,
@@ -1193,27 +1195,76 @@ trait MongoDBSystem extends Actor {
         "admin"
       ) // only "admin" DB for the admin command
 
-      channel.send(isMaster(id))
+      val now = System.currentTimeMillis()
+      val id = RequestId.isMaster.next
 
-      if (node.pingInfo.lastIsMasterId == -1) {
+      val updated = if (node.pingInfo.lastIsMasterId == -1) {
+        // There is no IsMaster request waiting response for the node:
+        // sending a new one
+        logger.debug(
+          s"[$lnm] Sends a fresh IsMaster request to ${node.toShortString}"
+        )
+
         node._copy(
           pingInfo = node.pingInfo.copy(
-            lastIsMasterTime = System.currentTimeMillis(),
+            lastIsMasterTime = now,
             lastIsMasterId = id
           )
         )
+      } else if ((
+        node.pingInfo.lastIsMasterTime + PingInfo.pingTimeout
+      ) < now) {
 
-      } else if (node.pingInfo.lastIsMasterId >= PingInfo.pingTimeout) {
+        // The previous IsMaster request is expired
+        val msg = s"${node.toShortString} hasn't answered in time to last ping! Please check its connectivity"
+
+        logger.warn(s"[$lnm] $msg")
+
+        // Unregister the pending requests for this node
+        val channelIds = node.connections.map(_.channel.getId)
+        val wasPrimary = node.status == NodeStatus.Primary
+        val error = {
+          val cause = new ClosedException(s"$msg ($lnm)")
+
+          if (wasPrimary) {
+            new PrimaryUnavailableException(supervisor, name, cause)
+          } else cause
+        }
+
+        awaitingResponses.retain { (_, awaitingResponse) =>
+          if (channelIds contains awaitingResponse.channelID) {
+            logger.trace(s"[$lnm] Unregistering the pending request ${awaitingResponse.promise} for ${node.toShortString}'")
+
+            awaitingResponse.promise.failure(error)
+            false
+          } else true
+        }
+
+        // Reset node state
+        updateHistory {
+          if (wasPrimary) s"PrimaryUnavailable"
+          else s"NodeUnavailable($node)"
+        }
+
         node._copy(
-          pingInfo = node.pingInfo.copy(
-            lastIsMasterTime = System.currentTimeMillis(),
-            lastIsMasterId = id,
-            ping = Long.MaxValue
+          status = NodeStatus.Unknown,
+          connections = Vector.empty,
+          authenticated = Set.empty,
+          pingInfo = PingInfo(
+            lastIsMasterTime = now,
+            lastIsMasterId = id
           )
         )
+      } else {
+        logger.debug(
+          s"Do not send isMaster request to already probed ${node.name}"
+        )
 
-      } else node
-    }.getOrElse(node)
+        node
+      }
+
+      new IsMasterRequest(updated, { channel.send(isMaster(id)); () })
+    }
 
   @deprecated(message = "Will be made private", since = "0.11.10")
   def allChannelGroup(nodeSet: NodeSet): DefaultChannelGroup = {
@@ -1376,7 +1427,7 @@ private[actors] case class AwaitingResponse(
 @deprecated(message = "Will be removed", since = "0.11.10")
 case object WaitForPrimary
 
-private[actors] object RequestId {
+private[reactivemongo] object RequestId {
   // all requestIds [0, 1000[ are for isMaster messages
   val isMaster = new RequestIdGenerator(0, 999)
 
@@ -1506,6 +1557,7 @@ object Exceptions {
 
     private[reactivemongo] def this(supervisor: String, connection: String, cause: Throwable) = this(s"This MongoConnection is closed ($supervisor/$connection)", cause)
 
+    private[reactivemongo] def this(msg: String) = this(msg, null)
     def this() = this("This MongoConnection is closed", null)
   }
 

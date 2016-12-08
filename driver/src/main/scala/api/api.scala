@@ -277,13 +277,12 @@ class MongoConnection(
     val mongosystem: ActorRef,
     val options: MongoConnectionOptions
 ) {
-
   import Exceptions._
 
   @deprecated("Create with an explicit supervisor and connection names", "0.11.14")
   def this(actorSys: ActorSystem, mongoSys: ActorRef, opts: MongoConnectionOptions) = this(s"unknown-${System identityHashCode mongoSys}", s"unknown-${System identityHashCode mongoSys}", actorSys, mongoSys, opts)
 
-  private[api] val logger = LazyLogger("reactivemongo.api.Failover2")
+  private[api] val logger = LazyLogger("reactivemongo.api.MongoConnection")
 
   private val lnm = s"$supervisor/$name" // log name
 
@@ -965,6 +964,7 @@ class MongoDriver(
     }
 
     val mongosystem = system.actorOf(Props(dbsystem), nm)
+
     def connection = (supervisorActor ? AddConnection(
       nm, nodes, options, mongosystem
     ))(Timeout(10, SECONDS))

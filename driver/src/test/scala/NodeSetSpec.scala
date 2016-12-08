@@ -1,6 +1,7 @@
 import scala.concurrent.Future
 
 import akka.actor.ActorRef
+import akka.testkit.TestActorRef
 
 import org.specs2.matcher.MatchResult
 import org.specs2.concurrent.{ ExecutionEnv => EE }
@@ -17,51 +18,32 @@ import reactivemongo.core.actors.{
   PrimaryAvailable,
   PrimaryUnavailable,
   SetAvailable,
-  SetUnavailable
+  SetUnavailable,
+  StandardDBSystem
 }
 import reactivemongo.core.actors.Exceptions.PrimaryUnavailableException
 
-class NodeSetSpec extends org.specs2.mutable.Specification {
+class NodeSetSpec extends org.specs2.mutable.Specification
+    with UnresponsiveSecondarySpec {
+
   "Node set" title
 
   sequential
 
-  import Common.{ failoverStrategy, timeout }
   import reactivemongo.api.tests._
+
+  @inline def failoverStrategy = Common.failoverStrategy
+  @inline def timeout = Common.timeout
+  lazy val md = MongoDriver()
+  lazy val actorSystem = md.system
+  val nodes = Seq("node1:27017", "node2:27017")
 
   section("unit")
   "Node set" should {
-    lazy val md = MongoDriver()
-    lazy val actorSystem = md.system
-
-    def withConMon[T](name: String)(f: ActorRef => MatchResult[T])(implicit ee: EE): MatchResult[Future[ActorRef]] =
-      actorSystem.actorSelection(s"/user/Monitor-$name").
-        resolveOne(timeout) aka "actor ref" must beLike[ActorRef] {
-          case ref => f(ref)
-        }.await(1, timeout)
-
-    def withCon[T](opts: MongoConnectionOptions = MongoConnectionOptions())(f: (MongoConnection, String) => T): T = {
-      val name = s"con-${System identityHashCode opts}"
-      val con = md.connection(
-        Seq("node1:27017", "node2:27017"),
-        authentications = Seq(Authenticate(
-          Common.commonDb, "test", "password"
-        )),
-        options = opts,
-        name = Some(name)
-      )
-
-      f(con, name)
-    }
-
     "not be available" >> {
       "if the entire node set is not available" in { implicit ee: EE =>
-        withCon() { (con, name) =>
-          isAvailable(con) must beFalse.await(1, timeout) and {
-            con.askClose()(timeout).map(_ => {}) must beEqualTo({}).
-              await(1, timeout)
-          }
-        }
+        withConAndSys(md) { (con, _) => isAvailable(con) }.
+          aka("is available") must beFalse.await(1, timeout)
       }
 
       "if the primary is not available if default preference" in {
@@ -99,23 +81,27 @@ class NodeSetSpec extends org.specs2.mutable.Specification {
         }
       }
 
-      "without the primary if slave ok" in { implicit ee: EE =>
-        val opts = MongoConnectionOptions(
-          readPreference = ReadPreference.primaryPreferred
-        )
+      "without the primary if slave ok" >> {
+        org.specs2.specification.core.Fragments.foreach[ReadPreference](
+          Seq(ReadPreference.primaryPreferred, ReadPreference.secondary)
+        ) { readPref =>
+            s"using $readPref" in { implicit ee: EE =>
+              val opts = MongoConnectionOptions(readPreference = readPref)
 
-        withCon(opts) { (con, name) =>
-          withConMon(name) { conMon =>
-            def test = (for {
-              before <- isAvailable(con)
-              _ = conMon ! SetAvailable(ProtocolMetadata.Default)
-              _ <- waitIsAvailable(con, failoverStrategy)
-              after <- isAvailable(con)
-            } yield before -> after).andThen { case _ => con.close() }
+              withCon(opts) { (con, name) =>
+                withConMon(name) { conMon =>
+                  def test = (for {
+                    before <- isAvailable(con)
+                    _ = conMon ! SetAvailable(ProtocolMetadata.Default)
+                    _ <- waitIsAvailable(con, failoverStrategy)
+                    after <- isAvailable(con)
+                  } yield before -> after).andThen { case _ => con.close() }
 
-            test must beEqualTo(false -> true).await(1, timeout)
+                  test must beEqualTo(false -> true).await(1, timeout)
+                }
+              }
+            }
           }
-        }
       }
     }
 
@@ -169,6 +155,8 @@ class NodeSetSpec extends org.specs2.mutable.Specification {
       }
     }
 
+    unresponsiveSecondarySpec
+
     "be closed" in {
       md.close(timeout) must not(throwA[Exception])
     }
@@ -187,4 +175,54 @@ class NodeSetSpec extends org.specs2.mutable.Specification {
     }
   }
   section("unit")
+
+  // ---
+
+  def withConAndSys[T](drv: MongoDriver, options: MongoConnectionOptions = MongoConnectionOptions(nbChannelsPerNode = 1))(f: (MongoConnection, TestActorRef[StandardDBSystem]) => Future[T])(implicit ee: EE): Future[T] = {
+    // See MongoDriver#connection
+    val supervisorName = s"Supervisor-${System identityHashCode ee}"
+    val poolName = s"Connection-${System identityHashCode f}"
+
+    @inline implicit def sys = drv.system
+
+    lazy val mongosystem = TestActorRef[StandardDBSystem](
+      standardDBSystem(
+        supervisorName, poolName,
+        nodes,
+        Seq(Authenticate(Common.commonDb, "test", "password")), options
+      ), poolName
+    )
+
+    def connection = addConnection(
+      drv, poolName, nodes, options, mongosystem
+    ).mapTo[MongoConnection]
+
+    connection.flatMap { con =>
+      f(con, mongosystem).andThen {
+        case _ =>
+          con.close()
+      }
+    }
+  }
+
+  def withCon[T](opts: MongoConnectionOptions = MongoConnectionOptions())(f: (MongoConnection, String) => T): T = {
+    val name = s"con-${System identityHashCode opts}"
+    val con = md.connection(
+      nodes,
+      authentications = Seq(Authenticate(
+        Common.commonDb, "test", "password"
+      )),
+      options = opts,
+      name = Some(name)
+    )
+
+    f(con, name)
+  }
+
+  def withConMon[T](name: String)(f: ActorRef => MatchResult[T])(implicit ee: EE): MatchResult[Future[ActorRef]] =
+    actorSystem.actorSelection(s"/user/Monitor-$name").
+      resolveOne(timeout) aka "actor ref" must beLike[ActorRef] {
+        case ref => f(ref)
+      }.await(1, timeout)
+
 }
