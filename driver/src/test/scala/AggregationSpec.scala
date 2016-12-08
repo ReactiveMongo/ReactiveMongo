@@ -92,7 +92,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
         coll.count() aka "count #1" must beEqualTo(4).await(1, slowTimeout)
       ).and(slowZipColl.count() aka "count #2" must beEqualTo(4).
           await(1, slowTimeout))
-    } tag "wip"
+    }
 
     "return states with populations above 10000000" >> {
       // http://docs.mongodb.org/manual/tutorial/aggregation-zip-code-data-set/#return-states-with-populations-above-10-million
@@ -307,7 +307,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
             ), Skip(2) :: groupPipeline
           ).map(_.firstBatch) must beEqualTo(expected take 2).await(1, timeout)
         }
-    } tag "wip"
+    }
 
     "return distinct states" >> {
       def distinctSpec(c: BSONCollection, timeout: FiniteDuration)(implicit ee: EE) = c.distinct[String, ListSet]("state").

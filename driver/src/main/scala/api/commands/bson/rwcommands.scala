@@ -79,7 +79,7 @@ object BSONCommonWriteCommandsImplicits {
       extends DealingWithGenericCommandErrorsReader[DefaultWriteResult] {
     def readResult(doc: BSONDocument): DefaultWriteResult = {
       DefaultWriteResult(
-        ok = doc.getAs[Int]("ok").exists(_ != 0),
+        ok = doc.getAs[BSONBooleanLike]("ok").fold(true)(_.toBoolean),
         n = doc.getAs[Int]("n").getOrElse(0),
         writeErrors = doc.getAs[Seq[WriteError]]("writeErrors").getOrElse(Seq.empty),
         writeConcernError = doc.getAs[WriteConcernError]("writeConcernError"),
@@ -104,6 +104,7 @@ object BSONInsertCommandImplicits {
       "documents" -> BSONArray(command.command.documents),
       "ordered" -> command.command.ordered,
       "writeConcern" -> command.command.writeConcern
+    // TODO: 3.4; bypassDocumentValidation: boolean
     )
   }
 }
@@ -143,7 +144,7 @@ object BSONUpdateCommandImplicits {
 
   implicit object UpdateResultReader extends DealingWithGenericCommandErrorsReader[UpdateResult] {
     def readResult(doc: BSONDocument) = UpdateWriteResult(
-      ok = doc.getAs[Int]("ok").exists(_ != 0),
+      ok = doc.getAs[BSONBooleanLike]("ok").fold(true)(_.toBoolean),
       n = doc.getAs[Int]("n").getOrElse(0),
       nModified = doc.getAs[Int]("nModified").getOrElse(0),
       upserted = doc.getAs[Seq[Upserted]]("upserted").getOrElse(Seq.empty),

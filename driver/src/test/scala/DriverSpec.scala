@@ -192,7 +192,7 @@ class DriverSpec extends org.specs2.mutable.Specification {
       db_.flatMap(_.createUser(s"test-$id", Some(s"password-$id"),
         roles = List(DBUserRole("readWrite", dbName)))).
         aka("creation") must beEqualTo({}).await(0, timeout)
-    } tag "not_mongo26"
+    }
 
     "not be successful with wrong credentials" >> {
       "with the default connection" in { implicit ee: EE =>
