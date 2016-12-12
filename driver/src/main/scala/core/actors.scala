@@ -630,7 +630,7 @@ trait MongoDBSystem extends Actor {
           retry(awaitingResponse) match {
             case Some(awaiting) => {
               logger.trace(s"[$lnm] Retrying to await response for requestID ${awaiting.requestID}: $awaiting")
-              retried += channelId -> awaiting
+              retried += awaiting.requestID -> awaiting
             }
 
             case _ => {
