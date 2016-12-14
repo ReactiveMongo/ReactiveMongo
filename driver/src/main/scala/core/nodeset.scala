@@ -1,34 +1,19 @@
 package reactivemongo.core.nodeset
 
-import java.util.concurrent.{ TimeUnit, Executor, Executors }
+import java.util.concurrent.{ Executor, Executors, TimeUnit }
 
 import scala.collection.generic.CanBuildFrom
 import scala.collection.immutable.Set
-
 import shaded.netty.util.HashedWheelTimer
 import shaded.netty.buffer.HeapChannelBufferFactory
 import shaded.netty.channel.socket.nio.NioClientSocketChannelFactory
-import shaded.netty.channel.{
-  Channel,
-  ChannelFuture,
-  ChannelPipeline,
-  Channels
-}
+import shaded.netty.channel.{ Channel, ChannelFuture, ChannelPipeline, Channels }
 import shaded.netty.handler.timeout.IdleStateHandler
-
 import akka.actor.ActorRef
-
 import reactivemongo.util.LazyLogger
 import reactivemongo.core.protocol.Request
-
 import reactivemongo.bson.BSONDocument
-import reactivemongo.core.protocol.{
-  MongoHandler,
-  MongoWireVersion,
-  RequestEncoder,
-  ResponseDecoder,
-  ResponseFrameDecoder
-}
+import reactivemongo.core.protocol.{ MongoHandler, MongoWireVersion, RequestEncoder, ResponseDecoder, ResponseFrameDecoder }
 import reactivemongo.api.{ MongoConnectionOptions, ReadPreference }
 
 package object utils {
@@ -639,21 +624,9 @@ final class ChannelFactory private[reactivemongo] (
       new MongoHandler(supervisor, connection, receiver))
 
     if (options.sslEnabled) {
-      val sslCtx = {
-        val tm: Array[javax.net.ssl.TrustManager] =
-          if (options.sslAllowsInvalidCert) Array(TrustAny) else null
-
-        val ctx = sslContext(tm)
-        val rand = new scala.util.Random(System.identityHashCode(tm))
-        val seed = Array.ofDim[Byte](128)
-        rand.nextBytes(seed)
-
-        ctx.init(null, tm, new java.security.SecureRandom(seed))
-        ctx
-      }
 
       val sslEng = {
-        val engine = sslCtx.createSSLEngine()
+        val engine = sslContext.createSSLEngine()
         engine.setUseClientMode(true)
         engine
       }
@@ -667,10 +640,10 @@ final class ChannelFactory private[reactivemongo] (
     pipeline
   }
 
-  private def sslContext(tm: Array[javax.net.ssl.TrustManager]) = {
+  private def sslContext = {
     import java.io.FileInputStream
-    import java.security.{ KeyStore, Security }
-    import javax.net.ssl.KeyManagerFactory
+    import java.security.KeyStore
+    import javax.net.ssl.{ KeyManagerFactory, TrustManager }
 
     val keyManagers = Option(System.getProperty("javax.net.ssl.keyStore")).map { path =>
 
@@ -684,20 +657,25 @@ final class ChannelFactory private[reactivemongo] (
         res
       }
 
-      val algorithm = Option(Security.getProperty("ssl.KeyManagerFactory.algorithm")).getOrElse("SunX509")
-
       val kmf = {
-        val res = KeyManagerFactory.getInstance(algorithm)
+        val res = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm)
         res.init(ks, password.toCharArray)
         res
       }
 
-      kmf.getKeyManagers()
+      kmf.getKeyManagers
     }
 
     val sslCtx = {
       val res = SSLContext.getInstance("SSL")
-      res.init(keyManagers.getOrElse(null), tm, null)
+
+      val tm: Array[TrustManager] = if (options.sslAllowsInvalidCert) Array(TrustAny) else null
+
+      val rand = new scala.util.Random(System.identityHashCode(tm))
+      val seed = Array.ofDim[Byte](128)
+      rand.nextBytes(seed)
+
+      res.init(keyManagers.orNull, tm, new java.security.SecureRandom(seed))
       res
     }
 
