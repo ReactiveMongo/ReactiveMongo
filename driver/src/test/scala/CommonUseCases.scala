@@ -43,8 +43,6 @@ class CommonUseCases extends Specification {
       val it = collection.find(BSONDocument()).
         options(QueryOpts().batchSize(2)).cursor[BSONDocument]()
 
-      println(s"it = ${System identityHashCode it}")
-
       it.collect[List]().map(_.map(_.getAs[BSONInteger]("age").get.value).
         mkString("")) must beEqualTo((18 to 60).mkString("")).
         await(1, timeout * 2)

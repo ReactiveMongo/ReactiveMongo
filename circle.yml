@@ -3,7 +3,7 @@ machine:
     version: oraclejdk8
   environment:
     CI_CATEGORY: "INTEGRATION_TESTS"
-    AKKA_VERSION: 2.4.8
+    AKKA_VERSION: 2.4.11
     MONGO_PROFILE: "default"
     MONGO_VER: 3
     TRAVIS_SCALA_VERSION: 2.11.8
@@ -22,6 +22,7 @@ dependencies:
     - "~/ssl"
     - "~/mongodb-linux-x86_64-2.6.12"
     - "~/mongodb-linux-x86_64-amazon-3.2.8"
+    - "~/mongodb-linux-x86_64-amazon-3.4.0"
 test:
   override:
   - ./.ci_scripts/retry.sh 3 ./.ci_scripts/validate.sh

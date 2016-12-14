@@ -163,7 +163,6 @@ object Command {
           response.documents
         )).next, reader
         )
-
       }
     }
 

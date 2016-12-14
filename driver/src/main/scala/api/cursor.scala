@@ -494,7 +494,6 @@ object DefaultCursor {
     failover: FailoverStrategy,
     isMongo26WriteOp: Boolean
   )(implicit reader: pack.Reader[A]) = new Impl[A] {
-
     val preference = readPreference
     val connection = mongoConnection
     val failoverStrategy = failover

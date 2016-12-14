@@ -285,29 +285,77 @@ object ReactiveMongoBuild extends Build {
         publishArtifact := false,
         previousArtifacts := Set.empty,
         travisEnv in Test := { // test:travisEnv from SBT CLI
+          val (akkaLower, akkaUpper) = "2.3.13" -> "2.4.11"
+          val (playLower, playUpper) = "2.3.8" -> "2.6.0"
+          val (mongoLower, mongoUpper) = "2_6" -> "3_4"
+
           val specs = List[(String, List[String])](
-            "MONGO_VER" -> List("2_6", "3"),
+            "MONGO_VER" -> List("2_6", "3", "3_4"),
             "MONGO_PROFILE" -> List("default", "ssl", "rs"),
-            "AKKA_VERSION" -> List("2.3.13", "2.4.11"),
-            "PLAY_VERSION" -> List("2.3.10", "2.6.0")
+            "AKKA_VERSION" -> List(akkaLower, akkaUpper),
+            "PLAY_VERSION" -> List(playLower, playUpper)
           )
 
-          def integrationMatrix = specs.flatMap {
+          lazy val integrationEnv = specs.flatMap {
             case (key, values) => values.map(key -> _)
           }.combinations(specs.size).filterNot { flags =>
-            flags.contains("MONGO_VER" -> "2_6") && flags.
-              contains("MONGO_PROFILE" -> "ssl")
+            /* chrono-compat exclusions */
+            (flags.contains("AKKA_VERSION" -> akkaLower) && flags.
+              contains("PLAY_VERSION" -> playUpper)) ||
+            (flags.contains("AKKA_VERSION" -> akkaUpper) && flags.
+              contains("PLAY_VERSION" -> playLower)) ||
+            (flags.contains("MONGO_VER" -> mongoLower) && flags.
+              contains("PLAY_VERSION" -> playUpper)) ||
+            (flags.contains("MONGO_VER" -> mongoUpper) && flags.
+              contains("PLAY_VERSION" -> playLower)) ||
+            (flags.contains("MONGO_VER" -> mongoUpper) && flags.
+              contains("AKKA_VERSION" -> akkaLower)) ||
+            (flags.contains("AKKA_VERSION" -> akkaLower) && flags.
+              contains("MONGO_PROFILE" -> "rs")) ||
+            /* profile exclusions */
+            (!flags.contains("MONGO_VER" -> mongoUpper) && flags.
+              contains("MONGO_PROFILE" -> "ssl")) ||
+            (flags.contains("MONGO_VER" -> mongoLower) && flags.
+              contains("MONGO_PROFILE" -> "rs") && flags.
+              contains("PLAY_VERSION" -> playLower))
           }.collect {
             case flags if (flags.map(_._1).toSet.size == specs.size) =>
-              "CI_CATEGORY=INTEGRATION_TESTS" :: flags.sortBy(_._1).map({
-                case (k, v) => s"$k=$v"
-              })
-          }.map { c => s"""  - ${c mkString " "}""" }
+              ("CI_CATEGORY" -> "INTEGRATION_TESTS") :: flags.sortBy(_._1)
+          }.toList
 
-          def matrix = (Iterator.single("  - CI_CATEGORY=UNIT_TESTS") ++ (
-            integrationMatrix)).mkString("\r\n")
+          @inline def integrationVars(flags: List[(String, String)]): String =
+            flags.map { case (k, v) => s"$k=$v" }.mkString(" ")
 
-          println(s"Travis CI env:\r\n$matrix")
+          def integrationMatrix =
+            integrationEnv.map(integrationVars).map { c => s"  - $c" }
+
+          def matrix = (List("env:", "  - CI_CATEGORY=UNIT_TESTS").iterator ++ (
+            integrationMatrix :+ "matrix: " :+ "  exclude: ") ++ List(
+            "    - scala: 2.10.5",
+              "      jdk: oraclejdk8",
+              "      env: CI_CATEGORY=UNIT_TESTS") ++ List(
+            "    - scala: 2.11.8",
+                "      jdk: oraclejdk7",
+                "      env: CI_CATEGORY=UNIT_TESTS") ++ (
+            integrationEnv.flatMap { flags =>
+              if (flags.contains("CI_CATEGORY" -> "INTEGRATION_TESTS") &&
+                (/* time-compat exclusions: */
+                  flags.contains("PLAY_VERSION" -> playUpper) ||
+                  flags.contains("AKKA_VERSION" -> akkaUpper) ||
+                  flags.contains("MONGO_VER" -> mongoLower) ||
+                  /* profile priority exclusions: */
+                  flags.contains("MONGO_PROFILE" -> "ssl"))) {
+                List(
+                  "    - scala: 2.10.5",
+                  s"      env: ${integrationVars(flags)}",
+                  "    - jdk: oraclejdk7",
+                  s"      env: ${integrationVars(flags)}"
+                )
+              } else List.empty[String]
+            })
+          ).mkString("\r\n")
+
+          println(s"# Travis CI env\r\n$matrix")
         }
       ).aggregate(bson, bsonmacros, shaded, driver, jmx)
 
