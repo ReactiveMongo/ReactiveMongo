@@ -1,9 +1,6 @@
 package reactivemongo.core.nodeset
 
 import java.util.concurrent.{ TimeUnit, Executor, Executors }
-import java.io.FileInputStream
-import java.security.{ KeyStore, Security }
-import javax.net.ssl.{ KeyManagerFactory, TrustManager, KeyManager }
 
 import scala.collection.generic.CanBuildFrom
 import scala.collection.immutable.Set
@@ -23,8 +20,15 @@ import akka.actor.ActorRef
 
 import reactivemongo.util.LazyLogger
 import reactivemongo.core.protocol.Request
+
 import reactivemongo.bson.BSONDocument
-import reactivemongo.core.protocol.{ MongoHandler, MongoWireVersion, RequestEncoder, ResponseDecoder, ResponseFrameDecoder }
+import reactivemongo.core.protocol.{
+  MongoHandler,
+  MongoWireVersion,
+  RequestEncoder,
+  ResponseDecoder,
+  ResponseFrameDecoder
+}
 import reactivemongo.api.{ MongoConnectionOptions, ReadPreference }
 
 package object utils {
@@ -639,7 +643,7 @@ final class ChannelFactory private[reactivemongo] (
         val tm: Array[javax.net.ssl.TrustManager] =
           if (options.sslAllowsInvalidCert) Array(TrustAny) else null
 
-        val ctx = sslContext
+        val ctx = sslContext(tm)
         val rand = new scala.util.Random(System.identityHashCode(tm))
         val seed = Array.ofDim[Byte](128)
         rand.nextBytes(seed)
@@ -649,7 +653,7 @@ final class ChannelFactory private[reactivemongo] (
       }
 
       val sslEng = {
-        val engine = sslContext.createSSLEngine()
+        val engine = sslCtx.createSSLEngine()
         engine.setUseClientMode(true)
         engine
       }
@@ -663,9 +667,12 @@ final class ChannelFactory private[reactivemongo] (
     pipeline
   }
 
-  private def sslContext = {
+  private def sslContext(tm: Array[javax.net.ssl.TrustManager]) = {
+    import java.io.FileInputStream
+    import java.security.{ KeyStore, Security }
+    import javax.net.ssl.KeyManagerFactory
 
-    val keyManagers: Array[KeyManager] = Option(System.getProperty("javax.net.ssl.keyStore")).map { path =>
+    val keyManagers = Option(System.getProperty("javax.net.ssl.keyStore")).map { path =>
 
       val password = Option(System.getProperty("javax.net.ssl.keyStorePassword")).getOrElse("")
 
@@ -673,6 +680,7 @@ final class ChannelFactory private[reactivemongo] (
         val res = KeyStore.getInstance("JKS")
         val fin = new FileInputStream(path)
         res.load(fin, password.toCharArray)
+        fin.close()
         res
       }
 
@@ -685,13 +693,11 @@ final class ChannelFactory private[reactivemongo] (
       }
 
       kmf.getKeyManagers()
-    }.getOrElse(null)
-
-    val tm: Array[TrustManager] = if (options.sslAllowsInvalidCert) Array(TrustAny) else null
+    }
 
     val sslCtx = {
       val res = SSLContext.getInstance("SSL")
-      res.init(keyManagers, tm, null)
+      res.init(keyManagers.getOrElse(null), tm, null)
       res
     }
 
