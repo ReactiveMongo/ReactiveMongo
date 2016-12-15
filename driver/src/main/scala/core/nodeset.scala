@@ -1,19 +1,34 @@
 package reactivemongo.core.nodeset
 
-import java.util.concurrent.{ Executor, Executors, TimeUnit }
+import java.util.concurrent.{ TimeUnit, Executor, Executors }
 
 import scala.collection.generic.CanBuildFrom
 import scala.collection.immutable.Set
+
 import shaded.netty.util.HashedWheelTimer
 import shaded.netty.buffer.HeapChannelBufferFactory
 import shaded.netty.channel.socket.nio.NioClientSocketChannelFactory
-import shaded.netty.channel.{ Channel, ChannelFuture, ChannelPipeline, Channels }
+import shaded.netty.channel.{
+  Channel,
+  ChannelFuture,
+  ChannelPipeline,
+  Channels
+}
 import shaded.netty.handler.timeout.IdleStateHandler
+
 import akka.actor.ActorRef
+
 import reactivemongo.util.LazyLogger
 import reactivemongo.core.protocol.Request
+
 import reactivemongo.bson.BSONDocument
-import reactivemongo.core.protocol.{ MongoHandler, MongoWireVersion, RequestEncoder, ResponseDecoder, ResponseFrameDecoder }
+import reactivemongo.core.protocol.{
+  MongoHandler,
+  MongoWireVersion,
+  RequestEncoder,
+  ResponseDecoder,
+  ResponseFrameDecoder
+}
 import reactivemongo.api.{ MongoConnectionOptions, ReadPreference }
 
 package object utils {
@@ -651,9 +666,14 @@ final class ChannelFactory private[reactivemongo] (
 
       val ks = {
         val res = KeyStore.getInstance("JKS")
-        val fin = new FileInputStream(path)
-        res.load(fin, password.toCharArray)
-        fin.close()
+
+        val fis = new FileInputStream(path)
+        try {
+          res.load(fis, password.toCharArray)
+        } finally {
+          fis.close()
+        }
+
         res
       }
 
