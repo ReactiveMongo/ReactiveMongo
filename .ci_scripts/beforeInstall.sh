@@ -86,14 +86,32 @@ fi
 
 mkdir /tmp/mongodb
 
-if [ "$MONGO_PROFILE" = "ssl" ]; then
+SSL_PASS=""
+
+if [ "$MONGO_PROFILE" = "self-ssl" -o "$MONGO_PROFILE" = "mutual-ssl" ]; then
+    SSL_PASS=`uuidgen`
+
+    "$SCRIPT_DIR/genSslCert.sh"
+
     cat >> /tmp/mongod.conf << EOF
   ssl:
     mode: requireSSL
     PEMKeyFile: $SCRIPT_DIR/server.pem
-    PEMKeyPassword: test
+    PEMKeyPassword: $SSL_PASS
+EOF
+
+    if [ "$MONGO_PROFILE" = "self-ssl" ]; then
+        cat >> /tmp/mongod.conf << EOF
     allowInvalidCertificates: true
 EOF
+    else
+        # mutual-ssl
+        cat >> /tmp/mongod.conf << EOF
+    CAFile: $SCRIPT_DIR/client.pem
+EOF
+
+        # TODO: JKS https://blog.codecentric.de/en/2013/01/how-to-use-self-signed-pem-client-certificates-in-java/
+    fi
 fi
 
 if [ "$MONGO_PROFILE" = "rs" ]; then
@@ -119,4 +137,5 @@ PATH="$PATH"
 LD_LIBRARY_PATH="$LD_LIBRARY_PATH"
 PRIMARY_HOST="$PRIMARY_HOST"
 PRIMARY_SLOW_PROXY="$PRIMARY_SLOW_PROXY"
+SSL_PASS=$SSL_PASS
 EOF
