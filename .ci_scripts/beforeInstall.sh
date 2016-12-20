@@ -91,7 +91,7 @@ mkdir /tmp/mongodb
 SSL_PASS=""
 
 if [ "$MONGO_PROFILE" = "self-ssl" -o "$MONGO_PROFILE" = "mutual-ssl" ]; then
-    SSL_PASS=secret
+    SSL_PASS=`cat /proc/sys/kernel/random/uuid`
 
     "$SCRIPT_DIR/genSslCert.sh" $SSL_PASS
 
