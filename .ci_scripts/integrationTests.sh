@@ -23,6 +23,7 @@ fi
 if [ "$MONGO_PROFILE" = "mutual-ssl" ]; then
     MONGOSHELL_OPTS="$MONGOSHELL_OPTS --ssl --sslCAFile $SCRIPT_DIR/server.pem"
     MONGOSHELL_OPTS="$MONGOSHELL_OPTS --sslPEMKeyFile $SCRIPT_DIR/client.pem"
+    MONGOSHELL_OPTS="$MONGOSHELL_OPTS --sslPEMKeyPassword $SSL_PASS"
 fi
 
 MONGOSHELL_OPTS="$MONGOSHELL_OPTS --eval"
@@ -68,7 +69,7 @@ if [ "$MONGO_PROFILE" = "self-ssl" -o "$MONGO_PROFILE" = "mutual-ssl" ]; then
     SBT_ARGS="$SBT_ARGS -Dtest.enableSSL=true"
 
     if [ "$MONGO_PROFILE" = "mutual-ssl" ]; then
-        # TODO: javax.net.ssl.keyStore
+        SBT_ARGS="$SBT_ARGS -Djavax.net.ssl.keyStore=/tmp/keystore.jks"
         SBT_ARGS="$SBT_ARGS -Djavax.net.ssl.keyStorePassword=$SSL_PASS"
         SBT_ARGS="$SBT_ARGS -Djavax.net.ssl.keyStoreType=JKS"
     fi
