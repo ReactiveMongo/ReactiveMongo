@@ -665,7 +665,8 @@ final class ChannelFactory private[reactivemongo] (
       val password = Option(System.getProperty("javax.net.ssl.keyStorePassword")).getOrElse("")
 
       val ks = {
-        val res = KeyStore.getInstance("JKS")
+        val ksType = Option(System.getProperty("javax.net.ssl.keyStoreType")).getOrElse("JKS")
+        val res = KeyStore.getInstance(ksType)
 
         val fis = new FileInputStream(path)
         try {
