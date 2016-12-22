@@ -1,5 +1,7 @@
 #! /bin/bash
 
+set -e
+
 echo "[INFO] Clean some IVY cache"
 rm -rf "$HOME/.ivy2/local/org.reactivemongo"
 
@@ -86,14 +88,36 @@ fi
 
 mkdir /tmp/mongodb
 
-if [ "$MONGO_PROFILE" = "ssl" ]; then
+SSL_PASS=""
+
+if [ "$MONGO_PROFILE" = "self-ssl" -o "$MONGO_PROFILE" = "mutual-ssl" ]; then
+    SSL_PASS=`cat /proc/sys/kernel/random/uuid`
+
+    "$SCRIPT_DIR/genSslCert.sh" $SSL_PASS
+
     cat >> /tmp/mongod.conf << EOF
   ssl:
     mode: requireSSL
     PEMKeyFile: $SCRIPT_DIR/server.pem
-    PEMKeyPassword: test
+    PEMKeyPassword: $SSL_PASS
+EOF
+
+    if [ "$MONGO_PROFILE" = "self-ssl" ]; then
+        cat >> /tmp/mongod.conf << EOF
     allowInvalidCertificates: true
 EOF
+    else
+        # mutual-ssl
+        cat >> /tmp/mongod.conf << EOF
+    CAFile: $SCRIPT_DIR/client.pem
+EOF
+
+        keytool -importkeystore  -srcstoretype PKCS12 \
+            -srckeystore $SCRIPT_DIR/keystore.p12 \
+            -destkeystore /tmp/keystore.jks \
+            -storepass $SSL_PASS -srcstorepass $SSL_PASS
+
+    fi
 fi
 
 if [ "$MONGO_PROFILE" = "rs" ]; then
@@ -119,4 +143,5 @@ PATH="$PATH"
 LD_LIBRARY_PATH="$LD_LIBRARY_PATH"
 PRIMARY_HOST="$PRIMARY_HOST"
 PRIMARY_SLOW_PROXY="$PRIMARY_SLOW_PROXY"
+SSL_PASS=$SSL_PASS
 EOF

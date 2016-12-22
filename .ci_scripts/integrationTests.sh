@@ -13,10 +13,17 @@ if [ "x$MONGOD_PID" = "x" ]; then
 fi
 
 # Check MongoDB connection
+SCRIPT_DIR=`dirname $0 | sed -e "s|^\./|$PWD/|"`
 MONGOSHELL_OPTS=""
 
-if [ "$MONGO_PROFILE" = "ssl" -a ! "$MONGO_VER" = "2_6" ]; then
+if [ "$MONGO_PROFILE" = "self-ssl" ]; then
     MONGOSHELL_OPTS="$MONGOSHELL_OPTS --ssl --sslAllowInvalidCertificates"
+fi
+
+if [ "$MONGO_PROFILE" = "mutual-ssl" ]; then
+    MONGOSHELL_OPTS="$MONGOSHELL_OPTS --ssl --sslCAFile $SCRIPT_DIR/server.pem"
+    MONGOSHELL_OPTS="$MONGOSHELL_OPTS --sslPEMKeyFile $SCRIPT_DIR/client.pem"
+    MONGOSHELL_OPTS="$MONGOSHELL_OPTS --sslPEMKeyPassword $SSL_PASS"
 fi
 
 MONGOSHELL_OPTS="$MONGOSHELL_OPTS --eval"
@@ -58,8 +65,14 @@ else
     SBT_ARGS="$SBT_ARGS -Dtest.authMode=cr"
 fi
 
-if [ "$MONGO_PROFILE" = "ssl" ]; then
+if [ "$MONGO_PROFILE" = "self-ssl" -o "$MONGO_PROFILE" = "mutual-ssl" ]; then
     SBT_ARGS="$SBT_ARGS -Dtest.enableSSL=true"
+
+    if [ "$MONGO_PROFILE" = "mutual-ssl" ]; then
+        SBT_ARGS="$SBT_ARGS -Djavax.net.ssl.keyStore=/tmp/keystore.jks"
+        SBT_ARGS="$SBT_ARGS -Djavax.net.ssl.keyStorePassword=$SSL_PASS"
+        SBT_ARGS="$SBT_ARGS -Djavax.net.ssl.keyStoreType=JKS"
+    fi
 fi
 
 if [ "$MONGO_PROFILE" = "rs" ]; then

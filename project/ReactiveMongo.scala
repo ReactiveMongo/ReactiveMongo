@@ -291,7 +291,8 @@ object ReactiveMongoBuild extends Build {
 
           val specs = List[(String, List[String])](
             "MONGO_VER" -> List("2_6", "3", "3_4"),
-            "MONGO_PROFILE" -> List("default", "ssl", "rs"),
+            "MONGO_PROFILE" -> List(
+              "default", "self-ssl", "mutual-ssl", "rs"),
             "AKKA_VERSION" -> List(akkaLower, akkaUpper),
             "PLAY_VERSION" -> List(playLower, playUpper)
           )
@@ -314,7 +315,9 @@ object ReactiveMongoBuild extends Build {
               contains("MONGO_PROFILE" -> "rs")) ||
             /* profile exclusions */
             (!flags.contains("MONGO_VER" -> mongoUpper) && flags.
-              contains("MONGO_PROFILE" -> "ssl")) ||
+              contains("MONGO_PROFILE" -> "self-ssl")) ||
+            (!flags.contains("MONGO_VER" -> mongoUpper) && flags.
+              contains("MONGO_PROFILE" -> "mutual-ssl")) ||
             (flags.contains("MONGO_VER" -> mongoLower) && flags.
               contains("MONGO_PROFILE" -> "rs") && flags.
               contains("PLAY_VERSION" -> playLower))
@@ -344,7 +347,8 @@ object ReactiveMongoBuild extends Build {
                   flags.contains("AKKA_VERSION" -> akkaUpper) ||
                   flags.contains("MONGO_VER" -> mongoLower) ||
                   /* profile priority exclusions: */
-                  flags.contains("MONGO_PROFILE" -> "ssl"))) {
+                  flags.contains("MONGO_PROFILE" -> "self-ssl") ||
+                  flags.contains("MONGO_PROFILE" -> "mutual-ssl"))) {
                 List(
                   "    - scala: 2.10.5",
                   s"      env: ${integrationVars(flags)}",
