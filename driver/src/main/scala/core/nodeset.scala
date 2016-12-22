@@ -639,21 +639,9 @@ final class ChannelFactory private[reactivemongo] (
       new MongoHandler(supervisor, connection, receiver))
 
     if (options.sslEnabled) {
-      val sslCtx = {
-        val tm: Array[javax.net.ssl.TrustManager] =
-          if (options.sslAllowsInvalidCert) Array(TrustAny) else null
-
-        val ctx = SSLContext.getInstance("SSL")
-        val rand = new scala.util.Random(System.identityHashCode(tm))
-        val seed = Array.ofDim[Byte](128)
-        rand.nextBytes(seed)
-
-        ctx.init(null, tm, new java.security.SecureRandom(seed))
-        ctx
-      }
 
       val sslEng = {
-        val engine = sslCtx.createSSLEngine()
+        val engine = sslContext.createSSLEngine()
         engine.setUseClientMode(true)
         engine
       }
@@ -665,6 +653,54 @@ final class ChannelFactory private[reactivemongo] (
     }
 
     pipeline
+  }
+
+  private def sslContext = {
+    import java.io.FileInputStream
+    import java.security.KeyStore
+    import javax.net.ssl.{ KeyManagerFactory, TrustManager }
+
+    val keyManagers = Option(System.getProperty("javax.net.ssl.keyStore")).map { path =>
+
+      val password = Option(System.getProperty("javax.net.ssl.keyStorePassword")).getOrElse("")
+
+      val ks = {
+        val ksType = Option(System.getProperty("javax.net.ssl.keyStoreType")).getOrElse("JKS")
+        val res = KeyStore.getInstance(ksType)
+
+        val fis = new FileInputStream(path)
+        try {
+          res.load(fis, password.toCharArray)
+        } finally {
+          fis.close()
+        }
+
+        res
+      }
+
+      val kmf = {
+        val res = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm)
+        res.init(ks, password.toCharArray)
+        res
+      }
+
+      kmf.getKeyManagers
+    }
+
+    val sslCtx = {
+      val res = SSLContext.getInstance("SSL")
+
+      val tm: Array[TrustManager] = if (options.sslAllowsInvalidCert) Array(TrustAny) else null
+
+      val rand = new scala.util.Random(System.identityHashCode(tm))
+      val seed = Array.ofDim[Byte](128)
+      rand.nextBytes(seed)
+
+      res.init(keyManagers.orNull, tm, new java.security.SecureRandom(seed))
+      res
+    }
+
+    sslCtx
   }
 
   private def makeChannel(receiver: ActorRef): Channel = {
