@@ -904,17 +904,21 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
       }
     }
 
-    private def closeIfNecessary(): Unit =
+    private def closeIfNecessary(): Unit = {
       if (!done) {
         done = true
         writer.close // array
         writer.close // doc
       }
 
+      ()
+    }
+
     private def init(): Unit = {
       writer.putString(tpe, name).putBoolean("ordered", ordered)
       putWriteConcern()
       writer.openArray("documents")
+      ()
     }
 
     private def putWriteConcern(): Unit = {
@@ -937,6 +941,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
       writeConcern.wtimeout foreach { writer.putInt("wtimeout", _) }
 
       writer.close
+      ()
     }
   }
 }

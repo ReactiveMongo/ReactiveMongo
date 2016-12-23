@@ -48,7 +48,11 @@ package object util {
     def DelayedFuture(millis: Long, system: ActorSystem): Future[Unit] = {
       implicit val ec = system.dispatcher
       val promise = Promise[Unit]()
-      system.scheduler.scheduleOnce(Duration.apply(millis, "millis"))(promise.success(()))
+
+      system.scheduler.scheduleOnce(Duration.apply(millis, "millis")) {
+        promise.success({}); ()
+      }
+
       promise.future
     }
   }

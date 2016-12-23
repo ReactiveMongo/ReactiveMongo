@@ -27,7 +27,7 @@ private[reactivemongo] trait MongoCrAuthentication { system: MongoDBSystem =>
   }
 
   protected val authReceive: Receive = {
-    case response: Response if RequestId.getNonce accepts response =>
+    case response: Response if RequestId.getNonce accepts response => {
       GetCrNonce.ResultMaker(response).fold(
         e =>
           logger.warn(s"error while processing getNonce response #${response.header.responseTo}", e),
@@ -56,9 +56,13 @@ private[reactivemongo] trait MongoCrAuthentication { system: MongoDBSystem =>
         }
       )
 
+      ()
+    }
+
     case response: Response if RequestId.authenticate accepts response => {
       logger.debug(s"AUTH: got authenticated response! ${response.info.channelId}")
       authenticationResponse(response)(CrAuthenticate.parseResponse(_))
+      ()
     }
   }
 }
@@ -134,6 +138,8 @@ private[reactivemongo] trait MongoScramSha1Authentication {
           }
         }
       )
+
+      ()
     }
 
     case response: Response if RequestId.authenticate accepts response => {
@@ -188,6 +194,8 @@ private[reactivemongo] trait MongoScramSha1Authentication {
           }
         }
       )
+
+      ()
     }
   }
 }

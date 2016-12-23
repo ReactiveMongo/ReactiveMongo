@@ -317,7 +317,7 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
    * @tparam Id the type of the id of this file (generally `BSONObjectID` or `BSONValue`).
    * @tparam M the type of the message digest
    */
-  private def iterateeMaybeMD5[Id <: pack.Value, M](file: FileToSave[pack.type, Id], digestInit: => M, digestUpdate: (M, Array[Byte]) => M, digestFinalize: M => Future[Option[Array[Byte]]], chunkSize: Int = 262144)(implicit readFileReader: pack.Reader[ReadFile[Id]], ctx: ExecutionContext, idProducer: IdProducer[Id], docWriter: BSONDocumentWriter[file.pack.Document]): Iteratee[Array[Byte], Future[ReadFile[Id]]] = {
+  private def iterateeMaybeMD5[Id <: pack.Value, M](file: FileToSave[pack.type, Id], digestInit: => M, digestUpdate: (M, Array[Byte]) => M, digestFinalize: M => Future[Option[Array[Byte]]], chunkSize: Int)(implicit readFileReader: pack.Reader[ReadFile[Id]], ctx: ExecutionContext, idProducer: IdProducer[Id], docWriter: BSONDocumentWriter[file.pack.Document]): Iteratee[Array[Byte], Future[ReadFile[Id]]] = {
     case class Chunk(
         previous: Array[Byte],
         n: Int,
@@ -437,7 +437,7 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
       }
 
       case _ => {
-        val errmsg = "not a chunk! failed assertion: data field is missing: ${BSONDocument pretty doc}"
+        val errmsg = s"not a chunk! failed assertion: data field is missing: ${BSONDocument pretty doc}"
 
         logger.error(errmsg)
         Cursor.Fail(ReactiveMongoException(errmsg))

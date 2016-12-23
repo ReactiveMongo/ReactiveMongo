@@ -3,8 +3,8 @@ import sbt.Keys._
 import scala.language.postfixOps
 
 object BuildSettings {
-  val nextMajor = "0.12.0"
-  val buildVersion = nextMajor
+  val nextMajor = "0.12.1"
+  val buildVersion = s"$nextMajor-SNAPSHOT"
 
   val filter = { (ms: Seq[(File, String)]) =>
     ms filter {
@@ -21,12 +21,21 @@ object BuildSettings {
 
   val buildSettings = Defaults.coreDefaultSettings ++ baseSettings ++ Seq(
     scalaVersion := "2.11.8",
-    crossScalaVersions := Seq("2.10.5", "2.11.8"),
+    crossScalaVersions := Seq("2.10.5", "2.11.8", "2.12.1"),
     crossVersion := CrossVersion.binary,
     //parallelExecution in Test := false,
     //fork in Test := true, // Don't share executioncontext between SBT CLI/tests
     scalacOptions in Compile ++= Seq(
-      "-unchecked", "-deprecation", "-target:jvm-1.6", "-Ywarn-unused-import"),
+      "-unchecked", "-deprecation", "-Ywarn-unused-import",
+      "-Ywarn-value-discard", "-Ywarn-dead-code"),
+    scalacOptions in Compile ++= {
+      if (scalaVersion.value startsWith "2.10.") Nil
+      else Seq("-Ywarn-unused", "-Xlint:missing-interpolator")
+    },
+    scalacOptions in Compile ++= {
+      if (!scalaVersion.value.startsWith("2.12.")) Seq("-target:jvm-1.6")
+      else Nil
+    },
     scalacOptions in (Compile, doc) ++= Seq("-unchecked", "-deprecation",
       /*"-diagrams", */"-implicits", "-skip-packages", "samples"),
     scalacOptions in (Compile, doc) ++= Opts.doc.title("ReactiveMongo API"),
@@ -34,9 +43,10 @@ object BuildSettings {
     scalacOptions in Compile := {
       val opts = (scalacOptions in Compile).value
 
-      if (scalaVersion.value != "2.11.8") {
+      if (scalaVersion.value != "2.10.5") opts
+      else {
         opts.filter(_ != "-Ywarn-unused-import")
-      } else opts
+      }
     },
     mappings in (Compile, packageBin) ~= filter,
     mappings in (Compile, packageSrc) ~= filter,
@@ -169,21 +179,27 @@ object Resolvers {
 }
 
 object Dependencies {
-  val akka = {
-    val ver = sys.env.get("AKKA_VERSION").getOrElse("2.3.13")
+  val akka = Def.setting[Seq[ModuleID]] {
+    val ver = sys.env.get("AKKA_VERSION").getOrElse {
+      if (scalaVersion.value startsWith "2.12.") "2.4.14"
+      else "2.3.13"
+    }
 
     Seq(
       "com.typesafe.akka" %% "akka-actor" % ver,
       "com.typesafe.akka" %% "akka-testkit" % ver % Test)
   }
 
-  val playIteratees = {
-    val ver = sys.env.get("PLAY_VERSION").getOrElse("2.3.10")
+  val playIteratees = Def.setting[ModuleID] {
+    val ver = sys.env.get("ITERATEES_VERSION").getOrElse {
+      if (scalaVersion.value startsWith "2.10.") "2.3.9"
+      else "2.6.1"
+    }
 
     "com.typesafe.play" %% "play-iteratees" % ver
   }
 
-  val specsVer = "3.8.3"
+  val specsVer = "3.8.6"
   val specs = "org.specs2" %% "specs2-core" % specsVer % Test
 
   val slf4jVer = "1.7.12"
@@ -198,11 +214,7 @@ object Dependencies {
   ) ++ Seq("log4j-core", "log4j-slf4j-impl").map(
     "org.apache.logging.log4j" % _ % log4jVer % Test)
 
-  val shapelessTest = "com.chuusai" % "shapeless" % "2.0.0" %
-  Test cross CrossVersion.binaryMapped {
-    case "2.10" => "2.10.5"
-    case x => x
-  }
+  val shapelessTest = "com.chuusai" %% "shapeless" % "2.3.2"
 
   val commonsCodec = "commons-codec" % "commons-codec" % "1.10"
 }
@@ -285,16 +297,16 @@ object ReactiveMongoBuild extends Build {
         publishArtifact := false,
         previousArtifacts := Set.empty,
         travisEnv in Test := { // test:travisEnv from SBT CLI
-          val (akkaLower, akkaUpper) = "2.3.13" -> "2.4.11"
-          val (playLower, playUpper) = "2.3.8" -> "2.6.0"
+          val (akkaLower, akkaUpper) = "2.3.13" -> "2.4.16"
+          val (playLower, playUpper) = "2.3.8" -> "2.6.1"
           val (mongoLower, mongoUpper) = "2_6" -> "3_4"
 
           val specs = List[(String, List[String])](
             "MONGO_VER" -> List("2_6", "3", "3_4"),
             "MONGO_PROFILE" -> List(
-              "default", "self-ssl", "mutual-ssl", "rs"),
+              "default", "invalid-ssl", "mutual-ssl", "rs"),
             "AKKA_VERSION" -> List(akkaLower, akkaUpper),
-            "PLAY_VERSION" -> List(playLower, playUpper)
+            "ITERATEES_VERSION" -> List(playLower, playUpper)
           )
 
           lazy val integrationEnv = specs.flatMap {
@@ -302,25 +314,25 @@ object ReactiveMongoBuild extends Build {
           }.combinations(specs.size).filterNot { flags =>
             /* chrono-compat exclusions */
             (flags.contains("AKKA_VERSION" -> akkaLower) && flags.
-              contains("PLAY_VERSION" -> playUpper)) ||
+              contains("ITERATEES_VERSION" -> playUpper)) ||
             (flags.contains("AKKA_VERSION" -> akkaUpper) && flags.
-              contains("PLAY_VERSION" -> playLower)) ||
+              contains("ITERATEES_VERSION" -> playLower)) ||
             (flags.contains("MONGO_VER" -> mongoLower) && flags.
-              contains("PLAY_VERSION" -> playUpper)) ||
+              contains("ITERATEES_VERSION" -> playUpper)) ||
             (flags.contains("MONGO_VER" -> mongoUpper) && flags.
-              contains("PLAY_VERSION" -> playLower)) ||
+              contains("ITERATEES_VERSION" -> playLower)) ||
             (flags.contains("MONGO_VER" -> mongoUpper) && flags.
               contains("AKKA_VERSION" -> akkaLower)) ||
             (flags.contains("AKKA_VERSION" -> akkaLower) && flags.
               contains("MONGO_PROFILE" -> "rs")) ||
             /* profile exclusions */
             (!flags.contains("MONGO_VER" -> mongoUpper) && flags.
-              contains("MONGO_PROFILE" -> "self-ssl")) ||
+              contains("MONGO_PROFILE" -> "invalid-ssl")) ||
             (!flags.contains("MONGO_VER" -> mongoUpper) && flags.
               contains("MONGO_PROFILE" -> "mutual-ssl")) ||
             (flags.contains("MONGO_VER" -> mongoLower) && flags.
               contains("MONGO_PROFILE" -> "rs") && flags.
-              contains("PLAY_VERSION" -> playLower))
+              contains("ITERATEES_VERSION" -> playLower))
           }.collect {
             case flags if (flags.map(_._1).toSet.size == specs.size) =>
               ("CI_CATEGORY" -> "INTEGRATION_TESTS") :: flags.sortBy(_._1)
@@ -339,20 +351,35 @@ object ReactiveMongoBuild extends Build {
               "      env: CI_CATEGORY=UNIT_TESTS") ++ List(
             "    - scala: 2.11.8",
                 "      jdk: oraclejdk7",
+                "      env: CI_CATEGORY=UNIT_TESTS") ++ List(
+            "    - scala: 2.12.1",
+                "      jdk: oraclejdk7",
                 "      env: CI_CATEGORY=UNIT_TESTS") ++ (
             integrationEnv.flatMap { flags =>
               if (flags.contains("CI_CATEGORY" -> "INTEGRATION_TESTS") &&
                 (/* time-compat exclusions: */
-                  flags.contains("PLAY_VERSION" -> playUpper) ||
+                  flags.contains("ITERATEES_VERSION" -> playUpper) ||
                   flags.contains("AKKA_VERSION" -> akkaUpper) ||
-                  flags.contains("MONGO_VER" -> mongoLower) ||
+                  flags.contains("MONGO_VER" -> mongoUpper) ||
                   /* profile priority exclusions: */
-                  flags.contains("MONGO_PROFILE" -> "self-ssl") ||
+                  flags.contains("MONGO_PROFILE" -> "invalid-ssl") ||
                   flags.contains("MONGO_PROFILE" -> "mutual-ssl"))) {
                 List(
                   "    - scala: 2.10.5",
                   s"      env: ${integrationVars(flags)}",
                   "    - jdk: oraclejdk7",
+                  s"      env: ${integrationVars(flags)}"
+                )
+              } else if (flags.contains("CI_CATEGORY" -> "INTEGRATION_TESTS") &&
+                (/* time-compat exclusions: */
+                  flags.contains("ITERATEES_VERSION" -> playLower) ||
+                  flags.contains("AKKA_VERSION" -> akkaLower) ||
+                    flags.contains("MONGO_VER" -> mongoLower)
+                )) {
+                List(
+                  "    - scala: 2.12.1",
+                  s"      env: ${integrationVars(flags)}",
+                  "    - jdk: oraclejdk8",
                   s"      env: ${integrationVars(flags)}"
                 )
               } else List.empty[String]
@@ -433,8 +460,8 @@ object ReactiveMongoBuild extends Build {
     settings(
       libraryDependencies ++= Seq(specs,
         "org.specs2" %% "specs2-scalacheck" % specsVer % Test,
-        "org.typelevel" %% "discipline" % "0.6" % Test,
-        "org.spire-math" %% "spire-laws" % "0.12.0" % Test),
+        "org.typelevel" %% "discipline" % "0.7.2" % Test,
+        "org.spire-math" %% "spire-laws" % "0.13.0" % Test),
       binaryIssueFilters ++= Seq(
         ProblemFilters.exclude[MissingTypesProblem](
           "reactivemongo.bson.BSONTimestamp$")))
@@ -498,8 +525,8 @@ object Version {
 
         Seq(Attributed(shadedDir / shadedJar)(AttributeMap.empty))
       },
-      libraryDependencies ++= akka ++ Seq(
-        playIteratees, commonsCodec, shapelessTest, specs) ++ logApi,
+      libraryDependencies ++= akka.value ++ Seq(
+        playIteratees.value, commonsCodec, shapelessTest, specs) ++ logApi,
       findbugsAnalyzedPath += target.value / "external",
       binaryIssueFilters ++= {
         import ProblemFilters.{ exclude => x }
@@ -512,6 +539,8 @@ object Version {
         @inline def mcp(s: String) = x[MissingClassProblem](s)
 
         Seq(
+          mcp("reactivemongo.api.ReadPreference$BSONDocumentWrapper$"), // priv
+          mcp("reactivemongo.api.ReadPreference$BSONDocumentWrapper"), // priv
           fcp("reactivemongo.api.MongoDriver$SupervisorActor"), // private
           mcp("reactivemongo.api.MongoDriver$SupervisorActor$"), // private
           fcp("reactivemongo.api.collections.bson.BSONCollection"),

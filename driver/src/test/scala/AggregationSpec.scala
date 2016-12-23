@@ -54,21 +54,8 @@ class AggregationSpec extends org.specs2.mutable.Specification {
         Sort
       }
       import reactivemongo.api.commands.{ bson => bsoncommands }
-      import bsoncommands.BSONAggregationFramework.{
-        IndexStatsResult,
-        IndexStatAccesses
-      }
+      import bsoncommands.BSONAggregationFramework.IndexStatsResult
       import bsoncommands.BSONAggregationResultImplicits.BSONIndexStatsReader
-
-      val expected = IndexStatsResult(
-        name = null,
-        key = BSONDocument.empty,
-        host = "foo",
-        accesses = IndexStatAccesses(
-          ops = 1L,
-          since = System.currentTimeMillis()
-        )
-      )
 
       coll.aggregate(IndexStats, List(Sort(Ascending("name")))).
         map(_.head[IndexStatsResult]) must beLike[List[IndexStatsResult]] {
@@ -105,10 +92,10 @@ class AggregationSpec extends org.specs2.mutable.Specification {
         import c.BatchCommands.AggregationFramework
         import AggregationFramework.{ Group, Match, SumField }
 
-        f(c.aggregate(Group(BSONString("$state"))(
+        f(c.aggregate(Group(BSONString(f"$$state"))(
           "totalPop" -> SumField("population")
         ), List(
-          Match(document("totalPop" -> document("$gte" -> 10000000L)))
+          Match(document("totalPop" -> document(f"$$gte" -> 10000000L)))
         )).map(_.firstBatch))
       }
 
@@ -128,7 +115,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
         import coll.BatchCommands.AggregationFramework
         import AggregationFramework.{ Group, SumAll }
 
-        coll.aggregate(Group(BSONString("$state"))("count" -> SumAll)).
+        coll.aggregate(Group(BSONString(f"$$state"))("count" -> SumAll)).
           map(_.firstBatch.toSet) must beEqualTo(Set(
             document("_id" -> "JP", "count" -> 2),
             document("_id" -> "FR", "count" -> 1),
@@ -138,18 +125,13 @@ class AggregationSpec extends org.specs2.mutable.Specification {
     }
 
     "explain simple result" in { implicit ee: EE =>
-      val expected = List(
-        document("_id" -> "JP", "totalPop" -> 13185702L),
-        document("_id" -> "NY", "totalPop" -> 19746227L)
-      )
-
       import coll.BatchCommands.AggregationFramework
       import AggregationFramework.{ Group, Match, SumField }
 
-      coll.aggregate(Group(BSONString("$state"))(
+      coll.aggregate(Group(BSONString(f"$$state"))(
         "totalPop" -> SumField("population")
       ), List(
-        Match(document("totalPop" -> document("$gte" -> 10000000L)))
+        Match(document("totalPop" -> document(f"$$gte" -> 10000000L)))
       ), explain = true).map(_.firstBatch).
         aka("results") must beLike[List[BSONDocument]] {
           case explainResult :: Nil =>
@@ -169,12 +151,14 @@ class AggregationSpec extends org.specs2.mutable.Specification {
         import c.BatchCommands.AggregationFramework
         import AggregationFramework.{ Group, SumField }
 
-        val firstOp = Group(document("state" -> "$state", "city" -> "$city"))(
+        val firstOp = Group(document(
+          "state" -> f"$$state", "city" -> f"$$city"
+        ))(
           "pop" -> SumField("population")
         )
 
         val pipeline = List(
-          Group(BSONString("$_id.state"))("avgCityPop" ->
+          Group(BSONString(f"$$_id.state"))("avgCityPop" ->
             AggregationFramework.AvgField("pop"))
         )
 
@@ -215,7 +199,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
             }
 
             val firstOp = Match(BSONDocument(
-              "$text" -> BSONDocument("$search" -> "JP")
+              f"$$text" -> BSONDocument(f"$$search" -> "JP")
             ))
             val pipeline = List(Sort(
               MetadataSort("score", TextScore), Descending("city")
@@ -275,34 +259,34 @@ class AggregationSpec extends org.specs2.mutable.Specification {
 
       val groupPipeline = List(
         Sort(Ascending("population")),
-        Group(BSONString("$_id.state"))(
+        Group(BSONString(f"$$_id.state"))(
           "biggestCity" -> LastField("_id.city"),
           "biggestPop" -> LastField("pop"),
           "smallestCity" -> FirstField("_id.city"),
           "smallestPop" -> FirstField("pop")
         ),
-        Project(document("_id" -> 0, "state" -> "$_id",
+        Project(document("_id" -> 0, "state" -> f"$$_id",
           "biggestCity" -> document(
-            "name" -> "$biggestCity", "population" -> "$biggestPop"
+            "name" -> f"$$biggestCity", "population" -> f"$$biggestPop"
           ),
           "smallestCity" -> document(
-            "name" -> "$smallestCity", "population" -> "$smallestPop"
+            "name" -> f"$$smallestCity", "population" -> f"$$smallestPop"
           )))
       )
 
       coll.aggregate(
-        Group(document("state" -> "$state", "city" -> "$city"))(
+        Group(document("state" -> f"$$state", "city" -> f"$$city"))(
           "pop" -> SumField("population")
         ), groupPipeline
       ).map(_.firstBatch) must beEqualTo(expected).await(1, timeout) and {
           coll.aggregate(
-            Group(document("state" -> "$state", "city" -> "$city"))(
+            Group(document("state" -> f"$$state", "city" -> f"$$city"))(
               "pop" -> SumField("population")
             ), Limit(2) :: groupPipeline
           ).map(_.firstBatch) must beEqualTo(expected drop 2).await(1, timeout)
         } and {
           coll.aggregate(
-            Group(document("state" -> "$state", "city" -> "$city"))(
+            Group(document("state" -> f"$$state", "city" -> f"$$city"))(
               "pop" -> SumField("population")
             ), Skip(2) :: groupPipeline
           ).map(_.firstBatch) must beEqualTo(expected take 2).await(1, timeout)
@@ -432,9 +416,9 @@ class AggregationSpec extends org.specs2.mutable.Specification {
       val sort = Sort(Ascending("_id"))
 
       sales.aggregate(Project(document("items" -> Filter(
-        input = BSONString("$items"),
+        input = BSONString(f"$$items"),
         as = "item",
-        cond = document("$gte" -> array("$$item.price", 100))
+        cond = document(f"$$gte" -> array(f"$$$$item.price", 100))
       ))), List(sort)).map(_.head[Sale]) must beEqualTo(expected).
         await(0, timeout)
     } tag "not_mongo26"
@@ -491,7 +475,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
 
       val afterUnwind = List(
         Lookup(inventory.name, "specs", "size", "docs"),
-        Match(document("docs" -> document("$ne" -> BSONArray())))
+        Match(document("docs" -> document(f"$$ne" -> BSONArray())))
       )
 
       orders.aggregate(UnwindField("specs"), afterUnwind).
@@ -553,7 +537,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
 
       books.aggregate(
         Sort(Ascending("title")),
-        List(Group(BSONString("$author"))(
+        List(Group(BSONString(f"$$author"))(
           "books" -> PushField("title")
         ), Out(outColl))
       ).map(_ => {}) must beEqualTo({}).await(0, timeout) and {
@@ -571,8 +555,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
       import books.BatchCommands.AggregationFramework
       import AggregationFramework.{ Ascending, Group, AddFieldToSet, Sort }
 
-      val outColl = s"authors-1-${System identityHashCode this}"
-
+      /* TODO: Remove
       type Author = (String, List[String])
       implicit val authorReader = BSONDocumentReader[Author] { doc =>
         (for {
@@ -580,10 +563,11 @@ class AggregationSpec extends org.specs2.mutable.Specification {
           books <- doc.getAsTry[List[String]]("books")
         } yield id -> books).get
       }
+       */
 
       books.aggregate(
         Sort(Ascending("title")),
-        List(Group(BSONString("$author"))(
+        List(Group(BSONString(f"$$author"))(
           "books" -> AddFieldToSet("title")
         ))
       ).map(_.firstBatch.toSet) must beEqualTo(List(
@@ -655,10 +639,10 @@ class AggregationSpec extends org.specs2.mutable.Specification {
          { $group: { _id: "$quiz", stdDev: { $stdDevPop: "$score" } } }
        ])
       */
-      contest.aggregate(Group(BSONString("$quiz"))(
+      contest.aggregate(Group(BSONString(f"$$quiz"))(
         "stdDev" -> StdDevPopField("score")
       ), List(Sort(Ascending("_id")))).map(_.head[QuizStdDev]).
-        aka("$stdDevPop results") must beEqualTo(List(
+        aka(f"$$stdDevPop results") must beEqualTo(List(
           QuizStdDev(1, 8.04155872120988D), QuizStdDev(2, 8.04155872120988D)
         )).await(0, timeout)
       /*
@@ -670,8 +654,8 @@ class AggregationSpec extends org.specs2.mutable.Specification {
     "return a sum as hash per quiz" in { implicit ee: EE =>
       import contest.BatchCommands.AggregationFramework.{ Group, Sum }
 
-      contest.aggregate(Group(BSONString("$quiz"))(
-        "hash" -> Sum(document("$multiply" -> array("$_id", "$score")))
+      contest.aggregate(Group(BSONString(f"$$quiz"))(
+        "hash" -> Sum(document(f"$$multiply" -> array(f"$$_id", f"$$score")))
       )).map(_.firstBatch.toSet) must beEqualTo(Set(
         document("_id" -> 2, "hash" -> 1261),
         document("_id" -> 1, "hash" -> 478)
@@ -681,7 +665,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
     "return the maximum score per quiz" in { implicit ee: EE =>
       import contest.BatchCommands.AggregationFramework.{ Group, MaxField }
 
-      contest.aggregate(Group(BSONString("$quiz"))(
+      contest.aggregate(Group(BSONString(f"$$quiz"))(
         "maxScore" -> MaxField("score")
       )).map(_.firstBatch.toSet) must beEqualTo(Set(
         document("_id" -> 2, "maxScore" -> 96),
@@ -692,8 +676,10 @@ class AggregationSpec extends org.specs2.mutable.Specification {
     "return a max as hash per quiz" in { implicit ee: EE =>
       import contest.BatchCommands.AggregationFramework.{ Group, Max }
 
-      contest.aggregate(Group(BSONString("$quiz"))(
-        "maxScore" -> Max(document("$multiply" -> array("$_id", "$score")))
+      contest.aggregate(Group(BSONString(f"$$quiz"))(
+        "maxScore" -> Max(document(
+          f"$$multiply" -> array(f"$$_id", f"$$score")
+        ))
       )).map(_.firstBatch.toSet) must beEqualTo(Set(
         document("_id" -> 2, "maxScore" -> 492),
         document("_id" -> 1, "maxScore" -> 213)
@@ -703,7 +689,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
     "return the minimum score per quiz" in { implicit ee: EE =>
       import contest.BatchCommands.AggregationFramework.{ Group, MinField }
 
-      contest.aggregate(Group(BSONString("$quiz"))(
+      contest.aggregate(Group(BSONString(f"$$quiz"))(
         "minScore" -> MinField("score")
       )).map(_.firstBatch.toSet) must beEqualTo(Set(
         document("_id" -> 2, "minScore" -> 77),
@@ -714,8 +700,10 @@ class AggregationSpec extends org.specs2.mutable.Specification {
     "return a min as hash per quiz" in { implicit ee: EE =>
       import contest.BatchCommands.AggregationFramework.{ Group, Min }
 
-      contest.aggregate(Group(BSONString("$quiz"))(
-        "minScore" -> Min(document("$multiply" -> array("$_id", "$score")))
+      contest.aggregate(Group(BSONString(f"$$quiz"))(
+        "minScore" -> Min(document(
+          f"$$multiply" -> array(f"$$_id", f"$$score")
+        ))
       )).map(_.firstBatch.toSet) must beEqualTo(Set(
         document("_id" -> 2, "minScore" -> 384),
         document("_id" -> 1, "minScore" -> 85)
@@ -734,8 +722,8 @@ class AggregationSpec extends org.specs2.mutable.Specification {
         ))
       )
 
-      contest.aggregate(Group(BSONString("$quiz"))(
-        "scores" -> Push(document("name" -> "$name", "score" -> "$score"))
+      contest.aggregate(Group(BSONString(f"$$quiz"))(
+        "scores" -> Push(document("name" -> f"$$name", "score" -> f"$$score"))
       )).map(_.head[QuizScores].toSet) must beEqualTo(expected).
         await(1, timeout)
     }
@@ -752,8 +740,8 @@ class AggregationSpec extends org.specs2.mutable.Specification {
         ))
       )
 
-      contest.aggregate(Group(BSONString("$quiz"))(
-        "scores" -> AddToSet(document("name" -> "$name", "score" -> "$score"))
+      contest.aggregate(Group(BSONString(f"$$quiz"))(
+        "scores" -> AddToSet(document("name" -> f"$$name", "score" -> f"$$score"))
       )).map(_.head[QuizScores].toSet) must beEqualTo(expected).
         await(1, timeout)
     }
@@ -784,11 +772,10 @@ class AggregationSpec extends org.specs2.mutable.Specification {
       import contest.BatchCommands.AggregationFramework.{
         Group,
         Sample,
-        StdDevSamp,
-        PipelineOperator
+        StdDevSamp
       }
 
-      implicit val reader = Macros.reader[QuizStdDev]
+      //TODO: Remove: implicit val reader = Macros.reader[QuizStdDev]
 
       val expected = List(
         BSONDocument("_id" -> BSONNull, "ageStdDev" -> 11.135528725660043D)
@@ -801,14 +788,10 @@ class AggregationSpec extends org.specs2.mutable.Specification {
        ])
       */
       contest.aggregate(Sample(100), List(Group(BSONNull)(
-        "ageStdDev" -> StdDevSamp(BSONString("$age"))
+        "ageStdDev" -> StdDevSamp(BSONString(f"$$age"))
       ))).map(_.firstBatch) must beEqualTo(expected).await(0, timeout) and {
-        val sample = PipelineOperator(document(
-          "$sample" -> document("size" -> 100)
-        ))
-
         contest.aggregate(Sample(100), List(Group(BSONNull)(
-          "ageStdDev" -> StdDevSamp(BSONString("$age"))
+          "ageStdDev" -> StdDevSamp(BSONString(f"$$age"))
         ))).map(_.firstBatch) must beEqualTo(expected).await(0, timeout)
       }
     } tag "not_mongo26"
@@ -1009,16 +992,16 @@ db.forecasts.aggregate(
  */
 
       val result = forecasts.aggregate(Match(document("year" -> 2014)), List(
-        Redact(document("$cond" -> document(
+        Redact(document(f"$$cond" -> document(
           "if" -> document(
-            "$gt" -> array(document(
-              "$size" -> document("$setIntersection" -> array(
-                "$tags", array("STLW", "G")
+            f"$$gt" -> array(document(
+              f"$$size" -> document(f"$$setIntersection" -> array(
+                f"$$tags", array("STLW", "G")
               ))
             ), 0)
           ),
-          "then" -> "$$DESCEND",
-          "else" -> "$$PRUNE"
+          "then" -> f"$$$$DESCEND",
+          "else" -> f"$$$$PRUNE"
         )))
       )).map(_.head[Redaction])
 
@@ -1150,10 +1133,10 @@ db.accounts.aggregate([
  */
       val result = customers.aggregate(Match(document("status" -> "A")), List(
         Redact(document(
-          "$cond" -> document(
-            "if" -> document("$eq" -> array("$level", 5)),
-            "then" -> "$$PRUNE",
-            "else" -> "$$DESCEND"
+          f"$$cond" -> document(
+            "if" -> document(f"$$eq" -> array(f"$$level", 5)),
+            "then" -> f"$$$$PRUNE",
+            "else" -> f"$$$$DESCEND"
           )
         ))
       )).map(_.head[BSONDocument])
@@ -1220,10 +1203,12 @@ db.accounts.aggregate([
   implicit val scoreReader = Macros.reader[Score]
 
   case class QuizScores(_id: Int, scores: Set[Score])
-  implicit val reader = BSONDocumentReader[QuizScores] { doc =>
-    (for {
-      i <- doc.getAsTry[Int]("_id")
-      s <- doc.getAsTry[Set[Score]]("scores")
-    } yield QuizScores(i, s)).get
-  }
+
+  implicit val quizScoresReader: BSONDocumentReader[QuizScores] =
+    BSONDocumentReader[QuizScores] { doc =>
+      (for {
+        i <- doc.getAsTry[Int]("_id")
+        s <- doc.getAsTry[Set[Score]]("scores")
+      } yield QuizScores(i, s)).get
+    }
 }

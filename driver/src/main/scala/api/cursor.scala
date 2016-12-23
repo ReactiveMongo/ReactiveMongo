@@ -882,11 +882,13 @@ private[api] final class FoldResponses[T](
   @inline private def ok(r: Response, v: T): Unit = {
     kill(r.reply.cursorID) // Releases cursor before ending
     promise.success(v)
+    ()
   }
 
   @inline private def ko(r: Response, f: Throwable): Unit = {
     kill(r.reply.cursorID) // Releases cursor before ending
     promise.failure(f)
+    ()
   }
 
   @inline private def handleResponse(last: Response, cur: T, c: Int): Unit = {
@@ -971,10 +973,14 @@ private[api] final class FoldResponses[T](
   /**
    * Enqueues a `message` to be processed while fold the cursor results.
    */
-  def !(message: Any): Unit = actorSys.scheduler.scheduleOnce(
-    // TODO: on retry, add some delay according FailoverStrategy
-    scala.concurrent.duration.Duration.Zero
-  )(handle(message))(ec)
+  def !(message: Any): Unit = {
+    actorSys.scheduler.scheduleOnce(
+      // TODO: on retry, add some delay according FailoverStrategy
+      scala.concurrent.duration.Duration.Zero
+    )(handle(message))(ec)
+
+    ()
+  }
 
   // Messages
 

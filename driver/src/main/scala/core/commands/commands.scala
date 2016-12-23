@@ -23,7 +23,6 @@ import reactivemongo.bson.{
   BSONBoolean,
   BSONBooleanLike,
   BSONDocument,
-  BSONDouble,
   BSONElement,
   BSONInteger,
   BSONNumberLike,

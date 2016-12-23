@@ -85,8 +85,6 @@ class BSONCollectionSpec extends org.specs2.mutable.Specification {
       @inline def cursor(implicit ec: ExecutionContext): Cursor[BSONDocument] =
         collection.find(BSONDocument("plop" -> "plop")).cursor[BSONDocument]()
 
-      @inline def slowCursor(implicit ec: ExecutionContext): Cursor[BSONDocument] = slowColl.find(BSONDocument("plop" -> "plop")).cursor[BSONDocument]()
-
       "when empty with success using collect" in { implicit ee: EE =>
         cursor.collect[Vector](10).map(_.length) must beEqualTo(0).
           await(1, timeout)

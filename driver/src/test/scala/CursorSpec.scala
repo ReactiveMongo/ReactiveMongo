@@ -930,10 +930,6 @@ class CursorSpec extends org.specs2.mutable.Specification
 
       { // .enumerate
         def enumSpec(defaultColl: ExecutionContext => BSONCollection, specCol: (ExecutionContext, String) => BSONCollection, timeout: FiniteDuration) = {
-          def delayedTimeout = FiniteDuration(
-            (timeout.toMillis * 1.25D).toLong, MILLISECONDS
-          )
-
           "if fails while processing with existing documents" in {
             implicit ee: EE =>
               @volatile var count = 0

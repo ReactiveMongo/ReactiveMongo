@@ -222,6 +222,8 @@ trait MongoDBSystem extends Actor {
           _setInfo = updated.info
           l.nodeSetUpdated(previous, _setInfo)
         }
+
+        ()
       }
     }
 
@@ -235,7 +237,7 @@ trait MongoDBSystem extends Actor {
   // <-- monitor
 
   @inline private def updateHistory(event: String): Unit =
-    history.add(System.currentTimeMillis() -> event)
+    { history.add(System.currentTimeMillis() -> event); () }
 
   private[reactivemongo] def internalState() = new InternalState(
     history.toArray.foldLeft(Array.empty[StackTraceElement]) {
@@ -325,11 +327,13 @@ trait MongoDBSystem extends Actor {
     connectAll(_nodeSet, { (node, chan) =>
       chan.addListener(new ChannelFutureListener {
         def operationComplete(chan: ChannelFuture) =
-          sendIsMaster(node, RequestId.isMaster.next)
+          { sendIsMaster(node, RequestId.isMaster.next); () }
       })
 
       chan
     })
+
+    ()
   }
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
@@ -345,6 +349,8 @@ trait MongoDBSystem extends Actor {
     logger.info(s"[$lnm] Stopping the MongoDBSystem ${self.path}")
 
     close()
+
+    ()
   }
 
   override def postRestart(reason: Throwable): Unit = {
@@ -455,7 +461,10 @@ trait MongoDBSystem extends Actor {
   // TODO: Specific option?
   @inline private def requestRetries = options.failoverStrategy.retries
 
-  private def failureOrLog[T](promise: Promise[T], cause: Throwable)(log: Throwable => Unit): Unit = if (promise.isCompleted) log(cause) else promise.failure(cause)
+  private def failureOrLog[T](promise: Promise[T], cause: Throwable)(log: Throwable => Unit): Unit = {
+    if (promise.isCompleted) log(cause)
+    else { promise.failure(cause); () }
+  }
 
   private def retry(req: AwaitingResponse): Option[AwaitingResponse] = {
     val onError = failureOrLog(req.promise, _: Throwable) { cause =>
@@ -486,7 +495,7 @@ trait MongoDBSystem extends Actor {
   protected def authReceive: Receive
 
   private val processing: Receive = {
-    case RegisterMonitor => monitors += sender
+    case RegisterMonitor => { monitors += sender; () }
 
     case Close => {
       logger.debug(s"[$lnm] Received Close message, going to close connections and moving on state Closing")
@@ -507,6 +516,8 @@ trait MongoDBSystem extends Actor {
 
       val r = req(RequestId.common.next)
       pickChannel(r).map(_._2.send(r))
+
+      ()
     }
 
     case req @ RequestMakerExpectingResponse(maker, _) => {
@@ -531,6 +542,8 @@ trait MongoDBSystem extends Actor {
 
         con.send(request)
       })
+
+      ()
     }
 
     case req @ CheckedWriteRequestExpectingResponse(_) => {
@@ -558,6 +571,8 @@ trait MongoDBSystem extends Actor {
 
         con.send(request, writeConcern)
       })
+
+      ()
     }
 
     case ConnectAll => { // monitor
@@ -570,6 +585,7 @@ trait MongoDBSystem extends Actor {
       logger.debug(s"[$lnm] ConnectAll Job running... Status: $statusInfo")
 
       connectAll(_nodeSet)
+      ()
     }
 
     case RefreshAll => {
@@ -772,7 +788,11 @@ trait MongoDBSystem extends Actor {
             channelFactory, self, options.nbChannelsPerNode
           ))
         }
+
+        ()
       }
+
+      ()
     }
   }
 
@@ -780,11 +800,12 @@ trait MongoDBSystem extends Actor {
     case req @ RequestMaker(_, _, _, _) =>
       logger.error(s"[$lnm] Received a non-expecting response request during closing process: $req")
 
-    case RegisterMonitor => monitors += sender
+    case RegisterMonitor => { monitors += sender; () }
 
     case req @ ExpectingResponse(promise) => {
       logger.debug(s"[$lnm] Received an expecting response request during closing process: $req, completing its promise with a failure")
       promise.failure(new ClosedException(supervisor, name, internalState))
+      ()
     }
 
     case msg @ ChannelClosed(channelId) => {
@@ -820,6 +841,7 @@ trait MongoDBSystem extends Actor {
       logger.warn(s"[$lnm$$Closing] SPURIOUS $msg (ignored, channel closed)")
 
       updateNodeSetOnDisconnect(channelId)
+      ()
     }
 
     case Close =>
@@ -842,14 +864,16 @@ trait MongoDBSystem extends Actor {
             logger.debug(s"[$lnm] {${response.header.responseTo}} sending a failure... (${response.error.get})")
 
             if (response.error.get.isNotAPrimaryError) onPrimaryUnavailable()
+
             promise.failure(response.error.get)
+            ()
           } else if (isGetLastError) {
             logger.debug(s"[$lnm] {${response.header.responseTo}} it's a getlasterror")
 
             // todo, for now rewinding buffer at original index
             //import reactivemongo.api.commands.bson.BSONGetLastErrorImplicits.LastErrorReader
 
-            lastError(response).fold(e => {
+            lastError(response).fold({ e =>
               logger.error(s"[$lnm] Error deserializing LastError message #${response.header.responseTo}", e)
               promise.failure(new RuntimeException(s"Error deserializing LastError message #${response.header.responseTo} ($lnm)", e))
             }, { lastError =>
@@ -863,6 +887,8 @@ trait MongoDBSystem extends Actor {
                 promise.success(response)
               }
             })
+
+            ()
           } else if (isMongo26WriteOp) {
             // TODO - logs, bson
             // MongoDB 26 Write Protocol errors
@@ -886,6 +912,7 @@ trait MongoDBSystem extends Actor {
             if (processedOk) {
               logger.trace(s"[$lnm] {${response.header.responseTo}} [MongoDB26 Write Op response] sending a success!")
               promise.success(response)
+              ()
             } else {
               logger.debug(s"[$lnm] {${response.header.responseTo}} [MongoDB26 Write Op response] processedOk is false! sending an error")
 
@@ -904,10 +931,12 @@ trait MongoDBSystem extends Actor {
               }
 
               promise.failure(GenericDriverException("not ok"))
+              ()
             }
           } else {
             logger.trace(s"[$lnm] {${response.header.responseTo}} [MongoDB26 Write Op response] sending a success!")
             promise.success(response)
+            ()
           }
         }
 
@@ -924,6 +953,7 @@ trait MongoDBSystem extends Actor {
         authenticateNodeSet(ns.
           copy(authenticates = ns.authenticates + authenticate))
       }
+      ()
     }
 
     case a => logger.error(s"[$lnm] Not supported: $a")

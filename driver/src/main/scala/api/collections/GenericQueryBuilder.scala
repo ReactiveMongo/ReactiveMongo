@@ -63,7 +63,7 @@ trait GenericQueryBuilder[P <: SerializationPack] {
     maxTimeMsOption: Option[Long] = maxTimeMsOption
   ): Self
 
-  private def write(document: pack.Document, buffer: ChannelBufferWritableBuffer = ChannelBufferWritableBuffer()): ChannelBufferWritableBuffer = {
+  private def write(document: pack.Document, buffer: ChannelBufferWritableBuffer): ChannelBufferWritableBuffer = {
     pack.writeToBuffer(buffer, document)
     buffer
   }

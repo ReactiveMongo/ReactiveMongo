@@ -16,26 +16,36 @@
 package reactivemongo.core.iteratees
 
 import play.api.libs.iteratee._
-import scala.concurrent._
-import scala.concurrent.ExecutionContext.Implicits.global
+
 import scala.util.{ Failure, Success }
 
+import scala.concurrent.{ ExecutionContext, Future, Promise }
+
 object CustomEnumeratee {
+  import ExecutionContext.{ global => globalEc }
+
   trait RecoverFromErrorFunction {
     def apply[E, A](throwable: Throwable, input: Input[E], continue: () => Iteratee[E, A]): Iteratee[E, A]
   }
+
   object RecoverFromErrorFunction {
     object StopOnError extends RecoverFromErrorFunction {
       def apply[E, A](throwable: Throwable, input: Input[E], continue: () => Iteratee[E, A]): Iteratee[E, A] =
         Error(throwable.getMessage(), input)
     }
+
     object ContinueOnError extends RecoverFromErrorFunction {
       def apply[E, A](throwable: Throwable, input: Input[E], continue: () => Iteratee[E, A]): Iteratee[E, A] =
         continue()
     }
   }
-  def stopOnError[E]: Enumeratee[E, E] = recover(RecoverFromErrorFunction.StopOnError)
-  def continueOnError[E]: Enumeratee[E, E] = recover(RecoverFromErrorFunction.ContinueOnError)
+
+  def stopOnError[E]: Enumeratee[E, E] =
+    recover(RecoverFromErrorFunction.StopOnError)(globalEc)
+
+  def continueOnError[E]: Enumeratee[E, E] =
+    recover(RecoverFromErrorFunction.ContinueOnError)(globalEc)
+
   def recover[E](ƒ: RecoverFromErrorFunction)(implicit ec: ExecutionContext): Enumeratee[E, E] = {
     new Enumeratee[E, E] {
       def applyOn[A](it: Iteratee[E, A]): Iteratee[E, Iteratee[E, A]] = {
@@ -105,11 +115,10 @@ object CustomEnumerator {
         case Step.Cont(ƒ) =>
           loop(zero, ƒ(Input.El(zero)))
         case Step.Done(a, e) =>
-          val done = Done(a, e)
-          Future.successful(done)
+          Future.successful(Done(a, e))
+
         case Step.Error(msg, e) =>
-          val error = Error(msg, e)
-          Future.successful(error)
+          Future.successful(Error(msg, e))
       }
 
     }
@@ -129,15 +138,15 @@ object CustomEnumerator {
   class StateEnumerator[Chunk](zero: Future[Option[Chunk]])(nextChunk: Chunk => Future[Option[Chunk]])(implicit ec: ExecutionContext) extends Enumerator[Chunk] {
     def apply[A](i: Iteratee[Chunk, A]): Future[Iteratee[Chunk, A]] = {
       val promise = Promise[Iteratee[Chunk, A]]
+
       def inloop(step: Future[Option[Chunk]], iteratee: Iteratee[Chunk, A]): Unit = {
         iteratee.fold {
           case Step.Cont(f) => {
             val future = step.map {
-              case Some(state) =>
-                (Some(state), f(Input.El(state)))
-              case None =>
-                (None, f(Input.EOF))
+              case Some(state) => (Some(state), f(Input.El(state)))
+              case None        => (None, f(Input.EOF))
             }
+
             future.onSuccess {
               case (state, iteratee) =>
                 if (state.isDefined)
@@ -150,18 +159,23 @@ object CustomEnumerator {
             }
             future.map(_._2)
           }
+
           case Step.Done(a, e) => {
             val finalIteratee = Done(a, e)
             promise.success(finalIteratee)
             Future.successful(finalIteratee)
           }
+
           case Step.Error(msg, e) => {
             val finalIteratee = Error(msg, e)
             promise.success(finalIteratee)
             Future.successful(finalIteratee)
           }
         }
+
+        ()
       }
+
       inloop(zero, i)
       promise.future
     }
