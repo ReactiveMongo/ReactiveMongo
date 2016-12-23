@@ -3,10 +3,10 @@ machine:
     version: oraclejdk8
   environment:
     CI_CATEGORY: "INTEGRATION_TESTS"
-    AKKA_VERSION: 2.4.11
+    AKKA_VERSION: 2.4.16
     MONGO_PROFILE: "default"
     MONGO_VER: 3
-    TRAVIS_SCALA_VERSION: 2.11.8
+    TRAVIS_SCALA_VERSION: 2.12.1
     SBT_VER: 0.13.11
 dependencies:
   pre:

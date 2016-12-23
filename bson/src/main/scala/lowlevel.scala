@@ -45,7 +45,6 @@ class LowLevelBsonDocReader[A <: ReadableBuffer](rbuf: A) {
     rbuf.index = start
     res
   }
-  private val end = start + length
   private def slice = rbuf.slice(length)
 
   type -> [A, B] = (A, B)
@@ -59,9 +58,6 @@ class LowLevelBsonDocReader[A <: ReadableBuffer](rbuf: A) {
 
     def skipCString(): Unit =
       while (buf.readByte != 0x00) {}
-
-    @inline def move(diff: Int): Unit =
-      buf.index = buf.index + diff
 
     def stream(): Stream[Field] = {
       val tpe = buf.readByte

@@ -235,8 +235,8 @@ final class LegacyIndexesManager(db: DB)(
 
   def ensure(nsIndex: NSIndex): Future[Boolean] = {
     val query = BSONDocument(
-      "ns" -> BSONString(nsIndex.namespace),
-      "name" -> BSONString(nsIndex.index.eventualName)
+      "ns" -> nsIndex.namespace,
+      "name" -> nsIndex.index.eventualName
     )
 
     collection.find(query).one.flatMap { idx =>

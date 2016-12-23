@@ -84,9 +84,6 @@ class MonitorSpec extends org.specs2.mutable.Specification {
             } and {
               val nodeSet3 = nodeSet(dbsystem)
               val primary3 = nodeSet3.primary
-              val authCon3 = primary3.toVector.flatMap {
-                _.authenticatedConnections.subject
-              }
 
               primary3.map(_.name) aka "primary #3 (after ChannelClosed)" must (
                 beSome(primary1.get.name)
@@ -154,9 +151,6 @@ class MonitorSpec extends org.specs2.mutable.Specification {
           } and { // #5
             val nodeSet5 = nodeSet(dbsystem)
             val primary5 = nodeSet5.primary
-            val authCon5 = primary5.toVector.flatMap {
-              _.authenticatedConnections.subject
-            }
 
             primary5.map(_.name) aka "primary #5 (after Akka Restart)" must (
               beSome(primary1.get.name)

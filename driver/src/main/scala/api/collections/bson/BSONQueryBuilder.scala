@@ -93,15 +93,15 @@ case class BSONQueryBuilder(
     }
 
     val optional = List(
-      queryOption.map { "$query" -> _ },
-      sortOption.map { "$orderby" -> _ },
-      hintOption.map { "$hint" -> _ },
-      maxTimeMsOption.map { "$maxTimeMS" -> BSONLong(_) },
-      commentString.map { "$comment" -> BSONString(_) },
-      option(explainFlag, "$explain" -> BSONBoolean(true)),
-      option(snapshotFlag, "$snapshot" -> BSONBoolean(true))
+      queryOption.map { f"$$query" -> _ },
+      sortOption.map { f"$$orderby" -> _ },
+      hintOption.map { f"$$hint" -> _ },
+      maxTimeMsOption.map { f"$$maxTimeMS" -> BSONLong(_) },
+      commentString.map { f"$$comment" -> BSONString(_) },
+      option(explainFlag, f"$$explain" -> BSONBoolean(true)),
+      option(snapshotFlag, f"$$snapshot" -> BSONBoolean(true))
     ).flatten
 
-    BSONDocument(optional :+ ("$readPreference" -> pref))
+    BSONDocument(optional :+ (f"$$readPreference" -> pref))
   }
 }

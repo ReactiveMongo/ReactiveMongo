@@ -16,7 +16,7 @@ fi
 SCRIPT_DIR=`dirname $0 | sed -e "s|^\./|$PWD/|"`
 MONGOSHELL_OPTS=""
 
-if [ "$MONGO_PROFILE" = "self-ssl" ]; then
+if [ "$MONGO_PROFILE" = "invalid-ssl" ]; then
     MONGOSHELL_OPTS="$MONGOSHELL_OPTS --ssl --sslAllowInvalidCertificates"
 fi
 
@@ -65,7 +65,7 @@ else
     SBT_ARGS="$SBT_ARGS -Dtest.authMode=cr"
 fi
 
-if [ "$MONGO_PROFILE" = "self-ssl" -o "$MONGO_PROFILE" = "mutual-ssl" ]; then
+if [ "$MONGO_PROFILE" = "invalid-ssl" -o "$MONGO_PROFILE" = "mutual-ssl" ]; then
     SBT_ARGS="$SBT_ARGS -Dtest.enableSSL=true"
 
     if [ "$MONGO_PROFILE" = "mutual-ssl" ]; then

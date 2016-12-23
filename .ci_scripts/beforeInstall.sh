@@ -90,7 +90,7 @@ mkdir /tmp/mongodb
 
 SSL_PASS=""
 
-if [ "$MONGO_PROFILE" = "self-ssl" -o "$MONGO_PROFILE" = "mutual-ssl" ]; then
+if [ "$MONGO_PROFILE" = "invalid-ssl" -o "$MONGO_PROFILE" = "mutual-ssl" ]; then
     SSL_PASS=`cat /proc/sys/kernel/random/uuid`
 
     "$SCRIPT_DIR/genSslCert.sh" $SSL_PASS
@@ -102,7 +102,7 @@ if [ "$MONGO_PROFILE" = "self-ssl" -o "$MONGO_PROFILE" = "mutual-ssl" ]; then
     PEMKeyPassword: $SSL_PASS
 EOF
 
-    if [ "$MONGO_PROFILE" = "self-ssl" ]; then
+    if [ "$MONGO_PROFILE" = "invalid-ssl" ]; then
         cat >> /tmp/mongod.conf << EOF
     allowInvalidCertificates: true
 EOF
