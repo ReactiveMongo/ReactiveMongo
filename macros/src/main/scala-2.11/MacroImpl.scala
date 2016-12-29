@@ -21,20 +21,19 @@ private object MacroImpl {
     def write(document: A) = Helper[A, Opts](c).writeBody.splice
   })
 
-  def handler[A: c.WeakTypeTag, Opts: c.WeakTypeTag](c: Context): c.Expr[BSONDocumentReader[A] with BSONDocumentWriter[A] with BSONHandler[BSONDocument, A]] = {
+  def handler[A: c.WeakTypeTag, Opts: c.WeakTypeTag](c: Context): c.Expr[BSONDocumentHandler[A]] = {
     val helper = Helper[A, Opts](c)
 
-    c.universe.reify(
-      new BSONDocumentReader[A] with BSONDocumentWriter[A] with BSONHandler[BSONDocument, A] {
-        lazy val forwardReader: BSONDocumentReader[A] =
-          BSONDocumentReader[A](this.read _)
+    c.universe.reify(new BSONDocumentReader[A] with BSONDocumentWriter[A] with BSONHandler[BSONDocument, A] {
+      lazy val forwardReader: BSONDocumentReader[A] =
+        BSONDocumentReader[A](this.read _)
 
-        lazy val forwardWriter: BSONDocumentWriter[A] =
-          BSONDocumentWriter[A](this.write _)
+      lazy val forwardWriter: BSONDocumentWriter[A] =
+        BSONDocumentWriter[A](this.write _)
 
-        def read(document: BSONDocument): A = helper.readBody.splice
-        def write(document: A): BSONDocument = helper.writeBody.splice
-      })
+      def read(document: BSONDocument): A = helper.readBody.splice
+      def write(document: A): BSONDocument = helper.writeBody.splice
+    })
   }
 
   private def Helper[A: c.WeakTypeTag, Opts: c.WeakTypeTag](c: Context) = new Helper[c.type, A](c) {
@@ -54,7 +53,7 @@ private object MacroImpl {
     private val readerType: Type = typeOf[Reader[_]].typeConstructor
 
     lazy val readBody: c.Expr[A] = {
-      val writer = unionTypes.map { types =>
+      val reader = unionTypes.map { types =>
         val resolve = resolver(Map.empty, "Reader")(readerType)
         val cases = types map { typ =>
           val pattern = if (hasOption[SaveSimpleName])
@@ -70,10 +69,10 @@ private object MacroImpl {
         Match(className, cases)
       } getOrElse readBodyConstruct(A)
 
-      val result = c.Expr[A](writer)
+      val result = c.Expr[A](reader)
 
       if (hasOption[Macros.Options.Verbose]) {
-        c.echo(c.enclosingPosition, show(result))
+        c.echo(c.enclosingPosition, show(reader))
       }
 
       result
@@ -93,7 +92,7 @@ private object MacroImpl {
       val result = c.Expr[BSONDocument](writer)
 
       if (hasOption[Macros.Options.Verbose]) {
-        c.echo(c.enclosingPosition, show(result))
+        c.echo(c.enclosingPosition, show(writer))
       }
 
       result
@@ -135,19 +134,19 @@ private object MacroImpl {
 
       val values = constructor.paramLists.head.map { param =>
         val t = param.typeSignature
-        val sig = boundTypes.lift(t.typeSymbol.fullName).getOrElse(t)
+        val sig = boundTypes.getOrElse(t.typeSymbol.fullName, t)
         val opt = optionTypeParameter(sig)
-        val typ = opt getOrElse sig
+        //val typ = opt getOrElse sig
         val (reader, _) = resolve(sig)
         val pname = paramName(param)
 
         if (reader.isEmpty) {
-          c.abort(c.enclosingPosition, s"Implicit ${classOf[Reader[_]].getName}[${sig.typeSymbol.fullName}] not found for '$pname'")
+          c.abort(c.enclosingPosition, s"Implicit not found for '$pname': ${classOf[Reader[_]].getName}[_, $sig]")
         }
 
         opt match {
-          case Some(_) => q"document.getAs[$typ]($pname)($reader)"
-          case _ => q"document.getAsTry[$typ]($pname)($reader).get"
+          case Some(_) => q"document.getAs($pname)($reader)"
+          case _ => q"document.getAsTry($pname)($reader).get"
         }
       }
 
@@ -204,7 +203,7 @@ private object MacroImpl {
           val pname = paramName(param)
 
           if (writer.isEmpty) {
-            c.abort(c.enclosingPosition, s"Implicit ${classOf[Writer[_]].getName}[${tpe.typeSymbol.name}] for '$pname' not found")
+            c.abort(c.enclosingPosition, s"Implicit ${classOf[Writer[_]].getName}[${tpe.typeSymbol.name}, _] for '$pname' not found")
           }
 
           val tuple_i = {
@@ -223,7 +222,7 @@ private object MacroImpl {
           val pname = paramName(param)
 
           if (writer.isEmpty) {
-            c.abort(c.enclosingPosition, s"Implicit ${classOf[Writer[_]].getName}[${tpe.typeSymbol.name}] for '$pname' not found")
+            c.abort(c.enclosingPosition, s"Implicit ${classOf[Writer[_]].getName}[${tpe.typeSymbol.name}, _] for '$pname' not found")
           }
 
           val tuple_i = {

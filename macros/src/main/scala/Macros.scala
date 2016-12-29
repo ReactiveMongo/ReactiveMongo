@@ -31,13 +31,13 @@ object Macros {
   def writerOpts[A, Opts <: Options.Default]: BSONDocumentWriter[A] = macro MacroImpl.writer[A, Opts]
 
   /** Creates an instance of BSONReader and BSONWriter for case class A */
-  def handler[A]: BSONDocumentReader[A] with BSONDocumentWriter[A] with BSONHandler[BSONDocument, A] = macro MacroImpl.handler[A, Options.Default]
+  def handler[A]: BSONDocumentHandler[A] = macro MacroImpl.handler[A, Options.Default]
 
   /**
    * Creates an instance of BSONReader and BSONWriter for case class A,
    * and takes additional options.
    */
-  def handlerOpts[A, Opts <: Options.Default]: BSONDocumentReader[A] with BSONDocumentWriter[A] with BSONHandler[BSONDocument, A] = macro MacroImpl.handler[A, Opts]
+  def handlerOpts[A, Opts <: Options.Default]: BSONDocumentHandler[A] = macro MacroImpl.handler[A, Opts]
 
   /**
    * Methods with 'Opts' postfix will take additional options in the form of

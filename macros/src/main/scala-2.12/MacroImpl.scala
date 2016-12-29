@@ -54,7 +54,7 @@ private object MacroImpl {
     private val readerType: Type = typeOf[Reader[_]].typeConstructor
 
     lazy val readBody: c.Expr[A] = {
-      val writer = unionTypes.map { types =>
+      val reader = unionTypes.map { types =>
         val resolve = resolver(Map.empty, "Reader")(readerType)
         val cases = types map { typ =>
           val pattern = if (hasOption[SaveSimpleName])
@@ -70,7 +70,7 @@ private object MacroImpl {
         Match(className, cases)
       } getOrElse readBodyConstruct(A)
 
-      val result = c.Expr[A](writer)
+      val result = c.Expr[A](reader)
 
       if (hasOption[Macros.Options.Verbose]) {
         c.echo(c.enclosingPosition, show(result))
@@ -135,19 +135,19 @@ private object MacroImpl {
 
       val values = constructor.paramLists.head.map { param =>
         val t = param.typeSignature
-        val sig = boundTypes.lift(t.typeSymbol.fullName).getOrElse(t)
+        val sig = boundTypes.getOrElse(t.typeSymbol.fullName, t)
         val opt = optionTypeParameter(sig)
-        val typ = opt getOrElse sig
+        //val typ = opt getOrElse sig
         val (reader, _) = resolve(sig)
         val pname = paramName(param)
 
         if (reader.isEmpty) {
-          c.abort(c.enclosingPosition, s"Implicit ${classOf[Reader[_]].getName}[${sig.typeSymbol.fullName}] not found for '$pname'")
+          c.abort(c.enclosingPosition, s"Implicit not found '$pname': ${classOf[Reader[_]].getName}[_, $sig]")
         }
 
         opt match {
-          case Some(_) => q"document.getAs[$typ]($pname)($reader)"
-          case _ => q"document.getAsTry[$typ]($pname)($reader).get"
+          case Some(_) => q"document.getAs($pname)($reader)"
+          case _ => q"document.getAsTry($pname)($reader).get"
         }
       }
 
@@ -204,7 +204,7 @@ private object MacroImpl {
           val pname = paramName(param)
 
           if (writer.isEmpty) {
-            c.abort(c.enclosingPosition, s"Implicit ${classOf[Writer[_]].getName}[${tpe.typeSymbol.name}] for '$pname' not found")
+            c.abort(c.enclosingPosition, s"Implicit not found for '$pname': ${classOf[Writer[_]].getName}[$tpe, _]")
           }
 
           val tuple_i = {
@@ -223,7 +223,7 @@ private object MacroImpl {
           val pname = paramName(param)
 
           if (writer.isEmpty) {
-            c.abort(c.enclosingPosition, s"Implicit ${classOf[Writer[_]].getName}[${tpe.typeSymbol.name}] for '$pname' not found")
+            c.abort(c.enclosingPosition, s"Implicit not found for '$pname': ${classOf[Writer[_]].getName}[$tpe, _]")
           }
 
           val tuple_i = {
