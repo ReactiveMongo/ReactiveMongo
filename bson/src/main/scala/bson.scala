@@ -49,6 +49,9 @@ object `package` extends DefaultBSONHandlers {
   def generateId = BSONObjectID.generate()
 
   def element(name: String, value: BSONValue) = BSONElement(name, value)
+
+  /** Convenient type alias for document handlers */
+  type BSONDocumentHandler[T] = BSONDocumentReader[T] with BSONDocumentWriter[T] with BSONHandler[BSONDocument, T]
 }
 
 object BSON {

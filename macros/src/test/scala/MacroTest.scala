@@ -34,6 +34,8 @@ object MacroTest {
   case class Foo[T](bar: T, lorem: String)
   case class Bar(name: String, next: Option[Bar])
 
+  case class GenSeq[A](items: Seq[A], count: Int)
+
   object Nest {
     case class Nested(name: String)
   }

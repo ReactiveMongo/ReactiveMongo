@@ -1,11 +1,14 @@
 import reactivemongo.bson.{
   BSON,
   BSONDocument,
+  BSONDocumentHandler,
   BSONDocumentReader,
   BSONDocumentWriter,
   BSONDouble,
-  BSONReader,
+  BSONHandler,
   BSONInteger,
+  BSONReader,
+  BSONString,
   BSONWriter,
   Macros
 }
@@ -61,10 +64,42 @@ class MacroSpec extends org.specs2.mutable.Specification {
       }
     }
 
-    "support generic case class" in {
+    "support generic case class Foo" >> {
       implicit def singleHandler = Macros.handler[Single]
 
-      roundtrip(Foo(Single("A"), "ipsum"), Macros.handler[Foo[Single]])
+      "directly" in {
+        roundtrip(Foo(Single("A"), "ipsum"), Macros.handler[Foo[Single]])
+      }
+
+      "from generic function" in {
+        def handler[T](implicit w: BSONDocumentWriter[T], r: BSONDocumentReader[T]) = Macros.handler[Foo[T]]
+
+        roundtrip(Foo(Single("A"), "ipsum"), handler[Single])
+      }
+    }
+
+    "support generic case class GenSeq" in {
+      implicit def singleHandler = new BSONWriter[Single, BSONString] with BSONReader[BSONString, Single] with BSONHandler[BSONString, Single] {
+        def write(single: Single) = BSONString(single.value)
+        def read(str: BSONString) = Single(str.value)
+      }
+
+      implicit def optionHandler[T](implicit h: BSONHandler[BSONString, T]): BSONDocumentHandler[Option[T]] = new BSONDocumentReader[Option[T]] with BSONDocumentWriter[Option[T]] with BSONHandler[BSONDocument, Option[T]] {
+
+        def read(doc: BSONDocument): Option[T] =
+          doc.getAs[BSONString](f"$$some").map(h.read(_))
+
+        def write(single: Option[T]) = single match {
+          case Some(v) => BSONDocument(f"$$some" -> h.write(v))
+          case _       => BSONDocument.empty
+        }
+      }
+
+      def genSeqHandler[T: BSONDocumentHandler]: BSONDocumentHandler[GenSeq[T]] = Macros.handler[GenSeq[T]]
+
+      val seq = GenSeq(Seq(Option.empty[Single], Option(Single("A"))), 1)
+
+      roundtrip(seq, genSeqHandler[Option[Single]])
     }
 
     "handle overloaded apply correctly" in {
@@ -118,11 +153,6 @@ class MacroSpec extends org.specs2.mutable.Specification {
       val b = UB("hai")
       val format = Macros.handlerOpts[UT, UnionType[UA \/ UB \/ UC \/ UD \/ UF.type]]
 
-      /* TODO: Remove
-      println(BSONDocument pretty (format write a))
-      println(BSONDocument pretty (format write b))
-       */
-
       format.write(a).getAs[String]("className").
         aka("class #1") must beSome("MacroTest.Union.UA") and {
           format.write(b).getAs[String]("className").
@@ -136,11 +166,6 @@ class MacroSpec extends org.specs2.mutable.Specification {
       val a = UA(1)
       val b = UB("hai")
       val format = Macros.handlerOpts[UT, SimpleUnionType[UA \/ UB \/ UC \/ UD]]
-
-      /* TODO: Remove
-      println(BSONDocument pretty (format write a))
-      println(BSONDocument pretty (format write b))
-       */
 
       format.write(a).getAs[String]("className") must beSome("UA") and {
         format.write(b).getAs[String]("className") must beSome("UB")
@@ -241,11 +266,6 @@ class MacroSpec extends org.specs2.mutable.Specification {
       val doc = RenamedId(value = "some value")
       val serialized = format write doc
 
-      /* TODO: Remove
-      println("renaming")
-      println(BSONDocument.pretty(serialized))
-       */
-
       serialized mustEqual (
         BSONDocument("_id" -> doc.myID, "value" -> doc.value)
       ) and {
@@ -291,11 +311,11 @@ class MacroSpec extends org.specs2.mutable.Specification {
       def writeSpec2(w: BSONDocumentWriter[WithImplicit2[Double]]) =
         w.write(fixture2) must_== doc2
 
-      "to generate reader" in readSpec1(Macros.reader[WithImplicit1]) tag "wip"
+      "to generate reader" in readSpec1(Macros.reader[WithImplicit1])
 
       "to generate writer with type parameters" in writeSpec2(
         Macros.writer[WithImplicit2[Double]]
-      ) tag "wip"
+      )
 
       "to generate handler" in {
         val f1 = Macros.handler[WithImplicit1]
@@ -304,7 +324,7 @@ class MacroSpec extends org.specs2.mutable.Specification {
         readSpec1(f1) and (f1.write(fixture1) must_== doc1) and {
           writeSpec2(f2) and (f2.read(doc2) must_== fixture2)
         }
-      } tag "wip"
+      }
     }
   }
 
