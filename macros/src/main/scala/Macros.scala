@@ -47,7 +47,7 @@ object Macros {
   object Options {
 
     /**
-     * Default options that are implied if invoking "non-Opts" method.
+     * The default options that are implied if invoking "non-Opts" method.
      * All other options extend this.
      */
     trait Default
@@ -56,9 +56,10 @@ object Macros {
     trait Verbose extends Default
 
     /**
-     * In `write` method also store class name(dynamic type) as a string
+     * In `write` method also store class name (dynamic type) as a string
      * in a property named "className".
      */
+    @deprecated(message = "Default behaviour for sealed trait, if union types are not explicitly defined", since = "0.12-RC2")
     trait SaveClassName extends Default
 
     /**
@@ -86,7 +87,8 @@ object Macros {
      * fully-qualified name.
      * @tparam Types to use in pattern matching. Listed in a "type list" \/
      */
-    trait SimpleUnionType[Types <: \/[_, _]] extends UnionType[Types] with SaveSimpleName with Default
+    trait SimpleUnionType[Types <: \/[_, _]]
+      extends UnionType[Types] with SaveSimpleName with Default
 
     /**
      * Type for making type-level lists for UnionType.
@@ -110,7 +112,8 @@ object Macros {
      * (e.g. the fully-qualified name).
      */
     @deprecated(message = "Default behaviour for sealed trait, if union types are not explicitly defined", since = "0.12-RC2")
-    trait SimpleAllImplementations extends AllImplementations with SaveSimpleName with Default
+    trait SimpleAllImplementations
+      extends AllImplementations with SaveSimpleName with Default
   }
 
   /** Annotations to use on case classes that are being processed by macros. */

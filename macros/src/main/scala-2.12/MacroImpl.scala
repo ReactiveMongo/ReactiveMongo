@@ -158,16 +158,15 @@ private object MacroImpl {
       val (writer, _) = r(tpe)
 
       if (!writer.isEmpty) {
-        val doc = q"$writer.write(document)"
+        @inline def doc = q"$writer.write(document)"
 
-        classNameTree(tpe) map { className =>
-          val nameE = c.Expr[(String, BSONString)](className)
+        classNameTree(tpe).fold(doc) { nameE =>
           val docE = c.Expr[BSONDocument](doc)
 
           reify {
             docE.splice ++ BSONDocument(Seq(nameE.splice))
           }.tree
-        } getOrElse doc
+        }
       } else writeBodyConstruct(tpe)
     }
 
@@ -176,8 +175,7 @@ private object MacroImpl {
       else writeBodyConstructClass(tpe)
 
     private def writeBodyConstructSingleton(tpe: Type): Tree = (
-      classNameTree(tpe) map { className =>
-        val nameE = c.Expr[(String, BSONString)](className)
+      classNameTree(tpe) map { nameE =>
         reify { BSONDocument(Seq((nameE.splice))) }
       } getOrElse reify { BSONDocument.empty }
       ).tree
@@ -240,7 +238,8 @@ private object MacroImpl {
 
       }
 
-      val mkBSONdoc = Apply(bsonDocPath, values ++ classNameTree(tpe))
+      val mkBSONdoc = Apply(bsonDocPath,
+        values ++ classNameTree(tpe).map(_.tree))
 
       val writer = {
         if (optional.isEmpty) List(mkBSONdoc)
@@ -259,16 +258,17 @@ private object MacroImpl {
       } else writer.head
     }
 
-    private def classNameTree(A: c.Type) = {
-      if (hasOption[Macros.Options.SaveClassName]) Some {
-        val name = if (hasOption[Macros.Options.SaveSimpleName])
-          c.Expr[String](q"${A.typeSymbol.name.decodedName.toString}")
-        else
-          c.Expr[String](q"${A.typeSymbol.fullName}")
+    private def classNameTree(tpe: c.Type): Option[c.Expr[(String, BSONString)]] = {
+      val tpeSym = A.typeSymbol.asClass
 
-        reify(("className", BSONStringHandler.write(name.splice))).tree
-      }
-      else None
+      if (hasOption[Macros.Options.SaveClassName] ||
+        tpeSym.isSealed && tpeSym.isAbstract) Some {
+        val name = if (hasOption[Macros.Options.SaveSimpleName]) {
+          c.Expr[String](q"${tpe.typeSymbol.name.decodedName.toString}")
+        } else c.Expr[String](q"${tpe.typeSymbol.fullName}")
+
+        reify(("className", BSONStringHandler.write(name.splice)))
+      } else None
     }
 
     private lazy val unionTypes: Option[List[c.Type]] =

@@ -212,7 +212,7 @@ class MacroSpec extends org.specs2.mutable.Specification {
     "automate Union on sealed traits" in {
       import Macros.Options._
       import Union._
-      implicit val format = Macros.handlerOpts[UT, AllImplementations]
+      implicit val format = Macros.handler[UT]
 
       format.write(UA(1)).getAs[String]("className").
         aka("class #1") must beSome("MacroTest.Union.UA") and {
@@ -221,7 +221,7 @@ class MacroSpec extends org.specs2.mutable.Specification {
         } and roundtripImp[UT](UA(17)) and roundtripImp[UT](UB("foo")) and {
           roundtripImp[UT](UC("bar")) and roundtripImp[UT](UD("baz"))
         } and roundtripImp[UT](UF)
-    }
+    } tag "wip"
 
     "support automatic implementations search with nested traits" in {
       import Macros.Options._
