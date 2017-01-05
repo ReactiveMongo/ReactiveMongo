@@ -3,7 +3,7 @@ import sbt.Keys._
 import scala.language.postfixOps
 
 object BuildSettings {
-  val nextMajor = "0.12.1"
+  val nextMajor = "0.12.2"
   val buildVersion = s"$nextMajor-SNAPSHOT"
 
   val filter = { (ms: Seq[(File, String)]) =>
@@ -80,7 +80,8 @@ object Publish {
 
   val mimaSettings = mimaDefaultSettings ++ Seq(
     previousArtifacts := {
-      if (crossPaths.value) {
+      if (scalaVersion.value startsWith "2.12.") Set.empty
+      else if (crossPaths.value) {
         Set(organization.value % s"${moduleName.value}_${scalaBinaryVersion.value}" % previousVersion)
       } else {
         Set(organization.value % moduleName.value % previousVersion)
