@@ -508,10 +508,10 @@ object DefaultCursor {
     }
 
     @inline def makeRequest(maxDocs: Int)(implicit ctx: ExecutionContext): Future[Response] = Failover2(mongoConnection, failoverStrategy) { () =>
-      val nrt = query.numberToReturn
+      val ntr = query.numberToReturn
       val max = if (maxDocs < 0) Int.MaxValue else maxDocs
       val q = { // normalize the number of docs to return
-        if (nrt > 0 && nrt <= max) query
+        if (ntr > 0 && ntr <= max) query
         else query.copy(numberToReturn = max)
       }
 
@@ -596,12 +596,11 @@ object DefaultCursor {
 
     private def next(response: Response, maxDocs: Int)(implicit ctx: ExecutionContext): Future[Option[Response]] = {
       if (response.reply.cursorID != 0) {
-        val toReturn =
-          if (numberToReturn > 0) numberToReturn
-          else maxDocs - (
-            response.reply.numberReturned + response.reply.startingFrom
-          )
-
+        val max = if (maxDocs < 0) Int.MaxValue else maxDocs
+        val toReturn = { // normalize the number of docs to return
+          if (numberToReturn > 0 && numberToReturn <= max) numberToReturn
+          else max
+        }
         val op = GetMore(fullCollectionName, toReturn, response.reply.cursorID)
 
         logger.trace(s"[Cursor] Calling next on ${response.reply.cursorID}, op=$op")
