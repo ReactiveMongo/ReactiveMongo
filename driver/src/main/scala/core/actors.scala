@@ -1245,29 +1245,13 @@ trait MongoDBSystem extends Actor {
 }
 
 @deprecated("Internal class: will be made private", "0.11.14")
-final class LegacyDBSystem private[reactivemongo] (
+abstract class StandardDBSystem private[reactivemongo] (
     val supervisor: String,
     val name: String,
     val seeds: Seq[String],
     val initialAuthenticates: Seq[Authenticate],
     val options: MongoConnectionOptions
-) extends MongoDBSystem with MongoCrAuthentication {
-
-  def newChannelFactory(effect: Unit): ChannelFactory =
-    new ChannelFactory(supervisor, name, options)
-
-  @deprecated("Initialize with an explicit supervisor and connection names", "0.11.14")
-  def this(s: Seq[String], a: Seq[Authenticate], opts: MongoConnectionOptions) = this(s"unknown-${System identityHashCode opts}", s"unknown-${System identityHashCode opts}", s, a, opts)
-}
-
-@deprecated("Internal class: will be made private", "0.11.14")
-final class StandardDBSystem private[reactivemongo] (
-    val supervisor: String,
-    val name: String,
-    val seeds: Seq[String],
-    val initialAuthenticates: Seq[Authenticate],
-    val options: MongoConnectionOptions
-) extends MongoDBSystem with MongoScramSha1Authentication {
+) extends MongoDBSystem {
 
   def newChannelFactory(effect: Unit): ChannelFactory =
     new ChannelFactory(supervisor, name, options)

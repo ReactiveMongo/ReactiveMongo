@@ -11,7 +11,8 @@ import reactivemongo.core.nodeset.{ Authenticate, NodeSet }
 import reactivemongo.core.actors.{
   ChannelClosed,
   MongoDBSystem,
-  StandardDBSystem
+  StandardDBSystem,
+  MongoScramSha1Authentication
 }
 
 package object tests {
@@ -22,7 +23,8 @@ package object tests {
 
   def waitIsAvailable(con: MongoConnection, failoverStrategy: FailoverStrategy)(implicit ec: ExecutionContext): Future[Unit] = con.waitIsAvailable(failoverStrategy)
 
-  def standardDBSystem(supervisor: String, name: String, nodes: Seq[String], authenticates: Seq[Authenticate], options: MongoConnectionOptions) = new StandardDBSystem(supervisor, name, nodes, authenticates, options)
+  def standardDBSystem(supervisor: String, name: String, nodes: Seq[String], authenticates: Seq[Authenticate], options: MongoConnectionOptions) =
+    new StandardDBSystem(supervisor, name, nodes, authenticates, options) with MongoScramSha1Authentication
 
   def addConnection(d: MongoDriver, name: String, nodes: Seq[String], options: MongoConnectionOptions, mongosystem: ActorRef): Future[Any] = {
     import akka.pattern.ask
