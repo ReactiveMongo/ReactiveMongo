@@ -70,28 +70,6 @@ case class BSONQueryBuilder(
     // Primary and SecondaryPreferred are encoded as the slaveOk flag;
     // the others are encoded as $readPreference field.
 
-    def pref = {
-      val mode = readPreference match {
-        case ReadPreference.Primary                    => "primary"
-        case ReadPreference.PrimaryPreferred(filter)   => "primaryPreferred"
-        case ReadPreference.Secondary(filter)          => "secondary"
-        case ReadPreference.SecondaryPreferred(filter) => "secondaryPreferred"
-        case ReadPreference.Nearest(filter)            => "nearest"
-      }
-      val base = Seq[BSONElement]("mode" -> BSONString(mode))
-
-      BSONDocument(readPreference match {
-        case ReadPreference.Taggable(tagSet) =>
-          base :+ BSONElement("tags", BSONArray(
-            tagSet.map(tags => BSONDocument(tags.toList.map {
-              case (k, v) => k -> BSONString(v)
-            }))
-          ))
-
-        case _ => base
-      })
-    }
-
     val optional = List(
       queryOption.map { f"$$query" -> _ },
       sortOption.map { f"$$orderby" -> _ },
@@ -102,6 +80,32 @@ case class BSONQueryBuilder(
       option(snapshotFlag, f"$$snapshot" -> BSONBoolean(true))
     ).flatten
 
-    BSONDocument(optional :+ (f"$$readPreference" -> pref))
+    BSONDocument(optional :+ (
+      f"$$readPreference" -> BSONReadPreference.write(readPreference)
+    ))
+  }
+}
+
+private[api] object BSONReadPreference {
+  def write(readPreference: ReadPreference) = {
+    val mode = readPreference match {
+      case ReadPreference.Primary                    => "primary"
+      case ReadPreference.PrimaryPreferred(filter)   => "primaryPreferred"
+      case ReadPreference.Secondary(filter)          => "secondary"
+      case ReadPreference.SecondaryPreferred(filter) => "secondaryPreferred"
+      case ReadPreference.Nearest(filter)            => "nearest"
+    }
+    val base = Seq[BSONElement]("mode" -> BSONString(mode))
+
+    BSONDocument(readPreference match {
+      case ReadPreference.Taggable(tagSet) if tagSet.nonEmpty =>
+        base :+ BSONElement("tags", BSONArray(
+          tagSet.map(tags => BSONDocument(tags.toList.map {
+            case (k, v) => k -> BSONString(v)
+          }))
+        ))
+
+      case _ => base
+    })
   }
 }

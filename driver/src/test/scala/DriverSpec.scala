@@ -42,16 +42,11 @@ class DriverSpec extends org.specs2.mutable.Specification {
     }
 
     "start and close with one connection open (using raw URI)" in {
-      val md = MongoDriver()
-      val uri = s"mongodb://$primaryHost/$commonDb"
-
-      md.close(timeout) must not(throwA[Exception])
+      MongoDriver().close(timeout) must not(throwA[Exception])
     }
 
     "start and close with multiple connections open" in {
-      val md = MongoDriver()
-
-      md.close(timeout) must not(throwA[Exception])
+      MongoDriver().close(timeout) must not(throwA[Exception])
     }
 
     "use the failover strategy defined in the options" in { implicit ee: EE =>

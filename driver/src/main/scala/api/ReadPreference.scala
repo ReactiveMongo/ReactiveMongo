@@ -65,7 +65,7 @@ object ReadPreference {
   object Taggable {
     def unapply(pref: ReadPreference): Option[List[Map[String, String]]] =
       pref match {
-        case p: Taggable => Some(p.tags)
+        case p: Taggable => p.tags.headOption.map(_ :: p.tags.tail)
         case _           => None
       }
   }
