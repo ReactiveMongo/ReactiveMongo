@@ -14,6 +14,8 @@ import reactivemongo.core.actors.{
   StandardDBSystem
 }
 
+import reactivemongo.bson.BSONDocument
+
 package object tests {
   // Test alias
   def _failover2[A](c: MongoConnection, s: FailoverStrategy)(p: () => Future[A])(implicit ec: ExecutionContext): Failover2[A] = Failover2.apply(c, s)(p)(ec)
@@ -44,7 +46,7 @@ package object tests {
 
   def makeRequest[T](cursor: Cursor[T], maxDocs: Int)(implicit ec: ExecutionContext): Future[Response] = cursor.asInstanceOf[CursorOps[T]].makeRequest(maxDocs)
 
-  def fakeResponse(doc: reactivemongo.bson.BSONDocument, reqID: Int = 2, respTo: Int = 1): Response = {
+  def fakeResponse(doc: BSONDocument, reqID: Int = 2, respTo: Int = 1): Response = {
     val reply = reactivemongo.core.protocol.Reply(
       flags = 1,
       cursorID = 1,
@@ -81,4 +83,7 @@ package object tests {
     FoldResponses[T](
       z, makeRequest, next, killCursors, suc, err, maxDocs
     )(sys, ec)
+
+  def bsonReadPref(pref: ReadPreference): BSONDocument =
+    reactivemongo.api.collections.bson.BSONReadPreference.write(pref)
 }
