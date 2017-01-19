@@ -32,8 +32,7 @@ sealed trait WriteResult {
 object WriteResult {
   def lastError(result: WriteResult): Option[LastError] = result match {
     case error @ LastError(_, _, _, _, _, _, _, _, _, _, _, _, _, _) => Some(error)
-    case _ if (result.ok) => None
-    case _ => Some(LastError(
+    case _ if result.inError || result.hasErrors => Some(LastError(
       false, // ok
       result.errmsg,
       result.code,
@@ -49,6 +48,7 @@ object WriteResult {
       result.writeErrors,
       result.writeConcernError
     ))
+    case _ => None
   }
 
   /**
