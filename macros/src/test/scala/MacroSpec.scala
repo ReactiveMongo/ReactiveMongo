@@ -14,6 +14,8 @@ import reactivemongo.bson.{
 }
 import reactivemongo.bson.exceptions.DocumentKeyNotFound
 
+import org.specs2.matcher.MatchResult
+
 class MacroSpec extends org.specs2.mutable.Specification {
   "Macros" title
 
@@ -151,7 +153,7 @@ class MacroSpec extends org.specs2.mutable.Specification {
       import Macros.Options._
       val a = UA(1)
       val b = UB("hai")
-      val format = Macros.handlerOpts[UT, UnionType[UA \/ UB \/ UC \/ UD \/ UF.type]]
+      val format = Macros.handlerOpts[UT, UnionType[UA \/ UB \/ UC \/ UD \/ UF.type] with AutomaticMaterialization]
 
       format.write(a).getAs[String]("className").
         aka("class #1") must beSome("MacroTest.Union.UA") and {
@@ -165,7 +167,7 @@ class MacroSpec extends org.specs2.mutable.Specification {
       import Macros.Options._
       val a = UA(1)
       val b = UB("hai")
-      val format = Macros.handlerOpts[UT, SimpleUnionType[UA \/ UB \/ UC \/ UD]]
+      val format = Macros.handlerOpts[UT, SimpleUnionType[UA \/ UB \/ UC \/ UD] with AutomaticMaterialization]
 
       format.write(a).getAs[String]("className") must beSome("UA") and {
         format.write(b).getAs[String]("className") must beSome("UB")
@@ -212,7 +214,7 @@ class MacroSpec extends org.specs2.mutable.Specification {
     "automate Union on sealed traits" in {
       import Macros.Options._
       import Union._
-      implicit val format = Macros.handler[UT]
+      implicit val format = Macros.handlerOpts[UT, AutomaticMaterialization]
 
       format.write(UA(1)).getAs[String]("className").
         aka("class #1") must beSome("MacroTest.Union.UA") and {
@@ -221,12 +223,12 @@ class MacroSpec extends org.specs2.mutable.Specification {
         } and roundtripImp[UT](UA(17)) and roundtripImp[UT](UB("foo")) and {
           roundtripImp[UT](UC("bar")) and roundtripImp[UT](UD("baz"))
         } and roundtripImp[UT](UF)
-    } tag "wip"
+    }
 
     "support automatic implementations search with nested traits" in {
       import Macros.Options._
       import InheritanceModule._
-      implicit val format = Macros.handlerOpts[T, AllImplementations]
+      implicit val format = Macros.handlerOpts[T, AllImplementations with AutomaticMaterialization]
 
       format.write(A()).getAs[String]("className").
         aka("class #1") must beSome("MacroTest.InheritanceModule.A") and {
@@ -240,7 +242,7 @@ class MacroSpec extends org.specs2.mutable.Specification {
     "automate Union on sealed traits with simple name" in {
       import Macros.Options._
       import Union._
-      implicit val format = Macros.handlerOpts[UT, SimpleAllImplementations]
+      implicit val format = Macros.handlerOpts[UT, SimpleAllImplementations with AutomaticMaterialization]
 
       format.write(UA(1)).getAs[String]("className") must beSome("UA")
       format.write(UB("buzz")).getAs[String]("className") must beSome("UB")
@@ -398,13 +400,15 @@ class MacroSpec extends org.specs2.mutable.Specification {
 
   // ---
 
-  def roundtrip[A](original: A, format: BSONReader[BSONDocument, A] with BSONWriter[A, BSONDocument]) = {
-    val serialized = format write original
-    val deserialized = format read serialized
+  def roundtrip[A](original: A)(implicit reader: BSONReader[BSONDocument, A], writer: BSONWriter[A, BSONDocument]): MatchResult[Any] = {
+    def serialized = writer write original
+    def deserialized = reader read serialized
 
     original mustEqual deserialized
   }
 
-  def roundtripImp[A](data: A)(implicit format: BSONReader[BSONDocument, A] with BSONWriter[A, BSONDocument]) = roundtrip(data, format)
+  def roundtrip[A](original: A, format: BSONReader[BSONDocument, A] with BSONWriter[A, BSONDocument]): MatchResult[Any] = roundtrip(original)(format, format)
+
+  def roundtripImp[A](data: A)(implicit reader: BSONReader[BSONDocument, A], writer: BSONWriter[A, BSONDocument]) = roundtrip(data)
 
 }
