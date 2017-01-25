@@ -51,7 +51,22 @@ object MacroTest {
   object Union {
     sealed trait UT
     case class UA(n: Int) extends UT
-    case class UB(s: String) extends UT
+
+    class UB(val s: String) extends UT {
+      override def equals(that: Any): Boolean = that match {
+        case other: UB => s == other.s
+        case _         => false
+      }
+
+      override def hashCode: Int = s.hashCode
+    }
+
+    object UB {
+      def apply(s: String): UB = new UB(s)
+      def unapply(ub: UB): Option[String] = Some(ub.s)
+      implicit val handler: Handler[UB] = Macros.handler[UB]
+    }
+
     case class UC(s: String) extends UT
     case class UD(s: String) extends UT
     object UE extends UT
@@ -68,13 +83,18 @@ object MacroTest {
 
   object TreeModule {
     /*
-    due to compiler limitations(read: only workaround I found), handlers must be defined here
-    and explicit type annotations added to enable compiler to use implicit handlers recursively
+     Due to compiler limitations (read: only workaround I found), 
+     handlers must be defined here and explicit type annotations added 
+     to enable compiler to use implicit handlers recursively.
      */
 
     sealed trait Tree
+
     case class Node(left: Tree, right: Tree) extends Tree
+    implicit val nodeHandler: Handler[Node] = Macros.handler[Node]
+
     case class Leaf(data: String) extends Tree
+    implicit val leafHandler: Handler[Leaf] = Macros.handler[Leaf]
 
     object Tree {
       import Macros.Options._
@@ -85,7 +105,10 @@ object MacroTest {
 
   object TreeCustom {
     sealed trait Tree
+
     case class Node(left: Tree, right: Tree) extends Tree
+    implicit val nodeHandler: Handler[Node] = Macros.handler[Node]
+
     case class Leaf(data: String) extends Tree
 
     object Leaf {
@@ -107,8 +130,12 @@ object MacroTest {
 
   object IntListModule {
     sealed trait IntList
+
     case class Cons(head: Int, tail: IntList) extends IntList
+    implicit val consHandler: Handler[Cons] = Macros.handler[Cons]
+
     case object Tail extends IntList
+    implicit val tailHandler: Handler[Tail.type] = Macros.handler[Tail.type]
 
     object IntList {
       import Macros.Options.{ UnionType, \/ }
@@ -120,10 +147,16 @@ object MacroTest {
 
   object InheritanceModule {
     sealed trait T
+
     case class A() extends T
+    implicit val ah: Handler[A] = Macros.handler[A]
+
     case object B extends T
+    implicit val bh: Handler[B.type] = Macros.handler[B.type]
+
     sealed trait TT extends T
     case class C() extends TT
+    implicit val ch: Handler[C] = Macros.handler[C]
   }
 
   case class Pair(@Ignore left: String, right: String)

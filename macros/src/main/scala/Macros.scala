@@ -114,6 +114,16 @@ object Macros {
     @deprecated(message = "Default behaviour for sealed trait, if union types are not explicitly defined", since = "0.12-RC2")
     trait SimpleAllImplementations
       extends AllImplementations with SaveSimpleName with Default
+
+    /**
+     * For a sealed family (all implementations of a sealed trait
+     * or defined explicit union types), this option enables the automatic
+     * materialization of handlers for the member types.
+     *
+     * If used, make sure it cannot lead to type recursion issue
+     * (disabled by default).
+     */
+    trait AutomaticMaterialization extends Default
   }
 
   /** Annotations to use on case classes that are being processed by macros. */
