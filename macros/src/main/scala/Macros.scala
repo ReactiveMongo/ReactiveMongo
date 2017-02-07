@@ -64,7 +64,7 @@ object Macros {
 
     /**
      * Same as [[SaveClassName]] but using the class simple name
-     * (e.g. the fully-qualified name).
+     * (i.e. Not the fully-qualified name).
      */
     trait SaveSimpleName extends SaveClassName with Default
 
