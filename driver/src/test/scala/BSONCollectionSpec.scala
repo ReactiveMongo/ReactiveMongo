@@ -132,8 +132,11 @@ class BSONCollectionSpec extends org.specs2.mutable.Specification {
 
     "read until John" in { implicit ee: EE =>
       implicit val reader = PersonReader
-      @inline def cursor = findAll(collection).cursor[Person]()
-      val persons = Seq(person, person2, person3)
+      @inline def cursor = findAll(collection).sort(
+        BSONDocument("age" -> 1)
+      ).cursor[Person]()
+
+      val persons = Seq(person2, person4, person, person3)
 
       cursor.foldWhile(Nil: Seq[Person])({ (s, p) =>
         if (p.name == "John") Cursor.Done(s :+ p)
