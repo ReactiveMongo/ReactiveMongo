@@ -53,14 +53,23 @@ class GridFSSpec extends org.specs2.mutable.Specification {
       def find(n: String): Future[Option[GFile]] =
         gfs.find(BSONDocument("filename" -> n)).headOption
 
-      def matchFile(actual: GFile, expected: DefaultFileToSave, content: Array[Byte]) = actual.filename must_== expected.filename and (
+      def matchFile(
+        actual: GFile,
+        expected: DefaultFileToSave,
+        content: Array[Byte]
+      ) = actual.filename must_== expected.filename and (
         actual.uploadDate must beSome
       ) and (actual.contentType must_== expected.contentType) and {
           import scala.collection.mutable.ArrayBuilder
           def res = gfs.enumerate(actual) |>>>
             Iteratee.fold(ArrayBuilder.make[Byte]()) { _ ++= _ }
 
-          res.map(_.result()) must beEqualTo(content).await(1, timeout)
+          val buf = new java.io.ByteArrayOutputStream()
+
+          res.map(_.result()) must beEqualTo(content).await(1, timeout) and {
+            gfs.readToOutputStream(actual, buf).
+              map(_ => buf.toByteArray) must beEqualTo(content).await(1, timeout)
+          }
         }
 
       find(filename1) aka "file #1" must beSome[GFile].
