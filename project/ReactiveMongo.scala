@@ -457,15 +457,21 @@ object ReactiveMongoBuild extends Build {
   lazy val bson = Project(
     s"$projectPrefix-BSON",
     file("bson"),
-    settings = buildSettings ++ Findbugs.settings).
-    settings(
+    settings = buildSettings ++ Findbugs.settings ++ Seq(
+      unmanagedSourceDirectories in Compile ++= {
+        if (scala.util.Properties isJavaAtLeast "1.8") {
+          Seq(sourceDirectory.value / "main" / "scala-java8")
+        } else Nil
+      },
       libraryDependencies ++= Seq(specs,
         "org.specs2" %% "specs2-scalacheck" % specsVer % Test,
         "org.typelevel" %% "discipline" % "0.7.2" % Test,
         "org.spire-math" %% "spire-laws" % "0.13.0" % Test),
       binaryIssueFilters ++= Seq(
         ProblemFilters.exclude[MissingTypesProblem](
-          "reactivemongo.bson.BSONTimestamp$")))
+          "reactivemongo.bson.BSONTimestamp$"))
+    )
+  )
 
   lazy val bsonmacros = Project(
     s"$projectPrefix-BSON-Macros",
@@ -483,15 +489,16 @@ object ReactiveMongoBuild extends Build {
     settings = buildSettings ++ Findbugs.settings ++ Seq(
       resolvers := resolversList,
       compile in Compile <<= (compile in Compile).dependsOn(assembly in shaded),
-      sourceGenerators in Compile <+= (version).zip(sourceManaged in Compile).map {
+      sourceGenerators in Compile <+= (version).zip(
+        sourceManaged in Compile).map {
         case (ver, dir) =>
-        val outdir = dir / "reactivemongo" / "api"
-        val f = outdir / "Version.scala"
+          val outdir = dir / "reactivemongo" / "api"
+          val f = outdir / "Version.scala"
 
-        outdir.mkdirs()
+          outdir.mkdirs()
 
-        Seq(IO.writer[File](f, "", IO.defaultCharset, false) { w =>
-          w.append(s"""package reactivemongo.api
+          Seq(IO.writer[File](f, "", IO.defaultCharset, false) { w =>
+            w.append(s"""package reactivemongo.api
 object Version {
   /** The ReactiveMongo API version */
   override val toString = "$ver"
@@ -500,8 +507,8 @@ object Version {
   val majorVersion = "${Publish.majorVersion}"
 }""")
 
-          f
-        })
+            f
+          })
       },
       driverCleanup := {
         val classDir = (classDirectory in Compile).value
