@@ -1,5 +1,5 @@
 package reactivemongo.bson
 
 import java.time.{
-  LocalDate, LocalDateTime, LocalTime, ZoneId, ZonedDateTime
+  LocalDate, LocalDateTime, LocalTime, Period, OffsetDateTime, ZoneId, ZonedDateTime
 }
