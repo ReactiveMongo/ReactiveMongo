@@ -237,7 +237,7 @@ trait MongoDBSystem extends Actor {
   // <-- monitor
 
   @inline private def updateHistory(event: String): Unit =
-    { history.add(System.currentTimeMillis() -> event); () }
+    { history.offer(System.currentTimeMillis() -> event); () }
 
   private[reactivemongo] def internalState() = new InternalState(
     history.toArray.foldLeft(Array.empty[StackTraceElement]) {
@@ -598,6 +598,12 @@ trait MongoDBSystem extends Actor {
       })
 
       logger.debug(s"[$lnm] RefreshAll Job running... Status: $statusInfo")
+
+      context.system.scheduler.scheduleOnce(Duration.Zero) {
+        while (history.size > historyMax) { // compensate EvictionQueue safety
+          history.poll()
+        }
+      }
     }
 
     case ChannelConnected(channelId) => {
