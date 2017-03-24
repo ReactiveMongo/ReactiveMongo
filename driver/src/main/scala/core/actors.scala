@@ -616,9 +616,9 @@ trait MongoDBSystem extends Actor {
         while (history.size > historyMax) { // compensate EvictionQueue safety
           history.poll()
         }
-
-        ()
       }
+
+      ()
     }
 
     case ChannelConnected(channelId) => {
