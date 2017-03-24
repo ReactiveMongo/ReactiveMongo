@@ -662,7 +662,7 @@ object DefaultCursor {
         )
 
         connection.send(killReq)
-      } else logger.trace(s"[$logCat] Cursor exhausted ($cursorID)")
+      } else logger.trace(s"[$logCat] Nothing to release: cursor already exhausted ($cursorID)")
     }
 
     def head(implicit ctx: ExecutionContext): Future[A] =
