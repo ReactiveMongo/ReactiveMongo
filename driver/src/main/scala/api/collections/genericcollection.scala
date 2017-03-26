@@ -273,14 +273,14 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
     val version = db.connection.metadata.
       fold[MongoWireVersion](MongoWireVersion.V30)(_.maxWireVersion)
 
-    runCommand(DistinctCommand.Distinct(
+    Future(DistinctCommand.Distinct(
       key, selector, readConcern, version
-    ), readPreference).flatMap {
+    )).flatMap(runCommand(_, readPreference).flatMap {
       _.result[T, M] match {
         case Failure(cause)  => Future.failed[M[T]](cause)
         case Success(result) => Future.successful(result)
       }
-    }
+    })
   }
 
   @inline private def defaultWriteConcern = db.connection.options.writeConcern
@@ -359,21 +359,19 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
     db.connection.metadata match {
       case Some(metadata) if metadata.maxWireVersion >= MongoWireVersion.V26 =>
         // TODO: ordered + bulk
-        Failover2(db.connection, failoverStrategy) { () =>
-          runCommand(BatchCommands.InsertCommand.Insert(
-            writeConcern = writeConcern
-          )(document), readPreference).flatMap { wr =>
-            val flattened = wr.flatten
-            if (!flattened.ok) {
-              // was ordered, with one doc => fail if has an error
-              Future.failed(WriteResult.lastError(flattened).
-                getOrElse[Exception](GenericDriverException(
-                  s"fails to insert: $document"
-                )))
+        Future(BatchCommands.InsertCommand.Insert(
+          writeConcern = writeConcern
+        )(document)).flatMap(runCommand(_, readPreference).flatMap { wr =>
+          val flattened = wr.flatten
+          if (!flattened.ok) {
+            // was ordered, with one doc => fail if has an error
+            Future.failed(WriteResult.lastError(flattened).
+              getOrElse[Exception](GenericDriverException(
+                s"fails to insert: $document"
+              )))
 
-            } else Future.successful(wr)
-          }
-        }.future
+          } else Future.successful(wr)
+        })
 
       case Some(metadata) => // Mongo < 2.6
         Future.failed[WriteResult](new scala.RuntimeException(
@@ -408,21 +406,19 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
       // TODO: ordered + bulk
       import BatchCommands.UpdateCommand.{ Update, UpdateElement }
 
-      Failover2(db.connection, failoverStrategy) { () =>
-        runCommand(Update(writeConcern = writeConcern)(
-          UpdateElement(selector, update, upsert, multi)
-        ), readPreference).flatMap { wr =>
-          val flattened = wr.flatten
-          if (!flattened.ok) {
-            // was ordered, with one doc => fail if has an error
-            Future.failed(WriteResult.lastError(flattened).
-              getOrElse[Exception](GenericDriverException(
-                s"fails to update: $update"
-              )))
+      Future(Update(writeConcern = writeConcern)(
+        UpdateElement(selector, update, upsert, multi)
+      )).flatMap(runCommand(_, readPreference).flatMap { wr =>
+        val flattened = wr.flatten
+        if (!flattened.ok) {
+          // was ordered, with one doc => fail if has an error
+          Future.failed(WriteResult.lastError(flattened).
+            getOrElse[Exception](GenericDriverException(
+              s"fails to update: $update"
+            )))
 
-          } else Future.successful(wr)
-        }
-      }.future
+        } else Future.successful(wr)
+      })
     }
 
     case Some(metadata) => // Mongo < 2.6
@@ -472,14 +468,13 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    */
   def findAndModify[S](selector: S, modifier: BatchCommands.FindAndModifyCommand.Modify, sort: Option[pack.Document] = None, fields: Option[pack.Document] = None)(implicit swriter: pack.Writer[S], ec: ExecutionContext): Future[BatchCommands.FindAndModifyCommand.FindAndModifyResult] = {
     import FindAndModifyCommand.{ ImplicitlyDocumentProducer => DP }
-    val command = BatchCommands.FindAndModifyCommand.FindAndModify(
+
+    Future(BatchCommands.FindAndModifyCommand.FindAndModify(
       query = selector,
       modify = modifier,
       sort = sort.map(implicitly[DP](_)),
       fields = fields.map(implicitly[DP](_))
-    )
-
-    runCommand(command, readPreference)
+    )).flatMap(runCommand(_, readPreference))
   }
 
   /**
@@ -710,20 +705,18 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
       import BatchCommands.DeleteCommand.{ Delete, DeleteElement }
       val limit = if (firstMatchOnly) 1 else 0
 
-      Failover2(db.connection, failoverStrategy) { () =>
-        runCommand(Delete(writeConcern = writeConcern)(
-          DeleteElement(selector, limit)
-        ), readPreference).flatMap { wr =>
-          val flattened = wr.flatten
-          if (!flattened.ok) {
-            // was ordered, with one doc => fail if has an error
-            Future.failed(WriteResult.lastError(flattened).
-              getOrElse[Exception](GenericDriverException(
-                s"fails to remove: $selector"
-              )))
-          } else Future.successful(wr)
-        }
-      }.future
+      Future(Delete(writeConcern = writeConcern)(
+        DeleteElement(selector, limit)
+      )).flatMap(runCommand(_, readPreference).flatMap { wr =>
+        val flattened = wr.flatten
+        if (!flattened.ok) {
+          // was ordered, with one doc => fail if has an error
+          Future.failed(WriteResult.lastError(flattened).
+            getOrElse[Exception](GenericDriverException(
+              s"fails to remove: $selector"
+            )))
+        } else Future.successful(wr)
+      })
     }
 
     case Some(metadata) => // Mongo < 2.6
