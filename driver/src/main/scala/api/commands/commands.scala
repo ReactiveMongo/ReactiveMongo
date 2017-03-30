@@ -223,11 +223,13 @@ object Command {
         cursor[R](rp)
 
       for {
-        firstResponse <- cursor.makeRequest(cursor.numberToReturn)
-        result <- cursor.headOption.flatMap(_.fold(Future.failed[R](
-          ReactiveMongoException("missing result")
-        ))(Future.successful(_)))
-      } yield ResponseResult(firstResponse, cursor.numberToReturn, result)
+        response <- cursor.makeRequest(cursor.numberToReturn)
+        iterator = cursor.documentIterator(response)
+        result <- {
+          if (!iterator.hasNext) Future.failed(ReactiveMongoException("missing result"))
+          else Future.successful(iterator.next())
+        }
+      } yield ResponseResult(response, cursor.numberToReturn, result)
     }
 
     @deprecated("Use the alternative with `ReadPreference`", "0.12-RC5")
