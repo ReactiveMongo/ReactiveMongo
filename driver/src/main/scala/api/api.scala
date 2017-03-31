@@ -44,7 +44,6 @@ import reactivemongo.core.actors.{
   Closed,
   Exceptions,
   ExpectingResponse,
-  LegacyDBSystem,
   MongoDBSystem,
   PrimaryAvailable,
   PrimaryUnavailable,
@@ -722,6 +721,9 @@ object MongoConnection {
           case ("authSource", v) => unsupported -> result.
             copy(authSource = Some(v))
 
+          case ("authMode", "x509") => unsupported -> result.
+            copy(authMode = X509Authentication)
+
           case ("authMode", "mongocr") => unsupported -> result.
             copy(authMode = CrAuthentication)
 
@@ -952,16 +954,21 @@ class MongoDriver(
    */
   def connection(nodes: Seq[String], options: MongoConnectionOptions = MongoConnectionOptions(), authentications: Seq[Authenticate] = Seq.empty, name: Option[String] = None): MongoConnection = {
     val nm = name.getOrElse(s"Connection-${+MongoDriver.nextCounter}")
+    import reactivemongo.core.actors.{ MongoScramSha1Authentication, MongoCrAuthentication, MongoX509Authentication }
 
     // TODO: Passing ref to MongoDBSystem.history to AddConnection
     lazy val dbsystem: MongoDBSystem = options.authMode match {
-      case CrAuthentication => new LegacyDBSystem(
+      case CrAuthentication => new StandardDBSystem(
         supervisorName, nm, nodes, authentications, options
-      )
+      ) with MongoCrAuthentication
+
+      case X509Authentication => new StandardDBSystem(
+        supervisorName, nm, nodes, authentications, options
+      ) with MongoX509Authentication
 
       case _ => new StandardDBSystem(
         supervisorName, nm, nodes, authentications, options
-      )
+      ) with MongoScramSha1Authentication
     }
 
     val mongosystem = system.actorOf(Props(dbsystem), nm)

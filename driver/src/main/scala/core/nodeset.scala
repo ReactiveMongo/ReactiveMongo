@@ -479,7 +479,7 @@ case class Authenticate(
 }
 
 sealed trait Authenticating extends Authentication {
-  def password: String
+  override def toString: String = s"Authenticating($db, $user})"
 }
 
 object Authenticating {
@@ -494,6 +494,8 @@ object Authenticating {
       case ScramSha1Authenticating(db, user, pass, _, _, _, _, _) =>
         Some((db, user, pass))
 
+      case X509Authenticating(db, user) => Some((db, user, ""))
+
       case _ =>
         None
     }
@@ -505,16 +507,14 @@ case class CrAuthenticating(db: String, user: String, password: String, nonce: O
 }
 
 case class ScramSha1Authenticating(
-    db: String, user: String, password: String,
-    randomPrefix: String, saslStart: String,
-    conversationId: Option[Int] = None,
-    serverSignature: Option[Array[Byte]] = None,
-    step: Int = 0
-) extends Authenticating {
+  db: String, user: String, password: String,
+  randomPrefix: String, saslStart: String,
+  conversationId: Option[Int] = None,
+  serverSignature: Option[Array[Byte]] = None,
+  step: Int = 0
+) extends Authenticating
 
-  override def toString: String =
-    s"Authenticating($db, $user})"
-}
+case class X509Authenticating(db: String, user: String) extends Authenticating
 
 case class Authenticated(db: String, user: String) extends Authentication
 
