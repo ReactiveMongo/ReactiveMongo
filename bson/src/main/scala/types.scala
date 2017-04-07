@@ -37,7 +37,9 @@ object Producer {
     private[bson] def generate() = element._2.map(value => BSONElement(element._1, value))
   }
 
-  case class OptionValueProducer(private val element: Option[BSONValue]) extends Producer[BSONValue] {
+  case class OptionValueProducer(
+      private val element: Option[BSONValue]
+  ) extends Producer[BSONValue] {
     private[bson] def generate() = element
   }
 
@@ -47,22 +49,20 @@ object Producer {
   )
   def nameValue2Producer[T](element: (String, T))(implicit writer: BSONWriter[T, _ <: BSONValue]) = NameOptionValueProducer(element._1, Some(writer.write(element._2)))
 
-  implicit def element2Producer[E <% BSONElement](element: E) = {
+  implicit def element2Producer[E <% BSONElement](element: E): Producer[BSONElement] = {
     val e = implicitly[BSONElement](element)
     NameOptionValueProducer(e.name, Some(e.value))
   }
 
-  implicit def nameOptionValue2Producer[T](element: (String, Option[T]))(implicit writer: BSONWriter[T, _ <: BSONValue]) = NameOptionValueProducer(element._1, element._2.map(value => writer.write(value)))
+  implicit def nameOptionValue2Producer[T](element: (String, Option[T]))(implicit writer: BSONWriter[T, _ <: BSONValue]): Producer[BSONElement] = NameOptionValueProducer(element._1, element._2.map(value => writer.write(value)))
 
-  implicit def noneOptionValue2Producer(element: (String, None.type)) =
-    NameOptionValueProducer(element._1, None)
+  implicit def noneOptionValue2Producer(element: (String, None.type)): Producer[BSONElement] = NameOptionValueProducer(element._1, None)
 
-  implicit def valueProducer[T](element: T)(implicit writer: BSONWriter[T, _ <: BSONValue]) = OptionValueProducer(Some(writer.write(element)))
+  implicit def valueProducer[T](element: T)(implicit writer: BSONWriter[T, _ <: BSONValue]): Producer[BSONValue] = OptionValueProducer(Some(writer.write(element)))
 
-  implicit def optionValueProducer[T](element: Option[T])(implicit writer: BSONWriter[T, _ <: BSONValue]) = OptionValueProducer(element.map(writer.write(_)))
+  implicit def optionValueProducer[T](element: Option[T])(implicit writer: BSONWriter[T, _ <: BSONValue]): Producer[BSONValue] = OptionValueProducer(element.map(writer.write(_)))
 
-  implicit def noneOptionValueProducer(element: None.type) =
-    OptionValueProducer(None)
+  implicit def noneOptionValueProducer(element: None.type): Producer[BSONValue] = OptionValueProducer(None)
 
 }
 
@@ -334,7 +334,14 @@ case object BSONUndefined
   val code = 0x06.toByte
 }
 
-/** BSON ObjectId value. */
+/**
+ * BSON ObjectId value.
+ *
+ * +------------------------+------------------------+------------------------+------------------------+
+ * + timestamp (in seconds) +   machine identifier   +    thread identifier   +        increment       +
+ * +        (4 bytes)       +        (3 bytes)       +        (2 bytes)       +        (3 bytes)       +
+ * +------------------------+------------------------+------------------------+------------------------+
+ */
 @SerialVersionUID(239421902L)
 class BSONObjectID private (private val raw: Array[Byte])
     extends BSONValue with Serializable with Equals {
@@ -441,34 +448,23 @@ object BSONObjectID {
 
   def unapply(id: BSONObjectID): Option[Array[Byte]] = Some(id.valueAsArray)
 
-  /** Tries to make a BSON ObjectId element from a hexadecimal String representation. */
-  def parse(id: String): Try[BSONObjectID] = Try {
-    if (id.length != 24)
-      throw new IllegalArgumentException(s"wrong ObjectId: '$id'")
-    /** Constructs a BSON ObjectId element from a hexadecimal String representation */
-    new BSONObjectID(Converters.str2Hex(id))
+  /** Tries to make a BSON ObjectId from a hexadecimal string representation. */
+  def parse(id: String): Try[BSONObjectID] = {
+    if (id.length != 24) Failure[BSONObjectID](
+      new IllegalArgumentException(s"Wrong ObjectId (length != 24): '$id'")
+    )
+    else Try(new BSONObjectID(Converters str2Hex id))
   }
 
   /**
-   * Generates a new BSON ObjectID.
+   * Generates a new BSON ObjectID using the current time.
    *
-   * +------------------------+------------------------+------------------------+------------------------+
-   * + timestamp (in seconds) +   machine identifier   +    thread identifier   +        increment       +
-   * +        (4 bytes)       +        (3 bytes)       +        (2 bytes)       +        (3 bytes)       +
-   * +------------------------+------------------------+------------------------+------------------------+
-   *
-   * The returned BSONObjectID contains a timestamp set to the current time (in seconds),
-   * with the `machine identifier`, `thread identifier` and `increment` properly set.
+   * @see [[fromTime]]
    */
   def generate(): BSONObjectID = fromTime(System.currentTimeMillis, false)
 
   /**
    * Generates a new BSON ObjectID from the given timestamp in milliseconds.
-   *
-   * +------------------------+------------------------+------------------------+------------------------+
-   * + timestamp (in seconds) +   machine identifier   +    thread identifier   +        increment       +
-   * +        (4 bytes)       +        (3 bytes)       +        (2 bytes)       +        (3 bytes)       +
-   * +------------------------+------------------------+------------------------+------------------------+
    *
    * The included timestamp is the number of seconds since epoch, so a BSONObjectID time part has only
    * a precision up to the second. To get a reasonably unique ID, you _must_ set `onlyTimestamp` to false.

@@ -20,3 +20,7 @@ addSbtPlugin("com.eed3si9n" % "sbt-assembly" % "0.14.1")
 addSbtPlugin("com.typesafe" % "sbt-mima-plugin" % "0.1.8")
 
 addSbtPlugin("de.johoop" % "findbugs4sbt" % "1.4.0")
+
+//addSbtPlugin("de.johoop" % "cpd4sbt" % "1.2.0")
+
+//addSbtPlugin("com.sksamuel.scapegoat" %% "sbt-scapegoat" % "1.0.4")

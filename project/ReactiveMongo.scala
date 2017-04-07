@@ -280,6 +280,7 @@ object ReactiveMongoBuild extends Build {
   import sbtassembly.{
     AssemblyKeys, MergeStrategy, PathList, ShadeRule
   }, AssemblyKeys._
+
   import com.typesafe.tools.mima.core._, ProblemFilters._, Problem.ClassVersion
   import com.typesafe.tools.mima.plugin.MimaKeys.{
     binaryIssueFilters, previousArtifacts
@@ -289,107 +290,106 @@ object ReactiveMongoBuild extends Build {
 
   val projectPrefix = "ReactiveMongo"
 
-  lazy val reactivemongo =
-    Project(
-      s"$projectPrefix-Root",
-      file("."),
-      settings = buildSettings ++ Documentation.settings).
-      settings(
-        publishArtifact := false,
-        previousArtifacts := Set.empty,
-        travisEnv in Test := { // test:travisEnv from SBT CLI
-          val (akkaLower, akkaUpper) = "2.3.13" -> "2.4.16"
-          val (playLower, playUpper) = "2.3.8" -> "2.6.1"
-          val (mongoLower, mongoUpper) = "2_6" -> "3_4"
+  lazy val reactivemongo = Project(
+    s"$projectPrefix-Root",
+    file("."),
+    settings = buildSettings ++ Documentation.settings).
+    settings(
+      publishArtifact := false,
+      previousArtifacts := Set.empty,
+      travisEnv in Test := { // test:travisEnv from SBT CLI
+        val (akkaLower, akkaUpper) = "2.3.13" -> "2.4.16"
+        val (playLower, playUpper) = "2.3.8" -> "2.6.1"
+        val (mongoLower, mongoUpper) = "2_6" -> "3_4"
 
-          val specs = List[(String, List[String])](
-            "MONGO_VER" -> List("2_6", "3", "3_4"),
-            "MONGO_PROFILE" -> List(
-              "default", "invalid-ssl", "mutual-ssl", "rs"),
-            "AKKA_VERSION" -> List(akkaLower, akkaUpper),
-            "ITERATEES_VERSION" -> List(playLower, playUpper)
-          )
+        val specs = List[(String, List[String])](
+          "MONGO_VER" -> List("2_6", "3", "3_4"),
+          "MONGO_PROFILE" -> List(
+            "default", "invalid-ssl", "mutual-ssl", "rs"),
+          "AKKA_VERSION" -> List(akkaLower, akkaUpper),
+          "ITERATEES_VERSION" -> List(playLower, playUpper)
+        )
 
-          lazy val integrationEnv = specs.flatMap {
-            case (key, values) => values.map(key -> _)
-          }.combinations(specs.size).filterNot { flags =>
-            /* chrono-compat exclusions */
-            (flags.contains("AKKA_VERSION" -> akkaLower) && flags.
-              contains("ITERATEES_VERSION" -> playUpper)) ||
-            (flags.contains("AKKA_VERSION" -> akkaUpper) && flags.
-              contains("ITERATEES_VERSION" -> playLower)) ||
-            (flags.contains("MONGO_VER" -> mongoLower) && flags.
-              contains("ITERATEES_VERSION" -> playUpper)) ||
-            (flags.contains("MONGO_VER" -> mongoUpper) && flags.
-              contains("ITERATEES_VERSION" -> playLower)) ||
-            (flags.contains("MONGO_VER" -> mongoUpper) && flags.
-              contains("AKKA_VERSION" -> akkaLower)) ||
-            (flags.contains("AKKA_VERSION" -> akkaLower) && flags.
-              contains("MONGO_PROFILE" -> "rs")) ||
-            /* profile exclusions */
-            (!flags.contains("MONGO_VER" -> mongoUpper) && flags.
-              contains("MONGO_PROFILE" -> "invalid-ssl")) ||
-            (!flags.contains("MONGO_VER" -> mongoUpper) && flags.
-              contains("MONGO_PROFILE" -> "mutual-ssl")) ||
-            (flags.contains("MONGO_VER" -> mongoLower) && flags.
-              contains("MONGO_PROFILE" -> "rs") && flags.
-              contains("ITERATEES_VERSION" -> playLower))
-          }.collect {
-            case flags if (flags.map(_._1).toSet.size == specs.size) =>
-              ("CI_CATEGORY" -> "INTEGRATION_TESTS") :: flags.sortBy(_._1)
-          }.toList
+        lazy val integrationEnv = specs.flatMap {
+          case (key, values) => values.map(key -> _)
+        }.combinations(specs.size).filterNot { flags =>
+          /* chrono-compat exclusions */
+          (flags.contains("AKKA_VERSION" -> akkaLower) && flags.
+            contains("ITERATEES_VERSION" -> playUpper)) ||
+          (flags.contains("AKKA_VERSION" -> akkaUpper) && flags.
+            contains("ITERATEES_VERSION" -> playLower)) ||
+          (flags.contains("MONGO_VER" -> mongoLower) && flags.
+            contains("ITERATEES_VERSION" -> playUpper)) ||
+          (flags.contains("MONGO_VER" -> mongoUpper) && flags.
+            contains("ITERATEES_VERSION" -> playLower)) ||
+          (flags.contains("MONGO_VER" -> mongoUpper) && flags.
+            contains("AKKA_VERSION" -> akkaLower)) ||
+          (flags.contains("AKKA_VERSION" -> akkaLower) && flags.
+            contains("MONGO_PROFILE" -> "rs")) ||
+          /* profile exclusions */
+          (!flags.contains("MONGO_VER" -> mongoUpper) && flags.
+            contains("MONGO_PROFILE" -> "invalid-ssl")) ||
+          (!flags.contains("MONGO_VER" -> mongoUpper) && flags.
+            contains("MONGO_PROFILE" -> "mutual-ssl")) ||
+          (flags.contains("MONGO_VER" -> mongoLower) && flags.
+            contains("MONGO_PROFILE" -> "rs") && flags.
+            contains("ITERATEES_VERSION" -> playLower))
+        }.collect {
+          case flags if (flags.map(_._1).toSet.size == specs.size) =>
+            ("CI_CATEGORY" -> "INTEGRATION_TESTS") :: flags.sortBy(_._1)
+        }.toList
 
-          @inline def integrationVars(flags: List[(String, String)]): String =
-            flags.map { case (k, v) => s"$k=$v" }.mkString(" ")
+        @inline def integrationVars(flags: List[(String, String)]): String =
+          flags.map { case (k, v) => s"$k=$v" }.mkString(" ")
 
-          def integrationMatrix =
-            integrationEnv.map(integrationVars).map { c => s"  - $c" }
+        def integrationMatrix =
+          integrationEnv.map(integrationVars).map { c => s"  - $c" }
 
-          def matrix = (List("env:", "  - CI_CATEGORY=UNIT_TESTS").iterator ++ (
-            integrationMatrix :+ "matrix: " :+ "  exclude: ") ++ List(
-            "    - scala: 2.10.5",
-              "      jdk: oraclejdk8",
+        def matrix = (List("env:", "  - CI_CATEGORY=UNIT_TESTS").iterator ++ (
+          integrationMatrix :+ "matrix: " :+ "  exclude: ") ++ List(
+          "    - scala: 2.10.5",
+            "      jdk: oraclejdk8",
+            "      env: CI_CATEGORY=UNIT_TESTS") ++ List(
+          "    - scala: 2.11.8",
+              "      jdk: oraclejdk7",
               "      env: CI_CATEGORY=UNIT_TESTS") ++ List(
-            "    - scala: 2.11.8",
-                "      jdk: oraclejdk7",
-                "      env: CI_CATEGORY=UNIT_TESTS") ++ List(
-            "    - scala: 2.12.1",
+          "    - scala: 2.12.1",
                 "      jdk: oraclejdk7",
                 "      env: CI_CATEGORY=UNIT_TESTS") ++ (
-            integrationEnv.flatMap { flags =>
-              if (flags.contains("CI_CATEGORY" -> "INTEGRATION_TESTS") &&
-                (/* time-compat exclusions: */
-                  flags.contains("ITERATEES_VERSION" -> playUpper) ||
+          integrationEnv.flatMap { flags =>
+            if (flags.contains("CI_CATEGORY" -> "INTEGRATION_TESTS") &&
+              (/* time-compat exclusions: */
+                flags.contains("ITERATEES_VERSION" -> playUpper) ||
                   flags.contains("AKKA_VERSION" -> akkaUpper) ||
                   flags.contains("MONGO_VER" -> mongoUpper) ||
                   /* profile priority exclusions: */
                   flags.contains("MONGO_PROFILE" -> "invalid-ssl") ||
                   flags.contains("MONGO_PROFILE" -> "mutual-ssl"))) {
-                List(
-                  "    - scala: 2.10.5",
-                  s"      env: ${integrationVars(flags)}",
-                  "    - jdk: oraclejdk7",
-                  s"      env: ${integrationVars(flags)}"
-                )
-              } else if (flags.contains("CI_CATEGORY" -> "INTEGRATION_TESTS") &&
-                (/* time-compat exclusions: */
-                  flags.contains("ITERATEES_VERSION" -> playLower) ||
+              List(
+                "    - scala: 2.10.5",
+                s"      env: ${integrationVars(flags)}",
+                "    - jdk: oraclejdk7",
+                s"      env: ${integrationVars(flags)}"
+              )
+            } else if (flags.contains("CI_CATEGORY" -> "INTEGRATION_TESTS") &&
+              (/* time-compat exclusions: */
+                flags.contains("ITERATEES_VERSION" -> playLower) ||
                   flags.contains("AKKA_VERSION" -> akkaLower) ||
-                    flags.contains("MONGO_VER" -> mongoLower)
-                )) {
-                List(
-                  "    - scala: 2.12.1",
-                  s"      env: ${integrationVars(flags)}",
-                  "    - jdk: oraclejdk8",
-                  s"      env: ${integrationVars(flags)}"
-                )
-              } else List.empty[String]
-            })
-          ).mkString("\r\n")
+                  flags.contains("MONGO_VER" -> mongoLower)
+              )) {
+              List(
+                "    - scala: 2.12.1",
+                s"      env: ${integrationVars(flags)}",
+                "    - jdk: oraclejdk8",
+                s"      env: ${integrationVars(flags)}"
+              )
+            } else List.empty[String]
+          })
+        ).mkString("\r\n")
 
-          println(s"# Travis CI env\r\n$matrix")
-        }
-      ).aggregate(bson, bsonmacros, shaded, driver, jmx)
+        println(s"# Travis CI env\r\n$matrix")
+      }
+    ).aggregate(bson, bsonmacros, shaded, driver, jmx)
 
   import scala.xml.{ Elem => XmlElem, Node => XmlNode }
   private def transformPomDependencies(tx: XmlElem => Option[XmlNode]): XmlNode => XmlNode = { node: XmlNode =>
@@ -424,7 +424,7 @@ object ReactiveMongoBuild extends Build {
       crossPaths := false,
       autoScalaLibrary := false,
       libraryDependencies ++= Seq(
-        "io.netty" % "netty" % "3.10.5.Final" cross CrossVersion.Disabled,
+        "io.netty" % "netty" % "3.10.6.Final" cross CrossVersion.Disabled,
         "com.google.guava" % "guava" % "19.0" cross CrossVersion.Disabled
       ),
       assemblyShadeRules in assembly := Seq(
@@ -457,15 +457,26 @@ object ReactiveMongoBuild extends Build {
   lazy val bson = Project(
     s"$projectPrefix-BSON",
     file("bson"),
-    settings = buildSettings ++ Findbugs.settings).
-    settings(
+    settings = buildSettings ++ Findbugs.settings ++ Seq(
       libraryDependencies ++= Seq(specs,
         "org.specs2" %% "specs2-scalacheck" % specsVer % Test,
         "org.typelevel" %% "discipline" % "0.7.2" % Test,
         "org.spire-math" %% "spire-laws" % "0.13.0" % Test),
-      binaryIssueFilters ++= Seq(
-        ProblemFilters.exclude[MissingTypesProblem](
-          "reactivemongo.bson.BSONTimestamp$")))
+      binaryIssueFilters ++= {
+        import ProblemFilters.{ exclude => x }
+        @inline def irt(s: String) = x[IncompatibleResultTypeProblem](s)
+
+        Seq(
+          x[MissingTypesProblem]("reactivemongo.bson.BSONTimestamp$"),
+          irt("reactivemongo.bson.Producer.noneOptionValue2Producer"),
+          irt("reactivemongo.bson.Producer.noneOptionValueProducer"),
+          irt("reactivemongo.bson.Producer.nameOptionValue2Producer"),
+          irt("reactivemongo.bson.Producer.valueProducer"),
+          irt("reactivemongo.bson.Producer.optionValueProducer")
+        )
+      }
+    )
+  )
 
   lazy val bsonmacros = Project(
     s"$projectPrefix-BSON-Macros",
@@ -473,7 +484,8 @@ object ReactiveMongoBuild extends Build {
     settings = buildSettings ++ Findbugs.settings ++ Seq(
       libraryDependencies ++= Seq(specs,
         "org.scala-lang" % "scala-compiler" % scalaVersion.value % "provided")
-    )).dependsOn(bson)
+    ))
+    .dependsOn(bson)
 
   val driverCleanup = taskKey[Unit]("Driver compilation cleanup")
 
@@ -916,7 +928,8 @@ object Version {
       //mappings in (Compile, packageDoc) ~= driverFilter,
       mappings in (Compile, packageSrc) ~= driverFilter,
       apiMappings ++= Documentation.mappings("com.typesafe.akka", "http://doc.akka.io/api/akka/%s/")("akka-actor").value ++ Documentation.mappings("com.typesafe.play", "http://playframework.com/documentation/%s/api/scala/index.html", _.replaceAll("[\\d]$", "x"))("play-iteratees").value
-    )).dependsOn(bsonmacros, shaded)
+    )
+  ).dependsOn(bsonmacros, shaded)
 
   private val providedInternalDeps: XmlNode => XmlNode = {
     import scala.xml.NodeSeq

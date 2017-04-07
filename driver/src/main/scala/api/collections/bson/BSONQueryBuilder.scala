@@ -95,7 +95,7 @@ private[api] object BSONReadPreference {
       case ReadPreference.SecondaryPreferred(filter) => "secondaryPreferred"
       case ReadPreference.Nearest(filter)            => "nearest"
     }
-    val base = Seq[BSONElement]("mode" -> BSONString(mode))
+    val base = Seq[BSONElement]("mode" -> mode)
 
     BSONDocument(readPreference match {
       case ReadPreference.Taggable(tagSet) if tagSet.nonEmpty =>

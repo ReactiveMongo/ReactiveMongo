@@ -350,4 +350,61 @@ class DriverSpec extends org.specs2.mutable.Specification {
     }
     section("mongo2", "mongo24", "not_mongo26")
   }
+
+  "BSON read preference" should {
+    import reactivemongo.bson.BSONArray
+    import reactivemongo.api.ReadPreference
+    import reactivemongo.api.tests.{ bsonReadPref => bson }
+    import org.specs2.specification.core.Fragments
+
+    Fragments.foreach[(ReadPreference, String)](Seq(
+      ReadPreference.primary -> "primary",
+      ReadPreference.secondary -> "secondary",
+      ReadPreference.nearest -> "nearest"
+    )) {
+      case (pref, mode) =>
+        s"""be encoded as '{ "mode": "$mode" }'""" in {
+          bson(pref) must_== BSONDocument("mode" -> mode)
+        }
+    }
+
+    "be taggable and" >> {
+      val tagSet = List(
+        Map("foo" -> "bar", "lorem" -> "ipsum"),
+        Map("dolor" -> "es")
+      )
+      val bsonTags = BSONArray(
+        BSONDocument("foo" -> "bar", "lorem" -> "ipsum"),
+        BSONDocument("dolor" -> "es")
+      )
+
+      Fragments.foreach[(ReadPreference, String)](Seq(
+        ReadPreference.primaryPreferred(tagSet) -> "primaryPreferred",
+        ReadPreference.secondary(tagSet) -> "secondary",
+        ReadPreference.secondaryPreferred(tagSet) -> "secondaryPreferred",
+        ReadPreference.nearest(tagSet) -> "nearest"
+      )) {
+        case (pref, mode) =>
+          val expected = BSONDocument("mode" -> mode, "tags" -> bsonTags)
+
+          s"be encoded as '${BSONDocument pretty expected}'" in {
+            bson(pref) must_== expected
+          }
+      }
+    }
+
+    "skip empty tag set and" >> {
+      Fragments.foreach[(ReadPreference, String)](Seq(
+        ReadPreference.primaryPreferred() -> "primaryPreferred",
+        ReadPreference.secondary() -> "secondary",
+        ReadPreference.secondaryPreferred() -> "secondaryPreferred",
+        ReadPreference.nearest() -> "nearest"
+      )) {
+        case (pref, mode) =>
+          s"""be encoded as '{ "mode": "$mode" }'""" in {
+            bson(pref) must_== BSONDocument("mode" -> mode)
+          }
+      }
+    }
+  }
 }
