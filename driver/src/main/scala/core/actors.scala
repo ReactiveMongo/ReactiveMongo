@@ -703,118 +703,7 @@ trait MongoDBSystem extends Actor {
       logger.debug(s"[$lnm] Channel #$channelId is released")
     }
 
-    case IsMasterResponse(response) => {
-      import reactivemongo.api.BSONSerializationPack
-      import reactivemongo.api.commands.bson.BSONIsMasterCommandImplicits
-      import reactivemongo.api.commands.Command
-
-      val isMaster = Command.deserialize(BSONSerializationPack, response)(
-        BSONIsMasterCommandImplicits.IsMasterResultReader
-      )
-
-      logger.trace(s"[$lnm] IsMaster response: $isMaster")
-
-      val updated = {
-        val respTo = response.header.responseTo
-        @inline def event =
-          s"IsMaster(${respTo}, ${_nodeSet.toShortString}"
-
-        updateNodeSet(event) { nodeSet =>
-          val nodeSetWasReachable = nodeSet.isReachable
-          val wasPrimary = nodeSet.primary.toSeq.flatMap(_.names)
-          @volatile var chanNode = Option.empty[Node]
-
-          val prepared =
-            nodeSet.updateNodeByChannelId(response.info.channelId) { node =>
-              val pingInfo =
-                if (node.pingInfo.lastIsMasterId == respTo) {
-                  // No longer waiting response for isMaster,
-                  // reset the pending state, and update the ping time
-                  node.pingInfo.copy(
-                    ping =
-                    System.currentTimeMillis() - node.pingInfo.lastIsMasterTime,
-                    lastIsMasterTime = 0, lastIsMasterId = -1
-                  )
-                } else node.pingInfo
-
-              val nodeStatus = isMaster.status
-              val authenticating =
-                if (!nodeStatus.queryable || nodeSet.authenticates.isEmpty) {
-                  node
-                } else authenticateNode(node, nodeSet.authenticates.toSeq)
-
-              val meta = ProtocolMetadata(
-                MongoWireVersion(isMaster.minWireVersion),
-                MongoWireVersion(isMaster.maxWireVersion),
-                isMaster.maxBsonObjectSize,
-                isMaster.maxMessageSizeBytes,
-                isMaster.maxWriteBatchSize
-              )
-
-              val an = authenticating._copy(
-                status = nodeStatus,
-                pingInfo = pingInfo,
-                tags = isMaster.replicaSet.flatMap(_.tags),
-                protocolMetadata = meta,
-                isMongos = isMaster.isMongos
-              )
-
-              val n = isMaster.replicaSet.fold(an)(rs => an.withAlias(rs.me))
-              chanNode = Some(n)
-
-              n
-            }
-
-          val discoveredNodes = isMaster.replicaSet.toSeq.flatMap { rs =>
-            rs.hosts.collect {
-              case host if (!prepared.nodes.exists(_.names contains host)) =>
-                // Prepare node for newly discovered host in the RS
-                Node(host, NodeStatus.Uninitialized,
-                  Vector.empty, Set.empty, None, ProtocolMetadata.Default)
-            }
-          }
-
-          logger.trace(s"[$lnm] Discovered nodes: $discoveredNodes")
-
-          val upSet = prepared.copy(nodes = prepared.nodes ++ discoveredNodes)
-
-          chanNode.foreach { node =>
-            if (!upSet.authenticates.isEmpty && node.authenticated.isEmpty) {
-              logger.debug(s"[$lnm] The node set is available (${node.names}); Waiting authentication: ${node.authenticated}")
-
-            } else {
-              if (!nodeSetWasReachable && upSet.isReachable) {
-                broadcastMonitors(SetAvailable(upSet.protocolMetadata))
-                logger.debug(s"[$lnm] The node set is now available")
-              }
-
-              if (upSet.primary.exists(n => !wasPrimary.contains(n.name))) {
-                broadcastMonitors(PrimaryAvailable(upSet.protocolMetadata))
-                logger.debug(
-                  s"[$lnm] The primary is now available: ${node.names}"
-                )
-              }
-            }
-          }
-
-          upSet
-        }
-      }
-
-      context.system.scheduler.scheduleOnce(Duration.Zero) {
-        @inline def event = s"ConnectAll$$IsMaster(${response.header.responseTo}, ${updated.toShortString})"
-
-        updateNodeSet(event) { ns =>
-          connectAll(ns.createNeededChannels(
-            channelFactory, self, options.nbChannelsPerNode
-          ))
-        }
-
-        ()
-      }
-
-      ()
-    }
+    case IsMasterResponse(response) => onIsMaster(response)
   }
 
   val closing: Receive = {
@@ -982,6 +871,141 @@ trait MongoDBSystem extends Actor {
 
   override lazy val receive: Receive =
     processing.orElse(authReceive).orElse(fallback)
+
+  // ---
+
+  private def onIsMaster(response: Response) {
+    import reactivemongo.api.BSONSerializationPack
+    import reactivemongo.api.commands.bson.BSONIsMasterCommandImplicits
+    import reactivemongo.api.commands.Command
+
+    val isMaster = Command.deserialize(BSONSerializationPack, response)(
+      BSONIsMasterCommandImplicits.IsMasterResultReader
+    )
+
+    logger.trace(s"[$lnm] IsMaster response: $isMaster")
+
+    val updated = {
+      val respTo = response.header.responseTo
+      @inline def event =
+        s"IsMaster(${respTo}, ${_nodeSet.toShortString}"
+
+      updateNodeSet(event) { nodeSet =>
+        val nodeSetWasReachable = nodeSet.isReachable
+        val wasPrimary: Option[Node] = nodeSet.primary
+        @volatile var chanNode = Option.empty[Node]
+
+        // Update the details of the node corresponding to the response chan
+        val prepared =
+          nodeSet.updateNodeByChannelId(response.info.channelId) { node =>
+            val pingInfo =
+              if (node.pingInfo.lastIsMasterId == respTo) {
+                // No longer waiting response for isMaster,
+                // reset the pending state, and update the ping time
+                node.pingInfo.copy(
+                  ping =
+                  System.currentTimeMillis() - node.pingInfo.lastIsMasterTime,
+                  lastIsMasterTime = 0, lastIsMasterId = -1
+                )
+              } else node.pingInfo
+
+            val nodeStatus = isMaster.status
+            val authenticating =
+              if (!nodeStatus.queryable || nodeSet.authenticates.isEmpty) {
+                node
+              } else authenticateNode(node, nodeSet.authenticates.toSeq)
+
+            val meta = ProtocolMetadata(
+              MongoWireVersion(isMaster.minWireVersion),
+              MongoWireVersion(isMaster.maxWireVersion),
+              isMaster.maxBsonObjectSize,
+              isMaster.maxMessageSizeBytes,
+              isMaster.maxWriteBatchSize
+            )
+
+            val an = authenticating._copy(
+              status = nodeStatus,
+              pingInfo = pingInfo,
+              tags = isMaster.replicaSet.flatMap(_.tags),
+              protocolMetadata = meta,
+              isMongos = isMaster.isMongos
+            )
+
+            val n = isMaster.replicaSet.fold(an)(rs => an.withAlias(rs.me))
+            chanNode = Some(n)
+
+            n
+          }
+
+        val discoveredNodes = isMaster.replicaSet.toSeq.flatMap {
+          _.hosts.collect {
+            case host if (!prepared.nodes.exists(_.names contains host)) =>
+              // Prepare node for newly discovered host in the RS
+              Node(host, NodeStatus.Uninitialized,
+                Vector.empty, Set.empty, None, ProtocolMetadata.Default)
+          }
+        }
+
+        logger.trace(s"[$lnm] Discovered nodes: $discoveredNodes")
+
+        val upSet = prepared.copy(nodes = prepared.nodes ++ discoveredNodes)
+
+        chanNode.fold(upSet) { node =>
+          if (!upSet.authenticates.isEmpty && node.authenticated.isEmpty) {
+            logger.debug(s"[$lnm] The node set is available (${node.names}); Waiting authentication: ${node.authenticated}")
+
+          } else {
+            if (!nodeSetWasReachable && upSet.isReachable) {
+              broadcastMonitors(SetAvailable(upSet.protocolMetadata))
+              logger.debug(s"[$lnm] The node set is now available")
+            }
+
+            @inline def wasPrimNames: Seq[String] =
+              wasPrimary.toSeq.flatMap(_.names)
+
+            if (upSet.primary.exists(n => !wasPrimNames.contains(n.name))) {
+              broadcastMonitors(PrimaryAvailable(upSet.protocolMetadata))
+
+              val newPrim = upSet.primary.map(_.name)
+
+              logger.debug(
+                s"[$lnm] The primary is now available: ${newPrim.mkString}"
+              )
+            }
+          }
+
+          if (node.status != NodeStatus.Primary) upSet else {
+            // Current node is known and primary
+
+            // TODO: Test; 1. an NodeSet with node A & B, with primary A;
+            // 2. Receive a isMaster response from B, with primary = B
+
+            upSet.updateAll { n =>
+              if (!node.names.contains(n.name) && // the node itself
+                n.status == NodeStatus) {
+                // invalidate node status on primary status conflict
+                n._copy(status = NodeStatus.Unknown)
+              } else n
+            }
+          }
+        }
+      }
+    }
+
+    context.system.scheduler.scheduleOnce(Duration.Zero) {
+      @inline def event = s"ConnectAll$$IsMaster(${response.header.responseTo}, ${updated.toShortString})"
+
+      updateNodeSet(event) { ns =>
+        connectAll(ns.createNeededChannels(
+          channelFactory, self, options.nbChannelsPerNode
+        ))
+      }
+
+      ()
+    }
+
+    ()
+  }
 
   def onPrimaryUnavailable() {
     self ! RefreshAll
