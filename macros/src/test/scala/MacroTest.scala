@@ -46,6 +46,16 @@ object MacroTest {
       OverloadedApply(seq mkString " ")
   }
 
+  case class OverloadedApply2(string: String, number: Int)
+  object OverloadedApply2 {
+    def apply(n: Int): OverloadedApply2 = OverloadedApply2("", n)
+  }
+
+  case class OverloadedApply3(string: String, number: Int)
+  object OverloadedApply3 {
+    def apply(): OverloadedApply3 = OverloadedApply3("", 0)
+  }
+
   object Union {
     sealed trait UT
     case class UA(n: Int) extends UT
