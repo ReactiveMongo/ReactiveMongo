@@ -325,6 +325,7 @@ trait AggregationFramework[P <: SerializationPack]
   }
 
   /**
+   * Since MongoDB 3.4
    * Categorizes incoming documents into a specific number of groups, called buckets,
    * based on a specified expression. Bucket boundaries are automatically determined
    * in an attempt to evenly distribute the documents into the specified number of buckets.
