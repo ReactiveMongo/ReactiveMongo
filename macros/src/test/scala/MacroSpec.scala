@@ -112,6 +112,22 @@ class MacroSpec extends org.specs2.mutable.Specification {
       roundtrip(doc2, f)
     }
 
+    "handle overloaded apply with different number of arguments correctly" in {
+      val doc1 = OverloadedApply2("hello", 5)
+      val doc2 = OverloadedApply2("hello")
+      val f = Macros.handler[OverloadedApply2]
+      roundtrip(doc1, f)
+      roundtrip(doc2, f)
+    }
+
+    "handle overloaded apply with 0 number of arguments correctly" in {
+      val doc1 = OverloadedApply3("hello", 5)
+      val doc2 = OverloadedApply3()
+      val f = Macros.handler[OverloadedApply3]
+      roundtrip(doc1, f)
+      roundtrip(doc2, f)
+    }
+
     "case class and handler inside trait" in {
       val t = new NestModule {}
       roundtrip(t.Nested("it works"), t.format)
