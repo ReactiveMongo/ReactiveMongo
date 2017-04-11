@@ -77,7 +77,7 @@ class MacroSpec extends org.specs2.mutable.Specification {
 
     "handle overloaded apply with different number of arguments correctly" in {
       val doc1 = OverloadedApply2("hello", 5)
-      val doc2 = OverloadedApply2(10)
+      val doc2 = OverloadedApply2("hello")
       val f = Macros.handler[OverloadedApply2]
       roundtrip(doc1, f)
       roundtrip(doc2, f)

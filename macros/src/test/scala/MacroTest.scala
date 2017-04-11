@@ -48,7 +48,7 @@ object MacroTest {
 
   case class OverloadedApply2(string: String, number: Int)
   object OverloadedApply2 {
-    def apply(n: Int): OverloadedApply2 = OverloadedApply2("", n)
+    def apply(string: String): OverloadedApply2 = OverloadedApply2(string, 0)
   }
 
   case class OverloadedApply3(string: String, number: Int)
