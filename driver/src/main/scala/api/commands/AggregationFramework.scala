@@ -324,6 +324,28 @@ trait AggregationFramework[P <: SerializationPack]
       makeDocument(Seq(elementProducer(f"$$addFields", specifications)))
   }
 
+  /**
+   * Categorizes incoming documents into a specific number of groups, called buckets,
+   * based on a specified expression. Bucket boundaries are automatically determined
+   * in an attempt to evenly distribute the documents into the specified number of buckets.
+   * Document fields identifier must be prefixed with `$`.
+   * https://docs.mongodb.com/manual/reference/operator/aggregation/bucketAuto/
+   * @param identifiers any BSON value acceptable by mongodb as identifier
+   * @param ops the sequence of operators specifying aggregate calculation
+   */
+  case class BucketAuto(groupBy: pack.Value, buckets: Int, granularity: Option[String])(output: (String, GroupFunction)*)
+      extends PipelineOperator {
+    val makePipe: pack.Document =
+      makeDocument(Seq(elementProducer(f"$$bucketAuto", makeDocument(Seq(
+        Some(elementProducer("groupBy", groupBy)),
+        Some(elementProducer("buckets", intValue(buckets))),
+        granularity.map { g => elementProducer("granularity", stringValue(g)) },
+        Some(elementProducer("output", makeDocument(output.map({
+          case (field, op) => elementProducer(field, op.makeFunction)
+        }))))
+      ).flatten))))
+  }
+
   /** References the score associated with the corresponding [[https://docs.mongodb.org/v3.0/reference/operator/query/text/#op._S_text `\$text`]] query for each matching document. */
   case object TextScore extends MetadataKeyword {
     val name = "textScore"
