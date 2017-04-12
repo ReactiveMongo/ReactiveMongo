@@ -1184,7 +1184,12 @@ trait MongoDBSystem extends Actor {
   private[reactivemongo] def connectAll(nodeSet: NodeSet, connecting: (Node, ChannelFuture) => (Node, ChannelFuture) = { _ -> _ }): NodeSet = {
     val nodes = nodeSet.nodes.map { node =>
       node.connections.foldLeft(node) { (n, con) =>
-        if (con.channel.isConnected) n else try {
+        if (con.channel.isConnected ||
+          con.status == ConnectionStatus.Connecting) {
+          // TODO: Test
+          // connected or already trying to connect
+          n
+        } else try {
           connecting(n, con.channel.connect(
             new InetSocketAddress(node.host, node.port)
           ))._1
