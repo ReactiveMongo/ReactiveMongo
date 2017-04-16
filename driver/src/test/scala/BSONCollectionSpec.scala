@@ -63,9 +63,14 @@ class BSONCollectionSpec extends org.specs2.mutable.Specification {
       implicit val writer = PersonWriter
 
       "with insert" in { implicit ee: EE =>
-        collection.insert(person).map(_.ok) must beTrue.await(1, timeout) and (
-          collection.insert(person2).map(_.ok) must beTrue.await(1, timeout)
-        )
+        collection.insert(person).map(_.ok) must beTrue.await(1, timeout) and {
+          val coll = collection.withReadPreference(ReadPreference.secondary)
+
+          coll.readPreference must_== ReadPreference.secondary and {
+            // Anyway use ReadPreference.Primary for insert op
+            coll.insert(person2).map(_.ok) must beTrue.await(1, timeout)
+          }
+        }
       }
 
       "with bulkInsert" in { implicit ee: EE =>

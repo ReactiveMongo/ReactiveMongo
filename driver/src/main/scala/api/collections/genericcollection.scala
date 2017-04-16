@@ -167,6 +167,8 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
   val pack: P
   protected val BatchCommands: BatchCommands[pack.type]
 
+  @inline private def writePref = ReadPreference.Primary
+
   /**
    * Alias for type of the aggregation framework,
    * depending on the type of the collection.
@@ -361,7 +363,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
         // TODO: ordered + bulk
         Future(BatchCommands.InsertCommand.Insert(
           writeConcern = writeConcern
-        )(document)).flatMap(runCommand(_, readPreference).flatMap { wr =>
+        )(document)).flatMap(runCommand(_, writePref).flatMap { wr =>
           val flattened = wr.flatten
           if (!flattened.ok) {
             // was ordered, with one doc => fail if has an error
@@ -408,7 +410,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
 
       Future(Update(writeConcern = writeConcern)(
         UpdateElement(selector, update, upsert, multi)
-      )).flatMap(runCommand(_, readPreference).flatMap { wr =>
+      )).flatMap(runCommand(_, writePref).flatMap { wr =>
         val flattened = wr.flatten
         if (!flattened.ok) {
           // was ordered, with one doc => fail if has an error
@@ -474,7 +476,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
       modify = modifier,
       sort = sort.map(implicitly[DP](_)),
       fields = fields.map(implicitly[DP](_))
-    )).flatMap(runCommand(_, readPreference))
+    )).flatMap(runCommand(_, writePref))
   }
 
   /**
@@ -707,7 +709,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
 
       Future(Delete(writeConcern = writeConcern)(
         DeleteElement(selector, limit)
-      )).flatMap(runCommand(_, readPreference).flatMap { wr =>
+      )).flatMap(runCommand(_, writePref).flatMap { wr =>
         val flattened = wr.flatten
         if (!flattened.ok) {
           // was ordered, with one doc => fail if has an error
