@@ -516,7 +516,6 @@ class MongoConnection(
 
     mongosystem ! RegisterMonitor
 
-    //private val waitingForPrimary = Queue[ActorRef]()
     private var primaryAvailable = false
 
     private val waitingForClose = Queue[ActorRef]()
@@ -526,41 +525,32 @@ class MongoConnection(
     override val receive: Receive = {
       case pa @ PrimaryAvailable(meta) => {
         logger.debug(s"[$lnm] A primary is available: $meta")
+
         metadata = Some(meta)
         primaryAvailable = true
-        //waitingForPrimary.dequeueAll(_ => true).foreach(_ ! pa)
       }
 
       case PrimaryUnavailable => {
         logger.debug(s"[$lnm] There is no primary available")
+
         primaryAvailable = false
       }
 
       case SetAvailable(meta) => {
         logger.debug(s"[$lnm] A node is available: $meta")
+
         metadata = Some(meta)
         setAvailable = true
       }
 
-      case SetUnavailable =>
+      case SetUnavailable => {
         setAvailable = false
+
         logger.debug(s"[$lnm] No node seems to be available")
-
-      /* TODO: Remove 
-      case WaitForPrimary => {
-        if (killed) {
-          sender ! Failure(ConnectionException(
-            "MongoDBSystem actor shutting down or no longer active"))
-
-        } else if (primaryAvailable && metadata.isDefined) {
-          logger.debug(s"$sender is waiting for a primary... available right now, go!")
-          sender ! PrimaryAvailable(metadata.get)
-        } else {
-          logger.debug(s"$sender is waiting for a primary...  not available, warning as soon a primary is available.")
-          waitingForPrimary += sender
-        }
       }
-         */
+
+      case IsAvailable(result)        => { result success setAvailable; () }
+      case IsPrimaryAvailable(result) => { result success primaryAvailable; () }
 
       case Close => {
         logger.debug(s"[$lnm] Monitor received Close")
@@ -572,12 +562,6 @@ class MongoConnection(
         mongosystem ! Close
         waitingForClose += sender
 
-        /*
-        waitingForPrimary.dequeueAll(_ => true).foreach(
-          _ ! Failure(new scala.RuntimeException(
-            s"MongoDBSystem actor shutting down or no longer active ($lnm)")))
-         */
-
         ()
       }
 
@@ -588,15 +572,9 @@ class MongoConnection(
         context.stop(self)
         ()
       }
-
-      case IsAvailable(result)        => { result success setAvailable; () }
-      case IsPrimaryAvailable(result) => { result success primaryAvailable; () }
     }
 
     override def postStop = logger.debug(s"Monitor $self stopped ($lnm)")
-  }
-
-  object MonitorActor {
   }
 }
 

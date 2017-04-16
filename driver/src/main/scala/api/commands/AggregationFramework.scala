@@ -315,17 +315,6 @@ trait AggregationFramework[P <: SerializationPack]
 
   /**
    * Since MongoDB 3.4
-   * https://docs.mongodb.com/manual/reference/operator/aggregation/addFields/
-   *
-   * @param specifications The fields to include. The resulting objects will also contain these fields.
-   */
-  case class AddFields(specifications: pack.Document) extends PipelineOperator {
-    val makePipe: pack.Document =
-      makeDocument(Seq(elementProducer(f"$$addFields", specifications)))
-  }
-
-  /**
-   * Since MongoDB 3.4
    * Categorizes incoming documents into a specific number of groups, called buckets,
    * based on a specified expression. Bucket boundaries are automatically determined
    * in an attempt to evenly distribute the documents into the specified number of buckets.
@@ -659,6 +648,17 @@ sealed trait GroupAggregation[P <: SerializationPack] {
    */
   case class Push(pushExpr: pack.Value) extends GroupFunction {
     val makeFunction = makeDocument(Seq(elementProducer(f"$$push", pushExpr)))
+  }
+
+  /**
+   * Since MongoDB 3.4
+   *
+   * @param specifications The fields to include. The resulting objects will also contain these fields.
+   * @see https://docs.mongodb.com/manual/reference/operator/aggregation/addFields/
+   */
+  case class AddFields(specifications: pack.Document) extends PipelineOperator {
+    val makePipe: pack.Document =
+      makeDocument(Seq(elementProducer(f"$$addFields", specifications)))
   }
 
   case class AddFieldToSet(field: String) extends GroupFunction {

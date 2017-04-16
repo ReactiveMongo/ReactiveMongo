@@ -423,7 +423,6 @@ trait MongoDBSystem extends Actor {
         connections = Vector.empty,
         authenticated = Set.empty
       )
-
     } else node._copy(connections = connections)
   }
 
@@ -509,7 +508,33 @@ trait MongoDBSystem extends Actor {
   protected def authReceive: Receive
 
   private val processing: Receive = {
-    case RegisterMonitor => { monitors += sender; () }
+    case RegisterMonitor => {
+      logger.debug(s"[$lnm] Register monitor $sender")
+
+      monitors += sender
+
+      // In case the NodeSet status has already been updated ...
+      // TODO: Test
+
+      val ns = nodeSetLock.synchronized { this._nodeSet }
+
+      if (ns.isReachable) {
+        sender ! SetAvailable(ns.protocolMetadata)
+        logger.debug(s"[$lnm] The node set is available")
+      }
+
+      ns.primary.foreach { prim =>
+        if (!ns.authenticates.isEmpty && prim.authenticated.isEmpty) {
+          logger.debug(s"[$lnm] The node set is available (${prim.names}); Waiting authentication: ${prim.authenticated}")
+        } else {
+          sender ! PrimaryAvailable(ns.protocolMetadata)
+
+          logger.debug(s"[$lnm] The primary is available: $prim")
+        }
+      }
+
+      ()
+    }
 
     case Close => {
       logger.debug(s"[$lnm] Received Close message, going to close connections and moving on state Closing")
@@ -694,6 +719,7 @@ trait MongoDBSystem extends Actor {
       } else if (!_nodeSet.primary.isDefined) {
         if (primaryWasAvailable) {
           logger.warn(s"[$lnm] The primary is unavailable, is there a network problem?")
+
           broadcastMonitors(PrimaryUnavailable)
         } else logger.debug(
           s"[$lnm] The primary is still unavailable, is there a network problem?"
@@ -1007,7 +1033,7 @@ trait MongoDBSystem extends Actor {
     ()
   }
 
-  def onPrimaryUnavailable() {
+  private[reactivemongo] def onPrimaryUnavailable() {
     self ! RefreshAll
 
     updateNodeSet("PrimaryUnavailable")(_.updateAll { node =>
@@ -1182,26 +1208,42 @@ trait MongoDBSystem extends Actor {
   private def broadcastMonitors(message: AnyRef) = monitors.foreach(_ ! message)
 
   private[reactivemongo] def connectAll(nodeSet: NodeSet, connecting: (Node, ChannelFuture) => (Node, ChannelFuture) = { _ -> _ }): NodeSet = {
-    val nodes = nodeSet.nodes.map { node =>
-      node.connections.foldLeft(node) { (n, con) =>
+    @annotation.tailrec
+    def updateNode(n: Node, before: Vector[Connection], updated: Vector[Connection]): Node = before.headOption match {
+      case Some(c) => {
+        val con = if (!c.channel.isConnected) c else {
+          // Early status normalization,
+          // if connectAll take place before ChannelConnected
+          c.copy(status = ConnectionStatus.Connected)
+        }
+
         if (con.channel.isConnected ||
           con.status == ConnectionStatus.Connecting) {
-          // TODO: Test
           // connected or already trying to connect
-          n
-        } else try {
-          connecting(n, con.channel.connect(
-            new InetSocketAddress(node.host, node.port)
-          ))._1
-        } catch {
-          case reason: Throwable =>
-            logger.warn(s"[$lnm] Fails to connect node: ${node.toShortString}")
-            n
+
+          updateNode(n, before.tail, con +: updated)
+        } else {
+          val upCon = con.copy(status = ConnectionStatus.Connecting)
+          val upNode = try {
+            connecting(n, upCon.channel.connect(
+              new InetSocketAddress(n.host, n.port)
+            ))._1
+          } catch {
+            case reason: Throwable =>
+              logger.warn(s"[$lnm] Fails to connect node with channel ${con.channel.getId}: ${n.toShortString}")
+              n
+          }
+
+          updateNode(upNode, before.tail, upCon +: updated)
         }
       }
+
+      case _ => n._copy(connections = updated.reverse)
     }
 
-    nodeSet.copy(nodes = nodes)
+    nodeSet.copy(nodes = nodeSet.nodes.map { node =>
+      updateNode(node, node.connections, Vector.empty)
+    })
   }
 
   private class IsMasterRequest(
@@ -1252,7 +1294,7 @@ trait MongoDBSystem extends Actor {
         // Unregister the pending requests for this node
         val channelIds = node.connections.map(_.channel.getId)
         val wasPrimary = node.status == NodeStatus.Primary
-        val error = {
+        def error = {
           val cause = new ClosedException(s"$msg ($lnm)")
 
           if (wasPrimary) {
@@ -1277,7 +1319,7 @@ trait MongoDBSystem extends Actor {
 
         node._copy(
           status = NodeStatus.Unknown,
-          connections = Vector.empty,
+          //connections = Vector.empty,
           authenticated = Set.empty,
           pingInfo = PingInfo(
             lastIsMasterTime = now,

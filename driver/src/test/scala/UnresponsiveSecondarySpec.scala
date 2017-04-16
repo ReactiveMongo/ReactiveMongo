@@ -142,7 +142,7 @@ trait UnresponsiveSecondarySpec { parent: NodeSetSpec =>
           }
         }
       }.await(1, timeout)
-    } tag "foo"
+    }
 
   // ---
 
