@@ -23,7 +23,8 @@ import shaded.netty.channel.{
   DefaultChannelConfig,
   DefaultChannelPipeline,
   ExceptionEvent,
-  MessageEvent
+  MessageEvent,
+  SucceededChannelFuture
 }
 
 object NettyEmbedder {
@@ -102,7 +103,7 @@ object NettyEmbedder {
         }
     }
 
-  def EncoderEmbedder[E: ClassTag](chanId: Int, handlers: ChannelDownstreamHandler*) = new AbstractCodecEmbedder[E](chanId, handlers) {
+  def EncoderEmbedder[E: ClassTag](chanId: Int, connected: Boolean, handlers: ChannelDownstreamHandler*) = new AbstractCodecEmbedder[E](chanId, connected, handlers) {
     def offer(input: Object): Boolean = {
       Channels.write(getChannel(), input).setSuccess()
       isEmpty()
@@ -111,9 +112,10 @@ object NettyEmbedder {
 
   // ---
 
-  def withChannel[T](chanId: Int, handler: ChannelEvent => Unit)(f: Channel => T): T = {
+  def withChannel[T](chanId: Int, connected: Boolean, handler: ChannelEvent => Unit)(f: Channel => T): T = {
     lazy val em = NettyEmbedder.EncoderEmbedder(
       chanId,
+      connected,
       new ChannelDownstreamHandler {
         def handleDownstream(ctx: ChannelHandlerContext, evt: ChannelEvent) =
           handler(evt)
@@ -126,16 +128,20 @@ object NettyEmbedder {
       em.finish(); ()
     }
   }
+
+  def withChannel[T](chanId: Int, handler: ChannelEvent => Unit)(f: Channel => T): T = withChannel(chanId, false, handler)(f)
 }
 
 // Inspired from https://github.com/netty/netty/blob/3.10/src/main/java/org/jboss/netty/handler/codec/embedder/EmbeddedChannel.java
 class EmbeddedChannel(
   id: Int,
+  coned: Boolean,
   pipeline: ChannelPipeline,
   sink: ChannelSink
 ) extends AbstractChannel(
   id, null, NettyEmbedder.ChannelFactory(), pipeline, sink
 ) {
+  @volatile private var connected = coned
 
   val config = new DefaultChannelConfig()
   val localAddr = NettyEmbedder.SocketAddress()
@@ -145,7 +151,13 @@ class EmbeddedChannel(
   def getLocalAddress() = localAddr
   def getRemoteAddress() = remoteAddr
   def isBound() = true
-  def isConnected() = true
+
+  override def connect(remote: SocketAddress): ChannelFuture = {
+    connected = true
+    new SucceededChannelFuture(this)
+  }
+
+  def isConnected() = connected
 }
 
 final class CodecEmbedderException(
@@ -156,8 +168,13 @@ final class CodecEmbedderException(
   def this(cause: Throwable) = this(null, cause)
 }
 
+/**
+ * @param chanId the channel ID
+ * @param connected the initial connection status
+ */
 abstract class AbstractCodecEmbedder[E: ClassTag](
     chanId: Int,
+    connected: Boolean,
     handlers: Seq[ChannelHandler]
 ) {
   private val pipeline = NettyEmbedder.ChannelPipeline()
@@ -166,15 +183,17 @@ abstract class AbstractCodecEmbedder[E: ClassTag](
 
   configurePipeline(handlers)
 
-  private val channel = new EmbeddedChannel(chanId, pipeline, sink)
+  private val channel = new EmbeddedChannel(chanId, connected, pipeline, sink)
 
   fireInitialEvents()
 
   def this(
     chanId: Int,
-    cbf: ChannelBufferFactory, handlers: ChannelHandler*
+    connected: Boolean,
+    cbf: ChannelBufferFactory,
+    handlers: ChannelHandler*
   ) = {
-    this(chanId, handlers)
+    this(chanId, connected, handlers)
     channel.getConfig().setBufferFactory(cbf)
   }
 

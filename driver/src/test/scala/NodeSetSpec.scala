@@ -14,6 +14,7 @@ import reactivemongo.api.{
 }
 
 import reactivemongo.core.nodeset.{ Authenticate, ProtocolMetadata }
+
 import reactivemongo.core.actors.{
   PrimaryAvailable,
   PrimaryUnavailable,
@@ -24,7 +25,7 @@ import reactivemongo.core.actors.{
 import reactivemongo.core.actors.Exceptions.PrimaryUnavailableException
 
 class NodeSetSpec extends org.specs2.mutable.Specification
-    with UnresponsiveSecondarySpec {
+    with ConnectAllSpec with UnresponsiveSecondarySpec {
 
   "Node set" title
 
@@ -155,6 +156,8 @@ class NodeSetSpec extends org.specs2.mutable.Specification
       }
     }
 
+    connectAllSpec
+
     unresponsiveSecondarySpec
 
     "be closed" in {
@@ -224,5 +227,4 @@ class NodeSetSpec extends org.specs2.mutable.Specification
       resolveOne(timeout) aka "actor ref" must beLike[ActorRef] {
         case ref => f(ref)
       }.await(1, timeout)
-
 }

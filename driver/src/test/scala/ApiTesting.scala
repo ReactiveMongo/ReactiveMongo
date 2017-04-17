@@ -6,11 +6,12 @@ import scala.concurrent.duration.SECONDS
 import akka.util.Timeout
 import akka.actor.ActorRef
 
+import shaded.netty.channel.ChannelFuture
+
 import reactivemongo.core.protocol.Response
-import reactivemongo.core.nodeset.{ Authenticate, NodeSet }
+import reactivemongo.core.nodeset.{ Authenticate, NodeSet, Node }
 import reactivemongo.core.actors, actors.{
   ChannelClosed,
-  ChannelConnected,
   MongoDBSystem,
   RequestId,
   StandardDBSystem
@@ -96,4 +97,6 @@ package object tests {
   @inline def nodeSet(sys: StandardDBSystem) = sys._nodeSet
 
   @inline def isMasterReqId: Int = RequestId.isMaster.next
+
+  @inline def connectAll(sys: StandardDBSystem, ns: NodeSet, f: (Node, ChannelFuture) => (Node, ChannelFuture) = { _ -> _ }) = sys.connectAll(ns, f)
 }

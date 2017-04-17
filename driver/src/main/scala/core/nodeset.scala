@@ -360,7 +360,6 @@ case class Connection(
     authenticated: Set[Authenticated],
     authenticating: Option[Authenticating]
 ) {
-
   def send(message: Request, writeConcern: Request): ChannelFuture = {
     channel.write(message)
     channel.write(writeConcern)
