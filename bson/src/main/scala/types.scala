@@ -20,6 +20,8 @@ import scala.util.{ Failure, Success, Try }
 import buffer._
 import utils.Converters
 
+import scala.language.implicitConversions
+
 sealed trait Producer[T] {
   @deprecated("Use [[apply]]", "0.12.0")
   private[bson] def produce: Option[T] = generate().headOption
@@ -47,16 +49,16 @@ object Producer {
     "Replaced by [[element2Producer]] + [[BSONElement.converted]]",
     "0.12.0"
   )
-  def nameValue2Producer[T](element: (String, T))(implicit writer: BSONWriter[T, _ <: BSONValue]) = NameOptionValueProducer(element._1, Some(writer.write(element._2)))
+  def nameValue2Producer[T](element: (String, T))(implicit writer: BSONWriter[T, _ <: BSONValue]) = NameOptionValueProducer(element._1 -> Some(writer.write(element._2)))
 
   implicit def element2Producer[E <% BSONElement](element: E): Producer[BSONElement] = {
     val e = implicitly[BSONElement](element)
-    NameOptionValueProducer(e.name, Some(e.value))
+    NameOptionValueProducer(e.name -> Some(e.value))
   }
 
-  implicit def nameOptionValue2Producer[T](element: (String, Option[T]))(implicit writer: BSONWriter[T, _ <: BSONValue]): Producer[BSONElement] = NameOptionValueProducer(element._1, element._2.map(value => writer.write(value)))
+  implicit def nameOptionValue2Producer[T](element: (String, Option[T]))(implicit writer: BSONWriter[T, _ <: BSONValue]): Producer[BSONElement] = NameOptionValueProducer(element._1 -> element._2.map(value => writer.write(value)))
 
-  implicit def noneOptionValue2Producer(element: (String, None.type)): Producer[BSONElement] = NameOptionValueProducer(element._1, None)
+  implicit def noneOptionValue2Producer(element: (String, None.type)): Producer[BSONElement] = NameOptionValueProducer(element._1 -> None)
 
   implicit def valueProducer[T](element: T)(implicit writer: BSONWriter[T, _ <: BSONValue]): Producer[BSONValue] = OptionValueProducer(Some(writer.write(element)))
 
