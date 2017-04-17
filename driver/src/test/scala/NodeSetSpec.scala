@@ -188,7 +188,7 @@ class NodeSetSpec extends org.specs2.mutable.Specification
             )
           }
 
-        val node1 = node(1, "localhost:27017",
+        val node1 = node(1, "node:27017",
           true, ConnectionStatus.Connected)
 
         val node2 = node(2, "localhost:27018",
@@ -204,8 +204,7 @@ class NodeSetSpec extends org.specs2.mutable.Specification
           Vector(node1, node2, node3, node4), Set.empty)
 
         def concurCon = Future(conAll(ref.underlyingActor)(ns) { (n, c) =>
-          coned.synchronized {
-            println(s"--> ${n.name}")
+          coned.synchronized {{
             coned += n.name
           }
 
@@ -217,7 +216,7 @@ class NodeSetSpec extends org.specs2.mutable.Specification
             node.connections.map { node.name -> _.status }
           }.toSet)
       } must beEqualTo(Set[(String, ConnectionStatus)](
-        "localhost:27017" -> ConnectionStatus.Connected, // already connect
+        "node:27017" -> ConnectionStatus.Connected, // already connect
         "localhost:27018" -> ConnectionStatus.Connecting,
         "localhost:27018" -> ConnectionStatus.Connected,
         "localhost:27019" -> ConnectionStatus.Connecting,
