@@ -552,6 +552,7 @@ object Version {
         @inline def mcp(s: String) = x[MissingClassProblem](s)
 
         Seq(
+          mcp("reactivemongo.api.MongoConnection$MonitorActor$"),
           mcp("reactivemongo.api.ReadPreference$BSONDocumentWrapper$"), // priv
           mcp("reactivemongo.api.ReadPreference$BSONDocumentWrapper"), // priv
           fcp("reactivemongo.api.MongoDriver$SupervisorActor"), // private

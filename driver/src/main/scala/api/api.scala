@@ -522,7 +522,7 @@ class MongoConnection(
 
     private var setAvailable = false
 
-    override val receive: Receive = {
+    val receive: Receive = {
       case pa @ PrimaryAvailable(meta) => {
         logger.debug(s"[$lnm] A primary is available: $meta")
 
@@ -1075,7 +1075,7 @@ class MongoDriver(
   private final class SupervisorActor(driver: MongoDriver) extends Actor {
     def isEmpty = driver.connectionMonitors.isEmpty
 
-    override def receive = {
+    val receive: Receive = {
       case AddConnection(name, nodes, opts, sys) => {
         logger.debug(
           s"[$supervisorName] Add connection to the supervisor: $name"

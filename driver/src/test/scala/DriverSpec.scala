@@ -1,9 +1,17 @@
-import scala.concurrent.{ Await, ExecutionContext }
+import scala.concurrent.{ Await, ExecutionContext, Future, Promise }
 import scala.concurrent.duration._
+
+import akka.actor.{ Actor, ActorRef, ActorSystem, Props }
 
 import reactivemongo.bson.BSONDocument
 
-import reactivemongo.core.nodeset.Authenticate
+import reactivemongo.core.actors.{
+  PrimaryAvailable,
+  RegisterMonitor,
+  SetAvailable
+}
+
+import reactivemongo.core.nodeset.{ Authenticate, ProtocolMetadata }
 import reactivemongo.core.commands.{
   FailedAuthentication,
   SuccessfulAuthentication
@@ -62,6 +70,35 @@ class DriverSpec extends org.specs2.mutable.Specification {
         }
     }
 
+    "notify a monitor after the NodeSet is started" in { implicit ee: EE =>
+      val con = driver.connection(List(primaryHost), DefaultOptions)
+      val setAvailable = Promise[ProtocolMetadata]()
+      val priAvailable = Promise[ProtocolMetadata]()
+
+      val setMon = testMonitor(setAvailable) {
+        case msg: SetAvailable =>
+          SetAvailable.unapply(msg)
+        case _ => None
+      }
+
+      val priMon = testMonitor(priAvailable) {
+        case msg: PrimaryAvailable =>
+          PrimaryAvailable.unapply(msg)
+
+        case _ => None
+      }
+
+      con.database(commonDb).flatMap { _ =>
+        // Database is resolved (so NodeSet and Primary is reachable) ...
+
+        // ... register monitors after
+        setMon ! con.mongosystem
+        priMon ! con.mongosystem
+
+        Future.sequence(Seq(setAvailable.future, priAvailable.future))
+      }.map(_.size) must beEqualTo(2).await(0, timeout)
+    }
+
     "fail within expected timeout interval" in { implicit ee: EE =>
       lazy val con = driver.connection(
         List("foo:123"),
@@ -72,7 +109,7 @@ class DriverSpec extends org.specs2.mutable.Specification {
 
       con.database(commonDb).
         map(_ => Option.empty[Throwable] -> -1L).recover {
-          case reason => Some(reason) -> (System.currentTimeMillis() - before)
+          case reason => Option(reason) -> (System.currentTimeMillis() - before)
         }.aka("duration") must beLike[(Option[Throwable], Long)] {
           case (Some(reason), duration) => reason.getStackTrace.headOption.
             aka("most recent") must beSome[StackTraceElement].like {
@@ -407,4 +444,24 @@ class DriverSpec extends org.specs2.mutable.Specification {
       }
     }
   }
+
+  // ---
+
+  def testMonitor[T](result: Promise[T], actorSys: ActorSystem = driver.system)(test: Any => Option[T]): ActorRef = actorSys.actorOf(Props(new Actor {
+    private object Msg {
+      def unapply(that: Any): Option[T] = test(that)
+    }
+
+    val receive: Receive = {
+      case sys: akka.actor.ActorRef => {
+        // Manually register this as connection/system monitor
+        sys ! RegisterMonitor
+      }
+
+      case Msg(v) => {
+        result.success(v)
+        context.stop(self)
+      }
+    }
+  }))
 }
