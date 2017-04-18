@@ -3,9 +3,6 @@ import sbt.Keys._
 import scala.language.postfixOps
 
 object BuildSettings {
-  val nextMajor = "0.12.2"
-  val buildVersion = s"$nextMajor-SNAPSHOT"
-
   val filter = { (ms: Seq[(File, String)]) =>
     ms filter {
       case (file, path) =>
@@ -14,10 +11,7 @@ object BuildSettings {
     }
   }
 
-  val baseSettings = Seq(
-    organization := "org.reactivemongo",
-    version := buildVersion,
-    shellPrompt := ShellPrompt.buildShellPrompt)
+  val baseSettings = Seq(organization := "org.reactivemongo")
 
   val buildSettings = Defaults.coreDefaultSettings ++ baseSettings ++ Seq(
     scalaVersion := "2.11.8",
@@ -25,21 +19,50 @@ object BuildSettings {
     crossVersion := CrossVersion.binary,
     //parallelExecution in Test := false,
     //fork in Test := true, // Don't share executioncontext between SBT CLI/tests
-    scalacOptions in Compile ++= Seq(
-      "-unchecked", "-deprecation", "-Ywarn-unused-import",
-      "-Ywarn-value-discard", "-Ywarn-dead-code"),
+    scalacOptions ++= Seq(
+      "-encoding", "UTF-8",
+      "-unchecked",
+      "-deprecation",
+      "-feature",
+      //"-Xfatal-warnings",
+      "-Xlint",
+      "-Ywarn-numeric-widen",
+      "-Ywarn-dead-code",
+      "-Ywarn-value-discard",
+      "-g:vars"
+    ),
+    scalacOptions in Compile ++= {
+      if (!scalaVersion.value.startsWith("2.11.")) Nil
+      else Seq(
+        "-Yconst-opt",
+        "-Yclosure-elim",
+        "-Ydead-code",
+        "-Yopt:_"
+      )
+    },
     scalacOptions in Compile ++= {
       if (scalaVersion.value startsWith "2.10.") Nil
-      else Seq("-Ywarn-unused", "-Xlint:missing-interpolator")
+      else Seq(
+        "-Ywarn-infer-any",
+        "-Ywarn-unused",
+        "-Ywarn-unused-import",
+        "-Xlint:missing-interpolator"
+      )
     },
     scalacOptions in Compile ++= {
       if (!scalaVersion.value.startsWith("2.12.")) Seq("-target:jvm-1.6")
       else Nil
     },
+    scalacOptions in (Compile, console) ~= {
+      _.filterNot { opt => opt.startsWith("-X") || opt.startsWith("-Y") }
+    },
+    scalacOptions in (Test, console) ~= {
+      _.filterNot { opt => opt.startsWith("-X") || opt.startsWith("-Y") }
+    },
     scalacOptions in (Compile, doc) ++= Seq("-unchecked", "-deprecation",
       /*"-diagrams", */"-implicits", "-skip-packages", "samples"),
     scalacOptions in (Compile, doc) ++= Opts.doc.title("ReactiveMongo API"),
-    scalacOptions in (Compile, doc) ++= Opts.doc.version(nextMajor),
+    scalacOptions in (Compile, doc) ++= Opts.doc.version(Release.major.value),
     scalacOptions in Compile := {
       val opts = (scalacOptions in Compile).value
 
@@ -50,126 +73,9 @@ object BuildSettings {
     },
     mappings in (Compile, packageBin) ~= filter,
     mappings in (Compile, packageSrc) ~= filter,
-    mappings in (Compile, packageDoc) ~= filter) ++
-  Publish.settings ++ Format.settings ++ Publish.mimaSettings
-
-}
-
-object Publish {
-  import com.typesafe.tools.mima.plugin.MimaPlugin.mimaDefaultSettings
-  import com.typesafe.tools.mima.plugin.MimaKeys.{
-    binaryIssueFilters, previousArtifacts
-  }
-  import com.typesafe.tools.mima.core._, ProblemFilters._, Problem.ClassVersion
-
-  @inline def env(n: String): String = sys.env.get(n).getOrElse(n)
-
-  private val repoName = env("PUBLISH_REPO_NAME")
-  private val repoUrl = env("PUBLISH_REPO_URL")
-
-  val majorVersion = "0.12"
-  val previousVersion = "0.11.0"
-
-  val missingMethodInOld: ProblemFilter = {
-    case mmp @ MissingMethodProblem(_) if (
-      mmp.affectedVersion == ClassVersion.Old) => false
-
-    case MissingMethodProblem(old) => !old.isAccessible
-    case _ => true
-  }
-
-  val mimaSettings = mimaDefaultSettings ++ Seq(
-    previousArtifacts := {
-      if (scalaVersion.value startsWith "2.12.") Set.empty
-      else if (crossPaths.value) {
-        Set(organization.value % s"${moduleName.value}_${scalaBinaryVersion.value}" % previousVersion)
-      } else {
-        Set(organization.value % moduleName.value % previousVersion)
-      }
-    },
-    binaryIssueFilters ++= Seq(missingMethodInOld))
-
-  val siteUrl = "http://reactivemongo.org"
-
-  lazy val settings = Seq(
-    publishMavenStyle := true,
-    publishArtifact in Test := false,
-    publishTo := Some(repoUrl).map(repoName at _),
-    credentials += Credentials(repoName, env("PUBLISH_REPO_ID"),
-      env("PUBLISH_USER"), env("PUBLISH_PASS")),
-    pomIncludeRepository := { _ => false },
-    licenses := {
-      Seq("Apache 2.0" ->
-        url("http://www.apache.org/licenses/LICENSE-2.0"))
-    },
-    homepage := Some(url(siteUrl)),
-    autoAPIMappings := true,
-    apiURL := Some(url(s"$siteUrl/release/$majorVersion/api/")),
-    pomExtra := (
-      <scm>
-        <url>git://github.com/ReactiveMongo/ReactiveMongo.git</url>
-          <connection>scm:git://github.com/ReactiveMongo/ReactiveMongo.git</connection>
-          </scm>
-        <developers>
-        <developer>
-        <id>sgodbillon</id>
-        <name>Stephane Godbillon</name>
-        <url>http://stephane.godbillon.com</url>
-          </developer>
-        </developers>))
-}
-
-object Format {
-  import com.typesafe.sbt.SbtScalariform._
-
-  lazy val settings = scalariformSettings ++ Seq(
-    ScalariformKeys.preferences := formattingPreferences)
-
-  lazy val formattingPreferences = {
-    import scalariform.formatter.preferences._
-    FormattingPreferences().
-      setPreference(AlignParameters, false).
-      setPreference(AlignSingleLineCaseStatements, true).
-      setPreference(CompactControlReadability, false).
-      setPreference(CompactStringConcatenation, false).
-      setPreference(DoubleIndentClassDeclaration, true).
-      setPreference(FormatXml, true).
-      setPreference(IndentLocalDefs, false).
-      setPreference(IndentPackageBlocks, true).
-      setPreference(IndentSpaces, 2).
-      setPreference(MultilineScaladocCommentsStartOnFirstLine, false).
-      setPreference(PreserveSpaceBeforeArguments, false).
-      setPreference(RewriteArrowSymbols, false).
-      setPreference(SpaceBeforeColon, false).
-      setPreference(SpaceInsideBrackets, false).
-      setPreference(SpacesAroundMultiImports, true).
-      setPreference(SpacesWithinPatternBinders, true)
-  }
-}
-
-// Shell prompt which show the current project,
-// git branch and build version
-object ShellPrompt {
-  object devnull extends ProcessLogger {
-    def info(s: => String) {}
-
-    def error(s: => String) {}
-
-    def buffer[T](f: => T): T = f
-  }
-
-  def currBranch = (
-    ("git status -sb" lines_! devnull headOption)
-      getOrElse "-" stripPrefix "## ")
-
-  val buildShellPrompt = {
-    (state: State) =>
-    {
-      val currProject = Project.extract(state).currentProject.id
-      "%s:%s:%s> ".format(
-        currProject, currBranch, BuildSettings.buildVersion)
-    }
-  }
+    mappings in (Compile, packageDoc) ~= filter
+  ) ++ Publish.settings ++ Format.settings ++ (
+    Release.settings ++ Publish.mimaSettings)
 }
 
 object Resolvers {
@@ -286,6 +192,8 @@ object ReactiveMongoBuild extends Build {
     binaryIssueFilters, previousArtifacts
   }
 
+  import de.johoop.cpd4sbt.CopyPasteDetector
+
   val travisEnv = taskKey[Unit]("Print Travis CI env")
 
   val projectPrefix = "ReactiveMongo"
@@ -389,7 +297,8 @@ object ReactiveMongoBuild extends Build {
 
         println(s"# Travis CI env\r\n$matrix")
       }
-    ).aggregate(bson, bsonmacros, shaded, driver, jmx)
+    ).aggregate(bson, bsonmacros, shaded, driver, jmx).
+    enablePlugins(CopyPasteDetector)
 
   import scala.xml.{ Elem => XmlElem, Node => XmlNode }
   private def transformPomDependencies(tx: XmlElem => Option[XmlNode]): XmlNode => XmlNode = { node: XmlNode =>
@@ -418,8 +327,7 @@ object ReactiveMongoBuild extends Build {
   lazy val shaded = Project(
     s"$projectPrefix-Shaded",
     file("shaded"),
-    settings = baseSettings ++ Publish.settings).
-    settings(
+    settings = baseSettings ++ Publish.settings ++ Seq(
       previousArtifacts := Set.empty,
       crossPaths := false,
       autoScalaLibrary := false,
@@ -436,6 +344,7 @@ object ReactiveMongoBuild extends Build {
       packageBin in Compile := target.value / (
         assemblyJarName in assembly).value
     )
+  )
 
   private val driverFilter: Seq[(File, String)] => Seq[(File, String)] = {
     (_: Seq[(File, String)]).filter {
@@ -476,7 +385,7 @@ object ReactiveMongoBuild extends Build {
         )
       }
     )
-  )
+  ).enablePlugins(CopyPasteDetector)
 
   lazy val bsonmacros = Project(
     s"$projectPrefix-BSON-Macros",
@@ -485,6 +394,7 @@ object ReactiveMongoBuild extends Build {
       libraryDependencies ++= Seq(specs,
         "org.scala-lang" % "scala-compiler" % scalaVersion.value % "provided")
     ))
+    .enablePlugins(CopyPasteDetector)
     .dependsOn(bson)
 
   val driverCleanup = taskKey[Unit]("Driver compilation cleanup")
@@ -495,8 +405,9 @@ object ReactiveMongoBuild extends Build {
     settings = buildSettings ++ Findbugs.settings ++ Seq(
       resolvers := resolversList,
       compile in Compile <<= (compile in Compile).dependsOn(assembly in shaded),
-      sourceGenerators in Compile <+= (version).zip(sourceManaged in Compile).map {
-        case (ver, dir) =>
+      sourceGenerators in Compile += Def.task {
+        val ver = version.value
+        val dir = (sourceManaged in Compile).value
         val outdir = dir / "reactivemongo" / "api"
         val f = outdir / "Version.scala"
 
@@ -509,12 +420,12 @@ object Version {
   override val toString = "$ver"
 
   /** The major version (e.g. 0.12 for the release 0.12.0) */
-  val majorVersion = "${Publish.majorVersion}"
+  val majorVersion = "${Release.major.value}"
 }""")
 
           f
         })
-      },
+      }.taskValue,
       driverCleanup := {
         val classDir = (classDirectory in Compile).value
         val extDir = {
@@ -930,7 +841,8 @@ object Version {
       mappings in (Compile, packageSrc) ~= driverFilter,
       apiMappings ++= Documentation.mappings("com.typesafe.akka", "http://doc.akka.io/api/akka/%s/")("akka-actor").value ++ Documentation.mappings("com.typesafe.play", "http://playframework.com/documentation/%s/api/scala/index.html", _.replaceAll("[\\d]$", "x"))("play-iteratees").value
     )
-  ).dependsOn(bsonmacros, shaded)
+  ).enablePlugins(CopyPasteDetector).
+    dependsOn(bsonmacros, shaded)
 
   private val providedInternalDeps: XmlNode => XmlNode = {
     import scala.xml.NodeSeq
@@ -964,5 +876,6 @@ object Version {
       testOptions in Test += Tests.Cleanup(commonCleanup),
       libraryDependencies ++= Seq(specs) ++ logApi,
       pomPostProcess := providedInternalDeps
-    ).dependsOn(driver)
+    ).enablePlugins(CopyPasteDetector).
+    dependsOn(driver)
 }

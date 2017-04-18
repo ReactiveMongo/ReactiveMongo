@@ -98,7 +98,7 @@ class JmxSpec extends org.specs2.mutable.Specification {
     "be registered" in { implicit ee: EE =>
       Try(db).map(_.name) must beSuccessfulTry[String].like {
         case name => name aka "database name" must_== Common.dbName and {
-          val mbeans = mbs.queryMBeans(new ObjectName("org.reactivemongo.Supervisor-*.${Common.connection.name}:type=Node,*"), null)
+          val mbeans = mbs.queryMBeans(new ObjectName(s"org.reactivemongo.Supervisor-*.${Common.connection.name}:type=Node,*"), null)
 
           nodeMBean aka ("Node MBean") must beLike[ObjectInstance] {
             case bi => verifyBeanInstance(bi, "reactivemongo.jmx.Node",
