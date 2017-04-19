@@ -92,11 +92,11 @@ object Release {
       val ver = (version in ThisBuild).value
 
       if (ver endsWith "-SNAPSHOT") {
-        // Prepare the release the SNAPSHOT from master, with a release branch
-        s"Release $ver"
-      } else {
         // Bump for the next coming sprint, on develop
         s"Bump to $ver"
+      } else {
+        // Prepare the release the SNAPSHOT from master, with a release branch
+        s"Release $ver"
       }
     },
     releaseProcess := {
