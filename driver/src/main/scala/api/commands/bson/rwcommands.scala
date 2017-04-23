@@ -27,10 +27,17 @@ object BSONGetLastErrorImplicits {
       singleShard = doc.getAs[String]("singleShard"),
       updatedExisting = doc.getAs[BSONBooleanLike]("updatedExisting").map(_.toBoolean).getOrElse(false),
       upserted = doc.getAs[BSONValue]("upserted"),
-      wnote = doc.get("wnote").map {
-        case BSONString("majority") => GetLastError.Majority
-        case BSONString(tagSet)     => GetLastError.TagSet(tagSet)
-        case BSONInteger(acks)      => GetLastError.WaitForAknowledgments(acks)
+      wnote = doc.get("wnote").flatMap {
+        case BSONString("majority") =>
+          Some(GetLastError.Majority)
+
+        case BSONString(tagSet) =>
+          Some(GetLastError.TagSet(tagSet))
+
+        case BSONInteger(acks) =>
+          Some(GetLastError.WaitForAknowledgments(acks))
+
+        case _ => Option.empty
       },
       wtimeout = doc.getAs[Boolean]("wtimeout").getOrElse(false),
       waited = doc.getAs[Int]("waited"),

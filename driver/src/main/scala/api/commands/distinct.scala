@@ -1,5 +1,7 @@
 package reactivemongo.api.commands
 
+import scala.language.higherKinds
+
 import scala.util.{ Failure, Success, Try }
 
 import scala.collection.generic.CanBuildFrom

@@ -101,7 +101,7 @@ class ChannelBufferWritableBuffer(val buffer: ChannelBuffer = ChannelBuffers.dyn
   }
 
   def writeByte(byte: Byte): WritableBuffer = {
-    buffer writeByte byte
+    buffer writeByte byte.toInt
     this
   }
 

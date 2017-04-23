@@ -164,6 +164,8 @@ trait BatchCommands[P <: SerializationPack] {
  * @define aggBatchSizeParam the batch size (for the aggregation cursor; if `None` use the default one)
  */
 trait GenericCollection[P <: SerializationPack with Singleton] extends Collection with GenericCollectionWithCommands[P] with CollectionMetaCommands with reactivemongo.api.commands.ImplicitCommandHelpers[P] { self =>
+  import scala.language.higherKinds
+
   val pack: P
   protected val BatchCommands: BatchCommands[pack.type]
 
@@ -240,7 +242,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    * @param pwriter the writer for the projection
    * @return $returnQueryBuilder
    */
-  def find[S, P](selector: S, projection: P)(implicit swriter: pack.Writer[S], pwriter: pack.Writer[P]): GenericQueryBuilder[pack.type] = genericQueryBuilder.query(selector).projection(projection)
+  def find[S, J](selector: S, projection: J)(implicit swriter: pack.Writer[S], pwriter: pack.Writer[J]): GenericQueryBuilder[pack.type] = genericQueryBuilder.query(selector).projection(projection)
 
   /**
    * Counts the matching documents.

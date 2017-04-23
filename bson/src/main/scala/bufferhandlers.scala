@@ -195,7 +195,7 @@ object DefaultBufferHandler extends BufferHandler {
     }
 
     def read(buffer: ReadableBuffer) =
-      BSONDBPointer(buffer.readCString, buffer.readArray(12))
+      new BSONDBPointer(buffer.readCString, () => buffer.readArray(12))
   }
 
   object BSONJavaScriptBufferHandler extends BufferRW[BSONJavaScript] {

@@ -33,7 +33,7 @@ object BSONAggregationFramework
 
   protected def booleanValue(b: Boolean): BSONValue = BSONBoolean(b)
   protected def intValue(i: Int): BSONValue = BSONInteger(i)
-  protected def longValue(l: Long): BSONValue = BSONDouble(l)
+  protected def longValue(l: Long): BSONValue = BSONDouble(l.toDouble)
   protected def doubleValue(d: Double): BSONValue = BSONDouble(d)
   protected def stringValue(s: String): BSONValue = BSONString(s)
 }

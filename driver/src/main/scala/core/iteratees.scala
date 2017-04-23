@@ -147,17 +147,14 @@ object CustomEnumerator {
               case None        => (None, f(Input.EOF))
             }
 
-            future.onSuccess {
-              case (state, iteratee) =>
-                if (state.isDefined)
-                  inloop(nextChunk(state.get), iteratee)
-                else
-                  promise.success(iteratee)
-            }
-            future.onFailure {
-              case e => promise.failure(e)
-            }
-            future.map(_._2)
+            future.andThen {
+              case Success((state, iteratee)) => {
+                if (state.isDefined) inloop(nextChunk(state.get), iteratee)
+                else promise.success(iteratee)
+              }
+
+              case Failure(e) => promise.failure(e)
+            }.map(_._2)
           }
 
           case Step.Done(a, e) => {

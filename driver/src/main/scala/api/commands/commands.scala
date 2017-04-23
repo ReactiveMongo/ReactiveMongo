@@ -81,6 +81,8 @@ object CommandError {
   }
 }
 
+import scala.language.higherKinds
+
 /**
  * Fetches a cursor from MongoDB results.
  * @tparam P the type of the serialization pack
@@ -110,6 +112,8 @@ trait CursorFetcher[P <: SerializationPack, +C[_] <: Cursor[_]] {
 case class ResultCursor(cursorId: Long, fullCollectionName: String)
 
 trait ImplicitCommandHelpers[P <: SerializationPack] {
+  import scala.language.implicitConversions
+
   val pack: P
 
   trait ImplicitlyDocumentProducer {
@@ -151,7 +155,7 @@ object Command {
 
     protected def defaultReadPreference = db.connection.options.readPreference
 
-    def one[A](readPreference: ReadPreference)(implicit reader: pack.Reader[A], ec: ExecutionContext): Future[A] = {
+    def one[T](readPreference: ReadPreference)(implicit reader: pack.Reader[T], ec: ExecutionContext): Future[T] = {
       val (requestMaker, m26WriteCommand) =
         buildRequestMaker(pack)(command, writer, readPreference, db.name)
 
@@ -166,7 +170,7 @@ object Command {
       }
     }
 
-    def cursor[A](readPreference: ReadPreference)(implicit reader: pack.Reader[A]): DefaultCursor.Impl[A] = {
+    def cursor[T](readPreference: ReadPreference)(implicit reader: pack.Reader[T]): DefaultCursor.Impl[T] = {
       val buffer = ChannelBufferWritableBuffer()
       pack.serializeAndWrite(buffer, command, writer)
 

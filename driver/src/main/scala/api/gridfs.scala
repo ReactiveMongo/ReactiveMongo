@@ -371,7 +371,7 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
           bson = BSONDocument(idProducer("_id" -> file.id)) ++ (
             "filename" -> file.filename.map(BSONString(_)),
             "chunkSize" -> BSONInteger(chunkSize),
-            "length" -> BSONLong(length),
+            "length" -> BSONLong(length.toLong),
             "uploadDate" -> BSONDateTime(uploadDate),
             "contentType" -> file.contentType.map(BSONString(_)),
             "md5" -> md5.map(Converters.hex2Str),

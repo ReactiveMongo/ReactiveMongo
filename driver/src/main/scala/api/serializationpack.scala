@@ -1,5 +1,7 @@
 package reactivemongo.api
 
+import scala.language.higherKinds
+
 import scala.util.Try
 
 import reactivemongo.bson.buffer.{ ReadableBuffer, WritableBuffer }
