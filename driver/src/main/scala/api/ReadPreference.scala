@@ -212,7 +212,7 @@ object ReadPreference {
     other.elements.forall { element =>
       els.find {
         case BSONElement(name, value) =>
-          element._1 == name && ((element._2, value) match {
+          element.name == name && ((element.value, value) match {
             case (d1: BSONDocument, d2: BSONDocument) =>
               d1.elements == d2.elements
 

@@ -15,6 +15,8 @@
  */
 package reactivemongo.utils
 
+import scala.language.implicitConversions
+
 import scala.concurrent._
 import scala.concurrent.duration._
 

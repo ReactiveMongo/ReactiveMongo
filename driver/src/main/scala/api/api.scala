@@ -1137,7 +1137,7 @@ class MongoDriver(
     }
 
     override def postStop: Unit = {
-      logger.info(s"[$supervisorName] Stopping the monitor")
+      logger.info(s"[$supervisorName] Stopping the monitor...")
 
       driver.system.shutdown()
     }

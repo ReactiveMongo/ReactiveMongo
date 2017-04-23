@@ -16,6 +16,8 @@
 package reactivemongo
 
 package object util {
+  import scala.language.implicitConversions
+
   /** Makes an option of the value matching the condition. */
   def option[T](cond: => Boolean, value: => T): Option[T] =
     if (cond) Some(value) else None
@@ -37,6 +39,7 @@ package object util {
       )
     }
   }
+
   object EitherMappableFuture {
     implicit def futureToEitherMappable[A](future: Future[A]): EitherMappableFuture[A] = EitherMappableFuture(future)
   }

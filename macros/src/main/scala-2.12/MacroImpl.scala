@@ -517,8 +517,8 @@ private object MacroImpl {
       }.headOption
     } yield apply -> unapply
 
-    type Reader[A] = BSONReader[_ <: BSONValue, A]
-    type Writer[A] = BSONWriter[A, _ <: BSONValue]
+    type Reader[T] = BSONReader[_ <: BSONValue, T]
+    type Writer[T] = BSONWriter[T, _ <: BSONValue]
 
     private def isSingleton(tpe: Type): Boolean = tpe <:< typeOf[Singleton]
 

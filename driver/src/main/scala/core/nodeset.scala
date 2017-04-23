@@ -1,5 +1,7 @@
 package reactivemongo.core.nodeset
 
+import scala.language.higherKinds
+
 import java.util.concurrent.{ TimeUnit, Executor, Executors }
 
 import scala.collection.generic.CanBuildFrom
@@ -628,7 +630,7 @@ final class ChannelFactory private[reactivemongo] (
     java.nio.ByteOrder.LITTLE_ENDIAN
   )
 
-  private def makePipeline(timeoutMS: Int, receiver: ActorRef): ChannelPipeline = {
+  private def makePipeline(timeoutMS: Long, receiver: ActorRef): ChannelPipeline = {
     val idleHandler = new IdleStateHandler(
       timer, 0, 0, timeoutMS, TimeUnit.MILLISECONDS
     )
@@ -704,7 +706,7 @@ final class ChannelFactory private[reactivemongo] (
 
   private def makeChannel(receiver: ActorRef): Channel = {
     val channel = channelFactory.newChannel(makePipeline(
-      options.maxIdleTimeMS, receiver
+      options.maxIdleTimeMS.toLong, receiver
     ))
     val config = channel.getConfig
 

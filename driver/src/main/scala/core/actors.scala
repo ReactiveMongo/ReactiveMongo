@@ -325,11 +325,11 @@ trait MongoDBSystem extends Actor {
   override def preStart(): Unit = {
     logger.info(s"[$lnm] Starting the MongoDBSystem ${self.path}")
 
-    val refreshInterval = options.monitorRefreshMS milliseconds
+    val refreshInterval = options.monitorRefreshMS.milliseconds
 
     connectAllJob = {
       val ms = options.monitorRefreshMS / 5
-      val interval = if (ms < 100) 100 milliseconds else refreshInterval
+      val interval = if (ms < 100) 100.milliseconds else refreshInterval
 
       context.system.scheduler.schedule(interval, interval, self, ConnectAll)
     }

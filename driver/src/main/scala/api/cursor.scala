@@ -15,6 +15,8 @@
  */
 package reactivemongo.api
 
+import scala.language.higherKinds
+
 import scala.util.{ Failure, Success, Try }
 import scala.collection.generic.CanBuildFrom
 import scala.collection.mutable.Builder
@@ -684,7 +686,7 @@ object DefaultCursor {
         } else Future(Some(result.next()))
       }
 
-    @inline private def syncSuccess[A, B](f: (A, B) => State[A])(implicit ec: ExecutionContext): (A, B) => Future[State[A]] = { (a: A, b: B) => Future(f(a, b)) }
+    @inline private def syncSuccess[T, U](f: (T, U) => State[T])(implicit ec: ExecutionContext): (T, U) => Future[State[T]] = { (a: T, b: U) => Future(f(a, b)) }
 
     def foldResponses[T](z: => T, maxDocs: Int = -1)(suc: (T, Response) => State[T], err: (T, Throwable) => State[T])(implicit ctx: ExecutionContext): Future[T] = FoldResponses(z, makeRequest(maxDocs)(_: ExecutionContext),
       nextResponse(maxDocs), killCursors _, syncSuccess(suc), err, maxDocs)(
@@ -774,7 +776,7 @@ object DefaultCursor {
           CustomEnumeratee.stopOnError
         else CustomEnumeratee.recover {
           new CustomEnumeratee.RecoverFromErrorFunction {
-            def apply[E, A](throwable: Throwable, input: Input[E], continue: () => Iteratee[E, A]): Iteratee[E, A] = throwable match {
+            def apply[I, O](throwable: Throwable, input: Input[I], continue: () => Iteratee[I, O]): Iteratee[I, O] = throwable match {
               case e: ReplyDocumentIteratorExhaustedException => {
                 val errstr = "ReplyDocumentIterator exhausted! Was this enumerator applied to many iteratees concurrently? Stopping to prevent infinite recovery."
                 logger.error(errstr, e)
@@ -933,12 +935,13 @@ private[api] final class FoldResponses[T](
 
       case Fail(f) => self ! OnError(last, cur, f, c)
 
-      case Cont(v) => nextResponse(ec, last).onSuccess({
-        case Some(r) => self ! ProcResponses(
+      case Cont(v) => nextResponse(ec, last).onComplete({
+        case Success(Some(r)) => self ! ProcResponses(
           () => Future.successful(r), v, nc, r.reply.cursorID
         )
 
-        case _ => ok(last, v)
+        case Success(_) => ok(last, v)
+        case Failure(e) => ko(last, e)
       })(ec)
     }
   }

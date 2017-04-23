@@ -16,6 +16,8 @@ case class GetLastError(
     with CommandWithResult[LastError]
 
 object GetLastError {
+  import scala.language.implicitConversions
+
   sealed trait W
   case object Majority extends W
   case class TagSet(tag: String) extends W
