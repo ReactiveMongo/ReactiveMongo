@@ -1,85 +1,13 @@
-/*
- * Copyright 2012-2013 Stephane Godbillon (@sgodbillon) and Zenexity
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *   http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package reactivemongo.api
+
+import scala.concurrent.{ ExecutionContext, Future }
 
 import reactivemongo.core.errors.GenericDatabaseException
 
-/**
- * A MongoDB Collection, resolved from a [[reactivemongo.api.DefaultDB]].
- *
- * You should consider the generic API
- * ([[reactivemongo.api.collections.GenericCollection]])
- * and the default [[reactivemongo.api.collections.bson.BSONCollection]].
- *
- * @define failoverStrategy the failover strategy to override the default one
- * @define otherName the name of another collection
- */
-trait Collection {
-  /** The database which this collection belong to. */
-  def db: DB
+import reactivemongo.api.commands._
+import reactivemongo.api.commands.bson._
 
-  /** The name of the collection. */
-  def name: String
-
-  /** The default failover strategy for the methods of this collection. */
-  def failoverStrategy: FailoverStrategy
-
-  /** Gets the full qualified name of this collection. */
-  def fullCollectionName = db.name + "." + name
-
-  /**
-   * Gets another implementation of this collection.
-   * An implicit CollectionProducer[C] must be present in the scope, or it will be the default implementation ([[reactivemongo.api.collections.bson.BSONCollection]]).
-   *
-   * @param failoverStrategy $failoverStrategy
-   */
-  def as[C <: Collection](failoverStrategy: FailoverStrategy = failoverStrategy)(implicit producer: CollectionProducer[C] = collections.bson.BSONCollectionProducer): C = {
-    producer.apply(db, name, failoverStrategy)
-  }
-
-  /**
-   * Gets another collection in the current database.
-   * An implicit CollectionProducer[C] must be present in the scope, or it will be the default implementation ([[reactivemongo.api.collections.bson.BSONCollection]]).
-   *
-   * @param name $otherName
-   * @param failoverStrategy $failoverStrategy
-   */
-  @deprecated("Consider using `sibling` instead", "0.10")
-  def sister[C <: Collection](name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit producer: CollectionProducer[C] = collections.bson.BSONCollectionProducer): C =
-    sibling(name, failoverStrategy)
-
-  /**
-   * Gets another collection in the current database.
-   * An implicit CollectionProducer[C] must be present in the scope, or it will be the default implementation ([[reactivemongo.api.collections.bson.BSONCollection]]).
-   *
-   * @param name $otherName
-   * @param failoverStrategy $failoverStrategy
-   */
-  def sibling[C <: Collection](name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit producer: CollectionProducer[C] = collections.bson.BSONCollectionProducer): C =
-    producer.apply(db, name, failoverStrategy)
-}
-
-/**
- * A Producer of [[Collection]] implementation.
- *
- * This is used to get an implementation implicitly when getting a reference of a [[Collection]].
- */
-trait CollectionProducer[+C <: Collection] {
-  def apply(db: DB, name: String, failoverStrategy: FailoverStrategy = FailoverStrategy()): C
-}
+import reactivemongo.api.indexes.CollectionIndexesManager
 
 /**
  * A mixin that provides commands about this Collection itself.
@@ -89,16 +17,12 @@ trait CollectionProducer[+C <: Collection] {
  * @define cappedMaxParam the maximum number of documents this capped collection can contain
  */
 trait CollectionMetaCommands { self: Collection =>
-  import scala.concurrent.{ ExecutionContext, Future }
-  import reactivemongo.api.commands._
-  import reactivemongo.api.commands.bson._
   import CommonImplicits._
   import BSONCreateImplicits._
   import BSONEmptyCappedImplicits._
   import BSONCollStatsImplicits._
   import BSONRenameCollectionImplicits._
   import BSONConvertToCappedImplicits._
-  import reactivemongo.api.indexes.CollectionIndexesManager
 
   /**
    * Creates this collection.

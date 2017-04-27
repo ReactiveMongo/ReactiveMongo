@@ -4,7 +4,13 @@ import scala.concurrent.{ ExecutionContext, Future }
 import scala.concurrent.duration.FiniteDuration
 
 import reactivemongo.bson._
-import reactivemongo.api.{ Cursor, CursorProducer, WrappedCursor }
+import reactivemongo.api.{
+  Cursor,
+  CursorFlattener,
+  CursorProducer,
+  FlattenedCursor,
+  WrappedCursor
+}
 import reactivemongo.api.collections.bson.BSONCollection
 
 import org.specs2.concurrent.{ ExecutionEnv => EE }
@@ -215,15 +221,19 @@ class AggregationSpec extends org.specs2.mutable.Specification {
       "with produced cursor" >> {
         "without limit (maxDocs)" in { implicit ee: EE =>
           withCtx(coll) { (firstOp, pipeline) =>
-            coll
-              .aggregate2[BSONDocument](firstOp, pipeline, batchSize = Some(1))
-              .collect[List](Int.MaxValue, Cursor.FailOnError[List[BSONDocument]]())
-              .aka("cursor result") must beEqualTo(expected).await(1, timeout)
+            val cursor = coll.aggregatorContext[BSONDocument](
+              firstOp, pipeline, batchSize = Some(1)
+            ).prepared.cursor
+
+            cursor.collect[List](
+              Int.MaxValue, Cursor.FailOnError[List[BSONDocument]]()
+            ) must beEqualTo(expected).await(1, timeout)
           }
         }
 
-        "verify type" in { implicit ee: EE =>
+        "of expected type" in { implicit ee: EE =>
           withCtx(coll) { (firstOp, pipeline) =>
+            // Custom cursor support
             trait FooCursor[T] extends Cursor[T] { def foo: String }
 
             class DefaultFooCursor[T](val wrappee: Cursor[T])
@@ -236,9 +246,20 @@ class AggregationSpec extends org.specs2.mutable.Specification {
               def produce(base: Cursor[T]) = new DefaultFooCursor(base)
             }
 
-            coll
-              .aggregate2[BSONDocument](firstOp, pipeline, batchSize = Some(1))
-              .isInstanceOf[FooCursor[BSONDocument]] must beEqualTo(true)
+            implicit def fooFlattener[T] = new CursorFlattener[FooCursor] {
+              def flatten[T](future: Future[FooCursor[T]]): FooCursor[T] =
+                new FlattenedCursor[T](future) with FooCursor[T] {
+                  def foo = "Flattened"
+                }
+            }
+
+            // Aggregation itself
+            val aggregator = coll.aggregatorContext[BSONDocument](
+              firstOp, pipeline, batchSize = Some(1)
+            ).prepared[FooCursor]
+
+            aggregator.cursor.isInstanceOf[FooCursor[BSONDocument]].
+              aka("cursor") must beEqualTo(true)
           }
         }
       }

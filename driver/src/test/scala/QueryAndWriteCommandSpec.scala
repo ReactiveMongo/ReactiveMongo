@@ -69,7 +69,7 @@ class QueryAndWriteCommandSpec extends org.specs2.mutable.Specification {
         ).map(_ => {}).
           aka("index") must beEqualTo({}).await(1, timeout) and {
             c.bulkInsert(docs, false).map(_ => {}) must beEqualTo({}).
-              await(1, timeout * (n / 2)) and {
+              await(1, timeout * (n / 2L)) and {
                 c.count(Some(BSONDocument("bulk" -> true))).
                   aka("count") must beEqualTo(e).await(1, timeout)
                 // all docs minus errors

@@ -343,7 +343,7 @@ class DriverSpec extends org.specs2.mutable.Specification {
   "Database" should {
     "be resolved from connection according the failover strategy" >> {
       "successfully" in { implicit ee: EE =>
-        val fos = FailoverStrategy(FiniteDuration(50, "ms"), 20, _ * 2)
+        val fos = FailoverStrategy(FiniteDuration(50, "ms"), 20, _ * 2D)
 
         Common.connection.database(Common.commonDb, fos).
           map(_ => {}) must beEqualTo({}).await(1, estTimeout(fos))
@@ -355,7 +355,7 @@ class DriverSpec extends org.specs2.mutable.Specification {
         val ws = scala.collection.mutable.ListBuffer.empty[Int]
         val expected = List(2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40, 42)
         val fos = FailoverStrategy(FiniteDuration(50, "ms"), 20,
-          { n => val w = n * 2; ws += w; w })
+          { n => val w = n * 2; ws += w; w.toDouble })
         val before = System.currentTimeMillis()
 
         con.database("foo", fos).map(_ => List.empty[Int]).

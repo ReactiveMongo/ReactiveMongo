@@ -17,7 +17,7 @@ package reactivemongo.core.actors
 
 import java.net.InetSocketAddress
 
-import scala.concurrent.{ Future, Promise }
+import scala.concurrent.Promise
 import scala.util.{ Failure, Success, Try }
 
 import akka.actor.{ Actor, ActorRef, Cancellable }
@@ -32,7 +32,6 @@ import shaded.netty.channel.group.{
 import reactivemongo.util.LazyLogger
 import reactivemongo.core.errors.{ DriverException, GenericDriverException }
 import reactivemongo.core.protocol.{
-  CheckedWriteRequest,
   GetMore,
   Query,
   QueryFlags,
@@ -63,94 +62,6 @@ import reactivemongo.core.nodeset.{
 import reactivemongo.api.{ MongoConnectionOptions, ReadPreference }
 import reactivemongo.api.commands.LastError
 import external.reactivemongo.ConnectionListener
-
-// messages
-
-/**
- * A message expecting a response from database.
- * It holds a promise that will be completed by the MongoDBSystem actor.
- * The future can be used to get the error or the successful response.
- */
-sealed trait ExpectingResponse {
-  private[actors] val promise: Promise[Response] = Promise()
-
-  /** The future response of this request. */
-  val future: Future[Response] = promise.future
-}
-
-object ExpectingResponse {
-  def unapply(that: Any): Option[Promise[Response]] = that match {
-    case req @ RequestMakerExpectingResponse(_, _) => Some(req.promise)
-    case req @ CheckedWriteRequestExpectingResponse(_) => Some(req.promise)
-    case _ => None
-  }
-}
-
-/**
- * A request expecting a response.
- *
- * @param requestMaker the request maker
- * @param isMongo26WriteOp true if the operation is a MongoDB 2.6 write one
- */
-case class RequestMakerExpectingResponse(
-  requestMaker: RequestMaker,
-  isMongo26WriteOp: Boolean
-) extends ExpectingResponse
-
-/**
- * A checked write request expecting a response.
- *
- * @param checkedWriteRequest The request maker.
- */
-case class CheckedWriteRequestExpectingResponse(
-  checkedWriteRequest: CheckedWriteRequest
-) extends ExpectingResponse
-
-/**
- * Message to close all active connections.
- * The MongoDBSystem actor must not be used after this message has been sent.
- */
-case object Close
-
-/**
- * Message to send in order to get warned the next time a primary is found.
- */
-private[reactivemongo] case object ConnectAll
-private[reactivemongo] case object RefreshAll
-private[reactivemongo] case class ChannelConnected(channelId: Int)
-
-private[reactivemongo] sealed trait ChannelUnavailable { def channelId: Int }
-
-private[reactivemongo] object ChannelUnavailable {
-  def unapply(cu: ChannelUnavailable): Option[Int] = Some(cu.channelId)
-}
-
-private[reactivemongo] case class ChannelDisconnected(
-  channelId: Int
-) extends ChannelUnavailable
-
-private[reactivemongo] case class ChannelClosed(
-  channelId: Int
-) extends ChannelUnavailable
-
-/** Message sent when the primary has been discovered. */
-case class PrimaryAvailable(metadata: ProtocolMetadata)
-
-/** Message sent when the primary has been lost. */
-case object PrimaryUnavailable
-
-// TODO
-case class SetAvailable(metadata: ProtocolMetadata)
-
-// TODO
-case object SetUnavailable
-
-/** Register a monitor. */
-case object RegisterMonitor
-
-/** MongoDBSystem has been shut down. */
-case object Closed
-case object GetLastMetadata
 
 /** Main actor that processes the requests. */
 @deprecated("Internal class: will be made private", "0.11.14")
@@ -1425,79 +1336,6 @@ object MongoDBSystem {
     LazyLogger("reactivemongo.core.actors.MongoDBSystem")
 }
 
-private[actors] case class AwaitingResponse(
-    request: Request,
-    channelID: Int,
-    promise: Promise[Response],
-    isGetLastError: Boolean,
-    isMongo26WriteOp: Boolean
-) {
-
-  @inline def requestID: Int = request.requestID
-
-  private var _retry = 0 // TODO: Refactor as property
-
-  // TODO: Refactor as Property
-  var _writeConcern: Option[Request] = None
-  def withWriteConcern(wc: Request): AwaitingResponse = {
-    _writeConcern = Some(wc)
-    this
-  }
-  def getWriteConcern: Option[Request] = _writeConcern
-
-  /**
-   * If this is not already completed and,
-   * if the current retry count is less then the maximum.
-   */
-  def retriable(max: Int): Option[Int => AwaitingResponse] =
-    if (!promise.isCompleted && _retry >= max) None else Some({ chanId: Int =>
-      val req = copy(this.request, channelID = chanId)
-
-      req._retry = _retry + 1
-      req._writeConcern = _writeConcern
-
-      req
-    })
-
-  def copy(
-    request: Request = this.request,
-    channelID: Int = this.channelID,
-    promise: Promise[Response] = this.promise,
-    isGetLastError: Boolean = this.isGetLastError,
-    isMongo26WriteOp: Boolean = this.isMongo26WriteOp
-  ): AwaitingResponse =
-    AwaitingResponse(request, channelID, promise,
-      isGetLastError, isMongo26WriteOp)
-
-  @deprecated(message = "Use [[copy]] with `Request`", since = "0.12-RC1")
-  def copy(
-    requestID: Int,
-    channelID: Int,
-    promise: Promise[Response],
-    isGetLastError: Boolean,
-    isMongo26WriteOp: Boolean
-  ): AwaitingResponse = {
-    val req = copy(
-      this.request,
-      channelID = channelID,
-      promise = promise,
-      isGetLastError = isGetLastError,
-      isMongo26WriteOp = isMongo26WriteOp
-    )
-
-    req._retry = this._retry
-    req._writeConcern = this._writeConcern
-
-    req
-  }
-}
-
-/**
- * A message to send to a MonitorActor to be warned when a primary has been discovered.
- */
-@deprecated(message = "Will be removed", since = "0.11.10")
-case object WaitForPrimary
-
 private[reactivemongo] object RequestId {
   // all requestIds [0, 1000[ are for isMaster messages
   val isMaster = new RequestIdGenerator(0, 999)
@@ -1510,140 +1348,4 @@ private[reactivemongo] object RequestId {
 
   // all requestIds [3000[ are for common messages
   val common = new RequestIdGenerator(3000, Int.MaxValue - 1)
-}
-
-private[actors] object IsMasterResponse {
-  def unapply(response: Response): Option[Response] =
-    if (RequestId.isMaster accepts response) Some(response) else None
-}
-
-/**
- * @param lower the lower bound
- * @param upper the upper bound
- */
-private[actors] class RequestIdGenerator(val lower: Int, val upper: Int)
-    extends Product with Serializable {
-
-  private val lock = new Object {}
-  private var value: Int = lower
-
-  def next: Int = lock.synchronized {
-    val v = value
-
-    if (v == upper) value = lower
-    else value = v + 1
-
-    v
-  }
-
-  def accepts(id: Int): Boolean = id >= lower && id <= upper
-  def accepts(response: Response): Boolean = accepts(response.header.responseTo)
-
-  override def equals(that: Any): Boolean = that match {
-    case RequestIdGenerator(l, u) => (lower == l) && (upper == u)
-    case _                        => false
-  }
-
-  override lazy val hashCode: Int = (lower, upper).hashCode
-
-  @deprecated("", "0.12-RC6")
-  def canEqual(that: Any): Boolean = that.isInstanceOf[RequestIdGenerator]
-
-  @deprecated("", "0.12-RC6")
-  val productArity = 2
-
-  @deprecated("", "0.12-RC6")
-  def productElement(n: Int): Any = n match {
-    case 0 => lower
-    case _ => upper
-  }
-}
-
-@deprecated("Use the class RequestIdGenerator", "0.12-RC6")
-object RequestIdGenerator
-    extends scala.runtime.AbstractFunction2[Int, Int, RequestIdGenerator] {
-
-  def apply(lower: Int, upper: Int): RequestIdGenerator =
-    new RequestIdGenerator(lower, upper)
-
-  def unapply(g: RequestIdGenerator): Option[(Int, Int)] =
-    Some(g.lower -> g.upper)
-}
-
-// exceptions
-object Exceptions {
-  import scala.util.control.NoStackTrace
-
-  private val primaryUnavailableMsg = "No primary node is available!"
-
-  private val nodeSetReachableMsg =
-    "The node set can not be reached! Please check your network connectivity"
-
-  /** An exception thrown when a request needs a non available primary. */
-  sealed class PrimaryUnavailableException private[reactivemongo] (
-      val message: String,
-      override val cause: Throwable = null
-  ) extends DriverException with NoStackTrace {
-
-    def this(supervisor: String, connection: String, cause: Throwable) =
-      this(s"$primaryUnavailableMsg ($supervisor/$connection)", cause)
-
-    def this() = this(primaryUnavailableMsg, null)
-  }
-
-  @deprecated(message = "Use constructor with details", since = "0.12-RC0")
-  case object PrimaryUnavailableException extends PrimaryUnavailableException()
-
-  /**
-   * An exception thrown when the entire node set is unavailable.
-   * The application may not have access to the network anymore.
-   */
-  sealed class NodeSetNotReachable private[reactivemongo] (
-      val message: String,
-      override val cause: Throwable
-  ) extends DriverException with NoStackTrace {
-
-    private[reactivemongo] def this(supervisor: String, connection: String, cause: Throwable) = this(s"$nodeSetReachableMsg ($supervisor/$connection)", cause)
-
-    private[reactivemongo] def this() = this(nodeSetReachableMsg, null)
-  }
-
-  @deprecated(message = "Use constructor with details", since = "0.12-RC0")
-  case object NodeSetNotReachable extends NodeSetNotReachable()
-
-  sealed class ChannelNotFound private[reactivemongo] (
-    val message: String,
-    val retriable: Boolean,
-    override val cause: Throwable
-  ) extends DriverException with NoStackTrace
-
-  @deprecated(message = "Use constructor with details", since = "0.12-RC0")
-  case object ChannelNotFound
-    extends ChannelNotFound("ChannelNotFound", false, null)
-
-  sealed class ClosedException private (
-      val message: String,
-      override val cause: Throwable
-  ) extends DriverException with NoStackTrace {
-
-    private[reactivemongo] def this(supervisor: String, connection: String, cause: Throwable) = this(s"This MongoConnection is closed ($supervisor/$connection)", cause)
-
-    private[reactivemongo] def this(msg: String) = this(msg, null)
-    def this() = this("This MongoConnection is closed", null)
-  }
-
-  @deprecated(message = "Use constructor with details", since = "0.12-RC0")
-  case object ClosedException extends ClosedException()
-
-  final class InternalState private[actors] (
-      trace: Array[StackTraceElement]
-  ) extends DriverException with NoStackTrace {
-    override def getMessage: String = null
-    val message = "InternalState"
-    super.setStackTrace(trace)
-  }
-
-  object InternalState {
-    val empty = new InternalState(Array.empty)
-  }
 }

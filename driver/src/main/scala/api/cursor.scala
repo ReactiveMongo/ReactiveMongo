@@ -311,92 +311,6 @@ object CursorOps {
 
 }
 
-class FlattenedCursor[T](cursor: Future[Cursor[T]]) extends Cursor[T] {
-  @deprecated(message = "Use the Play Iteratees module", since = "0.11.10")
-  def enumerate(maxDocs: Int = -1, stopOnError: Boolean = false)(implicit ctx: ExecutionContext): Enumerator[T] =
-    Enumerator.flatten(cursor.map(_.enumerate(maxDocs, stopOnError)))
-
-  @deprecated(message = "Use the Play Iteratees module", since = "0.11.10")
-  def enumerateBulks(maxDocs: Int = -1, stopOnError: Boolean = false)(implicit ctx: ExecutionContext): Enumerator[Iterator[T]] =
-    Enumerator.flatten(cursor.map(_.enumerateBulks(maxDocs, stopOnError)))
-
-  @deprecated(message = "Use the Play Iteratees module", since = "0.11.10")
-  def enumerateResponses(maxDocs: Int = -1, stopOnError: Boolean = false)(implicit ctx: ExecutionContext): Enumerator[Response] =
-    Enumerator.flatten(cursor.map(_.enumerateResponses(maxDocs, stopOnError)))
-
-  def head(implicit ctx: ExecutionContext): Future[T] = cursor.flatMap(_.head)
-
-  // TODO: Remove override
-  override def headOption(implicit ctx: ExecutionContext): Future[Option[T]] =
-    cursor.flatMap(_.headOption)
-
-  def collect[M[_]](maxDocs: Int, err: Cursor.ErrorHandler[M[T]])(implicit cbf: CanBuildFrom[M[_], T, M[T]], ec: ExecutionContext): Future[M[T]] = cursor.flatMap(_.collect[M](maxDocs, err))
-
-  def foldResponses[A](z: => A, maxDocs: Int = -1)(suc: (A, Response) => Cursor.State[A], err: Cursor.ErrorHandler[A])(implicit ctx: ExecutionContext): Future[A] = cursor.flatMap(_.foldResponses(z, maxDocs)(suc, err))
-
-  def foldResponsesM[A](z: => A, maxDocs: Int = -1)(suc: (A, Response) => Future[Cursor.State[A]], err: Cursor.ErrorHandler[A])(implicit ctx: ExecutionContext): Future[A] = cursor.flatMap(_.foldResponsesM(z, maxDocs)(suc, err))
-
-  def foldBulks[A](z: => A, maxDocs: Int = -1)(suc: (A, Iterator[T]) => Cursor.State[A], err: Cursor.ErrorHandler[A])(implicit ctx: ExecutionContext): Future[A] = cursor.flatMap(_.foldBulks(z, maxDocs)(suc, err))
-
-  def foldBulksM[A](z: => A, maxDocs: Int = -1)(suc: (A, Iterator[T]) => Future[Cursor.State[A]], err: Cursor.ErrorHandler[A])(implicit ctx: ExecutionContext): Future[A] = cursor.flatMap(_.foldBulksM(z, maxDocs)(suc, err))
-
-  def foldWhile[A](z: => A, maxDocs: Int = -1)(suc: (A, T) => Cursor.State[A], err: Cursor.ErrorHandler[A])(implicit ctx: ExecutionContext): Future[A] = cursor.flatMap(_.foldWhile(z, maxDocs)(suc, err))
-
-  def foldWhileM[A](z: => A, maxDocs: Int = -1)(suc: (A, T) => Future[Cursor.State[A]], err: Cursor.ErrorHandler[A])(implicit ctx: ExecutionContext): Future[A] = cursor.flatMap(_.foldWhileM(z, maxDocs)(suc, err))
-
-  @deprecated(message = "Use the Play Iteratees module", since = "0.11.10")
-  def rawEnumerateResponses(maxDocs: Int = -1)(implicit ctx: ExecutionContext): Enumerator[Response] =
-    Enumerator.flatten(cursor.map(_.rawEnumerateResponses(maxDocs)))
-
-}
-
-/**
- * Cursor wrapper, to help to define custom cursor classes.
- * @see CursorProducer
- */
-trait WrappedCursor[T] extends Cursor[T] {
-  /** The underlying cursor */
-  def wrappee: Cursor[T]
-
-  @deprecated(message = "Use the Play Iteratees module", since = "0.11.10")
-  def enumerate(maxDocs: Int = -1, stopOnError: Boolean = false)(implicit ctx: ExecutionContext): Enumerator[T] =
-    wrappee.enumerate(maxDocs, stopOnError)
-
-  @deprecated(message = "Use the Play Iteratees module", since = "0.11.10")
-  def enumerateBulks(maxDocs: Int = -1, stopOnError: Boolean = false)(implicit ctx: ExecutionContext): Enumerator[Iterator[T]] =
-    wrappee.enumerateBulks(maxDocs, stopOnError)
-
-  @deprecated(message = "Use the Play Iteratees module", since = "0.11.10")
-  def enumerateResponses(maxDocs: Int = -1, stopOnError: Boolean = false)(implicit ctx: ExecutionContext): Enumerator[Response] =
-    wrappee.enumerateResponses(maxDocs, stopOnError)
-
-  def collect[M[_]](maxDocs: Int, err: Cursor.ErrorHandler[M[T]])(implicit cbf: CanBuildFrom[M[_], T, M[T]], ec: ExecutionContext): Future[M[T]] = wrappee.collect[M](maxDocs, err)
-
-  // TODO: Remove
-  override def collect[M[_]](maxDocs: Int = -1, stopOnError: Boolean = true)(implicit cbf: CanBuildFrom[M[_], T, M[T]], ec: ExecutionContext): Future[M[T]] = wrappee.collect[M](maxDocs, stopOnError)
-
-  @deprecated(message = "Use the Play Iteratees module", since = "0.11.10")
-  def rawEnumerateResponses(maxDocs: Int = -1)(implicit ctx: ExecutionContext): Enumerator[Response] = wrappee.rawEnumerateResponses(maxDocs)
-
-  def foldResponses[A](z: => A, maxDocs: Int = -1)(suc: (A, Response) => Cursor.State[A], err: Cursor.ErrorHandler[A])(implicit ctx: ExecutionContext): Future[A] = wrappee.foldResponses(z, maxDocs)(suc, err)
-
-  def foldResponsesM[A](z: => A, maxDocs: Int = -1)(suc: (A, Response) => Future[Cursor.State[A]], err: Cursor.ErrorHandler[A])(implicit ctx: ExecutionContext): Future[A] = wrappee.foldResponsesM(z, maxDocs)(suc, err)
-
-  def foldBulks[A](z: => A, maxDocs: Int = -1)(suc: (A, Iterator[T]) => Cursor.State[A], err: Cursor.ErrorHandler[A])(implicit ctx: ExecutionContext): Future[A] = wrappee.foldBulks(z, maxDocs)(suc, err)
-
-  def foldBulksM[A](z: => A, maxDocs: Int = -1)(suc: (A, Iterator[T]) => Future[Cursor.State[A]], err: Cursor.ErrorHandler[A])(implicit ctx: ExecutionContext): Future[A] = wrappee.foldBulksM(z, maxDocs)(suc, err)
-
-  def foldWhile[A](z: => A, maxDocs: Int = -1)(suc: (A, T) => Cursor.State[A], err: Cursor.ErrorHandler[A])(implicit ctx: ExecutionContext): Future[A] = wrappee.foldWhile(z, maxDocs)(suc, err)
-
-  def foldWhileM[A](z: => A, maxDocs: Int = -1)(suc: (A, T) => Future[Cursor.State[A]], err: Cursor.ErrorHandler[A])(implicit ctx: ExecutionContext): Future[A] = wrappee.foldWhileM(z, maxDocs)(suc, err)
-
-  def head(implicit ctx: ExecutionContext): Future[T] = wrappee.head
-
-  // TODO: Remove override
-  override def headOption(implicit ctx: ExecutionContext): Future[Option[T]] =
-    wrappee.headOption
-}
-
 /** Cursor companion object */
 object Cursor {
   private[api] val logger = LazyLogger("reactivemongo.api.Cursor")
@@ -1050,19 +964,35 @@ trait CursorProducer[T] {
   type ProducedCursor <: Cursor[T]
 
   /** Produces a custom cursor from the `base` one. */
-  @deprecated("The `base` cursor will require [[CursorOps]].", "0.11.15")
+  @deprecated("The `base` cursor will be required to also provide [[CursorOps]].", "0.11.15") // See https://github.com/ReactiveMongo/ReactiveMongo-Streaming/blob/master/akka-stream/src/main/scala/package.scala#L14
   def produce(base: Cursor[T]): ProducedCursor
 }
 
 object CursorProducer {
-  implicit def defaultCursorProducer[T]: CursorProducer[T] =
+  private[api]type Aux[T, C[_] <: Cursor[_]] = CursorProducer[T] {
+    type ProducedCursor = C[T]
+  }
+
+  implicit def defaultCursorProducer[T]: CursorProducer.Aux[T, Cursor] =
     new CursorProducer[T] {
       type ProducedCursor = Cursor[T]
       def produce(base: Cursor[T]) = base
     }
 }
 
-/** Flattening strategy for cursor. */
+/**
+ * Flattening strategy for cursor.
+ *
+ * {{{
+ * trait FooCursor[T] extends Cursor[T] { def foo: String }
+ *
+ * implicit def fooFlattener[T] = new CursorFlattener[FooCursor] {
+ *   def flatten[T](future: Future[FooCursor[T]]): FooCursor[T] =
+ *     new FlattenedCursor[T](future) with FooCursor[T] {
+ *       def foo = "Flattened"
+ *     }
+ * }
+ */
 trait CursorFlattener[C[_] <: Cursor[_]] {
   /** Flatten a future of cursor as cursor. */
   def flatten[T](future: Future[C[T]]): C[T]
@@ -1072,6 +1002,6 @@ trait CursorFlattener[C[_] <: Cursor[_]] {
 object CursorFlattener {
   implicit object defaultCursorFlattener extends CursorFlattener[Cursor] {
     def flatten[T](future: Future[Cursor[T]]): Cursor[T] =
-      new FlattenedCursor(future)
+      new FlattenedCursor[T](future)
   }
 }
