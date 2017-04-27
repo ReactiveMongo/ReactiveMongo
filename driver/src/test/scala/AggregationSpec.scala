@@ -4,7 +4,7 @@ import scala.concurrent.{ ExecutionContext, Future }
 import scala.concurrent.duration.FiniteDuration
 
 import reactivemongo.bson._
-import reactivemongo.api.Cursor
+import reactivemongo.api.{ Cursor, CursorProducer, WrappedCursor }
 import reactivemongo.api.collections.bson.BSONCollection
 
 import org.specs2.concurrent.{ ExecutionEnv => EE }
@@ -209,6 +209,37 @@ class AggregationSpec extends org.specs2.mutable.Specification {
           }.collect[List](4, Cursor.FailOnError[List[ZipCode]]()).
             aka("aggregated") must beEqualTo(jpCodes).await(1, timeout)
 
+        }
+      }
+
+      "with produced cursor" >> {
+        "without limit (maxDocs)" in { implicit ee: EE =>
+          withCtx(coll) { (firstOp, pipeline) =>
+            coll
+              .aggregate2[BSONDocument](firstOp, pipeline, batchSize = Some(1))
+              .collect[List](Int.MaxValue, Cursor.FailOnError[List[BSONDocument]]())
+              .aka("cursor result") must beEqualTo(expected).await(1, timeout)
+          }
+        }
+
+        "verify type" in { implicit ee: EE =>
+          withCtx(coll) { (firstOp, pipeline) =>
+            trait FooCursor[T] extends Cursor[T] { def foo: String }
+
+            class DefaultFooCursor[T](val wrappee: Cursor[T])
+                extends FooCursor[T] with WrappedCursor[T] {
+              val foo = "Bar"
+            }
+
+            implicit def fooProducer[T] = new CursorProducer[T] {
+              type ProducedCursor = FooCursor[T]
+              def produce(base: Cursor[T]) = new DefaultFooCursor(base)
+            }
+
+            coll
+              .aggregate2[BSONDocument](firstOp, pipeline, batchSize = Some(1))
+              .isInstanceOf[FooCursor[BSONDocument]] must beEqualTo(true)
+          }
         }
       }
     }

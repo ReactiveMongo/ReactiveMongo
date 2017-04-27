@@ -36,13 +36,13 @@ $ sbt
 
 In order to execute the unit and integration tests, SBT can be used as follows.
 
-    sbt test-only -- exclude mongo2
+    sbt "test-only -- exclude mongo2"
 
 When running against MongoDB 2.6, the command must replace `exclude mongo2` with `exclude not_mongo26`.
 
 > The test environement must be able to handle the maximum number of incoming connection for the MongoDB instance. This must be checked, and eventually updated, using `ulimit -n`.
 
-[Travis](https://travis-ci.org/ReactiveMongo/ReactiveMongo): ![Travis build status](https://travis-ci.org/ReactiveMongo/ReactiveMongo.png?branch=master) 
+[Travis](https://travis-ci.org/ReactiveMongo/ReactiveMongo): ![Travis build status](https://travis-ci.org/ReactiveMongo/ReactiveMongo.png?branch=master)
 [![Test coverage](https://img.shields.io/badge/coverage-60%25-yellowgreen.svg)](https://reactivemongo.github.io/ReactiveMongo/coverage/0.12.0/)
 
 ### Learn More
