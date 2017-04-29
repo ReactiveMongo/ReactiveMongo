@@ -197,6 +197,8 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
 
   def readPreference: ReadPreference = db.defaultReadPreference
 
+  private val defaultCursorBatchSize: Int = 101
+
   /**
    * Returns a new reference to the same collection,
    * with the given read preference.
@@ -584,7 +586,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    * @param reader $readerParam
    * @param cf $cursorFlattenerParam
    */
-  @deprecated("Use [[aggregateWith2]]", "0.12.3")
+  @deprecated("Use [[aggregateWith1]]", "0.12.3")
   def aggregateWith[T](explain: Boolean = false, allowDiskUse: Boolean = false, bypassDocumentValidation: Boolean = false, readConcern: Option[ReadConcern] = None, readPreference: ReadPreference = ReadPreference.primary, batchSize: Option[Int] = None)(f: AggregationFramework => (PipelineOperator, List[PipelineOperator]))(implicit ec: ExecutionContext, reader: pack.Reader[T], cf: CursorFlattener[Cursor]): Cursor[T] = {
     import CursorProducer.defaultCursorProducer
     aggregateWith1(explain, allowDiskUse, bypassDocumentValidation, readConcern, readPreference, batchSize)(f)
@@ -633,10 +635,12 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    * @param reader $readerParam
    * @param cf $cursorFlattenerParam
    */
-  def aggregate1[T](firstOperator: PipelineOperator, otherOperators: List[PipelineOperator], explain: Boolean = false, allowDiskUse: Boolean = false, bypassDocumentValidation: Boolean = false, readConcern: Option[ReadConcern] = None, readPreference: ReadPreference = ReadPreference.primary, batchSize: Option[Int] = None)(implicit ec: ExecutionContext, reader: pack.Reader[T], cf: CursorFlattener[Cursor]): Cursor[T] = {
-    import CursorProducer.defaultCursorProducer
-    aggregate2[T](firstOperator, otherOperators, explain, allowDiskUse, bypassDocumentValidation, readConcern, readPreference, batchSize)
-  }
+  @deprecated("Use [[aggregatorContext]]", "0.12.3")
+  def aggregate1[T](firstOperator: PipelineOperator, otherOperators: List[PipelineOperator], explain: Boolean = false, allowDiskUse: Boolean = false, bypassDocumentValidation: Boolean = false, readConcern: Option[ReadConcern] = None, readPreference: ReadPreference = ReadPreference.primary, batchSize: Option[Int] = None)(implicit ec: ExecutionContext, reader: pack.Reader[T], cf: CursorFlattener[Cursor]): Cursor[T] = aggregatorContext[T](
+    firstOperator, otherOperators,
+    explain, allowDiskUse, bypassDocumentValidation,
+    readConcern, readPreference, batchSize
+  ).prepared[Cursor](CursorProducer.defaultCursorProducer[T]).cursor
 
   /**
    * [[http://docs.mongodb.org/manual/reference/command/aggregate/ Aggregates]] the matching documents.
@@ -679,39 +683,11 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    * @param reader $readerParam
    * @param cf $cursorFlattenerParam
    */
-  @deprecated("Use [[aggregate2]]", "0.12.2")
-  def aggregate[T](firstOperator: PipelineOperator, otherOperators: List[PipelineOperator], cursor: Option[BatchCommands.AggregationFramework.Cursor], explain: Boolean, allowDiskUse: Boolean, bypassDocumentValidation: Boolean, readConcern: Option[ReadConcern], readPreference: ReadPreference)(implicit ec: ExecutionContext, reader: pack.Reader[T]): Cursor[T] = {
-    import CursorProducer.defaultCursorProducer
-    aggregate2(firstOperator, otherOperators, explain, allowDiskUse, bypassDocumentValidation, readConcern, readPreference, cursor.map(_.batchSize))
-  }
+  @deprecated("Use [[aggregatorContext]]", "0.12.3")
+  def aggregate[T](firstOperator: PipelineOperator, otherOperators: List[PipelineOperator], cursor: Option[BatchCommands.AggregationFramework.Cursor], explain: Boolean, allowDiskUse: Boolean, bypassDocumentValidation: Boolean, readConcern: Option[ReadConcern], readPreference: ReadPreference)(implicit ec: ExecutionContext, reader: pack.Reader[T], cf: CursorFlattener[Cursor]): Cursor[T] = aggregate1[T](firstOperator, otherOperators, explain, allowDiskUse, bypassDocumentValidation, readConcern, readPreference, cursor.map(_.batchSize))
 
   /**
    * [[http://docs.mongodb.org/manual/reference/command/aggregate/ Aggregates]] the matching documents.
-   *
-   * {{{
-   * import scala.concurrent.Future
-   * import scala.concurrent.ExecutionContext.Implicits.global
-   *
-   * import reactivemongo.bson._
-   * import reactivemongo.api.Cursor
-   * import reactivemongo.api.collections.bson.BSONCollection
-   *
-   * def populatedStates(cities: BSONCollection): Future[Cursor[BSONDocument]] =
-   *   {
-   *     import cities.BatchCommands.AggregationFramework
-   *     import AggregationFramework.{
-   *       Cursor => AggCursor, Group, Match, SumField
-   *     }
-   *
-   *     val cursor = AggCursor(batchSize = 1) // initial batch size
-   *
-   *     cities.aggregate1[BSONDocument](Group(BSONString("\$state"))(
-   *       "totalPop" -> SumField("population")), List(
-   *         Match(document("totalPop" ->
-   *           document("\$gte" -> 10000000L)))),
-   *       cursor)
-   *   }
-   * }}}
    *
    * @tparam T $resultTParam
    *
@@ -724,49 +700,9 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    * @param readConcern $readConcernParam
    * @param readPreference $readPrefParam
    * @param reader $readerParam
-   * @param cf $cursorFlattenerParam
    * @param cp $cursorProducerParam
    */
-  def aggregate2[T](firstOperator: PipelineOperator, otherOperators: List[PipelineOperator] = Nil, explain: Boolean = false, allowDiskUse: Boolean = false, bypassDocumentValidation: Boolean = false, readConcern: Option[ReadConcern] = None, readPreference: ReadPreference = ReadPreference.primary, batchSize: Option[Int] = None)(implicit ec: ExecutionContext, reader: pack.Reader[T], cf: CursorFlattener[Cursor], cp: CursorProducer[T]): cp.ProducedCursor = {
-    import BatchCommands.AggregationFramework.{ Aggregate, AggregationResult }
-    import BatchCommands.{ AggregateWriter, AggregateReader }
-
-    import reactivemongo.core.netty.ChannelBufferWritableBuffer
-    import reactivemongo.bson.buffer.WritableBuffer
-    import reactivemongo.core.protocol.{ Reply, Response }
-
-    def ver = db.connection.metadata.
-      fold[MongoWireVersion](MongoWireVersion.V30)(_.maxWireVersion)
-
-    val aggregateCursor: Cursor[T] = cf.flatten(runWithResponse(Aggregate(firstOperator :: otherOperators, explain, allowDiskUse, Some(BatchCommands.AggregationFramework.Cursor(batchSize.getOrElse(defaultCursorBatchSize))), ver, bypassDocumentValidation, readConcern), readPreference).flatMap[Cursor[T]] {
-      case ResponseResult(response, numToReturn,
-        AggregationResult(firstBatch, Some(resultCursor))) => Future {
-
-        def docs = new ChannelBufferWritableBuffer().
-          writeBytes(firstBatch.foldLeft[WritableBuffer](
-            new ChannelBufferWritableBuffer()
-          )(pack.writeToBuffer).toReadableBuffer).buffer
-
-        def resp = Response(
-          response.header,
-          Reply(0, resultCursor.cursorId, 0, firstBatch.size),
-          docs, response.info
-        )
-
-        DefaultCursor.getMore[P, T](pack, resp,
-          resultCursor, numToReturn, readPreference, db.
-          connection, failoverStrategy, false)
-      }
-
-      case ResponseResult(response, _, _) => Future.failed[Cursor[T]](
-        GenericDriverException(s"missing cursor: $response")
-      )
-    })
-
-    cp.produce(aggregateCursor)
-  }
-
-  private val defaultCursorBatchSize: Int = 101
+  def aggregatorContext[T](firstOperator: PipelineOperator, otherOperators: List[PipelineOperator] = Nil, explain: Boolean = false, allowDiskUse: Boolean = false, bypassDocumentValidation: Boolean = false, readConcern: Option[ReadConcern] = None, readPreference: ReadPreference = ReadPreference.primary, batchSize: Option[Int] = None)(implicit reader: pack.Reader[T]): AggregatorContext[T] = new AggregatorContext[T](firstOperator, otherOperators, explain, allowDiskUse, bypassDocumentValidation, readConcern, readPreference, batchSize, reader)
 
   /**
    * Removes the matching document(s).
@@ -1017,6 +953,82 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
 
       writer.close
       ()
+    }
+  }
+
+  // ---
+
+  final class AggregatorContext[T](
+      val firstOperator: PipelineOperator,
+      val otherOperators: List[PipelineOperator],
+      val explain: Boolean,
+      val allowDiskUse: Boolean,
+      val bypassDocumentValidation: Boolean,
+      val readConcern: Option[ReadConcern],
+      val readPreference: ReadPreference,
+      val batchSize: Option[Int],
+      val reader: pack.Reader[T]
+  ) {
+    def prepared[AC[_] <: Cursor[_]](implicit cp: CursorProducer.Aux[T, AC]): Aggregator[T, AC] = new Aggregator[T, AC](this, cp)
+  }
+
+  final class Aggregator[T, AC[_] <: Cursor[_]](
+      val context: AggregatorContext[T],
+      val cp: CursorProducer.Aux[T, AC]
+  ) {
+    import BatchCommands.AggregationFramework.{ Aggregate, AggregationResult }
+    import BatchCommands.{ AggregateWriter, AggregateReader }
+
+    import reactivemongo.core.netty.ChannelBufferWritableBuffer
+    import reactivemongo.bson.buffer.WritableBuffer
+    import reactivemongo.core.protocol.{ Reply, Response }
+
+    import context._
+
+    @inline private def readPreference = context.readPreference
+    implicit private def aggReader: pack.Reader[T] = reader
+
+    private def ver = db.connection.metadata.
+      fold[MongoWireVersion](MongoWireVersion.V30)(_.maxWireVersion)
+
+    /**
+     * @param cf $cursorFlattenerParam
+     */
+    final def cursor(implicit ec: ExecutionContext, cf: CursorFlattener[AC]): AC[T] = {
+      def aggCursor: Future[cp.ProducedCursor] = runWithResponse(
+        Aggregate(
+          firstOperator :: otherOperators,
+          explain, allowDiskUse, Some(BatchCommands.AggregationFramework.Cursor(
+            batchSize.getOrElse(defaultCursorBatchSize)
+          )), ver, bypassDocumentValidation, readConcern
+        ), readPreference
+      ).flatMap[cp.ProducedCursor] {
+          case ResponseResult(response, numToReturn,
+            AggregationResult(firstBatch, Some(resultCursor))) => Future {
+
+            def docs = new ChannelBufferWritableBuffer().
+              writeBytes(firstBatch.foldLeft[WritableBuffer](
+                new ChannelBufferWritableBuffer()
+              )(pack.writeToBuffer).toReadableBuffer).buffer
+
+            def resp = Response(
+              response.header,
+              Reply(0, resultCursor.cursorId, 0, firstBatch.size),
+              docs, response.info
+            )
+
+            cp.produce(DefaultCursor.getMore[P, T](pack, resp,
+              resultCursor, numToReturn, readPreference, db.
+              connection, failoverStrategy, false))
+          }
+
+          case ResponseResult(response, _, _) =>
+            Future.failed[cp.ProducedCursor](
+              GenericDriverException(s"missing cursor: $response")
+            )
+        }
+
+      cf.flatten(aggCursor)
     }
   }
 }

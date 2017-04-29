@@ -15,7 +15,6 @@ import reactivemongo.core.nodeset.{
 }
 
 import reactivemongo.core.actors.StandardDBSystem
-import reactivemongo.core.actors.Exceptions.PrimaryUnavailableException
 
 trait ConnectAllSpec { parent: NodeSetSpec =>
   import reactivemongo.api.tests.connectAll

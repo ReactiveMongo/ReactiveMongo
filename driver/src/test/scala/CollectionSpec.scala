@@ -15,7 +15,7 @@ class CollectionSpec extends org.specs2.mutable.Specification {
   lazy val collection = db(s"collspec${System identityHashCode db}")
   lazy val slowColl = slowDb(s"collspec${System identityHashCode slowDb}")
 
-  val cappedMaxSize = 2 * 1024 * 1024
+  val cappedMaxSize: Long = 2 * 1024 * 1024
 
   "ReactiveMongo" should {
     "create a collection" in { implicit ee: EE =>

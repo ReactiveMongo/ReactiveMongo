@@ -21,12 +21,8 @@ import reactivemongo.bson.{
   BSONDocument,
   BSONDocumentReader,
   BSONDocumentWriter,
-  BSONDouble,
-  BSONInteger,
-  BSONLong,
   BSONNumberLike,
-  BSONString,
-  BSONValue
+  BSONString
 }
 
 import reactivemongo.core.protocol.MongoWireVersion
@@ -39,115 +35,6 @@ import reactivemongo.api.{
 }
 import reactivemongo.api.commands.{ DropIndexes, WriteResult }
 import scala.concurrent.{ Future, ExecutionContext }
-
-/** Type of Index */
-sealed trait IndexType {
-  /** Value of the index (`{fieldName: value}`). */
-  def value: BSONValue
-  private[indexes] def valueStr: String
-}
-
-object IndexType {
-  object Ascending extends IndexType {
-    def value = BSONInteger(1)
-    def valueStr = "1"
-  }
-
-  object Descending extends IndexType {
-    def value = BSONInteger(-1)
-    def valueStr = "-1"
-  }
-
-  object Geo2D extends IndexType {
-    def value = BSONString("2d")
-    def valueStr = "2d"
-  }
-
-  object Geo2DSpherical extends IndexType {
-    def value = BSONString("2dsphere")
-    def valueStr = "2dsphere"
-  }
-
-  object GeoHaystack extends IndexType {
-    def value = BSONString("geoHaystack")
-    def valueStr = "geoHaystack"
-  }
-
-  object Hashed extends IndexType {
-    def value = BSONString("hashed")
-    def valueStr = "hashed"
-  }
-
-  object Text extends IndexType {
-    def value = BSONString("text")
-    def valueStr = "text"
-  }
-
-  def apply(value: BSONValue) = value match {
-    case BSONInteger(i) if i > 0             => Ascending
-    case BSONInteger(i) if i < 0             => Descending
-    case BSONDouble(i) if i > 0              => Ascending
-    case BSONDouble(i) if i < 0              => Descending
-    case BSONLong(i) if i > 0                => Ascending
-    case BSONLong(i) if i < 0                => Descending
-    case BSONString(s) if s == "2d"          => Geo2D
-    case BSONString(s) if s == "2dsphere"    => Geo2DSpherical
-    case BSONString(s) if s == "geoHaystack" => GeoHaystack
-    case BSONString(s) if s == "hashed"      => Hashed
-    case BSONString(s) if s == "text"        => Text
-    case _                                   => throw new IllegalArgumentException("unsupported index type")
-  }
-}
-
-/**
- * A MongoDB index (excluding the namespace).
- *
- * Consider reading [[http://www.mongodb.org/display/DOCS/Indexes the documentation about indexes in MongoDB]].
- *
- * @param key The index key (it can be composed of multiple fields). This list should not be empty!
- * @param name The name of this index. If you provide none, a name will be computed for you.
- * @param unique Enforces uniqueness.
- * @param background States if this index should be built in background. You should read [[http://www.mongodb.org/display/DOCS/Indexes#Indexes-background%3Atrue the documentation about background indexing]] before using it.
- * @param dropDups States if duplicates should be discarded (if unique = true). Warning: you should read [[http://www.mongodb.org/display/DOCS/Indexes#Indexes-dropDups%3Atrue the documentation]].
- * @param sparse States if the index to build should only consider the documents that have the indexed fields. See [[http://www.mongodb.org/display/DOCS/Indexes#Indexes-sparse%3Atrue the documentation]] on the consequences of such an index.
- * @param version Indicates the [[http://www.mongodb.org/display/DOCS/Index+Versions version]] of the index (1 for >= 2.0, else 0). You should let MongoDB decide.
- * @param options Optional parameters for this index (typically specific to an IndexType like Geo2D).
- * @param partialFilter Optional [[https://docs.mongodb.com/manual/core/index-partial/#partial-index-with-unique-constraints partial filter]] (since MongoDB 3.2)
- */
-case class Index(
-    key: Seq[(String, IndexType)],
-    name: Option[String] = None,
-    unique: Boolean = false,
-    background: Boolean = false,
-    dropDups: Boolean = false, // Deprecated since 2.6, TODO: Remove
-    sparse: Boolean = false,
-    version: Option[Int] = None, // let MongoDB decide
-    // TODO: storageEngine (new for Mongo3)
-    partialFilter: Option[BSONDocument] = None,
-    options: BSONDocument = BSONDocument()
-) {
-
-  /** The name of the index (a default one is computed if none). */
-  lazy val eventualName: String = name.getOrElse(key.foldLeft("") { (name, kv) =>
-    name + (if (name.length > 0) "_" else "") + kv._1 + "_" + kv._2.valueStr
-  })
-}
-
-/**
- * A MongoDB namespaced index.
- * A MongoDB index is composed with the namespace (the fully qualified collection name) and the other fields of [[reactivemongo.api.indexes.Index]].
- *
- * Consider reading [[http://www.mongodb.org/display/DOCS/Indexes the documentation about indexes in MongoDB]].
- *
- * @param namespace The fully qualified name of the indexed collection.
- * @param index The other fields of the index.
- */
-case class NSIndex(namespace: String, index: Index) {
-  val (dbName: String, collectionName: String) = {
-    val spanned = namespace.span(_ != '.')
-    spanned._1 -> spanned._2.drop(1)
-  }
-}
 
 /** Indexes manager at database level. */
 sealed trait IndexesManager {

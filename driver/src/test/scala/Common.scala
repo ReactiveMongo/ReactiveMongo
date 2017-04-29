@@ -145,7 +145,7 @@ object Common {
   def tryUntil[T](retries: List[Int])(f: => T, test: T => Boolean): Boolean =
     if (test(f)) true else retries match {
       case delay :: next => {
-        Thread.sleep(delay)
+        Thread.sleep(delay.toLong)
         tryUntil(next)(f, test)
       }
 
