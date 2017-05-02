@@ -510,6 +510,17 @@ object BSONObjectID {
 
     BSONObjectID(id)
   }
+  
+  /** Generate a BSON ObjectID from a timestamp, especially for range queries */
+  def fromTime(timeMs: Long): BSONObjectID = {
+    val timestamp = (timeMs / 1000).toInt
+    val buf = new Array[Byte](12)
+    buf(0) = (timestamp >>> 24).toByte
+    buf(1) = (timestamp >> 16 & 0xFF).toByte
+    buf(2) = (timestamp >> 8 & 0xFF).toByte
+    buf(3) = (timestamp & 0xFF).toByte
+    BSONObjectID(buf)
+  }
 }
 
 /** BSON boolean value */
