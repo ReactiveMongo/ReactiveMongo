@@ -156,12 +156,15 @@ class Handlers extends org.specs2.mutable.Specification {
     "write primitives values" in {
       val input = Map("a" -> 1, "b" -> 2)
       val result = DefaultBSONHandlers.MapWriter(BSONStringHandler, BSONIntegerHandler).write(input)
+
       result mustEqual BSONDocument("a" -> 1, "b" -> 2)
     }
-
+    
     "read primitives values" in {
       val input = BSONDocument("a" -> 1, "b" -> 2)
-      val result = DefaultBSONHandlers.MapReader(BSONStringHandler, BSONIntegerHandler).read(input)
+      val handler = implicitly[BSONReader[BSONDocument, Map[String, Int]]]
+      val result = handler.read(input)
+
       result mustEqual Map("a" -> 1, "b" -> 2)
     }
 
@@ -182,6 +185,7 @@ class Handlers extends org.specs2.mutable.Specification {
       )
       val input = Map("a" -> Foo("foo", 10), "b" -> Foo("foo2", 20))
       val result = DefaultBSONHandlers.MapWriter(BSONStringHandler, fooWriter).write(input)
+
       result mustEqual expectedResult
     }
 
@@ -191,7 +195,9 @@ class Handlers extends org.specs2.mutable.Specification {
         "a" -> BSONDocument("label" -> "foo", "count" -> 10),
         "b" -> BSONDocument("label" -> "foo2", "count" -> 20)
       )
-      val result = DefaultBSONHandlers.MapReader(BSONStringHandler, fooReader).read(input)
+      val handler = implicitly[BSONReader[BSONDocument, Map[String, Foo]]]
+      val result = handler.read(input)
+
       result mustEqual expectedResult
     }
   }
