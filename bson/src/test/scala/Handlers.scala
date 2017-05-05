@@ -159,7 +159,7 @@ class Handlers extends org.specs2.mutable.Specification {
 
       result mustEqual BSONDocument("a" -> 1, "b" -> 2)
     }
-    
+
     "read primitives values" in {
       val input = BSONDocument("a" -> 1, "b" -> 2)
       val handler = implicitly[BSONReader[BSONDocument, Map[String, Int]]]
@@ -169,8 +169,8 @@ class Handlers extends org.specs2.mutable.Specification {
     }
 
     case class Foo(label: String, count: Int)
-    val fooWriter = BSONDocumentWriter[Foo] { foo => BSONDocument("label" -> foo.label, "count" -> foo.count) }
-    val fooReader = BSONDocumentReader[Foo] { document =>
+    implicit val fooWriter = BSONDocumentWriter[Foo] { foo => BSONDocument("label" -> foo.label, "count" -> foo.count) }
+    implicit val fooReader = BSONDocumentReader[Foo] { document =>
       val foo = for {
         label <- document.getAs[String]("label")
         count <- document.getAs[Int]("count")
