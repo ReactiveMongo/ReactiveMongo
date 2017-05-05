@@ -4,10 +4,9 @@
 
 If you wish to report an issue for ReactiveMongo, please ensure you have done the following things:
 
-* If it is a **documentation issue with a simple fix**, don't raise an issue, just edit the documentation yourself directly in GitHub and submit a pull request. This will be quicker for you and everybody.
-* If you are not **100% sure that it is a bug, first ask** about it on the [mailing list](https://groups.google.com/forum/#!forum/reactivemongo). You will get helped a lot quicker on the mailing list. The issue tracker is for verified bugs, not for questions.
+* If it is a **documentation issue with a simple fix**, don't raise an issue, just [edit the documentation](https://github.com/ReactiveMongo/reactivemongo-site) yourself directly in GitHub and submit a pull request. This will be quicker for you and everybody.
+* If you think there is a bug, first ask** about it on the [mailing list](https://groups.google.com/forum/#!forum/reactivemongo). You will get helped a lot quicker on the mailing list. The issue tracker is for verified bugs, not for questions. Please be as specific as possible, including sample code that reproduces the problem, stack traces if there are any exceptions thrown, and versions of ReactiveMongo, Play, OS, Java, etc.
 * If you have a **feature request**, please first raise it on the [mailing list](https://groups.google.com/forum/#!forum/reactivemongo). The mailing list is the best forum to discuss new features, and it may be that ReactiveMongo already provides something to achieve what you want to achieve and you didn't realise.
-* If you are **sure you have found a bug**, then raise an issue. Please be as specific as possible, including sample code that reproduces the problem, stack traces if there are any exceptions thrown, and versions of ReactiveMongo, Play, OS, Java, etc.
 
 ## Contributor Workflow
 
