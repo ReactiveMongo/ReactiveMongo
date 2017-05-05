@@ -392,7 +392,7 @@ trait DefaultBSONHandlers {
   implicit def MapWriter[K, V](implicit keyWriter: BSONWriter[K, BSONString], valueWriter: BSONWriter[V, _ <: BSONValue]): BSONDocumentWriter[Map[K, V]] =
     new BSONDocumentWriter[Map[K, V]] {
       def write(inputMap: Map[K, V]): BSONDocument = {
-        val elements = inputMap.toStream.map { tuple =>
+        val elements = inputMap.map { tuple =>
           BSONElement(keyWriter.write(tuple._1).value, valueWriter.write(tuple._2))
         }
         BSONDocument(elements)
