@@ -30,7 +30,7 @@ import shaded.netty.channel.group.{
 }
 
 import reactivemongo.util.LazyLogger
-import reactivemongo.core.errors.{ DriverException, GenericDriverException }
+import reactivemongo.core.errors.GenericDriverException
 import reactivemongo.core.protocol.{
   GetMore,
   Query,
