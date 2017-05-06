@@ -378,6 +378,26 @@ trait DefaultBSONHandlers {
 
   implicit def findReader[T](implicit reader: VariantBSONReader[_ <: BSONValue, T]): BSONReader[_ <: BSONValue, T] =
     new VariantBSONReaderWrapper(reader)
+
+  implicit def MapReader[K, V](implicit keyReader: BSONReader[BSONString, K], valueReader: BSONReader[_ <: BSONValue, V]): BSONDocumentReader[Map[K, V]] =
+    new BSONDocumentReader[Map[K, V]] {
+      def read(bson: BSONDocument): Map[K, V] = {
+        val elements = bson.elements.map { element =>
+          keyReader.read(BSONString(element.name)) -> element.value.seeAsTry[V].get
+        }
+        elements.toMap
+      }
+    }
+
+  implicit def MapWriter[K, V](implicit keyWriter: BSONWriter[K, BSONString], valueWriter: BSONWriter[V, _ <: BSONValue]): BSONDocumentWriter[Map[K, V]] =
+    new BSONDocumentWriter[Map[K, V]] {
+      def write(inputMap: Map[K, V]): BSONDocument = {
+        val elements = inputMap.map { tuple =>
+          BSONElement(keyWriter.write(tuple._1).value, valueWriter.write(tuple._2))
+        }
+        BSONDocument(elements)
+      }
+    }
 }
 
 object DefaultBSONHandlers extends DefaultBSONHandlers

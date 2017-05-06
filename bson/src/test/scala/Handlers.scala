@@ -152,6 +152,56 @@ class Handlers extends org.specs2.mutable.Specification {
     }
   }
 
+  "Map" should {
+    "write primitives values" in {
+      val input = Map("a" -> 1, "b" -> 2)
+      val result = DefaultBSONHandlers.MapWriter(BSONStringHandler, BSONIntegerHandler).write(input)
+
+      result mustEqual BSONDocument("a" -> 1, "b" -> 2)
+    }
+
+    "read primitives values" in {
+      val input = BSONDocument("a" -> 1, "b" -> 2)
+      val handler = implicitly[BSONReader[BSONDocument, Map[String, Int]]]
+      val result = handler.read(input)
+
+      result mustEqual Map("a" -> 1, "b" -> 2)
+    }
+
+    case class Foo(label: String, count: Int)
+    implicit val fooWriter = BSONDocumentWriter[Foo] { foo => BSONDocument("label" -> foo.label, "count" -> foo.count) }
+    implicit val fooReader = BSONDocumentReader[Foo] { document =>
+      val foo = for {
+        label <- document.getAs[String]("label")
+        count <- document.getAs[Int]("count")
+      } yield Foo(label, count)
+      foo.get
+    }
+
+    "write complex values" in {
+      val expectedResult = BSONDocument(
+        "a" -> BSONDocument("label" -> "foo", "count" -> 10),
+        "b" -> BSONDocument("label" -> "foo2", "count" -> 20)
+      )
+      val input = Map("a" -> Foo("foo", 10), "b" -> Foo("foo2", 20))
+      val result = DefaultBSONHandlers.MapWriter(BSONStringHandler, fooWriter).write(input)
+
+      result mustEqual expectedResult
+    }
+
+    "read complex values" in {
+      val expectedResult = Map("a" -> Foo("foo", 10), "b" -> Foo("foo2", 20))
+      val input = BSONDocument(
+        "a" -> BSONDocument("label" -> "foo", "count" -> 10),
+        "b" -> BSONDocument("label" -> "foo2", "count" -> 20)
+      )
+      val handler = implicitly[BSONReader[BSONDocument, Map[String, Foo]]]
+      val result = handler.read(input)
+
+      result mustEqual expectedResult
+    }
+  }
+
   "BSONDateTime" should {
     val time = System.currentTimeMillis()
     val bson = BSONDateTime(time)
