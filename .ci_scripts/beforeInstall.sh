@@ -56,7 +56,7 @@ if [ "$MONGO_VER" = "3" -o "$MONGO_VER" = "3_4" ]; then
     MONGO_TREE="3.2.10"
     
     if [ "$AKKA_VERSION" = "2.4.8" ]; then
-        MONGO_TREE="3.4.0"
+        MONGO_TREE="3.4.4"
     fi
 
     if [ ! -x "$HOME/mongodb-linux-x86_64-amazon-$MONGO_TREE/bin/mongod" ]; then
