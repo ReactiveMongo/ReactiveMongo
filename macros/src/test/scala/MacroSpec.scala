@@ -108,6 +108,7 @@ class MacroSpec extends org.specs2.mutable.Specification {
       val doc1 = OverloadedApply("hello")
       val doc2 = OverloadedApply(List("hello", "world"))
       val f = Macros.handler[OverloadedApply]
+
       roundtrip(doc1, f)
       roundtrip(doc2, f)
     }
@@ -116,6 +117,7 @@ class MacroSpec extends org.specs2.mutable.Specification {
       val doc1 = OverloadedApply2("hello", 5)
       val doc2 = OverloadedApply2("hello")
       val f = Macros.handler[OverloadedApply2]
+
       roundtrip(doc1, f)
       roundtrip(doc2, f)
     }
@@ -124,6 +126,7 @@ class MacroSpec extends org.specs2.mutable.Specification {
       val doc1 = OverloadedApply3("hello", 5)
       val doc2 = OverloadedApply3()
       val f = Macros.handler[OverloadedApply3]
+
       roundtrip(doc1, f)
       roundtrip(doc2, f)
     }

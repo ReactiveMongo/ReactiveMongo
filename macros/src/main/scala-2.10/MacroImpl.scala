@@ -9,24 +9,43 @@ import scala.reflect.macros.Context
 
 private object MacroImpl {
   def reader[A: c.WeakTypeTag, Opts: c.WeakTypeTag](c: Context): c.Expr[BSONDocumentReader[A]] = c.universe.reify(new BSONDocumentReader[A] {
-    lazy val forwardReader = BSONDocumentReader[A](this.read _)
-    def read(document: BSONDocument) = Helper[A, Opts](c).readBody.splice
+    private val r: BSONDocument => A = { document =>
+      Helper[A, Opts](c).readBody.splice
+    }
+
+    lazy val forwardReader = BSONDocumentReader[A](r)
+
+    def read(document: BSONDocument) = forwardReader.read(document)
   })
 
   def writer[A: c.WeakTypeTag, Opts: c.WeakTypeTag](c: Context): c.Expr[BSONDocumentWriter[A]] = c.universe.reify(new BSONDocumentWriter[A] {
-    lazy val forwardWriter = BSONDocumentWriter[A](this.write _)
-    def write(v: A) = Helper[A, Opts](c).writeBody.splice
+    private val w: A => BSONDocument = { v =>
+      Helper[A, Opts](c).writeBody.splice
+    }
+
+    lazy val forwardWriter = BSONDocumentWriter[A](w)
+
+    def write(v: A) = forwardWriter.write(v)
   })
 
   def handler[A: c.WeakTypeTag, Opts: c.WeakTypeTag](c: Context): c.Expr[BSONDocumentReader[A] with BSONDocumentWriter[A] with BSONHandler[BSONDocument, A]] = {
     val helper = Helper[A, Opts](c)
     c.universe.reify(
       new BSONDocumentReader[A] with BSONDocumentWriter[A] with BSONHandler[BSONDocument, A] {
-        lazy val forwardReader = BSONDocumentReader[A](this.read _)
-        lazy val forwardWriter = BSONDocumentWriter[A](this.write _)
+        private val r: BSONDocument => A = { document =>
+          Helper[A, Opts](c).readBody.splice
+        }
 
-        def read(document: BSONDocument): A = helper.readBody.splice
-        def write(v: A): BSONDocument = helper.writeBody.splice
+        lazy val forwardReader = BSONDocumentReader[A](r)
+
+        private val w: A => BSONDocument = { v =>
+          Helper[A, Opts](c).writeBody.splice
+        }
+
+        lazy val forwardWriter = BSONDocumentWriter[A](w)
+
+        def read(document: BSONDocument): A = forwardReader.read(document)
+        def write(v: A): BSONDocument = forwardWriter.write(v)
       })
   }
 
@@ -535,7 +554,9 @@ private object MacroImpl {
         alt.paramss match {
           case params :: ps if (ps.isEmpty || ps.headOption.flatMap(
             _.headOption).exists(_.isImplicit)
-          ) => conforms(params.map(_.typeSignature).zip(u))
+          ) => if (params.size != u.size) false else {
+            conforms(params.map(_.typeSignature).zip(u))
+          }
 
           case _ => {
             c.warning(c.enclosingPosition, s"""Constructor with multiple parameter lists is not supported: ${A.typeSymbol.name}${alt.typeSignature}""")
