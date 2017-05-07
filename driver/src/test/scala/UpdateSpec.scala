@@ -101,7 +101,7 @@ class UpdateSpec extends org.specs2.mutable.Specification {
 
         c.runCommand(Update(UpdateElement(
           q = jack, u = BSONDocument("$set" -> BSONDocument("age" -> 66))
-        ))) aka "result" must beLike[UpdateWriteResult]({
+        )), ReadPreference.primary) must beLike[UpdateWriteResult]({
           case result => result.nModified mustEqual 1 and (
             c.find(BSONDocument("age" -> 66)).
             one[Person] must beSome(jack.copy(age = 66)).await(1, timeout)
