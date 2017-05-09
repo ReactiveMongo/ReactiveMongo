@@ -58,16 +58,6 @@ object `package` extends DefaultBSONHandlers {
     read: BSONDocument => T,
     write: T => BSONDocument
   ): BSONDocumentHandler[T] = new BSONDocumentHandlerImpl[T](read, write)
-
-  private final class BSONDocumentHandlerImpl[T](
-    r: BSONDocument => T,
-    w: T => BSONDocument
-  ) extends BSONDocumentReader[T]
-      with BSONDocumentWriter[T] with BSONHandler[BSONDocument, T] {
-
-    def read(doc: BSONDocument): T = r(doc)
-    def write(value: T): BSONDocument = w(value)
-  }
 }
 
 object BSON {
