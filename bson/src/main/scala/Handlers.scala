@@ -50,6 +50,9 @@ trait BSONReader[B <: BSONValue, T] { self =>
   final def afterRead[U](f: T => U): BSONReader[B, U] =
     BSONReader[B, U]((read _) andThen f)
 
+  final def beforeRead[U <: BSONValue](f: U => B): BSONReader[U, T] =
+    BSONReader[U, T](f andThen (read _))
+
   private[reactivemongo] def widenReader[U >: T]: UnsafeBSONReader[U] =
     new UnsafeBSONReader[U] {
       def readTry(value: BSONValue): Try[U] =
@@ -398,6 +401,16 @@ trait DefaultBSONHandlers {
         BSONDocument(elements)
       }
     }
+}
+
+private[bson] final class BSONDocumentHandlerImpl[T](
+  r: BSONDocument => T,
+  w: T => BSONDocument
+) extends BSONDocumentReader[T]
+    with BSONDocumentWriter[T] with BSONHandler[BSONDocument, T] {
+
+  def read(doc: BSONDocument): T = r(doc)
+  def write(value: T): BSONDocument = w(value)
 }
 
 object DefaultBSONHandlers extends DefaultBSONHandlers
