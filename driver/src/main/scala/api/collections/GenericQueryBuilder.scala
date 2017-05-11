@@ -31,7 +31,7 @@ import reactivemongo.core.netty.{ BufferSequence, ChannelBufferWritableBuffer }
  * @define resultTParam the results type
  * @define requireOneFunction Sends this query and gets a future `T` (alias for [[reactivemongo.api.Cursor.head]])
  */
-trait GenericQueryBuilder[P <: SerializationPack] {
+trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
   val pack: P
   type Self <: GenericQueryBuilder[pack.type]
 
@@ -151,12 +151,6 @@ trait GenericQueryBuilder[P <: SerializationPack] {
   /** Sets the sorting document. */
   def sort(document: pack.Document): Self = copy(sortOption = Some(document))
 
-  def options(options: QueryOpts): Self = copy(options = options)
-
-  /** Returns a builder with the options updated. */
-  def updateOptions(update: QueryOpts => QueryOpts): Self =
-    copy(options = update(options))
-
   /**
    * Sets the projection document (for [[http://docs.mongodb.org/manual/core/read-operations-introduction/ retrieving only a subset of fields]]).
    *
@@ -188,4 +182,20 @@ trait GenericQueryBuilder[P <: SerializationPack] {
   /** Adds maxTimeMs to query https://docs.mongodb.org/v3.0/reference/operator/meta/maxTimeMS/ */
   def maxTimeMs(p: Long): Self = copy(maxTimeMsOption = Some(p))
 
+  def options(options: QueryOpts): Self = copy(options = options)
+
+  @deprecated("Use [[options]] or the separate query ops", "0.12.4")
+  def updateOptions(update: QueryOpts => QueryOpts): Self =
+    copy(options = update(options))
+
+  // QueryOps
+  def awaitData = options(options.awaitData)
+  def batchSize(n: Int) = options(options.batchSize(n))
+  def exhaust = options(options.exhaust)
+  def noCursorTimeout = options(options.noCursorTimeout)
+  def oplogReplay = options(options.oplogReplay)
+  def partial = options(options.partial)
+  def skip(n: Int) = options(options.skip(n))
+  def slaveOk = options(options.slaveOk)
+  def tailable = options(options.tailable)
 }

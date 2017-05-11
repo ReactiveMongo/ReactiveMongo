@@ -28,8 +28,7 @@ trait Cursor1Spec { spec: CursorSpec =>
       import reactivemongo.api.tests.{ makeRequest => req }
 
       def cursor(batchSize: Int = Int.MaxValue) =
-        coll.find(matchAll("makeReq1")).
-          updateOptions(_.batchSize(batchSize)).cursor()
+        coll.find(matchAll("makeReq1")).batchSize(batchSize).cursor()
 
       req(cursor(), 10) must beLike[Response] {
         case Response(_, Reply(_, id, from, ret), _, _) =>
