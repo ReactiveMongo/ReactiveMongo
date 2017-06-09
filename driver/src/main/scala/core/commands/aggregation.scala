@@ -91,7 +91,7 @@ case class Unwind(field: String) extends PipelineOperator {
 }
 
 /**
- * Groups documents together to calulate aggregates on document collections. This command
+ * Groups documents together to calculate aggregates on document collections. This command
  * aggregates on one field.
  * http://docs.mongodb.org/manual/reference/aggregation/group/#_S_group
  * @param idField Name of the field to aggregate on.
@@ -102,7 +102,7 @@ case class GroupField(idField: String)(ops: (String, GroupFunction)*) extends Pi
 }
 
 /**
- * Groups documents together to calulate aggregates on document collections. This command
+ * Groups documents together to calculate aggregates on document collections. This command
  * aggregates on multiple fields, and they must be named.
  * http://docs.mongodb.org/manual/reference/aggregation/group/#_S_group
  * @param idField Fields to aggregate on, and the names they should be aggregated under.
@@ -117,7 +117,7 @@ case class GroupMulti(idField: (String, String)*)(ops: (String, GroupFunction)*)
 }
 
 /**
- * Groups documents together to calulate aggregates on document collections. This command
+ * Groups documents together to calculate aggregates on document collections. This command
  * aggregates on arbitrary identifiers. Document fields identifier must be prefixed with `$`.
  * http://docs.mongodb.org/manual/reference/aggregation/group/#_S_group
  * @param identifiers Any BSON value acceptable by mongodb as identifier

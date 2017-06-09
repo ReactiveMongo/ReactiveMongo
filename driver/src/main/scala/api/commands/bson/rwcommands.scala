@@ -35,7 +35,7 @@ object BSONGetLastErrorImplicits {
           Some(GetLastError.TagSet(tagSet))
 
         case BSONInteger(acks) =>
-          Some(GetLastError.WaitForAknowledgments(acks))
+          Some(GetLastError.WaitForAcknowledgments(acks))
 
         case _ => Option.empty
       },
@@ -50,9 +50,10 @@ object BSONCommonWriteCommandsImplicits {
   implicit object GetLastErrorWWriter
       extends BSONWriter[GetLastError.W, BSONValue] {
     def write(w: GetLastError.W): BSONValue = w match {
-      case GetLastError.Majority                 => BSONString("majority")
-      case GetLastError.TagSet(tagSet)           => BSONString(tagSet)
-      case GetLastError.WaitForAknowledgments(n) => BSONInteger(n)
+      case GetLastError.Majority                  => BSONString("majority")
+      case GetLastError.TagSet(tagSet)            => BSONString(tagSet)
+      case GetLastError.WaitForAcknowledgments(n) => BSONInteger(n)
+      case GetLastError.WaitForAknowledgments(n)  => BSONInteger(n)
     }
   }
 

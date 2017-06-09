@@ -611,7 +611,7 @@ object MongoConnection {
 
         case ("writeConcernW", IntRe(str)) => unsupported -> result.
           copy(writeConcern = result.writeConcern.
-            copy(w = WriteConcern.WaitForAknowledgments(str.toInt)))
+            copy(w = WriteConcern.WaitForAcknowledgments(str.toInt)))
 
         case ("writeConcernW", tag) => unsupported -> result.
           copy(writeConcern = result.writeConcern.

@@ -4,7 +4,7 @@ import java.util.List;
 
 /**
  * The specification of the MBean about the ReactiveMongo node set.
- * Instances will be registered with names of the form 
+ * Instances will be registered with names of the form
  * `org.reactivemongo.{supervisor}.{connection}:type=NodeSet`.
  */
 public interface NodeSetMBean {
@@ -30,8 +30,8 @@ public interface NodeSetMBean {
      */
     public String getConnection();
 
-    /** 
-     * The optional name of the node set (replicaSet). 
+    /**
+     * The optional name of the node set (replicaSet).
      *
      * @return The node set name if any, or null of none
      */
@@ -75,7 +75,7 @@ public interface NodeSetMBean {
     /**
      * The information about the secondary nodes.
      *
-     * @return The string representation of the secondary nodes (possible empy)
+     * @return The string representation of the secondary nodes (possible empty)
      */
     public String getSecondaries();
 }
