@@ -112,6 +112,7 @@ trait CollectionMetaCommands { self: Collection =>
    *
    * @return a failure if the dropExisting option is false and the target collection already exists
    */
+  @deprecated(message = "Use `reactivemongo.api.DBMetaCommands.renameCollection on the admin database instead.", since = "0.12.4")
   def rename(to: String, dropExisting: Boolean = false)(implicit ec: ExecutionContext): Future[Unit] =
     Command.run(BSONSerializationPack).unboxed(self.db, RenameCollection(db.name + "." + name, db.name + "." + to, dropExisting), ReadPreference.primary)
 
