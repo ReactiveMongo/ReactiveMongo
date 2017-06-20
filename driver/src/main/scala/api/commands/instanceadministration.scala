@@ -276,8 +276,8 @@ trait CreateUserCommand[P <: SerializationPack]
  */
 trait PingCommand[P <: SerializationPack] {
 
-  case class Pong(number: Double) extends BoxedAnyVal[Double] {
-    def value: Double = number
+  case class Pong(bool: Boolean) extends BoxedAnyVal[Boolean] {
+    def value: Boolean = bool
   }
 
   case class Ping(number: Double = 1.0) extends Command

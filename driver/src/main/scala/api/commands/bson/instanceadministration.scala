@@ -386,7 +386,7 @@ object BSONPingCommand extends PingCommand[BSONSerializationPack.type] {
 
   implicit object PongReader extends DealingWithGenericCommandErrorsReader[Pong] {
     def readResult(bson: BSONDocument): Pong =
-      Pong(bson.getAs[BSONNumberLike]("ok").map(_.toDouble).getOrElse(0))
+      Pong(bson.getAs[BSONBooleanLike]("ok").exists(_.toBoolean))
   }
 
 }

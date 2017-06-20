@@ -78,7 +78,7 @@ trait DBMetaCommands { self: DB =>
    * Can only be executed if the this database reference is the `admin` one.
    *
    * @param db the name of the database where the collection exists with the `current` name
-   * @param current the current name of the collection, in the specified `db`
+   * @param from the current name of the collection, in the specified `db`
    * @param to the new name of this collection (inside the same `db`)
    * @param dropExisting If a collection of name `to` already exists, then drops that collection before renaming this one.
    *
@@ -130,9 +130,15 @@ trait DBMetaCommands { self: DB =>
   }
 
   /**
-   * Returns 1.0 when the server is responding to commands.
+   * Test if server responds to commands. The command will return `true` even if mongo is write-locked.
+   *
+   * @param readPreference Server to execute command against (default: `Nearest`).
+   *
+   * @return `true` if successful
    */
-  def ping(implicit ec: ExecutionContext): Future[Double] =
-    Command.run(BSONPingCommand.pack, FailoverStrategy())
-      .unboxed(self, BSONPingCommand.Ping(), ReadPreference.primary)
+  def ping(readPreference: ReadPreference = ReadPreference.nearest)(implicit ec: ExecutionContext): Future[Boolean] = {
+    Command.run(BSONPingCommand.pack, failoverStrategy)
+      .unboxed(self, BSONPingCommand.Ping(), readPreference)
+  }
 }
+

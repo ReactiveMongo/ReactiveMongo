@@ -233,10 +233,10 @@ class PingSpecification extends Specification {
 
   "respond 1.0" >> {
     "with the default connection" in { implicit ee: EE =>
-      connection.database("admin").flatMap(_.ping) must beEqualTo(1.0).await(0, timeout)
+      connection.database("admin").flatMap(_.ping()) must beTrue.await(0, timeout)
     }
     "with the slow connection" in { implicit ee: EE =>
-      slowConnection.database("admin").flatMap(_.ping) must beEqualTo(1.0).await(0, timeout)
+      slowConnection.database("admin").flatMap(_.ping()) must beTrue.await(0, timeout)
     }
   }
 }
