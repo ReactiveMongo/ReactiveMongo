@@ -227,3 +227,17 @@ class ReplSetMaintenanceSpec extends Specification {
 
   }
 }
+
+class PingSpecification extends Specification {
+  "Ping Command" title
+
+  "respond 1.0" >> {
+    "with the default connection" in { implicit ee: EE =>
+      connection.database("admin").flatMap(_.ping) must beEqualTo(1.0).await(0, timeout)
+    }
+    "with the slow connection" in { implicit ee: EE =>
+      slowConnection.database("admin").flatMap(_.ping) must beEqualTo(1.0).await(0, timeout)
+    }
+  }
+}
+

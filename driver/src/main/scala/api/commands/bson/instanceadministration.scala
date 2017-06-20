@@ -376,3 +376,18 @@ object BSONCreateUserCommand
     )
   }
 }
+
+object BSONPingCommand extends PingCommand[BSONSerializationPack.type] {
+  val pack = BSONSerializationPack
+
+  implicit object PingWriter extends BSONDocumentWriter[Ping] {
+    def write(ping: Ping): BSONDocument = BSONDocument("ping" -> ping.number)
+  }
+
+  implicit object PongReader extends DealingWithGenericCommandErrorsReader[Pong] {
+    def readResult(bson: BSONDocument): Pong =
+      Pong(bson.getAs[BSONNumberLike]("ok").map(_.toDouble).getOrElse(0))
+  }
+
+}
+

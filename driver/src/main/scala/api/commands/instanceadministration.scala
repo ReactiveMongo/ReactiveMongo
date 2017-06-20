@@ -270,3 +270,18 @@ trait CreateUserCommand[P <: SerializationPack]
       with CommandWithResult[UnitBox.type]
 
 }
+
+/**
+ * The [[https://docs.mongodb.com/manual/reference/command/ping/ ping]] command.
+ */
+trait PingCommand[P <: SerializationPack] {
+
+  case class Pong(number: Double) extends BoxedAnyVal[Double] {
+    def value: Double = number
+  }
+
+  case class Ping(number: Double = 1.0) extends Command
+    with CommandWithPack[P]
+    with CommandWithResult[Pong]
+}
+

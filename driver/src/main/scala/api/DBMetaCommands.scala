@@ -28,7 +28,8 @@ trait DBMetaCommands { self: DB =>
     CommonImplicits,
     BSONDropDatabaseImplicits,
     BSONServerStatusImplicits,
-    BSONCreateUserCommand
+    BSONCreateUserCommand,
+    BSONPingCommand
   }
   import reactivemongo.api.commands.bson.BSONListCollectionNamesImplicits._
   import CommonImplicits._
@@ -127,4 +128,11 @@ trait DBMetaCommands { self: DB =>
       self, command, ReadPreference.primary
     ).map(_ => {})
   }
+
+  /**
+   * Returns 1.0 when the server is responding to commands.
+   */
+  def ping(implicit ec: ExecutionContext): Future[Double] =
+    Command.run(BSONPingCommand.pack, FailoverStrategy())
+      .unboxed(self, BSONPingCommand.Ping(), ReadPreference.primary)
 }
