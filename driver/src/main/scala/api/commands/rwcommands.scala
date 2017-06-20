@@ -21,23 +21,28 @@ object GetLastError {
   sealed trait W
   case object Majority extends W
   case class TagSet(tag: String) extends W
+  @deprecated(message = "Use `WaitForAcknowledgments`", since = "0.12.4")
   case class WaitForAknowledgments(i: Int) extends W
+  case class WaitForAcknowledgments(i: Int) extends W
   object W {
     implicit def strToTagSet(s: String): W = TagSet(s)
+    @deprecated(message = "Use `intToWaitForAcknowledgments`", since = "0.12.4")
     implicit def intToWaitForAknowledgments(i: Int): W =
       WaitForAknowledgments(i)
+    implicit def intToWaitForAcknowledgments(i: Int): W =
+      WaitForAcknowledgments(i)
   }
 
   val Unacknowledged: GetLastError =
-    GetLastError(WaitForAknowledgments(0), false, false, None)
+    GetLastError(WaitForAcknowledgments(0), false, false, None)
 
   val Acknowledged: GetLastError =
-    GetLastError(WaitForAknowledgments(1), false, false, None)
+    GetLastError(WaitForAcknowledgments(1), false, false, None)
 
   val Journaled: GetLastError =
-    GetLastError(WaitForAknowledgments(1), true, false, None)
+    GetLastError(WaitForAcknowledgments(1), true, false, None)
 
-  def ReplicaAcknowledged(n: Int, timeout: Int, journaled: Boolean): GetLastError = GetLastError(WaitForAknowledgments(if (n < 2) 2 else n), journaled, false, (if (timeout <= 0) None else Some(timeout)))
+  def ReplicaAcknowledged(n: Int, timeout: Int, journaled: Boolean): GetLastError = GetLastError(WaitForAcknowledgments(if (n < 2) 2 else n), journaled, false, (if (timeout <= 0) None else Some(timeout)))
 
   def TagReplicaAcknowledged(tag: String, timeout: Int, journaled: Boolean): GetLastError = GetLastError(TagSet(tag), journaled, false, (if (timeout <= 0) None else Some(timeout)))
 

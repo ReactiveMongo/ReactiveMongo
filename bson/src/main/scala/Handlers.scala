@@ -78,7 +78,7 @@ object BSONReader {
 }
 
 /**
- * A writer that produces a subtype of [[BSONValue]] fron an instance of `T`.
+ * A writer that produces a subtype of [[BSONValue]] from an instance of `T`.
  */
 trait BSONWriter[T, B <: BSONValue] {
   /**
@@ -139,7 +139,7 @@ trait VariantBSONReader[-B <: BSONValue, +T] {
 }
 
 /**
- * A writer that produces a subtype of [[BSONValue]] fron an instance of `T`.
+ * A writer that produces a subtype of [[BSONValue]] from an instance of `T`.
  */
 trait VariantBSONWriter[-T, +B <: BSONValue] {
   /**

@@ -774,7 +774,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    *
    * @param selector the selector object, for finding the documents to update.
    * @param update the modifier object (with special keys like \$set) or replacement object.
-   * @param upsert states whether the update objet should be inserted if no match found. Defaults to false.
+   * @param upsert states whether the update object should be inserted if no match found. Defaults to false.
    * @param multi states whether the update may be done on all the matching documents.
    */
   @deprecated("Use [[update]]", "0.12.0")
@@ -942,6 +942,9 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
 
         case GetLastError.TagSet(tagSet) =>
           writer.putString("w", tagSet)
+
+        case GetLastError.WaitForAcknowledgments(n) =>
+          writer.putInt("w", n)
 
         case GetLastError.WaitForAknowledgments(n) =>
           writer.putInt("w", n)
