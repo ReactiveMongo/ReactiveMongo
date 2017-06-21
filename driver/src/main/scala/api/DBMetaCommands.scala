@@ -19,6 +19,7 @@ trait DBMetaCommands { self: DB =>
     Command,
     DropDatabase,
     ListCollectionNames,
+    PingCommand,
     ServerStatus,
     ServerStatusResult,
     UserRole,
@@ -29,12 +30,13 @@ trait DBMetaCommands { self: DB =>
     BSONDropDatabaseImplicits,
     BSONServerStatusImplicits,
     BSONCreateUserCommand,
-    BSONPingCommand
+    BSONPingCommandImplicits
   }
   import reactivemongo.api.commands.bson.BSONListCollectionNamesImplicits._
   import CommonImplicits._
   import BSONDropDatabaseImplicits._
   import BSONServerStatusImplicits._
+  import BSONPingCommandImplicits._
 
   /** Drops this database. */
   def drop()(implicit ec: ExecutionContext): Future[Unit] =
@@ -130,15 +132,13 @@ trait DBMetaCommands { self: DB =>
   }
 
   /**
-   * Test if server responds to commands. The command will return `true` even if mongo is write-locked.
+   * Tests if the server, resolved according to the given read preference, responds to commands.
    *
-   * @param readPreference Server to execute command against (default: `Nearest`).
-   *
-   * @return `true` if successful
+   * @return true if successful (even if the server is write locked)
    */
   def ping(readPreference: ReadPreference = ReadPreference.nearest)(implicit ec: ExecutionContext): Future[Boolean] = {
-    Command.run(BSONPingCommand.pack, failoverStrategy)
-      .unboxed(self, BSONPingCommand.Ping(), readPreference)
+    Command.run(BSONSerializationPack, failoverStrategy)
+      .apply(self, PingCommand, readPreference)
   }
 }
 

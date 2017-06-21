@@ -274,14 +274,5 @@ trait CreateUserCommand[P <: SerializationPack]
 /**
  * The [[https://docs.mongodb.com/manual/reference/command/ping/ ping]] command.
  */
-trait PingCommand[P <: SerializationPack] {
-
-  case class Pong(bool: Boolean) extends BoxedAnyVal[Boolean] {
-    def value: Boolean = bool
-  }
-
-  case class Ping(number: Double = 1.0) extends Command
-    with CommandWithPack[P]
-    with CommandWithResult[Pong]
-}
+case object PingCommand extends Command with CommandWithResult[Boolean]
 
