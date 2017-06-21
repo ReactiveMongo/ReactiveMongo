@@ -387,4 +387,3 @@ object BSONPingCommandImplicits {
     def read(bson: BSONDocument): Boolean = bson.getAs[BSONBooleanLike]("ok").exists(_.toBoolean)
   }
 }
-
