@@ -133,6 +133,7 @@ trait DBMetaCommands { self: DB =>
 
   /**
    * Tests if the server, resolved according to the given read preference, responds to commands.
+   * (since MongoDB 3.0)
    *
    * @return true if successful (even if the server is write locked)
    */
