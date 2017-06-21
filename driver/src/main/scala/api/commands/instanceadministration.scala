@@ -270,3 +270,9 @@ trait CreateUserCommand[P <: SerializationPack]
       with CommandWithResult[UnitBox.type]
 
 }
+
+/**
+ * The [[https://docs.mongodb.com/manual/reference/command/ping/ ping]] command.
+ */
+case object PingCommand extends Command with CommandWithResult[Boolean]
+

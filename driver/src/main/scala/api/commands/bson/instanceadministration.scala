@@ -376,3 +376,14 @@ object BSONCreateUserCommand
     )
   }
 }
+
+object BSONPingCommandImplicits {
+  implicit object PingWriter extends BSONDocumentWriter[PingCommand.type] {
+    val command = BSONDocument("ping" -> 1.0)
+    def write(ping: PingCommand.type): BSONDocument = command
+  }
+
+  implicit object PingReader extends DealingWithGenericCommandErrorsReader[Boolean] {
+    def readResult(bson: BSONDocument): Boolean = bson.getAs[BSONBooleanLike]("ok").exists(_.toBoolean)
+  }
+}

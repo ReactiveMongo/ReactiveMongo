@@ -19,6 +19,7 @@ trait DBMetaCommands { self: DB =>
     Command,
     DropDatabase,
     ListCollectionNames,
+    PingCommand,
     ServerStatus,
     ServerStatusResult,
     UserRole,
@@ -28,12 +29,14 @@ trait DBMetaCommands { self: DB =>
     CommonImplicits,
     BSONDropDatabaseImplicits,
     BSONServerStatusImplicits,
-    BSONCreateUserCommand
+    BSONCreateUserCommand,
+    BSONPingCommandImplicits
   }
   import reactivemongo.api.commands.bson.BSONListCollectionNamesImplicits._
   import CommonImplicits._
   import BSONDropDatabaseImplicits._
   import BSONServerStatusImplicits._
+  import BSONPingCommandImplicits._
 
   /** Drops this database. */
   def drop()(implicit ec: ExecutionContext): Future[Unit] =
@@ -77,7 +80,7 @@ trait DBMetaCommands { self: DB =>
    * Can only be executed if the this database reference is the `admin` one.
    *
    * @param db the name of the database where the collection exists with the `current` name
-   * @param current the current name of the collection, in the specified `db`
+   * @param from the current name of the collection, in the specified `db`
    * @param to the new name of this collection (inside the same `db`)
    * @param dropExisting If a collection of name `to` already exists, then drops that collection before renaming this one.
    *
@@ -126,5 +129,16 @@ trait DBMetaCommands { self: DB =>
     Command.run(BSONSerializationPack)(
       self, command, ReadPreference.primary
     ).map(_ => {})
+  }
+
+  /**
+   * Tests if the server, resolved according to the given read preference, responds to commands.
+   * (since MongoDB 3.0)
+   *
+   * @return true if successful (even if the server is write locked)
+   */
+  def ping(readPreference: ReadPreference = ReadPreference.nearest)(implicit ec: ExecutionContext): Future[Boolean] = {
+    Command.run(BSONSerializationPack, failoverStrategy)
+      .apply(self, PingCommand, readPreference)
   }
 }
