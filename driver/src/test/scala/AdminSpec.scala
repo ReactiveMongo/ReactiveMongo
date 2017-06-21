@@ -240,4 +240,3 @@ class PingSpecification extends Specification {
     }
   }
 }
-
