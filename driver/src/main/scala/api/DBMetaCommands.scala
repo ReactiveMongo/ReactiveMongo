@@ -141,4 +141,3 @@ trait DBMetaCommands { self: DB =>
       .apply(self, PingCommand, readPreference)
   }
 }
-
