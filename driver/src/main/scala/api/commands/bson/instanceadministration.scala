@@ -383,7 +383,7 @@ object BSONPingCommandImplicits {
     def write(ping: PingCommand.type): BSONDocument = command
   }
 
-  implicit object PingReader extends BSONDocumentReader[Boolean] {
-    def read(bson: BSONDocument): Boolean = bson.getAs[BSONBooleanLike]("ok").exists(_.toBoolean)
+  implicit object PingReader extends DealingWithGenericCommandErrorsReader[Boolean] {
+    def readResult(bson: BSONDocument): Boolean = bson.getAs[BSONBooleanLike]("ok").exists(_.toBoolean)
   }
 }
