@@ -182,7 +182,7 @@ class MongoURISpec extends org.specs2.mutable.Specification {
         authenticate = Some(Authenticate("somedb", "user123", "passwd123")),
         options = MongoConnectionOptions(
           writeConcern = WriteConcern.Default.copy(
-            w = WriteConcern.WaitForAknowledgments(5)
+            w = WriteConcern.WaitForAcknowledgments(5)
           )
         ),
         ignoredOptions = Nil
