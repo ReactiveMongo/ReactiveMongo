@@ -131,10 +131,10 @@ object BSONCollStatsImplicits {
       doc.getAs[BSONNumberLike]("paddingFactor").map(_.toDouble),
       doc.getAs[BSONNumberLike]("systemFlags").map(_.toInt),
       doc.getAs[BSONNumberLike]("userFlags").map(_.toInt),
-      doc.getAs[BSONNumberLike]("totalIndexSize").map(_.toInt).get,
+      doc.getAs[BSONNumberLike]("totalIndexSize").map(_.toDouble).get,
       {
         val indexSizes = doc.getAs[BSONDocument]("indexSizes").get
-        (for (kv <- indexSizes.elements) yield kv._1 -> kv._2.asInstanceOf[BSONInteger].value).toList
+        (for (kv <- indexSizes.elements) yield kv.name -> kv.value.asInstanceOf[BSONDouble].value).toList
       },
       doc.getAs[BSONBooleanLike]("capped").fold(false)(_.toBoolean),
       doc.getAs[BSONNumberLike]("max").map(_.toLong),
