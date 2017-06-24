@@ -206,7 +206,7 @@ object ReactiveMongoBuild extends Build {
       publishArtifact := false,
       previousArtifacts := Set.empty,
       travisEnv in Test := { // test:travisEnv from SBT CLI
-        val (akkaLower, akkaUpper) = "2.3.13" -> "2.5.1"
+        val (akkaLower, akkaUpper) = "2.3.13" -> "2.5.3"
         val (playLower, playUpper) = "2.3.8" -> "2.6.1"
         val (mongoLower, mongoUpper) = "2_6" -> "3_4"
 
