@@ -53,7 +53,8 @@ case class CollStats(scale: Option[Int] = None) extends CollectionCommand with C
  * @param paddingFactor Padding can speed up updates if documents grow (only for mmapv1 storage engine).
  * @param systemFlags System flags.
  * @param userFlags User flags.
- * @param indexSizes Size of specific indexes in bytes.
+ * @param totalIndexSize The total size in bytes (or in bytes / scale) of all indexes. -1 if value exceeds Int.MaxValue
+ * @param sizePerIndex Size of specific indexes in bytes (or in bytes / scale). -1 if value exceeds Int.MaxValue
  * @param capped States if this collection is capped.
  * @param max The maximum number of documents of this collection, if capped.
  * @param maxSize The maximum size in bytes (or in bytes / scale, if any) of this collection, if capped.
