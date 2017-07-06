@@ -14,8 +14,8 @@ object BuildSettings {
   val baseSettings = Seq(organization := "org.reactivemongo")
 
   val buildSettings = Defaults.coreDefaultSettings ++ baseSettings ++ Seq(
-    scalaVersion := "2.11.8",
-    crossScalaVersions := Seq("2.10.5", "2.11.8", "2.12.1"),
+    scalaVersion := "2.11.11",
+    crossScalaVersions := Seq("2.10.5", "2.11.11", "2.12.2"),
     crossVersion := CrossVersion.binary,
     //parallelExecution in Test := false,
     //fork in Test := true, // Don't share executioncontext between SBT CLI/tests
@@ -258,10 +258,10 @@ object ReactiveMongoBuild extends Build {
           "    - scala: 2.10.5",
             "      jdk: oraclejdk8",
             "      env: CI_CATEGORY=UNIT_TESTS") ++ List(
-          "    - scala: 2.11.8",
+          "    - scala: 2.11.11",
               "      jdk: oraclejdk7",
               "      env: CI_CATEGORY=UNIT_TESTS") ++ List(
-          "    - scala: 2.12.1",
+          "    - scala: 2.12.2",
                 "      jdk: oraclejdk7",
                 "      env: CI_CATEGORY=UNIT_TESTS") ++ (
           integrationEnv.flatMap { flags =>
@@ -286,7 +286,7 @@ object ReactiveMongoBuild extends Build {
                   flags.contains("MONGO_VER" -> mongoLower)
               )) {
               List(
-                "    - scala: 2.12.1",
+                "    - scala: 2.12.2",
                 s"      env: ${integrationVars(flags)}",
                 "    - jdk: oraclejdk8",
                 s"      env: ${integrationVars(flags)}"

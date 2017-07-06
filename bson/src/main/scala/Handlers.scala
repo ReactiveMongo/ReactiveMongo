@@ -302,13 +302,13 @@ trait DefaultBSONHandlers {
 
   class BSONBooleanLikeReader[B <: BSONValue] extends BSONReader[B, BSONBooleanLike] {
     def read(bson: B) = bson match {
-      case int: BSONInteger        => BSONIntegerBooleanLike(int)
-      case double: BSONDouble      => BSONDoubleBooleanLike(double)
-      case long: BSONLong          => BSONLongBooleanLike(long)
-      case boolean: BSONBoolean    => BSONBooleanBooleanLike(boolean)
-      case nll: BSONNull.type      => BSONNullBooleanLike(BSONNull)
-      case udf: BSONUndefined.type => BSONUndefinedBooleanLike(BSONUndefined)
-      case _                       => throw new UnsupportedOperationException()
+      case int: BSONInteger      => BSONIntegerBooleanLike(int)
+      case double: BSONDouble    => BSONDoubleBooleanLike(double)
+      case long: BSONLong        => BSONLongBooleanLike(long)
+      case boolean: BSONBoolean  => BSONBooleanBooleanLike(boolean)
+      case _: BSONNull.type      => BSONNullBooleanLike(BSONNull)
+      case _: BSONUndefined.type => BSONUndefinedBooleanLike(BSONUndefined)
+      case _                     => throw new UnsupportedOperationException()
     }
   }
 

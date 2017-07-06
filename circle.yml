@@ -6,7 +6,7 @@ machine:
     AKKA_VERSION: 2.4.17
     MONGO_PROFILE: "default"
     MONGO_VER: 3
-    TRAVIS_SCALA_VERSION: 2.12.1
+    TRAVIS_SCALA_VERSION: 2.12.2
     SBT_VER: 0.13.11
 dependencies:
   pre:

@@ -16,8 +16,8 @@ cache:
   - $HOME/mongodb-linux-x86_64-amazon-3.2.10
   - $HOME/mongodb-linux-x86_64-amazon-3.4.5
 scala:
-- 2.12.1
-- 2.11.8
+- 2.12.2
+- 2.11.11
 - 2.10.5
 jdk:
 - oraclejdk8
@@ -37,17 +37,17 @@ matrix:
     - scala: 2.10.5
       jdk: oraclejdk8
       env: CI_CATEGORY=UNIT_TESTS
-    - scala: 2.11.8
+    - scala: 2.11.11
       jdk: oraclejdk7
       env: CI_CATEGORY=UNIT_TESTS
-    - scala: 2.12.1
+    - scala: 2.12.2
       jdk: oraclejdk7
       env: CI_CATEGORY=UNIT_TESTS
-    - scala: 2.12.1
+    - scala: 2.12.2
       env: CI_CATEGORY=INTEGRATION_TESTS AKKA_VERSION=2.3.13 ITERATEES_VERSION=2.3.8 MONGO_PROFILE=default MONGO_VER=2_6
     - jdk: oraclejdk8
       env: CI_CATEGORY=INTEGRATION_TESTS AKKA_VERSION=2.3.13 ITERATEES_VERSION=2.3.8 MONGO_PROFILE=default MONGO_VER=2_6
-    - scala: 2.12.1
+    - scala: 2.12.2
       env: CI_CATEGORY=INTEGRATION_TESTS AKKA_VERSION=2.3.13 ITERATEES_VERSION=2.3.8 MONGO_PROFILE=default MONGO_VER=3
     - jdk: oraclejdk8
       env: CI_CATEGORY=INTEGRATION_TESTS AKKA_VERSION=2.3.13 ITERATEES_VERSION=2.3.8 MONGO_PROFILE=default MONGO_VER=3
