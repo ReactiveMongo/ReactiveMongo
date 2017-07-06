@@ -64,7 +64,8 @@ object Producer {
 
   implicit def optionValueProducer[T](element: Option[T])(implicit writer: BSONWriter[T, _ <: BSONValue]): Producer[BSONValue] = OptionValueProducer(element.map(writer.write(_)))
 
-  implicit def noneOptionValueProducer(element: None.type): Producer[BSONValue] = OptionValueProducer(None)
+  implicit val noneOptionValueProducer: None.type => Producer[BSONValue] =
+    _ => OptionValueProducer(None)
 
 }
 
@@ -175,7 +176,7 @@ case class BSONArray(stream: Stream[Try[BSONValue]])
    * If the matching value could not be deserialized, returns a `Failure`.
    */
   def getUnflattenedTry(index: Int): Try[Option[BSONValue]] = getTry(index) match {
-    case Failure(e: DocumentKeyNotFound) => Success(None)
+    case Failure(_: DocumentKeyNotFound) => Success(None)
     case Failure(e)                      => Failure(e)
     case Success(e)                      => Success(Some(e))
   }
@@ -211,7 +212,7 @@ case class BSONArray(stream: Stream[Try[BSONValue]])
    * If the value could not be deserialized or converted, returns a `Failure`.
    */
   def getAsUnflattenedTry[T](index: Int)(implicit reader: BSONReader[_ <: BSONValue, T]): Try[Option[T]] = getAsTry(index)(reader) match {
-    case Failure(e: DocumentKeyNotFound) => Success(None)
+    case Failure(_: DocumentKeyNotFound) => Success(None)
     case Failure(e)                      => Failure(e)
     case Success(e)                      => Success(Some(e))
   }
@@ -862,7 +863,7 @@ case class BSONDocument(stream: Stream[Try[BSONElement]])
    * If the value could not be deserialized or converted, returns a `Failure`.
    */
   def getAsUnflattenedTry[T](key: String)(implicit reader: BSONReader[_ <: BSONValue, T]): Try[Option[T]] = getAsTry(key)(reader) match {
-    case Failure(e: DocumentKeyNotFound) => Success(None)
+    case Failure(_: DocumentKeyNotFound) => Success(None)
     case Failure(e)                      => Failure(e)
     case Success(e)                      => Success(Some(e))
   }
