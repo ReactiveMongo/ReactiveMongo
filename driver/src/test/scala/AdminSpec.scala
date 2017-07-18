@@ -165,7 +165,8 @@ class ResyncSpec extends Specification {
       "be successful with ReplicaSet (MongoDB 3+)" in { implicit ee: EE =>
         connection.database("admin").flatMap(_.runCommand(Resync)) must (
           throwA[CommandError].like {
-            case CommandError.Code(c) => c aka "error code" must_== 95
+            case err @ CommandError.Code(c) =>
+              (c == 95 || c == 96 /* 3.4*/ ) aka "error code" must beTrue
           }
         ).await(0, timeout)
       } tag "not_mongo26"

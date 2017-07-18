@@ -55,8 +55,11 @@ export LD_LIBRARY_PATH="$HOME/ssl/lib:$LD_LIBRARY_PATH"
 if [ "$MONGO_VER" = "3" -o "$MONGO_VER" = "3_4" ]; then
     MONGO_TREE="3.2.10"
     
-    if [ "$AKKA_VERSION" = "2.4.8" ]; then
+    if [ "$AKKA_VERSION" = "2.5.3" ]; then
         MONGO_TREE="3.4.5"
+        MONGO_VER="3_4"
+
+        echo "Fix MongoDB version to 3.4.5 (due to Akka Stream version)"
     fi
 
     if [ ! -x "$HOME/mongodb-linux-x86_64-amazon-$MONGO_TREE/bin/mongod" ]; then
@@ -144,4 +147,5 @@ LD_LIBRARY_PATH="$LD_LIBRARY_PATH"
 PRIMARY_HOST="$PRIMARY_HOST"
 PRIMARY_SLOW_PROXY="$PRIMARY_SLOW_PROXY"
 SSL_PASS=$SSL_PASS
+MONGO_VER=$MONGO_VER
 EOF
