@@ -562,7 +562,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
     } tag "not_mongo26"
   }
 
-  "Aggregation result for '$out'" >> {
+  f"Aggregation result for '$$out'" >> {
     // https://docs.mongodb.com/master/reference/operator/aggregation/out/#example
 
     val books = db.collection(s"books-1-${System identityHashCode this}")
@@ -629,22 +629,12 @@ class AggregationSpec extends org.specs2.mutable.Specification {
       import books.BatchCommands.AggregationFramework
       import AggregationFramework.{ Ascending, Group, AddFieldToSet, Sort }
 
-      /* TODO: Remove
-      type Author = (String, List[String])
-      implicit val authorReader = BSONDocumentReader[Author] { doc =>
-        (for {
-          id <- doc.getAsTry[String]("_id")
-          books <- doc.getAsTry[List[String]]("books")
-        } yield id -> books).get
-      }
-       */
-
       books.aggregate(
         Sort(Ascending("title")),
         List(Group(BSONString(f"$$author"))(
           "books" -> AddFieldToSet("title")
         ))
-      ).map(_.firstBatch.toSet) must beEqualTo(List(
+      ).map(_.firstBatch.toSet) must beEqualTo(Set(
           document("_id" -> "Homer", "books" -> List("The Odyssey", "Iliad")),
           document("_id" -> "Dante", "books" -> List(
             "The Banquet", "Eclogues", "Divine Comedy"

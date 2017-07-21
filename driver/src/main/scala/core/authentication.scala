@@ -158,7 +158,7 @@ private[reactivemongo] trait MongoScramSha1Authentication {
 
           whenAuthenticating(response.info.channelId) {
             case (con, a @ ScramSha1Authenticating(
-              db, user, pwd, rand, msg, Some(cid), Some(sig),
+              db, _, _, _, _, Some(cid), Some(sig),
               1 /* step; TODO: more retry? */ )) => {
 
               val serverSig: Option[String] =

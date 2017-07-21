@@ -55,7 +55,7 @@ object CustomEnumeratee {
               case Step.Cont(k) =>
                 val n = k(in)
                 n.pureFlatFold[E, Iteratee[E, A]] {
-                  case Step.Cont(k) => Cont(step(n))
+                  case Step.Cont(_) => Cont(step(n))
                   case _            => Done(n, Input.Empty)
                 }
               case other => Done(other.it, in)
@@ -93,13 +93,14 @@ object CustomEnumerator {
 
       def loop(current: C, iteratee: Iteratee[C, A]): Future[Iteratee[C, A]] =
         iteratee.fold {
-          case step @ Step.Cont(ƒ) => next(current) flatMap {
+          case Step.Cont(ƒ) => next(current) flatMap {
             case Some(nnx) => loop(nnx, ƒ(Input.El(nnx)))
             case _ =>
               val it = ƒ(Input.Empty)
               cleanUp(current)
               Future.successful(it)
           }
+
           case Step.Done(a, e) =>
             val done = Done(a, e)
             cleanUp(current)

@@ -237,7 +237,7 @@ class MongoConnection(
     else mongosystem ! message
   }
 
-  private[api] def sendExpectingResponse(checkedWriteRequest: CheckedWriteRequest)(implicit ec: ExecutionContext): Future[Response] = whenActive {
+  private[api] def sendExpectingResponse(checkedWriteRequest: CheckedWriteRequest): Future[Response] = whenActive {
     val expectingResponse =
       CheckedWriteRequestExpectingResponse(checkedWriteRequest)
 
@@ -245,7 +245,7 @@ class MongoConnection(
     expectingResponse.future
   }
 
-  private[api] def sendExpectingResponse(requestMaker: RequestMaker, isMongo26WriteOp: Boolean)(implicit ec: ExecutionContext): Future[Response] = whenActive {
+  private[api] def sendExpectingResponse(requestMaker: RequestMaker, isMongo26WriteOp: Boolean): Future[Response] = whenActive {
     lazy val expectingResponse =
       RequestMakerExpectingResponse(requestMaker, isMongo26WriteOp)
 
@@ -332,7 +332,7 @@ class MongoConnection(
     private var setAvailable = false
 
     val receive: Receive = {
-      case pa @ PrimaryAvailable(meta) => {
+      case PrimaryAvailable(meta) => {
         logger.debug(s"[$lnm] A primary is available: $meta")
 
         metadata = Some(meta)
@@ -621,7 +621,7 @@ object MongoConnection {
           copy(writeConcern = result.writeConcern.
             copy(j = journaled.toBoolean))
 
-        case ("writeConcernTimeout", t @ IntRe(ms)) => unsupported -> result.
+        case ("writeConcernTimeout", IntRe(ms)) => unsupported -> result.
           copy(writeConcern = result.writeConcern.
             copy(wtimeout = Some(ms.toInt)))
 

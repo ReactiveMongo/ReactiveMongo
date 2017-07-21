@@ -89,11 +89,11 @@ case class BSONQueryBuilder(
 private[api] object BSONReadPreference {
   def write(readPreference: ReadPreference) = {
     val mode = readPreference match {
-      case ReadPreference.Primary                    => "primary"
-      case ReadPreference.PrimaryPreferred(filter)   => "primaryPreferred"
-      case ReadPreference.Secondary(filter)          => "secondary"
-      case ReadPreference.SecondaryPreferred(filter) => "secondaryPreferred"
-      case ReadPreference.Nearest(filter)            => "nearest"
+      case ReadPreference.Primary               => "primary"
+      case ReadPreference.PrimaryPreferred(_)   => "primaryPreferred"
+      case ReadPreference.Secondary(_)          => "secondary"
+      case ReadPreference.SecondaryPreferred(_) => "secondaryPreferred"
+      case ReadPreference.Nearest(_)            => "nearest"
     }
     val base = Seq[BSONElement]("mode" -> mode)
 
