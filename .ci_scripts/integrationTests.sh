@@ -55,11 +55,13 @@ if [ "$MONGO_PROFILE" = "rs" ]; then
 fi
 
 # JVM/SBT setup
-TEST_OPTS="exclude not_mongo26,unit"
+TEST_OPTS="exclude not_mongo26,gt_mongo3,unit"
 SBT_ARGS="-Dtest.primaryHost=$PRIMARY_HOST"
 SBT_ARGS="$SBT_ARGS -Dtest.slowPrimaryHost=$PRIMARY_SLOW_PROXY -Dtest.slowProxyDelay=300 -Dtest.slowFailoverRetries=12"
 
-if [ "$MONGO_VER" = "3" -o "$MONGO_VER" = "3_4" ]; then
+if [ "$MONGO_VER" = "3" ]; then
+    TEST_OPTS="exclude mongo2,gt_mongo3,unit"
+elif [ "$MONGO_VER" = "3_4" ]; then
     TEST_OPTS="exclude mongo2,unit"
 else
     SBT_ARGS="$SBT_ARGS -Dtest.authMode=cr"

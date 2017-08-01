@@ -832,7 +832,9 @@ private[api] final class FoldResponses[T](
 
           case Fail(f) => ko(last, f)
 
-          case Cont(v) => self ! HandleResponse(last, cur, nc)
+          case Cont(v) =>
+            // TODO: Use v instead of cur?
+            self ! HandleResponse(last, cur, nc)
         }
       }
     }

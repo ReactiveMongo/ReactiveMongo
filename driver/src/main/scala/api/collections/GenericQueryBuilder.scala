@@ -84,7 +84,7 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
    */
   def cursor[T](readPreference: ReadPreference = ReadPreference.primary, isMongo26WriteOp: Boolean = false)(implicit reader: pack.Reader[T], ec: ExecutionContext, cp: CursorProducer[T]): cp.ProducedCursor = cp.produce(defaultCursor[T](readPreference, isMongo26WriteOp))
 
-  private def defaultCursor[T](readPreference: ReadPreference, isMongo26WriteOp: Boolean = false)(implicit reader: pack.Reader[T], ec: ExecutionContext): Cursor[T] = {
+  private def defaultCursor[T](readPreference: ReadPreference, isMongo26WriteOp: Boolean = false)(implicit reader: pack.Reader[T]): Cursor[T] = {
     val documents = BufferSequence {
       val buffer = write(merge(readPreference), ChannelBufferWritableBuffer())
       projectionOption.map { projection =>
@@ -116,7 +116,7 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
    *
    * @tparam T $resultTParam
    */
-  def one[T](readPreference: ReadPreference)(implicit reader: pack.Reader[T], ec: ExecutionContext): Future[Option[T]] = copy(options = options.batchSize(1)).defaultCursor(readPreference)(reader, ec).headOption
+  def one[T](readPreference: ReadPreference)(implicit reader: pack.Reader[T], ec: ExecutionContext): Future[Option[T]] = copy(options = options.batchSize(1)).defaultCursor(readPreference)(reader).headOption
 
   /**
    * $requireOneFunction.
@@ -135,7 +135,7 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
    *
    * @tparam T $resultTParam
    */
-  def requireOne[T](readPreference: ReadPreference)(implicit reader: pack.Reader[T], ec: ExecutionContext): Future[T] = copy(options = options.batchSize(1)).defaultCursor(readPreference)(reader, ec).head
+  def requireOne[T](readPreference: ReadPreference)(implicit reader: pack.Reader[T], ec: ExecutionContext): Future[T] = copy(options = options.batchSize(1)).defaultCursor(readPreference)(reader).head
 
   /**
    * Sets the selector document.

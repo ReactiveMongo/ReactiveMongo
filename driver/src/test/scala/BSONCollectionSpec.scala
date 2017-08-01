@@ -153,7 +153,7 @@ class BSONCollectionSpec extends org.specs2.mutable.Specification {
       implicit val reader = BuggyPersonReader
       val future = findAll(collection).one[Person].map(_ => 0).recover {
         case e if e.getMessage == "hey hey hey" => -1
-        case e =>
+        case _ =>
           /* e.printStackTrace() */ -2
       }
 
@@ -169,7 +169,7 @@ class BSONCollectionSpec extends org.specs2.mutable.Specification {
         "using collect" in { implicit ee: EE =>
           val collect = cursor.collect[Vector]().map(_.size).recover {
             case e if e.getMessage == "hey hey hey" => -1
-            case e =>
+            case _ =>
               /* e.printStackTrace() */ -2
           }
 
@@ -229,7 +229,7 @@ class BSONCollectionSpec extends org.specs2.mutable.Specification {
         //println(s"person write succeed??  $lastError")
         0
       }.recover {
-        case ce: CustomException => -1
+        case _: CustomException => -1
         case e =>
           e.printStackTrace()
           -2
@@ -387,5 +387,5 @@ class BSONCollectionSpec extends org.specs2.mutable.Specification {
     }
   }
 
-  @inline def findAll(c: BSONCollection)(implicit ec: ExecutionContext) = c.find(BSONDocument.empty)
+  @inline def findAll(c: BSONCollection) = c.find(BSONDocument.empty)
 }

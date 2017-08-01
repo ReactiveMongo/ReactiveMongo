@@ -285,7 +285,7 @@ class MongoDriver(
     def isEmpty = driver.connectionMonitors.isEmpty
 
     val receive: Receive = {
-      case AddConnection(name, nodes, opts, sys) => {
+      case AddConnection(name, _, opts, sys) => {
         logger.debug(
           s"[$supervisorName] Add connection to the supervisor: $name"
         )
@@ -323,6 +323,7 @@ class MongoDriver(
       }
     }
 
+    @deprecated("Will be private", "0.12.6")
     def closing(shutdownTimeout: FiniteDuration): Receive = {
       case AddConnection(name, _, _, _) =>
         logger.warn(s"[$supervisorName] Refusing to add connection while MongoDriver is closing: $name")

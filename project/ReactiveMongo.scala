@@ -464,6 +464,7 @@ object Version {
 
         Seq(
           mcp("reactivemongo.api.MongoConnection$MonitorActor$"),
+          imt("reactivemongo.api.MongoConnection.sendExpectingResponse"), // priv
           mcp("reactivemongo.api.ReadPreference$BSONDocumentWrapper$"), // priv
           mcp("reactivemongo.api.ReadPreference$BSONDocumentWrapper"), // priv
           fcp("reactivemongo.api.MongoDriver$SupervisorActor"), // private

@@ -155,7 +155,7 @@ trait MongoDBSystem extends Actor {
       history.offer(time -> event)
       ()
     } catch {
-      case err: Exception if (retry > 0) => go(retry - 1)
+      case _: Exception if (retry > 0) => go(retry - 1)
       case err: Exception =>
         logger.warn(s"Fails to update history: $event", err)
     }
@@ -164,12 +164,15 @@ trait MongoDBSystem extends Actor {
   }
 
   private[reactivemongo] def internalState() = new InternalState(
-    history.toArray.foldLeft(Array.empty[StackTraceElement]) {
-      case (trace, (time, event)) => new StackTraceElement(
-        "reactivemongo", event.asInstanceOf[String],
-        s"<time:$time>", -1
-      ) +: trace
-    }
+    history.toArray(Array.fill[(Long, String)](historyMax)(null)).
+      foldLeft(Array.empty[StackTraceElement]) {
+        case (trace, null) => trace
+
+        case (trace, (time, event)) => new StackTraceElement(
+          "reactivemongo", event.asInstanceOf[String],
+          s"<time:$time>", -1
+        ) +: trace
+      }
   )
 
   private[reactivemongo] def getNodeSet = _nodeSet // For test purposes
@@ -1141,7 +1144,7 @@ trait MongoDBSystem extends Actor {
             ))._1
           } catch {
             case reason: Throwable =>
-              logger.warn(s"[$lnm] Fails to connect node with channel ${con.channel.getId}: ${n.toShortString}")
+              logger.warn(s"[$lnm] Fails to connect node with channel ${con.channel.getId}: ${n.toShortString}", reason)
               n
           }
 

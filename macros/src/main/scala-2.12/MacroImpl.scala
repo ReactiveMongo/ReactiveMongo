@@ -27,26 +27,22 @@ private object MacroImpl {
     def write(v: A) = forwardWriter.write(v)
   })
 
-  def handler[A: c.WeakTypeTag, Opts: c.WeakTypeTag](c: Context): c.Expr[BSONDocumentHandler[A]] = {
-    val helper = Helper[A, Opts](c)
+  def handler[A: c.WeakTypeTag, Opts: c.WeakTypeTag](c: Context): c.Expr[BSONDocumentHandler[A]] = c.universe.reify(new BSONDocumentReader[A] with BSONDocumentWriter[A] with BSONHandler[BSONDocument, A] {
+    private val r: BSONDocument => A = { document =>
+      Helper[A, Opts](c).readBody.splice
+    }
 
-    c.universe.reify(new BSONDocumentReader[A] with BSONDocumentWriter[A] with BSONHandler[BSONDocument, A] {
-      private val r: BSONDocument => A = { document =>
-        Helper[A, Opts](c).readBody.splice
-      }
+    lazy val forwardReader: BSONDocumentReader[A] = BSONDocumentReader[A](r)
 
-      lazy val forwardReader: BSONDocumentReader[A] = BSONDocumentReader[A](r)
+    private val w: A => BSONDocument = { v =>
+      Helper[A, Opts](c).writeBody.splice
+    }
 
-      private val w: A => BSONDocument = { v =>
-        Helper[A, Opts](c).writeBody.splice
-      }
+    lazy val forwardWriter: BSONDocumentWriter[A] = BSONDocumentWriter[A](w)
 
-      lazy val forwardWriter: BSONDocumentWriter[A] = BSONDocumentWriter[A](w)
-
-      def read(document: BSONDocument): A = forwardReader.read(document)
-      def write(v: A): BSONDocument = forwardWriter.write(v)
-    })
-  }
+    def read(document: BSONDocument): A = forwardReader.read(document)
+    def write(v: A): BSONDocument = forwardWriter.write(v)
+  })
 
   private def Helper[A: c.WeakTypeTag, Opts: c.WeakTypeTag](c: Context) = new Helper[c.type, A](c) {
     val A = c.weakTypeOf[A]

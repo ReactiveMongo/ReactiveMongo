@@ -140,7 +140,7 @@ class ServerStatusSpec extends Specification {
   "Database operation" should {
     "be successful" in { implicit ee: EE =>
       db.serverStatus must beLike[ServerStatusResult]({
-        case status @ ServerStatusResult(_, _, MongodProcess,
+        case ServerStatusResult(_, _, MongodProcess,
           _, _, _, _, _, _, _, _, _, _, _, _, _) =>
           //println(s"Server status: $status")
           ok
@@ -165,7 +165,8 @@ class ResyncSpec extends Specification {
       "be successful with ReplicaSet (MongoDB 3+)" in { implicit ee: EE =>
         connection.database("admin").flatMap(_.runCommand(Resync)) must (
           throwA[CommandError].like {
-            case CommandError.Code(c) => c aka "error code" must_== 95
+            case CommandError.Code(c) =>
+              (c == 95 || c == 96 /* 3.4*/ ) aka "error code" must beTrue
           }
         ).await(0, timeout)
       } tag "not_mongo26"

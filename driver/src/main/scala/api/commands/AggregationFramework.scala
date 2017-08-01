@@ -205,6 +205,57 @@ trait AggregationFramework[P <: SerializationPack]
   }
 
   /**
+   * _Since MongoDB 3.4:_ The [[https://docs.mongodb.com/manual/reference/operator/aggregation/graphLookup/ \$graphLookup]] aggregation stage.
+   *
+   * @param from the target collection for the $graphLookup operation to search
+   * @param startWith the expression that specifies the value of the `connectFromField` with which to start the recursive search
+   * @param connectFromField the field name whose value `\$graphLookup` uses to recursively match against the `connectToField` of other documents in the collection
+   * @param connectToField the field name in other documents against which to match the value of the field specified by the `connectFromField` parameter
+   * @param as the name of the array field added to each output document
+   * @param maxDepth an optional non-negative integral number specifying the maximum recursion depth
+   * @param depthField an optional name for a field to add to each traversed document in the search path
+   * @param restrictSearchWithMatch an optional filter expression
+   */
+  case class GraphLookup(
+      from: String,
+      startWith: pack.Value,
+      connectFromField: String,
+      connectToField: String,
+      as: String,
+      maxDepth: Option[Int] = None,
+      depthField: Option[String] = None,
+      restrictSearchWithMatch: Option[pack.Value] = None
+  ) extends PipelineOperator {
+    val makePipe: pack.Document = makeDocument(Seq(
+      elementProducer(f"$$graphLookup", makeDocument(Seq(
+        elementProducer("from", stringValue(from)),
+        elementProducer("startWith", startWith),
+        elementProducer("connectFromField", stringValue(connectFromField)),
+        elementProducer("connectToField", stringValue(connectToField)),
+        elementProducer("as", stringValue(as))
+      ) ++ options))
+    ))
+
+    private def options = {
+      val opts = Seq.newBuilder[pack.ElementProducer]
+
+      maxDepth.foreach { i =>
+        opts += elementProducer("maxDepth", intValue(i))
+      }
+
+      depthField.foreach { f =>
+        elementProducer("depthField", stringValue(f))
+      }
+
+      restrictSearchWithMatch.foreach { e =>
+        elementProducer("restrictSearchWithMatch", e)
+      }
+
+      opts.result()
+    }
+  }
+
+  /**
    * Skips over a number of documents before passing all further documents along the stream.
    * http://docs.mongodb.org/manual/reference/aggregation/skip/#_S_skip
    * @param skip the number of documents to skip

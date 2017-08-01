@@ -246,7 +246,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
               def produce(base: Cursor[T]) = new DefaultFooCursor(base)
             }
 
-            implicit def fooFlattener[T] = new CursorFlattener[FooCursor] {
+            implicit def fooFlattener = new CursorFlattener[FooCursor] {
               def flatten[T](future: Future[FooCursor[T]]): FooCursor[T] =
                 new FlattenedCursor[T](future) with FooCursor[T] {
                   def foo = "Flattened"
@@ -424,6 +424,28 @@ class AggregationSpec extends org.specs2.mutable.Specification {
 
     } tag "not_mongo26"
 
+    "perform a graph lookup so the joined documents are returned" in {
+      implicit ee: EE => // See https://docs.mongodb.com/manual/reference/operator/aggregation/graphLookup/#examples
+
+        implicit val productHandler = Macros.handler[Product]
+        implicit val invReportHandler = Macros.handler[InventoryReport]
+        import orders.BatchCommands.AggregationFramework.GraphLookup
+
+        def expected = List(
+          InventoryReport(1, Some("abc"), Some(12), Some(2),
+            List(Product(1, Some("abc"), Some("product 1"), Some(120)))),
+          InventoryReport(2, Some("jkl"), Some(20), Some(1),
+            List(Product(4, Some("jkl"), Some("product 4"), Some(70)))),
+          InventoryReport(3, docs = List.empty)
+        )
+
+        orders.aggregate(GraphLookup(
+          inventory.name, BSONString(f"$$item"), "item", "sku", "docs"
+        )).map(_.head[InventoryReport].toList) must beEqualTo(expected).
+          await(0, timeout)
+
+    } tag "gt_mongo3"
+
     val sales = db.collection(s"agg-sales-A-${System identityHashCode this}")
     implicit val saleItemHandler = Macros.handler[SaleItem]
     implicit val saleHandler = Macros.handler[Sale]
@@ -540,7 +562,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
     } tag "not_mongo26"
   }
 
-  "Aggregation result for '$out'" >> {
+  f"Aggregation result for '$$out'" >> {
     // https://docs.mongodb.com/master/reference/operator/aggregation/out/#example
 
     val books = db.collection(s"books-1-${System identityHashCode this}")
@@ -607,22 +629,12 @@ class AggregationSpec extends org.specs2.mutable.Specification {
       import books.BatchCommands.AggregationFramework
       import AggregationFramework.{ Ascending, Group, AddFieldToSet, Sort }
 
-      /* TODO: Remove
-      type Author = (String, List[String])
-      implicit val authorReader = BSONDocumentReader[Author] { doc =>
-        (for {
-          id <- doc.getAsTry[String]("_id")
-          books <- doc.getAsTry[List[String]]("books")
-        } yield id -> books).get
-      }
-       */
-
       books.aggregate(
         Sort(Ascending("title")),
         List(Group(BSONString(f"$$author"))(
           "books" -> AddFieldToSet("title")
         ))
-      ).map(_.firstBatch.toSet) must beEqualTo(List(
+      ).map(_.firstBatch.toSet) must beEqualTo(Set(
           document("_id" -> "Homer", "books" -> List("The Odyssey", "Iliad")),
           document("_id" -> "Dante", "books" -> List(
             "The Banquet", "Eclogues", "Divine Comedy"
