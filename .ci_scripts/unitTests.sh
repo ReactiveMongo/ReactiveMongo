@@ -33,11 +33,14 @@ export JVM_OPTS
 
 TEST_ARGS=";project ReactiveMongo-BSON ;test-only"
 
-TEST_ARGS="$TEST_ARGS ;project ReactiveMongo"
-TEST_ARGS="$TEST_ARGS ;test-only BSONObjectID -- include unit"
-TEST_ARGS="$TEST_ARGS ;test-only MongoURISpec -- include unit"
-TEST_ARGS="$TEST_ARGS ;test-only NodeSetSpec -- include unit"
-TEST_ARGS="$TEST_ARGS ;test-only reactivemongo.BsonSpec -- include unit"
+TEST_ARGS="$TEST_ARGS ;project ReactiveMongo; test-only"
+TEST_ARGS="$TEST_ARGS BSONObjectIDSpec"
+TEST_ARGS="$TEST_ARGS MongoURISpec"
+TEST_ARGS="$TEST_ARGS NodeSetSpec"
+TEST_ARGS="$TEST_ARGS reactivemongo.BsonSpec"
+TEST_ARGS="$TEST_ARGS UpdateSpec"
+TEST_ARGS="$TEST_ARGS -- include unit"
+
 TEST_ARGS="$TEST_ARGS ;project ReactiveMongo-BSON-Macros ;test-only"
 
 sed -e 's/"-deprecation", //' < project/ReactiveMongo.scala > .tmp && mv .tmp project/ReactiveMongo.scala

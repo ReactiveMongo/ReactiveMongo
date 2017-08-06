@@ -1,11 +1,19 @@
 import scala.concurrent.duration.FiniteDuration
 
+import reactivemongo.bson._
+
 import reactivemongo.api.ReadPreference
-import reactivemongo.api.commands.{ UpdateWriteResult, WriteResult, Upserted }
 import reactivemongo.api.collections.bson.BSONCollection
+
+import reactivemongo.api.commands.{
+  CommandError,
+  DefaultWriteResult,
+  UpdateWriteResult,
+  WriteResult,
+  Upserted
+}
 import reactivemongo.api.commands.bson.BSONUpdateCommand._
 import reactivemongo.api.commands.bson.BSONUpdateCommandImplicits._
-import reactivemongo.bson._
 
 import org.specs2.concurrent.{ ExecutionEnv => EE }
 
@@ -132,5 +140,31 @@ class UpdateSpec extends org.specs2.mutable.Specification {
         )
       }).await(1, timeout)
     }
+  }
+
+  "WriteResult" should {
+    val error = DefaultWriteResult(
+      ok = false,
+      n = 1,
+      writeErrors = Nil,
+      writeConcernError = None,
+      code = Some(23),
+      errmsg = Some("Foo")
+    )
+
+    "be matched as a CommandError when failed" in {
+      error must beLike {
+        case CommandError.Code(code) => code must_== 23
+      } and (error must beLike {
+        case CommandError.Message(msg) => msg must_== "Foo"
+      })
+    } tag "unit"
+
+    "not be matched as a CommandError when successful" in {
+      (error.copy(ok = true) match {
+        case CommandError.Code(_) | CommandError.Message(_) => true
+        case _ => false
+      }) must beFalse
+    } tag "unit"
   }
 }
