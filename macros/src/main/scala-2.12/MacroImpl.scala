@@ -153,23 +153,24 @@ private object MacroImpl {
       }.toMap
       val resolve = resolver(boundTypes, "Reader")(readerType)
 
-      val values = constructor.paramLists.head.map { param =>
-        val t = param.typeSignature
-        val sig = boundTypes.getOrElse(t.typeSymbol.fullName, t)
-        val opt = optionTypeParameter(sig)
-        //val typ = opt getOrElse sig
-        val (reader, _) = resolve(sig)
-        val pname = paramName(param)
+      val values = constructor.paramLists.
+        headOption.toSeq.flatten.map { param =>
+          val t = param.typeSignature
+          val sig = boundTypes.getOrElse(t.typeSymbol.fullName, t)
+          val opt = optionTypeParameter(sig)
+          //val typ = opt getOrElse sig
+          val (reader, _) = resolve(sig)
+          val pname = paramName(param)
 
-        if (reader.isEmpty) {
-          c.abort(c.enclosingPosition, s"Implicit not found '$pname': ${classOf[Reader[_]].getName}[_, $sig]")
-        }
+          if (reader.isEmpty) {
+            c.abort(c.enclosingPosition, s"Implicit not found '$pname': ${classOf[Reader[_]].getName}[_, $sig]")
+          }
 
-        opt match {
-          case Some(_) => q"document.getAs($pname)($reader)"
-          case _ => q"document.getAsTry($pname)($reader).get"
+          opt match {
+            case Some(_) => q"document.getAs($pname)($reader)"
+            case _ => q"document.getAsTry($pname)($reader).get"
+          }
         }
-      }
 
       q"${Ident(companion.name)}.apply(..$values)"
     }
@@ -217,16 +218,20 @@ private object MacroImpl {
         case (sym, ty) => sym.fullName -> ty
       }.toMap
       val resolve = resolver(boundTypes, "Writer")(writerType)
-
       val tuple = Ident(TermName("tuple"))
-      val (optional, required) = constructorParams.zipWithIndex.filterNot(p => ignoreField(p._1)) zip types partition (t => isOptionalType(t._2))
+
+      val (optional, required) =
+        constructorParams.zipWithIndex.zip(types).filterNot {
+          case ((sym, _), _) => ignoreField(sym)
+        }.partition(t => isOptionalType(t._2))
+
       val values = required map {
         case ((param, i), sig) =>
           val (writer, _) = resolve(sig)
           val pname = paramName(param)
 
           if (writer.isEmpty) {
-            c.abort(c.enclosingPosition, s"Implicit not found for '$pname': ${classOf[Writer[_]].getName}[$tpe, _]")
+            c.abort(c.enclosingPosition, s"Implicit not found for '$pname': ${classOf[Writer[_]].getName}[$sig, _]")
           }
 
           val tuple_i = {
@@ -245,7 +250,7 @@ private object MacroImpl {
           val pname = paramName(param)
 
           if (writer.isEmpty) {
-            c.abort(c.enclosingPosition, s"Implicit not found for '$pname': ${classOf[Writer[_]].getName}[$tpe, _]")
+            c.abort(c.enclosingPosition, s"Implicit not found for '$pname': ${classOf[Writer[_]].getName}[$sig, _]")
           }
 
           val tuple_i = {
