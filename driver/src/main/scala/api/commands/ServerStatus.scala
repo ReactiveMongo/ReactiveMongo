@@ -15,8 +15,7 @@ case class ServerStatusAsserts(
   warning: Int,
   msg: Int,
   user: Int,
-  rollovers: Int
-)
+  rollovers: Int)
 
 /**
  * Only for the MMAPv1 storage engine.
@@ -34,8 +33,7 @@ case class ServerStatusBackgroundFlushing(
   totalMs: Long,
   averageMs: Long,
   lastMs: Long,
-  lastFinished: Long
-)
+  lastFinished: Long)
 
 /**
  * @see [[ServerStatusResult]]
@@ -48,8 +46,7 @@ case class ServerStatusBackgroundFlushing(
 case class ServerStatusConnections(
   current: Int,
   available: Int,
-  totalCreated: Long
-)
+  totalCreated: Long)
 
 /**
  * Only for the MMAPv1 storage engine with the journaling enabled.
@@ -72,8 +69,7 @@ case class ServerStatusJournalingTime(
   writeToDataFiles: Long,
   remapPrivateView: Long,
   commits: Long,
-  commitsInWriteLock: Long
-)
+  commitsInWriteLock: Long)
 
 /**
  * Only for the MMAPv1 storage engine with the journaling enabled.
@@ -94,8 +90,7 @@ case class ServerStatusJournaling(
   compression: Double,
   commitsInWriteLock: Int,
   earlyCommits: Int,
-  timeMs: ServerStatusJournalingTime
-)
+  timeMs: ServerStatusJournalingTime)
 
 /**
  * @see [[ServerStatusResult]]
@@ -106,8 +101,7 @@ case class ServerStatusJournaling(
  */
 case class ServerStatusExtraInfo(
   heapUsageBytes: Int,
-  pageFaults: Int
-)
+  pageFaults: Int)
 
 /**
  * @see [[ServerStatusGlobalLock]]
@@ -120,8 +114,7 @@ case class ServerStatusExtraInfo(
 case class ServerStatusLock(
   total: Int,
   readers: Int,
-  writers: Int
-)
+  writers: Int)
 
 /**
  * @see [[ServerStatusResult]]
@@ -134,8 +127,7 @@ case class ServerStatusLock(
 case class ServerStatusGlobalLock(
   totalTime: Int,
   currentQueue: ServerStatusLock,
-  activeClients: ServerStatusLock
-)
+  activeClients: ServerStatusLock)
 
 /**
  * @see [[ServerStatusResult]]
@@ -148,8 +140,7 @@ case class ServerStatusGlobalLock(
 case class ServerStatusNetwork(
   bytesIn: Int,
   bytesOut: Int,
-  numRequests: Int
-)
+  numRequests: Int)
 
 /**
  * @see @see https://docs.mongodb.com/manual/reference/command/serverStatus/

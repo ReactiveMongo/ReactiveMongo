@@ -27,8 +27,7 @@ class IndexesSpec extends org.specs2.mutable.Specification {
       def spec(c: BSONCollection, timeout: FiniteDuration)(implicit ee: EE) = {
         val futs: Seq[Future[Unit]] = for (i <- 1 until 10)
           yield c.insert(BSONDocument(
-          "loc" -> BSONArray(i + 2D, i * 2D)
-        )).map(_ => {})
+          "loc" -> BSONArray(i + 2D, i * 2D))).map(_ => {})
 
         Future.sequence(futs) must not(throwA[Throwable]).await(1, timeout)
       }
@@ -46,8 +45,7 @@ class IndexesSpec extends org.specs2.mutable.Specification {
       def spec(c: BSONCollection, timeout: FiniteDuration)(implicit ee: EE) =
         c.indexesManager.ensure(Index(
           List("loc" -> Geo2D),
-          options = BSONDocument("min" -> -95, "max" -> 95, "bits" -> 28)
-        )).
+          options = BSONDocument("min" -> -95, "max" -> 95, "bits" -> 28))).
           aka("index") must beTrue.await(1, timeout * 2)
 
       "be created with the default connection" in { implicit ee: EE =>
@@ -61,8 +59,7 @@ class IndexesSpec extends org.specs2.mutable.Specification {
 
     "fail to insert some points out of range" in { implicit ee: EE =>
       geo.insert(
-        BSONDocument("loc" -> BSONArray(27.88D, 97.21D))
-      ).
+        BSONDocument("loc" -> BSONArray(27.88D, 97.21D))).
         map(_ => false).recover {
           case e: DatabaseException =>
             // MongoError['point not in interval of [ -95, 95 )' (code = 13027)]
@@ -81,10 +78,8 @@ class IndexesSpec extends org.specs2.mutable.Specification {
         future must beLike[Index] {
           case i @ Index(("loc", Geo2D) :: _, _, _, _, _, _, _, _, opts) =>
             opts.getAs[BSONInteger]("min").get.value mustEqual -95 and (
-              opts.getAs[BSONInteger]("max").get.value mustEqual 95
-            ) and (
-                opts.getAs[BSONInteger]("bits").get.value mustEqual 28
-              )
+              opts.getAs[BSONInteger]("max").get.value mustEqual 95) and (
+                opts.getAs[BSONInteger]("bits").get.value mustEqual 28)
         }.await(1, timeout)
       }
 
@@ -106,17 +101,14 @@ class IndexesSpec extends org.specs2.mutable.Specification {
         yield geo2DSpherical.insert(
         BSONDocument("loc" -> BSONDocument(
           "type" -> "Point",
-          "coordinates" -> BSONArray(i + 2D, i * 2D)
-        ))
-      ).map(_ => {})
+          "coordinates" -> BSONArray(i + 2D, i * 2D)))).map(_ => {})
 
       Future.sequence(futs) must not(throwA[Throwable]).await(1, timeout)
     }
 
     "make index" in { implicit ee: EE =>
       geo2DSpherical.indexesManager.ensure(
-        Index(List("loc" -> Geo2DSpherical))
-      ) must beTrue.await(1, timeout * 2)
+        Index(List("loc" -> Geo2DSpherical))) must beTrue.await(1, timeout * 2)
     }
 
     "retrieve indexes" in { implicit ee: EE =>
@@ -165,15 +157,13 @@ class IndexesSpec extends org.specs2.mutable.Specification {
 
     "be first created" in { implicit ee: EE =>
       col.indexesManager.ensure(Index(
-        Seq("token" -> IndexType.Ascending), unique = true
-      )).
+        Seq("token" -> IndexType.Ascending), unique = true)).
         aka("index creation") must beTrue.await(1, timeout * 2)
     }
 
     "not be created if already exists" in { implicit ee: EE =>
       col.indexesManager.ensure(Index(
-        Seq("token" -> IndexType.Ascending), unique = true
-      )).
+        Seq("token" -> IndexType.Ascending), unique = true)).
         aka("index creation") must beFalse.await(1, timeout * 2)
 
     }
@@ -187,8 +177,7 @@ class IndexesSpec extends org.specs2.mutable.Specification {
     val fixtures = List(
       BSONDocument("username" -> "david", "age" -> 29),
       BSONDocument("username" -> "amanda", "age" -> 35),
-      BSONDocument("username" -> "rajiv", "age" -> 57)
-    )
+      BSONDocument("username" -> "rajiv", "age" -> 57))
 
     @inline def fixturesInsert(implicit ee: EE) =
       fixtures.map { partial.insert(_) }
@@ -204,9 +193,7 @@ class IndexesSpec extends org.specs2.mutable.Specification {
         key = Seq("username" -> IndexType.Ascending),
         unique = true,
         partialFilter = Some(BSONDocument(
-          "age" -> BSONDocument("$gte" -> 21)
-        ))
-      )).
+          "age" -> BSONDocument("$gte" -> 21))))).
         map(_.ok) must beTrue.await(0, timeout)
     } tag "not_mongo26"
 
@@ -225,8 +212,7 @@ class IndexesSpec extends org.specs2.mutable.Specification {
         _ <- partial.insert(BSONDocument("username" -> "david", "age" -> 20))
         _ <- partial.insert(BSONDocument("username" -> "amanda"))
         _ <- partial.insert(BSONDocument(
-          "username" -> "rajiv", "age" -> Option.empty[Int]
-        ))
+          "username" -> "rajiv", "age" -> Option.empty[Int]))
 
         b <- partial.count()
       } yield a -> b

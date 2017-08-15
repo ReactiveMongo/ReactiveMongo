@@ -60,8 +60,7 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
     commentString: Option[String] = commentString,
     options: QueryOpts = options,
     failover: FailoverStrategy = failover,
-    maxTimeMsOption: Option[Long] = maxTimeMsOption
-  ): Self
+    maxTimeMsOption: Option[Long] = maxTimeMsOption): Self
 
   private def write(document: pack.Document, buffer: ChannelBufferWritableBuffer): ChannelBufferWritableBuffer = {
     pack.writeToBuffer(buffer, document)

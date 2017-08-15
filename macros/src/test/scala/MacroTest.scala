@@ -28,8 +28,7 @@ object MacroTest {
 
   case class RenamedId(
     @Key("_id") myID: BSONObjectID = BSONObjectID.generate(),
-    @CustomAnnotation value: String
-  )
+    @CustomAnnotation value: String)
 
   case class Foo[T](bar: T, lorem: String)
   case class Bar(name: String, next: Option[Bar])
@@ -93,8 +92,8 @@ object MacroTest {
 
   object TreeModule {
     /*
-     Due to compiler limitations (read: only workaround I found), 
-     handlers must be defined here and explicit type annotations added 
+     Due to compiler limitations (read: only workaround I found),
+     handlers must be defined here and explicit type annotations added
      to enable compiler to use implicit handlers recursively.
      */
 
@@ -173,6 +172,5 @@ object MacroTest {
 
   case class IgnoredAndKey(
     @Ignore a: Person,
-    @Key("second") b: String
-  )
+    @Key("second") b: String)
 }

@@ -158,8 +158,7 @@ class ResyncSpec extends Specification {
     if (!replSetOn) {
       "fail outside ReplicaSet (MongoDB 3+)" in { implicit ee: EE =>
         connection.database("admin").flatMap(_.runCommand(Resync)) must not(
-          throwA[CommandError]
-        ).await(0, timeout)
+          throwA[CommandError]).await(0, timeout)
       } tag "not_mongo26"
     } else {
       "be successful with ReplicaSet (MongoDB 3+)" in { implicit ee: EE =>
@@ -167,8 +166,7 @@ class ResyncSpec extends Specification {
           throwA[CommandError].like {
             case CommandError.Code(c) =>
               (c == 95 || c == 96 /* 3.4*/ ) aka "error code" must beTrue
-          }
-        ).await(0, timeout)
+          }).await(0, timeout)
       } tag "not_mongo26"
 
       "be successful with ReplicaSet (MongoDB 2)" in { implicit ee: EE =>
@@ -176,8 +174,7 @@ class ResyncSpec extends Specification {
           throwA[CommandError].like {
             case CommandError.Message(msg) =>
               msg aka "error message" must_== "primaries cannot resync"
-          }
-        ).await(0, timeout)
+          }).await(0, timeout)
       } tag "mongo2"
     }
   }
@@ -193,16 +190,14 @@ class ReplSetMaintenanceSpec extends Specification {
     if (!replSetOn) {
       "fail outside replicaSet (MongoDB 3+)" in { implicit ee: EE =>
         connection.database("admin").flatMap(_.runCommand(
-          ReplSetMaintenance(true)
-        )) must throwA[CommandError].like {
+          ReplSetMaintenance(true))) must throwA[CommandError].like {
           case CommandError.Code(code) => code aka "error code" must_== 76
         }.await(0, timeout)
       } tag "not_mongo26"
     } else {
       "fail with replicaSet (MongoDB 3+)" in { implicit ee: EE =>
         connection.database("admin").flatMap(_.runCommand(
-          ReplSetMaintenance(true)
-        )) must throwA[CommandError].like {
+          ReplSetMaintenance(true))) must throwA[CommandError].like {
           case CommandError.Code(code) => code aka "error code" must_== 95
         }.await(0, timeout)
       } tag "not_mongo26"
@@ -212,14 +207,12 @@ class ReplSetMaintenanceSpec extends Specification {
     if (!replSetOn) {
       "fail outside replicaSet (MongoDB 2.6)" in { implicit ee: EE =>
         connection.database("admin").flatMap(_.runCommand(
-          ReplSetMaintenance(true)
-        )) must throwA[CommandError].await(0, timeout)
+          ReplSetMaintenance(true))) must throwA[CommandError].await(0, timeout)
       } tag "mongo2"
     } else {
       "fail with replicaSet (MongoDB 2.6)" in { implicit ee: EE =>
         connection.database("admin").flatMap(_.runCommand(
-          ReplSetMaintenance(true)
-        )) must throwA[CommandError].like {
+          ReplSetMaintenance(true))) must throwA[CommandError].like {
           case CommandError.Message(msg) =>
             msg aka "message" must_== "primaries can't modify maintenance mode"
         }.await(0, timeout)

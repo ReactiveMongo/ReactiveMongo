@@ -13,7 +13,7 @@ trait SerializationPack { self: Singleton =>
   type Writer[A]
   type Reader[A]
   type NarrowValueReader[A]
-  private[reactivemongo]type WidenValueReader[A]
+  private[reactivemongo] type WidenValueReader[A]
 
   def IdentityWriter: Writer[Document]
   def IdentityReader: Reader[Document]
@@ -57,7 +57,7 @@ object BSONSerializationPack extends SerializationPack {
   type Writer[A] = BSONDocumentWriter[A]
   type Reader[A] = BSONDocumentReader[A]
   type NarrowValueReader[A] = BSONReader[_ <: BSONValue, A]
-  private[reactivemongo]type WidenValueReader[A] = UnsafeBSONReader[A]
+  private[reactivemongo] type WidenValueReader[A] = UnsafeBSONReader[A]
 
   object IdentityReader extends Reader[Document] {
     def read(document: Document): Document = document

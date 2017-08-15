@@ -30,8 +30,7 @@ trait TailableCursorSpec { specs: CursorSpec =>
       @inline def tailable(n: String, database: DB = db)(implicit ec: ExecutionContext) = {
         implicit val reader = IdReader
         collection(n, database).find(matchAll("cursorspec50")).options(
-          QueryOpts().tailable
-        ).cursor[Int]()
+          QueryOpts().tailable).cursor[Int]()
       }
 
       "using tailable" >> {
@@ -55,55 +54,44 @@ trait TailableCursorSpec { specs: CursorSpec =>
 
         "to fold bulks" in { implicit ee: EE =>
           tailable("foldw0a").foldBulks(List.empty[Int], 6)(
-            (s, bulk) => Cursor.Cont(s ++ bulk)
-          ) must beEqualTo(List(
-              0, 1, 2, 3, 4, 5
-            )).await(1, timeout)
+            (s, bulk) => Cursor.Cont(s ++ bulk)) must beEqualTo(List(
+              0, 1, 2, 3, 4, 5)).await(1, timeout)
         }
 
         "to fold bulks with async function" in { implicit ee: EE =>
           tailable("foldw0b").foldBulksM(List.empty[Int], 6)(
-            (s, bulk) => Future(Cursor.Cont(s ++ bulk))
-          ) must beEqualTo(List(
-              0, 1, 2, 3, 4, 5
-            )).await(1, timeout)
+            (s, bulk) => Future(Cursor.Cont(s ++ bulk))) must beEqualTo(List(
+              0, 1, 2, 3, 4, 5)).await(1, timeout)
         }
       }
 
       "using tailable foldWhile" >> {
         "successfully" in { implicit ee: EE =>
           tailable("foldw1a").foldWhile(List.empty[Int], 5)(
-            (s, i) => Cursor.Cont(i :: s)
-          ) must beEqualTo(List(
-              4, 3, 2, 1, 0
-            )).await(1, timeout)
+            (s, i) => Cursor.Cont(i :: s)) must beEqualTo(List(
+              4, 3, 2, 1, 0)).await(1, timeout)
         }
 
         "successfully with async function" in { implicit ee: EE =>
           tailable("foldw1b").foldWhileM(List.empty[Int], 5)(
-            (s, i) => Future(Cursor.Cont(i :: s))
-          ) must beEqualTo(List(
-              4, 3, 2, 1, 0
-            )).await(1, timeout)
+            (s, i) => Future(Cursor.Cont(i :: s))) must beEqualTo(List(
+              4, 3, 2, 1, 0)).await(1, timeout)
         }
 
         "leading to timeout w/o maxDocs" in { implicit ee: EE =>
           Await.result(tailable("foldw2").foldWhile(List.empty[Int])(
             (s, i) => Cursor.Cont(i :: s),
-            (_, e) => Cursor.Fail(e)
-          ), timeout) must throwA[Exception]
+            (_, e) => Cursor.Fail(e)), timeout) must throwA[Exception]
         }
 
         "gracefully stop at connection close w/o maxDocs" in {
           implicit ee: EE =>
             val con = driver.connection(List(primaryHost), DefaultOptions)
             lazy val delayedTimeout = FiniteDuration(
-              (timeout.toMillis * 1.25D).toLong, MILLISECONDS
-            )
+              (timeout.toMillis * 1.25D).toLong, MILLISECONDS)
 
             con.database(
-              "specs2-test-reactivemongo", failoverStrategy
-            ).flatMap { d =>
+              "specs2-test-reactivemongo", failoverStrategy).flatMap { d =>
                 tailable("foldw3", d).foldWhile(List.empty[Int])((s, i) => {
                   if (i == 1) con.close() // Force connection close
                   Cursor.Cont(i :: s)

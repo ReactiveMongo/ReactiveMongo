@@ -26,7 +26,7 @@ object BSONCountCommandImplicits {
   }
 
   implicit object CountWriter
-      extends BSONDocumentWriter[ResolvedCollectionCommand[Count]] {
+    extends BSONDocumentWriter[ResolvedCollectionCommand[Count]] {
 
     def write(count: ResolvedCollectionCommand[Count]): BSONDocument =
       BSONDocument(
@@ -34,12 +34,11 @@ object BSONCountCommandImplicits {
         "query" -> count.command.query,
         "limit" -> count.command.limit,
         "skip" -> count.command.skip,
-        "hint" -> count.command.hint
-      )
+        "hint" -> count.command.hint)
   }
 
   implicit object CountResultReader
-      extends DealingWithGenericCommandErrorsReader[CountResult] {
+    extends DealingWithGenericCommandErrorsReader[CountResult] {
 
     def readResult(doc: BSONDocument): CountResult =
       CountResult(doc.getAs[BSONNumberLike]("n").map(_.toInt).getOrElse(0))

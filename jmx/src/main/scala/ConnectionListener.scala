@@ -16,7 +16,7 @@ import reactivemongo.core.nodeset.{ NodeSetInfo, NodeInfo }
 
 /** Listener definition for the connection events. */
 final class ConnectionListener
-    extends external.reactivemongo.ConnectionListener {
+  extends external.reactivemongo.ConnectionListener {
 
   import java.lang.management.ManagementFactory
   import javax.management.MBeanServer
@@ -72,8 +72,7 @@ final class ConnectionListener
     createNode = () => new Node(supervisor, connection)
     nodeObjName = { node: NodeInfo =>
       new ObjectName(
-        s"org.reactivemongo.$supervisor.$connection", nodeProps(node)
-      )
+        s"org.reactivemongo.$supervisor.$connection", nodeProps(node))
     }
 
     nodeSet.sendNotification("stateChange", domain,
@@ -136,8 +135,7 @@ final class ConnectionListener
               logger.warn(s"The node MBean is already registered: $objName")
 
             case reason: Throwable => logger.warn(
-              s"Fails to register the node MBean: $objName", reason
-            )
+              s"Fails to register the node MBean: $objName", reason)
           }
       }
 
@@ -153,8 +151,7 @@ final class ConnectionListener
           }
         } catch {
           case reason: Throwable => logger.warn(
-            s"Fails to update the node MBean: $name", reason
-          )
+            s"Fails to update the node MBean: $name", reason)
         }
       }
     }
@@ -172,8 +169,7 @@ final class ConnectionListener
 
           val objName = new ObjectName(
             s"org.reactivemongo.${node.getSupervisor}.${node.getConnection}",
-            props
-          )
+            props)
 
           mbs.unregisterMBean(objName)
         } catch {
@@ -192,8 +188,7 @@ sealed trait NotificationSupport { self: NotificationBroadcasterSupport =>
   protected def attributeChanged[T: ClassTag](name: String, message: String, oldValue: T, newValue: T)(f: T => Unit): Unit = if (oldValue != newValue) {
     val n = new AttributeChangeNotification(
       this, changeSeq.incrementAndGet(), System.currentTimeMillis(),
-      message, name, implicitly[ClassTag[T]].toString, oldValue, newValue
-    )
+      message, name, implicitly[ClassTag[T]].toString, oldValue, newValue)
 
     f(newValue)
 
@@ -202,7 +197,7 @@ sealed trait NotificationSupport { self: NotificationBroadcasterSupport =>
 }
 
 final class NodeSet private[jmx] () extends NotificationBroadcasterSupport
-    with NodeSetMBean with NotificationSupport {
+  with NodeSetMBean with NotificationSupport {
 
   private var options: String = null
   private var supervisor: String = null
@@ -228,7 +223,7 @@ final class NodeSet private[jmx] () extends NotificationBroadcasterSupport
   def getNodes() = nodes
   def getSecondaries() = secondaries
 
-  // Notification support 
+  // Notification support
 
   private[jmx] def sendNotification[T](typ: String, source: T, msg: String) {
     sendNotification(new Notification(typ, source,
@@ -271,8 +266,7 @@ final class NodeSet private[jmx] () extends NotificationBroadcasterSupport
 
     attributeChanged[java.lang.Long](
       "Version", "The version of node set has changed",
-      version, _version
-    ) { version = _ }
+      version, _version) { version = _ }
 
     attributeChanged("Primary", "The information about the primary node",
       primary, _primary) { primary = _ }
@@ -297,36 +291,29 @@ object NodeSet {
     new MBeanNotificationInfo(
       Array("stateChange"),
       classOf[Notification].getName,
-      "The state of the connection pool has changed"
-    ),
+      "The state of the connection pool has changed"),
     new MBeanNotificationInfo(
       Array("nodeAdded"),
       classOf[Notification].getName,
-      "A node has been added to the set"
-    ),
+      "A node has been added to the set"),
     new MBeanNotificationInfo(
       Array("nodeUpdated"),
       classOf[Notification].getName,
-      "A node has been updated to the set"
-    ),
+      "A node has been updated to the set"),
     new MBeanNotificationInfo(
       Array("nodeRemoved"),
       classOf[Notification].getName,
-      "A node has been removed to the set"
-    ),
+      "A node has been removed to the set"),
     new MBeanNotificationInfo(
       Array[String](AttributeChangeNotification.ATTRIBUTE_CHANGE),
       classOf[AttributeChangeNotification].getName,
-      "The node set has changed"
-    )
-  )
+      "The node set has changed"))
 }
 
 final class Node private[jmx] (
   supervisor: String,
-  connection: String
-) extends NotificationBroadcasterSupport
-    with NodeMBean with NotificationSupport {
+  connection: String) extends NotificationBroadcasterSupport
+  with NodeMBean with NotificationSupport {
 
   import reactivemongo.bson.BSONDocument
 
@@ -386,28 +373,24 @@ final class Node private[jmx] (
     attributeChanged(
       "Connected",
       "The number of connections established to the node",
-      connected, _connected
-    ) { connected = _ }
+      connected, _connected) { connected = _ }
 
     attributeChanged(
       "Authenticated",
       "The number of authenticated connections to the node",
-      authenticated, _authenticated
-    ) { authenticated = _ }
+      authenticated, _authenticated) { authenticated = _ }
 
     attributeChanged("Tags", "The tags for the node", tags, _tags) { tags = _ }
 
     attributeChanged(
       "ProtocolMetadata",
       "The metadata for the protocol to connect to the node",
-      protocolMetadata, _protocolMetadata
-    ) { protocolMetadata = _ }
+      protocolMetadata, _protocolMetadata) { protocolMetadata = _ }
 
     attributeChanged(
       "PingInfo",
       "The information about the ping to the node",
-      pingInfo, _pingInfo
-    ) { pingInfo = _ }
+      pingInfo, _pingInfo) { pingInfo = _ }
 
     attributeChanged("Mongos", "Indicates whether the node is a Mongos one",
       mongos, _mongos) { mongos = _ }
@@ -441,7 +424,5 @@ object Node {
     new MBeanNotificationInfo(
       Array[String](AttributeChangeNotification.ATTRIBUTE_CHANGE),
       classOf[AttributeChangeNotification].getName,
-      "The node has changed"
-    )
-  )
+      "The node has changed"))
 }

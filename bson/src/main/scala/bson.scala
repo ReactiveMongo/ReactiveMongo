@@ -56,8 +56,7 @@ object `package` extends DefaultBSONHandlers {
   /** Handler factory */
   def BSONDocumentHandler[T](
     read: BSONDocument => T,
-    write: T => BSONDocument
-  ): BSONDocumentHandler[T] = new BSONDocumentHandlerImpl[T](read, write)
+    write: T => BSONDocument): BSONDocumentHandler[T] = new BSONDocumentHandlerImpl[T](read, write)
 }
 
 object BSON {

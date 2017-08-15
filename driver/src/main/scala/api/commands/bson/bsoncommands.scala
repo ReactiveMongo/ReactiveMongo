@@ -11,7 +11,7 @@ import reactivemongo.bson.{
 
 object CommonImplicits {
   implicit object UnitBoxReader
-      extends DealingWithGenericCommandErrorsReader[UnitBox.type] {
+    extends DealingWithGenericCommandErrorsReader[UnitBox.type] {
     def readResult(doc: BSONDocument): UnitBox.type = UnitBox
   }
 
@@ -25,10 +25,9 @@ trait BSONCommandError extends CommandError {
 }
 
 case class DefaultBSONCommandError(
-    code: Option[Int],
-    errmsg: Option[String],
-    originalDocument: BSONDocument
-) extends BSONCommandError {
+  code: Option[Int],
+  errmsg: Option[String],
+  originalDocument: BSONDocument) extends BSONCommandError {
   override def getMessage = s"CommandError[code=${code.getOrElse("<unknown>")}, errmsg=${errmsg.getOrElse("<unknown>")}, doc: ${BSONDocument.pretty(originalDocument)}]"
 }
 
@@ -42,8 +41,7 @@ trait DealingWithGenericCommandErrorsReader[A] extends BSONDocumentReader[A] {
       throw new DefaultBSONCommandError(
         code = doc.getAs[Int]("code"),
         errmsg = doc.getAs[String]("errmsg"),
-        originalDocument = doc
-      )
+        originalDocument = doc)
     } else readResult(doc)
   }
 }

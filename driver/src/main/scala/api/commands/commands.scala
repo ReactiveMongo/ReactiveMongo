@@ -32,8 +32,7 @@ trait BoxedAnyVal[A <: AnyVal] {
 case class ResponseResult[R](
   response: Response,
   numberToReturn: Int,
-  value: R
-)
+  value: R)
 
 import scala.language.higherKinds
 
@@ -118,9 +117,7 @@ object Command {
       }.future.map { response =>
         pack.readAndDeserialize(
           LoweLevelDocumentIterator(ChannelBufferReadableBuffer(
-          response.documents
-        )).next, reader
-        )
+            response.documents)).next, reader)
       }
     }
 
@@ -284,8 +281,7 @@ object Command {
  */
 final case class ResolvedCollectionCommand[C <: CollectionCommand](
   collection: String,
-  command: C
-) extends Command
+  command: C) extends Command
 
 object `package` {
   type WriteConcern = GetLastError

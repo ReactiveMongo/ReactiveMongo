@@ -18,17 +18,16 @@ import reactivemongo.bson.BSONDocument
  * @param partialFilter Optional [[https://docs.mongodb.com/manual/core/index-partial/#partial-index-with-unique-constraints partial filter]] (since MongoDB 3.2)
  */
 case class Index(
-    key: Seq[(String, IndexType)],
-    name: Option[String] = None,
-    unique: Boolean = false,
-    background: Boolean = false,
-    dropDups: Boolean = false, // Deprecated since 2.6, TODO: Remove
-    sparse: Boolean = false,
-    version: Option[Int] = None, // let MongoDB decide
-    // TODO: storageEngine (new for Mongo3)
-    partialFilter: Option[BSONDocument] = None,
-    options: BSONDocument = BSONDocument()
-) {
+  key: Seq[(String, IndexType)],
+  name: Option[String] = None,
+  unique: Boolean = false,
+  background: Boolean = false,
+  dropDups: Boolean = false, // Deprecated since 2.6, TODO: Remove
+  sparse: Boolean = false,
+  version: Option[Int] = None, // let MongoDB decide
+  // TODO: storageEngine (new for Mongo3)
+  partialFilter: Option[BSONDocument] = None,
+  options: BSONDocument = BSONDocument()) {
 
   /** The name of the index (a default one is computed if none). */
   lazy val eventualName: String = name.getOrElse(key.foldLeft("") { (name, kv) =>

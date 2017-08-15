@@ -69,9 +69,8 @@ final class BSONCollection(
   val db: DB,
   val name: String,
   val failoverStrategy: FailoverStrategy,
-  override val readPreference: ReadPreference
-) extends Product with GenericCollection[BSONSerializationPack.type]
-    with scala.Serializable with java.io.Serializable {
+  override val readPreference: ReadPreference) extends Product with GenericCollection[BSONSerializationPack.type]
+  with scala.Serializable with java.io.Serializable {
 
   @transient val pack = BSONSerializationPack
   @transient val BatchCommands = BSONBatchCommands
@@ -100,10 +99,8 @@ final class BSONCollection(
   def copy(
     db: DB = this.db,
     name: String = this.name,
-    failoverStrategy: FailoverStrategy = this.failoverStrategy
-  ): BSONCollection = new BSONCollection(
-    db, name, failoverStrategy, readPreference
-  )
+    failoverStrategy: FailoverStrategy = this.failoverStrategy): BSONCollection = new BSONCollection(
+    db, name, failoverStrategy, readPreference)
 
   def withReadPreference(pref: ReadPreference): BSONCollection =
     new BSONCollection(db, name, failoverStrategy, pref)

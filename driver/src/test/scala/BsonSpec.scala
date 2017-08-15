@@ -37,9 +37,7 @@ class BsonSpec extends Specification {
         "BSON" -> BSONArray(
           BSONString("awesome"),
           BSONDouble(5.05),
-          BSONDouble(1986)
-        )
-      )
+          BSONDouble(1986)))
 
       compare(embeddingArray, makeBuffer(doc))
     }
@@ -50,9 +48,7 @@ class BsonSpec extends Specification {
         "BSON" -> BSONArray(
           BSONString("awesome"),
           BSONDouble(5.05),
-          BSONDouble(1986)
-        )
-      ))
+          BSONDouble(1986))))
 
       compare(embeddingArray, makeBuffer(makeDocument(buffer)))
     }
@@ -87,8 +83,7 @@ class BsonSpec extends Specification {
         BSONInteger(1),
         Some(BSONInteger(2)),
         None,
-        Some(BSONInteger(4))
-      )
+        Some(BSONInteger(4)))
       val str = array.values.map {
         case BSONInteger(value) => value.toString
         case _                  => "NOELEM"
@@ -108,8 +103,7 @@ class BsonSpec extends Specification {
       "likeTrueDouble" -> BSONDouble(-0.1),
       "anInt" -> BSONInteger(200),
       "aLong" -> BSONLong(12345678912L),
-      "aDouble" -> BSONDouble(9876543210.98)
-    )
+      "aDouble" -> BSONDouble(9876543210.98))
     "abstract booleans and numbers" in {
       docLike.getAs[BSONBooleanLike]("likeFalseInt").get.toBoolean mustEqual false
       docLike.getAs[BSONBooleanLike]("likeFalseLong").get.toBoolean mustEqual false

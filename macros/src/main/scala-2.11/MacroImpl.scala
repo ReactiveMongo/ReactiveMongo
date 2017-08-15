@@ -55,8 +55,7 @@ private object MacroImpl {
     }
 
   private abstract class Helper[C <: Context, A](
-    val c: C
-  ) extends ImplicitResolver[C] {
+    val c: C) extends ImplicitResolver[C] {
     import c.universe._
 
     protected def A: Type
@@ -150,7 +149,7 @@ private object MacroImpl {
         c.abort(c.enclosingPosition, s"No matching apply/unapply found: $tpe"))
 
       val tpeArgs: List[c.Type] = tpe match {
-        case TypeRef(_, _, args) => args
+        case TypeRef(_, _, args)        => args
         case i @ ClassInfoType(_, _, _) => i.typeArgs
       }
       val boundTypes = constructor.typeParams.zip(tpeArgs).map {
@@ -172,7 +171,7 @@ private object MacroImpl {
 
         opt match {
           case Some(_) => q"document.getAs($pname)($reader)"
-          case _ => q"document.getAsTry($pname)($reader).get"
+          case _       => q"document.getAsTry($pname)($reader).get"
         }
       }
 
@@ -194,7 +193,7 @@ private object MacroImpl {
         })
       } else if (!hasOption[Macros.Options.AutomaticMaterialization]) {
         c.abort(c.enclosingPosition, s"Implicit not found for '${tpe.typeSymbol.name}': ${classOf[Writer[_]].getName}[_, ${tpe.typeSymbol.fullName}]")
-        
+
       } else None
     }
 
@@ -205,8 +204,7 @@ private object MacroImpl {
     private def writeBodyConstructSingleton(tpe: Type): Tree = (
       classNameTree(tpe) map { nameE =>
         reify { BSONDocument(Seq((nameE.splice))) }
-      } getOrElse reify { BSONDocument.empty }
-      ).tree
+      } getOrElse reify { BSONDocument.empty }).tree
 
     private def writeBodyConstructClass(id: Ident, tpe: Type): Tree = {
       val (constructor, deconstructor) = matchingApplyUnapply(tpe).getOrElse(
@@ -215,7 +213,7 @@ private object MacroImpl {
       val types = unapplyReturnTypes(deconstructor)
       val constructorParams = constructor.paramLists.head
       val tpeArgs: List[c.Type] = tpe match {
-        case TypeRef(_, _, args) => args
+        case TypeRef(_, _, args)        => args
         case i @ ClassInfoType(_, _, _) => i.typeArgs
       }
       val boundTypes = constructor.typeParams.zip(tpeArgs).map {
@@ -301,7 +299,8 @@ private object MacroImpl {
         } else c.Expr[String](q"${tpe.typeSymbol.fullName}")
 
         reify(("className", BSONStringHandler.write(name.splice)))
-      } else None
+      }
+      else None
     }
 
     private lazy val unionTypes: Option[List[c.Type]] =
@@ -319,7 +318,8 @@ private object MacroImpl {
               case TypeRef(_, _, List(a, b)) =>
                 parseUnionTree(a :: b :: rem, found)
 
-              case _ => c.abort(c.enclosingPosition,
+              case _ => c.abort(
+                c.enclosingPosition,
                 s"Union type parameters expected: $tree")
             }
           } else parseUnionTree(rem, tree :: found)
@@ -350,8 +350,7 @@ private object MacroImpl {
       def allSubclasses(path: Traversable[Symbol], subclasses: Set[Type]): Set[Type] = path.headOption match {
         case Some(cls: ClassSymbol) if (
           tpeSym != cls && !cls.isAbstract &&
-            cls.selfType.baseClasses.contains(tpeSym)
-        ) => {
+          cls.selfType.baseClasses.contains(tpeSym)) => {
           val newSub: Set[Type] = if ({
             val tpe = cls.typeSignature
             !applyMethod(tpe).isDefined || !unapplyMethod(tpe).isDefined
@@ -368,8 +367,7 @@ private object MacroImpl {
 
         case Some(o: ModuleSymbol) if (
           o.companion == NoSymbol && // not a companion object
-            tpeSym != c && o.typeSignature.baseClasses.contains(tpeSym)
-        ) => {
+          tpeSym != c && o.typeSignature.baseClasses.contains(tpeSym)) => {
           val newSub: Set[Type] = if (!o.moduleClass.asClass.isCaseClass) {
             c.warning(c.enclosingPosition, s"cannot handle object ${o.fullName}: no case accessor")
             Set.empty
@@ -384,7 +382,7 @@ private object MacroImpl {
 
         case Some(_) => allSubclasses(path.tail, subclasses)
 
-        case _ => subclasses
+        case _       => subclasses
       }
 
       if (tpeSym.isSealed && tpeSym.isAbstract) {
@@ -450,7 +448,7 @@ private object MacroImpl {
           None
         }
 
-        case s        => Some(s)
+        case s => Some(s)
       }
 
     private def unapplyMethod(implicit tpe: Type): Option[MethodSymbol] =
@@ -463,7 +461,7 @@ private object MacroImpl {
           None
         }
 
-        case s        => Some(s.asMethod)
+        case s => Some(s.asMethod)
       }
 
     /* Deep check for type compatibility */
@@ -473,16 +471,17 @@ private object MacroImpl {
         case Some((TypeRef(NoPrefix, a, _),
           TypeRef(NoPrefix, b, _))) => { // for generic parameter
           if (a.fullName != b.fullName) {
-            c.warning(c.enclosingPosition,
+            c.warning(
+              c.enclosingPosition,
               s"Type symbols are not compatible: $a != $b")
 
             false
-          }
-          else conforms(types.tail)
+          } else conforms(types.tail)
         }
 
         case Some((a, b)) if (a.typeArgs.size != b.typeArgs.size) => {
-          c.warning(c.enclosingPosition,
+          c.warning(
+            c.enclosingPosition,
             s"Type parameters are not matching: $a != $b")
 
           false
@@ -490,14 +489,16 @@ private object MacroImpl {
 
         case Some((a, b)) if a.typeArgs.isEmpty =>
           if (a =:= b) conforms(types.tail) else {
-            c.warning(c.enclosingPosition,
+            c.warning(
+              c.enclosingPosition,
               s"Types are not compatible: $a != $b")
 
             false
           }
 
         case Some((a, b)) if (a.baseClasses != b.baseClasses) => {
-          c.warning(c.enclosingPosition,
+          c.warning(
+            c.enclosingPosition,
             s"Generic types are not compatible: $a != $b")
 
           false
@@ -521,8 +522,7 @@ private object MacroImpl {
       apply <- alternatives.filter { alt =>
         alt.paramLists match {
           case params :: ps if (ps.isEmpty || ps.headOption.flatMap(
-            _.headOption).exists(_.isImplicit)
-          ) => if (params.size != u.size) false else {
+            _.headOption).exists(_.isImplicit)) => if (params.size != u.size) false else {
             conforms((params.map(_.typeSignature), u).zipped.toSeq)
           }
 
@@ -588,18 +588,18 @@ private object MacroImpl {
     }
 
     /**
-     * Replaces any reference to the type itself by the Placeholder type. 
+     * Replaces any reference to the type itself by the Placeholder type.
      * @return the normalized type + whether any self reference has been found
      */
     private def normalized(boundTypes: Map[String, Type])(tpe: Type): (Type, Boolean) = boundTypes.getOrElse(tpe.typeSymbol.fullName, tpe) match {
-        case t if (t =:= A) => PlaceholderType -> true
+      case t if (t =:= A) => PlaceholderType -> true
 
-        case TypeRef(_, sym, args) if args.nonEmpty =>
-          refactor(boundTypes)(args, sym.asType, List.empty, List.empty,
-            _ =:= A, PlaceholderType, false)
+      case TypeRef(_, sym, args) if args.nonEmpty =>
+        refactor(boundTypes)(args, sym.asType, List.empty, List.empty,
+          _ =:= A, PlaceholderType, false)
 
-        case t => t -> false
-      }
+      case t => t -> false
+    }
 
     /* Restores reference to the type itself when Placeholder is found. */
     private def denormalized(boundTypes: Map[String, Type])(ptype: Type): Type =
@@ -615,8 +615,7 @@ private object MacroImpl {
 
     private class ImplicitTransformer(
       boundTypes: Map[String, Type],
-      forwardSuffix: String
-    ) extends Transformer {
+      forwardSuffix: String) extends Transformer {
       private val denorm = denormalized(boundTypes) _
       val forwardName = TermName(s"forward$forwardSuffix")
 
@@ -625,8 +624,7 @@ private object MacroImpl {
           super.transform(TypeTree(denorm(tt.tpe)))
 
         case Select(Select(This(TypeName("Macros")), t), sym) if (
-          t.toString == "Placeholder" && sym.toString == "Handler"
-        ) => super.transform(q"$forwardName")
+          t.toString == "Placeholder" && sym.toString == "Handler") => super.transform(q"$forwardName")
 
         case _ => super.transform(tree)
       }
@@ -652,8 +650,7 @@ private object MacroImpl {
         c.inferImplicitValue(neededImplicitType)
       } else c.untypecheck(
         // Reset the type attributes on the refactored tree for the implicit
-        tx.transform(c.inferImplicitValue(neededImplicitType))
-      )
+        tx.transform(c.inferImplicitValue(neededImplicitType)))
 
       neededImplicit -> selfRef
     }
@@ -663,7 +660,7 @@ private object MacroImpl {
       boundTypes.getOrElse(t.typeSymbol.fullName, t) match {
         case TypeRef(_, base, args) if args.nonEmpty => s"""${base.asType.fullName}[${args.map(prettyType(boundTypes)(_)).mkString(", ")}]"""
 
-        case t => t.typeSymbol.fullName
+        case t                                       => t.typeSymbol.fullName
       }
 
     protected def resolver(boundTypes: Map[String, Type], forwardSuffix: String)(tc: Type): Type => Implicit = {

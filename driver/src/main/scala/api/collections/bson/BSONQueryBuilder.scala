@@ -35,18 +35,17 @@ import reactivemongo.api.collections.GenericQueryBuilder
 
 @SerialVersionUID(1634796413L)
 case class BSONQueryBuilder(
-    collection: Collection,
-    failover: FailoverStrategy,
-    queryOption: Option[BSONDocument] = None,
-    sortOption: Option[BSONDocument] = None,
-    projectionOption: Option[BSONDocument] = None,
-    hintOption: Option[BSONDocument] = None,
-    explainFlag: Boolean = false,
-    snapshotFlag: Boolean = false,
-    commentString: Option[String] = None,
-    options: QueryOpts = QueryOpts(),
-    maxTimeMsOption: Option[Long] = None
-) extends GenericQueryBuilder[BSONSerializationPack.type] {
+  collection: Collection,
+  failover: FailoverStrategy,
+  queryOption: Option[BSONDocument] = None,
+  sortOption: Option[BSONDocument] = None,
+  projectionOption: Option[BSONDocument] = None,
+  hintOption: Option[BSONDocument] = None,
+  explainFlag: Boolean = false,
+  snapshotFlag: Boolean = false,
+  commentString: Option[String] = None,
+  options: QueryOpts = QueryOpts(),
+  maxTimeMsOption: Option[Long] = None) extends GenericQueryBuilder[BSONSerializationPack.type] {
   import reactivemongo.util.option
 
   type Self = BSONQueryBuilder
@@ -62,8 +61,7 @@ case class BSONQueryBuilder(
     commentString: Option[String] = commentString,
     options: QueryOpts = options,
     failover: FailoverStrategy = failover,
-    maxTimeMsOption: Option[Long] = maxTimeMsOption
-  ): BSONQueryBuilder =
+    maxTimeMsOption: Option[Long] = maxTimeMsOption): BSONQueryBuilder =
     BSONQueryBuilder(collection, failover, queryOption, sortOption, projectionOption, hintOption, explainFlag, snapshotFlag, commentString, options, maxTimeMsOption)
 
   def merge(readPreference: ReadPreference): BSONDocument = {
@@ -77,12 +75,10 @@ case class BSONQueryBuilder(
       maxTimeMsOption.map { f"$$maxTimeMS" -> BSONLong(_) },
       commentString.map { f"$$comment" -> BSONString(_) },
       option(explainFlag, f"$$explain" -> BSONBoolean(true)),
-      option(snapshotFlag, f"$$snapshot" -> BSONBoolean(true))
-    ).flatten
+      option(snapshotFlag, f"$$snapshot" -> BSONBoolean(true))).flatten
 
     BSONDocument(optional :+ (
-      f"$$readPreference" -> BSONReadPreference.write(readPreference)
-    ))
+      f"$$readPreference" -> BSONReadPreference.write(readPreference)))
   }
 }
 
@@ -102,8 +98,7 @@ private[api] object BSONReadPreference {
         base :+ BSONElement("tags", BSONArray(
           tagSet.map(tags => BSONDocument(tags.toList.map {
             case (k, v) => k -> BSONString(v)
-          }))
-        ))
+          }))))
 
       case _ => base
     })

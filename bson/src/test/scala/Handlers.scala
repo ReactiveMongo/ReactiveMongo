@@ -31,12 +31,9 @@ class Handlers extends org.specs2.mutable.Specification {
       "emails" -> BSONArray(
         Some("james@example.org"),
         None,
-        Some("spamaddrjames@example.org")
-      ),
-      "adress" -> BSONString("coucou")
-    ),
-    "lastSeen" -> BSONLong(1360512704747L)
-  )
+        Some("spamaddrjames@example.org")),
+      "adress" -> BSONString("coucou")),
+    "lastSeen" -> BSONLong(1360512704747L))
 
   val array = BSONArray(
     BSONString("elem0"),
@@ -44,11 +41,9 @@ class Handlers extends org.specs2.mutable.Specification {
     1,
     2.222,
     BSONDocument(
-      "name" -> "Joe"
-    ),
+      "name" -> "Joe"),
     BSONArray(0L),
-    "pp[4]"
-  )
+    "pp[4]")
 
   "BSONBinary" should {
     import reactivemongo.bson.buffer.ArrayReadableBuffer
@@ -56,12 +51,10 @@ class Handlers extends org.specs2.mutable.Specification {
     "be read as byte array" in {
       val bytes = Array[Byte](1, 3, 5, 7)
       val bin = BSONBinary(
-        ArrayReadableBuffer(bytes), Subtype.GenericBinarySubtype
-      )
+        ArrayReadableBuffer(bytes), Subtype.GenericBinarySubtype)
 
       bin.as[Array[Byte]] aka "read #1" must_== bytes and (
-        bin.as[Array[Byte]] aka "read #2" must_== bytes
-      )
+        bin.as[Array[Byte]] aka "read #2" must_== bytes)
     }
   }
 
@@ -96,8 +89,7 @@ class Handlers extends org.specs2.mutable.Specification {
       doc.getAsTry[BSONNumberLike]("score") must beSuccessfulTry.like {
         case num =>
           num.toDouble mustEqual 3.88 and (num.toFloat mustEqual 3.88f) and (
-            num.toLong mustEqual 3
-          ) and (num.toInt mustEqual 3)
+            num.toLong mustEqual 3) and (num.toInt mustEqual 3)
       }
 
       doc.getAsTry[BSONBooleanLike]("score").
@@ -106,8 +98,7 @@ class Handlers extends org.specs2.mutable.Specification {
 
     "should not have a surname2" in {
       doc.getTry("surname2") must beFailedTry and (
-        doc.getUnflattenedTry("surname2") must beSuccessfulTry(None)
-      )
+        doc.getUnflattenedTry("surname2") must beSuccessfulTry(None))
     }
 
     "should be read" in {
@@ -128,8 +119,7 @@ class Handlers extends org.specs2.mutable.Specification {
 
     "have a an int = 2 at index 2" in {
       array.get(1) must beSome(BSONInteger(1)) and (
-        array.getAs[Int](1) must beSome(1)
-      )
+        array.getAs[Int](1) must beSome(1))
     }
 
     "get bsondocument at index 3" in {
@@ -146,8 +136,7 @@ class Handlers extends org.specs2.mutable.Specification {
         case tarray =>
           tarray.getAs[BSONLong](0) must beSome(BSONLong(0L)) and (
             tarray.getAs[BSONBooleanLike](0).
-            map(_.toBoolean) must beSome(false)
-          )
+            map(_.toBoolean) must beSome(false))
       }
     }
   }
@@ -181,8 +170,7 @@ class Handlers extends org.specs2.mutable.Specification {
     "write complex values" in {
       val expectedResult = BSONDocument(
         "a" -> BSONDocument("label" -> "foo", "count" -> 10),
-        "b" -> BSONDocument("label" -> "foo2", "count" -> 20)
-      )
+        "b" -> BSONDocument("label" -> "foo2", "count" -> 20))
       val input = Map("a" -> Foo("foo", 10), "b" -> Foo("foo2", 20))
       val result = DefaultBSONHandlers.MapWriter(BSONStringHandler, fooWriter).write(input)
 
@@ -193,8 +181,7 @@ class Handlers extends org.specs2.mutable.Specification {
       val expectedResult = Map("a" -> Foo("foo", 10), "b" -> Foo("foo2", 20))
       val input = BSONDocument(
         "a" -> BSONDocument("label" -> "foo", "count" -> 10),
-        "b" -> BSONDocument("label" -> "foo2", "count" -> 20)
-      )
+        "b" -> BSONDocument("label" -> "foo2", "count" -> 20))
       val handler = implicitly[BSONReader[BSONDocument, Map[String, Foo]]]
       val result = handler.read(input)
 
@@ -211,13 +198,11 @@ class Handlers extends org.specs2.mutable.Specification {
     "be read as date" in {
       handler.read(bson) must_== date and (
         handler.widenReader.readTry(bson: BSONValue).
-        aka("widen read") must beSuccessfulTry(date)
-      ) and (
+        aka("widen read") must beSuccessfulTry(date)) and (
           handler.widenReader.readTry {
             val str: BSONValue = BSONString("foo")
             str
-          } must beFailedTry
-        )
+          } must beFailedTry)
     }
 
     "be written from a date" in {
@@ -235,13 +220,11 @@ class Handlers extends org.specs2.mutable.Specification {
 
       reader.readOpt(bson).map(_.toLong) must beSome(num * 1000L) and (
         reader.widenReader.readTry(bson: BSONValue).
-        map(_.toLong) must beSuccessfulTry(num * 1000L)
-      ) and (
+        map(_.toLong) must beSuccessfulTry(num * 1000L)) and (
           reader.widenReader.readTry {
             val l: BSONValue = BSONArray(1L)
             l
-          } must beFailedTry
-        )
+          } must beFailedTry)
     }
   }
 
@@ -300,13 +283,11 @@ class Handlers extends org.specs2.mutable.Specification {
   case class Album(
     name: String,
     releaseYear: Int,
-    tracks: List[String]
-  )
+    tracks: List[String])
 
   case class Artist(
     name: String,
-    albums: List[Album]
-  )
+    albums: List[Album])
 
   val neilYoung = Artist(
     "Neil Young",
@@ -321,37 +302,29 @@ class Handlers extends org.specs2.mutable.Specification {
           "Down By the River",
           "Losing End (When You're On)",
           "Running Dry (Requiem For the Rockets)",
-          "Cowgirl in the Sand"
-        )
-      )
-    )
-  )
+          "Cowgirl in the Sand"))))
 
   implicit object AlbumHandler extends BSONDocumentWriter[Album] with BSONDocumentReader[Album] {
     def write(album: Album) = BSONDocument(
       "name" -> album.name,
       "releaseYear" -> album.releaseYear,
-      "tracks" -> album.tracks
-    )
+      "tracks" -> album.tracks)
 
     def read(doc: BSONDocument) = Album(
       doc.getAs[String]("name").get,
       doc.getAs[Int]("releaseYear").get,
-      doc.getAs[List[String]]("tracks").get
-    )
+      doc.getAs[List[String]]("tracks").get)
   }
 
   implicit object ArtistHandler extends BSONDocumentWriter[Artist] with BSONDocumentReader[Artist] {
     def write(artist: Artist) =
       BSONDocument(
         "name" -> artist.name,
-        "albums" -> artist.albums
-      )
+        "albums" -> artist.albums)
 
     def read(doc: BSONDocument) = Artist(
       doc.getAs[String]("name").get,
-      doc.getAs[List[Album]]("albums").get
-    )
+      doc.getAs[List[Album]]("albums").get)
   }
 
   "Neil Young" should {
@@ -384,8 +357,7 @@ class Handlers extends org.specs2.mutable.Specification {
         "Down By the River",
         "Losing End (When You're On)",
         "Running Dry (Requiem For the Rockets)",
-        "Cowgirl in the Sand"
-      )
+        "Cowgirl in the Sand")
       ny2 mustEqual neilYoung
       success
     }

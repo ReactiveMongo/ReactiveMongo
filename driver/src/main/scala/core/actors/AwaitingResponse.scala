@@ -5,12 +5,11 @@ import scala.concurrent.Promise
 import reactivemongo.core.protocol.{ Request, Response }
 
 private[actors] case class AwaitingResponse(
-    request: Request,
-    channelID: Int,
-    promise: Promise[Response],
-    isGetLastError: Boolean,
-    isMongo26WriteOp: Boolean
-) {
+  request: Request,
+  channelID: Int,
+  promise: Promise[Response],
+  isGetLastError: Boolean,
+  isMongo26WriteOp: Boolean) {
   @inline def requestID: Int = request.requestID
 
   private var _retry = 0 // TODO: Refactor as property
@@ -42,8 +41,7 @@ private[actors] case class AwaitingResponse(
     channelID: Int = this.channelID,
     promise: Promise[Response] = this.promise,
     isGetLastError: Boolean = this.isGetLastError,
-    isMongo26WriteOp: Boolean = this.isMongo26WriteOp
-  ): AwaitingResponse =
+    isMongo26WriteOp: Boolean = this.isMongo26WriteOp): AwaitingResponse =
     AwaitingResponse(request, channelID, promise,
       isGetLastError, isMongo26WriteOp)
 
@@ -53,15 +51,13 @@ private[actors] case class AwaitingResponse(
     channelID: Int,
     promise: Promise[Response],
     isGetLastError: Boolean,
-    isMongo26WriteOp: Boolean
-  ): AwaitingResponse = {
+    isMongo26WriteOp: Boolean): AwaitingResponse = {
     val req = copy(
       this.request,
       channelID = channelID,
       promise = promise,
       isGetLastError = isGetLastError,
-      isMongo26WriteOp = isMongo26WriteOp
-    )
+      isMongo26WriteOp = isMongo26WriteOp)
 
     req._retry = this._retry
     req._writeConcern = this._writeConcern

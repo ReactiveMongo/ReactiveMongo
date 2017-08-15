@@ -57,8 +57,7 @@ class Equality extends org.specs2.mutable.Specification {
 
     "retain equality through serialization/deserialization" in {
       val ba1 = BSONArray(Seq(
-        BSONInteger(42), BSONString("42"), BSONDouble(42.0), BSONDateTime(0)
-      ))
+        BSONInteger(42), BSONString("42"), BSONDouble(42.0), BSONDateTime(0)))
 
       val writeBuffer = new ArrayBSONBuffer
       BSONArrayBufferHandler.write(ba1, writeBuffer)
@@ -86,8 +85,7 @@ class Equality extends org.specs2.mutable.Specification {
         "binary" -> BSONBinary(Array[Byte](1, 2, 3), Subtype.GenericBinarySubtype),
         "objectid" -> BSONObjectID(Array[Byte](1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12)),
         "dbpointer" -> BSONDBPointer("coll", Array[Byte](1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12)),
-        "array" -> BSONArray(Seq(BSONInteger(42), BSONString("42"), BSONDouble(42.0), BSONDateTime(0)))
-      ))
+        "array" -> BSONArray(Seq(BSONInteger(42), BSONString("42"), BSONDouble(42.0), BSONDateTime(0)))))
       val writeBuffer = new ArrayBSONBuffer
       DefaultBufferHandler.write(writeBuffer, b1)
       val writeBytes = writeBuffer.array

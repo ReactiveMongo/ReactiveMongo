@@ -26,25 +26,20 @@ object BSONIsMasterCommandImplicits {
           passives = doc.getAs[Seq[String]]("passives").getOrElse(Seq.empty),
           arbiters = doc.getAs[Seq[String]]("arbiters").getOrElse(Seq.empty),
           isSecondary = doc.getAs[BSONBooleanLike](
-            "secondary"
-          ).fold(false)(_.toBoolean),
+            "secondary").fold(false)(_.toBoolean),
           isArbiterOnly = doc.getAs[BSONBooleanLike](
-            "arbiterOnly"
-          ).fold(false)(_.toBoolean),
+            "arbiterOnly").fold(false)(_.toBoolean),
           isPassive = doc.getAs[BSONBooleanLike](
-            "passive"
-          ).fold(false)(_.toBoolean),
+            "passive").fold(false)(_.toBoolean),
           isHidden = doc.getAs[BSONBooleanLike]("hidden").
             fold(false)(_.toBoolean),
           tags = doc.getAs[BSONDocument]("tags"),
-          electionId = doc.getAs[BSONNumberLike]("electionId").fold(-1)(_.toInt)
-        )
+          electionId = doc.getAs[BSONNumberLike]("electionId").fold(-1)(_.toInt))
       }
 
       IsMasterResult(
         isMaster = doc.getAs[BSONBooleanLike](
-          "ismaster"
-        ).fold(false)(_.toBoolean), // `ismaster`
+          "ismaster").fold(false)(_.toBoolean), // `ismaster`
         maxBsonObjectSize = doc.getAs[BSONNumberLike]("maxBsonObjectSize").
           fold[Int](16777216)(_.toInt), // default = 16 * 1024 * 1024
         maxMessageSizeBytes = doc.getAs[BSONNumberLike]("maxMessageSizeBytes").

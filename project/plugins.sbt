@@ -13,7 +13,7 @@ resolvers ++= Seq(
   Resolver.url("jsuereth-repo", url(
     "https://dl.bintray.com/jsuereth/sbt-plugins/"))(Resolver.ivyStylePatterns))
 
-addSbtPlugin("org.scalariform" % "sbt-scalariform" % "1.5.0")
+addSbtPlugin("org.scalariform" % "sbt-scalariform" % "1.7.1")
 
 addSbtPlugin("com.typesafe.sbt" % "sbt-git" % "0.8.4")
 

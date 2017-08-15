@@ -7,7 +7,7 @@ import reactivemongo.core.protocol.MongoWireVersion
  * Implements the [[http://docs.mongodb.org/manual/applications/aggregation/ Aggregation Framework]].
  */
 trait AggregationFramework[P <: SerializationPack]
-    extends ImplicitCommandHelpers[P] with GroupAggregation[P] {
+  extends ImplicitCommandHelpers[P] with GroupAggregation[P] {
 
   /**
    * @param batchSize the initial batch size for the cursor
@@ -29,9 +29,8 @@ trait AggregationFramework[P <: SerializationPack]
     cursor: Option[Cursor],
     wireVersion: MongoWireVersion,
     bypassDocumentValidation: Boolean,
-    readConcern: Option[ReadConcern]
-  ) extends CollectionCommand with CommandWithPack[pack.type]
-      with CommandWithResult[AggregationResult]
+    readConcern: Option[ReadConcern]) extends CollectionCommand with CommandWithPack[pack.type]
+    with CommandWithResult[AggregationResult]
 
   /**
    * @param firstBatch the documents of the first batch
@@ -39,9 +38,8 @@ trait AggregationFramework[P <: SerializationPack]
    * @see [[Cursor]]
    */
   case class AggregationResult(
-      firstBatch: List[pack.Document],
-      cursor: Option[ResultCursor] = None
-  ) {
+    firstBatch: List[pack.Document],
+    cursor: Option[ResultCursor] = None) {
 
     @deprecated(message = "Use [[firstBatch]]", since = "0.11.10")
     def documents = firstBatch
@@ -163,20 +161,17 @@ trait AggregationFramework[P <: SerializationPack]
    * @param as the name of the new array field to add to the input documents
    */
   case class Lookup(
-      from: String,
-      localField: String,
-      foreignField: String,
-      as: String
-  ) extends PipelineOperator {
+    from: String,
+    localField: String,
+    foreignField: String,
+    as: String) extends PipelineOperator {
     val makePipe: pack.Document = makeDocument(Seq(elementProducer(
       f"$$lookup",
       makeDocument(Seq(
         elementProducer("from", stringValue(from)),
         elementProducer("localField", stringValue(localField)),
         elementProducer("foreignField", stringValue(foreignField)),
-        elementProducer("as", stringValue(as))
-      ))
-    )))
+        elementProducer("as", stringValue(as)))))))
   }
 
   /**
@@ -187,15 +182,13 @@ trait AggregationFramework[P <: SerializationPack]
    * @param cond the expression that determines whether to include the element in the resulting array
    */
   case class Filter(input: pack.Value, as: String, cond: pack.Document)
-      extends PipelineOperator {
+    extends PipelineOperator {
 
     val makePipe: pack.Document = makeDocument(Seq(elementProducer(
       f"$$filter", makeDocument(Seq(
         elementProducer("input", input),
         elementProducer("as", stringValue(as)),
-        elementProducer("cond", cond)
-      ))
-    )))
+        elementProducer("cond", cond))))))
   }
 
   /** Filter companion */
@@ -217,24 +210,21 @@ trait AggregationFramework[P <: SerializationPack]
    * @param restrictSearchWithMatch an optional filter expression
    */
   case class GraphLookup(
-      from: String,
-      startWith: pack.Value,
-      connectFromField: String,
-      connectToField: String,
-      as: String,
-      maxDepth: Option[Int] = None,
-      depthField: Option[String] = None,
-      restrictSearchWithMatch: Option[pack.Value] = None
-  ) extends PipelineOperator {
+    from: String,
+    startWith: pack.Value,
+    connectFromField: String,
+    connectToField: String,
+    as: String,
+    maxDepth: Option[Int] = None,
+    depthField: Option[String] = None,
+    restrictSearchWithMatch: Option[pack.Value] = None) extends PipelineOperator {
     val makePipe: pack.Document = makeDocument(Seq(
       elementProducer(f"$$graphLookup", makeDocument(Seq(
         elementProducer("from", stringValue(from)),
         elementProducer("startWith", startWith),
         elementProducer("connectFromField", stringValue(connectFromField)),
         elementProducer("connectToField", stringValue(connectToField)),
-        elementProducer("as", stringValue(as))
-      ) ++ options))
-    ))
+        elementProducer("as", stringValue(as))) ++ options))))
 
     private def options = {
       val opts = Seq.newBuilder[pack.ElementProducer]
@@ -274,8 +264,7 @@ trait AggregationFramework[P <: SerializationPack]
     val makePipe: pack.Document =
       makeDocument(Seq(elementProducer(
         f"$$sample",
-        makeDocument(Seq(elementProducer("size", intValue(size))))
-      )))
+        makeDocument(Seq(elementProducer("size", intValue(size)))))))
   }
 
   /**
@@ -287,11 +276,10 @@ trait AggregationFramework[P <: SerializationPack]
    * @param ops the sequence of operators specifying aggregate calculation
    */
   case class Group(identifiers: pack.Value)(ops: (String, GroupFunction)*)
-      extends PipelineOperator {
+    extends PipelineOperator {
     val makePipe: pack.Document =
       makeDocument(Seq(elementProducer(f"$$group", makeDocument(Seq(
-        elementProducer("_id", identifiers)
-      ) ++
+        elementProducer("_id", identifiers)) ++
         ops.map({
           case (field, op) => elementProducer(field, op.makeFunction)
         })))))
@@ -306,7 +294,7 @@ trait AggregationFramework[P <: SerializationPack]
    * @param ops the sequence of operators specifying aggregate calculation
    */
   case class GroupField(idField: String)(ops: (String, GroupFunction)*)
-      extends PipelineOperator {
+    extends PipelineOperator {
 
     val makePipe = Group(stringValue("$" + idField))(ops: _*).makePipe
   }
@@ -319,8 +307,7 @@ trait AggregationFramework[P <: SerializationPack]
    * @param ops the sequence of operators specifying aggregate calculation
    */
   case class GroupMulti(idFields: (String, String)*)(
-      ops: (String, GroupFunction)*
-  ) extends PipelineOperator {
+    ops: (String, GroupFunction)*) extends PipelineOperator {
     val makePipe = Group(makeDocument(idFields.map {
       case (alias, attribute) =>
         elementProducer(alias, stringValue("$" + attribute))
@@ -341,8 +328,7 @@ trait AggregationFramework[P <: SerializationPack]
    */
   case object IndexStats extends PipelineOperator {
     val makePipe = makeDocument(Seq(
-      elementProducer(f"$$indexStats", makeDocument(Nil))
-    ))
+      elementProducer(f"$$indexStats", makeDocument(Nil))))
   }
 
   /**
@@ -361,8 +347,7 @@ trait AggregationFramework[P <: SerializationPack]
     name: String,
     key: pack.Document,
     host: String,
-    accesses: IndexStatAccesses
-  )
+    accesses: IndexStatAccesses)
 
   /**
    * Since MongoDB 3.4
@@ -375,7 +360,7 @@ trait AggregationFramework[P <: SerializationPack]
    * @param ops the sequence of operators specifying aggregate calculation
    */
   case class BucketAuto(groupBy: pack.Value, buckets: Int, granularity: Option[String])(output: (String, GroupFunction)*)
-      extends PipelineOperator {
+    extends PipelineOperator {
     val makePipe: pack.Document =
       makeDocument(Seq(elementProducer(f"$$bucketAuto", makeDocument(Seq(
         Some(elementProducer("groupBy", groupBy)),
@@ -383,8 +368,7 @@ trait AggregationFramework[P <: SerializationPack]
         granularity.map { g => elementProducer("granularity", stringValue(g)) },
         Some(elementProducer("output", makeDocument(output.map({
           case (field, op) => elementProducer(field, op.makeFunction)
-        }))))
-      ).flatten))))
+        }))))).flatten))))
   }
 
   /** References the score associated with the corresponding [[https://docs.mongodb.org/v3.0/reference/operator/query/text/#op._S_text `\$text`]] query for each matching document. */
@@ -413,8 +397,7 @@ trait AggregationFramework[P <: SerializationPack]
    * @param keyword the metadata keyword to sort by
    */
   case class MetadataSort(
-    field: String, keyword: MetadataKeyword
-  ) extends SortOrder
+    field: String, keyword: MetadataKeyword) extends SortOrder
 
   /**
    * Sorts the stream based on the given fields.
@@ -428,13 +411,11 @@ trait AggregationFramework[P <: SerializationPack]
         case Descending(field) => elementProducer(field, intValue(-1))
         case MetadataSort(field, keyword) => {
           val meta = makeDocument(Seq(
-            elementProducer(f"$$meta", stringValue(keyword.name))
-          ))
+            elementProducer(f"$$meta", stringValue(keyword.name))))
 
           elementProducer(field, meta)
         }
-      }))
-    ))
+      }))))
   }
 
   /**
@@ -456,21 +437,17 @@ trait AggregationFramework[P <: SerializationPack]
       Seq(elementProducer(f"$$geoNear", makeDocument(Seq(
         elementProducer("near", near),
         elementProducer("spherical", booleanValue(spherical)),
-        elementProducer("limit", longValue(limit))
-      ) ++ Seq(
+        elementProducer("limit", longValue(limit))) ++ Seq(
           minDistance.map(l => elementProducer("minDistance", longValue(l))),
           maxDistance.map(l => elementProducer("maxDistance", longValue(l))),
           query.map(s => elementProducer("query", s)),
           distanceMultiplier.map(d => elementProducer(
-            "distanceMultiplier", doubleValue(d)
-          )),
+            "distanceMultiplier", doubleValue(d))),
           Some(elementProducer("uniqueDocs", booleanValue(uniqueDocs))),
           distanceField.map(s =>
             elementProducer("distanceField", stringValue(s))),
           includeLocs.map(s =>
-            elementProducer("includeLocs", stringValue(s)))
-        ).flatten)))
-    )
+            elementProducer("includeLocs", stringValue(s)))).flatten))))
   }
 
   /**
@@ -488,9 +465,8 @@ trait AggregationFramework[P <: SerializationPack]
   class Unwind private[commands] (
     val productArity: Int,
     element: Int => Any,
-    operator: => pack.Document
-  ) extends PipelineOperator with Product
-      with Serializable with java.io.Serializable {
+    operator: => pack.Document) extends PipelineOperator with Product
+    with Serializable with java.io.Serializable {
 
     val makePipe: pack.Document = operator
 
@@ -529,8 +505,7 @@ trait AggregationFramework[P <: SerializationPack]
     def apply(
       path: String,
       includeArrayIndex: Option[String],
-      preserveNullAndEmptyArrays: Option[Boolean]
-    ): Unwind = Full(path, includeArrayIndex, preserveNullAndEmptyArrays)
+      preserveNullAndEmptyArrays: Option[Boolean]): Unwind = Full(path, includeArrayIndex, preserveNullAndEmptyArrays)
 
     def unapply(that: Unwind): Option[String] = that match {
       case UnwindField(field) => Some(field)
@@ -544,8 +519,7 @@ trait AggregationFramework[P <: SerializationPack]
     private case class Full(
       path: String,
       includeArrayIndex: Option[String],
-      preserveNullAndEmptyArrays: Option[Boolean]
-    ) extends Unwind(3, {
+      preserveNullAndEmptyArrays: Option[Boolean]) extends Unwind(3, {
       case 1 => path
       case 2 => includeArrayIndex
       case 3 => preserveNullAndEmptyArrays
@@ -562,13 +536,11 @@ trait AggregationFramework[P <: SerializationPack]
 
         preserveNullAndEmptyArrays.foreach { preserve =>
           elms += elementProducer(
-            "preserveNullAndEmptyArrays", booleanValue(preserve)
-          )
+            "preserveNullAndEmptyArrays", booleanValue(preserve))
         }
 
         elms.result()
-      }
-    ))))
+      }))))
   }
 }
 
@@ -603,8 +575,7 @@ sealed trait GroupAggregation[P <: SerializationPack] {
 
   case class SumField(field: String) extends GroupFunction {
     val makeFunction = makeDocument(Seq(elementProducer(
-      f"$$sum", stringValue("$" + field)
-    )))
+      f"$$sum", stringValue("$" + field))))
   }
 
   /**
@@ -617,21 +588,18 @@ sealed trait GroupAggregation[P <: SerializationPack] {
   /** Sum operation of the form `\$sum: 1` */
   case object SumAll extends GroupFunction {
     val makeFunction = makeDocument(Seq(elementProducer(
-      f"$$sum", intValue(1)
-    )))
+      f"$$sum", intValue(1))))
   }
 
   @deprecated("Use [[SumAll]]", "0.12.0")
   case class SumValue(value: Int) extends GroupFunction {
     val makeFunction = makeDocument(Seq(elementProducer(
-      f"$$sum", intValue(value)
-    )))
+      f"$$sum", intValue(value))))
   }
 
   case class AvgField(field: String) extends GroupFunction {
     val makeFunction = makeDocument(Seq(elementProducer(
-      f"$$avg", stringValue("$" + field)
-    )))
+      f"$$avg", stringValue("$" + field))))
   }
 
   case class Avg(avgExpr: pack.Value) extends GroupFunction {
@@ -640,32 +608,27 @@ sealed trait GroupAggregation[P <: SerializationPack] {
 
   case class FirstField(field: String) extends GroupFunction {
     val makeFunction = makeDocument(Seq(elementProducer(
-      f"$$first", stringValue("$" + field)
-    )))
+      f"$$first", stringValue("$" + field))))
   }
 
   case class First(firstExpr: pack.Value) extends GroupFunction {
     val makeFunction = makeDocument(Seq(elementProducer(
-      f"$$first", firstExpr
-    )))
+      f"$$first", firstExpr)))
   }
 
   case class LastField(field: String) extends GroupFunction {
     val makeFunction = makeDocument(Seq(elementProducer(
-      f"$$last", stringValue("$" + field)
-    )))
+      f"$$last", stringValue("$" + field))))
   }
 
   case class Last(lastExpr: pack.Value) extends GroupFunction {
     val makeFunction = makeDocument(Seq(elementProducer(
-      f"$$last", lastExpr
-    )))
+      f"$$last", lastExpr)))
   }
 
   case class MaxField(field: String) extends GroupFunction {
     val makeFunction = makeDocument(Seq(elementProducer(
-      f"$$max", stringValue("$" + field)
-    )))
+      f"$$max", stringValue("$" + field))))
   }
 
   /**
@@ -677,8 +640,7 @@ sealed trait GroupAggregation[P <: SerializationPack] {
 
   case class MinField(field: String) extends GroupFunction {
     val makeFunction = makeDocument(Seq(elementProducer(
-      f"$$min", stringValue("$" + field)
-    )))
+      f"$$min", stringValue("$" + field))))
   }
 
   /**
@@ -690,8 +652,7 @@ sealed trait GroupAggregation[P <: SerializationPack] {
 
   case class PushField(field: String) extends GroupFunction {
     val makeFunction = makeDocument(Seq(elementProducer(
-      f"$$push", stringValue("$" + field)
-    )))
+      f"$$push", stringValue("$" + field))))
   }
 
   /**
@@ -714,8 +675,7 @@ sealed trait GroupAggregation[P <: SerializationPack] {
 
   case class AddFieldToSet(field: String) extends GroupFunction {
     val makeFunction = makeDocument(Seq(elementProducer(
-      f"$$addToSet", stringValue("$" + field)
-    )))
+      f"$$addToSet", stringValue("$" + field))))
   }
 
   /**
@@ -723,35 +683,30 @@ sealed trait GroupAggregation[P <: SerializationPack] {
    */
   case class AddToSet(addToSetExpr: pack.Value) extends GroupFunction {
     val makeFunction = makeDocument(Seq(elementProducer(
-      f"$$addToSet", addToSetExpr
-    )))
+      f"$$addToSet", addToSetExpr)))
   }
 
   /** The [[https://docs.mongodb.com/manual/reference/operator/aggregation/stdDevPop/ \$stdDevPop]] group accumulator (since MongoDB 3.2) */
   case class StdDevPop(expression: pack.Value) extends GroupFunction {
     val makeFunction = makeDocument(Seq(elementProducer(
-      f"$$stdDevPop", expression
-    )))
+      f"$$stdDevPop", expression)))
   }
 
   /** The [[https://docs.mongodb.com/manual/reference/operator/aggregation/stdDevPop/ \$stdDevPop]] for a single field (since MongoDB 3.2) */
   case class StdDevPopField(field: String) extends GroupFunction {
     val makeFunction = makeDocument(Seq(elementProducer(
-      f"$$stdDevPop", stringValue("$" + field)
-    )))
+      f"$$stdDevPop", stringValue("$" + field))))
   }
 
   /** The [[https://docs.mongodb.com/manual/reference/operator/aggregation/stdDevSamp/ \$stdDevSamp]] group accumulator (since MongoDB 3.2) */
   case class StdDevSamp(expression: pack.Value) extends GroupFunction {
     val makeFunction = makeDocument(Seq(elementProducer(
-      f"$$stdDevSamp", expression
-    )))
+      f"$$stdDevSamp", expression)))
   }
 
   /** The [[https://docs.mongodb.com/manual/reference/operator/aggregation/stdDevSamp/ \$stdDevSamp]] for a single field (since MongoDB 3.2) */
   case class StdDevSampField(field: String) extends GroupFunction {
     val makeFunction = makeDocument(Seq(elementProducer(
-      f"$$stdDevSamp", stringValue("$" + field)
-    )))
+      f"$$stdDevSamp", stringValue("$" + field))))
   }
 }

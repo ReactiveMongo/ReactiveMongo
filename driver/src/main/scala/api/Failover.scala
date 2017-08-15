@@ -70,8 +70,7 @@ class Failover[T](message: T, connection: MongoConnection, strategy: FailoverStr
 
       case Failure(e) => {
         logger.trace(
-          "Got an non retryable error, completing with a failure...", e
-        )
+          "Got an non retryable error, completing with a failure...", e)
         promise.failure(e)
       }
 

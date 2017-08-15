@@ -32,10 +32,9 @@ import reactivemongo.util.LazyLogger
  * Simple TCP proxy using Netty.
  */
 final class NettyProxy(
-    localAddresses: Seq[InetSocketAddress],
-    remoteAddress: InetSocketAddress,
-    delay: Option[Long] = None
-) {
+  localAddresses: Seq[InetSocketAddress],
+  remoteAddress: InetSocketAddress,
+  delay: Option[Long] = None) {
 
   private val log = LazyLogger("reactivemongo.test.NettyProxy")
 
@@ -48,9 +47,8 @@ final class NettyProxy(
   })
 
   private class RemoteChannelHandler(
-    val clientChannel: Channel
-  )
-      extends SimpleChannelUpstreamHandler {
+    val clientChannel: Channel)
+    extends SimpleChannelUpstreamHandler {
 
     override def channelOpen(ctx: ChannelHandlerContext, e: ChannelStateEvent) {
       log.info(s"remote channel open ${e.getChannel}")
@@ -76,9 +74,8 @@ final class NettyProxy(
 
   private class ClientChannelHandler(
     remoteAddress: InetSocketAddress,
-    clientSocketChannelFactory: ClientSocketChannelFactory
-  )
-      extends SimpleChannelUpstreamHandler {
+    clientSocketChannelFactory: ClientSocketChannelFactory)
+    extends SimpleChannelUpstreamHandler {
 
     @volatile
     private var remoteChannel: Channel = null
@@ -92,13 +89,11 @@ final class NettyProxy(
       clientChannel.setReadable(false)
 
       val clientBootstrap = new ClientBootstrap(
-        clientSocketChannelFactory
-      )
+        clientSocketChannelFactory)
       clientBootstrap.setOption("connectTimeoutMillis", 1000)
       clientBootstrap.getPipeline.addLast(
         "handler",
-        new RemoteChannelHandler(clientChannel)
-      )
+        new RemoteChannelHandler(clientChannel))
 
       val connectFuture = clientBootstrap.connect(remoteAddress)
 
@@ -145,15 +140,13 @@ final class NettyProxy(
 
   private class ProxyPipelineFactory(
     val remoteAddress: InetSocketAddress,
-    val clientSocketChannelFactory: ClientSocketChannelFactory
-  )
-      extends ChannelPipelineFactory {
+    val clientSocketChannelFactory: ClientSocketChannelFactory)
+    extends ChannelPipelineFactory {
 
     override def getPipeline: ChannelPipeline =
       Channels.pipeline(new ClientChannelHandler(
         remoteAddress,
-        clientSocketChannelFactory
-      ))
+        clientSocketChannelFactory))
 
   }
 
@@ -174,8 +167,7 @@ final class NettyProxy(
       val serverBootstrap = new ServerBootstrap(srvChannelFactory)
 
       serverBootstrap.setPipelineFactory(new ProxyPipelineFactory(
-        remoteAddress, clientSocketChannelFactory
-      ))
+        remoteAddress, clientSocketChannelFactory))
 
       serverBootstrap.setOption("reuseAddress", true)
 

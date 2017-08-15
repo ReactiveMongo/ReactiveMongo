@@ -22,6 +22,6 @@ case class DocumentKeyNotFound(name: String) extends Exception {
 }
 
 case class TypeDoesNotMatch(message: String)
-    extends Exception with NoStackTrace {
+  extends Exception with NoStackTrace {
   override val getMessage = message
 }

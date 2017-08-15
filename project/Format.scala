@@ -11,7 +11,7 @@ object Format {
       setPreference(AlignSingleLineCaseStatements, true).
       setPreference(CompactControlReadability, false).
       setPreference(CompactStringConcatenation, false).
-      setPreference(DoubleIndentClassDeclaration, true).
+      setPreference(DoubleIndentConstructorArguments, false).
       setPreference(FormatXml, true).
       setPreference(IndentLocalDefs, false).
       setPreference(IndentPackageBlocks, true).

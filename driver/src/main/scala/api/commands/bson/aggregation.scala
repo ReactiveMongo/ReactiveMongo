@@ -16,7 +16,7 @@ import reactivemongo.api.commands.{ AggregationFramework, ResultCursor }
 import reactivemongo.api.commands.bson.CommonImplicits.ReadConcernWriter
 
 object BSONAggregationFramework
-    extends AggregationFramework[BSONSerializationPack.type] {
+  extends AggregationFramework[BSONSerializationPack.type] {
 
   import reactivemongo.bson.{ BSONBoolean, BSONDouble, BSONInteger, BSONString }
 
@@ -53,28 +53,25 @@ object BSONAggregationImplicits {
   }
 
   implicit object AggregateWriter
-      extends BSONDocumentWriter[ResolvedCollectionCommand[Aggregate]] {
+    extends BSONDocumentWriter[ResolvedCollectionCommand[Aggregate]] {
     def write(agg: ResolvedCollectionCommand[Aggregate]) = {
       val cmd = BSONDocument(
         "aggregate" -> BSONString(agg.collection),
         "pipeline" -> BSONArray(
-          { for (pipe <- agg.command.pipeline) yield pipe.makePipe }.toStream
-        ),
+          { for (pipe <- agg.command.pipeline) yield pipe.makePipe }.toStream),
         "explain" -> BSONBoolean(agg.command.explain),
         "allowDiskUse" -> BSONBoolean(agg.command.allowDiskUse),
-        "cursor" -> agg.command.cursor.map(CursorWriter.write(_))
-      )
+        "cursor" -> agg.command.cursor.map(CursorWriter.write(_)))
 
       if (agg.command.wireVersion < MongoWireVersion.V32) cmd else {
         cmd ++ ("bypassDocumentValidation" -> BSONBoolean(
-          agg.command.bypassDocumentValidation
-        ), "readConcern" -> agg.command.readConcern)
+          agg.command.bypassDocumentValidation), "readConcern" -> agg.command.readConcern)
       }
     }
   }
 
   implicit object AggregationResultReader
-      extends DealingWithGenericCommandErrorsReader[AggregationResult] {
+    extends DealingWithGenericCommandErrorsReader[AggregationResult] {
     def readResult(doc: BSONDocument): AggregationResult =
       if (doc contains "stages") AggregationResult(List(doc), None) else {
         doc.getAs[List[BSONDocument]]("result") match {
@@ -94,7 +91,7 @@ object BSONAggregationResultImplicits {
   import BSONAggregationFramework.{ IndexStatsResult, IndexStatAccesses }
 
   implicit object BSONIndexStatAccessesReader
-      extends BSONDocumentReader[IndexStatAccesses] {
+    extends BSONDocumentReader[IndexStatAccesses] {
 
     def read(doc: BSONDocument): IndexStatAccesses = (for {
       ops <- doc.getAsTry[BSONNumberLike]("ops").map(_.toLong)
@@ -103,7 +100,7 @@ object BSONAggregationResultImplicits {
   }
 
   implicit object BSONIndexStatsReader
-      extends BSONDocumentReader[IndexStatsResult] {
+    extends BSONDocumentReader[IndexStatsResult] {
 
     def read(doc: BSONDocument): IndexStatsResult = (for {
       name <- doc.getAsTry[String]("name")

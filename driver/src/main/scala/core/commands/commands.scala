@@ -157,8 +157,7 @@ object CommandError {
    */
   def checkOk(
     doc: BSONDocument, name: Option[String],
-    error: (BSONDocument, Option[String]) => CommandError = (doc, name) => CommandError("command " + name.map(_ + " ").getOrElse("") + "failed because the 'ok' field is missing or equals 0", Some(doc))
-  ): Option[CommandError] = {
+    error: (BSONDocument, Option[String]) => CommandError = (doc, name) => CommandError("command " + name.map(_ + " ").getOrElse("") + "failed because the 'ok' field is missing or equals 0", Some(doc))): Option[CommandError] = {
     doc.getAs[BSONNumberLike]("ok").map(_.toInt).orElse(Some(0)).flatMap {
       case 1 => None
       case _ => Some(error(doc, name))
@@ -176,8 +175,7 @@ object CommandError {
 class DefaultCommandError(
   val message: String,
   val code: Option[Int],
-  val originalDocument: Option[BSONDocument]
-) extends BSONCommandError
+  val originalDocument: Option[BSONDocument]) extends BSONCommandError
 
 /**
  * A makable command, that can produce a request maker ready to be sent to a [[reactivemongo.core.actors.MongoDBSystem]] actor.
@@ -196,8 +194,7 @@ class MakableCommand(val db: String, val command: Command[_]) {
    */
   def maker = RequestMaker(
     makeQuery,
-    BufferSequence.single(command.makeDocuments)
-  )
+    BufferSequence.single(command.makeDocuments))
 
   /**
    * Returns the [[reactivemongo.core.protocol.RequestMaker]] for the given command, using the given ReadPreference.
@@ -211,8 +208,7 @@ class MakableCommand(val db: String, val command: Command[_]) {
 
     RequestMaker(
       query.copy(flags = flags),
-      BufferSequence.single(command.makeDocuments), readPreference
-    )
+      BufferSequence.single(command.makeDocuments), readPreference)
   }
 }
 
@@ -240,19 +236,17 @@ case class RawCommand(bson: BSONDocument) extends Command[BSONDocument] {
  */
 @deprecated("consider using reactivemongo.api.commands.GetLastError instead", "0.11.0")
 case class GetLastError(
-    j: Boolean = false,
-    w: Option[BSONValue] = None,
-    wtimeout: Int = 0,
-    fsync: Boolean = false
-) extends Command[LastError] {
+  j: Boolean = false,
+  w: Option[BSONValue] = None,
+  wtimeout: Int = 0,
+  fsync: Boolean = false) extends Command[LastError] {
   override def makeDocuments =
     BSONDocument(
       "getlasterror" -> BSONInteger(1),
       "w" -> w,
       "wtimeout" -> Option(wtimeout).filter(_ > 0),
       "fsync" -> option(fsync, BSONBoolean(true)),
-      "j" -> option(j, BSONBoolean(true))
-    )
+      "j" -> option(j, BSONBoolean(true)))
 
   val ResultMaker = LastError
 }
@@ -270,14 +264,13 @@ case class GetLastError(
  */
 @deprecated("consider using reactivemongo.api.commands.WriteResult instead", "0.11.0")
 case class LastError(
-    ok: Boolean,
-    err: Option[String],
-    code: Option[Int],
-    errMsg: Option[String],
-    originalDocument: Option[BSONDocument],
-    updated: Int,
-    updatedExisting: Boolean
-) extends DatabaseException {
+  ok: Boolean,
+  err: Option[String],
+  code: Option[Int],
+  errMsg: Option[String],
+  originalDocument: Option[BSONDocument],
+  updated: Int,
+  updatedExisting: Boolean) extends DatabaseException {
   /** States if the last operation ended up with an error */
   lazy val inError: Boolean = !ok || err.isDefined
   lazy val stringify: String = s"toString [inError: $inError]"
@@ -356,8 +349,7 @@ object LastError extends BSONCommandResultMaker[LastError] {
       document.getAs[BSONString]("errmsg").map(_.value),
       Some(document),
       document.getAs[BSONInteger]("n").map(_.value).getOrElse(0),
-      document.getAs[BSONBoolean]("updatedExisting").map(_.value).getOrElse(false)
-    ))
+      document.getAs[BSONBoolean]("updatedExisting").map(_.value).getOrElse(false)))
   }
   def meaningful(response: Response) = {
     apply(response) match {
@@ -380,16 +372,14 @@ object LastError extends BSONCommandResultMaker[LastError] {
  */
 @deprecated("consider using reactivemongo.api.commands.Count instead", "0.11.0")
 case class Count(
-    collectionName: String,
-    query: Option[BSONDocument] = None,
-    fields: Option[BSONDocument] = None
-) extends Command[Int] {
+  collectionName: String,
+  query: Option[BSONDocument] = None,
+  fields: Option[BSONDocument] = None) extends Command[Int] {
   override def makeDocuments =
     BSONDocument(
       "count" -> BSONString(collectionName),
       "query" -> query,
-      "fields" -> fields
-    )
+      "fields" -> fields)
 
   val ResultMaker = Count
 }
@@ -409,8 +399,7 @@ object Count extends BSONCommandResultMaker[Int] {
  * Returns the state of the Replica Set from the target server's point of view.
  */
 @deprecated(
-  "consider using reactivemongo.api.commands.ReplSetGetStatus", "0.11.5"
-)
+  "consider using reactivemongo.api.commands.ReplSetGetStatus", "0.11.5")
 object ReplStatus extends AdminCommand[Map[String, BSONValue]] {
   override def makeDocuments = BSONDocument("replSetGetStatus" -> BSONInteger(1))
 
@@ -425,8 +414,7 @@ object ReplStatus extends AdminCommand[Map[String, BSONValue]] {
  * Gets the detailed status of the target server.
  */
 @deprecated(
-  "consider using reactivemongo.api.commands.ServerStatus", "0.11.5"
-)
+  "consider using reactivemongo.api.commands.ServerStatus", "0.11.5")
 object Status extends AdminCommand[Map[String, BSONValue]] {
   override def makeDocuments = BSONDocument("serverStatus" -> BSONInteger(1))
 
@@ -453,11 +441,9 @@ object IsMaster extends AdminCommand[IsMasterResponse] {
         document.getAs[BSONInteger]("maxBsonObjectSize").map(_.value).getOrElse(16777216), // TODO: default value should be 4M
         document.getAs[BSONString]("setName").map(_.value),
         document.getAs[BSONArray]("hosts").map(
-          _.values.map(_.asInstanceOf[BSONString].value).toList
-        ),
+          _.values.map(_.asInstanceOf[BSONString].value).toList),
         document.getAs[BSONString]("me").map(_.value),
-        document.getAs[BSONDocument]("tags")
-      ))
+        document.getAs[BSONDocument]("tags")))
     }
   }
 }
@@ -474,14 +460,13 @@ object IsMaster extends AdminCommand[IsMasterResponse] {
  */
 @deprecated("consider using reactivemongo.api.commands.IsMasterCommand instead", "0.11.0")
 case class IsMasterResponse(
-    isMaster: Boolean,
-    secondary: Boolean,
-    maxBsonObjectSize: Int,
-    setName: Option[String],
-    hosts: Option[Seq[String]],
-    me: Option[String],
-    tags: Option[BSONDocument]
-) {
+  isMaster: Boolean,
+  secondary: Boolean,
+  maxBsonObjectSize: Int,
+  setName: Option[String],
+  hosts: Option[Seq[String]],
+  me: Option[String],
+  tags: Option[BSONDocument]) {
   /** the resolved [[reactivemongo.core.nodeset.NodeStatus]] of the answering server */
   val status: NodeStatus = if (isMaster) NodeStatus.Primary else if (secondary) NodeStatus.Secondary else NodeStatus.NonQueryableUnknownStatus
 }
@@ -501,8 +486,7 @@ sealed trait Modify {
 case class Update(update: BSONDocument, fetchNewObject: Boolean) extends Modify {
   override def toDocument = BSONDocument(
     "update" -> update,
-    "new" -> BSONBoolean(fetchNewObject)
-  )
+    "new" -> BSONBoolean(fetchNewObject))
 }
 
 /** Remove (part of a FindAndModify command). */
@@ -526,21 +510,19 @@ object Remove extends Modify {
  */
 @deprecated("consider using reactivemongo.api.commands.FindAndModifyCommand instead", "0.11.0")
 case class FindAndModify(
-    collection: String,
-    query: BSONDocument,
-    modify: Modify,
-    upsert: Boolean = false,
-    sort: Option[BSONDocument] = None,
-    fields: Option[BSONDocument] = None
-) extends Command[Option[BSONDocument]] {
+  collection: String,
+  query: BSONDocument,
+  modify: Modify,
+  upsert: Boolean = false,
+  sort: Option[BSONDocument] = None,
+  fields: Option[BSONDocument] = None) extends Command[Option[BSONDocument]] {
   override def makeDocuments =
     BSONDocument(
       "findAndModify" -> BSONString(collection),
       "query" -> query,
       "sort" -> sort,
       "fields" -> fields,
-      "upsert" -> option(upsert, BSONBoolean(true))
-    ) ++ modify.toDocument
+      "upsert" -> option(upsert, BSONBoolean(true))) ++ modify.toDocument
 
   val ResultMaker = FindAndModify
 }
@@ -554,13 +536,11 @@ object FindAndModify extends BSONCommandResultMaker[Option[BSONDocument]] {
 
 @deprecated("consider using reactivemongo.api.commands.DropIndexes instead", "0.11.0")
 case class DeleteIndex(
-    collection: String,
-    index: String
-) extends Command[Int] {
+  collection: String,
+  index: String) extends Command[Int] {
   override def makeDocuments = BSONDocument(
     "deleteIndexes" -> BSONString(collection),
-    "index" -> BSONString(index)
-  )
+    "index" -> BSONString(index))
 
   object ResultMaker extends BSONCommandResultMaker[Int] {
     def apply(document: BSONDocument) =
