@@ -27,8 +27,7 @@ import reactivemongo.bson.BSONDocument
 import reactivemongo.bson.buffer.{ ReadableBuffer, WritableBuffer }
 
 class ChannelBufferReadableBuffer(
-    protected[netty] val buffer: ChannelBuffer
-) extends ReadableBuffer {
+  protected[netty] val buffer: ChannelBuffer) extends ReadableBuffer {
 
   def size = buffer.capacity()
 
@@ -134,9 +133,8 @@ object ChannelBufferWritableBuffer {
 }
 
 case class BufferSequence(
-    private val head: ChannelBuffer,
-    private val tail: ChannelBuffer*
-) {
+  private val head: ChannelBuffer,
+  private val tail: ChannelBuffer*) {
   def merged: ChannelBuffer = mergedBuffer.duplicate()
 
   private lazy val mergedBuffer =

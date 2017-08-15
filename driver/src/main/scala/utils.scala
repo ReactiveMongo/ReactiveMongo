@@ -45,8 +45,7 @@ object `package` {
 }
 
 @deprecated(
-  message = "Use [[reactivemongo.util.LazyLogger]]", since = "0.12.0"
-)
+  message = "Use [[reactivemongo.util.LazyLogger]]", since = "0.12.0")
 case class LazyLogger(logger: org.apache.logging.log4j.Logger) {
   def trace(s: => String) { if (logger.isTraceEnabled) logger.trace(s) }
   def trace(s: => String, e: => Throwable) { if (logger.isTraceEnabled) logger.trace(s, e) }
@@ -61,37 +60,32 @@ case class LazyLogger(logger: org.apache.logging.log4j.Logger) {
 }
 
 @deprecated(
-  message = "Use [[reactivemongo.util.LazyLogger]]", since = "0.12.0"
-)
+  message = "Use [[reactivemongo.util.LazyLogger]]", since = "0.12.0")
 object LazyLogger {
   def apply(logger: String): LazyLogger =
     LazyLogger(org.apache.logging.log4j.LogManager.getLogger(logger))
 }
 
 @deprecated(
-  message = "Use [[reactivemongo.util.EitherMappableFuture]]", since = "0.12.0"
-)
+  message = "Use [[reactivemongo.util.EitherMappableFuture]]", since = "0.12.0")
 case class EitherMappableFuture[A](future: Future[A]) {
   def mapEither[E <: Throwable, B](f: A => Either[E, B])(implicit ec: ExecutionContext) = {
     future.flatMap(
       f(_) match {
         case Left(e)  => Future.failed(e)
         case Right(b) => Future.successful(b)
-      }
-    )
+      })
   }
 }
 
 @deprecated(
-  message = "Use [[reactivemongo.util.EitherMappableFuture]]", since = "0.12.0"
-)
+  message = "Use [[reactivemongo.util.EitherMappableFuture]]", since = "0.12.0")
 object EitherMappableFuture {
   implicit def futureToEitherMappable[A](future: Future[A]): EitherMappableFuture[A] = EitherMappableFuture(future)
 }
 
 @deprecated(
-  message = "Use [[reactivemongo.util.ExtendedFutures]]", since = "0.12.0"
-)
+  message = "Use [[reactivemongo.util.ExtendedFutures]]", since = "0.12.0")
 object ExtendedFutures {
   import akka.actor.ActorSystem
 

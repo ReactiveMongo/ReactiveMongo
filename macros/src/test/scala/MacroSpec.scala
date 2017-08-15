@@ -26,8 +26,7 @@ class MacroSpec extends org.specs2.mutable.Specification {
     "handle primitives" in {
       roundtrip(
         Primitives(1.2, "hai", true, 42, Long.MaxValue),
-        Macros.handler[Primitives]
-      )
+        Macros.handler[Primitives])
     }
 
     "support nesting" in {
@@ -48,15 +47,13 @@ class MacroSpec extends org.specs2.mutable.Specification {
     "support seq" in {
       roundtrip(
         WordLover("john", Seq("hello", "world")),
-        Macros.handler[WordLover]
-      )
+        Macros.handler[WordLover])
     }
 
     "support single member case classes" in {
       roundtrip(
         Single("Foo"),
-        Macros.handler[Single]
-      )
+        Macros.handler[Single])
     }
 
     "support single member options" in {
@@ -288,9 +285,8 @@ class MacroSpec extends org.specs2.mutable.Specification {
       val doc = RenamedId(value = "some value")
       val serialized = format write doc
 
-      serialized must beTypedEqualTo(
-        BSONDocument("_id" -> doc.myID, "value" -> doc.value)
-      ) and {
+      serialized mustEqual (
+        BSONDocument("_id" -> doc.myID, "value" -> doc.value)) and {
           format.read(serialized) must_== doc
         }
     }
@@ -301,8 +297,7 @@ class MacroSpec extends org.specs2.mutable.Specification {
         val doc = pairHandler.write(Pair(left = "left", right = "right"))
 
         doc.aka(pretty(doc)) must beTypedEqualTo(
-          BSONDocument("right" -> "right")
-        )
+          BSONDocument("right" -> "right"))
       }
 
       "along with Key annotation" in {
@@ -313,8 +308,7 @@ class MacroSpec extends org.specs2.mutable.Specification {
         val doc = handler.write(IgnoredAndKey(Person("john", "doe"), "foo"))
 
         doc.aka(pretty(doc)) must beTypedEqualTo(
-          BSONDocument("second" -> "foo")
-        )
+          BSONDocument("second" -> "foo"))
       }
     }
 
@@ -328,8 +322,7 @@ class MacroSpec extends org.specs2.mutable.Specification {
           aka("bar2") must_== Bar("bar2", Some(bar1))
       } and (h.write(bar1) must_== doc1) and {
         h.write(Bar("bar2", Some(bar1))) must_== BSONDocument(
-          "name" -> "bar2", "next" -> doc1
-        )
+          "name" -> "bar2", "next" -> doc1)
       }
     }
 
@@ -348,8 +341,7 @@ class MacroSpec extends org.specs2.mutable.Specification {
       "to generate reader" in readSpec1(Macros.reader[WithImplicit1])
 
       "to generate writer with type parameters" in writeSpec2(
-        Macros.writer[WithImplicit2[Double]]
-      )
+        Macros.writer[WithImplicit2[Double]])
 
       "to generate handler" in {
         val f1 = Macros.handler[WithImplicit1]
@@ -372,8 +364,7 @@ class MacroSpec extends org.specs2.mutable.Specification {
 
     "throw meaningful exception if field has another type" in {
       val primitivesDoc = BSONDocument(
-        "dbl" -> 2D, "str" -> "str", "bl" -> true, "int" -> 2D, "long" -> 2L
-      )
+        "dbl" -> 2D, "str" -> "str", "bl" -> true, "int" -> 2D, "long" -> 2L)
 
       Macros.reader[Primitives].read(primitivesDoc).
         aka("read") must throwA[ClassCastException].like {
@@ -390,8 +381,7 @@ class MacroSpec extends org.specs2.mutable.Specification {
 
       r.read(BSONDocument(
         "bar" -> BSONDocument("value" -> "A"),
-        "lorem" -> "ipsum"
-      )) must_== Foo(Single("A"), "ipsum")
+        "lorem" -> "ipsum")) must_== Foo(Single("A"), "ipsum")
     }
 
     "be generated for class class with self reference" in {
@@ -413,8 +403,7 @@ class MacroSpec extends org.specs2.mutable.Specification {
 
       w.write(Foo(Single("A"), "ipsum")) must_== BSONDocument(
         "bar" -> BSONDocument("value" -> "A"),
-        "lorem" -> "ipsum"
-      )
+        "lorem" -> "ipsum")
     }
 
     "be generated for class class with self reference" in {
@@ -424,8 +413,7 @@ class MacroSpec extends org.specs2.mutable.Specification {
 
       w.write(bar1) must_== doc1 and {
         w.write(Bar("bar2", Some(bar1))) must_== BSONDocument(
-          "name" -> "bar2", "next" -> doc1
-        )
+          "name" -> "bar2", "next" -> doc1)
       }
     }
   }

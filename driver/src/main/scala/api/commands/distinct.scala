@@ -21,9 +21,8 @@ trait DistinctCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] 
     keyString: String,
     query: Option[pack.Document],
     readConcern: ReadConcern = ReadConcern.Local,
-    version: MongoWireVersion = MongoWireVersion.V30
-  ) extends CollectionCommand
-      with CommandWithPack[pack.type] with CommandWithResult[DistinctResult]
+    version: MongoWireVersion = MongoWireVersion.V30) extends CollectionCommand
+    with CommandWithPack[pack.type] with CommandWithResult[DistinctResult]
 
   /**
    * @param values the raw values (should not contain duplicate)

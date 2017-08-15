@@ -27,14 +27,12 @@ class CommonUseCases extends Specification {
 
     "insert some docs from a seq of docs" in { implicit ee: EE =>
       val docs = (18 to 60).toStream.map(i => BSONDocument(
-        "age" -> BSONInteger(i), "name" -> BSONString("Jack" + i)
-      ))
+        "age" -> BSONInteger(i), "name" -> BSONString("Jack" + i)))
 
       (for {
         result <- collection.bulkInsert(docs, ordered = true)
         count <- collection.runValueCommand(Count(BSONDocument(
-          "age" -> BSONDocument("$gte" -> 18, "$lte" -> 60)
-        )))
+          "age" -> BSONDocument("$gte" -> 18, "$lte" -> 60))))
       } yield count) must beEqualTo(43).await(1, timeout)
     }
 
@@ -59,9 +57,7 @@ class CommonUseCases extends Specification {
         BSONDocument(
           "$or" -> BSONArray(
             BSONDocument("name" -> BSONRegex("^jack2", "i")),
-            BSONDocument("name" -> BSONRegex("^jack3", "i"))
-          )
-        )
+            BSONDocument("name" -> BSONRegex("^jack3", "i"))))
 
       collection.find(query).cursor[BSONDocument]().collect[List]().
         map(_.size) aka "size" must beEqualTo(20).await(1, timeout)
@@ -72,15 +68,13 @@ class CommonUseCases extends Specification {
         val pjn = BSONDocument(
           "name" -> BSONInteger(1),
           "age" -> BSONInteger(1),
-          "something" -> BSONInteger(1)
-        )
+          "something" -> BSONInteger(1))
 
         def it = c.find(BSONDocument(), pjn).
           options(QueryOpts().batchSize(2)).cursor[BSONDocument]()
 
         it.collect[List]().map(_.map(
-          _.getAs[BSONInteger]("age").get.value
-        ).mkString("")) must beEqualTo((18 to 60).mkString("")).
+          _.getAs[BSONInteger]("age").get.value).mkString("")) must beEqualTo((18 to 60).mkString("")).
           await(1, timeout * 2)
       }
 
@@ -99,21 +93,16 @@ class CommonUseCases extends Specification {
           "entry" -> BSONInteger(1),
           "type" -> BSONString("telephone"),
           "professional" -> BSONBoolean(true),
-          "value" -> BSONString("+331234567890")
-        )
-      )
+          "value" -> BSONString("+331234567890")))
       val array2 = BSONArray(
         BSONDocument(
           "entry" -> BSONInteger(2),
           "type" -> BSONString("mail"),
           "professional" -> BSONBoolean(true),
-          "value" -> BSONString("joe@plop.com")
-        )
-      )
+          "value" -> BSONString("joe@plop.com")))
       val doc = BSONDocument(
         "name" -> BSONString("Joe"),
-        "contacts" -> (array ++ array2)
-      )
+        "contacts" -> (array ++ array2))
 
       Await.result(collection.insert(doc), timeout).ok mustEqual true
 

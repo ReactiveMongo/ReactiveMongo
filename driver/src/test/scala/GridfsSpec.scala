@@ -56,10 +56,8 @@ class GridFSSpec extends org.specs2.mutable.Specification {
       def matchFile(
         actual: GFile,
         expected: DefaultFileToSave,
-        content: Array[Byte]
-      ) = actual.filename must_== expected.filename and (
-        actual.uploadDate must beSome
-      ) and (actual.contentType must_== expected.contentType) and {
+        content: Array[Byte]) = actual.filename must_== expected.filename and (
+        actual.uploadDate must beSome) and (actual.contentType must_== expected.contentType) and {
           import scala.collection.mutable.ArrayBuilder
           def res = gfs.enumerate(actual) |>>>
             Iteratee.fold(ArrayBuilder.make[Byte]()) { _ ++= _ }

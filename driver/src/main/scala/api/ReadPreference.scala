@@ -45,7 +45,7 @@ object ReadPreference {
 
   @deprecated("For legacy purpose only", "0.11.12")
   sealed trait Taggable extends scala.Serializable with java.io.Serializable
-      with Product with Equals { self: ReadPreference =>
+    with Product with Equals { self: ReadPreference =>
 
     /** Returns the tags to be used. */
     def tags: List[Map[String, String]]
@@ -72,7 +72,7 @@ object ReadPreference {
 
   /** Reads from the primary if it is available, or secondaries if it is not. */
   class PrimaryPreferred @deprecated("Use `primaryPreferred(List)`", "0.11.12") (val filterTag: Option[BSONDocument => Boolean])
-      extends ReadPreference with Taggable {
+    extends ReadPreference with Taggable {
 
     private var _tags = List.empty[Map[String, String]]
     def tags = _tags
@@ -105,7 +105,7 @@ object ReadPreference {
 
   /** Reads only from any secondary. */
   class Secondary @deprecated("Use `secondary(List)`", "0.11.12") (val filterTag: Option[BSONDocument => Boolean])
-      extends ReadPreference with Taggable {
+    extends ReadPreference with Taggable {
 
     private var _tags = List.empty[Map[String, String]]
     def tags = _tags
@@ -138,7 +138,7 @@ object ReadPreference {
 
   /** Reads from any secondary, or from the primary if they are not available. */
   class SecondaryPreferred @deprecated("Use `secondaryPreferred(List)`", "0.11.12") (val filterTag: Option[BSONDocument => Boolean])
-      extends ReadPreference with Taggable {
+    extends ReadPreference with Taggable {
 
     private var _tags = List.empty[Map[String, String]]
     def tags = _tags
@@ -174,7 +174,7 @@ object ReadPreference {
    * all others), regardless its status (primary or secondary).
    */
   class Nearest @deprecated("Use `nearest(List)`", "0.11.12") (val filterTag: Option[BSONDocument => Boolean])
-      extends ReadPreference with Taggable {
+    extends ReadPreference with Taggable {
 
     private var _tags = List.empty[Map[String, String]]
     def tags = _tags

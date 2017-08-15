@@ -56,8 +56,7 @@ trait ConnectAllSpec { parent: NodeSetSpec =>
           val con = Connection(
             chan, status,
             authenticated = Set.empty,
-            authenticating = None
-          )
+            authenticating = None)
 
           Node(
             host,
@@ -65,8 +64,7 @@ trait ConnectAllSpec { parent: NodeSetSpec =>
             Vector(con),
             Set.empty,
             None,
-            ProtocolMetadata.Default
-          )
+            ProtocolMetadata.Default)
         }
 
       val node1 = node(1, s"$testhost:27017",
@@ -104,7 +102,6 @@ trait ConnectAllSpec { parent: NodeSetSpec =>
       s"$testhost:27019" -> ConnectionStatus.Connecting, // already Connecting
       // connecting `node4` (transition from Connecting to Connected)
       s"$testhost:27020" -> ConnectionStatus.Connecting,
-      s"$testhost:27020" -> ConnectionStatus.Connected
-    )).await(0, timeout) and checkCon(coned.result())
+      s"$testhost:27020" -> ConnectionStatus.Connected)).await(0, timeout) and checkCon(coned.result())
   }
 }

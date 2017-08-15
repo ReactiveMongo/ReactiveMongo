@@ -134,11 +134,10 @@ trait ChannelBufferReadable[T] {
  * @param opCode operation code of this message.
  */
 case class MessageHeader(
-    messageLength: Int,
-    requestID: Int,
-    responseTo: Int,
-    opCode: Int
-) extends ChannelBufferWritable {
+  messageLength: Int,
+  requestID: Int,
+  responseTo: Int,
+  opCode: Int) extends ChannelBufferWritable {
   override val writeTo = writeTupleToBuffer4((messageLength, requestID, responseTo, opCode)) _
   override val size = 4 + 4 + 4 + 4
 }
@@ -154,8 +153,7 @@ object MessageHeader extends ChannelBufferReadable[MessageHeader] {
       messageLength,
       requestID,
       responseTo,
-      opCode
-    )
+      opCode)
   }
 }
 
@@ -168,13 +166,12 @@ object MessageHeader extends ChannelBufferReadable[MessageHeader] {
  * @param channelIdHint a hint for sending this request on a particular channel.
  */
 case class Request(
-    requestID: Int,
-    responseTo: Int, // TODO remove, nothing to do here.
-    op: RequestOp,
-    documents: BufferSequence,
-    readPreference: ReadPreference = ReadPreference.primary,
-    channelIdHint: Option[Int] = None
-) extends ChannelBufferWritable {
+  requestID: Int,
+  responseTo: Int, // TODO remove, nothing to do here.
+  op: RequestOp,
+  documents: BufferSequence,
+  readPreference: ReadPreference = ReadPreference.primary,
+  channelIdHint: Option[Int] = None) extends ChannelBufferWritable {
   private def write(buffer: ChannelBuffer, writable: ChannelBufferWritable) =
     writable writeTo buffer
 
@@ -201,10 +198,9 @@ case class Request(
  * @param getLastError a [[reactivemongo.core.commands.GetLastError]] command message.
  */
 case class CheckedWriteRequest(
-    op: WriteRequestOp,
-    documents: BufferSequence,
-    getLastError: GetLastError
-) {
+  op: WriteRequestOp,
+  documents: BufferSequence,
+  getLastError: GetLastError) {
   def apply(): (RequestMaker, RequestMaker) = {
     import reactivemongo.api.BSONSerializationPack
     import reactivemongo.api.commands.Command
@@ -222,11 +218,10 @@ case class CheckedWriteRequest(
  * @param channelIdHint a hint for sending this request on a particular channel.
  */
 case class RequestMaker(
-    op: RequestOp,
-    documents: BufferSequence = BufferSequence.empty,
-    readPreference: ReadPreference = ReadPreference.primary,
-    channelIdHint: Option[Int] = None
-) {
+  op: RequestOp,
+  documents: BufferSequence = BufferSequence.empty,
+  readPreference: ReadPreference = ReadPreference.primary,
+  channelIdHint: Option[Int] = None) {
   def apply(id: Int) = Request(id, 0, op, documents, readPreference, channelIdHint)
 }
 
@@ -248,8 +243,7 @@ object Request {
     requestID,
     responseTo,
     op,
-    BufferSequence(ChannelBuffers.wrappedBuffer(ByteOrder.LITTLE_ENDIAN, documents))
-  )
+    BufferSequence(ChannelBuffers.wrappedBuffer(ByteOrder.LITTLE_ENDIAN, documents)))
 
   /**
    * Create a request.
@@ -281,11 +275,10 @@ object Request {
  * @param info some meta information about this response, see [[reactivemongo.core.protocol.ResponseInfo]].
  */
 case class Response(
-    header: MessageHeader,
-    reply: Reply,
-    documents: ChannelBuffer,
-    info: ResponseInfo
-) {
+  header: MessageHeader,
+  reply: Reply,
+  documents: ChannelBuffer,
+  info: ResponseInfo) {
   /** If this response is in error, explain this error. */
   lazy val error: Option[DatabaseException] = {
     if (reply.inError) {
@@ -304,8 +297,7 @@ object Response {
 
   def parse(response: Response): Iterator[BSONDocument] =
     ReplyDocumentIterator(BSONSerializationPack)(
-      response.reply, response.documents
-    )(BSONDocumentIdentity)
+      response.reply, response.documents)(BSONDocumentIdentity)
 }
 
 /**
@@ -354,8 +346,7 @@ object ReplyDocumentIterator {
 }
 
 case class ReplyDocumentIteratorExhaustedException(
-  val cause: Exception
-) extends Exception(cause)
+  val cause: Exception) extends Exception(cause)
 
 private[reactivemongo] object RequestEncoder {
   val logger = LazyLogger("reactivemongo.core.protocol.RequestEncoder")
@@ -386,8 +377,7 @@ private[reactivemongo] class ResponseDecoder extends OneToOneDecoder {
 }
 
 private[reactivemongo] class MongoHandler(
-    supervisor: String, connection: String, receiver: ActorRef
-) extends IdleStateAwareChannelHandler {
+  supervisor: String, connection: String, receiver: ActorRef) extends IdleStateAwareChannelHandler {
 
   override def messageReceived(ctx: ChannelHandlerContext, e: MessageEvent) {
     val response = e.getMessage.asInstanceOf[Response]

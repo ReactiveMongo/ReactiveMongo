@@ -11,19 +11,15 @@ import reactivemongo.bson._
  */
 @deprecated(
   message = "Use [[reactivemongo.api.collections.GenericCollection.aggregateWith]]",
-  since = "0.12-RC5"
-)
+  since = "0.12-RC5")
 case class Aggregate(
-    collectionName: String,
-    pipeline: Seq[PipelineOperator]
-) extends Command[Stream[BSONDocument]] {
+  collectionName: String,
+  pipeline: Seq[PipelineOperator]) extends Command[Stream[BSONDocument]] {
   override def makeDocuments =
     BSONDocument(
       "aggregate" -> BSONString(collectionName),
       "pipeline" -> BSONArray(
-        { for (pipe <- pipeline) yield pipe.makePipe }.toStream
-      )
-    )
+        { for (pipe <- pipeline) yield pipe.makePipe }.toStream))
 
   val ResultMaker = Aggregate
 }
@@ -49,8 +45,7 @@ sealed trait PipelineOperator {
  */
 case class Project(fields: (String, BSONValue)*) extends PipelineOperator {
   override val makePipe = BSONDocument(f"$$project" -> BSONDocument(
-    { for (field <- fields) yield field._1 -> field._2 }.toStream
-  ))
+    { for (field <- fields) yield field._1 -> field._2 }.toStream))
 }
 
 /**
@@ -111,9 +106,8 @@ case class GroupField(idField: String)(ops: (String, GroupFunction)*) extends Pi
 case class GroupMulti(idField: (String, String)*)(ops: (String, GroupFunction)*) extends PipelineOperator {
   override val makePipe = Group(BSONDocument(
     idField.map {
-    case (alias, attribute) => alias -> BSONString("$" + attribute)
-  }.toStream
-  ))(ops: _*).makePipe
+      case (alias, attribute) => alias -> BSONString("$" + attribute)
+    }.toStream))(ops: _*).makePipe
 }
 
 /**
@@ -133,9 +127,7 @@ case class Group(identifiers: BSONValue)(ops: (String, GroupFunction)*) extends 
           ops.map {
             case (field, operator) => field -> operator.makeFunction
           }
-        }.toStream
-    )
-  )
+        }.toStream))
 }
 
 /**
@@ -210,8 +202,7 @@ case class Push(field: String) extends GroupFunction {
 
 case class PushMulti(fields: (String, String)*) extends GroupFunction {
   val makeFunction = BSONDocument(f"$$push" -> BSONDocument(
-    fields.map(field => field._1 -> BSONString("$" + field._2))
-  ))
+    fields.map(field => field._1 -> BSONString("$" + field._2))))
 }
 
 case class SumField(field: String) extends GroupFunction {

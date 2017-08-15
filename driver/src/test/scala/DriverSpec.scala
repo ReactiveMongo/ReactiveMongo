@@ -37,16 +37,14 @@ class DriverSpec extends org.specs2.mutable.Specification {
       val md = MongoDriver()
 
       md.numConnections must_== 0 and (
-        md.close() must not(throwA[Throwable])
-      )
+        md.close() must not(throwA[Throwable]))
     }
 
     "cleanly start and close with no connections #2" in {
       val md = MongoDriver()
 
       md.numConnections must_== 0 and (
-        md.close(timeout) must not(throwA[Throwable])
-      )
+        md.close(timeout) must not(throwA[Throwable]))
     }
 
     "start and close with one connection open (using raw URI)" in {
@@ -60,8 +58,7 @@ class DriverSpec extends org.specs2.mutable.Specification {
     "use the failover strategy defined in the options" in { implicit ee: EE =>
       lazy val con = driver.connection(
         List(primaryHost),
-        DefaultOptions.copy(failoverStrategy = FailoverStrategy.remote)
-      )
+        DefaultOptions.copy(failoverStrategy = FailoverStrategy.remote))
 
       con.database(commonDb).map(_.failoverStrategy).
         aka("strategy") must beTypedEqualTo(FailoverStrategy.remote).
@@ -102,8 +99,7 @@ class DriverSpec extends org.specs2.mutable.Specification {
     "fail within expected timeout interval" in { implicit ee: EE =>
       lazy val con = driver.connection(
         List("foo:123"),
-        DefaultOptions.copy(failoverStrategy = FailoverStrategy.remote)
-      )
+        DefaultOptions.copy(failoverStrategy = FailoverStrategy.remote))
 
       val before = System.currentTimeMillis()
 
@@ -115,10 +111,8 @@ class DriverSpec extends org.specs2.mutable.Specification {
             aka("most recent") must beSome[StackTraceElement].like {
               case mostRecent =>
                 mostRecent.getClassName aka "class" must beEqualTo(
-                  "reactivemongo.api.MongoConnection"
-                ) and (
-                    mostRecent.getMethodName aka "method" must_== "database"
-                  )
+                  "reactivemongo.api.MongoConnection") and (
+                    mostRecent.getMethodName aka "method" must_== "database")
             } and {
               Option(reason.getCause) aka "cause" must beSome[Throwable].like {
                 case _: Exceptions.InternalState => ok
@@ -136,8 +130,7 @@ class DriverSpec extends org.specs2.mutable.Specification {
     lazy val drv = MongoDriver()
     lazy val connection = drv.connection(
       List(primaryHost),
-      options = DefaultOptions.copy(nbChannelsPerNode = 1)
-    )
+      options = DefaultOptions.copy(nbChannelsPerNode = 1))
 
     val dbName = "specs2-test-cr-auth"
     def db_(implicit ec: ExecutionContext) =
@@ -165,8 +158,7 @@ class DriverSpec extends org.specs2.mutable.Specification {
     "be successful with right credentials" in { implicit ee: EE =>
       connection.authenticate(dbName, s"test-$id", s"password-$id").
         aka("authentication") must beLike[SuccessfulAuthentication](
-          { case _ => ok }
-        ).await(1, timeout) and {
+          { case _ => ok }).await(1, timeout) and {
             db_.flatMap {
               _("testcol").insert(BSONDocument("foo" -> "bar")).map(_ => {})
             } must beEqualTo({}).await(1, timeout)
@@ -184,12 +176,10 @@ class DriverSpec extends org.specs2.mutable.Specification {
       def con = Common.driver.connection(
         List(primaryHost),
         options = conOpts,
-        authentications = Seq(auth)
-      )
+        authentications = Seq(auth))
 
       Await.result(con.database(
-        Common.commonDb, failoverStrategy
-      ), timeout).
+        Common.commonDb, failoverStrategy), timeout).
         aka("database resolution") must throwA[PrimaryUnavailableException]
     } tag "mongo2"
   }
@@ -200,8 +190,7 @@ class DriverSpec extends org.specs2.mutable.Specification {
     lazy val drv = MongoDriver()
     val conOpts = DefaultOptions.copy(nbChannelsPerNode = 1)
     lazy val connection = drv.connection(
-      List(primaryHost), options = conOpts
-    )
+      List(primaryHost), options = conOpts)
     val slowOpts = SlowOptions.copy(nbChannelsPerNode = 1)
     lazy val slowConnection = drv.connection(List(slowPrimary), slowOpts)
 
@@ -242,8 +231,7 @@ class DriverSpec extends org.specs2.mutable.Specification {
       "with the default connection" in { implicit ee: EE =>
         connection.authenticate(dbName, s"test-$id", s"password-$id").
           aka("authentication") must beLike[SuccessfulAuthentication](
-            { case _ => ok }
-          ).await(1, timeout) and {
+            { case _ => ok }).await(1, timeout) and {
               db_.flatMap {
                 _("testcol").insert(BSONDocument("foo" -> "bar"))
               }.map(_ => {}) must beEqualTo({}).await(1, timeout * 2)
@@ -254,8 +242,7 @@ class DriverSpec extends org.specs2.mutable.Specification {
       "with the slow connection" in { implicit ee: EE =>
         slowConnection.authenticate(dbName, s"test-$id", s"password-$id").
           aka("authentication") must beLike[SuccessfulAuthentication](
-            { case _ => ok }
-          ).await(1, slowTimeout)
+            { case _ => ok }).await(1, slowTimeout)
 
       } tag "not_mongo26"
     }
@@ -265,14 +252,12 @@ class DriverSpec extends org.specs2.mutable.Specification {
 
       "with the default connection" in { implicit ee: EE =>
         val con = drv.connection(
-          List(primaryHost), options = conOpts, authentications = Seq(auth)
-        )
+          List(primaryHost), options = conOpts, authentications = Seq(auth))
 
         con.database(dbName, Common.failoverStrategy).
           aka("authed DB") must beLike[DefaultDB] {
             case rdb => rdb.collection("testcol").insert(
-              BSONDocument("foo" -> "bar")
-            ).map(_ => {}).
+              BSONDocument("foo" -> "bar")).map(_ => {}).
               aka("insertion") must beEqualTo({}).await(1, timeout)
 
           }.await(1, timeout) and {
@@ -283,8 +268,7 @@ class DriverSpec extends org.specs2.mutable.Specification {
 
       "with the slow connection" in { implicit ee: EE =>
         val con = drv.connection(
-          List(slowPrimary), options = slowOpts, authentications = Seq(auth)
-        )
+          List(slowPrimary), options = slowOpts, authentications = Seq(auth))
 
         con.database(dbName, slowFailover).
           aka("authed DB") must beLike[DefaultDB] { case _ => ok }.
@@ -304,8 +288,7 @@ class DriverSpec extends org.specs2.mutable.Specification {
 
       "with the default connection" in { implicit ee: EE =>
         def con = Common.driver.connection(
-          List(primaryHost), options = conOpts, authentications = Seq(auth)
-        )
+          List(primaryHost), options = conOpts, authentications = Seq(auth))
 
         con.database(Common.commonDb, failoverStrategy).
           aka("DB resolution") must throwA[PrimaryUnavailableException].like {
@@ -313,10 +296,8 @@ class DriverSpec extends org.specs2.mutable.Specification {
               aka("most recent") must beSome[StackTraceElement].like {
                 case mostRecent =>
                   mostRecent.getClassName aka "class" must beEqualTo(
-                    "reactivemongo.api.MongoConnection"
-                  ) and (
-                      mostRecent.getMethodName aka "method" must_== "database"
-                    )
+                    "reactivemongo.api.MongoConnection") and (
+                      mostRecent.getMethodName aka "method" must_== "database")
               } and {
                 Option(reason.getCause).
                   aka("cause") must beSome[Throwable].like {
@@ -329,8 +310,7 @@ class DriverSpec extends org.specs2.mutable.Specification {
 
       "with the slow connection" in { implicit ee: EE =>
         def con = Common.driver.connection(
-          List(slowPrimary), options = slowOpts, authentications = Seq(auth)
-        )
+          List(slowPrimary), options = slowOpts, authentications = Seq(auth))
 
         con.database(Common.commonDb, slowFailover).
           aka("database resolution") must throwA[PrimaryUnavailableException].
@@ -375,14 +355,11 @@ class DriverSpec extends org.specs2.mutable.Specification {
 
       Common.connection.database(Common.commonDb, failoverStrategy).
         map(_ => {}) aka "database resolution" must (
-          throwA[ConnectionException]("unsupported MongoDB version")
-        ).
+          throwA[ConnectionException]("unsupported MongoDB version")).
           await(1, timeout) and (Await.result(
-            Common.connection.database(Common.commonDb), timeout
-          ).
+            Common.connection.database(Common.commonDb), timeout).
             aka("database") must throwA[ConnectionException](
-              "unsupported MongoDB version"
-            ))
+              "unsupported MongoDB version"))
 
     }
     section("mongo2", "mongo24", "not_mongo26")
@@ -397,8 +374,7 @@ class DriverSpec extends org.specs2.mutable.Specification {
     Fragments.foreach[(ReadPreference, String)](Seq(
       ReadPreference.primary -> "primary",
       ReadPreference.secondary -> "secondary",
-      ReadPreference.nearest -> "nearest"
-    )) {
+      ReadPreference.nearest -> "nearest")) {
       case (pref, mode) =>
         s"""be encoded as '{ "mode": "$mode" }'""" in {
           bson(pref) must_== BSONDocument("mode" -> mode)
@@ -408,19 +384,16 @@ class DriverSpec extends org.specs2.mutable.Specification {
     "be taggable and" >> {
       val tagSet = List(
         Map("foo" -> "bar", "lorem" -> "ipsum"),
-        Map("dolor" -> "es")
-      )
+        Map("dolor" -> "es"))
       val bsonTags = BSONArray(
         BSONDocument("foo" -> "bar", "lorem" -> "ipsum"),
-        BSONDocument("dolor" -> "es")
-      )
+        BSONDocument("dolor" -> "es"))
 
       Fragments.foreach[(ReadPreference, String)](Seq(
         ReadPreference.primaryPreferred(tagSet) -> "primaryPreferred",
         ReadPreference.secondary(tagSet) -> "secondary",
         ReadPreference.secondaryPreferred(tagSet) -> "secondaryPreferred",
-        ReadPreference.nearest(tagSet) -> "nearest"
-      )) {
+        ReadPreference.nearest(tagSet) -> "nearest")) {
         case (pref, mode) =>
           val expected = BSONDocument("mode" -> mode, "tags" -> bsonTags)
 
@@ -435,8 +408,7 @@ class DriverSpec extends org.specs2.mutable.Specification {
         ReadPreference.primaryPreferred() -> "primaryPreferred",
         ReadPreference.secondary() -> "secondary",
         ReadPreference.secondaryPreferred() -> "secondaryPreferred",
-        ReadPreference.nearest() -> "nearest"
-      )) {
+        ReadPreference.nearest() -> "nearest")) {
         case (pref, mode) =>
           s"""be encoded as '{ "mode": "$mode" }'""" in {
             bson(pref) must_== BSONDocument("mode" -> mode)

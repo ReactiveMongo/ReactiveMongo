@@ -13,9 +13,8 @@ object Exceptions {
 
   /** An exception thrown when a request needs a non available primary. */
   sealed class PrimaryUnavailableException private[reactivemongo] (
-      val message: String,
-      override val cause: Throwable = null
-  ) extends DriverException with NoStackTrace {
+    val message: String,
+    override val cause: Throwable = null) extends DriverException with NoStackTrace {
 
     def this(supervisor: String, connection: String, cause: Throwable) =
       this(s"$primaryUnavailableMsg ($supervisor/$connection)", cause)
@@ -31,9 +30,8 @@ object Exceptions {
    * The application may not have access to the network anymore.
    */
   sealed class NodeSetNotReachable private[reactivemongo] (
-      val message: String,
-      override val cause: Throwable
-  ) extends DriverException with NoStackTrace {
+    val message: String,
+    override val cause: Throwable) extends DriverException with NoStackTrace {
 
     private[reactivemongo] def this(supervisor: String, connection: String, cause: Throwable) = this(s"$nodeSetReachableMsg ($supervisor/$connection)", cause)
 
@@ -46,17 +44,15 @@ object Exceptions {
   sealed class ChannelNotFound private[reactivemongo] (
     val message: String,
     val retriable: Boolean,
-    override val cause: Throwable
-  ) extends DriverException with NoStackTrace
+    override val cause: Throwable) extends DriverException with NoStackTrace
 
   @deprecated(message = "Use constructor with details", since = "0.12-RC0")
   case object ChannelNotFound
     extends ChannelNotFound("ChannelNotFound", false, null)
 
   sealed class ClosedException private (
-      val message: String,
-      override val cause: Throwable
-  ) extends DriverException with NoStackTrace {
+    val message: String,
+    override val cause: Throwable) extends DriverException with NoStackTrace {
 
     private[reactivemongo] def this(supervisor: String, connection: String, cause: Throwable) = this(s"This MongoConnection is closed ($supervisor/$connection)", cause)
 
@@ -68,8 +64,7 @@ object Exceptions {
   case object ClosedException extends ClosedException()
 
   final class InternalState private[actors] (
-      trace: Array[StackTraceElement]
-  ) extends DriverException with NoStackTrace {
+    trace: Array[StackTraceElement]) extends DriverException with NoStackTrace {
     override def getMessage: String = null
     val message = "InternalState"
     super.setStackTrace(trace)

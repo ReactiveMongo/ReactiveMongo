@@ -54,8 +54,7 @@ package object tests {
       flags = 1,
       cursorID = 1,
       startingFrom = 0,
-      numberReturned = 1
-    )
+      numberReturned = 1)
 
     val message = reactivemongo.core.netty.BufferSequence.single(doc).merged
 
@@ -63,15 +62,13 @@ package object tests {
       messageLength = message.capacity,
       requestID = reqID,
       responseTo = respTo,
-      opCode = -1
-    )
+      opCode = -1)
 
     Response(
       header,
       reply,
       documents = message,
-      info = reactivemongo.core.protocol.ResponseInfo(chanId)
-    )
+      info = reactivemongo.core.protocol.ResponseInfo(chanId))
   }
 
   def foldResponses[T](
@@ -81,11 +78,9 @@ package object tests {
     z: => T,
     maxDocs: Int,
     suc: (T, Response) => Future[Cursor.State[T]],
-    err: Cursor.ErrorHandler[T]
-  )(implicit sys: akka.actor.ActorSystem, ec: ExecutionContext): Future[T] =
+    err: Cursor.ErrorHandler[T])(implicit sys: akka.actor.ActorSystem, ec: ExecutionContext): Future[T] =
     FoldResponses[T](
-      z, makeRequest, next, killCursors, suc, err, maxDocs
-    )(sys, ec)
+      z, makeRequest, next, killCursors, suc, err, maxDocs)(sys, ec)
 
   def bsonReadPref(pref: ReadPreference): BSONDocument =
     reactivemongo.api.collections.bson.BSONReadPreference.write(pref)

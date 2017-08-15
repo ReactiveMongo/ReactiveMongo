@@ -282,8 +282,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
       fold[MongoWireVersion](MongoWireVersion.V30)(_.maxWireVersion)
 
     Future(DistinctCommand.Distinct(
-      key, selector, readConcern, version
-    )).flatMap(runCommand(_, readPreference).flatMap {
+      key, selector, readConcern, version)).flatMap(runCommand(_, readPreference).flatMap {
       _.result[T, M] match {
         case Failure(cause)  => Future.failed[M[T]](cause)
         case Success(result) => Future.successful(result)
@@ -336,8 +335,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
         } else {
           // Mongo 2.4
           Future.failed[MultiBulkWriteResult](new scala.RuntimeException(
-            s"unsupported MongoDB version: $metadata"
-          ))
+            s"unsupported MongoDB version: $metadata"))
         }
       }
     } else Future.successful(MultiBulkWriteResult(
@@ -349,8 +347,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
       writeConcernError = None,
       code = None,
       errmsg = None,
-      totalN = 0
-    ))
+      totalN = 0))
   }
 
   /**
@@ -368,23 +365,20 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
       case Some(metadata) if metadata.maxWireVersion >= MongoWireVersion.V26 =>
         // TODO: ordered + bulk
         Future(BatchCommands.InsertCommand.Insert(
-          writeConcern = writeConcern
-        )(document)).flatMap(runCommand(_, writePref).flatMap { wr =>
+          writeConcern = writeConcern)(document)).flatMap(runCommand(_, writePref).flatMap { wr =>
           val flattened = wr.flatten
           if (!flattened.ok) {
             // was ordered, with one doc => fail if has an error
             Future.failed(WriteResult.lastError(flattened).
               getOrElse[Exception](GenericDriverException(
-                s"fails to insert: $document"
-              )))
+                s"fails to insert: $document")))
 
           } else Future.successful(wr)
         })
 
       case Some(metadata) => // Mongo < 2.6
         Future.failed[WriteResult](new scala.RuntimeException(
-          s"unsupported MongoDB version: $metadata"
-        ))
+          s"unsupported MongoDB version: $metadata"))
 
       case _ =>
         Future.failed(MissingMetadata())
@@ -409,21 +403,18 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    */
   def update[S, T](selector: S, update: T, writeConcern: WriteConcern = defaultWriteConcern, upsert: Boolean = false, multi: Boolean = false)(implicit swriter: pack.Writer[S], writer: pack.Writer[T], ec: ExecutionContext): Future[UpdateWriteResult] = db.connection.metadata match {
     case Some(metadata) if (
-      metadata.maxWireVersion >= MongoWireVersion.V26
-    ) => {
+      metadata.maxWireVersion >= MongoWireVersion.V26) => {
       // TODO: ordered + bulk
       import BatchCommands.UpdateCommand.{ Update, UpdateElement }
 
       Future(Update(writeConcern = writeConcern)(
-        UpdateElement(selector, update, upsert, multi)
-      )).flatMap(runCommand(_, writePref).flatMap { wr =>
+        UpdateElement(selector, update, upsert, multi))).flatMap(runCommand(_, writePref).flatMap { wr =>
         val flattened = wr.flatten
         if (!flattened.ok) {
           // was ordered, with one doc => fail if has an error
           Future.failed(WriteResult.lastError(flattened).
             getOrElse[Exception](GenericDriverException(
-              s"fails to update: $update"
-            )))
+              s"fails to update: $update")))
 
         } else Future.successful(wr)
       })
@@ -431,8 +422,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
 
     case Some(metadata) => // Mongo < 2.6
       Future.failed[UpdateWriteResult](new scala.RuntimeException(
-        s"unsupported MongoDB version: $metadata"
-      ))
+        s"unsupported MongoDB version: $metadata"))
 
     case _ => Future.failed(MissingMetadata())
   }
@@ -481,8 +471,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
       query = selector,
       modify = modifier,
       sort = sort.map(implicitly[DP](_)),
-      fields = fields.map(implicitly[DP](_))
-    )).flatMap(runCommand(_, writePref))
+      fields = fields.map(implicitly[DP](_)))).flatMap(runCommand(_, writePref))
   }
 
   /**
@@ -567,8 +556,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
 
     runWithResponse(Aggregate(
       firstOperator :: otherOperators, explain, allowDiskUse, None,
-      ver, bypassDocumentValidation, readConcern
-    ), readPreference).map(_.value)
+      ver, bypassDocumentValidation, readConcern), readPreference).map(_.value)
   }
 
   /**
@@ -639,8 +627,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
   def aggregate1[T](firstOperator: PipelineOperator, otherOperators: List[PipelineOperator], explain: Boolean = false, allowDiskUse: Boolean = false, bypassDocumentValidation: Boolean = false, readConcern: Option[ReadConcern] = None, readPreference: ReadPreference = ReadPreference.primary, batchSize: Option[Int] = None)(implicit ec: ExecutionContext, reader: pack.Reader[T], cf: CursorFlattener[Cursor]): Cursor[T] = aggregatorContext[T](
     firstOperator, otherOperators,
     explain, allowDiskUse, bypassDocumentValidation,
-    readConcern, readPreference, batchSize
-  ).prepared[Cursor](CursorProducer.defaultCursorProducer[T]).cursor
+    readConcern, readPreference, batchSize).prepared[Cursor](CursorProducer.defaultCursorProducer[T]).cursor
 
   /**
    * [[http://docs.mongodb.org/manual/reference/command/aggregate/ Aggregates]] the matching documents.
@@ -718,29 +705,25 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    */
   def remove[S](selector: S, writeConcern: WriteConcern = defaultWriteConcern, firstMatchOnly: Boolean = false)(implicit swriter: pack.Writer[S], ec: ExecutionContext): Future[WriteResult] = db.connection.metadata match {
     case Some(metadata) if (
-      metadata.maxWireVersion >= MongoWireVersion.V26
-    ) => {
+      metadata.maxWireVersion >= MongoWireVersion.V26) => {
       import BatchCommands.DeleteCommand.{ Delete, DeleteElement }
       val limit = if (firstMatchOnly) 1 else 0
 
       Future(Delete(writeConcern = writeConcern)(
-        DeleteElement(selector, limit)
-      )).flatMap(runCommand(_, writePref).flatMap { wr =>
+        DeleteElement(selector, limit))).flatMap(runCommand(_, writePref).flatMap { wr =>
         val flattened = wr.flatten
         if (!flattened.ok) {
           // was ordered, with one doc => fail if has an error
           Future.failed(WriteResult.lastError(flattened).
             getOrElse[Exception](GenericDriverException(
-              s"fails to remove: $selector"
-            )))
+              s"fails to remove: $selector")))
         } else Future.successful(wr)
       })
     }
 
     case Some(metadata) => // Mongo < 2.6
       Future.failed[WriteResult](new scala.RuntimeException(
-        s"unsupported MongoDB version: $metadata"
-      ))
+        s"unsupported MongoDB version: $metadata"))
 
     case _ =>
       Future.failed(MissingMetadata())
@@ -849,8 +832,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
       if (docsN >= thresholdDocs) {
         closeIfNecessary()
         val nextCommand = new Mongo26WriteCommand(
-          tpe, ordered, writeConcern, metadata
-        )
+          tpe, ordered, writeConcern, metadata)
 
         nextCommand.putOrIssueNewCommand(doc)
         Some(nextCommand)
@@ -868,8 +850,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
             throw new scala.RuntimeException(s"Mongo26WriteCommand could not accept doc of size = ${buf.index - start} bytes")
           } else if (buf.index > thresholdBytes) {
             val nextCommand = new Mongo26WriteCommand(
-              tpe, ordered, writeConcern, metadata
-            )
+              tpe, ordered, writeConcern, metadata)
 
             nextCommand.buf.writeByte(0x03)
             nextCommand.buf.writeCString("0")
@@ -905,13 +886,11 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
         case Some(wr) if (wr.inError || (wr.hasErrors && ordered)) => {
           Future.failed(WriteResult.lastError(wr).
             getOrElse[Exception](GenericDriverException(
-              s"write failure: $wr"
-            )))
+              s"write failure: $wr")))
         }
         case Some(wr) => Future.successful(wr)
         case c => Future.failed(
-          new GenericDriverException(s"no write result ? $c")
-        )
+          new GenericDriverException(s"no write result ? $c"))
       }
     }
 
@@ -962,23 +941,21 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
   // ---
 
   final class AggregatorContext[T](
-      val firstOperator: PipelineOperator,
-      val otherOperators: List[PipelineOperator],
-      val explain: Boolean,
-      val allowDiskUse: Boolean,
-      val bypassDocumentValidation: Boolean,
-      val readConcern: Option[ReadConcern],
-      val readPreference: ReadPreference,
-      val batchSize: Option[Int],
-      val reader: pack.Reader[T]
-  ) {
+    val firstOperator: PipelineOperator,
+    val otherOperators: List[PipelineOperator],
+    val explain: Boolean,
+    val allowDiskUse: Boolean,
+    val bypassDocumentValidation: Boolean,
+    val readConcern: Option[ReadConcern],
+    val readPreference: ReadPreference,
+    val batchSize: Option[Int],
+    val reader: pack.Reader[T]) {
     def prepared[AC[_] <: Cursor[_]](implicit cp: CursorProducer.Aux[T, AC]): Aggregator[T, AC] = new Aggregator[T, AC](this, cp)
   }
 
   final class Aggregator[T, AC[_] <: Cursor[_]](
-      val context: AggregatorContext[T],
-      val cp: CursorProducer.Aux[T, AC]
-  ) {
+    val context: AggregatorContext[T],
+    val cp: CursorProducer.Aux[T, AC]) {
     import BatchCommands.AggregationFramework.{ Aggregate, AggregationResult }
     import BatchCommands.{ AggregateWriter, AggregateReader }
 
@@ -1002,23 +979,18 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
         Aggregate(
           firstOperator :: otherOperators,
           explain, allowDiskUse, Some(BatchCommands.AggregationFramework.Cursor(
-            batchSize.getOrElse(defaultCursorBatchSize)
-          )), ver, bypassDocumentValidation, readConcern
-        ), readPreference
-      ).flatMap[cp.ProducedCursor] {
+            batchSize.getOrElse(defaultCursorBatchSize))), ver, bypassDocumentValidation, readConcern), readPreference).flatMap[cp.ProducedCursor] {
           case ResponseResult(response, numToReturn,
             AggregationResult(firstBatch, Some(resultCursor))) => Future {
 
             def docs = new ChannelBufferWritableBuffer().
               writeBytes(firstBatch.foldLeft[WritableBuffer](
-                new ChannelBufferWritableBuffer()
-              )(pack.writeToBuffer).toReadableBuffer).buffer
+                new ChannelBufferWritableBuffer())(pack.writeToBuffer).toReadableBuffer).buffer
 
             def resp = Response(
               response.header,
               Reply(0, resultCursor.cursorId, 0, firstBatch.size),
-              docs, response.info
-            )
+              docs, response.info)
 
             cp.produce(DefaultCursor.getMore[P, T](pack, resp,
               resultCursor, numToReturn, readPreference, db.
@@ -1027,8 +999,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
 
           case ResponseResult(response, _, _) =>
             Future.failed[cp.ProducedCursor](
-              GenericDriverException(s"missing cursor: $response")
-            )
+              GenericDriverException(s"missing cursor: $response"))
         }
 
       cf.flatten(aggCursor)

@@ -136,12 +136,9 @@ class SerializationSpecs extends Specification {
           "emails" -> BSONArray(
             Some("james@example.org"),
             None,
-            Some("spamaddrjames@example.org")
-          ),
-          "adress" -> BSONString("coucou")
-        ),
-        "lastSeen" -> BSONLong(1360512704747L)
-      )
+            Some("spamaddrjames@example.org")),
+          "adress" -> BSONString("coucou")),
+        "lastSeen" -> BSONLong(1360512704747L))
       val buffer = new ArrayBSONBuffer
       DefaultBufferHandler.write(buffer, doc)
       compare(expectedWholeDocumentBytes, buffer.array)
@@ -193,10 +190,8 @@ class SerializationSpecs extends Specification {
       val docarray = BSONDocument("contact" -> BSONDocument(
         "emails" -> BSONArray(
           BSONString("james@example.org"),
-          BSONString("spamaddrjames@example.org")
-        ),
-        "address" -> BSONString("coucou")
-      ))
+          BSONString("spamaddrjames@example.org")),
+        "address" -> BSONString("coucou")))
       val expected = Array[Byte](110, 0, 0, 0, 3, 99, 111, 110, 116, 97, 99, 116, 0, 96, 0, 0, 0, 4, 101, 109, 97, 105, 108, 115, 0, 63, 0, 0, 0, 2, 48, 0, 18, 0, 0, 0, 106, 97, 109, 101, 115, 64, 101, 120, 97, 109, 112, 108, 101, 46, 111, 114, 103, 0, 2, 49, 0, 26, 0, 0, 0, 115, 112, 97, 109, 97, 100, 100, 114, 106, 97, 109, 101, 115, 64, 101, 120, 97, 109, 112, 108, 101, 46, 111, 114, 103, 0, 0, 2, 97, 100, 100, 114, 101, 115, 115, 0, 7, 0, 0, 0, 99, 111, 117, 99, 111, 117, 0, 0, 0)
       val buffer = new ArrayBSONBuffer
       DefaultBufferHandler.write(buffer, docarray)

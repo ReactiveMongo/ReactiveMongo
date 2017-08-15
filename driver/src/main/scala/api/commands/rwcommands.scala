@@ -11,9 +11,8 @@ case class GetLastError(
   w: GetLastError.W,
   j: Boolean,
   fsync: Boolean,
-  wtimeout: Option[Int] = None
-) extends Command
-    with CommandWithResult[LastError]
+  wtimeout: Option[Int] = None) extends Command
+  with CommandWithResult[LastError]
 
 object GetLastError {
   import scala.language.implicitConversions
@@ -57,16 +56,15 @@ object MultiBulkWriteResult {
 }
 
 case class MultiBulkWriteResult(
-    ok: Boolean,
-    n: Int,
-    nModified: Int,
-    upserted: Seq[Upserted],
-    writeErrors: Seq[WriteError],
-    writeConcernError: Option[WriteConcernError], // TODO ?
-    code: Option[Int],
-    errmsg: Option[String],
-    totalN: Int
-) {
+  ok: Boolean,
+  n: Int,
+  nModified: Int,
+  upserted: Seq[Upserted],
+  writeErrors: Seq[WriteError],
+  writeConcernError: Option[WriteConcernError], // TODO ?
+  code: Option[Int],
+  errmsg: Option[String],
+  totalN: Int) {
   def merge(wr: WriteResult): MultiBulkWriteResult = wr match {
     case wr: UpdateWriteResult => MultiBulkWriteResult(
       ok = ok && wr.ok,
@@ -77,8 +75,7 @@ case class MultiBulkWriteResult(
       errmsg = errmsg.orElse(wr.errmsg),
       nModified = wr.nModified,
       upserted = wr.upserted,
-      totalN = totalN + wr.n + wr.writeErrors.size
-    )
+      totalN = totalN + wr.n + wr.writeErrors.size)
     case _ =>
       MultiBulkWriteResult(
         ok = ok && wr.ok,
@@ -89,8 +86,7 @@ case class MultiBulkWriteResult(
         errmsg = errmsg.orElse(wr.errmsg),
         nModified = nModified,
         upserted = upserted,
-        totalN = totalN + wr.n + wr.writeErrors.size
-      )
+        totalN = totalN + wr.n + wr.writeErrors.size)
   }
 
 }
@@ -99,8 +95,7 @@ trait InsertCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] {
   case class Insert(
     documents: Seq[P#Document],
     ordered: Boolean,
-    writeConcern: WriteConcern
-  ) extends CollectionCommand with CommandWithResult[InsertResult] with Mongo26WriteCommand
+    writeConcern: WriteConcern) extends CollectionCommand with CommandWithResult[InsertResult] with Mongo26WriteCommand
 
   type InsertResult = DefaultWriteResult // for simplified imports
 
@@ -115,8 +110,7 @@ trait UpdateCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] {
   case class Update(
     documents: Seq[UpdateElement],
     ordered: Boolean,
-    writeConcern: WriteConcern
-  ) extends CollectionCommand with CommandWithResult[UpdateResult] with Mongo26WriteCommand
+    writeConcern: WriteConcern) extends CollectionCommand with CommandWithResult[UpdateResult] with Mongo26WriteCommand
 
   type UpdateResult = UpdateWriteResult
 
@@ -124,8 +118,7 @@ trait UpdateCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] {
     q: P#Document,
     u: P#Document,
     upsert: Boolean,
-    multi: Boolean
-  )
+    multi: Boolean)
 
   object UpdateElement {
     def apply(q: ImplicitlyDocumentProducer, u: ImplicitlyDocumentProducer, upsert: Boolean = false, multi: Boolean = false): UpdateElement =
@@ -133,8 +126,7 @@ trait UpdateCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] {
         q.produce,
         u.produce,
         upsert,
-        multi
-      )
+        multi)
   }
 
   object Update {
@@ -144,8 +136,7 @@ trait UpdateCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] {
       Update(
         firstUpdate +: updates,
         ordered,
-        writeConcern
-      )
+        writeConcern)
   }
 }
 
@@ -153,8 +144,7 @@ trait DeleteCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] {
   case class Delete(
     deletes: Seq[DeleteElement],
     ordered: Boolean,
-    writeConcern: WriteConcern
-  ) extends CollectionCommand with CommandWithResult[DeleteResult] with Mongo26WriteCommand
+    writeConcern: WriteConcern) extends CollectionCommand with CommandWithResult[DeleteResult] with Mongo26WriteCommand
 
   object Delete {
     def apply(firstDelete: DeleteElement, deletes: DeleteElement*): Delete =
@@ -165,8 +155,7 @@ trait DeleteCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] {
 
   case class DeleteElement(
     q: P#Document,
-    limit: Int
-  )
+    limit: Int)
 
   object DeleteElement {
     def apply(doc: ImplicitlyDocumentProducer, limit: Int = 0): DeleteElement =

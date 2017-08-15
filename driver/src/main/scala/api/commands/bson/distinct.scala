@@ -13,7 +13,7 @@ object BSONDistinctCommandImplicits {
   import BSONDistinctCommand._
 
   implicit object DistinctWriter
-      extends BSONDocumentWriter[ResolvedCollectionCommand[Distinct]] {
+    extends BSONDocumentWriter[ResolvedCollectionCommand[Distinct]] {
 
     import CommonImplicits.ReadConcernWriter
 
@@ -21,8 +21,7 @@ object BSONDistinctCommandImplicits {
       val cmd = BSONDocument(
         "distinct" -> distinct.collection,
         "key" -> distinct.command.keyString,
-        "query" -> distinct.command.query
-      )
+        "query" -> distinct.command.query)
 
       if (distinct.command.version >= MongoWireVersion.V32) {
         cmd ++ ("readConcern" -> distinct.command.readConcern)
@@ -31,7 +30,7 @@ object BSONDistinctCommandImplicits {
   }
 
   implicit object DistinctResultReader
-      extends DealingWithGenericCommandErrorsReader[DistinctResult] {
+    extends DealingWithGenericCommandErrorsReader[DistinctResult] {
 
     def readResult(doc: BSONDocument): DistinctResult =
       DistinctResult(doc.getAs[BSONArray]("values").

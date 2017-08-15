@@ -13,7 +13,7 @@ import spire.algebra.{
 }
 
 class BSONLawsSpecs
-    extends org.specs2.mutable.Specification with Discipline {
+  extends org.specs2.mutable.Specification with Discipline {
 
   "BSON laws" title
 

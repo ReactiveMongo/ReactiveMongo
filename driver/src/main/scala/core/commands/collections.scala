@@ -19,14 +19,12 @@ import reactivemongo.bson._
 import DefaultBSONHandlers._
 
 case class CappedOptions(
-    size: Long,
-    maxDocuments: Option[Int] = None
-) {
+  size: Long,
+  maxDocuments: Option[Int] = None) {
   def toDocument = BSONDocument(
     "capped" -> BSONBoolean(true),
     "size" -> BSONLong(size),
-    "max" -> maxDocuments.map(max => BSONLong(max.toLong))
-  )
+    "max" -> maxDocuments.map(max => BSONLong(max.toLong)))
 }
 
 /**
@@ -40,15 +38,13 @@ case class CappedOptions(
  */
 @deprecated("consider using reactivemongo.api.commands.Create instead", "0.11.0")
 class CreateCollection(
-    name: String,
-    capped: Option[CappedOptions] = None,
-    autoIndexId: Option[Boolean] = None
-) extends Command[Boolean] {
+  name: String,
+  capped: Option[CappedOptions] = None,
+  autoIndexId: Option[Boolean] = None) extends Command[Boolean] {
   def makeDocuments = {
     val doc = BSONDocument(
       "create" -> BSONString(name),
-      "autoIndexId" -> autoIndexId.map(BSONBoolean(_))
-    )
+      "autoIndexId" -> autoIndexId.map(BSONBoolean(_)))
     if (capped.isDefined)
       doc ++ capped.get.toDocument
     else doc
@@ -69,9 +65,8 @@ class CreateCollection(
  */
 @deprecated("consider using reactivemongo.api.commands.ConvertToCapped instead", "0.11.0")
 class ConvertToCapped(
-    name: String,
-    capped: CappedOptions
-) extends Command[Boolean] {
+  name: String,
+  capped: CappedOptions) extends Command[Boolean] {
   def makeDocuments = {
     BSONDocument("convertToCapped" -> BSONString(name)) ++ capped.toDocument
   }
@@ -91,14 +86,12 @@ class ConvertToCapped(
  */
 @deprecated("consider using reactivemongo.api.commands.CollStats instead", "0.11.0")
 class CollStats(
-    name: String,
-    scale: Option[Int] = None
-) extends Command[CollStatsResult] {
+  name: String,
+  scale: Option[Int] = None) extends Command[CollStatsResult] {
   def makeDocuments = {
     BSONDocument(
       "collStats" -> BSONString(name),
-      "scale" -> scale.map(BSONInteger(_))
-    )
+      "scale" -> scale.map(BSONInteger(_)))
   }
 
   val ResultMaker = CollStatsResult
@@ -137,8 +130,7 @@ case class CollStatsResult(
   totalIndexSize: Int,
   indexSizes: Array[(String, Int)],
   capped: Boolean,
-  max: Option[Long]
-)
+  max: Option[Long])
 
 object CollStatsResult extends BSONCommandResultMaker[CollStatsResult] {
   def apply(doc: BSONDocument): Either[CommandError, CollStatsResult] = {
@@ -162,8 +154,7 @@ object CollStatsResult extends BSONCommandResultMaker[CollStatsResult] {
           (for (kv <- indexSizes.elements) yield kv.name -> kv.value.asInstanceOf[BSONInteger].value).toArray
         },
         doc.getAs[BSONBooleanLike]("capped").map(_.toBoolean).getOrElse(false),
-        doc.getAs[BSONDouble]("max").map(_.value.toLong)
-      )
+        doc.getAs[BSONDouble]("max").map(_.value.toLong))
     }
   }
 }
@@ -175,8 +166,7 @@ object CollStatsResult extends BSONCommandResultMaker[CollStatsResult] {
  */
 @deprecated("consider using reactivemongo.api.commands.Drop instead", "0.11.0")
 class Drop(
-    name: String
-) extends Command[Boolean] {
+  name: String) extends Command[Boolean] {
   def makeDocuments =
     BSONDocument("drop" -> BSONString(name))
 
@@ -194,8 +184,7 @@ class Drop(
  */
 @deprecated("consider using reactivemongo.api.commands.EmptyCapped instead", "0.11.0")
 class EmptyCapped(
-    name: String
-) extends Command[Boolean] {
+  name: String) extends Command[Boolean] {
   def makeDocuments =
     BSONDocument("emptycapped" -> BSONString(name))
 
@@ -215,16 +204,14 @@ class EmptyCapped(
  */
 @deprecated("consider using reactivemongo.api.commands.RenameCollection instead", "0.11.0")
 class RenameCollection(
-    name: String,
-    target: String,
-    dropTarget: Boolean = false
-) extends AdminCommand[Boolean] {
+  name: String,
+  target: String,
+  dropTarget: Boolean = false) extends AdminCommand[Boolean] {
   def makeDocuments =
     BSONDocument(
       "renameCollection" -> BSONString(name),
       "to" -> BSONString(target),
-      "dropTarget" -> BSONBoolean(dropTarget)
-    )
+      "dropTarget" -> BSONBoolean(dropTarget))
 
   object ResultMaker extends BSONCommandResultMaker[Boolean] {
     def apply(doc: BSONDocument) = {

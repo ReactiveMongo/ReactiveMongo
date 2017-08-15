@@ -41,8 +41,7 @@ trait DBMetaCommands { self: DB =>
   /** Drops this database. */
   def drop()(implicit ec: ExecutionContext): Future[Unit] =
     Command.run(BSONSerializationPack).unboxed(
-      self, DropDatabase, ReadPreference.primary
-    )
+      self, DropDatabase, ReadPreference.primary)
 
   /** Returns an index manager for this database. */
   def indexesManager(implicit ec: ExecutionContext) = IndexesManager(self)
@@ -53,8 +52,7 @@ trait DBMetaCommands { self: DB =>
     def read(bson: BSONDocument) = bson.get("name").collect {
       case BSONString(value) => value.substring(prefixLength)
     }.getOrElse(throw new Exception(
-      "name is expected on system.namespaces query"
-    ))
+      "name is expected on system.namespaces query"))
 
   }
 
@@ -64,15 +62,13 @@ trait DBMetaCommands { self: DB =>
 
     if (wireVer.exists(_ >= MongoWireVersion.V30)) {
       Command.run(BSONSerializationPack)(
-        self, ListCollectionNames, ReadPreference.primary
-      ).map(_.names)
+        self, ListCollectionNames, ReadPreference.primary).map(_.names)
 
     } else collection("system.namespaces").as[BSONCollection]().
       find(BSONDocument(
         "name" -> BSONRegex("^[^\\$]+$", "") // strip off any indexes
       )).cursor(defaultReadPreference)(
-        CollectionNameReader, ec, CursorProducer.defaultCursorProducer
-      ).collect[List]()
+        CollectionNameReader, ec, CursorProducer.defaultCursorProducer).collect[List]()
   }
 
   /**
@@ -92,15 +88,13 @@ trait DBMetaCommands { self: DB =>
 
     Command.run(BSONSerializationPack, failoverStrategy).unboxed(
       self, RenameCollection(s"${db}.$from", s"${db}.$to", dropExisting),
-      ReadPreference.primary
-    ).map(_ => self.collection(to))
+      ReadPreference.primary).map(_ => self.collection(to))
   }
 
   /** Returns the server status. */
   def serverStatus(implicit ec: ExecutionContext): Future[ServerStatusResult] =
     Command.run(BSONSerializationPack)(
-      self, ServerStatus, ReadPreference.primary
-    )
+      self, ServerStatus, ReadPreference.primary)
 
   /**
    * Create the specified user.
@@ -120,15 +114,12 @@ trait DBMetaCommands { self: DB =>
     roles: List[UserRole],
     digestPassword: Boolean = true,
     writeConcern: WriteConcern = connection.options.writeConcern,
-    customData: Option[BSONDocument] = None
-  )(implicit ec: ExecutionContext): Future[Unit] = {
+    customData: Option[BSONDocument] = None)(implicit ec: ExecutionContext): Future[Unit] = {
     val command = BSONCreateUserCommand.CreateUser(
-      name, pwd, roles, digestPassword, Some(writeConcern), customData
-    )
+      name, pwd, roles, digestPassword, Some(writeConcern), customData)
 
     Command.run(BSONSerializationPack)(
-      self, command, ReadPreference.primary
-    ).map(_ => {})
+      self, command, ReadPreference.primary).map(_ => {})
   }
 
   /**

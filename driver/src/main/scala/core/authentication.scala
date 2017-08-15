@@ -22,8 +22,7 @@ private[reactivemongo] trait MongoCrAuthentication { system: MongoDBSystem =>
   protected final def sendAuthenticate(connection: Connection, nextAuth: Authenticate): Connection = {
     connection.send(GetCrNonce(nextAuth.db).maker(RequestId.getNonce.next))
     connection.copy(authenticating = Some(
-      CrAuthenticating(nextAuth.db, nextAuth.user, nextAuth.password, None)
-    ))
+      CrAuthenticating(nextAuth.db, nextAuth.user, nextAuth.password, None)))
   }
 
   protected val authReceive: Receive = {
@@ -39,22 +38,19 @@ private[reactivemongo] trait MongoCrAuthentication { system: MongoDBSystem =>
                 maker(RequestId.authenticate.next))
 
               connection.copy(authenticating = Some(a.copy(
-                nonce = Some(nonce)
-              )))
+                nonce = Some(nonce))))
 
             case (connection, auth) => {
               val msg = s"unexpected authentication: $auth"
 
               logger.warn(s"AUTH: $msg")
               authenticationResponse(response)(
-                _ => Left(FailedAuthentication(msg))
-              )
+                _ => Left(FailedAuthentication(msg)))
 
               connection
             }
           }
-        }
-      )
+        })
 
       ()
     }
@@ -88,8 +84,7 @@ private[reactivemongo] trait MongoScramSha1Authentication {
 
     connection.copy(authenticating = Some(
       ScramSha1Authenticating(nextAuth.db, nextAuth.user, nextAuth.password,
-        start.randomPrefix, start.message)
-    ))
+        start.randomPrefix, start.message)))
   }
 
   protected val authReceive: Receive = {
@@ -119,10 +114,8 @@ private[reactivemongo] trait MongoScramSha1Authentication {
                   con.copy(authenticating = Some(a.copy(
                     conversationId = Some(challenge.conversationId),
                     serverSignature = Some(sig),
-                    step = step + 1
-                  )))
-                }
-              )
+                    step = step + 1)))
+                })
             }
 
             case (con, auth) => {
@@ -130,14 +123,12 @@ private[reactivemongo] trait MongoScramSha1Authentication {
 
               logger.warn(s"AUTH: $msg")
               authenticationResponse(response)(
-                _ => Left(FailedAuthentication(msg))
-              )
+                _ => Left(FailedAuthentication(msg)))
 
               con
             }
           }
-        }
-      )
+        })
 
       ()
     }
@@ -169,8 +160,7 @@ private[reactivemongo] trait MongoScramSha1Authentication {
 
                 logger.warn(s"AUTH: $msg")
                 authenticationResponse(response)(
-                  _ => Left(FailedAuthentication(msg))
-                )
+                  _ => Left(FailedAuthentication(msg)))
 
                 con
               } else {
@@ -186,14 +176,12 @@ private[reactivemongo] trait MongoScramSha1Authentication {
 
               logger.warn(s"AUTH: msg")
               authenticationResponse(response)(
-                _ => Left(FailedAuthentication(msg))
-              )
+                _ => Left(FailedAuthentication(msg)))
 
               con
             }
           }
-        }
-      )
+        })
 
       ()
     }

@@ -40,7 +40,7 @@ private[protocol] object BufferAccessors {
   }
 
   implicit object StringChannelInteroperable
-      extends BufferInteroperable[String] {
+    extends BufferInteroperable[String] {
 
     private def writeCString(buffer: ChannelBuffer, s: String): ChannelBuffer = {
       val bytes = s.getBytes("utf-8")
@@ -136,11 +136,10 @@ sealed trait WriteRequestOp extends CollectionAwareRequestOp
  * @param numberReturned The number of documents that are present in this reply.
  */
 case class Reply(
-    flags: Int,
-    cursorID: Long,
-    startingFrom: Int,
-    numberReturned: Int
-) extends Op {
+  flags: Int,
+  cursorID: Long,
+  startingFrom: Int,
+  numberReturned: Int) extends Op {
   override val code = 1
 
   /** States whether the cursor given in the request was found */
@@ -165,8 +164,7 @@ object Reply extends ChannelBufferReadable[Reply] {
     buffer.readInt,
     buffer.readLong,
     buffer.readInt,
-    buffer.readInt
-  )
+    buffer.readInt)
 }
 
 /**
@@ -175,9 +173,8 @@ object Reply extends ChannelBufferReadable[Reply] {
  * @param flags Operation flags.
  */
 case class Update(
-    fullCollectionName: String,
-    flags: Int
-) extends WriteRequestOp {
+  fullCollectionName: String,
+  flags: Int) extends WriteRequestOp {
   override val code = 2001
   override val writeTo = writeTupleToBuffer3((0, fullCollectionName, flags)) _
   override def size = 4 /* int32 = ZERO */ + 4 + fullCollectionName.length + 1
@@ -198,9 +195,8 @@ object UpdateFlags {
  * @param flags Operation flags.
  */
 case class Insert(
-    flags: Int,
-    fullCollectionName: String
-) extends WriteRequestOp {
+  flags: Int,
+  fullCollectionName: String) extends WriteRequestOp {
   override val code = 2002
   override val writeTo = writeTupleToBuffer2((flags, fullCollectionName)) _
   override def size = 4 + fullCollectionName.length + 1
@@ -216,11 +212,10 @@ case class Insert(
  * @param numberToReturn The number of documents to return in the response. 0 means the server will choose.
  */
 case class Query(
-    flags: Int,
-    fullCollectionName: String,
-    numberToSkip: Int,
-    numberToReturn: Int
-) extends CollectionAwareRequestOp {
+  flags: Int,
+  fullCollectionName: String,
+  numberToSkip: Int,
+  numberToReturn: Int) extends CollectionAwareRequestOp {
   override val expectsResponse = true
   override val code = 2004
   override val writeTo = writeTupleToBuffer4((flags, fullCollectionName, numberToSkip, numberToReturn)) _
@@ -264,10 +259,9 @@ object QueryFlags {
  * @param cursorId id of the cursor.
  */
 case class GetMore(
-    fullCollectionName: String,
-    numberToReturn: Int,
-    cursorID: Long
-) extends CollectionAwareRequestOp {
+  fullCollectionName: String,
+  numberToReturn: Int,
+  cursorID: Long) extends CollectionAwareRequestOp {
   override val expectsResponse = true
   override val code = 2005
   override val writeTo = writeTupleToBuffer4((0, fullCollectionName, numberToReturn, cursorID)) _
@@ -280,9 +274,8 @@ case class GetMore(
  * @param flags operation flags.
  */
 case class Delete(
-    fullCollectionName: String,
-    flags: Int
-) extends WriteRequestOp {
+  fullCollectionName: String,
+  flags: Int) extends WriteRequestOp {
   override val code = 2006
   override val writeTo = writeTupleToBuffer3((0, fullCollectionName, flags)) _
   override def size = 4 /* int32 ZERO */ + fullCollectionName.length + 1 + 4
@@ -295,8 +288,7 @@ case class Delete(
  * @param cursorIDs ids of the cursors to kill. Should not be empty.
  */
 case class KillCursors(
-    cursorIDs: Set[Long]
-) extends RequestOp {
+  cursorIDs: Set[Long]) extends RequestOp {
   override val code = 2007
   override val writeTo = { buffer: ChannelBuffer =>
     buffer writeInt 0

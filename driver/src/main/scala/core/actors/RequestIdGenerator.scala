@@ -7,7 +7,7 @@ import reactivemongo.core.protocol.Response
  * @param upper the upper bound
  */
 private[actors] class RequestIdGenerator(val lower: Int, val upper: Int)
-    extends Product with Serializable {
+  extends Product with Serializable {
 
   private val lock = new Object {}
   private var value: Int = lower
@@ -46,7 +46,7 @@ private[actors] class RequestIdGenerator(val lower: Int, val upper: Int)
 
 @deprecated("Use the class RequestIdGenerator", "0.12-RC6")
 object RequestIdGenerator
-    extends scala.runtime.AbstractFunction2[Int, Int, RequestIdGenerator] {
+  extends scala.runtime.AbstractFunction2[Int, Int, RequestIdGenerator] {
 
   def apply(lower: Int, upper: Int): RequestIdGenerator =
     new RequestIdGenerator(lower, upper)

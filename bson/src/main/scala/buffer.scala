@@ -156,8 +156,7 @@ import java.nio.{ ByteBuffer, ByteOrder }, ByteOrder._
 
 /** An array-backed readable buffer. */
 case class ArrayReadableBuffer private (
-    bytebuffer: ByteBuffer
-) extends ReadableBuffer {
+  bytebuffer: ByteBuffer) extends ReadableBuffer {
 
   bytebuffer.order(LITTLE_ENDIAN)
 
@@ -203,8 +202,7 @@ object ArrayReadableBuffer {
 
 /** An array-backed writable buffer. */
 class ArrayBSONBuffer protected[buffer] (
-    protected val buffer: ArrayBuffer[Byte]
-) extends WritableBuffer {
+  protected val buffer: ArrayBuffer[Byte]) extends WritableBuffer {
   def index = buffer.length // useless
 
   def bytebuffer(size: Int) = {

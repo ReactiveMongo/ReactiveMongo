@@ -34,21 +34,18 @@ object Producer {
     new Producer[T] { def generate() = f }
 
   case class NameOptionValueProducer(
-      private val element: (String, Option[BSONValue])
-  ) extends Producer[BSONElement] {
+    private val element: (String, Option[BSONValue])) extends Producer[BSONElement] {
     private[bson] def generate() = element._2.map(value => BSONElement(element._1, value))
   }
 
   case class OptionValueProducer(
-      private val element: Option[BSONValue]
-  ) extends Producer[BSONValue] {
+    private val element: Option[BSONValue]) extends Producer[BSONValue] {
     private[bson] def generate() = element
   }
 
   @deprecated(
     "Replaced by [[element2Producer]] + [[BSONElement.converted]]",
-    "0.12.0"
-  )
+    "0.12.0")
   def nameValue2Producer[T](element: (String, T))(implicit writer: BSONWriter[T, _ <: BSONValue]) = NameOptionValueProducer(element._1 -> Some(writer.write(element._2)))
 
   implicit def element2Producer[E <% BSONElement](element: E): Producer[BSONElement] = {
@@ -130,7 +127,7 @@ case class BSONString(value: String) extends BSONValue {
  * we cannot be sure that a not yet deserialized value will be processed without error.
  */
 case class BSONArray(stream: Stream[Try[BSONValue]])
-    extends BSONValue with BSONElementSet {
+  extends BSONValue with BSONElementSet {
 
   val code = 0x04.toByte
 
@@ -318,7 +315,7 @@ object BSONArray {
  * @param subtype The type of the binary content.
  */
 case class BSONBinary(value: ReadableBuffer, subtype: Subtype)
-    extends BSONValue {
+  extends BSONValue {
 
   val code = 0x05.toByte
 
@@ -333,7 +330,7 @@ object BSONBinary {
 
 /** BSON Undefined value */
 case object BSONUndefined
-    extends BSONValue {
+  extends BSONValue {
   val code = 0x06.toByte
 }
 
@@ -347,7 +344,7 @@ case object BSONUndefined
  */
 @SerialVersionUID(239421902L)
 class BSONObjectID private (private val raw: Array[Byte])
-    extends BSONValue with Serializable with Equals {
+  extends BSONValue with Serializable with Equals {
 
   val code = 0x07.toByte
 
@@ -454,8 +451,7 @@ object BSONObjectID {
   /** Tries to make a BSON ObjectId from a hexadecimal string representation. */
   def parse(id: String): Try[BSONObjectID] = {
     if (id.length != 24) Failure[BSONObjectID](
-      new IllegalArgumentException(s"Wrong ObjectId (length != 24): '$id'")
-    )
+      new IllegalArgumentException(s"Wrong ObjectId (length != 24): '$id'"))
     else Try(new BSONObjectID(Converters str2Hex id))
   }
 
@@ -515,14 +511,14 @@ object BSONObjectID {
 
 /** BSON boolean value */
 case class BSONBoolean(value: Boolean)
-    extends BSONValue {
+  extends BSONValue {
   val code = 0x08.toByte
 
 }
 
 /** BSON date time value */
 case class BSONDateTime(value: Long)
-    extends BSONValue {
+  extends BSONValue {
   val code = 0x09.toByte
 }
 
@@ -537,15 +533,14 @@ case object BSONNull extends BSONValue {
  * @param flags Regex flags.
  */
 case class BSONRegex(value: String, flags: String)
-    extends BSONValue {
+  extends BSONValue {
   val code = 0x0B.toByte
 }
 
 /** BSON DBPointer value. */
 class BSONDBPointer private[bson] (
-    val value: String,
-    internalId: () => Array[Byte]
-) extends BSONValue with Product with Serializable with java.io.Serializable {
+  val value: String,
+  internalId: () => Array[Byte]) extends BSONValue with Product with Serializable with java.io.Serializable {
   val code = 0x0C.toByte
 
   @deprecated("", "0.12.0")
@@ -634,7 +629,7 @@ case class BSONSymbol(value: String) extends BSONValue {
  * @param value The JavaScript source code. TODO
  */
 case class BSONJavaScriptWS(value: String)
-    extends BSONValue {
+  extends BSONValue {
   val code = 0x0F.toByte
 }
 
@@ -787,7 +782,7 @@ object BSONElementSet {
  * @define keyParam the key to be found in the document
  */
 case class BSONDocument(stream: Stream[Try[BSONElement]])
-    extends BSONValue with BSONElementSet {
+  extends BSONValue with BSONElementSet {
 
   val code = 0x03.toByte
 
@@ -878,8 +873,7 @@ case class BSONDocument(stream: Stream[Try[BSONElement]])
   /** Creates a new [[BSONDocument]] containing all the elements of this one and the given `elements`. */
   def merge(elements: Producer[BSONElement]*): BSONDocument =
     new BSONDocument(stream ++ elements.flatMap(
-      _.generate().map(value => Try(value))
-    ).toStream)
+      _.generate().map(value => Try(value))).toStream)
 
   @deprecated("Use `merge`", "0.12.0")
   def add(elements: Producer[BSONElement]*): BSONDocument = merge(elements: _*)
@@ -887,8 +881,7 @@ case class BSONDocument(stream: Stream[Try[BSONElement]])
   /** Creates a new [[BSONDocument]] without the elements corresponding the given `keys`. */
   def remove(keys: String*): BSONDocument = new BSONDocument(stream.filter {
     case Success(BSONElement(key, _)) if (
-      keys contains key
-    ) => false
+      keys contains key) => false
 
     case _ => true
   })
@@ -937,8 +930,7 @@ object BSONDocument {
   /** Creates a new [[BSONDocument]] containing all the given `elements`. */
   def apply(elements: Producer[BSONElement]*): BSONDocument =
     new BSONDocument(elements.flatMap(
-      _.generate().map(value => Try(value))
-    ).toStream)
+      _.generate().map(value => Try(value))).toStream)
 
   /**
    * Creates a new [[BSONDocument]] containing all the `elements`
@@ -968,9 +960,8 @@ object BSONDocument {
 }
 
 case class BSONElement(
-    name: String,
-    value: BSONValue
-) extends ElementProducer {
+  name: String,
+  value: BSONValue) extends ElementProducer {
 
   @deprecated("Use [[name]]", "0.12.0")
   @inline def _1 = name
@@ -1009,7 +1000,7 @@ object ElementProducer {
    * so that it forms an additive monoid with the [[Empty]] instance as `id`.
    */
   object Composition
-      extends ((ElementProducer, ElementProducer) => ElementProducer) {
+    extends ((ElementProducer, ElementProducer) => ElementProducer) {
 
     def apply(x: ElementProducer, y: ElementProducer): ElementProducer =
       (x, y) match {

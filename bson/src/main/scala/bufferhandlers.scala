@@ -73,8 +73,7 @@ object DefaultBufferHandler extends BufferHandler {
     0x11.toByte -> BSONTimestampBufferHandler, // timestamp,
     0x12.toByte -> BSONLongBufferHandler, // long,
     0xFF.toByte -> BSONMinKeyBufferHandler, // min
-    0x7F.toByte -> BSONMaxKeyBufferHandler
-  ) // max
+    0x7F.toByte -> BSONMaxKeyBufferHandler) // max
 
   object BSONDoubleBufferHandler extends BufferRW[BSONDouble] {
     def write(value: BSONDouble, buffer: WritableBuffer): WritableBuffer = buffer.writeDouble(value.value)

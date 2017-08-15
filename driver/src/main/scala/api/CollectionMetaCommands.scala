@@ -46,8 +46,7 @@ trait CollectionMetaCommands { self: Collection =>
     Command.run(BSONSerializationPack).unboxed(
       self,
       Create(Some(Capped(size, maxDocuments)), autoIndexId),
-      ReadPreference.primary
-    )
+      ReadPreference.primary)
 
   /**
    * Drops this collection.
@@ -74,12 +73,10 @@ trait CollectionMetaCommands { self: Collection =>
     import BSONDropCollectionImplicits._
 
     Command.run(BSONSerializationPack)(
-      self, DropCollection, ReadPreference.primary
-    ).flatMap {
+      self, DropCollection, ReadPreference.primary).flatMap {
       case DropCollectionResult(false) if failIfNotFound =>
         Future.failed[Boolean](GenericDatabaseException(
-          s"fails to drop collection: $name", Some(26)
-        ))
+          s"fails to drop collection: $name", Some(26)))
 
       case DropCollectionResult(dropped) => Future.successful(dropped)
     }
@@ -93,8 +90,7 @@ trait CollectionMetaCommands { self: Collection =>
   @deprecated("Deprecated because emptyCapped became an internal command, unavailable by default.", "0.9")
   def emptyCapped()(implicit ec: ExecutionContext): Future[Unit] =
     Command.run(BSONSerializationPack).unboxed(
-      self, EmptyCapped, ReadPreference.primary
-    )
+      self, EmptyCapped, ReadPreference.primary)
 
   /**
    * Converts this collection to a capped one.
@@ -121,8 +117,7 @@ trait CollectionMetaCommands { self: Collection =>
    */
   def stats()(implicit ec: ExecutionContext): Future[CollStatsResult] =
     Command.run(BSONSerializationPack)(
-      self, CollStats(None), ReadPreference.primary
-    )
+      self, CollStats(None), ReadPreference.primary)
 
   /**
    * Returns various information about this collection.

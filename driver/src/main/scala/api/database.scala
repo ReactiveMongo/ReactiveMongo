@@ -80,8 +80,7 @@ sealed trait DB {
   def command[T](command: CoreCommand[T], readPreference: ReadPreference = defaultReadPreference)(implicit ec: ExecutionContext): Future[T] =
     Failover(
       command.apply(name).maker(readPreference),
-      connection, failoverStrategy
-    ).future.mapEither(command.ResultMaker(_))
+      connection, failoverStrategy).future.mapEither(command.ResultMaker(_))
 
   /** Authenticates the connection on this database. */
   def authenticate(user: String, password: String)(implicit timeout: FiniteDuration): Future[SuccessfulAuthentication] = connection.authenticate(name, user, password)
@@ -134,10 +133,9 @@ trait GenericDB[P <: SerializationPack with Singleton] { self: DB =>
 /** The default DB implementation, that mixes in the database traits. */
 @SerialVersionUID(235871232L)
 case class DefaultDB(
-    name: String,
-    @transient connection: MongoConnection,
-    failoverStrategy: FailoverStrategy = FailoverStrategy()
-) extends DB with DBMetaCommands with GenericDB[BSONSerializationPack.type] {
+  name: String,
+  @transient connection: MongoConnection,
+  failoverStrategy: FailoverStrategy = FailoverStrategy()) extends DB with DBMetaCommands with GenericDB[BSONSerializationPack.type] {
 
   @transient val pack: BSONSerializationPack.type = BSONSerializationPack
 }

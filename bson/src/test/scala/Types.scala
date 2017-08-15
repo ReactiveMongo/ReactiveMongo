@@ -37,42 +37,33 @@ class Types extends Specification {
   "BSON document" should {
     "be empty" in {
       BSONDocument().elements must beEmpty and (
-        BSONDocument.empty.elements must beEmpty
-      ) and (
-          document.elements must beEmpty
-        ) and (
-            document().elements must beEmpty
-          ) and (
-              BSONDocument.empty.contains("foo") must beFalse
-            )
+        BSONDocument.empty.elements must beEmpty) and (
+          document.elements must beEmpty) and (
+            document().elements must beEmpty) and (
+              BSONDocument.empty.contains("foo") must beFalse)
     }
 
     "be created with a new element " in {
       val doc = BSONDocument.empty :~ ("foo" -> 1)
 
       doc must_== BSONDocument("foo" -> 1) and (
-        doc.contains("foo") must beTrue
-      )
+        doc.contains("foo") must beTrue)
     }
 
     "remove specified elements" in {
       val doc = BSONDocument("Foo" -> 1, "Bar" -> 2, "Lorem" -> 3)
 
       doc.remove("Bar", "Lorem") must_== BSONDocument("Foo" -> 1) and (
-        doc -- ("Foo", "Bar") must_== BSONDocument("Lorem" -> 3)
-      )
+        doc -- ("Foo", "Bar") must_== BSONDocument("Lorem" -> 3))
     }
   }
 
   "BSONArray" should {
     "be empty" in {
       BSONArray().values must beEmpty and (
-        BSONArray.empty.values must beEmpty
-      ) and (
-          array.values must beEmpty
-        ) and (
-            array().values must beEmpty
-          )
+        BSONArray.empty.values must beEmpty) and (
+          array.values must beEmpty) and (
+            array().values must beEmpty)
 
     }
 
@@ -92,8 +83,7 @@ class Types extends Specification {
       val bson = BSONBinary(bytes, Subtype.GenericBinarySubtype)
 
       bson.byteArray aka "read #1" must_== bytes and (
-        bson.byteArray aka "read #2" must_== bytes
-      )
+        bson.byteArray aka "read #2" must_== bytes)
     }
   }
 
@@ -102,10 +92,8 @@ class Types extends Specification {
       val ts = BSONTimestamp(6065270725701271558L)
 
       ts.value aka "raw value" must_== 6065270725701271558L and (
-        ts.time aka "time" must_== 1412180887L
-      ) and (
-          ts.ordinal aka "ordinal" must_== 6
-        )
+        ts.time aka "time" must_== 1412180887L) and (
+          ts.ordinal aka "ordinal" must_== 6)
     }
 
     "be created from the time and ordinal values" in {
