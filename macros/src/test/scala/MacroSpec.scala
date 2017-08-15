@@ -20,6 +20,7 @@ class MacroSpec extends org.specs2.mutable.Specification {
   "Macros" title
 
   import MacroTest._
+  import BSONDocument.pretty
 
   "Formatter" should {
     "handle primitives" in {
@@ -287,20 +288,32 @@ class MacroSpec extends org.specs2.mutable.Specification {
       val doc = RenamedId(value = "some value")
       val serialized = format write doc
 
-      serialized mustEqual (
+      serialized must beTypedEqualTo(
         BSONDocument("_id" -> doc.myID, "value" -> doc.value)
       ) and {
           format.read(serialized) must_== doc
         }
     }
 
-    "skip ignored fields" in {
-      val pairHandler = Macros.handler[Pair]
-      val doc = pairHandler.write(Pair(left = "left", right = "right"))
+    "skip ignored fields" >> {
+      "with Pair type" in {
+        val pairHandler = Macros.handler[Pair]
+        val doc = pairHandler.write(Pair(left = "left", right = "right"))
 
-      doc.isEmpty must beFalse and {
-        doc.aka(BSONDocument.pretty(doc)) must beTypedEqualTo(
+        doc.aka(pretty(doc)) must beTypedEqualTo(
           BSONDocument("right" -> "right")
+        )
+      }
+
+      "along with Key annotation" in {
+        // TODO: Macros.reader or handler (manage Ignore with reader?)
+        implicit val handler: BSONDocumentWriter[IgnoredAndKey] =
+          Macros.writer[IgnoredAndKey]
+
+        val doc = handler.write(IgnoredAndKey(Person("john", "doe"), "foo"))
+
+        doc.aka(pretty(doc)) must beTypedEqualTo(
+          BSONDocument("second" -> "foo")
         )
       }
     }

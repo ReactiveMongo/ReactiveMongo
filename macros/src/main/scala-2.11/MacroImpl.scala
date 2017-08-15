@@ -222,23 +222,27 @@ private object MacroImpl {
         case (sym, ty) => sym.fullName -> ty
       }.toMap
       val resolve = resolver(boundTypes, "Writer")(writerType)
-
       val tuple = Ident(TermName("tuple"))
-      val (optional, required) = constructorParams.zipWithIndex.filterNot(p => ignoreField(p._1)) zip types partition (t => isOptionalType(t._2))
+
+      val (optional, required) =
+        constructorParams.zipWithIndex.zip(types).filterNot {
+          case ((sym, _), _) => ignoreField(sym)
+        }.partition(t => isOptionalType(t._2))
+
       val values = required map {
         case ((param, i), sig) =>
           val (writer, _) = resolve(sig)
           val pname = paramName(param)
 
           if (writer.isEmpty) {
-            c.abort(c.enclosingPosition, s"Implicit ${classOf[Writer[_]].getName}[${tpe.typeSymbol.name}, _] for '$pname' not found")
+            c.abort(c.enclosingPosition, s"Implicit not found for '$pname': ${classOf[Writer[_]].getName}[${sig.typeSymbol.name}, _]")
           }
 
           val tuple_i = {
             if (types.length == 1) tuple
             else Select(tuple, TermName("_" + (i + 1)))
           }
-          val bs_value = c.Expr[BSONValue](q"$writer.write($tuple_i)")
+          val bs_value = c.Expr[BSONValue](q"$writer.write(${tuple_i})")
           val name = c.Expr[String](q"$pname")
           reify((name.splice, bs_value.splice): (String, BSONValue)).tree
       }
@@ -250,7 +254,7 @@ private object MacroImpl {
           val pname = paramName(param)
 
           if (writer.isEmpty) {
-            c.abort(c.enclosingPosition, s"Implicit ${classOf[Writer[_]].getName}[${tpe.typeSymbol.name}, _] for '$pname' not found")
+            c.abort(c.enclosingPosition, s"Implicit not found for '$pname': ${classOf[Writer[_]].getName}[${sig.typeSymbol.name}, _]")
           }
 
           val tuple_i = {

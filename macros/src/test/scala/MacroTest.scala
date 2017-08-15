@@ -170,4 +170,9 @@ object MacroTest {
   }
 
   case class Pair(@Ignore left: String, right: String)
+
+  case class IgnoredAndKey(
+    @Ignore a: Person,
+    @Key("second") b: String
+  )
 }
