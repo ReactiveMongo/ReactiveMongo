@@ -376,12 +376,13 @@ private object MacroImpl {
         Apply(Select(Ident(bufName), "$plus$eq"), List(cn.tree))
       }
 
-      val writer =
-        c.parse(s"val ${bufName} = scala.collection.immutable.Stream.newBuilder[reactivemongo.bson.BSONElement]") +: (fields :+ c.parse("reactivemongo.bson.BSONDocument(buf.result())"))
+      val writer = c.parse(s"val ${bufName} = scala.collection.immutable.Stream.newBuilder[reactivemongo.bson.BSONElement]") +: (fields :+ c.parse(s"reactivemongo.bson.BSONDocument($bufName.result())"))
 
-      if (constructorParams.isEmpty) { // no class parameter to unapply
+      if (values.isEmpty && extra.isEmpty) { // no class parameter to unapply
         Block(writer: _*)
       } else {
+        // Extract/unapply the class instance as ${tupleDef}
+
         val unapplyTree = Select(Ident(companion(tpe).name.toString), "unapply")
         val invokeUnapply = Select(Apply(unapplyTree, List(id)), "get")
         val tupleDef = ValDef(Modifiers(), tupleName, TypeTree(), invokeUnapply)
@@ -520,9 +521,6 @@ private object MacroImpl {
 
     private def isOptionalType(implicit tpe: Type): Boolean =
       c.typeOf[Option[_]].typeConstructor == tpe.typeConstructor
-
-    private def bsonDocPath: Select = Select(Select(
-      Ident(newTermName("reactivemongo")), "bson"), "BSONDocument")
 
     private def paramName(param: Symbol): String = param.annotations.collect {
       case ann if ann.tpe =:= typeOf[Key] => ann.scalaArgs.collect {
