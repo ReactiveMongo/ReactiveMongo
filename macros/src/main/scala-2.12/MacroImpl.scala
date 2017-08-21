@@ -169,13 +169,15 @@ private object MacroImpl {
             c.abort(c.enclosingPosition, s"Implicit not found '$pname': ${classOf[Reader[_]].getName}[_, $sig]")
           }
 
-          if (param.annotations.exists(_.tree.tpe =:= typeOf[Flatten]) &&
-            reader.tpe <:< appliedType(docReaderType, List(sig))) {
-
+          if (param.annotations.exists(_.tree.tpe =:= typeOf[Flatten])) {
             if (reader.toString == "forwardReader") {
               c.abort(
                 c.enclosingPosition,
                 s"Cannot flatten reader for '$pname': recursive type")
+            }
+
+            if (!(reader.tpe <:< appliedType(docReaderType, List(sig)))) {
+              c.abort(c.enclosingPosition, s"Cannot flatten reader '$reader': doesn't conform BSONDocumentReader")
             }
 
             q"${reader}.read(document)"
@@ -260,13 +262,15 @@ private object MacroImpl {
         pname: String,
         sig: Type,
         writer: Tree): Boolean = {
-        if (param.annotations.exists(_.tpe =:= typeOf[Flatten]) &&
-          writer.tpe <:< appliedType(docWriterType, List(sig))) {
-
+        if (param.annotations.exists(_.tpe =:= typeOf[Flatten])) {
           if (writer.toString == "forwardWriter") {
             c.abort(
               c.enclosingPosition,
               s"Cannot flatten writer for '$pname': recursive type")
+          }
+
+          if (!(writer.tpe <:< appliedType(docWriterType, List(sig)))) {
+            c.abort(c.enclosingPosition, s"Cannot flatten writer '$writer': doesn't conform BSONDocumentWriter")
           }
 
           true
@@ -290,21 +294,16 @@ private object MacroImpl {
           val sig = optionTypeParameter(optType).get
           val pname = paramName(param)
           val writer = resolveWriter(pname, sig)
+          val name = c.Expr[String](q"$pname")
 
-          if (mustFlatten(param, pname, sig, writer)) {
-            q"$bufName ++= $writer.write(${tupleElement(i)}).elements"
-          } else {
-            val name = c.Expr[String](q"$pname")
+          val vterm = TermName("v")
+          val bsv = c.Expr[BSONValue](q"$writer.write($vterm)")
+          val vp = ValDef(
+            Modifiers(c.universe.Flag.PARAM),
+            vterm, TypeTree(sig), EmptyTree) // ${v} =>
+          val field = reify((name.splice, bsv.splice)).tree
 
-            val vterm = TermName("v")
-            val bsv = c.Expr[BSONValue](q"$writer.write($vterm)")
-            val vp = ValDef(
-              Modifiers(c.universe.Flag.PARAM),
-              vterm, TypeTree(sig), EmptyTree) // ${v} =>
-            val field = reify((name.splice, bsv.splice)).tree
-
-            q"${tupleElement(i)}.foreach { $vp => $bufName += $field }"
-          }
+          q"${tupleElement(i)}.foreach { $vp => $bufName += $field }"
       }
 
       // List[Tree] corresponding to fields appended to the buffer/builder

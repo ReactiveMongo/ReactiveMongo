@@ -328,6 +328,9 @@ class MacroSpec extends org.specs2.mutable.Specification {
     }
 
     "support @Flatten annotation" in {
+      shapeless.test.illTyped("Macros.handler[InvalidRecursive]")
+      shapeless.test.illTyped("Macros.handler[InvalidNonDoc]")
+
       roundtrip(
         LabelledRange("range1", Range(start = 2, end = 5)),
         Macros.handler[LabelledRange])
@@ -403,6 +406,9 @@ class MacroSpec extends org.specs2.mutable.Specification {
     }
 
     "be generated with @Flatten annotation" in {
+      shapeless.test.illTyped("Macros.reader[InvalidRecursive]")
+      shapeless.test.illTyped("Macros.reader[InvalidNonDoc]")
+
       val r = Macros.reader[LabelledRange]
       val doc = BSONDocument("name" -> "range1", "start" -> 2, "end" -> 5)
       val lr = LabelledRange("range1", Range(start = 2, end = 5))
@@ -433,12 +439,15 @@ class MacroSpec extends org.specs2.mutable.Specification {
     }
 
     "be generated with @Flatten annotation" in {
+      shapeless.test.illTyped("Macros.writer[InvalidRecursive]")
+      shapeless.test.illTyped("Macros.writer[InvalidNonDoc]")
+
       val w = Macros.writer[LabelledRange]
       val lr = LabelledRange("range2", Range(start = 1, end = 3))
       val doc = BSONDocument("name" -> "range2", "start" -> 1, "end" -> 3)
 
       w.write(lr) must_== doc
-    } // TODO: Test Flatten with a property Option[T : BSONDocumentWriter] ?
+    }
   }
 
   // ---

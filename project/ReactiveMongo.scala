@@ -392,7 +392,9 @@ object ReactiveMongoBuild extends Build {
     file("macros"),
     settings = buildSettings ++ Findbugs.settings ++ Seq(
       libraryDependencies ++= Seq(specs,
-        "org.scala-lang" % "scala-compiler" % scalaVersion.value % "provided")
+        "org.scala-lang" % "scala-compiler" % scalaVersion.value % Provided,
+        shapelessTest % Test
+      )
     ))
     .enablePlugins(CopyPasteDetector)
     .dependsOn(bson)

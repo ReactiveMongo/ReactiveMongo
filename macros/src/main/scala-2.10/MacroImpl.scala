@@ -202,13 +202,15 @@ private object MacroImpl {
           c.abort(c.enclosingPosition, s"Implicit not found for '$pname': ${classOf[Reader[_]].getName}[_, $typ]")
         }
 
-        if (param.annotations.exists(_.tpe =:= typeOf[Flatten]) &&
-          reader.tpe <:< appliedType(docReaderType, List(typ))) {
-
+        if (param.annotations.exists(_.tpe =:= typeOf[Flatten])) {
           if (reader.toString == "forwardReader") {
             c.abort(
               c.enclosingPosition,
               s"Cannot flatten reader for '$pname': recursive type")
+          }
+
+          if (!(reader.tpe <:< appliedType(docReaderType, List(typ)))) {
+            c.abort(c.enclosingPosition, s"Cannot flatten reader '$reader': doesn't conform BSONDocumentReader")
           }
 
           Apply( // ${reader}.read(document)
@@ -320,13 +322,15 @@ private object MacroImpl {
         pname: String,
         sig: Type,
         writer: Tree): Boolean = {
-        if (param.annotations.exists(_.tpe =:= typeOf[Flatten]) &&
-          writer.tpe <:< appliedType(docWriterType, List(sig))) {
-
+        if (param.annotations.exists(_.tpe =:= typeOf[Flatten])) {
           if (writer.toString == "forwardWriter") {
             c.abort(
               c.enclosingPosition,
               s"Cannot flatten writer for '$pname': recursive type")
+          }
+
+          if (!(writer.tpe <:< appliedType(docWriterType, List(sig)))) {
+            c.abort(c.enclosingPosition, s"Cannot flatten writer '$writer': doesn't conform BSONDocumentWriter")
           }
 
           true
@@ -356,7 +360,6 @@ private object MacroImpl {
           val sig = optionTypeParameter(optType).get
           val pname = paramName(param)
           val writer = resolveWriter(pname, sig)
-
           val vterm = newTermName("v")
           val bsv = c.Expr[BSONValue]( // writer.write(${vterm})
             Apply(Select(writer, "write"), List(Ident(vterm))))

@@ -180,7 +180,14 @@ object MacroTest {
     implicit val handler = Macros.handler[Range]
   }
 
+  // Flatten
   case class LabelledRange(
     name: String,
     @Flatten range: Range)
+
+  case class InvalidRecursive(
+    property: String,
+    @Flatten parent: InvalidRecursive)
+
+  case class InvalidNonDoc(@Flatten name: String)
 }
