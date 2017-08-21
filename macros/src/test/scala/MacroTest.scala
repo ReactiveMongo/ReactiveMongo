@@ -6,7 +6,7 @@ import reactivemongo.bson.{
   BSONObjectID,
   Macros
 }
-import reactivemongo.bson.Macros.Annotations.{ Key, Ignore }
+import reactivemongo.bson.Macros.Annotations.{ Flatten, Key, Ignore }
 
 object MacroTest {
   type Handler[A] = BSONDocumentReader[A] with BSONDocumentWriter[A] with BSONHandler[BSONDocument, A]
@@ -173,4 +173,21 @@ object MacroTest {
   case class IgnoredAndKey(
     @Ignore a: Person,
     @Key("second") b: String)
+
+  case class Range(start: Int, end: Int)
+
+  object Range {
+    implicit val handler = Macros.handler[Range]
+  }
+
+  // Flatten
+  case class LabelledRange(
+    name: String,
+    @Flatten range: Range)
+
+  case class InvalidRecursive(
+    property: String,
+    @Flatten parent: InvalidRecursive)
+
+  case class InvalidNonDoc(@Flatten name: String)
 }

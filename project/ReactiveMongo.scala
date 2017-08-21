@@ -15,7 +15,7 @@ object BuildSettings {
 
   val buildSettings = Defaults.coreDefaultSettings ++ baseSettings ++ Seq(
     scalaVersion := "2.11.11",
-    crossScalaVersions := Seq("2.10.5", "2.11.11", "2.12.2"),
+    crossScalaVersions := Seq("2.10.5", "2.11.11", "2.12.3"),
     crossVersion := CrossVersion.binary,
     //parallelExecution in Test := false,
     //fork in Test := true, // Don't share executioncontext between SBT CLI/tests
@@ -392,7 +392,9 @@ object ReactiveMongoBuild extends Build {
     file("macros"),
     settings = buildSettings ++ Findbugs.settings ++ Seq(
       libraryDependencies ++= Seq(specs,
-        "org.scala-lang" % "scala-compiler" % scalaVersion.value % "provided")
+        "org.scala-lang" % "scala-compiler" % scalaVersion.value % Provided,
+        shapelessTest % Test
+      )
     ))
     .enablePlugins(CopyPasteDetector)
     .dependsOn(bson)

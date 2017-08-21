@@ -1,6 +1,6 @@
 package reactivemongo.bson
 
-import reactivemongo.bson.Macros.Annotations.{ Ignore, Key }
+import reactivemongo.bson.Macros.Annotations.{ Flatten, Ignore, Key }
 import reactivemongo.bson.Macros.Options.SaveSimpleName
 
 import scala.collection.immutable.Set
@@ -62,12 +62,17 @@ private object MacroImpl {
     protected def Opts: Type
 
     private val writerType: Type = typeOf[Writer[_]].typeConstructor
+    private val docWriterType: Type =
+      typeOf[BSONDocumentWriter[_]].typeConstructor
+
     private val readerType: Type = typeOf[Reader[_]].typeConstructor
+    private val docReaderType: Type =
+      typeOf[BSONDocumentReader[_]].typeConstructor
 
     lazy val readBody: c.Expr[A] = {
       val reader = unionTypes.map { types =>
         val resolve = resolver(Map.empty, "Reader")(readerType)
-        val cases = types map { typ =>
+        val cases = types.map { typ =>
           val pattern = if (hasOption[SaveSimpleName])
             Literal(Constant(typ.typeSymbol.name.decodedName.toString))
           else
@@ -140,8 +145,8 @@ private object MacroImpl {
         case TypeRef(_, sym, _) => sym
         case _                  => c.abort(c.enclosingPosition, s"Something weird is going on with '$tpe'. Should be a singleton but can't parse it")
       }
-      val name = TermName(sym.name.toString) //this is ugly but quite stable compared to other attempts
-      Ident(name)
+
+      Ident(TermName(sym.name.toString))
     }
 
     private def readBodyConstructClass(implicit tpe: Type) = {
@@ -157,23 +162,35 @@ private object MacroImpl {
       }.toMap
       val resolve = resolver(boundTypes, "Reader")(readerType)
 
-      val values = constructor.paramLists.head.map { param =>
-        val t = param.typeSignature
-        val sig = boundTypes.getOrElse(t.typeSymbol.fullName, t)
-        val opt = optionTypeParameter(sig)
-        //val typ = opt getOrElse sig
-        val (reader, _) = resolve(sig)
-        val pname = paramName(param)
+      val values = constructor.paramLists.
+        headOption.toSeq.flatten.map { param =>
+          val t = param.typeSignature
+          val sig = boundTypes.getOrElse(t.typeSymbol.fullName, t)
+          val opt = optionTypeParameter(sig)
+          val (reader, _) = resolve(sig)
+          val pname = paramName(param)
 
-        if (reader.isEmpty) {
-          c.abort(c.enclosingPosition, s"Implicit not found for '$pname': ${classOf[Reader[_]].getName}[_, $sig]")
-        }
+          if (reader.isEmpty) {
+            c.abort(c.enclosingPosition, s"Implicit not found for '$pname': ${classOf[Reader[_]].getName}[_, $sig]")
+          }
 
-        opt match {
-          case Some(_) => q"document.getAs($pname)($reader)"
-          case _       => q"document.getAsTry($pname)($reader).get"
+          if (param.annotations.exists(_.tree.tpe =:= typeOf[Flatten])) {
+            if (reader.toString == "forwardReader") {
+              c.abort(
+                c.enclosingPosition,
+                s"Cannot flatten reader for '$pname': recursive type")
+            }
+
+            if (!(reader.tpe <:< appliedType(docReaderType, List(sig)))) {
+              c.abort(c.enclosingPosition, s"Cannot flatten reader '$reader': doesn't conform BSONDocumentReader")
+            }
+
+            q"${reader}.read(document)"
+          } else opt match {
+            case Some(_) => q"document.getAs($pname)($reader)"
+            case _       => q"document.getAsTry($pname)($reader).get"
+          }
         }
-      }
 
       q"${Ident(companion.name)}.apply(..$values)"
     }
@@ -202,7 +219,7 @@ private object MacroImpl {
       else writeBodyConstructClass(id, tpe)
 
     private def writeBodyConstructSingleton(tpe: Type): Tree = (
-      classNameTree(tpe) map { nameE =>
+      classNameTree(tpe).map { nameE =>
         reify { BSONDocument(Seq((nameE.splice))) }
       } getOrElse reify { BSONDocument.empty }).tree
 
@@ -220,73 +237,103 @@ private object MacroImpl {
         case (sym, ty) => sym.fullName -> ty
       }.toMap
       val resolve = resolver(boundTypes, "Writer")(writerType)
-      val tuple = Ident(TermName("tuple"))
+      lazy val tupleName = TermName("tuple")
 
       val (optional, required) =
         constructorParams.zipWithIndex.zip(types).filterNot {
           case ((sym, _), _) => ignoreField(sym)
         }.partition(t => isOptionalType(t._2))
 
-      val values = required map {
-        case ((param, i), sig) =>
-          val (writer, _) = resolve(sig)
-          val pname = paramName(param)
+      def resolveWriter(pname: String, tpe: Type) = {
+        val (writer, _) = resolve(tpe)
 
-          if (writer.isEmpty) {
-            c.abort(c.enclosingPosition, s"Implicit not found for '$pname': ${classOf[Writer[_]].getName}[${sig.typeSymbol.name}, _]")
-          }
+        if (writer.isEmpty) {
+          c.abort(c.enclosingPosition, s"Implicit not found for '$pname': ${classOf[Writer[_]].getName}[$tpe, _]")
+        }
 
-          val tuple_i = {
-            if (types.length == 1) tuple
-            else Select(tuple, TermName("_" + (i + 1)))
-          }
-          val bs_value = c.Expr[BSONValue](q"$writer.write(${tuple_i})")
-          val name = c.Expr[String](q"$pname")
-          reify((name.splice, bs_value.splice): (String, BSONValue)).tree
+        writer
       }
 
-      val appends = optional map {
+      val tupleElement: Int => Tree = {
+        val tuple = Ident(tupleName)
+
+        if (types.length == 1) { _: Int => tuple }
+        else { i: Int => Select(tuple, "_" + (i + 1)) }
+      }
+
+      val bufName = TermName("buf")
+
+      def mustFlatten(
+        param: Symbol,
+        pname: String,
+        sig: Type,
+        writer: Tree): Boolean = {
+        if (param.annotations.exists(_.tpe =:= typeOf[Flatten])) {
+
+          if (writer.toString == "forwardWriter") {
+            c.abort(
+              c.enclosingPosition,
+              s"Cannot flatten writer for '$pname': recursive type")
+          }
+
+          if (!(writer.tpe <:< appliedType(docWriterType, List(sig)))) {
+            c.abort(c.enclosingPosition, s"Cannot flatten writer '$writer': doesn't conform BSONDocumentWriter")
+          }
+
+          true
+        } else false
+      }
+
+      val values = required.map {
+        case ((param, i), sig) =>
+          val pname = paramName(param)
+          val writer = resolveWriter(pname, sig)
+
+          if (mustFlatten(param, pname, sig, writer)) {
+            q"$bufName ++= $writer.write(${tupleElement(i)}).elements"
+          } else {
+            q"$bufName += $pname -> $writer.write(${tupleElement(i)})"
+          }
+      }
+
+      val extra = optional.map {
         case ((param, i), optType) =>
           val sig = optionTypeParameter(optType).get
-          val (writer, _) = resolve(sig)
           val pname = paramName(param)
-
-          if (writer.isEmpty) {
-            c.abort(c.enclosingPosition, s"Implicit not found for '$pname': ${classOf[Writer[_]].getName}[${sig.typeSymbol.name}, _]")
-          }
-
-          val tuple_i = {
-            if (types.length == 1) tuple
-            else Select(tuple, TermName("_" + (i + 1)))
-          }
-          val bs_value = c.Expr[BSONValue](q"$writer.write($tuple_i.get)")
+          val writer = resolveWriter(pname, sig)
           val name = c.Expr[String](q"$pname")
+          val vterm = TermName("v")
+          val bsv = c.Expr[BSONValue](q"$writer.write($vterm)")
+          val vp = ValDef(
+            Modifiers(c.universe.Flag.PARAM),
+            vterm, TypeTree(sig), EmptyTree) // ${v} =>
+          val field = reify((name.splice, bsv.splice)).tree
 
-          If(
-            Select(tuple_i, TermName("isDefined")),
-            Apply(Select(Ident(TermName("buf")), TermName("$plus$colon$eq")), List(reify((name.splice, bs_value.splice)).tree)),
-            EmptyTree)
-
+          q"${tupleElement(i)}.foreach { $vp => $bufName += $field }"
       }
 
-      val mkBSONdoc = Apply(
-        bsonDocPath, values ++ classNameTree(tpe).map(_.tree))
-
-      val writer = {
-        if (optional.isEmpty) List(mkBSONdoc)
-        else List(
-          q"val bson = $mkBSONdoc",
-          q"var buf = scala.collection.immutable.Stream[(String,reactivemongo.bson.BSONValue)]()") ++ appends :+ q"bson.merge(reactivemongo.bson.BSONDocument(buf))"
+      // List[Tree] corresponding to fields appended to the buffer/builder
+      val fields = values ++ extra ++ classNameTree(tpe).map { cn =>
+        q"$bufName += $cn"
       }
 
-      val unapplyTree = Select(Ident(companion(tpe).name), TermName("unapply"))
-      val invokeUnapply = Select(Apply(unapplyTree, List(id)), TermName("get"))
-      val tupleDef = q"val tuple = $invokeUnapply"
+      val writer = q"val ${bufName} = scala.collection.immutable.Stream.newBuilder[reactivemongo.bson.BSONElement]" +: (fields :+ q"reactivemongo.bson.BSONDocument(${bufName}.result())")
 
-      if (values.length + appends.length > 0) {
-        val trees = tupleDef :: writer
-        q"{..$trees}"
-      } else writer.head
+      if (values.isEmpty && extra.isEmpty) {
+        q"{..$writer}"
+      } else {
+        // Extract/unapply the class instance as ${tupleDef}
+
+        val unapplyTree = Select(Ident(
+          companion(tpe).name), TermName("unapply"))
+
+        val invokeUnapply = Select(Apply(
+          unapplyTree, List(id)), TermName("get"))
+
+        val tupleDef = q"val tuple = $invokeUnapply"
+
+        q"{..${tupleDef :: writer}}"
+      }
     }
 
     private def classNameTree(tpe: c.Type): Option[c.Expr[(String, BSONString)]] = {
@@ -419,9 +466,6 @@ private object MacroImpl {
 
     private def isOptionalType(implicit A: c.Type): Boolean =
       (c.typeOf[Option[_]].typeConstructor == A.typeConstructor)
-
-    private def bsonDocPath: c.universe.Select = Select(Select(Ident(
-      TermName("reactivemongo")), TermName("bson")), TermName("BSONDocument"))
 
     private def paramName(param: c.Symbol): String = {
       param.annotations.collect {

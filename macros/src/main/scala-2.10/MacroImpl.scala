@@ -2,7 +2,7 @@ package reactivemongo.bson
 
 import scala.collection.immutable.Set
 
-import reactivemongo.bson.Macros.Annotations.{ Ignore, Key }
+import reactivemongo.bson.Macros.Annotations.{ Flatten, Ignore, Key }
 import reactivemongo.bson.Macros.Options.SaveSimpleName
 
 import scala.reflect.macros.Context
@@ -61,13 +61,21 @@ private object MacroImpl {
     protected def A: Type
     protected def Opts: Type
 
+    type Reader[A] = BSONReader[_ <: BSONValue, A]
+    type Writer[A] = BSONWriter[A, _ <: BSONValue]
+
     private val writerType: Type = typeOf[Writer[_]].typeConstructor
+    private val docWriterType: Type =
+      typeOf[BSONDocumentWriter[_]].typeConstructor
+
     private val readerType: Type = typeOf[Reader[_]].typeConstructor
+    private val docReaderType: Type =
+      typeOf[BSONDocumentReader[_]].typeConstructor
 
     lazy val readBody: c.Expr[A] = {
-      val reader = unionTypes map { types =>
+      val reader = unionTypes.map { types =>
         val resolve = resolver(Map.empty, "Reader")(readerType)
-        val cases = types map { typ =>
+        val cases = types.map { typ =>
           val pattern = if (hasOption[SaveSimpleName])
             Literal(Constant(typ.typeSymbol.name.decodedName.toString))
           else
@@ -96,9 +104,9 @@ private object MacroImpl {
     }
 
     lazy val writeBody: c.Expr[BSONDocument] = {
-      val writer = unionTypes map { types =>
+      val writer = unionTypes.map { types =>
         val resolve = resolver(Map.empty, "Writer")(writerType)
-        val cases = types map { typ =>
+        val cases = types.map { typ =>
           val n = c.fresh("v")
           val id = Ident(n)
 
@@ -187,26 +195,40 @@ private object MacroImpl {
         }
         val opt = optionTypeParameter(sig)
         val typ = opt getOrElse sig
-        val (reader, _) = resolve(sig)
+        val (reader, _) = resolve(typ)
         val pname = paramName(param)
 
         if (reader.isEmpty) {
-          c.abort(c.enclosingPosition, s"Implicit not found for '$pname': ${classOf[Reader[_]].getName}[_, $sig]")
+          c.abort(c.enclosingPosition, s"Implicit not found for '$pname': ${classOf[Reader[_]].getName}[_, $typ]")
         }
 
-        opt match {
-          case Some(_) =>
+        if (param.annotations.exists(_.tpe =:= typeOf[Flatten])) {
+          if (reader.toString == "forwardReader") {
+            c.abort(
+              c.enclosingPosition,
+              s"Cannot flatten reader for '$pname': recursive type")
+          }
+
+          if (!(reader.tpe <:< appliedType(docReaderType, List(typ)))) {
+            c.abort(c.enclosingPosition, s"Cannot flatten reader '$reader': doesn't conform BSONDocumentReader")
+          }
+
+          Apply( // ${reader}.read(document)
+            Select(reader, "read"), List(Ident("document")))
+        } else opt match {
+          case Some(_) => // document.getAs[$typ]($pname)($reader)
             Apply(Apply(
               TypeApply(
                 Select(Ident("document"), "getAs"),
                 List(TypeTree(typ))),
               List(Literal(Constant(pname)))), List(reader))
 
-          case _ => Select(Apply(Apply(
-            TypeApply(
-              Select(Ident("document"), "getAsTry"),
-              List(TypeTree(typ))),
-            List(Literal(Constant(pname)))), List(reader)), "get")
+          case _ => // document.getAsTry[$typ]($pname)($reader).get
+            Select(Apply(Apply(
+              TypeApply(
+                Select(Ident("document"), "getAsTry"),
+                List(TypeTree(typ))),
+              List(Literal(Constant(pname)))), List(reader)), "get")
         }
       }
 
@@ -257,65 +279,119 @@ private object MacroImpl {
         case (sym, ty) => sym.fullName -> ty
       }.toMap
       val resolve = resolver(boundTypes, "Writer")(writerType)
-      val tuple = Ident(newTermName("tuple"))
+      lazy val tupleName = newTermName("tuple")
 
       val (optional, required) =
         constructorParams.zipWithIndex.zip(types).filterNot {
           case ((sym, _), _) => ignoreField(sym)
         }.partition(t => isOptionalType(t._2))
 
-      val values = required map {
-        case ((param, i), sig) =>
-          val (writer, _) = resolve(sig)
-          val pname = paramName(param)
+      def resolveWriter(pname: String, tpe: Type) = {
+        val (writer, _) = resolve(tpe)
 
-          if (writer.isEmpty) {
-            c.abort(c.enclosingPosition, s"Implicit not found for '$pname': ${classOf[Writer[_]].getName}[$sig, _]")
-          }
+        if (writer.isEmpty) {
+          c.abort(c.enclosingPosition, s"Implicit not found for '$pname': ${classOf[Writer[_]].getName}[$tpe, _]")
+        }
 
-          val tuple_i = if (types.length == 1) tuple else Select(tuple, "_" + (i + 1))
-          val bs_value = c.Expr[BSONValue](Apply(Select(writer, "write"), List(tuple_i)))
-          val name = c.literal(pname)
-          reify((name.splice, bs_value.splice): (String, BSONValue)).tree
+        writer
       }
 
-      val appends = optional map {
+      val tupleElement: Int => Tree = {
+        val tuple = Ident(tupleName)
+
+        if (types.length == 1) { _: Int => tuple }
+        else { i: Int => Select(tuple, "_" + (i + 1)) }
+      }
+
+      // TODO: buf newTermName
+      val bufName = newTermName("buf")
+
+      // buf += ${pname} -> ${bsv}
+      def append[V <: BSONValue](pname: String, bsv: c.Expr[V]): Tree =
+        Apply(Select(Ident(bufName), "$plus$eq"), List(reify(
+          (c.literal(pname).splice, bsv.splice)).tree))
+
+      // buf ++= ${bsd}.elements
+      def appendFields(bsd: c.Expr[BSONDocument]): Tree =
+        Apply(
+          Select(Ident(bufName), "$plus$plus$eq"),
+          List(reify(bsd.splice.elements).tree))
+
+      def mustFlatten(
+        param: Symbol,
+        pname: String,
+        sig: Type,
+        writer: Tree): Boolean = {
+        if (param.annotations.exists(_.tpe =:= typeOf[Flatten])) {
+          if (writer.toString == "forwardWriter") {
+            c.abort(
+              c.enclosingPosition,
+              s"Cannot flatten writer for '$pname': recursive type")
+          }
+
+          if (!(writer.tpe <:< appliedType(docWriterType, List(sig)))) {
+            c.abort(c.enclosingPosition, s"Cannot flatten writer '$writer': doesn't conform BSONDocumentWriter")
+          }
+
+          true
+        } else false
+      }
+
+      val values = required.map {
+        case ((param, i), sig) =>
+          val pname = paramName(param)
+          val writer = resolveWriter(pname, sig)
+
+          if (mustFlatten(param, pname, sig, writer)) {
+            val bsd = c.Expr[BSONDocument](
+              Apply(Select(writer, "write"), List(tupleElement(i))))
+
+            appendFields(bsd)
+          } else {
+            val bsv = c.Expr[BSONValue](
+              Apply(Select(writer, "write"), List(tupleElement(i))))
+
+            append(pname, bsv)
+          }
+      }
+
+      val extra = optional.flatMap {
         case ((param, i), optType) =>
           val sig = optionTypeParameter(optType).get
-          val (writer, _) = resolve(sig)
           val pname = paramName(param)
+          val writer = resolveWriter(pname, sig)
+          val vterm = newTermName("v")
+          val bsv = c.Expr[BSONValue]( // writer.write(${vterm})
+            Apply(Select(writer, "write"), List(Ident(vterm))))
 
-          if (writer.isEmpty) {
-            c.abort(c.enclosingPosition, s"Implicit not found for '$pname': ${classOf[Writer[_]].getName}[$sig, _]")
-          }
+          val ap = append(pname, bsv)
 
-          val tuple_i = if (types.length == 1) tuple else Select(tuple, "_" + (i + 1))
-          val bs_value = c.Expr[BSONValue](Apply(Select(writer, "write"), List(Select(tuple_i, "get"))))
-          val name = c.literal(pname)
-          If(
-            Select(tuple_i, "isDefined"),
-            Apply(Select(Ident("buf"), "$plus$colon$eq"), List(reify((name.splice, bs_value.splice)).tree)),
-            EmptyTree)
+          val z = Apply(Select(tupleElement(i), newTermName("foreach")), List(
+            Function(List(
+              ValDef(Modifiers(c.universe.Flag.PARAM), vterm,
+                TypeTree(sig), EmptyTree)), ap)))
+
+          List(z)
       }
 
-      val mkBSONdoc = Apply(
-        bsonDocPath,
-        values ++ classNameTree(tpe).map(_.tree))
-
-      val writer = {
-        if (optional.isEmpty) List(mkBSONdoc)
-        else List(
-          ValDef(Modifiers(), newTermName("bson"), TypeTree(), mkBSONdoc),
-          c.parse("var buf = scala.collection.immutable.Stream[(String,reactivemongo.bson.BSONValue)]()")) ++ appends :+ c.parse("bson.merge(reactivemongo.bson.BSONDocument(buf))")
+      // List[Tree] corresponding to fields appended to the buffer/builder
+      val fields = values ++ extra ++ classNameTree(tpe).map { cn =>
+        Apply(Select(Ident(bufName), "$plus$eq"), List(cn.tree))
       }
 
-      val unapplyTree = Select(Ident(companion(tpe).name.toString), "unapply")
-      val invokeUnapply = Select(Apply(unapplyTree, List(id)), "get")
-      val tupleDef = ValDef(Modifiers(), newTermName("tuple"), TypeTree(), invokeUnapply)
+      val writer = c.parse(s"val ${bufName} = scala.collection.immutable.Stream.newBuilder[reactivemongo.bson.BSONElement]") +: (fields :+ c.parse(s"reactivemongo.bson.BSONDocument($bufName.result())"))
 
-      if (values.length + appends.length > 0) {
+      if (values.isEmpty && extra.isEmpty) { // no class parameter to unapply
+        Block(writer: _*)
+      } else {
+        // Extract/unapply the class instance as ${tupleDef}
+
+        val unapplyTree = Select(Ident(companion(tpe).name.toString), "unapply")
+        val invokeUnapply = Select(Apply(unapplyTree, List(id)), "get")
+        val tupleDef = ValDef(Modifiers(), tupleName, TypeTree(), invokeUnapply)
+
         Block((tupleDef :: writer): _*)
-      } else writer.head
+      }
     }
 
     private def classNameTree(tpe: Type): Option[c.Expr[(String, BSONString)]] = {
@@ -327,7 +403,7 @@ private object MacroImpl {
           c.literal(tpe.typeSymbol.name.decodedName.toString)
         } else c.literal(tpe.typeSymbol.fullName)
 
-        reify("className", BSONStringHandler.write(name.splice))
+        reify("className" -> BSONStringHandler.write(name.splice))
       }
       else None
     }
@@ -367,7 +443,8 @@ private object MacroImpl {
 
         case _ => None
       }
-      tree map { t => parseUnionTree(List(t), Nil) }
+
+      tree.map { t => parseUnionTree(List(t), Nil) }
     }
 
     private def directKnownSubclasses: Option[List[Type]] = {
@@ -447,9 +524,6 @@ private object MacroImpl {
 
     private def isOptionalType(implicit tpe: Type): Boolean =
       c.typeOf[Option[_]].typeConstructor == tpe.typeConstructor
-
-    private def bsonDocPath: Select = Select(Select(
-      Ident(newTermName("reactivemongo")), "bson"), "BSONDocument")
 
     private def paramName(param: Symbol): String = param.annotations.collect {
       case ann if ann.tpe =:= typeOf[Key] => ann.scalaArgs.collect {
@@ -571,9 +645,6 @@ private object MacroImpl {
         }
       }.headOption
     } yield apply -> unapply
-
-    type Reader[A] = BSONReader[_ <: BSONValue, A]
-    type Writer[A] = BSONWriter[A, _ <: BSONValue]
 
     private def isSingleton(t: Type): Boolean = t <:< typeOf[Singleton]
 

@@ -1,6 +1,6 @@
 package reactivemongo.bson
 
-import reactivemongo.bson.Macros.Annotations.{ Ignore, Key }
+import reactivemongo.bson.Macros.Annotations.{ Flatten, Ignore, Key }
 import reactivemongo.bson.Macros.Options.SaveSimpleName
 
 import scala.collection.immutable.Set
@@ -50,20 +50,24 @@ private object MacroImpl {
   }
 
   private abstract class Helper[C <: Context, A](
-    val c: C
-  ) extends ImplicitResolver[C] {
+    val c: C) extends ImplicitResolver[C] {
     import c.universe._
 
     protected def A: Type
     protected def Opts: Type
 
     private val writerType: Type = typeOf[Writer[_]].typeConstructor
+    private val docWriterType: Type =
+      typeOf[BSONDocumentWriter[_]].typeConstructor
+
     private val readerType: Type = typeOf[Reader[_]].typeConstructor
+    private val docReaderType: Type =
+      typeOf[BSONDocumentReader[_]].typeConstructor
 
     lazy val readBody: c.Expr[A] = {
       val reader = unionTypes.map { types =>
         val resolve = resolver(Map.empty, "Reader")(readerType)
-        val cases = types map { typ =>
+        val cases = types.map { typ =>
           val pattern = if (hasOption[SaveSimpleName])
             Literal(Constant(typ.typeSymbol.name.decodedName.toString))
           else
@@ -136,8 +140,8 @@ private object MacroImpl {
         case TypeRef(_, sym, _) => sym
         case _                  => c.abort(c.enclosingPosition, s"Something weird is going on with '$tpe'. Should be a singleton but can't parse it")
       }
-      val name = TermName(sym.name.toString) //this is ugly but quite stable compared to other attempts
-      Ident(name)
+
+      Ident(TermName(sym.name.toString))
     }
 
     private def readBodyConstructClass(implicit tpe: Type) = {
@@ -145,7 +149,7 @@ private object MacroImpl {
         c.abort(c.enclosingPosition, s"No matching apply/unapply found: $tpe"))
 
       val tpeArgs: List[c.Type] = tpe match {
-        case TypeRef(_, _, args) => args
+        case TypeRef(_, _, args)        => args
         case i @ ClassInfoType(_, _, _) => i.typeArgs
       }
       val boundTypes = constructor.typeParams.zip(tpeArgs).map {
@@ -158,7 +162,6 @@ private object MacroImpl {
           val t = param.typeSignature
           val sig = boundTypes.getOrElse(t.typeSymbol.fullName, t)
           val opt = optionTypeParameter(sig)
-          //val typ = opt getOrElse sig
           val (reader, _) = resolve(sig)
           val pname = paramName(param)
 
@@ -166,9 +169,21 @@ private object MacroImpl {
             c.abort(c.enclosingPosition, s"Implicit not found '$pname': ${classOf[Reader[_]].getName}[_, $sig]")
           }
 
-          opt match {
+          if (param.annotations.exists(_.tree.tpe =:= typeOf[Flatten])) {
+            if (reader.toString == "forwardReader") {
+              c.abort(
+                c.enclosingPosition,
+                s"Cannot flatten reader for '$pname': recursive type")
+            }
+
+            if (!(reader.tpe <:< appliedType(docReaderType, List(sig)))) {
+              c.abort(c.enclosingPosition, s"Cannot flatten reader '$reader': doesn't conform BSONDocumentReader")
+            }
+
+            q"${reader}.read(document)"
+          } else opt match {
             case Some(_) => q"document.getAs($pname)($reader)"
-            case _ => q"document.getAsTry($pname)($reader).get"
+            case _       => q"document.getAsTry($pname)($reader).get"
           }
         }
 
@@ -199,10 +214,9 @@ private object MacroImpl {
       else writeBodyConstructClass(id, tpe)
 
     private def writeBodyConstructSingleton(tpe: Type): Tree = (
-      classNameTree(tpe) map { nameE =>
+      classNameTree(tpe).map { nameE =>
         reify { BSONDocument(Seq((nameE.splice))) }
-      } getOrElse reify { BSONDocument.empty }
-      ).tree
+      } getOrElse reify { BSONDocument.empty }).tree
 
     private def writeBodyConstructClass(id: Ident, tpe: Type): Tree = {
       val (constructor, deconstructor) = matchingApplyUnapply(tpe).getOrElse(
@@ -211,80 +225,109 @@ private object MacroImpl {
       val types = unapplyReturnTypes(deconstructor)
       val constructorParams = constructor.paramLists.head
       val tpeArgs: List[c.Type] = tpe match {
-        case TypeRef(_, _, args) => args
+        case TypeRef(_, _, args)        => args
         case i @ ClassInfoType(_, _, _) => i.typeArgs
       }
       val boundTypes = constructor.typeParams.zip(tpeArgs).map {
         case (sym, ty) => sym.fullName -> ty
       }.toMap
       val resolve = resolver(boundTypes, "Writer")(writerType)
-      val tuple = Ident(TermName("tuple"))
+      val tupleName = TermName("tuple")
 
       val (optional, required) =
         constructorParams.zipWithIndex.zip(types).filterNot {
           case ((sym, _), _) => ignoreField(sym)
         }.partition(t => isOptionalType(t._2))
 
-      val values = required map {
-        case ((param, i), sig) =>
-          val (writer, _) = resolve(sig)
-          val pname = paramName(param)
+      def resolveWriter(pname: String, tpe: Type) = {
+        val (writer, _) = resolve(tpe)
 
-          if (writer.isEmpty) {
-            c.abort(c.enclosingPosition, s"Implicit not found for '$pname': ${classOf[Writer[_]].getName}[$sig, _]")
-          }
+        if (writer.isEmpty) {
+          c.abort(c.enclosingPosition, s"Implicit not found for '$pname': ${classOf[Writer[_]].getName}[$tpe, _]")
+        }
 
-          val tuple_i = {
-            if (types.length == 1) tuple
-            else Select(tuple, TermName("_" + (i + 1)))
-          }
-          val bs_value = c.Expr[BSONValue](q"$writer.write($tuple_i)")
-          val name = c.Expr[String](q"$pname")
-          reify((name.splice, bs_value.splice): (String, BSONValue)).tree
+        writer
       }
 
-      val appends = optional map {
+      val tupleElement: Int => Tree = {
+        val tuple = Ident(tupleName)
+        if (types.length == 1) { _: Int => tuple }
+        else { i: Int => Select(tuple, "_" + (i + 1)) }
+      }
+
+      val bufName = TermName("buf")
+
+      def mustFlatten(
+        param: Symbol,
+        pname: String,
+        sig: Type,
+        writer: Tree): Boolean = {
+        if (param.annotations.exists(_.tpe =:= typeOf[Flatten])) {
+          if (writer.toString == "forwardWriter") {
+            c.abort(
+              c.enclosingPosition,
+              s"Cannot flatten writer for '$pname': recursive type")
+          }
+
+          if (!(writer.tpe <:< appliedType(docWriterType, List(sig)))) {
+            c.abort(c.enclosingPosition, s"Cannot flatten writer '$writer': doesn't conform BSONDocumentWriter")
+          }
+
+          true
+        } else false
+      }
+
+      val values = required.map {
+        case ((param, i), sig) =>
+          val pname = paramName(param)
+          val writer = resolveWriter(pname, sig)
+
+          if (mustFlatten(param, pname, sig, writer)) {
+            q"$bufName ++= $writer.write(${tupleElement(i)}).elements"
+          } else {
+            q"$bufName += $pname -> $writer.write(${tupleElement(i)})"
+          }
+      }
+
+      val extra = optional.map {
         case ((param, i), optType) =>
           val sig = optionTypeParameter(optType).get
-          val (writer, _) = resolve(sig)
           val pname = paramName(param)
-
-          if (writer.isEmpty) {
-            c.abort(c.enclosingPosition, s"Implicit not found for '$pname': ${classOf[Writer[_]].getName}[$sig, _]")
-          }
-
-          val tuple_i = {
-            if (types.length == 1) tuple
-            else Select(tuple, TermName("_" + (i + 1)))
-          }
-          val bs_value = c.Expr[BSONValue](q"$writer.write($tuple_i.get)")
+          val writer = resolveWriter(pname, sig)
           val name = c.Expr[String](q"$pname")
 
-          If(
-            Select(tuple_i, TermName("isDefined")),
-            Apply(Select(Ident(TermName("buf")), TermName("$plus$colon$eq")), List(reify((name.splice, bs_value.splice)).tree)),
-            EmptyTree)
+          val vterm = TermName("v")
+          val bsv = c.Expr[BSONValue](q"$writer.write($vterm)")
+          val vp = ValDef(
+            Modifiers(c.universe.Flag.PARAM),
+            vterm, TypeTree(sig), EmptyTree) // ${v} =>
+          val field = reify((name.splice, bsv.splice)).tree
 
+          q"${tupleElement(i)}.foreach { $vp => $bufName += $field }"
       }
 
-      val mkBSONdoc = Apply(bsonDocPath,
-        values ++ classNameTree(tpe).map(_.tree))
-
-      val writer = {
-        if (optional.isEmpty) List(mkBSONdoc)
-        else List(
-          q"val bson = $mkBSONdoc",
-          q"var buf = scala.collection.immutable.Stream[(String,reactivemongo.bson.BSONValue)]()") ++ appends :+ q"bson.merge(reactivemongo.bson.BSONDocument(buf))"
+      // List[Tree] corresponding to fields appended to the buffer/builder
+      val fields = values ++ extra ++ classNameTree(tpe).map { cn =>
+        q"$bufName += $cn"
       }
 
-      val unapplyTree = Select(Ident(companion(tpe).name), TermName("unapply"))
-      val invokeUnapply = Select(Apply(unapplyTree, List(id)), TermName("get"))
-      val tupleDef = q"val tuple = $invokeUnapply"
+      val writer = q"val ${bufName} = scala.collection.immutable.Stream.newBuilder[reactivemongo.bson.BSONElement]" +: (fields :+ q"reactivemongo.bson.BSONDocument(${bufName}.result())")
 
-      if (values.length + appends.length > 0) {
-        val trees = tupleDef :: writer
-        q"{..$trees}"
-      } else writer.head
+      if (values.isEmpty && extra.isEmpty) {
+        q"{..$writer}"
+      } else {
+        // Extract/unapply the class instance as ${tupleDef}
+
+        val unapplyTree = Select(Ident(
+          companion(tpe).name), TermName("unapply"))
+
+        val invokeUnapply = Select(Apply(
+          unapplyTree, List(id)), TermName("get"))
+
+        val tupleDef = q"val tuple = $invokeUnapply"
+
+        q"{..${tupleDef :: writer}}"
+      }
     }
 
     private def classNameTree(tpe: c.Type): Option[c.Expr[(String, BSONString)]] = {
@@ -297,7 +340,8 @@ private object MacroImpl {
         } else c.Expr[String](q"${tpe.typeSymbol.fullName}")
 
         reify(("className", BSONStringHandler.write(name.splice)))
-      } else None
+      }
+      else None
     }
 
     private lazy val unionTypes: Option[List[c.Type]] =
@@ -315,7 +359,8 @@ private object MacroImpl {
               case TypeRef(_, _, List(a, b)) =>
                 parseUnionTree(a :: b :: rem, found)
 
-              case _ => c.abort(c.enclosingPosition,
+              case _ => c.abort(
+                c.enclosingPosition,
                 s"Union type parameters expected: $tree")
             }
           } else parseUnionTree(rem, tree :: found)
@@ -346,8 +391,7 @@ private object MacroImpl {
       def allSubclasses(path: Traversable[Symbol], subclasses: Set[Type]): Set[Type] = path.headOption match {
         case Some(cls: ClassSymbol) if (
           tpeSym != cls && !cls.isAbstract &&
-            cls.selfType.baseClasses.contains(tpeSym)
-        ) => {
+          cls.selfType.baseClasses.contains(tpeSym)) => {
           val newSub: Set[Type] = if ({
             val tpe = cls.typeSignature
             !applyMethod(tpe).isDefined || !unapplyMethod(tpe).isDefined
@@ -364,8 +408,7 @@ private object MacroImpl {
 
         case Some(o: ModuleSymbol) if (
           o.companion == NoSymbol && // not a companion object
-            tpeSym != c && o.typeSignature.baseClasses.contains(tpeSym)
-        ) => {
+          tpeSym != c && o.typeSignature.baseClasses.contains(tpeSym)) => {
           val newSub: Set[Type] = if (!o.moduleClass.asClass.isCaseClass) {
             c.warning(c.enclosingPosition, s"cannot handle object ${o.fullName}: no case accessor")
             Set.empty
@@ -380,7 +423,7 @@ private object MacroImpl {
 
         case Some(_) => allSubclasses(path.tail, subclasses)
 
-        case _ => subclasses
+        case _       => subclasses
       }
 
       if (tpeSym.isSealed && tpeSym.isAbstract) {
@@ -418,9 +461,6 @@ private object MacroImpl {
     private def isOptionalType(implicit A: c.Type): Boolean =
       (c.typeOf[Option[_]].typeConstructor == A.typeConstructor)
 
-    private def bsonDocPath: c.universe.Select = Select(Select(Ident(
-      TermName("reactivemongo")), TermName("bson")), TermName("BSONDocument"))
-
     private def paramName(param: c.Symbol): String = {
       param.annotations.collect {
         case ann if ann.tree.tpe =:= typeOf[Key] =>
@@ -446,7 +486,7 @@ private object MacroImpl {
           None
         }
 
-        case s        => Some(s)
+        case s => Some(s)
       }
 
     private def unapplyMethod(implicit tpe: Type): Option[MethodSymbol] =
@@ -459,7 +499,7 @@ private object MacroImpl {
           None
         }
 
-        case s        => Some(s.asMethod)
+        case s => Some(s.asMethod)
       }
 
     /* Deep check for type compatibility */
@@ -469,16 +509,17 @@ private object MacroImpl {
         case Some((TypeRef(NoPrefix, a, _),
           TypeRef(NoPrefix, b, _))) => { // for generic parameter
           if (a.fullName != b.fullName) {
-            c.warning(c.enclosingPosition,
+            c.warning(
+              c.enclosingPosition,
               s"Type symbols are not compatible: $a != $b")
 
             false
-          }
-          else conforms(types.tail)
+          } else conforms(types.tail)
         }
 
         case Some((a, b)) if (a.typeArgs.size != b.typeArgs.size) => {
-          c.warning(c.enclosingPosition,
+          c.warning(
+            c.enclosingPosition,
             s"Type parameters are not matching: $a != $b")
 
           false
@@ -486,14 +527,16 @@ private object MacroImpl {
 
         case Some((a, b)) if a.typeArgs.isEmpty =>
           if (a =:= b) conforms(types.tail) else {
-            c.warning(c.enclosingPosition,
+            c.warning(
+              c.enclosingPosition,
               s"Types are not compatible: $a != $b")
 
             false
           }
 
         case Some((a, b)) if (a.baseClasses != b.baseClasses) => {
-          c.warning(c.enclosingPosition,
+          c.warning(
+            c.enclosingPosition,
             s"Generic types are not compatible: $a != $b")
 
           false
@@ -517,8 +560,7 @@ private object MacroImpl {
       apply <- alternatives.filter { alt =>
         alt.paramLists match {
           case params :: ps if (ps.isEmpty || ps.headOption.flatMap(
-            _.headOption).exists(_.isImplicit)
-          ) => if (params.size != u.size) false else {
+            _.headOption).exists(_.isImplicit)) => if (params.size != u.size) false else {
             conforms((params.map(_.typeSignature), u).zipped.toSeq)
           }
 
@@ -584,18 +626,18 @@ private object MacroImpl {
     }
 
     /**
-     * Replaces any reference to the type itself by the Placeholder type. 
+     * Replaces any reference to the type itself by the Placeholder type.
      * @return the normalized type + whether any self reference has been found
      */
     private def normalized(boundTypes: Map[String, Type])(tpe: Type): (Type, Boolean) = boundTypes.getOrElse(tpe.typeSymbol.fullName, tpe) match {
-        case t if (t =:= A) => PlaceholderType -> true
+      case t if (t =:= A) => PlaceholderType -> true
 
-        case TypeRef(_, sym, args) if args.nonEmpty =>
-          refactor(boundTypes)(args, sym.asType, List.empty, List.empty,
-            _ =:= A, PlaceholderType, false)
+      case TypeRef(_, sym, args) if args.nonEmpty =>
+        refactor(boundTypes)(args, sym.asType, List.empty, List.empty,
+          _ =:= A, PlaceholderType, false)
 
-        case t => t -> false
-      }
+      case t => t -> false
+    }
 
     /* Restores reference to the type itself when Placeholder is found. */
     private def denormalized(boundTypes: Map[String, Type])(ptype: Type): Type =
@@ -611,8 +653,7 @@ private object MacroImpl {
 
     private class ImplicitTransformer(
       boundTypes: Map[String, Type],
-      forwardSuffix: String
-    ) extends Transformer {
+      forwardSuffix: String) extends Transformer {
       private val denorm = denormalized(boundTypes) _
       val forwardName = TermName(s"forward$forwardSuffix")
 
@@ -621,8 +662,7 @@ private object MacroImpl {
           super.transform(TypeTree(denorm(tt.tpe)))
 
         case Select(Select(This(TypeName("Macros")), t), sym) if (
-          t.toString == "Placeholder" && sym.toString == "Handler"
-        ) => super.transform(q"$forwardName")
+          t.toString == "Placeholder" && sym.toString == "Handler") => super.transform(q"$forwardName")
 
         case _ => super.transform(tree)
       }
@@ -648,8 +688,7 @@ private object MacroImpl {
         c.inferImplicitValue(neededImplicitType)
       } else c.untypecheck(
         // Reset the type attributes on the refactored tree for the implicit
-        tx.transform(c.inferImplicitValue(neededImplicitType))
-      )
+        tx.transform(c.inferImplicitValue(neededImplicitType)))
 
       neededImplicit -> selfRef
     }
@@ -659,7 +698,7 @@ private object MacroImpl {
       boundTypes.getOrElse(t.typeSymbol.fullName, t) match {
         case TypeRef(_, base, args) if args.nonEmpty => s"""${base.asType.fullName}[${args.map(prettyType(boundTypes)(_)).mkString(", ")}]"""
 
-        case t => t.typeSymbol.fullName
+        case t                                       => t.typeSymbol.fullName
       }
 
     protected def resolver(boundTypes: Map[String, Type], forwardSuffix: String)(tc: Type): Type => Implicit = {
