@@ -272,6 +272,7 @@ class MacroSpec extends org.specs2.mutable.Specification {
     "support automatic implementations search with nested traits with simple name" in {
       import Macros.Options._
       import InheritanceModule._
+
       implicit val format = Macros.handlerOpts[T, SimpleAllImplementations]
 
       format.write(A()).getAs[String]("className") must beSome("A")
@@ -324,6 +325,12 @@ class MacroSpec extends org.specs2.mutable.Specification {
         h.write(Bar("bar2", Some(bar1))) must_== BSONDocument(
           "name" -> "bar2", "next" -> doc1)
       }
+    }
+
+    "support @Flatten annotation" in {
+      roundtrip(
+        LabelledRange("range1", Range(start = 2, end = 5)),
+        Macros.handler[LabelledRange])
     }
 
     "handle case class with implicits" >> {
@@ -394,6 +401,14 @@ class MacroSpec extends org.specs2.mutable.Specification {
           aka("bar2") must_== Bar("bar2", Some(bar1))
       }
     }
+
+    "be generated with @Flatten annotation" in {
+      val r = Macros.reader[LabelledRange]
+      val doc = BSONDocument("name" -> "range1", "start" -> 2, "end" -> 5)
+      val lr = LabelledRange("range1", Range(start = 2, end = 5))
+
+      r.read(doc) must_== lr
+    }
   }
 
   "Writer" should {
@@ -416,6 +431,14 @@ class MacroSpec extends org.specs2.mutable.Specification {
           "name" -> "bar2", "next" -> doc1)
       }
     }
+
+    "be generated with @Flatten annotation" in {
+      val w = Macros.writer[LabelledRange]
+      val lr = LabelledRange("range2", Range(start = 1, end = 3))
+      val doc = BSONDocument("name" -> "range2", "start" -> 1, "end" -> 3)
+
+      w.write(lr) must_== doc
+    } // TODO: Test Flatten with a property Option[T : BSONDocumentWriter] ?
   }
 
   // ---

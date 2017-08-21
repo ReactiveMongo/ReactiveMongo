@@ -150,6 +150,29 @@ object Macros {
     /** Ignores a field */
     @meta.param
     case class Ignore() extends StaticAnnotation
+
+    /**
+     * Indicates that if a property is represented as a document itself,
+     * the document fields are directly included in top document,
+     * rather than nesting it.
+     *
+     * {{{
+     * case class Range(start: Int, end: Int)
+     *
+     * case class LabelledRange(
+     *   name: String,
+     *   @Flatten range: Range)
+     *
+     * // Flattened
+     * BSONDocument("name" -> "foo", "start" -> 0, "end" -> 1)
+     *
+     * // Rather than:
+     * // BSONDocument("name" -> "foo", "range" -> BSONDocument(
+     * //   "start" -> 0, "end" -> 1))
+     * }}}
+     */
+    @meta.param
+    case class Flatten() extends StaticAnnotation
   }
 
   /** Only for internal purposes */
