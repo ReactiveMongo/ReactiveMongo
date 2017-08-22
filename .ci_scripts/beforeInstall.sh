@@ -55,7 +55,7 @@ export LD_LIBRARY_PATH="$HOME/ssl/lib:$LD_LIBRARY_PATH"
 if [ "$MONGO_VER" = "3" -o "$MONGO_VER" = "3_4" ]; then
     MONGO_TREE="3.2.10"
     
-    if [ "$AKKA_VERSION" = "2.5.3" ]; then
+    if [ "$AKKA_VERSION" = "2.5.4" ]; then
         MONGO_TREE="3.4.5"
         MONGO_VER="3_4"
 
