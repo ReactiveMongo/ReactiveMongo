@@ -234,11 +234,11 @@ trait AggregationFramework[P <: SerializationPack]
       }
 
       depthField.foreach { f =>
-        elementProducer("depthField", stringValue(f))
+        opts += elementProducer("depthField", stringValue(f))
       }
 
       restrictSearchWithMatch.foreach { e =>
-        elementProducer("restrictSearchWithMatch", e)
+        opts += elementProducer("restrictSearchWithMatch", e)
       }
 
       opts.result()

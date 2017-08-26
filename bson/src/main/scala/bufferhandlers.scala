@@ -34,12 +34,11 @@ trait BufferHandler {
 
   def writeDocument(document: BSONDocument, buffer: WritableBuffer): WritableBuffer
 
-  def stream(buffer: ReadableBuffer): Stream[(String, BSONValue)] = {
-    val elem = deserialize(buffer)
-    if (elem.isSuccess)
-      elem.get #:: stream(buffer)
-    else Stream.empty
-  }
+  def stream(buffer: ReadableBuffer): Stream[(String, BSONValue)] =
+    deserialize(buffer) match {
+      case Success(elem) => elem #:: stream(buffer)
+      case _             => Stream.empty
+    }
 }
 
 object DefaultBufferHandler extends BufferHandler {
@@ -255,6 +254,7 @@ sealed trait BSONIterator extends Iterator[(String, BSONValue)] {
   val startIndex = buffer.index
   val documentSize = buffer.readInt
 
+  @SuppressWarnings(Array("OptionGet")) // TODO: Review
   def next: (String, BSONValue) = {
     val code = buffer.readByte
     buffer.readString -> DefaultBufferHandler.handlersByCode.get(code).map(_.read(buffer)).get
@@ -269,22 +269,23 @@ sealed trait BSONIterator extends Iterator[(String, BSONValue)] {
 object BSONIterator {
   private[bson] def pretty(i: Int, it: Iterator[Try[BSONElement]]): String = {
     val prefix = (0 to i).map { i => "  " }.mkString("")
-    (for (tryElem <- it) yield {
-      tryElem match {
-        case Success(elem) => elem.value match {
-          case array: BSONArray  => prefix + elem.name + ": [\n" + pretty(i + 1, array.elements.map(Success(_)).iterator) + "\n" + prefix + "]"
 
-          case doc: BSONDocument => prefix + elem.name + ": {\n" + pretty(i + 1, doc.stream.iterator) + "\n" + prefix + "}"
+    it.map {
+      case Success(elem) => elem.value match {
+        case array: BSONArray  => prefix + elem.name + ": [\n" + pretty(i + 1, array.elements.map(Success(_)).iterator) + "\n" + prefix + "]"
 
-          case BSONString(s) =>
-            prefix + elem.name + ": \"" + s.replaceAll("\"", "\\\"") + '"'
+        case doc: BSONDocument => prefix + elem.name + ": {\n" + pretty(i + 1, doc.stream.iterator) + "\n" + prefix + "}"
 
-          case _ => prefix + elem.name + ": " + elem.value.toString
-        }
-        case Failure(e) => s"${prefix}ERROR[${e.getMessage()}]"
+        case BSONString(s) =>
+          prefix + elem.name + ": \"" + s.replaceAll("\"", "\\\"") + '"'
+
+        case _ => prefix + elem.name + ": " + elem.value.toString
       }
-    }).mkString(",\n")
+
+      case Failure(e) => s"${prefix}ERROR[${e.getMessage()}]"
+    }.mkString(",\n")
   }
+
   /** Makes a pretty String representation of the given iterator of BSON elements. */
   def pretty(it: Iterator[Try[BSONElement]]): String = "{\n" + pretty(0, it) + "\n}"
 }

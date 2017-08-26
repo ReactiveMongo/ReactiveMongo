@@ -482,7 +482,7 @@ object MongoConnection {
           case _ => throw new URIParsingException(
             s"Could not parse URI '$uri': invalid options '$options'")
         }
-      }.toMap
+      }(scala.collection.breakOut)
 
       case _ => Map.empty
     }

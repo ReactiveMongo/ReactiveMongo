@@ -166,7 +166,7 @@ object Documentation {
       if module.organization == org
       if names.exists(module.name.startsWith)
       rev = revision(module.revision)
-    } yield entry.data -> url(location.format(rev))).toMap
+    } yield entry.data -> url(location.format(rev)))(scala.collection.breakOut)
   }
 
   val settings = UnidocPlugin.unidocSettings ++ Seq(

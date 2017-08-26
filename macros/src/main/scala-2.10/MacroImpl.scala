@@ -169,14 +169,16 @@ private object MacroImpl {
         case TypeRef(_, _, args)    => args
         case ClassInfoType(_, _, _) => Nil
       }
-      val boundTypes = constructor.typeParams.zip(tpeArgs).flatMap {
-        case (sym, ty) => sym.fullName.split("\\.").reverse.toList match {
-          case last :: _ if (last == sym.fullName) =>
-            List(sym.fullName -> ty)
+      val boundTypes: Map[String, Type] =
+        constructor.typeParams.zip(tpeArgs).flatMap {
+          case (sym, ty) => sym.fullName.split("\\.").reverse.toList match {
+            case last :: _ if (last == sym.fullName) =>
+              List(sym.fullName -> ty)
 
-          case last :: _ => List(sym.fullName -> ty, last -> ty)
-        }
-      }.toMap
+            case last :: _ => List(sym.fullName -> ty, last -> ty)
+          }
+        }(scala.collection.breakOut)
+
       val resolve = resolver(boundTypes, "Reader")(readerType)
 
       val values = constructor.paramss.head.map { param =>
@@ -275,9 +277,11 @@ private object MacroImpl {
         case TypeRef(_, _, args)    => args
         case ClassInfoType(_, _, _) => Nil
       }
-      val boundTypes = constructor.typeParams.zip(tpeArgs).map {
-        case (sym, ty) => sym.fullName -> ty
-      }.toMap
+      val boundTypes: Map[String, Type] =
+        constructor.typeParams.zip(tpeArgs).map {
+          case (sym, ty) => sym.fullName -> ty
+        }(scala.collection.breakOut)
+
       val resolve = resolver(boundTypes, "Writer")(writerType)
       lazy val tupleName = newTermName("tuple")
 
