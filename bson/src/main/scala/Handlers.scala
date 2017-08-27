@@ -378,12 +378,10 @@ trait DefaultBSONHandlers {
 
   implicit def MapReader[K, V](implicit keyReader: BSONReader[BSONString, K], valueReader: BSONReader[_ <: BSONValue, V]): BSONDocumentReader[Map[K, V]] =
     new BSONDocumentReader[Map[K, V]] {
-      def read(bson: BSONDocument): Map[K, V] = {
-        val elements = bson.elements.map { element =>
+      def read(bson: BSONDocument): Map[K, V] =
+        bson.elements.map { element =>
           keyReader.read(BSONString(element.name)) -> element.value.seeAsTry[V].get
-        }
-        elements.toMap
-      }
+        }(scala.collection.breakOut)
     }
 
   implicit def MapWriter[K, V](implicit keyWriter: BSONWriter[K, BSONString], valueWriter: BSONWriter[V, _ <: BSONValue]): BSONDocumentWriter[Map[K, V]] =
