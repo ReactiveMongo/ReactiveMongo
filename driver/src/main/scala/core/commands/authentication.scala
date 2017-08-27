@@ -108,7 +108,7 @@ object ScramSha1Negociation {
    */
   def parsePayload(payload: String): Map[String, String] =
     payload.split(",").map(_.split("=", 2)).
-      map(array => array(0) -> array(1)).toMap
+      map(array => array(0) -> array(1))(scala.collection.breakOut)
 
   /**
    * Parses the binary `payload` as a map of properties exchanged

@@ -101,7 +101,7 @@ object BSONValue {
   object Addition extends ((BSONValue, BSONValue) => BSONArray) {
     def apply(x: BSONValue, y: BSONValue): BSONArray = (x, y) match {
       case (a @ BSONArray(_), b @ BSONArray(_)) => a.merge(b)
-      case (a @ BSONArray(_), _)                => a.add(y)
+      case (a @ BSONArray(_), _)                => a.merge(y)
       case (_, b @ BSONArray(_))                => x +: b
       case _                                    => BSONArray(List(x, y))
     }
@@ -232,6 +232,7 @@ case class BSONArray(stream: Stream[Try[BSONValue]])
   /**
    * Alias for `merge`.
    */
+  @deprecated("Use the corresponding `merge`", "0.12.0")
   def add(values: Producer[BSONValue]*): BSONArray = merge(values: _*)
 
   /** Returns a [[BSONArray]] with the given value prepended to its elements. */
@@ -285,7 +286,9 @@ case class BSONArray(stream: Stream[Try[BSONValue]])
 
   private[bson] def generate() = elements
 
-  def values: Stream[BSONValue] = stream.filter(_.isSuccess).map(_.get)
+  def values: Stream[BSONValue] = stream.collect {
+    case Success(v) => v
+  }
 }
 
 object BSONArray {
@@ -726,7 +729,7 @@ sealed trait BSONElementSet extends ElementProducer { self: BSONValue =>
   /** Returns a `Map` representation for this element set. */
   def toMap: Map[String, BSONValue] = elements.map {
     case BSONElement(name, value) => name -> value
-  }.toMap
+  }(scala.collection.breakOut)
 
   /**
    * Checks whether the given key is found in this element set.
@@ -905,7 +908,9 @@ case class BSONDocument(stream: Stream[Try[BSONElement]])
   }
 
   /** Returns a `Stream` for all the elements of this `BSONDocument`. */
-  lazy val elements: Stream[BSONElement] = stream.filter(_.isSuccess).map(_.get)
+  lazy val elements: Stream[BSONElement] = stream.collect {
+    case Success(v) => v
+  }
 
   private[bson] def generate() = elements
 

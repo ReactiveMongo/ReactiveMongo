@@ -1,20 +1,3 @@
-/*
- * Copyright 2013 Stephane Godbillon
- * @sgodbillon
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *   http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-import org.specs2.mutable._
 import reactivemongo.bson._
 import buffer._
 import java.util.Arrays
@@ -22,7 +5,7 @@ import reactivemongo.bson.DefaultBSONHandlers._
 
 import java.util.Arrays
 
-class SerializationSpecs extends Specification {
+class SerializationSpec extends org.specs2.mutable.Specification {
 
   def compare(a1: Array[Byte], a2: Array[Byte]) = {
     if (Arrays.equals(a1, a2)) {
@@ -128,14 +111,14 @@ class SerializationSpecs extends Specification {
         "name" -> "James",
         "age" -> 27,
         "surname1" -> Some("Jim"),
-        "surname2" -> None,
+        "surname2" -> Option.empty[String],
         "score" -> 3.88,
         "online" -> true,
         "_id" -> BSONObjectID("5117c6391aa562a90098f621"),
         "contact" -> BSONDocument(
           "emails" -> BSONArray(
             Some("james@example.org"),
-            None,
+            Option.empty[String],
             Some("spamaddrjames@example.org")),
           "adress" -> BSONString("coucou")),
         "lastSeen" -> BSONLong(1360512704747L))

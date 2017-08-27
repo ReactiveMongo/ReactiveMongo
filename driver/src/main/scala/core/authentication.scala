@@ -145,7 +145,7 @@ private[reactivemongo] trait MongoScramSha1Authentication {
       resp.fold(
         { r => authenticationResponse(response)(_ => r) },
         { payload: Array[Byte] =>
-          logger.debug("2-phase SCRAM-SHA1 negociation")
+          logger.debug("2-phase SCRAM-SHA1 negotiation")
 
           whenAuthenticating(response.info.channelId) {
             case (con, a @ ScramSha1Authenticating(

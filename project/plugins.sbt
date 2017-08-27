@@ -29,4 +29,4 @@ addSbtPlugin("de.johoop" % "findbugs4sbt" % "1.4.0")
 
 addSbtPlugin("de.johoop" % "cpd4sbt" % "1.2.0")
 
-addSbtPlugin("com.github.gseitz" % "sbt-release" % "1.0.3")
+addSbtPlugin("com.github.gseitz" % "sbt-release" % "1.0.6")
