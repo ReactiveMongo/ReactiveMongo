@@ -17,7 +17,7 @@ package reactivemongo.core.actors
 
 import java.net.InetSocketAddress
 
-import scala.concurrent.Promise
+import scala.concurrent.{ Future, Promise }
 import scala.util.{ Failure, Success, Try }
 
 import akka.actor.{ Actor, ActorRef, Cancellable }
@@ -97,7 +97,8 @@ trait MongoDBSystem extends Actor {
 
   private var channelFactory: ChannelFactory = newChannelFactory({})
 
-  private val lnm = s"$supervisor/$name" // log naming
+  /** Logging discriminator */
+  protected val lnm = s"$supervisor/$name" // log naming
 
   private val listener: Option[ConnectionListener] = {
     val cl = ConnectionListener()
@@ -295,8 +296,8 @@ trait MongoDBSystem extends Actor {
   protected def sendAuthenticate(connection: Connection, authentication: Authenticate): Connection
 
   @annotation.tailrec
-  protected final def authenticateConnection(connection: Connection, auths: Seq[Authenticate]): Connection = {
-    if (!connection.authenticating.isEmpty) connection
+  protected final def authenticateConnection(connection: Connection, auths: Set[Authenticate]): Connection = {
+    if (connection.authenticating.nonEmpty) connection
     else auths.headOption match {
       case Some(nextAuth) =>
         if (connection.isAuthenticated(nextAuth.db, nextAuth.user)) {
@@ -307,32 +308,24 @@ trait MongoDBSystem extends Actor {
     }
   }
 
-  private final def authenticateNode(node: Node, auths: Seq[Authenticate]): Node = node._copy(connections = node.connections.map {
+  private final def authenticateNode(node: Node, auths: Set[Authenticate]): Node = node._copy(connections = node.connections.map {
     case connection if connection.status == ConnectionStatus.Connected =>
       authenticateConnection(connection, auths)
 
     case connection => connection
   })
 
-  private final def authenticateNodeSet(nodeSet: NodeSet): NodeSet =
-    nodeSet.updateAll {
-      case node @ Node(_, status, _, _, _, _, _, _) if status.queryable =>
-        authenticateNode(node, nodeSet.authenticates.toSeq)
-
-      case node => node
-    }
-
   private def collectConnections(node: Node)(collector: PartialFunction[Connection, Connection]): Node = {
     val connections = node.connections.collect(collector)
 
     if (connections.isEmpty) {
-      logger.debug(
-        s"[$lnm] No longer connected node; Fallback to Unknown status")
+      logger.debug(s"[$lnm] Node '${node.name}' is no longer connected; Fallback to Unknown status")
 
       node._copy(
         status = NodeStatus.Unknown,
         connections = Vector.empty,
         authenticated = Set.empty)
+
     } else node._copy(connections = connections)
   }
 
@@ -434,7 +427,7 @@ trait MongoDBSystem extends Actor {
       }
 
       ns.primary.foreach { prim =>
-        if (!ns.authenticates.isEmpty && prim.authenticated.isEmpty) {
+        if (ns.authenticates.nonEmpty && prim.authenticated.isEmpty) {
           logger.debug(s"[$lnm] The node set is available (${prim.names}); Waiting authentication: ${prim.authenticated}")
         } else {
           sender ! PrimaryAvailable(ns.protocolMetadata)
@@ -624,7 +617,7 @@ trait MongoDBSystem extends Actor {
           s"[$lnm] The primary is still unavailable, is there a network problem?")
       }
 
-      logger.debug(s"[$lnm] Channel #$channelId is released")
+      logger.trace(s"[$lnm] Channel #$channelId is released")
     }
 
     case IsMasterResponse(response) => onIsMaster(response)
@@ -777,13 +770,22 @@ trait MongoDBSystem extends Actor {
 
     case request @ AuthRequest(authenticate, _) => {
       logger.debug(s"[$lnm] New authenticate request $authenticate")
+      // For [[MongoConnection.authenticate]]
 
       AuthRequestsManager.addAuthRequest(request)
 
       updateNodeSet(authenticate.toString) { ns =>
-        authenticateNodeSet(ns.
-          copy(authenticates = ns.authenticates + authenticate))
+        // Authenticate the entire NodeSet
+        val authenticates = ns.authenticates + authenticate
+
+        ns.copy(authenticates = authenticates).updateAll {
+          case node @ Node(_, status, _, _, _, _, _, _) if status.queryable =>
+            authenticateNode(node, authenticates)
+
+          case node => node
+        }
       }
+
       ()
     }
 
@@ -832,7 +834,7 @@ trait MongoDBSystem extends Actor {
             val authenticating =
               if (!nodeStatus.queryable || nodeSet.authenticates.isEmpty) {
                 node
-              } else authenticateNode(node, nodeSet.authenticates.toSeq)
+              } else authenticateNode(node, nodeSet.authenticates)
 
             val meta = ProtocolMetadata(
               MongoWireVersion(isMaster.minWireVersion),
@@ -868,25 +870,30 @@ trait MongoDBSystem extends Actor {
         val upSet = prepared.copy(nodes = prepared.nodes ++ discoveredNodes)
 
         chanNode.fold(upSet) { node =>
-          if (!upSet.authenticates.isEmpty && node.authenticated.isEmpty) {
+          if (upSet.authenticates.nonEmpty && node.authenticated.isEmpty) {
             logger.debug(s"[$lnm] The node set is available (${node.names}); Waiting authentication: ${node.authenticated}")
 
           } else {
             if (!nodeSetWasReachable && upSet.isReachable) {
-              broadcastMonitors(SetAvailable(upSet.protocolMetadata))
               logger.debug(s"[$lnm] The node set is now available")
+
+              broadcastMonitors(SetAvailable(upSet.protocolMetadata))
+
+              updateHistory(s"SetAvailable(${nodeSet.toShortString})")
             }
 
             @inline def wasPrimNames: Seq[String] =
               wasPrimary.toSeq.flatMap(_.names)
 
             if (upSet.primary.exists(n => !wasPrimNames.contains(n.name))) {
-              broadcastMonitors(PrimaryAvailable(upSet.protocolMetadata))
-
               val newPrim = upSet.primary.map(_.name)
 
               logger.debug(
                 s"[$lnm] The primary is now available: ${newPrim.mkString}")
+
+              broadcastMonitors(PrimaryAvailable(upSet.protocolMetadata))
+
+              updateHistory(s"PrimaryAvailable(${nodeSet.toShortString})")
             }
           }
 
@@ -954,9 +961,8 @@ trait MongoDBSystem extends Actor {
       val authed = auth.map(con.authenticated + _).getOrElse(con.authenticated)
 
       authenticateConnection(
-        con.copy(
-          authenticated = authed, authenticating = None),
-        nodeSet.authenticates.toSeq)
+        con.copy(authenticated = authed, authenticating = None),
+        nodeSet.authenticates)
 
     } { node =>
       node._copy(authenticated = auth.map(node.authenticated + _).
@@ -984,13 +990,19 @@ trait MongoDBSystem extends Actor {
                 originalAuthenticate, successfulAuthentication)
 
               if (nodeSet.isReachable) {
-                broadcastMonitors(SetAvailable(nodeSet.protocolMetadata))
                 logger.debug(s"[$lnm] The node set is now authenticated")
+
+                broadcastMonitors(SetAvailable(nodeSet.protocolMetadata))
+
+                updateHistory(s"SetAvailable(${nodeSet.toShortString})")
               }
 
               if (nodeSet.primary.isDefined) {
-                broadcastMonitors(PrimaryAvailable(nodeSet.protocolMetadata))
                 logger.debug(s"[$lnm] The primary is now authenticated")
+
+                broadcastMonitors(PrimaryAvailable(nodeSet.protocolMetadata))
+
+                updateHistory(s"PrimaryAvailable(${nodeSet.toShortString})")
               } else if (nodeSet.isReachable) {
                 logger.warn(s"""[$lnm] The node set is authenticated, but the primary is not available: ${nodeSet.name} -> ${nodeSet.nodes.map(_.names) mkString ", "}""")
               }
@@ -1044,7 +1056,7 @@ trait MongoDBSystem extends Actor {
         val reqAuth = ns.authenticates.nonEmpty
         val cause: Throwable = if (!secOk) {
           ns.primary match {
-            case Some(prim) => new ChannelNotFound(s"Channel not found from the primary node: '${prim.name}' { ${nodeInfo(reqAuth, prim)} } ($supervisor/$name)", true, internalState)
+            case Some(prim) => new ChannelNotFound(s"No active channel can be found to the primary node: '${prim.name}' { ${nodeInfo(reqAuth, prim)} } ($supervisor/$name)", true, internalState)
 
             case _ => new PrimaryUnavailableException(
               supervisor, name, internalState)
@@ -1306,4 +1318,10 @@ private[reactivemongo] object RequestId {
 
   // all requestIds [3000[ are for common messages
   val common = new RequestIdGenerator(3000, Int.MaxValue - 1)
+}
+
+case class AuthRequest(
+  authenticate: Authenticate,
+  promise: Promise[SuccessfulAuthentication] = Promise()) {
+  def future: Future[SuccessfulAuthentication] = promise.future
 }

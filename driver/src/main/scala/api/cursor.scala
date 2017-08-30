@@ -817,7 +817,7 @@ private[api] final class FoldResponses[T](
 
           case Fail(f) => ko(last, f)
 
-          case Cont(v) =>
+          case Cont(_ /*v*/ ) =>
             // TODO: Use v instead of cur?
             self ! HandleResponse(last, cur, nc)
         }
@@ -973,6 +973,7 @@ object CursorProducer {
  *       def foo = "Flattened"
  *     }
  * }
+ * }}}
  */
 trait CursorFlattener[C[_] <: Cursor[_]] {
   /** Flatten a future of cursor as cursor. */

@@ -200,7 +200,7 @@ trait AggregationFramework[P <: SerializationPack]
   /**
    * _Since MongoDB 3.4:_ The [[https://docs.mongodb.com/manual/reference/operator/aggregation/graphLookup/ \$graphLookup]] aggregation stage.
    *
-   * @param from the target collection for the $graphLookup operation to search
+   * @param from the target collection for the \$graphLookup operation to search
    * @param startWith the expression that specifies the value of the `connectFromField` with which to start the recursive search
    * @param connectFromField the field name whose value `\$graphLookup` uses to recursively match against the `connectToField` of other documents in the collection
    * @param connectToField the field name in other documents against which to match the value of the field specified by the `connectFromField` parameter

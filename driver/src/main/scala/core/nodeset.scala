@@ -248,15 +248,7 @@ case class Node(
     }))
 
   @deprecated(message = "Use `createNeededChannels` with an explicit `channelFactory`", since = "0.12-RC1")
-  def createNeededChannels(receiver: ActorRef, upTo: Int)(implicit channelFactory: ChannelFactory): Node = {
-    if (connections.size < upTo) {
-      _copy(connections = connections ++ (for {
-        i ← 0 until (upTo - connections.size)
-      } yield Connection(
-        channelFactory.create(host, port, receiver),
-        ConnectionStatus.Disconnected, Set.empty, None)))
-    } else this
-  }
+  def createNeededChannels(receiver: ActorRef, upTo: Int)(implicit channelFactory: ChannelFactory): Node = createNeededChannels(channelFactory, receiver, upTo)
 
   private[core] def createNeededChannels(channelFactory: ChannelFactory, receiver: ActorRef, upTo: Int): Node = {
     if (connections.size < upTo) {
@@ -586,14 +578,14 @@ final class ChannelFactory private[reactivemongo] (
       s"unknown-${System identityHashCode opts}",
       s"unknown-${System identityHashCode opts}", opts, bossEx, workerEx)
 
-  import javax.net.ssl.SSLContext
-
   private val logger = LazyLogger("reactivemongo.core.nodeset.ChannelFactory")
   private val timer = new HashedWheelTimer()
 
   def create(host: String = "localhost", port: Int = 27017, receiver: ActorRef): Channel = {
-    val channel = makeChannel(receiver)
-    logger.trace(s"[$supervisor/$connection] Created a new channel: $channel")
+    val channel = makeChannel(host, port, receiver)
+
+    logger.trace(s"[$supervisor/$connection] Created a new channel to ${host}:${port}: $channel")
+
     channel
   }
 
@@ -603,7 +595,11 @@ final class ChannelFactory private[reactivemongo] (
   private val bufferFactory = new HeapChannelBufferFactory(
     java.nio.ByteOrder.LITTLE_ENDIAN)
 
-  private def makePipeline(timeoutMS: Long, receiver: ActorRef): ChannelPipeline = {
+  private def makePipeline(
+    timeoutMS: Long,
+    host: String,
+    port: Int,
+    receiver: ActorRef): ChannelPipeline = {
     val idleHandler = new IdleStateHandler(
       timer, 0, 0, timeoutMS, TimeUnit.MILLISECONDS)
 
@@ -612,13 +608,7 @@ final class ChannelFactory private[reactivemongo] (
       new MongoHandler(supervisor, connection, receiver))
 
     if (options.sslEnabled) {
-
-      val sslEng = {
-        val engine = sslContext.createSSLEngine()
-        engine.setUseClientMode(true)
-        engine
-      }
-
+      val sslEng = reactivemongo.core.SSL.createEngine(sslContext, host, port)
       val sslHandler =
         new shaded.netty.handler.ssl.SslHandler(sslEng, false /* TLS */ )
 
@@ -633,12 +623,11 @@ final class ChannelFactory private[reactivemongo] (
     import java.security.KeyStore
     import javax.net.ssl.{ KeyManagerFactory, TrustManager }
 
-    val keyManagers = Option(System.getProperty("javax.net.ssl.keyStore")).map { path =>
-
-      val password = Option(System.getProperty("javax.net.ssl.keyStorePassword")).getOrElse("")
+    val keyManagers = sys.props.get("javax.net.ssl.keyStore").map { path =>
+      val password = sys.props.getOrElse("javax.net.ssl.keyStorePassword", "")
 
       val ks = {
-        val ksType = Option(System.getProperty("javax.net.ssl.keyStoreType")).getOrElse("JKS")
+        val ksType = sys.props.getOrElse("javax.net.ssl.keyStoreType", "JKS")
         val res = KeyStore.getInstance(ksType)
 
         val fis = new FileInputStream(path)
@@ -661,24 +650,30 @@ final class ChannelFactory private[reactivemongo] (
     }
 
     val sslCtx = {
-      val res = SSLContext.getInstance("SSL")
+      val res = javax.net.ssl.SSLContext.getInstance("SSL")
 
-      val tm: Array[TrustManager] = if (options.sslAllowsInvalidCert) Array(TrustAny) else null
+      val tm: Array[TrustManager] =
+        if (options.sslAllowsInvalidCert) Array(TrustAny) else null
 
       val rand = new scala.util.Random(System.identityHashCode(tm))
       val seed = Array.ofDim[Byte](128)
       rand.nextBytes(seed)
 
       res.init(keyManagers.orNull, tm, new java.security.SecureRandom(seed))
+
       res
     }
 
     sslCtx
   }
 
-  private def makeChannel(receiver: ActorRef): Channel = {
+  private def makeChannel(
+    host: String,
+    port: Int,
+    receiver: ActorRef): Channel = {
+
     val channel = channelFactory.newChannel(makePipeline(
-      options.maxIdleTimeMS.toLong, receiver))
+      options.maxIdleTimeMS.toLong, host, port, receiver))
     val config = channel.getConfig
 
     config.setTcpNoDelay(options.tcpNoDelay)
@@ -686,7 +681,7 @@ final class ChannelFactory private[reactivemongo] (
     config.setKeepAlive(options.keepAlive)
     config.setConnectTimeoutMillis(options.connectTimeoutMS)
 
-    logger.debug(s"Netty channel configuration:\n- connectTimeoutMS: ${options.connectTimeoutMS}\n- maxIdleTimeMS: ${options.maxIdleTimeMS}ms\n- tcpNoDelay: ${options.tcpNoDelay}\n- keepAlive: ${options.keepAlive}\n- sslEnabled: ${options.sslEnabled}")
+    logger.trace(s"Netty channel configuration:\n- connectTimeoutMS: ${options.connectTimeoutMS}\n- maxIdleTimeMS: ${options.maxIdleTimeMS}ms\n- tcpNoDelay: ${options.tcpNoDelay}\n- keepAlive: ${options.keepAlive}\n- sslEnabled: ${options.sslEnabled}")
 
     channel
   }
