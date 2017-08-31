@@ -163,7 +163,7 @@ trait BatchCommands[P <: SerializationPack] {
  * @define cursorFlattenerParam the cursor flattener (by default use the builtin one)
  * @define cursorProducerParam the cursor producer
  * @define aggBatchSizeParam the batch size (for the aggregation cursor; if `None` use the default one)
- * @define f the function to create the aggregation pipeline using the aggregation framework depending on the collection type
+ * @define aggregationPipelineFunction the function to create the aggregation pipeline using the aggregation framework depending on the collection type
  */
 trait GenericCollection[P <: SerializationPack with Singleton] extends Collection with GenericCollectionWithCommands[P] with CollectionMetaCommands with reactivemongo.api.commands.ImplicitCommandHelpers[P] { self =>
   import scala.language.higherKinds

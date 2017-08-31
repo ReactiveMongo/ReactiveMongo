@@ -90,7 +90,7 @@ class MongoConnection(
   @deprecated("Create with an explicit supervisor and connection names", "0.11.14")
   def this(actorSys: ActorSystem, mongoSys: ActorRef, opts: MongoConnectionOptions) = this(s"unknown-${System identityHashCode mongoSys}", s"unknown-${System identityHashCode mongoSys}", actorSys, mongoSys, opts)
 
-  private[api] val logger = LazyLogger("reactivemongo.api.MongoConnection")
+  import MongoConnection.logger
 
   private val lnm = s"$supervisor/$name" // log name
 
@@ -384,6 +384,8 @@ object MongoConnection {
   val DefaultHost = "localhost"
   val DefaultPort = 27017
 
+  private[api] val logger = LazyLogger("reactivemongo.api.MongoConnection")
+
   final class URIParsingException(message: String)
     extends Exception with NoStackTrace {
     override def getMessage() = message
@@ -509,8 +511,14 @@ object MongoConnection {
           case ("maxIdleTimeMS", v) => unsupported -> result.
             copy(maxIdleTimeMS = v.toInt)
 
-          case ("sslEnabled", v) => unsupported -> result.
-            copy(sslEnabled = v.toBoolean)
+          case ("sslEnabled", v) => {
+            logger.warn(
+              s"Connection option 'sslEnabled' deprecated: use option 'ssl'")
+            unsupported -> result.copy(sslEnabled = v.toBoolean)
+          }
+
+          case ("ssl", v) =>
+            unsupported -> result.copy(sslEnabled = v.toBoolean)
 
           case ("sslAllowsInvalidCert", v) => unsupported -> result.
             copy(sslAllowsInvalidCert = v.toBoolean)

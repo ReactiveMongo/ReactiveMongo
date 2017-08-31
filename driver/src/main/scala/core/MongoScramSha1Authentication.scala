@@ -1,7 +1,5 @@
 package reactivemongo.core.actors
 
-import scala.concurrent.{ Future, Promise }
-
 import reactivemongo.core.commands.{
   FailedAuthentication,
   SuccessfulAuthentication
@@ -10,57 +8,8 @@ import reactivemongo.core.commands.{
 import reactivemongo.core.protocol.Response
 import reactivemongo.core.nodeset.{
   Authenticate,
-  CrAuthenticating,
   Connection,
   ScramSha1Authenticating
-}
-
-private[reactivemongo] trait MongoCrAuthentication { system: MongoDBSystem =>
-  import reactivemongo.core.commands.{ CrAuthenticate, GetCrNonce }
-  import MongoDBSystem.logger
-
-  protected final def sendAuthenticate(connection: Connection, nextAuth: Authenticate): Connection = {
-    connection.send(GetCrNonce(nextAuth.db).maker(RequestId.getNonce.next))
-    connection.copy(authenticating = Some(
-      CrAuthenticating(nextAuth.db, nextAuth.user, nextAuth.password, None)))
-  }
-
-  protected val authReceive: Receive = {
-    case response: Response if RequestId.getNonce accepts response => {
-      GetCrNonce.ResultMaker(response).fold(
-        e =>
-          logger.warn(s"error while processing getNonce response #${response.header.responseTo}", e),
-        nonce => {
-          logger.debug(s"AUTH: got nonce for channel ${response.info.channelId}: $nonce")
-          whenAuthenticating(response.info.channelId) {
-            case (connection, a @ CrAuthenticating(db, user, pass, _)) =>
-              connection.send(CrAuthenticate(user, pass, nonce)(db).
-                maker(RequestId.authenticate.next))
-
-              connection.copy(authenticating = Some(a.copy(
-                nonce = Some(nonce))))
-
-            case (connection, auth) => {
-              val msg = s"unexpected authentication: $auth"
-
-              logger.warn(s"AUTH: $msg")
-              authenticationResponse(response)(
-                _ => Left(FailedAuthentication(msg)))
-
-              connection
-            }
-          }
-        })
-
-      ()
-    }
-
-    case response: Response if RequestId.authenticate accepts response => {
-      logger.debug(s"AUTH: got authenticated response! ${response.info.channelId}")
-      authenticationResponse(response)(CrAuthenticate.parseResponse(_))
-      ()
-    }
-  }
 }
 
 private[reactivemongo] trait MongoScramSha1Authentication {
@@ -73,12 +22,13 @@ private[reactivemongo] trait MongoScramSha1Authentication {
     ScramSha1Initiate,
     ScramSha1Negociation,
     ScramSha1FinalNegociation,
-    ScramSha1StartNegociation,
-    SuccessfulAuthentication
+    ScramSha1StartNegociation
   }
 
   protected final def sendAuthenticate(connection: Connection, nextAuth: Authenticate): Connection = {
     val start = ScramSha1Initiate(nextAuth.user)
+
+    println("-> sendAuthenticate")
 
     connection.send(start(nextAuth.db).maker(RequestId.getNonce.next))
 
@@ -91,14 +41,14 @@ private[reactivemongo] trait MongoScramSha1Authentication {
     case response: Response if RequestId.getNonce accepts response => {
       ScramSha1Initiate.parseResponse(response).fold(
         { e =>
-          val msg = s"error while processing getNonce response #${response.header.responseTo}"
+          val msg = s"Error while processing getNonce response #${response.header.responseTo}"
 
-          logger.warn(s"AUTH: $msg")
-          logger.debug("SCRAM-SHA1 getNonce failure", e)
+          logger.warn(s"[$lnm] $msg")
+          logger.debug(s"[$lnm] SCRAM-SHA1 getNonce failure", e)
 
           authenticationResponse(response)(_ => Left(FailedAuthentication(msg)))
         }, { challenge =>
-          logger.debug(s"AUTH: got challenge for channel ${response.info.channelId}: $challenge")
+          logger.debug(s"[$lnm] Got challenge for channel ${response.info.channelId}: $challenge")
 
           whenAuthenticating(response.info.channelId) {
             case (con, a @ ScramSha1Authenticating(
@@ -119,9 +69,10 @@ private[reactivemongo] trait MongoScramSha1Authentication {
             }
 
             case (con, auth) => {
-              val msg = s"unexpected authentication: $auth"
+              val msg = s"Unexpected authentication: $auth"
 
-              logger.warn(s"AUTH: $msg")
+              logger.warn(s"[$lnm] $msg")
+
               authenticationResponse(response)(
                 _ => Left(FailedAuthentication(msg)))
 
@@ -134,7 +85,7 @@ private[reactivemongo] trait MongoScramSha1Authentication {
     }
 
     case response: Response if RequestId.authenticate accepts response => {
-      logger.debug(s"AUTH: got authenticated response! ${response.info.channelId}")
+      logger.debug(s"[$lnm] Got authenticated response! ${response.info.channelId}")
 
       @inline def resp: Either[Either[CommandError, SuccessfulAuthentication], Array[Byte]] = ScramSha1StartNegociation.parseResponse(response) match {
         case Left(err)             => Left(Left(err))
@@ -156,9 +107,10 @@ private[reactivemongo] trait MongoScramSha1Authentication {
                 ScramSha1Negociation.parsePayload(payload).get("v")
 
               if (!serverSig.exists(_ == Base64.encodeBase64String(sig))) {
-                val msg = "the SCRAM-SHA1 server signature is invalid"
+                val msg = "SCRAM-SHA1 server signature is invalid"
 
-                logger.warn(s"AUTH: $msg")
+                logger.warn(s"[$lnm] $msg")
+
                 authenticationResponse(response)(
                   _ => Left(FailedAuthentication(msg)))
 
@@ -172,9 +124,10 @@ private[reactivemongo] trait MongoScramSha1Authentication {
             }
 
             case (con, auth) => {
-              val msg = s"unexpected authentication: $auth"
+              val msg = s"Unexpected authentication: $auth"
 
-              logger.warn(s"AUTH: msg")
+              logger.warn(s"[$lnm] msg")
+
               authenticationResponse(response)(
                 _ => Left(FailedAuthentication(msg)))
 
@@ -186,8 +139,4 @@ private[reactivemongo] trait MongoScramSha1Authentication {
       ()
     }
   }
-}
-
-case class AuthRequest(authenticate: Authenticate, promise: Promise[SuccessfulAuthentication] = Promise()) {
-  def future: Future[SuccessfulAuthentication] = promise.future
 }

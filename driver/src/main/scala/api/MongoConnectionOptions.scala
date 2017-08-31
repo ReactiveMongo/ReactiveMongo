@@ -15,7 +15,7 @@ case object ScramSha1Authentication extends AuthenticationMode
  * Options for MongoConnection.
  *
  * @param connectTimeoutMS The number of milliseconds to wait for a connection to be established before giving up.
- * @param authSource The database source for authentication credentials.
+ * @param authSource the database source for authentication credentials (corresponds to the `authenticationDatabase` with MongoShell)
  * @param sslEnabled Enable SSL connection (required to be accepted on server-side).
  * @param sslAllowsInvalidCert If `sslEnabled` is true, this one indicates whether to accept invalid certificates (e.g. self-signed).
  * @param authMode Either [[CrAuthentication]] or [[ScramSha1Authentication]]

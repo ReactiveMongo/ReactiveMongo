@@ -429,10 +429,10 @@ private[reactivemongo] class MongoHandler(
   }
 
   @inline def log(e: ChannelEvent, s: String) = MongoHandler.
-    logger.trace(s"[$supervisor/$connection @ ${e.getChannel}] $s")
+    logger.trace(s"[$supervisor/$connection] @ ${e.getChannel}] $s")
 
   @inline def log(e: ChannelEvent, s: String, cause: Throwable) = MongoHandler.
-    logger.trace(s"[$supervisor/$connection @ ${e.getChannel}] $s", cause)
+    logger.trace(s"[$supervisor/$connection] @ ${e.getChannel}] $s", cause)
 }
 
 private[reactivemongo] object MongoHandler {

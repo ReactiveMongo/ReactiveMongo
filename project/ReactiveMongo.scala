@@ -13,12 +13,24 @@ object BuildSettings {
 
   val baseSettings = Seq(organization := "org.reactivemongo")
 
+  val java8 = scala.util.Properties.isJavaAtLeast("1.8")
+
   val buildSettings = Defaults.coreDefaultSettings ++ baseSettings ++ Seq(
     scalaVersion := "2.11.11",
     crossScalaVersions := Seq("2.10.5", "2.11.11", "2.12.3"),
     crossVersion := CrossVersion.binary,
     //parallelExecution in Test := false,
     //fork in Test := true, // Don't share executioncontext between SBT CLI/tests
+    unmanagedSourceDirectories in Compile ++= {
+      val jdir = if (java8) "java8" else "java7"
+
+      Seq((sourceDirectory in Compile).value / jdir)
+    },
+    unmanagedSourceDirectories in Test ++= {
+      val jdir = if (java8) "java8" else "java7"
+
+      Seq((sourceDirectory in Compile).value / jdir)
+    },
     scalacOptions ++= Seq(
       "-encoding", "UTF-8",
       "-unchecked",
