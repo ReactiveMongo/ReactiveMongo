@@ -60,6 +60,9 @@ object Exceptions {
     def this() = this("This MongoConnection is closed", null)
   }
 
+  final class NotAuthenticatedException private[core] (
+    val message: String) extends DriverException with NoStackTrace
+
   @deprecated(message = "Use constructor with details", since = "0.12-RC0")
   case object ClosedException extends ClosedException()
 
