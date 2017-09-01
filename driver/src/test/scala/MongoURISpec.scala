@@ -101,7 +101,7 @@ class MongoURISpec extends org.specs2.mutable.Specification {
           ignoredOptions = List("foo")))
     }
 
-    val withAuthParamAndSource = "mongodb://user123:;qGu:je/LX}nN\\8@host1:27018,host2:27019,host3:27020/somedb?foo=bar&authSource=authdb"
+    val withAuthParamAndSource = "mongodb://user123:;qGu:je/LX}nN\\8@host1:27018,host2:27019,host3:27020/somedb?foo=bar&authenticationDatabase=authdb"
 
     s"parse $withAuthParamAndSource with success" in {
       parseURI(withAuthParamAndSource) must beSuccessfulTry(
@@ -110,7 +110,7 @@ class MongoURISpec extends org.specs2.mutable.Specification {
           db = Some("somedb"),
           authenticate = Some(Authenticate(
             "authdb", "user123", ";qGu:je/LX}nN\\8")),
-          options = MongoConnectionOptions(authSource = Some("authdb")),
+          options = MongoConnectionOptions(authenticationDatabase = Some("authdb")),
           ignoredOptions = List("foo")))
     }
 

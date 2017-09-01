@@ -15,7 +15,7 @@ case object ScramSha1Authentication extends AuthenticationMode
  * Options for MongoConnection.
  *
  * @param connectTimeoutMS The number of milliseconds to wait for a connection to be established before giving up.
- * @param authSource the database source for authentication credentials (corresponds to the `authenticationDatabase` with MongoShell)
+ * @param authenticationDatabase the name of the database used for authentication
  * @param sslEnabled Enable SSL connection (required to be accepted on server-side).
  * @param sslAllowsInvalidCert If `sslEnabled` is true, this one indicates whether to accept invalid certificates (e.g. self-signed).
  * @param authMode Either [[CrAuthentication]] or [[ScramSha1Authentication]]
@@ -32,7 +32,7 @@ case class MongoConnectionOptions(
   // canonical options - connection
   connectTimeoutMS: Int = 0,
   // canonical options - authentication options
-  authSource: Option[String] = None,
+  @deprecatedName('authSource) authenticationDatabase: Option[String] = None,
   sslEnabled: Boolean = false,
   sslAllowsInvalidCert: Boolean = false,
   authMode: AuthenticationMode = ScramSha1Authentication,
@@ -49,13 +49,20 @@ case class MongoConnectionOptions(
   failoverStrategy: FailoverStrategy = FailoverStrategy.default,
 
   monitorRefreshMS: Int = 10000,
-  maxIdleTimeMS: Int = 0)
+  maxIdleTimeMS: Int = 0) {
+
+  /**
+   * The database source for authentication credentials (corresponds to the `authenticationDatabase` with MongoShell).
+   */
+  @deprecated("Use [[authenticationDatabase]]", "0.12.7")
+  def authSource: Option[String] = authenticationDatabase
+}
 
 object MongoConnectionOptions {
   @inline private def ms(duration: Int): String = s"${duration}ms"
 
-  private[reactivemongo] def toStrings(options: MongoConnectionOptions): List[(String, String)] = options.authSource.toList.map(
-    "authSource" -> _.toString) ++ List(
+  private[reactivemongo] def toStrings(options: MongoConnectionOptions): List[(String, String)] = options.authenticationDatabase.toList.map(
+    "authenticationDatabase" -> _.toString) ++ List(
       "authMode" -> options.authMode.toString,
       "nbChannelsPerNode" -> options.nbChannelsPerNode.toString,
       "monitorRefreshMS" -> ms(options.monitorRefreshMS),

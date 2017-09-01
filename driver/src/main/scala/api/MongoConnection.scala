@@ -441,7 +441,9 @@ object MongoConnection {
             db.fold[ParsedURI](throw new URIParsingException(s"Could not parse URI '$uri': authentication information found but no database name in URI")) { database =>
               val (unsupportedKeys, options) = opts
 
-              ParsedURI(hosts, options, unsupportedKeys, Some(database), Some(Authenticate.apply(options.authSource.getOrElse(database), user, pass)))
+              ParsedURI(hosts, options, unsupportedKeys, Some(database),
+                Some(Authenticate(options.authenticationDatabase.
+                  getOrElse(database), user, pass)))
             }
           }
 
@@ -496,8 +498,14 @@ object MongoConnection {
     val (remOpts, step1) = opts.iterator.foldLeft(
       Map.empty[String, String] -> MongoConnectionOptions()) {
         case ((unsupported, result), kv) => kv match {
-          case ("authSource", v) => unsupported -> result.
-            copy(authSource = Some(v))
+          case ("authSource", v) => {
+            logger.warn(s"Connection option 'authSource' deprecated: use option 'authenticationDatabase'")
+
+            unsupported -> result.copy(authenticationDatabase = Some(v))
+          }
+
+          case ("authenticationDatabase", v) =>
+            unsupported -> result.copy(authenticationDatabase = Some(v))
 
           case ("authMode", "mongocr") => unsupported -> result.
             copy(authMode = CrAuthentication)

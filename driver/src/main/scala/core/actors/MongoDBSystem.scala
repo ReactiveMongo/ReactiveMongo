@@ -158,7 +158,7 @@ trait MongoDBSystem extends Actor {
     } catch {
       case _: Exception if (retry > 0) => go(retry - 1)
       case err: Exception =>
-        logger.warn(s"Fails to update history: $event", err)
+        logger.debug(s"Fails to update history: $event", err)
     }
 
     go(3)
@@ -1056,7 +1056,16 @@ trait MongoDBSystem extends Actor {
         val reqAuth = ns.authenticates.nonEmpty
         val cause: Throwable = if (!secOk) {
           ns.primary match {
-            case Some(prim) => new ChannelNotFound(s"No active channel can be found to the primary node: '${prim.name}' { ${nodeInfo(reqAuth, prim)} } ($supervisor/$name)", true, internalState)
+            case Some(prim) => {
+              val details = s"'${prim.name}' { ${nodeInfo(reqAuth, prim)} } ($supervisor/$name)"
+
+              if (prim.authenticated.nonEmpty) {
+                new ChannelNotFound(s"No active channel can be found to the primary node: $details", true, internalState)
+              } else {
+                new NotAuthenticatedException(
+                  s"No authenticated channel for the primary node: $details")
+              }
+            }
 
             case _ => new PrimaryUnavailableException(
               supervisor, name, internalState)
@@ -1064,11 +1073,21 @@ trait MongoDBSystem extends Actor {
         } else if (!ns.isReachable) {
           new NodeSetNotReachable(supervisor, name, internalState)
         } else {
-          val details = ns.nodes.map { node =>
-            s"'${node.name}' [${node.status}] { ${nodeInfo(reqAuth, node)} }"
-          }.mkString("; ")
+          // Node set is reachable, secondary is ok, but no channel found
+          val (authed, msgs) = ns.nodes.foldLeft(
+            false -> Seq.empty[String]) {
+              case ((authed, msgs), node) =>
+                val msg = s"'${node.name}' [${node.status}] { ${nodeInfo(reqAuth, node)} }"
 
-          new ChannelNotFound(s"Channel not found from the nodes: $details ($supervisor/$name); $history", true, internalState)
+                (authed || node.authenticated.nonEmpty) -> (msg +: msgs)
+            }
+          val details = s"""${msgs.mkString(", ")} ($supervisor/$name)"""
+
+          if (authed) {
+            new ChannelNotFound(s"No active channel found for the nodes: $details", true, internalState)
+          } else {
+            new NotAuthenticatedException(s"No authenticated channel: $details")
+          }
         }
 
         Failure(cause)
