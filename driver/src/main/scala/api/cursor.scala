@@ -552,9 +552,8 @@ object DefaultCursor {
               Future.failed[Option[Response]](err)
           }
         } else {
-          logger.debug("[tailResponse] Current cursor exhausted, renewing...")
-          DelayedFuture(500, connection.actorSystem).
-            flatMap { _ => makeRequest(maxDocs).map(Some(_)) }
+          logger.debug("[tailResponse] Current cursor exhausted.")
+          Future.successful(Option.empty)
         }
       }
     }

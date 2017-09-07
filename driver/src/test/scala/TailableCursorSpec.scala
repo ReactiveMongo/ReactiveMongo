@@ -43,6 +43,15 @@ trait TailableCursorSpec { specs: CursorSpec =>
           } must beEqualTo(List(0, 1, 2, 3, 4, 5)).await(1, timeout)
         }
 
+        "to fold responses and exhaust cursor" in { implicit ee: EE =>
+          implicit val reader = IdReader
+          tailable("foldrexhaust").foldResponses(List.empty[Int], 20) { (s, resp) =>
+            val bulk = Response.parse(resp).flatMap(_.asOpt[Int].toList)
+
+            Cursor.Cont(s ++ bulk)
+          } must beEqualTo(List(0, 1, 2, 3, 4, 5, 6, 7, 8, 9)).await(1, timeout)
+        }
+
         "to fold responses with async function" in { implicit ee: EE =>
           implicit val reader = IdReader
           tailable("foldr0").foldResponsesM(List.empty[Int], 6) { (s, resp) =>
