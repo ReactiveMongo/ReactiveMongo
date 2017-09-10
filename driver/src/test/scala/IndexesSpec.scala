@@ -8,6 +8,7 @@ import reactivemongo.api.indexes.{ Index, IndexType }, IndexType.{
   Geo2DSpherical
 }
 import reactivemongo.api.collections.bson.BSONCollection
+import reactivemongo.api.commands.CommandError
 import reactivemongo.core.errors.DatabaseException
 
 import org.specs2.concurrent.{ ExecutionEnv => EE }
@@ -156,9 +157,10 @@ class IndexesSpec extends org.specs2.mutable.Specification {
     lazy val col = db(s"indexed_col_${hashCode}")
 
     "be first created" in { implicit ee: EE =>
-      col.indexesManager.ensure(Index(
-        Seq("token" -> IndexType.Ascending), unique = true)).
-        aka("index creation") must beTrue.await(1, timeout * 2)
+      col.create().flatMap { _ =>
+        col.indexesManager.ensure(Index(
+          Seq("token" -> IndexType.Ascending), unique = true))
+      } aka "index creation" must beTrue.await(1, timeout * 2)
     }
 
     "not be created if already exists" in { implicit ee: EE =>
@@ -176,7 +178,7 @@ class IndexesSpec extends org.specs2.mutable.Specification {
 
     val fixtures = List(
       BSONDocument("username" -> "david", "age" -> 29),
-      BSONDocument("username" -> "amanda", "age" -> 35),
+      BSONDocument("username" -> "amanda", "age" -> 29),
       BSONDocument("username" -> "rajiv", "age" -> 57))
 
     @inline def fixturesInsert(implicit ee: EE) =
@@ -186,6 +188,19 @@ class IndexesSpec extends org.specs2.mutable.Specification {
       Future.sequence(fixturesInsert).
         map(_ => {}) must beEqualTo({}).await(0, timeout)
 
+    } tag "not_mongo26"
+
+    "fail with already inserted documents" in { implicit ee: EE =>
+      val idx = Index(
+        key = Seq("age" -> IndexType.Ascending),
+        unique = true)
+
+      val mngr = partial.indexesManager
+      def spec[T](test: => Future[T]) = test must throwA[CommandError].like {
+        case CommandError.Code(11000) => ok
+      }.await
+
+      spec(mngr.ensure(idx)) and spec(mngr.create(idx))
     } tag "not_mongo26"
 
     "be created" in { implicit ee: EE =>

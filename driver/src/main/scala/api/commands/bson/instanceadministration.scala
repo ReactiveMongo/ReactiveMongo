@@ -23,9 +23,8 @@ object BSONListCollectionNamesImplicits {
   }
 
   implicit object BSONCollectionNameReaders
-    extends BSONDocumentReader[CollectionNames] {
-    def read(doc: BSONDocument): CollectionNames = (for {
-      _ <- doc.getAs[BSONNumberLike]("ok").map(_.toInt).filter(_ == 1)
+    extends DealingWithGenericCommandErrorsReader[CollectionNames] {
+    def readResult(doc: BSONDocument): CollectionNames = (for {
       cr <- doc.getAs[BSONDocument]("cursor")
       fb <- cr.getAs[List[BSONDocument]]("firstBatch")
       ns <- wtColNames(fb, Nil)
@@ -167,7 +166,10 @@ object BSONListIndexesImplicits {
       BSONDocument("listIndexes" -> command.collection)
   }
 
-  implicit object BSONIndexListReader extends BSONDocumentReader[List[Index]] {
+  implicit object BSONIndexListReader
+    extends DealingWithGenericCommandErrorsReader[List[Index]] {
+
+    @deprecated("Only for internal use", "0.12.7")
     @annotation.tailrec
     def readBatch(batch: List[BSONDocument], indexes: List[Index]): Try[List[Index]] = batch match {
       case d :: ds => d.asTry[Index](IndexesManager.IndexReader) match {
@@ -177,27 +179,13 @@ object BSONListIndexesImplicits {
       case _ => Success(indexes)
     }
 
-    implicit object LastErrorReader extends BSONDocumentReader[WriteResult] {
-      def read(doc: BSONDocument): WriteResult = (for {
-        ok <- doc.getAs[BSONBooleanLike]("ok").map(_.toBoolean)
-        n = doc.getAs[BSONNumberLike]("n").fold(0)(_.toInt)
-        msg <- doc.getAs[String]("errmsg")
-        code <- doc.getAs[BSONNumberLike]("code").map(_.toInt)
-      } yield DefaultWriteResult(
-        ok, n, Nil, None, Some(code), Some(msg))).get
-    }
+    import BSONCommonWriteCommandsImplicits.DefaultWriteResultReader
 
-    def read(doc: BSONDocument): List[Index] = (for {
-      _ <- doc.getAs[BSONNumberLike]("ok").fold[Option[Unit]](
-        throw GenericDriverException(
-          "the result of listIndexes must be ok")) { ok =>
-          if (ok.toInt == 1) Some(()) else {
-            throw doc.asOpt[WriteResult].
-              flatMap[Exception](WriteResult.lastError).
-              getOrElse(new GenericDriverException(
-                s"fails to create index: ${BSONDocument pretty doc}"))
-          }
-        }
+    @deprecated("Use [[BSONCommonWriteCommandsImplicits.DefaultWriteResultReader]]", "0.12.7")
+    val LastErrorReader: BSONDocumentReader[WriteResult] =
+      BSONDocumentReader[WriteResult] { DefaultWriteResultReader.read(_) }
+
+    def readResult(doc: BSONDocument): List[Index] = (for {
       a <- doc.getAs[BSONDocument]("cursor")
       b <- a.getAs[List[BSONDocument]]("firstBatch")
     } yield b).fold[List[Index]](throw GenericDriverException(
@@ -221,18 +209,9 @@ object BSONCreateIndexesImplicits {
     }
   }
 
-  implicit object BSONCreateIndexesResultReader
-    extends BSONDocumentReader[WriteResult] {
-
-    import reactivemongo.api.commands.DefaultWriteResult
-
-    def read(doc: BSONDocument): WriteResult =
-      doc.getAs[BSONNumberLike]("ok").map(_.toInt).fold[WriteResult](
-        throw GenericDriverException("the count must be defined")) { n =>
-          doc.getAs[String]("errmsg").fold[WriteResult](
-            DefaultWriteResult(true, n, Nil, None, None, None))(
-              err => DefaultWriteResult(false, n, Nil, None, None, Some(err)))
-        }
+  @deprecated("Use [[BSONCommonWriteCommandsImplicits.DefaultWriteResultReader]]", "0.12.7")
+  val BSONCreateIndexesResultReader = BSONDocumentReader[WriteResult] {
+    BSONCommonWriteCommandsImplicits.DefaultWriteResultReader.read(_)
   }
 }
 
@@ -366,6 +345,7 @@ object BSONPingCommandImplicits {
   }
 
   implicit object PingReader extends DealingWithGenericCommandErrorsReader[Boolean] {
-    def readResult(bson: BSONDocument): Boolean = bson.getAs[BSONBooleanLike]("ok").exists(_.toBoolean)
+    def readResult(bson: BSONDocument): Boolean =
+      bson.getAs[BSONBooleanLike]("ok").exists(_.toBoolean)
   }
 }

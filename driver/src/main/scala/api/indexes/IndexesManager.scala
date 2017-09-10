@@ -287,6 +287,8 @@ private class DefaultCollectionIndexesManager(db: DB, collectionName: String)(
   }
   import reactivemongo.api.commands.bson.BSONListIndexesImplicits._
   import reactivemongo.api.commands.bson.BSONCreateIndexesImplicits._
+  import reactivemongo.api.commands.bson.
+    BSONCommonWriteCommandsImplicits.DefaultWriteResultReader
 
   private lazy val collection = db(collectionName)
   private lazy val listCommand = ListIndexes(db.name)
@@ -304,6 +306,9 @@ private class DefaultCollectionIndexesManager(db: DB, collectionName: String)(
     is <- list().map(_.dropWhile(_.key != index.key).headOption.isDefined)
     cr <- if (!is) create(index).map(_ => true) else Future.successful(false)
   } yield cr
+
+  implicit private val writeResultReader =
+    BSONDocumentReader[WriteResult] { DefaultWriteResultReader.read(_) }
 
   def create(index: Index): Future[WriteResult] =
     Command.run(BSONSerializationPack)(
