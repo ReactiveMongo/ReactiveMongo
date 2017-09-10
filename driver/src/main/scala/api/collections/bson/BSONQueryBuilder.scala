@@ -31,7 +31,7 @@ import reactivemongo.api.{
   QueryOpts,
   ReadPreference
 }
-import reactivemongo.api.collections.GenericQueryBuilder
+import reactivemongo.api.collections.{ GenericCollection, GenericQueryBuilder }
 
 @SerialVersionUID(1634796413L)
 case class BSONQueryBuilder(
@@ -50,6 +50,11 @@ case class BSONQueryBuilder(
 
   type Self = BSONQueryBuilder
   @transient val pack = BSONSerializationPack
+
+  val readPreference: ReadPreference = collection match {
+    case coll: GenericCollection[_] => coll.readPreference
+    case _                          => ReadPreference.primary
+  }
 
   def copy(
     queryOption: Option[BSONDocument] = queryOption,

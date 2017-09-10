@@ -25,11 +25,7 @@ import scala.concurrent.{ ExecutionContext, Future }
 import shaded.netty.buffer.ChannelBuffer
 
 import reactivemongo.api._
-import reactivemongo.api.commands.{
-  CursorFetcher,
-  ResponseResult,
-  WriteConcern
-}
+import reactivemongo.api.commands.{ ResponseResult, WriteConcern }
 import reactivemongo.core.nodeset.ProtocolMetadata
 import reactivemongo.core.protocol.{
   Delete,
@@ -47,85 +43,6 @@ import reactivemongo.core.errors.{
 }
 
 trait GenericCollectionProducer[P <: SerializationPack with Singleton, +C <: GenericCollection[P]] extends CollectionProducer[C]
-
-trait GenericCollectionWithCommands[P <: SerializationPack with Singleton] { self: GenericCollection[P] =>
-  val pack: P
-
-  import reactivemongo.api.commands.{
-    BoxedAnyVal,
-    CollectionCommand,
-    Command,
-    CommandWithResult,
-    ResponseResult,
-    ResolvedCollectionCommand
-  }
-
-  def runner = Command.run(pack, self.failoverStrategy)
-
-  def runCommand[R, C <: CollectionCommand with CommandWithResult[R]](command: C with CommandWithResult[R], readPreference: ReadPreference)(implicit writer: pack.Writer[ResolvedCollectionCommand[C]], reader: pack.Reader[R], ec: ExecutionContext): Future[R] = runner(self, command, readPreference)
-
-  @deprecated("Use the alternative with `ReadPreference`", "0.12-RC5")
-  def runCommand[R, C <: CollectionCommand with CommandWithResult[R]](command: C with CommandWithResult[R])(implicit writer: pack.Writer[ResolvedCollectionCommand[C]], reader: pack.Reader[R], ec: ExecutionContext): Future[R] = runCommand[R, C](command, ReadPreference.primary)
-
-  def runWithResponse[R, C <: CollectionCommand with CommandWithResult[R]](command: C with CommandWithResult[R], readPreference: ReadPreference)(implicit writer: pack.Writer[ResolvedCollectionCommand[C]], reader: pack.Reader[R], ec: ExecutionContext): Future[ResponseResult[R]] = runner.withResponse(self, command, readPreference)
-
-  @deprecated("Use the alternative with `ReadPreference`", "0.12-RC5")
-  def runWithResponse[R, C <: CollectionCommand with CommandWithResult[R]](command: C with CommandWithResult[R])(implicit writer: pack.Writer[ResolvedCollectionCommand[C]], reader: pack.Reader[R], ec: ExecutionContext): Future[ResponseResult[R]] = runWithResponse[R, C](command, ReadPreference.primary)
-
-  def runCommand[C <: CollectionCommand](command: C)(implicit writer: pack.Writer[ResolvedCollectionCommand[C]]): CursorFetcher[pack.type, Cursor] = runner(self, command)
-
-  @deprecated("Use the alternative with `ReadPreference`", "0.12-RC5")
-  def runValueCommand[A <: AnyVal, R <: BoxedAnyVal[A], C <: CollectionCommand with CommandWithResult[R]](command: C with CommandWithResult[R with BoxedAnyVal[A]])(implicit writer: pack.Writer[ResolvedCollectionCommand[C]], reader: pack.Reader[R], ec: ExecutionContext): Future[A] = runner.unboxed(self, command, ReadPreference.primary)
-
-  def runValueCommand[A <: AnyVal, R <: BoxedAnyVal[A], C <: CollectionCommand with CommandWithResult[R]](command: C with CommandWithResult[R with BoxedAnyVal[A]], rp: ReadPreference)(implicit writer: pack.Writer[ResolvedCollectionCommand[C]], reader: pack.Reader[R], ec: ExecutionContext): Future[A] = runner.unboxed(self, command, rp)
-}
-
-trait BatchCommands[P <: SerializationPack] {
-  import reactivemongo.api.commands.{
-    AggregationFramework => AC,
-    CountCommand => CC,
-    DistinctCommand => DistC,
-    InsertCommand => IC,
-    UpdateCommand => UC,
-    DeleteCommand => DC,
-    DefaultWriteResult,
-    LastError,
-    ResolvedCollectionCommand,
-    FindAndModifyCommand => FMC
-  }
-
-  val pack: P
-
-  val CountCommand: CC[pack.type]
-  implicit def CountWriter: pack.Writer[ResolvedCollectionCommand[CountCommand.Count]]
-  implicit def CountResultReader: pack.Reader[CountCommand.CountResult]
-
-  val DistinctCommand: DistC[pack.type]
-  implicit def DistinctWriter: pack.Writer[ResolvedCollectionCommand[DistinctCommand.Distinct]]
-  implicit def DistinctResultReader: pack.Reader[DistinctCommand.DistinctResult]
-
-  val InsertCommand: IC[pack.type]
-  implicit def InsertWriter: pack.Writer[ResolvedCollectionCommand[InsertCommand.Insert]]
-
-  val UpdateCommand: UC[pack.type]
-  implicit def UpdateWriter: pack.Writer[ResolvedCollectionCommand[UpdateCommand.Update]]
-  implicit def UpdateReader: pack.Reader[UpdateCommand.UpdateResult]
-
-  val DeleteCommand: DC[pack.type]
-  implicit def DeleteWriter: pack.Writer[ResolvedCollectionCommand[DeleteCommand.Delete]]
-
-  val FindAndModifyCommand: FMC[pack.type]
-  implicit def FindAndModifyWriter: pack.Writer[ResolvedCollectionCommand[FindAndModifyCommand.FindAndModify]]
-  implicit def FindAndModifyReader: pack.Reader[FindAndModifyCommand.FindAndModifyResult]
-
-  val AggregationFramework: AC[pack.type]
-  implicit def AggregateWriter: pack.Writer[ResolvedCollectionCommand[AggregationFramework.Aggregate]]
-  implicit def AggregateReader: pack.Reader[AggregationFramework.AggregationResult]
-
-  implicit def DefaultWriteResultReader: pack.Reader[DefaultWriteResult]
-
-  implicit def LastErrorReader: pack.Reader[LastError]
-}
 
 /**
  * A Collection that provides default methods using a `SerializationPack`
@@ -195,6 +112,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
   def failoverStrategy: FailoverStrategy
   def genericQueryBuilder: GenericQueryBuilder[pack.type]
 
+  /** The default read preference */
   def readPreference: ReadPreference = db.defaultReadPreference
 
   private val defaultCursorBatchSize: Int = 101
