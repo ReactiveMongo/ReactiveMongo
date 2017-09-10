@@ -64,8 +64,8 @@ class QueryAndWriteCommandSpec extends org.specs2.mutable.Specification {
           } else BSONDocument("bulk" -> true, "i" -> i, "plop" -> i)
         }
 
-        c.indexesManager.ensure(
-          Index(List("plop" -> Ascending), unique = true)).map(_ => {}).
+        c.create().flatMap(_ => c.indexesManager.ensure(
+          Index(List("plop" -> Ascending), unique = true)).map(_ => {})).
           aka("index") must beEqualTo({}).await(1, timeout) and {
             c.bulkInsert(docs, false).map(_ => {}) must beEqualTo({}).
               await(1, timeout * (n / 2L)) and {

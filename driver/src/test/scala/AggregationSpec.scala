@@ -28,8 +28,8 @@ class AggregationSpec extends org.specs2.mutable.Specification {
     import reactivemongo.api.indexes._, IndexType._
 
     val c = db(zipColName)
-    scala.concurrent.Await.result(c.indexesManager.ensure(Index(
-      List("city" -> Text, "state" -> Text))).map(_ => c), timeout * 2)
+    scala.concurrent.Await.result(c.create().flatMap(_ => c.indexesManager.ensure(Index(
+      List("city" -> Text, "state" -> Text))).map(_ => c)), timeout * 2)
   }
   lazy val slowZipColl = slowDb(zipColName)
 
@@ -765,8 +765,8 @@ class AggregationSpec extends org.specs2.mutable.Specification {
       import reactivemongo.api.indexes._, IndexType._
 
       // db.place.createIndex({'loc':"2dsphere"})
-      scala.concurrent.Await.result(places.indexesManager.ensure(Index(
-        List("loc" -> Geo2DSpherical))).map(_ => {}), timeout * 2)
+      scala.concurrent.Await.result(places.create().flatMap(_ => places.indexesManager.ensure(Index(
+        List("loc" -> Geo2DSpherical))).map(_ => {})), timeout * 2)
     }
 
     "must be inserted" in { implicit ee: EE =>
