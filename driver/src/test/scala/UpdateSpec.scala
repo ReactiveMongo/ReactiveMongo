@@ -68,10 +68,11 @@ class UpdateSpec extends org.specs2.mutable.Specification {
 
       "upsert a person with the slow connection and Secondary preference" in {
         implicit ee: EE =>
-          val coll = slowCol1.withReadPreference(ReadPreference.secondary)
+          val coll = slowCol1.withReadPreference(
+            ReadPreference.secondaryPreferred)
 
-          coll.readPreference must_== ReadPreference.secondary and {
-            spec(coll, timeout)
+          coll.readPreference must_== ReadPreference.secondaryPreferred and {
+            spec(coll, slowTimeout)
           }
       }
     }
@@ -125,13 +126,15 @@ class UpdateSpec extends org.specs2.mutable.Specification {
     "update a document" in { implicit ee: EE =>
       val doc = BSONDocument("_id" -> "foo", "bar" -> 2)
 
-      col2.runCommand(Update(UpdateElement(
-        q = doc, u = BSONDocument("$set" -> BSONDocument("bar" -> 3))))) aka "result" must beLike[UpdateWriteResult]({
-        case result => result.nModified must_== 1 and (
-          col2.find(BSONDocument("_id" -> "foo")).one[BSONDocument].
-          aka("updated") must beSome(BSONDocument(
-            "_id" -> "foo", "bar" -> 3)).await(1, timeout))
-      }).await(1, timeout)
+      col2.runCommand(
+        Update(UpdateElement(
+          q = doc, u = BSONDocument("$set" -> BSONDocument("bar" -> 3)))),
+        ReadPreference.primary) aka "result" must beLike[UpdateWriteResult]({
+          case result => result.nModified must_== 1 and (
+            col2.find(BSONDocument("_id" -> "foo")).one[BSONDocument].
+            aka("updated") must beSome(BSONDocument(
+              "_id" -> "foo", "bar" -> 3)).await(1, timeout))
+        }).await(1, timeout)
     }
   }
 

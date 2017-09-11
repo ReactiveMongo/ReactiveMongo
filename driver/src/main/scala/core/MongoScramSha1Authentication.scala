@@ -28,8 +28,6 @@ private[reactivemongo] trait MongoScramSha1Authentication {
   protected final def sendAuthenticate(connection: Connection, nextAuth: Authenticate): Connection = {
     val start = ScramSha1Initiate(nextAuth.user)
 
-    println("-> sendAuthenticate")
-
     connection.send(start(nextAuth.db).maker(RequestId.getNonce.next))
 
     connection.copy(authenticating = Some(
