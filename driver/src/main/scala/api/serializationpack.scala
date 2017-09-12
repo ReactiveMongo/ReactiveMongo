@@ -45,6 +45,8 @@ trait SerializationPack { self: Singleton =>
   def widenReader[T](r: NarrowValueReader[T]): WidenValueReader[T]
 
   def readValue[A](value: Value, reader: WidenValueReader[A]): Try[A]
+
+  private[reactivemongo] def bsonSize(value: Value): Int = -1
 }
 
 /** The default serialization pack. */
@@ -88,4 +90,7 @@ object BSONSerializationPack extends SerializationPack {
 
   def readValue[A](value: Value, reader: WidenValueReader[A]): Try[A] =
     reader.readTry(value)
+
+  override private[reactivemongo] def bsonSize(value: Value): Int =
+    value.byteSize
 }

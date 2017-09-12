@@ -51,7 +51,7 @@ case class BSONQueryBuilder(
   type Self = BSONQueryBuilder
   @transient val pack = BSONSerializationPack
 
-  val readPreference: ReadPreference = collection match {
+  override val readPreference: ReadPreference = collection match {
     case coll: GenericCollection[_] => coll.readPreference
     case _                          => ReadPreference.primary
   }

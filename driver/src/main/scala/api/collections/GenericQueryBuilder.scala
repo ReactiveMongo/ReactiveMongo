@@ -48,7 +48,7 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
   def maxTimeMsOption: Option[Long]
 
   /** The default [[ReadPreference]] */
-  def readPreference: ReadPreference
+  def readPreference: ReadPreference = ReadPreference.primary
 
   @deprecated("Will be removed from the public API", "0.12.0")
   def merge(readPreference: ReadPreference): pack.Document

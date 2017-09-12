@@ -226,7 +226,9 @@ object Command {
 
   private[reactivemongo] def buildRequestMaker[P <: SerializationPack, A](pack: P)(command: A, writer: pack.Writer[A], readPreference: ReadPreference, db: String): (RequestMaker, Boolean) = {
     val buffer = ChannelBufferWritableBuffer()
+
     pack.serializeAndWrite(buffer, command, writer)
+
     val documents = BufferSequence(buffer.buffer)
     val flags = if (readPreference.slaveOk) QueryFlags.SlaveOk else 0
     val query = Query(flags, db + ".$cmd", 0, 1)
@@ -282,6 +284,9 @@ object Command {
 final case class ResolvedCollectionCommand[C <: CollectionCommand](
   collection: String,
   command: C) extends Command
+
+@deprecated(message = "", since = "0.12.7")
+trait Mongo26WriteCommand
 
 object `package` {
   type WriteConcern = GetLastError
