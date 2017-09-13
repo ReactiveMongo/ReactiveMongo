@@ -1,3 +1,4 @@
+import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
 
 import reactivemongo.api._
@@ -53,6 +54,8 @@ class QueryAndWriteCommandSpec extends org.specs2.mutable.Specification {
     }
 
     val nDocs = 1000000
+    def colName(n: Int) = s"queryandwritecommandsspec$n"
+
     s"insert with bulks (including 3 duplicate errors)" >> {
       import reactivemongo.api.indexes._
       import reactivemongo.api.indexes.IndexType.Ascending
@@ -76,15 +79,13 @@ class QueryAndWriteCommandSpec extends org.specs2.mutable.Specification {
           }
       }
 
-      def newName(n: Int) = s"queryandwritecommandsspec$n"
-
       s"$nDocs documents with the default connection" in { implicit ee: EE =>
-        bulkSpec(db(newName(nDocs)), nDocs, nDocs - 3, timeout)
+        bulkSpec(db(colName(nDocs)), nDocs, nDocs - 3, timeout)
       }
 
       s"${nDocs / 1000} with the slow connection" in { implicit ee: EE =>
         bulkSpec(
-          slowDb(newName(nDocs / 1000)),
+          slowDb(colName(nDocs / 1000)),
           nDocs / 1000, nDocs / 1000, slowTimeout)
       }
     }
@@ -92,8 +93,28 @@ class QueryAndWriteCommandSpec extends org.specs2.mutable.Specification {
     "insert from an empty bulk of docs" in { implicit ee: EE =>
       val docs = Stream.empty[BSONDocument]
 
-      collection.bulkInsert(docs, ordered = true).map(_.n) must beEqualTo(0).
+      collection.insert[BSONDocument](ordered = true).
+        many(docs).map(_.n) must beEqualTo(0).
         await(1, timeout)
+    }
+
+    "update using bulks" in { implicit ee: EE =>
+      val coll = db(colName(nDocs))
+      val builder = coll.update(ordered = false)
+
+      Future.sequence(Seq(
+        builder.element(
+          q = BSONDocument("upsert" -> 1),
+          u = BSONDocument("i" -> -1, "foo" -> "bar"),
+          upsert = true,
+          multi = false),
+        builder.element(
+          q = BSONDocument("i" -> BSONDocument(f"$$lte" -> 3)),
+          u = BSONDocument(f"$$set" -> BSONDocument("foo" -> "bar")),
+          upsert = false,
+          multi = true))).flatMap(builder.many(_)).map { r =>
+        (r.n, r.nModified, r.upserted.size)
+      } must beEqualTo((6, 4, 1)).await(0, timeout)
     }
   }
 }

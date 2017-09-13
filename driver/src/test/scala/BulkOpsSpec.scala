@@ -6,7 +6,7 @@ import org.specs2.concurrent.{ ExecutionEnv => EE }
 
 import reactivemongo.bson.BSONDocument
 
-import reactivemongo.api.BSONSerializationPack
+import reactivemongo.api.commands.BulkOps._
 
 class BulkOpsSpec extends org.specs2.mutable.Specification {
   "Bulk operations" title
@@ -14,22 +14,20 @@ class BulkOpsSpec extends org.specs2.mutable.Specification {
   val doc1 = BSONDocument("foo" -> 1)
   val doc2 = BSONDocument("bar" -> "lorem", "int" -> 2)
 
-  import bulkOps.BulkStage
-
   val bsonSize1 = doc1.byteSize * 2
 
-  def producer1 = bulkOps.bulks(
+  def producer1 = bulks[BSONDocument](
     documents = Seq.empty,
     maxBsonSize = bsonSize1,
-    maxBulkSize = 2)
+    maxBulkSize = 2)(_.byteSize)
 
   val bsonSize2 = doc2.byteSize * 2
 
   val producer2Docs = Seq(doc1, doc1, doc2, doc1, doc2)
-  def producer2 = bulkOps.bulks(
+  def producer2 = bulks[BSONDocument](
     documents = producer2Docs,
     maxBsonSize = bsonSize2,
-    maxBulkSize = 2)
+    maxBulkSize = 2)(_.byteSize)
 
   implicit val docOrdering = math.Ordering.by[BSONDocument, Int](_.hashCode)
 
@@ -37,7 +35,7 @@ class BulkOpsSpec extends org.specs2.mutable.Specification {
 
   "Preparation" should {
     "produce 1 single empty stage" in {
-      producer1 must beLike[bulkOps.BulkProducer] {
+      producer1 must beLike[BulkProducer[BSONDocument]] {
         case prod1 => prod1() must beRight.like {
           case BulkStage(bulk, None) => bulk must beEmpty
         }
@@ -45,10 +43,11 @@ class BulkOpsSpec extends org.specs2.mutable.Specification {
     }
 
     s"produce 1 bulk [#1, #1] then fail as #2(${doc2.byteSize}) > ${bsonSize1}" in {
-      bulkOps.bulks(
+      bulks[BSONDocument](
         documents = Seq(doc1, doc1, doc2, doc1),
         maxBsonSize = bsonSize1,
-        maxBulkSize = 2) must beLike[bulkOps.BulkProducer] {
+        maxBulkSize = 2)(_.byteSize).
+        aka("bulk producer") must beLike[BulkProducer[BSONDocument]] {
           case prod1 => prod1() must beRight.like {
             case BulkStage(bulk1, Some(prod2)) =>
               bulk1.toList must_== List(doc1, doc1) and {
@@ -60,7 +59,7 @@ class BulkOpsSpec extends org.specs2.mutable.Specification {
     }
 
     s"produce 5 bulks [#1, #1, #2, #1, #2]" in {
-      producer2 must beLike[bulkOps.BulkProducer] {
+      producer2 must beLike[BulkProducer[BSONDocument]] {
         case prod1 => prod1() must beRight.like {
           case BulkStage(bulk1, Some(prod2)) =>
             bulk1.toList must_== List(doc1, doc1) and {
@@ -80,11 +79,9 @@ class BulkOpsSpec extends org.specs2.mutable.Specification {
   }
 
   "Application" should {
-    import bulkOps.bulkApply
-
     "be successfully ordered" >> {
-      val app = bulkApply[Iterable[BSONDocument]](
-        _: bulkOps.BulkProducer)(Future.successful(_), None)(
+      val app = bulkApply[BSONDocument, Iterable[BSONDocument]](
+        _: BulkProducer[BSONDocument])(Future.successful(_), None)(
           _: ExecutionContext)
 
       "for producer1" in { implicit ee: EE =>
@@ -103,8 +100,8 @@ class BulkOpsSpec extends org.specs2.mutable.Specification {
       }
 
     "be successfully unordered" >> {
-      val app = bulkApply[Iterable[BSONDocument]](
-        _: bulkOps.BulkProducer)(Future.successful(_), recoverWithEmpty)(
+      val app = bulkApply[BSONDocument, Iterable[BSONDocument]](
+        _: BulkProducer[BSONDocument])(Future.successful(_), recoverWithEmpty)(
           _: ExecutionContext)
 
       "for producer1" in { implicit ee: EE =>
@@ -133,15 +130,15 @@ class BulkOpsSpec extends org.specs2.mutable.Specification {
     }
 
     "be failed on the first failure for producer2" in { implicit ee: EE =>
-      val app = bulkApply[Iterable[BSONDocument]](
-        _: bulkOps.BulkProducer)(foo, None)(_: ExecutionContext)
+      val app = bulkApply[BSONDocument, Iterable[BSONDocument]](
+        _: BulkProducer[BSONDocument])(foo, None)(_: ExecutionContext)
 
       app(producer2, ee.ec) must throwA[Exception]("Foo").await
     }
 
     "be successfully unordered even with failures" >> {
-      val app = bulkApply[Iterable[BSONDocument]](
-        _: bulkOps.BulkProducer)(foo, recoverWithEmpty)(
+      val app = bulkApply[BSONDocument, Iterable[BSONDocument]](
+        _: BulkProducer[BSONDocument])(foo, recoverWithEmpty)(
           _: ExecutionContext)
 
       "for producer1" in { implicit ee: EE =>
@@ -154,11 +151,4 @@ class BulkOpsSpec extends org.specs2.mutable.Specification {
       }
     }
   }
-
-  // ---
-
-  lazy val bulkOps =
-    new reactivemongo.api.commands.BulkOps[BSONSerializationPack.type] {
-      val pack = BSONSerializationPack
-    }
 }

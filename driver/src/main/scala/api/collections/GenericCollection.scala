@@ -24,7 +24,6 @@ import scala.concurrent.{ ExecutionContext, Future }
 
 import reactivemongo.api._
 import reactivemongo.api.commands.{
-  BulkOps,
   UpdateWriteResult,
   WriteConcern,
   WriteResult
@@ -85,7 +84,7 @@ trait GenericCollectionProducer[P <: SerializationPack with Singleton, +C <: Gen
  * @define aggregationPipelineFunction the function to create the aggregation pipeline using the aggregation framework depending on the collection type
  * @define orderedParam the [[https://docs.mongodb.com/manual/reference/method/db.collection.insert/#perform-an-unordered-insert ordered]] behaviour
  */
-trait GenericCollection[P <: SerializationPack with Singleton] extends Collection with GenericCollectionWithCommands[P] with CollectionMetaCommands with reactivemongo.api.commands.ImplicitCommandHelpers[P] with InsertOps[P] with Aggregator[P] with BulkOps[P] { self =>
+trait GenericCollection[P <: SerializationPack with Singleton] extends Collection with GenericCollectionWithCommands[P] with CollectionMetaCommands with reactivemongo.api.commands.ImplicitCommandHelpers[P] with InsertOps[P] with UpdateOps[P] with Aggregator[P] { self =>
   import scala.language.higherKinds
 
   val pack: P
@@ -220,9 +219,50 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    * @param writeConcern $writeConcernParam
    * @param writer $writerParam to be inserted
    * @return $returnWriteResult
+   *
+   * {{{
+   * collection.insert(myDoc)
+   *
+   * // Equivalent to:
+   * collection.insert[MyDocType](true, defaultWriteConcern).one(document)
+   * }}}
    */
   def insert[T](document: T, writeConcern: WriteConcern = defaultWriteConcern)(implicit writer: pack.Writer[T], ec: ExecutionContext): Future[WriteResult] =
     prepareInsert[T](true, writeConcern).one(document)
+
+  /**
+   * Returns a builder for insert operations.
+   * Uses the default write concern.
+   *
+   * @tparam T The type of the document to insert. $implicitWriterT.
+   * @param ordered $orderedParam
+   *
+   * {{{
+   * collection.insert[MyDocType](ordered = true).one(singleDoc)
+   *
+   * collection.insert[MyDocType](ordered = true).one(multiDocs)
+   * }}}
+   */
+  def insert[T: pack.Writer](ordered: Boolean)(implicit ec: ExecutionContext): InsertBuilder[T] = prepareInsert[T](ordered, defaultWriteConcern)
+
+  /**
+   * Returns a builder for insert operations.
+   *
+   * @tparam T The type of the document to insert. $implicitWriterT.
+   *
+   * @param ordered $orderedParam
+   * @param writeConcern $writeConcernParam
+   *
+   * {{{
+   * collection.insert[MyDocType](true, aWriteConcern).one(singleDoc)
+   *
+   * collection.insert[MyDocType](true, aWriteConcern).one(multiDocs)
+   * }}}
+   */
+  def insert[T: pack.Writer](
+    ordered: Boolean,
+    writeConcern: WriteConcern): InsertBuilder[T] =
+    prepareInsert[T](ordered, writeConcern)
 
   /**
    * Updates one or more documents matching the given selector
@@ -241,31 +281,32 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    *
    * @return $returnWriteResult
    */
-  def update[S, T](selector: S, update: T, writeConcern: WriteConcern = defaultWriteConcern, upsert: Boolean = false, multi: Boolean = false)(implicit swriter: pack.Writer[S], writer: pack.Writer[T], ec: ExecutionContext): Future[UpdateWriteResult] = db.connection.metadata match {
-    case Some(metadata) if (
-      metadata.maxWireVersion >= MongoWireVersion.V26) => {
-      // TODO: ordered + bulk
-      import BatchCommands.UpdateCommand.{ Update, UpdateElement }
+  def update[S, T](selector: S, update: T, writeConcern: WriteConcern = defaultWriteConcern, upsert: Boolean = false, multi: Boolean = false)(implicit swriter: pack.Writer[S], writer: pack.Writer[T], ec: ExecutionContext): Future[UpdateWriteResult] = prepareUpdate(ordered = true, writeConcern = writeConcern).
+    one(selector, update, upsert, multi)
 
-      Future(Update(writeConcern = writeConcern)(
-        UpdateElement(selector, update, upsert, multi))).flatMap(runCommand(_, writePref).flatMap { wr =>
-        val flattened = wr.flatten
-        if (!flattened.ok) {
-          // was ordered, with one doc => fail if has an error
-          Future.failed(WriteResult.lastError(flattened).
-            getOrElse[Exception](GenericDriverException(
-              s"fails to update: $update")))
+  /**
+   * Returns an update builder.
+   *
+   * {{{
+   * // Equivalent to collection.update(query, update, ...)
+   * collection.update(ordered = true).
+   *   one(query, update, upsert = false, multi = false)
+   * }}}
+   */
+  def update(ordered: Boolean): UpdateBuilder =
+    prepareUpdate(ordered, defaultWriteConcern)
 
-        } else Future.successful(wr)
-      })
-    }
-
-    case Some(metadata) => // Mongo < 2.6
-      Future.failed[UpdateWriteResult](new scala.RuntimeException(
-        s"unsupported MongoDB version: $metadata"))
-
-    case _ => Future.failed(MissingMetadata())
-  }
+  /**
+   * Returns an update builder.
+   *
+   * {{{
+   * collection.update(ordered, writeConcern).many(updates)
+   * }}}
+   */
+  def update(
+    ordered: Boolean,
+    writeConcern: WriteConcern): UpdateBuilder =
+    prepareUpdate(ordered, writeConcern)
 
   /**
    * Returns an update modifier, to be used with [[findAndModify]].
@@ -636,6 +677,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
   /**
    * @param ordered $orderedParam
    */
+  @deprecated("Use `insert[T](ordered).many(documents)`", "0.12.7")
   def bulkInsert(ordered: Boolean)(documents: ImplicitlyDocumentProducer*)(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] =
     db.connection.metadata.map { metadata =>
       bulkInsert(documents.toStream.map(_.produce), ordered, defaultWriteConcern, metadata.maxBulkSize, metadata.maxBsonSize)
@@ -644,6 +686,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
   /**
    * @param ordered $orderedParam
    */
+  @deprecated("Use `insert[T](ordered, writeConcern).many(documents)`", "0.12.7")
   def bulkInsert(ordered: Boolean, writeConcern: WriteConcern)(documents: ImplicitlyDocumentProducer*)(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] =
     db.connection.metadata.map { metadata =>
       bulkInsert(documents.toStream.map(_.produce), ordered, writeConcern, metadata.maxBulkSize, metadata.maxBsonSize)
@@ -652,18 +695,21 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
   /**
    * @param ordered $orderedParam
    */
+  @deprecated("Use `insert[T](ordered, writeConcern).many(documents)`", "0.12.7")
   def bulkInsert(ordered: Boolean, writeConcern: WriteConcern, bulkSize: Int, bulkByteSize: Int)(documents: ImplicitlyDocumentProducer*)(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] =
     bulkInsert(documents.toStream.map(_.produce), ordered, writeConcern, bulkSize, bulkByteSize)
 
   /**
    * @param ordered $orderedParam
    */
+  @deprecated("Use `insert[T](ordered).many(documents)`", "0.12.7")
   def bulkInsert(documents: Stream[pack.Document], ordered: Boolean)(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] =
     bulkInsert(documents, ordered, defaultWriteConcern)
 
   /**
    * @param ordered $orderedParam
    */
+  @deprecated("Use `insert[T](ordered).many(documents, writeConcern)`", "0.12.7")
   def bulkInsert(documents: Stream[pack.Document], ordered: Boolean, writeConcern: WriteConcern)(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] =
     db.connection.metadata.map { metadata =>
       bulkInsert(documents, ordered, writeConcern,
@@ -674,9 +720,10 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
   /**
    * @param ordered $orderedParam
    */
+  @deprecated("Use `insert[T](ordered).many(documents, writeConcern)`", "0.12.7")
   def bulkInsert(documents: Stream[pack.Document], ordered: Boolean, writeConcern: WriteConcern = defaultWriteConcern, @deprecated("Unused", "0.12.7") bulkSize: Int, @deprecated("Unused", "0.12.7") bulkByteSize: Int)(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] = prepareInsert[pack.Document](ordered, writeConcern).many(documents)
 
-  @deprecated("", "0.12.7")
+  @deprecated("Unused", "0.12.7")
   protected sealed trait BulkMaker[R, S <: BulkMaker[R, S]] {
     def fill(docs: Stream[pack.Document]): (Stream[pack.Document], Option[S]) = {
       @annotation.tailrec
@@ -696,7 +743,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
     def send()(implicit ec: ExecutionContext): Future[R]
   }
 
-  @deprecated("", "0.12.7")
+  @deprecated("Unused", "0.12.7")
   protected object Mongo26WriteCommand {
     def insert(
       ordered: Boolean,
@@ -705,7 +752,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
       new Mongo26WriteCommand("insert", ordered, writeConcern, metadata)
   }
 
-  @deprecated("", "0.12.7")
+  @deprecated("Unused", "0.12.7")
   protected class Mongo26WriteCommand private (
     tpe: String,
     ordered: Boolean,

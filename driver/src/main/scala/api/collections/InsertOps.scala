@@ -24,7 +24,7 @@ import reactivemongo.api.commands.{
  * @define orderedParam the [[https://docs.mongodb.com/manual/reference/method/db.collection.insert/#perform-an-unordered-insert ordered]] behaviour
  */
 private[reactivemongo] trait InsertOps[P <: SerializationPack with Singleton] {
-  collection: GenericCollection[P] with BulkOps[P] =>
+  collection: GenericCollection[P] =>
 
   val pack: P
 
@@ -36,23 +36,23 @@ private[reactivemongo] trait InsertOps[P <: SerializationPack with Singleton] {
     ordered: Boolean,
     writeConcern: WriteConcern): InsertBuilder[T] = {
     if (ordered) {
-      new Ordered[T](writeConcern, implicitly[pack.Writer[T]])
+      new OrderedInsert[T](writeConcern, implicitly[pack.Writer[T]])
     } else {
-      new Unordered[T](writeConcern, implicitly[pack.Writer[T]])
+      new UnorderedInsert[T](writeConcern, implicitly[pack.Writer[T]])
     }
   }
 
   /** Builder for insert operations. */
   sealed trait InsertBuilder[T] {
-    protected implicit def writer: pack.Writer[T]
+    implicit protected def writer: pack.Writer[T]
 
-    final protected lazy val metadata: Future[ProtocolMetadata] =
+    private lazy val metadata: Future[ProtocolMetadata] =
       collection.db.connection.metadata.fold(
         Future.failed[ProtocolMetadata](collection.MissingMetadata()))(
           Future.successful(_))
 
     /** The max BSON size, including the size of command envelope */
-    final protected def maxBsonSize(implicit ec: ExecutionContext) =
+    private def maxBsonSize(implicit ec: ExecutionContext) =
       metadata.map { meta =>
         // Command envelope to compute accurate BSON size limit
         val i = ResolvedCollectionCommand(
@@ -84,23 +84,23 @@ private[reactivemongo] trait InsertOps[P <: SerializationPack with Singleton] {
       maxSz <- maxBsonSize
       docs <- serialize(documents)
       res <- {
-        val bulkProducer = collection.bulks(
-          docs, meta.maxBulkSize, maxSz)
+        val bulkProducer = BulkOps.bulks(
+          docs, meta.maxBulkSize, maxSz) { pack.bsonSize(_) }
 
-        collection.bulkApply[WriteResult](bulkProducer)({ bulk =>
+        BulkOps.bulkApply[pack.Document, WriteResult](bulkProducer)({ bulk =>
           execute(bulk.toSeq)
         }, bulkRecover).map(MultiBulkWriteResult(_))
       }
     } yield res
 
-    final protected def serialize(input: Iterable[T])(implicit ec: ExecutionContext): Future[Iterable[pack.Document]] = Future.sequence(input.map { v =>
+    private def serialize(input: Iterable[T])(implicit ec: ExecutionContext): Future[Iterable[pack.Document]] = Future.sequence(input.map { v =>
       Try(pack.serialize(v, writer)) match {
         case Success(v) => Future.successful(v)
         case Failure(e) => Future.failed[pack.Document](e)
       }
     })
 
-    protected final def execute(documents: Seq[pack.Document])(
+    private final def execute(documents: Seq[pack.Document])(
       implicit
       ec: ExecutionContext): Future[WriteResult] = metadata.flatMap { meta =>
       import BatchCommands.{ DefaultWriteResultReader, InsertWriter }
@@ -131,7 +131,7 @@ private[reactivemongo] trait InsertOps[P <: SerializationPack with Singleton] {
 
   private val orderedRecover = Option.empty[Exception => Future[WriteResult]]
 
-  private final class Ordered[T](
+  private final class OrderedInsert[T](
     val writeConcern: WriteConcern,
     val writer: pack.Writer[T]) extends InsertBuilder[T] {
 
@@ -159,7 +159,7 @@ private[reactivemongo] trait InsertOps[P <: SerializationPack with Singleton] {
         wtime = Option.empty[Int]))
     }
 
-  private final class Unordered[T](
+  private final class UnorderedInsert[T](
     val writeConcern: WriteConcern,
     val writer: pack.Writer[T]) extends InsertBuilder[T] {
 
