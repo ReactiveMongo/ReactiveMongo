@@ -4,11 +4,8 @@ import scala.concurrent.{ ExecutionContext, Future }
 
 import reactivemongo.core.errors.GenericDriverException
 
-import reactivemongo.api.SerializationPack
-
-/** Internal bulk operations for the given `pack`. */
-trait BulkOps[P <: SerializationPack with Singleton] {
-  val pack: P
+/** Internal bulk operations */
+private[reactivemongo] object BulkOps {
 
   /**
    * Applies the given function `f` on all the bulks,
@@ -16,10 +13,13 @@ trait BulkOps[P <: SerializationPack with Singleton] {
    *
    * @param recoverOrdered the function to recover some failure while applying `f` on some bulk, if and only if the [[https://docs.mongodb.com/manual/reference/method/db.collection.insert/#perform-an-unordered-insert ordered]] behaviour is selected
    */
-  private[reactivemongo] def bulkApply[T](producer: BulkProducer)(f: Iterable[pack.Document] => Future[T], recoverUnordered: Option[Exception => Future[T]] = Option.empty)(implicit ec: ExecutionContext): Future[Seq[T]] =
+  def bulkApply[I, O](producer: BulkProducer[I])(f: Iterable[I] => Future[O], recoverUnordered: Option[Exception => Future[O]] = Option.empty)(implicit ec: ExecutionContext): Future[Seq[O]] =
     recoverUnordered match {
-      case Some(recover) => unorderedApply[T](producer, Seq.empty)(f, recover)
-      case _             => orderedApply[T](producer, Seq.empty)(f)
+      case Some(recover) =>
+        unorderedApply[I, O](producer, Seq.empty)(f, recover)
+
+      case _ =>
+        orderedApply[I, O](producer, Seq.empty)(f)
     }
 
   /**
@@ -29,74 +29,76 @@ trait BulkOps[P <: SerializationPack with Singleton] {
    * @param documents the documents to be grouped in bulks
    * @param maxBsonSize see [[reactivemongo.core.nodeset.ProtocolMetadata.maxBsonSize]]
    * @param maxBulkSize see [[reactivemongo.core.nodeset.ProtocolMetadata.maxBulkSize]]
+   * @param sz the function used to determine the BSON size of each document
+   * @tparam I the input (document) type
    */
-  private[reactivemongo] def bulks(
-    documents: Iterable[pack.Document],
+  def bulks[I](
+    documents: Iterable[I],
     maxBsonSize: Int,
-    maxBulkSize: Int): BulkProducer =
-    new BulkProducer(0, documents, maxBsonSize, maxBulkSize)
+    maxBulkSize: Int)(sz: I => Int): BulkProducer[I] =
+    new BulkProducer[I](0, documents, sz, maxBsonSize, maxBulkSize)
 
   /** Bulk stage */
-  case class BulkStage(
-    bulk: Iterable[pack.Document],
-    next: Option[BulkProducer])
+  case class BulkStage[I](
+    bulk: Iterable[I],
+    next: Option[BulkProducer[I]])
 
   /** Bulk producer */
-  final class BulkProducer(
+  final class BulkProducer[I](
     offset: Int,
-    documents: Iterable[pack.Document],
+    documents: Iterable[I],
+    sz: I => Int,
     maxBsonSize: Int,
-    maxBulkSize: Int) extends (() => Either[String, BulkStage]) {
+    maxBulkSize: Int) extends (() => Either[String, BulkStage[I]]) {
 
     /**
      * Returns either an error message, or the next stage.
      */
-    def apply(): Either[String, BulkStage] = go(documents, 0, 0, Seq.empty)
+    def apply(): Either[String, BulkStage[I]] = go(documents, 0, 0, Seq.empty)
 
     @annotation.tailrec
     def go(
-      input: Iterable[pack.Document],
+      input: Iterable[I],
       docs: Int,
       bsonSize: Int,
-      bulk: Seq[pack.Document]): Either[String, BulkStage] =
-      input.headOption match {
-        case Some(doc) => {
-          val bsz = pack.bsonSize(doc)
+      bulk: Seq[I]): Either[String, BulkStage[I]] = input.headOption match {
+      case Some(doc) => {
+        val bsz = sz(doc)
 
-          if (bsz > maxBsonSize) {
-            Left(s"size of document #${offset + docs} exceed the maxBsonSize: $bsz > $maxBsonSize")
+        if (bsz > maxBsonSize) {
+          Left(s"size of document #${offset + docs} exceed the maxBsonSize: $bsz > $maxBsonSize")
+        } else {
+          val nc = docs + 1
+          val nsz = bsonSize + bsz
+
+          if (nsz > maxBsonSize) {
+            Right(BulkStage[I](
+              bulk = bulk.reverse,
+              next = Some(new BulkProducer[I](
+                offset + nc, input, sz, maxBsonSize, maxBulkSize))))
+
+          } else if (nc == maxBulkSize || nsz == maxBsonSize) {
+            Right(BulkStage[I](
+              bulk = (doc +: bulk).reverse,
+              next = Some(new BulkProducer[I](
+                offset + nc, input.tail, sz, maxBsonSize, maxBulkSize))))
+
           } else {
-            val nc = docs + 1
-            val nsz = bsonSize + bsz
-
-            if (nsz > maxBsonSize) {
-              Right(BulkStage(
-                bulk = bulk.reverse,
-                next = Some(new BulkProducer(
-                  offset + nc, input, maxBsonSize, maxBulkSize))))
-
-            } else if (nc == maxBulkSize || nsz == maxBsonSize) {
-              Right(BulkStage(
-                bulk = (doc +: bulk).reverse,
-                next = Some(new BulkProducer(
-                  offset + nc, input.tail, maxBsonSize, maxBulkSize))))
-
-            } else {
-              go(input.tail, nc, nsz, doc +: bulk)
-            }
+            go(input.tail, nc, nsz, doc +: bulk)
           }
         }
-
-        case _ => Right(BulkStage(bulk.reverse, None))
       }
+
+      case _ => Right(BulkStage[I](bulk.reverse, None))
+    }
 
     override val toString = s"BulkProducer(offset = $offset)"
   }
 
   // ---
 
-  private def unorderedApply[T](current: BulkProducer, tasks: Seq[Future[T]])(f: Iterable[pack.Document] => Future[T], recover: Exception => Future[T])(implicit ec: ExecutionContext): Future[Seq[T]] = current() match {
-    case Left(cause) => Future.failed[Seq[T]](GenericDriverException(cause))
+  private def unorderedApply[I, O](current: BulkProducer[I], tasks: Seq[Future[O]])(f: Iterable[I] => Future[O], recover: Exception => Future[O])(implicit ec: ExecutionContext): Future[Seq[O]] = current() match {
+    case Left(cause) => Future.failed[Seq[O]](GenericDriverException(cause))
 
     case Right(BulkStage(bulk, _)) if bulk.isEmpty =>
       Future.sequence(tasks.reverse)
@@ -112,9 +114,9 @@ trait BulkOps[P <: SerializationPack with Singleton] {
       }) +: tasks).reverse)
   }
 
-  private def orderedApply[T](current: BulkProducer, values: Seq[T])(f: Iterable[pack.Document] => Future[T])(implicit ec: ExecutionContext): Future[Seq[T]] =
+  private def orderedApply[I, O](current: BulkProducer[I], values: Seq[O])(f: Iterable[I] => Future[O])(implicit ec: ExecutionContext): Future[Seq[O]] =
     current() match {
-      case Left(cause) => Future.failed[Seq[T]](GenericDriverException(cause))
+      case Left(cause) => Future.failed[Seq[O]](GenericDriverException(cause))
 
       case Right(BulkStage(bulk, _)) if bulk.isEmpty =>
         Future.successful(values.reverse)
@@ -125,8 +127,4 @@ trait BulkOps[P <: SerializationPack with Singleton] {
       case Right(BulkStage(bulk, _)) =>
         f(bulk).map { v => (v +: values).reverse }
     }
-
-  private lazy val logger = reactivemongo.util.LazyLogger(
-    s"reactivemongo.api.commands.BulkOps[${pack}]")
-
 }

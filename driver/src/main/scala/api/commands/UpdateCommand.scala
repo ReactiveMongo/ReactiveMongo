@@ -17,6 +17,12 @@ trait UpdateCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] {
 
   type UpdateResult = UpdateWriteResult
 
+  /**
+   * @param q the query that matches the documents to update
+   * @param u the modifications to apply
+   * @param upsert if true perform an insert if no documents match the query
+   * @param multi if true updates all the matching documents
+   */
   case class UpdateElement(
     q: P#Document,
     u: P#Document,
