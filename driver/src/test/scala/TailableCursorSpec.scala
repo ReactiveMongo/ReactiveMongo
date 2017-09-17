@@ -1,5 +1,5 @@
-import scala.concurrent.{ Await, ExecutionContext, Future }
-import scala.concurrent.duration.{ FiniteDuration, MILLISECONDS }
+import scala.concurrent.{ Await, ExecutionContext, Future, Promise }
+import scala.concurrent.duration._
 
 import reactivemongo.bson.{ BSONDocument, BSONDocumentReader }
 import reactivemongo.core.protocol.Response
@@ -18,9 +18,19 @@ trait TailableCursorSpec { specs: CursorSpec =>
         val col = database(s"somecollection_captail_$n")
 
         col.createCapped(4096, Some(10)).flatMap { _ =>
+          val sched = Common.driver.system.scheduler
+
           (0 until 10).foldLeft(Future successful {}) { (f, id) =>
-            f.flatMap(_ => col.insert(BSONDocument("id" -> id)).map(_ =>
-              Thread.sleep(200)))
+            f.flatMap(_ => col.insert(BSONDocument("id" -> id)).flatMap { _ =>
+              val pause = Promise[Unit]()
+
+              sched.scheduleOnce(200.milliseconds) {
+                pause.trySuccess({})
+                ()
+              }
+
+              pause.future
+            })
           }.map(_ => info(s"All fixtures inserted in test collection '$n'"))
         }
 
