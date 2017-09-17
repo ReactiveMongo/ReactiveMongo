@@ -6,3 +6,5 @@ if [ `echo "$JAVA_HOME" | grep java-7-oracle | wc -l` -eq 1 ]; then
 else
     JVM_OPTS="$JVM_OPTS -XX:MetaspaceSize=512M -XX:MaxMetaspaceSize=512M"
 fi
+
+export _JAVA_OPTIONS=""

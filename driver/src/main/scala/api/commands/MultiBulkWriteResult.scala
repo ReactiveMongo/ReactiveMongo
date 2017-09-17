@@ -1,14 +1,16 @@
 package reactivemongo.api.commands
 
 object MultiBulkWriteResult {
-  def apply(): MultiBulkWriteResult = MultiBulkWriteResult(
-    true, 0, 0, Seq.empty, Seq.empty, None, None, None, 0)
+  @deprecated("Use [[empty]]", "0.12.7")
+  def apply(): MultiBulkWriteResult = empty
 
-  def apply(wr: WriteResult): MultiBulkWriteResult =
-    apply().merge(wr)
+  def apply(wr: WriteResult): MultiBulkWriteResult = empty.merge(wr)
 
   def apply(rs: Iterable[WriteResult]): MultiBulkWriteResult =
-    rs.foldLeft(apply())(_ merge _)
+    rs.foldLeft(empty)(_ merge _)
+
+  val empty: MultiBulkWriteResult = MultiBulkWriteResult(
+    true, 0, 0, Seq.empty, Seq.empty, None, None, None, 0)
 }
 
 case class MultiBulkWriteResult(

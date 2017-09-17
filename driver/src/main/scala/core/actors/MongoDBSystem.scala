@@ -909,8 +909,8 @@ trait MongoDBSystem extends Actor {
 
             upSet.updateAll { n =>
               if (!node.names.contains(n.name) && // the node itself
-                n.status == NodeStatus) {
-                // invalidate node status on primary status conflict
+                n.status != node.status) {
+                // invalidate node status on status conflict
                 n._copy(status = NodeStatus.Unknown)
               } else n
             }

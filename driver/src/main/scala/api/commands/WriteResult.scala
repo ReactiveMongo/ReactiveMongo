@@ -81,6 +81,9 @@ object WriteResult {
   object Message {
     def unapply(result: WriteResult): Option[String] = result.errmsg
   }
+
+  private[reactivemongo] def empty: WriteResult = DefaultWriteResult(
+    true, 0, Seq.empty, Option.empty, Option.empty, Option.empty)
 }
 
 case class LastError(

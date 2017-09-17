@@ -1,7 +1,6 @@
 package reactivemongo.api.commands.bson
 
 import reactivemongo.bson.{
-  BSONArray,
   BSONDocument,
   BSONDocumentReader,
   BSONElement,
@@ -18,24 +17,39 @@ import reactivemongo.api.commands.bson.CommonImplicits.ReadConcernWriter
 object BSONAggregationFramework
   extends AggregationFramework[BSONSerializationPack.type] {
 
-  import reactivemongo.bson.{ BSONBoolean, BSONDouble, BSONInteger, BSONString }
-
   val pack: BSONSerializationPack.type = BSONSerializationPack
 
-  protected def makeDocument(elements: Seq[Producer[BSONElement]]) =
-    BSONDocument(elements: _*)
+  @deprecated("Use [[pack.newBuilder]]", "0.12.7")
+  @inline protected def makeDocument(elements: Seq[Producer[BSONElement]]) =
+    pack.newBuilder.document(elements)
 
-  protected def makeArray(value: BSONValue, values: Seq[BSONValue]) =
-    BSONArray(value +: values)
+  @deprecated("Use [[pack.newBuilder]]", "0.12.7")
+  @inline protected def makeArray(value: BSONValue, values: Seq[BSONValue]) =
+    pack.newBuilder.array(value, values)
 
-  protected def elementProducer(name: String, value: BSONValue) =
-    name -> value
+  @deprecated("Use [[pack.newBuilder]]", "0.12.7")
+  @inline protected def elementProducer(name: String, value: BSONValue) =
+    pack.newBuilder.elementProducer(name, value)
 
-  protected def booleanValue(b: Boolean): BSONValue = BSONBoolean(b)
-  protected def intValue(i: Int): BSONValue = BSONInteger(i)
-  protected def longValue(l: Long): BSONValue = BSONDouble(l.toDouble)
-  protected def doubleValue(d: Double): BSONValue = BSONDouble(d)
-  protected def stringValue(s: String): BSONValue = BSONString(s)
+  @deprecated("Use [[pack.newBuilder]]", "0.12.7")
+  @inline protected def booleanValue(b: Boolean): BSONValue =
+    pack.newBuilder.boolean(b)
+
+  @deprecated("Use [[pack.newBuilder]]", "0.12.7")
+  @inline protected def intValue(i: Int): BSONValue =
+    pack.newBuilder.int(i)
+
+  @deprecated("Use [[pack.newBuilder]]", "0.12.7")
+  @inline protected def longValue(l: Long): BSONValue =
+    pack.newBuilder.long(l)
+
+  @deprecated("Use [[pack.newBuilder]]", "0.12.7")
+  @inline protected def doubleValue(d: Double): BSONValue =
+    pack.newBuilder.double(d)
+
+  @deprecated("Use [[pack.newBuilder]]", "0.12.7")
+  @inline protected def stringValue(s: String): BSONValue =
+    pack.newBuilder.string(s)
 }
 
 object BSONAggregationImplicits {

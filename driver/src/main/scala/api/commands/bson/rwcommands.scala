@@ -101,13 +101,8 @@ object BSONInsertCommandImplicits {
   import BSONCommonWriteCommandsImplicits._
 
   implicit object InsertWriter extends BSONDocumentWriter[ResolvedCollectionCommand[Insert]] {
-    def write(insert: ResolvedCollectionCommand[Insert]) = BSONDocument(
-      "insert" -> insert.collection,
-      "documents" -> BSONArray(insert.command.documents),
-      "ordered" -> insert.command.ordered,
-      "writeConcern" -> insert.command.writeConcern
-    // TODO: 3.4; bypassDocumentValidation: boolean
-    )
+    def write(insert: ResolvedCollectionCommand[Insert]): BSONDocument =
+      BSONInsertCommand.serialize(insert)
   }
 }
 
