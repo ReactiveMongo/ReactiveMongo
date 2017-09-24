@@ -264,24 +264,24 @@ class AggregationSpec extends org.specs2.mutable.Specification {
       val expected = List(
         document(
           "biggestCity" -> document(
-            "name" -> "NEW YORK", "population" -> 19746227L),
+            "name" -> "LE MANS", "population" -> 148169L),
           "smallestCity" -> document(
-            "name" -> "NEW YORK", "population" -> 19746227L),
-          "state" -> "NY"),
+            "name" -> "LE MANS", "population" -> 148169L),
+          "state" -> "FR"),
         document(
-          "biggestCity" -> document(
-            "name" -> "LE MANS", "population" -> 148169L),
-          "smallestCity" -> document(
-            "name" -> "LE MANS", "population" -> 148169L),
-          "state" -> "FR"), document(
           "biggestCity" -> document(
             "name" -> "TOKYO", "population" -> 13185502L),
           "smallestCity" -> document(
             "name" -> "AOGASHIMA", "population" -> 200L),
-          "state" -> "JP"))
+          "state" -> "JP"),
+        document(
+          "biggestCity" -> document(
+            "name" -> "NEW YORK", "population" -> 19746227L),
+          "smallestCity" -> document(
+            "name" -> "NEW YORK", "population" -> 19746227L),
+          "state" -> "NY"))
 
       val groupPipeline = List(
-        Sort(Ascending("population")),
         Group(BSONString(f"$$_id.state"))(
           "biggestCity" -> LastField("_id.city"),
           "biggestPop" -> LastField("pop"),
@@ -291,18 +291,20 @@ class AggregationSpec extends org.specs2.mutable.Specification {
           "biggestCity" -> document(
             "name" -> f"$$biggestCity", "population" -> f"$$biggestPop"),
           "smallestCity" -> document(
-            "name" -> f"$$smallestCity", "population" -> f"$$smallestPop"))))
+            "name" -> f"$$smallestCity", "population" -> f"$$smallestPop"))),
+        Sort(Ascending("state")))
 
       coll.aggregate(
         Group(document("state" -> f"$$state", "city" -> f"$$city"))(
           "pop" -> SumField("population")), groupPipeline).map(_.firstBatch) must beEqualTo(expected).await(1, timeout) and {
           coll.aggregate(
             Group(document("state" -> f"$$state", "city" -> f"$$city"))(
-              "pop" -> SumField("population")), Limit(2) :: groupPipeline).map(_.firstBatch) must beEqualTo(expected drop 2).await(1, timeout)
+              "pop" -> SumField("population")), groupPipeline :+ Limit(2)).map(_.firstBatch) must beEqualTo(expected take 2).await(1, timeout)
+
         } and {
           coll.aggregate(
             Group(document("state" -> f"$$state", "city" -> f"$$city"))(
-              "pop" -> SumField("population")), Skip(2) :: groupPipeline).map(_.firstBatch) must beEqualTo(expected take 2).await(1, timeout)
+              "pop" -> SumField("population")), groupPipeline :+ Skip(2)).map(_.firstBatch) must beEqualTo(expected drop 2).await(1, timeout)
         }
     }
 
@@ -526,6 +528,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
           "_id" -> 7020, "title" -> "Iliad",
           "author" -> "Homer", "copies" -> 10))
 
+      // TODO: bulk insert
       Future.sequence(fixtures.map { doc => books.insert(doc) }).map(_ => {}).
         aka("fixtures") must beEqualTo({}).await(0, timeout)
     }
@@ -560,13 +563,17 @@ class AggregationSpec extends org.specs2.mutable.Specification {
       import books.BatchCommands.AggregationFramework
       import AggregationFramework.{ Ascending, Group, AddFieldToSet, Sort }
 
+      implicit val catReader = Macros.reader[AuthorCatalog]
+
       books.aggregate(
         Sort(Ascending("title")),
         List(Group(BSONString(f"$$author"))(
-          "books" -> AddFieldToSet("title")))).map(_.firstBatch.toSet) must beEqualTo(Set(
-          document("_id" -> "Homer", "books" -> List("The Odyssey", "Iliad")),
-          document("_id" -> "Dante", "books" -> List(
-            "The Banquet", "Eclogues", "Divine Comedy")))).await(1, timeout)
+          "books" -> AddFieldToSet("title")))).map(
+          _.head[AuthorCatalog].toSet) must beEqualTo(Set(
+            AuthorCatalog(_id = "Homer", books = Set("The Odyssey", "Iliad")),
+            AuthorCatalog(_id = "Dante", books = Set(
+              "The Banquet", "Eclogues", "Divine Comedy")))).await(1, timeout)
+
     }
   }
 
@@ -1095,6 +1102,11 @@ db.accounts.aggregate([
 
   case class SaleItem(itemId: Int, quantity: Int, price: Int)
   case class Sale(_id: Int, items: List[SaleItem])
+
+  case class AuthorCatalog(
+    _id: String, // author name
+    books: Set[String] // books titles
+  )
 
   case class QuizStdDev(_id: Int, stdDev: Double)
 

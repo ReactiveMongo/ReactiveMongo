@@ -118,7 +118,7 @@ class DriverSpec extends org.specs2.mutable.Specification {
                 case _: Exceptions.InternalState => ok
               }
             } and {
-              (duration must be_>=(17000L)) and (duration must be_<(22000L))
+              (duration must be_>=(17000L)) and (duration must be_<(28500L))
             }
         }.await(1, 22.seconds) and {
           con.askClose()(timeout) must not(throwA[Exception]).await(1, timeout)
@@ -343,7 +343,7 @@ class DriverSpec extends org.specs2.mutable.Specification {
           await(1, timeout * 2) and {
             val duration = System.currentTimeMillis() - before
 
-            duration must be_<(estTimeout(fos).toMillis + 25)
+            duration must be_<(estTimeout(fos).toMillis + 500 /* ms */ )
           }
       }
     }

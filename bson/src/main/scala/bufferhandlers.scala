@@ -314,15 +314,28 @@ object BSONIterator {
     val prefix = (0 to i).map { i => "  " }.mkString("")
 
     it.map {
-      case Success(elem) => elem.value match {
-        case array: BSONArray  => prefix + elem.name + ": [\n" + pretty(i + 1, array.elements.map(Success(_)).iterator) + "\n" + prefix + "]"
+      case Success(BSONElement(name, value)) => value match {
+        case array: BSONArray => prefix + name + ": [\n" + pretty(i + 1, array.elements.map(Success(_)).iterator) + "\n" + prefix + "]"
 
-        case doc: BSONDocument => prefix + elem.name + ": {\n" + pretty(i + 1, doc.stream.iterator) + "\n" + prefix + "}"
+        case BSONBoolean(b) =>
+          prefix + name + s": $b"
+
+        case doc: BSONDocument => prefix + name + ": {\n" + pretty(i + 1, doc.stream.iterator) + "\n" + prefix + "}"
+
+        case BSONDouble(d) =>
+          prefix + name + s""": NumberDecimal("$d")"""
+
+        case BSONLong(l) =>
+          prefix + name + s": NumberLong($l)"
 
         case BSONString(s) =>
-          prefix + elem.name + ": \"" + s.replaceAll("\"", "\\\"") + '"'
+          prefix + name + ": \"" + s.replaceAll("\"", "\\\"") + '"'
 
-        case _ => prefix + elem.name + ": " + elem.value.toString
+        case oid @ BSONObjectID(_) =>
+          prefix + name + s""": Object(${oid.stringify})"""
+
+        case _ =>
+          prefix + name + ": " + value.toString
       }
 
       case Failure(e) => s"${prefix}ERROR[${e.getMessage()}]"
