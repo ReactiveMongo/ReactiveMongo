@@ -1,7 +1,7 @@
 package reactivemongo.api
 
 import scala.concurrent.{ ExecutionContext, Future }
-import scala.concurrent.duration.SECONDS
+import scala.concurrent.duration.{ FiniteDuration, SECONDS }
 
 import akka.util.Timeout
 import akka.actor.ActorRef
@@ -23,7 +23,7 @@ package object tests {
   // Test alias
   def _failover2[A](c: MongoConnection, s: FailoverStrategy)(p: () => Future[A])(implicit ec: ExecutionContext): Failover2[A] = Failover2.apply(c, s)(p)(ec)
 
-  def isAvailable(con: MongoConnection)(implicit ec: ExecutionContext): Future[Boolean] = con.probe.map(_.isEmpty)
+  def isAvailable(con: MongoConnection, timeout: FiniteDuration)(implicit ec: ExecutionContext): Future[Boolean] = con.probe(timeout).map(_ => true)
 
   def waitIsAvailable(con: MongoConnection, failoverStrategy: FailoverStrategy)(implicit ec: ExecutionContext): Future[Unit] = con.waitIsAvailable(failoverStrategy)
 

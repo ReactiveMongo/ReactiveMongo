@@ -15,7 +15,7 @@
  */
 package reactivemongo.api
 
-import java.util.concurrent.TimeUnit.MILLISECONDS
+//import java.util.concurrent.TimeUnit.MILLISECONDS
 
 import scala.util.Try
 import scala.util.control.{ NonFatal, NoStackTrace }
@@ -30,7 +30,7 @@ import scala.concurrent.duration.{ Duration, FiniteDuration }
 
 import akka.util.Timeout
 import akka.actor.{ Actor, ActorRef, ActorSystem, Props }
-import akka.pattern.{ after, ask }
+import akka.pattern.ask //{ after, ask }
 
 import reactivemongo.core.actors.{
   AuthRequest,
@@ -137,6 +137,28 @@ class MongoConnection(
   private[api] def waitIsAvailable(failoverStrategy: FailoverStrategy)(implicit ec: ExecutionContext): Future[Unit] = {
     logger.debug(s"[$lnm] Waiting is available...")
 
+    val timeoutFactor = 1.25D // TODO: Review
+    val timeout: FiniteDuration = (1 to failoverStrategy.retries).
+      foldLeft(failoverStrategy.initialDelay) { (d, i) =>
+        d + (failoverStrategy.initialDelay * (
+          (timeoutFactor * failoverStrategy.delayFactor(i)).toLong))
+      }
+
+    probe(timeout).recoverWith {
+      case error: Throwable => {
+        error.setStackTrace(databaseSTE +: error.getStackTrace)
+        Future.failed[ProtocolMetadata](error)
+      }
+    }.flatMap {
+      case ProtocolMetadata(
+        _, MongoWireVersion.V24AndBefore, _, _, _) =>
+        Future.failed[Unit](ConnectionException(
+          s"unsupported MongoDB version < 2.6 ($lnm)"))
+
+      case _ => Future successful {}
+    }
+
+    /*
     @inline def nextTimeout(i: Int): FiniteDuration = {
       val delayFactor: Double = failoverStrategy.delayFactor(i)
 
@@ -210,6 +232,7 @@ class MongoConnection(
             s"protocol metadata not available ($lnm)"))
         }
       }
+     */
   }
 
   /** Returns true if the connection has not been killed. */
@@ -273,10 +296,10 @@ class MongoConnection(
    */
   def close(): Unit = monitor ! Close
 
-  private case class IsAvailable(result: Promise[Boolean]) {
+  private case class IsAvailable(result: Promise[ProtocolMetadata]) {
     override val toString = "IsAvailable?"
   }
-  private case class IsPrimaryAvailable(result: Promise[Boolean]) {
+  private case class IsPrimaryAvailable(result: Promise[ProtocolMetadata]) {
     override val toString = "IsPrimaryAvailable?"
   }
 
@@ -285,82 +308,102 @@ class MongoConnection(
    *
    * @return Future(None) if available
    */
-  private[api] def probe: Future[Option[Exception]] = whenActive {
-    val p = Promise[Boolean]()
-    val check = {
-      if (options.readPreference.slaveOk) IsAvailable(p)
-      else IsPrimaryAvailable(p)
-    }
+  private[api] def probe(timeout: FiniteDuration): Future[ProtocolMetadata] =
+    whenActive {
+      val p = Promise[ProtocolMetadata]()
+      val check = {
+        if (options.readPreference.slaveOk) IsAvailable(p)
+        else IsPrimaryAvailable(p)
+      }
 
-    monitor ! check
+      monitor ! check
 
-    import actorSystem.dispatcher
+      import actorSystem.dispatcher
 
-    p.future.map {
-      case true => Option.empty[Exception] // is available - no error
-
-      case _ => {
-        if (options.readPreference.slaveOk) {
-          Some(new NodeSetNotReachable(supervisor, name, history()))
-        } else {
-          Some(new PrimaryUnavailableException(supervisor, name, history()))
-        }
+      Await.ready(p.future, timeout).recoverWith {
+        case _: Exception => // e.g. java.util.concurrent.TimeoutException
+          Future.failed[ProtocolMetadata] {
+            if (options.readPreference.slaveOk) {
+              new NodeSetNotReachable(supervisor, name, history())
+            } else {
+              new PrimaryUnavailableException(supervisor, name, history())
+            }
+          }
       }
     }
-  }
 
   private[api] val monitor = actorSystem.actorOf(
     Props(new MonitorActor), s"Monitor-$name")
 
-  @volatile private[api] var metadata: Option[ProtocolMetadata] = None
+  // TODO: Remove (use probe)
+  @volatile private[api] var metadata = Option.empty[ProtocolMetadata]
 
   private class MonitorActor extends Actor {
     import scala.collection.mutable.Queue
 
     mongosystem ! RegisterMonitor
 
-    private var primaryAvailable = false
+    private var setAvailable = Promise[ProtocolMetadata]()
+    private var primaryAvailable = Promise[ProtocolMetadata]()
 
     private val waitingForClose = Queue[ActorRef]()
-
-    private var setAvailable = false
 
     val receive: Receive = {
       case PrimaryAvailable(meta) => {
         logger.debug(s"[$lnm] A primary is available: $meta")
 
         metadata = Some(meta)
-        primaryAvailable = true
+
+        if (!primaryAvailable.trySuccess(meta)) {
+          primaryAvailable = Promise.successful(meta)
+        }
       }
 
       case PrimaryUnavailable => {
         logger.debug(s"[$lnm] There is no primary available")
 
-        primaryAvailable = false
+        if (primaryAvailable.isCompleted) {
+          primaryAvailable = Promise[ProtocolMetadata]()
+        }
       }
 
       case SetAvailable(meta) => {
         logger.debug(s"[$lnm] A node is available: $meta")
 
         metadata = Some(meta)
-        setAvailable = true
+
+        if (!setAvailable.trySuccess(meta)) {
+          setAvailable = Promise.successful(meta)
+        }
       }
 
       case SetUnavailable => {
-        setAvailable = false
-
         logger.debug(s"[$lnm] No node seems to be available")
+
+        if (setAvailable.isCompleted) {
+          setAvailable = Promise[ProtocolMetadata]()
+        }
       }
 
-      case IsAvailable(result)        => { result success setAvailable; () }
-      case IsPrimaryAvailable(result) => { result success primaryAvailable; () }
+      case IsAvailable(result) => {
+        result.completeWith(setAvailable.future)
+        ()
+      }
+
+      case IsPrimaryAvailable(result) => {
+        result.completeWith(primaryAvailable.future)
+        ()
+      }
 
       case Close => {
         logger.debug(s"[$lnm] Monitor received Close")
 
         killed = true
-        primaryAvailable = false
-        setAvailable = false
+        primaryAvailable = Promise.failed[ProtocolMetadata](
+          new Exception(s"[$lnm] Closing connection..."))
+
+        setAvailable = Promise.failed[ProtocolMetadata](
+          new Exception(s"[$lnm] Closing connection..."))
 
         mongosystem ! Close
         waitingForClose += sender

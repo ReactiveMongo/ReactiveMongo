@@ -46,7 +46,7 @@ trait UnresponsiveSecondarySpec { parent: NodeSetSpec =>
 
         withConMon1(ref.underlyingActor.name) { conMon =>
           (for {
-            before <- isAvailable(con)
+            before <- isAvailable(con, timeout)
 
             state1 <- {
               updateNodeSet(ref.underlyingActor, "SetupTestChannel") {
