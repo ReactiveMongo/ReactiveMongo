@@ -333,7 +333,7 @@ class DriverSpec extends org.specs2.mutable.Specification {
       "with failure" in { implicit ee: EE =>
         lazy val con = Common.driver.connection(List("unavailable:27017"))
         val ws = scala.collection.mutable.ListBuffer.empty[Int]
-        val expected = List(2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40, 42)
+        val expected = List(2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40)
         val fos = FailoverStrategy(FiniteDuration(50, "ms"), 20,
           { n => val w = n * 2; ws += w; w.toDouble })
         val before = System.currentTimeMillis()
@@ -343,7 +343,7 @@ class DriverSpec extends org.specs2.mutable.Specification {
           await(1, timeout * 2) and {
             val duration = System.currentTimeMillis() - before
 
-            duration must be_<(estTimeout(fos).toMillis)
+            duration must be_<(estTimeout(fos).toMillis + 25)
           }
       }
     }
