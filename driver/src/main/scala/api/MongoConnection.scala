@@ -320,15 +320,32 @@ class MongoConnection(
 
       import actorSystem.dispatcher
 
-      Await.ready(p.future, timeout).recoverWith {
-        case _: Exception => // e.g. java.util.concurrent.TimeoutException
-          Future.failed[ProtocolMetadata] {
-            if (options.readPreference.slaveOk) {
-              new NodeSetNotReachable(supervisor, name, history())
-            } else {
-              new PrimaryUnavailableException(supervisor, name, history())
-            }
-          }
+      def unavailResult = Future.failed[ProtocolMetadata] {
+        if (options.readPreference.slaveOk) {
+          new NodeSetNotReachable(supervisor, name, history())
+        } else {
+          new PrimaryUnavailableException(supervisor, name, history())
+        }
+      }
+
+      def await() = Await.ready(p.future, timeout).recoverWith {
+        case cause: Exception =>
+          logger.warn(s"[$lnm] Fails to probe connection monitor", cause)
+          unavailResult
+      }
+
+      try {
+        await()
+      } catch {
+        case _: java.util.concurrent.TimeoutException =>
+          logger.warn(s"[$lnm] Timeout while probing the connection monitor")
+          unavailResult
+
+        case cause: Exception => {
+          logger.warn(s"[$lnm] Unexpected exception while probing connection monitor", cause)
+
+          unavailResult
+        }
       }
     }
 
