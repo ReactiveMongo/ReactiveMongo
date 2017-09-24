@@ -89,7 +89,9 @@ else
     echo "  maxIncomingConnections: $MAX_CON" >> /tmp/mongod.conf
 fi
 
-mkdir /tmp/mongodb
+if [ ! -d /tmp/mongodb ]; then
+    mkdir /tmp/mongodb
+fi
 
 SSL_PASS=""
 

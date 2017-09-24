@@ -130,7 +130,8 @@ class MongoConnection(
     waitIsAvailable(failoverStrategy).map(_ => apply(name, failoverStrategy))
 
   private val databaseSTE = new StackTraceElement(
-    "reactivemongo.api.MongoConnection", "database", "api.scala", -1)
+    "reactivemongo.api.MongoConnection", "database",
+    "MongoConnection.scala", -1)
 
   /** Returns a future that will be successful when node set is available. */
   private[api] def waitIsAvailable(failoverStrategy: FailoverStrategy)(implicit ec: ExecutionContext): Future[Unit] = {

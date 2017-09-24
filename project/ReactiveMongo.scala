@@ -464,7 +464,8 @@ object Version {
         Seq(Attributed(shadedDir / shadedJar)(AttributeMap.empty))
       },
       libraryDependencies ++= akka.value ++ Seq(
-        playIteratees.value, commonsCodec, shapelessTest, specs) ++ logApi,
+        playIteratees.value, commonsCodec,
+        shapelessTest % Test, specs) ++ logApi,
       findbugsAnalyzedPath += target.value / "external",
       binaryIssueFilters ++= {
         import ProblemFilters.{ exclude => x }
