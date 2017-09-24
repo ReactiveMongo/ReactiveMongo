@@ -262,31 +262,22 @@ trait Cursor1Spec { spec: CursorSpec =>
         Cursor.flatten(Future.successful(cursor)).foo must_== "raB")
     }
 
-    "throw exception when maxTimeout reached" >> {
-      def timeoutSpec(c: BSONCollection, timeout: FiniteDuration)(implicit ee: EE) = {
-        def delayedTimeout = FiniteDuration(
-          (timeout.toMillis * 1.25D).toLong, MILLISECONDS)
+    "throw exception when maxTimeout reached" in { implicit ee: EE =>
+      def delayedTimeout = FiniteDuration(
+        (slowTimeout.toMillis * 1.25D).toLong, MILLISECONDS)
 
-        def futs: Seq[Future[Unit]] = for (i <- 0 until 16517)
-          yield c.insert(BSONDocument(
-          "i" -> i, "record" -> s"record$i")).
-          map(_ => debug(s"fixture #$i inserted (${c.name})"))
+      def futs: Seq[Future[Unit]] = for (i <- 0 until 16517)
+        yield slowColl.insert(BSONDocument(
+        "i" -> i, "record" -> s"record$i")).
+        map(_ => debug(s"fixture #$i inserted (${slowColl.name})"))
 
-        Future.sequence(futs).map(_ => {}).
-          aka("fixtures") must beEqualTo({}).await(1, delayedTimeout) and {
-            c.find(BSONDocument("record" -> "asd")).maxTimeMs(1).cursor().
-              collect[List](10) must throwA[DetailedDatabaseException].
-              await(1, timeout + DurationInt(1).seconds)
-          }
-      }
-
-      "with the default connection" in { implicit ee: EE =>
-        timeoutSpec(coll, timeout)
-      }
-
-      "with the slow connection" in { implicit ee: EE =>
-        timeoutSpec(slowColl, slowTimeout)
-      }
+      Future.sequence(futs).map(_ => {}).
+        aka("fixtures") must beEqualTo({}).await(1, delayedTimeout) and {
+          slowColl.find(BSONDocument("record" -> "asd")).
+            maxTimeMs(1).cursor().
+            collect[List](10) must throwA[DetailedDatabaseException].
+            await(1, slowTimeout + DurationInt(1).seconds)
+        }
     }
   }
 }
