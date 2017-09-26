@@ -1,7 +1,8 @@
 #! /bin/bash
 
-source /tmp/integration-env.sh
+ENV_FILE="$1"
 
+source "$ENV_FILE"
 export LD_LIBRARY_PATH
 
 MONGOD_PID=`ps -o pid,comm -u $USER | grep 'mongod$' | awk '{ printf("%s\n", $1); }'`
