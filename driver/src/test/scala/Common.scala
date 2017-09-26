@@ -127,14 +127,24 @@ object Common {
 
   lazy val slowConnection = driver.connection(List(slowPrimary), SlowOptions)
 
+  def database() = {
+    import ExecutionContext.Implicits.global
+
+    connection.database(commonDb, failoverStrategy)
+  }
+
+  def slowDatabase() = {
+    import ExecutionContext.Implicits.global
+
+    slowConnection.database(commonDb, slowFailover)
+  }
+
   lazy val (db, slowDb) = {
     import ExecutionContext.Implicits.global
 
-    val _db = connection.database(commonDb, failoverStrategy).
-      flatMap { d => d.drop.map(_ => d) }
+    val _db = database().flatMap { d => d.drop.map(_ => d) }
 
-    Await.result(_db, timeout) -> Await.result(
-      slowConnection.database(commonDb, slowFailover), slowTimeout)
+    Await.result(_db, timeout) -> Await.result(slowDatabase(), slowTimeout)
   }
 
   @annotation.tailrec
