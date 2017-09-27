@@ -29,7 +29,7 @@ if [ "$AKKA_VERSION" = "2.5.4" ]; then
     MONGO_MINOR="3.4.5"
     MONGO_VER="3_4"
 
-    echo "Fix MongoDB version to 3.4.5 (due to Akka Stream version)"
+    echo "[WARN] Fix MongoDB version to 3.4.5 (due to Akka Stream version)"
 else
     if [ "$MONGO_VER" = "2_6" ]; then
         MONGO_MINOR="2.6.12"
@@ -43,8 +43,7 @@ PRIMARY_SLOW_PROXY="localhost:27019"
 
 # OpenSSL
 if [ ! -L "$HOME/ssl/lib/libssl.so.1.0.0" ] && [ ! -f "$HOME/ssl/lib/libssl.so.1.0.0" ]; then
-  echo "Building OpenSSL"
-  ls -al "$HOME/ssl/lib/libssl.so.1.0.0"
+  echo "[INFO] Building OpenSSL"
 
   cd /tmp
   curl -s -o - https://www.openssl.org/source/openssl-1.0.1s.tar.gz | tar -xzf -
@@ -61,20 +60,30 @@ fi
 export LD_LIBRARY_PATH="$HOME/ssl/lib:$LD_LIBRARY_PATH"
 
 # Build MongoDB
-echo "Building MongoDB ${MONGO_MINOR} ..."
+echo "[INFO] Building MongoDB ${MONGO_MINOR} ..."
 
 cd "$HOME"
 
-if [ -d "mongodb-linux-x86_64-amazon-$MONGO_MINOR" ]; then
-    rm -rf "mongodb-linux-x86_64-amazon-$MONGO_MINOR"
+MONGO_ARCH="x86_64-amazon"
+
+if [ "$MONGO_VER" = "2_6" ]; then
+  MONGO_ARCH="x86_64"
 fi
 
-if [ ! -x "$HOME/mongodb-linux-x86_64-amazon-$MONGO_MINOR/bin/mongod" ]; then
-    curl -s -o - "https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-amazon-$MONGO_MINOR.tgz" | tar -xzf -
-    chmod u+x "mongodb-linux-x86_64-amazon-$MONGO_MINOR/bin/mongod"
+MONGO_HOME="$HOME/mongodb-linux-$MONGO_ARCH-$MONGO_MINOR"
+
+if [ ! -x "$MONGO_HOME/bin/mongod" ]; then
+    if [ -d "$MONGO_HOME" ]; then
+      rm -rf "$MONGO_HOME"
+    fi
+
+    curl -s -o - "https://fastdl.mongodb.org/linux/mongodb-linux-$MONGO_ARCH-$MONGO_MINOR.tgz" | tar -xzf -
+    chmod u+x "$MONGO_HOME/bin/mongod"
 fi
 
-PATH="$HOME/mongodb-linux-x86_64-amazon-$MONGO_MINOR/bin:$PATH"
+echo "[INFO] MongoDB available at $MONGO_HOME"
+
+PATH="$MONGO_HOME/bin:$PATH"
 
 cat > "$ENV_FILE" <<EOF
 PATH="$PATH"

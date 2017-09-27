@@ -2,8 +2,10 @@ import scala.concurrent.{ Await, ExecutionContext }
 import scala.concurrent.duration._
 import reactivemongo.api.{
   CrAuthentication,
+  DefaultDB,
   FailoverStrategy,
   MongoDriver,
+  MongoConnection,
   MongoConnectionOptions
 }
 
@@ -127,25 +129,17 @@ object Common {
 
   lazy val slowConnection = driver.connection(List(slowPrimary), SlowOptions)
 
-  def database() = {
+  def databases(con: MongoConnection, slowCon: MongoConnection): (DefaultDB, DefaultDB) = {
     import ExecutionContext.Implicits.global
 
-    connection.database(commonDb, failoverStrategy)
+    val _db = con.database(
+      commonDb, failoverStrategy).flatMap { d => d.drop.map(_ => d) }
+
+    Await.result(_db, timeout) -> Await.result(
+      slowCon.database(commonDb, slowFailover), slowTimeout)
   }
 
-  def slowDatabase() = {
-    import ExecutionContext.Implicits.global
-
-    slowConnection.database(commonDb, slowFailover)
-  }
-
-  lazy val (db, slowDb) = {
-    import ExecutionContext.Implicits.global
-
-    val _db = database().flatMap { d => d.drop.map(_ => d) }
-
-    Await.result(_db, timeout) -> Await.result(slowDatabase(), slowTimeout)
-  }
+  lazy val (db, slowDb) = databases(connection, slowConnection)
 
   @annotation.tailrec
   def tryUntil[T](retries: List[Int])(f: => T, test: T => Boolean): Boolean =

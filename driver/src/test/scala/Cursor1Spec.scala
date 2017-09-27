@@ -274,8 +274,8 @@ trait Cursor1Spec { spec: CursorSpec =>
       Future.sequence(futs).map(_ => {}).
         aka("fixtures") must beEqualTo({}).await(1, delayedTimeout) and {
           slowColl.find(BSONDocument("record" -> "asd")).
-            batchSize(1024).maxTimeMs(1).cursor().
-            collect[List](4096) must throwA[DetailedDatabaseException].
+            batchSize(4096).maxTimeMs(1).cursor().
+            collect[List](8192) must throwA[DetailedDatabaseException].
             await(1, slowTimeout + DurationInt(1).seconds)
         }
     }

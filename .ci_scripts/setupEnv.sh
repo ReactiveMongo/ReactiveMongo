@@ -22,7 +22,7 @@ fi
 
 MONGO_CONF=`mktemp`
 
-echo "Max connection: $MAX_CON"
+echo "[INFO] Max connection: $MAX_CON"
 
 export PATH="$HOME/mongodb-linux-x86_64-amazon-$MONGO_MINOR/bin:$PATH"
 

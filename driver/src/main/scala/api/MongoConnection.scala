@@ -15,8 +15,6 @@
  */
 package reactivemongo.api
 
-//import java.util.concurrent.TimeUnit.MILLISECONDS
-
 import scala.util.Try
 import scala.util.control.{ NonFatal, NoStackTrace }
 
@@ -30,7 +28,7 @@ import scala.concurrent.duration.{ Duration, FiniteDuration }
 
 import akka.util.Timeout
 import akka.actor.{ Actor, ActorRef, ActorSystem, Props }
-import akka.pattern.ask //{ after, ask }
+import akka.pattern.ask
 
 import reactivemongo.core.actors.{
   AuthRequest,
@@ -127,14 +125,16 @@ class MongoConnection(
    * @param failoverStrategy $failoverStrategy
    */
   def database(name: String, failoverStrategy: FailoverStrategy = options.failoverStrategy)(implicit context: ExecutionContext): Future[DefaultDB] =
-    waitIsAvailable(failoverStrategy).map(_ => apply(name, failoverStrategy))
+    waitIsAvailable(failoverStrategy, databaseSTE()).
+      map(_ => apply(name, failoverStrategy))
 
-  private val databaseSTE = new StackTraceElement(
-    "reactivemongo.api.MongoConnection", "database",
-    "MongoConnection.scala", -1)
+  @inline private def databaseSTE() =
+    Thread.currentThread.getStackTrace.tail.tail.take(2).reverse
 
   /** Returns a future that will be successful when node set is available. */
-  private[api] def waitIsAvailable(failoverStrategy: FailoverStrategy)(implicit ec: ExecutionContext): Future[Unit] = {
+  private[api] def waitIsAvailable(
+    failoverStrategy: FailoverStrategy,
+    contextSTE: Array[StackTraceElement])(implicit ec: ExecutionContext): Future[Unit] = {
     logger.debug(s"[$lnm] Waiting is available...")
 
     val timeoutFactor = 1.25D // TODO: Review
@@ -146,7 +146,7 @@ class MongoConnection(
 
     probe(timeout).recoverWith {
       case error: Throwable => {
-        error.setStackTrace(databaseSTE +: error.getStackTrace)
+        error.setStackTrace(contextSTE ++: error.getStackTrace)
         Future.failed[ProtocolMetadata](error)
       }
     }.flatMap {
@@ -157,82 +157,6 @@ class MongoConnection(
 
       case _ => Future successful {}
     }
-
-    /*
-    @inline def nextTimeout(i: Int): FiniteDuration = {
-      val delayFactor: Double = failoverStrategy.delayFactor(i)
-
-      Duration.unapply(failoverStrategy.initialDelay * delayFactor).
-        fold(failoverStrategy.initialDelay)(t => FiniteDuration(t._1, t._2))
-    }
-
-    type Retry = (FiniteDuration, Throwable)
-
-    @inline def finalErr(lastErr: Throwable): Throwable = {
-      val error = if (lastErr == null) {
-        new NodeSetNotReachable(supervisor, name, history())
-      } else lastErr
-
-      error.setStackTrace(databaseSTE +: error.getStackTrace)
-
-      error
-    }
-
-    def wait(iteration: Int, attempt: Int, timeout: FiniteDuration, lastErr: Throwable = null): Future[Unit] = {
-      logger.trace(
-        s"[$lnm] Wait is available: $attempt @ ${System.currentTimeMillis}")
-
-      if (attempt == 0) {
-        Future.failed(finalErr(lastErr))
-      } else {
-        @inline def res: Either[Retry, Unit] = try {
-          val before = System.currentTimeMillis
-          val unavail = Await.result(probe, timeout)
-          val duration = System.currentTimeMillis - before
-
-          unavail match {
-            case Some(reason) => Left(FiniteDuration(
-              timeout.toMillis - duration, MILLISECONDS) -> reason)
-
-            case _ => Right({})
-          }
-        } catch {
-          case e: Throwable => Left(timeout -> e)
-        }
-
-        @inline def doRetry(delay: FiniteDuration, reason: Throwable): Future[Unit] = after(delay, actorSystem.scheduler) {
-          val nextIt = iteration + 1
-          wait(nextIt, attempt - 1, nextTimeout(nextIt), reason)
-        }
-
-        res match {
-          case Left((delay, error)) => {
-            logger.trace(s"[$lnm] Got an error, retrying", error)
-            // TODO: Keep an explicit stacktrace accross the retries
-            // TODO: Transform error into a single StackTraceElement to add it
-
-            doRetry(delay, error)
-          }
-
-          case _ => Future.successful({})
-        }
-      }
-    }
-
-    wait(0, 1 + failoverStrategy.retries, failoverStrategy.initialDelay).
-      flatMap { _ =>
-        metadata match {
-          case Some(ProtocolMetadata(
-            _, MongoWireVersion.V24AndBefore, _, _, _)) =>
-            Future.failed[Unit](ConnectionException(
-              s"unsupported MongoDB version < 2.6 ($lnm)"))
-
-          case Some(_) => Future successful {}
-          case _ => Future.failed[Unit](ConnectionException(
-            s"protocol metadata not available ($lnm)"))
-        }
-      }
-     */
   }
 
   /** Returns true if the connection has not been killed. */

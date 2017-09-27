@@ -5,10 +5,10 @@ if [ `git grep localhost | grep 'src/test' | grep -vi 'Common.scala' | wc -l` -n
   exit 1
 fi 
 
-if [ "$TRAVIS_SCALA_VERSION" = "2.10.5" -a `javac -version 2>&1 | grep 1.7 | wc -l` -eq 1 ]; then
+if [ "$SCALA_VERSION" = "2.10.5" -a `javac -version 2>&1 | grep 1.7 | wc -l` -eq 1 ]; then
     echo "[INFO] Check the source format and backward compatibility"
 
-    sbt ++$TRAVIS_SCALA_VERSION scalariformFormat test:scalariformFormat > /dev/null
+    sbt ++$SCALA_VERSION scalariformFormat test:scalariformFormat > /dev/null
     git diff --exit-code || (cat >> /dev/stdout <<EOF
 [ERROR] Scalariform check failed, see differences above.
 To fix, format your sources using sbt scalariformFormat test:scalariformFormat before submitting a pull request.
@@ -17,9 +17,9 @@ EOF
         false
     )
 
-    sbt ++$TRAVIS_SCALA_VERSION ";error ;mimaReportBinaryIssues" || exit 2
+    sbt ++$SCALA_VERSION ";error ;mimaReportBinaryIssues" || exit 2
 
-    sbt ++$TRAVIS_SCALA_VERSION ";project ReactiveMongo-BSON ;findbugs ;project ReactiveMongo-BSON-Macros ;findbugs ;project ReactiveMongo ;findbugs ;project ReactiveMongo-JMX ;findbugs" || exit 3
+    sbt ++$SCALA_VERSION ";project ReactiveMongo-BSON ;findbugs ;project ReactiveMongo-BSON-Macros ;findbugs ;project ReactiveMongo ;findbugs ;project ReactiveMongo-JMX ;findbugs" || exit 3
 fi
 
 # JVM/SBT setup
@@ -45,4 +45,4 @@ TEST_ARGS="$TEST_ARGS ;project ReactiveMongo-BSON-Macros ;test-only"
 
 sed -e 's/"-deprecation", //' < project/ReactiveMongo.scala > .tmp && mv .tmp project/ReactiveMongo.scala
 
-sbt ++$TRAVIS_SCALA_VERSION "$TEST_ARGS"
+sbt ++$SCALA_VERSION "$TEST_ARGS"

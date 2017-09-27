@@ -505,7 +505,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
     } tag "not_mongo26"
   }
 
-  f"Aggregation result for '$$out'" >> {
+  f"Aggregation result for '$$out'" should {
     // https://docs.mongodb.com/master/reference/operator/aggregation/out/#example
 
     val books = db.collection(s"books-1-${System identityHashCode this}")
@@ -533,7 +533,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
         aka("fixtures") must beEqualTo({}).await(0, timeout)
     }
 
-    "should be outputed to collection" in { implicit ee: EE =>
+    "be outputed to collection" in { implicit ee: EE =>
       import books.BatchCommands.AggregationFramework
       import AggregationFramework.{ Ascending, Group, PushField, Out, Sort }
 
@@ -559,11 +559,16 @@ class AggregationSpec extends org.specs2.mutable.Specification {
         }
     }
 
-    "should be added to set" in { implicit ee: EE =>
+    "be added to set" in { implicit ee: EE =>
       import books.BatchCommands.AggregationFramework
       import AggregationFramework.{ Ascending, Group, AddFieldToSet, Sort }
 
-      implicit val catReader = Macros.reader[AuthorCatalog]
+      implicit val catReader = BSONDocumentReader[AuthorCatalog] { doc =>
+        (for {
+          id <- doc.getAsTry[String]("_id")
+          bs <- doc.getAsTry[Set[String]]("books")
+        } yield AuthorCatalog(id, bs)).get
+      }
 
       books.aggregate(
         Sort(Ascending("title")),
@@ -577,7 +582,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
     }
   }
 
-  "Aggregation result for '$stdDevPop'" >> {
+  "Aggregation result for '$stdDevPop'" should {
     // https://docs.mongodb.com/manual/reference/operator/aggregation/stdDevPop/#examples
 
     val contest = db.collection(s"contest-1-${System identityHashCode this}")
@@ -716,7 +721,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
     }
   }
 
-  "Aggregation result '$stdDevSamp'" >> {
+  "Aggregation result '$stdDevSamp'" should {
     // https://docs.mongodb.com/manual/reference/operator/aggregation/stdDevSamp/#example
 
     val contest = db.collection(s"contest-2-${System identityHashCode this}")
@@ -762,7 +767,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
     } tag "not_mongo26"
   }
 
-  "Geo-indexed documents" >> {
+  "Geo-indexed documents" should {
     // https://docs.mongodb.com/manual/reference/operator/aggregation/geoNear/#example
 
     val places = db(s"places${System identityHashCode this}")

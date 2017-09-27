@@ -107,7 +107,7 @@ class DriverSpec extends org.specs2.mutable.Specification {
         map(_ => Option.empty[Throwable] -> -1L).recover {
           case reason => Option(reason) -> (System.currentTimeMillis() - before)
         }.aka("duration") must beLike[(Option[Throwable], Long)] {
-          case (Some(reason), duration) => reason.getStackTrace.headOption.
+          case (Some(reason), duration) => reason.getStackTrace.tail.headOption.
             aka("most recent") must beSome[StackTraceElement].like {
               case mostRecent =>
                 mostRecent.getClassName aka "class" must beEqualTo(
@@ -292,7 +292,7 @@ class DriverSpec extends org.specs2.mutable.Specification {
 
         con.database(Common.commonDb, failoverStrategy).
           aka("DB resolution") must throwA[PrimaryUnavailableException].like {
-            case reason => reason.getStackTrace.headOption.
+            case reason => reason.getStackTrace.tail.headOption.
               aka("most recent") must beSome[StackTraceElement].like {
                 case mostRecent =>
                   mostRecent.getClassName aka "class" must beEqualTo(

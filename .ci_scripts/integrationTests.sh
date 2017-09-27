@@ -8,7 +8,7 @@ export LD_LIBRARY_PATH
 MONGOD_PID=`ps -o pid,comm -u $USER | grep 'mongod$' | awk '{ printf("%s\n", $1); }'`
 
 if [ "x$MONGOD_PID" = "x" ]; then
-    echo "ERROR: MongoDB process not found" > /dev/stderr
+    echo "[ERROR] MongoDB process not found" > /dev/stderr
     tail -n 100 /tmp/mongod.log
     exit 1
 fi
@@ -31,7 +31,7 @@ MONGOSHELL_OPTS="$MONGOSHELL_OPTS --eval"
 MONGODB_NAME=`mongo "$PRIMARY_HOST/FOO" $MONGOSHELL_OPTS 'db.getName()' 2>/dev/null | tail -n 1`
 
 if [ ! "x$MONGODB_NAME" = "xFOO" ]; then
-    echo -n "\nERROR: Fails to connect using the MongoShell\n"
+    echo -n "\n[ERROR] Fails to connect using the MongoShell\n"
     mongo "$PRIMARY_HOST/FOO" $MONGOSHELL_OPTS 'db.getName()'
     tail -n 100 /tmp/mongod.log
     exit 2
@@ -50,7 +50,7 @@ mongo "$PRIMARY_HOST/FOO" $MONGOSHELL_OPTS 'var s=db.serverStatus();JSON.stringi
 
 if [ "$MONGO_PROFILE" = "rs" ]; then
     mongo "$PRIMARY_HOST" $MONGOSHELL_OPTS "rs.initiate({\"_id\":\"testrs0\",\"version\":1,\"members\":[{\"_id\":0,\"host\":\"$PRIMARY_HOST\"}]});" || (
-        echo "ERROR: Fails to setup the ReplicaSet" > /dev/stderr
+        echo "[ERROR] Fails to setup the ReplicaSet" > /dev/stderr
         false
     )
 fi
