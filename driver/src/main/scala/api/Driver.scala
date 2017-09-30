@@ -5,7 +5,7 @@ import java.util.concurrent.atomic.AtomicLong
 import scala.util.{ Failure, Success }
 
 import scala.collection.mutable
-import scala.concurrent.{ ExecutionContext, Future, Promise }
+import scala.concurrent.{ ExecutionContext, Future }
 import scala.concurrent.duration.{ FiniteDuration, SECONDS }
 
 import com.typesafe.config.Config
@@ -198,7 +198,7 @@ private[api] trait Driver {
     }
 
     def closing: Receive = {
-      val done = Promise[Unit]()
+      val waitingForClose = mutable.Queue[ActorRef](sender)
 
       {
         case AddConnection(name, _, _, _) =>
@@ -211,19 +211,14 @@ private[api] trait Driver {
 
             if (isEmpty) {
               context.stop(self)
-              done.success({})
+              waitingForClose.dequeueAll(_ => true).foreach(_ ! Closed)
             }
           }
 
-        case Close => {
+        case Close =>
           logger.warn(s"[$supervisorName] Close received but already closing.")
-          
-          implicit def ec = context.system.dispatcher
-
-          done.future.onComplete {
-            case Success(_) => sender ! Closed
-          }
-        }
+          waitingForClose += sender
+          ()
       }
     }
 
