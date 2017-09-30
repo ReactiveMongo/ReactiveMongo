@@ -2,7 +2,7 @@ package reactivemongo.api
 
 import java.util.concurrent.atomic.AtomicLong
 
-import scala.util.{ Failure, Success }
+import scala.util.{ Failure, Promise, Success }
 
 import scala.collection.mutable
 import scala.concurrent.{ ExecutionContext, Future }
@@ -198,7 +198,7 @@ private[api] trait Driver {
     }
 
     def closing: Receive = {
-      val waitingForClose = mutable.Queue[ActorRef](sender)
+      val done = Promise[Unit]()
 
       {
         case AddConnection(name, _, _, _) =>
@@ -211,14 +211,17 @@ private[api] trait Driver {
 
             if (isEmpty) {
               context.stop(self)
-              waitingForClose.dequeueAll(_ => true).foreach(_ ! Closed)
+              done.success({})
             }
           }
 
-        case Close =>
+        case Close => {
           logger.warn(s"[$supervisorName] Close received but already closing.")
-          waitingForClose += sender
-          ()
+
+          done.future.onComplete {
+            case Success(_) => sender ! Closed
+          }
+        }
       }
     }
 
