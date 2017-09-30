@@ -149,10 +149,7 @@ class MongoDriver(
    */
   def connection(parsedURI: MongoConnection.ParsedURI, name: Option[String], strictUri: Boolean): Try[MongoConnection] = {
     if (!parsedURI.ignoredOptions.isEmpty && strictUri) {
-      Failure(new IllegalArgumentException(s"The connection URI contains unsupported options: ${
-        parsedURI.ignoredOptions
-          .mkString(", ")
-      }"))
+      Failure(new IllegalArgumentException(s"The connection URI contains unsupported options: ${parsedURI.ignoredOptions.mkString(", ")}"))
     } else {
       if (!parsedURI.ignoredOptions.isEmpty) logger.warn(s"Some options were ignored because they are not supported (yet): ${parsedURI.ignoredOptions.mkString(", ")}")
 
