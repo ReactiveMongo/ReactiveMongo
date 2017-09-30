@@ -187,16 +187,15 @@ class DriverSpec extends org.specs2.mutable.Specification {
   "Authentication SCRAM-SHA1" should {
     import Common.{ DefaultOptions, timeout }
 
-    lazy val drv = MongoDriver()
+    lazy val drv = reactivemongo.api.AsyncDriver()
     val conOpts = DefaultOptions.copy(nbChannelsPerNode = 1)
-    lazy val connection = drv.connection(
-      List(primaryHost), options = conOpts)
+    lazy val connection = drv.connect(List(primaryHost), options = conOpts)
     val slowOpts = SlowOptions.copy(nbChannelsPerNode = 1)
-    lazy val slowConnection = drv.connection(List(slowPrimary), slowOpts)
+    lazy val slowConnection = drv.connect(List(slowPrimary), slowOpts)
 
     val dbName = "specs2-test-scramsha1-auth"
     def db_(implicit ee: ExecutionContext) =
-      connection.database(dbName, failoverStrategy)
+      connection.flatMap(_.database(dbName, failoverStrategy))
 
     val id = System.identityHashCode(drv)
 
@@ -213,14 +212,14 @@ class DriverSpec extends org.specs2.mutable.Specification {
 
     "not be successful with wrong credentials" >> {
       "with the default connection" in { implicit ee: EE =>
-        connection.authenticate(dbName, "foo", "bar").
+        connection.flatMap(_.authenticate(dbName, "foo", "bar")).
           aka("authentication") must throwA[FailedAuthentication].
           await(1, timeout)
 
       } tag "not_mongo26"
 
       "with the slow connection" in { implicit ee: EE =>
-        slowConnection.authenticate(dbName, "foo", "bar").
+        slowConnection.flatMap(_.authenticate(dbName, "foo", "bar")).
           aka("authentication") must throwA[FailedAuthentication].
           await(1, slowTimeout)
 
@@ -229,7 +228,8 @@ class DriverSpec extends org.specs2.mutable.Specification {
 
     "be successful on existing connection with right credentials" >> {
       "with the default connection" in { implicit ee: EE =>
-        connection.authenticate(dbName, s"test-$id", s"password-$id").
+        connection.flatMap(
+          _.authenticate(dbName, s"test-$id", s"password-$id")).
           aka("authentication") must beLike[SuccessfulAuthentication](
             { case _ => ok }).await(1, timeout) and {
               db_.flatMap {
@@ -240,7 +240,8 @@ class DriverSpec extends org.specs2.mutable.Specification {
       } tag "not_mongo26"
 
       "with the slow connection" in { implicit ee: EE =>
-        slowConnection.authenticate(dbName, s"test-$id", s"password-$id").
+        slowConnection.flatMap(
+          _.authenticate(dbName, s"test-$id", s"password-$id")).
           aka("authentication") must beLike[SuccessfulAuthentication](
             { case _ => ok }).await(1, slowTimeout)
 
@@ -251,8 +252,10 @@ class DriverSpec extends org.specs2.mutable.Specification {
       val auth = Authenticate(dbName, s"test-$id", s"password-$id")
 
       "with the default connection" in { implicit ee: EE =>
-        val con = drv.connection(
-          List(primaryHost), options = conOpts, authentications = Seq(auth))
+        val con = Await.result(
+          drv.connect(
+            List(primaryHost), options = conOpts, authentications = Seq(auth)),
+          timeout)
 
         con.database(dbName, Common.failoverStrategy).
           aka("authed DB") must beLike[DefaultDB] {
@@ -261,14 +264,16 @@ class DriverSpec extends org.specs2.mutable.Specification {
               aka("insertion") must beEqualTo({}).await(1, timeout)
 
           }.await(1, timeout) and {
-            con.askClose()(timeout) must not(throwA[Exception]).
-              await(1, timeout)
+            con.askClose()(timeout).
+              aka("close") must not(throwA[Exception]).await(1, timeout)
           }
       } tag "not_mongo26"
 
       "with the slow connection" in { implicit ee: EE =>
-        val con = drv.connection(
-          List(slowPrimary), options = slowOpts, authentications = Seq(auth))
+        val con = Await.result(
+          drv.connect(
+            List(slowPrimary), options = slowOpts, authentications = Seq(auth)),
+          timeout)
 
         con.database(dbName, slowFailover).
           aka("authed DB") must beLike[DefaultDB] { case _ => ok }.
@@ -279,8 +284,9 @@ class DriverSpec extends org.specs2.mutable.Specification {
       } tag "not_mongo26"
     }
 
-    "driver shutdown" in { // mainly to ensure the test driver is closed
-      drv.close(timeout) must not(throwA[Exception])
+    "driver shutdown" in { implicit ee: EE =>
+      // mainly to ensure the test driver is closed
+      drv.close(timeout) must not(throwA[Exception]).await
     } tag "not_mongo26"
 
     "fail on DB without authentication" >> {

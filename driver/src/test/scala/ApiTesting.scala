@@ -34,7 +34,7 @@ package object tests {
   def addConnection(d: MongoDriver, name: String, nodes: Seq[String], options: MongoConnectionOptions, mongosystem: ActorRef): Future[Any] = {
     import akka.pattern.ask
 
-    def message = d.AddConnection(name, nodes, options, mongosystem)
+    def message = d.addConnectionMsg(name, nodes, options, mongosystem)
     implicit def timeout = Timeout(10, SECONDS)
 
     d.supervisorActor ? message

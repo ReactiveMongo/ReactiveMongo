@@ -1,24 +1,14 @@
 package reactivemongo.api
 
-import java.util.concurrent.atomic.AtomicLong
-
 import scala.util.{ Try, Failure, Success }
 
-import scala.concurrent.{ Await, Future }
+import scala.concurrent.{ Await, ExecutionContext }
 import scala.concurrent.duration.{ Duration, FiniteDuration, SECONDS }
 
 import com.typesafe.config.Config
 
-import akka.util.Timeout
-import akka.actor.{ Actor, ActorRef, ActorSystem, Props, Terminated }
-import akka.pattern.ask
+import akka.actor.ActorRef
 
-import reactivemongo.core.actors.{
-  Close,
-  LegacyDBSystem,
-  MongoDBSystem,
-  StandardDBSystem
-}
 import reactivemongo.core.nodeset.Authenticate
 import reactivemongo.util.LazyLogger
 
@@ -37,54 +27,13 @@ import reactivemongo.util.LazyLogger
  * @define uriStrictParam the strict URI, that will be parsed by [[reactivemongo.api.MongoConnection.parseURI]]
  */
 class MongoDriver(
-  config: Option[Config] = None,
-  classLoader: Option[ClassLoader] = None) {
+  protected val config: Option[Config] = None,
+  protected val classLoader: Option[ClassLoader] = None) extends Driver {
+
   @deprecated("Use the constructor with the classloader", "0.12-RC6")
   def this(config: Option[Config]) = this(config, None)
 
-  import scala.collection.mutable.{ Map => MutableMap }
   import MongoDriver.logger
-  import reactivemongo.core.{
-    AsyncSystemControl,
-    SystemControl,
-    TimedSystemControl
-  }
-
-  /* MongoDriver always uses its own ActorSystem
-   * so it can have complete control separate from other
-   * Actor Systems in the application
-   */
-  val system = {
-    import com.typesafe.config.ConfigFactory
-    val reference = config getOrElse ConfigFactory.load()
-    val cfg = if (!reference.hasPath("mongo-async-driver")) {
-      logger.info("No mongo-async-driver configuration found")
-      ConfigFactory.empty()
-    } else reference.getConfig("mongo-async-driver")
-
-    ActorSystem("reactivemongo", Some(cfg), classLoader)
-  }
-
-  private val systemClose: Option[FiniteDuration] => Future[Unit] =
-    SystemControl(system) match {
-      case Success(TimedSystemControl(close)) => { timeout =>
-        close(timeout) match {
-          case Failure(cause) => Future.failed[Unit](cause)
-          case _              => Future.successful({})
-        }
-      }
-
-      case Success(AsyncSystemControl(close)) =>
-        { _ => close() }
-
-      case Failure(cause) => { _ => Future.failed[Unit](cause) }
-    }
-
-  private val supervisorName = s"Supervisor-${MongoDriver.nextCounter}"
-  private[reactivemongo] val supervisorActor =
-    system.actorOf(Props(new SupervisorActor(this)), supervisorName)
-
-  private val connectionMonitors = MutableMap.empty[ActorRef, MongoConnection]
 
   /** Keep a list of all connections so that we can terminate the actors */
   @deprecated(message = "Will be made private", since = "0.12-RC1")
@@ -93,22 +42,29 @@ class MongoDriver(
   @deprecated(message = "Will be made private", since = "0.12-RC1")
   def numConnections: Int = connectionMonitors.size
 
+  @deprecated("Will be made private", "0.12.7")
+  case class AddConnection(
+    name: String,
+    nodes: Seq[String],
+    options: MongoConnectionOptions,
+    mongosystem: ActorRef)
+
+  @deprecated("Will be made private", "0.12.7")
+  class SupervisorActor() extends akka.actor.Actor with Product
+    with Serializable with java.io.Serializable {
+
+    def receive: Receive = throw new UnsupportedOperationException()
+    def canEqual(that: Any): Boolean = false
+    def productArity: Int = 0
+    def productElement(n: Int): Any = throw new UnsupportedOperationException()
+  }
+
   /**
    * Closes this driver (and all its connections and resources).
    * Awaits the termination until the timeout is expired.
    */
   def close(timeout: FiniteDuration = FiniteDuration(2, SECONDS)): Unit = {
-    logger.info(s"[$supervisorName] Closing instance of ReactiveMongo driver")
-
-    // Terminate actors used by MongoConnections
-    connections.foreach(_.close())
-
-    // Tell the supervisor to close.
-    // It will shut down all the connections and monitors
-    // and then shut down the ActorSystem as it is exiting.
-    supervisorActor ! Close
-
-    Await.result(systemClose(Some(timeout)), timeout) // Unsafe
+    Await.result(askClose(timeout)(ExecutionContext.global), timeout) // Unsafe
   }
 
   /**
@@ -136,32 +92,7 @@ class MongoDriver(
    * @param options $optionsParam
    */
   def connection(nodes: Seq[String], options: MongoConnectionOptions = MongoConnectionOptions(), authentications: Seq[Authenticate] = Seq.empty, name: Option[String] = None): MongoConnection = {
-    val nm = name.getOrElse(s"Connection-${+MongoDriver.nextCounter}")
-
-    // TODO: Passing ref to MongoDBSystem.history to AddConnection
-    lazy val dbsystem: MongoDBSystem = options.authMode match {
-      case CrAuthentication => new LegacyDBSystem(
-        supervisorName, nm, nodes, authentications, options)
-
-      case _ => new StandardDBSystem(
-        supervisorName, nm, nodes, authentications, options)
-    }
-
-    val mongosystem = system.actorOf(Props(dbsystem), nm)
-
-    def connection = (supervisorActor ? AddConnection(
-      nm, nodes, options, mongosystem))(Timeout(10, SECONDS))
-
-    logger.info(s"[$supervisorName] Creating connection: $nm")
-
-    import system.dispatcher
-
-    Await.result(connection.mapTo[MongoConnection].map { c =>
-      // TODO: Review
-      c.history = () => dbsystem.internalState
-      c
-    }, Duration.Inf)
-    // TODO: Returns Future[MongoConnection]
+    Await.result(askConnection(nodes, options, authentications, name), Duration.Inf)
   }
 
   /**
@@ -173,16 +104,6 @@ class MongoDriver(
    */
   def connection(uriStrict: String): Try[MongoConnection] =
     connection(uriStrict, name = None, strictUri = true)
-
-  /**
-   * Creates a new MongoConnection from URI.
-   *
-   * $seeConnectDBTutorial
-   *
-   * @param uriStrict $uriStrictParam
-   * @param name $connectionNameParam
-   */
-  def connection(uriStrict: String, name: Option[String]): Try[MongoConnection] = connection(uriStrict, name, strictUri = true)
 
   /**
    * Creates a new MongoConnection from URI.
@@ -227,7 +148,6 @@ class MongoDriver(
    * @param strictUri $strictUriParam
    */
   def connection(parsedURI: MongoConnection.ParsedURI, name: Option[String], strictUri: Boolean): Try[MongoConnection] = {
-
     if (!parsedURI.ignoredOptions.isEmpty && strictUri) {
       Failure(new IllegalArgumentException(s"The connection URI contains unsupported options: ${parsedURI.ignoredOptions.mkString(", ")}"))
     } else {
@@ -268,81 +188,6 @@ class MongoDriver(
   def connection(parsedURI: MongoConnection.ParsedURI): MongoConnection =
     connection(parsedURI, None, false).get // Unsafe
 
-  private[reactivemongo] case class AddConnection(
-    name: String,
-    nodes: Seq[String],
-    options: MongoConnectionOptions,
-    mongosystem: ActorRef)
-
-  //private case class CloseWithTimeout(timeout: FiniteDuration)
-
-  private final class SupervisorActor(driver: MongoDriver) extends Actor {
-    def isEmpty = driver.connectionMonitors.isEmpty
-
-    val receive: Receive = {
-      case AddConnection(name, _, opts, sys) => {
-        logger.debug(
-          s"[$supervisorName] Add connection to the supervisor: $name")
-
-        val connection = new MongoConnection(
-          supervisorName, name, driver.system, sys, opts)
-        //connection.nodes = nodes
-
-        driver.connectionMonitors.put(connection.monitor, connection)
-        context.watch(connection.monitor)
-        sender ! connection
-      }
-
-      case Terminated(actor) => {
-        logger.debug(
-          s"[$supervisorName] Pool actor is terminated: ${actor.path}")
-
-        driver.connectionMonitors.remove(actor)
-        ()
-      }
-
-      /*
-      case CloseWithTimeout(timeout) =>
-        if (isEmpty) context.stop(self)
-        else context.become(closing(timeout))
-         */
-
-      case Close => {
-        logger.debug(s"[$supervisorName] Close the supervisor")
-
-        if (isEmpty) context.stop(self)
-        else context.become(closing(Duration.Zero))
-      }
-    }
-
-    @deprecated("Will be private", "0.12.6")
-    def closing(shutdownTimeout: FiniteDuration): Receive = {
-      case AddConnection(name, _, _, _) =>
-        logger.warn(s"[$supervisorName] Refusing to add connection while MongoDriver is closing: $name")
-
-      case Terminated(actor) =>
-        driver.connectionMonitors.remove(actor).foreach { con =>
-          logger.debug(
-            s"[$supervisorName] Connection is terminated: ${con.name}")
-
-          if (isEmpty) context.stop(self)
-        }
-
-      /*
-      case CloseWithTimeout(timeout) =>
-        logger.warn("CloseWithTimeout ignored, already closing.")
-         */
-
-      case Close =>
-        logger.warn(s"[$supervisorName] Close ignored, already closing.")
-    }
-
-    override def postStop: Unit = {
-      logger.info(s"[$supervisorName] Stopping the monitor...")
-
-      ()
-    }
-  }
 }
 
 /** The driver factory */
@@ -358,7 +203,4 @@ object MongoDriver {
   /** Creates a new [[MongoDriver]] with the given `config`. */
   def apply(config: Config, classLoader: ClassLoader): MongoDriver =
     new MongoDriver(Some(config), Some(classLoader))
-
-  private[api] val _counter = new AtomicLong(0)
-  private[api] def nextCounter: Long = _counter.incrementAndGet()
 }
