@@ -2,10 +2,10 @@ package reactivemongo.api
 
 import java.util.concurrent.atomic.AtomicLong
 
-import scala.util.{ Failure, Promise, Success }
+import scala.util.{ Failure, Success }
 
 import scala.collection.mutable
-import scala.concurrent.{ ExecutionContext, Future }
+import scala.concurrent.{ ExecutionContext, Future, Promise }
 import scala.concurrent.duration.{ FiniteDuration, SECONDS }
 
 import com.typesafe.config.Config
