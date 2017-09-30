@@ -760,6 +760,7 @@ private object MacroImpl {
 
       // infers implicit
       val neededImplicitType = appliedType(tc.typeConstructor, ptpe :: Nil)
+
       val neededImplicit = if (!selfRef) {
         c.inferImplicitValue(neededImplicitType)
       } else c.resetAllAttrs(

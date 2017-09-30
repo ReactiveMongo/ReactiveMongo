@@ -63,10 +63,16 @@ private[reactivemongo] trait UpdateOps[P <: SerializationPack with Singleton] {
       }
 
     private lazy val elementEnvelopeSize = {
-      import reactivemongo.bson.BSONDocument
+      val builder = pack.newBuilder
+      val emptyDoc = builder.document(Seq.empty)
+      val sfalse = builder.boolean(false)
+      val elements = Seq[pack.ElementProducer](
+        builder.elementProducer("q", emptyDoc),
+        builder.elementProducer("u", emptyDoc),
+        builder.elementProducer("upsert", sfalse),
+        builder.elementProducer("multi", sfalse))
 
-      BSONDocument("q" -> BSONDocument.empty, "u" -> BSONDocument.empty,
-        "upsert" -> false, "multi" -> false).byteSize
+      pack.bsonSize(builder.document(elements))
     }
 
     /** $orderedParam */

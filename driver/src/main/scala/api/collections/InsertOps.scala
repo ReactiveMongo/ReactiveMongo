@@ -7,8 +7,6 @@ import scala.concurrent.{ ExecutionContext, Future }
 import reactivemongo.core.protocol.MongoWireVersion
 import reactivemongo.core.errors.GenericDriverException
 
-import reactivemongo.core.nodeset.ProtocolMetadata
-
 import reactivemongo.api.SerializationPack
 import reactivemongo.api.commands.{
   BulkOps,
@@ -46,24 +44,22 @@ private[reactivemongo] trait InsertOps[P <: SerializationPack with Singleton] {
   sealed trait InsertBuilder[T] {
     implicit protected def writer: pack.Writer[T]
 
-    private lazy val metadata: Future[ProtocolMetadata] =
-      collection.db.connection.metadata.fold(
-        Future.failed[ProtocolMetadata](collection.MissingMetadata()))(
-          Future.successful(_))
+    @inline private def metadata = collection.db.connection.metadata
 
     /** The max BSON size, including the size of command envelope */
-    private def maxBsonSize(implicit ec: ExecutionContext) =
-      metadata.map { meta =>
-        // Command envelope to compute accurate BSON size limit
-        val i = ResolvedCollectionCommand(
-          collection.name,
-          BatchCommands.InsertCommand.Insert(
-            Seq.empty, ordered, writeConcern))
+    private lazy val maxBsonSize: Option[Int] = metadata.map { meta =>
+      // Command envelope to compute accurate BSON size limit
+      val emptyDoc: pack.Document = pack.newBuilder.document(Seq.empty)
 
-        val doc = pack.serialize(i, BatchCommands.InsertWriter)
+      val i = ResolvedCollectionCommand(
+        collection.name,
+        BatchCommands.InsertCommand.Insert(
+          emptyDoc, Seq.empty[pack.Document], ordered, writeConcern))
 
-        meta.maxBsonSize - pack.bsonSize(doc)
-      }
+      val doc = pack.serialize(i, BatchCommands.InsertWriter)
+
+      meta.maxBsonSize - pack.bsonSize(doc) + pack.bsonSize(emptyDoc)
+    }
 
     /** $orderedParam */
     def ordered: Boolean
@@ -79,19 +75,31 @@ private[reactivemongo] trait InsertOps[P <: SerializationPack with Singleton] {
     }
 
     /** Inserts many documents, according the ordered behaviour. */
-    final def many(documents: Iterable[T])(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] = for {
-      meta <- metadata
-      maxSz <- maxBsonSize
-      docs <- serialize(documents)
-      res <- {
-        val bulkProducer = BulkOps.bulks(
-          docs, meta.maxBulkSize, maxSz) { pack.bsonSize(_) }
+    final def many(documents: Iterable[T])(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] = {
+      val ctx = (for {
+        meta <- metadata
+        maxSz <- maxBsonSize
+      } yield meta.maxBulkSize -> maxSz) match {
+        case Some((c, sz)) =>
+          Future.successful(c -> sz)
 
-        BulkOps.bulkApply[pack.Document, WriteResult](bulkProducer)({ bulk =>
-          execute(bulk.toSeq)
-        }, bulkRecover).map(MultiBulkWriteResult(_))
+        case _ =>
+          Future.failed[(Int, Int)](collection.MissingMetadata())
       }
-    } yield res
+
+      for {
+        (bulkSz, maxSz) <- ctx
+        docs <- serialize(documents)
+        res <- {
+          val bulkProducer = BulkOps.bulks(
+            docs, bulkSz, maxSz) { pack.bsonSize(_) }
+
+          BulkOps.bulkApply[pack.Document, WriteResult](bulkProducer)({ bulk =>
+            execute(bulk.toSeq)
+          }, bulkRecover).map(MultiBulkWriteResult(_))
+        }
+      } yield res
+    }
 
     private def serialize(input: Iterable[T])(implicit ec: ExecutionContext): Future[Iterable[pack.Document]] = Future.sequence(input.map { v =>
       Try(pack.serialize(v, writer)) match {
@@ -100,30 +108,37 @@ private[reactivemongo] trait InsertOps[P <: SerializationPack with Singleton] {
       }
     })
 
-    private final def execute(documents: Seq[pack.Document])(
-      implicit
-      ec: ExecutionContext): Future[WriteResult] = metadata.flatMap { meta =>
-      import BatchCommands.{ DefaultWriteResultReader, InsertWriter }
+    private final def execute(documents: Seq[pack.Document])(implicit ec: ExecutionContext): Future[WriteResult] = documents.headOption match {
+      case Some(head) => metadata match {
+        case Some(meta) => {
+          import BatchCommands.{ DefaultWriteResultReader, InsertWriter }
 
-      if (meta.maxWireVersion >= MongoWireVersion.V26) {
-        val cmd = BatchCommands.InsertCommand.Insert(
-          documents, ordered, writeConcern)
+          if (meta.maxWireVersion >= MongoWireVersion.V26) {
+            val cmd = BatchCommands.InsertCommand.Insert(
+              head, documents.tail, ordered, writeConcern)
 
-        Future.successful(cmd).flatMap(runCommand(_, writePref).flatMap { wr =>
-          val flattened = wr.flatten
+            Future.successful(cmd).flatMap(
+              runCommand(_, writePref).flatMap { wr =>
+                val flattened = wr.flatten
 
-          if (!flattened.ok) {
-            // was ordered, with one doc => fail if has an error
-            Future.failed(WriteResult.lastError(flattened).
-              getOrElse[Exception](GenericDriverException(
-                s"fails to insert: $documents")))
+                if (!flattened.ok) {
+                  // was ordered, with one doc => fail if has an error
+                  Future.failed(WriteResult.lastError(flattened).
+                    getOrElse[Exception](GenericDriverException(
+                      s"fails to insert: $documents")))
 
-          } else Future.successful(wr)
-        })
-      } else { // Mongo < 2.6
-        Future.failed[WriteResult](GenericDriverException(
-          s"unsupported MongoDB version: $meta"))
+                } else Future.successful(wr)
+              })
+          } else { // Mongo < 2.6
+            Future.failed[WriteResult](GenericDriverException(
+              s"unsupported MongoDB version: $meta"))
+          }
+        }
+
+        case _ => Future.failed[WriteResult](collection.MissingMetadata())
       }
+
+      case _ => Future.successful(WriteResult.empty) // No doc to insert
     }
   }
 

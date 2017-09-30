@@ -15,8 +15,6 @@
  */
 package reactivemongo.api
 
-import java.util.concurrent.TimeUnit.MILLISECONDS
-
 import scala.util.Try
 import scala.util.control.{ NonFatal, NoStackTrace }
 
@@ -30,7 +28,7 @@ import scala.concurrent.duration.{ Duration, FiniteDuration }
 
 import akka.util.Timeout
 import akka.actor.{ Actor, ActorRef, ActorSystem, Props }
-import akka.pattern.{ after, ask }
+import akka.pattern.ask
 
 import reactivemongo.core.actors.{
   AuthRequest,
@@ -127,88 +125,38 @@ class MongoConnection(
    * @param failoverStrategy $failoverStrategy
    */
   def database(name: String, failoverStrategy: FailoverStrategy = options.failoverStrategy)(implicit context: ExecutionContext): Future[DefaultDB] =
-    waitIsAvailable(failoverStrategy).map(_ => apply(name, failoverStrategy))
+    waitIsAvailable(failoverStrategy, databaseSTE()).
+      map(_ => apply(name, failoverStrategy))
 
-  private val databaseSTE = new StackTraceElement(
-    "reactivemongo.api.MongoConnection", "database", "api.scala", -1)
+  @inline private def databaseSTE() =
+    Thread.currentThread.getStackTrace.tail.tail.take(2).reverse
 
   /** Returns a future that will be successful when node set is available. */
-  private[api] def waitIsAvailable(failoverStrategy: FailoverStrategy)(implicit ec: ExecutionContext): Future[Unit] = {
+  private[api] def waitIsAvailable(
+    failoverStrategy: FailoverStrategy,
+    contextSTE: Array[StackTraceElement])(implicit ec: ExecutionContext): Future[Unit] = {
     logger.debug(s"[$lnm] Waiting is available...")
 
-    @inline def nextTimeout(i: Int): FiniteDuration = {
-      val delayFactor: Double = failoverStrategy.delayFactor(i)
-
-      Duration.unapply(failoverStrategy.initialDelay * delayFactor).
-        fold(failoverStrategy.initialDelay)(t => FiniteDuration(t._1, t._2))
-    }
-
-    type Retry = (FiniteDuration, Throwable)
-
-    @inline def finalErr(lastErr: Throwable): Throwable = {
-      val error = if (lastErr == null) {
-        new NodeSetNotReachable(supervisor, name, history())
-      } else lastErr
-
-      error.setStackTrace(databaseSTE +: error.getStackTrace)
-
-      error
-    }
-
-    def wait(iteration: Int, attempt: Int, timeout: FiniteDuration, lastErr: Throwable = null): Future[Unit] = {
-      logger.trace(
-        s"[$lnm] Wait is available: $attempt @ ${System.currentTimeMillis}")
-
-      if (attempt == 0) {
-        Future.failed(finalErr(lastErr))
-      } else {
-        @inline def res: Either[Retry, Unit] = try {
-          val before = System.currentTimeMillis
-          val unavail = Await.result(probe, timeout)
-          val duration = System.currentTimeMillis - before
-
-          unavail match {
-            case Some(reason) => Left(FiniteDuration(
-              timeout.toMillis - duration, MILLISECONDS) -> reason)
-
-            case _ => Right({})
-          }
-        } catch {
-          case e: Throwable => Left(timeout -> e)
-        }
-
-        @inline def doRetry(delay: FiniteDuration, reason: Throwable): Future[Unit] = after(delay, actorSystem.scheduler) {
-          val nextIt = iteration + 1
-          wait(nextIt, attempt - 1, nextTimeout(nextIt), reason)
-        }
-
-        res match {
-          case Left((delay, error)) => {
-            logger.trace(s"[$lnm] Got an error, retrying", error)
-            // TODO: Keep an explicit stacktrace accross the retries
-            // TODO: Transform error into a single StackTraceElement to add it
-
-            doRetry(delay, error)
-          }
-
-          case _ => Future.successful({})
-        }
+    val timeoutFactor = 1.25D // TODO: Review
+    val timeout: FiniteDuration = (1 to failoverStrategy.retries).
+      foldLeft(failoverStrategy.initialDelay) { (d, i) =>
+        d + (failoverStrategy.initialDelay * (
+          (timeoutFactor * failoverStrategy.delayFactor(i)).toLong))
       }
-    }
 
-    wait(0, 1 + failoverStrategy.retries, failoverStrategy.initialDelay).
-      flatMap { _ =>
-        metadata match {
-          case Some(ProtocolMetadata(
-            _, MongoWireVersion.V24AndBefore, _, _, _)) =>
-            Future.failed[Unit](ConnectionException(
-              s"unsupported MongoDB version < 2.6 ($lnm)"))
-
-          case Some(_) => Future successful {}
-          case _ => Future.failed[Unit](ConnectionException(
-            s"protocol metadata not available ($lnm)"))
-        }
+    probe(timeout).recoverWith {
+      case error: Throwable => {
+        error.setStackTrace(contextSTE ++: error.getStackTrace)
+        Future.failed[ProtocolMetadata](error)
       }
+    }.flatMap {
+      case ProtocolMetadata(
+        _, MongoWireVersion.V24AndBefore, _, _, _) =>
+        Future.failed[Unit](ConnectionException(
+          s"unsupported MongoDB version < 2.6 ($lnm)"))
+
+      case _ => Future successful {}
+    }
   }
 
   /** Returns true if the connection has not been killed. */
@@ -272,10 +220,10 @@ class MongoConnection(
    */
   def close(): Unit = monitor ! Close
 
-  private case class IsAvailable(result: Promise[Boolean]) {
+  private case class IsAvailable(result: Promise[ProtocolMetadata]) {
     override val toString = "IsAvailable?"
   }
-  private case class IsPrimaryAvailable(result: Promise[Boolean]) {
+  private case class IsPrimaryAvailable(result: Promise[ProtocolMetadata]) {
     override val toString = "IsPrimaryAvailable?"
   }
 
@@ -284,82 +232,119 @@ class MongoConnection(
    *
    * @return Future(None) if available
    */
-  private[api] def probe: Future[Option[Exception]] = whenActive {
-    val p = Promise[Boolean]()
-    val check = {
-      if (options.readPreference.slaveOk) IsAvailable(p)
-      else IsPrimaryAvailable(p)
-    }
+  private[api] def probe(timeout: FiniteDuration): Future[ProtocolMetadata] =
+    whenActive {
+      val p = Promise[ProtocolMetadata]()
+      val check = {
+        if (options.readPreference.slaveOk) IsAvailable(p)
+        else IsPrimaryAvailable(p)
+      }
 
-    monitor ! check
+      monitor ! check
 
-    import actorSystem.dispatcher
+      import actorSystem.dispatcher
 
-    p.future.map {
-      case true => Option.empty[Exception] // is available - no error
-
-      case _ => {
+      def unavailResult = Future.failed[ProtocolMetadata] {
         if (options.readPreference.slaveOk) {
-          Some(new NodeSetNotReachable(supervisor, name, history()))
+          new NodeSetNotReachable(supervisor, name, history())
         } else {
-          Some(new PrimaryUnavailableException(supervisor, name, history()))
+          new PrimaryUnavailableException(supervisor, name, history())
+        }
+      }
+
+      def await() = Await.ready(p.future, timeout).recoverWith {
+        case cause: Exception =>
+          logger.warn(s"[$lnm] Fails to probe connection monitor", cause)
+          unavailResult
+      }
+
+      try {
+        await()
+      } catch {
+        case _: java.util.concurrent.TimeoutException =>
+          logger.warn(s"[$lnm] Timeout while probing the connection monitor")
+          unavailResult
+
+        case cause: Exception => {
+          logger.warn(s"[$lnm] Unexpected exception while probing connection monitor", cause)
+
+          unavailResult
         }
       }
     }
-  }
 
   private[api] val monitor = actorSystem.actorOf(
     Props(new MonitorActor), s"Monitor-$name")
 
-  @volatile private[api] var metadata: Option[ProtocolMetadata] = None
+  // TODO: Remove (use probe)
+  @volatile private[api] var metadata = Option.empty[ProtocolMetadata]
 
   private class MonitorActor extends Actor {
     import scala.collection.mutable.Queue
 
     mongosystem ! RegisterMonitor
 
-    private var primaryAvailable = false
+    private var setAvailable = Promise[ProtocolMetadata]()
+    private var primaryAvailable = Promise[ProtocolMetadata]()
 
     private val waitingForClose = Queue[ActorRef]()
-
-    private var setAvailable = false
 
     val receive: Receive = {
       case PrimaryAvailable(meta) => {
         logger.debug(s"[$lnm] A primary is available: $meta")
 
         metadata = Some(meta)
-        primaryAvailable = true
+
+        if (!primaryAvailable.trySuccess(meta)) {
+          primaryAvailable = Promise.successful(meta)
+        }
       }
 
       case PrimaryUnavailable => {
         logger.debug(s"[$lnm] There is no primary available")
 
-        primaryAvailable = false
+        if (primaryAvailable.isCompleted) {
+          primaryAvailable = Promise[ProtocolMetadata]()
+        }
       }
 
       case SetAvailable(meta) => {
         logger.debug(s"[$lnm] A node is available: $meta")
 
         metadata = Some(meta)
-        setAvailable = true
+
+        if (!setAvailable.trySuccess(meta)) {
+          setAvailable = Promise.successful(meta)
+        }
       }
 
       case SetUnavailable => {
-        setAvailable = false
-
         logger.debug(s"[$lnm] No node seems to be available")
+
+        if (setAvailable.isCompleted) {
+          setAvailable = Promise[ProtocolMetadata]()
+        }
       }
 
-      case IsAvailable(result)        => { result success setAvailable; () }
-      case IsPrimaryAvailable(result) => { result success primaryAvailable; () }
+      case IsAvailable(result) => {
+        result.completeWith(setAvailable.future)
+        ()
+      }
+
+      case IsPrimaryAvailable(result) => {
+        result.completeWith(primaryAvailable.future)
+        ()
+      }
 
       case Close => {
         logger.debug(s"[$lnm] Monitor received Close")
 
         killed = true
-        primaryAvailable = false
-        setAvailable = false
+        primaryAvailable = Promise.failed[ProtocolMetadata](
+          new Exception(s"[$lnm] Closing connection..."))
+
+        setAvailable = Promise.failed[ProtocolMetadata](
+          new Exception(s"[$lnm] Closing connection..."))
 
         mongosystem ! Close
         waitingForClose += sender

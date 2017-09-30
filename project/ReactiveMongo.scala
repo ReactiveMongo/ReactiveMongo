@@ -273,7 +273,7 @@ object ReactiveMongoBuild extends Build {
           "    - scala: 2.11.11",
               "      jdk: oraclejdk7",
               "      env: CI_CATEGORY=UNIT_TESTS") ++ List(
-          "    - scala: 2.12.2",
+          "    - scala: 2.12.3",
                 "      jdk: oraclejdk7",
                 "      env: CI_CATEGORY=UNIT_TESTS") ++ (
           integrationEnv.flatMap { flags =>
@@ -298,7 +298,7 @@ object ReactiveMongoBuild extends Build {
                   flags.contains("MONGO_VER" -> mongoLower)
               )) {
               List(
-                "    - scala: 2.12.2",
+                "    - scala: 2.12.3",
                 s"      env: ${integrationVars(flags)}",
                 "    - jdk: oraclejdk8",
                 s"      env: ${integrationVars(flags)}"
@@ -352,7 +352,7 @@ object ReactiveMongoBuild extends Build {
         ShadeRule.rename("com.google.**" -> "shaded.google.@1").inAll
       ),
       pomPostProcess := transformPomDependencies { _ => None },
-      makePom <<= makePom.dependsOn(assembly),
+      makePom := makePom.dependsOn(assembly).value,
       packageBin in Compile := target.value / (
         assemblyJarName in assembly).value
     )
@@ -418,7 +418,8 @@ object ReactiveMongoBuild extends Build {
     file("driver"),
     settings = buildSettings ++ Findbugs.settings ++ Seq(
       resolvers := resolversList,
-      compile in Compile <<= (compile in Compile).dependsOn(assembly in shaded),
+      compile in Compile := (compile in Compile).
+        dependsOn(assembly in shaded).value,
       sourceGenerators in Compile += Def.task {
         val ver = version.value
         val dir = (sourceManaged in Compile).value
@@ -454,7 +455,7 @@ object Version {
 
         IO.move(listenerClass, extDir / classFile)
       },
-      driverCleanup <<= driverCleanup.triggeredBy(compile in Compile),
+      driverCleanup := driverCleanup.triggeredBy(compile in Compile).value,
       unmanagedJars in Compile := {
         val shadedDir = (target in shaded).value
         val shadedJar = (assemblyJarName in (shaded, assembly)).value
@@ -464,7 +465,8 @@ object Version {
         Seq(Attributed(shadedDir / shadedJar)(AttributeMap.empty))
       },
       libraryDependencies ++= akka.value ++ Seq(
-        playIteratees.value, commonsCodec, shapelessTest, specs) ++ logApi,
+        playIteratees.value, commonsCodec,
+        shapelessTest % Test, specs) ++ logApi,
       findbugsAnalyzedPath += target.value / "external",
       binaryIssueFilters ++= {
         import ProblemFilters.{ exclude => x }
