@@ -45,47 +45,45 @@ trait SerializationPack { self: Singleton =>
   def widenReader[T](r: NarrowValueReader[T]): WidenValueReader[T]
 
   def readValue[A](value: Value, reader: WidenValueReader[A]): Try[A]
+
+  private[reactivemongo] def bsonSize(value: Value): Int = -1
+  // TODO: Remove the default value after release
+
+  private[reactivemongo] def newBuilder: SerializationPack.Builder[self.type] = null // TODO: Remove the default value after release
 }
 
-/** The default serialization pack. */
-object BSONSerializationPack extends SerializationPack {
-  import reactivemongo.bson._, buffer.DefaultBufferHandler
+object SerializationPack {
+  /** A builder for serialization simple values (useful for the commands) */
+  private[reactivemongo] trait Builder[P <: SerializationPack with Singleton] {
+    protected val pack: P
 
-  type Value = BSONValue
-  type ElementProducer = Producer[BSONElement]
-  type Document = BSONDocument
-  type Writer[A] = BSONDocumentWriter[A]
-  type Reader[A] = BSONDocumentReader[A]
-  type NarrowValueReader[A] = BSONReader[_ <: BSONValue, A]
-  private[reactivemongo] type WidenValueReader[A] = UnsafeBSONReader[A]
+    /** Returns a new document from a sequence of element producers. */
+    def document(elements: Seq[pack.ElementProducer]): pack.Document
 
-  object IdentityReader extends Reader[Document] {
-    def read(document: Document): Document = document
+    /** Returns a new non empty array of values */
+    def array(value: pack.Value, values: Seq[pack.Value]): pack.Value
+
+    /**
+     * Returns a producer of element, for the given `name` and `value`.
+     *
+     * @param name the element name
+     * @param value the element value
+     */
+    def elementProducer(name: String, value: pack.Value): pack.ElementProducer
+
+    /** Returns a boolean as a serialized value. */
+    def boolean(b: Boolean): pack.Value
+
+    /** Returns an integer as a serialized value. */
+    def int(i: Int): pack.Value
+
+    /** Returns an long as a serialized value. */
+    def long(l: Long): pack.Value
+
+    /** Returns an double as a serialized value. */
+    def double(d: Double): pack.Value
+
+    /** Returns an string as a serialized value. */
+    def string(s: String): pack.Value
   }
-
-  object IdentityWriter extends Writer[Document] {
-    def write(document: Document): Document = document
-  }
-
-  def serialize[A](a: A, writer: Writer[A]): Document = writer.write(a)
-
-  def deserialize[A](document: Document, reader: Reader[A]): A =
-    reader.read(document)
-
-  def writeToBuffer(buffer: WritableBuffer, document: Document): WritableBuffer = DefaultBufferHandler.writeDocument(document, buffer)
-
-  def readFromBuffer(buffer: ReadableBuffer): Document =
-    DefaultBufferHandler.readDocument(buffer).get
-
-  def writer[A](f: A => Document): Writer[A] = new BSONDocumentWriter[A] {
-    def write(input: A): Document = f(input)
-  }
-
-  def isEmpty(document: Document) = document.isEmpty
-
-  def widenReader[T](r: NarrowValueReader[T]): WidenValueReader[T] =
-    r.widenReader
-
-  def readValue[A](value: Value, reader: WidenValueReader[A]): Try[A] =
-    reader.readTry(value)
 }

@@ -1,3 +1,5 @@
+package reactivemongo
+
 import reactivemongo.bson._
 
 import org.typelevel.discipline.specs2.mutable.Discipline

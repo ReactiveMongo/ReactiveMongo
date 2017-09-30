@@ -88,7 +88,7 @@ object ReadPreference {
       pref
     }
 
-    override val toString = s"PrimaryPreferred(${_tags})"
+    override val toString = s"""PrimaryPreferred(${_tags mkString ", "})"""
   }
 
   /** Factory for the [[PrimaryPreferred]] read preference. */
@@ -121,7 +121,7 @@ object ReadPreference {
       pref
     }
 
-    override val toString = s"Secondary(${_tags})"
+    override val toString = s"""Secondary(${_tags mkString ", "})"""
   }
 
   /** Factory for the [[Secondary]] read preference. */
@@ -154,7 +154,7 @@ object ReadPreference {
       pref
     }
 
-    override val toString = s"SecondaryPreferred(${_tags})"
+    override val toString = s"""SecondaryPreferred(${_tags mkString ", "})"""
   }
 
   /** Factory for the [[SecondaryPreferred]] read preference. */
@@ -190,7 +190,7 @@ object ReadPreference {
       pref
     }
 
-    override val toString = s"Nearest(${_tags})"
+    override val toString = s"""Nearest(${_tags mkString ", "})"""
   }
 
   /** Factory for the [[Nearest]] read preference. */

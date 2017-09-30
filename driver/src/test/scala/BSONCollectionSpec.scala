@@ -74,21 +74,24 @@ class BSONCollectionSpec extends org.specs2.mutable.Specification {
       }
 
       "with bulkInsert" in { implicit ee: EE =>
-        val persons =
-          Seq[collection.ImplicitlyDocumentProducer](person3, person4, person5)
-        /* OR
-        val persons = Seq(person3, person4, person5).
-          map(implicitly[collection.ImplicitlyDocumentProducer](_))
-         */
+        val persons = Seq(person3, person4, person5)
 
-        collection.bulkInsert(true)(persons: _*).map(_.ok).
+        collection.insert[Person](ordered = true).many(persons).map(_.ok).
           aka("insertion") must beTrue.await(1, timeout)
       }
     }
 
     "read cursor" >> {
       @inline def cursor(implicit ec: ExecutionContext): Cursor[BSONDocument] =
-        collection.find(BSONDocument("plop" -> "plop")).cursor[BSONDocument]()
+        collection.withReadPreference(ReadPreference.secondaryPreferred).
+          find(BSONDocument("plop" -> "plop")).cursor[BSONDocument]()
+
+      "use read preference from the collection" in { implicit ee: EE =>
+        import scala.language.reflectiveCalls
+        val withPref = cursor.asInstanceOf[{ def preference: ReadPreference }]
+
+        withPref.preference must_== ReadPreference.secondaryPreferred
+      }
 
       "when empty with success using collect" in { implicit ee: EE =>
         cursor.collect[Vector](10).map(_.length) must beEqualTo(0).

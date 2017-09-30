@@ -704,11 +704,15 @@ trait MongoDBSystem extends Actor {
             }, { lastError =>
               if (lastError.inError) {
                 logger.trace(s"[$lnm] {${response.header.responseTo}} sending a failure (lasterror is not ok)")
+
                 if (lastError.isNotAPrimaryError) onPrimaryUnavailable()
+
                 promise.failure(lastError)
               } else {
                 logger.trace(s"[$lnm] {${response.header.responseTo}} sending a success (lasterror is ok)")
+
                 response.documents.readerIndex(response.documents.readerIndex)
+
                 promise.success(response)
               }
             })
@@ -905,8 +909,8 @@ trait MongoDBSystem extends Actor {
 
             upSet.updateAll { n =>
               if (!node.names.contains(n.name) && // the node itself
-                n.status == NodeStatus) {
-                // invalidate node status on primary status conflict
+                n.status != node.status) {
+                // invalidate node status on status conflict
                 n._copy(status = NodeStatus.Unknown)
               } else n
             }
@@ -1053,13 +1057,13 @@ trait MongoDBSystem extends Actor {
 
       case _ => ns.pick(request.readPreference).map(Success(_)).getOrElse {
         val secOk = secondaryOK(request)
-        val reqAuth = ns.authenticates.nonEmpty
+        lazy val reqAuth = ns.authenticates.nonEmpty
         val cause: Throwable = if (!secOk) {
           ns.primary match {
             case Some(prim) => {
               val details = s"'${prim.name}' { ${nodeInfo(reqAuth, prim)} } ($supervisor/$name)"
 
-              if (prim.authenticated.nonEmpty) {
+              if (!reqAuth || prim.authenticated.nonEmpty) {
                 new ChannelNotFound(s"No active channel can be found to the primary node: $details", true, internalState)
               } else {
                 new NotAuthenticatedException(
@@ -1083,8 +1087,8 @@ trait MongoDBSystem extends Actor {
             }
           val details = s"""${msgs.mkString(", ")} ($supervisor/$name)"""
 
-          if (authed) {
-            new ChannelNotFound(s"No active channel found for the nodes: $details", true, internalState)
+          if (!reqAuth || authed) {
+            new ChannelNotFound(s"No active channel with '${request.readPreference}' found for the nodes: $details", true, internalState)
           } else {
             new NotAuthenticatedException(s"No authenticated channel: $details")
           }

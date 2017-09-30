@@ -47,6 +47,9 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
   def collection: Collection
   def maxTimeMsOption: Option[Long]
 
+  /** The default [[ReadPreference]] */
+  def readPreference: ReadPreference = ReadPreference.primary
+
   @deprecated("Will be removed from the public API", "0.12.0")
   def merge(readPreference: ReadPreference): pack.Document
 
@@ -71,7 +74,7 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
    * Sends this query and gets a [[Cursor]] of instances of `T`.
    */
   @deprecated("Use `cursor()` or `cursor(readPreference)`", "0.11.0")
-  def cursor[T](implicit reader: pack.Reader[T], ec: ExecutionContext, cp: CursorProducer[T]): cp.ProducedCursor = cursor(ReadPreference.primary)
+  def cursor[T](implicit reader: pack.Reader[T], ec: ExecutionContext, cp: CursorProducer[T]): cp.ProducedCursor = cursor(readPreference)
 
   /**
    * Makes a [[Cursor]] of this query, which can be enumerated.
@@ -81,7 +84,7 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
    *
    * @tparam T $resultTParam
    */
-  def cursor[T](readPreference: ReadPreference = ReadPreference.primary, isMongo26WriteOp: Boolean = false)(implicit reader: pack.Reader[T], ec: ExecutionContext, cp: CursorProducer[T]): cp.ProducedCursor = cp.produce(defaultCursor[T](readPreference, isMongo26WriteOp))
+  def cursor[T](readPreference: ReadPreference = readPreference, isMongo26WriteOp: Boolean = false)(implicit reader: pack.Reader[T], ec: ExecutionContext, cp: CursorProducer[T]): cp.ProducedCursor = cp.produce(defaultCursor[T](readPreference, isMongo26WriteOp))
 
   private def defaultCursor[T](readPreference: ReadPreference, isMongo26WriteOp: Boolean = false)(implicit reader: pack.Reader[T]): Cursor[T] = {
     val documents = BufferSequence {
@@ -105,7 +108,7 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
    *
    * @tparam T $resultTParam
    */
-  def one[T](implicit reader: pack.Reader[T], ec: ExecutionContext): Future[Option[T]] = one(ReadPreference.primary)
+  def one[T](implicit reader: pack.Reader[T], ec: ExecutionContext): Future[Option[T]] = one(readPreference)
 
   /**
    * $oneFunction.
@@ -124,7 +127,7 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
    *
    * @tparam T $resultTParam
    */
-  def requireOne[T](implicit reader: pack.Reader[T], ec: ExecutionContext): Future[T] = requireOne(ReadPreference.primary)
+  def requireOne[T](implicit reader: pack.Reader[T], ec: ExecutionContext): Future[T] = requireOne(readPreference)
 
   /**
    * $requireOneFunction.

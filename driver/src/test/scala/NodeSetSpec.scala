@@ -43,7 +43,7 @@ class NodeSetSpec extends org.specs2.mutable.Specification
   "Node set" should {
     "not be available" >> {
       "if the entire node set is not available" in { implicit ee: EE =>
-        withConAndSys(md) { (con, _) => isAvailable(con) }.
+        withConAndSys(md) { (con, _) => isAvailable(con, timeout) }.
           aka("is available") must beFalse.await(1, timeout)
       }
 
@@ -67,13 +67,13 @@ class NodeSetSpec extends org.specs2.mutable.Specification
         withCon() { (con, name) =>
           withConMon(name) { conMon =>
             def test = (for {
-              before <- isAvailable(con)
+              before <- isAvailable(con, timeout)
               _ = {
                 conMon ! SetAvailable(ProtocolMetadata.Default)
                 conMon ! PrimaryAvailable(ProtocolMetadata.Default)
               }
               _ <- waitIsAvailable(con, failoverStrategy)
-              after <- isAvailable(con)
+              after <- isAvailable(con, timeout)
             } yield before -> after).andThen { case _ => con.close() }
 
             test must beEqualTo(false -> true).await(1, timeout)
@@ -90,10 +90,10 @@ class NodeSetSpec extends org.specs2.mutable.Specification
               withCon(opts) { (con, name) =>
                 withConMon(name) { conMon =>
                   def test = (for {
-                    before <- isAvailable(con)
+                    before <- isAvailable(con, timeout)
                     _ = conMon ! SetAvailable(ProtocolMetadata.Default)
                     _ <- waitIsAvailable(con, failoverStrategy)
-                    after <- isAvailable(con)
+                    after <- isAvailable(con, timeout)
                   } yield before -> after).andThen { case _ => con.close() }
 
                   test must beEqualTo(false -> true).await(1, timeout)
@@ -114,7 +114,7 @@ class NodeSetSpec extends org.specs2.mutable.Specification
 
               def test = (for {
                 _ <- waitIsAvailable(con, failoverStrategy)
-                before <- isAvailable(con)
+                before <- isAvailable(con, timeout)
                 _ = conMon ! PrimaryUnavailable
                 after <- waitIsAvailable(
                   con, failoverStrategy).map(_ => true).recover {
@@ -137,7 +137,7 @@ class NodeSetSpec extends org.specs2.mutable.Specification
 
             def test = (for {
               _ <- waitIsAvailable(con, failoverStrategy)
-              before <- isAvailable(con)
+              before <- isAvailable(con, timeout)
               _ = conMon ! SetUnavailable
               after <- waitIsAvailable(
                 con, failoverStrategy).map(_ => true).recover {

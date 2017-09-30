@@ -16,9 +16,7 @@
 package reactivemongo.api.collections.bson
 
 import reactivemongo.api.{ DB, FailoverStrategy, ReadPreference }
-import reactivemongo.api.commands.bson._
 import reactivemongo.api.collections.{
-  BatchCommands,
   GenericCollection,
   GenericCollectionProducer
 }
@@ -28,40 +26,6 @@ object `package` {
   implicit object BSONCollectionProducer extends GenericCollectionProducer[BSONSerializationPack.type, BSONCollection] {
     def apply(db: DB, name: String, failoverStrategy: FailoverStrategy = FailoverStrategy()): BSONCollection = new BSONCollection(db, name, failoverStrategy, db.defaultReadPreference)
   }
-}
-
-object BSONBatchCommands extends BatchCommands[BSONSerializationPack.type] {
-  val pack = BSONSerializationPack
-
-  val CountCommand = BSONCountCommand
-  implicit def CountWriter = BSONCountCommandImplicits.CountWriter
-  implicit def CountResultReader = BSONCountCommandImplicits.CountResultReader
-
-  val DistinctCommand = BSONDistinctCommand
-  implicit def DistinctWriter = BSONDistinctCommandImplicits.DistinctWriter
-  implicit def DistinctResultReader = BSONDistinctCommandImplicits.DistinctResultReader
-
-  val InsertCommand = BSONInsertCommand
-  implicit def InsertWriter = BSONInsertCommandImplicits.InsertWriter
-
-  val UpdateCommand = BSONUpdateCommand
-  implicit def UpdateWriter = BSONUpdateCommandImplicits.UpdateWriter
-  implicit def UpdateReader = BSONUpdateCommandImplicits.UpdateResultReader
-
-  val DeleteCommand = BSONDeleteCommand
-  implicit def DeleteWriter = BSONDeleteCommandImplicits.DeleteWriter
-  implicit def DefaultWriteResultReader = BSONCommonWriteCommandsImplicits.DefaultWriteResultReader
-
-  val FindAndModifyCommand = BSONFindAndModifyCommand
-  implicit def FindAndModifyWriter = BSONFindAndModifyImplicits.FindAndModifyWriter
-  implicit def FindAndModifyReader = BSONFindAndModifyImplicits.FindAndModifyResultReader
-
-  val AggregationFramework = BSONAggregationFramework
-  implicit def AggregateWriter = BSONAggregationImplicits.AggregateWriter
-  implicit def AggregateReader =
-    BSONAggregationImplicits.AggregationResultReader
-
-  implicit def LastErrorReader = BSONGetLastErrorImplicits.LastErrorReader
 }
 
 @SerialVersionUID(1382847900L)

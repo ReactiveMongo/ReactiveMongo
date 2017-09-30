@@ -71,6 +71,9 @@ sealed trait BSONValue {
    * The code indicating the BSON type for this value
    */
   val code: Byte
+
+  /** The number of bytes for the serialized representation */
+  private[reactivemongo] def byteSize: Int = -1
 }
 
 object BSONValue {
@@ -111,10 +114,14 @@ object BSONValue {
 /** A BSON Double. */
 case class BSONDouble(value: Double) extends BSONValue {
   val code = 0x01.toByte
+
+  override private[reactivemongo] val byteSize = 8
 }
 
 case class BSONString(value: String) extends BSONValue {
   val code = 0x02.toByte
+
+  override private[reactivemongo] lazy val byteSize = 5 + value.getBytes.size
 }
 
 /**
@@ -324,6 +331,14 @@ case class BSONBinary(value: ReadableBuffer, subtype: Subtype)
 
   /** Returns the whole binary content as array. */
   def byteArray: Array[Byte] = value.duplicate().readArray(value.size)
+
+  override private[reactivemongo] lazy val byteSize = {
+    5 /* header = 4 (value.readable: Int) + 1 (subtype.value.toByte) */ +
+      value.readable
+  }
+
+  override lazy val toString: String =
+    s"BSONBinary(${subtype}, size = ${value.readable})"
 }
 
 object BSONBinary {
@@ -335,6 +350,7 @@ object BSONBinary {
 case object BSONUndefined
   extends BSONValue {
   val code = 0x06.toByte
+  override private[reactivemongo] val byteSize = 0
 }
 
 /**
@@ -374,7 +390,9 @@ class BSONObjectID private (private val raw: Array[Byte])
   /** The time of this BSONObjectId, in seconds */
   def timeSecond: Int = ByteBuffer.wrap(raw.take(4)).getInt
 
-  def valueAsArray = Arrays.copyOf(raw, 12)
+  def valueAsArray: Array[Byte] = Arrays.copyOf(raw, 12)
+
+  @inline override private[reactivemongo] def byteSize = raw.size
 }
 
 object BSONObjectID {
@@ -516,18 +534,20 @@ object BSONObjectID {
 case class BSONBoolean(value: Boolean)
   extends BSONValue {
   val code = 0x08.toByte
-
+  override private[reactivemongo] val byteSize = 1
 }
 
 /** BSON date time value */
 case class BSONDateTime(value: Long)
   extends BSONValue {
   val code = 0x09.toByte
+  override private[reactivemongo] val byteSize = 8
 }
 
 /** BSON null value */
 case object BSONNull extends BSONValue {
   val code = 0x0A.toByte
+  override private[reactivemongo] val byteSize = 0
 }
 
 /**
@@ -538,6 +558,9 @@ case object BSONNull extends BSONValue {
 case class BSONRegex(value: String, flags: String)
   extends BSONValue {
   val code = 0x0B.toByte
+
+  override private[reactivemongo] lazy val byteSize =
+    2 + value.getBytes.size + flags.getBytes.size
 }
 
 /** BSON DBPointer value. */
@@ -566,6 +589,9 @@ class BSONDBPointer private[bson] (
 
   private[bson] def withId[T](f: Array[Byte] => T): T = f(internalId())
 
+  override private[reactivemongo] lazy val byteSize: Int =
+    1 + value.getBytes.size + internalId().size
+
   // ---
 
   def canEqual(that: Any): Boolean = that.isInstanceOf[BSONDBPointer]
@@ -590,6 +616,8 @@ class BSONDBPointer private[bson] (
   }
 
   override def hashCode: Int = (value, objectId).hashCode
+
+  override lazy val toString: String = s"BSONDBPointer(${objectId})"
 }
 
 object BSONDBPointer extends scala.runtime.AbstractFunction2[String, Array[Byte], BSONDBPointer] {
@@ -619,11 +647,15 @@ object BSONDBPointer extends scala.runtime.AbstractFunction2[String, Array[Byte]
  */
 case class BSONJavaScript(value: String) extends BSONValue {
   val code = 0x0D.toByte
+
+  override private[reactivemongo] lazy val byteSize = 5 + value.getBytes.size
 }
 
 /** BSON Symbol value. */
 case class BSONSymbol(value: String) extends BSONValue {
   val code = 0x0E.toByte
+
+  override private[reactivemongo] lazy val byteSize = 5 + value.getBytes.size
 }
 
 /**
@@ -634,11 +666,14 @@ case class BSONSymbol(value: String) extends BSONValue {
 case class BSONJavaScriptWS(value: String)
   extends BSONValue {
   val code = 0x0F.toByte
+
+  override private[reactivemongo] lazy val byteSize = 5 + value.getBytes.size
 }
 
 /** BSON Integer value */
 case class BSONInteger(value: Int) extends BSONValue {
   val code = 0x10.toByte
+  override private[reactivemongo] val byteSize = 4
 }
 
 /** BSON Timestamp value */
@@ -650,6 +685,8 @@ case class BSONTimestamp(value: Long) extends BSONValue {
 
   /** Ordinal (with the second) */
   val ordinal = value.toInt
+
+  override private[reactivemongo] val byteSize = 8
 }
 
 /** Timestamp companion */
@@ -667,16 +704,21 @@ object BSONTimestamp {
 /** BSON Long value */
 case class BSONLong(value: Long) extends BSONValue {
   val code = 0x12.toByte
+  override private[reactivemongo] val byteSize = 8
 }
 
 /** BSON Min key value */
 object BSONMinKey extends BSONValue {
   val code = 0xFF.toByte
+  override private[reactivemongo] val byteSize = 0
+  override val toString = "BSONMinKey"
 }
 
 /** BSON Max key value */
 object BSONMaxKey extends BSONValue {
   val code = 0x7F.toByte
+  override private[reactivemongo] val byteSize = 0
+  override val toString = "BSONMaxKey"
 }
 
 /** Binary Subtype */
@@ -755,6 +797,12 @@ sealed trait BSONElementSet extends ElementProducer { self: BSONValue =>
 
   /** The number of elements */
   def size: Int
+
+  override private[reactivemongo] lazy val byteSize: Int =
+    elements.foldLeft(5) {
+      case (sz, BSONElement(n, v)) =>
+        sz + 2 + n.getBytes.size + v.byteSize
+    }
 
   /** Indicates whether this element set is empty */
   def isEmpty: Boolean

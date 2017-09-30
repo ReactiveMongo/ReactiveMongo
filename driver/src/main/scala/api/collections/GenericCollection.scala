@@ -22,18 +22,15 @@ import scala.collection.generic.CanBuildFrom
 
 import scala.concurrent.{ ExecutionContext, Future }
 
-import shaded.netty.buffer.ChannelBuffer
-
 import reactivemongo.api._
 import reactivemongo.api.commands.{
-  CursorFetcher,
-  ResponseResult,
-  WriteConcern
+  UpdateWriteResult,
+  WriteConcern,
+  WriteResult
 }
-import reactivemongo.core.nodeset.ProtocolMetadata
+
 import reactivemongo.core.protocol.{
   Delete,
-  Query,
   Insert,
   MongoWireVersion,
   RequestMaker,
@@ -47,85 +44,6 @@ import reactivemongo.core.errors.{
 }
 
 trait GenericCollectionProducer[P <: SerializationPack with Singleton, +C <: GenericCollection[P]] extends CollectionProducer[C]
-
-trait GenericCollectionWithCommands[P <: SerializationPack with Singleton] { self: GenericCollection[P] =>
-  val pack: P
-
-  import reactivemongo.api.commands.{
-    BoxedAnyVal,
-    CollectionCommand,
-    Command,
-    CommandWithResult,
-    ResponseResult,
-    ResolvedCollectionCommand
-  }
-
-  def runner = Command.run(pack, self.failoverStrategy)
-
-  def runCommand[R, C <: CollectionCommand with CommandWithResult[R]](command: C with CommandWithResult[R], readPreference: ReadPreference)(implicit writer: pack.Writer[ResolvedCollectionCommand[C]], reader: pack.Reader[R], ec: ExecutionContext): Future[R] = runner(self, command, readPreference)
-
-  @deprecated("Use the alternative with `ReadPreference`", "0.12-RC5")
-  def runCommand[R, C <: CollectionCommand with CommandWithResult[R]](command: C with CommandWithResult[R])(implicit writer: pack.Writer[ResolvedCollectionCommand[C]], reader: pack.Reader[R], ec: ExecutionContext): Future[R] = runCommand[R, C](command, ReadPreference.primary)
-
-  def runWithResponse[R, C <: CollectionCommand with CommandWithResult[R]](command: C with CommandWithResult[R], readPreference: ReadPreference)(implicit writer: pack.Writer[ResolvedCollectionCommand[C]], reader: pack.Reader[R], ec: ExecutionContext): Future[ResponseResult[R]] = runner.withResponse(self, command, readPreference)
-
-  @deprecated("Use the alternative with `ReadPreference`", "0.12-RC5")
-  def runWithResponse[R, C <: CollectionCommand with CommandWithResult[R]](command: C with CommandWithResult[R])(implicit writer: pack.Writer[ResolvedCollectionCommand[C]], reader: pack.Reader[R], ec: ExecutionContext): Future[ResponseResult[R]] = runWithResponse[R, C](command, ReadPreference.primary)
-
-  def runCommand[C <: CollectionCommand](command: C)(implicit writer: pack.Writer[ResolvedCollectionCommand[C]]): CursorFetcher[pack.type, Cursor] = runner(self, command)
-
-  @deprecated("Use the alternative with `ReadPreference`", "0.12-RC5")
-  def runValueCommand[A <: AnyVal, R <: BoxedAnyVal[A], C <: CollectionCommand with CommandWithResult[R]](command: C with CommandWithResult[R with BoxedAnyVal[A]])(implicit writer: pack.Writer[ResolvedCollectionCommand[C]], reader: pack.Reader[R], ec: ExecutionContext): Future[A] = runner.unboxed(self, command, ReadPreference.primary)
-
-  def runValueCommand[A <: AnyVal, R <: BoxedAnyVal[A], C <: CollectionCommand with CommandWithResult[R]](command: C with CommandWithResult[R with BoxedAnyVal[A]], rp: ReadPreference)(implicit writer: pack.Writer[ResolvedCollectionCommand[C]], reader: pack.Reader[R], ec: ExecutionContext): Future[A] = runner.unboxed(self, command, rp)
-}
-
-trait BatchCommands[P <: SerializationPack] {
-  import reactivemongo.api.commands.{
-    AggregationFramework => AC,
-    CountCommand => CC,
-    DistinctCommand => DistC,
-    InsertCommand => IC,
-    UpdateCommand => UC,
-    DeleteCommand => DC,
-    DefaultWriteResult,
-    LastError,
-    ResolvedCollectionCommand,
-    FindAndModifyCommand => FMC
-  }
-
-  val pack: P
-
-  val CountCommand: CC[pack.type]
-  implicit def CountWriter: pack.Writer[ResolvedCollectionCommand[CountCommand.Count]]
-  implicit def CountResultReader: pack.Reader[CountCommand.CountResult]
-
-  val DistinctCommand: DistC[pack.type]
-  implicit def DistinctWriter: pack.Writer[ResolvedCollectionCommand[DistinctCommand.Distinct]]
-  implicit def DistinctResultReader: pack.Reader[DistinctCommand.DistinctResult]
-
-  val InsertCommand: IC[pack.type]
-  implicit def InsertWriter: pack.Writer[ResolvedCollectionCommand[InsertCommand.Insert]]
-
-  val UpdateCommand: UC[pack.type]
-  implicit def UpdateWriter: pack.Writer[ResolvedCollectionCommand[UpdateCommand.Update]]
-  implicit def UpdateReader: pack.Reader[UpdateCommand.UpdateResult]
-
-  val DeleteCommand: DC[pack.type]
-  implicit def DeleteWriter: pack.Writer[ResolvedCollectionCommand[DeleteCommand.Delete]]
-
-  val FindAndModifyCommand: FMC[pack.type]
-  implicit def FindAndModifyWriter: pack.Writer[ResolvedCollectionCommand[FindAndModifyCommand.FindAndModify]]
-  implicit def FindAndModifyReader: pack.Reader[FindAndModifyCommand.FindAndModifyResult]
-
-  val AggregationFramework: AC[pack.type]
-  implicit def AggregateWriter: pack.Writer[ResolvedCollectionCommand[AggregationFramework.Aggregate]]
-  implicit def AggregateReader: pack.Reader[AggregationFramework.AggregationResult]
-
-  implicit def DefaultWriteResultReader: pack.Reader[DefaultWriteResult]
-
-  implicit def LastErrorReader: pack.Reader[LastError]
-}
 
 /**
  * A Collection that provides default methods using a `SerializationPack`
@@ -164,14 +82,15 @@ trait BatchCommands[P <: SerializationPack] {
  * @define cursorProducerParam the cursor producer
  * @define aggBatchSizeParam the batch size (for the aggregation cursor; if `None` use the default one)
  * @define aggregationPipelineFunction the function to create the aggregation pipeline using the aggregation framework depending on the collection type
+ * @define orderedParam the [[https://docs.mongodb.com/manual/reference/method/db.collection.insert/#perform-an-unordered-insert ordered]] behaviour
  */
-trait GenericCollection[P <: SerializationPack with Singleton] extends Collection with GenericCollectionWithCommands[P] with CollectionMetaCommands with reactivemongo.api.commands.ImplicitCommandHelpers[P] { self =>
+trait GenericCollection[P <: SerializationPack with Singleton] extends Collection with GenericCollectionWithCommands[P] with CollectionMetaCommands with reactivemongo.api.commands.ImplicitCommandHelpers[P] with InsertOps[P] with UpdateOps[P] with Aggregator[P] { self =>
   import scala.language.higherKinds
 
   val pack: P
   protected val BatchCommands: BatchCommands[pack.type]
 
-  @inline private def writePref = ReadPreference.Primary
+  @inline protected def writePref = ReadPreference.Primary
 
   /**
    * Alias for type of the aggregation framework,
@@ -195,9 +114,11 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
   def failoverStrategy: FailoverStrategy
   def genericQueryBuilder: GenericQueryBuilder[pack.type]
 
+  /** The default read preference */
   def readPreference: ReadPreference = db.defaultReadPreference
+  // TODO: Remove default value from this trait after next release
 
-  private val defaultCursorBatchSize: Int = 101
+  protected val defaultCursorBatchSize: Int = 101
 
   /**
    * Returns a new reference to the same collection,
@@ -206,11 +127,6 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
   def withReadPreference(pref: ReadPreference): GenericCollection[P]
 
   import BatchCommands._
-  import reactivemongo.api.commands.{
-    MultiBulkWriteResult,
-    UpdateWriteResult,
-    WriteResult
-  }
 
   private def writeDoc[T](doc: T, writer: pack.Writer[T]) = {
     val buffer = ChannelBufferWritableBuffer()
@@ -290,65 +206,9 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
     })
   }
 
-  @inline private def defaultWriteConcern = db.connection.options.writeConcern
-  @inline private def MissingMetadata() =
+  @inline protected def defaultWriteConcern = db.connection.options.writeConcern
+  @inline protected def MissingMetadata() =
     ConnectionNotInitialized.MissingMetadata(db.connection.history())
-
-  def bulkInsert(ordered: Boolean)(documents: ImplicitlyDocumentProducer*)(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] =
-    db.connection.metadata.map { metadata =>
-      bulkInsert(documents.toStream.map(_.produce), ordered, defaultWriteConcern, metadata.maxBulkSize, metadata.maxBsonSize)
-    }.getOrElse(Future.failed(MissingMetadata()))
-
-  def bulkInsert(ordered: Boolean, writeConcern: WriteConcern)(documents: ImplicitlyDocumentProducer*)(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] =
-    db.connection.metadata.map { metadata =>
-      bulkInsert(documents.toStream.map(_.produce), ordered, writeConcern, metadata.maxBulkSize, metadata.maxBsonSize)
-    }.getOrElse(Future.failed(MissingMetadata()))
-
-  def bulkInsert(ordered: Boolean, writeConcern: WriteConcern, bulkSize: Int, bulkByteSize: Int)(documents: ImplicitlyDocumentProducer*)(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] =
-    bulkInsert(documents.toStream.map(_.produce), ordered, writeConcern, bulkSize, bulkByteSize)
-
-  def bulkInsert(documents: Stream[pack.Document], ordered: Boolean)(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] =
-    bulkInsert(documents, ordered, defaultWriteConcern)
-
-  def bulkInsert(documents: Stream[pack.Document], ordered: Boolean, writeConcern: WriteConcern)(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] =
-    db.connection.metadata.map { metadata =>
-      bulkInsert(documents, ordered, writeConcern, metadata.maxBulkSize, metadata.maxBsonSize)
-    }.getOrElse(Future.failed(MissingMetadata()))
-
-  def bulkInsert(documents: Stream[pack.Document], ordered: Boolean, writeConcern: WriteConcern = defaultWriteConcern, bulkSize: Int, bulkByteSize: Int)(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] = watchFailure {
-    def createBulk[R, A <: BulkMaker[R, A]](docs: Stream[pack.Document], command: A with BulkMaker[R, A]): Future[List[R]] = {
-      val (tail, nc) = command.fill(docs)
-
-      command.send().flatMap { wr =>
-        if (nc.isDefined) createBulk(tail, nc.get).map(wr2 => wr :: wr2)
-        else Future.successful(List(wr)) // done
-      }
-    }
-
-    if (!documents.isEmpty) {
-      val havingMetadata = db.connection.metadata.
-        fold(Future.failed[ProtocolMetadata](MissingMetadata()))(Future.successful)
-
-      havingMetadata.flatMap { metadata =>
-        if (metadata.maxWireVersion >= MongoWireVersion.V26) {
-          createBulk(documents, Mongo26WriteCommand.insert(ordered, writeConcern, metadata)).map { _.foldLeft(MultiBulkWriteResult())(_ merge _) }
-        } else {
-          // Mongo 2.4
-          Future.failed[MultiBulkWriteResult](new scala.RuntimeException(
-            s"unsupported MongoDB version: $metadata"))
-        }
-      }
-    } else Future.successful(MultiBulkWriteResult(
-      ok = true,
-      n = 0,
-      nModified = 0,
-      upserted = Seq.empty,
-      writeErrors = Seq.empty,
-      writeConcernError = None,
-      code = None,
-      errmsg = None,
-      totalN = 0))
-  }
 
   /**
    * Inserts a document into the collection and waits for the [[reactivemongo.api.commands.WriteResult]].
@@ -359,30 +219,50 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    * @param writeConcern $writeConcernParam
    * @param writer $writerParam to be inserted
    * @return $returnWriteResult
+   *
+   * {{{
+   * collection.insert(myDoc)
+   *
+   * // Equivalent to:
+   * collection.insert[MyDocType](true, defaultWriteConcern).one(document)
+   * }}}
    */
   def insert[T](document: T, writeConcern: WriteConcern = defaultWriteConcern)(implicit writer: pack.Writer[T], ec: ExecutionContext): Future[WriteResult] =
-    db.connection.metadata match {
-      case Some(metadata) if metadata.maxWireVersion >= MongoWireVersion.V26 =>
-        // TODO: ordered + bulk
-        Future(BatchCommands.InsertCommand.Insert(
-          writeConcern = writeConcern)(document)).flatMap(runCommand(_, writePref).flatMap { wr =>
-          val flattened = wr.flatten
-          if (!flattened.ok) {
-            // was ordered, with one doc => fail if has an error
-            Future.failed(WriteResult.lastError(flattened).
-              getOrElse[Exception](GenericDriverException(
-                s"fails to insert: $document")))
+    prepareInsert[T](true, writeConcern).one(document)
 
-          } else Future.successful(wr)
-        })
+  /**
+   * Returns a builder for insert operations.
+   * Uses the default write concern.
+   *
+   * @tparam T The type of the document to insert. $implicitWriterT.
+   * @param ordered $orderedParam
+   *
+   * {{{
+   * collection.insert[MyDocType](ordered = true).one(singleDoc)
+   *
+   * collection.insert[MyDocType](ordered = true).one(multiDocs)
+   * }}}
+   */
+  def insert[T: pack.Writer](ordered: Boolean)(implicit ec: ExecutionContext): InsertBuilder[T] = prepareInsert[T](ordered, defaultWriteConcern)
 
-      case Some(metadata) => // Mongo < 2.6
-        Future.failed[WriteResult](new scala.RuntimeException(
-          s"unsupported MongoDB version: $metadata"))
-
-      case _ =>
-        Future.failed(MissingMetadata())
-    }
+  /**
+   * Returns a builder for insert operations.
+   *
+   * @tparam T The type of the document to insert. $implicitWriterT.
+   *
+   * @param ordered $orderedParam
+   * @param writeConcern $writeConcernParam
+   *
+   * {{{
+   * collection.insert[MyDocType](true, aWriteConcern).one(singleDoc)
+   *
+   * collection.insert[MyDocType](true, aWriteConcern).one(multiDocs)
+   * }}}
+   */
+  def insert[T: pack.Writer](
+    ordered: Boolean,
+    writeConcern: WriteConcern): InsertBuilder[T] =
+    prepareInsert[T](ordered, writeConcern)
 
   /**
    * Updates one or more documents matching the given selector
@@ -401,31 +281,32 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    *
    * @return $returnWriteResult
    */
-  def update[S, T](selector: S, update: T, writeConcern: WriteConcern = defaultWriteConcern, upsert: Boolean = false, multi: Boolean = false)(implicit swriter: pack.Writer[S], writer: pack.Writer[T], ec: ExecutionContext): Future[UpdateWriteResult] = db.connection.metadata match {
-    case Some(metadata) if (
-      metadata.maxWireVersion >= MongoWireVersion.V26) => {
-      // TODO: ordered + bulk
-      import BatchCommands.UpdateCommand.{ Update, UpdateElement }
+  def update[S, T](selector: S, update: T, writeConcern: WriteConcern = defaultWriteConcern, upsert: Boolean = false, multi: Boolean = false)(implicit swriter: pack.Writer[S], writer: pack.Writer[T], ec: ExecutionContext): Future[UpdateWriteResult] = prepareUpdate(ordered = true, writeConcern = writeConcern).
+    one(selector, update, upsert, multi)
 
-      Future(Update(writeConcern = writeConcern)(
-        UpdateElement(selector, update, upsert, multi))).flatMap(runCommand(_, writePref).flatMap { wr =>
-        val flattened = wr.flatten
-        if (!flattened.ok) {
-          // was ordered, with one doc => fail if has an error
-          Future.failed(WriteResult.lastError(flattened).
-            getOrElse[Exception](GenericDriverException(
-              s"fails to update: $update")))
+  /**
+   * Returns an update builder.
+   *
+   * {{{
+   * // Equivalent to collection.update(query, update, ...)
+   * collection.update(ordered = true).
+   *   one(query, update, upsert = false, multi = false)
+   * }}}
+   */
+  def update(ordered: Boolean): UpdateBuilder =
+    prepareUpdate(ordered, defaultWriteConcern)
 
-        } else Future.successful(wr)
-      })
-    }
-
-    case Some(metadata) => // Mongo < 2.6
-      Future.failed[UpdateWriteResult](new scala.RuntimeException(
-        s"unsupported MongoDB version: $metadata"))
-
-    case _ => Future.failed(MissingMetadata())
-  }
+  /**
+   * Returns an update builder.
+   *
+   * {{{
+   * collection.update(ordered, writeConcern).many(updates)
+   * }}}
+   */
+  def update(
+    ordered: Boolean,
+    writeConcern: WriteConcern): UpdateBuilder =
+    prepareUpdate(ordered, writeConcern)
 
   /**
    * Returns an update modifier, to be used with [[findAndModify]].
@@ -787,10 +668,62 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
     db.connection.send(message)
   }
 
-  protected object Mongo26WriteCommand {
-    def insert(ordered: Boolean, writeConcern: WriteConcern, metadata: ProtocolMetadata): Mongo26WriteCommand = new Mongo26WriteCommand("insert", ordered, writeConcern, metadata)
-  }
+  // ---
 
+  import shaded.netty.buffer.ChannelBuffer
+  import reactivemongo.core.nodeset.ProtocolMetadata
+  import reactivemongo.api.commands.MultiBulkWriteResult
+
+  /**
+   * @param ordered $orderedParam
+   */
+  @deprecated("Use `insert[T](ordered).many(documents)`", "0.12.7")
+  def bulkInsert(ordered: Boolean)(documents: ImplicitlyDocumentProducer*)(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] =
+    db.connection.metadata.map { metadata =>
+      bulkInsert(documents.toStream.map(_.produce), ordered, defaultWriteConcern, metadata.maxBulkSize, metadata.maxBsonSize)
+    }.getOrElse(Future.failed(MissingMetadata()))
+
+  /**
+   * @param ordered $orderedParam
+   */
+  @deprecated("Use `insert[T](ordered, writeConcern).many(documents)`", "0.12.7")
+  def bulkInsert(ordered: Boolean, writeConcern: WriteConcern)(documents: ImplicitlyDocumentProducer*)(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] =
+    db.connection.metadata.map { metadata =>
+      bulkInsert(documents.toStream.map(_.produce), ordered, writeConcern, metadata.maxBulkSize, metadata.maxBsonSize)
+    }.getOrElse(Future.failed(MissingMetadata()))
+
+  /**
+   * @param ordered $orderedParam
+   */
+  @deprecated("Use `insert[T](ordered, writeConcern).many(documents)`", "0.12.7")
+  def bulkInsert(ordered: Boolean, writeConcern: WriteConcern, bulkSize: Int, bulkByteSize: Int)(documents: ImplicitlyDocumentProducer*)(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] =
+    bulkInsert(documents.toStream.map(_.produce), ordered, writeConcern, bulkSize, bulkByteSize)
+
+  /**
+   * @param ordered $orderedParam
+   */
+  @deprecated("Use `insert[T](ordered).many(documents)`", "0.12.7")
+  def bulkInsert(documents: Stream[pack.Document], ordered: Boolean)(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] =
+    bulkInsert(documents, ordered, defaultWriteConcern)
+
+  /**
+   * @param ordered $orderedParam
+   */
+  @deprecated("Use `insert[T](ordered).many(documents, writeConcern)`", "0.12.7")
+  def bulkInsert(documents: Stream[pack.Document], ordered: Boolean, writeConcern: WriteConcern)(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] =
+    db.connection.metadata.map { metadata =>
+      bulkInsert(documents, ordered, writeConcern,
+        metadata.maxBulkSize, metadata.maxBsonSize)
+
+    }.getOrElse(Future.failed(MissingMetadata()))
+
+  /**
+   * @param ordered $orderedParam
+   */
+  @deprecated("Use `insert[T](ordered).many(documents, writeConcern)`", "0.12.7")
+  def bulkInsert(documents: Stream[pack.Document], ordered: Boolean, writeConcern: WriteConcern = defaultWriteConcern, @deprecated("Unused", "0.12.7") bulkSize: Int, @deprecated("Unused", "0.12.7") bulkByteSize: Int)(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] = prepareInsert[pack.Document](ordered, writeConcern).many(documents)
+
+  @deprecated("Unused", "0.12.7")
   protected sealed trait BulkMaker[R, S <: BulkMaker[R, S]] {
     def fill(docs: Stream[pack.Document]): (Stream[pack.Document], Option[S]) = {
       @annotation.tailrec
@@ -810,7 +743,22 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
     def send()(implicit ec: ExecutionContext): Future[R]
   }
 
-  protected class Mongo26WriteCommand private (tpe: String, ordered: Boolean, writeConcern: WriteConcern, metadata: ProtocolMetadata) extends BulkMaker[WriteResult, Mongo26WriteCommand] {
+  @deprecated("Unused", "0.12.7")
+  protected object Mongo26WriteCommand {
+    def insert(
+      ordered: Boolean,
+      writeConcern: WriteConcern,
+      metadata: ProtocolMetadata): Mongo26WriteCommand =
+      new Mongo26WriteCommand("insert", ordered, writeConcern, metadata)
+  }
+
+  @deprecated("Unused", "0.12.7")
+  protected class Mongo26WriteCommand private (
+    tpe: String,
+    ordered: Boolean,
+    writeConcern: WriteConcern,
+    metadata: ProtocolMetadata) extends BulkMaker[WriteResult, Mongo26WriteCommand] {
+    import reactivemongo.core.protocol.Query
     import reactivemongo.bson.lowlevel.LowLevelBsonDocWriter
 
     private var done = false
@@ -831,6 +779,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
 
       if (docsN >= thresholdDocs) {
         closeIfNecessary()
+
         val nextCommand = new Mongo26WriteCommand(
           tpe, ordered, writeConcern, metadata)
 
@@ -844,27 +793,26 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
         val start2 = buf.index
         pack.writeToBuffer(buf, doc)
 
-        val result =
-          if (buf.index > thresholdBytes && docsN == 0) {
-            // first and already out of bound
-            throw new scala.RuntimeException(s"Mongo26WriteCommand could not accept doc of size = ${buf.index - start} bytes")
-          } else if (buf.index > thresholdBytes) {
-            val nextCommand = new Mongo26WriteCommand(
-              tpe, ordered, writeConcern, metadata)
+        val result = if (buf.index > thresholdBytes && docsN == 0) {
+          // first and already out of bound
+          throw new scala.RuntimeException(s"Mongo26WriteCommand could not accept doc of size = ${buf.index - start} bytes")
+        } else if (buf.index > thresholdBytes) {
+          val nextCommand = new Mongo26WriteCommand(
+            tpe, ordered, writeConcern, metadata)
 
-            nextCommand.buf.writeByte(0x03)
-            nextCommand.buf.writeCString("0")
-            nextCommand.buf.buffer.
-              writeBytes(buf.buffer, start2, buf.index - start2)
+          nextCommand.buf.writeByte(0x03)
+          nextCommand.buf.writeCString("0")
+          nextCommand.buf.buffer.writeBytes(
+            buf.buffer, start2, buf.index - start2)
 
-            nextCommand.docsN = 1
-            buf.buffer.readerIndex(0)
-            buf.buffer.writerIndex(start)
+          nextCommand.docsN = 1
+          buf.buffer.readerIndex(0)
+          buf.buffer.writerIndex(start)
 
-            closeIfNecessary()
+          closeIfNecessary()
 
-            Some(nextCommand)
-          } else None
+          Some(nextCommand)
+        } else None
 
         docsN += 1
         result
@@ -935,74 +883,6 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
 
       writer.close
       ()
-    }
-  }
-
-  // ---
-
-  final class AggregatorContext[T](
-    val firstOperator: PipelineOperator,
-    val otherOperators: List[PipelineOperator],
-    val explain: Boolean,
-    val allowDiskUse: Boolean,
-    val bypassDocumentValidation: Boolean,
-    val readConcern: Option[ReadConcern],
-    val readPreference: ReadPreference,
-    val batchSize: Option[Int],
-    val reader: pack.Reader[T]) {
-    def prepared[AC[_] <: Cursor[_]](implicit cp: CursorProducer.Aux[T, AC]): Aggregator[T, AC] = new Aggregator[T, AC](this, cp)
-  }
-
-  final class Aggregator[T, AC[_] <: Cursor[_]](
-    val context: AggregatorContext[T],
-    val cp: CursorProducer.Aux[T, AC]) {
-    import BatchCommands.AggregationFramework.{ Aggregate, AggregationResult }
-    import BatchCommands.{ AggregateWriter, AggregateReader }
-
-    import reactivemongo.core.netty.ChannelBufferWritableBuffer
-    import reactivemongo.bson.buffer.WritableBuffer
-    import reactivemongo.core.protocol.{ Reply, Response }
-
-    import context._
-
-    @inline private def readPreference = context.readPreference
-    implicit private def aggReader: pack.Reader[T] = reader
-
-    private def ver = db.connection.metadata.
-      fold[MongoWireVersion](MongoWireVersion.V30)(_.maxWireVersion)
-
-    /**
-     * @param cf $cursorFlattenerParam
-     */
-    final def cursor(implicit ec: ExecutionContext, cf: CursorFlattener[AC]): AC[T] = {
-      def aggCursor: Future[cp.ProducedCursor] = runWithResponse(
-        Aggregate(
-          firstOperator :: otherOperators,
-          explain, allowDiskUse, Some(BatchCommands.AggregationFramework.Cursor(
-            batchSize.getOrElse(defaultCursorBatchSize))), ver, bypassDocumentValidation, readConcern), readPreference).flatMap[cp.ProducedCursor] {
-          case ResponseResult(response, numToReturn,
-            AggregationResult(firstBatch, Some(resultCursor))) => Future {
-
-            def docs = new ChannelBufferWritableBuffer().
-              writeBytes(firstBatch.foldLeft[WritableBuffer](
-                new ChannelBufferWritableBuffer())(pack.writeToBuffer).toReadableBuffer).buffer
-
-            def resp = Response(
-              response.header,
-              Reply(0, resultCursor.cursorId, 0, firstBatch.size),
-              docs, response.info)
-
-            cp.produce(DefaultCursor.getMore[P, T](pack, resp,
-              resultCursor, numToReturn, readPreference, db.
-              connection, failoverStrategy, false))
-          }
-
-          case ResponseResult(response, _, _) =>
-            Future.failed[cp.ProducedCursor](
-              GenericDriverException(s"missing cursor: $response"))
-        }
-
-      cf.flatten(aggCursor)
     }
   }
 }

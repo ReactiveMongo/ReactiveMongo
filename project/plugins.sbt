@@ -15,13 +15,13 @@ resolvers ++= Seq(
 
 addSbtPlugin("org.scalariform" % "sbt-scalariform" % "1.7.1")
 
-addSbtPlugin("com.typesafe.sbt" % "sbt-git" % "0.8.4")
+addSbtPlugin("com.typesafe.sbt" % "sbt-git" % "0.9.3")
 
 addSbtPlugin("com.eed3si9n" % "sbt-unidoc" % "0.3.3-dcdc4774d19d1500437bc63e79c3abb8f99bcdb4")
 
 addSbtPlugin("net.virtual-void" % "sbt-dependency-graph" % "0.8.2")
 
-addSbtPlugin("com.eed3si9n" % "sbt-assembly" % "0.14.1")
+addSbtPlugin("com.eed3si9n" % "sbt-assembly" % "0.14.5")
 
 addSbtPlugin("com.typesafe" % "sbt-mima-plugin" % "0.1.8")
 
