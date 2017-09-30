@@ -218,7 +218,7 @@ private[api] trait Driver {
         case Close => {
           logger.warn(s"[$supervisorName] Close received but already closing.")
           
-          import context.system.dispatcher
+          implicit def ec = context.system.dispatcher
 
           done.future.onComplete {
             case Success(_) => sender ! Closed
