@@ -110,9 +110,9 @@ trait Cursor[T] {
    * @param err $errorHandlerParam
    *
    * {{{
-   * val cursor = collection.find(query, filter).cursor[BSONDocument]
+   * val cursor = collection.find(query, filter).cursor[BSONDocument]()
    * // return the 3 first documents in a Vector[BSONDocument].
-   * val vector = cursor.collect[Vector](3, Cursor.FailOnError())
+   * val vector = cursor.collect[Vector](3, Cursor.FailOnError[Vector[BSONDocument]]())
    * }}}
    */
   def collect[M[_]](maxDocs: Int, err: ErrorHandler[M[T]])(implicit cbf: CanBuildFrom[M[_], T, M[T]], ec: ExecutionContext): Future[M[T]]
@@ -124,7 +124,7 @@ trait Cursor[T] {
    * @param stopOnError $stopOnErrorParam.
    *
    * {{{
-   * val cursor = collection.find(query, filter).cursor[BSONDocument]
+   * val cursor = collection.find(query, filter).cursor[BSONDocument]()
    * // return the 3 first documents in a Vector[BSONDocument].
    * val vector = cursor.collect[Vector](3)
    * }}}
