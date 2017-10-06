@@ -511,7 +511,7 @@ object DefaultCursor {
         val toReturn = { // normalize the number of docs to return
           if (numberToReturn > 0 && numberToReturn <= max) numberToReturn
           else max - (
-            response.reply.numberReturned + response.reply.startingFrom)
+            response.reply.startingFrom + response.reply.numberReturned)
         }
         val op = GetMore(fullCollectionName, toReturn, response.reply.cursorID)
 
