@@ -84,7 +84,7 @@ private[reactivemongo] trait UpdateOps[P <: SerializationPack with Singleton] {
     protected def bulkRecover: Option[Exception => Future[UpdateWriteResult]]
 
     /**
-     * Performs a single update (see [[UpdateElement]]).
+     * Performs a [[https://docs.mongodb.com/manual/reference/method/db.collection.updateOne/ single update]] (see [[UpdateElement]]).
      */
     final def one[Q, U](q: Q, u: U, upsert: Boolean, multi: Boolean)(implicit ec: ExecutionContext, qw: pack.Writer[Q], uw: pack.Writer[U]): Future[UpdateWriteResult] = element[Q, U](q, u, upsert, multi).flatMap { upd => execute(Seq(upd)) }
 
@@ -97,20 +97,39 @@ private[reactivemongo] trait UpdateOps[P <: SerializationPack with Singleton] {
         case Failure(cause)   => Future.failed[UpdateElement](cause)
       }
 
-    /** Updates many documents, according the ordered behaviour. */
+    /**
+     * [[https://docs.mongodb.com/manual/reference/method/db.collection.updateMany/ Updates many documents]], according the ordered behaviour.
+     *
+     * {{{
+     * import reactivemongo.bson.BSONDocument
+     * import reactivemongo.api.collections.BSONCollection
+     *
+     * def updateMany(coll: BSONCollection, docs: Iterable[BSONDocument]) = {
+     *   val update = coll.update(ordered = true)
+     *   val elements = docs.map { doc =>
+     *     update.element(
+     *       q = BSONDocument("update" -> "selector"),
+     *       u = BSONDocument("\$set" -> doc),
+     *       upsert = true,
+     *       multi = false)
+     *   }
+     *
+     *   update.many(elements) // Future[MultiBulkWriteResult]
+     * }
+     * }}}
+     */
     final def many(updates: Iterable[UpdateElement])(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] = for {
       meta <- metadata
       maxSz <- maxBsonSize
       res <- {
         val bulkProducer = BulkOps.bulks(
-          updates, meta.maxBulkSize, maxSz) { up =>
+          updates, maxSz, meta.maxBulkSize) { up =>
           elementEnvelopeSize + pack.bsonSize(up.q) + pack.bsonSize(up.u)
         }
 
         BulkOps.bulkApply[UpdateElement, UpdateWriteResult](
-          bulkProducer)({ bulk =>
-          execute(bulk.toSeq)
-        }, bulkRecover).map(MultiBulkWriteResult(_))
+          bulkProducer)({ bulk => execute(bulk.toSeq) }, bulkRecover).
+          map(MultiBulkWriteResult(_))
       }
     } yield res
 
