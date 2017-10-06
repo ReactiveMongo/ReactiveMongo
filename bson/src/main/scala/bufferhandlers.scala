@@ -310,35 +310,50 @@ sealed trait BSONIterator extends Iterator[(String, BSONValue)] {
 }
 
 object BSONIterator {
-  private[bson] def pretty(i: Int, it: Iterator[Try[BSONElement]]): String = {
-    val prefix = (0 to i).map { i => "  " }.mkString("")
+  private[bson] def pretty(i: Int, it: Iterator[Try[BSONElement]], f: String => String = { name => s""""${name}": """ }): String = {
+    val indent = (0 to i).map { i => "  " }.mkString("")
 
     it.map {
-      case Success(BSONElement(name, value)) => value match {
-        case array: BSONArray => prefix + name + ": [\n" + pretty(i + 1, array.elements.map(Success(_)).iterator) + "\n" + prefix + "]"
+      case Success(BSONElement(name, value)) => {
+        val prefix = s"${indent}${f(name)}"
 
-        case BSONBoolean(b) =>
-          prefix + name + s": $b"
+        value match {
+          case array: BSONArray => s"${prefix}[\n" + pretty(i + 1, array.elements.map(Success(_)).iterator, _ => "") + s"\n${indent}]"
 
-        case doc: BSONDocument => prefix + name + ": {\n" + pretty(i + 1, doc.stream.iterator) + "\n" + prefix + "}"
+          case BSONBoolean(b) =>
+            s"${indent}${name}: $b"
 
-        case BSONDouble(d) =>
-          prefix + name + s""": NumberDecimal("$d")"""
+          case BSONDocument(elements) =>
+            s"${prefix}{\n" + pretty(i + 1, elements.iterator) + s"\n$indent}"
 
-        case BSONLong(l) =>
-          prefix + name + s": NumberLong($l)"
+          case BSONDouble(d) =>
+            s"""${prefix}NumberDecimal($d)"""
 
-        case BSONString(s) =>
-          prefix + name + ": \"" + s.replaceAll("\"", "\\\"") + '"'
+          case BSONInteger(i) =>
+            s"${prefix}$i"
 
-        case oid @ BSONObjectID(_) =>
-          prefix + name + s""": Object(${oid.stringify})"""
+          case BSONLong(l) =>
+            s"${prefix}NumberLong($l)"
 
-        case _ =>
-          prefix + name + ": " + value.toString
+          case BSONString(s) =>
+            prefix + '"' + s.replaceAll("\"", "\\\"") + '"'
+
+          case oid @ BSONObjectID(_) =>
+            s"${prefix}Object(${oid.stringify})"
+
+          case ts @ BSONTimestamp(_) =>
+            s"${prefix}Timestamp(${ts.time}, ${ts.ordinal})"
+
+          case BSONUndefined => s"${prefix}undefined"
+          case BSONMinKey    => s"${prefix}MinKey"
+          case BSONMaxKey    => s"${prefix}MaxKey"
+
+          case _ =>
+            s"${prefix}$value"
+        }
       }
 
-      case Failure(e) => s"${prefix}ERROR[${e.getMessage()}]"
+      case Failure(e) => s"${indent}ERROR[${e.getMessage()}]"
     }.mkString(",\n")
   }
 
