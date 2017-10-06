@@ -279,5 +279,22 @@ trait Cursor1Spec { spec: CursorSpec =>
             await(1, slowTimeout + DurationInt(1).seconds)
         }
     }
+
+    "collect exact number of results" in { implicit ee: EE =>
+      val futs: Seq[Future[Unit]] = for (i <- 0 until nDocs) yield {
+        coll.insert(BSONDocument(
+          "i" -> i,
+          "record" -> s"record$i",
+          "junk" -> Seq.fill(100)(s"junk"),
+          "junk2" -> Seq.fill(100)(s"junk"))).map(_ => {})
+      }
+
+      Future.sequence(futs).map { _ =>
+        info(s"inserted $nDocs records")
+      } aka "fixtures" must beEqualTo({}).await(1, timeout)
+
+      coll.find(matchAll("cursorspec1")).cursor().collect[List](10000).
+        map(_.size) aka "result size" must beEqualTo(10000).await(1, timeout)
+    }
   }
 }
