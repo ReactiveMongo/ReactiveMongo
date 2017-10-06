@@ -92,7 +92,7 @@ private[reactivemongo] trait InsertOps[P <: SerializationPack with Singleton] {
         docs <- serialize(documents)
         res <- {
           val bulkProducer = BulkOps.bulks(
-            docs, bulkSz, maxSz) { pack.bsonSize(_) }
+            docs, maxSz, bulkSz) { pack.bsonSize(_) }
 
           BulkOps.bulkApply[pack.Document, WriteResult](bulkProducer)({ bulk =>
             execute(bulk.toSeq)
