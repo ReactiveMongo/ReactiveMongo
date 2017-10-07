@@ -111,6 +111,14 @@ trait Cursor1Spec { spec: CursorSpec =>
           "i" -> 1, "record" -> "record1")).await(0, timeout)
     }
 
+    "collect with limited maxDocs" in { implicit ee: EE =>
+      val max = (nDocs / 8).toInt
+
+      coll.find(matchAll("collectLimit")).updateOptions(_.batchSize(997)).
+        cursor().collect[List](max) must haveSize[List[BSONDocument]](max).
+        await(1, timeout)
+    }
+
     def foldSpec1(c: BSONCollection, timeout: FiniteDuration) = {
       "get 10 first docs" in { implicit ee: EE =>
         c.find(matchAll("cursorspec1")).cursor().collect[List](10).

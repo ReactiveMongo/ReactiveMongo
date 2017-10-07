@@ -412,7 +412,7 @@ object DefaultCursor {
     val failoverStrategy = failover
     val mongo26WriteOp = isMongo26WriteOp
     val fullCollectionName = query.fullCollectionName
-    val numberToReturn = query.numberToReturn
+    val numberToReturn = query.numberToReturn // see QueryOpts.batchSizeN
     val tailable = (query.flags &
       QueryFlags.TailableCursor) == QueryFlags.TailableCursor
 
@@ -421,12 +421,7 @@ object DefaultCursor {
     }
 
     @inline def makeRequest(maxDocs: Int)(implicit ctx: ExecutionContext): Future[Response] = Failover2(mongoConnection, failoverStrategy) { () =>
-      val ntr = query.numberToReturn
-      val max = if (maxDocs < 0) Int.MaxValue else maxDocs
-      val q = { // normalize the number of docs to return
-        if (ntr > 0 && ntr <= max) query
-        else query.copy(numberToReturn = max)
-      }
+      val q = query.copy(numberToReturn = toReturn(numberToReturn, maxDocs, 0))
 
       mongoConnection.sendExpectingResponse(
         RequestMaker(q, requestBuffer, readPreference), isMongo26WriteOp)
@@ -507,12 +502,10 @@ object DefaultCursor {
 
     private def next(response: Response, maxDocs: Int)(implicit ctx: ExecutionContext): Future[Option[Response]] = {
       if (response.reply.cursorID != 0) {
-        val max = if (maxDocs < 0) Int.MaxValue else maxDocs
-        val toReturn = { // normalize the number of docs to return
-          if (numberToReturn > 0 && numberToReturn <= max) numberToReturn
-          else max
-        }
-        val op = GetMore(fullCollectionName, toReturn, response.reply.cursorID)
+        val ntr = toReturn(
+          this.numberToReturn, maxDocs, nextBatchOffset(response))
+
+        val op = GetMore(fullCollectionName, ntr, response.reply.cursorID)
 
         logger.trace(s"[Cursor] Calling next on ${response.reply.cursorID}, op=$op")
 
@@ -531,10 +524,9 @@ object DefaultCursor {
       }
     }
 
-    @inline
-    private def hasNext(response: Response, maxDocs: Int): Boolean =
-      (response.reply.cursorID != 0) && (maxDocs < 0 ||
-        (response.reply.numberReturned + response.reply.startingFrom) < maxDocs)
+    @inline private def hasNext(response: Response, maxDocs: Int): Boolean =
+      (response.reply.cursorID != 0) && (
+        maxDocs < 0 || (DefaultCursor.nextBatchOffset(response) < maxDocs))
 
     /** Returns next response using tailable mode */
     private def tailResponse(current: Response, maxDocs: Int)(implicit context: ExecutionContext): Future[Option[Response]] = {
@@ -738,6 +730,22 @@ object DefaultCursor {
       } else { (ec: ExecutionContext, r: Response) =>
         tailResponse(r, maxDocs)(ec)
       }
+    }
+  }
+
+  @inline private def nextBatchOffset(response: Response): Int =
+    response.reply.numberReturned + response.reply.startingFrom
+
+  @inline private def toReturn(
+    batchSizeN: Int, maxDocs: Int, offset: Int): Int = {
+    // Normalizes the max number of documents
+    val max = if (maxDocs < 0) Int.MaxValue else maxDocs
+
+    if (batchSizeN > 0 && (offset + batchSizeN) <= max) {
+      // Valid `numberToReturn` and next batch won't exceed the max
+      batchSizeN
+    } else {
+      max - offset
     }
   }
 }
