@@ -12,7 +12,7 @@ libraryDependencies ++= Seq(
 )
 ```
 
-[![Maven Central](https://maven-badges.herokuapp.com/maven-central/org.reactivemongo/reactivemongo_2.12/badge.svg)](https://maven-badges.herokuapp.com/maven-central/org.reactivemongo/reactivemongo_2.12/)
+[![Maven](https://img.shields.io/maven-central/v/org.reactivemongo/reactivemongo_2.12.svg)](http://search.maven.org/#search%7Cga%7C1%7Ca%3A%22reactivemongo_2.12%22) [![Javadocs](https://javadoc.io/badge/org.reactivemongo/reactivemongo_2.12.svg)](https://javadoc.io/doc/org.reactivemongo/reactivemongo_2.12)
 
 ## Build manually
 

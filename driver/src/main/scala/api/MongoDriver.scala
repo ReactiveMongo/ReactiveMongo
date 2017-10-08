@@ -63,9 +63,8 @@ class MongoDriver(
    * Closes this driver (and all its connections and resources).
    * Awaits the termination until the timeout is expired.
    */
-  def close(timeout: FiniteDuration = FiniteDuration(2, SECONDS)): Unit = {
+  def close(timeout: FiniteDuration = FiniteDuration(2, SECONDS)): Unit =
     Await.result(askClose(timeout)(ExecutionContext.global), timeout) // Unsafe
-  }
 
   /**
    * Creates a new MongoConnection.
