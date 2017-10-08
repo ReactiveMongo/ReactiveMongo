@@ -43,23 +43,26 @@ object Publish {
     credentials += Credentials(repoName, env("PUBLISH_REPO_ID"),
       env("PUBLISH_USER"), env("PUBLISH_PASS")),
     pomIncludeRepository := { _ => false },
+    autoAPIMappings := true,
+    apiURL := Some(url(s"$siteUrl/release/${Release.major.value}/api/")),
     licenses := {
       Seq("Apache 2.0" ->
         url("http://www.apache.org/licenses/LICENSE-2.0"))
     },
     homepage := Some(url(siteUrl)),
-    autoAPIMappings := true,
-    apiURL := Some(url(s"$siteUrl/release/${Release.major.value}/api/")),
-    pomExtra := (
-      <scm>
-        <url>git://github.com/ReactiveMongo/ReactiveMongo.git</url>
-          <connection>scm:git://github.com/ReactiveMongo/ReactiveMongo.git</connection>
-          </scm>
-        <developers>
-        <developer>
-        <id>sgodbillon</id>
-        <name>Stephane Godbillon</name>
-        <url>http://stephane.godbillon.com</url>
-          </developer>
-        </developers>))
+    scmInfo := Some(
+      ScmInfo(
+        url("https://github.com/ReactiveMongo/ReactiveMongo"),
+        "scm:git://github.com/ReactiveMongo/ReactiveMongo.git")),
+    developers := List(
+      Developer(
+        id = "sgodbillon",
+        name = "Stephane Godbillon",
+        email = "",
+        url = url("http://stephane.godbillon.com")),
+      Developer(
+        id = "cchantep",
+        name = "Cédric Chantepie",
+        email = "",
+        url = url("http://github.com/cchantep/"))))
 }
