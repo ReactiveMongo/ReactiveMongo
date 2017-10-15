@@ -1,5 +1,6 @@
 import reactivemongo.bson.{
   BSON,
+  BSONDecimal,
   BSONDocument,
   BSONDocumentHandler,
   BSONDocumentReader,
@@ -52,7 +53,7 @@ class MacroSpec extends org.specs2.mutable.Specification {
 
     "support single member case classes" in {
       roundtrip(
-        Single("Foo"),
+        Single(BigDecimal("12.345")),
         Macros.handler[Single])
     }
 
@@ -68,26 +69,30 @@ class MacroSpec extends org.specs2.mutable.Specification {
       implicit def singleHandler = Macros.handler[Single]
 
       "directly" in {
-        roundtrip(Foo(Single("A"), "ipsum"), Macros.handler[Foo[Single]])
+        roundtrip(
+          Foo(Single(BigDecimal(123L)), "ipsum"),
+          Macros.handler[Foo[Single]])
       }
 
       "from generic function" in {
         def handler[T](implicit w: BSONDocumentWriter[T], r: BSONDocumentReader[T]) = Macros.handler[Foo[T]]
 
-        roundtrip(Foo(Single("A"), "ipsum"), handler[Single])
+        roundtrip(Foo(Single(BigDecimal(1.23D)), "ipsum"), handler[Single])
       }
     }
 
     "support generic case class GenSeq" in {
-      implicit def singleHandler = new BSONWriter[Single, BSONString] with BSONReader[BSONString, Single] with BSONHandler[BSONString, Single] {
-        def write(single: Single) = BSONString(single.value)
-        def read(str: BSONString) = Single(str.value)
+      implicit def singleHandler = new BSONWriter[Single, BSONDecimal] with BSONReader[BSONDecimal, Single] with BSONHandler[BSONDecimal, Single] {
+        def write(single: Single) = BSONDecimal.fromBigDecimal(single.value).get
+
+        def read(dec: BSONDecimal) =
+          BSONDecimal.toBigDecimal(dec).map(Single(_)).get
       }
 
-      implicit def optionHandler[T](implicit h: BSONHandler[BSONString, T]): BSONDocumentHandler[Option[T]] = new BSONDocumentReader[Option[T]] with BSONDocumentWriter[Option[T]] with BSONHandler[BSONDocument, Option[T]] {
+      implicit def optionHandler[T](implicit h: BSONHandler[BSONDecimal, T]): BSONDocumentHandler[Option[T]] = new BSONDocumentReader[Option[T]] with BSONDocumentWriter[Option[T]] with BSONHandler[BSONDocument, Option[T]] {
 
         def read(doc: BSONDocument): Option[T] =
-          doc.getAs[BSONString](f"$$some").map(h.read(_))
+          doc.getAs[BSONDecimal](f"$$some").map(h.read(_))
 
         def write(single: Option[T]) = single match {
           case Some(v) => BSONDocument(f"$$some" -> h.write(v))
@@ -97,7 +102,9 @@ class MacroSpec extends org.specs2.mutable.Specification {
 
       def genSeqHandler[T: BSONDocumentHandler]: BSONDocumentHandler[GenSeq[T]] = Macros.handler[GenSeq[T]]
 
-      val seq = GenSeq(Seq(Option.empty[Single], Option(Single("A"))), 1)
+      val seq = GenSeq(Seq(
+        Option.empty[Single],
+        Option(Single(BigDecimal(1)))), 1)
 
       roundtrip(seq, genSeqHandler[Option[Single]])
     }
@@ -388,10 +395,11 @@ class MacroSpec extends org.specs2.mutable.Specification {
     "be generated for a generic case class" in {
       implicit def singleReader = Macros.reader[Single]
       val r = Macros.reader[Foo[Single]]
+      val big = BigDecimal(1.23D)
 
       r.read(BSONDocument(
-        "bar" -> BSONDocument("value" -> "A"),
-        "lorem" -> "ipsum")) must_== Foo(Single("A"), "ipsum")
+        "bar" -> BSONDocument("value" -> big),
+        "lorem" -> "ipsum")) must_== Foo(Single(big), "ipsum")
     }
 
     "be generated for class class with self reference" in {
@@ -422,8 +430,8 @@ class MacroSpec extends org.specs2.mutable.Specification {
       implicit def singleWriter = Macros.writer[Single]
       val w = Macros.writer[Foo[Single]]
 
-      w.write(Foo(Single("A"), "ipsum")) must_== BSONDocument(
-        "bar" -> BSONDocument("value" -> "A"),
+      w.write(Foo(Single(BigDecimal(1)), "ipsum")) must_== BSONDocument(
+        "bar" -> BSONDocument("value" -> BigDecimal(1)),
         "lorem" -> "ipsum")
     }
 

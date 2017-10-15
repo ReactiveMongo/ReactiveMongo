@@ -17,7 +17,7 @@ object BuildSettings {
 
   val buildSettings = Defaults.coreDefaultSettings ++ baseSettings ++ Seq(
     scalaVersion := "2.11.11",
-    crossScalaVersions := Seq("2.10.5", "2.11.11", "2.12.3"),
+    crossScalaVersions := Seq("2.10.5", "2.11.11", "2.12.4"),
     crossVersion := CrossVersion.binary,
     //parallelExecution in Test := false,
     //fork in Test := true, // Don't share executioncontext between SBT CLI/tests
@@ -218,7 +218,7 @@ object ReactiveMongoBuild extends Build {
       publishArtifact := false,
       previousArtifacts := Set.empty,
       travisEnv in Test := { // test:travisEnv from SBT CLI
-        val (akkaLower, akkaUpper) = "2.3.13" -> "2.5.4"
+        val (akkaLower, akkaUpper) = "2.3.13" -> "2.5.6"
         val (playLower, playUpper) = "2.3.8" -> "2.6.1"
         val (mongoLower, mongoUpper) = "2_6" -> "3_4"
 
@@ -386,14 +386,21 @@ object ReactiveMongoBuild extends Build {
       binaryIssueFilters ++= {
         import ProblemFilters.{ exclude => x }
         @inline def irt(s: String) = x[IncompatibleResultTypeProblem](s)
+        @inline def mtp(s: String) = x[MissingTypesProblem](s)
+        @inline def fmp(s: String) = x[FinalMethodProblem](s)
+        @inline def imt(s: String) = x[IncompatibleMethTypeProblem](s)
 
         Seq(
-          x[MissingTypesProblem]("reactivemongo.bson.BSONTimestamp$"),
+          mtp("reactivemongo.bson.BSONTimestamp$"),
           irt("reactivemongo.bson.Producer.noneOptionValue2Producer"),
           irt("reactivemongo.bson.Producer.noneOptionValueProducer"),
           irt("reactivemongo.bson.Producer.nameOptionValue2Producer"),
           irt("reactivemongo.bson.Producer.valueProducer"),
-          irt("reactivemongo.bson.Producer.optionValueProducer")
+          irt("reactivemongo.bson.Producer.optionValueProducer"),
+          mtp("reactivemongo.bson.ExtendedNumeric"),
+          fmp("reactivemongo.bson.ExtendedNumeric.value"),
+          imt("reactivemongo.bson.ExtendedNumeric.this"),
+          mtp("reactivemongo.bson.ExtendedNumeric$")
         )
       }
     )

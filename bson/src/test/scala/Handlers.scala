@@ -107,8 +107,8 @@ class Handlers extends org.specs2.mutable.Specification {
     }
 
     "be written" in {
-      BSONDocumentWriter { s: String => BSONDocument("$foo" -> s) }.
-        write("bar") must_== BSONDocument("$foo" -> "bar")
+      BSONDocumentWriter { s: String => BSONDocument(f"$$foo" -> s) }.
+        write("bar") must_== BSONDocument(f"$$foo" -> "bar")
     }
   }
 

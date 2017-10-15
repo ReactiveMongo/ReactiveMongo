@@ -99,7 +99,7 @@ private[api] trait Driver {
     // It will shut down all the connections and monitors
     (supervisorActor ? Close)(Timeout(timeout)).recover {
       case err =>
-        logger.warn(s"[$supervisorName] Failed to close connections within timeout. Continuing closing of ReactiveMongo driver anyway.", err)
+        logger.warn(s"[$supervisorName] Fails to close connections within timeout. Continuing closing of ReactiveMongo driver anyway.", err)
     } // and then shut down the ActorSystem as it is exiting.
       .flatMap(_ => systemClose(Some(timeout)))
   }
@@ -172,13 +172,15 @@ private[api] trait Driver {
         //connection.nodes = nodes
 
         driver.connectionMonitors.put(connection.monitor, connection)
+
         context.watch(connection.monitor)
+
         sender ! connection
       }
 
       case Terminated(actor) => {
         logger.debug(
-          s"[$supervisorName] Pool actor is terminated: ${actor.path}")
+          s"[$supervisorName] Connection is terminated: ${actor.path}")
 
         driver.connectionMonitors.remove(actor)
         ()

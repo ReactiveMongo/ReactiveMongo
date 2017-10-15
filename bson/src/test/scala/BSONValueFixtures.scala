@@ -75,11 +75,22 @@ object BSONValueFixtures {
 
   val bsonLongFixtures = List(BSONLong(-1L), BSONLong(0), BSONLong(12345L))
 
+  val bsonDecimalFixtures = List(
+    BSONDecimal.PositiveZero,
+    BSONDecimal.NegativeZero,
+    BSONDecimal.PositiveInf,
+    BSONDecimal.NegativeInf,
+    BSONDecimal.NaN,
+    BSONDecimal(0x3040000000000000L, 0x0000000000000001L),
+    BSONDecimal(-5746593124524752896L, -9223372036854775808L),
+    BSONDecimal(3476778912330022912L, 9223372036854775807L),
+    BSONDecimal(0x3040000000000000L, 0x000000e67a93c822L),
+    BSONDecimal(0x3036000000000000L, 0x0000000000003039L),
+    BSONDecimal(0x3032000000000000L, 0x0000000000003039L))
+
   val bsonConstFixtures = List(BSONUndefined, BSONNull, BSONMinKey, BSONMaxKey)
 
-  lazy val bsonValueFixtures = bsonDoubleFixtures ++ bsonStrFixtures ++ (
-    bsonIntFixtures ++ bsonArrayFixtures ++ bsonDocFixtures ++ bsonBinFixtures) ++ bsonOidFixtures ++ bsonBoolFixtures ++ bsonDateTimeFixtures ++ (
-      bsonRegexFixtures ++ bsonDBPFixtures ++ bsonJSFixtures ++ bsonSymFixtures) ++ bsonJSWsFixtures ++ bsonTsFixtures ++ bsonLongFixtures
+  lazy val bsonValueFixtures = bsonDoubleFixtures ++ bsonStrFixtures ++ bsonIntFixtures ++ bsonArrayFixtures ++ bsonDocFixtures ++ bsonBinFixtures ++ bsonOidFixtures ++ bsonBoolFixtures ++ bsonDateTimeFixtures ++ bsonRegexFixtures ++ bsonDBPFixtures ++ bsonJSFixtures ++ bsonSymFixtures ++ bsonJSWsFixtures ++ bsonTsFixtures ++ bsonLongFixtures ++ bsonDecimalFixtures
 
   lazy val elementProducerFixtures: List[ElementProducer] =
     bsonValueFixtures.map {

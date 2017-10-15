@@ -108,11 +108,12 @@ class CommonUseCases extends Specification {
 
       val fetched = Await.result(collection.find(BSONDocument("name" -> BSONString("Joe"))).one[BSONDocument], timeout)
       fetched.isDefined mustEqual true
-      val contactsString = fetched.get.getAs[BSONArray]("contacts").get.values.map {
-        case contact: BSONDocument =>
-          contact.getAs[BSONString]("type").get.value + ":" +
-            contact.getAs[BSONString]("value").get.value
-      }.mkString(",")
+      val contactsString = fetched.get.getAs[BSONArray]("contacts").
+        get.values.collect {
+          case contact: BSONDocument =>
+            contact.getAs[BSONString]("type").get.value + ":" +
+              contact.getAs[BSONString]("value").get.value
+        }.mkString(",")
 
       contactsString mustEqual "telephone:+331234567890,mail:joe@plop.com"
     }

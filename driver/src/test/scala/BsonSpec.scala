@@ -84,6 +84,7 @@ class BsonSpec extends Specification {
         Some(BSONInteger(2)),
         None,
         Some(BSONInteger(4)))
+
       val str = array.values.map {
         case BSONInteger(value) => value.toString
         case _                  => "NOELEM"

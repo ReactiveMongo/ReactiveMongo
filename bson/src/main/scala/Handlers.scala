@@ -252,6 +252,13 @@ trait DefaultBSONHandlers {
     def write(double: Double) = BSONDouble(double)
   }
 
+  implicit object BSONDecimalHandler
+    extends BSONHandler[BSONDecimal, BigDecimal] {
+
+    def read(decimal: BSONDecimal) = BSONDecimal.toBigDecimal(decimal).get
+    def write(value: BigDecimal) = BSONDecimal.fromBigDecimal(value).get
+  }
+
   implicit object BSONStringHandler extends BSONHandler[BSONString, String] {
     def read(string: BSONString) = string.value
     def write(string: String) = BSONString(string)
@@ -277,14 +284,16 @@ trait DefaultBSONHandlers {
   import BSONNumberLike._
   import BSONBooleanLike._
 
-  class BSONNumberLikeReader[B <: BSONValue] extends BSONReader[B, BSONNumberLike] {
-    def read(bson: B) = bson match {
-      case int: BSONInteger   => BSONIntegerNumberLike(int)
-      case long: BSONLong     => BSONLongNumberLike(long)
-      case double: BSONDouble => BSONDoubleNumberLike(double)
-      case dt: BSONDateTime   => BSONDateTimeNumberLike(dt)
-      case ts: BSONTimestamp  => BSONTimestampNumberLike(ts)
-      case _                  => throw new UnsupportedOperationException()
+  class BSONNumberLikeReader[B <: BSONValue]
+    extends BSONReader[B, BSONNumberLike] {
+    def read(bson: B): BSONNumberLike = bson match {
+      case i: BSONInteger    => BSONIntegerNumberLike(i)
+      case l: BSONLong       => BSONLongNumberLike(l)
+      case d: BSONDouble     => BSONDoubleNumberLike(d)
+      case dt: BSONDateTime  => BSONDateTimeNumberLike(dt)
+      case ts: BSONTimestamp => BSONTimestampNumberLike(ts)
+      case dec: BSONDecimal  => BSONDecimalNumberLike(dec)
+      case _                 => throw new UnsupportedOperationException()
     }
   }
 
@@ -292,16 +301,19 @@ trait DefaultBSONHandlers {
     def write(number: BSONNumberLike) = number.underlying
   }
 
-  implicit def bsonNumberLikeReader[B <: BSONValue] = new BSONNumberLikeReader[B]
+  implicit def bsonNumberLikeReader[B <: BSONValue] =
+    new BSONNumberLikeReader[B]
 
-  class BSONBooleanLikeReader[B <: BSONValue] extends BSONReader[B, BSONBooleanLike] {
-    def read(bson: B) = bson match {
+  class BSONBooleanLikeReader[B <: BSONValue]
+    extends BSONReader[B, BSONBooleanLike] {
+    def read(bson: B): BSONBooleanLike = bson match {
       case int: BSONInteger      => BSONIntegerBooleanLike(int)
       case double: BSONDouble    => BSONDoubleBooleanLike(double)
       case long: BSONLong        => BSONLongBooleanLike(long)
       case boolean: BSONBoolean  => BSONBooleanBooleanLike(boolean)
       case _: BSONNull.type      => BSONNullBooleanLike(BSONNull)
       case _: BSONUndefined.type => BSONUndefinedBooleanLike(BSONUndefined)
+      case dec: BSONDecimal      => BSONDecimalBooleanLike(dec)
       case _                     => throw new UnsupportedOperationException()
     }
   }
@@ -310,7 +322,8 @@ trait DefaultBSONHandlers {
     def write(number: BSONBooleanLike) = number.underlying
   }
 
-  implicit def bsonBooleanLikeReader[B <: BSONValue] = new BSONBooleanLikeReader[B]
+  implicit def bsonBooleanLikeReader[B <: BSONValue] =
+    new BSONBooleanLikeReader[B]
 
   // Collections Handlers
   class BSONArrayCollectionReader[M[_], T](implicit cbf: CanBuildFrom[M[_], T, M[T]], reader: BSONReader[_ <: BSONValue, T]) extends BSONReader[BSONArray, M[T]] {
@@ -340,6 +353,9 @@ trait DefaultBSONHandlers {
   implicit object BSONStringIdentity extends IdentityBSONConverter[BSONString]
 
   implicit object BSONIntegerIdentity extends IdentityBSONConverter[BSONInteger]
+
+  implicit object BSONDecimalIdentity
+    extends IdentityBSONConverter[BSONDecimal]
 
   implicit object BSONArrayIdentity extends IdentityBSONConverter[BSONArray]
 

@@ -29,26 +29,32 @@ class UpdateSpec extends org.specs2.mutable.Specification {
   lazy val col2 = db(s"update2${System identityHashCode slowDb}")
   lazy val slowCol2 = slowDb(s"slowup2${System identityHashCode slowDb}")
 
-  case class Person(firstName: String, lastName: String, age: Int)
+  case class Person(
+    firstName: String,
+    lastName: String,
+    age: Int,
+    score: BigDecimal)
 
   implicit object PersonReader extends BSONDocumentReader[Person] {
     def read(doc: BSONDocument) = Person(
       doc.getAs[String]("firstName").getOrElse(""),
       doc.getAs[String]("lastName").getOrElse(""),
-      doc.getAs[Int]("age").getOrElse(0))
+      doc.getAs[Int]("age").getOrElse(0),
+      doc.getAs[BigDecimal]("score").getOrElse(BigDecimal(-1L)))
   }
 
   implicit object PersonWriter extends BSONDocumentWriter[Person] {
     def write(person: Person) = BSONDocument(
       "firstName" -> person.firstName,
       "lastName" -> person.lastName,
-      "age" -> person.age)
+      "age" -> person.age,
+      "score" -> person.score)
   }
 
   "Update" should {
     {
       def spec(c: BSONCollection, timeout: FiniteDuration)(implicit ee: EE) = {
-        val jack = Person("Jack", "London", 27)
+        val jack = Person("Jack", "London", 27, BigDecimal("12.345"))
 
         c.update(jack, BSONDocument("$set" -> BSONDocument("age" -> 33)),
           upsert = true) must beLike[UpdateWriteResult]({
@@ -104,7 +110,7 @@ class UpdateSpec extends org.specs2.mutable.Specification {
 
     {
       def spec(c: BSONCollection, timeout: FiniteDuration)(implicit ee: EE) = {
-        val jack = Person("Jack", "London", 33)
+        val jack = Person("Jack", "London", 33, BigDecimal("12.345"))
 
         c.runCommand(Update(UpdateElement(
           q = jack, u = BSONDocument("$set" -> BSONDocument("age" -> 66)))), ReadPreference.primary) must beLike[UpdateWriteResult]({

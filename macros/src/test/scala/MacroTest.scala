@@ -15,7 +15,7 @@ object MacroTest {
   case class Pet(name: String, owner: Person)
   case class Primitives(dbl: Double, str: String, bl: Boolean, int: Int, long: Long)
   case class Optional(name: String, value: Option[String])
-  case class Single(value: String)
+  case class Single(value: BigDecimal)
   case class OptionalSingle(value: Option[String])
   case class SingleTuple(value: (String, String))
   case class User(_id: BSONObjectID = BSONObjectID.generate(), name: String)

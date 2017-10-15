@@ -26,13 +26,13 @@ trait BufferHandler {
     serialize(document, buffer)
   }
 
-  def write(buffer: WritableBuffer, arr: BSONArray) = {
-    serialize(arr, buffer)
-  }
+  def write(buffer: WritableBuffer, arr: BSONArray) = serialize(arr, buffer)
 
   def readDocument(buffer: ReadableBuffer): Try[BSONDocument]
 
-  def writeDocument(document: BSONDocument, buffer: WritableBuffer): WritableBuffer
+  def writeDocument(
+    document: BSONDocument,
+    buffer: WritableBuffer): WritableBuffer
 
   def stream(buffer: ReadableBuffer): Stream[(String, BSONValue)] =
     deserialize(buffer) match {
@@ -50,32 +50,36 @@ object DefaultBufferHandler extends BufferHandler {
     def read(buffer: ReadableBuffer): B
   }
 
-  sealed trait BufferRW[B <: BSONValue] extends BufferWriter[B] with BufferReader[B]
+  sealed trait BufferRW[B <: BSONValue]
+    extends BufferWriter[B] with BufferReader[B]
 
   val handlersByCode: Map[Byte, BufferRW[_ <: BSONValue]] = Map(
-    0x01.toByte -> BSONDoubleBufferHandler,
-    0x02.toByte -> BSONStringBufferHandler,
-    0x03.toByte -> BSONDocumentBufferHandler,
-    0x04.toByte -> BSONArrayBufferHandler, // array
-    0x05.toByte -> BSONBinaryBufferHandler, // binary TODO
-    0x06.toByte -> BSONUndefinedBufferHandler, // undefined,
-    0x07.toByte -> BSONObjectIDBufferHandler, // objectid,
-    0x08.toByte -> BSONBooleanBufferHandler, // boolean
-    0x09.toByte -> BSONDateTimeBufferHandler, // datetime
-    0x0A.toByte -> BSONNullBufferHandler, // null
-    0x0B.toByte -> BSONRegexBufferHandler, // regex
-    0x0C.toByte -> BSONDBPointerBufferHandler, // dbpointer
-    0x0D.toByte -> BSONJavaScriptBufferHandler, // JS
-    0x0E.toByte -> BSONSymbolBufferHandler, // symbol
-    0x0F.toByte -> BSONJavaScriptWSBufferHandler, // JS with scope
-    0x10.toByte -> BSONIntegerBufferHandler,
-    0x11.toByte -> BSONTimestampBufferHandler, // timestamp,
-    0x12.toByte -> BSONLongBufferHandler, // long,
+    (0x01: Byte) -> BSONDoubleBufferHandler,
+    (0x02: Byte) -> BSONStringBufferHandler,
+    (0x03: Byte) -> BSONDocumentBufferHandler,
+    (0x04: Byte) -> BSONArrayBufferHandler, // array
+    (0x05: Byte) -> BSONBinaryBufferHandler, // binary TODO
+    (0x06: Byte) -> BSONUndefinedBufferHandler, // undefined,
+    (0x07: Byte) -> BSONObjectIDBufferHandler, // objectid,
+    (0x08: Byte) -> BSONBooleanBufferHandler, // boolean
+    (0x09: Byte) -> BSONDateTimeBufferHandler, // datetime
+    (0x0A: Byte) -> BSONNullBufferHandler, // null
+    (0x0B: Byte) -> BSONRegexBufferHandler, // regex
+    (0x0C: Byte) -> BSONDBPointerBufferHandler, // dbpointer
+    (0x0D: Byte) -> BSONJavaScriptBufferHandler, // JS
+    (0x0E: Byte) -> BSONSymbolBufferHandler, // symbol
+    (0x0F: Byte) -> BSONJavaScriptWSBufferHandler, // JS with scope
+    (0x10: Byte) -> BSONIntegerBufferHandler,
+    (0x11: Byte) -> BSONTimestampBufferHandler, // timestamp,
+    (0x12: Byte) -> BSONLongBufferHandler, // long,
+    (0x13: Byte) -> BSONDecimalBufferHandler, // decimal
     0xFF.toByte -> BSONMinKeyBufferHandler, // min
-    0x7F.toByte -> BSONMaxKeyBufferHandler) // max
+    (0x7F: Byte) -> BSONMaxKeyBufferHandler) // max
 
   object BSONDoubleBufferHandler extends BufferRW[BSONDouble] {
-    def write(value: BSONDouble, buffer: WritableBuffer): WritableBuffer = buffer.writeDouble(value.value)
+    def write(value: BSONDouble, buffer: WritableBuffer): WritableBuffer =
+      buffer.writeDouble(value.value)
+
     def read(buffer: ReadableBuffer): BSONDouble = BSONDouble(buffer.readDouble)
   }
 
@@ -258,8 +262,18 @@ object DefaultBufferHandler extends BufferHandler {
   }
 
   object BSONLongBufferHandler extends BufferRW[BSONLong] {
-    def write(long: BSONLong, buffer: WritableBuffer) = buffer writeLong long.value
+    def write(long: BSONLong, buffer: WritableBuffer) =
+      buffer writeLong long.value
+
     def read(buffer: ReadableBuffer) = BSONLong(buffer.readLong)
+  }
+
+  object BSONDecimalBufferHandler extends BufferRW[BSONDecimal] {
+    def write(decimal: BSONDecimal, buffer: WritableBuffer) =
+      buffer.writeLong(decimal.high).writeLong(decimal.low)
+
+    def read(buffer: ReadableBuffer): BSONDecimal =
+      BSONDecimal(high = buffer.readLong(), low = buffer.readLong())
   }
 
   object BSONMinKeyBufferHandler extends BufferRW[BSONMinKey.type] {
@@ -283,12 +297,12 @@ object DefaultBufferHandler extends BufferHandler {
     } else throw new NoSuchElementException("buffer can not be read, end of buffer reached")
   }
 
-  def readDocument(buffer: ReadableBuffer): Try[BSONDocument] = Try {
-    BSONDocumentBufferHandler.read(buffer)
-  }
+  def readDocument(buffer: ReadableBuffer): Try[BSONDocument] =
+    Try(BSONDocumentBufferHandler read buffer)
 
-  def writeDocument(document: BSONDocument, buffer: WritableBuffer): WritableBuffer =
-    serialize(document, buffer)
+  def writeDocument(
+    document: BSONDocument,
+    buffer: WritableBuffer): WritableBuffer = serialize(document, buffer)
 }
 
 sealed trait BSONIterator extends Iterator[(String, BSONValue)] {
@@ -327,13 +341,16 @@ object BSONIterator {
             s"${prefix}{\n" + pretty(i + 1, elements.iterator) + s"\n$indent}"
 
           case BSONDouble(d) =>
-            s"""${prefix}NumberDecimal($d)"""
+            s"""${prefix}$d"""
 
           case BSONInteger(i) =>
             s"${prefix}$i"
 
           case BSONLong(l) =>
             s"${prefix}NumberLong($l)"
+
+          case d @ BSONDecimal(_, _) =>
+            s"${prefix}NumberDecimal($d)"
 
           case BSONString(s) =>
             prefix + '"' + s.replaceAll("\"", "\\\"") + '"'
