@@ -442,7 +442,6 @@ class CursorSpec extends org.specs2.mutable.Specification
 
         "when enumerating documents with the default connection" >> {
           enumSpec(defaultColl, cursorDb(_: String), timeout)
-
         }
 
         "when enumerating document with the slow connection" >> {
@@ -839,7 +838,8 @@ class CursorSpec extends org.specs2.mutable.Specification
               @volatile var count = 0
               var i = 0
               val inc = Iteratee.foreach[BSONDocument] { _ =>
-                debug(s"continueOnError: enumerate(#1): $i")
+                //debug
+                println(s"continueOnError: enumerate(#1): $i")
                 i = i + 1
                 if (i % 2 == 0) sys.error("Foo")
                 count = count + 1
@@ -850,7 +850,7 @@ class CursorSpec extends org.specs2.mutable.Specification
 
               (cursor.enumerate(128, false) |>>> inc).map(_ => count).
                 aka("enumerating") must beEqualTo(32).await(1, timeout)
-          }
+          } tag "wip"
 
           "if fails while processing w/o documents" in { implicit ee: EE =>
             @volatile var count = 0
@@ -894,9 +894,11 @@ class CursorSpec extends org.specs2.mutable.Specification
           enumSpec(defaultColl, cursorDb(_: String), timeout)
         }
 
+        /*
         "when enumerating documents with the slow connection" >> {
           enumSpec(slowDefaultColl, slowCursorDb(_: String), slowTimeout)
         }
+         */
       }
 
       "Driver instance must be closed" in {

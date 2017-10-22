@@ -703,6 +703,8 @@ object DefaultCursor {
 
       enumerateResponses(maxDocs, stopOnError) &>
         Enumeratee.mapFlatten { response =>
+          println(s"response = ${response.reply.numberReturned} from ${response.reply.startingFrom}")
+
           val iterator = makeIterator(response)
 
           if (!iterator.hasNext) Enumerator.empty
