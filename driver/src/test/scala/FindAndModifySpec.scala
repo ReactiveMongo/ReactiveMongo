@@ -7,9 +7,11 @@ import reactivemongo.api.commands.bson._
 import BSONFindAndModifyCommand._
 import BSONFindAndModifyImplicits._
 
-import org.specs2.concurrent.{ ExecutionEnv => EE }
+import org.specs2.concurrent.ExecutionEnv
 
-class FindAndModifySpec extends org.specs2.mutable.Specification {
+class FindAndModifySpec(implicit ee: ExecutionEnv)
+  extends org.specs2.mutable.Specification {
+
   import Common._
 
   sequential
@@ -45,7 +47,7 @@ class FindAndModifySpec extends org.specs2.mutable.Specification {
           "$set" -> BSONDocument("age" -> 40)),
         fetchNewObject = true, upsert = true)
 
-      def upsertAndFetch(c: BSONCollection, timeout: FiniteDuration)(implicit ee: EE) = c.runCommand(FindAndModify(jack, upsertOp)).
+      def upsertAndFetch(c: BSONCollection, timeout: FiniteDuration) = c.runCommand(FindAndModify(jack, upsertOp)).
         aka("result") must (beLike[FindAndModifyResult] {
           case result =>
             result.lastError.exists(_.upsertedId.isDefined) must beTrue and (
@@ -54,16 +56,16 @@ class FindAndModifySpec extends org.specs2.mutable.Specification {
               })
         }).await(1, timeout)
 
-      "with the default connection" in { implicit ee: EE =>
+      "with the default connection" in {
         upsertAndFetch(collection, timeout)
       }
 
-      "with the slow connection" in { implicit ee: EE =>
+      "with the slow connection" in {
         upsertAndFetch(slowColl, slowTimeout)
       }
     }
 
-    "modify a doc and fetch its previous value" in { implicit ee: EE =>
+    "modify a doc and fetch its previous value" in {
       val jack = Person("Jack", "London", 40)
       val incrementAge = BSONDocument(
         "$inc" -> BSONDocument("age" -> 1))
@@ -81,7 +83,7 @@ class FindAndModifySpec extends org.specs2.mutable.Specification {
       }).await(1, timeout)
     }
 
-    "make a failing FindAndModify" in { implicit ee: EE =>
+    "make a failing FindAndModify" in {
       val query = BSONDocument()
       val future = collection.runCommand(
         FindAndModify(query, Update(BSONDocument("$inc" -> "age"))))

@@ -9,15 +9,15 @@ import org.specs2.mutable.Specification
 
 import Common._
 
-import org.specs2.concurrent.{ ExecutionEnv => EE }
+import org.specs2.concurrent.ExecutionEnv
 
-class IsMasterSpec extends Specification {
+class IsMasterSpec(implicit ee: ExecutionEnv) extends Specification {
   "isMaster" title
 
   import bson.BSONIsMasterCommand._
 
   "BSON command" should {
-    "be successful" in { implicit ee: EE =>
+    "be successful" in {
       test must beLike[IsMasterResult] {
         case IsMasterResult(true, _, _, _, Some(_), _, _, rs, _) =>
           if (replSetOn) {
@@ -33,29 +33,29 @@ class IsMasterSpec extends Specification {
     }
   }
 
-  private def test(implicit ee: EE) = {
+  private def test = {
     import bson.BSONIsMasterCommandImplicits._
     connection.database("admin").flatMap(_.runCommand(IsMaster))
   }
 }
 
-class RenameCollectionSpec extends Specification {
+class RenameCollectionSpec(implicit ee: ExecutionEnv) extends Specification {
   "renameCollection" title
 
   "Collection" should {
-    def spec(c: MongoConnection, timeout: FiniteDuration)(f: MongoConnection => Future[BSONCollection])(implicit ee: EE) = (for {
+    def spec(c: MongoConnection, timeout: FiniteDuration)(f: MongoConnection => Future[BSONCollection]) = (for {
       coll <- f(c)
       _ <- coll.create()
       _ <- coll.rename(s"renamed${System identityHashCode c}")
     } yield ()) aka "renaming" must beEqualTo({}).await(0, timeout)
 
-    "be renamed using the default connection" in { implicit ee: EE =>
+    "be renamed using the default connection" in {
       spec(connection, timeout) {
         _.database("admin").map(_(s"foo_${System identityHashCode db}"))
       }
     }
 
-    "be renamed using the slow connection" in { implicit ee: EE =>
+    "be renamed using the slow connection" in {
       spec(slowConnection, slowTimeout) {
         _.database("admin").map(_(s"foo_${System identityHashCode slowDb}"))
       }
@@ -63,7 +63,7 @@ class RenameCollectionSpec extends Specification {
   }
 
   "Database 'admin'" should {
-    "rename collection if target doesn't exist" in { implicit ee: EE =>
+    "rename collection if target doesn't exist" in {
       (for {
         admin <- connection.database("admin", failoverStrategy)
         c1 = db.collection(s"foo_${System identityHashCode admin}")
@@ -75,7 +75,7 @@ class RenameCollectionSpec extends Specification {
       }.await(0, timeout)
     }
 
-    "fail to rename collection if target exists" in { implicit ee: EE =>
+    "fail to rename collection if target exists" in {
       val c1 = db.collection(s"foo_${System identityHashCode ee}")
 
       (for {
@@ -100,11 +100,11 @@ class RenameCollectionSpec extends Specification {
   }
 }
 
-class ReplSetGetStatusSpec extends Specification {
+class ReplSetGetStatusSpec(implicit ee: ExecutionEnv) extends Specification {
   "replSetGetStatus" title
 
   "BSON command" should {
-    "be successful" in { implicit ee: EE =>
+    "be successful" in {
       if (replSetOn) {
         test must beLike[ReplSetStatus] {
           case ReplSetStatus(_, _, _, _ :: Nil) => ok
@@ -115,17 +115,17 @@ class ReplSetGetStatusSpec extends Specification {
     }
   }
 
-  private def test(implicit ee: EE) = {
+  private def test = {
     import bson.BSONReplSetGetStatusImplicits._
     connection.database("admin").flatMap(_.runCommand(ReplSetGetStatus))
   }
 }
 
-class ServerStatusSpec extends Specification {
+class ServerStatusSpec(implicit ee: ExecutionEnv) extends Specification {
   "serverStatus" title
 
   "BSON command" should {
-    "be successful" in { implicit ee: EE =>
+    "be successful" in {
       import bson.BSONServerStatusImplicits._
 
       db.runCommand(ServerStatus) must beLike[ServerStatusResult]({
@@ -138,7 +138,7 @@ class ServerStatusSpec extends Specification {
   }
 
   "Database operation" should {
-    "be successful" in { implicit ee: EE =>
+    "be successful" in {
       db.serverStatus must beLike[ServerStatusResult]({
         case ServerStatusResult(_, _, MongodProcess,
           _, _, _, _, _, _, _, _, _, _, _, _, _) =>
@@ -149,19 +149,19 @@ class ServerStatusSpec extends Specification {
   }
 }
 
-class ResyncSpec extends Specification {
+class ResyncSpec(implicit ee: ExecutionEnv) extends Specification {
   "Resync" title
 
   "Resync BSON command" should {
     import bson.BSONResyncImplicits._
 
     if (!replSetOn) {
-      "fail outside ReplicaSet (MongoDB 3+)" in { implicit ee: EE =>
+      "fail outside ReplicaSet (MongoDB 3+)" in {
         connection.database("admin").flatMap(_.runCommand(Resync)) must not(
           throwA[CommandError]).await(0, timeout)
       } tag "not_mongo26"
     } else {
-      "be successful with ReplicaSet (MongoDB 3+)" in { implicit ee: EE =>
+      "be successful with ReplicaSet (MongoDB 3+)" in {
         connection.database("admin").flatMap(_.runCommand(Resync)) must (
           throwA[CommandError].like {
             case CommandError.Code(c) =>
@@ -169,7 +169,7 @@ class ResyncSpec extends Specification {
           }).await(0, timeout)
       } tag "not_mongo26"
 
-      "be successful with ReplicaSet (MongoDB 2)" in { implicit ee: EE =>
+      "be successful with ReplicaSet (MongoDB 2)" in {
         connection.database("admin").flatMap(_.runCommand(Resync)) must (
           throwA[CommandError].like {
             case CommandError.Message(msg) =>
@@ -180,7 +180,7 @@ class ResyncSpec extends Specification {
   }
 }
 
-class ReplSetMaintenanceSpec extends Specification {
+class ReplSetMaintenanceSpec(implicit ee: ExecutionEnv) extends Specification {
   "ReplSetMaintenance" title
 
   "BSON command" should {
@@ -188,14 +188,14 @@ class ReplSetMaintenanceSpec extends Specification {
 
     // MongoDB 3
     if (!replSetOn) {
-      "fail outside replicaSet (MongoDB 3+)" in { implicit ee: EE =>
+      "fail outside replicaSet (MongoDB 3+)" in {
         connection.database("admin").flatMap(_.runCommand(
           ReplSetMaintenance(true))) must throwA[CommandError].like {
           case CommandError.Code(code) => code aka "error code" must_== 76
         }.await(0, timeout)
       } tag "not_mongo26"
     } else {
-      "fail with replicaSet (MongoDB 3+)" in { implicit ee: EE =>
+      "fail with replicaSet (MongoDB 3+)" in {
         connection.database("admin").flatMap(_.runCommand(
           ReplSetMaintenance(true))) must throwA[CommandError].like {
           case CommandError.Code(code) => code aka "error code" must_== 95
@@ -205,12 +205,12 @@ class ReplSetMaintenanceSpec extends Specification {
 
     // MongoDB 2.6
     if (!replSetOn) {
-      "fail outside replicaSet (MongoDB 2.6)" in { implicit ee: EE =>
+      "fail outside replicaSet (MongoDB 2.6)" in {
         connection.database("admin").flatMap(_.runCommand(
           ReplSetMaintenance(true))) must throwA[CommandError].await(0, timeout)
       } tag "mongo2"
     } else {
-      "fail with replicaSet (MongoDB 2.6)" in { implicit ee: EE =>
+      "fail with replicaSet (MongoDB 2.6)" in {
         connection.database("admin").flatMap(_.runCommand(
           ReplSetMaintenance(true))) must throwA[CommandError].like {
           case CommandError.Message(msg) =>
@@ -222,14 +222,14 @@ class ReplSetMaintenanceSpec extends Specification {
   }
 }
 
-class PingSpecification extends Specification {
+class PingSpecification(implicit ee: ExecutionEnv) extends Specification {
   "Ping Command" title
 
   "respond 1.0" >> {
-    "with the default connection" in { implicit ee: EE =>
+    "with the default connection" in {
       connection.database("admin").flatMap(_.ping()) must beTrue.await(0, timeout)
     }
-    "with the slow connection" in { implicit ee: EE =>
+    "with the slow connection" in {
       slowConnection.database("admin").flatMap(_.ping()) must beTrue.await(0, timeout)
     }
   }

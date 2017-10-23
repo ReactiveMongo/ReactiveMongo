@@ -3,15 +3,18 @@ import scala.concurrent.duration.FiniteDuration
 
 import play.api.libs.iteratee._
 
-import reactivemongo.api.BSONSerializationPack
-import reactivemongo.api.gridfs.{ ReadFile, DefaultFileToSave, GridFS }
-import reactivemongo.api.gridfs.Implicits._
 import reactivemongo.bson._
 import reactivemongo.bson.utils.Converters
 
-import org.specs2.concurrent.{ ExecutionEnv => EE }
+import reactivemongo.api.BSONSerializationPack
+import reactivemongo.api.gridfs.{ ReadFile, DefaultFileToSave, GridFS }
+import reactivemongo.api.gridfs.Implicits._
 
-class GridFSSpec extends org.specs2.mutable.Specification {
+import org.specs2.concurrent.ExecutionEnv
+
+class GridFSSpec(implicit ee: ExecutionEnv)
+  extends org.specs2.mutable.Specification {
+
   "GridFS" title
 
   import Common._
@@ -35,7 +38,7 @@ class GridFSSpec extends org.specs2.mutable.Specification {
     lazy val file1 = DefaultFileToSave(Some(filename1), Some("application/file"))
     lazy val content1 = (1 to 100).view.map(_.toByte).toArray
 
-    "store a file without a computed MD5" in { implicit ee: EE =>
+    "store a file without a computed MD5" in {
       gfs.save(Enumerator(content1), file1).map(_.filename).
         aka("filename") must beSome(filename1).await(1, timeout)
     }
@@ -44,12 +47,12 @@ class GridFSSpec extends org.specs2.mutable.Specification {
     lazy val file2 = DefaultFileToSave(Some(filename2), Some("text/plain"))
     lazy val content2 = (100 to 200).view.map(_.toByte).toArray
 
-    "store a file with computed MD5" in { implicit ee: EE =>
+    "store a file with computed MD5" in {
       gfs.saveWithMD5(Enumerator(content2), file2).map(_.filename).
         aka("filename") must beSome(filename2).await(1, timeout)
     }
 
-    "find the files" in { implicit ee: EE =>
+    "find the files" in {
       def find(n: String): Future[Option[GFile]] =
         gfs.find(BSONDocument("filename" -> n)).headOption
 
@@ -84,7 +87,7 @@ class GridFSSpec extends org.specs2.mutable.Specification {
         }
     }
 
-    "delete the files from GridFS" in { implicit ee: EE =>
+    "delete the files from GridFS" in {
       (for {
         a <- gfs.remove(file1.id).map(_.n)
         b <- gfs.remove(file2.id).map(_.n)

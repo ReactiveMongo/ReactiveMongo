@@ -15,9 +15,11 @@ import reactivemongo.api.commands.{
 import reactivemongo.api.commands.bson.BSONUpdateCommand._
 import reactivemongo.api.commands.bson.BSONUpdateCommandImplicits._
 
-import org.specs2.concurrent.{ ExecutionEnv => EE }
+import org.specs2.concurrent.ExecutionEnv
 
-class UpdateSpec extends org.specs2.mutable.Specification {
+class UpdateSpec(implicit ee: ExecutionEnv)
+  extends org.specs2.mutable.Specification {
+
   "Update" title
 
   sequential
@@ -53,7 +55,7 @@ class UpdateSpec extends org.specs2.mutable.Specification {
 
   "Update" should {
     {
-      def spec(c: BSONCollection, timeout: FiniteDuration)(implicit ee: EE) = {
+      def spec(c: BSONCollection, timeout: FiniteDuration) = {
         val jack = Person("Jack", "London", 27, BigDecimal("12.345"))
 
         c.update(jack, BSONDocument("$set" -> BSONDocument("age" -> 33)),
@@ -68,23 +70,22 @@ class UpdateSpec extends org.specs2.mutable.Specification {
 
       }
 
-      "upsert a person with the default connection" in { implicit ee: EE =>
+      "upsert a person with the default connection" in {
         spec(col1, timeout)
       }
 
       "upsert a person with the slow connection and Secondary preference" in {
-        implicit ee: EE =>
-          val coll = slowCol1.withReadPreference(
-            ReadPreference.secondaryPreferred)
+        val coll = slowCol1.withReadPreference(
+          ReadPreference.secondaryPreferred)
 
-          coll.readPreference must_== ReadPreference.secondaryPreferred and {
-            spec(coll, slowTimeout)
-          }
+        coll.readPreference must_== ReadPreference.secondaryPreferred and {
+          spec(coll, slowTimeout)
+        }
       }
     }
 
     {
-      def spec(c: BSONCollection, timeout: FiniteDuration)(implicit ee: EE) = {
+      def spec(c: BSONCollection, timeout: FiniteDuration) = {
         val doc = BSONDocument("_id" -> "foo", "bar" -> 2)
 
         c.update(BSONDocument.empty, doc, upsert = true).
@@ -99,17 +100,17 @@ class UpdateSpec extends org.specs2.mutable.Specification {
           }
       }
 
-      "upsert a document with the default connection" in { implicit ee: EE =>
+      "upsert a document with the default connection" in {
         spec(col2, timeout)
       }
 
-      "upsert a document with the slow connection" in { implicit ee: EE =>
+      "upsert a document with the slow connection" in {
         spec(slowCol2, slowTimeout)
       }
     }
 
     {
-      def spec(c: BSONCollection, timeout: FiniteDuration)(implicit ee: EE) = {
+      def spec(c: BSONCollection, timeout: FiniteDuration) = {
         val jack = Person("Jack", "London", 33, BigDecimal("12.345"))
 
         c.runCommand(Update(UpdateElement(
@@ -120,16 +121,16 @@ class UpdateSpec extends org.specs2.mutable.Specification {
         }).await(1, timeout)
       }
 
-      "update a person with the default connection" in { implicit ee: EE =>
+      "update a person with the default connection" in {
         spec(col1, timeout)
       }
 
-      "update a person with the slow connection" in { implicit ee: EE =>
+      "update a person with the slow connection" in {
         spec(slowCol1, slowTimeout)
       }
     }
 
-    "update a document" in { implicit ee: EE =>
+    "update a document" in {
       val doc = BSONDocument("_id" -> "foo", "bar" -> 2)
 
       col2.runCommand(

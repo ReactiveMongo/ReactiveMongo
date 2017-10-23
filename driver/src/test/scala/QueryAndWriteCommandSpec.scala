@@ -15,9 +15,12 @@ import BSONCountCommandImplicits._
 import BSONIsMasterCommand._
 import BSONIsMasterCommandImplicits._
 
-import org.specs2.concurrent.{ ExecutionEnv => EE }
+import org.specs2.concurrent.ExecutionEnv
 
-class QueryAndWriteCommandSpec extends org.specs2.mutable.Specification {
+class QueryAndWriteCommandSpec(
+  implicit
+  ee: ExecutionEnv) extends org.specs2.mutable.Specification {
+
   import Common._
 
   sequential
@@ -29,7 +32,7 @@ class QueryAndWriteCommandSpec extends org.specs2.mutable.Specification {
   "ReactiveMongo" should {
     "insert 1 doc and retrieve it" >> {
       val doc = BSONDocument("_id" -> BSONNull, "name" -> "jack", "plop" -> -1)
-      def test1(c: BSONCollection, timeout: FiniteDuration)(implicit ee: EE) = {
+      def test1(c: BSONCollection, timeout: FiniteDuration) = {
         Command.run(BSONSerializationPack)(collection, Insert(doc, doc)).
           map(_.ok) aka "inserted" must beTrue.await(1, timeout) and {
             collection.find(doc).cursor[BSONDocument]().
@@ -44,11 +47,11 @@ class QueryAndWriteCommandSpec extends org.specs2.mutable.Specification {
           }
       }
 
-      "with the default connection" in { implicit ee: EE =>
+      "with the default connection" in {
         test1(collection, timeout)
       }
 
-      "with the slow connection" in { implicit ee: EE =>
+      "with the slow connection" in {
         test1(slowColl, slowTimeout)
       }
     }
@@ -60,7 +63,7 @@ class QueryAndWriteCommandSpec extends org.specs2.mutable.Specification {
       import reactivemongo.api.indexes._
       import reactivemongo.api.indexes.IndexType.Ascending
 
-      def bulkSpec(c: BSONCollection, n: Int, e: Int, timeout: FiniteDuration)(implicit ee: EE) = {
+      def bulkSpec(c: BSONCollection, n: Int, e: Int, timeout: FiniteDuration) = {
         @inline def docs = (0 until n).toStream.map { i =>
           if (i == 0 || i == 1529 || i == 3026 || i == 19862) {
             BSONDocument("bulk" -> true, "i" -> i, "plop" -> -3)
@@ -79,18 +82,18 @@ class QueryAndWriteCommandSpec extends org.specs2.mutable.Specification {
           }
       }
 
-      s"$nDocs documents with the default connection" in { implicit ee: EE =>
+      s"$nDocs documents with the default connection" in {
         bulkSpec(db(colName(nDocs)), nDocs, nDocs - 3, timeout)
       }
 
-      s"${nDocs / 1000} with the slow connection" in { implicit ee: EE =>
+      s"${nDocs / 1000} with the slow connection" in {
         bulkSpec(
           slowDb(colName(nDocs / 1000)),
           nDocs / 1000, nDocs / 1000, slowTimeout)
       }
     }
 
-    "insert from an empty bulk of docs" in { implicit ee: EE =>
+    "insert from an empty bulk of docs" in {
       val docs = Stream.empty[BSONDocument]
 
       collection.insert[BSONDocument](ordered = true).
@@ -98,7 +101,7 @@ class QueryAndWriteCommandSpec extends org.specs2.mutable.Specification {
         await(1, timeout)
     }
 
-    "update using bulks" in { implicit ee: EE =>
+    "update using bulks" in {
       val coll = db(colName(nDocs))
       val builder = coll.update(ordered = false)
 

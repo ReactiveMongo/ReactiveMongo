@@ -10,20 +10,25 @@ import reactivemongo.core.actors.{
   RegisterMonitor,
   SetAvailable
 }
+import reactivemongo.core.actors.Exceptions.{
+  InternalState,
+  PrimaryUnavailableException
+}
 
 import reactivemongo.core.nodeset.{ Authenticate, ProtocolMetadata }
 import reactivemongo.core.commands.{
   FailedAuthentication,
   SuccessfulAuthentication
 }
-import reactivemongo.core.actors.Exceptions, Exceptions.PrimaryUnavailableException
 
 import reactivemongo.api.{ DefaultDB, FailoverStrategy, MongoDriver }
 import reactivemongo.api.commands.DBUserRole
 
-import org.specs2.concurrent.{ ExecutionEnv => EE }
+import org.specs2.concurrent.ExecutionEnv
 
-class DriverSpec extends org.specs2.mutable.Specification {
+class DriverSpec(implicit ee: ExecutionEnv)
+  extends org.specs2.mutable.Specification {
+
   "Driver" title
 
   sequential
@@ -55,7 +60,7 @@ class DriverSpec extends org.specs2.mutable.Specification {
       MongoDriver().close(timeout) must not(throwA[Exception])
     }
 
-    "use the failover strategy defined in the options" in { implicit ee: EE =>
+    "use the failover strategy defined in the options" in {
       lazy val con = driver.connection(
         List(primaryHost),
         DefaultOptions.copy(failoverStrategy = FailoverStrategy.remote))
@@ -67,7 +72,7 @@ class DriverSpec extends org.specs2.mutable.Specification {
         }
     }
 
-    "notify a monitor after the NodeSet is started" in { implicit ee: EE =>
+    "notify a monitor after the NodeSet is started" in {
       val con = driver.connection(List(primaryHost), DefaultOptions)
       val setAvailable = Promise[ProtocolMetadata]()
       val priAvailable = Promise[ProtocolMetadata]()
@@ -96,7 +101,7 @@ class DriverSpec extends org.specs2.mutable.Specification {
       }.map(_.size) must beEqualTo(2).await(0, timeout)
     }
 
-    "fail within expected timeout interval" in { implicit ee: EE =>
+    "fail within expected timeout interval" in {
       lazy val con = driver.connection(
         List("foo:123"),
         DefaultOptions.copy(failoverStrategy = FailoverStrategy.remote))
@@ -115,7 +120,7 @@ class DriverSpec extends org.specs2.mutable.Specification {
                     mostRecent.getMethodName aka "method" must_== "database")
             } and {
               Option(reason.getCause) aka "cause" must beSome[Throwable].like {
-                case _: Exceptions.InternalState => ok
+                case _: InternalState => ok
               }
             } and {
               (duration must be_>=(17000L)) and (duration must be_<(28500L))
@@ -133,29 +138,28 @@ class DriverSpec extends org.specs2.mutable.Specification {
       options = DefaultOptions.copy(nbChannelsPerNode = 1))
 
     val dbName = "specs2-test-cr-auth"
-    def db_(implicit ec: ExecutionContext) =
-      connection.database(dbName, failoverStrategy)
+    lazy val db_ = connection.database(dbName, failoverStrategy)
 
     val id = System.identityHashCode(drv)
 
-    "be the default mode" in { implicit ee: EE =>
+    "be the default mode" in {
       db_.flatMap(_.drop()).map(_ => {}) must beEqualTo({}).await(1, timeout)
     } tag "mongo2"
 
-    "create a user" in { implicit ee: EE =>
+    "create a user" in {
       db_.flatMap(_.createUser(s"test-$id", Some(s"password-$id"),
         roles = List(DBUserRole("readWrite", dbName)))).
         aka("creation") must beEqualTo({}).await(0, timeout)
     } tag "mongo2"
 
-    "not be successful with wrong credentials" in { implicit ee: EE =>
+    "not be successful with wrong credentials" in {
       connection.authenticate(dbName, "foo", "bar").
         aka("authentication") must throwA[FailedAuthentication].
         await(1, timeout)
 
     } tag "mongo2"
 
-    "be successful with right credentials" in { implicit ee: EE =>
+    "be successful with right credentials" in {
       connection.authenticate(dbName, s"test-$id", s"password-$id").
         aka("authentication") must beLike[SuccessfulAuthentication](
           { case _ => ok }).await(1, timeout) and {
@@ -169,7 +173,7 @@ class DriverSpec extends org.specs2.mutable.Specification {
       drv.close(timeout) must not(throwA[Exception])
     } tag "mongo2"
 
-    "fail on DB without authentication" in { implicit ee: EE =>
+    "fail on DB without authentication" in {
       val auth = Authenticate(Common.commonDb, "test", "password")
       val conOpts = DefaultOptions.copy(nbChannelsPerNode = 1)
 
@@ -199,26 +203,26 @@ class DriverSpec extends org.specs2.mutable.Specification {
 
     val id = System.identityHashCode(drv)
 
-    "work only if configured" in { implicit ee: EE =>
+    "work only if configured" in {
       db_.flatMap(_.drop()).map(_ => {}) must beEqualTo({}).
         await(0, timeout * 2)
     } tag "not_mongo26"
 
-    "create a user" in { implicit ee: EE =>
+    "create a user" in {
       db_.flatMap(_.createUser(s"test-$id", Some(s"password-$id"),
         roles = List(DBUserRole("readWrite", dbName)))).
         aka("creation") must beEqualTo({}).await(0, timeout)
     }
 
     "not be successful with wrong credentials" >> {
-      "with the default connection" in { implicit ee: EE =>
+      "with the default connection" in {
         connection.flatMap(_.authenticate(dbName, "foo", "bar")).
           aka("authentication") must throwA[FailedAuthentication].
           await(1, timeout)
 
       } tag "not_mongo26"
 
-      "with the slow connection" in { implicit ee: EE =>
+      "with the slow connection" in {
         slowConnection.flatMap(_.authenticate(dbName, "foo", "bar")).
           aka("authentication") must throwA[FailedAuthentication].
           await(1, slowTimeout)
@@ -227,7 +231,7 @@ class DriverSpec extends org.specs2.mutable.Specification {
     }
 
     "be successful on existing connection with right credentials" >> {
-      "with the default connection" in { implicit ee: EE =>
+      "with the default connection" in {
         connection.flatMap(
           _.authenticate(dbName, s"test-$id", s"password-$id")).
           aka("authentication") must beLike[SuccessfulAuthentication](
@@ -239,7 +243,7 @@ class DriverSpec extends org.specs2.mutable.Specification {
 
       } tag "not_mongo26"
 
-      "with the slow connection" in { implicit ee: EE =>
+      "with the slow connection" in {
         slowConnection.flatMap(
           _.authenticate(dbName, s"test-$id", s"password-$id")).
           aka("authentication") must beLike[SuccessfulAuthentication](
@@ -251,7 +255,7 @@ class DriverSpec extends org.specs2.mutable.Specification {
     "be successful with right credentials" >> {
       val auth = Authenticate(dbName, s"test-$id", s"password-$id")
 
-      "with the default connection" in { implicit ee: EE =>
+      "with the default connection" in {
         val con = Await.result(
           drv.connect(
             List(primaryHost), options = conOpts, authentications = Seq(auth)),
@@ -269,7 +273,7 @@ class DriverSpec extends org.specs2.mutable.Specification {
           }
       } tag "not_mongo26"
 
-      "with the slow connection" in { implicit ee: EE =>
+      "with the slow connection" in {
         val con = Await.result(
           drv.connect(
             List(slowPrimary), options = slowOpts, authentications = Seq(auth)),
@@ -284,7 +288,7 @@ class DriverSpec extends org.specs2.mutable.Specification {
       } tag "not_mongo26"
     }
 
-    "driver shutdown" in { implicit ee: EE =>
+    "driver shutdown" in {
       // mainly to ensure the test driver is closed
       drv.close(timeout) must not(throwA[Exception]).await
     } tag "not_mongo26"
@@ -292,7 +296,7 @@ class DriverSpec extends org.specs2.mutable.Specification {
     "fail on DB without authentication" >> {
       val auth = Authenticate(Common.commonDb, "test", "password")
 
-      "with the default connection" in { implicit ee: EE =>
+      "with the default connection" in {
         def con = Common.driver.connection(
           List(primaryHost), options = conOpts, authentications = Seq(auth))
 
@@ -307,14 +311,14 @@ class DriverSpec extends org.specs2.mutable.Specification {
               } and {
                 Option(reason.getCause).
                   aka("cause") must beSome[Throwable].like {
-                    case _: Exceptions.InternalState => ok
+                    case _: InternalState => ok
                   }
               }
           }.await(1, timeout)
 
       } tag "not_mongo26"
 
-      "with the slow connection" in { implicit ee: EE =>
+      "with the slow connection" in {
         def con = Common.driver.connection(
           List(slowPrimary), options = slowOpts, authentications = Seq(auth))
 
@@ -328,7 +332,7 @@ class DriverSpec extends org.specs2.mutable.Specification {
 
   "Database" should {
     "be resolved from connection according the failover strategy" >> {
-      "successfully" in { implicit ee: EE =>
+      "successfully" in {
         val fos = FailoverStrategy(FiniteDuration(50, "ms"), 20, _ * 2D)
 
         Common.connection.database(Common.commonDb, fos).
@@ -336,7 +340,7 @@ class DriverSpec extends org.specs2.mutable.Specification {
 
       }
 
-      "with failure" in { implicit ee: EE =>
+      "with failure" in {
         lazy val con = Common.driver.connection(List("unavailable:27017"))
         val ws = scala.collection.mutable.ListBuffer.empty[Int]
         val expected = List(2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40)
@@ -355,7 +359,7 @@ class DriverSpec extends org.specs2.mutable.Specification {
     }
 
     section("mongo2", "mongo24", "not_mongo26")
-    "fail with MongoDB < 2.6" in { implicit ee: EE =>
+    "fail with MongoDB < 2.6" in {
 
       import reactivemongo.core.errors.ConnectionException
 

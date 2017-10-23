@@ -4,7 +4,7 @@ import akka.actor.ActorRef
 import akka.testkit.TestActorRef
 
 import org.specs2.matcher.MatchResult
-import org.specs2.concurrent.{ ExecutionEnv => EE }
+import org.specs2.concurrent.ExecutionEnv
 
 import reactivemongo.api.{
   MongoConnection,
@@ -24,7 +24,8 @@ import reactivemongo.core.actors.{
 }
 import reactivemongo.core.actors.Exceptions.PrimaryUnavailableException
 
-class NodeSetSpec extends org.specs2.mutable.Specification
+class NodeSetSpec(implicit val ee: ExecutionEnv)
+  extends org.specs2.mutable.Specification
   with ConnectAllSpec with UnresponsiveSecondarySpec {
 
   "Node set" title
@@ -42,28 +43,28 @@ class NodeSetSpec extends org.specs2.mutable.Specification
   section("unit")
   "Node set" should {
     "not be available" >> {
-      "if the entire node set is not available" in { implicit ee: EE =>
+      "if the entire node set is not available" in {
         withConAndSys(md) { (con, _) => isAvailable(con, timeout) }.
           aka("is available") must beFalse.await(1, timeout)
       }
 
       "if the primary is not available if default preference" in {
-        implicit ee: EE =>
-          withCon() { (con, name) =>
-            withConMon(name) { conMon =>
-              conMon ! SetAvailable(ProtocolMetadata.Default)
 
-              waitIsAvailable(con, failoverStrategy).map(_ => true).recover {
-                case reason: PrimaryUnavailableException if (
-                  reason.getMessage.indexOf(name) != -1) => false
-              } must beFalse.await(1, timeout)
-            }
+        withCon() { (con, name) =>
+          withConMon(name) { conMon =>
+            conMon ! SetAvailable(ProtocolMetadata.Default)
+
+            waitIsAvailable(con, failoverStrategy).map(_ => true).recover {
+              case reason: PrimaryUnavailableException if (
+                reason.getMessage.indexOf(name) != -1) => false
+            } must beFalse.await(1, timeout)
           }
+        }
       }
     }
 
     "be available" >> {
-      "with the primary if default preference" in { implicit ee: EE =>
+      "with the primary if default preference" in {
         withCon() { (con, name) =>
           withConMon(name) { conMon =>
             def test = (for {
@@ -84,7 +85,7 @@ class NodeSetSpec extends org.specs2.mutable.Specification
       "without the primary if slave ok" >> {
         org.specs2.specification.core.Fragments.foreach[ReadPreference](
           Seq(ReadPreference.primaryPreferred, ReadPreference.secondary)) { readPref =>
-            s"using $readPref" in { implicit ee: EE =>
+            s"using $readPref" in {
               val opts = MongoConnectionOptions(readPreference = readPref)
 
               withCon(opts) { (con, name) =>
@@ -106,28 +107,27 @@ class NodeSetSpec extends org.specs2.mutable.Specification
 
     "be unavailable" >> {
       "with the primary unavailable if default preference" in {
-        implicit ee: EE =>
-          withCon() { (con, name) =>
-            withConMon(name) { conMon =>
-              conMon ! SetAvailable(ProtocolMetadata.Default)
-              conMon ! PrimaryAvailable(ProtocolMetadata.Default)
+        withCon() { (con, name) =>
+          withConMon(name) { conMon =>
+            conMon ! SetAvailable(ProtocolMetadata.Default)
+            conMon ! PrimaryAvailable(ProtocolMetadata.Default)
 
-              def test = (for {
-                _ <- waitIsAvailable(con, failoverStrategy)
-                before <- isAvailable(con, timeout)
-                _ = conMon ! PrimaryUnavailable
-                after <- waitIsAvailable(
-                  con, failoverStrategy).map(_ => true).recover {
-                  case _ => false
-                }
-              } yield before -> after).andThen { case _ => con.close() }
+            def test = (for {
+              _ <- waitIsAvailable(con, failoverStrategy)
+              before <- isAvailable(con, timeout)
+              _ = conMon ! PrimaryUnavailable
+              after <- waitIsAvailable(
+                con, failoverStrategy).map(_ => true).recover {
+                case _ => false
+              }
+            } yield before -> after).andThen { case _ => con.close() }
 
-              test must beEqualTo(true -> false).await(1, timeout)
-            }
+            test must beEqualTo(true -> false).await(1, timeout)
           }
+        }
       }
 
-      "without the primary if slave ok" in { implicit ee: EE =>
+      "without the primary if slave ok" in {
         val opts = MongoConnectionOptions(
           readPreference = ReadPreference.primaryPreferred)
 
@@ -176,7 +176,7 @@ class NodeSetSpec extends org.specs2.mutable.Specification
 
   // ---
 
-  def withConAndSys[T](drv: MongoDriver, options: MongoConnectionOptions = MongoConnectionOptions(nbChannelsPerNode = 1))(f: (MongoConnection, TestActorRef[StandardDBSystem]) => Future[T])(implicit ee: EE): Future[T] = {
+  def withConAndSys[T](drv: MongoDriver, options: MongoConnectionOptions = MongoConnectionOptions(nbChannelsPerNode = 1))(f: (MongoConnection, TestActorRef[StandardDBSystem]) => Future[T]): Future[T] = {
     // See MongoDriver#connection
     val supervisorName = s"Supervisor-${System identityHashCode ee}"
     val poolName = s"Connection-${System identityHashCode f}"
@@ -212,7 +212,7 @@ class NodeSetSpec extends org.specs2.mutable.Specification
     f(con, name)
   }
 
-  def withConMon[T](name: String)(f: ActorRef => MatchResult[T])(implicit ee: EE): MatchResult[Future[ActorRef]] =
+  def withConMon[T](name: String)(f: ActorRef => MatchResult[T]): MatchResult[Future[ActorRef]] =
     actorSystem.actorSelection(s"/user/Monitor-$name").
       resolveOne(timeout) aka "actor ref" must beLike[ActorRef] {
         case ref => f(ref)

@@ -5,7 +5,6 @@ import akka.actor.ActorRef
 import akka.testkit.TestActorRef
 
 import org.specs2.matcher.MatchResult
-import org.specs2.concurrent.{ ExecutionEnv => EE }
 
 import reactivemongo.bson.BSONDocument
 
@@ -37,7 +36,7 @@ trait UnresponsiveSecondarySpec { parent: NodeSetSpec =>
   // ---
 
   def unresponsiveSecondarySpec =
-    "mark as Unknown the unresponsive secondary" in { implicit ee: EE =>
+    "mark as Unknown the unresponsive secondary" in {
       withConAndSys(usd) { (con, ref) =>
         def nsState: Set[(String, NodeStatus)] =
           nodeSet(ref.underlyingActor).nodes.map { n =>
@@ -139,7 +138,7 @@ trait UnresponsiveSecondarySpec { parent: NodeSetSpec =>
 
   // ---
 
-  private def withConMon1[T](name: String)(f: ActorRef => Future[MatchResult[T]])(implicit ee: EE): Future[MatchResult[T]] =
+  private def withConMon1[T](name: String)(f: ActorRef => Future[MatchResult[T]]): Future[MatchResult[T]] =
     usSys.actorSelection(s"/user/Monitor-$name").
       resolveOne(timeout).flatMap(f)
 
