@@ -18,7 +18,7 @@ trait Cursor1Spec { spec: CursorSpec =>
       Future.sequence(futs).map { _ =>
         info(s"inserted $nDocs records")
       } aka "fixtures" must beEqualTo({}).await(1, timeout)
-    } tag "wip"
+    }
 
     "make request for cursor query" in {
       import reactivemongo.core.protocol.{ Response, Reply }

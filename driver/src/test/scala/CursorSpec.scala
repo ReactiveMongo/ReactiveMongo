@@ -125,74 +125,6 @@ class CursorSpec(implicit val ee: ExecutionEnv)
         }
       }
 
-      { // .enumerateResponse
-        def enumRespSpec(tag: String, defaultColl: BSONCollection, specCol: String => BSONCollection, timeout: FiniteDuration) = {
-          "if fails while processing with existing documents" in {
-            @volatile var count = 0
-            val inc = Iteratee.foreach[Response] { _ =>
-              debug(s"stopOnError: enumResp (#1): $count")
-              if (count == 1) sys.error("Foo")
-
-              count = count + 1
-            }
-            val c = defaultColl
-            val cursor = c.find(matchAll(s"$tag-spec15")).options(
-              QueryOpts(batchSizeN = 2)).cursor()
-
-            (cursor.enumerateResponses(10, true) |>>> inc).
-              recover({ case _ => count }).
-              aka("enumerating") must beEqualTo(1).await(1, timeout)
-          }
-
-          "if fails while processing w/o documents" in {
-            @volatile var count = 0
-            val inc = Iteratee.foreach[Response] { _ =>
-              debug(s"stopOnError: enumResp (#2): $count")
-              count = count + 1
-              sys.error("Foo")
-            }
-
-            val c = specCol(System.identityHashCode(inc).toString)
-            val cursor = c.find(matchAll(s"$tag-spec16")).options(
-              QueryOpts(batchSizeN = 2)).cursor()
-
-            (cursor.enumerateResponses(10, true) |>>> inc).
-              recover({ case _ => count }) must beEqualTo(1).await(1, timeout)
-          }
-
-          "if fails to send request" in {
-            @volatile var count = 0
-            val inc = Iteratee.foreach[Response] { _ =>
-              debug(s"stopOnError: enumResp (#3): $count")
-              count = count + 1
-            }
-            val con17 = driver.connection(
-              List(primaryHost), DefaultOptions.copy(nbChannelsPerNode = 1))
-
-            val db17 = Await.result(con17.database("dbspec17"), timeout)
-            lazy val c = db17(collName)
-            val cursor = c.find(matchAll(s"$tag-spec17")).cursor()
-
-            // Close connection to make the related cursor erroneous
-            con17.askClose()(timeout).
-              map(_ => {}) must beEqualTo({}).await(1, timeout) and {
-                (cursor.enumerateResponses(10, true) |>>> inc).
-                  recover({ case _ => count }) must beEqualTo(0).
-                  await(1, timeout)
-              }
-          }
-        }
-
-        "when enumerating responses with the default connection" >> {
-          enumRespSpec("default", defaultColl, cursorDb(_: String), timeout)
-        }
-
-        "when enumerating responses with the slow connection" >> {
-          enumRespSpec(
-            "slow", slowDefaultColl, slowCursorDb(_: String), slowTimeout)
-        }
-      }
-
       "when folding bulks" >> {
         "if fails while processing with existing documents" in {
 
@@ -270,63 +202,6 @@ class CursorSpec(implicit val ee: ExecutionEnv)
         }
       }
 
-      "when enumerating bulks" >> {
-        "if fails while processing with existing documents" in {
-
-          @volatile var count = 0
-          val inc = Iteratee.foreach[Iterator[BSONDocument]] { _ =>
-            debug(s"stopOnError: enumerateBulks (#1): $count")
-            if (count == 1) sys.error("Foo")
-
-            count = count + 1
-          }
-          val c = defaultColl
-          val cursor = c.find(matchAll("cursorspec22")).options(
-            QueryOpts(batchSizeN = 2)).cursor()
-
-          (cursor.enumerateBulks(10, true) |>>> inc).
-            recover({ case _ => count }) must beEqualTo(1).await(1, timeout)
-        }
-
-        "if fails while processing w/o documents" in {
-          @volatile var count = 0
-          val inc = Iteratee.foreach[Iterator[BSONDocument]] { _ =>
-            debug(s"stopOnError: enumerateBulks (#2): $count")
-            count = count + 1
-            sys.error("Foo")
-          }
-          val c = cursorDb(System.identityHashCode(inc).toString)
-          val cursor = c.find(matchAll("cursorspec23")).options(
-            QueryOpts(batchSizeN = 2)).cursor()
-
-          (cursor.enumerateBulks(10, true) |>>> inc).
-            recover({ case _ => count }) must beEqualTo(1).
-            await(1, timeout)
-        }
-
-        "if fails to send request" in {
-          @volatile var count = 0
-          val inc = Iteratee.foreach[Iterator[BSONDocument]] { _ =>
-            debug(s"stopOnError: enumerateBulks (#3): $count")
-            count = count + 1
-          }
-          val con24 = driver.connection(
-            List(primaryHost), DefaultOptions.copy(nbChannelsPerNode = 1))
-
-          val db24 = Await.result(con24.database("dbspec24"), timeout)
-          lazy val c = db24(collName)
-          val cursor = c.find(matchAll("cursorspec24")).cursor()
-
-          // Close connection to make the related cursor erroneous
-          con24.askClose()(timeout).
-            map(_ => {}) must beEqualTo({}).await(1, timeout) and {
-              (cursor.enumerateBulks(10, true) |>>> inc).
-                recover({ case _ => count }) must beEqualTo(0).
-                await(1, timeout)
-            }
-        }
-      }
-
       { // .foldWhile
         def foldWhileSpec(defaultColl: BSONCollection, specCol: String => BSONCollection, timeout: FiniteDuration) = {
           "if fails while processing with existing documents" in {
@@ -389,61 +264,8 @@ class CursorSpec(implicit val ee: ExecutionEnv)
           foldWhileSpec(defaultColl, cursorDb(_: String), timeout)
         }
 
-        "when enumerating responses with the slow connection" >> {
+        "when folding documents with the slow connection" >> {
           foldWhileSpec(slowDefaultColl, slowCursorDb(_: String), slowTimeout)
-        }
-      }
-
-      { // .enumerate (deprecated)
-        def enumSpec(
-          defaultColl: BSONCollection,
-          specCol: (String) => BSONCollection,
-          timeout: FiniteDuration) = {
-          "if fails while processing with existing documents" in {
-            @volatile var count = 0
-            val inc = Iteratee.foreach[BSONDocument] { _ =>
-              debug(s"stopOnError: enumerate (#1): $count")
-              if (count == 5) sys.error("Foo")
-
-              count = count + 1
-            }
-            val c = defaultColl
-            val cursor = c.find(matchAll("cursorspec28")).cursor()
-
-            (cursor.enumerate(10, true) |>>> inc).
-              recover({ case _ => count }) must beEqualTo(5).await(1, timeout)
-          }
-
-          "if fails to send request" in {
-            @volatile var count = 0
-            val inc = Iteratee.foreach[BSONDocument] { _ =>
-              debug(s"stopOnError: enumerate (#2): $count")
-              count = count + 1
-            }
-            val con29 = driver.connection(
-              List(primaryHost), DefaultOptions.copy(nbChannelsPerNode = 1))
-
-            val db29 = Await.result(con29.database("dbspec29"), timeout)
-            lazy val c = db29(collName)
-
-            val cursor = c.find(matchAll("cursorspec29")).cursor()
-
-            // Close connection to make the related cursor erroneous
-            con29.askClose()(timeout).
-              map(_ => {}) must beEqualTo({}).await(1, timeout) and {
-                (cursor.enumerate(10, true) |>>> inc).
-                  recover({ case _ => count }).
-                  aka("enumerating") must beEqualTo(0).await(1, timeout)
-              }
-          }
-        }
-
-        "when enumerating documents with the default connection" >> {
-          enumSpec(defaultColl, cursorDb(_: String), timeout)
-        }
-
-        "when enumerating document with the slow connection" >> {
-          enumSpec(slowDefaultColl, slowCursorDb(_: String), slowTimeout)
         }
       }
 
@@ -549,76 +371,6 @@ class CursorSpec(implicit val ee: ExecutionEnv)
         }
       }
 
-      { // .enumerateResponses
-        def enumRespSpec(defaultColl: BSONCollection, specCol: String => BSONCollection, timeout: FiniteDuration) = {
-          def delayedTimeout = FiniteDuration(
-            (timeout.toMillis * 1.25D).toLong, MILLISECONDS)
-
-          "if fails while processing with existing documents" in {
-            @volatile var count = 0
-            var i = 0
-            val inc = Iteratee.foreach[Response] { _ =>
-              debug(s"continueOnError: enumerateResponses (#1): $count")
-              i = i + 1
-              if (i % 2 == 0) sys.error("Foo")
-              count = count + 1
-            }
-            val c = defaultColl
-            val cursor = c.find(matchAll("cursorspec34")).options(QueryOpts(
-              batchSizeN = 4)).cursor()
-
-            (cursor.enumerateResponses(128, false) |>>> inc).map(_ => count).
-              aka("enumerating") must beEqualTo(16).await(2, delayedTimeout)
-          }
-
-          "if fails while processing w/o documents" in {
-            @volatile var count = 0
-            val inc = Iteratee.foreach[Response] { _ =>
-              debug(s"continueOnError: enumerateResponses (#2): $count")
-              count = count + 1
-              sys.error("Foo")
-            }
-            val c = specCol(System.identityHashCode(inc).toString)
-            val cursor = c.find(matchAll("cursorspec35")).
-              options(QueryOpts(batchSizeN = 2)).cursor()
-
-            (cursor.enumerateResponses(64, false) |>>> inc).map(_ => count).
-              aka("enumerating") must beEqualTo(1).
-              await(2, delayedTimeout)
-          }
-
-          "if fails to send request" in {
-            @volatile var count = 0
-            val inc = Iteratee.foreach[Response] { _ =>
-              debug(s"continueOnError: enumerateResponses (#3): $count")
-              count = count + 1
-            }
-            val con36 = driver.connection(
-              List(primaryHost), DefaultOptions.copy(nbChannelsPerNode = 1))
-
-            lazy val db36 = Await.result(con36.database("dbspec36"), timeout)
-            lazy val c = db36(collName)
-            val cursor = c.find(matchAll("cursorspec36")).cursor()
-
-            // Close connection to make the related cursor erroneous
-            con36.askClose()(timeout).
-              map(_ => {}) must beEqualTo({}).await(1, timeout) and {
-                (cursor.enumerateResponses(128, false) |>>> inc).
-                  recover({ case _ => count }) must beEqualTo(0).
-                  await(1, timeout)
-              }
-          }
-        }
-
-        "when enumerating responses with the default connection" >> {
-          enumRespSpec(defaultColl, cursorDb(_: String), timeout)
-        }
-
-        "when enumerating responses with the default connection" >> {
-          enumRespSpec(slowDefaultColl, slowCursorDb(_: String), slowTimeout)
-        }
-      }
-
       "when folding bulks" >> {
         lazy val delayedTimeout = FiniteDuration(
           (timeout.toMillis * 1.25D).toLong, MILLISECONDS)
@@ -697,65 +449,6 @@ class CursorSpec(implicit val ee: ExecutionEnv)
         }
       }
 
-      "when enumerating bulks" >> {
-        lazy val delayedTimeout = FiniteDuration(
-          (timeout.toMillis * 1.25D).toLong, MILLISECONDS)
-
-        "if fails while processing with existing documents" in {
-
-          @volatile var count = 0
-          var i = 0
-          val inc = Iteratee.foreach[Iterator[BSONDocument]] { _ =>
-            debug(s"continueOnError: enumerateBulks (#1): $i")
-            i = i + 1
-            if (i % 2 == 0) sys.error("Foo")
-            count = count + 1
-          }
-          val c = slowDefaultColl
-          val cursor = c.find(matchAll("cursorspec41")).options(QueryOpts(
-            batchSizeN = 4)).cursor()
-
-          (cursor.enumerateBulks(128, false) |>>> inc).map(_ => count).
-            aka("enumerating") must beEqualTo(16).await(2, delayedTimeout)
-        }
-
-        "if fails while processing w/o documents" in {
-          @volatile var count = 0
-          val inc = Iteratee.foreach[Iterator[BSONDocument]] { _ =>
-            debug(s"continueOnError: enumerateBulks (#2): $count")
-            count = count + 1
-            sys.error("Foo")
-          }
-          val c = cursorDb(System.identityHashCode(inc).toString)
-          val cursor = c.find(matchAll("cursorspec42")).
-            options(QueryOpts(batchSizeN = 2)).cursor()
-
-          (cursor.enumerateBulks(64, false) |>>> inc).map(_ => count).
-            aka("enumerating") must beEqualTo(1).await(2, delayedTimeout)
-        }
-
-        "if fails to send request" in {
-          @volatile var count = 0
-          val inc = Iteratee.foreach[Iterator[BSONDocument]] {
-            debug(s"continueOnError: enumerateBulks (#3): $count")
-            _ => count = count + 1
-          }
-          val con43 = driver.connection(
-            List(primaryHost), DefaultOptions.copy(nbChannelsPerNode = 1))
-
-          lazy val db43 = Await.result(con43.database("dbspec43"), timeout)
-          lazy val c = db43(collName)
-          val cursor = c.find(matchAll("cursorspec43")).cursor()
-
-          // Close connection to make the related cursor erroneous
-          con43.askClose()(timeout).map(_ => {}) must beEqualTo({}).
-            await(1, timeout) and {
-              (cursor.enumerateBulks(128, false) |>>> inc).
-                recover({ case _ => count }) must beEqualTo(0).await(1, timeout)
-            }
-        }
-      }
-
       { // .foldWhile
         def foldWhileSpec(defaultColl: BSONCollection, specCol: String => BSONCollection, timeout: FiniteDuration) = {
           def delayedTimeout = FiniteDuration(
@@ -824,74 +517,6 @@ class CursorSpec(implicit val ee: ExecutionEnv)
         "when folding documents with the default connection" >> {
           foldWhileSpec(slowDefaultColl, slowCursorDb(_: String), slowTimeout)
         }
-      }
-
-      { // .enumerate (deprecated)
-        def enumSpec(defaultColl: BSONCollection, specCol: String => BSONCollection, timeout: FiniteDuration) = {
-          "if fails while processing with existing documents" in {
-            @volatile var count = 0
-            var i = 0
-            val inc = Iteratee.foreach[BSONDocument] { _ =>
-              debug(s"continueOnError: enumerate(#1): $i")
-              i = i + 1
-              if (i % 2 == 0) sys.error("Foo")
-              count = count + 1
-            }
-
-            val cursor = defaultColl.find(matchAll("cursorspec47")).
-              options(QueryOpts(batchSizeN = 4)).cursor()
-
-            (cursor.enumerate(128, false) |>>> inc).map(_ => count).
-              aka("enumerating") must beEqualTo(32).await(1, timeout)
-          } tag "wip"
-
-          "if fails while processing w/o documents" in {
-            @volatile var count = 0
-            val inc = Iteratee.foreach[BSONDocument] { _ =>
-              debug(s"continueOnError: enumerate(#2): $count")
-              count = count + 1
-              sys.error("Foo")
-            }
-            val c = specCol(System.identityHashCode(inc).toString)
-            val cursor = c.find(matchAll("cursorspec48")).
-              options(QueryOpts(batchSizeN = 2)).cursor()
-
-            (cursor.enumerate(64, false) |>>> inc).map(_ => count).
-              aka("enumerating") must beEqualTo(0).await(1, timeout)
-          }
-
-          "if fails to send request" in {
-            @volatile var count = 0
-            val inc = Iteratee.foreach[BSONDocument] { _ =>
-              debug(s"continueOnError: enumerate(#3): $count")
-              count = count + 1
-            }
-            val con49 = driver.connection(
-              List(primaryHost), DefaultOptions.copy(nbChannelsPerNode = 1))
-
-            lazy val db49 = Await.result(con49.database("dbspec49"), timeout)
-            lazy val c = db49(collName)
-            val cursor = c.find(matchAll("cursorspec49")).cursor()
-
-            // Close connection to make the related cursor erroneous
-            con49.askClose()(timeout).map(_ => {}) must beEqualTo({}).
-              await(1, timeout) and {
-                (cursor.enumerate(128, false) |>>> inc).
-                  recover({ case _ => count }) must beEqualTo(0).
-                  await(1, timeout)
-              }
-          }
-        }
-
-        "when enumerating documents with the default connection" >> {
-          enumSpec(defaultColl, cursorDb(_: String), timeout)
-        }
-
-        /*
-        "when enumerating documents with the slow connection" >> {
-          enumSpec(slowDefaultColl, slowCursorDb(_: String), slowTimeout)
-        }
-         */
       }
 
       "Driver instance must be closed" in {

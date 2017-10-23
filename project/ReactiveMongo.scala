@@ -100,7 +100,7 @@ object Resolvers {
 object Dependencies {
   val akka = Def.setting[Seq[ModuleID]] {
     val ver = sys.env.get("AKKA_VERSION").getOrElse {
-      if (scalaVersion.value startsWith "2.12.") "2.4.14"
+      if (scalaVersion.value startsWith "2.12.") "2.5.6"
       else "2.3.13"
     }
 
@@ -118,7 +118,7 @@ object Dependencies {
     "com.typesafe.play" %% "play-iteratees" % ver
   }
 
-  val specsVer = "3.8.6"
+  val specsVer = "3.8.6" // TODO: 3.9.4, 4.x
   val specs = "org.specs2" %% "specs2-core" % specsVer % Test
 
   val slf4jVer = "1.7.12"

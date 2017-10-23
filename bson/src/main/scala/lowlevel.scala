@@ -101,7 +101,7 @@ class LowLevelBsonDocReader[A <: ReadableBuffer](rbuf: A) {
         case 0x01 =>
           DoubleField(name, buf.readDouble)
 
-        case x @ (0x02 | 0x13 | 0x0D | 0x0E) => {
+        case 0x02 | 0x13 | 0x0D | 0x0E => {
           // string | decimal | javascript | symbol
           val length = buf.readInt + 4 // variable length
 

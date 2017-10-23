@@ -1,4 +1,4 @@
-import scala.concurrent.{ Await, ExecutionContext, Future, Promise }
+import scala.concurrent.{ Await, Future, Promise }
 import scala.concurrent.duration._
 
 import reactivemongo.bson.{ BSONDocument, BSONDocumentReader }
