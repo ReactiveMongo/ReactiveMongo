@@ -1,14 +1,13 @@
 package reactivemongo
 
 import java.util.Arrays
-import org.specs2.mutable._
 
 import reactivemongo.bson._
 import reactivemongo.core.netty._, ChannelBufferWritableBuffer.{
   single => makeBuffer
 }, ChannelBufferReadableBuffer.{ document => makeDocument }
 
-class BsonSpec extends Specification {
+class BsonSpec extends org.specs2.mutable.Specification {
   "BSON serialization" title
 
   val simple = Array[Byte](0x16, 0x00, 0x00, 0x00, 0x02, 'h', 'e', 'l', 'l', 'o', 0x00, 0x06, 0x00, 0x00, 0x00, 'w', 'o', 'r', 'l', 'd', 0x00, 0x00)
@@ -84,6 +83,7 @@ class BsonSpec extends Specification {
         Some(BSONInteger(2)),
         None,
         Some(BSONInteger(4)))
+
       val str = array.values.map {
         case BSONInteger(value) => value.toString
         case _                  => "NOELEM"

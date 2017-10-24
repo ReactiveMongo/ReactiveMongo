@@ -2,13 +2,15 @@ package reactivemongo
 
 import scala.concurrent.{ ExecutionContext, Future }
 
-import org.specs2.concurrent.{ ExecutionEnv => EE }
+import org.specs2.concurrent.ExecutionEnv
 
 import reactivemongo.bson.BSONDocument
 
 import reactivemongo.api.commands.BulkOps._
 
-class BulkOpsSpec extends org.specs2.mutable.Specification {
+class BulkOpsSpec(implicit ee: ExecutionEnv)
+  extends org.specs2.mutable.Specification {
+
   "Bulk operations" title
 
   val doc1 = BSONDocument("foo" -> 1)
@@ -84,11 +86,11 @@ class BulkOpsSpec extends org.specs2.mutable.Specification {
         _: BulkProducer[BSONDocument])(Future.successful(_), None)(
           _: ExecutionContext)
 
-      "for producer1" in { implicit ee: EE =>
+      "for producer1" in {
         app(producer1, ee.ec) must beEqualTo(Nil).await
       }
 
-      "for producer2" in { implicit ee: EE =>
+      "for producer2" in {
         app(producer2, ee.ec) must beEqualTo(Seq(
           Seq(doc1, doc1), Seq(doc2, doc1), Seq(doc2))).await
       }
@@ -104,11 +106,11 @@ class BulkOpsSpec extends org.specs2.mutable.Specification {
         _: BulkProducer[BSONDocument])(Future.successful(_), recoverWithEmpty)(
           _: ExecutionContext)
 
-      "for producer1" in { implicit ee: EE =>
+      "for producer1" in {
         app(producer1, ee.ec) must beEqualTo(Nil).await
       }
 
-      "for producer2" in { implicit ee: EE =>
+      "for producer2" in {
         app(producer2, ee.ec).map(
           _.flatten.sorted) must beEqualTo(producer2Docs.sorted).await
       }
@@ -129,7 +131,7 @@ class BulkOpsSpec extends org.specs2.mutable.Specification {
       }
     }
 
-    "be failed on the first failure for producer2" in { implicit ee: EE =>
+    "be failed on the first failure for producer2" in {
       val app = bulkApply[BSONDocument, Iterable[BSONDocument]](
         _: BulkProducer[BSONDocument])(foo, None)(_: ExecutionContext)
 
@@ -141,11 +143,11 @@ class BulkOpsSpec extends org.specs2.mutable.Specification {
         _: BulkProducer[BSONDocument])(foo, recoverWithEmpty)(
           _: ExecutionContext)
 
-      "for producer1" in { implicit ee: EE =>
+      "for producer1" in {
         app(producer1, ee.ec) must beEqualTo(Nil).await
       }
 
-      "for producer2" in { implicit ee: EE =>
+      "for producer2" in {
         app(producer2, ee.ec).map(
           _.flatten.size) must beLessThan(producer2Docs.size).await
       }

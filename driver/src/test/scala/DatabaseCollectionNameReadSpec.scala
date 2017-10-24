@@ -3,9 +3,11 @@ import scala.concurrent.duration.FiniteDuration
 import reactivemongo.bson.{ BSONString, BSONDocument }
 import reactivemongo.api.MongoConnection
 
-import org.specs2.concurrent.{ ExecutionEnv => EE }
+import org.specs2.concurrent.ExecutionEnv
 
-class DatabaseCollectionNameReadSpec extends org.specs2.mutable.Specification {
+class DatabaseCollectionNameReadSpec(implicit ee: ExecutionEnv)
+  extends org.specs2.mutable.Specification {
+
   sequential
 
   import Common._
@@ -14,7 +16,7 @@ class DatabaseCollectionNameReadSpec extends org.specs2.mutable.Specification {
     val dbName = s"dbnmeread${System identityHashCode this}"
 
     "query names of collection from database" >> {
-      def dbSpec(con: MongoConnection, timeout: FiniteDuration)(implicit ee: EE) = {
+      def dbSpec(con: MongoConnection, timeout: FiniteDuration) = {
         val db2 = con.database(dbName)
         def i1 = db2.map(_("collection_one")).flatMap(
           _.insert(BSONDocument("one" -> BSONString("one")))).map(_.ok)
@@ -32,23 +34,23 @@ class DatabaseCollectionNameReadSpec extends org.specs2.mutable.Specification {
         }
       }
 
-      "with the default connection" in { implicit ee: EE =>
+      "with the default connection" in {
         dbSpec(connection, timeout)
       }
 
-      "with the slow connection" in { implicit ee: EE =>
+      "with the slow connection" in {
         dbSpec(slowConnection, slowTimeout)
       }
     }
 
     {
-      def dropSpec(con: MongoConnection, timeout: FiniteDuration)(implicit ee: EE) = connection.database(dbName).flatMap(_.drop()) aka "drop" must beEqualTo({}).await(2, timeout)
+      def dropSpec(con: MongoConnection, timeout: FiniteDuration) = connection.database(dbName).flatMap(_.drop()) aka "drop" must beEqualTo({}).await(2, timeout)
 
-      "be dropped with the default connection" in { implicit ee: EE =>
+      "be dropped with the default connection" in {
         dropSpec(connection, timeout)
       }
 
-      "be dropped with the slow connection" in { implicit ee: EE =>
+      "be dropped with the slow connection" in {
         dropSpec(slowConnection, slowTimeout)
       }
     }

@@ -25,11 +25,11 @@ EOF
 
 MONGO_MINOR="3.2.10"
     
-if [ "$AKKA_VERSION" = "2.5.4" ]; then
-    MONGO_MINOR="3.4.5"
+if [ "$AKKA_VERSION" = "2.5.6" ]; then
+    MONGO_MINOR="3.4.9"
     MONGO_VER="3_4"
 
-    echo "[WARN] Fix MongoDB version to 3.4.5 (due to Akka Stream version)"
+    echo "[WARN] Fix MongoDB version to 3.4.9 (due to Akka Stream version)"
 else
     if [ "$MONGO_VER" = "2_6" ]; then
         MONGO_MINOR="2.6.12"

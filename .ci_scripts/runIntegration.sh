@@ -39,11 +39,8 @@ EOF
 export JVM_OPTS
 export SBT_OPTS="$SBT_ARGS"
 
-TEST_ARGS=";project ReactiveMongo ;testOnly -- $TEST_OPTS"
-TEST_ARGS="$TEST_ARGS ;project ReactiveMongo-JMX ;testOnly -- $TEST_OPTS"
-
-#TEST_ARGS="test-only CursorSpec -- include wip" #$TEST_OPTS"
-TEST_ARGS="test-only QueryAndWriteCommandSpec -- $TEST_OPTS"
+TEST_ARGS=";project ReactiveMongo ;testQuick -- $TEST_OPTS"
+TEST_ARGS="$TEST_ARGS ;project ReactiveMongo-JMX ;testQuick -- $TEST_OPTS"
 
 sed -e 's/"-deprecation", //' < project/ReactiveMongo.scala > .tmp && mv .tmp project/ReactiveMongo.scala
 

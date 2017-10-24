@@ -1,6 +1,6 @@
 import scala.collection.immutable.{ ListSet, Set }
 
-import scala.concurrent.{ ExecutionContext, Future }
+import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
 
 import reactivemongo.bson._
@@ -13,9 +13,11 @@ import reactivemongo.api.{
 }
 import reactivemongo.api.collections.bson.BSONCollection
 
-import org.specs2.concurrent.{ ExecutionEnv => EE }
+import org.specs2.concurrent.ExecutionEnv
 
-class AggregationSpec extends org.specs2.mutable.Specification {
+class AggregationSpec(implicit ee: ExecutionEnv)
+  extends org.specs2.mutable.Specification {
+
   "Aggregation framework" title
 
   import Common._
@@ -24,7 +26,6 @@ class AggregationSpec extends org.specs2.mutable.Specification {
 
   val zipColName = s"zipcodes${System identityHashCode this}"
   lazy val coll = {
-    import ExecutionContext.Implicits.global
     import reactivemongo.api.indexes._, IndexType._
 
     val c = db(zipColName)
@@ -50,7 +51,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
   // ---
 
   "Zip codes collection" should {
-    "expose the index stats" in { implicit ee: EE =>
+    "expose the index stats" in {
       import coll.BatchCommands.AggregationFramework.{
         Ascending,
         IndexStats,
@@ -72,7 +73,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
         }.await(0, timeout)
     } tag "not_mongo26"
 
-    "be inserted" in { implicit ee: EE =>
+    "be inserted" in {
       def insert(data: List[ZipCode]): Future[Unit] = data.headOption match {
         case Some(zip) => coll.insert(zip).flatMap(_ => insert(data.tail))
         case _         => Future.successful({})
@@ -89,7 +90,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
         document("_id" -> "JP", "totalPop" -> 13185702L),
         document("_id" -> "NY", "totalPop" -> 19746227L))
 
-      def withRes[T](c: BSONCollection)(f: Future[List[BSONDocument]] => T)(implicit ec: ExecutionContext) = {
+      def withRes[T](c: BSONCollection)(f: Future[List[BSONDocument]] => T) = {
         import c.BatchCommands.AggregationFramework
         import AggregationFramework.{ Group, Match, SumField }
 
@@ -98,19 +99,19 @@ class AggregationSpec extends org.specs2.mutable.Specification {
           Match(document("totalPop" -> document(f"$$gte" -> 10000000L))))).map(_.firstBatch))
       }
 
-      "with the default connection" in { implicit ee: EE =>
+      "with the default connection" in {
         withRes(coll) {
           _ aka "results" must beEqualTo(expected).await(1, timeout)
         }
       }
 
-      "with the slow connection" in { implicit ee: EE =>
+      "with the slow connection" in {
         withRes(slowZipColl) {
           _ aka "results" must beEqualTo(expected).await(1, slowTimeout)
         }
       }
 
-      "with expected count" in { implicit ee: EE =>
+      "with expected count" in {
         import coll.BatchCommands.AggregationFramework
         import AggregationFramework.{ Group, SumAll }
 
@@ -122,7 +123,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
       }
     }
 
-    "explain simple result" in { implicit ee: EE =>
+    "explain simple result" in {
       import coll.BatchCommands.AggregationFramework
       import AggregationFramework.{ Group, Match, SumField }
 
@@ -157,7 +158,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
         f(firstOp, pipeline)
       }
 
-      "successfully as a single batch" in { implicit ee: EE =>
+      "successfully as a single batch" in {
         withCtx(coll) { (firstOp, pipeline) =>
           coll.aggregate(firstOp, pipeline).map(_.firstBatch).
             aka("results") must beEqualTo(expected).await(1, timeout)
@@ -165,22 +166,22 @@ class AggregationSpec extends org.specs2.mutable.Specification {
       }
 
       "with cursor" >> {
-        def collect(c: BSONCollection, upTo: Int = Int.MaxValue)(implicit ec: ExecutionContext) = withCtx(c) { (firstOp, pipeline) =>
+        def collect(c: BSONCollection, upTo: Int = Int.MaxValue) = withCtx(c) { (firstOp, pipeline) =>
           c.aggregate1[BSONDocument](firstOp, pipeline, batchSize = Some(1)).
             collect[List](upTo, Cursor.FailOnError[List[BSONDocument]]())
         }
 
-        "without limit (maxDocs)" in { implicit ee: EE =>
+        "without limit (maxDocs)" in {
           collect(coll) aka "cursor result" must beEqualTo(expected).
             await(1, timeout)
         }
 
-        "with limit (maxDocs)" in { implicit ee: EE =>
+        "with limit (maxDocs)" in {
           collect(coll, 2) aka "cursor result" must beEqualTo(expected take 2).
             await(1, timeout)
         }
 
-        "with metadata sort" in { implicit ee: EE =>
+        "with metadata sort" in {
           coll.aggregateWith[ZipCode]() { framework =>
             import framework.{
               Descending,
@@ -203,7 +204,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
       }
 
       "with produced cursor" >> {
-        "without limit (maxDocs)" in { implicit ee: EE =>
+        "without limit (maxDocs)" in {
           withCtx(coll) { (firstOp, pipeline) =>
             val cursor = coll.aggregatorContext[BSONDocument](
               firstOp, pipeline, batchSize = Some(1)).prepared.cursor
@@ -213,7 +214,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
           }
         }
 
-        "of expected type" in { implicit ee: EE =>
+        "of expected type" in {
           withCtx(coll) { (firstOp, pipeline) =>
             // Custom cursor support
             trait FooCursor[T] extends Cursor[T] { def foo: String }
@@ -246,7 +247,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
       }
     }
 
-    "return largest and smallest cities by state" in { implicit ee: EE =>
+    "return largest and smallest cities by state" in {
       // See http://docs.mongodb.org/manual/tutorial/aggregation-zip-code-data-set/#return-largest-and-smallest-cities-by-state
       import coll.BatchCommands.AggregationFramework
       import AggregationFramework.{
@@ -309,20 +310,20 @@ class AggregationSpec extends org.specs2.mutable.Specification {
     }
 
     "return distinct states" >> {
-      def distinctSpec(c: BSONCollection, timeout: FiniteDuration)(implicit ee: EE) = c.distinct[String, ListSet]("state").
+      def distinctSpec(c: BSONCollection, timeout: FiniteDuration) = c.distinct[String, ListSet]("state").
         aka("states") must beEqualTo(ListSet("NY", "FR", "JP")).
         await(1, timeout)
 
-      "with the default connection" in { implicit ee: EE =>
+      "with the default connection" in {
         distinctSpec(coll, timeout)
       }
 
-      "with the slow connection" in { implicit ee: EE =>
+      "with the slow connection" in {
         distinctSpec(slowZipColl, slowTimeout)
       }
     }
 
-    "return a random sample" in { implicit ee: EE =>
+    "return a random sample" in {
       import coll.BatchCommands.AggregationFramework
 
       coll.aggregate(AggregationFramework.Sample(2)).map(_.head[ZipCode].
@@ -335,7 +336,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
     val inventory = db.collection(
       s"agg-inv-1-${System identityHashCode orders}")
 
-    "be provided with order fixtures" in { implicit ee: EE =>
+    "be provided with order fixtures" in {
       (for {
         // orders
         _ <- orders.insert(BSONDocument(
@@ -361,43 +362,43 @@ class AggregationSpec extends org.specs2.mutable.Specification {
     } tag "not_mongo26"
 
     "perform a simple lookup so the joined documents are returned" in {
-      implicit ee: EE => // See https://docs.mongodb.com/master/reference/operator/aggregation/lookup/#examples
+      // See https://docs.mongodb.com/master/reference/operator/aggregation/lookup/#examples
 
-        implicit val productHandler = Macros.handler[Product]
-        implicit val invReportHandler = Macros.handler[InventoryReport]
-        import orders.BatchCommands.AggregationFramework.Lookup
+      implicit val productHandler = Macros.handler[Product]
+      implicit val invReportHandler = Macros.handler[InventoryReport]
+      import orders.BatchCommands.AggregationFramework.Lookup
 
-        def expected = List(
-          InventoryReport(1, Some("abc"), Some(12), Some(2),
-            List(Product(1, Some("abc"), Some("product 1"), Some(120)))),
-          InventoryReport(2, Some("jkl"), Some(20), Some(1),
-            List(Product(4, Some("jkl"), Some("product 4"), Some(70)))),
-          InventoryReport(3, docs = List(
-            Product(5, None, Some("Incomplete")), Product(6))))
+      def expected = List(
+        InventoryReport(1, Some("abc"), Some(12), Some(2),
+          List(Product(1, Some("abc"), Some("product 1"), Some(120)))),
+        InventoryReport(2, Some("jkl"), Some(20), Some(1),
+          List(Product(4, Some("jkl"), Some("product 4"), Some(70)))),
+        InventoryReport(3, docs = List(
+          Product(5, None, Some("Incomplete")), Product(6))))
 
-        orders.aggregate(Lookup(inventory.name, "item", "sku", "docs")).
-          map(_.head[InventoryReport].toList) must beEqualTo(expected).
-          await(0, timeout)
+      orders.aggregate(Lookup(inventory.name, "item", "sku", "docs")).
+        map(_.head[InventoryReport].toList) must beEqualTo(expected).
+        await(0, timeout)
 
     } tag "not_mongo26"
 
     "perform a graph lookup so the joined documents are returned" in {
-      implicit ee: EE => // See https://docs.mongodb.com/manual/reference/operator/aggregation/graphLookup/#examples
+      // See https://docs.mongodb.com/manual/reference/operator/aggregation/graphLookup/#examples
 
-        implicit val productHandler = Macros.handler[Product]
-        implicit val invReportHandler = Macros.handler[InventoryReport]
-        import orders.BatchCommands.AggregationFramework.GraphLookup
+      implicit val productHandler = Macros.handler[Product]
+      implicit val invReportHandler = Macros.handler[InventoryReport]
+      import orders.BatchCommands.AggregationFramework.GraphLookup
 
-        def expected = List(
-          InventoryReport(1, Some("abc"), Some(12), Some(2),
-            List(Product(1, Some("abc"), Some("product 1"), Some(120)))),
-          InventoryReport(2, Some("jkl"), Some(20), Some(1),
-            List(Product(4, Some("jkl"), Some("product 4"), Some(70)))),
-          InventoryReport(3, docs = List.empty))
+      def expected = List(
+        InventoryReport(1, Some("abc"), Some(12), Some(2),
+          List(Product(1, Some("abc"), Some("product 1"), Some(120)))),
+        InventoryReport(2, Some("jkl"), Some(20), Some(1),
+          List(Product(4, Some("jkl"), Some("product 4"), Some(70)))),
+        InventoryReport(3, docs = List.empty))
 
-        orders.aggregate(GraphLookup(
-          inventory.name, BSONString(f"$$item"), "item", "sku", "docs")).map(_.head[InventoryReport].toList) must beEqualTo(expected).
-          await(0, timeout)
+      orders.aggregate(GraphLookup(
+        inventory.name, BSONString(f"$$item"), "item", "sku", "docs")).map(_.head[InventoryReport].toList) must beEqualTo(expected).
+        await(0, timeout)
 
     } tag "gt_mongo3"
 
@@ -405,7 +406,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
     implicit val saleItemHandler = Macros.handler[SaleItem]
     implicit val saleHandler = Macros.handler[Sale]
 
-    "be provided with sale fixtures" in { implicit ee: EE =>
+    "be provided with sale fixtures" in {
       def fixtures = Seq(
         document("_id" -> 0, "items" -> array(
           document("itemId" -> 43, "quantity" -> 2, "price" -> 10),
@@ -421,7 +422,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
         map(_ => {}) must beEqualTo({}).await(0, timeout)
     } tag "not_mongo26"
 
-    "filter when using a '$project' stage" in { implicit ee: EE =>
+    "filter when using a '$project' stage" in {
       // See https://docs.mongodb.com/master/reference/operator/aggregation/filter/#example
 
       import sales.BatchCommands.AggregationFramework.{
@@ -451,7 +452,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
     val inventory = db.collection(
       s"agg-inv-2-${System identityHashCode orders}")
 
-    "be provided the fixtures" in { implicit ee: EE =>
+    "be provided the fixtures" in {
       (for {
         // orders
         _ <- orders.insert(BSONDocument(
@@ -472,7 +473,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
       } yield ()) must beEqualTo({}).await(0, timeout)
     } tag "not_mongo26"
 
-    "so the joined documents are returned" in { implicit ee: EE =>
+    "so the joined documents are returned" in {
       import orders.BatchCommands.AggregationFramework
       import AggregationFramework.{ Lookup, Match, Unwind, UnwindField }
 
@@ -510,7 +511,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
 
     val books = db.collection(s"books-1-${System identityHashCode this}")
 
-    "with valid fixtures" in { implicit ee: EE =>
+    "with valid fixtures" in {
       val fixtures = Seq(
         BSONDocument(
           "_id" -> 8751, "title" -> "The Banquet",
@@ -533,7 +534,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
         aka("fixtures") must beEqualTo({}).await(0, timeout)
     }
 
-    "be outputed to collection" in { implicit ee: EE =>
+    "be outputed to collection" in {
       import books.BatchCommands.AggregationFramework
       import AggregationFramework.{ Ascending, Group, PushField, Out, Sort }
 
@@ -559,7 +560,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
         }
     }
 
-    "be added to set" in { implicit ee: EE =>
+    "be added to set" in {
       import books.BatchCommands.AggregationFramework
       import AggregationFramework.{ Ascending, Group, AddFieldToSet, Sort }
 
@@ -587,7 +588,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
 
     val contest = db.collection(s"contest-1-${System identityHashCode this}")
 
-    "with valid fixtures" in { implicit ee: EE =>
+    "with valid fixtures" in {
       /*
        { "_id" : 1, "name" : "dave123", "quiz" : 1, "score" : 85 }
        { "_id" : 2, "name" : "dave2", "quiz" : 1, "score" : 90 }
@@ -620,7 +621,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
         aka("fixtures") must beEqualTo({}).await(0, timeout)
     }
 
-    "return the standard deviation of each quiz" in { implicit ee: EE =>
+    "return the standard deviation of each quiz" in {
       import contest.BatchCommands.AggregationFramework.{
         Ascending,
         Group,
@@ -645,7 +646,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
        */
     } tag "not_mongo26"
 
-    "return a sum as hash per quiz" in { implicit ee: EE =>
+    "return a sum as hash per quiz" in {
       import contest.BatchCommands.AggregationFramework.{ Group, Sum }
 
       contest.aggregate(Group(BSONString(f"$$quiz"))(
@@ -654,7 +655,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
         document("_id" -> 1, "hash" -> 478))).await(1, timeout)
     }
 
-    "return the maximum score per quiz" in { implicit ee: EE =>
+    "return the maximum score per quiz" in {
       import contest.BatchCommands.AggregationFramework.{ Group, MaxField }
 
       contest.aggregate(Group(BSONString(f"$$quiz"))(
@@ -663,7 +664,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
         document("_id" -> 1, "maxScore" -> 90))).await(1, timeout)
     }
 
-    "return a max as hash per quiz" in { implicit ee: EE =>
+    "return a max as hash per quiz" in {
       import contest.BatchCommands.AggregationFramework.{ Group, Max }
 
       contest.aggregate(Group(BSONString(f"$$quiz"))(
@@ -673,7 +674,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
         document("_id" -> 1, "maxScore" -> 213))).await(1, timeout)
     }
 
-    "return the minimum score per quiz" in { implicit ee: EE =>
+    "return the minimum score per quiz" in {
       import contest.BatchCommands.AggregationFramework.{ Group, MinField }
 
       contest.aggregate(Group(BSONString(f"$$quiz"))(
@@ -682,7 +683,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
         document("_id" -> 1, "minScore" -> 71))).await(1, timeout)
     }
 
-    "return a min as hash per quiz" in { implicit ee: EE =>
+    "return a min as hash per quiz" in {
       import contest.BatchCommands.AggregationFramework.{ Group, Min }
 
       contest.aggregate(Group(BSONString(f"$$quiz"))(
@@ -692,7 +693,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
         document("_id" -> 1, "minScore" -> 85))).await(1, timeout)
     }
 
-    "push name and score per quiz group" in { implicit ee: EE =>
+    "push name and score per quiz group" in {
       import contest.BatchCommands.AggregationFramework.{ Group, Push }
 
       val expected = Set(
@@ -706,7 +707,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
         await(1, timeout)
     }
 
-    "add name and score to a set per quiz group" in { implicit ee: EE =>
+    "add name and score to a set per quiz group" in {
       import contest.BatchCommands.AggregationFramework.{ Group, AddToSet }
 
       val expected = Set(
@@ -726,7 +727,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
 
     val contest = db.collection(s"contest-2-${System identityHashCode this}")
 
-    "with valid fixtures" in { implicit ee: EE =>
+    "with valid fixtures" in {
       /*
        {_id: 0, username: "user0", age: 20}
        {_id: 1, username: "user1", age: 42}
@@ -741,7 +742,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
         aka("fixtures") must beEqualTo({}).await(0, timeout)
     } tag "not_mongo26"
 
-    "return the standard deviation of each quiz" in { implicit ee: EE =>
+    "return the standard deviation of each quiz" in {
       import contest.BatchCommands.AggregationFramework.{
         Group,
         Sample,
@@ -773,7 +774,6 @@ class AggregationSpec extends org.specs2.mutable.Specification {
     val places = db(s"places${System identityHashCode this}")
 
     {
-      import ExecutionContext.Implicits.global
       import reactivemongo.api.indexes._, IndexType._
 
       // db.place.createIndex({'loc':"2dsphere"})
@@ -781,7 +781,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
         List("loc" -> Geo2DSpherical))).map(_ => {})), timeout * 2)
     }
 
-    "must be inserted" in { implicit ee: EE =>
+    "must be inserted" in {
       /*
        {
          "type": "public",
@@ -817,7 +817,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
         await(0, timeout)
     }
 
-    "and aggregated using $geoNear" in { implicit ee: EE =>
+    "and aggregated using $geoNear" in {
       import places.BatchCommands.AggregationFramework.GeoNear
 
       /*
@@ -870,7 +870,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
     // https://docs.mongodb.com/manual/reference/operator/aggregation/redact/
     val forecasts = db(s"forecasts{System identityHashCode this}")
 
-    "be inserted" in { implicit ee: EE =>
+    "be inserted" in {
       /*
 {
   _id: 1,
@@ -922,7 +922,7 @@ class AggregationSpec extends org.specs2.mutable.Specification {
               "tags" -> BSONArray("HCS")))))).map(_ => {}) must beEqualTo({}).await(0, timeout)
     }
 
-    "be redacted" in { implicit ee: EE =>
+    "be redacted" in {
       import forecasts.BatchCommands.AggregationFramework.{ Match, Redact }
 
       implicit val subsectionReader = Macros.handler[Subsection]
@@ -996,7 +996,7 @@ db.forecasts.aggregate(
     // https://docs.mongodb.com/manual/reference/operator/aggregation/redact/
     val customers = db(s"customers{System identityHashCode this}")
 
-    "be inserted" in { implicit ee: EE =>
+    "be inserted" in {
       /*
 {
   _id: 1,
@@ -1053,7 +1053,7 @@ db.forecasts.aggregate(
         "status" -> "A")).map(_ => {}) must beEqualTo({}).await(0, timeout)
     }
 
-    "be redacted" in { implicit ee: EE =>
+    "be redacted" in {
       import customers.BatchCommands.AggregationFramework.{ Match, Redact }
 
       /*

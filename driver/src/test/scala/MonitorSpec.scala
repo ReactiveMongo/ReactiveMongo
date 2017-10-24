@@ -3,7 +3,7 @@ import akka.testkit.TestActorRef
 
 import scala.concurrent.Future
 
-import org.specs2.concurrent.{ ExecutionEnv => EE }
+import org.specs2.concurrent.ExecutionEnv
 
 import reactivemongo.core.actors.StandardDBSystem
 import reactivemongo.core.nodeset.{ Authenticate, Connection, Node }
@@ -16,14 +16,16 @@ import reactivemongo.api.{
   ReadPreference
 }
 
-class MonitorSpec extends org.specs2.mutable.Specification {
+class MonitorSpec(implicit ee: ExecutionEnv)
+  extends org.specs2.mutable.Specification {
+
   "Monitor" title
 
   import reactivemongo.api.tests._
   import Common.{ timeout, tryUntil }
 
   "Monitor" should {
-    "manage a single node DB system" in { implicit ee: EE =>
+    "manage a single node DB system" in {
       val expectFactor = 3L
       val opts = Common.DefaultOptions.copy(
         nbChannelsPerNode = 3,
@@ -99,7 +101,7 @@ class MonitorSpec extends org.specs2.mutable.Specification {
       }.await(0, timeout * expectFactor)
     }
 
-    "manage unhandled Actor exception and Akka Restart" in { implicit ee: EE =>
+    "manage unhandled Actor exception and Akka Restart" in {
       val expectFactor = 5L
       val opts = Common.DefaultOptions.copy(
         nbChannelsPerNode = 3,
@@ -157,7 +159,7 @@ class MonitorSpec extends org.specs2.mutable.Specification {
 
   // ---
 
-  def withConAndSys[T](nodes: Seq[String] = Seq(Common.primaryHost), options: MongoConnectionOptions = Common.DefaultOptions, drv: MongoDriver = Common.driver, authentications: Seq[Authenticate] = Seq.empty[Authenticate])(f: (MongoConnection, TestActorRef[StandardDBSystem]) => Future[T])(implicit ee: EE): Future[T] = {
+  def withConAndSys[T](nodes: Seq[String] = Seq(Common.primaryHost), options: MongoConnectionOptions = Common.DefaultOptions, drv: MongoDriver = Common.driver, authentications: Seq[Authenticate] = Seq.empty[Authenticate])(f: (MongoConnection, TestActorRef[StandardDBSystem]) => Future[T]): Future[T] = {
     // See MongoDriver#connection
     val supervisorName = s"Supervisor-${System identityHashCode ee}"
     val poolName = s"Connection-${System identityHashCode f}"

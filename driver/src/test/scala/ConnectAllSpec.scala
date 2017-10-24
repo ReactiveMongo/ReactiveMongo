@@ -3,7 +3,6 @@ import scala.concurrent.Future
 import shaded.netty.channel.ChannelFuture
 
 import org.specs2.matcher.MatchResult
-import org.specs2.concurrent.{ ExecutionEnv => EE }
 
 import reactivemongo.core.nodeset.{
   Connection,
@@ -47,7 +46,7 @@ trait ConnectAllSpec { parent: NodeSetSpec =>
 
   // ---
 
-  private def builder(specTitle: String, checkCon: List[String] => MatchResult[Any])(conAll: StandardDBSystem => NodeSet => ((Node, ChannelFuture) => (Node, ChannelFuture)) => NodeSet) = specTitle in { implicit ee: EE =>
+  private def builder(specTitle: String, checkCon: List[String] => MatchResult[Any])(conAll: StandardDBSystem => NodeSet => ((Node, ChannelFuture) => (Node, ChannelFuture)) => NodeSet) = specTitle in {
     val coned = List.newBuilder[String]
 
     withConAndSys(md) { (con, ref) =>

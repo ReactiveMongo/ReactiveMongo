@@ -14,14 +14,16 @@ import scala.util.{ Failure, Success, Try }
 import scala.concurrent.{ Future, Promise }
 import scala.concurrent.duration._
 
-import org.specs2.concurrent.{ ExecutionEnv => EE }
+import org.specs2.concurrent.ExecutionEnv
 import org.specs2.matcher.MatchResult
 
 import external.reactivemongo.ConnectionListener
 
 import reactivemongo.jmx.{ Node, NodeSet }
 
-class JmxSpec extends org.specs2.mutable.Specification {
+class JmxSpec(implicit ee: ExecutionEnv)
+  extends org.specs2.mutable.Specification {
+
   "JMX" title
 
   sequential
@@ -38,7 +40,7 @@ class JmxSpec extends org.specs2.mutable.Specification {
   }
 
   "NodeSet MBean" should {
-    "be registered" in { implicit ee: EE =>
+    "be registered" in {
       Try(db).map(_.name) must beSuccessfulTry[String].like {
         case name => name aka "database name" must_== Common.dbName and {
           val mbeans = mbs.queryMBeans(new ObjectName(
@@ -92,11 +94,9 @@ class JmxSpec extends org.specs2.mutable.Specification {
   }
 
   "Node MBean" should {
-    "be registered" in { implicit ee: EE =>
+    "be registered" in {
       Try(db).map(_.name) must beSuccessfulTry[String].like {
         case name => name aka "database name" must_== Common.dbName and {
-          val mbeans = mbs.queryMBeans(new ObjectName(s"org.reactivemongo.Supervisor-*.${Common.connection.name}:type=Node,*"), null)
-
           nodeMBean aka ("Node MBean") must beLike[ObjectInstance] {
             case bi => verifyBeanInstance(bi, "reactivemongo.jmx.Node",
               nodeAttrs, Node.notificationInfo) and {
@@ -148,7 +148,7 @@ class JmxSpec extends org.specs2.mutable.Specification {
         }
     }
 
-  def nodeMBean(implicit ee: EE): Future[ObjectInstance] = {
+  def nodeMBean: Future[ObjectInstance] = {
     val mbeans = mbs.queryMBeans(new ObjectName(
       "org.reactivemongo.Supervisor-*:type=Node,*"), null)
 
@@ -164,7 +164,7 @@ class JmxSpec extends org.specs2.mutable.Specification {
       case Failure(e) => Future.failed[T](e)
     }
 
-  def waitNodeMBean(implicit ee: EE): Future[ObjectInstance] = {
+  def waitNodeMBean: Future[ObjectInstance] = {
     val mbeans = mbs.queryMBeans(new ObjectName(
       "org.reactivemongo.Supervisor-*:type=NodeSet,*"), null)
 
@@ -174,8 +174,10 @@ class JmxSpec extends org.specs2.mutable.Specification {
       }
       val objName = Promise[ObjectName]()
       val listener = new NotificationListener {
-        def handleNotification(n: Notification, b: Object): Unit =
+        def handleNotification(n: Notification, b: Object): Unit = {
           objName.tryComplete(Try(n.getSource.asInstanceOf[ObjectName]))
+          ()
+        }
       }
 
       mbs.addNotificationListener(ns.getObjectName, listener, filter, null)

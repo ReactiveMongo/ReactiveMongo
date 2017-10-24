@@ -16,26 +16,31 @@ class SerializationSpec extends org.specs2.mutable.Specification {
 
     "serialize a whole document" in {
       val buf = new LowLevelBsonDocWriter(new ArrayBSONBuffer)
-      buf.
-        putString("name", "James").
+
+      buf.putString("name", "James").
         putInt("age", 27).
         putString("surname1", "Jim").
         putDouble("score", 3.88).
         putBoolean("online", true).
-        putObjectId("_id", BSONObjectID("5117c6391aa562a90098f621").valueAsArray).
+        putObjectId("_id", BSONObjectID(
+          "5117c6391aa562a90098f621").valueAsArray).
         openDocument("contact").
-        openArray("emails").
-        putString("0", "james@example.org").
-        putString("1", "spamaddrjames@example.org").
-        close.
-        putString("adress", "coucou").
-        close.
-        putLong("lastSeen", 1360512704747L).
-        close
+        putDecimal(
+          "priority",
+          BSONDecimal.NegativeInf.high, BSONDecimal.NegativeInf.low).
+          openArray("emails").
+          putString("0", "james@example.org").
+          putString("1", "spamaddrjames@example.org").
+          close.
+          putString("address", "coucou").
+          close.
+          putLong("lastSeen", 1360512704747L).
+          close
+
       compare(expectedWholeDocumentBytes, buf.result.array)
     }
 
-    "list all fields in a bson doc" in {
+    "list all fields in a BSON document" in {
       /*val doc = BSONDocument(
         "name" -> "James",
         "age" -> 27,
@@ -89,13 +94,31 @@ class SerializationSpec extends org.specs2.mutable.Specification {
 
         ()
       }
+
       listAll(new LowLevelBsonDocReader(ArrayReadableBuffer(cpxDoc)))
+
       //println(fields.toList)
       true mustEqual true
     }
   }
 
   "BSON Default Serializer" should {
+    def codec[T <: BSONValue](expected: T): Option[T] = {
+      val buffer = new ArrayBSONBuffer
+
+      DefaultBufferHandler.handlersByCode.get(expected.code).map { h =>
+        val handler = h.asInstanceOf[DefaultBufferHandler.BufferRW[T]]
+
+        handler.read(handler.write(expected, buffer).toReadableBuffer)
+      }
+    }
+
+    "serialize a BSON decimal" in {
+      BSONDecimal.fromLong(123L) must beSuccessfulTry[BSONDecimal].like {
+        case expected => codec(expected) must beSome(expected)
+      }
+    }
+
     "serialize a whole document" in {
       val doc = BSONDocument(
         "name" -> "James",
@@ -106,15 +129,22 @@ class SerializationSpec extends org.specs2.mutable.Specification {
         "online" -> true,
         "_id" -> BSONObjectID("5117c6391aa562a90098f621"),
         "contact" -> BSONDocument(
+          "priority" -> BSONDecimal.NegativeInf,
           "emails" -> BSONArray(
             Some("james@example.org"),
             Option.empty[String],
             Some("spamaddrjames@example.org")),
-          "adress" -> BSONString("coucou")),
+          "address" -> BSONString("coucou")),
         "lastSeen" -> BSONLong(1360512704747L))
+
       val buffer = new ArrayBSONBuffer
-      DefaultBufferHandler.write(buffer, doc)
-      compare(expectedWholeDocumentBytes, buffer.array)
+
+      DefaultBufferHandler.writeDocument(doc, buffer)
+
+      DefaultBufferHandler.readDocument(
+        buffer.toReadableBuffer) must beSuccessfulTry(doc) and {
+          compare(expectedWholeDocumentBytes, buffer.array)
+        }
     }
 
     "serialize a document containing a boolean" in {
@@ -381,6 +411,16 @@ class SerializationSpec extends org.specs2.mutable.Specification {
           }
       }
     }
+
+    "be 16 for any BSONDecimal" >> {
+      Fragments.foreach(bsonDecimalFixtures) { bsonDec =>
+        s"like $bsonDec" in {
+          bsonDec.byteSize must_== 16 and {
+            written(bsonDec) must_== 16
+          }
+        }
+      }
+    }
   }
 
   // ---
@@ -398,6 +438,6 @@ class SerializationSpec extends org.specs2.mutable.Specification {
 
   lazy val cpxDoc = Array[Byte](73, 1, 0, 0, 7, 95, 105, 100, 0, 84, 37, 32, -44, 86, 16, 26, 53, 33, 121, 71, -94, 2, 110, 97, 109, 101, 0, 5, 0, 0, 0, 106, 97, 99, 107, 0, 4, 99, 111, 110, 116, 97, 99, 116, 0, 113, 0, 0, 0, 3, 48, 0, 52, 0, 0, 0, 2, 116, 112, 101, 0, 4, 0, 0, 0, 116, 101, 108, 0, 2, 110, 117, 109, 0, 11, 0, 0, 0, 56, 55, 54, 56, 49, 55, 50, 54, 51, 56, 0, 1, 116, 114, 117, 99, 0, 0, 0, 0, 0, 0, 0, 88, 64, 0, 3, 49, 0, 50, 0, 0, 0, 2, 116, 112, 101, 0, 4, 0, 0, 0, 112, 114, 111, 0, 2, 110, 117, 109, 0, 9, 0, 0, 0, 48, 57, 56, 55, 49, 48, 57, 50, 0, 1, 116, 114, 117, 99, 0, -51, -52, -52, -52, -52, 76, 49, -64, 0, 0, 2, 97, 100, 100, 114, 101, 115, 115, 0, 36, 0, 0, 0, 108, 107, 110, 99, 118, 101, 111, 119, 110, 118, 101, 111, 119, 110, 118, 32, 119, 111, 105, 118, 110, 101, 119, 59, 111, 118, 110, 32, 113, 39, 112, 106, 102, 110, 32, 0, 13, 102, 117, 110, 99, 0, 44, 0, 0, 0, 102, 117, 110, 99, 116, 105, 111, 110, 32, 40, 41, 32, 123, 32, 118, 97, 114, 32, 97, 32, 61, 32, 57, 57, 59, 32, 114, 101, 116, 117, 114, 110, 32, 104, 101, 121, 32, 43, 32, 57, 57, 32, 125, 0, 5, 100, 97, 116, 97, 0, 9, 0, 0, 0, 0, -115, -86, -33, -45, -35, 123, -37, -121, -32, 11, 114, 120, 0, 91, 97, 122, 93, 123, 52, 125, 0, 105, 0, 7, 105, 100, 50, 0, 84, 37, 32, -44, 86, 16, 26, 53, 33, 121, 71, -95, 2, 101, 110, 100, 0, 7, 0, 0, 0, 101, 110, 102, 105, 110, 33, 0, 0)
 
-  lazy val expectedWholeDocumentBytes = Array[Byte](-45, 0, 0, 0, 2, 110, 97, 109, 101, 0, 6, 0, 0, 0, 74, 97, 109, 101, 115, 0, 16, 97, 103, 101, 0, 27, 0, 0, 0, 2, 115, 117, 114, 110, 97, 109, 101, 49, 0, 4, 0, 0, 0, 74, 105, 109, 0, 1, 115, 99, 111, 114, 101, 0, 10, -41, -93, 112, 61, 10, 15, 64, 8, 111, 110, 108, 105, 110, 101, 0, 1, 7, 95, 105, 100, 0, 81, 23, -58, 57, 26, -91, 98, -87, 0, -104, -10, 33, 3, 99, 111, 110, 116, 97, 99, 116, 0, 95, 0, 0, 0, 4, 101, 109, 97, 105, 108, 115, 0, 63, 0, 0, 0, 2, 48, 0, 18, 0, 0, 0, 106, 97, 109, 101, 115, 64, 101, 120, 97, 109, 112, 108, 101, 46, 111, 114, 103, 0, 2, 49, 0, 26, 0, 0, 0, 115, 112, 97, 109, 97, 100, 100, 114, 106, 97, 109, 101, 115, 64, 101, 120, 97, 109, 112, 108, 101, 46, 111, 114, 103, 0, 0, 2, 97, 100, 114, 101, 115, 115, 0, 7, 0, 0, 0, 99, 111, 117, 99, 111, 117, 0, 0, 18, 108, 97, 115, 116, 83, 101, 101, 110, 0, -21, 96, -32, -60, 60, 1, 0, 0, 0)
+  lazy val expectedWholeDocumentBytes = Array[Byte](-18, 0, 0, 0, 2, 110, 97, 109, 101, 0, 6, 0, 0, 0, 74, 97, 109, 101, 115, 0, 16, 97, 103, 101, 0, 27, 0, 0, 0, 2, 115, 117, 114, 110, 97, 109, 101, 49, 0, 4, 0, 0, 0, 74, 105, 109, 0, 1, 115, 99, 111, 114, 101, 0, 10, -41, -93, 112, 61, 10, 15, 64, 8, 111, 110, 108, 105, 110, 101, 0, 1, 7, 95, 105, 100, 0, 81, 23, -58, 57, 26, -91, 98, -87, 0, -104, -10, 33, 3, 99, 111, 110, 116, 97, 99, 116, 0, 122, 0, 0, 0, 19, 112, 114, 105, 111, 114, 105, 116, 121, 0, 0, 0, 0, 0, 0, 0, 0, -8, 0, 0, 0, 0, 0, 0, 0, 0, 4, 101, 109, 97, 105, 108, 115, 0, 63, 0, 0, 0, 2, 48, 0, 18, 0, 0, 0, 106, 97, 109, 101, 115, 64, 101, 120, 97, 109, 112, 108, 101, 46, 111, 114, 103, 0, 2, 49, 0, 26, 0, 0, 0, 115, 112, 97, 109, 97, 100, 100, 114, 106, 97, 109, 101, 115, 64, 101, 120, 97, 109, 112, 108, 101, 46, 111, 114, 103, 0, 0, 2, 97, 100, 100, 114, 101, 115, 115, 0, 7, 0, 0, 0, 99, 111, 117, 99, 111, 117, 0, 0, 18, 108, 97, 115, 116, 83, 101, 101, 110, 0, -21, 96, -32, -60, 60, 1, 0, 0, 0)
 
 }

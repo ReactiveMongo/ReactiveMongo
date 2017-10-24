@@ -1,52 +1,86 @@
 package reactivemongo.bson.lowlevel
 
-import reactivemongo.bson.buffer._
+import reactivemongo.bson.buffer.{ ReadableBuffer, WritableBuffer }
 
+@deprecated("Will be removed", "0.12.8")
 sealed trait Field {
   def tpe: Byte
   def name: String
 }
-trait ValueField[A <: AnyVal] { self: Field =>
+
+@deprecated("Will be removed", "0.12.8")
+trait ValueField[A <: AnyVal] { _: Field =>
   def value: A
 }
-case class BooleanField(name: String, value: Boolean) extends Field with ValueField[Boolean] {
+
+@deprecated("Will be removed", "0.12.8")
+case class BooleanField(name: String, value: Boolean)
+  extends Field with ValueField[Boolean] {
   final val tpe = 0x08: Byte
 }
-case class IntField(name: String, value: Int) extends Field with ValueField[Int] {
+
+@deprecated("Will be removed", "0.12.8")
+case class IntField(name: String, value: Int)
+  extends Field with ValueField[Int] {
   final val tpe = 0x10: Byte
 }
-case class DoubleField(name: String, value: Double) extends Field with ValueField[Double] {
+
+@deprecated("Will be removed", "0.12.8")
+case class DoubleField(name: String, value: Double)
+  extends Field with ValueField[Double] {
   final val tpe = 0x01: Byte
 }
+
+@deprecated("Will be removed", "0.12.8")
 case class NoValue(tpe: Byte, name: String) extends Field
-case class LongField(tpe: Byte, name: String, value: Long) extends Field with ValueField[Long]
+
+/**
+ * @param tpe can be `long` (19), `regex` (11) or `dbPointer` (12)
+ */
+case class LongField(tpe: Byte, name: String, value: Long)
+  extends Field with ValueField[Long]
 
 @SerialVersionUID(587711495L)
-case class StructureField[A <: ReadableBuffer](tpe: Byte, name: String, @transient reader: LowLevelBsonDocReader[A]) extends Field
+case class StructureField[A <: ReadableBuffer](
+  tpe: Byte, name: String, @transient reader: LowLevelBsonDocReader[A]) extends Field
 
-case class LazyField[A <: ReadableBuffer](tpe: Byte, name: String, buffer: A) extends Field
+/** Field with value not yet decoded (kept as low-level `buffer`). */
+case class LazyField[A <: ReadableBuffer](
+  tpe: Byte, name: String, buffer: A) extends Field
 
-object LoweLevelDocumentIterator extends (ReadableBuffer => Iterator[ReadableBuffer]) {
-  def apply(buf: ReadableBuffer): Iterator[ReadableBuffer] = new Iterator[ReadableBuffer] {
-    private val slice = buf.slice(buf.readable)
-    def hasNext = slice.readable >= 5 // length + 0x00
-    def next = {
-      val length = slice.readInt
-      slice.index -= 4
-      slice.slice(length)
+@deprecated("Will be removed", "0.12.8")
+object LoweLevelDocumentIterator
+  extends (ReadableBuffer => Iterator[ReadableBuffer]) {
+
+  def apply(buf: ReadableBuffer): Iterator[ReadableBuffer] =
+    new Iterator[ReadableBuffer] {
+      private val slice = buf.slice(buf.readable)
+
+      def hasNext = slice.readable >= 5 // length + 0x00
+
+      def next = {
+        val length = slice.readInt
+
+        slice.index -= 4
+
+        slice.slice(length)
+      }
     }
-  }
 }
 
+@deprecated("Will be removed", "0.12.8")
 class LowLevelBsonDocReader[A <: ReadableBuffer](rbuf: A) {
   private val start = rbuf.index
+
   private val length = {
     val res = rbuf.readInt
     rbuf.index = start
     res
   }
+
   private def slice = rbuf.slice(length)
 
+  @deprecated("Use [[Tuple2]] type directly", "0.12.8")
   type ->[T, U] = (T, U)
 
   def lookup(name: String): Option[Field] =
@@ -66,26 +100,51 @@ class LowLevelBsonDocReader[A <: ReadableBuffer](rbuf: A) {
       val field = (0xFF & tpe) match {
         case 0x01 =>
           DoubleField(name, buf.readDouble)
-        case 0x09 | 0x11 | 0x12 =>
-          LongField(tpe, name, buf.readLong)
-        case 0x08 =>
-          BooleanField(name, buf.readByte == 0x01)
-        case 0x10 =>
-          IntField(name, buf.readInt)
-        case 0x03 | 0x04 =>
+
+        case 0x02 | 0x13 | 0x0D | 0x0E => {
+          // string | decimal | javascript | symbol
+          val length = buf.readInt + 4 // variable length
+
+          buf.index = buf.index - 4
+
+          val res = LazyField(tpe, name, buf.slice(length))
+
+          buf.index = buf.index + length
+
+          res
+        }
+
+        case 0x03 | 0x04 => { // object | array
           val length = buf.readInt
           buf.index = buf.index - 4
-          val res = StructureField(tpe, name, new LowLevelBsonDocReader(buf.slice(length)))
+          val res = StructureField(tpe, name,
+            new LowLevelBsonDocReader(buf.slice(length)))
           buf.index += length
           res
-        case 0x05 =>
+        }
+
+        case 0x05 => { // binData
           val length = buf.readInt + 4 + 1
           buf.index = buf.index - 4
           val res = LazyField(tpe, name, buf.slice(length))
           buf.index = buf.index + length
           res
-        //buf.index = buf.index + buf.readInt + 5
-        case 0x0B =>
+          //buf.index = buf.index + buf.readInt + 5
+        }
+
+        case 0x06 | 0x0A | 0xFF | 0x7F =>
+          NoValue(tpe, name)
+
+        case 0x08 =>
+          BooleanField(name, buf.readByte == 0x01)
+
+        case 0x09 | 0x11 | 0x12 => // date | timestamp | long
+          LongField(tpe, name, buf.readLong)
+
+        case 0x10 =>
+          IntField(name, buf.readInt)
+
+        case 0x0B => { // regex
           val now = buf.index
           skipCString(); skipCString()
           val length = buf.index - now
@@ -93,40 +152,39 @@ class LowLevelBsonDocReader[A <: ReadableBuffer](rbuf: A) {
           val res = LazyField(tpe, name, buf.slice(length))
           buf.index = buf.index + length
           res
-        case 0x02 | 0x0D | 0x0E =>
-          val length = buf.readInt + 4
-          buf.index = buf.index - 4
-          val res = LazyField(tpe, name, buf.slice(length))
-          buf.index = buf.index + length
-          res
-        case 0x0C =>
+        }
+
+        case 0x0C => { // dbPointer
           val length = buf.readInt + 12 + 4
           buf.index = buf.index - 4
           val res = LazyField(tpe, name, buf.slice(length))
           buf.index = buf.index + length
           res
-        case 0x07 =>
+        }
+
+        case 0x07 => { // objectId
           val res = LazyField(tpe, name, buf.slice(12))
           buf.index = buf.index + 12
           res
+        }
+
         case 0x0F =>
           // TODO
           ???
 
-        case 0x06 | 0x0A | 0xFF | 0x7F =>
-          NoValue(tpe, name)
-
         case x => throw new RuntimeException(s"unexpected type $x")
       }
-      if (buf.readable > 1)
+
+      if (buf.readable > 1) {
         field #:: stream()
-      else Stream(field)
+      } else Stream(field)
     }
 
     stream
   }
 }
 
+@deprecated("Will be removed", "0.12.8")
 class LowLevelBsonDocWriter[A <: WritableBuffer](buf: A) {
   private var marks = List[(Int, Int)](0 -> 0x03)
 
@@ -151,38 +209,53 @@ class LowLevelBsonDocWriter[A <: WritableBuffer](buf: A) {
     buf.writeDouble(value)
     this
   }
+
   def putString(key: String, value: String): this.type = {
     buf.writeByte(0x02)
     buf.writeCString(key)
     buf.writeString(value)
     this
   }
+
   def putUndefined(): this.type = {
     buf.writeByte(0x06)
     this
   }
+
   def putObjectId(key: String, value: Array[Byte]): this.type = {
     buf.writeByte(0x07)
     buf.writeCString(key)
     buf.writeBytes(value)
     this
   }
+
   def putBoolean(key: String, value: Boolean): this.type = {
     buf.writeByte(0x08)
     buf.writeCString(key)
     buf.writeByte(if (value) 1 else 0)
     this
   }
+
   def putDateTime(key: String, value: Long): this.type = {
     buf.writeByte(0x09)
     buf.writeCString(key)
     buf.writeLong(value)
     this
   }
+
+  def putDecimal(key: String, high: Long, low: Long): this.type = {
+    buf.writeByte(0x13)
+    buf.writeCString(key)
+    buf.writeLong(high)
+    buf.writeLong(low)
+    this
+  }
+
   def putNull(): this.type = {
     buf.writeByte(0x0A)
     this
   }
+
   def putRegex(key: String, value: String, flags: String): this.type = {
     buf.writeByte(0x0B)
     buf.writeCString(key)
@@ -190,6 +263,7 @@ class LowLevelBsonDocWriter[A <: WritableBuffer](buf: A) {
     buf.writeCString(flags)
     this
   }
+
   def putDBPointer(key: String, db: String, value: Array[Byte]): this.type = {
     buf.writeByte(0x0C)
     buf.writeCString(key)
@@ -197,41 +271,48 @@ class LowLevelBsonDocWriter[A <: WritableBuffer](buf: A) {
     buf.writeBytes(value)
     this
   }
+
   def putJavaScript(key: String, value: String): this.type = {
     buf.writeByte(0x0D)
     buf.writeCString(key)
     buf.writeString(value)
     this
   }
+
   def putSymbol(key: String, value: String): this.type = {
     buf.writeByte(0x0E)
     buf.writeCString(key)
     buf.writeString(value)
     this
   }
+
   def putInt(key: String, value: Int): this.type = {
     buf.writeByte(0x10)
     buf.writeCString(key)
     buf.writeInt(value)
     this
   }
+
   def putTimestamp(key: String, value: Long): this.type = {
     buf.writeByte(0x11)
     buf.writeCString(key)
     buf.writeLong(value)
     this
   }
+
   def putLong(key: String, value: Long): this.type = {
     buf.writeByte(0x12)
     buf.writeCString(key)
     buf.writeLong(value)
     this
   }
+
   def putMinKey(key: String): this.type = {
     buf.writeByte(0xFF.toByte)
     buf.writeCString(key)
     this
   }
+
   def putMaxKey(key: String): this.type = {
     buf.writeByte(0x7F)
     buf.writeCString(key)
@@ -245,6 +326,7 @@ class LowLevelBsonDocWriter[A <: WritableBuffer](buf: A) {
     buf.writeInt(0) // length
     this
   }
+
   def openArray(key: String): this.type = {
     buf.writeByte(0x04)
     buf.writeCString(key)
@@ -252,6 +334,7 @@ class LowLevelBsonDocWriter[A <: WritableBuffer](buf: A) {
     buf.writeInt(0) // length
     this
   }
+
   def openBinary(key: String, tpe: Byte): this.type = {
     buf.writeByte(0x05)
     buf.writeCString(key)
@@ -260,6 +343,7 @@ class LowLevelBsonDocWriter[A <: WritableBuffer](buf: A) {
     buf.writeByte(tpe)
     this
   }
+
   def openJavaScriptWithScope(key: String, value: String): this.type = {
     buf.writeByte(0x0F)
     buf.writeCString(key)
@@ -273,37 +357,17 @@ class LowLevelBsonDocWriter[A <: WritableBuffer](buf: A) {
 
   def close(): this.type = {
     val (pos, tpe) = popMark
-    if (tpe == 0x05)
-      buf.setInt(pos, buf.index - pos - 1) // no trailing nul, excluding binary type byte
-    else {
+
+    if (tpe == 0x05) {
+      // no trailing nul, excluding binary type byte
+      buf.setInt(pos, buf.index - pos - 1)
+    } else {
       buf.setInt(pos, buf.index - pos + 1)
       buf.writeByte(0)
     }
+
     this
   }
 
   def result(): A = buf
 }
-/*
-sealed trait NonStructuralBSONValue[A <: BSONValue]
-object NonStructuralBSONValue {
-  implicit def doubleEv: NonStructuralBSONValue[BSONDouble] = null
-  implicit def stringEv: NonStructuralBSONValue[BSONString] = null
-  //implicit def binaryEv: NonStructuralBSONValue[BSONBinary] = null
-  implicit def undefinedEv: NonStructuralBSONValue[BSONUndefined.type] = null
-  implicit def objectIdEv: NonStructuralBSONValue[BSONObjectID] = null
-  implicit def booleanEv: NonStructuralBSONValue[BSONBoolean] = null
-  implicit def dateTimeEv: NonStructuralBSONValue[BSONDateTime] = null
-  implicit def nullEv: NonStructuralBSONValue[BSONNull.type] = null
-  implicit def regexEv: NonStructuralBSONValue[BSONRegex] = null
-  implicit def dbPointerEv: NonStructuralBSONValue[BSONDBPointer] = null
-  implicit def jsEv: NonStructuralBSONValue[BSONJavaScript] = null
-  implicit def symbolEv: NonStructuralBSONValue[BSONSymbol] = null
-  implicit def jswsEv: NonStructuralBSONValue[BSONJavaScriptWS] = null
-  implicit def integerEv: NonStructuralBSONValue[BSONInteger] = null
-  implicit def timestampEv: NonStructuralBSONValue[BSONTimestamp] = null
-  implicit def longEv: NonStructuralBSONValue[BSONLong] = null
-  implicit def minKeyEv: NonStructuralBSONValue[BSONMinKey.type] = null
-  implicit def maxKeyEv: NonStructuralBSONValue[BSONMaxKey.type] = null
-}
-*/

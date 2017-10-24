@@ -7,9 +7,11 @@ import reactivemongo.api.commands.Command
 
 import reactivemongo.api.collections.bson.BSONCollection
 
-import org.specs2.concurrent.{ ExecutionEnv => EE }
+import org.specs2.concurrent.ExecutionEnv
 
-class RawCommandSpec extends org.specs2.mutable.Specification {
+class RawCommandSpec(implicit ee: ExecutionEnv)
+  extends org.specs2.mutable.Specification {
+
   "Raw command" title
 
   import Common._
@@ -25,18 +27,18 @@ class RawCommandSpec extends org.specs2.mutable.Specification {
   lazy val collection = db(colName)
 
   "Collection" should {
-    "be found with the default connection" in { implicit ee: EE =>
+    "be found with the default connection" in {
       collection.create() must beEqualTo({}).await(1, timeout)
     }
 
-    "be found with the slow connection" in { implicit ee: EE =>
+    "be found with the slow connection" in {
       slowDb(colName).create() must beEqualTo({}).await(1, slowTimeout)
     }
   }
 
   "Raw command" should {
     "re-index test collection with command as document" >> {
-      def reindexSpec(c: BSONCollection, timeout: FiniteDuration)(implicit ee: EE) = {
+      def reindexSpec(c: BSONCollection, timeout: FiniteDuration) = {
         val runner = Command.run(BSONSerializationPack)
         val reIndexDoc = BSONDocument("reIndex" -> collection.name)
 
@@ -46,11 +48,11 @@ class RawCommandSpec extends org.specs2.mutable.Specification {
           }.await(1, timeout)
       }
 
-      "with the default connection" in { implicit ee: EE =>
+      "with the default connection" in {
         reindexSpec(collection, timeout)
       }
 
-      "with the slow connection" in { implicit ee: EE =>
+      "with the slow connection" in {
         reindexSpec(slowDb(collection.name), slowTimeout)
       }
     }

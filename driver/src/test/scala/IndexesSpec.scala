@@ -11,9 +11,11 @@ import reactivemongo.api.collections.bson.BSONCollection
 import reactivemongo.api.commands.CommandError
 import reactivemongo.core.errors.DatabaseException
 
-import org.specs2.concurrent.{ ExecutionEnv => EE }
+import org.specs2.concurrent.ExecutionEnv
 
-class IndexesSpec extends org.specs2.mutable.Specification {
+class IndexesSpec(implicit ee: ExecutionEnv)
+  extends org.specs2.mutable.Specification {
+
   "Indexes management" title
 
   sequential
@@ -25,7 +27,7 @@ class IndexesSpec extends org.specs2.mutable.Specification {
 
   "ReactiveMongo Geo Indexes" should {
     {
-      def spec(c: BSONCollection, timeout: FiniteDuration)(implicit ee: EE) = {
+      def spec(c: BSONCollection, timeout: FiniteDuration) = {
         val futs: Seq[Future[Unit]] = for (i <- 1 until 10)
           yield c.insert(BSONDocument(
           "loc" -> BSONArray(i + 2D, i * 2D))).map(_ => {})
@@ -33,32 +35,32 @@ class IndexesSpec extends org.specs2.mutable.Specification {
         Future.sequence(futs) must not(throwA[Throwable]).await(1, timeout)
       }
 
-      "insert some points with the default connection" in { implicit ee: EE =>
+      "insert some points with the default connection" in {
         spec(geo, timeout)
       }
 
-      "insert some points with the default connection" in { implicit ee: EE =>
+      "insert some points with the default connection" in {
         spec(slowGeo, slowTimeout)
       }
     }
 
     {
-      def spec(c: BSONCollection, timeout: FiniteDuration)(implicit ee: EE) =
+      def spec(c: BSONCollection, timeout: FiniteDuration) =
         c.indexesManager.ensure(Index(
           List("loc" -> Geo2D),
           options = BSONDocument("min" -> -95, "max" -> 95, "bits" -> 28))).
           aka("index") must beTrue.await(1, timeout * 2)
 
-      "be created with the default connection" in { implicit ee: EE =>
+      "be created with the default connection" in {
         spec(geo, timeout)
       }
 
-      "be created with the slow connection" in { implicit ee: EE =>
+      "be created with the slow connection" in {
         spec(slowGeo, slowTimeout)
       }
     }
 
-    "fail to insert some points out of range" in { implicit ee: EE =>
+    "fail to insert some points out of range" in {
       geo.insert(
         BSONDocument("loc" -> BSONArray(27.88D, 97.21D))).
         map(_ => false).recover {
@@ -71,7 +73,7 @@ class IndexesSpec extends org.specs2.mutable.Specification {
     }
 
     {
-      def spec(c: BSONCollection, timeout: FiniteDuration)(implicit ee: EE) = {
+      def spec(c: BSONCollection, timeout: FiniteDuration) = {
         def future = c.indexesManager.list().map {
           _.filter(_.name.get == "loc_2d")
         }.filter(!_.isEmpty).map(_.apply(0))
@@ -84,11 +86,11 @@ class IndexesSpec extends org.specs2.mutable.Specification {
         }.await(1, timeout)
       }
 
-      "retrieve indexes with the default connection" in { implicit ee: EE =>
+      "retrieve indexes with the default connection" in {
         spec(geo, timeout)
       }
 
-      "retrieve indexes with the default connection" in { implicit ee: EE =>
+      "retrieve indexes with the default connection" in {
         spec(slowGeo, slowTimeout)
       }
     }
@@ -97,7 +99,7 @@ class IndexesSpec extends org.specs2.mutable.Specification {
   lazy val geo2DSpherical = db("geo2d")
 
   "ReactiveMongo Geo2D indexes" should {
-    "insert some points" in { implicit ee: EE =>
+    "insert some points" in {
       val futs: Seq[Future[Unit]] = for (i <- 1 until 10)
         yield geo2DSpherical.insert(
         BSONDocument("loc" -> BSONDocument(
@@ -107,12 +109,12 @@ class IndexesSpec extends org.specs2.mutable.Specification {
       Future.sequence(futs) must not(throwA[Throwable]).await(1, timeout)
     }
 
-    "make index" in { implicit ee: EE =>
+    "make index" in {
       geo2DSpherical.indexesManager.ensure(
         Index(List("loc" -> Geo2DSpherical))) must beTrue.await(1, timeout * 2)
     }
 
-    "retrieve indexes" in { implicit ee: EE =>
+    "retrieve indexes" in {
       geo2DSpherical.indexesManager.list().map {
         _.filter(_.name.get == "loc_2dsphere")
       }.filter(!_.isEmpty).map(_.apply(0)).map(_.key(0)).
@@ -123,7 +125,7 @@ class IndexesSpec extends org.specs2.mutable.Specification {
   lazy val hashed = db("hashed")
 
   "Hashed indexes" should {
-    "insert some data" in { implicit ee: EE =>
+    "insert some data" in {
       // With WiredTiger, collection must exist before
       val futs: Seq[Future[Unit]] = for (i <- 1 until 10)
         yield hashed.insert(BSONDocument("field" -> s"data-$i")).map(_ => {})
@@ -131,12 +133,12 @@ class IndexesSpec extends org.specs2.mutable.Specification {
       Future.sequence(futs) must not(throwA[Throwable]).await(1, timeout)
     }
 
-    "make index" in { implicit ee: EE =>
+    "make index" in {
       hashed.indexesManager.ensure(Index(List("field" -> Hashed))).
         aka("index") must beTrue.await(1, timeout)
     }
 
-    "retrieve indexes" in { implicit ee: EE =>
+    "retrieve indexes" in {
       val index = hashed.indexesManager.list().map {
         _.filter(_.name.get == "field_hashed")
       }.filter(!_.isEmpty).map(_.apply(0))
@@ -146,7 +148,7 @@ class IndexesSpec extends org.specs2.mutable.Specification {
   }
 
   "Index manager" should {
-    "drop all indexes in db.geo" in { implicit ee: EE =>
+    "drop all indexes in db.geo" in {
       geo.indexesManager.dropAll() must beEqualTo(2 /* _id and loc */ ).
         await(1, timeout)
     }
@@ -156,14 +158,14 @@ class IndexesSpec extends org.specs2.mutable.Specification {
     import reactivemongo.api.indexes._
     lazy val col = db(s"indexed_col_${hashCode}")
 
-    "be first created" in { implicit ee: EE =>
+    "be first created" in {
       col.create().flatMap { _ =>
         col.indexesManager.ensure(Index(
           Seq("token" -> IndexType.Ascending), unique = true))
       } aka "index creation" must beTrue.await(1, timeout * 2)
     }
 
-    "not be created if already exists" in { implicit ee: EE =>
+    "not be created if already exists" in {
       col.indexesManager.ensure(Index(
         Seq("token" -> IndexType.Ascending), unique = true)).
         aka("index creation") must beFalse.await(1, timeout * 2)
@@ -181,16 +183,16 @@ class IndexesSpec extends org.specs2.mutable.Specification {
       BSONDocument("username" -> "amanda", "age" -> 29),
       BSONDocument("username" -> "rajiv", "age" -> 57))
 
-    @inline def fixturesInsert(implicit ee: EE) =
+    @inline def fixturesInsert =
       fixtures.map { partial.insert(_) }
 
-    "have fixtures" in { implicit ee: EE =>
+    "have fixtures" in {
       Future.sequence(fixturesInsert).
         map(_ => {}) must beEqualTo({}).await(0, timeout)
 
     } tag "not_mongo26"
 
-    "fail with already inserted documents" in { implicit ee: EE =>
+    "fail with already inserted documents" in {
       val idx = Index(
         key = Seq("age" -> IndexType.Ascending),
         unique = true)
@@ -203,7 +205,7 @@ class IndexesSpec extends org.specs2.mutable.Specification {
       spec(mngr.ensure(idx)) and spec(mngr.create(idx))
     } tag "not_mongo26"
 
-    "be created" in { implicit ee: EE =>
+    "be created" in {
       partial.indexesManager.create(Index(
         key = Seq("username" -> IndexType.Ascending),
         unique = true,
@@ -212,7 +214,7 @@ class IndexesSpec extends org.specs2.mutable.Specification {
         map(_.ok) must beTrue.await(0, timeout)
     } tag "not_mongo26"
 
-    "not have duplicate fixtures" in { implicit ee: EE =>
+    "not have duplicate fixtures" in {
       Future.fold(fixturesInsert)(false) { (inserted, res) =>
         if (res.ok) true else inserted
       }.recover {
@@ -221,7 +223,7 @@ class IndexesSpec extends org.specs2.mutable.Specification {
       } aka "inserted" must beFalse.await(0, timeout)
     } tag "not_mongo26"
 
-    "allow duplicate if the filter doesn't match" in { implicit ee: EE =>
+    "allow duplicate if the filter doesn't match" in {
       def insertAndCount = for {
         a <- partial.count()
         _ <- partial.insert(BSONDocument("username" -> "david", "age" -> 20))

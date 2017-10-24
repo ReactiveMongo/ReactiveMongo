@@ -31,9 +31,9 @@ EOF
 
 export JVM_OPTS
 
-TEST_ARGS=";project ReactiveMongo-BSON ;test-only"
+TEST_ARGS=";project ReactiveMongo-BSON ;testQuick"
 
-TEST_ARGS="$TEST_ARGS ;project ReactiveMongo; test-only"
+TEST_ARGS="$TEST_ARGS ;project ReactiveMongo; testQuick"
 TEST_ARGS="$TEST_ARGS BSONObjectIDSpec"
 TEST_ARGS="$TEST_ARGS MongoURISpec"
 TEST_ARGS="$TEST_ARGS NodeSetSpec"
@@ -41,7 +41,7 @@ TEST_ARGS="$TEST_ARGS reactivemongo.BsonSpec"
 TEST_ARGS="$TEST_ARGS UpdateSpec"
 TEST_ARGS="$TEST_ARGS -- include unit"
 
-TEST_ARGS="$TEST_ARGS ;project ReactiveMongo-BSON-Macros ;test-only"
+TEST_ARGS="$TEST_ARGS ;project ReactiveMongo-BSON-Macros ;testQuick"
 
 sed -e 's/"-deprecation", //' < project/ReactiveMongo.scala > .tmp && mv .tmp project/ReactiveMongo.scala
 
