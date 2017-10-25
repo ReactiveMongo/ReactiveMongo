@@ -117,13 +117,13 @@ object BSONValue {
 
 /** A BSON Double. */
 case class BSONDouble(value: Double) extends BSONValue {
-  val code = 0x01.toByte
+  val code = 0x01: Byte
 
   override private[reactivemongo] val byteSize = 8
 }
 
 case class BSONString(value: String) extends BSONValue {
-  val code = 0x02.toByte
+  val code = 0x02: Byte
 
   override private[reactivemongo] lazy val byteSize = 5 + value.getBytes.size
 }
@@ -140,7 +140,7 @@ case class BSONString(value: String) extends BSONValue {
 case class BSONArray(stream: Stream[Try[BSONValue]])
   extends BSONValue with BSONElementSet {
 
-  val code = 0x04.toByte
+  val code = 0x04: Byte
 
   type SetType = BSONArray
 
@@ -331,7 +331,7 @@ object BSONArray {
 case class BSONBinary(value: ReadableBuffer, subtype: Subtype)
   extends BSONValue {
 
-  val code = 0x05.toByte
+  val code = 0x05: Byte
 
   /** Returns the whole binary content as array. */
   def byteArray: Array[Byte] = value.duplicate().readArray(value.size)
@@ -369,7 +369,7 @@ case object BSONUndefined
 class BSONObjectID private (private val raw: Array[Byte])
   extends BSONValue with Serializable with Equals {
 
-  val code = 0x07.toByte
+  val code = 0x07: Byte
 
   import java.util.Arrays
   import java.nio.ByteBuffer
@@ -537,20 +537,20 @@ object BSONObjectID {
 /** BSON boolean value */
 case class BSONBoolean(value: Boolean)
   extends BSONValue {
-  val code = 0x08.toByte
+  val code = 0x08: Byte
   override private[reactivemongo] val byteSize = 1
 }
 
 /** BSON date time value */
 case class BSONDateTime(value: Long)
   extends BSONValue {
-  val code = 0x09.toByte
+  val code = 0x09: Byte
   override private[reactivemongo] val byteSize = 8
 }
 
 /** BSON null value */
 case object BSONNull extends BSONValue {
-  val code = 0x0A.toByte
+  val code = 0x0A: Byte
   override private[reactivemongo] val byteSize = 0
 }
 
@@ -561,7 +561,7 @@ case object BSONNull extends BSONValue {
  */
 case class BSONRegex(value: String, flags: String)
   extends BSONValue {
-  val code = 0x0B.toByte
+  val code = 0x0B: Byte
 
   override private[reactivemongo] lazy val byteSize =
     2 + value.getBytes.size + flags.getBytes.size
@@ -571,7 +571,7 @@ case class BSONRegex(value: String, flags: String)
 class BSONDBPointer private[bson] (
   val value: String,
   internalId: () => Array[Byte]) extends BSONValue with Product with Serializable with java.io.Serializable {
-  val code = 0x0C.toByte
+  val code = 0x0C: Byte
 
   @deprecated("", "0.12.0")
   def this(value: String, id: Array[Byte]) = this(value, { () =>
@@ -650,7 +650,7 @@ object BSONDBPointer extends scala.runtime.AbstractFunction2[String, Array[Byte]
  * @param value The JavaScript source code.
  */
 case class BSONJavaScript(value: String) extends BSONValue {
-  val code = 0x0D.toByte
+  val code = 0x0D: Byte
 
   override private[reactivemongo] lazy val byteSize = 5 + value.getBytes.size
 }
@@ -669,20 +669,20 @@ case class BSONSymbol(value: String) extends BSONValue {
  */
 case class BSONJavaScriptWS(value: String)
   extends BSONValue {
-  val code = 0x0F.toByte
+  val code = 0x0F: Byte
 
   override private[reactivemongo] lazy val byteSize = 5 + value.getBytes.size
 }
 
 /** BSON Integer value */
 case class BSONInteger(value: Int) extends BSONValue {
-  val code = 0x10.toByte
+  val code = 0x10: Byte
   override private[reactivemongo] val byteSize = 4
 }
 
 /** BSON Timestamp value */
 case class BSONTimestamp(value: Long) extends BSONValue {
-  val code = 0x11.toByte
+  val code = 0x11: Byte
 
   /** Seconds since the Unix epoch */
   val time = value >>> 32
@@ -707,11 +707,10 @@ object BSONTimestamp {
 
 /** BSON Long value */
 case class BSONLong(value: Long) extends BSONValue {
-  val code = 0x12.toByte
+  val code = 0x12: Byte
   override private[reactivemongo] val byteSize = 8
 }
 
-/** BSON Decimal128 value */
 /**
  * Value wrapper for a [[https://github.com/mongodb/specifications/blob/master/source/bson-decimal128/decimal128.rst BSON 128-bit decimal]].
  *
@@ -722,7 +721,7 @@ case class BSONLong(value: Long) extends BSONValue {
 final class BSONDecimal(val high: Long, val low: Long)
   extends BSONValue with Product2[Long, Long] {
 
-  val code = 0x13.toByte
+  val code = 0x13: Byte
 
   /** Returns true if is negative. */
   lazy val isNegative: Boolean =
@@ -866,7 +865,7 @@ object BSONMinKey extends BSONValue {
 
 /** BSON Max key value */
 object BSONMaxKey extends BSONValue {
-  val code = 0x7F.toByte
+  val code = 0x7F: Byte
   override private[reactivemongo] val byteSize = 0
   override val toString = "BSONMaxKey"
 }
@@ -878,12 +877,12 @@ sealed trait Subtype {
 }
 
 object Subtype {
-  case object GenericBinarySubtype extends Subtype { val value = 0x00.toByte }
-  case object FunctionSubtype extends Subtype { val value = 0x01.toByte }
-  case object OldBinarySubtype extends Subtype { val value = 0x02.toByte }
-  case object OldUuidSubtype extends Subtype { val value = 0x03.toByte }
-  case object UuidSubtype extends Subtype { val value = 0x04.toByte }
-  case object Md5Subtype extends Subtype { val value = 0x05.toByte }
+  case object GenericBinarySubtype extends Subtype { val value = 0x00: Byte }
+  case object FunctionSubtype extends Subtype { val value = 0x01: Byte }
+  case object OldBinarySubtype extends Subtype { val value = 0x02: Byte }
+  case object OldUuidSubtype extends Subtype { val value = 0x03: Byte }
+  case object UuidSubtype extends Subtype { val value = 0x04: Byte }
+  case object Md5Subtype extends Subtype { val value = 0x05: Byte }
   case object UserDefinedSubtype extends Subtype { val value = 0x80.toByte }
 
   def apply(code: Byte) = code match {
@@ -948,14 +947,14 @@ sealed trait BSONElementSet extends ElementProducer { self: BSONValue =>
   /** The number of elements */
   def size: Int
 
+  /** Indicates whether this element set is empty */
+  def isEmpty: Boolean
+
   override private[reactivemongo] lazy val byteSize: Int =
     elements.foldLeft(5) {
       case (sz, BSONElement(n, v)) =>
         sz + 2 + n.getBytes.size + v.byteSize
     }
-
-  /** Indicates whether this element set is empty */
-  def isEmpty: Boolean
 }
 
 object BSONElementSet {
