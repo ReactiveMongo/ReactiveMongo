@@ -292,12 +292,16 @@ case class Response(
 
 object Response {
   import reactivemongo.api.BSONSerializationPack
-  import reactivemongo.bson.BSONDocument
+  import reactivemongo.bson.{ BSONDocument, BSONDocumentReader, BSONValue }
   import reactivemongo.bson.DefaultBSONHandlers.BSONDocumentIdentity
 
   def parse(response: Response): Iterator[BSONDocument] =
+    parse[BSONDocument](response, BSONDocumentIdentity)
+
+  @inline private[reactivemongo] def parse[T](
+    response: Response, reader: BSONDocumentReader[T]): Iterator[T] =
     ReplyDocumentIterator(BSONSerializationPack)(
-      response.reply, response.documents)(BSONDocumentIdentity)
+      response.reply, response.documents)(reader)
 }
 
 /**

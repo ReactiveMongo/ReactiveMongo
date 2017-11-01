@@ -34,7 +34,7 @@ trait SerializationPack { self: Singleton =>
 
   final def readAndDeserialize[A](response: Response, reader: Reader[A]): A = {
     val buf = response.documents
-    val channelBuf = ChannelBufferReadableBuffer(buf.readBytes(buf.getInt(buf.readerIndex)))
+    val channelBuf = ChannelBufferReadableBuffer(buf)
     readAndDeserialize(channelBuf, reader)
   }
 
