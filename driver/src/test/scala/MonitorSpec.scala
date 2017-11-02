@@ -108,6 +108,15 @@ class MonitorSpec(implicit ee: ExecutionEnv)
         monitorRefreshMS = 3600000 // disable refreshAll/connectAll during test
       )
 
+      // Disable logging (as simulating errors)
+      val log = org.apache.logging.log4j.LogManager.
+        getLogger("akka.actor.OneForOneStrategy").
+        asInstanceOf[org.apache.logging.log4j.core.Logger]
+
+      val level = log.getLevel
+      log.setLevel(org.apache.logging.log4j.Level.OFF)
+      //
+
       withConAndSys(options = opts) { (con, sysRef) =>
         @inline def dbsystem = sysRef.underlyingActor
 
@@ -153,6 +162,8 @@ class MonitorSpec(implicit ee: ExecutionEnv)
               }
           }
         }
+      }.andThen {
+        case _ => log.setLevel(level)
       }.await(0, timeout * expectFactor)
     }
   }
@@ -161,8 +172,8 @@ class MonitorSpec(implicit ee: ExecutionEnv)
 
   def withConAndSys[T](nodes: Seq[String] = Seq(Common.primaryHost), options: MongoConnectionOptions = Common.DefaultOptions, drv: MongoDriver = Common.driver, authentications: Seq[Authenticate] = Seq.empty[Authenticate])(f: (MongoConnection, TestActorRef[StandardDBSystem]) => Future[T]): Future[T] = {
     // See MongoDriver#connection
-    val supervisorName = s"Supervisor-${System identityHashCode ee}"
-    val poolName = s"Connection-${System identityHashCode f}"
+    val supervisorName = s"monitorspec-sup-${System identityHashCode ee}"
+    val poolName = s"monitorspec-con-${System identityHashCode f}"
 
     implicit def sys: akka.actor.ActorSystem = drv.system
     lazy val mongosystem = TestActorRef[StandardDBSystem](
@@ -170,8 +181,7 @@ class MonitorSpec(implicit ee: ExecutionEnv)
         supervisorName, poolName, nodes, authentications, options), poolName)
 
     def connection = addConnection(
-      drv,
-      poolName, nodes, options, mongosystem).mapTo[MongoConnection]
+      drv, poolName, nodes, options, mongosystem).mapTo[MongoConnection]
 
     connection.flatMap { con =>
       f(con, mongosystem).andThen { case _ => con.close() }

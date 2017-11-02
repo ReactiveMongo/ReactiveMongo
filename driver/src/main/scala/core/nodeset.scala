@@ -213,7 +213,7 @@ case class Node(
   name: String,
   @transient status: NodeStatus,
   @transient connections: Vector[Connection],
-  @transient authenticated: Set[Authenticated], // TODO: connections.authenticated
+  @transient authenticated: Set[Authenticated], // TODO: connections.authenticated (remove)
   tags: Option[BSONDocument],
   protocolMetadata: ProtocolMetadata,
   pingInfo: PingInfo = PingInfo(),
@@ -312,7 +312,7 @@ case class NodeInfo(
   /** All the node names (including its aliases) */
   def names: Set[String] = aliases + name
 
-  override lazy val toString = s"Node[$name: $status ($connected/$connections available connections), latency=${pingInfo.ping}], auth=$authenticated"
+  override lazy val toString = s"Node[$name: $status ($connected/$connections available connections), latency=${pingInfo.ping}, auth=$authenticated]"
 }
 
 case class ProtocolMetadata(

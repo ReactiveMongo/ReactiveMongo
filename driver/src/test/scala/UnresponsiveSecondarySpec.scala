@@ -27,11 +27,7 @@ trait UnresponsiveSecondarySpec { parent: NodeSetSpec =>
   import NettyEmbedder.withChannel
 
   private val usd = reactivemongo.api.MongoDriver()
-  lazy val usSys = usd.system
-
-  Runtime.getRuntime.addShutdownHook(new Thread {
-    override def run() = usd.close()
-  })
+  @inline private def usSys = usd.system
 
   // ---
 
@@ -129,11 +125,9 @@ trait UnresponsiveSecondarySpec { parent: NodeSetSpec =>
                   n.copy(authenticated = Set.empty, connections = Vector.empty)
                 }
               }
-
-              usd.close()
           }
         }
-      }.await(1, timeout)
+      }.andThen { case _ => usd.close() }.await(1, timeout)
     }
 
   // ---

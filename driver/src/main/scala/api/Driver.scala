@@ -52,8 +52,6 @@ private[api] trait Driver {
     TimedSystemControl
   }
 
-  @volatile private var closedSystem = false
-
   /* Driver always uses its own ActorSystem
    * so it can have complete control separate from other
    * Actor Systems in the application
@@ -67,13 +65,7 @@ private[api] trait Driver {
       ConfigFactory.empty()
     } else reference.getConfig("mongo-async-driver")
 
-    val sys = ActorSystem("reactivemongo", Some(cfg), classLoader)
-
-    sys.registerOnTermination {
-      closedSystem = true
-    }
-
-    sys
+    ActorSystem("reactivemongo", Some(cfg), classLoader)
   }
 
   private val systemClose: Option[FiniteDuration] => Future[Unit] =
@@ -91,6 +83,8 @@ private[api] trait Driver {
       case Failure(cause) => { _ => Future.failed[Unit](cause) }
     }
 
+  private var closedBy = Array.empty[StackTraceElement]
+
   protected final val supervisorName = s"Supervisor-${Driver.nextCounter}"
   private[reactivemongo] final val supervisorActor =
     system.actorOf(Props(new SupervisorActor(this)), supervisorName)
@@ -105,13 +99,22 @@ private[api] trait Driver {
   protected final def askClose(timeout: FiniteDuration)(implicit executionContext: ExecutionContext): Future[Unit] = {
     logger.info(s"[$supervisorName] Closing instance of ReactiveMongo driver")
 
-    val callerSTE = Thread.currentThread.getStackTrace.drop(3).take(2)
+    val callerSTE = Thread.currentThread.getStackTrace.drop(3).take(3)
 
-    if (closedSystem) {
+    val alreadyClosing = systemClose.synchronized {
+      if (closedBy.isEmpty) {
+        closedBy = callerSTE
+        false
+      } else {
+        true
+      }
+    }
+
+    if (alreadyClosing) {
       val error = ReactiveMongoException(
         s"System already closed: $supervisorName")
 
-      error.setStackTrace(callerSTE)
+      error.setStackTrace(closedBy)
 
       Future.failed[Unit](error)
     } else {
@@ -119,6 +122,8 @@ private[api] trait Driver {
       // It will shut down all the connections and monitors
       (supervisorActor ? Close)(Timeout(timeout)).recover {
         case err =>
+          err.setStackTrace(callerSTE)
+
           logger.warn(s"[$supervisorName] Fails to close connections within timeout. Continuing closing of ReactiveMongo driver anyway.", err)
       }.flatMap { _ =>
         // ... and then shut down the ActorSystem as it is exiting.
@@ -183,7 +188,7 @@ private[api] trait Driver {
     AddConnection(name, nodes, options, mongosystem)
 
   final class SupervisorActor(driver: Driver) extends Actor {
-    def isEmpty = driver.connectionMonitors.isEmpty
+    @inline def isEmpty = driver.connectionMonitors.isEmpty
 
     val receive: Receive = {
       case AddConnection(name, _, opts, sys) => {
@@ -214,9 +219,10 @@ private[api] trait Driver {
 
         if (isEmpty) {
           context.stop(self)
-          sender() ! Closed
+          sender ! Closed
         } else {
           context.become(closing)
+
           driver.connectionMonitors.values.foreach(_.close())
         }
       }
@@ -231,8 +237,7 @@ private[api] trait Driver {
 
         case Terminated(actor) =>
           driver.connectionMonitors.remove(actor).foreach { con =>
-            logger.debug(
-              s"[$supervisorName] Connection is terminated: ${con.name}")
+            logger.debug(s"[$supervisorName] Connection is terminated: ${con.name}")
 
             if (isEmpty) {
               context.stop(self)
@@ -240,10 +245,16 @@ private[api] trait Driver {
             }
           }
 
-        case Close =>
+        case Close if isEmpty => {
+          logger.debug(s"[$supervisorName] Close the supervisor")
+          sender ! Closed
+        }
+
+        case Close => {
           logger.warn(s"[$supervisorName] Close received but already closing.")
           waitingForClose += sender
           ()
+        }
       }
     }
 
