@@ -10,6 +10,7 @@ import reactivemongo.core.actors.{
   RegisterMonitor,
   SetAvailable
 }
+import reactivemongo.core.errors.ReactiveMongoException
 import reactivemongo.core.actors.Exceptions.{
   InternalState,
   PrimaryUnavailableException
@@ -41,8 +42,13 @@ class DriverSpec(implicit ee: ExecutionEnv)
     "cleanly start and close with no connections #1" in {
       val md = MongoDriver()
 
-      md.numConnections must_== 0 and (
-        md.close() must not(throwA[Throwable]))
+      md.numConnections must_== 0 and {
+        md.close() must not(throwA[Throwable])
+      } and {
+        md.close() aka "extra close" must throwA[ReactiveMongoException](
+          ".*System already closed.*")
+
+      }
     }
 
     "cleanly start and close with no connections #2" in {

@@ -21,6 +21,7 @@ import reactivemongo.core.actors.{
   MongoDBSystem,
   StandardDBSystem
 }
+import reactivemongo.core.errors.ReactiveMongoException
 import reactivemongo.core.nodeset.Authenticate
 import reactivemongo.util.LazyLogger
 
@@ -51,6 +52,8 @@ private[api] trait Driver {
     TimedSystemControl
   }
 
+  @volatile private var closedSystem = false
+
   /* Driver always uses its own ActorSystem
    * so it can have complete control separate from other
    * Actor Systems in the application
@@ -64,7 +67,13 @@ private[api] trait Driver {
       ConfigFactory.empty()
     } else reference.getConfig("mongo-async-driver")
 
-    ActorSystem("reactivemongo", Some(cfg), classLoader)
+    val sys = ActorSystem("reactivemongo", Some(cfg), classLoader)
+
+    sys.registerOnTermination {
+      closedSystem = true
+    }
+
+    sys
   }
 
   private val systemClose: Option[FiniteDuration] => Future[Unit] =
@@ -95,13 +104,27 @@ private[api] trait Driver {
    */
   protected final def askClose(timeout: FiniteDuration)(implicit executionContext: ExecutionContext): Future[Unit] = {
     logger.info(s"[$supervisorName] Closing instance of ReactiveMongo driver")
-    // Tell the supervisor to close.
-    // It will shut down all the connections and monitors
-    (supervisorActor ? Close)(Timeout(timeout)).recover {
-      case err =>
-        logger.warn(s"[$supervisorName] Fails to close connections within timeout. Continuing closing of ReactiveMongo driver anyway.", err)
-    } // and then shut down the ActorSystem as it is exiting.
-      .flatMap(_ => systemClose(Some(timeout)))
+
+    val callerSTE = Thread.currentThread.getStackTrace.drop(3).take(2)
+
+    if (closedSystem) {
+      val error = ReactiveMongoException(
+        s"System already closed: $supervisorName")
+
+      error.setStackTrace(callerSTE)
+
+      Future.failed[Unit](error)
+    } else {
+      // Tell the supervisor to close.
+      // It will shut down all the connections and monitors
+      (supervisorActor ? Close)(Timeout(timeout)).recover {
+        case err =>
+          logger.warn(s"[$supervisorName] Fails to close connections within timeout. Continuing closing of ReactiveMongo driver anyway.", err)
+      }.flatMap { _ =>
+        // ... and then shut down the ActorSystem as it is exiting.
+        systemClose(Some(timeout))
+      }
+    }
   }
 
   /**
