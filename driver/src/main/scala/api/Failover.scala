@@ -140,8 +140,6 @@ class Failover2[A](producer: () => Future[A], connection: MongoConnection, strat
           // or the nodeset is unreachable
           logger.error(s"[$lnm] Got an error, no more attempts to do. Completing with a failure... ", e)
 
-          println(s"[$lnm] Got an error, no more attempts to do $n / ${strategy.retries}. Completing with a failure... $e")
-
           Future.failed(e)
         }
       }
