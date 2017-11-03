@@ -280,7 +280,7 @@ case class Node(
     node
   }
 
-  def toShortString = s"Node[$name: $status (${connected.size}/${connections.size} available connections), latency=${pingInfo.ping}], auth=$authenticated"
+  def toShortString = s"Node[$name: $status (${connected.size}/${connections.size} available connections), latency=${pingInfo.ping}, authenticated=$authenticated]"
 
   /** Returns the read-only information about this node. */
   def info = NodeInfo(name, aliases.result(), host, port, status,
@@ -363,6 +363,7 @@ object PingInfo {
   val pingTimeout = 60 * 1000
 }
 
+// TODO: Move NodeStatus types to a separate file
 sealed trait NodeStatus { def queryable = false }
 
 sealed trait QueryableNodeStatus { self: NodeStatus =>

@@ -814,7 +814,7 @@ trait MongoDBSystem extends Actor {
     val updated = {
       val respTo = response.header.responseTo
       @inline def event =
-        s"IsMaster(${respTo}, ${_nodeSet.toShortString}"
+        s"IsMaster(${respTo}, ${_nodeSet.toShortString})"
 
       updateNodeSet(event) { nodeSet =>
         val nodeSetWasReachable = nodeSet.isReachable
@@ -835,6 +835,7 @@ trait MongoDBSystem extends Actor {
               } else node.pingInfo
 
             val nodeStatus = isMaster.status
+
             val authenticating =
               if (!nodeStatus.queryable || nodeSet.authenticates.isEmpty) {
                 node
@@ -908,9 +909,11 @@ trait MongoDBSystem extends Actor {
             // 2. Receive a isMaster response from B, with primary = B
 
             upSet.updateAll { n =>
-              if (!node.names.contains(n.name) && // the node itself
+              if (node.names.contains(n.name) && // the node itself
                 n.status != node.status) {
                 // invalidate node status on status conflict
+                logger.warn(s"Invalid node status for ${node.name}; Fallback to Unknown status")
+
                 n._copy(status = NodeStatus.Unknown)
               } else n
             }
@@ -1164,7 +1167,7 @@ trait MongoDBSystem extends Actor {
   private class IsMasterRequest(
     val node: Node, f: => Unit = ()) { def send() = { f; node } }
 
-  private def requestIsMaster(node: Node): IsMasterRequest =
+  private def requestIsMaster(node: Node): IsMasterRequest = {
     node.connected.headOption.fold(new IsMasterRequest(node)) { channel =>
       import reactivemongo.api.BSONSerializationPack
       import reactivemongo.api.commands.bson.{
@@ -1242,6 +1245,7 @@ trait MongoDBSystem extends Actor {
 
       new IsMasterRequest(updated, { channel.send(isMaster(id)); () })
     }
+  }
 
   @deprecated(message = "Will be made private", since = "0.11.10")
   def allChannelGroup(nodeSet: NodeSet): DefaultChannelGroup = {
