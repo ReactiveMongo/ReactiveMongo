@@ -6,6 +6,7 @@ import reactivemongo.bson.buffer.{
 }, DefaultBufferHandler._
 
 class Equality extends org.specs2.mutable.Specification {
+  section("unit")
 
   "BSONDBPointer" should {
     "permit equality to work" in {
@@ -97,4 +98,6 @@ class Equality extends org.specs2.mutable.Specification {
         aka("result") must beSuccessfulTry(b1)
     }
   }
+
+  section("unit")
 }

@@ -45,6 +45,8 @@ class Handlers extends org.specs2.mutable.Specification {
     BSONArray(0L),
     "pp[4]")
 
+  section("unit")
+
   "BSONBinary" should {
     import reactivemongo.bson.buffer.ArrayReadableBuffer
 
@@ -277,6 +279,8 @@ class Handlers extends org.specs2.mutable.Specification {
       h.write(foo) must_== bson and (h.read(bson) must_== foo)
     }
   }
+
+  section("unit")
 
   // ---
 

@@ -20,6 +20,8 @@ import reactivemongo.bson._
 class Types extends Specification {
   "BSON types" title
 
+  section("unit")
+
   "Generating BSONObjectID" should {
     "not throw a SocketException" in {
 
@@ -100,4 +102,6 @@ class Types extends Specification {
       BSONTimestamp(1412180887L, 6) must_== BSONTimestamp(6065270725701271558L)
     }
   }
+
+  section("unit")
 }

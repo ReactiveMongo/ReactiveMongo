@@ -22,6 +22,8 @@ class BSONLawsSpecs
   import BSONCheck._
   import LawEvidences._
 
+  section("unit")
+
   { // Addition semigroup
     val semigroup = new Semigroup[BSONValue] {
       def op(x: BSONValue, y: BSONValue): BSONValue = BSONValue.Addition(x, y)
@@ -43,6 +45,8 @@ class BSONLawsSpecs
 
     checkAll("ElementProducer", GroupLaws[ElementProducer].additiveMonoid)
   }
+
+  section("unit")
 }
 
 object LawEvidences {

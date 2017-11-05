@@ -44,12 +44,12 @@ class UpdateSpec(implicit val ee: ExecutionEnv)
 
         c.update(person, BSONDocument("$set" -> BSONDocument("age" -> 33)),
           upsert = true) must beLike[UpdateWriteResult]({
-            case result => result.upserted.toList must beLike[List[Upserted]] {
-              case Upserted(0, id: BSONObjectID) :: Nil =>
-                c.find(BSONDocument("_id" -> id)).one[T].
-                  aka("found") must beSome(upd(person)).await(1, timeout)
-            }
-          }).await(1, timeout)
+          case result => result.upserted.toList must beLike[List[Upserted]] {
+            case Upserted(0, id: BSONObjectID) :: Nil =>
+              c.find(BSONDocument("_id" -> id)).one[T].
+                aka("found") must beSome(upd(person)).await(1, timeout)
+          }
+        }).await(1, timeout)
       }
 
       section("mongo2", "mongo24", "not_mongo26")
@@ -136,7 +136,7 @@ class UpdateSpec(implicit val ee: ExecutionEnv)
           ReadPreference.primary) must beLike[UpdateWriteResult]({
             case result => result.nModified mustEqual 1 and (
               c.find(BSONDocument("age" -> 66)).
-                one[T] must beSome(upd(person)).await(1, timeout))
+              one[T] must beSome(upd(person)).await(1, timeout))
           }).await(1, timeout)
       }
 

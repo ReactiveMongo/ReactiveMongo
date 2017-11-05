@@ -9,6 +9,8 @@ import org.specs2.specification.core.Fragments
 class BSONDecimalSpec extends org.specs2.mutable.Specification {
   "BSON decimal (128bits)" title
 
+  section("unit")
+
   "BSONDecimal" should {
     {
       def fixtures =
@@ -530,4 +532,6 @@ class BSONDecimalSpec extends org.specs2.mutable.Specification {
       }
     }
   }
+
+  section("unit")
 }
