@@ -17,7 +17,7 @@ package reactivemongo.core.actors
 
 import java.net.InetSocketAddress
 
-import scala.concurrent.{ Future, Promise }
+import scala.concurrent.{ Await, ExecutionContext, Future, Promise }
 import scala.util.{ Failure, Success, Try }
 
 import akka.actor.{ Actor, ActorRef, Cancellable }
@@ -96,6 +96,7 @@ trait MongoDBSystem extends Actor {
   protected def newChannelFactory(effect: Unit): ChannelFactory
 
   private var channelFactory: ChannelFactory = newChannelFactory({})
+  @volatile private var closingFactory = false
 
   /** Logging discriminator */
   protected val lnm = s"$supervisor/$name" // log naming
@@ -186,7 +187,9 @@ trait MongoDBSystem extends Actor {
     ns
   }
 
-  private def close(): NodeSet = {
+  private def close(): NodeSet = if (closingFactory) _nodeSet else {
+    closingFactory = true
+
     logger.debug(s"[$lnm] Closing MongoDBSystem")
 
     // cancel all jobs
@@ -199,12 +202,17 @@ trait MongoDBSystem extends Actor {
       def operationComplete(future: ChannelGroupFuture): Unit = {
         logger.debug(s"[$lnm] Netty says all channels are closed.")
 
-        try {
-          factory.channelFactory.releaseExternalResources()
-        } catch {
-          case err: Throwable =>
-            logger.debug(s"[$lnm] Fails to release channel resources", err)
-        }
+        @inline def rc: ExecutionContext =
+          ExecutionContext.Implicits.global
+
+        Await.ready(Future(
+          factory.channelFactory.releaseExternalResources())(rc), 2.seconds).
+          onComplete({
+            case Failure(cause) =>
+              logger.debug(s"[$lnm] Fails to release channel resources", cause)
+
+            case _ => ()
+          })(rc)
       }
     }
 
@@ -270,6 +278,17 @@ trait MongoDBSystem extends Actor {
     logger.info(s"[$lnm] $msg", reason)
 
     super.preRestart(reason, message)
+
+    context.system.scheduler.scheduleOnce(Duration.Zero) {
+      // ... so the monitors are restored after restart
+      monitors.foreach { mon =>
+        self.tell(RegisterMonitor, mon)
+      }
+
+      ()
+    }
+
+    ()
   }
 
   override def postStop() {
@@ -326,7 +345,12 @@ trait MongoDBSystem extends Actor {
         connections = Vector.empty,
         authenticated = Set.empty)
 
-    } else node._copy(connections = connections)
+    } else {
+      node._copy(
+        connections = connections,
+        authenticated = connections.toSet.flatMap(
+          (_: Connection).authenticated))
+    }
   }
 
   private def stopWhenDisconnected[T](state: String, msg: T): Unit = {
@@ -344,7 +368,9 @@ trait MongoDBSystem extends Actor {
 
     if (remainingConnections == 0) {
       monitors.foreach(_ ! Closed)
+
       logger.debug(s"[$lnm] Stopping $self")
+
       context.stop(self)
     }
   }
@@ -549,7 +575,9 @@ trait MongoDBSystem extends Actor {
 
       updateNodeSet(s"ChannelConnected($channelId, $statusInfo)")(
         _.updateByChannelId(channelId)(
-          _.copy(status = ConnectionStatus.Connected)) { requestIsMaster(_).send() })
+          _.copy(status = ConnectionStatus.Connected)) {
+            requestIsMaster(_).send()
+          })
 
       logger.trace(
         s"[$lnm] Channel #$channelId connected. NodeSet status: $statusInfo")
@@ -643,23 +671,13 @@ trait MongoDBSystem extends Actor {
           }
         })
 
-      stopWhenDisconnected("Closing", msg)
+      stopWhenDisconnected("Closing$$ChannelClosed", msg)
     }
 
     case msg @ ChannelDisconnected(channelId) => {
       updateNodeSetOnDisconnect(channelId)
 
-      if (logger.isDebugEnabled) {
-        val remainingConnections = _nodeSet.nodes.foldLeft(0) { (open, node) =>
-          open + node.connections.size
-        }
-        val disconnected = _nodeSet.nodes.foldLeft(0) { (open, node) =>
-          open + node.connections.count(
-            _.status == ConnectionStatus.Disconnected)
-        }
-
-        logger.debug(s"[$lnm$$Closing] Received $msg, remainingConnections = $remainingConnections, disconnected = $disconnected, connected = ${remainingConnections - disconnected}")
-      }
+      stopWhenDisconnected("Closing$$ChannelClosed", msg)
     }
 
     case msg @ ChannelConnected(channelId) => {
@@ -1156,7 +1174,13 @@ trait MongoDBSystem extends Actor {
         }
       }
 
-      case _ => n._copy(connections = updated.reverse)
+      case _ => {
+        val cons = updated.reverse
+
+        n._copy(
+          connections = cons,
+          authenticated = cons.toSet.flatMap((_: Connection).authenticated))
+      }
     }
 
     nodeSet.copy(nodes = nodeSet.nodes.map { node =>

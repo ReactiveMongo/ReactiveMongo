@@ -106,7 +106,8 @@ object Dependencies {
 
     Seq(
       "com.typesafe.akka" %% "akka-actor" % ver,
-      "com.typesafe.akka" %% "akka-testkit" % ver % Test)
+      "com.typesafe.akka" %% "akka-testkit" % ver % Test,
+      "com.typesafe.akka" %% "akka-slf4j" % ver % Test)
   }
 
   val playIteratees = Def.setting[ModuleID] {

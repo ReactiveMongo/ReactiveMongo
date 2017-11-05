@@ -178,36 +178,31 @@ class NodeSetSpec(implicit val ee: ExecutionEnv)
 
   def withConAndSys[T](drv: MongoDriver, options: MongoConnectionOptions = MongoConnectionOptions(nbChannelsPerNode = 1))(f: (MongoConnection, TestActorRef[StandardDBSystem]) => Future[T]): Future[T] = {
     // See MongoDriver#connection
-    val supervisorName = s"Supervisor-${System identityHashCode ee}"
-    val poolName = s"Connection-${System identityHashCode f}"
+    val supervisorName = s"withConAndSys-sup-${System identityHashCode ee}"
+    val poolName = s"withConAndSys-con-${System identityHashCode f}"
 
     @inline implicit def sys = drv.system
 
+    val auths = Seq(Authenticate(Common.commonDb, "test", "password"))
     lazy val mongosystem = TestActorRef[StandardDBSystem](
-      standardDBSystem(
-        supervisorName, poolName,
-        nodes,
-        Seq(Authenticate(Common.commonDb, "test", "password")), options), poolName)
+      standardDBSystem(supervisorName, poolName, nodes, auths, options),
+      poolName)
 
     def connection = addConnection(
       drv, poolName, nodes, options, mongosystem).mapTo[MongoConnection]
 
     connection.flatMap { con =>
       f(con, mongosystem).andThen {
-        case _ =>
-          con.close()
+        case _ => con.close()
       }
     }
   }
 
   def withCon[T](opts: MongoConnectionOptions = MongoConnectionOptions())(f: (MongoConnection, String) => T): T = {
-    val name = s"con-${System identityHashCode opts}"
+    val name = s"withCon-${System identityHashCode opts}"
+    val auths = Seq(Authenticate(Common.commonDb, "test", "password"))
     val con = md.connection(
-      nodes,
-      authentications = Seq(Authenticate(
-        Common.commonDb, "test", "password")),
-      options = opts,
-      name = Some(name))
+      nodes, authentications = auths, options = opts, name = Some(name))
 
     f(con, name)
   }

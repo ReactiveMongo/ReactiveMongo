@@ -27,67 +27,67 @@ class UpdateSpec(implicit val ee: ExecutionEnv)
   import Common._
 
   lazy val col1 = db(s"update1${System identityHashCode db}")
-  lazy val slowCol1 = slowDb(s"slowup1{System identityHashCode db}")
+  lazy val slowCol1 = slowDb(s"slowup1${System identityHashCode db}")
   lazy val col2 = db(s"update2${System identityHashCode slowDb}")
   lazy val slowCol2 = slowDb(s"slowup2${System identityHashCode slowDb}")
 
-  "Update" should {
+  "ReactiveMongo" should {
+    // with fixtures ...
+    val jack3 = Person3("Jack", "London", 27, BigDecimal("12.345"))
+    val jack = Person("Jack", "London", 27)
+    val jane3 = Person3("Jane", "London", 18, BigDecimal("3.45"))
+    val jane = Person("Jane", "London", 18)
+
     {
       def spec[T: BSONDocumentWriter: BSONDocumentReader](c: BSONCollection, timeout: FiniteDuration, f: => T)(upd: T => T) = {
-        val jack = f
+        val person = f
 
-        c.update(jack, BSONDocument("$set" -> BSONDocument("age" -> 33)),
+        c.update(person, BSONDocument("$set" -> BSONDocument("age" -> 33)),
           upsert = true) must beLike[UpdateWriteResult]({
-          case result => result.upserted.toList must beLike[List[Upserted]] {
-            case Upserted(0, id: BSONObjectID) :: Nil =>
-              c.find(BSONDocument("_id" -> id)).one[T].
-                aka("found") must beSome(upd(jack)).
-                await(1, timeout)
-          }
-        }).await(1, timeout)
-
+            case result => result.upserted.toList must beLike[List[Upserted]] {
+              case Upserted(0, id: BSONObjectID) :: Nil =>
+                c.find(BSONDocument("_id" -> id)).one[T].
+                  aka("found") must beSome(upd(person)).await(1, timeout)
+            }
+          }).await(1, timeout)
       }
 
       section("mongo2", "mongo24", "not_mongo26")
-      "with MongoDB < 3" >> {
-        val person = Person("Jack", "London", 27)
-
-        "upsert a person with the default connection" in {
-          spec(col1, timeout, person)(_.copy(age = 33))
+      "upsert with MongoDB < 3" >> {
+        "a person with the default connection" in {
+          spec(col1, timeout, jack)(_.copy(age = 33))
         }
 
-        "upsert a person with the slow connection and Secondary preference" in {
+        "a person with the slow connection and Secondary preference" in {
           val coll = slowCol1.withReadPreference(
             ReadPreference.secondaryPreferred)
 
           coll.readPreference must_== ReadPreference.secondaryPreferred and {
-            spec(coll, slowTimeout, person)(_.copy(age = 33))
+            spec(coll, slowTimeout, jane)(_.copy(age = 33))
           }
         }
       }
       section("mongo2", "mongo24", "not_mongo26")
 
       section("gt_mongo3")
-      "with MongoDB 3.4+" >> {
-        val person = Person3("Jack", "London", 27, BigDecimal("12.345"))
-
-        "upsert a person with the default connection" in {
-          spec(col1, timeout, person)(_.copy(age = 33))
+      "upsert with MongoDB 3.4+" >> {
+        "a person with the default connection" in {
+          spec(col1, timeout, jack3)(_.copy(age = 33))
         }
 
-        "upsert a person with the slow connection and Secondary preference" in {
+        "a person with the slow connection and Secondary preference" in {
           val coll = slowCol1.withReadPreference(
             ReadPreference.secondaryPreferred)
 
           coll.readPreference must_== ReadPreference.secondaryPreferred and {
-            spec(coll, slowTimeout, person)(_.copy(age = 33))
+            spec(coll, slowTimeout, jane3)(_.copy(age = 33))
           }
         }
       }
       section("gt_mongo3")
     }
 
-    "Upsert a document" >> {
+    "upsert a document" >> {
       def spec(c: BSONCollection, timeout: FiniteDuration) = {
         val doc = BSONDocument("_id" -> "foo", "bar" -> 2)
 
@@ -112,50 +112,7 @@ class UpdateSpec(implicit val ee: ExecutionEnv)
       }
     }
 
-    {
-      def spec[T: BSONDocumentWriter: BSONDocumentReader](c: BSONCollection, timeout: FiniteDuration, f: => T)(upd: T => T) = {
-        val jack = f
-
-        c.runCommand(
-          Update(UpdateElement(
-            q = jack, u = BSONDocument("$set" -> BSONDocument("age" -> 66)))),
-          ReadPreference.primary) must beLike[UpdateWriteResult]({
-            case result => result.nModified mustEqual 1 and (
-              c.find(BSONDocument("age" -> 66)).
-              one[T] must beSome(upd(jack)).await(1, timeout))
-          }).await(1, timeout)
-      }
-
-      section("mongo2", "mongo24", "not_mongo26")
-      "with MongoDB < 3" >> {
-        val person = Person("Jack", "London", 33)
-
-        "update a person with the default connection" in {
-          spec(col1, timeout, person)(_.copy(age = 66))
-        }
-
-        "update a person with the slow connection" in {
-          spec(slowCol1, slowTimeout, person)(_.copy(age = 66))
-        }
-      }
-      section("mongo2", "mongo24", "not_mongo26")
-
-      section("gt_mongo3")
-      "with MongoDB 3.4+" >> {
-        val person = Person3("Jack", "London", 33, BigDecimal("12.345"))
-
-        "update a person with the default connection" in {
-          spec(col1, timeout, person)(_.copy(age = 66))
-        }
-
-        "update a person with the slow connection" in {
-          spec(slowCol1, slowTimeout, person)(_.copy(age = 66))
-        }
-      }
-      section("gt_mongo3")
-    }
-
-    "update a document" in {
+    "update a document directly using the Update command" in {
       val doc = BSONDocument("_id" -> "foo", "bar" -> 2)
 
       col2.runCommand(
@@ -167,6 +124,53 @@ class UpdateSpec(implicit val ee: ExecutionEnv)
             aka("updated") must beSome(BSONDocument(
               "_id" -> "foo", "bar" -> 3)).await(1, timeout))
         }).await(1, timeout)
+    }
+
+    {
+      def spec[T: BSONDocumentWriter: BSONDocumentReader](c: BSONCollection, timeout: FiniteDuration, f: => T)(upd: T => T) = {
+        val person = f
+
+        c.runCommand(
+          Update(UpdateElement(
+            q = person, u = BSONDocument("$set" -> BSONDocument("age" -> 66)))),
+          ReadPreference.primary) must beLike[UpdateWriteResult]({
+            case result => result.nModified mustEqual 1 and (
+              c.find(BSONDocument("age" -> 66)).
+                one[T] must beSome(upd(person)).await(1, timeout))
+          }).await(1, timeout)
+      }
+
+      section("mongo2", "mongo24", "not_mongo26")
+      "update with MongoDB < 3" >> {
+        "a person with the default connection" in {
+          val person = jack.copy(age = 33) // as after previous upsert test
+
+          spec(col1, timeout, person)(_.copy(age = 66))
+        }
+
+        "a person with the slow connection" in {
+          val person = jane.copy(age = 33) // as after previous upsert test
+
+          spec(slowCol1, slowTimeout, person)(_.copy(age = 66))
+        }
+      }
+      section("mongo2", "mongo24", "not_mongo26")
+
+      section("gt_mongo3")
+      "update with MongoDB 3.4+" >> {
+        "a person with the default connection" in {
+          val person = jack3.copy(age = 33) // as after previous upsert test
+
+          spec(col1, timeout, person)(_.copy(age = 66))
+        }
+
+        "a person with the slow connection" in {
+          val person = jane3.copy(age = 33) // as after previous upsert test
+
+          spec(slowCol1, slowTimeout, person)(_.copy(age = 66))
+        }
+      }
+      section("gt_mongo3")
     }
   }
 

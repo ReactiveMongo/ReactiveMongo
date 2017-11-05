@@ -82,8 +82,9 @@ EOF
 fi
 
 # MongoDB
-echo -e "\n# MongoDB Configuration:"
-cat "$MONGO_CONF"
+echo -e "\n  --- MongoDB Configuration ---"
+sed -e 's/^/  /' < "$MONGO_CONF"
+echo -e "  --- end ---\n"
 
 # Print version information
 MV=`mongod --version 2>/dev/null | head -n 1`

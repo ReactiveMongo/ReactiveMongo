@@ -129,7 +129,7 @@ class ServerStatusSpec(implicit ee: ExecutionEnv) extends Specification {
       import bson.BSONServerStatusImplicits._
 
       db.runCommand(ServerStatus) must beLike[ServerStatusResult]({
-        case status @ ServerStatusResult(_, _, MongodProcess,
+        case ServerStatusResult(_, _, MongodProcess,
           _, _, _, _, _, _, _, _, _, _, _, _, _) =>
           //println(s"Server status: $status")
           ok

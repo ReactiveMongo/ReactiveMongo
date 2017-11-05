@@ -157,7 +157,7 @@ object Common {
   def close(): Unit = {
     if (driverStarted) {
       try {
-        driver.close()
+        driver.close(timeout)
       } catch {
         case e: Throwable =>
           logger.warn(s"Fails to stop the default driver: $e")
