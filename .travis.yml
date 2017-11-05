@@ -14,7 +14,7 @@ cache:
   - $HOME/ssl
   - $HOME/mongodb-linux-x86_64-2.6.12
   - $HOME/mongodb-linux-x86_64-amazon-3.2.10
-  - $HOME/mongodb-linux-x86_64-amazon-3.4.9
+  - $HOME/mongodb-linux-x86_64-amazon-3.4.10
 scala:
 - 2.12.4
 - 2.11.11

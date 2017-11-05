@@ -43,9 +43,9 @@ class DriverSpec(implicit ee: ExecutionEnv)
       val md = MongoDriver()
 
       md.numConnections must_== 0 and {
-        md.close() must not(throwA[Throwable])
+        md.close(timeout) must not(throwA[Throwable])
       } and {
-        md.close() aka "extra close" must throwA[ReactiveMongoException](
+        md.close(timeout) aka "extra close" must throwA[ReactiveMongoException](
           ".*System already closed.*")
 
       }
@@ -296,7 +296,7 @@ class DriverSpec(implicit ee: ExecutionEnv)
 
     "driver shutdown" in {
       // mainly to ensure the test driver is closed
-      drv.close(timeout) must not(throwA[Exception]).await
+      drv.close(timeout) must not(throwA[Exception]).await(1, timeout)
     } tag "not_mongo26"
 
     "fail on DB without authentication" >> {
