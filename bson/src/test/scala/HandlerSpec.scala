@@ -18,32 +18,8 @@ package reactivemongo.bson
  */
 import java.util.Date
 
-class Handlers extends org.specs2.mutable.Specification {
-  val doc = BSONDocument(
-    "name" -> "James",
-    "age" -> 27,
-    "surname1" -> Some("Jim"),
-    "surname2" -> None,
-    "score" -> 3.88,
-    "online" -> true,
-    "_id" -> BSONObjectID("5117c6391aa562a90098f621"),
-    "contact" -> BSONDocument(
-      "emails" -> BSONArray(
-        Some("james@example.org"),
-        None,
-        Some("spamaddrjames@example.org")),
-      "adress" -> BSONString("coucou")),
-    "lastSeen" -> BSONLong(1360512704747L))
-
-  val array = BSONArray(
-    BSONString("elem0"),
-    None,
-    1,
-    2.222,
-    BSONDocument(
-      "name" -> "Joe"),
-    BSONArray(0L),
-    "pp[4]")
+class HandlerSpec extends org.specs2.mutable.Specification {
+  "Handler" title
 
   section("unit")
 
@@ -283,6 +259,32 @@ class Handlers extends org.specs2.mutable.Specification {
   section("unit")
 
   // ---
+
+  lazy val doc = BSONDocument(
+    "name" -> "James",
+    "age" -> 27,
+    "surname1" -> Some("Jim"),
+    "surname2" -> None,
+    "score" -> 3.88,
+    "online" -> true,
+    "_id" -> BSONObjectID("5117c6391aa562a90098f621"),
+    "contact" -> BSONDocument(
+      "emails" -> BSONArray(
+        Some("james@example.org"),
+        None,
+        Some("spamaddrjames@example.org")),
+      "adress" -> BSONString("coucou")),
+    "lastSeen" -> BSONLong(1360512704747L))
+
+  lazy val array = BSONArray(
+    BSONString("elem0"),
+    None,
+    1,
+    2.222,
+    BSONDocument(
+      "name" -> "Joe"),
+    BSONArray(0L),
+    "pp[4]")
 
   case class Album(
     name: String,

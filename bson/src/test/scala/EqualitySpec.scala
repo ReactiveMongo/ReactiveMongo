@@ -5,7 +5,9 @@ import reactivemongo.bson.buffer.{
   ArrayBSONBuffer
 }, DefaultBufferHandler._
 
-class Equality extends org.specs2.mutable.Specification {
+class EqualitySpec extends org.specs2.mutable.Specification {
+  "Equality" title
+
   section("unit")
 
   "BSONDBPointer" should {

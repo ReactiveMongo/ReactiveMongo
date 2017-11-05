@@ -17,24 +17,10 @@
 import org.specs2.mutable._
 import reactivemongo.bson._
 
-class Types extends Specification {
+class TypeSpec extends Specification {
   "BSON types" title
 
   section("unit")
-
-  "Generating BSONObjectID" should {
-    "not throw a SocketException" in {
-
-      /*
-       * for i in `seq 1 257`; do
-       *   openvpn --mktun --dev tun$i
-       *   ip link set tun$i up
-       *   ip -6 addr add 2001:DB8::`printf %04x $i`/128 dev tun$i
-       * done
-       */
-      BSONObjectID.generate() must beAnInstanceOf[BSONObjectID]
-    }
-  }
 
   "BSON document" should {
     "be empty" in {
