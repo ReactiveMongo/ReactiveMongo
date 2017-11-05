@@ -10,6 +10,9 @@ import java.util.Arrays
 import org.specs2.specification.core.Fragments
 
 class SerializationSpec extends org.specs2.mutable.Specification {
+  "Serialization" title
+
+  section("unit")
 
   "BSON Raw Buffer Writer" should {
     import reactivemongo.bson.lowlevel._
@@ -422,6 +425,8 @@ class SerializationSpec extends org.specs2.mutable.Specification {
       }
     }
   }
+
+  section("unit")
 
   // ---
 

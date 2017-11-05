@@ -1,10 +1,7 @@
 import scala.concurrent.{ Await, Future }
 import scala.concurrent.duration._
 
-import play.api.libs.iteratee.Iteratee
-
 import reactivemongo.bson._
-import reactivemongo.core.protocol.Response
 import reactivemongo.api.{
   Cursor,
   QueryOpts,
