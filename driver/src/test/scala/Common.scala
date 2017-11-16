@@ -8,10 +8,12 @@ import reactivemongo.api.{
   FailoverStrategy,
   MongoDriver,
   MongoConnection,
-  MongoConnectionOptions
+  MongoConnectionOptions,
+  X509Authentication
 }
+import reactivemongo.core.nodeset.Authenticate
 
-object Common {
+object Common extends CommonAuth {
   val logger = reactivemongo.util.LazyLogger("tests")
 
   val replSetOn =
@@ -20,8 +22,10 @@ object Common {
       case _      => false
     }
 
+/*
   val crMode = Option(System getProperty "test.authMode").
     filter(_ == "cr").map(_ => CrAuthentication)
+*/
 
   val primaryHost =
     Option(System getProperty "test.primaryHost").getOrElse("localhost:27017")
@@ -71,7 +75,7 @@ object Common {
       } else a
     }
 
-    crMode.fold(b) { mode => b.copy(authMode = mode) }
+    authMode.fold(b) { mode => b.copy(authMode = mode) }
   }
 
   lazy val connection = driver.connection(List(primaryHost), DefaultOptions)
@@ -90,7 +94,7 @@ object Common {
   val slowPrimary = Option(
     System getProperty "test.slowPrimaryHost").getOrElse("localhost:27019")
 
-  val slowTimeout: FiniteDuration = {
+  val slowTimeout: FiniteDuration = /*increaseTimeoutIfX509*/ {
     val maxTimeout = estTimeout(slowFailover)
 
     if (maxTimeout < 10.seconds) 10.seconds
@@ -183,4 +187,46 @@ object Common {
 
     slowProxy.stop()
   }
+}
+
+sealed trait CommonAuth {
+
+  import reactivemongo.api.AuthenticationMode
+
+  def driver: MongoDriver
+
+  def authMode: Option[AuthenticationMode] =
+    Option(System.getProperty("test.authMode")).flatMap {
+      case "cr"   => Some(CrAuthentication)
+      case "x509" => Some(X509Authentication)
+      case _      => None
+    }
+
+  def defaultAuthentications: Seq[Authenticate] =
+    ifX509(Seq(Authenticate("", certSubject, "")))(otherwise = Nil)
+
+  def certSubject: String =
+    Option(System.getProperty("test.clientCertSubject"))
+      .getOrElse(sys.error("Client cert subject required if X509 auth enabled"))
+
+  def increaseTimeoutIfX509(timeout: FiniteDuration): FiniteDuration =
+    ifX509(timeout * 10)(otherwise = timeout)
+
+/*
+  def makeConnection(nodes: Seq[String], options: MongoConnectionOptions): MongoConnection = {
+    makeConnection(driver)(nodes, options)
+  }
+
+  def makeConnection(driver: MongoDriver)(
+    nodes: Seq[String],
+    options: MongoConnectionOptions): MongoConnection = {
+    driver.connection(nodes, options, defaultAuthentications)
+  }
+*/
+
+  def ifX509[T](block: => T)(otherwise: => T): T =
+    authMode match {
+      case Some(X509Authentication) => block
+      case _                        => otherwise
+    }
 }

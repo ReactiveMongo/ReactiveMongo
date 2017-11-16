@@ -3,7 +3,7 @@
 if [ `git grep localhost | grep 'src/test' | grep -vi 'Common.scala' | wc -l` -ne 0 ]; then
   echo "[ERROR] Test resources must not contains hardcoded localhost mention"
   exit 1
-fi 
+fi
 
 if [ "$SCALA_VERSION" = "2.11.11" -a `javac -version 2>&1 | grep 1.7 | wc -l` -eq 1 ]; then
     echo "[INFO] Check the source format and backward compatibility"

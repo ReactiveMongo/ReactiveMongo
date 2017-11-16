@@ -208,7 +208,7 @@ object ReactiveMongoBuild extends Build {
         val specs = List[(String, List[String])](
           "MONGO_VER" -> List("2_6", "3", "3_4"),
           "MONGO_PROFILE" -> List(
-            "default", "invalid-ssl", "mutual-ssl", "rs"),
+            "default", "invalid-ssl", "mutual-ssl", "rs", "x509"),
           "AKKA_VERSION" -> List(akkaLower, akkaUpper),
           "ITERATEES_VERSION" -> List(playLower, playUpper)
         )
@@ -234,6 +234,8 @@ object ReactiveMongoBuild extends Build {
             contains("MONGO_PROFILE" -> "invalid-ssl")) ||
           (!flags.contains("MONGO_VER" -> mongoUpper) && flags.
             contains("MONGO_PROFILE" -> "mutual-ssl")) ||
+          (!flags.contains("MONGO_VER" -> mongoUpper) && flags.
+            contains("MONGO_PROFILE" -> "x509")) ||
           (flags.contains("MONGO_VER" -> mongoLower) && flags.
             contains("MONGO_PROFILE" -> "rs") && flags.
             contains("ITERATEES_VERSION" -> playLower))
@@ -281,7 +283,7 @@ object ReactiveMongoBuild extends Build {
                   flags.contains("MONGO_VER" -> mongoLower)
               )) {
               List(
-                "    - scala: 2.12.3",
+                "    - scala: 2.12.6",
                 s"      env: ${integrationVars(flags)}",
                 "    - jdk: oraclejdk8",
                 s"      env: ${integrationVars(flags)}"
@@ -968,5 +970,5 @@ object Version {
       libraryDependencies ++= Seq(specs.value) ++ logApi,
       pomPostProcess := providedInternalDeps
     )).enablePlugins(CpdPlugin).
-    dependsOn(driver)
+    dependsOn(driver % "test->test;compile->compile")
 }
