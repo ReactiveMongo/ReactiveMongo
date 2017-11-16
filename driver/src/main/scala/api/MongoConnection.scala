@@ -427,20 +427,31 @@ object MongoConnection {
 
       // ---
 
+      val (unsupportedKeys, options) = opts
       if (useful.indexOf("@") == -1) {
         val (db, hosts) = parseHostsAndDbName(useful)
-        val (unsupportedKeys, options) = opts
 
-        ParsedURI(hosts, options, unsupportedKeys, db, None)
+        options.authMode match {
+          case X509Authentication => ParsedURI(hosts, options, unsupportedKeys, db,
+            Some(Authenticate(db.getOrElse(throw new URIParsingException(s"Could not parse URI '$uri': authentication information found but no database name in URI")), "", "")))
+          case _ => ParsedURI(hosts, options, unsupportedKeys, db, None)
+        }
       } else {
-        val WithAuth = """([^:]+):([^@]*)@(.+)""".r
+
+        val WithAuth = """([^:]+)(|:[^@]*)@(.+)""".r
+        object PassExtractor {
+          def unapply(s: String): Option[String] = Some(s.stripPrefix(":"))
+        }
 
         useful match {
-          case WithAuth(user, pass, hostsPortsAndDbName) => {
+          case WithAuth(user, PassExtractor(pass), hostsPortsAndDbName) => {
             val (db, hosts) = parseHostsAndDbName(hostsPortsAndDbName)
 
             db.fold[ParsedURI](throw new URIParsingException(s"Could not parse URI '$uri': authentication information found but no database name in URI")) { database =>
-              val (unsupportedKeys, options) = opts
+
+              if (options.authMode == X509Authentication && pass.nonEmpty) {
+                throw new URIParsingException("You should not provide a password when authenticating with X509 authentication")
+              }
 
               ParsedURI(hosts, options, unsupportedKeys, Some(database),
                 Some(Authenticate(options.authenticationDatabase.
@@ -518,6 +529,9 @@ object MongoConnection {
 
             unsupported -> result.copy(authenticationDatabase = Some(v))
           }
+
+          case ("authMode", "x509") => unsupported -> result.
+            copy(authMode = X509Authentication)
 
           case ("authenticationDatabase", v) =>
             unsupported -> result.copy(authenticationDatabase = Some(v))

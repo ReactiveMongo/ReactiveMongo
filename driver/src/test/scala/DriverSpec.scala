@@ -3,6 +3,7 @@ import scala.concurrent.duration._
 
 import akka.actor.{ Actor, ActorRef, ActorSystem, Props }
 
+import reactivemongo.api.X509Authentication
 import reactivemongo.bson.BSONDocument
 
 import reactivemongo.core.actors.{
@@ -140,6 +141,8 @@ class DriverSpec(implicit ee: ExecutionEnv)
   }
 
   "CR Authentication" should {
+    section("cr_auth")
+
     lazy val drv = newDriver()
     lazy val connection = drv.connection(
       List(primaryHost),
@@ -199,9 +202,13 @@ class DriverSpec(implicit ee: ExecutionEnv)
         aka("database resolution") must throwA[PrimaryUnavailableException]
     }
     section("mongo2")
+
+    section("cr_auth")
   }
 
   "Authentication SCRAM-SHA1" should {
+    section("scram_auth")
+
     import Common.{ DefaultOptions, timeout }
 
     lazy val drv = Common.newAsyncDriver()
@@ -339,19 +346,84 @@ class DriverSpec(implicit ee: ExecutionEnv)
         def con = Common.driver.connection(
           List(slowPrimary), options = slowOpts, authentications = Seq(auth))
 
-        Common.slowProxy.isStarted must beTrue and {
-          eventually(2, timeout) {
-            //println("DriverSpec_1")
+Common.slowProxy.isStarted must beTrue and {
+eventually(2, timeout) {
+//println("DriverSpec_1")
 
-            con.database(Common.commonDb, slowFailover).
-              aka("resolution") must throwA[PrimaryUnavailableException].
-              await(0, slowTimeout + timeout)
-          }
-        }
+con.database(Common.commonDb, slowFailover).
+aka("resolution") must throwA[PrimaryUnavailableException].
+await(0, slowTimeout + timeout)
+}
+}
+
       }
     }
-
     section("not_mongo26")
+
+    section("scram_auth")
+  }
+
+  "X509 Authentication" should {
+    section("x509")
+
+    val drv = reactivemongo.api.AsyncDriver()
+    val conOpts =
+      DefaultOptions.copy(
+        nbChannelsPerNode = 1,
+        authMode = X509Authentication,
+        sslEnabled = true,
+        sslAllowsInvalidCert = true)
+    val dbName = "specs2-test-x509-auth"
+
+    "be successful with right credentials" in {
+      val certSubjectAsUser = certSubject
+      val auth = Authenticate(dbName, certSubject, "")
+      val con =
+        Await.result(
+          drv.connect(List(primaryHost), options = conOpts, authentications = Seq(auth)),
+          timeout)
+
+      con.database(dbName, Common.failoverStrategy).
+        aka("authed DB") must beLike[DefaultDB] {
+          case rdb => rdb.collection("testcol").insert(
+            BSONDocument("foo" -> "bar")).map(_ => {}).
+            aka("insertion") must beEqualTo({}).await(1, timeout)
+
+        }.await(1, timeout) and {
+          con.askClose()(timeout).
+            aka("close") must not(throwA[Exception]).await(1, timeout)
+        }
+    }
+
+    "driver shutdown" in {
+      // mainly to ensure the test driver is closed
+      drv.close(timeout) must not(throwA[Exception]).await(1, timeout)
+    }
+
+    "fail without authentication" >> {
+      val unauthorizedUser = "user_that_is_not_cert_subject"
+      val auth = Authenticate(Common.commonDb, unauthorizedUser, "password")
+      def con = Common.driver.connection(
+        List(primaryHost), options = conOpts, authentications = Seq(auth))
+
+      con.database(Common.commonDb, failoverStrategy).
+        aka("DB resolution") must throwA[PrimaryUnavailableException].like {
+          case reason => reason.getStackTrace.tail.headOption.
+            aka("most recent") must beSome[StackTraceElement].like {
+              case mostRecent =>
+                mostRecent.getClassName aka "class" must beEqualTo(
+                  "reactivemongo.api.MongoConnection") and (
+                    mostRecent.getMethodName aka "method" must_== "database")
+            } and {
+              Option(reason.getCause).
+                aka("cause") must beSome[Throwable].like {
+                  case _: InternalState => ok
+                }
+            }
+        }.await(1, timeout)
+
+    }
+    section("x509")
   }
 
   // ---

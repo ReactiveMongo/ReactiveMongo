@@ -20,10 +20,17 @@ else
     SBT_OPTS="$SBT_OPTS -Dtest.authMode=cr"
 fi
 
-if [ "$MONGO_PROFILE" = "invalid-ssl" -o "$MONGO_PROFILE" = "mutual-ssl" ]; then
+if [ "$MONGO_PROFILE" != "x509" ]; then
+    TEST_OPTS="$TEST_OPTS,x509" # exclude x509 tests for all other profiles
+else
+    TEST_OPTS="$TEST_OPTS,scram_auth,cr_auth" # exclude other auth types for x509 tests
+    SBT_OPTS="$SBT_OPTS -Dtest.authMode=x509 -Dtest.clientCertSubject=$CLIENT_CERT_SUBJECT"
+fi
+
+if [ "$MONGO_PROFILE" = "invalid-ssl" -o "$MONGO_PROFILE" = "mutual-ssl" -o "$MONGO_PROFILE" = "x509" ]; then
     SBT_OPTS="$SBT_OPTS -Dtest.enableSSL=true"
 
-    if [ "$MONGO_PROFILE" = "mutual-ssl" ]; then
+    if [ "$MONGO_PROFILE" = "mutual-ssl" -o "$MONGO_PROFILE" = "x509" ]; then
         SBT_OPTS="$SBT_OPTS -Djavax.net.ssl.keyStore=/tmp/keystore.jks"
         SBT_OPTS="$SBT_OPTS -Djavax.net.ssl.keyStorePassword=$SSL_PASS"
         SBT_OPTS="$SBT_OPTS -Djavax.net.ssl.keyStoreType=JKS"

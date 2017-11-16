@@ -4,11 +4,8 @@ import scala.util.{ Try, Failure, Success }
 
 import scala.concurrent.{ Await, ExecutionContext }
 import scala.concurrent.duration.{ Duration, FiniteDuration, SECONDS }
-
 import com.typesafe.config.Config
-
 import akka.actor.ActorRef
-
 import reactivemongo.core.nodeset.Authenticate
 import reactivemongo.util.LazyLogger
 
