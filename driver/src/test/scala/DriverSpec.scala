@@ -3,8 +3,8 @@ import scala.concurrent.duration._
 
 import akka.actor.{ Actor, ActorRef, ActorSystem, Props }
 
+import reactivemongo.api.X509Authentication
 import reactivemongo.bson.BSONDocument
-
 import reactivemongo.core.actors.{
   PrimaryAvailable,
   RegisterMonitor,
@@ -67,7 +67,7 @@ class DriverSpec(implicit ee: ExecutionEnv)
     }
 
     "use the failover strategy defined in the options" in {
-      lazy val con = driver.connection(
+      lazy val con = makeConnection(
         List(primaryHost),
         DefaultOptions.copy(failoverStrategy = FailoverStrategy.remote))
 
@@ -79,7 +79,7 @@ class DriverSpec(implicit ee: ExecutionEnv)
     }
 
     "notify a monitor after the NodeSet is started" in {
-      val con = driver.connection(List(primaryHost), DefaultOptions)
+      val con = makeConnection(List(primaryHost), DefaultOptions)
       val setAvailable = Promise[ProtocolMetadata]()
       val priAvailable = Promise[ProtocolMetadata]()
 
@@ -108,7 +108,7 @@ class DriverSpec(implicit ee: ExecutionEnv)
     }
 
     "fail within expected timeout interval" in {
-      lazy val con = driver.connection(
+      lazy val con = makeConnection(
         List("foo:123"),
         DefaultOptions.copy(failoverStrategy = FailoverStrategy.remote))
 
@@ -138,6 +138,8 @@ class DriverSpec(implicit ee: ExecutionEnv)
   }
 
   "CR Authentication" should {
+    section("cr_auth")
+
     lazy val drv = MongoDriver()
     lazy val connection = drv.connection(
       List(primaryHost),
@@ -192,9 +194,13 @@ class DriverSpec(implicit ee: ExecutionEnv)
         Common.commonDb, failoverStrategy), timeout).
         aka("database resolution") must throwA[PrimaryUnavailableException]
     } tag "mongo2"
+
+    section("cr_auth")
   }
 
   "Authentication SCRAM-SHA1" should {
+    section("scram_auth")
+
     import Common.{ DefaultOptions, timeout }
 
     lazy val drv = reactivemongo.api.AsyncDriver()
@@ -334,6 +340,70 @@ class DriverSpec(implicit ee: ExecutionEnv)
 
       } tag "not_mongo26"
     }
+    section("scram_auth")
+  }
+
+  "X509 Authentication" should {
+    section("x509")
+
+    val drv = reactivemongo.api.AsyncDriver()
+    val conOpts =
+      DefaultOptions.copy(
+        nbChannelsPerNode = 1,
+        authMode = X509Authentication,
+        sslEnabled = true,
+        sslAllowsInvalidCert = true)
+    val dbName = "specs2-test-x509-auth"
+
+    "be successful with right credentials" in {
+      val certSubjectAsUser = certSubject
+      val auth = Authenticate(dbName, certSubject, "")
+      val con =
+        Await.result(
+          drv.connect(List(primaryHost), options = conOpts, authentications = Seq(auth)),
+          timeout)
+
+      con.database(dbName, Common.failoverStrategy).
+        aka("authed DB") must beLike[DefaultDB] {
+          case rdb => rdb.collection("testcol").insert(
+            BSONDocument("foo" -> "bar")).map(_ => {}).
+            aka("insertion") must beEqualTo({}).await(1, timeout)
+
+        }.await(1, timeout) and {
+          con.askClose()(timeout).
+            aka("close") must not(throwA[Exception]).await(1, timeout)
+        }
+    }
+
+    "driver shutdown" in {
+      // mainly to ensure the test driver is closed
+      drv.close(timeout) must not(throwA[Exception]).await(1, timeout)
+    }
+
+    "fail without authentication" >> {
+      val unauthorizedUser = "user_that_is_not_cert_subject"
+      val auth = Authenticate(Common.commonDb, unauthorizedUser, "password")
+      def con = Common.driver.connection(
+        List(primaryHost), options = conOpts, authentications = Seq(auth))
+
+      con.database(Common.commonDb, failoverStrategy).
+        aka("DB resolution") must throwA[PrimaryUnavailableException].like {
+          case reason => reason.getStackTrace.tail.headOption.
+            aka("most recent") must beSome[StackTraceElement].like {
+              case mostRecent =>
+                mostRecent.getClassName aka "class" must beEqualTo(
+                  "reactivemongo.api.MongoConnection") and (
+                    mostRecent.getMethodName aka "method" must_== "database")
+            } and {
+              Option(reason.getCause).
+                aka("cause") must beSome[Throwable].like {
+                  case _: InternalState => ok
+                }
+            }
+        }.await(1, timeout)
+
+    }
+    section("x509")
   }
 
   "Database" should {

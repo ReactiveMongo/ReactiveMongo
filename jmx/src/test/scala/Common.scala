@@ -1,17 +1,13 @@
-object Common {
+object Common extends CommonAuth {
   import scala.concurrent.{ Await, ExecutionContext }
   import scala.concurrent.duration._
   import reactivemongo.api.{
     FailoverStrategy,
     MongoDriver,
-    MongoConnectionOptions,
-    CrAuthentication
+    MongoConnectionOptions
   }
 
   implicit val ec = ExecutionContext.Implicits.global
-
-  val crMode = Option(System getProperty "test.authMode").
-    filter(_ == "cr").map(_ => CrAuthentication)
 
   val DefaultOptions = {
     val a = MongoConnectionOptions(nbChannelsPerNode = 2)
@@ -20,7 +16,7 @@ object Common {
       a.copy(sslEnabled = true, sslAllowsInvalidCert = true)
     } else a
 
-    crMode.fold(b) { mode => b.copy(authMode = mode) }
+    authMode.fold(b) { mode => b.copy(authMode = mode) }
   }
 
   val primaryHost =
@@ -30,11 +26,11 @@ object Common {
     flatMap(r => scala.util.Try(r.toInt).toOption).getOrElse(7)
 
   lazy val driver = new MongoDriver
-  lazy val connection = driver.connection(List(primaryHost), DefaultOptions)
+  lazy val connection = makeConnection(List(primaryHost), DefaultOptions)
 
   val failoverStrategy = FailoverStrategy(retries = failoverRetries)
 
-  val timeout = 10.seconds
+  val timeout = increaseTimeoutIfX509(10.seconds)
   val timeoutMillis = timeout.toMillis.toInt
 
   val dbName = "specs2-reactivemongo-jmx"

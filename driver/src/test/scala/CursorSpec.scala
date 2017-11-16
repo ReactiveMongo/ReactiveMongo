@@ -26,10 +26,10 @@ class CursorSpec(implicit val ee: ExecutionEnv)
     "stop on error" >> {
       lazy val cursorDrv = new MongoDriver
       lazy val cursorCon =
-        cursorDrv.connection(List(primaryHost), DefaultOptions)
+        Common.makeConnection(cursorDrv)(List(primaryHost), DefaultOptions)
 
       lazy val slowCursorCon =
-        cursorDrv.connection(List(slowPrimary), SlowOptions)
+        Common.makeConnection(cursorDrv)(List(slowPrimary), SlowOptions)
 
       lazy val (cursorDb, slowCursorDb) =
         Common.databases(cursorCon, slowCursorCon)
@@ -94,7 +94,7 @@ class CursorSpec(implicit val ee: ExecutionEnv)
               debug(s"stopOnError: foldResponses (#4): $count")
               count = count + 1
             }
-            val con14 = driver.connection(
+            val con14 = Common.makeConnection(
               List(primaryHost), DefaultOptions.copy(nbChannelsPerNode = 1))
 
             val db14 = Await.result(con14.database("dbspec14"), timeout)
@@ -180,7 +180,7 @@ class CursorSpec(implicit val ee: ExecutionEnv)
             debug(s"stopOnError: foldBulks (#4): $count")
             count = count + 1
           }
-          val con21 = driver.connection(
+          val con21 = Common.makeConnection(
             List(primaryHost), DefaultOptions.copy(nbChannelsPerNode = 1))
 
           val db21 = Await.result(con21.database("dbspec21"), timeout)
@@ -238,7 +238,7 @@ class CursorSpec(implicit val ee: ExecutionEnv)
               debug(s"stopOnError: foldWhile (#3): $count")
               count = count + 1
             }
-            val con27 = driver.connection(
+            val con27 = Common.makeConnection(
               List(primaryHost), DefaultOptions.copy(nbChannelsPerNode = 1))
 
             val db27 = Await.result(con27.database("dbspec27"), timeout)
@@ -274,10 +274,10 @@ class CursorSpec(implicit val ee: ExecutionEnv)
     "continue on error" >> {
       lazy val cursorDrv = new MongoDriver
       lazy val cursorCon =
-        cursorDrv.connection(List(primaryHost), DefaultOptions)
+        Common.makeConnection(cursorDrv)(List(primaryHost), DefaultOptions)
 
       lazy val slowCursorCon =
-        cursorDrv.connection(List(slowPrimary), SlowOptions)
+        Common.makeConnection(cursorDrv)(List(slowPrimary), SlowOptions)
 
       lazy val (cursorDb, slowCursorDb) =
         Common.databases(cursorCon, slowCursorCon)
@@ -341,7 +341,7 @@ class CursorSpec(implicit val ee: ExecutionEnv)
               debug(s"continueOnError: foldResponses (#4): $count")
               count = count + 1
             }
-            val con33 = driver.connection(
+            val con33 = Common.makeConnection(
               List(primaryHost), DefaultOptions.copy(nbChannelsPerNode = 1))
 
             lazy val db33 = Await.result(con33.database("dbspec33"), timeout)
@@ -427,7 +427,7 @@ class CursorSpec(implicit val ee: ExecutionEnv)
             debug(s"continueOnError: foldBulks (#4): $count")
             count = count + 1
           }
-          val con40 = driver.connection(
+          val con40 = Common.makeConnection(
             List(primaryHost), DefaultOptions.copy(nbChannelsPerNode = 1))
 
           lazy val db40 = Await.result(con40.database("dbspec40"), timeout)
@@ -488,7 +488,7 @@ class CursorSpec(implicit val ee: ExecutionEnv)
               debug(s"continueOnError: foldWhile(#3): $count")
               count = count + 1
             }
-            val con46 = driver.connection(
+            val con46 = Common.makeConnection(
               List(primaryHost), DefaultOptions.copy(nbChannelsPerNode = 1))
 
             lazy val db46 = Await.result(con46.database("dbspec46"), timeout)

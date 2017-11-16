@@ -11,6 +11,9 @@ case object CrAuthentication extends AuthenticationMode
 /** SCRAM-SHA-1 authentication (see MongoDB 3.0) */
 case object ScramSha1Authentication extends AuthenticationMode
 
+/** X509 authentication */
+case object X509Authentication extends AuthenticationMode
+
 /**
  * Options for MongoConnection.
  *
@@ -18,7 +21,7 @@ case object ScramSha1Authentication extends AuthenticationMode
  * @param authenticationDatabase the name of the database used for authentication
  * @param sslEnabled Enable SSL connection (required to be accepted on server-side).
  * @param sslAllowsInvalidCert If `sslEnabled` is true, this one indicates whether to accept invalid certificates (e.g. self-signed).
- * @param authMode Either [[CrAuthentication]] or [[ScramSha1Authentication]]
+ * @param authMode Either [[CrAuthentication]] or [[ScramSha1Authentication]] or [[X509Authentication]]
  * @param tcpNoDelay TCPNoDelay flag (ReactiveMongo-specific option). The default value is false (see [[http://docs.oracle.com/javase/8/docs/api/java/net/StandardSocketOptions.html#TCP_NODELAY TCP_NODELAY]]).
  * @param keepAlive TCP KeepAlive flag (ReactiveMongo-specific option). The default value is false (see [[http://docs.oracle.com/javase/8/docs/api/java/net/StandardSocketOptions.html#SO_KEEPALIVE SO_KEEPALIVE]]).
  * @param nbChannelsPerNode Number of channels (connections) per node (ReactiveMongo-specific option).
