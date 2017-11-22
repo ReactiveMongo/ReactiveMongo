@@ -41,7 +41,7 @@ package object tests {
   }
 
   def history(sys: MongoDBSystem): Traversable[(Long, String)] =
-    sys.history.toArray.toList.collect {
+    sys.syncHistory.toArray.toList.collect {
       case (time: Long, event: String) => time -> event
     }
 

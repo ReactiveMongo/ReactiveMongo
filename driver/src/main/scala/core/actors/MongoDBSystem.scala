@@ -20,6 +20,8 @@ import java.net.InetSocketAddress
 import scala.concurrent.{ Await, ExecutionContext, Future, Promise }
 import scala.util.{ Failure, Success, Try }
 
+import shaded.google.common.collect.{ EvictingQueue, Queues }
+
 import akka.actor.{ Actor, ActorRef, Cancellable }
 
 import shaded.netty.channel.{ ChannelFuture, ChannelFutureListener }
@@ -120,13 +122,13 @@ trait MongoDBSystem extends Actor {
 
   // history
   private val historyMax = 25 // TODO: configurable from options
-  private[reactivemongo] var history = shaded.google.common.collect.
-    EvictingQueue.create[(Long, String)](historyMax)
+  private val history = EvictingQueue.create[(Long, String)](historyMax)
+  private[reactivemongo] val syncHistory = Queues.synchronizedQueue(history)
 
   private type NodeSetHandler = (String, NodeSetInfo, NodeSet) => Unit
   private val nodeSetUpdated: NodeSetHandler =
     listener.fold[NodeSetHandler]({ (event: String, _, _) =>
-      updateHistory(event)
+      updateHistory(event); ()
     }) { l =>
       { (event: String, previous: NodeSetInfo, updated: NodeSet) =>
         updateHistory(event)
@@ -149,21 +151,8 @@ trait MongoDBSystem extends Actor {
   nodeSetUpdated(s"Init(${_nodeSet.toShortString})", null, _nodeSet)
   // <-- monitor
 
-  @inline private def updateHistory(event: String): Unit = {
-    val time = System.currentTimeMillis()
-
-    @annotation.tailrec
-    def go(retry: Int): Unit = try { // compensate EvictionQueue safety
-      history.offer(time -> event)
-      ()
-    } catch {
-      case _: Exception if (retry > 0) => go(retry - 1)
-      case err: Exception =>
-        logger.debug(s"Fails to update history: $event", err)
-    }
-
-    go(3)
-  }
+  @inline private def updateHistory(event: String) =
+    syncHistory.offer(System.currentTimeMillis() -> event)
 
   private[reactivemongo] def internalState() = new InternalState(
     history.toArray(Array.fill[(Long, String)](historyMax)(null)).
@@ -560,12 +549,6 @@ trait MongoDBSystem extends Actor {
       })
 
       logger.debug(s"[$lnm] RefreshAll Job running... Status: $statusInfo")
-
-      context.system.scheduler.scheduleOnce(Duration.Zero) {
-        while (history.size > historyMax) { // compensate EvictionQueue safety
-          history.poll()
-        }
-      }
 
       ()
     }
