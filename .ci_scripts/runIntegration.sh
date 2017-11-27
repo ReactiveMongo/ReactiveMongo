@@ -17,7 +17,7 @@ fi
 if [ "$MONGO_PROFILE" != "x509" ]; then
     TEST_OPTS="$TEST_OPTS,x509" # exclude x509 tests for all other profiles
 else
-    TEST_OPTS="$TEST_OPTS,scram_auth,cr_auth"
+    TEST_OPTS="$TEST_OPTS,scram_auth,cr_auth" # exclude other auth types for x509 tests
     SBT_ARGS="$SBT_ARGS -Dtest.authMode=x509 -Dtest.clientCertSubject=$CLIENT_CERT_SUBJECT"
 fi
 
