@@ -60,21 +60,22 @@ EOF
         cat >> "$MONGO_CONF" << EOF
     allowInvalidCertificates: true
 EOF
-    elif [ "$MONGO_PROFILE" = "mutual-ssl" -o "$MONGO_PROFILE" = "x509" ]; then
+    fi
+
+    if [ "$MONGO_PROFILE" = "mutual-ssl" -o "$MONGO_PROFILE" = "x509" ]; then
         # mutual-ssl
         cat >> "$MONGO_CONF" << EOF
     CAFile: $SCRIPT_DIR/client.pem
 EOF
 
-    keytool -importkeystore  -srcstoretype PKCS12 \
-        -srckeystore "$SCRIPT_DIR/keystore.p12" \
-        -destkeystore /tmp/keystore.jks \
-        -storepass $SSL_PASS -srcstorepass $SSL_PASS
+        keytool -importkeystore  -srcstoretype PKCS12 \
+            -srckeystore "$SCRIPT_DIR/keystore.p12" \
+            -destkeystore /tmp/keystore.jks \
+            -storepass $SSL_PASS -srcstorepass $SSL_PASS
     fi
 
-
     if [ "$MONGO_PROFILE" = "x509" ]; then
-        "${SCRIPT_DIR}/addX509User.sh" "$PATH" "$MONGO_DATA" "$SCRIPT_DIR" "$ENV_FILE"
+        "${SCRIPT_DIR}/addX509User.sh" "$MONGO_DATA" "$SCRIPT_DIR" "$ENV_FILE" "$PRIMARY_HOST"
         cat >> "$MONGO_CONF" << EOF
 security:
   clusterAuthMode: x509
