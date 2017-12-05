@@ -1,5 +1,8 @@
 package reactivemongo.bson
 
+import java.nio.ByteBuffer
+import java.util.UUID
+
 import scala.collection.generic.CanBuildFrom
 import scala.util.Try
 
@@ -73,6 +76,23 @@ trait DefaultBSONHandlers {
   implicit object BSONDateTimeHandler extends BSONHandler[BSONDateTime, Date] {
     def read(bson: BSONDateTime) = new Date(bson.value)
     def write(date: Date) = BSONDateTime(date.getTime)
+  }
+
+  implicit object BSONUUID extends BSONHandler[BSONBinary, UUID] {
+    def read(bson: BSONBinary): UUID =
+      bson match {
+        case BSONBinary(value, Subtype.OldUuidSubtype) =>
+          val buf = ByteBuffer.wrap(value.readArray(value.size))
+          new UUID(buf.getLong(), buf.getLong())
+        case BSONBinary(_, _) => throw new UnsupportedOperationException()
+      }
+
+    def write(uuid: UUID): BSONBinary = {
+      val buf = ByteBuffer.allocate(16)
+      buf.putLong(uuid.getMostSignificantBits)
+      buf.putLong(uuid.getLeastSignificantBits)
+      BSONBinary(buf.array, Subtype.OldUuidSubtype)
+    }
   }
 
   // Typeclasses Handlers

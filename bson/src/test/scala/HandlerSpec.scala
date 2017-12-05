@@ -16,9 +16,9 @@ package reactivemongo.bson
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import java.util.Date
+import java.util.{ Date, UUID }
 
-class HandlerSpec extends org.specs2.mutable.Specification {
+class HandlerSpec extends org.specs2.mutable.Specification with org.specs2.mutable.Tables {
   "Handler" title
 
   section("unit")
@@ -185,6 +185,41 @@ class HandlerSpec extends org.specs2.mutable.Specification {
 
     "be written from a date" in {
       handler.write(date) must_== bson
+    }
+  }
+
+  "BSONUUID" should {
+    val handler = implicitly[BSONHandler[BSONBinary, UUID]]
+
+    def toBSON(data: String) =
+      BSONBinary(java.util.Base64.getDecoder.decode(data), Subtype.OldUuidSubtype)
+
+    def samples = {
+      // format: OFF
+      "uuid"                                                 | "bson"                             |>
+      new UUID(4793879671838491585L, -5342314370169832241L)  ! toBSON("QodIKZfmQ8G13Elil4/8zw==") |
+      new UUID(-1989835052343017465L, -4716986973275013401L) ! toBSON("5GKvj/95QAe+ieVW58w+5w==") |
+      new UUID(5070598595613705829L, -6200690427744432944L)  ! toBSON("Rl5ijromRmWp8rjonCDM0A==") |
+      new UUID(4529017632743115460L, -5152242247727217871L)  ! toBSON("PtpNio0iSsS4f475M3WDMQ==") |
+      new UUID(-4214216713783916491L, -5897292932777780516L) ! toBSON("xYQYOghlSDWuKJtSpVva3A==") |
+      new UUID(-2057851820875366031L, -4838717313752534155L) ! toBSON("43EKrABVQXG82Ww9YT9zdQ==") |
+      new UUID(2943678787726560731L, -5772207900862822594L)  ! toBSON("KNoMQttLTduv5P9/I15HPg==") |
+      new UUID(374917139408440634L, -7251744175318344351L)   ! toBSON("BTP5JuKlTTqbXKEYDCRdYQ==") |
+      new UUID(-7896317514590173683L, -8344199234270585618L) ! toBSON("kmqlDpUoRg2MM3MBgjcc7g==") |
+      new UUID(3380890878656136860L, -7630899215597937545L)  ! toBSON("LutWV2aoRpyWGZmX+Xpcdw==")
+      // format: ON
+    }
+
+    "be read as uuid" in {
+      samples | { (uuid, bson) =>
+        handler.read(bson) === uuid
+      }
+    }
+
+    "be written from a uuid" in {
+      samples | { (uuid, bson) =>
+        handler.write(uuid) === bson
+      }
     }
   }
 
