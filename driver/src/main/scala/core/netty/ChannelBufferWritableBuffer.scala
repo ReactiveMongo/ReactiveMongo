@@ -20,48 +20,6 @@ import shaded.netty.buffer.{ ByteBuf, Unpooled }
 import reactivemongo.bson.BSONDocument
 import reactivemongo.bson.buffer.{ ReadableBuffer, WritableBuffer }
 
-class ChannelBufferReadableBuffer(
-  protected[netty] val buffer: ByteBuf) extends ReadableBuffer {
-
-  def size = buffer.capacity()
-
-  def index = buffer.readerIndex()
-
-  def index_=(i: Int) = { buffer.readerIndex(i); () }
-
-  def discard(n: Int) = { buffer.readerIndex(buffer.readerIndex + n); () }
-
-  def slice(n: Int) =
-    new ChannelBufferReadableBuffer(buffer.slice(buffer.readerIndex, n))
-
-  def readBytes(array: Array[Byte]): Unit = { buffer.readBytes(array); () }
-
-  def readByte() = buffer.readByte()
-
-  def readInt() = buffer.readIntLE()
-
-  def readLong() = buffer.readLongLE()
-
-  def readDouble() = buffer.readDoubleLE()
-
-  def readable() = buffer.readableBytes()
-
-  def toWritableBuffer: ChannelBufferWritableBuffer = {
-    val buf = new ChannelBufferWritableBuffer
-    buf.writeBytes(buffer)
-  }
-
-  def duplicate() = new ChannelBufferReadableBuffer(buffer.duplicate())
-}
-
-object ChannelBufferReadableBuffer {
-  def apply(buffer: ByteBuf) = new ChannelBufferReadableBuffer(buffer)
-
-  def document(buffer: ByteBuf): BSONDocument =
-    BSONDocument.read(ChannelBufferReadableBuffer(buffer))
-
-}
-
 class ChannelBufferWritableBuffer(
   val buffer: ByteBuf = Unpooled.buffer(32)) extends WritableBuffer {
 
@@ -126,24 +84,4 @@ object ChannelBufferWritableBuffer {
     BSONDocument.write(document, buffer)
     buffer.buffer
   }
-}
-
-case class BufferSequence(
-  private val head: ByteBuf,
-  private val tail: ByteBuf*) {
-
-  def merged: ByteBuf = mergedBuffer.duplicate()
-
-  private lazy val mergedBuffer =
-    Unpooled.wrappedBuffer((head +: tail): _*)
-}
-
-object BufferSequence {
-  /** Returns an empty buffer sequence. */
-  val empty: BufferSequence = BufferSequence(Unpooled.EMPTY_BUFFER)
-
-  /** Returns a new channel buffer with the give `document` written on. */
-  private[reactivemongo] def single(document: BSONDocument): BufferSequence =
-    BufferSequence(ChannelBufferWritableBuffer single document)
-
 }

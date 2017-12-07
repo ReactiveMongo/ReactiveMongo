@@ -27,17 +27,17 @@ object NettyEmbedder extends LowPriorityNettyEmbedder {
   private final class EmChannel(
     chanId: ChannelId,
     initiallyActive: Boolean = false)
-    extends EmbeddedChannel(chanId) {
+    extends EmbeddedChannel(chanId, false, false) {
 
     import java.net.SocketAddress
 
     private val lock = new Object {}
 
     // Override the getter to be able the have an initial inactive embedded chan
-    private var active: () => Boolean = () => initiallyActive
-    private var open: () => Boolean = () => true
+    @volatile private var active: () => Boolean = () => initiallyActive
+    @volatile private var open: () => Boolean = () => true
 
-    private var toggleActiveCtrl: () => Unit = { () =>
+    @volatile private var toggleActiveCtrl: () => Unit = { () =>
       // Restore the default getter
       active = () => super.isActive
       open = () => super.isOpen
@@ -74,6 +74,7 @@ object NettyEmbedder extends LowPriorityNettyEmbedder {
       super.connect(r, l, p)
     }
 
+    config.setAutoRead(false)
     register() // on init (required for initially inactive to get connected
   }
 
@@ -97,6 +98,7 @@ object NettyEmbedder extends LowPriorityNettyEmbedder {
     val chan = new EmChannel(chanId, connected)
 
     chan.pipeline.addLast(WithChannelHandler)
+    chan.connect(new java.net.InetSocketAddress(27017))
 
     try {
       val res = f(chan)
@@ -106,12 +108,7 @@ object NettyEmbedder extends LowPriorityNettyEmbedder {
           getLogger("shaded.netty.channel.AbstractChannelHandlerContext").
           asInstanceOf[org.apache.logging.log4j.core.Logger]
 
-        val level = log.getLevel
-        log.setLevel(org.apache.logging.log4j.Level.ERROR)
-
         chan.close()
-
-        log.setLevel(level)
       })
 
       res

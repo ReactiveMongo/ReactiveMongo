@@ -97,7 +97,7 @@ case class RequestMaker(
 // protocol handlers for netty.
 private[reactivemongo] class RequestEncoder
   extends shaded.netty.handler.codec.MessageToByteEncoder[Request] {
-  override def encode(
+  def encode(
     ctx: ChannelHandlerContext,
     message: Request,
     buffer: ByteBuf) {
@@ -423,7 +423,8 @@ private[reactivemongo] class ResponseDecoder
     val readableBytes = frame.readableBytes
 
     if (readableBytes < MessageHeader.size) {
-      frame.readBytes(readableBytes) // discard
+      //frame.readBytes(readableBytes) // discard
+      frame.discardReadBytes()
 
       throw new IllegalStateException(
         s"Invalid message size: $readableBytes < ${MessageHeader.size}")

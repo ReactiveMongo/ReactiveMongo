@@ -7,7 +7,12 @@ import scala.concurrent.Promise
 import shaded.netty.util.concurrent.{ Future, GenericFutureListener }
 
 import shaded.netty.bootstrap.Bootstrap
-import shaded.netty.channel.{ Channel, ChannelOption, EventLoopGroup }
+
+import shaded.netty.channel.{
+  Channel,
+  ChannelOption,
+  EventLoopGroup
+}, ChannelOption.{ CONNECT_TIMEOUT_MILLIS, SO_KEEPALIVE, TCP_NODELAY }
 
 import shaded.netty.channel.ChannelInitializer
 import shaded.netty.channel.nio.NioEventLoopGroup
@@ -31,20 +36,20 @@ import reactivemongo.api.MongoConnectionOptions
  * @param connection the name of the connection pool
  */
 @deprecated("Internal class: will be made private", "0.11.14")
-final class ChannelFactory private[reactivemongo] (
+private[reactivemongo] final class ChannelFactory(
   supervisor: String,
   connection: String,
-  options: MongoConnectionOptions,
-  @deprecatedName('bossExecutor) parentGroup: EventLoopGroup = new NioEventLoopGroup(),
-  @deprecatedName('workerExecutor) childGroup: EventLoopGroup = new NioEventLoopGroup()) extends ChannelInitializer[NioSocketChannel] {
+  options: MongoConnectionOptions) extends ChannelInitializer[Channel] {
+
+  private val pack = reactivemongo.core.netty.Pack()
+  private val parentGroup: EventLoopGroup = pack.eventLoopGroup()
+  private val childGroup: EventLoopGroup = pack.eventLoopGroup()
 
   private val logger = LazyLogger("reactivemongo.core.nodeset.ChannelFactory")
 
-  import ChannelOption.{ CONNECT_TIMEOUT_MILLIS, SO_KEEPALIVE, TCP_NODELAY }
-
   private lazy val channelFactory = new Bootstrap().
     group(parentGroup).
-    channel(classOf[NioSocketChannel]).
+    channel(pack.channelClass).
     option(TCP_NODELAY, new JBool(options.tcpNoDelay)).
     option(SO_KEEPALIVE, new JBool(options.keepAlive)).
     option(CONNECT_TIMEOUT_MILLIS, new Integer(options.connectTimeoutMS)).
@@ -57,7 +62,7 @@ final class ChannelFactory private[reactivemongo] (
     port: Int = 27017,
     receiver: ActorRef): Channel = {
     val resolution = channelFactory.connect(host, port)
-    val channel = resolution.channel.asInstanceOf[NioSocketChannel]
+    val channel = resolution.channel
 
     trace(s"Created new channel #${channel.id} to ${host}:${port} (registered = ${channel.isRegistered})")
 
@@ -73,7 +78,7 @@ final class ChannelFactory private[reactivemongo] (
     channel
   }
 
-  def initChannel(channel: NioSocketChannel) {
+  def initChannel(channel: Channel) {
     val host = channel.attr(ChannelFactory.hostKey).get
 
     if (host == null) {
