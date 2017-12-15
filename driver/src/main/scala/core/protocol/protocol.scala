@@ -109,7 +109,9 @@ private[reactivemongo] class RequestEncoder
     val bytes = Array.ofDim[Byte](buf.readableBytes)
     buf.getBytes(0, bytes)
     println(s"$message ---> ${bytes.toList}")
-    */
+     */
+
+    //println(s"encode#${System identityHashCode message}: ${System identityHashCode buffer}")
 
     message writeTo buffer
 

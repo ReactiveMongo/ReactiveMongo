@@ -90,9 +90,13 @@ class ChannelFactorySpec(implicit ee: ExecutionEnv)
           addListener(new ChannelFutureListener {
             def operationComplete(op: ChannelFuture) {
               if (!sentRequest.isCompleted && op.isSuccess) {
-                val buf = chan.outboundMessages.poll().asInstanceOf[ByteBuf]
+                val buf = chan.readOutbound[ByteBuf]
+
+                //println(s"[${System identityHashCode req}]buf: ${System identityHashCode buf}")
 
                 sentRequest.success(getBytes(buf, buf.readableBytes))
+
+                buf.release()
 
                 chan.writeOneInbound(expectedResp)
 
@@ -150,7 +154,13 @@ class ChannelFactorySpec(implicit ee: ExecutionEnv)
         result.future must beLike[IsMasterResult] {
           case IsMasterResult(true, 16777216, 48000000, 1000,
             Some(_), min, max, _, _) => min must be_<(max)
-        }.await(1, timeout)
+        }.await(1, timeout) and {
+          if (!chan.closeFuture.isDone) {
+            chan.close()
+          }
+
+          ok
+        }
       }
     }
   }

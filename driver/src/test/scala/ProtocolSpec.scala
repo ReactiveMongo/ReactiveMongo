@@ -1,4 +1,4 @@
-import shaded.netty.buffer.{ ByteBuf, Unpooled }
+import shaded.netty.buffer.Unpooled
 
 import reactivemongo.core.protocol.{
   MessageHeader,
@@ -98,7 +98,7 @@ class ProtocolSpec extends org.specs2.mutable.Specification {
     }
 
     "be read from Netty buffer" in {
-      decodeResponse(msg1Bytes) must beLike[(ByteBuf, Response)] {
+      decodeResponse(msg1Bytes) {
         case (buf, Response(
           `header`, `reply`, documents, ResponseInfo(null))) => {
           val offset = header.size + ( /*reply*/ 4 + 8 + 4 + 4)

@@ -510,6 +510,7 @@ object Version {
           imt("reactivemongo.core.actors.AwaitingResponse.this"), // private
           mmp("reactivemongo.core.protocol.MongoHandler.this"), // private
           fcp("reactivemongo.core.nodeset.ChannelFactory"),
+          imt("reactivemongo.core.nodeset.ChannelFactory.this"), // private
           mcp("reactivemongo.core.actors.RefreshAllNodes"),
           mcp("reactivemongo.core.actors.RefreshAllNodes$"),
           imt("reactivemongo.core.actors.ChannelConnected.apply"), // private

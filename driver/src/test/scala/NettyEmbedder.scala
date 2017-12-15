@@ -100,21 +100,33 @@ object NettyEmbedder extends LowPriorityNettyEmbedder {
     chan.pipeline.addLast(WithChannelHandler)
     chan.connect(new java.net.InetSocketAddress(27017))
 
+    @annotation.tailrec
+    def release(): Unit = Option(chan.readOutbound[shaded.netty.buffer.ByteBuf]) match {
+      case Some(remaining) => {
+        println(s"_rem: $remaining")
+        remaining.release()
+        release()
+      }
+
+      case _ => chan.close(); ()
+    }
+
+    def close(): Unit = {
+      if (chan.finish) release()
+      else chan.close()
+    }
+
     try {
       val res = f(chan)
 
       implicitly[OnComplete[T]].onComplete(res, { () =>
-        val log = org.apache.logging.log4j.LogManager.
-          getLogger("shaded.netty.channel.AbstractChannelHandlerContext").
-          asInstanceOf[org.apache.logging.log4j.core.Logger]
-
-        chan.close()
+        close()
       })
 
       res
     } catch {
       case cause: Exception =>
-        chan.close()
+        close()
         throw cause
     }
   }

@@ -635,11 +635,37 @@ trait MongoDBSystem extends Actor {
           debug(s"Unavailable channel #${channelId} is already unattached")
         }
 
-        case (_, ns) => {
+        case (_, onDisconnect) => {
           trace(s"Channel #$channelId is unavailable")
 
           val nodeSetWasReachable = _nodeSet.isReachable
           val primaryWasAvailable = _nodeSet.primary.isDefined
+
+          val ns = updateNodeSet("ChannelDisconnected$$After") {
+            _.updateNodeByChannelId(channelId) { n =>
+              val node = {
+                if (n.pingInfo.channelId.exists(_ == channelId)) {
+                  // #cch2: The channel used to send isMaster request is
+                  // the one disconnected there
+
+                  debug(s"Discard pending isMaster ping: used channel #${channelId} is disconnected")
+
+                  n._copy(pingInfo = PingInfo())
+                } else {
+                  n
+                }
+              }
+
+              if (node.connected.isEmpty) {
+                // If there no longer established connection
+                trace(s"Unset the node status on disconnect (#${channelId})")
+
+                node._copy(status = NodeStatus.Unknown)
+              } else {
+                node
+              }
+            }
+          }
 
           val retried = Map.newBuilder[Int, AwaitingResponse]
 
@@ -672,6 +698,7 @@ trait MongoDBSystem extends Actor {
             if (nodeSetWasReachable) {
               warn("The entire node set is unreachable, is there a network problem?")
 
+              broadcastMonitors(PrimaryUnavailable)
               broadcastMonitors(SetUnavailable)
             } else {
               debug("The entire node set is still unreachable, is there a network problem?")
@@ -715,7 +742,22 @@ trait MongoDBSystem extends Actor {
     case msg @ ChannelConnected(channelId) => {
       warn(s"SPURIOUS $msg (ignored, channel closed)")
 
-      updateNodeSetOnDisconnect(channelId)
+      // updateNodeSetOnDisconnect(channelId)
+
+      updateNodeSet("Closing$$ChannelConnected") {
+        _.updateNodeByChannelId(channelId) {
+          collectConnections(_) {
+            case other if (other.channel.id != channelId) =>
+              other
+
+            case con => {
+              con.channel.close()
+              con
+            }
+          }
+        }
+      }
+
       ()
     }
 
@@ -883,10 +925,15 @@ trait MongoDBSystem extends Actor {
               if (node.pingInfo.lastIsMasterId == respTo) {
                 // No longer waiting response for isMaster,
                 // reset the pending state, and update the ping time
+                val pingTime =
+                  System.currentTimeMillis() - node.pingInfo.lastIsMasterTime
+
                 node.pingInfo.copy(
-                  ping =
-                    System.currentTimeMillis() - node.pingInfo.lastIsMasterTime,
-                  lastIsMasterTime = 0, lastIsMasterId = -1)
+                  ping = pingTime,
+                  lastIsMasterTime = 0,
+                  lastIsMasterId = -1,
+                  channelId = None)
+
               } else node.pingInfo
 
             val nodeStatus = isMaster.status
@@ -1290,10 +1337,6 @@ trait MongoDBSystem extends Actor {
 
       val now = System.currentTimeMillis()
 
-      // 724#TODO2: ? Add chanId on PingInfo to be able to retry IsMaster
-      // if sent with a chan detected then as ChannelDisconnected
-      // as for the awaitingResponses
-
       val updated = if (node.pingInfo.lastIsMasterId == -1) {
         // There is no IsMaster request waiting response for the node:
         // sending a new one
@@ -1302,7 +1345,8 @@ trait MongoDBSystem extends Actor {
         node._copy(
           pingInfo = node.pingInfo.copy(
             lastIsMasterTime = now,
-            lastIsMasterId = id))
+            lastIsMasterId = id,
+            channelId = Some(con.channel.id)))
 
       } else if ((
         node.pingInfo.lastIsMasterTime + PingInfo.pingTimeout) < now) {
@@ -1318,9 +1362,8 @@ trait MongoDBSystem extends Actor {
         def error = {
           val cause = new ClosedException(s"$msg ($lnm)")
 
-          if (wasPrimary) {
-            new PrimaryUnavailableException(supervisor, name, cause)
-          } else cause
+          if (!wasPrimary) cause
+          else new PrimaryUnavailableException(supervisor, name, cause)
         }
 
         awaitingResponses.retain { (_, awaitingResponse) =>
@@ -1343,8 +1386,10 @@ trait MongoDBSystem extends Actor {
           //connections = Vector.empty,
           authenticated = Set.empty,
           pingInfo = PingInfo(
+            ping = Long.MaxValue,
             lastIsMasterTime = now,
-            lastIsMasterId = id))
+            lastIsMasterId = id,
+            channelId = con.channel.id))
 
       } else {
         debug(s"Do not prepare a isMaster request to already probed ${node.name}")

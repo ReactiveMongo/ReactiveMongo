@@ -26,6 +26,7 @@ import reactivemongo.core.nodeset.{
   NodeSet
 }
 import reactivemongo.core.actors, actors.{
+  ChannelConnected,
   ChannelDisconnected,
   MongoDBSystem,
   RequestId,
@@ -65,6 +66,8 @@ package object tests extends QueryCodecs[BSONSerializationPack.type] {
     }
 
   def nodeSet(sys: MongoDBSystem): NodeSet = sys.getNodeSet
+
+  def channelConnected(id: ChannelId) = ChannelConnected(id)
 
   def channelClosed(id: ChannelId) = ChannelDisconnected(id)
 
@@ -158,19 +161,27 @@ package object tests extends QueryCodecs[BSONSerializationPack.type] {
   @inline def isMasterResponse(response: Response) =
     RequestId.isMaster accepts response
 
-  val decodeResponse: Array[Byte] => (ByteBuf, Response) = {
+  def decodeResponse[T]: Array[Byte] => (Tuple2[ByteBuf, Response] => T) => T = {
     val decoder = new ResponseDecoder()
 
     { bytes =>
       val buf = Unpooled.buffer(bytes.size, bytes.size)
       val out = new java.util.ArrayList[Object](1)
 
+      buf.retain()
+
       buf.writeBytes(bytes)
       buf.resetReaderIndex()
 
       decoder.decode(null, buf, out)
 
-      buf -> out.get(0).asInstanceOf[Response]
+      { f: (Tuple2[ByteBuf, Response] => T) =>
+        try {
+          f(buf -> out.get(0).asInstanceOf[Response])
+        } finally {
+          buf.release()
+        }
+      }
     }
   }
 

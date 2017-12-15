@@ -1,9 +1,10 @@
 import akka.actor.Actor
 import akka.testkit.TestActorRef
 
-import shaded.netty.channel.ChannelId
+import shaded.netty.channel.{ ChannelId, ChannelFuture, ChannelFutureListener }
 
-import scala.concurrent.Future
+import scala.concurrent.{ Future, Promise }
+import scala.concurrent.duration._
 
 import org.specs2.concurrent.ExecutionEnv
 
@@ -169,6 +170,116 @@ class MonitorSpec(implicit ee: ExecutionEnv)
         }
       }.andThen {
         case _ => log.setLevel(level)
+      }.await(0, timeout * expectFactor)
+    }
+
+    "manage channel disconnection while probing isMaster" in {
+      val expectFactor = 3L
+      val opts = Common.DefaultOptions.copy(
+        nbChannelsPerNode = 2,
+        monitorRefreshMS = 3600000 // disable refreshAll/connectAll during test
+      )
+
+      withConAndSys(options = opts) { (con, sysRef) =>
+        @inline def dbsystem = sysRef.underlyingActor
+
+        waitIsAvailable(con, Common.failoverStrategy).map { _ =>
+          val nodeSet1 = nodeSet(dbsystem)
+          val connections1 = nodeSet1.nodes.flatMap(_.connected)
+
+          nodeSet1.nodes.size must_== 1 and {
+            // #1 - Fully available with expected connection count (2)
+            isAvailable(con, 1.seconds) must beTrue.await(1, timeout) and {
+              connections1.size aka "connected #1" must beEqualTo(2).
+                eventually(2, timeout)
+            }
+          } and {
+            // #2 - Pass messages to the system to indicate all the connections
+            // are closed, even if the underlying channels are not
+            connections1.foreach { con1 =>
+              dbsystem.receive(channelClosed(con1.channel.id)) // ensure
+            } must_== ({})
+          } and {
+            // #3 - After connections are closed:
+            // no longer available, no connected connection
+            nodeSet(dbsystem).nodes.flatMap(_.connected) must beEmpty and {
+              isAvailable(con, 1.seconds) must beFalse.await(1, timeout)
+            }
+          } and {
+            // #4 - Pass message to the system so the first connection
+            // is considered connected, so it's used to probe isMaster again;
+            // The channel of this connection is deregistered,
+            // so the incoming buffer is not read (and so no isMaster response).
+
+            val before4 = System.currentTimeMillis()
+
+            connections1.headOption.foreach { con1 =>
+              con1.channel.deregister()
+              /* ... so isMaster sent on ChannelConnected
+                 thereafter cannot succeed */
+
+              dbsystem.receive(channelConnected(con1.channel.id))
+            }
+
+            val ns = nodeSet(dbsystem)
+
+            ns.nodes.flatMap(_.connected).size must_== 1 and {
+              ns.nodes.headOption.map(
+                _.pingInfo.lastIsMasterTime) must beSome[Long].which {
+                  // a new isMaster ping must have been sent
+                  // as the first connection is again available
+                  _ must beGreaterThan(before4)
+                }
+            } and {
+              // The nodeset is still not available,
+              // as the channel of the first connection used for isMaster
+              // is deregistered/paused for now
+              isAvailable(con, timeout) must beFalse.await(1, timeout)
+            }
+          } and {
+            // #5 - Completely close the channel (only deregistered until now)
+            // of the first connection, which is waiting for isMaster response
+
+            connections1.headOption.foreach { con1 =>
+              dbsystem.receive(channelClosed(con1.channel.id))
+
+              con1.channel.close()
+            }
+
+            // Pending ping must be discard as the corresponding connection
+            // is indicated as closed (see MongoDBSystem#cch2)
+            nodeSet(dbsystem).nodes.headOption.
+              map(_.pingInfo.lastIsMasterId) must beSome(-1)
+          } and {
+            // #6 - Remove the first/closed connection from the NodeSet,
+            // then there is only the second (disconnected) connection,
+            // whose channel is still registered/available
+
+            updateNodeSet(dbsystem, "MonitorSpec#6") {
+              _.updateAll { n =>
+                n.copy(connections = n.connections.tail)
+              }
+            }
+
+            nodeSet(dbsystem).nodes.flatMap(_.connected) must beEmpty and {
+              isAvailable(con, timeout) must beFalse.await(1, timeout)
+            }
+          } and {
+            // #7 - Pass message to the system to indicate the second
+            // (only remaining) connection is back online.
+            val connections7 = nodeSet(dbsystem).nodes.flatMap(_.connections)
+
+            connections7.size aka "connection count#7" must_== 1 and {
+              connections7.foreach { c =>
+                dbsystem.receive(channelConnected(c.channel.id))
+              }
+
+              isAvailable(con, 1.seconds) must beTrue.await(1, timeout)
+            } and {
+              nodeSet(dbsystem).nodes.flatMap(_.connected).size must_== 1
+            }
+          }
+        }
       }.await(0, timeout * expectFactor)
     }
   }

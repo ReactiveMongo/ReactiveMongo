@@ -36,7 +36,7 @@ import reactivemongo.api.MongoConnectionOptions
  * @param connection the name of the connection pool
  */
 @deprecated("Internal class: will be made private", "0.11.14")
-private[reactivemongo] final class ChannelFactory(
+final class ChannelFactory private[reactivemongo] (
   supervisor: String,
   connection: String,
   options: MongoConnectionOptions) extends ChannelInitializer[Channel] {
