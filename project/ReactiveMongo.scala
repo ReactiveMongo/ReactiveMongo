@@ -16,8 +16,8 @@ object BuildSettings {
   val java8 = scala.util.Properties.isJavaAtLeast("1.8")
 
   val buildSettings = Defaults.coreDefaultSettings ++ baseSettings ++ Seq(
-    scalaVersion := "2.11.11",
-    crossScalaVersions := Seq("2.10.5", "2.11.11", "2.12.4"),
+    scalaVersion := "2.12.4",
+    crossScalaVersions := Seq("2.10.7", "2.11.12", scalaVersion.value),
     crossVersion := CrossVersion.binary,
     //parallelExecution in Test := false,
     //fork in Test := true, // Don't share executioncontext between SBT CLI/tests
@@ -63,7 +63,7 @@ object BuildSettings {
     },
     scalacOptions in Compile ++= {
       if (!scalaVersion.value.startsWith("2.12.")) Seq("-target:jvm-1.6")
-      else Nil
+      else Seq("-target:jvm-1.8")
     },
     scalacOptions in (Compile, console) ~= {
       _.filterNot { opt => opt.startsWith("-X") || opt.startsWith("-Y") }
@@ -78,7 +78,7 @@ object BuildSettings {
     scalacOptions in Compile := {
       val opts = (scalacOptions in Compile).value
 
-      if (scalaVersion.value != "2.10.5") opts
+      if (scalaVersion.value != "2.10.7") opts
       else {
         opts.filter(_ != "-Ywarn-unused-import")
       }
@@ -268,13 +268,13 @@ object ReactiveMongoBuild extends Build {
 
         def matrix = (List("env:", "  - CI_CATEGORY=UNIT_TESTS").iterator ++ (
           integrationMatrix :+ "matrix: " :+ "  exclude: ") ++ List(
-          "    - scala: 2.10.5",
+          "    - scala: 2.10.7",
             "      jdk: oraclejdk8",
             "      env: CI_CATEGORY=UNIT_TESTS") ++ List(
-          "    - scala: 2.11.11",
+          "    - scala: 2.11.12",
               "      jdk: oraclejdk7",
               "      env: CI_CATEGORY=UNIT_TESTS") ++ List(
-          "    - scala: 2.12.3",
+          "    - scala: 2.12.4",
                 "      jdk: oraclejdk7",
                 "      env: CI_CATEGORY=UNIT_TESTS") ++ (
           integrationEnv.flatMap { flags =>
@@ -287,7 +287,7 @@ object ReactiveMongoBuild extends Build {
                   flags.contains("MONGO_PROFILE" -> "invalid-ssl") ||
                   flags.contains("MONGO_PROFILE" -> "mutual-ssl"))) {
               List(
-                "    - scala: 2.10.5",
+                "    - scala: 2.10.7",
                 s"      env: ${integrationVars(flags)}",
                 "    - jdk: oraclejdk7",
                 s"      env: ${integrationVars(flags)}"
@@ -568,6 +568,7 @@ object Version {
           mcp("reactivemongo.core.actors.RefreshAllNodes"),
           mcp("reactivemongo.core.actors.RefreshAllNodes$"),
           mmp("reactivemongo.core.actors.MongoDBSystem.DefaultConnectionRetryInterval"),
+          fmp("reactivemongo.api.collections.bson.BSONCollection.fullCollectionName"),
           mmp("reactivemongo.api.CollectionMetaCommands.drop"),
           mmp("reactivemongo.api.DB.coll"),
           mmp("reactivemongo.api.DB.coll$default$2"),
@@ -858,7 +859,37 @@ object Version {
           mmp("reactivemongo.api.indexes.Index.copy"),
           mmp("reactivemongo.api.indexes.Index.this"),
           mtp("reactivemongo.api.indexes.Index$"),
-          mmp("reactivemongo.api.indexes.Index.apply"))
+          mmp("reactivemongo.api.indexes.Index.apply"),
+          mcp("reactivemongo.core.commands.Count"),
+          mcp("reactivemongo.core.commands.CollStats"),
+          mcp("reactivemongo.core.commands.RenameCollection$"),
+          mcp("reactivemongo.core.commands.ConvertToCapped"),
+          mcp("reactivemongo.core.commands.LastError$"),
+          mcp("reactivemongo.core.commands.LastError"),
+          mcp("reactivemongo.core.commands.GetLastError"),
+          mcp("reactivemongo.core.commands.IsMaster$"),
+          mcp("reactivemongo.core.commands.CollStats$"),
+          mcp("reactivemongo.core.commands.CreateCollection$"),
+          mcp("reactivemongo.core.commands.IsMasterResponse$"),
+          mcp("reactivemongo.core.commands.Count$"),
+          mcp("reactivemongo.core.commands.IsMasterResponse"),
+          mcp("reactivemongo.core.commands.CreateCollection"),
+          mcp("reactivemongo.core.commands.EmptyCapped"),
+          mcp("reactivemongo.core.commands.RawCommand"),
+          mcp("reactivemongo.core.commands.GetLastError$"),
+          mcp("reactivemongo.core.commands.Drop"),
+          mcp("reactivemongo.core.commands.RawCommand$"),
+          mcp("reactivemongo.core.commands.RenameCollection"),
+          mcp("reactivemongo.core.commands.IsMaster"),
+          mcp("reactivemongo.core.commands.DeleteIndex$"),
+          mcp("reactivemongo.core.commands.Update"),
+          mcp("reactivemongo.core.commands.FindAndModify"),
+          mcp("reactivemongo.core.commands.Update$"),
+          mcp("reactivemongo.core.commands.FindAndModify$"),
+          mcp("reactivemongo.core.commands.Remove$"),
+          mcp("reactivemongo.core.commands.Remove"),
+          mcp("reactivemongo.core.commands.DeleteIndex")
+        )
       },
       testOptions in Test += Tests.Cleanup(commonCleanup),
       mappings in (Compile, packageBin) ~= driverFilter,

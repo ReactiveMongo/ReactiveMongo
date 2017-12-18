@@ -18,12 +18,7 @@ package reactivemongo.api
 import scala.concurrent.{ ExecutionContext, Future }
 import scala.concurrent.duration.FiniteDuration
 
-import reactivemongo.core.commands.{
-  Command => CoreCommand,
-  SuccessfulAuthentication
-}
-
-import reactivemongo.utils.EitherMappableFuture.futureToEitherMappable
+import reactivemongo.core.commands.SuccessfulAuthentication
 
 /**
  * The reference to a MongoDB database, obtained from a [[reactivemongo.api.MongoConnection]].
@@ -67,20 +62,6 @@ sealed trait DB {
 
   @inline def defaultReadPreference: ReadPreference =
     connection.options.readPreference
-
-  /**
-   * Sends a command and get the future result of the command.
-   *
-   * @param command the command to send
-   * @param readPreference the ReadPreference to use for this command (defaults to [[MongoConnectionOptions.readPreference]])
-   *
-   * @return a future containing the result of the command.
-   */
-  @deprecated("Consider using reactivemongo.api.commands along with `DefaultDB.runCommand` methods", "0.11.0")
-  def command[T](command: CoreCommand[T], readPreference: ReadPreference = defaultReadPreference)(implicit ec: ExecutionContext): Future[T] =
-    Failover(
-      command.apply(name).maker(readPreference),
-      connection, failoverStrategy).future.mapEither(command.ResultMaker(_))
 
   /** Authenticates the connection on this database. */
   def authenticate(user: String, password: String)(implicit timeout: FiniteDuration): Future[SuccessfulAuthentication] = connection.authenticate(name, user, password)

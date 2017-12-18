@@ -84,7 +84,7 @@ trait GenericCollectionProducer[P <: SerializationPack with Singleton, +C <: Gen
  * @define aggregationPipelineFunction the function to create the aggregation pipeline using the aggregation framework depending on the collection type
  * @define orderedParam the [[https://docs.mongodb.com/manual/reference/method/db.collection.insert/#perform-an-unordered-insert ordered]] behaviour
  */
-trait GenericCollection[P <: SerializationPack with Singleton] extends Collection with GenericCollectionWithCommands[P] with CollectionMetaCommands with reactivemongo.api.commands.ImplicitCommandHelpers[P] with InsertOps[P] with UpdateOps[P] with Aggregator[P] { self =>
+trait GenericCollection[P <: SerializationPack with Singleton] extends Collection with GenericCollectionWithCommands[P] with CollectionMetaCommands with reactivemongo.api.commands.ImplicitCommandHelpers[P] with InsertOps[P] with UpdateOps[P] with Aggregator[P] with GenericCollectionMetaCommands[P] { self =>
   import scala.language.higherKinds
 
   val pack: P
@@ -508,7 +508,8 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
   def aggregate1[T](firstOperator: PipelineOperator, otherOperators: List[PipelineOperator], explain: Boolean = false, allowDiskUse: Boolean = false, bypassDocumentValidation: Boolean = false, readConcern: Option[ReadConcern] = None, readPreference: ReadPreference = ReadPreference.primary, batchSize: Option[Int] = None)(implicit ec: ExecutionContext, reader: pack.Reader[T], cf: CursorFlattener[Cursor]): Cursor[T] = aggregatorContext[T](
     firstOperator, otherOperators,
     explain, allowDiskUse, bypassDocumentValidation,
-    readConcern, readPreference, batchSize).prepared[Cursor](CursorProducer.defaultCursorProducer[T]).cursor
+    readConcern, readPreference, batchSize).
+    prepared[Cursor](CursorProducer.defaultCursorProducer[T]).cursor
 
   /**
    * [[http://docs.mongodb.org/manual/reference/command/aggregate/ Aggregates]] the matching documents.
@@ -828,7 +829,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
       val documents = BufferSequence(result())
       val op = Query(0, db.name + ".$cmd", 0, 1)
 
-      val cursor = DefaultCursor.query(pack, op, documents, ReadPreference.primary, db.connection, failoverStrategy, true)(BatchCommands.DefaultWriteResultReader) //(Mongo26WriteCommand.DefaultWriteResultBufferReader)
+      val cursor = DefaultCursor.query(pack, op, _ => documents, ReadPreference.primary, db.connection, failoverStrategy, true, fullCollectionName)(BatchCommands.DefaultWriteResultReader) //(Mongo26WriteCommand.DefaultWriteResultBufferReader)
 
       cursor.headOption.flatMap {
         case Some(wr) if (wr.inError || (wr.hasErrors && ordered)) => {

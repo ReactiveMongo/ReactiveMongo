@@ -36,7 +36,7 @@ trait Collection {
   def failoverStrategy: FailoverStrategy
 
   /** Gets the full qualified name of this collection. */
-  def fullCollectionName = db.name + "." + name
+  @inline final def fullCollectionName = db.name + "." + name
 
   /**
    * Gets another implementation of this collection.
@@ -44,9 +44,8 @@ trait Collection {
    *
    * @param failoverStrategy $failoverStrategy
    */
-  def as[C <: Collection](failoverStrategy: FailoverStrategy = failoverStrategy)(implicit producer: CollectionProducer[C] = collections.bson.BSONCollectionProducer): C = {
-    producer.apply(db, name, failoverStrategy)
-  }
+  @deprecated("Resolve the collection from DB", "0.12.8")
+  def as[C <: Collection](failoverStrategy: FailoverStrategy = failoverStrategy)(implicit producer: CollectionProducer[C] = collections.bson.BSONCollectionProducer): C = producer.apply(db, name, failoverStrategy)
 
   /**
    * Gets another collection in the current database.
@@ -55,19 +54,7 @@ trait Collection {
    * @param name $otherName
    * @param failoverStrategy $failoverStrategy
    */
-  @deprecated("Consider using `sibling` instead", "0.10")
-  def sister[C <: Collection](name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit producer: CollectionProducer[C] = collections.bson.BSONCollectionProducer): C =
-    sibling(name, failoverStrategy)
-
-  /**
-   * Gets another collection in the current database.
-   * An implicit CollectionProducer[C] must be present in the scope, or it will be the default implementation ([[reactivemongo.api.collections.bson.BSONCollection]]).
-   *
-   * @param name $otherName
-   * @param failoverStrategy $failoverStrategy
-   */
-  def sibling[C <: Collection](name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit producer: CollectionProducer[C] = collections.bson.BSONCollectionProducer): C =
-    producer.apply(db, name, failoverStrategy)
+  def sibling[C <: Collection](name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit producer: CollectionProducer[C] = collections.bson.BSONCollectionProducer): C = producer.apply(db, name, failoverStrategy)
 }
 
 /**

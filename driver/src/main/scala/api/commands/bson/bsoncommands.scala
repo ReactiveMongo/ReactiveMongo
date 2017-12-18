@@ -1,7 +1,5 @@
 package reactivemongo.api.commands.bson
 
-import reactivemongo.api.ReadConcern
-import reactivemongo.api.commands.{ CommandError, UnitBox }
 import reactivemongo.bson.{
   BSONBooleanLike,
   BSONDocument,
@@ -9,7 +7,10 @@ import reactivemongo.bson.{
   BSONDocumentWriter
 }
 
-object CommonImplicits {
+import reactivemongo.api.ReadConcern
+import reactivemongo.api.commands.{ CommandError, UnitBox }
+
+object CommonImplicits { // See CommandCodecs
   implicit object UnitBoxReader
     extends DealingWithGenericCommandErrorsReader[UnitBox.type] {
     def readResult(doc: BSONDocument): UnitBox.type = UnitBox
@@ -24,6 +25,7 @@ trait BSONCommandError extends CommandError {
   def originalDocument: BSONDocument
 }
 
+// See CommandError.apply
 case class DefaultBSONCommandError(
   code: Option[Int],
   errmsg: Option[String],
@@ -37,7 +39,7 @@ trait DealingWithGenericCommandErrorsReader[A] extends BSONDocumentReader[A] {
   def readResult(doc: BSONDocument): A
 
   final def read(doc: BSONDocument): A = {
-    if (!doc.getAs[BSONBooleanLike]("ok").exists(_.toBoolean)) {
+    if (!doc.getAs[BSONBooleanLike]("ok").forall(_.toBoolean)) {
       throw new DefaultBSONCommandError(
         code = doc.getAs[Int]("code"),
         errmsg = doc.getAs[String]("errmsg"),

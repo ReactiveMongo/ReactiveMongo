@@ -1,9 +1,12 @@
 import scala.concurrent.duration.FiniteDuration
 
 import reactivemongo.bson._
+
+import reactivemongo.api.ReadPreference
 import reactivemongo.api.commands.CommandError
 import reactivemongo.api.collections.bson.BSONCollection
 import reactivemongo.api.commands.bson._
+
 import BSONFindAndModifyCommand._
 import BSONFindAndModifyImplicits._
 
@@ -47,14 +50,15 @@ class FindAndModifySpec(implicit ee: ExecutionEnv)
           "$set" -> BSONDocument("age" -> 40)),
         fetchNewObject = true, upsert = true)
 
-      def upsertAndFetch(c: BSONCollection, timeout: FiniteDuration) = c.runCommand(FindAndModify(jack, upsertOp)).
-        aka("result") must (beLike[FindAndModifyResult] {
-          case result =>
-            result.lastError.exists(_.upsertedId.isDefined) must beTrue and (
-              result.result[Person] aka "upserted" must beSome[Person].like {
-                case Person("Jack", "London", 40) => ok
-              })
-        }).await(1, timeout)
+      def upsertAndFetch(c: BSONCollection, timeout: FiniteDuration) =
+        c.runCommand(FindAndModify(jack, upsertOp), ReadPreference.primary).
+          aka("result") must (beLike[FindAndModifyResult] {
+            case result =>
+              result.lastError.exists(_.upsertedId.isDefined) must beTrue and (
+                result.result[Person] aka "upserted" must beSome[Person].like {
+                  case Person("Jack", "London", 40) => ok
+                })
+          }).await(1, timeout)
 
       "with the default connection" in {
         upsertAndFetch(collection, timeout)

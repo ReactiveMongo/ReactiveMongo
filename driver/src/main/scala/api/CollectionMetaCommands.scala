@@ -31,7 +31,7 @@ trait CollectionMetaCommands { self: Collection =>
    *
    * @param autoIndexId $autoIndexIdParam
    */
-  def create(autoIndexId: Boolean = true)(implicit ec: ExecutionContext): Future[Unit] = Command.run(BSONSerializationPack).unboxed(self, Create(None, autoIndexId), ReadPreference.primary)
+  def create(autoIndexId: Boolean = true)(implicit ec: ExecutionContext): Future[Unit] = command.unboxed(self, Create(None, autoIndexId), ReadPreference.primary)
 
   /**
    * Creates this collection as a capped one.
@@ -43,7 +43,7 @@ trait CollectionMetaCommands { self: Collection =>
    * @param autoIndexId $autoIndexIdParam
    */
   def createCapped(size: Long, maxDocuments: Option[Int], autoIndexId: Boolean = false)(implicit ec: ExecutionContext): Future[Unit] =
-    Command.run(BSONSerializationPack).unboxed(
+    command.unboxed(
       self,
       Create(Some(Capped(size, maxDocuments)), autoIndexId),
       ReadPreference.primary)
@@ -72,13 +72,13 @@ trait CollectionMetaCommands { self: Collection =>
   def drop(failIfNotFound: Boolean)(implicit ec: ExecutionContext): Future[Boolean] = {
     import BSONDropCollectionImplicits._
 
-    Command.run(BSONSerializationPack)(
-      self, DropCollection, ReadPreference.primary).flatMap {
+    command(self, DropCollection, ReadPreference.primary).flatMap {
       case DropCollectionResult(false) if failIfNotFound =>
         Future.failed[Boolean](GenericDatabaseException(
           s"fails to drop collection: $name", Some(26)))
 
-      case DropCollectionResult(dropped) => Future.successful(dropped)
+      case DropCollectionResult(dropped) =>
+        Future.successful(dropped)
     }
   }
 
@@ -89,8 +89,7 @@ trait CollectionMetaCommands { self: Collection =>
    */
   @deprecated("Deprecated because emptyCapped became an internal command, unavailable by default.", "0.9")
   def emptyCapped()(implicit ec: ExecutionContext): Future[Unit] =
-    Command.run(BSONSerializationPack).unboxed(
-      self, EmptyCapped, ReadPreference.primary)
+    command.unboxed(self, EmptyCapped, ReadPreference.primary)
 
   /**
    * Converts this collection to a capped one.
@@ -98,7 +97,7 @@ trait CollectionMetaCommands { self: Collection =>
    * @param size $cappedSizeParam
    * @param maxDocuments $cappedMaxParam
    */
-  def convertToCapped(size: Long, maxDocuments: Option[Int])(implicit ec: ExecutionContext): Future[Unit] = Command.run(BSONSerializationPack).unboxed(self, ConvertToCapped(Capped(size, maxDocuments)), ReadPreference.primary)
+  def convertToCapped(size: Long, maxDocuments: Option[Int])(implicit ec: ExecutionContext): Future[Unit] = command.unboxed(self, ConvertToCapped(Capped(size, maxDocuments)), ReadPreference.primary)
 
   /**
    * Renames this collection.
@@ -109,24 +108,26 @@ trait CollectionMetaCommands { self: Collection =>
    * @return a failure if the dropExisting option is false and the target collection already exists
    */
   @deprecated(message = "Use `reactivemongo.api.DBMetaCommands.renameCollection on the admin database instead.", since = "0.12.4")
-  def rename(to: String, dropExisting: Boolean = false)(implicit ec: ExecutionContext): Future[Unit] =
-    Command.run(BSONSerializationPack).unboxed(self.db, RenameCollection(db.name + "." + name, db.name + "." + to, dropExisting), ReadPreference.primary)
+  def rename(to: String, dropExisting: Boolean = false)(implicit ec: ExecutionContext): Future[Unit] = command.unboxed(self.db, RenameCollection(db.name + "." + name, db.name + "." + to, dropExisting), ReadPreference.primary)
 
   /**
    * Returns various information about this collection.
    */
   def stats()(implicit ec: ExecutionContext): Future[CollStatsResult] =
-    Command.run(BSONSerializationPack)(
-      self, CollStats(None), ReadPreference.primary)
+    command(self, CollStats(None), ReadPreference.primary)
 
   /**
    * Returns various information about this collection.
    *
    * @param scale the scale factor (for example, to get all the sizes in kilobytes)
    */
-  def stats(scale: Int)(implicit ec: ExecutionContext): Future[CollStatsResult] = Command.run(BSONSerializationPack)(self, CollStats(Some(scale)), ReadPreference.primary)
+  def stats(scale: Int)(implicit ec: ExecutionContext): Future[CollStatsResult] = command(self, CollStats(Some(scale)), ReadPreference.primary)
 
   /** Returns an index manager for this collection. */
   def indexesManager(implicit ec: ExecutionContext): CollectionIndexesManager =
     CollectionIndexesManager(self.db, name)
+
+  // Command runner
+  private lazy val command =
+    Command.run(BSONSerializationPack, failoverStrategy)
 }

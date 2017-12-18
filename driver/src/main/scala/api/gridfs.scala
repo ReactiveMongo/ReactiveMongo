@@ -37,6 +37,7 @@ import reactivemongo.bson.{
   Producer,
   Subtype
 }
+
 import reactivemongo.api.{
   Cursor,
   CursorProducer,
@@ -47,7 +48,9 @@ import reactivemongo.api.{
   SerializationPack
 }
 import reactivemongo.api.commands.WriteResult
+
 import reactivemongo.util._
+
 import reactivemongo.core.errors.ReactiveMongoException
 import reactivemongo.core.netty.ChannelBufferWritableBuffer
 
@@ -55,7 +58,10 @@ import reactivemongo.api.collections.{
   GenericCollection,
   GenericCollectionProducer
 }
-import reactivemongo.api.collections.bson.BSONCollectionProducer
+import reactivemongo.api.collections.bson.{
+  BSONCollection,
+  BSONCollectionProducer
+}
 
 object `package` {
   private[gridfs] val logger = LazyLogger("reactivemongo.api.gridfs")
@@ -153,11 +159,6 @@ object DefaultFileToSave {
   }
 
   object FileName {
-    @deprecated(message = "The filename is now optional, pass it as an `Option[String]`.", since = "0.11.3")
-    implicit object StringFileName extends FileName[String] {
-      def apply(name: String) = Some(name)
-    }
-
     implicit object OptionalFileName extends FileName[Option[String]] {
       def apply(name: Option[String]) = name
     }
@@ -302,6 +303,14 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
   }
 
   /**
+   * @param name the collection name
+   */
+  private def asBSON(name: String): BSONCollection = {
+    implicit def producer = BSONCollectionProducer
+    producer.apply(db, name, db.failoverStrategy)
+  }
+
+  /**
    * Returns an `Iteratee` that will consume data to put into a GridFS store.
    *
    * @param file the metadata of the file to store.
@@ -346,10 +355,6 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
         }
       }
 
-      import reactivemongo.api.collections.bson.{
-        BSONCollection,
-        BSONCollectionProducer
-      }
       import reactivemongo.bson.utils.Converters
 
       def finish(): Future[ReadFile[Id]] = {
@@ -368,7 +373,8 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
             "contentType" -> file.contentType.map(BSONString(_)),
             "md5" -> md5.map(Converters.hex2Str),
             "metadata" -> option(!pack.isEmpty(file.metadata), file.metadata))
-          res <- files.as[BSONCollection]().insert(bson).map { _ =>
+
+          res <- asBSON(files.name).insert(bson).map { _ =>
             val buf = ChannelBufferWritableBuffer()
             BSONSerializationPack.writeToBuffer(buf, bson)
             pack.readAndDeserialize(buf.toReadableBuffer, readFileReader)
@@ -384,7 +390,7 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
           "n" -> BSONInteger(n),
           "data" -> BSONBinary(array, Subtype.GenericBinarySubtype))
 
-        chunks.as[BSONCollection]().insert(bson)
+        asBSON(chunks.name).insert(bson)
       }
     }
 
@@ -402,18 +408,13 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
    * @param file the file to be read
    */
   def enumerate[Id <: pack.Value](file: ReadFile[Id])(implicit ctx: ExecutionContext, idProducer: IdProducer[Id]): Enumerator[Array[Byte]] = {
-    import reactivemongo.api.collections.bson.{
-      BSONCollection,
-      BSONCollectionProducer
-    }
-
     def selector = BSONDocument(idProducer("files_id" -> file.id)) ++ (
       "n" -> BSONDocument(
         "$gte" -> 0,
         "$lte" -> BSONLong(file.length / file.chunkSize + (
           if (file.length % file.chunkSize > 0) 1 else 0))))
 
-    @inline def cursor = chunks.as[BSONCollection]().find(selector).
+    @inline def cursor = asBSON(chunks.name).find(selector).
       sort(BSONDocument("n" -> 1)).cursor[BSONDocument](defaultReadPreference)
 
     @inline def pushChunk(chan: Concurrent.Channel[Array[Byte]], doc: BSONDocument): Cursor.State[Unit] = doc.get("data") match {
@@ -459,14 +460,9 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
    * @param id The file id to remove from this store.
    */
   def remove[Id <: pack.Value](id: Id)(implicit ctx: ExecutionContext, idProducer: IdProducer[Id]): Future[WriteResult] = {
-    import reactivemongo.api.collections.bson.{
-      BSONCollection,
-      BSONCollectionProducer
-    }
-
-    chunks.as[BSONCollection]().
+    asBSON(chunks.name).
       remove(BSONDocument(idProducer("files_id" -> id))).flatMap { _ =>
-        files.as[BSONCollection]().remove(BSONDocument(idProducer("_id" -> id)))
+        asBSON(files.name).remove(BSONDocument(idProducer("_id" -> id)))
       }
   }
 

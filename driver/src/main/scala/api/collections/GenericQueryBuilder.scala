@@ -17,7 +17,8 @@ package reactivemongo.api.collections
 
 import scala.concurrent.{ ExecutionContext, Future }
 import reactivemongo.api._
-import reactivemongo.core.protocol.{ Query, QueryFlags }
+
+import reactivemongo.core.protocol.{ Query, QueryFlags, MongoWireVersion }
 import reactivemongo.core.netty.{ BufferSequence, ChannelBufferWritableBuffer }
 
 /**
@@ -31,7 +32,9 @@ import reactivemongo.core.netty.{ BufferSequence, ChannelBufferWritableBuffer }
  * @define resultTParam the results type
  * @define requireOneFunction Sends this query and gets a future `T` (alias for [[reactivemongo.api.Cursor.head]])
  */
-trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
+trait GenericQueryBuilder[P <: SerializationPack]
+  extends QueryOps with QueryCodecs[P] {
+
   val pack: P
   type Self <: GenericQueryBuilder[pack.type]
 
@@ -47,11 +50,164 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
   def collection: Collection
   def maxTimeMsOption: Option[Long]
 
+  /* TODO: https://docs.mongodb.com/v3.2/reference/command/find/#dbcmd.find
+
+   - singleBatch: boolean; Optional. Determines whether to close the cursor after the first batch. Defaults to false.
+   - maxScan: boolean; Optional. Maximum number of documents or index keys to scan when executing the query.
+   - readConcern: document; Optional. Specifies the read concern. The option has the following syntax:
+   - max: document; Optional. The exclusive upper bound for a specific index; https://docs.mongodb.com/v3.4/reference/method/cursor.max/#cursor.max
+   - min: document; Optional. The exclusive upper bound for a specific index; https://docs.mongodb.com/v3.4/reference/method/cursor.min/#cursor.min
+   - returnKey: boolean; Optional. If true, returns only the index keys in the resulting documents.
+   - showRecordId: boolean; Optional. Determines whether to return the record identifier for each document.
+- noCursorTimeout: boolean; Optional. Prevents the server from timing out idle cursors after an inactivity period (10 minutes).
+   - allowPartialResults: boolean; Optional. For queries against a sharded collection, returns partial results from the mongos if some shards are unavailable instead of throwing an error.
+   - collation: documentat; Optional; Specifies the collation to use for the operation.
+   */
+
   /** The default [[ReadPreference]] */
-  def readPreference: ReadPreference = ReadPreference.primary
+  val readPreference: ReadPreference = collection match {
+    case coll: GenericCollection[_] => coll.readPreference
+    case _                          => ReadPreference.primary
+  }
+
+  protected lazy val version = collection.db.connection.metadata.
+    fold[MongoWireVersion](MongoWireVersion.V30)(_.maxWireVersion)
 
   @deprecated("Will be removed from the public API", "0.12.0")
-  def merge(readPreference: ReadPreference): pack.Document
+  def merge(readPreference: ReadPreference): pack.Document =
+    merge(readPreference, Int.MaxValue)
+
+  protected def merge(readPreference: ReadPreference, maxDocs: Int): pack.Document = {
+    val builder = pack.newBuilder
+
+    import builder.{
+      boolean,
+      document,
+      elementProducer => element,
+      int,
+      long,
+      string
+    }
+
+    // Primary and SecondaryPreferred are encoded as the slaveOk flag;
+    // the others are encoded as $readPreference field.
+
+    val merged = if (version.compareTo(MongoWireVersion.V32) < 0) {
+      val elements = Seq.newBuilder[pack.ElementProducer]
+
+      queryOption.foreach {
+        elements += element(f"$$query", _)
+      }
+
+      sortOption.foreach {
+        elements += element(f"$$orderby", _)
+      }
+
+      hintOption.foreach {
+        elements += element(f"$$hint", _)
+      }
+
+      maxTimeMsOption.foreach { l =>
+        elements += element(f"$$maxTimeMS", long(l))
+      }
+
+      commentString.foreach { c =>
+        elements += element(f"$$comment", string(c))
+      }
+
+      if (explainFlag) {
+        elements += element(f"$$explain", boolean(true))
+      }
+
+      if (snapshotFlag) {
+        elements += element(f"$$snapshot", boolean(true))
+      }
+
+      elements += element(f"$$readPreference", writeReadPref(readPreference))
+
+      document(elements.result())
+    } else {
+      // TODO: singleBatch, maxScan, readConcern, max, min, returnKey
+      // showRecordId, noCursorTimeout, allowPartialResults, collation
+
+      import QueryFlags.{ AwaitData, OplogReplay, TailableCursor }
+
+      def awaitData: Boolean = (options.flagsN & AwaitData) == AwaitData
+      def oplogReplay: Boolean = (options.flagsN & OplogReplay) == OplogReplay
+      def tailable: Boolean =
+        (options.flagsN & TailableCursor) == TailableCursor
+
+      lazy val limit: Option[Int] = {
+        if (maxDocs > 0 && maxDocs < Int.MaxValue) Some(maxDocs)
+        else Option.empty[Int]
+      }
+
+      def batchSize: Option[Int] = {
+        val sz = limit.fold(options.batchSizeN) { options.batchSizeN min _ }
+
+        if (sz > 0 && sz < Int.MaxValue) Some(sz)
+        else Option.empty[Int]
+      }
+
+      val elements = Seq.newBuilder[pack.ElementProducer]
+
+      elements ++= Seq(
+        element("find", string(collection.name)),
+        element("skip", int(options.skipN)),
+        element("snapshot", boolean(snapshotFlag)),
+        element("tailable", boolean(tailable)),
+        element("awaitData", boolean(awaitData)),
+        element("oplogReplay", boolean(oplogReplay)))
+
+      queryOption.foreach {
+        elements += element("filter", _)
+      }
+
+      sortOption.foreach {
+        elements += element("sort", _)
+      }
+
+      projectionOption.foreach {
+        elements += element("projection", _)
+      }
+
+      hintOption.foreach {
+        elements += element("hint", _)
+      }
+
+      batchSize.foreach { i =>
+        elements += element("batchSize", int(i))
+      }
+
+      limit.foreach { i =>
+        elements += element("limit", int(i))
+      }
+
+      commentString.foreach { c =>
+        elements += element("comment", string(c))
+      }
+
+      maxTimeMsOption.foreach { l =>
+        elements += element("maxTimeMS", long(l))
+      }
+
+      val readPref = element(f"$$readPreference", writeReadPref(readPreference))
+
+      if (!explainFlag) {
+        elements += readPref
+
+        document(elements.result())
+      } else {
+        document(Seq[pack.ElementProducer](
+          element("explain", document(elements.result())),
+          readPref))
+      }
+    }
+
+    logger.debug(s"command: ${pack pretty merged}")
+
+    merged
+  }
 
   def copy(
     queryOption: Option[pack.Document] = queryOption,
@@ -71,12 +227,6 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
   }
 
   /**
-   * Sends this query and gets a [[Cursor]] of instances of `T`.
-   */
-  @deprecated("Use `cursor()` or `cursor(readPreference)`", "0.11.0")
-  def cursor[T](implicit reader: pack.Reader[T], ec: ExecutionContext, cp: CursorProducer[T]): cp.ProducedCursor = cursor(readPreference)
-
-  /**
    * Makes a [[Cursor]] of this query, which can be enumerated.
    *
    * @param readPreference $readPrefParam
@@ -86,19 +236,44 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
    */
   def cursor[T](readPreference: ReadPreference = readPreference, isMongo26WriteOp: Boolean = false)(implicit reader: pack.Reader[T], ec: ExecutionContext, cp: CursorProducer[T]): cp.ProducedCursor = cp.produce(defaultCursor[T](readPreference, isMongo26WriteOp))
 
-  private def defaultCursor[T](readPreference: ReadPreference, isMongo26WriteOp: Boolean = false)(implicit reader: pack.Reader[T]): Cursor[T] = {
-    val documents = BufferSequence {
-      val buffer = write(merge(readPreference), ChannelBufferWritableBuffer())
-      projectionOption.map { projection =>
-        write(projection, buffer)
-      }.getOrElse(buffer).buffer
+  private def defaultCursor[T](
+    readPreference: ReadPreference,
+    isMongo26WriteOp: Boolean = false)(implicit reader: pack.Reader[T]): Cursor[T] = {
+    val body = {
+      if (version.compareTo(MongoWireVersion.V32) < 0) { _: Int =>
+        val buffer = write(merge(readPreference), ChannelBufferWritableBuffer())
+
+        BufferSequence(
+          projectionOption.fold(buffer) { write(_, buffer) }.buffer)
+
+      } else { maxDocs: Int =>
+        // if MongoDB 3.2+, projection is managed in merge
+        def prepared = write(
+          merge(readPreference, maxDocs),
+          ChannelBufferWritableBuffer())
+
+        BufferSequence(prepared.buffer)
+      }
     }
 
-    val flags = if (readPreference.slaveOk) options.flagsN | QueryFlags.SlaveOk else options.flagsN
+    val flags = {
+      if (readPreference.slaveOk) options.flagsN | QueryFlags.SlaveOk
+      else options.flagsN
+    }
 
-    val op = Query(flags, collection.fullCollectionName, options.skipN, options.batchSizeN)
+    val name = {
+      if (version.compareTo(MongoWireVersion.V32) < 0) {
+        collection.fullCollectionName
+      } else {
+        collection.db.name + ".$cmd" // Command 'find' for 3.2+
+      }
+    }
 
-    DefaultCursor.query(pack, op, documents, readPreference, collection.db.connection, failover, isMongo26WriteOp)(reader)
+    val op = Query(flags, name, options.skipN, options.batchSizeN)
+
+    DefaultCursor.query(pack, op, body, readPreference,
+      collection.db.connection, failover, isMongo26WriteOp,
+      collection.fullCollectionName)(reader)
   }
 
   /**
@@ -200,4 +375,47 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
   def skip(n: Int) = options(options.skip(n))
   def slaveOk = options(options.slaveOk)
   def tailable = options(options.tailable)
+
+  private lazy val logger = reactivemongo.util.LazyLogger(getClass.getName)
+}
+
+private[reactivemongo] trait QueryCodecs[P <: SerializationPack] {
+  val pack: P
+
+  private[api] def writeReadPref(readPreference: ReadPreference): pack.Document = {
+    val builder = pack.newBuilder
+
+    import builder.{ elementProducer => element, document, string }
+
+    val mode = readPreference match {
+      case ReadPreference.Primary               => "primary"
+      case ReadPreference.PrimaryPreferred(_)   => "primaryPreferred"
+      case ReadPreference.Secondary(_)          => "secondary"
+      case ReadPreference.SecondaryPreferred(_) => "secondaryPreferred"
+      case ReadPreference.Nearest(_)            => "nearest"
+    }
+    val elements = Seq.newBuilder[pack.ElementProducer]
+
+    elements += element("mode", string(mode))
+
+    readPreference match {
+      case ReadPreference.Taggable(first :: tagSet) if tagSet.nonEmpty => {
+        val head = document(first.toSeq.map {
+          case (k, v) => element(k, string(v))
+        })
+
+        elements += element("tags", builder.array(
+          head,
+          tagSet.toSeq.map { tags =>
+            document(tags.toSeq.map {
+              case (k, v) => element(k, string(v))
+            })
+          }))
+      }
+
+      case _ => ()
+    }
+
+    document(elements.result())
+  }
 }

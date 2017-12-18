@@ -183,8 +183,10 @@ class MonitorSpec(implicit ee: ExecutionEnv)
     def connection = addConnection(
       drv, poolName, nodes, options, mongosystem).mapTo[MongoConnection]
 
-    connection.flatMap { con =>
-      f(con, mongosystem).andThen { case _ => con.close() }
-    }
+    for {
+      con <- connection
+      res <- f(con, mongosystem)
+      _ <- con.askClose()(timeout).recover { case _ => () }
+    } yield res
   }
 }

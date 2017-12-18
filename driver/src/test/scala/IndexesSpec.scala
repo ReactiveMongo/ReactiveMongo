@@ -96,7 +96,7 @@ class IndexesSpec(implicit ee: ExecutionEnv)
     }
   }
 
-  lazy val geo2DSpherical = db("geo2d")
+  lazy val geo2DSpherical = db(s"geo2d_${System identityHashCode this}")
 
   "ReactiveMongo Geo2D indexes" should {
     "insert some points" in {
@@ -122,7 +122,7 @@ class IndexesSpec(implicit ee: ExecutionEnv)
     }
   }
 
-  lazy val hashed = db("hashed")
+  lazy val hashed = db(s"hashed_${System identityHashCode this}")
 
   "Hashed indexes" should {
     "insert some data" in {

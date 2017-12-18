@@ -10,7 +10,10 @@ import reactivemongo.bson.{
   BSONString
 }
 
-import reactivemongo.api.collections.bson.BSONCollection
+import reactivemongo.api.collections.bson.{
+  BSONCollection,
+  BSONCollectionProducer
+}
 
 /** A mixin that provides commands about this database itself. */
 trait DBMetaCommands { self: DB =>
@@ -40,7 +43,7 @@ trait DBMetaCommands { self: DB =>
 
   /** Drops this database. */
   def drop()(implicit ec: ExecutionContext): Future[Unit] =
-    Command.run(BSONSerializationPack).unboxed(
+    Command.run(BSONSerializationPack, failoverStrategy).unboxed(
       self, DropDatabase, ReadPreference.primary)
 
   /** Returns an index manager for this database. */
@@ -61,14 +64,21 @@ trait DBMetaCommands { self: DB =>
     val wireVer = connection.metadata.map(_.maxWireVersion)
 
     if (wireVer.exists(_ >= MongoWireVersion.V30)) {
-      Command.run(BSONSerializationPack)(
+      Command.run(BSONSerializationPack, failoverStrategy)(
         self, ListCollectionNames, ReadPreference.primary).map(_.names)
 
-    } else collection("system.namespaces").as[BSONCollection]().
-      find(BSONDocument(
+    } else {
+      implicit def producer = BSONCollectionProducer
+
+      val coll: BSONCollection =
+        producer.apply(self, "system.namespaces", self.failoverStrategy)
+
+      coll.find(BSONDocument(
         "name" -> BSONRegex("^[^\\$]+$", "") // strip off any indexes
       )).cursor(defaultReadPreference)(
-        CollectionNameReader, ec, CursorProducer.defaultCursorProducer).collect[List]()
+        CollectionNameReader, ec, CursorProducer.defaultCursorProducer).
+        collect[List](-1, Cursor.FailOnError[List[String]]())
+    }
   }
 
   /**
@@ -93,7 +103,7 @@ trait DBMetaCommands { self: DB =>
 
   /** Returns the server status. */
   def serverStatus(implicit ec: ExecutionContext): Future[ServerStatusResult] =
-    Command.run(BSONSerializationPack)(
+    Command.run(BSONSerializationPack, failoverStrategy)(
       self, ServerStatus, ReadPreference.primary)
 
   /**
@@ -118,7 +128,7 @@ trait DBMetaCommands { self: DB =>
     val command = BSONCreateUserCommand.CreateUser(
       name, pwd, roles, digestPassword, Some(writeConcern), customData)
 
-    Command.run(BSONSerializationPack)(
+    Command.run(BSONSerializationPack, failoverStrategy)(
       self, command, ReadPreference.primary).map(_ => {})
   }
 

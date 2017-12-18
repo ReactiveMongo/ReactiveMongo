@@ -17,6 +17,8 @@ package reactivemongo.core.protocol
 
 import java.nio.ByteOrder
 
+import scala.util.{ Failure, Success, Try }
+
 import akka.actor.ActorRef
 
 import shaded.netty.buffer._
@@ -28,13 +30,17 @@ import shaded.netty.handler.timeout.{
   IdleStateAwareChannelHandler
 }
 
+import reactivemongo.bson.{ BSONBooleanLike, BSONDocument, BSONNumberLike }
+
 import reactivemongo.core.actors.{
   ChannelConnected,
   ChannelClosed,
   ChannelDisconnected
 }
+
 import reactivemongo.api.SerializationPack
 import reactivemongo.api.commands.GetLastError
+
 import reactivemongo.core.errors._
 import reactivemongo.core.netty._
 import reactivemongo.util.LazyLogger
@@ -191,7 +197,7 @@ case class Request(
 }
 
 /**
- * A helper to build write request which result needs to be checked (by sending a [[reactivemongo.core.commands.GetLastError]] command after).
+ * A helper to build write request which result needs to be checked.
  *
  * @param op write operation.
  * @param documents body of this request, a [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]] containing 0, 1, or many documents.
@@ -222,7 +228,8 @@ case class RequestMaker(
   documents: BufferSequence = BufferSequence.empty,
   readPreference: ReadPreference = ReadPreference.primary,
   channelIdHint: Option[Int] = None) {
-  def apply(id: Int) = Request(id, 0, op, documents, readPreference, channelIdHint)
+  def apply(id: Int): Request = Request(
+    id, 0, op, documents, readPreference, channelIdHint)
 }
 
 /**
@@ -243,7 +250,8 @@ object Request {
     requestID,
     responseTo,
     op,
-    BufferSequence(ChannelBuffers.wrappedBuffer(ByteOrder.LITTLE_ENDIAN, documents)))
+    BufferSequence(
+      ChannelBuffers.wrappedBuffer(ByteOrder.LITTLE_ENDIAN, documents)))
 
   /**
    * Create a request.
@@ -269,39 +277,107 @@ object Request {
 /**
  * A Mongo Wire Protocol Response messages.
  *
- * @param header header of this response.
- * @param reply the reply operation contained in this response.
- * @param documents body of this response, a [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]] containing 0, 1, or many documents.
- * @param info some meta information about this response, see [[reactivemongo.core.protocol.ResponseInfo]].
+ * @param header the header of this response
+ * @param reply the reply operation contained in this response
+ * @param documents the body of this response, a [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]] containing 0, 1, or many documents
+ * @param info some meta information about this response, see [[reactivemongo.core.protocol.ResponseInfo]]
  */
-case class Response(
-  header: MessageHeader,
-  reply: Reply,
-  documents: ChannelBuffer,
-  info: ResponseInfo) {
+sealed abstract class Response(
+  val header: MessageHeader,
+  val reply: Reply,
+  val documents: ChannelBuffer,
+  val info: ResponseInfo) extends Product4[MessageHeader, Reply, ChannelBuffer, ResponseInfo] with Serializable {
+  @inline def _1 = header
+  @inline def _2 = reply
+  @inline def _3 = documents
+  @inline def _4 = info
+
+  def canEqual(that: Any): Boolean = that match {
+    case _: Response => true
+    case _           => false
+  }
+
   /** If this response is in error, explain this error. */
   lazy val error: Option[DatabaseException] = {
     if (reply.inError) {
       val bson = Response.parse(this)
 
-      if (bson.hasNext) Some(ReactiveMongoException(bson.next))
+      if (bson.hasNext) Some(DatabaseException(bson.next))
       else None
     } else None
   }
+
+  private[reactivemongo] def cursorID(id: Long): Response
+
+  private[reactivemongo] def startingFrom(offset: Int): Response
+
+  override def toString = s"Response($header, $reply, $info)"
 }
 
 object Response {
   import reactivemongo.api.BSONSerializationPack
-  import reactivemongo.bson.{ BSONDocument, BSONDocumentReader, BSONValue }
+  import reactivemongo.bson.BSONDocument
   import reactivemongo.bson.DefaultBSONHandlers.BSONDocumentIdentity
 
-  def parse(response: Response): Iterator[BSONDocument] =
-    parse[BSONDocument](response, BSONDocumentIdentity)
+  def apply(
+    header: MessageHeader,
+    reply: Reply,
+    documents: ChannelBuffer,
+    info: ResponseInfo): Response = Successful(header, reply, documents, info)
 
-  @inline private[reactivemongo] def parse[T](
-    response: Response, reader: BSONDocumentReader[T]): Iterator[T] =
-    ReplyDocumentIterator(BSONSerializationPack)(
-      response.reply, response.documents)(reader)
+  def parse(response: Response): Iterator[BSONDocument] = parse[BSONSerializationPack.type, BSONDocument](BSONSerializationPack)(response, BSONDocumentIdentity)
+
+  @inline private[reactivemongo] def parse[P <: SerializationPack, T](
+    pack: P)(response: Response, reader: pack.Reader[T]): Iterator[T] =
+    ReplyDocumentIterator.parse(pack)(response)(reader)
+
+  def unapply(response: Response): Option[(MessageHeader, Reply, ChannelBuffer, ResponseInfo)] = Some((response.header, response.reply, response.documents, response.info))
+
+  // ---
+
+  private[reactivemongo] final case class Successful(
+    _header: MessageHeader,
+    _reply: Reply,
+    _documents: ChannelBuffer,
+    _info: ResponseInfo) extends Response(
+    _header, _reply, _documents, _info) {
+
+    private[reactivemongo] def cursorID(id: Long): Response =
+      copy(_reply = this._reply.copy(cursorID = id))
+
+    private[reactivemongo] def startingFrom(offset: Int): Response =
+      copy(_reply = this._reply.copy(startingFrom = offset))
+  }
+
+  // For MongoDB 3.2+ response with cursor
+  private[reactivemongo] final case class WithCursor(
+    _header: MessageHeader,
+    _reply: Reply,
+    _documents: ChannelBuffer,
+    _info: ResponseInfo,
+    ns: String,
+    private[core]preloaded: Seq[BSONDocument]) extends Response(
+    _header, _reply, _documents, _info) {
+    private[reactivemongo] def cursorID(id: Long): Response =
+      copy(_reply = this._reply.copy(cursorID = id))
+
+    private[reactivemongo] def startingFrom(offset: Int): Response =
+      copy(_reply = this._reply.copy(startingFrom = offset))
+  }
+
+  private[reactivemongo] final case class CommandError(
+    _header: MessageHeader,
+    _reply: Reply,
+    _info: ResponseInfo,
+    private[reactivemongo]cause: DatabaseException) extends Response(_header, _reply, ChannelBuffers.EMPTY_BUFFER, _info) {
+    override lazy val error: Option[DatabaseException] = Some(cause)
+
+    private[reactivemongo] def cursorID(id: Long): Response =
+      copy(_reply = this._reply.copy(cursorID = id))
+
+    private[reactivemongo] def startingFrom(offset: Int): Response =
+      copy(_reply = this._reply.copy(startingFrom = offset))
+  }
 }
 
 /**
@@ -331,13 +407,51 @@ private[reactivemongo] class RequestEncoder extends OneToOneEncoder {
 }
 
 object ReplyDocumentIterator {
+  private[reactivemongo] def parse[P <: SerializationPack, A](pack: P)(response: Response)(implicit reader: pack.Reader[A]): Iterator[A] = response match {
+    case Response.CommandError(_, _, _, cause) => new Iterator[A] {
+      val hasNext = false
+      @inline def next: A = throw cause
+      //throw ReplyDocumentIteratorExhaustedException(cause)
+    }
+
+    case Response.WithCursor(_, _, _, _, _, preloaded) => {
+      val buf = response.documents
+
+      if (buf.readableBytes == 0) {
+        Iterator.empty
+      } else {
+        try {
+          buf.skipBytes(buf.getInt(buf.readerIndex))
+
+          def docs = apply[P, A](pack)(response.reply, buf)
+
+          val firstBatch = preloaded.iterator.map { bson =>
+            pack.deserialize(pack.document(bson), reader)
+          }
+
+          firstBatch ++ docs
+        } catch {
+          case cause: Exception => new Iterator[A] {
+            val hasNext = false
+            @inline def next: A = throw cause
+            //throw ReplyDocumentIteratorExhaustedException(cause)
+          }
+        }
+      }
+    }
+
+    case _ => apply[P, A](pack)(response.reply, response.documents)
+  }
+
   def apply[P <: SerializationPack, A](pack: P)(reply: Reply, buffer: ChannelBuffer)(implicit reader: pack.Reader[A]): Iterator[A] = new Iterator[A] {
     override val isTraversableAgain = false // TODO: Add test
     override def hasNext = buffer.readable
 
     override def next = try {
-      val cbrb = ChannelBufferReadableBuffer(buffer.readBytes(buffer.getInt(buffer.readerIndex)))
-      pack.readAndDeserialize(cbrb, reader)
+      val rb = ChannelBufferReadableBuffer(
+        buffer readBytes buffer.getInt(buffer.readerIndex))
+
+      pack.readAndDeserialize(rb, reader)
     } catch {
       case e: IndexOutOfBoundsException =>
         /*
@@ -359,14 +473,18 @@ private[reactivemongo] object RequestEncoder {
 private[reactivemongo] class ResponseFrameDecoder extends FrameDecoder {
   override def decode(context: ChannelHandlerContext, channel: Channel, buffer: ChannelBuffer) = {
     val readableBytes = buffer.readableBytes
+
     if (readableBytes < 4) null
     else {
-      buffer.markReaderIndex
+      buffer.markReaderIndex()
+
       val length = buffer.readInt
+
       buffer.resetReaderIndex
-      if (length <= readableBytes && length > 0)
+
+      if (length <= readableBytes && length > 0) {
         buffer.readBytes(length)
-      else null
+      } else null
     }
   }
 }
@@ -375,8 +493,73 @@ private[reactivemongo] class ResponseDecoder extends OneToOneDecoder {
   def decode(ctx: ChannelHandlerContext, channel: Channel, obj: Object): Response = {
     val buffer = obj.asInstanceOf[ChannelBuffer]
     val header = MessageHeader(buffer)
+    val reply = Reply(buffer)
+    val info = ResponseInfo(channel.getId)
 
-    Response(header, Reply(buffer), buffer, ResponseInfo(channel.getId))
+    if (reply.cursorID == 0 && reply.numberReturned > 0) {
+      buffer.markReaderIndex()
+
+      document(buffer) match {
+        case Failure(cause) =>
+          Response.CommandError(header, reply, info, DatabaseException(cause))
+
+        case Success(doc) => {
+          val ok = doc.getAs[BSONBooleanLike]("ok")
+          def failed = {
+            val r = {
+              if (reply.inError) reply
+              else reply.copy(flags = reply.flags | 0x02)
+            }
+
+            Response.CommandError(header, r, info, DatabaseException(doc))
+          }
+
+          doc.getAs[BSONDocument]("cursor") match {
+            case Some(cursor) if ok.exists(_.toBoolean) => {
+              val ry = for {
+                id <- cursor.getAs[BSONNumberLike]("id").map(_.toLong)
+                ns <- cursor.getAs[String]("ns")
+                batch <- cursor.getAs[Seq[BSONDocument]]("firstBatch").orElse(
+                  cursor.getAs[Seq[BSONDocument]]("nextBatch"))
+
+              } yield (ns, batch, reply.copy(
+                cursorID = id,
+                numberReturned = batch.size))
+
+              buffer.resetReaderIndex()
+
+              ry.fold(Response(header, reply, buffer, info)) {
+                case (ns, batch, r) => Response.WithCursor(
+                  header, r, buffer, info, ns, batch)
+              }
+            }
+
+            case Some(_) => failed
+
+            case _ => {
+              buffer.resetReaderIndex()
+
+              if (ok.forall(_.toBoolean)) {
+                Response(header, reply, buffer, info)
+              } else { // !ok
+                failed
+              }
+            }
+          }
+        }
+      }
+    } else {
+      Response(header, reply, buffer, info)
+    }
+  }
+
+  // ---
+
+  @inline private def document(buf: ChannelBuffer) = Try[BSONDocument] {
+    val docBuf = ChannelBufferReadableBuffer(
+      buf readBytes buf.getInt(buf.readerIndex))
+
+    reactivemongo.api.BSONSerializationPack.readFromBuffer(docBuf)
   }
 }
 
