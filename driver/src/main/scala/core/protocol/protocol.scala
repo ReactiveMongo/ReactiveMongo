@@ -473,12 +473,17 @@ private[reactivemongo] class ResponseDecoder
 
     //val docs = frame.copy() // 'detach' as frame is reused by networking
     val docs: ByteBuf = {
-      // Copy as unpooled (non-derived) buffer
-      val buf = Unpooled.buffer(frame.readableBytes)
+      if (reply.numberReturned == 0) {
+        frame.discardReadBytes()
+        Unpooled.EMPTY_BUFFER
+      } else {
+        // Copy as unpooled (non-derived) buffer
+        val buf = Unpooled.buffer(frame.readableBytes)
 
-      buf.writeBytes(frame)
+        buf.writeBytes(frame)
 
-      buf
+        buf
+      }
     }
 
     //println(s"_here: ${frame.refCnt}")

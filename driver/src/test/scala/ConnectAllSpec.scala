@@ -24,7 +24,7 @@ trait ConnectAllSpec { _: NodeSetSpec =>
       { ns =>
         connectAll(sys, ns)
       }
-    }
+    } tag "wip"
 
     builder("connect all the nodes with synchronization") { sys =>
       { ns =>

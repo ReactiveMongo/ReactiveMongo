@@ -103,7 +103,6 @@ object NettyEmbedder extends LowPriorityNettyEmbedder {
     @annotation.tailrec
     def release(): Unit = Option(chan.readOutbound[shaded.netty.buffer.ByteBuf]) match {
       case Some(remaining) => {
-        println(s"_rem: $remaining")
         remaining.release()
         release()
       }

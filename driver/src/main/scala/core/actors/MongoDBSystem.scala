@@ -1235,7 +1235,7 @@ trait MongoDBSystem extends Actor {
     @annotation.tailrec
     def updateNode(n: Node, before: Vector[Connection], updated: Vector[Connection]): Node = before.headOption match {
       case Some(c) => {
-        //println(s"-> c.status = ${c.status} ? ${c.channel.isActive}")
+        //println(s"${n.name} -> c.status = ${c.status} ? ${c.channel.isActive}")
 
         if (c.status == ConnectionStatus.Connecting ||
           c.status == ConnectionStatus.Connected) {
