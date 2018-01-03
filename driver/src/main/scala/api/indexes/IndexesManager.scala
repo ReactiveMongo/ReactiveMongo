@@ -45,10 +45,14 @@ sealed trait IndexesManager {
   /**
    * Creates the given index only if it does not exist on this database.
    *
+   * The following rules are used to check the matching index:
+   * - if `nsIndex.isDefined`, it checks using the index name,
+   * - otherwise it checks using the key.
+   *
    * Warning: given the options you choose, and the data to index, it can be a long and blocking operation on the database.
    * You should really consider reading [[http://www.mongodb.org/display/DOCS/Indexes]] before doing this, especially in production.
    *
-   * @param nsIndex The index to create.
+   * @param nsIndex the index to create
    *
    * @return a future containing true if the index was created, false if it already exists.
    */
@@ -125,10 +129,11 @@ final class LegacyIndexesManager(db: DB)(
       "name" -> nsIndex.index.eventualName)
 
     collection.find(query).one.flatMap { idx =>
-      if (!idx.isDefined)
+      if (!idx.isDefined) {
         create(nsIndex).map(_ => true)
-      // there is a match, returning a future ok. TODO
-      else Future.successful(false)
+      } else {
+        Future.successful(false)
+      }
     }
   }
 
@@ -161,6 +166,7 @@ final class DefaultIndexesManager(db: DB with DBMetaCommands)(
   private def listIndexes(collections: List[String], indexes: List[NSIndex]): Future[List[NSIndex]] = collections match {
     case c :: cs => onCollection(c).list().flatMap(ix =>
       listIndexes(cs, indexes ++ ix.map(NSIndex(s"${db.name}.$c", _))))
+
     case _ => Future.successful(indexes)
   }
 
@@ -189,6 +195,10 @@ sealed trait CollectionIndexesManager {
 
   /**
    * Creates the given index only if it does not exist on this collection.
+   *
+   * The following rules are used to check the matching index:
+   * - if `nsIndex.isDefined`, it checks using the index name,
+   * - otherwise it checks using the key.
    *
    * Warning: given the options you choose, and the data to index, it can be a long and blocking operation on the database.
    * You should really consider reading [[http://www.mongodb.org/display/DOCS/Indexes]] before doing this, especially in production.
@@ -302,10 +312,18 @@ private class DefaultCollectionIndexesManager(db: DB, collectionName: String)(
       case err => Future.failed(err)
     }
 
-  def ensure(index: Index): Future[Boolean] = for {
-    is <- list().map(_.dropWhile(_.key != index.key).headOption.isDefined)
-    cr <- if (!is) create(index).map(_ => true) else Future.successful(false)
-  } yield cr
+  def ensure(index: Index): Future[Boolean] = list().flatMap { indexes =>
+    val idx = index.name match {
+      case Some(n) => indexes.find(_.name.exists(_ == n))
+      case _       => indexes.find(_.key == index.key)
+    }
+
+    if (!idx.isDefined) {
+      create(index).map(_ => true)
+    } else {
+      Future.successful(false)
+    }
+  }
 
   implicit private val writeResultReader =
     BSONDocumentReader[WriteResult] { DefaultWriteResultReader.read(_) }
@@ -398,7 +416,15 @@ object IndexesManager {
   implicit object IndexReader extends BSONDocumentReader[Index] {
     def read(doc: BSONDocument): Index = doc.getAs[BSONDocument]("key").map(
       _.elements.map { elem => elem.name -> IndexType(elem.value) }.toList).
-      fold[Index](throw new Exception("the key must be defined")) { key =>
+      fold[Index](throw new Exception("the key must be defined")) { k =>
+        val key = doc.getAs[BSONDocument]("weights").fold(k) { w =>
+          val fields = w.elements.map(_.name)
+
+          (k, fields).zipped.map {
+            case ((_, tpe), name) => name -> tpe
+          }.toList
+        }
+
         val options = doc.elements.filterNot { element =>
           element.name == "ns" || element.name == "key" ||
             element.name == "name" || element.name == "unique" ||
