@@ -237,4 +237,26 @@ class IndexesSpec(implicit ee: ExecutionEnv)
       insertAndCount must beEqualTo(3 -> 6).await(0, timeout)
     } tag "not_mongo26"
   }
+
+  "Text index" should {
+    lazy val coll = db(s"txtidx${System identityHashCode this}")
+    lazy val mngr = coll.indexesManager
+
+    val name = "mySearchIndex"
+    val textIndex = Index(
+      Seq(
+        "someFieldA" -> IndexType.Text,
+        "someFieldB" -> IndexType.Text),
+      name = Some(name))
+
+    "be created" in {
+      mngr.create(textIndex).flatMap(_ => mngr.list().map(_.flatMap(_.name))).
+        aka("indexes") must contain(atLeast(name)).await(0, timeout)
+
+    }
+
+    "be ensured" in {
+      mngr.ensure(textIndex) must beFalse.await(0, timeout)
+    }
+  }
 }
