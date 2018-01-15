@@ -102,7 +102,7 @@ export TEST_CLASSES="UpdateSpec DriverSpec CursorSpec"
 
 These sample applications are kept up to date with the latest driver version. They are built upon Play 2.6.
 
-* [A simple TODO app built with Play!, Swagger and ReactiveMongo](https://github.com/ricsirigu/play26-swagger-reactivemongo)
+* [A simple TODO app built with Play, Swagger and ReactiveMongo](https://github.com/ricsirigu/play26-swagger-reactivemongo)
 
 These sample applications are built upon Play 2.3.
 
