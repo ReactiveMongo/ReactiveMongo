@@ -98,7 +98,13 @@ export TEST_CLASSES="UpdateSpec DriverSpec CursorSpec"
 - [Get help](https://groups.google.com/forum/?fromgroups#!forum/reactivemongo)
 - [Contribute](https://github.com/ReactiveMongo/ReactiveMongo/blob/master/CONTRIBUTING.md#reactivemongo-developer--contributor-guidelines)
 
-**Samples:** These sample applications are kept up to date with the latest driver version. They are built upon Play 2.3.
+**Samples:**  
+
+These sample applications are kept up to date with the latest driver version. They are built upon Play 2.6.
+
+* [A simple TODO app built with Play!, Swagger and ReactiveMongo](https://github.com/ricsirigu/play26-swagger-reactivemongo)
+
+These sample applications are built upon Play 2.3.
 
 * [ReactiveMongo Tailable Cursor, WebSocket and Play 2](https://github.com/sgodbillon/reactivemongo-tailablecursor-demo)
 * [Full Web Application featuring basic CRUD operations and GridFS streaming](https://github.com/sgodbillon/reactivemongo-demo-app)
