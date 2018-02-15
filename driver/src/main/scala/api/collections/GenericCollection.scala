@@ -101,9 +101,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
   type AggregationFramework = BatchCommands.AggregationFramework.type
 
   /**
-   * Alias for [[BatchCommands.AggregationFramework.PipelineOperator]]
-   *
-   * @see [[reactivemongo.api.commands.AggregationFramework.PipelineOperator]]
+   * Alias for [[reactivemongo.api.commands.AggregationFramework.PipelineOperator]]
    */
   type PipelineOperator = BatchCommands.AggregationFramework.PipelineOperator
 
@@ -243,7 +241,8 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    * collection.insert[MyDocType](ordered = true).one(multiDocs)
    * }}}
    */
-  def insert[T: pack.Writer](ordered: Boolean)(implicit ec: ExecutionContext): InsertBuilder[T] = prepareInsert[T](ordered, defaultWriteConcern)
+  def insert[T: pack.Writer](ordered: Boolean): InsertBuilder[T] =
+    prepareInsert[T](ordered, defaultWriteConcern)
 
   /**
    * Returns a builder for insert operations.
@@ -642,7 +641,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    * @param upsert states whether the update object should be inserted if no match found. Defaults to false.
    * @param multi states whether the update may be done on all the matching documents.
    */
-  @deprecated("Use [[update]]", "0.12.0")
+  @deprecated("Use `update(Boolean)`", "0.12.0")
   def uncheckedUpdate[S, U](selector: S, update: U, upsert: Boolean = false, multi: Boolean = false)(implicit selectorWriter: pack.Writer[S], updateWriter: pack.Writer[U]): Unit = {
     val flags = 0 | (if (upsert) UpdateFlags.Upsert else 0) | (if (multi) UpdateFlags.MultiUpdate else 0)
     val op = Update(fullCollectionName, flags)
@@ -661,7 +660,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    *
    * @param document the document to insert.
    */
-  @deprecated("Use [[insert]]", "0.12.0")
+  @deprecated("Use `insert[T](Boolean)`", "0.12.0")
   def uncheckedInsert[T](document: T)(implicit writer: pack.Writer[T]): Unit = {
     val op = Insert(0, fullCollectionName)
     val bson = writeDoc(document, writer)

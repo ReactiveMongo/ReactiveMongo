@@ -79,7 +79,7 @@ class IndexesSpec(implicit ee: ExecutionEnv)
         }.filter(!_.isEmpty).map(_.apply(0))
 
         future must beLike[Index] {
-          case i @ Index(("loc", Geo2D) :: _, _, _, _, _, _, _, _, opts) =>
+          case Index(("loc", Geo2D) :: _, _, _, _, _, _, _, _, opts) =>
             opts.getAs[BSONInteger]("min").get.value mustEqual -95 and (
               opts.getAs[BSONInteger]("max").get.value mustEqual 95) and (
                 opts.getAs[BSONInteger]("bits").get.value mustEqual 28)

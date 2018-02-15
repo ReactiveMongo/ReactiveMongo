@@ -139,38 +139,10 @@ object Dependencies {
   val commonsCodec = "commons-codec" % "commons-codec" % "1.10"
 }
 
-object Findbugs {
-  import scala.xml.{ NodeSeq, XML }, XML.{ loadFile => loadXML }
-
-  import de.johoop.findbugs4sbt.{ FindBugs, ReportType }, FindBugs.{
-    findbugsExcludeFilters, findbugsReportPath, findbugsReportType,
-    findbugsSettings
-  }
-
-  @inline def task = FindBugs.findbugs
-
-  val settings = findbugsSettings ++ Seq(
-    findbugsReportType := Some(ReportType.PlainHtml),
-    findbugsReportPath := Some(target.value / "findbugs.html"),
-    findbugsExcludeFilters := {
-      val commonFilters = loadXML(baseDirectory.value / ".." / "project" / (
-        "findbugs-exclude-filters.xml"))
-
-      val filters = {
-        val f = baseDirectory.value / "findbugs-exclude-filters.xml"
-        if (!f.exists) NodeSeq.Empty else loadXML(f).child
-      }
-
-      Some(
-        <FindBugsFilter>${commonFilters.child}${filters}</FindBugsFilter>
-      )
-    }
-  )
-}
-
 object Documentation {
-  import sbtunidoc.{ Plugin => UnidocPlugin },
-    UnidocPlugin.UnidocKeys._, UnidocPlugin.ScalaUnidoc
+  import sbtunidoc.{ ScalaUnidocPlugin => UnidocPlugin }
+  import sbtunidoc.BaseUnidocPlugin.autoImport._//
+  import UnidocPlugin.autoImport.ScalaUnidoc
 
   def mappings(org: String, location: String, revision: String => String = identity)(names: String*) = Def.task[Map[File, URL]] {
     (for {
@@ -182,7 +154,7 @@ object Documentation {
     } yield entry.data -> url(location.format(rev)))(scala.collection.breakOut)
   }
 
-  val settings = UnidocPlugin.unidocSettings ++ Seq(
+  val settings = UnidocPlugin.projectSettings ++ Seq(
     unidocProjectFilter in (ScalaUnidoc, unidoc) := {
       inAnyProject -- inProjects(
         ReactiveMongoBuild.shaded, ReactiveMongoBuild.jmx)
@@ -200,12 +172,13 @@ object ReactiveMongoBuild extends Build {
     AssemblyKeys, MergeStrategy, PathList, ShadeRule
   }, AssemblyKeys._
 
-  import com.typesafe.tools.mima.core._, ProblemFilters._, Problem.ClassVersion
+  import com.typesafe.tools.mima.core._, ProblemFilters._
   import com.typesafe.tools.mima.plugin.MimaKeys.{
-    binaryIssueFilters, previousArtifacts
+    mimaBinaryIssueFilters, mimaPreviousArtifacts
   }
 
-  import de.johoop.cpd4sbt.CopyPasteDetector
+  import com.github.sbt.cpd.CpdPlugin
+  import sbtunidoc.ScalaUnidocPlugin
 
   val travisEnv = taskKey[Unit]("Print Travis CI env")
 
@@ -217,7 +190,7 @@ object ReactiveMongoBuild extends Build {
     settings = buildSettings ++ Documentation.settings).
     settings(
       publishArtifact := false,
-      previousArtifacts := Set.empty,
+      mimaPreviousArtifacts := Set.empty,
       travisEnv in Test := { // test:travisEnv from SBT CLI
         val (akkaLower, akkaUpper) = "2.3.13" -> "2.5.6"
         val (playLower, playUpper) = "2.3.8" -> "2.6.1"
@@ -311,7 +284,7 @@ object ReactiveMongoBuild extends Build {
         println(s"# Travis CI env\r\n$matrix")
       }
     ).aggregate(bson, bsonmacros, shaded, driver, jmx).
-    enablePlugins(CopyPasteDetector)
+    enablePlugins(ScalaUnidocPlugin, CpdPlugin)
 
   import scala.xml.{ Elem => XmlElem, Node => XmlNode }
   private def transformPomDependencies(tx: XmlElem => Option[XmlNode]): XmlNode => XmlNode = { node: XmlNode =>
@@ -335,13 +308,13 @@ object ReactiveMongoBuild extends Build {
     }
   }
 
-  import de.johoop.findbugs4sbt.FindBugs.findbugsAnalyzedPath
+  import com.github.sbt.findbugs.FindbugsKeys.findbugsAnalyzedPath
 
   lazy val shaded = Project(
     s"$projectPrefix-Shaded",
     file("shaded"),
     settings = baseSettings ++ Publish.settings ++ Seq(
-      previousArtifacts := Set.empty,
+      mimaPreviousArtifacts := Set.empty,
       crossPaths := false,
       autoScalaLibrary := false,
       libraryDependencies ++= Seq(
@@ -384,7 +357,7 @@ object ReactiveMongoBuild extends Build {
         "org.specs2" %% "specs2-scalacheck" % specsVer % Test,
         "org.typelevel" %% "discipline" % "0.7.2" % Test,
         "org.spire-math" %% "spire-laws" % "0.13.0" % Test),
-      binaryIssueFilters ++= {
+      mimaBinaryIssueFilters ++= {
         import ProblemFilters.{ exclude => x }
         @inline def irt(s: String) = x[IncompatibleResultTypeProblem](s)
         @inline def mtp(s: String) = x[MissingTypesProblem](s)
@@ -405,7 +378,7 @@ object ReactiveMongoBuild extends Build {
         )
       }
     )
-  ).enablePlugins(CopyPasteDetector)
+  ).enablePlugins(CpdPlugin)
 
   lazy val bsonmacros = Project(
     s"$projectPrefix-BSON-Macros",
@@ -416,7 +389,7 @@ object ReactiveMongoBuild extends Build {
         shapelessTest % Test
       )
     ))
-    .enablePlugins(CopyPasteDetector)
+    .enablePlugins(CpdPlugin)
     .dependsOn(bson)
 
   val driverCleanup = taskKey[Unit]("Driver compilation cleanup")
@@ -476,7 +449,7 @@ object Version {
         playIteratees.value, commonsCodec,
         shapelessTest % Test, specs) ++ logApi,
       findbugsAnalyzedPath += target.value / "external",
-      binaryIssueFilters ++= {
+      mimaBinaryIssueFilters ++= {
         import ProblemFilters.{ exclude => x }
         @inline def mmp(s: String) = x[MissingMethodProblem](s)
         @inline def imt(s: String) = x[IncompatibleMethTypeProblem](s)
@@ -486,7 +459,32 @@ object Version {
         @inline def mtp(s: String) = x[MissingTypesProblem](s)
         @inline def mcp(s: String) = x[MissingClassProblem](s)
 
-        Seq(
+        // 2.12
+        val f212: ProblemFilter = {
+          case MissingClassProblem(cls) => {
+            !(cls.fullName.startsWith(
+              "reactivemongo.api.commands.AggregationFramework") ||
+              cls.fullName.startsWith(
+                "reactivemongo.api.commands.GroupAggregation"))
+          }
+
+          case MissingTypesProblem(cls, _) => {
+            !(cls.fullName.startsWith(
+              "reactivemongo.api.commands.AggregationFramework") ||
+              cls.fullName.startsWith(
+                "reactivemongo.api.commands.GroupAggregation"))
+          }
+
+          case _ => true
+        }
+
+        Seq( // TODO: according Scala version
+          f212,
+          exclude[DirectAbstractMethodProblem](
+            "reactivemongo.api.Cursor.headOption"),
+          exclude[DirectAbstractMethodProblem](
+            "reactivemongo.api.collections.GenericQueryBuilder.readPreference"),
+          // --
           mcp("reactivemongo.api.MongoConnection$MonitorActor$"),
           imt("reactivemongo.api.MongoConnection.sendExpectingResponse"), // priv
           mcp("reactivemongo.api.ReadPreference$BSONDocumentWrapper$"), // priv
@@ -888,7 +886,8 @@ object Version {
           mcp("reactivemongo.core.commands.FindAndModify$"),
           mcp("reactivemongo.core.commands.Remove$"),
           mcp("reactivemongo.core.commands.Remove"),
-          mcp("reactivemongo.core.commands.DeleteIndex")
+          mcp("reactivemongo.core.commands.DeleteIndex"),
+          exclude[AbstractClassProblem]("reactivemongo.core.protocol.Response")
         )
       },
       testOptions in Test += Tests.Cleanup(commonCleanup),
@@ -897,7 +896,7 @@ object Version {
       mappings in (Compile, packageSrc) ~= driverFilter,
       apiMappings ++= Documentation.mappings("com.typesafe.akka", "http://doc.akka.io/api/akka/%s/")("akka-actor").value ++ Documentation.mappings("com.typesafe.play", "http://playframework.com/documentation/%s/api/scala/index.html", _.replaceAll("[\\d]$", "x"))("play-iteratees").value
     )
-  ).enablePlugins(CopyPasteDetector).
+  ).enablePlugins(CpdPlugin).
     dependsOn(bsonmacros, shaded)
 
   private val providedInternalDeps: XmlNode => XmlNode = {
@@ -926,12 +925,11 @@ object Version {
   lazy val jmx = Project(
     s"$projectPrefix-JMX",
     file("jmx"),
-    settings = buildSettings ++ Findbugs.settings).
-    settings(
-      previousArtifacts := Set.empty,
+    settings = buildSettings ++ Findbugs.settings ++ Seq(
+      mimaPreviousArtifacts := Set.empty,
       testOptions in Test += Tests.Cleanup(commonCleanup),
       libraryDependencies ++= Seq(specs) ++ logApi,
       pomPostProcess := providedInternalDeps
-    ).enablePlugins(CopyPasteDetector).
+    )).enablePlugins(CpdPlugin).
     dependsOn(driver)
 }

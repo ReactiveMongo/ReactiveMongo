@@ -105,7 +105,7 @@ final class LegacyIndexesManager(db: DB)(
 
   val collection = db("system.indexes")
 
-  def list(): Future[List[NSIndex]] = collection.find(BSONDocument()).cursor(db.connection.options.readPreference)(IndexesManager.NSIndexReader, context, CursorProducer.defaultCursorProducer).collect[List](-1, Cursor.FailOnError[List[NSIndex]]())
+  def list(): Future[List[NSIndex]] = collection.find(BSONDocument()).cursor(db.connection.options.readPreference)(IndexesManager.NSIndexReader, CursorProducer.defaultCursorProducer).collect[List](-1, Cursor.FailOnError[List[NSIndex]]())
 
   def ensure(nsIndex: NSIndex): Future[Boolean] = {
     val query = BSONDocument(

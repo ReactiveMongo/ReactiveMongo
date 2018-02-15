@@ -1,9 +1,11 @@
 import scala.concurrent.{ Await, Future }
-import scala.concurrent.duration.{ DurationInt, FiniteDuration, MILLISECONDS }
+import scala.concurrent.duration.{ DurationInt, FiniteDuration }
 
-import reactivemongo.bson.BSONDocument
+import reactivemongo.bson.{ BSONDocument, BSONJavaScript }
 import reactivemongo.core.errors.DetailedDatabaseException
+
 import reactivemongo.api.{ Cursor, CursorFlattener, CursorProducer }
+import reactivemongo.api.commands.CommandError
 import reactivemongo.api.collections.bson.BSONCollection
 
 trait Cursor1Spec { spec: CursorSpec =>
@@ -31,9 +33,9 @@ trait Cursor1Spec { spec: CursorSpec =>
       insert(nDocs, Seq.empty).map { _ =>
         info(s"inserted $nDocs records")
       } aka "fixtures" must beEqualTo({}).await(1, timeout)
-    }
+    } tag "wip"
 
-    "make request for cursor query" in {
+    "request for cursor query" in {
       import reactivemongo.core.protocol.{ Response, Reply }
       import reactivemongo.api.tests.{ makeRequest => req, nextResponse }
 
@@ -84,23 +86,28 @@ trait Cursor1Spec { spec: CursorSpec =>
         val batchSize = 128
         val max = (batchSize * 2) - 1
         val cur = cursor(batchSize)
+        @volatile var r1: Response = null // Workaround to avoid nesting .await
 
         req(cur, max) must beLike[Response] {
-          case r1 @ Response(_, Reply(_, id1, from1, ret1), _, _) =>
+          case r @ Response(_, Reply(_, id1, from1, ret1), _, _) =>
             id1 aka "cursor ID #7a" must not(beEqualTo(0)) and {
               from1 must_== 0 and (ret1 must_== batchSize)
             } and {
-              nextResponse(cur, max)(ee.ec, r1) must beSome[Response].like {
-                case r2 @ Response(_, Reply(_, id2, from2, ret2), _, _) =>
-                  id2 aka "cursor ID #7b" must_== 0 and {
-                    from2 aka "from #7b" must_== 128 and (ret2 must_== (batchSize - 1))
-                  } and {
-                    nextResponse(cur, max)(ee.ec, r2) must beNone.
-                      await(1, timeout)
-                  }
-              }.await(1, timeout)
+              r1 = r
+              r1 aka "r1" must not(beNull)
             }
-        }.await(1, timeout)
+        }.await(1, timeout) and {
+          nextResponse(cur, max)(ee.ec, r1) must beSome[Response].like {
+            case r2 @ Response(_, Reply(_, id2, from2, ret2), _, _) =>
+              id2 aka "cursor ID #7b" must_== 0 and {
+                from2 aka "from #7b" must_== 128
+              } and {
+                ret2 must_== (batchSize - 1)
+              } and {
+                nextResponse(cur, 1)(ee.ec, r2) must beNone.await(1, timeout)
+              }
+          }.await(1, timeout)
+        }
       }
     }
 
@@ -153,15 +160,17 @@ trait Cursor1Spec { spec: CursorSpec =>
     "collect with limited maxDocs" in {
       val max = (nDocs / 8).toInt
 
-      coll.find(matchAll("collectLimit")).updateOptions(_.batchSize(997)).
-        cursor().collect[List](max) must haveSize[List[BSONDocument]](max).
+      coll.find(matchAll("collectLimit")).batchSize(997).cursor().
+        collect[List](max, Cursor.FailOnError[List[BSONDocument]]()).
+        aka("documents") must haveSize[List[BSONDocument]](max).
         await(1, timeout)
 
     }
 
     def foldSpec1(c: BSONCollection, timeout: FiniteDuration) = {
       "get 10 first docs" in {
-        c.find(matchAll("cursorspec1")).cursor().collect[List](10).
+        c.find(matchAll("cursorspec1")).cursor().
+          collect[List](10, Cursor.FailOnError[List[BSONDocument]]()).
           map(_.size) aka "result size" must beEqualTo(10).await(1, timeout)
       }
 
@@ -324,21 +333,13 @@ trait Cursor1Spec { spec: CursorSpec =>
     }
 
     "throw exception when maxTimeout reached" in {
-      def delayedTimeout = FiniteDuration(
-        (slowTimeout.toMillis * 1.25D).toLong, MILLISECONDS)
-
-      def futs: Seq[Future[Unit]] = for (i <- 0 until 16517)
-        yield slowColl.insert(BSONDocument(
-        "i" -> i, "record" -> s"record$i")).
-        map(_ => debug(s"fixture #$i inserted (${slowColl.name})"))
-
-      Future.sequence(futs).map(_ => {}).
-        aka("fixtures") must beEqualTo({}).await(1, delayedTimeout) and {
-          slowColl.find(BSONDocument("record" -> "asd")).
-            batchSize(4096).maxTimeMs(1).cursor().
-            collect[List](8192) must throwA[DetailedDatabaseException].
-            await(1, slowTimeout + DurationInt(1).seconds)
-        }
-    }
+      // TODO: check where compile error
+      coll.find(BSONDocument(f"$$where" -> BSONJavaScript(
+        "function(d){for(i=0;i<2147483647;i++){};return true}"))).batchSize(nDocs).maxTimeMs(1).cursor().
+        collect[List](nDocs, Cursor.FailOnError[List[BSONDocument]]()).
+        aka("slow query") must throwA[DetailedDatabaseException].like {
+          case err @ CommandError.Code(code) => code must_== 50
+        }.await(1, slowTimeout + DurationInt(1).seconds)
+    } tag "wip"
   }
 }

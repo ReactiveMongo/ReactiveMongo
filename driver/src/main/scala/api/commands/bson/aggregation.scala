@@ -19,35 +19,35 @@ object BSONAggregationFramework
 
   val pack: BSONSerializationPack.type = BSONSerializationPack
 
-  @deprecated("Use [[pack.newBuilder]]", "0.12.7")
+  @deprecated("Use `pack.newBuilder`", "0.12.7")
   @inline protected def makeDocument(elements: Seq[Producer[BSONElement]]) =
     pack.newBuilder.document(elements)
 
-  @deprecated("Use [[pack.newBuilder]]", "0.12.7")
+  @deprecated("Use `pack.newBuilder`", "0.12.7")
   @inline protected def makeArray(value: BSONValue, values: Seq[BSONValue]) =
     pack.newBuilder.array(value, values)
 
-  @deprecated("Use [[pack.newBuilder]]", "0.12.7")
+  @deprecated("Use `pack.newBuilder`", "0.12.7")
   @inline protected def elementProducer(name: String, value: BSONValue) =
     pack.newBuilder.elementProducer(name, value)
 
-  @deprecated("Use [[pack.newBuilder]]", "0.12.7")
+  @deprecated("Use `pack.newBuilder`", "0.12.7")
   @inline protected def booleanValue(b: Boolean): BSONValue =
     pack.newBuilder.boolean(b)
 
-  @deprecated("Use [[pack.newBuilder]]", "0.12.7")
+  @deprecated("Use `pack.newBuilder`", "0.12.7")
   @inline protected def intValue(i: Int): BSONValue =
     pack.newBuilder.int(i)
 
-  @deprecated("Use [[pack.newBuilder]]", "0.12.7")
+  @deprecated("Use `pack.newBuilder`", "0.12.7")
   @inline protected def longValue(l: Long): BSONValue =
     pack.newBuilder.long(l)
 
-  @deprecated("Use [[pack.newBuilder]]", "0.12.7")
+  @deprecated("Use `pack.newBuilder`", "0.12.7")
   @inline protected def doubleValue(d: Double): BSONValue =
     pack.newBuilder.double(d)
 
-  @deprecated("Use [[pack.newBuilder]]", "0.12.7")
+  @deprecated("Use `pack.newBuilder`", "0.12.7")
   @inline protected def stringValue(s: String): BSONValue =
     pack.newBuilder.string(s)
 }

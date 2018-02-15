@@ -32,7 +32,7 @@ object ReactiveMongoException {
   def apply(message: String): ReactiveMongoException =
     GenericDriverException(message)
 
-  @deprecated("Use [[DatabaseException]]", "0.12.8")
+  @deprecated("Use [[DatabaseException]]", "0.13.0")
   def apply(doc: BSONDocument) = DatabaseException(doc)
 }
 

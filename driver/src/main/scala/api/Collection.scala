@@ -44,7 +44,7 @@ trait Collection {
    *
    * @param failoverStrategy $failoverStrategy
    */
-  @deprecated("Resolve the collection from DB", "0.12.8")
+  @deprecated("Resolve the collection from DB", "0.13.0")
   def as[C <: Collection](failoverStrategy: FailoverStrategy = failoverStrategy)(implicit producer: CollectionProducer[C] = collections.bson.BSONCollectionProducer): C = producer.apply(db, name, failoverStrategy)
 
   /**

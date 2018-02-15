@@ -17,7 +17,7 @@ package reactivemongo.bson.buffer
 
 import scala.collection.mutable.ArrayBuffer
 
-@deprecated("Unused", "0.12.8")
+@deprecated("Unused", "0.13.0")
 trait BSONBuffer extends ReadableBuffer with WritableBuffer
 
 import java.nio.ByteBuffer

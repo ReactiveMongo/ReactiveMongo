@@ -197,7 +197,7 @@ class CursorSpec(implicit val ee: ExecutionEnv)
       }
 
       { // .foldWhile
-        def foldWhileSpec(defaultColl: BSONCollection, specCol: String => BSONCollection, timeout: FiniteDuration) = {
+        def foldWhileSpec(defaultColl: BSONCollection, timeout: FiniteDuration) = {
           "if fails while processing with existing documents" in {
             @volatile var count = 0
             val onError: (Unit, Throwable) => Unit = { (_, _) =>
@@ -256,11 +256,11 @@ class CursorSpec(implicit val ee: ExecutionEnv)
         }
 
         "when folding documents with the default connection" >> {
-          foldWhileSpec(defaultColl, cursorDb(_: String), timeout)
+          foldWhileSpec(defaultColl, timeout)
         }
 
         "when folding documents with the slow connection" >> {
-          foldWhileSpec(slowDefaultColl, slowCursorDb(_: String), slowTimeout)
+          foldWhileSpec(slowDefaultColl, slowTimeout)
         }
       }
 
@@ -454,7 +454,7 @@ class CursorSpec(implicit val ee: ExecutionEnv)
       }
 
       { // .foldWhile
-        def foldWhileSpec(defaultColl: BSONCollection, specCol: String => BSONCollection, timeout: FiniteDuration) = {
+        def foldWhileSpec(defaultColl: BSONCollection, timeout: FiniteDuration) = {
           def delayedTimeout = FiniteDuration(
             (timeout.toMillis * 1.25D).toLong, MILLISECONDS)
 
@@ -515,11 +515,11 @@ class CursorSpec(implicit val ee: ExecutionEnv)
         }
 
         "when folding documents with the default connection" >> {
-          foldWhileSpec(defaultColl, cursorDb(_: String), timeout)
+          foldWhileSpec(defaultColl, timeout)
         }
 
         "when folding documents with the slow connection" >> {
-          foldWhileSpec(slowDefaultColl, slowCursorDb(_: String), slowTimeout)
+          foldWhileSpec(slowDefaultColl, slowTimeout)
         }
       }
 

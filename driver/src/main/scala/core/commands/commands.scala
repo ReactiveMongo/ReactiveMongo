@@ -75,8 +75,6 @@ trait CommandResultMaker[Result] {
 
 trait BSONCommandResultMaker[Result] extends CommandResultMaker[Result] {
   final def apply(response: Response): Either[CommandError, Result] = {
-    println(s"response = $response")
-
     lazy val document = response match {
       case Response.CommandError(_, _, _, cause) =>
         cause.originalDocument match {
@@ -86,8 +84,6 @@ trait BSONCommandResultMaker[Result] extends CommandResultMaker[Result] {
 
       case _ => Response.parse(response).next()
     }
-
-    println(s"document = ${BSONDocument pretty document}")
 
     try {
       apply(document)

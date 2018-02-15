@@ -61,7 +61,7 @@ trait GenericQueryBuilder[P <: SerializationPack]
    - showRecordId: boolean; Optional. Determines whether to return the record identifier for each document.
 - noCursorTimeout: boolean; Optional. Prevents the server from timing out idle cursors after an inactivity period (10 minutes).
    - allowPartialResults: boolean; Optional. For queries against a sharded collection, returns partial results from the mongos if some shards are unavailable instead of throwing an error.
-   - collation: documentat; Optional; Specifies the collation to use for the operation.
+   - collation: document; Optional; Specifies the collation to use for the operation.
    */
 
   /** The default [[ReadPreference]] */
@@ -234,7 +234,7 @@ trait GenericQueryBuilder[P <: SerializationPack]
    *
    * @tparam T $resultTParam
    */
-  def cursor[T](readPreference: ReadPreference = readPreference, isMongo26WriteOp: Boolean = false)(implicit reader: pack.Reader[T], ec: ExecutionContext, cp: CursorProducer[T]): cp.ProducedCursor = cp.produce(defaultCursor[T](readPreference, isMongo26WriteOp))
+  def cursor[T](readPreference: ReadPreference = readPreference, isMongo26WriteOp: Boolean = false)(implicit reader: pack.Reader[T], cp: CursorProducer[T]): cp.ProducedCursor = cp.produce(defaultCursor[T](readPreference, isMongo26WriteOp))
 
   private def defaultCursor[T](
     readPreference: ReadPreference,
@@ -361,7 +361,7 @@ trait GenericQueryBuilder[P <: SerializationPack]
 
   def options(options: QueryOpts): Self = copy(options = options)
 
-  @deprecated("Use [[options]] or the separate query ops", "0.12.4")
+  @deprecated("Use `options` or the separate query ops", "0.12.4")
   def updateOptions(update: QueryOpts => QueryOpts): Self =
     copy(options = update(options))
 

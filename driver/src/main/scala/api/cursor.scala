@@ -587,7 +587,8 @@ object DefaultCursor {
       version.compareTo(MongoWireVersion.V32) < 0
 
     protected lazy val requester: (Int, Int, RequestMaker) => ExecutionContext => Future[Response] = {
-      @inline def base(req: RequestMaker)(implicit ec: ExecutionContext): Future[Response] = connection.sendExpectingResponse(req, mongo26WriteOp)
+      @inline def base(req: RequestMaker): Future[Response] =
+        connection.sendExpectingResponse(req, mongo26WriteOp)
 
       if (lessThenV32) {
         { (off: Int, maxDocs: Int, req: RequestMaker) =>

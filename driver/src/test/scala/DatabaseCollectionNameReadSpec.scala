@@ -44,7 +44,9 @@ class DatabaseCollectionNameReadSpec(implicit ee: ExecutionEnv)
     }
 
     {
-      def dropSpec(con: MongoConnection, timeout: FiniteDuration) = connection.database(dbName).flatMap(_.drop()) aka "drop" must beEqualTo({}).await(2, timeout)
+      def dropSpec(con: MongoConnection, timeout: FiniteDuration) =
+        con.database(dbName).flatMap(
+          _.drop()) aka "drop" must beEqualTo({}).await(2, timeout)
 
       "be dropped with the default connection" in {
         dropSpec(connection, timeout)

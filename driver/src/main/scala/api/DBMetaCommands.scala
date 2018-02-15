@@ -76,7 +76,7 @@ trait DBMetaCommands { self: DB =>
       coll.find(BSONDocument(
         "name" -> BSONRegex("^[^\\$]+$", "") // strip off any indexes
       )).cursor(defaultReadPreference)(
-        CollectionNameReader, ec, CursorProducer.defaultCursorProducer).
+        CollectionNameReader, CursorProducer.defaultCursorProducer).
         collect[List](-1, Cursor.FailOnError[List[String]]())
     }
   }

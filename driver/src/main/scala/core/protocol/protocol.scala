@@ -201,7 +201,7 @@ case class Request(
  *
  * @param op write operation.
  * @param documents body of this request, a [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ChannelBuffer.html ChannelBuffer]] containing 0, 1, or many documents.
- * @param getLastError a [[reactivemongo.core.commands.GetLastError]] command message.
+ * @param getLastError a `GetLastError` command message.
  */
 case class CheckedWriteRequest(
   op: WriteRequestOp,

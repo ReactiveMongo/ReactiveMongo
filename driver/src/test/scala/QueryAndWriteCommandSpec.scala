@@ -34,16 +34,15 @@ class QueryAndWriteCommandSpec(
       val doc = BSONDocument("_id" -> BSONNull, "name" -> "jack", "plop" -> -1)
       val runner = Command.run(BSONSerializationPack, db.failoverStrategy)
 
-      def test1(c: BSONCollection, timeout: FiniteDuration) = {
-        runner(
-          coll1, Insert(doc, doc), ReadPreference.primary).
+      def test1(coll: BSONCollection, timeout: FiniteDuration) = {
+        runner(coll, Insert(doc, doc), ReadPreference.primary).
           map(_.ok) must beTrue.await(1, timeout) and {
-            coll1.find(doc).cursor[BSONDocument]().
+            coll.find(doc).cursor[BSONDocument]().
               collect[List](-1, Cursor.FailOnError[List[BSONDocument]]()).
               map(_.size) must beEqualTo(1).await(1, timeout)
 
           } and {
-            runner.unboxed(coll1, Count(BSONDocument()),
+            runner.unboxed(coll, Count(BSONDocument()),
               ReadPreference.primary) must beEqualTo(1).await(1, timeout)
           } and {
             runner(db, IsMaster, ReadPreference.primary).

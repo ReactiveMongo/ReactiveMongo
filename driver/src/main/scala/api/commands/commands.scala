@@ -189,7 +189,7 @@ object Command {
      * Executes the `command` and returns its result
      * along with the MongoDB response.
      */
-    private[reactivemongo] def cursor[R, C <: CollectionCommand with CommandWithResult[R]](collection: Collection, command: C, rp: ReadPreference)(implicit writer: pack.Writer[ResolvedCollectionCommand[C]], reader: pack.Reader[R], ec: ExecutionContext): DefaultCursor.Impl[R] = fetchCursor(
+    private[reactivemongo] def cursor[R, C <: CollectionCommand with CommandWithResult[R]](collection: Collection, command: C, rp: ReadPreference)(implicit writer: pack.Writer[ResolvedCollectionCommand[C]], reader: pack.Reader[R]): DefaultCursor.Impl[R] = fetchCursor(
       collection.db, collection.fullCollectionName, pack,
       ResolvedCollectionCommand(collection.name, command), failover).
       cursor[R](rp)
