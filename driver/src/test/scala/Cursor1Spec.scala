@@ -33,7 +33,7 @@ trait Cursor1Spec { spec: CursorSpec =>
       insert(nDocs, Seq.empty).map { _ =>
         info(s"inserted $nDocs records")
       } aka "fixtures" must beEqualTo({}).await(1, timeout)
-    } tag "wip"
+    }
 
     "request for cursor query" in {
       import reactivemongo.core.protocol.{ Response, Reply }
@@ -340,6 +340,6 @@ trait Cursor1Spec { spec: CursorSpec =>
         aka("slow query") must throwA[DetailedDatabaseException].like {
           case err @ CommandError.Code(code) => code must_== 50
         }.await(1, slowTimeout + DurationInt(1).seconds)
-    } tag "wip"
+    }
   }
 }

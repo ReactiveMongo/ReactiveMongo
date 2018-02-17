@@ -8,7 +8,7 @@ export PATH
 
 which mongod
 
-MONGOD_CMD="mongod -f $MONGO_CONF --port 27018 --fork"
+MONGOD_CMD="mongod -f $MONGO_CONF --fork"
 
 $MONGOD
 
