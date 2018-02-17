@@ -19,7 +19,11 @@ import reactivemongo.core.actors, actors.{
 
 import reactivemongo.bson.BSONDocument
 
-package object tests {
+import reactivemongo.api.collections.QueryCodecs
+
+package object tests extends QueryCodecs[BSONSerializationPack.type] {
+  val pack = BSONSerializationPack
+
   // Test alias
   def _failover2[A](c: MongoConnection, s: FailoverStrategy)(p: () => Future[A])(implicit ec: ExecutionContext): Failover2[A] = Failover2.apply(c, s)(p)(ec)
 
@@ -50,6 +54,9 @@ package object tests {
   def channelClosed(id: Int) = ChannelClosed(id)
 
   def makeRequest[T](cursor: Cursor[T], maxDocs: Int)(implicit ec: ExecutionContext): Future[Response] = cursor.asInstanceOf[CursorOps[T]].makeRequest(maxDocs)
+
+  def nextResponse[T](cursor: Cursor[T], maxDocs: Int) =
+    cursor.asInstanceOf[CursorOps[T]].nextResponse(maxDocs)
 
   def fakeResponse(doc: BSONDocument, reqID: Int = 2, respTo: Int = 1, chanId: Int = 1): Response = {
     val reply = reactivemongo.core.protocol.Reply(
@@ -84,8 +91,7 @@ package object tests {
     FoldResponses[T](
       z, makeRequest, next, killCursors, suc, err, maxDocs)(sys, ec)
 
-  def bsonReadPref(pref: ReadPreference): BSONDocument =
-    reactivemongo.api.collections.bson.BSONReadPreference.write(pref)
+  def bsonReadPref(pref: ReadPreference): BSONDocument = writeReadPref(pref)
 
   @inline def RefreshAll = actors.RefreshAll
 

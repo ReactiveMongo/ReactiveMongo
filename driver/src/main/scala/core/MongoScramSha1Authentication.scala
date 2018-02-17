@@ -16,7 +16,6 @@ private[reactivemongo] trait MongoScramSha1Authentication {
   system: MongoDBSystem =>
 
   import org.apache.commons.codec.binary.Base64
-  import MongoDBSystem.logger
   import reactivemongo.core.commands.{
     CommandError,
     ScramSha1Initiate,
@@ -83,7 +82,8 @@ private[reactivemongo] trait MongoScramSha1Authentication {
     }
 
     case response: Response if RequestId.authenticate accepts response => {
-      logger.debug(s"[$lnm] Got authenticated response! ${response.info.channelId}")
+      logger.debug(
+        s"[$lnm] Got authenticated response! ${response.info.channelId}")
 
       @inline def resp: Either[Either[CommandError, SuccessfulAuthentication], Array[Byte]] = ScramSha1StartNegociation.parseResponse(response) match {
         case Left(err)             => Left(Left(err))

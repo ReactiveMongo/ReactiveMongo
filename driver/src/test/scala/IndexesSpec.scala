@@ -79,7 +79,7 @@ class IndexesSpec(implicit ee: ExecutionEnv)
         }.filter(!_.isEmpty).map(_.apply(0))
 
         future must beLike[Index] {
-          case i @ Index(("loc", Geo2D) :: _, _, _, _, _, _, _, _, opts) =>
+          case Index(("loc", Geo2D) :: _, _, _, _, _, _, _, _, opts) =>
             opts.getAs[BSONInteger]("min").get.value mustEqual -95 and (
               opts.getAs[BSONInteger]("max").get.value mustEqual 95) and (
                 opts.getAs[BSONInteger]("bits").get.value mustEqual 28)
@@ -96,7 +96,7 @@ class IndexesSpec(implicit ee: ExecutionEnv)
     }
   }
 
-  lazy val geo2DSpherical = db("geo2d")
+  lazy val geo2DSpherical = db(s"geo2d_${System identityHashCode this}")
 
   "ReactiveMongo Geo2D indexes" should {
     "insert some points" in {
@@ -122,7 +122,7 @@ class IndexesSpec(implicit ee: ExecutionEnv)
     }
   }
 
-  lazy val hashed = db("hashed")
+  lazy val hashed = db(s"hashed_${System identityHashCode this}")
 
   "Hashed indexes" should {
     "insert some data" in {

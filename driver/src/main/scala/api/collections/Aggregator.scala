@@ -2,24 +2,28 @@ package reactivemongo.api.collections
 
 import scala.language.higherKinds
 
-import scala.concurrent.{ ExecutionContext, Future }
+import scala.concurrent.ExecutionContext // Future
 
 import reactivemongo.api.{
   Cursor,
   CursorFlattener,
   CursorProducer,
-  DefaultCursor,
   ReadConcern,
   ReadPreference,
   SerializationPack
 }
 
-import reactivemongo.api.commands.ResponseResult
+import reactivemongo.api.commands.{
+  CollectionCommand,
+  CommandCodecs,
+  CommandWithPack,
+  CommandWithResult,
+  ResolvedCollectionCommand
+}
 import reactivemongo.core.protocol.MongoWireVersion
 
-import reactivemongo.core.errors.GenericDriverException
-
-private[collections] trait Aggregator[P <: SerializationPack with Singleton] {
+private[collections] trait Aggregator[P <: SerializationPack with Singleton]
+  extends CommandCodecs[P] {
   collection: GenericCollection[P] =>
 
   // ---
@@ -40,17 +44,10 @@ private[collections] trait Aggregator[P <: SerializationPack with Singleton] {
   final class Aggregator[T, AC[_] <: Cursor[_]](
     val context: AggregatorContext[T],
     val cp: CursorProducer.Aux[T, AC]) {
-    import BatchCommands.AggregationFramework.{ Aggregate, AggregationResult }
-    import BatchCommands.{ AggregateWriter, AggregateReader }
-
-    import reactivemongo.core.netty.ChannelBufferWritableBuffer
-    import reactivemongo.bson.buffer.WritableBuffer
-    import reactivemongo.core.protocol.{ Reply, Response }
 
     import context._
 
     @inline private def readPreference = context.readPreference
-    implicit private def aggReader: pack.Reader[T] = reader
 
     private def ver = db.connection.metadata.
       fold[MongoWireVersion](MongoWireVersion.V30)(_.maxWireVersion)
@@ -59,34 +56,78 @@ private[collections] trait Aggregator[P <: SerializationPack with Singleton] {
      * @param cf the cursor flattener (by default use the builtin one)
      */
     final def cursor(implicit ec: ExecutionContext, cf: CursorFlattener[AC]): AC[T] = {
-      def aggCursor: Future[cp.ProducedCursor] = runWithResponse(
-        Aggregate(
-          firstOperator :: otherOperators,
-          explain, allowDiskUse, Some(BatchCommands.AggregationFramework.Cursor(
-            batchSize.getOrElse(defaultCursorBatchSize))), ver, bypassDocumentValidation, readConcern), readPreference).flatMap[cp.ProducedCursor] {
-          case ResponseResult(response, numToReturn,
-            AggregationResult(firstBatch, Some(resultCursor))) => Future {
+      def batchSz = batchSize.getOrElse(defaultCursorBatchSize)
+      implicit def writer = commandWriter[T]
+      implicit def aggReader: pack.Reader[T] = reader
 
-            def docs = new ChannelBufferWritableBuffer().
-              writeBytes(firstBatch.foldLeft[WritableBuffer](
-                new ChannelBufferWritableBuffer())(pack.writeToBuffer).toReadableBuffer).buffer
+      val cmd = new Aggregate[T](
+        firstOperator, otherOperators, explain, allowDiskUse, batchSz, ver,
+        bypassDocumentValidation, readConcern)
 
-            def resp = Response(
-              response.header,
-              Reply(0, resultCursor.cursorId, 0, firstBatch.size),
-              docs, response.info)
+      val cursor = runner.cursor[T, Aggregate[T]](
+        collection, cmd, readPreference)
 
-            cp.produce(DefaultCursor.getMore[P, T](pack, resp,
-              resultCursor, numToReturn, readPreference, db.
-              connection, failoverStrategy, false))
+      cp.produce(cursor)
+    }
+  }
+
+  /**
+   * @param pipeline the sequence of MongoDB aggregation operations
+   * @param explain specifies to return the information on the processing of the pipeline
+   * @param allowDiskUse enables writing to temporary files
+   * @param batchSize the batch size
+   * @param bypassDocumentValidation available only if you specify the \$out aggregation operator
+   * @param readConcern the read concern (since MongoDB 3.2)
+   */
+  private final class Aggregate[T](
+    val operator: PipelineOperator,
+    val pipeline: Seq[PipelineOperator],
+    val explain: Boolean = false,
+    val allowDiskUse: Boolean,
+    val batchSize: Int,
+    val wireVersion: MongoWireVersion,
+    val bypassDocumentValidation: Boolean,
+    val readConcern: Option[ReadConcern]) extends CollectionCommand
+    with CommandWithPack[pack.type]
+    with CommandWithResult[T]
+
+  private type AggregateCmd[T] = ResolvedCollectionCommand[Aggregate[T]]
+
+  private def commandWriter[T]: pack.Writer[AggregateCmd[T]] = {
+    val builder = pack.newBuilder
+    import builder.{ boolean, document, elementProducer => element }
+
+    pack.writer[AggregateCmd[T]] { agg =>
+      val pipeline = builder.array(
+        agg.command.operator.makePipe,
+        agg.command.pipeline.map(_.makePipe))
+
+      val base = Seq(
+        element("aggregate", builder.string(agg.collection)),
+        element("pipeline", pipeline),
+        element("explain", boolean(agg.command.explain)),
+        element("allowDiskUse", boolean(agg.command.allowDiskUse)),
+        element("cursor", document(Seq(
+          element("batchSize", builder.int(agg.command.batchSize))))))
+
+      val cmd = {
+        if (agg.command.wireVersion < MongoWireVersion.V32) {
+          base
+        } else {
+          val byp = element("bypassDocumentValidation", boolean(
+            agg.command.bypassDocumentValidation))
+
+          agg.command.readConcern match {
+            case Some(concern) => base ++ Seq(
+              byp,
+              element("readConcern", collection.writeReadConcern(concern)))
+
+            case _ => base :+ byp
           }
-
-          case ResponseResult(response, _, _) =>
-            Future.failed[cp.ProducedCursor](
-              GenericDriverException(s"missing cursor: $response"))
         }
+      }
 
-      cf.flatten(aggCursor)
+      document(cmd)
     }
   }
 }

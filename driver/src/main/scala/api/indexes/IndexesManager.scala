@@ -26,10 +26,12 @@ import reactivemongo.bson.{
 }
 
 import reactivemongo.core.protocol.MongoWireVersion
+
 import reactivemongo.api.{
   DB,
   DBMetaCommands,
   BSONSerializationPack,
+  Cursor,
   CursorProducer,
   ReadPreference
 }
@@ -69,24 +71,6 @@ sealed trait IndexesManager {
   def create(nsIndex: NSIndex): Future[WriteResult]
 
   /**
-   * Deletes the given index on the given collection.
-   *
-   * @return The deleted index number.
-   */
-  @deprecated("Use drop instead", "0.11.0")
-  def delete(nsIndex: NSIndex): Future[Int] =
-    delete(nsIndex.collectionName, nsIndex.index.eventualName)
-
-  /**
-   * Deletes the given index on the given collection.
-   *
-   * @return The number of indexes that were dropped.
-   */
-  @deprecated("Use drop instead", "0.11.0")
-  def delete(collectionName: String, indexName: String): Future[Int] =
-    drop(collectionName, indexName)
-
-  /**
    * Drops the given index on the given collection.
    *
    * @return The number of indexes that were dropped.
@@ -121,7 +105,7 @@ final class LegacyIndexesManager(db: DB)(
 
   val collection = db("system.indexes")
 
-  def list(): Future[List[NSIndex]] = collection.find(BSONDocument()).cursor(db.connection.options.readPreference)(IndexesManager.NSIndexReader, context, CursorProducer.defaultCursorProducer).collect[List]()
+  def list(): Future[List[NSIndex]] = collection.find(BSONDocument()).cursor(db.connection.options.readPreference)(IndexesManager.NSIndexReader, CursorProducer.defaultCursorProducer).collect[List](-1, Cursor.FailOnError[List[NSIndex]]())
 
   def ensure(nsIndex: NSIndex): Future[Boolean] = {
     val query = BSONDocument(
@@ -220,22 +204,6 @@ sealed trait CollectionIndexesManager {
   def create(index: Index): Future[WriteResult]
 
   /**
-   * Deletes the given index on that collection.
-   *
-   * @return The deleted index number.
-   */
-  @deprecated("Use drop instead", "0.11.0")
-  def delete(index: Index): Future[Int]
-
-  /**
-   * Deletes the given index on that collection.
-   *
-   * @return The deleted index number.
-   */
-  @deprecated("Use drop instead", "0.11.0")
-  def delete(name: String): Future[Int]
-
-  /**
    * Drops the given index on that collection.
    *
    * @return The number of indexes that were dropped.
@@ -271,12 +239,6 @@ private class LegacyCollectionIndexesManager(
   def create(index: Index): Future[WriteResult] =
     legacy.create(NSIndex(fqName, index))
 
-  @deprecated("Use drop instead", "0.11.0")
-  def delete(index: Index) = drop(NSIndex(fqName, index))
-
-  @deprecated("Use drop instead", "0.11.0")
-  def delete(name: String) = drop(name)
-
   @deprecated("Use [[IndexesManager.drop]]", "0.11.0")
   def drop(nsIndex: NSIndex): Future[Int] = legacy.drop(nsIndex)
 
@@ -303,8 +265,11 @@ private class DefaultCollectionIndexesManager(db: DB, collectionName: String)(
   private lazy val collection = db(collectionName)
   private lazy val listCommand = ListIndexes(db.name)
 
+  private lazy val runner =
+    Command.run(BSONSerializationPack, db.failoverStrategy)
+
   def list(): Future[List[Index]] =
-    Command.run(BSONSerializationPack)(
+    runner(
       collection, listCommand, ReadPreference.primary).recoverWith {
       case err: WriteResult if err.code.exists(_ == 26 /* no database */ ) =>
         Future.successful(List.empty[Index])
@@ -329,21 +294,15 @@ private class DefaultCollectionIndexesManager(db: DB, collectionName: String)(
     BSONDocumentReader[WriteResult] { DefaultWriteResultReader.read(_) }
 
   def create(index: Index): Future[WriteResult] =
-    Command.run(BSONSerializationPack)(
+    runner(
       collection,
       CreateIndexes(db.name, List(index)),
       ReadPreference.primary)
 
-  @deprecated("Use drop instead", "0.11.0")
-  def delete(index: Index) = drop(index.eventualName)
-
-  @deprecated("Use drop instead", "0.11.0")
-  def delete(name: String) = drop(name)
-
   @deprecated("Use [[IndexesManager.drop]]", "0.11.0")
   def drop(nsIndex: NSIndex): Future[Int] = {
     import reactivemongo.api.commands.bson.BSONDropIndexesImplicits._
-    Command.run(BSONSerializationPack)(
+    runner(
       db(nsIndex.collectionName),
       DropIndexes(nsIndex.index.eventualName),
       ReadPreference.primary).map(_.value)
@@ -351,7 +310,7 @@ private class DefaultCollectionIndexesManager(db: DB, collectionName: String)(
 
   def drop(indexName: String): Future[Int] = {
     import reactivemongo.api.commands.bson.BSONDropIndexesImplicits._
-    Command.run(BSONSerializationPack)(
+    runner(
       collection, DropIndexes(indexName), ReadPreference.primary).map(_.value)
   }
 
@@ -407,8 +366,10 @@ object IndexesManager {
 
   implicit object NSIndexWriter extends BSONDocumentWriter[NSIndex] {
     def write(nsIndex: NSIndex): BSONDocument = {
-      if (nsIndex.index.key.isEmpty)
+      if (nsIndex.index.key.isEmpty) {
         throw new RuntimeException("the key should not be empty!")
+      }
+
       toBSONDocument(nsIndex)
     }
   }

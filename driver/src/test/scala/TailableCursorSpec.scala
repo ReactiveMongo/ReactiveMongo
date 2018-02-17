@@ -38,7 +38,7 @@ trait TailableCursorSpec { specs: CursorSpec =>
       @inline def tailable(n: String, database: DB = db) = {
         implicit val reader = IdReader
         collection(n, database).find(matchAll("cursorspec50")).options(
-          QueryOpts().tailable).cursor[Int]()
+          QueryOpts().tailable).batchSize(512).cursor[Int]()
       }
 
       "using tailable" >> {
@@ -100,7 +100,10 @@ trait TailableCursorSpec { specs: CursorSpec =>
           con.database(
             "specs2-test-reactivemongo", failoverStrategy).flatMap { d =>
               tailable("foldw3", d).foldWhile(List.empty[Int])((s, i) => {
-                if (i == 1) con.close() // Force connection close
+                if (i == 1) { // Force connection close
+                  Await.result(con.askClose()(timeout), timeout)
+                }
+
                 Cursor.Cont(i :: s)
               }, (_, e) => Cursor.Fail(e))
             } must beLike[List[Int]] {

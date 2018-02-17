@@ -51,7 +51,7 @@ private[core] case class ScramSha1Initiate(
 object ScramSha1Initiate extends BSONCommandResultMaker[ScramSha1Challenge] {
   def parseResponse(response: Response): Either[CommandError, ScramSha1Challenge] = apply(response)
 
-  def apply(bson: BSONDocument) =
+  def apply(bson: BSONDocument) = {
     CommandError.checkOk(bson, Some("authenticate"), (doc, name) => {
       FailedAuthentication(doc.getAs[BSONString]("errmsg").
         map(_.value).getOrElse(""), Some(doc))
@@ -64,6 +64,7 @@ object ScramSha1Initiate extends BSONCommandResultMaker[ScramSha1Challenge] {
           Right(ScramSha1Challenge(conversationId, payload))
       }
     }
+  }
 
   // Request utility
   private val authChars: Stream[Char] = new Iterator[Char] {
@@ -312,10 +313,10 @@ private[core] case class CrAuthenticate(
   import reactivemongo.bson.utils.Converters._
 
   /** the computed digest of the password */
-  lazy val pwdDigest = md5Hex(s"$user:mongo:$password")
+  lazy val pwdDigest = md5Hex(s"$user:mongo:$password", "UTF-8")
 
   /** the digest of the tuple (''nonce'', ''user'', ''pwdDigest'') */
-  lazy val key = md5Hex(nonce + user + pwdDigest)
+  lazy val key = md5Hex(nonce + user + pwdDigest, "UTF-8")
 
   override def makeDocuments = BSONDocument("authenticate" -> BSONInteger(1), "user" -> BSONString(user), "nonce" -> BSONString(nonce), "key" -> BSONString(key))
 
@@ -353,8 +354,8 @@ object SilentSuccessfulAuthentication extends SuccessfulAuthentication
  *
  * Previous versions of MongoDB only return ok = BSONDouble(1.0).
  *
- * @param db database name
- * @param user username
+ * @param db the database name
+ * @param user the user name
  * @param readOnly states if the authentication gives us only the right to read from the database.
  */
 case class VerboseSuccessfulAuthentication(
@@ -365,7 +366,7 @@ case class VerboseSuccessfulAuthentication(
 /**
  * A failed authentication result
  *
- * @param message the explanation of the error.
+ * @param message the explanation of the error
  */
 case class FailedAuthentication(
   message: String,

@@ -64,14 +64,14 @@ private[bson] sealed trait IsBooleanLike[A] extends HasNumeric[A] {
 }
 
 private[bson] class ExtendedNumeric[A: Numeric](provider: Try[A]) {
-  @deprecated("Use the safe `provider`", "0.12.8")
+  @deprecated("Use the safe `provider`", "0.13.0")
   final lazy val value: A = provider.get
 
   def numeric = implicitly[Numeric[A]]
 }
 
 private[bson] object ExtendedNumeric {
-  @deprecated("Use the constructor with a `provider`", "0.12.8")
+  @deprecated("Use the constructor with a `provider`", "0.13.0")
   def apply[A: Numeric](pure: A): ExtendedNumeric[A] =
     new ExtendedNumeric[A](Success(pure))
 }

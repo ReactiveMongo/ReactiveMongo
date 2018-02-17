@@ -35,7 +35,8 @@ class IsMasterSpec(implicit ee: ExecutionEnv) extends Specification {
 
   private def test = {
     import bson.BSONIsMasterCommandImplicits._
-    connection.database("admin").flatMap(_.runCommand(IsMaster))
+    connection.database("admin").flatMap(
+      _.runCommand(IsMaster, Common.failoverStrategy))
   }
 }
 
@@ -117,7 +118,8 @@ class ReplSetGetStatusSpec(implicit ee: ExecutionEnv) extends Specification {
 
   private def test = {
     import bson.BSONReplSetGetStatusImplicits._
-    connection.database("admin").flatMap(_.runCommand(ReplSetGetStatus))
+    connection.database("admin").flatMap(
+      _.runCommand(ReplSetGetStatus, Common.failoverStrategy))
   }
 }
 
@@ -128,7 +130,8 @@ class ServerStatusSpec(implicit ee: ExecutionEnv) extends Specification {
     "be successful" in {
       import bson.BSONServerStatusImplicits._
 
-      db.runCommand(ServerStatus) must beLike[ServerStatusResult]({
+      db.runCommand(
+        ServerStatus, Common.failoverStrategy) must beLike[ServerStatusResult]({
         case ServerStatusResult(_, _, MongodProcess,
           _, _, _, _, _, _, _, _, _, _, _, _, _) =>
           //println(s"Server status: $status")
@@ -157,24 +160,27 @@ class ResyncSpec(implicit ee: ExecutionEnv) extends Specification {
 
     if (!replSetOn) {
       "fail outside ReplicaSet (MongoDB 3+)" in {
-        connection.database("admin").flatMap(_.runCommand(Resync)) must not(
-          throwA[CommandError]).await(0, timeout)
+        connection.database("admin").flatMap(
+          _.runCommand(Resync, Common.failoverStrategy)) must not(
+            throwA[CommandError]).await(0, timeout)
       } tag "not_mongo26"
     } else {
       "be successful with ReplicaSet (MongoDB 3+)" in {
-        connection.database("admin").flatMap(_.runCommand(Resync)) must (
-          throwA[CommandError].like {
-            case CommandError.Code(c) =>
-              (c == 95 || c == 96 /* 3.4*/ ) aka "error code" must beTrue
-          }).await(0, timeout)
+        connection.database("admin").flatMap(
+          _.runCommand(Resync, Common.failoverStrategy)) must (
+            throwA[CommandError].like {
+              case CommandError.Code(c) =>
+                (c == 95 || c == 96 /* 3.4*/ ) aka "error code" must beTrue
+            }).await(0, timeout)
       } tag "not_mongo26"
 
       "be successful with ReplicaSet (MongoDB 2)" in {
-        connection.database("admin").flatMap(_.runCommand(Resync)) must (
-          throwA[CommandError].like {
-            case CommandError.Message(msg) =>
-              msg aka "error message" must_== "primaries cannot resync"
-          }).await(0, timeout)
+        connection.database("admin").flatMap(
+          _.runCommand(Resync, Common.failoverStrategy)) must (
+            throwA[CommandError].like {
+              case CommandError.Message(msg) =>
+                msg aka "error message" must_== "primaries cannot resync"
+            }).await(0, timeout)
       } tag "mongo2"
     }
   }
@@ -190,14 +196,16 @@ class ReplSetMaintenanceSpec(implicit ee: ExecutionEnv) extends Specification {
     if (!replSetOn) {
       "fail outside replicaSet (MongoDB 3+)" in {
         connection.database("admin").flatMap(_.runCommand(
-          ReplSetMaintenance(true))) must throwA[CommandError].like {
+          ReplSetMaintenance(true),
+          Common.failoverStrategy)) must throwA[CommandError].like {
           case CommandError.Code(code) => code aka "error code" must_== 76
         }.await(0, timeout)
       } tag "not_mongo26"
     } else {
       "fail with replicaSet (MongoDB 3+)" in {
         connection.database("admin").flatMap(_.runCommand(
-          ReplSetMaintenance(true))) must throwA[CommandError].like {
+          ReplSetMaintenance(true),
+          Common.failoverStrategy)) must throwA[CommandError].like {
           case CommandError.Code(code) => code aka "error code" must_== 95
         }.await(0, timeout)
       } tag "not_mongo26"
@@ -207,12 +215,14 @@ class ReplSetMaintenanceSpec(implicit ee: ExecutionEnv) extends Specification {
     if (!replSetOn) {
       "fail outside replicaSet (MongoDB 2.6)" in {
         connection.database("admin").flatMap(_.runCommand(
-          ReplSetMaintenance(true))) must throwA[CommandError].await(0, timeout)
+          ReplSetMaintenance(true),
+          Common.failoverStrategy)) must throwA[CommandError].await(0, timeout)
       } tag "mongo2"
     } else {
       "fail with replicaSet (MongoDB 2.6)" in {
         connection.database("admin").flatMap(_.runCommand(
-          ReplSetMaintenance(true))) must throwA[CommandError].like {
+          ReplSetMaintenance(true),
+          Common.failoverStrategy)) must throwA[CommandError].like {
           case CommandError.Message(msg) =>
             msg aka "message" must_== "primaries can't modify maintenance mode"
         }.await(0, timeout)
@@ -227,10 +237,13 @@ class PingSpecification(implicit ee: ExecutionEnv) extends Specification {
 
   "respond 1.0" >> {
     "with the default connection" in {
-      connection.database("admin").flatMap(_.ping()) must beTrue.await(0, timeout)
+      connection.database("admin").
+        flatMap(_.ping()) must beTrue.await(0, timeout)
     }
+
     "with the slow connection" in {
-      slowConnection.database("admin").flatMap(_.ping()) must beTrue.await(0, timeout)
+      slowConnection.database("admin").
+        flatMap(_.ping()) must beTrue.await(0, timeout)
     }
   }
 }

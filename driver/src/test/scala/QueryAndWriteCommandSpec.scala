@@ -32,18 +32,21 @@ class QueryAndWriteCommandSpec(
       lazy val slowColl1 = slowDb(colName1)
 
       val doc = BSONDocument("_id" -> BSONNull, "name" -> "jack", "plop" -> -1)
-      def test1(c: BSONCollection, timeout: FiniteDuration) = {
-        Command.run(BSONSerializationPack)(coll1, Insert(doc, doc)).
-          map(_.ok) aka "inserted" must beTrue.await(1, timeout) and {
-            coll1.find(doc).cursor[BSONDocument]().
-              collect[List]().map(_.size) must beEqualTo(1).await(1, timeout)
+      val runner = Command.run(BSONSerializationPack, db.failoverStrategy)
+
+      def test1(coll: BSONCollection, timeout: FiniteDuration) = {
+        runner(coll, Insert(doc, doc), ReadPreference.primary).
+          map(_.ok) must beTrue.await(1, timeout) and {
+            coll.find(doc).cursor[BSONDocument]().
+              collect[List](-1, Cursor.FailOnError[List[BSONDocument]]()).
+              map(_.size) must beEqualTo(1).await(1, timeout)
+
           } and {
-            Command.run(BSONSerializationPack).
-              unboxed(coll1, Count(BSONDocument())) must beEqualTo(1).
-              await(1, timeout)
+            runner.unboxed(coll, Count(BSONDocument()),
+              ReadPreference.primary) must beEqualTo(1).await(1, timeout)
           } and {
-            Command.run(BSONSerializationPack)(db, IsMaster).map(_ => {}).
-              aka("isMaster") must beEqualTo({}).await(1, timeout)
+            runner(db, IsMaster, ReadPreference.primary).
+              map(_ => {}) must beEqualTo({}).await(1, timeout)
           }
       }
 
