@@ -47,7 +47,7 @@ import reactivemongo.api.{
   ReadPreference,
   SerializationPack
 }
-import reactivemongo.api.commands.WriteResult
+import reactivemongo.api.commands.{ CommandError, WriteResult }
 
 import reactivemongo.util._
 
@@ -205,7 +205,7 @@ case class DefaultReadFile(
 /**
  * A GridFS store.
  * @param db The database where this store is located.
- * @param prefix The prefix of this store. The `files` and `chunks` collections will be actually named `prefix.files` and `prefix.chunks`.
+ * @param prefix The prefix of this store. The `files` and `chunks` collections will be actually named `\${prefix}.files` and `\${prefix}.chunks`.
  */
 class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, prefix: String = "fs")(implicit producer: GenericCollectionProducer[P, GenericCollection[P]] = BSONCollectionProducer) { self =>
   import reactivemongo.api.indexes.{ Index, IndexType }, IndexType.Ascending
@@ -447,34 +447,51 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
 
   /**
    * Removes a file from this store.
-   * Note that if the file does not actually exist, the returned future will not be hold an error.
+   * Note that if the file does not actually exist,
+   * the returned future will not be hold an error.
    *
-   * @param file The file entry to remove from this store.
+   * @param file the file entry to remove from this store
    */
   def remove[Id <: pack.Value](file: BasicMetadata[Id])(implicit ctx: ExecutionContext, idProducer: IdProducer[Id]): Future[WriteResult] = remove(file.id)
 
   /**
    * Removes a file from this store.
-   * Note that if the file does not actually exist, the returned future will not be hold an error.
+   * Note that if the file does not actually exist,
+   * the returned future will not be hold an error.
    *
-   * @param id The file id to remove from this store.
+   * @param id the file id to remove from this store
    */
-  def remove[Id <: pack.Value](id: Id)(implicit ctx: ExecutionContext, idProducer: IdProducer[Id]): Future[WriteResult] = {
-    asBSON(chunks.name).
-      remove(BSONDocument(idProducer("files_id" -> id))).flatMap { _ =>
+  def remove[Id <: pack.Value](id: Id)(implicit ctx: ExecutionContext, idProducer: IdProducer[Id]): Future[WriteResult] =
+    asBSON(chunks.name).remove(BSONDocument(idProducer("files_id" -> id))).
+      flatMap { _ =>
         asBSON(files.name).remove(BSONDocument(idProducer("_id" -> id)))
       }
-  }
 
   /**
-   * Creates the needed index on the `chunks` collection, if none.
+   * Creates the needed indexes on the GridFS collections
+   * (`chunks` and `files`).
    *
    * Please note that you should really consider reading [[http://www.mongodb.org/display/DOCS/Indexes]] before doing this, especially in production.
    *
    * @return A future containing true if the index was created, false if it already exists.
    */
-  def ensureIndex()(implicit ctx: ExecutionContext): Future[Boolean] =
-    db.indexesManager.onCollection(prefix + ".chunks").ensure(Index(List("files_id" -> Ascending, "n" -> Ascending), unique = true))
+  def ensureIndex()(implicit ctx: ExecutionContext): Future[Boolean] = for {
+    _ <- chunks.create(autoIndexId = false).recover {
+      case CommandError.Code(48 /*NamespaceExists*/ ) =>
+        logger.info(s"Collection ${chunks.fullCollectionName} already exists")
+    }
+    c <- chunks.indexesManager.ensure(
+      Index(List("files_id" -> Ascending, "n" -> Ascending), unique = true))
+
+    _ <- files.create(autoIndexId = false).recover {
+      case CommandError.Code(48 /*NamespaceExists*/ ) =>
+        logger.info(s"Collection ${files.fullCollectionName} already exists")
+    }
+    f <- files.indexesManager.ensure(
+      Index(List("filename" -> Ascending, "uploadDate" -> Ascending)))
+  } yield (c && f)
+
+  override def toString: String = s"GridFS(db = ${db.name}, files = ${files.name}, chunks = ${chunks.name})"
 }
 
 object GridFS {

@@ -8,7 +8,7 @@ import reactivemongo.bson.{
 }
 
 import reactivemongo.api.ReadConcern
-import reactivemongo.api.commands.{ CommandError, UnitBox }
+import reactivemongo.api.commands.{ Command, CommandError, UnitBox }
 
 object CommonImplicits { // See CommandCodecs
   implicit object UnitBoxReader
@@ -44,6 +44,12 @@ trait DealingWithGenericCommandErrorsReader[A] extends BSONDocumentReader[A] {
         code = doc.getAs[Int]("code"),
         errmsg = doc.getAs[String]("errmsg"),
         originalDocument = doc)
-    } else readResult(doc)
+    } else {
+      doc.getAs[String]("note").foreach { note =>
+        Command.logger.info(s"${note}: ${BSONDocument pretty doc}")
+      }
+
+      readResult(doc)
+    }
   }
 }

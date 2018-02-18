@@ -13,7 +13,13 @@ private[reactivemongo] trait CommandCodecs[P <: SerializationPack] {
 
     pack.reader[A] { doc: pack.Document =>
       decoder.booleanLike(doc, "ok") match {
-        case Some(true) => readResult(doc)
+        case Some(true) => {
+          decoder.string(doc, "note").foreach { note =>
+            Command.logger.info(s"${note}: ${pack pretty doc}")
+          }
+
+          readResult(doc)
+        }
 
         case _ => throw CommandError(pack)(
           code = decoder.int(doc, "code"),

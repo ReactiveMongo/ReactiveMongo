@@ -105,6 +105,9 @@ object Command {
     Response
   }
 
+  private[commands] lazy val logger =
+    reactivemongo.util.LazyLogger("reactivemongo.api.commands")
+
   def defaultCursorFetcher[P <: SerializationPack, A](db: DB, p: P, command: A, failover: FailoverStrategy)(implicit writer: p.Writer[A]): CursorFetcher[p.type, DefaultCursor.Impl] = fetchCursor[p.type, A](db, db.name + ".$cmd", p, command, failover)
 
   /**
