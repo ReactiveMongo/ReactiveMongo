@@ -6,11 +6,7 @@ import reactivemongo.core.netty.ChannelBufferReadableBuffer
 import reactivemongo.core.nodeset.{ Authenticate, Connection, X509Authenticating }
 import reactivemongo.core.protocol.Response
 
-private[reactivemongo] trait MongoX509Authentication {
-  system: MongoDBSystem =>
-
-  import MongoDBSystem.logger
-
+private[reactivemongo] trait MongoX509Authentication { system: MongoDBSystem =>
   protected final def sendAuthenticate(connection: Connection, nextAuth: Authenticate): Connection = {
     connection.send(X509Authenticate(nextAuth.user)("$external").maker(RequestId.authenticate.next))
 
