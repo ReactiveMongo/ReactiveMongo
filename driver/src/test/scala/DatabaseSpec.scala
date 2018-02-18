@@ -77,7 +77,7 @@ class DatabaseSpec(implicit ee: ExecutionEnv)
         } yield name -> c2.name) must beLike[(String, String)] {
           case (expected, name) => name aka "new name" must_== expected
         }.await(0, timeout)
-      } tag "wip"
+      }
 
       "fail to rename collection if target exists" in {
         val c1 = db.collection(s"foo_${System identityHashCode ee}")

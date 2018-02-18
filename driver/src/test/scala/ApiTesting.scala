@@ -227,4 +227,7 @@ package object tests extends QueryCodecs[BSONSerializationPack.type] {
   }
 
   @inline def dbHash(db: DB with DBMetaCommands, collections: Seq[String] = Seq.empty)(implicit ec: ExecutionContext) = db.hash(collections)
+
+  def withContent[T](uri: java.net.URI)(f: java.io.InputStream => T): T =
+    reactivemongo.util.withContent[T](uri)(f)
 }

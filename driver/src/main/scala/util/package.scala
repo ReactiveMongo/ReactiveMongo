@@ -15,6 +15,12 @@
  */
 package reactivemongo
 
+import java.io.InputStream
+
+import java.net.URI
+
+import scala.util.control.NonFatal
+
 package object util {
   import scala.language.implicitConversions
 
@@ -56,6 +62,24 @@ package object util {
       }
 
       promise.future
+    }
+  }
+
+  private[reactivemongo] def withContent[T](uri: URI)(f: InputStream => T): T = {
+    lazy val in = if (uri.getScheme == "classpath") {
+      Thread.currentThread().getContextClassLoader.
+        getResourceAsStream(uri.getPath)
+
+    } else {
+      uri.toURL.openStream()
+    }
+
+    try {
+      f(in)
+    } catch {
+      case NonFatal(cause) => throw cause
+    } finally {
+      in.close()
     }
   }
 }

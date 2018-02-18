@@ -133,19 +133,22 @@ private[api] trait Driver {
    * Creates a new MongoConnection.
    *
    * @param nodes $nodesParam
-   * @param authentications $authParam
-   * @param name $connectionNameParam
    * @param options $optionsParam
+   * @param name $connectionNameParam
    */
   protected final def askConnection(
     nodes: Seq[String], // TODO: Check nodes is empty
     options: MongoConnectionOptions,
-    authentications: Seq[Authenticate],
     name: Option[String]): Future[MongoConnection] = {
 
     val nm = name.getOrElse(s"Connection-${+Driver.nextCounter}")
+    val authentications = options.credentials.map {
+      case (db, c) => Authenticate(db, c.user, c.password)
+    }.toSeq
 
     // TODO: Passing ref to MongoDBSystem.history to AddConnection
+    // TODO: pass options.credentials.fallback
+
     lazy val dbsystem: MongoDBSystem = options.authMode match {
       case CrAuthentication => new LegacyDBSystem(
         supervisorName, nm, nodes, authentications, options)

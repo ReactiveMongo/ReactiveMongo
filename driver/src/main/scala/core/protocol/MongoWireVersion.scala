@@ -59,6 +59,13 @@ object MongoWireVersion {
       that != null && that.isInstanceOf[V34.type]
   }
 
+  object V36 extends MongoWireVersion {
+    val value = 6
+    override val toString = "3.6"
+    override def equals(that: Any): Boolean =
+      that != null && that.isInstanceOf[V36.type]
+  }
+
   def apply(v: Int): MongoWireVersion = {
     if (v <= V26.value) V26
     else if (v >= V34.value) V34

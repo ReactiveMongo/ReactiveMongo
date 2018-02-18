@@ -153,7 +153,7 @@ class ChannelFactorySpec(implicit ee: ExecutionEnv)
         chan.writeAndFlush(isMasterRequest()).addListener(printOnError)
 
         result.future must beLike[IsMasterResult] {
-          case IsMasterResult(true, 16777216, 48000000, 1000,
+          case IsMasterResult(true, 16777216, 48000000, _,
             Some(_), min, max, _, _) => min must be_<(max)
         }.await(1, timeout) and {
           if (!chan.closeFuture.isDone) {

@@ -5,20 +5,21 @@ ARG mongoProfile
 ARG akkaVersion
 ARG iterateesVersion
 ARG scalaVersion
+ARG sslPass
 
 LABEL org.reactivemongo.mongoMajor="${mongoMajor}" \
-      org.reactivemongo.mongoProfile="${mongoProfile}" \
-      org.reactivemongo.akkaVersion="${akkaVersion}" \
-      org.reactivemongo.iterateesVersion="${iterateesVersion}" \
-      org.reactivemongo.scalaVersion="${scalaVersion}"
+org.reactivemongo.mongoProfile="${mongoProfile}" \
+org.reactivemongo.akkaVersion="${akkaVersion}" \
+org.reactivemongo.iterateesVersion="${iterateesVersion}" \
+org.reactivemongo.scalaVersion="${scalaVersion}"
 
 ENV MONGO_VER=${mongoMajor} MONGO_PROFILE=${mongoProfile}
 ENV AKKA_VERSION=${akkaVersion} ITERATEES_VERSION=${iterateesVersion}
-ENV SCALA_VERSION=${scalaVersion}
+ENV SCALA_VERSION=${scalaVersion} SSL_PASS=${sslPass}
 
 ENV PRIMARY_HOST=db:27018 PRIMARY_SLOW_PROXY=localhost:27019
 
-RUN apk add --no-cache tzdata curl bash git && \
+RUN apk add --no-cache tzdata curl bash git openssl && \
 cp /usr/share/zoneinfo/Europe/Paris /etc/localtime && \
 echo "Europe/Paris" > /etc/timezone && \
 apk del tzdata && \
@@ -30,5 +31,11 @@ cd /usr/bin && \
 echo "Fails to sync time"; true ))
 
 ENV PATH="${PATH}:/root/sbt/bin" SCRIPT_DIR=/root/ReactiveMongo/.ci_scripts
+
+# Assume the following files are available in the shared volume,
+# as copied by the db entrypoint (see 'Copy SSL certs ...' in its dockerfile)
+# - /root/ReactiveMongo/.ci_scripts/client-cert.pem
+# - /root/ReactiveMongo/.ci_scripts/root-ca/root-ca.pem
+# - /root/ReactiveMongo/.ci_scripts/keystore.p12
 
 WORKDIR /root/ReactiveMongo

@@ -177,7 +177,7 @@ class NodeSetSpec(implicit val ee: ExecutionEnv)
 
     @inline implicit def sys = drv.system
 
-    val auths = Seq(Authenticate(Common.commonDb, "test", "password"))
+    val auths = Seq(Authenticate(Common.commonDb, "test", Some("password")))
     lazy val mongosystem = TestActorRef[StandardDBSystem](
       standardDBSystem(supervisorName, poolName, nodes, auths, options),
       poolName)
@@ -194,9 +194,10 @@ class NodeSetSpec(implicit val ee: ExecutionEnv)
 
   private def withCon[T](opts: MongoConnectionOptions = MongoConnectionOptions())(test: (String, MongoConnection, ActorRef) => MatchResult[T]): org.specs2.execute.Result = {
     val name = s"withCon-${System identityHashCode opts}"
-    val auths = Seq(Authenticate(Common.commonDb, "test", "password"))
     val con = md.connection(
-      nodes, authentications = auths, options = opts, name = Some(name))
+      nodes, options = opts.copy(credentials = Map(
+      Common.commonDb -> MongoConnectionOptions.Credential(
+        "test", Some("password")))), name = Some(name))
 
     val res = actorSystem.actorSelection(s"/user/Monitor-$name").
       resolveOne(timeout).map(test(name, con, _)).andThen {

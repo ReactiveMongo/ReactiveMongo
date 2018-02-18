@@ -93,7 +93,7 @@ trait TailableCursorSpec { specs: CursorSpec =>
         }
 
         "gracefully stop at connection close w/o maxDocs" in {
-          val con = Common.makeConnection(List(primaryHost), DefaultOptions)
+          val con = driver.connection(List(primaryHost), DefaultOptions)
           lazy val delayedTimeout = FiniteDuration(
             (timeout.toMillis * 1.25D).toLong, MILLISECONDS)
 

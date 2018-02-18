@@ -25,7 +25,9 @@ class IndexesSpec(implicit ee: ExecutionEnv)
 
   import Common.{ timeout, slowTimeout }
 
-  lazy val (db, slowDb) = Common.databases(s"reactivemongo-gridfs-${System identityHashCode this}", Common.connection, Common.slowConnection)
+  lazy val (db, slowDb) = Common.databases(
+    s"reactivemongo-gridfs-${System identityHashCode this}",
+    Common.connection, Common.slowConnection)
 
   def afterAll = { db.drop(); () }
 

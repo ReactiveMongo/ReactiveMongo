@@ -16,6 +16,12 @@ It's also possible to obtain an interactive shell from the test container.
 
     docker-compose run --rm --entrypoint /bin/ash integration_tests
 
+In the interactive shell, you can execute `./.ci_scripts/runIntegration.sh interactive`
+
+To check the MongoDB logs:
+
+    docker logs -f reactivemongo_db_...
+
 Cleanup:
 
 ```

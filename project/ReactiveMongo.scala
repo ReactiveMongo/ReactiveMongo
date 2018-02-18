@@ -498,6 +498,8 @@ object Version {
 
         Seq( // TODO: according Scala version
           f212,
+          fmp("reactivemongo.core.actors.LegacyDBSystem.lnm"),
+          fmp("reactivemongo.core.actors.StandardDBSystem.lnm"),
           exclude[DirectAbstractMethodProblem](
             "reactivemongo.api.Cursor.headOption"),
           exclude[DirectAbstractMethodProblem](
@@ -970,5 +972,5 @@ object Version {
       libraryDependencies ++= Seq(specs.value) ++ logApi,
       pomPostProcess := providedInternalDeps
     )).enablePlugins(CpdPlugin).
-    dependsOn(driver % "test->test;compile->compile")
+    dependsOn(driver)
 }

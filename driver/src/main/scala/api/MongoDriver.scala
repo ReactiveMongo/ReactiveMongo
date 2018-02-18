@@ -83,13 +83,54 @@ class MongoDriver(
    * $seeConnectDBTutorial
    *
    * @param nodes $nodesParam
+   * @param options $optionsParam
    * @param authentications $authParam
    * @param name $connectionNameParam
+   */
+  @deprecated("Use `connection` without `authentications` (but possibly without `options.credentials`)", "0.14.0")
+  def connection(nodes: Seq[String], options: MongoConnectionOptions = MongoConnectionOptions(), authentications: Seq[Authenticate] = Seq.empty, name: Option[String] = None): MongoConnection = {
+    val credentials = options.credentials ++ authentications.map { a =>
+      a.db -> MongoConnectionOptions.Credential(a.user, a.password)
+    }
+
+    Await.result(askConnection(nodes, options.copy(
+      credentials = credentials), name), Duration.Inf)
+  }
+
+  /**
+   * Creates a new MongoConnection.
+   *
+   * $seeConnectDBTutorial
+   *
+   * @param nodes $nodesParam
+   */
+  def connection(nodes: Seq[String]): MongoConnection = Await.result(
+    askConnection(nodes, MongoConnectionOptions(), Option.empty), Duration.Inf)
+
+  /**
+   * Creates a new MongoConnection.
+   *
+   * $seeConnectDBTutorial
+   *
+   * @param nodes $nodesParam
    * @param options $optionsParam
    */
-  def connection(nodes: Seq[String], options: MongoConnectionOptions = MongoConnectionOptions(), authentications: Seq[Authenticate] = Seq.empty, name: Option[String] = None): MongoConnection = {
-    Await.result(askConnection(nodes, options, authentications, name), Duration.Inf)
-  }
+  def connection(nodes: Seq[String], options: MongoConnectionOptions): MongoConnection = Await.result(askConnection(nodes, options, Option.empty), Duration.Inf)
+
+  /**
+   * Creates a new MongoConnection.
+   *
+   * $seeConnectDBTutorial
+   *
+   * @param nodes $nodesParam
+   * @param options $optionsParam
+   * @param name $connectionNameParam
+   */
+  def connection(
+    nodes: Seq[String],
+    options: MongoConnectionOptions,
+    name: String): MongoConnection = Await.result(
+    askConnection(nodes, options, Some(name)), Duration.Inf)
 
   /**
    * Creates a new MongoConnection from URI.

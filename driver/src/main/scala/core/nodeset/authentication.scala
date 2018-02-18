@@ -7,18 +7,20 @@ sealed trait Authentication {
 
 /**
  * @param db the name of the database
- * @param user the name of the user
- * @param password the password for the [[user]]
+ * @param user the name (or subject for X509) of the user
+ * @param password the password for the [[user]] (`None` for X509)
  */
+@deprecated("Will be private", "0.14.0")
 case class Authenticate(
   db: String,
   user: String,
-  password: String) extends Authentication {
+  password: Option[String]) extends Authentication {
 
   override def toString = s"Authenticate($db, $user)"
 }
 
 sealed trait Authenticating extends Authentication {
+  @deprecated("Will be removed", "0.14.0")
   def password: String
 }
 
@@ -26,16 +28,16 @@ object Authenticating {
   @deprecated(message = "Use [[reactivemongo.core.nodeset.CrAuthenticating]]", since = "0.11.10")
   def apply(db: String, user: String, password: String, nonce: Option[String]): Authenticating = CrAuthenticating(db, user, password, nonce)
 
-  def unapply(auth: Authenticating): Option[(String, String, String)] =
+  def unapply(auth: Authenticating): Option[(String, String, Option[String])] =
     auth match {
       case CrAuthenticating(db, user, pass, _) =>
-        Some((db, user, pass))
+        Some((db, user, Some(pass)))
 
       case ScramSha1Authenticating(db, user, pass, _, _, _, _, _) =>
-        Some((db, user, pass))
+        Some((db, user, Some(pass)))
 
-      case X509Authenticating(db, user, pass) =>
-        Some((db, user, pass))
+      case X509Authenticating(db, user) =>
+        Some((db, user, Option.empty[String]))
 
       case _ =>
         None
@@ -58,8 +60,8 @@ case class ScramSha1Authenticating(
     s"Authenticating($db, $user})"
 }
 
-case class X509Authenticating(db: String, user: String, password: String) extends Authenticating {
-  // we must keep password so the state machine works, it however will be ignored
+case class X509Authenticating(db: String, user: String) extends Authenticating {
+  def password = "deprecated"
 }
 
 case class Authenticated(db: String, user: String) extends Authentication

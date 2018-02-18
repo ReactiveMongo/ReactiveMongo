@@ -61,7 +61,7 @@ case class NodeSet(
     throw new UnsupportedOperationException(
       "Use updateNodeByChannelId with ChannelId")
 
-  def updateNodeByChannelId(id: ChannelId)(f: Node => Node) =
+  def updateNodeByChannelId(id: ChannelId)(f: Node => Node): NodeSet =
     updateByChannelId(id)(identity)(f)
 
   def updateConnectionByChannelId(id: ChannelId)(f: Connection => Connection): NodeSet = updateByChannelId(id)(f)(identity)
