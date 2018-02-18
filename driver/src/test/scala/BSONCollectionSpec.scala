@@ -2,16 +2,15 @@ import scala.concurrent._, duration.FiniteDuration
 
 import reactivemongo.api._, collections.bson.BSONCollection
 import reactivemongo.bson._
-import reactivemongo.core.errors.GenericDatabaseException
 
 import org.specs2.concurrent.ExecutionEnv
 
+// TODO: Merge with CollectionSpec
 class BSONCollectionSpec(implicit ee: ExecutionEnv)
   extends org.specs2.mutable.Specification {
 
   "BSON collection" title
 
-  import reactivemongo.api.commands.bson.DefaultBSONCommandError
   import reactivemongo.api.collections.bson._
   import Common._
 
@@ -105,7 +104,7 @@ class BSONCollectionSpec(implicit ee: ExecutionEnv)
           one[BSONDocument] must beSome[BSONDocument].which { doc =>
             doc.elements.size must_== 2 /* _id+name */ and (
               doc.getAs[String]("name") aka "name" must beSome("Jack"))
-          }.await(2, timeout)
+          }.await(1, timeout)
       }
 
       "explain query result" >> {
@@ -153,10 +152,10 @@ class BSONCollectionSpec(implicit ee: ExecutionEnv)
       val future = findAll(collection).one[Person].map(_ => 0).recover {
         case e if e.getMessage == "hey hey hey" => -1
         case _ =>
-          /* e.printStackTrace() */ -2
+          /* e.printStackTrace(); */ -2
       }
 
-      future must beEqualTo(-1).await(1, timeout)
+      future must beTypedEqualTo(-1).await(1, timeout)
     }
 
     {
@@ -320,58 +319,7 @@ class BSONCollectionSpec(implicit ee: ExecutionEnv)
         }
       }
     }
-
-    {
-      def renameSpec(_db: DefaultDB) =
-        "be renamed with failure" in {
-          _db(s"foo_${System identityHashCode _db}").
-            rename("renamed").map(_ => false).recover({
-              case DefaultBSONCommandError(Some(13), Some(msg), _) if (
-                msg contains "renameCollection ") => true
-              case _ => false
-            }) must beTrue.await(1, timeout)
-        }
-
-      "with the default connection" >> renameSpec(db)
-      "with the default connection" >> renameSpec(slowDb)
-    }
-
-    {
-      def dropSpec(_db: DefaultDB) = {
-        "be dropped successfully if exists (deprecated)" in {
-          val col = _db(s"foo_${System identityHashCode _db}")
-
-          col.create().flatMap(_ => col.drop(false)).
-            aka("legacy drop") must beTrue.await(1, timeout)
-        }
-
-        "be dropped with failure if doesn't exist (deprecated)" in {
-
-          val col = _db(s"foo_${System identityHashCode _db}")
-
-          col.drop() aka "legacy drop" must throwA[Exception].like {
-            case GenericDatabaseException(_, Some(26)) => ok
-          }.await(1, timeout)
-        }
-
-        "be dropped successfully if exist" in {
-          val col = _db(s"foo1_${System identityHashCode _db}")
-
-          col.create().flatMap(_ => col.drop(false)).
-            aka("dropped") must beTrue.await(1, timeout)
-        }
-
-        "be dropped successfully if doesn't exist" in {
-          val col = _db(s"foo2_${System identityHashCode _db}")
-
-          col.drop(false) aka "dropped" must beFalse.await(1, timeout)
-        }
-      }
-
-      "with the default connection" >> dropSpec(db)
-      "with the slow connection" >> dropSpec(db)
-    }
   }
 
-  @inline def findAll(c: BSONCollection) = c.find(BSONDocument.empty)
+  @inline def findAll(c: BSONCollection) = c.find(BSONDocument())
 }

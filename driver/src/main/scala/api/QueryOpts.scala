@@ -32,13 +32,15 @@ object SortOrder {
  * or set them directly.
  *
  * @param skipN the number of documents to skip.
- * @param batchSizeN the upper limit on the number of documents to retrieve per batch.
+ * @param batchSizeN the upper limit on the number of documents to retrieve per batch (0 for unspecified)
  * @param flagsN the query flags
  */
 case class QueryOpts(
   skipN: Int = 0,
   batchSizeN: Int = 0,
   flagsN: Int = 0) extends QueryOps {
+  // TODO: Merge with QueryBuilder (exception slaveOk)
+  // keep flags preparation as internal for compat < 3.2
   type Self = QueryOpts
 
   /** Sets the query flags. */

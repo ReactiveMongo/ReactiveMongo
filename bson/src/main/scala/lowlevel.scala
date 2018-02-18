@@ -2,36 +2,36 @@ package reactivemongo.bson.lowlevel
 
 import reactivemongo.bson.buffer.{ ReadableBuffer, WritableBuffer }
 
-@deprecated("Will be removed", "0.12.8")
+@deprecated("Will be removed", "0.13.0")
 sealed trait Field {
   def tpe: Byte
   def name: String
 }
 
-@deprecated("Will be removed", "0.12.8")
+@deprecated("Will be removed", "0.13.0")
 trait ValueField[A <: AnyVal] { _: Field =>
   def value: A
 }
 
-@deprecated("Will be removed", "0.12.8")
+@deprecated("Will be removed", "0.13.0")
 case class BooleanField(name: String, value: Boolean)
   extends Field with ValueField[Boolean] {
   final val tpe = 0x08: Byte
 }
 
-@deprecated("Will be removed", "0.12.8")
+@deprecated("Will be removed", "0.13.0")
 case class IntField(name: String, value: Int)
   extends Field with ValueField[Int] {
   final val tpe = 0x10: Byte
 }
 
-@deprecated("Will be removed", "0.12.8")
+@deprecated("Will be removed", "0.13.0")
 case class DoubleField(name: String, value: Double)
   extends Field with ValueField[Double] {
   final val tpe = 0x01: Byte
 }
 
-@deprecated("Will be removed", "0.12.8")
+@deprecated("Will be removed", "0.13.0")
 case class NoValue(tpe: Byte, name: String) extends Field
 
 /**
@@ -48,7 +48,7 @@ case class StructureField[A <: ReadableBuffer](
 case class LazyField[A <: ReadableBuffer](
   tpe: Byte, name: String, buffer: A) extends Field
 
-@deprecated("Will be removed", "0.12.8")
+@deprecated("Will be removed", "0.13.0")
 object LoweLevelDocumentIterator
   extends (ReadableBuffer => Iterator[ReadableBuffer]) {
 
@@ -68,7 +68,7 @@ object LoweLevelDocumentIterator
     }
 }
 
-@deprecated("Will be removed", "0.12.8")
+@deprecated("Will be removed", "0.13.0")
 class LowLevelBsonDocReader[A <: ReadableBuffer](rbuf: A) {
   private val start = rbuf.index
 
@@ -80,7 +80,7 @@ class LowLevelBsonDocReader[A <: ReadableBuffer](rbuf: A) {
 
   private def slice = rbuf.slice(length)
 
-  @deprecated("Use [[Tuple2]] type directly", "0.12.8")
+  @deprecated("Use `Tuple2` type directly", "0.13.0")
   type ->[T, U] = (T, U)
 
   def lookup(name: String): Option[Field] =
@@ -184,7 +184,7 @@ class LowLevelBsonDocReader[A <: ReadableBuffer](rbuf: A) {
   }
 }
 
-@deprecated("Will be removed", "0.12.8")
+@deprecated("Will be removed", "0.13.0")
 class LowLevelBsonDocWriter[A <: WritableBuffer](buf: A) {
   private var marks = List[(Int, Int)](0 -> 0x03)
 

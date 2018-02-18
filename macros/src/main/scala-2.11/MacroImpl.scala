@@ -262,7 +262,7 @@ private object MacroImpl {
         val tuple = Ident(tupleName)
 
         if (types.length == 1) { _: Int => tuple }
-        else { i: Int => Select(tuple, "_" + (i + 1)) }
+        else { i: Int => Select(tuple, TermName("_" + (i + 1))) }
       }
 
       val bufName = TermName("buf")
@@ -272,7 +272,7 @@ private object MacroImpl {
         pname: String,
         sig: Type,
         writer: Tree): Boolean = {
-        if (param.annotations.exists(_.tpe =:= typeOf[Flatten])) {
+        if (param.annotations.exists(_.tree.tpe =:= typeOf[Flatten])) {
 
           if (writer.toString == "forwardWriter") {
             c.abort(

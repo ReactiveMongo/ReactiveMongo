@@ -69,7 +69,7 @@ class UpdateSpec(implicit val ee: ExecutionEnv)
       }
       section("mongo2", "mongo24", "not_mongo26")
 
-      section("gt_mongo3")
+      section("gt_mongo32")
       "upsert with MongoDB 3.4+" >> {
         "a person with the default connection" in {
           spec(col1, timeout, jack3)(_.copy(age = 33))
@@ -84,7 +84,7 @@ class UpdateSpec(implicit val ee: ExecutionEnv)
           }
         }
       }
-      section("gt_mongo3")
+      section("gt_mongo32")
     }
 
     "upsert a document" >> {
@@ -156,7 +156,7 @@ class UpdateSpec(implicit val ee: ExecutionEnv)
       }
       section("mongo2", "mongo24", "not_mongo26")
 
-      section("gt_mongo3")
+      section("gt_mongo32")
       "update with MongoDB 3.4+" >> {
         "a person with the default connection" in {
           val person = jack3.copy(age = 33) // as after previous upsert test
@@ -170,7 +170,7 @@ class UpdateSpec(implicit val ee: ExecutionEnv)
           spec(slowCol1, slowTimeout, person)(_.copy(age = 66))
         }
       }
-      section("gt_mongo3")
+      section("gt_mongo32")
     }
   }
 

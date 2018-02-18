@@ -11,7 +11,7 @@ trait BatchCommands[P <: SerializationPack] {
     UpdateCommand => UC,
     DeleteCommand => DC,
     DefaultWriteResult,
-    LastError,
+    //LastError,
     ResolvedCollectionCommand,
     FindAndModifyCommand => FMC
   }
@@ -46,5 +46,5 @@ trait BatchCommands[P <: SerializationPack] {
 
   implicit def DefaultWriteResultReader: pack.Reader[DefaultWriteResult]
 
-  implicit def LastErrorReader: pack.Reader[LastError]
+  //implicit def LastErrorReader: pack.Reader[LastError]
 }

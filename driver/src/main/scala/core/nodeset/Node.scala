@@ -77,7 +77,7 @@ case class Node(
     val node = copy(name, status, connections, authenticated, tags,
       protocolMetadata, pingInfo, isMongos)
 
-    node.aliases ++= this.aliases.result()
+    node.aliases ++= aliases
 
     node
   }

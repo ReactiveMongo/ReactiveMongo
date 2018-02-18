@@ -2,10 +2,8 @@ import scala.concurrent.duration.FiniteDuration
 
 import reactivemongo.bson.BSONDocument
 
-import reactivemongo.api.BSONSerializationPack
+import reactivemongo.api.{ BSONSerializationPack, DB, ReadPreference }
 import reactivemongo.api.commands.Command
-
-import reactivemongo.api.collections.bson.BSONCollection
 
 import org.specs2.concurrent.ExecutionEnv
 
@@ -38,22 +36,22 @@ class RawCommandSpec(implicit ee: ExecutionEnv)
 
   "Raw command" should {
     "re-index test collection with command as document" >> {
-      def reindexSpec(c: BSONCollection, timeout: FiniteDuration) = {
-        val runner = Command.run(BSONSerializationPack)
+      def reindexSpec(db: DB, timeout: FiniteDuration) = {
+        val runner = Command.run(BSONSerializationPack, db.failoverStrategy)
         val reIndexDoc = BSONDocument("reIndex" -> collection.name)
 
         runner.apply(db, runner.rawCommand(reIndexDoc)).
-          one[BSONDocument] must beLike[BSONDocument] {
+          one[BSONDocument](ReadPreference.primary) must beLike[BSONDocument] {
             case doc => doc.getAs[Double]("ok") must beSome(1)
           }.await(1, timeout)
       }
 
       "with the default connection" in {
-        reindexSpec(collection, timeout)
+        reindexSpec(db, timeout)
       }
 
       "with the slow connection" in {
-        reindexSpec(slowDb(collection.name), slowTimeout)
+        reindexSpec(slowDb, slowTimeout)
       }
     }
   }

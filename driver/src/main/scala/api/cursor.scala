@@ -26,15 +26,19 @@ import akka.actor.ActorSystem
 
 import play.api.libs.iteratee.{ Enumerator, Enumeratee, Error, Input, Iteratee }
 
+import reactivemongo.bson.BSONDocument
+
 import reactivemongo.core.actors.Exceptions
 import reactivemongo.core.iteratees.{ CustomEnumeratee, CustomEnumerator }
 import reactivemongo.core.netty.BufferSequence
 import reactivemongo.core.protocol.{
   GetMore,
   KillCursors,
+  MongoWireVersion,
   Query,
   QueryFlags,
   RequestMaker,
+  RequestOp,
   Response,
   ReplyDocumentIterator,
   ReplyDocumentIteratorExhaustedException
@@ -256,8 +260,7 @@ trait Cursor[T] {
    * val maybeFirst: Future[Option[BSONDocument]] = cursor.headOption
    * }}}
    */
-  def headOption(implicit ctx: ExecutionContext): Future[Option[T]] =
-    Future.successful(Option.empty[T]) // TODO: Remove body
+  def headOption(implicit ctx: ExecutionContext): Future[Option[T]]
 
   /**
    * Produces an Enumerator of responses from the database.
@@ -274,6 +277,11 @@ sealed trait CursorOps[T] { cursor: Cursor[T] =>
   /** Sends the initial request. */
   private[reactivemongo] def makeRequest(maxDocs: Int)(implicit ctx: ExecutionContext): Future[Response]
 
+  /**
+   * Returns a function that can be used to get the next response,
+   * if allowed according the `maxDocs` and the cursor options
+   * (cursor not exhausted, tailable, ...)
+   */
   private[reactivemongo] def nextResponse(maxDocs: Int): (ExecutionContext, Response) => Future[Option[Response]]
 
   /**
@@ -380,6 +388,8 @@ object Cursor {
   case object NoSuchResultException
     extends java.util.NoSuchElementException()
     with scala.util.control.NoStackTrace
+
+  private[api] val DefaultBatchSize = 101
 }
 
 object DefaultCursor {
@@ -396,37 +406,70 @@ object DefaultCursor {
     mongoConnection: MongoConnection,
     failover: FailoverStrategy,
     isMongo26WriteOp: Boolean)(implicit reader: pack.Reader[A]): Cursor[A] =
-    DefaultCursor.query[P, A](pack, query, documents, readPreference,
-      mongoConnection, failover, isMongo26WriteOp)
+    DefaultCursor.query[P, A](pack, query, _ => documents, readPreference,
+      mongoConnection, failover, isMongo26WriteOp, query.fullCollectionName)
 
+  /**
+   * @param collectionName the fully qualified collection name (even if `query.fullCollectionName` is `\$cmd`)
+   */
   def query[P <: SerializationPack, A](
     pack: P,
     query: Query,
-    requestBuffer: BufferSequence,
+    requestBuffer: Int => BufferSequence,
     readPreference: ReadPreference,
     mongoConnection: MongoConnection,
     failover: FailoverStrategy,
-    isMongo26WriteOp: Boolean)(implicit reader: pack.Reader[A]) = new Impl[A] {
-    val preference = readPreference
-    val connection = mongoConnection
-    val failoverStrategy = failover
-    val mongo26WriteOp = isMongo26WriteOp
-    val fullCollectionName = query.fullCollectionName
-    val numberToReturn = query.numberToReturn // see QueryOpts.batchSizeN
-    val tailable = (query.flags &
-      QueryFlags.TailableCursor) == QueryFlags.TailableCursor
+    isMongo26WriteOp: Boolean,
+    collectionName: String)(implicit reader: pack.Reader[A]): Impl[A] =
+    new Impl[A] {
+      val preference = readPreference
+      val connection = mongoConnection
+      val failoverStrategy = failover
+      val mongo26WriteOp = isMongo26WriteOp
+      val fullCollectionName = collectionName
 
-    val makeIterator = { response: Response =>
-      ReplyDocumentIterator(pack)(response.reply, response.documents)(reader)
+      val numberToReturn = prepareNumberToReturn(mongoConnection)(query)
+      val tailable = (query.flags &
+        QueryFlags.TailableCursor) == QueryFlags.TailableCursor
+
+      val makeIterator = ReplyDocumentIterator.parse(pack)(_: Response)(reader)
+
+      @inline def makeRequest(maxDocs: Int)(implicit ctx: ExecutionContext): Future[Response] = Failover2(mongoConnection, failoverStrategy) { () =>
+        val ntr = toReturn(numberToReturn, maxDocs, 0)
+
+        // MongoDB2.6: Int.MaxValue
+
+        val op = query.copy(numberToReturn = ntr)
+        val req = RequestMaker(op, requestBuffer(maxDocs), readPreference)
+
+        requester(0, maxDocs, req)(ctx)
+      }.future.flatMap {
+        case Response.CommandError(_, _, _, cause) =>
+          Future.failed[Response](cause)
+
+        case response =>
+          Future.successful(response)
+      }
+
+      // TODO: maxTimeMS
+      val getMoreOpCmd: Function2[Long, Int, (RequestOp, BufferSequence)] = {
+        if (lessThenV32) { (cursorId, ntr) =>
+          GetMore(fullCollectionName, ntr, cursorId) -> BufferSequence.empty
+        } else {
+          val moreQry = query.copy(numberToSkip = 0, numberToReturn = 1)
+          val collName = fullCollectionName.span(_ != '.')._2.tail
+
+          { (cursorId, ntr) =>
+            val cmd = BSONDocument(
+              "getMore" -> cursorId,
+              "collection" -> collName,
+              "batchSize" -> ntr) // TODO: maxTimeMS
+
+            moreQry -> BufferSequence.single(cmd)
+          }
+        }
+      }
     }
-
-    @inline def makeRequest(maxDocs: Int)(implicit ctx: ExecutionContext): Future[Response] = Failover2(mongoConnection, failoverStrategy) { () =>
-      val q = query.copy(numberToReturn = toReturn(numberToReturn, maxDocs, 0))
-
-      mongoConnection.sendExpectingResponse(
-        RequestMaker(q, requestBuffer, readPreference), isMongo26WriteOp)
-    }.future
-  }
 
   /**
    * @param channelId the ID of the current channel
@@ -440,43 +483,80 @@ object DefaultCursor {
     readPreference: ReadPreference,
     mongoConnection: MongoConnection,
     failover: FailoverStrategy,
-    isMongo26WriteOp: Boolean)(implicit reader: pack.Reader[A]) = new Impl[A] {
-    val preference = readPreference
-    val connection = mongoConnection
-    val failoverStrategy = failover
-    val mongo26WriteOp = isMongo26WriteOp
-    val fullCollectionName = result.fullCollectionName
-    val numberToReturn = toReturn
-    val tailable = false // ??
+    isMongo26WriteOp: Boolean)(implicit reader: pack.Reader[A]): Impl[A] =
+    new Impl[A] {
+      val preference = readPreference
+      val connection = mongoConnection
+      val failoverStrategy = failover
+      val mongo26WriteOp = isMongo26WriteOp
+      val fullCollectionName = result.fullCollectionName
+      val numberToReturn = toReturn
+      val tailable = false // ??
 
-    private lazy val response = preload
+      private lazy val response = preload
 
-    val makeIterator = { response: Response =>
-      ReplyDocumentIterator(pack)(response.reply, response.documents)(reader)
-    }
+      val makeIterator = ReplyDocumentIterator.parse(pack)(_: Response)(reader)
 
-    private var req: Int => ExecutionContext => Future[Response] = { maxDocs =>
-      { implicit ec =>
-        this.req = makeReq
-        Future.successful(response)
+      private var req: Int => ExecutionContext => Future[Response] = { maxDocs =>
+        { implicit ec =>
+          this.req = makeReq
+          Future.successful(response)
+        }
       }
-    }
 
-    private val op = GetMore(fullCollectionName, toReturn, result.cursorId)
-    private lazy val reqMaker =
-      RequestMaker(op).copy(channelIdHint = Some(response.info.channelId))
+      // TODO: maxTimeMS
+      val getMoreOpCmd: Function2[Long, Int, (RequestOp, BufferSequence)] = {
+        if (lessThenV32) { (cursorId, ntr) =>
+          GetMore(fullCollectionName, ntr, cursorId) -> BufferSequence.empty
+        } else {
+          val collName = fullCollectionName.span(_ != '.')._2.tail
 
-    private val makeReq = { maxDocs: Int =>
-      { implicit ctx: ExecutionContext =>
-        logger.trace(s"[Cursor] Calling next on ${result.cursorId}, op=$op")
+          { (cursorId, ntr) =>
+            val cmd = BSONDocument(
+              "getMore" -> cursorId,
+              "collection" -> collName,
+              "batchSize" -> ntr) // TODO: maxTimeMS
 
-        Failover2(connection, failoverStrategy) { () =>
-          connection.sendExpectingResponse(reqMaker, mongo26WriteOp)
-        }.future
+            GetMore(
+              fullCollectionName, 1, cursorId) -> BufferSequence.single(cmd)
+          }
+        }
       }
+
+      private val makeReq = { maxDocs: Int =>
+        { implicit ctx: ExecutionContext =>
+          Failover2(connection, failoverStrategy) { () =>
+            val (op, cmd) = getMoreOpCmd(result.cursorId, toReturn)
+
+            logger.trace(s"Calling next on #${result.cursorId}, op=$op")
+
+            val req = RequestMaker(op, cmd).
+              copy(channelIdHint = Some(response.info.channelId))
+
+            requester(response.reply.startingFrom, maxDocs, req)(ctx)
+          }.future
+        }
+      }
+
+      def makeRequest(maxDocs: Int)(implicit ctx: ExecutionContext): Future[Response] = req(maxDocs)(ctx)
     }
 
-    def makeRequest(maxDocs: Int)(implicit ctx: ExecutionContext): Future[Response] = req(maxDocs)(ctx)
+  private[api] def prepareNumberToReturn(mongoConnection: MongoConnection): Query => Int = {
+    val version = mongoConnection.metadata.
+      fold[MongoWireVersion](MongoWireVersion.V30)(_.maxWireVersion)
+
+    if (version.compareTo(MongoWireVersion.V32) < 0) { q: Query =>
+      // see QueryOpts.batchSizeN
+
+      /*if (q.numberToReturn == Int.MaxValue) {
+       q.numberToReturn min Cursor.DefaultBatchSize*/
+
+      if (q.numberToReturn <= 0) {
+        Cursor.DefaultBatchSize
+      } else q.numberToReturn
+    } else {
+      (_: Query) => 1 // nested 'cursor' document
+    }
   }
 
   private[reactivemongo] trait Impl[A] extends Cursor[A] with CursorOps[A] {
@@ -495,38 +575,88 @@ object DefaultCursor {
 
     def tailable: Boolean
 
-    def makeIterator: Response => Iterator[A]
+    def makeIterator: Response => Iterator[A] // Unsafe
 
-    def documentIterator(response: Response): Iterator[A] =
+    final def documentIterator(response: Response): Iterator[A] =
       makeIterator(response)
+
+    protected final lazy val version = connection.metadata.
+      fold[MongoWireVersion](MongoWireVersion.V30)(_.maxWireVersion)
+
+    @inline protected def lessThenV32: Boolean =
+      version.compareTo(MongoWireVersion.V32) < 0
+
+    protected lazy val requester: (Int, Int, RequestMaker) => ExecutionContext => Future[Response] = {
+      @inline def base(req: RequestMaker): Future[Response] =
+        connection.sendExpectingResponse(req, mongo26WriteOp)
+
+      if (lessThenV32) {
+        { (off: Int, maxDocs: Int, req: RequestMaker) =>
+          val max = if (maxDocs > 0) maxDocs else Int.MaxValue
+
+          { implicit ec: ExecutionContext =>
+            base(req).map { response =>
+              val fetched = // See nextBatchOffset
+                response.reply.numberReturned + response.reply.startingFrom
+
+              if (fetched < max) {
+                response
+              } else response match {
+                case error @ Response.CommandError(_, _, _, _) => error
+
+                case r => {
+                  // Normalizes as MongoDB 2.x doesn't offer the 'limit'
+                  // on query, which allows with MongoDB 3 to exhaust
+                  // the cursor with a last partial batch
+
+                  r.cursorID(0L)
+                }
+              }
+            }
+          }
+        }
+      } else { (startingFrom: Int, _: Int, req: RequestMaker) =>
+        { implicit ec: ExecutionContext =>
+          base(req).map {
+            // Normalizes as 'new' cursor doesn't indicate such property
+            _.startingFrom(startingFrom)
+          }
+        }
+      }
+    }
+
+    // cursorId: Long, toReturn: Int
+    protected def getMoreOpCmd: Function2[Long, Int, (RequestOp, BufferSequence)]
 
     private def next(response: Response, maxDocs: Int)(implicit ctx: ExecutionContext): Future[Option[Response]] = {
       if (response.reply.cursorID != 0) {
-        val ntr = toReturn(
-          this.numberToReturn, maxDocs, nextBatchOffset(response))
+        // numberToReturn=1 for new find command,
+        // so rather use batchSize from the previous reply
+        val reply = response.reply
+        val nextOffset = nextBatchOffset(response)
+        val ntr = toReturn(reply.numberReturned, maxDocs, nextOffset)
 
-        val op = GetMore(fullCollectionName, ntr, response.reply.cursorID)
+        val (op, cmd) = getMoreOpCmd(reply.cursorID, ntr)
 
-        logger.trace(s"[Cursor] Calling next on ${response.reply.cursorID}, op=$op")
+        logger.trace(s"Asking for the next batch of $ntr documents on cursor #${reply.cursorID}, after ${nextOffset}: $op")
+
+        def req = RequestMaker(
+          op, cmd,
+          readPreference = preference,
+          channelIdHint = Some(response.info.channelId))
 
         Failover2(connection, failoverStrategy) { () =>
-          connection.sendExpectingResponse(
-            RequestMaker(
-              op,
-              readPreference = preference,
-              channelIdHint = Some(response.info.channelId)),
-            mongo26WriteOp)
-
+          requester(nextOffset, maxDocs, req)(ctx)
         }.future.map(Some(_))
       } else {
-        logger.error("[Cursor] Call to next() but cursorID is 0, there is probably a bug")
+        logger.warn("Call to next() but cursorID is 0, there is probably a bug")
         Future.successful(Option.empty[Response])
       }
     }
 
     @inline private def hasNext(response: Response, maxDocs: Int): Boolean =
       (response.reply.cursorID != 0) && (
-        maxDocs < 0 || (DefaultCursor.nextBatchOffset(response) < maxDocs))
+        maxDocs < 0 || (nextBatchOffset(response) < maxDocs))
 
     /** Returns next response using tailable mode */
     private def tailResponse(current: Response, maxDocs: Int)(implicit context: ExecutionContext): Future[Option[Response]] = {
@@ -574,14 +704,15 @@ object DefaultCursor {
         } else Future(result.next())
       }
 
-    // TODO: Remove override
-    override def headOption(implicit ctx: ExecutionContext): Future[Option[A]] =
+    final def headOption(implicit ctx: ExecutionContext): Future[Option[A]] =
       makeRequest(1).flatMap { response =>
         val result = documentIterator(response)
 
         if (!result.hasNext) {
           Future.successful(Option.empty[A])
-        } else Future(Some(result.next()))
+        } else {
+          Future(Some(result.next()))
+        }
       }
 
     @inline private def syncSuccess[T, U](f: (T, U) => State[T])(implicit ec: ExecutionContext): (T, U) => Future[State[T]] = { (a: T, b: U) => Future(f(a, b)) }
@@ -606,9 +737,10 @@ object DefaultCursor {
     def foldWhile[T](z: => T, maxDocs: Int = -1)(suc: (T, A) => State[T], err: (T, Throwable) => State[T])(implicit ctx: ExecutionContext): Future[T] = foldWhileM[T](z, maxDocs)(syncSuccess[T, A](suc), err)
 
     def foldWhileM[T](z: => T, maxDocs: Int = -1)(suc: (T, A) => Future[State[T]], err: (T, Throwable) => State[T])(implicit ctx: ExecutionContext): Future[T] = {
-      def go(v: T, it: Iterator[A]): Future[State[T]] =
-        if (!it.hasNext) Future.successful(Cont(v))
-        else Try(it.next) match {
+      def go(v: T, it: Iterator[A]): Future[State[T]] = {
+        if (!it.hasNext) {
+          Future.successful(Cont(v))
+        } else Try(it.next) match {
           case Failure(
             x @ ReplyDocumentIteratorExhaustedException(_)) =>
             Future.successful(Fail(x))
@@ -617,16 +749,26 @@ object DefaultCursor {
             case Cont(cv) => go(cv, it)
             case f @ Fail(Unrecoverable(_)) =>
               /* already marked unrecoverable */ Future.successful(f)
-            case Fail(u) => Future.successful(Fail(Unrecoverable(u)))
-            case st      => Future.successful(st)
+
+            case Fail(u) =>
+              Future.successful(Fail(Unrecoverable(u)))
+
+            case st => Future.successful(st)
           }
 
-          case Success(a) => suc(v, a).flatMap {
-            case Cont(cv)    => go(cv, it)
-            case f @ Fail(_) => Future.successful(f)
-            case st          => Future.successful(st)
+          case Success(a) => suc(v, a).recover {
+            case cause if it.hasNext => err(v, cause)
+          }.flatMap {
+            case Cont(cv) => go(cv, it)
+
+            case Fail(cause) =>
+              // Prevent error handler at bulk/response level to recover
+              Future.successful(Fail(Unrecoverable(cause)))
+
+            case st => Future.successful(st)
           }
         }
+      }
 
       foldBulksM(z, maxDocs)(go, err)
     }
@@ -636,8 +778,11 @@ object DefaultCursor {
       Enumerator.flatten(makeRequest(maxDocs).
         map(new CustomEnumerator.SEnumerator(_)(
           next = response => {
-            if (hasNext(response, maxDocs)) next(response, maxDocs)
-            else Future.successful(Option.empty[Response])
+            if (hasNext(response, maxDocs)) {
+              next(response, maxDocs)
+            } else {
+              Future.successful(Option.empty[Response])
+            }
           }, cleanUp = { resp => killCursors(resp.reply.cursorID, "Cursor") })))
 
     @deprecated(message = "Only for internal use", since = "0.11.10")
@@ -725,8 +870,11 @@ object DefaultCursor {
 
     def nextResponse(maxDocs: Int): (ExecutionContext, Response) => Future[Option[Response]] = {
       if (!tailable) { (ec: ExecutionContext, r: Response) =>
-        if (!hasNext(r, maxDocs)) Future.successful(Option.empty[Response])
-        else next(r, maxDocs)(ec)
+        if (!hasNext(r, maxDocs)) {
+          Future.successful(Option.empty[Response])
+        } else {
+          next(r, maxDocs)(ec)
+        }
       } else { (ec: ExecutionContext, r: Response) =>
         tailResponse(r, maxDocs)(ec)
       }
@@ -750,11 +898,6 @@ object DefaultCursor {
   }
 }
 
-/**
- * @define curParam the current value
- * @define cParam the value index (first = 0)
- * @define lastParam the last [[reactivemongo.core.protocol.Response]]
- */
 private[api] final class FoldResponses[T](
   nextResponse: (ExecutionContext, Response) => Future[Option[Response]],
   killCursors: (Long, String) => Unit,
@@ -803,54 +946,63 @@ private[api] final class FoldResponses[T](
   @inline private def handleResponse(last: Response, cur: T, c: Int): Unit = {
     logger.trace(s"Process response: $last")
 
-    suc(cur, last).onComplete({
-      case Success(next)  => self ! ProcNext(last, cur, next, c)
-      case Failure(error) => self ! OnError(last, cur, error, c)
+    val handled: Future[State[T]] = try {
+      suc(cur, last)
+    } catch {
+      case unsafe: Exception /* see makeIterator */ =>
+        Future.failed[State[T]](unsafe)
+    }
+
+    def nc = c + last.reply.numberReturned
+
+    handled.onComplete({
+      case Success(next)  => self ! ProcNext(last, cur, next, nc)
+      case Failure(error) => self ! OnError(last, cur, error, nc)
     })(ec)
   }
 
   @inline
   private def onError(last: Response, cur: T, error: Throwable, c: Int): Unit =
     error match {
-      case Unrecoverable(e) => ko(last, e) // already marked recoverable
+      case Unrecoverable(e) =>
+        ko(last, e) // already marked recoverable
 
-      case _ => {
-        val nc = c + 1 // resp.reply.numberReturned
+      case _ => err(cur, error) match {
+        case Done(d) => ok(last, d)
 
-        err(cur, error) match {
-          case Done(d) => ok(last, d)
+        case Fail(f) => ko(last, f)
 
-          case Cont(v) if (
-            maxDocs > -1 && nc >= maxDocs) => ok(last, v)
-
-          case Fail(f) => ko(last, f)
-
-          case Cont(_ /*v*/ ) =>
-            // TODO: Use v instead of cur?
-            self ! HandleResponse(last, cur, nc)
-        }
+        case next @ Cont(v) =>
+          self ! ProcNext(last, v /*cur*/ , next, c)
       }
     }
 
-  @inline private def procNext(last: Response, cur: T, next: State[T], c: Int): Unit = {
-    val nc = c + last.reply.numberReturned
-
-    next match {
-      case Done(d) => ok(last, d)
-
-      case Cont(v) if (
-        maxDocs > -1 && nc >= maxDocs) => ok(last, v)
-
-      case Fail(f) => self ! OnError(last, cur, f, c)
-
-      case Cont(v) => nextResponse(ec, last).onComplete({
-        case Success(Some(r)) => self ! ProcResponses(
-          () => Future.successful(r), v, nc, r.reply.cursorID)
-
-        case Success(_) => ok(last, v)
-        case Failure(e) => ko(last, e)
-      })(ec)
+  @inline private def fetch(
+    c: Int,
+    ec: ExecutionContext,
+    r: Response): Future[Option[Response]] = {
+    // Enforce maxDocs check as r.reply.startingFrom (checked in hasNext),
+    // will always be set to 0 by the server for tailable cursor/capped coll
+    if (c < maxDocs) {
+      // nextResponse will take care of cursorID, ...
+      nextResponse(ec, r)
+    } else {
+      Future.successful(Option.empty[Response])
     }
+  }
+
+  @inline private def procNext(last: Response, cur: T, next: State[T], c: Int): Unit = next match {
+    case Done(d) => ok(last, d)
+
+    case Fail(f) => self ! OnError(last, cur, f, c)
+
+    case Cont(v) => fetch(c, ec, last).onComplete({
+      case Success(Some(r)) => self ! ProcResponses(
+        () => Future.successful(r), v, c, r.reply.cursorID)
+
+      case Success(_) => ok(last, v)
+      case Failure(e) => ko(last, e)
+    })(ec)
   }
 
   @inline private def procResponses(last: Future[Response], cur: T, c: Int, lastID: Long): Unit = last.onComplete({
@@ -938,8 +1090,9 @@ private[api] object FoldResponses {
     err: Cursor.ErrorHandler[T],
     maxDocs: Int)(implicit actorSys: ActorSystem, ec: ExecutionContext): Future[T] = {
     Future(z)(ec).flatMap({ v =>
+      val max = if (maxDocs > 0) maxDocs else Int.MaxValue
       val f = new FoldResponses[T](
-        nextResponse, killCursors, maxDocs, suc, err)(actorSys, ec)
+        nextResponse, killCursors, max, suc, err)(actorSys, ec)
 
       f ! f.ProcResponses(() => makeRequest(ec), v, 0, -1L)
 

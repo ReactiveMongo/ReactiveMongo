@@ -2,12 +2,8 @@ import scala.concurrent.{ Await, Future }
 import scala.concurrent.duration._
 
 import reactivemongo.bson._
-import reactivemongo.api.{
-  Cursor,
-  QueryOpts,
-  MongoDriver,
-  WrappedCursor
-}
+import reactivemongo.api.{ Cursor, QueryOpts, WrappedCursor }
+
 import reactivemongo.api.collections.bson.BSONCollection
 
 import org.specs2.concurrent.ExecutionEnv
@@ -24,7 +20,7 @@ class CursorSpec(implicit val ee: ExecutionEnv)
     group1 // include fixture insert
 
     "stop on error" >> {
-      lazy val cursorDrv = new MongoDriver
+      lazy val cursorDrv = Common.newDriver
       lazy val cursorCon =
         Common.makeConnection(cursorDrv)(List(primaryHost), DefaultOptions)
 
@@ -53,7 +49,7 @@ class CursorSpec(implicit val ee: ExecutionEnv)
             val cursor = c.find(matchAll("cursorspec11")).cursor()
 
             cursor.foldResponsesM({}, 128)(
-              { (_, _) => Future[Cursor.State[Unit]](sys.error("Foo")) },
+              { (_, _) => Future[Cursor.State[Unit]](sys.error("Foo #11")) },
               Cursor.FailOnError[Unit](onError)).recover({ case _ => count }).
               aka("folding") must beEqualTo(1).await(1, timeout)
 
@@ -69,9 +65,11 @@ class CursorSpec(implicit val ee: ExecutionEnv)
             val cursor = c.find(matchAll("cursorspec12")).cursor()
 
             cursor.foldResponses({}, 128)(
-              { (_, _) => sys.error("Foo"): Cursor.State[Unit] },
+              { (_, _) => sys.error("Foo #12"): Cursor.State[Unit] },
               Cursor.FailOnError[Unit](onError)).recover({ case _ => count }).
-              aka("folding") must beEqualTo(1).await(1, timeout)
+              aka("folding") must beEqualTo(1).
+              await(1, timeout)
+
           }
 
           "if fails with initial value" in {
@@ -83,7 +81,7 @@ class CursorSpec(implicit val ee: ExecutionEnv)
             val c = specCol(System.identityHashCode(onError).toString)
             val cursor = c.find(matchAll("cursorspec13")).cursor()
 
-            cursor.foldResponses[Unit](sys.error("Foo"), 128)(
+            cursor.foldResponses[Unit](sys.error("Foo #13"), 128)(
               (_, _) => Cursor.Cont({}), Cursor.FailOnError[Unit](onError)).
               recover { case _ => count } must beEqualTo(0).await(1, timeout)
           }
@@ -124,7 +122,6 @@ class CursorSpec(implicit val ee: ExecutionEnv)
 
       "when folding bulks" >> {
         "if fails while processing with existing documents" in {
-
           @volatile var count = 0
           val onError: (Unit, Throwable) => Unit = { (_, _) =>
             debug(s"stopOnError: foldBulks (#1): $count")
@@ -135,7 +132,7 @@ class CursorSpec(implicit val ee: ExecutionEnv)
             QueryOpts(batchSizeN = 64)).cursor()
 
           cursor.foldBulksM({}, 128)(
-            { (_, _) => Future[Cursor.State[Unit]](sys.error("Foo")) },
+            { (_, _) => Future[Cursor.State[Unit]](sys.error("Foo #18")) },
             Cursor.FailOnError[Unit](onError)).recover({ case _ => count }).
             aka("folding") must beEqualTo(1).await(1, timeout)
 
@@ -152,7 +149,7 @@ class CursorSpec(implicit val ee: ExecutionEnv)
             QueryOpts(batchSizeN = 64)).cursor()
 
           cursor.foldBulks({}, 128)(
-            { (_, _) => sys.error("Foo"): Cursor.State[Unit] },
+            { (_, _) => sys.error("Foo #19"): Cursor.State[Unit] },
             Cursor.FailOnError[Unit](onError)).recover({ case _ => count }).
             aka("folding") must beEqualTo(1).await(1, timeout)
         }
@@ -167,7 +164,7 @@ class CursorSpec(implicit val ee: ExecutionEnv)
           val cursor = c.find(matchAll("cursorspec20")).options(
             QueryOpts(batchSizeN = 64)).cursor()
 
-          cursor.foldBulksM[Unit](sys.error("Foo"), 128)(
+          cursor.foldBulksM[Unit](sys.error("Foo #20"), 128)(
             (_, _) => Future(Cursor.Cont({})),
             Cursor.FailOnError[Unit](onError)).
             recover({ case _ => count }) must beEqualTo(0).await(1, timeout)
@@ -200,7 +197,7 @@ class CursorSpec(implicit val ee: ExecutionEnv)
       }
 
       { // .foldWhile
-        def foldWhileSpec(defaultColl: BSONCollection, specCol: String => BSONCollection, timeout: FiniteDuration) = {
+        def foldWhileSpec(defaultColl: BSONCollection, timeout: FiniteDuration) = {
           "if fails while processing with existing documents" in {
             @volatile var count = 0
             val onError: (Unit, Throwable) => Unit = { (_, _) =>
@@ -209,9 +206,10 @@ class CursorSpec(implicit val ee: ExecutionEnv)
             }
             val c = defaultColl
             val cursor = c.find(matchAll("cursorspec25")).cursor()
+            // default batch size 101
 
             cursor.foldWhileM({}, 128)(
-              { (_, _) => Future[Cursor.State[Unit]](sys.error("Foo")) },
+              { (_, _) => Future[Cursor.State[Unit]](sys.error("Foo #25")) },
               Cursor.FailOnError[Unit](onError)).recover({ case _ => count }).
               aka("folding") must beEqualTo(1).await(1, timeout)
 
@@ -226,7 +224,7 @@ class CursorSpec(implicit val ee: ExecutionEnv)
             val c = defaultColl
             val cursor = c.find(matchAll("cursorspec26")).cursor()
 
-            cursor.foldWhile[Unit](sys.error("Foo"), 128)(
+            cursor.foldWhile[Unit](sys.error("Foo #26"), 128)(
               (_, _) => Cursor.Cont({}), Cursor.FailOnError[Unit](onError)).
               recover({ case _ => count }) must beEqualTo(0).
               await(1, timeout)
@@ -258,11 +256,11 @@ class CursorSpec(implicit val ee: ExecutionEnv)
         }
 
         "when folding documents with the default connection" >> {
-          foldWhileSpec(defaultColl, cursorDb(_: String), timeout)
+          foldWhileSpec(defaultColl, timeout)
         }
 
         "when folding documents with the slow connection" >> {
-          foldWhileSpec(slowDefaultColl, slowCursorDb(_: String), slowTimeout)
+          foldWhileSpec(slowDefaultColl, slowTimeout)
         }
       }
 
@@ -272,7 +270,7 @@ class CursorSpec(implicit val ee: ExecutionEnv)
     }
 
     "continue on error" >> {
-      lazy val cursorDrv = new MongoDriver
+      lazy val cursorDrv = Common.newDriver
       lazy val cursorCon =
         Common.makeConnection(cursorDrv)(List(primaryHost), DefaultOptions)
 
@@ -299,10 +297,14 @@ class CursorSpec(implicit val ee: ExecutionEnv)
             val cursor = defaultColl.
               find(matchAll("cursorspec30")).cursor()
 
-            // retry on the initial failure - until the max (128) is reached
+            // retry on the initial failure - until the max (128) is reached,
+            // with default batch size 101
             cursor.foldResponsesM({}, 128)(
-              { (_, _) => Future[Cursor.State[Unit]](sys.error("Foo")) },
-              Cursor.ContOnError[Unit](onError)).map(_ => count) must beEqualTo(128).await(2, delayedTimeout)
+              { (_, _) => Future[Cursor.State[Unit]](sys.error("Foo #30")) },
+              Cursor.ContOnError[Unit](onError)).map(_ => count).
+              aka("foldResponse") must beEqualTo(2 /* ceil(128 / 101) */ ).
+              await(2, delayedTimeout)
+
           }
 
           "if fails while processing w/o documents" in {
@@ -311,12 +313,15 @@ class CursorSpec(implicit val ee: ExecutionEnv)
               debug(s"continueOnError: foldResponses (#2): $count")
               count = count + 1
             }
-            val c = specCol(System.identityHashCode(onError).toString)
+            val c = specCol(s"emptycoll_${System identityHashCode onError}")
             val cursor = c.find(matchAll("cursorspec31")).cursor()
 
             cursor.foldResponses({}, 64)(
-              { (_, _) => sys.error("Foo"): Cursor.State[Unit] },
-              Cursor.ContOnError[Unit](onError)).map(_ => count) must beEqualTo(64).await(2, delayedTimeout)
+              { (_, _) => sys.error("Foo #31"): Cursor.State[Unit] },
+              Cursor.ContOnError[Unit](onError)).map(_ => count).
+              aka("foldResponses") must beEqualTo(1 /* batchSize(101) / 64*/ ).
+              await(2, delayedTimeout)
+
           }
 
           "if fails with initial value" in {
@@ -328,7 +333,7 @@ class CursorSpec(implicit val ee: ExecutionEnv)
             val c = specCol(System.identityHashCode(onError).toString)
             val cursor = c.find(matchAll("cursorspec32")).cursor()
 
-            cursor.foldResponsesM[Unit](sys.error("Foo"), 128)(
+            cursor.foldResponsesM[Unit](sys.error("Foo #32"), 128)(
               (_, _) => Future(Cursor.Cont({})),
               Cursor.ContOnError[Unit](onError)).
               recover({ case _ => count }) must beEqualTo(0).
@@ -373,8 +378,8 @@ class CursorSpec(implicit val ee: ExecutionEnv)
           (timeout.toMillis * 1.25D).toLong, MILLISECONDS)
 
         "if fails while processing with existing documents" in {
-
           @volatile var count = 0
+
           val onError: (Unit, Throwable) => Unit = { (_, _) =>
             debug(s"continueOnError: foldBulks (#1): $count")
             count = count + 1
@@ -383,9 +388,10 @@ class CursorSpec(implicit val ee: ExecutionEnv)
             options(QueryOpts(batchSizeN = 64)).cursor()
 
           cursor.foldBulks({}, 128)(
-            { (_, _) => sys.error("Foo"): Cursor.State[Unit] },
+            { (_, _) => sys.error("Foo #37"): Cursor.State[Unit] },
             Cursor.ContOnError[Unit](onError)).map(_ => count).
-            aka("folding") must beEqualTo(128).await(2, delayedTimeout)
+            aka("folding") must beEqualTo(2 /* maxDocs / batchSize */ ).
+            await(2, delayedTimeout)
         }
 
         "if fails while processing w/o documents" in {
@@ -394,14 +400,15 @@ class CursorSpec(implicit val ee: ExecutionEnv)
             debug(s"continueOnError: foldBulks (#2): $count")
             count = count + 1
           }
-          val c = cursorDb(System.identityHashCode(onError).toString)
+          val c = cursorDb(s"emptycoll_${System identityHashCode onError}")
           val cursor = c.find(matchAll("cursorspec38")).options(
             QueryOpts(batchSizeN = 64)).cursor()
 
           cursor.foldBulksM({}, 64)(
-            { (_, _) => Future[Cursor.State[Unit]](sys.error("Foo")) },
+            { (_, _) => Future[Cursor.State[Unit]](sys.error("Foo #38")) },
             Cursor.ContOnError[Unit](onError)).map(_ => count).
-            aka("folding") must beEqualTo(64).await(2, delayedTimeout)
+            aka("folding") must beEqualTo(1 /* 64 / batchSize */ ).
+            await(2, delayedTimeout)
 
         }
 
@@ -415,7 +422,7 @@ class CursorSpec(implicit val ee: ExecutionEnv)
           val cursor = c.find(matchAll("cursorspec39")).options(
             QueryOpts(batchSizeN = 64)).cursor()
 
-          cursor.foldBulks[Unit](sys.error("Foo"), 128)(
+          cursor.foldBulks[Unit](sys.error("Foo #39"), 128)(
             (_, _) => Cursor.Cont({}), Cursor.ContOnError[Unit](onError)).
             recover({ case _ => count }) must beEqualTo(0).
             await(2, delayedTimeout)
@@ -447,21 +454,21 @@ class CursorSpec(implicit val ee: ExecutionEnv)
       }
 
       { // .foldWhile
-        def foldWhileSpec(defaultColl: BSONCollection, specCol: String => BSONCollection, timeout: FiniteDuration) = {
+        def foldWhileSpec(defaultColl: BSONCollection, timeout: FiniteDuration) = {
           def delayedTimeout = FiniteDuration(
             (timeout.toMillis * 1.25D).toLong, MILLISECONDS)
 
           "if fails while processing with existing documents" in {
             @volatile var count = 0
             val onError: (Unit, Throwable) => Unit = { (_, _) =>
-              debug(s"continueOnError: foldWhile(#1): $count")
+              debug(s"continueOnError: foldWhileM(#1): $count")
               count = count + 1
             }
             val cursor = defaultColl.
               find(matchAll("cursorspec44")).cursor()
 
             cursor.foldWhileM({}, 128)(
-              { (_, _) => Future[Cursor.State[Unit]](sys.error("Foo")) },
+              { (_, _) => Future[Cursor.State[Unit]](sys.error("Foo #44")) },
               Cursor.ContOnError[Unit](onError)).map(_ => count).
               aka("folding") must beEqualTo(128).await(2, delayedTimeout)
 
@@ -476,7 +483,7 @@ class CursorSpec(implicit val ee: ExecutionEnv)
             val c = defaultColl
             val cursor = c.find(matchAll("cursorspec45")).cursor()
 
-            cursor.foldWhile[Unit](sys.error("Foo"), 128)(
+            cursor.foldWhile[Unit](sys.error("Foo #45"), 128)(
               (_, _) => Cursor.Cont({}), Cursor.ContOnError[Unit](onError)).
               recover({ case _ => count }) must beEqualTo(0).
               await(2, delayedTimeout)
@@ -508,11 +515,11 @@ class CursorSpec(implicit val ee: ExecutionEnv)
         }
 
         "when folding documents with the default connection" >> {
-          foldWhileSpec(defaultColl, cursorDb(_: String), timeout)
+          foldWhileSpec(defaultColl, timeout)
         }
 
-        "when folding documents with the default connection" >> {
-          foldWhileSpec(slowDefaultColl, slowCursorDb(_: String), slowTimeout)
+        "when folding documents with the slow connection" >> {
+          foldWhileSpec(slowDefaultColl, slowTimeout)
         }
       }
 

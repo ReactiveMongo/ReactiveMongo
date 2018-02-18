@@ -218,7 +218,7 @@ class MongoConnection(
    * Closes this MongoConnection
    * (closes all the channels and ends the actors)
    */
-  @deprecated("Use [[askClose]]", "0.12.8")
+  @deprecated("Use [[askClose]]", "0.13.0")
   def close(): Unit = monitor ! Close
 
   private case class IsAvailable(result: Promise[ProtocolMetadata]) {

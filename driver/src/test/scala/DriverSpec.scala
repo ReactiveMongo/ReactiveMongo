@@ -22,7 +22,7 @@ import reactivemongo.core.commands.{
   SuccessfulAuthentication
 }
 
-import reactivemongo.api.{ DefaultDB, FailoverStrategy, MongoDriver }
+import reactivemongo.api.{ DefaultDB, FailoverStrategy }
 import reactivemongo.api.commands.DBUserRole
 
 import org.specs2.concurrent.ExecutionEnv
@@ -40,7 +40,7 @@ class DriverSpec(implicit ee: ExecutionEnv)
 
   "Connection pool" should {
     "cleanly start and close with no connections #1" in {
-      val md = MongoDriver()
+      val md = newDriver()
 
       md.numConnections must_== 0 and {
         md.close(timeout) must not(throwA[Throwable])
@@ -52,18 +52,18 @@ class DriverSpec(implicit ee: ExecutionEnv)
     }
 
     "cleanly start and close with no connections #2" in {
-      val md = MongoDriver()
+      val md = newDriver()
 
       md.numConnections must_== 0 and (
         md.close(timeout) must not(throwA[Throwable]))
     }
 
     "start and close with one connection open (using raw URI)" in {
-      MongoDriver().close(timeout) must not(throwA[Exception])
+      newDriver().close(timeout) must not(throwA[Exception])
     }
 
     "start and close with multiple connections open" in {
-      MongoDriver().close(timeout) must not(throwA[Exception])
+      newDriver().close(timeout) must not(throwA[Exception])
     }
 
     "use the failover strategy defined in the options" in {
@@ -138,34 +138,36 @@ class DriverSpec(implicit ee: ExecutionEnv)
   }
 
   "CR Authentication" should {
-    section("cr_auth")
-
-    lazy val drv = MongoDriver()
+    lazy val drv = newDriver()
     lazy val connection = drv.connection(
       List(primaryHost),
-      options = DefaultOptions.copy(nbChannelsPerNode = 1))
+      options = DefaultOptions.copy(
+        authMode = reactivemongo.api.CrAuthentication, // enforce
+        nbChannelsPerNode = 1))
 
     val dbName = "specs2-test-cr-auth"
     lazy val db_ = connection.database(dbName, failoverStrategy)
 
     val id = System.identityHashCode(drv)
 
+    section("mongo2")
+
     "be the default mode" in {
       db_.flatMap(_.drop()).map(_ => {}) must beEqualTo({}).await(1, timeout)
-    } tag "mongo2"
+    }
 
     "create a user" in {
       db_.flatMap(_.createUser(s"test-$id", Some(s"password-$id"),
         roles = List(DBUserRole("readWrite", dbName)))).
         aka("creation") must beEqualTo({}).await(0, timeout)
-    } tag "mongo2"
+    }
 
     "not be successful with wrong credentials" in {
       connection.authenticate(dbName, "foo", "bar").
         aka("authentication") must throwA[FailedAuthentication].
         await(1, timeout)
 
-    } tag "mongo2"
+    }
 
     "be successful with right credentials" in {
       connection.authenticate(dbName, s"test-$id", s"password-$id").
@@ -175,11 +177,11 @@ class DriverSpec(implicit ee: ExecutionEnv)
               _("testcol").insert(BSONDocument("foo" -> "bar")).map(_ => {})
             } must beEqualTo({}).await(1, timeout)
           }
-    } tag "mongo2"
+    }
 
     "driver shutdown" in { // mainly to ensure the test driver is closed
       drv.close(timeout) must not(throwA[Exception])
-    } tag "mongo2"
+    }
 
     "fail on DB without authentication" in {
       val auth = Authenticate(Common.commonDb, "test", "password")
@@ -193,9 +195,9 @@ class DriverSpec(implicit ee: ExecutionEnv)
       Await.result(con.database(
         Common.commonDb, failoverStrategy), timeout).
         aka("database resolution") must throwA[PrimaryUnavailableException]
-    } tag "mongo2"
+    }
 
-    section("cr_auth")
+    section("mongo2")
   }
 
   "Authentication SCRAM-SHA1" should {
@@ -203,7 +205,7 @@ class DriverSpec(implicit ee: ExecutionEnv)
 
     import Common.{ DefaultOptions, timeout }
 
-    lazy val drv = reactivemongo.api.AsyncDriver()
+    lazy val drv = Common.newAsyncDriver()
     val conOpts = DefaultOptions.copy(nbChannelsPerNode = 1)
     lazy val connection = drv.connect(List(primaryHost), options = conOpts)
     val slowOpts = SlowOptions.copy(nbChannelsPerNode = 1)
@@ -215,10 +217,12 @@ class DriverSpec(implicit ee: ExecutionEnv)
 
     val id = System.identityHashCode(drv)
 
+    section("not_mongo26")
+
     "work only if configured" in {
       db_.flatMap(_.drop()).map(_ => {}) must beEqualTo({}).
         await(0, timeout * 2)
-    } tag "not_mongo26"
+    }
 
     "create a user" in {
       db_.flatMap(_.createUser(s"test-$id", Some(s"password-$id"),
@@ -232,14 +236,14 @@ class DriverSpec(implicit ee: ExecutionEnv)
           aka("authentication") must throwA[FailedAuthentication].
           await(1, timeout)
 
-      } tag "not_mongo26"
+      }
 
       "with the slow connection" in {
         slowConnection.flatMap(_.authenticate(dbName, "foo", "bar")).
           aka("authentication") must throwA[FailedAuthentication].
           await(1, slowTimeout)
 
-      } tag "not_mongo26"
+      }
     }
 
     "be successful on existing connection with right credentials" >> {
@@ -253,7 +257,7 @@ class DriverSpec(implicit ee: ExecutionEnv)
               }.map(_ => {}) must beEqualTo({}).await(1, timeout * 2)
             }
 
-      } tag "not_mongo26"
+      }
 
       "with the slow connection" in {
         slowConnection.flatMap(
@@ -261,7 +265,7 @@ class DriverSpec(implicit ee: ExecutionEnv)
           aka("authentication") must beLike[SuccessfulAuthentication](
             { case _ => ok }).await(1, slowTimeout)
 
-      } tag "not_mongo26"
+      }
     }
 
     "be successful with right credentials" >> {
@@ -283,7 +287,7 @@ class DriverSpec(implicit ee: ExecutionEnv)
             con.askClose()(timeout).
               aka("close") must not(throwA[Exception]).await(1, timeout)
           }
-      } tag "not_mongo26"
+      }
 
       "with the slow connection" in {
         val con = Await.result(
@@ -297,13 +301,13 @@ class DriverSpec(implicit ee: ExecutionEnv)
             con.askClose()(slowTimeout) must not(throwA[Exception]).
               await(1, slowTimeout)
           }
-      } tag "not_mongo26"
+      }
     }
 
     "driver shutdown" in {
       // mainly to ensure the test driver is closed
       drv.close(timeout) must not(throwA[Exception]).await(1, timeout)
-    } tag "not_mongo26"
+    }
 
     "fail on DB without authentication" >> {
       val auth = Authenticate(Common.commonDb, "test", "password")
@@ -328,7 +332,7 @@ class DriverSpec(implicit ee: ExecutionEnv)
               }
           }.await(1, timeout)
 
-      } tag "not_mongo26"
+      }
 
       "with the slow connection" in {
         def con = Common.driver.connection(
@@ -338,8 +342,9 @@ class DriverSpec(implicit ee: ExecutionEnv)
           aka("database resolution") must throwA[PrimaryUnavailableException].
           await(1, slowTimeout)
 
-      } tag "not_mongo26"
+      }
     }
+
     section("scram_auth")
   }
 
@@ -404,6 +409,8 @@ class DriverSpec(implicit ee: ExecutionEnv)
 
     }
     section("x509")
+
+    section("not_mongo26")
   }
 
   "Database" should {

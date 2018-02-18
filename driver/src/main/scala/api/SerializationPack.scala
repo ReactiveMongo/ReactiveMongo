@@ -4,6 +4,7 @@ import scala.language.higherKinds
 
 import scala.util.Try
 
+import reactivemongo.bson.BSONDocument
 import reactivemongo.bson.buffer.{ ReadableBuffer, WritableBuffer }
 
 trait SerializationPack { self: Singleton =>
@@ -46,10 +47,20 @@ trait SerializationPack { self: Singleton =>
 
   def readValue[A](value: Value, reader: WidenValueReader[A]): Try[A]
 
+  // Returns a Reader from a function
+  private[reactivemongo] def reader[A](f: Document => A): Reader[A]
+
+  // Returns a deserialized document as a BSON one (for internal intercompat)
+  private[reactivemongo] def document(doc: BSONDocument): Document
+
   private[reactivemongo] def bsonSize(value: Value): Int = -1
   // TODO: Remove the default value after release
 
   private[reactivemongo] def newBuilder: SerializationPack.Builder[self.type] = null // TODO: Remove the default value after release
+
+  private[reactivemongo] def newDecoder: SerializationPack.Decoder[self.type] = null // TODO: Remove the default value after release
+
+  private[reactivemongo] def pretty(doc: Document): String = doc.toString
 }
 
 object SerializationPack {
@@ -85,5 +96,45 @@ object SerializationPack {
 
     /** Returns an string as a serialized value. */
     def string(s: String): pack.Value
+  }
+
+  /**
+   * A decoder for serialization simple values (for internal use).
+   *
+   * @define returnsNamedElement Returns the named element from the given document
+   */
+  private[reactivemongo] trait Decoder[P <: SerializationPack with Singleton] {
+    protected val pack: P
+
+    /**
+     * @returnsNamedElement, if the element is a boolean-like field
+     * (numeric or boolean).
+     */
+    def booleanLike(document: pack.Document, name: String): Option[Boolean]
+
+    /**
+     * @returnsNamedElement, if the element is a nested document.
+     */
+    def child(document: pack.Document, name: String): Option[pack.Document]
+
+    /**
+     * @returnsNamedElement, if the element is a list of nested documents.
+     */
+    def children(document: pack.Document, name: String): List[pack.Document]
+
+    /**
+     * @returnsNamedElement, if the element is a double field.
+     */
+    def double(document: pack.Document, name: String): Option[Double]
+
+    /**
+     * @returnsNamedElement, if the element is an integer field.
+     */
+    def int(document: pack.Document, name: String): Option[Int]
+
+    /**
+     * @returnsNamedElement, if the element is an string field.
+     */
+    def string(document: pack.Document, name: String): Option[String]
   }
 }

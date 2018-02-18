@@ -1,7 +1,5 @@
 package reactivemongo.core.nodeset
 
-import scala.language.higherKinds
-
 sealed trait Authentication {
   def user: String
   def db: String

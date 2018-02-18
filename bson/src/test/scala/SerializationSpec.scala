@@ -71,7 +71,7 @@ class SerializationSpec extends org.specs2.mutable.Specification {
             case StructureField(_, _, b) =>
               //println(f.name)
               listAll(b, spaces + 2)
-            case LazyField(tpe, _, b) =>
+            case LazyField(tpe, _, _) =>
               if (tpe == 0x02 || tpe == 0x0D || tpe == 0x0E) {
                 //println(s"${f.name} -> ${b.readString}")
               } else if (tpe == 0x05) {
@@ -83,11 +83,11 @@ class SerializationSpec extends org.specs2.mutable.Specification {
               } else {
                 //println(s"${f.name} -> <${b.readable} bytes>")
               }
-            case v: ValueField[_] => {
+            case _: ValueField[_] => {
               //println(s"${f.name} -> ${v.value}")
             }
 
-            case NoValue(tpe, _) => {
+            case NoValue(_ /*tpe*/ , _) => {
               //println(s"${f.name} -> <singleton $tpe>")
             }
           }

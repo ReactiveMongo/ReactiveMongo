@@ -79,7 +79,7 @@ class IndexesSpec(implicit ee: ExecutionEnv)
         }.filter(!_.isEmpty).map(_.apply(0))
 
         future must beLike[Index] {
-          case i @ Index(("loc", Geo2D) :: _, _, _, _, _, _, _, _, opts) =>
+          case Index(("loc", Geo2D) :: _, _, _, _, _, _, _, _, opts) =>
             opts.getAs[BSONInteger]("min").get.value mustEqual -95 and (
               opts.getAs[BSONInteger]("max").get.value mustEqual 95) and (
                 opts.getAs[BSONInteger]("bits").get.value mustEqual 28)
@@ -96,7 +96,7 @@ class IndexesSpec(implicit ee: ExecutionEnv)
     }
   }
 
-  lazy val geo2DSpherical = db("geo2d")
+  lazy val geo2DSpherical = db(s"geo2d_${System identityHashCode this}")
 
   "ReactiveMongo Geo2D indexes" should {
     "insert some points" in {
@@ -122,7 +122,7 @@ class IndexesSpec(implicit ee: ExecutionEnv)
     }
   }
 
-  lazy val hashed = db("hashed")
+  lazy val hashed = db(s"hashed_${System identityHashCode this}")
 
   "Hashed indexes" should {
     "insert some data" in {
@@ -236,5 +236,27 @@ class IndexesSpec(implicit ee: ExecutionEnv)
 
       insertAndCount must beEqualTo(3 -> 6).await(0, timeout)
     } tag "not_mongo26"
+  }
+
+  "Text index" should {
+    lazy val coll = db(s"txtidx${System identityHashCode this}")
+    lazy val mngr = coll.indexesManager
+
+    val name = "mySearchIndex"
+    val textIndex = Index(
+      Seq(
+        "someFieldA" -> IndexType.Text,
+        "someFieldB" -> IndexType.Text),
+      name = Some(name))
+
+    "be created" in {
+      mngr.create(textIndex).flatMap(_ => mngr.list().map(_.flatMap(_.name))).
+        aka("indexes") must contain(atLeast(name)).await(0, timeout)
+
+    }
+
+    "be ensured" in {
+      mngr.ensure(textIndex) must beFalse.await(0, timeout)
+    }
   }
 }

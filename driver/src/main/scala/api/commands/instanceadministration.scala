@@ -1,5 +1,7 @@
 package reactivemongo.api.commands
 
+import reactivemongo.api.SerializationPack
+
 object DropDatabase extends Command with CommandWithResult[UnitBox.type]
 
 @deprecated("Use [[DropCollection]]", "0.12.0")
@@ -34,7 +36,8 @@ case class Capped(
 case class ConvertToCapped(
   capped: Capped) extends CollectionCommand with CommandWithResult[UnitBox.type]
 
-case class CollStats(scale: Option[Int] = None) extends CollectionCommand with CommandWithResult[CollStatsResult]
+case class CollStats(scale: Option[Int] = None)
+  extends CollectionCommand with CommandWithResult[CollStatsResult]
 
 /**
  * Various information about a collection.
