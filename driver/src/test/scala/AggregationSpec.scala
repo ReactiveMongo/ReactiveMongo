@@ -79,9 +79,11 @@ class AggregationSpec(implicit ee: ExecutionEnv)
         case _         => Future.successful({})
       }
 
-      insert(zipCodes) aka "insert" must beEqualTo({}).await(1, timeout) and (
-        coll.count() aka "count #1" must beEqualTo(4).await(1, slowTimeout)).and(slowZipColl.count() aka "count #2" must beEqualTo(4).
-          await(1, slowTimeout))
+      insert(zipCodes) aka "insert" must beEqualTo({}).await(1, timeout) and {
+        coll.count() aka "c#1" must beEqualTo(4).await(1, slowTimeout)
+      } and {
+        slowZipColl.count() aka "c#2" must beEqualTo(4).await(1, slowTimeout)
+      }
     }
 
     "return states with populations above 10000000" >> {
@@ -96,7 +98,8 @@ class AggregationSpec(implicit ee: ExecutionEnv)
 
         f(c.aggregate(Group(BSONString(f"$$state"))(
           "totalPop" -> SumField("population")), List(
-          Match(document("totalPop" -> document(f"$$gte" -> 10000000L))))).map(_.firstBatch))
+          Match(document("totalPop" -> document(f"$$gte" -> 10000000L))))).
+          map(_.firstBatch))
       }
 
       "with the default connection" in {
@@ -110,6 +113,28 @@ class AggregationSpec(implicit ee: ExecutionEnv)
           _ aka "results" must beEqualTo(expected).await(1, slowTimeout)
         }
       }
+
+      "using a view" in {
+        import coll.BatchCommands.AggregationFramework
+        import AggregationFramework.{ Group, Match, SumField }
+
+        val viewName = s"pop10m${System identityHashCode this}"
+
+        def result = for {
+          _ <- coll.createView(
+            name = viewName,
+            operator = Group(BSONString(f"$$state"))(
+              "totalPop" -> SumField("population")),
+            pipeline = Seq(
+              Match(document("totalPop" -> document(f"$$gte" -> 10000000L)))))
+          view = db(viewName)
+          res <- view.find(
+            BSONDocument.empty).cursor[BSONDocument]().collect[List](
+              expected.size + 2, Cursor.FailOnError[List[BSONDocument]]())
+        } yield res
+
+        result must beEqualTo(expected).await(1, timeout)
+      } tag "gt_mongo32"
 
       "with expected count" in {
         import coll.BatchCommands.AggregationFramework
@@ -129,7 +154,8 @@ class AggregationSpec(implicit ee: ExecutionEnv)
 
       coll.aggregate(Group(BSONString(f"$$state"))(
         "totalPop" -> SumField("population")), List(
-        Match(document("totalPop" -> document(f"$$gte" -> 10000000L)))), explain = true).map(_.firstBatch).
+        Match(document("totalPop" -> document(f"$$gte" -> 10000000L)))),
+        explain = true).map(_.firstBatch).
         aka("results") must beLike[List[BSONDocument]] {
           case explainResult :: Nil =>
             explainResult.getAs[BSONArray]("stages") must beSome
@@ -172,13 +198,11 @@ class AggregationSpec(implicit ee: ExecutionEnv)
         }
 
         "without limit (maxDocs)" in {
-          collect(coll) aka "cursor result" must beEqualTo(expected).
-            await(1, timeout)
+          collect(coll) must beEqualTo(expected).await(1, timeout)
         }
 
         "with limit (maxDocs)" in {
-          collect(coll, 2) aka "cursor result" must beEqualTo(expected take 2).
-            await(1, timeout)
+          collect(coll, 2) must beEqualTo(expected take 2).await(1, timeout)
         }
 
         "with metadata sort" in {
@@ -198,7 +222,7 @@ class AggregationSpec(implicit ee: ExecutionEnv)
 
             firstOp -> pipeline
           }.collect[List](4, Cursor.FailOnError[List[ZipCode]]()).
-            aka("aggregated") must beEqualTo(jpCodes).await(1, timeout)
+            aka("aggregated") must beTypedEqualTo(jpCodes).await(1, timeout)
 
         }
       }
@@ -400,7 +424,7 @@ class AggregationSpec(implicit ee: ExecutionEnv)
         inventory.name, BSONString(f"$$item"), "item", "sku", "docs")).map(_.head[InventoryReport].toList) must beEqualTo(expected).
         await(0, timeout)
 
-    } tag "gt_mongo3"
+    } tag "gt_mongo32"
 
     val sales = db.collection(s"agg-sales-A-${System identityHashCode this}")
     implicit val saleItemHandler = Macros.handler[SaleItem]
@@ -868,7 +892,7 @@ class AggregationSpec(implicit ee: ExecutionEnv)
 
   "Forecasts" should {
     // https://docs.mongodb.com/manual/reference/operator/aggregation/redact/
-    val forecasts = db(s"forecasts{System identityHashCode this}")
+    val forecasts = db(s"forecasts${System identityHashCode this}")
 
     "be inserted" in {
       /*
@@ -994,7 +1018,7 @@ db.forecasts.aggregate(
 
   "Customer accounts" should {
     // https://docs.mongodb.com/manual/reference/operator/aggregation/redact/
-    val customers = db(s"customers{System identityHashCode this}")
+    val customers = db(s"customers${System identityHashCode this}")
 
     "be inserted" in {
       /*

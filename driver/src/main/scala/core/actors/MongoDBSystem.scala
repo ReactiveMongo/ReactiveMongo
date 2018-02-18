@@ -70,7 +70,9 @@ import external.reactivemongo.ConnectionListener
 trait MongoDBSystem extends Actor {
   import scala.concurrent.duration._
   import Exceptions._
-  import MongoDBSystem._
+
+  protected final val logger =
+    LazyLogger("reactivemongo.core.actors.MongoDBSystem")
 
   /** The name of the driver supervisor. */
   def supervisor: String
@@ -193,6 +195,8 @@ trait MongoDBSystem extends Actor {
 
         @inline def rc: ExecutionContext =
           ExecutionContext.Implicits.global
+
+        //println(s"Closing: --> ${System identityHashCode factory.channelFactory}")
 
         Await.ready(Future(
           factory.channelFactory.releaseExternalResources())(rc), 2.seconds).
@@ -686,86 +690,96 @@ trait MongoDBSystem extends Actor {
 
           awaitingResponses -= response.header.responseTo
 
-          if (response.error.isDefined) {
-            logger.debug(s"[$lnm] {${response.header.responseTo}} sending a failure... (${response.error.get})")
+          response match {
+            case cmderr: Response.CommandError =>
+              promise.success(cmderr); ()
 
-            if (response.error.get.isNotAPrimaryError) onPrimaryUnavailable()
+            case _ => {
+              if (response.error.isDefined) { // TODO: Option pattern matching
+                logger.debug(s"[$lnm] {${response.header.responseTo}} sending a failure... (${response.error.get})")
 
-            promise.failure(response.error.get)
-            ()
-          } else if (isGetLastError) {
-            logger.debug(s"[$lnm] {${response.header.responseTo}} it's a getlasterror")
+                if (response.error.get.isNotAPrimaryError) {
+                  onPrimaryUnavailable()
+                }
 
-            // todo, for now rewinding buffer at original index
-            //import reactivemongo.api.commands.bson.BSONGetLastErrorImplicits.LastErrorReader
+                promise.failure(response.error.get)
+                ()
+              } else if (isGetLastError) {
+                logger.debug(s"[$lnm] {${response.header.responseTo}} it's a getlasterror")
 
-            lastError(response).fold({ e =>
-              logger.error(s"[$lnm] Error deserializing LastError message #${response.header.responseTo}", e)
-              promise.failure(new RuntimeException(s"Error deserializing LastError message #${response.header.responseTo} ($lnm)", e))
-            }, { lastError =>
-              if (lastError.inError) {
-                logger.trace(s"[$lnm] {${response.header.responseTo}} sending a failure (lasterror is not ok)")
+                // todo, for now rewinding buffer at original index
+                //import reactivemongo.api.commands.bson.BSONGetLastErrorImplicits.LastErrorReader
 
-                if (lastError.isNotAPrimaryError) onPrimaryUnavailable()
+                lastError(response).fold({ e =>
+                  logger.error(s"[$lnm] Error deserializing LastError message #${response.header.responseTo}", e)
+                  promise.failure(new RuntimeException(s"Error deserializing LastError message #${response.header.responseTo} ($lnm)", e))
+                }, { lastError =>
+                  if (lastError.inError) {
+                    logger.trace(s"[$lnm] {${response.header.responseTo}} sending a failure (lasterror is not ok)")
 
-                promise.failure(lastError)
+                    if (lastError.isNotAPrimaryError) onPrimaryUnavailable()
+
+                    promise.failure(lastError)
+                  } else {
+                    logger.trace(s"[$lnm] {${response.header.responseTo}} sending a success (lasterror is ok)")
+
+                    response.documents.readerIndex(response.documents.readerIndex)
+
+                    promise.success(response)
+                  }
+                })
+
+                ()
+              } else if (isMongo26WriteOp) {
+                // TODO - logs, bson
+                // MongoDB 26 Write Protocol errors
+                logger.trace(
+                  s"[$lnm] Received a response to a MongoDB2.6 Write Op")
+
+                import reactivemongo.bson.lowlevel._
+                import reactivemongo.core.netty.ChannelBufferReadableBuffer
+                val reader = new LowLevelBsonDocReader(new ChannelBufferReadableBuffer(response.documents))
+                val fields = reader.fieldStream
+                val okField = fields.find(_.name == "ok")
+
+                logger.trace(s"[$lnm] {${response.header.responseTo}} ok field is: $okField")
+                val processedOk = okField.collect {
+                  case BooleanField(_, v) => v
+                  case IntField(_, v)     => v != 0
+                  case DoubleField(_, v)  => v != 0
+                }.getOrElse(false)
+
+                if (processedOk) {
+                  logger.trace(s"[$lnm] {${response.header.responseTo}} [MongoDB26 Write Op response] sending a success!")
+                  promise.success(response)
+                  ()
+                } else {
+                  logger.debug(s"[$lnm] {${response.header.responseTo}} [MongoDB26 Write Op response] processedOk is false! sending an error")
+
+                  val notAPrimary = fields.find(_.name == "errmsg").exists {
+                    case errmsg @ LazyField(0x02, _, buf) =>
+                      logger.debug(s"[$lnm] {${response.header.responseTo}} [MongoDB26 Write Op response] errmsg is $errmsg!")
+                      buf.readString == "not a primary"
+
+                    case errmsg =>
+                      logger.debug(s"[$lnm] {${response.header.responseTo}} [MongoDB26 Write Op response] errmsg is $errmsg but not interesting!")
+                      false
+                  }
+
+                  if (notAPrimary) {
+                    logger.debug(s"[$lnm] {${response.header.responseTo}} [MongoDB26 Write Op response] not a primary error!")
+                    onPrimaryUnavailable()
+                  }
+
+                  promise.failure(GenericDriverException("not ok"))
+                  ()
+                }
               } else {
-                logger.trace(s"[$lnm] {${response.header.responseTo}} sending a success (lasterror is ok)")
-
-                response.documents.readerIndex(response.documents.readerIndex)
-
+                logger.trace(s"[$lnm] {${response.header.responseTo}} [MongoDB26 Write Op response] sending a success!")
                 promise.success(response)
+                ()
               }
-            })
-
-            ()
-          } else if (isMongo26WriteOp) {
-            // TODO - logs, bson
-            // MongoDB 26 Write Protocol errors
-            logger.trace(
-              s"[$lnm] Received a response to a MongoDB2.6 Write Op")
-
-            import reactivemongo.bson.lowlevel._
-            import reactivemongo.core.netty.ChannelBufferReadableBuffer
-            val reader = new LowLevelBsonDocReader(new ChannelBufferReadableBuffer(response.documents))
-            val fields = reader.fieldStream
-            val okField = fields.find(_.name == "ok")
-
-            logger.trace(s"[$lnm] {${response.header.responseTo}} ok field is: $okField")
-            val processedOk = okField.collect {
-              case BooleanField(_, v) => v
-              case IntField(_, v)     => v != 0
-              case DoubleField(_, v)  => v != 0
-            }.getOrElse(false)
-
-            if (processedOk) {
-              logger.trace(s"[$lnm] {${response.header.responseTo}} [MongoDB26 Write Op response] sending a success!")
-              promise.success(response)
-              ()
-            } else {
-              logger.debug(s"[$lnm] {${response.header.responseTo}} [MongoDB26 Write Op response] processedOk is false! sending an error")
-
-              val notAPrimary = fields.find(_.name == "errmsg").exists {
-                case errmsg @ LazyField(0x02, _, buf) =>
-                  logger.debug(s"[$lnm] {${response.header.responseTo}} [MongoDB26 Write Op response] errmsg is $errmsg!")
-                  buf.readString == "not a primary"
-                case errmsg =>
-                  logger.debug(s"[$lnm] {${response.header.responseTo}} [MongoDB26 Write Op response] errmsg is $errmsg but not interesting!")
-                  false
-              }
-
-              if (notAPrimary) {
-                logger.debug(s"[$lnm] {${response.header.responseTo}} [MongoDB26 Write Op response] not a primary error!")
-                onPrimaryUnavailable()
-              }
-
-              promise.failure(GenericDriverException("not ok"))
-              ()
             }
-          } else {
-            logger.trace(s"[$lnm] {${response.header.responseTo}} [MongoDB26 Write Op response] sending a success!")
-            promise.success(response)
-            ()
           }
         }
 
@@ -1336,8 +1350,6 @@ final class StandardDBSystem private[reactivemongo] (
 
 @deprecated("Internal class: will be made private", "0.11.14")
 object MongoDBSystem {
-  private[actors] val logger =
-    LazyLogger("reactivemongo.core.actors.MongoDBSystem")
 }
 
 private[reactivemongo] object RequestId {

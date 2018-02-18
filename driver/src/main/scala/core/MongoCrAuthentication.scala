@@ -11,7 +11,6 @@ import reactivemongo.core.nodeset.{
 
 private[reactivemongo] trait MongoCrAuthentication { system: MongoDBSystem =>
   import reactivemongo.core.commands.{ CrAuthenticate, GetCrNonce }
-  import MongoDBSystem.logger
 
   protected final def sendAuthenticate(connection: Connection, nextAuth: Authenticate): Connection = {
     connection.send(GetCrNonce(nextAuth.db).maker(RequestId.getNonce.next))

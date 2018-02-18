@@ -8,7 +8,9 @@ export PATH
 
 which mongod
 
-MONGOD_CMD="mongod -f $MONGO_CONF --port 27018 --fork"
+MONGOD_CMD="mongod -f $MONGO_CONF --fork"
+
+$MONGOD
 
 if [ `which numactl | wc -l` -gt 0 ]; then
     numactl --interleave=all $MONGOD_CMD

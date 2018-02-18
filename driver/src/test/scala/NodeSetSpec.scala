@@ -1,4 +1,4 @@
-import scala.concurrent.Future
+import scala.concurrent.{ Await, Future }
 
 import akka.actor.ActorRef
 import akka.testkit.TestActorRef
@@ -36,7 +36,7 @@ class NodeSetSpec(implicit val ee: ExecutionEnv)
 
   @inline def failoverStrategy = Common.failoverStrategy
   @inline def timeout = Common.timeout
-  lazy val md = MongoDriver()
+  lazy val md = Common.newDriver()
   lazy val actorSystem = md.system
   val nodes = Seq("node1:27017", "node2:27017")
 
@@ -49,7 +49,6 @@ class NodeSetSpec(implicit val ee: ExecutionEnv)
       }
 
       "if the primary is not available if default preference" in {
-
         withCon() { (con, name) =>
           withConMon(name) { conMon =>
             conMon ! SetAvailable(ProtocolMetadata.Default)
@@ -75,7 +74,9 @@ class NodeSetSpec(implicit val ee: ExecutionEnv)
               }
               _ <- waitIsAvailable(con, failoverStrategy)
               after <- isAvailable(con, timeout)
-            } yield before -> after).andThen { case _ => con.close() }
+            } yield before -> after).flatMap { res =>
+              con.askClose()(timeout).recover { case _ => () }.map(_ => res)
+            }
 
             test must beEqualTo(false -> true).await(1, timeout)
           }
@@ -95,7 +96,9 @@ class NodeSetSpec(implicit val ee: ExecutionEnv)
                     _ = conMon ! SetAvailable(ProtocolMetadata.Default)
                     _ <- waitIsAvailable(con, failoverStrategy)
                     after <- isAvailable(con, timeout)
-                  } yield before -> after).andThen { case _ => con.close() }
+                  } yield before -> after).flatMap { res =>
+                    con.askClose()(timeout).recover { case _ => () }.map(_ => res)
+                  }
 
                   test must beEqualTo(false -> true).await(1, timeout)
                 }
@@ -120,7 +123,9 @@ class NodeSetSpec(implicit val ee: ExecutionEnv)
                 con, failoverStrategy).map(_ => true).recover {
                 case _ => false
               }
-            } yield before -> after).andThen { case _ => con.close() }
+            } yield before -> after).flatMap { res =>
+              con.askClose()(timeout).recover { case _ => () }.map(_ => res)
+            }
 
             test must beEqualTo(true -> false).await(1, timeout)
           }
@@ -143,7 +148,9 @@ class NodeSetSpec(implicit val ee: ExecutionEnv)
                 con, failoverStrategy).map(_ => true).recover {
                 case _ => false
               }
-            } yield before -> after).andThen { case _ => con.close() }
+            } yield before -> after).flatMap { res =>
+              con.askClose()(timeout).recover { case _ => () }.map(_ => res)
+            }
 
             test must beEqualTo(true -> false).await(1, timeout)
           }
@@ -192,22 +199,30 @@ class NodeSetSpec(implicit val ee: ExecutionEnv)
       drv, poolName, nodes, options, mongosystem).mapTo[MongoConnection]
 
     connection.flatMap { con =>
-      f(con, mongosystem).andThen {
-        case _ => con.close()
+      f(con, mongosystem).flatMap { res =>
+        con.askClose()(timeout).recover { case _ => {} }.map(_ => res)
       }
     }
   }
 
-  def withCon[T](opts: MongoConnectionOptions = MongoConnectionOptions())(f: (MongoConnection, String) => T): T = {
+  private def withCon[T](opts: MongoConnectionOptions = MongoConnectionOptions())(f: (MongoConnection, String) => T): T = {
     val name = s"withCon-${System identityHashCode opts}"
     val auths = Seq(Authenticate(Common.commonDb, "test", "password"))
     val con = md.connection(
       nodes, authentications = auths, options = opts, name = Some(name))
 
-    f(con, name)
+    try {
+      f(con, name)
+    } finally {
+      try {
+        Await.result(con.askClose()(timeout), timeout); ()
+      } catch {
+        case cause: Exception => cause.printStackTrace()
+      }
+    }
   }
 
-  def withConMon[T](name: String)(f: ActorRef => MatchResult[T]): MatchResult[Future[ActorRef]] =
+  private def withConMon[T](name: String)(f: ActorRef => MatchResult[T]): MatchResult[Future[ActorRef]] =
     actorSystem.actorSelection(s"/user/Monitor-$name").
       resolveOne(timeout) aka "actor ref" must beLike[ActorRef] {
         case ref => f(ref)

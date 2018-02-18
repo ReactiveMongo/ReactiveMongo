@@ -1,6 +1,8 @@
 import scala.concurrent.{ Await, ExecutionContext }
 import scala.concurrent.duration._
+
 import reactivemongo.api.{
+  AsyncDriver,
   CrAuthentication,
   DefaultDB,
   FailoverStrategy,
@@ -27,12 +29,16 @@ object Common {
   val failoverRetries = Option(System getProperty "test.failoverRetries").
     flatMap(r => scala.util.Try(r.toInt).toOption).getOrElse(7)
 
-  @volatile private var driverStarted = false
-  lazy val driver = {
-    val d = MongoDriver()
-    driverStarted = true
-    d
+  private val driverReg = Seq.newBuilder[MongoDriver]
+  def newDriver(): MongoDriver = driverReg.synchronized {
+    val drv = MongoDriver()
+
+    driverReg += drv
+
+    drv
   }
+
+  lazy val driver = newDriver()
 
   val failoverStrategy = FailoverStrategy(retries = failoverRetries)
 
@@ -152,16 +158,37 @@ object Common {
       case _ => false
     }
 
+  private val asyncDriverReg = Seq.newBuilder[AsyncDriver]
+  def newAsyncDriver(): AsyncDriver = asyncDriverReg.synchronized {
+    val drv = AsyncDriver()
+
+    asyncDriverReg += drv
+
+    drv
+  }
+
   // ---
 
   def close(): Unit = {
-    if (driverStarted) {
+    import ExecutionContext.Implicits.global
+
+    driverReg.result().foreach { driver =>
       try {
         driver.close(timeout)
       } catch {
         case e: Throwable =>
-          logger.warn(s"Fails to stop the default driver: $e")
-          logger.debug("Fails to stop the default driver", e)
+          logger.warn(s"Fails to stop driver: $e")
+          logger.debug("Fails to stop driver", e)
+      }
+    }
+
+    asyncDriverReg.result().foreach { driver =>
+      try {
+        Await.result(driver.close(timeout), timeout * 1.2D)
+      } catch {
+        case e: Throwable =>
+          logger.warn(s"Fails to stop async driver: $e")
+          logger.debug("Fails to stop async driver", e)
       }
     }
 

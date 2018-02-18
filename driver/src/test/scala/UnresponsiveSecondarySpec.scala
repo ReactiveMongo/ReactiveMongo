@@ -26,7 +26,7 @@ trait UnresponsiveSecondarySpec { parent: NodeSetSpec =>
   import reactivemongo.api.tests._
   import NettyEmbedder.withChannel
 
-  private val usd = reactivemongo.api.MongoDriver()
+  private val usd = Common.newDriver()
   @inline private def usSys = usd.system
 
   // ---

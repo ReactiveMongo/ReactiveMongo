@@ -220,6 +220,8 @@ case class Query(
   override val code = 2004
   override val writeTo = writeTupleToBuffer4((flags, fullCollectionName, numberToSkip, numberToReturn)) _
   override def size = 4 + fullCollectionName.length + 1 + 4 + 4
+
+  @inline override def toString = s"Query($fullCollectionName, flags=$flags, skip=$numberToSkip, return=$numberToReturn)"
 }
 
 /**

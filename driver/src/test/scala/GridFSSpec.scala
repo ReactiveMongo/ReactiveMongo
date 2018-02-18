@@ -22,11 +22,13 @@ class GridFSSpec(implicit ee: ExecutionEnv)
   sequential
 
   "Default connection" should {
-    gridFsSpec(GridFS[BSONSerializationPack.type](db), timeout)
+    val prefix = s"fs${System identityHashCode db}"
+    gridFsSpec(GridFS[BSONSerializationPack.type](db, prefix), timeout)
   }
 
   "Slow connection" should {
-    gridFsSpec(GridFS[BSONSerializationPack.type](db), timeout)
+    val prefix = s"fs${System identityHashCode slowDb}"
+    gridFsSpec(GridFS[BSONSerializationPack.type](slowDb, prefix), timeout)
   }
 
   // ---
@@ -37,6 +39,10 @@ class GridFSSpec(implicit ee: ExecutionEnv)
     val filename1 = s"file1-${System identityHashCode gfs}"
     lazy val file1 = DefaultFileToSave(Some(filename1), Some("application/file"))
     lazy val content1 = (1 to 100).view.map(_.toByte).toArray
+
+    "ensure the indexes are ok" in {
+      gfs.ensureIndex() must beTrue.await(1, timeout)
+    }
 
     "store a file without a computed MD5" in {
       gfs.save(Enumerator(content1), file1).map(_.filename).

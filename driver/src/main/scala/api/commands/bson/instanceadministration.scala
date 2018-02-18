@@ -2,8 +2,20 @@ package reactivemongo.api.commands.bson
 
 import scala.util.{ Failure, Success }
 
+import reactivemongo.bson.{
+  BSONBooleanLike,
+  BSONDocument,
+  BSONDocumentReader,
+  BSONDocumentWriter,
+  BSONInteger,
+  BSONNumberLike,
+  BSONString,
+  BSONValue,
+  BSONWriter
+}
+
+import reactivemongo.api.BSONSerializationPack
 import reactivemongo.api.commands._
-import reactivemongo.bson._
 
 import reactivemongo.core.errors.GenericDriverException
 
@@ -36,7 +48,7 @@ object BSONListCollectionNamesImplicits {
   private def wtColNames(meta: List[BSONDocument], ns: List[String]): Option[List[String]] = meta match {
     case d :: ds => d.getAs[String]("name") match {
       case Some(n) => wtColNames(ds, n :: ns)
-      case _       => None // error
+      case _       => Option.empty[List[String]] // error
     }
     case _ => Some(ns.reverse)
   }
@@ -93,6 +105,7 @@ object BSONCreateImplicits {
         "size" -> capped.size,
         "max" -> capped.max)
   }
+
   implicit object CreateWriter extends BSONDocumentWriter[ResolvedCollectionCommand[Create]] {
     def write(command: ResolvedCollectionCommand[Create]): BSONDocument =
       BSONDocument(

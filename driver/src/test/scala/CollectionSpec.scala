@@ -1,7 +1,7 @@
 import scala.concurrent.duration.FiniteDuration
 
 import reactivemongo.bson.{ BSONDocument, BSONString }
-import reactivemongo.api.MongoConnection
+
 import reactivemongo.api.commands.CollStatsResult
 import reactivemongo.api.collections.bson.BSONCollection
 
@@ -44,19 +44,18 @@ class CollectionSpec(implicit ee: ExecutionEnv)
     } tag "mongo2"
 
     "check if it's capped (MongoDB >= 3.0)" >> {
-      def statSpec(con: MongoConnection, c: BSONCollection, timeout: FiniteDuration) = {
+      def statSpec(c: BSONCollection, timeout: FiniteDuration) =
         c.stats must beLike[CollStatsResult] {
           case stats => stats.capped must beTrue and (
             stats.maxSize must beSome(cappedMaxSize))
         }.await(1, timeout)
-      }
 
       "with the default connection" in {
-        statSpec(connection, collection, timeout)
+        statSpec(collection, timeout)
       } tag "not_mongo26"
 
       "with the slow connection" in {
-        statSpec(slowConnection, slowColl, slowTimeout)
+        statSpec(slowColl, slowTimeout)
       } tag "not_mongo26"
     }
 

@@ -32,8 +32,8 @@ object ReactiveMongoException {
   def apply(message: String): ReactiveMongoException =
     GenericDriverException(message)
 
-  def apply(doc: BSONDocument): DatabaseException =
-    new DetailedDatabaseException(doc)
+  @deprecated("Use [[DatabaseException]]", "0.13.0")
+  def apply(doc: BSONDocument) = DatabaseException(doc)
 }
 
 /** An error thrown by a MongoDB node. */
@@ -57,6 +57,21 @@ trait DatabaseException extends ReactiveMongoException {
     case 10057 | 15845 | 16550 => true
     case _                     => false
   }.getOrElse(false)
+}
+
+private[reactivemongo] object DatabaseException {
+  def apply(doc: BSONDocument): DatabaseException =
+    new DetailedDatabaseException(doc)
+
+  def apply(cause: Throwable): DatabaseException = new Default(cause)
+
+  // ---
+
+  private final class Default(val cause: Throwable) extends DatabaseException {
+    val originalDocument = Option.empty[BSONDocument]
+    val code = Option.empty[Int]
+    val message = s"${cause.getClass.getName}: ${cause.getMessage}"
+  }
 }
 
 /** A driver-specific error */
@@ -117,8 +132,7 @@ object ConnectionNotInitialized {
   def unapply(instance: ConnectionNotInitialized): Option[String] =
     Some(instance.message)
 
-  def MissingMetadata(cause: Throwable): ConnectionNotInitialized =
-    new ConnectionNotInitialized("Connection is missing metadata (like protocol version, etc.) The connection pool is probably being initialized.", cause)
+  def MissingMetadata(cause: Throwable): ConnectionNotInitialized = new ConnectionNotInitialized("Connection is missing metadata (like protocol version, etc.) The connection pool is probably being initialized.", cause)
 
   @deprecated(message = "Use constructor with cause", since = "0.12-RC1")
   def MissingMetadata: ConnectionNotInitialized = MissingMetadata(null)
@@ -138,6 +152,11 @@ class DetailedDatabaseException(
   doc: BSONDocument) extends DatabaseException with NoStackTrace {
 
   val originalDocument = Some(doc)
-  lazy val message = doc.getAs[BSONString]("$err").map(_.value).getOrElse("$err is not present, unknown error")
+
+  lazy val message = doc.getAs[String]("$err").orElse {
+    doc.getAs[String]("errmsg")
+  }.getOrElse(
+    s"message is not present, unknown error: ${BSONDocument pretty doc}")
+
   lazy val code = doc.getAs[BSONInteger]("code").map(_.value)
 }

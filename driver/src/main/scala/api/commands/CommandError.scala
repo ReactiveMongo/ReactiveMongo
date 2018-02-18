@@ -2,6 +2,8 @@ package reactivemongo.api.commands
 
 import scala.util.control.NoStackTrace
 
+import reactivemongo.api.SerializationPack
+
 /** Base definition for all the errors for the command execution errors. */
 trait CommandError extends Exception with NoStackTrace {
   /** The error code */
@@ -14,6 +16,8 @@ trait CommandError extends Exception with NoStackTrace {
 }
 
 object CommandError {
+  import reactivemongo.core.errors.DatabaseException
+
   object Code {
     /**
      * Pattern matching extractor for the error code.
@@ -37,6 +41,7 @@ object CommandError {
     def unapply(scrutinee: Any): Option[Int] = scrutinee match {
       case err: CommandError           => err.code
       case res: WriteResult if !res.ok => WriteResult.Code.unapply(res)
+      case err: DatabaseException      => err.code
       case _                           => None
     }
   }
@@ -62,7 +67,29 @@ object CommandError {
     def unapply(scrutinee: Any): Option[String] = scrutinee match {
       case err: CommandError           => err.errmsg
       case res: WriteResult if !res.ok => WriteResult.Message.unapply(res)
+      case err: DatabaseException      => Option(err.getMessage)
       case _                           => None
     }
+  }
+
+  /**
+   * @param pack the serialization pack
+   * @param code the error code
+   * @param errmsg the error message
+   * @param originalDocument the response document
+   */
+  private[reactivemongo] def apply[P <: SerializationPack](pack: P)(
+    code: Option[Int],
+    errmsg: Option[String],
+    originalDocument: pack.Document): CommandError =
+    new DefaultCommandError(code, errmsg, () => pack pretty originalDocument)
+
+  // ---
+
+  private[reactivemongo] final class DefaultCommandError(
+    val code: Option[Int],
+    val errmsg: Option[String],
+    showDocument: () => String) extends CommandError {
+    override def getMessage = s"CommandError[code=${code.getOrElse("<unknown>")}, errmsg=${errmsg.getOrElse("<unknown>")}, doc: ${showDocument()}]"
   }
 }

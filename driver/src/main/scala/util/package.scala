@@ -40,7 +40,7 @@ package object util {
   }
 
   object EitherMappableFuture {
-    implicit def futureToEitherMappable[A](future: Future[A]): EitherMappableFuture[A] = EitherMappableFuture(future)
+    implicit def futureToEitherMappable[A](future: Future[A]): EitherMappableFuture[A] = new EitherMappableFuture[A](future)
   }
 
   object ExtendedFutures {

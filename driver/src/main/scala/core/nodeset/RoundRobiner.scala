@@ -1,5 +1,7 @@
 package reactivemongo.core.nodeset
 
+import scala.language.higherKinds
+
 @deprecated(message = "Will be made private", since = "0.11.10")
 class RoundRobiner[A, M[T] <: Iterable[T]](val subject: M[A], startAtIndex: Int = 0) {
   private val iterator = new ContinuousIterator(subject)

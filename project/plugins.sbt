@@ -13,20 +13,21 @@ resolvers ++= Seq(
   Resolver.url("jsuereth-repo", url(
     "https://dl.bintray.com/jsuereth/sbt-plugins/"))(Resolver.ivyStylePatterns))
 
-addSbtPlugin("org.scalariform" % "sbt-scalariform" % "1.7.1")
+addSbtPlugin("org.scalariform" % "sbt-scalariform" % "1.8.2")
 
 addSbtPlugin("com.typesafe.sbt" % "sbt-git" % "0.9.3")
 
-addSbtPlugin("com.eed3si9n" % "sbt-unidoc" % "0.3.3-dcdc4774d19d1500437bc63e79c3abb8f99bcdb4")
+//addSbtPlugin("com.eed3si9n" % "sbt-unidoc" % "0.3.3-dcdc4774d19d1500437bc63e79c3abb8f99bcdb4")
+addSbtPlugin("com.eed3si9n" % "sbt-unidoc" % "0.4.1")
 
-addSbtPlugin("net.virtual-void" % "sbt-dependency-graph" % "0.8.2")
+addSbtPlugin("net.virtual-void" % "sbt-dependency-graph" % "0.9.0")
 
-addSbtPlugin("com.eed3si9n" % "sbt-assembly" % "0.14.5")
+addSbtPlugin("com.eed3si9n" % "sbt-assembly" % "0.14.6")
 
-addSbtPlugin("com.typesafe" % "sbt-mima-plugin" % "0.1.8")
+addSbtPlugin("com.typesafe" % "sbt-mima-plugin" % "0.1.18")
 
-addSbtPlugin("de.johoop" % "findbugs4sbt" % "1.4.0")
+addSbtPlugin("com.github.sbt" % "sbt-findbugs" % "2.0.0")
 
-addSbtPlugin("de.johoop" % "cpd4sbt" % "1.2.0")
+addSbtPlugin("com.github.sbt" % "sbt-cpd" % "2.0.0")
 
-addSbtPlugin("com.github.gseitz" % "sbt-release" % "1.0.6")
+addSbtPlugin("com.github.gseitz" % "sbt-release" % "1.0.7")
