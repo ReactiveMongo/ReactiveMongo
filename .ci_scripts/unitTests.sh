@@ -5,6 +5,11 @@ if [ `git grep localhost | grep 'src/test' | grep -vi 'Common.scala' | wc -l` -n
   exit 1
 fi
 
+if [ `git grep "$SCRIPT_DIR" $(basename "$SCRIPT_DIR") | grep -v $(basename $0) | wc -l` -ne 0 ]; then
+  echo "[ERROR] CI scripts must not contains hardcoded mention to self dir"
+  exit 2
+fi
+
 if [ "$SCALA_VERSION" = "2.11.11" -a `javac -version 2>&1 | grep 1.7 | wc -l` -eq 1 ]; then
     echo "[INFO] Check the source format and backward compatibility"
 
@@ -17,9 +22,9 @@ EOF
         false
     )
 
-    sbt ++$SCALA_VERSION ";error ;mimaReportBinaryIssues" || exit 2
+    sbt ++$SCALA_VERSION ";error ;mimaReportBinaryIssues" || exit 3
 
-    sbt ++$SCALA_VERSION ";project ReactiveMongo-BSON ;findbugs ;project ReactiveMongo-BSON-Macros ;findbugs ;project ReactiveMongo ;findbugs ;project ReactiveMongo-JMX ;findbugs" || exit 3
+    sbt ++$SCALA_VERSION ";project ReactiveMongo-BSON ;findbugs ;project ReactiveMongo-BSON-Macros ;findbugs ;project ReactiveMongo ;findbugs ;project ReactiveMongo-JMX ;findbugs" || exit 4
 fi
 
 # JVM/SBT setup

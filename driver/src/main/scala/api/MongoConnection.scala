@@ -203,7 +203,7 @@ class MongoConnection(
     password: String,
     failoverStrategy: FailoverStrategy = options.failoverStrategy)(implicit ec: ExecutionContext): Future[SuccessfulAuthentication] = waitIsAvailable(
     failoverStrategy, stackTrace()).flatMap { _ =>
-    val req = AuthRequest(Authenticate(db, user, password))
+    val req = AuthRequest(Authenticate(db, user, Option(password)))
     mongosystem ! req
     req.future
   }
@@ -381,6 +381,10 @@ class MongoConnection(
 
 }
 
+/**
+ * @define hosts host and port for the servers of the MongoDB replica set
+ * @define options options ignored from the parsed URI
+ */
 object MongoConnection {
   val DefaultHost = "localhost"
   val DefaultPort = 27017
@@ -393,18 +397,18 @@ object MongoConnection {
   }
 
   /**
-   * @param hosts the hosts of the servers of the MongoDB replica set
+   * @param hosts the $hosts
    * @param options the connection options
-   * @param ignoredOptions the options ignored from the parsed URI
+   * @param ignoredOptions the $options
    * @param db the name of the database
-   * @param authenticate the authenticate information (see [[MongoConnectionOptions.authMode]])
+   * @param authenticate the authenticate information (see [[MongoConnectionOptions.authenticationMechanism]])
    */
   final case class ParsedURI(
     hosts: List[(String, Int)],
     options: MongoConnectionOptions,
     ignoredOptions: List[String],
     db: Option[String],
-    authenticate: Option[Authenticate])
+    @deprecated("Use `options.credentials`", "0.14.0") authenticate: Option[Authenticate])
   // TODO: Type for URI with required DB name
 
   /**
@@ -428,34 +432,51 @@ object MongoConnection {
       // ---
 
       val (unsupportedKeys, options) = opts
+
       if (useful.indexOf("@") == -1) {
         val (db, hosts) = parseHostsAndDbName(useful)
 
-        options.authMode match {
-          case X509Authentication => ParsedURI(hosts, options, unsupportedKeys, db,
-            Some(Authenticate(db.getOrElse(throw new URIParsingException(s"Could not parse URI '$uri': authentication information found but no database name in URI")), "", "")))
+        options.authenticationMechanism match {
+          case X509Authentication => {
+            val dbName = db.getOrElse(throw new URIParsingException(s"Could not parse URI '$uri': authentication information found but no database name in URI"))
+
+            val optsWithX509 = options.copy(credentials = Map(
+              dbName -> MongoConnectionOptions.Credential("", None)))
+
+            ParsedURI(hosts, optsWithX509, unsupportedKeys, db,
+              Some(Authenticate(dbName, "", None)))
+          }
+
           case _ => ParsedURI(hosts, options, unsupportedKeys, db, None)
         }
       } else {
-
         val WithAuth = """([^:]+)(|:[^@]*)@(.+)""".r
-        object PassExtractor {
-          def unapply(s: String): Option[String] = Some(s.stripPrefix(":"))
-        }
 
         useful match {
-          case WithAuth(user, PassExtractor(pass), hostsPortsAndDbName) => {
+          case WithAuth(user, p, hostsPortsAndDbName) => {
+            val pass = p.stripPrefix(":")
             val (db, hosts) = parseHostsAndDbName(hostsPortsAndDbName)
 
             db.fold[ParsedURI](throw new URIParsingException(s"Could not parse URI '$uri': authentication information found but no database name in URI")) { database =>
 
-              if (options.authMode == X509Authentication && pass.nonEmpty) {
+              if (options.authenticationMechanism == X509Authentication && pass.nonEmpty) {
                 throw new URIParsingException("You should not provide a password when authenticating with X509 authentication")
               }
 
-              ParsedURI(hosts, options, unsupportedKeys, Some(database),
-                Some(Authenticate(options.authenticationDatabase.
-                  getOrElse(database), user, pass)))
+              val password = {
+                if (options.authenticationMechanism != X509Authentication) {
+                  Option(pass)
+                } else Option.empty[String]
+              }
+
+              val authDb = options.authenticationDatabase.getOrElse(database)
+              val optsWithCred = options.copy(
+                credentials = options.credentials + (
+                  authDb -> MongoConnectionOptions.Credential(
+                    user, password)))
+
+              ParsedURI(hosts, optsWithCred, unsupportedKeys, Some(database),
+                Some(Authenticate(authDb, user, password)))
             }
           }
 
@@ -492,16 +513,16 @@ object MongoConnection {
     }
   }
 
-  private def parseHostsAndDbName(hostsPortAndDbName: String): (Option[String], List[(String, Int)]) = hostsPortAndDbName.split("/").toList match {
+  private def parseHostsAndDbName(input: String): (Option[String], List[(String, Int)]) = input.takeWhile(_ != '?').split("/").toList match {
     case hosts :: Nil =>
-      None -> parseHosts(hosts.takeWhile(_ != '?'))
+      None -> parseHosts(hosts)
 
     case hosts :: dbName :: Nil =>
-      Some(dbName.takeWhile(_ != '?')) -> parseHosts(hosts)
+      Some(dbName) -> parseHosts(hosts)
 
     case _ =>
       throw new URIParsingException(
-        s"Could not parse hosts and database from URI: '$hostsPortAndDbName'")
+        s"Could not parse hosts and database from URI: '$input'")
   }
 
   private def parseOptions(uriAndOptions: String): Map[String, String] =
@@ -530,17 +551,40 @@ object MongoConnection {
             unsupported -> result.copy(authenticationDatabase = Some(v))
           }
 
-          case ("authMode", "x509") => unsupported -> result.
-            copy(authMode = X509Authentication)
+          case ("authenticationMechanism", "x509") => unsupported -> result.
+            copy(authenticationMechanism = X509Authentication)
+
+          case ("authenticationMechanism", "mongocr") => unsupported -> result.
+            copy(authenticationMechanism = CrAuthentication)
+
+          case ("authenticationMechanism", _) => unsupported -> result.
+            copy(authenticationMechanism = ScramSha1Authentication)
+
+          // deprecated
+          case ("authMode", "x509") => {
+            logger.warn(s"Connection option 'authMode' is deprecated; Use option 'authenticationMechanism'")
+
+            unsupported -> result.copy(
+              authenticationMechanism = X509Authentication)
+          }
+
+          case ("authMode", "mongocr") => {
+            logger.warn(s"Connection option 'authMode' is deprecated; Use option 'authenticationMechanism'")
+
+            unsupported -> result.copy(
+              authenticationMechanism = CrAuthentication)
+          }
+
+          case ("authMode", _) => {
+            logger.warn(s"Connection option 'authMode' is deprecated; Use option 'authenticationMechanism'")
+
+            unsupported -> result.copy(
+              authenticationMechanism = ScramSha1Authentication)
+          }
+          // __deprecated
 
           case ("authenticationDatabase", v) =>
             unsupported -> result.copy(authenticationDatabase = Some(v))
-
-          case ("authMode", "mongocr") => unsupported -> result.
-            copy(authMode = CrAuthentication)
-
-          case ("authMode", _) => unsupported -> result.
-            copy(authMode = ScramSha1Authentication)
 
           case ("connectTimeoutMS", v) => unsupported -> result.
             copy(connectTimeoutMS = v.toInt)
@@ -550,7 +594,7 @@ object MongoConnection {
 
           case ("sslEnabled", v) => {
             logger.warn(
-              s"Connection option 'sslEnabled' deprecated: use option 'ssl'")
+              s"Connection option 'sslEnabled' is deprecated; Use option 'ssl'")
             unsupported -> result.copy(sslEnabled = v.toBoolean)
           }
 
@@ -629,8 +673,19 @@ object MongoConnection {
         }
       }
 
+    val step2 = remOpts.get("keyStore").fold(step1) { uri =>
+      val keyStore = MongoConnectionOptions.KeyStore(
+        resource = new java.net.URI(uri),
+        password = remOpts.get("keyStorePassword").map(_.toCharArray),
+        storeType = remOpts.get("keyStoreType").getOrElse("PKCS12"))
+
+      step1.copy(keyStore = Some(keyStore))
+    }
+
+    val remOpts2 = remOpts - "keyStore" - "keyStorePassword" - "keyStoreType"
+
     // Overriding options
-    remOpts.iterator.foldLeft(List.empty[String] -> step1) {
+    remOpts2.iterator.foldLeft(List.empty[String] -> step2) {
       case ((unsupported, result), kv) => kv match {
         case ("writeConcernW", "majority") => unsupported -> result.
           copy(writeConcern = result.writeConcern.

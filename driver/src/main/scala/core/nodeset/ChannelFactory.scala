@@ -114,27 +114,32 @@ final class ChannelFactory private[reactivemongo] (
       new ResponseFrameDecoder(), new ResponseDecoder(),
       new RequestEncoder(), mongoHandler)
 
-    trace(s"Netty channel configuration:\n- connectTimeoutMS: ${options.connectTimeoutMS}\n- maxIdleTimeMS: ${options.maxIdleTimeMS}ms\n- tcpNoDelay: ${options.tcpNoDelay}\n- keepAlive: ${options.keepAlive}\n- sslEnabled: ${options.sslEnabled}")
+    trace(s"Netty channel configuration:\n- connectTimeoutMS: ${options.connectTimeoutMS}\n- maxIdleTimeMS: ${options.maxIdleTimeMS}ms\n- tcpNoDelay: ${options.tcpNoDelay}\n- keepAlive: ${options.keepAlive}\n- sslEnabled: ${options.sslEnabled}\n- keyStore: ${options.keyStore}")
   }
 
+  private def keyStore: Option[MongoConnectionOptions.KeyStore] =
+    options.keyStore.orElse {
+      sys.props.get("javax.net.ssl.keyStore").map { path =>
+        MongoConnectionOptions.KeyStore(
+          resource = new java.io.File(path).toURI,
+          storeType = sys.props.getOrElse("javax.net.ssl.keyStoreType", "JKS"),
+          password = sys.props.get(
+            "javax.net.ssl.keyStorePassword").map(_.toCharArray))
+
+      }
+    }
+
   private def sslContext = {
-    import java.io.FileInputStream
     import java.security.KeyStore
     import javax.net.ssl.{ KeyManagerFactory, TrustManager }
 
-    val keyManagers = sys.props.get("javax.net.ssl.keyStore").map { path =>
-      val password = sys.props.getOrElse("javax.net.ssl.keyStorePassword", "")
+    val keyManagers = keyStore.map { settings =>
+      val password = settings.password.getOrElse(Array.empty[Char])
 
-      val ks = {
-        val ksType = sys.props.getOrElse("javax.net.ssl.keyStoreType", "JKS")
-        val res = KeyStore.getInstance(ksType)
+      val ks = reactivemongo.util.withContent(settings.resource) { storeIn =>
+        val res = KeyStore.getInstance(settings.storeType)
 
-        val fis = new FileInputStream(path)
-        try {
-          res.load(fis, password.toCharArray)
-        } finally {
-          fis.close()
-        }
+        res.load(storeIn, password)
 
         res
       }
@@ -143,7 +148,7 @@ final class ChannelFactory private[reactivemongo] (
         val res = KeyManagerFactory.getInstance(
           KeyManagerFactory.getDefaultAlgorithm)
 
-        res.init(ks, password.toCharArray)
+        res.init(ks, password)
         res
       }
 

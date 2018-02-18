@@ -30,6 +30,9 @@ case object X509Authentication extends AuthenticationMode
  * @param failoverStrategy the default failover strategy
  * @param monitorRefreshMS the interval in milliseconds used by monitor to refresh the node set (default: 10000 aka 10s)
  * @param maxIdleTimeMS the maximum number of milliseconds that a [[https://docs.mongodb.com/manual/reference/connection-string/#urioption.maxIdleTimeMS channel can remain idle]] in the connection pool before being removed and closed (default: 0 to disable, as implemented using [[http://netty.io/4.1/api/io/netty/handler/timeout/IdleStateHandler.html Netty IdleStateHandler]]); If not 0, must be greater or equal to [[#monitorRefreshMS]]
+ * @param maxHistorySize the maximum size of the pool history (default: 25)
+ * @param credentials the credentials per database names
+ * @param keyStore an optional key store
  */
 case class MongoConnectionOptions(
   // canonical options - connection
@@ -38,7 +41,7 @@ case class MongoConnectionOptions(
   @deprecatedName('authSource) authenticationDatabase: Option[String] = None,
   sslEnabled: Boolean = false,
   sslAllowsInvalidCert: Boolean = false,
-  authMode: AuthenticationMode = ScramSha1Authentication,
+  @deprecatedName('authMode) authenticationMechanism: AuthenticationMode = ScramSha1Authentication,
 
   // reactivemongo specific options
   tcpNoDelay: Boolean = false,
@@ -52,21 +55,68 @@ case class MongoConnectionOptions(
   failoverStrategy: FailoverStrategy = FailoverStrategy.default,
 
   monitorRefreshMS: Int = 10000,
-  maxIdleTimeMS: Int = 0) {
+  maxIdleTimeMS: Int = 0,
+  maxHistorySize: Int = 25,
+  credentials: Map[String, MongoConnectionOptions.Credential] = Map.empty,
+  keyStore: Option[MongoConnectionOptions.KeyStore] = Option.empty) {
+
+  /**
+   * The database source for authentication credentials (corresponds to the `authenticationMechanism` with MongoShell).
+   */
+  @inline def authMode: AuthenticationMode = authenticationMechanism
 
   /**
    * The database source for authentication credentials (corresponds to the `authenticationDatabase` with MongoShell).
    */
   @deprecated("Use [[authenticationDatabase]]", "0.12.7")
-  def authSource: Option[String] = authenticationDatabase
+  @inline def authSource: Option[String] = authenticationDatabase
 }
 
 object MongoConnectionOptions {
   @inline private def ms(duration: Int): String = s"${duration}ms"
 
+  /**
+   * @param user the name (or subject) of the user
+   * @param password the associated password if some
+   */
+  case class Credential(user: String, password: Option[String])
+
+  /**
+   * @param resource the ressource to load as key store
+   * @param password the password to load the store
+   * @param storeType the type of the key store (e.g. `PKCS12`)
+   */
+  case class KeyStore(
+    resource: java.net.URI,
+    password: Option[Array[Char]],
+    storeType: String) {
+    override def toString = s"KeyStore#${storeType}{$resource}"
+
+    import java.util.Arrays
+
+    override def equals(that: Any): Boolean = that match {
+      case KeyStore(`resource`, Some(p), `storeType`) =>
+        password.exists(pwd => Arrays.equals(p, pwd))
+
+      case KeyStore(`resource`, None, `storeType`) =>
+        password.isEmpty
+
+      case _ => false
+    }
+
+    override def hashCode: Int =
+      (resource, storeType, password.map(Arrays.hashCode(_))).hashCode
+
+    override protected def finalize(): Unit = {
+      password.foreach { p =>
+        p.indices.foreach { p(_) = '\u0000' }
+      }
+    }
+  }
+
   private[reactivemongo] def toStrings(options: MongoConnectionOptions): List[(String, String)] = options.authenticationDatabase.toList.map(
     "authenticationDatabase" -> _.toString) ++ List(
-      "authMode" -> options.authMode.toString,
+      "authenticationMechanism" -> options.authMode.toString,
       "nbChannelsPerNode" -> options.nbChannelsPerNode.toString,
       "monitorRefreshMS" -> ms(options.monitorRefreshMS),
       "connectTimeoutMS" -> ms(options.connectTimeoutMS),

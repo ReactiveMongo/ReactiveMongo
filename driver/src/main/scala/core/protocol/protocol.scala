@@ -257,17 +257,6 @@ private[reactivemongo] class ResponseFrameDecoder
       }
     }
   }
-
-  // ---
-
-  /* TODO: Remove?
-  @inline private def document(buf: ByteBuf) = scala.util.Try[BSONDocument] {
-    val docBuf = ChannelBufferReadableBuffer(
-      buf readBytes buf.getInt(buf.readerIndex))
-
-    reactivemongo.api.BSONSerializationPack.readFromBuffer(docBuf)
-  }
-   */
 }
 
 private[reactivemongo] class ResponseDecoder
@@ -285,15 +274,6 @@ private[reactivemongo] class ResponseDecoder
     context: ChannelHandlerContext,
     frame: ByteBuf, // see ResponseFrameDecoder
     out: JList[Object]): Unit = {
-
-    /*
-    try {
-      println(s"_decode2 #${context.attr(Debug.ParentBuf).get}: ${frame.refCnt}")
-    } catch {
-      case cause: Throwable =>
-        cause.printStackTrace()
-    }
-     */
 
     /*
     val attr =
@@ -366,7 +346,7 @@ private[reactivemongo] class ResponseDecoder
 
       first(docs) match {
         case Failure(cause) => {
-          cause.printStackTrace()
+          //cause.printStackTrace()
           Response.CommandError(header, reply, info, DatabaseException(cause))
         }
 

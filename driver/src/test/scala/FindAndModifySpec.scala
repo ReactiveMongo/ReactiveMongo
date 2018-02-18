@@ -120,7 +120,7 @@ final class FindAndModifySpec(implicit ee: ExecutionEnv)
           map(_.n) must beTypedEqualTo(1).await(0, slowTimeout) and {
             slowColl.count(Some(BSON.writeDocument(before))).
               aka("count before") must beTypedEqualTo(1).await(1, slowTimeout)
-          } and {
+          } and eventually(2, timeout) {
             upsertAndFetch(
               slowColl, before, after.age, slowTimeout) { result =>
               result.lastError.exists(_.upsertedId.isDefined) must beFalse

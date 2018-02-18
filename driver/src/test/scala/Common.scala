@@ -11,26 +11,18 @@ import reactivemongo.api.{
   MongoConnectionOptions,
   X509Authentication
 }
-import reactivemongo.core.nodeset.Authenticate
 
 object Common extends CommonAuth {
   val logger = reactivemongo.util.LazyLogger("tests")
 
-  val replSetOn =
-    Option(System getProperty "test.replicaSet").fold(false) {
-      case "true" => true
-      case _      => false
-    }
+  val replSetOn = sys.props.get("test.replicaSet").fold(false) {
+    case "true" => true
+    case _      => false
+  }
 
-/*
-  val crMode = Option(System getProperty "test.authMode").
-    filter(_ == "cr").map(_ => CrAuthentication)
-*/
+  val primaryHost = sys.props.getOrElse("test.primaryHost", "localhost:27017")
 
-  val primaryHost =
-    Option(System getProperty "test.primaryHost").getOrElse("localhost:27017")
-
-  val failoverRetries = Option(System getProperty "test.failoverRetries").
+  val failoverRetries = sys.props.get("test.failoverRetries").
     flatMap(r => scala.util.Try(r.toInt).toOption).getOrElse(7)
 
   private val driverReg = Seq.newBuilder[MongoDriver]
@@ -62,20 +54,25 @@ object Common extends CommonAuth {
   val DefaultOptions = {
     val a = MongoConnectionOptions(
       failoverStrategy = failoverStrategy,
-      nbChannelsPerNode = 20,
-      /*
-      writeConcern = reactivemongo.api.commands.WriteConcern.
-        Journaled.copy(w = reactivemongo.api.commands.WriteConcern.Majority),
-       */
-      monitorRefreshMS = (timeout.toMillis / 2).toInt)
+      //nbChannelsPerNode = 20,
+      monitorRefreshMS = (timeout.toMillis / 2).toInt,
+      credentials = DefaultCredentials.map("" -> _)(scala.collection.breakOut),
+      keyStore = sys.props.get("test.keyStore").map { uri =>
+        MongoConnectionOptions.KeyStore(
+          resource = new java.net.URI(uri), // file://..
+          storeType = "PKCS12",
+          password = sys.props.get("test.keyStorePassword").map(_.toCharArray))
+      })
 
     val b = {
-      if (Option(System getProperty "test.enableSSL").exists(_ == "true")) {
+      if (sys.props.get("test.enableSSL").exists(_ == "true")) {
         a.copy(sslEnabled = true, sslAllowsInvalidCert = true)
       } else a
     }
 
-    authMode.fold(b) { mode => b.copy(authMode = mode) }
+    authMode.fold(b) { mode =>
+      b.copy(authenticationMechanism = mode)
+    }
   }
 
   lazy val connection = driver.connection(List(primaryHost), DefaultOptions)
@@ -85,14 +82,13 @@ object Common extends CommonAuth {
   // ---
 
   val slowFailover = {
-    val retries = Option(System getProperty "test.slowFailoverRetries").
-      fold(20)(_.toInt)
+    val retries = sys.props.get("test.slowFailoverRetries").fold(20)(_.toInt)
 
     failoverStrategy.copy(retries = retries)
   }
 
-  val slowPrimary = Option(
-    System getProperty "test.slowPrimaryHost").getOrElse("localhost:27019")
+  val slowPrimary = sys.props.getOrElse(
+    "test.slowPrimaryHost", "localhost:27019")
 
   val slowTimeout: FiniteDuration = /*increaseTimeoutIfX509*/ {
     val maxTimeout = estTimeout(slowFailover)
@@ -109,7 +105,7 @@ object Common extends CommonAuth {
     import java.net.InetSocketAddress
     import ExecutionContext.Implicits.global
 
-    val delay = Option(System getProperty "test.slowProxyDelay").
+    val delay = sys.props.get("test.slowProxyDelay").
       fold(500L /* ms */ )(_.toLong)
 
     import NettyProxy.InetAddress
@@ -190,39 +186,22 @@ object Common extends CommonAuth {
 }
 
 sealed trait CommonAuth {
-
   import reactivemongo.api.AuthenticationMode
 
   def driver: MongoDriver
 
   def authMode: Option[AuthenticationMode] =
-    Option(System.getProperty("test.authMode")).flatMap {
+    sys.props.get("test.authenticationMechanism").flatMap {
       case "cr"   => Some(CrAuthentication)
       case "x509" => Some(X509Authentication)
       case _      => None
     }
 
-  def defaultAuthentications: Seq[Authenticate] =
-    ifX509(Seq(Authenticate("", certSubject, "")))(otherwise = Nil)
+  private lazy val certSubject = sys.props.get("test.clientCertSubject")
 
-  def certSubject: String =
-    Option(System.getProperty("test.clientCertSubject"))
-      .getOrElse(sys.error("Client cert subject required if X509 auth enabled"))
-
-  def increaseTimeoutIfX509(timeout: FiniteDuration): FiniteDuration =
-    ifX509(timeout * 10)(otherwise = timeout)
-
-/*
-  def makeConnection(nodes: Seq[String], options: MongoConnectionOptions): MongoConnection = {
-    makeConnection(driver)(nodes, options)
+  lazy val DefaultCredentials = certSubject.toSeq.map { cert =>
+    MongoConnectionOptions.Credential(cert, None)
   }
-
-  def makeConnection(driver: MongoDriver)(
-    nodes: Seq[String],
-    options: MongoConnectionOptions): MongoConnection = {
-    driver.connection(nodes, options, defaultAuthentications)
-  }
-*/
 
   def ifX509[T](block: => T)(otherwise: => T): T =
     authMode match {

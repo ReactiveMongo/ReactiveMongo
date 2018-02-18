@@ -51,6 +51,7 @@ import reactivemongo.core.protocol.{
 }
 import reactivemongo.core.commands.{
   CommandError,
+  FailedAuthentication,
   SuccessfulAuthentication
 }
 import reactivemongo.core.nodeset.{
@@ -126,9 +127,11 @@ trait MongoDBSystem extends Actor {
   private var refreshAllJob: Cancellable = NoJob
 
   // history
-  private val historyMax = 25 // TODO: configurable from options
-  private val history = EvictingQueue.create[(Long, String)](historyMax)
-  private[reactivemongo] val syncHistory = Queues.synchronizedQueue(history)
+  private lazy val historyMax = options.maxHistorySize
+  private lazy val history = EvictingQueue.create[(Long, String)](historyMax)
+
+  private[reactivemongo] lazy val syncHistory =
+    Queues.synchronizedQueue(history)
 
   private type NodeSetHandler = (String, NodeSetInfo, NodeSet) => Unit
   private val nodeSetUpdated: NodeSetHandler =
@@ -230,7 +233,7 @@ trait MongoDBSystem extends Actor {
     }
   }
 
-  private class OperationHandler(
+  protected final class OperationHandler(
     logError: Throwable => Unit,
     logSuccess: ChannelId => Unit)
     extends ChannelFutureListener {
@@ -255,23 +258,6 @@ trait MongoDBSystem extends Actor {
     val ns = connectAll(initNodeSet())
 
     nodeSetUpdated(s"Start(${ns.toShortString})", null, ns)
-
-    //updateNodeSet(s"Start(${_nodeSet})") { ns =>
-    //_nodeSet = connectAll(_nodeSet)
-    /*, { (node, con) =>
-      val req = requestIsMaster(node)
-
-      con.addListener(new ChannelFutureListener {
-        def operationComplete(op: ChannelFuture) = {
-          //logger.debug
-          println(s"[$lnm] Asking whether ${node.name} is master (channel #${op.channel.id})")
-
-          req.send()
-        }
-      })
-
-      req.node -> con
-     })*/
 
     // Prepare the period jobs
     val refreshInterval = options.monitorRefreshMS.milliseconds
@@ -341,12 +327,17 @@ trait MongoDBSystem extends Actor {
 
   @annotation.tailrec
   protected final def authenticateConnection(connection: Connection, auths: Set[Authenticate]): Connection = {
-    if (connection.authenticating.nonEmpty) connection
-    else auths.headOption match {
+    if (connection.authenticating.nonEmpty) {
+      //_println(s"Already authenticating $connection")
+
+      connection
+    } else auths.headOption match {
       case Some(nextAuth) =>
         if (connection.isAuthenticated(nextAuth.db, nextAuth.user)) {
           authenticateConnection(connection, auths.tail)
-        } else sendAuthenticate(connection, nextAuth)
+        } else {
+          sendAuthenticate(connection, nextAuth)
+        }
 
       case _ => connection
     }
@@ -404,24 +395,27 @@ trait MongoDBSystem extends Actor {
     }
   }
 
-  private def updateNodeSetOnDisconnect(channelId: ChannelId): (Boolean, NodeSet) = {
+  private def updateNodeSetOnDisconnect(channelId: ChannelId)(
+    f: (Boolean, NodeSet) => NodeSet): NodeSet = {
     @inline def event =
       s"ChannelDisconnected($channelId, ${_nodeSet.toShortString})"
 
     @volatile var updated = false
 
-    val ns = updateNodeSet(event)(_.updateNodeByChannelId(channelId) {
-      collectConnections(_) {
-        case other if (other.channel.id != channelId) =>
-          other // keep connections for other channels unchanged
+    updateNodeSet(event) { ns =>
+      val updSet = ns.updateNodeByChannelId(channelId) {
+        collectConnections(_) {
+          case other if (other.channel.id != channelId) =>
+            other // keep connections for other channels unchanged
 
-        case con =>
-          updated = true
-          con.copy(status = ConnectionStatus.Disconnected)
+          case con =>
+            updated = true
+            con.copy(status = ConnectionStatus.Disconnected)
+        }
       }
-    })
 
-    updated -> ns
+      f(updated, updSet)
+    }
   }
 
   private def lastError(response: Response): Either[Throwable, LastError] = {
@@ -619,53 +613,49 @@ trait MongoDBSystem extends Actor {
       trace(s"Channel #$channelId is connected; NodeSet status: $statusInfo")
 
       updateNodeSet(s"ChannelConnected($channelId, $statusInfo)") { ns =>
-        //println(s"_connected_ns: ${ns.nodes.flatMap(_.connections).map(_.channel)}")
-
         ns.updateByChannelId(channelId)(
-          _.copy(status = ConnectionStatus.Connected)) { n =>
-            //println(s"_connected_node: ${n.name}")
-            requestIsMaster(n).send()
+          _.copy(status = ConnectionStatus.Connected)) { node =>
+            requestIsMaster(node).send()
           }
       }
 
       ()
     }
 
-    case ChannelDisconnected(channelId) =>
-      updateNodeSetOnDisconnect(channelId) match {
-        case (false, _) => {
-          debug(s"Unavailable channel #${channelId} is already unattached")
+    case ChannelDisconnected(chanId) => {
+      updateNodeSetOnDisconnect(chanId) {
+        case (false, onDisconnect) => {
+          debug(s"Unavailable channel #${chanId} is already unattached")
+          onDisconnect
         }
 
-        case (_, _ /*onDisconnect*/ ) => {
-          trace(s"Channel #$channelId is unavailable")
+        case (_, onDisconnect) => {
+          trace(s"Channel #$chanId is unavailable")
 
-          val nodeSetWasReachable = _nodeSet.isReachable
-          val primaryWasAvailable = _nodeSet.primary.isDefined
+          val nodeSetWasReachable = onDisconnect.isReachable
+          val primaryWasAvailable = onDisconnect.primary.isDefined
 
-          val ns = updateNodeSet("ChannelDisconnected$$After") {
-            _.updateNodeByChannelId(channelId) { n =>
-              val node = {
-                if (n.pingInfo.channelId.exists(_ == channelId)) {
-                  // #cch2: The channel used to send isMaster request is
-                  // the one disconnected there
+          val ns = onDisconnect.updateNodeByChannelId(chanId) { n =>
+            val node = {
+              if (n.pingInfo.channelId.exists(_ == chanId)) {
+                // #cch2: The channel used to send isMaster request is
+                // the one disconnected there
 
-                  debug(s"Discard pending isMaster ping: used channel #${channelId} is disconnected")
+                debug(s"Discard pending isMaster ping: used channel #${chanId} is disconnected")
 
-                  n._copy(pingInfo = PingInfo())
-                } else {
-                  n
-                }
-              }
-
-              if (node.connected.isEmpty) {
-                // If there no longer established connection
-                trace(s"Unset the node status on disconnect (#${channelId})")
-
-                node._copy(status = NodeStatus.Unknown)
+                n._copy(pingInfo = PingInfo())
               } else {
-                node
+                n
               }
+            }
+
+            if (node.connected.isEmpty) {
+              // If there no longer established connection
+              trace(s"Unset the node status on disconnect (#${chanId})")
+
+              node._copy(status = NodeStatus.Unknown)
+            } else {
+              node
             }
           }
 
@@ -674,7 +664,7 @@ trait MongoDBSystem extends Actor {
           // TODO: Retry isMaster?
 
           awaitingResponses.retain { (_, awaitingResponse) =>
-            if (awaitingResponse.channelID == channelId) {
+            if (awaitingResponse.channelID == chanId) {
               retry(awaitingResponse) match {
                 case Some(awaiting) => {
                   trace(s"Retrying to await response for requestID ${awaiting.requestID}: $awaiting")
@@ -682,11 +672,11 @@ trait MongoDBSystem extends Actor {
                 }
 
                 case _ => {
-                  debug(s"Completing response for '${awaitingResponse.request.op}' with error='socket disconnected' (channel #$channelId)")
+                  debug(s"Completing response for '${awaitingResponse.request.op}' with error='socket disconnected' (channel #$chanId)")
 
                   failureOrLog(awaitingResponse.promise, SocketDisconnected)(
                     err => warn(
-                      s"Socket disconnected (channel #$channelId)", err))
+                      s"Socket disconnected (channel #$chanId)", err))
                 }
               }
 
@@ -715,11 +705,30 @@ trait MongoDBSystem extends Actor {
             }
           }
 
-          trace(s"Channel #$channelId is released")
+          trace(s"Channel #$chanId is released")
+
+          ns
         }
       }
 
+      ()
+    }
+
     case IsMasterResponse(response) => onIsMaster(response)
+
+    case err @ Response.CommandError(_, _, _, cause) if (
+      RequestId.authenticate accepts err) => {
+      // Successful authenticate responses go to `authReceive` then
+
+      warn("Fails to authenticate", cause)
+
+      updateNodeSet(s"AuthenticationFailure(${err.info._channelId})") { ns =>
+        handleAuthResponse(ns, err)(
+          Left(FailedAuthentication(cause.getMessage)))
+      }
+
+      ()
+    }
   }
 
   val closing: Receive = {
@@ -736,7 +745,7 @@ trait MongoDBSystem extends Actor {
     }
 
     case msg @ ChannelDisconnected(channelId) => {
-      updateNodeSetOnDisconnect(channelId)
+      updateNodeSetOnDisconnect(channelId) { (_, ns) => ns }
 
       stopWhenDisconnected("Closing$$ChannelDisconnected", msg)
     }
@@ -797,7 +806,6 @@ trait MongoDBSystem extends Actor {
                 debug(s"{${response.header.responseTo}} it's a getlasterror")
 
                 // todo, for now rewinding buffer at original index
-                //import reactivemongo.api.commands.bson.BSONGetLastErrorImplicits.LastErrorReader
 
                 lastError(response).fold({ e =>
                   error(s"Error deserializing LastError message #${response.header.responseTo}", e)
@@ -887,6 +895,8 @@ trait MongoDBSystem extends Actor {
       AuthRequestsManager.addAuthRequest(request)
 
       updateNodeSet(authenticate.toString) { ns =>
+        //println(s"_addAuth   [${System identityHashCode this}]: ${ns.authenticates.map(_.user).mkString("[", ", ", "]")}#${System identityHashCode ns} + ${authenticate.user}")
+
         // Authenticate the entire NodeSet
         val authenticates = ns.authenticates + authenticate
 
@@ -952,7 +962,9 @@ trait MongoDBSystem extends Actor {
             val authenticating =
               if (!nodeStatus.queryable || nodeSet.authenticates.isEmpty) {
                 node
-              } else authenticateNode(node, nodeSet.authenticates)
+              } else {
+                authenticateNode(node, nodeSet.authenticates)
+              }
 
             val meta = ProtocolMetadata(
               MongoWireVersion(isMaster.minWireVersion),
@@ -1073,40 +1085,28 @@ trait MongoDBSystem extends Actor {
       this._nodeSet = updated
     }
 
+    //println(s"\r\n----===> ${event take 30} : ${updated.authenticates.map(_.user).mkString("[", ", ", "]")}\r\n")
+
     nodeSetUpdated(event, previous, updated)
 
     updated
   }
 
-  private def updateAuthenticate(nodeSet: NodeSet, channelId: ChannelId, replyTo: Authenticate, auth: Option[Authenticated]): NodeSet = {
-    val ns = nodeSet.updateByChannelId(channelId) { con =>
-      val authed = auth.map(con.authenticated + _).getOrElse(con.authenticated)
+  protected final def handleAuthResponse(nodeSet: NodeSet, resp: Response)(
+    check: => Either[CommandError, SuccessfulAuthentication]): NodeSet = {
 
-      authenticateConnection(
-        con.copy(authenticated = authed, authenticating = None),
-        nodeSet.authenticates)
+    val chanId = resp.info._channelId
+    val authed = check
+    val authenticate = Promise[Authenticate]()
 
-    } { node =>
-      node._copy(authenticated = auth.map(node.authenticated + _).
-        getOrElse(node.authenticated))
-    }
-
-    if (!auth.isDefined) ns.copy(authenticates = ns.authenticates - replyTo)
-    else ns
-  }
-
-  protected def authenticationResponse(response: Response)(check: Response => Either[CommandError, SuccessfulAuthentication]): NodeSet = {
-    @inline def event =
-      s"Authentication(${response.info._channelId}, ${_nodeSet.toShortString})"
-
-    updateNodeSet(event) { nodeSet =>
-      val auth = nodeSet.pickByChannelId(
-        response.info._channelId).flatMap(_._2.authenticating)
-
-      auth match {
+    val updSet = nodeSet.updateNodeByChannelId(chanId) { node =>
+      node.pickConnectionByChannelId(chanId).flatMap(_.authenticating) match {
         case Some(Authenticating(db, user, pass)) => {
           val originalAuthenticate = Authenticate(db, user, pass)
-          val authenticated = check(response) match {
+
+          authenticate.success(originalAuthenticate)
+
+          val authenticated: Option[Authenticated] = authed match {
             case Right(successfulAuthentication) => {
               AuthRequestsManager.handleAuthResult(
                 originalAuthenticate, successfulAuthentication)
@@ -1122,7 +1122,8 @@ trait MongoDBSystem extends Actor {
               if (nodeSet.primary.isDefined) {
                 debug("The primary is now authenticated")
 
-                broadcastMonitors(PrimaryAvailable(nodeSet.protocolMetadata))
+                broadcastMonitors(
+                  PrimaryAvailable(nodeSet.protocolMetadata))
 
                 updateHistory(s"PrimaryAvailable(${nodeSet.toShortString})")
               } else if (nodeSet.isReachable) {
@@ -1134,21 +1135,54 @@ trait MongoDBSystem extends Actor {
 
             case Left(error) => {
               AuthRequestsManager.handleAuthResult(originalAuthenticate, error)
-              None
+
+              Option.empty[Authenticated]
             }
           }
 
-          updateAuthenticate(
-            nodeSet,
-            response.info._channelId, originalAuthenticate, authenticated)
+          authenticated match {
+            case Some(auth) => node.updateByChannelId(chanId)(
+              { con =>
+                authenticateConnection(
+                  con.copy(
+                    authenticating = None,
+                    authenticated = con.authenticated + auth),
+                  nodeSet.authenticates)
+              }) {
+                _._copy(authenticated = node.authenticated + auth)
+              }
+
+            case _ => node.updateByChannelId(chanId)(
+              _.copy(authenticating = None))(identity /* unchanged */ )
+          }
         }
 
-        case res => {
-          warn(s"Authentication result: $res")
-          nodeSet
+        case _ => {
+          warn(s"No pending authentication matching the response channel #${chanId}: $resp")
+
+          node
         }
       }
     }
+
+    if (authed.isLeft) { // there is an auth error
+      authenticate.future.value match {
+        case Some(Success(replyTo)) => { // original requested auth
+          //println(s"_removeAuth[${System identityHashCode this}]: ${updSet.authenticates.map(_.user).mkString("[", ", ", "]")}#${System identityHashCode updSet} - ${replyTo.user}")
+
+          val after = updSet.copy(authenticates = updSet.authenticates - replyTo)
+
+          //println(s"_removeAuth[${System identityHashCode this}]: ${after.authenticates.map(_.user).mkString("[", ", ", "]")}#${System identityHashCode after} <-- after")
+
+          after
+        }
+
+        case r => {
+          warn(s"Original authenticate not resolved: $r")
+          updSet
+        }
+      }
+    } else updSet
   }
 
   private def secondaryOK(message: Request): Boolean =
@@ -1231,13 +1265,6 @@ trait MongoDBSystem extends Actor {
     }
   }
 
-  private[actors] def whenAuthenticating(channelId: ChannelId)(f: Tuple2[Connection, Authenticating] => Connection): NodeSet =
-    updateNodeSet(s"Authenticating($channelId)")(
-      _.updateConnectionByChannelId(channelId) { connection =>
-        connection.authenticating.fold(connection)(authenticating =>
-          f(connection -> authenticating))
-      })
-
   // ---
 
   private def broadcastMonitors(message: AnyRef) = monitors.foreach(_ ! message)
@@ -1252,21 +1279,6 @@ trait MongoDBSystem extends Actor {
 
         if (c.status == ConnectionStatus.Connecting ||
           c.status == ConnectionStatus.Connected) {
-
-          /*
-          if (c.status == ConnectionStatus.Connecting && c.channel.isActive) {
-            // #cch1: Can happen for the first channel become active so quick,
-            // it happens even before the ChannelFactory.initChannel ends.
-
-            scheduler.scheduleOnce(Duration.Zero) {
-              // Schedule/deferred notification than immediate one,
-              // to avoid synchronization issue around NodeSet update
-
-              //println("_cch1")
-              self ! ChannelConnected(c.channel.id)
-            }
-          }
-           */
 
           updateNode(n, before.tail, c +: updated)
         } else {
@@ -1302,8 +1314,6 @@ trait MongoDBSystem extends Actor {
             }
           }
 
-          //println(s"upCon: ${c.status} => $upStatus")
-
           val upCon = c.copy(status = upStatus)
           val upNode = {
             if (c.status == upStatus) n
@@ -1334,95 +1344,94 @@ trait MongoDBSystem extends Actor {
     def send() = { f; node }
   }
 
-  private def requestIsMaster(node: Node): IsMasterRequest =
-    {
-      /*_println(s"requestIsMaster? ${node.connected.headOption.mkString}"); */ node.connected.headOption.fold(new IsMasterRequest(node)) { con =>
-        import reactivemongo.api.BSONSerializationPack
-        import reactivemongo.api.commands.bson.{
-          BSONIsMasterCommandImplicits,
-          BSONIsMasterCommand
-        }, BSONIsMasterCommand.IsMaster
-        import reactivemongo.api.commands.Command
+  private def requestIsMaster(node: Node): IsMasterRequest = {
+    /*_println(s"requestIsMaster? ${node.connected.headOption.mkString}"); */ node.connected.headOption.fold(new IsMasterRequest(node)) { con =>
+      import reactivemongo.api.BSONSerializationPack
+      import reactivemongo.api.commands.bson.{
+        BSONIsMasterCommandImplicits,
+        BSONIsMasterCommand
+      }, BSONIsMasterCommand.IsMaster
+      import reactivemongo.api.commands.Command
 
-        val id = RequestId.isMaster.next
-        val (isMaster, _) = Command.buildRequestMaker(BSONSerializationPack)(
-          IsMaster(id.toString),
-          BSONIsMasterCommandImplicits.IsMasterWriter,
-          ReadPreference.primaryPreferred,
-          "admin") // only "admin" DB for the admin command
+      val id = RequestId.isMaster.next
+      val (isMaster, _) = Command.buildRequestMaker(BSONSerializationPack)(
+        IsMaster(id.toString),
+        BSONIsMasterCommandImplicits.IsMasterWriter,
+        ReadPreference.primaryPreferred,
+        "admin") // only "admin" DB for the admin command
 
-        val now = System.currentTimeMillis()
+      val now = System.currentTimeMillis()
 
-        val updated = if (node.pingInfo.lastIsMasterId == -1) {
-          // There is no IsMaster request waiting response for the node:
-          // sending a new one
-          debug(s"Prepares a fresh IsMaster request to ${node.toShortString} (channel #${con.channel.id})")
+      val updated = if (node.pingInfo.lastIsMasterId == -1) {
+        // There is no IsMaster request waiting response for the node:
+        // sending a new one
+        debug(s"Prepares a fresh IsMaster request to ${node.toShortString} (channel #${con.channel.id})")
 
-          node._copy(
-            pingInfo = node.pingInfo.copy(
-              lastIsMasterTime = now,
-              lastIsMasterId = id,
-              channelId = Some(con.channel.id)))
+        node._copy(
+          pingInfo = node.pingInfo.copy(
+            lastIsMasterTime = now,
+            lastIsMasterId = id,
+            channelId = Some(con.channel.id)))
 
-        } else if ((
-          node.pingInfo.lastIsMasterTime + PingInfo.pingTimeout) < now) {
+      } else if ((
+        node.pingInfo.lastIsMasterTime + PingInfo.pingTimeout) < now) {
 
-          // The previous IsMaster request is expired
-          val msg = s"${node.toShortString} hasn't answered in time to last ping! Please check its connectivity"
+        // The previous IsMaster request is expired
+        val msg = s"${node.toShortString} hasn't answered in time to last ping! Please check its connectivity"
 
-          warn(msg)
+        warn(msg)
 
-          // Unregister the pending requests for this node
-          val channelIds = node.connections.map(_.channel.id)
-          val wasPrimary = node.status == NodeStatus.Primary
-          def error = {
-            val cause = new ClosedException(s"$msg ($lnm)")
+        // Unregister the pending requests for this node
+        val channelIds = node.connections.map(_.channel.id)
+        val wasPrimary = node.status == NodeStatus.Primary
+        def error = {
+          val cause = new ClosedException(s"$msg ($lnm)")
 
-            if (!wasPrimary) cause
-            else new PrimaryUnavailableException(supervisor, name, cause)
-          }
-
-          awaitingResponses.retain { (_, awaitingResponse) =>
-            if (channelIds contains awaitingResponse.channelID) {
-              trace(s"Unregistering the pending request ${awaitingResponse.promise} for ${node.toShortString}'")
-
-              awaitingResponse.promise.failure(error)
-              false
-            } else true
-          }
-
-          // Reset node state
-          updateHistory {
-            if (wasPrimary) s"PrimaryUnavailable"
-            else s"NodeUnavailable($node)"
-          }
-
-          node._copy(
-            status = NodeStatus.Unknown,
-            //connections = Vector.empty,
-            authenticated = Set.empty,
-            pingInfo = PingInfo(
-              ping = Long.MaxValue,
-              lastIsMasterTime = now,
-              lastIsMasterId = id,
-              channelId = con.channel.id))
-
-        } else {
-          debug(s"Do not prepare a isMaster request to already probed ${node.name}")
-
-          node
+          if (!wasPrimary) cause
+          else new PrimaryUnavailableException(supervisor, name, cause)
         }
 
-        new IsMasterRequest(updated, {
-          con.send(isMaster(id)).addListener(new OperationHandler(
-            error(s"Fails to send a isMaster request to ${node.name} (channel #${con.channel.id})", _),
-            { chanId =>
-              trace(s"isMaster request successful on channel #${chanId}")
-            }))
-          ()
-        })
+        awaitingResponses.retain { (_, awaitingResponse) =>
+          if (channelIds contains awaitingResponse.channelID) {
+            trace(s"Unregistering the pending request ${awaitingResponse.promise} for ${node.toShortString}'")
+
+            awaitingResponse.promise.failure(error)
+            false
+          } else true
+        }
+
+        // Reset node state
+        updateHistory {
+          if (wasPrimary) s"PrimaryUnavailable"
+          else s"NodeUnavailable($node)"
+        }
+
+        node._copy(
+          status = NodeStatus.Unknown,
+          //connections = Vector.empty,
+          authenticated = Set.empty,
+          pingInfo = PingInfo(
+            ping = Long.MaxValue,
+            lastIsMasterTime = now,
+            lastIsMasterId = id,
+            channelId = con.channel.id))
+
+      } else {
+        debug(s"Do not prepare a isMaster request to already probed ${node.name}")
+
+        node
       }
+
+      new IsMasterRequest(updated, {
+        con.send(isMaster(id)).addListener(new OperationHandler(
+          error(s"Fails to send a isMaster request to ${node.name} (channel #${con.channel.id})", _),
+          { chanId =>
+            trace(s"isMaster request successful on channel #${chanId}")
+          }))
+        ()
+      })
     }
+  }
 
   @inline private def scheduler = context.system.scheduler
 
@@ -1438,37 +1447,52 @@ trait MongoDBSystem extends Actor {
     result
   }
 
-  // Auth Methods
+  // Manage authenticate request other than the initial ones
   private object AuthRequestsManager {
-    var authRequests =
+    private var authRequests =
       Map.empty[Authenticate, List[Promise[SuccessfulAuthentication]]]
 
     def addAuthRequest(request: AuthRequest): Map[Authenticate, List[Promise[SuccessfulAuthentication]]] = {
       val found = authRequests.get(request.authenticate)
-      authRequests = authRequests + (request.authenticate -> (request.promise :: found.getOrElse(Nil)))
+
+      //println(s"_addRequest: ${authRequests.map(_._1.user)} + ${request.authenticate.user}")
+
+      authRequests = authRequests + (request.authenticate -> (
+        request.promise :: found.getOrElse(Nil)))
+
       authRequests
     }
 
-    def handleAuthResult(authenticate: Authenticate, result: SuccessfulAuthentication): Map[Authenticate, List[Promise[SuccessfulAuthentication]]] = {
-      val found = authRequests.get(authenticate)
-      if (found.isDefined) {
-        found.get.foreach { _.success(result) }
-        authRequests = authRequests - authenticate
+    private def withRequest[T](authenticate: Authenticate)(
+      f: Promise[SuccessfulAuthentication] => T): Map[Authenticate, List[Promise[SuccessfulAuthentication]]] = {
+      // TODO: synchronized
+
+      authRequests.get(authenticate) match {
+        case Some(found) => {
+          //println(s"_removeReq : ${authRequests.map(_._1.user)} - ${authenticate.user}")
+
+          authRequests = authRequests - authenticate
+
+          found.foreach(f)
+        }
+
+        case _ => {
+          debug(s"No pending authentication is matching response: $authenticate")
+
+          authRequests
+        }
       }
+
       authRequests
     }
 
-    def handleAuthResult(authenticate: Authenticate, result: Throwable): Map[Authenticate, List[Promise[SuccessfulAuthentication]]] = {
-      val found = authRequests.get(authenticate)
+    def handleAuthResult(
+      authenticate: Authenticate,
+      result: SuccessfulAuthentication) =
+      withRequest(authenticate)(_.success(result))
 
-      error("Authentication failure", result)
-
-      if (found.isDefined) {
-        found.get.foreach { _.failure(result) }
-        authRequests = authRequests - authenticate
-      }
-      authRequests
-    }
+    def handleAuthResult(authenticate: Authenticate, result: Throwable) =
+      withRequest(authenticate)(_.failure(result))
   }
 
   private object NoJob extends Cancellable {
@@ -1478,7 +1502,7 @@ trait MongoDBSystem extends Actor {
 
   // --- Logging ---
 
-  protected val lnm = s"$supervisor/$name" // log naming
+  protected final val lnm = s"$supervisor/$name" // log naming
 
   @inline protected def _println(msg: => String) = println(s"[$lnm] $msg")
 

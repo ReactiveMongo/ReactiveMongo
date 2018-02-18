@@ -11,6 +11,8 @@ import reactivemongo.api.commands.WriteConcern
 class MongoURISpec extends org.specs2.mutable.Specification {
   "Mongo URI" title
 
+  import MongoConnectionOptions.Credential
+
   section("unit")
   "MongoConnection URI parser" should {
     val simplest = "mongodb://host1"
@@ -80,9 +82,10 @@ class MongoURISpec extends org.specs2.mutable.Specification {
         ParsedURI(
           hosts = List("host1" -> 27017),
           db = Some("somedb"),
-          authenticate = Some(Authenticate("somedb", "user123", "passwd123")),
-          options = MongoConnectionOptions(),
-          ignoredOptions = List()))
+          authenticate = Some(Authenticate("somedb", "user123", Some("passwd123"))),
+          options = MongoConnectionOptions(credentials = Map(
+            "somedb" -> Credential("user123", Some("passwd123")))),
+          ignoredOptions = List.empty))
     }
 
     val wrongWithAuth = "mongodb://user123:passwd123@host1"
@@ -90,15 +93,18 @@ class MongoURISpec extends org.specs2.mutable.Specification {
       parseURI(wrongWithAuth).isFailure must beTrue
     }
 
-    val fullFeatured = "mongodb://user123:passwd123@host1:27018,host2:27019,host3:27020/somedb?foo=bar&authMode=scram-sha1"
+    val fullFeatured = "mongodb://user123:passwd123@host1:27018,host2:27019,host3:27020/somedb?foo=bar&authenticationMechanism=scram-sha1"
 
     s"parse $fullFeatured with success" in {
       parseURI(fullFeatured) must beSuccessfulTry(
         ParsedURI(
           hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
           db = Some("somedb"),
-          authenticate = Some(Authenticate("somedb", "user123", "passwd123")),
-          options = MongoConnectionOptions(authMode = ScramSha1Authentication),
+          authenticate = Some(Authenticate("somedb", "user123", Some("passwd123"))),
+          options = MongoConnectionOptions(
+            authenticationMechanism = ScramSha1Authentication,
+            credentials = Map("somedb" -> Credential(
+              "user123", Some("passwd123")))),
           ignoredOptions = List("foo")))
     }
 
@@ -110,32 +116,40 @@ class MongoURISpec extends org.specs2.mutable.Specification {
           hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
           db = Some("somedb"),
           authenticate = Some(Authenticate(
-            "authdb", "user123", ";qGu:je/LX}nN\\8")),
-          options = MongoConnectionOptions(authenticationDatabase = Some("authdb")),
+            "authdb", "user123", Some(";qGu:je/LX}nN\\8"))),
+          options = MongoConnectionOptions(
+            authenticationDatabase = Some("authdb"),
+            credentials = Map(
+              "authdb" -> Credential("user123", Some(";qGu:je/LX}nN\\8")))),
           ignoredOptions = List("foo")))
     }
 
-    val withAuthModeX509WithNoUser = "mongodb://host1:27018,host2:27019,host3:27020/somedb?foo=bar&authMode=x509"
+    val withAuthModeX509WithNoUser = "mongodb://host1:27018,host2:27019,host3:27020/somedb?foo=bar&authenticationMechanism=x509"
 
     s"parse $withAuthModeX509WithNoUser with success" in {
       parseURI(withAuthModeX509WithNoUser) must beSuccessfulTry(
         ParsedURI(
           hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
           db = Some("somedb"),
-          authenticate = Some(Authenticate("somedb", "", "")),
-          options = MongoConnectionOptions(authMode = X509Authentication),
+          authenticate = Some(Authenticate("somedb", "", None)),
+          options = MongoConnectionOptions(
+            authenticationMechanism = X509Authentication,
+            credentials = Map("somedb" -> Credential("", None))),
           ignoredOptions = List("foo")))
     }
 
-    val withAuthModeX509WithUser = "mongodb://username@test.com,CN=127.0.0.1,OU=TEST_CLIENT,O=TEST_CLIENT,L=LONDON,ST=LONDON,C=UK@host1:27018,host2:27019,host3:27020/somedb?foo=bar&authMode=x509"
+    val withAuthModeX509WithUser = "mongodb://username@test.com,CN=127.0.0.1,OU=TEST_CLIENT,O=TEST_CLIENT,L=LONDON,ST=LONDON,C=UK@host1:27018,host2:27019,host3:27020/somedb?foo=bar&authenticationMechanism=x509"
 
     s"parse $withAuthModeX509WithUser with success" in {
       parseURI(withAuthModeX509WithUser) must beSuccessfulTry(
         ParsedURI(
           hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
           db = Some("somedb"),
-          authenticate = Some(Authenticate("somedb", "username@test.com,CN=127.0.0.1,OU=TEST_CLIENT,O=TEST_CLIENT,L=LONDON,ST=LONDON,C=UK", "")),
-          options = MongoConnectionOptions(authMode = X509Authentication),
+          authenticate = Some(Authenticate("somedb", "username@test.com,CN=127.0.0.1,OU=TEST_CLIENT,O=TEST_CLIENT,L=LONDON,ST=LONDON,C=UK", None)),
+          options = MongoConnectionOptions(
+            authenticationMechanism = X509Authentication,
+            credentials = Map(
+              "somedb" -> Credential("username@test.com,CN=127.0.0.1,OU=TEST_CLIENT,O=TEST_CLIENT,L=LONDON,ST=LONDON,C=UK", None))),
           ignoredOptions = List("foo")))
     }
 
@@ -145,9 +159,11 @@ class MongoURISpec extends org.specs2.mutable.Specification {
       parseURI(withWriteConcern) must beSuccessfulTry(ParsedURI(
         hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
         db = Some("somedb"),
-        authenticate = Some(Authenticate("somedb", "user123", "passwd123")),
+        authenticate = Some(Authenticate("somedb", "user123", Some("passwd123"))),
         options = MongoConnectionOptions(
-          writeConcern = WriteConcern.Journaled),
+          writeConcern = WriteConcern.Journaled,
+          credentials = Map(
+            "somedb" -> Credential("user123", Some("passwd123")))),
         ignoredOptions = Nil))
     }
 
@@ -157,9 +173,11 @@ class MongoURISpec extends org.specs2.mutable.Specification {
       parseURI(withWriteConcernWMaj) must beSuccessfulTry(ParsedURI(
         hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
         db = Some("somedb"),
-        authenticate = Some(Authenticate("somedb", "user123", "passwd123")),
+        authenticate = Some(Authenticate("somedb", "user123", Some("passwd123"))),
         options = MongoConnectionOptions(
-          writeConcern = WriteConcern.Default.copy(w = WriteConcern.Majority)),
+          writeConcern = WriteConcern.Default.copy(w = WriteConcern.Majority),
+          credentials = Map(
+            "somedb" -> Credential("user123", Some("passwd123")))),
         ignoredOptions = Nil))
     }
 
@@ -169,10 +187,12 @@ class MongoURISpec extends org.specs2.mutable.Specification {
       parseURI(withWriteConcernWTag) must beSuccessfulTry(ParsedURI(
         hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
         db = Some("somedb"),
-        authenticate = Some(Authenticate("somedb", "user123", "passwd123")),
+        authenticate = Some(Authenticate("somedb", "user123", Some("passwd123"))),
         options = MongoConnectionOptions(
           writeConcern = WriteConcern.Default.copy(
-            w = WriteConcern.TagSet("anyTag"))),
+            w = WriteConcern.TagSet("anyTag")),
+          credentials = Map(
+            "somedb" -> Credential("user123", Some("passwd123")))),
         ignoredOptions = Nil))
     }
 
@@ -182,10 +202,12 @@ class MongoURISpec extends org.specs2.mutable.Specification {
       parseURI(withWriteConcernWAck) must beSuccessfulTry(ParsedURI(
         hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
         db = Some("somedb"),
-        authenticate = Some(Authenticate("somedb", "user123", "passwd123")),
+        authenticate = Some(Authenticate("somedb", "user123", Some("passwd123"))),
         options = MongoConnectionOptions(
           writeConcern = WriteConcern.Default.copy(
-            w = WriteConcern.WaitForAcknowledgments(5))),
+            w = WriteConcern.WaitForAcknowledgments(5)),
+          credentials = Map(
+            "somedb" -> Credential("user123", Some("passwd123")))),
         ignoredOptions = Nil))
     }
 
@@ -196,9 +218,11 @@ class MongoURISpec extends org.specs2.mutable.Specification {
         ParsedURI(
           hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
           db = Some("somedb"),
-          authenticate = Some(Authenticate("somedb", "user123", "passwd123")),
+          authenticate = Some(Authenticate("somedb", "user123", Some("passwd123"))),
           options = MongoConnectionOptions(
-            writeConcern = WriteConcern.Default.copy(j = true)),
+            writeConcern = WriteConcern.Default.copy(j = true),
+            credentials = Map(
+              "somedb" -> Credential("user123", Some("passwd123")))),
           ignoredOptions = Nil))
     }
 
@@ -209,9 +233,11 @@ class MongoURISpec extends org.specs2.mutable.Specification {
         ParsedURI(
           hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
           db = Some("somedb"),
-          authenticate = Some(Authenticate("somedb", "user123", "passwd123")),
+          authenticate = Some(Authenticate("somedb", "user123", Some("passwd123"))),
           options = MongoConnectionOptions(
-            writeConcern = WriteConcern.Journaled.copy(j = false)),
+            writeConcern = WriteConcern.Journaled.copy(j = false),
+            credentials = Map(
+              "somedb" -> Credential("user123", Some("passwd123")))),
           ignoredOptions = Nil))
     }
 
@@ -222,10 +248,25 @@ class MongoURISpec extends org.specs2.mutable.Specification {
         ParsedURI(
           hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
           db = Some("somedb"),
-          authenticate = Some(Authenticate("somedb", "user123", "passwd123")),
+          authenticate = Some(Authenticate("somedb", "user123", Some("passwd123"))),
           options = MongoConnectionOptions(
-            writeConcern = WriteConcern.Default.copy(wtimeout = Some(1543))),
+            writeConcern = WriteConcern.Default.copy(wtimeout = Some(1543)),
+            credentials = Map(
+              "somedb" -> Credential("user123", Some("passwd123")))),
           ignoredOptions = Nil))
+    }
+
+    val withKeyStore = "mongodb://host1?keyStore=file:///tmp/foo&keyStoreType=PKCS12&keyStorePassword=bar"
+
+    s"fail to parse $withKeyStore" in {
+      parseURI(withKeyStore) must beSuccessfulTry[ParsedURI].like {
+        case uri => uri.options.keyStore must beSome(
+          MongoConnectionOptions.KeyStore(
+            resource = new java.io.File("/tmp/foo").toURI,
+            password = Some("bar".toCharArray),
+            storeType = "PKCS12"))
+
+      }
     }
 
     val defaultFo = "mongodb://host1?rm.failover=default"
@@ -328,6 +369,29 @@ class MongoURISpec extends org.specs2.mutable.Specification {
       parseURI(invalidIdle) must beFailedTry[ParsedURI].withThrowable[MongoConnection.URIParsingException]("Invalid URI options: maxIdleTimeMS\\(99\\) < monitorRefreshMS\\(100\\)")
     }
   }
+
+  "URI" should {
+    import scala.io.Source
+
+    "be loaded from a local file" in {
+      val resource = new java.io.File("/etc/hosts")
+
+      reactivemongo.api.tests.withContent(resource.toURI) { in =>
+        Source.fromInputStream(in).mkString must beTypedEqualTo(
+          Source.fromFile(resource).mkString)
+      }
+    }
+
+    "be loaded from classpath" in {
+      val resource = getClass.getResource("/reference.conf")
+
+      reactivemongo.api.tests.withContent(resource.toURI) { in =>
+        Source.fromInputStream(in).mkString must beTypedEqualTo(
+          Source.fromURL(resource).mkString)
+      }
+    }
+  }
+
   section("unit")
 
   // ---

@@ -87,6 +87,8 @@ case class Node(
     node
   }
 
+  @inline private[core] def pickConnectionByChannelId(id: ChannelId): Option[Connection] = connections.find(_.channel.id == id)
+
   private[core] def updateByChannelId(id: ChannelId)(fc: Connection => Connection)(fn: Node => Node): Node = {
     val (updCons, updated) = utils.update(connections) {
       case conn if (conn.channel.id == id) => fc(conn)

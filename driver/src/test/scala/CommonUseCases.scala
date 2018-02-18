@@ -96,10 +96,10 @@ class CommonUseCases(implicit ee: ExecutionEnv)
         findSpec(collection, timeout)
       }
 
-      "with the slow connection" in {
-        org.specs2.execute.EventuallyResults.eventually(2, timeout) {
-          findSpec(slowColl, slowTimeout * 2)
-        }
+      "with the slow connection" in eventually(2, timeout) {
+        val t = Common.ifX509(slowTimeout * 5)(slowTimeout * 2)
+
+        findSpec(slowColl, t)
       }
     }
 

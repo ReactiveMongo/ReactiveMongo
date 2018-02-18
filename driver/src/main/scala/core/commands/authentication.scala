@@ -318,7 +318,11 @@ private[core] case class CrAuthenticate(
   /** the digest of the tuple (''nonce'', ''user'', ''pwdDigest'') */
   lazy val key = md5Hex(nonce + user + pwdDigest, "UTF-8")
 
-  override def makeDocuments = BSONDocument("authenticate" -> BSONInteger(1), "user" -> BSONString(user), "nonce" -> BSONString(nonce), "key" -> BSONString(key))
+  override def makeDocuments = BSONDocument(
+    "authenticate" -> BSONInteger(1),
+    "user" -> BSONString(user),
+    "nonce" -> BSONString(nonce),
+    "key" -> BSONString(key))
 
   val ResultMaker = CrAuthenticate
 }
@@ -329,23 +333,25 @@ object CrAuthenticate extends BSONCommandResultMaker[SuccessfulAuthentication] {
 
   def apply(document: BSONDocument) = {
     CommandError.checkOk(document, Some("authenticate"), (doc, name) => {
-      FailedAuthentication(doc.getAs[BSONString]("errmsg").map(_.value).getOrElse(""), Some(doc))
+      FailedAuthentication(
+        doc.getAs[BSONString]("errmsg").fold("")(_.value), Some(doc))
+
     }).toLeft(document.get("dbname") match {
       case Some(BSONString(dbname)) => VerboseSuccessfulAuthentication(
         dbname,
         document.getAs[String]("user").get,
         document.getAs[Boolean]("readOnly").getOrElse(false))
+
       case _ => SilentSuccessfulAuthentication
     })
   }
 }
 
-private[core] case class X509Authenticate(user: String) extends Command[SuccessfulAuthentication] {
+private[core] case class X509Authenticate(user: Option[String])
+  extends Command[SuccessfulAuthentication] {
 
-  private val userNameDocument = if (user.isEmpty) {
-    BSONDocument()
-  } else {
-    BSONDocument("user" -> BSONString(user))
+  private val userNameDocument = user.fold(BSONDocument.empty) { name =>
+    BSONDocument("user" -> BSONString(name))
   }
 
   override def makeDocuments = BSONDocument(

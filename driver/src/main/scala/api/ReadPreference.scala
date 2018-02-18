@@ -1,11 +1,7 @@
 package reactivemongo.api
 
-import reactivemongo.bson.{
-  BSONArray,
-  BSONDocument,
-  BSONElement,
-  BSONDocumentWriter
-}
+// BSONDocumentWriter
+import reactivemongo.bson.BSONDocument
 
 /**
  * MongoDB Read Preferences enable to read from primary or secondaries
@@ -88,26 +84,6 @@ object ReadPreference {
     extends ReadPreference with Taggable {
 
     override val toString = s"""Nearest(${tags mkString ", "})"""
-  }
-
-  // TODO: Move to BSON module
-  private def containsAll(target: BSONDocument, other: BSONDocument): Boolean = {
-    val els = target.elements
-
-    other.elements.forall { element =>
-      els.find {
-        case BSONElement(name, value) =>
-          element.name == name && ((element.value, value) match {
-            case (d1: BSONDocument, d2: BSONDocument) =>
-              d1.elements == d2.elements
-
-            case (a1: BSONArray, a2: BSONArray) =>
-              a1.values == a2.values
-
-            case (v1, v2) => v1 == v2
-          })
-      }.isDefined
-    }
   }
 
   /** Reads only from the primary. This is the default choice. */
