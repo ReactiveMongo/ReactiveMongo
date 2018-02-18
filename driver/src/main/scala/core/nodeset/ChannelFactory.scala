@@ -15,8 +15,8 @@ import shaded.netty.channel.{
 }, ChannelOption.{ CONNECT_TIMEOUT_MILLIS, SO_KEEPALIVE, TCP_NODELAY }
 
 import shaded.netty.channel.ChannelInitializer
-import shaded.netty.channel.nio.NioEventLoopGroup
-import shaded.netty.channel.socket.nio.NioSocketChannel
+//import shaded.netty.channel.nio.NioEventLoopGroup
+//import shaded.netty.channel.socket.nio.NioSocketChannel
 
 import akka.actor.ActorRef
 

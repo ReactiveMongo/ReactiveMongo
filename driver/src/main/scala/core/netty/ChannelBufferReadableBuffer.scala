@@ -15,10 +15,10 @@
  */
 package reactivemongo.core.netty
 
-import shaded.netty.buffer.{ ByteBuf, Unpooled }
+import shaded.netty.buffer.ByteBuf
 
 import reactivemongo.bson.BSONDocument
-import reactivemongo.bson.buffer.{ ReadableBuffer, WritableBuffer }
+import reactivemongo.bson.buffer.ReadableBuffer
 
 class ChannelBufferReadableBuffer(
   protected[netty] val buffer: ByteBuf) extends ReadableBuffer {

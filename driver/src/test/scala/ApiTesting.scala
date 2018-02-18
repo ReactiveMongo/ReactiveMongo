@@ -76,7 +76,6 @@ package object tests extends QueryCodecs[BSONSerializationPack.type] {
   def nextResponse[T](cursor: Cursor[T], maxDocs: Int) =
     cursor.asInstanceOf[CursorOps[T]].nextResponse(maxDocs)
 
-  def fakeResponse(doc: BSONDocument, reqID: Int = 2, respTo: Int = 1, chanId: Int = 1): Response = {
   @inline def channelBuffer(doc: BSONDocument) =
     reactivemongo.core.netty.ChannelBufferWritableBuffer.single(doc)
 

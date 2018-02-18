@@ -358,8 +358,11 @@ class MongoConnection(
 
   @inline private def debug(msg: => String) = logger.debug(s"[$lnm] $msg")
 
+  @inline private def warn(msg: => String) = logger.warn(s"[$lnm] $msg")
+
   @inline private def warn(msg: => String, cause: Exception) =
     logger.warn(s"[$lnm] $msg", cause)
+
 }
 
 object MongoConnection {

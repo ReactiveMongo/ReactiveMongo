@@ -22,8 +22,8 @@ class ResponseInfo(val _channelId: ChannelId)
   @inline def _1 = _channelId
 
   def canEqual(that: Any): Boolean = that match {
-    case other: ResponseInfo => true
-    case _                   => false
+    case _: ResponseInfo => true
+    case _               => false
   }
 }
 

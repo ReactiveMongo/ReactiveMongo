@@ -635,7 +635,7 @@ trait MongoDBSystem extends Actor {
           debug(s"Unavailable channel #${channelId} is already unattached")
         }
 
-        case (_, onDisconnect) => {
+        case (_, _ /*onDisconnect*/ ) => {
           trace(s"Channel #$channelId is unavailable")
 
           val nodeSetWasReachable = _nodeSet.isReachable
@@ -782,10 +782,6 @@ trait MongoDBSystem extends Actor {
               promise.success(cmderr); ()
 
             case _ => {
-          if (response.error.isDefined) {
-            debug(s"{${response.header.responseTo}} sending a failure... (${response.error.get})")
-
-            case _ => {
               if (response.error.isDefined) { // TODO: Option pattern matching
                 debug(s"{${response.header.responseTo}} sending a failure... (${response.error.get})")
 
@@ -824,44 +820,57 @@ trait MongoDBSystem extends Actor {
               } else if (isMongo26WriteOp) {
                 // TODO - logs, bson
                 // MongoDB 26 Write Protocol errors
-                logger.trace(
-                  s"[$lnm] Received a response to a MongoDB2.6 Write Op")
+                trace(s"Received a response to a MongoDB2.6 Write Op")
 
-            trace(s"{${response.header.responseTo}} ok field is: $okField")
-            val processedOk = okField.collect {
-              case BooleanField(_, v) => v
-              case IntField(_, v)     => v != 0
-              case DoubleField(_, v)  => v != 0
-            }.getOrElse(false)
+                import reactivemongo.bson.lowlevel._
+                import reactivemongo.core.netty.ChannelBufferReadableBuffer
 
-            if (processedOk) {
-              trace(s"{${response.header.responseTo}} [MongoDB26 Write Op response] sending a success!")
-              promise.success(response)
-              ()
-            } else {
-              debug(s"{${response.header.responseTo}} [MongoDB26 Write Op response] processedOk is false! sending an error")
+                val fields = {
+                  val reader = new LowLevelBsonDocReader(
+                    new ChannelBufferReadableBuffer(response.documents))
 
-              val notAPrimary = fields.find(_.name == "errmsg").exists {
-                case errmsg @ LazyField(0x02, _, buf) =>
-                  debug(s"{${response.header.responseTo}} [MongoDB26 Write Op response] errmsg is $errmsg!")
-                  buf.readString == "not a primary"
-                case errmsg =>
-                  debug(s"{${response.header.responseTo}} [MongoDB26 Write Op response] errmsg is $errmsg but not interesting!")
-                  false
+                  reader.fieldStream
+                }
+                val okField = fields.find(_.name == "ok")
+
+                trace(s"{${response.header.responseTo}} ok field is: $okField")
+
+                val processedOk = okField.collect {
+                  case BooleanField(_, v) => v
+                  case IntField(_, v)     => v != 0
+                  case DoubleField(_, v)  => v != 0
+                }.getOrElse(false)
+
+                if (processedOk) {
+                  trace(s"{${response.header.responseTo}} [MongoDB26 Write Op response] sending a success!")
+                  promise.success(response)
+                  ()
+                } else {
+                  debug(s"{${response.header.responseTo}} [MongoDB26 Write Op response] processedOk is false! sending an error")
+
+                  val notAPrimary = fields.find(_.name == "errmsg").exists {
+                    case errmsg @ LazyField(0x02, _, buf) =>
+                      debug(s"{${response.header.responseTo}} [MongoDB26 Write Op response] errmsg is $errmsg!")
+                      buf.readString == "not a primary"
+                    case errmsg =>
+                      debug(s"{${response.header.responseTo}} [MongoDB26 Write Op response] errmsg is $errmsg but not interesting!")
+                      false
+                  }
+
+                  if (notAPrimary) {
+                    debug(s"{${response.header.responseTo}} [MongoDB26 Write Op response] not a primary error!")
+                    onPrimaryUnavailable()
+                  }
+
+                  promise.failure(GenericDriverException("not ok"))
+                  ()
+                }
+              } else {
+                trace(s"{${response.header.responseTo}} [MongoDB26 Write Op response] sending a success!")
+                promise.success(response)
+                ()
               }
-
-              if (notAPrimary) {
-                debug(s"{${response.header.responseTo}} [MongoDB26 Write Op response] not a primary error!")
-                onPrimaryUnavailable()
-              }
-
-              promise.failure(GenericDriverException("not ok"))
-              ()
             }
-          } else {
-            trace(s"{${response.header.responseTo}} [MongoDB26 Write Op response] sending a success!")
-            promise.success(response)
-            ()
           }
         }
 

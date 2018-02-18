@@ -531,7 +531,7 @@ object DefaultCursor {
             logger.trace(s"Calling next on #${result.cursorId}, op=$op")
 
             val req = RequestMaker(op, cmd).
-              copy(channelIdHint = Some(response.info.channelId))
+              copy(channelIdHint = Some(response.info._channelId))
 
             requester(response.reply.startingFrom, maxDocs, req)(ctx)
           }.future
@@ -643,7 +643,7 @@ object DefaultCursor {
         def req = RequestMaker(
           op, cmd,
           readPreference = preference,
-          channelIdHint = Some(response.info.channelId))
+          channelIdHint = Some(response.info._channelId))
 
         Failover2(connection, failoverStrategy) { () =>
           requester(nextOffset, maxDocs, req)(ctx)
