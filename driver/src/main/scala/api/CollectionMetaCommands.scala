@@ -27,7 +27,15 @@ trait CollectionMetaCommands { self: Collection =>
   /**
    * Creates this collection.
    *
-   * The returned future will be completed with an error if this collection already exists.
+   * The returned future will be completed with an error if
+   * this collection already exists.
+   *
+   * {{{
+   * coll.create().recover {
+   *   case CommandError.Code(48 /*NamespaceExists*/ ) =>
+   *     println(s"Collection \${coll.fullCollectionName} already exists")
+   * }
+   * }}}
    *
    * @param autoIndexId $autoIndexIdParam
    */

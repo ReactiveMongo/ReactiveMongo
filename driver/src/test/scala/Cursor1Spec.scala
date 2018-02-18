@@ -338,7 +338,7 @@ trait Cursor1Spec { spec: CursorSpec =>
         "function(d){for(i=0;i<2147483647;i++){};return true}"))).batchSize(nDocs).maxTimeMs(1).cursor().
         collect[List](nDocs, Cursor.FailOnError[List[BSONDocument]]()).
         aka("slow query") must throwA[DetailedDatabaseException].like {
-          case err @ CommandError.Code(code) => code must_== 50
+          case CommandError.Code(code) => code must_== 50
         }.await(1, slowTimeout + DurationInt(1).seconds)
     }
   }
