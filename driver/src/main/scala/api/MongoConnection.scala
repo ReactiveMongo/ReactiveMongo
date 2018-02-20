@@ -243,6 +243,7 @@ class MongoConnection(
 
       monitor ! check
 
+      import akka.pattern.after
       import actorSystem.dispatcher
 
       def unavailResult = Future.failed[ProtocolMetadata] {
@@ -253,25 +254,17 @@ class MongoConnection(
         }
       }
 
-      def await() = Await.ready(p.future, timeout).recoverWith {
-        case cause: Exception =>
-          logger.warn(s"[$lnm] Fails to probe connection monitor", cause)
-          unavailResult
-      }
+      Future.firstCompletedOf(Seq(
+        p.future.recoverWith {
+          case cause: Exception =>
+            logger.warn(s"[$lnm] Fails to probe the connection monitor", cause)
 
-      try {
-        await()
-      } catch {
-        case _: java.util.concurrent.TimeoutException =>
+            unavailResult
+        },
+        after(timeout, actorSystem.scheduler)({
           logger.warn(s"[$lnm] Timeout while probing the connection monitor")
           unavailResult
-
-        case cause: Exception => {
-          logger.warn(s"[$lnm] Unexpected exception while probing connection monitor", cause)
-
-          unavailResult
-        }
-      }
+        })))
     }
 
   private[api] val monitor = actorSystem.actorOf(

@@ -113,27 +113,32 @@ class DriverSpec(implicit ee: ExecutionEnv)
         DefaultOptions.copy(failoverStrategy = FailoverStrategy.remote))
 
       val before = System.currentTimeMillis()
+      val unresolved = con.database(commonDb)
+      val after = System.currentTimeMillis()
 
-      con.database(commonDb).
-        map(_ => Option.empty[Throwable] -> -1L).recover {
-          case reason => Option(reason) -> (System.currentTimeMillis() - before)
+      (after - before) aka "invocation" must beBetween(0L, 75L) and {
+        unresolved.map(_ => Option.empty[Throwable] -> -1L).recover {
+          case reason => Option(reason) -> (System.currentTimeMillis() - after)
         }.aka("duration") must beLike[(Option[Throwable], Long)] {
-          case (Some(reason), duration) => reason.getStackTrace.tail.headOption.
-            aka("most recent") must beSome[StackTraceElement].like {
-              case mostRecent =>
-                mostRecent.getClassName aka "class" must beEqualTo(
-                  "reactivemongo.api.MongoConnection") and (
-                    mostRecent.getMethodName aka "method" must_== "database")
-            } and {
-              Option(reason.getCause) aka "cause" must beSome[Throwable].like {
-                case _: InternalState => ok
+          case (Some(reason), duration) =>
+            reason.getStackTrace.tail.headOption.
+              aka("most recent") must beSome[StackTraceElement].like {
+                case mostRecent =>
+                  mostRecent.getClassName aka "class" must beEqualTo(
+                    "reactivemongo.api.MongoConnection") and (
+                      mostRecent.getMethodName aka "method" must_== "database")
+
+              } and {
+                Option(reason.getCause) must beSome[Throwable].like {
+                  case _: InternalState => ok
+                }
+              } and {
+                (duration must be_>=(17000L)) and (duration must be_<(28500L))
               }
-            } and {
-              (duration must be_>=(17000L)) and (duration must be_<(28500L))
-            }
         }.await(1, 22.seconds) and {
           con.askClose()(timeout) must not(throwA[Exception]).await(1, timeout)
         }
+      }
     }
   }
 
