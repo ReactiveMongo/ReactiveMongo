@@ -18,12 +18,7 @@ package reactivemongo.api
 import scala.util.Try
 import scala.util.control.{ NonFatal, NoStackTrace }
 
-import scala.concurrent.{
-  Await,
-  ExecutionContext,
-  Future,
-  Promise
-}
+import scala.concurrent.{ ExecutionContext, Future, Promise }
 import scala.concurrent.duration.{ Duration, FiniteDuration }
 
 import akka.util.Timeout

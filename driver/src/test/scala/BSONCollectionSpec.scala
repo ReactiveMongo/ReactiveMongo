@@ -239,12 +239,19 @@ class BSONCollectionSpec(implicit ee: ExecutionEnv)
     }
 
     "write a JavaScript value" in {
+      val selector = BSONDocument("age" -> 101)
+      def find = collection.find(selector).one[BSONDocument]
+
       collection.insert(BSONDocument(
         "age" -> 101,
         "name" -> BSONJavaScript("db.getName()"))).flatMap { _ =>
-        collection.find(BSONDocument("age" -> 101)).one[BSONDocument].map(
-          _.flatMap(_.getAs[BSONJavaScript]("name")).map(_.value))
-      } aka "inserted" must beSome("db.getName()").await(1, timeout)
+        find.map(_.flatMap(_.getAs[BSONJavaScript]("name")).map(_.value))
+      } aka "inserted" must beSome("db.getName()").await(1, timeout) and {
+        collection.remove(selector).map(_.n) must beTypedEqualTo(1).
+          await(1, timeout)
+      } and {
+        find must beNone.await(1, timeout)
+      }
     }
 
     { // Find & update

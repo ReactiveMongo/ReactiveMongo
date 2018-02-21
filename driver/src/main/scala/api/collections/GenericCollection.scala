@@ -84,7 +84,7 @@ trait GenericCollectionProducer[P <: SerializationPack with Singleton, +C <: Gen
  * @define aggregationPipelineFunction the function to create the aggregation pipeline using the aggregation framework depending on the collection type
  * @define orderedParam the [[https://docs.mongodb.com/manual/reference/method/db.collection.insert/#perform-an-unordered-insert ordered]] behaviour
  */
-trait GenericCollection[P <: SerializationPack with Singleton] extends Collection with GenericCollectionWithCommands[P] with CollectionMetaCommands with reactivemongo.api.commands.ImplicitCommandHelpers[P] with InsertOps[P] with UpdateOps[P] with Aggregator[P] with GenericCollectionMetaCommands[P] { self =>
+trait GenericCollection[P <: SerializationPack with Singleton] extends Collection with GenericCollectionWithCommands[P] with CollectionMetaCommands with reactivemongo.api.commands.ImplicitCommandHelpers[P] with InsertOps[P] with UpdateOps[P] with DeleteOps[P] with Aggregator[P] with GenericCollectionMetaCommands[P] { self =>
   import scala.language.higherKinds
 
   val pack: P
@@ -573,33 +573,23 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
   def aggregatorContext[T](firstOperator: PipelineOperator, otherOperators: List[PipelineOperator] = Nil, explain: Boolean = false, allowDiskUse: Boolean = false, bypassDocumentValidation: Boolean = false, readConcern: Option[ReadConcern] = None, readPreference: ReadPreference = ReadPreference.primary, batchSize: Option[Int] = None)(implicit reader: pack.Reader[T]): AggregatorContext[T] = new AggregatorContext[T](firstOperator, otherOperators, explain, allowDiskUse, bypassDocumentValidation, readConcern, readPreference, batchSize, reader)
 
   /**
-   * Removes the matching document(s).
-   *
    * @tparam S $selectorTParam
-   *
-   * @param selector $selectorParam
    * @param writeConcern $writeConcernParam
-   * @param firstMatchOnly states whether only the first matched documents has to be removed from this collection.
    * @param swriter $swriterParam
    *
    * @return a future [[reactivemongo.api.commands.WriteResult]] that can be used to check whether the removal was successful
+   *
+   * {{{
+   * // Equivalent to:
+   * collection.delete[MyDocType](true, defaultWriteConcern).one(document)
+   * }}}
    */
+  @deprecated("Use [[delete]]", "0.13.1")
   def remove[S](selector: S, writeConcern: WriteConcern = defaultWriteConcern, firstMatchOnly: Boolean = false)(implicit swriter: pack.Writer[S], ec: ExecutionContext): Future[WriteResult] = db.connection.metadata match {
     case Some(metadata) if (
       metadata.maxWireVersion >= MongoWireVersion.V26) => {
-      import BatchCommands.DeleteCommand.{ Delete, DeleteElement }
-      val limit = if (firstMatchOnly) 1 else 0
-
-      Future(Delete(writeConcern = writeConcern)(
-        DeleteElement(selector, limit))).flatMap(runCommand(_, writePref).flatMap { wr =>
-        val flattened = wr.flatten
-        if (!flattened.ok) {
-          // was ordered, with one doc => fail if has an error
-          Future.failed(WriteResult.lastError(flattened).
-            getOrElse[Exception](GenericDriverException(
-              s"fails to remove: $selector")))
-        } else Future.successful(wr)
-      })
+      val limit = if (firstMatchOnly) Some(1) else Option.empty[Int]
+      delete(true, writeConcern).one(selector, limit)
     }
 
     case Some(metadata) => // Mongo < 2.6
@@ -609,6 +599,16 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
     case _ =>
       Future.failed(MissingMetadata())
   }
+
+  /**
+   * [[https://docs.mongodb.com/manual/reference/command/delete/ Deletes]] the matching document(s).
+   *
+   * @param ordered $orderedParam
+   * @param limit the maximum number of documents to be deleted (or unlimited)
+   *
+   */
+  def delete[S](ordered: Boolean, writeConcern: WriteConcern): DeleteBuilder =
+    prepareDelete(true, writeConcern)
 
   /**
    * Remove the matched document(s) from the collection without writeConcern.

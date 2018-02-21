@@ -18,7 +18,9 @@ sealed trait WriteResult {
   /** If the result is a failure, the error message */
   private[commands] def errmsg: Option[String]
 
-  private[reactivemongo] def hasErrors: Boolean = !writeErrors.isEmpty || !writeConcernError.isEmpty
+  private[reactivemongo] def hasErrors: Boolean =
+    !writeErrors.isEmpty || !writeConcernError.isEmpty
+
   private[reactivemongo] def inError: Boolean = !ok || code.isDefined
 
   protected def message = errmsg.getOrElse("<none>")
