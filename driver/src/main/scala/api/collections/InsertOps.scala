@@ -10,6 +10,7 @@ import reactivemongo.core.errors.GenericDriverException
 import reactivemongo.api.SerializationPack
 import reactivemongo.api.commands.{
   BulkOps,
+  CommandCodecs,
   MultiBulkWriteResult,
   LastError,
   ResolvedCollectionCommand,
@@ -21,10 +22,10 @@ import reactivemongo.api.commands.{
  * @define writeConcernParam the [[https://docs.mongodb.com/manual/reference/write-concern/ writer concern]] to be used
  * @define orderedParam the [[https://docs.mongodb.com/manual/reference/method/db.collection.insert/#perform-an-unordered-insert ordered]] behaviour
  */
-private[reactivemongo] trait InsertOps[P <: SerializationPack with Singleton] {
-  collection: GenericCollection[P] =>
+trait InsertOps[P <: SerializationPack with Singleton]
+  extends CommandCodecs[P] { collection: GenericCollection[P] =>
 
-  val pack: P
+  protected val pack: P
 
   /**
    * @param ordered $orderedParam
@@ -69,12 +70,39 @@ private[reactivemongo] trait InsertOps[P <: SerializationPack with Singleton] {
 
     protected def bulkRecover: Option[Exception => Future[WriteResult]]
 
-    /** Inserts a single document */
+    /**
+     * Inserts a single document.
+     *
+     * {{{
+     * import reactivemongo.bson.BSONDocument
+     * import reactivemongo.api.collections.BSONCollection
+     *
+     * def insertOne(coll: BSONCollection, doc: BSONDocument) = {
+     *   val insert = coll.insert(ordered = true)
+     *
+     *   insert.one(doc)
+     * }
+     * }}}
+     */
     final def one(document: T)(implicit ec: ExecutionContext): Future[WriteResult] = Future(pack.serialize(document, writer)).flatMap { single =>
       execute(Seq(single))
     }
 
     /** Inserts many documents, according the ordered behaviour. */
+    /**
+     * [[https://docs.mongodb.com/manual/reference/method/db.collection.insertMany/ Inserts many documents]], according the ordered behaviour.
+     *
+     * {{{
+     * import reactivemongo.bson.BSONDocument
+     * import reactivemongo.api.collections.BSONCollection
+     *
+     * def insertMany(coll: BSONCollection, docs: Iterable[BSONDocument]) = {
+     *   val insert = coll.insert(ordered = true)
+     *
+     *   insert.many(elements) // Future[MultiBulkWriteResult]
+     * }
+     * }}}
+     */
     final def many(documents: Iterable[T])(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] = {
       val ctx = (for {
         meta <- metadata
@@ -96,10 +124,12 @@ private[reactivemongo] trait InsertOps[P <: SerializationPack with Singleton] {
 
           BulkOps.bulkApply[pack.Document, WriteResult](bulkProducer)({ bulk =>
             execute(bulk.toSeq)
-          }, bulkRecover).map(MultiBulkWriteResult(_))
+          }, bulkRecover)
         }
-      } yield res
+      } yield MultiBulkWriteResult(res)
     }
+
+    // ---
 
     private def serialize(input: Iterable[T])(implicit ec: ExecutionContext): Future[Iterable[pack.Document]] = Future.sequence(input.map { v =>
       Try(pack.serialize(v, writer)) match {
@@ -111,7 +141,7 @@ private[reactivemongo] trait InsertOps[P <: SerializationPack with Singleton] {
     private final def execute(documents: Seq[pack.Document])(implicit ec: ExecutionContext): Future[WriteResult] = documents.headOption match {
       case Some(head) => metadata match {
         case Some(meta) => {
-          import BatchCommands.{ DefaultWriteResultReader, InsertWriter }
+          import BatchCommands.InsertWriter
 
           if (meta.maxWireVersion >= MongoWireVersion.V26) {
             val cmd = BatchCommands.InsertCommand.Insert(

@@ -34,7 +34,9 @@ trait BatchCommands[P <: SerializationPack] {
   implicit def UpdateReader: pack.Reader[UpdateCommand.UpdateResult]
 
   val DeleteCommand: DC[pack.type]
-  implicit def DeleteWriter: pack.Writer[ResolvedCollectionCommand[DeleteCommand.Delete]]
+
+  @deprecated("Will use internal write", "0.13.1")
+  def DeleteWriter: pack.Writer[ResolvedCollectionCommand[DeleteCommand.Delete]]
 
   val FindAndModifyCommand: FMC[pack.type]
   implicit def FindAndModifyWriter: pack.Writer[ResolvedCollectionCommand[FindAndModifyCommand.FindAndModify]]
@@ -44,7 +46,8 @@ trait BatchCommands[P <: SerializationPack] {
   implicit def AggregateWriter: pack.Writer[ResolvedCollectionCommand[AggregationFramework.Aggregate]]
   implicit def AggregateReader: pack.Reader[AggregationFramework.AggregationResult]
 
-  implicit def DefaultWriteResultReader: pack.Reader[DefaultWriteResult]
+  @deprecated("Use internal reader", "0.13.1")
+  def DefaultWriteResultReader: pack.Reader[DefaultWriteResult]
 
   //implicit def LastErrorReader: pack.Reader[LastError]
 }

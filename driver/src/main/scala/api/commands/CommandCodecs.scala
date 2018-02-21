@@ -40,4 +40,35 @@ private[reactivemongo] trait CommandCodecs[P <: SerializationPack] {
         "level", builder.string(concern.level))))
     }
   }
+
+  implicit private[reactivemongo] def defaultWriteResultReader: pack.Reader[DefaultWriteResult] = {
+    val decoder = pack.newDecoder
+
+    def readWriteError(doc: pack.Document): WriteError = (for {
+      index <- decoder.int(doc, "index")
+      code <- decoder.int(doc, "code")
+      err <- decoder.string(doc, "errmsg")
+    } yield WriteError(index, code, err)).get
+
+    def readWriteConcernError(doc: pack.Document): WriteConcernError = (for {
+      code <- decoder.int(doc, "code")
+      err <- decoder.string(doc, "errmsg")
+    } yield WriteConcernError(code, err)).get
+
+    dealingWithGenericCommandErrorsReader[DefaultWriteResult] { doc =>
+      val werrors = decoder.children(doc, "writeErrors").map(readWriteError(_))
+
+      val wcError = decoder.child(doc, "writeConcernError").
+        map(readWriteConcernError(_))
+
+      DefaultWriteResult(
+        ok = decoder.booleanLike(doc, "ok").getOrElse(true),
+        n = decoder.int(doc, "n").getOrElse(0),
+        writeErrors = werrors,
+        writeConcernError = wcError,
+        code = decoder.int(doc, "code"),
+        errmsg = decoder.string(doc, "errmsg"))
+
+    }
+  }
 }

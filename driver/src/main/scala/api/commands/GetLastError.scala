@@ -1,5 +1,7 @@
 package reactivemongo.api.commands
 
+import reactivemongo.api.SerializationPack
+
 /**
  * @param wtimeout the [[http://docs.mongodb.org/manual/reference/write-concern/#wtimeout time limit]]
  */
@@ -10,6 +12,7 @@ case class GetLastError(
   wtimeout: Option[Int] = None) extends Command
   with CommandWithResult[LastError]
 
+// TODO: Rename as WriteConcern
 object GetLastError {
   sealed trait W
   case object Majority extends W
@@ -50,4 +53,35 @@ object GetLastError {
   def TagReplicaAcknowledged(tag: String, timeout: Int, journaled: Boolean): GetLastError = GetLastError(TagSet(tag), journaled, false, (if (timeout <= 0) None else Some(timeout)))
 
   def Default: GetLastError = Acknowledged
+
+  private[api] def serializeWith[P <: SerializationPack](
+    pack: P, writeConcern: WriteConcern)(
+    builder: SerializationPack.Builder[pack.type]): pack.Document = {
+    import builder.{ elementProducer => element, int, string }
+
+    val elements = Seq.newBuilder[pack.ElementProducer]
+
+    writeConcern.w match {
+      case GetLastError.Majority =>
+        elements += element("w", string("majority"))
+
+      case GetLastError.TagSet(tagSet) =>
+        elements += element("w", string(tagSet))
+
+      case GetLastError.WaitForAcknowledgments(n) =>
+        elements += element("w", int(n))
+
+      case GetLastError.WaitForAknowledgments(n) =>
+        elements += element("w", int(n))
+
+    }
+
+    element("j", builder.boolean(true))
+
+    writeConcern.wtimeout.foreach { t =>
+      elements += element("wtimeout", int(t))
+    }
+
+    builder.document(elements.result())
+  }
 }

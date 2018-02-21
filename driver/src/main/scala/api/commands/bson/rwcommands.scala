@@ -78,6 +78,7 @@ object BSONCommonWriteCommandsImplicits {
         errmsg = doc.getAs[String]("errmsg").get)
   }
 
+  @deprecated("Use internal CommandCodecs", "0.13.1")
   implicit object DefaultWriteResultReader
     extends DealingWithGenericCommandErrorsReader[DefaultWriteResult] {
     def readResult(doc: BSONDocument): DefaultWriteResult = {
@@ -158,6 +159,7 @@ object BSONDeleteCommandImplicits {
   import BSONDeleteCommand._
   import BSONCommonWriteCommandsImplicits._
 
+  @deprecated("Use internal writer", "0.13.1")
   implicit object DeleteElementWriter extends BSONDocumentWriter[DeleteElement] {
     def write(element: DeleteElement): BSONDocument = {
       BSONDocument(
@@ -166,6 +168,7 @@ object BSONDeleteCommandImplicits {
     }
   }
 
+  @deprecated("Use internal writer", "0.13.1")
   implicit object DeleteWriter extends BSONDocumentWriter[ResolvedCollectionCommand[Delete]] {
     def write(delete: ResolvedCollectionCommand[Delete]): BSONDocument = {
       BSONDocument(

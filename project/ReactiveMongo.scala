@@ -485,6 +485,8 @@ object Version {
           exclude[DirectAbstractMethodProblem](
             "reactivemongo.api.collections.GenericQueryBuilder.readPreference"),
           // --
+          exclude[IncompatibleTemplateDefProblem](
+            "reactivemongo.api.commands.DeleteCommand$DeleteElement"),
           mcp("reactivemongo.api.MongoConnection$MonitorActor$"),
           imt("reactivemongo.api.MongoConnection.sendExpectingResponse"), // priv
           mcp("reactivemongo.api.ReadPreference$BSONDocumentWrapper$"), // priv

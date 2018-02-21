@@ -38,10 +38,16 @@ object Collation {
 
   // ---
 
-  private[api] def serialize[P <: SerializationPack](
+  @inline private[api] def serialize[P <: SerializationPack](
     pack: P,
-    collation: Collation): pack.Document = {
-    val builder = pack.newBuilder
+    collation: Collation): pack.Document =
+    serializeWith(pack, collation)(pack.newBuilder)
+
+  private[api] def serializeWith[P <: SerializationPack](
+    pack: P,
+    collation: Collation)(
+    builder: SerializationPack.Builder[pack.type]): pack.Document = {
+
     import builder.{ elementProducer => element, int, string, boolean }
 
     val elements = Seq.newBuilder[pack.ElementProducer]
