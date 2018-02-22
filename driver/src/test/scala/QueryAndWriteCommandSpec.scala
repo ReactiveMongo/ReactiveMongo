@@ -14,6 +14,7 @@ import BSONCountCommand._
 import BSONCountCommandImplicits._
 import BSONIsMasterCommand._
 import BSONIsMasterCommandImplicits._
+import scala.concurrent.duration._
 
 import org.specs2.concurrent.ExecutionEnv
 
@@ -83,9 +84,11 @@ class QueryAndWriteCommandSpec(
             aka("index") must beEqualTo({}).await(1, timeout) and {
               c.bulkInsert(docs, false).map(_ => {}) must beEqualTo({}).
                 await(1, timeout * (n / 2L)) and {
-                  c.count(Some(BSONDocument("bulk" -> true))).
-                    aka("count") must beEqualTo(e).await(1, timeout)
-                  // all docs minus errors
+                  eventually(retries = 5, sleep = 10.seconds) {
+                    c.count(Some(BSONDocument("bulk" -> true))).
+                      aka("count") must beEqualTo(e).await(1, timeout)
+                    // all docs minus errors
+                  }
                 }
             }
         }

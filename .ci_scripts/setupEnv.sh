@@ -40,7 +40,7 @@ echo "  maxIncomingConnections: $MAX_CON" >> "$MONGO_CONF"
 
 SSL_PASS=""
 
-if [ "$MONGO_PROFILE" = "invalid-ssl" -o "$MONGO_PROFILE" = "mutual-ssl" ]; then
+if [ "$MONGO_PROFILE" = "invalid-ssl" -o "$MONGO_PROFILE" = "mutual-ssl" -o "$MONGO_PROFILE" = "x509" ]; then
     if [ `which uuidgen | wc -l` -eq 1 ]; then
       SSL_PASS=`uuidgen`
     else
@@ -60,7 +60,9 @@ EOF
         cat >> "$MONGO_CONF" << EOF
     allowInvalidCertificates: true
 EOF
-    else
+    fi
+
+    if [ "$MONGO_PROFILE" = "mutual-ssl" -o "$MONGO_PROFILE" = "x509" ]; then
         # mutual-ssl
         cat >> "$MONGO_CONF" << EOF
     CAFile: $SCRIPT_DIR/client.pem
@@ -70,7 +72,14 @@ EOF
             -srckeystore "$SCRIPT_DIR/keystore.p12" \
             -destkeystore /tmp/keystore.jks \
             -storepass $SSL_PASS -srcstorepass $SSL_PASS
+    fi
 
+    if [ "$MONGO_PROFILE" = "x509" ]; then
+        "${SCRIPT_DIR}/addX509User.sh" "$MONGO_DATA" "$SCRIPT_DIR" "$ENV_FILE" "$PRIMARY_HOST"
+        cat >> "$MONGO_CONF" << EOF
+security:
+  clusterAuthMode: x509
+EOF
     fi
 fi
 

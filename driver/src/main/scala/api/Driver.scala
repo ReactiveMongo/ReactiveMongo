@@ -19,7 +19,8 @@ import reactivemongo.core.actors.{
   Closed,
   LegacyDBSystem,
   MongoDBSystem,
-  StandardDBSystem
+  StandardDBSystem,
+  StandardDBSystemWithX509
 }
 import reactivemongo.core.errors.ReactiveMongoException
 import reactivemongo.core.nodeset.Authenticate
@@ -151,6 +152,9 @@ private[api] trait Driver {
     // TODO: Passing ref to MongoDBSystem.history to AddConnection
     lazy val dbsystem: MongoDBSystem = options.authMode match {
       case CrAuthentication => new LegacyDBSystem(
+        supervisorName, nm, nodes, authentications, options)
+
+      case X509Authentication => new StandardDBSystemWithX509(
         supervisorName, nm, nodes, authentications, options)
 
       case _ => new StandardDBSystem(
