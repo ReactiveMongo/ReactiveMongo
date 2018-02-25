@@ -232,7 +232,7 @@ class ReplSetMaintenanceSpec(implicit ee: ExecutionEnv) extends Specification {
   }
 }
 
-class PingSpecification(implicit ee: ExecutionEnv) extends Specification {
+class PingSpec(implicit ee: ExecutionEnv) extends Specification {
   "Ping Command" title
 
   "respond 1.0" >> {

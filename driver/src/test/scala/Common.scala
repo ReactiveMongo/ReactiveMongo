@@ -97,14 +97,14 @@ object Common {
     failoverStrategy = slowFailover,
     monitorRefreshMS = (slowTimeout.toMillis / 2).toInt)
 
-  val slowProxy: NettyProxy = {
+  lazy val slowProxy: NettyProxy = {
     import java.net.InetSocketAddress
+    import ExecutionContext.Implicits.global
 
     val delay = Option(System getProperty "test.slowProxyDelay").
       fold(500L /* ms */ )(_.toLong)
 
     import NettyProxy.InetAddress
-    import ExecutionContext.Implicits.global
 
     def localAddr: InetSocketAddress = InetAddress.unapply(slowPrimary).get
     def remoteAddr: InetSocketAddress = InetAddress.unapply(primaryHost).get
@@ -122,8 +122,12 @@ object Common {
     val _db = con.database(
       commonDb, failoverStrategy).flatMap { d => d.drop.map(_ => d) }
 
-    Await.result(_db, timeout) -> Await.result(
-      slowCon.database(commonDb, slowFailover), slowTimeout)
+    if (slowProxy.isStarted) {
+      Await.result(_db, timeout) -> Await.result(
+        slowCon.database(commonDb, slowFailover), slowTimeout)
+    } else {
+      sys.error("Slow proxy is not up")
+    }
   }
 
   lazy val (db, slowDb) = databases(connection, slowConnection)

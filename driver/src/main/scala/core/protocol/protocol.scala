@@ -134,7 +134,7 @@ object ReplyDocumentIterator {
         Iterator.empty
       } else {
         try {
-          buf.skipBytes(buf.getInt(buf.readerIndex))
+          buf.skipBytes(buf.getIntLE(buf.readerIndex))
 
           def docs = apply[P, A](pack)(response.reply, buf)
 
@@ -270,6 +270,14 @@ private[reactivemongo] class ResponseFrameDecoder
 private[reactivemongo] class ResponseDecoder
   extends shaded.netty.handler.codec.MessageToMessageDecoder[ByteBuf] {
 
+  import scala.util.{ Failure, Success, Try }
+  import reactivemongo.core.errors.DatabaseException
+  import reactivemongo.bson.{
+    BSONBooleanLike,
+    BSONDocument,
+    BSONNumberLike
+  }
+
   override def decode(
     context: ChannelHandlerContext,
     frame: ByteBuf, // see ResponseFrameDecoder
@@ -340,6 +348,7 @@ private[reactivemongo] class ResponseDecoder
 
     val reply = Reply(frame)
     val chanId = Option(context).map(_.channel.id).orNull
+    def info = ResponseInfo(chanId)
 
     //val docs = frame.copy() // 'detach' as frame is reused by networking
     val docs: ByteBuf = {
@@ -356,12 +365,85 @@ private[reactivemongo] class ResponseDecoder
       }
     }
 
-    //println(s"_here: ${frame.refCnt}")
+    //println(s"_here: ${frame.refCnt} / ${docs.readableBytes}")
 
-    out.add(Response(header, reply, docs, ResponseInfo(chanId)))
+    def response = if (reply.cursorID == 0 && reply.numberReturned > 0) {
+      first(docs) match {
+        case Failure(cause) =>
+          cause.printStackTrace()
+          Response.CommandError(header, reply, info, DatabaseException(cause))
 
-    frame.release() // X
+        case Success(doc) => {
+          //println(s"doc = ${BSONDocument pretty doc}")
+
+          val ok = doc.getAs[BSONBooleanLike]("ok")
+          def failed = {
+            val r = {
+              if (reply.inError) reply
+              else reply.copy(flags = reply.flags | 0x02)
+            }
+
+            Response.CommandError(header, r, info, DatabaseException(doc))
+          }
+
+          //println(s"ok = $ok")
+
+          doc.getAs[BSONDocument]("cursor") match {
+            case Some(cursor) if ok.exists(_.toBoolean) => {
+              //println(s"cursor = ${BSONDocument pretty cursor}")
+
+              val ry = for {
+                id <- cursor.getAs[BSONNumberLike]("id").map(_.toLong)
+                ns <- cursor.getAs[String]("ns")
+                batch <- cursor.getAs[Seq[BSONDocument]]("firstBatch").orElse(
+                  cursor.getAs[Seq[BSONDocument]]("nextBatch"))
+
+              } yield (ns, batch, reply.copy(
+                cursorID = id,
+                numberReturned = batch.size))
+
+              docs.resetReaderIndex()
+
+              ry.fold(Response(header, reply, docs, info)) {
+                case (ns, batch, r) => Response.WithCursor(
+                  header, r, docs, info, ns, batch)
+              }
+            }
+
+            case Some(_) => failed
+
+            case _ => {
+              docs.resetReaderIndex()
+
+              if (ok.forall(_.toBoolean)) {
+                Response(header, reply, docs, info)
+              } else { // !ok
+                failed
+              }
+            }
+          }
+        }
+      }
+    } else {
+      Response(header, reply, docs, info)
+    }
+
+    try {
+      out.add(response)
+    } finally {
+      frame.release() // X
+
+      ()
+    }
 
     ()
   }
+
+  @inline private def first(buf: ByteBuf) =
+    Try[reactivemongo.bson.BSONDocument] {
+      val docBuf = ChannelBufferReadableBuffer(
+        buf readBytes buf.getIntLE(buf.readerIndex))
+
+      reactivemongo.api.BSONSerializationPack.readFromBuffer(docBuf)
+    }
 }

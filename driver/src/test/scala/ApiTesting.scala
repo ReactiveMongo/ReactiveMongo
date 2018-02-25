@@ -179,6 +179,7 @@ package object tests extends QueryCodecs[BSONSerializationPack.type] {
           f(buf -> out.get(0).asInstanceOf[Response])
         } finally {
           buf.release()
+          ()
         }
       }
     }

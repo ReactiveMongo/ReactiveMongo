@@ -116,10 +116,10 @@ class MongoConnection(
    * @param failoverStrategy $failoverStrategy
    */
   def database(name: String, failoverStrategy: FailoverStrategy = options.failoverStrategy)(implicit context: ExecutionContext): Future[DefaultDB] =
-    waitIsAvailable(failoverStrategy, databaseSTE()).
+    waitIsAvailable(failoverStrategy, stackTrace()).
       map(_ => apply(name, failoverStrategy))
 
-  @inline private def databaseSTE() =
+  @inline private def stackTrace() =
     Thread.currentThread.getStackTrace.tail.tail.take(2).reverse
 
   /** Returns a future that will be successful when node set is available. */
@@ -186,14 +186,23 @@ class MongoConnection(
     expectingResponse.future
   }
 
+  @deprecated("Use `authenticate` with `failoverStrategy`", "0.14.0")
+  def authenticate(db: String, user: String, password: String): Future[SuccessfulAuthentication] = authenticate(db, user, password, options.failoverStrategy)(actorSystem.dispatcher)
+
   /**
    * Authenticates the connection on the given database.
    *
    * @param db $dbName
    * @param user the user name
    * @param password the user password
+   * @param failoverStrategy $failoverStrategy
    */
-  def authenticate(db: String, user: String, password: String): Future[SuccessfulAuthentication] = whenActive {
+  def authenticate(
+    db: String,
+    user: String,
+    password: String,
+    failoverStrategy: FailoverStrategy = options.failoverStrategy)(implicit ec: ExecutionContext): Future[SuccessfulAuthentication] = waitIsAvailable(
+    failoverStrategy, stackTrace()).flatMap { _ =>
     val req = AuthRequest(Authenticate(db, user, password))
     mongosystem ! req
     req.future

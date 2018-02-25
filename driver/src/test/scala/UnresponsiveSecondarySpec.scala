@@ -1,5 +1,5 @@
 import scala.collection.immutable.Set
-import scala.concurrent.Future
+import scala.concurrent.{ Await, Future }
 
 import akka.actor.ActorRef
 import akka.testkit.TestActorRef
@@ -24,7 +24,6 @@ import shaded.netty.channel.{ Channel, DefaultChannelId }
 
 trait UnresponsiveSecondarySpec { parent: NodeSetSpec =>
   import reactivemongo.api.tests._
-  import NettyEmbedder.withChannel1
 
   private val usd = Common.newDriver()
   @inline private def usSys = usd.system
@@ -40,6 +39,8 @@ trait UnresponsiveSecondarySpec { parent: NodeSetSpec =>
           }.toSet
 
         withConMon1(ref.underlyingActor.name) { conMon =>
+          val channels = List.newBuilder[Channel]
+
           (for {
             state1 <- {
               updateNodeSet(ref.underlyingActor, "SetupTestChannel") {
@@ -51,12 +52,16 @@ trait UnresponsiveSecondarySpec { parent: NodeSetSpec =>
                     else node2Handler _
                   }
 
-                  withChannel1(cid, nettyHandler(ref)(hfun)) { chan =>
-                    n.copy(
-                      authenticated = Set(
-                        Authenticated(Common.commonDb, "test")),
-                      connections = Vector(connectedCon(chan)))
-                  }
+                  val chan = Await.result(
+                    NettyEmbedder.simpleChannel(cid, nettyHandler(ref)(hfun)),
+                    Common.timeout)
+
+                  channels += chan
+
+                  n.copy(
+                    authenticated = Set(
+                      Authenticated(Common.commonDb, "test")),
+                    connections = Vector(connectedCon(chan)))
                 }
               }
 
@@ -120,10 +125,14 @@ trait UnresponsiveSecondarySpec { parent: NodeSetSpec =>
                   n.copy(authenticated = Set.empty, connections = Vector.empty)
                 }
               }
+
+              channels.result().foreach {
+                _.close()
+              }
           }
         }
       }.andThen { case _ => usd.close() }.await(1, timeout)
-    }
+    } tag "wip"
 
   // ---
 

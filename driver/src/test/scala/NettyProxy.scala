@@ -149,6 +149,8 @@ final class NettyProxy(
 
   private val started = new java.util.concurrent.atomic.AtomicBoolean(false)
 
+  @inline def isStarted: Boolean = started.get
+
   private lazy val serverGroup =
     new shaded.netty.channel.nio.NioEventLoopGroup()
 
@@ -169,7 +171,9 @@ final class NettyProxy(
               group(clientGroup).
               channel(classOf[NioSocketChannel]).
               option(ChannelOption.AUTO_READ, java.lang.Boolean.TRUE).
-              option(ChannelOption.CONNECT_TIMEOUT_MILLIS, new Integer(1000))
+              option(
+                ChannelOption.CONNECT_TIMEOUT_MILLIS,
+                Integer.valueOf(1000))
 
             ch.pipeline.addLast(new ClientChannelHandler(
               clientBootstrap, remoteAddress)); ()
@@ -180,6 +184,8 @@ final class NettyProxy(
 
       Future.sequence(localAddresses.map { local =>
         val bound = Promise[Channel]()
+
+        log.debug(s"Binding server socket on $local")
 
         serverBootstrap.bind(local).addListener(new ChannelFutureListener {
           def operationComplete(ch: ChannelFuture) {
@@ -201,6 +207,8 @@ final class NettyProxy(
       }).map { _ =>
         log.info(s"Remote address: $remoteAddress")
       }
+
+      Future({})
     }
   }
 

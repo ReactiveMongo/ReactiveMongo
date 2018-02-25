@@ -25,6 +25,8 @@ class ResponseInfo(val _channelId: ChannelId)
     case _: ResponseInfo => true
     case _               => false
   }
+
+  override def toString = s"ResponseInfo(${_channelId})"
 }
 
 object ResponseInfo

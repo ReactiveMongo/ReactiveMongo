@@ -1,11 +1,11 @@
-import scala.concurrent.Future
+import scala.concurrent.{ Await, Future, Promise }
 import scala.concurrent.ExecutionContext.Implicits.global
 
 import shaded.netty.channel.{
   Channel,
   ChannelId,
   ChannelFuture,
-  ChannelHandler,
+  ChannelFutureListener,
   ChannelPromise,
   ChannelHandlerContext
 }
@@ -92,13 +92,24 @@ object NettyEmbedder extends LowPriorityNettyEmbedder {
         beforeWrite(ctx.channel, msg)
 
         ctx.write(msg, promise)
+
+        ()
       }
     }
 
     val chan = new EmChannel(chanId, connected)
 
     chan.pipeline.addLast(WithChannelHandler)
-    chan.connect(new java.net.InetSocketAddress(27017))
+
+    val ready = Promise[Unit]()
+
+    chan.connect(new java.net.InetSocketAddress(27017)).
+      addListener(new ChannelFutureListener {
+        def operationComplete(op: ChannelFuture) = {
+          if (op.isSuccess) ready.success({})
+          else ready.failure(op.cause)
+        }
+      })
 
     @annotation.tailrec
     def release(): Unit = Option(chan.readOutbound[shaded.netty.buffer.ByteBuf]) match {
@@ -112,10 +123,15 @@ object NettyEmbedder extends LowPriorityNettyEmbedder {
 
     def close(): Unit = {
       if (chan.finish) release()
-      else chan.close()
+      else {
+        chan.close()
+        ()
+      }
     }
 
     try {
+      Await.result(ready.future, Common.timeout)
+
       val res = f(chan)
 
       implicitly[OnComplete[T]].onComplete(res, { () =>
@@ -130,9 +146,55 @@ object NettyEmbedder extends LowPriorityNettyEmbedder {
     }
   }
 
-  def withChannel1[T](chanId: ChannelId, handler: (Channel, Object) => Unit)(f: EmbeddedChannel => T): T = withChannel(chanId, false, handler)(f)
-
   def withChannel2[T](chanId: ChannelId, connected: Boolean)(f: EmbeddedChannel => T): T = withChannel(chanId, connected, (_, _) => {})(f)
+
+  def simpleChannel(chanId: ChannelId, connected: Boolean): Future[EmbeddedChannel] = {
+    val chan = new EmChannel(chanId, connected)
+    val ready = Promise[EmbeddedChannel]()
+
+    chan.connect(new java.net.InetSocketAddress(27017)).
+      addListener(new ChannelFutureListener {
+        def operationComplete(op: ChannelFuture) = {
+          if (op.isSuccess) ready.success(chan)
+          else ready.failure(op.cause)
+        }
+      })
+
+    ready.future
+  }
+
+  def simpleChannel(chanId: ChannelId, handler: (Channel, Object) => Unit): Future[EmbeddedChannel] = {
+    object WithChannelHandler
+      extends shaded.netty.channel.ChannelOutboundHandlerAdapter {
+
+      override def write(
+        ctx: ChannelHandlerContext,
+        msg: Object,
+        promise: ChannelPromise): Unit = {
+        handler(ctx.channel, msg)
+
+        ctx.write(msg, promise)
+
+        ()
+      }
+    }
+
+    val chan = new EmChannel(chanId, false)
+
+    chan.pipeline.addLast(WithChannelHandler)
+
+    val ready = Promise[EmbeddedChannel]()
+
+    chan.connect(new java.net.InetSocketAddress(27017)).
+      addListener(new ChannelFutureListener {
+        def operationComplete(op: ChannelFuture) = {
+          if (op.isSuccess) ready.success(chan)
+          else ready.failure(op.cause)
+        }
+      })
+
+    ready.future
+  }
 }
 
 sealed trait LowPriorityNettyEmbedder { _: NettyEmbedder.type =>

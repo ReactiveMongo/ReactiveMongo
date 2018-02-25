@@ -45,7 +45,7 @@ trait Cursor1Spec { spec: CursorSpec =>
       req(cursor(nDocs + 1), nDocs + 1) must beLike[Response] {
         case Response(_, Reply(_, id, from, ret), _, _) =>
           id aka "cursor ID #1" must_== 0 and {
-            from must_== 0 and (ret must_== nDocs)
+            from must_== 0 and (ret aka "returned" must_== nDocs)
           }
       }.await(1, timeout) and {
         req(cursor(nDocs), 1) must beLike[Response] {
@@ -128,7 +128,7 @@ trait Cursor1Spec { spec: CursorSpec =>
         headOptionSpec(coll, timeout)
       }
 
-      "with the default connection" >> {
+      "with the slow connection" >> {
         headOptionSpec(slowColl, slowTimeout)
       }
     }

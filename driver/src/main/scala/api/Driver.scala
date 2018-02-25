@@ -6,7 +6,7 @@ import scala.util.{ Failure, Success }
 
 import scala.collection.mutable
 import scala.concurrent.{ ExecutionContext, Future }
-import scala.concurrent.duration.{ FiniteDuration, SECONDS }
+import scala.concurrent.duration.{ FiniteDuration, MILLISECONDS }
 
 import com.typesafe.config.Config
 
@@ -159,8 +159,14 @@ private[api] trait Driver {
 
     val mongosystem = system.actorOf(Props(dbsystem), nm)
 
+    def timeout = if (options.connectTimeoutMS > 0) {
+      Timeout(options.connectTimeoutMS.toLong, MILLISECONDS)
+    } else {
+      Timeout(10000L, MILLISECONDS) // 10s
+    }
+
     def connection = (supervisorActor ? AddConnection(
-      nm, nodes, options, mongosystem))(Timeout(10, SECONDS))
+      nm, nodes, options, mongosystem))(timeout)
 
     logger.info(s"[$supervisorName] Creating connection: $nm")
 
@@ -246,14 +252,12 @@ private[api] trait Driver {
           }
 
         case Close(src) if isEmpty => {
-          //logger.debug
-          println(s"[$supervisorName] Close the supervisor for $src")
+          logger.debug(s"[$supervisorName] Close the supervisor for $src")
           sender ! Closed
         }
 
         case Close(src) => {
-          //logger.warn
-          println(s"[$supervisorName] Close request received from $src, but already closing.")
+          logger.warn(s"[$supervisorName] Close request received from $src, but already closing.")
           waitingForClose += sender
           ()
         }

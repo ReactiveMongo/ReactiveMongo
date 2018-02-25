@@ -194,7 +194,6 @@ class NodeSetSpec(implicit val ee: ExecutionEnv)
     val poolName = s"withConAndSys-con-${System identityHashCode f}"
 
     @inline implicit def sys = drv.system
-    @inline implicit def tmout = timeout
 
     val auths = Seq(Authenticate(Common.commonDb, "test", "password"))
     lazy val mongosystem = TestActorRef[StandardDBSystem](

@@ -509,7 +509,9 @@ trait MongoDBSystem extends Actor {
         case Success(ns) => {
           val connectedCon = ns.nodes.foldLeft(0) { _ + _.connected.size }
 
-          if (connectedCon == 0) stopWhenDisconnected("Processing", Close)
+          if (connectedCon == 0) {
+            stopWhenDisconnected("Processing", Close)
+          }
 
           listener.foreach(_.poolShutdown(supervisor, name))
         }
@@ -581,9 +583,9 @@ trait MongoDBSystem extends Actor {
           { chanId =>
             trace(s"Request $reqId successful on channel #${chanId}")
           }))
-      })
 
-      ()
+        ()
+      })
     }
 
     case ConnectAll => { // monitor
@@ -1244,7 +1246,7 @@ trait MongoDBSystem extends Actor {
     @annotation.tailrec
     def updateNode(n: Node, before: Vector[Connection], updated: Vector[Connection]): Node = before.headOption match {
       case Some(c) => {
-        //println(s"${n.name} -> c.status = ${c.status} ? ${c.channel.isActive}")
+        //println(s"${n.name} -> ${c.channel} = ${c.status} ? ${c.channel.isActive}")
 
         if (c.status == ConnectionStatus.Connecting ||
           c.status == ConnectionStatus.Connected) {
@@ -1296,6 +1298,8 @@ trait MongoDBSystem extends Actor {
             }
           }
 
+          //println(s"upCon: ${c.status} => $upStatus")
+
           val upCon = c.copy(status = upStatus)
           val upNode = {
             if (c.status == upStatus) n
@@ -1318,8 +1322,6 @@ trait MongoDBSystem extends Actor {
     //println(s"_connect_all: ${nodeSet.nodes}")
 
     nodeSet.copy(nodes = nodeSet.nodes.map { node =>
-      //println(s"_connect_node = $node")
-
       updateNode(node, node.connections, Vector.empty)
     })
   }

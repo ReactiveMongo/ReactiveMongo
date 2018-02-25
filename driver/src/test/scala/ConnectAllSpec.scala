@@ -24,7 +24,7 @@ trait ConnectAllSpec { _: NodeSetSpec =>
       { ns =>
         connectAll(sys, ns)
       }
-    } tag "wip"
+    }
 
     builder("connect all the nodes with synchronization") { sys =>
       { ns =>
@@ -47,7 +47,7 @@ trait ConnectAllSpec { _: NodeSetSpec =>
       true, ConnectionStatus.Connected)
 
     val node2 = Tuple4(ChanId2, s"$testhost:27018",
-      false, ConnectionStatus.Disconnected)
+      true, ConnectionStatus.Disconnected)
 
     val node3 = Tuple4(ChanId3, s"$testhost:27019",
       false, ConnectionStatus.Connecting)
@@ -64,8 +64,8 @@ trait ConnectAllSpec { _: NodeSetSpec =>
         chanId: ChannelId,
         host: String,
         chanConnected: Boolean,
-        status: ConnectionStatus): Node =
-        NettyEmbedder.withChannel2(chanId, chanConnected) { chan =>
+        status: ConnectionStatus): Future[Node] = {
+        NettyEmbedder.simpleChannel(chanId, chanConnected).map { chan =>
           val con = Connection(
             chan, status,
             authenticated = Set.empty,
@@ -79,29 +79,38 @@ trait ConnectAllSpec { _: NodeSetSpec =>
             None,
             ProtocolMetadata.Default)
         }
-
-      val nsNodes = connectAllNodes.map {
-        case (chanId, name, connected, status) =>
-          node(chanId, name, connected, status)
       }
 
-      val ns = NodeSet(Some("foo"), None, nsNodes, Set.empty)
+      lazy val nsNodes = Future.sequence(connectAllNodes.map {
+        case (chanId, name, connected, status) =>
+          node(chanId, name, connected, status)
+      })
 
-      def concurCon = Future(conAll(ref.underlyingActor)(ns))
+      def ns = nsNodes.map { nodes =>
+        NodeSet(Some("foo"), None, nodes, Set.empty)
+      }
+
+      lazy val concurCon = ns.flatMap { nodes =>
+        Future(conAll(ref.underlyingActor)(nodes))
+      }
 
       Future.sequence((0 to 10).map(_ => concurCon)).map {
         _.flatMap(_.nodes.flatMap { node =>
           node.connections.map { node.name -> _.status }
         }).toSet
+      }.andThen {
+        case _ => nsNodes.foreach {
+          _.foreach {
+            _.connected.foreach(_.channel.close())
+          }
+        }
       }
     } must contain(exactly[(String, ConnectionStatus)](
       s"$testhost:27017" -> ConnectionStatus.Connected, // already Connected
-      // connecting `node2` (transition from Connecting to Connected)
-      s"$testhost:27018" -> ConnectionStatus.Connecting,
+      // Disconnected to Connected for :27018 as chan is active/connected
       s"$testhost:27018" -> ConnectionStatus.Connected,
       s"$testhost:27019" -> ConnectionStatus.Connecting, // already Connecting
-      // connecting `node4` (transition from Connecting to Connected)
-      s"$testhost:27020" -> ConnectionStatus.Connecting,
+      // connecting `node4` (transition from Disconnected to Connected)
       s"$testhost:27020" -> ConnectionStatus.Connected)).await(0, timeout)
   }
 }

@@ -79,8 +79,6 @@ class DriverSpec(implicit ee: ExecutionEnv)
     }
 
     "notify a monitor after the NodeSet is started" in {
-      // TODO: Move to MonitorSpec
-
       val con = driver.connection(List(primaryHost), DefaultOptions)
       val setAvailable = Promise[ProtocolMetadata]()
       val priAvailable = Promise[ProtocolMetadata]()
@@ -213,7 +211,10 @@ class DriverSpec(implicit ee: ExecutionEnv)
     val conOpts = DefaultOptions.copy(nbChannelsPerNode = 1)
     lazy val connection = drv.connect(List(primaryHost), options = conOpts)
     val slowOpts = SlowOptions.copy(nbChannelsPerNode = 1)
-    lazy val slowConnection = drv.connect(List(slowPrimary), slowOpts)
+    lazy val slowConnection = {
+      val started = Common.slowProxy.isStarted
+      drv.connect(List(slowPrimary), slowOpts).filter(_ => started)
+    }
 
     val dbName = "specs2-test-scramsha1-auth"
     def db_(implicit ee: ExecutionContext) =
@@ -246,7 +247,6 @@ class DriverSpec(implicit ee: ExecutionEnv)
         slowConnection.flatMap(_.authenticate(dbName, "foo", "bar")).
           aka("authentication") must throwA[FailedAuthentication].
           await(1, slowTimeout)
-
       }
     }
 
@@ -297,7 +297,7 @@ class DriverSpec(implicit ee: ExecutionEnv)
         val con = Await.result(
           drv.connect(
             List(slowPrimary), options = slowOpts, authentications = Seq(auth)),
-          timeout)
+          slowTimeout)
 
         con.database(dbName, slowFailover).
           aka("authed DB") must beLike[DefaultDB] { case _ => ok }.
@@ -342,10 +342,11 @@ class DriverSpec(implicit ee: ExecutionEnv)
         def con = Common.driver.connection(
           List(slowPrimary), options = slowOpts, authentications = Seq(auth))
 
-        con.database(Common.commonDb, slowFailover).
-          aka("database resolution") must throwA[PrimaryUnavailableException].
-          await(1, slowTimeout)
-
+        Common.slowProxy.isStarted must beTrue and {
+          con.database(Common.commonDb, slowFailover).
+            aka("database resolution") must throwA[PrimaryUnavailableException].
+            await(0, slowTimeout + 1.second)
+        }
       }
     }
 
@@ -366,16 +367,20 @@ class DriverSpec(implicit ee: ExecutionEnv)
         lazy val con = Common.driver.connection(List("unavailable:27017"))
         val ws = scala.collection.mutable.ListBuffer.empty[Int]
         val expected = List(2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40)
-        val fos = FailoverStrategy(FiniteDuration(50, "ms"), 20,
+        val fos1 = FailoverStrategy(FiniteDuration(50, "ms"), 20,
           { n => val w = n * 2; ws += w; w.toDouble })
-        val before = System.currentTimeMillis()
+        val fos2 = FailoverStrategy(FiniteDuration(50, "ms"), 20,
+          _ * 2 toDouble) // without accumulator
 
-        con.database("foo", fos).map(_ => List.empty[Int]).
+        val before = System.currentTimeMillis()
+        val estmout = estTimeout(fos2)
+
+        con.database("foo", fos1).map(_ => List.empty[Int]).
           recover({ case _ => ws.result() }) must beEqualTo(expected).
-          await(1, timeout * 2) and {
+          await(0, estmout * 2) and {
             val duration = System.currentTimeMillis() - before
 
-            duration must be_<(estTimeout(fos).toMillis + 500 /* ms */ )
+            duration must be_<(estmout.toMillis + 500 /* ms */ )
           }
       }
     }

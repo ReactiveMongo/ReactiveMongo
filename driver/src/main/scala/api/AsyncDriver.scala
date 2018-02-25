@@ -60,10 +60,13 @@ class AsyncDriver(
    * @param name $connectionNameParam
    */
   def connect(parsedURI: MongoConnection.ParsedURI, name: Option[String]): Future[MongoConnection] = {
-    if (!parsedURI.ignoredOptions.isEmpty)
+    if (!parsedURI.ignoredOptions.isEmpty) {
       Future.failed(new IllegalArgumentException(s"The connection URI contains unsupported options: ${parsedURI.ignoredOptions.mkString(", ")}"))
-    else
-      askConnection(parsedURI.hosts.map(h => h._1 + ':' + h._2), parsedURI.options, parsedURI.authenticate.toSeq, name)
+    } else {
+      askConnection(
+        parsedURI.hosts.map(h => h._1 + ':' + h._2),
+        parsedURI.options, parsedURI.authenticate.toSeq, name)
+    }
   }
 
   /**
