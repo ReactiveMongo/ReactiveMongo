@@ -18,7 +18,7 @@ class BsonSpec extends org.specs2.mutable.Specification {
 
   section("unit")
 
-  "BSON codec" should {
+  "Codec" should {
     "produce a simple document" in {
       val doc = BSONDocument("hello" -> BSONString("world"))
 
@@ -53,7 +53,7 @@ class BsonSpec extends org.specs2.mutable.Specification {
       compare(embeddingArray, makeBuffer(makeDocument(buffer)))
     }
 
-    "nested subdocuments and arrays" in {
+    "produce nested subdocuments and arrays" in {
       val expected = Array[Byte](72, 0, 0, 0, 3, 112, 117, 115, 104, 65, 108, 108, 0, 58, 0, 0, 0, 4, 99, 111, 110, 102, 105, 103, 0, 45, 0, 0, 0, 3, 48, 0, 37, 0, 0, 0, 2, 110, 97, 109, 101, 0, 7, 0, 0, 0, 102, 111, 111, 98, 97, 114, 0, 2, 118, 97, 108, 117, 101, 0, 4, 0, 0, 0, 98, 97, 114, 0, 0, 0, 0, 0)
 
       // {"pushAll":{"config":[{"name":"foobar","value":"bar"}]}}
@@ -93,30 +93,41 @@ class BsonSpec extends org.specs2.mutable.Specification {
       str mustEqual "1,2,4"
     }
 
-    val docLike = BSONDocument(
-      "likeFalseInt" -> BSONInteger(0),
-      "likeFalseLong" -> BSONLong(0),
-      "likeFalseDouble" -> BSONDouble(0.0),
-      "likeFalseUndefined" -> BSONUndefined,
-      "likeFalseNull" -> BSONNull,
-      "likeTrueInt" -> BSONInteger(1),
-      "likeTrueLong" -> BSONLong(2),
-      "likeTrueDouble" -> BSONDouble(-0.1),
-      "anInt" -> BSONInteger(200),
-      "aLong" -> BSONLong(12345678912L),
-      "aDouble" -> BSONDouble(9876543210.98))
-    "abstract booleans and numbers" in {
-      docLike.getAs[BSONBooleanLike]("likeFalseInt").get.toBoolean mustEqual false
-      docLike.getAs[BSONBooleanLike]("likeFalseLong").get.toBoolean mustEqual false
-      docLike.getAs[BSONBooleanLike]("likeFalseDouble").get.toBoolean mustEqual false
-      docLike.getAs[BSONBooleanLike]("likeFalseUndefined").get.toBoolean mustEqual false
-      docLike.getAs[BSONBooleanLike]("likeFalseNull").get.toBoolean mustEqual false
-      docLike.getAs[BSONBooleanLike]("likeTrueInt").get.toBoolean mustEqual true
-      docLike.getAs[BSONBooleanLike]("likeTrueLong").get.toBoolean mustEqual true
-      docLike.getAs[BSONBooleanLike]("likeTrueDouble").get.toBoolean mustEqual true
-      docLike.getAs[BSONNumberLike]("anInt").get.toDouble mustEqual 200
-      docLike.getAs[BSONNumberLike]("aLong").get.toDouble mustEqual 12345678912L
-      docLike.getAs[BSONNumberLike]("aDouble").get.toDouble mustEqual 9876543210.98
+    "extract booleans and numbers" in {
+      val docLike = BSONDocument(
+        "likeFalseInt" -> BSONInteger(0),
+        "likeFalseLong" -> BSONLong(0),
+        "likeFalseDouble" -> BSONDouble(0.0),
+        "likeFalseUndefined" -> BSONUndefined,
+        "likeFalseNull" -> BSONNull,
+        "likeTrueInt" -> BSONInteger(1),
+        "likeTrueLong" -> BSONLong(2),
+        "likeTrueDouble" -> BSONDouble(-0.1),
+        "anInt" -> BSONInteger(200),
+        "aLong" -> BSONLong(12345678912L),
+        "aDouble" -> BSONDouble(9876543210.98))
+
+      docLike.getAs[BSONBooleanLike]("likeFalseInt").map(_.toBoolean) must beSome(false) and {
+        docLike.getAs[BSONBooleanLike]("likeFalseLong").map(_.toBoolean) must beSome(false)
+      } and {
+        docLike.getAs[BSONBooleanLike]("likeFalseDouble").map(_.toBoolean) must beSome(false)
+      } and {
+        docLike.getAs[BSONBooleanLike]("likeFalseUndefined").map(_.toBoolean) must beSome(false)
+      } and {
+        docLike.getAs[BSONBooleanLike]("likeFalseNull").map(_.toBoolean) must beSome(false)
+      } and {
+        docLike.getAs[BSONBooleanLike]("likeTrueInt").map(_.toBoolean) must beSome(true)
+      } and {
+        docLike.getAs[BSONBooleanLike]("likeTrueLong").map(_.toBoolean) must beSome(true)
+      } and {
+        docLike.getAs[BSONBooleanLike]("likeTrueDouble").map(_.toBoolean) must beSome(true)
+      } and {
+        docLike.getAs[BSONNumberLike]("anInt").map(_.toDouble) must beSome(200)
+      } and {
+        docLike.getAs[BSONNumberLike]("aLong").map(_.toDouble) must beSome(12345678912L)
+      } and {
+        docLike.getAs[BSONNumberLike]("aDouble").map(_.toDouble) must beSome(9876543210.98)
+      }
     }
   }
 

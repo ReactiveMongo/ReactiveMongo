@@ -28,7 +28,7 @@ class CursorSpec(implicit val ee: ExecutionEnv)
         cursorDrv.connection(List(slowPrimary), SlowOptions)
 
       lazy val (cursorDb, slowCursorDb) =
-        Common.databases(cursorCon, slowCursorCon)
+        Common.databases(Common.commonDb, cursorCon, slowCursorCon)
 
       @inline def defaultColl = cursorDb(collName)
       @inline def slowDefaultColl = slowCursorDb(collName)
@@ -265,7 +265,8 @@ class CursorSpec(implicit val ee: ExecutionEnv)
       }
 
       "Driver instance must be closed" in {
-        cursorDrv.close(timeout) must not(throwA[Exception])
+        cursorDrv.close(timeout) must not(throwA[Exception]).
+          eventually(1, timeout)
       }
     }
 
@@ -278,7 +279,7 @@ class CursorSpec(implicit val ee: ExecutionEnv)
         cursorDrv.connection(List(slowPrimary), SlowOptions)
 
       lazy val (cursorDb, slowCursorDb) =
-        Common.databases(cursorCon, slowCursorCon)
+        Common.databases(Common.commonDb, cursorCon, slowCursorCon)
 
       @inline def defaultColl = slowCursorDb(collName)
       @inline def slowDefaultColl = slowCursorDb(collName)

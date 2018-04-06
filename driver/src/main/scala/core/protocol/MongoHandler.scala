@@ -46,23 +46,23 @@ private[reactivemongo] class MongoHandler(
   }
 
   override def channelInactive(ctx: ChannelHandlerContext) {
-    val chan = ctx.channel
+    if (last != -1) {
+      val chan = ctx.channel
 
-    if (chan.remoteAddress != null) {
-      log(ctx, "Channel is closed")
+      if (chan.remoteAddress != null) {
+        log(ctx, s"Channel is closed: $last")
+      }
+
+      last = System.currentTimeMillis()
+
+      receiver ! ChannelDisconnected(chan.id)
     }
-
-    last = System.currentTimeMillis()
-
-    receiver ! ChannelDisconnected(chan.id)
 
     super.channelInactive(ctx)
   }
 
   override def channelRead(ctx: ChannelHandlerContext, msg: Any) {
     last = System.currentTimeMillis()
-
-    //println("_channelRead")
 
     msg match {
       case response: Response => {
@@ -97,6 +97,14 @@ private[reactivemongo] class MongoHandler(
     //super.exceptionCaught(ctx, cause) - Do not bubble as it's the last handler
   }
 
+  override def handlerAdded(ctx: ChannelHandlerContext): Unit = {
+    if (ctx.channel.isActive) {
+      channelActive(ctx)
+    }
+
+    super.handlerAdded(ctx)
+  }
+
   /*
   override def channelReadComplete(ctx: ChannelHandlerContext): Unit = {
     println("_READ_COMP")
@@ -108,24 +116,20 @@ private[reactivemongo] class MongoHandler(
     super.channelRegistered(ctx)
   }
 
-
   override def handlerRemoved(ctx: ChannelHandlerContext): Unit = {
     println(s"_REMOVED #${ctx.channel.id}")
     super.handlerRemoved(ctx)
   }
-
-  override def handlerAdded(ctx: ChannelHandlerContext): Unit = {
-    println(s"_ADDED #${ctx.channel.id} ? ${ctx.channel.isActive}")
-    super.handlerAdded(ctx)
-  }
    */
 
   @inline def log(ctx: ChannelHandlerContext, s: String) =
-    MongoHandler.logger.trace(
+    //MongoHandler.logger.trace(
+    if (supervisor startsWith "monitorspec") println(
       s"[$supervisor/$connection] $s (channel ${ctx.channel})")
 
   @inline def log(ctx: ChannelHandlerContext, s: String, cause: Throwable) =
-    MongoHandler.logger.trace(
+    //MongoHandler.logger.trace(
+    if (supervisor startsWith "monitorspec") println(
       s"[$supervisor/$connection] $s (channel ${ctx.channel})", cause)
 }
 

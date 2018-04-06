@@ -1,6 +1,9 @@
+import java.lang.{ Boolean => JBool }
+
 import java.net.InetSocketAddress
 
-import scala.util.Try
+import scala.util.{ Failure, Success, Try }
+import scala.util.control.NonFatal
 
 import scala.concurrent.{ Future, ExecutionContext, Promise }
 
@@ -16,15 +19,17 @@ import shaded.netty.channel.{
   ChannelInitializer,
   ChannelInboundHandlerAdapter
 }
+
 import shaded.netty.bootstrap.{ Bootstrap, ServerBootstrap }
 
-import shaded.netty.channel.socket.nio.NioSocketChannel
+import shaded.netty.channel.nio.NioEventLoopGroup
+import shaded.netty.channel.socket.nio.{
+  NioSocketChannel,
+  NioServerSocketChannel
+}
 
 import reactivemongo.util.LazyLogger
 
-/**
- * Simple TCP proxy using Netty.
- */
 final class NettyProxy(
   localAddresses: Seq[InetSocketAddress],
   remoteAddress: InetSocketAddress,
@@ -32,165 +37,48 @@ final class NettyProxy(
 
   import NettyProxy.log
 
-  private val beforeProxy: () => Unit = delay.fold(() => {})(d => { () =>
-    try {
-      Thread.sleep(d)
-    } catch {
-      case e: Throwable => e.printStackTrace()
-    }
-  })
+  case class State(
+    groups: Seq[NioEventLoopGroup],
+    channels: Seq[Channel])
 
-  private class RemoteChannelHandler(
-    val clientChannel: Channel)
-    extends ChannelInboundHandlerAdapter {
+  private val starting = new java.util.concurrent.atomic.AtomicBoolean(false)
+  private val state = Promise[State]()
 
-    override def channelActive(ctx: ChannelHandlerContext) {
-      log.info(s"Remote channel open ${ctx.channel}")
-    }
+  @inline def isStarted: Boolean = state.future.value.exists(_.isSuccess)
 
-    override def exceptionCaught(ctx: ChannelHandlerContext, cause: Throwable) {
-      log.warn(s"Remote channel exception caught ${ctx.channel}", cause)
-      ctx.channel.close()
-      ()
-    }
+  def start()(implicit ec: ExecutionContext): Future[State] = {
+    if (starting.getAndSet(true)) {
+      state.future
+    } else {
+      log.debug(s"Netty version ${Version.identify}")
 
-    override def channelInactive(ctx: ChannelHandlerContext) {
-      log.info(s"Remote channel closed ${ctx.channel}")
-      closeOnFlush(clientChannel)
-    }
+      // Configure the bootstrap.
+      val bossGroup = new NioEventLoopGroup(1)
+      val workerGroup = new NioEventLoopGroup()
 
-    override def channelRead(ctx: ChannelHandlerContext, msg: Object) {
-      beforeProxy()
-
-      log.debug(s"Read remote message to forward it to client (${clientChannel}): $msg")
-
-      clientChannel.writeAndFlush(msg)
-      ()
-    }
-  }
-
-  private lazy val clientGroup =
-    new shaded.netty.channel.nio.NioEventLoopGroup()
-
-  private class ClientChannelHandler(
-    clientBootstrap: Bootstrap,
-    remoteAddress: InetSocketAddress)
-    //clientSocketChannelFactory: ClientSocketChannelFactory)
-    extends ChannelInboundHandlerAdapter {
-
-    @volatile private var remoteChannel: Channel = null
-
-    override def channelActive(ctx: ChannelHandlerContext) {
-      val clientChannel = ctx.channel
-
-      beforeProxy()
-      log.info(s"Client channel open $clientChannel")
-
-      //clientChannel.setReadable(false)
-
-      //val b = clientBootstrap.handler(this)
-      val b = clientBootstrap.handler(new RemoteChannelHandler(clientChannel))
-      val connectFuture = b.connect(remoteAddress)
-
-      remoteChannel = connectFuture.channel
-
-      /*
-      remoteChannel.pipeline().addLast(
-        "handler", new RemoteChannelHandler(clientChannel))
-       */
-
-      connectFuture.addListener(new ChannelFutureListener {
-        def operationComplete(future: ChannelFuture) {
-          if (future.isSuccess) {
-            log.info(s"Remote channel connect success $remoteChannel")
-            //clientChannel.setReadable(true)
-          } else {
-            log.warn(
-              s"Remote channel connect failure $remoteChannel",
-              future.cause)
-
-            clientChannel.close()
-          }
-
-          ()
-        }
-      })
-
-      ()
-    }
-
-    override def exceptionCaught(ctx: ChannelHandlerContext, cause: Throwable) {
-      log.warn(s"Client channel exception caught ${ctx.channel}", cause)
-
-      beforeProxy()
-      ctx.channel.close()
-      ()
-    }
-
-    override def channelInactive(ctx: ChannelHandlerContext) {
-      log.info(s"Client channel closed ${ctx.channel}")
-
-      if (remoteChannel != null) {
-        beforeProxy()
-        closeOnFlush(remoteChannel)
-      }
-    }
-
-    override def channelRead(ctx: ChannelHandlerContext, msg: Object) {
-      log.debug(s"Read client message to forward it to remote (${remoteChannel}): $msg")
-
-      if (remoteChannel != null) {
-        beforeProxy()
-        remoteChannel.writeAndFlush(msg)
-      }
-      ()
-    }
-  }
-
-  private val started = new java.util.concurrent.atomic.AtomicBoolean(false)
-
-  @inline def isStarted: Boolean = started.get
-
-  private lazy val serverGroup =
-    new shaded.netty.channel.nio.NioEventLoopGroup()
-
-  def start()(implicit ec: ExecutionContext): Future[Unit] = {
-    if (started.getAndSet(true)) Future.successful({})
-    else {
       lazy val serverBootstrap = new ServerBootstrap().
-        option(ChannelOption.SO_REUSEADDR, java.lang.Boolean.TRUE).
-        channel(
-          classOf[shaded.netty.channel.socket.nio.NioServerSocketChannel]).
-        group(serverGroup).
-        childOption(ChannelOption.AUTO_READ, java.lang.Boolean.TRUE).
+        option(ChannelOption.SO_REUSEADDR, JBool.TRUE).
+        channel(classOf[NioServerSocketChannel]).
+        group(bossGroup, workerGroup).
+        childOption(ChannelOption.AUTO_READ, JBool.FALSE).
         childHandler(new ChannelInitializer[NioSocketChannel] {
-          def initChannel(ch: NioSocketChannel) {
-            log.debug(s"Initializing channel $ch")
+          def initChannel(ch: NioSocketChannel): Unit = {
+            ch.pipeline().addLast(
+              new NettyProxyFrontendHandler(remoteAddress, delay))
 
-            val clientBootstrap = new Bootstrap().
-              group(clientGroup).
-              channel(classOf[NioSocketChannel]).
-              option(ChannelOption.AUTO_READ, java.lang.Boolean.TRUE).
-              option(
-                ChannelOption.CONNECT_TIMEOUT_MILLIS,
-                Integer.valueOf(1000))
-
-            ch.pipeline.addLast(new ClientChannelHandler(
-              clientBootstrap, remoteAddress)); ()
+            ()
           }
         })
 
-      log.debug(s"Netty version ${Version.identify}")
-
-      Future.sequence(localAddresses.map { local =>
+      def bind = Future.sequence(localAddresses.map { localAddr =>
         val bound = Promise[Channel]()
 
-        log.debug(s"Binding server socket on $local")
+        log.debug(s"Binding server socket on $localAddr")
 
-        serverBootstrap.bind(local).addListener(new ChannelFutureListener {
-          def operationComplete(ch: ChannelFuture) {
+        serverBootstrap.bind(localAddr).addListener(new ChannelFutureListener {
+          def operationComplete(ch: ChannelFuture): Unit = {
             if (ch.isSuccess) {
-              log.info(s"Listening on ${ch.channel.localAddress}")
+              log.info(s"Listen on ${ch.channel.localAddress}")
 
               bound.success(ch.channel)
             } else {
@@ -204,33 +92,176 @@ final class NettyProxy(
         })
 
         bound.future
-      }).map { _ =>
-        log.info(s"Remote address: $remoteAddress")
+      }).andThen {
+        case Failure(cause) =>
+          log.warn("Fails to bind Netty proxy", cause)
+
+          try {
+            bossGroup.shutdownGracefully()
+          } catch {
+            case NonFatal(err) => log.warn("Fails to shutdown bossGroup", err)
+          }
+
+          workerGroup.shutdownGracefully()
+      }.map { channels =>
+        State(
+          groups = Seq(bossGroup, workerGroup),
+          channels = channels)
       }
 
-      Future({})
+      state.completeWith(bind).future
     }
   }
 
-  /**
-   * Close the channel after all pending writes are complete.
-   */
-  private def closeOnFlush(channel: Channel) {
-    if (channel.isActive) {
-      channel.writeAndFlush(Unpooled.EMPTY_BUFFER).
+  def stop(): Unit = state.future.value.foreach {
+    case Success(st) => {
+      st.groups.foreach { g =>
+        try {
+          g.shutdownGracefully()
+        } catch {
+          case NonFatal(err) => log.warn("Fail to shutdown group", err)
+        }
+      }
+
+      st.channels.foreach { ch =>
+        try {
+          ch.closeFuture().sync()
+        } catch {
+          case NonFatal(err) => log.warn("Fail to close channel", err)
+        }
+      }
+    }
+
+    case _ => ()
+  }
+}
+
+final class NettyProxyFrontendHandler(
+  remoteAddress: InetSocketAddress,
+  delay: Option[Long]) extends ChannelInboundHandlerAdapter {
+
+  @volatile private var outboundChannel: Channel = null
+
+  private val beforeProxy: () => Unit = delay.fold(() => {})(d => { () =>
+    try {
+      Thread.sleep(d)
+    } catch {
+      case e: Throwable => e.printStackTrace()
+    }
+  })
+
+  override def channelActive(ctx: ChannelHandlerContext): Unit = {
+    val inboundChannel: Channel = ctx.channel()
+
+    // Start the connection attempt.
+    val b = new Bootstrap()
+
+    b.group(inboundChannel.eventLoop).
+      channel(ctx.channel().getClass).
+      handler(new NettyProxyBackendHandler(this, beforeProxy, inboundChannel)).
+      option(ChannelOption.AUTO_READ, JBool.FALSE)
+
+    val f = b.connect(remoteAddress)
+
+    outboundChannel = f.channel()
+
+    f.addListener(new ChannelFutureListener() {
+      def operationComplete(future: ChannelFuture): Unit = {
+        if (future.isSuccess) {
+          // connection complete start to read first data
+          inboundChannel.read()
+        } else {
+          // Close the connection if the connection attempt has failed.
+          inboundChannel.close()
+        }
+
+        ()
+      }
+    })
+
+    ()
+  }
+
+  override def channelRead(ctx: ChannelHandlerContext, msg: Object): Unit = {
+    if (outboundChannel != null && outboundChannel.isActive()) {
+      beforeProxy()
+
+      NettyProxy.log.debug(s"Read in proxy frontend (${outboundChannel}): $msg")
+
+      outboundChannel.writeAndFlush(msg).
+        addListener(new ChannelFutureListener() {
+          def operationComplete(future: ChannelFuture) {
+            if (future.isSuccess()) {
+              // was able to flush out data, start to read the next chunk
+              ctx.channel().read()
+            } else {
+              future.channel().close()
+            }
+
+            ()
+          }
+        })
+    }
+
+    ()
+  }
+
+  override def channelInactive(ctx: ChannelHandlerContext): Unit =
+    if (outboundChannel != null) {
+      closeOnFlush(outboundChannel)
+    }
+
+  override def exceptionCaught(ctx: ChannelHandlerContext, cause: Throwable): Unit = {
+    NettyProxy.log.warn("Error in proxy frontend", cause)
+    closeOnFlush(ctx.channel())
+  }
+
+  def closeOnFlush(ch: Channel): Unit = {
+    if (ch.isActive()) {
+      ch.writeAndFlush(Unpooled.EMPTY_BUFFER).
         addListener(ChannelFutureListener.CLOSE)
-
-    } else if (channel.isRegistered) {
-      channel.close
     }
+
+    ()
+  }
+}
+
+final class NettyProxyBackendHandler(
+  frontend: NettyProxyFrontendHandler,
+  beforeProxy: () => Unit,
+  inboundChannel: Channel) extends ChannelInboundHandlerAdapter {
+
+  override def channelActive(ctx: ChannelHandlerContext): Unit = {
+    ctx.read(); ()
+  }
+
+  override def channelRead(ctx: ChannelHandlerContext, msg: Object): Unit = {
+    NettyProxy.log.debug(s"Read in backend proxy (${inboundChannel}): $msg")
+
+    beforeProxy()
+
+    inboundChannel.writeAndFlush(msg).addListener(new ChannelFutureListener() {
+      def operationComplete(future: ChannelFuture): Unit = {
+        if (future.isSuccess()) {
+          ctx.channel().read()
+        } else {
+          future.channel().close()
+        }
+
+        ()
+      }
+    })
+
     ()
   }
 
-  def stop() {
-    clientGroup.shutdownGracefully()
-    serverGroup.shutdownGracefully()
+  override def channelInactive(ctx: ChannelHandlerContext): Unit =
+    frontend.closeOnFlush(inboundChannel)
 
-    ()
+  override def exceptionCaught(
+    ctx: ChannelHandlerContext, cause: Throwable): Unit = {
+    NettyProxy.log.warn("Error in proxy backend", cause)
+    frontend.closeOnFlush(ctx.channel())
   }
 }
 
@@ -257,6 +288,8 @@ object NettyProxy {
       val proxy = new NettyProxy(Seq(local), remote, delay)
 
       Await.result(proxy.start(), 5.seconds)
+
+      ()
     }
 
     case _ => log.info(s"Invalid arguments: ${args mkString " "}")

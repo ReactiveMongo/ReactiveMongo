@@ -4,7 +4,8 @@ import reactivemongo.api.SerializationPack
 import reactivemongo.core.nodeset.NodeStatus
 
 trait IsMasterCommand[P <: SerializationPack] {
-  class IsMaster(val comment: Option[String]) extends Command with CommandWithResult[IsMasterResult] with CommandWithPack[P]
+  class IsMaster(val comment: Option[String]) extends Command
+    with CommandWithResult[IsMasterResult] with CommandWithPack[P]
 
   object IsMaster extends IsMaster(None) {
     def apply(comment: String): IsMaster = new IsMaster(Some(comment))

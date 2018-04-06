@@ -34,10 +34,12 @@ export JVM_OPTS
 TEST_ARGS=";project ReactiveMongo-BSON ;testQuick"
 
 TEST_ARGS="$TEST_ARGS ;project ReactiveMongo; testQuick"
+TEST_ARGS="$TEST_ARGS ReadPreferenceSpec"
 TEST_ARGS="$TEST_ARGS BSONObjectIDSpec"
 TEST_ARGS="$TEST_ARGS MongoURISpec"
 TEST_ARGS="$TEST_ARGS NodeSetSpec"
 TEST_ARGS="$TEST_ARGS reactivemongo.BsonSpec"
+TEST_ARGS="$TEST_ARGS reactivemongo.BulkOpsSpec"
 TEST_ARGS="$TEST_ARGS UpdateSpec"
 TEST_ARGS="$TEST_ARGS -- include unit"
 

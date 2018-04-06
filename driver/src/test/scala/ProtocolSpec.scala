@@ -52,31 +52,28 @@ class ProtocolSpec extends org.specs2.mutable.Specification {
     }
   }
 
-  "RequestOp" should {
-    val queryOp = Query(4, f"admin.$$cmd", 0, 1)
-    val buffer = Unpooled.buffer(queryOp.size, queryOp.size)
-    val opBytes = Array[Byte](4, 0, 0, 0, 97, 100, 109, 105, 110, 46, 36, 99, 109, 100, 0, 0, 0, 0, 0, 1, 0, 0, 0)
-
-    "be written to Netty buffer" in {
-      val buf = buffer
-
-      queryOp.writeTo(buf) must_== ({}) and {
-        getBytes(buf, queryOp.size) must_== opBytes
-      }
-    }
-  }
-
   "Request" should {
-    import reactivemongo.api.tests.isMasterRequest
+    "be written to Netty buffer" >> {
+      "for Query" in {
+        val queryOp = Query(4, f"admin.$$cmd", 0, 1)
+        val buffer = Unpooled.buffer(queryOp.size, queryOp.size)
+        val opBytes = Array[Byte](4, 0, 0, 0, 97, 100, 109, 105, 110, 46, 36, 99, 109, 100, 0, 0, 0, 0, 0, 1, 0, 0, 0)
 
-    "be written to Netty buffer" in {
-      val req = isMasterRequest()
-      val bytes = Array[Byte](58, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -44, 7, 0, 0, 4, 0, 0, 0, 97, 100, 109, 105, 110, 46, 36, 99, 109, 100, 0, 0, 0, 0, 0, 1, 0, 0, 0, 19, 0, 0, 0, 16, 105, 115, 109, 97, 115, 116, 101, 114, 0, 1, 0, 0, 0, 0)
+        queryOp.writeTo(buffer) must_== ({}) and {
+          getBytes(buffer, queryOp.size) must_== opBytes
+        }
+      }
 
-      val buffer = Unpooled.buffer(req.size, req.size)
+      "for isMaster" in {
+        import reactivemongo.api.tests.isMasterRequest
 
-      req.writeTo(buffer) must_== ({}) and {
-        getBytes(buffer, req.size) must_== bytes
+        val req = isMasterRequest(reqId = 0)
+        val buffer = Unpooled.buffer(req.size, req.size)
+        val bytes = Array[Byte](58, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -44, 7, 0, 0, 4, 0, 0, 0, 97, 100, 109, 105, 110, 46, 36, 99, 109, 100, 0, 0, 0, 0, 0, 1, 0, 0, 0, 19, 0, 0, 0, 16, 105, 115, 109, 97, 115, 116, 101, 114, 0, 1, 0, 0, 0, 0)
+
+        req.writeTo(buffer) must_== ({}) and {
+          getBytes(buffer, req.size) must_== bytes
+        }
       }
     }
   }

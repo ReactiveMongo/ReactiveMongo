@@ -35,6 +35,7 @@ class BulkOpsSpec(implicit ee: ExecutionEnv)
 
   // ---
 
+  section("unit")
   "Preparation" should {
     "produce 1 single empty stage" in {
       producer1 must beLike[BulkProducer[BSONDocument]] {
@@ -153,4 +154,5 @@ class BulkOpsSpec(implicit ee: ExecutionEnv)
       }
     }
   }
+  section("unit")
 }

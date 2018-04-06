@@ -15,8 +15,6 @@ import shaded.netty.channel.{
 }, ChannelOption.{ CONNECT_TIMEOUT_MILLIS, SO_KEEPALIVE, TCP_NODELAY }
 
 import shaded.netty.channel.ChannelInitializer
-//import shaded.netty.channel.nio.NioEventLoopGroup
-//import shaded.netty.channel.socket.nio.NioSocketChannel
 
 import akka.actor.ActorRef
 
@@ -64,7 +62,7 @@ final class ChannelFactory private[reactivemongo] (
     val resolution = channelFactory.connect(host, port)
     val channel = resolution.channel
 
-    trace(s"Created new channel #${channel.id} to ${host}:${port} (registered = ${channel.isRegistered})")
+    debug(s"Created new channel #${channel.id} to ${host}:${port} (registered = ${channel.isRegistered})")
 
     if (channel.isRegistered) {
       initChannel(channel, host, port, receiver)
@@ -95,7 +93,7 @@ final class ChannelFactory private[reactivemongo] (
     channel: Channel,
     host: String, port: Int,
     receiver: ActorRef) {
-    trace(s"Initializing channel ${channel.id} to ${host}:${port} ($receiver)")
+    debug(s"Initializing channel ${channel.id} to ${host}:${port} ($receiver)")
 
     val pipeline = channel.pipeline
 
@@ -187,6 +185,9 @@ final class ChannelFactory private[reactivemongo] (
 
     ()
   }
+
+  @inline private def debug(msg: => String) =
+    logger.debug(s"[$supervisor/$connection] ${msg}")
 
   @inline private def trace(msg: => String) =
     logger.trace(s"[$supervisor/$connection] ${msg}")

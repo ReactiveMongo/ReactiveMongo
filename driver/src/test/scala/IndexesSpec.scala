@@ -14,18 +14,27 @@ import reactivemongo.core.errors.DatabaseException
 import org.specs2.concurrent.ExecutionEnv
 
 class IndexesSpec(implicit ee: ExecutionEnv)
-  extends org.specs2.mutable.Specification {
+  extends org.specs2.mutable.Specification
+  with org.specs2.specification.AfterAll {
 
   "Indexes management" title
 
   sequential
 
-  import Common._
+  // ---
+
+  import Common.{ timeout, slowTimeout }
+
+  lazy val (db, slowDb) = Common.databases(s"reactivemongo-gridfs-${System identityHashCode this}", Common.connection, Common.slowConnection)
+
+  def afterAll = { db.drop(); () }
 
   lazy val geo = db(s"geo${System identityHashCode this}")
   lazy val slowGeo = slowDb(s"geo${System identityHashCode slowDb}")
 
-  "ReactiveMongo Geo Indexes" should {
+  // ---
+
+  "Geo Indexes" should {
     {
       def spec(c: BSONCollection, timeout: FiniteDuration) = {
         val futs: Seq[Future[Unit]] = for (i <- 1 until 10)
@@ -39,7 +48,7 @@ class IndexesSpec(implicit ee: ExecutionEnv)
         spec(geo, timeout)
       }
 
-      "insert some points with the default connection" in {
+      "insert some points with the slow connection" in {
         spec(slowGeo, slowTimeout)
       }
     }
@@ -90,7 +99,7 @@ class IndexesSpec(implicit ee: ExecutionEnv)
         spec(geo, timeout)
       }
 
-      "retrieve indexes with the default connection" in {
+      "retrieve indexes with the slow connection" in {
         spec(slowGeo, slowTimeout)
       }
     }
@@ -98,15 +107,16 @@ class IndexesSpec(implicit ee: ExecutionEnv)
 
   lazy val geo2DSpherical = db(s"geo2d_${System identityHashCode this}")
 
-  "ReactiveMongo Geo2D indexes" should {
+  "Geo2D indexes" should {
     "insert some points" in {
-      val futs: Seq[Future[Unit]] = for (i <- 1 until 10)
-        yield geo2DSpherical.insert(
+      val batch = for (i <- 1 until 10) yield {
         BSONDocument("loc" -> BSONDocument(
           "type" -> "Point",
-          "coordinates" -> BSONArray(i + 2D, i * 2D)))).map(_ => {})
+          "coordinates" -> BSONArray(i + 2D, i * 2D)))
+      }
 
-      Future.sequence(futs) must not(throwA[Throwable]).await(1, timeout)
+      geo2DSpherical.insert[BSONDocument](false).many(batch).map(_.n).
+        aka("inserted") must beTypedEqualTo(9).await(1, timeout)
     }
 
     "make index" in {

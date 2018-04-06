@@ -223,10 +223,10 @@ class MongoConnection(
   def close(): Unit = monitor ! Close("MongoConnection.close")
 
   private case class IsAvailable(result: Promise[ProtocolMetadata]) {
-    override val toString = "IsAvailable?"
+    override val toString = s"IsAvailable#${System identityHashCode this}?"
   }
   private case class IsPrimaryAvailable(result: Promise[ProtocolMetadata]) {
-    override val toString = "IsPrimaryAvailable?"
+    override val toString = s"IsPrimaryAvailable#${System identityHashCode this}?"
   }
 
   /**
@@ -258,13 +258,17 @@ class MongoConnection(
       Future.firstCompletedOf(Seq(
         p.future.recoverWith {
           case cause: Exception =>
-            warn("Fails to probe the connection monitor", cause)
+            warn(s"Fails to probe the connection monitor: $check", cause)
 
             unavailResult
         },
         after(timeout, actorSystem.scheduler)({
-          warn("Timeout while probing the connection monitor")
-          unavailResult
+          if (p.future.isCompleted) {
+            p.future // discard timeout as probing has completed
+          } else {
+            warn(s"[${System.currentTimeMillis()}] Timeout after $timeout while probing the connection monitor: $check ${System identityHashCode p} --> ${p.future.value}")
+            unavailResult
+          }
         })))
     }
 
@@ -364,6 +368,8 @@ class MongoConnection(
   import MongoConnection.logger
 
   private val lnm = s"$supervisor/$name" // log name
+
+  //@inline private def _println(msg: => String) = println(s"[$lnm] $msg")
 
   @inline private def debug(msg: => String) = logger.debug(s"[$lnm] $msg")
 

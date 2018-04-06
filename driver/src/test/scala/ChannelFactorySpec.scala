@@ -92,8 +92,6 @@ class ChannelFactorySpec(implicit ee: ExecutionEnv)
               if (!sentRequest.isCompleted && op.isSuccess) {
                 val buf = chan.readOutbound[ByteBuf]
 
-                //println(s"[${System identityHashCode req}]buf: ${System identityHashCode buf}")
-
                 sentRequest.success(getBytes(buf, buf.readableBytes))
 
                 buf.release()
@@ -146,7 +144,9 @@ class ChannelFactorySpec(implicit ee: ExecutionEnv)
       }
 
       val actorRef = akka.testkit.TestActorRef(actor, "test2")
-      val chan = createChannel(factory, actorRef)
+      val chan = createChannel(factory, actorRef,
+        host = Common.primaryHost.takeWhile(_ != ':'),
+        port = Common.primaryHost.dropWhile(_ != ':').drop(1).toInt)
 
       chanConnected.future must beEqualTo({}).await(1, timeout) and {
         chan.writeAndFlush(isMasterRequest()).addListener(printOnError)
@@ -158,6 +158,8 @@ class ChannelFactorySpec(implicit ee: ExecutionEnv)
           if (!chan.closeFuture.isDone) {
             chan.close()
           }
+
+          actorRef.stop()
 
           ok
         }

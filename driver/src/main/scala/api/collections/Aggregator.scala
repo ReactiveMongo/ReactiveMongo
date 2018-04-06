@@ -6,7 +6,6 @@ import scala.concurrent.ExecutionContext // Future
 
 import reactivemongo.api.{
   Cursor,
-  CursorFlattener,
   CursorProducer,
   ReadConcern,
   ReadPreference,
@@ -52,10 +51,7 @@ private[collections] trait Aggregator[P <: SerializationPack with Singleton]
     private def ver = db.connection.metadata.
       fold[MongoWireVersion](MongoWireVersion.V30)(_.maxWireVersion)
 
-    /**
-     * @param cf the cursor flattener (by default use the builtin one)
-     */
-    final def cursor(implicit ec: ExecutionContext, cf: CursorFlattener[AC]): AC[T] = {
+    final def cursor(implicit ec: ExecutionContext): AC[T] = {
       def batchSz = batchSize.getOrElse(defaultCursorBatchSize)
       implicit def writer = commandWriter[T]
       implicit def aggReader: pack.Reader[T] = reader

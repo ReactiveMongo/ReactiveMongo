@@ -971,6 +971,8 @@ trait MongoDBSystem extends Actor {
             val n = isMaster.replicaSet.fold(an)(rs => an.withAlias(rs.me))
             chanNode = Some(n)
 
+            trace(s"Node refreshed from isMaster: ${node.toShortString}")
+
             n
           }
 
@@ -983,7 +985,7 @@ trait MongoDBSystem extends Actor {
           }
         }
 
-        trace(s"Discovered nodes: $discoveredNodes")
+        trace(s"Discovered ${discoveredNodes.size} nodes: ${discoveredNodes mkString ", "}")
 
         val upSet = prepared.copy(nodes = prepared.nodes ++ discoveredNodes)
 
@@ -1251,6 +1253,7 @@ trait MongoDBSystem extends Actor {
         if (c.status == ConnectionStatus.Connecting ||
           c.status == ConnectionStatus.Connected) {
 
+          /*
           if (c.status == ConnectionStatus.Connecting && c.channel.isActive) {
             // #cch1: Can happen for the first channel become active so quick,
             // it happens even before the ChannelFactory.initChannel ends.
@@ -1263,6 +1266,7 @@ trait MongoDBSystem extends Actor {
               self ! ChannelConnected(c.channel.id)
             }
           }
+           */
 
           updateNode(n, before.tail, c +: updated)
         } else {
@@ -1331,91 +1335,93 @@ trait MongoDBSystem extends Actor {
   }
 
   private def requestIsMaster(node: Node): IsMasterRequest =
-    node.connected.headOption.fold(new IsMasterRequest(node)) { con =>
-      import reactivemongo.api.BSONSerializationPack
-      import reactivemongo.api.commands.bson.{
-        BSONIsMasterCommandImplicits,
-        BSONIsMasterCommand
-      }, BSONIsMasterCommand.IsMaster
-      import reactivemongo.api.commands.Command
+    {
+      /*_println(s"requestIsMaster? ${node.connected.headOption.mkString}"); */ node.connected.headOption.fold(new IsMasterRequest(node)) { con =>
+        import reactivemongo.api.BSONSerializationPack
+        import reactivemongo.api.commands.bson.{
+          BSONIsMasterCommandImplicits,
+          BSONIsMasterCommand
+        }, BSONIsMasterCommand.IsMaster
+        import reactivemongo.api.commands.Command
 
-      val id = RequestId.isMaster.next
-      val (isMaster, _) = Command.buildRequestMaker(BSONSerializationPack)(
-        IsMaster(id.toString),
-        BSONIsMasterCommandImplicits.IsMasterWriter,
-        ReadPreference.primaryPreferred,
-        "admin") // only "admin" DB for the admin command
+        val id = RequestId.isMaster.next
+        val (isMaster, _) = Command.buildRequestMaker(BSONSerializationPack)(
+          IsMaster(id.toString),
+          BSONIsMasterCommandImplicits.IsMasterWriter,
+          ReadPreference.primaryPreferred,
+          "admin") // only "admin" DB for the admin command
 
-      val now = System.currentTimeMillis()
+        val now = System.currentTimeMillis()
 
-      val updated = if (node.pingInfo.lastIsMasterId == -1) {
-        // There is no IsMaster request waiting response for the node:
-        // sending a new one
-        debug(s"Prepares a fresh IsMaster request to ${node.toShortString} (channel #${con.channel.id})")
+        val updated = if (node.pingInfo.lastIsMasterId == -1) {
+          // There is no IsMaster request waiting response for the node:
+          // sending a new one
+          debug(s"Prepares a fresh IsMaster request to ${node.toShortString} (channel #${con.channel.id})")
 
-        node._copy(
-          pingInfo = node.pingInfo.copy(
-            lastIsMasterTime = now,
-            lastIsMasterId = id,
-            channelId = Some(con.channel.id)))
+          node._copy(
+            pingInfo = node.pingInfo.copy(
+              lastIsMasterTime = now,
+              lastIsMasterId = id,
+              channelId = Some(con.channel.id)))
 
-      } else if ((
-        node.pingInfo.lastIsMasterTime + PingInfo.pingTimeout) < now) {
+        } else if ((
+          node.pingInfo.lastIsMasterTime + PingInfo.pingTimeout) < now) {
 
-        // The previous IsMaster request is expired
-        val msg = s"${node.toShortString} hasn't answered in time to last ping! Please check its connectivity"
+          // The previous IsMaster request is expired
+          val msg = s"${node.toShortString} hasn't answered in time to last ping! Please check its connectivity"
 
-        warn(msg)
+          warn(msg)
 
-        // Unregister the pending requests for this node
-        val channelIds = node.connections.map(_.channel.id)
-        val wasPrimary = node.status == NodeStatus.Primary
-        def error = {
-          val cause = new ClosedException(s"$msg ($lnm)")
+          // Unregister the pending requests for this node
+          val channelIds = node.connections.map(_.channel.id)
+          val wasPrimary = node.status == NodeStatus.Primary
+          def error = {
+            val cause = new ClosedException(s"$msg ($lnm)")
 
-          if (!wasPrimary) cause
-          else new PrimaryUnavailableException(supervisor, name, cause)
+            if (!wasPrimary) cause
+            else new PrimaryUnavailableException(supervisor, name, cause)
+          }
+
+          awaitingResponses.retain { (_, awaitingResponse) =>
+            if (channelIds contains awaitingResponse.channelID) {
+              trace(s"Unregistering the pending request ${awaitingResponse.promise} for ${node.toShortString}'")
+
+              awaitingResponse.promise.failure(error)
+              false
+            } else true
+          }
+
+          // Reset node state
+          updateHistory {
+            if (wasPrimary) s"PrimaryUnavailable"
+            else s"NodeUnavailable($node)"
+          }
+
+          node._copy(
+            status = NodeStatus.Unknown,
+            //connections = Vector.empty,
+            authenticated = Set.empty,
+            pingInfo = PingInfo(
+              ping = Long.MaxValue,
+              lastIsMasterTime = now,
+              lastIsMasterId = id,
+              channelId = con.channel.id))
+
+        } else {
+          debug(s"Do not prepare a isMaster request to already probed ${node.name}")
+
+          node
         }
 
-        awaitingResponses.retain { (_, awaitingResponse) =>
-          if (channelIds contains awaitingResponse.channelID) {
-            trace(s"Unregistering the pending request ${awaitingResponse.promise} for ${node.toShortString}'")
-
-            awaitingResponse.promise.failure(error)
-            false
-          } else true
-        }
-
-        // Reset node state
-        updateHistory {
-          if (wasPrimary) s"PrimaryUnavailable"
-          else s"NodeUnavailable($node)"
-        }
-
-        node._copy(
-          status = NodeStatus.Unknown,
-          //connections = Vector.empty,
-          authenticated = Set.empty,
-          pingInfo = PingInfo(
-            ping = Long.MaxValue,
-            lastIsMasterTime = now,
-            lastIsMasterId = id,
-            channelId = con.channel.id))
-
-      } else {
-        debug(s"Do not prepare a isMaster request to already probed ${node.name}")
-
-        node
+        new IsMasterRequest(updated, {
+          con.send(isMaster(id)).addListener(new OperationHandler(
+            error(s"Fails to send a isMaster request to ${node.name} (channel #${con.channel.id})", _),
+            { chanId =>
+              trace(s"isMaster request successful on channel #${chanId}")
+            }))
+          ()
+        })
       }
-
-      new IsMasterRequest(updated, {
-        con.send(isMaster(id)).addListener(new OperationHandler(
-          error(s"Fails to send a isMaster request to ${node.name} (channel #${con.channel.id})", _),
-          { chanId =>
-            trace(s"isMaster request successful on channel #${chanId}")
-          }))
-        ()
-      })
     }
 
   @inline private def scheduler = context.system.scheduler
@@ -1473,6 +1479,8 @@ trait MongoDBSystem extends Actor {
   // --- Logging ---
 
   protected val lnm = s"$supervisor/$name" // log naming
+
+  @inline protected def _println(msg: => String) = println(s"[$lnm] $msg")
 
   @inline protected def debug(msg: => String) = logger.debug(s"[$lnm] $msg")
 

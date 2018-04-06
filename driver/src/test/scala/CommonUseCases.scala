@@ -1,8 +1,6 @@
 import scala.concurrent._
 import scala.concurrent.duration.FiniteDuration
 
-import org.specs2.mutable._
-
 import reactivemongo.api._
 import reactivemongo.bson._
 import reactivemongo.api.collections.bson.BSONCollection
@@ -11,18 +9,30 @@ import reactivemongo.api.commands.bson.BSONCountCommandImplicits._
 
 import org.specs2.concurrent.ExecutionEnv
 
-class CommonUseCases(implicit ee: ExecutionEnv) extends Specification {
-  import Common._
+class CommonUseCases(implicit ee: ExecutionEnv)
+  extends org.specs2.mutable.Specification
+  with org.specs2.specification.AfterAll {
+
+  "Common use cases" title
 
   sequential
+
+  // ---
+  import Common.{ timeout, slowTimeout }
+
+  lazy val (db, slowDb) = Common.databases(s"reactivemongo-usecases-${System identityHashCode this}", Common.connection, Common.slowConnection)
 
   val colName = s"commonusecases${System identityHashCode this}"
   lazy val collection = db(colName)
   lazy val slowColl = slowDb(colName)
 
+  def afterAll = { db.drop(); () }
+
+  // ---
+
   "ReactiveMongo" should {
     "create a collection" in {
-      collection.create() must beEqualTo({}).await(1, timeout)
+      collection.create() must beTypedEqualTo({}).await(1, timeout)
     }
 
     "insert some docs from a seq of docs" in {
@@ -40,6 +50,9 @@ class CommonUseCases(implicit ee: ExecutionEnv) extends Specification {
       // batchSize (>1) allows us to test cursors ;)
       val it = collection.find(BSONDocument()).
         options(QueryOpts().batchSize(2)).cursor[BSONDocument]()
+
+      import reactivemongo.core.protocol.{ Response, Reply }
+      import reactivemongo.api.tests.{ makeRequest => req, nextResponse }
 
       it.collect[List]().map(_.map(_.getAs[BSONInteger]("age").get.value).
         mkString("")) must beEqualTo((18 to 60).mkString("")).
@@ -65,17 +78,18 @@ class CommonUseCases(implicit ee: ExecutionEnv) extends Specification {
 
     "find them with a projection" >> {
       def findSpec(c: BSONCollection, timeout: FiniteDuration) = {
-        val pjn = BSONDocument(
-          "name" -> BSONInteger(1),
-          "age" -> BSONInteger(1),
-          "something" -> BSONInteger(1))
+        val pjn = BSONDocument("name" -> 1, "age" -> 1, "something" -> 1)
 
-        def it = c.find(BSONDocument(), pjn).
+        def it = c.find(BSONDocument.empty, pjn).
           options(QueryOpts().batchSize(2)).cursor[BSONDocument]()
 
-        it.collect[List]().map(_.map(
-          _.getAs[BSONInteger]("age").get.value).mkString("")) must beEqualTo((18 to 60).mkString("")).
-          await(1, timeout * 2)
+        import reactivemongo.core.protocol.{ Response, Reply }
+        import reactivemongo.api.tests.{ makeRequest => req, nextResponse }
+
+        it.collect[List]().map {
+          _.map(_.getAs[BSONInteger]("age").get.value).mkString("")
+        } must beEqualTo((18 to 60).mkString("")).
+          await(1, timeout).eventually(2, timeout)
       }
 
       "with the default connection" in {
@@ -104,9 +118,10 @@ class CommonUseCases(implicit ee: ExecutionEnv) extends Specification {
         "name" -> BSONString("Joe"),
         "contacts" -> (array ++ array2))
 
-      Await.result(collection.insert(doc), timeout).ok mustEqual true
+      Await.result(collection.insert(doc), timeout).ok must beTrue
 
       val fetched = Await.result(collection.find(BSONDocument("name" -> BSONString("Joe"))).one[BSONDocument], timeout)
+
       fetched.isDefined mustEqual true
       val contactsString = fetched.get.getAs[BSONArray]("contacts").
         get.values.collect {

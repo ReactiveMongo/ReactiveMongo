@@ -134,13 +134,16 @@ package object tests extends QueryCodecs[BSONSerializationPack.type] {
 
   @inline def channelFactory(supervisorName: String, connectionName: String, options: MongoConnectionOptions): ChannelFactory = new ChannelFactory(supervisorName, connectionName, options)
 
-  @inline def createChannel(factory: ChannelFactory, receiver: ActorRef) =
-    factory.create(receiver = receiver)
+  @inline def createChannel(
+    factory: ChannelFactory,
+    receiver: ActorRef,
+    host: String,
+    port: Int) = factory.create(host, port, receiver)
 
   @inline def releaseChannelFactory(f: ChannelFactory, clb: Promise[Unit]) =
     f.release(clb)
 
-  @inline def isMasterRequest(readPref: ReadPreference = ReadPreference.primaryPreferred): Request = {
+  @inline def isMasterRequest(reqId: Int = RequestId.isMaster.next): Request = {
     import reactivemongo.api.BSONSerializationPack
     import reactivemongo.api.commands.bson.{
       BSONIsMasterCommandImplicits,
@@ -154,7 +157,7 @@ package object tests extends QueryCodecs[BSONSerializationPack.type] {
       reactivemongo.api.ReadPreference.primaryPreferred,
       "admin") // only "admin" DB for the admin command
 
-    isMaster(RequestId.isMaster.next) // RequestId.isMaster
+    isMaster(reqId) // RequestId.isMaster
   }
 
   @inline def isMasterResponse(response: Response) =
@@ -222,4 +225,6 @@ package object tests extends QueryCodecs[BSONSerializationPack.type] {
 
     bytes
   }
+
+  @inline def dbHash(db: DB with DBMetaCommands, collections: Seq[String] = Seq.empty)(implicit ec: ExecutionContext) = db.hash(collections)
 }

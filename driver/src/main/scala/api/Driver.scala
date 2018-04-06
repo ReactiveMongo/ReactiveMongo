@@ -21,7 +21,6 @@ import reactivemongo.core.actors.{
   MongoDBSystem,
   StandardDBSystem
 }
-import reactivemongo.core.errors.ReactiveMongoException
 import reactivemongo.core.nodeset.Authenticate
 import reactivemongo.util.LazyLogger
 
@@ -111,12 +110,9 @@ private[api] trait Driver {
     }
 
     if (alreadyClosing) {
-      val error = ReactiveMongoException(
-        s"System already closed: $supervisorName")
+      logger.info(s"System already closed: $supervisorName")
 
-      error.setStackTrace(closedBy)
-
-      Future.failed[Unit](error)
+      Future.successful({})
     } else {
       // Tell the supervisor to close.
       // It will shut down all the connections and monitors

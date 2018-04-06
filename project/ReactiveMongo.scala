@@ -327,7 +327,7 @@ object ReactiveMongoBuild extends Build {
       autoScalaLibrary := false,
       resolvers += Resolver.mavenLocal,
       libraryDependencies ++= Seq(
-        "io.netty" % "netty-handler" % "4.1.17.Final" cross CrossVersion.Disabled,
+        "io.netty" % "netty-handler" % "4.1.22.Final" changing(), //cross CrossVersion.Disabled,
         "com.google.guava" % "guava" % "19.0" cross CrossVersion.Disabled
       ),
       assemblyShadeRules in assembly := Seq(
@@ -352,12 +352,14 @@ object ReactiveMongoBuild extends Build {
     }
   } andThen BuildSettings.filter
 
-  private val commonCleanup: ClassLoader => Unit = { cl =>
+  private val commonCleanup = Def.task[ClassLoader => Unit] { cl: ClassLoader =>
     import scala.language.reflectiveCalls
 
     val c = cl.loadClass("Common$")
     type M = { def close(): Unit }
     val m: M = c.getField("MODULE$").get(null).asInstanceOf[M]
+
+    streams.value.log.info(s"Closing $m ...")
 
     m.close()
   }
@@ -922,7 +924,7 @@ object Version {
           exclude[AbstractClassProblem]("reactivemongo.core.protocol.Response")
         )
       },
-      testOptions in Test += Tests.Cleanup(commonCleanup),
+      testOptions in Test += Tests.Cleanup(commonCleanup.value),
       mappings in (Compile, packageBin) ~= driverFilter,
       //mappings in (Compile, packageDoc) ~= driverFilter,
       mappings in (Compile, packageSrc) ~= driverFilter,
@@ -959,7 +961,7 @@ object Version {
     file("jmx"),
     settings = buildSettings ++ Findbugs.settings ++ Seq(
       mimaPreviousArtifacts := Set.empty,
-      testOptions in Test += Tests.Cleanup(commonCleanup),
+      testOptions in Test += Tests.Cleanup(commonCleanup.value),
       libraryDependencies ++= Seq(specs.value) ++ logApi,
       pomPostProcess := providedInternalDeps
     )).enablePlugins(CpdPlugin).

@@ -11,7 +11,7 @@
     <logger name="reactivemongo.api.Failover2" level="OFF" />
     <logger name="reactivemongo.api.MongoConnection" level="OFF" />
 
-    <logger name="reactivemongo.test.NettyProxy" level="WARN" />
+    <logger name="NettyProxy" level="DEBUG" />
     <logger name="reactivemongo.core" level="OFF" />
 
     <logger name="shaded.netty" level="WARN" />

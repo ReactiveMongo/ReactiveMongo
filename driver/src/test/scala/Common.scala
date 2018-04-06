@@ -59,6 +59,10 @@ object Common {
     val a = MongoConnectionOptions(
       failoverStrategy = failoverStrategy,
       nbChannelsPerNode = 20,
+      /*
+      writeConcern = reactivemongo.api.commands.WriteConcern.
+        Journaled.copy(w = reactivemongo.api.commands.WriteConcern.Majority),
+       */
       monitorRefreshMS = (timeout.toMillis / 2).toInt)
 
     val b = {
@@ -97,7 +101,7 @@ object Common {
     failoverStrategy = slowFailover,
     monitorRefreshMS = (slowTimeout.toMillis / 2).toInt)
 
-  lazy val slowProxy: NettyProxy = {
+  val slowProxy: NettyProxy = {
     import java.net.InetSocketAddress
     import ExecutionContext.Implicits.global
 
@@ -109,28 +113,28 @@ object Common {
     def localAddr: InetSocketAddress = InetAddress.unapply(slowPrimary).get
     def remoteAddr: InetSocketAddress = InetAddress.unapply(primaryHost).get
 
-    val proxy = new NettyProxy(Seq(localAddr), remoteAddr, Some(delay))
+    val prx = new NettyProxy(Seq(localAddr), remoteAddr, Some(delay))
 
-    Await.result(proxy.start().map(_ => proxy), slowTimeout)
+    prx.start()
+
+    prx
   }
 
   lazy val slowConnection = driver.connection(List(slowPrimary), SlowOptions)
 
-  def databases(con: MongoConnection, slowCon: MongoConnection): (DefaultDB, DefaultDB) = {
+  def databases(name: String, con: MongoConnection, slowCon: MongoConnection): (DefaultDB, DefaultDB) = {
     import ExecutionContext.Implicits.global
 
     val _db = con.database(
-      commonDb, failoverStrategy).flatMap { d => d.drop.map(_ => d) }
+      name, failoverStrategy).flatMap { d => d.drop.map(_ => d) }
 
-    if (slowProxy.isStarted) {
-      Await.result(_db, timeout) -> Await.result(
-        slowCon.database(commonDb, slowFailover), slowTimeout)
-    } else {
-      sys.error("Slow proxy is not up")
-    }
+    Await.result(_db, timeout) -> Await.result((for {
+      _ <- slowProxy.start()
+      resolved <- slowCon.database(name, slowFailover)
+    } yield resolved), timeout + slowTimeout)
   }
 
-  lazy val (db, slowDb) = databases(connection, slowConnection)
+  lazy val (db, slowDb) = databases(commonDb, connection, slowConnection)
 
   @annotation.tailrec
   def tryUntil[T](retries: List[Int])(f: => T, test: T => Boolean): Boolean =

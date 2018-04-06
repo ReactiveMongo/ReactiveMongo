@@ -238,7 +238,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    * }}}
    */
   def insert[T: pack.Writer](ordered: Boolean): InsertBuilder[T] =
-    prepareInsert[T](ordered, defaultWriteConcern)
+    prepareInsert[T](ordered, defaultWriteConcern) // TODO: Move Writer requirement to InsertBuilder
 
   /**
    * Returns a builder for insert operations.
@@ -398,24 +398,6 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
   /**
    * $aggregation.
    *
-   * {{{
-   * import scala.concurrent.Future
-   * import scala.concurrent.ExecutionContext.Implicits.global
-   *
-   * import reactivemongo.bson._
-   * import reactivemongo.api.collections.bson.BSONCollection
-   *
-   * def populatedStates(cities: BSONCollection): Future[List[BSONDocument]] = {
-   *   import cities.BatchCommands.AggregationFramework
-   *   import AggregationFramework.{ Group, Match, SumField }
-   *
-   *   cities.aggregate(Group(BSONString("\$state"))(
-   *     "totalPop" -> SumField("population")), List(
-   *       Match(document("totalPop" ->
-   *         document("\$gte" -> 10000000L))))).map(_.documents)
-   * }
-   * }}}
-   *
    * @param firstOperator $firstOpParam
    * @param otherOperators $otherOpsParam
    * @param explain $explainParam of the pipeline
@@ -423,6 +405,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    * @param bypassDocumentValidation $bypassParam
    * @param readConcern $readConcernParam
    */
+  @deprecated("Use [[aggregateWith1]]", "0.12.7")
   def aggregate(firstOperator: PipelineOperator, otherOperators: List[PipelineOperator] = Nil, explain: Boolean = false, allowDiskUse: Boolean = false, bypassDocumentValidation: Boolean = false, readConcern: Option[ReadConcern] = None)(implicit ec: ExecutionContext): Future[BatchCommands.AggregationFramework.AggregationResult] = {
     import BatchCommands.AggregationFramework.Aggregate
     import BatchCommands.{ AggregateWriter, AggregateReader }
@@ -509,31 +492,6 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
   /**
    * [[http://docs.mongodb.org/manual/reference/command/aggregate/ Aggregates]] the matching documents.
    *
-   * {{{
-   * import scala.concurrent.Future
-   * import scala.concurrent.ExecutionContext.Implicits.global
-   *
-   * import reactivemongo.bson._
-   * import reactivemongo.api.Cursor
-   * import reactivemongo.api.collections.bson.BSONCollection
-   *
-   * def populatedStates(cities: BSONCollection): Future[Cursor[BSONDocument]] =
-   *   {
-   *     import cities.BatchCommands.AggregationFramework
-   *     import AggregationFramework.{
-   *       Cursor => AggCursor, Group, Match, SumField
-   *     }
-   *
-   *     val cursor = AggCursor(batchSize = 1) // initial batch size
-   *
-   *     cities.aggregate1[BSONDocument](Group(BSONString("\$state"))(
-   *       "totalPop" -> SumField("population")), List(
-   *         Match(document("totalPop" ->
-   *           document("\$gte" -> 10000000L)))),
-   *       cursor)
-   *   }
-   * }}}
-   *
    * @tparam T $resultTParam
    *
    * @param firstOperator $firstOpParam
@@ -552,6 +510,25 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
 
   /**
    * [[http://docs.mongodb.org/manual/reference/command/aggregate/ Aggregates]] the matching documents.
+   *
+   * {{{
+   * import scala.concurrent.Future
+   * import scala.concurrent.ExecutionContext.Implicits.global
+   *
+   * import reactivemongo.bson._
+   * import reactivemongo.api.collections.bson.BSONCollection
+   *
+   * def populatedStates(cities: BSONCollection): Future[List[BSONDocument]] = {
+   *   import cities.BatchCommands.AggregationFramework
+   *   import AggregationFramework.{ Group, Match, SumField }
+   *
+   *   cities.aggregatorContext[BSONDocument](Group(BSONString("\$state"))(
+   *     "totalPop" -> SumField("population")), List(
+   *       Match(document("totalPop" ->
+   *         document("\$gte" -> 10000000L))))).
+   *     prepared.cursor.collect[List]()
+   * }
+   * }}}
    *
    * @tparam T $resultTParam
    *
@@ -608,11 +585,11 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    * [[https://docs.mongodb.com/manual/reference/command/delete/ Deletes]] the matching document(s).
    *
    * @param ordered $orderedParam
-   * @param limit the maximum number of documents to be deleted (or unlimited)
+   * @param writeConcern $writeConcernParam
    *
    */
   def delete[S](ordered: Boolean, writeConcern: WriteConcern): DeleteBuilder =
-    prepareDelete(true, writeConcern)
+    prepareDelete(ordered, writeConcern)
 
   /**
    * Remove the matched document(s) from the collection without writeConcern.

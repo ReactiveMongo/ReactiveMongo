@@ -335,10 +335,21 @@ trait Cursor1Spec { spec: CursorSpec =>
     "throw exception when maxTimeout reached" in {
       // TODO: check where compile error
       coll.find(BSONDocument(f"$$where" -> BSONJavaScript(
-        "function(d){for(i=0;i<2147483647;i++){};return true}"))).batchSize(nDocs).maxTimeMs(1).cursor().
+        "function(d){for(i=0;i<2147483647;i++){};return true}"))).
+        batchSize(nDocs).maxTimeMs(1).cursor().
         collect[List](nDocs, Cursor.FailOnError[List[BSONDocument]]()).
         aka("slow query") must throwA[DetailedDatabaseException].like {
-          case CommandError.Code(code) => code must_== 50
+          case err @ CommandError.Code(code) =>
+            if (code != 50) {
+              println(s"Cursor1Spec: $err")
+
+              err.asInstanceOf[DetailedDatabaseException].
+                originalDocument.foreach { doc =>
+                  println(s"===> ${BSONDocument pretty doc}")
+                }
+            }
+
+            code must_== 50
         }.await(1, slowTimeout + DurationInt(1).seconds)
     }
   }
