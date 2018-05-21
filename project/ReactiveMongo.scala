@@ -102,7 +102,7 @@ object Resolvers {
 object Dependencies {
   val akka = Def.setting[Seq[ModuleID]] {
     val ver = sys.env.get("AKKA_VERSION").getOrElse {
-      if (scalaVersion.value startsWith "2.12.") "2.5.6"
+      if (scalaVersion.value startsWith "2.12.") "2.5.12"
       else "2.3.13"
     }
 
@@ -123,7 +123,7 @@ object Dependencies {
 
   val specsVer = Def.setting[String] {
     if (scalaVersion.value startsWith "2.10") "3.9.5" // 4.0.1 not avail
-    else "4.0.1"
+    else "4.0.2"
   }
 
   val specs = Def.setting[ModuleID] {
@@ -167,7 +167,8 @@ object Documentation {
       inAnyProject -- inProjects(
         ReactiveMongoBuild.shaded, ReactiveMongoBuild.jmx)
     },
-    apiMappings ++= mappings("org.scala-lang", "http://scala-lang.org/api/%s/")("scala-library").value
+    apiMappings ++= mappings(
+      "org.scala-lang", "http://scala-lang.org/api/%s/")("scala-library").value
   )
 }
 
@@ -200,7 +201,7 @@ object ReactiveMongoBuild extends Build {
       publishArtifact := false,
       mimaPreviousArtifacts := Set.empty,
       travisEnv in Test := { // test:travisEnv from SBT CLI
-        val (akkaLower, akkaUpper) = "2.3.13" -> "2.5.6"
+        val (akkaLower, akkaUpper) = "2.3.13" -> "2.5.12"
         val (playLower, playUpper) = "2.3.8" -> "2.6.1"
         val (mongoLower, mongoUpper) = "2_6" -> "3_4"
 
@@ -327,7 +328,7 @@ object ReactiveMongoBuild extends Build {
       autoScalaLibrary := false,
       resolvers += Resolver.mavenLocal,
       libraryDependencies ++= Seq(
-        "io.netty" % "netty-handler" % "4.1.22.Final" changing(), //cross CrossVersion.Disabled,
+        "io.netty" % "netty-handler" % "4.1.25.Final" changing(), //cross CrossVersion.Disabled,
         "com.google.guava" % "guava" % "19.0" cross CrossVersion.Disabled
       ),
       assemblyShadeRules in assembly := Seq(

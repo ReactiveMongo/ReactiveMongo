@@ -36,10 +36,15 @@ trait CollectionMetaCommands { self: Collection =>
    *     println(s"Collection \${coll.fullCollectionName} already exists")
    * }
    * }}}
-   *
-   * @param autoIndexId $autoIndexIdParam
    */
-  def create(autoIndexId: Boolean = true)(implicit ec: ExecutionContext): Future[Unit] = command.unboxed(self, Create(None, autoIndexId), ReadPreference.primary)
+  def create()(implicit ec: ExecutionContext): Future[Unit] =
+    command.unboxed(self, Create(None, false), ReadPreference.primary)
+
+  /**
+   * @param autoIndexId DEPRECATED: $autoIndexIdParam
+   */
+  @deprecated("Use `create` without deprecated `autoIndexId`", "0.14.0")
+  def create(autoIndexId: Boolean = false)(implicit ec: ExecutionContext): Future[Unit] = command.unboxed(self, Create(None, autoIndexId), ReadPreference.primary)
 
   /**
    * Creates this collection as a capped one.

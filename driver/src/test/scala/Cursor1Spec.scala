@@ -1,11 +1,9 @@
 import scala.concurrent.{ Await, Future }
-import scala.concurrent.duration.{ DurationInt, FiniteDuration }
+import scala.concurrent.duration.FiniteDuration
 
-import reactivemongo.bson.{ BSONDocument, BSONJavaScript }
-import reactivemongo.core.errors.DetailedDatabaseException
+import reactivemongo.bson.BSONDocument
 
 import reactivemongo.api.{ Cursor, CursorFlattener, CursorProducer }
-import reactivemongo.api.commands.CommandError
 import reactivemongo.api.collections.bson.BSONCollection
 
 trait Cursor1Spec { spec: CursorSpec =>
@@ -18,7 +16,7 @@ trait Cursor1Spec { spec: CursorSpec =>
           Future.sequence(bulks).map(_ => {})
         } else {
           val len = if (rem < 256) rem else 256
-          val prepared = nDocs - rem
+          def prepared = nDocs - rem
 
           def bulk = coll.insert[BSONDocument](false).many(
             for (i <- 0 until len) yield {
@@ -210,7 +208,7 @@ trait Cursor1Spec { spec: CursorSpec =>
           "all the documents" in {
             coll.find(matchAll("cursorspec4b")).
               batchSize(2096).cursor().foldWhileM(0)(
-                (st, _) => Future(Cursor.Cont(st + 1))).
+                (st, _) => Future.successful(Cursor.Cont(st + 1))).
                 aka("result size") must beEqualTo(16517).await(1, timeout)
           }
 
@@ -243,7 +241,7 @@ trait Cursor1Spec { spec: CursorSpec =>
           "for all the documents" in {
             coll.find(matchAll("cursorspec6b")).
               batchSize(2096).cursor().foldBulksM(0)(
-                (st, bulk) => Future(Cursor.Cont(st + bulk.size))).
+                (st, bulk) => Future.successful(Cursor.Cont(st + bulk.size))).
                 aka("result size") must beEqualTo(16517).await(1, timeout)
           }
 
@@ -276,14 +274,14 @@ trait Cursor1Spec { spec: CursorSpec =>
           "for all the documents" in {
             coll.find(matchAll("cursorspec8b")).
               batchSize(2096).cursor().foldResponsesM(0)((st, resp) =>
-                Future(Cursor.Cont(st + resp.reply.numberReturned))).
+                Future.successful(Cursor.Cont(st + resp.reply.numberReturned))).
               aka("result size") must beEqualTo(16517).await(1, timeout)
           }
 
           "for 1024 documents" in {
             coll.find(matchAll("cursorspec9b")).batchSize(256).cursor().
               foldResponsesM(0, 1024)(
-                (st, resp) => Future(
+                (st, resp) => Future.successful(
                   Cursor.Cont(st + resp.reply.numberReturned))).
                 aka("result size") must beEqualTo(1024).await(1, timeout)
           }
@@ -296,21 +294,21 @@ trait Cursor1Spec { spec: CursorSpec =>
     }
 
     "with the slow connection" >> {
-      foldSpec1(slowColl, slowTimeout)
+      foldSpec1(slowColl, slowTimeout * 2L)
     }
 
     "fold the responses with async function" >> {
       "for all the documents" in {
         coll.find(matchAll("cursorspec8")).
           batchSize(2096).cursor().foldResponsesM(0)((st, resp) =>
-            Future(Cursor.Cont(st + resp.reply.numberReturned))).
+            Future.successful(Cursor.Cont(st + resp.reply.numberReturned))).
           aka("result size") must beEqualTo(16517).await(1, timeout)
       }
 
       "for 1024 documents" in {
         coll.find(matchAll("cursorspec9")).batchSize(256).cursor().
           foldResponsesM(0, 1024)((st, resp) =>
-            Future(Cursor.Cont(st + resp.reply.numberReturned))).
+            Future.successful(Cursor.Cont(st + resp.reply.numberReturned))).
           aka("result size") must beEqualTo(1024).await(1, timeout)
       }
     }
@@ -330,27 +328,6 @@ trait Cursor1Spec { spec: CursorSpec =>
 
       cursor.foo must_== "Bar" and (
         Cursor.flatten(Future.successful(cursor)).foo must_== "raB")
-    }
-
-    "throw exception when maxTimeout reached" in {
-      // TODO: check where compile error
-      coll.find(BSONDocument(f"$$where" -> BSONJavaScript(
-        "function(d){for(i=0;i<2147483647;i++){};return true}"))).
-        batchSize(nDocs).maxTimeMs(1).cursor().
-        collect[List](nDocs, Cursor.FailOnError[List[BSONDocument]]()).
-        aka("slow query") must throwA[DetailedDatabaseException].like {
-          case err @ CommandError.Code(code) =>
-            if (code != 50) {
-              println(s"Cursor1Spec: $err")
-
-              err.asInstanceOf[DetailedDatabaseException].
-                originalDocument.foreach { doc =>
-                  println(s"===> ${BSONDocument pretty doc}")
-                }
-            }
-
-            code must_== 50
-        }.await(1, slowTimeout + DurationInt(1).seconds)
     }
   }
 }

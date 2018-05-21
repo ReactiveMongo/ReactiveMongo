@@ -34,18 +34,20 @@ private[reactivemongo] class MongoHandler(
   }
 
   override def channelIdle(ctx: ChannelHandlerContext, e: IdleStateEvent) = {
-    val now = System.currentTimeMillis()
+    if (last != -1L) {
+      val now = System.currentTimeMillis()
 
-    log(ctx, s"Channel has been inactive for ${now - last} (last = $last)")
+      log(ctx, s"Channel has been inactive for ${now - last} (last = $last)")
+    }
 
-    last = System.currentTimeMillis()
-
-    ctx.channel.close()
+    ctx.channel.close() // configured timeout - See channelInactive
 
     super.channelIdle(ctx, e)
   }
 
   override def channelInactive(ctx: ChannelHandlerContext) {
+    val now = System.currentTimeMillis()
+
     if (last != -1) {
       val chan = ctx.channel
 
@@ -53,7 +55,7 @@ private[reactivemongo] class MongoHandler(
         log(ctx, s"Channel is closed: $last")
       }
 
-      last = System.currentTimeMillis()
+      last = now
 
       receiver ! ChannelDisconnected(chan.id)
     }
@@ -116,6 +118,11 @@ private[reactivemongo] class MongoHandler(
     super.channelRegistered(ctx)
   }
 
+  override def channelUnregistered(ctx: ChannelHandlerContext): Unit = {
+    println(s"_UNREG #${ctx.channel.id}")
+    super.channelUnregistered(ctx)
+  }
+
   override def handlerRemoved(ctx: ChannelHandlerContext): Unit = {
     println(s"_REMOVED #${ctx.channel.id}")
     super.handlerRemoved(ctx)
@@ -123,13 +130,11 @@ private[reactivemongo] class MongoHandler(
    */
 
   @inline def log(ctx: ChannelHandlerContext, s: String) =
-    //MongoHandler.logger.trace(
-    if (supervisor startsWith "monitorspec") println(
+    MongoHandler.logger.trace(
       s"[$supervisor/$connection] $s (channel ${ctx.channel})")
 
   @inline def log(ctx: ChannelHandlerContext, s: String, cause: Throwable) =
-    //MongoHandler.logger.trace(
-    if (supervisor startsWith "monitorspec") println(
+    MongoHandler.logger.trace(
       s"[$supervisor/$connection] $s (channel ${ctx.channel})", cause)
 }
 

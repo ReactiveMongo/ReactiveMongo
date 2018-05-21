@@ -16,10 +16,11 @@
 package reactivemongo.api.collections
 
 import scala.concurrent.{ ExecutionContext, Future }
-import reactivemongo.api._
 
 import reactivemongo.core.protocol.{ Query, QueryFlags, MongoWireVersion }
 import reactivemongo.core.netty.{ BufferSequence, ChannelBufferWritableBuffer }
+
+import reactivemongo.api._
 
 /**
  * A builder that helps to make a fine-tuned query to MongoDB.
@@ -34,6 +35,7 @@ import reactivemongo.core.netty.{ BufferSequence, ChannelBufferWritableBuffer }
  */
 trait GenericQueryBuilder[P <: SerializationPack]
   extends QueryOps with QueryCodecs[P] {
+  // TODO: Unit test?
 
   val pack: P
   type Self <: GenericQueryBuilder[pack.type]
@@ -50,11 +52,13 @@ trait GenericQueryBuilder[P <: SerializationPack]
   def collection: Collection
   def maxTimeMsOption: Option[Long]
 
+  /** The read concern (since 3.2) */
+  //def readConcern: ReadConcern = ReadConcern.default
+
   /* TODO: https://docs.mongodb.com/v3.2/reference/command/find/#dbcmd.find
 
    - singleBatch: boolean; Optional. Determines whether to close the cursor after the first batch. Defaults to false.
    - maxScan: boolean; Optional. Maximum number of documents or index keys to scan when executing the query.
-   - readConcern: document; Optional. Specifies the read concern. The option has the following syntax:
    - max: document; Optional. The exclusive upper bound for a specific index; https://docs.mongodb.com/v3.4/reference/method/cursor.max/#cursor.max
    - min: document; Optional. The exclusive upper bound for a specific index; https://docs.mongodb.com/v3.4/reference/method/cursor.min/#cursor.min
    - returnKey: boolean; Optional. If true, returns only the index keys in the resulting documents.
@@ -127,7 +131,7 @@ trait GenericQueryBuilder[P <: SerializationPack]
 
       document(elements.result())
     } else {
-      // TODO: singleBatch, maxScan, readConcern, max, min, returnKey
+      // TODO: singleBatch, maxScan, max, min, returnKey
       // showRecordId, noCursorTimeout, allowPartialResults, collation
 
       import QueryFlags.{ AwaitData, OplogReplay, TailableCursor }
@@ -157,7 +161,10 @@ trait GenericQueryBuilder[P <: SerializationPack]
         element("snapshot", boolean(snapshotFlag)),
         element("tailable", boolean(tailable)),
         element("awaitData", boolean(awaitData)),
-        element("oplogReplay", boolean(oplogReplay)))
+        element("oplogReplay", boolean(oplogReplay)) /*,
+        element(
+          "readConcern",
+          CommandCodecs.writeReadConcern(pack)(readConcern))*/ )
 
       queryOption.foreach {
         elements += element("filter", _)

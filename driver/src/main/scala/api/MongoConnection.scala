@@ -266,13 +266,14 @@ class MongoConnection(
           if (p.future.isCompleted) {
             p.future // discard timeout as probing has completed
           } else {
-            warn(s"[${System.currentTimeMillis()}] Timeout after $timeout while probing the connection monitor: $check ${System identityHashCode p} --> ${p.future.value}")
+            // TODO: Logging
+            warn(s"Timeout after $timeout while probing the connection monitor: $check")
             unavailResult
           }
         })))
     }
 
-  private[api] val monitor = actorSystem.actorOf(
+  private[api] lazy val monitor = actorSystem.actorOf(
     Props(new MonitorActor), s"Monitor-$name")
 
   // TODO: Remove (use probe)

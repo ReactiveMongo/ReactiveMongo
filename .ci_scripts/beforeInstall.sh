@@ -1,4 +1,4 @@
-#! /bin/bash
+#! /usr/bin/env bash
 
 set -e
 
@@ -22,8 +22,12 @@ SCRIPT_DIR=`dirname $0 | sed -e "s|^\./|$PWD/|"`
 echo "[INFO] MongoDB major version: $MONGO_VER"
 
 MONGO_MINOR="3.2.10"
+
+if [ "$MONGO_VER" = "3_4" ]; then
+    MONGO_MINOR="3.4.10"
+fi
     
-if [ "$AKKA_VERSION" = "2.5.6" ]; then
+if [ "$AKKA_VERSION" = "2.5.12" ]; then
     MONGO_MINOR="3.4.10"
     MONGO_VER="3_4"
 
@@ -40,7 +44,7 @@ PRIMARY_HOST="localhost:27018"
 PRIMARY_SLOW_PROXY="localhost:27019"
 
 # OpenSSL
-if [ ! -L "$HOME/ssl/lib/libssl.so.1.0.0" ] && [ ! -f "$HOME/ssl/lib/libssl.so.1.0.0" ]; then
+if [ `echo "$MONGO_PROFILE" | grep ssl | wc -l` -eq 1 ] && [ ! -L "$HOME/ssl/lib/libssl.so.1.0.0" ] && [ ! -f "$HOME/ssl/lib/libssl.so.1.0.0" ]; then
   echo "[INFO] Building OpenSSL"
 
   cd /tmp
@@ -53,6 +57,7 @@ if [ ! -L "$HOME/ssl/lib/libssl.so.1.0.0" ] && [ ! -f "$HOME/ssl/lib/libssl.so.1
 
   ln -s "$HOME/ssl/lib/libssl.so.1.0.0" "$HOME/ssl/lib/libssl.so.10"
   ln -s "$HOME/ssl/lib/libcrypto.so.1.0.0" "$HOME/ssl/lib/libcrypto.so.10"
+  export PATH="$HOME/ssl/bin:$PATH"
 fi
 
 export LD_LIBRARY_PATH="$HOME/ssl/lib:$LD_LIBRARY_PATH"

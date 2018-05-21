@@ -119,7 +119,7 @@ trait MongoDBSystem extends Actor {
 
   private val monitors = scala.collection.mutable.ListBuffer[ActorRef]()
 
-  implicit val ec = context.system.dispatcher
+  @inline implicit def ec = context.system.dispatcher
 
   // Inner jobs
   private var connectAllJob: Cancellable = NoJob

@@ -210,7 +210,7 @@ class IndexesSpec(implicit ee: ExecutionEnv)
       val mngr = partial.indexesManager
       def spec[T](test: => Future[T]) = test must throwA[CommandError].like {
         case CommandError.Code(11000) => ok
-      }.await
+      }.awaitFor(timeout)
 
       spec(mngr.ensure(idx)) and spec(mngr.create(idx))
     } tag "not_mongo26"
@@ -221,7 +221,7 @@ class IndexesSpec(implicit ee: ExecutionEnv)
         unique = true,
         partialFilter = Some(BSONDocument(
           "age" -> BSONDocument("$gte" -> 21))))).
-        map(_.ok) must beTrue.await(0, timeout)
+        map(_.ok) must beTrue.awaitFor(timeout)
     } tag "not_mongo26"
 
     "not have duplicate fixtures" in {

@@ -46,6 +46,8 @@ class JmxSpec(implicit ee: ExecutionEnv)
           val mbeans = mbs.queryMBeans(new ObjectName(
             "org.reactivemongo.Supervisor-*:type=NodeSet,*"), null)
 
+          val l = 5 + Common.primaryHost.size // Node[...
+
           Try(mbeans.iterator.next()) must beSuccessfulTry[ObjectInstance].
             which { bi =>
               val on = bi.getObjectName
@@ -64,7 +66,7 @@ class JmxSpec(implicit ee: ExecutionEnv)
                             if (typ == "java.lang.String" && (
                               v != null && v.toString.startsWith("Node["))) {
 
-                              v.asInstanceOf[String].take(20)
+                              v.asInstanceOf[String].take(l)
                             } else v
                         }) match {
                           case Success(_ :: _ :: _ :: _ :: null :: _) => ()

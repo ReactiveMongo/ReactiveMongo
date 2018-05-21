@@ -1,4 +1,4 @@
-import scala.concurrent.{ Future, Promise }
+import scala.concurrent.Promise
 
 import akka.actor.Actor
 
@@ -13,7 +13,7 @@ import reactivemongo.core.protocol.{
   ResponseInfo
 }
 
-import reactivemongo.api.{ BSONSerializationPack, MongoConnectionOptions }
+import reactivemongo.api.BSONSerializationPack
 import reactivemongo.api.commands.bson.{
   BSONIsMasterCommand,
   BSONIsMasterCommandImplicits
@@ -40,7 +40,7 @@ class ChannelFactorySpec(implicit ee: ExecutionEnv)
   import Common.timeout
   implicit def actorSys = Common.driver.system
 
-  val factory = channelFactory("sup-1", "con-2", MongoConnectionOptions())
+  val factory = channelFactory("sup-1", "con-2", Common.DefaultOptions)
 
   section("unit")
 
@@ -124,22 +124,23 @@ class ChannelFactorySpec(implicit ee: ExecutionEnv)
       def actor = new Actor {
         val receive: Receive = {
           case msg if (msg.toString startsWith "ChannelConnected(") =>
-            chanConnected.success({}); ()
+            chanConnected.success(Common.logger.info(s"NIO $msg")); ()
 
           case resp: Response if (
             chanConnected.isCompleted && isMasterResponse(resp)) => {
-            result.completeWith(Future {
+
+            result.tryComplete(scala.util.Try {
               val bson = BSONSerializationPack.readAndDeserialize(
                 resp, BSONSerializationPack.IdentityReader)
 
               IsMasterResultReader.read(bson)
             })
 
-            ()
+            Common.logger.info(s"NIO isMasterResponse: $resp")
           }
 
           case msg =>
-            Common.logger.info(s"Unhandled message: $msg")
+            Common.logger.warn(s"Unhandled message [connected: ${chanConnected.isCompleted}]: $msg")
         }
       }
 

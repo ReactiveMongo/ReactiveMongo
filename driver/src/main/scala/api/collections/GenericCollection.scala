@@ -21,12 +21,15 @@ import scala.util.control.NonFatal
 import scala.collection.generic.CanBuildFrom
 
 import scala.concurrent.{ ExecutionContext, Future }
+import scala.concurrent.duration.FiniteDuration
 
 import shaded.netty.buffer.ByteBuf
 
 import reactivemongo.api._
 import reactivemongo.api.commands.{
+  Collation,
   UpdateWriteResult,
+  ResolvedCollectionCommand,
   WriteConcern,
   WriteResult
 }
@@ -316,6 +319,15 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
   @transient lazy val removeModifier =
     BatchCommands.FindAndModifyCommand.Remove
 
+  @deprecated("Use other `findAndModify`", "0.14.0")
+  def findAndModify[S](selector: S, modifier: BatchCommands.FindAndModifyCommand.Modify, sort: Option[pack.Document] = None, fields: Option[pack.Document] = None)(implicit swriter: pack.Writer[S], ec: ExecutionContext): Future[BatchCommands.FindAndModifyCommand.FindAndModifyResult] = findAndModify[S](
+    selector, modifier, sort, fields,
+    bypassDocumentValidation = false,
+    writeConcern = defaultWriteConcern,
+    maxTime = Option.empty[FiniteDuration],
+    collation = Option.empty[Collation],
+    arrayFilters = Seq.empty[pack.Document])
+
   /**
    * Applies a [[http://docs.mongodb.org/manual/reference/command/findAndModify/ findAndModify]] operation. See [[findAndUpdate]] and [[findAndRemove]] convenient functions.
    *
@@ -338,16 +350,53 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    * @param modifier $modifierParam
    * @param sort $sortParam (default: `None`)
    * @param fields $fieldsParam
+   * @param bypassDocumentValidation
+   * @param writeConcern $writeConcernParam
+   * @param maxTime
+   * @param collation
+   * @param arrayFilters
    * @param swriter $swriterParam
    */
-  def findAndModify[S](selector: S, modifier: BatchCommands.FindAndModifyCommand.Modify, sort: Option[pack.Document] = None, fields: Option[pack.Document] = None)(implicit swriter: pack.Writer[S], ec: ExecutionContext): Future[BatchCommands.FindAndModifyCommand.FindAndModifyResult] = {
-    import FindAndModifyCommand.{ ImplicitlyDocumentProducer => DP }
+  def findAndModify[S](
+    selector: S,
+    modifier: BatchCommands.FindAndModifyCommand.Modify,
+    sort: Option[pack.Document],
+    fields: Option[pack.Document],
+    bypassDocumentValidation: Boolean,
+    writeConcern: WriteConcern,
+    maxTime: Option[FiniteDuration],
+    collation: Option[Collation],
+    arrayFilters: Seq[pack.Document])(implicit swriter: pack.Writer[S], ec: ExecutionContext): Future[BatchCommands.FindAndModifyCommand.FindAndModifyResult] = {
 
-    Future(BatchCommands.FindAndModifyCommand.FindAndModify(
-      query = selector,
+    import FindAndModifyCommand.{
+      FindAndModify,
+      ImplicitlyDocumentProducer => DP
+    }
+
+    implicit val writer =
+      pack.writer[ResolvedCollectionCommand[FindAndModify]] { cmd =>
+        FindAndModifyCommand.serialize(cmd)
+      }
+
+    Future(FindAndModify(
+      query = implicitly[DP](selector),
       modify = modifier,
       sort = sort.map(implicitly[DP](_)),
-      fields = fields.map(implicitly[DP](_)))).flatMap(runCommand(_, writePref))
+      fields = fields.map(implicitly[DP](_)),
+      bypassDocumentValidation = bypassDocumentValidation,
+      writeConcern = writeConcern,
+      maxTimeMS = maxTime.flatMap { t =>
+        val ms = t.toMillis
+
+        if (ms < Int.MaxValue) {
+          Some(ms.toInt)
+        } else {
+          Option.empty[Int]
+        }
+      },
+      collation = collation,
+      arrayFilters = arrayFilters.map(implicitly[DP](_)))).
+      flatMap(runCommand(_, writePref))
   }
 
   /**

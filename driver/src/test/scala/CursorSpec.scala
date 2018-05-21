@@ -96,14 +96,13 @@ class CursorSpec(implicit val ee: ExecutionEnv)
               List(primaryHost), DefaultOptions.copy(nbChannelsPerNode = 1))
 
             val db14 = Await.result(con14.database("dbspec14"), timeout)
-            lazy val c = db14(collName)
-            val cursor = c.find(matchAll("cursorspec14")).cursor()
+            val cursor = db14(collName).find(matchAll("cursorspec14")).cursor()
 
             // Close connection to make the related cursor erroneous
             con14.askClose()(timeout).map(_ => {}) must beEqualTo({}).
               await(1, timeout) and {
                 cursor.foldResponsesM({}, 128)(
-                  (_, _) => Future(Cursor.Cont({})),
+                  (_, _) => Future.successful(Cursor.Cont({})),
                   Cursor.FailOnError[Unit](onError)).
                   recover { case _ => count } must beEqualTo(1).
                   await(1, timeout)
@@ -165,7 +164,7 @@ class CursorSpec(implicit val ee: ExecutionEnv)
             QueryOpts(batchSizeN = 64)).cursor()
 
           cursor.foldBulksM[Unit](sys.error("Foo #20"), 128)(
-            (_, _) => Future(Cursor.Cont({})),
+            (_, _) => Future.successful(Cursor.Cont({})),
             Cursor.FailOnError[Unit](onError)).
             recover({ case _ => count }) must beEqualTo(0).await(1, timeout)
 
@@ -335,7 +334,7 @@ class CursorSpec(implicit val ee: ExecutionEnv)
             val cursor = c.find(matchAll("cursorspec32")).cursor()
 
             cursor.foldResponsesM[Unit](sys.error("Foo #32"), 128)(
-              (_, _) => Future(Cursor.Cont({})),
+              (_, _) => Future.successful(Cursor.Cont({})),
               Cursor.ContOnError[Unit](onError)).
               recover({ case _ => count }) must beEqualTo(0).
               await(2, delayedTimeout)
@@ -507,7 +506,7 @@ class CursorSpec(implicit val ee: ExecutionEnv)
             con46.askClose()(timeout).
               map(_ => {}) must beEqualTo({}).await(1, timeout) and {
                 cursor.foldWhileM({}, 64)(
-                  (_, _) => Future(Cursor.Cont({})),
+                  (_, _) => Future.successful(Cursor.Cont({})),
                   Cursor.ContOnError[Unit](onError)).map(_ => count).
                   aka("folding") must beEqualTo(1).await(1, timeout)
 
@@ -597,21 +596,21 @@ sealed trait CursorSpecEnv { spec: CursorSpec =>
 
   // Aliases so sub-spec can reuse the same
   @inline def driver = Common.driver
-  val db = Common.db
+  @inline def db = Common.db
   @inline def timeout = Common.timeout
   @inline def DefaultOptions = Common.DefaultOptions
   @inline def primaryHost = Common.primaryHost
   @inline def failoverStrategy = Common.failoverStrategy
   @inline def logger = Common.logger
-  val slowDb = Common.slowDb
+  @inline def slowDb = Common.slowDb
   @inline def slowTimeout = Common.slowTimeout
   @inline def slowFailover = Common.slowFailover
   @inline def slowPrimary = Common.slowPrimary
   @inline def SlowOptions = Common.SlowOptions
 
   val collName = s"cursorspec${System identityHashCode this}"
-  lazy val coll = db(collName)
-  lazy val slowColl = slowDb(collName)
+  lazy val coll: BSONCollection = db(collName)
+  lazy val slowColl: BSONCollection = slowDb(collName)
   val info = logger.info(_: String)
   val debug = logger.debug(_: String)
 }

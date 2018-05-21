@@ -52,7 +52,7 @@ To reproduce a Travis build, the following script can be used to setup a local t
 ```
 # According travis `env`
 export CI_CATEGORY=INTEGRATION_TESTS \
-       AKKA_VERSION=2.5.6 \
+       AKKA_VERSION=2.5.12 \
        ITERATEES_VERSION=2.6.1 \
        MONGO_PROFILE=invalid-ssl \
        MONGO_VER=3_4 \

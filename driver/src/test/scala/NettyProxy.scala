@@ -275,9 +275,9 @@ object NettyProxy {
   /**
    * Usage:
    *
-   *   test:run localhost:27019 localhost:27017
+   *   test:run host:27019 host:27017
    *
-   *   test:run localhost:27019 localhost:27017 300
+   *   test:run host:27019 host:27017 300
    */
   def main(args: Array[String]): Unit = args.toList match {
     case InetAddress(local) :: InetAddress(remote) :: opts => {

@@ -1,0 +1,23 @@
+FROM centos
+
+ARG mongoMajor
+ARG mongoProfile
+
+LABEL org.reactivemongo.mongoMajor="${mongoMajor}" \
+      org.reactivemongo.mongoProfile="${mongoProfile}"
+
+ENV MONGO_VER=${mongoMajor} MONGO_PROFILE=${mongoProfile}
+
+COPY .ci_scripts /root/.ci_scripts
+
+RUN yum install -y perl make gcc which && \
+cd /usr/bin && \
+cd /root && \
+./.ci_scripts/beforeInstall.sh INTEGRATION_TESTS $MONGO_VER $MONGO_PROFILE /tmp/integration-env.sh && \
+source /tmp/integration-env.sh && \
+sed -e 's|bindIp: 127.0.0.1|bindIp: 0.0.0.0|;s|/tmp/mongod.log|/dev/stdout|' < $MONGO_CONF > .tmp && mv .tmp $MONGO_CONF && \
+sed -e 's/--fork//' < .ci_scripts/fork-mongod.sh > /tmp/mongod.sh && \
+chmod u+x /tmp/mongod.sh
+
+ENTRYPOINT /tmp/mongod.sh /tmp/integration-env.sh
+EXPOSE 27018

@@ -51,12 +51,13 @@ class CommonUseCases(implicit ee: ExecutionEnv)
       val it = collection.find(BSONDocument()).
         options(QueryOpts().batchSize(2)).cursor[BSONDocument]()
 
-      import reactivemongo.core.protocol.{ Response, Reply }
-      import reactivemongo.api.tests.{ makeRequest => req, nextResponse }
+      //import reactivemongo.core.protocol.{ Response, Reply }
+      //import reactivemongo.api.tests.{ makeRequest => req, nextResponse }
 
       it.collect[List]().map(_.map(_.getAs[BSONInteger]("age").get.value).
         mkString("")) must beEqualTo((18 to 60).mkString("")).
         await(1, timeout * 2)
+
     }
 
     "find by regexp" in {
@@ -77,19 +78,18 @@ class CommonUseCases(implicit ee: ExecutionEnv)
     }
 
     "find them with a projection" >> {
-      def findSpec(c: BSONCollection, timeout: FiniteDuration) = {
-        val pjn = BSONDocument("name" -> 1, "age" -> 1, "something" -> 1)
+      val pjn = BSONDocument("name" -> 1, "age" -> 1, "something" -> 1)
 
+      def findSpec(c: BSONCollection, t: FiniteDuration) = {
         def it = c.find(BSONDocument.empty, pjn).
           options(QueryOpts().batchSize(2)).cursor[BSONDocument]()
 
-        import reactivemongo.core.protocol.{ Response, Reply }
-        import reactivemongo.api.tests.{ makeRequest => req, nextResponse }
+        //import reactivemongo.core.protocol.{ Response, Reply }
+        //import reactivemongo.api.tests.{ makeRequest => req, nextResponse }
 
         it.collect[List]().map {
           _.map(_.getAs[BSONInteger]("age").get.value).mkString("")
-        } must beEqualTo((18 to 60).mkString("")).
-          await(1, timeout).eventually(2, timeout)
+        } must beEqualTo((18 to 60).mkString("")).await(0, t)
       }
 
       "with the default connection" in {
@@ -97,7 +97,9 @@ class CommonUseCases(implicit ee: ExecutionEnv)
       }
 
       "with the slow connection" in {
-        findSpec(slowColl, slowTimeout)
+        org.specs2.execute.EventuallyResults.eventually(2, timeout) {
+          findSpec(slowColl, slowTimeout * 2)
+        }
       }
     }
 

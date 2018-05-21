@@ -13,14 +13,7 @@ private[reactivemongo] trait CommandCodecs[P <: SerializationPack] {
   implicit private[reactivemongo] def unitBoxReader: pack.Reader[UnitBox.type] =
     dealingWithGenericCommandErrorsReader[UnitBox.type] { _ => UnitBox }
 
-  private[reactivemongo] lazy val writeReadConcern: ReadConcern => pack.Document = {
-    val builder = pack.newBuilder
-
-    { concern: ReadConcern =>
-      builder.document(Seq(builder.elementProducer(
-        "level", builder.string(concern.level))))
-    }
-  }
+  private[reactivemongo] lazy val writeReadConcern: ReadConcern => pack.Document = CommandCodecs.writeReadConcern(pack)
 
   implicit private[reactivemongo] def defaultWriteResultReader: pack.Reader[DefaultWriteResult] = {
     val decoder = pack.newDecoder
@@ -79,4 +72,12 @@ private[reactivemongo] object CommandCodecs {
     }
   }
 
+  private[reactivemongo] def writeReadConcern[P <: SerializationPack](pack: P): ReadConcern => pack.Document = {
+    val builder = pack.newBuilder
+
+    { concern: ReadConcern =>
+      builder.document(Seq(builder.elementProducer(
+        "level", builder.string(concern.level))))
+    }
+  }
 }

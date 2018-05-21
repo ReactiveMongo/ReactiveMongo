@@ -1,121 +1,36 @@
 import scala.concurrent.duration.FiniteDuration
 
-import reactivemongo.bson.{
-  BSONDocument,
-  BSONDocumentReader,
-  BSONDocumentWriter
-}
+import reactivemongo.bson.BSONDocument
 
 import reactivemongo.api.{ BSONSerializationPack, DefaultDB, ReadPreference }
 import reactivemongo.api.commands._
 
-import reactivemongo.api.collections.bson.BSONCollection
-
 import org.specs2.concurrent.ExecutionEnv
 
-class CommandSpec(implicit ee: ExecutionEnv)
+final class CommandSpec(implicit ee: ExecutionEnv)
   extends org.specs2.mutable.Specification {
 
   "Commands" title
 
   import Common._
 
-  "FindAndModify" should {
-    sequential
-
-    import reactivemongo.api.commands.bson.BSONFindAndModifyCommand._
-    import reactivemongo.api.commands.bson.BSONFindAndModifyImplicits._
-
-    val colName = s"FindAndModifySpec${System identityHashCode this}"
-    lazy val collection = db(colName)
-    lazy val slowColl = slowDb(colName)
-
-    case class Person(
-      firstName: String,
-      lastName: String,
-      age: Int)
-
-    implicit object PersonReader extends BSONDocumentReader[Person] {
-      def read(doc: BSONDocument): Person = Person(
-        doc.getAs[String]("firstName").getOrElse(""),
-        doc.getAs[String]("lastName").getOrElse(""),
-        doc.getAs[Int]("age").getOrElse(0))
-    }
-
-    implicit object PersonWriter extends BSONDocumentWriter[Person] {
-      def write(person: Person): BSONDocument = BSONDocument(
-        "firstName" -> person.firstName,
-        "lastName" -> person.lastName,
-        "age" -> person.age)
-    }
-
-    val jack1 = Person("Jack", "London", 27)
-    val jack2 = jack1.copy(age = /* updated to */ 40)
-
-    "upsert a doc and fetch it" >> {
-      val upsertOp = Update(
-        BSONDocument(
-          "$set" -> BSONDocument("age" -> 40)),
-        fetchNewObject = true, upsert = true)
-
-      def upsertAndFetch(c: BSONCollection, timeout: FiniteDuration) =
-        c.runCommand(FindAndModify(jack1, upsertOp), ReadPreference.primary).
-          aka("result") must (beLike[FindAndModifyResult] {
-            case result =>
-              println(s"FindAndModify.result = $result")
-              result.lastError.exists(_.upsertedId.isDefined) must beTrue and (
-                result.result[Person] aka "upserted" must beSome[Person](
-                  jack2))
-          }).await(1, timeout)
-
-      "with the default connection" in {
-        upsertAndFetch(collection, timeout)
-      }
-
-      "with the slow connection" in {
-        upsertAndFetch(slowColl, slowTimeout)
-      }
-    }
-
-    "modify a document and fetch its previous value" in {
-      val incrementAge = BSONDocument(
-        "$inc" -> BSONDocument("age" -> 1))
-
-      def future = collection.findAndUpdate(jack2, incrementAge)
-
-      future must (beLike[FindAndModifyResult] {
-        case result =>
-          result.result[Person] aka "previous value" must beSome(jack2) and {
-            collection.find(jack2.copy(age = jack2.age + 1)).one[Person].
-              aka("incremented") must beSome[Person].await(1, timeout)
-          }
-      }).await(1, timeout)
-    }
-
-    "fail" in {
-      val query = BSONDocument()
-      val future = collection.runCommand(
-        FindAndModify(query, Update(BSONDocument("$inc" -> "age"))))
-
-      future.map(_ => Option.empty[Int]).recover {
-        case e: CommandError =>
-          //e.printStackTrace
-          e.code
-      } must beSome( /*code = */ 9).await(1, timeout)
-    }
-  }
-
   "Raw command" should {
     "re-index test collection with command as document" >> {
-      val runner = Command.run(BSONSerializationPack, db.failoverStrategy)
-      def reindexSpec(db: DefaultDB, coll: String, timeout: FiniteDuration) = {
+      lazy val runner = Command.run(BSONSerializationPack, db.failoverStrategy)
+
+      def reindexSpec(db: DefaultDB, coll: String, t: FiniteDuration) = {
         val reIndexDoc = BSONDocument("reIndex" -> coll)
 
-        db(coll).create() must beEqualTo({}).await(0, timeout) and {
+        db(coll).create() must beEqualTo({}).await(0, t) and {
           runner.apply(db, runner.rawCommand(reIndexDoc)).one[BSONDocument](
             ReadPreference.primary) must beLike[BSONDocument] {
-              case doc => doc.getAs[Double]("ok") must beSome(1)
-            }.await(1, timeout)
+              case doc =>
+                if (doc.getAs[Double]("ok").exists(_ != 1)) {
+                  println(s"CommandSpec#reIndex: ${BSONDocument pretty doc}")
+                }
+
+                doc.getAs[Double]("ok") must beSome(1)
+            }.await(1, t)
         }
       }
 

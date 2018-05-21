@@ -1,4 +1,4 @@
-#! /bin/bash
+#! /usr/bin/env bash
 
 set -e
 
@@ -85,6 +85,8 @@ fi
 echo -e "\n  --- MongoDB Configuration ---"
 sed -e 's/^/  /' < "$MONGO_CONF"
 echo -e "  --- end ---\n"
+
+mongod --version
 
 # Print version information
 MV=`mongod --version 2>/dev/null | head -n 1`

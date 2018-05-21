@@ -184,21 +184,34 @@ class MonitorSpec(implicit ee: ExecutionEnv)
       withConAndSys(options = opts) { (con, sysRef) =>
         @inline def dbsystem = sysRef.underlyingActor
 
-        waitIsAvailable(con, Common.failoverStrategy).map { _ =>
-          lazy val nodeSet1 = nodeSet(dbsystem)
-          lazy val connections1 = nodeSet1.nodes.flatMap(_.connected)
+        //println(s"MonitorSpec_1: ${System.currentTimeMillis()}")
 
-          println("MonitorSpec_2")
+        Future.successful(eventually(2, timeout) {
+          isAvailable(con, timeout) must beTrue.await(0, timeout)
+        } and {
+          @volatile var connections1 = Vector.empty[Connection]
 
-          nodeSet(dbsystem).nodes.size must_== 1 and {
-            // #1 - Fully available with expected connection count (2)
-            isAvailable(con, 1.seconds) must beTrue.await(1, timeout) and {
-              connections1.size aka "connected #1" must beTypedEqualTo(2).
-                eventually(2, timeout)
+          //println("MonitorSpec_2")
+
+          eventually(2, timeout) {
+            nodeSet(dbsystem).nodes aka "nodes #1" must beLike[Vector[Node]] {
+              case nodes1 => nodes1.size must_=== 1 and {
+                // #1 - Fully available with expected connection count (2)
+                isAvailable(con, 1.seconds) must beTrue.await(0, timeout)
+              } and {
+                nodes1.flatMap(_.connected) must beLike[Vector[Connection]] {
+                  case cons => cons.size aka "connected #1" must_=== 2 and {
+                    connections1 = cons
+                    ok
+                  }
+                }
+              }
             }
           } and {
-            // #2 - Pass messages to the system to indicate all the connections
-            // are closed, even if the underlying channels are not
+            // #2 - Pass messages to the system to indicate
+            // all the connections are closed,
+            // even if the underlying channels are not
+
             connections1.foreach { con1 =>
               dbsystem.receive(channelClosed(con1.channel.id)) // ensure
             } must_== ({})
@@ -209,19 +222,20 @@ class MonitorSpec(implicit ee: ExecutionEnv)
               isAvailable(con, 1.seconds) must beFalse.await(1, timeout)
             }
           } and {
-            println("MonitorSpec_3")
+            //println("MonitorSpec_3")
 
             // #4 - Pass message to the system so the first connection
             // is considered connected, so it's used to probe isMaster again;
             // The channel of this connection is deregistered,
-            // so the incoming buffer is not read (and so no isMaster response).
+            // so the incoming buffer is not read
+            // (and so no isMaster response).
 
             val before4 = System.currentTimeMillis()
 
             connections1.headOption.foreach { con1 =>
               con1.channel.deregister()
               /* ... so isMaster sent on ChannelConnected
-                 thereafter cannot succeed */
+               thereafter cannot succeed */
 
               dbsystem.receive(channelConnected(con1.channel.id))
             }
@@ -239,10 +253,12 @@ class MonitorSpec(implicit ee: ExecutionEnv)
               // The nodeset is still not available,
               // as the channel of the first connection used for isMaster
               // is deregistered/paused for now
-              isAvailable(con, timeout) must beFalse.await(1, unavailTimeout)
+              eventually(2, timeout) {
+                isAvailable(con, timeout) must beFalse.await(0, unavailTimeout)
+              }
             }
           } and {
-            println("MonitorSpec_4")
+            //println("MonitorSpec_4")
 
             // #5 - Completely close the channel (only deregistered until now)
             // of the first connection, which is waiting for isMaster response
@@ -257,6 +273,7 @@ class MonitorSpec(implicit ee: ExecutionEnv)
             // is indicated as closed (see MongoDBSystem#cch2)
             nodeSet(dbsystem).nodes.headOption.
               map(_.pingInfo.lastIsMasterId) must beSome(-1)
+
           } and {
             // #6 - Remove the first/closed connection from the NodeSet,
             // then there is only the second (disconnected) connection,
@@ -283,17 +300,21 @@ class MonitorSpec(implicit ee: ExecutionEnv)
 
               isAvailable(con, 1.seconds) must beTrue.await(1, timeout)
             } and {
-              nodeSet(dbsystem).nodes.flatMap(_.connected).size must_== 1
+              nodeSet(dbsystem).nodes.flatMap(_.connected) must not(beEmpty)
             }
           }
-        }
+        })
       }.await(0, timeout * expectFactor)
     }
   }
 
   // ---
 
-  def withConAndSys[T](nodes: Seq[String] = Seq(Common.primaryHost), options: MongoConnectionOptions = Common.DefaultOptions, drv: MongoDriver = Common.driver, authentications: Seq[Authenticate] = Seq.empty[Authenticate])(f: (MongoConnection, TestActorRef[StandardDBSystem]) => Future[T]): Future[T] = {
+  private def withConAndSys[T](
+    nodes: Seq[String] = Seq(Common.primaryHost),
+    options: MongoConnectionOptions = Common.DefaultOptions,
+    drv: MongoDriver = Common.driver,
+    authentications: Seq[Authenticate] = Seq.empty[Authenticate])(f: (MongoConnection, TestActorRef[StandardDBSystem]) => Future[T]): Future[T] = {
     // See MongoDriver#connection
     val supervisorName = s"monitorspec-sup-${System identityHashCode ee}"
     val poolName = s"monitorspec-con-${System identityHashCode f}"

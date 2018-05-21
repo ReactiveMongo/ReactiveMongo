@@ -15,8 +15,7 @@
     <logger name="reactivemongo.core" level="OFF" />
 
     <logger name="shaded.netty" level="WARN" />
-    <logger name="shaded.netty.util.ResourceLeakDetector" level="TRACE" />
-    <logger name="shaded.netty.channel.DefaultChannelPipeline" level="DEBUG" />
+    <!-- logger name="shaded.netty.util.ResourceLeakDetector" level="TRACE" / -->
 
     <root level="WARN">
       <appender-ref ref="Console"/>

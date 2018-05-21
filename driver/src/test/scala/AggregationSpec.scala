@@ -4,13 +4,7 @@ import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
 
 import reactivemongo.bson._
-import reactivemongo.api.{
-  Cursor,
-  CursorFlattener,
-  CursorProducer,
-  FlattenedCursor,
-  WrappedCursor
-}
+import reactivemongo.api.{ Cursor, CursorProducer, WrappedCursor }
 import reactivemongo.api.collections.bson.BSONCollection
 
 import org.specs2.concurrent.ExecutionEnv
@@ -71,11 +65,8 @@ class AggregationSpec(implicit ee: ExecutionEnv)
 
       coll.aggregate(IndexStats, List(Sort(Ascending("name")))).
         map(_.head[IndexStatsResult]) must beLike[List[IndexStatsResult]] {
-          case IndexStatsResult("_id_", k1, _, _) ::
-            IndexStatsResult("city_text_state_text", k2, _, _) :: Nil =>
-            k1.getAs[BSONNumberLike]("_id").map(_.toInt) must beSome(1) and {
-              k2.getAs[String]("_fts") must beSome("text")
-            } and {
+          case IndexStatsResult("city_text_state_text", k2, _, _) :: Nil =>
+            k2.getAs[String]("_fts") must beSome("text") and {
               k2.getAs[BSONNumberLike]("_ftsx").map(_.toInt) must beSome(1)
             }
         }.await(0, timeout)
@@ -259,13 +250,6 @@ class AggregationSpec(implicit ee: ExecutionEnv)
             implicit def fooProducer[T] = new CursorProducer[T] {
               type ProducedCursor = FooCursor[T]
               def produce(base: Cursor[T]) = new DefaultFooCursor(base)
-            }
-
-            implicit def fooFlattener = new CursorFlattener[FooCursor] {
-              def flatten[T](future: Future[FooCursor[T]]): FooCursor[T] =
-                new FlattenedCursor[T](future) with FooCursor[T] {
-                  def foo = "Flattened"
-                }
             }
 
             // Aggregation itself

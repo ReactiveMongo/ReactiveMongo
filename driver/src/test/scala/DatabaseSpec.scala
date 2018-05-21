@@ -111,8 +111,6 @@ class DatabaseSpec(implicit ee: ExecutionEnv)
           hash.md5 must not(beEmpty[String])
         } and {
           hash.collectionHashes must not(beEmpty[Map[String, String]])
-        } and {
-          hash.timeMillis must beGreaterThan(0L)
         }
       }.await(1, timeout)
     }

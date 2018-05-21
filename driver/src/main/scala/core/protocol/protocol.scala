@@ -121,11 +121,12 @@ private[reactivemongo] class RequestEncoder
 
 object ReplyDocumentIterator {
   private[reactivemongo] def parse[P <: SerializationPack, A](pack: P)(response: Response)(implicit reader: pack.Reader[A]): Iterator[A] = response match {
-    case Response.CommandError(_, _, _, cause) => new Iterator[A] {
-      val hasNext = false
-      @inline def next: A = throw cause
-      //throw ReplyDocumentIteratorExhaustedException(cause)
-    }
+    case Response.CommandError(_, _, _, cause) =>
+      new Iterator[A] {
+        val hasNext = false
+        @inline def next: A = throw cause
+        //throw ReplyDocumentIteratorExhaustedException(cause)
+      }
 
     case Response.WithCursor(_, _, _, _, _, preloaded) => {
       val buf = response.documents
@@ -136,7 +137,7 @@ object ReplyDocumentIterator {
         try {
           buf.skipBytes(buf.getIntLE(buf.readerIndex))
 
-          def docs = apply[P, A](pack)(response.reply, buf)
+          def docs = parseDocuments[P, A](pack)(buf)
 
           val firstBatch = preloaded.iterator.map { bson =>
             pack.deserialize(pack.document(bson), reader)
@@ -153,11 +154,13 @@ object ReplyDocumentIterator {
       }
     }
 
-    case _ => apply[P, A](pack)(response.reply, response.documents)
+    case _ => parseDocuments[P, A](pack)(response.documents)
   }
 
-  // TODO: Deprecated the `reply` parameter
-  def apply[P <: SerializationPack, A](pack: P)(reply: Reply, buffer: ByteBuf)(implicit reader: pack.Reader[A]): Iterator[A] = new Iterator[A] {
+  @deprecated("Use `parseDocuments`", "0.14.0")
+  def apply[P <: SerializationPack, A](pack: P)(reply: Reply, buffer: ByteBuf)(implicit reader: pack.Reader[A]): Iterator[A] = parseDocuments[P, A](pack)(buffer)
+
+  private[core] def parseDocuments[P <: SerializationPack, A](pack: P)(buffer: ByteBuf)(implicit reader: pack.Reader[A]): Iterator[A] = new Iterator[A] {
     override val isTraversableAgain = false // TODO: Add test
     override def hasNext = buffer.isReadable()
 
@@ -351,27 +354,21 @@ private[reactivemongo] class ResponseDecoder
     def info = ResponseInfo(chanId)
 
     //val docs = frame.copy() // 'detach' as frame is reused by networking
-    val docs: ByteBuf = {
-      if (reply.numberReturned == 0) {
-        frame.discardReadBytes()
-        Unpooled.EMPTY_BUFFER
-      } else {
-        // Copy as unpooled (non-derived) buffer
-        val buf = Unpooled.buffer(frame.readableBytes)
-
-        buf.writeBytes(frame)
-
-        buf
-      }
-    }
 
     //println(s"_here: ${frame.refCnt} / ${docs.readableBytes}")
 
     def response = if (reply.cursorID == 0 && reply.numberReturned > 0) {
+      // Copy as unpooled (non-derived) buffer
+      val docs = Unpooled.buffer(frame.readableBytes)
+
+      docs.writeBytes(frame)
+      frame.release()
+
       first(docs) match {
-        case Failure(cause) =>
+        case Failure(cause) => {
           cause.printStackTrace()
           Response.CommandError(header, reply, info, DatabaseException(cause))
+        }
 
         case Success(doc) => {
           //println(s"doc = ${BSONDocument pretty doc}")
@@ -424,25 +421,35 @@ private[reactivemongo] class ResponseDecoder
           }
         }
       }
-    } else {
+    } else if (reply.numberReturned > 0) {
+      // Copy as unpooled (non-derived) buffer
+      val docs = Unpooled.buffer(frame.readableBytes)
+
+      docs.writeBytes(frame)
+      frame.release()
+
       Response(header, reply, docs, info)
+    } else {
+      frame.discardReadBytes()
+
+      Response(header, reply, Unpooled.EMPTY_BUFFER, info)
     }
 
-    try {
-      out.add(response)
-    } finally {
-      frame.release() // X
-
-      ()
-    }
+    out.add(response)
 
     ()
   }
 
   @inline private def first(buf: ByteBuf) =
     Try[reactivemongo.bson.BSONDocument] {
-      val docBuf = ChannelBufferReadableBuffer(
-        buf readBytes buf.getIntLE(buf.readerIndex))
+      val sz = buf.getIntLE(buf.readerIndex)
+      val bytes = Array.ofDim[Byte](sz)
+
+      // Avoid .readBytes(sz) which internally allocate a ByteBuf
+      // (which would require to manage its release)
+      buf.readBytes(bytes)
+
+      val docBuf = ChannelBufferReadableBuffer(Unpooled wrappedBuffer bytes)
 
       reactivemongo.api.BSONSerializationPack.readFromBuffer(docBuf)
     }

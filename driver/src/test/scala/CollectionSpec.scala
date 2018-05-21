@@ -188,6 +188,7 @@ class CollectionSpec(implicit protected val ee: ExecutionEnv)
     }
 
     "read documents skipping errors using collect" >> {
+      // TODO: Move to CursorSpec?
       implicit val reader = new SometimesBuggyPersonReader
 
       def resultSpec(c: BSONCollection, timeout: FiniteDuration) =
@@ -244,6 +245,7 @@ class CollectionSpec(implicit protected val ee: ExecutionEnv)
     { // Find & update
       implicit val reader = PersonReader
       implicit val writer = PersonWriter
+      // TODO: Move to FindAndModifySpec
 
       def findAndUpdateSpec(c: BSONCollection, timeout: FiniteDuration, five: Person = person5) = {
         "by updating age of 'Joline', & returns the old document" in {

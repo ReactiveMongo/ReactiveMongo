@@ -260,11 +260,12 @@ class DriverSpec(implicit ee: ExecutionEnv)
       }
 
       "with the slow connection" in {
-        slowConnection.flatMap(
-          _.authenticate(dbName, s"test-$id", s"password-$id")).
-          aka("authentication") must beLike[SuccessfulAuthentication](
-            { case _ => ok }).await(1, slowTimeout)
-
+        eventually(2, timeout) {
+          slowConnection.flatMap(
+            _.authenticate(dbName, s"test-$id", s"password-$id")).
+            aka("authentication") must beLike[SuccessfulAuthentication](
+              { case _ => ok }).await(0, slowTimeout)
+        }
       }
     }
 
@@ -309,7 +310,7 @@ class DriverSpec(implicit ee: ExecutionEnv)
       drv.close(timeout) must not(throwA[Exception]).await(1, timeout)
     }
 
-    "fail on DB without authentication" >> {
+    "fail on DB with invalid authentication" >> {
       val auth = Authenticate(Common.commonDb, "test", "password")
 
       "with the default connection" in {
@@ -339,9 +340,13 @@ class DriverSpec(implicit ee: ExecutionEnv)
           List(slowPrimary), options = slowOpts, authentications = Seq(auth))
 
         Common.slowProxy.isStarted must beTrue and {
-          con.database(Common.commonDb, slowFailover).
-            aka("database resolution") must throwA[PrimaryUnavailableException].
-            await(0, slowTimeout + 1.second)
+          eventually(2, timeout) {
+            //println("DriverSpec_1")
+
+            con.database(Common.commonDb, slowFailover).
+              aka("resolution") must throwA[PrimaryUnavailableException].
+              await(0, slowTimeout + timeout)
+          }
         }
       }
     }

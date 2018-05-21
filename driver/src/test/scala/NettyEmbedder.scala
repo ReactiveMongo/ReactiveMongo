@@ -108,6 +108,8 @@ object NettyEmbedder extends LowPriorityNettyEmbedder {
         def operationComplete(op: ChannelFuture) = {
           if (op.isSuccess) ready.success({})
           else ready.failure(op.cause)
+
+          ()
         }
       })
 
@@ -157,6 +159,8 @@ object NettyEmbedder extends LowPriorityNettyEmbedder {
         def operationComplete(op: ChannelFuture) = {
           if (op.isSuccess) ready.success(chan)
           else ready.failure(op.cause)
+
+          ()
         }
       })
 
@@ -190,6 +194,8 @@ object NettyEmbedder extends LowPriorityNettyEmbedder {
         def operationComplete(op: ChannelFuture) = {
           if (op.isSuccess) ready.success(chan)
           else ready.failure(op.cause)
+
+          ()
         }
       })
 

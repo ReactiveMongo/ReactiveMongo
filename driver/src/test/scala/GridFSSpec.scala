@@ -48,8 +48,6 @@ class GridFSSpec(implicit ee: ExecutionEnv)
     gfs: GridFS[BSONSerializationPack.type],
     timeout: FiniteDuration) = {
 
-    sequential
-
     val filename1 = s"file1-${System identityHashCode gfs}"
     lazy val file1 = DefaultFileToSave(
       Some(filename1), Some("application/file"))

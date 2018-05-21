@@ -3,7 +3,9 @@
 SCRIPT_DIR=`dirname $0`
 JAVA_COMPAT=`javac -version 2>&1 | grep 1.7 | wc -l`
 
-killall -9 mongod
+if [ ! "$CATEGORY" = "UNIT_TESTS" ]; then
+  killall -9 mongod
+fi
 
 rm -rf "$HOME/.ivy2/cache/org.reactivemongo/"
 
