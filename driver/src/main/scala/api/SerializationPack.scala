@@ -34,8 +34,7 @@ trait SerializationPack { self: Singleton =>
   import reactivemongo.core.netty.ChannelBufferReadableBuffer
 
   final def readAndDeserialize[A](response: Response, reader: Reader[A]): A = {
-    val buf = response.documents
-    val channelBuf = ChannelBufferReadableBuffer(buf)
+    val channelBuf = ChannelBufferReadableBuffer(response.documents)
     readAndDeserialize(channelBuf, reader)
   }
 
@@ -106,6 +105,9 @@ object SerializationPack {
   private[reactivemongo] trait Decoder[P <: SerializationPack with Singleton] {
     protected val pack: P
 
+    /** Returns the names of the document elements. */
+    def names(document: pack.Document): Set[String]
+
     /**
      * @returnsNamedElement, if the element is a boolean-like field
      * (numeric or boolean).
@@ -131,6 +133,11 @@ object SerializationPack {
      * @returnsNamedElement, if the element is an integer field.
      */
     def int(document: pack.Document, name: String): Option[Int]
+
+    /**
+     * @returnsNamedElement, if the element is an long field.
+     */
+    def long(document: pack.Document, name: String): Option[Long]
 
     /**
      * @returnsNamedElement, if the element is an string field.

@@ -47,49 +47,7 @@ When running against MongoDB 2.6, the command must replace `exclude mongo2` with
 
 *Reproduce Travis build:*
 
-To reproduce a Travis build, the following script can be used to setup a local test environment.
-
-```
-# According travis `env`
-export CI_CATEGORY=INTEGRATION_TESTS \
-       AKKA_VERSION=2.5.6 \
-       ITERATEES_VERSION=2.6.1 \
-       MONGO_PROFILE=invalid-ssl \
-       MONGO_VER=3_4 \
-       ENV_FILE="/tmp/integration-env.sh"
-
-# Settings to start mongod (available in local PATH)
-# !! Make sure not have any other services already bound on the ports
-export MONGO_MINOR="3.4.10" \
-       PRIMARY_HOST="localhost:27018" \
-       PRIMARY_SLOW_PROXY="localhost:27019"
-
-./.ci_scripts/setupEnv.sh $MONGO_VER $MONGO_MINOR $MONGO_PROFILE \
-  $PRIMARY_HOST $PRIMARY_SLOW_PROXY "$ENV_FILE"
-
-if [ "x$CI_CATEGORY" = "xINTEGRATION_TESTS" ]; then ( \
-  ./.ci_scripts/fork-mongod.sh /tmp/integration-env.sh); fi
-```
-
-Once the local environment is set up, the test build can be executed using the following commands.
-
-```
-export SCALA_VERSION=2.12.4
-
-./.ci_scripts/validate.sh /tmp/integration-env.sh
-```
-
-It's possible to restrict the executed tests as below.
-
-```
-export TEST_CLASSES=UpdateSpec
-
-# Only run the `UpdateSpec` test suite
-./.ci_scripts/validate.sh /tmp/integration-env.sh
-
-export TEST_CLASSES="UpdateSpec DriverSpec CursorSpec"
-./.ci_scripts/validate.sh /tmp/integration-env.sh
-```
+To reproduce a Travis build, see the [Docker](tools/docker/README.md) tools.
 
 ### Learn More
 

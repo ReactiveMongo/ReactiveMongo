@@ -75,17 +75,13 @@ import reactivemongo.util.LazyLogger
 class MongoConnection(
   val supervisor: String,
   val name: String,
-  val actorSystem: ActorSystem,
+  @deprecated("Will be private", "0.14.0") val actorSystem: ActorSystem,
   val mongosystem: ActorRef,
-  val options: MongoConnectionOptions) {
+  val options: MongoConnectionOptions) { // TODO: toString as MongoURI
   import Exceptions._
 
   @deprecated("Create with an explicit supervisor and connection names", "0.11.14")
   def this(actorSys: ActorSystem, mongoSys: ActorRef, opts: MongoConnectionOptions) = this(s"unknown-${System identityHashCode mongoSys}", s"unknown-${System identityHashCode mongoSys}", actorSys, mongoSys, opts)
-
-  import MongoConnection.logger
-
-  private val lnm = s"$supervisor/$name" // log name
 
   // TODO: Review
   private[api] var history = () => InternalState.empty
@@ -120,17 +116,17 @@ class MongoConnection(
    * @param failoverStrategy $failoverStrategy
    */
   def database(name: String, failoverStrategy: FailoverStrategy = options.failoverStrategy)(implicit context: ExecutionContext): Future[DefaultDB] =
-    waitIsAvailable(failoverStrategy, databaseSTE()).
+    waitIsAvailable(failoverStrategy, stackTrace()).
       map(_ => apply(name, failoverStrategy))
 
-  @inline private def databaseSTE() =
+  @inline private def stackTrace() =
     Thread.currentThread.getStackTrace.tail.tail.take(2).reverse
 
   /** Returns a future that will be successful when node set is available. */
   private[api] def waitIsAvailable(
     failoverStrategy: FailoverStrategy,
     contextSTE: Array[StackTraceElement])(implicit ec: ExecutionContext): Future[Unit] = {
-    logger.debug(s"[$lnm] Waiting is available...")
+    debug("Waiting is available...")
 
     val timeoutFactor = 1.25D // TODO: Review
     val timeout: FiniteDuration = (1 to failoverStrategy.retries).
@@ -159,7 +155,7 @@ class MongoConnection(
 
   private def whenActive[T](f: => Future[T]): Future[T] = {
     if (killed) {
-      logger.debug(s"[$lnm] Cannot send request when the connection is killed")
+      debug("Cannot send request when the connection is killed")
       Future.failed(new ClosedException(supervisor, name, history()))
     } else f
   }
@@ -190,14 +186,23 @@ class MongoConnection(
     expectingResponse.future
   }
 
+  @deprecated("Use `authenticate` with `failoverStrategy`", "0.14.0")
+  def authenticate(db: String, user: String, password: String): Future[SuccessfulAuthentication] = authenticate(db, user, password, options.failoverStrategy)(actorSystem.dispatcher)
+
   /**
    * Authenticates the connection on the given database.
    *
    * @param db $dbName
    * @param user the user name
    * @param password the user password
+   * @param failoverStrategy $failoverStrategy
    */
-  def authenticate(db: String, user: String, password: String): Future[SuccessfulAuthentication] = whenActive {
+  def authenticate(
+    db: String,
+    user: String,
+    password: String,
+    failoverStrategy: FailoverStrategy = options.failoverStrategy)(implicit ec: ExecutionContext): Future[SuccessfulAuthentication] = waitIsAvailable(
+    failoverStrategy, stackTrace()).flatMap { _ =>
     val req = AuthRequest(Authenticate(db, user, password))
     mongosystem ! req
     req.future
@@ -206,21 +211,22 @@ class MongoConnection(
   /**
    * Closes this MongoConnection (closes all the channels and ends the actors).
    */
-  def askClose()(implicit timeout: FiniteDuration): Future[_] =
-    whenActive { ask(monitor, Close)(Timeout(timeout)) }
+  def askClose()(implicit timeout: FiniteDuration): Future[_] = whenActive {
+    ask(monitor, Close("MongoConnection.askClose"))(Timeout(timeout))
+  }
 
   /**
    * Closes this MongoConnection
    * (closes all the channels and ends the actors)
    */
   @deprecated("Use [[askClose]]", "0.13.0")
-  def close(): Unit = monitor ! Close
+  def close(): Unit = monitor ! Close("MongoConnection.close")
 
   private case class IsAvailable(result: Promise[ProtocolMetadata]) {
-    override val toString = "IsAvailable?"
+    override val toString = s"IsAvailable#${System identityHashCode this}?"
   }
   private case class IsPrimaryAvailable(result: Promise[ProtocolMetadata]) {
-    override val toString = "IsPrimaryAvailable?"
+    override val toString = s"IsPrimaryAvailable#${System identityHashCode this}?"
   }
 
   /**
@@ -252,17 +258,22 @@ class MongoConnection(
       Future.firstCompletedOf(Seq(
         p.future.recoverWith {
           case cause: Exception =>
-            logger.warn(s"[$lnm] Fails to probe the connection monitor", cause)
+            warn(s"Fails to probe the connection monitor: $check", cause)
 
             unavailResult
         },
         after(timeout, actorSystem.scheduler)({
-          logger.warn(s"[$lnm] Timeout while probing the connection monitor")
-          unavailResult
+          if (p.future.isCompleted) {
+            p.future // discard timeout as probing has completed
+          } else {
+            // TODO: Logging
+            warn(s"Timeout after $timeout while probing the connection monitor: $check")
+            unavailResult
+          }
         })))
     }
 
-  private[api] val monitor = actorSystem.actorOf(
+  private[api] lazy val monitor = actorSystem.actorOf(
     Props(new MonitorActor), s"Monitor-$name")
 
   // TODO: Remove (use probe)
@@ -280,7 +291,7 @@ class MongoConnection(
 
     val receive: Receive = {
       case PrimaryAvailable(meta) => {
-        logger.debug(s"[$lnm] A primary is available: $meta")
+        debug(s"A primary is available: $meta")
 
         metadata = Some(meta)
 
@@ -290,7 +301,7 @@ class MongoConnection(
       }
 
       case PrimaryUnavailable => {
-        logger.debug(s"[$lnm] There is no primary available")
+        debug("There is no primary available")
 
         if (primaryAvailable.isCompleted) {
           primaryAvailable = Promise[ProtocolMetadata]()
@@ -298,7 +309,7 @@ class MongoConnection(
       }
 
       case SetAvailable(meta) => {
-        logger.debug(s"[$lnm] A node is available: $meta")
+        debug(s"A node is available: $meta")
 
         metadata = Some(meta)
 
@@ -308,7 +319,7 @@ class MongoConnection(
       }
 
       case SetUnavailable => {
-        logger.debug(s"[$lnm] No node seems to be available")
+        debug("No node seems to be available")
 
         if (setAvailable.isCompleted) {
           setAvailable = Promise[ProtocolMetadata]()
@@ -325,8 +336,8 @@ class MongoConnection(
         ()
       }
 
-      case Close => {
-        logger.debug(s"[$lnm] Monitor received Close")
+      case Close(src) => {
+        debug(s"Monitor received Close request from $src")
 
         killed = true
         primaryAvailable = Promise.failed[ProtocolMetadata](
@@ -335,14 +346,14 @@ class MongoConnection(
         setAvailable = Promise.failed[ProtocolMetadata](
           new Exception(s"[$lnm] Closing connection..."))
 
-        mongosystem ! Close
+        mongosystem ! Close("MonitorActor#Close")
         waitingForClose += sender
 
         ()
       }
 
       case Closed => {
-        logger.debug(s"[$lnm] Monitor ${self.path} is now closed")
+        debug("Monitor is now closed")
 
         waitingForClose.dequeueAll(_ => true).foreach(_ ! Closed)
         context.stop(self)
@@ -350,8 +361,24 @@ class MongoConnection(
       }
     }
 
-    override def postStop = logger.debug(s"Monitor $self stopped ($lnm)")
+    override def postStop = debug("Monitor is stopped")
   }
+
+  // --- Logging ---
+
+  import MongoConnection.logger
+
+  private val lnm = s"$supervisor/$name" // log name
+
+  //@inline private def _println(msg: => String) = println(s"[$lnm] $msg")
+
+  @inline private def debug(msg: => String) = logger.debug(s"[$lnm] $msg")
+
+  @inline private def warn(msg: => String) = logger.warn(s"[$lnm] $msg")
+
+  @inline private def warn(msg: => String, cause: Exception) =
+    logger.warn(s"[$lnm] $msg", cause)
+
 }
 
 object MongoConnection {
@@ -428,25 +455,39 @@ object MongoConnection {
   }
 
   private def parseHosts(hosts: String) = hosts.split(",").toList.map { host =>
-    host.split(':').toList match {
+    host.trim.split(':').toList match {
       case host :: port :: Nil => host -> {
         try {
           val p = port.toInt
           if (p > 0 && p < 65536) p
-          else throw new URIParsingException(s"Could not parse hosts '$hosts' from URI: invalid port '$port'")
+          else throw new URIParsingException(
+            s"Could not parse hosts '$hosts' from URI: invalid port '$port'")
+
         } catch {
-          case _: NumberFormatException => throw new URIParsingException(s"Could not parse hosts '$hosts' from URI: invalid port '$port'")
-          case NonFatal(e)              => throw e
+          case _: NumberFormatException => throw new URIParsingException(
+            s"Could not parse hosts '$hosts' from URI: invalid port '$port'")
+
+          case NonFatal(e) => throw e
         }
       }
+
+      case "" :: _ => throw new URIParsingException(
+        s"No valid host in the URI: '$hosts'")
+
       case host :: Nil => host -> DefaultPort
-      case _           => throw new URIParsingException(s"Could not parse hosts from URI: invalid definition '$hosts'")
+
+      case _ => throw new URIParsingException(
+        s"Could not parse hosts from URI: invalid definition '$hosts'")
     }
   }
 
   private def parseHostsAndDbName(hostsPortAndDbName: String): (Option[String], List[(String, Int)]) = hostsPortAndDbName.split("/").toList match {
-    case hosts :: Nil           => None -> parseHosts(hosts.takeWhile(_ != '?'))
-    case hosts :: dbName :: Nil => Some(dbName.takeWhile(_ != '?')) -> parseHosts(hosts)
+    case hosts :: Nil =>
+      None -> parseHosts(hosts.takeWhile(_ != '?'))
+
+    case hosts :: dbName :: Nil =>
+      Some(dbName.takeWhile(_ != '?')) -> parseHosts(hosts)
+
     case _ =>
       throw new URIParsingException(
         s"Could not parse hosts and database from URI: '$hostsPortAndDbName'")

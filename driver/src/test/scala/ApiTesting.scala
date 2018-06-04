@@ -1,17 +1,33 @@
 package reactivemongo.api
 
-import scala.concurrent.{ ExecutionContext, Future }
+import scala.concurrent.{ ExecutionContext, Future, Promise }
 import scala.concurrent.duration.{ FiniteDuration, SECONDS }
 
 import akka.util.Timeout
 import akka.actor.ActorRef
 
-import shaded.netty.channel.ChannelFuture
+import shaded.netty.channel.{
+  Channel,
+  ChannelId,
+  DefaultChannelId
+}
 
-import reactivemongo.core.protocol.Response
-import reactivemongo.core.nodeset.{ Authenticate, NodeSet, Node }
+import shaded.netty.buffer.{ ByteBuf, Unpooled }
+
+import reactivemongo.core.protocol.{
+  Request,
+  Response,
+  ResponseFrameDecoder,
+  ResponseDecoder
+}
+import reactivemongo.core.nodeset.{
+  Authenticate,
+  ChannelFactory,
+  NodeSet
+}
 import reactivemongo.core.actors, actors.{
-  ChannelClosed,
+  ChannelConnected,
+  ChannelDisconnected,
   MongoDBSystem,
   RequestId,
   StandardDBSystem
@@ -51,21 +67,33 @@ package object tests extends QueryCodecs[BSONSerializationPack.type] {
 
   def nodeSet(sys: MongoDBSystem): NodeSet = sys.getNodeSet
 
-  def channelClosed(id: Int) = ChannelClosed(id)
+  def channelConnected(id: ChannelId) = ChannelConnected(id)
+
+  def channelClosed(id: ChannelId) = ChannelDisconnected(id)
 
   def makeRequest[T](cursor: Cursor[T], maxDocs: Int)(implicit ec: ExecutionContext): Future[Response] = cursor.asInstanceOf[CursorOps[T]].makeRequest(maxDocs)
 
   def nextResponse[T](cursor: Cursor[T], maxDocs: Int) =
     cursor.asInstanceOf[CursorOps[T]].nextResponse(maxDocs)
 
-  def fakeResponse(doc: BSONDocument, reqID: Int = 2, respTo: Int = 1, chanId: Int = 1): Response = {
+  @inline def channelBuffer(doc: BSONDocument) =
+    reactivemongo.core.netty.ChannelBufferWritableBuffer.single(doc)
+
+  @inline def bufferSeq(doc: BSONDocument) =
+    reactivemongo.core.netty.BufferSequence.single(doc)
+
+  def fakeResponse(
+    doc: BSONDocument,
+    reqID: Int = 2,
+    respTo: Int = 1,
+    chanId: ChannelId = DefaultChannelId.newInstance()): Response = {
     val reply = reactivemongo.core.protocol.Reply(
       flags = 1,
       cursorID = 1,
       startingFrom = 0,
       numberReturned = 1)
 
-    val message = reactivemongo.core.netty.BufferSequence.single(doc).merged
+    val message = bufferSeq(doc).merged
 
     val header = reactivemongo.core.protocol.MessageHeader(
       messageLength = message.capacity,
@@ -99,7 +127,104 @@ package object tests extends QueryCodecs[BSONSerializationPack.type] {
 
   @inline def nodeSet(sys: StandardDBSystem) = sys._nodeSet
 
-  @inline def isMasterReqId: Int = RequestId.isMaster.next
+  @inline def isMasterReqId(): Int = RequestId.isMaster.next
 
-  @inline def connectAll(sys: StandardDBSystem, ns: NodeSet, f: (Node, ChannelFuture) => (Node, ChannelFuture) = { _ -> _ }) = sys.connectAll(ns, f)
+  @inline def connectAll(sys: StandardDBSystem, ns: NodeSet) =
+    sys.connectAll(ns)
+
+  @inline def channelFactory(supervisorName: String, connectionName: String, options: MongoConnectionOptions): ChannelFactory = new ChannelFactory(supervisorName, connectionName, options)
+
+  @inline def createChannel(
+    factory: ChannelFactory,
+    receiver: ActorRef,
+    host: String,
+    port: Int) = factory.create(host, port, receiver)
+
+  @inline def releaseChannelFactory(f: ChannelFactory, clb: Promise[Unit]) =
+    f.release(clb)
+
+  @inline def isMasterRequest(reqId: Int = RequestId.isMaster.next): Request = {
+    import reactivemongo.api.BSONSerializationPack
+    import reactivemongo.api.commands.bson.{
+      BSONIsMasterCommandImplicits,
+      BSONIsMasterCommand
+    }, BSONIsMasterCommand.IsMaster
+    import reactivemongo.api.commands.Command
+
+    val (isMaster, _) = Command.buildRequestMaker(BSONSerializationPack)(
+      IsMaster,
+      BSONIsMasterCommandImplicits.IsMasterWriter,
+      reactivemongo.api.ReadPreference.primaryPreferred,
+      "admin") // only "admin" DB for the admin command
+
+    isMaster(reqId) // RequestId.isMaster
+  }
+
+  @inline def isMasterResponse(response: Response) =
+    RequestId.isMaster accepts response
+
+  def decodeResponse[T]: Array[Byte] => (Tuple2[ByteBuf, Response] => T) => T = {
+    val decoder = new ResponseDecoder()
+
+    { bytes =>
+      val buf = Unpooled.buffer(bytes.size, bytes.size)
+      val out = new java.util.ArrayList[Object](1)
+
+      buf.retain()
+
+      buf.writeBytes(bytes)
+      buf.resetReaderIndex()
+
+      decoder.decode(null, buf, out)
+
+      { f: (Tuple2[ByteBuf, Response] => T) =>
+        try {
+          f(buf -> out.get(0).asInstanceOf[Response])
+        } finally {
+          buf.release()
+          ()
+        }
+      }
+    }
+  }
+
+  val decodeFrameResp: Array[Byte] => List[ByteBuf] = {
+    val decoder = new ResponseFrameDecoder()
+
+    { bytes =>
+      val buf = Unpooled.buffer(bytes.size, bytes.size)
+      val out = new java.util.ArrayList[Object](1)
+
+      buf.writeBytes(bytes)
+      buf.resetReaderIndex()
+
+      decoder.decode(null, buf, out)
+
+      val frames = List.newBuilder[ByteBuf]
+      val it = out.iterator
+
+      while (it.hasNext) {
+        frames += it.next().asInstanceOf[ByteBuf]
+      }
+
+      frames.result()
+    }
+  }
+
+  @inline def initChannel(
+    factory: ChannelFactory,
+    channel: Channel,
+    host: String, port: Int,
+    receiver: ActorRef) = factory.initChannel(channel, host, port, receiver)
+
+  def getBytes(buf: ByteBuf, size: Int): Array[Byte] = {
+    val bytes = Array.ofDim[Byte](size)
+
+    buf.resetReaderIndex()
+    buf.getBytes(0, bytes)
+
+    bytes
+  }
+
+  @inline def dbHash(db: DB with DBMetaCommands, collections: Seq[String] = Seq.empty)(implicit ec: ExecutionContext) = db.hash(collections)
 }

@@ -25,9 +25,9 @@ private[reactivemongo] trait MongoCrAuthentication { system: MongoDBSystem =>
           logger.warn(s"[$lnm] An error has occured while processing getNonce response #${response.header.responseTo}", e)
         },
         { nonce =>
-          logger.debug(s"[$lnm] Got authentication nonce for channel ${response.info.channelId}: $nonce")
+          logger.debug(s"[$lnm] Got authentication nonce for channel ${response.info._channelId}: $nonce")
 
-          whenAuthenticating(response.info.channelId) {
+          whenAuthenticating(response.info._channelId) {
             case (connection, a @ CrAuthenticating(db, user, pass, _)) =>
               connection.send(CrAuthenticate(user, pass, nonce)(db).
                 maker(RequestId.authenticate.next))
@@ -52,7 +52,7 @@ private[reactivemongo] trait MongoCrAuthentication { system: MongoDBSystem =>
     }
 
     case response: Response if RequestId.authenticate accepts response => {
-      logger.debug(s"[$lnm] Got authenticated response! ${response.info.channelId}")
+      logger.debug(s"[$lnm] Got authenticated response! ${response.info._channelId}")
       authenticationResponse(response)(CrAuthenticate.parseResponse(_))
       ()
     }

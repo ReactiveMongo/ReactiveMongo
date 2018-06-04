@@ -104,7 +104,8 @@ object ReadPreference {
   }
 
   /** Reads only from any secondary. */
-  class Secondary @deprecated("Use `secondary(List)`", "0.11.12") (val filterTag: Option[BSONDocument => Boolean])
+  class Secondary @deprecated("Use `secondary(List)`", "0.11.12") (
+    val filterTag: Option[BSONDocument => Boolean])
     extends ReadPreference with Taggable {
 
     private var _tags = List.empty[Map[String, String]]
@@ -303,7 +304,13 @@ sealed trait ReadConcern {
 
 object ReadConcern {
   object Available extends ReadConcern { val level = "available" }
+
+  /** Requires `--enableMajorityReadConcern` */
   object Majority extends ReadConcern { val level = "majority" }
+
   object Local extends ReadConcern { val level = "local" }
   object Linearizable extends ReadConcern { val level = "linearizable" }
+
+  /** Local */
+  @inline private[api] def default: ReadConcern = Local
 }

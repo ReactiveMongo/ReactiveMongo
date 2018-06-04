@@ -1,0 +1,34 @@
+FROM openjdk:8-jdk-alpine
+
+ARG mongoMajor
+ARG mongoProfile
+ARG akkaVersion
+ARG iterateesVersion
+ARG scalaVersion
+
+LABEL org.reactivemongo.mongoMajor="${mongoMajor}" \
+      org.reactivemongo.mongoProfile="${mongoProfile}" \
+      org.reactivemongo.akkaVersion="${akkaVersion}" \
+      org.reactivemongo.iterateesVersion="${iterateesVersion}" \
+      org.reactivemongo.scalaVersion="${scalaVersion}"
+
+ENV MONGO_VER=${mongoMajor} MONGO_PROFILE=${mongoProfile}
+ENV AKKA_VERSION=${akkaVersion} ITERATEES_VERSION=${iterateesVersion}
+ENV SCALA_VERSION=${scalaVersion}
+
+ENV PRIMARY_HOST=db:27018 PRIMARY_SLOW_PROXY=localhost:27019
+
+RUN apk add --no-cache tzdata curl bash git && \
+cp /usr/share/zoneinfo/Europe/Paris /etc/localtime && \
+echo "Europe/Paris" > /etc/timezone && \
+apk del tzdata && \
+cd /root && \
+(curl -L -s -o /dev/stdout 'https://github.com/sbt/sbt/releases/download/v1.1.4/sbt-1.1.4.tgz' | tar -xzvf -) && \
+cd /usr/bin && \
+(curl -L -s -o /dev/stdout 'https://github.com/jwilder/dockerize/releases/download/v0.3.0/dockerize-linux-amd64-v0.3.0.tar.gz' | tar -xzvf -) && \
+(ntpd -d -q -n -p time.google.com || ( \
+echo "Fails to sync time"; true ))
+
+ENV PATH="${PATH}:/root/sbt/bin" SCRIPT_DIR=/root/ReactiveMongo/.ci_scripts
+
+WORKDIR /root/ReactiveMongo

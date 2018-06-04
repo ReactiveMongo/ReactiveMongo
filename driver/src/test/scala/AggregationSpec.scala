@@ -4,33 +4,35 @@ import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
 
 import reactivemongo.bson._
-import reactivemongo.api.{
-  Cursor,
-  CursorFlattener,
-  CursorProducer,
-  FlattenedCursor,
-  WrappedCursor
-}
+import reactivemongo.api.{ Cursor, CursorProducer, WrappedCursor }
 import reactivemongo.api.collections.bson.BSONCollection
 
 import org.specs2.concurrent.ExecutionEnv
 
 class AggregationSpec(implicit ee: ExecutionEnv)
-  extends org.specs2.mutable.Specification {
+  extends org.specs2.mutable.Specification
+  with org.specs2.specification.AfterAll {
 
   "Aggregation framework" title
 
-  import Common._
-
   sequential
+
+  // ---
+
+  import Common.{ timeout, slowTimeout }
+
+  lazy val (db, slowDb) = Common.databases(s"reactivemongo-agg-${System identityHashCode this}", Common.connection, Common.slowConnection)
+
+  def afterAll = { db.drop(); () }
 
   val zipColName = s"zipcodes${System identityHashCode this}"
   lazy val coll = {
     import reactivemongo.api.indexes._, IndexType._
 
     val c = db(zipColName)
-    scala.concurrent.Await.result(c.create().flatMap(_ => c.indexesManager.ensure(Index(
-      List("city" -> Text, "state" -> Text))).map(_ => c)), timeout * 2)
+    scala.concurrent.Await.result(c.create().flatMap(_ =>
+      c.indexesManager.ensure(Index(
+        List("city" -> Text, "state" -> Text))).map(_ => c)), timeout * 2)
   }
   lazy val slowZipColl = slowDb(zipColName)
 
@@ -63,11 +65,8 @@ class AggregationSpec(implicit ee: ExecutionEnv)
 
       coll.aggregate(IndexStats, List(Sort(Ascending("name")))).
         map(_.head[IndexStatsResult]) must beLike[List[IndexStatsResult]] {
-          case IndexStatsResult("_id_", k1, _, _) ::
-            IndexStatsResult("city_text_state_text", k2, _, _) :: Nil =>
-            k1.getAs[BSONNumberLike]("_id").map(_.toInt) must beSome(1) and {
-              k2.getAs[String]("_fts") must beSome("text")
-            } and {
+          case IndexStatsResult("city_text_state_text", k2, _, _) :: Nil =>
+            k2.getAs[String]("_fts") must beSome("text") and {
               k2.getAs[BSONNumberLike]("_ftsx").map(_.toInt) must beSome(1)
             }
         }.await(0, timeout)
@@ -253,13 +252,6 @@ class AggregationSpec(implicit ee: ExecutionEnv)
               def produce(base: Cursor[T]) = new DefaultFooCursor(base)
             }
 
-            implicit def fooFlattener = new CursorFlattener[FooCursor] {
-              def flatten[T](future: Future[FooCursor[T]]): FooCursor[T] =
-                new FlattenedCursor[T](future) with FooCursor[T] {
-                  def foo = "Flattened"
-                }
-            }
-
             // Aggregation itself
             val aggregator = coll.aggregatorContext[BSONDocument](
               firstOp, pipeline, batchSize = Some(1)).prepared[FooCursor]
@@ -348,9 +340,9 @@ class AggregationSpec(implicit ee: ExecutionEnv)
     }
 
     "return a random sample" in {
-      import coll.BatchCommands.AggregationFramework
+      import coll.BatchCommands.AggregationFramework.Sample
 
-      coll.aggregate(AggregationFramework.Sample(2)).map(_.head[ZipCode].
+      coll.aggregate(Sample(2)).map(_.head[ZipCode].
         filter(zipCodes.contains).size) must beEqualTo(2).await(0, timeout)
     } tag "not_mongo26"
   }
@@ -797,16 +789,13 @@ class AggregationSpec(implicit ee: ExecutionEnv)
 
     val places = db(s"places${System identityHashCode this}")
 
-    {
+    "must be inserted" in {
       import reactivemongo.api.indexes._, IndexType._
 
-      // db.place.createIndex({'loc':"2dsphere"})
-      scala.concurrent.Await.result(places.create().flatMap(_ => places.indexesManager.ensure(Index(
-        List("loc" -> Geo2DSpherical))).map(_ => {})), timeout * 2)
-    }
-
-    "must be inserted" in {
-      /*
+      places.create().flatMap { _ =>
+        places.indexesManager.ensure(Index(List("loc" -> Geo2DSpherical)))
+      }.map(_ => {}) must beEqualTo({}).await(1, timeout) and {
+        /*
        {
          "type": "public",
          "loc": {
@@ -825,20 +814,21 @@ class AggregationSpec(implicit ee: ExecutionEnv)
        }
        */
 
-      Future.sequence(Seq(
-        document(
-          "type" -> "public",
-          "loc" -> document(
-            "type" -> "Point", "coordinates" -> array(-73.97, 40.77)),
-          "name" -> "Central Park",
-          "category" -> "Parks"),
-        document(
-          "type" -> "public",
-          "loc" -> document(
-            "type" -> "Point", "coordinates" -> array(-73.88, 40.78)),
-          "name" -> "La Guardia Airport",
-          "category" -> "Airport")).map { doc => places.insert(doc) }).map(_ => {}) must beEqualTo({}).
-        await(0, timeout)
+        Future.sequence(Seq(
+          document(
+            "type" -> "public",
+            "loc" -> document(
+              "type" -> "Point", "coordinates" -> array(-73.97, 40.77)),
+            "name" -> "Central Park",
+            "category" -> "Parks"),
+          document(
+            "type" -> "public",
+            "loc" -> document(
+              "type" -> "Point", "coordinates" -> array(-73.88, 40.78)),
+            "name" -> "La Guardia Airport",
+            "category" -> "Airport")).map { doc => places.insert(doc) }).
+          map(_ => {}) must beEqualTo({}).await(0, timeout)
+      }
     }
 
     "and aggregated using $geoNear" in {

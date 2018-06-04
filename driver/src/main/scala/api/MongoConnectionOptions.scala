@@ -26,7 +26,7 @@ case object ScramSha1Authentication extends AuthenticationMode
  * @param readPreference the default read preference
  * @param failoverStrategy the default failover strategy
  * @param monitorRefreshMS the interval in milliseconds used by monitor to refresh the node set (default: 10000 aka 10s)
- * @param maxIdleTimeMS the maximum number of milliseconds that a [[https://docs.mongodb.com/manual/reference/connection-string/#urioption.maxIdleTimeMS channel can remain idle]] in the connection pool before being removed and closed (default: 0 to disable, as implemented using [[https://docs.jboss.org/netty/3.2/api/org/jboss/netty/handler/timeout/IdleStateHandler.html Netty IdleStateHandler]]); If not 0, must be greater or equal to [[#monitorRefreshMS]]
+ * @param maxIdleTimeMS the maximum number of milliseconds that a [[https://docs.mongodb.com/manual/reference/connection-string/#urioption.maxIdleTimeMS channel can remain idle]] in the connection pool before being removed and closed (default: 0 to disable, as implemented using [[http://netty.io/4.1/api/io/netty/handler/timeout/IdleStateHandler.html Netty IdleStateHandler]]); If not 0, must be greater or equal to [[#monitorRefreshMS]]
  */
 case class MongoConnectionOptions(
   // canonical options - connection

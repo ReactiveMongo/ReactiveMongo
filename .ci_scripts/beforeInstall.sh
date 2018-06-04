@@ -1,4 +1,4 @@
-#! /bin/bash
+#! /usr/bin/env bash
 
 set -e
 
@@ -22,8 +22,12 @@ SCRIPT_DIR=`dirname $0 | sed -e "s|^\./|$PWD/|"`
 echo "[INFO] MongoDB major version: $MONGO_VER"
 
 MONGO_MINOR="3.2.10"
+
+if [ "$MONGO_VER" = "3_4" ]; then
+    MONGO_MINOR="3.4.10"
+fi
     
-if [ "$AKKA_VERSION" = "2.5.6" ]; then
+if [ "$AKKA_VERSION" = "2.5.13" ]; then
     MONGO_MINOR="3.4.10"
     MONGO_VER="3_4"
 
@@ -55,6 +59,7 @@ if [ ! -L "$HOME/ssl/lib/libssl.so.1.0.0" ] && [ ! -f "$HOME/ssl/lib/libssl.so.1
   ln -s "$HOME/ssl/lib/libcrypto.so.1.0.0" "$HOME/ssl/lib/libcrypto.so.10"
 fi
 
+export PATH="$HOME/ssl/bin:$PATH"
 export LD_LIBRARY_PATH="$HOME/ssl/lib:$LD_LIBRARY_PATH"
 
 # Build MongoDB

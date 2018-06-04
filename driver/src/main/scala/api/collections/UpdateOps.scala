@@ -21,9 +21,9 @@ import reactivemongo.api.commands.{
 
 /**
  * @define writeConcernParam the [[https://docs.mongodb.com/manual/reference/write-concern/ writer concern]] to be used
- * @define orderedParam the ordered behaviour
+ * @define orderedParam the [[https://docs.mongodb.com/manual/reference/method/db.collection.update/#perform-an-unordered-update ordered]] behaviour
  */
-trait UpdateOps[P <: SerializationPack with Singleton] {
+private[reactivemongo] trait UpdateOps[P <: SerializationPack with Singleton] {
   collection: GenericCollection[P] =>
 
   protected val pack: P
@@ -145,18 +145,17 @@ trait UpdateOps[P <: SerializationPack with Singleton] {
           val cmd = BatchCommands.UpdateCommand.Update(
             updates, ordered, writeConcern)
 
-          Future.successful(cmd).flatMap(
-            runCommand(_, writePref).flatMap { wr =>
-              val flattened = wr.flatten
+          runCommand(cmd, writePref).flatMap { wr =>
+            val flattened = wr.flatten
 
-              if (!flattened.ok) {
-                // was ordered, with one doc => fail if has an error
-                Future.failed(WriteResult.lastError(flattened).
-                  getOrElse[Exception](GenericDriverException(
-                    s"fails to update: $updates")))
+            if (!flattened.ok) {
+              // was ordered, with one doc => fail if has an error
+              Future.failed(WriteResult.lastError(flattened).
+                getOrElse[Exception](GenericDriverException(
+                  s"fails to update: $updates")))
 
-              } else Future.successful(wr)
-            })
+            } else Future.successful(wr)
+          }
         } else { // Mongo < 2.6
           Future.failed[UpdateWriteResult](GenericDriverException(
             s"unsupported MongoDB version: $meta"))

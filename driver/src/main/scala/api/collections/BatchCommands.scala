@@ -35,11 +35,12 @@ trait BatchCommands[P <: SerializationPack] {
 
   val DeleteCommand: DC[pack.type]
 
-  @deprecated("Will use internal write", "0.13.1")
+  @deprecated("Will use internal writer", "0.13.1")
   def DeleteWriter: pack.Writer[ResolvedCollectionCommand[DeleteCommand.Delete]]
 
   val FindAndModifyCommand: FMC[pack.type]
-  implicit def FindAndModifyWriter: pack.Writer[ResolvedCollectionCommand[FindAndModifyCommand.FindAndModify]]
+  @deprecated("Will use internal writer", "0.14.0")
+  def FindAndModifyWriter: pack.Writer[ResolvedCollectionCommand[FindAndModifyCommand.FindAndModify]]
   implicit def FindAndModifyReader: pack.Reader[FindAndModifyCommand.FindAndModifyResult]
 
   val AggregationFramework: AC[pack.type]

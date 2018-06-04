@@ -30,7 +30,7 @@ class NodeSetSpec(implicit val ee: ExecutionEnv)
 
   "Node set" title
 
-  sequential
+  sequential // for ConnectAllSpec
 
   import reactivemongo.api.tests._
 
@@ -38,48 +38,46 @@ class NodeSetSpec(implicit val ee: ExecutionEnv)
   @inline def timeout = Common.timeout
   lazy val md = Common.newDriver()
   lazy val actorSystem = md.system
-  val nodes = Seq("node1:27017", "node2:27017")
+
+  protected val nodes = Seq(
+    "nodesetspec.node1:27017", "nodesetspec.node2:27017")
 
   section("unit")
   "Node set" should {
     "not be available" >> {
       "if the entire node set is not available" in {
-        withConAndSys(md) { (con, _) => isAvailable(con, timeout) }.
-          aka("is available") must beFalse.await(1, timeout)
+        scala.concurrent.Await.result(withConAndSys(md) {
+          (con, _) => isAvailable(con, timeout)
+        }, timeout) must throwA[java.util.concurrent.TimeoutException]
       }
 
       "if the primary is not available if default preference" in {
-        withCon() { (con, name) =>
-          withConMon(name) { conMon =>
-            conMon ! SetAvailable(ProtocolMetadata.Default)
+        withCon() { (name, con, mon) =>
+          mon ! SetAvailable(ProtocolMetadata.Default)
 
-            waitIsAvailable(con, failoverStrategy).map(_ => true).recover {
-              case reason: PrimaryUnavailableException if (
-                reason.getMessage.indexOf(name) != -1) => false
-            } must beFalse.await(1, timeout)
-          }
+          waitIsAvailable(con, failoverStrategy).map(_ => true).recover {
+            case reason: PrimaryUnavailableException if (
+              reason.getMessage.indexOf(name) != -1) => false
+          } must beFalse.await(1, timeout)
         }
       }
     }
 
     "be available" >> {
       "with the primary if default preference" in {
-        withCon() { (con, name) =>
-          withConMon(name) { conMon =>
-            def test = (for {
-              before <- isAvailable(con, timeout)
-              _ = {
-                conMon ! SetAvailable(ProtocolMetadata.Default)
-                conMon ! PrimaryAvailable(ProtocolMetadata.Default)
-              }
-              _ <- waitIsAvailable(con, failoverStrategy)
-              after <- isAvailable(con, timeout)
-            } yield before -> after).flatMap { res =>
-              con.askClose()(timeout).recover { case _ => () }.map(_ => res)
+        withCon() { (_, con, mon) =>
+          def test = (for {
+            _ <- {
+              mon ! SetAvailable(ProtocolMetadata.Default)
+              mon ! PrimaryAvailable(ProtocolMetadata.Default)
+
+              waitIsAvailable(con, failoverStrategy)
             }
 
-            test must beEqualTo(false -> true).await(1, timeout)
-          }
+            after <- isAvailable(con, timeout)
+          } yield after)
+
+          test must beTrue.await(1, timeout)
         }
       }
 
@@ -89,19 +87,16 @@ class NodeSetSpec(implicit val ee: ExecutionEnv)
             s"using $readPref" in {
               val opts = MongoConnectionOptions(readPreference = readPref)
 
-              withCon(opts) { (con, name) =>
-                withConMon(name) { conMon =>
-                  def test = (for {
-                    before <- isAvailable(con, timeout)
-                    _ = conMon ! SetAvailable(ProtocolMetadata.Default)
-                    _ <- waitIsAvailable(con, failoverStrategy)
-                    after <- isAvailable(con, timeout)
-                  } yield before -> after).flatMap { res =>
-                    con.askClose()(timeout).recover { case _ => () }.map(_ => res)
+              withCon(opts) { (_, con, mon) =>
+                def test = (for {
+                  _ <- {
+                    mon ! SetAvailable(ProtocolMetadata.Default)
+                    waitIsAvailable(con, failoverStrategy)
                   }
+                  after <- isAvailable(con, timeout)
+                } yield after)
 
-                  test must beEqualTo(false -> true).await(1, timeout)
-                }
+                test must beTrue.await(1, timeout)
               }
             }
           }
@@ -110,25 +105,21 @@ class NodeSetSpec(implicit val ee: ExecutionEnv)
 
     "be unavailable" >> {
       "with the primary unavailable if default preference" in {
-        withCon() { (con, name) =>
-          withConMon(name) { conMon =>
-            conMon ! SetAvailable(ProtocolMetadata.Default)
-            conMon ! PrimaryAvailable(ProtocolMetadata.Default)
+        withCon() { (name, con, mon) =>
+          mon ! SetAvailable(ProtocolMetadata.Default)
+          mon ! PrimaryAvailable(ProtocolMetadata.Default)
 
-            def test = (for {
-              _ <- waitIsAvailable(con, failoverStrategy)
-              before <- isAvailable(con, timeout)
-              _ = conMon ! PrimaryUnavailable
-              after <- waitIsAvailable(
-                con, failoverStrategy).map(_ => true).recover {
-                case _ => false
-              }
-            } yield before -> after).flatMap { res =>
-              con.askClose()(timeout).recover { case _ => () }.map(_ => res)
+          def test = (for {
+            _ <- waitIsAvailable(con, failoverStrategy)
+            before <- isAvailable(con, timeout)
+            _ = mon ! PrimaryUnavailable
+            after <- waitIsAvailable(
+              con, failoverStrategy).map(_ => true).recover {
+              case _ => false
             }
+          } yield before -> after)
 
-            test must beEqualTo(true -> false).await(1, timeout)
-          }
+          test must beEqualTo(true -> false).await(1, timeout)
         }
       }
 
@@ -136,24 +127,20 @@ class NodeSetSpec(implicit val ee: ExecutionEnv)
         val opts = MongoConnectionOptions(
           readPreference = ReadPreference.primaryPreferred)
 
-        withCon(opts) { (con, name) =>
-          withConMon(name) { conMon =>
-            conMon ! SetAvailable(ProtocolMetadata.Default)
+        withCon(opts) { (name, con, mon) =>
+          mon ! SetAvailable(ProtocolMetadata.Default)
 
-            def test = (for {
-              _ <- waitIsAvailable(con, failoverStrategy)
-              before <- isAvailable(con, timeout)
-              _ = conMon ! SetUnavailable
-              after <- waitIsAvailable(
-                con, failoverStrategy).map(_ => true).recover {
-                case _ => false
-              }
-            } yield before -> after).flatMap { res =>
-              con.askClose()(timeout).recover { case _ => () }.map(_ => res)
+          def test = (for {
+            _ <- waitIsAvailable(con, failoverStrategy)
+            before <- isAvailable(con, timeout)
+            _ = mon ! SetUnavailable
+            after <- waitIsAvailable(
+              con, failoverStrategy).map(_ => true).recover {
+              case _ => false
             }
+          } yield before -> after)
 
-            test must beEqualTo(true -> false).await(1, timeout)
-          }
+          test must beEqualTo(true -> false).await(1, timeout)
         }
       }
     }
@@ -183,7 +170,7 @@ class NodeSetSpec(implicit val ee: ExecutionEnv)
 
   // ---
 
-  def withConAndSys[T](drv: MongoDriver, options: MongoConnectionOptions = MongoConnectionOptions(nbChannelsPerNode = 1))(f: (MongoConnection, TestActorRef[StandardDBSystem]) => Future[T]): Future[T] = {
+  def withConAndSys[T](drv: MongoDriver, options: MongoConnectionOptions = MongoConnectionOptions(nbChannelsPerNode = 1), _nodes: Seq[String] = nodes)(f: (MongoConnection, TestActorRef[StandardDBSystem]) => Future[T]): Future[T] = {
     // See MongoDriver#connection
     val supervisorName = s"withConAndSys-sup-${System identityHashCode ee}"
     val poolName = s"withConAndSys-con-${System identityHashCode f}"
@@ -196,7 +183,7 @@ class NodeSetSpec(implicit val ee: ExecutionEnv)
       poolName)
 
     def connection = addConnection(
-      drv, poolName, nodes, options, mongosystem).mapTo[MongoConnection]
+      drv, poolName, _nodes, options, mongosystem).mapTo[MongoConnection]
 
     connection.flatMap { con =>
       f(con, mongosystem).flatMap { res =>
@@ -205,26 +192,21 @@ class NodeSetSpec(implicit val ee: ExecutionEnv)
     }
   }
 
-  private def withCon[T](opts: MongoConnectionOptions = MongoConnectionOptions())(f: (MongoConnection, String) => T): T = {
+  private def withCon[T](opts: MongoConnectionOptions = MongoConnectionOptions())(test: (String, MongoConnection, ActorRef) => MatchResult[T]): org.specs2.execute.Result = {
     val name = s"withCon-${System identityHashCode opts}"
     val auths = Seq(Authenticate(Common.commonDb, "test", "password"))
     val con = md.connection(
       nodes, authentications = auths, options = opts, name = Some(name))
 
-    try {
-      f(con, name)
-    } finally {
-      try {
-        Await.result(con.askClose()(timeout), timeout); ()
-      } catch {
-        case cause: Exception => cause.printStackTrace()
+    val res = actorSystem.actorSelection(s"/user/Monitor-$name").
+      resolveOne(timeout).map(test(name, con, _)).andThen {
+        case _ => try {
+          Await.result(con.askClose()(timeout), timeout); ()
+        } catch {
+          case cause: Exception => cause.printStackTrace()
+        }
       }
-    }
-  }
 
-  private def withConMon[T](name: String)(f: ActorRef => MatchResult[T]): MatchResult[Future[ActorRef]] =
-    actorSystem.actorSelection(s"/user/Monitor-$name").
-      resolveOne(timeout) aka "actor ref" must beLike[ActorRef] {
-        case ref => f(ref)
-      }.await(1, timeout)
+    res.await(0, Common.slowTimeout /* tolerate nested timeout */ )
+  }
 }

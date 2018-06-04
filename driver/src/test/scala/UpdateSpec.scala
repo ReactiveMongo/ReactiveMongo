@@ -5,38 +5,30 @@ import reactivemongo.bson._
 import reactivemongo.api.ReadPreference
 import reactivemongo.api.collections.bson.BSONCollection
 
-import reactivemongo.api.commands.{
-  CommandError,
-  DefaultWriteResult,
-  UpdateWriteResult,
-  WriteResult,
-  Upserted
-}
+import reactivemongo.api.commands.{ UpdateWriteResult, WriteResult, Upserted }
 import reactivemongo.api.commands.bson.BSONUpdateCommand._
 import reactivemongo.api.commands.bson.BSONUpdateCommandImplicits._
 
-import org.specs2.concurrent.ExecutionEnv
-
-class UpdateSpec(implicit val ee: ExecutionEnv)
-  extends org.specs2.mutable.Specification with UpdateFixtures {
-
-  "Update" title
-
-  sequential
+trait UpdateSpec extends UpdateFixtures { collectionSpec: CollectionSpec =>
 
   import Common._
 
-  lazy val col1 = db(s"update1${System identityHashCode db}")
-  lazy val slowCol1 = slowDb(s"slowup1${System identityHashCode db}")
-  lazy val col2 = db(s"update2${System identityHashCode slowDb}")
-  lazy val slowCol2 = slowDb(s"slowup2${System identityHashCode slowDb}")
+  private lazy val updCol1 = db(s"update1${System identityHashCode db}")
+  private lazy val slowUpdCol1 = slowDb(s"slowup1${System identityHashCode db}")
+  private lazy val updCol2 = db(s"update2${System identityHashCode slowDb}")
 
-  "ReactiveMongo" should {
+  private lazy val slowUpdCol2 = slowDb(
+    s"slowup2${System identityHashCode slowDb}")
+
+  def updateSpecs = {
+    implicit val personReader = PersonReader
+    implicit val personWriter = PersonWriter
+
     // with fixtures ...
     val jack3 = Person3("Jack", "London", 27, BigDecimal("12.345"))
-    val jack = Person("Jack", "London", 27)
+    val jack = Person("Jack London", 27)
     val jane3 = Person3("Jane", "London", 18, BigDecimal("3.45"))
-    val jane = Person("Jane", "London", 18)
+    val jane = Person("Jack London", 18)
 
     {
       def spec[T: BSONDocumentWriter: BSONDocumentReader](c: BSONCollection, timeout: FiniteDuration, f: => T)(upd: T => T) = {
@@ -55,11 +47,11 @@ class UpdateSpec(implicit val ee: ExecutionEnv)
       section("mongo2", "mongo24", "not_mongo26")
       "upsert with MongoDB < 3" >> {
         "a person with the default connection" in {
-          spec(col1, timeout, jack)(_.copy(age = 33))
+          spec(updCol1, timeout, jack)(_.copy(age = 33))
         }
 
         "a person with the slow connection and Secondary preference" in {
-          val coll = slowCol1.withReadPreference(
+          val coll = slowUpdCol1.withReadPreference(
             ReadPreference.secondaryPreferred)
 
           coll.readPreference must_== ReadPreference.secondaryPreferred and {
@@ -72,11 +64,11 @@ class UpdateSpec(implicit val ee: ExecutionEnv)
       section("gt_mongo32")
       "upsert with MongoDB 3.4+" >> {
         "a person with the default connection" in {
-          spec(col1, timeout, jack3)(_.copy(age = 33))
+          spec(updCol1, timeout, jack3)(_.copy(age = 33))
         }
 
         "a person with the slow connection and Secondary preference" in {
-          val coll = slowCol1.withReadPreference(
+          val coll = slowUpdCol1.withReadPreference(
             ReadPreference.secondaryPreferred)
 
           coll.readPreference must_== ReadPreference.secondaryPreferred and {
@@ -104,23 +96,23 @@ class UpdateSpec(implicit val ee: ExecutionEnv)
       }
 
       "with the default connection" in {
-        spec(col2, timeout)
+        spec(updCol2, timeout)
       }
 
       "with the slow connection" in {
-        spec(slowCol2, slowTimeout)
+        spec(slowUpdCol2, slowTimeout)
       }
     }
 
     "update a document directly using the Update command" in {
       val doc = BSONDocument("_id" -> "foo", "bar" -> 2)
 
-      col2.runCommand(
+      updCol2.runCommand(
         Update(UpdateElement(
           q = doc, u = BSONDocument("$set" -> BSONDocument("bar" -> 3)))),
         ReadPreference.primary) aka "result" must beLike[UpdateWriteResult]({
           case result => result.nModified must_== 1 and (
-            col2.find(BSONDocument("_id" -> "foo")).one[BSONDocument].
+            updCol2.find(BSONDocument("_id" -> "foo")).one[BSONDocument].
             aka("updated") must beSome(BSONDocument(
               "_id" -> "foo", "bar" -> 3)).await(1, timeout))
         }).await(1, timeout)
@@ -145,13 +137,13 @@ class UpdateSpec(implicit val ee: ExecutionEnv)
         "a person with the default connection" in {
           val person = jack.copy(age = 33) // as after previous upsert test
 
-          spec(col1, timeout, person)(_.copy(age = 66))
+          spec(updCol1, timeout, person)(_.copy(age = 66))
         }
 
         "a person with the slow connection" in {
           val person = jane.copy(age = 33) // as after previous upsert test
 
-          spec(slowCol1, slowTimeout, person)(_.copy(age = 66))
+          spec(slowUpdCol1, slowTimeout, person)(_.copy(age = 66))
         }
       }
       section("mongo2", "mongo24", "not_mongo26")
@@ -161,69 +153,21 @@ class UpdateSpec(implicit val ee: ExecutionEnv)
         "a person with the default connection" in {
           val person = jack3.copy(age = 33) // as after previous upsert test
 
-          spec(col1, timeout, person)(_.copy(age = 66))
+          spec(updCol1, timeout, person)(_.copy(age = 66))
         }
 
         "a person with the slow connection" in {
           val person = jane3.copy(age = 33) // as after previous upsert test
 
-          spec(slowCol1, slowTimeout, person)(_.copy(age = 66))
+          spec(slowUpdCol1, slowTimeout, person)(_.copy(age = 66))
         }
       }
       section("gt_mongo32")
     }
   }
-
-  "WriteResult" should {
-    val error = DefaultWriteResult(
-      ok = false,
-      n = 1,
-      writeErrors = Nil,
-      writeConcernError = None,
-      code = Some(23),
-      errmsg = Some("Foo"))
-
-    "be matched as a CommandError when failed" in {
-      error must beLike {
-        case CommandError.Code(code) => code must_== 23
-      } and (error must beLike {
-        case CommandError.Message(msg) => msg must_== "Foo"
-      })
-    } tag "unit"
-
-    "not be matched as a CommandError when successful" in {
-      (error.copy(ok = true) match {
-        case CommandError.Code(_) | CommandError.Message(_) => true
-        case _ => false
-      }) must beFalse
-    } tag "unit"
-  }
 }
 
 sealed trait UpdateFixtures { _: UpdateSpec =>
-  case class Person(
-    firstName: String,
-    lastName: String,
-    age: Int)
-
-  object Person {
-    implicit val personReader: BSONDocumentReader[Person] =
-      BSONDocumentReader[Person] { doc: BSONDocument =>
-        Person(
-          doc.getAs[String]("firstName").getOrElse(""),
-          doc.getAs[String]("lastName").getOrElse(""),
-          doc.getAs[Int]("age").getOrElse(0))
-      }
-
-    implicit val personWriter: BSONDocumentWriter[Person] =
-      BSONDocumentWriter[Person] { person: Person =>
-        BSONDocument(
-          "firstName" -> person.firstName,
-          "lastName" -> person.lastName,
-          "age" -> person.age)
-      }
-  }
-
   case class Person3(
     firstName: String,
     lastName: String,

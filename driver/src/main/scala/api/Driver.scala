@@ -6,7 +6,7 @@ import scala.util.{ Failure, Success }
 
 import scala.collection.mutable
 import scala.concurrent.{ ExecutionContext, Future }
-import scala.concurrent.duration.{ FiniteDuration, SECONDS }
+import scala.concurrent.duration.{ FiniteDuration, MILLISECONDS }
 
 import com.typesafe.config.Config
 
@@ -21,7 +21,6 @@ import reactivemongo.core.actors.{
   MongoDBSystem,
   StandardDBSystem
 }
-import reactivemongo.core.errors.ReactiveMongoException
 import reactivemongo.core.nodeset.Authenticate
 import reactivemongo.util.LazyLogger
 
@@ -111,16 +110,13 @@ private[api] trait Driver {
     }
 
     if (alreadyClosing) {
-      val error = ReactiveMongoException(
-        s"System already closed: $supervisorName")
+      logger.info(s"System already closed: $supervisorName")
 
-      error.setStackTrace(closedBy)
-
-      Future.failed[Unit](error)
+      Future.successful({})
     } else {
       // Tell the supervisor to close.
       // It will shut down all the connections and monitors
-      (supervisorActor ? Close)(Timeout(timeout)).recover {
+      (supervisorActor ? Close("Driver.askClose"))(Timeout(timeout)).recover {
         case err =>
           err.setStackTrace(callerSTE)
 
@@ -141,7 +137,7 @@ private[api] trait Driver {
    * @param options $optionsParam
    */
   protected final def askConnection(
-    nodes: Seq[String],
+    nodes: Seq[String], // TODO: Check nodes is empty
     options: MongoConnectionOptions,
     authentications: Seq[Authenticate],
     name: Option[String]): Future[MongoConnection] = {
@@ -159,8 +155,14 @@ private[api] trait Driver {
 
     val mongosystem = system.actorOf(Props(dbsystem), nm)
 
+    def timeout = if (options.connectTimeoutMS > 0) {
+      Timeout(options.connectTimeoutMS.toLong, MILLISECONDS)
+    } else {
+      Timeout(10000L, MILLISECONDS) // 10s
+    }
+
     def connection = (supervisorActor ? AddConnection(
-      nm, nodes, options, mongosystem))(Timeout(10, SECONDS))
+      nm, nodes, options, mongosystem))(timeout)
 
     logger.info(s"[$supervisorName] Creating connection: $nm")
 
@@ -214,8 +216,8 @@ private[api] trait Driver {
         ()
       }
 
-      case Close => {
-        logger.debug(s"[$supervisorName] Close the supervisor")
+      case Close(src) => {
+        logger.debug(s"[$supervisorName] Close the supervisor for $src")
 
         if (isEmpty) {
           context.stop(self)
@@ -245,13 +247,13 @@ private[api] trait Driver {
             }
           }
 
-        case Close if isEmpty => {
-          logger.debug(s"[$supervisorName] Close the supervisor")
+        case Close(src) if isEmpty => {
+          logger.debug(s"[$supervisorName] Close the supervisor for $src")
           sender ! Closed
         }
 
-        case Close => {
-          logger.warn(s"[$supervisorName] Close received but already closing.")
+        case Close(src) => {
+          logger.warn(s"[$supervisorName] Close request received from $src, but already closing.")
           waitingForClose += sender
           ()
         }

@@ -2,6 +2,8 @@ package reactivemongo.core.actors
 
 import scala.concurrent.{ Future, Promise }
 
+import shaded.netty.channel.ChannelId
+
 import reactivemongo.core.protocol.{
   CheckedWriteRequest,
   RequestMaker,
@@ -47,30 +49,31 @@ case class RequestMakerExpectingResponse(
 case class CheckedWriteRequestExpectingResponse(
   checkedWriteRequest: CheckedWriteRequest) extends ExpectingResponse
 
+@deprecated(message = "Will be private", since = "0.12.8")
+sealed class Close {
+  def source: String = "unknown"
+}
+
 /**
  * Message to close all active connections.
  * The MongoDBSystem actor must not be used after this message has been sent.
  */
-case object Close
+case object Close extends Close {
+  def apply(src: String): Close = new Close {
+    override val source = src
+  }
+
+  def unapply(msg: Close): Option[String] = Some(msg.source)
+}
 
 /**
  * Message to send in order to get warned the next time a primary is found.
  */
 private[reactivemongo] case object ConnectAll
 private[reactivemongo] case object RefreshAll
-private[reactivemongo] case class ChannelConnected(channelId: Int)
+private[reactivemongo] case class ChannelConnected(channelId: ChannelId)
 
-private[reactivemongo] sealed trait ChannelUnavailable { def channelId: Int }
-
-private[reactivemongo] object ChannelUnavailable {
-  def unapply(cu: ChannelUnavailable): Option[Int] = Some(cu.channelId)
-}
-
-private[reactivemongo] case class ChannelDisconnected(
-  channelId: Int) extends ChannelUnavailable
-
-private[reactivemongo] case class ChannelClosed(
-  channelId: Int) extends ChannelUnavailable
+private[reactivemongo] case class ChannelDisconnected(channelId: ChannelId)
 
 /** Message sent when the primary has been discovered. */
 case class PrimaryAvailable(metadata: ProtocolMetadata)

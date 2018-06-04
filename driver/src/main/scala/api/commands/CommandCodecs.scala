@@ -8,38 +8,12 @@ private[reactivemongo] trait CommandCodecs[P <: SerializationPack] {
   /**
    * Helper to read a command result, with error handling.
    */
-  private[reactivemongo] def dealingWithGenericCommandErrorsReader[A](readResult: pack.Document => A): pack.Reader[A] = {
-    val decoder = pack.newDecoder
-
-    pack.reader[A] { doc: pack.Document =>
-      decoder.booleanLike(doc, "ok") match {
-        case Some(true) => {
-          decoder.string(doc, "note").foreach { note =>
-            Command.logger.info(s"${note}: ${pack pretty doc}")
-          }
-
-          readResult(doc)
-        }
-
-        case _ => throw CommandError(pack)(
-          code = decoder.int(doc, "code"),
-          errmsg = decoder.string(doc, "errmsg"),
-          originalDocument = doc)
-      }
-    }
-  }
+  private[reactivemongo] def dealingWithGenericCommandErrorsReader[A](readResult: pack.Document => A): pack.Reader[A] = CommandCodecs.dealingWithGenericCommandErrorsReader[pack.type, A](pack)(readResult)
 
   implicit private[reactivemongo] def unitBoxReader: pack.Reader[UnitBox.type] =
     dealingWithGenericCommandErrorsReader[UnitBox.type] { _ => UnitBox }
 
-  private[reactivemongo] lazy val writeReadConcern: ReadConcern => pack.Document = {
-    val builder = pack.newBuilder
-
-    { concern: ReadConcern =>
-      builder.document(Seq(builder.elementProducer(
-        "level", builder.string(concern.level))))
-    }
-  }
+  private[reactivemongo] lazy val writeReadConcern: ReadConcern => pack.Document = CommandCodecs.writeReadConcern(pack)
 
   implicit private[reactivemongo] def defaultWriteResultReader: pack.Reader[DefaultWriteResult] = {
     val decoder = pack.newDecoder
@@ -69,6 +43,41 @@ private[reactivemongo] trait CommandCodecs[P <: SerializationPack] {
         code = decoder.int(doc, "code"),
         errmsg = decoder.string(doc, "errmsg"))
 
+    }
+  }
+}
+
+private[reactivemongo] object CommandCodecs {
+  /**
+   * Helper to read a command result, with error handling.
+   */
+  private[reactivemongo] def dealingWithGenericCommandErrorsReader[P <: SerializationPack, A](pack: P)(readResult: pack.Document => A): pack.Reader[A] = {
+    val decoder = pack.newDecoder
+
+    pack.reader[A] { doc: pack.Document =>
+      decoder.booleanLike(doc, "ok") match {
+        case Some(true) => {
+          decoder.string(doc, "note").foreach { note =>
+            Command.logger.info(s"${note}: ${pack pretty doc}")
+          }
+
+          readResult(doc)
+        }
+
+        case _ => throw CommandError(pack)(
+          code = decoder.int(doc, "code"),
+          errmsg = decoder.string(doc, "errmsg"),
+          originalDocument = doc)
+      }
+    }
+  }
+
+  private[reactivemongo] def writeReadConcern[P <: SerializationPack](pack: P): ReadConcern => pack.Document = {
+    val builder = pack.newBuilder
+
+    { concern: ReadConcern =>
+      builder.document(Seq(builder.elementProducer(
+        "level", builder.string(concern.level))))
     }
   }
 }

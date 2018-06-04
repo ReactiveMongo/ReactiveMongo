@@ -21,6 +21,8 @@ trait DBMetaCommands { self: DB =>
   import reactivemongo.api.commands.{
     Command,
     DropDatabase,
+    DBHash,
+    DBHashResult,
     ListCollectionNames,
     PingCommand,
     ServerStatus,
@@ -139,7 +141,20 @@ trait DBMetaCommands { self: DB =>
    * @return true if successful (even if the server is write locked)
    */
   def ping(readPreference: ReadPreference = ReadPreference.nearest)(implicit ec: ExecutionContext): Future[Boolean] = {
-    Command.run(BSONSerializationPack, failoverStrategy)
-      .apply(self, PingCommand, readPreference)
+    Command.run(BSONSerializationPack, failoverStrategy).
+      apply(self, PingCommand, readPreference)
+  }
+
+  // TODO: Public once covered with test
+  // See: https://docs.mongodb.com/manual/reference/command/dbHash/
+  private[reactivemongo] def hash(collections: Seq[String], readPreference: ReadPreference = defaultReadPreference)(implicit ec: ExecutionContext): Future[DBHashResult] = {
+    implicit def w: BSONSerializationPack.Writer[DBHash] =
+      DBHash.commandWriter(BSONSerializationPack)
+
+    implicit def r: BSONSerializationPack.Reader[DBHashResult] =
+      DBHashResult.reader(BSONSerializationPack)
+
+    Command.run(BSONSerializationPack, failoverStrategy).
+      apply(self, new DBHash(collections), readPreference)
   }
 }

@@ -147,18 +147,17 @@ trait InsertOps[P <: SerializationPack with Singleton]
             val cmd = BatchCommands.InsertCommand.Insert(
               head, documents.tail, ordered, writeConcern)
 
-            Future.successful(cmd).flatMap(
-              runCommand(_, writePref).flatMap { wr =>
-                val flattened = wr.flatten
+            runCommand(cmd, writePref).flatMap { wr =>
+              val flattened = wr.flatten
 
-                if (!flattened.ok) {
-                  // was ordered, with one doc => fail if has an error
-                  Future.failed(WriteResult.lastError(flattened).
-                    getOrElse[Exception](GenericDriverException(
-                      s"fails to insert: $documents")))
+              if (!flattened.ok) {
+                // was ordered, with one doc => fail if has an error
+                Future.failed(WriteResult.lastError(flattened).
+                  getOrElse[Exception](GenericDriverException(
+                    s"fails to insert: $documents")))
 
-                } else Future.successful(wr)
-              })
+              } else Future.successful(wr)
+            }
           } else { // Mongo < 2.6
             Future.failed[WriteResult](GenericDriverException(
               s"unsupported MongoDB version: $meta"))

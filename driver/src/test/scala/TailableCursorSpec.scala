@@ -67,9 +67,9 @@ trait TailableCursorSpec { specs: CursorSpec =>
         }
 
         "to fold bulks with async function" in {
-          tailable("foldw0b").foldBulksM(List.empty[Int], 6)(
-            (s, bulk) => Future(Cursor.Cont(s ++ bulk))) must beEqualTo(List(
-              0, 1, 2, 3, 4, 5)).await(1, timeout)
+          tailable("foldw0b").foldBulksM(List.empty[Int], 6)((s, bulk) =>
+            Future.successful(Cursor.Cont(s ++ bulk))) must beEqualTo(List(
+            0, 1, 2, 3, 4, 5)).await(1, timeout)
         }
       }
 
@@ -81,9 +81,9 @@ trait TailableCursorSpec { specs: CursorSpec =>
         }
 
         "successfully with async function" in {
-          tailable("foldw1b").foldWhileM(List.empty[Int], 5)(
-            (s, i) => Future(Cursor.Cont(i :: s))) must beEqualTo(List(
-              4, 3, 2, 1, 0)).await(1, timeout)
+          tailable("foldw1b").foldWhileM(List.empty[Int], 5)((s, i) =>
+            Future.successful(Cursor.Cont(i :: s))) must beEqualTo(List(
+            4, 3, 2, 1, 0)).await(1, timeout)
         }
 
         "leading to timeout w/o maxDocs" in {

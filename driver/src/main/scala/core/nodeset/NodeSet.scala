@@ -2,6 +2,8 @@ package reactivemongo.core.nodeset
 
 import scala.collection.immutable.Set
 
+import shaded.netty.channel.ChannelId
+
 import akka.actor.ActorRef
 
 import reactivemongo.bson.BSONDocument
@@ -52,24 +54,38 @@ case class NodeSet(
 
   def updateAll(f: Node => Node): NodeSet = copy(nodes = nodes.map(f))
 
-  def updateNodeByChannelId(id: Int)(f: Node => Node) =
+  @deprecated(message = "Use updateNodeByChannelId with ChannelId", "0.12.8")
+  @throws[UnsupportedOperationException](
+    "Use updateNodeByChannelId with ChannelId")
+  def updateNodeByChannelId(id: Int)(f: Node => Node): NodeSet =
+    throw new UnsupportedOperationException(
+      "Use updateNodeByChannelId with ChannelId")
+
+  def updateNodeByChannelId(id: ChannelId)(f: Node => Node) =
     updateByChannelId(id)(identity)(f)
 
-  def updateConnectionByChannelId(id: Int)(f: Connection => Connection) =
-    updateByChannelId(id)(f)(identity)
+  def updateConnectionByChannelId(id: ChannelId)(f: Connection => Connection): NodeSet = updateByChannelId(id)(f)(identity)
 
-  def updateByChannelId(id: Int)(fc: Connection => Connection)(fn: Node => Node) = copy(nodes = nodes.map { node =>
-    val (connections, updated) = utils.update(node.connections) {
-      case conn if (conn.channel.getId == id) => fc(conn)
-    }
+  @deprecated(
+    message = "Use updateConnectionByChannelId with ChannelId", "0.12.8")
+  @throws[UnsupportedOperationException](
+    "Use updateConnectionByChannelId with ChannelId")
+  def updateConnectionByChannelId(id: Int)(f: Connection => Connection): NodeSet = throw new UnsupportedOperationException("Use updateConnectionByChannelId with ChannelId")
 
-    if (updated) fn(node._copy(connections = connections))
-    else node
-  })
+  @deprecated(message = "Use updateByChannelId with ChannelId", "0.12.8")
+  @throws[UnsupportedOperationException]("Use updateByChannelId with ChannelId")
+  def updateByChannelId(id: Int)(fc: Connection => Connection)(fn: Node => Node): NodeSet = throw new UnsupportedOperationException("Use updateByChannelId with ChannelId")
 
+  def updateByChannelId(id: ChannelId)(fc: Connection => Connection)(fn: Node => Node): NodeSet = copy(nodes = nodes.map(_.updateByChannelId(id)(fc)(fn)))
+
+  @deprecated(message = "Use pickByChanneId with ChannelId", "0.12.8")
+  @throws[UnsupportedOperationException]("Use pickByChanneId with ChannelId")
   def pickByChannelId(id: Int): Option[(Node, Connection)] =
+    throw new UnsupportedOperationException("Use pickByChanneId with ChannelId")
+
+  def pickByChannelId(id: ChannelId): Option[(Node, Connection)] =
     nodes.view.map(node =>
-      node -> node.connections.find(_.channel.getId == id)).collectFirst {
+      node -> node.connections.find(_.channel.id == id)).collectFirst {
       case (node, Some(con)) if (
         con.status == ConnectionStatus.Connected) => node -> con
     }

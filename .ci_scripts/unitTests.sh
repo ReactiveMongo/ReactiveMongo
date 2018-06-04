@@ -5,7 +5,7 @@ if [ `git grep localhost | grep 'src/test' | grep -vi 'Common.scala' | wc -l` -n
   exit 1
 fi 
 
-if [ "$SCALA_VERSION" = "2.10.5" -a `javac -version 2>&1 | grep 1.7 | wc -l` -eq 1 ]; then
+if [ "$SCALA_VERSION" = "2.11.11" -a `javac -version 2>&1 | grep 1.7 | wc -l` -eq 1 ]; then
     echo "[INFO] Check the source format and backward compatibility"
 
     sbt ++$SCALA_VERSION scalariformFormat test:scalariformFormat > /dev/null
@@ -34,10 +34,12 @@ export JVM_OPTS
 TEST_ARGS=";project ReactiveMongo-BSON ;testQuick"
 
 TEST_ARGS="$TEST_ARGS ;project ReactiveMongo; testQuick"
+TEST_ARGS="$TEST_ARGS ReadPreferenceSpec"
 TEST_ARGS="$TEST_ARGS BSONObjectIDSpec"
 TEST_ARGS="$TEST_ARGS MongoURISpec"
 TEST_ARGS="$TEST_ARGS NodeSetSpec"
 TEST_ARGS="$TEST_ARGS reactivemongo.BsonSpec"
+TEST_ARGS="$TEST_ARGS reactivemongo.BulkOpsSpec"
 TEST_ARGS="$TEST_ARGS UpdateSpec"
 TEST_ARGS="$TEST_ARGS -- include unit"
 

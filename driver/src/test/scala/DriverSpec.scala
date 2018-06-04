@@ -10,7 +10,6 @@ import reactivemongo.core.actors.{
   RegisterMonitor,
   SetAvailable
 }
-import reactivemongo.core.errors.ReactiveMongoException
 import reactivemongo.core.actors.Exceptions.{
   InternalState,
   PrimaryUnavailableException
@@ -45,9 +44,7 @@ class DriverSpec(implicit ee: ExecutionEnv)
       md.numConnections must_== 0 and {
         md.close(timeout) must not(throwA[Throwable])
       } and {
-        md.close(timeout) aka "extra close" must throwA[ReactiveMongoException](
-          ".*System already closed.*")
-
+        md.close(timeout) aka "extra close" must_=== ({})
       }
     }
 
@@ -150,7 +147,7 @@ class DriverSpec(implicit ee: ExecutionEnv)
         authMode = reactivemongo.api.CrAuthentication, // enforce
         nbChannelsPerNode = 1))
 
-    val dbName = "specs2-test-cr-auth"
+    val dbName = s"specs2-test-cr${System identityHashCode drv}"
     lazy val db_ = connection.database(dbName, failoverStrategy)
 
     val id = System.identityHashCode(drv)
@@ -211,13 +208,15 @@ class DriverSpec(implicit ee: ExecutionEnv)
     val conOpts = DefaultOptions.copy(nbChannelsPerNode = 1)
     lazy val connection = drv.connect(List(primaryHost), options = conOpts)
     val slowOpts = SlowOptions.copy(nbChannelsPerNode = 1)
-    lazy val slowConnection = drv.connect(List(slowPrimary), slowOpts)
-
-    val dbName = "specs2-test-scramsha1-auth"
-    def db_(implicit ee: ExecutionContext) =
-      connection.flatMap(_.database(dbName, failoverStrategy))
+    lazy val slowConnection = {
+      val started = Common.slowProxy.isStarted
+      drv.connect(List(slowPrimary), slowOpts).filter(_ => started)
+    }
 
     val id = System.identityHashCode(drv)
+    val dbName = s"specs2-test-scramsha1${id}"
+    def db_(implicit ee: ExecutionContext) =
+      connection.flatMap(_.database(dbName, failoverStrategy))
 
     section("not_mongo26")
 
@@ -244,7 +243,6 @@ class DriverSpec(implicit ee: ExecutionEnv)
         slowConnection.flatMap(_.authenticate(dbName, "foo", "bar")).
           aka("authentication") must throwA[FailedAuthentication].
           await(1, slowTimeout)
-
       }
     }
 
@@ -262,11 +260,12 @@ class DriverSpec(implicit ee: ExecutionEnv)
       }
 
       "with the slow connection" in {
-        slowConnection.flatMap(
-          _.authenticate(dbName, s"test-$id", s"password-$id")).
-          aka("authentication") must beLike[SuccessfulAuthentication](
-            { case _ => ok }).await(1, slowTimeout)
-
+        eventually(2, timeout) {
+          slowConnection.flatMap(
+            _.authenticate(dbName, s"test-$id", s"password-$id")).
+            aka("authentication") must beLike[SuccessfulAuthentication](
+              { case _ => ok }).await(0, slowTimeout)
+        }
       }
     }
 
@@ -295,7 +294,7 @@ class DriverSpec(implicit ee: ExecutionEnv)
         val con = Await.result(
           drv.connect(
             List(slowPrimary), options = slowOpts, authentications = Seq(auth)),
-          timeout)
+          slowTimeout)
 
         con.database(dbName, slowFailover).
           aka("authed DB") must beLike[DefaultDB] { case _ => ok }.
@@ -311,7 +310,7 @@ class DriverSpec(implicit ee: ExecutionEnv)
       drv.close(timeout) must not(throwA[Exception]).await(1, timeout)
     }
 
-    "fail on DB without authentication" >> {
+    "fail on DB with invalid authentication" >> {
       val auth = Authenticate(Common.commonDb, "test", "password")
 
       "with the default connection" in {
@@ -340,111 +339,19 @@ class DriverSpec(implicit ee: ExecutionEnv)
         def con = Common.driver.connection(
           List(slowPrimary), options = slowOpts, authentications = Seq(auth))
 
-        con.database(Common.commonDb, slowFailover).
-          aka("database resolution") must throwA[PrimaryUnavailableException].
-          await(1, slowTimeout)
+        Common.slowProxy.isStarted must beTrue and {
+          eventually(2, timeout) {
+            //println("DriverSpec_1")
 
+            con.database(Common.commonDb, slowFailover).
+              aka("resolution") must throwA[PrimaryUnavailableException].
+              await(0, slowTimeout + timeout)
+          }
+        }
       }
     }
 
     section("not_mongo26")
-  }
-
-  "Database" should {
-    "be resolved from connection according the failover strategy" >> {
-      "successfully" in {
-        val fos = FailoverStrategy(FiniteDuration(50, "ms"), 20, _ * 2D)
-
-        Common.connection.database(Common.commonDb, fos).
-          map(_ => {}) must beEqualTo({}).await(1, estTimeout(fos))
-
-      }
-
-      "with failure" in {
-        lazy val con = Common.driver.connection(List("unavailable:27017"))
-        val ws = scala.collection.mutable.ListBuffer.empty[Int]
-        val expected = List(2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40)
-        val fos = FailoverStrategy(FiniteDuration(50, "ms"), 20,
-          { n => val w = n * 2; ws += w; w.toDouble })
-        val before = System.currentTimeMillis()
-
-        con.database("foo", fos).map(_ => List.empty[Int]).
-          recover({ case _ => ws.result() }) must beEqualTo(expected).
-          await(1, timeout * 2) and {
-            val duration = System.currentTimeMillis() - before
-
-            duration must be_<(estTimeout(fos).toMillis + 500 /* ms */ )
-          }
-      }
-    }
-
-    section("mongo2", "mongo24", "not_mongo26")
-    "fail with MongoDB < 2.6" in {
-
-      import reactivemongo.core.errors.ConnectionException
-
-      Common.connection.database(Common.commonDb, failoverStrategy).
-        map(_ => {}) aka "database resolution" must (
-          throwA[ConnectionException]("unsupported MongoDB version")).
-          await(1, timeout) and (Await.result(
-            Common.connection.database(Common.commonDb), timeout).
-            aka("database") must throwA[ConnectionException](
-              "unsupported MongoDB version"))
-
-    }
-    section("mongo2", "mongo24", "not_mongo26")
-  }
-
-  "BSON read preference" should {
-    import reactivemongo.bson.BSONArray
-    import reactivemongo.api.ReadPreference
-    import reactivemongo.api.tests.{ bsonReadPref => bson }
-    import org.specs2.specification.core.Fragments
-
-    Fragments.foreach[(ReadPreference, String)](Seq(
-      ReadPreference.primary -> "primary",
-      ReadPreference.secondary -> "secondary",
-      ReadPreference.nearest -> "nearest")) {
-      case (pref, mode) =>
-        s"""be encoded as '{ "mode": "$mode" }'""" in {
-          bson(pref) must_== BSONDocument("mode" -> mode)
-        }
-    }
-
-    "be taggable and" >> {
-      val tagSet = List(
-        Map("foo" -> "bar", "lorem" -> "ipsum"),
-        Map("dolor" -> "es"))
-      val bsonTags = BSONArray(
-        BSONDocument("foo" -> "bar", "lorem" -> "ipsum"),
-        BSONDocument("dolor" -> "es"))
-
-      Fragments.foreach[(ReadPreference, String)](Seq(
-        ReadPreference.primaryPreferred(tagSet) -> "primaryPreferred",
-        ReadPreference.secondary(tagSet) -> "secondary",
-        ReadPreference.secondaryPreferred(tagSet) -> "secondaryPreferred",
-        ReadPreference.nearest(tagSet) -> "nearest")) {
-        case (pref, mode) =>
-          val expected = BSONDocument("mode" -> mode, "tags" -> bsonTags)
-
-          s"be encoded as '${BSONDocument pretty expected}'" in {
-            bson(pref) must_== expected
-          }
-      }
-    }
-
-    "skip empty tag set and" >> {
-      Fragments.foreach[(ReadPreference, String)](Seq(
-        ReadPreference.primaryPreferred() -> "primaryPreferred",
-        ReadPreference.secondary() -> "secondary",
-        ReadPreference.secondaryPreferred() -> "secondaryPreferred",
-        ReadPreference.nearest() -> "nearest")) {
-        case (pref, mode) =>
-          s"""be encoded as '{ "mode": "$mode" }'""" in {
-            bson(pref) must_== BSONDocument("mode" -> mode)
-          }
-      }
-    }
   }
 
   // ---

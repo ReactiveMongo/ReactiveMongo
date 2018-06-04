@@ -92,10 +92,10 @@ object Command {
     FailoverStrategy
   }
   import reactivemongo.core.actors.RequestMakerExpectingResponse
-  import reactivemongo.bson.lowlevel.LoweLevelDocumentIterator
+  //import reactivemongo.bson.lowlevel.LoweLevelDocumentIterator
   import reactivemongo.core.netty.{
     BufferSequence,
-    ChannelBufferReadableBuffer,
+    //ChannelBufferReadableBuffer,
     ChannelBufferWritableBuffer
   }
   import reactivemongo.core.protocol.{
@@ -113,7 +113,7 @@ object Command {
   /**
    * @param fullCollectionName the fully qualified collection name (even if `query.fullCollectionName` is `\$cmd`)
    */
-  private[reactivemongo] def fetchCursor[P <: SerializationPack, A](db: DB, fullCollectionName: String, p: P, command: A, failover: FailoverStrategy)(implicit writer: p.Writer[A]): CursorFetcher[p.type, DefaultCursor.Impl] = new CursorFetcher[p.type, DefaultCursor.Impl] {
+  private[reactivemongo] def fetchCursor[P <: SerializationPack, A](db: DB, fullCollectionName: String, p: P, command: A, failover: FailoverStrategy)(implicit writer: p.Writer[A]): CursorFetcher[p.type, DefaultCursor.Impl] = new CursorFetcher[p.type, DefaultCursor.Impl] with CommandCodecs[p.type] {
     val pack: p.type = p
 
     protected def defaultReadPreference = db.connection.options.readPreference
@@ -127,17 +127,13 @@ object Command {
       }.future.flatMap {
         case Response.CommandError(_, _, _, cause) =>
           cause.originalDocument match {
-            case Some(error) => {
-              val doc = pack.document(error)
-              Future(pack.deserialize(doc, reader))
-            }
+            case Some(doc) =>
+              Future(pack.deserialize(pack.document(doc), reader))
 
             case _ => Future.failed[T](cause)
           }
 
-        case response => Future(pack.readAndDeserialize(
-          LoweLevelDocumentIterator(ChannelBufferReadableBuffer(
-            response.documents)).next, reader))
+        case response => Future(pack.readAndDeserialize(response, reader))
       }
     }
 
@@ -251,7 +247,8 @@ object Command {
    */
   def run[P <: SerializationPack](pack: P, failover: FailoverStrategy): CommandWithPackRunner[pack.type] = CommandWithPackRunner(pack, failover)
 
-  private[reactivemongo] def deserialize[P <: SerializationPack, A](pack: P, response: Response)(implicit reader: pack.Reader[A]): A =
+  private[reactivemongo] def deserialize[P <: SerializationPack, A](
+    pack: P, response: Response)(implicit reader: pack.Reader[A]): A =
     pack.readAndDeserialize(response, reader)
 
   private[reactivemongo] def buildRequestMaker[P <: SerializationPack, A](pack: P)(command: A, writer: pack.Writer[A], readPreference: ReadPreference, db: String): (RequestMaker, Boolean) = {
@@ -277,9 +274,11 @@ object Command {
     def apply[C <: Command with Mongo26WriteCommand](db: DB, command: C)(implicit writer: pack.Writer[C]): RequestMakerExpectingResponse =
       onDatabase(db.name, command)
 
-    def apply[C <: CollectionCommand](collection: Collection, command: C, readPreference: ReadPreference)(implicit writer: pack.Writer[ResolvedCollectionCommand[C]]): RequestMakerExpectingResponse = onCollection(collection.db.name, collection.name, command, readPreference)
+    def apply[C <: CollectionCommand](collection: Collection, command: C, readPreference: ReadPreference)(implicit writer: pack.Writer[ResolvedCollectionCommand[C]]): RequestMakerExpectingResponse =
+      onCollection(collection.db.name, collection.name, command, readPreference)
 
-    def apply[C <: CollectionCommand with Mongo26WriteCommand](collection: Collection, command: C)(implicit writer: pack.Writer[ResolvedCollectionCommand[C]]): RequestMakerExpectingResponse = onCollection(collection.db.name, collection.name, command)
+    def apply[C <: CollectionCommand with Mongo26WriteCommand](collection: Collection, command: C)(implicit writer: pack.Writer[ResolvedCollectionCommand[C]]): RequestMakerExpectingResponse =
+      onCollection(collection.db.name, collection.name, command)
 
     def onDatabase[C <: Command](db: String, command: C, readPreference: ReadPreference)(implicit writer: pack.Writer[C]): RequestMakerExpectingResponse = {
       val (requestMaker, mongo26WriteCommand) =

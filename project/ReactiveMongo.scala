@@ -16,7 +16,7 @@ object BuildSettings {
   val java8 = scala.util.Properties.isJavaAtLeast("1.8")
 
   val buildSettings = Defaults.coreDefaultSettings ++ baseSettings ++ Seq(
-    scalaVersion := "2.12.4",
+    scalaVersion := "2.12.6",
     crossScalaVersions := Seq("2.10.7", "2.11.12", scalaVersion.value),
     crossVersion := CrossVersion.binary,
     //parallelExecution in Test := false,
@@ -71,6 +71,7 @@ object BuildSettings {
     scalacOptions in (Test, console) ~= {
       _.filterNot { opt => opt.startsWith("-X") || opt.startsWith("-Y") }
     },
+    scalacOptions in (Test, console) += "-Yrepl-class-based",
     scalacOptions in (Compile, doc) ++= Seq("-unchecked", "-deprecation",
       /*"-diagrams", */"-implicits", "-skip-packages", "samples"),
     scalacOptions in (Compile, doc) ++= Opts.doc.title("ReactiveMongo API"),
@@ -94,13 +95,14 @@ object Resolvers {
   val typesafe = Seq(
     "Typesafe repository snapshots" at "http://repo.typesafe.com/typesafe/snapshots/",
     "Typesafe repository releases" at "http://repo.typesafe.com/typesafe/releases/")
+
   val resolversList = typesafe
 }
 
 object Dependencies {
   val akka = Def.setting[Seq[ModuleID]] {
     val ver = sys.env.get("AKKA_VERSION").getOrElse {
-      if (scalaVersion.value startsWith "2.12.") "2.5.6"
+      if (scalaVersion.value startsWith "2.12.") "2.5.13"
       else "2.3.13"
     }
 
@@ -119,8 +121,14 @@ object Dependencies {
     "com.typesafe.play" %% "play-iteratees" % ver
   }
 
-  val specsVer = "3.8.6" // TODO: 3.9.4, 4.x
-  val specs = "org.specs2" %% "specs2-core" % specsVer % Test
+  val specsVer = Def.setting[String] {
+    if (scalaVersion.value startsWith "2.10") "3.9.5" // 4.0.1 not avail
+    else "4.2.0"
+  }
+
+  val specs = Def.setting[ModuleID] {
+    "org.specs2" %% "specs2-core" % specsVer.value % Test
+  }
 
   val slf4jVer = "1.7.12"
   val log4jVer = "2.5"
@@ -134,9 +142,9 @@ object Dependencies {
   ) ++ Seq("log4j-core", "log4j-slf4j-impl").map(
     "org.apache.logging.log4j" % _ % log4jVer % Test)
 
-  val shapelessTest = "com.chuusai" %% "shapeless" % "2.3.2"
+  val shapelessTest = "com.chuusai" %% "shapeless" % "2.3.3"
 
-  val commonsCodec = "commons-codec" % "commons-codec" % "1.10"
+  val commonsCodec = "commons-codec" % "commons-codec" % "1.11"
 }
 
 object Documentation {
@@ -159,7 +167,8 @@ object Documentation {
       inAnyProject -- inProjects(
         ReactiveMongoBuild.shaded, ReactiveMongoBuild.jmx)
     },
-    apiMappings ++= mappings("org.scala-lang", "http://scala-lang.org/api/%s/")("scala-library").value
+    apiMappings ++= mappings(
+      "org.scala-lang", "http://scala-lang.org/api/%s/")("scala-library").value
   )
 }
 
@@ -192,7 +201,7 @@ object ReactiveMongoBuild extends Build {
       publishArtifact := false,
       mimaPreviousArtifacts := Set.empty,
       travisEnv in Test := { // test:travisEnv from SBT CLI
-        val (akkaLower, akkaUpper) = "2.3.13" -> "2.5.6"
+        val (akkaLower, akkaUpper) = "2.3.13" -> "2.5.13"
         val (playLower, playUpper) = "2.3.8" -> "2.6.1"
         val (mongoLower, mongoUpper) = "2_6" -> "3_4"
 
@@ -247,7 +256,7 @@ object ReactiveMongoBuild extends Build {
           "    - scala: 2.11.12",
               "      jdk: oraclejdk7",
               "      env: CI_CATEGORY=UNIT_TESTS") ++ List(
-          "    - scala: 2.12.4",
+          "    - scala: 2.12.6",
                 "      jdk: oraclejdk7",
                 "      env: CI_CATEGORY=UNIT_TESTS") ++ (
           integrationEnv.flatMap { flags =>
@@ -317,14 +326,19 @@ object ReactiveMongoBuild extends Build {
       mimaPreviousArtifacts := Set.empty,
       crossPaths := false,
       autoScalaLibrary := false,
+      resolvers += Resolver.mavenLocal,
       libraryDependencies ++= Seq(
-        "io.netty" % "netty" % "3.10.6.Final" cross CrossVersion.Disabled,
+        "io.netty" % "netty-handler" % "4.1.25.Final" changing(), //cross CrossVersion.Disabled,
         "com.google.guava" % "guava" % "19.0" cross CrossVersion.Disabled
       ),
       assemblyShadeRules in assembly := Seq(
-        ShadeRule.rename("org.jboss.netty.**" -> "shaded.netty.@1").inAll,
+        ShadeRule.rename("io.netty.**" -> "shaded.netty.@1").inAll,
         ShadeRule.rename("com.google.**" -> "shaded.google.@1").inAll
       ),
+      assemblyMergeStrategy in assembly := {
+        case "META-INF/io.netty.versions.properties" => MergeStrategy.last
+        case x => (assemblyMergeStrategy in assembly).value(x)
+      },
       pomPostProcess := transformPomDependencies { _ => None },
       makePom := makePom.dependsOn(assembly).value,
       packageBin in Compile := target.value / (
@@ -339,12 +353,14 @@ object ReactiveMongoBuild extends Build {
     }
   } andThen BuildSettings.filter
 
-  private val commonCleanup: ClassLoader => Unit = { cl =>
+  private val commonCleanup = Def.task[ClassLoader => Unit] { cl: ClassLoader =>
     import scala.language.reflectiveCalls
 
     val c = cl.loadClass("Common$")
     type M = { def close(): Unit }
     val m: M = c.getField("MODULE$").get(null).asInstanceOf[M]
+
+    streams.value.log.info(s"Closing $m ...")
 
     m.close()
   }
@@ -353,10 +369,10 @@ object ReactiveMongoBuild extends Build {
     s"$projectPrefix-BSON",
     file("bson"),
     settings = buildSettings ++ Findbugs.settings ++ Seq(
-      libraryDependencies ++= Seq(specs,
-        "org.specs2" %% "specs2-scalacheck" % specsVer % Test,
-        "org.typelevel" %% "discipline" % "0.7.2" % Test,
-        "org.spire-math" %% "spire-laws" % "0.13.0" % Test),
+      libraryDependencies ++= Seq(specs.value,
+        "org.specs2" %% "specs2-scalacheck" % specsVer.value % Test,
+        "org.typelevel" %% "discipline" % "0.9.0" % Test,
+        "org.typelevel" %% "spire-laws" % "0.15.0" % Test),
       mimaBinaryIssueFilters ++= {
         import ProblemFilters.{ exclude => x }
         @inline def irt(s: String) = x[IncompatibleResultTypeProblem](s)
@@ -384,7 +400,7 @@ object ReactiveMongoBuild extends Build {
     s"$projectPrefix-BSON-Macros",
     file("macros"),
     settings = buildSettings ++ Findbugs.settings ++ Seq(
-      libraryDependencies ++= Seq(specs,
+      libraryDependencies ++= Seq(specs.value,
         "org.scala-lang" % "scala-compiler" % scalaVersion.value % Provided,
         shapelessTest % Test
       )
@@ -447,7 +463,7 @@ object Version {
       },
       libraryDependencies ++= akka.value ++ Seq(
         playIteratees.value, commonsCodec,
-        shapelessTest % Test, specs) ++ logApi,
+        shapelessTest % Test, specs.value) ++ logApi,
       findbugsAnalyzedPath += target.value / "external",
       mimaBinaryIssueFilters ++= {
         import ProblemFilters.{ exclude => x }
@@ -498,8 +514,24 @@ object Version {
           imt("reactivemongo.core.actors.AwaitingResponse.this"), // private
           mmp("reactivemongo.core.protocol.MongoHandler.this"), // private
           fcp("reactivemongo.core.nodeset.ChannelFactory"),
+          imt("reactivemongo.core.nodeset.ChannelFactory.this"), // private
           mcp("reactivemongo.core.actors.RefreshAllNodes"),
           mcp("reactivemongo.core.actors.RefreshAllNodes$"),
+          imt("reactivemongo.core.actors.ChannelConnected.apply"), // private
+          mcp("reactivemongo.core.actors.ChannelUnavailable$"), // private
+          mcp("reactivemongo.core.actors.ChannelUnavailable"), // private
+          mtp("reactivemongo.core.actors.ChannelDisconnected"), // private
+          imt("reactivemongo.core.actors.ChannelDisconnected.copy"), // private
+          imt("reactivemongo.core.actors.ChannelDisconnected.this"), // private
+          irt("reactivemongo.core.actors.ChannelDisconnected.channelId"), // prv
+          mcp("reactivemongo.core.actors.ChannelClosed$"), // private
+          mcp("reactivemongo.core.actors.ChannelClosed"), // private
+          imt("reactivemongo.core.actors.AwaitingResponse.copy"), // private
+          irt("reactivemongo.core.actors.AwaitingResponse.channelID"), // priv
+          imt("reactivemongo.core.actors.ChannelConnected.copy"), // private
+          imt("reactivemongo.core.actors.ChannelConnected.this"), // private
+          irt("reactivemongo.core.actors.ChannelConnected.channelId"), // priv
+          imt("reactivemongo.core.actors.ChannelDisconnected.apply"), // private
           mmp("reactivemongo.core.actors.MongoDBSystem.DefaultConnectionRetryInterval"),
           imt("reactivemongo.core.netty.ChannelBufferReadableBuffer.apply"),
           irt("reactivemongo.core.netty.ChannelBufferReadableBuffer.buffer"),
@@ -512,6 +544,7 @@ object Version {
           imt("reactivemongo.core.netty.BufferSequence.this"),
           imt("reactivemongo.core.netty.BufferSequence.apply"),
           imt("reactivemongo.core.protocol.package.RichBuffer"),
+          mcp("reactivemongo.core.protocol.RequestEncoder$"), // private
           imt(
             "reactivemongo.core.protocol.BufferAccessors.writeTupleToBuffer2"),
           imt(
@@ -892,7 +925,7 @@ object Version {
           exclude[AbstractClassProblem]("reactivemongo.core.protocol.Response")
         )
       },
-      testOptions in Test += Tests.Cleanup(commonCleanup),
+      testOptions in Test += Tests.Cleanup(commonCleanup.value),
       mappings in (Compile, packageBin) ~= driverFilter,
       //mappings in (Compile, packageDoc) ~= driverFilter,
       mappings in (Compile, packageSrc) ~= driverFilter,
@@ -929,8 +962,8 @@ object Version {
     file("jmx"),
     settings = buildSettings ++ Findbugs.settings ++ Seq(
       mimaPreviousArtifacts := Set.empty,
-      testOptions in Test += Tests.Cleanup(commonCleanup),
-      libraryDependencies ++= Seq(specs) ++ logApi,
+      testOptions in Test += Tests.Cleanup(commonCleanup.value),
+      libraryDependencies ++= Seq(specs.value) ++ logApi,
       pomPostProcess := providedInternalDeps
     )).enablePlugins(CpdPlugin).
     dependsOn(driver)

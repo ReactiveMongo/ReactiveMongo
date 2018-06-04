@@ -21,10 +21,15 @@ import scala.util.control.NonFatal
 import scala.collection.generic.CanBuildFrom
 
 import scala.concurrent.{ ExecutionContext, Future }
+import scala.concurrent.duration.FiniteDuration
+
+import shaded.netty.buffer.ByteBuf
 
 import reactivemongo.api._
 import reactivemongo.api.commands.{
+  Collation,
   UpdateWriteResult,
+  ResolvedCollectionCommand,
   WriteConcern,
   WriteResult
 }
@@ -125,12 +130,6 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
   def withReadPreference(pref: ReadPreference): GenericCollection[P]
 
   import BatchCommands._
-
-  private def writeDoc[T](doc: T, writer: pack.Writer[T]) = {
-    val buffer = ChannelBufferWritableBuffer()
-    pack.serializeAndWrite(buffer, doc, writer)
-    buffer.buffer
-  }
 
   protected def watchFailure[T](future: => Future[T]): Future[T] =
     Try(future).recover { case NonFatal(e) => Future.failed(e) }.get
@@ -242,7 +241,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    * }}}
    */
   def insert[T: pack.Writer](ordered: Boolean): InsertBuilder[T] =
-    prepareInsert[T](ordered, defaultWriteConcern)
+    prepareInsert[T](ordered, defaultWriteConcern) // TODO: Move Writer requirement to InsertBuilder
 
   /**
    * Returns a builder for insert operations.
@@ -320,6 +319,15 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
   @transient lazy val removeModifier =
     BatchCommands.FindAndModifyCommand.Remove
 
+  @deprecated("Use other `findAndModify`", "0.14.0")
+  def findAndModify[S](selector: S, modifier: BatchCommands.FindAndModifyCommand.Modify, sort: Option[pack.Document] = None, fields: Option[pack.Document] = None)(implicit swriter: pack.Writer[S], ec: ExecutionContext): Future[BatchCommands.FindAndModifyCommand.FindAndModifyResult] = findAndModify[S](
+    selector, modifier, sort, fields,
+    bypassDocumentValidation = false,
+    writeConcern = defaultWriteConcern,
+    maxTime = Option.empty[FiniteDuration],
+    collation = Option.empty[Collation],
+    arrayFilters = Seq.empty[pack.Document])
+
   /**
    * Applies a [[http://docs.mongodb.org/manual/reference/command/findAndModify/ findAndModify]] operation. See [[findAndUpdate]] and [[findAndRemove]] convenient functions.
    *
@@ -342,16 +350,53 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    * @param modifier $modifierParam
    * @param sort $sortParam (default: `None`)
    * @param fields $fieldsParam
+   * @param bypassDocumentValidation
+   * @param writeConcern $writeConcernParam
+   * @param maxTime
+   * @param collation
+   * @param arrayFilters
    * @param swriter $swriterParam
    */
-  def findAndModify[S](selector: S, modifier: BatchCommands.FindAndModifyCommand.Modify, sort: Option[pack.Document] = None, fields: Option[pack.Document] = None)(implicit swriter: pack.Writer[S], ec: ExecutionContext): Future[BatchCommands.FindAndModifyCommand.FindAndModifyResult] = {
-    import FindAndModifyCommand.{ ImplicitlyDocumentProducer => DP }
+  def findAndModify[S](
+    selector: S,
+    modifier: BatchCommands.FindAndModifyCommand.Modify,
+    sort: Option[pack.Document],
+    fields: Option[pack.Document],
+    bypassDocumentValidation: Boolean,
+    writeConcern: WriteConcern,
+    maxTime: Option[FiniteDuration],
+    collation: Option[Collation],
+    arrayFilters: Seq[pack.Document])(implicit swriter: pack.Writer[S], ec: ExecutionContext): Future[BatchCommands.FindAndModifyCommand.FindAndModifyResult] = {
 
-    Future(BatchCommands.FindAndModifyCommand.FindAndModify(
-      query = selector,
+    import FindAndModifyCommand.{
+      FindAndModify,
+      ImplicitlyDocumentProducer => DP
+    }
+
+    implicit val writer =
+      pack.writer[ResolvedCollectionCommand[FindAndModify]] { cmd =>
+        FindAndModifyCommand.serialize(cmd)
+      }
+
+    Future(FindAndModify(
+      query = implicitly[DP](selector),
       modify = modifier,
       sort = sort.map(implicitly[DP](_)),
-      fields = fields.map(implicitly[DP](_)))).flatMap(runCommand(_, writePref))
+      fields = fields.map(implicitly[DP](_)),
+      bypassDocumentValidation = bypassDocumentValidation,
+      writeConcern = writeConcern,
+      maxTimeMS = maxTime.flatMap { t =>
+        val ms = t.toMillis
+
+        if (ms < Int.MaxValue) {
+          Some(ms.toInt)
+        } else {
+          Option.empty[Int]
+        }
+      },
+      collation = collation,
+      arrayFilters = arrayFilters.map(implicitly[DP](_)))).
+      flatMap(runCommand(_, writePref))
   }
 
   /**
@@ -402,24 +447,6 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
   /**
    * $aggregation.
    *
-   * {{{
-   * import scala.concurrent.Future
-   * import scala.concurrent.ExecutionContext.Implicits.global
-   *
-   * import reactivemongo.bson._
-   * import reactivemongo.api.collections.bson.BSONCollection
-   *
-   * def populatedStates(cities: BSONCollection): Future[List[BSONDocument]] = {
-   *   import cities.BatchCommands.AggregationFramework
-   *   import AggregationFramework.{ Group, Match, SumField }
-   *
-   *   cities.aggregate(Group(BSONString("\$state"))(
-   *     "totalPop" -> SumField("population")), List(
-   *       Match(document("totalPop" ->
-   *         document("\$gte" -> 10000000L))))).map(_.documents)
-   * }
-   * }}}
-   *
    * @param firstOperator $firstOpParam
    * @param otherOperators $otherOpsParam
    * @param explain $explainParam of the pipeline
@@ -427,6 +454,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    * @param bypassDocumentValidation $bypassParam
    * @param readConcern $readConcernParam
    */
+  @deprecated("Use [[aggregateWith1]]", "0.12.7")
   def aggregate(firstOperator: PipelineOperator, otherOperators: List[PipelineOperator] = Nil, explain: Boolean = false, allowDiskUse: Boolean = false, bypassDocumentValidation: Boolean = false, readConcern: Option[ReadConcern] = None)(implicit ec: ExecutionContext): Future[BatchCommands.AggregationFramework.AggregationResult] = {
     import BatchCommands.AggregationFramework.Aggregate
     import BatchCommands.{ AggregateWriter, AggregateReader }
@@ -513,31 +541,6 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
   /**
    * [[http://docs.mongodb.org/manual/reference/command/aggregate/ Aggregates]] the matching documents.
    *
-   * {{{
-   * import scala.concurrent.Future
-   * import scala.concurrent.ExecutionContext.Implicits.global
-   *
-   * import reactivemongo.bson._
-   * import reactivemongo.api.Cursor
-   * import reactivemongo.api.collections.bson.BSONCollection
-   *
-   * def populatedStates(cities: BSONCollection): Future[Cursor[BSONDocument]] =
-   *   {
-   *     import cities.BatchCommands.AggregationFramework
-   *     import AggregationFramework.{
-   *       Cursor => AggCursor, Group, Match, SumField
-   *     }
-   *
-   *     val cursor = AggCursor(batchSize = 1) // initial batch size
-   *
-   *     cities.aggregate1[BSONDocument](Group(BSONString("\$state"))(
-   *       "totalPop" -> SumField("population")), List(
-   *         Match(document("totalPop" ->
-   *           document("\$gte" -> 10000000L)))),
-   *       cursor)
-   *   }
-   * }}}
-   *
    * @tparam T $resultTParam
    *
    * @param firstOperator $firstOpParam
@@ -556,6 +559,25 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
 
   /**
    * [[http://docs.mongodb.org/manual/reference/command/aggregate/ Aggregates]] the matching documents.
+   *
+   * {{{
+   * import scala.concurrent.Future
+   * import scala.concurrent.ExecutionContext.Implicits.global
+   *
+   * import reactivemongo.bson._
+   * import reactivemongo.api.collections.bson.BSONCollection
+   *
+   * def populatedStates(cities: BSONCollection): Future[List[BSONDocument]] = {
+   *   import cities.BatchCommands.AggregationFramework
+   *   import AggregationFramework.{ Group, Match, SumField }
+   *
+   *   cities.aggregatorContext[BSONDocument](Group(BSONString("\$state"))(
+   *     "totalPop" -> SumField("population")), List(
+   *       Match(document("totalPop" ->
+   *         document("\$gte" -> 10000000L))))).
+   *     prepared.cursor.collect[List]()
+   * }
+   * }}}
    *
    * @tparam T $resultTParam
    *
@@ -600,15 +622,23 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
       Future.failed(MissingMetadata())
   }
 
+  private def writeDoc[T](
+    doc: T,
+    writer: pack.Writer[T],
+    buffer: ChannelBufferWritableBuffer = ChannelBufferWritableBuffer()) = {
+    pack.serializeAndWrite(buffer, doc, writer)
+    buffer
+  }
+
   /**
    * [[https://docs.mongodb.com/manual/reference/command/delete/ Deletes]] the matching document(s).
    *
    * @param ordered $orderedParam
-   * @param limit the maximum number of documents to be deleted (or unlimited)
+   * @param writeConcern $writeConcernParam
    *
    */
   def delete[S](ordered: Boolean, writeConcern: WriteConcern): DeleteBuilder =
-    prepareDelete(true, writeConcern)
+    prepareDelete(ordered, writeConcern)
 
   /**
    * Remove the matched document(s) from the collection without writeConcern.
@@ -624,7 +654,9 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
   def uncheckedRemove[T](query: T, firstMatchOnly: Boolean = false)(implicit writer: pack.Writer[T], ec: ExecutionContext): Unit = {
     val op = Delete(fullCollectionName, if (firstMatchOnly) 1 else 0)
     val bson = writeDoc(query, writer)
-    val message = RequestMaker(op, BufferSequence(bson))
+    val buf = bson.buffer
+    val message = RequestMaker(op, BufferSequence(buf))
+
     db.connection.send(message)
   }
 
@@ -645,10 +677,13 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
   def uncheckedUpdate[S, U](selector: S, update: U, upsert: Boolean = false, multi: Boolean = false)(implicit selectorWriter: pack.Writer[S], updateWriter: pack.Writer[U]): Unit = {
     val flags = 0 | (if (upsert) UpdateFlags.Upsert else 0) | (if (multi) UpdateFlags.MultiUpdate else 0)
     val op = Update(fullCollectionName, flags)
-    val bson = writeDoc(selector, selectorWriter)
-    bson.writeBytes(writeDoc(update, updateWriter))
-    val message = RequestMaker(op, BufferSequence(bson))
-    db.connection.send(message)
+    val bson = {
+      val b = writeDoc(selector, selectorWriter)
+      writeDoc(update, updateWriter, b)
+    }
+    val buf = bson.buffer
+
+    db.connection.send(RequestMaker(op, BufferSequence(buf)))
   }
 
   /**
@@ -664,13 +699,14 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
   def uncheckedInsert[T](document: T)(implicit writer: pack.Writer[T]): Unit = {
     val op = Insert(0, fullCollectionName)
     val bson = writeDoc(document, writer)
-    val message = RequestMaker(op, BufferSequence(bson))
+    val buf = bson.buffer
+    val message = RequestMaker(op, BufferSequence(buf))
+
     db.connection.send(message)
   }
 
   // ---
 
-  import shaded.netty.buffer.ChannelBuffer
   import reactivemongo.core.nodeset.ProtocolMetadata
   import reactivemongo.api.commands.MultiBulkWriteResult
 
@@ -739,7 +775,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
     }
 
     def putOrIssueNewCommand(doc: pack.Document): Option[S]
-    def result(): ChannelBuffer
+    def result(): ByteBuf
     def send()(implicit ec: ExecutionContext): Future[R]
   }
 
@@ -793,7 +829,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
         val start2 = buf.index
         pack.writeToBuffer(buf, doc)
 
-        val result = if (buf.index > thresholdBytes && docsN == 0) {
+        val res = if (buf.index > thresholdBytes && docsN == 0) {
           // first and already out of bound
           throw new scala.RuntimeException(s"Mongo26WriteCommand could not accept doc of size = ${buf.index - start} bytes")
         } else if (buf.index > thresholdBytes) {
@@ -815,17 +851,19 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
         } else None
 
         docsN += 1
-        result
+
+        res
       }
     }
 
-    def result(): ChannelBuffer = {
+    def result(): ByteBuf = {
       closeIfNecessary()
       buf.buffer
     }
 
     def send()(implicit ec: ExecutionContext): Future[WriteResult] = {
-      val documents = BufferSequence(result())
+      val bson = result()
+      val documents = BufferSequence(bson)
       val op = Query(0, db.name + ".$cmd", 0, 1)
 
       val cursor = DefaultCursor.query(pack, op, _ => documents, ReadPreference.primary, db.connection, failoverStrategy, true, fullCollectionName)(BatchCommands.DefaultWriteResultReader) //(Mongo26WriteCommand.DefaultWriteResultBufferReader)
@@ -836,7 +874,9 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
             getOrElse[Exception](GenericDriverException(
               s"write failure: $wr")))
         }
+
         case Some(wr) => Future.successful(wr)
+
         case c => Future.failed(
           new GenericDriverException(s"no write result ? $c"))
       }

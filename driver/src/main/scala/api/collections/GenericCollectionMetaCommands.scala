@@ -2,7 +2,7 @@ package reactivemongo.api.collections
 
 import scala.concurrent.{ ExecutionContext, Future }
 
-import reactivemongo.api.{ ReadPreference, SerializationPack }
+import reactivemongo.api.SerializationPack
 
 import reactivemongo.api.commands.{
   CollectionCommand,
@@ -51,8 +51,7 @@ private[reactivemongo] trait GenericCollectionMetaCommands[P <: SerializationPac
     name: String,
     operator: PipelineOperator,
     pipeline: Seq[PipelineOperator],
-    collation: Option[Collation] = None,
-    readPreference: ReadPreference = self.writePref)(implicit ec: ExecutionContext): Future[Unit] = {
+    collation: Option[Collation] = None)(implicit ec: ExecutionContext): Future[Unit] = {
 
     val cmd = new CreateView(name, operator, pipeline, collation)
 
