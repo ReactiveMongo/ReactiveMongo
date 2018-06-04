@@ -16,7 +16,7 @@ object BuildSettings {
   val java8 = scala.util.Properties.isJavaAtLeast("1.8")
 
   val buildSettings = Defaults.coreDefaultSettings ++ baseSettings ++ Seq(
-    scalaVersion := "2.12.4",
+    scalaVersion := "2.12.6",
     crossScalaVersions := Seq("2.10.7", "2.11.12", scalaVersion.value),
     crossVersion := CrossVersion.binary,
     //parallelExecution in Test := false,
@@ -102,7 +102,7 @@ object Resolvers {
 object Dependencies {
   val akka = Def.setting[Seq[ModuleID]] {
     val ver = sys.env.get("AKKA_VERSION").getOrElse {
-      if (scalaVersion.value startsWith "2.12.") "2.5.12"
+      if (scalaVersion.value startsWith "2.12.") "2.5.13"
       else "2.3.13"
     }
 
@@ -123,7 +123,7 @@ object Dependencies {
 
   val specsVer = Def.setting[String] {
     if (scalaVersion.value startsWith "2.10") "3.9.5" // 4.0.1 not avail
-    else "4.0.2"
+    else "4.2.0"
   }
 
   val specs = Def.setting[ModuleID] {
@@ -142,9 +142,9 @@ object Dependencies {
   ) ++ Seq("log4j-core", "log4j-slf4j-impl").map(
     "org.apache.logging.log4j" % _ % log4jVer % Test)
 
-  val shapelessTest = "com.chuusai" %% "shapeless" % "2.3.2"
+  val shapelessTest = "com.chuusai" %% "shapeless" % "2.3.3"
 
-  val commonsCodec = "commons-codec" % "commons-codec" % "1.10"
+  val commonsCodec = "commons-codec" % "commons-codec" % "1.11"
 }
 
 object Documentation {
@@ -201,7 +201,7 @@ object ReactiveMongoBuild extends Build {
       publishArtifact := false,
       mimaPreviousArtifacts := Set.empty,
       travisEnv in Test := { // test:travisEnv from SBT CLI
-        val (akkaLower, akkaUpper) = "2.3.13" -> "2.5.12"
+        val (akkaLower, akkaUpper) = "2.3.13" -> "2.5.13"
         val (playLower, playUpper) = "2.3.8" -> "2.6.1"
         val (mongoLower, mongoUpper) = "2_6" -> "3_4"
 
@@ -256,7 +256,7 @@ object ReactiveMongoBuild extends Build {
           "    - scala: 2.11.12",
               "      jdk: oraclejdk7",
               "      env: CI_CATEGORY=UNIT_TESTS") ++ List(
-          "    - scala: 2.12.4",
+          "    - scala: 2.12.6",
                 "      jdk: oraclejdk7",
                 "      env: CI_CATEGORY=UNIT_TESTS") ++ (
           integrationEnv.flatMap { flags =>
@@ -371,8 +371,8 @@ object ReactiveMongoBuild extends Build {
     settings = buildSettings ++ Findbugs.settings ++ Seq(
       libraryDependencies ++= Seq(specs.value,
         "org.specs2" %% "specs2-scalacheck" % specsVer.value % Test,
-        "org.typelevel" %% "discipline" % "0.8" % Test,
-        "org.spire-math" %% "spire-laws" % "0.13.0" % Test),
+        "org.typelevel" %% "discipline" % "0.9.0" % Test,
+        "org.typelevel" %% "spire-laws" % "0.15.0" % Test),
       mimaBinaryIssueFilters ++= {
         import ProblemFilters.{ exclude => x }
         @inline def irt(s: String) = x[IncompatibleResultTypeProblem](s)

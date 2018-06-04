@@ -27,7 +27,7 @@ if [ "$MONGO_VER" = "3_4" ]; then
     MONGO_MINOR="3.4.10"
 fi
     
-if [ "$AKKA_VERSION" = "2.5.12" ]; then
+if [ "$AKKA_VERSION" = "2.5.13" ]; then
     MONGO_MINOR="3.4.10"
     MONGO_VER="3_4"
 
@@ -44,7 +44,7 @@ PRIMARY_HOST="localhost:27018"
 PRIMARY_SLOW_PROXY="localhost:27019"
 
 # OpenSSL
-if [ `echo "$MONGO_PROFILE" | grep ssl | wc -l` -eq 1 ] && [ ! -L "$HOME/ssl/lib/libssl.so.1.0.0" ] && [ ! -f "$HOME/ssl/lib/libssl.so.1.0.0" ]; then
+if [ ! -L "$HOME/ssl/lib/libssl.so.1.0.0" ] && [ ! -f "$HOME/ssl/lib/libssl.so.1.0.0" ]; then
   echo "[INFO] Building OpenSSL"
 
   cd /tmp
@@ -57,9 +57,9 @@ if [ `echo "$MONGO_PROFILE" | grep ssl | wc -l` -eq 1 ] && [ ! -L "$HOME/ssl/lib
 
   ln -s "$HOME/ssl/lib/libssl.so.1.0.0" "$HOME/ssl/lib/libssl.so.10"
   ln -s "$HOME/ssl/lib/libcrypto.so.1.0.0" "$HOME/ssl/lib/libcrypto.so.10"
-  export PATH="$HOME/ssl/bin:$PATH"
 fi
 
+export PATH="$HOME/ssl/bin:$PATH"
 export LD_LIBRARY_PATH="$HOME/ssl/lib:$LD_LIBRARY_PATH"
 
 # Build MongoDB

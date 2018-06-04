@@ -26,7 +26,8 @@ class BSONLawsSpecs
 
   { // Addition semigroup
     val semigroup = new Semigroup[BSONValue] {
-      def op(x: BSONValue, y: BSONValue): BSONValue = BSONValue.Addition(x, y)
+      def combine(x: BSONValue, y: BSONValue): BSONValue =
+        BSONValue.Addition(x, y)
     }
     implicit val additive: AdditiveSemigroup[BSONValue] = Additive(semigroup)
 
@@ -35,8 +36,8 @@ class BSONLawsSpecs
 
   { // Composition monoid
     val monoid = new Monoid[ElementProducer] {
-      val id = ElementProducer.Empty
-      def op(x: ElementProducer, y: ElementProducer): ElementProducer =
+      val empty = ElementProducer.Empty
+      def combine(x: ElementProducer, y: ElementProducer): ElementProducer =
         ElementProducer.Composition(x, y)
     }
 
