@@ -130,7 +130,7 @@ trait FindAndModifyCommand[P <: SerializationPack] extends ImplicitCommandHelper
           element("update", document),
           element("new", boolean(fetchNewObject)))
 
-      case Remove =>
+      case _ =>
         elements += element("remove", boolean(true))
     }
 

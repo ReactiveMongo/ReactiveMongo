@@ -507,6 +507,8 @@ object Version {
           imt("reactivemongo.api.MongoConnection.sendExpectingResponse"), // priv
           mcp("reactivemongo.api.ReadPreference$BSONDocumentWrapper$"), // priv
           mcp("reactivemongo.api.ReadPreference$BSONDocumentWrapper"), // priv
+          mtp("reactivemongo.api.ReadPreference$Taggable"), // 0.11.x
+          mtp("reactivemongo.api.ReadPreference$Taggable$"), // 0.11.x
           fcp("reactivemongo.api.MongoDriver$SupervisorActor"), // private
           mcp("reactivemongo.api.MongoDriver$SupervisorActor$"), // private
           fcp("reactivemongo.api.collections.bson.BSONCollection"),
