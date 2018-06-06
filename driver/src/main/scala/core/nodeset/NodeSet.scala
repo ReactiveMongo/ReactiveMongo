@@ -111,27 +111,29 @@ case class NodeSet(
 
   // http://docs.mongodb.org/manual/reference/read-preference/
   def pick(preference: ReadPreference): Option[(Node, Connection)] = {
+    def filter(tags: Seq[Map[String, String]]) = ReadPreference.TagFilter(tags)
+
     if (mongos.isDefined) {
       pickConnectionAndFlatten(mongos)
     } else preference match {
       case ReadPreference.Primary =>
         pickConnectionAndFlatten(primary)
 
-      case ReadPreference.PrimaryPreferred(filter) =>
+      case ReadPreference.PrimaryPreferred(tags) =>
         pickConnectionAndFlatten(primary.orElse(
-          pickFromGroupWithFilter(secondaries, filter, secondaries.pick)))
+          pickFromGroupWithFilter(secondaries, filter(tags), secondaries.pick)))
 
-      case ReadPreference.Secondary(filter) =>
+      case ReadPreference.Secondary(tags) =>
         pickConnectionAndFlatten(pickFromGroupWithFilter(
-          secondaries, filter, secondaries.pick))
+          secondaries, filter(tags), secondaries.pick))
 
-      case ReadPreference.SecondaryPreferred(filter) =>
+      case ReadPreference.SecondaryPreferred(tags) =>
         pickConnectionAndFlatten(pickFromGroupWithFilter(
-          secondaries, filter, secondaries.pick).orElse(primary))
+          secondaries, filter(tags), secondaries.pick).orElse(primary))
 
-      case ReadPreference.Nearest(filter) =>
+      case ReadPreference.Nearest(tags) =>
         pickConnectionAndFlatten(pickFromGroupWithFilter(
-          nearestGroup, filter, nearest))
+          nearestGroup, filter(tags), nearest))
     }
   }
 
