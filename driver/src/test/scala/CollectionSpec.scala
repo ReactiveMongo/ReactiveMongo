@@ -235,7 +235,7 @@ class CollectionSpec(implicit protected val ee: ExecutionEnv)
         "name" -> BSONJavaScript("db.getName()"))).flatMap { _ =>
         find.map(_.flatMap(_.getAs[BSONJavaScript]("name")).map(_.value))
       } aka "inserted" must beSome("db.getName()").await(1, timeout) and {
-        collection.remove(selector).map(_.n) must beTypedEqualTo(1).
+        collection.deleteMany(selector).map(_.n) must beTypedEqualTo(1).
           await(1, timeout)
       } and {
         find must beNone.await(1, timeout)
