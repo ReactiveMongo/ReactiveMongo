@@ -246,8 +246,8 @@ class LowLevelBsonDocWriter[A <: WritableBuffer](buf: A) {
   def putDecimal(key: String, high: Long, low: Long): this.type = {
     buf.writeByte(0x13)
     buf.writeCString(key)
-    buf.writeLong(high)
     buf.writeLong(low)
+    buf.writeLong(high)
     this
   }
 

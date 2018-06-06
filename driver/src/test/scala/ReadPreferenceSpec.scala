@@ -41,19 +41,6 @@ class ReadPreferenceSpec extends org.specs2.mutable.Specification {
           }
       }
     }
-
-    "skip empty tag set and" >> {
-      Fragments.foreach[(ReadPreference, String)](Seq(
-        ReadPreference.primaryPreferred() -> "primaryPreferred",
-        ReadPreference.secondary() -> "secondary",
-        ReadPreference.secondaryPreferred() -> "secondaryPreferred",
-        ReadPreference.nearest() -> "nearest")) {
-        case (pref, mode) =>
-          s"""be encoded as '{ "mode": "$mode" }'""" in {
-            bson(pref) must_== BSONDocument("mode" -> mode)
-          }
-      }
-    }
   }
   section("unit")
 }

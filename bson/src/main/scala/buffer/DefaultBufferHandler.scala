@@ -258,10 +258,10 @@ object DefaultBufferHandler extends BufferHandler {
 
   object BSONDecimalBufferHandler extends BufferRW[BSONDecimal] {
     def write(decimal: BSONDecimal, buffer: WritableBuffer) =
-      buffer.writeLong(decimal.high).writeLong(decimal.low)
+      buffer.writeLong(decimal.low).writeLong(decimal.high)
 
     def read(buffer: ReadableBuffer): BSONDecimal =
-      BSONDecimal(high = buffer.readLong(), low = buffer.readLong())
+      BSONDecimal(low = buffer.readLong(), high = buffer.readLong())
   }
 
   object BSONMinKeyBufferHandler extends BufferRW[BSONMinKey.type] {
