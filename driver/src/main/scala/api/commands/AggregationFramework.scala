@@ -413,6 +413,32 @@ trait AggregationFramework[P <: SerializationPack]
   }
 
   /**
+   * Promotes a specified document to the top level and replaces all other fields.
+   * The operation replaces all existing fields in the input document, including the _id field.
+   * https://docs.mongodb.com/manual/reference/operator/aggregation/replaceRoot
+   * @param newRoot The field name to become the new root
+   */
+  case class ReplaceRootField(newRoot: String) extends PipelineOperator {
+    import builder.{ document, elementProducer => element }
+    override val makePipe: pack.Document = document(Seq(
+      element(f"$$replaceRoot", document(Seq(
+        element("newRoot", builder.string("$" + newRoot)))))))
+  }
+
+  /**
+   * Promotes a specified document to the top level and replaces all other fields.
+   * The operation replaces all existing fields in the input document, including the _id field.
+   * https://docs.mongodb.com/manual/reference/operator/aggregation/replaceRoot
+   * @param newRoot The new root object
+   */
+  case class ReplaceRoot(newRoot: pack.Document) extends PipelineOperator {
+    import builder.{ document, elementProducer => element }
+    override val makePipe: pack.Document = document(Seq(
+      element(f"$$replaceRoot", document(Seq(
+        element("newRoot", newRoot))))))
+  }
+
+  /**
    * Outputs documents in order of nearest to farthest from a specified point.
    *
    * http://docs.mongodb.org/manual/reference/operator/aggregation/geoNear/#pipe._S_geoNear
