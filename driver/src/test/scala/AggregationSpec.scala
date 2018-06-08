@@ -1099,6 +1099,76 @@ db.accounts.aggregate([
     }
   }
 
+  "Produce" should {
+    // https://docs.mongodb.com/manual/reference/operator/aggregation/replaceRoot/#replaceroot-with-an-embedded-document
+    val produce: BSONCollection = db(s"produce${System identityHashCode this}")
+
+    "be inserted" in {
+      /*
+      {
+         "_id" : 1,
+         "fruit" : [ "apples", "oranges" ],
+         "in_stock" : { "oranges" : 20, "apples" : 60 },
+         "on_order" : { "oranges" : 35, "apples" : 75 }
+      }
+       */
+      produce.insert(document(
+        "_id" -> 1,
+        "fruit" -> array("apples", "oranges"),
+        "in_stock" -> document(
+          "oranges" -> 20,
+          "apples" -> 60),
+        "on_order" -> document(
+          "oranges" -> 35,
+          "apples" -> 75))).map(_ => {}) must beEqualTo({}).await(0, timeout)
+    }
+
+    "and reshaped using $replaceRoot" in {
+      val result = produce.aggregateWith1[BSONDocument]() {
+        framework =>
+          import framework._
+
+          Match(document("_id" -> 1)) -> List(
+            ReplaceRootField("in_stock"))
+      }.head
+
+      result must beEqualTo(document(
+        "oranges" -> 20,
+        "apples" -> 60)).await(0, timeout)
+    }
+  }
+
+  "Contacts" should {
+    // https://docs.mongodb.com/manual/reference/operator/aggregation/replaceRoot/#replaceroot-with-a-newly-created-document
+    val contacts: BSONCollection = db(s"contacts${System identityHashCode this}")
+
+    "be inserted" in {
+      /*
+      { "_id" : 1, "first_name" : "Gary", "last_name" : "Sheffield", "city" : "New York" }
+       */
+      contacts.insert(document(
+        "_id" -> 1,
+        "first_name" -> "Gary",
+        "last_name" -> "Sheffield",
+        "city" -> "New York")).map(_ => {}) must beEqualTo({}).await(0, timeout)
+    }
+
+    "and reshaped using $replaceRoot" in {
+      val result = contacts.aggregateWith1[BSONDocument]() {
+        framework =>
+          import framework._
+
+          Match(document("_id" -> 1)) -> List(
+            ReplaceRoot(document(
+              "full_name" -> document(
+                "$concat" -> array("$first_name", " ", "$last_name")))))
+      }.head
+
+      result must beEqualTo(document(
+        "full_name" -> "Gary Sheffield")).await(0, timeout)
+    }
+  }
+
   // ---
 
   case class Location(lon: Double, lat: Double)
