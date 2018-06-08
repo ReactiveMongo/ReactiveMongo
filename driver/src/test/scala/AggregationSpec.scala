@@ -63,10 +63,10 @@ class AggregationSpec(implicit ee: ExecutionEnv)
           import framework._
 
           IndexStats -> List(Sort(Ascending("name")))
-      }.head
+      }.headOption
 
-      result must beLike[IndexStatsResult] {
-        case IndexStatsResult("city_text_state_text", k2, _, _) =>
+      result must beLike[Option[IndexStatsResult]] {
+        case Some(IndexStatsResult("city_text_state_text", k2, _, _)) =>
           k2.getAs[String]("_fts") must beSome("text") and {
             k2.getAs[BSONNumberLike]("_ftsx").map(_.toInt) must beSome(1)
           }
@@ -161,10 +161,10 @@ class AggregationSpec(implicit ee: ExecutionEnv)
 
           Group(BSONString(f"$$state"))("totalPop" -> SumField("population")) -> List(
             Match(document("totalPop" -> document(f"$$gte" -> 10000000L))))
-      }.head
+      }.headOption
 
-      result aka "results" must beLike[BSONDocument] {
-        case explainResult => explainResult.getAs[BSONArray]("stages") must beSome
+      result aka "results" must beLike[Option[BSONDocument]] {
+        case Some(explainResult) => explainResult.getAs[BSONArray]("stages") must beSome
       }.await(1, timeout)
     }
 
@@ -548,13 +548,13 @@ class AggregationSpec(implicit ee: ExecutionEnv)
           import framework._
 
           UnwindField("specs") -> afterUnwind
-      }.head must beEqualTo(expected).await(0, timeout) and {
+      }.headOption must beSome(expected).await(0, timeout) and {
         orders.aggregateWith1[BSONDocument]() {
           framework =>
             import framework._
 
             Unwind("specs", None, Some(true)) -> afterUnwind
-        }.head must beEqualTo(expected).await(0, timeout)
+        }.headOption must beSome(expected).await(0, timeout)
       }
     } tag "not_mongo26"
   }
@@ -828,7 +828,7 @@ class AggregationSpec(implicit ee: ExecutionEnv)
 
           Sample(100) -> List(Group(BSONNull)(
             "ageStdDev" -> StdDevSamp(BSONString(f"$$age"))))
-      }.head must beEqualTo(expected).await(0, timeout)
+      }.headOption must beSome(expected).await(0, timeout)
     } tag "not_mongo26"
   }
 
@@ -1018,7 +1018,7 @@ db.forecasts.aggregate(
                     f"$$tags", array("STLW", "G")))), 0)),
               "then" -> f"$$$$DESCEND",
               "else" -> f"$$$$PRUNE"))))
-      }.head
+      }.headOption
 
       val expected = Redaction(
         title = "123 Department Report",
@@ -1054,7 +1054,7 @@ db.forecasts.aggregate(
 }
  */
 
-      result must beEqualTo(expected).await(0, timeout)
+      result must beSome(expected).await(0, timeout)
     }
   }
 
@@ -1144,9 +1144,9 @@ db.accounts.aggregate([
                 "if" -> document(f"$$eq" -> array(f"$$level", 5)),
                 "then" -> f"$$$$PRUNE",
                 "else" -> f"$$$$DESCEND"))))
-      }.head
+      }.headOption
 
-      result must beEqualTo(document(
+      result must beSome(document(
         "_id" -> 1,
         "level" -> 1,
         "acct_id" -> "xyz123",
