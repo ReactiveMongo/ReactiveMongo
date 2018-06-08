@@ -1130,9 +1130,9 @@ db.accounts.aggregate([
 
           Match(document("_id" -> 1)) -> List(
             ReplaceRootField("in_stock"))
-      }.head
+      }.headOption
 
-      result must beEqualTo(document(
+      result must beSome(document(
         "oranges" -> 20,
         "apples" -> 60)).await(0, timeout)
     }
@@ -1162,9 +1162,9 @@ db.accounts.aggregate([
             ReplaceRoot(document(
               "full_name" -> document(
                 "$concat" -> array("$first_name", " ", "$last_name")))))
-      }.head
+      }.headOption
 
-      result must beEqualTo(document(
+      result must beSome(document(
         "full_name" -> "Gary Sheffield")).await(0, timeout)
     }
   }
