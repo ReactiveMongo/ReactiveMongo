@@ -58,11 +58,10 @@ class AggregationSpec(implicit ee: ExecutionEnv)
       import bsoncommands.BSONAggregationFramework.IndexStatsResult
       import bsoncommands.BSONAggregationResultImplicits.BSONIndexStatsReader
 
-      val result = coll.aggregateWith1[IndexStatsResult]() {
-        framework =>
-          import framework._
+      val result = coll.aggregateWith1[IndexStatsResult]() { framework =>
+        import framework._
 
-          IndexStats -> List(Sort(Ascending("name")))
+        IndexStats -> List(Sort(Ascending("name")))
       }.headOption
 
       result must beLike[Option[IndexStatsResult]] {
@@ -93,12 +92,11 @@ class AggregationSpec(implicit ee: ExecutionEnv)
         document("_id" -> "NY", "totalPop" -> 19746227L))
 
       def withRes[T](c: BSONCollection)(f: Future[List[BSONDocument]] => T): T = {
-        f(c.aggregateWith1[BSONDocument]() {
-          framework =>
-            import framework._
+        f(c.aggregateWith1[BSONDocument]() { framework =>
+          import framework._
 
-            Group(BSONString(f"$$state"))("totalPop" -> SumField("population")) -> List(
-              Match(document("totalPop" -> document(f"$$gte" -> 10000000L))))
+          Group(BSONString(f"$$state"))("totalPop" -> SumField("population")) -> List(
+            Match(document("totalPop" -> document(f"$$gte" -> 10000000L))))
         }.collect[List](Int.MaxValue, Cursor.FailOnError[List[BSONDocument]]()))
       }
 
