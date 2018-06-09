@@ -151,6 +151,26 @@ case class Ascending(field: String) extends SortOrder
 case class Descending(field: String) extends SortOrder
 
 /**
+ * Promotes a specified document to the top level and replaces all other fields.
+ * The operation replaces all existing fields in the input document, including the _id field.
+ * https://docs.mongodb.com/manual/reference/operator/aggregation/replaceRoot
+ * @param newRoot The field name to become the new root
+ */
+case class ReplaceRootField(newRoot: String) extends PipelineOperator {
+  override val makePipe = BSONDocument(f"$$replaceRoot" -> BSONDocument("newRoot" -> BSONString("$" + newRoot)))
+}
+
+/**
+ * Promotes a specified document to the top level and replaces all other fields.
+ * The operation replaces all existing fields in the input document, including the _id field.
+ * https://docs.mongodb.com/manual/reference/operator/aggregation/replaceRoot
+ * @param newRoot The new root object
+ */
+case class ReplaceRoot(newRoot: BSONDocument) extends PipelineOperator {
+  override val makePipe = BSONDocument(f"$$replaceRoot" -> BSONDocument("newRoot" -> newRoot))
+}
+
+/**
  * Represents one of the group operators for the "Group" Operation. This class is sealed
  * as these are defined in the MongoDB spec, and clients should not need to customise these.
  */
