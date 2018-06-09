@@ -137,14 +137,12 @@ class AggregationSpec(implicit ee: ExecutionEnv)
       } tag "gt_mongo32"
 
       "with expected count" in {
-        val result = coll.aggregateWith1[BSONDocument]() {
-          framework =>
-            import framework._
+        import coll.BatchCommands.AggregationFramework
+        import AggregationFramework.{ Group, SumAll }
+        val result = coll.aggregatorContext[BSONDocument](Group(BSONString(f"$$state"))("count" -> SumAll)).prepared.cursor
+          .collect[Set](Int.MaxValue, Cursor.FailOnError[Set[BSONDocument]]())
 
-            Group(BSONString(f"$$state"))("count" -> SumAll) -> List()
-        }.collect[Set](Int.MaxValue, Cursor.FailOnError[Set[BSONDocument]]())
-
-        result must beEqualTo(Set(
+        result must beTypedEqualTo(Set(
           document("_id" -> "JP", "count" -> 2),
           document("_id" -> "FR", "count" -> 1),
           document("_id" -> "NY", "count" -> 1))).await(1, timeout)
@@ -152,9 +150,6 @@ class AggregationSpec(implicit ee: ExecutionEnv)
     }
 
     "explain simple result" in {
-      import coll.BatchCommands.AggregationFramework
-      import AggregationFramework.{ Group, Match, SumField }
-
       val result = coll.aggregateWith1[BSONDocument](explain = true) {
         framework =>
           import framework._
@@ -244,7 +239,7 @@ class AggregationSpec(implicit ee: ExecutionEnv)
               firstOp, pipeline, batchSize = Some(1)).prepared.cursor
 
             cursor.collect[List](
-              Int.MaxValue, Cursor.FailOnError[List[BSONDocument]]()) must beEqualTo(expected).await(1, timeout)
+              Int.MaxValue, Cursor.FailOnError[List[BSONDocument]]()) must beTypedEqualTo(expected).await(1, timeout)
           }
         }
 
@@ -328,14 +323,14 @@ class AggregationSpec(implicit ee: ExecutionEnv)
 
           Group(document("state" -> f"$$state", "city" -> f"$$city"))(
             "pop" -> SumField("population")) -> groupPipeline
-      }.collect[List](Int.MaxValue, Cursor.FailOnError[List[BSONDocument]]()) must beEqualTo(expected).await(1, timeout) and {
+      }.collect[List](Int.MaxValue, Cursor.FailOnError[List[BSONDocument]]()) must beTypedEqualTo(expected).await(1, timeout) and {
         coll.aggregateWith1[BSONDocument]() {
           framework =>
             import framework._
 
             Group(document("state" -> f"$$state", "city" -> f"$$city"))(
               "pop" -> SumField("population")) -> (groupPipeline :+ Limit(2))
-        }.collect[List](Int.MaxValue, Cursor.FailOnError[List[BSONDocument]]()) must beEqualTo(expected take 2).await(1, timeout)
+        }.collect[List](Int.MaxValue, Cursor.FailOnError[List[BSONDocument]]()) must beTypedEqualTo(expected take 2).await(1, timeout)
       } and {
         coll.aggregateWith1[BSONDocument]() {
           framework =>
@@ -343,13 +338,13 @@ class AggregationSpec(implicit ee: ExecutionEnv)
 
             Group(document("state" -> f"$$state", "city" -> f"$$city"))(
               "pop" -> SumField("population")) -> (groupPipeline :+ Skip(2))
-        }.collect[List](Int.MaxValue, Cursor.FailOnError[List[BSONDocument]]()) must beEqualTo(expected drop 2).await(1, timeout)
+        }.collect[List](Int.MaxValue, Cursor.FailOnError[List[BSONDocument]]()) must beTypedEqualTo(expected drop 2).await(1, timeout)
       }
     }
 
     "return distinct states" >> {
       def distinctSpec(c: BSONCollection, timeout: FiniteDuration) = c.distinct[String, ListSet]("state").
-        aka("states") must beEqualTo(ListSet("NY", "FR", "JP")).
+        aka("states") must beTypedEqualTo(ListSet("NY", "FR", "JP")).
         await(1, timeout)
 
       "with the default connection" in {
@@ -364,13 +359,8 @@ class AggregationSpec(implicit ee: ExecutionEnv)
     "return a random sample" in {
       import coll.BatchCommands.AggregationFramework.Sample
 
-      coll
-        .aggregateWith1[ZipCode]() {
-          framework =>
-            import framework._
-
-            Sample(2) -> List()
-        }.collect[List](Int.MaxValue, Cursor.FailOnError[List[ZipCode]]())
+      coll.aggregatorContext[ZipCode](Sample(2)).prepared.cursor
+        .collect[List](Int.MaxValue, Cursor.FailOnError[List[ZipCode]]())
         .map(_.count(zipCodes.contains)) must beEqualTo(2).await(0, timeout)
     } tag "not_mongo26"
   }
@@ -419,12 +409,11 @@ class AggregationSpec(implicit ee: ExecutionEnv)
         InventoryReport(3, docs = List(
           Product(5, None, Some("Incomplete")), Product(6))))
 
-      orders
-        .aggregateWith1[InventoryReport]() {
-          framework =>
-            import framework._
-            Lookup(inventory.name, "item", "sku", "docs") -> List()
-        }.collect[List](Int.MaxValue, Cursor.FailOnError[List[InventoryReport]]()) must beEqualTo(expected).await(0, timeout)
+      import coll.BatchCommands.AggregationFramework
+      import AggregationFramework.Lookup
+
+      orders.aggregatorContext[InventoryReport](Lookup(inventory.name, "item", "sku", "docs")).prepared.cursor
+        .collect[List](Int.MaxValue, Cursor.FailOnError[List[InventoryReport]]()) must beTypedEqualTo(expected).await(0, timeout)
     } tag "not_mongo26"
 
     "perform a graph lookup so the joined documents are returned" in {
@@ -440,11 +429,11 @@ class AggregationSpec(implicit ee: ExecutionEnv)
           List(Product(4, Some("jkl"), Some("product 4"), Some(70)))),
         InventoryReport(3, docs = List.empty))
 
-      orders.aggregateWith1[InventoryReport]() {
-        framework =>
-          import framework._
-          GraphLookup(inventory.name, BSONString(f"$$item"), "item", "sku", "docs") -> List()
-      }.collect[List](Int.MaxValue, Cursor.FailOnError[List[InventoryReport]]()) must beEqualTo(expected).await(0, timeout)
+      import coll.BatchCommands.AggregationFramework
+      import AggregationFramework.GraphLookup
+
+      orders.aggregatorContext[InventoryReport](GraphLookup(inventory.name, BSONString(f"$$item"), "item", "sku", "docs")).prepared.cursor
+        .collect[List](Int.MaxValue, Cursor.FailOnError[List[InventoryReport]]()) must beTypedEqualTo(expected).await(0, timeout)
     } tag "gt_mongo32"
 
     val sales: BSONCollection = db.collection(s"agg-sales-A-${System identityHashCode this}")
@@ -490,7 +479,7 @@ class AggregationSpec(implicit ee: ExecutionEnv)
             input = BSONString(f"$$items"),
             as = "item",
             cond = document(f"$$gte" -> array(f"$$$$item.price", 100))))) -> List(sort)
-      }.collect[List](Int.MaxValue, Cursor.FailOnError[List[Sale]]()) must beEqualTo(expected).await(0, timeout)
+      }.collect[List](Int.MaxValue, Cursor.FailOnError[List[Sale]]()) must beTypedEqualTo(expected).await(0, timeout)
     } tag "not_mongo26"
   }
 
@@ -607,7 +596,7 @@ class AggregationSpec(implicit ee: ExecutionEnv)
             Out(outColl))
       }.collect[List](Int.MaxValue, Cursor.FailOnError[List[Author]]()).map(_ => {}) must beEqualTo({}).await(0, timeout) and {
         db.collection[BSONCollection](outColl).find(BSONDocument.empty).cursor[Author]().
-          collect[List](3, Cursor.FailOnError[List[Author]]()) must beEqualTo(
+          collect[List](3, Cursor.FailOnError[List[Author]]()) must beTypedEqualTo(
             List(
               "Homer" -> List("Iliad", "The Odyssey"),
               "Dante" -> List("Divine Comedy", "Eclogues", "The Banquet"))).await(0, timeout)
@@ -628,7 +617,7 @@ class AggregationSpec(implicit ee: ExecutionEnv)
 
           Sort(Ascending("title")) -> List(Group(BSONString(f"$$author"))(
             "books" -> AddFieldToSet("title")))
-      }.collect[Set](Int.MaxValue, Cursor.FailOnError[Set[AuthorCatalog]]()) must beEqualTo(Set(
+      }.collect[Set](Int.MaxValue, Cursor.FailOnError[Set[AuthorCatalog]]()) must beTypedEqualTo(Set(
         AuthorCatalog(_id = "Homer", books = Set("The Odyssey", "Iliad")),
         AuthorCatalog(_id = "Dante", books = Set(
           "The Banquet", "Eclogues", "Divine Comedy")))).await(1, timeout)
@@ -687,7 +676,7 @@ class AggregationSpec(implicit ee: ExecutionEnv)
 
           Group(BSONString(f"$$quiz"))("stdDev" -> StdDevPopField("score")) -> List(
             Sort(Ascending("_id")))
-      }.collect[List](Int.MaxValue, Cursor.FailOnError[List[QuizStdDev]]()).aka(f"$$stdDevPop results") must beEqualTo(List(
+      }.collect[List](Int.MaxValue, Cursor.FailOnError[List[QuizStdDev]]()).aka(f"$$stdDevPop results") must beTypedEqualTo(List(
         QuizStdDev(1, 8.04155872120988D), QuizStdDev(2, 8.04155872120988D))).await(0, timeout)
 
       /*
@@ -697,63 +686,62 @@ class AggregationSpec(implicit ee: ExecutionEnv)
     } tag "not_mongo26"
 
     "return a sum as hash per quiz" in {
-      contest.aggregateWith1[BSONDocument]() {
-        framework =>
-          import framework._
+      import coll.BatchCommands.AggregationFramework
+      import AggregationFramework.{ Group, Sum }
 
-          Group(BSONString(f"$$quiz"))(
-            "hash" -> Sum(document(f"$$multiply" -> array(f"$$_id", f"$$score")))) -> List()
-      }.collect[Set](Int.MaxValue, Cursor.FailOnError[Set[BSONDocument]]()) must beEqualTo(Set(
-        document("_id" -> 2, "hash" -> 1261),
-        document("_id" -> 1, "hash" -> 478))).await(1, timeout)
+      contest.aggregatorContext[BSONDocument](
+        Group(BSONString(f"$$quiz"))(
+          "hash" -> Sum(document(f"$$multiply" -> array(f"$$_id", f"$$score"))))).prepared.cursor
+        .collect[Set](Int.MaxValue, Cursor.FailOnError[Set[BSONDocument]]()) must beTypedEqualTo(Set(
+          document("_id" -> 2, "hash" -> 1261),
+          document("_id" -> 1, "hash" -> 478))).await(1, timeout)
     }
 
     "return the maximum score per quiz" in {
-      contest.aggregateWith1[BSONDocument]() {
-        framework =>
-          import framework._
+      import coll.BatchCommands.AggregationFramework
+      import AggregationFramework.{ Group, MaxField }
 
-          Group(BSONString(f"$$quiz"))("maxScore" -> MaxField("score")) -> List()
-      }.collect[Set](Int.MaxValue, Cursor.FailOnError[Set[BSONDocument]]()) must beEqualTo(Set(
-        document("_id" -> 2, "maxScore" -> 96),
-        document("_id" -> 1, "maxScore" -> 90))).await(1, timeout)
+      contest.aggregatorContext[BSONDocument](
+        Group(BSONString(f"$$quiz"))("maxScore" -> MaxField("score"))).prepared.cursor
+        .collect[Set](Int.MaxValue, Cursor.FailOnError[Set[BSONDocument]]()) must beTypedEqualTo(Set(
+          document("_id" -> 2, "maxScore" -> 96),
+          document("_id" -> 1, "maxScore" -> 90))).await(1, timeout)
     }
 
     "return a max as hash per quiz" in {
-      contest.aggregateWith1[BSONDocument]() {
-        framework =>
-          import framework._
+      import coll.BatchCommands.AggregationFramework
+      import AggregationFramework.{ Group, Max }
 
-          Group(BSONString(f"$$quiz"))(
-            "maxScore" -> Max(document(
-              f"$$multiply" -> array(f"$$_id", f"$$score")))) -> List()
-      }.collect[Set](Int.MaxValue, Cursor.FailOnError[Set[BSONDocument]]()) must beEqualTo(Set(
-        document("_id" -> 2, "maxScore" -> 492),
-        document("_id" -> 1, "maxScore" -> 213))).await(1, timeout)
+      contest.aggregatorContext[BSONDocument](
+        Group(BSONString(f"$$quiz"))(
+          "maxScore" -> Max(document(
+            f"$$multiply" -> array(f"$$_id", f"$$score"))))).prepared.cursor
+        .collect[Set](Int.MaxValue, Cursor.FailOnError[Set[BSONDocument]]()) must beTypedEqualTo(Set(
+          document("_id" -> 2, "maxScore" -> 492),
+          document("_id" -> 1, "maxScore" -> 213))).await(1, timeout)
     }
 
     "return the minimum score per quiz" in {
-      contest.aggregateWith1[BSONDocument]() {
-        framework =>
-          import framework._
+      import coll.BatchCommands.AggregationFramework
+      import AggregationFramework.{ Group, MinField }
 
-          Group(BSONString(f"$$quiz"))("minScore" -> MinField("score")) -> List()
-      }.collect[Set](Int.MaxValue, Cursor.FailOnError[Set[BSONDocument]]()) must beEqualTo(Set(
-        document("_id" -> 2, "minScore" -> 77),
-        document("_id" -> 1, "minScore" -> 71))).await(1, timeout)
+      contest.aggregatorContext[BSONDocument](Group(BSONString(f"$$quiz"))("minScore" -> MinField("score"))).prepared.cursor
+        .collect[Set](Int.MaxValue, Cursor.FailOnError[Set[BSONDocument]]()) must beTypedEqualTo(Set(
+          document("_id" -> 2, "minScore" -> 77),
+          document("_id" -> 1, "minScore" -> 71))).await(1, timeout)
     }
 
     "return a min as hash per quiz" in {
-      contest.aggregateWith1[BSONDocument]() {
-        framework =>
-          import framework._
+      import coll.BatchCommands.AggregationFramework
+      import AggregationFramework.{ Group, Min }
 
-          Group(BSONString(f"$$quiz"))(
-            "minScore" -> Min(document(
-              f"$$multiply" -> array(f"$$_id", f"$$score")))) -> List()
-      }.collect[Set](Int.MaxValue, Cursor.FailOnError[Set[BSONDocument]]()) must beEqualTo(Set(
-        document("_id" -> 2, "minScore" -> 384),
-        document("_id" -> 1, "minScore" -> 85))).await(1, timeout)
+      contest.aggregatorContext[BSONDocument](
+        Group(BSONString(f"$$quiz"))(
+          "minScore" -> Min(document(
+            f"$$multiply" -> array(f"$$_id", f"$$score"))))).prepared.cursor
+        .collect[Set](Int.MaxValue, Cursor.FailOnError[Set[BSONDocument]]()) must beTypedEqualTo(Set(
+          document("_id" -> 2, "minScore" -> 384),
+          document("_id" -> 1, "minScore" -> 85))).await(1, timeout)
     }
 
     "push name and score per quiz group" in {
@@ -763,13 +751,13 @@ class AggregationSpec(implicit ee: ExecutionEnv)
         QuizScores(1, Set(
           Score("dave123", 85), Score("dave2", 90), Score("ahn", 71))))
 
-      contest.aggregateWith1[QuizScores]() {
-        framework =>
-          import framework._
+      import coll.BatchCommands.AggregationFramework
+      import AggregationFramework.{ Group, Push }
 
-          Group(BSONString(f"$$quiz"))(
-            "scores" -> Push(document("name" -> f"$$name", "score" -> f"$$score"))) -> List()
-      }.collect[Set](Int.MaxValue, Cursor.FailOnError[Set[QuizScores]]()) must beEqualTo(expected).await(1, timeout)
+      contest.aggregatorContext[QuizScores](
+        Group(BSONString(f"$$quiz"))(
+          "scores" -> Push(document("name" -> f"$$name", "score" -> f"$$score")))).prepared.cursor
+        .collect[Set](Int.MaxValue, Cursor.FailOnError[Set[QuizScores]]()) must beTypedEqualTo(expected).await(1, timeout)
     }
 
     "add name and score to a set per quiz group" in {
@@ -779,13 +767,13 @@ class AggregationSpec(implicit ee: ExecutionEnv)
         QuizScores(1, Set(
           Score("dave123", 85), Score("dave2", 90), Score("ahn", 71))))
 
-      contest.aggregateWith1[QuizScores]() {
-        framework =>
-          import framework._
+      import coll.BatchCommands.AggregationFramework
+      import AggregationFramework.{ Group, AddToSet }
 
-          Group(BSONString(f"$$quiz"))(
-            "scores" -> AddToSet(document("name" -> f"$$name", "score" -> f"$$score"))) -> List()
-      }.collect[Set](Int.MaxValue, Cursor.FailOnError[Set[QuizScores]]()) must beEqualTo(expected).await(1, timeout)
+      contest.aggregatorContext[QuizScores](
+        Group(BSONString(f"$$quiz"))(
+          "scores" -> AddToSet(document("name" -> f"$$name", "score" -> f"$$score")))).prepared.cursor
+        .collect[Set](Int.MaxValue, Cursor.FailOnError[Set[QuizScores]]()) must beTypedEqualTo(expected).await(1, timeout)
     }
   }
 
@@ -904,27 +892,27 @@ class AggregationSpec(implicit ee: ExecutionEnv)
       }
       implicit val placeReader: BSONDocumentReader[GeoPlace] = Macros.reader[GeoPlace]
 
-      places.aggregateWith1[GeoPlace]() {
-        framework =>
-          import framework._
+      import coll.BatchCommands.AggregationFramework
+      import AggregationFramework.GeoNear
 
-          GeoNear(document(
-            "type" -> "Point",
-            "coordinates" -> array(-73.9667, 40.78)), distanceField = Some("dist.calculated"),
-            minDistance = Some(1000),
-            maxDistance = Some(5000),
-            query = Some(document("type" -> "public")),
-            includeLocs = Some("dist.loc"),
-            limit = 5,
-            spherical = true) -> List()
-      }.collect[List](Int.MaxValue, Cursor.FailOnError[List[GeoPlace]]()) aka "places" must beEqualTo(List(
-        GeoPlace(
-          loc = GeoPoint(List(-73.97D, 40.77D)),
-          name = "Central Park",
-          category = "Parks",
-          dist = GeoDistance(
-            calculated = 1147,
-            loc = GeoPoint(List(-73.97D, 40.77D)))))).await(0, timeout)
+      places.aggregatorContext[GeoPlace](
+        GeoNear(document(
+          "type" -> "Point",
+          "coordinates" -> array(-73.9667, 40.78)), distanceField = Some("dist.calculated"),
+          minDistance = Some(1000),
+          maxDistance = Some(5000),
+          query = Some(document("type" -> "public")),
+          includeLocs = Some("dist.loc"),
+          limit = 5,
+          spherical = true)).prepared.cursor
+        .collect[List](Int.MaxValue, Cursor.FailOnError[List[GeoPlace]]()) aka "places" must beTypedEqualTo(List(
+          GeoPlace(
+            loc = GeoPoint(List(-73.97D, 40.77D)),
+            name = "Central Park",
+            category = "Parks",
+            dist = GeoDistance(
+              calculated = 1147,
+              loc = GeoPoint(List(-73.97D, 40.77D)))))).await(0, timeout)
 
       // { "type" : "public", "loc" : { "type" : "Point", "coordinates" : [ -73.97, 40.77 ] }, "name" : "Central Park", "category" : "Parks", "dist" : { "calculated" : 1147.4220523120696, "loc" : { "type" : "Point", "coordinates" : [ -73.97, 40.77 ] } } }
     }
