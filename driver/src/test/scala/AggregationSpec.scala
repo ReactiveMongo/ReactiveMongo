@@ -1099,6 +1099,7 @@ db.accounts.aggregate([
     }
   }
 
+  section("gt_mongo32")
   "Produce" should {
     // https://docs.mongodb.com/manual/reference/operator/aggregation/replaceRoot/#replaceroot-with-an-embedded-document
     val produce: BSONCollection = db(s"produce${System identityHashCode this}")
@@ -1168,6 +1169,7 @@ db.accounts.aggregate([
         "full_name" -> "Gary Sheffield")).await(0, timeout)
     }
   }
+  section("gt_mongo32")
 
   // ---
 
