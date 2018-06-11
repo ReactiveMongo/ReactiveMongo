@@ -462,9 +462,9 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
    * @param id the file id to remove from this store
    */
   def remove[Id <: pack.Value](id: Id)(implicit ctx: ExecutionContext, idProducer: IdProducer[Id]): Future[WriteResult] =
-    asBSON(chunks.name).deleteMany(BSONDocument(idProducer("files_id" -> id))).
+    asBSON(chunks.name).delete().one(BSONDocument(idProducer("files_id" -> id)), limit = None).
       flatMap { _ =>
-        asBSON(files.name).deleteMany(BSONDocument(idProducer("_id" -> id)))
+        asBSON(files.name).delete().one(BSONDocument(idProducer("_id" -> id)), limit = None)
       }
 
   /**
