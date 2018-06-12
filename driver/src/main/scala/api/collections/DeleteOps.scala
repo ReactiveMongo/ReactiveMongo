@@ -55,7 +55,8 @@ trait DeleteOps[P <: SerializationPack with Singleton]
     protected def bulkRecover: Option[Exception => Future[WriteResult]]
 
     /**
-     * Performs a [[https://docs.mongodb.com/manual/reference/method/db.collection.deleteOne/ single delete]] (see [[BatchCommands.DeleteCommand.DeleteElement]]).
+     * Performs a delete with a one single selector (see [[BatchCommands.DeleteCommand.DeleteElement]]).
+     * This will delete all the documents matched by the `q` selector.
      */
     final def one[Q, U](q: Q, limit: Option[Int] = None, collation: Option[Collation] = None)(implicit ec: ExecutionContext, qw: pack.Writer[Q]): Future[WriteResult] = element[Q, U](q, limit, collation).flatMap { upd => execute(Seq(upd)) }
 
@@ -69,13 +70,13 @@ trait DeleteOps[P <: SerializationPack with Singleton]
       }
 
     /**
-     * [[https://docs.mongodb.com/manual/reference/method/db.collection.deleteMany/ Deletes many documents]], according the ordered behaviour.
+     * Performs a bulk operation using many deletes, each can delete multiple documents.
      *
      * {{{
      * import reactivemongo.bson.BSONDocument
      * import reactivemongo.api.collections.BSONCollection
      *
-     * def deleteMany(coll: BSONCollection, docs: Iterable[BSONDocument]) = {
+     * def bulkDelete(coll: BSONCollection, docs: Iterable[BSONDocument]) = {
      *   val delete = coll.delete(ordered = true)
      *   val elements = docs.map { doc =>
      *     delete.element(

@@ -603,10 +603,10 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    *
    * {{{
    * // Equivalent to:
-   * collection.delete[MyDocType](true, defaultWriteConcern).one(document)
+   * collection.delete[MyDocType](true, defaultWriteConcern).one(document, limit)
    * }}}
    */
-  @deprecated("Use [[delete]]", "0.13.1")
+  @deprecated("Use delete().one(selector, limit)", "0.13.1")
   def remove[S](selector: S, writeConcern: WriteConcern = defaultWriteConcern, firstMatchOnly: Boolean = false)(implicit swriter: pack.Writer[S], ec: ExecutionContext): Future[WriteResult] = db.connection.metadata match {
     case Some(metadata) if (
       metadata.maxWireVersion >= MongoWireVersion.V26) => {
@@ -637,7 +637,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    * @param writeConcern $writeConcernParam
    *
    */
-  def delete[S](ordered: Boolean, writeConcern: WriteConcern): DeleteBuilder =
+  def delete[S](ordered: Boolean = true, writeConcern: WriteConcern = defaultWriteConcern): DeleteBuilder =
     prepareDelete(ordered, writeConcern)
 
   /**
