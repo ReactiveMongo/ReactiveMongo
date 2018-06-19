@@ -68,10 +68,34 @@ class UtilSpec extends org.specs2.mutable.Specification {
       }.toList
     }
 
+    def txtRecords(
+      name: String,
+      resolver: Resolver = defaultResolver): List[String] = {
+
+      val lookup = new Lookup(name, Type.TXT)
+
+      lookup.setResolver(resolver)
+
+      lookup.run().map { rec =>
+        val data = rec.rdataToString
+        val stripped = data.stripPrefix("\"")
+
+        if (stripped == data) {
+          data
+        } else {
+          stripped.stripSuffix("\"")
+        }
+      }.toList
+    }
+
     // ---
 
     "resolve SRV record for _imaps._tcp at gmail.com" in {
       srvRecords("gmail.com", "_imaps._tcp") must_=== List("imap.gmail.com")
+    } tag "wip"
+
+    "resolve TXT record for gmail.com" in {
+      txtRecords("gmail.com") must_=== List("v=spf1 redirect=_spf.google.com")
     } tag "wip"
   }
 }
