@@ -370,28 +370,6 @@ class MongoURISpec extends org.specs2.mutable.Specification {
     }
   }
 
-  "URI" should {
-    import scala.io.Source
-
-    "be loaded from a local file" in {
-      val resource = new java.io.File("/etc/hosts")
-
-      reactivemongo.api.tests.withContent(resource.toURI) { in =>
-        Source.fromInputStream(in).mkString must beTypedEqualTo(
-          Source.fromFile(resource).mkString)
-      }
-    }
-
-    "be loaded from classpath" in {
-      val resource = getClass.getResource("/reference.conf")
-
-      reactivemongo.api.tests.withContent(resource.toURI) { in =>
-        Source.fromInputStream(in).mkString must beTypedEqualTo(
-          Source.fromURL(resource).mkString)
-      }
-    }
-  }
-
   section("unit")
 
   // ---
