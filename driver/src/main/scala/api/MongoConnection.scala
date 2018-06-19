@@ -381,10 +381,6 @@ class MongoConnection(
 
 }
 
-/**
- * @define hosts host and port for the servers of the MongoDB replica set
- * @define options options ignored from the parsed URI
- */
 object MongoConnection {
   val DefaultHost = "localhost"
   val DefaultPort = 27017
@@ -397,9 +393,9 @@ object MongoConnection {
   }
 
   /**
-   * @param hosts the $hosts
+   * @param hosts the host and port for the servers of the MongoDB replica set
    * @param options the connection options
-   * @param ignoredOptions the $options
+   * @param ignoredOptions the options ignored from the parsed URI
    * @param db the name of the database
    * @param authenticate the authenticate information (see [[MongoConnectionOptions.authenticationMechanism]])
    */
