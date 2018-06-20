@@ -132,4 +132,32 @@ package object util {
     }.toList
   }
 
+  /**
+   * @param name the DNS name (e.g. `mycluster.mongodb.com`)
+   * @param timeout the resolution timeout (default: 5 seconds)
+   */
+  def txtRecords(
+    name: String,
+    timeout: FiniteDuration = dnsTimeout): List[String] = {
+
+    val lookup = new Lookup(name, Type.TXT)
+
+    lookup.setResolver {
+      val r = Lookup.getDefaultResolver
+      r.setTimeout(timeout.toSeconds.toInt)
+      r
+    }
+
+    lookup.run().map { rec =>
+      val data = rec.rdataToString
+      val stripped = data.stripPrefix("\"")
+
+      if (stripped == data) {
+        data
+      } else {
+        stripped.stripSuffix("\"")
+      }
+    }.toList
+  }
+
 }

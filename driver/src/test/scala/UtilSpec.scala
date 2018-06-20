@@ -26,40 +26,6 @@ class UtilSpec extends org.specs2.mutable.Specification {
   section("unit")
 
   "DNS resolver" should {
-    import Common.timeout
-
-    // ---
-
-    import org.xbill.DNS.{ Lookup, Resolver, Type }
-
-    def defaultResolver: Resolver = {
-      val r = Lookup.getDefaultResolver
-      r.setTimeout(timeout.toSeconds.toInt)
-      r
-    }
-
-    def txtRecords(
-      name: String,
-      resolver: Resolver = defaultResolver): List[String] = {
-
-      val lookup = new Lookup(name, Type.TXT)
-
-      lookup.setResolver(resolver)
-
-      lookup.run().map { rec =>
-        val data = rec.rdataToString
-        val stripped = data.stripPrefix("\"")
-
-        if (stripped == data) {
-          data
-        } else {
-          stripped.stripSuffix("\"")
-        }
-      }.toList
-    }
-
-    // ---
-
     "resolve SRV record for _imaps._tcp at gmail.com" in {
       reactivemongo.util.srvRecords(
         name = "gmail.com",
@@ -68,7 +34,8 @@ class UtilSpec extends org.specs2.mutable.Specification {
     } tag "wip"
 
     "resolve TXT record for gmail.com" in {
-      txtRecords("gmail.com") must_=== List("v=spf1 redirect=_spf.google.com")
+      reactivemongo.util.txtRecords(
+        "gmail.com") must_=== List("v=spf1 redirect=_spf.google.com")
     } tag "wip"
   }
 }
