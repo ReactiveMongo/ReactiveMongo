@@ -65,6 +65,8 @@ package object util {
     }
   }
 
+  // ---
+
   private[reactivemongo] def withContent[T](uri: URI)(f: InputStream => T): T = {
     lazy val in = if (uri.getScheme == "classpath") {
       Thread.currentThread().getContextClassLoader.
@@ -82,4 +84,52 @@ package object util {
       in.close()
     }
   }
+
+  // ---
+
+  import scala.concurrent.duration.FiniteDuration
+
+  import org.xbill.DNS.{ Lookup, Name, Type }
+
+  private lazy val dnsTimeout = FiniteDuration(5, "seconds")
+
+  /**
+   * @param name the DNS name (e.g. `mycluster.mongodb.com`)
+   * @param timeout the resolution timeout (default: 5 seconds)
+   * @param srvPrefix the SRV prefix (default: `_mongodb._tcp`)
+   */
+  def srvRecords(
+    name: String,
+    timeout: FiniteDuration = dnsTimeout,
+    srvPrefix: String = "_mongodb._tcp"): List[String] = {
+    val service = Name.fromConstantString(name + '.')
+    // assert service.label >= 3
+
+    val baseName = Name.fromString(
+      name.dropWhile(_ != '.').drop(1), Name.root)
+
+    val srvName = Name.concatenate(
+      Name.fromConstantString(srvPrefix), service)
+
+    val lookup = new Lookup(srvName, Type.SRV)
+
+    lookup.setResolver {
+      val r = Lookup.getDefaultResolver
+      r.setTimeout(timeout.toSeconds.toInt)
+      r
+    }
+
+    lookup.run().map { rec =>
+      val nme = rec.getAdditionalName
+
+      // if nme.isAbsolute then assert nme.subdomain(baseName)
+
+      if (nme.isAbsolute) {
+        nme.toString(true)
+      } else {
+        Name.concatenate(nme, baseName).toString(true)
+      }
+    }.toList
+  }
+
 }
