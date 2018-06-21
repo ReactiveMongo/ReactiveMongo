@@ -89,9 +89,9 @@ package object util {
 
   import scala.concurrent.duration.FiniteDuration
 
-  import org.xbill.DNS.{ Lookup, Name, Type }
+  import org.xbill.DNS.{ Lookup, Name, Record, SRVRecord, Type }
 
-  private lazy val dnsTimeout = FiniteDuration(5, "seconds")
+  private[reactivemongo] lazy val dnsTimeout = FiniteDuration(5, "seconds")
 
   /**
    * @param name the DNS name (e.g. `mycluster.mongodb.com`)
@@ -101,35 +101,68 @@ package object util {
   def srvRecords(
     name: String,
     timeout: FiniteDuration = dnsTimeout,
-    srvPrefix: String = "_mongodb._tcp"): List[String] = {
-    val service = Name.fromConstantString(name + '.')
-    // assert service.label >= 3
+    srvPrefix: String = "_mongodb._tcp")(
+    implicit
+    ec: ExecutionContext): Future[List[(String, Int)]] = {
 
     val baseName = Name.fromString(
       name.dropWhile(_ != '.').drop(1), Name.root)
 
-    val srvName = Name.concatenate(
-      Name.fromConstantString(srvPrefix), service)
+    def resolve: Future[Array[Record]] = {
+      val service = Name.fromConstantString(name + '.')
 
-    val lookup = new Lookup(srvName, Type.SRV)
+      if (service.labels < 3) {
+        Future.failed[Array[Record]](new IllegalArgumentException(
+          s"Invalid DNS service name (e.g. 'service.domain.tld'): $service"))
+      } else Future {
+        // assert service.label >= 3
 
-    lookup.setResolver {
-      val r = Lookup.getDefaultResolver
-      r.setTimeout(timeout.toSeconds.toInt)
-      r
+        val srvName = Name.concatenate(
+          Name.fromConstantString(srvPrefix), service)
+
+        val lookup = new Lookup(srvName, Type.SRV)
+
+        lookup.setResolver {
+          val r = Lookup.getDefaultResolver
+          r.setTimeout(timeout.toSeconds.toInt)
+          r
+        }
+
+        lookup.run()
+      }
     }
 
-    lookup.run().map { rec =>
-      val nme = rec.getAdditionalName
+    @annotation.tailrec
+    def go(records: Array[Record], names: List[(String, Int)]): Future[List[(String, Int)]] =
+      records.headOption match {
+        case Some(rec: SRVRecord) => {
+          val nme = rec.getAdditionalName
 
-      // if nme.isAbsolute then assert nme.subdomain(baseName)
+          if (nme.isAbsolute) {
+            if (!nme.subdomain(baseName)) {
+              Future.failed[List[(String, Int)]](new IllegalArgumentException(
+                s"$nme is not subdomain of $baseName"))
 
-      if (nme.isAbsolute) {
-        nme.toString(true)
-      } else {
-        Name.concatenate(nme, baseName).toString(true)
+            } else {
+              go(records.tail, (nme.toString(true) -> rec.getPort) :: names)
+            }
+          } else {
+            go(
+              records.tail,
+              (Name.concatenate(
+                nme, baseName).toString(true) -> rec.getPort) :: names)
+          }
+        }
+
+        case Some(rec) => Future.failed[List[(String, Int)]](
+          new IllegalArgumentException(s"Unexpected record: $rec"))
+
+        case _ => Future.successful(names.reverse)
       }
-    }.toList
+
+    // ---
+
+    resolve.flatMap { records => go(records, List.empty) }
   }
 
   /**
@@ -138,7 +171,9 @@ package object util {
    */
   def txtRecords(
     name: String,
-    timeout: FiniteDuration = dnsTimeout): List[String] = {
+    timeout: FiniteDuration = dnsTimeout)(
+    implicit
+    ec: ExecutionContext): Future[List[String]] = Future {
 
     val lookup = new Lookup(name, Type.TXT)
 
@@ -159,5 +194,4 @@ package object util {
       }
     }.toList
   }
-
 }
