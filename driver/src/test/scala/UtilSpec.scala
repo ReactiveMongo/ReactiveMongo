@@ -37,13 +37,13 @@ class UtilSpec(implicit ee: ExecutionEnv)
         "imap.gmail.com" -> 993)).
         await
 
-    } tag "wip"
+    }
 
     "resolve TXT record for gmail.com" in {
       reactivemongo.util.txtRecords(
         "gmail.com") must beTypedEqualTo(
           List("v=spf1 redirect=_spf.google.com")).await
 
-    } tag "wip"
+    }
   }
 }

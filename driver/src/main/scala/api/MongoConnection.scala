@@ -413,11 +413,23 @@ object MongoConnection {
    * @param uri the connection URI (see [[http://docs.mongodb.org/manual/reference/connection-string/ the MongoDB URI documentation]] for more information)
    */
   def parseURI(uri: String): Try[ParsedURI] = {
-    val prefix = "mongodb://"
+    val seedList = uri.startsWith("mongodb+srv://")
 
     Try {
-      val useful = uri.replace(prefix, "")
-      def opts = makeOptions(parseOptions(useful))
+      val useful: String = {
+        if (uri startsWith "mongodb://") uri.drop(10)
+        else if (seedList) uri.drop(14)
+        else throw new URIParsingException(s"Invalid scheme: $uri")
+      }
+
+      def opts = {
+        val empty = MongoConnectionOptions()
+        val initial = if (!seedList) empty else {
+          empty.copy(sslEnabled = true)
+        }
+
+        makeOptions(parseOptions(useful), empty)
+      }
 
       if (opts._2.maxIdleTimeMS != 0 &&
         opts._2.maxIdleTimeMS < opts._2.monitorRefreshMS) {
@@ -537,9 +549,12 @@ object MongoConnection {
   val IntRe = "^([0-9]+)$".r
   val FailoverRe = "^([^:]+):([0-9]+)x([0-9.]+)$".r
 
-  private def makeOptions(opts: Map[String, String]): (List[String], MongoConnectionOptions) = {
+  private def makeOptions(
+    opts: Map[String, String],
+    initial: MongoConnectionOptions): (List[String], MongoConnectionOptions) = {
+
     val (remOpts, step1) = opts.iterator.foldLeft(
-      Map.empty[String, String] -> MongoConnectionOptions()) {
+      Map.empty[String, String] -> initial) {
         case ((unsupported, result), kv) => kv match {
           case ("authSource", v) => {
             logger.warn(s"Connection option 'authSource' deprecated: use option 'authenticationDatabase'")
