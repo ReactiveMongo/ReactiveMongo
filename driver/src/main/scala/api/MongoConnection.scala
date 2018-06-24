@@ -20,7 +20,7 @@ import scala.util.control.{ NonFatal, NoStackTrace }
 
 import scala.collection.immutable.ListSet
 
-import scala.concurrent.{ ExecutionContext, Future, Promise }
+import scala.concurrent.{ Await, ExecutionContext, Future, Promise }
 import scala.concurrent.duration.{ Duration, FiniteDuration }
 
 import akka.util.Timeout
@@ -50,7 +50,8 @@ import reactivemongo.core.protocol.{
 }
 import reactivemongo.core.commands.SuccessfulAuthentication
 import reactivemongo.api.commands.WriteConcern
-import reactivemongo.util.LazyLogger
+
+import reactivemongo.util.{ LazyLogger, SRVRecordResolver }
 
 /**
  * A pool of MongoDB connections, obtained from a [[reactivemongo.api.MongoDriver]].
@@ -415,6 +416,15 @@ object MongoConnection {
    * @param uri the connection URI (see [[http://docs.mongodb.org/manual/reference/connection-string/ the MongoDB URI documentation]] for more information)
    */
   def parseURI(uri: String): Try[ParsedURI] = {
+    import scala.concurrent.ExecutionContext.Implicits.global
+
+    parseURI(uri, reactivemongo.util.dnsResolve())
+  }
+
+  private[reactivemongo] def parseURI(
+    uri: String,
+    srvRecResolver: SRVRecordResolver): Try[ParsedURI] = {
+
     val seedList = uri.startsWith("mongodb+srv://")
 
     Try {
@@ -445,7 +455,7 @@ object MongoConnection {
       val setSpec = useful.takeWhile(_ != '?') // options already parsed
 
       if (setSpec.indexOf("@") == -1) {
-        val (db, hosts) = parseHostsAndDbName(seedList, setSpec)
+        val (db, hosts) = parseHostsAndDbName(seedList, setSpec, srvRecResolver)
 
         options.authenticationMechanism match {
           case X509Authentication => {
@@ -466,7 +476,8 @@ object MongoConnection {
         setSpec match {
           case WithAuth(user, p, hostsPortsAndDbName) => {
             val pass = p.stripPrefix(":")
-            val (db, hosts) = parseHostsAndDbName(seedList, hostsPortsAndDbName)
+            val (db, hosts) = parseHostsAndDbName(
+              seedList, hostsPortsAndDbName, srvRecResolver)
 
             db.fold[ParsedURI](throw new URIParsingException(s"Could not parse URI '$uri': authentication information found but no database name in URI")) { database =>
 
@@ -499,48 +510,59 @@ object MongoConnection {
 
   private def parseHosts(
     seedList: Boolean,
-    hosts: String): ListSet[(String, Int)] = hosts.split(",").map({ h =>
-    h.span(_ != ':') match {
-      case ("", _) => throw new URIParsingException(
-        s"No valid host in the URI: '$h'")
+    hosts: String,
+    srvRecResolver: SRVRecordResolver): ListSet[(String, Int)] = {
+    if (seedList) {
+      import scala.concurrent.ExecutionContext.Implicits.global
 
-      case (host, "") => host -> DefaultPort
+      ListSet.empty[(String, Int)] ++ Await.result(
+        reactivemongo.util.srvRecords(hosts)(srvRecResolver),
+        reactivemongo.util.dnsTimeout)
 
-      case (host, port) => host -> {
-        try {
-          val p = port.drop(1).toInt
-          if (p > 0 && p < 65536) p
-          else throw new URIParsingException(
-            s"Could not parse host '$h' from URI: invalid port '$port'")
+    } else {
+      hosts.split(",").map({ h =>
+        h.span(_ != ':') match {
+          case ("", _) => throw new URIParsingException(
+            s"No valid host in the URI: '$h'")
 
-        } catch {
-          case _: NumberFormatException => throw new URIParsingException(
-            s"Could not parse host '$h' from URI: invalid port '$port'")
+          case (host, "") => host -> DefaultPort
 
-          case NonFatal(e) => throw e
+          case (host, port) => host -> {
+            try {
+              val p = port.drop(1).toInt
+              if (p > 0 && p < 65536) p
+              else throw new URIParsingException(
+                s"Could not parse host '$h' from URI: invalid port '$port'")
+
+            } catch {
+              case _: NumberFormatException => throw new URIParsingException(
+                s"Could not parse host '$h' from URI: invalid port '$port'")
+
+              case NonFatal(e) => throw e
+            }
+          }
+
+          case _ => throw new URIParsingException(
+            s"Could not parse host from URI: invalid definition '$h'")
         }
-      }
-
-      case _ => throw new URIParsingException(
-        s"Could not parse host from URI: invalid definition '$h'")
+      })(scala.collection.breakOut)
     }
-  })(scala.collection.breakOut)
-  //new BuildSet[(String, Int), Array[String]])
+  }
 
   private def parseHostsAndDbName(
     seedList: Boolean,
-    input: String): (Option[String], ListSet[(String, Int)]) =
-    input.span(_ != '/') match {
-      case (hosts, "") =>
-        None -> parseHosts(seedList, hosts)
+    input: String,
+    srvRecResolver: SRVRecordResolver): (Option[String], ListSet[(String, Int)]) = input.span(_ != '/') match {
+    case (hosts, "") =>
+      None -> parseHosts(seedList, hosts, srvRecResolver)
 
-      case (hosts, dbName) =>
-        Some(dbName drop 1) -> parseHosts(seedList, hosts)
+    case (hosts, dbName) =>
+      Some(dbName drop 1) -> parseHosts(seedList, hosts, srvRecResolver)
 
-      case _ =>
-        throw new URIParsingException(
-          s"Could not parse hosts and database from URI: '$input'")
-    }
+    case _ =>
+      throw new URIParsingException(
+        s"Could not parse hosts and database from URI: '$input'")
+  }
 
   private def parseOptions(uriAndOptions: String): Map[String, String] =
     uriAndOptions.split('?').toList match {

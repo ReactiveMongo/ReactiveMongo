@@ -31,11 +31,10 @@ class UtilSpec(implicit ee: ExecutionEnv)
 
   "DNS resolver" should {
     "resolve SRV record for _imaps._tcp at gmail.com" in {
-      reactivemongo.util.srvRecords(
+      reactivemongo.api.tests.srvRecords(
         name = "gmail.com",
-        srvPrefix = "_imaps._tcp") must beTypedEqualTo(List(
-        "imap.gmail.com" -> 993)).
-        await
+        srvPrefix = "_imaps._tcp") must beTypedEqualTo(
+        List("imap.gmail.com" -> 993)).await
 
     }
 
