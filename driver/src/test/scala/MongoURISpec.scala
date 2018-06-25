@@ -10,7 +10,11 @@ import reactivemongo.api.{
 import reactivemongo.core.nodeset.Authenticate
 import reactivemongo.api.commands.WriteConcern
 
-class MongoURISpec extends org.specs2.mutable.Specification {
+import org.specs2.concurrent.ExecutionEnv
+
+class MongoURISpec(implicit ee: ExecutionEnv)
+  extends org.specs2.mutable.Specification {
+
   "Mongo URI" title
 
   import MongoConnectionOptions.Credential
@@ -370,6 +374,38 @@ class MongoURISpec extends org.specs2.mutable.Specification {
     s"fail to parse $invalidIdle (with maxIdleTimeMS < monitorRefreshMS)" in {
       parseURI(invalidIdle) must beFailedTry[ParsedURI].withThrowable[MongoConnection.URIParsingException]("Invalid URI options: maxIdleTimeMS\\(99\\) < monitorRefreshMS\\(100\\)")
     }
+
+    val validSeedList = "mongodb+srv://mongo.domain.tld/foo"
+
+    s"parse seed list with success from $validSeedList" in {
+      import org.xbill.DNS.{ Name, Record, SRVRecord, Type }
+
+      def records = Array[Record](
+        new SRVRecord(
+          Name.fromConstantString("mongo.domain.tld."),
+          Type.SRV, 3600, 1, 1, 27017,
+          Name.fromConstantString("mongo1.domain.tld.")),
+        new SRVRecord(
+          Name.fromConstantString("mongo.domain.tld."),
+          Type.SRV, 3600, 1, 1, 27018,
+          Name.fromConstantString("mongo2.domain.tld.")))
+
+      parseURI(validSeedList, fixturesResolver { name =>
+        if (name == "mongo.domain.tld") {
+          records
+        } else {
+          throw new IllegalArgumentException(s"Unexpected name '$name'")
+        }
+      }) must beSuccessfulTry[ParsedURI].like {
+        case uri =>
+          // enforced by default when seed list ...
+          uri.options.sslEnabled must beTrue and {
+            uri.hosts must_=== List(
+              "mongo1.domain.tld" -> 27017,
+              "mongo2.domain.tld" -> 27018)
+          }
+      }
+    } tag "wip"
   }
 
   section("unit")
@@ -381,7 +417,7 @@ class MongoURISpec extends org.specs2.mutable.Specification {
 
   private def fixturesResolver(
     services: String => Array[Record] = _ => Array.empty): SRVRecordResolver = {
-    implicit ec: ExecutionContext =>
+    _ =>
       { name: String =>
         Future(services(name))
       }

@@ -440,7 +440,7 @@ object MongoConnection {
           empty.copy(sslEnabled = true)
         }
 
-        makeOptions(parseOptions(useful), empty)
+        makeOptions(parseOptions(useful), initial)
       }
 
       if (opts._2.maxIdleTimeMS != 0 &&
