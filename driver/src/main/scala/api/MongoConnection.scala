@@ -439,6 +439,7 @@ object MongoConnection {
       }
 
       val setSpec = useful.takeWhile(_ != '?') // options already parsed
+      val credentialEnd = setSpec.indexOf("@")
 
       def opts = {
         val empty = MongoConnectionOptions()
@@ -450,8 +451,11 @@ object MongoConnection {
           if (!seedList) {
             Map.empty[String, String]
           } else {
+            val serviceName = setSpec. // strip credentials before '@',
+              drop(credentialEnd + 1).takeWhile(_ != '/') // and DB after '/'
+
             val records = Await.result(
-              txtResolver(setSpec),
+              txtResolver(serviceName),
               reactivemongo.util.dnsTimeout)
 
             records.foldLeft(Map.empty[String, String]) { (o, r) =>
@@ -473,7 +477,7 @@ object MongoConnection {
 
       val (unsupportedKeys, options) = opts
 
-      if (setSpec.indexOf("@") == -1) {
+      if (credentialEnd == -1) {
         val (db, hosts) = parseHostsAndDbName(seedList, setSpec, srvRecResolver)
 
         options.authenticationMechanism match {

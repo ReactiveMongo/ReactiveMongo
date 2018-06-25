@@ -379,7 +379,7 @@ class MongoURISpec(implicit ee: ExecutionEnv)
       parseURI(invalidIdle) must beFailedTry[ParsedURI].withThrowable[MongoConnection.URIParsingException]("Invalid URI options: maxIdleTimeMS\\(99\\) < monitorRefreshMS\\(100\\)")
     }
 
-    val validSeedList = "mongodb+srv://mongo.domain.tld/foo"
+    val validSeedList = "mongodb+srv://usr:pwd@mongo.domain.tld/foo"
 
     s"parse seed list with success from $validSeedList" in {
       import org.xbill.DNS.{ Name, Record, SRVRecord, Type }
@@ -401,15 +401,19 @@ class MongoURISpec(implicit ee: ExecutionEnv)
           throw new IllegalArgumentException(s"Unexpected name '$name'")
         }
       }) must beSuccessfulTry[ParsedURI].like {
-        case uri =>
+        case uri => uri.db must beSome("foo") and {
           // enforced by default when seed list ...
           uri.options.sslEnabled must beTrue and {
             uri.hosts must_=== List(
               "mongo1.domain.tld" -> 27017,
               "mongo2.domain.tld" -> 27018)
+          } and {
+            uri.options.credentials must_=== Map(
+              "foo" -> Credential("usr", Some("pwd")))
           }
+        }
       }
-    }
+    } tag "wip"
 
     s"fail to parse seed list when target hosts are not with same base" in {
       import org.xbill.DNS.{ Name, Record, SRVRecord, Type }
