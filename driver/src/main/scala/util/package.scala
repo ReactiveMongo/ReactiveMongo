@@ -21,6 +21,8 @@ import java.net.URI
 
 import scala.util.control.NonFatal
 
+import scala.collection.immutable.ListSet
+
 import reactivemongo.core.errors.GenericDriverException
 
 package object util {
@@ -199,7 +201,7 @@ package object util {
     name: String,
     timeout: FiniteDuration = dnsTimeout)(
     implicit
-    ec: ExecutionContext): Future[List[String]] = Future {
+    ec: ExecutionContext): Future[ListSet[String]] = Future {
 
     val lookup = new Lookup(name, Type.TXT)
 
@@ -209,7 +211,7 @@ package object util {
       r
     }
 
-    lookup.run().map { rec =>
+    lookup.run().map({ rec =>
       val data = rec.rdataToString
       val stripped = data.stripPrefix("\"")
 
@@ -218,6 +220,6 @@ package object util {
       } else {
         stripped.stripSuffix("\"")
       }
-    }.toList
+    })(scala.collection.breakOut)
   }
 }

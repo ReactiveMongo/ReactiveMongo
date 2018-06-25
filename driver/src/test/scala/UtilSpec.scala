@@ -1,5 +1,7 @@
 import org.specs2.concurrent.ExecutionEnv
 
+import scala.collection.immutable.ListSet
+
 class UtilSpec(implicit ee: ExecutionEnv)
   extends org.specs2.mutable.Specification {
 
@@ -39,9 +41,8 @@ class UtilSpec(implicit ee: ExecutionEnv)
     }
 
     "resolve TXT record for gmail.com" in {
-      reactivemongo.util.txtRecords(
-        "gmail.com") must beTypedEqualTo(
-          List("v=spf1 redirect=_spf.google.com")).await
+      reactivemongo.util.txtRecords("gmail.com") must beTypedEqualTo(
+        ListSet("v=spf1 redirect=_spf.google.com")).await
 
     }
   }
