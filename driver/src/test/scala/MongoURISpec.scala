@@ -1,3 +1,5 @@
+import scala.collection.immutable.ListSet
+
 import scala.concurrent.{ ExecutionContext, Future }
 
 import reactivemongo.api.{
@@ -392,7 +394,7 @@ class MongoURISpec(implicit ee: ExecutionEnv)
           Type.SRV, 3600, 1, 1, 27018,
           Name.fromConstantString("mongo2.domain.tld.")))
 
-      parseURI(validSeedList, fixturesResolver { name =>
+      parseURI(validSeedList, srvRecResolver { name =>
         if (name == "mongo.domain.tld") {
           records
         } else {
@@ -422,7 +424,7 @@ class MongoURISpec(implicit ee: ExecutionEnv)
           Type.SRV, 3600, 1, 1, 27018,
           Name.fromConstantString("mongo2.other.tld.")))
 
-      parseURI(validSeedList, fixturesResolver { name =>
+      parseURI(validSeedList, srvRecResolver { name =>
         if (name == "mongo.domain.tld") {
           records
         } else {
@@ -440,7 +442,7 @@ class MongoURISpec(implicit ee: ExecutionEnv)
           Name.fromConstantString("mongo.domain.tld."),
           Type.A, 3600, java.net.InetAddress.getLoopbackAddress))
 
-      parseURI(validSeedList, fixturesResolver(_ => records)).
+      parseURI(validSeedList, srvRecResolver(_ => records)).
         aka("failure") must beFailedTry.withThrowable[GenericDriverException](
           ".*Unexpected record: mongo\\.domain\\.tld\\..*")
     }
@@ -451,9 +453,9 @@ class MongoURISpec(implicit ee: ExecutionEnv)
   // ---
 
   import org.xbill.DNS.Record
-  import reactivemongo.util.SRVRecordResolver
+  import reactivemongo.util.{ SRVRecordResolver, TXTResolver }
 
-  private def fixturesResolver(
+  private def srvRecResolver(
     services: String => Array[Record] = _ => Array.empty): SRVRecordResolver = {
     _ =>
       { name: String =>
@@ -461,10 +463,16 @@ class MongoURISpec(implicit ee: ExecutionEnv)
       }
   }
 
+  private def txtResolver(
+    resolve: String => ListSet[String] = _ => ListSet.empty): TXTResolver = {
+    name: String => Future(resolve(name))
+  }
+
   def parseURI(
     uri: String,
-    srvResolver: SRVRecordResolver = fixturesResolver()) =
-    reactivemongo.api.tests.parseURI(uri, srvResolver)
+    srvResolver: SRVRecordResolver = srvRecResolver(),
+    txts: TXTResolver = txtResolver()) = reactivemongo.api.tests.
+    parseURI(uri, srvResolver, txts)
 
   def strategyStr(uri: ParsedURI): String = {
     val fos = uri.options.failoverStrategy

@@ -51,7 +51,7 @@ import reactivemongo.core.protocol.{
 import reactivemongo.core.commands.SuccessfulAuthentication
 import reactivemongo.api.commands.WriteConcern
 
-import reactivemongo.util.{ LazyLogger, SRVRecordResolver }
+import reactivemongo.util.{ LazyLogger, SRVRecordResolver, TXTResolver }
 
 /**
  * A pool of MongoDB connections, obtained from a [[reactivemongo.api.MongoDriver]].
@@ -418,12 +418,16 @@ object MongoConnection {
   def parseURI(uri: String): Try[ParsedURI] = {
     import scala.concurrent.ExecutionContext.Implicits.global
 
-    parseURI(uri, reactivemongo.util.dnsResolve())
+    parseURI(
+      uri,
+      reactivemongo.util.dnsResolve(),
+      reactivemongo.util.txtRecords())
   }
 
   private[reactivemongo] def parseURI(
     uri: String,
-    srvRecResolver: SRVRecordResolver): Try[ParsedURI] = {
+    srvRecResolver: SRVRecordResolver,
+    txtResolver: TXTResolver): Try[ParsedURI] = {
 
     val seedList = uri.startsWith("mongodb+srv://")
 
@@ -443,13 +447,11 @@ object MongoConnection {
         }
 
         def txtOptions: Map[String, String] = {
-          import scala.concurrent.ExecutionContext.Implicits.global
-
           if (!seedList) {
             Map.empty[String, String]
           } else {
             val records = Await.result(
-              reactivemongo.util.txtRecords().apply(setSpec),
+              txtResolver(setSpec),
               reactivemongo.util.dnsTimeout)
 
             records.foldLeft(Map.empty[String, String]) { (o, r) =>

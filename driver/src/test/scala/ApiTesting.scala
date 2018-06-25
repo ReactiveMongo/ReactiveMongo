@@ -233,6 +233,9 @@ package object tests extends QueryCodecs[BSONSerializationPack.type] {
 
   def srvRecords(name: String, srvPrefix: String)(implicit ec: ExecutionContext) = reactivemongo.util.srvRecords(name)(reactivemongo.util.dnsResolve(srvPrefix = srvPrefix))
 
-  def parseURI(uri: String, srvResolver: reactivemongo.util.SRVRecordResolver) =
-    MongoConnection.parseURI(uri, srvResolver)
+  def parseURI(
+    uri: String,
+    srvResolver: reactivemongo.util.SRVRecordResolver,
+    txtResolver: reactivemongo.util.TXTResolver) =
+    MongoConnection.parseURI(uri, srvResolver, txtResolver)
 }
