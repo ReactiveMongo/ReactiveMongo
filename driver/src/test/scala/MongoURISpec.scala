@@ -1,9 +1,11 @@
+import scala.concurrent.{ ExecutionContext, Future }
+
 import reactivemongo.api.{
   MongoConnection,
   MongoConnectionOptions,
   ScramSha1Authentication,
   X509Authentication
-}, MongoConnection.{ ParsedURI, URIParsingException, parseURI }
+}, MongoConnection.{ ParsedURI, URIParsingException }
 
 import reactivemongo.core.nodeset.Authenticate
 import reactivemongo.api.commands.WriteConcern
@@ -373,6 +375,22 @@ class MongoURISpec extends org.specs2.mutable.Specification {
   section("unit")
 
   // ---
+
+  import org.xbill.DNS.Record
+  import reactivemongo.util.SRVRecordResolver
+
+  private def fixturesResolver(
+    services: String => Array[Record] = _ => Array.empty): SRVRecordResolver = {
+    implicit ec: ExecutionContext =>
+      { name: String =>
+        Future(services(name))
+      }
+  }
+
+  def parseURI(
+    uri: String,
+    srvResolver: SRVRecordResolver = fixturesResolver()) =
+    reactivemongo.api.tests.parseURI(uri, srvResolver)
 
   def strategyStr(uri: ParsedURI): String = {
     val fos = uri.options.failoverStrategy
