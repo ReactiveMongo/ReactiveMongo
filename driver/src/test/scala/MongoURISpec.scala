@@ -8,6 +8,8 @@ import reactivemongo.api.{
 }, MongoConnection.{ ParsedURI, URIParsingException }
 
 import reactivemongo.core.nodeset.Authenticate
+import reactivemongo.core.errors.GenericDriverException
+
 import reactivemongo.api.commands.WriteConcern
 
 import org.specs2.concurrent.ExecutionEnv
@@ -405,7 +407,43 @@ class MongoURISpec(implicit ee: ExecutionEnv)
               "mongo2.domain.tld" -> 27018)
           }
       }
-    } tag "wip"
+    }
+
+    s"fail to parse seed list when target hosts are not with same base" in {
+      import org.xbill.DNS.{ Name, Record, SRVRecord, Type }
+
+      def records = Array[Record](
+        new SRVRecord(
+          Name.fromConstantString("mongo.domain.tld."),
+          Type.SRV, 3600, 1, 1, 27017,
+          Name.fromConstantString("mongo1.other.tld.")),
+        new SRVRecord(
+          Name.fromConstantString("mongo.domain.tld."),
+          Type.SRV, 3600, 1, 1, 27018,
+          Name.fromConstantString("mongo2.other.tld.")))
+
+      parseURI(validSeedList, fixturesResolver { name =>
+        if (name == "mongo.domain.tld") {
+          records
+        } else {
+          throw new IllegalArgumentException(s"Unexpected name '$name'")
+        }
+      }) must beFailedTry.withThrowable[GenericDriverException](
+        ".*mongo1\\.other\\.tld\\. is not subdomain of domain\\.tld\\..*")
+    }
+
+    s"fail to parse seed list when non-SRV records are resolved" in {
+      import org.xbill.DNS.{ Name, Record, ARecord, Type }
+
+      def records = Array[Record](
+        new ARecord(
+          Name.fromConstantString("mongo.domain.tld."),
+          Type.A, 3600, java.net.InetAddress.getLoopbackAddress))
+
+      parseURI(validSeedList, fixturesResolver(_ => records)).
+        aka("failure") must beFailedTry.withThrowable[GenericDriverException](
+          ".*Unexpected record: mongo\\.domain\\.tld\\..*")
+    }
   }
 
   section("unit")

@@ -21,6 +21,8 @@ import java.net.URI
 
 import scala.util.control.NonFatal
 
+import reactivemongo.core.errors.GenericDriverException
+
 package object util {
   import scala.language.implicitConversions
 
@@ -122,7 +124,7 @@ package object util {
         val service = Name.fromConstantString(name + '.')
 
         if (service.labels < 3) {
-          Future.failed[Array[Record]](new IllegalArgumentException(
+          Future.failed[Array[Record]](GenericDriverException(
             s"Invalid DNS service name (e.g. 'service.domain.tld'): $service"))
 
         } else Future {
@@ -162,7 +164,7 @@ package object util {
 
             if (nme.isAbsolute) {
               if (!nme.subdomain(baseName)) {
-                Future.failed[List[SRV]](new IllegalArgumentException(
+                Future.failed[List[SRV]](GenericDriverException(
                   s"$nme is not subdomain of $baseName"))
 
               } else {
@@ -177,7 +179,7 @@ package object util {
           }
 
           case Some(rec) => Future.failed[List[SRV]](
-            new IllegalArgumentException(s"Unexpected record: $rec"))
+            GenericDriverException(s"Unexpected record: $rec"))
 
           case _ => Future.successful(names.reverse)
         }
