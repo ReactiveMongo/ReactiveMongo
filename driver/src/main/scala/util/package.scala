@@ -201,7 +201,7 @@ package object util {
     name: String,
     timeout: FiniteDuration = dnsTimeout)(
     implicit
-    ec: ExecutionContext): Future[ListSet[String]] = Future {
+    ec: ExecutionContext): Future[ListSet[String]] = {
 
     val lookup = new Lookup(name, Type.TXT)
 
@@ -211,15 +211,23 @@ package object util {
       r
     }
 
-    lookup.run().map({ rec =>
-      val data = rec.rdataToString
-      val stripped = data.stripPrefix("\"")
+    Future(lookup.run()).map {
+      case null => ListSet.empty[String]
 
-      if (stripped == data) {
-        data
-      } else {
-        stripped.stripSuffix("\"")
+      case records => {
+        val txts: ListSet[String] = records.map({ rec =>
+          val data = rec.rdataToString
+          val stripped = data.stripPrefix("\"")
+
+          if (stripped == data) {
+            data
+          } else {
+            stripped.stripSuffix("\"")
+          }
+        })(scala.collection.breakOut)
+
+        txts
       }
-    })(scala.collection.breakOut)
+    }
   }
 }

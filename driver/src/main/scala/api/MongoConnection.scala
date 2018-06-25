@@ -434,13 +434,31 @@ object MongoConnection {
         else throw new URIParsingException(s"Invalid scheme: $uri")
       }
 
+      val setSpec = useful.takeWhile(_ != '?') // options already parsed
+
       def opts = {
         val empty = MongoConnectionOptions()
         val initial = if (!seedList) empty else {
           empty.copy(sslEnabled = true)
         }
 
-        makeOptions(parseOptions(useful), initial)
+        def txtOptions: Map[String, String] = {
+          import scala.concurrent.ExecutionContext.Implicits.global
+
+          if (!seedList) {
+            Map.empty[String, String]
+          } else {
+            val records = Await.result(
+              reactivemongo.util.txtRecords(setSpec),
+              reactivemongo.util.dnsTimeout)
+
+            records.foldLeft(Map.empty[String, String]) { (o, r) =>
+              o ++ parseOptions(r)
+            }
+          }
+        }
+
+        makeOptions(txtOptions ++ parseOptions(useful), initial)
       }
 
       if (opts._2.maxIdleTimeMS != 0 &&
@@ -452,7 +470,6 @@ object MongoConnection {
       // ---
 
       val (unsupportedKeys, options) = opts
-      val setSpec = useful.takeWhile(_ != '?') // options already parsed
 
       if (setSpec.indexOf("@") == -1) {
         val (db, hosts) = parseHostsAndDbName(seedList, setSpec, srvRecResolver)
