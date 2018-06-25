@@ -193,16 +193,16 @@ package object util {
     }
   }
 
+  type TXTResolver = String => Future[ListSet[String]]
+
   /**
    * @param name the DNS name (e.g. `mycluster.mongodb.com`)
    * @param timeout the resolution timeout (default: 5 seconds)
    */
   def txtRecords(
-    name: String,
     timeout: FiniteDuration = dnsTimeout)(
     implicit
-    ec: ExecutionContext): Future[ListSet[String]] = {
-
+    ec: ExecutionContext): TXTResolver = { name: String =>
     val lookup = new Lookup(name, Type.TXT)
 
     lookup.setResolver {

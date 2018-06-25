@@ -449,7 +449,7 @@ object MongoConnection {
             Map.empty[String, String]
           } else {
             val records = Await.result(
-              reactivemongo.util.txtRecords(setSpec),
+              reactivemongo.util.txtRecords().apply(setSpec),
               reactivemongo.util.dnsTimeout)
 
             records.foldLeft(Map.empty[String, String]) { (o, r) =>
