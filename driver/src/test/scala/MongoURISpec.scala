@@ -413,7 +413,7 @@ class MongoURISpec(implicit ee: ExecutionEnv)
           }
         }
       }
-    } tag "wip"
+    }
 
     s"fail to parse seed list when target hosts are not with same base" in {
       import org.xbill.DNS.{ Name, Record, SRVRecord, Type }
@@ -449,6 +449,39 @@ class MongoURISpec(implicit ee: ExecutionEnv)
       parseURI(validSeedList, srvRecResolver(_ => records)).
         aka("failure") must beFailedTry.withThrowable[GenericDriverException](
           ".*Unexpected record: mongo\\.domain\\.tld\\..*")
+    }
+
+    val fullFeaturedSeedList = "mongodb+srv://user123:passwd123@service.domain.tld/somedb?foo=bar&sslEnabled=false"
+
+    s"parse $fullFeatured with success" in {
+      import org.xbill.DNS.{ Name, Record, SRVRecord, Type }
+
+      parseURI(
+        uri = fullFeaturedSeedList,
+        srvResolver = srvRecResolver(_ =>
+          Array[Record](new SRVRecord(
+            Name.fromConstantString("mongo.domain.tld."),
+            Type.SRV, 3600, 1, 1, 27017,
+            Name.fromConstantString("mongo1.domain.tld.")))),
+        txts = txtResolver({ name =>
+          if (name == "service.domain.tld") {
+            ListSet("authenticationMechanism=scram-sha1", "foo=lorem")
+          } else {
+            throw new IllegalArgumentException(s"Unexpected: $name")
+          }
+        })) must beSuccessfulTry(
+          ParsedURI(
+            hosts = List("mongo1.domain.tld" -> 27017),
+            db = Some("somedb"),
+            authenticate = Some(
+              Authenticate("somedb", "user123", Some("passwd123"))),
+            options = MongoConnectionOptions(
+              sslEnabled = false, // overriden from URI
+              authenticationMechanism = ScramSha1Authentication,
+              credentials = Map("somedb" -> Credential(
+                "user123", Some("passwd123")))),
+            ignoredOptions = List("foo")))
+
     }
   }
 
