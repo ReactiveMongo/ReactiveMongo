@@ -18,8 +18,6 @@ package reactivemongo.api
 import scala.util.Try
 import scala.util.control.{ NonFatal, NoStackTrace }
 
-import scala.collection.immutable.ListSet
-
 import scala.concurrent.{ Await, ExecutionContext, Future, Promise }
 import scala.concurrent.duration.{ Duration, FiniteDuration }
 
