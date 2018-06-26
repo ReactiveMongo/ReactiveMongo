@@ -18,7 +18,9 @@ package reactivemongo.api
 import scala.util.Try
 import scala.util.control.{ NonFatal, NoStackTrace }
 
-import scala.concurrent.{ ExecutionContext, Future, Promise }
+import scala.collection.immutable.ListSet
+
+import scala.concurrent.{ Await, ExecutionContext, Future, Promise }
 import scala.concurrent.duration.{ Duration, FiniteDuration }
 
 import akka.util.Timeout
@@ -48,7 +50,8 @@ import reactivemongo.core.protocol.{
 }
 import reactivemongo.core.commands.SuccessfulAuthentication
 import reactivemongo.api.commands.WriteConcern
-import reactivemongo.util.LazyLogger
+
+import reactivemongo.util.{ LazyLogger, SRVRecordResolver, TXTResolver }
 
 /**
  * A pool of MongoDB connections, obtained from a [[reactivemongo.api.MongoDriver]].
@@ -381,10 +384,6 @@ class MongoConnection(
 
 }
 
-/**
- * @define hosts host and port for the servers of the MongoDB replica set
- * @define options options ignored from the parsed URI
- */
 object MongoConnection {
   val DefaultHost = "localhost"
   val DefaultPort = 27017
@@ -397,14 +396,14 @@ object MongoConnection {
   }
 
   /**
-   * @param hosts the $hosts
+   * @param hosts the host and port for the servers of the MongoDB replica set
    * @param options the connection options
-   * @param ignoredOptions the $options
+   * @param ignoredOptions the options ignored from the parsed URI
    * @param db the name of the database
    * @param authenticate the authenticate information (see [[MongoConnectionOptions.authenticationMechanism]])
    */
   final case class ParsedURI(
-    hosts: List[(String, Int)],
+    hosts: List[(String, Int)], // TODO: ListSet
     options: MongoConnectionOptions,
     ignoredOptions: List[String],
     db: Option[String],
@@ -417,11 +416,56 @@ object MongoConnection {
    * @param uri the connection URI (see [[http://docs.mongodb.org/manual/reference/connection-string/ the MongoDB URI documentation]] for more information)
    */
   def parseURI(uri: String): Try[ParsedURI] = {
-    val prefix = "mongodb://"
+    import scala.concurrent.ExecutionContext.Implicits.global
+
+    parseURI(
+      uri,
+      reactivemongo.util.dnsResolve(),
+      reactivemongo.util.txtRecords())
+  }
+
+  private[reactivemongo] def parseURI(
+    uri: String,
+    srvRecResolver: SRVRecordResolver,
+    txtResolver: TXTResolver): Try[ParsedURI] = {
+
+    val seedList = uri.startsWith("mongodb+srv://")
 
     Try {
-      val useful = uri.replace(prefix, "")
-      def opts = makeOptions(parseOptions(useful))
+      val useful: String = {
+        if (uri startsWith "mongodb://") uri.drop(10)
+        else if (seedList) uri.drop(14)
+        else throw new URIParsingException(s"Invalid scheme: $uri")
+      }
+
+      val setSpec = useful.takeWhile(_ != '?') // options already parsed
+      val credentialEnd = setSpec.indexOf("@")
+
+      def opts = {
+        val empty = MongoConnectionOptions()
+        val initial = if (!seedList) empty else {
+          empty.copy(sslEnabled = true)
+        }
+
+        def txtOptions: Map[String, String] = {
+          if (!seedList) {
+            Map.empty[String, String]
+          } else {
+            val serviceName = setSpec. // strip credentials before '@',
+              drop(credentialEnd + 1).takeWhile(_ != '/') // and DB after '/'
+
+            val records = Await.result(
+              txtResolver(serviceName),
+              reactivemongo.util.dnsTimeout)
+
+            records.foldLeft(Map.empty[String, String]) { (o, r) =>
+              o ++ parseOptions(r)
+            }
+          }
+        }
+
+        makeOptions(txtOptions ++ parseOptions(useful), initial)
+      }
 
       if (opts._2.maxIdleTimeMS != 0 &&
         opts._2.maxIdleTimeMS < opts._2.monitorRefreshMS) {
@@ -433,8 +477,8 @@ object MongoConnection {
 
       val (unsupportedKeys, options) = opts
 
-      if (useful.indexOf("@") == -1) {
-        val (db, hosts) = parseHostsAndDbName(useful)
+      if (credentialEnd == -1) {
+        val (db, hosts) = parseHostsAndDbName(seedList, setSpec, srvRecResolver)
 
         options.authenticationMechanism match {
           case X509Authentication => {
@@ -443,19 +487,20 @@ object MongoConnection {
             val optsWithX509 = options.copy(credentials = Map(
               dbName -> MongoConnectionOptions.Credential("", None)))
 
-            ParsedURI(hosts, optsWithX509, unsupportedKeys, db,
+            ParsedURI(hosts.toList, optsWithX509, unsupportedKeys, db,
               Some(Authenticate(dbName, "", None)))
           }
 
-          case _ => ParsedURI(hosts, options, unsupportedKeys, db, None)
+          case _ => ParsedURI(hosts.toList, options, unsupportedKeys, db, None)
         }
       } else {
         val WithAuth = """([^:]+)(|:[^@]*)@(.+)""".r
 
-        useful match {
+        setSpec match {
           case WithAuth(user, p, hostsPortsAndDbName) => {
             val pass = p.stripPrefix(":")
-            val (db, hosts) = parseHostsAndDbName(hostsPortsAndDbName)
+            val (db, hosts) = parseHostsAndDbName(
+              seedList, hostsPortsAndDbName, srvRecResolver)
 
             db.fold[ParsedURI](throw new URIParsingException(s"Could not parse URI '$uri': authentication information found but no database name in URI")) { database =>
 
@@ -475,8 +520,8 @@ object MongoConnection {
                   authDb -> MongoConnectionOptions.Credential(
                     user, password)))
 
-              ParsedURI(hosts, optsWithCred, unsupportedKeys, Some(database),
-                Some(Authenticate(authDb, user, password)))
+              ParsedURI(hosts.toList, optsWithCred, unsupportedKeys,
+                Some(database), Some(Authenticate(authDb, user, password)))
             }
           }
 
@@ -486,44 +531,62 @@ object MongoConnection {
     }
   }
 
-  private def parseHosts(hosts: String) = hosts.split(",").toList.map { host =>
-    host.trim.split(':').toList match {
-      case host :: port :: Nil => host -> {
-        try {
-          val p = port.toInt
-          if (p > 0 && p < 65536) p
-          else throw new URIParsingException(
-            s"Could not parse hosts '$hosts' from URI: invalid port '$port'")
+  private def parseHosts(
+    seedList: Boolean,
+    hosts: String,
+    srvRecResolver: SRVRecordResolver): List[(String, Int)] = {
+    if (seedList) {
+      import scala.concurrent.ExecutionContext.Implicits.global
 
-        } catch {
-          case _: NumberFormatException => throw new URIParsingException(
-            s"Could not parse hosts '$hosts' from URI: invalid port '$port'")
+      Await.result(
+        reactivemongo.util.srvRecords(hosts)(srvRecResolver),
+        reactivemongo.util.dnsTimeout).toList
 
-          case NonFatal(e) => throw e
+    } else {
+      hosts.split(",").map({ h =>
+        h.span(_ != ':') match {
+          case ("", _) => throw new URIParsingException(
+            s"No valid host in the URI: '$h'")
+
+          case (host, "") => host -> DefaultPort
+
+          case (host, port) => host -> {
+            try {
+              val p = port.drop(1).toInt
+              if (p > 0 && p < 65536) p
+              else throw new URIParsingException(
+                s"Could not parse host '$h' from URI: invalid port '$port'")
+
+            } catch {
+              case _: NumberFormatException => throw new URIParsingException(
+                s"Could not parse host '$h' from URI: invalid port '$port'")
+
+              case NonFatal(e) => throw e
+            }
+          }
+
+          case _ => throw new URIParsingException(
+            s"Could not parse host from URI: invalid definition '$h'")
         }
-      }
-
-      case "" :: _ => throw new URIParsingException(
-        s"No valid host in the URI: '$hosts'")
-
-      case host :: Nil => host -> DefaultPort
-
-      case _ => throw new URIParsingException(
-        s"Could not parse hosts from URI: invalid definition '$hosts'")
+      })(scala.collection.breakOut)
     }
   }
 
-  private def parseHostsAndDbName(input: String): (Option[String], List[(String, Int)]) = input.takeWhile(_ != '?').split("/").toList match {
-    case hosts :: Nil =>
-      None -> parseHosts(hosts)
+  private def parseHostsAndDbName(
+    seedList: Boolean,
+    input: String,
+    srvRecResolver: SRVRecordResolver): (Option[String], List[(String, Int)]) =
+    input.span(_ != '/') match {
+      case (hosts, "") =>
+        None -> parseHosts(seedList, hosts, srvRecResolver)
 
-    case hosts :: dbName :: Nil =>
-      Some(dbName) -> parseHosts(hosts)
+      case (hosts, dbName) =>
+        Some(dbName drop 1) -> parseHosts(seedList, hosts, srvRecResolver)
 
-    case _ =>
-      throw new URIParsingException(
-        s"Could not parse hosts and database from URI: '$input'")
-  }
+      case _ =>
+        throw new URIParsingException(
+          s"Could not parse hosts and database from URI: '$input'")
+    }
 
   private def parseOptions(uriAndOptions: String): Map[String, String] =
     uriAndOptions.split('?').toList match {
@@ -541,9 +604,12 @@ object MongoConnection {
   val IntRe = "^([0-9]+)$".r
   val FailoverRe = "^([^:]+):([0-9]+)x([0-9.]+)$".r
 
-  private def makeOptions(opts: Map[String, String]): (List[String], MongoConnectionOptions) = {
+  private def makeOptions(
+    opts: Map[String, String],
+    initial: MongoConnectionOptions): (List[String], MongoConnectionOptions) = {
+
     val (remOpts, step1) = opts.iterator.foldLeft(
-      Map.empty[String, String] -> MongoConnectionOptions()) {
+      Map.empty[String, String] -> initial) {
         case ((unsupported, result), kv) => kv match {
           case ("authSource", v) => {
             logger.warn(s"Connection option 'authSource' deprecated: use option 'authenticationDatabase'")

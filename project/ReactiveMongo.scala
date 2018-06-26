@@ -464,6 +464,7 @@ object Version {
         Seq(Attributed(shadedDir / shadedJar)(AttributeMap.empty))
       },
       libraryDependencies ++= akka.value ++ Seq(
+        "dnsjava" % "dnsjava" % "2.1.8",
         playIteratees.value, commonsCodec,
         shapelessTest % Test, specs.value) ++ logApi,
       findbugsAnalyzedPath += target.value / "external",

@@ -1,14 +1,24 @@
+import scala.collection.immutable.ListSet
+
+import scala.concurrent.{ ExecutionContext, Future }
+
 import reactivemongo.api.{
   MongoConnection,
   MongoConnectionOptions,
   ScramSha1Authentication,
   X509Authentication
-}, MongoConnection.{ ParsedURI, URIParsingException, parseURI }
+}, MongoConnection.{ ParsedURI, URIParsingException }
 
 import reactivemongo.core.nodeset.Authenticate
+import reactivemongo.core.errors.GenericDriverException
+
 import reactivemongo.api.commands.WriteConcern
 
-class MongoURISpec extends org.specs2.mutable.Specification {
+import org.specs2.concurrent.ExecutionEnv
+
+class MongoURISpec(implicit ee: ExecutionEnv)
+  extends org.specs2.mutable.Specification {
+
   "Mongo URI" title
 
   import MongoConnectionOptions.Credential
@@ -368,33 +378,138 @@ class MongoURISpec extends org.specs2.mutable.Specification {
     s"fail to parse $invalidIdle (with maxIdleTimeMS < monitorRefreshMS)" in {
       parseURI(invalidIdle) must beFailedTry[ParsedURI].withThrowable[MongoConnection.URIParsingException]("Invalid URI options: maxIdleTimeMS\\(99\\) < monitorRefreshMS\\(100\\)")
     }
-  }
 
-  "URI" should {
-    import scala.io.Source
+    val validSeedList = "mongodb+srv://usr:pwd@mongo.domain.tld/foo"
 
-    "be loaded from a local file" in {
-      val resource = new java.io.File("/etc/hosts")
+    s"parse seed list with success from $validSeedList" in {
+      import org.xbill.DNS.{ Name, Record, SRVRecord, Type }
 
-      reactivemongo.api.tests.withContent(resource.toURI) { in =>
-        Source.fromInputStream(in).mkString must beTypedEqualTo(
-          Source.fromFile(resource).mkString)
+      def records = Array[Record](
+        new SRVRecord(
+          Name.fromConstantString("mongo.domain.tld."),
+          Type.SRV, 3600, 1, 1, 27017,
+          Name.fromConstantString("mongo1.domain.tld.")),
+        new SRVRecord(
+          Name.fromConstantString("mongo.domain.tld."),
+          Type.SRV, 3600, 1, 1, 27018,
+          Name.fromConstantString("mongo2.domain.tld.")))
+
+      parseURI(validSeedList, srvRecResolver { name =>
+        if (name == "mongo.domain.tld") {
+          records
+        } else {
+          throw new IllegalArgumentException(s"Unexpected name '$name'")
+        }
+      }) must beSuccessfulTry[ParsedURI].like {
+        case uri => uri.db must beSome("foo") and {
+          // enforced by default when seed list ...
+          uri.options.sslEnabled must beTrue and {
+            uri.hosts must_=== List(
+              "mongo1.domain.tld" -> 27017,
+              "mongo2.domain.tld" -> 27018)
+          } and {
+            uri.options.credentials must_=== Map(
+              "foo" -> Credential("usr", Some("pwd")))
+          }
+        }
       }
     }
 
-    "be loaded from classpath" in {
-      val resource = getClass.getResource("/reference.conf")
+    s"fail to parse seed list when target hosts are not with same base" in {
+      import org.xbill.DNS.{ Name, Record, SRVRecord, Type }
 
-      reactivemongo.api.tests.withContent(resource.toURI) { in =>
-        Source.fromInputStream(in).mkString must beTypedEqualTo(
-          Source.fromURL(resource).mkString)
-      }
+      def records = Array[Record](
+        new SRVRecord(
+          Name.fromConstantString("mongo.domain.tld."),
+          Type.SRV, 3600, 1, 1, 27017,
+          Name.fromConstantString("mongo1.other.tld.")),
+        new SRVRecord(
+          Name.fromConstantString("mongo.domain.tld."),
+          Type.SRV, 3600, 1, 1, 27018,
+          Name.fromConstantString("mongo2.other.tld.")))
+
+      parseURI(validSeedList, srvRecResolver { name =>
+        if (name == "mongo.domain.tld") {
+          records
+        } else {
+          throw new IllegalArgumentException(s"Unexpected name '$name'")
+        }
+      }) must beFailedTry.withThrowable[GenericDriverException](
+        ".*mongo1\\.other\\.tld\\. is not subdomain of domain\\.tld\\..*")
+    }
+
+    s"fail to parse seed list when non-SRV records are resolved" in {
+      import org.xbill.DNS.{ Name, Record, ARecord, Type }
+
+      def records = Array[Record](
+        new ARecord(
+          Name.fromConstantString("mongo.domain.tld."),
+          Type.A, 3600, java.net.InetAddress.getLoopbackAddress))
+
+      parseURI(validSeedList, srvRecResolver(_ => records)).
+        aka("failure") must beFailedTry.withThrowable[GenericDriverException](
+          ".*Unexpected record: mongo\\.domain\\.tld\\..*")
+    }
+
+    val fullFeaturedSeedList = "mongodb+srv://user123:passwd123@service.domain.tld/somedb?foo=bar&sslEnabled=false"
+
+    s"parse $fullFeatured with success" in {
+      import org.xbill.DNS.{ Name, Record, SRVRecord, Type }
+
+      parseURI(
+        uri = fullFeaturedSeedList,
+        srvResolver = srvRecResolver(_ =>
+          Array[Record](new SRVRecord(
+            Name.fromConstantString("mongo.domain.tld."),
+            Type.SRV, 3600, 1, 1, 27017,
+            Name.fromConstantString("mongo1.domain.tld.")))),
+        txts = txtResolver({ name =>
+          if (name == "service.domain.tld") {
+            ListSet("authenticationMechanism=scram-sha1", "foo=lorem")
+          } else {
+            throw new IllegalArgumentException(s"Unexpected: $name")
+          }
+        })) must beSuccessfulTry(
+          ParsedURI(
+            hosts = List("mongo1.domain.tld" -> 27017),
+            db = Some("somedb"),
+            authenticate = Some(
+              Authenticate("somedb", "user123", Some("passwd123"))),
+            options = MongoConnectionOptions(
+              sslEnabled = false, // overriden from URI
+              authenticationMechanism = ScramSha1Authentication,
+              credentials = Map("somedb" -> Credential(
+                "user123", Some("passwd123")))),
+            ignoredOptions = List("foo")))
+
     }
   }
 
   section("unit")
 
   // ---
+
+  import org.xbill.DNS.Record
+  import reactivemongo.util.{ SRVRecordResolver, TXTResolver }
+
+  private def srvRecResolver(
+    services: String => Array[Record] = _ => Array.empty): SRVRecordResolver = {
+    _ =>
+      { name: String =>
+        Future(services(name))
+      }
+  }
+
+  private def txtResolver(
+    resolve: String => ListSet[String] = _ => ListSet.empty): TXTResolver = {
+    name: String => Future(resolve(name))
+  }
+
+  def parseURI(
+    uri: String,
+    srvResolver: SRVRecordResolver = srvRecResolver(),
+    txts: TXTResolver = txtResolver()) = reactivemongo.api.tests.
+    parseURI(uri, srvResolver, txts)
 
   def strategyStr(uri: ParsedURI): String = {
     val fos = uri.options.failoverStrategy
