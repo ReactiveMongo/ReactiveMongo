@@ -534,13 +534,13 @@ object MongoConnection {
   private def parseHosts(
     seedList: Boolean,
     hosts: String,
-    srvRecResolver: SRVRecordResolver): ListSet[(String, Int)] = {
+    srvRecResolver: SRVRecordResolver): List[(String, Int)] = {
     if (seedList) {
       import scala.concurrent.ExecutionContext.Implicits.global
 
-      ListSet.empty[(String, Int)] ++ Await.result(
+      Await.result(
         reactivemongo.util.srvRecords(hosts)(srvRecResolver),
-        reactivemongo.util.dnsTimeout)
+        reactivemongo.util.dnsTimeout).toList
 
     } else {
       hosts.split(",").map({ h =>
@@ -575,17 +575,18 @@ object MongoConnection {
   private def parseHostsAndDbName(
     seedList: Boolean,
     input: String,
-    srvRecResolver: SRVRecordResolver): (Option[String], ListSet[(String, Int)]) = input.span(_ != '/') match {
-    case (hosts, "") =>
-      None -> parseHosts(seedList, hosts, srvRecResolver)
+    srvRecResolver: SRVRecordResolver): (Option[String], List[(String, Int)]) =
+    input.span(_ != '/') match {
+      case (hosts, "") =>
+        None -> parseHosts(seedList, hosts, srvRecResolver)
 
-    case (hosts, dbName) =>
-      Some(dbName drop 1) -> parseHosts(seedList, hosts, srvRecResolver)
+      case (hosts, dbName) =>
+        Some(dbName drop 1) -> parseHosts(seedList, hosts, srvRecResolver)
 
-    case _ =>
-      throw new URIParsingException(
-        s"Could not parse hosts and database from URI: '$input'")
-  }
+      case _ =>
+        throw new URIParsingException(
+          s"Could not parse hosts and database from URI: '$input'")
+    }
 
   private def parseOptions(uriAndOptions: String): Map[String, String] =
     uriAndOptions.split('?').toList match {
