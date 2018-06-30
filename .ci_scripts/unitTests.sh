@@ -10,7 +10,7 @@ if [ `git grep "$SCRIPT_DIR" $(basename "$SCRIPT_DIR") | grep -v $(basename $0) 
   exit 2
 fi
 
-if [ "$SCALA_VERSION" = "2.11.11" -a `javac -version 2>&1 | grep 1.7 | wc -l` -eq 1 ]; then
+if [ "$SCALA_VERSION" = "2.11.12" -a `javac -version 2>&1 | grep 1.7 | wc -l` -eq 1 ]; then
     echo "[INFO] Check the source format and backward compatibility"
 
     sbt ++$SCALA_VERSION scalariformFormat test:scalariformFormat > /dev/null
@@ -30,8 +30,13 @@ fi
 # JVM/SBT setup
 source "$SCRIPT_DIR/jvmopts.sh"
 
+if [ "x$TRAVIS_OS_NAME" = "xosx" ]; then
+    export SBT_OPTS="-Dtest.nettyNativeArch=osx"
+fi
+
 cat > /dev/stdout <<EOF
 - JVM options: $JVM_OPTS
+- SBT options: $SBT_OPTS
 EOF
 
 export JVM_OPTS

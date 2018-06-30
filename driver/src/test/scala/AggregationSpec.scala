@@ -487,27 +487,26 @@ class AggregationSpec(implicit ee: ExecutionEnv)
     "filter when using a '$project' stage" in {
       // See https://docs.mongodb.com/master/reference/operator/aggregation/filter/#example
 
-      import sales.BatchCommands.AggregationFramework.{
-        Ascending,
-        Sort
-      }
-
       def expected = List(
         Sale(_id = 0, items = List(SaleItem(2, 1, 240))),
         Sale(_id = 1, items = List(
           SaleItem(23, 3, 110), SaleItem(38, 1, 300))),
         Sale(_id = 2, items = Nil))
-      val sort = Sort(Ascending("_id"))
 
-      sales.aggregateWith1[Sale]() {
-        framework =>
-          import framework._
+      sales.aggregateWith1[Sale]() { framework =>
+        import framework._
 
-          Project(document("items" -> Filter(
-            input = BSONString(f"$$items"),
-            as = "item",
-            cond = document(f"$$gte" -> array(f"$$$$item.price", 100))))) -> List(sort)
-      }.collect[List](Int.MaxValue, Cursor.FailOnError[List[Sale]]()) must beTypedEqualTo(expected).await(0, timeout)
+        val sort = Sort(Ascending("_id"))
+
+        Project(document("items" -> Filter(
+          input = BSONString(f"$$items"),
+          as = "item",
+          cond = document(
+            f"$$gte" -> array(f"$$$$item.price", 100))))) -> List(sort)
+
+      }.collect[List](Int.MaxValue, Cursor.FailOnError[List[Sale]]()).
+        aka("filtered") must beTypedEqualTo(expected).await(0, timeout)
+
     } tag "not_mongo26"
   }
 

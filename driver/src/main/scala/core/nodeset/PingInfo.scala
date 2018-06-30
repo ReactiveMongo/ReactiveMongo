@@ -1,6 +1,6 @@
 package reactivemongo.core.nodeset
 
-import shaded.netty.channel.ChannelId
+import reactivemongo.io.netty.channel.ChannelId
 
 /**
  * @param ping the response delay for the last IsMaster request (duration between request and its response, or `Long.MaxValue`)

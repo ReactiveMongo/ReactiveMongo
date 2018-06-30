@@ -22,16 +22,16 @@ import scala.concurrent.{ Await, Future, Promise }
 import scala.util.{ Failure, Success, Try }
 import scala.util.control.NonFatal
 
-import shaded.google.common.collect.{ EvictingQueue, Queues }
+import reactivemongo.com.google.common.collect.{ EvictingQueue, Queues }
 
 import akka.actor.{ Actor, ActorRef, Cancellable }
 
-import shaded.netty.channel.{
+import reactivemongo.io.netty.channel.{
   ChannelFuture,
   ChannelFutureListener,
   ChannelId
 }
-import shaded.netty.channel.group.{
+import reactivemongo.io.netty.channel.group.{
   ChannelGroupFuture,
   ChannelGroupFutureListener,
   DefaultChannelGroup
@@ -1438,7 +1438,7 @@ trait MongoDBSystem extends Actor {
   @deprecated(message = "Will be made private", since = "0.11.10")
   def allChannelGroup(nodeSet: NodeSet): DefaultChannelGroup = {
     val result = new DefaultChannelGroup(
-      shaded.netty.util.concurrent.GlobalEventExecutor.INSTANCE)
+      reactivemongo.io.netty.util.concurrent.GlobalEventExecutor.INSTANCE)
 
     for (node <- nodeSet.nodes) {
       for (connection <- node.connections) result.add(connection.channel)

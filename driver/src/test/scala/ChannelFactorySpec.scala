@@ -2,9 +2,9 @@ import scala.concurrent.Promise
 
 import akka.actor.Actor
 
-import shaded.netty.buffer.{ ByteBuf, Unpooled }
+import reactivemongo.io.netty.buffer.{ ByteBuf, Unpooled }
 
-import shaded.netty.channel.{ ChannelFuture, ChannelFutureListener }
+import reactivemongo.io.netty.channel.{ ChannelFuture, ChannelFutureListener }
 
 import reactivemongo.core.protocol.{
   MessageHeader,
@@ -45,7 +45,7 @@ class ChannelFactorySpec(implicit ee: ExecutionEnv)
   section("unit")
 
   "Embedded channel" should {
-    import shaded.netty.channel.DefaultChannelId
+    import reactivemongo.io.netty.channel.DefaultChannelId
 
     "manage isMaster command" in {
       val cid = DefaultChannelId.newInstance()
@@ -114,6 +114,30 @@ class ChannelFactorySpec(implicit ee: ExecutionEnv)
     }
   }
 
+  Common.nettyNativeArch.foreach { arch =>
+    s"Netty native support for $arch" should {
+      "be loaded" in {
+        def actor = new Actor {
+          val receive: Receive = {
+            case _ => ???
+          }
+        }
+
+        val actorRef = akka.testkit.TestActorRef(actor, "test3")
+        lazy val chan = createChannel(factory, actorRef, "foo", 27017)
+
+        arch must beLike[String] {
+          case "osx" =>
+            chan.close(); chan.getClass.getName must startWith(
+              "reactivemongo.io.netty.channel.kqueue.KQueue")
+
+          case "linux" =>
+            chan.close(); chan.getClass.getName must startWith(
+              "reactivemongo.io.netty.channel.epoll.Epoll")
+        }
+      }
+    }
+  }
   section("unit")
 
   "NIO channel" should {
@@ -162,7 +186,14 @@ class ChannelFactorySpec(implicit ee: ExecutionEnv)
 
           actorRef.stop()
 
-          ok
+          Common.nettyNativeArch.fold(ok) {
+            case "osx" => chan.getClass.getName must startWith(
+              "reactivemongo.io.netty.channel.kqueue.KQueue")
+
+            case "linux" => chan.getClass.getName must startWith(
+              "reactivemongo.io.netty.channel.epoll.Epoll")
+
+          }
         }
       }
     }

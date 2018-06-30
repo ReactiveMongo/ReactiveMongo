@@ -1,9 +1,9 @@
 package reactivemongo.core.netty
 
-import shaded.netty.channel.{ Channel, EventLoopGroup }
+import reactivemongo.io.netty.channel.{ Channel, EventLoopGroup }
 
-import shaded.netty.channel.nio.NioEventLoopGroup
-import shaded.netty.channel.socket.nio.NioSocketChannel
+import reactivemongo.io.netty.channel.nio.NioEventLoopGroup
+import reactivemongo.io.netty.channel.socket.nio.NioSocketChannel
 
 import reactivemongo.util.LazyLogger
 
@@ -13,18 +13,26 @@ import reactivemongo.util.LazyLogger
  */
 private[core] final class Pack(
   val eventLoopGroup: () => EventLoopGroup,
-  val channelClass: Class[_ <: Channel])
+  val channelClass: Class[_ <: Channel]) {
+
+  override def toString = s"NettyPack($channelClass)"
+}
 
 private[core] object Pack {
   private val logger = LazyLogger("reactivemongo.core.netty.Pack")
 
-  def apply(): Pack = kqueue.orElse(epoll).getOrElse(nio)
+  def apply(): Pack = {
+    val pack = kqueue.orElse(epoll).getOrElse(nio)
 
-  private val kqueuePkg = "shaded.io.netty.channel.kqueue"
+    logger.info(s"Instanciated $pack")
+
+    pack
+  }
+
+  private val kqueuePkg = "reactivemongo.io.netty.channel.kqueue"
   private def kqueue: Option[Pack] = try {
     Some(Class.forName(
       s"${kqueuePkg}.KQueueSocketChannel")).map { cls =>
-      println(s"--_> $cls")
       val chanClass = cls.asInstanceOf[Class[_ <: Channel]]
       val groupClass = Class.forName(s"${kqueuePkg}.KQueueEventLoopGroup").
         asInstanceOf[Class[_ <: EventLoopGroup]]
@@ -33,12 +41,11 @@ private[core] object Pack {
     }
   } catch {
     case cause: Exception =>
-      //logger.debug
-      println("Cannot use Netty KQueue", cause)
+      logger.debug("Cannot use Netty KQueue", cause)
       None
   }
 
-  private val epollPkg = "shaded.io.netty.channel.epoll"
+  private val epollPkg = "reactivemongo.io.netty.channel.epoll"
   private def epoll: Option[Pack] = try {
     Some(Class.forName(
       s"${epollPkg}.EpollSocketChannel")).map { cls =>

@@ -4,11 +4,11 @@ import java.util.concurrent.TimeUnit
 
 import akka.actor.ActorRef
 
-import shaded.netty.channel.{
+import reactivemongo.io.netty.channel.{
   ChannelHandlerContext,
   ChannelPromise
 }
-import shaded.netty.handler.timeout.IdleStateEvent
+import reactivemongo.io.netty.handler.timeout.IdleStateEvent
 
 import reactivemongo.core.actors.{ ChannelConnected, ChannelDisconnected }
 
@@ -18,7 +18,7 @@ private[reactivemongo] class MongoHandler(
   supervisor: String,
   connection: String,
   receiver: ActorRef,
-  idleTimeMS: Long) extends shaded.netty.handler.timeout.IdleStateHandler(
+  idleTimeMS: Long) extends reactivemongo.io.netty.handler.timeout.IdleStateHandler(
   idleTimeMS, idleTimeMS, idleTimeMS, TimeUnit.MILLISECONDS) {
 
   private var last: Long = -1L

@@ -14,7 +14,7 @@ object Bson {
 
   lazy val module = Project("ReactiveMongo-BSON", file("bson")).
     enablePlugins(CpdPlugin).
-    settings(BuildSettings.settings ++ Findbugs.settings ++ Seq(
+    settings(Common.settings ++ Findbugs.settings ++ Seq(
       libraryDependencies ++= Seq(specs.value,
         "org.specs2" %% "specs2-scalacheck" % specsVer.value % Test,
         "org.typelevel" %% "discipline" % "0.9.0" % Test,

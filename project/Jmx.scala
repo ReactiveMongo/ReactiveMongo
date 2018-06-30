@@ -15,9 +15,9 @@ final class Jmx(driver: Project) {
     enablePlugins(CpdPlugin).
     dependsOn(driver).
     settings(
-      BuildSettings.settings ++ Findbugs.settings ++ Seq(
+      Common.settings ++ Findbugs.settings ++ Seq(
         mimaPreviousArtifacts := Set.empty,
-        testOptions in Test += Tests.Cleanup(BuildSettings.commonCleanup.value),
+        testOptions in Test += Tests.Cleanup(Common.cleanup.value),
         libraryDependencies ++= Seq(specs.value) ++ logApi,
         pomPostProcess := providedInternalDeps
       )

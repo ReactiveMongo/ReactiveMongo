@@ -1,6 +1,6 @@
 package reactivemongo.core.protocol
 
-import shaded.netty.buffer.ByteBuf
+import reactivemongo.io.netty.buffer.ByteBuf
 
 /**
  * Helper methods to write tuples of supported types into a [[http://netty.io/4.1/api/io/netty/buffer/ByteBuf.html ByteBuf]].

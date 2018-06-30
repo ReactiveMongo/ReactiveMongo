@@ -1,6 +1,6 @@
 package reactivemongo.core.protocol
 
-import shaded.netty.buffer.ByteBuf
+import reactivemongo.io.netty.buffer.ByteBuf
 
 object `package` {
   @deprecated("Will be removed", "0.12.0")

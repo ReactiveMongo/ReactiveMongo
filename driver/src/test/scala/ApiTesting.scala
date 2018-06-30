@@ -6,13 +6,13 @@ import scala.concurrent.duration.{ FiniteDuration, SECONDS }
 import akka.util.Timeout
 import akka.actor.ActorRef
 
-import shaded.netty.channel.{
+import reactivemongo.io.netty.channel.{
   Channel,
   ChannelId,
   DefaultChannelId
 }
 
-import shaded.netty.buffer.{ ByteBuf, Unpooled }
+import reactivemongo.io.netty.buffer.{ ByteBuf, Unpooled }
 
 import reactivemongo.core.protocol.{
   Request,

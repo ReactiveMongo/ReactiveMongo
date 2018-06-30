@@ -4,17 +4,17 @@ import java.lang.{ Boolean => JBool }
 
 import scala.concurrent.Promise
 
-import shaded.netty.util.concurrent.{ Future, GenericFutureListener }
+import reactivemongo.io.netty.util.concurrent.{ Future, GenericFutureListener }
 
-import shaded.netty.bootstrap.Bootstrap
+import reactivemongo.io.netty.bootstrap.Bootstrap
 
-import shaded.netty.channel.{
+import reactivemongo.io.netty.channel.{
   Channel,
   ChannelOption,
   EventLoopGroup
 }, ChannelOption.{ CONNECT_TIMEOUT_MILLIS, SO_KEEPALIVE, TCP_NODELAY }
 
-import shaded.netty.channel.ChannelInitializer
+import reactivemongo.io.netty.channel.ChannelInitializer
 
 import akka.actor.ActorRef
 
@@ -52,7 +52,7 @@ final class ChannelFactory private[reactivemongo] (
     option(SO_KEEPALIVE, new JBool(options.keepAlive)).
     option(CONNECT_TIMEOUT_MILLIS, new Integer(options.connectTimeoutMS)).
     handler(this)
-  //childHandler(new shaded.netty.channel.ChannelHandlerAdapter {})
+  //childHandler(new reactivemongo.io.netty.channel.ChannelHandlerAdapter {})
   //config.setBufferFactory(bufferFactory)
 
   private[reactivemongo] def create(
@@ -102,7 +102,7 @@ final class ChannelFactory private[reactivemongo] (
         createEngine(sslContext, host, port)
 
       val sslHandler =
-        new shaded.netty.handler.ssl.SslHandler(sslEng, false /* TLS */ )
+        new reactivemongo.io.netty.handler.ssl.SslHandler(sslEng, false /* TLS */ )
 
       pipeline.addFirst("ssl", sslHandler)
     }
@@ -210,7 +210,7 @@ final class ChannelFactory private[reactivemongo] (
 }
 
 private[reactivemongo] object ChannelFactory {
-  import shaded.netty.util.AttributeKey
+  import reactivemongo.io.netty.util.AttributeKey
 
   val hostKey = AttributeKey.newInstance[String]("mongoHost")
 

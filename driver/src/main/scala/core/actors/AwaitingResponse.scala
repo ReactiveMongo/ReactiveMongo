@@ -2,7 +2,7 @@ package reactivemongo.core.actors
 
 import scala.concurrent.Promise
 
-import shaded.netty.channel.ChannelId
+import reactivemongo.io.netty.channel.ChannelId
 
 import reactivemongo.core.protocol.{ Request, Response }
 

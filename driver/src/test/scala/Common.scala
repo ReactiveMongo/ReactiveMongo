@@ -22,6 +22,8 @@ object Common extends CommonAuth {
 
   val primaryHost = sys.props.getOrElse("test.primaryHost", "localhost:27017")
 
+  val nettyNativeArch = sys.props.get("test.nettyNativeArch")
+
   val failoverRetries = sys.props.get("test.failoverRetries").
     flatMap(r => scala.util.Try(r.toInt).toOption).getOrElse(7)
 

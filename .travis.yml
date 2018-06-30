@@ -1,3 +1,6 @@
+os:
+- linux
+- osx
 language: scala
 sudo: true
 dist: trusty
@@ -35,6 +38,14 @@ env:
   - CI_CATEGORY=INTEGRATION_TESTS AKKA_VERSION=2.5.13 ITERATEES_VERSION=2.6.1 MONGO_PROFILE=x509 MONGO_VER=3_6
 matrix: 
   exclude:
+    - os: osx
+      CI_CATEGORY=INTEGRATION_TESTS
+    - os: osx
+      scala: 2.11.12
+      CI_CATEGORY=UNIT_TESTS
+    - os: linux
+      scala: 2.12.6
+      CI_CATEGORY=UNIT_TESTS
     - scala: 2.11.12
       jdk: oraclejdk8
       env: CI_CATEGORY=UNIT_TESTS

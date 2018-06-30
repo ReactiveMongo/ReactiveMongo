@@ -1,3 +1,6 @@
+import scala.xml.{ Elem => XmlElem, Node => XmlNode, NodeSeq, XML }
+import scala.xml.transform.{ RewriteRule, RuleTransformer }
+
 import sbt._
 import sbt.Keys._
 
@@ -11,15 +14,17 @@ import com.github.sbt.findbugs.FindbugsKeys.findbugsAnalyzedPath
 
 final class Driver(
   bsonmacros: Project,
-  shaded: Project) {
+  shaded: Project,
+  linuxShaded: Project,
+  osxShaded: Project) {
 
   import Dependencies._
 
   lazy val module = Project("ReactiveMongo", file("driver")).
     enablePlugins(CpdPlugin).
-    dependsOn(bsonmacros, shaded).
+    dependsOn(bsonmacros).
     settings(
-      BuildSettings.settings ++ Findbugs.settings ++ Seq(
+      Common.settings ++ Findbugs.settings ++ Seq(
         resolvers := Resolvers.resolversList,
         compile in Compile := (compile in Compile).
           dependsOn(assembly in shaded).value,
@@ -61,18 +66,43 @@ object Version {
         },
         driverCleanup := driverCleanup.triggeredBy(compile in Compile).value,
         unmanagedJars in Compile := {
-          val shadedDir = (target in shaded).value
-          val shadedJar = (assemblyJarName in (shaded, assembly)).value
+          val dir = (target in shaded).value
+          val jar = (assemblyJarName in (shaded, assembly)).value
 
-          (shadedDir / "classes").mkdirs() // Findbugs workaround
+          (dir / "classes").mkdirs() // Findbugs workaround
 
-          Seq(Attributed(shadedDir / shadedJar)(AttributeMap.empty))
+          Seq(Attributed(dir / jar)(AttributeMap.empty))
+        },
+        pomPostProcess := {
+          val tr = new RuleTransformer(new RewriteRule {
+            override def transform(node: XmlNode): NodeSeq = node match {
+              case e: XmlElem if e.label == "dependencies" => {
+                val shadedDep: XmlNode = 
+                  <dependency>
+                    <groupId>{organization.value}</groupId>
+                    <artifactId>reactivemongo-shaded</artifactId>
+                    <version>{version.value}</version>
+                  </dependency>
+
+                XmlElem(e.prefix, e.label, e.attributes, e.scope,
+                  e.minimizeEmpty, (e.child :+ shadedDep): _*)
+              }
+
+              case _ => node
+            }
+          })
+
+          { node: XmlNode =>
+            tr.transform(node).headOption match {
+              case Some(transformed) => transformed
+              case _ => sys.error("Fails to transform the POM")
+            }
+          }
         },
         libraryDependencies ++= akka.value ++ Seq(
-          //"org.reactivemongo" % "reactivemongo-native" % version.value % Test,
-          "dnsjava" % "dnsjava" % "2.1.8",
-          playIteratees.value, commonsCodec,
-          shapelessTest % Test, specs.value) ++ logApi,
+            "dnsjava" % "dnsjava" % "2.1.8",
+            playIteratees.value, commonsCodec,
+            shapelessTest % Test, specs.value) ++ logApi,
         findbugsAnalyzedPath += target.value / "external",
         mimaBinaryIssueFilters ++= {
           import com.typesafe.tools.mima.core._, ProblemFilters.{ exclude => x }
@@ -538,13 +568,43 @@ object Version {
             x[AbstractClassProblem]("reactivemongo.core.protocol.Response")
           )
         },
-        testOptions in Test += Tests.Cleanup(BuildSettings.commonCleanup.value),
+        testOptions in Test += Tests.Cleanup(Common.cleanup.value),
         mappings in (Compile, packageBin) ~= driverFilter,
         //mappings in (Compile, packageDoc) ~= driverFilter,
         mappings in (Compile, packageSrc) ~= driverFilter,
         apiMappings ++= Documentation.mappings("com.typesafe.akka", "http://doc.akka.io/api/akka/%s/")("akka-actor").value ++ Documentation.mappings("com.typesafe.play", "http://playframework.com/documentation/%s/api/scala/index.html", _.replaceAll("[\\d]$", "x"))("play-iteratees").value
       )
-    )
+    ).configure { p =>
+      sys.props.get("test.nettyNativeArch") match {
+        case Some("osx") => p.settings(Seq(
+          compile in Test := (compile in Test).
+            dependsOn(osxShaded / Compile / packageBin).value,
+          unmanagedJars in Test += {
+            val dir = (target in osxShaded).value
+            val jar = (assemblyJarName in (osxShaded, assembly)).value
+
+            (dir / "classes").mkdirs() // Findbugs workaround
+
+            Attributed(dir / jar)(AttributeMap.empty)
+          }
+        ))
+
+        case Some(_/* linux */) => p.settings(Seq(
+          compile in Test := (compile in Test).
+            dependsOn(linuxShaded / Compile / packageBin).value,
+          unmanagedJars in Test += {
+            val dir = (target in linuxShaded).value
+            val jar = (assemblyJarName in (linuxShaded, assembly)).value
+
+            (dir / "classes").mkdirs() // Findbugs workaround
+
+            Attributed(dir / jar)(AttributeMap.empty)
+          }
+        ))
+
+        case _ => p
+      }
+    }
 
   // ---
 
@@ -553,7 +613,7 @@ object Version {
       case (file, name) =>
         !(name endsWith "external/reactivemongo/StaticListenerBinder.class")
     }
-  } andThen BuildSettings.filter
+  } andThen Common.filter
 
   private val driverCleanup = taskKey[Unit]("Driver compilation cleanup")
 }

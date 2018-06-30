@@ -23,7 +23,7 @@ import scala.collection.generic.CanBuildFrom
 import scala.concurrent.{ ExecutionContext, Future }
 import scala.concurrent.duration.FiniteDuration
 
-import shaded.netty.buffer.ByteBuf
+import reactivemongo.io.netty.buffer.ByteBuf
 
 import reactivemongo.api._
 import reactivemongo.api.commands.{

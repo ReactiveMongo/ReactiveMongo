@@ -1,7 +1,7 @@
 import scala.concurrent.{ Await, Future, Promise }
 import scala.concurrent.ExecutionContext.Implicits.global
 
-import shaded.netty.channel.{
+import reactivemongo.io.netty.channel.{
   Channel,
   ChannelId,
   ChannelFuture,
@@ -9,7 +9,7 @@ import shaded.netty.channel.{
   ChannelPromise,
   ChannelHandlerContext
 }
-import shaded.netty.channel.embedded.EmbeddedChannel
+import reactivemongo.io.netty.channel.embedded.EmbeddedChannel
 
 object NettyEmbedder extends LowPriorityNettyEmbedder {
   sealed trait OnComplete[T] {
@@ -83,7 +83,7 @@ object NettyEmbedder extends LowPriorityNettyEmbedder {
     connected: Boolean,
     beforeWrite: (Channel, Object) => Unit)(f: EmbeddedChannel => T): T = {
     object WithChannelHandler
-      extends shaded.netty.channel.ChannelOutboundHandlerAdapter {
+      extends reactivemongo.io.netty.channel.ChannelOutboundHandlerAdapter {
 
       override def write(
         ctx: ChannelHandlerContext,
@@ -114,7 +114,7 @@ object NettyEmbedder extends LowPriorityNettyEmbedder {
       })
 
     @annotation.tailrec
-    def release(): Unit = Option(chan.readOutbound[shaded.netty.buffer.ByteBuf]) match {
+    def release(): Unit = Option(chan.readOutbound[reactivemongo.io.netty.buffer.ByteBuf]) match {
       case Some(remaining) => {
         remaining.release()
         release()
@@ -169,7 +169,7 @@ object NettyEmbedder extends LowPriorityNettyEmbedder {
 
   def simpleChannel(chanId: ChannelId, handler: (Channel, Object) => Unit): Future[EmbeddedChannel] = {
     object WithChannelHandler
-      extends shaded.netty.channel.ChannelOutboundHandlerAdapter {
+      extends reactivemongo.io.netty.channel.ChannelOutboundHandlerAdapter {
 
       override def write(
         ctx: ChannelHandlerContext,
