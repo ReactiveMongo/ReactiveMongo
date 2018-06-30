@@ -635,9 +635,8 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    *
    * @param ordered $orderedParam
    * @param writeConcern $writeConcernParam
-   *
    */
-  def delete[S](ordered: Boolean = true, writeConcern: WriteConcern = defaultWriteConcern): DeleteBuilder =
+  def delete[S](ordered: Boolean = true, writeConcern: WriteConcern = defaultWriteConcern): DeleteBuilder = // TODO: Remove the type param ?
     prepareDelete(ordered, writeConcern)
 
   /**

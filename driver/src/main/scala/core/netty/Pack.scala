@@ -20,10 +20,11 @@ private[core] object Pack {
 
   def apply(): Pack = kqueue.orElse(epoll).getOrElse(nio)
 
-  private val kqueuePkg = "shaded.netty.channel.kqueue"
+  private val kqueuePkg = "shaded.io.netty.channel.kqueue"
   private def kqueue: Option[Pack] = try {
     Some(Class.forName(
       s"${kqueuePkg}.KQueueSocketChannel")).map { cls =>
+      println(s"--_> $cls")
       val chanClass = cls.asInstanceOf[Class[_ <: Channel]]
       val groupClass = Class.forName(s"${kqueuePkg}.KQueueEventLoopGroup").
         asInstanceOf[Class[_ <: EventLoopGroup]]
@@ -32,14 +33,16 @@ private[core] object Pack {
     }
   } catch {
     case cause: Exception =>
-      logger.debug("Cannot use Netty KQueue", cause)
+      //logger.debug
+      println("Cannot use Netty KQueue", cause)
       None
   }
 
-  private val epollPkg = "shaded.netty.channel.epoll"
+  private val epollPkg = "shaded.io.netty.channel.epoll"
   private def epoll: Option[Pack] = try {
     Some(Class.forName(
       s"${epollPkg}.EpollSocketChannel")).map { cls =>
+
       val chanClass = cls.asInstanceOf[Class[_ <: Channel]]
       val groupClass = Class.forName(s"${epollPkg}.EpollEventLoopGroup").
         asInstanceOf[Class[_ <: EventLoopGroup]]
