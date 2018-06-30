@@ -19,7 +19,7 @@ object Shaded {
         resolvers += Resolver.mavenLocal,
         libraryDependencies ++= Seq(
           "io.netty" % "netty-handler" % Dependencies.netty,
-          "com.google.guava" % "guava" % "19.0" cross CrossVersion.Disabled
+          "com.google.guava" % "guava" % "19.0" cross CrossVersion.Disabled()
         ),
         assemblyShadeRules in assembly := Seq(
           ShadeRule.rename("io.netty.**" -> "shaded.netty.@1").inAll,

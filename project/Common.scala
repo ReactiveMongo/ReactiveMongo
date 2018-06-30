@@ -1,7 +1,7 @@
 import sbt._
 import sbt.Keys._
 
-object BuildSettings {
+object Common {
   val baseSettings = Seq(organization := "org.reactivemongo")
 
   val filter = { (ms: Seq[(File, String)]) =>
@@ -89,15 +89,19 @@ object BuildSettings {
   ) ++ Publish.settings ++ Format.settings ++ (
     Release.settings ++ Publish.mimaSettings)
 
-  val commonCleanup = Def.task[ClassLoader => Unit] { cl: ClassLoader =>
-    import scala.language.reflectiveCalls
+  val cleanup = Def.task[ClassLoader => Unit] {
+    val log = streams.value.log
 
-    val c = cl.loadClass("Common$")
-    type M = { def close(): Unit }
-    val m: M = c.getField("MODULE$").get(null).asInstanceOf[M]
+    {cl: ClassLoader =>
+      import scala.language.reflectiveCalls
 
-    streams.value.log.info(s"Closing $m ...")
+      val c = cl.loadClass("Common$")
+      type M = { def close(): Unit }
+      val m: M = c.getField("MODULE$").get(null).asInstanceOf[M]
 
-    m.close()
+      log.info(s"Closing $m ...")
+
+      m.close()
+    }
   }
 }

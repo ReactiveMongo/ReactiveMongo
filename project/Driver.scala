@@ -28,6 +28,7 @@ final class Driver(
           val dir = (sourceManaged in Compile).value
           val outdir = dir / "reactivemongo" / "api"
           val f = outdir / "Version.scala"
+          val major = Release.major.value
 
           outdir.mkdirs()
 
@@ -38,7 +39,7 @@ object Version {
   override val toString = "$ver"
 
   /** The major version (e.g. 0.12 for the release 0.12.0) */
-  val majorVersion = "${Release.major.value}"
+  val majorVersion = "${major}"
 }""")
 
             f
@@ -68,7 +69,7 @@ object Version {
           Seq(Attributed(shadedDir / shadedJar)(AttributeMap.empty))
         },
         libraryDependencies ++= akka.value ++ Seq(
-          "org.reactivemongo" % "reactivemongo-native" % version.value % Test,
+          //"org.reactivemongo" % "reactivemongo-native" % version.value % Test,
           "dnsjava" % "dnsjava" % "2.1.8",
           playIteratees.value, commonsCodec,
           shapelessTest % Test, specs.value) ++ logApi,
