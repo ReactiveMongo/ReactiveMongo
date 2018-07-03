@@ -434,6 +434,36 @@ class AggregationSpec(implicit ee: ExecutionEnv)
         .collect[List](Int.MaxValue, Cursor.FailOnError[List[InventoryReport]]()) must beTypedEqualTo(expected).await(0, timeout)
     } tag "gt_mongo32"
 
+    "automatically group in bucket" in {
+      // https://docs.mongodb.com/manual/reference/operator/aggregation/bucketAuto/
+
+      val expected = Set(
+        document(
+          "_id" -> document(
+            "min" -> BSONNull,
+            "max" -> 12),
+          "count" -> 1),
+        document(
+          "_id" -> document(
+            "min" -> 12,
+            "max" -> 20),
+          "count" -> 1),
+        document(
+          "_id" -> document(
+            "min" -> 20,
+            "max" -> 20),
+          "count" -> 1))
+
+      orders.aggregateWith1[BSONDocument]() { framework =>
+        import framework.BucketAuto
+
+        BucketAuto(BSONString(f"$$price"), 3, None)() -> List.empty
+      }.collect[Set](Int.MaxValue, Cursor.FailOnError[Set[BSONDocument]]()).
+        aka("buckets") must beEqualTo(expected).await(0, timeout)
+    } tag "gt_mongo32"
+
+    // Sales
+
     val sales: BSONCollection = db.collection(s"agg-sales-A-${System identityHashCode this}")
     implicit val saleItemHandler: BSONDocumentHandler[SaleItem] = Macros.handler[SaleItem]
     implicit val saleHandler: BSONDocumentHandler[Sale] = Macros.handler[Sale]
@@ -1231,7 +1261,7 @@ db.accounts.aggregate([
           "quiz" -> BSONArray(8, 8),
           "extraCredit" -> 8))
       } yield ()) must beTypedEqualTo({}).await(0, timeout)
-    } tag "wip"
+    }
 
     "be aggregated with $$sum on array fields" in {
       val expectedResults = Set(
@@ -1265,7 +1295,7 @@ db.accounts.aggregate([
               f"$$totalHomework", f"$$totalQuiz", f"$$extraCredit")))))
       }.collect[Set](Int.MaxValue, Cursor.FailOnError[Set[BSONDocument]]()).
         aka("aggregated") must beTypedEqualTo(expectedResults).await(0, timeout)
-    } tag "wip"
+    }
   }
   section("gt_mongo32")
 
