@@ -434,6 +434,36 @@ class AggregationSpec(implicit ee: ExecutionEnv)
         .collect[List](Int.MaxValue, Cursor.FailOnError[List[InventoryReport]]()) must beTypedEqualTo(expected).await(0, timeout)
     } tag "gt_mongo32"
 
+    "automatically group in bucket" in {
+      // https://docs.mongodb.com/manual/reference/operator/aggregation/bucketAuto/
+
+      val expected = Set(
+        document(
+          "_id" -> document(
+            "min" -> BSONNull,
+            "max" -> 12),
+          "count" -> 1),
+        document(
+          "_id" -> document(
+            "min" -> 12,
+            "max" -> 20),
+          "count" -> 1),
+        document(
+          "_id" -> document(
+            "min" -> 20,
+            "max" -> 20),
+          "count" -> 1))
+
+      orders.aggregateWith1[BSONDocument]() { framework =>
+        import framework.BucketAuto
+
+        BucketAuto(BSONString(f"$$price"), 3, None)() -> List.empty
+      }.collect[Set](Int.MaxValue, Cursor.FailOnError[Set[BSONDocument]]()).
+        aka("buckets") must beEqualTo(expected).await(0, timeout)
+    } tag "gt_mongo32"
+
+    // Sales
+
     val sales: BSONCollection = db.collection(s"agg-sales-A-${System identityHashCode this}")
     implicit val saleItemHandler: BSONDocumentHandler[SaleItem] = Macros.handler[SaleItem]
     implicit val saleHandler: BSONDocumentHandler[Sale] = Macros.handler[Sale]
@@ -1192,22 +1222,79 @@ db.accounts.aggregate([
         "_id" -> 1,
         "first_name" -> "Gary",
         "last_name" -> "Sheffield",
-        "city" -> "New York")).map(_ => {}) must beEqualTo({}).await(0, timeout)
+        "city" -> "New York")).
+        map(_ => {}) must beTypedEqualTo({}).await(0, timeout)
     }
 
     "and reshaped using $replaceRoot" in {
-      val result = contacts.aggregateWith1[BSONDocument]() {
-        framework =>
-          import framework._
+      val result = contacts.aggregateWith1[BSONDocument]() { framework =>
+        import framework._
 
-          Match(document("_id" -> 1)) -> List(
-            ReplaceRoot(document(
-              "full_name" -> document(
-                "$concat" -> array("$first_name", " ", "$last_name")))))
+        Match(document("_id" -> 1)) -> List(
+          ReplaceRoot(document(
+            "full_name" -> document(
+              "$concat" -> array("$first_name", " ", "$last_name")))))
       }.headOption
 
       result must beSome(document(
         "full_name" -> "Gary Sheffield")).await(0, timeout)
+    }
+  }
+
+  "Students" should {
+    // https://docs.mongodb.com/manual/reference/operator/aggregation/addFields/
+    val students: BSONCollection =
+      db(s"students${System identityHashCode this}")
+
+    "be inserted" in {
+      (for {
+        _ <- students.insert(document(
+          "_id" -> 1,
+          "student" -> "Maya",
+          "homework" -> BSONArray(10, 5, 10),
+          "quiz" -> BSONArray(10, 8),
+          "extraCredit" -> 0))
+        _ <- students.insert(document(
+          "_id" -> 2,
+          "student" -> "Ryan",
+          "homework" -> BSONArray(5, 6, 5),
+          "quiz" -> BSONArray(8, 8),
+          "extraCredit" -> 8))
+      } yield ()) must beTypedEqualTo({}).await(0, timeout)
+    }
+
+    "be aggregated with $$sum on array fields" in {
+      val expectedResults = Set(
+        document(
+          "_id" -> 1,
+          "student" -> "Maya",
+          "homework" -> BSONArray(10, 5, 10),
+          "quiz" -> BSONArray(10, 8),
+          "extraCredit" -> 0,
+          "totalHomework" -> 25,
+          "totalQuiz" -> 18,
+          "totalScore" -> 43),
+        document(
+          "_id" -> 2,
+          "student" -> "Ryan",
+          "homework" -> BSONArray(5, 6, 5),
+          "quiz" -> BSONArray(8, 8),
+          "extraCredit" -> 8,
+          "totalHomework" -> 16,
+          "totalQuiz" -> 16,
+          "totalScore" -> 40))
+
+      students.aggregateWith1[BSONDocument]() { framework =>
+        import framework.AddFields
+
+        AddFields(document(
+          "totalHomework" -> document(f"$$sum" -> f"$$homework"),
+          "totalQuiz" -> document(f"$$sum" -> f"$$quiz"))) -> List(
+          AddFields(document(
+            "totalScore" -> document(f"$$add" -> array(
+              f"$$totalHomework", f"$$totalQuiz", f"$$extraCredit")))))
+      }.collect[Set](Int.MaxValue, Cursor.FailOnError[Set[BSONDocument]]()).
+        aka("aggregated") must beTypedEqualTo(expectedResults).await(0, timeout)
     }
   }
   section("gt_mongo32")

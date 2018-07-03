@@ -60,6 +60,7 @@ object BSONIterator {
           case ts @ BSONTimestamp(_) =>
             s"${prefix}Timestamp(${ts.time}, ${ts.ordinal})"
 
+          case BSONNull      => s"${prefix}null"
           case BSONUndefined => s"${prefix}undefined"
           case BSONMinKey    => s"${prefix}MinKey"
           case BSONMaxKey    => s"${prefix}MaxKey"
