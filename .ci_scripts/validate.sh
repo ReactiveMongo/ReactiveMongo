@@ -6,6 +6,10 @@ SCRIPT_DIR=`dirname $0 | sed -e "s|^\./|$PWD/|"`
 
 cd "$SCRIPT_DIR/.."
 
+echo "### SBT"
+
+which sbt
+
 if [ "$CI_CATEGORY" = "UNIT_TESTS" ]; then
     source $SCRIPT_DIR/unitTests.sh
 else

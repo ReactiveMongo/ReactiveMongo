@@ -3,12 +3,13 @@ import sbt.Keys._
 
 object Resolvers {
   val resolversList = Seq(
-    Resolver.typesafeRepo("releases")
+    Resolver.typesafeRepo("releases"),
+    Resolver.sonatypeRepo("snapshots")
   )
 }
 
 object Dependencies {
-  val netty = "4.1.26.Final-SNAPSHOT"
+  val netty = "4.1.26.Final"
 
   val akka = Def.setting[Seq[ModuleID]] {
     val ver = sys.env.get("AKKA_VERSION").getOrElse {

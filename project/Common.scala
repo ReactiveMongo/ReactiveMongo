@@ -14,9 +14,11 @@ object Common {
 
   private val java8 = scala.util.Properties.isJavaAtLeast("1.8")
 
+  val scalaCompatVer = "2.11.12"
+
   val settings = Defaults.coreDefaultSettings ++ baseSettings ++ Seq(
     scalaVersion := "2.12.6",
-    crossScalaVersions := Seq("2.10.7", "2.11.12", scalaVersion.value),
+    crossScalaVersions := Seq("2.10.7", scalaCompatVer, scalaVersion.value),
     crossVersion := CrossVersion.binary,
     //parallelExecution in Test := false,
     //fork in Test := true, // Don't share executioncontext between SBT CLI/tests

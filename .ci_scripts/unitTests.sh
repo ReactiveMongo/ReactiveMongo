@@ -55,6 +55,6 @@ TEST_ARGS="$TEST_ARGS -- include unit"
 
 TEST_ARGS="$TEST_ARGS ;project ReactiveMongo-BSON-Macros ;testQuick"
 
-sed -e 's/"-deprecation", //' < project/ReactiveMongo.scala > .tmp && mv .tmp project/ReactiveMongo.scala
+sed -e 's/"-deprecation", //' < project/Driver.scala > .tmp && mv .tmp project/Driver.scala
 
 sbt ++$SCALA_VERSION "$TEST_ARGS"
