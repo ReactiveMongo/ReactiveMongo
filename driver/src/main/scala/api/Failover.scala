@@ -49,7 +49,7 @@ class Failover[T](message: T, connection: MongoConnection, strategy: FailoverStr
    */
   val future: Future[Response] = promise.future
 
-  private def send(n: Int) {
+  private def send(n: Int): Unit = {
     val expectingResponse = expectingResponseMaker(message)
     connection.mongosystem ! expectingResponse
     expectingResponse.future.onComplete {
