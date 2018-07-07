@@ -238,7 +238,7 @@ trait MongoDBSystem extends Actor {
     logSuccess: ChannelId => Unit)
     extends ChannelFutureListener {
 
-    final def operationComplete(op: ChannelFuture) {
+    final def operationComplete(op: ChannelFuture): Unit = {
       if (!op.isSuccess) {
         logError(op.cause)
       } else {
@@ -919,7 +919,7 @@ trait MongoDBSystem extends Actor {
 
   // ---
 
-  private def onIsMaster(response: Response) {
+  private def onIsMaster(response: Response): Unit = {
     import reactivemongo.api.BSONSerializationPack
     import reactivemongo.api.commands.bson.BSONIsMasterCommandImplicits
     import reactivemongo.api.commands.Command
@@ -1062,7 +1062,7 @@ trait MongoDBSystem extends Actor {
     ()
   }
 
-  private[reactivemongo] def onPrimaryUnavailable() {
+  private[reactivemongo] def onPrimaryUnavailable(): Unit = {
     self ! RefreshAll
 
     updateNodeSet("PrimaryUnavailable")(_.updateAll { node =>

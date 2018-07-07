@@ -76,7 +76,7 @@ final class ChannelFactory private[reactivemongo] (
     channel
   }
 
-  def initChannel(channel: Channel) {
+  def initChannel(channel: Channel): Unit = {
     val host = channel.attr(ChannelFactory.hostKey).get
 
     if (host == null) {
@@ -92,7 +92,7 @@ final class ChannelFactory private[reactivemongo] (
   private[reactivemongo] def initChannel(
     channel: Channel,
     host: String, port: Int,
-    receiver: ActorRef) {
+    receiver: ActorRef): Unit = {
     debug(s"Initializing channel ${channel.id} to ${host}:${port} ($receiver)")
 
     val pipeline = channel.pipeline
@@ -176,10 +176,10 @@ final class ChannelFactory private[reactivemongo] (
   private[reactivemongo] def release(callback: Promise[Unit]): Unit = {
     parentGroup.shutdownGracefully().
       addListener(new GenericFutureListener[Future[Any]] {
-        def operationComplete(f: Future[Any]) {
+        def operationComplete(f: Future[Any]): Unit = {
           childGroup.shutdownGracefully().
             addListener(new GenericFutureListener[Future[Any]] {
-              def operationComplete(f: Future[Any]) {
+              def operationComplete(f: Future[Any]): Unit = {
                 callback.success({}); ()
               }
             })

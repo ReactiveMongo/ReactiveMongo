@@ -190,7 +190,7 @@ final class NettyProxyFrontendHandler(
 
       outboundChannel.writeAndFlush(msg).
         addListener(new ChannelFutureListener() {
-          def operationComplete(future: ChannelFuture) {
+          def operationComplete(future: ChannelFuture): Unit = {
             if (future.isSuccess()) {
               // was able to flush out data, start to read the next chunk
               ctx.channel().read()
