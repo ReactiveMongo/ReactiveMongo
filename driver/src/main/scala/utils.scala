@@ -46,7 +46,7 @@ object `package` {
 
 @deprecated(
   message = "Use [[reactivemongo.util.LazyLogger]]", since = "0.12.0")
-case class LazyLogger(logger: org.apache.logging.log4j.Logger) {
+case class LazyLogger(logger: org.slf4j.Logger) {
   def trace(s: => String): Unit = { if (logger.isTraceEnabled) logger.trace(s) }
   def trace(s: => String, e: => Throwable): Unit = { if (logger.isTraceEnabled) logger.trace(s, e) }
   def debug(s: => String): Unit = { if (logger.isDebugEnabled) logger.debug(s) }
@@ -63,7 +63,7 @@ case class LazyLogger(logger: org.apache.logging.log4j.Logger) {
   message = "Use [[reactivemongo.util.LazyLogger]]", since = "0.12.0")
 object LazyLogger {
   def apply(logger: String): LazyLogger =
-    LazyLogger(org.apache.logging.log4j.LogManager.getLogger(logger))
+    LazyLogger(org.slf4j.LoggerFactory.getLogger(logger))
 }
 
 @deprecated(
