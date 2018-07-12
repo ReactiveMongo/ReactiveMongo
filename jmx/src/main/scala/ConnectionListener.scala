@@ -225,7 +225,7 @@ final class NodeSet private[jmx] () extends NotificationBroadcasterSupport
 
   // Notification support
 
-  private[jmx] def sendNotification[T](typ: String, source: T, msg: String) {
+  private[jmx] def sendNotification[T](typ: String, source: T, msg: String): Unit = {
     sendNotification(new Notification(typ, source,
       changeSeq.incrementAndGet(), System.currentTimeMillis(), msg))
   }

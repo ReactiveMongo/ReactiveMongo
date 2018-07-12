@@ -23,7 +23,7 @@ private[reactivemongo] class MongoHandler(
 
   private var last: Long = -1L
 
-  override def channelActive(ctx: ChannelHandlerContext) {
+  override def channelActive(ctx: ChannelHandlerContext): Unit = {
     log(ctx, "Channel is active")
 
     last = System.currentTimeMillis()
@@ -45,7 +45,7 @@ private[reactivemongo] class MongoHandler(
     super.channelIdle(ctx, e)
   }
 
-  override def channelInactive(ctx: ChannelHandlerContext) {
+  override def channelInactive(ctx: ChannelHandlerContext): Unit = {
     val now = System.currentTimeMillis()
 
     if (last != -1) {
@@ -63,7 +63,7 @@ private[reactivemongo] class MongoHandler(
     super.channelInactive(ctx)
   }
 
-  override def channelRead(ctx: ChannelHandlerContext, msg: Any) {
+  override def channelRead(ctx: ChannelHandlerContext, msg: Any): Unit = {
     last = System.currentTimeMillis()
 
     msg match {
@@ -85,7 +85,7 @@ private[reactivemongo] class MongoHandler(
   override def write(
     ctx: ChannelHandlerContext,
     msg: Any,
-    promise: ChannelPromise) {
+    promise: ChannelPromise): Unit = {
     log(ctx, s"Channel is requested to write")
 
     last = System.currentTimeMillis()

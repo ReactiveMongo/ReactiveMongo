@@ -100,7 +100,7 @@ private[reactivemongo] class RequestEncoder
   def encode(
     ctx: ChannelHandlerContext,
     message: Request,
-    buffer: ByteBuf) {
+    buffer: ByteBuf): Unit = {
 
     /* DEBUG
     val buf = buffer.duplicate()
@@ -232,7 +232,7 @@ private[reactivemongo] class ResponseFrameDecoder
   }
 
   @annotation.tailrec
-  private def frames(buffer: ByteBuf, readableBytes: Int, out: JList[Object]) {
+  private def frames(buffer: ByteBuf, readableBytes: Int, out: JList[Object]): Unit = {
     if (readableBytes > 0) {
       buffer.markReaderIndex()
 
