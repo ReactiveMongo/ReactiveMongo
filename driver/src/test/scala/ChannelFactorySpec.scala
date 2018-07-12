@@ -140,7 +140,7 @@ class ChannelFactorySpec(implicit ee: ExecutionEnv)
   }
   section("unit")
 
-  s"""Channel ${nettyNativeArch getOrElse "nio"}""" should {
+  s"""Channel ${Common.nettyNativeArch getOrElse "nio"}""" should {
     "manage isMaster command" in {
       val result = Promise[IsMasterResult]()
       val chanConnected = Promise[Unit]()
