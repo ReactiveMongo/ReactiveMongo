@@ -5,6 +5,13 @@ set -e
 echo "[INFO] Clean some IVY cache"
 rm -rf "$HOME/.ivy2/local/org.reactivemongo"
 
+if [ "$OS_NAME" = "osx" ]; then
+  echo "[INFO] Mac OS X setup"
+
+  brew update
+  brew install sbt
+fi
+
 CATEGORY="$1"
 
 if [ "$CATEGORY" = "UNIT_TESTS" ]; then
