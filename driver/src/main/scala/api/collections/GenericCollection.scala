@@ -23,7 +23,7 @@ import scala.collection.generic.CanBuildFrom
 import scala.concurrent.{ ExecutionContext, Future }
 import scala.concurrent.duration.FiniteDuration
 
-import shaded.netty.buffer.ByteBuf
+import reactivemongo.io.netty.buffer.ByteBuf
 
 import reactivemongo.api._
 import reactivemongo.api.commands.{
@@ -635,9 +635,8 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    *
    * @param ordered $orderedParam
    * @param writeConcern $writeConcernParam
-   *
    */
-  def delete[S](ordered: Boolean = true, writeConcern: WriteConcern = defaultWriteConcern): DeleteBuilder =
+  def delete[S](ordered: Boolean = true, writeConcern: WriteConcern = defaultWriteConcern): DeleteBuilder = // TODO: Remove the type param ?
     prepareDelete(ordered, writeConcern)
 
   /**

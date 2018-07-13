@@ -1,6 +1,6 @@
 import scala.concurrent.Future
 
-import shaded.netty.channel.{ ChannelId, DefaultChannelId }
+import reactivemongo.io.netty.channel.{ ChannelId, DefaultChannelId }
 
 import reactivemongo.core.nodeset.{
   Connection,

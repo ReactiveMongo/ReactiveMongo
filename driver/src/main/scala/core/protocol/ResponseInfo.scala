@@ -1,6 +1,6 @@
 package reactivemongo.core.protocol
 
-import shaded.netty.channel.ChannelId
+import reactivemongo.io.netty.channel.ChannelId
 
 /**
  * Response meta information.

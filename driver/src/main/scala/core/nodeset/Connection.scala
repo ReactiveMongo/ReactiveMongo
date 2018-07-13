@@ -2,7 +2,7 @@ package reactivemongo.core.nodeset
 
 import scala.collection.immutable.Set
 
-import shaded.netty.channel.{ Channel, ChannelFuture }
+import reactivemongo.io.netty.channel.{ Channel, ChannelFuture }
 
 import reactivemongo.core.protocol.Request
 

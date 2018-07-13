@@ -15,7 +15,7 @@
  */
 package reactivemongo.core.netty
 
-import shaded.netty.buffer.ByteBuf
+import reactivemongo.io.netty.buffer.ByteBuf
 
 import reactivemongo.bson.BSONDocument
 import reactivemongo.bson.buffer.ReadableBuffer

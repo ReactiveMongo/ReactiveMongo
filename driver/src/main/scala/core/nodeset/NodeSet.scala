@@ -2,7 +2,7 @@ package reactivemongo.core.nodeset
 
 import scala.collection.immutable.Set
 
-import shaded.netty.channel.ChannelId
+import reactivemongo.io.netty.channel.ChannelId
 
 import akka.actor.ActorRef
 

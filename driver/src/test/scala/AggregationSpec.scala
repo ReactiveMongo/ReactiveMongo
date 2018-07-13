@@ -487,27 +487,26 @@ class AggregationSpec(implicit ee: ExecutionEnv)
     "filter when using a '$project' stage" in {
       // See https://docs.mongodb.com/master/reference/operator/aggregation/filter/#example
 
-      import sales.BatchCommands.AggregationFramework.{
-        Ascending,
-        Sort
-      }
-
       def expected = List(
         Sale(_id = 0, items = List(SaleItem(2, 1, 240))),
         Sale(_id = 1, items = List(
           SaleItem(23, 3, 110), SaleItem(38, 1, 300))),
         Sale(_id = 2, items = Nil))
-      val sort = Sort(Ascending("_id"))
 
-      sales.aggregateWith1[Sale]() {
-        framework =>
-          import framework._
+      sales.aggregateWith1[Sale]() { framework =>
+        import framework._
 
-          Project(document("items" -> Filter(
-            input = BSONString(f"$$items"),
-            as = "item",
-            cond = document(f"$$gte" -> array(f"$$$$item.price", 100))))) -> List(sort)
-      }.collect[List](Int.MaxValue, Cursor.FailOnError[List[Sale]]()) must beTypedEqualTo(expected).await(0, timeout)
+        val sort = Sort(Ascending("_id"))
+
+        Project(document("items" -> Filter(
+          input = BSONString(f"$$items"),
+          as = "item",
+          cond = document(
+            f"$$gte" -> array(f"$$$$item.price", 100))))) -> List(sort)
+
+      }.collect[List](Int.MaxValue, Cursor.FailOnError[List[Sale]]()).
+        aka("filtered") must beTypedEqualTo(expected).await(0, timeout)
+
     } tag "not_mongo26"
   }
 
@@ -1173,7 +1172,7 @@ db.accounts.aggregate([
   section("gt_mongo32")
   "Produce" should {
     // https://docs.mongodb.com/manual/reference/operator/aggregation/replaceRoot/#replaceroot-with-an-embedded-document
-    val produce: BSONCollection = db(s"produce${System identityHashCode this}")
+    val fruits: BSONCollection = db(s"fruits${System identityHashCode this}")
 
     "be inserted" in {
       /*
@@ -1184,7 +1183,7 @@ db.accounts.aggregate([
          "on_order" : { "oranges" : 35, "apples" : 75 }
       }
        */
-      produce.insert(document(
+      fruits.insert(document(
         "_id" -> 1,
         "fruit" -> array("apples", "oranges"),
         "in_stock" -> document(
@@ -1196,17 +1195,14 @@ db.accounts.aggregate([
     }
 
     "and reshaped using $replaceRoot" in {
-      val result = produce.aggregateWith1[BSONDocument]() {
-        framework =>
-          import framework._
+      val result = fruits.aggregateWith1[BSONDocument]() { framework =>
+        import framework._
 
-          Match(document("_id" -> 1)) -> List(
-            ReplaceRootField("in_stock"))
+        Match(document("_id" -> 1)) -> List(ReplaceRootField("in_stock"))
       }.headOption
 
-      result must beSome(document(
-        "oranges" -> 20,
-        "apples" -> 60)).await(0, timeout)
+      result must beSome(document("oranges" -> 20, "apples" -> 60)).
+        await(0, timeout)
     }
   }
 

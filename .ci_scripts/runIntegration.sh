@@ -5,12 +5,12 @@
 set -e
 
 # JVM/SBT setup
-SBT_OPTS="-Dsbt.scala.version=2.10.7 -Dtest.primaryHost=$PRIMARY_HOST"
-SBT_OPTS="$SBT_OPTS -Dtest.slowPrimaryHost=$PRIMARY_SLOW_PROXY"
+SBT_OPTS="-Dtest.primaryHost=$PRIMARY_HOST -Dtest.slowPrimaryHost=$PRIMARY_SLOW_PROXY"
 SBT_OPTS="$SBT_OPTS -Dtest.slowProxyDelay=300 -Dtest.slowFailoverRetries=12"
 
 TEST_OPTS=""
 
+# MongoDB
 echo "- MongoDB major: $MONGO_VER"
 
 if [ "$MONGO_VER" = "3" ]; then
@@ -48,9 +48,13 @@ if [ "$MONGO_PROFILE" = "rs" ]; then
     SBT_OPTS="$SBT_OPTS -Dtest.replicaSet=true"
 fi
 
+if [ "$MONGO_PROFILE" = "default" -a "$MONGO_VER" = "3_6" ]; then
+    SBT_OPTS="$SBT_OPTS -Dtest.nettyNativeArch=linux"
+fi
+
 # Netty
-SBT_OPTS="$SBT_OPTS -Dshaded.netty.leakDetection.level=paranoid"
-SBT_OPTS="$SBT_OPTS -Dshaded.netty.leakDetection.acquireAndReleaseOnly=true"
+SBT_OPTS="$SBT_OPTS -Dreactivemongo.io.netty.leakDetection.level=paranoid"
+SBT_OPTS="$SBT_OPTS -Dreactivemongo.io.netty.leakDetection.acquireAndReleaseOnly=true"
 
 source "$SCRIPT_DIR/jvmopts.sh"
 
@@ -69,7 +73,7 @@ if [ $# -ge 1 ]; then
     MODE="$1"
 fi
 
-sed -e 's/"-deprecation", //' < project/ReactiveMongo.scala > .tmp && mv .tmp project/ReactiveMongo.scala
+sed -e 's/"-deprecation", //' < project/Common.scala > .tmp && mv .tmp project/Common.scala
 
 if [ "x$MODE" = "xinteractive" ]; then
     sbt #++$SCALA_VERSION

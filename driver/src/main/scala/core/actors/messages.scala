@@ -2,7 +2,7 @@ package reactivemongo.core.actors
 
 import scala.concurrent.{ Future, Promise }
 
-import shaded.netty.channel.ChannelId
+import reactivemongo.io.netty.channel.ChannelId
 
 import reactivemongo.core.protocol.{
   CheckedWriteRequest,
