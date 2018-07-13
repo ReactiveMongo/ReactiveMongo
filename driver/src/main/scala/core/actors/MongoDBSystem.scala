@@ -518,7 +518,7 @@ trait MongoDBSystem extends Actor {
       trace(s"Transmiting a request: $req")
 
       val r = req(RequestId.common.next)
-      pickChannel(r).map(_._2.send(r))
+      pickChannel(r).map(_._2.send(r)) // TODO: Check is expecting?
 
       ()
     }
@@ -1206,7 +1206,7 @@ trait MongoDBSystem extends Actor {
 
     request.channelIdHint match {
       case Some(chanId) => ns.pickByChannelId(chanId).map(Success(_)).getOrElse(
-        Failure(new ChannelNotFound(s"#chanId", false, internalState)))
+        Failure(new ChannelNotFound(s"#${chanId}", false, internalState)))
 
       case _ => ns.pick(request.readPreference).map(Success(_)).getOrElse {
         val secOk = secondaryOK(request)

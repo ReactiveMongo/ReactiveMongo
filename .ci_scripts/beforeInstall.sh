@@ -30,15 +30,15 @@ echo "[INFO] MongoDB major version: $MONGO_VER"
 
 MONGO_MINOR="3.2.10"
 
-if [ "$MONGO_VER" = "3_6" ]; then
-    MONGO_MINOR="3.6.5"
+if [ "$MONGO_VER" = "4" ]; then
+    MONGO_MINOR="4.0.0"
 fi
     
 if [ "$AKKA_VERSION" = "2.5.13" ]; then
-    MONGO_MINOR="3.6.5"
-    MONGO_VER="3_6"
+    MONGO_MINOR="4.0.0"
+    MONGO_VER="4"
 
-    echo "[WARN] Fix MongoDB version to 3.6.5 (due to Akka Stream version)"
+    echo "[WARN] Fix MongoDB version to $MONGO_MINOR (due to Akka Stream version)"
 else
     if [ "$MONGO_VER" = "2_6" ]; then
         MONGO_MINOR="2.6.12"

@@ -62,9 +62,14 @@ class AggregationSpec(implicit ee: ExecutionEnv)
         import framework._
 
         IndexStats -> List(Sort(Ascending("name")))
-      }.headOption
+      }.collect[List](
+        Int.MaxValue, Cursor.FailOnError[List[IndexStatsResult]]()).
+        map(_.find(_.name != "_id_"))
 
       result must beLike[Option[IndexStatsResult]] {
+        case Some(IndexStatsResult("_id_", k2, _, _)) =>
+          sys.error(s"--> ${BSONDocument pretty k2}")
+
         case Some(IndexStatsResult("city_text_state_text", k2, _, _)) =>
           k2.getAs[String]("_fts") must beSome("text") and {
             k2.getAs[BSONNumberLike]("_ftsx").map(_.toInt) must beSome(1)
