@@ -33,10 +33,6 @@ matrix:
     jdk: openjdk8
     scala: 2.12.6
   - os: linux
-    jdk: oraclejdk7
-    scala: 2.11.12
-    env: CI_CATEGORY=INTEGRATION_TESTS AKKA_VERSION=2.3.13 ITERATEES_VERSION=2.3.8 MONGO_PROFILE=default MONGO_VER=2_6
-  - os: linux
     jdk: openjdk8
     scala: 2.12.6
     env: CI_CATEGORY=INTEGRATION_TESTS AKKA_VERSION=2.5.13 ITERATEES_VERSION=2.6.1 MONGO_PROFILE=default MONGO_VER=3
