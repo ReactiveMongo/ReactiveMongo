@@ -15,7 +15,7 @@ echo "- MongoDB major: $MONGO_VER"
 
 if [ "$MONGO_VER" = "3" ]; then
     TEST_OPTS="exclude mongo2,gt_mongo32,unit"
-elif [ "$MONGO_VER" = "3_6" ]; then
+elif [ "$MONGO_VER" = "4" ]; then
     TEST_OPTS="exclude mongo2,unit"
 else
     TEST_OPTS="exclude not_mongo26,gt_mongo32,unit"
@@ -48,7 +48,7 @@ if [ "$MONGO_PROFILE" = "rs" ]; then
     SBT_OPTS="$SBT_OPTS -Dtest.replicaSet=true"
 fi
 
-if [ "$MONGO_PROFILE" = "default" -a "$MONGO_VER" = "3_6" ]; then
+if [ "$MONGO_PROFILE" = "default" -a "$MONGO_VER" = "4" ]; then
     SBT_OPTS="$SBT_OPTS -Dtest.nettyNativeArch=linux"
 fi
 

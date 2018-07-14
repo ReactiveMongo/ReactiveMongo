@@ -158,13 +158,16 @@ trait GenericQueryBuilder[P <: SerializationPack]
       elements ++= Seq(
         element("find", string(collection.name)),
         element("skip", int(options.skipN)),
-        element("snapshot", boolean(snapshotFlag)),
         element("tailable", boolean(tailable)),
         element("awaitData", boolean(awaitData)),
         element("oplogReplay", boolean(oplogReplay)) /*,
         element(
           "readConcern",
           CommandCodecs.writeReadConcern(pack)(readConcern))*/ )
+
+      if (version.compareTo(MongoWireVersion.V34) < 0) {
+        elements += element("snapshot", boolean(snapshotFlag))
+      }
 
       queryOption.foreach {
         elements += element("filter", _)

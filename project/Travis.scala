@@ -9,8 +9,8 @@ object Travis {
 
   lazy val settings = Seq(
     travisEnv in Test := { // test:travisEnv from SBT CLI
-      val (mongoLower, mongoUpper) = "2_6" -> "3_6"
-      val (jdkLower, jdkUpper) = "oraclejdk7" -> "openjdk8"
+      val (mongoLower, mongoUpper) = "2_6" -> "4"
+      val (jdkLower, jdkUpper) = "openjdk8" -> "oraclejdk9"
 
       // Scala
       import Common.{ scalaCompatVer => scalaLower }
@@ -22,7 +22,7 @@ object Travis {
 
       // Base specifications for the integration envs
       val integrationSpecs = List[(String, List[String])](
-        "MONGO_VER" -> List("2_6", "3", "3_6"),
+        "MONGO_VER" -> List(mongoLower, "3", mongoUpper),
         "MONGO_PROFILE" -> List(
           "default", "invalid-ssl", "mutual-ssl", "rs", "x509"),
         "AKKA_VERSION" -> List(akkaLower, akkaUpper),
@@ -31,7 +31,7 @@ object Travis {
 
       // Base specifications about JDK/Scala
       val javaSpecs = List(
-        "oraclejdk7", "openjdk8",
+        "openjdk8", "oraclejdk9",
         "scala2.12.6", "scala2.11.12"
       ).combinations(2).flatMap {
         case jdk :: scala :: Nil if (
@@ -165,7 +165,7 @@ object Travis {
           "      scala: 2.11.12",
           "      env: CI_CATEGORY=UNIT_TESTS",
         s"    - scala: ${scalaUpper}", //
-          "      jdk: oraclejdk7",
+          "      jdk: openjdk8",
           "      env: CI_CATEGORY=UNIT_TESTS") ++ (
         integrationEnv.flatMap { flags =>
           if (flags.contains("CI_CATEGORY" -> "INTEGRATION_TESTS") &&
@@ -179,7 +179,7 @@ object Travis {
             List(
               "    - scala: 2.10.7",
               s"      env: ${integrationVars(flags)}",
-              "    - jdk: oraclejdk7",
+              "    - jdk: openjdk8",
               s"      env: ${integrationVars(flags)}"
             )
           } else if (flags.contains("CI_CATEGORY" -> "INTEGRATION_TESTS") &&
@@ -191,7 +191,7 @@ object Travis {
             List(
               "    - scala: 2.12.6",
               s"      env: ${integrationVars(flags)}",
-              "    - jdk: openjdk8",
+              "    - jdk: oraclejdk9",
               s"      env: ${integrationVars(flags)}"
             )
           } else List.empty[String]

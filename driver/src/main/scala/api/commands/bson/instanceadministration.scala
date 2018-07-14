@@ -107,12 +107,17 @@ object BSONCreateImplicits {
   }
 
   implicit object CreateWriter extends BSONDocumentWriter[ResolvedCollectionCommand[Create]] {
-    def write(command: ResolvedCollectionCommand[Create]): BSONDocument =
-      BSONDocument(
-        "create" -> command.collection,
-        "autoIndexId" -> command.command.autoIndexId) ++ command.command.capped.fold(BSONDocument.empty)(capped => {
-          CappedWriter.write(capped) ++ ("capped" -> true)
-        })
+    def write(command: ResolvedCollectionCommand[Create]): BSONDocument = {
+      val base = BSONDocument("create" -> command.collection)
+
+      val cmd = if (command.command.autoIndexId) {
+        base.merge("autoIndexId" -> command.command.autoIndexId)
+      } else base
+
+      command.command.capped.fold(cmd) { capped =>
+        cmd.merge("capped" -> true) ++ CappedWriter.write(capped)
+      }
+    }
   }
 }
 

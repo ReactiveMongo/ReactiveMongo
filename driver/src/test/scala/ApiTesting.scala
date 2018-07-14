@@ -238,4 +238,6 @@ package object tests extends QueryCodecs[BSONSerializationPack.type] {
     srvResolver: reactivemongo.util.SRVRecordResolver,
     txtResolver: reactivemongo.util.TXTResolver) =
     MongoConnection.parseURI(uri, srvResolver, txtResolver)
+
+  @inline def probe(con: MongoConnection, timeout: FiniteDuration) = con.probe(timeout)
 }
