@@ -1,4 +1,10 @@
-import scala.xml.{ Elem => XmlElem, Node => XmlNode, NodeSeq, XML }
+import scala.xml.{
+  Attribute => XmlAttr,
+  Elem => XmlElem,
+  Node => XmlNode,
+  NodeSeq,
+  XML
+}
 import scala.xml.transform.{ RewriteRule, RuleTransformer }
 
 import sbt._
@@ -72,32 +78,6 @@ object Version {
           (dir / "classes").mkdirs() // Findbugs workaround
 
           Seq(Attributed(dir / jar)(AttributeMap.empty))
-        },
-        pomPostProcess := {
-          val tr = new RuleTransformer(new RewriteRule {
-            override def transform(node: XmlNode): NodeSeq = node match {
-              case e: XmlElem if e.label == "dependencies" => {
-                val shadedDep: XmlNode = 
-                  <dependency>
-                    <groupId>{organization.value}</groupId>
-                    <artifactId>reactivemongo-shaded</artifactId>
-                    <version>{version.value}</version>
-                  </dependency>
-
-                XmlElem(e.prefix, e.label, e.attributes, e.scope,
-                  e.minimizeEmpty, (e.child :+ shadedDep): _*)
-              }
-
-              case _ => node
-            }
-          })
-
-          { node: XmlNode =>
-            tr.transform(node).headOption match {
-              case Some(transformed) => transformed
-              case _ => sys.error("Fails to transform the POM")
-            }
-          }
         },
         libraryDependencies ++= akka.value ++ Seq(
             "dnsjava" % "dnsjava" % "2.1.8",
@@ -604,7 +584,7 @@ object Version {
 
         case _ => p
       }
-    }
+    }.dependsOn(shaded)
 
   // ---
 
@@ -616,4 +596,33 @@ object Version {
   } andThen Common.filter
 
   private val driverCleanup = taskKey[Unit]("Driver compilation cleanup")
+
+  /* TODO: Remove
+  private def ivyXml(f: File, ver: String, org: String): File = {
+    val orig = XML loadFile f
+
+    val tr = new RuleTransformer(new RewriteRule {
+      override def transform(node: XmlNode): NodeSeq = node match {
+        case e: XmlElem if e.label == "dependencies" => {
+          val x: XmlElem = <dependency conf="compile-&gt;default(compile)" name="reactivemongo-shaded" />
+
+          val shadedDep = x % XmlAttr("", "rev", ver,
+            XmlAttr("", "org", org, x.attributes))
+
+          XmlElem(e.prefix, e.label, e.attributes, e.scope,
+            e.minimizeEmpty, (shadedDep +: e.child): _*)
+
+        }
+
+        case _ => node
+      }
+    })
+
+    val xml = tr.transform(orig).headOption.getOrElse(orig)
+
+    XML.save(f.getPath, xml, "UTF-8", true)
+
+    f
+  }
+   */
 }
