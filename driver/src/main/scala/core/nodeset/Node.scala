@@ -51,9 +51,6 @@ case class Node(
       authenticated.exists(_ == auth)
     }))
 
-  @deprecated(message = "Use `createNeededChannels` with an explicit `channelFactory`", since = "0.12-RC1")
-  def createNeededChannels(receiver: ActorRef, upTo: Int)(implicit channelFactory: ChannelFactory): Node = createNeededChannels(channelFactory, receiver, upTo)
-
   private[core] def createNeededChannels(
     channelFactory: ChannelFactory,
     receiver: ActorRef,

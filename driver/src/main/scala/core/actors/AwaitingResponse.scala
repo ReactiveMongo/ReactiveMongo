@@ -47,23 +47,4 @@ private[actors] case class AwaitingResponse(
     AwaitingResponse(request, channelID, promise,
       isGetLastError, isMongo26WriteOp)
 
-  @deprecated(message = "Use [[copy]] with `Request`", since = "0.12-RC1")
-  def copy(
-    requestID: Int,
-    channelID: ChannelId,
-    promise: Promise[Response],
-    isGetLastError: Boolean,
-    isMongo26WriteOp: Boolean): AwaitingResponse = {
-    val req = copy(
-      this.request,
-      channelID = channelID,
-      promise = promise,
-      isGetLastError = isGetLastError,
-      isMongo26WriteOp = isMongo26WriteOp)
-
-    req._retry = this._retry
-    req._writeConcern = this._writeConcern
-
-    req
-  }
 }

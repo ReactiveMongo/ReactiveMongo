@@ -122,24 +122,6 @@ trait Cursor[T] {
   def collect[M[_]](maxDocs: Int, err: ErrorHandler[M[T]])(implicit cbf: CanBuildFrom[M[_], T, M[T]], ec: ExecutionContext): Future[M[T]]
 
   /**
-   * $collect.
-   *
-   * @param maxDocs $maxDocsParam.
-   * @param stopOnError $stopOnErrorParam.
-   *
-   * {{{
-   * val cursor = collection.find(query, filter).cursor[BSONDocument]()
-   * // return the 3 first documents in a Vector[BSONDocument].
-   * val vector = cursor.collect[Vector](3)
-   * }}}
-   */
-  @deprecated(message = "Use `collect` with an [[Cursor.ErrorHandler]].", since = "0.12-RC1")
-  def collect[M[_]](maxDocs: Int = -1, stopOnError: Boolean = true)(implicit cbf: CanBuildFrom[M[_], T, M[T]], ec: ExecutionContext): Future[M[T]] = {
-    val err = if (stopOnError) FailOnError[M[T]]() else ContOnError[M[T]]()
-    collect[M](maxDocs, err)
-  }
-
-  /**
    * $foldResp
    *
    * @param z $zeroParam
@@ -235,10 +217,6 @@ trait Cursor[T] {
    */
   def fold[A](z: => A, maxDocs: Int = -1)(suc: (A, T) => A)(implicit ctx: ExecutionContext): Future[A] = foldWhile[A](z, maxDocs)(
     { (st, v) => Cursor.Cont[A](suc(st, v)) }, FailOnError[A]())
-
-  /** Returns the list of the matching documents. */
-  @deprecated("consider using collect[List] instead", "0.10.0")
-  def toList(maxDocs: Int = -1, stopOnError: Boolean = true)(implicit ctx: ExecutionContext): Future[List[T]] = collect[List](maxDocs, stopOnError)
 
   /**
    * $getHead, or fails with [[Cursor.NoSuchResultException]] if none.

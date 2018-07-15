@@ -27,27 +27,21 @@ class MongoDriver(
   protected val config: Option[Config] = None,
   protected val classLoader: Option[ClassLoader] = None) extends Driver {
 
-  @deprecated("Use the constructor with the classloader", "0.12-RC6")
-  def this(config: Option[Config]) = this(config, None)
-
   import MongoDriver.logger
 
   /** Keep a list of all connections so that we can terminate the actors */
-  @deprecated(message = "Will be made private", since = "0.12-RC1")
-  def connections: Iterable[MongoConnection] = connectionMonitors.values
+  private[reactivemongo] def connections: Iterable[MongoConnection] = connectionMonitors.values
 
-  @deprecated(message = "Will be made private", since = "0.12-RC1")
-  def numConnections: Int = connectionMonitors.size
+  private[reactivemongo] def numConnections: Int = connectionMonitors.size
 
-  @deprecated("Will be made private", "0.12.7")
-  case class AddConnection(
+  private[reactivemongo] case class AddConnection(
     name: String,
     nodes: Seq[String],
     options: MongoConnectionOptions,
     mongosystem: ActorRef)
 
-  @deprecated("Will be made private", "0.12.7")
-  class SupervisorActor() extends akka.actor.Actor with Product
+  private[reactivemongo] class SupervisorActor()
+    extends akka.actor.Actor with Product
     with Serializable with java.io.Serializable {
 
     def receive: Receive = throw new UnsupportedOperationException()

@@ -24,7 +24,7 @@ private[core] object Pack {
   def apply(): Pack = {
     val pack = kqueue.orElse(epoll).getOrElse(nio)
 
-    logger.info(s"Instanciated $pack")
+    logger.info(s"Instantiated $pack")
 
     pack
   }

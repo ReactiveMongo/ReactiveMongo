@@ -90,12 +90,6 @@ case class NodeSet(
         con.status == ConnectionStatus.Connected) => node -> con
     }
 
-  @deprecated(message = "Unused", since = "0.12-RC0")
-  def pickForWrite: Option[(Node, Connection)] = primary.view.map(node =>
-    node -> node.authenticatedConnections.subject.headOption).collectFirst {
-    case (node, Some(connection)) => node -> connection
-  }
-
   private val pickConnectionAndFlatten: Option[Node] => Option[(Node, Connection)] = {
     val p: RoundRobiner[Connection, Vector] => Option[Connection] =
       if (authenticates.isEmpty) _.pick
@@ -136,13 +130,6 @@ case class NodeSet(
           nearestGroup, filter(tags), nearest))
     }
   }
-
-  /**
-   * Returns a NodeSet with channels created to `upTo` given maximum,
-   * per each member of the set.
-   */
-  @deprecated(message = "Use `createNeededChannels` with the explicit `channelFactory`", since = "0.12-RC1")
-  def createNeededChannels(receiver: ActorRef, upTo: Int)(implicit channelFactory: ChannelFactory): NodeSet = createNeededChannels(channelFactory, receiver, upTo)
 
   /**
    * Returns a NodeSet with channels created to `upTo` given maximum,
