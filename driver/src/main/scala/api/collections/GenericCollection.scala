@@ -23,8 +23,6 @@ import scala.collection.generic.CanBuildFrom
 import scala.concurrent.{ ExecutionContext, Future }
 import scala.concurrent.duration.FiniteDuration
 
-import reactivemongo.io.netty.buffer.ByteBuf
-
 import reactivemongo.api._
 import reactivemongo.api.commands.{
   Collation,
@@ -35,11 +33,8 @@ import reactivemongo.api.commands.{
 }
 
 import reactivemongo.core.protocol.MongoWireVersion
-import reactivemongo.core.netty.{ BufferSequence, ChannelBufferWritableBuffer }
-import reactivemongo.core.errors.{
-  ConnectionNotInitialized,
-  GenericDriverException
-}
+import reactivemongo.core.netty.ChannelBufferWritableBuffer
+import reactivemongo.core.errors.ConnectionNotInitialized
 
 trait GenericCollectionProducer[P <: SerializationPack with Singleton, +C <: GenericCollection[P]] extends CollectionProducer[C]
 
@@ -461,8 +456,6 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
 
     cp.produce(aggregateCursor)
   }
-
-  //private def aggregate[T](firstOperator: PipelineOperator, otherOperators: List[PipelineOperator], cursor: Option[BatchCommands.AggregationFramework.Cursor], explain: Boolean, allowDiskUse: Boolean, bypassDocumentValidation: Boolean, readConcern: Option[ReadConcern], readPreference: ReadPreference)(implicit ec: ExecutionContext, reader: pack.Reader[T], cf: CursorFlattener[Cursor]): Cursor[T] =
 
   /**
    * [[http://docs.mongodb.org/manual/reference/command/aggregate/ Aggregates]] the matching documents.

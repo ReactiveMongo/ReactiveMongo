@@ -28,7 +28,10 @@ import play.api.libs.iteratee.{ Enumerator, Enumeratee, Error, Input, Iteratee }
 
 import reactivemongo.bson.BSONDocument
 
-import reactivemongo.core.actors.Exceptions
+import reactivemongo.core.actors.{
+  Exceptions,
+  RequestMakerExpectingResponse
+}
 import reactivemongo.core.iteratees.{ CustomEnumeratee, CustomEnumerator }
 import reactivemongo.core.netty.BufferSequence
 import reactivemongo.core.protocol.{
@@ -69,7 +72,7 @@ import reactivemongo.util.{
  */
 trait Cursor[T] {
   // TODO: maxDocs; 0 for unlimited maxDocs
-  import Cursor.{ ContOnError, ErrorHandler, FailOnError }
+  import Cursor.{ ErrorHandler, FailOnError }
 
   /**
    * Produces an Enumerator of documents.
@@ -418,7 +421,9 @@ object DefaultCursor {
         // MongoDB2.6: Int.MaxValue
 
         val op = query.copy(numberToReturn = ntr)
-        val req = RequestMaker(op, requestBuffer(maxDocs), readPreference)
+        val req = RequestMakerExpectingResponse(
+          RequestMaker(op, requestBuffer(maxDocs), readPreference),
+          isMongo26WriteOp)
 
         requester(0, maxDocs, req)(ctx)
       }.future.flatMap {
@@ -508,8 +513,10 @@ object DefaultCursor {
 
             logger.trace(s"Calling next on #${result.cursorId}, op=$op")
 
-            val req = RequestMaker(op, cmd).
-              copy(channelIdHint = Some(response.info._channelId))
+            val req = RequestMakerExpectingResponse(
+              RequestMaker(op, cmd).
+                copy(channelIdHint = Some(response.info._channelId)),
+              isMongo26WriteOp)
 
             requester(response.reply.startingFrom, maxDocs, req)(ctx)
           }.future
@@ -564,12 +571,12 @@ object DefaultCursor {
     @inline protected def lessThenV32: Boolean =
       version.compareTo(MongoWireVersion.V32) < 0
 
-    protected lazy val requester: (Int, Int, RequestMaker) => ExecutionContext => Future[Response] = {
-      @inline def base(req: RequestMaker): Future[Response] =
-        connection.sendExpectingResponse(req, mongo26WriteOp)
+    protected lazy val requester: (Int, Int, RequestMakerExpectingResponse) => ExecutionContext => Future[Response] = {
+      @inline def base(req: RequestMakerExpectingResponse): Future[Response] =
+        connection.sendExpectingResponse(req)
 
       if (lessThenV32) {
-        { (off: Int, maxDocs: Int, req: RequestMaker) =>
+        { (off: Int, maxDocs: Int, req: RequestMakerExpectingResponse) =>
           val max = if (maxDocs > 0) maxDocs else Int.MaxValue
 
           { implicit ec: ExecutionContext =>
@@ -593,7 +600,7 @@ object DefaultCursor {
             }
           }
         }
-      } else { (startingFrom: Int, _: Int, req: RequestMaker) =>
+      } else { (startingFrom: Int, _: Int, req: RequestMakerExpectingResponse) =>
         { implicit ec: ExecutionContext =>
           base(req).map {
             // Normalizes as 'new' cursor doesn't indicate such property
@@ -618,10 +625,11 @@ object DefaultCursor {
 
         logger.trace(s"Asking for the next batch of $ntr documents on cursor #${reply.cursorID}, after ${nextOffset}: $op")
 
-        def req = RequestMaker(
-          op, cmd,
-          readPreference = preference,
-          channelIdHint = Some(response.info._channelId))
+        def req = RequestMakerExpectingResponse(
+          RequestMaker(op, cmd,
+            readPreference = preference,
+            channelIdHint = Some(response.info._channelId)),
+          mongo26WriteOp)
 
         Failover2(connection, failoverStrategy) { () =>
           requester(nextOffset, maxDocs, req)(ctx)
@@ -665,11 +673,16 @@ object DefaultCursor {
       if (cursorID != 0) {
         logger.debug(s"[$logCat] Clean up $cursorID, sending KillCursors")
 
-        val killReq = RequestMaker(
-          KillCursors(Set(cursorID)),
-          readPreference = preference)
+        val killReq = RequestMakerExpectingResponse(
+          RequestMaker(KillCursors(Set(cursorID)), readPreference = preference),
+          false)
 
-        connection.send(killReq)
+        import ExecutionContext.Implicits.global
+
+        connection.sendExpectingResponse(killReq).onComplete {
+          case Failure(cause) => logger.warn(
+            s"[$logCat] Fails to kill cursor #${cursorID}", cause)
+        }
       } else logger.trace(s"[$logCat] Nothing to release: cursor already exhausted ($cursorID)")
     }
 

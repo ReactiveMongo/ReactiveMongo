@@ -514,15 +514,6 @@ trait MongoDBSystem extends Actor {
       }
     }
 
-    case req @ RequestMaker(_, _, _, _) => {
-      trace(s"Transmiting a request: $req")
-
-      val r = req(RequestId.common.next)
-      pickChannel(r).map(_._2.send(r)) // TODO: Check is expecting?
-
-      ()
-    }
-
     case req @ RequestMakerExpectingResponse(maker, _) => {
       val reqId = RequestId.common.next
 
@@ -732,9 +723,6 @@ trait MongoDBSystem extends Actor {
   }
 
   val closing: Receive = {
-    case req @ RequestMaker(_, _, _, _) =>
-      error(s"Received a non-expecting response request during closing process: $req")
-
     case RegisterMonitor => { monitors += sender; () }
 
     case req @ ExpectingResponse(promise) => {
@@ -1084,8 +1072,6 @@ trait MongoDBSystem extends Actor {
 
       this._nodeSet = updated
     }
-
-    //println(s"\r\n----===> ${event take 30} : ${updated.authenticates.map(_.user).mkString("[", ", ", "]")}\r\n")
 
     nodeSetUpdated(event, previous, updated)
 

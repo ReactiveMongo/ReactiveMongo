@@ -51,7 +51,7 @@ private[collections] trait Aggregator[P <: SerializationPack with Singleton]
     private def ver = db.connection.metadata.
       fold[MongoWireVersion](MongoWireVersion.V30)(_.maxWireVersion)
 
-    final def cursor(implicit ec: ExecutionContext): AC[T] = {
+    final def cursor: AC[T] = {
       def batchSz = batchSize.getOrElse(defaultCursorBatchSize)
       implicit def writer = commandWriter[T]
       implicit def aggReader: pack.Reader[T] = reader

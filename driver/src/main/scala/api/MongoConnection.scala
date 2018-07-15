@@ -179,13 +179,14 @@ class MongoConnection(
     expectingResponse.future
   }
 
-  private[api] def sendExpectingResponse(requestMaker: RequestMaker, isMongo26WriteOp: Boolean): Future[Response] = whenActive {
-    lazy val expectingResponse =
-      RequestMakerExpectingResponse(requestMaker, isMongo26WriteOp)
+  //private[api] def sendExpectingResponse(requestMaker: RequestMaker, isMongo26WriteOp: Boolean): Future[Response] = sendExpectingResponse(RequestMakerExpectingResponse(requestMaker, isMongo26WriteOp))
 
-    mongosystem ! expectingResponse
-    expectingResponse.future
-  }
+  private[api] def sendExpectingResponse(
+    expectingResponse: RequestMakerExpectingResponse): Future[Response] =
+    whenActive {
+      mongosystem ! expectingResponse
+      expectingResponse.future
+    }
 
   @deprecated("Use `authenticate` with `failoverStrategy`", "0.14.0")
   def authenticate(db: String, user: String, password: String): Future[SuccessfulAuthentication] = authenticate(db, user, password, options.failoverStrategy)(actorSystem.dispatcher)

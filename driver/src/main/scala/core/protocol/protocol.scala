@@ -102,17 +102,6 @@ private[reactivemongo] class RequestEncoder
     message: Request,
     buffer: ByteBuf): Unit = {
 
-    /* DEBUG
-    val buf = buffer.duplicate()
-    message writeTo buf
-    buf.resetReaderIndex()
-    val bytes = Array.ofDim[Byte](buf.readableBytes)
-    buf.getBytes(0, bytes)
-    println(s"$message ---> ${bytes.toList}")
-     */
-
-    //println(s"encode#${System identityHashCode message}: ${System identityHashCode buffer}")
-
     message writeTo buffer
 
     ()
@@ -204,31 +193,9 @@ private[reactivemongo] class ResponseFrameDecoder
     buffer: ByteBuf,
     out: JList[Object]): Unit = {
 
-    //val id = rand.nextInt()
-    //println(s"_before  #${id}: ${buffer.refCnt}")
-
-    /*
-    if (buffer.refCnt == 0) { // recycled buffer
-      buffer.retain()
-    }
-     */
-
     frames(buffer, buffer.readableBytes, out)
 
-    /*
-    context.attr(Debug.ParentBuf).set(id)
-
-    println(s"_after   #${id}: ${out.size} => ${buffer.refCnt}")
-     */
-
     ()
-    /*
-  } catch {
-    case cause: Throwable =>
-      println(s"$cause : ${buffer.readableBytes}")
-      cause.printStackTrace()
-      throw cause
-     */
   }
 
   @annotation.tailrec
@@ -236,20 +203,14 @@ private[reactivemongo] class ResponseFrameDecoder
     if (readableBytes > 0) {
       buffer.markReaderIndex()
 
-      //println("_frames_1")
-
       // MessageHeader.messageLength (including the int32 size of messageLength)
       val messageLength = buffer.readIntLE()
 
       buffer.resetReaderIndex()
 
       if (messageLength <= readableBytes) {
-        //out.add(buffer readBytes messageLength)
-
         val frame = buffer.readRetainedSlice(messageLength)
         // #frm1: .. as need to be kept up to the [[ResponseDecoder]]
-
-        //println(s"_frame   #${id}: ${buffer.refCnt} (${frame.refCnt}) <- ${buffer.readerIndex}")
 
         out.add(frame)
 
@@ -275,14 +236,6 @@ private[reactivemongo] class ResponseDecoder
     frame: ByteBuf, // see ResponseFrameDecoder
     out: JList[Object]): Unit = {
 
-    /*
-    val attr =
-      context.attr(reactivemongo.io.netty.util.AttributeKey.
-        newInstance[Int]("parentBuf")).get
-
-    println(s"_decode2${attr}: ${frame.refCnt}")
-     */
-
     val readableBytes = frame.readableBytes
 
     if (readableBytes < MessageHeader.size) {
@@ -295,30 +248,23 @@ private[reactivemongo] class ResponseDecoder
 
     // ---
 
-    //println("_decode2b")
-
     val header: MessageHeader = try {
       MessageHeader(frame)
     } catch {
       case cause: Throwable =>
-        //println("_cause_1")
-
         frame.discardReadBytes()
-        //frame.readBytes(frame.readableBytes)
 
         throw new IllegalStateException("Invalid message header", cause)
     }
 
     if (header.messageLength > readableBytes) {
       frame.discardReadBytes()
-      //frame.readBytes(readableBytes - header.size)
 
       throw new IllegalStateException(
         s"Invalid message length: ${header.messageLength} < ${readableBytes}")
 
     } else if (header.opCode != Reply.code) {
       frame.discardReadBytes()
-      //frame.readBytes(readableBytes - header.size)
 
       throw new IllegalStateException(
         s"Unexpected opCode ${header.opCode} != ${Reply.code}")
@@ -327,15 +273,9 @@ private[reactivemongo] class ResponseDecoder
 
     // ---
 
-    //println(s"_before_reply: ${frame.refCnt}")
-
     val reply = Reply(frame)
     val chanId = Option(context).map(_.channel.id).orNull
     def info = ResponseInfo(chanId)
-
-    //val docs = frame.copy() // 'detach' as frame is reused by networking
-
-    //println(s"_here: ${frame.refCnt} / ${docs.readableBytes}")
 
     def response = if (reply.cursorID == 0 && reply.numberReturned > 0) {
       // Copy as unpooled (non-derived) buffer
@@ -351,8 +291,6 @@ private[reactivemongo] class ResponseDecoder
         }
 
         case Success(doc) => {
-          //println(s"doc = ${BSONDocument pretty doc}")
-
           val ok = doc.getAs[BSONBooleanLike]("ok")
           def failed = {
             val r = {
@@ -363,12 +301,8 @@ private[reactivemongo] class ResponseDecoder
             Response.CommandError(header, r, info, DatabaseException(doc))
           }
 
-          //println(s"ok = $ok")
-
           doc.getAs[BSONDocument]("cursor") match {
             case Some(cursor) if ok.exists(_.toBoolean) => {
-              //println(s"cursor = ${BSONDocument pretty cursor}")
-
               val ry = for {
                 id <- cursor.getAs[BSONNumberLike]("id").map(_.toLong)
                 ns <- cursor.getAs[String]("ns")
