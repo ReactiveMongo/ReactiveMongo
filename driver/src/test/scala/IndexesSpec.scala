@@ -185,6 +185,14 @@ class IndexesSpec(implicit ee: ExecutionEnv)
     }
   }
 
+  "Listing indexes" should {
+    "return empty list if collection doesn't exist" in {
+      lazy val col = db(s"nonexistent-collection-$hashCode")
+
+      col.indexesManager.list() must beEmpty[List[Index]].await(0, timeout)
+    }
+  }
+
   lazy val partial = db(s"partial${System identityHashCode this}")
 
   "Index with partial filter" should {
