@@ -16,12 +16,7 @@
 package reactivemongo.core.commands
 
 import reactivemongo.api.ReadPreference
-import reactivemongo.bson.{
-  BSONDocument,
-  BSONInteger,
-  BSONNumberLike,
-  BSONValue
-}
+import reactivemongo.bson.{ BSONDocument, BSONNumberLike }
 import reactivemongo.core.errors.ReactiveMongoException
 import reactivemongo.core.protocol.{ RequestMaker, Query, QueryFlags, Response }
 import reactivemongo.core.netty._
@@ -208,36 +203,6 @@ class MakableCommand(val db: String, val command: Command[_]) {
     RequestMaker(
       query.copy(flags = flags),
       BufferSequence.single(command.makeDocuments), readPreference)
-  }
-}
-
-/**
- * ReplSetGetStatus Command.
- *
- * Returns the state of the Replica Set from the target server's point of view.
- */
-@deprecated(
-  "consider using reactivemongo.api.commands.ReplSetGetStatus", "0.11.5")
-object ReplStatus extends AdminCommand[Map[String, BSONValue]] {
-  override def makeDocuments = BSONDocument("replSetGetStatus" -> BSONInteger(1))
-
-  object ResultMaker extends BSONCommandResultMaker[Map[String, BSONValue]] {
-    def apply(document: BSONDocument) = Right(document.toMap)
-  }
-}
-
-/**
- * ServerStatus Command.
- *
- * Gets the detailed status of the target server.
- */
-@deprecated(
-  "consider using reactivemongo.api.commands.ServerStatus", "0.11.5")
-object Status extends AdminCommand[Map[String, BSONValue]] {
-  override def makeDocuments = BSONDocument("serverStatus" -> BSONInteger(1))
-
-  object ResultMaker extends BSONCommandResultMaker[Map[String, BSONValue]] {
-    def apply(document: BSONDocument) = Right(document.toMap)
   }
 }
 

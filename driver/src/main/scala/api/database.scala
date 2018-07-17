@@ -70,16 +70,8 @@ sealed trait DB {
    * Returns the database of the given name on the same MongoConnection.
    *
    * @param name $nameParam
-   * @see [[sibling1]]
    */
-  def sibling(name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit ec: ExecutionContext): DefaultDB = connection(name, failoverStrategy)
-
-  /**
-   * Returns the database of the given name on the same MongoConnection.
-   *
-   * @param name $nameParam
-   */
-  def sibling1(name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit ec: ExecutionContext): Future[DefaultDB] = connection.database(name, failoverStrategy)
+  def sibling(name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit ec: ExecutionContext): Future[DefaultDB] = connection.database(name, failoverStrategy)
 
 }
 

@@ -17,15 +17,6 @@ package reactivemongo.api
 
 import reactivemongo.core.protocol.QueryFlags
 
-@deprecated(message = "Will be removed", since = "0.11.10")
-sealed trait SortOrder
-
-@deprecated(message = "Will be removed", since = "0.11.10")
-object SortOrder {
-  case object Ascending extends SortOrder
-  case object Descending extends SortOrder
-}
-
 /**
  * A helper to make the query options.
  * You may use the methods to set the fields of this class,

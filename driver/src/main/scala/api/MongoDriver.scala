@@ -63,20 +63,6 @@ class MongoDriver(
    * $seeConnectDBTutorial
    *
    * @param nodes $nodesParam
-   * @param authentications $authParam
-   * @param nbChannelsPerNode $nbChannelsParam
-   * @param name $connectionNameParam
-   * @param options $optionsParam
-   */
-  @deprecated(message = "Must use `connection` with `nbChannelsPerNode` set in the `options`.", since = "0.11.3")
-  def connection(nodes: Seq[String], options: MongoConnectionOptions, authentications: Seq[Authenticate], nbChannelsPerNode: Int, name: Option[String]): MongoConnection = connection(nodes, options, authentications, name)
-
-  /**
-   * Creates a new MongoConnection.
-   *
-   * $seeConnectDBTutorial
-   *
-   * @param nodes $nodesParam
    * @param options $optionsParam
    * @param authentications $authParam
    * @param name $connectionNameParam
@@ -153,18 +139,6 @@ class MongoDriver(
    * $seeConnectDBTutorial
    *
    * @param parsedURI $parsedURIParam
-   * @param nbChannelsPerNode $nbChannelsParam
-   * @param name $connectionNameParam
-   */
-  @deprecated(message = "Must you reactivemongo.api.MongoDriver.connection(reactivemongo.api.MongoConnection.ParsedURI,Option[String]):reactivemongo.api.MongoConnection connection(..)]] with `nbChannelsPerNode` set in the `parsedURI`.", since = "0.11.3")
-  def connection(parsedURI: MongoConnection.ParsedURI, nbChannelsPerNode: Int, name: Option[String]): MongoConnection = connection(parsedURI, name)
-
-  /**
-   * Creates a new MongoConnection from URI.
-   *
-   * $seeConnectDBTutorial
-   *
-   * @param parsedURI $parsedURIParam
    * @param name $connectionNameParam
    */
   def connection(parsedURI: MongoConnection.ParsedURI, name: Option[String]): MongoConnection = connection(parsedURI, name, strictUri = false).get // Unsafe
@@ -187,17 +161,6 @@ class MongoDriver(
       Success(connection(parsedURI.hosts.map(h => h._1 + ':' + h._2), parsedURI.options, parsedURI.authenticate.toSeq, name))
     }
   }
-
-  /**
-   * Creates a new MongoConnection from URI.
-   *
-   * $seeConnectDBTutorial
-   *
-   * @param parsedURI $parsedURIParam
-   * @param nbChannelsPerNode $nbChannelsParam
-   */
-  @deprecated(message = "Must you `connection` with `nbChannelsPerNode` set in the options of the `parsedURI`.", since = "0.11.3")
-  def connection(parsedURI: MongoConnection.ParsedURI, nbChannelsPerNode: Int): MongoConnection = connection(parsedURI, None, false).get // Unsafe
 
   /**
    * Creates a new MongoConnection from URI.

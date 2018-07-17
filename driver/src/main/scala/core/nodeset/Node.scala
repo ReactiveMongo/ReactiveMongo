@@ -11,9 +11,8 @@ import reactivemongo.bson.BSONDocument
 /**
  * @param name the main name of the node
  */
-@deprecated(message = "Will be made private", since = "0.11.10")
 @SerialVersionUID(440354552L)
-case class Node(
+private[reactivemongo] case class Node(
   name: String,
   @transient status: NodeStatus,
   @transient connections: Vector[Connection],
