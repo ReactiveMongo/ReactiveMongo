@@ -1212,47 +1212,50 @@ trait MongoDBSystem extends Actor {
       case Some(chanId) => ns.pickByChannelId(chanId).map(Success(_)).getOrElse(
         Failure(new ChannelNotFound(s"#${chanId}", false, internalState)))
 
-      // TODO: Check awaitingResponses not to pick a connection related to some awaiting channel
-      case _ => ns.pick(request.readPreference).map(Success(_)).getOrElse {
-        val secOk = secondaryOK(request)
-        lazy val reqAuth = ns.authenticates.nonEmpty
-        val cause: Throwable = if (!secOk) {
-          ns.primary match {
-            case Some(prim) => {
-              val details = s"'${prim.name}' { ${nodeInfo(reqAuth, prim)} } ($supervisor/$name)"
+      case _ => requestTracker.withAwaiting { (_, chans) =>
+        val accept = { c: Connection => !chans.contains(c.channel.id) }
 
-              if (!reqAuth || prim.authenticated.nonEmpty) {
-                new ChannelNotFound(s"No active channel can be found to the primary node: $details", true, internalState)
-              } else {
-                new NotAuthenticatedException(
-                  s"No authenticated channel for the primary node: $details")
+        ns.pick(request.readPreference, accept).map(Success(_)).getOrElse {
+          val secOk = secondaryOK(request)
+          lazy val reqAuth = ns.authenticates.nonEmpty
+          val cause: Throwable = if (!secOk) {
+            ns.primary match {
+              case Some(prim) => {
+                val details = s"'${prim.name}' { ${nodeInfo(reqAuth, prim)} } ($supervisor/$name)"
+
+                if (!reqAuth || prim.authenticated.nonEmpty) {
+                  new ChannelNotFound(s"No active channel can be found to the primary node: $details", true, internalState)
+                } else {
+                  new NotAuthenticatedException(
+                    s"No authenticated channel for the primary node: $details")
+                }
               }
+
+              case _ => new PrimaryUnavailableException(
+                supervisor, name, internalState)
             }
-
-            case _ => new PrimaryUnavailableException(
-              supervisor, name, internalState)
-          }
-        } else if (!ns.isReachable) {
-          new NodeSetNotReachable(supervisor, name, internalState)
-        } else {
-          // Node set is reachable, secondary is ok, but no channel found
-          val (authed, msgs) = ns.nodes.foldLeft(
-            false -> Seq.empty[String]) {
-              case ((authed, msgs), node) =>
-                val msg = s"'${node.name}' [${node.status}] { ${nodeInfo(reqAuth, node)} }"
-
-                (authed || node.authenticated.nonEmpty) -> (msg +: msgs)
-            }
-          val details = s"""${msgs.mkString(", ")} ($supervisor/$name)"""
-
-          if (!reqAuth || authed) {
-            new ChannelNotFound(s"No active channel with '${request.readPreference}' found for the nodes: $details", true, internalState)
+          } else if (!ns.isReachable) {
+            new NodeSetNotReachable(supervisor, name, internalState)
           } else {
-            new NotAuthenticatedException(s"No authenticated channel: $details")
-          }
-        }
+            // Node set is reachable, secondary is ok, but no channel found
+            val (authed, msgs) = ns.nodes.foldLeft(
+              false -> Seq.empty[String]) {
+                case ((authed, msgs), node) =>
+                  val msg = s"'${node.name}' [${node.status}] { ${nodeInfo(reqAuth, node)} }"
 
-        Failure(cause)
+                  (authed || node.authenticated.nonEmpty) -> (msg +: msgs)
+              }
+            val details = s"""${msgs.mkString(", ")} ($supervisor/$name)"""
+
+            if (!reqAuth || authed) {
+              new ChannelNotFound(s"No active channel with '${request.readPreference}' found for the nodes: $details", true, internalState)
+            } else {
+              new NotAuthenticatedException(s"No authenticated channel: $details")
+            }
+          }
+
+          Failure(cause)
+        }
       }
     }
   }

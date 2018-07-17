@@ -68,11 +68,45 @@ case class NodeSet(
         con.status == ConnectionStatus.Connected) => node -> con
     }
 
-  private val pickConnectionAndFlatten: Option[Node] => Option[(Node, Connection)] = {
+  def pick(preference: ReadPreference): Option[(Node, Connection)] =
+    pick(preference, _ => true)
+
+  // http://docs.mongodb.org/manual/reference/read-preference/
+  private[reactivemongo] def pick(
+    preference: ReadPreference,
+    accept: Connection => Boolean): Option[(Node, Connection)] = {
+
+    def filter(tags: Seq[Map[String, String]]) = ReadPreference.TagFilter(tags)
+
+    if (mongos.isDefined) {
+      pickConnectionAndFlatten(accept)(mongos)
+    } else preference match {
+      case ReadPreference.Primary =>
+        pickConnectionAndFlatten(accept)(primary)
+
+      case ReadPreference.PrimaryPreferred(tags) =>
+        pickConnectionAndFlatten(accept)(primary.orElse(
+          pickFromGroupWithFilter(secondaries, filter(tags), secondaries.pick)))
+
+      case ReadPreference.Secondary(tags) =>
+        pickConnectionAndFlatten(accept)(pickFromGroupWithFilter(
+          secondaries, filter(tags), secondaries.pick))
+
+      case ReadPreference.SecondaryPreferred(tags) =>
+        pickConnectionAndFlatten(accept)(pickFromGroupWithFilter(
+          secondaries, filter(tags), secondaries.pick).orElse(primary))
+
+      case ReadPreference.Nearest(tags) =>
+        pickConnectionAndFlatten(accept)(pickFromGroupWithFilter(
+          nearestGroup, filter(tags), nearest))
+    }
+  }
+
+  private def pickConnectionAndFlatten(accept: Connection => Boolean): Option[Node] => Option[(Node, Connection)] = {
     val p: RoundRobiner[Connection, Vector] => Option[Connection] =
-      if (authenticates.isEmpty) _.pick
+      if (authenticates.isEmpty) _.pickWithFilter(accept)
       else _.pickWithFilter(c =>
-        !c.authenticating.isDefined && !c.authenticated.isEmpty)
+        !c.authenticating.isDefined && !c.authenticated.isEmpty && accept(c))
 
     _.flatMap(node => p(node.authenticatedConnections).map(node -> _))
   }
@@ -80,34 +114,6 @@ case class NodeSet(
   private def pickFromGroupWithFilter(roundRobiner: RoundRobiner[Node, Vector], filter: Option[BSONDocument => Boolean], fallback: => Option[Node]) =
     filter.fold(fallback)(f =>
       roundRobiner.pickWithFilter(_.tags.fold(false)(f)))
-
-  // http://docs.mongodb.org/manual/reference/read-preference/
-  def pick(preference: ReadPreference): Option[(Node, Connection)] = {
-    def filter(tags: Seq[Map[String, String]]) = ReadPreference.TagFilter(tags)
-
-    if (mongos.isDefined) {
-      pickConnectionAndFlatten(mongos)
-    } else preference match {
-      case ReadPreference.Primary =>
-        pickConnectionAndFlatten(primary)
-
-      case ReadPreference.PrimaryPreferred(tags) =>
-        pickConnectionAndFlatten(primary.orElse(
-          pickFromGroupWithFilter(secondaries, filter(tags), secondaries.pick)))
-
-      case ReadPreference.Secondary(tags) =>
-        pickConnectionAndFlatten(pickFromGroupWithFilter(
-          secondaries, filter(tags), secondaries.pick))
-
-      case ReadPreference.SecondaryPreferred(tags) =>
-        pickConnectionAndFlatten(pickFromGroupWithFilter(
-          secondaries, filter(tags), secondaries.pick).orElse(primary))
-
-      case ReadPreference.Nearest(tags) =>
-        pickConnectionAndFlatten(pickFromGroupWithFilter(
-          nearestGroup, filter(tags), nearest))
-    }
-  }
 
   /**
    * Returns a NodeSet with channels created to `upTo` given maximum,
