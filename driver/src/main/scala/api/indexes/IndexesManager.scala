@@ -35,7 +35,7 @@ import reactivemongo.api.{
   CursorProducer,
   ReadPreference
 }
-import reactivemongo.api.commands.{ DropIndexes, WriteResult }
+import reactivemongo.api.commands.{ CommandError, DropIndexes, WriteResult }
 import scala.concurrent.{ Future, ExecutionContext }
 
 /** Indexes manager at database level. */
@@ -269,9 +269,8 @@ private class DefaultCollectionIndexesManager(db: DB, collectionName: String)(
     Command.run(BSONSerializationPack, db.failoverStrategy)
 
   def list(): Future[List[Index]] =
-    runner(
-      collection, listCommand, ReadPreference.primary).recoverWith {
-      case err: WriteResult if err.code.exists(_ == 26 /* no database */ ) =>
+    runner(collection, listCommand, ReadPreference.primary).recoverWith {
+      case CommandError.Code(26 /* no database or collection */ ) =>
         Future.successful(List.empty[Index])
 
       case err => Future.failed(err)
