@@ -46,24 +46,10 @@ object `package` {
 
 @deprecated(
   message = "Use [[reactivemongo.util.LazyLogger]]", since = "0.12.0")
-case class LazyLogger(logger: org.apache.logging.log4j.Logger) {
-  def trace(s: => String): Unit = { if (logger.isTraceEnabled) logger.trace(s) }
-  def trace(s: => String, e: => Throwable): Unit = { if (logger.isTraceEnabled) logger.trace(s, e) }
-  def debug(s: => String): Unit = { if (logger.isDebugEnabled) logger.debug(s) }
-  def debug(s: => String, e: => Throwable): Unit = { if (logger.isDebugEnabled) logger.debug(s, e) }
-  def info(s: => String): Unit = { if (logger.isInfoEnabled) logger.info(s) }
-  def info(s: => String, e: => Throwable): Unit = { if (logger.isInfoEnabled) logger.info(s, e) }
-  def warn(s: => String): Unit = { if (logger.isWarnEnabled) logger.warn(s) }
-  def warn(s: => String, e: => Throwable): Unit = { if (logger.isWarnEnabled) logger.warn(s, e) }
-  def error(s: => String): Unit = { if (logger.isErrorEnabled) logger.error(s) }
-  def error(s: => String, e: => Throwable): Unit = { if (logger.isErrorEnabled) logger.error(s, e) }
-}
-
-@deprecated(
-  message = "Use [[reactivemongo.util.LazyLogger]]", since = "0.12.0")
 object LazyLogger {
-  def apply(logger: String): LazyLogger =
-    LazyLogger(org.apache.logging.log4j.LogManager.getLogger(logger))
+  def apply(logger: String): reactivemongo.util.LazyLogger.LazyLogger = {
+    reactivemongo.util.LazyLogger(logger)
+  }
 }
 
 @deprecated(
