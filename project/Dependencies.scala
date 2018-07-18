@@ -54,7 +54,7 @@ object Dependencies {
     "org.apache.logging.log4j" % "log4j-slf4j-impl" % log4jVer % Test
   )
 
-  LazyLogger  val shapelessTest = "com.chuusai" %% "shapeless" % "2.3.3"
+  val shapelessTest = "com.chuusai" %% "shapeless" % "2.3.3"
 
   val commonsCodec = "commons-codec" % "commons-codec" % "1.11"
 }
