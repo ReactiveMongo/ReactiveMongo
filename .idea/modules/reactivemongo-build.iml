@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<module external.linked.project.id="ReactiveMongo-build" external.linked.project.path="$MODULE_DIR$/../../driver/project" external.root.project.path="$MODULE_DIR$/../.." external.system.id="SBT" sbt.imports="ReactiveMongoBuild._, _root_.org.jetbrains.sbt.IdeaShellPlugin.autoImport._, _root_.net.virtualvoid.sbt.graph.DependencyGraphPlugin.autoImport._, _root_.com.timushev.sbt.updates.UpdatesPlugin.autoImport._, _root_.com.typesafe.sbt.GitPlugin.autoImport._, _root_.com.scalapenos.sbt.prompt.SbtPrompt.autoImport._, _root_.com.typesafe.sbt.SbtScalariform.autoImport._, _root_.sbtunidoc.BaseUnidocPlugin.autoImport._, _root_.sbtunidoc.GenJavadocPlugin.autoImport._, _root_.sbtunidoc.JavaUnidocPlugin.autoImport._, _root_.sbtunidoc.ScalaUnidocPlugin.autoImport._, _root_.sbtassembly.AssemblyPlugin.autoImport._, _root_.com.typesafe.tools.mima.plugin.MimaPlugin.autoImport._, _root_.com.github.sbt.findbugs.FindbugsPlugin.autoImport._, _root_.com.github.sbt.cpd.CpdPlugin.autoImport._, _root_.sbtrelease.ReleasePlugin.autoImport._, _root_.sbt.plugins.IvyPlugin, _root_.sbt.plugins.JvmPlugin, _root_.sbt.plugins.CorePlugin, _root_.sbt.plugins.JUnitXmlReportPlugin, _root_.sbt.plugins.Giter8TemplatePlugin, _root_.org.jetbrains.sbt.StructurePlugin, _root_.org.jetbrains.sbt.IdeaShellPlugin, _root_.net.virtualvoid.sbt.graph.DependencyGraphPlugin, _root_.com.timushev.sbt.updates.UpdatesPlugin, _root_.com.typesafe.sbt.GitBranchPrompt, _root_.com.typesafe.sbt.GitPlugin, _root_.com.typesafe.sbt.GitVersioning, _root_.com.scalapenos.sbt.prompt.SbtPrompt, _root_.com.typesafe.sbt.SbtScalariform, _root_.sbtunidoc.BaseUnidocPlugin, _root_.sbtunidoc.GenJavadocPlugin, _root_.sbtunidoc.JavaUnidocPlugin, _root_.sbtunidoc.PublishJavadocPlugin, _root_.sbtunidoc.ScalaUnidocPlugin, _root_.sbtassembly.AssemblyPlugin, _root_.com.typesafe.tools.mima.plugin.MimaPlugin, _root_.com.github.sbt.findbugs.FindbugsPlugin, _root_.com.github.sbt.cpd.CpdPlugin, _root_.sbtrelease.ReleasePlugin, sbt._, Keys._, dsl._" sbt.resolvers="$USER_HOME$/.ivy2/cache|ivy|Local cache, file:/Users/flavian/.sbt/preloaded|maven|local-preloaded, http://repo.typesafe.com/typesafe/releases/|maven|Typesafe repository releases, https://repo1.maven.org/maven2/|maven|public, http://repo.typesafe.com/typesafe/snapshots/|maven|Typesafe repository snapshots" type="SBT_MODULE" version="4">
+  <component name="NewModuleRootManager">
+    <output url="file://$MODULE_DIR$/../../project/target/idea-classes" />
+    <output-test url="file://$MODULE_DIR$/../../project/target/idea-test-classes" />
+    <exclude-output />
+    <content url="file://$MODULE_DIR$/../../project">
+      <sourceFolder url="file://$MODULE_DIR$/../../project" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/../../project/project/target" />
+      <excludeFolder url="file://$MODULE_DIR$/../../project/target" />
+    </content>
+    <orderEntry type="inheritedJdk" />
+    <orderEntry type="sourceFolder" forTests="false" />
+    <orderEntry type="module-library">
+      <library name="sbt: sbt-and-plugins">
+        <CLASSES />
+        <JAVADOC />
+        <SOURCES />
+      </library>
+    </orderEntry>
+  </component>
+</module>

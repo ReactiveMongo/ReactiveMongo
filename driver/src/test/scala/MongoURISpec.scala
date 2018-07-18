@@ -1,6 +1,6 @@
 import scala.collection.immutable.ListSet
 
-import scala.concurrent.{ ExecutionContext, Future }
+import scala.concurrent.Future
 
 import reactivemongo.api.{
   MongoConnection,

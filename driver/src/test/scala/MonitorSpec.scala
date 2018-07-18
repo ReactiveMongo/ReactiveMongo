@@ -1,7 +1,7 @@
 import akka.actor.Actor
 import akka.testkit.TestActorRef
 
-import shaded.netty.channel.ChannelId
+import reactivemongo.io.netty.channel.ChannelId
 
 import scala.concurrent.Future
 import scala.concurrent.duration._

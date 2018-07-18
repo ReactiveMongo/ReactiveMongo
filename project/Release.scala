@@ -8,20 +8,15 @@ object Release {
 
   private val gitRemote = "origin"
 
-  private val releaseVer: String => String =
-    Version(_).map(_.withoutQualifier.string).
-      getOrElse(sbtrelease.versionFormatError)
-
   private def createLocalBranch(f: (String, String) => String) = Def.setting {
     val vcs = releaseVcs.value.get
-    val ver: String = version.value
-    val releaseBranch = f(ver, releaseVer(ver))
+    val ver = version.value
+    val next = Version(_: String).map(_.withoutQualifier.string).getOrElse(???)
+    val releaseBranch = f(ver, next(ver))
 
     ReleaseStep(action = { st =>
-      val log = sysPLogger(st.log)
-
-      if ((vcs.cmd("checkout", "-b", releaseBranch) ! log) == 0) {
-        vcs.cmd("push", "-u", gitRemote, releaseBranch) !! log
+      if ((vcs.cmd("checkout", "-b", releaseBranch) ! st.log) == 0) {
+        vcs.cmd("push", "-u", gitRemote, releaseBranch) !! st.log
         // Need to push for the plugin checks
       }
 
@@ -40,9 +35,7 @@ object Release {
     val vcs = releaseVcs.value.get
 
     ReleaseStep(action = { st =>
-      val log = sysPLogger(st.log)
-
-      vcs.cmd("push", gitRemote, vcs.currentBranch) !! log
+      vcs.cmd("push", gitRemote, vcs.currentBranch) !! st.log
 
       st
     })
@@ -81,12 +74,15 @@ object Release {
   val major = Def.setting[String] {
     Version(version.value) match {
       case Some(Version(maj, Seq(min, _), _)) => s"${maj}.${min}"
-      case _ => sys.error(s"Invalid version: ${version.value}")
+      case _                                  => sys.error(s"Invalid version: ${version.value}")
     }
   }
 
   val settings = Seq(
-    releaseVersion := releaseVer,
+    releaseVersion := { ver =>
+      Version(ver).map(_.withoutQualifier.string).
+        getOrElse(sbtrelease.versionFormatError)
+    },
     releaseNextVersion := { ver =>
       // e.g. 1.2 => 1.3-SNAPSHOT
       Version(ver).map(_.bumpBugfix.asSnapshot.string).
@@ -96,11 +92,11 @@ object Release {
       val ver = (version in ThisBuild).value
 
       if (ver endsWith "-SNAPSHOT") {
-        // Bump for the next coming sprint, on develop
-        s"Bump to $ver"
-      } else {
         // Prepare the release the SNAPSHOT from master, with a release branch
-        s"Release $ver"
+        s"Bump $ver"
+      } else {
+        // Bump for the next coming sprint, on develop
+        s"Release to $ver"
       }
     },
     releaseProcess := {
@@ -108,13 +104,4 @@ object Release {
       else bumpMaster.value
     }
   )
-
-  private def sysPLogger(log: sbt.Logger) =
-    new scala.sys.process.ProcessLogger {
-      val plog = sbt.Logger.log2PLog(log)
-
-      def buffer[T](f: => T): T = plog.buffer(f)
-      def err(s: => String) = plog.error(s)
-      def out(s: => String) = plog.info(s)
-    }
 }

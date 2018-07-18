@@ -1,6 +1,6 @@
 package reactivemongo.core.protocol
 
-import shaded.netty.buffer.ByteBuf
+import reactivemongo.io.netty.buffer.ByteBuf
 
 import reactivemongo.core.protocol.BufferAccessors.writeTupleToBuffer4
 

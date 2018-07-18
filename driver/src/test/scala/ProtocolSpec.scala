@@ -1,4 +1,4 @@
-import shaded.netty.buffer.Unpooled
+import reactivemongo.io.netty.buffer.Unpooled
 
 import reactivemongo.core.protocol.{
   MessageHeader,

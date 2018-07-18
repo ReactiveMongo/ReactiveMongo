@@ -22,7 +22,7 @@ dependencies:
     - "~/.sbt"
     - "~/ssl"
     - "~/mongodb-linux-x86_64-amazon-3.2.8"
-    - "~/mongodb-linux-x86_64-amazon-3.6.5"
+    - "~/mongodb-linux-x86_64-amazon-4.0.0"
 test:
   override:
   - ./.ci_scripts/retry.sh 3 ./.ci_scripts/validate.sh /tmp/integration-env.sh

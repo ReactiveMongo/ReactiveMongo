@@ -20,7 +20,7 @@ import reactivemongo.core.protocol.Request
 import reactivemongo.core.actors.StandardDBSystem
 import reactivemongo.core.netty.ChannelBufferReadableBuffer
 
-import shaded.netty.channel.{ Channel, DefaultChannelId }
+import reactivemongo.io.netty.channel.{ Channel, DefaultChannelId }
 
 trait UnresponsiveSecondarySpec { parent: NodeSetSpec =>
   import reactivemongo.api.tests._

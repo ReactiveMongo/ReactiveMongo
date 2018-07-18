@@ -7,10 +7,10 @@ import scala.util.control.NonFatal
 
 import scala.concurrent.{ Future, ExecutionContext, Promise }
 
-import shaded.netty.util.Version
-import shaded.netty.buffer.Unpooled
+import reactivemongo.io.netty.util.Version
+import reactivemongo.io.netty.buffer.Unpooled
 
-import shaded.netty.channel.{
+import reactivemongo.io.netty.channel.{
   Channel,
   ChannelFuture,
   ChannelOption,
@@ -20,10 +20,10 @@ import shaded.netty.channel.{
   ChannelInboundHandlerAdapter
 }
 
-import shaded.netty.bootstrap.{ Bootstrap, ServerBootstrap }
+import reactivemongo.io.netty.bootstrap.{ Bootstrap, ServerBootstrap }
 
-import shaded.netty.channel.nio.NioEventLoopGroup
-import shaded.netty.channel.socket.nio.{
+import reactivemongo.io.netty.channel.nio.NioEventLoopGroup
+import reactivemongo.io.netty.channel.socket.nio.{
   NioSocketChannel,
   NioServerSocketChannel
 }

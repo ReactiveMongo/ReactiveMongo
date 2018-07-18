@@ -22,16 +22,16 @@ import scala.concurrent.{ Await, Future, Promise }
 import scala.util.{ Failure, Success, Try }
 import scala.util.control.NonFatal
 
-import shaded.google.common.collect.{ EvictingQueue, Queues }
+import reactivemongo.com.google.common.collect.{ EvictingQueue, Queues }
 
 import akka.actor.{ Actor, ActorRef, Cancellable }
 
-import shaded.netty.channel.{
+import reactivemongo.io.netty.channel.{
   ChannelFuture,
   ChannelFutureListener,
   ChannelId
 }
-import shaded.netty.channel.group.{
+import reactivemongo.io.netty.channel.group.{
   ChannelGroupFuture,
   ChannelGroupFutureListener,
   DefaultChannelGroup
@@ -518,7 +518,7 @@ trait MongoDBSystem extends Actor {
       trace(s"Transmiting a request: $req")
 
       val r = req(RequestId.common.next)
-      pickChannel(r).map(_._2.send(r))
+      pickChannel(r).map(_._2.send(r)) // TODO: Check is expecting?
 
       ()
     }
@@ -1206,7 +1206,7 @@ trait MongoDBSystem extends Actor {
 
     request.channelIdHint match {
       case Some(chanId) => ns.pickByChannelId(chanId).map(Success(_)).getOrElse(
-        Failure(new ChannelNotFound(s"#chanId", false, internalState)))
+        Failure(new ChannelNotFound(s"#${chanId}", false, internalState)))
 
       case _ => ns.pick(request.readPreference).map(Success(_)).getOrElse {
         val secOk = secondaryOK(request)
@@ -1438,7 +1438,7 @@ trait MongoDBSystem extends Actor {
   @deprecated(message = "Will be made private", since = "0.11.10")
   def allChannelGroup(nodeSet: NodeSet): DefaultChannelGroup = {
     val result = new DefaultChannelGroup(
-      shaded.netty.util.concurrent.GlobalEventExecutor.INSTANCE)
+      reactivemongo.io.netty.util.concurrent.GlobalEventExecutor.INSTANCE)
 
     for (node <- nodeSet.nodes) {
       for (connection <- node.connections) result.add(connection.channel)

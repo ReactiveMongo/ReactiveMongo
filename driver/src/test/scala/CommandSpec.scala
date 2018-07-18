@@ -93,21 +93,38 @@ final class CommandSpec(implicit ee: ExecutionEnv)
 
     "resync" in {
       import bson.BSONResyncImplicits._
+      import reactivemongo.core.protocol.MongoWireVersion
 
       if (!replSetOn) {
         "fail outside ReplicaSet (MongoDB 3+)" in {
-          connection.database("admin").flatMap(
-            _.runCommand(Resync, Common.failoverStrategy)) must not(
-              throwA[CommandError]).await(0, timeout)
+          (for {
+            ver <- reactivemongo.api.tests.probe(
+              connection, timeout).map(_.maxWireVersion)
+
+            _ <- connection.database("admin").flatMap( // mongoVersion
+              _.runCommand(Resync, Common.failoverStrategy)).map(
+                _ => {}).recover {
+                  case CommandError.Code(59 /* no such command */ ) if (
+                    ver == MongoWireVersion.V40) => () // command removed at 4
+
+                }
+          } yield ()) must not(throwA[CommandError]).await(0, timeout)
         } tag "not_mongo26"
       } else {
         "be successful with ReplicaSet (MongoDB 3+)" in {
-          connection.database("admin").flatMap(
-            _.runCommand(Resync, Common.failoverStrategy)) must (
-              throwA[CommandError].like {
-                case CommandError.Code(c) =>
-                  (c == 95 || c == 96 /* 3.4*/ ) aka "error code" must beTrue
-              }).await(0, timeout)
+          (for {
+            ver <- reactivemongo.api.tests.probe(
+              connection, timeout).map(_.maxWireVersion)
+
+            res <- connection.database("admin").flatMap(
+              _.runCommand(Resync, Common.failoverStrategy)).map(
+                _ => false).recover {
+                  case CommandError.Code(59 /* no such command */ ) if (
+                    ver == MongoWireVersion.V40) => true // ok: command removed at 4
+
+                  case CommandError.Code(95 | 96 /* 3.4 */ ) => true
+                }
+          } yield res) must beTrue.await(0, timeout)
         } tag "not_mongo26"
 
         "be successful with ReplicaSet (MongoDB 2)" in {

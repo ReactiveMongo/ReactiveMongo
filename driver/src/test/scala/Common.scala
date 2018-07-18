@@ -22,6 +22,8 @@ object Common extends CommonAuth {
 
   val primaryHost = sys.props.getOrElse("test.primaryHost", "localhost:27017")
 
+  val nettyNativeArch = sys.props.get("test.nettyNativeArch")
+
   val failoverRetries = sys.props.get("test.failoverRetries").
     flatMap(r => scala.util.Try(r.toInt).toOption).getOrElse(7)
 
@@ -54,7 +56,6 @@ object Common extends CommonAuth {
   val DefaultOptions = {
     val a = MongoConnectionOptions(
       failoverStrategy = failoverStrategy,
-      //nbChannelsPerNode = 20,
       monitorRefreshMS = (timeout.toMillis / 2).toInt,
       credentials = DefaultCredentials.map("" -> _)(scala.collection.breakOut),
       keyStore = sys.props.get("test.keyStore").map { uri =>
@@ -90,7 +91,7 @@ object Common extends CommonAuth {
   val slowPrimary = sys.props.getOrElse(
     "test.slowPrimaryHost", "localhost:27019")
 
-  val slowTimeout: FiniteDuration = /*increaseTimeoutIfX509*/ {
+  val slowTimeout: FiniteDuration = {
     val maxTimeout = estTimeout(slowFailover)
 
     if (maxTimeout < 10.seconds) 10.seconds

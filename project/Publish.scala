@@ -48,7 +48,7 @@ object Publish {
       env("PUBLISH_USER"), env("PUBLISH_PASS")),
     pomIncludeRepository := { _ => false },
     autoAPIMappings := true,
-    apiURL := Some(url(s"$siteUrl/release/${Release.major.value}/api/")),
+    apiURL := Some(url(s"$siteUrl/release/1.x/api/")),
     licenses := {
       Seq("Apache 2.0" ->
         url("http://www.apache.org/licenses/LICENSE-2.0"))

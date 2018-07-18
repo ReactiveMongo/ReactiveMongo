@@ -6,13 +6,13 @@ import scala.concurrent.duration.{ FiniteDuration, SECONDS }
 import akka.util.Timeout
 import akka.actor.ActorRef
 
-import shaded.netty.channel.{
+import reactivemongo.io.netty.channel.{
   Channel,
   ChannelId,
   DefaultChannelId
 }
 
-import shaded.netty.buffer.{ ByteBuf, Unpooled }
+import reactivemongo.io.netty.buffer.{ ByteBuf, Unpooled }
 
 import reactivemongo.core.protocol.{
   Request,
@@ -238,4 +238,6 @@ package object tests extends QueryCodecs[BSONSerializationPack.type] {
     srvResolver: reactivemongo.util.SRVRecordResolver,
     txtResolver: reactivemongo.util.TXTResolver) =
     MongoConnection.parseURI(uri, srvResolver, txtResolver)
+
+  @inline def probe(con: MongoConnection, timeout: FiniteDuration) = con.probe(timeout)
 }

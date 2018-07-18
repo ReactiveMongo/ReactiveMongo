@@ -132,7 +132,7 @@ class BsonSpec extends org.specs2.mutable.Specification {
   }
 
   "Serialization pack" should {
-    import shaded.netty.channel.DefaultChannelId
+    import reactivemongo.io.netty.channel.DefaultChannelId
     import reactivemongo.api.tests._
 
     val doc = BSONDocument("foo" -> 1, "bar" -> "LOREM")
@@ -174,7 +174,7 @@ class BsonSpec extends org.specs2.mutable.Specification {
 
   // ---
 
-  import shaded.netty.buffer.ByteBuf
+  import reactivemongo.io.netty.buffer.ByteBuf
 
   def compare(origin: Array[Byte], buffer: ByteBuf) = {
     val array = new Array[Byte](buffer.writerIndex)

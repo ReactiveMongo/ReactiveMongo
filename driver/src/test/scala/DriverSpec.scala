@@ -402,8 +402,7 @@ class DriverSpec(implicit ee: ExecutionEnv)
     val conOpts = DefaultOptions.copy(
       nbChannelsPerNode = 1,
       authenticationMechanism = X509Authentication,
-      sslEnabled = true /*,
-        sslAllowsInvalidCert = true*/ )
+      sslEnabled = true)
 
     val dbName = "specs2-test-x509-auth"
 

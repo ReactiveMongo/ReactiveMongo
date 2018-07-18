@@ -1,5 +1,8 @@
-language: scala
+os:
+- linux
+- osx
 sudo: true
+language: scala
 dist: trusty
 addons:
   apt:
@@ -16,55 +19,85 @@ cache:
   - $HOME/ssl
   - $HOME/mongodb-linux-x86_64-2.6.12
   - $HOME/mongodb-linux-x86_64-amazon-3.2.10
-  - $HOME/mongodb-linux-x86_64-amazon-3.6.5
-scala:
-- 2.12.6
-- 2.11.12
-jdk:
-- oraclejdk8
-- oraclejdk7
+  - $HOME/mongodb-linux-x86_64-amazon-4.0.0
 env:
-  - CI_CATEGORY=UNIT_TESTS
-  - CI_CATEGORY=INTEGRATION_TESTS AKKA_VERSION=2.3.13 ITERATEES_VERSION=2.3.8 MONGO_PROFILE=default MONGO_VER=2_6
-  - CI_CATEGORY=INTEGRATION_TESTS AKKA_VERSION=2.5.13 ITERATEES_VERSION=2.6.1 MONGO_PROFILE=default MONGO_VER=3
-  - CI_CATEGORY=INTEGRATION_TESTS AKKA_VERSION=2.5.13 ITERATEES_VERSION=2.6.1 MONGO_PROFILE=rs MONGO_VER=3
-  - CI_CATEGORY=INTEGRATION_TESTS AKKA_VERSION=2.5.13 ITERATEES_VERSION=2.6.1 MONGO_PROFILE=default MONGO_VER=3_6
-  - CI_CATEGORY=INTEGRATION_TESTS AKKA_VERSION=2.5.13 ITERATEES_VERSION=2.6.1 MONGO_PROFILE=invalid-ssl MONGO_VER=3_6
-  - CI_CATEGORY=INTEGRATION_TESTS AKKA_VERSION=2.5.13 ITERATEES_VERSION=2.6.1 MONGO_PROFILE=mutual-ssl MONGO_VER=3_6
-  - CI_CATEGORY=INTEGRATION_TESTS AKKA_VERSION=2.5.13 ITERATEES_VERSION=2.6.1 MONGO_PROFILE=rs MONGO_VER=3_6
-  - CI_CATEGORY=INTEGRATION_TESTS AKKA_VERSION=2.5.13 ITERATEES_VERSION=2.6.1 MONGO_PROFILE=x509 MONGO_VER=3_6
-matrix: 
+  - _DISABLED=true
+matrix:
+  include:
+  - os: osx
+    osx_image: xcode9.4
+    language: java
+    env: CI_CATEGORY=UNIT_TESTS OS_NAME=osx TRAVIS_SCALA_VERSION=2.11.12
+  - os: linux
+    env: CI_CATEGORY=UNIT_TESTS
+    jdk: oraclejdk9
+    scala: 2.12.6
+  - os: linux
+    jdk: openjdk8
+    scala: 2.11.12
+    env: CI_CATEGORY=INTEGRATION_TESTS AKKA_VERSION=2.3.13 ITERATEES_VERSION=2.3.8 MONGO_PROFILE=default MONGO_VER=2_6
+  - os: linux
+    jdk: oraclejdk9
+    scala: 2.12.6
+    env: CI_CATEGORY=INTEGRATION_TESTS AKKA_VERSION=2.5.13 ITERATEES_VERSION=2.6.1 MONGO_PROFILE=default MONGO_VER=3
+  - os: linux
+    jdk: oraclejdk9
+    scala: 2.12.6
+    env: CI_CATEGORY=INTEGRATION_TESTS AKKA_VERSION=2.5.13 ITERATEES_VERSION=2.6.1 MONGO_PROFILE=rs MONGO_VER=3
+  - os: linux
+    jdk: oraclejdk9
+    scala: 2.12.6
+    env: CI_CATEGORY=INTEGRATION_TESTS AKKA_VERSION=2.5.13 ITERATEES_VERSION=2.6.1 MONGO_PROFILE=default MONGO_VER=4
+  - os: linux
+    jdk: oraclejdk9
+    scala: 2.12.6
+    env: CI_CATEGORY=INTEGRATION_TESTS AKKA_VERSION=2.5.13 ITERATEES_VERSION=2.6.1 MONGO_PROFILE=invalid-ssl MONGO_VER=4
+  - os: linux
+    jdk: oraclejdk9
+    scala: 2.12.6
+    env: CI_CATEGORY=INTEGRATION_TESTS AKKA_VERSION=2.5.13 ITERATEES_VERSION=2.6.1 MONGO_PROFILE=mutual-ssl MONGO_VER=4
+  - os: linux
+    jdk: oraclejdk9
+    scala: 2.12.6
+    env: CI_CATEGORY=INTEGRATION_TESTS AKKA_VERSION=2.5.13 ITERATEES_VERSION=2.6.1 MONGO_PROFILE=rs MONGO_VER=4
+  - os: linux
+    jdk: oraclejdk9
+    scala: 2.12.6
+    env: CI_CATEGORY=INTEGRATION_TESTS AKKA_VERSION=2.5.13 ITERATEES_VERSION=2.6.1 MONGO_PROFILE=x509 MONGO_VER=4
+  - os: linux
+    jdk: oraclejdk9
+    scala: 2.11.12
+    env: CI_CATEGORY=INTEGRATION_TESTS AKKA_VERSION=2.5.13 ITERATEES_VERSION=2.6.1 MONGO_PROFILE=default MONGO_VER=3
+  - os: linux
+    jdk: oraclejdk9
+    scala: 2.11.12
+    env: CI_CATEGORY=INTEGRATION_TESTS AKKA_VERSION=2.5.13 ITERATEES_VERSION=2.6.1 MONGO_PROFILE=rs MONGO_VER=3
+  - os: linux
+    jdk: oraclejdk9
+    scala: 2.11.12
+    env: CI_CATEGORY=INTEGRATION_TESTS AKKA_VERSION=2.5.13 ITERATEES_VERSION=2.6.1 MONGO_PROFILE=default MONGO_VER=4
+  - os: linux
+    jdk: oraclejdk9
+    scala: 2.11.12
+    env: CI_CATEGORY=INTEGRATION_TESTS AKKA_VERSION=2.5.13 ITERATEES_VERSION=2.6.1 MONGO_PROFILE=invalid-ssl MONGO_VER=4
+  - os: linux
+    jdk: oraclejdk9
+    scala: 2.11.12
+    env: CI_CATEGORY=INTEGRATION_TESTS AKKA_VERSION=2.5.13 ITERATEES_VERSION=2.6.1 MONGO_PROFILE=mutual-ssl MONGO_VER=4
+  - os: linux
+    jdk: oraclejdk9
+    scala: 2.11.12
+    env: CI_CATEGORY=INTEGRATION_TESTS AKKA_VERSION=2.5.13 ITERATEES_VERSION=2.6.1 MONGO_PROFILE=rs MONGO_VER=4
+  - os: linux
+    jdk: oraclejdk9
+    scala: 2.11.12
+    env: CI_CATEGORY=INTEGRATION_TESTS AKKA_VERSION=2.5.13 ITERATEES_VERSION=2.6.1 MONGO_PROFILE=x509 MONGO_VER=4
   exclude:
-    - scala: 2.11.12
-      jdk: oraclejdk8
-      env: CI_CATEGORY=UNIT_TESTS
-    - scala: 2.12.6
-      jdk: oraclejdk7
-      env: CI_CATEGORY=UNIT_TESTS
-    - scala: 2.12.6
-      env: CI_CATEGORY=INTEGRATION_TESTS AKKA_VERSION=2.3.13 ITERATEES_VERSION=2.3.8 MONGO_PROFILE=default MONGO_VER=2_6
-    - jdk: oraclejdk8
-      env: CI_CATEGORY=INTEGRATION_TESTS AKKA_VERSION=2.3.13 ITERATEES_VERSION=2.3.8 MONGO_PROFILE=default MONGO_VER=2_6
-    - scala: 2.12.6
-      env: CI_CATEGORY=INTEGRATION_TESTS AKKA_VERSION=2.3.13 ITERATEES_VERSION=2.3.8 MONGO_PROFILE=default MONGO_VER=3
-    - jdk: oraclejdk7
-      env: CI_CATEGORY=INTEGRATION_TESTS AKKA_VERSION=2.5.13 ITERATEES_VERSION=2.6.1 MONGO_PROFILE=default MONGO_VER=3
-    - jdk: oraclejdk7
-      env: CI_CATEGORY=INTEGRATION_TESTS AKKA_VERSION=2.5.13 ITERATEES_VERSION=2.6.1 MONGO_PROFILE=rs MONGO_VER=3
-    - jdk: oraclejdk7
-      env: CI_CATEGORY=INTEGRATION_TESTS AKKA_VERSION=2.5.13 ITERATEES_VERSION=2.6.1 MONGO_PROFILE=default MONGO_VER=3_6
-    - jdk: oraclejdk7
-      env: CI_CATEGORY=INTEGRATION_TESTS AKKA_VERSION=2.5.13 ITERATEES_VERSION=2.6.1 MONGO_PROFILE=invalid-ssl MONGO_VER=3_6
-    - jdk: oraclejdk7
-      env: CI_CATEGORY=INTEGRATION_TESTS AKKA_VERSION=2.5.13 ITERATEES_VERSION=2.6.1 MONGO_PROFILE=mutual-ssl MONGO_VER=3_6
-    - jdk: oraclejdk7
-      env: CI_CATEGORY=INTEGRATION_TESTS AKKA_VERSION=2.5.13 ITERATEES_VERSION=2.6.1 MONGO_PROFILE=x509 MONGO_VER=3_6
-    - jdk: oraclejdk7
-      env: CI_CATEGORY=INTEGRATION_TESTS AKKA_VERSION=2.5.13 ITERATEES_VERSION=2.6.1 MONGO_PROFILE=rs MONGO_VER=3_6
+  - env: _DISABLED=true
 before_install:
   - ./.ci_scripts/beforeInstall.sh $CI_CATEGORY $MONGO_VER $MONGO_PROFILE /tmp/integration-env.sh
   - if [ "x$CI_CATEGORY" = "xINTEGRATION_TESTS" ]; then (./.ci_scripts/fork-mongod.sh /tmp/integration-env.sh); fi
 script:
   - export SCALA_VERSION="$TRAVIS_SCALA_VERSION"
   - ./.ci_scripts/retry.sh 3 ./.ci_scripts/validate.sh /tmp/integration-env.sh
-after_success: ./.ci_scripts/afterSuccess.sh
+after_success: CI_BRANCH=$TRAVIS_BRANCH ./.ci_scripts/afterSuccess.sh

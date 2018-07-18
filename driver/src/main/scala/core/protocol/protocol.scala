@@ -17,8 +17,8 @@ package reactivemongo.core.protocol
 
 import java.util.{ List => JList }
 
-import shaded.netty.buffer.{ ByteBuf, Unpooled }
-import shaded.netty.channel.{ ChannelHandlerContext, ChannelId }
+import reactivemongo.io.netty.buffer.{ ByteBuf, Unpooled }
+import reactivemongo.io.netty.channel.{ ChannelHandlerContext, ChannelId }
 
 import reactivemongo.api.SerializationPack
 import reactivemongo.api.commands.GetLastError
@@ -96,7 +96,7 @@ case class RequestMaker(
 
 // protocol handlers for netty.
 private[reactivemongo] class RequestEncoder
-  extends shaded.netty.handler.codec.MessageToByteEncoder[Request] {
+  extends reactivemongo.io.netty.handler.codec.MessageToByteEncoder[Request] {
   def encode(
     ctx: ChannelHandlerContext,
     message: Request,
@@ -185,7 +185,7 @@ case class ReplyDocumentIteratorExhaustedException(
   val cause: Exception) extends Exception(cause)
 
 private[reactivemongo] object Debug {
-  val ParentBuf = shaded.netty.util.AttributeKey.
+  val ParentBuf = reactivemongo.io.netty.util.AttributeKey.
     newInstance[Int]("parentBuf")
 }
 
@@ -195,7 +195,7 @@ private[reactivemongo] object Debug {
  * if it contains more than one frame.
  */
 private[reactivemongo] class ResponseFrameDecoder
-  extends shaded.netty.handler.codec.ByteToMessageDecoder {
+  extends reactivemongo.io.netty.handler.codec.ByteToMessageDecoder {
 
   //private val rand = new scala.util.Random(System identityHashCode this)
 
@@ -260,7 +260,7 @@ private[reactivemongo] class ResponseFrameDecoder
 }
 
 private[reactivemongo] class ResponseDecoder
-  extends shaded.netty.handler.codec.MessageToMessageDecoder[ByteBuf] {
+  extends reactivemongo.io.netty.handler.codec.MessageToMessageDecoder[ByteBuf] {
 
   import scala.util.{ Failure, Success, Try }
   import reactivemongo.core.errors.DatabaseException
@@ -277,7 +277,7 @@ private[reactivemongo] class ResponseDecoder
 
     /*
     val attr =
-      context.attr(shaded.netty.util.AttributeKey.
+      context.attr(reactivemongo.io.netty.util.AttributeKey.
         newInstance[Int]("parentBuf")).get
 
     println(s"_decode2${attr}: ${frame.refCnt}")
