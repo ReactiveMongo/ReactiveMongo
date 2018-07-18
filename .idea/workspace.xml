@@ -2,76 +2,7 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="f0084e65-b427-433b-a8e2-2e38bdf3c540" name="Default" comment="">
-      <change afterPath="$PROJECT_DIR$/build.sbt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/project/Bson.scala" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/project/Common.scala" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/project/Dependencies.scala" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/project/Documentation.scala" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/project/Driver.scala" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/project/Jmx.scala" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/project/Shaded.scala" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/project/Travis.scala" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/project/XmlUtil.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.ci_scripts/afterSuccess.sh" beforeDir="false" afterPath="$PROJECT_DIR$/.ci_scripts/afterSuccess.sh" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.ci_scripts/beforeInstall.sh" beforeDir="false" afterPath="$PROJECT_DIR$/.ci_scripts/beforeInstall.sh" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.ci_scripts/runIntegration.sh" beforeDir="false" afterPath="$PROJECT_DIR$/.ci_scripts/runIntegration.sh" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.ci_scripts/setupEnv.sh" beforeDir="false" afterPath="$PROJECT_DIR$/.ci_scripts/setupEnv.sh" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.ci_scripts/unitTests.sh" beforeDir="false" afterPath="$PROJECT_DIR$/.ci_scripts/unitTests.sh" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.travis.yml" beforeDir="false" afterPath="$PROJECT_DIR$/.travis.yml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/circle.yml" beforeDir="false" afterPath="$PROJECT_DIR$/circle.yml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/driver/src/main/scala/api/collections/GenericCollection.scala" beforeDir="false" afterPath="$PROJECT_DIR$/driver/src/main/scala/api/collections/GenericCollection.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/driver/src/main/scala/api/collections/GenericQueryBuilder.scala" beforeDir="false" afterPath="$PROJECT_DIR$/driver/src/main/scala/api/collections/GenericQueryBuilder.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/driver/src/main/scala/api/commands/bson/instanceadministration.scala" beforeDir="false" afterPath="$PROJECT_DIR$/driver/src/main/scala/api/commands/bson/instanceadministration.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/driver/src/main/scala/api/indexes/IndexesManager.scala" beforeDir="false" afterPath="$PROJECT_DIR$/driver/src/main/scala/api/indexes/IndexesManager.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/driver/src/main/scala/core/actors/AwaitingResponse.scala" beforeDir="false" afterPath="$PROJECT_DIR$/driver/src/main/scala/core/actors/AwaitingResponse.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/driver/src/main/scala/core/actors/MongoDBSystem.scala" beforeDir="false" afterPath="$PROJECT_DIR$/driver/src/main/scala/core/actors/MongoDBSystem.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/driver/src/main/scala/core/actors/messages.scala" beforeDir="false" afterPath="$PROJECT_DIR$/driver/src/main/scala/core/actors/messages.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/driver/src/main/scala/core/netty/BufferSequence.scala" beforeDir="false" afterPath="$PROJECT_DIR$/driver/src/main/scala/core/netty/BufferSequence.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/driver/src/main/scala/core/netty/ChannelBufferReadableBuffer.scala" beforeDir="false" afterPath="$PROJECT_DIR$/driver/src/main/scala/core/netty/ChannelBufferReadableBuffer.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/driver/src/main/scala/core/netty/ChannelBufferWritableBuffer.scala" beforeDir="false" afterPath="$PROJECT_DIR$/driver/src/main/scala/core/netty/ChannelBufferWritableBuffer.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/driver/src/main/scala/core/netty/Pack.scala" beforeDir="false" afterPath="$PROJECT_DIR$/driver/src/main/scala/core/netty/Pack.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/driver/src/main/scala/core/nodeset/ChannelFactory.scala" beforeDir="false" afterPath="$PROJECT_DIR$/driver/src/main/scala/core/nodeset/ChannelFactory.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/driver/src/main/scala/core/nodeset/Connection.scala" beforeDir="false" afterPath="$PROJECT_DIR$/driver/src/main/scala/core/nodeset/Connection.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/driver/src/main/scala/core/nodeset/Node.scala" beforeDir="false" afterPath="$PROJECT_DIR$/driver/src/main/scala/core/nodeset/Node.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/driver/src/main/scala/core/nodeset/NodeSet.scala" beforeDir="false" afterPath="$PROJECT_DIR$/driver/src/main/scala/core/nodeset/NodeSet.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/driver/src/main/scala/core/nodeset/PingInfo.scala" beforeDir="false" afterPath="$PROJECT_DIR$/driver/src/main/scala/core/nodeset/PingInfo.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/driver/src/main/scala/core/protocol/BufferAccessors.scala" beforeDir="false" afterPath="$PROJECT_DIR$/driver/src/main/scala/core/protocol/BufferAccessors.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/driver/src/main/scala/core/protocol/MessageHeader.scala" beforeDir="false" afterPath="$PROJECT_DIR$/driver/src/main/scala/core/protocol/MessageHeader.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/driver/src/main/scala/core/protocol/MongoHandler.scala" beforeDir="false" afterPath="$PROJECT_DIR$/driver/src/main/scala/core/protocol/MongoHandler.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/driver/src/main/scala/core/protocol/MongoWireVersion.scala" beforeDir="false" afterPath="$PROJECT_DIR$/driver/src/main/scala/core/protocol/MongoWireVersion.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/driver/src/main/scala/core/protocol/Request.scala" beforeDir="false" afterPath="$PROJECT_DIR$/driver/src/main/scala/core/protocol/Request.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/driver/src/main/scala/core/protocol/Response.scala" beforeDir="false" afterPath="$PROJECT_DIR$/driver/src/main/scala/core/protocol/Response.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/driver/src/main/scala/core/protocol/ResponseInfo.scala" beforeDir="false" afterPath="$PROJECT_DIR$/driver/src/main/scala/core/protocol/ResponseInfo.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/driver/src/main/scala/core/protocol/operations.scala" beforeDir="false" afterPath="$PROJECT_DIR$/driver/src/main/scala/core/protocol/operations.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/driver/src/main/scala/core/protocol/package.scala" beforeDir="false" afterPath="$PROJECT_DIR$/driver/src/main/scala/core/protocol/package.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/driver/src/main/scala/core/protocol/protocol.scala" beforeDir="false" afterPath="$PROJECT_DIR$/driver/src/main/scala/core/protocol/protocol.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/driver/src/test/resources/log4j2.xml" beforeDir="false" afterPath="$PROJECT_DIR$/driver/src/test/resources/log4j2.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/driver/src/test/scala/AggregationSpec.scala" beforeDir="false" afterPath="$PROJECT_DIR$/driver/src/test/scala/AggregationSpec.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/driver/src/test/scala/ApiTesting.scala" beforeDir="false" afterPath="$PROJECT_DIR$/driver/src/test/scala/ApiTesting.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/driver/src/test/scala/BsonSpec.scala" beforeDir="false" afterPath="$PROJECT_DIR$/driver/src/test/scala/BsonSpec.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/driver/src/test/scala/ChannelFactorySpec.scala" beforeDir="false" afterPath="$PROJECT_DIR$/driver/src/test/scala/ChannelFactorySpec.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/driver/src/test/scala/CommandSpec.scala" beforeDir="false" afterPath="$PROJECT_DIR$/driver/src/test/scala/CommandSpec.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/driver/src/test/scala/Common.scala" beforeDir="false" afterPath="$PROJECT_DIR$/driver/src/test/scala/Common.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/driver/src/test/scala/ConnectAllSpec.scala" beforeDir="false" afterPath="$PROJECT_DIR$/driver/src/test/scala/ConnectAllSpec.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/driver/src/test/scala/DriverSpec.scala" beforeDir="false" afterPath="$PROJECT_DIR$/driver/src/test/scala/DriverSpec.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/driver/src/test/scala/IndexesSpec.scala" beforeDir="false" afterPath="$PROJECT_DIR$/driver/src/test/scala/IndexesSpec.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/driver/src/test/scala/MongoURISpec.scala" beforeDir="false" afterPath="$PROJECT_DIR$/driver/src/test/scala/MongoURISpec.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/driver/src/test/scala/MonitorSpec.scala" beforeDir="false" afterPath="$PROJECT_DIR$/driver/src/test/scala/MonitorSpec.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/driver/src/test/scala/NettyEmbedder.scala" beforeDir="false" afterPath="$PROJECT_DIR$/driver/src/test/scala/NettyEmbedder.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/driver/src/test/scala/NettyProxy.scala" beforeDir="false" afterPath="$PROJECT_DIR$/driver/src/test/scala/NettyProxy.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/driver/src/test/scala/ProtocolSpec.scala" beforeDir="false" afterPath="$PROJECT_DIR$/driver/src/test/scala/ProtocolSpec.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/driver/src/test/scala/UnresponsiveSecondarySpec.scala" beforeDir="false" afterPath="$PROJECT_DIR$/driver/src/test/scala/UnresponsiveSecondarySpec.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/jmx/src/main/scala/NodeMBean.java" beforeDir="false" afterPath="$PROJECT_DIR$/jmx/src/main/java/NodeMBean.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/jmx/src/main/scala/NodeSetMBean.java" beforeDir="false" afterPath="$PROJECT_DIR$/jmx/src/main/java/NodeSetMBean.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/jmx/src/test/resources/log4j2.xml" beforeDir="false" afterPath="$PROJECT_DIR$/jmx/src/test/resources/log4j2.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/project/Publish.scala" beforeDir="false" afterPath="$PROJECT_DIR$/project/Publish.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/project/ReactiveMongo.scala" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/project/Release.scala" beforeDir="false" afterPath="$PROJECT_DIR$/project/Release.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/project/build.properties" beforeDir="false" afterPath="$PROJECT_DIR$/project/build.properties" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/project/plugins.sbt" beforeDir="false" afterPath="$PROJECT_DIR$/project/plugins.sbt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tools/docker/docker-compose.yml" beforeDir="false" afterPath="$PROJECT_DIR$/tools/docker/docker-compose.yml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/version.sbt" beforeDir="false" afterPath="$PROJECT_DIR$/version.sbt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/project/Dependencies.scala" beforeDir="false" afterPath="$PROJECT_DIR$/project/Dependencies.scala" afterDir="false" />
     </list>
     <ignored path="$PROJECT_DIR$/target/" />
     <ignored path="$PROJECT_DIR$/project/project/target/" />
@@ -129,8 +60,8 @@
       <file leaf-file-name="Dependencies.scala" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/project/Dependencies.scala">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="303">
-              <caret line="56" selection-start-line="56" selection-end-line="56" />
+            <state relative-caret-position="153">
+              <caret line="46" lean-forward="true" selection-start-line="46" selection-end-line="46" />
             </state>
           </provider>
         </entry>
@@ -419,11 +350,11 @@
         <entry key="$PROJECT_DIR$/../../chatroulette/cr-service-partnerfinder" value="1504728327000" />
         <entry key="$PROJECT_DIR$/../../dubai-example" value="1493041600000" />
         <entry key="$PROJECT_DIR$/../../goodlord/goodlord-akka" value="1485863272000" />
-        <entry key="$PROJECT_DIR$" value="24509491606000" />
+        <entry key="$PROJECT_DIR$" value="24509491653000" />
         <entry key="$PROJECT_DIR$/build.sbt" value="2885559422" />
         <entry key="$PROJECT_DIR$/project/Bson.scala" value="3712754864" />
         <entry key="$PROJECT_DIR$/project/Common.scala" value="2232134860" />
-        <entry key="$PROJECT_DIR$/project/Dependencies.scala" value="2942079587" />
+        <entry key="$PROJECT_DIR$/project/Dependencies.scala" value="3728895834" />
         <entry key="$PROJECT_DIR$/project/Documentation.scala" value="1105665430" />
         <entry key="$PROJECT_DIR$/project/Driver.scala" value="4279716207" />
         <entry key="$PROJECT_DIR$/project/Findbugs.scala" value="3958725734" />
@@ -516,7 +447,6 @@
   </component>
   <component name="ToolWindowManager">
     <frame x="0" y="23" width="1440" height="809" extended-state="0" />
-    <editor active="true" />
     <layout>
       <window_info anchor="bottom" id="TODO" order="6" />
       <window_info anchor="right" id="sbt" order="3" />
@@ -894,8 +824,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/project/Dependencies.scala">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="303">
-          <caret line="56" selection-start-line="56" selection-end-line="56" />
+        <state relative-caret-position="153">
+          <caret line="46" lean-forward="true" selection-start-line="46" selection-end-line="46" />
         </state>
       </provider>
     </entry>
