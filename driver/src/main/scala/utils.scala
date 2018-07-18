@@ -47,8 +47,8 @@ object `package` {
 @deprecated(
   message = "Use [[reactivemongo.util.LazyLogger]]", since = "0.12.0")
 object LazyLogger {
-  def apply(logger: String): LazyLogger = {
-    reactivemongo.util.LazyLogger(org.slf4j.LoggerFactory.getLogger(logger))
+  def apply(logger: String): reactivemongo.util.LazyLogger.LazyLogger = {
+    reactivemongo.util.LazyLogger(logger)
   }
 }
 
