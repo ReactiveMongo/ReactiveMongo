@@ -527,7 +527,9 @@ trait MongoDBSystem extends Actor {
 
             chans += con.channel.id
 
-            trace(s"Registering awaiting response for requestID $reqId, awaitingResponses: $resps")
+            //println(s"_reserve: ${con.channel.id}")
+
+            trace(s"Registering awaiting response for requestID $reqId on channel #${con.channel.id}, awaitingResponses: $resps")
           }
         } else {
           trace(s"NOT registering awaiting response for requestID $reqId")
@@ -565,7 +567,9 @@ trait MongoDBSystem extends Actor {
 
           chans += con.channel.id
 
-          trace(s"Registering awaiting response for requestID $reqId, awaitingResponses: $resps")
+          //println(s"_reserve: ${con.channel.id}")
+
+          trace(s"Registering awaiting response for requestID $reqId on channel #${con.channel.id}, awaitingResponses: $resps")
         }
 
         con.send(request, writeConcern).addListener(new OperationHandler(
@@ -662,16 +666,20 @@ trait MongoDBSystem extends Actor {
           requestTracker.withAwaiting { (resps, chans) =>
             chans -= chanId
 
+            //println(s"_release: $chanId")
+
             val retriedChans = Set.newBuilder[ChannelId]
 
             resps.retain { (_, awaitingResponse) =>
               if (awaitingResponse.channelID == chanId) {
                 retry(awaitingResponse) match {
                   case Some(awaiting) => {
-                    trace(s"Retrying to await response for requestID ${awaiting.requestID}: $awaiting")
+                    trace(s"Retrying to await response for requestID ${awaiting.requestID} on channel #${awaiting.channelID}: $awaiting")
 
                     retried += awaiting.requestID -> awaiting
                     retriedChans += awaiting.channelID
+
+                    //println(s"_reserve: ${awaiting.channelID}")
                   }
 
                   case _ => {
@@ -794,6 +802,8 @@ trait MongoDBSystem extends Actor {
             resps -= response.header.responseTo
             chans -= chanId
 
+            //println(s"_release: $chanId")
+
             response match {
               case cmderr: Response.CommandError =>
                 promise.success(cmderr); ()
@@ -901,8 +911,6 @@ trait MongoDBSystem extends Actor {
       AuthRequestsManager.addAuthRequest(request)
 
       updateNodeSet(authenticate.toString) { ns =>
-        //println(s"_addAuth   [${System identityHashCode this}]: ${ns.authenticates.map(_.user).mkString("[", ", ", "]")}#${System identityHashCode ns} + ${authenticate.user}")
-
         // Authenticate the entire NodeSet
         val authenticates = ns.authenticates + authenticate
 
@@ -1172,13 +1180,7 @@ trait MongoDBSystem extends Actor {
     if (authed.isLeft) { // there is an auth error
       authenticate.future.value match {
         case Some(Success(replyTo)) => { // original requested auth
-          //println(s"_removeAuth[${System identityHashCode this}]: ${updSet.authenticates.map(_.user).mkString("[", ", ", "]")}#${System identityHashCode updSet} - ${replyTo.user}")
-
-          val after = updSet.copy(authenticates = updSet.authenticates - replyTo)
-
-          //println(s"_removeAuth[${System identityHashCode this}]: ${after.authenticates.map(_.user).mkString("[", ", ", "]")}#${System identityHashCode after} <-- after")
-
-          after
+          updSet.copy(authenticates = updSet.authenticates - replyTo)
         }
 
         case r => {
@@ -1403,6 +1405,8 @@ trait MongoDBSystem extends Actor {
           resps.retain { (_, awaitingResponse) =>
             chans -= awaitingResponse.channelID
 
+            //println(s"_release: ${awaitingResponse.channelID}")
+
             if (channelIds contains awaitingResponse.channelID) {
               trace(s"Unregistering the pending request ${awaitingResponse.promise} for ${node.toShortString}'")
 
@@ -1467,8 +1471,6 @@ trait MongoDBSystem extends Actor {
     def addAuthRequest(request: AuthRequest): Map[Authenticate, List[Promise[SuccessfulAuthentication]]] = {
       val found = authRequests.get(request.authenticate)
 
-      //println(s"_addRequest: ${authRequests.map(_._1.user)} + ${request.authenticate.user}")
-
       authRequests = authRequests + (request.authenticate -> (
         request.promise :: found.getOrElse(Nil)))
 
@@ -1481,8 +1483,6 @@ trait MongoDBSystem extends Actor {
 
       authRequests.get(authenticate) match {
         case Some(found) => {
-          //println(s"_removeReq : ${authRequests.map(_._1.user)} - ${authenticate.user}")
-
           authRequests = authRequests - authenticate
 
           found.foreach(f)

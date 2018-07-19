@@ -288,7 +288,7 @@ class CollectionSpec(implicit protected val ee: ExecutionEnv)
     "be managed so that" >> metaSpec
 
     "use bulks" >> {
-      s"to insert (including 3 duplicate errors)" >> {
+      "to insert (including 3 duplicate errors)" >> {
         val nDocs = 1000000
         def colName(n: Int) = s"bulked${System identityHashCode this}_${n}"
 

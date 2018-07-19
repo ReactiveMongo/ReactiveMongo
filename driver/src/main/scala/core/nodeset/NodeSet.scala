@@ -104,7 +104,7 @@ case class NodeSet(
 
   private def pickConnectionAndFlatten(accept: Connection => Boolean): Option[Node] => Option[(Node, Connection)] = {
     val p: RoundRobiner[Connection, Vector] => Option[Connection] =
-      if (authenticates.isEmpty) _.pickWithFilter(accept)
+      if (authenticates.isEmpty) _.pick //WithFilter(accept)
       else _.pickWithFilter(c =>
         !c.authenticating.isDefined && !c.authenticated.isEmpty && accept(c))
 
