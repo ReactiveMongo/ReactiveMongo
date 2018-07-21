@@ -1,3 +1,5 @@
+package tests
+
 import scala.concurrent.{ Await, ExecutionContext }
 import scala.concurrent.duration._
 

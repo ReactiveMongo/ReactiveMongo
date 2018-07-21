@@ -1,3 +1,5 @@
+package tests
+
 import scala.concurrent.{ Await, Future, Promise }
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -132,7 +134,7 @@ object NettyEmbedder extends LowPriorityNettyEmbedder {
     }
 
     try {
-      Await.result(ready.future, Common.timeout)
+      Await.result(ready.future, tests.Common.timeout)
 
       val res = f(chan)
 

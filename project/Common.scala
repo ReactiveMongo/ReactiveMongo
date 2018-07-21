@@ -16,6 +16,8 @@ object Common {
 
   val scalaCompatVer = "2.11.12"
 
+  val closeableObject = SettingKey[String]("class name of a closeable object")
+
   val settings = Defaults.coreDefaultSettings ++ baseSettings ++ Seq(
     scalaVersion := "2.12.6",
     crossScalaVersions := Seq("2.10.7", scalaCompatVer, scalaVersion.value),
@@ -87,7 +89,8 @@ object Common {
     },
     mappings in (Compile, packageBin) ~= filter,
     mappings in (Compile, packageSrc) ~= filter,
-    mappings in (Compile, packageDoc) ~= filter
+    mappings in (Compile, packageDoc) ~= filter,
+    closeableObject in Test := "Common$"
   ) ++ Publish.settings ++ Format.settings ++ (
     Release.settings ++ Publish.mimaSettings)
 
@@ -97,7 +100,8 @@ object Common {
     {cl: ClassLoader =>
       import scala.language.reflectiveCalls
 
-      val c = cl.loadClass("Common$")
+      val objectClass = (closeableObject in Test).value
+      val c = cl.loadClass(objectClass)
       type M = { def close(): Unit }
       val m: M = c.getField("MODULE$").get(null).asInstanceOf[M]
 

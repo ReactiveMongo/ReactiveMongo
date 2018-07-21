@@ -19,6 +19,7 @@ final class FindAndModifySpec(implicit ee: ExecutionEnv)
 
   "FindAndModify" title
 
+  import tests.Common
   import Common._
 
   "Raw findAndModify" should {

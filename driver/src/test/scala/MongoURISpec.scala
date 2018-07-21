@@ -22,6 +22,7 @@ class MongoURISpec(implicit ee: ExecutionEnv)
   "Mongo URI" title
 
   import MongoConnectionOptions.Credential
+  import tests.Common
 
   section("unit")
   "MongoConnection URI parser" should {

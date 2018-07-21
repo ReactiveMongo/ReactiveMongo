@@ -23,6 +23,8 @@ import BSONIsMasterCommand.IsMasterResult
 import org.specs2.specification.AfterAll
 import org.specs2.concurrent.ExecutionEnv
 
+import _root_.tests.{ Common, NettyEmbedder }
+
 class ChannelFactorySpec(implicit ee: ExecutionEnv)
   extends org.specs2.mutable.Specification with AfterAll {
 

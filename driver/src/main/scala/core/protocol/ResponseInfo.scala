@@ -26,6 +26,13 @@ class ResponseInfo(val _channelId: ChannelId)
     case _               => false
   }
 
+  override def equals(that: Any): Boolean = that match {
+    case other: ResponseInfo => other._channelId == this._channelId
+    case _                   => false
+  }
+
+  override def hashCode: Int = _channelId.hashCode
+
   override def toString = s"ResponseInfo(${_channelId})"
 }
 

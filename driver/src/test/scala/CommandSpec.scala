@@ -12,6 +12,7 @@ final class CommandSpec(implicit ee: ExecutionEnv)
 
   "Commands" title
 
+  import tests.Common
   import Common._
 
   "Raw command" should {

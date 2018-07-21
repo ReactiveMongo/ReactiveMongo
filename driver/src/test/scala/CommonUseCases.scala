@@ -9,7 +9,9 @@ import reactivemongo.api.commands.bson.BSONCountCommandImplicits._
 
 import org.specs2.concurrent.ExecutionEnv
 
-class CommonUseCases(implicit ee: ExecutionEnv)
+import _root_.tests.Common
+
+final class CommonUseCases(implicit ee: ExecutionEnv)
   extends org.specs2.mutable.Specification
   with org.specs2.specification.AfterAll {
 
@@ -18,6 +20,7 @@ class CommonUseCases(implicit ee: ExecutionEnv)
   sequential
 
   // ---
+
   import Common.{ timeout, slowTimeout }
 
   lazy val (db, slowDb) = Common.databases(s"reactivemongo-usecases-${System identityHashCode this}", Common.connection, Common.slowConnection)

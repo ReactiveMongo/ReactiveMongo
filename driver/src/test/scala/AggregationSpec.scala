@@ -19,6 +19,7 @@ class AggregationSpec(implicit ee: ExecutionEnv)
 
   // ---
 
+  import tests.Common
   import Common.{ timeout, slowTimeout }
 
   lazy val (db, slowDb) = Common.databases(s"reactivemongo-agg-${System identityHashCode this}", Common.connection, Common.slowConnection)

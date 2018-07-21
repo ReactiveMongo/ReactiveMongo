@@ -9,6 +9,7 @@ import reactivemongo.api.commands.CommandError.{ Code, Message }
 
 // TODO: Separate Spec?
 trait CollectionMetaSpec { collSpec: CollectionSpec =>
+  import _root_.tests.Common
   import Common._
 
   def metaSpec = {

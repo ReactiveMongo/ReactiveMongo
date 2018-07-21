@@ -1514,7 +1514,7 @@ trait MongoDBSystem extends Actor {
 
   // --- Logging ---
 
-  protected final val lnm = s"$supervisor/$name" // log naming
+  protected final lazy val lnm = s"$supervisor/$name" // log naming
 
   @inline protected def _println(msg: => String) = println(s"[$lnm] $msg")
 

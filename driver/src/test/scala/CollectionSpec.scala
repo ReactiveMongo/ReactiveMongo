@@ -6,6 +6,8 @@ import reactivemongo.bson._
 
 import org.specs2.concurrent.ExecutionEnv
 
+import _root_.tests.Common
+
 class CollectionSpec(implicit protected val ee: ExecutionEnv)
   extends org.specs2.mutable.Specification
   with org.specs2.specification.AfterAll
@@ -325,7 +327,7 @@ class CollectionSpec(implicit protected val ee: ExecutionEnv)
 
         s"$nDocs documents with the default connection" in {
           bulkSpec(db(colName(nDocs)), nDocs, nDocs - 3, timeout)
-        }
+        } tag "wip"
 
         s"${nDocs / 1000} with the slow connection" in {
           bulkSpec(

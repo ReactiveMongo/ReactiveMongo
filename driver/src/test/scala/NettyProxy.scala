@@ -1,3 +1,5 @@
+package tests
+
 import java.lang.{ Boolean => JBool }
 
 import java.net.InetSocketAddress

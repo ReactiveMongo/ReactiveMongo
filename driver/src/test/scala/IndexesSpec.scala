@@ -23,6 +23,7 @@ class IndexesSpec(implicit ee: ExecutionEnv)
 
   // ---
 
+  import tests.Common
   import Common.{ timeout, slowTimeout }
 
   lazy val (db, slowDb) = Common.databases(

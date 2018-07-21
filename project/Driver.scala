@@ -505,6 +505,7 @@ object Version {
             x[AbstractClassProblem]("reactivemongo.core.protocol.Response")
           )
         },
+        Common.closeableObject in Test := "tests.Common$",
         testOptions in Test += Tests.Cleanup(Common.cleanup.value),
         mappings in (Compile, packageBin) ~= driverFilter,
         //mappings in (Compile, packageDoc) ~= driverFilter,

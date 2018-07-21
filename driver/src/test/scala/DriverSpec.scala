@@ -34,6 +34,7 @@ class DriverSpec(implicit ee: ExecutionEnv)
 
   sequential
 
+  import tests.Common
   import Common._
 
   val hosts = Seq(primaryHost)
