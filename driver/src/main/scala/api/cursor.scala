@@ -225,12 +225,15 @@ sealed trait CursorOps[T] { cursor: Cursor[T] =>
    */
   private[reactivemongo] def documentIterator(response: Response): Iterator[T]
 
+  @deprecated("Use [[killCursor]]", "0.16.0")
+  def kill(cursorID: Long): Unit
+
   /**
    * Kills the server resources associated with the specified cursor.
    *
-   * @param cursorID the cursor ID
+   * @param id the cursor ID
    */
-  def kill(cursorID: Long): Unit
+  private[reactivemongo] def killCursor(id: Long)(implicit ctx: ExecutionContext): Unit
 
   /** Indicates whether the underlying cursor is taible. */
   def tailable: Boolean
@@ -609,17 +612,21 @@ object DefaultCursor {
       }
     }
 
-    def kill(cursorID: Long): Unit = killCursors(cursorID, "Cursor")
+    def kill(cursorID: Long): Unit = // DEPRECATED
+      killCursor(cursorID)(connection.actorSystem.dispatcher)
 
-    private def killCursors(cursorID: Long, logCat: String): Unit = {
+    def killCursor(id: Long)(implicit ec: ExecutionContext): Unit =
+      killCursors(id, "Cursor")
+
+    private def killCursors(
+      cursorID: Long,
+      logCat: String)(implicit ec: ExecutionContext): Unit = {
       if (cursorID != 0) {
         logger.debug(s"[$logCat] Clean up $cursorID, sending KillCursors")
 
         val killReq = RequestMakerExpectingResponse(
           RequestMaker(KillCursors(Set(cursorID)), readPreference = preference),
           false)
-
-        import ExecutionContext.Implicits.global
 
         connection.sendExpectingResponse(killReq).onComplete {
           case Failure(cause) => logger.warn(

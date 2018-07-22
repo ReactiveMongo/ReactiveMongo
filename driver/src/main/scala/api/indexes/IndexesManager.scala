@@ -208,13 +208,6 @@ sealed trait CollectionIndexesManager {
    *
    * @return The number of indexes that were dropped.
    */
-  def drop(nsIndex: NSIndex): Future[Int]
-
-  /**
-   * Drops the given index on that collection.
-   *
-   * @return The number of indexes that were dropped.
-   */
   def drop(indexName: String): Future[Int]
 
   /**
@@ -238,9 +231,6 @@ private class LegacyCollectionIndexesManager(
 
   def create(index: Index): Future[WriteResult] =
     legacy.create(NSIndex(fqName, index))
-
-  @deprecated("Use [[IndexesManager.drop]]", "0.11.0")
-  def drop(nsIndex: NSIndex): Future[Int] = legacy.drop(nsIndex)
 
   def drop(indexName: String): Future[Int] =
     legacy.drop(collectionName, indexName)
@@ -297,15 +287,6 @@ private class DefaultCollectionIndexesManager(db: DB, collectionName: String)(
       collection,
       CreateIndexes(db.name, List(index)),
       ReadPreference.primary)
-
-  @deprecated("Use [[IndexesManager.drop]]", "0.11.0")
-  def drop(nsIndex: NSIndex): Future[Int] = {
-    import reactivemongo.api.commands.bson.BSONDropIndexesImplicits._
-    runner(
-      db(nsIndex.collectionName),
-      DropIndexes(nsIndex.index.eventualName),
-      ReadPreference.primary).map(_.value)
-  }
 
   def drop(indexName: String): Future[Int] = {
     import reactivemongo.api.commands.bson.BSONDropIndexesImplicits._

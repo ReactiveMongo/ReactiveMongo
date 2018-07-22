@@ -33,7 +33,6 @@ import reactivemongo.api.commands.{
 }
 
 import reactivemongo.core.protocol.MongoWireVersion
-import reactivemongo.core.netty.ChannelBufferWritableBuffer
 import reactivemongo.core.errors.ConnectionNotInitialized
 
 trait GenericCollectionProducer[P <: SerializationPack with Singleton, +C <: GenericCollection[P]] extends CollectionProducer[C]
@@ -295,7 +294,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
     prepareUpdate(ordered, writeConcern)
 
   /**
-   * Returns an update modifier, to be used with [[findAndModify]].
+   * Returns an update modifier, to be used with `findAndModify`.
    *
    * @param update $updateParam
    * @param fetchNewObject the command result must be the new object instead of the old one.
@@ -303,7 +302,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    */
   def updateModifier[U](update: U, fetchNewObject: Boolean = false, upsert: Boolean = false)(implicit updateWriter: pack.Writer[U]): BatchCommands.FindAndModifyCommand.Update = BatchCommands.FindAndModifyCommand.Update(update, fetchNewObject, upsert)
 
-  /** Returns a removal modifier, to be used with [[findAndModify]]. */
+  /** Returns a removal modifier, to be used with `findAndModify`. */
   @transient lazy val removeModifier =
     BatchCommands.FindAndModifyCommand.Remove
 
@@ -388,7 +387,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
   }
 
   /**
-   * Finds some matching document, and updates it (using [[findAndModify]]).
+   * Finds some matching document, and updates it (using `findAndModify`).
    *
    * {{{
    * val person: Future[BSONDocument] = collection.findAndUpdate(
@@ -411,11 +410,18 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    */
   def findAndUpdate[S, T](selector: S, update: T, fetchNewObject: Boolean = false, upsert: Boolean = false, sort: Option[pack.Document] = None, fields: Option[pack.Document] = None)(implicit swriter: pack.Writer[S], writer: pack.Writer[T], ec: ExecutionContext): Future[BatchCommands.FindAndModifyCommand.FindAndModifyResult] = {
     val updateOp = updateModifier(update, fetchNewObject, upsert)
-    findAndModify(selector, updateOp, sort, fields)
+
+    findAndModify(selector, updateOp, sort, fields,
+      bypassDocumentValidation = false,
+      writeConcern = defaultWriteConcern,
+      maxTime = Option.empty[FiniteDuration],
+      collation = Option.empty[Collation],
+      arrayFilters = Seq.empty[pack.Document])
+
   }
 
   /**
-   * Finds some matching document, and removes it (using [[findAndModify]]).
+   * Finds some matching document, and removes it (using `findAndModify`).
    *
    * {{{
    * val removed: Future[Person] = collection.findAndRemove(
@@ -430,7 +436,12 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    * @param fields $fieldsParam
    * @param swriter $swriterParam
    */
-  def findAndRemove[S](selector: S, sort: Option[pack.Document] = None, fields: Option[pack.Document] = None)(implicit swriter: pack.Writer[S], ec: ExecutionContext): Future[BatchCommands.FindAndModifyCommand.FindAndModifyResult] = findAndModify[S](selector, removeModifier, sort, fields)
+  def findAndRemove[S](selector: S, sort: Option[pack.Document] = None, fields: Option[pack.Document] = None)(implicit swriter: pack.Writer[S], ec: ExecutionContext): Future[BatchCommands.FindAndModifyCommand.FindAndModifyResult] = findAndModify[S](selector, removeModifier, sort, fields,
+    bypassDocumentValidation = false,
+    writeConcern = defaultWriteConcern,
+    maxTime = Option.empty[FiniteDuration],
+    collation = Option.empty[Collation],
+    arrayFilters = Seq.empty[pack.Document])
 
   /**
    * $aggregation.
@@ -447,12 +458,41 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    * @param reader $readerParam
    * @param cf $cursorFlattenerParam
    */
-  def aggregateWith1[T](explain: Boolean = false, allowDiskUse: Boolean = false, bypassDocumentValidation: Boolean = false, readConcern: Option[ReadConcern] = None, readPreference: ReadPreference = ReadPreference.primary, batchSize: Option[Int] = None)(f: AggregationFramework => (PipelineOperator, List[PipelineOperator]))(implicit ec: ExecutionContext, reader: pack.Reader[T], cf: CursorFlattener[Cursor], cp: CursorProducer[T]): cp.ProducedCursor = {
+  @deprecated("Use [[aggregateWith]]", "0.16.0")
+  def aggregateWith1[T](explain: Boolean = false, allowDiskUse: Boolean = false, bypassDocumentValidation: Boolean = false, readConcern: Option[ReadConcern] = None, readPreference: ReadPreference = ReadPreference.primary, batchSize: Option[Int] = None)(f: AggregationFramework => (PipelineOperator, List[PipelineOperator]))(implicit ec: ExecutionContext, reader: pack.Reader[T], cf: CursorFlattener[Cursor], cp: CursorProducer[T]): cp.ProducedCursor = aggregateWith[T](explain, allowDiskUse, bypassDocumentValidation, readConcern, readPreference, batchSize)(f)
+
+  /**
+   * $aggregation.
+   *
+   * @tparam T $resultTParam
+   *
+   * @param explain $explainParam of the pipeline
+   * @param allowDiskUse $allowDiskUseParam
+   * @param bypassDocumentValidation $bypassParam
+   * @param readConcern $readConcernParam
+   * @param readPreference $readPrefParam (default: primary)
+   * @param batchSize $aggBatchSizeParam
+   * @param f $aggregationPipelineFunction
+   * @param reader $readerParam
+   */
+  def aggregateWith[T](
+    explain: Boolean = false,
+    allowDiskUse: Boolean = false,
+    bypassDocumentValidation: Boolean = false,
+    readConcern: Option[ReadConcern] = None,
+    readPreference: ReadPreference = ReadPreference.primary,
+    batchSize: Option[Int] = None)(
+    f: AggregationFramework => (PipelineOperator, List[PipelineOperator]))(
+    implicit
+    reader: pack.Reader[T],
+    cp: CursorProducer[T]): cp.ProducedCursor = {
+
     val (firstOp, otherOps) = f(BatchCommands.AggregationFramework)
 
     val aggregateCursor: Cursor[T] = aggregatorContext[T](
       firstOp, otherOps, explain, allowDiskUse,
-      bypassDocumentValidation, readConcern, readPreference, batchSize).prepared[Cursor](CursorProducer.defaultCursorProducer[T]).cursor
+      bypassDocumentValidation, readConcern, readPreference, batchSize).
+      prepared[Cursor](CursorProducer.defaultCursorProducer[T]).cursor
 
     cp.produce(aggregateCursor)
   }
@@ -520,14 +560,6 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
 
     case _ =>
       Future.failed(MissingMetadata())
-  }
-
-  private def writeDoc[T](
-    doc: T,
-    writer: pack.Writer[T],
-    buffer: ChannelBufferWritableBuffer = ChannelBufferWritableBuffer()) = {
-    pack.serializeAndWrite(buffer, doc, writer)
-    buffer
   }
 
   /**

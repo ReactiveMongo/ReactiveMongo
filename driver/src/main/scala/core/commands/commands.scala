@@ -98,22 +98,6 @@ trait BSONCommandResultMaker[Result] extends CommandResultMaker[Result] {
   def apply(document: BSONDocument): Either[CommandError, Result]
 }
 
-/**
- * A command that targets the ''admin'' database only (administrative commands).
- */
-trait AdminCommand[Result] extends Command[Result] {
-  /**
-   * As and admin command targets only the ''admin'' database, @param db will be ignored.
-   * @inheritdoc
-   */
-  override def apply(db: String): MakableCommand = apply()
-
-  /**
-   * Produces a [[reactivemongo.core.commands.MakableCommand]] instance of this command.
-   */
-  def apply(): MakableCommand = new MakableCommand("admin", this)
-}
-
 /** A generic command error. */
 trait CommandError extends ReactiveMongoException {
   /** error code */
@@ -204,9 +188,4 @@ class MakableCommand(val db: String, val command: Command[_]) {
       query.copy(flags = flags),
       BufferSequence.single(command.makeDocuments), readPreference)
   }
-}
-
-/** A modify operation, part of a FindAndModify command */
-sealed trait Modify {
-  protected[commands] def toDocument: BSONDocument
 }
