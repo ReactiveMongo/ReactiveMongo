@@ -33,8 +33,7 @@ import reactivemongo.api._
  * @define resultTParam the results type
  * @define requireOneFunction Sends this query and gets a future `T` (alias for [[reactivemongo.api.Cursor.head]])
  */
-trait GenericQueryBuilder[P <: SerializationPack]
-  extends QueryOps with QueryCodecs[P] {
+trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
   // TODO: Unit test?
 
   val pack: P
@@ -95,6 +94,8 @@ trait GenericQueryBuilder[P <: SerializationPack]
 
     // Primary and SecondaryPreferred are encoded as the slaveOk flag;
     // the others are encoded as $readPreference field.
+
+    val writeReadPref = QueryCodecs.writeReadPref[pack.type](builder)
 
     val merged = if (version.compareTo(MongoWireVersion.V32) < 0) {
       val elements = Seq.newBuilder[pack.ElementProducer]
@@ -394,43 +395,42 @@ trait GenericQueryBuilder[P <: SerializationPack]
   private lazy val logger = reactivemongo.util.LazyLogger(getClass.getName)
 }
 
-private[reactivemongo] trait QueryCodecs[P <: SerializationPack] {
-  val pack: P
+private[reactivemongo] object QueryCodecs {
+  @inline def writeReadPref[P <: SerializationPack with Singleton](pack: P): ReadPreference => pack.Document = writeReadPref[pack.type](pack.newBuilder)
 
-  private[api] def writeReadPref(readPreference: ReadPreference): pack.Document = {
-    val builder = pack.newBuilder
+  def writeReadPref[P <: SerializationPack with Singleton](builder: SerializationPack.Builder[P]): ReadPreference => builder.pack.Document =
+    { readPreference: ReadPreference =>
+      import builder.{ elementProducer => element, document, string }
 
-    import builder.{ elementProducer => element, document, string }
+      val mode = readPreference match {
+        case ReadPreference.Primary               => "primary"
+        case ReadPreference.PrimaryPreferred(_)   => "primaryPreferred"
+        case ReadPreference.Secondary(_)          => "secondary"
+        case ReadPreference.SecondaryPreferred(_) => "secondaryPreferred"
+        case ReadPreference.Nearest(_)            => "nearest"
+      }
+      val elements = Seq.newBuilder[builder.pack.ElementProducer]
 
-    val mode = readPreference match {
-      case ReadPreference.Primary               => "primary"
-      case ReadPreference.PrimaryPreferred(_)   => "primaryPreferred"
-      case ReadPreference.Secondary(_)          => "secondary"
-      case ReadPreference.SecondaryPreferred(_) => "secondaryPreferred"
-      case ReadPreference.Nearest(_)            => "nearest"
-    }
-    val elements = Seq.newBuilder[pack.ElementProducer]
+      elements += element("mode", string(mode))
 
-    elements += element("mode", string(mode))
+      readPreference match {
+        case ReadPreference.Taggable(first :: tagSet) if tagSet.nonEmpty => {
+          val head = document(first.toSeq.map {
+            case (k, v) => element(k, string(v))
+          })
 
-    readPreference match {
-      case ReadPreference.Taggable(first :: tagSet) if tagSet.nonEmpty => {
-        val head = document(first.toSeq.map {
-          case (k, v) => element(k, string(v))
-        })
+          elements += element("tags", builder.array(
+            head,
+            tagSet.toSeq.map { tags =>
+              document(tags.toSeq.map {
+                case (k, v) => element(k, string(v))
+              })
+            }))
+        }
 
-        elements += element("tags", builder.array(
-          head,
-          tagSet.toSeq.map { tags =>
-            document(tags.toSeq.map {
-              case (k, v) => element(k, string(v))
-            })
-          }))
+        case _ => ()
       }
 
-      case _ => ()
+      document(elements.result())
     }
-
-    document(elements.result())
-  }
 }

@@ -1,5 +1,7 @@
 package reactivemongo.api
 
+import java.util.UUID
+
 import scala.util.Try
 
 import reactivemongo.bson.buffer.{ ReadableBuffer, WritableBuffer }
@@ -64,7 +66,7 @@ object BSONSerializationPack extends SerializationPack { self =>
   /** A builder for serialization simple values (useful for the commands) */
   private object Builder
     extends SerializationPack.Builder[BSONSerializationPack.type] {
-    protected val pack = self
+    protected[reactivemongo] val pack = self
 
     def document(elements: Seq[ElementProducer]): Document =
       BSONDocument(elements: _*)
@@ -84,6 +86,15 @@ object BSONSerializationPack extends SerializationPack { self =>
     def double(d: Double): Value = BSONDouble(d)
 
     def string(s: String): Value = BSONString(s)
+
+    def uuid(id: UUID): Value = { // TODO: Adds handler in BSON
+      val buf = java.nio.ByteBuffer.wrap(Array.ofDim[Byte](16))
+
+      buf putLong id.getMostSignificantBits
+      buf putLong id.getLeastSignificantBits
+
+      BSONBinary(buf.array, Subtype.UuidSubtype)
+    }
   }
 
   private object Decoder
@@ -115,5 +126,11 @@ object BSONSerializationPack extends SerializationPack { self =>
 
     def string(document: BSONDocument, name: String): Option[String] =
       document.getAs[String](name)
+
+    def uuid(document: BSONDocument, name: String): Option[UUID] =
+      document.getAs[BSONBinary](name).collect {
+        case bin @ BSONBinary(_, Subtype.UuidSubtype) =>
+          UUID.nameUUIDFromBytes(bin.byteArray)
+      }
   }
 }

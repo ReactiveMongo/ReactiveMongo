@@ -1,5 +1,7 @@
 package reactivemongo.api
 
+import java.util.UUID
+
 import scala.concurrent.{ ExecutionContext, Future, Promise }
 import scala.concurrent.duration.{ FiniteDuration, SECONDS }
 
@@ -37,7 +39,7 @@ import reactivemongo.bson.BSONDocument
 
 import reactivemongo.api.collections.QueryCodecs
 
-package object tests extends QueryCodecs[BSONSerializationPack.type] {
+package object tests {
   val pack = BSONSerializationPack
 
   def numConnections(d: MongoDriver): Int = d.numConnections
@@ -121,7 +123,11 @@ package object tests extends QueryCodecs[BSONSerializationPack.type] {
     FoldResponses[T](
       z, makeRequest, next, killCursors, suc, err, maxDocs)(sys, ec)
 
-  def bsonReadPref(pref: ReadPreference): BSONDocument = writeReadPref(pref)
+  val bsonReadPref: ReadPreference => BSONDocument = {
+    val writeReadPref = QueryCodecs.writeReadPref(BSONSerializationPack)
+
+    writeReadPref(_: ReadPreference)
+  }
 
   @inline def RefreshAll = actors.RefreshAll
 
@@ -242,4 +248,6 @@ package object tests extends QueryCodecs[BSONSerializationPack.type] {
     MongoConnection.parseURI(uri, srvResolver, txtResolver)
 
   @inline def probe(con: MongoConnection, timeout: FiniteDuration) = con.probe(timeout)
+
+  def sessionId(db: DB): Option[UUID] = db.sessionId
 }

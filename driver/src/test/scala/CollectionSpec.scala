@@ -287,6 +287,35 @@ class CollectionSpec(implicit protected val ee: ExecutionEnv)
       }
     }
 
+    "manage session" >> {
+      import java.util.UUID
+
+      section("gt_mongo32")
+
+      "start & end" in {
+        (for {
+          coll <- collection.startSession()
+          _ <- coll.startSession() // no-op
+          id <- coll.endSession()
+        } yield id) aka "session ID" must beSome[UUID].awaitFor(timeout)
+      }
+
+      "not end without start" in {
+        collection.endSession() must beNone.await
+      }
+
+      "not kill without start" in {
+        collection.endSession() must beNone.await
+      }
+
+      "start & kill" in {
+        collection.startSession().flatMap(_.killSession()).
+          aka("session ID") must beSome[UUID].awaitFor(timeout)
+      }
+
+      section("gt_mongo32")
+    }
+
     "be managed so that" >> metaSpec
 
     "use bulks" >> {

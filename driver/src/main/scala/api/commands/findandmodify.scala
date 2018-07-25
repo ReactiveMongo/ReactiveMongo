@@ -106,14 +106,14 @@ trait FindAndModifyCommand[P <: SerializationPack] extends ImplicitCommandHelper
     import cmd.command
 
     val elements = Seq.newBuilder[pack.ElementProducer]
+    val writeWriteConcern = CommandCodecs.writeWriteConcern[pack.type](builder)
 
     elements ++= Seq(
       element("findAndModify", string(cmd.collection)),
       element("query", command.query),
       element("bypassDocumentValidation", boolean(
         command.bypassDocumentValidation)),
-      element("writeConcern", GetLastError.
-        serializeWith(pack, command.writeConcern)(builder)))
+      element("writeConcern", writeWriteConcern(command.writeConcern)))
 
     command.fields.foreach { f =>
       elements += element("fields", f)

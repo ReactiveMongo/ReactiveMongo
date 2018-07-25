@@ -157,8 +157,6 @@ class MongoConnection(
     expectingResponse.future
   }
 
-  //private[api] def sendExpectingResponse(requestMaker: RequestMaker, isMongo26WriteOp: Boolean): Future[Response] = sendExpectingResponse(RequestMakerExpectingResponse(requestMaker, isMongo26WriteOp))
-
   private[api] def sendExpectingResponse(
     expectingResponse: RequestMakerExpectingResponse): Future[Response] =
     whenActive {

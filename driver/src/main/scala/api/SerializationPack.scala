@@ -1,5 +1,7 @@
 package reactivemongo.api
 
+import java.util.UUID
+
 import scala.language.higherKinds
 
 import scala.util.Try
@@ -65,7 +67,7 @@ trait SerializationPack { self: Singleton =>
 object SerializationPack {
   /** A builder for serialization simple values (useful for the commands) */
   private[reactivemongo] trait Builder[P <: SerializationPack with Singleton] {
-    protected val pack: P
+    protected[reactivemongo] val pack: P
 
     /** Returns a new document from a sequence of element producers. */
     def document(elements: Seq[pack.ElementProducer]): pack.Document
@@ -95,6 +97,9 @@ object SerializationPack {
 
     /** Returns an string as a serialized value. */
     def string(s: String): pack.Value
+
+    /** Returns an UUID as a serialized value. */
+    def uuid(id: UUID): pack.Value
   }
 
   /**
@@ -130,18 +135,23 @@ object SerializationPack {
     def double(document: pack.Document, name: String): Option[Double]
 
     /**
-     * @returnsNamedElement, if the element is an integer field.
+     * @returnsNamedElement, if the element is a integer field.
      */
     def int(document: pack.Document, name: String): Option[Int]
 
     /**
-     * @returnsNamedElement, if the element is an long field.
+     * @returnsNamedElement, if the element is a long field.
      */
     def long(document: pack.Document, name: String): Option[Long]
 
     /**
-     * @returnsNamedElement, if the element is an string field.
+     * @returnsNamedElement, if the element is a string field.
      */
     def string(document: pack.Document, name: String): Option[String]
+
+    /**
+     * @returnsNamedElement, if the element is a binary/uuid field.
+     */
+    def uuid(document: pack.Document, name: String): Option[UUID]
   }
 }

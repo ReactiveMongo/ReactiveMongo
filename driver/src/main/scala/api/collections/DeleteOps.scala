@@ -15,7 +15,6 @@ import reactivemongo.api.commands.{
   Collation,
   CommandCodecs,
   LastError,
-  GetLastError,
   MultiBulkWriteResult,
   ResolvedCollectionCommand,
   WriteConcern,
@@ -207,11 +206,12 @@ trait DeleteOps[P <: SerializationPack with Singleton]
 
     val elements = Seq.newBuilder[pack.ElementProducer]
 
+    val writeWriteConcern = CommandCodecs.writeWriteConcern(builder)
+
     elements ++= Seq(
       element("delete", builder.string(delete.collection)),
       element("ordered", builder.boolean(delete.command.ordered)),
-      element("writeConcern", GetLastError.serializeWith(
-        pack, delete.command.writeConcern)(builder)))
+      element("writeConcern", writeWriteConcern(delete.command.writeConcern)))
 
     delete.command.deletes.headOption.foreach { first =>
       elements += element("deletes", builder.array(

@@ -93,9 +93,11 @@ private[collections] trait Aggregator[P <: SerializationPack with Singleton]
 
   private def commandWriter[T]: pack.Writer[AggregateCmd[T]] = {
     val builder = pack.newBuilder
-    import builder.{ boolean, document, elementProducer => element }
+    val writeReadConcern = CommandCodecs.writeReadConcern(builder)
 
     pack.writer[AggregateCmd[T]] { agg =>
+      import builder.{ boolean, document, elementProducer => element }
+
       val pipeline = builder.array(
         agg.command.operator.makePipe,
         agg.command.pipeline.map(_.makePipe))
@@ -118,7 +120,7 @@ private[collections] trait Aggregator[P <: SerializationPack with Singleton]
           agg.command.readConcern match {
             case Some(concern) => base ++ Seq(
               byp,
-              element("readConcern", collection.writeReadConcern(concern)))
+              element("readConcern", writeReadConcern(concern)))
 
             case _ => base :+ byp
           }

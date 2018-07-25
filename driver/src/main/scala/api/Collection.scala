@@ -15,6 +15,10 @@
  */
 package reactivemongo.api
 
+import java.util.UUID
+
+import scala.concurrent.{ ExecutionContext, Future }
+
 /**
  * A MongoDB Collection, resolved from a [[reactivemongo.api.DefaultDB]].
  *
@@ -26,6 +30,8 @@ package reactivemongo.api
  * @define otherName the name of another collection
  */
 trait Collection {
+  import collections.bson.BSONCollectionProducer
+
   /** The database which this collection belong to. */
   def db: DB
 
@@ -45,7 +51,7 @@ trait Collection {
    * @param failoverStrategy $failoverStrategy
    */
   @deprecated("Resolve the collection from DB", "0.13.0")
-  def as[C <: Collection](failoverStrategy: FailoverStrategy = failoverStrategy)(implicit producer: CollectionProducer[C] = collections.bson.BSONCollectionProducer): C = producer.apply(db, name, failoverStrategy)
+  def as[C <: Collection](failoverStrategy: FailoverStrategy = failoverStrategy)(implicit producer: CollectionProducer[C] = BSONCollectionProducer): C = producer.apply(db, name, failoverStrategy)
 
   /**
    * Gets another collection in the current database.
@@ -54,7 +60,27 @@ trait Collection {
    * @param name $otherName
    * @param failoverStrategy $failoverStrategy
    */
-  def sibling[C <: Collection](name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit producer: CollectionProducer[C] = collections.bson.BSONCollectionProducer): C = producer.apply(db, name, failoverStrategy)
+  def sibling[C <: Collection](name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit producer: CollectionProducer[C] = BSONCollectionProducer): C = producer.apply(db, name, failoverStrategy)
+
+  /**
+   * See [[reactivemongo.api.DB.startSession]]
+   */
+  final def startSession[C <: Collection]()(
+    implicit
+    ec: ExecutionContext,
+    producer: CollectionProducer[C] = BSONCollectionProducer): Future[C] =
+    db.startSession().map { producer.apply(_, name, failoverStrategy) }
+
+  /**
+   * See [[reactivemongo.api.DB.endSession]]
+   */
+  @inline def endSession()(implicit ec: ExecutionContext): Future[Option[UUID]] = db.endSession()
+
+  /**
+   * See [[reactivemongo.api.DB.killSession]]
+   */
+  @inline def killSession()(implicit ec: ExecutionContext): Future[Option[UUID]] = db.killSession()
+
 }
 
 /**

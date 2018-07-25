@@ -64,6 +64,35 @@ class DatabaseSpec(implicit ee: ExecutionEnv)
     }
     section("mongo2", "mongo24", "not_mongo26")
 
+    "manage session" >> {
+      import java.util.UUID
+
+      section("gt_mongo32")
+
+      "start & end" in {
+        (for {
+          db <- Common.db.startSession()
+          _ <- db.startSession() // no-op
+          id <- db.endSession()
+        } yield id) aka "session ID" must beSome[UUID].awaitFor(timeout)
+      }
+
+      "not end without start" in {
+        Common.db.endSession() must beNone.await
+      }
+
+      "not kill without start" in {
+        Common.db.endSession() must beNone.await
+      }
+
+      "start & kill" in {
+        Common.db.startSession().flatMap(_.killSession()).
+          aka("session ID") must beSome[UUID].awaitFor(timeout)
+      }
+
+      section("gt_mongo32")
+    }
+
     "admin" >> {
       "rename successfully collection if target doesn't exist" in {
         (for {

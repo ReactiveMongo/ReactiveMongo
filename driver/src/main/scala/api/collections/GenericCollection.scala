@@ -25,7 +25,9 @@ import scala.concurrent.duration.FiniteDuration
 
 import reactivemongo.api._
 import reactivemongo.api.commands.{
+  CommandCodecs,
   Collation,
+  UnitBox,
   UpdateWriteResult,
   ResolvedCollectionCommand,
   WriteConcern,
@@ -100,6 +102,9 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
   implicit def PackIdentityReader: pack.Reader[pack.Document] = pack.IdentityReader
 
   implicit def PackIdentityWriter: pack.Writer[pack.Document] = pack.IdentityWriter
+
+  implicit protected lazy val unitBoxReader: pack.Reader[UnitBox.type] =
+    CommandCodecs.unitBoxReader[pack.type](pack)
 
   def failoverStrategy: FailoverStrategy
   def genericQueryBuilder: GenericQueryBuilder[pack.type]

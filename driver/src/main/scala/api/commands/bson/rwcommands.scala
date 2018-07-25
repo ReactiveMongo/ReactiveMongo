@@ -55,6 +55,7 @@ object BSONCommonWriteCommandsImplicits {
     }
   }
 
+  @deprecated("Internally use CommandCodecs", "0.16.0")
   implicit object WriteConcernWriter extends BSONDocumentWriter[WriteConcern] {
     def write(wc: WriteConcern): BSONDocument = BSONDocument(
       "w" -> wc.w,

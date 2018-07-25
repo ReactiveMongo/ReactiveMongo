@@ -17,6 +17,8 @@ import reactivemongo.api.collections.bson.{
 
 /** A mixin that provides commands about this database itself. */
 trait DBMetaCommands { self: DB =>
+  // TODO: endSessions, killAllSessions, killAllSessionsByPattern, killSessions, refreshSessions
+
   import reactivemongo.core.protocol.MongoWireVersion
   import reactivemongo.api.commands.{
     Command,
