@@ -249,5 +249,5 @@ package object tests {
 
   @inline def probe(con: MongoConnection, timeout: FiniteDuration) = con.probe(timeout)
 
-  def sessionId(db: DB): Option[UUID] = db.sessionId
+  def sessionId(db: DB): Option[UUID] = db.session.map(_.lsid)
 }

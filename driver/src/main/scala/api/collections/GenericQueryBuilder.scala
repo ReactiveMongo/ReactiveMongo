@@ -80,10 +80,8 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
    */
 
   /** The default [[ReadPreference]] */
-  val readPreference: ReadPreference = collection match {
-    case coll: GenericCollection[_] => coll.readPreference
-    case _                          => ReadPreference.primary
-  }
+  @deprecated("Will be private/internal", "0.16.0")
+  @inline def readPreference: ReadPreference = ReadPreference.primary
 
   protected lazy val version = collection.db.connection.metadata.
     fold[MongoWireVersion](MongoWireVersion.V30)(_.maxWireVersion)
@@ -210,12 +208,14 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
         elements += element("maxTimeMS", long(l))
       }
 
-      /*
       if (version.compareTo(MongoWireVersion.V36) >= 0) {
-        collection.db.sessionId.foreach { lsid =>
+        collection.db.session.foreach { session =>
+          elements += element("lsid", document(
+            Seq(element("id", builder.uuid(session.lsid)))))
+
+          elements += element("txnNumber", long(session.nextTxnNumber()))
         }
       }
-       */
 
       val readPref = element(f"$$readPreference", writeReadPref(readPreference))
 
@@ -410,39 +410,4 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
   }
 
   private lazy val logger = reactivemongo.util.LazyLogger(getClass.getName)
-}
-
-private[api] trait GenericCollectionWithQueryBuilder[P <: SerializationPack with Singleton] { parent: GenericCollection[P] =>
-
-  protected final class CollectionQueryBuilder(
-    val failover: FailoverStrategy,
-    val queryOption: Option[pack.Document] = None,
-    val sortOption: Option[pack.Document] = None,
-    val projectionOption: Option[pack.Document] = None,
-    val hintOption: Option[pack.Document] = None,
-    val explainFlag: Boolean = false,
-    val snapshotFlag: Boolean = false,
-    val commentString: Option[String] = None,
-    val options: QueryOpts = QueryOpts(),
-    val maxTimeMsOption: Option[Long] = None) extends GenericQueryBuilder[pack.type] {
-    type Self = CollectionQueryBuilder
-    val pack: parent.pack.type = parent.pack
-    override val collection = parent
-
-    def copy(
-      queryOption: Option[pack.Document] = queryOption,
-      sortOption: Option[pack.Document] = sortOption,
-      projectionOption: Option[pack.Document] = projectionOption,
-      hintOption: Option[pack.Document] = hintOption,
-      explainFlag: Boolean = explainFlag,
-      snapshotFlag: Boolean = snapshotFlag,
-      commentString: Option[String] = commentString,
-      options: QueryOpts = options,
-      failover: FailoverStrategy = failover,
-      maxTimeMsOption: Option[Long] = maxTimeMsOption): CollectionQueryBuilder =
-      new CollectionQueryBuilder(failover, queryOption, sortOption,
-        projectionOption, hintOption, explainFlag, snapshotFlag, commentString,
-        options, maxTimeMsOption)
-
-  }
 }

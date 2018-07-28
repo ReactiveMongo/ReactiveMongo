@@ -116,7 +116,7 @@ trait GenericCollection[P <: SerializationPack with Singleton]
     CommandCodecs.unitBoxReader[pack.type](pack)
 
   /** Builder used to prepare queries */
-  protected def genericQueryBuilder: GenericQueryBuilder[pack.type] =
+  protected lazy val genericQueryBuilder: GenericQueryBuilder[pack.type] =
     new CollectionQueryBuilder(failoverStrategy)
 
   /**
