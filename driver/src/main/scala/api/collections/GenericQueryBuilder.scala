@@ -210,6 +210,13 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
         elements += element("maxTimeMS", long(l))
       }
 
+      /*
+      if (version.compareTo(MongoWireVersion.V36) >= 0) {
+        collection.db.sessionId.foreach { lsid =>
+        }
+      }
+       */
+
       val readPref = element(f"$$readPreference", writeReadPref(readPreference))
 
       if (!explainFlag) {

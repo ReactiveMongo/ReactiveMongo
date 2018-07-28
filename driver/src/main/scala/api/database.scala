@@ -56,7 +56,7 @@ sealed trait DB {
   /** A failover strategy for sending requests. */
   def failoverStrategy: FailoverStrategy
 
-  private[api] def sessionId: Option[UUID]
+  private[api] def session: Option[Session]
 
   /**
    * $resolveDescription (alias for the `collection` method).
@@ -86,11 +86,14 @@ sealed trait DB {
   def sibling(name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit ec: ExecutionContext): Future[DefaultDB] = connection.database(name, failoverStrategy)
 
   /**
-   * Starts a [[https://docs.mongodb.com/manual/reference/command/startSession/ new session]], do nothing if a session has already being started.
+   * Starts a [[https://docs.mongodb.com/manual/reference/command/startSession/ new session]], do nothing if a session has already being started (since MongoDB 3.6)
    */
   def startSession()(implicit ec: ExecutionContext): Future[DBType]
 
-  private[api] def withSession(session: StartSessionResult): DBType
+  /**
+   * @param session the result of the startSession command
+   */
+  private[api] def withNewSession(result: StartSessionResult): DBType
 
   /**
    * Ends the session associated with this database reference.
@@ -127,7 +130,7 @@ class DefaultDB(
   val name: String,
   @transient val connection: MongoConnection,
   @transient val failoverStrategy: FailoverStrategy = FailoverStrategy(),
-  @transient session: Option[StartSessionResult] = Option.empty)
+  @transient val session: Option[Session] = Option.empty)
   extends DB with DBMetaCommands with GenericDB[BSONSerializationPack.type]
   with Product with Serializable {
 
@@ -142,8 +145,6 @@ class DefaultDB(
 
   @transient val pack: BSONSerializationPack.type = BSONSerializationPack
 
-  private[api] lazy val sessionId: Option[UUID] = session.map(_.id)
-
   def startSession()(implicit ec: ExecutionContext): Future[DefaultDB] =
     session match {
       case Some(_) => Future.successful(this) // NoOp
@@ -156,15 +157,16 @@ class DefaultDB(
           StartSessionResult.reader(BSONSerializationPack)
 
         Command.run(BSONSerializationPack, failoverStrategy).
-          apply(this, StartSession, defaultReadPreference).map(withSession)
+          apply(this, StartSession, defaultReadPreference).map(withNewSession)
       }
     }
 
-  private[api] def withSession(session: StartSessionResult): DefaultDB =
-    new DefaultDB(name, connection, failoverStrategy, Option(session))
+  private[api] def withNewSession(result: StartSessionResult): DefaultDB =
+    new DefaultDB(name, connection, failoverStrategy,
+      Option(result).map { r => new Session(r.id) })
 
   def endSession()(implicit ec: ExecutionContext): Future[Option[UUID]] =
-    session.map(_.id) match {
+    session.map(_.lsid) match {
       case state @ Some(uuid) => {
         implicit def w: BSONSerializationPack.Writer[EndSessions] =
           EndSessions.commandWriter(BSONSerializationPack)
@@ -184,7 +186,7 @@ class DefaultDB(
     }
 
   def killSession()(implicit ec: ExecutionContext): Future[Option[UUID]] =
-    session.map(_.id) match {
+    session.map(_.lsid) match {
       case state @ Some(uuid) => {
         implicit def w: BSONSerializationPack.Writer[KillSessions] =
           KillSessions.commandWriter(BSONSerializationPack)
@@ -228,4 +230,11 @@ object DB {
   @deprecated("Use [[MongoConnection.database]]", "0.12.0")
   def apply(name: String, connection: MongoConnection, failoverStrategy: FailoverStrategy = FailoverStrategy()) = new DefaultDB(name, connection, failoverStrategy)
 
+}
+
+/** See [[https://docs.mongodb.com/manual/reference/server-sessions/#command-options commands options]] related to logical session. */
+private[api] final class Session(val lsid: UUID) {
+  private val transactionNumber = new java.util.concurrent.atomic.AtomicLong()
+
+  def nextTxnNumber(): Long = transactionNumber.incrementAndGet()
 }
