@@ -147,7 +147,7 @@ trait InsertOps[P <: SerializationPack with Singleton]
             val cmd = BatchCommands.InsertCommand.Insert(
               head, documents.tail, ordered, writeConcern)
 
-            runCommand(cmd, writePref).flatMap { wr =>
+            runCommand(cmd, writePreference).flatMap { wr =>
               val flattened = wr.flatten
 
               if (!flattened.ok) {

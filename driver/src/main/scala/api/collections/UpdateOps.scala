@@ -145,7 +145,7 @@ private[reactivemongo] trait UpdateOps[P <: SerializationPack with Singleton] {
           val cmd = BatchCommands.UpdateCommand.Update(
             updates, ordered, writeConcern)
 
-          runCommand(cmd, writePref).flatMap { wr =>
+          runCommand(cmd, writePreference).flatMap { wr =>
             val flattened = wr.flatten
 
             if (!flattened.ok) {

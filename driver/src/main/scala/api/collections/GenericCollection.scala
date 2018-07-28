@@ -27,6 +27,7 @@ import reactivemongo.api._
 import reactivemongo.api.commands.{
   CommandCodecs,
   Collation,
+  //ImplicitCommandHelpers,
   UnitBox,
   UpdateWriteResult,
   ResolvedCollectionCommand,
@@ -78,13 +79,19 @@ trait GenericCollectionProducer[P <: SerializationPack with Singleton, +C <: Gen
  * @define aggregationPipelineFunction the function to create the aggregation pipeline using the aggregation framework depending on the collection type
  * @define orderedParam the [[https://docs.mongodb.com/manual/reference/method/db.collection.insert/#perform-an-unordered-insert ordered]] behaviour
  */
-trait GenericCollection[P <: SerializationPack with Singleton] extends Collection with GenericCollectionWithCommands[P] with CollectionMetaCommands with reactivemongo.api.commands.ImplicitCommandHelpers[P] with InsertOps[P] with UpdateOps[P] with DeleteOps[P] with Aggregator[P] with GenericCollectionMetaCommands[P] { self =>
+trait GenericCollection[P <: SerializationPack with Singleton]
+  extends Collection with GenericCollectionWithCommands[P]
+  with CollectionMetaCommands //with ImplicitCommandHelpers[P]
+  with InsertOps[P] with UpdateOps[P] with DeleteOps[P]
+  with Aggregator[P] with GenericCollectionMetaCommands[P]
+  with GenericCollectionWithQueryBuilder[P] { self =>
+
   import scala.language.higherKinds
 
   val pack: P
-  protected val BatchCommands: BatchCommands[pack.type]
 
-  @inline protected def writePref = ReadPreference.Primary
+  protected val BatchCommands: BatchCommands[pack.type]
+  import BatchCommands._
 
   /**
    * Alias for type of the aggregation framework,
@@ -99,32 +106,24 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    */
   type PipelineOperator = BatchCommands.AggregationFramework.PipelineOperator
 
+  @deprecated("Will be private/internal", "0.16.0")
   implicit def PackIdentityReader: pack.Reader[pack.Document] = pack.IdentityReader
 
+  @deprecated("Will be private/internal", "0.16.0")
   implicit def PackIdentityWriter: pack.Writer[pack.Document] = pack.IdentityWriter
 
   implicit protected lazy val unitBoxReader: pack.Reader[UnitBox.type] =
     CommandCodecs.unitBoxReader[pack.type](pack)
 
-  def failoverStrategy: FailoverStrategy
-  def genericQueryBuilder: GenericQueryBuilder[pack.type]
-
-  /** The default read preference */
-  def readPreference: ReadPreference = db.defaultReadPreference
-  // TODO: Remove default value from this trait after next release
-
-  protected val defaultCursorBatchSize: Int = 101
+  /** Builder used to prepare queries */
+  protected def genericQueryBuilder: GenericQueryBuilder[pack.type] =
+    new CollectionQueryBuilder(failoverStrategy)
 
   /**
    * Returns a new reference to the same collection,
    * with the given read preference.
    */
   def withReadPreference(pref: ReadPreference): GenericCollection[P]
-
-  import BatchCommands._
-
-  protected def watchFailure[T](future: => Future[T]): Future[T] =
-    Try(future).recover { case NonFatal(e) => Future.failed(e) }.get
 
   /**
    * $findDescription.
@@ -194,10 +193,6 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
       }
     })
   }
-
-  @inline protected def defaultWriteConcern = db.connection.options.writeConcern
-  @inline protected def MissingMetadata() =
-    ConnectionNotInitialized.MissingMetadata(db.connection.history())
 
   /**
    * Inserts a document into the collection and waits for the [[reactivemongo.api.commands.WriteResult]].
@@ -307,7 +302,8 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    */
   def updateModifier[U](update: U, fetchNewObject: Boolean = false, upsert: Boolean = false)(implicit updateWriter: pack.Writer[U]): BatchCommands.FindAndModifyCommand.Update = BatchCommands.FindAndModifyCommand.Update(update, fetchNewObject, upsert)
 
-  /** Returns a removal modifier, to be used with `findAndModify`. */
+  /** Returns a removal modifier, to be used with [[findAndModify]]. */
+  @deprecated("Will be private/internal", "0.16.0")
   @transient lazy val removeModifier =
     BatchCommands.FindAndModifyCommand.Remove
 
@@ -388,7 +384,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
       },
       collation = collation,
       arrayFilters = arrayFilters.map(implicitly[DP](_)))).
-      flatMap(runCommand(_, writePref))
+      flatMap(runCommand(_, writePreference))
   }
 
   /**
@@ -575,4 +571,32 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    */
   def delete[S](ordered: Boolean = true, writeConcern: WriteConcern = defaultWriteConcern): DeleteBuilder = // TODO: Remove the type param ?
     prepareDelete(ordered, writeConcern)
+
+  // --- Internals ---
+
+  /** The read preference for the write operations (primary) */
+  @inline protected def writePreference: ReadPreference = ReadPreference.Primary
+
+  /** The default write concern */
+  @inline protected def defaultWriteConcern = db.connection.options.writeConcern
+
+  /** The default read preference */
+  @inline def readPreference: ReadPreference = db.defaultReadPreference
+  // TODO: Remove default value from this trait after next release
+
+  @inline protected def defaultCursorBatchSize: Int = 101
+
+  protected def watchFailure[T](future: => Future[T]): Future[T] =
+    Try(future).recover { case NonFatal(e) => Future.failed(e) }.get
+
+  @inline protected def MissingMetadata() =
+    ConnectionNotInitialized.MissingMetadata(db.connection.history())
+
+  private def writeDoc[T](
+    doc: T,
+    writer: pack.Writer[T],
+    buffer: ChannelBufferWritableBuffer = ChannelBufferWritableBuffer()) = {
+    pack.serializeAndWrite(buffer, doc, writer)
+    buffer
+  }
 }

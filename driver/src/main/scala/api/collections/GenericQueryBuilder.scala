@@ -20,7 +20,17 @@ import scala.concurrent.{ ExecutionContext, Future }
 import reactivemongo.core.protocol.{ Query, QueryFlags, MongoWireVersion }
 import reactivemongo.core.netty.{ BufferSequence, ChannelBufferWritableBuffer }
 
-import reactivemongo.api._
+import reactivemongo.api.{
+  Collection,
+  Cursor,
+  CursorProducer,
+  DefaultCursor,
+  FailoverStrategy,
+  QueryOpts,
+  QueryOps,
+  ReadPreference,
+  SerializationPack
+}
 
 /**
  * A builder that helps to make a fine-tuned query to MongoDB.
@@ -33,10 +43,12 @@ import reactivemongo.api._
  * @define resultTParam the results type
  * @define requireOneFunction Sends this query and gets a future `T` (alias for [[reactivemongo.api.Cursor.head]])
  */
+@deprecated("Will be private/internal", "0.16.0")
 trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
   // TODO: Unit test?
 
   val pack: P
+
   type Self <: GenericQueryBuilder[pack.type]
 
   def queryOption: Option[pack.Document]
@@ -51,7 +63,7 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
   def collection: Collection
   def maxTimeMsOption: Option[Long]
 
-  /** The read concern (since 3.2) */
+  ///** The read concern (since 3.2) */
   //def readConcern: ReadConcern = ReadConcern.default
 
   /* TODO: https://docs.mongodb.com/v3.2/reference/command/find/#dbcmd.find
@@ -75,10 +87,6 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
 
   protected lazy val version = collection.db.connection.metadata.
     fold[MongoWireVersion](MongoWireVersion.V30)(_.maxWireVersion)
-
-  @deprecated("Will be removed from the public API", "0.12.0")
-  def merge(readPreference: ReadPreference): pack.Document =
-    merge(readPreference, Int.MaxValue)
 
   protected def merge(readPreference: ReadPreference, maxDocs: Int): pack.Document = {
     val builder = pack.newBuilder
@@ -218,23 +226,6 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
     logger.debug(s"command: ${pack pretty merged}")
 
     merged
-  }
-
-  def copy(
-    queryOption: Option[pack.Document] = queryOption,
-    sortOption: Option[pack.Document] = sortOption,
-    projectionOption: Option[pack.Document] = projectionOption,
-    hintOption: Option[pack.Document] = hintOption,
-    explainFlag: Boolean = explainFlag,
-    snapshotFlag: Boolean = snapshotFlag,
-    commentString: Option[String] = commentString,
-    options: QueryOpts = options,
-    failover: FailoverStrategy = failover,
-    maxTimeMsOption: Option[Long] = maxTimeMsOption): Self
-
-  private def write(document: pack.Document, buffer: ChannelBufferWritableBuffer): ChannelBufferWritableBuffer = {
-    pack.writeToBuffer(buffer, document)
-    buffer
   }
 
   /**
@@ -392,45 +383,59 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
   def slaveOk = options(options.slaveOk)
   def tailable = options(options.tailable)
 
+  def copy(
+    queryOption: Option[pack.Document] = queryOption,
+    sortOption: Option[pack.Document] = sortOption,
+    projectionOption: Option[pack.Document] = projectionOption,
+    hintOption: Option[pack.Document] = hintOption,
+    explainFlag: Boolean = explainFlag,
+    snapshotFlag: Boolean = snapshotFlag,
+    commentString: Option[String] = commentString,
+    options: QueryOpts = options,
+    failover: FailoverStrategy = failover,
+    maxTimeMsOption: Option[Long] = maxTimeMsOption): Self
+
+  // ---
+
+  private def write(document: pack.Document, buffer: ChannelBufferWritableBuffer): ChannelBufferWritableBuffer = {
+    pack.writeToBuffer(buffer, document)
+    buffer
+  }
+
   private lazy val logger = reactivemongo.util.LazyLogger(getClass.getName)
 }
 
-private[reactivemongo] object QueryCodecs {
-  @inline def writeReadPref[P <: SerializationPack with Singleton](pack: P): ReadPreference => pack.Document = writeReadPref[pack.type](pack.newBuilder)
+private[api] trait GenericCollectionWithQueryBuilder[P <: SerializationPack with Singleton] { parent: GenericCollection[P] =>
 
-  def writeReadPref[P <: SerializationPack with Singleton](builder: SerializationPack.Builder[P]): ReadPreference => builder.pack.Document =
-    { readPreference: ReadPreference =>
-      import builder.{ elementProducer => element, document, string }
+  protected final class CollectionQueryBuilder(
+    val failover: FailoverStrategy,
+    val queryOption: Option[pack.Document] = None,
+    val sortOption: Option[pack.Document] = None,
+    val projectionOption: Option[pack.Document] = None,
+    val hintOption: Option[pack.Document] = None,
+    val explainFlag: Boolean = false,
+    val snapshotFlag: Boolean = false,
+    val commentString: Option[String] = None,
+    val options: QueryOpts = QueryOpts(),
+    val maxTimeMsOption: Option[Long] = None) extends GenericQueryBuilder[pack.type] {
+    type Self = CollectionQueryBuilder
+    val pack: parent.pack.type = parent.pack
+    override val collection = parent
 
-      val mode = readPreference match {
-        case ReadPreference.Primary               => "primary"
-        case ReadPreference.PrimaryPreferred(_)   => "primaryPreferred"
-        case ReadPreference.Secondary(_)          => "secondary"
-        case ReadPreference.SecondaryPreferred(_) => "secondaryPreferred"
-        case ReadPreference.Nearest(_)            => "nearest"
-      }
-      val elements = Seq.newBuilder[builder.pack.ElementProducer]
+    def copy(
+      queryOption: Option[pack.Document] = queryOption,
+      sortOption: Option[pack.Document] = sortOption,
+      projectionOption: Option[pack.Document] = projectionOption,
+      hintOption: Option[pack.Document] = hintOption,
+      explainFlag: Boolean = explainFlag,
+      snapshotFlag: Boolean = snapshotFlag,
+      commentString: Option[String] = commentString,
+      options: QueryOpts = options,
+      failover: FailoverStrategy = failover,
+      maxTimeMsOption: Option[Long] = maxTimeMsOption): CollectionQueryBuilder =
+      new CollectionQueryBuilder(failover, queryOption, sortOption,
+        projectionOption, hintOption, explainFlag, snapshotFlag, commentString,
+        options, maxTimeMsOption)
 
-      elements += element("mode", string(mode))
-
-      readPreference match {
-        case ReadPreference.Taggable(first :: tagSet) if tagSet.nonEmpty => {
-          val head = document(first.toSeq.map {
-            case (k, v) => element(k, string(v))
-          })
-
-          elements += element("tags", builder.array(
-            head,
-            tagSet.toSeq.map { tags =>
-              document(tags.toSeq.map {
-                case (k, v) => element(k, string(v))
-              })
-            }))
-        }
-
-        case _ => ()
-      }
-
-      document(elements.result())
-    }
+  }
 }

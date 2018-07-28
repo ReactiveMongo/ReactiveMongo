@@ -58,7 +58,7 @@ private[reactivemongo] trait GenericCollectionMetaCommands[P <: SerializationPac
     // Command codecs
     implicit def writer = createViewWriter
 
-    command.unboxed(self, cmd, writePref)
+    command.unboxed(self, cmd, writePreference)
   }
 
   // ---

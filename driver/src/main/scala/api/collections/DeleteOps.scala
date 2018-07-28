@@ -143,7 +143,7 @@ trait DeleteOps[P <: SerializationPack with Singleton]
             pack.writer { serialize(_) }
 
           Future.successful(cmd).flatMap(
-            runCommand(_, writePref).flatMap { wr =>
+            runCommand(_, writePreference).flatMap { wr =>
               val flattened = wr.flatten
 
               if (!flattened.ok) {

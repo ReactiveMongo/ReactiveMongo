@@ -39,6 +39,7 @@ trait Collection {
   def name: String
 
   /** The default failover strategy for the methods of this collection. */
+  @deprecated("Will be private", "0.16.0")
   def failoverStrategy: FailoverStrategy
 
   /** Gets the full qualified name of this collection. */
