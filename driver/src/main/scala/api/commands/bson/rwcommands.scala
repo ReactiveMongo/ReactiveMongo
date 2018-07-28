@@ -57,10 +57,9 @@ object BSONCommonWriteCommandsImplicits {
 
   @deprecated("Internally use CommandCodecs", "0.16.0")
   implicit object WriteConcernWriter extends BSONDocumentWriter[WriteConcern] {
-    def write(wc: WriteConcern): BSONDocument = BSONDocument(
-      "w" -> wc.w,
-      "j" -> (if (wc.j) Some(true) else None),
-      "wtimeout" -> wc.wtimeout)
+    private val writer = CommandCodecs.writeWriteConcern(BSONSerializationPack)
+
+    def write(wc: WriteConcern): BSONDocument = writer(wc)
   }
 
   implicit object WriteErrorReader extends BSONDocumentReader[WriteError] {
@@ -94,17 +93,23 @@ object BSONCommonWriteCommandsImplicits {
   }
 }
 
+@deprecated("Will be private/internal", "0.16.0")
 object BSONInsertCommand extends InsertCommand[BSONSerializationPack.type] {
   val pack = BSONSerializationPack
 }
 
+@deprecated("Will be private/internal", "0.16.0")
 object BSONInsertCommandImplicits {
   import BSONInsertCommand._
-  import BSONCommonWriteCommandsImplicits._
 
-  implicit object InsertWriter extends BSONDocumentWriter[ResolvedCollectionCommand[Insert]] {
+  object InsertWriter
+    extends BSONDocumentWriter[ResolvedCollectionCommand[Insert]] {
+
+    private val underlying =
+      InsertCommand.writer(BSONSerializationPack)(BSONInsertCommand)(None)
+
     def write(insert: ResolvedCollectionCommand[Insert]): BSONDocument =
-      BSONInsertCommand.serialize(insert)
+      underlying(insert)
   }
 }
 

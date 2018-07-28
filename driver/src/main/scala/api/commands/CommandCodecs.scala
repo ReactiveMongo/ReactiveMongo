@@ -1,6 +1,6 @@
 package reactivemongo.api.commands
 
-import reactivemongo.api.{ ReadConcern, SerializationPack }
+import reactivemongo.api.{ ReadConcern, Session, SerializationPack }
 
 private[reactivemongo] trait CommandCodecs[P <: SerializationPack with Singleton] {
   protected val pack: P
@@ -106,5 +106,20 @@ private[reactivemongo] object CommandCodecs {
     }
 
     builder.document(elements.result())
+  }
+
+  type SeqBuilder[T] = scala.collection.mutable.Builder[T, Seq[T]]
+
+  def writeSession[P <: SerializationPack with Singleton](builder: SerializationPack.Builder[P]): SeqBuilder[builder.pack.ElementProducer] => Session => Unit = { elements =>
+    import builder.{ document, elementProducer => element }
+
+    { session: Session =>
+      elements += element("lsid", document(
+        Seq(element("id", builder.uuid(session.lsid)))))
+
+      elements += element("txnNumber", builder.long(session.nextTxnNumber()))
+
+      ()
+    }
   }
 }

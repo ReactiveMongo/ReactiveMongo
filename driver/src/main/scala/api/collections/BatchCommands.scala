@@ -11,7 +11,6 @@ trait BatchCommands[P <: SerializationPack] {
     UpdateCommand => UC,
     DeleteCommand => DC,
     DefaultWriteResult,
-    //LastError,
     ResolvedCollectionCommand,
     FindAndModifyCommand => FMC
   }
@@ -27,7 +26,7 @@ trait BatchCommands[P <: SerializationPack] {
   implicit def DistinctResultReader: pack.Reader[DistinctCommand.DistinctResult]
 
   val InsertCommand: IC[pack.type]
-  implicit def InsertWriter: pack.Writer[ResolvedCollectionCommand[InsertCommand.Insert]]
+  @deprecated("Will be removed", "0.16.0") def InsertWriter: pack.Writer[ResolvedCollectionCommand[InsertCommand.Insert]]
 
   val UpdateCommand: UC[pack.type]
   implicit def UpdateWriter: pack.Writer[ResolvedCollectionCommand[UpdateCommand.Update]]

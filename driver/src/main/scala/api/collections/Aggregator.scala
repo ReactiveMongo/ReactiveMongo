@@ -19,8 +19,7 @@ import reactivemongo.api.commands.{
 }
 import reactivemongo.core.protocol.MongoWireVersion
 
-private[collections] trait Aggregator[P <: SerializationPack with Singleton]
-  extends CommandCodecs[P] {
+private[collections] trait Aggregator[P <: SerializationPack with Singleton] {
   collection: GenericCollection[P] =>
 
   // ---

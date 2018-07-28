@@ -53,18 +53,26 @@ class CollectionSpec(implicit protected val ee: ExecutionEnv)
 
         collection.insert[Person](ordered = true).many(persons).map(_.ok).
           aka("insertion") must beTrue.await(1, timeout)
-      }
+      } tag "wip"
     }
 
     "count the inserted documents" in {
-      collection.count() must beEqualTo(5).await(1, timeout) and {
-        collection.count(skip = 1) must beEqualTo(4).await(1, timeout)
+      def count(
+        selector: Option[BSONDocument] = None,
+        limit: Option[Int] = None,
+        skip: Int = 0,
+        hint: Option[collections.Hint[BSONSerializationPack.type]] = None,
+        readConcern: ReadConcern = ReadConcern.Local) =
+        collection.count(selector, limit, skip, hint, readConcern)
+
+      count() must beTypedEqualTo(5L).await(1, timeout) and {
+        count(skip = 1) must beTypedEqualTo(4L).await(1, timeout)
       } and {
-        collection.count(selector = Some(BSONDocument("name" -> "Jack"))).
-          aka("matching count") must beEqualTo(1).await(1, timeout)
+        count(selector = Some(BSONDocument("name" -> "Jack"))).
+          aka("matching count") must beTypedEqualTo(1L).await(1, timeout)
       } and {
-        collection.count(selector = Some(BSONDocument("name" -> "Foo"))).
-          aka("not matching count") must beEqualTo(0).await(1, timeout)
+        count(selector = Some(BSONDocument("name" -> "Foo"))).
+          aka("not matching count") must beTypedEqualTo(0L).await(1, timeout)
       }
     }
 

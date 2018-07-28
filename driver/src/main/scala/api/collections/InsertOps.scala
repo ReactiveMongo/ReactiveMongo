@@ -10,9 +10,8 @@ import reactivemongo.core.errors.GenericDriverException
 import reactivemongo.api.SerializationPack
 import reactivemongo.api.commands.{
   BulkOps,
-  CommandCodecs,
-  MultiBulkWriteResult,
   LastError,
+  MultiBulkWriteResult,
   ResolvedCollectionCommand,
   WriteConcern,
   WriteResult
@@ -22,10 +21,13 @@ import reactivemongo.api.commands.{
  * @define writeConcernParam the [[https://docs.mongodb.com/manual/reference/write-concern/ writer concern]] to be used
  * @define orderedParam the [[https://docs.mongodb.com/manual/reference/method/db.collection.insert/#perform-an-unordered-insert ordered]] behaviour
  */
-trait InsertOps[P <: SerializationPack with Singleton]
-  extends CommandCodecs[P] { collection: GenericCollection[P] =>
+trait InsertOps[P <: SerializationPack with Singleton] {
+  collection: GenericCollection[P] =>
 
-  protected val pack: P
+  private object InsertCommand
+    extends reactivemongo.api.commands.InsertCommand[collection.pack.type] {
+    val pack: collection.pack.type = collection.pack
+  }
 
   /**
    * @param ordered $orderedParam
@@ -41,6 +43,15 @@ trait InsertOps[P <: SerializationPack with Singleton]
     }
   }
 
+  private type InsertCmd = ResolvedCollectionCommand[InsertCommand.Insert]
+
+  implicit private lazy val insertWriter: pack.Writer[InsertCmd] = {
+    val underlying = reactivemongo.api.commands.InsertCommand.
+      writer(pack)(InsertCommand)(collection.db.session)
+
+    pack.writer[InsertCmd](underlying)
+  }
+
   /** Builder for insert operations. */
   sealed trait InsertBuilder[T] {
     implicit protected def writer: pack.Writer[T]
@@ -52,12 +63,12 @@ trait InsertOps[P <: SerializationPack with Singleton]
       // Command envelope to compute accurate BSON size limit
       val emptyDoc: pack.Document = pack.newBuilder.document(Seq.empty)
 
-      val i = ResolvedCollectionCommand(
+      val emptyCmd = ResolvedCollectionCommand(
         collection.name,
-        BatchCommands.InsertCommand.Insert(
+        InsertCommand.Insert(
           emptyDoc, Seq.empty[pack.Document], ordered, writeConcern))
 
-      val doc = pack.serialize(i, BatchCommands.InsertWriter)
+      val doc = pack.serialize(emptyCmd, insertWriter)
 
       meta.maxBsonSize - pack.bsonSize(doc) + pack.bsonSize(emptyDoc)
     }
@@ -141,10 +152,8 @@ trait InsertOps[P <: SerializationPack with Singleton]
     private final def execute(documents: Seq[pack.Document])(implicit ec: ExecutionContext): Future[WriteResult] = documents.headOption match {
       case Some(head) => metadata match {
         case Some(meta) => {
-          import BatchCommands.InsertWriter
-
           if (meta.maxWireVersion >= MongoWireVersion.V26) {
-            val cmd = BatchCommands.InsertCommand.Insert(
+            val cmd = InsertCommand.Insert(
               head, documents.tail, ordered, writeConcern)
 
             runCommand(cmd, writePreference).flatMap { wr =>

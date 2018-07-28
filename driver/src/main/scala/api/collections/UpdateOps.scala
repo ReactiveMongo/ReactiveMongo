@@ -26,8 +26,6 @@ import reactivemongo.api.commands.{
 private[reactivemongo] trait UpdateOps[P <: SerializationPack with Singleton] {
   collection: GenericCollection[P] =>
 
-  protected val pack: P
-
   /**
    * @param ordered $orderedParam
    * @param writeConcern writeConcernParam

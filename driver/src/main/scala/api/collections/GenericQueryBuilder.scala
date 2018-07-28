@@ -32,6 +32,8 @@ import reactivemongo.api.{
   SerializationPack
 }
 
+import reactivemongo.api.commands.CommandCodecs
+
 /**
  * A builder that helps to make a fine-tuned query to MongoDB.
  *
@@ -210,10 +212,7 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
 
       if (version.compareTo(MongoWireVersion.V36) >= 0) {
         collection.db.session.foreach { session =>
-          elements += element("lsid", document(
-            Seq(element("id", builder.uuid(session.lsid)))))
-
-          elements += element("txnNumber", long(session.nextTxnNumber()))
+          CommandCodecs.writeSession(builder)(elements)(session)
         }
       }
 

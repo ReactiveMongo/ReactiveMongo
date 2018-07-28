@@ -82,9 +82,9 @@ trait GenericCollectionProducer[P <: SerializationPack with Singleton, +C <: Gen
 trait GenericCollection[P <: SerializationPack with Singleton]
   extends Collection with GenericCollectionWithCommands[P]
   with CollectionMetaCommands //with ImplicitCommandHelpers[P]
-  with InsertOps[P] with UpdateOps[P] with DeleteOps[P]
+  with InsertOps[P] with UpdateOps[P] with DeleteOps[P] with CountOp[P]
   with Aggregator[P] with GenericCollectionMetaCommands[P]
-  with GenericCollectionWithQueryBuilder[P] { self =>
+  with GenericCollectionWithQueryBuilder[P] with HintFactory[P] { self =>
 
   import scala.language.higherKinds
 
@@ -163,7 +163,28 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * @param skip the number of matching documents to skip before counting
    * @param hint the index to use (either the index name or the index document)
    */
+  @deprecated("Use `count` with `readConcern` parameter", "0.16.0")
   def count[H](selector: Option[pack.Document] = None, limit: Int = 0, skip: Int = 0, hint: Option[H] = None)(implicit h: H => CountCommand.Hint, ec: ExecutionContext): Future[Int] = runValueCommand(CountCommand.Count(query = selector, limit, skip, hint.map(h)), readPreference)
+
+  /**
+   * Counts the matching documents.
+   * @see $queryLink
+   *
+   * @param selector $selectorParam
+   * @param limit the maximum number of matching documents to count
+   * @param skip the number of matching documents to skip before counting
+   * @param hint the index to use (either the index name or the index document)
+   * @param readConcern $readConcernParam
+   *
+   * @see [[hint]]
+   */
+  def count(
+    selector: Option[pack.Document],
+    limit: Option[Int],
+    skip: Int,
+    hint: Option[Hint[pack.type]],
+    readConcern: ReadConcern)(implicit ec: ExecutionContext): Future[Long] =
+    countDocuments(selector, limit, skip, hint, Some(readConcern))
 
   /**
    * Returns the distinct values for a specified field
