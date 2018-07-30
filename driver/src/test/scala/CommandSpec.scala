@@ -100,7 +100,7 @@ final class CommandSpec(implicit ee: ExecutionEnv)
         "fail outside ReplicaSet (MongoDB 3+)" in {
           (for {
             ver <- reactivemongo.api.tests.probe(
-              connection, timeout).map(_.maxWireVersion)
+              connection, timeout).map(_.metadata.maxWireVersion)
 
             _ <- connection.database("admin").flatMap( // mongoVersion
               _.runCommand(Resync, Common.failoverStrategy)).map(
@@ -115,7 +115,7 @@ final class CommandSpec(implicit ee: ExecutionEnv)
         "be successful with ReplicaSet (MongoDB 3+)" in {
           (for {
             ver <- reactivemongo.api.tests.probe(
-              connection, timeout).map(_.maxWireVersion)
+              connection, timeout).map(_.metadata.maxWireVersion)
 
             res <- connection.database("admin").flatMap(
               _.runCommand(Resync, Common.failoverStrategy)).map(

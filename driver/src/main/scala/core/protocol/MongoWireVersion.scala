@@ -13,23 +13,7 @@ sealed trait MongoWireVersion extends Ordered[MongoWireVersion] {
 }
 
 object MongoWireVersion {
-  /*
-   * Original meaning of MongoWireVersion is more about protocol features.
-   *
-   * - RELEASE_2_4_AND_BEFORE (0)
-   * - AGG_RETURNS_CURSORS (1)
-   * - BATCH_COMMANDS (2)
-   *
-   * But wireProtocol=1 is virtually non-existent; Mongo 2.4 was 0 and Mongo 2.6 is 2.
-   */
-  @deprecated(message = "No longer supported", since = "0.12.0")
-  object V24AndBefore extends MongoWireVersion {
-    val value = 0
-    override val toString = "<=2.4"
-
-    override def equals(that: Any): Boolean = that == V24AndBefore
-  }
-
+  @deprecated("MongoDB 2.6 EOL reached by Oct 2016: https://www.mongodb.com/support-policy", "0.16.0")
   object V26 extends MongoWireVersion {
     val value = 2
     override val toString = "2.6"
@@ -38,6 +22,7 @@ object MongoWireVersion {
       that != null && that.isInstanceOf[V26.type]
   }
 
+  @deprecated("MongoDB 3.0 EOL reached by Feb 2018: https://www.mongodb.com/support-policy", "0.16.0")
   object V30 extends MongoWireVersion {
     val value = 3
     override val toString = "3.0"

@@ -478,7 +478,7 @@ trait MongoDBSystem extends Actor {
       val ns = nodeSetLock.synchronized { this._nodeSet }
 
       if (ns.isReachable) {
-        sender ! SetAvailable(ns.protocolMetadata)
+        sender ! new SetAvailable(ns.protocolMetadata, ns.name)
         debug("The node set is available")
       }
 
@@ -486,7 +486,7 @@ trait MongoDBSystem extends Actor {
         if (ns.authenticates.nonEmpty && prim.authenticated.isEmpty) {
           debug(s"The node set is available (${prim.names}); Waiting authentication: ${prim.authenticated}")
         } else {
-          sender ! PrimaryAvailable(ns.protocolMetadata)
+          sender ! new PrimaryAvailable(ns.protocolMetadata, ns.name)
 
           debug(s"The primary is available: $prim")
         }
@@ -1019,7 +1019,10 @@ trait MongoDBSystem extends Actor {
 
         trace(s"Discovered ${discoveredNodes.size} nodes: ${discoveredNodes mkString ", "}")
 
-        val upSet = prepared.copy(nodes = prepared.nodes ++ discoveredNodes)
+        val upSet = prepared.copy(
+          name = isMaster.replicaSet.map(_.setName),
+          version = isMaster.replicaSet.map(_.setVersion),
+          nodes = prepared.nodes ++ discoveredNodes)
 
         chanNode.fold(upSet) { node =>
           if (upSet.authenticates.nonEmpty && node.authenticated.isEmpty) {
@@ -1029,7 +1032,8 @@ trait MongoDBSystem extends Actor {
             if (!nodeSetWasReachable && upSet.isReachable) {
               debug("The node set is now available")
 
-              broadcastMonitors(SetAvailable(upSet.protocolMetadata))
+              broadcastMonitors(
+                new SetAvailable(upSet.protocolMetadata, upSet.name))
 
               updateHistory(s"SetAvailable(${nodeSet.toShortString})")
             }
@@ -1042,7 +1046,8 @@ trait MongoDBSystem extends Actor {
 
               debug(s"The primary is now available: ${newPrim.mkString}")
 
-              broadcastMonitors(PrimaryAvailable(upSet.protocolMetadata))
+              broadcastMonitors(new PrimaryAvailable(
+                upSet.protocolMetadata, upSet.name))
 
               updateHistory(s"PrimaryAvailable(${nodeSet.toShortString})")
             }
@@ -1132,7 +1137,8 @@ trait MongoDBSystem extends Actor {
               if (nodeSet.isReachable) {
                 debug("The node set is now authenticated")
 
-                broadcastMonitors(SetAvailable(nodeSet.protocolMetadata))
+                broadcastMonitors(
+                  new SetAvailable(nodeSet.protocolMetadata, nodeSet.name))
 
                 updateHistory(s"SetAvailable(${nodeSet.toShortString})")
               }
@@ -1141,7 +1147,7 @@ trait MongoDBSystem extends Actor {
                 debug("The primary is now authenticated")
 
                 broadcastMonitors(
-                  PrimaryAvailable(nodeSet.protocolMetadata))
+                  new PrimaryAvailable(nodeSet.protocolMetadata, nodeSet.name))
 
                 updateHistory(s"PrimaryAvailable(${nodeSet.toShortString})")
               } else if (nodeSet.isReachable) {

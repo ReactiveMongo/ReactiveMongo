@@ -117,7 +117,9 @@ private[reactivemongo] object CommandCodecs {
       elements += element("lsid", document(
         Seq(element("id", builder.uuid(session.lsid)))))
 
-      elements += element("txnNumber", builder.long(session.nextTxnNumber()))
+      session.nextTxnNumber.foreach { txnNumber =>
+        elements += element("txnNumber", builder.long(txnNumber))
+      }
 
       ()
     }

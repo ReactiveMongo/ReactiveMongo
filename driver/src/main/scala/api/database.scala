@@ -17,15 +17,19 @@ package reactivemongo.api
 
 import java.util.UUID
 
-import scala.concurrent.{ ExecutionContext, Future }
+import scala.concurrent.{ Await, ExecutionContext, Future }
 import scala.concurrent.duration.FiniteDuration
 
 import reactivemongo.core.commands.SuccessfulAuthentication
 
 import reactivemongo.api.commands.{
   Command,
+  CommandCodecs,
+  EndSessions,
+  KillSessions,
   StartSession,
-  StartSessionResult
+  StartSessionResult,
+  UnitBox
 }
 
 /**
@@ -49,6 +53,9 @@ sealed trait DB {
 
   /** The [[reactivemongo.api.MongoConnection]] that will be used to query this database. */
   @transient def connection: MongoConnection
+
+  /** The state of the associated [[connection]] */
+  protected def connectionState: ConnectionState
 
   /** This database name. */
   def name: String
@@ -82,8 +89,17 @@ sealed trait DB {
    * Returns the database of the given name on the same MongoConnection.
    *
    * @param name $nameParam
+   * @see [[sibling1]]
    */
-  def sibling(name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit ec: ExecutionContext): Future[DefaultDB] = connection.database(name, failoverStrategy)
+  @deprecated("Use [[sibling1]]", "0.16.0")
+  def sibling(name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit ec: ExecutionContext): DefaultDB = Await.result(connection.database(name, failoverStrategy), FiniteDuration(15, "seconds"))
+
+  /**
+   * Returns the database of the given name on the same MongoConnection.
+   *
+   * @param name $nameParam
+   */
+  def sibling1(name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit ec: ExecutionContext): Future[DefaultDB] = connection.database(name, failoverStrategy)
 
   /**
    * Starts a [[https://docs.mongodb.com/manual/reference/command/startSession/ new session]], do nothing if a session has already being started (since MongoDB 3.6)
@@ -112,7 +128,7 @@ sealed trait DB {
   def killSession()(implicit ec: ExecutionContext): Future[Option[UUID]]
 }
 
-sealed trait GenericDB[P <: SerializationPack with Singleton] { self: DB =>
+private[api] sealed trait GenericDB[P <: SerializationPack with Singleton] { self: DB =>
   val pack: P
 
   import reactivemongo.api.commands._
@@ -126,20 +142,14 @@ sealed trait GenericDB[P <: SerializationPack with Singleton] { self: DB =>
 
 /** The default DB implementation, that mixes in the database traits. */
 @SerialVersionUID(235871232L)
-class DefaultDB(
+class DefaultDB private[api] (
   val name: String,
   @transient val connection: MongoConnection,
+  val connectionState: ConnectionState,
   @transient val failoverStrategy: FailoverStrategy = FailoverStrategy(),
   @transient val session: Option[Session] = Option.empty)
   extends DB with DBMetaCommands with GenericDB[BSONSerializationPack.type]
   with Product with Serializable {
-
-  import reactivemongo.api.commands.{
-    CommandCodecs,
-    EndSessions,
-    KillSessions,
-    UnitBox
-  }
 
   type DBType = DefaultDB
 
@@ -162,8 +172,13 @@ class DefaultDB(
     }
 
   private[api] def withNewSession(result: StartSessionResult): DefaultDB =
-    new DefaultDB(name, connection, failoverStrategy,
-      Option(result).map { r => new Session(r.id) })
+    new DefaultDB(name, connection, connectionState, failoverStrategy,
+      Option(result).map { r =>
+        connectionState.setName match {
+          case Some(_) => new ReplicaSetSession(r.id)
+          case _       => new PlainSession(r.id)
+        }
+      })
 
   def endSession()(implicit ec: ExecutionContext): Future[Option[UUID]] =
     session.map(_.lsid) match {
@@ -223,18 +238,9 @@ class DefaultDB(
 @deprecated("Use DefaultDB class", "0.16.0")
 object DefaultDB extends scala.runtime.AbstractFunction3[String, MongoConnection, FailoverStrategy, DefaultDB] {
   @deprecated("Use DefaultDB constructor", "0.16.0")
-  def apply(name: String, connection: MongoConnection, failoverStrategy: FailoverStrategy): DefaultDB = new DefaultDB(name, connection, failoverStrategy)
+  def apply(name: String, connection: MongoConnection, failoverStrategy: FailoverStrategy): DefaultDB = throw new UnsupportedOperationException("Use DefaultDB constructor")
 }
 
+@deprecated("Will be removed", "0.16.0")
 object DB {
-  @deprecated("Use [[MongoConnection.database]]", "0.12.0")
-  def apply(name: String, connection: MongoConnection, failoverStrategy: FailoverStrategy = FailoverStrategy()) = new DefaultDB(name, connection, failoverStrategy)
-
-}
-
-/** See [[https://docs.mongodb.com/manual/reference/server-sessions/#command-options commands options]] related to logical session. */
-private[api] final class Session(val lsid: UUID) {
-  private val transactionNumber = new java.util.concurrent.atomic.AtomicLong()
-
-  def nextTxnNumber(): Long = transactionNumber.incrementAndGet()
 }
