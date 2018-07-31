@@ -50,8 +50,6 @@
     <Or>
       <Class name="~reactivemongo\.api\.DefaultCursor\$Impl\$\$anonfun\$tailableCursorEnumerateResponses.*" />
       <Class name="~.+MongoConnection\$\$makeOptions\$.+" />
-      <Class name="~.+CustomEnumeratee\$\$anon.+" />
-      <Class name="~.+StateEnumerator\$\$anon.+" />
     </Or>
     <Or>
       <Local name="current" />

@@ -1,3 +1,5 @@
+package reactivemongo
+
 import scala.concurrent.{ Await, Future }
 
 import akka.actor.ActorRef
@@ -33,6 +35,7 @@ class NodeSetSpec(implicit val ee: ExecutionEnv)
   sequential // for ConnectAllSpec
 
   import reactivemongo.api.tests._
+  import tests.Common
 
   @inline def failoverStrategy = Common.failoverStrategy
   @inline def timeout = Common.timeout
@@ -177,7 +180,8 @@ class NodeSetSpec(implicit val ee: ExecutionEnv)
 
     @inline implicit def sys = drv.system
 
-    val auths = Seq(Authenticate(Common.commonDb, "test", Some("password")))
+    val auths = Seq(Authenticate(
+      Common.commonDb, "test", Some("password")))
     lazy val mongosystem = TestActorRef[StandardDBSystem](
       standardDBSystem(supervisorName, poolName, nodes, auths, options),
       poolName)

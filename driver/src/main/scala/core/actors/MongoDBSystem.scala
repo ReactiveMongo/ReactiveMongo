@@ -46,7 +46,6 @@ import reactivemongo.core.protocol.{
   KillCursors,
   MongoWireVersion,
   Request,
-  RequestMaker,
   Response
 }
 import reactivemongo.core.commands.{
@@ -115,8 +114,7 @@ trait MongoDBSystem extends Actor {
     cl
   }
 
-  private val awaitingResponses =
-    scala.collection.mutable.LinkedHashMap[Int, AwaitingResponse]()
+  private val requestTracker = new RequestTracker
 
   private val monitors = scala.collection.mutable.ListBuffer[ActorRef]()
 
@@ -154,9 +152,6 @@ trait MongoDBSystem extends Actor {
   private val nodeSetLock = new Object {}
   private[reactivemongo] var _nodeSet: NodeSet = null
   private var _setInfo: NodeSetInfo = null
-
-  //initNodeSet()
-  ////nodeSetUpdated(s"Init(${_nodeSet.toShortString})", null, _nodeSet)
   // <-- monitor
 
   @inline private def updateHistory(event: String) =
@@ -219,15 +214,18 @@ trait MongoDBSystem extends Actor {
       // fail all requests waiting for a response
       val istate = internalState
 
-      awaitingResponses.foreach {
-        case (_, r) if (!r.promise.isCompleted) =>
-          // fail all requests waiting for a response
-          r.promise.failure(new ClosedException(supervisor, name, istate))
+      requestTracker.withAwaiting { (resps, chans) =>
+        resps.foreach {
+          case (_, r) if (!r.promise.isCompleted) =>
+            // fail all requests waiting for a response
+            r.promise.failure(new ClosedException(supervisor, name, istate))
 
-        case _ => ( /* already completed */ )
+          case _ => ( /* already completed */ )
+        }
+
+        resps.clear()
+        chans.clear()
       }
-
-      awaitingResponses.clear()
 
       done.future.map(_ => ns)
     }
@@ -436,20 +434,18 @@ trait MongoDBSystem extends Actor {
     else { promise.failure(cause); () }
   }
 
+  /* !! Should not use `requestTracker.withAwaiting` */
   private def retry(req: AwaitingResponse): Option[AwaitingResponse] = {
     val onError = failureOrLog(req.promise, _: Throwable) { cause =>
       error(s"Fails to retry '${req.request.op}' (channel #${req.channelID})", cause)
     }
 
-    req.retriable(requestRetries).flatMap { newReq =>
+    req.retriable(requestRetries).flatMap { renew =>
       foldNodeConnection(req.request)({ error =>
         onError(error)
         None
       }, { (node, con) =>
-        val reqId = req.requestID
-        val awaiting = newReq(con.channel.id)
-
-        awaitingResponses += reqId -> awaiting
+        val awaiting = renew(con.channel.id)
 
         awaiting.getWriteConcern.fold(con.send(awaiting.request)) { wc =>
           con.send(awaiting.request, wc)
@@ -514,15 +510,6 @@ trait MongoDBSystem extends Actor {
       }
     }
 
-    case req @ RequestMaker(_, _, _, _) => {
-      trace(s"Transmiting a request: $req")
-
-      val r = req(RequestId.common.next)
-      pickChannel(r).map(_._2.send(r)) // TODO: Check is expecting?
-
-      ()
-    }
-
     case req @ RequestMakerExpectingResponse(maker, _) => {
       val reqId = RequestId.common.next
 
@@ -532,12 +519,18 @@ trait MongoDBSystem extends Actor {
 
       foldNodeConnection(request)(req.promise.failure(_), { (node, con) =>
         if (request.op.expectsResponse) {
-          awaitingResponses += reqId -> AwaitingResponse(
-            request, con.channel.id, req.promise,
-            isGetLastError = false,
-            isMongo26WriteOp = req.isMongo26WriteOp)
+          requestTracker.withAwaiting { (resps, chans) =>
+            resps += reqId -> AwaitingResponse(
+              request, con.channel.id, req.promise,
+              isGetLastError = false,
+              isMongo26WriteOp = req.isMongo26WriteOp)
 
-          trace(s"Registering awaiting response for requestID $reqId, awaitingResponses: $awaitingResponses")
+            chans += con.channel.id
+
+            //println(s"_reserve: ${con.channel.id}")
+
+            trace(s"Registering awaiting response for requestID $reqId on channel #${con.channel.id}, awaitingResponses: $resps")
+          }
         } else {
           trace(s"NOT registering awaiting response for requestID $reqId")
         }
@@ -566,11 +559,18 @@ trait MongoDBSystem extends Actor {
       }
 
       foldNodeConnection(request)(onError, { (node, con) =>
-        awaitingResponses += reqId -> AwaitingResponse(
-          request, con.channel.id, req.promise,
-          isGetLastError = true, isMongo26WriteOp = false).withWriteConcern(writeConcern)
+        requestTracker.withAwaiting { (resps, chans) =>
+          resps += reqId -> AwaitingResponse(
+            request, con.channel.id, req.promise,
+            isGetLastError = true, isMongo26WriteOp = false).
+            withWriteConcern(writeConcern)
 
-        trace(s"Registering awaiting response for requestID $reqId, awaitingResponses: $awaitingResponses")
+          chans += con.channel.id
+
+          //println(s"_reserve: ${con.channel.id}")
+
+          trace(s"Registering awaiting response for requestID $reqId on channel #${con.channel.id}, awaitingResponses: $resps")
+        }
 
         con.send(request, writeConcern).addListener(new OperationHandler(
           error(s"Fails to send checked write request $reqId", _),
@@ -663,28 +663,41 @@ trait MongoDBSystem extends Actor {
 
           // TODO: Retry isMaster?
 
-          awaitingResponses.retain { (_, awaitingResponse) =>
-            if (awaitingResponse.channelID == chanId) {
-              retry(awaitingResponse) match {
-                case Some(awaiting) => {
-                  trace(s"Retrying to await response for requestID ${awaiting.requestID}: $awaiting")
-                  retried += awaiting.requestID -> awaiting
+          requestTracker.withAwaiting { (resps, chans) =>
+            chans -= chanId
+
+            //println(s"_release: $chanId")
+
+            val retriedChans = Set.newBuilder[ChannelId]
+
+            resps.retain { (_, awaitingResponse) =>
+              if (awaitingResponse.channelID == chanId) {
+                retry(awaitingResponse) match {
+                  case Some(awaiting) => {
+                    trace(s"Retrying to await response for requestID ${awaiting.requestID} on channel #${awaiting.channelID}: $awaiting")
+
+                    retried += awaiting.requestID -> awaiting
+                    retriedChans += awaiting.channelID
+
+                    //println(s"_reserve: ${awaiting.channelID}")
+                  }
+
+                  case _ => {
+                    debug(s"Completing response for '${awaitingResponse.request.op}' with error='socket disconnected' (channel #$chanId)")
+
+                    failureOrLog(awaitingResponse.promise, SocketDisconnected)(
+                      err => warn(
+                        s"Socket disconnected (channel #$chanId)", err))
+                  }
                 }
 
-                case _ => {
-                  debug(s"Completing response for '${awaitingResponse.request.op}' with error='socket disconnected' (channel #$chanId)")
+                false
+              } else true
+            }
 
-                  failureOrLog(awaitingResponse.promise, SocketDisconnected)(
-                    err => warn(
-                      s"Socket disconnected (channel #$chanId)", err))
-                }
-              }
-
-              false
-            } else true
+            chans ++= retriedChans.result()
+            resps ++= retried.result()
           }
-
-          awaitingResponses ++= retried.result()
 
           if (!ns.isReachable) {
             if (nodeSetWasReachable) {
@@ -732,9 +745,6 @@ trait MongoDBSystem extends Actor {
   }
 
   val closing: Receive = {
-    case req @ RequestMaker(_, _, _, _) =>
-      error(s"Received a non-expecting response request during closing process: $req")
-
     case RegisterMonitor => { monitors += sender; () }
 
     case req @ ExpectingResponse(promise) => {
@@ -781,112 +791,118 @@ trait MongoDBSystem extends Actor {
 
   // any other response
   private val fallback: Receive = {
-    case response: Response if RequestId.common accepts response => {
-      awaitingResponses.get(response.header.responseTo) match {
-        case Some(AwaitingResponse(_, _, promise, isGetLastError, isMongo26WriteOp)) => {
-          trace(s"Got a response from ${response.info._channelId} to ${response.header.responseTo}! Will give back message=$response to promise ${System.identityHashCode(promise)}")
+    case response: Response if RequestId.common accepts response =>
+      requestTracker.withAwaiting { (resps, chans) =>
+        resps.get(response.header.responseTo) match {
+          case Some(AwaitingResponse(
+            _, chanId, promise, isGetLastError, isMongo26WriteOp)) => {
 
-          awaitingResponses -= response.header.responseTo
+            trace(s"Got a response from ${response.info._channelId} to ${response.header.responseTo}! Will give back message=$response to promise ${System.identityHashCode(promise)}")
 
-          response match {
-            case cmderr: Response.CommandError =>
-              promise.success(cmderr); ()
+            resps -= response.header.responseTo
+            chans -= chanId
 
-            case _ => {
-              if (response.error.isDefined) { // TODO: Option pattern matching
-                debug(s"{${response.header.responseTo}} sending a failure... (${response.error.get})")
+            //println(s"_release: $chanId")
 
-                if (response.error.get.isNotAPrimaryError) {
-                  onPrimaryUnavailable()
-                }
+            response match {
+              case cmderr: Response.CommandError =>
+                promise.success(cmderr); ()
 
-                promise.failure(response.error.get)
-                ()
-              } else if (isGetLastError) {
-                debug(s"{${response.header.responseTo}} it's a getlasterror")
+              case _ => {
+                if (response.error.isDefined) { // TODO: Option pattern matching
+                  debug(s"{${response.header.responseTo}} sending a failure... (${response.error.get})")
 
-                // todo, for now rewinding buffer at original index
-
-                lastError(response).fold({ e =>
-                  error(s"Error deserializing LastError message #${response.header.responseTo}", e)
-                  promise.failure(new RuntimeException(s"Error deserializing LastError message #${response.header.responseTo} ($lnm)", e))
-                }, { lastError =>
-                  if (lastError.inError) {
-                    trace(s"{${response.header.responseTo}} sending a failure (lasterror is not ok)")
-
-                    if (lastError.isNotAPrimaryError) onPrimaryUnavailable()
-
-                    promise.failure(lastError)
-                  } else {
-                    trace(s"{${response.header.responseTo}} sending a success (lasterror is ok)")
-
-                    response.documents.readerIndex(response.documents.readerIndex)
-
-                    promise.success(response)
-                  }
-                })
-
-                ()
-              } else if (isMongo26WriteOp) {
-                // TODO - logs, bson
-                // MongoDB 26 Write Protocol errors
-                trace(s"Received a response to a MongoDB2.6 Write Op")
-
-                import reactivemongo.bson.lowlevel._
-                import reactivemongo.core.netty.ChannelBufferReadableBuffer
-
-                val fields = {
-                  val reader = new LowLevelBsonDocReader(
-                    new ChannelBufferReadableBuffer(response.documents))
-
-                  reader.fieldStream
-                }
-                val okField = fields.find(_.name == "ok")
-
-                trace(s"{${response.header.responseTo}} ok field is: $okField")
-
-                val processedOk = okField.collect {
-                  case BooleanField(_, v) => v
-                  case IntField(_, v)     => v != 0
-                  case DoubleField(_, v)  => v != 0
-                }.getOrElse(false)
-
-                if (processedOk) {
-                  trace(s"{${response.header.responseTo}} [MongoDB26 Write Op response] sending a success!")
-                  promise.success(response)
-                  ()
-                } else {
-                  debug(s"{${response.header.responseTo}} [MongoDB26 Write Op response] processedOk is false! sending an error")
-
-                  val notAPrimary = fields.find(_.name == "errmsg").exists {
-                    case errmsg @ LazyField(0x02, _, buf) =>
-                      debug(s"{${response.header.responseTo}} [MongoDB26 Write Op response] errmsg is $errmsg!")
-                      buf.readString == "not a primary"
-                    case errmsg =>
-                      debug(s"{${response.header.responseTo}} [MongoDB26 Write Op response] errmsg is $errmsg but not interesting!")
-                      false
-                  }
-
-                  if (notAPrimary) {
-                    debug(s"{${response.header.responseTo}} [MongoDB26 Write Op response] not a primary error!")
+                  if (response.error.get.isNotAPrimaryError) {
                     onPrimaryUnavailable()
                   }
 
-                  promise.failure(GenericDriverException("not ok"))
+                  promise.failure(response.error.get)
+                  ()
+                } else if (isGetLastError) {
+                  debug(s"{${response.header.responseTo}} it's a getlasterror")
+
+                  // todo, for now rewinding buffer at original index
+
+                  lastError(response).fold({ e =>
+                    error(s"Error deserializing LastError message #${response.header.responseTo}", e)
+                    promise.failure(new RuntimeException(s"Error deserializing LastError message #${response.header.responseTo} ($lnm)", e))
+                  }, { lastError =>
+                    if (lastError.inError) {
+                      trace(s"{${response.header.responseTo}} sending a failure (lasterror is not ok)")
+
+                      if (lastError.isNotAPrimaryError) onPrimaryUnavailable()
+
+                      promise.failure(lastError)
+                    } else {
+                      trace(s"{${response.header.responseTo}} sending a success (lasterror is ok)")
+
+                      response.documents.readerIndex(response.documents.readerIndex)
+
+                      promise.success(response)
+                    }
+                  })
+
+                  ()
+                } else if (isMongo26WriteOp) {
+                  // TODO - logs, bson
+                  // MongoDB 26 Write Protocol errors
+                  trace(s"Received a response to a MongoDB2.6 Write Op")
+
+                  import reactivemongo.bson.lowlevel._
+                  import reactivemongo.core.netty.ChannelBufferReadableBuffer
+
+                  val fields = {
+                    val reader = new LowLevelBsonDocReader(
+                      new ChannelBufferReadableBuffer(response.documents))
+
+                    reader.fieldStream
+                  }
+                  val okField = fields.find(_.name == "ok")
+
+                  trace(s"{${response.header.responseTo}} ok field is: $okField")
+
+                  val processedOk = okField.collect {
+                    case BooleanField(_, v) => v
+                    case IntField(_, v)     => v != 0
+                    case DoubleField(_, v)  => v != 0
+                  }.getOrElse(false)
+
+                  if (processedOk) {
+                    trace(s"{${response.header.responseTo}} [MongoDB26 Write Op response] sending a success!")
+                    promise.success(response)
+                    ()
+                  } else {
+                    debug(s"{${response.header.responseTo}} [MongoDB26 Write Op response] processedOk is false! sending an error")
+
+                    val notAPrimary = fields.find(_.name == "errmsg").exists {
+                      case errmsg @ LazyField(0x02, _, buf) =>
+                        debug(s"{${response.header.responseTo}} [MongoDB26 Write Op response] errmsg is $errmsg!")
+                        buf.readString == "not a primary"
+                      case errmsg =>
+                        debug(s"{${response.header.responseTo}} [MongoDB26 Write Op response] errmsg is $errmsg but not interesting!")
+                        false
+                    }
+
+                    if (notAPrimary) {
+                      debug(s"{${response.header.responseTo}} [MongoDB26 Write Op response] not a primary error!")
+                      onPrimaryUnavailable()
+                    }
+
+                    promise.failure(GenericDriverException("not ok"))
+                    ()
+                  }
+                } else {
+                  trace(s"{${response.header.responseTo}} [MongoDB26 Write Op response] sending a success!")
+                  promise.success(response)
                   ()
                 }
-              } else {
-                trace(s"{${response.header.responseTo}} [MongoDB26 Write Op response] sending a success!")
-                promise.success(response)
-                ()
               }
             }
           }
-        }
 
-        case _ => error(s"Oups. ${response.header.responseTo} not found! complete message is $response")
+          case _ => error(s"Oups. ${response.header.responseTo} not found! complete message is $response")
+        }
       }
-    }
 
     case request @ AuthRequest(authenticate, _) => {
       debug(s"New authenticate request $authenticate")
@@ -895,8 +911,6 @@ trait MongoDBSystem extends Actor {
       AuthRequestsManager.addAuthRequest(request)
 
       updateNodeSet(authenticate.toString) { ns =>
-        //println(s"_addAuth   [${System identityHashCode this}]: ${ns.authenticates.map(_.user).mkString("[", ", ", "]")}#${System identityHashCode ns} + ${authenticate.user}")
-
         // Authenticate the entire NodeSet
         val authenticates = ns.authenticates + authenticate
 
@@ -1085,8 +1099,6 @@ trait MongoDBSystem extends Actor {
       this._nodeSet = updated
     }
 
-    //println(s"\r\n----===> ${event take 30} : ${updated.authenticates.map(_.user).mkString("[", ", ", "]")}\r\n")
-
     nodeSetUpdated(event, previous, updated)
 
     updated
@@ -1168,13 +1180,7 @@ trait MongoDBSystem extends Actor {
     if (authed.isLeft) { // there is an auth error
       authenticate.future.value match {
         case Some(Success(replyTo)) => { // original requested auth
-          //println(s"_removeAuth[${System identityHashCode this}]: ${updSet.authenticates.map(_.user).mkString("[", ", ", "]")}#${System identityHashCode updSet} - ${replyTo.user}")
-
-          val after = updSet.copy(authenticates = updSet.authenticates - replyTo)
-
-          //println(s"_removeAuth[${System identityHashCode this}]: ${after.authenticates.map(_.user).mkString("[", ", ", "]")}#${System identityHashCode after} <-- after")
-
-          after
+          updSet.copy(authenticates = updSet.authenticates - replyTo)
         }
 
         case r => {
@@ -1208,46 +1214,50 @@ trait MongoDBSystem extends Actor {
       case Some(chanId) => ns.pickByChannelId(chanId).map(Success(_)).getOrElse(
         Failure(new ChannelNotFound(s"#${chanId}", false, internalState)))
 
-      case _ => ns.pick(request.readPreference).map(Success(_)).getOrElse {
-        val secOk = secondaryOK(request)
-        lazy val reqAuth = ns.authenticates.nonEmpty
-        val cause: Throwable = if (!secOk) {
-          ns.primary match {
-            case Some(prim) => {
-              val details = s"'${prim.name}' { ${nodeInfo(reqAuth, prim)} } ($supervisor/$name)"
+      case _ => requestTracker.withAwaiting { (_, chans) =>
+        val accept = { c: Connection => !chans.contains(c.channel.id) }
 
-              if (!reqAuth || prim.authenticated.nonEmpty) {
-                new ChannelNotFound(s"No active channel can be found to the primary node: $details", true, internalState)
-              } else {
-                new NotAuthenticatedException(
-                  s"No authenticated channel for the primary node: $details")
+        ns.pick(request.readPreference, accept).map(Success(_)).getOrElse {
+          val secOk = secondaryOK(request)
+          lazy val reqAuth = ns.authenticates.nonEmpty
+          val cause: Throwable = if (!secOk) {
+            ns.primary match {
+              case Some(prim) => {
+                val details = s"'${prim.name}' { ${nodeInfo(reqAuth, prim)} } ($supervisor/$name)"
+
+                if (!reqAuth || prim.authenticated.nonEmpty) {
+                  new ChannelNotFound(s"No active channel can be found to the primary node: $details", true, internalState)
+                } else {
+                  new NotAuthenticatedException(
+                    s"No authenticated channel for the primary node: $details")
+                }
               }
+
+              case _ => new PrimaryUnavailableException(
+                supervisor, name, internalState)
             }
-
-            case _ => new PrimaryUnavailableException(
-              supervisor, name, internalState)
-          }
-        } else if (!ns.isReachable) {
-          new NodeSetNotReachable(supervisor, name, internalState)
-        } else {
-          // Node set is reachable, secondary is ok, but no channel found
-          val (authed, msgs) = ns.nodes.foldLeft(
-            false -> Seq.empty[String]) {
-              case ((authed, msgs), node) =>
-                val msg = s"'${node.name}' [${node.status}] { ${nodeInfo(reqAuth, node)} }"
-
-                (authed || node.authenticated.nonEmpty) -> (msg +: msgs)
-            }
-          val details = s"""${msgs.mkString(", ")} ($supervisor/$name)"""
-
-          if (!reqAuth || authed) {
-            new ChannelNotFound(s"No active channel with '${request.readPreference}' found for the nodes: $details", true, internalState)
+          } else if (!ns.isReachable) {
+            new NodeSetNotReachable(supervisor, name, internalState)
           } else {
-            new NotAuthenticatedException(s"No authenticated channel: $details")
-          }
-        }
+            // Node set is reachable, secondary is ok, but no channel found
+            val (authed, msgs) = ns.nodes.foldLeft(
+              false -> Seq.empty[String]) {
+                case ((authed, msgs), node) =>
+                  val msg = s"'${node.name}' [${node.status}] { ${nodeInfo(reqAuth, node)} }"
 
-        Failure(cause)
+                  (authed || node.authenticated.nonEmpty) -> (msg +: msgs)
+              }
+            val details = s"""${msgs.mkString(", ")} ($supervisor/$name)"""
+
+            if (!reqAuth || authed) {
+              new ChannelNotFound(s"No active channel with '${request.readPreference}' found for the nodes: $details", true, internalState)
+            } else {
+              new NotAuthenticatedException(s"No authenticated channel: $details")
+            }
+          }
+
+          Failure(cause)
+        }
       }
     }
   }
@@ -1391,13 +1401,19 @@ trait MongoDBSystem extends Actor {
           else new PrimaryUnavailableException(supervisor, name, cause)
         }
 
-        awaitingResponses.retain { (_, awaitingResponse) =>
-          if (channelIds contains awaitingResponse.channelID) {
-            trace(s"Unregistering the pending request ${awaitingResponse.promise} for ${node.toShortString}'")
+        requestTracker.withAwaiting { (resps, chans) =>
+          resps.retain { (_, awaitingResponse) =>
+            chans -= awaitingResponse.channelID
 
-            awaitingResponse.promise.failure(error)
-            false
-          } else true
+            //println(s"_release: ${awaitingResponse.channelID}")
+
+            if (channelIds contains awaitingResponse.channelID) {
+              trace(s"Unregistering the pending request ${awaitingResponse.promise} for ${node.toShortString}'")
+
+              awaitingResponse.promise.failure(error)
+              false
+            } else true
+          }
         }
 
         // Reset node state
@@ -1455,8 +1471,6 @@ trait MongoDBSystem extends Actor {
     def addAuthRequest(request: AuthRequest): Map[Authenticate, List[Promise[SuccessfulAuthentication]]] = {
       val found = authRequests.get(request.authenticate)
 
-      //println(s"_addRequest: ${authRequests.map(_._1.user)} + ${request.authenticate.user}")
-
       authRequests = authRequests + (request.authenticate -> (
         request.promise :: found.getOrElse(Nil)))
 
@@ -1469,8 +1483,6 @@ trait MongoDBSystem extends Actor {
 
       authRequests.get(authenticate) match {
         case Some(found) => {
-          //println(s"_removeReq : ${authRequests.map(_._1.user)} - ${authenticate.user}")
-
           authRequests = authRequests - authenticate
 
           found.foreach(f)
@@ -1502,7 +1514,7 @@ trait MongoDBSystem extends Actor {
 
   // --- Logging ---
 
-  protected final val lnm = s"$supervisor/$name" // log naming
+  protected final lazy val lnm = s"$supervisor/$name" // log naming
 
   @inline protected def _println(msg: => String) = println(s"[$lnm] $msg")
 
@@ -1537,8 +1549,6 @@ final class LegacyDBSystem private[reactivemongo] (
   def newChannelFactory(effect: Unit): ChannelFactory =
     new ChannelFactory(supervisor, name, options)
 
-  @deprecated("Initialize with an explicit supervisor and connection names", "0.11.14")
-  def this(s: Seq[String], a: Seq[Authenticate], opts: MongoConnectionOptions) = this(s"unknown-${System identityHashCode opts}", s"unknown-${System identityHashCode opts}", s, a, opts)
 }
 
 @deprecated("Internal class: will be made private", "0.11.14")
@@ -1589,4 +1599,17 @@ case class AuthRequest(
   authenticate: Authenticate,
   promise: Promise[SuccessfulAuthentication] = Promise()) {
   def future: Future[SuccessfulAuthentication] = promise.future
+}
+
+private[actors] final class RequestTracker {
+  import scala.collection.mutable.{ LinkedHashMap, Set }
+
+  private val awaitingResponses = LinkedHashMap.empty[Int, AwaitingResponse]
+
+  private val awaitingChannels = Set.empty[ChannelId]
+
+  private[actors] def withAwaiting[T](f: Function2[LinkedHashMap[Int, AwaitingResponse], Set[ChannelId], T]): T =
+    awaitingResponses.synchronized {
+      f(awaitingResponses, awaitingChannels)
+    }
 }

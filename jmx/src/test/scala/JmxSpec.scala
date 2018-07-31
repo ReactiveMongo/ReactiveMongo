@@ -141,7 +141,7 @@ class JmxSpec(implicit ee: ExecutionEnv)
             aka("MBean info") must beSuccessfulTry[MBeanInfo].like {
               case info => info.getAttributes.map(attr => {
                 (attr.getName, attr.getType, attr.isReadable, attr.isWritable)
-              }).iterator must containAllOf(attrs) and {
+              }).toSeq must containAllOf(attrs) and {
                 info.getOperations aka "operations" must beEmpty
               } and {
                 info.getNotifications must_== notifInfo

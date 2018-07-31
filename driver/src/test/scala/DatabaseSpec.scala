@@ -13,6 +13,7 @@ class DatabaseSpec(implicit ee: ExecutionEnv)
 
   sequential
 
+  import tests.Common
   import Common._
 
   "Database" should {

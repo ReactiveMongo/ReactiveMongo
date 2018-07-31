@@ -1,3 +1,5 @@
+package reactivemongo
+
 import scala.collection.immutable.Set
 import scala.concurrent.{ Await, Future }
 
@@ -21,6 +23,8 @@ import reactivemongo.core.actors.StandardDBSystem
 import reactivemongo.core.netty.ChannelBufferReadableBuffer
 
 import reactivemongo.io.netty.channel.{ Channel, DefaultChannelId }
+
+import _root_.tests.{ Common, NettyEmbedder }
 
 trait UnresponsiveSecondarySpec { parent: NodeSetSpec =>
   import reactivemongo.api.tests._
@@ -90,13 +94,14 @@ trait UnresponsiveSecondarySpec { parent: NodeSetSpec =>
               ref ! RefreshAll
             }
           } yield {
-            val unregistered = Common.tryUntil((0 to 5).map(_ * 500).toList)(
-              nodeSet(ref.underlyingActor).nodes,
-              (_: Vector[Node]).exists { node =>
-                if (node.name startsWith "nodesetspec.node2:") {
-                  node.status == NodeStatus.Unknown
-                } else false
-              })
+            val unregistered = Common.tryUntil(
+              (0 to 5).map(_ * 500).toList)(
+                nodeSet(ref.underlyingActor).nodes,
+                (_: Vector[Node]).exists { node =>
+                  if (node.name startsWith "nodesetspec.node2:") {
+                    node.status == NodeStatus.Unknown
+                  } else false
+                })
 
             (state1, unregistered, nsState)
           }).map {

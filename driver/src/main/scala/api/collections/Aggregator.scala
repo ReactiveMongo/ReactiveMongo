@@ -2,8 +2,6 @@ package reactivemongo.api.collections
 
 import scala.language.higherKinds
 
-import scala.concurrent.ExecutionContext // Future
-
 import reactivemongo.api.{
   Cursor,
   CursorProducer,
@@ -37,7 +35,11 @@ private[collections] trait Aggregator[P <: SerializationPack with Singleton]
     val readPreference: ReadPreference,
     val batchSize: Option[Int],
     val reader: pack.Reader[T]) {
-    def prepared[AC[_] <: Cursor[_]](implicit cp: CursorProducer.Aux[T, AC]): Aggregator[T, AC] = new Aggregator[T, AC](this, cp)
+
+    def prepared[AC[_] <: Cursor[_]](
+      implicit
+      cp: CursorProducer.Aux[T, AC]): Aggregator[T, AC] =
+      new Aggregator[T, AC](this, cp)
   }
 
   final class Aggregator[T, AC[_] <: Cursor[_]](
@@ -51,7 +53,7 @@ private[collections] trait Aggregator[P <: SerializationPack with Singleton]
     private def ver = db.connection.metadata.
       fold[MongoWireVersion](MongoWireVersion.V30)(_.maxWireVersion)
 
-    final def cursor(implicit ec: ExecutionContext): AC[T] = {
+    final def cursor: AC[T] = {
       def batchSz = batchSize.getOrElse(defaultCursorBatchSize)
       implicit def writer = commandWriter[T]
       implicit def aggReader: pack.Reader[T] = reader

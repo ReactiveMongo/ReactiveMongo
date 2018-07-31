@@ -11,6 +11,7 @@ class FailoverSpec(implicit ee: ExecutionEnv)
 
   "Failover" title
 
+  import tests.Common
   import Common._
 
   "Asynchronous failover" should {

@@ -5,6 +5,8 @@ import reactivemongo.bson.{ BSONDocument, BSONDocumentReader }
 import reactivemongo.core.protocol.Response
 import reactivemongo.api.{ Cursor, DB, QueryOpts }
 
+import _root_.tests.Common
+
 trait TailableCursorSpec { specs: CursorSpec =>
   def tailableSpec = {
     object IdReader extends BSONDocumentReader[Int] {

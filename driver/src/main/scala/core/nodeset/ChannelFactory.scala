@@ -33,8 +33,7 @@ import reactivemongo.api.MongoConnectionOptions
  * @param supervisor the name of the driver supervisor
  * @param connection the name of the connection pool
  */
-@deprecated("Internal class: will be made private", "0.11.14")
-final class ChannelFactory private[reactivemongo] (
+private[reactivemongo] final class ChannelFactory(
   supervisor: String,
   connection: String,
   options: MongoConnectionOptions) extends ChannelInitializer[Channel] {

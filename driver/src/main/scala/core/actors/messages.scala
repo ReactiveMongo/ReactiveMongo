@@ -94,12 +94,6 @@ case object RegisterMonitor
 case object Closed
 case object GetLastMetadata
 
-/**
- * A message to send to a MonitorActor to be warned when a primary has been discovered.
- */
-@deprecated(message = "Will be removed", since = "0.11.10")
-case object WaitForPrimary
-
 private[actors] object IsMasterResponse {
   def unapply(response: Response): Option[Response] =
     if (RequestId.isMaster accepts response) Some(response) else None

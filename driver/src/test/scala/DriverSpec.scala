@@ -34,6 +34,7 @@ class DriverSpec(implicit ee: ExecutionEnv)
 
   sequential
 
+  import tests.Common
   import Common._
 
   val hosts = Seq(primaryHost)
@@ -42,7 +43,7 @@ class DriverSpec(implicit ee: ExecutionEnv)
     "cleanly start and close with no connections #1" in {
       val md = newDriver()
 
-      md.numConnections must_== 0 and {
+      reactivemongo.api.tests.numConnections(md) must_== 0 and {
         md.close(timeout) must not(throwA[Throwable])
       } and {
         md.close(timeout) aka "extra close" must_=== ({})
@@ -52,7 +53,7 @@ class DriverSpec(implicit ee: ExecutionEnv)
     "cleanly start and close with no connections #2" in {
       val md = newDriver()
 
-      md.numConnections must_== 0 and (
+      reactivemongo.api.tests.numConnections(md) must_== 0 and (
         md.close(timeout) must not(throwA[Throwable]))
     }
 

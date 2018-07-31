@@ -19,6 +19,7 @@ final class FindAndModifySpec(implicit ee: ExecutionEnv)
 
   "FindAndModify" title
 
+  import tests.Common
   import Common._
 
   "Raw findAndModify" should {
@@ -166,7 +167,8 @@ final class FindAndModifySpec(implicit ee: ExecutionEnv)
       val future = for {
         _ <- collection.insert[Person](ordered = true).one(jack2)
         r <- collection.runCommand(
-          FindAndModify(query, Update(BSONDocument("$inc" -> "age"))))
+          FindAndModify(query, Update(BSONDocument("$inc" -> "age"))),
+          ReadPreference.Primary)
       } yield r
 
       future.map(_ => Option.empty[Int]).recover {

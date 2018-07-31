@@ -1,3 +1,5 @@
+package reactivemongo
+
 import akka.actor.Actor
 import akka.testkit.TestActorRef
 
@@ -18,6 +20,8 @@ import reactivemongo.api.{
   MongoDriver,
   ReadPreference
 }
+
+import _root_.tests.Common
 
 class MonitorSpec(implicit ee: ExecutionEnv)
   extends org.specs2.mutable.Specification {

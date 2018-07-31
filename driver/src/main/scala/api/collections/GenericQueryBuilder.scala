@@ -147,7 +147,7 @@ trait GenericQueryBuilder[P <: SerializationPack]
       }
 
       def batchSize: Option[Int] = {
-        val sz = limit.fold(options.batchSizeN) { options.batchSizeN min _ }
+        val sz = limit.fold(options.batchSizeN)(options.batchSizeN.min)
 
         if (sz > 0 && sz < Int.MaxValue) Some(sz)
         else Option.empty[Int]
@@ -248,10 +248,15 @@ trait GenericQueryBuilder[P <: SerializationPack]
 
   private def defaultCursor[T](
     readPreference: ReadPreference,
-    isMongo26WriteOp: Boolean = false)(implicit reader: pack.Reader[T]): Cursor[T] = {
+    isMongo26WriteOp: Boolean = false)(
+    implicit
+    reader: pack.Reader[T]): Cursor[T] = {
+
     val body = {
       if (version.compareTo(MongoWireVersion.V32) < 0) { _: Int =>
-        val buffer = write(merge(readPreference), ChannelBufferWritableBuffer())
+        val buffer = write(
+          merge(readPreference, Int.MaxValue),
+          ChannelBufferWritableBuffer())
 
         BufferSequence(
           projectionOption.fold(buffer) { write(_, buffer) }.buffer)

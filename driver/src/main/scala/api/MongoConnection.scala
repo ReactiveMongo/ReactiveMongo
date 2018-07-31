@@ -81,32 +81,10 @@ class MongoConnection(
   val options: MongoConnectionOptions) { // TODO: toString as MongoURI
   import Exceptions._
 
-  @deprecated("Create with an explicit supervisor and connection names", "0.11.14")
-  def this(actorSys: ActorSystem, mongoSys: ActorRef, opts: MongoConnectionOptions) = this(s"unknown-${System identityHashCode mongoSys}", s"unknown-${System identityHashCode mongoSys}", actorSys, mongoSys, opts)
-
   // TODO: Review
   private[api] var history = () => InternalState.empty
 
   @volatile private[api] var killed: Boolean = false
-
-  /**
-   * Returns a DefaultDB reference using this connection.
-   *
-   * @param name $dbName
-   * @param failoverStrategy $failoverStrategy
-   */
-  @deprecated(message = "Use [[database]]", since = "0.11.8")
-  def apply(name: String, failoverStrategy: FailoverStrategy = options.failoverStrategy)(implicit context: ExecutionContext): DefaultDB = DefaultDB(name, this, failoverStrategy)
-
-  /**
-   * Returns a DefaultDB reference using this connection
-   * (alias for the `apply` method).
-   *
-   * @param name $dbName
-   * @param failoverStrategy $failoverStrategy
-   */
-  @deprecated(message = "Must use [[database]]", since = "0.11.8")
-  def db(name: String, failoverStrategy: FailoverStrategy = options.failoverStrategy)(implicit context: ExecutionContext): DefaultDB = apply(name, failoverStrategy)
 
   /**
    * Returns a DefaultDB reference using this connection.
@@ -118,7 +96,7 @@ class MongoConnection(
    */
   def database(name: String, failoverStrategy: FailoverStrategy = options.failoverStrategy)(implicit context: ExecutionContext): Future[DefaultDB] =
     waitIsAvailable(failoverStrategy, stackTrace()).
-      map(_ => apply(name, failoverStrategy))
+      map(_ => DefaultDB(name, this, failoverStrategy))
 
   @inline private def stackTrace() =
     Thread.currentThread.getStackTrace.tail.tail.take(2).reverse
@@ -179,13 +157,14 @@ class MongoConnection(
     expectingResponse.future
   }
 
-  private[api] def sendExpectingResponse(requestMaker: RequestMaker, isMongo26WriteOp: Boolean): Future[Response] = whenActive {
-    lazy val expectingResponse =
-      RequestMakerExpectingResponse(requestMaker, isMongo26WriteOp)
+  //private[api] def sendExpectingResponse(requestMaker: RequestMaker, isMongo26WriteOp: Boolean): Future[Response] = sendExpectingResponse(RequestMakerExpectingResponse(requestMaker, isMongo26WriteOp))
 
-    mongosystem ! expectingResponse
-    expectingResponse.future
-  }
+  private[api] def sendExpectingResponse(
+    expectingResponse: RequestMakerExpectingResponse): Future[Response] =
+    whenActive {
+      mongosystem ! expectingResponse
+      expectingResponse.future
+    }
 
   @deprecated("Use `authenticate` with `failoverStrategy`", "0.14.0")
   def authenticate(db: String, user: String, password: String): Future[SuccessfulAuthentication] = authenticate(db, user, password, options.failoverStrategy)(actorSystem.dispatcher)

@@ -6,6 +6,8 @@ import reactivemongo.bson._
 
 import org.specs2.concurrent.ExecutionEnv
 
+import _root_.tests.Common
+
 class CollectionSpec(implicit protected val ee: ExecutionEnv)
   extends org.specs2.mutable.Specification
   with org.specs2.specification.AfterAll
@@ -79,7 +81,8 @@ class CollectionSpec(implicit protected val ee: ExecutionEnv)
       }
 
       "when empty with success using collect" in {
-        cursor.collect[Vector](10).map(_.length) must beEqualTo(0).
+        cursor.collect[Vector](10, Cursor.FailOnError[Vector[BSONDocument]]()).
+          map(_.length) must beEqualTo(0).
           await(1, timeout)
       }
 
@@ -148,11 +151,13 @@ class CollectionSpec(implicit protected val ee: ExecutionEnv)
         @inline def cursor = findAll(c).cursor[Person]()
 
         "using collect" in {
-          val collect = cursor.collect[Vector]().map(_.size).recover {
-            case e if e.getMessage == "hey hey hey" => -1
-            case _ =>
-              /* e.printStackTrace() */ -2
-          }
+          val collect = cursor.
+            collect(-1, Cursor.FailOnError[Vector[Person]]()).
+            map(_.size).recover {
+              case e if e.getMessage == "hey hey hey" => -1
+              case _ =>
+                /* e.printStackTrace() */ -2
+            }
 
           collect aka "first collect" must not(throwA[Exception]).
             await(1, timeout) and (collect must beEqualTo(-1).await(1, timeout))
@@ -192,7 +197,8 @@ class CollectionSpec(implicit protected val ee: ExecutionEnv)
       implicit val reader = new SometimesBuggyPersonReader
 
       def resultSpec(c: BSONCollection, timeout: FiniteDuration) =
-        findAll(c).cursor[Person]().collect[Vector](stopOnError = false).
+        findAll(c).cursor[Person]().collect[Vector](
+          Int.MaxValue, Cursor.ContOnError[Vector[Person]]()).
           map(_.length) must beTypedEqualTo(4).await(1, timeout)
 
       "with the default connection" in {
@@ -284,7 +290,7 @@ class CollectionSpec(implicit protected val ee: ExecutionEnv)
     "be managed so that" >> metaSpec
 
     "use bulks" >> {
-      s"to insert (including 3 duplicate errors)" >> {
+      "to insert (including 3 duplicate errors)" >> {
         val nDocs = 1000000
         def colName(n: Int) = s"bulked${System identityHashCode this}_${n}"
 
@@ -308,8 +314,10 @@ class CollectionSpec(implicit protected val ee: ExecutionEnv)
             r <- c.indexesManager.ensure(
               Index(List("plop" -> Ascending), unique = true))
           } yield r) must beTrue.await(1, timeout) and {
-            c.bulkInsert(docs, false).map(_.n) must beTypedEqualTo(e).
+            c.insert[BSONDocument](ordered = false).
+              many(docs).map(_.n) must beTypedEqualTo(e).
               await(1, timeout * (n / 2L))
+
           } and {
             c.count(Some(BSONDocument("bulk" -> true))).
               aka("count") must beTypedEqualTo(e).await(1, timeout)
@@ -319,7 +327,7 @@ class CollectionSpec(implicit protected val ee: ExecutionEnv)
 
         s"$nDocs documents with the default connection" in {
           bulkSpec(db(colName(nDocs)), nDocs, nDocs - 3, timeout)
-        }
+        } tag "wip"
 
         s"${nDocs / 1000} with the slow connection" in {
           bulkSpec(

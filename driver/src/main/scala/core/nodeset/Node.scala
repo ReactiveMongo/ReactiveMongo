@@ -11,9 +11,8 @@ import reactivemongo.bson.BSONDocument
 /**
  * @param name the main name of the node
  */
-@deprecated(message = "Will be made private", since = "0.11.10")
 @SerialVersionUID(440354552L)
-case class Node(
+private[reactivemongo] case class Node(
   name: String,
   @transient status: NodeStatus,
   @transient connections: Vector[Connection],
@@ -50,9 +49,6 @@ case class Node(
     connected.filter(_.authenticated.forall { auth =>
       authenticated.exists(_ == auth)
     }))
-
-  @deprecated(message = "Use `createNeededChannels` with an explicit `channelFactory`", since = "0.12-RC1")
-  def createNeededChannels(receiver: ActorRef, upTo: Int)(implicit channelFactory: ChannelFactory): Node = createNeededChannels(channelFactory, receiver, upTo)
 
   private[core] def createNeededChannels(
     channelFactory: ChannelFactory,

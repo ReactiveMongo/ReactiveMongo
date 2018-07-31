@@ -54,34 +54,12 @@ case class NodeSet(
 
   def updateAll(f: Node => Node): NodeSet = copy(nodes = nodes.map(f))
 
-  @deprecated(message = "Use updateNodeByChannelId with ChannelId", "0.12.8")
-  @throws[UnsupportedOperationException](
-    "Use updateNodeByChannelId with ChannelId")
-  def updateNodeByChannelId(id: Int)(f: Node => Node): NodeSet =
-    throw new UnsupportedOperationException(
-      "Use updateNodeByChannelId with ChannelId")
-
   def updateNodeByChannelId(id: ChannelId)(f: Node => Node): NodeSet =
     updateByChannelId(id)(identity)(f)
 
   def updateConnectionByChannelId(id: ChannelId)(f: Connection => Connection): NodeSet = updateByChannelId(id)(f)(identity)
 
-  @deprecated(
-    message = "Use updateConnectionByChannelId with ChannelId", "0.12.8")
-  @throws[UnsupportedOperationException](
-    "Use updateConnectionByChannelId with ChannelId")
-  def updateConnectionByChannelId(id: Int)(f: Connection => Connection): NodeSet = throw new UnsupportedOperationException("Use updateConnectionByChannelId with ChannelId")
-
-  @deprecated(message = "Use updateByChannelId with ChannelId", "0.12.8")
-  @throws[UnsupportedOperationException]("Use updateByChannelId with ChannelId")
-  def updateByChannelId(id: Int)(fc: Connection => Connection)(fn: Node => Node): NodeSet = throw new UnsupportedOperationException("Use updateByChannelId with ChannelId")
-
   def updateByChannelId(id: ChannelId)(fc: Connection => Connection)(fn: Node => Node): NodeSet = copy(nodes = nodes.map(_.updateByChannelId(id)(fc)(fn)))
-
-  @deprecated(message = "Use pickByChanneId with ChannelId", "0.12.8")
-  @throws[UnsupportedOperationException]("Use pickByChanneId with ChannelId")
-  def pickByChannelId(id: Int): Option[(Node, Connection)] =
-    throw new UnsupportedOperationException("Use pickByChanneId with ChannelId")
 
   def pickByChannelId(id: ChannelId): Option[(Node, Connection)] =
     nodes.view.map(node =>
@@ -90,17 +68,45 @@ case class NodeSet(
         con.status == ConnectionStatus.Connected) => node -> con
     }
 
-  @deprecated(message = "Unused", since = "0.12-RC0")
-  def pickForWrite: Option[(Node, Connection)] = primary.view.map(node =>
-    node -> node.authenticatedConnections.subject.headOption).collectFirst {
-    case (node, Some(connection)) => node -> connection
+  def pick(preference: ReadPreference): Option[(Node, Connection)] =
+    pick(preference, _ => true)
+
+  // http://docs.mongodb.org/manual/reference/read-preference/
+  private[reactivemongo] def pick(
+    preference: ReadPreference,
+    accept: Connection => Boolean): Option[(Node, Connection)] = {
+
+    def filter(tags: Seq[Map[String, String]]) = ReadPreference.TagFilter(tags)
+
+    if (mongos.isDefined) {
+      pickConnectionAndFlatten(accept)(mongos)
+    } else preference match {
+      case ReadPreference.Primary =>
+        pickConnectionAndFlatten(accept)(primary)
+
+      case ReadPreference.PrimaryPreferred(tags) =>
+        pickConnectionAndFlatten(accept)(primary.orElse(
+          pickFromGroupWithFilter(secondaries, filter(tags), secondaries.pick)))
+
+      case ReadPreference.Secondary(tags) =>
+        pickConnectionAndFlatten(accept)(pickFromGroupWithFilter(
+          secondaries, filter(tags), secondaries.pick))
+
+      case ReadPreference.SecondaryPreferred(tags) =>
+        pickConnectionAndFlatten(accept)(pickFromGroupWithFilter(
+          secondaries, filter(tags), secondaries.pick).orElse(primary))
+
+      case ReadPreference.Nearest(tags) =>
+        pickConnectionAndFlatten(accept)(pickFromGroupWithFilter(
+          nearestGroup, filter(tags), nearest))
+    }
   }
 
-  private val pickConnectionAndFlatten: Option[Node] => Option[(Node, Connection)] = {
+  private def pickConnectionAndFlatten(accept: Connection => Boolean): Option[Node] => Option[(Node, Connection)] = {
     val p: RoundRobiner[Connection, Vector] => Option[Connection] =
-      if (authenticates.isEmpty) _.pick
+      if (authenticates.isEmpty) _.pick //TODO: WithFilter(accept)
       else _.pickWithFilter(c =>
-        !c.authenticating.isDefined && !c.authenticated.isEmpty)
+        !c.authenticating.isDefined && !c.authenticated.isEmpty && accept(c))
 
     _.flatMap(node => p(node.authenticatedConnections).map(node -> _))
   }
@@ -108,41 +114,6 @@ case class NodeSet(
   private def pickFromGroupWithFilter(roundRobiner: RoundRobiner[Node, Vector], filter: Option[BSONDocument => Boolean], fallback: => Option[Node]) =
     filter.fold(fallback)(f =>
       roundRobiner.pickWithFilter(_.tags.fold(false)(f)))
-
-  // http://docs.mongodb.org/manual/reference/read-preference/
-  def pick(preference: ReadPreference): Option[(Node, Connection)] = {
-    def filter(tags: Seq[Map[String, String]]) = ReadPreference.TagFilter(tags)
-
-    if (mongos.isDefined) {
-      pickConnectionAndFlatten(mongos)
-    } else preference match {
-      case ReadPreference.Primary =>
-        pickConnectionAndFlatten(primary)
-
-      case ReadPreference.PrimaryPreferred(tags) =>
-        pickConnectionAndFlatten(primary.orElse(
-          pickFromGroupWithFilter(secondaries, filter(tags), secondaries.pick)))
-
-      case ReadPreference.Secondary(tags) =>
-        pickConnectionAndFlatten(pickFromGroupWithFilter(
-          secondaries, filter(tags), secondaries.pick))
-
-      case ReadPreference.SecondaryPreferred(tags) =>
-        pickConnectionAndFlatten(pickFromGroupWithFilter(
-          secondaries, filter(tags), secondaries.pick).orElse(primary))
-
-      case ReadPreference.Nearest(tags) =>
-        pickConnectionAndFlatten(pickFromGroupWithFilter(
-          nearestGroup, filter(tags), nearest))
-    }
-  }
-
-  /**
-   * Returns a NodeSet with channels created to `upTo` given maximum,
-   * per each member of the set.
-   */
-  @deprecated(message = "Use `createNeededChannels` with the explicit `channelFactory`", since = "0.12-RC1")
-  def createNeededChannels(receiver: ActorRef, upTo: Int)(implicit channelFactory: ChannelFactory): NodeSet = createNeededChannels(channelFactory, receiver, upTo)
 
   /**
    * Returns a NodeSet with channels created to `upTo` given maximum,

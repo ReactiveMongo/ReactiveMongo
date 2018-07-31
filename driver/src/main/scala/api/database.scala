@@ -70,43 +70,19 @@ sealed trait DB {
    * Returns the database of the given name on the same MongoConnection.
    *
    * @param name $nameParam
-   * @see [[sibling1]]
    */
-  def sibling(name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit ec: ExecutionContext): DefaultDB = connection(name, failoverStrategy)
-
-  /**
-   * Returns the database of the given name on the same MongoConnection.
-   *
-   * @param name $nameParam
-   */
-  def sibling1(name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit ec: ExecutionContext): Future[DefaultDB] = connection.database(name, failoverStrategy)
+  def sibling(name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit ec: ExecutionContext): Future[DefaultDB] = connection.database(name, failoverStrategy)
 
 }
 
-@deprecated(message = "Will be made sealed", since = "0.12-RC0")
-trait GenericDB[P <: SerializationPack with Singleton] { self: DB =>
+sealed trait GenericDB[P <: SerializationPack with Singleton] { self: DB =>
   val pack: P
 
   import reactivemongo.api.commands._
 
-  @deprecated(message = "Either use one of the `runX` function on the DB instance, or use `reactivemongo.api.commands.Command.run` directly", since = "0.12-RC0")
-  def runner = Command.run(pack)
-
-  @deprecated(message = "Use `runCommand` with the `failoverStrategy` parameter", since = "0.12-RC0")
-  def runCommand[R, C <: Command with CommandWithResult[R]](command: C with CommandWithResult[R])(implicit writer: pack.Writer[C], reader: pack.Reader[R], ec: ExecutionContext): Future[R] = runCommand[R, C](command, failoverStrategy)
-
-  def runCommand[R, C <: Command with CommandWithResult[R]](command: C with CommandWithResult[R], failoverStrategy: FailoverStrategy)(implicit writer: pack.Writer[C], reader: pack.Reader[R], ec: ExecutionContext): Future[R] = Command.run(pack, failoverStrategy).apply(self, command)
-
-  @deprecated(message = "Use `runCommand` with the `failoverStrategy` parameter", since = "0.12-RC0")
-  def runCommand[C <: Command](command: C)(implicit writer: pack.Writer[C]): CursorFetcher[pack.type, Cursor] = runCommand[C](command, failoverStrategy)
+  def runCommand[R, C <: Command with CommandWithResult[R]](command: C with CommandWithResult[R], failoverStrategy: FailoverStrategy)(implicit writer: pack.Writer[C], reader: pack.Reader[R], ec: ExecutionContext): Future[R] = Command.run(pack, failoverStrategy).apply(self, command, self.defaultReadPreference)
 
   def runCommand[C <: Command](command: C, failoverStrategy: FailoverStrategy)(implicit writer: pack.Writer[C]): CursorFetcher[pack.type, Cursor] = Command.run(pack, failoverStrategy).apply(self, command)
-
-  @deprecated(message = "Use `runValueCommand` with the `failoverStrategy` parameter", since = "0.12-RC0")
-  def runValueCommand[A <: AnyVal, R <: BoxedAnyVal[A], C <: Command with CommandWithResult[R]](command: C with CommandWithResult[R with BoxedAnyVal[A]])(implicit writer: pack.Writer[C], reader: pack.Reader[R], ec: ExecutionContext): Future[A] = runValueCommand[A, R, C](command, failoverStrategy)
-
-  @deprecated("Use the alternative with `ReadPreference`", "0.12-RC5")
-  def runValueCommand[A <: AnyVal, R <: BoxedAnyVal[A], C <: Command with CommandWithResult[R]](command: C with CommandWithResult[R with BoxedAnyVal[A]], failoverStrategy: FailoverStrategy)(implicit writer: pack.Writer[C], reader: pack.Reader[R], ec: ExecutionContext): Future[A] = runValueCommand[A, R, C](command, failoverStrategy, ReadPreference.primary)
 
   def runValueCommand[A <: AnyVal, R <: BoxedAnyVal[A], C <: Command with CommandWithResult[R]](command: C with CommandWithResult[R with BoxedAnyVal[A]], failoverStrategy: FailoverStrategy, readPreference: ReadPreference)(implicit writer: pack.Writer[C], reader: pack.Reader[R], ec: ExecutionContext): Future[A] = Command.run(pack, failoverStrategy).unboxed(self, command, readPreference)
 }

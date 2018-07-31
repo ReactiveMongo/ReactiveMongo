@@ -1,3 +1,5 @@
+package reactivemongo
+
 import scala.concurrent.Future
 
 import reactivemongo.io.netty.channel.{ ChannelId, DefaultChannelId }
@@ -12,6 +14,8 @@ import reactivemongo.core.nodeset.{
 }
 
 import reactivemongo.core.actors.StandardDBSystem
+
+import _root_.tests.NettyEmbedder
 
 trait ConnectAllSpec { _: NodeSetSpec =>
   import reactivemongo.api.tests.connectAll

@@ -9,7 +9,9 @@ import reactivemongo.api.commands.bson.BSONCountCommandImplicits._
 
 import org.specs2.concurrent.ExecutionEnv
 
-class CommonUseCases(implicit ee: ExecutionEnv)
+import _root_.tests.Common
+
+final class CommonUseCases(implicit ee: ExecutionEnv)
   extends org.specs2.mutable.Specification
   with org.specs2.specification.AfterAll {
 
@@ -18,6 +20,7 @@ class CommonUseCases(implicit ee: ExecutionEnv)
   sequential
 
   // ---
+
   import Common.{ timeout, slowTimeout }
 
   lazy val (db, slowDb) = Common.databases(s"reactivemongo-usecases-${System identityHashCode this}", Common.connection, Common.slowConnection)
@@ -40,9 +43,11 @@ class CommonUseCases(implicit ee: ExecutionEnv)
         "age" -> BSONInteger(i), "name" -> BSONString("Jack" + i)))
 
       (for {
-        result <- collection.bulkInsert(docs, ordered = true)
-        count <- collection.runValueCommand(Count(BSONDocument(
-          "age" -> BSONDocument("$gte" -> 18, "$lte" -> 60))))
+        result <- collection.insert[BSONDocument](ordered = true).many(docs)
+        count <- collection.runValueCommand(
+          Count(BSONDocument(
+            "age" -> BSONDocument("$gte" -> 18, "$lte" -> 60))),
+          ReadPreference.Primary)
       } yield count) must beEqualTo(43).await(1, timeout)
     }
 
@@ -54,16 +59,18 @@ class CommonUseCases(implicit ee: ExecutionEnv)
       //import reactivemongo.core.protocol.{ Response, Reply }
       //import reactivemongo.api.tests.{ makeRequest => req, nextResponse }
 
-      it.collect[List]().map(_.map(_.getAs[BSONInteger]("age").get.value).
-        mkString("")) must beEqualTo((18 to 60).mkString("")).
+      it.collect[List](Int.MaxValue, Cursor.FailOnError[List[BSONDocument]]()).
+        map(_.map(_.getAs[BSONInteger]("age").get.value).
+          mkString("")) must beEqualTo((18 to 60).mkString("")).
         await(1, timeout * 2)
 
     }
 
     "find by regexp" in {
       collection.find(BSONDocument("name" -> BSONRegex("ack2", ""))).
-        cursor[BSONDocument]().collect[List]().map(_.size).
-        aka("size") must beEqualTo(10).await(1, timeout)
+        cursor[BSONDocument]().
+        collect[List](Int.MaxValue, Cursor.FailOnError[List[BSONDocument]]()).
+        map(_.size) must beEqualTo(10).await(1, timeout)
     }
 
     "find by regexp with flag" in {
@@ -73,7 +80,8 @@ class CommonUseCases(implicit ee: ExecutionEnv)
             BSONDocument("name" -> BSONRegex("^jack2", "i")),
             BSONDocument("name" -> BSONRegex("^jack3", "i"))))
 
-      collection.find(query).cursor[BSONDocument]().collect[List]().
+      collection.find(query).cursor[BSONDocument]().
+        collect[List](Int.MaxValue, Cursor.FailOnError[List[BSONDocument]]()).
         map(_.size) aka "size" must beEqualTo(20).await(1, timeout)
     }
 
@@ -87,9 +95,10 @@ class CommonUseCases(implicit ee: ExecutionEnv)
         //import reactivemongo.core.protocol.{ Response, Reply }
         //import reactivemongo.api.tests.{ makeRequest => req, nextResponse }
 
-        it.collect[List]().map {
-          _.map(_.getAs[BSONInteger]("age").get.value).mkString("")
-        } must beEqualTo((18 to 60).mkString("")).await(0, t)
+        it.collect[List](
+          Int.MaxValue, Cursor.FailOnError[List[BSONDocument]]()).map {
+            _.map(_.getAs[BSONInteger]("age").get.value).mkString("")
+          } must beEqualTo((18 to 60).mkString("")).await(0, t)
       }
 
       "with the default connection" in {

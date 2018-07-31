@@ -47,12 +47,6 @@ trait AggregationFramework[P <: SerializationPack]
     firstBatch: List[pack.Document],
     cursor: Option[ResultCursor] = None) {
 
-    @deprecated(message = "Use [[firstBatch]]", since = "0.11.10")
-    def documents = firstBatch
-
-    @deprecated(message = "Use [[head]]", since = "0.11.10")
-    def result[T](implicit reader: pack.Reader[T]): List[T] = head[T]
-
     /**
      * Returns the first batch as a list, using the given `reader`.
      */

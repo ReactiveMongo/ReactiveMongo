@@ -7,17 +7,9 @@ import scala.concurrent.duration.{ Duration, FiniteDuration }
 
 import akka.pattern.after
 
-import reactivemongo.core.actors.{
-  CheckedWriteRequestExpectingResponse,
-  ExpectingResponse,
-  RequestMakerExpectingResponse
-}
+import reactivemongo.core.actors.ExpectingResponse
 import reactivemongo.core.errors.ConnectionException
-import reactivemongo.core.protocol.{
-  CheckedWriteRequest,
-  RequestMaker,
-  Response
-}
+import reactivemongo.core.protocol.Response
 import reactivemongo.util.LazyLogger
 
 /**
@@ -97,8 +89,7 @@ class Failover[T](message: T, connection: MongoConnection, strategy: FailoverStr
   send(0)
 }
 
-@deprecated(message = "Will be made private", since = "0.11.11")
-class Failover2[A](producer: () => Future[A], connection: MongoConnection, strategy: FailoverStrategy)(implicit ec: ExecutionContext) {
+private[reactivemongo] class Failover2[A](producer: () => Future[A], connection: MongoConnection, strategy: FailoverStrategy)(implicit ec: ExecutionContext) {
   import Failover2.logger, logger.trace
   import reactivemongo.core.errors._
   import reactivemongo.core.actors.Exceptions._
@@ -176,29 +167,4 @@ object Failover2 {
 
   def apply[A](connection: MongoConnection, strategy: FailoverStrategy)(producer: () => Future[A])(implicit ec: ExecutionContext): Failover2[A] =
     new Failover2(producer, connection, strategy)
-}
-
-@deprecated(message = "Unused", since = "0.11.10")
-object Failover {
-  /**
-   * Produces a [[reactivemongo.api.Failover]] holding a future reference that is completed with a result, after 1 or more attempts (specified in the given strategy).
-   *
-   * @param checkedWriteRequest The checkedWriteRequest to send to the given actor.
-   * @param connection The reference to the MongoConnection the given message will be sent to.
-   * @param strategy The Failover strategy.
-   */
-  @deprecated(message = "Unused", since = "0.11.10")
-  def apply(checkedWriteRequest: CheckedWriteRequest, connection: MongoConnection, strategy: FailoverStrategy)(implicit ec: ExecutionContext): Failover[CheckedWriteRequest] =
-    new Failover(checkedWriteRequest, connection, strategy)(CheckedWriteRequestExpectingResponse.apply)
-
-  /**
-   * Produces a [[reactivemongo.api.Failover]] holding a future reference that is completed with a result, after 1 or more attempts (specified in the given strategy).
-   *
-   * @param requestMaker The requestMaker to send to the given actor.
-   * @param connection The reference to the MongoConnection actor the given message will be sent to.
-   * @param strategy The Failover strategy.
-   */
-  @deprecated(message = "Unused", since = "0.11.10")
-  def apply(requestMaker: RequestMaker, connection: MongoConnection, strategy: FailoverStrategy)(implicit ec: ExecutionContext): Failover[RequestMaker] =
-    new Failover(requestMaker, connection, strategy)(RequestMakerExpectingResponse(_, false))
 }

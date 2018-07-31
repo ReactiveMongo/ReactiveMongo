@@ -11,6 +11,7 @@ import reactivemongo.api.{
 }
 
 import reactivemongo.core.protocol.Response
+import reactivemongo.core.actors.RequestMakerExpectingResponse
 import reactivemongo.core.errors.ReactiveMongoException
 
 sealed trait AbstractCommand
@@ -47,14 +48,7 @@ trait CursorFetcher[P <: SerializationPack, +C[_] <: Cursor[_]] {
 
   def one[A](readPreference: ReadPreference)(implicit reader: pack.Reader[A], ec: ExecutionContext): Future[A]
 
-  @deprecated("Use the alternative with `ReadPreference`", "0.12.0")
-  def one[A](implicit reader: pack.Reader[A], ec: ExecutionContext): Future[A] = one[A](defaultReadPreference)
-
   def cursor[A](readPreference: ReadPreference)(implicit reader: pack.Reader[A]): C[A]
-
-  @deprecated("Use the alternative with `ReadPreference`", "0.12.0")
-  def cursor[A](implicit reader: pack.Reader[A]): C[A] =
-    cursor(defaultReadPreference)
 
   protected def defaultReadPreference: ReadPreference
 }
@@ -123,7 +117,9 @@ object Command {
         buildRequestMaker(pack)(command, writer, readPreference, db.name)
 
       Failover2(db.connection, failover) { () =>
-        db.connection.sendExpectingResponse(requestMaker, m26WriteCommand)
+        db.connection.sendExpectingResponse(
+          RequestMakerExpectingResponse(requestMaker, m26WriteCommand))
+
       }.future.flatMap {
         case Response.CommandError(_, _, _, cause) =>
           cause.originalDocument match {
@@ -157,30 +153,17 @@ object Command {
   }
 
   case class CommandWithPackRunner[P <: SerializationPack](pack: P, failover: FailoverStrategy = FailoverStrategy()) {
-    // database
-    @deprecated("Use alternative with `ReadPreference`", "0.12.0")
-    def apply[R, C <: Command with CommandWithResult[R]](db: DB, command: C with CommandWithResult[R])(implicit writer: pack.Writer[C], reader: pack.Reader[R], ec: ExecutionContext): Future[R] = apply[R, C](db, command, ReadPreference.primary)
-
     def apply[R, C <: Command with CommandWithResult[R]](db: DB, command: C with CommandWithResult[R], rp: ReadPreference)(implicit writer: pack.Writer[C], reader: pack.Reader[R], ec: ExecutionContext): Future[R] = defaultCursorFetcher(db, pack, command, failover).one[R](rp)
 
     def apply[C <: Command](db: DB, command: C)(implicit writer: pack.Writer[C]): CursorFetcher[pack.type, Cursor] = defaultCursorFetcher(db, pack, command, failover)
 
-    @deprecated("Use the alternative with `ReadPreference`", "0.12-RC5")
-    def unboxed[A <: AnyVal, R <: BoxedAnyVal[A], C <: Command with CommandWithResult[R]](db: DB, command: C with CommandWithResult[R with BoxedAnyVal[A]])(implicit writer: pack.Writer[C], reader: pack.Reader[R], ec: ExecutionContext): Future[A] = unboxed[A, R, C](db, command, ReadPreference.primary)
-
     def unboxed[A <: AnyVal, R <: BoxedAnyVal[A], C <: Command with CommandWithResult[R]](db: DB, command: C with CommandWithResult[R with BoxedAnyVal[A]], rp: ReadPreference)(implicit writer: pack.Writer[C], reader: pack.Reader[R], ec: ExecutionContext): Future[A] = defaultCursorFetcher(db, pack, command, failover).one[R](rp).map(_.value)
-
-    @deprecated("Use the alternative with `ReadPreference`", "0.12-RC5")
-    def unboxed[A <: AnyVal, R <: BoxedAnyVal[A], C <: CollectionCommand with CommandWithResult[R]](collection: Collection, command: C with CommandWithResult[R with BoxedAnyVal[A]])(implicit writer: pack.Writer[ResolvedCollectionCommand[C]], reader: pack.Reader[R], ec: ExecutionContext): Future[A] = unboxed[A, R, C](collection, command, ReadPreference.primary)
 
     def unboxed[A <: AnyVal, R <: BoxedAnyVal[A], C <: CollectionCommand with CommandWithResult[R]](collection: Collection, command: C with CommandWithResult[R with BoxedAnyVal[A]], rp: ReadPreference)(implicit writer: pack.Writer[ResolvedCollectionCommand[C]], reader: pack.Reader[R], ec: ExecutionContext): Future[A] =
       defaultCursorFetcher(collection.db, pack, ResolvedCollectionCommand(collection.name, command), failover).one[R](rp).map(_.value)
 
     // collection
     def apply[R, C <: CollectionCommand with CommandWithResult[R]](collection: Collection, command: C with CommandWithResult[R], rp: ReadPreference)(implicit writer: pack.Writer[ResolvedCollectionCommand[C]], reader: pack.Reader[R], ec: ExecutionContext): Future[R] = defaultCursorFetcher(collection.db, pack, ResolvedCollectionCommand(collection.name, command), failover).one[R](rp)
-
-    @deprecated("Use the alternative with `ReadPreference`", "0.12-RC5")
-    def apply[R, C <: CollectionCommand with CommandWithResult[R]](collection: Collection, command: C with CommandWithResult[R])(implicit writer: pack.Writer[ResolvedCollectionCommand[C]], reader: pack.Reader[R], ec: ExecutionContext): Future[R] = apply[R, C](collection, command, ReadPreference.primary)
 
     def apply[C <: CollectionCommand](collection: Collection, command: C)(implicit writer: pack.Writer[ResolvedCollectionCommand[C]]): CursorFetcher[pack.type, Cursor] = defaultCursorFetcher(collection.db, pack, ResolvedCollectionCommand(collection.name, command), failover)
 
@@ -213,9 +196,6 @@ object Command {
       } yield ResponseResult(resp, cursor.numberToReturn, result)
     }
 
-    @deprecated("Use the alternative with `ReadPreference`", "0.12-RC5")
-    def withResponse[R, C <: CollectionCommand with CommandWithResult[R]](collection: Collection, command: C)(implicit writer: pack.Writer[ResolvedCollectionCommand[C]], reader: pack.Reader[R], ec: ExecutionContext): Future[ResponseResult[R]] = withResponse[R, C](collection, command)
-
     def rawCommand[T](input: T)(implicit writer: pack.Writer[T]): RawCommand =
       RawCommand(pack.serialize(input, writer))
 
@@ -225,10 +205,6 @@ object Command {
       implicit val writer: pack.Writer[RawCommand] = pack.writer(_.document)
     }
   }
-
-  @deprecated(message = "Use `run` with the `failoverStrategy` parameter", since = "0.12-RC0")
-  def run[P <: SerializationPack](pack: P): CommandWithPackRunner[pack.type] =
-    CommandWithPackRunner(pack, FailoverStrategy())
 
   /**
    * Returns a command runner.
@@ -251,7 +227,7 @@ object Command {
     pack: P, response: Response)(implicit reader: pack.Reader[A]): A =
     pack.readAndDeserialize(response, reader)
 
-  private[reactivemongo] def buildRequestMaker[P <: SerializationPack, A](pack: P)(command: A, writer: pack.Writer[A], readPreference: ReadPreference, db: String): (RequestMaker, Boolean) = {
+  private[reactivemongo] def buildRequestMaker[P <: SerializationPack, A](pack: P)(command: A, writer: pack.Writer[A], readPreference: ReadPreference, db: String): (RequestMaker, Boolean) = { // TODO: Returns RequestMakerExpectingResponse
     val buffer = ChannelBufferWritableBuffer()
 
     pack.serializeAndWrite(buffer, command, writer)

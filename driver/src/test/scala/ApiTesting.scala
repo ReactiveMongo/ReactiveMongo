@@ -40,6 +40,8 @@ import reactivemongo.api.collections.QueryCodecs
 package object tests extends QueryCodecs[BSONSerializationPack.type] {
   val pack = BSONSerializationPack
 
+  def numConnections(d: MongoDriver): Int = d.numConnections
+
   // Test alias
   def _failover2[A](c: MongoConnection, s: FailoverStrategy)(p: () => Future[A])(implicit ec: ExecutionContext): Failover2[A] = Failover2.apply(c, s)(p)(ec)
 

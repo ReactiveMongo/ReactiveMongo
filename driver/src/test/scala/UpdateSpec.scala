@@ -9,6 +9,8 @@ import reactivemongo.api.commands.{ UpdateWriteResult, WriteResult, Upserted }
 import reactivemongo.api.commands.bson.BSONUpdateCommand._
 import reactivemongo.api.commands.bson.BSONUpdateCommandImplicits._
 
+import _root_.tests.Common
+
 trait UpdateSpec extends UpdateFixtures { collectionSpec: CollectionSpec =>
 
   import Common._

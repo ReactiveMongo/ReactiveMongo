@@ -18,18 +18,20 @@ package reactivemongo.api
 import scala.language.higherKinds
 
 import scala.util.{ Failure, Success, Try }
+
 import scala.collection.generic.CanBuildFrom
 import scala.collection.mutable.Builder
+
 import scala.concurrent.{ ExecutionContext, Future }
 
 import akka.actor.ActorSystem
 
-import play.api.libs.iteratee.{ Enumerator, Enumeratee, Error, Input, Iteratee }
-
 import reactivemongo.bson.BSONDocument
 
-import reactivemongo.core.actors.Exceptions
-import reactivemongo.core.iteratees.{ CustomEnumeratee, CustomEnumerator }
+import reactivemongo.core.actors.{
+  Exceptions,
+  RequestMakerExpectingResponse
+}
 import reactivemongo.core.netty.BufferSequence
 import reactivemongo.core.protocol.{
   GetMore,
@@ -69,43 +71,7 @@ import reactivemongo.util.{
  */
 trait Cursor[T] {
   // TODO: maxDocs; 0 for unlimited maxDocs
-  import Cursor.{ ContOnError, ErrorHandler, FailOnError }
-
-  /**
-   * Produces an Enumerator of documents.
-   * The returned enumerator may process up to `maxDocs`.
-   * If `stopOnError` is false, then documents that cause error are dropped,
-   * so the enumerator may emit a little less than `maxDocs`,
-   * even if it processes `maxDocs` documents.
-   *
-   * @param maxDocs $maxDocsParam.
-   * @param stopOnError $stopOnErrorParam.
-   * @return an [[play.api.libs.iteratee.Enumerator]] of documents
-   */
-  @deprecated(message = "Use `.enumerator` from Play Iteratees module", since = "0.11.10")
-  def enumerate(maxDocs: Int = -1, stopOnError: Boolean = false)(implicit ctx: ExecutionContext): Enumerator[T]
-
-  /**
-   * Produces an Enumerator of Iterator of documents.
-   * Given the `stopOnError` parameter, this Enumerator may stop on any non-fatal exception, or skip and continue.
-   *
-   * @param maxDocs $maxDocsParam. $maxDocsWarning.
-   * @param stopOnError $stopOnErrorParam.
-   * @return an [[play.api.libs.iteratee.Enumerator]] of Iterators of documents
-   */
-  @deprecated(message = "Use `.bulkEnumerator` from the Play Iteratees module", since = "0.11.10")
-  def enumerateBulks(maxDocs: Int = -1, stopOnError: Boolean = false)(implicit ctx: ExecutionContext): Enumerator[Iterator[T]]
-
-  /**
-   * Produces an Enumerator of responses from the database.
-   * Given the `stopOnError` parameter, this Enumerator may stop on any non-fatal exception, or skip and continue.
-   *
-   * @param maxDocs $maxDocsParam. $maxDocsWarning.
-   * @param stopOnError $stopOnErrorParam.
-   * @return an [[play.api.libs.iteratee.Enumerator]] of Responses.
-   */
-  @deprecated(message = "Use `.responseEnumerator` from the Play Iteratees module", since = "0.11.10")
-  def enumerateResponses(maxDocs: Int = -1, stopOnError: Boolean = false)(implicit ctx: ExecutionContext): Enumerator[Response]
+  import Cursor.{ ErrorHandler, FailOnError }
 
   /**
    * $collect.
@@ -120,24 +86,6 @@ trait Cursor[T] {
    * }}}
    */
   def collect[M[_]](maxDocs: Int, err: ErrorHandler[M[T]])(implicit cbf: CanBuildFrom[M[_], T, M[T]], ec: ExecutionContext): Future[M[T]]
-
-  /**
-   * $collect.
-   *
-   * @param maxDocs $maxDocsParam.
-   * @param stopOnError $stopOnErrorParam.
-   *
-   * {{{
-   * val cursor = collection.find(query, filter).cursor[BSONDocument]()
-   * // return the 3 first documents in a Vector[BSONDocument].
-   * val vector = cursor.collect[Vector](3)
-   * }}}
-   */
-  @deprecated(message = "Use `collect` with an [[Cursor.ErrorHandler]].", since = "0.12-RC1")
-  def collect[M[_]](maxDocs: Int = -1, stopOnError: Boolean = true)(implicit cbf: CanBuildFrom[M[_], T, M[T]], ec: ExecutionContext): Future[M[T]] = {
-    val err = if (stopOnError) FailOnError[M[T]]() else ContOnError[M[T]]()
-    collect[M](maxDocs, err)
-  }
 
   /**
    * $foldResp
@@ -236,10 +184,6 @@ trait Cursor[T] {
   def fold[A](z: => A, maxDocs: Int = -1)(suc: (A, T) => A)(implicit ctx: ExecutionContext): Future[A] = foldWhile[A](z, maxDocs)(
     { (st, v) => Cursor.Cont[A](suc(st, v)) }, FailOnError[A]())
 
-  /** Returns the list of the matching documents. */
-  @deprecated("consider using collect[List] instead", "0.10.0")
-  def toList(maxDocs: Int = -1, stopOnError: Boolean = true)(implicit ctx: ExecutionContext): Future[List[T]] = collect[List](maxDocs, stopOnError)
-
   /**
    * $getHead, or fails with [[Cursor.NoSuchResultException]] if none.
    *
@@ -261,15 +205,6 @@ trait Cursor[T] {
    * }}}
    */
   def headOption(implicit ctx: ExecutionContext): Future[Option[T]]
-
-  /**
-   * Produces an Enumerator of responses from the database.
-   * An Enumeratee for error handling should be used to prevent silent failures.
-   *
-   * @param maxDocs $maxDocsParam
-   */
-  @deprecated(message = "Use the Play Iteratees module", since = "0.11.10")
-  def rawEnumerateResponses(maxDocs: Int = -1)(implicit ctx: ExecutionContext): Enumerator[Response]
 }
 
 /** Internal cursor operations. */
@@ -290,12 +225,15 @@ sealed trait CursorOps[T] { cursor: Cursor[T] =>
    */
   private[reactivemongo] def documentIterator(response: Response): Iterator[T]
 
+  @deprecated("Use [[killCursor]]", "0.16.0")
+  def kill(cursorID: Long): Unit
+
   /**
    * Kills the server resources associated with the specified cursor.
    *
-   * @param cursorID the cursor ID
+   * @param id the cursor ID
    */
-  def kill(cursorID: Long): Unit
+  private[reactivemongo] def killCursor(id: Long)(implicit ctx: ExecutionContext): Unit
 
   /** Indicates whether the underlying cursor is taible. */
   def tailable: Boolean
@@ -397,18 +335,6 @@ object DefaultCursor {
   import reactivemongo.api.commands.ResultCursor
   import CursorOps.Unrecoverable
 
-  @deprecated(message = "Use [[query]]", since = "0.11.10")
-  def apply[P <: SerializationPack, A](
-    pack: P,
-    query: Query,
-    documents: BufferSequence,
-    readPreference: ReadPreference,
-    mongoConnection: MongoConnection,
-    failover: FailoverStrategy,
-    isMongo26WriteOp: Boolean)(implicit reader: pack.Reader[A]): Cursor[A] =
-    DefaultCursor.query[P, A](pack, query, _ => documents, readPreference,
-      mongoConnection, failover, isMongo26WriteOp, query.fullCollectionName)
-
   /**
    * @param collectionName the fully qualified collection name (even if `query.fullCollectionName` is `\$cmd`)
    */
@@ -440,7 +366,9 @@ object DefaultCursor {
         // MongoDB2.6: Int.MaxValue
 
         val op = query.copy(numberToReturn = ntr)
-        val req = RequestMaker(op, requestBuffer(maxDocs), readPreference)
+        val req = RequestMakerExpectingResponse(
+          RequestMaker(op, requestBuffer(maxDocs), readPreference),
+          isMongo26WriteOp)
 
         requester(0, maxDocs, req)(ctx)
       }.future.flatMap {
@@ -530,8 +458,10 @@ object DefaultCursor {
 
             logger.trace(s"Calling next on #${result.cursorId}, op=$op")
 
-            val req = RequestMaker(op, cmd).
-              copy(channelIdHint = Some(response.info._channelId))
+            val req = RequestMakerExpectingResponse(
+              RequestMaker(op, cmd).
+                copy(channelIdHint = Some(response.info._channelId)),
+              isMongo26WriteOp)
 
             requester(response.reply.startingFrom, maxDocs, req)(ctx)
           }.future
@@ -586,12 +516,12 @@ object DefaultCursor {
     @inline protected def lessThenV32: Boolean =
       version.compareTo(MongoWireVersion.V32) < 0
 
-    protected lazy val requester: (Int, Int, RequestMaker) => ExecutionContext => Future[Response] = {
-      @inline def base(req: RequestMaker): Future[Response] =
-        connection.sendExpectingResponse(req, mongo26WriteOp)
+    protected lazy val requester: (Int, Int, RequestMakerExpectingResponse) => ExecutionContext => Future[Response] = {
+      @inline def base(req: RequestMakerExpectingResponse): Future[Response] =
+        connection.sendExpectingResponse(req)
 
       if (lessThenV32) {
-        { (off: Int, maxDocs: Int, req: RequestMaker) =>
+        { (off: Int, maxDocs: Int, req: RequestMakerExpectingResponse) =>
           val max = if (maxDocs > 0) maxDocs else Int.MaxValue
 
           { implicit ec: ExecutionContext =>
@@ -615,7 +545,7 @@ object DefaultCursor {
             }
           }
         }
-      } else { (startingFrom: Int, _: Int, req: RequestMaker) =>
+      } else { (startingFrom: Int, _: Int, req: RequestMakerExpectingResponse) =>
         { implicit ec: ExecutionContext =>
           base(req).map {
             // Normalizes as 'new' cursor doesn't indicate such property
@@ -640,10 +570,11 @@ object DefaultCursor {
 
         logger.trace(s"Asking for the next batch of $ntr documents on cursor #${reply.cursorID}, after ${nextOffset}: $op")
 
-        def req = RequestMaker(
-          op, cmd,
-          readPreference = preference,
-          channelIdHint = Some(response.info._channelId))
+        def req = RequestMakerExpectingResponse(
+          RequestMaker(op, cmd,
+            readPreference = preference,
+            channelIdHint = Some(response.info._channelId)),
+          mongo26WriteOp)
 
         Failover2(connection, failoverStrategy) { () =>
           requester(nextOffset, maxDocs, req)(ctx)
@@ -681,17 +612,28 @@ object DefaultCursor {
       }
     }
 
-    def kill(cursorID: Long): Unit = killCursors(cursorID, "Cursor")
+    def kill(cursorID: Long): Unit = // DEPRECATED
+      killCursor(cursorID)(connection.actorSystem.dispatcher)
 
-    private def killCursors(cursorID: Long, logCat: String): Unit = {
+    def killCursor(id: Long)(implicit ec: ExecutionContext): Unit =
+      killCursors(id, "Cursor")
+
+    private def killCursors(
+      cursorID: Long,
+      logCat: String)(implicit ec: ExecutionContext): Unit = {
       if (cursorID != 0) {
         logger.debug(s"[$logCat] Clean up $cursorID, sending KillCursors")
 
-        val killReq = RequestMaker(
-          KillCursors(Set(cursorID)),
-          readPreference = preference)
+        val killReq = RequestMakerExpectingResponse(
+          RequestMaker(KillCursors(Set(cursorID)), readPreference = preference),
+          false)
 
-        connection.send(killReq)
+        connection.sendExpectingResponse(killReq).onComplete {
+          case Failure(cause) => logger.warn(
+            s"[$logCat] Fails to kill cursor #${cursorID}", cause)
+
+          case _ => ()
+        }
       } else logger.trace(s"[$logCat] Nothing to release: cursor already exhausted ($cursorID)")
     }
 
@@ -771,94 +713,6 @@ object DefaultCursor {
       }
 
       foldBulksM(z, maxDocs)(go, err)
-    }
-
-    @deprecated(message = "Only for internal use", since = "0.11.10")
-    def simpleCursorEnumerateResponses(maxDocs: Int = -1)(implicit ctx: ExecutionContext): Enumerator[Response] =
-      Enumerator.flatten(makeRequest(maxDocs).
-        map(new CustomEnumerator.SEnumerator(_)(
-          next = response => {
-            if (hasNext(response, maxDocs)) {
-              next(response, maxDocs)
-            } else {
-              Future.successful(Option.empty[Response])
-            }
-          }, cleanUp = { resp => killCursors(resp.reply.cursorID, "Cursor") })))
-
-    @deprecated(message = "Only for internal use", since = "0.11.10")
-    def tailableCursorEnumerateResponses(maxDocs: Int = -1)(implicit ctx: ExecutionContext): Enumerator[Response] =
-      Enumerator.flatten(makeRequest(maxDocs).map { response =>
-        new CustomEnumerator.SEnumerator(response -> 0)(
-          next = { current =>
-            val (r, c) = current
-            if (c < maxDocs) {
-              tailResponse(r, maxDocs).
-                map(_.map((_, c + r.reply.numberReturned)))
-
-            } else Future.successful(Option.empty[(Response, Int)])
-          },
-          cleanUp = { current =>
-            val (r, _) = current
-            killCursors(r.reply.cursorID, "Tailable Cursor")
-          }).map(_._1)
-      })
-
-    @deprecated(message = "Use the Play Iteratees module", since = "0.11.10")
-    def rawEnumerateResponses(maxDocs: Int = -1)(implicit ctx: ExecutionContext): Enumerator[Response] =
-      if (tailable) tailableCursorEnumerateResponses(maxDocs)
-      else simpleCursorEnumerateResponses(maxDocs)
-
-    @deprecated(message = "Use the Play Iteratees module", since = "0.11.10")
-    def enumerateResponses(maxDocs: Int = -1, stopOnError: Boolean = false)(implicit ctx: ExecutionContext): Enumerator[Response] =
-      rawEnumerateResponses(maxDocs) &> {
-        if (stopOnError)
-          CustomEnumeratee.stopOnError
-        else CustomEnumeratee.recover {
-          new CustomEnumeratee.RecoverFromErrorFunction {
-            def apply[I, O](throwable: Throwable, input: Input[I], continue: () => Iteratee[I, O]): Iteratee[I, O] = throwable match {
-              case e: ReplyDocumentIteratorExhaustedException => {
-                val errstr = "ReplyDocumentIterator exhausted! Was this enumerator applied to many iteratees concurrently? Stopping to prevent infinite recovery."
-                logger.error(errstr, e)
-                Error(errstr, input)
-              }
-
-              case e =>
-                logger.debug("There was an exception during the stream, dropping it since stopOnError is false", e)
-                continue()
-            }
-          }
-        }
-      }
-
-    @deprecated(message = "Use the Play Iteratees module", since = "0.11.10")
-    def enumerateBulks(maxDocs: Int = -1, stopOnError: Boolean = false)(implicit ctx: ExecutionContext): Enumerator[Iterator[A]] =
-      enumerateResponses(maxDocs, stopOnError) &> Enumeratee.map(makeIterator)
-
-    @deprecated(message = "Use the Play Iteratees module", since = "0.11.10")
-    def enumerate(maxDocs: Int = -1, stopOnError: Boolean = false)(implicit ctx: ExecutionContext): Enumerator[A] = {
-      @annotation.tailrec
-      def _next(it: Iterator[A], stopOnError: Boolean): Option[Try[A]] = {
-        if (it.hasNext) {
-          val tried = Try(it.next)
-
-          if (tried.isFailure && !stopOnError) _next(it, stopOnError)
-          else Some(tried)
-        } else None
-      }
-
-      enumerateResponses(maxDocs, stopOnError) &>
-        Enumeratee.mapFlatten { response =>
-          val iterator = makeIterator(response)
-
-          if (!iterator.hasNext) Enumerator.empty
-          else CustomEnumerator.SEnumerator(iterator.next) { _ =>
-            _next(iterator, stopOnError).
-              fold(Future.successful(Option.empty[A])) {
-                case Success(mt) => Future.successful(Some(mt))
-                case Failure(e)  => Future.failed(e)
-              }
-          }
-        }
     }
 
     def collect[M[_]](maxDocs: Int, err: ErrorHandler[M[A]])(implicit cbf: CanBuildFrom[M[_], A, M[A]], ec: ExecutionContext): Future[M[A]] =

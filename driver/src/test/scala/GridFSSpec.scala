@@ -22,6 +22,7 @@ class GridFSSpec(implicit ee: ExecutionEnv)
 
   // ---
 
+  import tests.Common
   import Common.{ timeout, slowTimeout }
 
   lazy val (db, slowDb) = Common.databases(s"reactivemongo-gridfs-${System identityHashCode this}", Common.connection, Common.slowConnection)
