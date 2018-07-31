@@ -61,17 +61,21 @@ trait ChannelBufferReadable[T] {
  * @param documents body of this request, a [[http://netty.io/4.1/api/io/netty/buffer/ByteBuf.html ByteBuf]] containing 0, 1, or many documents.
  * @param getLastError a [[reactivemongo.core.commands.GetLastError]] command message.
  */
+@deprecated("Unused", "0.16.0")
 case class CheckedWriteRequest(
   op: WriteRequestOp,
   documents: BufferSequence,
   getLastError: GetLastError) {
+
+  import reactivemongo.api.BSONSerializationPack
+  import reactivemongo.api.commands.Command
+  import reactivemongo.api.commands.bson.
+    BSONGetLastErrorImplicits.GetLastErrorWriter
+
   def apply(): (RequestMaker, RequestMaker) = {
-    import reactivemongo.api.BSONSerializationPack
-    import reactivemongo.api.commands.Command
-    import reactivemongo.api.commands.bson.BSONGetLastErrorImplicits.GetLastErrorWriter
-    val gleRequestMaker = Command.requestMaker(BSONSerializationPack).
-      onDatabase(op.db, getLastError, ReadPreference.primary)(
-        GetLastErrorWriter).requestMaker
+    val (gleRequestMaker, _) =
+      Command.buildRequestMaker(BSONSerializationPack)(
+        getLastError, GetLastErrorWriter, ReadPreference.primary, op.db)
 
     RequestMaker(op, documents) -> gleRequestMaker
   }
@@ -303,22 +307,20 @@ private[reactivemongo] class ResponseDecoder
 
           doc.getAs[BSONDocument]("cursor") match {
             case Some(cursor) if ok.exists(_.toBoolean) => {
-              val ry = for {
+              val withCursor: Option[Response] = for {
                 id <- cursor.getAs[BSONNumberLike]("id").map(_.toLong)
                 ns <- cursor.getAs[String]("ns")
                 batch <- cursor.getAs[Seq[BSONDocument]]("firstBatch").orElse(
                   cursor.getAs[Seq[BSONDocument]]("nextBatch"))
+              } yield {
+                val r = reply.copy(cursorID = id, numberReturned = batch.size)
 
-              } yield (ns, batch, reply.copy(
-                cursorID = id,
-                numberReturned = batch.size))
+                Response.WithCursor(header, r, docs, info, ns, batch)
+              }
 
               docs.resetReaderIndex()
 
-              ry.fold(Response(header, reply, docs, info)) {
-                case (ns, batch, r) => Response.WithCursor(
-                  header, r, docs, info, ns, batch)
-              }
+              withCursor getOrElse Response(header, reply, docs, info)
             }
 
             case Some(_) => failed

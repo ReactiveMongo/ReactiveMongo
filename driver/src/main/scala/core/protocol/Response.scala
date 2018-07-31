@@ -4,8 +4,6 @@ import reactivemongo.io.netty.buffer.{ ByteBuf, Unpooled }
 
 import reactivemongo.core.errors._
 
-import reactivemongo.api.SerializationPack
-
 /**
  * A Mongo Wire Protocol Response messages.
  *
@@ -14,6 +12,7 @@ import reactivemongo.api.SerializationPack
  * @param documents the body of this response, a [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ByteBuf.html ByteBuf]] containing 0, 1, or many documents
  * @param info some meta information about this response, see [[reactivemongo.core.protocol.ResponseInfo]]
  */
+@deprecated("Will be private/internal", "0.16.0")
 sealed abstract class Response(
   val header: MessageHeader,
   val reply: Reply,
@@ -46,6 +45,7 @@ sealed abstract class Response(
   override def toString = s"Response($header, $reply, $info)"
 }
 
+@deprecated("Will be private/internal", "0.16.0")
 object Response {
   import reactivemongo.api.BSONSerializationPack
   import reactivemongo.bson.BSONDocument
@@ -57,11 +57,8 @@ object Response {
     documents: ByteBuf,
     info: ResponseInfo): Response = Successful(header, reply, documents, info)
 
-  def parse(response: Response): Iterator[BSONDocument] = parse[BSONSerializationPack.type, BSONDocument](BSONSerializationPack)(response, BSONDocumentIdentity)
-
-  @inline private[reactivemongo] def parse[P <: SerializationPack, T](
-    pack: P)(response: Response, reader: pack.Reader[T]): Iterator[T] =
-    ReplyDocumentIterator.parse(pack)(response)(reader)
+  def parse(response: Response): Iterator[BSONDocument] =
+    ReplyDocumentIterator.parse(BSONSerializationPack)(response)(BSONDocumentIdentity)
 
   def unapply(response: Response): Option[(MessageHeader, Reply, ByteBuf, ResponseInfo)] = Some((response.header, response.reply, response.documents, response.info))
 

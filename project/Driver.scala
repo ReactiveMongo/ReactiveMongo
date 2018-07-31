@@ -168,6 +168,9 @@ object Version {
             imt("reactivemongo.core.netty.BufferSequence.this"),
             imt("reactivemongo.core.netty.BufferSequence.apply"),
             imt("reactivemongo.core.protocol.package.RichBuffer"),
+            mtp("reactivemongo.core.protocol.ResponseInfo$"), // private
+            mtp("reactivemongo.core.protocol.ResponseInfo"),
+            fcp("reactivemongo.core.protocol.ResponseInfo"),
             mcp("reactivemongo.core.protocol.RequestEncoder$"), // private
             imt(
               "reactivemongo.core.protocol.BufferAccessors.writeTupleToBuffer2"),

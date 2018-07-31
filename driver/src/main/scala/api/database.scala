@@ -82,8 +82,11 @@ sealed trait DB {
   @inline def defaultReadPreference: ReadPreference =
     connection.options.readPreference
 
-  /** Authenticates the connection on this database. */
+  @deprecated("Use `authenticate` without `timeout`", "0.16.0")
   def authenticate(user: String, password: String)(implicit timeout: FiniteDuration): Future[SuccessfulAuthentication] = connection.authenticate(name, user, password)
+
+  /** Authenticates the connection on this database. */
+  def authenticate(user: String, password: String)(implicit ec: ExecutionContext): Future[SuccessfulAuthentication] = connection.authenticate(name, user, password, failoverStrategy)
 
   /**
    * Returns the database of the given name on the same MongoConnection.

@@ -519,7 +519,7 @@ trait MongoDBSystem extends Actor {
     case req @ RequestMakerExpectingResponse(maker, _) => {
       val reqId = RequestId.common.next
 
-      trace(s"Received a request expecting a response ($reqId): $req")
+      debug(s"Received a request expecting a response ($reqId): $req")
 
       val request = maker(reqId)
 
@@ -549,43 +549,6 @@ trait MongoDBSystem extends Actor {
       })
 
       ()
-    }
-
-    case req @ CheckedWriteRequestExpectingResponse(_) => {
-      debug("Received a checked write request")
-
-      val checkedWriteRequest = req.checkedWriteRequest
-      val reqId = RequestId.common.next
-      val (request, writeConcern) = {
-        val tuple = checkedWriteRequest()
-        tuple._1(reqId) -> tuple._2(reqId)
-      }
-      val onError = failureOrLog(req.promise, _: Throwable) { cause =>
-        error(s"Fails to register a request: ${request.op}", cause)
-      }
-
-      foldNodeConnection(request)(onError, { (node, con) =>
-        requestTracker.withAwaiting { (resps, chans) =>
-          resps += reqId -> AwaitingResponse(
-            request, con.channel.id, req.promise,
-            isGetLastError = true, isMongo26WriteOp = false).
-            withWriteConcern(writeConcern)
-
-          chans += con.channel.id
-
-          //println(s"_reserve: ${con.channel.id}")
-
-          trace(s"Registering awaiting response for requestID $reqId on channel #${con.channel.id}, awaitingResponses: $resps")
-        }
-
-        con.send(request, writeConcern).addListener(new OperationHandler(
-          error(s"Fails to send checked write request $reqId", _),
-          { chanId =>
-            trace(s"Request $reqId successful on channel #${chanId}")
-          }))
-
-        ()
-      })
     }
 
     case ConnectAll => { // monitor
@@ -672,8 +635,6 @@ trait MongoDBSystem extends Actor {
           requestTracker.withAwaiting { (resps, chans) =>
             chans -= chanId
 
-            //println(s"_release: $chanId")
-
             val retriedChans = Set.newBuilder[ChannelId]
 
             resps.retain { (_, awaitingResponse) =>
@@ -684,8 +645,6 @@ trait MongoDBSystem extends Actor {
 
                     retried += awaiting.requestID -> awaiting
                     retriedChans += awaiting.channelID
-
-                    //println(s"_reserve: ${awaiting.channelID}")
                   }
 
                   case _ => {
@@ -942,10 +901,9 @@ trait MongoDBSystem extends Actor {
   private def onIsMaster(response: Response): Unit = {
     import reactivemongo.api.BSONSerializationPack
     import reactivemongo.api.commands.bson.BSONIsMasterCommandImplicits
-    import reactivemongo.api.commands.Command
 
-    val isMaster = Command.deserialize(BSONSerializationPack, response)(
-      BSONIsMasterCommandImplicits.IsMasterResultReader)
+    val isMaster = BSONSerializationPack.readAndDeserialize(
+      response, BSONIsMasterCommandImplicits.IsMasterResultReader)
 
     trace(s"IsMaster response: $isMaster")
 
@@ -1021,7 +979,7 @@ trait MongoDBSystem extends Actor {
 
         val upSet = prepared.copy(
           name = isMaster.replicaSet.map(_.setName),
-          version = isMaster.replicaSet.map(_.setVersion),
+          version = isMaster.replicaSet.map { _.setVersion.toLong },
           nodes = prepared.nodes ++ discoveredNodes)
 
         chanNode.fold(upSet) { node =>

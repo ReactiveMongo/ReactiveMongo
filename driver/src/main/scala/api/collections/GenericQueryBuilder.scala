@@ -285,7 +285,7 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
     val op = Query(flags, name, options.skipN, options.batchSizeN)
 
     DefaultCursor.query(pack, op, body, readPreference,
-      collection.db.connection, failover, isMongo26WriteOp,
+      collection.db, failover, isMongo26WriteOp,
       collection.fullCollectionName)(reader)
   }
 

@@ -27,7 +27,7 @@ import reactivemongo.api._
 import reactivemongo.api.commands.{
   CommandCodecs,
   Collation,
-  //ImplicitCommandHelpers,
+  ImplicitCommandHelpers,
   UnitBox,
   UpdateWriteResult,
   ResolvedCollectionCommand,
@@ -81,7 +81,7 @@ trait GenericCollectionProducer[P <: SerializationPack with Singleton, +C <: Gen
  */
 trait GenericCollection[P <: SerializationPack with Singleton]
   extends Collection with GenericCollectionWithCommands[P]
-  with CollectionMetaCommands //with ImplicitCommandHelpers[P]
+  with CollectionMetaCommands with ImplicitCommandHelpers[P]
   with InsertOps[P] with UpdateOps[P] with DeleteOps[P] with CountOp[P]
   with Aggregator[P] with GenericCollectionMetaCommands[P]
   with GenericCollectionWithQueryBuilder[P] with HintFactory[P] { self =>
@@ -611,11 +611,4 @@ trait GenericCollection[P <: SerializationPack with Singleton]
   @inline protected def MissingMetadata() =
     ConnectionNotInitialized.MissingMetadata(db.connection.history())
 
-  private def writeDoc[T](
-    doc: T,
-    writer: pack.Writer[T],
-    buffer: ChannelBufferWritableBuffer = ChannelBufferWritableBuffer()) = {
-    pack.serializeAndWrite(buffer, doc, writer)
-    buffer
-  }
 }

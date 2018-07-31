@@ -53,7 +53,7 @@ class CollectionSpec(implicit protected val ee: ExecutionEnv)
 
         collection.insert[Person](ordered = true).many(persons).map(_.ok).
           aka("insertion") must beTrue.await(1, timeout)
-      } tag "wip"
+      }
     }
 
     "count the inserted documents" in {
@@ -306,7 +306,7 @@ class CollectionSpec(implicit protected val ee: ExecutionEnv)
           _ <- coll.startSession() // no-op
           id <- coll.endSession()
         } yield id) aka "session ID" must beSome[UUID].awaitFor(timeout)
-      }
+      } tag "wip"
 
       "not end without start" in {
         collection.endSession() must beNone.await

@@ -28,8 +28,7 @@ sealed trait ExpectingResponse {
 object ExpectingResponse {
   def unapply(that: Any): Option[Promise[Response]] = that match {
     case req @ RequestMakerExpectingResponse(_, _) => Some(req.promise)
-    case req @ CheckedWriteRequestExpectingResponse(_) => Some(req.promise)
-    case _ => None
+    case _                                         => None
   }
 }
 
@@ -49,7 +48,7 @@ case class RequestMakerExpectingResponse(
  *
  * @param checkedWriteRequest The request maker.
  */
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Unused", "0.16.0")
 case class CheckedWriteRequestExpectingResponse(
   checkedWriteRequest: CheckedWriteRequest) extends ExpectingResponse
 

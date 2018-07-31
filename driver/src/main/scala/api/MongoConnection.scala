@@ -27,7 +27,6 @@ import akka.pattern.ask
 
 import reactivemongo.core.actors.{
   AuthRequest,
-  CheckedWriteRequestExpectingResponse,
   Close,
   Closed,
   Exceptions,
@@ -38,13 +37,8 @@ import reactivemongo.core.actors.{
   SetAvailable,
   SetUnavailable
 }
-//import reactivemongo.core.errors.ConnectionException
 import reactivemongo.core.nodeset.{ Authenticate, ProtocolMetadata }
-import reactivemongo.core.protocol.{
-  CheckedWriteRequest,
-  RequestMaker,
-  Response
-}
+import reactivemongo.core.protocol.Response
 import reactivemongo.core.commands.SuccessfulAuthentication
 import reactivemongo.api.commands.WriteConcern
 
@@ -84,11 +78,6 @@ class MongoConnection(
   val options: MongoConnectionOptions) { // TODO: toString as MongoURI
   import Exceptions._
 
-  // TODO: Review
-  private[api] var history = () => InternalState.empty
-
-  @volatile private[api] var killed: Boolean = false
-
   /**
    * Returns a DefaultDB reference using this connection.
    * The failover strategy is also used to wait for the node set to be ready,
@@ -101,9 +90,6 @@ class MongoConnection(
     waitIsAvailable(failoverStrategy, stackTrace()).map { state =>
       new DefaultDB(name, this, state, failoverStrategy)
     }
-
-  /** Returns true if the connection has not been killed. */
-  @inline def active: Boolean = !killed
 
   @deprecated("Use `authenticate` with `failoverStrategy`", "0.14.0")
   def authenticate(db: String, user: String, password: String): Future[SuccessfulAuthentication] = authenticate(db, user, password, options.failoverStrategy)(actorSystem.dispatcher)
@@ -134,14 +120,16 @@ class MongoConnection(
     ask(monitor, Close("MongoConnection.askClose"))(Timeout(timeout))
   }
 
-  /**
-   * Closes this MongoConnection
-   * (closes all the channels and ends the actors)
-   */
-  @deprecated("Use [[askClose]]", "0.13.0")
-  def close(): Unit = monitor ! Close("MongoConnection.close")
+  /** Returns true if the connection has not been killed. */
+  @inline def active: Boolean = !killed
 
   // --- Internals ---
+
+  // TODO: Review
+  private[api] var history = () => InternalState.empty
+
+  /** Whether this connection has been killed/is closed */
+  @volatile private[api] var killed: Boolean = false
 
   @inline private def stackTrace() =
     Thread.currentThread.getStackTrace.tail.tail.take(2).reverse
@@ -177,33 +165,12 @@ class MongoConnection(
     } else f
   }
 
-  /**
-   * Writes a request and drop the response if any.
-   *
-   * @param message The request maker.
-   */
-  private[api] def send(message: RequestMaker): Unit = {
-    if (killed) throw new ClosedException(supervisor, name, history())
-    else mongosystem ! message
-  }
-
-  private[api] def sendExpectingResponse(checkedWriteRequest: CheckedWriteRequest): Future[Response] = whenActive {
-    val expectingResponse =
-      CheckedWriteRequestExpectingResponse(checkedWriteRequest)
-
-    mongosystem ! expectingResponse
-    expectingResponse.future
-  }
-
-  private[api] def sendExpectingResponse(requestMaker: RequestMaker, isMongo26WriteOp: Boolean): Future[Response] = whenActive {
-    lazy val expectingResponse =
-      RequestMakerExpectingResponse(requestMaker, isMongo26WriteOp)
-
+  private[api] def sendExpectingResponse(
+    expectingResponse: RequestMakerExpectingResponse): Future[Response] =
     whenActive {
       mongosystem ! expectingResponse
       expectingResponse.future
     }
-  }
 
   private case class IsAvailable(result: Promise[ConnectionState]) {
     override val toString = s"IsAvailable#${System identityHashCode this}?"
@@ -250,7 +217,6 @@ class MongoConnection(
           if (p.future.isCompleted) {
             p.future // discard timeout as probing has completed
           } else {
-            // TODO: Logging
             warn(s"Timeout after $timeout while probing the connection monitor: $check")
             unavailResult
           }
@@ -586,7 +552,10 @@ object MongoConnection {
       case _ => Map.empty
     }
 
+  @deprecated("Will be private/internal", "0.16.0")
   val IntRe = "^([0-9]+)$".r
+
+  @deprecated("Will be private/internal", "0.16.0")
   val FailoverRe = "^([^:]+):([0-9]+)x([0-9.]+)$".r
 
   private def makeOptions(
