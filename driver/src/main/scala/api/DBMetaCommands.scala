@@ -65,9 +65,9 @@ trait DBMetaCommands { self: DB =>
 
   /** Returns the names of the collections in this database. */
   def collectionNames(implicit ec: ExecutionContext): Future[List[String]] = {
-    val wireVer = connection.metadata.map(_.maxWireVersion)
+    val wireVer = connectionState.metadata.maxWireVersion
 
-    if (wireVer.exists(_ >= MongoWireVersion.V30)) {
+    if (wireVer >= MongoWireVersion.V30) {
       Command.run(BSONSerializationPack, failoverStrategy)(
         self, ListCollectionNames, ReadPreference.primary).map(_.names)
 

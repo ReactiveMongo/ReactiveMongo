@@ -203,16 +203,16 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    */
   def distinct[T, M[_] <: Iterable[_]](key: String, selector: Option[pack.Document] = None, readConcern: ReadConcern = ReadConcern.Local)(implicit reader: pack.NarrowValueReader[T], ec: ExecutionContext, cbf: CanBuildFrom[M[_], T, M[T]]): Future[M[T]] = {
     implicit val widenReader = pack.widenReader(reader)
-    val version = db.connection.metadata.
-      fold[MongoWireVersion](MongoWireVersion.V30)(_.maxWireVersion)
+    val version = db.connectionState.metadata.maxWireVersion
 
     Future(DistinctCommand.Distinct(
-      key, selector, readConcern, version)).flatMap(runCommand(_, readPreference).flatMap {
-      _.result[T, M] match {
-        case Failure(cause)  => Future.failed[M[T]](cause)
-        case Success(result) => Future.successful(result)
-      }
-    })
+      key, selector, readConcern, version)).flatMap(
+      runCommand(_, readPreference).flatMap {
+        _.result[T, M] match {
+          case Failure(cause)  => Future.failed[M[T]](cause)
+          case Success(result) => Future.successful(result)
+        }
+      })
   }
 
   /**
@@ -569,19 +569,17 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * }}}
    */
   @deprecated("Use delete().one(selector, limit)", "0.13.1")
-  def remove[S](selector: S, writeConcern: WriteConcern = defaultWriteConcern, firstMatchOnly: Boolean = false)(implicit swriter: pack.Writer[S], ec: ExecutionContext): Future[WriteResult] = db.connection.metadata match {
-    case Some(metadata) if (
-      metadata.maxWireVersion >= MongoWireVersion.V26) => {
+  def remove[S](selector: S, writeConcern: WriteConcern = defaultWriteConcern, firstMatchOnly: Boolean = false)(implicit swriter: pack.Writer[S], ec: ExecutionContext): Future[WriteResult] = {
+    val metadata = db.connectionState.metadata
+
+    if (metadata.maxWireVersion >= MongoWireVersion.V26) {
       val limit = if (firstMatchOnly) Some(1) else Option.empty[Int]
       delete(true, writeConcern).one(selector, limit)
-    }
-
-    case Some(metadata) => // Mongo < 2.6
+    } else {
+      // Mongo < 2.6
       Future.failed[WriteResult](new scala.RuntimeException(
         s"unsupported MongoDB version: $metadata"))
-
-    case _ =>
-      Future.failed(MissingMetadata())
+    }
   }
 
   /**

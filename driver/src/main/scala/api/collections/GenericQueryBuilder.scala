@@ -85,8 +85,8 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
   @deprecated("Will be private/internal", "0.16.0")
   @inline def readPreference: ReadPreference = ReadPreference.primary
 
-  protected lazy val version = collection.db.connection.metadata.
-    fold[MongoWireVersion](MongoWireVersion.V30)(_.maxWireVersion)
+  protected lazy val version =
+    collection.db.connectionState.metadata.maxWireVersion
 
   protected def merge(readPreference: ReadPreference, maxDocs: Int): pack.Document = {
     val builder = pack.newBuilder

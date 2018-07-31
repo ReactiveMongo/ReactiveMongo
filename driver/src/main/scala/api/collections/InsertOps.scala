@@ -56,10 +56,10 @@ trait InsertOps[P <: SerializationPack with Singleton] {
   sealed trait InsertBuilder[T] {
     implicit protected def writer: pack.Writer[T]
 
-    @inline private def metadata = collection.db.connection.metadata
+    @inline private def metadata = db.connectionState.metadata
 
     /** The max BSON size, including the size of command envelope */
-    private lazy val maxBsonSize: Option[Int] = metadata.map { meta =>
+    private lazy val maxBsonSize: Int = {
       // Command envelope to compute accurate BSON size limit
       val emptyDoc: pack.Document = pack.newBuilder.document(Seq.empty)
 
@@ -70,7 +70,7 @@ trait InsertOps[P <: SerializationPack with Singleton] {
 
       val doc = pack.serialize(emptyCmd, insertWriter)
 
-      meta.maxBsonSize - pack.bsonSize(doc) + pack.bsonSize(emptyDoc)
+      metadata.maxBsonSize - pack.bsonSize(doc) + pack.bsonSize(emptyDoc)
     }
 
     /** $orderedParam */
@@ -115,19 +115,10 @@ trait InsertOps[P <: SerializationPack with Singleton] {
      * }}}
      */
     final def many(documents: Iterable[T])(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] = {
-      val ctx = (for {
-        meta <- metadata
-        maxSz <- maxBsonSize
-      } yield meta.maxBulkSize -> maxSz) match {
-        case Some((c, sz)) =>
-          Future.successful(c -> sz)
-
-        case _ =>
-          Future.failed[(Int, Int)](collection.MissingMetadata())
-      }
+      val bulkSz = metadata.maxBulkSize
+      val maxSz = maxBsonSize
 
       for {
-        (bulkSz, maxSz) <- ctx
         docs <- serialize(documents)
         res <- {
           val bulkProducer = BulkOps.bulks(
@@ -150,30 +141,26 @@ trait InsertOps[P <: SerializationPack with Singleton] {
     })
 
     private final def execute(documents: Seq[pack.Document])(implicit ec: ExecutionContext): Future[WriteResult] = documents.headOption match {
-      case Some(head) => metadata match {
-        case Some(meta) => {
-          if (meta.maxWireVersion >= MongoWireVersion.V26) {
-            val cmd = InsertCommand.Insert(
-              head, documents.tail, ordered, writeConcern)
+      case Some(head) => {
+        if (metadata.maxWireVersion >= MongoWireVersion.V26) {
+          val cmd = InsertCommand.Insert(
+            head, documents.tail, ordered, writeConcern)
 
-            runCommand(cmd, writePreference).flatMap { wr =>
-              val flattened = wr.flatten
+          runCommand(cmd, writePreference).flatMap { wr =>
+            val flattened = wr.flatten
 
-              if (!flattened.ok) {
-                // was ordered, with one doc => fail if has an error
-                Future.failed(WriteResult.lastError(flattened).
-                  getOrElse[Exception](GenericDriverException(
-                    s"fails to insert: $documents")))
+            if (!flattened.ok) {
+              // was ordered, with one doc => fail if has an error
+              Future.failed(WriteResult.lastError(flattened).
+                getOrElse[Exception](GenericDriverException(
+                  s"fails to insert: $documents")))
 
-              } else Future.successful(wr)
-            }
-          } else { // Mongo < 2.6
-            Future.failed[WriteResult](GenericDriverException(
-              s"unsupported MongoDB version: $meta"))
+            } else Future.successful(wr)
           }
+        } else { // Mongo < 2.6
+          Future.failed[WriteResult](GenericDriverException(
+            s"unsupported MongoDB version: $metadata"))
         }
-
-        case _ => Future.failed[WriteResult](collection.MissingMetadata())
       }
 
       case _ => Future.successful(WriteResult.empty) // No doc to insert

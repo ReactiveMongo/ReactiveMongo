@@ -55,7 +55,7 @@ sealed trait DB {
   @transient def connection: MongoConnection
 
   /** The state of the associated [[connection]] */
-  protected def connectionState: ConnectionState
+  private[api] def connectionState: ConnectionState
 
   /** This database name. */
   def name: String

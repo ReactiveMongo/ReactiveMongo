@@ -49,8 +49,7 @@ private[collections] trait Aggregator[P <: SerializationPack with Singleton] {
 
     @inline private def readPreference = context.readPreference
 
-    private def ver = db.connection.metadata.
-      fold[MongoWireVersion](MongoWireVersion.V30)(_.maxWireVersion)
+    private def ver = db.connectionState.metadata.maxWireVersion
 
     final def cursor: AC[T] = {
       def batchSz = batchSize.getOrElse(defaultCursorBatchSize)

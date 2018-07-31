@@ -7,8 +7,6 @@ import scala.concurrent.{ ExecutionContext, Future }
 import reactivemongo.core.protocol.MongoWireVersion
 import reactivemongo.core.errors.GenericDriverException
 
-import reactivemongo.core.nodeset.ProtocolMetadata
-
 import reactivemongo.api.SerializationPack
 import reactivemongo.api.commands.{
   BulkOps,
@@ -87,39 +85,32 @@ trait DeleteOps[P <: SerializationPack with Singleton]
      * }
      * }}}
      */
-    final def many(deletes: Iterable[DeleteElement])(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] = for {
-      meta <- metadata
-      maxSz <- maxBsonSize
-      res <- {
-        val bulkProducer = BulkOps.bulks(
-          deletes, maxSz, meta.maxBulkSize) { d =>
-          elementEnvelopeSize + pack.bsonSize(d.q)
-        }
-
-        BulkOps.bulkApply[DeleteElement, WriteResult](
-          bulkProducer)({ bulk => execute(bulk.toSeq) }, bulkRecover)
+    final def many(deletes: Iterable[DeleteElement])(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] = {
+      val bulkProducer = BulkOps.bulks(
+        deletes, maxBsonSize, metadata.maxBulkSize) { d =>
+        elementEnvelopeSize + pack.bsonSize(d.q)
       }
-    } yield MultiBulkWriteResult(res)
+
+      BulkOps.bulkApply[DeleteElement, WriteResult](
+        bulkProducer)({ bulk => execute(bulk.toSeq) }, bulkRecover).
+        map(MultiBulkWriteResult(_))
+    }
 
     // ---
 
-    private lazy val metadata: Future[ProtocolMetadata] =
-      collection.db.connection.metadata.fold(
-        Future.failed[ProtocolMetadata](collection.MissingMetadata()))(
-          Future.successful(_))
+    @inline private def metadata = collection.db.connectionState.metadata
 
     /** The max BSON size, including the size of command envelope */
-    private def maxBsonSize(implicit ec: ExecutionContext) =
-      metadata.map { meta =>
-        // Command envelope to compute accurate BSON size limit
-        val i = ResolvedCollectionCommand(
-          collection.name,
-          Delete(Seq.empty, ordered, writeConcern))
+    private def maxBsonSize = {
+      // Command envelope to compute accurate BSON size limit
+      val emptyCmd = ResolvedCollectionCommand(
+        collection.name,
+        Delete(Seq.empty, ordered, writeConcern))
 
-        val doc = serialize(i)
+      val doc = serialize(emptyCmd)
 
-        meta.maxBsonSize - pack.bsonSize(doc)
-      }
+      metadata.maxBsonSize - pack.bsonSize(doc)
+    }
 
     private lazy val elementEnvelopeSize = {
       val builder = pack.newBuilder
@@ -134,31 +125,30 @@ trait DeleteOps[P <: SerializationPack with Singleton]
 
     private final def execute(deletes: Seq[DeleteElement])(
       implicit
-      ec: ExecutionContext): Future[WriteResult] =
-      metadata.flatMap { meta =>
-        if (meta.maxWireVersion >= MongoWireVersion.V26) {
-          val cmd = Delete(deletes, ordered, writeConcern)
+      ec: ExecutionContext): Future[WriteResult] = {
+      if (metadata.maxWireVersion >= MongoWireVersion.V26) {
+        val cmd = Delete(deletes, ordered, writeConcern)
 
-          implicit def writer: pack.Writer[ResolvedCollectionCommand[Delete]] =
-            pack.writer { serialize(_) }
+        implicit def writer: pack.Writer[ResolvedCollectionCommand[Delete]] =
+          pack.writer { serialize(_) }
 
-          Future.successful(cmd).flatMap(
-            runCommand(_, writePreference).flatMap { wr =>
-              val flattened = wr.flatten
+        Future.successful(cmd).flatMap(
+          runCommand(_, writePreference).flatMap { wr =>
+            val flattened = wr.flatten
 
-              if (!flattened.ok) {
-                // was ordered, with one doc => fail if has an error
-                Future.failed(WriteResult.lastError(flattened).
-                  getOrElse[Exception](GenericDriverException(
-                    s"fails to delete: $deletes")))
+            if (!flattened.ok) {
+              // was ordered, with one doc => fail if has an error
+              Future.failed(WriteResult.lastError(flattened).
+                getOrElse[Exception](GenericDriverException(
+                  s"fails to delete: $deletes")))
 
-              } else Future.successful(wr)
-            })
-        } else { // Mongo < 2.6
-          Future.failed[WriteResult](GenericDriverException(
-            s"unsupported MongoDB version: $meta"))
-        }
+            } else Future.successful(wr)
+          })
+      } else { // Mongo < 2.6
+        Future.failed[WriteResult](GenericDriverException(
+          s"unsupported MongoDB version: $metadata"))
       }
+    }
   }
 
   // ---

@@ -33,6 +33,7 @@ case object X509Authentication extends AuthenticationMode
  * @param maxHistorySize the maximum size of the pool history (default: 25)
  * @param credentials the credentials per database names
  * @param keyStore an optional key store
+ * @param causalConsistency the default causal consistency (default: true)
  */
 case class MongoConnectionOptions(
   // canonical options - connection

@@ -472,14 +472,11 @@ object DefaultCursor {
     }
 
   private[api] def prepareNumberToReturn(mongoConnection: MongoConnection): Query => Int = {
-    val version = mongoConnection.metadata.
+    val version = mongoConnection._metadata.
       fold[MongoWireVersion](MongoWireVersion.V30)(_.maxWireVersion)
 
     if (version.compareTo(MongoWireVersion.V32) < 0) { q: Query =>
       // see QueryOpts.batchSizeN
-
-      /*if (q.numberToReturn == Int.MaxValue) {
-       q.numberToReturn min Cursor.DefaultBatchSize*/
 
       if (q.numberToReturn <= 0) {
         Cursor.DefaultBatchSize
@@ -510,7 +507,7 @@ object DefaultCursor {
     final def documentIterator(response: Response): Iterator[A] =
       makeIterator(response)
 
-    protected final lazy val version = connection.metadata.
+    protected final lazy val version = connection._metadata.
       fold[MongoWireVersion](MongoWireVersion.V30)(_.maxWireVersion)
 
     @inline protected def lessThenV32: Boolean =

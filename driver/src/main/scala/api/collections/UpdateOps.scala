@@ -7,8 +7,6 @@ import scala.concurrent.{ ExecutionContext, Future }
 import reactivemongo.core.protocol.MongoWireVersion
 import reactivemongo.core.errors.GenericDriverException
 
-import reactivemongo.core.nodeset.ProtocolMetadata
-
 import reactivemongo.api.SerializationPack
 import reactivemongo.api.commands.{
   BulkOps,
@@ -84,41 +82,33 @@ private[reactivemongo] trait UpdateOps[P <: SerializationPack with Singleton] {
      * }
      * }}}
      */
-    final def many(updates: Iterable[UpdateElement])(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] = for {
-      meta <- metadata
-      maxSz <- maxBsonSize
-      res <- {
-        val bulkProducer = BulkOps.bulks(
-          updates, maxSz, meta.maxBulkSize) { up =>
-          elementEnvelopeSize + pack.bsonSize(up.q) + pack.bsonSize(up.u)
-        }
-
-        BulkOps.bulkApply[UpdateElement, UpdateWriteResult](
-          bulkProducer)({ bulk => execute(bulk.toSeq) }, bulkRecover).
-          map(MultiBulkWriteResult(_))
+    final def many(updates: Iterable[UpdateElement])(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] = {
+      val bulkProducer = BulkOps.bulks(
+        updates, maxBsonSize, metadata.maxBulkSize) { up =>
+        elementEnvelopeSize + pack.bsonSize(up.q) + pack.bsonSize(up.u)
       }
-    } yield res
+
+      BulkOps.bulkApply[UpdateElement, UpdateWriteResult](
+        bulkProducer)({ bulk => execute(bulk.toSeq) }, bulkRecover).
+        map(MultiBulkWriteResult(_))
+    }
 
     // ---
 
-    private lazy val metadata: Future[ProtocolMetadata] =
-      collection.db.connection.metadata.fold(
-        Future.failed[ProtocolMetadata](collection.MissingMetadata()))(
-          Future.successful(_))
+    @inline private def metadata = db.connectionState.metadata
 
     /** The max BSON size, including the size of command envelope */
-    private def maxBsonSize(implicit ec: ExecutionContext) =
-      metadata.map { meta =>
-        // Command envelope to compute accurate BSON size limit
-        val i = ResolvedCollectionCommand(
-          collection.name,
-          BatchCommands.UpdateCommand.Update(
-            Seq.empty, ordered, writeConcern))
+    private def maxBsonSize = {
+      // Command envelope to compute accurate BSON size limit
+      val emptyCmd = ResolvedCollectionCommand(
+        collection.name,
+        BatchCommands.UpdateCommand.Update(
+          Seq.empty, ordered, writeConcern))
 
-        val doc = pack.serialize(i, BatchCommands.UpdateWriter)
+      val doc = pack.serialize(emptyCmd, BatchCommands.UpdateWriter)
 
-        meta.maxBsonSize - pack.bsonSize(doc)
-      }
+      metadata.maxBsonSize - pack.bsonSize(doc)
+    }
 
     private lazy val elementEnvelopeSize = {
       val builder = pack.newBuilder
@@ -135,30 +125,29 @@ private[reactivemongo] trait UpdateOps[P <: SerializationPack with Singleton] {
 
     private final def execute(updates: Seq[UpdateElement])(
       implicit
-      ec: ExecutionContext): Future[UpdateWriteResult] =
-      metadata.flatMap { meta =>
-        import BatchCommands.{ UpdateReader, UpdateWriter }
+      ec: ExecutionContext): Future[UpdateWriteResult] = {
+      import BatchCommands.{ UpdateReader, UpdateWriter }
 
-        if (meta.maxWireVersion >= MongoWireVersion.V26) {
-          val cmd = BatchCommands.UpdateCommand.Update(
-            updates, ordered, writeConcern)
+      if (metadata.maxWireVersion >= MongoWireVersion.V26) {
+        val cmd = BatchCommands.UpdateCommand.Update(
+          updates, ordered, writeConcern)
 
-          runCommand(cmd, writePreference).flatMap { wr =>
-            val flattened = wr.flatten
+        runCommand(cmd, writePreference).flatMap { wr =>
+          val flattened = wr.flatten
 
-            if (!flattened.ok) {
-              // was ordered, with one doc => fail if has an error
-              Future.failed(WriteResult.lastError(flattened).
-                getOrElse[Exception](GenericDriverException(
-                  s"fails to update: $updates")))
+          if (!flattened.ok) {
+            // was ordered, with one doc => fail if has an error
+            Future.failed(WriteResult.lastError(flattened).
+              getOrElse[Exception](GenericDriverException(
+                s"fails to update: $updates")))
 
-            } else Future.successful(wr)
-          }
-        } else { // Mongo < 2.6
-          Future.failed[UpdateWriteResult](GenericDriverException(
-            s"unsupported MongoDB version: $meta"))
+          } else Future.successful(wr)
         }
+      } else { // Mongo < 2.6
+        Future.failed[UpdateWriteResult](GenericDriverException(
+          s"unsupported MongoDB version: $metadata"))
       }
+    }
   }
 
   // ---

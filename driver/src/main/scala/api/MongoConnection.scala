@@ -260,8 +260,8 @@ class MongoConnection(
   private[api] lazy val monitor = actorSystem.actorOf(
     Props(new MonitorActor), s"Monitor-$name")
 
-  // TODO: Remove (use probe)
-  @volatile private[api] var metadata = Option.empty[ProtocolMetadata]
+  // TODO: Remove (use probe or DB.connectionState)
+  @volatile private[api] var _metadata = Option.empty[ProtocolMetadata]
 
   private class MonitorActor extends Actor {
     import scala.collection.mutable.Queue
@@ -277,7 +277,7 @@ class MongoConnection(
       case available: PrimaryAvailable => {
         debug(s"A primary is available: ${available.metadata}")
 
-        metadata = Some(available.metadata)
+        _metadata = Some(available.metadata)
 
         val state = ConnectionState(available.metadata, available.setName)
 
@@ -297,7 +297,7 @@ class MongoConnection(
       case available: SetAvailable => {
         debug(s"A node is available: ${available.metadata}")
 
-        metadata = Some(available.metadata)
+        _metadata = Some(available.metadata)
 
         val state = ConnectionState(available.metadata, available.setName)
 

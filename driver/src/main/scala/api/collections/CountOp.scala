@@ -46,8 +46,8 @@ private[api] trait CountOp[P <: SerializationPack with Singleton] {
 
   private type CountCmd = ResolvedCollectionCommand[CountCommand]
 
-  protected lazy val version = collection.db.connection.metadata.
-    fold[MongoWireVersion](MongoWireVersion.V30)(_.maxWireVersion)
+  protected lazy val version =
+    collection.db.connectionState.metadata.maxWireVersion
 
   // TODO: Unit test
   private def commandWriter: pack.Writer[CountCmd] = {
