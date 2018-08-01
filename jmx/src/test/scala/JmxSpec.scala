@@ -80,8 +80,14 @@ class JmxSpec(implicit ee: ExecutionEnv)
                 mbs.addNotificationListener(on, listener, null, null)
 
                 attrs.future must beEqualTo(List(
-                  null.asInstanceOf[String], // name
-                  -1L, // version
+                  { // set name
+                    if (Common.replSetOn) "testrs0"
+                    else null.asInstanceOf[String]
+                  },
+                  { // set version
+                    if (Common.replSetOn) 1L
+                    else -1L
+                  },
                   s"Node[$host:$port", // primary
                   null.asInstanceOf[String], // mongos
                   s"Node[$host:$port", // nearest

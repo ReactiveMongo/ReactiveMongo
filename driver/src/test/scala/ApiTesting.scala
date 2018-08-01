@@ -250,4 +250,6 @@ package object tests {
   @inline def probe(con: MongoConnection, timeout: FiniteDuration) = con.probe(timeout)
 
   def sessionId(db: DB): Option[UUID] = db.session.map(_.lsid)
+
+  def preload(resp: Response)(implicit ec: ExecutionContext): Future[(Response, BSONDocument)] = Response.preload(resp)
 }

@@ -18,6 +18,7 @@ package reactivemongo.api.collections
 import reactivemongo.api.{
   FailoverStrategy,
   QueryOpts,
+  ReadConcern,
   SerializationPack
 }
 
@@ -33,7 +34,8 @@ private[api] trait GenericCollectionWithQueryBuilder[P <: SerializationPack with
     val snapshotFlag: Boolean = false,
     val commentString: Option[String] = None,
     val options: QueryOpts = QueryOpts(),
-    val maxTimeMsOption: Option[Long] = None) extends GenericQueryBuilder[pack.type] {
+    val maxTimeMsOption: Option[Long] = None,
+    override val readConcern: ReadConcern = parent.readConcern) extends GenericQueryBuilder[pack.type] {
     type Self = CollectionQueryBuilder
     val pack: parent.pack.type = parent.pack
     override val collection = parent
@@ -52,7 +54,7 @@ private[api] trait GenericCollectionWithQueryBuilder[P <: SerializationPack with
       maxTimeMsOption: Option[Long] = maxTimeMsOption): CollectionQueryBuilder =
       new CollectionQueryBuilder(failover, queryOption, sortOption,
         projectionOption, hintOption, explainFlag, snapshotFlag, commentString,
-        options, maxTimeMsOption)
+        options, maxTimeMsOption, readConcern)
 
   }
 }

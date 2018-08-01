@@ -17,13 +17,18 @@ package reactivemongo.core.protocol
 
 import java.util.{ List => JList }
 
+import scala.util.{ Failure, Success, Try }
+
 import reactivemongo.io.netty.buffer.{ ByteBuf, Unpooled }
 import reactivemongo.io.netty.channel.{ ChannelHandlerContext, ChannelId }
 
-import reactivemongo.api.SerializationPack
-import reactivemongo.api.commands.GetLastError
+import reactivemongo.bson.{ BSONBooleanLike, BSONDocument, BSONNumberLike }
 
 import reactivemongo.core.netty.{ BufferSequence, ChannelBufferReadableBuffer }
+import reactivemongo.core.errors.DatabaseException
+
+import reactivemongo.api.SerializationPack
+import reactivemongo.api.commands.GetLastError
 
 import reactivemongo.api.ReadPreference
 
@@ -227,14 +232,6 @@ private[reactivemongo] class ResponseFrameDecoder
 private[reactivemongo] class ResponseDecoder
   extends reactivemongo.io.netty.handler.codec.MessageToMessageDecoder[ByteBuf] {
 
-  import scala.util.{ Failure, Success, Try }
-  import reactivemongo.core.errors.DatabaseException
-  import reactivemongo.bson.{
-    BSONBooleanLike,
-    BSONDocument,
-    BSONNumberLike
-  }
-
   override def decode(
     context: ChannelHandlerContext,
     frame: ByteBuf, // see ResponseFrameDecoder
@@ -288,7 +285,7 @@ private[reactivemongo] class ResponseDecoder
       docs.writeBytes(frame)
       frame.release()
 
-      first(docs) match {
+      ResponseDecoder.first(docs) match {
         case Failure(cause) => {
           //cause.printStackTrace()
           Response.CommandError(header, reply, info, DatabaseException(cause))
@@ -355,18 +352,19 @@ private[reactivemongo] class ResponseDecoder
 
     ()
   }
+}
 
-  @inline private def first(buf: ByteBuf) =
-    Try[reactivemongo.bson.BSONDocument] {
-      val sz = buf.getIntLE(buf.readerIndex)
-      val bytes = Array.ofDim[Byte](sz)
+private[reactivemongo] object ResponseDecoder {
+  @inline private[reactivemongo] def first(buf: ByteBuf) = Try[BSONDocument] {
+    val sz = buf.getIntLE(buf.readerIndex)
+    val bytes = Array.ofDim[Byte](sz)
 
-      // Avoid .readBytes(sz) which internally allocate a ByteBuf
-      // (which would require to manage its release)
-      buf.readBytes(bytes)
+    // Avoid .readBytes(sz) which internally allocate a ByteBuf
+    // (which would require to manage its release)
+    buf.readBytes(bytes)
 
-      val docBuf = ChannelBufferReadableBuffer(Unpooled wrappedBuffer bytes)
+    val docBuf = ChannelBufferReadableBuffer(Unpooled wrappedBuffer bytes)
 
-      reactivemongo.api.BSONSerializationPack.readFromBuffer(docBuf)
-    }
+    reactivemongo.api.BSONSerializationPack.readFromBuffer(docBuf)
+  }
 }

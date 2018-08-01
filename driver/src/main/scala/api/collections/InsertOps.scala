@@ -10,6 +10,7 @@ import reactivemongo.core.errors.GenericDriverException
 import reactivemongo.api.SerializationPack
 import reactivemongo.api.commands.{
   BulkOps,
+  CommandCodecs,
   LastError,
   MultiBulkWriteResult,
   ResolvedCollectionCommand,
@@ -139,6 +140,9 @@ trait InsertOps[P <: SerializationPack with Singleton] {
         case Failure(e) => Future.failed[pack.Document](e)
       }
     })
+
+    implicit private val resultReader: pack.Reader[InsertCommand.InsertResult] =
+      CommandCodecs.defaultWriteResultReader(pack)
 
     private final def execute(documents: Seq[pack.Document])(implicit ec: ExecutionContext): Future[WriteResult] = documents.headOption match {
       case Some(head) => {

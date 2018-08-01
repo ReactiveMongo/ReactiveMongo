@@ -23,12 +23,14 @@ import reactivemongo.api.commands.{
  * @define writeConcernParam the [[https://docs.mongodb.com/manual/reference/write-concern/ writer concern]] to be used
  * @define orderedParam the ordered behaviour
  */
-trait DeleteOps[P <: SerializationPack with Singleton]
-  extends CommandCodecs[P] { collection: GenericCollection[P] =>
+trait DeleteOps[P <: SerializationPack with Singleton] {
+  collection: GenericCollection[P] =>
 
-  import BatchCommands.DeleteCommand.{ Delete, DeleteElement }
-
-  protected val pack: P
+  object DeleteCommand
+    extends reactivemongo.api.commands.DeleteCommand[collection.pack.type] {
+    val pack: collection.pack.type = collection.pack
+  }
+  import DeleteCommand.{ Delete, DeleteElement }
 
   /**
    * @param ordered $orderedParam
@@ -52,12 +54,12 @@ trait DeleteOps[P <: SerializationPack with Singleton]
     protected def bulkRecover: Option[Exception => Future[WriteResult]]
 
     /**
-     * Performs a delete with a one single selector (see [[BatchCommands.DeleteCommand.DeleteElement]]).
+     * Performs a delete with a one single selector (see [[DeleteCommand.DeleteElement]]).
      * This will delete all the documents matched by the `q` selector.
      */
     final def one[Q, U](q: Q, limit: Option[Int] = None, collation: Option[Collation] = None)(implicit ec: ExecutionContext, qw: pack.Writer[Q]): Future[WriteResult] = element[Q, U](q, limit, collation).flatMap { upd => execute(Seq(upd)) }
 
-    /** Prepares an [[BatchCommands.DeleteCommand.DeleteElement]] */
+    /** Prepares an [[DeleteCommand.DeleteElement]] */
     final def element[Q, U](q: Q, limit: Option[Int], collation: Option[Collation])(implicit qw: pack.Writer[Q]): Future[DeleteElement] =
       (Try(pack.serialize(q, qw)).map { query =>
         DeleteElement(query, limit.getOrElse(0), collation)
@@ -122,6 +124,9 @@ trait DeleteOps[P <: SerializationPack with Singleton]
 
       pack.bsonSize(builder.document(elements))
     }
+
+    implicit private val resultReader: pack.Reader[DeleteCommand.DeleteResult] =
+      CommandCodecs.defaultWriteResultReader(pack)
 
     private final def execute(deletes: Seq[DeleteElement])(
       implicit

@@ -15,8 +15,6 @@
  */
 package reactivemongo.api
 
-import java.util.UUID
-
 import scala.concurrent.{ Await, ExecutionContext, Future }
 import scala.concurrent.duration.FiniteDuration
 
@@ -105,30 +103,25 @@ sealed trait DB {
   def sibling1(name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit ec: ExecutionContext): Future[DefaultDB] = connection.database(name, failoverStrategy)
 
   /**
-   * Starts a [[https://docs.mongodb.com/manual/reference/command/startSession/ new session]], do nothing if a session has already being started (since MongoDB 3.6)
+   * Starts a [[https://docs.mongodb.com/manual/reference/command/startSession/ new session]], does nothing if a session has already being started (since MongoDB 3.6).
+   *
+   * '''EXPERIMENTAL:''' API may change without notice.
    */
   def startSession()(implicit ec: ExecutionContext): Future[DBType]
 
   /**
-   * @param session the result of the startSession command
+   * [[https://docs.mongodb.com/manual/reference/command/endSessions Ends the session]] associated with this database reference, if any otherwise does nothing (since MongoDB 3.6).
+   *
+   * '''EXPERIMENTAL:''' API may change without notice.
    */
-  private[api] def withNewSession(result: StartSessionResult): DBType
+  def endSession()(implicit ec: ExecutionContext): Future[DBType]
 
   /**
-   * Ends the session associated with this database reference.
+   * [[https://docs.mongodb.com/manual/reference/command/killSessions Kills the session]] (abort) associated with this database reference, if any otherwise does nothing (since MongoDB 3.6).
    *
-   * @return UUID for the ended session, if there is some
-   * @see [[https://docs.mongodb.com/manual/reference/command/endSessions Command endSessions]]
+   * '''EXPERIMENTAL:''' API may change without notice.
    */
-  def endSession()(implicit ec: ExecutionContext): Future[Option[UUID]]
-
-  /**
-   * Ends the session associated with this database reference.
-   *
-   * @return UUID for the ended session, if there is some
-   * @see [[https://docs.mongodb.com/manual/reference/command/killSessions Command killSessions]]
-   */
-  def killSession()(implicit ec: ExecutionContext): Future[Option[UUID]]
+  def killSession()(implicit ec: ExecutionContext): Future[DBType]
 }
 
 private[api] sealed trait GenericDB[P <: SerializationPack with Singleton] { self: DB =>
@@ -174,7 +167,7 @@ class DefaultDB private[api] (
       }
     }
 
-  private[api] def withNewSession(result: StartSessionResult): DefaultDB =
+  private def withNewSession(result: StartSessionResult): DefaultDB =
     new DefaultDB(name, connection, connectionState, failoverStrategy,
       Option(result).map { r =>
         connectionState.setName match {
@@ -183,9 +176,9 @@ class DefaultDB private[api] (
         }
       })
 
-  def endSession()(implicit ec: ExecutionContext): Future[Option[UUID]] =
+  def endSession()(implicit ec: ExecutionContext): Future[DefaultDB] =
     session.map(_.lsid) match {
-      case state @ Some(uuid) => {
+      case Some(uuid) => {
         implicit def w: BSONSerializationPack.Writer[EndSessions] =
           EndSessions.commandWriter(BSONSerializationPack)
 
@@ -195,17 +188,19 @@ class DefaultDB private[api] (
         val endSessions = new EndSessions(uuid)
 
         Command.run(BSONSerializationPack, failoverStrategy).
-          apply(this, endSessions, defaultReadPreference).map(_ => state)
+          apply(this, endSessions, defaultReadPreference).map(_ =>
+            new DefaultDB(name, connection, connectionState, failoverStrategy,
+              None))
 
       }
 
       case _ =>
-        Future.successful(Option.empty[UUID]) // NoOp
+        Future.successful(this) // NoOp
     }
 
-  def killSession()(implicit ec: ExecutionContext): Future[Option[UUID]] =
+  def killSession()(implicit ec: ExecutionContext): Future[DefaultDB] =
     session.map(_.lsid) match {
-      case state @ Some(uuid) => {
+      case Some(uuid) => {
         implicit def w: BSONSerializationPack.Writer[KillSessions] =
           KillSessions.commandWriter(BSONSerializationPack)
 
@@ -215,11 +210,13 @@ class DefaultDB private[api] (
         val killSessions = new KillSessions(uuid)
 
         Command.run(BSONSerializationPack, failoverStrategy).
-          apply(this, killSessions, defaultReadPreference).map(_ => state)
+          apply(this, killSessions, defaultReadPreference).map(_ =>
+            new DefaultDB(name, connection, connectionState, failoverStrategy,
+              None))
 
       }
 
-      case _ => Future.successful(Option.empty[UUID]) // NoOp
+      case _ => Future.successful(this) // NoOp
     }
 
   @deprecated("DefaultDB will no longer be a Product", "0.16.0")

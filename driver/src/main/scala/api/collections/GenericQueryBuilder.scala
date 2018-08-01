@@ -28,6 +28,7 @@ import reactivemongo.api.{
   FailoverStrategy,
   QueryOpts,
   QueryOps,
+  ReadConcern,
   ReadPreference,
   SerializationPack
 }
@@ -65,8 +66,8 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
   def collection: Collection
   def maxTimeMsOption: Option[Long]
 
-  ///** The read concern (since 3.2) */
-  //def readConcern: ReadConcern = ReadConcern.default
+  /** The read concern (since 3.2) */
+  def readConcern: ReadConcern = ReadConcern.default // TODO: Remove body
 
   /* TODO: https://docs.mongodb.com/v3.2/reference/command/find/#dbcmd.find
 
@@ -88,7 +89,8 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
   protected lazy val version =
     collection.db.connectionState.metadata.maxWireVersion
 
-  protected def merge(readPreference: ReadPreference, maxDocs: Int): pack.Document = {
+  // TODO: Unit test
+  private[reactivemongo] def merge(readPreference: ReadPreference, maxDocs: Int): pack.Document = {
     val builder = pack.newBuilder
 
     import builder.{
@@ -169,10 +171,7 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
         element("skip", int(options.skipN)),
         element("tailable", boolean(tailable)),
         element("awaitData", boolean(awaitData)),
-        element("oplogReplay", boolean(oplogReplay)) /*,
-        element(
-          "readConcern",
-          CommandCodecs.writeReadConcern(pack)(readConcern))*/ )
+        element("oplogReplay", boolean(oplogReplay)))
 
       if (version.compareTo(MongoWireVersion.V34) < 0) {
         elements += element("snapshot", boolean(snapshotFlag))
@@ -210,10 +209,35 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
         elements += element("maxTimeMS", long(l))
       }
 
+      @inline def simpleReadConcern(): Unit = {
+        elements += element(
+          "readConcern", CommandCodecs.writeReadConcern(builder)(readConcern))
+
+        ()
+      }
+
+      // TODO: Remove this if, just check session
       if (version.compareTo(MongoWireVersion.V36) >= 0) {
-        collection.db.session.foreach { session =>
-          CommandCodecs.writeSession(builder)(elements)(session)
+        collection.db.session match {
+          case Some(session) => {
+            CommandCodecs.writeSession(builder)(elements)(session)
+
+            session.operationTime match {
+              case Some(opTime) => {
+                elements += element(
+                  "readConcern",
+                  CommandCodecs.writeSessionReadConcern(builder)(
+                    readConcern, opTime))
+              }
+
+              case _ => simpleReadConcern()
+            }
+          }
+
+          case _ => simpleReadConcern()
         }
+      } else {
+        simpleReadConcern()
       }
 
       val readPref = element(f"$$readPreference", writeReadPref(readPreference))
@@ -389,6 +413,7 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
   def slaveOk = options(options.slaveOk)
   def tailable = options(options.tailable)
 
+  @deprecated("Will be private/internal", "0.16.0")
   def copy(
     queryOption: Option[pack.Document] = queryOption,
     sortOption: Option[pack.Document] = sortOption,

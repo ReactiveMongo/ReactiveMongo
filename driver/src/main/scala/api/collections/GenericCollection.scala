@@ -201,7 +201,10 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * val distinctStates = collection.distinct[String, Set]("state")
    * }}}
    */
-  def distinct[T, M[_] <: Iterable[_]](key: String, selector: Option[pack.Document] = None, readConcern: ReadConcern = ReadConcern.Local)(implicit reader: pack.NarrowValueReader[T], ec: ExecutionContext, cbf: CanBuildFrom[M[_], T, M[T]]): Future[M[T]] = {
+  def distinct[T, M[_] <: Iterable[_]](
+    key: String,
+    selector: Option[pack.Document] = None,
+    readConcern: ReadConcern = self.readConcern)(implicit reader: pack.NarrowValueReader[T], ec: ExecutionContext, cbf: CanBuildFrom[M[_], T, M[T]]): Future[M[T]] = {
     implicit val widenReader = pack.widenReader(reader)
     val version = db.connectionState.metadata.maxWireVersion
 
@@ -232,7 +235,7 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * collection.insert[MyDocType](true, defaultWriteConcern).one(document)
    * }}}
    */
-  def insert[T](document: T, writeConcern: WriteConcern = defaultWriteConcern)(implicit writer: pack.Writer[T], ec: ExecutionContext): Future[WriteResult] =
+  def insert[T](document: T, writeConcern: WriteConcern = writeConcern)(implicit writer: pack.Writer[T], ec: ExecutionContext): Future[WriteResult] =
     prepareInsert[T](true, writeConcern).one(document)
 
   /**
@@ -249,7 +252,7 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * }}}
    */
   def insert[T: pack.Writer](ordered: Boolean): InsertBuilder[T] =
-    prepareInsert[T](ordered, defaultWriteConcern) // TODO: Move Writer requirement to InsertBuilder
+    prepareInsert[T](ordered, writeConcern) // TODO: Move Writer requirement to InsertBuilder
 
   /**
    * Returns a builder for insert operations.
@@ -287,7 +290,7 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    *
    * @return $returnWriteResult
    */
-  def update[S, T](selector: S, update: T, writeConcern: WriteConcern = defaultWriteConcern, upsert: Boolean = false, multi: Boolean = false)(implicit swriter: pack.Writer[S], writer: pack.Writer[T], ec: ExecutionContext): Future[UpdateWriteResult] = prepareUpdate(ordered = true, writeConcern = writeConcern).
+  def update[S, T](selector: S, update: T, writeConcern: WriteConcern = writeConcern, upsert: Boolean = false, multi: Boolean = false)(implicit swriter: pack.Writer[S], writer: pack.Writer[T], ec: ExecutionContext): Future[UpdateWriteResult] = prepareUpdate(ordered = true, writeConcern = writeConcern).
     one(selector, update, upsert, multi)
 
   /**
@@ -300,7 +303,7 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * }}}
    */
   def update(ordered: Boolean): UpdateBuilder =
-    prepareUpdate(ordered, defaultWriteConcern)
+    prepareUpdate(ordered, writeConcern)
 
   /**
    * Returns an update builder.
@@ -332,7 +335,7 @@ trait GenericCollection[P <: SerializationPack with Singleton]
   def findAndModify[S](selector: S, modifier: BatchCommands.FindAndModifyCommand.Modify, sort: Option[pack.Document] = None, fields: Option[pack.Document] = None)(implicit swriter: pack.Writer[S], ec: ExecutionContext): Future[BatchCommands.FindAndModifyCommand.FindAndModifyResult] = findAndModify[S](
     selector, modifier, sort, fields,
     bypassDocumentValidation = false,
-    writeConcern = defaultWriteConcern,
+    writeConcern = writeConcern,
     maxTime = Option.empty[FiniteDuration],
     collation = Option.empty[Collation],
     arrayFilters = Seq.empty[pack.Document])
@@ -435,7 +438,7 @@ trait GenericCollection[P <: SerializationPack with Singleton]
 
     findAndModify(selector, updateOp, sort, fields,
       bypassDocumentValidation = false,
-      writeConcern = defaultWriteConcern,
+      writeConcern = writeConcern,
       maxTime = Option.empty[FiniteDuration],
       collation = Option.empty[Collation],
       arrayFilters = Seq.empty[pack.Document])
@@ -460,7 +463,7 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    */
   def findAndRemove[S](selector: S, sort: Option[pack.Document] = None, fields: Option[pack.Document] = None)(implicit swriter: pack.Writer[S], ec: ExecutionContext): Future[BatchCommands.FindAndModifyCommand.FindAndModifyResult] = findAndModify[S](selector, removeModifier, sort, fields,
     bypassDocumentValidation = false,
-    writeConcern = defaultWriteConcern,
+    writeConcern = writeConcern,
     maxTime = Option.empty[FiniteDuration],
     collation = Option.empty[Collation],
     arrayFilters = Seq.empty[pack.Document])
@@ -569,7 +572,7 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * }}}
    */
   @deprecated("Use delete().one(selector, limit)", "0.13.1")
-  def remove[S](selector: S, writeConcern: WriteConcern = defaultWriteConcern, firstMatchOnly: Boolean = false)(implicit swriter: pack.Writer[S], ec: ExecutionContext): Future[WriteResult] = {
+  def remove[S](selector: S, writeConcern: WriteConcern = writeConcern, firstMatchOnly: Boolean = false)(implicit swriter: pack.Writer[S], ec: ExecutionContext): Future[WriteResult] = {
     val metadata = db.connectionState.metadata
 
     if (metadata.maxWireVersion >= MongoWireVersion.V26) {
@@ -588,7 +591,7 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * @param ordered $orderedParam
    * @param writeConcern $writeConcernParam
    */
-  def delete[S](ordered: Boolean = true, writeConcern: WriteConcern = defaultWriteConcern): DeleteBuilder = // TODO: Remove the type param ?
+  def delete[S](ordered: Boolean = true, writeConcern: WriteConcern = writeConcern): DeleteBuilder = // TODO: Remove the type param ?
     prepareDelete(ordered, writeConcern)
 
   // --- Internals ---
@@ -597,11 +600,14 @@ trait GenericCollection[P <: SerializationPack with Singleton]
   @inline protected def writePreference: ReadPreference = ReadPreference.Primary
 
   /** The default write concern */
-  @inline protected def defaultWriteConcern = db.connection.options.writeConcern
+  @inline protected def writeConcern = db.connection.options.writeConcern
 
   /** The default read preference */
   @inline def readPreference: ReadPreference = db.defaultReadPreference
   // TODO: Remove default value from this trait after next release
+
+  /** The default read concern */
+  @inline protected def readConcern = db.connection.options.readConcern
 
   @inline protected def defaultCursorBatchSize: Int = 101
 

@@ -6,6 +6,9 @@ import scala.util.Try
 
 import reactivemongo.bson.buffer.{ ReadableBuffer, WritableBuffer }
 
+import reactivemongo.core.protocol.Response
+import reactivemongo.core.netty.ChannelBufferReadableBuffer
+
 /** The default serialization pack. */
 object BSONSerializationPack extends SerializationPack { self =>
   import reactivemongo.bson._, buffer.DefaultBufferHandler
@@ -36,6 +39,23 @@ object BSONSerializationPack extends SerializationPack { self =>
   def readFromBuffer(buffer: ReadableBuffer): Document =
     DefaultBufferHandler.readDocument(buffer).get
 
+  override final def readAndDeserialize[A](response: Response, reader: Reader[A]): A = response match {
+    case s @ Response.Successful(_, _, docs, _) => s.first match {
+      case Some(preloaded) =>
+        deserialize[A](preloaded, reader) // optimization
+
+      case _ => {
+        val channelBuf = ChannelBufferReadableBuffer(docs)
+        readAndDeserialize(channelBuf, reader)
+      }
+    }
+
+    case _ => {
+      val channelBuf = ChannelBufferReadableBuffer(response.documents)
+      readAndDeserialize(channelBuf, reader)
+    }
+  }
+
   def writer[A](f: A => Document): Writer[A] = BSONDocumentWriter[A](f)
 
   def isEmpty(document: Document) = document.isEmpty
@@ -53,6 +73,8 @@ object BSONSerializationPack extends SerializationPack { self =>
     value.byteSize
 
   private[reactivemongo] def document(doc: BSONDocument): Document = doc
+
+  private[reactivemongo] def bsonValue(value: BSONValue): BSONValue = value
 
   override private[reactivemongo] val newBuilder: SerializationPack.Builder[BSONSerializationPack.type] = Builder
 
@@ -95,14 +117,28 @@ object BSONSerializationPack extends SerializationPack { self =>
 
       BSONBinary(buf.array, Subtype.UuidSubtype)
     }
+
+    /** Returns a timestamp as a serialized value. */
+    def timestamp(time: Long): Value = BSONTimestamp(time)
   }
 
   private object Decoder
     extends SerializationPack.Decoder[BSONSerializationPack.type] {
-    protected val pack = self
+    protected[reactivemongo] val pack = self
+
+    def asDocument(value: BSONValue): Option[BSONDocument] = value match {
+      case doc: BSONDocument => Some(doc)
+      case _                 => None
+    }
 
     def names(document: BSONDocument): Set[String] =
       document.elements.map(_.name).toSet
+
+    def get(document: BSONDocument, name: String): Option[BSONValue] =
+      document.get(name)
+
+    def array(document: pack.Document, name: String): Option[Seq[BSONValue]] =
+      document.getAs[BSONArray](name).map(_.elements.map(_.value))
 
     def booleanLike(document: BSONDocument, name: String): Option[Boolean] =
       document.getAs[BSONBooleanLike](name).map(_.toBoolean)

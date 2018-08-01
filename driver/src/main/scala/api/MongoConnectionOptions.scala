@@ -25,7 +25,7 @@ case object X509Authentication extends AuthenticationMode
  * @param tcpNoDelay TCPNoDelay flag (ReactiveMongo-specific option). The default value is false (see [[http://docs.oracle.com/javase/8/docs/api/java/net/StandardSocketOptions.html#TCP_NODELAY TCP_NODELAY]]).
  * @param keepAlive TCP KeepAlive flag (ReactiveMongo-specific option). The default value is false (see [[http://docs.oracle.com/javase/8/docs/api/java/net/StandardSocketOptions.html#SO_KEEPALIVE SO_KEEPALIVE]]).
  * @param nbChannelsPerNode Number of channels (connections) per node (ReactiveMongo-specific option).
- * @param writeConcern the default write concern
+ * @param writeConcern the default [[https://docs.mongodb.com/manual/reference/write-concern/ write concern]]
  * @param readPreference the default read preference
  * @param failoverStrategy the default failover strategy
  * @param monitorRefreshMS the interval in milliseconds used by monitor to refresh the node set (default: 10000 aka 10s)
@@ -33,7 +33,7 @@ case object X509Authentication extends AuthenticationMode
  * @param maxHistorySize the maximum size of the pool history (default: 25)
  * @param credentials the credentials per database names
  * @param keyStore an optional key store
- * @param causalConsistency the default causal consistency (default: true)
+ * @param readConcern the default [[https://docs.mongodb.com/manual/reference/read-concern/ read concern]]
  */
 case class MongoConnectionOptions(
   // canonical options - connection
@@ -59,7 +59,8 @@ case class MongoConnectionOptions(
   maxIdleTimeMS: Int = 0,
   maxHistorySize: Int = 25,
   credentials: Map[String, MongoConnectionOptions.Credential] = Map.empty,
-  keyStore: Option[MongoConnectionOptions.KeyStore] = Option.empty) {
+  keyStore: Option[MongoConnectionOptions.KeyStore] = Option.empty,
+  readConcern: ReadConcern = ReadConcern.default) {
 
   /**
    * The database source for authentication credentials (corresponds to the `authenticationMechanism` with MongoShell).
@@ -127,6 +128,7 @@ object MongoConnectionOptions {
       "sslEnabled" -> options.sslEnabled.toString,
       "sslAllowsInvalidCert" -> options.sslAllowsInvalidCert.toString,
       "writeConcern" -> options.writeConcern.toString,
-      "readPreference" -> options.readPreference.toString)
+      "readPreference" -> options.readPreference.toString,
+      "readConcern" -> options.readConcern.level)
 
 }

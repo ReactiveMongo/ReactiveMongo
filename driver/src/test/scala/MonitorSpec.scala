@@ -147,7 +147,7 @@ class MonitorSpec(implicit ee: ExecutionEnv)
               aka("channel #1") must beSome[(Node, Connection)]
           } and { // #2
             val respWithNulls = Response(null, null, null,
-              new ResponseInfo(DefaultChannelId.newInstance()))
+              ResponseInfo(DefaultChannelId.newInstance()))
 
             dbsystem.receive(respWithNulls).
               aka("invalid response") must throwA[NullPointerException] and {

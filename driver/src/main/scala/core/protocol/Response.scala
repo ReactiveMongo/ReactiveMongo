@@ -1,5 +1,9 @@
 package reactivemongo.core.protocol
 
+import scala.util.{ Failure, Success }
+
+import scala.concurrent.{ ExecutionContext, Future }
+
 import reactivemongo.io.netty.buffer.{ ByteBuf, Unpooled }
 
 import reactivemongo.core.errors._
@@ -58,9 +62,46 @@ object Response {
     info: ResponseInfo): Response = Successful(header, reply, documents, info)
 
   def parse(response: Response): Iterator[BSONDocument] =
-    ReplyDocumentIterator.parse(BSONSerializationPack)(response)(BSONDocumentIdentity)
+    ReplyDocumentIterator.parse(BSONSerializationPack)(
+      response)(BSONDocumentIdentity)
 
   def unapply(response: Response): Option[(MessageHeader, Reply, ByteBuf, ResponseInfo)] = Some((response.header, response.reply, response.documents, response.info))
+
+  private[reactivemongo] def preload(response: Response)(
+    implicit
+    ec: ExecutionContext): Future[(Response, BSONDocument)] =
+    response match {
+      case r @ WithCursor(_, _, _, _, _, preloaded +: _) =>
+        Future.successful(r -> preloaded)
+
+      case WithCursor(_, _, _, _, _, _) =>
+        Future.failed(ReactiveMongoException(
+          s"Cannot preload cursor response: $response"))
+
+      case CommandError(_, _, _, cause) =>
+        Future.failed(cause)
+
+      case Successful(_, Reply(_, _, _, 0), _, _) =>
+        Future.failed(ReactiveMongoException(
+          s"Cannot preload empty response: $response"))
+
+      case Successful(header, reply, docs, info) => {
+        val buf = docs.duplicate()
+
+        ResponseDecoder.first(buf) match {
+          case Success(first) => Future {
+            buf.resetReaderIndex()
+
+            val other = Successful(header, reply, buf, info)
+            other.first = Option(first)
+
+            other -> first
+          }
+
+          case Failure(cause) => Future.failed(cause)
+        }
+      }
+    }
 
   // ---
 
@@ -70,6 +111,8 @@ object Response {
     _documents: ByteBuf,
     _info: ResponseInfo) extends Response(
     _header, _reply, _documents, _info) {
+
+    @volatile private[reactivemongo] var first = Option.empty[BSONDocument]
 
     private[reactivemongo] def cursorID(id: Long): Response =
       copy(_reply = this._reply.copy(cursorID = id))

@@ -2,6 +2,8 @@ import scala.concurrent._, duration.FiniteDuration
 
 import reactivemongo.api._, collections.bson._
 
+import reactivemongo.api.commands.WriteConcern
+
 import reactivemongo.bson._
 
 import org.specs2.concurrent.ExecutionEnv
@@ -28,7 +30,7 @@ class CollectionSpec(implicit protected val ee: ExecutionEnv)
   // ---
 
   "BSON collection" should {
-    "write successfully 5 docs" >> {
+    "write successfully 5 documents" >> {
       implicit val writer = PersonWriter
 
       "with insert" in {
@@ -266,8 +268,16 @@ class CollectionSpec(implicit protected val ee: ExecutionEnv)
           val updateOp = c.updateModifier(
             BSONDocument("$set" -> BSONDocument("age" -> 35)))
 
-          c.findAndModify(BSONDocument("name" -> "Joline"), updateOp).
-            map(_.result[Person]) must beSome(five).await(1, timeout)
+          c.findAndModify(
+            selector = BSONDocument("name" -> "Joline"),
+            modifier = updateOp,
+            sort = None,
+            fields = None,
+            bypassDocumentValidation = false,
+            writeConcern = WriteConcern.Default,
+            maxTime = None,
+            collation = None,
+            arrayFilters = Seq.empty).map(_.result[Person]) must beSome(five).await(1, timeout)
         }
 
         "by updating age of 'James', & returns the updated document" in {
@@ -296,30 +306,35 @@ class CollectionSpec(implicit protected val ee: ExecutionEnv)
     }
 
     "manage session" >> {
-      import java.util.UUID
-
       section("gt_mongo32")
 
       "start & end" in {
-        (for {
-          coll <- collection.startSession()
-          _ <- coll.startSession() // no-op
-          id <- coll.endSession()
-        } yield id) aka "session ID" must beSome[UUID].awaitFor(timeout)
+        Common.db.startSession() must beLike[DefaultDB] {
+          case db =>
+            val coll = db.collection(s"session_${System identityHashCode this}")
+            val id = System.identityHashCode(db)
+            val base = BSONDocument("_id" -> id)
+            val inserted = base :~ ("value" -> 1)
+            val updated = base :~ ("value" -> 2)
+
+            (for {
+              _ <- coll.insert[BSONDocument](false).one(inserted)
+              r <- coll.find(base).one[BSONDocument]
+            } yield r) must beSome(inserted).awaitFor(timeout) and {
+              (for {
+                _ <- coll.update(false).one(
+                  q = base,
+                  u = BSONDocument(f"$$set" -> BSONDocument("value" -> 2)),
+                  upsert = false,
+                  multi = false)
+
+                r <- coll.find(base).one[BSONDocument]
+              } yield r) must beSome(updated).awaitFor(timeout)
+            } and {
+              db.endSession().map(_ => {}) must beEqualTo({}).awaitFor(timeout)
+            }
+        }.awaitFor(timeout)
       } tag "wip"
-
-      "not end without start" in {
-        collection.endSession() must beNone.await
-      }
-
-      "not kill without start" in {
-        collection.endSession() must beNone.await
-      }
-
-      "start & kill" in {
-        collection.startSession().flatMap(_.killSession()).
-          aka("session ID") must beSome[UUID].awaitFor(timeout)
-      }
 
       section("gt_mongo32")
     }
@@ -356,15 +371,20 @@ class CollectionSpec(implicit protected val ee: ExecutionEnv)
               await(1, timeout * (n / 2L))
 
           } and {
-            c.count(Some(BSONDocument("bulk" -> true))).
-              aka("count") must beTypedEqualTo(e).await(1, timeout)
+            c.count(
+              selector = Some(BSONDocument("bulk" -> true)),
+              limit = None,
+              skip = 0,
+              hint = None,
+              readConcern = ReadConcern.Local).
+              aka("count") must beTypedEqualTo(e.toLong).await(1, timeout)
             // all docs minus errors
           }
         }
 
         s"$nDocs documents with the default connection" in {
           bulkSpec(db(colName(nDocs)), nDocs, nDocs - 3, timeout)
-        } tag "wip"
+        }
 
         s"${nDocs / 1000} with the slow connection" in {
           bulkSpec(

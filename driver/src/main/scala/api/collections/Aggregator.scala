@@ -45,7 +45,15 @@ private[collections] trait Aggregator[P <: SerializationPack with Singleton] {
     val context: AggregatorContext[T],
     val cp: CursorProducer.Aux[T, AC]) {
 
-    import context._
+    import context.{
+      allowDiskUse,
+      batchSize,
+      bypassDocumentValidation,
+      explain,
+      firstOperator,
+      otherOperators,
+      reader
+    }
 
     @inline private def readPreference = context.readPreference
 
@@ -58,7 +66,7 @@ private[collections] trait Aggregator[P <: SerializationPack with Singleton] {
 
       val cmd = new Aggregate[T](
         firstOperator, otherOperators, explain, allowDiskUse, batchSz, ver,
-        bypassDocumentValidation, readConcern)
+        bypassDocumentValidation, Some(readConcern))
 
       val cursor = runner.cursor[T, Aggregate[T]](
         collection, cmd, readPreference)

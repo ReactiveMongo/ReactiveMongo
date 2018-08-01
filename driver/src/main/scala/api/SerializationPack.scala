@@ -6,8 +6,11 @@ import scala.language.higherKinds
 
 import scala.util.Try
 
-import reactivemongo.bson.BSONDocument
+import reactivemongo.bson.{ BSONDocument, BSONValue }
 import reactivemongo.bson.buffer.{ ReadableBuffer, WritableBuffer }
+
+import reactivemongo.core.protocol.Response
+import reactivemongo.core.netty.ChannelBufferReadableBuffer
 
 trait SerializationPack { self: Singleton =>
   type Value
@@ -32,10 +35,7 @@ trait SerializationPack { self: Singleton =>
   def readAndDeserialize[A](buffer: ReadableBuffer, reader: Reader[A]): A =
     deserialize(readFromBuffer(buffer), reader)
 
-  import reactivemongo.core.protocol.Response
-  import reactivemongo.core.netty.ChannelBufferReadableBuffer
-
-  final def readAndDeserialize[A](response: Response, reader: Reader[A]): A = {
+  def readAndDeserialize[A](response: Response, reader: Reader[A]): A = {
     val channelBuf = ChannelBufferReadableBuffer(response.documents)
     readAndDeserialize(channelBuf, reader)
   }
@@ -53,6 +53,9 @@ trait SerializationPack { self: Singleton =>
 
   // Returns a deserialized document as a BSON one (for internal intercompat)
   private[reactivemongo] def document(doc: BSONDocument): Document
+
+  // Returns a BSON value
+  private[reactivemongo] def bsonValue(value: Value): BSONValue
 
   private[reactivemongo] def bsonSize(value: Value): Int = -1
   // TODO: Remove the default value after release
@@ -89,17 +92,20 @@ object SerializationPack {
     /** Returns an integer as a serialized value. */
     def int(i: Int): pack.Value
 
-    /** Returns an long as a serialized value. */
+    /** Returns a long as a serialized value. */
     def long(l: Long): pack.Value
 
-    /** Returns an double as a serialized value. */
+    /** Returns a double as a serialized value. */
     def double(d: Double): pack.Value
 
-    /** Returns an string as a serialized value. */
+    /** Returns a string as a serialized value. */
     def string(s: String): pack.Value
 
     /** Returns an UUID as a serialized value. */
     def uuid(id: UUID): pack.Value
+
+    /** Returns a timestamp as a serialized value. */
+    def timestamp(time: Long): pack.Value
   }
 
   /**
@@ -108,10 +114,21 @@ object SerializationPack {
    * @define returnsNamedElement Returns the named element from the given document
    */
   private[reactivemongo] trait Decoder[P <: SerializationPack with Singleton] {
-    protected val pack: P
+    protected[reactivemongo] val pack: P
+
+    /** Extract the value, if and only if it's a document. */
+    def asDocument(value: pack.Value): Option[pack.Document]
 
     /** Returns the names of the document elements. */
     def names(document: pack.Document): Set[String]
+
+    /** @returnsNamedElement, if the element exists. */
+    def get(document: pack.Document, name: String): Option[pack.Value]
+
+    /**
+     * @returnsNamedElement, if the element is an array field.
+     */
+    def array(document: pack.Document, name: String): Option[Seq[pack.Value]]
 
     /**
      * @returnsNamedElement, if the element is a boolean-like field

@@ -6,8 +6,9 @@ import reactivemongo.api.{
   Cursor,
   Collection,
   DB,
-  ReadPreference,
-  SerializationPack
+  SerializationPack,
+  Session,
+  ReadPreference
 }
 
 import reactivemongo.core.protocol.Response
@@ -100,12 +101,13 @@ object Command {
   private[commands] lazy val logger =
     reactivemongo.util.LazyLogger("reactivemongo.api.commands")
 
+  @deprecated("Will be private/internal", "0.16.0")
   def defaultCursorFetcher[P <: SerializationPack, A](db: DB, p: P, command: A, failover: FailoverStrategy)(implicit writer: p.Writer[A]): CursorFetcher[p.type, DefaultCursor.Impl] = fetchCursor[p.type, A](db, db.name + ".$cmd", p, command, failover)
 
   /**
    * @param fullCollectionName the fully qualified collection name (even if `query.fullCollectionName` is `\$cmd`)
    */
-  private[reactivemongo] def fetchCursor[P <: SerializationPack, A](db: DB, fullCollectionName: String, p: P, command: A, failover: FailoverStrategy)(implicit writer: p.Writer[A]): CursorFetcher[p.type, DefaultCursor.Impl] = new CursorFetcher[p.type, DefaultCursor.Impl] with CommandCodecs[p.type] {
+  private[reactivemongo] def fetchCursor[P <: SerializationPack, A](db: DB, fullCollectionName: String, p: P, command: A, failover: FailoverStrategy)(implicit writer: p.Writer[A]): CursorFetcher[p.type, DefaultCursor.Impl] = new CursorFetcher[p.type, DefaultCursor.Impl] {
     val pack: p.type = p
 
     protected def defaultReadPreference = db.connection.options.readPreference
@@ -127,7 +129,14 @@ object Command {
             case _ => Future.failed[T](cause)
           }
 
-        case response => Future(pack.readAndDeserialize(response, reader))
+        case response => db.session match {
+          case Some(session) =>
+            Session.updateOnResponse(session, response).map {
+              case (_, resp) => pack.readAndDeserialize(resp, reader)
+            }
+
+          case _ => Future(pack.readAndDeserialize(response, reader))
+        }
       }
     }
 
@@ -150,6 +159,7 @@ object Command {
     }
   }
 
+  @deprecated("Will be private/internal", "0.16.0")
   case class CommandWithPackRunner[P <: SerializationPack](pack: P, failover: FailoverStrategy = FailoverStrategy()) {
     def apply[R, C <: Command with CommandWithResult[R]](db: DB, command: C with CommandWithResult[R], rp: ReadPreference)(implicit writer: pack.Writer[C], reader: pack.Reader[R], ec: ExecutionContext): Future[R] = defaultCursorFetcher(db, pack, command, failover).one[R](rp)
 
@@ -219,6 +229,7 @@ object Command {
    *   unboxed(aCollection, Count(BSONDocument("bulk" -> true)))
    * }}}
    */
+  @deprecated("Will be private/internal", "0.16.0")
   def run[P <: SerializationPack](pack: P, failover: FailoverStrategy): CommandWithPackRunner[pack.type] = CommandWithPackRunner(pack, failover)
 
   private[reactivemongo] def buildRequestMaker[P <: SerializationPack, A](pack: P)(command: A, writer: pack.Writer[A], readPreference: ReadPreference, db: String): (RequestMaker, Boolean) = {
@@ -246,10 +257,11 @@ final case class ResolvedCollectionCommand[C <: CollectionCommand](
   collection: String,
   command: C) extends Command
 
-@deprecated(message = "", since = "0.12.7")
+@deprecated(message = "Will be removed as EOL for 2.6", since = "0.12.7")
 trait Mongo26WriteCommand
 
 object `package` {
+  // TODO: Move to the `api` package
   type WriteConcern = GetLastError
   val WriteConcern = GetLastError
 }

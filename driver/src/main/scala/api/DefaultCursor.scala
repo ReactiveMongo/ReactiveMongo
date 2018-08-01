@@ -66,7 +66,7 @@ object DefaultCursor {
     collectionName: String)(implicit reader: pack.Reader[A]): Impl[A] =
     new Impl[A] {
       val preference = readPreference
-      val connection = db.connection
+      val database = db
       val failoverStrategy = failover
       val mongo26WriteOp = isMongo26WriteOp
       val fullCollectionName = collectionName
@@ -146,7 +146,9 @@ object DefaultCursor {
     /** The read preference */
     def preference: ReadPreference
 
-    def connection: MongoConnection
+    def database: DB
+
+    @inline def connection: MongoConnection = database.connection
 
     def failoverStrategy: FailoverStrategy
 
@@ -170,15 +172,25 @@ object DefaultCursor {
       version.compareTo(MongoWireVersion.V32) < 0
 
     protected lazy val requester: (Int, Int, RequestMakerExpectingResponse) => ExecutionContext => Future[Response] = {
-      @inline def base(req: RequestMakerExpectingResponse): Future[Response] =
-        connection.sendExpectingResponse(req)
+      val base: ExecutionContext => RequestMakerExpectingResponse => Future[Response] = { implicit ec: ExecutionContext =>
+        database.session match {
+          case Some(session) => { req: RequestMakerExpectingResponse =>
+            connection.sendExpectingResponse(req).flatMap {
+              Session.updateOnResponse(session, _).map(_._2)
+            }
+          }
+
+          case _ =>
+            connection.sendExpectingResponse(_: RequestMakerExpectingResponse)
+        }
+      }
 
       if (lessThenV32) {
         { (off: Int, maxDocs: Int, req: RequestMakerExpectingResponse) =>
           val max = if (maxDocs > 0) maxDocs else Int.MaxValue
 
           { implicit ec: ExecutionContext =>
-            base(req).map { response =>
+            base(ec)(req).map { response =>
               val fetched = // See nextBatchOffset
                 response.reply.numberReturned + response.reply.startingFrom
 
@@ -200,7 +212,7 @@ object DefaultCursor {
         }
       } else { (startingFrom: Int, _: Int, req: RequestMakerExpectingResponse) =>
         { implicit ec: ExecutionContext =>
-          base(req).map {
+          base(ec)(req).map {
             // Normalizes as 'new' cursor doesn't indicate such property
             _.startingFrom(startingFrom)
           }
@@ -277,17 +289,28 @@ object DefaultCursor {
       if (cursorID != 0) {
         logger.debug(s"[$logCat] Clean up $cursorID, sending KillCursors")
 
-        val killReq = RequestMakerExpectingResponse(
-          RequestMaker(KillCursors(Set(cursorID)), readPreference = preference),
-          false)
+        def send() = connection.sendExpectingResponse(
+          RequestMakerExpectingResponse(RequestMaker(
+            KillCursors(Set(cursorID)),
+            readPreference = preference), false))
 
-        connection.sendExpectingResponse(killReq).onComplete {
+        val result = database.session match {
+          case Some(session) => send().flatMap {
+            Session.updateOnResponse(session, _)
+          }.map(_._2)
+
+          case _ => send()
+        }
+
+        result.onComplete {
           case Failure(cause) => logger.warn(
             s"[$logCat] Fails to kill cursor #${cursorID}", cause)
 
           case _ => ()
         }
-      } else logger.trace(s"[$logCat] Nothing to release: cursor already exhausted ($cursorID)")
+      } else {
+        logger.trace(s"[$logCat] Nothing to release: cursor already exhausted ($cursorID)")
+      }
     }
 
     def head(implicit ctx: ExecutionContext): Future[A] =

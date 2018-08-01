@@ -24,6 +24,11 @@ import reactivemongo.api.commands.{
 private[reactivemongo] trait UpdateOps[P <: SerializationPack with Singleton] {
   collection: GenericCollection[P] =>
 
+  object UpdateCommand
+    extends reactivemongo.api.commands.UpdateCommand[collection.pack.type] {
+    val pack: collection.pack.type = collection.pack
+  }
+
   /**
    * @param ordered $orderedParam
    * @param writeConcern writeConcernParam
@@ -37,7 +42,7 @@ private[reactivemongo] trait UpdateOps[P <: SerializationPack with Singleton] {
 
   /** Builder for update operations. */
   sealed trait UpdateBuilder {
-    import BatchCommands.UpdateCommand.UpdateElement
+    import UpdateCommand.UpdateElement
 
     /** $orderedParam */
     def ordered: Boolean
@@ -48,11 +53,11 @@ private[reactivemongo] trait UpdateOps[P <: SerializationPack with Singleton] {
     protected def bulkRecover: Option[Exception => Future[UpdateWriteResult]]
 
     /**
-     * Performs a [[https://docs.mongodb.com/manual/reference/method/db.collection.updateOne/ single update]] (see [[BatchCommands.UpdateCommand.UpdateElement]]).
+     * Performs a [[https://docs.mongodb.com/manual/reference/method/db.collection.updateOne/ single update]] (see [[UpdateCommand.UpdateElement]]).
      */
     final def one[Q, U](q: Q, u: U, upsert: Boolean, multi: Boolean)(implicit ec: ExecutionContext, qw: pack.Writer[Q], uw: pack.Writer[U]): Future[UpdateWriteResult] = element[Q, U](q, u, upsert, multi).flatMap { upd => execute(Seq(upd)) }
 
-    /** Prepares an [[BatchCommands.UpdateCommand.UpdateElement]] */
+    /** Prepares an [[UpdateCommand.UpdateElement]] */
     final def element[Q, U](q: Q, u: U, upsert: Boolean, multi: Boolean)(implicit qw: pack.Writer[Q], uw: pack.Writer[U]): Future[UpdateElement] =
       (Try(pack.serialize(q, qw)).map { query =>
         UpdateElement(query, pack.serialize(u, uw), upsert, multi)
@@ -97,15 +102,23 @@ private[reactivemongo] trait UpdateOps[P <: SerializationPack with Singleton] {
 
     @inline private def metadata = db.connectionState.metadata
 
+    private type UpdateCmd = ResolvedCollectionCommand[UpdateCommand.Update]
+
+    implicit private lazy val updateWriter: pack.Writer[UpdateCmd] = {
+      val underlying = reactivemongo.api.commands.UpdateCommand.
+        writer(pack)(UpdateCommand)(collection.db.session)
+
+      pack.writer[UpdateCmd](underlying)
+    }
+
     /** The max BSON size, including the size of command envelope */
     private def maxBsonSize = {
       // Command envelope to compute accurate BSON size limit
       val emptyCmd = ResolvedCollectionCommand(
         collection.name,
-        BatchCommands.UpdateCommand.Update(
-          Seq.empty, ordered, writeConcern))
+        UpdateCommand.Update(Seq.empty, ordered, writeConcern))
 
-      val doc = pack.serialize(emptyCmd, BatchCommands.UpdateWriter)
+      val doc = pack.serialize(emptyCmd, updateWriter)
 
       metadata.maxBsonSize - pack.bsonSize(doc)
     }
@@ -123,14 +136,15 @@ private[reactivemongo] trait UpdateOps[P <: SerializationPack with Singleton] {
       pack.bsonSize(builder.document(elements))
     }
 
+    implicit private val resultReader: pack.Reader[UpdateCommand.UpdateResult] =
+      reactivemongo.api.commands.UpdateCommand.reader(pack)(UpdateCommand)
+
     private final def execute(updates: Seq[UpdateElement])(
       implicit
       ec: ExecutionContext): Future[UpdateWriteResult] = {
-      import BatchCommands.{ UpdateReader, UpdateWriter }
 
       if (metadata.maxWireVersion >= MongoWireVersion.V26) {
-        val cmd = BatchCommands.UpdateCommand.Update(
-          updates, ordered, writeConcern)
+        val cmd = UpdateCommand.Update(updates, ordered, writeConcern)
 
         runCommand(cmd, writePreference).flatMap { wr =>
           val flattened = wr.flatten
