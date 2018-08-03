@@ -57,11 +57,15 @@ private[reactivemongo] case class Node(
     if (connections.size < upTo) {
       _copy(connections = connections ++ (for {
         _ ← 0 until (upTo - connections.size)
-      } yield Connection(
-        channelFactory.create(host, port, receiver),
-        ConnectionStatus.Connecting, Set.empty, None)))
+      } yield createConnection(channelFactory, receiver)))
     } else this
   }
+
+  private[core] def createConnection(
+    channelFactory: ChannelFactory,
+    receiver: ActorRef): Connection = Connection(
+    channelFactory.create(host, port, receiver),
+    ConnectionStatus.Connecting, Set.empty, None)
 
   // TODO: Remove when aliases is refactored
   private[reactivemongo] def _copy(
