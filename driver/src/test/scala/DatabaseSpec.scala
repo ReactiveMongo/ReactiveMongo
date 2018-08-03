@@ -43,7 +43,7 @@ class DatabaseSpec(implicit ee: ExecutionEnv)
           await(0, estmout * 2) and {
             val duration = System.currentTimeMillis() - before
 
-            duration must be_<(estmout.toMillis + 750 /* ms */ )
+            duration must be_<(estmout.toMillis + 1000 /* ms */ )
           }
       } tag "unit"
     }

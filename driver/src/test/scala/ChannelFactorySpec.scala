@@ -121,7 +121,7 @@ class ChannelFactorySpec(implicit ee: ExecutionEnv)
       "be loaded" in {
         def actor = new Actor {
           val receive: Receive = {
-            case _ => ???
+            case _ => ()
           }
         }
 
