@@ -116,8 +116,7 @@ trait GenericCollection[P <: SerializationPack with Singleton]
     CommandCodecs.unitBoxReader[pack.type](pack)
 
   /** Builder used to prepare queries */
-  protected lazy val genericQueryBuilder: GenericQueryBuilder[pack.type] =
-    new CollectionQueryBuilder(failoverStrategy)
+  private[reactivemongo] lazy val genericQueryBuilder: GenericQueryBuilder[pack.type] = new CollectionQueryBuilder(failoverStrategy)
 
   /**
    * Returns a new reference to the same collection,
@@ -173,10 +172,8 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * @param selector $selectorParam
    * @param limit the maximum number of matching documents to count
    * @param skip the number of matching documents to skip before counting
-   * @param hint the index to use (either the index name or the index document)
+   * @param hint the index to use (either the index name or the index document; see `hint(..)`)
    * @param readConcern $readConcernParam
-   *
-   * @see [[hint]]
    */
   def count(
     selector: Option[pack.Document],
@@ -326,7 +323,7 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    */
   def updateModifier[U](update: U, fetchNewObject: Boolean = false, upsert: Boolean = false)(implicit updateWriter: pack.Writer[U]): BatchCommands.FindAndModifyCommand.Update = BatchCommands.FindAndModifyCommand.Update(update, fetchNewObject, upsert)
 
-  /** Returns a removal modifier, to be used with [[findAndModify]]. */
+  /** Returns a removal modifier, to be used with `findAndModify`. */
   @deprecated("Will be private/internal", "0.16.0")
   @transient lazy val removeModifier =
     BatchCommands.FindAndModifyCommand.Remove

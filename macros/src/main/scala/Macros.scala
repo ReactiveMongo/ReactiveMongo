@@ -101,21 +101,6 @@ object Macros {
     trait \/[A, B]
 
     /**
-     * Similar to [[reactivemongo.bson.Macros.Options.UnionType]] but finds all
-     * implementations of the top trait automatically.
-     */
-    @deprecated(message = "Default behaviour for sealed trait, if union types are not explicitly defined", since = "0.12-RC2")
-    trait AllImplementations extends SaveClassName with Default
-
-    /**
-     * Same as [[AllImplementations]] but saving the simple name
-     * (e.g. the fully-qualified name).
-     */
-    @deprecated(message = "Default behaviour for sealed trait, if union types are not explicitly defined", since = "0.12-RC2")
-    trait SimpleAllImplementations
-      extends AllImplementations with SaveSimpleName with Default
-
-    /**
      * For a sealed family (all implementations of a sealed trait
      * or defined explicit union types), this option enables the automatic
      * materialization of handlers for the member types.

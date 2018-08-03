@@ -43,13 +43,6 @@ object Converters {
   }
 
   /**
-   * Returns the MD5 hash for the given UTF-8 `string`,
-   * and turns it into a hexadecimal String representation.
-   */
-  @deprecated("Use `md5Hex` with explicit encoding", "0.12.0")
-  def md5Hex(string: String): String = md5Hex(string, "UTF-8")
-
-  /**
    * Returns the MD5 hash for the given `string`,
    * and turns it into a hexadecimal String representation.
    *
@@ -58,10 +51,6 @@ object Converters {
    */
   def md5Hex(string: String, encoding: String): String =
     hex2Str(md5(string, encoding))
-
-  /** Returns the MD5 hash of the given UTF-8 `string`. */
-  @deprecated("Use `md5` with explicit encoding", "0.12.0")
-  def md5(string: String): Array[Byte] = md5(string, "UTF-8")
 
   /**
    * Returns the MD5 hash of the given `string`.

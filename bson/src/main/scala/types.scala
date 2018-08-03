@@ -25,9 +25,6 @@ import utils.Converters
 import scala.language.implicitConversions
 
 sealed trait Producer[T] {
-  @deprecated("Use [[apply]]", "0.12.0")
-  private[bson] def produce: Option[T] = generate().headOption
-
   private[bson] def generate(): Traversable[T]
 }
 
@@ -46,11 +43,6 @@ object Producer {
     private val element: Option[BSONValue]) extends Producer[BSONValue] {
     private[bson] def generate() = element
   }
-
-  @deprecated(
-    "Replaced by [[element2Producer]] + [[BSONElement.converted]]",
-    "0.12.0")
-  def nameValue2Producer[T](element: (String, T))(implicit writer: BSONWriter[T, _ <: BSONValue]) = NameOptionValueProducer(element._1 -> Some(writer.write(element._2)))
 
   implicit def element2Producer[E <% BSONElement](element: E): Producer[BSONElement] = {
     val e = implicitly[BSONElement](element)
@@ -234,18 +226,6 @@ case class BSONArray(stream: Stream[Try[BSONValue]])
       v.generate().map(value => Try(value))
     }.toStream)
 
-  /**
-   * Alias for `merge`.
-   */
-  @deprecated("Use the corresponding `merge`", "0.12.0")
-  def add(doc: BSONArray): BSONArray = merge(doc)
-
-  /**
-   * Alias for `merge`.
-   */
-  @deprecated("Use the corresponding `merge`", "0.12.0")
-  def add(values: Producer[BSONValue]*): BSONArray = merge(values: _*)
-
   /** Returns a [[BSONArray]] with the given value prepended to its elements. */
   def prepend(value: Producer[BSONValue]): BSONArray =
     new BSONArray(value.generate().map(Try(_)) ++: stream)
@@ -272,24 +252,11 @@ case class BSONArray(stream: Stream[Try[BSONValue]])
   def ~:(elements: Producer[BSONElement]): BSONArray =
     BSONArray(values(elements)) ++ this
 
-  @deprecated("Use [[size]]", "0.12.0")
-  def length = size
-
   @inline def size = stream.size
 
   @inline def isEmpty: Boolean = stream.isEmpty
 
   override def toString: String = s"BSONArray(<${if (isEmpty) "empty" else "non-empty"}>)"
-
-  /**
-   * Returns an iterator for the values as elements,
-   * with their indexes as names (e.g. "0" for the first).
-   */
-  @deprecated(message = "Use [[elements]]", "0.12.0")
-  def iterator: Iterator[Try[(String, BSONValue)]] =
-    stream.zipWithIndex.map { vv =>
-      vv._1.map(vv._2.toString -> _)
-    }.toIterator
 
   def elements: List[BSONElement] = stream.zipWithIndex.collect {
     case (Success(v), index) => BSONElement(index.toString, v)
@@ -400,13 +367,6 @@ class BSONObjectID private (private val raw: Array[Byte])
 }
 
 object BSONObjectID {
-  /**
-   * Constructs a BSON ObjectId element from a hexadecimal String representation.
-   * Throws an exception if the given argument is not a valid ObjectID.
-   */
-  @deprecated("`parse(str: String): Try[BSONObjectID]` should be considered instead of this method", "0.12.0")
-  def apply(id: String): BSONObjectID = parse(id).get
-
   def apply(array: Array[Byte]): BSONObjectID = {
     if (array.length != 12)
       throw new IllegalArgumentException(s"wrong byte array for an ObjectId (size ${array.length})")
@@ -581,26 +541,11 @@ case class BSONRegex(value: String, flags: String)
 /** BSON DBPointer value. */
 class BSONDBPointer private[bson] (
   val value: String,
-  internalId: () => Array[Byte]) extends BSONValue with Product with Serializable with java.io.Serializable {
+  internalId: () => Array[Byte]) extends BSONValue {
   val code = 0x0C: Byte
-
-  @deprecated("", "0.12.0")
-  def this(value: String, id: Array[Byte]) = this(value, { () =>
-    val idCopy = Array.ofDim[Byte](id.size)
-    id.copyToArray(idCopy)
-    idCopy
-  })
 
   /** The BSONObjectID representation of this reference. */
   val objectId = BSONObjectID(internalId())
-
-  @deprecated("Do not use", "0.12.0")
-  def id: Array[Byte] = {
-    val bytes = internalId()
-    val idCopy = Array.ofDim[Byte](bytes.size)
-    bytes.copyToArray(idCopy)
-    idCopy
-  }
 
   private[bson] def withId[T](f: Array[Byte] => T): T = f(internalId())
 
@@ -609,25 +554,11 @@ class BSONDBPointer private[bson] (
 
   // ---
 
-  def canEqual(that: Any): Boolean = that.isInstanceOf[BSONDBPointer]
+  override def equals(that: Any): Boolean = that match {
+    case other: BSONDBPointer =>
+      (other.value -> other.objectId) == (value -> objectId)
 
-  @deprecated("No longer a case class", "0.12.0")
-  val productArity = 2
-
-  @deprecated("No longer a case class", "0.12.0")
-  def productElement(n: Int): Any = n match {
-    case 0 => value
-    case 1 => id
-  }
-
-  @deprecated("No longer a case class", "0.12.0")
-  def copy(value: String = this.value, id: Array[Byte] = internalId()): BSONDBPointer = BSONDBPointer(value, id)
-
-  override def equals(that: Any): Boolean = {
-    canEqual(that) && {
-      val other = that.asInstanceOf[BSONDBPointer]
-      this.value.equals(other.value) && (this.objectId == other.objectId)
-    }
+    case _ => false
   }
 
   override def hashCode: Int = (value, objectId).hashCode
@@ -635,17 +566,7 @@ class BSONDBPointer private[bson] (
   override lazy val toString: String = s"BSONDBPointer(${objectId})"
 }
 
-object BSONDBPointer extends scala.runtime.AbstractFunction2[String, Array[Byte], BSONDBPointer] {
-
-  /** Returns a new DB pointer */
-  @deprecated("", "0.12.0")
-  def apply(value: String, id: Array[Byte]): BSONDBPointer = {
-    val idCopy = Array.ofDim[Byte](id.size)
-    id.copyToArray(idCopy)
-
-    new BSONDBPointer(value, () => idCopy)
-  }
-
+object BSONDBPointer {
   /** Returns a new DB pointer */
   def apply(value: String, id: => Array[Byte]): BSONDBPointer =
     new BSONDBPointer(value, () => id)
@@ -976,11 +897,6 @@ object BSONElementSet {
   implicit def apply(set: Traversable[BSONElement]): BSONElementSet =
     new BSONDocument(set.map(Success(_)).toStream)
 
-  @deprecated("Use the appropriate factory", "0.12.0")
-  implicit def legacy[T <: Product](input: Traversable[T]): BSONElementSet =
-    new BSONDocument(input.collect {
-      case (name: String, v: BSONValue) => Success(BSONElement(name, v))
-    }.toStream)
 }
 
 /**
@@ -1078,16 +994,10 @@ case class BSONDocument(stream: Stream[Try[BSONElement]])
   def merge(doc: BSONDocument): BSONDocument =
     new BSONDocument(stream ++ doc.stream)
 
-  @deprecated("Use `merge`", "0.12.0")
-  def add(doc: BSONDocument): BSONDocument = merge(doc)
-
   /** Creates a new [[BSONDocument]] containing all the elements of this one and the given `elements`. */
   def merge(elements: Producer[BSONElement]*): BSONDocument =
     new BSONDocument(stream ++ elements.flatMap(
       _.generate().map(value => Try(value))).toStream)
-
-  @deprecated("Use `merge`", "0.12.0")
-  def add(elements: Producer[BSONElement]*): BSONDocument = merge(elements: _*)
 
   /** Creates a new [[BSONDocument]] without the elements corresponding the given `keys`. */
   def remove(keys: String*): BSONDocument = new BSONDocument(stream.filter {
@@ -1175,12 +1085,6 @@ object BSONDocument {
 case class BSONElement(
   name: String,
   value: BSONValue) extends ElementProducer {
-
-  @deprecated("Use [[name]]", "0.12.0")
-  @inline def _1 = name
-
-  @deprecated("Use [[value]]", "0.12.0")
-  @inline def _2 = value
 
   def generate() = List(this)
 }

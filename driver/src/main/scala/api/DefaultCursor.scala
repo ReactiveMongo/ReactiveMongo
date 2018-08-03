@@ -446,7 +446,7 @@ sealed trait CursorOps[T] { cursor: Cursor[T] =>
    */
   private[reactivemongo] def documentIterator(response: Response): Iterator[T]
 
-  @deprecated("Use [[killCursor]]", "0.16.0")
+  @deprecated("Use `killCursor`", "0.16.0")
   def kill(cursorID: Long): Unit
 
   /**

@@ -60,11 +60,11 @@ trait ChannelBufferReadable[T] {
 // concrete classes
 
 /**
- * A helper to build write request which result needs to be checked (by sending a [[reactivemongo.core.commands.GetLastError]] command after).
+ * A helper to build write request which result needs to be checked (by sending a [[reactivemongo.api.commands.GetLastError]] command after).
  *
  * @param op write operation.
  * @param documents body of this request, a [[http://netty.io/4.1/api/io/netty/buffer/ByteBuf.html ByteBuf]] containing 0, 1, or many documents.
- * @param getLastError a [[reactivemongo.core.commands.GetLastError]] command message.
+ * @param getLastError a `GetLastError` command message.
  */
 @deprecated("Unused", "0.16.0")
 case class CheckedWriteRequest(

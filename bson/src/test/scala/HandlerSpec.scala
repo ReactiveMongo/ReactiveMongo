@@ -267,7 +267,7 @@ class HandlerSpec extends org.specs2.mutable.Specification {
     "surname2" -> None,
     "score" -> 3.88,
     "online" -> true,
-    "_id" -> BSONObjectID("5117c6391aa562a90098f621"),
+    "_id" -> BSONObjectID.parse("5117c6391aa562a90098f621").get, // !!
     "contact" -> BSONDocument(
       "emails" -> BSONArray(
         Some("james@example.org"),

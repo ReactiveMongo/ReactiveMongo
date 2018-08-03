@@ -28,12 +28,9 @@ object Bson {
         @inline def imt(s: String) = x[IncompatibleMethTypeProblem](s)
 
         Seq(
+          mtp("reactivemongo.bson.BSONDBPointer$"),
+          mtp("reactivemongo.bson.BSONDBPointer"),
           mtp("reactivemongo.bson.BSONTimestamp$"),
-          irt("reactivemongo.bson.Producer.noneOptionValue2Producer"),
-          irt("reactivemongo.bson.Producer.noneOptionValueProducer"),
-          irt("reactivemongo.bson.Producer.nameOptionValue2Producer"),
-          irt("reactivemongo.bson.Producer.valueProducer"),
-          irt("reactivemongo.bson.Producer.optionValueProducer"),
           mtp("reactivemongo.bson.ExtendedNumeric"),
           fmp("reactivemongo.bson.ExtendedNumeric.value"),
           imt("reactivemongo.bson.ExtendedNumeric.this"),
