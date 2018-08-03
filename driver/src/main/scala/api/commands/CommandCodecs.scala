@@ -51,20 +51,39 @@ private[reactivemongo] object CommandCodecs {
 
   def unitBoxReader[P <: SerializationPack](pack: P): pack.Reader[UnitBox.type] = dealingWithGenericCommandErrorsReader[pack.type, UnitBox.type](pack) { _ => UnitBox }
 
-  def writeReadConcern[P <: SerializationPack with Singleton](pack: P): ReadConcern => pack.Document = writeReadConcern[pack.type](pack.newBuilder)
+  //def writeReadConcern[P <: SerializationPack with Singleton](pack: P): ReadConcern => pack.Document = writeReadConcern[pack.type](pack.newBuilder)
 
-  def writeReadConcern[P <: SerializationPack with Singleton](builder: SerializationPack.Builder[P]): ReadConcern => builder.pack.Document = { c: ReadConcern =>
-    builder.document(Seq(
-      builder.elementProducer("level", builder.string(c.level))))
-  }
+  def writeReadConcern[P <: SerializationPack with Singleton](builder: SerializationPack.Builder[P]): ReadConcern => Seq[builder.pack.ElementProducer] = { c: ReadConcern => Seq(builder.elementProducer("level", builder.string(c.level))) }
 
-  def writeSessionReadConcern[P <: SerializationPack with Singleton](builder: SerializationPack.Builder[P]): (ReadConcern, Long) => builder.pack.Document = {
-    (c: ReadConcern, time: Long) =>
-      import builder.{ elementProducer => element }
+  def writeSessionReadConcern[P <: SerializationPack with Singleton](builder: SerializationPack.Builder[P], session: Option[Session]): ReadConcern => Seq[builder.pack.ElementProducer] = {
+    import builder.{ document, elementProducer => element, pack }
 
-      builder.document(Seq(
-        element("level", builder.string(c.level)),
-        element("afterClusterTime", builder.timestamp(time))))
+    val simpleWriteConcern = writeReadConcern(builder)
+    def simpleWrite(c: ReadConcern): pack.ElementProducer =
+      element("readConcern", document(simpleWriteConcern(c)))
+
+    val writeSession = CommandCodecs.writeSession(builder)
+
+    session match {
+      case Some(s) => { c: ReadConcern =>
+        val elements = Seq.newBuilder[pack.ElementProducer]
+
+        elements ++= writeSession(s)
+
+        s.operationTime match {
+          case Some(opTime) =>
+            elements += element("readConcern", document(
+              simpleWriteConcern(c) :+ element(
+                "afterClusterTime", builder.timestamp(opTime))))
+
+          case _ => elements += simpleWrite(c)
+        }
+
+        elements.result()
+      }
+
+      case _ => { c: ReadConcern => Seq(simpleWrite(c)) }
+    }
   }
 
   @inline def writeWriteConcern[P <: SerializationPack with Singleton](pack: P): WriteConcern => pack.Document = writeWriteConcern[pack.type](pack.newBuilder)
@@ -97,20 +116,20 @@ private[reactivemongo] object CommandCodecs {
     }
   }
 
-  type SeqBuilder[T] = scala.collection.mutable.Builder[T, Seq[T]]
-
-  def writeSession[P <: SerializationPack with Singleton](builder: SerializationPack.Builder[P]): SeqBuilder[builder.pack.ElementProducer] => Session => Unit = { elements =>
-    import builder.{ document, elementProducer => element }
+  def writeSession[P <: SerializationPack with Singleton](builder: SerializationPack.Builder[P]): Session => Seq[builder.pack.ElementProducer] = {
+    import builder.{ elementProducer => element }
 
     { session: Session =>
-      elements += element("lsid", document(
-        Seq(element("id", builder.uuid(session.lsid)))))
+      val idElmt = builder.document(Seq(
+        element("id", builder.uuid(session.lsid))))
 
-      session.nextTxnNumber.foreach { txnNumber =>
-        elements += element("txnNumber", builder.long(txnNumber))
+      session.nextTxnNumber match {
+        case Some(txnNumber) => Seq(
+          element("lsid", idElmt),
+          element("txnNumber", builder.long(txnNumber)))
+
+        case _ => Seq(element("lsid", idElmt))
       }
-
-      ()
     }
   }
 

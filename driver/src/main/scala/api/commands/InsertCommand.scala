@@ -25,6 +25,7 @@ trait InsertCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] {
 
 private[reactivemongo] object InsertCommand {
   // TODO: Unit test
+  // TODO: Move in InsertOps as internal function
   def writer[P <: SerializationPack with Singleton](pack: P)(
     context: InsertCommand[pack.type]): Option[Session] => ResolvedCollectionCommand[context.Insert] => pack.Document = {
     val builder = pack.newBuilder
@@ -47,7 +48,9 @@ private[reactivemongo] object InsertCommand {
           element("writeConcern", writeWriteConcern(command.writeConcern)),
           element("documents", documents))
 
-        session.foreach { writeSession(elements)(_) }
+        session.foreach { s =>
+          elements ++= writeSession(s)
+        }
 
         builder.document(elements.result())
       }

@@ -99,7 +99,11 @@ private[collections] trait Aggregator[P <: SerializationPack with Singleton] {
 
   private def commandWriter[T]: pack.Writer[AggregateCmd[T]] = {
     val builder = pack.newBuilder
-    val writeReadConcern = CommandCodecs.writeReadConcern(builder)
+    val session = collection.db.session.filter( // TODO: Remove
+      _ => (version.compareTo(MongoWireVersion.V36) >= 0))
+
+    val writeReadConcern = CommandCodecs.writeSessionReadConcern(
+      builder, session)
 
     pack.writer[AggregateCmd[T]] { agg =>
       import builder.{ boolean, document, elementProducer => element }
@@ -124,9 +128,8 @@ private[collections] trait Aggregator[P <: SerializationPack with Singleton] {
             agg.command.bypassDocumentValidation))
 
           agg.command.readConcern match {
-            case Some(concern) => base ++ Seq(
-              byp,
-              element("readConcern", writeReadConcern(concern)))
+            case Some(concern) =>
+              (base :+ byp) ++ writeReadConcern(concern)
 
             case _ => base :+ byp
           }

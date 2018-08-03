@@ -134,6 +134,7 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * @param swriter $swriterParam
    * @return $returnQueryBuilder
    */
+  @deprecated("Use `find` with optional `projection`", "0.16.0")
   def find[S](selector: S)(implicit swriter: pack.Writer[S]): GenericQueryBuilder[pack.type] = genericQueryBuilder.query(selector)
 
   /**
@@ -149,7 +150,28 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * @param pwriter the writer for the projection
    * @return $returnQueryBuilder
    */
+  @deprecated("Use `find` with optional `projection`", "0.16.0")
   def find[S, J](selector: S, projection: J)(implicit swriter: pack.Writer[S], pwriter: pack.Writer[J]): GenericQueryBuilder[pack.type] = genericQueryBuilder.query(selector).projection(projection)
+
+  /**
+   * $findDescription, with the projection applied.
+   * @see $queryLink
+   *
+   * @tparam S $selectorTParam
+   * @tparam P The type of the projection object. An implicit `Writer[P]` typeclass for handling it has to be in the scope.
+   *
+   * @param selector $selectorParam
+   * @param projection the projection document to select only a subset of each matching documents
+   * @param swriter $swriterParam
+   * @param pwriter the writer for the projection
+   * @return $returnQueryBuilder
+   */
+  def find[S, J](selector: S, projection: Option[J] = Option.empty)(implicit swriter: pack.Writer[S], pwriter: pack.Writer[J]): GenericQueryBuilder[pack.type] = {
+    val queryBuilder: GenericQueryBuilder[pack.type] =
+      genericQueryBuilder.query(selector)
+
+    projection.fold(queryBuilder) { queryBuilder.projection(_) }
+  }
 
   /**
    * Counts the matching documents.
@@ -234,6 +256,7 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    */
   def insert[T](document: T, writeConcern: WriteConcern = writeConcern)(implicit writer: pack.Writer[T], ec: ExecutionContext): Future[WriteResult] =
     prepareInsert[T](true, writeConcern).one(document)
+  // TODO: Remove the Writer from there
 
   /**
    * Returns a builder for insert operations.

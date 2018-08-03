@@ -52,7 +52,11 @@ private[api] trait CountOp[P <: SerializationPack with Singleton] {
   // TODO: Unit test
   private def commandWriter: pack.Writer[CountCmd] = {
     val builder = pack.newBuilder
-    val writeReadConcern = CommandCodecs.writeReadConcern(builder)
+    val session = collection.db.session.filter( // TODO: Remove
+      _ => (version.compareTo(MongoWireVersion.V36) >= 0))
+
+    val writeReadConcern = CommandCodecs.writeSessionReadConcern(
+      builder, session)
 
     pack.writer[CountCmd] { count =>
       import builder.{
@@ -85,15 +89,8 @@ private[api] trait CountOp[P <: SerializationPack with Singleton] {
         case hint => println(s"Unsupported count hint: $hint") // should never
       }
 
-      count.command.readConcern.foreach { rc =>
-        elements += element("readConcern", writeReadConcern(rc))
-      }
-
-      if (version.compareTo(MongoWireVersion.V36) >= 0) {
-        collection.db.session.foreach { session =>
-          CommandCodecs.writeSession(builder)(elements)(session)
-        }
-      }
+      val rc = count.command.readConcern.getOrElse(collection.readConcern)
+      elements ++= writeReadConcern(rc)
 
       document(elements.result())
     }

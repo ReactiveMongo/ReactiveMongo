@@ -82,6 +82,16 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
    - collation: document; Optional; Specifies the collation to use for the operation.
    */
 
+  /**
+   * Makes a [[Cursor]] of this query, which can be enumerated.
+   *
+   * @param readPreference $readPrefParam
+   * @param reader $readerParam
+   *
+   * @tparam T $resultTParam
+   */
+  def cursor[T](readPreference: ReadPreference = readPreference, isMongo26WriteOp: Boolean = false)(implicit reader: pack.Reader[T], cp: CursorProducer[T]): cp.ProducedCursor = cp.produce(defaultCursor[T](readPreference, isMongo26WriteOp))
+
   /** The default [[ReadPreference]] */
   @deprecated("Will be private/internal", "0.16.0")
   @inline def readPreference: ReadPreference = ReadPreference.primary
@@ -89,7 +99,122 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
   protected lazy val version =
     collection.db.connectionState.metadata.maxWireVersion
 
-  // TODO: Unit test
+  /**
+   * $oneFunction.
+   *
+   * @param reader $readerParam
+   *
+   * @tparam T $resultTParam
+   */
+  def one[T](implicit reader: pack.Reader[T], ec: ExecutionContext): Future[Option[T]] = one(readPreference)
+
+  /**
+   * $oneFunction.
+   *
+   * @param readPreference $readPrefParam
+   * @param reader $readerParam
+   *
+   * @tparam T $resultTParam
+   */
+  def one[T](readPreference: ReadPreference)(implicit reader: pack.Reader[T], ec: ExecutionContext): Future[Option[T]] = copy(options = options.batchSize(1)).defaultCursor(readPreference)(reader).headOption
+
+  /**
+   * $requireOneFunction.
+   *
+   * @param reader $readerParam
+   *
+   * @tparam T $resultTParam
+   */
+  def requireOne[T](implicit reader: pack.Reader[T], ec: ExecutionContext): Future[T] = requireOne(readPreference)
+
+  /**
+   * $requireOneFunction.
+   *
+   * @param readPreference $readPrefParam
+   * @param reader $readerParam
+   *
+   * @tparam T $resultTParam
+   */
+  def requireOne[T](readPreference: ReadPreference)(implicit reader: pack.Reader[T], ec: ExecutionContext): Future[T] = copy(options = options.batchSize(1)).defaultCursor(readPreference)(reader).head
+
+  /**
+   * Sets the selector document.
+   *
+   * @tparam Qry The type of the query. An implicit `Writer[Qry]` typeclass for handling it has to be in the scope.
+   */
+  def query[Qry](selector: Qry)(implicit writer: pack.Writer[Qry]): Self =
+    copy(queryOption = Some(pack.serialize(selector, writer)))
+
+  /** Sets the query (the selector document). */
+  def query(selector: pack.Document): Self = copy(queryOption = Some(selector))
+
+  /** Sets the sorting document. */
+  def sort(document: pack.Document): Self = copy(sortOption = Some(document))
+
+  /**
+   * Sets the projection document (for [[http://docs.mongodb.org/manual/core/read-operations-introduction/ retrieving only a subset of fields]]).
+   *
+   * @tparam Pjn The type of the projection. An implicit `Writer[Pjn]` typeclass for handling it has to be in the scope.
+   */
+  def projection[Pjn](p: Pjn)(implicit writer: pack.Writer[Pjn]): Self =
+    copy(projectionOption = Some(pack.serialize(p, writer)))
+
+  /**
+   * Sets the projection document (for [[http://docs.mongodb.org/manual/core/read-operations-introduction/ retrieving only a subset of fields]]).
+   */
+  def projection(p: pack.Document): Self = copy(projectionOption = Some(p))
+
+  /** Sets the hint document (a document that declares the index MongoDB should use for this query). */
+  def hint(document: pack.Document): Self = copy(hintOption = Some(document))
+
+  /** Sets the hint document (a document that declares the index MongoDB should use for this query). */
+  // TODO def hint(indexName: String): Self = copy(hintOption = Some(BSONDocument(indexName -> BSONInteger(1))))
+
+  /** Toggles [[https://docs.mongodb.org/manual/reference/method/cursor.explain/#cursor.explain explain mode]]. */
+  def explain(flag: Boolean = true): Self = copy(explainFlag = flag)
+
+  /** Toggles [[https://docs.mongodb.org/manual/faq/developers/#faq-developers-isolate-cursors snapshot mode]]. */
+  def snapshot(flag: Boolean = true): Self = copy(snapshotFlag = flag)
+
+  /** Adds a comment to this query, that may appear in the MongoDB logs. */
+  def comment(message: String): Self = copy(commentString = Some(message))
+
+  /** Adds maxTimeMs to query https://docs.mongodb.org/v3.0/reference/operator/meta/maxTimeMS/ */
+  def maxTimeMs(p: Long): Self = copy(maxTimeMsOption = Some(p))
+
+  def options(options: QueryOpts): Self = copy(options = options)
+
+  @deprecated("Use `options` or the separate query ops", "0.12.4")
+  def updateOptions(update: QueryOpts => QueryOpts): Self =
+    copy(options = update(options))
+
+  // QueryOps
+  def awaitData = options(options.awaitData)
+  def batchSize(n: Int) = options(options.batchSize(n))
+  def exhaust = options(options.exhaust)
+  def noCursorTimeout = options(options.noCursorTimeout)
+  def oplogReplay = options(options.oplogReplay)
+  def partial = options(options.partial)
+  def skip(n: Int) = options(options.skip(n))
+  def slaveOk = options(options.slaveOk)
+  def tailable = options(options.tailable)
+
+  @deprecated("Will be private/internal", "0.16.0")
+  def copy(
+    queryOption: Option[pack.Document] = queryOption,
+    sortOption: Option[pack.Document] = sortOption,
+    projectionOption: Option[pack.Document] = projectionOption,
+    hintOption: Option[pack.Document] = hintOption,
+    explainFlag: Boolean = explainFlag,
+    snapshotFlag: Boolean = snapshotFlag,
+    commentString: Option[String] = commentString,
+    options: QueryOpts = options,
+    failover: FailoverStrategy = failover,
+    maxTimeMsOption: Option[Long] = maxTimeMsOption): Self
+
+  // ---
+
+  // TODO: Unit test (see merge test in ReactiveMongo-Play-Json)
   private[reactivemongo] def merge(readPreference: ReadPreference, maxDocs: Int): pack.Document = {
     val builder = pack.newBuilder
 
@@ -209,36 +334,11 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
         elements += element("maxTimeMS", long(l))
       }
 
-      @inline def simpleReadConcern(): Unit = {
-        elements += element(
-          "readConcern", CommandCodecs.writeReadConcern(builder)(readConcern))
+      val session = collection.db.session.filter( // TODO: Remove
+        _ => (version.compareTo(MongoWireVersion.V36) >= 0))
 
-        ()
-      }
-
-      // TODO: Remove this if, just check session
-      if (version.compareTo(MongoWireVersion.V36) >= 0) {
-        collection.db.session match {
-          case Some(session) => {
-            CommandCodecs.writeSession(builder)(elements)(session)
-
-            session.operationTime match {
-              case Some(opTime) => {
-                elements += element(
-                  "readConcern",
-                  CommandCodecs.writeSessionReadConcern(builder)(
-                    readConcern, opTime))
-              }
-
-              case _ => simpleReadConcern()
-            }
-          }
-
-          case _ => simpleReadConcern()
-        }
-      } else {
-        simpleReadConcern()
-      }
+      elements ++= CommandCodecs.writeSessionReadConcern(
+        builder, session)(readConcern)
 
       val readPref = element(f"$$readPreference", writeReadPref(readPreference))
 
@@ -257,16 +357,6 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
 
     merged
   }
-
-  /**
-   * Makes a [[Cursor]] of this query, which can be enumerated.
-   *
-   * @param readPreference $readPrefParam
-   * @param reader $readerParam
-   *
-   * @tparam T $resultTParam
-   */
-  def cursor[T](readPreference: ReadPreference = readPreference, isMongo26WriteOp: Boolean = false)(implicit reader: pack.Reader[T], cp: CursorProducer[T]): cp.ProducedCursor = cp.produce(defaultCursor[T](readPreference, isMongo26WriteOp))
 
   private def defaultCursor[T](
     readPreference: ReadPreference,
@@ -312,121 +402,6 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
       collection.db, failover, isMongo26WriteOp,
       collection.fullCollectionName)(reader)
   }
-
-  /**
-   * $oneFunction.
-   *
-   * @param reader $readerParam
-   *
-   * @tparam T $resultTParam
-   */
-  def one[T](implicit reader: pack.Reader[T], ec: ExecutionContext): Future[Option[T]] = one(readPreference)
-
-  /**
-   * $oneFunction.
-   *
-   * @param readPreference $readPrefParam
-   * @param reader $readerParam
-   *
-   * @tparam T $resultTParam
-   */
-  def one[T](readPreference: ReadPreference)(implicit reader: pack.Reader[T], ec: ExecutionContext): Future[Option[T]] = copy(options = options.batchSize(1)).defaultCursor(readPreference)(reader).headOption
-
-  /**
-   * $requireOneFunction.
-   *
-   * @param reader $readerParam
-   *
-   * @tparam T $resultTParam
-   */
-  def requireOne[T](implicit reader: pack.Reader[T], ec: ExecutionContext): Future[T] = requireOne(readPreference)
-
-  /**
-   * $requireOneFunction.
-   *
-   * @param readPreference $readPrefParam
-   * @param reader $readerParam
-   *
-   * @tparam T $resultTParam
-   */
-  def requireOne[T](readPreference: ReadPreference)(implicit reader: pack.Reader[T], ec: ExecutionContext): Future[T] = copy(options = options.batchSize(1)).defaultCursor(readPreference)(reader).head
-
-  /**
-   * Sets the selector document.
-   *
-   * @tparam Qry The type of the query. An implicit `Writer[Qry]` typeclass for handling it has to be in the scope.
-   */
-  def query[Qry](selector: Qry)(implicit writer: pack.Writer[Qry]): Self =
-    copy(queryOption = Some(pack.serialize(selector, writer)))
-
-  /** Sets the query (the selector document). */
-  def query(selector: pack.Document): Self = copy(queryOption = Some(selector))
-
-  /** Sets the sorting document. */
-  def sort(document: pack.Document): Self = copy(sortOption = Some(document))
-
-  /**
-   * Sets the projection document (for [[http://docs.mongodb.org/manual/core/read-operations-introduction/ retrieving only a subset of fields]]).
-   *
-   * @tparam Pjn The type of the projection. An implicit `Writer[Pjn]` typeclass for handling it has to be in the scope.
-   */
-  def projection[Pjn](p: Pjn)(implicit writer: pack.Writer[Pjn]): Self =
-    copy(projectionOption = Some(pack.serialize(p, writer)))
-
-  /**
-   * Sets the projection document (for [[http://docs.mongodb.org/manual/core/read-operations-introduction/ retrieving only a subset of fields]]).
-   */
-  def projection(p: pack.Document): Self = copy(projectionOption = Some(p))
-
-  /** Sets the hint document (a document that declares the index MongoDB should use for this query). */
-  def hint(document: pack.Document): Self = copy(hintOption = Some(document))
-
-  /** Sets the hint document (a document that declares the index MongoDB should use for this query). */
-  // TODO def hint(indexName: String): Self = copy(hintOption = Some(BSONDocument(indexName -> BSONInteger(1))))
-
-  /** Toggles [[https://docs.mongodb.org/manual/reference/method/cursor.explain/#cursor.explain explain mode]]. */
-  def explain(flag: Boolean = true): Self = copy(explainFlag = flag)
-
-  /** Toggles [[https://docs.mongodb.org/manual/faq/developers/#faq-developers-isolate-cursors snapshot mode]]. */
-  def snapshot(flag: Boolean = true): Self = copy(snapshotFlag = flag)
-
-  /** Adds a comment to this query, that may appear in the MongoDB logs. */
-  def comment(message: String): Self = copy(commentString = Some(message))
-
-  /** Adds maxTimeMs to query https://docs.mongodb.org/v3.0/reference/operator/meta/maxTimeMS/ */
-  def maxTimeMs(p: Long): Self = copy(maxTimeMsOption = Some(p))
-
-  def options(options: QueryOpts): Self = copy(options = options)
-
-  @deprecated("Use `options` or the separate query ops", "0.12.4")
-  def updateOptions(update: QueryOpts => QueryOpts): Self =
-    copy(options = update(options))
-
-  // QueryOps
-  def awaitData = options(options.awaitData)
-  def batchSize(n: Int) = options(options.batchSize(n))
-  def exhaust = options(options.exhaust)
-  def noCursorTimeout = options(options.noCursorTimeout)
-  def oplogReplay = options(options.oplogReplay)
-  def partial = options(options.partial)
-  def skip(n: Int) = options(options.skip(n))
-  def slaveOk = options(options.slaveOk)
-  def tailable = options(options.tailable)
-
-  @deprecated("Will be private/internal", "0.16.0")
-  def copy(
-    queryOption: Option[pack.Document] = queryOption,
-    sortOption: Option[pack.Document] = sortOption,
-    projectionOption: Option[pack.Document] = projectionOption,
-    hintOption: Option[pack.Document] = hintOption,
-    explainFlag: Boolean = explainFlag,
-    snapshotFlag: Boolean = snapshotFlag,
-    commentString: Option[String] = commentString,
-    options: QueryOpts = options,
-    failover: FailoverStrategy = failover,
-    maxTimeMsOption: Option[Long] = maxTimeMsOption): Self
-
-  // ---
 
   private def write(document: pack.Document, buffer: ChannelBufferWritableBuffer): ChannelBufferWritableBuffer = {
     pack.writeToBuffer(buffer, document)

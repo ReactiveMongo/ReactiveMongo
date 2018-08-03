@@ -331,6 +331,13 @@ class CollectionSpec(implicit protected val ee: ExecutionEnv)
                 r <- coll.find(base).one[BSONDocument]
               } yield r) must beSome(updated).awaitFor(timeout)
             } and {
+              coll.count(
+                selector = Some(base), hint = None,
+                limit = None, skip = 0,
+                readConcern = ReadConcern.Local) must beTypedEqualTo(1L).
+                awaitFor(timeout)
+
+            } and {
               db.endSession().map(_ => {}) must beEqualTo({}).awaitFor(timeout)
             }
         }.awaitFor(timeout)

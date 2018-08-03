@@ -98,7 +98,9 @@ private[reactivemongo] object UpdateCommand {
               builder.string("_used_by_UpdateOps_to_compute_bson_size"))
         }
 
-        session.foreach { writeSession(elements)(_) }
+        session.foreach { s =>
+          elements ++= writeSession(s)
+        }
 
         builder.document(elements.result())
       }
