@@ -403,14 +403,20 @@ trait MongoDBSystem extends Actor {
     @volatile var updated = false
 
     updateNodeSet(event) { ns =>
-      val updSet = ns.updateNodeByChannelId(channelId) {
-        collectConnections(_) {
+      val updSet = ns.updateNodeByChannelId(channelId) { n =>
+        collectConnections(n) {
           case other if (other.channel.id != channelId) =>
             other // keep connections for other channels unchanged
 
-          case con =>
+          case con => {
             updated = true
-            con.copy(status = ConnectionStatus.Disconnected)
+
+            if (con.channel.isOpen) { // can still be reused
+              con.copy(status = ConnectionStatus.Disconnected)
+            } else {
+              n.createConnection(channelFactory, self)
+            }
+          }
         }
       }
 

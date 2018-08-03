@@ -10,6 +10,8 @@ import reactivemongo.io.netty.bootstrap.Bootstrap
 
 import reactivemongo.io.netty.channel.{
   Channel,
+  ChannelFuture,
+  ChannelFutureListener,
   ChannelOption,
   EventLoopGroup
 }, ChannelOption.{ CONNECT_TIMEOUT_MILLIS, SO_KEEPALIVE, TCP_NODELAY }
@@ -26,6 +28,7 @@ import reactivemongo.core.protocol.{
   ResponseFrameDecoder,
   ResponseDecoder
 }
+import reactivemongo.core.actors.ChannelDisconnected
 
 import reactivemongo.api.MongoConnectionOptions
 
@@ -59,7 +62,21 @@ final class ChannelFactory private[reactivemongo] (
     host: String = "localhost",
     port: Int = 27017,
     receiver: ActorRef): Channel = {
-    val resolution = channelFactory.connect(host, port)
+    val resolution = channelFactory.connect(host, port).addListener(
+      new ChannelFutureListener {
+        def operationComplete(op: ChannelFuture) {
+          if (!op.isSuccess) {
+            val chanId = op.channel.id
+
+            debug(
+              s"Connection to ${host}:${port} refused for channel #${chanId}",
+              op.cause)
+
+            receiver ! ChannelDisconnected(chanId)
+          }
+        }
+      })
+
     val channel = resolution.channel
 
     debug(s"Created new channel #${channel.id} to ${host}:${port} (registered = ${channel.isRegistered})")
@@ -193,6 +210,9 @@ final class ChannelFactory private[reactivemongo] (
 
   @inline private def debug(msg: => String) =
     logger.debug(s"[$supervisor/$connection] ${msg}")
+
+  @inline private def debug(msg: => String, cause: Throwable) =
+    logger.debug(s"[$supervisor/$connection] ${msg}", cause)
 
   @inline private def trace(msg: => String) =
     logger.trace(s"[$supervisor/$connection] ${msg}")
