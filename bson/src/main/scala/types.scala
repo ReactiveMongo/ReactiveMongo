@@ -315,6 +315,15 @@ case class BSONBinary(value: ReadableBuffer, subtype: Subtype)
 object BSONBinary {
   def apply(value: Array[Byte], subtype: Subtype): BSONBinary =
     BSONBinary(ArrayReadableBuffer(value), subtype)
+
+  def apply(id: java.util.UUID): BSONBinary = {
+    val buf = java.nio.ByteBuffer.wrap(Array.ofDim[Byte](16))
+
+    buf putLong id.getMostSignificantBits
+    buf putLong id.getLeastSignificantBits
+
+    BSONBinary(buf.array, Subtype.UuidSubtype)
+  }
 }
 
 /** BSON Undefined value */

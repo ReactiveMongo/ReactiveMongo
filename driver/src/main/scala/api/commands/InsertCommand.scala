@@ -25,7 +25,6 @@ trait InsertCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] {
 }
 
 private[reactivemongo] object InsertCommand {
-  // TODO: Unit test
   // TODO: Move in InsertOps as internal function
   def writer[P <: SerializationPack with Singleton](pack: P)(
     context: InsertCommand[pack.type]): Option[Session] => ResolvedCollectionCommand[context.Insert] => pack.Document = {

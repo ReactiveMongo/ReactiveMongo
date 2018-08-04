@@ -11,7 +11,6 @@ trait BatchCommands[P <: SerializationPack] {
     InsertCommand => IC,
     UpdateCommand => UC,
     DeleteCommand => DC,
-    DefaultWriteResult,
     ResolvedCollectionCommand,
     FindAndModifyCommand => FMC
   }

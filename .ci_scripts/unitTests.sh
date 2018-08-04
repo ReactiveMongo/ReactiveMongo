@@ -55,6 +55,8 @@ TEST_ARGS="$TEST_ARGS ReadPreferenceSpec"
 TEST_ARGS="$TEST_ARGS UtilSpec"
 TEST_ARGS="$TEST_ARGS WriteResultSpec"
 TEST_ARGS="$TEST_ARGS BSONObjectIDSpec"
+TEST_ARGS="$TEST_ARGS reactivemongo.InsertCommandSpec"
+TEST_ARGS="$TEST_ARGS reactivemongo.UpdateCommandSpec"
 TEST_ARGS="$TEST_ARGS -- include unit"
 
 TEST_ARGS="$TEST_ARGS ;project ReactiveMongo-BSON-Macros ;testQuick"

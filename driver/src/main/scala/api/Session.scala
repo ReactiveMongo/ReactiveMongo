@@ -15,7 +15,7 @@ import reactivemongo.core.protocol.Response
  * @param lsid the ID of the logical (server) session
  * @param causalConsistency the causal consistency
  */
-private[api] sealed abstract class Session(
+private[reactivemongo] sealed abstract class Session(
   val lsid: UUID,
   val causalConsistency: Boolean) {
 
@@ -41,14 +41,14 @@ private[api] sealed abstract class Session(
   override lazy val hashCode: Int = (lsid -> causalConsistency).hashCode
 }
 
-private[api] final class PlainSession(
+private[reactivemongo] final class PlainSession(
   lsid: UUID,
   causalConsistency: Boolean = true) extends Session(lsid, causalConsistency) {
 
   @inline def nextTxnNumber() = Option.empty[Long]
 }
 
-private[api] final class ReplicaSetSession(
+private[reactivemongo] final class ReplicaSetSession(
   lsid: UUID,
   causalConsistency: Boolean = true) extends Session(lsid, causalConsistency) {
 

@@ -40,6 +40,7 @@ lazy val `ReactiveMongo-Root` = project.in(file(".")).
       publishArtifact := false,
       publishTo := None,
       publishLocal := {},
+      publish := {},
       mimaPreviousArtifacts := Set.empty
   )).aggregate(
     `ReactiveMongo-BSON`,

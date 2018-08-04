@@ -109,14 +109,7 @@ object BSONSerializationPack extends SerializationPack { self =>
 
     def string(s: String): Value = BSONString(s)
 
-    def uuid(id: UUID): Value = { // TODO: Adds handler in BSON
-      val buf = java.nio.ByteBuffer.wrap(Array.ofDim[Byte](16))
-
-      buf putLong id.getMostSignificantBits
-      buf putLong id.getLeastSignificantBits
-
-      BSONBinary(buf.array, Subtype.UuidSubtype)
-    }
+    def uuid(id: UUID): Value = BSONBinary(id)
 
     /** Returns a timestamp as a serialized value. */
     def timestamp(time: Long): Value = BSONTimestamp(time)
