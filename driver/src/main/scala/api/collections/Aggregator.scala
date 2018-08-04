@@ -23,6 +23,8 @@ import reactivemongo.core.protocol.MongoWireVersion
 private[collections] trait Aggregator[P <: SerializationPack with Singleton] {
   collection: GenericCollection[P] =>
 
+  // TODO: comment, hint, collation, maxTimeMS
+
   // ---
 
   final class AggregatorContext[T](
@@ -118,6 +120,11 @@ private[collections] trait Aggregator[P <: SerializationPack with Singleton] {
         cmd.operator.makePipe,
         cmd.pipeline.map(_.makePipe))
 
+      lazy val isOut: Boolean = cmd.pipeline.lastOption.exists {
+        case BatchCommands.AggregationFramework.Out(_) => true
+        case _                                         => false
+      }
+
       val elements = Seq.newBuilder[pack.ElementProducer]
 
       elements ++= Seq(
@@ -135,7 +142,7 @@ private[collections] trait Aggregator[P <: SerializationPack with Singleton] {
         elements ++= writeReadConcern(cmd.readConcern)
       }
 
-      if (cmd.wireVersion >= MongoWireVersion.V36) {
+      if (cmd.wireVersion >= MongoWireVersion.V36 && isOut) {
         elements += element("writeConcern", writeWriteConcern(cmd.writeConcern))
       }
 

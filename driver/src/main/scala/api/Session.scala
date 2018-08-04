@@ -90,7 +90,7 @@ private[api] object Session {
       }
 
       opTime.fold(session -> resp) { operationTime =>
-        println(s"session.operationTime = $operationTime")
+        //TODO: logging/trace: println(s"session.operationTime = $operationTime")
 
         val clusterTime = for {
           nested <- preloaded.getAs[BSONDocument](f"$$clusterTime")
