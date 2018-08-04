@@ -11,6 +11,7 @@ import reactivemongo.core.protocol.MongoWireVersion
 import reactivemongo.api.{ ReadConcern, SerializationPack }
 
 /** The [[https://docs.mongodb.org/manual/reference/command/distinct/ distinct]] command. */
+@deprecated("Use `.distinct` on collection", "0.16.0")
 trait DistinctCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] {
   /**
    * @param keyString the field for which to return distinct values

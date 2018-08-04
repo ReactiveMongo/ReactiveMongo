@@ -331,10 +331,22 @@ class CollectionSpec(implicit protected val ee: ExecutionEnv)
                 r <- coll.find(base).one[BSONDocument]
               } yield r) must beSome(updated).awaitFor(timeout)
             } and {
+              coll.distinct[Int, List](
+                key = "_id",
+                query = None,
+                readConcern = ReadConcern.Local,
+                collation = None) must beTypedEqualTo(List(id)).
+                awaitFor(timeout)
+
+            } and {
+              coll.delete(ordered = true).one(base).
+                map(_ => {}) must beTypedEqualTo({}).awaitFor(timeout)
+
+            } and {
               coll.count(
                 selector = Some(base), hint = None,
                 limit = None, skip = 0,
-                readConcern = ReadConcern.Local) must beTypedEqualTo(1L).
+                readConcern = ReadConcern.Local) must beTypedEqualTo(0L).
                 awaitFor(timeout)
 
             } and {

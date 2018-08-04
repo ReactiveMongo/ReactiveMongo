@@ -5,10 +5,12 @@ import reactivemongo.bson._
 import reactivemongo.api.BSONSerializationPack
 import reactivemongo.api.commands.{ DistinctCommand, ResolvedCollectionCommand }
 
+@deprecated("Use `.distinct` on collection", "0.16.0")
 object BSONDistinctCommand extends DistinctCommand[BSONSerializationPack.type] {
   val pack = BSONSerializationPack
 }
 
+@deprecated("Use `.distinct` on collection", "0.16.0")
 object BSONDistinctCommandImplicits {
   import BSONDistinctCommand._
 

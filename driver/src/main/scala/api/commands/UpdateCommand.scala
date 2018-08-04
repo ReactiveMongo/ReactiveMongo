@@ -5,6 +5,7 @@ import reactivemongo.api.{ Session, SerializationPack }
 /**
  * Implements the [[https://docs.mongodb.com/manual/reference/command/update/ update]] command.
  */
+@deprecated("Use the new update operation", "0.16.0")
 trait UpdateCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] {
   val pack: P
 

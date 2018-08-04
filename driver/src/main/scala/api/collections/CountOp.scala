@@ -13,9 +13,6 @@ import reactivemongo.api.commands.{
   ResolvedCollectionCommand
 }
 
-/**
- * @define writeConcernParam the [[https://docs.mongodb.com/manual/reference/write-concern/ writer concern]] to be used
- */
 private[api] trait CountOp[P <: SerializationPack with Singleton] {
   collection: GenericCollection[P] =>
 
@@ -27,7 +24,7 @@ private[api] trait CountOp[P <: SerializationPack with Singleton] {
     limit: Option[Int],
     skip: Int,
     hint: Option[Hint[pack.type]],
-    readConcern: Option[ReadConcern])(
+    readConcern: ReadConcern)(
     implicit
     ec: ExecutionContext): Future[Long] = {
 
@@ -41,13 +38,10 @@ private[api] trait CountOp[P <: SerializationPack with Singleton] {
     val limit: Option[Int],
     val skip: Int,
     val hint: Option[Hint[pack.type]],
-    val readConcern: Option[ReadConcern])
+    val readConcern: ReadConcern)
     extends CollectionCommand with CommandWithResult[Long]
 
   private type CountCmd = ResolvedCollectionCommand[CountCommand]
-
-  protected lazy val version =
-    collection.db.connectionState.metadata.maxWireVersion
 
   // TODO: Unit test
   private def commandWriter: pack.Writer[CountCmd] = {
@@ -89,8 +83,7 @@ private[api] trait CountOp[P <: SerializationPack with Singleton] {
         case hint => println(s"Unsupported count hint: $hint") // should never
       }
 
-      val rc = count.command.readConcern.getOrElse(collection.readConcern)
-      elements ++= writeReadConcern(rc)
+      elements ++= writeReadConcern(count.command.readConcern)
 
       document(elements.result())
     }

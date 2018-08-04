@@ -1,5 +1,7 @@
 package reactivemongo.api.commands
 
+import scala.language.higherKinds
+
 import scala.concurrent.{ ExecutionContext, Future }
 
 import reactivemongo.api.{
@@ -33,12 +35,11 @@ trait BoxedAnyVal[A <: AnyVal] {
  * @param numberToReturn the number of documents to return
  * @param value the value parsed from the response
  */
+@deprecated("Will be private/internal", "0.16.0")
 case class ResponseResult[R](
   response: Response,
   numberToReturn: Int,
   value: R)
-
-import scala.language.higherKinds
 
 /**
  * Fetches a cursor from MongoDB results.
@@ -261,7 +262,9 @@ final case class ResolvedCollectionCommand[C <: CollectionCommand](
 trait Mongo26WriteCommand
 
 object `package` {
-  // TODO: Move to the `api` package
+  @deprecated("Will be replaced by `reactivemongo.api.commands.WriteConcern`", "0.16.0")
   type WriteConcern = GetLastError
+
+  @deprecated("Will be replaced by `reactivemongo.api.commands.WriteConcern`", "0.16.0")
   val WriteConcern = GetLastError
 }

@@ -9,7 +9,6 @@ import reactivemongo.core.errors.GenericDriverException
 
 import reactivemongo.api.SerializationPack
 import reactivemongo.api.commands.{
-  BulkOps,
   MultiBulkWriteResult,
   ResolvedCollectionCommand,
   UpdateWriteResult,

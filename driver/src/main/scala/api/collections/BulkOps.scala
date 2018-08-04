@@ -1,4 +1,4 @@
-package reactivemongo.api.commands
+package reactivemongo.api.collections
 
 import scala.concurrent.{ ExecutionContext, Future }
 

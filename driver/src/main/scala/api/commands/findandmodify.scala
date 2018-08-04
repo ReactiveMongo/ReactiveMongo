@@ -2,6 +2,7 @@ package reactivemongo.api.commands
 
 import reactivemongo.api.SerializationPack
 
+@deprecated("Will be private/internal", "0.16.0")
 trait FindAndModifyCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] {
   import pack._
 

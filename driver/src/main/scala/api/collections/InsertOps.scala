@@ -9,7 +9,6 @@ import reactivemongo.core.errors.GenericDriverException
 
 import reactivemongo.api.SerializationPack
 import reactivemongo.api.commands.{
-  BulkOps,
   CommandCodecs,
   LastError,
   MultiBulkWriteResult,
@@ -24,6 +23,8 @@ import reactivemongo.api.commands.{
  */
 trait InsertOps[P <: SerializationPack with Singleton] {
   collection: GenericCollection[P] =>
+
+  // TODO: bypassDocumentValidation: bool
 
   private object InsertCommand
     extends reactivemongo.api.commands.InsertCommand[collection.pack.type] {

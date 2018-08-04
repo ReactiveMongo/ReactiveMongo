@@ -3,6 +3,7 @@ package reactivemongo.api.commands
 /**
  * @param wtimeout the [[http://docs.mongodb.org/manual/reference/write-concern/#wtimeout time limit]]
  */
+@deprecated("Will be replaced by `reactivemongo.api.commands.WriteConcern`", "0.16.0")
 case class GetLastError(
   w: GetLastError.W,
   j: Boolean,
@@ -11,6 +12,7 @@ case class GetLastError(
   with CommandWithResult[LastError]
 
 // TODO: Rename as WriteConcern
+@deprecated("Will be replaced by `reactivemongo.api.commands.WriteConcern`", "0.16.0")
 object GetLastError {
   sealed trait W
   case object Majority extends W

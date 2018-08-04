@@ -15,7 +15,7 @@
  */
 package reactivemongo.api.collections
 
-import scala.util.{ Failure, Success, Try }
+import scala.util.Try
 import scala.util.control.NonFatal
 
 import scala.collection.generic.CanBuildFrom
@@ -78,17 +78,21 @@ trait GenericCollectionProducer[P <: SerializationPack with Singleton, +C <: Gen
  * @define aggBatchSizeParam the batch size (for the aggregation cursor; if `None` use the default one)
  * @define aggregationPipelineFunction the function to create the aggregation pipeline using the aggregation framework depending on the collection type
  * @define orderedParam the [[https://docs.mongodb.com/manual/reference/method/db.collection.insert/#perform-an-unordered-insert ordered]] behaviour
+ * @define collationParam the collation
  */
 trait GenericCollection[P <: SerializationPack with Singleton]
   extends Collection with GenericCollectionWithCommands[P]
-  with CollectionMetaCommands with ImplicitCommandHelpers[P]
-  with InsertOps[P] with UpdateOps[P] with DeleteOps[P] with CountOp[P]
+  with CollectionMetaCommands with ImplicitCommandHelpers[P] with InsertOps[P]
+  with UpdateOps[P] with DeleteOps[P] with CountOp[P] with DistinctOp[P]
   with Aggregator[P] with GenericCollectionMetaCommands[P]
   with GenericCollectionWithQueryBuilder[P] with HintFactory[P] { self =>
 
   import scala.language.higherKinds
 
   val pack: P
+
+  /** Upper MongoDB version (used for version checks) */
+  protected lazy val version = db.connectionState.metadata.maxWireVersion
 
   protected val BatchCommands: BatchCommands[pack.type]
   import BatchCommands._
@@ -203,7 +207,13 @@ trait GenericCollection[P <: SerializationPack with Singleton]
     skip: Int,
     hint: Option[Hint[pack.type]],
     readConcern: ReadConcern)(implicit ec: ExecutionContext): Future[Long] =
-    countDocuments(selector, limit, skip, hint, Some(readConcern))
+    countDocuments(selector, limit, skip, hint, readConcern)
+
+  @deprecated("Use `distinct` with `Collation`", "0.16.0")
+  def distinct[T, M[_] <: Iterable[_]](
+    key: String,
+    selector: Option[pack.Document] = None,
+    readConcern: ReadConcern = self.readConcern)(implicit reader: pack.NarrowValueReader[T], ec: ExecutionContext, cbf: CanBuildFrom[M[_], T, M[T]]): Future[M[T]] = distinctDocuments[T, M](key, selector, readConcern, collation = None)
 
   /**
    * Returns the distinct values for a specified field
@@ -213,29 +223,23 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * @tparam M the container, that must be a [[scala.collection.Iterable]]
    *
    * @param key the field for which to return distinct values
-   * @param selector $selectorParam, that specifies the documents from which to retrieve the distinct values.
+   * @param query $selectorParam, that specifies the documents from which to retrieve the distinct values.
    * @param readConcern $readConcernParam
+   * @param collation $collationParam
    *
    * {{{
-   * val distinctStates = collection.distinct[String, Set]("state")
+   * val distinctStates = collection.distinct[String, Set](
+   *   "state", None, ReadConcern.Local, None)
    * }}}
    */
   def distinct[T, M[_] <: Iterable[_]](
     key: String,
-    selector: Option[pack.Document] = None,
-    readConcern: ReadConcern = self.readConcern)(implicit reader: pack.NarrowValueReader[T], ec: ExecutionContext, cbf: CanBuildFrom[M[_], T, M[T]]): Future[M[T]] = {
-    implicit val widenReader = pack.widenReader(reader)
-    val version = db.connectionState.metadata.maxWireVersion
-
-    Future(DistinctCommand.Distinct(
-      key, selector, readConcern, version)).flatMap(
-      runCommand(_, readPreference).flatMap {
-        _.result[T, M] match {
-          case Failure(cause)  => Future.failed[M[T]](cause)
-          case Success(result) => Future.successful(result)
-        }
-      })
-  }
+    query: Option[pack.Document],
+    readConcern: ReadConcern,
+    collation: Option[Collation])(implicit
+    reader: pack.NarrowValueReader[T],
+    ec: ExecutionContext, cbf: CanBuildFrom[M[_], T, M[T]]): Future[M[T]] =
+    distinctDocuments[T, M](key, query, readConcern, collation)
 
   /**
    * Inserts a document into the collection and waits for the [[reactivemongo.api.commands.WriteResult]].
@@ -385,7 +389,7 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * @param bypassDocumentValidation
    * @param writeConcern $writeConcernParam
    * @param maxTime
-   * @param collation
+   * @param collation $collationParam
    * @param arrayFilters
    * @param swriter $swriterParam
    */

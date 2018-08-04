@@ -5,12 +5,13 @@ import reactivemongo.api.{ SerializationPack, Session }
 /**
  * Implements the [[https://docs.mongodb.com/manual/reference/command/insert/ insert]] command.
  */
+@deprecated("Use the new insert operation", "0.16.0")
 trait InsertCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] {
   /**
    * @param head the first mandatory document
    * @param tail maybe other documents
    */
-  case class Insert( // TODO: bypassDocumentValidation: bool
+  case class Insert(
     head: pack.Document,
     tail: Seq[pack.Document],
     ordered: Boolean,
