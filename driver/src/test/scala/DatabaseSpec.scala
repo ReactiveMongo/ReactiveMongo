@@ -1,7 +1,7 @@
 import scala.concurrent.Await
 import scala.concurrent.duration.FiniteDuration
 
-import reactivemongo.api.{ FailoverStrategy, MongoConnection }
+import reactivemongo.api.{ DefaultDB, FailoverStrategy, MongoConnection }
 import reactivemongo.api.commands.CommandError
 
 import org.specs2.concurrent.ExecutionEnv
@@ -63,6 +63,37 @@ class DatabaseSpec(implicit ee: ExecutionEnv)
           }
     }
     section("mongo2", "mongo24", "not_mongo26")
+
+    "manage session" >> {
+      section("gt_mongo32")
+
+      "start & end" in {
+        (for {
+          db <- Common.db.startSession()
+          _ <- db.startSession() // no-op
+          after <- db.endSession()
+        } yield {
+          System.identityHashCode(db) -> System.identityHashCode(after)
+        }) must beLike[(Int, Int)] {
+          case (hash1, hash2) => hash1 must not(beEqualTo(hash2))
+        }.awaitFor(timeout)
+      }
+
+      "not end without start" in {
+        Common.db.endSession() must beAnInstanceOf[DefaultDB].await
+      }
+
+      "not kill without start" in {
+        Common.db.killSession() must beAnInstanceOf[DefaultDB].await
+      }
+
+      "start & kill" in {
+        Common.db.startSession().flatMap(_.killSession()).
+          aka("session ID") must beAnInstanceOf[DefaultDB].awaitFor(timeout)
+      }
+
+      section("gt_mongo32")
+    }
 
     "admin" >> {
       "rename successfully collection if target doesn't exist" in {

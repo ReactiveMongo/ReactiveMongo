@@ -50,9 +50,9 @@ private[reactivemongo] final class ChannelFactory(
   private lazy val channelFactory = new Bootstrap().
     group(parentGroup).
     channel(pack.channelClass).
-    option(TCP_NODELAY, new JBool(options.tcpNoDelay)).
-    option(SO_KEEPALIVE, new JBool(options.keepAlive)).
-    option(CONNECT_TIMEOUT_MILLIS, new Integer(options.connectTimeoutMS)).
+    option(TCP_NODELAY, JBool.valueOf(options.tcpNoDelay)).
+    option(SO_KEEPALIVE, JBool.valueOf(options.keepAlive)).
+    option(CONNECT_TIMEOUT_MILLIS, Integer.valueOf(options.connectTimeoutMS)).
     handler(this)
   //childHandler(new reactivemongo.io.netty.channel.ChannelHandlerAdapter {})
   //config.setBufferFactory(bufferFactory)

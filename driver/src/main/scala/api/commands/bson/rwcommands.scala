@@ -4,13 +4,16 @@ import reactivemongo.api.BSONSerializationPack
 import reactivemongo.api.commands._
 import reactivemongo.bson._
 
+@deprecated("Internally use CommandCodecs", "0.16.0")
 object BSONGetLastErrorImplicits {
   implicit object GetLastErrorWriter extends BSONDocumentWriter[GetLastError] {
+    private val underlying =
+      CommandCodecs.writeGetLastErrorWWriter(BSONSerializationPack.newBuilder)
+
     def write(wc: GetLastError): BSONDocument = {
-      val w = BSONCommonWriteCommandsImplicits.GetLastErrorWWriter.write(wc.w)
       BSONDocument(
         "getlasterror" -> 1,
-        "w" -> w,
+        "w" -> underlying(wc.w),
         "j" -> (if (wc.j) Some(true) else None),
         "wtimeout" -> wc.wtimeout)
     }
@@ -44,77 +47,82 @@ object BSONGetLastErrorImplicits {
   }
 }
 
+@deprecated("Internally use CommandCodecs", "0.16.0")
 object BSONCommonWriteCommandsImplicits {
   implicit object GetLastErrorWWriter
     extends BSONWriter[GetLastError.W, BSONValue] {
-    def write(w: GetLastError.W): BSONValue = w match {
-      case GetLastError.Majority                  => BSONString("majority")
-      case GetLastError.TagSet(tagSet)            => BSONString(tagSet)
-      case GetLastError.WaitForAcknowledgments(n) => BSONInteger(n)
-      case GetLastError.WaitForAknowledgments(n)  => BSONInteger(n)
-    }
+
+    private val underlying =
+      CommandCodecs.writeGetLastErrorWWriter(BSONSerializationPack.newBuilder)
+
+    def write(w: GetLastError.W): BSONValue = underlying(w)
   }
 
+  @deprecated("Internally use CommandCodecs", "0.16.0")
   implicit object WriteConcernWriter extends BSONDocumentWriter[WriteConcern] {
-    def write(wc: WriteConcern): BSONDocument = BSONDocument(
-      "w" -> wc.w,
-      "j" -> (if (wc.j) Some(true) else None),
-      "wtimeout" -> wc.wtimeout)
+    private val writer = CommandCodecs.writeWriteConcern(BSONSerializationPack)
+
+    def write(wc: WriteConcern): BSONDocument = writer(wc)
   }
 
+  @deprecated("Internally use CommandCodecs", "0.16.0")
   implicit object WriteErrorReader extends BSONDocumentReader[WriteError] {
-    def read(doc: BSONDocument): WriteError =
-      WriteError(
-        index = doc.getAs[Int]("index").get,
-        code = doc.getAs[Int]("code").get,
-        errmsg = doc.getAs[String]("errmsg").get)
+    private val underlying =
+      CommandCodecs.readWriteError(BSONSerializationPack.newDecoder)
+
+    def read(doc: BSONDocument): WriteError = underlying(doc)
   }
 
+  @deprecated("Internally use CommandCodecs", "0.16.0")
   implicit object WriteConcernErrorReader
     extends BSONDocumentReader[WriteConcernError] {
-    def read(doc: BSONDocument): WriteConcernError =
-      WriteConcernError(
-        code = doc.getAs[Int]("code").get,
-        errmsg = doc.getAs[String]("errmsg").get)
+    private val underlying =
+      CommandCodecs.readWriteConcernError(BSONSerializationPack.newDecoder)
+
+    def read(doc: BSONDocument): WriteConcernError = underlying(doc)
   }
 
   @deprecated("Use internal CommandCodecs", "0.13.1")
   implicit object DefaultWriteResultReader
     extends DealingWithGenericCommandErrorsReader[DefaultWriteResult] {
-    def readResult(doc: BSONDocument): DefaultWriteResult = {
-      DefaultWriteResult(
-        ok = doc.getAs[BSONBooleanLike]("ok").fold(true)(_.toBoolean),
-        n = doc.getAs[Int]("n").getOrElse(0),
-        writeErrors = doc.getAs[Seq[WriteError]]("writeErrors").getOrElse(Seq.empty),
-        writeConcernError = doc.getAs[WriteConcernError]("writeConcernError"),
-        code = doc.getAs[Int]("code"),
-        errmsg = doc.getAs[String]("errmsg"))
-    }
+    private val underlying =
+      CommandCodecs.defaultWriteResultReader(BSONSerializationPack)
+
+    def readResult(doc: BSONDocument): DefaultWriteResult = underlying.read(doc)
   }
 }
 
+@deprecated("Will be private/internal", "0.16.0")
 object BSONInsertCommand extends InsertCommand[BSONSerializationPack.type] {
   val pack = BSONSerializationPack
 }
 
+@deprecated("Will be private/internal", "0.16.0")
 object BSONInsertCommandImplicits {
   import BSONInsertCommand._
-  import BSONCommonWriteCommandsImplicits._
 
-  implicit object InsertWriter extends BSONDocumentWriter[ResolvedCollectionCommand[Insert]] {
+  object InsertWriter
+    extends BSONDocumentWriter[ResolvedCollectionCommand[Insert]] {
+
+    private val underlying =
+      InsertCommand.writer(BSONSerializationPack)(BSONInsertCommand)(None)
+
     def write(insert: ResolvedCollectionCommand[Insert]): BSONDocument =
-      BSONInsertCommand.serialize(insert)
+      underlying(insert)
   }
 }
 
+@deprecated("Will be private/internal", "0.16.0")
 object BSONUpdateCommand extends UpdateCommand[BSONSerializationPack.type] {
   val pack = BSONSerializationPack
 }
 
+@deprecated("Will be private/internal", "0.16.0")
 object BSONUpdateCommandImplicits {
   import BSONUpdateCommand._
   import BSONCommonWriteCommandsImplicits._
 
+  @deprecated("Will be private/internal", "0.16.0")
   implicit object UpdateElementWriter extends BSONDocumentWriter[UpdateElement] {
     def write(element: UpdateElement) = BSONDocument(
       "q" -> element.q,
@@ -123,6 +131,7 @@ object BSONUpdateCommandImplicits {
       "multi" -> element.multi)
   }
 
+  @deprecated("Will be private/internal", "0.16.0")
   implicit object UpdateWriter extends BSONDocumentWriter[ResolvedCollectionCommand[Update]] {
     def write(update: ResolvedCollectionCommand[Update]) = BSONDocument(
       "update" -> update.collection,
@@ -131,30 +140,29 @@ object BSONUpdateCommandImplicits {
       "writeConcern" -> update.command.writeConcern)
   }
 
+  @deprecated("Will be removed", "0.16.0")
   implicit object UpsertedReader extends BSONDocumentReader[Upserted] {
-    def read(doc: BSONDocument) = Upserted(
-      index = doc.getAs[Int]("index").get,
-      _id = doc.get("_id").get)
+    private val underlying =
+      CommandCodecs.readUpserted(BSONSerializationPack.newDecoder)
+
+    def read(doc: BSONDocument) = underlying(doc)
   }
 
+  @deprecated("Will be removed", "0.16.0")
   implicit object UpdateResultReader extends DealingWithGenericCommandErrorsReader[UpdateResult] {
-    def readResult(doc: BSONDocument) = UpdateWriteResult(
-      ok = doc.getAs[BSONBooleanLike]("ok").fold(true)(_.toBoolean),
-      n = doc.getAs[Int]("n").getOrElse(0),
-      nModified = doc.getAs[Int]("nModified").getOrElse(0),
-      upserted = doc.getAs[Seq[Upserted]]("upserted").getOrElse(Seq.empty),
-      writeErrors = doc.getAs[Seq[WriteError]]("writeErrors").getOrElse(Seq.empty),
-      writeConcernError = doc.getAs[WriteConcernError]("writeConcernError"),
-      code = doc.getAs[Int]("code"), //FIXME There is no corresponding official docs.
-      errmsg = doc.getAs[String]("errmsg") //FIXME There is no corresponding official docs.
-    )
+    private val underlying =
+      UpdateCommand.reader(BSONSerializationPack)(BSONUpdateCommand)
+
+    def readResult(doc: BSONDocument): UpdateResult = underlying.read(doc)
   }
 }
 
+@deprecated("Will be private/internal", "0.16.0")
 object BSONDeleteCommand extends DeleteCommand[BSONSerializationPack.type] {
   val pack = BSONSerializationPack
 }
 
+@deprecated("Will be private/internal", "0.16.0")
 object BSONDeleteCommandImplicits {
   import BSONDeleteCommand._
   import BSONCommonWriteCommandsImplicits._

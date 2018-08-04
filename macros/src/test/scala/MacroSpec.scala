@@ -252,7 +252,7 @@ class MacroSpec extends org.specs2.mutable.Specification {
     "support automatic implementations search with nested traits" in {
       import Macros.Options._
       import InheritanceModule._
-      implicit val format = Macros.handlerOpts[T, AllImplementations with AutomaticMaterialization]
+      implicit val format = Macros.handlerOpts[T, AutomaticMaterialization]
 
       format.write(A()).getAs[String]("className").
         aka("class #1") must beSome("MacroTest.InheritanceModule.A") and {
@@ -266,7 +266,7 @@ class MacroSpec extends org.specs2.mutable.Specification {
     "automate Union on sealed traits with simple name" in {
       import Macros.Options._
       import Union._
-      implicit val format = Macros.handlerOpts[UT, SimpleAllImplementations with AutomaticMaterialization]
+      implicit val format = Macros.handlerOpts[UT, SaveSimpleName with AutomaticMaterialization]
 
       format.write(UA(1)).getAs[String]("className") must beSome("UA")
       format.write(UB("buzz")).getAs[String]("className") must beSome("UB")
@@ -280,7 +280,7 @@ class MacroSpec extends org.specs2.mutable.Specification {
       import Macros.Options._
       import InheritanceModule._
 
-      implicit val format = Macros.handlerOpts[T, SimpleAllImplementations]
+      implicit val format = Macros.handlerOpts[T, SaveSimpleName]
 
       format.write(A()).getAs[String]("className") must beSome("A")
       format.write(B).getAs[String]("className") must beSome("B")

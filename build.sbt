@@ -37,8 +37,11 @@ lazy val `ReactiveMongo-Root` = project.in(file(".")).
   enablePlugins(ScalaUnidocPlugin, CpdPlugin).
   settings(Common.settings ++ docSettings ++
     Travis.settings ++ Seq(
-    publishArtifact := false,
-    mimaPreviousArtifacts := Set.empty
+      publishArtifact := false,
+      publishTo := None,
+      publishLocal := {},
+      publish := {},
+      mimaPreviousArtifacts := Set.empty
   )).aggregate(
     `ReactiveMongo-BSON`,
     `ReactiveMongo-BSON-Macros`,

@@ -15,7 +15,7 @@
  */
 package reactivemongo.api.collections
 
-import scala.util.{ Failure, Success, Try }
+import scala.util.Try
 import scala.util.control.NonFatal
 
 import scala.collection.generic.CanBuildFrom
@@ -25,7 +25,10 @@ import scala.concurrent.duration.FiniteDuration
 
 import reactivemongo.api._
 import reactivemongo.api.commands.{
+  CommandCodecs,
   Collation,
+  ImplicitCommandHelpers,
+  UnitBox,
   UpdateWriteResult,
   ResolvedCollectionCommand,
   WriteConcern,
@@ -75,14 +78,24 @@ trait GenericCollectionProducer[P <: SerializationPack with Singleton, +C <: Gen
  * @define aggBatchSizeParam the batch size (for the aggregation cursor; if `None` use the default one)
  * @define aggregationPipelineFunction the function to create the aggregation pipeline using the aggregation framework depending on the collection type
  * @define orderedParam the [[https://docs.mongodb.com/manual/reference/method/db.collection.insert/#perform-an-unordered-insert ordered]] behaviour
+ * @define collationParam the collation
  */
-trait GenericCollection[P <: SerializationPack with Singleton] extends Collection with GenericCollectionWithCommands[P] with CollectionMetaCommands with reactivemongo.api.commands.ImplicitCommandHelpers[P] with InsertOps[P] with UpdateOps[P] with DeleteOps[P] with Aggregator[P] with GenericCollectionMetaCommands[P] { self =>
+trait GenericCollection[P <: SerializationPack with Singleton]
+  extends Collection with GenericCollectionWithCommands[P]
+  with CollectionMetaCommands with ImplicitCommandHelpers[P] with InsertOps[P]
+  with UpdateOps[P] with DeleteOps[P] with CountOp[P] with DistinctOp[P]
+  with Aggregator[P] with GenericCollectionMetaCommands[P]
+  with GenericCollectionWithQueryBuilder[P] with HintFactory[P] { self =>
+
   import scala.language.higherKinds
 
   val pack: P
-  protected val BatchCommands: BatchCommands[pack.type]
 
-  @inline protected def writePref = ReadPreference.Primary
+  /** Upper MongoDB version (used for version checks) */
+  protected lazy val version = db.connectionState.metadata.maxWireVersion
+
+  protected val BatchCommands: BatchCommands[pack.type]
+  import BatchCommands._
 
   /**
    * Alias for type of the aggregation framework,
@@ -97,29 +110,23 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    */
   type PipelineOperator = BatchCommands.AggregationFramework.PipelineOperator
 
+  @deprecated("Will be private/internal", "0.16.0")
   implicit def PackIdentityReader: pack.Reader[pack.Document] = pack.IdentityReader
 
+  @deprecated("Will be private/internal", "0.16.0")
   implicit def PackIdentityWriter: pack.Writer[pack.Document] = pack.IdentityWriter
 
-  def failoverStrategy: FailoverStrategy
-  def genericQueryBuilder: GenericQueryBuilder[pack.type]
+  implicit protected lazy val unitBoxReader: pack.Reader[UnitBox.type] =
+    CommandCodecs.unitBoxReader[pack.type](pack)
 
-  /** The default read preference */
-  def readPreference: ReadPreference = db.defaultReadPreference
-  // TODO: Remove default value from this trait after next release
-
-  protected val defaultCursorBatchSize: Int = 101
+  /** Builder used to prepare queries */
+  private[reactivemongo] lazy val genericQueryBuilder: GenericQueryBuilder[pack.type] = new CollectionQueryBuilder(failoverStrategy)
 
   /**
    * Returns a new reference to the same collection,
    * with the given read preference.
    */
   def withReadPreference(pref: ReadPreference): GenericCollection[P]
-
-  import BatchCommands._
-
-  protected def watchFailure[T](future: => Future[T]): Future[T] =
-    Try(future).recover { case NonFatal(e) => Future.failed(e) }.get
 
   /**
    * $findDescription.
@@ -131,6 +138,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    * @param swriter $swriterParam
    * @return $returnQueryBuilder
    */
+  @deprecated("Use `find` with optional `projection`", "0.16.0")
   def find[S](selector: S)(implicit swriter: pack.Writer[S]): GenericQueryBuilder[pack.type] = genericQueryBuilder.query(selector)
 
   /**
@@ -146,7 +154,28 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    * @param pwriter the writer for the projection
    * @return $returnQueryBuilder
    */
+  @deprecated("Use `find` with optional `projection`", "0.16.0")
   def find[S, J](selector: S, projection: J)(implicit swriter: pack.Writer[S], pwriter: pack.Writer[J]): GenericQueryBuilder[pack.type] = genericQueryBuilder.query(selector).projection(projection)
+
+  /**
+   * $findDescription, with the projection applied.
+   * @see $queryLink
+   *
+   * @tparam S $selectorTParam
+   * @tparam P The type of the projection object. An implicit `Writer[P]` typeclass for handling it has to be in the scope.
+   *
+   * @param selector $selectorParam
+   * @param projection the projection document to select only a subset of each matching documents
+   * @param swriter $swriterParam
+   * @param pwriter the writer for the projection
+   * @return $returnQueryBuilder
+   */
+  def find[S, J](selector: S, projection: Option[J] = Option.empty)(implicit swriter: pack.Writer[S], pwriter: pack.Writer[J]): GenericQueryBuilder[pack.type] = {
+    val queryBuilder: GenericQueryBuilder[pack.type] =
+      genericQueryBuilder.query(selector)
+
+    projection.fold(queryBuilder) { queryBuilder.projection(_) }
+  }
 
   /**
    * Counts the matching documents.
@@ -159,7 +188,32 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    * @param skip the number of matching documents to skip before counting
    * @param hint the index to use (either the index name or the index document)
    */
+  @deprecated("Use `count` with `readConcern` parameter", "0.16.0")
   def count[H](selector: Option[pack.Document] = None, limit: Int = 0, skip: Int = 0, hint: Option[H] = None)(implicit h: H => CountCommand.Hint, ec: ExecutionContext): Future[Int] = runValueCommand(CountCommand.Count(query = selector, limit, skip, hint.map(h)), readPreference)
+
+  /**
+   * Counts the matching documents.
+   * @see $queryLink
+   *
+   * @param selector $selectorParam
+   * @param limit the maximum number of matching documents to count
+   * @param skip the number of matching documents to skip before counting
+   * @param hint the index to use (either the index name or the index document; see `hint(..)`)
+   * @param readConcern $readConcernParam
+   */
+  def count(
+    selector: Option[pack.Document],
+    limit: Option[Int],
+    skip: Int,
+    hint: Option[Hint[pack.type]],
+    readConcern: ReadConcern)(implicit ec: ExecutionContext): Future[Long] =
+    countDocuments(selector, limit, skip, hint, readConcern)
+
+  @deprecated("Use `distinct` with `Collation`", "0.16.0")
+  def distinct[T, M[_] <: Iterable[_]](
+    key: String,
+    selector: Option[pack.Document] = None,
+    readConcern: ReadConcern = self.readConcern)(implicit reader: pack.NarrowValueReader[T], ec: ExecutionContext, cbf: CanBuildFrom[M[_], T, M[T]]): Future[M[T]] = distinctDocuments[T, M](key, selector, readConcern, collation = None)
 
   /**
    * Returns the distinct values for a specified field
@@ -169,30 +223,23 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    * @tparam M the container, that must be a [[scala.collection.Iterable]]
    *
    * @param key the field for which to return distinct values
-   * @param selector $selectorParam, that specifies the documents from which to retrieve the distinct values.
+   * @param query $selectorParam, that specifies the documents from which to retrieve the distinct values.
    * @param readConcern $readConcernParam
+   * @param collation $collationParam
    *
    * {{{
-   * val distinctStates = collection.distinct[String, Set]("state")
+   * val distinctStates = collection.distinct[String, Set](
+   *   "state", None, ReadConcern.Local, None)
    * }}}
    */
-  def distinct[T, M[_] <: Iterable[_]](key: String, selector: Option[pack.Document] = None, readConcern: ReadConcern = ReadConcern.Local)(implicit reader: pack.NarrowValueReader[T], ec: ExecutionContext, cbf: CanBuildFrom[M[_], T, M[T]]): Future[M[T]] = {
-    implicit val widenReader = pack.widenReader(reader)
-    val version = db.connection.metadata.
-      fold[MongoWireVersion](MongoWireVersion.V30)(_.maxWireVersion)
-
-    Future(DistinctCommand.Distinct(
-      key, selector, readConcern, version)).flatMap(runCommand(_, readPreference).flatMap {
-      _.result[T, M] match {
-        case Failure(cause)  => Future.failed[M[T]](cause)
-        case Success(result) => Future.successful(result)
-      }
-    })
-  }
-
-  @inline protected def defaultWriteConcern = db.connection.options.writeConcern
-  @inline protected def MissingMetadata() =
-    ConnectionNotInitialized.MissingMetadata(db.connection.history())
+  def distinct[T, M[_] <: Iterable[_]](
+    key: String,
+    query: Option[pack.Document],
+    readConcern: ReadConcern,
+    collation: Option[Collation])(implicit
+    reader: pack.NarrowValueReader[T],
+    ec: ExecutionContext, cbf: CanBuildFrom[M[_], T, M[T]]): Future[M[T]] =
+    distinctDocuments[T, M](key, query, readConcern, collation)
 
   /**
    * Inserts a document into the collection and waits for the [[reactivemongo.api.commands.WriteResult]].
@@ -211,8 +258,9 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    * collection.insert[MyDocType](true, defaultWriteConcern).one(document)
    * }}}
    */
-  def insert[T](document: T, writeConcern: WriteConcern = defaultWriteConcern)(implicit writer: pack.Writer[T], ec: ExecutionContext): Future[WriteResult] =
+  def insert[T](document: T, writeConcern: WriteConcern = writeConcern)(implicit writer: pack.Writer[T], ec: ExecutionContext): Future[WriteResult] =
     prepareInsert[T](true, writeConcern).one(document)
+  // TODO: Remove the Writer from there
 
   /**
    * Returns a builder for insert operations.
@@ -228,7 +276,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    * }}}
    */
   def insert[T: pack.Writer](ordered: Boolean): InsertBuilder[T] =
-    prepareInsert[T](ordered, defaultWriteConcern) // TODO: Move Writer requirement to InsertBuilder
+    prepareInsert[T](ordered, writeConcern) // TODO: Move Writer requirement to InsertBuilder
 
   /**
    * Returns a builder for insert operations.
@@ -266,7 +314,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    *
    * @return $returnWriteResult
    */
-  def update[S, T](selector: S, update: T, writeConcern: WriteConcern = defaultWriteConcern, upsert: Boolean = false, multi: Boolean = false)(implicit swriter: pack.Writer[S], writer: pack.Writer[T], ec: ExecutionContext): Future[UpdateWriteResult] = prepareUpdate(ordered = true, writeConcern = writeConcern).
+  def update[S, T](selector: S, update: T, writeConcern: WriteConcern = writeConcern, upsert: Boolean = false, multi: Boolean = false)(implicit swriter: pack.Writer[S], writer: pack.Writer[T], ec: ExecutionContext): Future[UpdateWriteResult] = prepareUpdate(ordered = true, writeConcern = writeConcern).
     one(selector, update, upsert, multi)
 
   /**
@@ -279,7 +327,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    * }}}
    */
   def update(ordered: Boolean): UpdateBuilder =
-    prepareUpdate(ordered, defaultWriteConcern)
+    prepareUpdate(ordered, writeConcern)
 
   /**
    * Returns an update builder.
@@ -303,6 +351,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
   def updateModifier[U](update: U, fetchNewObject: Boolean = false, upsert: Boolean = false)(implicit updateWriter: pack.Writer[U]): BatchCommands.FindAndModifyCommand.Update = BatchCommands.FindAndModifyCommand.Update(update, fetchNewObject, upsert)
 
   /** Returns a removal modifier, to be used with `findAndModify`. */
+  @deprecated("Will be private/internal", "0.16.0")
   @transient lazy val removeModifier =
     BatchCommands.FindAndModifyCommand.Remove
 
@@ -310,7 +359,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
   def findAndModify[S](selector: S, modifier: BatchCommands.FindAndModifyCommand.Modify, sort: Option[pack.Document] = None, fields: Option[pack.Document] = None)(implicit swriter: pack.Writer[S], ec: ExecutionContext): Future[BatchCommands.FindAndModifyCommand.FindAndModifyResult] = findAndModify[S](
     selector, modifier, sort, fields,
     bypassDocumentValidation = false,
-    writeConcern = defaultWriteConcern,
+    writeConcern = writeConcern,
     maxTime = Option.empty[FiniteDuration],
     collation = Option.empty[Collation],
     arrayFilters = Seq.empty[pack.Document])
@@ -340,7 +389,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    * @param bypassDocumentValidation
    * @param writeConcern $writeConcernParam
    * @param maxTime
-   * @param collation
+   * @param collation $collationParam
    * @param arrayFilters
    * @param swriter $swriterParam
    */
@@ -361,8 +410,8 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
     }
 
     implicit val writer =
-      pack.writer[ResolvedCollectionCommand[FindAndModify]] { cmd =>
-        FindAndModifyCommand.serialize(cmd)
+      pack.writer[ResolvedCollectionCommand[FindAndModify]] {
+        FindAndModifyCommand.serialize(version, db.session)
       }
 
     Future(FindAndModify(
@@ -383,7 +432,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
       },
       collation = collation,
       arrayFilters = arrayFilters.map(implicitly[DP](_)))).
-      flatMap(runCommand(_, writePref))
+      flatMap(runCommand(_, writePreference))
   }
 
   /**
@@ -413,7 +462,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
 
     findAndModify(selector, updateOp, sort, fields,
       bypassDocumentValidation = false,
-      writeConcern = defaultWriteConcern,
+      writeConcern = writeConcern,
       maxTime = Option.empty[FiniteDuration],
       collation = Option.empty[Collation],
       arrayFilters = Seq.empty[pack.Document])
@@ -438,7 +487,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    */
   def findAndRemove[S](selector: S, sort: Option[pack.Document] = None, fields: Option[pack.Document] = None)(implicit swriter: pack.Writer[S], ec: ExecutionContext): Future[BatchCommands.FindAndModifyCommand.FindAndModifyResult] = findAndModify[S](selector, removeModifier, sort, fields,
     bypassDocumentValidation = false,
-    writeConcern = defaultWriteConcern,
+    writeConcern = writeConcern,
     maxTime = Option.empty[FiniteDuration],
     collation = Option.empty[Collation],
     arrayFilters = Seq.empty[pack.Document])
@@ -532,7 +581,7 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    * @param reader $readerParam
    * @param cp $cursorProducerParam
    */
-  def aggregatorContext[T](firstOperator: PipelineOperator, otherOperators: List[PipelineOperator] = Nil, explain: Boolean = false, allowDiskUse: Boolean = false, bypassDocumentValidation: Boolean = false, readConcern: Option[ReadConcern] = None, readPreference: ReadPreference = ReadPreference.primary, batchSize: Option[Int] = None)(implicit reader: pack.Reader[T]): AggregatorContext[T] = new AggregatorContext[T](firstOperator, otherOperators, explain, allowDiskUse, bypassDocumentValidation, readConcern, readPreference, batchSize, reader)
+  def aggregatorContext[T](firstOperator: PipelineOperator, otherOperators: List[PipelineOperator] = Nil, explain: Boolean = false, allowDiskUse: Boolean = false, bypassDocumentValidation: Boolean = false, readConcern: Option[ReadConcern] = None, readPreference: ReadPreference = ReadPreference.primary, batchSize: Option[Int] = None)(implicit reader: pack.Reader[T]): AggregatorContext[T] = new AggregatorContext[T](firstOperator, otherOperators, explain, allowDiskUse, bypassDocumentValidation, readConcern.getOrElse(self.readConcern), writeConcern, readPreference, batchSize, reader) // TODO: writeConcern as parameter
 
   /**
    * @tparam S $selectorTParam
@@ -547,19 +596,17 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    * }}}
    */
   @deprecated("Use delete().one(selector, limit)", "0.13.1")
-  def remove[S](selector: S, writeConcern: WriteConcern = defaultWriteConcern, firstMatchOnly: Boolean = false)(implicit swriter: pack.Writer[S], ec: ExecutionContext): Future[WriteResult] = db.connection.metadata match {
-    case Some(metadata) if (
-      metadata.maxWireVersion >= MongoWireVersion.V26) => {
+  def remove[S](selector: S, writeConcern: WriteConcern = writeConcern, firstMatchOnly: Boolean = false)(implicit swriter: pack.Writer[S], ec: ExecutionContext): Future[WriteResult] = {
+    val metadata = db.connectionState.metadata
+
+    if (metadata.maxWireVersion >= MongoWireVersion.V26) {
       val limit = if (firstMatchOnly) Some(1) else Option.empty[Int]
       delete(true, writeConcern).one(selector, limit)
-    }
-
-    case Some(metadata) => // Mongo < 2.6
+    } else {
+      // Mongo < 2.6
       Future.failed[WriteResult](new scala.RuntimeException(
         s"unsupported MongoDB version: $metadata"))
-
-    case _ =>
-      Future.failed(MissingMetadata())
+    }
   }
 
   /**
@@ -568,6 +615,30 @@ trait GenericCollection[P <: SerializationPack with Singleton] extends Collectio
    * @param ordered $orderedParam
    * @param writeConcern $writeConcernParam
    */
-  def delete[S](ordered: Boolean = true, writeConcern: WriteConcern = defaultWriteConcern): DeleteBuilder = // TODO: Remove the type param ?
+  def delete[S](ordered: Boolean = true, writeConcern: WriteConcern = writeConcern): DeleteBuilder = // TODO: Remove the type param ?
     prepareDelete(ordered, writeConcern)
+
+  // --- Internals ---
+
+  /** The read preference for the write operations (primary) */
+  @inline protected def writePreference: ReadPreference = ReadPreference.Primary
+
+  /** The default write concern */
+  @inline protected def writeConcern = db.connection.options.writeConcern
+
+  /** The default read preference */
+  @inline def readPreference: ReadPreference = db.defaultReadPreference
+  // TODO: Remove default value from this trait after next release
+
+  /** The default read concern */
+  @inline protected def readConcern = db.connection.options.readConcern
+
+  @inline protected def defaultCursorBatchSize: Int = 101
+
+  protected def watchFailure[T](future: => Future[T]): Future[T] =
+    Try(future).recover { case NonFatal(e) => Future.failed(e) }.get
+
+  @inline protected def MissingMetadata() =
+    ConnectionNotInitialized.MissingMetadata(db.connection.history())
+
 }

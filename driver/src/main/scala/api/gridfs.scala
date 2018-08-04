@@ -476,14 +476,14 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
    * @return A future containing true if the index was created, false if it already exists.
    */
   def ensureIndex()(implicit ctx: ExecutionContext): Future[Boolean] = for {
-    _ <- chunks.create(autoIndexId = false).recover {
+    _ <- chunks.create().recover {
       case CommandError.Code(48 /*NamespaceExists*/ ) =>
         logger.info(s"Collection ${chunks.fullCollectionName} already exists")
     }
     c <- chunks.indexesManager.ensure(
       Index(List("files_id" -> Ascending, "n" -> Ascending), unique = true))
 
-    _ <- files.create(autoIndexId = false).recover {
+    _ <- files.create().recover {
       case CommandError.Code(48 /*NamespaceExists*/ ) =>
         logger.info(s"Collection ${files.fullCollectionName} already exists")
     }

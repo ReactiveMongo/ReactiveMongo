@@ -41,8 +41,8 @@ class TypeSpec extends Specification {
     "remove specified elements" in {
       val doc = BSONDocument("Foo" -> 1, "Bar" -> 2, "Lorem" -> 3)
 
-      doc.remove("Bar", "Lorem") must_== BSONDocument("Foo" -> 1) and (
-        doc -- ("Foo", "Bar") must_== BSONDocument("Lorem" -> 3))
+      doc.remove("Bar", "Lorem") must_=== BSONDocument("Foo" -> 1) and (
+        doc -- ("Foo", "Bar") must_=== BSONDocument("Lorem" -> 3))
     }
   }
 
@@ -61,7 +61,7 @@ class TypeSpec extends Specification {
     }
 
     "be returned with a prepended element" in {
-      BSONString("bar") +: BSONArray("foo") must_== BSONArray("bar", "foo")
+      BSONString("bar") +: BSONArray("foo") must_=== BSONArray("bar", "foo")
     }
   }
 
@@ -72,6 +72,16 @@ class TypeSpec extends Specification {
 
       bson.byteArray aka "read #1" must_== bytes and (
         bson.byteArray aka "read #2" must_== bytes)
+    }
+
+    "be created from UUID" in {
+      val uuid = java.util.UUID.fromString(
+        "b32e4733-0679-4dd3-9978-230e70b55dce")
+
+      val expectedBytes = Array[Byte](
+        -77, 46, 71, 51, 6, 121, 77, -45, -103, 120, 35, 14, 112, -75, 93, -50)
+
+      BSONBinary(uuid) must_=== BSONBinary(expectedBytes, Subtype.UuidSubtype)
     }
   }
 

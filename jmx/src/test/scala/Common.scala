@@ -9,6 +9,11 @@ object Common extends CommonAuth {
 
   implicit val ec = ExecutionContext.Implicits.global
 
+  val replSetOn = sys.props.get("test.replicaSet").fold(false) {
+    case "true" => true
+    case _      => false
+  }
+
   val DefaultOptions = {
     val a = MongoConnectionOptions(
       nbChannelsPerNode = 2,

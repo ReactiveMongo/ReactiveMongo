@@ -1,7 +1,10 @@
 package reactivemongo.api.commands
 
-import reactivemongo.api.SerializationPack
+import reactivemongo.api.{ SerializationPack, Session }
 
+import reactivemongo.core.protocol.MongoWireVersion
+
+@deprecated("Will be private/internal", "0.16.0")
 trait FindAndModifyCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] {
   import pack._
 
@@ -92,61 +95,74 @@ trait FindAndModifyCommand[P <: SerializationPack] extends ImplicitCommandHelper
       value.map(pack.deserialize(_, reader))
   }
 
-  def serialize(
-    cmd: ResolvedCollectionCommand[FindAndModify]): pack.Document = {
+  def serialize(wireVer: MongoWireVersion, session: Option[Session]): ResolvedCollectionCommand[FindAndModify] => pack.Document = {
     val builder = pack.newBuilder
+    val writeWriteConcern = CommandCodecs.writeWriteConcern(builder)
 
-    import builder.{
-      array,
-      boolean,
-      elementProducer => element,
-      int,
-      string
+    val sessionElmts: Seq[pack.ElementProducer] =
+      session.fold(Seq.empty[pack.ElementProducer])(
+        CommandCodecs.writeSession(builder))
+
+    { cmd: ResolvedCollectionCommand[FindAndModify] =>
+
+      import builder.{
+        array,
+        boolean,
+        elementProducer => element,
+        int,
+        string
+      }
+      import cmd.command
+
+      val elements = Seq.newBuilder[pack.ElementProducer]
+
+      elements ++= Seq(
+        element("findAndModify", string(cmd.collection)),
+        element("query", command.query),
+        element("bypassDocumentValidation", boolean(
+          command.bypassDocumentValidation)))
+
+      if (wireVer.compareTo(MongoWireVersion.V40) >= 0) {
+        elements += element(
+          "writeConcern",
+          writeWriteConcern(command.writeConcern))
+      }
+
+      elements ++= sessionElmts
+
+      command.fields.foreach { f =>
+        elements += element("fields", f)
+      }
+
+      command.arrayFilters.headOption.foreach { f =>
+        elements += element("arrayFilters", array(f, command.arrayFilters.tail))
+      }
+
+      command.modify match {
+        case Update(document, fetchNewObject, upsert) =>
+          elements ++= Seq(
+            element("upsert", boolean(upsert)),
+            element("update", document),
+            element("new", boolean(fetchNewObject)))
+
+        case _ =>
+          elements += element("remove", boolean(true))
+      }
+
+      command.sort.foreach { s =>
+        elements += element("sort", s)
+      }
+
+      command.maxTimeMS.foreach { ms =>
+        elements += element("maxTimeMS", int(ms))
+      }
+
+      command.collation.foreach { c =>
+        elements += element(
+          "collation", Collation.serializeWith(pack, c)(builder))
+      }
+
+      builder.document(elements.result())
     }
-    import cmd.command
-
-    val elements = Seq.newBuilder[pack.ElementProducer]
-
-    elements ++= Seq(
-      element("findAndModify", string(cmd.collection)),
-      element("query", command.query),
-      element("bypassDocumentValidation", boolean(
-        command.bypassDocumentValidation)),
-      element("writeConcern", GetLastError.
-        serializeWith(pack, command.writeConcern)(builder)))
-
-    command.fields.foreach { f =>
-      elements += element("fields", f)
-    }
-
-    command.arrayFilters.headOption.foreach { f =>
-      elements += element("arrayFilters", array(f, command.arrayFilters.tail))
-    }
-
-    command.modify match {
-      case Update(document, fetchNewObject, upsert) =>
-        elements ++= Seq(
-          element("upsert", boolean(upsert)),
-          element("update", document),
-          element("new", boolean(fetchNewObject)))
-
-      case _ =>
-        elements += element("remove", boolean(true))
-    }
-
-    command.sort.foreach { s =>
-      elements += element("sort", s)
-    }
-
-    command.maxTimeMS.foreach { ms =>
-      elements += element("maxTimeMS", int(ms))
-    }
-
-    command.collation.foreach { c =>
-      elements += element(
-        "collation", Collation.serializeWith(pack, c)(builder))
-    }
-
-    builder.document(elements.result())
   }
 }

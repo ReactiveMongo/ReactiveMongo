@@ -3,6 +3,7 @@ package reactivemongo.api.commands
 import reactivemongo.api.SerializationPack
 import reactivemongo.core.nodeset.NodeStatus
 
+@deprecated("Will be private/internal", "0.16.0")
 trait IsMasterCommand[P <: SerializationPack] {
   class IsMaster(val comment: Option[String]) extends Command
     with CommandWithResult[IsMasterResult] with CommandWithPack[P]

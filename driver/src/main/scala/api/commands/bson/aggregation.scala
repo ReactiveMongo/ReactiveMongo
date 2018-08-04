@@ -1,57 +1,20 @@
 package reactivemongo.api.commands.bson
 
-import reactivemongo.bson.{
-  BSONDocument,
-  BSONDocumentReader,
-  BSONElement,
-  BSONNumberLike,
-  BSONValue,
-  Producer
-}
+import reactivemongo.bson.{ BSONDocument, BSONDocumentReader, BSONNumberLike }
 
 import reactivemongo.core.protocol.MongoWireVersion
 import reactivemongo.api.BSONSerializationPack
 import reactivemongo.api.commands.{ AggregationFramework, ResultCursor }
 import reactivemongo.api.commands.bson.CommonImplicits.ReadConcernWriter
 
+@deprecated("Will be private/internal", "0.16.0")
 object BSONAggregationFramework
   extends AggregationFramework[BSONSerializationPack.type] {
 
   val pack: BSONSerializationPack.type = BSONSerializationPack
-
-  @deprecated("Use `pack.newBuilder`", "0.12.7")
-  @inline protected def makeDocument(elements: Seq[Producer[BSONElement]]) =
-    pack.newBuilder.document(elements)
-
-  @deprecated("Use `pack.newBuilder`", "0.12.7")
-  @inline protected def makeArray(value: BSONValue, values: Seq[BSONValue]) =
-    pack.newBuilder.array(value, values)
-
-  @deprecated("Use `pack.newBuilder`", "0.12.7")
-  @inline protected def elementProducer(name: String, value: BSONValue) =
-    pack.newBuilder.elementProducer(name, value)
-
-  @deprecated("Use `pack.newBuilder`", "0.12.7")
-  @inline protected def booleanValue(b: Boolean): BSONValue =
-    pack.newBuilder.boolean(b)
-
-  @deprecated("Use `pack.newBuilder`", "0.12.7")
-  @inline protected def intValue(i: Int): BSONValue =
-    pack.newBuilder.int(i)
-
-  @deprecated("Use `pack.newBuilder`", "0.12.7")
-  @inline protected def longValue(l: Long): BSONValue =
-    pack.newBuilder.long(l)
-
-  @deprecated("Use `pack.newBuilder`", "0.12.7")
-  @inline protected def doubleValue(d: Double): BSONValue =
-    pack.newBuilder.double(d)
-
-  @deprecated("Use `pack.newBuilder`", "0.12.7")
-  @inline protected def stringValue(s: String): BSONValue =
-    pack.newBuilder.string(s)
 }
 
+@deprecated("Will be private/internal", "0.16.0")
 object BSONAggregationImplicits {
   import reactivemongo.api.commands.ResolvedCollectionCommand
   import BSONAggregationFramework.{ Aggregate, AggregationResult, Cursor }
@@ -106,6 +69,7 @@ object BSONAggregationImplicits {
   }
 }
 
+@deprecated("Will be private/internal", "0.16.0")
 object BSONAggregationResultImplicits {
   import BSONAggregationFramework.{ IndexStatsResult, IndexStatAccesses }
 

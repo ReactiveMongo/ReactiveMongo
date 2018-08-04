@@ -7,10 +7,14 @@ import reactivemongo.core.protocol.{
   Response,
   ResponseInfo
 }
+import reactivemongo.bson.BSONDocument
 
 import org.specs2.specification.core.Fragments
+import org.specs2.concurrent.ExecutionEnv
 
-class ProtocolSpec extends org.specs2.mutable.Specification {
+class ProtocolSpec(implicit ee: ExecutionEnv)
+  extends org.specs2.mutable.Specification {
+
   "Protocol" title
 
   import reactivemongo.api.tests.getBytes
@@ -23,19 +27,19 @@ class ProtocolSpec extends org.specs2.mutable.Specification {
     def buffer = Unpooled.buffer(msg1Bytes.size, msg1Bytes.size)
 
     "be read from Netty buffer" in {
-      MessageHeader.readFrom(buffer writeBytes msg1Bytes) must_== header
+      MessageHeader.readFrom(buffer writeBytes msg1Bytes) must_=== header
     }
 
     "be written to Netty buffer" in {
       val buf = buffer
 
-      header.writeTo(buf) must_== ({}) and {
+      header.writeTo(buf) must_=== ({}) and {
         val written = Array.ofDim[Byte](header.size)
 
         buf.resetReaderIndex()
         buf.getBytes(0, written)
 
-        written must_== msg1Bytes.take(header.size)
+        written must_=== msg1Bytes.take(header.size)
       }
     }
   }
@@ -48,7 +52,7 @@ class ProtocolSpec extends org.specs2.mutable.Specification {
 
     "be read from Netty buffer (after message)" in {
       Reply.readFrom(
-        buffer writeBytes msg1Bytes.drop(header.size)) must_== reply
+        buffer writeBytes msg1Bytes.drop(header.size)) must_=== reply
     }
   }
 
@@ -59,8 +63,8 @@ class ProtocolSpec extends org.specs2.mutable.Specification {
         val buffer = Unpooled.buffer(queryOp.size, queryOp.size)
         val opBytes = Array[Byte](4, 0, 0, 0, 97, 100, 109, 105, 110, 46, 36, 99, 109, 100, 0, 0, 0, 0, 0, 1, 0, 0, 0)
 
-        queryOp.writeTo(buffer) must_== ({}) and {
-          getBytes(buffer, queryOp.size) must_== opBytes
+        queryOp.writeTo(buffer) must_=== ({}) and {
+          getBytes(buffer, queryOp.size) must_=== opBytes
         }
       }
 
@@ -71,15 +75,15 @@ class ProtocolSpec extends org.specs2.mutable.Specification {
         val buffer = Unpooled.buffer(req.size, req.size)
         val bytes = Array[Byte](58, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -44, 7, 0, 0, 4, 0, 0, 0, 97, 100, 109, 105, 110, 46, 36, 99, 109, 100, 0, 0, 0, 0, 0, 1, 0, 0, 0, 19, 0, 0, 0, 16, 105, 115, 109, 97, 115, 116, 101, 114, 0, 1, 0, 0, 0, 0)
 
-        req.writeTo(buffer) must_== ({}) and {
-          getBytes(buffer, req.size) must_== bytes
+        req.writeTo(buffer) must_=== ({}) and {
+          getBytes(buffer, req.size) must_=== bytes
         }
       }
     }
   }
 
   "Response" should {
-    import reactivemongo.api.tests.{ decodeResponse, decodeFrameResp }
+    import reactivemongo.api.tests.{ decodeResponse, decodeFrameResp, preload }
 
     "be decoded from Netty" >> {
       Fragments.foreach(Seq[(Array[Byte], Int)](
@@ -96,8 +100,8 @@ class ProtocolSpec extends org.specs2.mutable.Specification {
 
     "be read from Netty buffer" in {
       decodeResponse(msg1Bytes) {
-        case (buf, Response(
-          `header`, `reply`, documents, ResponseInfo(null))) => {
+        case (buf, response @ Response(
+          `header`, `reply`, documents, info @ ResponseInfo(_))) => {
           val offset = header.size + ( /*reply*/ 4 + 8 + 4 + 4)
           val docsSize = msg1Bytes.size - offset
 
@@ -105,7 +109,16 @@ class ProtocolSpec extends org.specs2.mutable.Specification {
           buf.setIndex(0, 0)
           buf.writeInt(0)
 
-          getBytes(documents, docsSize) must_== msg1Bytes.drop(offset)
+          val expectedBytes = msg1Bytes.drop(offset)
+
+          preload(response) must beLike[(Response, BSONDocument)] {
+            case (Response(`header`, `reply`, docs, `info`), doc) =>
+              doc.getAs[Boolean]("ismaster") must beSome(true) and {
+                getBytes(docs, docsSize) must_=== expectedBytes
+              }
+          }.await and {
+            getBytes(documents, docsSize) must_=== expectedBytes
+          }
         }
       }
     }

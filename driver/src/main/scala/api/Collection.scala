@@ -26,6 +26,8 @@ package reactivemongo.api
  * @define otherName the name of another collection
  */
 trait Collection {
+  import collections.bson.BSONCollectionProducer
+
   /** The database which this collection belong to. */
   def db: DB
 
@@ -33,6 +35,7 @@ trait Collection {
   def name: String
 
   /** The default failover strategy for the methods of this collection. */
+  @deprecated("Will be private", "0.16.0")
   def failoverStrategy: FailoverStrategy
 
   /** Gets the full qualified name of this collection. */
@@ -45,7 +48,7 @@ trait Collection {
    * @param failoverStrategy $failoverStrategy
    */
   @deprecated("Resolve the collection from DB", "0.13.0")
-  def as[C <: Collection](failoverStrategy: FailoverStrategy = failoverStrategy)(implicit producer: CollectionProducer[C] = collections.bson.BSONCollectionProducer): C = producer.apply(db, name, failoverStrategy)
+  def as[C <: Collection](failoverStrategy: FailoverStrategy = failoverStrategy)(implicit producer: CollectionProducer[C] = BSONCollectionProducer): C = producer.apply(db, name, failoverStrategy)
 
   /**
    * Gets another collection in the current database.
@@ -54,7 +57,7 @@ trait Collection {
    * @param name $otherName
    * @param failoverStrategy $failoverStrategy
    */
-  def sibling[C <: Collection](name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit producer: CollectionProducer[C] = collections.bson.BSONCollectionProducer): C = producer.apply(db, name, failoverStrategy)
+  def sibling[C <: Collection](name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit producer: CollectionProducer[C] = BSONCollectionProducer): C = producer.apply(db, name, failoverStrategy)
 }
 
 /**

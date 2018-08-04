@@ -32,25 +32,33 @@ class BsonSpec extends org.specs2.mutable.Specification {
     }
 
     "produce a document embedding an array" in {
-      val doc = BSONDocument(
-        "_id" -> BSONObjectID("503792c1984587971b14530e"),
-        "BSON" -> BSONArray(
-          BSONString("awesome"),
-          BSONDouble(5.05),
-          BSONDouble(1986)))
+      BSONObjectID.parse("503792c1984587971b14530e").
+        aka("parsed") must beSuccessfulTry[BSONObjectID].like {
+          case oid =>
+            val doc = BSONDocument(
+              "_id" -> oid,
+              "BSON" -> BSONArray(
+                BSONString("awesome"),
+                BSONDouble(5.05),
+                BSONDouble(1986)))
 
-      compare(embeddingArray, makeBuffer(doc))
+            compare(embeddingArray, makeBuffer(doc))
+        }
     }
 
     "produce a document embedding an array through traversable" in {
-      val buffer = makeBuffer(BSONDocument(
-        "_id" -> BSONObjectID("503792c1984587971b14530e"),
-        "BSON" -> BSONArray(
-          BSONString("awesome"),
-          BSONDouble(5.05),
-          BSONDouble(1986))))
+      BSONObjectID.parse("503792c1984587971b14530e").
+        aka("parsed") must beSuccessfulTry[BSONObjectID].like {
+          case oid =>
+            val buffer = makeBuffer(BSONDocument(
+              "_id" -> oid,
+              "BSON" -> BSONArray(
+                BSONString("awesome"),
+                BSONDouble(5.05),
+                BSONDouble(1986))))
 
-      compare(embeddingArray, makeBuffer(makeDocument(buffer)))
+            compare(embeddingArray, makeBuffer(makeDocument(buffer)))
+        }
     }
 
     "produce nested subdocuments and arrays" in {

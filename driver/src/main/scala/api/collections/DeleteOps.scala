@@ -7,15 +7,11 @@ import scala.concurrent.{ ExecutionContext, Future }
 import reactivemongo.core.protocol.MongoWireVersion
 import reactivemongo.core.errors.GenericDriverException
 
-import reactivemongo.core.nodeset.ProtocolMetadata
-
 import reactivemongo.api.SerializationPack
 import reactivemongo.api.commands.{
-  BulkOps,
   Collation,
   CommandCodecs,
   LastError,
-  GetLastError,
   MultiBulkWriteResult,
   ResolvedCollectionCommand,
   WriteConcern,
@@ -26,12 +22,14 @@ import reactivemongo.api.commands.{
  * @define writeConcernParam the [[https://docs.mongodb.com/manual/reference/write-concern/ writer concern]] to be used
  * @define orderedParam the ordered behaviour
  */
-trait DeleteOps[P <: SerializationPack with Singleton]
-  extends CommandCodecs[P] { collection: GenericCollection[P] =>
+trait DeleteOps[P <: SerializationPack with Singleton] {
+  collection: GenericCollection[P] =>
 
-  import BatchCommands.DeleteCommand.{ Delete, DeleteElement }
-
-  protected val pack: P
+  object DeleteCommand
+    extends reactivemongo.api.commands.DeleteCommand[collection.pack.type] {
+    val pack: collection.pack.type = collection.pack
+  }
+  import DeleteCommand.{ Delete, DeleteElement }
 
   /**
    * @param ordered $orderedParam
@@ -44,7 +42,13 @@ trait DeleteOps[P <: SerializationPack with Singleton]
     else new UnorderedDelete(writeConcern)
   }
 
-  /** Builder for delete operations. */
+  /**
+   * Builder for delete operations.
+   *
+   * @define queryParam the query/selector
+   * @define limitParam the maximum number of documents
+   * @define collationParam the collation
+   */
   sealed trait DeleteBuilder {
     /** $orderedParam */
     def ordered: Boolean
@@ -55,12 +59,24 @@ trait DeleteOps[P <: SerializationPack with Singleton]
     protected def bulkRecover: Option[Exception => Future[WriteResult]]
 
     /**
-     * Performs a delete with a one single selector (see [[BatchCommands.DeleteCommand.DeleteElement]]).
+     * Performs a delete with a one single selector (see [[DeleteCommand.DeleteElement]]).
      * This will delete all the documents matched by the `q` selector.
+     *
+     * @param q $queryParam
+     * @param limit $limitParam
+     * @param collation $collationParam
      */
     final def one[Q, U](q: Q, limit: Option[Int] = None, collation: Option[Collation] = None)(implicit ec: ExecutionContext, qw: pack.Writer[Q]): Future[WriteResult] = element[Q, U](q, limit, collation).flatMap { upd => execute(Seq(upd)) }
 
-    /** Prepares an [[BatchCommands.DeleteCommand.DeleteElement]] */
+    /**
+     * Prepares an [[DeleteCommand.DeleteElement]].
+     *
+     * @param q $queryParam
+     * @param limit $limitParam
+     * @param collation $collationParam
+     *
+     * @see [[many]]
+     */
     final def element[Q, U](q: Q, limit: Option[Int], collation: Option[Collation])(implicit qw: pack.Writer[Q]): Future[DeleteElement] =
       (Try(pack.serialize(q, qw)).map { query =>
         DeleteElement(query, limit.getOrElse(0), collation)
@@ -88,39 +104,32 @@ trait DeleteOps[P <: SerializationPack with Singleton]
      * }
      * }}}
      */
-    final def many(deletes: Iterable[DeleteElement])(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] = for {
-      meta <- metadata
-      maxSz <- maxBsonSize
-      res <- {
-        val bulkProducer = BulkOps.bulks(
-          deletes, maxSz, meta.maxBulkSize) { d =>
-          elementEnvelopeSize + pack.bsonSize(d.q)
-        }
-
-        BulkOps.bulkApply[DeleteElement, WriteResult](
-          bulkProducer)({ bulk => execute(bulk.toSeq) }, bulkRecover)
+    final def many(deletes: Iterable[DeleteElement])(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] = {
+      val bulkProducer = BulkOps.bulks(
+        deletes, maxBsonSize, metadata.maxBulkSize) { d =>
+        elementEnvelopeSize + pack.bsonSize(d.q)
       }
-    } yield MultiBulkWriteResult(res)
+
+      BulkOps.bulkApply[DeleteElement, WriteResult](
+        bulkProducer)({ bulk => execute(bulk.toSeq) }, bulkRecover).
+        map(MultiBulkWriteResult(_))
+    }
 
     // ---
 
-    private lazy val metadata: Future[ProtocolMetadata] =
-      collection.db.connection.metadata.fold(
-        Future.failed[ProtocolMetadata](collection.MissingMetadata()))(
-          Future.successful(_))
+    @inline private def metadata = collection.db.connectionState.metadata
 
     /** The max BSON size, including the size of command envelope */
-    private def maxBsonSize(implicit ec: ExecutionContext) =
-      metadata.map { meta =>
-        // Command envelope to compute accurate BSON size limit
-        val i = ResolvedCollectionCommand(
-          collection.name,
-          Delete(Seq.empty, ordered, writeConcern))
+    private def maxBsonSize = {
+      // Command envelope to compute accurate BSON size limit
+      val emptyCmd = ResolvedCollectionCommand(
+        collection.name,
+        Delete(Seq.empty, ordered, writeConcern))
 
-        val doc = serialize(i)
+      val doc = serialize(emptyCmd)
 
-        meta.maxBsonSize - pack.bsonSize(doc)
-      }
+      metadata.maxBsonSize - pack.bsonSize(doc)
+    }
 
     private lazy val elementEnvelopeSize = {
       val builder = pack.newBuilder
@@ -133,33 +142,35 @@ trait DeleteOps[P <: SerializationPack with Singleton]
       pack.bsonSize(builder.document(elements))
     }
 
+    implicit private val resultReader: pack.Reader[DeleteCommand.DeleteResult] =
+      CommandCodecs.defaultWriteResultReader(pack)
+
     private final def execute(deletes: Seq[DeleteElement])(
       implicit
-      ec: ExecutionContext): Future[WriteResult] =
-      metadata.flatMap { meta =>
-        if (meta.maxWireVersion >= MongoWireVersion.V26) {
-          val cmd = Delete(deletes, ordered, writeConcern)
+      ec: ExecutionContext): Future[WriteResult] = {
+      if (metadata.maxWireVersion >= MongoWireVersion.V26) {
+        val cmd = Delete(deletes, ordered, writeConcern)
 
-          implicit def writer: pack.Writer[ResolvedCollectionCommand[Delete]] =
-            pack.writer { serialize(_) }
+        implicit def writer: pack.Writer[ResolvedCollectionCommand[Delete]] =
+          pack.writer { serialize(_) }
 
-          Future.successful(cmd).flatMap(
-            runCommand(_, writePref).flatMap { wr =>
-              val flattened = wr.flatten
+        Future.successful(cmd).flatMap(
+          runCommand(_, writePreference).flatMap { wr =>
+            val flattened = wr.flatten
 
-              if (!flattened.ok) {
-                // was ordered, with one doc => fail if has an error
-                Future.failed(WriteResult.lastError(flattened).
-                  getOrElse[Exception](GenericDriverException(
-                    s"fails to delete: $deletes")))
+            if (!flattened.ok) {
+              // was ordered, with one doc => fail if has an error
+              Future.failed(WriteResult.lastError(flattened).
+                getOrElse[Exception](GenericDriverException(
+                  s"fails to delete: $deletes")))
 
-              } else Future.successful(wr)
-            })
-        } else { // Mongo < 2.6
-          Future.failed[WriteResult](GenericDriverException(
-            s"unsupported MongoDB version: $meta"))
-        }
+            } else Future.successful(wr)
+          })
+      } else { // Mongo < 2.6
+        Future.failed[WriteResult](GenericDriverException(
+          s"unsupported MongoDB version: $metadata"))
       }
+    }
   }
 
   // ---
@@ -207,11 +218,12 @@ trait DeleteOps[P <: SerializationPack with Singleton]
 
     val elements = Seq.newBuilder[pack.ElementProducer]
 
+    val writeWriteConcern = CommandCodecs.writeWriteConcern(builder)
+
     elements ++= Seq(
       element("delete", builder.string(delete.collection)),
       element("ordered", builder.boolean(delete.command.ordered)),
-      element("writeConcern", GetLastError.serializeWith(
-        pack, delete.command.writeConcern)(builder)))
+      element("writeConcern", writeWriteConcern(delete.command.writeConcern)))
 
     delete.command.deletes.headOption.foreach { first =>
       elements += element("deletes", builder.array(

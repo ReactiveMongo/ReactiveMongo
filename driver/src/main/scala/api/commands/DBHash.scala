@@ -6,7 +6,7 @@ import reactivemongo.api.SerializationPack
 private[reactivemongo] final class DBHash(val collections: Seq[String])
   extends Command with CommandWithResult[DBHashResult]
 
-final case class DBHashResult(
+final case class DBHashResult( // TODO: Move to `api` package
   host: String,
   collectionHashes: Map[String, String],
   md5: String,

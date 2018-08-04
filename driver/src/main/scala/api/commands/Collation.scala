@@ -5,7 +5,7 @@ import reactivemongo.api.SerializationPack
 /**
  * Represents a [[https://docs.mongodb.com/manual/reference/collation/ collection, view, index or operation]] specific collation.
  */
-final class Collation(
+final class Collation( // TODO: Move to `api` package
   val locale: String,
   val caseLevel: Option[Boolean],
   val caseFirst: Option[Collation.CaseFirst],
@@ -13,7 +13,22 @@ final class Collation(
   val numericOrdering: Option[Boolean],
   val alternate: Option[Collation.Alternate],
   val maxVariable: Option[Collation.MaxVariable],
-  val backwards: Option[Boolean])
+  val backwards: Option[Boolean]) {
+
+  override def equals(that: Any): Boolean = that match {
+    case other: Collation => other.tupled == tupled
+    case _                => false
+  }
+
+  override def hashCode: Int = tupled.hashCode
+
+  // ---
+
+  private[api] def tupled =
+    (locale, caseLevel, caseFirst, strength, numericOrdering, alternate,
+      maxVariable, backwards)
+
+}
 
 object Collation {
   class Strength(val value: Int) extends AnyVal

@@ -5,6 +5,7 @@ import reactivemongo.api.SerializationPack
 /**
  * Implements the [[https://docs.mongodb.com/manual/reference/command/delete/ delete]] command.
  */
+@deprecated("Use the new `delete` operation", "0.16.0")
 trait DeleteCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] {
   case class Delete(
     deletes: Seq[DeleteElement],
@@ -46,10 +47,6 @@ trait DeleteCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] {
       val q: pack.Document,
       val limit: Int,
       val collation: Option[Collation]) extends DeleteElement
-
-    @deprecated(message = "Use", since = "0.13.1")
-    def apply(doc: ImplicitlyDocumentProducer, limit: Int = 0): DeleteElement =
-      apply(doc.produce, limit, None)
 
     def apply(
       q: pack.Document,

@@ -2,6 +2,8 @@ import scala.concurrent._, duration.FiniteDuration
 
 import reactivemongo.api._, collections.bson._
 
+import reactivemongo.api.commands.WriteConcern
+
 import reactivemongo.bson._
 
 import org.specs2.concurrent.ExecutionEnv
@@ -28,7 +30,7 @@ class CollectionSpec(implicit protected val ee: ExecutionEnv)
   // ---
 
   "BSON collection" should {
-    "write successfully 5 docs" >> {
+    "write successfully 5 documents" >> {
       implicit val writer = PersonWriter
 
       "with insert" in {
@@ -57,14 +59,22 @@ class CollectionSpec(implicit protected val ee: ExecutionEnv)
     }
 
     "count the inserted documents" in {
-      collection.count() must beEqualTo(5).await(1, timeout) and {
-        collection.count(skip = 1) must beEqualTo(4).await(1, timeout)
+      def count(
+        selector: Option[BSONDocument] = None,
+        limit: Option[Int] = None,
+        skip: Int = 0,
+        hint: Option[collections.Hint[BSONSerializationPack.type]] = None,
+        readConcern: ReadConcern = ReadConcern.Local) =
+        collection.count(selector, limit, skip, hint, readConcern)
+
+      count() must beTypedEqualTo(5L).await(1, timeout) and {
+        count(skip = 1) must beTypedEqualTo(4L).await(1, timeout)
       } and {
-        collection.count(selector = Some(BSONDocument("name" -> "Jack"))).
-          aka("matching count") must beEqualTo(1).await(1, timeout)
+        count(selector = Some(BSONDocument("name" -> "Jack"))).
+          aka("matching count") must beTypedEqualTo(1L).await(1, timeout)
       } and {
-        collection.count(selector = Some(BSONDocument("name" -> "Foo"))).
-          aka("not matching count") must beEqualTo(0).await(1, timeout)
+        count(selector = Some(BSONDocument("name" -> "Foo"))).
+          aka("not matching count") must beTypedEqualTo(0L).await(1, timeout)
       }
     }
 
@@ -258,8 +268,16 @@ class CollectionSpec(implicit protected val ee: ExecutionEnv)
           val updateOp = c.updateModifier(
             BSONDocument("$set" -> BSONDocument("age" -> 35)))
 
-          c.findAndModify(BSONDocument("name" -> "Joline"), updateOp).
-            map(_.result[Person]) must beSome(five).await(1, timeout)
+          c.findAndModify(
+            selector = BSONDocument("name" -> "Joline"),
+            modifier = updateOp,
+            sort = None,
+            fields = None,
+            bypassDocumentValidation = false,
+            writeConcern = WriteConcern.Default,
+            maxTime = None,
+            collation = None,
+            arrayFilters = Seq.empty).map(_.result[Person]) must beSome(five).await(1, timeout)
         }
 
         "by updating age of 'James', & returns the updated document" in {
@@ -285,6 +303,59 @@ class CollectionSpec(implicit protected val ee: ExecutionEnv)
       "find and update with the slow connection" >> {
         findAndUpdateSpec(slowColl, slowTimeout, person5.copy(age = 35))
       }
+    }
+
+    "manage session" >> {
+      section("gt_mongo32")
+
+      "start & end" in {
+        Common.db.startSession() must beLike[DefaultDB] {
+          case db =>
+            val coll = db.collection(s"session_${System identityHashCode this}")
+            val id = System.identityHashCode(db)
+            val base = BSONDocument("_id" -> id)
+            val inserted = base :~ ("value" -> 1)
+            val updated = base :~ ("value" -> 2)
+
+            (for {
+              _ <- coll.insert[BSONDocument](false).one(inserted)
+              r <- coll.find(base).one[BSONDocument]
+            } yield r) must beSome(inserted).awaitFor(timeout) and {
+              (for {
+                _ <- coll.update(false).one(
+                  q = base,
+                  u = BSONDocument(f"$$set" -> BSONDocument("value" -> 2)),
+                  upsert = false,
+                  multi = false)
+
+                r <- coll.find(base).one[BSONDocument]
+              } yield r) must beSome(updated).awaitFor(timeout)
+            } and {
+              coll.distinct[Int, List](
+                key = "_id",
+                query = None,
+                readConcern = ReadConcern.Local,
+                collation = None) must beTypedEqualTo(List(id)).
+                awaitFor(timeout)
+
+            } and {
+              coll.delete(ordered = true).one(base).
+                map(_ => {}) must beTypedEqualTo({}).awaitFor(timeout)
+
+            } and {
+              coll.count(
+                selector = Some(base), hint = None,
+                limit = None, skip = 0,
+                readConcern = ReadConcern.Local) must beTypedEqualTo(0L).
+                awaitFor(timeout)
+
+            } and {
+              db.endSession().map(_ => {}) must beEqualTo({}).awaitFor(timeout)
+            }
+        }.awaitFor(timeout)
+      }
+
+      section("gt_mongo32")
     }
 
     "be managed so that" >> metaSpec
@@ -319,15 +390,20 @@ class CollectionSpec(implicit protected val ee: ExecutionEnv)
               await(1, timeout * (n / 2L))
 
           } and {
-            c.count(Some(BSONDocument("bulk" -> true))).
-              aka("count") must beTypedEqualTo(e).await(1, timeout)
+            c.count(
+              selector = Some(BSONDocument("bulk" -> true)),
+              limit = None,
+              skip = 0,
+              hint = None,
+              readConcern = ReadConcern.Local).
+              aka("count") must beTypedEqualTo(e.toLong).await(1, timeout)
             // all docs minus errors
           }
         }
 
         s"$nDocs documents with the default connection" in {
           bulkSpec(db(colName(nDocs)), nDocs, nDocs - 3, timeout)
-        } tag "wip"
+        }
 
         s"${nDocs / 1000} with the slow connection" in {
           bulkSpec(

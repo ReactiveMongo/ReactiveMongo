@@ -3,7 +3,7 @@ package reactivemongo
 import akka.actor.Actor
 import akka.testkit.TestActorRef
 
-import reactivemongo.io.netty.channel.ChannelId
+import reactivemongo.io.netty.channel.{ ChannelId, DefaultChannelId }
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
@@ -12,7 +12,7 @@ import org.specs2.concurrent.ExecutionEnv
 
 import reactivemongo.core.actors.StandardDBSystem
 import reactivemongo.core.nodeset.{ Authenticate, Connection, Node }
-import reactivemongo.core.protocol.Response
+import reactivemongo.core.protocol.{ Response, ResponseInfo }
 
 import reactivemongo.api.{
   MongoConnection,
@@ -146,7 +146,8 @@ class MonitorSpec(implicit ee: ExecutionEnv)
             nodeset1.pick(ReadPreference.Primary).
               aka("channel #1") must beSome[(Node, Connection)]
           } and { // #2
-            val respWithNulls = Response(null, null, null, null)
+            val respWithNulls = Response(null, null, null,
+              ResponseInfo(DefaultChannelId.newInstance()))
 
             dbsystem.receive(respWithNulls).
               aka("invalid response") must throwA[NullPointerException] and {

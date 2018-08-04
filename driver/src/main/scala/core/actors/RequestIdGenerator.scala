@@ -6,9 +6,7 @@ import reactivemongo.core.protocol.Response
  * @param lower the lower bound
  * @param upper the upper bound
  */
-private[actors] class RequestIdGenerator(val lower: Int, val upper: Int)
-  extends Product with Serializable {
-
+private[actors] class RequestIdGenerator(val lower: Int, val upper: Int) {
   private val lock = new Object {}
   private var value: Int = lower
 
@@ -30,27 +28,9 @@ private[actors] class RequestIdGenerator(val lower: Int, val upper: Int)
   }
 
   override lazy val hashCode: Int = (lower, upper).hashCode
-
-  @deprecated("", "0.12-RC6")
-  def canEqual(that: Any): Boolean = that.isInstanceOf[RequestIdGenerator]
-
-  @deprecated("", "0.12-RC6")
-  val productArity = 2
-
-  @deprecated("", "0.12-RC6")
-  def productElement(n: Int): Any = n match {
-    case 0 => lower
-    case _ => upper
-  }
 }
 
-@deprecated("Use the class RequestIdGenerator", "0.12-RC6")
-object RequestIdGenerator
-  extends scala.runtime.AbstractFunction2[Int, Int, RequestIdGenerator] {
-
-  def apply(lower: Int, upper: Int): RequestIdGenerator =
-    new RequestIdGenerator(lower, upper)
-
+private[actors] object RequestIdGenerator {
   def unapply(g: RequestIdGenerator): Option[(Int, Int)] =
     Some(g.lower -> g.upper)
 }

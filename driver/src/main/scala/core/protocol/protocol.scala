@@ -17,13 +17,18 @@ package reactivemongo.core.protocol
 
 import java.util.{ List => JList }
 
+import scala.util.{ Failure, Success, Try }
+
 import reactivemongo.io.netty.buffer.{ ByteBuf, Unpooled }
 import reactivemongo.io.netty.channel.{ ChannelHandlerContext, ChannelId }
 
-import reactivemongo.api.SerializationPack
-import reactivemongo.api.commands.GetLastError
+import reactivemongo.bson.{ BSONBooleanLike, BSONDocument, BSONNumberLike }
 
 import reactivemongo.core.netty.{ BufferSequence, ChannelBufferReadableBuffer }
+import reactivemongo.core.errors.DatabaseException
+
+import reactivemongo.api.SerializationPack
+import reactivemongo.api.commands.GetLastError
 
 import reactivemongo.api.ReadPreference
 
@@ -55,23 +60,27 @@ trait ChannelBufferReadable[T] {
 // concrete classes
 
 /**
- * A helper to build write request which result needs to be checked (by sending a [[reactivemongo.core.commands.GetLastError]] command after).
+ * A helper to build write request which result needs to be checked (by sending a [[reactivemongo.api.commands.GetLastError]] command after).
  *
  * @param op write operation.
  * @param documents body of this request, a [[http://netty.io/4.1/api/io/netty/buffer/ByteBuf.html ByteBuf]] containing 0, 1, or many documents.
- * @param getLastError a [[reactivemongo.core.commands.GetLastError]] command message.
+ * @param getLastError a `GetLastError` command message.
  */
+@deprecated("Unused", "0.16.0")
 case class CheckedWriteRequest(
   op: WriteRequestOp,
   documents: BufferSequence,
   getLastError: GetLastError) {
+
+  import reactivemongo.api.BSONSerializationPack
+  import reactivemongo.api.commands.Command
+  import reactivemongo.api.commands.bson.
+    BSONGetLastErrorImplicits.GetLastErrorWriter
+
   def apply(): (RequestMaker, RequestMaker) = {
-    import reactivemongo.api.BSONSerializationPack
-    import reactivemongo.api.commands.Command
-    import reactivemongo.api.commands.bson.BSONGetLastErrorImplicits.GetLastErrorWriter
-    val gleRequestMaker = Command.requestMaker(BSONSerializationPack).
-      onDatabase(op.db, getLastError, ReadPreference.primary)(
-        GetLastErrorWriter).requestMaker
+    val (gleRequestMaker, _) =
+      Command.buildRequestMaker(BSONSerializationPack)(
+        getLastError, GetLastErrorWriter, ReadPreference.primary, op.db)
 
     RequestMaker(op, documents) -> gleRequestMaker
   }
@@ -223,14 +232,6 @@ private[reactivemongo] class ResponseFrameDecoder
 private[reactivemongo] class ResponseDecoder
   extends reactivemongo.io.netty.handler.codec.MessageToMessageDecoder[ByteBuf] {
 
-  import scala.util.{ Failure, Success, Try }
-  import reactivemongo.core.errors.DatabaseException
-  import reactivemongo.bson.{
-    BSONBooleanLike,
-    BSONDocument,
-    BSONNumberLike
-  }
-
   override def decode(
     context: ChannelHandlerContext,
     frame: ByteBuf, // see ResponseFrameDecoder
@@ -284,7 +285,7 @@ private[reactivemongo] class ResponseDecoder
       docs.writeBytes(frame)
       frame.release()
 
-      first(docs) match {
+      ResponseDecoder.first(docs) match {
         case Failure(cause) => {
           //cause.printStackTrace()
           Response.CommandError(header, reply, info, DatabaseException(cause))
@@ -303,22 +304,20 @@ private[reactivemongo] class ResponseDecoder
 
           doc.getAs[BSONDocument]("cursor") match {
             case Some(cursor) if ok.exists(_.toBoolean) => {
-              val ry = for {
+              val withCursor: Option[Response] = for {
                 id <- cursor.getAs[BSONNumberLike]("id").map(_.toLong)
                 ns <- cursor.getAs[String]("ns")
                 batch <- cursor.getAs[Seq[BSONDocument]]("firstBatch").orElse(
                   cursor.getAs[Seq[BSONDocument]]("nextBatch"))
+              } yield {
+                val r = reply.copy(cursorID = id, numberReturned = batch.size)
 
-              } yield (ns, batch, reply.copy(
-                cursorID = id,
-                numberReturned = batch.size))
+                Response.WithCursor(header, r, docs, info, ns, batch)
+              }
 
               docs.resetReaderIndex()
 
-              ry.fold(Response(header, reply, docs, info)) {
-                case (ns, batch, r) => Response.WithCursor(
-                  header, r, docs, info, ns, batch)
-              }
+              withCursor getOrElse Response(header, reply, docs, info)
             }
 
             case Some(_) => failed
@@ -353,18 +352,19 @@ private[reactivemongo] class ResponseDecoder
 
     ()
   }
+}
 
-  @inline private def first(buf: ByteBuf) =
-    Try[reactivemongo.bson.BSONDocument] {
-      val sz = buf.getIntLE(buf.readerIndex)
-      val bytes = Array.ofDim[Byte](sz)
+private[reactivemongo] object ResponseDecoder {
+  @inline private[reactivemongo] def first(buf: ByteBuf) = Try[BSONDocument] {
+    val sz = buf.getIntLE(buf.readerIndex)
+    val bytes = Array.ofDim[Byte](sz)
 
-      // Avoid .readBytes(sz) which internally allocate a ByteBuf
-      // (which would require to manage its release)
-      buf.readBytes(bytes)
+    // Avoid .readBytes(sz) which internally allocate a ByteBuf
+    // (which would require to manage its release)
+    buf.readBytes(bytes)
 
-      val docBuf = ChannelBufferReadableBuffer(Unpooled wrappedBuffer bytes)
+    val docBuf = ChannelBufferReadableBuffer(Unpooled wrappedBuffer bytes)
 
-      reactivemongo.api.BSONSerializationPack.readFromBuffer(docBuf)
-    }
+    reactivemongo.api.BSONSerializationPack.readFromBuffer(docBuf)
+  }
 }

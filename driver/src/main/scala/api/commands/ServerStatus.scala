@@ -184,5 +184,6 @@ case class ServerStatusResult(
 )
 
 /** Server [[http://docs.mongodb.org/manual/reference/server-status/ status]] */
+@deprecated("Will be private/internal", "0.16.0")
 case object ServerStatus
   extends Command with CommandWithResult[ServerStatusResult]

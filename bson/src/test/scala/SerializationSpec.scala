@@ -25,8 +25,8 @@ class SerializationSpec extends org.specs2.mutable.Specification {
         putString("surname1", "Jim").
         putDouble("score", 3.88).
         putBoolean("online", true).
-        putObjectId("_id", BSONObjectID(
-          "5117c6391aa562a90098f621").valueAsArray).
+        putObjectId("_id", BSONObjectID.parse(
+          "5117c6391aa562a90098f621").get.valueAsArray).
         openDocument("contact").
         putDecimal(
           "priority",
@@ -130,7 +130,7 @@ class SerializationSpec extends org.specs2.mutable.Specification {
         "surname2" -> Option.empty[String],
         "score" -> 3.88,
         "online" -> true,
-        "_id" -> BSONObjectID("5117c6391aa562a90098f621"),
+        "_id" -> BSONObjectID.parse("5117c6391aa562a90098f621").get,
         "contact" -> BSONDocument(
           "priority" -> BSONDecimal.NegativeInf,
           "emails" -> BSONArray(

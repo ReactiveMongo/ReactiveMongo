@@ -38,7 +38,6 @@ final class BSONCollection(
 
   @transient val pack = BSONSerializationPack
   @transient val BatchCommands = BSONBatchCommands
-  def genericQueryBuilder = BSONQueryBuilder(this, failoverStrategy)
 
   override lazy val toString =
     s"BSONCollection('${db.name}'.'$name', $failoverStrategy)"

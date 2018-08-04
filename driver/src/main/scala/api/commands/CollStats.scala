@@ -1,5 +1,6 @@
 package reactivemongo.api.commands
 
+@deprecated("Will be private/internal", "0.16.0")
 case class CollStats(scale: Option[Int] = None)
   extends CollectionCommand with CommandWithResult[CollStatsResult]
 
@@ -22,7 +23,7 @@ case class CollStats(scale: Option[Int] = None)
  * @param max The maximum number of documents of this collection, if capped.
  * @param maxSize The maximum size in bytes (or in bytes / scale, if any) of this collection, if capped.
  */
-case class CollStatsResult(
+case class CollStatsResult( // TODO: Move to `api` package
   ns: String,
   count: Int,
   size: Double,

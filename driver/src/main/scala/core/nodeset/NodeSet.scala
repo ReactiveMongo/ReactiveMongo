@@ -9,6 +9,10 @@ import akka.actor.ActorRef
 import reactivemongo.bson.BSONDocument
 import reactivemongo.api.ReadPreference
 
+/**
+ * @param name the replicaSet name
+ * @param version the replicaSet version
+ */
 @SerialVersionUID(527078726L)
 case class NodeSet(
   name: Option[String],

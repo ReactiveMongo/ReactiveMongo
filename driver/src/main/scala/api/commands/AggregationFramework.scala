@@ -55,43 +55,6 @@ trait AggregationFramework[P <: SerializationPack]
 
   }
 
-  /** Returns a document from a sequence of element producers. */
-  @deprecated("Use `pack.newBuilder`", "0.12.7")
-  protected def makeDocument(elements: Seq[pack.ElementProducer]): pack.Document
-
-  /** Returns a non empty array of values */
-  @deprecated("Use `pack.newBuilder`", "0.12.7")
-  protected def makeArray(value: pack.Value, values: Seq[pack.Value]): pack.Value
-
-  /**
-   * Returns a producer of element for the given `name` and `value`.
-   *
-   * @param name the element name
-   * @param value the element value
-   */
-  @deprecated("Use `pack.newBuilder`", "0.12.7")
-  protected def elementProducer(name: String, value: pack.Value): pack.ElementProducer
-
-  /** Returns an boolean as a serialized value. */
-  @deprecated("Use `pack.newBuilder`", "0.12.7")
-  protected def booleanValue(b: Boolean): pack.Value
-
-  /** Returns an integer as a serialized value. */
-  @deprecated("Use `pack.newBuilder`", "0.12.7")
-  protected def intValue(i: Int): pack.Value
-
-  /** Returns an long as a serialized value. */
-  @deprecated("Use `pack.newBuilder`", "0.12.7")
-  protected def longValue(l: Long): pack.Value
-
-  /** Returns an double as a serialized value. */
-  @deprecated("Use `pack.newBuilder`", "0.12.7")
-  protected def doubleValue(d: Double): pack.Value
-
-  /** Returns an string as a serialized value. */
-  @deprecated("Use `pack.newBuilder`", "0.12.7")
-  protected def stringValue(s: String): pack.Value
-
   /**
    * Reshapes a document stream by renaming, adding, or removing fields.
    * Also uses [[http://docs.mongodb.org/manual/reference/aggregation/project/#_S_project Project]] to create computed values or sub-objects.

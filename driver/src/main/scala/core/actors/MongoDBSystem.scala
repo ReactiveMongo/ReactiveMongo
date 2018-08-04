@@ -478,7 +478,7 @@ trait MongoDBSystem extends Actor {
       val ns = nodeSetLock.synchronized { this._nodeSet }
 
       if (ns.isReachable) {
-        sender ! SetAvailable(ns.protocolMetadata)
+        sender ! new SetAvailable(ns.protocolMetadata, ns.name)
         debug("The node set is available")
       }
 
@@ -486,7 +486,7 @@ trait MongoDBSystem extends Actor {
         if (ns.authenticates.nonEmpty && prim.authenticated.isEmpty) {
           debug(s"The node set is available (${prim.names}); Waiting authentication: ${prim.authenticated}")
         } else {
-          sender ! PrimaryAvailable(ns.protocolMetadata)
+          sender ! new PrimaryAvailable(ns.protocolMetadata, ns.name)
 
           debug(s"The primary is available: $prim")
         }
@@ -519,7 +519,7 @@ trait MongoDBSystem extends Actor {
     case req @ RequestMakerExpectingResponse(maker, _) => {
       val reqId = RequestId.common.next
 
-      trace(s"Received a request expecting a response ($reqId): $req")
+      debug(s"Received a request expecting a response ($reqId): $req")
 
       val request = maker(reqId)
 
@@ -549,43 +549,6 @@ trait MongoDBSystem extends Actor {
       })
 
       ()
-    }
-
-    case req @ CheckedWriteRequestExpectingResponse(_) => {
-      debug("Received a checked write request")
-
-      val checkedWriteRequest = req.checkedWriteRequest
-      val reqId = RequestId.common.next
-      val (request, writeConcern) = {
-        val tuple = checkedWriteRequest()
-        tuple._1(reqId) -> tuple._2(reqId)
-      }
-      val onError = failureOrLog(req.promise, _: Throwable) { cause =>
-        error(s"Fails to register a request: ${request.op}", cause)
-      }
-
-      foldNodeConnection(request)(onError, { (node, con) =>
-        requestTracker.withAwaiting { (resps, chans) =>
-          resps += reqId -> AwaitingResponse(
-            request, con.channel.id, req.promise,
-            isGetLastError = true, isMongo26WriteOp = false).
-            withWriteConcern(writeConcern)
-
-          chans += con.channel.id
-
-          //println(s"_reserve: ${con.channel.id}")
-
-          trace(s"Registering awaiting response for requestID $reqId on channel #${con.channel.id}, awaitingResponses: $resps")
-        }
-
-        con.send(request, writeConcern).addListener(new OperationHandler(
-          error(s"Fails to send checked write request $reqId", _),
-          { chanId =>
-            trace(s"Request $reqId successful on channel #${chanId}")
-          }))
-
-        ()
-      })
     }
 
     case ConnectAll => { // monitor
@@ -672,8 +635,6 @@ trait MongoDBSystem extends Actor {
           requestTracker.withAwaiting { (resps, chans) =>
             chans -= chanId
 
-            //println(s"_release: $chanId")
-
             val retriedChans = Set.newBuilder[ChannelId]
 
             resps.retain { (_, awaitingResponse) =>
@@ -684,8 +645,6 @@ trait MongoDBSystem extends Actor {
 
                     retried += awaiting.requestID -> awaiting
                     retriedChans += awaiting.channelID
-
-                    //println(s"_reserve: ${awaiting.channelID}")
                   }
 
                   case _ => {
@@ -942,10 +901,9 @@ trait MongoDBSystem extends Actor {
   private def onIsMaster(response: Response): Unit = {
     import reactivemongo.api.BSONSerializationPack
     import reactivemongo.api.commands.bson.BSONIsMasterCommandImplicits
-    import reactivemongo.api.commands.Command
 
-    val isMaster = Command.deserialize(BSONSerializationPack, response)(
-      BSONIsMasterCommandImplicits.IsMasterResultReader)
+    val isMaster = BSONSerializationPack.readAndDeserialize(
+      response, BSONIsMasterCommandImplicits.IsMasterResultReader)
 
     trace(s"IsMaster response: $isMaster")
 
@@ -1019,7 +977,10 @@ trait MongoDBSystem extends Actor {
 
         trace(s"Discovered ${discoveredNodes.size} nodes: ${discoveredNodes mkString ", "}")
 
-        val upSet = prepared.copy(nodes = prepared.nodes ++ discoveredNodes)
+        val upSet = prepared.copy(
+          name = isMaster.replicaSet.map(_.setName),
+          version = isMaster.replicaSet.map { _.setVersion.toLong },
+          nodes = prepared.nodes ++ discoveredNodes)
 
         chanNode.fold(upSet) { node =>
           if (upSet.authenticates.nonEmpty && node.authenticated.isEmpty) {
@@ -1029,7 +990,8 @@ trait MongoDBSystem extends Actor {
             if (!nodeSetWasReachable && upSet.isReachable) {
               debug("The node set is now available")
 
-              broadcastMonitors(SetAvailable(upSet.protocolMetadata))
+              broadcastMonitors(
+                new SetAvailable(upSet.protocolMetadata, upSet.name))
 
               updateHistory(s"SetAvailable(${nodeSet.toShortString})")
             }
@@ -1042,7 +1004,8 @@ trait MongoDBSystem extends Actor {
 
               debug(s"The primary is now available: ${newPrim.mkString}")
 
-              broadcastMonitors(PrimaryAvailable(upSet.protocolMetadata))
+              broadcastMonitors(new PrimaryAvailable(
+                upSet.protocolMetadata, upSet.name))
 
               updateHistory(s"PrimaryAvailable(${nodeSet.toShortString})")
             }
@@ -1132,7 +1095,8 @@ trait MongoDBSystem extends Actor {
               if (nodeSet.isReachable) {
                 debug("The node set is now authenticated")
 
-                broadcastMonitors(SetAvailable(nodeSet.protocolMetadata))
+                broadcastMonitors(
+                  new SetAvailable(nodeSet.protocolMetadata, nodeSet.name))
 
                 updateHistory(s"SetAvailable(${nodeSet.toShortString})")
               }
@@ -1141,7 +1105,7 @@ trait MongoDBSystem extends Actor {
                 debug("The primary is now authenticated")
 
                 broadcastMonitors(
-                  PrimaryAvailable(nodeSet.protocolMetadata))
+                  new PrimaryAvailable(nodeSet.protocolMetadata, nodeSet.name))
 
                 updateHistory(s"PrimaryAvailable(${nodeSet.toShortString})")
               } else if (nodeSet.isReachable) {

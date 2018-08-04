@@ -9,10 +9,9 @@ import reactivemongo.core.errors.GenericDriverException
 
 import reactivemongo.api.SerializationPack
 import reactivemongo.api.commands.{
-  BulkOps,
   CommandCodecs,
-  MultiBulkWriteResult,
   LastError,
+  MultiBulkWriteResult,
   ResolvedCollectionCommand,
   WriteConcern,
   WriteResult
@@ -22,10 +21,15 @@ import reactivemongo.api.commands.{
  * @define writeConcernParam the [[https://docs.mongodb.com/manual/reference/write-concern/ writer concern]] to be used
  * @define orderedParam the [[https://docs.mongodb.com/manual/reference/method/db.collection.insert/#perform-an-unordered-insert ordered]] behaviour
  */
-trait InsertOps[P <: SerializationPack with Singleton]
-  extends CommandCodecs[P] { collection: GenericCollection[P] =>
+trait InsertOps[P <: SerializationPack with Singleton] {
+  collection: GenericCollection[P] =>
 
-  protected val pack: P
+  // TODO: bypassDocumentValidation: bool
+
+  private object InsertCommand
+    extends reactivemongo.api.commands.InsertCommand[collection.pack.type] {
+    val pack: collection.pack.type = collection.pack
+  }
 
   /**
    * @param ordered $orderedParam
@@ -41,25 +45,34 @@ trait InsertOps[P <: SerializationPack with Singleton]
     }
   }
 
+  private type InsertCmd = ResolvedCollectionCommand[InsertCommand.Insert]
+
+  implicit private lazy val insertWriter: pack.Writer[InsertCmd] = {
+    val underlying = reactivemongo.api.commands.InsertCommand.
+      writer(pack)(InsertCommand)(collection.db.session)
+
+    pack.writer[InsertCmd](underlying)
+  }
+
   /** Builder for insert operations. */
   sealed trait InsertBuilder[T] {
     implicit protected def writer: pack.Writer[T]
 
-    @inline private def metadata = collection.db.connection.metadata
+    @inline private def metadata = db.connectionState.metadata
 
     /** The max BSON size, including the size of command envelope */
-    private lazy val maxBsonSize: Option[Int] = metadata.map { meta =>
+    private lazy val maxBsonSize: Int = {
       // Command envelope to compute accurate BSON size limit
       val emptyDoc: pack.Document = pack.newBuilder.document(Seq.empty)
 
-      val i = ResolvedCollectionCommand(
+      val emptyCmd = ResolvedCollectionCommand(
         collection.name,
-        BatchCommands.InsertCommand.Insert(
+        InsertCommand.Insert(
           emptyDoc, Seq.empty[pack.Document], ordered, writeConcern))
 
-      val doc = pack.serialize(i, BatchCommands.InsertWriter)
+      val doc = pack.serialize(emptyCmd, insertWriter)
 
-      meta.maxBsonSize - pack.bsonSize(doc) + pack.bsonSize(emptyDoc)
+      metadata.maxBsonSize - pack.bsonSize(doc) + pack.bsonSize(emptyDoc)
     }
 
     /** $orderedParam */
@@ -104,19 +117,10 @@ trait InsertOps[P <: SerializationPack with Singleton]
      * }}}
      */
     final def many(documents: Iterable[T])(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] = {
-      val ctx = (for {
-        meta <- metadata
-        maxSz <- maxBsonSize
-      } yield meta.maxBulkSize -> maxSz) match {
-        case Some((c, sz)) =>
-          Future.successful(c -> sz)
-
-        case _ =>
-          Future.failed[(Int, Int)](collection.MissingMetadata())
-      }
+      val bulkSz = metadata.maxBulkSize
+      val maxSz = maxBsonSize
 
       for {
-        (bulkSz, maxSz) <- ctx
         docs <- serialize(documents)
         res <- {
           val bulkProducer = BulkOps.bulks(
@@ -138,33 +142,30 @@ trait InsertOps[P <: SerializationPack with Singleton]
       }
     })
 
+    implicit private val resultReader: pack.Reader[InsertCommand.InsertResult] =
+      CommandCodecs.defaultWriteResultReader(pack)
+
     private final def execute(documents: Seq[pack.Document])(implicit ec: ExecutionContext): Future[WriteResult] = documents.headOption match {
-      case Some(head) => metadata match {
-        case Some(meta) => {
-          import BatchCommands.InsertWriter
+      case Some(head) => {
+        if (metadata.maxWireVersion >= MongoWireVersion.V26) {
+          val cmd = InsertCommand.Insert(
+            head, documents.tail, ordered, writeConcern)
 
-          if (meta.maxWireVersion >= MongoWireVersion.V26) {
-            val cmd = BatchCommands.InsertCommand.Insert(
-              head, documents.tail, ordered, writeConcern)
+          runCommand(cmd, writePreference).flatMap { wr =>
+            val flattened = wr.flatten
 
-            runCommand(cmd, writePref).flatMap { wr =>
-              val flattened = wr.flatten
+            if (!flattened.ok) {
+              // was ordered, with one doc => fail if has an error
+              Future.failed(WriteResult.lastError(flattened).
+                getOrElse[Exception](GenericDriverException(
+                  s"fails to insert: $documents")))
 
-              if (!flattened.ok) {
-                // was ordered, with one doc => fail if has an error
-                Future.failed(WriteResult.lastError(flattened).
-                  getOrElse[Exception](GenericDriverException(
-                    s"fails to insert: $documents")))
-
-              } else Future.successful(wr)
-            }
-          } else { // Mongo < 2.6
-            Future.failed[WriteResult](GenericDriverException(
-              s"unsupported MongoDB version: $meta"))
+            } else Future.successful(wr)
           }
+        } else { // Mongo < 2.6
+          Future.failed[WriteResult](GenericDriverException(
+            s"unsupported MongoDB version: $metadata"))
         }
-
-        case _ => Future.failed[WriteResult](collection.MissingMetadata())
       }
 
       case _ => Future.successful(WriteResult.empty) // No doc to insert

@@ -15,13 +15,15 @@ import reactivemongo.api.commands.{
   CommandCodecs,
   CommandWithPack,
   CommandWithResult,
-  ResolvedCollectionCommand
+  ResolvedCollectionCommand,
+  WriteConcern
 }
 import reactivemongo.core.protocol.MongoWireVersion
 
-private[collections] trait Aggregator[P <: SerializationPack with Singleton]
-  extends CommandCodecs[P] {
+private[collections] trait Aggregator[P <: SerializationPack with Singleton] {
   collection: GenericCollection[P] =>
+
+  // TODO: comment, hint, collation, maxTimeMS
 
   // ---
 
@@ -31,7 +33,8 @@ private[collections] trait Aggregator[P <: SerializationPack with Singleton]
     val explain: Boolean,
     val allowDiskUse: Boolean,
     val bypassDocumentValidation: Boolean,
-    val readConcern: Option[ReadConcern],
+    val readConcern: ReadConcern,
+    val writeConcern: WriteConcern,
     val readPreference: ReadPreference,
     val batchSize: Option[Int],
     val reader: pack.Reader[T]) {
@@ -46,12 +49,19 @@ private[collections] trait Aggregator[P <: SerializationPack with Singleton]
     val context: AggregatorContext[T],
     val cp: CursorProducer.Aux[T, AC]) {
 
-    import context._
+    import context.{
+      allowDiskUse,
+      batchSize,
+      bypassDocumentValidation,
+      explain,
+      firstOperator,
+      otherOperators,
+      reader
+    }
 
     @inline private def readPreference = context.readPreference
 
-    private def ver = db.connection.metadata.
-      fold[MongoWireVersion](MongoWireVersion.V30)(_.maxWireVersion)
+    private def ver = db.connectionState.metadata.maxWireVersion
 
     final def cursor: AC[T] = {
       def batchSz = batchSize.getOrElse(defaultCursorBatchSize)
@@ -60,7 +70,7 @@ private[collections] trait Aggregator[P <: SerializationPack with Singleton]
 
       val cmd = new Aggregate[T](
         firstOperator, otherOperators, explain, allowDiskUse, batchSz, ver,
-        bypassDocumentValidation, readConcern)
+        bypassDocumentValidation, readConcern, writeConcern)
 
       val cursor = runner.cursor[T, Aggregate[T]](
         collection, cmd, readPreference)
@@ -85,7 +95,8 @@ private[collections] trait Aggregator[P <: SerializationPack with Singleton]
     val batchSize: Int,
     val wireVersion: MongoWireVersion,
     val bypassDocumentValidation: Boolean,
-    val readConcern: Option[ReadConcern]) extends CollectionCommand
+    val readConcern: ReadConcern,
+    val writeConcern: WriteConcern) extends CollectionCommand
     with CommandWithPack[pack.type]
     with CommandWithResult[T]
 
@@ -93,39 +104,49 @@ private[collections] trait Aggregator[P <: SerializationPack with Singleton]
 
   private def commandWriter[T]: pack.Writer[AggregateCmd[T]] = {
     val builder = pack.newBuilder
-    import builder.{ boolean, document, elementProducer => element }
+    val session = collection.db.session.filter( // TODO: Remove
+      _ => (version.compareTo(MongoWireVersion.V36) >= 0))
+
+    val writeReadConcern = CommandCodecs.writeSessionReadConcern(
+      builder, session)
+
+    val writeWriteConcern = CommandCodecs.writeWriteConcern(builder)
 
     pack.writer[AggregateCmd[T]] { agg =>
+      import builder.{ boolean, document, elementProducer => element }
+      import agg.{ command => cmd }
+
       val pipeline = builder.array(
-        agg.command.operator.makePipe,
-        agg.command.pipeline.map(_.makePipe))
+        cmd.operator.makePipe,
+        cmd.pipeline.map(_.makePipe))
 
-      val base = Seq(
-        element("aggregate", builder.string(agg.collection)),
-        element("pipeline", pipeline),
-        element("explain", boolean(agg.command.explain)),
-        element("allowDiskUse", boolean(agg.command.allowDiskUse)),
-        element("cursor", document(Seq(
-          element("batchSize", builder.int(agg.command.batchSize))))))
-
-      val cmd = {
-        if (agg.command.wireVersion < MongoWireVersion.V32) {
-          base
-        } else {
-          val byp = element("bypassDocumentValidation", boolean(
-            agg.command.bypassDocumentValidation))
-
-          agg.command.readConcern match {
-            case Some(concern) => base ++ Seq(
-              byp,
-              element("readConcern", collection.writeReadConcern(concern)))
-
-            case _ => base :+ byp
-          }
-        }
+      lazy val isOut: Boolean = cmd.pipeline.lastOption.exists {
+        case BatchCommands.AggregationFramework.Out(_) => true
+        case _                                         => false
       }
 
-      document(cmd)
+      val elements = Seq.newBuilder[pack.ElementProducer]
+
+      elements ++= Seq(
+        element("aggregate", builder.string(agg.collection)),
+        element("pipeline", pipeline),
+        element("explain", boolean(cmd.explain)),
+        element("allowDiskUse", boolean(cmd.allowDiskUse)),
+        element("cursor", document(Seq(
+          element("batchSize", builder.int(cmd.batchSize))))))
+
+      if (cmd.wireVersion >= MongoWireVersion.V32) {
+        elements += element("bypassDocumentValidation", boolean(
+          cmd.bypassDocumentValidation))
+
+        elements ++= writeReadConcern(cmd.readConcern)
+      }
+
+      if (cmd.wireVersion >= MongoWireVersion.V36 && isOut) {
+        elements += element("writeConcern", writeWriteConcern(cmd.writeConcern))
+      }
+
+      document(elements.result())
     }
   }
 }

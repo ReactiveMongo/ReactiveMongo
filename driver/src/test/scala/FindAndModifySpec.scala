@@ -7,6 +7,8 @@ import reactivemongo.bson.{
   BSONDocumentWriter
 }
 
+import reactivemongo.core.protocol.MongoWireVersion
+
 import reactivemongo.api.{ BSONSerializationPack, ReadPreference }
 import reactivemongo.api.commands._
 
@@ -47,7 +49,7 @@ final class FindAndModifySpec(implicit ee: ExecutionEnv)
         "age" -> person.age)
     }
 
-    implicit val writer: BSONDocumentWriter[ResolvedCollectionCommand[FindAndModify]] = BSONSerializationPack.writer[ResolvedCollectionCommand[FindAndModify]] { BSONFindAndModifyCommand.serialize(_) }
+    implicit val writer: BSONDocumentWriter[ResolvedCollectionCommand[FindAndModify]] = BSONSerializationPack.writer[ResolvedCollectionCommand[FindAndModify]] { BSONFindAndModifyCommand.serialize(MongoWireVersion.V34, None) }
 
     val jack1 = Person("Jack", "London", 27)
     val jack2 = jack1.copy(age = /* updated to */ 40)

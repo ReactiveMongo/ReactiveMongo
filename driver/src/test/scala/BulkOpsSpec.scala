@@ -6,7 +6,7 @@ import org.specs2.concurrent.ExecutionEnv
 
 import reactivemongo.bson.BSONDocument
 
-import reactivemongo.api.commands.BulkOps._
+import reactivemongo.api.collections.BulkOps._
 
 class BulkOpsSpec(implicit ee: ExecutionEnv)
   extends org.specs2.mutable.Specification {

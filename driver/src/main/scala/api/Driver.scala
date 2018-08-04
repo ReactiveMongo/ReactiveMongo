@@ -232,7 +232,13 @@ private[api] trait Driver {
         } else {
           context.become(closing)
 
-          driver.connectionMonitors.values.foreach(_.close())
+          // TODO
+          implicit def timeout = FiniteDuration(10, "seconds")
+          implicit def ec: ExecutionContext = context.dispatcher
+
+          Future.sequence(driver.connectionMonitors.values.map(_.askClose()))
+
+          ()
         }
       }
     }

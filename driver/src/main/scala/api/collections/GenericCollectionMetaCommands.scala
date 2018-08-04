@@ -7,7 +7,6 @@ import reactivemongo.api.SerializationPack
 import reactivemongo.api.commands.{
   CollectionCommand,
   Command,
-  CommandCodecs,
   CommandWithResult,
   Collation,
   ResolvedCollectionCommand,
@@ -15,7 +14,7 @@ import reactivemongo.api.commands.{
 }
 
 /** The meta commands for collection that require the serialization pack. */
-private[reactivemongo] trait GenericCollectionMetaCommands[P <: SerializationPack with Singleton] extends CommandCodecs[P] { self: GenericCollection[P] =>
+private[reactivemongo] trait GenericCollectionMetaCommands[P <: SerializationPack with Singleton] { self: GenericCollection[P] =>
 
   /**
    * Creates a view on this collection, using an aggregation pipeline.
@@ -58,7 +57,7 @@ private[reactivemongo] trait GenericCollectionMetaCommands[P <: SerializationPac
     // Command codecs
     implicit def writer = createViewWriter
 
-    command.unboxed(self, cmd, writePref)
+    command.unboxed(self, cmd, writePreference)
   }
 
   // ---
