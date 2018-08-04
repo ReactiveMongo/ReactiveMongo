@@ -581,7 +581,7 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * @param reader $readerParam
    * @param cp $cursorProducerParam
    */
-  def aggregatorContext[T](firstOperator: PipelineOperator, otherOperators: List[PipelineOperator] = Nil, explain: Boolean = false, allowDiskUse: Boolean = false, bypassDocumentValidation: Boolean = false, readConcern: Option[ReadConcern] = None, readPreference: ReadPreference = ReadPreference.primary, batchSize: Option[Int] = None)(implicit reader: pack.Reader[T]): AggregatorContext[T] = new AggregatorContext[T](firstOperator, otherOperators, explain, allowDiskUse, bypassDocumentValidation, readConcern, readPreference, batchSize, reader)
+  def aggregatorContext[T](firstOperator: PipelineOperator, otherOperators: List[PipelineOperator] = Nil, explain: Boolean = false, allowDiskUse: Boolean = false, bypassDocumentValidation: Boolean = false, readConcern: Option[ReadConcern] = None, readPreference: ReadPreference = ReadPreference.primary, batchSize: Option[Int] = None)(implicit reader: pack.Reader[T]): AggregatorContext[T] = new AggregatorContext[T](firstOperator, otherOperators, explain, allowDiskUse, bypassDocumentValidation, readConcern.getOrElse(self.readConcern), writeConcern, readPreference, batchSize, reader) // TODO: writeConcern as parameter
 
   /**
    * @tparam S $selectorTParam

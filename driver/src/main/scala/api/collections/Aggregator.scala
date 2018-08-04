@@ -15,7 +15,8 @@ import reactivemongo.api.commands.{
   CommandCodecs,
   CommandWithPack,
   CommandWithResult,
-  ResolvedCollectionCommand
+  ResolvedCollectionCommand,
+  WriteConcern
 }
 import reactivemongo.core.protocol.MongoWireVersion
 
@@ -30,7 +31,8 @@ private[collections] trait Aggregator[P <: SerializationPack with Singleton] {
     val explain: Boolean,
     val allowDiskUse: Boolean,
     val bypassDocumentValidation: Boolean,
-    val readConcern: Option[ReadConcern],
+    val readConcern: ReadConcern,
+    val writeConcern: WriteConcern,
     val readPreference: ReadPreference,
     val batchSize: Option[Int],
     val reader: pack.Reader[T]) {
@@ -66,7 +68,7 @@ private[collections] trait Aggregator[P <: SerializationPack with Singleton] {
 
       val cmd = new Aggregate[T](
         firstOperator, otherOperators, explain, allowDiskUse, batchSz, ver,
-        bypassDocumentValidation, Some(readConcern))
+        bypassDocumentValidation, readConcern, writeConcern)
 
       val cursor = runner.cursor[T, Aggregate[T]](
         collection, cmd, readPreference)
@@ -91,7 +93,8 @@ private[collections] trait Aggregator[P <: SerializationPack with Singleton] {
     val batchSize: Int,
     val wireVersion: MongoWireVersion,
     val bypassDocumentValidation: Boolean,
-    val readConcern: Option[ReadConcern]) extends CollectionCommand
+    val readConcern: ReadConcern,
+    val writeConcern: WriteConcern) extends CollectionCommand
     with CommandWithPack[pack.type]
     with CommandWithResult[T]
 
@@ -105,30 +108,35 @@ private[collections] trait Aggregator[P <: SerializationPack with Singleton] {
     val writeReadConcern = CommandCodecs.writeSessionReadConcern(
       builder, session)
 
+    val writeWriteConcern = CommandCodecs.writeWriteConcern(builder)
+
     pack.writer[AggregateCmd[T]] { agg =>
       import builder.{ boolean, document, elementProducer => element }
+      import agg.{ command => cmd }
 
       val pipeline = builder.array(
-        agg.command.operator.makePipe,
-        agg.command.pipeline.map(_.makePipe))
+        cmd.operator.makePipe,
+        cmd.pipeline.map(_.makePipe))
 
       val elements = Seq.newBuilder[pack.ElementProducer]
 
       elements ++= Seq(
         element("aggregate", builder.string(agg.collection)),
         element("pipeline", pipeline),
-        element("explain", boolean(agg.command.explain)),
-        element("allowDiskUse", boolean(agg.command.allowDiskUse)),
+        element("explain", boolean(cmd.explain)),
+        element("allowDiskUse", boolean(cmd.allowDiskUse)),
         element("cursor", document(Seq(
-          element("batchSize", builder.int(agg.command.batchSize))))))
+          element("batchSize", builder.int(cmd.batchSize))))))
 
-      if (agg.command.wireVersion >= MongoWireVersion.V32) {
+      if (cmd.wireVersion >= MongoWireVersion.V32) {
         elements += element("bypassDocumentValidation", boolean(
-          agg.command.bypassDocumentValidation))
+          cmd.bypassDocumentValidation))
+
+        elements ++= writeReadConcern(cmd.readConcern)
       }
 
-      agg.command.readConcern.foreach { rc =>
-        elements ++= writeReadConcern(rc)
+      if (cmd.wireVersion >= MongoWireVersion.V36) {
+        elements += element("writeConcern", writeWriteConcern(cmd.writeConcern))
       }
 
       document(elements.result())
