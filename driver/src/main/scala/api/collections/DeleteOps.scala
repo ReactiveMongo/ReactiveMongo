@@ -42,7 +42,13 @@ trait DeleteOps[P <: SerializationPack with Singleton] {
     else new UnorderedDelete(writeConcern)
   }
 
-  /** Builder for delete operations. */
+  /**
+   * Builder for delete operations.
+   *
+   * @define queryParam the query/selector
+   * @define limitParam the maximum number of documents
+   * @define collationParam the collation
+   */
   sealed trait DeleteBuilder {
     /** $orderedParam */
     def ordered: Boolean
@@ -55,10 +61,22 @@ trait DeleteOps[P <: SerializationPack with Singleton] {
     /**
      * Performs a delete with a one single selector (see [[DeleteCommand.DeleteElement]]).
      * This will delete all the documents matched by the `q` selector.
+     *
+     * @param q $queryParam
+     * @param limit $limitParam
+     * @param collation $collationParam
      */
     final def one[Q, U](q: Q, limit: Option[Int] = None, collation: Option[Collation] = None)(implicit ec: ExecutionContext, qw: pack.Writer[Q]): Future[WriteResult] = element[Q, U](q, limit, collation).flatMap { upd => execute(Seq(upd)) }
 
-    /** Prepares an [[DeleteCommand.DeleteElement]] */
+    /**
+     * Prepares an [[DeleteCommand.DeleteElement]].
+     *
+     * @param q $queryParam
+     * @param limit $limitParam
+     * @param collation $collationParam
+     *
+     * @see [[many]]
+     */
     final def element[Q, U](q: Q, limit: Option[Int], collation: Option[Collation])(implicit qw: pack.Writer[Q]): Future[DeleteElement] =
       (Try(pack.serialize(q, qw)).map { query =>
         DeleteElement(query, limit.getOrElse(0), collation)

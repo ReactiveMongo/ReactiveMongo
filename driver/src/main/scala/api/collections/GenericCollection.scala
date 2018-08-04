@@ -410,8 +410,8 @@ trait GenericCollection[P <: SerializationPack with Singleton]
     }
 
     implicit val writer =
-      pack.writer[ResolvedCollectionCommand[FindAndModify]] { cmd =>
-        FindAndModifyCommand.serialize(cmd)
+      pack.writer[ResolvedCollectionCommand[FindAndModify]] {
+        FindAndModifyCommand.serialize(version, db.session)
       }
 
     Future(FindAndModify(

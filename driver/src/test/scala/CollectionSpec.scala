@@ -353,7 +353,7 @@ class CollectionSpec(implicit protected val ee: ExecutionEnv)
               db.endSession().map(_ => {}) must beEqualTo({}).awaitFor(timeout)
             }
         }.awaitFor(timeout)
-      } tag "wip"
+      }
 
       section("gt_mongo32")
     }

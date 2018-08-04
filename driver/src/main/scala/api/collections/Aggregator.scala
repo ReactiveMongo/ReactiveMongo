@@ -112,7 +112,9 @@ private[collections] trait Aggregator[P <: SerializationPack with Singleton] {
         agg.command.operator.makePipe,
         agg.command.pipeline.map(_.makePipe))
 
-      val base = Seq(
+      val elements = Seq.newBuilder[pack.ElementProducer]
+
+      elements ++= Seq(
         element("aggregate", builder.string(agg.collection)),
         element("pipeline", pipeline),
         element("explain", boolean(agg.command.explain)),
@@ -120,23 +122,16 @@ private[collections] trait Aggregator[P <: SerializationPack with Singleton] {
         element("cursor", document(Seq(
           element("batchSize", builder.int(agg.command.batchSize))))))
 
-      val cmd = {
-        if (agg.command.wireVersion < MongoWireVersion.V32) {
-          base
-        } else {
-          val byp = element("bypassDocumentValidation", boolean(
-            agg.command.bypassDocumentValidation))
-
-          agg.command.readConcern match {
-            case Some(concern) =>
-              (base :+ byp) ++ writeReadConcern(concern)
-
-            case _ => base :+ byp
-          }
-        }
+      if (agg.command.wireVersion >= MongoWireVersion.V32) {
+        elements += element("bypassDocumentValidation", boolean(
+          agg.command.bypassDocumentValidation))
       }
 
-      document(cmd)
+      agg.command.readConcern.foreach { rc =>
+        elements ++= writeReadConcern(rc)
+      }
+
+      document(elements.result())
     }
   }
 }
