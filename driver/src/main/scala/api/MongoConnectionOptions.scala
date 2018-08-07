@@ -1,6 +1,6 @@
 package reactivemongo.api
 
-import reactivemongo.api.commands.WriteConcern
+import reactivemongo.api.commands.{ WriteConcern => WC }
 
 /** Then mode of authentication against the replica set. */
 sealed trait AuthenticationMode
@@ -50,7 +50,7 @@ case class MongoConnectionOptions(
   nbChannelsPerNode: Int = 10,
 
   // read and write preferences
-  writeConcern: WriteConcern = WriteConcern.Default,
+  writeConcern: WC = WC.Default,
   readPreference: ReadPreference = ReadPreference.primary,
 
   failoverStrategy: FailoverStrategy = FailoverStrategy.default,

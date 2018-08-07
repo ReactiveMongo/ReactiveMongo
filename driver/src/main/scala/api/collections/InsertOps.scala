@@ -35,13 +35,13 @@ trait InsertOps[P <: SerializationPack with Singleton] {
    * @param ordered $orderedParam
    * @param writeConcern writeConcernParam
    */
-  private[reactivemongo] final def prepareInsert[T: pack.Writer](
+  private[reactivemongo] final def prepareInsert(
     ordered: Boolean,
-    writeConcern: WriteConcern): InsertBuilder[T] = {
+    writeConcern: WriteConcern): InsertBuilder = {
     if (ordered) {
-      new OrderedInsert[T](writeConcern, implicitly[pack.Writer[T]])
+      new OrderedInsert(writeConcern)
     } else {
-      new UnorderedInsert[T](writeConcern, implicitly[pack.Writer[T]])
+      new UnorderedInsert(writeConcern)
     }
   }
 
@@ -55,8 +55,8 @@ trait InsertOps[P <: SerializationPack with Singleton] {
   }
 
   /** Builder for insert operations. */
-  sealed trait InsertBuilder[T] {
-    implicit protected def writer: pack.Writer[T]
+  sealed trait InsertBuilder {
+    //implicit protected def writer: pack.Writer[T]
 
     @inline private def metadata = db.connectionState.metadata
 
@@ -97,7 +97,7 @@ trait InsertOps[P <: SerializationPack with Singleton] {
      * }
      * }}}
      */
-    final def one(document: T)(implicit ec: ExecutionContext): Future[WriteResult] = Future(pack.serialize(document, writer)).flatMap { single =>
+    final def one[T](document: T)(implicit ec: ExecutionContext, writer: pack.Writer[T]): Future[WriteResult] = Future(pack.serialize(document, writer)).flatMap { single =>
       execute(Seq(single))
     }
 
@@ -116,7 +116,7 @@ trait InsertOps[P <: SerializationPack with Singleton] {
      * }
      * }}}
      */
-    final def many(documents: Iterable[T])(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] = {
+    final def many[T](documents: Iterable[T])(implicit ec: ExecutionContext, writer: pack.Writer[T]): Future[MultiBulkWriteResult] = {
       val bulkSz = metadata.maxBulkSize
       val maxSz = maxBsonSize
 
@@ -135,12 +135,13 @@ trait InsertOps[P <: SerializationPack with Singleton] {
 
     // ---
 
-    private def serialize(input: Iterable[T])(implicit ec: ExecutionContext): Future[Iterable[pack.Document]] = Future.sequence(input.map { v =>
-      Try(pack.serialize(v, writer)) match {
-        case Success(v) => Future.successful(v)
-        case Failure(e) => Future.failed[pack.Document](e)
-      }
-    })
+    private def serialize[T](input: Iterable[T])(implicit ec: ExecutionContext, writer: pack.Writer[T]): Future[Iterable[pack.Document]] =
+      Future.sequence(input.map { v =>
+        Try(pack.serialize(v, writer)) match {
+          case Success(v) => Future.successful(v)
+          case Failure(e) => Future.failed[pack.Document](e)
+        }
+      })
 
     implicit private val resultReader: pack.Reader[InsertCommand.InsertResult] =
       CommandCodecs.defaultWriteResultReader(pack)
@@ -176,9 +177,8 @@ trait InsertOps[P <: SerializationPack with Singleton] {
 
   private val orderedRecover = Option.empty[Exception => Future[WriteResult]]
 
-  private final class OrderedInsert[T](
-    val writeConcern: WriteConcern,
-    val writer: pack.Writer[T]) extends InsertBuilder[T] {
+  private final class OrderedInsert(
+    val writeConcern: WriteConcern) extends InsertBuilder {
 
     val ordered = true
     val bulkRecover = orderedRecover
@@ -204,9 +204,8 @@ trait InsertOps[P <: SerializationPack with Singleton] {
         wtime = Option.empty[Int]))
     }
 
-  private final class UnorderedInsert[T](
-    val writeConcern: WriteConcern,
-    val writer: pack.Writer[T]) extends InsertBuilder[T] {
+  private final class UnorderedInsert(
+    val writeConcern: WriteConcern) extends InsertBuilder {
 
     val ordered = false
     val bulkRecover = unorderedRecover

@@ -255,12 +255,27 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * collection.insert(myDoc)
    *
    * // Equivalent to:
-   * collection.insert[MyDocType](true, defaultWriteConcern).one(document)
+   * collection.insert(true, defaultWriteConcern).one(document)
    * }}}
    */
+  @deprecated("Use `.insert(ordered = false).one(..)`", "0.16.1")
   def insert[T](document: T, writeConcern: WriteConcern = writeConcern)(implicit writer: pack.Writer[T], ec: ExecutionContext): Future[WriteResult] =
-    prepareInsert[T](true, writeConcern).one(document)
-  // TODO: Remove the Writer from there
+    prepareInsert(true, writeConcern).one(document)
+
+  /**
+   * Returns an unordered builder for insert operations.
+   * Uses the default write concern.
+   *
+   * @tparam T The type of the document to insert. $implicitWriterT.
+   * @param ordered $orderedParam
+   *
+   * {{{
+   * collection.insert(ordered = true).one(singleDoc)
+   *
+   * collection.insert(ordered = true).many(multiInserts)
+   * }}}
+   */
+  def insert: InsertBuilder = prepareInsert(false, writeConcern)
 
   /**
    * Returns a builder for insert operations.
@@ -270,13 +285,13 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * @param ordered $orderedParam
    *
    * {{{
-   * collection.insert[MyDocType](ordered = true).one(singleDoc)
+   * collection.insert(ordered = true).one(singleDoc)
    *
-   * collection.insert[MyDocType](ordered = true).one(multiDocs)
+   * collection.insert(ordered = true).many(multiInserts)
    * }}}
    */
-  def insert[T: pack.Writer](ordered: Boolean): InsertBuilder[T] =
-    prepareInsert[T](ordered, writeConcern) // TODO: Move Writer requirement to InsertBuilder
+  def insert(ordered: Boolean): InsertBuilder =
+    prepareInsert(ordered, writeConcern)
 
   /**
    * Returns a builder for insert operations.
@@ -287,15 +302,13 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * @param writeConcern $writeConcernParam
    *
    * {{{
-   * collection.insert[MyDocType](true, aWriteConcern).one(singleDoc)
+   * collection.insert(true, aWriteConcern).one(singleDoc)
    *
-   * collection.insert[MyDocType](true, aWriteConcern).one(multiDocs)
+   * collection.insert(true, aWriteConcern).many(multiInserts)
    * }}}
    */
-  def insert[T: pack.Writer](
-    ordered: Boolean,
-    writeConcern: WriteConcern): InsertBuilder[T] =
-    prepareInsert[T](ordered, writeConcern)
+  def insert(ordered: Boolean, writeConcern: WriteConcern): InsertBuilder =
+    prepareInsert(ordered, writeConcern)
 
   /**
    * Updates one or more documents matching the given selector
@@ -314,14 +327,23 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    *
    * @return $returnWriteResult
    */
+  @deprecated("Use `.update(ordered = false).one(..)`", "0.16.1")
   def update[S, T](selector: S, update: T, writeConcern: WriteConcern = writeConcern, upsert: Boolean = false, multi: Boolean = false)(implicit swriter: pack.Writer[S], writer: pack.Writer[T], ec: ExecutionContext): Future[UpdateWriteResult] = prepareUpdate(ordered = true, writeConcern = writeConcern).
     one(selector, update, upsert, multi)
+
+  /**
+   * Returns an unordered update builder.
+   *
+   * {{{
+   * collection.update.one(query, update, upsert = false, multi = false)
+   * }}}
+   */
+  def update: UpdateBuilder = prepareUpdate(false, writeConcern)
 
   /**
    * Returns an update builder.
    *
    * {{{
-   * // Equivalent to collection.update(query, update, ...)
    * collection.update(ordered = true).
    *   one(query, update, upsert = false, multi = false)
    * }}}
@@ -592,7 +614,7 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    *
    * {{{
    * // Equivalent to:
-   * collection.delete[MyDocType](true, defaultWriteConcern).one(document, limit)
+   * collection.delete(true, defaultWriteConcern).one(document, limit)
    * }}}
    */
   @deprecated("Use delete().one(selector, limit)", "0.13.1")
@@ -601,7 +623,7 @@ trait GenericCollection[P <: SerializationPack with Singleton]
 
     if (metadata.maxWireVersion >= MongoWireVersion.V26) {
       val limit = if (firstMatchOnly) Some(1) else Option.empty[Int]
-      delete(true, writeConcern).one(selector, limit)
+      prepareDelete(true, writeConcern).one(selector, limit)
     } else {
       // Mongo < 2.6
       Future.failed[WriteResult](new scala.RuntimeException(
@@ -610,13 +632,27 @@ trait GenericCollection[P <: SerializationPack with Singleton]
   }
 
   /**
-   * [[https://docs.mongodb.com/manual/reference/command/delete/ Deletes]] the matching document(s).
+   * Prepare an unordered [[https://docs.mongodb.com/manual/reference/command/delete/ delete]] builder.
+   *
+   * {{{
+   * collection.delete.one(document, limit)
+   *
+   * // Equivalent to .delete(false, defaultWriteConcern)
+   * }}}
+   */
+  def delete: DeleteBuilder = prepareDelete(false, writeConcern)
+
+  /**
+   * Prepare a [[https://docs.mongodb.com/manual/reference/command/delete/ delete]] builder.
    *
    * @param ordered $orderedParam
    * @param writeConcern $writeConcernParam
+   *
+   * {{{
+   * collection.delete(true, defaultWriteConcern).one(document, limit)
+   * }}}
    */
-  def delete[S](ordered: Boolean = true, writeConcern: WriteConcern = writeConcern): DeleteBuilder = // TODO: Remove the type param ?
-    prepareDelete(ordered, writeConcern)
+  def delete(ordered: Boolean = true, writeConcern: WriteConcern = writeConcern): DeleteBuilder = prepareDelete(ordered, writeConcern)
 
   // --- Internals ---
 

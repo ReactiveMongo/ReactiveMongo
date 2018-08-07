@@ -40,7 +40,7 @@ import reactivemongo.core.actors.{
 import reactivemongo.core.nodeset.{ Authenticate, ProtocolMetadata }
 import reactivemongo.core.protocol.Response
 import reactivemongo.core.commands.SuccessfulAuthentication
-import reactivemongo.api.commands.WriteConcern
+import reactivemongo.api.commands.{ WriteConcern => WC }
 
 import reactivemongo.util.{ LazyLogger, SRVRecordResolver, TXTResolver }
 
@@ -255,7 +255,7 @@ class MongoConnection(
       case PrimaryUnavailable => {
         debug("There is no primary available")
 
-        if (primaryAvailable.isCompleted) {
+        if (primaryAvailable.isCompleted) { // reset availability
           primaryAvailable = Promise[ConnectionState]()
         }
       }
@@ -634,16 +634,16 @@ object MongoConnection {
             copy(nbChannelsPerNode = v.toInt)
 
           case ("writeConcern", "unacknowledged") => unsupported -> result.
-            copy(writeConcern = WriteConcern.Unacknowledged)
+            copy(writeConcern = WC.Unacknowledged)
 
           case ("writeConcern", "acknowledged") => unsupported -> result.
-            copy(writeConcern = WriteConcern.Acknowledged)
+            copy(writeConcern = WC.Acknowledged)
 
           case ("writeConcern", "journaled") => unsupported -> result.
-            copy(writeConcern = WriteConcern.Journaled)
+            copy(writeConcern = WC.Journaled)
 
           case ("writeConcern", "default") => unsupported -> result.
-            copy(writeConcern = WriteConcern.Default)
+            copy(writeConcern = WC.Default)
 
           case ("readPreference", "primary") => unsupported -> result.
             copy(readPreference = ReadPreference.primary)
@@ -709,15 +709,15 @@ object MongoConnection {
       case ((unsupported, result), kv) => kv match {
         case ("writeConcernW", "majority") => unsupported -> result.
           copy(writeConcern = result.writeConcern.
-            copy(w = WriteConcern.Majority))
+            copy(w = WC.Majority))
 
         case ("writeConcernW", IntRe(str)) => unsupported -> result.
           copy(writeConcern = result.writeConcern.
-            copy(w = WriteConcern.WaitForAcknowledgments(str.toInt)))
+            copy(w = WC.WaitForAcknowledgments(str.toInt)))
 
         case ("writeConcernW", tag) => unsupported -> result.
           copy(writeConcern = result.writeConcern.
-            copy(w = WriteConcern.TagSet(tag)))
+            copy(w = WC.TagSet(tag)))
 
         case ("writeConcernJ", journaled) => unsupported -> result.
           copy(writeConcern = result.writeConcern.

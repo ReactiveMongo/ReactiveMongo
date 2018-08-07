@@ -43,7 +43,7 @@ final class CommonUseCases(implicit ee: ExecutionEnv)
         "age" -> BSONInteger(i), "name" -> BSONString("Jack" + i)))
 
       (for {
-        result <- collection.insert[BSONDocument](ordered = true).many(docs)
+        result <- collection.insert(ordered = true).many(docs)
         count <- collection.runValueCommand(
           Count(BSONDocument(
             "age" -> BSONDocument("$gte" -> 18, "$lte" -> 60))),

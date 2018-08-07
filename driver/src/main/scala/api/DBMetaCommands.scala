@@ -30,7 +30,7 @@ trait DBMetaCommands { self: DB =>
     ServerStatus,
     ServerStatusResult,
     UserRole,
-    WriteConcern
+    WriteConcern => WC
   }
   import reactivemongo.api.commands.bson.{
     CommonImplicits,
@@ -127,7 +127,7 @@ trait DBMetaCommands { self: DB =>
     pwd: Option[String],
     roles: List[UserRole],
     digestPassword: Boolean = true,
-    writeConcern: WriteConcern = connection.options.writeConcern,
+    writeConcern: WC = connection.options.writeConcern,
     customData: Option[BSONDocument] = None)(implicit ec: ExecutionContext): Future[Unit] = {
     val command = BSONCreateUserCommand.CreateUser(
       name, pwd, roles, digestPassword, Some(writeConcern), customData)
