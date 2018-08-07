@@ -44,7 +44,7 @@ class CollectionSpec(implicit protected val ee: ExecutionEnv)
             } must beTypedEqualTo(true -> 1).await(1, timeout)
           }
         } and {
-          slowColl.find(BSONDocument.empty).cursor[BSONDocument]().
+          slowColl.find(BSONDocument.empty, projection = None).cursor[BSONDocument]().
             collect[List](-1, Cursor.FailOnError[List[BSONDocument]]()).
             map(_.size) must beTypedEqualTo(2).await(1, slowTimeout)
         }
