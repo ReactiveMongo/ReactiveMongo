@@ -184,9 +184,6 @@ trait DefaultBSONHandlers {
   implicit def findWriter[T](implicit writer: VariantBSONWriter[T, _ <: BSONValue]): BSONWriter[T, _ <: BSONValue] =
     new VariantBSONWriterWrapper(writer)
 
-  implicit def findReader[T](implicit reader: VariantBSONReader[_ <: BSONValue, T]): BSONReader[_ <: BSONValue, T] =
-    new VariantBSONReaderWrapper(reader)
-
   implicit def MapReader[K, V](implicit keyReader: BSONReader[BSONString, K], valueReader: BSONReader[_ <: BSONValue, V]): BSONDocumentReader[Map[K, V]] =
     new BSONDocumentReader[Map[K, V]] {
       def read(bson: BSONDocument): Map[K, V] =
