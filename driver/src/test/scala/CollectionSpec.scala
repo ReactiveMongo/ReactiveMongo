@@ -53,7 +53,7 @@ class CollectionSpec(implicit protected val ee: ExecutionEnv)
       "with bulkInsert" in {
         val persons = Seq(person3, person4, person5)
 
-        collection.insert[Person](ordered = true).many(persons).map(_.ok).
+        collection.insert(ordered = true).many(persons).map(_.ok).
           aka("insertion") must beTrue.await(1, timeout)
       }
     }
@@ -318,7 +318,7 @@ class CollectionSpec(implicit protected val ee: ExecutionEnv)
             val updated = base :~ ("value" -> 2)
 
             (for {
-              _ <- coll.insert[BSONDocument](false).one(inserted)
+              _ <- coll.insert(false).one(inserted)
               r <- coll.find(base).one[BSONDocument]
             } yield r) must beSome(inserted).awaitFor(timeout) and {
               (for {
@@ -385,9 +385,8 @@ class CollectionSpec(implicit protected val ee: ExecutionEnv)
             r <- c.indexesManager.ensure(
               Index(List("plop" -> Ascending), unique = true))
           } yield r) must beTrue.await(1, timeout) and {
-            c.insert[BSONDocument](ordered = false).
-              many(docs).map(_.n) must beTypedEqualTo(e).
-              await(1, timeout * (n / 2L))
+            c.insert(ordered = false).many(docs).
+              map(_.n) must beTypedEqualTo(e).await(1, timeout * (n / 2L))
 
           } and {
             c.count(
@@ -418,8 +417,8 @@ class CollectionSpec(implicit protected val ee: ExecutionEnv)
         "to insert" in {
           val docs = Stream.empty[BSONDocument]
 
-          coll.insert[BSONDocument](ordered = true).
-            many(docs).map(_.n) must beEqualTo(0).await(1, timeout)
+          coll.insert(ordered = true).many(docs).
+            map(_.n) must beEqualTo(0).await(1, timeout)
         }
 
         "to update" in {

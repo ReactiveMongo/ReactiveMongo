@@ -77,7 +77,7 @@ trait DeleteOps[P <: SerializationPack with Singleton] {
      *
      * @see [[many]]
      */
-    final def element[Q, U](q: Q, limit: Option[Int], collation: Option[Collation])(implicit qw: pack.Writer[Q]): Future[DeleteElement] =
+    final def element[Q, U](q: Q, limit: Option[Int] = None, collation: Option[Collation] = None)(implicit qw: pack.Writer[Q]): Future[DeleteElement] =
       (Try(pack.serialize(q, qw)).map { query =>
         DeleteElement(query, limit.getOrElse(0), collation)
       }) match {
