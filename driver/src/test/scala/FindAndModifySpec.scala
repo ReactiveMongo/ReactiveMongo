@@ -119,7 +119,7 @@ final class FindAndModifySpec(implicit ee: ExecutionEnv)
         val colName = s"FindAndModifySpec${System identityHashCode this}-2"
         val slowColl = slowDb(colName)
 
-        slowColl.insert[Person](ordered = true).one(before).
+        slowColl.insert(ordered = true).one(before).
           map(_.n) must beTypedEqualTo(1).await(0, slowTimeout) and {
             slowColl.count(Some(BSON.writeDocument(before))).
               aka("count before") must beTypedEqualTo(1).await(1, slowTimeout)
@@ -140,7 +140,7 @@ final class FindAndModifySpec(implicit ee: ExecutionEnv)
 
       def future = collection.findAndUpdate(jack2, incrementAge)
 
-      collection.insert[Person](ordered = true).one(jack2).
+      collection.insert(ordered = true).one(jack2).
         map(_.n) must beTypedEqualTo(1).await(0, slowTimeout) and {
           future must (beLike[FindAndModifyResult] {
             case res =>
@@ -167,7 +167,7 @@ final class FindAndModifySpec(implicit ee: ExecutionEnv)
         f"$$exists" -> false))
 
       val future = for {
-        _ <- collection.insert[Person](ordered = true).one(jack2)
+        _ <- collection.insert(ordered = true).one(jack2)
         r <- collection.runCommand(
           FindAndModify(query, Update(BSONDocument("$inc" -> "age"))),
           ReadPreference.Primary)

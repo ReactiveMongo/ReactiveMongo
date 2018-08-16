@@ -118,7 +118,7 @@ class IndexesSpec(implicit ee: ExecutionEnv)
           "coordinates" -> BSONArray(i + 2D, i * 2D)))
       }
 
-      geo2DSpherical.insert[BSONDocument](false).many(batch).map(_.n).
+      geo2DSpherical.insert(false).many(batch).map(_.n).
         aka("inserted") must beTypedEqualTo(9).await(1, timeout)
     }
 

@@ -54,10 +54,10 @@ private[reactivemongo] trait UpdateOps[P <: SerializationPack with Singleton] {
     /**
      * Performs a [[https://docs.mongodb.com/manual/reference/method/db.collection.updateOne/ single update]] (see [[UpdateCommand.UpdateElement]]).
      */
-    final def one[Q, U](q: Q, u: U, upsert: Boolean, multi: Boolean)(implicit ec: ExecutionContext, qw: pack.Writer[Q], uw: pack.Writer[U]): Future[UpdateWriteResult] = element[Q, U](q, u, upsert, multi).flatMap { upd => execute(Seq(upd)) }
+    final def one[Q, U](q: Q, u: U, upsert: Boolean = false, multi: Boolean = false)(implicit ec: ExecutionContext, qw: pack.Writer[Q], uw: pack.Writer[U]): Future[UpdateWriteResult] = element[Q, U](q, u, upsert, multi).flatMap { upd => execute(Seq(upd)) }
 
     /** Prepares an [[UpdateCommand.UpdateElement]] */
-    final def element[Q, U](q: Q, u: U, upsert: Boolean, multi: Boolean)(implicit qw: pack.Writer[Q], uw: pack.Writer[U]): Future[UpdateElement] =
+    final def element[Q, U](q: Q, u: U, upsert: Boolean = false, multi: Boolean = false)(implicit qw: pack.Writer[Q], uw: pack.Writer[U]): Future[UpdateElement] =
       (Try(pack.serialize(q, qw)).map { query =>
         UpdateElement(query, pack.serialize(u, uw), upsert, multi)
       }) match {
