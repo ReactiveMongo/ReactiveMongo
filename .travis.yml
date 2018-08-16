@@ -100,4 +100,6 @@ before_install:
 script:
   - export SCALA_VERSION="$TRAVIS_SCALA_VERSION"
   - ./.ci_scripts/retry.sh 3 ./.ci_scripts/validate.sh /tmp/integration-env.sh
-after_success: CI_BRANCH=$TRAVIS_BRANCH ./.ci_scripts/afterSuccess.sh
+after_success:
+  - unset AKKA_VERSION ITERATEES_VERSION
+  - CI_BRANCH=$TRAVIS_BRANCH ./.ci_scripts/afterSuccess.sh

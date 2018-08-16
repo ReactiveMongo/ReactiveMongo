@@ -31,8 +31,6 @@ class VariantBSONReaderWrapper[B <: BSONValue, T](reader: VariantBSONReader[B, T
 }
 
 trait DefaultBSONHandlers extends LowPrioBSONHandlers {
-  import scala.language.higherKinds
-
   implicit object BSONIntegerHandler extends BSONHandler[BSONInteger, Int] {
     def read(int: BSONInteger) = int.value
     def write(int: Int) = BSONInteger(int)
