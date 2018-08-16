@@ -18,7 +18,7 @@ trait Cursor1Spec { spec: CursorSpec =>
           val len = if (rem < 256) rem else 256
           def prepared = nDocs - rem
 
-          def bulk = coll.insert[BSONDocument](false).many(
+          def bulk = coll.insert(false).many(
             for (i <- 0 until len) yield {
               val n = i + prepared
               BSONDocument("i" -> n, "record" -> s"record$n")

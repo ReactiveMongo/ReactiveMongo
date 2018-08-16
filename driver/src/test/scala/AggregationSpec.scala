@@ -99,10 +99,11 @@ class AggregationSpec(implicit ee: ExecutionEnv)
 
       def withRes[T](c: BSONCollection)(f: Future[List[BSONDocument]] => T): T = {
         f(c.aggregateWith1[BSONDocument]() { framework =>
-          import framework._
+          import framework.{ Group, Match, SumField }
 
-          Group(BSONString(f"$$state"))("totalPop" -> SumField("population")) -> List(
-            Match(document("totalPop" -> document(f"$$gte" -> 10000000L))))
+          Group(BSONString(f"$$state"))(
+            "totalPop" -> SumField("population")) -> List(
+              Match(document("totalPop" -> document(f"$$gte" -> 10000000L))))
         }.collect[List](Int.MaxValue, Cursor.FailOnError[List[BSONDocument]]()))
       }
 
@@ -156,10 +157,11 @@ class AggregationSpec(implicit ee: ExecutionEnv)
     "explain simple result" in {
       val result = coll.aggregateWith1[BSONDocument](explain = true) {
         framework =>
-          import framework._
+          import framework.{ Group, Match, SumField }
 
-          Group(BSONString(f"$$state"))("totalPop" -> SumField("population")) -> List(
-            Match(document("totalPop" -> document(f"$$gte" -> 10000000L))))
+          Group(BSONString(f"$$state"))(
+            "totalPop" -> SumField("population")) -> List(
+              Match(document("totalPop" -> document(f"$$gte" -> 10000000L))))
       }.headOption
 
       result aka "results" must beLike[Option[BSONDocument]] {
@@ -321,27 +323,27 @@ class AggregationSpec(implicit ee: ExecutionEnv)
             "name" -> f"$$smallestCity", "population" -> f"$$smallestPop"))),
         Sort(Ascending("state")))
 
-      coll.aggregateWith1[BSONDocument]() {
-        framework =>
-          import framework._
+      coll.aggregateWith1[BSONDocument]() { framework =>
+        import framework.{ Group, SumField }
+
+        Group(document("state" -> f"$$state", "city" -> f"$$city"))(
+          "pop" -> SumField("population")) -> groupPipeline
+
+      }.collect[List](Int.MaxValue, Cursor.FailOnError[List[BSONDocument]]()) must beTypedEqualTo(expected).await(1, timeout) and {
+        coll.aggregateWith1[BSONDocument]() { framework =>
+          import framework.{ Group, SumField }
 
           Group(document("state" -> f"$$state", "city" -> f"$$city"))(
-            "pop" -> SumField("population")) -> groupPipeline
-      }.collect[List](Int.MaxValue, Cursor.FailOnError[List[BSONDocument]]()) must beTypedEqualTo(expected).await(1, timeout) and {
-        coll.aggregateWith1[BSONDocument]() {
-          framework =>
-            import framework._
+            "pop" -> SumField("population")) -> (groupPipeline :+ Limit(2))
 
-            Group(document("state" -> f"$$state", "city" -> f"$$city"))(
-              "pop" -> SumField("population")) -> (groupPipeline :+ Limit(2))
         }.collect[List](Int.MaxValue, Cursor.FailOnError[List[BSONDocument]]()) must beTypedEqualTo(expected take 2).await(1, timeout)
       } and {
-        coll.aggregateWith1[BSONDocument]() {
-          framework =>
-            import framework._
+        coll.aggregateWith1[BSONDocument]() { framework =>
+          import framework.{ Group, SumField }
 
-            Group(document("state" -> f"$$state", "city" -> f"$$city"))(
-              "pop" -> SumField("population")) -> (groupPipeline :+ Skip(2))
+          Group(document("state" -> f"$$state", "city" -> f"$$city"))(
+            "pop" -> SumField("population")) -> (groupPipeline :+ Skip(2))
+
         }.collect[List](Int.MaxValue, Cursor.FailOnError[List[BSONDocument]]()) must beTypedEqualTo(expected drop 2).await(1, timeout)
       }
     }
@@ -500,7 +502,7 @@ class AggregationSpec(implicit ee: ExecutionEnv)
         Sale(_id = 2, items = Nil))
 
       sales.aggregateWith1[Sale]() { framework =>
-        import framework._
+        import framework.{ Ascending, Filter, Project, Sort }
 
         val sort = Sort(Ascending("_id"))
 
@@ -1027,18 +1029,18 @@ db.forecasts.aggregate(
    ]
 );
  */
-      val result = forecasts.aggregateWith1[Redaction]() {
-        framework =>
-          import framework._
+      val result = forecasts.aggregateWith1[Redaction]() { framework =>
+        import framework.{ Match, Redact }
 
-          Match(document("year" -> 2014)) -> List(
-            Redact(document(f"$$cond" -> document(
-              "if" -> document(
-                f"$$gt" -> array(document(
-                  f"$$size" -> document(f"$$setIntersection" -> array(
-                    f"$$tags", array("STLW", "G")))), 0)),
-              "then" -> f"$$$$DESCEND",
-              "else" -> f"$$$$PRUNE"))))
+        Match(document("year" -> 2014)) -> List(
+          Redact(document(f"$$cond" -> document(
+            "if" -> document(
+              f"$$gt" -> array(document(
+                f"$$size" -> document(f"$$setIntersection" -> array(
+                  f"$$tags", array("STLW", "G")))), 0)),
+            "then" -> f"$$$$DESCEND",
+            "else" -> f"$$$$PRUNE"))))
+
       }.headOption
 
       val expected = Redaction(
@@ -1155,16 +1157,16 @@ db.accounts.aggregate([
     }
   ])
  */
-      val result = customers.aggregateWith1[BSONDocument]() {
-        framework =>
-          import framework._
+      val result = customers.aggregateWith1[BSONDocument]() { framework =>
+        import framework.{ Match, Redact }
 
-          Match(document("status" -> "A")) -> List(
-            Redact(document(
-              f"$$cond" -> document(
-                "if" -> document(f"$$eq" -> array(f"$$level", 5)),
-                "then" -> f"$$$$PRUNE",
-                "else" -> f"$$$$DESCEND"))))
+        Match(document("status" -> "A")) -> List(
+          Redact(document(
+            f"$$cond" -> document(
+              "if" -> document(f"$$eq" -> array(f"$$level", 5)),
+              "then" -> f"$$$$PRUNE",
+              "else" -> f"$$$$DESCEND"))))
+
       }.headOption
 
       result must beSome(document(
@@ -1202,7 +1204,7 @@ db.accounts.aggregate([
 
     "and reshaped using $replaceRoot" in {
       val result = fruits.aggregateWith1[BSONDocument]() { framework =>
-        import framework._
+        import framework.{ Match, ReplaceRootField }
 
         Match(document("_id" -> 1)) -> List(ReplaceRootField("in_stock"))
       }.headOption
@@ -1230,12 +1232,12 @@ db.accounts.aggregate([
 
     "and reshaped using $replaceRoot" in {
       val result = contacts.aggregateWith1[BSONDocument]() { framework =>
-        import framework._
+        import framework.{ Match, ReplaceRoot }
 
-        Match(document("_id" -> 1)) -> List(
-          ReplaceRoot(document(
-            "full_name" -> document(
-              "$concat" -> array("$first_name", " ", "$last_name")))))
+        Match(document("_id" -> 1)) -> List(ReplaceRoot(document(
+          "full_name" -> document(
+            f"$$concat" -> array(f"$$first_name", " ", f"$$last_name")))))
+
       }.headOption
 
       result must beSome(document(

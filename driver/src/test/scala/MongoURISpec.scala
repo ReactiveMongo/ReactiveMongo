@@ -6,13 +6,12 @@ import reactivemongo.api.{
   MongoConnection,
   MongoConnectionOptions,
   ScramSha1Authentication,
-  X509Authentication
+  X509Authentication,
+  WriteConcern
 }, MongoConnection.{ ParsedURI, URIParsingException }
 
 import reactivemongo.core.nodeset.Authenticate
 import reactivemongo.core.errors.GenericDriverException
-
-import reactivemongo.api.commands.WriteConcern
 
 import org.specs2.concurrent.ExecutionEnv
 
@@ -35,7 +34,7 @@ class MongoURISpec(implicit ee: ExecutionEnv)
           db = None,
           authenticate = None,
           options = MongoConnectionOptions(),
-          ignoredOptions = List()))
+          ignoredOptions = List.empty))
     }
 
     val withOpts = "mongodb://host1?foo=bar"
@@ -186,7 +185,8 @@ class MongoURISpec(implicit ee: ExecutionEnv)
         db = Some("somedb"),
         authenticate = Some(Authenticate("somedb", "user123", Some("passwd123"))),
         options = MongoConnectionOptions(
-          writeConcern = WriteConcern.Default.copy(w = WriteConcern.Majority),
+          writeConcern = WriteConcern.Default.copy(
+            w = reactivemongo.api.commands.WriteConcern.Majority),
           credentials = Map(
             "somedb" -> Credential("user123", Some("passwd123")))),
         ignoredOptions = Nil))
@@ -201,7 +201,7 @@ class MongoURISpec(implicit ee: ExecutionEnv)
         authenticate = Some(Authenticate("somedb", "user123", Some("passwd123"))),
         options = MongoConnectionOptions(
           writeConcern = WriteConcern.Default.copy(
-            w = WriteConcern.TagSet("anyTag")),
+            w = reactivemongo.api.commands.WriteConcern.TagSet("anyTag")),
           credentials = Map(
             "somedb" -> Credential("user123", Some("passwd123")))),
         ignoredOptions = Nil))
@@ -216,7 +216,8 @@ class MongoURISpec(implicit ee: ExecutionEnv)
         authenticate = Some(Authenticate("somedb", "user123", Some("passwd123"))),
         options = MongoConnectionOptions(
           writeConcern = WriteConcern.Default.copy(
-            w = WriteConcern.WaitForAcknowledgments(5)),
+            w = reactivemongo.api.commands.WriteConcern.
+              WaitForAcknowledgments(5)),
           credentials = Map(
             "somedb" -> Credential("user123", Some("passwd123")))),
         ignoredOptions = Nil))
