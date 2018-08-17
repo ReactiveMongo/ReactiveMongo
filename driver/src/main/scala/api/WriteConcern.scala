@@ -32,14 +32,8 @@ object WriteConcern {
   def Default: GetLastError with WriteConcern = Acknowledged
 }
 
-package object commands {
+package commands {
   import reactivemongo.api.{ WriteConcern => WC }
-
-  @deprecated("Will be replaced by `reactivemongo.api.commands.WriteConcern`", "0.16.0")
-  type WriteConcern = GetLastError
-
-  @deprecated("Will be replaced by `reactivemongo.api.commands.WriteConcern`", "0.16.0")
-  val WriteConcern = GetLastError
 
   /**
    * @param wtimeout the [[http://docs.mongodb.org/manual/reference/write-concern/#wtimeout time limit]]
