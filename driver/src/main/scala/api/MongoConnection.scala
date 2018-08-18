@@ -71,11 +71,11 @@ private[api] case class ConnectionState(
  * @define failoverStrategy the failover strategy for sending requests
  */
 class MongoConnection(
-  val supervisor: String,
-  val name: String,
+  @deprecated("Will be private", "0.17.0") val supervisor: String,
+  @deprecated("Will be private", "0.17.0") val name: String,
   @deprecated("Will be private", "0.14.0") val actorSystem: ActorSystem,
-  val mongosystem: ActorRef,
-  val options: MongoConnectionOptions) { // TODO: toString as MongoURI
+  @deprecated("Will be private", "0.17.0") val mongosystem: ActorRef,
+  @deprecated("Will be private", "0.17.0") val options: MongoConnectionOptions) { // TODO: toString as MongoURI
   import Exceptions._
 
   /**
@@ -86,7 +86,7 @@ class MongoConnection(
    * @param name $dbName
    * @param failoverStrategy $failoverStrategy
    */
-  def database(name: String, failoverStrategy: FailoverStrategy = options.failoverStrategy)(implicit context: ExecutionContext): Future[DefaultDB] =
+  def database(name: String, failoverStrategy: FailoverStrategy = options.failoverStrategy)(implicit @deprecatedName('context) ec: ExecutionContext): Future[DefaultDB] =
     waitIsAvailable(failoverStrategy, stackTrace()).map { state =>
       new DefaultDB(name, this, state, failoverStrategy)
     }

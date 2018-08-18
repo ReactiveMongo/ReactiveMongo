@@ -333,7 +333,7 @@ class CollectionSpec(implicit protected val ee: ExecutionEnv)
             } and {
               coll.distinct[Int, List](
                 key = "_id",
-                query = None,
+                selector = None,
                 readConcern = ReadConcern.Local,
                 collation = None) must beTypedEqualTo(List(id)).
                 awaitFor(timeout)

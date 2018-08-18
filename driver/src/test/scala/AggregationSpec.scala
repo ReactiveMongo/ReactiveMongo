@@ -286,8 +286,7 @@ class AggregationSpec(implicit ee: ExecutionEnv)
         Project,
         Sort,
         Ascending,
-        Skip,
-        SumField
+        Skip
       }
 
       val expected = List(

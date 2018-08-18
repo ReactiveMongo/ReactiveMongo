@@ -113,7 +113,7 @@ trait DBMetaCommands { self: DB =>
   /**
    * Create the specified user.
    *
-   * @param name the name of the user to be created
+   * @param user the name of the user to be created
    * @param pwd the user password (not required if the database uses external credentials)
    * @param roles the roles granted to the user, possibly an empty to create users without roles
    * @param digestPassword when true, the mongod instance will create the hash of the user password (default: `true`)
@@ -123,14 +123,14 @@ trait DBMetaCommands { self: DB =>
    * @see https://docs.mongodb.com/manual/reference/command/createUser/
    */
   def createUser(
-    name: String,
+    @deprecatedName('name) user: String,
     pwd: Option[String],
     roles: List[UserRole],
     digestPassword: Boolean = true,
     writeConcern: WC = connection.options.writeConcern,
     customData: Option[BSONDocument] = None)(implicit ec: ExecutionContext): Future[Unit] = {
     val command = BSONCreateUserCommand.CreateUser(
-      name, pwd, roles, digestPassword, Some(writeConcern), customData)
+      user, pwd, roles, digestPassword, Some(writeConcern), customData)
 
     Command.run(BSONSerializationPack, failoverStrategy)(
       self, command, ReadPreference.primary).map(_ => {})
