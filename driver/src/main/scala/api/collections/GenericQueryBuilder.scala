@@ -364,7 +364,7 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
     readPreference: ReadPreference,
     isMongo26WriteOp: Boolean = false)(
     implicit
-    reader: pack.Reader[T]): Cursor[T] = {
+    reader: pack.Reader[T]): Cursor.WithOps[T] = {
 
     val body = {
       if (version.compareTo(MongoWireVersion.V32) < 0) { _: Int =>

@@ -184,6 +184,8 @@ trait Cursor[T] {
 
 /** Cursor companion object */
 object Cursor {
+  type WithOps[T] = Cursor[T] with CursorOps[T]
+
   private[api] val logger = LazyLogger("reactivemongo.api.Cursor")
 
   /**
@@ -262,7 +264,7 @@ trait CursorProducer[T] {
 
   /** Produces a custom cursor from the `base` one. */
   @deprecated("The `base` cursor will be required to also provide [[CursorOps]].", "0.11.15") // See https://github.com/ReactiveMongo/ReactiveMongo-Streaming/blob/master/akka-stream/src/main/scala/package.scala#L14
-  def produce(base: Cursor[T]): ProducedCursor
+  def produce(base: Cursor[T] with CursorOps[T]): ProducedCursor
 }
 
 object CursorProducer {
@@ -270,10 +272,10 @@ object CursorProducer {
     type ProducedCursor = C[T]
   }
 
-  implicit def defaultCursorProducer[T]: CursorProducer.Aux[T, Cursor] =
+  implicit def defaultCursorProducer[T]: CursorProducer.Aux[T, Cursor.WithOps] =
     new CursorProducer[T] {
-      type ProducedCursor = Cursor[T]
-      def produce(base: Cursor[T]) = base
+      type ProducedCursor = Cursor.WithOps[T]
+      def produce(base: Cursor.WithOps[T]) = base
     }
 }
 
