@@ -153,23 +153,14 @@ class MacroSpec extends org.specs2.mutable.Specification {
       roundtrip(Person("john", "doe"), format)
     }
 
-    "persist class name on demand" in {
-      val person = Person("john", "doe")
-      val format = Macros.handlerOpts[Person, Macros.Options.SaveClassName]
-      val doc = format write person
-
-      doc.getAs[String]("className") mustEqual Some("MacroTest.Person") and {
-        roundtrip(person, format)
-      }
-    }
-
-    "persist simple class name on demand" in {
+    "not persist class name for case class" in {
       val person = Person("john", "doe")
       val format = Macros.handlerOpts[Person, Macros.Options.SaveSimpleName]
       val doc = format write person
 
-      doc.getAs[String]("className") mustEqual Some("Person")
-      roundtrip(person, format)
+      doc.getAs[String]("className") must beNone and {
+        roundtrip(person, format)
+      }
     }
 
     "handle union types (ADT)" in {

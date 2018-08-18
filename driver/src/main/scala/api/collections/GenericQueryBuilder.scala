@@ -394,7 +394,7 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
       if (version.compareTo(MongoWireVersion.V32) < 0) {
         collection.fullCollectionName
       } else {
-        collection.db.name + ".$cmd" // Command 'find' for 3.2+
+        collection.db.name + f".$$cmd" // Command 'find' for 3.2+
       }
     }
 

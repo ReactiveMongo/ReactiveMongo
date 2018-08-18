@@ -188,6 +188,7 @@ final class DefaultIndexesManager(db: DB with DBMetaCommands)(
 /**
  * @define the index to create
  * @define droppedCount The number of indexes that were dropped.
+ * @define indexToCreate the index to create
  */
 sealed trait CollectionIndexesManager {
   /** Returns the list of indexes for the current collection. */

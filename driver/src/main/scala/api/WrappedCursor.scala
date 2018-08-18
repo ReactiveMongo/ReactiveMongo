@@ -31,7 +31,5 @@ trait WrappedCursor[T] extends Cursor[T] {
 
   def head(implicit @deprecatedName('ctx) ec: ExecutionContext): Future[T] = wrappee.head
 
-  // TODO: Remove override
-  override def headOption(implicit @deprecatedName('ctx) ec: ExecutionContext): Future[Option[T]] =
-    wrappee.headOption
+  override def headOption(implicit @deprecatedName('ctx) ec: ExecutionContext): Future[Option[T]] = wrappee.headOption
 }

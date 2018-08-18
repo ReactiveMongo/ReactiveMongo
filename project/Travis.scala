@@ -1,11 +1,8 @@
-import scala.collection.immutable.ListSet
-
 import sbt._
 import sbt.Keys._
 
 object Travis {
   val travisEnv = taskKey[Unit]("Print Travis CI env")
-
 
   lazy val settings = Seq(
     travisEnv in Test := { // test:travisEnv from SBT CLI
