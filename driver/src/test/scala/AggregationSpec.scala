@@ -3,8 +3,26 @@ import scala.collection.immutable.{ ListSet, Set }
 import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
 
-import reactivemongo.bson._
-import reactivemongo.api.{ Cursor, CursorProducer, WrappedCursor }
+import reactivemongo.bson.{
+  BSONArray,
+  BSONDocument,
+  BSONDocumentHandler,
+  BSONDocumentReader,
+  BSONInteger,
+  BSONNull,
+  BSONNumberLike,
+  BSONString,
+  Macros,
+  array,
+  document
+}
+import reactivemongo.api.{
+  Cursor,
+  CursorOps,
+  CursorProducer,
+  WrappedCursor,
+  WrappedCursorOps
+}
 import reactivemongo.api.collections.bson.BSONCollection
 
 import org.specs2.concurrent.ExecutionEnv
@@ -252,16 +270,22 @@ class AggregationSpec(implicit ee: ExecutionEnv)
         "of expected type" in {
           withCtx(coll) { (firstOp, pipeline) =>
             // Custom cursor support
-            trait FooCursor[T] extends Cursor[T] { def foo: String }
+            trait FooCursor[T] extends Cursor[T] with CursorOps[T] {
+              def foo: String
+            }
 
-            class DefaultFooCursor[T](val wrappee: Cursor[T])
-              extends FooCursor[T] with WrappedCursor[T] {
+            class DefaultFooCursor[T](val wrappee: Cursor.WithOps[T])
+              extends FooCursor[T] with WrappedCursor[T]
+              with WrappedCursorOps[T] {
+
+              @inline def opsWrappee = wrappee
+
               val foo = "Bar"
             }
 
             implicit def fooProducer[T] = new CursorProducer[T] {
               type ProducedCursor = FooCursor[T]
-              def produce(base: Cursor[T]) = new DefaultFooCursor(base)
+              def produce(base: Cursor.WithOps[T]) = new DefaultFooCursor(base)
             }
 
             // Aggregation itself
@@ -269,7 +293,7 @@ class AggregationSpec(implicit ee: ExecutionEnv)
               firstOp, pipeline, batchSize = Some(1)).prepared[FooCursor]
 
             aggregator.cursor.isInstanceOf[FooCursor[BSONDocument]].
-              aka("cursor") must beEqualTo(true)
+              aka("cursor") must beTrue
           }
         }
       }
@@ -286,8 +310,7 @@ class AggregationSpec(implicit ee: ExecutionEnv)
         Project,
         Sort,
         Ascending,
-        Skip,
-        SumField
+        Skip
       }
 
       val expected = List(

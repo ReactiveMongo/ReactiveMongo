@@ -24,11 +24,12 @@ import reactivemongo.util.LazyLogger
  *
  * @tparam T Type of the message to send.
  * @param message The message to send to the given actor. This message will be wrapped into an ExpectingResponse message by the `expectingResponseMaker` function.
- * @param connection The reference to the MongoConnection the given message will be sent to.
- * @param strategy The Failover strategy.
- * @param expectingResponseMaker A function that takes a message of type `T` and wraps it into an ExpectingResponse message.
+ * @param connection the reference to the MongoConnection the given message will be sent to
+ * @param failoverStrategy the Failover strategy
+ * @param expectingResponseMaker a function that takes a message of type `T` and wraps it into an ExpectingResponse message
  */
-class Failover[T](message: T, connection: MongoConnection, strategy: FailoverStrategy)(expectingResponseMaker: T => ExpectingResponse)(implicit ec: ExecutionContext) {
+@deprecated("Unused, will be removed", "0.17.0")
+class Failover[T](message: T, connection: MongoConnection, @deprecatedName('strategy) failoverStrategy: FailoverStrategy)(expectingResponseMaker: T => ExpectingResponse)(implicit ec: ExecutionContext) {
   import Failover2.logger
   import reactivemongo.core.errors._
   import reactivemongo.core.actors.Exceptions._
@@ -46,10 +47,10 @@ class Failover[T](message: T, connection: MongoConnection, strategy: FailoverStr
     connection.mongosystem ! expectingResponse
     expectingResponse.future.onComplete {
       case Failure(e) if isRetryable(e) =>
-        if (n < strategy.retries) {
+        if (n < failoverStrategy.retries) {
           val `try` = n + 1
-          val delayFactor = strategy.delayFactor(`try`)
-          val delay = Duration.unapply(strategy.initialDelay * delayFactor).map(t => FiniteDuration(t._1, t._2)).getOrElse(strategy.initialDelay)
+          val delayFactor = failoverStrategy.delayFactor(`try`)
+          val delay = Duration.unapply(failoverStrategy.initialDelay * delayFactor).fold(failoverStrategy.initialDelay)(t => FiniteDuration(t._1, t._2))
 
           logger.debug(s"Got an error, retrying... (try #${`try`} is scheduled in ${delay.toMillis} ms)", e)
 
@@ -89,7 +90,7 @@ class Failover[T](message: T, connection: MongoConnection, strategy: FailoverStr
   send(0)
 }
 
-private[reactivemongo] class Failover2[A](producer: () => Future[A], connection: MongoConnection, strategy: FailoverStrategy)(implicit ec: ExecutionContext) {
+private[reactivemongo] class Failover2[A](producer: () => Future[A], connection: MongoConnection, @deprecatedName('strategy) failoverStrategy: FailoverStrategy)(implicit ec: ExecutionContext) {
   import Failover2.logger, logger.trace
   import reactivemongo.core.errors._
   import reactivemongo.core.actors.Exceptions._
@@ -117,11 +118,12 @@ private[reactivemongo] class Failover2[A](producer: () => Future[A], connection:
       case err => Failure(err)
     }.flatMap {
       case Failure(e) if isRetryable(e) => {
-        if (n < strategy.retries) {
+        if (n < failoverStrategy.retries) {
           val `try` = n + 1
-          val delayFactor = strategy.delayFactor(`try`)
-          val delay = Duration.unapply(strategy.initialDelay * delayFactor).
-            fold(strategy.initialDelay)(t => FiniteDuration(t._1, t._2))
+          val delayFactor = failoverStrategy.delayFactor(`try`)
+          val delay = Duration.unapply(
+            failoverStrategy.initialDelay * delayFactor).
+            fold(failoverStrategy.initialDelay)(t => FiniteDuration(t._1, t._2))
 
           trace(s"[$lnm] Got an error, retrying... (try #${`try`} is scheduled in ${delay.toMillis} ms)", e)
 
@@ -162,9 +164,13 @@ private[reactivemongo] class Failover2[A](producer: () => Future[A], connection:
   //send(0)
 }
 
+@deprecated("Will be private/internal", "0.17.0")
 object Failover2 {
   private[api] val logger = LazyLogger("reactivemongo.api.Failover2")
 
-  def apply[A](connection: MongoConnection, strategy: FailoverStrategy)(producer: () => Future[A])(implicit ec: ExecutionContext): Failover2[A] =
-    new Failover2(producer, connection, strategy)
+  def apply[A](
+    connection: MongoConnection,
+    @deprecatedName('strategy) failoverStrategy: FailoverStrategy)(
+    producer: () => Future[A])(implicit ec: ExecutionContext): Failover2[A] =
+    new Failover2(producer, connection, failoverStrategy)
 }

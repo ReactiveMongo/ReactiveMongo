@@ -62,7 +62,9 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
   def snapshotFlag: Boolean
   def commentString: Option[String]
   def options: QueryOpts
-  def failover: FailoverStrategy
+
+  @deprecatedName('failover) def failoverStrategy: FailoverStrategy
+
   def collection: Collection
   def maxTimeMsOption: Option[Long]
 
@@ -209,7 +211,7 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
     snapshotFlag: Boolean = snapshotFlag,
     commentString: Option[String] = commentString,
     options: QueryOpts = options,
-    failover: FailoverStrategy = failover,
+    @deprecatedName('failover) failoverStrategy: FailoverStrategy = failoverStrategy,
     maxTimeMsOption: Option[Long] = maxTimeMsOption): Self
 
   // ---
@@ -362,7 +364,7 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
     readPreference: ReadPreference,
     isMongo26WriteOp: Boolean = false)(
     implicit
-    reader: pack.Reader[T]): Cursor[T] = {
+    reader: pack.Reader[T]): Cursor.WithOps[T] = {
 
     val body = {
       if (version.compareTo(MongoWireVersion.V32) < 0) { _: Int =>
@@ -392,14 +394,14 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
       if (version.compareTo(MongoWireVersion.V32) < 0) {
         collection.fullCollectionName
       } else {
-        collection.db.name + ".$cmd" // Command 'find' for 3.2+
+        collection.db.name + f".$$cmd" // Command 'find' for 3.2+
       }
     }
 
     val op = Query(flags, name, options.skipN, options.batchSizeN)
 
     DefaultCursor.query(pack, op, body, readPreference,
-      collection.db, failover, isMongo26WriteOp,
+      collection.db, failoverStrategy, isMongo26WriteOp,
       collection.fullCollectionName)(reader)
   }
 

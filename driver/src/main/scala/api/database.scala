@@ -45,6 +45,7 @@ import reactivemongo.api.commands.{
  *
  * @define resolveDescription Returns a [[reactivemongo.api.Collection]] from this database
  * @define nameParam the name of the collection to resolve
+ * @define failoverStrategyParam the failover strategy to override the default one
  */
 sealed trait DB {
   protected type DBType <: DB
@@ -67,6 +68,7 @@ sealed trait DB {
    * $resolveDescription (alias for the `collection` method).
    *
    * @param name $nameParam
+   * @param failoverStrategy $failoverStrategyParam
    */
   def apply[C <: Collection](name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit producer: CollectionProducer[C] = collections.bson.BSONCollectionProducer): C = collection(name, failoverStrategy)
 
@@ -74,19 +76,26 @@ sealed trait DB {
    * $resolveDescription.
    *
    * @param name $nameParam
+   * @param failoverStrategy $failoverStrategyParam
    */
   def collection[C <: Collection](name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit producer: CollectionProducer[C] = collections.bson.BSONCollectionProducer): C = producer(this, name, failoverStrategy)
 
   @inline def defaultReadPreference: ReadPreference =
     connection.options.readPreference
 
-  /** Authenticates the connection on this database. */
+  /**
+   * Authenticates the connection on this database.
+   *
+   * @param user the name of the user
+   * @param password the user password
+   */
   def authenticate(user: String, password: String)(implicit ec: ExecutionContext): Future[SuccessfulAuthentication] = connection.authenticate(name, user, password, failoverStrategy)
 
   /**
    * Returns the database of the given name on the same MongoConnection.
    *
    * @param name $nameParam
+   * @param failoverStrategy $failoverStrategyParam
    * @see [[sibling1]]
    */
   @deprecated("Use [[sibling1]]", "0.16.0")
@@ -96,6 +105,7 @@ sealed trait DB {
    * Returns the database of the given name on the same MongoConnection.
    *
    * @param name $nameParam
+   * @param failoverStrategy $failoverStrategyParam
    */
   def sibling1(name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit ec: ExecutionContext): Future[DefaultDB] = connection.database(name, failoverStrategy)
 
@@ -121,15 +131,27 @@ sealed trait DB {
   def killSession()(implicit ec: ExecutionContext): Future[DBType]
 }
 
+/**
+ * @define failoverStrategyParam the failover strategy to override the default one
+ */
 private[api] sealed trait GenericDB[P <: SerializationPack with Singleton] { self: DB =>
   val pack: P
 
   import reactivemongo.api.commands._
 
+  /**
+   * @param failoverStrategy $failoverStrategyParam
+   */
   def runCommand[R, C <: Command with CommandWithResult[R]](command: C with CommandWithResult[R], failoverStrategy: FailoverStrategy)(implicit writer: pack.Writer[C], reader: pack.Reader[R], ec: ExecutionContext): Future[R] = Command.run(pack, failoverStrategy).apply(self, command, self.defaultReadPreference)
 
+  /**
+   * @param failoverStrategy $failoverStrategyParam
+   */
   def runCommand[C <: Command](command: C, failoverStrategy: FailoverStrategy)(implicit writer: pack.Writer[C]): CursorFetcher[pack.type, Cursor] = Command.run(pack, failoverStrategy).apply(self, command)
 
+  /**
+   * @param failoverStrategy $failoverStrategyParam
+   */
   def runValueCommand[A <: AnyVal, R <: BoxedAnyVal[A], C <: Command with CommandWithResult[R]](command: C with CommandWithResult[R with BoxedAnyVal[A]], failoverStrategy: FailoverStrategy, readPreference: ReadPreference)(implicit writer: pack.Writer[C], reader: pack.Reader[R], ec: ExecutionContext): Future[A] = Command.run(pack, failoverStrategy).unboxed(self, command, readPreference)
 }
 

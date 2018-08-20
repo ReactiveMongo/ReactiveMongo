@@ -91,7 +91,7 @@ object DefaultCursor {
 
       val makeIterator = ReplyDocumentIterator.parse(pack)(_: Response)(reader)
 
-      @inline def makeRequest(maxDocs: Int)(implicit ctx: ExecutionContext): Future[Response] = Failover2(connection, failoverStrategy) { () =>
+      @inline def makeRequest(maxDocs: Int)(implicit @deprecatedName('ctx) ec: ExecutionContext): Future[Response] = Failover2(connection, failoverStrategy) { () =>
         val ntr = toReturn(numberToReturn, maxDocs, 0)
 
         // MongoDB2.6: Int.MaxValue
@@ -101,7 +101,7 @@ object DefaultCursor {
           RequestMaker(op, requestBuffer(maxDocs), readPreference),
           isMongo26WriteOp)
 
-        requester(0, maxDocs, req)(ctx)
+        requester(0, maxDocs, req)(ec)
       }.future.flatMap {
         case Response.CommandError(_, _, _, cause) =>
           Future.failed[Response](cause)
@@ -223,7 +223,7 @@ object DefaultCursor {
     // cursorId: Long, toReturn: Int
     protected def getMoreOpCmd: Function2[Long, Int, (RequestOp, BufferSequence)]
 
-    private def next(response: Response, maxDocs: Int)(implicit ctx: ExecutionContext): Future[Option[Response]] = {
+    private def next(response: Response, maxDocs: Int)(implicit ec: ExecutionContext): Future[Option[Response]] = {
       if (response.reply.cursorID != 0) {
         // numberToReturn=1 for new find command,
         // so rather use batchSize from the previous reply
@@ -242,7 +242,7 @@ object DefaultCursor {
           mongo26WriteOp)
 
         Failover2(connection, failoverStrategy) { () =>
-          requester(nextOffset, maxDocs, req)(ctx)
+          requester(nextOffset, maxDocs, req)(ec)
         }.future.map(Some(_))
       } else {
         logger.warn("Call to next() but cursorID is 0, there is probably a bug")
@@ -255,7 +255,7 @@ object DefaultCursor {
         maxDocs < 0 || (nextBatchOffset(response) < maxDocs))
 
     /** Returns next response using tailable mode */
-    private def tailResponse(current: Response, maxDocs: Int)(implicit context: ExecutionContext): Future[Option[Response]] = {
+    private def tailResponse(current: Response, maxDocs: Int)(implicit ec: ExecutionContext): Future[Option[Response]] = {
       {
         @inline def closed = Future.successful {
           logger.warn("[tailResponse] Connection is closed")
@@ -313,7 +313,7 @@ object DefaultCursor {
       }
     }
 
-    def head(implicit ctx: ExecutionContext): Future[A] =
+    def head(implicit @deprecatedName('ctx) ec: ExecutionContext): Future[A] =
       makeRequest(1).flatMap { response =>
         val result = documentIterator(response)
 
@@ -322,7 +322,7 @@ object DefaultCursor {
         } else Future(result.next())
       }
 
-    final def headOption(implicit ctx: ExecutionContext): Future[Option[A]] =
+    final def headOption(implicit @deprecatedName('ctx) ec: ExecutionContext): Future[Option[A]] =
       makeRequest(1).flatMap { response =>
         val result = documentIterator(response)
 
@@ -335,26 +335,26 @@ object DefaultCursor {
 
     @inline private def syncSuccess[T, U](f: (T, U) => State[T])(implicit ec: ExecutionContext): (T, U) => Future[State[T]] = { (a: T, b: U) => Future(f(a, b)) }
 
-    def foldResponses[T](z: => T, maxDocs: Int = -1)(suc: (T, Response) => State[T], err: (T, Throwable) => State[T])(implicit ctx: ExecutionContext): Future[T] = FoldResponses(z, makeRequest(maxDocs)(_: ExecutionContext),
+    def foldResponses[T](z: => T, maxDocs: Int = -1)(suc: (T, Response) => State[T], err: (T, Throwable) => State[T])(implicit @deprecatedName('ctx) ec: ExecutionContext): Future[T] = FoldResponses(z, makeRequest(maxDocs)(_: ExecutionContext),
       nextResponse(maxDocs), killCursors _, syncSuccess(suc), err, maxDocs)(
-        connection.actorSystem, ctx)
+        connection.actorSystem, ec)
 
-    def foldResponsesM[T](z: => T, maxDocs: Int = -1)(suc: (T, Response) => Future[State[T]], err: (T, Throwable) => State[T])(implicit ctx: ExecutionContext): Future[T] = FoldResponses(z, makeRequest(maxDocs)(_: ExecutionContext),
+    def foldResponsesM[T](z: => T, maxDocs: Int = -1)(suc: (T, Response) => Future[State[T]], err: (T, Throwable) => State[T])(implicit @deprecatedName('ctx) ec: ExecutionContext): Future[T] = FoldResponses(z, makeRequest(maxDocs)(_: ExecutionContext),
       nextResponse(maxDocs), killCursors _, suc, err, maxDocs)(
-        connection.actorSystem, ctx)
+        connection.actorSystem, ec)
 
-    def foldBulks[T](z: => T, maxDocs: Int = -1)(suc: (T, Iterator[A]) => State[T], err: (T, Throwable) => State[T])(implicit ctx: ExecutionContext): Future[T] = foldBulksM[T](z, maxDocs)(syncSuccess[T, Iterator[A]](suc), err)
+    def foldBulks[T](z: => T, maxDocs: Int = -1)(suc: (T, Iterator[A]) => State[T], err: (T, Throwable) => State[T])(implicit @deprecatedName('ctx) ec: ExecutionContext): Future[T] = foldBulksM[T](z, maxDocs)(syncSuccess[T, Iterator[A]](suc), err)
 
-    def foldBulksM[T](z: => T, maxDocs: Int = -1)(suc: (T, Iterator[A]) => Future[State[T]], err: (T, Throwable) => State[T])(implicit ctx: ExecutionContext): Future[T] = foldResponsesM(z, maxDocs)({ (s, r) =>
+    def foldBulksM[T](z: => T, maxDocs: Int = -1)(suc: (T, Iterator[A]) => Future[State[T]], err: (T, Throwable) => State[T])(implicit @deprecatedName('ctx) ec: ExecutionContext): Future[T] = foldResponsesM(z, maxDocs)({ (s, r) =>
       Try(makeIterator(r)) match {
         case Success(it) => suc(s, it)
         case Failure(e)  => Future.successful[State[T]](Fail(e))
       }
     }, err)
 
-    def foldWhile[T](z: => T, maxDocs: Int = -1)(suc: (T, A) => State[T], err: (T, Throwable) => State[T])(implicit ctx: ExecutionContext): Future[T] = foldWhileM[T](z, maxDocs)(syncSuccess[T, A](suc), err)
+    def foldWhile[T](z: => T, maxDocs: Int = -1)(suc: (T, A) => State[T], err: (T, Throwable) => State[T])(implicit @deprecatedName('ctx) ec: ExecutionContext): Future[T] = foldWhileM[T](z, maxDocs)(syncSuccess[T, A](suc), err)
 
-    def foldWhileM[T](z: => T, maxDocs: Int = -1)(suc: (T, A) => Future[State[T]], err: (T, Throwable) => State[T])(implicit ctx: ExecutionContext): Future[T] = {
+    def foldWhileM[T](z: => T, maxDocs: Int = -1)(suc: (T, A) => Future[State[T]], err: (T, Throwable) => State[T])(implicit @deprecatedName('ctx) ec: ExecutionContext): Future[T] = {
       def go(v: T, it: Iterator[A]): Future[State[T]] = {
         if (!it.hasNext) {
           Future.successful(Cont(v))
@@ -426,53 +426,4 @@ object DefaultCursor {
       max - offset
     }
   }
-}
-
-/** Internal cursor operations. */
-sealed trait CursorOps[T] { cursor: Cursor[T] =>
-  /** Sends the initial request. */
-  private[reactivemongo] def makeRequest(maxDocs: Int)(implicit ctx: ExecutionContext): Future[Response]
-
-  /**
-   * Returns a function that can be used to get the next response,
-   * if allowed according the `maxDocs` and the cursor options
-   * (cursor not exhausted, tailable, ...)
-   */
-  private[reactivemongo] def nextResponse(maxDocs: Int): (ExecutionContext, Response) => Future[Option[Response]]
-
-  /**
-   * Returns an iterator to read the response documents,
-   * according the provided read for the element type `T`.
-   */
-  private[reactivemongo] def documentIterator(response: Response): Iterator[T]
-
-  @deprecated("Use `killCursor`", "0.16.0")
-  def kill(cursorID: Long): Unit
-
-  /**
-   * Kills the server resources associated with the specified cursor.
-   *
-   * @param id the cursor ID
-   */
-  private[reactivemongo] def killCursor(id: Long)(implicit ctx: ExecutionContext): Unit
-
-  /** Indicates whether the underlying cursor is taible. */
-  def tailable: Boolean
-
-  /** Returns the underlying connection. */
-  def connection: MongoConnection
-
-  /** Returns the strategy to failover the cursor operations. */
-  def failoverStrategy: FailoverStrategy
-}
-
-object CursorOps {
-  /**
-   * Wraps exception that has already been passed to the current error handler
-   * and should not be recovered.
-   */
-  private[reactivemongo] case class Unrecoverable(cause: Throwable)
-    extends scala.RuntimeException(cause)
-    with scala.util.control.NoStackTrace
-
 }
