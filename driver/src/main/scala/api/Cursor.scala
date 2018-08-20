@@ -71,7 +71,7 @@ trait Cursor[T] {
    * @param err $errorHandlerParam
    * @tparam A $resultTParam
    */
-  def foldResponses[A](z: => A, maxDocs: Int = -1)(suc: (A, Response) => Cursor.State[A], err: ErrorHandler[A] = FailOnError[A]())(implicit ctx: ExecutionContext): Future[A]
+  def foldResponses[A](z: => A, maxDocs: Int = -1)(suc: (A, Response) => Cursor.State[A], err: ErrorHandler[A] = FailOnError[A]())(implicit @deprecatedName('ctx) ec: ExecutionContext): Future[A]
 
   /**
    * $foldResp
@@ -82,7 +82,7 @@ trait Cursor[T] {
    * @param err $errorHandlerParam
    * @tparam A $resultTParam
    */
-  def foldResponsesM[A](z: => A, maxDocs: Int = -1)(suc: (A, Response) => Future[Cursor.State[A]], err: ErrorHandler[A] = FailOnError[A]())(implicit ctx: ExecutionContext): Future[A]
+  def foldResponsesM[A](z: => A, maxDocs: Int = -1)(suc: (A, Response) => Future[Cursor.State[A]], err: ErrorHandler[A] = FailOnError[A]())(implicit @deprecatedName('ctx) ec: ExecutionContext): Future[A]
 
   /**
    * $foldBulks
@@ -93,7 +93,7 @@ trait Cursor[T] {
    * @param err $errorHandlerParam
    * @tparam A $resultTParam
    */
-  def foldBulks[A](z: => A, maxDocs: Int = -1)(suc: (A, Iterator[T]) => Cursor.State[A], err: ErrorHandler[A] = FailOnError[A]())(implicit ctx: ExecutionContext): Future[A]
+  def foldBulks[A](z: => A, maxDocs: Int = -1)(suc: (A, Iterator[T]) => Cursor.State[A], err: ErrorHandler[A] = FailOnError[A]())(implicit @deprecatedName('ctx) ec: ExecutionContext): Future[A]
 
   /**
    * $foldBulks
@@ -104,7 +104,7 @@ trait Cursor[T] {
    * @param err $errorHandlerParam
    * @tparam A $resultTParam
    */
-  def foldBulksM[A](z: => A, maxDocs: Int = -1)(suc: (A, Iterator[T]) => Future[Cursor.State[A]], err: ErrorHandler[A] = FailOnError[A]())(implicit ctx: ExecutionContext): Future[A]
+  def foldBulksM[A](z: => A, maxDocs: Int = -1)(suc: (A, Iterator[T]) => Future[Cursor.State[A]], err: ErrorHandler[A] = FailOnError[A]())(implicit @deprecatedName('ctx) ec: ExecutionContext): Future[A]
 
   /**
    * $foldWhile
@@ -120,7 +120,7 @@ trait Cursor[T] {
    *   { (l, e) => println("last valid value: " + l); Cursor.Fail(e) })
    * }}}
    */
-  def foldWhile[A](z: => A, maxDocs: Int = -1)(suc: (A, T) => Cursor.State[A], err: ErrorHandler[A] = FailOnError[A]())(implicit ctx: ExecutionContext): Future[A]
+  def foldWhile[A](z: => A, maxDocs: Int = -1)(suc: (A, T) => Cursor.State[A], err: ErrorHandler[A] = FailOnError[A]())(implicit @deprecatedName('ctx) ec: ExecutionContext): Future[A]
 
   /**
    * $foldWhile
@@ -140,7 +140,7 @@ trait Cursor[T] {
    *   })
    * }}}
    */
-  def foldWhileM[A](z: => A, maxDocs: Int = -1)(suc: (A, T) => Future[Cursor.State[A]], err: ErrorHandler[A] = FailOnError[A]())(implicit ctx: ExecutionContext): Future[A]
+  def foldWhileM[A](z: => A, maxDocs: Int = -1)(suc: (A, T) => Future[Cursor.State[A]], err: ErrorHandler[A] = FailOnError[A]())(implicit @deprecatedName('ctx) ec: ExecutionContext): Future[A]
 
   /**
    * $foldWhile
@@ -156,7 +156,7 @@ trait Cursor[T] {
    *   { (l, e) => println("last valid value: " + l); Cursor.Fail(e) })
    * }}}
    */
-  def fold[A](z: => A, maxDocs: Int = -1)(suc: (A, T) => A)(implicit ctx: ExecutionContext): Future[A] = foldWhile[A](z, maxDocs)(
+  def fold[A](z: => A, maxDocs: Int = -1)(suc: (A, T) => A)(implicit @deprecatedName('ctx) ec: ExecutionContext): Future[A] = foldWhile[A](z, maxDocs)(
     { (st, v) => Cursor.Cont[A](suc(st, v)) }, FailOnError[A]())
 
   /**
@@ -168,7 +168,7 @@ trait Cursor[T] {
    * val first: Future[BSONDocument] = cursor.head
    * }}}
    */
-  def head(implicit ctx: ExecutionContext): Future[T]
+  def head(implicit @deprecatedName('ctx) ec: ExecutionContext): Future[T]
 
   /**
    * $getHead, if any.
@@ -179,11 +179,13 @@ trait Cursor[T] {
    * val maybeFirst: Future[Option[BSONDocument]] = cursor.headOption
    * }}}
    */
-  def headOption(implicit ctx: ExecutionContext): Future[Option[T]]
+  def headOption(implicit @deprecatedName('ctx) ec: ExecutionContext): Future[Option[T]]
 }
 
 /** Cursor companion object */
 object Cursor {
+  type WithOps[T] = Cursor[T] with CursorOps[T]
+
   private[api] val logger = LazyLogger("reactivemongo.api.Cursor")
 
   /**
@@ -254,52 +256,4 @@ object Cursor {
     with scala.util.control.NoStackTrace
 
   private[api] val DefaultBatchSize = 101
-}
-
-/** Allows to enrich a base cursor. */
-trait CursorProducer[T] {
-  type ProducedCursor <: Cursor[T]
-
-  /** Produces a custom cursor from the `base` one. */
-  @deprecated("The `base` cursor will be required to also provide [[CursorOps]].", "0.11.15") // See https://github.com/ReactiveMongo/ReactiveMongo-Streaming/blob/master/akka-stream/src/main/scala/package.scala#L14
-  def produce(base: Cursor[T]): ProducedCursor
-}
-
-object CursorProducer {
-  private[api] type Aux[T, C[_] <: Cursor[_]] = CursorProducer[T] {
-    type ProducedCursor = C[T]
-  }
-
-  implicit def defaultCursorProducer[T]: CursorProducer.Aux[T, Cursor] =
-    new CursorProducer[T] {
-      type ProducedCursor = Cursor[T]
-      def produce(base: Cursor[T]) = base
-    }
-}
-
-/**
- * Flattening strategy for cursor.
- *
- * {{{
- * trait FooCursor[T] extends Cursor[T] { def foo: String }
- *
- * implicit def fooFlattener[T] = new CursorFlattener[FooCursor] {
- *   def flatten[T](future: Future[FooCursor[T]]): FooCursor[T] =
- *     new FlattenedCursor[T](future) with FooCursor[T] {
- *       def foo = "Flattened"
- *     }
- * }
- * }}}
- */
-trait CursorFlattener[C[_] <: Cursor[_]] {
-  /** Flatten a future of cursor as cursor. */
-  def flatten[T](future: Future[C[T]]): C[T]
-}
-
-/** Flatteners helper */
-object CursorFlattener {
-  implicit object defaultCursorFlattener extends CursorFlattener[Cursor] {
-    def flatten[T](future: Future[Cursor[T]]): Cursor[T] =
-      new FlattenedCursor[T](future)
-  }
 }

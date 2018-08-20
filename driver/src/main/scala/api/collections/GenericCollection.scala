@@ -223,7 +223,7 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * @tparam M the container, that must be a [[scala.collection.Iterable]]
    *
    * @param key the field for which to return distinct values
-   * @param query $selectorParam, that specifies the documents from which to retrieve the distinct values.
+   * @param selector $selectorParam, that specifies the documents from which to retrieve the distinct values.
    * @param readConcern $readConcernParam
    * @param collation $collationParam
    *
@@ -234,12 +234,12 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    */
   def distinct[T, M[_] <: Iterable[_]](
     key: String,
-    query: Option[pack.Document],
+    @deprecatedName('query) selector: Option[pack.Document],
     readConcern: ReadConcern,
     collation: Option[Collation])(implicit
     reader: pack.NarrowValueReader[T],
     ec: ExecutionContext, cbf: CanBuildFrom[M[_], T, M[T]]): Future[M[T]] =
-    distinctDocuments[T, M](key, query, readConcern, collation)
+    distinctDocuments[T, M](key, selector, readConcern, collation)
 
   /**
    * Inserts a document into the collection and waits for the [[reactivemongo.api.commands.WriteResult]].
@@ -560,10 +560,10 @@ trait GenericCollection[P <: SerializationPack with Singleton]
 
     val (firstOp, otherOps) = f(BatchCommands.AggregationFramework)
 
-    val aggregateCursor: Cursor[T] = aggregatorContext[T](
+    val aggregateCursor: Cursor.WithOps[T] = aggregatorContext[T](
       firstOp, otherOps, explain, allowDiskUse,
       bypassDocumentValidation, readConcern, readPreference, batchSize).
-      prepared[Cursor](CursorProducer.defaultCursorProducer[T]).cursor
+      prepared[Cursor.WithOps](CursorProducer.defaultCursorProducer[T]).cursor
 
     cp.produce(aggregateCursor)
   }
@@ -632,7 +632,7 @@ trait GenericCollection[P <: SerializationPack with Singleton]
   }
 
   /**
-   * Prepare an unordered [[https://docs.mongodb.com/manual/reference/command/delete/ delete]] builder.
+   * Prepares an unordered [[https://docs.mongodb.com/manual/reference/command/delete/ delete]] builder.
    *
    * {{{
    * collection.delete.one(document, limit)
@@ -643,7 +643,7 @@ trait GenericCollection[P <: SerializationPack with Singleton]
   def delete: DeleteBuilder = prepareDelete(false, writeConcern)
 
   /**
-   * Prepare a [[https://docs.mongodb.com/manual/reference/command/delete/ delete]] builder.
+   * Prepares a [[https://docs.mongodb.com/manual/reference/command/delete/ delete]] builder.
    *
    * @param ordered $orderedParam
    * @param writeConcern $writeConcernParam

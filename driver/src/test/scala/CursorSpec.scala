@@ -2,7 +2,7 @@ import scala.concurrent.{ Await, Future }
 import scala.concurrent.duration._
 
 import reactivemongo.bson._
-import reactivemongo.api.{ Cursor, QueryOpts, WrappedCursor }
+import reactivemongo.api.{ Cursor, QueryOpts }
 
 import reactivemongo.api.collections.bson.BSONCollection
 
@@ -577,20 +577,7 @@ class CursorSpec(implicit val ee: ExecutionEnv)
 
   /* A selector matching all the documents, with an unique content for debug. */
   @inline def matchAll(name: String) =
-    BSONDocument(name -> BSONDocument("$exists" -> false))
-
-  trait FooCursor[T] extends Cursor[T] { def foo: String }
-
-  class DefaultFooCursor[T](val wrappee: Cursor[T])
-    extends FooCursor[T] with WrappedCursor[T] {
-    val foo = "Bar"
-  }
-
-  class FlattenedFooCursor[T](cursor: Future[FooCursor[T]])
-    extends reactivemongo.api.FlattenedCursor[T](cursor) with FooCursor[T] {
-
-    val foo = "raB"
-  }
+    BSONDocument(name -> BSONDocument(f"$$exists" -> false))
 }
 
 sealed trait CursorSpecEnv { spec: CursorSpec =>

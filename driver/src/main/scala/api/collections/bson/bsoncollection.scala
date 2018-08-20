@@ -29,7 +29,7 @@ object `package` {
 }
 
 @SerialVersionUID(1382847900L)
-final class BSONCollection(
+final class BSONCollection @deprecated("Class will be refactored", "0.17.0") (
   val db: DB,
   val name: String,
   val failoverStrategy: FailoverStrategy,
@@ -70,9 +70,9 @@ final class BSONCollection(
 }
 
 /** Factory and extractors */
+@deprecated("Case accessors will be removed", "0.17.0")
 object BSONCollection extends scala.runtime.AbstractFunction3[DB, String, FailoverStrategy, BSONCollection] {
 
-  @deprecated(message = "Use the class constructor", since = "0.12-RC2")
   def apply(db: DB, name: String, failoverStrategy: FailoverStrategy): BSONCollection = new BSONCollection(db, name, failoverStrategy, db.defaultReadPreference)
 
   def unapply(c: BSONCollection): Option[(DB, String, FailoverStrategy)] = Some((c.db, c.name, c.failoverStrategy))
