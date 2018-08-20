@@ -18,15 +18,12 @@ sealed trait WriteResult {
   /** If the result is a failure, the error message */
   private[commands] def errmsg: Option[String]
 
-  private[reactivemongo] def hasErrors: Boolean = !writeErrors.isEmpty || !writeConcernError.isEmpty
+  private[reactivemongo] def hasErrors: Boolean =
+    !writeErrors.isEmpty || !writeConcernError.isEmpty
+
   private[reactivemongo] def inError: Boolean = !ok || code.isDefined
 
   protected def message = errmsg.getOrElse("<none>")
-
-  @deprecated("Use the detailed properties (e.g. `code`)", "0.12.0")
-  def originalDocument = Option.empty[reactivemongo.bson.BSONDocument] // TODO
-  //def stringify: String = toString + " [inError: " + inError + "]"
-  //override def getMessage() = toString + " [inError: " + inError + "]"
 }
 
 object WriteResult {
@@ -102,11 +99,10 @@ case class LastError(
   writeErrors: Seq[WriteError] = Nil,
   writeConcernError: Option[WriteConcernError] = None) extends DatabaseException with WriteResult with NoStackTrace {
 
-  @deprecated("Use [[errmsg]]", "0.12.0")
-  val err = errmsg
-
   override def inError: Boolean = !ok || errmsg.isDefined
-  //def stringify: String = toString + " [inError: " + inError + "]"
+
+  @deprecated("Use the detailed properties (e.g. `code`)", "0.12.0")
+  def originalDocument = Option.empty[reactivemongo.bson.BSONDocument] // TODO
 
   override lazy val message = errmsg.getOrElse("<none>")
 }
@@ -126,6 +122,7 @@ case class WriteError(
  */
 case class WriteConcernError(code: Int, errmsg: String)
 
+@deprecated("Will be private/internal", "0.16.0")
 case class DefaultWriteResult(
   ok: Boolean,
   n: Int,

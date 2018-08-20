@@ -47,12 +47,6 @@ trait AggregationFramework[P <: SerializationPack]
     firstBatch: List[pack.Document],
     cursor: Option[ResultCursor] = None) {
 
-    @deprecated(message = "Use [[firstBatch]]", since = "0.11.10")
-    def documents = firstBatch
-
-    @deprecated(message = "Use [[head]]", since = "0.11.10")
-    def result[T](implicit reader: pack.Reader[T]): List[T] = head[T]
-
     /**
      * Returns the first batch as a list, using the given `reader`.
      */
@@ -60,43 +54,6 @@ trait AggregationFramework[P <: SerializationPack]
       firstBatch.map(pack.deserialize(_, reader))
 
   }
-
-  /** Returns a document from a sequence of element producers. */
-  @deprecated("Use `pack.newBuilder`", "0.12.7")
-  protected def makeDocument(elements: Seq[pack.ElementProducer]): pack.Document
-
-  /** Returns a non empty array of values */
-  @deprecated("Use `pack.newBuilder`", "0.12.7")
-  protected def makeArray(value: pack.Value, values: Seq[pack.Value]): pack.Value
-
-  /**
-   * Returns a producer of element for the given `name` and `value`.
-   *
-   * @param name the element name
-   * @param value the element value
-   */
-  @deprecated("Use `pack.newBuilder`", "0.12.7")
-  protected def elementProducer(name: String, value: pack.Value): pack.ElementProducer
-
-  /** Returns an boolean as a serialized value. */
-  @deprecated("Use `pack.newBuilder`", "0.12.7")
-  protected def booleanValue(b: Boolean): pack.Value
-
-  /** Returns an integer as a serialized value. */
-  @deprecated("Use `pack.newBuilder`", "0.12.7")
-  protected def intValue(i: Int): pack.Value
-
-  /** Returns an long as a serialized value. */
-  @deprecated("Use `pack.newBuilder`", "0.12.7")
-  protected def longValue(l: Long): pack.Value
-
-  /** Returns an double as a serialized value. */
-  @deprecated("Use `pack.newBuilder`", "0.12.7")
-  protected def doubleValue(d: Double): pack.Value
-
-  /** Returns an string as a serialized value. */
-  @deprecated("Use `pack.newBuilder`", "0.12.7")
-  protected def stringValue(s: String): pack.Value
 
   /**
    * Reshapes a document stream by renaming, adding, or removing fields.
@@ -410,6 +367,32 @@ trait AggregationFramework[P <: SerializationPack]
           element(field, meta)
         }
       }))))
+  }
+
+  /**
+   * Promotes a specified document to the top level and replaces all other fields.
+   * The operation replaces all existing fields in the input document, including the _id field.
+   * https://docs.mongodb.com/manual/reference/operator/aggregation/replaceRoot
+   * @param newRoot The field name to become the new root
+   */
+  case class ReplaceRootField(newRoot: String) extends PipelineOperator {
+    import builder.{ document, elementProducer => element }
+    override val makePipe: pack.Document = document(Seq(
+      element(f"$$replaceRoot", document(Seq(
+        element("newRoot", builder.string("$" + newRoot)))))))
+  }
+
+  /**
+   * Promotes a specified document to the top level and replaces all other fields.
+   * The operation replaces all existing fields in the input document, including the _id field.
+   * https://docs.mongodb.com/manual/reference/operator/aggregation/replaceRoot
+   * @param newRoot The new root object
+   */
+  case class ReplaceRoot(newRoot: pack.Document) extends PipelineOperator {
+    import builder.{ document, elementProducer => element }
+    override val makePipe: pack.Document = document(Seq(
+      element(f"$$replaceRoot", document(Seq(
+        element("newRoot", newRoot))))))
   }
 
   /**

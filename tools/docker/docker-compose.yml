@@ -1,0 +1,54 @@
+version: '2.2'
+services:
+  db:
+    container_name: reactivemongo_db_1
+    environment:
+      - SCRIPT_DIR=/root/.ci_scripts
+    image: reactivemongo-db:0.1-${MONGO_VER:-4}${MONGO_PROFILE}${SSL_PASS}
+    build:
+      context: ../..
+      dockerfile: tools/docker/mongodb-dockerfile
+      args:
+        - mongoMajor=${MONGO_VER:-4}
+        - mongoProfile=${MONGO_PROFILE:-default}
+        - sslPass=${SSL_PASS:-reactivemongo}
+    volumes:
+      - ../../.ci_scripts:/tmp/.ci_scripts
+    extra_hosts:
+      - "db:127.0.0.1"
+    ports:
+      - 27018
+
+  integration_tests:
+    container_name: reactivemongo_integration_tests_1
+    environment:
+      - CI_CATEGORY=INTEGRATION_TESTS
+    image: reactivemongo-integration-tests:0.1-${MONGO_VER:-4}${MONGO_PROFILE}${SCALA_VERSION}${SSL_PASS}
+    build:
+      context: .
+      dockerfile: java-dockerfile 
+      args:
+        - mongoMajor=${MONGO_VER:-4}
+        - mongoProfile=${MONGO_PROFILE:-default}
+        - akkaVersion=${AKKA_VERSION:-2.5.13}
+        - iterateesVersion=${ITERATEES_VERSION:-2.6.1}
+        - scalaVersion=${SCALA_VERSION:-2.12.6}
+        - sslPass=${SSL_PASS:-reactivemongo}
+    entrypoint:
+      - ./.ci_scripts/runIntegration.sh
+    volumes:
+      - ~/.m2:/root/.m2
+      - ~/.ivy2:/root/.ivy2
+      - ~/.sbt:/root/.sbt
+      - ../..:/root/ReactiveMongo # also share cert generated from db container
+    depends_on:
+      - db
+    links:
+      - db
+    stdin_open: true
+    tty: true
+    cpus: 0.5
+    mem_limit: 4g
+    healthcheck:
+      test: "dockerize -timeout 90s -wait tcp://db:27018"
+

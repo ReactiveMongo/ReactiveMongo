@@ -15,10 +15,20 @@
  */
 package reactivemongo.api
 
-import scala.concurrent.{ ExecutionContext, Future }
+import scala.concurrent.{ Await, ExecutionContext, Future }
 import scala.concurrent.duration.FiniteDuration
 
 import reactivemongo.core.commands.SuccessfulAuthentication
+
+import reactivemongo.api.commands.{
+  Command,
+  CommandCodecs,
+  EndSessions,
+  KillSessions,
+  StartSession,
+  StartSessionResult,
+  UnitBox
+}
 
 /**
  * The reference to a MongoDB database, obtained from a [[reactivemongo.api.MongoConnection]].
@@ -35,10 +45,16 @@ import reactivemongo.core.commands.SuccessfulAuthentication
  *
  * @define resolveDescription Returns a [[reactivemongo.api.Collection]] from this database
  * @define nameParam the name of the collection to resolve
+ * @define failoverStrategyParam the failover strategy to override the default one
  */
 sealed trait DB {
+  protected type DBType <: DB
+
   /** The [[reactivemongo.api.MongoConnection]] that will be used to query this database. */
   @transient def connection: MongoConnection
+
+  /** The state of the associated [[connection]] */
+  private[api] def connectionState: ConnectionState
 
   /** This database name. */
   def name: String
@@ -46,10 +62,13 @@ sealed trait DB {
   /** A failover strategy for sending requests. */
   def failoverStrategy: FailoverStrategy
 
+  private[api] def session: Option[Session]
+
   /**
    * $resolveDescription (alias for the `collection` method).
    *
    * @param name $nameParam
+   * @param failoverStrategy $failoverStrategyParam
    */
   def apply[C <: Collection](name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit producer: CollectionProducer[C] = collections.bson.BSONCollectionProducer): C = collection(name, failoverStrategy)
 
@@ -57,72 +76,190 @@ sealed trait DB {
    * $resolveDescription.
    *
    * @param name $nameParam
+   * @param failoverStrategy $failoverStrategyParam
    */
   def collection[C <: Collection](name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit producer: CollectionProducer[C] = collections.bson.BSONCollectionProducer): C = producer(this, name, failoverStrategy)
 
   @inline def defaultReadPreference: ReadPreference =
     connection.options.readPreference
 
-  /** Authenticates the connection on this database. */
-  def authenticate(user: String, password: String)(implicit timeout: FiniteDuration): Future[SuccessfulAuthentication] = connection.authenticate(name, user, password)
+  /**
+   * Authenticates the connection on this database.
+   *
+   * @param user the name of the user
+   * @param password the user password
+   */
+  def authenticate(user: String, password: String)(implicit ec: ExecutionContext): Future[SuccessfulAuthentication] = connection.authenticate(name, user, password, failoverStrategy)
 
   /**
    * Returns the database of the given name on the same MongoConnection.
    *
    * @param name $nameParam
+   * @param failoverStrategy $failoverStrategyParam
    * @see [[sibling1]]
    */
-  def sibling(name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit ec: ExecutionContext): DefaultDB = connection(name, failoverStrategy)
+  @deprecated("Use [[sibling1]]", "0.16.0")
+  def sibling(name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit ec: ExecutionContext): DefaultDB = Await.result(connection.database(name, failoverStrategy), FiniteDuration(15, "seconds"))
 
   /**
    * Returns the database of the given name on the same MongoConnection.
    *
    * @param name $nameParam
+   * @param failoverStrategy $failoverStrategyParam
    */
   def sibling1(name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit ec: ExecutionContext): Future[DefaultDB] = connection.database(name, failoverStrategy)
 
+  /**
+   * Starts a [[https://docs.mongodb.com/manual/reference/command/startSession/ new session]], does nothing if a session has already being started (since MongoDB 3.6).
+   *
+   * '''EXPERIMENTAL:''' API may change without notice.
+   */
+  def startSession()(implicit ec: ExecutionContext): Future[DBType]
+
+  /**
+   * [[https://docs.mongodb.com/manual/reference/command/endSessions Ends the session]] associated with this database reference, if any otherwise does nothing (since MongoDB 3.6).
+   *
+   * '''EXPERIMENTAL:''' API may change without notice.
+   */
+  def endSession()(implicit ec: ExecutionContext): Future[DBType]
+
+  /**
+   * [[https://docs.mongodb.com/manual/reference/command/killSessions Kills the session]] (abort) associated with this database reference, if any otherwise does nothing (since MongoDB 3.6).
+   *
+   * '''EXPERIMENTAL:''' API may change without notice.
+   */
+  def killSession()(implicit ec: ExecutionContext): Future[DBType]
 }
 
-@deprecated(message = "Will be made sealed", since = "0.12-RC0")
-trait GenericDB[P <: SerializationPack with Singleton] { self: DB =>
+/**
+ * @define failoverStrategyParam the failover strategy to override the default one
+ */
+private[api] sealed trait GenericDB[P <: SerializationPack with Singleton] { self: DB =>
   val pack: P
 
   import reactivemongo.api.commands._
 
-  @deprecated(message = "Either use one of the `runX` function on the DB instance, or use `reactivemongo.api.commands.Command.run` directly", since = "0.12-RC0")
-  def runner = Command.run(pack)
+  /**
+   * @param failoverStrategy $failoverStrategyParam
+   */
+  def runCommand[R, C <: Command with CommandWithResult[R]](command: C with CommandWithResult[R], failoverStrategy: FailoverStrategy)(implicit writer: pack.Writer[C], reader: pack.Reader[R], ec: ExecutionContext): Future[R] = Command.run(pack, failoverStrategy).apply(self, command, self.defaultReadPreference)
 
-  @deprecated(message = "Use `runCommand` with the `failoverStrategy` parameter", since = "0.12-RC0")
-  def runCommand[R, C <: Command with CommandWithResult[R]](command: C with CommandWithResult[R])(implicit writer: pack.Writer[C], reader: pack.Reader[R], ec: ExecutionContext): Future[R] = runCommand[R, C](command, failoverStrategy)
-
-  def runCommand[R, C <: Command with CommandWithResult[R]](command: C with CommandWithResult[R], failoverStrategy: FailoverStrategy)(implicit writer: pack.Writer[C], reader: pack.Reader[R], ec: ExecutionContext): Future[R] = Command.run(pack, failoverStrategy).apply(self, command)
-
-  @deprecated(message = "Use `runCommand` with the `failoverStrategy` parameter", since = "0.12-RC0")
-  def runCommand[C <: Command](command: C)(implicit writer: pack.Writer[C]): CursorFetcher[pack.type, Cursor] = runCommand[C](command, failoverStrategy)
-
+  /**
+   * @param failoverStrategy $failoverStrategyParam
+   */
   def runCommand[C <: Command](command: C, failoverStrategy: FailoverStrategy)(implicit writer: pack.Writer[C]): CursorFetcher[pack.type, Cursor] = Command.run(pack, failoverStrategy).apply(self, command)
 
-  @deprecated(message = "Use `runValueCommand` with the `failoverStrategy` parameter", since = "0.12-RC0")
-  def runValueCommand[A <: AnyVal, R <: BoxedAnyVal[A], C <: Command with CommandWithResult[R]](command: C with CommandWithResult[R with BoxedAnyVal[A]])(implicit writer: pack.Writer[C], reader: pack.Reader[R], ec: ExecutionContext): Future[A] = runValueCommand[A, R, C](command, failoverStrategy)
-
-  @deprecated("Use the alternative with `ReadPreference`", "0.12-RC5")
-  def runValueCommand[A <: AnyVal, R <: BoxedAnyVal[A], C <: Command with CommandWithResult[R]](command: C with CommandWithResult[R with BoxedAnyVal[A]], failoverStrategy: FailoverStrategy)(implicit writer: pack.Writer[C], reader: pack.Reader[R], ec: ExecutionContext): Future[A] = runValueCommand[A, R, C](command, failoverStrategy, ReadPreference.primary)
-
+  /**
+   * @param failoverStrategy $failoverStrategyParam
+   */
   def runValueCommand[A <: AnyVal, R <: BoxedAnyVal[A], C <: Command with CommandWithResult[R]](command: C with CommandWithResult[R with BoxedAnyVal[A]], failoverStrategy: FailoverStrategy, readPreference: ReadPreference)(implicit writer: pack.Writer[C], reader: pack.Reader[R], ec: ExecutionContext): Future[A] = Command.run(pack, failoverStrategy).unboxed(self, command, readPreference)
 }
 
 /** The default DB implementation, that mixes in the database traits. */
 @SerialVersionUID(235871232L)
-case class DefaultDB(
-  name: String,
-  @transient connection: MongoConnection,
-  failoverStrategy: FailoverStrategy = FailoverStrategy()) extends DB with DBMetaCommands with GenericDB[BSONSerializationPack.type] {
+class DefaultDB private[api] (
+  val name: String,
+  @transient val connection: MongoConnection,
+  val connectionState: ConnectionState,
+  @transient val failoverStrategy: FailoverStrategy = FailoverStrategy(),
+  @transient val session: Option[Session] = Option.empty)
+  extends DB with DBMetaCommands with GenericDB[BSONSerializationPack.type]
+  with Product with Serializable {
+
+  type DBType = DefaultDB
 
   @transient val pack: BSONSerializationPack.type = BSONSerializationPack
+
+  def startSession()(implicit ec: ExecutionContext): Future[DefaultDB] =
+    session match {
+      case Some(_) => Future.successful(this) // NoOp
+
+      case _ => {
+        implicit def w: BSONSerializationPack.Writer[StartSession.type] =
+          StartSession.commandWriter(BSONSerializationPack)
+
+        implicit def r: BSONSerializationPack.Reader[StartSessionResult] =
+          StartSessionResult.reader(BSONSerializationPack)
+
+        Command.run(BSONSerializationPack, failoverStrategy).
+          apply(this, StartSession, defaultReadPreference).map(withNewSession)
+      }
+    }
+
+  private def withNewSession(result: StartSessionResult): DefaultDB =
+    new DefaultDB(name, connection, connectionState, failoverStrategy,
+      Option(result).map { r =>
+        connectionState.setName match {
+          case Some(_) => new ReplicaSetSession(r.id)
+          case _       => new PlainSession(r.id)
+        }
+      })
+
+  def endSession()(implicit ec: ExecutionContext): Future[DefaultDB] =
+    session.map(_.lsid) match {
+      case Some(uuid) => {
+        implicit def w: BSONSerializationPack.Writer[EndSessions] =
+          EndSessions.commandWriter(BSONSerializationPack)
+
+        implicit def r: BSONSerializationPack.Reader[UnitBox.type] =
+          CommandCodecs.unitBoxReader(BSONSerializationPack)
+
+        val endSessions = new EndSessions(uuid)
+
+        Command.run(BSONSerializationPack, failoverStrategy).
+          apply(this, endSessions, defaultReadPreference).map(_ =>
+            new DefaultDB(name, connection, connectionState, failoverStrategy,
+              None))
+
+      }
+
+      case _ =>
+        Future.successful(this) // NoOp
+    }
+
+  def killSession()(implicit ec: ExecutionContext): Future[DefaultDB] =
+    session.map(_.lsid) match {
+      case Some(uuid) => {
+        implicit def w: BSONSerializationPack.Writer[KillSessions] =
+          KillSessions.commandWriter(BSONSerializationPack)
+
+        implicit def r: BSONSerializationPack.Reader[UnitBox.type] =
+          CommandCodecs.unitBoxReader(BSONSerializationPack)
+
+        val killSessions = new KillSessions(uuid)
+
+        Command.run(BSONSerializationPack, failoverStrategy).
+          apply(this, killSessions, defaultReadPreference).map(_ =>
+            new DefaultDB(name, connection, connectionState, failoverStrategy,
+              None))
+
+      }
+
+      case _ => Future.successful(this) // NoOp
+    }
+
+  @deprecated("DefaultDB will no longer be a Product", "0.16.0")
+  val productArity = 3
+
+  @deprecated("DefaultDB will no longer be a Product", "0.16.0")
+  def productElement(n: Int): Any = (n: @scala.annotation.switch) match {
+    case 0 => name
+    case 1 => connection
+    case _ => failoverStrategy
+  }
+
+  def canEqual(that: Any): Boolean = that match {
+    case _: DefaultDB => true
+    case _            => false
+  }
 }
 
-object DB {
-  @deprecated("Use [[MongoConnection.database]]", "0.12.0")
-  def apply(name: String, connection: MongoConnection, failoverStrategy: FailoverStrategy = FailoverStrategy()) = DefaultDB(name, connection, failoverStrategy)
+@deprecated("Use DefaultDB class", "0.16.0")
+object DefaultDB extends scala.runtime.AbstractFunction3[String, MongoConnection, FailoverStrategy, DefaultDB] {
+  @deprecated("Use DefaultDB constructor", "0.16.0")
+  def apply(name: String, connection: MongoConnection, failoverStrategy: FailoverStrategy): DefaultDB = throw new UnsupportedOperationException("Use DefaultDB constructor")
+}
 
+@deprecated("Will be removed", "0.16.0")
+object DB {
 }

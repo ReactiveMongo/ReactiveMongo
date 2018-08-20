@@ -2,12 +2,11 @@ package reactivemongo.api.collections
 
 import scala.concurrent.{ ExecutionContext, Future }
 
-import reactivemongo.api.{ ReadPreference, SerializationPack }
+import reactivemongo.api.SerializationPack
 
 import reactivemongo.api.commands.{
   CollectionCommand,
   Command,
-  CommandCodecs,
   CommandWithResult,
   Collation,
   ResolvedCollectionCommand,
@@ -15,7 +14,7 @@ import reactivemongo.api.commands.{
 }
 
 /** The meta commands for collection that require the serialization pack. */
-private[reactivemongo] trait GenericCollectionMetaCommands[P <: SerializationPack with Singleton] extends CommandCodecs[P] { self: GenericCollection[P] =>
+private[reactivemongo] trait GenericCollectionMetaCommands[P <: SerializationPack with Singleton] { self: GenericCollection[P] =>
 
   /**
    * Creates a view on this collection, using an aggregation pipeline.
@@ -51,15 +50,14 @@ private[reactivemongo] trait GenericCollectionMetaCommands[P <: SerializationPac
     name: String,
     operator: PipelineOperator,
     pipeline: Seq[PipelineOperator],
-    collation: Option[Collation] = None,
-    readPreference: ReadPreference = self.writePref)(implicit ec: ExecutionContext): Future[Unit] = {
+    collation: Option[Collation] = None)(implicit ec: ExecutionContext): Future[Unit] = {
 
     val cmd = new CreateView(name, operator, pipeline, collation)
 
     // Command codecs
     implicit def writer = createViewWriter
 
-    command.unboxed(self, cmd, writePref)
+    command.unboxed(self, cmd, writePreference)
   }
 
   // ---

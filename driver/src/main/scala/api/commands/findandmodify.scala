@@ -1,7 +1,10 @@
 package reactivemongo.api.commands
 
-import reactivemongo.api.SerializationPack
+import reactivemongo.api.{ SerializationPack, Session }
 
+import reactivemongo.core.protocol.MongoWireVersion
+
+@deprecated("Will be private/internal", "0.16.0")
 trait FindAndModifyCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] {
   import pack._
 
@@ -9,17 +12,49 @@ trait FindAndModifyCommand[P <: SerializationPack] extends ImplicitCommandHelper
     query: Document,
     modify: Modify,
     sort: Option[Document],
-    fields: Option[Document]) extends CollectionCommand with CommandWithPack[P] with CommandWithResult[FindAndModifyResult] {
+    fields: Option[Document],
+    bypassDocumentValidation: Boolean,
+    writeConcern: WriteConcern,
+    maxTimeMS: Option[Int],
+    collation: Option[Collation],
+    arrayFilters: Seq[Document]) extends CollectionCommand with CommandWithPack[P] with CommandWithResult[FindAndModifyResult] {
     def upsert = modify.upsert
   }
 
   object FindAndModify {
+    @deprecated("Use other `apply`", "0.14.0")
     def apply(query: ImplicitlyDocumentProducer, modify: Modify, sort: Option[ImplicitlyDocumentProducer] = None, fields: Option[ImplicitlyDocumentProducer] = None): FindAndModify =
       FindAndModify(
         query.produce,
         modify,
         sort.map(_.produce),
-        fields.map(_.produce))
+        fields.map(_.produce),
+        bypassDocumentValidation = false,
+        writeConcern = GetLastError.Default,
+        maxTimeMS = Option.empty,
+        collation = Option.empty,
+        arrayFilters = Seq.empty)
+
+    def apply(
+      query: ImplicitlyDocumentProducer,
+      modify: Modify,
+      sort: Option[ImplicitlyDocumentProducer],
+      fields: Option[ImplicitlyDocumentProducer],
+      bypassDocumentValidation: Boolean,
+      writeConcern: WriteConcern,
+      maxTimeMS: Option[Int],
+      collation: Option[Collation],
+      arrayFilters: Seq[ImplicitlyDocumentProducer]): FindAndModify =
+      FindAndModify(
+        query.produce,
+        modify,
+        sort.map(_.produce),
+        fields.map(_.produce),
+        bypassDocumentValidation,
+        writeConcern,
+        maxTimeMS,
+        collation,
+        arrayFilters.map(_.produce))
   }
 
   /** A modify operation, part of a FindAndModify command */
@@ -58,5 +93,76 @@ trait FindAndModifyCommand[P <: SerializationPack] extends ImplicitCommandHelper
     value: Option[Document]) {
     def result[R](implicit reader: Reader[R]): Option[R] =
       value.map(pack.deserialize(_, reader))
+  }
+
+  def serialize(wireVer: MongoWireVersion, session: Option[Session]): ResolvedCollectionCommand[FindAndModify] => pack.Document = {
+    val builder = pack.newBuilder
+    val writeWriteConcern = CommandCodecs.writeWriteConcern(builder)
+
+    val sessionElmts: Seq[pack.ElementProducer] =
+      session.fold(Seq.empty[pack.ElementProducer])(
+        CommandCodecs.writeSession(builder))
+
+    { cmd: ResolvedCollectionCommand[FindAndModify] =>
+
+      import builder.{
+        array,
+        boolean,
+        elementProducer => element,
+        int,
+        string
+      }
+      import cmd.command
+
+      val elements = Seq.newBuilder[pack.ElementProducer]
+
+      elements ++= Seq(
+        element("findAndModify", string(cmd.collection)),
+        element("query", command.query),
+        element("bypassDocumentValidation", boolean(
+          command.bypassDocumentValidation)))
+
+      if (wireVer.compareTo(MongoWireVersion.V40) >= 0) {
+        elements += element(
+          "writeConcern",
+          writeWriteConcern(command.writeConcern))
+      }
+
+      elements ++= sessionElmts
+
+      command.fields.foreach { f =>
+        elements += element("fields", f)
+      }
+
+      command.arrayFilters.headOption.foreach { f =>
+        elements += element("arrayFilters", array(f, command.arrayFilters.tail))
+      }
+
+      command.modify match {
+        case Update(document, fetchNewObject, upsert) =>
+          elements ++= Seq(
+            element("upsert", boolean(upsert)),
+            element("update", document),
+            element("new", boolean(fetchNewObject)))
+
+        case _ =>
+          elements += element("remove", boolean(true))
+      }
+
+      command.sort.foreach { s =>
+        elements += element("sort", s)
+      }
+
+      command.maxTimeMS.foreach { ms =>
+        elements += element("maxTimeMS", int(ms))
+      }
+
+      command.collation.foreach { c =>
+        elements += element(
+          "collation", Collation.serializeWith(pack, c)(builder))
+      }
+
+      builder.document(elements.result())
+    }
   }
 }

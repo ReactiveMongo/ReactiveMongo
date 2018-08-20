@@ -1,8 +1,13 @@
 package reactivemongo.api
 
+import java.util.UUID
+
 import scala.util.Try
 
 import reactivemongo.bson.buffer.{ ReadableBuffer, WritableBuffer }
+
+import reactivemongo.core.protocol.Response
+import reactivemongo.core.netty.ChannelBufferReadableBuffer
 
 /** The default serialization pack. */
 object BSONSerializationPack extends SerializationPack { self =>
@@ -34,6 +39,23 @@ object BSONSerializationPack extends SerializationPack { self =>
   def readFromBuffer(buffer: ReadableBuffer): Document =
     DefaultBufferHandler.readDocument(buffer).get
 
+  override final def readAndDeserialize[A](response: Response, reader: Reader[A]): A = response match {
+    case s @ Response.Successful(_, _, docs, _) => s.first match {
+      case Some(preloaded) =>
+        deserialize[A](preloaded, reader) // optimization
+
+      case _ => {
+        val channelBuf = ChannelBufferReadableBuffer(docs)
+        readAndDeserialize(channelBuf, reader)
+      }
+    }
+
+    case _ => {
+      val channelBuf = ChannelBufferReadableBuffer(response.documents)
+      readAndDeserialize(channelBuf, reader)
+    }
+  }
+
   def writer[A](f: A => Document): Writer[A] = BSONDocumentWriter[A](f)
 
   def isEmpty(document: Document) = document.isEmpty
@@ -52,6 +74,8 @@ object BSONSerializationPack extends SerializationPack { self =>
 
   private[reactivemongo] def document(doc: BSONDocument): Document = doc
 
+  private[reactivemongo] def bsonValue(value: BSONValue): BSONValue = value
+
   override private[reactivemongo] val newBuilder: SerializationPack.Builder[BSONSerializationPack.type] = Builder
 
   override private[reactivemongo] val newDecoder: SerializationPack.Decoder[BSONSerializationPack.type] = Decoder
@@ -64,7 +88,7 @@ object BSONSerializationPack extends SerializationPack { self =>
   /** A builder for serialization simple values (useful for the commands) */
   private object Builder
     extends SerializationPack.Builder[BSONSerializationPack.type] {
-    protected val pack = self
+    protected[reactivemongo] val pack = self
 
     def document(elements: Seq[ElementProducer]): Document =
       BSONDocument(elements: _*)
@@ -84,13 +108,32 @@ object BSONSerializationPack extends SerializationPack { self =>
     def double(d: Double): Value = BSONDouble(d)
 
     def string(s: String): Value = BSONString(s)
+
+    def uuid(id: UUID): Value = BSONBinary(id)
+
+    /** Returns a timestamp as a serialized value. */
+    def timestamp(time: Long): Value = BSONTimestamp(time)
   }
 
   private object Decoder
     extends SerializationPack.Decoder[BSONSerializationPack.type] {
-    protected val pack = self
+    protected[reactivemongo] val pack = self
 
-    def booleanLike(document: pack.Document, name: String): Option[Boolean] =
+    def asDocument(value: BSONValue): Option[BSONDocument] = value match {
+      case doc: BSONDocument => Some(doc)
+      case _                 => None
+    }
+
+    def names(document: BSONDocument): Set[String] =
+      document.elements.map(_.name).toSet
+
+    def get(document: BSONDocument, name: String): Option[BSONValue] =
+      document.get(name)
+
+    def array(document: pack.Document, name: String): Option[Seq[BSONValue]] =
+      document.getAs[BSONArray](name).map(_.elements.map(_.value))
+
+    def booleanLike(document: BSONDocument, name: String): Option[Boolean] =
       document.getAs[BSONBooleanLike](name).map(_.toBoolean)
 
     def child(document: BSONDocument, name: String): Option[BSONDocument] =
@@ -107,7 +150,16 @@ object BSONSerializationPack extends SerializationPack { self =>
     def int(document: BSONDocument, name: String): Option[Int] =
       document.getAs[Int](name)
 
+    def long(document: BSONDocument, name: String): Option[Long] =
+      document.getAs[BSONNumberLike](name).map(_.toLong)
+
     def string(document: BSONDocument, name: String): Option[String] =
       document.getAs[String](name)
+
+    def uuid(document: BSONDocument, name: String): Option[UUID] =
+      document.getAs[BSONBinary](name).collect {
+        case bin @ BSONBinary(_, Subtype.UuidSubtype) =>
+          UUID.nameUUIDFromBytes(bin.byteArray)
+      }
   }
 }

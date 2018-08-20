@@ -16,12 +16,7 @@
 package reactivemongo.core.commands
 
 import reactivemongo.api.ReadPreference
-import reactivemongo.bson.{
-  BSONDocument,
-  BSONInteger,
-  BSONNumberLike,
-  BSONValue
-}
+import reactivemongo.bson.{ BSONDocument, BSONNumberLike }
 import reactivemongo.core.errors.ReactiveMongoException
 import reactivemongo.core.protocol.{ RequestMaker, Query, QueryFlags, Response }
 import reactivemongo.core.netty._
@@ -101,22 +96,6 @@ trait BSONCommandResultMaker[Result] extends CommandResultMaker[Result] {
    * Deserializes the given document into an instance of Result.
    */
   def apply(document: BSONDocument): Either[CommandError, Result]
-}
-
-/**
- * A command that targets the ''admin'' database only (administrative commands).
- */
-trait AdminCommand[Result] extends Command[Result] {
-  /**
-   * As and admin command targets only the ''admin'' database, @param db will be ignored.
-   * @inheritdoc
-   */
-  override def apply(db: String): MakableCommand = apply()
-
-  /**
-   * Produces a [[reactivemongo.core.commands.MakableCommand]] instance of this command.
-   */
-  def apply(): MakableCommand = new MakableCommand("admin", this)
 }
 
 /** A generic command error. */
@@ -209,39 +188,4 @@ class MakableCommand(val db: String, val command: Command[_]) {
       query.copy(flags = flags),
       BufferSequence.single(command.makeDocuments), readPreference)
   }
-}
-
-/**
- * ReplSetGetStatus Command.
- *
- * Returns the state of the Replica Set from the target server's point of view.
- */
-@deprecated(
-  "consider using reactivemongo.api.commands.ReplSetGetStatus", "0.11.5")
-object ReplStatus extends AdminCommand[Map[String, BSONValue]] {
-  override def makeDocuments = BSONDocument("replSetGetStatus" -> BSONInteger(1))
-
-  object ResultMaker extends BSONCommandResultMaker[Map[String, BSONValue]] {
-    def apply(document: BSONDocument) = Right(document.toMap)
-  }
-}
-
-/**
- * ServerStatus Command.
- *
- * Gets the detailed status of the target server.
- */
-@deprecated(
-  "consider using reactivemongo.api.commands.ServerStatus", "0.11.5")
-object Status extends AdminCommand[Map[String, BSONValue]] {
-  override def makeDocuments = BSONDocument("serverStatus" -> BSONInteger(1))
-
-  object ResultMaker extends BSONCommandResultMaker[Map[String, BSONValue]] {
-    def apply(document: BSONDocument) = Right(document.toMap)
-  }
-}
-
-/** A modify operation, part of a FindAndModify command */
-sealed trait Modify {
-  protected[commands] def toDocument: BSONDocument
 }

@@ -56,17 +56,9 @@ object Macros {
     trait Verbose extends Default
 
     /**
-     * In `write` method also store class name (dynamic type) as a string
-     * in a property named "className".
+     * Uses the class simple name (i.e. Not the fully-qualified name).
      */
-    @deprecated(message = "Default behaviour for sealed trait, if union types are not explicitly defined", since = "0.12-RC2")
-    trait SaveClassName extends Default
-
-    /**
-     * Same as [[SaveClassName]] but using the class simple name
-     * (i.e. Not the fully-qualified name).
-     */
-    trait SaveSimpleName extends SaveClassName with Default
+    trait SaveSimpleName extends Default
 
     /**
      * Use type parameter `A` as static type but use pattern matching to handle
@@ -74,13 +66,11 @@ object Macros {
      * data types(pattern where you have a sealed trait and several implementing
      * case classes). When writing a case class into BSON its dynamic type
      * will be pattern matched, when reading from BSON the pattern matching
-     * will be done on the `className` string. This option extends
-     * [[reactivemongo.bson.Macros.Options.SaveClassName]] in to ensure class
-     * names are always serialized.
+     * will be done on the `className` string.
      *
      * @tparam Types to use in pattern matching. Listed in a "type list" \/
      */
-    trait UnionType[Types <: \/[_, _]] extends SaveClassName with Default
+    trait UnionType[Types <: \/[_, _]] extends Default
 
     /**
      * Same as [[UnionType]] but saving the class’ simple name io. the
@@ -99,21 +89,6 @@ object Macros {
      * `Foo \/ Bar \/ Baz` is interpreted as type Foo or type Bar or type Baz
      */
     trait \/[A, B]
-
-    /**
-     * Similar to [[reactivemongo.bson.Macros.Options.UnionType]] but finds all
-     * implementations of the top trait automatically.
-     */
-    @deprecated(message = "Default behaviour for sealed trait, if union types are not explicitly defined", since = "0.12-RC2")
-    trait AllImplementations extends SaveClassName with Default
-
-    /**
-     * Same as [[AllImplementations]] but saving the simple name
-     * (e.g. the fully-qualified name).
-     */
-    @deprecated(message = "Default behaviour for sealed trait, if union types are not explicitly defined", since = "0.12-RC2")
-    trait SimpleAllImplementations
-      extends AllImplementations with SaveSimpleName with Default
 
     /**
      * For a sealed family (all implementations of a sealed trait

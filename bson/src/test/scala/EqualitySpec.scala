@@ -12,9 +12,10 @@ class EqualitySpec extends org.specs2.mutable.Specification {
 
   "BSONDBPointer" should {
     "permit equality to work" in {
-      val dbp1 = BSONDBPointer("coll", Array[Byte](1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12))
-      val dbp2 = dbp1.copy()
-      dbp1 must beEqualTo(dbp2)
+      def create() = BSONDBPointer(
+        "coll", Array[Byte](1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12))
+
+      create() must_=== create()
     }
 
     "retain equality through serialization/deserialization" in {
@@ -24,9 +25,11 @@ class EqualitySpec extends org.specs2.mutable.Specification {
       val writeBytes = writeBuffer.array
       val readBuffer = ArrayReadableBuffer(writeBytes)
       val readBytes = readBuffer.slice(readBuffer.readable()).readArray(readBuffer.readable())
-      writeBytes must beEqualTo(readBytes)
-      val bdp2 = BSONDBPointerBufferHandler.read(readBuffer)
-      dbp1 must beEqualTo(bdp2)
+
+      writeBytes must_=== readBytes and {
+        val bdp2 = BSONDBPointerBufferHandler.read(readBuffer)
+        dbp1 must_=== bdp2
+      }
     }
   }
 
@@ -35,7 +38,7 @@ class EqualitySpec extends org.specs2.mutable.Specification {
       val boid1 = BSONObjectID.parse("0102030405060708090a0b0c").get
       val boid2 = BSONObjectID.parse("0102030405060708090a0b0c").get
 
-      boid1 must beTypedEqualTo(boid2)
+      boid1 must_=== boid2
     }
 
     "retain equality through serialization/deserialization" in {

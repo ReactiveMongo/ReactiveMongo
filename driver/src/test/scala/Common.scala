@@ -1,3 +1,5 @@
+package tests
+
 import scala.concurrent.{ Await, ExecutionContext }
 import scala.concurrent.duration._
 
@@ -8,25 +10,23 @@ import reactivemongo.api.{
   FailoverStrategy,
   MongoDriver,
   MongoConnection,
-  MongoConnectionOptions
+  MongoConnectionOptions,
+  X509Authentication
 }
 
-object Common {
+object Common extends CommonAuth {
   val logger = reactivemongo.util.LazyLogger("tests")
 
-  val replSetOn =
-    Option(System getProperty "test.replicaSet").fold(false) {
-      case "true" => true
-      case _      => false
-    }
+  val replSetOn = sys.props.get("test.replicaSet").fold(false) {
+    case "true" => true
+    case _      => false
+  }
 
-  val crMode = Option(System getProperty "test.authMode").
-    filter(_ == "cr").map(_ => CrAuthentication)
+  val primaryHost = sys.props.getOrElse("test.primaryHost", "localhost:27017")
 
-  val primaryHost =
-    Option(System getProperty "test.primaryHost").getOrElse("localhost:27017")
+  val nettyNativeArch = sys.props.get("test.nettyNativeArch")
 
-  val failoverRetries = Option(System getProperty "test.failoverRetries").
+  val failoverRetries = sys.props.get("test.failoverRetries").
     flatMap(r => scala.util.Try(r.toInt).toOption).getOrElse(7)
 
   private val driverReg = Seq.newBuilder[MongoDriver]
@@ -42,22 +42,6 @@ object Common {
 
   val failoverStrategy = FailoverStrategy(retries = failoverRetries)
 
-  val DefaultOptions = {
-    val a = MongoConnectionOptions(
-      failoverStrategy = failoverStrategy,
-      nbChannelsPerNode = 20)
-
-    val b = {
-      if (Option(System getProperty "test.enableSSL").exists(_ == "true")) {
-        a.copy(sslEnabled = true, sslAllowsInvalidCert = true)
-      } else a
-    }
-
-    crMode.fold(b) { mode => b.copy(authMode = mode) }
-  }
-
-  lazy val connection = driver.connection(List(primaryHost), DefaultOptions)
-
   private val timeoutFactor = 1.25D
   def estTimeout(fos: FailoverStrategy): FiniteDuration =
     (1 to fos.retries).foldLeft(fos.initialDelay) { (d, i) =>
@@ -71,22 +55,43 @@ object Common {
     else maxTimeout
   }
 
+  val DefaultOptions = {
+    val a = MongoConnectionOptions(
+      failoverStrategy = failoverStrategy,
+      monitorRefreshMS = (timeout.toMillis / 2).toInt,
+      credentials = DefaultCredentials.map("" -> _)(scala.collection.breakOut),
+      keyStore = sys.props.get("test.keyStore").map { uri =>
+        MongoConnectionOptions.KeyStore(
+          resource = new java.net.URI(uri), // file://..
+          storeType = "PKCS12",
+          password = sys.props.get("test.keyStorePassword").map(_.toCharArray))
+      })
+
+    val b = {
+      if (sys.props.get("test.enableSSL").exists(_ == "true")) {
+        a.copy(sslEnabled = true, sslAllowsInvalidCert = true)
+      } else a
+    }
+
+    authMode.fold(b) { mode =>
+      b.copy(authenticationMechanism = mode)
+    }
+  }
+
+  lazy val connection = driver.connection(List(primaryHost), DefaultOptions)
+
   val commonDb = "specs2-test-reactivemongo"
 
   // ---
 
   val slowFailover = {
-    val retries = Option(System getProperty "test.slowFailoverRetries").
-      fold(20)(_.toInt)
+    val retries = sys.props.get("test.slowFailoverRetries").fold(20)(_.toInt)
 
     failoverStrategy.copy(retries = retries)
   }
 
-  val SlowOptions = DefaultOptions.copy(
-    failoverStrategy = slowFailover)
-
-  val slowPrimary = Option(
-    System getProperty "test.slowPrimaryHost").getOrElse("localhost:27019")
+  val slowPrimary = sys.props.getOrElse(
+    "test.slowPrimaryHost", "localhost:27019")
 
   val slowTimeout: FiniteDuration = {
     val maxTimeout = estTimeout(slowFailover)
@@ -95,57 +100,44 @@ object Common {
     else maxTimeout
   }
 
+  val SlowOptions = DefaultOptions.copy(
+    failoverStrategy = slowFailover,
+    monitorRefreshMS = (slowTimeout.toMillis / 2).toInt)
+
   val slowProxy: NettyProxy = {
     import java.net.InetSocketAddress
+    import ExecutionContext.Implicits.global
 
-    val delay = Option(System getProperty "test.slowProxyDelay").
+    val delay = sys.props.get("test.slowProxyDelay").
       fold(500L /* ms */ )(_.toLong)
 
-    val AddressPort = """^(.*):(.*)$""".r
-    def localAddr: InetSocketAddress = slowPrimary match {
-      case AddressPort(addr, p) => try {
-        val port = p.toInt
-        new InetSocketAddress(addr, port)
-      } catch {
-        case e: Throwable =>
-          logger.error(s"fails to prepare local address: $e")
-          throw e
-      }
+    import NettyProxy.InetAddress
 
-      case _ => sys.error(s"invalid local address: $slowPrimary")
-    }
+    def localAddr: InetSocketAddress = InetAddress.unapply(slowPrimary).get
+    def remoteAddr: InetSocketAddress = InetAddress.unapply(primaryHost).get
 
-    def remoteAddr: InetSocketAddress = primaryHost.span(_ != ':') match {
-      case (host, p) => try {
-        val port = p.drop(1).toInt
-        new InetSocketAddress(host, port)
-      } catch {
-        case e: Throwable =>
-          logger.error(s"fails to prepare remote address: $e")
-          throw e
-      }
+    val prx = new NettyProxy(Seq(localAddr), remoteAddr, Some(delay))
 
-      case _ => sys.error(s"invalid remote address: $primaryHost")
-    }
+    prx.start()
 
-    val proxy = new NettyProxy(Seq(localAddr), remoteAddr, Some(delay))
-    proxy.start()
-    proxy
+    prx
   }
 
   lazy val slowConnection = driver.connection(List(slowPrimary), SlowOptions)
 
-  def databases(con: MongoConnection, slowCon: MongoConnection): (DefaultDB, DefaultDB) = {
+  def databases(name: String, con: MongoConnection, slowCon: MongoConnection): (DefaultDB, DefaultDB) = {
     import ExecutionContext.Implicits.global
 
     val _db = con.database(
-      commonDb, failoverStrategy).flatMap { d => d.drop.map(_ => d) }
+      name, failoverStrategy).flatMap { d => d.drop.map(_ => d) }
 
-    Await.result(_db, timeout) -> Await.result(
-      slowCon.database(commonDb, slowFailover), slowTimeout)
+    Await.result(_db, timeout) -> Await.result((for {
+      _ <- slowProxy.start()
+      resolved <- slowCon.database(name, slowFailover)
+    } yield resolved), timeout + slowTimeout)
   }
 
-  lazy val (db, slowDb) = databases(connection, slowConnection)
+  lazy val (db, slowDb) = databases(commonDb, connection, slowConnection)
 
   @annotation.tailrec
   def tryUntil[T](retries: List[Int])(f: => T, test: T => Boolean): Boolean =
@@ -194,4 +186,29 @@ object Common {
 
     slowProxy.stop()
   }
+}
+
+sealed trait CommonAuth {
+  import reactivemongo.api.AuthenticationMode
+
+  def driver: MongoDriver
+
+  def authMode: Option[AuthenticationMode] =
+    sys.props.get("test.authenticationMechanism").flatMap {
+      case "cr"   => Some(CrAuthentication)
+      case "x509" => Some(X509Authentication)
+      case _      => None
+    }
+
+  private lazy val certSubject = sys.props.get("test.clientCertSubject")
+
+  lazy val DefaultCredentials = certSubject.toSeq.map { cert =>
+    MongoConnectionOptions.Credential(cert, None)
+  }
+
+  def ifX509[T](block: => T)(otherwise: => T): T =
+    authMode match {
+      case Some(X509Authentication) => block
+      case _                        => otherwise
+    }
 }

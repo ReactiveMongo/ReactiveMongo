@@ -1,9 +1,16 @@
-#! /bin/bash
+#! /usr/bin/env bash
 
 set -e
 
 echo "[INFO] Clean some IVY cache"
 rm -rf "$HOME/.ivy2/local/org.reactivemongo"
+
+if [ "$OS_NAME" = "osx" ]; then
+  echo "[INFO] Mac OS X setup"
+
+  brew update
+  brew install sbt
+fi
 
 CATEGORY="$1"
 
@@ -22,12 +29,16 @@ SCRIPT_DIR=`dirname $0 | sed -e "s|^\./|$PWD/|"`
 echo "[INFO] MongoDB major version: $MONGO_VER"
 
 MONGO_MINOR="3.2.10"
-    
-if [ "$AKKA_VERSION" = "2.5.6" ]; then
-    MONGO_MINOR="3.4.10"
-    MONGO_VER="3_4"
 
-    echo "[WARN] Fix MongoDB version to 3.4.10 (due to Akka Stream version)"
+if [ "$MONGO_VER" = "4" ]; then
+    MONGO_MINOR="4.0.0"
+fi
+    
+if [ "$AKKA_VERSION" = "2.5.13" ]; then
+    MONGO_MINOR="4.0.0"
+    MONGO_VER="4"
+
+    echo "[WARN] Fix MongoDB version to $MONGO_MINOR (due to Akka Stream version)"
 else
     if [ "$MONGO_VER" = "2_6" ]; then
         MONGO_MINOR="2.6.12"
@@ -36,8 +47,8 @@ fi
 
 # Prepare integration env
 
-PRIMARY_HOST="localhost:27018"
-PRIMARY_SLOW_PROXY="localhost:27019"
+PRIMARY_HOST=`hostname`":27018"
+PRIMARY_SLOW_PROXY=`hostname`":27019"
 
 # OpenSSL
 if [ ! -L "$HOME/ssl/lib/libssl.so.1.0.0" ] && [ ! -f "$HOME/ssl/lib/libssl.so.1.0.0" ]; then
@@ -55,6 +66,7 @@ if [ ! -L "$HOME/ssl/lib/libssl.so.1.0.0" ] && [ ! -f "$HOME/ssl/lib/libssl.so.1
   ln -s "$HOME/ssl/lib/libcrypto.so.1.0.0" "$HOME/ssl/lib/libcrypto.so.10"
 fi
 
+export PATH="$HOME/ssl/bin:$PATH"
 export LD_LIBRARY_PATH="$HOME/ssl/lib:$LD_LIBRARY_PATH"
 
 # Build MongoDB

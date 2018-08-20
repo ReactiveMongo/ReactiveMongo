@@ -1,79 +1,144 @@
-import reactivemongo.api._, collections.bson.BSONCollection
+import scala.concurrent.duration.FiniteDuration
+
 import reactivemongo.bson._
 
-import org.specs2.concurrent.ExecutionEnv
+import reactivemongo.api._, collections.bson.BSONCollection
 
-class CollectionMetaSpec(implicit ee: ExecutionEnv)
-  extends org.specs2.mutable.Specification {
+import reactivemongo.api.commands.CollStatsResult
+import reactivemongo.api.commands.CommandError.{ Code, Message }
 
-  "Collection meta operations" title
-
-  import reactivemongo.api.commands.CommandError.{ Code, Message }
-  import reactivemongo.api.collections.bson._
+// TODO: Separate Spec?
+trait CollectionMetaSpec { collSpec: CollectionSpec =>
+  import _root_.tests.Common
   import Common._
 
-  sequential
+  def metaSpec = {
+    "with the default connection" >> {
+      val colName = s"collmeta${System identityHashCode this}"
 
-  val colName = s"collmeta${System identityHashCode this}"
-  lazy val collection = db(colName)
-  lazy val slowColl = slowDb(colName)
-
-  "BSON collection" should {
-    "be created" in {
-      collection.create() must beTypedEqualTo({}).await(1, timeout)
-    }
-
-    {
-      def renameSpec(_db: DefaultDB) =
-        "be renamed with failure" in {
-          _db(colName).rename("renamed").map(_ => false).recover({
-            case Code(13) & Message(msg) if (
-              msg contains "renameCollection ") => true
-            case _ => false
-          }) must beTrue.await(1, timeout)
-        }
-
-      "with the default connection" >> renameSpec(db)
-      "with the slow connection" >> renameSpec(slowDb)
-    }
-
-    {
-      def dropSpec(_db: DefaultDB) = {
-        "be dropped successfully if exists (deprecated)" in {
-          val col = _db(s"foo_${System identityHashCode _db}")
-
-          col.create().flatMap(_ => col.drop(false)).
-            aka("legacy drop") must beTrue.await(1, timeout)
-        }
-
-        "be dropped with failure if doesn't exist (deprecated)" in {
-          val col = _db(s"foo_${System identityHashCode _db}")
-
-          col.drop() aka "legacy drop" must throwA[Exception].like {
-            case Code(26) => ok
-          }.await(1, timeout)
-        }
-
-        "be dropped successfully if exist" in {
-          val col = _db(s"foo1_${System identityHashCode _db}")
-
-          col.create().flatMap(_ => col.drop(false)).
-            aka("dropped") must beTrue.await(1, timeout)
-        }
-
-        "be dropped successfully if doesn't exist" in {
-          val col = _db(s"foo2_${System identityHashCode _db}")
-
-          col.drop(false) aka "dropped" must beFalse.await(1, timeout)
-        }
+      "be created" in {
+        db(colName).create() must beTypedEqualTo({}).await(1, timeout)
       }
 
-      "with the default connection" >> dropSpec(db)
-      "with the slow connection" >> dropSpec(db)
+      cappedSpec(db(colName), timeout)
+
+      listSpec(db, timeout)
+
+      "be renamed" >> {
+        successfulRename(connection, timeout)
+
+        failedRename(db, colName, timeout)
+      }
+
+      dropSpec(db, colName, timeout)
+    }
+
+    "with the slow connection" >> {
+      val colName = s"collmeta${System identityHashCode db}"
+
+      "be created" in {
+        slowDb(colName).create() must beTypedEqualTo({}).
+          await(1, slowTimeout)
+      }
+
+      cappedSpec(slowDb(colName), slowTimeout)
+
+      listSpec(slowDb, slowTimeout)
+
+      "be renamed" >> {
+        successfulRename(slowConnection, slowTimeout)
+
+        failedRename(slowDb, colName, slowTimeout)
+      }
+
+      dropSpec(slowDb, colName, slowTimeout)
     }
   }
 
-  @inline def findAll(c: BSONCollection) = c.find(BSONDocument())
+  // ---
+
+  val cappedMaxSize: Long = 2 * 1024 * 1024
+
+  def cappedSpec(c: BSONCollection, timeout: FiniteDuration) =
+    "be capped" >> {
+      "after conversion" in {
+        c.convertToCapped(cappedMaxSize, None) must beEqualTo({}).
+          await(1, timeout)
+      }
+
+      "with statistics (MongoDB <= 2.6)" in {
+        c.stats must beLike[CollStatsResult] {
+          case stats => stats.capped must beTrue and (stats.maxSize must beNone)
+        }.await(1, timeout)
+      } tag "mongo2"
+
+      "with statistics (MongoDB >= 3.0)" >> {
+        c.stats must beLike[CollStatsResult] {
+          case stats => stats.capped must beTrue and (
+            stats.maxSize must beSome(cappedMaxSize))
+        }.await(1, timeout)
+      } tag "not_mongo26"
+    }
+
+  def successfulRename(c: MongoConnection, timeout: FiniteDuration) =
+    "successfully" in {
+      (for {
+        coll <- c.database("admin").map(
+          _(s"foo_${System identityHashCode timeout}"))
+
+        _ <- coll.create()
+        _ <- coll.rename(s"renamed${System identityHashCode coll}")
+      } yield ()) aka "renaming" must beEqualTo({}).await(0, timeout)
+    }
+
+  def failedRename(_db: DefaultDB, colName: String, timeout: FiniteDuration) =
+    "with failure" in {
+      _db(colName).rename("renamed").map(_ => false).recover({
+        case Code(13) & Message(msg) if (
+          msg contains "renameCollection ") => true
+        case _ => false
+      }) must beTrue.await(1, timeout)
+    }
+
+  def listSpec(db2: DefaultDB, timeout: FiniteDuration) = "be listed" in {
+    val doc = BSONDocument("foo" -> BSONString("bar"))
+    val name1 = s"collection_one${System identityHashCode doc}"
+    val name2 = s"collection_two${System identityHashCode doc}"
+
+    def i1 = db2(name1).insert(doc).map(_.ok)
+
+    def i2 = db2(name2).insert(doc).map(_.ok)
+
+    i1 aka "insert #1" must beTrue.await(1, timeout) and {
+      i2 aka "insert #2" must beTrue.await(1, timeout)
+    } and {
+      db2.collectionNames must contain(atLeast(name1, name2)).await(2, timeout)
+      // ... as the concurrent tests could create other collections
+    }
+  }
+
+  def dropSpec(_db: DefaultDB, name: String, timeout: FiniteDuration) = {
+    def col = _db(name)
+
+    "be dropped successfully if exists (deprecated)" in {
+      col.drop(false) aka "legacy drop" must beTrue.await(1, timeout)
+    }
+
+    "be dropped with failure if doesn't exist (deprecated)" in {
+      col.drop() aka "legacy drop" must throwA[Exception].like {
+        case Code(26) => ok
+      }.await(1, timeout)
+    }
+
+    "be dropped successfully if exist" in {
+      col.create().flatMap(_ => col.drop(false)).
+        aka("dropped") must beTrue.await(1, timeout)
+    }
+
+    "be dropped successfully if doesn't exist" in {
+      col.drop(false) aka "dropped" must beFalse.await(1, timeout)
+    }
+  }
 
   object & {
     def unapply[T](any: T): Option[(T, T)] = Some(any -> any)

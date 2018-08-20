@@ -46,6 +46,8 @@ class JmxSpec(implicit ee: ExecutionEnv)
           val mbeans = mbs.queryMBeans(new ObjectName(
             "org.reactivemongo.Supervisor-*:type=NodeSet,*"), null)
 
+          val l = 5 + Common.primaryHost.size // Node[...
+
           Try(mbeans.iterator.next()) must beSuccessfulTry[ObjectInstance].
             which { bi =>
               val on = bi.getObjectName
@@ -64,7 +66,7 @@ class JmxSpec(implicit ee: ExecutionEnv)
                             if (typ == "java.lang.String" && (
                               v != null && v.toString.startsWith("Node["))) {
 
-                              v.asInstanceOf[String].take(20)
+                              v.asInstanceOf[String].take(l)
                             } else v
                         }) match {
                           case Success(_ :: _ :: _ :: _ :: null :: _) => ()
@@ -78,8 +80,14 @@ class JmxSpec(implicit ee: ExecutionEnv)
                 mbs.addNotificationListener(on, listener, null, null)
 
                 attrs.future must beEqualTo(List(
-                  null.asInstanceOf[String], // name
-                  -1L, // version
+                  { // set name
+                    if (Common.replSetOn) "testrs0"
+                    else null.asInstanceOf[String]
+                  },
+                  { // set version
+                    if (Common.replSetOn) 1L
+                    else -1L
+                  },
                   s"Node[$host:$port", // primary
                   null.asInstanceOf[String], // mongos
                   s"Node[$host:$port", // nearest
@@ -139,7 +147,7 @@ class JmxSpec(implicit ee: ExecutionEnv)
             aka("MBean info") must beSuccessfulTry[MBeanInfo].like {
               case info => info.getAttributes.map(attr => {
                 (attr.getName, attr.getType, attr.isReadable, attr.isWritable)
-              }).iterator must containAllOf(attrs) and {
+              }).toSeq must containAllOf(attrs) and {
                 info.getOperations aka "operations" must beEmpty
               } and {
                 info.getNotifications must_== notifInfo

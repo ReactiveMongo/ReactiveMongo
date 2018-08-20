@@ -83,20 +83,28 @@ object DefaultBufferHandler extends BufferHandler {
       buffer
     }
 
-    def read(b: ReadableBuffer) = {
-      val length = b.readInt
-      val buffer = b.slice(length - 4)
-      b.discard(length - 4)
+    def read(buffer: ReadableBuffer) = {
+      val length = buffer.readInt()
+      val bodyLen = length - 4
+
+      val body = buffer.slice(bodyLen)
+
+      buffer.discard(bodyLen)
+
       def makeStream(): Stream[Try[BSONElement]] = {
-        if (buffer.readable > 1) { // last is 0
-          val code = buffer.readByte
-          val name = buffer.readCString
-          val elem = Try(BSONElement(name, DefaultBufferHandler.handlersByCode.get(code).map(_.read(buffer)).get))
+        if (body.readable > 1) { // last is 0
+          val code = body.readByte
+          val name = body.readCString
+
+          val elem = Try(BSONElement(name, DefaultBufferHandler.handlersByCode.get(code).map(_.read(body)).get))
           elem #:: makeStream
         } else Stream.empty
       }
+
       val stream = makeStream
+
       stream.force // TODO remove
+
       new BSONDocument(stream)
     }
   }
@@ -168,7 +176,9 @@ object DefaultBufferHandler extends BufferHandler {
   }
 
   object BSONBooleanBufferHandler extends BufferRW[BSONBoolean] {
-    def write(boolean: BSONBoolean, buffer: WritableBuffer) = buffer writeByte (if (boolean.value) 1 else 0)
+    def write(boolean: BSONBoolean, buffer: WritableBuffer) =
+      buffer writeByte (if (boolean.value) 1 else 0)
+
     def read(buffer: ReadableBuffer) = BSONBoolean(buffer.readByte == 0x01)
   }
 
@@ -190,7 +200,8 @@ object DefaultBufferHandler extends BufferHandler {
       buffer writeCString regex.flags
     }
 
-    def read(buffer: ReadableBuffer) = BSONRegex(buffer.readCString, buffer.readCString)
+    def read(buffer: ReadableBuffer) =
+      BSONRegex(buffer.readCString, buffer.readCString)
   }
 
   object BSONDBPointerBufferHandler extends BufferRW[BSONDBPointer] {
@@ -247,10 +258,10 @@ object DefaultBufferHandler extends BufferHandler {
 
   object BSONDecimalBufferHandler extends BufferRW[BSONDecimal] {
     def write(decimal: BSONDecimal, buffer: WritableBuffer) =
-      buffer.writeLong(decimal.high).writeLong(decimal.low)
+      buffer.writeLong(decimal.low).writeLong(decimal.high)
 
     def read(buffer: ReadableBuffer): BSONDecimal =
-      BSONDecimal(high = buffer.readLong(), low = buffer.readLong())
+      BSONDecimal(low = buffer.readLong(), high = buffer.readLong())
   }
 
   object BSONMinKeyBufferHandler extends BufferRW[BSONMinKey.type] {
@@ -264,7 +275,8 @@ object DefaultBufferHandler extends BufferHandler {
   }
 
   def serialize(bson: BSONValue, buffer: WritableBuffer): WritableBuffer = {
-    handlersByCode.get(bson.code).get.asInstanceOf[BufferRW[BSONValue]].write(bson, buffer)
+    handlersByCode.get(bson.code).
+      get.asInstanceOf[BufferRW[BSONValue]].write(bson, buffer)
   }
 
   def deserialize(buffer: ReadableBuffer): Try[(String, BSONValue)] = Try {

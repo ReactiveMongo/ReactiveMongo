@@ -31,6 +31,7 @@ import reactivemongo.bson.{
  * db.runCommand(ServerStatus)
  * }}}
  */
+@deprecated("Will be private/internal", "0.16.0")
 object BSONServerStatusImplicits {
   implicit object BSONServerStatusWriter
     extends BSONDocumentWriter[ServerStatus.type] {

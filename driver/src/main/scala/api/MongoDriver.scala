@@ -4,11 +4,8 @@ import scala.util.{ Try, Failure, Success }
 
 import scala.concurrent.{ Await, ExecutionContext }
 import scala.concurrent.duration.{ Duration, FiniteDuration, SECONDS }
-
 import com.typesafe.config.Config
-
 import akka.actor.ActorRef
-
 import reactivemongo.core.nodeset.Authenticate
 import reactivemongo.util.LazyLogger
 
@@ -30,27 +27,21 @@ class MongoDriver(
   protected val config: Option[Config] = None,
   protected val classLoader: Option[ClassLoader] = None) extends Driver {
 
-  @deprecated("Use the constructor with the classloader", "0.12-RC6")
-  def this(config: Option[Config]) = this(config, None)
-
   import MongoDriver.logger
 
   /** Keep a list of all connections so that we can terminate the actors */
-  @deprecated(message = "Will be made private", since = "0.12-RC1")
-  def connections: Iterable[MongoConnection] = connectionMonitors.values
+  private[reactivemongo] def connections: Iterable[MongoConnection] = connectionMonitors.values
 
-  @deprecated(message = "Will be made private", since = "0.12-RC1")
-  def numConnections: Int = connectionMonitors.size
+  private[reactivemongo] def numConnections: Int = connectionMonitors.size
 
-  @deprecated("Will be made private", "0.12.7")
-  case class AddConnection(
+  private[reactivemongo] case class AddConnection(
     name: String,
     nodes: Seq[String],
     options: MongoConnectionOptions,
     mongosystem: ActorRef)
 
-  @deprecated("Will be made private", "0.12.7")
-  class SupervisorActor() extends akka.actor.Actor with Product
+  private[reactivemongo] class SupervisorActor()
+    extends akka.actor.Actor with Product
     with Serializable with java.io.Serializable {
 
     def receive: Receive = throw new UnsupportedOperationException()
@@ -72,13 +63,19 @@ class MongoDriver(
    * $seeConnectDBTutorial
    *
    * @param nodes $nodesParam
-   * @param authentications $authParam
-   * @param nbChannelsPerNode $nbChannelsParam
-   * @param name $connectionNameParam
    * @param options $optionsParam
+   * @param authentications $authParam
+   * @param name $connectionNameParam
    */
-  @deprecated(message = "Must use `connection` with `nbChannelsPerNode` set in the `options`.", since = "0.11.3")
-  def connection(nodes: Seq[String], options: MongoConnectionOptions, authentications: Seq[Authenticate], nbChannelsPerNode: Int, name: Option[String]): MongoConnection = connection(nodes, options, authentications, name)
+  @deprecated("Use `connection` without `authentications` (but possibly without `options.credentials`)", "0.14.0")
+  def connection(nodes: Seq[String], options: MongoConnectionOptions = MongoConnectionOptions(), authentications: Seq[Authenticate] = Seq.empty, name: Option[String] = None): MongoConnection = {
+    val credentials = options.credentials ++ authentications.map { a =>
+      a.db -> MongoConnectionOptions.Credential(a.user, a.password)
+    }
+
+    Await.result(askConnection(nodes, options.copy(
+      credentials = credentials), name), Duration.Inf)
+  }
 
   /**
    * Creates a new MongoConnection.
@@ -86,13 +83,34 @@ class MongoDriver(
    * $seeConnectDBTutorial
    *
    * @param nodes $nodesParam
-   * @param authentications $authParam
-   * @param name $connectionNameParam
+   */
+  def connection(nodes: Seq[String]): MongoConnection = Await.result(
+    askConnection(nodes, MongoConnectionOptions(), Option.empty), Duration.Inf)
+
+  /**
+   * Creates a new MongoConnection.
+   *
+   * $seeConnectDBTutorial
+   *
+   * @param nodes $nodesParam
    * @param options $optionsParam
    */
-  def connection(nodes: Seq[String], options: MongoConnectionOptions = MongoConnectionOptions(), authentications: Seq[Authenticate] = Seq.empty, name: Option[String] = None): MongoConnection = {
-    Await.result(askConnection(nodes, options, authentications, name), Duration.Inf)
-  }
+  def connection(nodes: Seq[String], options: MongoConnectionOptions): MongoConnection = Await.result(askConnection(nodes, options, Option.empty), Duration.Inf)
+
+  /**
+   * Creates a new MongoConnection.
+   *
+   * $seeConnectDBTutorial
+   *
+   * @param nodes $nodesParam
+   * @param options $optionsParam
+   * @param name $connectionNameParam
+   */
+  def connection(
+    nodes: Seq[String],
+    options: MongoConnectionOptions,
+    name: String): MongoConnection = Await.result(
+    askConnection(nodes, options, Some(name)), Duration.Inf)
 
   /**
    * Creates a new MongoConnection from URI.
@@ -114,18 +132,6 @@ class MongoDriver(
    * @param strictUri $strictUriParam
    */
   def connection(uri: String, name: Option[String], strictUri: Boolean): Try[MongoConnection] = MongoConnection.parseURI(uri).flatMap(connection(_, name, strictUri))
-
-  /**
-   * Creates a new MongoConnection from URI.
-   *
-   * $seeConnectDBTutorial
-   *
-   * @param parsedURI $parsedURIParam
-   * @param nbChannelsPerNode $nbChannelsParam
-   * @param name $connectionNameParam
-   */
-  @deprecated(message = "Must you reactivemongo.api.MongoDriver.connection(reactivemongo.api.MongoConnection.ParsedURI,Option[String]):reactivemongo.api.MongoConnection connection(..)]] with `nbChannelsPerNode` set in the `parsedURI`.", since = "0.11.3")
-  def connection(parsedURI: MongoConnection.ParsedURI, nbChannelsPerNode: Int, name: Option[String]): MongoConnection = connection(parsedURI, name)
 
   /**
    * Creates a new MongoConnection from URI.
@@ -155,17 +161,6 @@ class MongoDriver(
       Success(connection(parsedURI.hosts.map(h => h._1 + ':' + h._2), parsedURI.options, parsedURI.authenticate.toSeq, name))
     }
   }
-
-  /**
-   * Creates a new MongoConnection from URI.
-   *
-   * $seeConnectDBTutorial
-   *
-   * @param parsedURI $parsedURIParam
-   * @param nbChannelsPerNode $nbChannelsParam
-   */
-  @deprecated(message = "Must you `connection` with `nbChannelsPerNode` set in the options of the `parsedURI`.", since = "0.11.3")
-  def connection(parsedURI: MongoConnection.ParsedURI, nbChannelsPerNode: Int): MongoConnection = connection(parsedURI, None, false).get // Unsafe
 
   /**
    * Creates a new MongoConnection from URI.

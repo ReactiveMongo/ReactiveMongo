@@ -337,8 +337,7 @@ private object MacroImpl {
     private def classNameTree(tpe: c.Type): Option[c.Expr[(String, BSONString)]] = {
       val tpeSym = A.typeSymbol.asClass
 
-      if (hasOption[Macros.Options.SaveClassName] ||
-        tpeSym.isSealed && tpeSym.isAbstract) Some {
+      if (tpeSym.isSealed && tpeSym.isAbstract) Some {
         val name = if (hasOption[Macros.Options.SaveSimpleName]) {
           c.Expr[String](q"${tpe.typeSymbol.name.decodedName.toString}")
         } else c.Expr[String](q"${tpe.typeSymbol.fullName}")

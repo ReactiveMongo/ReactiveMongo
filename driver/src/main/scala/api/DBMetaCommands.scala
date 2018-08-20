@@ -17,16 +17,20 @@ import reactivemongo.api.collections.bson.{
 
 /** A mixin that provides commands about this database itself. */
 trait DBMetaCommands { self: DB =>
+  // TODO: endSessions, killAllSessions, killAllSessionsByPattern, killSessions, refreshSessions
+
   import reactivemongo.core.protocol.MongoWireVersion
   import reactivemongo.api.commands.{
     Command,
     DropDatabase,
+    DBHash,
+    DBHashResult,
     ListCollectionNames,
     PingCommand,
     ServerStatus,
     ServerStatusResult,
     UserRole,
-    WriteConcern
+    WriteConcern => WC
   }
   import reactivemongo.api.commands.bson.{
     CommonImplicits,
@@ -61,9 +65,9 @@ trait DBMetaCommands { self: DB =>
 
   /** Returns the names of the collections in this database. */
   def collectionNames(implicit ec: ExecutionContext): Future[List[String]] = {
-    val wireVer = connection.metadata.map(_.maxWireVersion)
+    val wireVer = connectionState.metadata.maxWireVersion
 
-    if (wireVer.exists(_ >= MongoWireVersion.V30)) {
+    if (wireVer >= MongoWireVersion.V30) {
       Command.run(BSONSerializationPack, failoverStrategy)(
         self, ListCollectionNames, ReadPreference.primary).map(_.names)
 
@@ -109,7 +113,7 @@ trait DBMetaCommands { self: DB =>
   /**
    * Create the specified user.
    *
-   * @param name the name of the user to be created
+   * @param user the name of the user to be created
    * @param pwd the user password (not required if the database uses external credentials)
    * @param roles the roles granted to the user, possibly an empty to create users without roles
    * @param digestPassword when true, the mongod instance will create the hash of the user password (default: `true`)
@@ -119,14 +123,14 @@ trait DBMetaCommands { self: DB =>
    * @see https://docs.mongodb.com/manual/reference/command/createUser/
    */
   def createUser(
-    name: String,
+    @deprecatedName('name) user: String,
     pwd: Option[String],
     roles: List[UserRole],
     digestPassword: Boolean = true,
-    writeConcern: WriteConcern = connection.options.writeConcern,
+    writeConcern: WC = connection.options.writeConcern,
     customData: Option[BSONDocument] = None)(implicit ec: ExecutionContext): Future[Unit] = {
     val command = BSONCreateUserCommand.CreateUser(
-      name, pwd, roles, digestPassword, Some(writeConcern), customData)
+      user, pwd, roles, digestPassword, Some(writeConcern), customData)
 
     Command.run(BSONSerializationPack, failoverStrategy)(
       self, command, ReadPreference.primary).map(_ => {})
@@ -139,7 +143,20 @@ trait DBMetaCommands { self: DB =>
    * @return true if successful (even if the server is write locked)
    */
   def ping(readPreference: ReadPreference = ReadPreference.nearest)(implicit ec: ExecutionContext): Future[Boolean] = {
-    Command.run(BSONSerializationPack, failoverStrategy)
-      .apply(self, PingCommand, readPreference)
+    Command.run(BSONSerializationPack, failoverStrategy).
+      apply(self, PingCommand, readPreference)
+  }
+
+  // TODO: Public once covered with test
+  // See: https://docs.mongodb.com/manual/reference/command/dbHash/
+  private[reactivemongo] def hash(collections: Seq[String], readPreference: ReadPreference = defaultReadPreference)(implicit ec: ExecutionContext): Future[DBHashResult] = {
+    implicit def w: BSONSerializationPack.Writer[DBHash] =
+      DBHash.commandWriter(BSONSerializationPack)
+
+    implicit def r: BSONSerializationPack.Reader[DBHashResult] =
+      DBHashResult.reader(BSONSerializationPack)
+
+    Command.run(BSONSerializationPack, failoverStrategy).
+      apply(self, new DBHash(collections), readPreference)
   }
 }

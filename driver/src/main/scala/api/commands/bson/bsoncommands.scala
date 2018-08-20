@@ -10,6 +10,7 @@ import reactivemongo.bson.{
 import reactivemongo.api.ReadConcern
 import reactivemongo.api.commands.{ Command, CommandError, UnitBox }
 
+@deprecated("Will be private/internal", "0.16.0")
 object CommonImplicits { // See CommandCodecs
   implicit object UnitBoxReader
     extends DealingWithGenericCommandErrorsReader[UnitBox.type] {
@@ -21,11 +22,13 @@ object CommonImplicits { // See CommandCodecs
   }
 }
 
+@deprecated("Will be private/internal", "0.16.0")
 trait BSONCommandError extends CommandError {
   def originalDocument: BSONDocument
 }
 
 // See CommandError.apply
+@deprecated("Will be private/internal", "0.16.0")
 case class DefaultBSONCommandError(
   code: Option[Int],
   errmsg: Option[String],
@@ -34,6 +37,7 @@ case class DefaultBSONCommandError(
 }
 
 /** Helper to read a command result, with error handling. */
+@deprecated("Will be private/internal", "0.16.0")
 trait DealingWithGenericCommandErrorsReader[A] extends BSONDocumentReader[A] {
   /** Results the successful result (only if `ok` is true). */
   def readResult(doc: BSONDocument): A

@@ -19,7 +19,6 @@ import reactivemongo.api.indexes.CollectionIndexesManager
 trait CollectionMetaCommands { self: Collection =>
   import CommonImplicits._
   import BSONCreateImplicits._
-  import BSONEmptyCappedImplicits._
   import BSONCollStatsImplicits._
   import BSONRenameCollectionImplicits._
   import BSONConvertToCappedImplicits._
@@ -36,10 +35,15 @@ trait CollectionMetaCommands { self: Collection =>
    *     println(s"Collection \${coll.fullCollectionName} already exists")
    * }
    * }}}
-   *
-   * @param autoIndexId $autoIndexIdParam
    */
-  def create(autoIndexId: Boolean = true)(implicit ec: ExecutionContext): Future[Unit] = command.unboxed(self, Create(None, autoIndexId), ReadPreference.primary)
+  def create()(implicit ec: ExecutionContext): Future[Unit] =
+    command.unboxed(self, Create(None, false), ReadPreference.primary)
+
+  /**
+   * @param autoIndexId DEPRECATED: $autoIndexIdParam
+   */
+  @deprecated("Use `create` without deprecated `autoIndexId`", "0.14.0")
+  def create(autoIndexId: Boolean = false)(implicit ec: ExecutionContext): Future[Unit] = command.unboxed(self, Create(None, autoIndexId), ReadPreference.primary)
 
   /**
    * Creates this collection as a capped one.
@@ -89,15 +93,6 @@ trait CollectionMetaCommands { self: Collection =>
         Future.successful(dropped)
     }
   }
-
-  /**
-   * If this collection is capped, removes all the documents it contains.
-   *
-   * Deprecated because it became an internal command, unavailable by default.
-   */
-  @deprecated("Deprecated because emptyCapped became an internal command, unavailable by default.", "0.9")
-  def emptyCapped()(implicit ec: ExecutionContext): Future[Unit] =
-    command.unboxed(self, EmptyCapped, ReadPreference.primary)
 
   /**
    * Converts this collection to a capped one.

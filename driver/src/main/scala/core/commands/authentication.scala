@@ -261,12 +261,6 @@ object ScramSha1FinalNegociation
 
 // --- MongoDB CR authentication ---
 
-@deprecated(message = "See [[GetCrNonce]]", since = "0.11.10")
-object Getnonce extends Command[String] {
-  override def makeDocuments = GetCrNonce.makeDocuments
-  val ResultMaker = GetCrNonce.ResultMaker
-}
-
 /**
  * Getnonce Command for Mongo CR authentication.
  *
@@ -280,25 +274,6 @@ object GetCrNonce extends Command[String] {
       CommandError.checkOk(document, Some("getnonce")).
         toLeft(document.getAs[BSONString]("nonce").get.value)
   }
-}
-
-@deprecated("See `CrAuthenticate`", "0.11.10")
-case class Authenticate(user: String, password: String, nonce: String)
-  extends Command[SuccessfulAuthentication] {
-
-  private val underlying = CrAuthenticate(user, password, nonce)
-
-  @deprecated("See `CrAuthenticate.makeDocuments`", "0.11.10")
-  override def makeDocuments = underlying.makeDocuments
-
-  @deprecated("See `CrAuthenticate.ResultMaker`", "0.11.10")
-  val ResultMaker = underlying.ResultMaker
-
-  @deprecated("See `CrAuthenticate.pwdDigest`", "0.11.10")
-  def pwdDigest = underlying.pwdDigest
-
-  @deprecated("See `CrAuthenticate.key`", "0.11.10")
-  def key = underlying.key
 }
 
 /**
@@ -318,7 +293,11 @@ private[core] case class CrAuthenticate(
   /** the digest of the tuple (''nonce'', ''user'', ''pwdDigest'') */
   lazy val key = md5Hex(nonce + user + pwdDigest, "UTF-8")
 
-  override def makeDocuments = BSONDocument("authenticate" -> BSONInteger(1), "user" -> BSONString(user), "nonce" -> BSONString(nonce), "key" -> BSONString(key))
+  override def makeDocuments = BSONDocument(
+    "authenticate" -> BSONInteger(1),
+    "user" -> BSONString(user),
+    "nonce" -> BSONString(nonce),
+    "key" -> BSONString(key))
 
   val ResultMaker = CrAuthenticate
 }
@@ -329,14 +308,41 @@ object CrAuthenticate extends BSONCommandResultMaker[SuccessfulAuthentication] {
 
   def apply(document: BSONDocument) = {
     CommandError.checkOk(document, Some("authenticate"), (doc, name) => {
-      FailedAuthentication(doc.getAs[BSONString]("errmsg").map(_.value).getOrElse(""), Some(doc))
+      FailedAuthentication(
+        doc.getAs[BSONString]("errmsg").fold("")(_.value), Some(doc))
+
     }).toLeft(document.get("dbname") match {
       case Some(BSONString(dbname)) => VerboseSuccessfulAuthentication(
         dbname,
         document.getAs[String]("user").get,
         document.getAs[Boolean]("readOnly").getOrElse(false))
+
       case _ => SilentSuccessfulAuthentication
     })
+  }
+}
+
+private[core] case class X509Authenticate(user: Option[String])
+  extends Command[SuccessfulAuthentication] {
+
+  private val userNameDocument = user.fold(BSONDocument.empty) { name =>
+    BSONDocument("user" -> BSONString(name))
+  }
+
+  override def makeDocuments = BSONDocument(
+    "authenticate" -> BSONInteger(1),
+    "mechanism" -> BSONString("MONGODB-X509")) ++ userNameDocument
+
+  override val ResultMaker = X509Authenticate
+}
+
+object X509Authenticate extends BSONCommandResultMaker[SuccessfulAuthentication] {
+  def parseResponse(response: Response): Either[CommandError, SuccessfulAuthentication] = apply(response)
+
+  def apply(document: BSONDocument) = {
+    CommandError.checkOk(document, Some("authenticate"), (doc, name) => {
+      FailedAuthentication(doc.getAs[BSONString]("errmsg").map(_.value).getOrElse(""), Some(doc))
+    }).toLeft(SilentSuccessfulAuthentication)
   }
 }
 

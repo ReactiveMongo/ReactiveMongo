@@ -2,7 +2,7 @@ package reactivemongo.core.nodeset
 
 import scala.collection.immutable.Set
 
-import shaded.netty.channel.{ Channel, ChannelFuture }
+import reactivemongo.io.netty.channel.{ Channel, ChannelFuture }
 
 import reactivemongo.core.protocol.Request
 
@@ -13,10 +13,10 @@ case class Connection(
   authenticating: Option[Authenticating]) {
   def send(message: Request, writeConcern: Request): ChannelFuture = {
     channel.write(message)
-    channel.write(writeConcern)
+    channel.writeAndFlush(writeConcern)
   }
 
-  def send(message: Request): ChannelFuture = channel.write(message)
+  def send(message: Request): ChannelFuture = channel.writeAndFlush(message)
 
   /** Returns whether the `user` is authenticated against the `db`. */
   def isAuthenticated(db: String, user: String): Boolean =

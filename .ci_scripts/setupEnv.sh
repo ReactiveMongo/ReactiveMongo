@@ -1,4 +1,4 @@
-#! /bin/bash
+#! /usr/bin/env bash
 
 set -e
 
@@ -29,7 +29,7 @@ export PATH="$HOME/mongodb-linux-x86_64-amazon-$MONGO_MINOR/bin:$PATH"
 MONGO_DATA=`mktemp -d`
 MONGO_CONF_SUFFIX="26"
 
-if [ "$MONGO_VER" = "3" -o "$MONGO_VER" = "3_4" ]; then
+if [ "$MONGO_VER" = "3" -o "$MONGO_VER" = "4" ]; then
     MONGO_CONF_SUFFIX="3"
 fi
 
@@ -38,39 +38,56 @@ sed -e "s|MONGO_DATA|$MONGO_DATA|g" < \
 
 echo "  maxIncomingConnections: $MAX_CON" >> "$MONGO_CONF"
 
-SSL_PASS=""
+# So available as empty if not X509 (for java-dockerfile COPY)
+if [ ! -d "$SCRIPT_DIR/root-ca" ]; then
+    mkdir "$SCRIPT_DIR/root-ca"
+fi
 
-if [ "$MONGO_PROFILE" = "invalid-ssl" -o "$MONGO_PROFILE" = "mutual-ssl" ]; then
-    if [ `which uuidgen | wc -l` -eq 1 ]; then
-      SSL_PASS=`uuidgen`
-    else
-      SSL_PASS=`cat /proc/sys/kernel/random/uuid`
+touch "$SCRIPT_DIR/client-cert.pem" \
+      "$SCRIPT_DIR/root-ca/root-ca.pem" \
+      "$SCRIPT_DIR/keystore.p12"
+
+if [ "$MONGO_PROFILE" = "invalid-ssl" -o "$MONGO_PROFILE" = "mutual-ssl" -o "$MONGO_PROFILE" = "x509" ]; then
+    if [ "x$SSL_PASS" = "x" ]; then
+      if [ `which uuidgen | wc -l` -eq 1 ]; then
+        SSL_PASS=`uuidgen`
+      else
+        SSL_PASS=`cat /proc/sys/kernel/random/uuid`
+      fi
     fi
 
-    "$SCRIPT_DIR/genSslCert.sh" $SSL_PASS
+
+    if [ "$MONGO_PROFILE" = "invalid-ssl" ]; then
+        "$SCRIPT_DIR/selfSslCert.sh" "$SSL_PASS"
+    else
+        "$SCRIPT_DIR/fullSslCert.sh" "$SSL_PASS"
+    fi
+
+    ls -al "$SCRIPT_DIR/keystore.p12"
 
     cat >> "$MONGO_CONF" << EOF
   ssl:
     mode: requireSSL
-    PEMKeyFile: $SCRIPT_DIR/server.pem
+    PEMKeyFile: $SCRIPT_DIR/server-cert.pem
     PEMKeyPassword: $SSL_PASS
 EOF
 
-    if [ "$MONGO_PROFILE" = "invalid-ssl" ]; then
+    if [ "$MONGO_PROFILE" != "invalid-ssl" ]; then
+        cat >> "$MONGO_CONF" << EOF
+    CAFile: $SCRIPT_DIR/root-ca/root-ca.pem
+EOF
+    else
         cat >> "$MONGO_CONF" << EOF
     allowInvalidCertificates: true
 EOF
-    else
-        # mutual-ssl
+    fi
+
+    if [ "$MONGO_PROFILE" = "x509" ]; then
+        "${SCRIPT_DIR}/addX509User.sh" "$MONGO_DATA" "$SCRIPT_DIR" "$ENV_FILE" "$PRIMARY_HOST"
         cat >> "$MONGO_CONF" << EOF
-    CAFile: $SCRIPT_DIR/client.pem
+security:
+  clusterAuthMode: x509
 EOF
-
-        keytool -importkeystore  -srcstoretype PKCS12 \
-            -srckeystore "$SCRIPT_DIR/keystore.p12" \
-            -destkeystore /tmp/keystore.jks \
-            -storepass $SSL_PASS -srcstorepass $SSL_PASS
-
     fi
 fi
 
@@ -82,9 +99,11 @@ EOF
 fi
 
 # MongoDB
-echo -e "\n  --- MongoDB Configuration ---"
+echo -e "\n  --- MongoDB Configuration: $MONGO_CONF ---"
 sed -e 's/^/  /' < "$MONGO_CONF"
 echo -e "  --- end ---\n"
+
+mongod --version
 
 # Print version information
 MV=`mongod --version 2>/dev/null | head -n 1`

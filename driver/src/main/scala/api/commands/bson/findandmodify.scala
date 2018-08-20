@@ -5,13 +5,19 @@ import reactivemongo.api.commands.{
   FindAndModifyCommand,
   ResolvedCollectionCommand
 }
-import reactivemongo.bson.{ BSONDocument, BSONDocumentWriter, BSONValue }
+import reactivemongo.bson.{
+  BSONDocument,
+  BSONDocumentWriter,
+  BSONValue
+}
 
+@deprecated("Will be private/internal", "0.16.0")
 object BSONFindAndModifyCommand
   extends FindAndModifyCommand[BSONSerializationPack.type] {
   val pack: BSONSerializationPack.type = BSONSerializationPack
 }
 
+@deprecated("Will be private/internal", "0.16.0")
 object BSONFindAndModifyImplicits {
   import BSONFindAndModifyCommand._
   implicit object FindAndModifyResultReader
@@ -29,22 +35,10 @@ object BSONFindAndModifyImplicits {
         result.getAs[BSONDocument]("value"))
   }
 
-  implicit object FindAndModifyWriter
+  @deprecated("Do not use", "0.14.0")
+  object FindAndModifyWriter
     extends BSONDocumentWriter[ResolvedCollectionCommand[FindAndModify]] {
 
-    def write(cmd: ResolvedCollectionCommand[FindAndModify]): BSONDocument =
-      BSONDocument(
-        "findAndModify" -> cmd.collection,
-        "query" -> cmd.command.query,
-        "sort" -> cmd.command.sort,
-        "fields" -> cmd.command.fields) ++
-        (cmd.command.modify match {
-          case Update(document, fetchNewObject, upsert) =>
-            BSONDocument(
-              "upsert" -> upsert,
-              "update" -> document,
-              "new" -> fetchNewObject)
-          case Remove => BSONDocument("remove" -> true)
-        })
+    def write(cmd: ResolvedCollectionCommand[FindAndModify]): BSONDocument = ???
   }
 }

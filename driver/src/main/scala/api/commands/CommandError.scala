@@ -84,6 +84,12 @@ object CommandError {
     originalDocument: pack.Document): CommandError =
     new DefaultCommandError(code, errmsg, () => pack pretty originalDocument)
 
+  private[reactivemongo] def parse(error: DatabaseException): CommandError =
+    new DefaultCommandError(error.code, Some(error.getMessage), { () =>
+      error.originalDocument.fold("<unknown>")(
+        reactivemongo.bson.BSONDocument.pretty(_))
+    })
+
   // ---
 
   private[reactivemongo] final class DefaultCommandError(

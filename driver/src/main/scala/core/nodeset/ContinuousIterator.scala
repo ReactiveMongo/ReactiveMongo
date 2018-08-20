@@ -1,7 +1,6 @@
 package reactivemongo.core.nodeset
 
-@deprecated("Internal class: will be made private", "0.11.14")
-class ContinuousIterator[A](iterable: Iterable[A], private var toDrop: Int = 0) extends Iterator[A] {
+private[reactivemongo] class ContinuousIterator[A](iterable: Iterable[A], private var toDrop: Int = 0) extends Iterator[A] {
   private var iterator = iterable.iterator
   private var i = 0
 

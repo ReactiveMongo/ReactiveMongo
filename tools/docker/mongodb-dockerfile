@@ -1,0 +1,36 @@
+FROM centos
+
+RUN yum install -y perl make gcc which psmisc
+
+ARG mongoMajor
+ARG mongoProfile
+ARG sslPass
+
+LABEL org.reactivemongo.mongoMajor="${mongoMajor}" \
+org.reactivemongo.mongoProfile="${mongoProfile}"
+
+ENV MONGO_VER=${mongoMajor} MONGO_PROFILE=${mongoProfile} SSL_PASS=${sslPass}
+
+COPY .ci_scripts /root/.ci_scripts
+
+RUN cd /usr/bin && \
+cd /root && \
+sed -e 's/`hostname`/"db"/' < /root/.ci_scripts/ssl-props.sh > /tmp/ssl-props.sh && mv /tmp/ssl-props.sh /root/.ci_scripts/ssl-props.sh && \
+./.ci_scripts/beforeInstall.sh INTEGRATION_TESTS $MONGO_VER $MONGO_PROFILE /tmp/integration-env.sh && \
+source /tmp/integration-env.sh && \
+sed -e 's|/tmp/mongod.log|/dev/stdout|' < $MONGO_CONF > .tmp && mv .tmp $MONGO_CONF && \
+(grep -v '^#!' .ci_scripts/fork-mongod.sh | \
+sed -e 's/--fork//') > /tmp/mongod2.sh && \
+echo -e '#! /usr/bin/env bash\n\
+\n\
+set -e\n\
+\n\
+cd /root/.ci_scripts\n\
+echo "Copy SSL certs to shared volume .ci_scripts"\n\
+cp -R client-cert.pem root-ca keystore.p12 /tmp/.ci_scripts\n\
+\n' > /tmp/mongod.sh && \
+cat /tmp/mongod2.sh >> /tmp/mongod.sh && \
+chmod u+x /tmp/mongod.sh
+
+ENTRYPOINT /tmp/mongod.sh /tmp/integration-env.sh
+EXPOSE 27018

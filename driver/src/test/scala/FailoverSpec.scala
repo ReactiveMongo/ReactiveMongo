@@ -11,35 +11,40 @@ class FailoverSpec(implicit ee: ExecutionEnv)
 
   "Failover" title
 
+  import tests.Common
   import Common._
 
-  {
-    val strategy = FailoverStrategy.default.copy(retries = 1)
-    def spec(con: MongoConnection, timeout: FiniteDuration) = {
-      "be successful" in {
-        _failover2(con, strategy)(() => Future.successful({})).
-          future must beTypedEqualTo({}).await(1, timeout)
-      }
-
-      "fail" in {
-        _failover2(con, strategy)(() =>
-          Future.failed(new Exception("Foo"))).
-          future must throwA[Exception]("Foo").await(1, timeout)
-      }
-
-      "handle producer error" in {
-        _failover2(con, strategy) { () =>
-          throw new scala.RuntimeException("Producer error")
-        }.future must throwA[Exception]("Producer error").await(1, timeout)
-      }
-    }
-
-    "Asynchronous failover on the default connection" should {
+  "Asynchronous failover" should {
+    "on the default connection" >> {
       spec(connection, timeout)
     }
 
-    "Asynchronous failover on the slow connection" should {
+    "on the slow connection" >> {
       spec(slowConnection, slowTimeout)
     }
   }
+
+  // ---
+
+  private val strategy = FailoverStrategy.default.copy(retries = 1)
+
+  private def spec(con: MongoConnection, timeout: FiniteDuration) = {
+    "be successful" in {
+      _failover2(con, strategy)(() => Future.successful({})).
+        future must beTypedEqualTo({}).await(1, timeout)
+    }
+
+    "fail" in {
+      _failover2(con, strategy)(() =>
+        Future.failed(new Exception("Foo"))).
+        future must throwA[Exception]("Foo").await(1, timeout)
+    }
+
+    "handle producer error" in {
+      _failover2(con, strategy) { () =>
+        throw new scala.RuntimeException("Producer error")
+      }.future must throwA[Exception]("Producer error").await(1, timeout)
+    }
+  }
+
 }

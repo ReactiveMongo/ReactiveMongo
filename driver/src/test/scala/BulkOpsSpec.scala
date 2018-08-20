@@ -6,7 +6,7 @@ import org.specs2.concurrent.ExecutionEnv
 
 import reactivemongo.bson.BSONDocument
 
-import reactivemongo.api.commands.BulkOps._
+import reactivemongo.api.collections.BulkOps._
 
 class BulkOpsSpec(implicit ee: ExecutionEnv)
   extends org.specs2.mutable.Specification {
@@ -35,6 +35,7 @@ class BulkOpsSpec(implicit ee: ExecutionEnv)
 
   // ---
 
+  section("unit")
   "Preparation" should {
     "produce 1 single empty stage" in {
       producer1 must beLike[BulkProducer[BSONDocument]] {
@@ -153,4 +154,5 @@ class BulkOpsSpec(implicit ee: ExecutionEnv)
       }
     }
   }
+  section("unit")
 }

@@ -2,11 +2,17 @@ package reactivemongo.core.nodeset
 
 import scala.collection.immutable.Set
 
+import reactivemongo.io.netty.channel.ChannelId
+
 import akka.actor.ActorRef
 
 import reactivemongo.bson.BSONDocument
 import reactivemongo.api.ReadPreference
 
+/**
+ * @param name the replicaSet name
+ * @param version the replicaSet version
+ */
 @SerialVersionUID(527078726L)
 case class NodeSet(
   name: Option[String],
@@ -52,39 +58,59 @@ case class NodeSet(
 
   def updateAll(f: Node => Node): NodeSet = copy(nodes = nodes.map(f))
 
-  def updateNodeByChannelId(id: Int)(f: Node => Node) =
+  def updateNodeByChannelId(id: ChannelId)(f: Node => Node): NodeSet =
     updateByChannelId(id)(identity)(f)
 
-  def updateConnectionByChannelId(id: Int)(f: Connection => Connection) =
-    updateByChannelId(id)(f)(identity)
+  def updateConnectionByChannelId(id: ChannelId)(f: Connection => Connection): NodeSet = updateByChannelId(id)(f)(identity)
 
-  def updateByChannelId(id: Int)(fc: Connection => Connection)(fn: Node => Node) = copy(nodes = nodes.map { node =>
-    val (connections, updated) = utils.update(node.connections) {
-      case conn if (conn.channel.getId == id) => fc(conn)
-    }
+  def updateByChannelId(id: ChannelId)(fc: Connection => Connection)(fn: Node => Node): NodeSet = copy(nodes = nodes.map(_.updateByChannelId(id)(fc)(fn)))
 
-    if (updated) fn(node._copy(connections = connections))
-    else node
-  })
-
-  def pickByChannelId(id: Int): Option[(Node, Connection)] =
+  def pickByChannelId(id: ChannelId): Option[(Node, Connection)] =
     nodes.view.map(node =>
-      node -> node.connections.find(_.channel.getId == id)).collectFirst {
+      node -> node.connections.find(_.channel.id == id)).collectFirst {
       case (node, Some(con)) if (
         con.status == ConnectionStatus.Connected) => node -> con
     }
 
-  @deprecated(message = "Unused", since = "0.12-RC0")
-  def pickForWrite: Option[(Node, Connection)] = primary.view.map(node =>
-    node -> node.authenticatedConnections.subject.headOption).collectFirst {
-    case (node, Some(connection)) => node -> connection
+  def pick(preference: ReadPreference): Option[(Node, Connection)] =
+    pick(preference, _ => true)
+
+  // http://docs.mongodb.org/manual/reference/read-preference/
+  private[reactivemongo] def pick(
+    preference: ReadPreference,
+    accept: Connection => Boolean): Option[(Node, Connection)] = {
+
+    def filter(tags: Seq[Map[String, String]]) = ReadPreference.TagFilter(tags)
+
+    if (mongos.isDefined) {
+      pickConnectionAndFlatten(accept)(mongos)
+    } else preference match {
+      case ReadPreference.Primary =>
+        pickConnectionAndFlatten(accept)(primary)
+
+      case ReadPreference.PrimaryPreferred(tags) =>
+        pickConnectionAndFlatten(accept)(primary.orElse(
+          pickFromGroupWithFilter(secondaries, filter(tags), secondaries.pick)))
+
+      case ReadPreference.Secondary(tags) =>
+        pickConnectionAndFlatten(accept)(pickFromGroupWithFilter(
+          secondaries, filter(tags), secondaries.pick))
+
+      case ReadPreference.SecondaryPreferred(tags) =>
+        pickConnectionAndFlatten(accept)(pickFromGroupWithFilter(
+          secondaries, filter(tags), secondaries.pick).orElse(primary))
+
+      case ReadPreference.Nearest(tags) =>
+        pickConnectionAndFlatten(accept)(pickFromGroupWithFilter(
+          nearestGroup, filter(tags), nearest))
+    }
   }
 
-  private val pickConnectionAndFlatten: Option[Node] => Option[(Node, Connection)] = {
+  private def pickConnectionAndFlatten(accept: Connection => Boolean): Option[Node] => Option[(Node, Connection)] = {
     val p: RoundRobiner[Connection, Vector] => Option[Connection] =
-      if (authenticates.isEmpty) _.pick
+      if (authenticates.isEmpty) _.pick //TODO: WithFilter(accept)
       else _.pickWithFilter(c =>
-        !c.authenticating.isDefined && !c.authenticated.isEmpty)
+        !c.authenticating.isDefined && !c.authenticated.isEmpty && accept(c))
 
     _.flatMap(node => p(node.authenticatedConnections).map(node -> _))
   }
@@ -92,39 +118,6 @@ case class NodeSet(
   private def pickFromGroupWithFilter(roundRobiner: RoundRobiner[Node, Vector], filter: Option[BSONDocument => Boolean], fallback: => Option[Node]) =
     filter.fold(fallback)(f =>
       roundRobiner.pickWithFilter(_.tags.fold(false)(f)))
-
-  // http://docs.mongodb.org/manual/reference/read-preference/
-  def pick(preference: ReadPreference): Option[(Node, Connection)] = {
-    if (mongos.isDefined) {
-      pickConnectionAndFlatten(mongos)
-    } else preference match {
-      case ReadPreference.Primary =>
-        pickConnectionAndFlatten(primary)
-
-      case ReadPreference.PrimaryPreferred(filter) =>
-        pickConnectionAndFlatten(primary.orElse(
-          pickFromGroupWithFilter(secondaries, filter, secondaries.pick)))
-
-      case ReadPreference.Secondary(filter) =>
-        pickConnectionAndFlatten(pickFromGroupWithFilter(
-          secondaries, filter, secondaries.pick))
-
-      case ReadPreference.SecondaryPreferred(filter) =>
-        pickConnectionAndFlatten(pickFromGroupWithFilter(
-          secondaries, filter, secondaries.pick).orElse(primary))
-
-      case ReadPreference.Nearest(filter) =>
-        pickConnectionAndFlatten(pickFromGroupWithFilter(
-          nearestGroup, filter, nearest))
-    }
-  }
-
-  /**
-   * Returns a NodeSet with channels created to `upTo` given maximum,
-   * per each member of the set.
-   */
-  @deprecated(message = "Use `createNeededChannels` with the explicit `channelFactory`", since = "0.12-RC1")
-  def createNeededChannels(receiver: ActorRef, upTo: Int)(implicit channelFactory: ChannelFactory): NodeSet = createNeededChannels(channelFactory, receiver, upTo)
 
   /**
    * Returns a NodeSet with channels created to `upTo` given maximum,

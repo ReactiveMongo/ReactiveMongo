@@ -4,13 +4,15 @@ import reactivemongo.api.BSONSerializationPack
 import reactivemongo.api.commands._
 import reactivemongo.bson._
 
+@deprecated("Will be private/internal", "0.16.0")
 object BSONIsMasterCommand extends IsMasterCommand[BSONSerializationPack.type]
 
+@deprecated("Will be private/internal", "0.16.0")
 object BSONIsMasterCommandImplicits {
   import BSONIsMasterCommand._
 
-  implicit object IsMasterWriter extends BSONDocumentWriter[IsMaster.type] {
-    def write(im: IsMaster.type) = BSONDocument("ismaster" -> 1)
+  implicit def IsMasterWriter[T <: IsMaster] = BSONDocumentWriter[T] { im: T =>
+    BSONDocument("ismaster" -> 1, f"$$comment" -> im.comment)
   }
 
   implicit object IsMasterResultReader extends DealingWithGenericCommandErrorsReader[IsMasterResult] {

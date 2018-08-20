@@ -1,11 +1,14 @@
 import scala.concurrent.{ Await, Future }
-import scala.concurrent.duration.{ DurationInt, FiniteDuration }
+import scala.concurrent.duration.FiniteDuration
 
-import reactivemongo.bson.{ BSONDocument, BSONJavaScript }
-import reactivemongo.core.errors.DetailedDatabaseException
+import reactivemongo.bson.BSONDocument
 
-import reactivemongo.api.{ Cursor, CursorFlattener, CursorProducer }
-import reactivemongo.api.commands.CommandError
+import reactivemongo.api.{
+  Cursor,
+  CursorFlattener,
+  CursorProducer,
+  WrappedCursor
+}
 import reactivemongo.api.collections.bson.BSONCollection
 
 trait Cursor1Spec { spec: CursorSpec =>
@@ -18,9 +21,9 @@ trait Cursor1Spec { spec: CursorSpec =>
           Future.sequence(bulks).map(_ => {})
         } else {
           val len = if (rem < 256) rem else 256
-          val prepared = nDocs - rem
+          def prepared = nDocs - rem
 
-          def bulk = coll.insert[BSONDocument](false).many(
+          def bulk = coll.insert(false).many(
             for (i <- 0 until len) yield {
               val n = i + prepared
               BSONDocument("i" -> n, "record" -> s"record$n")
@@ -45,7 +48,7 @@ trait Cursor1Spec { spec: CursorSpec =>
       req(cursor(nDocs + 1), nDocs + 1) must beLike[Response] {
         case Response(_, Reply(_, id, from, ret), _, _) =>
           id aka "cursor ID #1" must_== 0 and {
-            from must_== 0 and (ret must_== nDocs)
+            from must_== 0 and (ret aka "returned" must_== nDocs)
           }
       }.await(1, timeout) and {
         req(cursor(nDocs), 1) must beLike[Response] {
@@ -128,7 +131,7 @@ trait Cursor1Spec { spec: CursorSpec =>
         headOptionSpec(coll, timeout)
       }
 
-      "with the default connection" >> {
+      "with the slow connection" >> {
         headOptionSpec(slowColl, slowTimeout)
       }
     }
@@ -210,7 +213,7 @@ trait Cursor1Spec { spec: CursorSpec =>
           "all the documents" in {
             coll.find(matchAll("cursorspec4b")).
               batchSize(2096).cursor().foldWhileM(0)(
-                (st, _) => Future(Cursor.Cont(st + 1))).
+                (st, _) => Future.successful(Cursor.Cont(st + 1))).
                 aka("result size") must beEqualTo(16517).await(1, timeout)
           }
 
@@ -243,7 +246,7 @@ trait Cursor1Spec { spec: CursorSpec =>
           "for all the documents" in {
             coll.find(matchAll("cursorspec6b")).
               batchSize(2096).cursor().foldBulksM(0)(
-                (st, bulk) => Future(Cursor.Cont(st + bulk.size))).
+                (st, bulk) => Future.successful(Cursor.Cont(st + bulk.size))).
                 aka("result size") must beEqualTo(16517).await(1, timeout)
           }
 
@@ -276,14 +279,14 @@ trait Cursor1Spec { spec: CursorSpec =>
           "for all the documents" in {
             coll.find(matchAll("cursorspec8b")).
               batchSize(2096).cursor().foldResponsesM(0)((st, resp) =>
-                Future(Cursor.Cont(st + resp.reply.numberReturned))).
+                Future.successful(Cursor.Cont(st + resp.reply.numberReturned))).
               aka("result size") must beEqualTo(16517).await(1, timeout)
           }
 
           "for 1024 documents" in {
             coll.find(matchAll("cursorspec9b")).batchSize(256).cursor().
               foldResponsesM(0, 1024)(
-                (st, resp) => Future(
+                (st, resp) => Future.successful(
                   Cursor.Cont(st + resp.reply.numberReturned))).
                 aka("result size") must beEqualTo(1024).await(1, timeout)
           }
@@ -296,21 +299,21 @@ trait Cursor1Spec { spec: CursorSpec =>
     }
 
     "with the slow connection" >> {
-      foldSpec1(slowColl, slowTimeout)
+      foldSpec1(slowColl, slowTimeout * 2L)
     }
 
     "fold the responses with async function" >> {
       "for all the documents" in {
         coll.find(matchAll("cursorspec8")).
           batchSize(2096).cursor().foldResponsesM(0)((st, resp) =>
-            Future(Cursor.Cont(st + resp.reply.numberReturned))).
+            Future.successful(Cursor.Cont(st + resp.reply.numberReturned))).
           aka("result size") must beEqualTo(16517).await(1, timeout)
       }
 
       "for 1024 documents" in {
         coll.find(matchAll("cursorspec9")).batchSize(256).cursor().
           foldResponsesM(0, 1024)((st, resp) =>
-            Future(Cursor.Cont(st + resp.reply.numberReturned))).
+            Future.successful(Cursor.Cont(st + resp.reply.numberReturned))).
           aka("result size") must beEqualTo(1024).await(1, timeout)
       }
     }
@@ -318,28 +321,52 @@ trait Cursor1Spec { spec: CursorSpec =>
     "produce a custom cursor for the results" in {
       implicit def fooProducer[T] = new CursorProducer[T] {
         type ProducedCursor = FooCursor[T]
-        def produce(base: Cursor[T]) = new DefaultFooCursor(base)
+
+        def produce(base: Cursor.WithOps[T]): ProducedCursor =
+          new DefaultFooCursor(base)
       }
 
       implicit object fooFlattener extends CursorFlattener[FooCursor] {
+        type Flattened[T] = FooCursor[T]
+
         def flatten[T](future: Future[FooCursor[T]]) =
           new FlattenedFooCursor(future)
       }
 
-      val cursor = coll.find(matchAll("cursorspec10")).cursor()
+      val cursor = coll.find(matchAll("cursorspec10")).cursor[BSONDocument]()
 
-      cursor.foo must_== "Bar" and (
-        Cursor.flatten(Future.successful(cursor)).foo must_== "raB")
-    }
+      cursor.foo must_== "Bar" and {
+        Cursor.flatten(Future.successful(cursor)).foo must_=== "raB"
+      } and {
+        val extCursor: FooExtCursor[BSONDocument] = new DefaultFooCursor(cursor)
 
-    "throw exception when maxTimeout reached" in {
-      // TODO: check where compile error
-      coll.find(BSONDocument(f"$$where" -> BSONJavaScript(
-        "function(d){for(i=0;i<2147483647;i++){};return true}"))).batchSize(nDocs).maxTimeMs(1).cursor().
-        collect[List](nDocs, Cursor.FailOnError[List[BSONDocument]]()).
-        aka("slow query") must throwA[DetailedDatabaseException].like {
-          case CommandError.Code(code) => code must_== 50
-        }.await(1, slowTimeout + DurationInt(1).seconds)
+        // Check resolution as super type (FooExtCursor <: FooCursor)
+        val flattened = Cursor.flatten[BSONDocument, FooCursor](
+          Future.successful[FooExtCursor[BSONDocument]](extCursor))
+
+        flattened must beAnInstanceOf[FooCursor[BSONDocument]] and {
+          flattened must not(beAnInstanceOf[FooExtCursor[BSONDocument]])
+        } and {
+          flattened.foo must_=== "raB"
+        }
+      }
     }
+  }
+
+  // ---
+
+  private sealed trait FooCursor[T] extends Cursor[T] { def foo: String }
+
+  private sealed trait FooExtCursor[T] extends FooCursor[T]
+
+  private class DefaultFooCursor[T](val wrappee: Cursor[T])
+    extends FooExtCursor[T] with WrappedCursor[T] {
+    val foo = "Bar"
+  }
+
+  private class FlattenedFooCursor[T](cursor: Future[FooCursor[T]])
+    extends reactivemongo.api.FlattenedCursor[T](cursor) with FooCursor[T] {
+
+    val foo = "raB"
   }
 }

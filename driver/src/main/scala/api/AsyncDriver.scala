@@ -29,10 +29,48 @@ class AsyncDriver(
    *
    * @param nodes $nodesParam
    * @param authentications $authParam
+   * @param options $optionsParam
    * @param name $connectionNameParam
+   */
+  @deprecated("Use `connect` without `authencations` (but possibily with `credentials` on `options`)", "0.14.0")
+  def connect(nodes: Seq[String], options: MongoConnectionOptions = MongoConnectionOptions(), authentications: Seq[Authenticate] = Seq.empty, name: Option[String] = None): Future[MongoConnection] = {
+    val credentials = options.credentials ++ authentications.map { a =>
+      a.db -> MongoConnectionOptions.Credential(a.user, a.password)
+    }
+
+    askConnection(nodes, options.copy(credentials = credentials), name)
+  }
+
+  /**
+   * Creates a new MongoConnection.
+   *
+   * @param nodes $nodesParam
+   */
+  def connect(nodes: Seq[String]): Future[MongoConnection] =
+    askConnection(nodes, MongoConnectionOptions(), Option.empty)
+
+  /**
+   * Creates a new MongoConnection.
+   *
+   * @param nodes $nodesParam
    * @param options $optionsParam
    */
-  def connect(nodes: Seq[String], options: MongoConnectionOptions = MongoConnectionOptions(), authentications: Seq[Authenticate] = Seq.empty, name: Option[String] = None): Future[MongoConnection] = askConnection(nodes, options, authentications, name)
+  def connect(
+    nodes: Seq[String],
+    options: MongoConnectionOptions): Future[MongoConnection] =
+    askConnection(nodes, options, Option.empty)
+
+  /**
+   * Creates a new MongoConnection.
+   *
+   * @param nodes $nodesParam
+   * @param options $optionsParam
+   * @param name $connectionNameParam
+   */
+  def connect(
+    nodes: Seq[String],
+    options: MongoConnectionOptions,
+    name: String): Future[MongoConnection] = askConnection(nodes, options, Some(name))
 
   /**
    * Creates a new MongoConnection from URI.
@@ -60,10 +98,19 @@ class AsyncDriver(
    * @param name $connectionNameParam
    */
   def connect(parsedURI: MongoConnection.ParsedURI, name: Option[String]): Future[MongoConnection] = {
-    if (!parsedURI.ignoredOptions.isEmpty)
+    if (!parsedURI.ignoredOptions.isEmpty) {
       Future.failed(new IllegalArgumentException(s"The connection URI contains unsupported options: ${parsedURI.ignoredOptions.mkString(", ")}"))
-    else
-      askConnection(parsedURI.hosts.map(h => h._1 + ':' + h._2), parsedURI.options, parsedURI.authenticate.toSeq, name)
+    } else {
+      val credentials = parsedURI.options.
+        credentials ++ parsedURI.authenticate.map { a =>
+          a.db -> MongoConnectionOptions.Credential(a.user, a.password)
+        }
+
+      askConnection(
+        parsedURI.hosts.map(h => h._1 + ':' + h._2),
+        parsedURI.options.copy(credentials = credentials),
+        name)
+    }
   }
 
   /**
@@ -78,7 +125,7 @@ class AsyncDriver(
    * Closes this driver (and all its connections and resources).
    * Will wait until the timeout for proper closing of connections before forcing hard shutdown.
    */
-  final def close(timeout: FiniteDuration = FiniteDuration(2, SECONDS))(implicit executionContext: ExecutionContext): Future[Unit] = askClose(timeout)
+  final def close(timeout: FiniteDuration = FiniteDuration(2, SECONDS))(implicit @deprecatedName('executionContext) ec: ExecutionContext): Future[Unit] = askClose(timeout)
 
 }
 

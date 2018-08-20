@@ -21,15 +21,15 @@ import reactivemongo.api.{
   Collection,
   BSONSerializationPack,
   FailoverStrategy,
-  QueryOpts,
-  ReadPreference
+  QueryOpts
 }
 import reactivemongo.api.collections.GenericQueryBuilder
 
 @SerialVersionUID(1634796413L)
+@deprecated("Useless, will be remove", "0.16.0")
 case class BSONQueryBuilder(
   collection: Collection,
-  failover: FailoverStrategy,
+  @deprecatedName('failover) failoverStrategy: FailoverStrategy,
   queryOption: Option[BSONDocument] = None,
   sortOption: Option[BSONDocument] = None,
   projectionOption: Option[BSONDocument] = None,
@@ -51,12 +51,7 @@ case class BSONQueryBuilder(
     snapshotFlag: Boolean = snapshotFlag,
     commentString: Option[String] = commentString,
     options: QueryOpts = options,
-    failover: FailoverStrategy = failover,
+    @deprecatedName('failover) failoverStrategy: FailoverStrategy = failoverStrategy,
     maxTimeMsOption: Option[Long] = maxTimeMsOption): BSONQueryBuilder =
-    BSONQueryBuilder(collection, failover, queryOption, sortOption, projectionOption, hintOption, explainFlag, snapshotFlag, commentString, options, maxTimeMsOption)
-
-  @deprecated("Will be removed from the public API", "0.12.0")
-  override def merge(readPreference: ReadPreference): BSONDocument =
-    super.merge(readPreference)
-
+    BSONQueryBuilder(collection, failoverStrategy, queryOption, sortOption, projectionOption, hintOption, explainFlag, snapshotFlag, commentString, options, maxTimeMsOption)
 }

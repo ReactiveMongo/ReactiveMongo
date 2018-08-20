@@ -3,10 +3,12 @@ package reactivemongo.api.commands.bson
 import reactivemongo.api.BSONSerializationPack
 import reactivemongo.api.commands._
 
+@deprecated("Use new collection.count", "0.16.0")
 object BSONCountCommand extends CountCommand[BSONSerializationPack.type] {
   val pack = BSONSerializationPack
 }
 
+@deprecated("Use new collection.count", "0.16.0")
 object BSONCountCommandImplicits {
   import reactivemongo.bson.{
     BSONDocument,

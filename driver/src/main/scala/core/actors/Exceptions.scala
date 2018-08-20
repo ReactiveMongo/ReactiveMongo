@@ -38,17 +38,10 @@ object Exceptions {
     private[reactivemongo] def this() = this(nodeSetReachableMsg, null)
   }
 
-  @deprecated(message = "Use constructor with details", since = "0.12-RC0")
-  case object NodeSetNotReachable extends NodeSetNotReachable()
-
   sealed class ChannelNotFound private[reactivemongo] (
     val message: String,
     val retriable: Boolean,
     override val cause: Throwable) extends DriverException with NoStackTrace
-
-  @deprecated(message = "Use constructor with details", since = "0.12-RC0")
-  case object ChannelNotFound
-    extends ChannelNotFound("ChannelNotFound", false, null)
 
   sealed class ClosedException private (
     val message: String,
@@ -62,9 +55,6 @@ object Exceptions {
 
   final class NotAuthenticatedException private[core] (
     val message: String) extends DriverException with NoStackTrace
-
-  @deprecated(message = "Use constructor with details", since = "0.12-RC0")
-  case object ClosedException extends ClosedException()
 
   final class InternalState private[actors] (
     trace: Array[StackTraceElement]) extends DriverException with NoStackTrace {

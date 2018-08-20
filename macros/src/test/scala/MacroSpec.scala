@@ -153,23 +153,14 @@ class MacroSpec extends org.specs2.mutable.Specification {
       roundtrip(Person("john", "doe"), format)
     }
 
-    "persist class name on demand" in {
-      val person = Person("john", "doe")
-      val format = Macros.handlerOpts[Person, Macros.Options.SaveClassName]
-      val doc = format write person
-
-      doc.getAs[String]("className") mustEqual Some("MacroTest.Person") and {
-        roundtrip(person, format)
-      }
-    }
-
-    "persist simple class name on demand" in {
+    "not persist class name for case class" in {
       val person = Person("john", "doe")
       val format = Macros.handlerOpts[Person, Macros.Options.SaveSimpleName]
       val doc = format write person
 
-      doc.getAs[String]("className") mustEqual Some("Person")
-      roundtrip(person, format)
+      doc.getAs[String]("className") must beNone and {
+        roundtrip(person, format)
+      }
     }
 
     "handle union types (ADT)" in {
@@ -252,7 +243,7 @@ class MacroSpec extends org.specs2.mutable.Specification {
     "support automatic implementations search with nested traits" in {
       import Macros.Options._
       import InheritanceModule._
-      implicit val format = Macros.handlerOpts[T, AllImplementations with AutomaticMaterialization]
+      implicit val format = Macros.handlerOpts[T, AutomaticMaterialization]
 
       format.write(A()).getAs[String]("className").
         aka("class #1") must beSome("MacroTest.InheritanceModule.A") and {
@@ -266,7 +257,7 @@ class MacroSpec extends org.specs2.mutable.Specification {
     "automate Union on sealed traits with simple name" in {
       import Macros.Options._
       import Union._
-      implicit val format = Macros.handlerOpts[UT, SimpleAllImplementations with AutomaticMaterialization]
+      implicit val format = Macros.handlerOpts[UT, SaveSimpleName with AutomaticMaterialization]
 
       format.write(UA(1)).getAs[String]("className") must beSome("UA")
       format.write(UB("buzz")).getAs[String]("className") must beSome("UB")
@@ -280,7 +271,7 @@ class MacroSpec extends org.specs2.mutable.Specification {
       import Macros.Options._
       import InheritanceModule._
 
-      implicit val format = Macros.handlerOpts[T, SimpleAllImplementations]
+      implicit val format = Macros.handlerOpts[T, SaveSimpleName]
 
       format.write(A()).getAs[String]("className") must beSome("A")
       format.write(B).getAs[String]("className") must beSome("B")

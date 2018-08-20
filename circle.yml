@@ -4,8 +4,8 @@ machine:
   environment:
     CI_CATEGORY: "INTEGRATION_TESTS"
     MONGO_PROFILE: "default"
-    MONGO_VER: 2_6
-    SCALA_VERSION: 2.10.5
+    MONGO_VER: 3
+    SCALA_VERSION: 2.10.7
     AKKA_VERSION: 2.3.13
     ITERATEES_VERSION: 2.3.8
     SBT_VER: 0.13.16
@@ -21,7 +21,8 @@ dependencies:
     - "~/.ivy2"
     - "~/.sbt"
     - "~/ssl"
-    - "~/mongodb-linux-x86_64-2.6.12"
+    - "~/mongodb-linux-x86_64-amazon-3.2.8"
+    - "~/mongodb-linux-x86_64-amazon-4.0.0"
 test:
   override:
   - ./.ci_scripts/retry.sh 3 ./.ci_scripts/validate.sh /tmp/integration-env.sh

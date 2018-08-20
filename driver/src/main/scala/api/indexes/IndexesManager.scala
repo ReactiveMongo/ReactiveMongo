@@ -35,10 +35,16 @@ import reactivemongo.api.{
   CursorProducer,
   ReadPreference
 }
-import reactivemongo.api.commands.{ DropIndexes, WriteResult }
+import reactivemongo.api.commands.{ CommandError, DropIndexes, WriteResult }
 import scala.concurrent.{ Future, ExecutionContext }
 
-/** Indexes manager at database level. */
+/**
+ * Indexes manager at database level.
+ *
+ * @define collectionNameParam the collection name
+ * @define nsIndexToCreate the index to create
+ * @define droppedCount The number of indexes that were dropped.
+ */
 sealed trait IndexesManager {
 
   /** Gets a future list of all the index on this database. */
@@ -54,9 +60,9 @@ sealed trait IndexesManager {
    * Warning: given the options you choose, and the data to index, it can be a long and blocking operation on the database.
    * You should really consider reading [[http://www.mongodb.org/display/DOCS/Indexes]] before doing this, especially in production.
    *
-   * @param nsIndex the index to create
+   * @param nsIndex $nsIndexToCreate
    *
-   * @return a future containing true if the index was created, false if it already exists.
+   * @return true if the index was created, false if it already exists.
    */
   def ensure(nsIndex: NSIndex): Future[Boolean]
 
@@ -66,14 +72,14 @@ sealed trait IndexesManager {
    * Warning: given the options you choose, and the data to index, it can be a long and blocking operation on the database.
    * You should really consider reading [[http://www.mongodb.org/display/DOCS/Indexes]] before doing this, especially in production.
    *
-   * @param nsIndex The index to create.
+   * @param nsIndex $nsIndexToCreate
    */
   def create(nsIndex: NSIndex): Future[WriteResult]
 
   /**
    * Drops the given index on the given collection.
    *
-   * @return The number of indexes that were dropped.
+   * @return $droppedCount
    */
   def drop(nsIndex: NSIndex): Future[Int] =
     drop(nsIndex.collectionName, nsIndex.index.eventualName)
@@ -81,17 +87,25 @@ sealed trait IndexesManager {
   /**
    * Drops the given index on the given collection.
    *
-   * @return The number of indexes that were dropped.
+   * @param collectionName $collectionNameParam
+   * @param indexName the name of the index to be dropped
+   * @return $droppedCount
    */
   def drop(collectionName: String, indexName: String): Future[Int]
 
   /**
    * Drops all the indexes on the given collection.
+   *
+   * @param collectionName $collectionNameParam
    */
   def dropAll(collectionName: String): Future[Int]
 
-  /** Gets a manager for the given collection. */
-  def onCollection(name: String): CollectionIndexesManager
+  /**
+   * Returns a manager for the given collection.
+   *
+   * @param collectionName $collectionNameParam
+   */
+  def onCollection(@deprecatedName('name) collectionName: String): CollectionIndexesManager
 }
 
 /**
@@ -101,7 +115,7 @@ sealed trait IndexesManager {
  */
 final class LegacyIndexesManager(db: DB)(
   implicit
-  context: ExecutionContext) extends IndexesManager {
+  ec: ExecutionContext) extends IndexesManager {
 
   val collection = db("system.indexes")
 
@@ -134,8 +148,7 @@ final class LegacyIndexesManager(db: DB)(
 
   def dropAll(collectionName: String): Future[Int] = drop(collectionName, "*")
 
-  def onCollection(name: String): CollectionIndexesManager =
-    new LegacyCollectionIndexesManager(db.name, name, this)
+  def onCollection(@deprecatedName('name) collectionName: String): CollectionIndexesManager = new LegacyCollectionIndexesManager(db.name, collectionName, this)
 }
 
 /**
@@ -145,7 +158,7 @@ final class LegacyIndexesManager(db: DB)(
  */
 final class DefaultIndexesManager(db: DB with DBMetaCommands)(
   implicit
-  context: ExecutionContext) extends IndexesManager {
+  ec: ExecutionContext) extends IndexesManager {
 
   private def listIndexes(collections: List[String], indexes: List[NSIndex]): Future[List[NSIndex]] = collections match {
     case c :: cs => onCollection(c).list().flatMap(ix =>
@@ -169,10 +182,14 @@ final class DefaultIndexesManager(db: DB with DBMetaCommands)(
   def dropAll(collectionName: String): Future[Int] =
     onCollection(collectionName).dropAll()
 
-  def onCollection(name: String): CollectionIndexesManager =
-    new DefaultCollectionIndexesManager(db, name)
+  def onCollection(@deprecatedName('name) collectionName: String): CollectionIndexesManager = new DefaultCollectionIndexesManager(db, collectionName)
 }
 
+/**
+ * @define the index to create
+ * @define droppedCount The number of indexes that were dropped.
+ * @define indexToCreate the index to create
+ */
 sealed trait CollectionIndexesManager {
   /** Returns the list of indexes for the current collection. */
   def list(): Future[List[Index]]
@@ -187,9 +204,9 @@ sealed trait CollectionIndexesManager {
    * Warning: given the options you choose, and the data to index, it can be a long and blocking operation on the database.
    * You should really consider reading [[http://www.mongodb.org/display/DOCS/Indexes]] before doing this, especially in production.
    *
-   * @param index The index to create.
+   * @param index $indexToCreate
    *
-   * @return a future containing true if the index was created, false if it already exists.
+   * @return true if the index was created, false if it already exists.
    */
   def ensure(index: Index): Future[Boolean]
 
@@ -199,26 +216,21 @@ sealed trait CollectionIndexesManager {
    * Warning: given the options you choose, and the data to index, it can be a long and blocking operation on the database.
    * You should really consider reading [[http://www.mongodb.org/display/DOCS/Indexes]] before doing this, especially in production.
    *
-   * @param index The index to create.
+   * @param index $indexToCreate
    */
   def create(index: Index): Future[WriteResult]
 
   /**
    * Drops the given index on that collection.
    *
-   * @return The number of indexes that were dropped.
-   */
-  def drop(nsIndex: NSIndex): Future[Int]
-
-  /**
-   * Drops the given index on that collection.
-   *
-   * @return The number of indexes that were dropped.
+   * @param indexName the name of the index to be dropped
+   * @return $droppedCount
    */
   def drop(indexName: String): Future[Int]
 
   /**
    * Drops all the indexes on that collection.
+   * @return $droppedCount
    */
   def dropAll(): Future[Int]
 }
@@ -226,7 +238,7 @@ sealed trait CollectionIndexesManager {
 private class LegacyCollectionIndexesManager(
   db: String, collectionName: String, legacy: LegacyIndexesManager)(
   implicit
-  context: ExecutionContext) extends CollectionIndexesManager {
+  ec: ExecutionContext) extends CollectionIndexesManager {
 
   val fqName = db + "." + collectionName
 
@@ -239,9 +251,6 @@ private class LegacyCollectionIndexesManager(
   def create(index: Index): Future[WriteResult] =
     legacy.create(NSIndex(fqName, index))
 
-  @deprecated("Use [[IndexesManager.drop]]", "0.11.0")
-  def drop(nsIndex: NSIndex): Future[Int] = legacy.drop(nsIndex)
-
   def drop(indexName: String): Future[Int] =
     legacy.drop(collectionName, indexName)
 
@@ -250,7 +259,7 @@ private class LegacyCollectionIndexesManager(
 
 private class DefaultCollectionIndexesManager(db: DB, collectionName: String)(
   implicit
-  context: ExecutionContext) extends CollectionIndexesManager {
+  ec: ExecutionContext) extends CollectionIndexesManager {
 
   import reactivemongo.api.commands.{
     CreateIndexes,
@@ -269,9 +278,8 @@ private class DefaultCollectionIndexesManager(db: DB, collectionName: String)(
     Command.run(BSONSerializationPack, db.failoverStrategy)
 
   def list(): Future[List[Index]] =
-    runner(
-      collection, listCommand, ReadPreference.primary).recoverWith {
-      case err: WriteResult if err.code.exists(_ == 26 /* no database */ ) =>
+    runner(collection, listCommand, ReadPreference.primary).recoverWith {
+      case CommandError.Code(26 /* no database or collection */ ) =>
         Future.successful(List.empty[Index])
 
       case err => Future.failed(err)
@@ -299,15 +307,6 @@ private class DefaultCollectionIndexesManager(db: DB, collectionName: String)(
       CreateIndexes(db.name, List(index)),
       ReadPreference.primary)
 
-  @deprecated("Use [[IndexesManager.drop]]", "0.11.0")
-  def drop(nsIndex: NSIndex): Future[Int] = {
-    import reactivemongo.api.commands.bson.BSONDropIndexesImplicits._
-    runner(
-      db(nsIndex.collectionName),
-      DropIndexes(nsIndex.index.eventualName),
-      ReadPreference.primary).map(_.value)
-  }
-
   def drop(indexName: String): Future[Int] = {
     import reactivemongo.api.commands.bson.BSONDropIndexesImplicits._
     runner(
@@ -325,10 +324,10 @@ object CollectionIndexesManager {
    * @param db the database
    * @param collectionName the collection name
    */
-  def apply(db: DB, collectionName: String)(implicit context: ExecutionContext): CollectionIndexesManager = {
-    val wireVer = db.connection.metadata.map(_.maxWireVersion)
+  def apply(db: DB, collectionName: String)(implicit ec: ExecutionContext): CollectionIndexesManager = {
+    val wireVer = db.connectionState.metadata.maxWireVersion
 
-    if (wireVer.exists(_ >= MongoWireVersion.V30)) {
+    if (wireVer >= MongoWireVersion.V30) {
       new DefaultCollectionIndexesManager(db, collectionName)
     } else new LegacyCollectionIndexesManager(db.name, collectionName,
       new LegacyIndexesManager(db))
@@ -343,10 +342,10 @@ object IndexesManager {
    *
    * @param db the database
    */
-  def apply(db: DB with DBMetaCommands)(implicit context: ExecutionContext): IndexesManager = {
-    val wireVer = db.connection.metadata.map(_.maxWireVersion)
+  def apply(db: DB with DBMetaCommands)(implicit ec: ExecutionContext): IndexesManager = {
+    val wireVer = db.connectionState.metadata.maxWireVersion
 
-    if (wireVer.exists(_ >= MongoWireVersion.V30)) new DefaultIndexesManager(db)
+    if (wireVer >= MongoWireVersion.V30) new DefaultIndexesManager(db)
     else new LegacyIndexesManager(db)
   }
 

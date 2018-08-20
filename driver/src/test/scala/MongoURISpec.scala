@@ -1,14 +1,27 @@
+import scala.collection.immutable.ListSet
+
+import scala.concurrent.Future
+
 import reactivemongo.api.{
   MongoConnection,
   MongoConnectionOptions,
-  ScramSha1Authentication
-}, MongoConnection.{ ParsedURI, parseURI }
+  ScramSha1Authentication,
+  X509Authentication,
+  WriteConcern
+}, MongoConnection.{ ParsedURI, URIParsingException }
 
 import reactivemongo.core.nodeset.Authenticate
-import reactivemongo.api.commands.WriteConcern
+import reactivemongo.core.errors.GenericDriverException
 
-class MongoURISpec extends org.specs2.mutable.Specification {
+import org.specs2.concurrent.ExecutionEnv
+
+class MongoURISpec(implicit ee: ExecutionEnv)
+  extends org.specs2.mutable.Specification {
+
   "Mongo URI" title
+
+  import MongoConnectionOptions.Credential
+  import tests.Common
 
   section("unit")
   "MongoConnection URI parser" should {
@@ -21,7 +34,7 @@ class MongoURISpec extends org.specs2.mutable.Specification {
           db = None,
           authenticate = None,
           options = MongoConnectionOptions(),
-          ignoredOptions = List()))
+          ignoredOptions = List.empty))
     }
 
     val withOpts = "mongodb://host1?foo=bar"
@@ -79,9 +92,10 @@ class MongoURISpec extends org.specs2.mutable.Specification {
         ParsedURI(
           hosts = List("host1" -> 27017),
           db = Some("somedb"),
-          authenticate = Some(Authenticate("somedb", "user123", "passwd123")),
-          options = MongoConnectionOptions(),
-          ignoredOptions = List()))
+          authenticate = Some(Authenticate("somedb", "user123", Some("passwd123"))),
+          options = MongoConnectionOptions(credentials = Map(
+            "somedb" -> Credential("user123", Some("passwd123")))),
+          ignoredOptions = List.empty))
     }
 
     val wrongWithAuth = "mongodb://user123:passwd123@host1"
@@ -89,15 +103,18 @@ class MongoURISpec extends org.specs2.mutable.Specification {
       parseURI(wrongWithAuth).isFailure must beTrue
     }
 
-    val fullFeatured = "mongodb://user123:passwd123@host1:27018,host2:27019,host3:27020/somedb?foo=bar&authMode=scram-sha1"
+    val fullFeatured = "mongodb://user123:passwd123@host1:27018,host2:27019,host3:27020/somedb?foo=bar&authenticationMechanism=scram-sha1"
 
     s"parse $fullFeatured with success" in {
       parseURI(fullFeatured) must beSuccessfulTry(
         ParsedURI(
           hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
           db = Some("somedb"),
-          authenticate = Some(Authenticate("somedb", "user123", "passwd123")),
-          options = MongoConnectionOptions(authMode = ScramSha1Authentication),
+          authenticate = Some(Authenticate("somedb", "user123", Some("passwd123"))),
+          options = MongoConnectionOptions(
+            authenticationMechanism = ScramSha1Authentication,
+            credentials = Map("somedb" -> Credential(
+              "user123", Some("passwd123")))),
           ignoredOptions = List("foo")))
     }
 
@@ -109,8 +126,40 @@ class MongoURISpec extends org.specs2.mutable.Specification {
           hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
           db = Some("somedb"),
           authenticate = Some(Authenticate(
-            "authdb", "user123", ";qGu:je/LX}nN\\8")),
-          options = MongoConnectionOptions(authenticationDatabase = Some("authdb")),
+            "authdb", "user123", Some(";qGu:je/LX}nN\\8"))),
+          options = MongoConnectionOptions(
+            authenticationDatabase = Some("authdb"),
+            credentials = Map(
+              "authdb" -> Credential("user123", Some(";qGu:je/LX}nN\\8")))),
+          ignoredOptions = List("foo")))
+    }
+
+    val withAuthModeX509WithNoUser = "mongodb://host1:27018,host2:27019,host3:27020/somedb?foo=bar&authenticationMechanism=x509"
+
+    s"parse $withAuthModeX509WithNoUser with success" in {
+      parseURI(withAuthModeX509WithNoUser) must beSuccessfulTry(
+        ParsedURI(
+          hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
+          db = Some("somedb"),
+          authenticate = Some(Authenticate("somedb", "", None)),
+          options = MongoConnectionOptions(
+            authenticationMechanism = X509Authentication,
+            credentials = Map("somedb" -> Credential("", None))),
+          ignoredOptions = List("foo")))
+    }
+
+    val withAuthModeX509WithUser = "mongodb://username@test.com,CN=127.0.0.1,OU=TEST_CLIENT,O=TEST_CLIENT,L=LONDON,ST=LONDON,C=UK@host1:27018,host2:27019,host3:27020/somedb?foo=bar&authenticationMechanism=x509"
+
+    s"parse $withAuthModeX509WithUser with success" in {
+      parseURI(withAuthModeX509WithUser) must beSuccessfulTry(
+        ParsedURI(
+          hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
+          db = Some("somedb"),
+          authenticate = Some(Authenticate("somedb", "username@test.com,CN=127.0.0.1,OU=TEST_CLIENT,O=TEST_CLIENT,L=LONDON,ST=LONDON,C=UK", None)),
+          options = MongoConnectionOptions(
+            authenticationMechanism = X509Authentication,
+            credentials = Map(
+              "somedb" -> Credential("username@test.com,CN=127.0.0.1,OU=TEST_CLIENT,O=TEST_CLIENT,L=LONDON,ST=LONDON,C=UK", None))),
           ignoredOptions = List("foo")))
     }
 
@@ -120,9 +169,11 @@ class MongoURISpec extends org.specs2.mutable.Specification {
       parseURI(withWriteConcern) must beSuccessfulTry(ParsedURI(
         hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
         db = Some("somedb"),
-        authenticate = Some(Authenticate("somedb", "user123", "passwd123")),
+        authenticate = Some(Authenticate("somedb", "user123", Some("passwd123"))),
         options = MongoConnectionOptions(
-          writeConcern = WriteConcern.Journaled),
+          writeConcern = WriteConcern.Journaled,
+          credentials = Map(
+            "somedb" -> Credential("user123", Some("passwd123")))),
         ignoredOptions = Nil))
     }
 
@@ -132,9 +183,12 @@ class MongoURISpec extends org.specs2.mutable.Specification {
       parseURI(withWriteConcernWMaj) must beSuccessfulTry(ParsedURI(
         hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
         db = Some("somedb"),
-        authenticate = Some(Authenticate("somedb", "user123", "passwd123")),
+        authenticate = Some(Authenticate("somedb", "user123", Some("passwd123"))),
         options = MongoConnectionOptions(
-          writeConcern = WriteConcern.Default.copy(w = WriteConcern.Majority)),
+          writeConcern = WriteConcern.Default.copy(
+            w = reactivemongo.api.commands.WriteConcern.Majority),
+          credentials = Map(
+            "somedb" -> Credential("user123", Some("passwd123")))),
         ignoredOptions = Nil))
     }
 
@@ -144,10 +198,12 @@ class MongoURISpec extends org.specs2.mutable.Specification {
       parseURI(withWriteConcernWTag) must beSuccessfulTry(ParsedURI(
         hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
         db = Some("somedb"),
-        authenticate = Some(Authenticate("somedb", "user123", "passwd123")),
+        authenticate = Some(Authenticate("somedb", "user123", Some("passwd123"))),
         options = MongoConnectionOptions(
           writeConcern = WriteConcern.Default.copy(
-            w = WriteConcern.TagSet("anyTag"))),
+            w = reactivemongo.api.commands.WriteConcern.TagSet("anyTag")),
+          credentials = Map(
+            "somedb" -> Credential("user123", Some("passwd123")))),
         ignoredOptions = Nil))
     }
 
@@ -157,10 +213,13 @@ class MongoURISpec extends org.specs2.mutable.Specification {
       parseURI(withWriteConcernWAck) must beSuccessfulTry(ParsedURI(
         hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
         db = Some("somedb"),
-        authenticate = Some(Authenticate("somedb", "user123", "passwd123")),
+        authenticate = Some(Authenticate("somedb", "user123", Some("passwd123"))),
         options = MongoConnectionOptions(
           writeConcern = WriteConcern.Default.copy(
-            w = WriteConcern.WaitForAcknowledgments(5))),
+            w = reactivemongo.api.commands.WriteConcern.
+              WaitForAcknowledgments(5)),
+          credentials = Map(
+            "somedb" -> Credential("user123", Some("passwd123")))),
         ignoredOptions = Nil))
     }
 
@@ -171,9 +230,11 @@ class MongoURISpec extends org.specs2.mutable.Specification {
         ParsedURI(
           hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
           db = Some("somedb"),
-          authenticate = Some(Authenticate("somedb", "user123", "passwd123")),
+          authenticate = Some(Authenticate("somedb", "user123", Some("passwd123"))),
           options = MongoConnectionOptions(
-            writeConcern = WriteConcern.Default.copy(j = true)),
+            writeConcern = WriteConcern.Default.copy(j = true),
+            credentials = Map(
+              "somedb" -> Credential("user123", Some("passwd123")))),
           ignoredOptions = Nil))
     }
 
@@ -184,9 +245,11 @@ class MongoURISpec extends org.specs2.mutable.Specification {
         ParsedURI(
           hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
           db = Some("somedb"),
-          authenticate = Some(Authenticate("somedb", "user123", "passwd123")),
+          authenticate = Some(Authenticate("somedb", "user123", Some("passwd123"))),
           options = MongoConnectionOptions(
-            writeConcern = WriteConcern.Journaled.copy(j = false)),
+            writeConcern = WriteConcern.Journaled.copy(j = false),
+            credentials = Map(
+              "somedb" -> Credential("user123", Some("passwd123")))),
           ignoredOptions = Nil))
     }
 
@@ -197,10 +260,25 @@ class MongoURISpec extends org.specs2.mutable.Specification {
         ParsedURI(
           hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
           db = Some("somedb"),
-          authenticate = Some(Authenticate("somedb", "user123", "passwd123")),
+          authenticate = Some(Authenticate("somedb", "user123", Some("passwd123"))),
           options = MongoConnectionOptions(
-            writeConcern = WriteConcern.Default.copy(wtimeout = Some(1543))),
+            writeConcern = WriteConcern.Default.copy(wtimeout = Some(1543)),
+            credentials = Map(
+              "somedb" -> Credential("user123", Some("passwd123")))),
           ignoredOptions = Nil))
+    }
+
+    val withKeyStore = "mongodb://host1?keyStore=file:///tmp/foo&keyStoreType=PKCS12&keyStorePassword=bar"
+
+    s"fail to parse $withKeyStore" in {
+      parseURI(withKeyStore) must beSuccessfulTry[ParsedURI].like {
+        case uri => uri.options.keyStore must beSome(
+          MongoConnectionOptions.KeyStore(
+            resource = new java.io.File("/tmp/foo").toURI,
+            password = Some("bar".toCharArray),
+            storeType = "PKCS12"))
+
+      }
     }
 
     val defaultFo = "mongodb://host1?rm.failover=default"
@@ -237,6 +315,14 @@ class MongoURISpec extends org.specs2.mutable.Specification {
         case uri =>
           strategyStr(uri) must_== "123 milliseconds615 milliseconds1230 milliseconds1845 milliseconds2460 milliseconds"
       }
+    }
+
+    val invalidNoNodes = "mongodb://?writeConcern=journaled"
+
+    s"fail to parse $invalidNoNodes" in {
+      parseURI(invalidNoNodes) must beFailedTry.
+        withThrowable[URIParsingException]("No valid host in the URI: ''")
+
     }
 
     val foInvalidDelay = "mongodb://host1?rm.failover=123ko:4x5"
@@ -294,10 +380,138 @@ class MongoURISpec extends org.specs2.mutable.Specification {
     s"fail to parse $invalidIdle (with maxIdleTimeMS < monitorRefreshMS)" in {
       parseURI(invalidIdle) must beFailedTry[ParsedURI].withThrowable[MongoConnection.URIParsingException]("Invalid URI options: maxIdleTimeMS\\(99\\) < monitorRefreshMS\\(100\\)")
     }
+
+    val validSeedList = "mongodb+srv://usr:pwd@mongo.domain.tld/foo"
+
+    s"parse seed list with success from $validSeedList" in {
+      import org.xbill.DNS.{ Name, Record, SRVRecord, Type }
+
+      def records = Array[Record](
+        new SRVRecord(
+          Name.fromConstantString("mongo.domain.tld."),
+          Type.SRV, 3600, 1, 1, 27017,
+          Name.fromConstantString("mongo1.domain.tld.")),
+        new SRVRecord(
+          Name.fromConstantString("mongo.domain.tld."),
+          Type.SRV, 3600, 1, 1, 27018,
+          Name.fromConstantString("mongo2.domain.tld.")))
+
+      parseURI(validSeedList, srvRecResolver { name =>
+        if (name == "mongo.domain.tld") {
+          records
+        } else {
+          throw new IllegalArgumentException(s"Unexpected name '$name'")
+        }
+      }) must beSuccessfulTry[ParsedURI].like {
+        case uri => uri.db must beSome("foo") and {
+          // enforced by default when seed list ...
+          uri.options.sslEnabled must beTrue and {
+            uri.hosts must_=== List(
+              "mongo1.domain.tld" -> 27017,
+              "mongo2.domain.tld" -> 27018)
+          } and {
+            uri.options.credentials must_=== Map(
+              "foo" -> Credential("usr", Some("pwd")))
+          }
+        }
+      }
+    }
+
+    s"fail to parse seed list when target hosts are not with same base" in {
+      import org.xbill.DNS.{ Name, Record, SRVRecord, Type }
+
+      def records = Array[Record](
+        new SRVRecord(
+          Name.fromConstantString("mongo.domain.tld."),
+          Type.SRV, 3600, 1, 1, 27017,
+          Name.fromConstantString("mongo1.other.tld.")),
+        new SRVRecord(
+          Name.fromConstantString("mongo.domain.tld."),
+          Type.SRV, 3600, 1, 1, 27018,
+          Name.fromConstantString("mongo2.other.tld.")))
+
+      parseURI(validSeedList, srvRecResolver { name =>
+        if (name == "mongo.domain.tld") {
+          records
+        } else {
+          throw new IllegalArgumentException(s"Unexpected name '$name'")
+        }
+      }) must beFailedTry.withThrowable[GenericDriverException](
+        ".*mongo1\\.other\\.tld\\. is not subdomain of domain\\.tld\\..*")
+    }
+
+    s"fail to parse seed list when non-SRV records are resolved" in {
+      import org.xbill.DNS.{ Name, Record, ARecord, Type }
+
+      def records = Array[Record](
+        new ARecord(
+          Name.fromConstantString("mongo.domain.tld."),
+          Type.A, 3600, java.net.InetAddress.getLoopbackAddress))
+
+      parseURI(validSeedList, srvRecResolver(_ => records)).
+        aka("failure") must beFailedTry.withThrowable[GenericDriverException](
+          ".*Unexpected record: mongo\\.domain\\.tld\\..*")
+    }
+
+    val fullFeaturedSeedList = "mongodb+srv://user123:passwd123@service.domain.tld/somedb?foo=bar&sslEnabled=false"
+
+    s"parse $fullFeatured with success" in {
+      import org.xbill.DNS.{ Name, Record, SRVRecord, Type }
+
+      parseURI(
+        uri = fullFeaturedSeedList,
+        srvResolver = srvRecResolver(_ =>
+          Array[Record](new SRVRecord(
+            Name.fromConstantString("mongo.domain.tld."),
+            Type.SRV, 3600, 1, 1, 27017,
+            Name.fromConstantString("mongo1.domain.tld.")))),
+        txts = txtResolver({ name =>
+          if (name == "service.domain.tld") {
+            ListSet("authenticationMechanism=scram-sha1", "foo=lorem")
+          } else {
+            throw new IllegalArgumentException(s"Unexpected: $name")
+          }
+        })) must beSuccessfulTry(
+          ParsedURI(
+            hosts = List("mongo1.domain.tld" -> 27017),
+            db = Some("somedb"),
+            authenticate = Some(
+              Authenticate("somedb", "user123", Some("passwd123"))),
+            options = MongoConnectionOptions(
+              sslEnabled = false, // overriden from URI
+              authenticationMechanism = ScramSha1Authentication,
+              credentials = Map("somedb" -> Credential(
+                "user123", Some("passwd123")))),
+            ignoredOptions = List("foo")))
+
+    }
   }
+
   section("unit")
 
   // ---
+
+  import org.xbill.DNS.Record
+  import reactivemongo.util.{ SRVRecordResolver, TXTResolver }
+
+  private def srvRecResolver(
+    services: String => Array[Record] = _ => Array.empty): SRVRecordResolver = {
+    _ =>
+      { name: String =>
+        Future(services(name))
+      }
+  }
+
+  private def txtResolver(
+    resolve: String => ListSet[String] = _ => ListSet.empty): TXTResolver = {
+    name: String => Future(resolve(name))
+  }
+
+  def parseURI(
+    uri: String,
+    srvResolver: SRVRecordResolver = srvRecResolver(),
+    txts: TXTResolver = txtResolver()) = reactivemongo.api.tests.
+    parseURI(uri, srvResolver, txts)
 
   def strategyStr(uri: ParsedURI): String = {
     val fos = uri.options.failoverStrategy

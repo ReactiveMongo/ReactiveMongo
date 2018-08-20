@@ -2,6 +2,8 @@ package reactivemongo.core.nodeset
 
 import scala.collection.immutable.Set
 
+import reactivemongo.io.netty.channel.ChannelId
+
 import akka.actor.ActorRef
 
 import reactivemongo.bson.BSONDocument
@@ -9,9 +11,8 @@ import reactivemongo.bson.BSONDocument
 /**
  * @param name the main name of the node
  */
-@deprecated(message = "Will be made private", since = "0.11.10")
 @SerialVersionUID(440354552L)
-case class Node(
+private[reactivemongo] case class Node(
   name: String,
   @transient status: NodeStatus,
   @transient connections: Vector[Connection],
@@ -49,18 +50,22 @@ case class Node(
       authenticated.exists(_ == auth)
     }))
 
-  @deprecated(message = "Use `createNeededChannels` with an explicit `channelFactory`", since = "0.12-RC1")
-  def createNeededChannels(receiver: ActorRef, upTo: Int)(implicit channelFactory: ChannelFactory): Node = createNeededChannels(channelFactory, receiver, upTo)
-
-  private[core] def createNeededChannels(channelFactory: ChannelFactory, receiver: ActorRef, upTo: Int): Node = {
+  private[core] def createNeededChannels(
+    channelFactory: ChannelFactory,
+    receiver: ActorRef,
+    upTo: Int): Node = {
     if (connections.size < upTo) {
       _copy(connections = connections ++ (for {
-        i ← 0 until (upTo - connections.size)
-      } yield Connection(
-        channelFactory.create(host, port, receiver),
-        ConnectionStatus.Disconnected, Set.empty, None)))
+        _ ← 0 until (upTo - connections.size)
+      } yield createConnection(channelFactory, receiver)))
     } else this
   }
+
+  private[core] def createConnection(
+    channelFactory: ChannelFactory,
+    receiver: ActorRef): Connection = Connection(
+    channelFactory.create(host, port, receiver),
+    ConnectionStatus.Connecting, Set.empty, None)
 
   // TODO: Remove when aliases is refactored
   private[reactivemongo] def _copy(
@@ -82,7 +87,18 @@ case class Node(
     node
   }
 
-  def toShortString = s"Node[$name: $status (${connected.size}/${connections.size} available connections), latency=${pingInfo.ping}, authenticated=$authenticated]"
+  @inline private[core] def pickConnectionByChannelId(id: ChannelId): Option[Connection] = connections.find(_.channel.id == id)
+
+  private[core] def updateByChannelId(id: ChannelId)(fc: Connection => Connection)(fn: Node => Node): Node = {
+    val (updCons, updated) = utils.update(connections) {
+      case conn if (conn.channel.id == id) => fc(conn)
+    }
+
+    if (updated) fn(_copy(connections = updCons))
+    else this
+  }
+
+  def toShortString = s"""Node[$name: $status (${connected.size}/${connections.size} available connections), latency=${pingInfo.ping}, authenticated={${authenticated mkString ", "}}]"""
 
   /** Returns the read-only information about this node. */
   def info = NodeInfo(name, aliases.result(), host, port, status,

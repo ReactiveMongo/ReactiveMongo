@@ -30,9 +30,7 @@ class VariantBSONReaderWrapper[B <: BSONValue, T](reader: VariantBSONReader[B, T
   def read(b: B) = reader.read(b)
 }
 
-trait DefaultBSONHandlers {
-  import scala.language.higherKinds
-
+trait DefaultBSONHandlers extends LowPrioBSONHandlers {
   implicit object BSONIntegerHandler extends BSONHandler[BSONInteger, Int] {
     def read(int: BSONInteger) = int.value
     def write(int: Int) = BSONInteger(int)
@@ -120,24 +118,6 @@ trait DefaultBSONHandlers {
   implicit def bsonBooleanLikeReader[B <: BSONValue] =
     new BSONBooleanLikeReader[B]
 
-  // Collections Handlers
-  class BSONArrayCollectionReader[M[_], T](implicit cbf: CanBuildFrom[M[_], T, M[T]], reader: BSONReader[_ <: BSONValue, T]) extends BSONReader[BSONArray, M[T]] {
-    def read(array: BSONArray) =
-      array.stream.filter(_.isSuccess).map { v =>
-        reader.asInstanceOf[BSONReader[BSONValue, T]].read(v.get)
-      }.to[M]
-  }
-
-  class BSONArrayCollectionWriter[T, Repr <% Traversable[T]](implicit writer: BSONWriter[T, _ <: BSONValue]) extends VariantBSONWriter[Repr, BSONArray] {
-    def write(repr: Repr) = {
-      new BSONArray(repr.map(s => Try(writer.write(s))).to[Stream])
-    }
-  }
-
-  implicit def collectionToBSONArrayCollectionWriter[T, Repr <% Traversable[T]](implicit writer: BSONWriter[T, _ <: BSONValue]): VariantBSONWriter[Repr, BSONArray] = new BSONArrayCollectionWriter[T, Repr]
-
-  implicit def bsonArrayToCollectionReader[M[_], T](implicit cbf: CanBuildFrom[M[_], T, M[T]], reader: BSONReader[_ <: BSONValue, T]): BSONReader[BSONArray, M[T]] = new BSONArrayCollectionReader
-
   abstract class IdentityBSONConverter[T <: BSONValue](implicit m: Manifest[T]) extends BSONReader[T, T] with BSONWriter[T, T] {
     override def write(t: T): T = m.runtimeClass.cast(t).asInstanceOf[T]
     override def writeOpt(t: T): Option[T] = if (m.runtimeClass.isInstance(t)) Some(t.asInstanceOf[T]) else None
@@ -184,9 +164,6 @@ trait DefaultBSONHandlers {
   implicit def findWriter[T](implicit writer: VariantBSONWriter[T, _ <: BSONValue]): BSONWriter[T, _ <: BSONValue] =
     new VariantBSONWriterWrapper(writer)
 
-  implicit def findReader[T](implicit reader: VariantBSONReader[_ <: BSONValue, T]): BSONReader[_ <: BSONValue, T] =
-    new VariantBSONReaderWrapper(reader)
-
   implicit def MapReader[K, V](implicit keyReader: BSONReader[BSONString, K], valueReader: BSONReader[_ <: BSONValue, V]): BSONDocumentReader[Map[K, V]] =
     new BSONDocumentReader[Map[K, V]] {
       def read(bson: BSONDocument): Map[K, V] =
@@ -204,6 +181,29 @@ trait DefaultBSONHandlers {
         BSONDocument(elements)
       }
     }
+}
+
+trait LowPrioBSONHandlers {
+  import scala.language.higherKinds
+
+  // Collections Handlers
+  class BSONArrayCollectionReader[M[_], T](implicit cbf: CanBuildFrom[M[_], T, M[T]], reader: BSONReader[_ <: BSONValue, T]) extends BSONReader[BSONArray, M[T]] {
+    def read(array: BSONArray) =
+      array.stream.filter(_.isSuccess).map { v =>
+        reader.asInstanceOf[BSONReader[BSONValue, T]].read(v.get)
+      }.to[M]
+  }
+
+  class BSONArrayCollectionWriter[T, Repr <% Traversable[T]](implicit writer: BSONWriter[T, _ <: BSONValue]) extends VariantBSONWriter[Repr, BSONArray] {
+    def write(repr: Repr) = {
+      new BSONArray(repr.map(s => Try(writer.write(s))).to[Stream])
+    }
+  }
+
+  implicit def collectionToBSONArrayCollectionWriter[T, Repr <% Traversable[T]](implicit writer: BSONWriter[T, _ <: BSONValue]): VariantBSONWriter[Repr, BSONArray] = new BSONArrayCollectionWriter[T, Repr]
+
+  implicit def bsonArrayToCollectionReader[M[_], T](implicit cbf: CanBuildFrom[M[_], T, M[T]], reader: BSONReader[_ <: BSONValue, T]): BSONReader[BSONArray, M[T]] = new BSONArrayCollectionReader
+
 }
 
 private[bson] final class BSONDocumentHandlerImpl[T](
