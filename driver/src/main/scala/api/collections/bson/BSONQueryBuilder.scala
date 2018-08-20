@@ -29,7 +29,7 @@ import reactivemongo.api.collections.GenericQueryBuilder
 @deprecated("Useless, will be remove", "0.16.0")
 case class BSONQueryBuilder(
   collection: Collection,
-  failover: FailoverStrategy,
+  @deprecatedName('failover) failoverStrategy: FailoverStrategy,
   queryOption: Option[BSONDocument] = None,
   sortOption: Option[BSONDocument] = None,
   projectionOption: Option[BSONDocument] = None,
@@ -51,7 +51,7 @@ case class BSONQueryBuilder(
     snapshotFlag: Boolean = snapshotFlag,
     commentString: Option[String] = commentString,
     options: QueryOpts = options,
-    failover: FailoverStrategy = failover,
+    @deprecatedName('failover) failoverStrategy: FailoverStrategy = failoverStrategy,
     maxTimeMsOption: Option[Long] = maxTimeMsOption): BSONQueryBuilder =
-    BSONQueryBuilder(collection, failover, queryOption, sortOption, projectionOption, hintOption, explainFlag, snapshotFlag, commentString, options, maxTimeMsOption)
+    BSONQueryBuilder(collection, failoverStrategy, queryOption, sortOption, projectionOption, hintOption, explainFlag, snapshotFlag, commentString, options, maxTimeMsOption)
 }

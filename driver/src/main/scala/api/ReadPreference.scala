@@ -1,6 +1,5 @@
 package reactivemongo.api
 
-// BSONDocumentWriter
 import reactivemongo.bson.BSONDocument
 
 /**

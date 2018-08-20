@@ -39,7 +39,7 @@ private[collections] trait Aggregator[P <: SerializationPack with Singleton] {
     val batchSize: Option[Int],
     val reader: pack.Reader[T]) {
 
-    def prepared[AC[_] <: Cursor[_]](
+    def prepared[AC[_] <: Cursor.WithOps[_]](
       implicit
       cp: CursorProducer.Aux[T, AC]): Aggregator[T, AC] =
       new Aggregator[T, AC](this, cp)

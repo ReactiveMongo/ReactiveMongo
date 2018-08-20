@@ -3,7 +3,12 @@ import scala.concurrent.duration.FiniteDuration
 
 import reactivemongo.bson.BSONDocument
 
-import reactivemongo.api.{ Cursor, CursorFlattener, CursorProducer }
+import reactivemongo.api.{
+  Cursor,
+  CursorFlattener,
+  CursorProducer,
+  WrappedCursor
+}
 import reactivemongo.api.collections.bson.BSONCollection
 
 trait Cursor1Spec { spec: CursorSpec =>
@@ -316,18 +321,52 @@ trait Cursor1Spec { spec: CursorSpec =>
     "produce a custom cursor for the results" in {
       implicit def fooProducer[T] = new CursorProducer[T] {
         type ProducedCursor = FooCursor[T]
-        def produce(base: Cursor[T]) = new DefaultFooCursor(base)
+
+        def produce(base: Cursor.WithOps[T]): ProducedCursor =
+          new DefaultFooCursor(base)
       }
 
       implicit object fooFlattener extends CursorFlattener[FooCursor] {
+        type Flattened[T] = FooCursor[T]
+
         def flatten[T](future: Future[FooCursor[T]]) =
           new FlattenedFooCursor(future)
       }
 
-      val cursor = coll.find(matchAll("cursorspec10")).cursor()
+      val cursor = coll.find(matchAll("cursorspec10")).cursor[BSONDocument]()
 
-      cursor.foo must_== "Bar" and (
-        Cursor.flatten(Future.successful(cursor)).foo must_== "raB")
+      cursor.foo must_== "Bar" and {
+        Cursor.flatten(Future.successful(cursor)).foo must_=== "raB"
+      } and {
+        val extCursor: FooExtCursor[BSONDocument] = new DefaultFooCursor(cursor)
+
+        // Check resolution as super type (FooExtCursor <: FooCursor)
+        val flattened = Cursor.flatten[BSONDocument, FooCursor](
+          Future.successful[FooExtCursor[BSONDocument]](extCursor))
+
+        flattened must beAnInstanceOf[FooCursor[BSONDocument]] and {
+          flattened must not(beAnInstanceOf[FooExtCursor[BSONDocument]])
+        } and {
+          flattened.foo must_=== "raB"
+        }
+      }
     }
+  }
+
+  // ---
+
+  private sealed trait FooCursor[T] extends Cursor[T] { def foo: String }
+
+  private sealed trait FooExtCursor[T] extends FooCursor[T]
+
+  private class DefaultFooCursor[T](val wrappee: Cursor[T])
+    extends FooExtCursor[T] with WrappedCursor[T] {
+    val foo = "Bar"
+  }
+
+  private class FlattenedFooCursor[T](cursor: Future[FooCursor[T]])
+    extends reactivemongo.api.FlattenedCursor[T](cursor) with FooCursor[T] {
+
+    val foo = "raB"
   }
 }
