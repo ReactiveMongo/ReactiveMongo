@@ -55,8 +55,3 @@ To reproduce a Travis build, see the [Docker](tools/docker/README.md) tools.
 - [Search or create issues](https://github.com/ReactiveMongo/ReactiveMongo/issues)
 - [Get help](https://groups.google.com/forum/?fromgroups#!forum/reactivemongo)
 - [Contribute](https://github.com/ReactiveMongo/ReactiveMongo/blob/master/CONTRIBUTING.md#reactivemongo-developer--contributor-guidelines)
-
-**Samples:** These sample applications are kept up to date with the latest driver version. They are built upon Play 2.3.
-
-* [ReactiveMongo Tailable Cursor, WebSocket and Play 2](https://github.com/sgodbillon/reactivemongo-tailablecursor-demo)
-* [Full Web Application featuring basic CRUD operations and GridFS streaming](https://github.com/sgodbillon/reactivemongo-demo-app)
