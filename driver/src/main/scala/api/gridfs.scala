@@ -240,7 +240,7 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
    * @param chunkSize Size of the chunks. Defaults to 256kB.
    *
    * @return A future of a ReadFile[Id].
-    */
+   */
   @deprecated("Will be moved to `reactivemongo.play.iteratees.GridFS`", "0.17.0")
   def save[Id <: pack.Value](enumerator: Enumerator[Array[Byte]], file: FileToSave[pack.type, Id], chunkSize: Int = 262144)(implicit readFileReader: pack.Reader[ReadFile[Id]], @deprecatedName('ctx) ec: ExecutionContext, idProducer: IdProducer[Id], docWriter: BSONDocumentWriter[file.pack.Document]): Future[ReadFile[Id]] = (enumerator |>>> iteratee(file, chunkSize)).flatMap(f => f)
 

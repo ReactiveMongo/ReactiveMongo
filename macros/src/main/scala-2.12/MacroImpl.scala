@@ -387,10 +387,50 @@ private object MacroImpl {
     }
 
     private def directKnownSubclasses: Option[List[Type]] = {
+      // Workaround for SI-7046: https://issues.scala-lang.org/browse/SI-7046
       val tpeSym = A.typeSymbol.asClass
 
+      @annotation.tailrec
+      def allSubclasses(path: Traversable[Symbol], subclasses: Set[Type]): Set[Type] = path.headOption match {
+        case Some(cls: ClassSymbol) if (
+          tpeSym != cls && !cls.isAbstract &&
+          cls.selfType.baseClasses.contains(tpeSym)) => {
+          val newSub: Set[Type] = if ({
+            val tpe = cls.typeSignature
+            !applyMethod(tpe).isDefined || !unapplyMethod(tpe).isDefined
+          }) {
+            c.warning(c.enclosingPosition, s"cannot handle class ${cls.fullName}: no case accessor")
+            Set.empty
+          } else if (!cls.typeParams.isEmpty) {
+            c.warning(c.enclosingPosition, s"cannot handle class ${cls.fullName}: type parameter not supported")
+            Set.empty
+          } else Set(cls.selfType)
+
+          allSubclasses(path.tail, subclasses ++ newSub)
+        }
+
+        case Some(o: ModuleSymbol) if (
+          o.companion == NoSymbol && // not a companion object
+          tpeSym != c && o.typeSignature.baseClasses.contains(tpeSym)) => {
+          val newSub: Set[Type] = if (!o.moduleClass.asClass.isCaseClass) {
+            c.warning(c.enclosingPosition, s"cannot handle object ${o.fullName}: no case accessor")
+            Set.empty
+          } else Set(o.typeSignature)
+
+          allSubclasses(path.tail, subclasses ++ newSub)
+        }
+
+        case Some(o: ModuleSymbol) if (
+          o.companion == NoSymbol // not a companion object
+        ) => allSubclasses(path.tail, subclasses)
+
+        case Some(_) => allSubclasses(path.tail, subclasses)
+
+        case _       => subclasses
+      }
+
       if (tpeSym.isSealed && tpeSym.isAbstract) {
-        Some(tpeSym.knownDirectSubclasses.map(_.typeSignature).toList)
+        Some(allSubclasses(tpeSym.owner.typeSignature.decls, Set.empty).toList)
       } else None
     }
 
