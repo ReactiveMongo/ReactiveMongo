@@ -30,3 +30,18 @@ export PUBLISH_USER="$SONATYPE_USER"
 export PUBLISH_PASS="$SONATYPE_PASS"
 
 sbt '+publish'
+
+# Dependent builds
+DEPENDENT_REPOS="play-json:6957830"
+DEPENDENT_REPOS="$DEPENDENT_REPOS play:293753"
+DEPENDENT_REPOS="$DEPENDENT_REPOS site:2460463"
+DEPENDENT_REPOS="$DEPENDENT_REPOS streaming:9464091"
+
+for REPO in "$PLAY_JSON $PLAY $SITE $STREAMING"; do
+  REPO_NAME=`echo "$REPO" | cut -d ':' -f 1`
+  REPO_ID=`echo "$REPO" | cut -d ':' -f 2`
+
+  echo "INFO: Trigger build for repository $REPO_NAME ($REPO_ID)"
+
+  "$SCRIPT_DIR/trigger-travis-build.sh" "$REPO_ID"
+done
