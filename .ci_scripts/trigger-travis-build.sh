@@ -19,6 +19,11 @@ set -e
 #
 auth_token="$TRAVIS_AUTH_TOKEN"
 
+if [ -z "$auth_token" ]; then
+  echo "[ERROR] Missing token"
+  exit 1
+fi
+
 # The Travis API endpoint. .com and .org are the commercial and free versions,
 # respectively; enterprise users will have their own hostname.
 #
@@ -33,19 +38,10 @@ repo_id=$1
 # of the API method, all later arguments are passed to curl directly.
 #
 function travis-api {
-  curl -s $endpoint$1 \
+  curl -s "$endpoint$1" \
        -H "Authorization: token $auth_token" \
        -H 'Content-Type: application/json' \
        "${@:2}"
-}
-
-# Create a new environment variable for the repo and return its ID. First
-# argument is the environment variable name, and the second is the value.
-#
-function env-var {
-  travis-api /settings/env_vars?repository_id=$repo_id \
-             -d "{\"env_var\":{\"name\":\"$1\",\"value\":\"$2\",\"public\":true}}" |
-    sed 's/{"env_var":{"id":"\([^"]*\)",.*/\1/'
 }
 
 # Get the build ID of the last master build.
@@ -53,28 +49,19 @@ function env-var {
 last_master_build_id=`travis-api /repos/$repo_id/branches/master |
                       sed 's/{"branch":{"id":\([0-9]*\),.*/\1/'`
 
-# Set the three environment variables needed, and capture their IDs so that they
-# can be removed later.
-#
-env_var_ids=(`env-var DEPENDENT_BUILD true`
-             `env-var TRIGGER_COMMIT $TRAVIS_COMMIT`
-             `env-var TRIGGER_REPO $TRAVIS_REPO_SLUG`)
-
 # Restart the last master build.
 #
-travis-api /builds/$last_master_build_id/restart -X POST
+travis-api "/builds/$last_master_build_id/restart" -X POST
 
 # Wait for the build to start using the new environment variables.
 #
-until travis-api /builds/$last_master_build_id | grep '"state":"started"'; do
+I=0
+until travis-api "/builds/$last_master_build_id" | grep '"state":"started"'; do
   sleep 5
-done
 
-# Remove all of the environment variables set above. This does mean that if this
-# script is terminated for whatever reason, these will need to be cleaned up
-# manually. We can do this either through the API, or by going to Settings ->
-# Environment Variables in the Travis web interface.
-#
-for env_var_id in "${env_var_ids[@]}"; do
-  travis-api /settings/env_vars/$env_var_id?repository_id=$repo_id -X DELETE
+  if [ $I -gt 5 ]; then
+    exit
+  else
+    I=`expr $I + 1`
+  fi
 done

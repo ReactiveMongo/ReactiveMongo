@@ -34,10 +34,9 @@ sbt '+publish'
 # Dependent builds
 DEPENDENT_REPOS="play-json:6957830"
 DEPENDENT_REPOS="$DEPENDENT_REPOS play:293753"
-DEPENDENT_REPOS="$DEPENDENT_REPOS site:2460463"
 DEPENDENT_REPOS="$DEPENDENT_REPOS streaming:9464091"
 
-for REPO in "$DEPENDENT_REPOS"; do
+for REPO in $DEPENDENT_REPOS; do
   REPO_NAME=`echo "$REPO" | cut -d ':' -f 1`
   REPO_ID=`echo "$REPO" | cut -d ':' -f 2`
 
