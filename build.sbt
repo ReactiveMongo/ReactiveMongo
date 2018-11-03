@@ -1,4 +1,6 @@
-lazy val `ReactiveMongo-BSON` = Bson.module
+lazy val `ReactiveMongo-Shaded` = Shaded.commonModule
+
+lazy val `ReactiveMongo-BSON` = new Bson(`ReactiveMongo-Shaded`).module
 
 lazy val `ReactiveMongo-BSON-Macros` = project.in(file("macros")).
   enablePlugins(CpdPlugin).
@@ -11,8 +13,6 @@ lazy val `ReactiveMongo-BSON-Macros` = project.in(file("macros")).
       )
     )
   )
-
-lazy val `ReactiveMongo-Shaded` = Shaded.commonModule
 
 lazy val `ReactiveMongo-Shaded-Native-osx-x86_64` =
   Shaded.nativeModule("osx-x86_64", "kqueue")

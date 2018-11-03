@@ -51,7 +51,7 @@ class MacroSpec extends org.specs2.mutable.Specification {
       Macros.reader[Optional].read(
         BSONDocument(
           "name" -> "invalidValueType",
-          "value" -> 4)) must throwA[Exception]("Foo")
+          "value" -> 4)) must throwA[Exception]("BSONInteger")
     }
 
     "support seq" in {
