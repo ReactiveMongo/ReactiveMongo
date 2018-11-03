@@ -33,7 +33,6 @@ sbt '+publish'
 
 # Dependent builds
 DEPENDENT_REPOS="play-json:6957830"
-DEPENDENT_REPOS="$DEPENDENT_REPOS play:293753"
 DEPENDENT_REPOS="$DEPENDENT_REPOS streaming:9464091"
 
 for REPO in $DEPENDENT_REPOS; do

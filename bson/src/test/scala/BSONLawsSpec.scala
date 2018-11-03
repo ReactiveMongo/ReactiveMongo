@@ -1,5 +1,3 @@
-package reactivemongo
-
 import reactivemongo.bson._
 
 import org.typelevel.discipline.specs2.mutable.Discipline
@@ -14,6 +12,8 @@ import spire.algebra.{
   Semigroup
 }
 
+import reactivemongo.BSONValueFixtures
+
 class BSONLawsSpecs
   extends org.specs2.mutable.Specification with Discipline {
 
@@ -22,12 +22,9 @@ class BSONLawsSpecs
   import BSONCheck._
   import LawEvidences._
 
-  section("unit")
-
   { // Addition semigroup
     val semigroup = new Semigroup[BSONValue] {
-      def combine(x: BSONValue, y: BSONValue): BSONValue =
-        BSONValue.Addition(x, y)
+      def combine(x: BSONValue, y: BSONValue): BSONValue = BSONValue.Addition(x, y)
     }
     implicit val additive: AdditiveSemigroup[BSONValue] = Additive(semigroup)
 
@@ -45,9 +42,39 @@ class BSONLawsSpecs
       Additive(monoid)
 
     checkAll("ElementProducer", GroupLaws[ElementProducer].additiveMonoid)
-  }
 
-  section("unit")
+    "foo" in {
+      /*
+      val a = BSONElement("97300710", BSONJavaScriptWS("bar()"))
+      val b = BSONElement("808965863", BSONDouble(0.0012345D))
+      val c = BSONElement("97300710", BSONJavaScript("bar()"))
+       */
+
+      val a = BSONDocument("foo" -> "bar")
+      val b = BSONArray(BSONString("lorem"))
+      val c = BSONElement("-471589850", BSONBoolean(false))
+
+      val op = ElementProducer.Composition.apply _
+
+      println(s"---> ${BSONArray pretty op(b, c).asInstanceOf[BSONArray]}")
+
+      val r1 = op(op(a, b), c)
+      val r2 = op(a, op(b, c))
+
+      println(s"r1 = $r1")
+      println(s"r2 = $r2 / ${BSONArray pretty op(b, c).asInstanceOf[BSONArray]}")
+
+      println(s"r1 = ${BSONDocument pretty r1.asInstanceOf[BSONDocument]}")
+      println(s"r2 = ${BSONDocument pretty r2.asInstanceOf[BSONDocument]}")
+
+      /*
+      println(s"r1 = ${BSONArray pretty r1.asInstanceOf[BSONArray]}")
+      println(s"r2 = ${BSONArray pretty r2.asInstanceOf[BSONArray]}")
+       */
+
+      r1 must_=== r2
+    } tag "wip"
+  }
 }
 
 object LawEvidences {

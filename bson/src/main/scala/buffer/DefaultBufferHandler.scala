@@ -19,6 +19,11 @@ import reactivemongo.bson._
 import scala.util.Try
 
 object DefaultBufferHandler extends BufferHandler {
+  def serialize(bson: BSONValue, buffer: WritableBuffer): WritableBuffer = {
+    handlersByCode.get(bson.code).
+      get.asInstanceOf[BufferRW[BSONValue]].write(bson, buffer)
+  }
+
   sealed trait BufferWriter[B <: BSONValue] {
     def write(value: B, buffer: WritableBuffer): WritableBuffer
   }
@@ -272,11 +277,6 @@ object DefaultBufferHandler extends BufferHandler {
   object BSONMaxKeyBufferHandler extends BufferRW[BSONMaxKey.type] {
     def write(b: BSONMaxKey.type, buffer: WritableBuffer) = buffer
     def read(buffer: ReadableBuffer) = BSONMaxKey
-  }
-
-  def serialize(bson: BSONValue, buffer: WritableBuffer): WritableBuffer = {
-    handlersByCode.get(bson.code).
-      get.asInstanceOf[BufferRW[BSONValue]].write(bson, buffer)
   }
 
   def deserialize(buffer: ReadableBuffer): Try[(String, BSONValue)] = Try {

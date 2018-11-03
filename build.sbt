@@ -50,3 +50,7 @@ lazy val `ReactiveMongo-Root` = project.in(file(".")).
     `ReactiveMongo-Shaded-Native-linux-x86_64`,
     `ReactiveMongo`,
     `ReactiveMongo-JMX`)
+
+lazy val benchmarks = (project in file("benchmarks")).
+  enablePlugins(JmhPlugin).
+  dependsOn(`ReactiveMongo-BSON` % "compile->test")

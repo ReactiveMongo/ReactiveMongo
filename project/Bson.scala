@@ -34,7 +34,9 @@ object Bson {
           mtp("reactivemongo.bson.ExtendedNumeric"),
           fmp("reactivemongo.bson.ExtendedNumeric.value"),
           imt("reactivemongo.bson.ExtendedNumeric.this"),
-          mtp("reactivemongo.bson.ExtendedNumeric$")
+          mtp("reactivemongo.bson.ExtendedNumeric$"),
+          x[UpdateForwarderBodyProblem]("reactivemongo.bson.DefaultBSONHandlers.collectionToBSONArrayCollectionWriter"),
+          x[UpdateForwarderBodyProblem]("reactivemongo.bson.DefaultBSONHandlers.bsonArrayToCollectionReader")
         )
       }
     ))

@@ -287,6 +287,18 @@ object BSONArray {
 
   /** An empty BSONArray. */
   val empty: BSONArray = BSONArray()
+
+  /** Writes the `document` into the `buffer`. */
+  private[reactivemongo] def write(value: BSONArray, buffer: WritableBuffer): WritableBuffer = DefaultBufferHandler.BSONArrayBufferHandler.write(value, buffer)
+
+  /**
+   * Reads a `document` from the `buffer`.
+   *
+   * Note that the buffer's readerIndex must be set on the start of a document, or it will fail.
+   */
+  private[reactivemongo] def read(buffer: ReadableBuffer): Try[BSONArray] =
+    Try(DefaultBufferHandler.BSONArrayBufferHandler read buffer)
+
 }
 
 /**
@@ -1095,7 +1107,7 @@ case class BSONElement(
   name: String,
   value: BSONValue) extends ElementProducer {
 
-  def generate() = List(this)
+  def generate() = Option(this)
 }
 
 object BSONElement extends BSONElementLowPriority {
