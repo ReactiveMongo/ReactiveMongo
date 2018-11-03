@@ -45,6 +45,15 @@ class MacroSpec extends org.specs2.mutable.Specification {
       roundtrip(some, format) and roundtrip(none, format)
     }
 
+    "not support type mismatch for optional value" in {
+      //val reader: BSONReader[BSONDocument, Optional] =
+
+      Macros.reader[Optional].read(
+        BSONDocument(
+          "name" -> "invalidValueType",
+          "value" -> 4)) must throwA[Exception]("Foo")
+    }
+
     "support seq" in {
       roundtrip(
         WordLover("john", Seq("hello", "world")),
