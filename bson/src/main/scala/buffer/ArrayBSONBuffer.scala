@@ -15,17 +15,15 @@
  */
 package reactivemongo.bson.buffer
 
-import scala.collection.mutable.ArrayBuffer
-
-@deprecated("Unused", "0.13.0")
-trait BSONBuffer extends ReadableBuffer with WritableBuffer
+import reactivemongo.io.netty.buffer.{ ByteBuf, Unpooled }
 
 import java.nio.ByteBuffer
 
 /** An array-backed writable buffer. */
 class ArrayBSONBuffer protected[buffer] (
-  protected val buffer: ArrayBuffer[Byte]) extends WritableBuffer {
-  def index = buffer.length // useless
+  private[reactivemongo] val buffer: ByteBuf) extends WritableBuffer {
+
+  def index: Int = buffer.readableBytes() // useless
 
   def bytebuffer(size: Int): ByteBuffer = {
     val b = ByteBuffer.allocate(size)
@@ -33,51 +31,56 @@ class ArrayBSONBuffer protected[buffer] (
     b
   }
 
-  def this() = this(new ArrayBuffer[Byte]())
+  def this() = this(Unpooled.buffer(96))
 
   /** Returns an array containing all the data that were put in this buffer. */
-  def array = buffer.toArray
+  def array = {
+    val bytes = Array.ofDim[Byte](index)
+    buffer.getBytes(0, bytes, 0, index)
+    bytes
+  }
 
   def setInt(index: Int, value: Int): this.type = {
-    val array = bytebuffer(4).putInt(value).array
-
-    buffer.update(index, array(0))
-    buffer.update(index + 1, array(1))
-    buffer.update(index + 2, array(2))
-    buffer.update(index + 3, array(3))
-
+    buffer.setIntLE(index, value)
     this
   }
 
   def toReadableBuffer = ArrayReadableBuffer(array)
 
   def writeBytes(array: Array[Byte]): this.type = {
-    buffer ++= array
-    //index += array.length
+    buffer.writeBytes(array)
     this
   }
 
+  override def writeBytes(buf: ReadableBuffer): this.type = buf match {
+    case in: ArrayReadableBuffer => {
+      buffer.writeBytes(in.bytebuffer)
+      this
+    }
+
+    case _ => super.writeBytes(buf)
+  }
+
   def writeByte(byte: Byte): WritableBuffer = {
-    buffer += byte
+    buffer.writeByte(byte.toInt)
     //index += 1
     this
   }
 
   def writeInt(int: Int): WritableBuffer = {
-    val array = bytebuffer(4).putInt(int).array
-    buffer ++= array
+    buffer.writeIntLE(int)
     //index += 4
     this
   }
 
   def writeLong(long: Long): WritableBuffer = {
-    buffer ++= bytebuffer(8).putLong(long).array
+    buffer.writeLongLE(long)
     //index += 8
     this
   }
 
   def writeDouble(double: Double): WritableBuffer = {
-    buffer ++= bytebuffer(8).putDouble(double).array
+    buffer.writeDoubleLE(double)
     //index += 8
     this
   }

@@ -200,6 +200,13 @@ private object MacroImpl {
         val (reader, _) = resolve(typ)
         val pname = paramName(param)
 
+        def tree(getter: String) =
+          Select(Apply(Apply(
+            TypeApply(
+              Select(Ident("document"), getter),
+              List(TypeTree(typ))),
+            List(Literal(Constant(pname)))), List(reader)), "get")
+
         if (reader.isEmpty) {
           c.abort(c.enclosingPosition, s"Implicit not found for '$pname': ${classOf[Reader[_]].getName}[_, $typ]")
         }
@@ -218,19 +225,13 @@ private object MacroImpl {
           Apply( // ${reader}.read(document)
             Select(reader, "read"), List(Ident("document")))
         } else opt match {
-          case Some(_) => // document.getAs[$typ]($pname)($reader)
-            Apply(Apply(
-              TypeApply(
-                Select(Ident("document"), "getAs"),
-                List(TypeTree(typ))),
-              List(Literal(Constant(pname)))), List(reader))
+          case Some(_) =>
+            // document.getAsUnflattenedTry[$typ]($pname)($reader).get
+            tree("getAsUnflattenedTry")
 
-          case _ => // document.getAsTry[$typ]($pname)($reader).get
-            Select(Apply(Apply(
-              TypeApply(
-                Select(Ident("document"), "getAsTry"),
-                List(TypeTree(typ))),
-              List(Literal(Constant(pname)))), List(reader)), "get")
+          case _ =>
+            // document.getAsTry[$typ]($pname)($reader).get
+            tree("getAsTry")
         }
       }
 

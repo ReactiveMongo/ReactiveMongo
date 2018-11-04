@@ -4,7 +4,7 @@ import java.nio.{ ByteBuffer, ByteOrder }
 
 /** An array-backed readable buffer. */
 case class ArrayReadableBuffer private (
-  bytebuffer: ByteBuffer) extends ReadableBuffer {
+  private[reactivemongo] val bytebuffer: ByteBuffer) extends ReadableBuffer {
 
   bytebuffer.order(ByteOrder.LITTLE_ENDIAN)
 

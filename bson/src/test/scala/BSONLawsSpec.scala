@@ -1,5 +1,3 @@
-package reactivemongo
-
 import reactivemongo.bson._
 
 import org.typelevel.discipline.specs2.mutable.Discipline
@@ -14,6 +12,8 @@ import spire.algebra.{
   Semigroup
 }
 
+import reactivemongo.BSONValueFixtures
+
 class BSONLawsSpecs
   extends org.specs2.mutable.Specification with Discipline {
 
@@ -22,12 +22,9 @@ class BSONLawsSpecs
   import BSONCheck._
   import LawEvidences._
 
-  section("unit")
-
   { // Addition semigroup
     val semigroup = new Semigroup[BSONValue] {
-      def combine(x: BSONValue, y: BSONValue): BSONValue =
-        BSONValue.Addition(x, y)
+      def combine(x: BSONValue, y: BSONValue): BSONValue = BSONValue.Addition(x, y)
     }
     implicit val additive: AdditiveSemigroup[BSONValue] = Additive(semigroup)
 
@@ -46,8 +43,6 @@ class BSONLawsSpecs
 
     checkAll("ElementProducer", GroupLaws[ElementProducer].additiveMonoid)
   }
-
-  section("unit")
 }
 
 object LawEvidences {
