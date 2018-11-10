@@ -51,32 +51,21 @@ private[collections] trait Aggregator[P <: SerializationPack with Singleton] {
     val context: AggregatorContext[T],
     val cp: CursorProducer.Aux[T, AC]) {
 
-    import context.{
-      allowDiskUse,
-      batchSize,
-      cursorOptions,
-      bypassDocumentValidation,
-      explain,
-      firstOperator,
-      otherOperators,
-      reader
-    }
-
-    @inline private def readPreference = context.readPreference
-
     private def ver = db.connectionState.metadata.maxWireVersion
 
     final def cursor: AC[T] = {
-      def batchSz = batchSize.getOrElse(defaultCursorBatchSize)
+      def batchSz = context.batchSize.getOrElse(defaultCursorBatchSize)
       implicit def writer = commandWriter[T]
-      implicit def aggReader: pack.Reader[T] = reader
+      implicit def aggReader: pack.Reader[T] = context.reader
 
       val cmd = new Aggregate[T](
-        firstOperator, otherOperators, explain, allowDiskUse, batchSz, ver,
-        bypassDocumentValidation, readConcern, writeConcern)
+        context.firstOperator, context.otherOperators, context.explain,
+        context.allowDiskUse, batchSz, ver,
+        context.bypassDocumentValidation,
+        context.readConcern, context.writeConcern)
 
       val cursor = runner.cursor[T, Aggregate[T]](
-        collection, cmd, cursorOptions, readPreference)
+        collection, cmd, context.cursorOptions, context.readPreference)
 
       cp.produce(cursor)
     }
