@@ -30,7 +30,8 @@ case class QueryOpts(
   skipN: Int = 0,
   batchSizeN: Int = 0,
   flagsN: Int = 0) extends QueryOps {
-  // TODO: Merge with QueryBuilder (exception slaveOk)
+
+  // TODO: Merge skipN and batchSizeN with QueryBuilder
   // keep flags preparation as internal for compat < 3.2
   type Self = QueryOpts
 

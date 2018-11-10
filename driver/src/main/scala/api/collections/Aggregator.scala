@@ -4,6 +4,7 @@ import scala.language.higherKinds
 
 import reactivemongo.api.{
   Cursor,
+  CursorOptions,
   CursorProducer,
   ReadConcern,
   ReadPreference,
@@ -37,6 +38,7 @@ private[collections] trait Aggregator[P <: SerializationPack with Singleton] {
     val writeConcern: WriteConcern,
     val readPreference: ReadPreference,
     val batchSize: Option[Int],
+    val cursorOptions: CursorOptions,
     val reader: pack.Reader[T]) {
 
     def prepared[AC[_] <: Cursor.WithOps[_]](
@@ -52,6 +54,7 @@ private[collections] trait Aggregator[P <: SerializationPack with Singleton] {
     import context.{
       allowDiskUse,
       batchSize,
+      cursorOptions,
       bypassDocumentValidation,
       explain,
       firstOperator,
@@ -73,7 +76,7 @@ private[collections] trait Aggregator[P <: SerializationPack with Singleton] {
         bypassDocumentValidation, readConcern, writeConcern)
 
       val cursor = runner.cursor[T, Aggregate[T]](
-        collection, cmd, readPreference)
+        collection, cmd, cursorOptions, readPreference)
 
       cp.produce(cursor)
     }

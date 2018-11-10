@@ -6,6 +6,7 @@ import scala.concurrent.{ ExecutionContext, Future }
 
 import reactivemongo.api.{
   Cursor,
+  CursorOptions,
   Collection,
   DB,
   SerializationPack,
@@ -103,12 +104,18 @@ object Command {
     reactivemongo.util.LazyLogger("reactivemongo.api.commands")
 
   @deprecated("Will be private/internal", "0.16.0")
-  def defaultCursorFetcher[P <: SerializationPack, A](db: DB, p: P, command: A, failover: FailoverStrategy)(implicit writer: p.Writer[A]): CursorFetcher[p.type, DefaultCursor.Impl] = fetchCursor[p.type, A](db, db.name + ".$cmd", p, command, failover)
+  def defaultCursorFetcher[P <: SerializationPack, A](db: DB, p: P, command: A, failover: FailoverStrategy)(implicit writer: p.Writer[A]): CursorFetcher[p.type, DefaultCursor.Impl] = fetchCursor[p.type, A](db, db.name + ".$cmd", p, command, failover, CursorOptions.empty)
 
   /**
    * @param fullCollectionName the fully qualified collection name (even if `query.fullCollectionName` is `\$cmd`)
    */
-  private[reactivemongo] def fetchCursor[P <: SerializationPack, A](db: DB, fullCollectionName: String, p: P, command: A, failover: FailoverStrategy)(implicit writer: p.Writer[A]): CursorFetcher[p.type, DefaultCursor.Impl] = new CursorFetcher[p.type, DefaultCursor.Impl] {
+  private[reactivemongo] def fetchCursor[P <: SerializationPack, A](
+    db: DB,
+    fullCollectionName: String,
+    p: P,
+    command: A,
+    failover: FailoverStrategy,
+    options: CursorOptions)(implicit writer: p.Writer[A]): CursorFetcher[p.type, DefaultCursor.Impl] = new CursorFetcher[p.type, DefaultCursor.Impl] {
     val pack: p.type = p
 
     protected def defaultReadPreference = db.connection.options.readPreference
@@ -146,7 +153,11 @@ object Command {
       pack.serializeAndWrite(buffer, command, writer)
 
       val bs = BufferSequence(buffer.buffer)
-      val flags = if (readPreference.slaveOk) QueryFlags.SlaveOk else 0
+      val flags = {
+        if (readPreference.slaveOk) options.slaveOk.flags
+        else options.flags
+      }
+
       val op = Query(flags, db.name + ".$cmd", 0, 1)
       val mongo26WriteCommand = command match {
         case _: Mongo26WriteCommand => true
@@ -180,9 +191,9 @@ object Command {
      * Executes the `command` and returns its result
      * along with the MongoDB response.
      */
-    private[reactivemongo] def cursor[R, C <: CollectionCommand with CommandWithResult[R]](collection: Collection, command: C, rp: ReadPreference)(implicit writer: pack.Writer[ResolvedCollectionCommand[C]], reader: pack.Reader[R]): DefaultCursor.Impl[R] = fetchCursor(
+    private[reactivemongo] def cursor[R, C <: CollectionCommand with CommandWithResult[R]](collection: Collection, command: C, options: CursorOptions, rp: ReadPreference)(implicit writer: pack.Writer[ResolvedCollectionCommand[C]], reader: pack.Reader[R]): DefaultCursor.Impl[R] = fetchCursor(
       collection.db, collection.fullCollectionName, pack,
-      ResolvedCollectionCommand(collection.name, command), failover).
+      ResolvedCollectionCommand(collection.name, command), failover, options).
       cursor[R](rp)
 
     /**
