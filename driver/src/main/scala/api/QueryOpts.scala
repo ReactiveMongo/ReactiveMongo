@@ -42,17 +42,17 @@ case class QueryOpts(
 
   def batchSize(n: Int) = copy(batchSizeN = n)
 
-  def tailable = copy(flagsN = flagsN ^ QueryFlags.TailableCursor)
+  def tailable = copy(flagsN = flagsN | QueryFlags.TailableCursor)
 
-  def slaveOk = copy(flagsN = flagsN ^ QueryFlags.SlaveOk)
+  def slaveOk = copy(flagsN = flagsN | QueryFlags.SlaveOk)
 
-  def oplogReplay = copy(flagsN = flagsN ^ QueryFlags.OplogReplay)
+  def oplogReplay = copy(flagsN = flagsN | QueryFlags.OplogReplay)
 
-  def noCursorTimeout = copy(flagsN = flagsN ^ QueryFlags.NoCursorTimeout)
+  def noCursorTimeout = copy(flagsN = flagsN | QueryFlags.NoCursorTimeout)
 
-  def awaitData = copy(flagsN = flagsN ^ QueryFlags.AwaitData)
+  def awaitData = copy(flagsN = flagsN | QueryFlags.AwaitData)
 
-  def exhaust = copy(flagsN = flagsN ^ QueryFlags.Exhaust)
+  def exhaust = copy(flagsN = flagsN | QueryFlags.Exhaust)
 
-  def partial = copy(flagsN = flagsN ^ QueryFlags.Partial)
+  def partial = copy(flagsN = flagsN | QueryFlags.Partial)
 }
