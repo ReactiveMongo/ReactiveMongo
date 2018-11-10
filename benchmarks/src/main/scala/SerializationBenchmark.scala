@@ -6,25 +6,29 @@ import org.openjdk.jmh.annotations._
 import reactivemongo.bson.buffer.{
   DefaultBufferHandler,
   ArrayBSONBuffer,
+  ReadableBuffer,
   WritableBuffer
 }, DefaultBufferHandler.serialize
 
 sealed trait SerializationBenchmark {
   private var written: WritableBuffer = _
   private var value: BSONValue = _
+
+  private var input: ReadableBuffer = _
   private var output: WritableBuffer = _
 
-  protected def setupSerialization[B <: BSONValue](values: Seq[B]): Unit = {
-    scala.util.Random.shuffle(values).headOption.foreach { v =>
+  protected def setupSerialization[B <: BSONValue](values: Seq[B]): Unit =
+    values.headOption.foreach { v =>
       value = v
 
-      written = DefaultBufferHandler.serialize(v, new ArrayBSONBuffer)
+      written = DefaultBufferHandler.serialize(
+        v, (new ArrayBSONBuffer).writeByte(value.code)).writeString("field")
     }
-  }
 
   @Setup(Level.Invocation)
   def setupInvocation(): Unit = {
     output = new ArrayBSONBuffer
+    input = written.toReadableBuffer
   }
 
   @Benchmark
@@ -32,9 +36,10 @@ sealed trait SerializationBenchmark {
     DefaultBufferHandler.serialize(value, output)
 
   @Benchmark
-  def read(): BSONValue =
-    DefaultBufferHandler.handlersByCode(value.code).
-      read(written.toReadableBuffer)
+  def read(): Unit = {
+    val result = DefaultBufferHandler.deserialize(input)
+    result == ("field" -> value)
+  }
 }
 
 @State(Scope.Benchmark)
