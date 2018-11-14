@@ -606,10 +606,36 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * @param writeConcern $writeConcernParam
    * @param batchSize $aggBatchSizeParam
    * @param cursorOptions the options for the result cursor
+   * @param maxTimeMS specifies a time limit in milliseconds for processing operations on a cursor.
    * @param reader $readerParam
    * @param cp $cursorProducerParam
    */
-  def aggregatorContext[T](firstOperator: PipelineOperator, otherOperators: List[PipelineOperator] = Nil, explain: Boolean = false, allowDiskUse: Boolean = false, bypassDocumentValidation: Boolean = false, readConcern: Option[ReadConcern] = None, readPreference: ReadPreference = ReadPreference.primary, writeConcern: WriteConcern = this.writeConcern, batchSize: Option[Int] = None, cursorOptions: CursorOptions = CursorOptions.empty)(implicit reader: pack.Reader[T]): AggregatorContext[T] = new AggregatorContext[T](firstOperator, otherOperators, explain, allowDiskUse, bypassDocumentValidation, readConcern.getOrElse(self.readConcern), writeConcern, readPreference, batchSize, cursorOptions, reader)
+  def aggregatorContext[T](
+    firstOperator: PipelineOperator,
+    otherOperators: List[PipelineOperator] = Nil,
+    explain: Boolean = false,
+    allowDiskUse: Boolean = false,
+    bypassDocumentValidation: Boolean = false,
+    readConcern: Option[ReadConcern] = None,
+    readPreference: ReadPreference = ReadPreference.primary,
+    writeConcern: WriteConcern = this.writeConcern,
+    batchSize: Option[Int] = None,
+    cursorOptions: CursorOptions = CursorOptions.empty,
+    maxTimeMS: Option[Long] = None)(implicit reader: pack.Reader[T]): AggregatorContext[T] = {
+    new AggregatorContext[T](
+      firstOperator,
+      otherOperators,
+      explain,
+      allowDiskUse,
+      bypassDocumentValidation,
+      readConcern.getOrElse(self.readConcern),
+      writeConcern,
+      readPreference,
+      batchSize,
+      cursorOptions,
+      maxTimeMS,
+      reader)
+  }
 
   /**
    * @tparam S $selectorTParam

@@ -402,7 +402,7 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
 
     DefaultCursor.query(pack, op, body, readPreference,
       collection.db, failoverStrategy, isMongo26WriteOp,
-      collection.fullCollectionName)(reader)
+      collection.fullCollectionName, maxTimeMsOption)(reader)
   }
 
   private def write(document: pack.Document, buffer: ChannelBufferWritableBuffer): ChannelBufferWritableBuffer = {
