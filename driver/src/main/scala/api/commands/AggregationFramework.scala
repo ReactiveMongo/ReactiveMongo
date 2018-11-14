@@ -1,6 +1,7 @@
 package reactivemongo.api.commands
 
-import reactivemongo.api.{ ReadConcern, SerializationPack }
+import api.ChangeStreams
+import reactivemongo.api.{ReadConcern, SerializationPack}
 import reactivemongo.core.protocol.MongoWireVersion
 
 /**
@@ -522,4 +523,40 @@ trait AggregationFramework[P <: SerializationPack]
         elms.result()
       }))))
   }
+
+  // Change Stream
+  //
+  // Specification:
+  // https://github.com/mongodb/specifications/blob/master/source/change-streams/change-streams.rst#server-specification
+
+  /**
+   * Low level pipeline operator which allows to open a tailable cursor against subsequent ChangeEvents of a given
+   * collection (since MongoDB 3.6).
+   * https://docs.mongodb.com/manual/reference/change-events/
+   *
+   * For common use-cases, you might prefer to use the `watch` operator on a collection.
+   *
+   * Note: the target mongo instance MUST be a replica-set (even in the case of a single node deployement).
+   *
+   * @param resumeAfter the id of the last known Change Event, if any. The stream will resume just after that event.
+   * @param startAtOperationTime the operation time before which all Change Events are known. Must be in the time range
+   *                             of the oplog. (since MongoDB 4.0)
+   * @param fullDocument if set to UpdateLookup, every update change event will be joined with the *current* version of the
+   *                     relevant document.
+   */
+  case class ChangeStream(
+    resumeAfter: Option[pack.Value] = None,
+    startAtOperationTime: Option[pack.Value] = None, // TODO restrict to something more like a timestamp?
+    fullDocument: Option[ChangeStreams.FullDocument] = None
+  ) extends PipelineOperator {
+
+    def makePipe: pack.Document = builder.document(Seq(
+      builder.elementProducer(f"$$changeStream", builder.document(Seq(
+        resumeAfter.map(v => builder.elementProducer("resumeAfter", v)),
+        startAtOperationTime.map(v => builder.elementProducer("startAtOperationTime", v)),
+        fullDocument.map(v => builder.elementProducer("fullDocument", builder.string(v.name))),
+      ).flatten))
+    ))
+  }
+
 }
