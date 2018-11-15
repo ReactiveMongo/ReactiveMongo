@@ -8,21 +8,18 @@ import org.specs2.concurrent.ExecutionEnv
 import reactivemongo.api.Cursor
 import reactivemongo.api.collections.bson.BSONCollection
 import reactivemongo.bson.BSONDocument
-import tests.Common
+import reactivemongo.core.protocol.MongoWireVersion
 import tests.Common.timeout
-import util.WithTemporaryCollection
+import util.{MongoSkips, WithTemporaryCollection}
 
 class ChangeStreamSpec(implicit val ee: ExecutionEnv)
   extends org.specs2.mutable.Specification
-    with WithTemporaryCollection {
+    with WithTemporaryCollection
+    with MongoSkips {
 
-  "Change streams specs".title
-
-//  db.connectionState.metadata.maxWireVersion >= MongoWireVersion.V36
-
-  if (Common.replSetOn) {
-    "the change stream of a collection" should {
-      "return the next change event" in withTmpCollection { coll: BSONCollection =>
+  "The ChangeStream of a collection" should {
+    "return the next change event" in skippedIf(isNotReplicaSet, isNotAtLeast(db, MongoWireVersion.V36)) {
+      withTmpCollection { coll: BSONCollection =>
         // given
         val cursor = coll.watch[BSONDocument]().cursor[Cursor.WithOps]
         val testDocument = BSONDocument(
@@ -47,8 +44,10 @@ class ChangeStreamSpec(implicit val ee: ExecutionEnv)
           event.getAs[BSONDocument]("fullDocument") must beSome(testDocument)
         }.await(retries = 2, 1.second)
       }
+    }
 
-      "resume with the next event after a known id" in withTmpCollection { coll: BSONCollection =>
+    "resume with the next event after a known id" in skippedIf(isNotReplicaSet, isNotAtLeast(db, MongoWireVersion.V36)) {
+      withTmpCollection { coll: BSONCollection =>
         // given
         val cursor = coll.watch[BSONDocument]().cursor[Cursor.WithOps]
         val testDocument1 = BSONDocument(
@@ -69,9 +68,11 @@ class ChangeStreamSpec(implicit val ee: ExecutionEnv)
         val result = firstEventFuture.flatMap { firstEvent =>
           firstEvent.get("_id") match {
             case None => Future.failed(new Exception("The event had no id"))
-            case Some(eventId) => foldOne(coll.watch(
-              resumeAfter = Some(eventId)
-            ).cursor[Cursor.WithOps])
+            case Some(eventId) => foldOne(
+              coll.watch(
+                resumeAfter = Some(eventId)
+              ).cursor[Cursor.WithOps]
+            )
           }
         }
 
@@ -83,8 +84,10 @@ class ChangeStreamSpec(implicit val ee: ExecutionEnv)
           event.getAs[BSONDocument]("fullDocument") must beSome(testDocument2)
         }.await(retries = 2, 1.second)
       }
+    }
 
-      "resume with the same event after a known operation time" in withTmpCollection { coll: BSONCollection =>
+    "resume with the same event after a known operation time" in skippedIf(isNotReplicaSet, isNotAtLeast(db, MongoWireVersion.V40)) {
+      withTmpCollection { coll: BSONCollection =>
         // given
         val cursor = coll.watch[BSONDocument]().cursor[Cursor.WithOps]
         val testDocument1 = BSONDocument(
@@ -105,9 +108,11 @@ class ChangeStreamSpec(implicit val ee: ExecutionEnv)
         val result = firstEventFuture.flatMap { firstEvent =>
           firstEvent.get("clusterTime") match {
             case None => Future.failed(new Exception("The event had no clusterTime"))
-            case Some(clusterTime) => foldOne(coll.watch[BSONDocument](
-              startAtOperationTime = Some(clusterTime)
-            ).cursor[Cursor.WithOps])
+            case Some(clusterTime) => foldOne(
+              coll.watch[BSONDocument](
+                startAtOperationTime = Some(clusterTime)
+              ).cursor[Cursor.WithOps]
+            )
           }
         }
 
@@ -119,8 +124,10 @@ class ChangeStreamSpec(implicit val ee: ExecutionEnv)
           event.getAs[BSONDocument]("fullDocument") must beSome(testDocument1)
         }.await(retries = 2, 1.second)
       }
+    }
 
-      "lookup the most recent document version" in withTmpCollection { coll: BSONCollection =>
+    "lookup the most recent document version" in skippedIf(isNotReplicaSet, isNotAtLeast(db, MongoWireVersion.V36)) {
+      withTmpCollection { coll: BSONCollection =>
         // given
         val cursor = coll.watch[BSONDocument]().cursor[Cursor.WithOps]
         val id = "lookup_test1"
@@ -154,10 +161,12 @@ class ChangeStreamSpec(implicit val ee: ExecutionEnv)
                   BSONDocument("_id" -> id),
                   BSONDocument(f"$$set" -> BSONDocument(fieldName -> lastValue))
                 )
-                event <- foldOne(coll.watch[BSONDocument](
-                  resumeAfter = Some(eventId),
-                  fullDocument = Some(ChangeStreams.FullDocument.UpdateLookup)
-                ).cursor[Cursor.WithOps])
+                event <- foldOne(
+                  coll.watch[BSONDocument](
+                    resumeAfter = Some(eventId),
+                    fullDocument = Some(ChangeStreams.FullDocument.UpdateLookup)
+                  ).cursor[Cursor.WithOps]
+                )
               } yield event
           }
         }
@@ -172,8 +181,6 @@ class ChangeStreamSpec(implicit val ee: ExecutionEnv)
         }.await(retries = 2, 1.second)
       }
     }
-  } else {
-    "untestable because the target mongo server is not within a Replica Set" in skipped
   }
 
   private val actorSystem = ActorSystem("changeStreams")
