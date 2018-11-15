@@ -1,5 +1,3 @@
-package aggregation
-
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future, Promise}
 import scala.util.Try
@@ -7,29 +5,24 @@ import scala.util.Try
 import akka.actor.ActorSystem
 import api.ChangeStreams
 import org.specs2.concurrent.ExecutionEnv
+import reactivemongo.api.Cursor
 import reactivemongo.api.collections.bson.BSONCollection
-import reactivemongo.api.{Cursor, CursorOptions, ReadConcern}
-import reactivemongo.bson.{BSONDocument, BSONValue}
+import reactivemongo.bson.BSONDocument
 import tests.Common
 import tests.Common.timeout
+import util.WithTemporaryCollection
 
 class ChangeStreamSpec(implicit val ee: ExecutionEnv)
   extends org.specs2.mutable.Specification
-    with WithTemporaryDb {
+    with WithTemporaryCollection {
 
   "Change streams specs".title
 
-  sequential
+//  db.connectionState.metadata.maxWireVersion >= MongoWireVersion.V36
 
   if (Common.replSetOn) {
-    lazy val coll: BSONCollection = {
-      val c: BSONCollection = db("changeStreamTests")
-      scala.concurrent.Await.result(c.create(), timeout * 2)
-      c
-    }
-
     "the change stream of a collection" should {
-      "return the next change event" in {
+      "return the next change event" in withTmpCollection { coll: BSONCollection =>
         // given
         val cursor = coll.watch[BSONDocument]().cursor[Cursor.WithOps]
         val testDocument = BSONDocument(
@@ -55,7 +48,7 @@ class ChangeStreamSpec(implicit val ee: ExecutionEnv)
         }.await(retries = 2, 1.second)
       }
 
-      "resume with the next event after a known id" in {
+      "resume with the next event after a known id" in withTmpCollection { coll: BSONCollection =>
         // given
         val cursor = coll.watch[BSONDocument]().cursor[Cursor.WithOps]
         val testDocument1 = BSONDocument(
@@ -91,7 +84,7 @@ class ChangeStreamSpec(implicit val ee: ExecutionEnv)
         }.await(retries = 2, 1.second)
       }
 
-      "resume with the same event after a known operation time" in {
+      "resume with the same event after a known operation time" in withTmpCollection { coll: BSONCollection =>
         // given
         val cursor = coll.watch[BSONDocument]().cursor[Cursor.WithOps]
         val testDocument1 = BSONDocument(
@@ -127,7 +120,7 @@ class ChangeStreamSpec(implicit val ee: ExecutionEnv)
         }.await(retries = 2, 1.second)
       }
 
-      "lookup the most recent document version" in {
+      "lookup the most recent document version" in withTmpCollection { coll: BSONCollection =>
         // given
         val cursor = coll.watch[BSONDocument]().cursor[Cursor.WithOps]
         val id = "lookup_test1"

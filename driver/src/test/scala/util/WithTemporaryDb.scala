@@ -1,4 +1,4 @@
-package aggregation
+package util
 
 import org.specs2.concurrent.ExecutionEnv
 import tests.Common
