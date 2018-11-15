@@ -31,7 +31,7 @@ class ChangeStreamSpec(implicit val ee: ExecutionEnv)
     "the change stream of a collection" should {
       "return the next change event" in {
         // given
-        val cursor = watch(coll)().cursor
+        val cursor = coll.watch[BSONDocument]().cursor[Cursor.WithOps]
         val testDocument = BSONDocument(
           "_id" -> "test",
           "foo" -> "bar",
@@ -57,7 +57,7 @@ class ChangeStreamSpec(implicit val ee: ExecutionEnv)
 
       "resume with the next event after a known id" in {
         // given
-        val cursor = watch(coll)().cursor
+        val cursor = coll.watch[BSONDocument]().cursor[Cursor.WithOps]
         val testDocument1 = BSONDocument(
           "_id" -> "resume_test1",
           "foo" -> "bar",
@@ -76,7 +76,9 @@ class ChangeStreamSpec(implicit val ee: ExecutionEnv)
         val result = firstEventFuture.flatMap { firstEvent =>
           firstEvent.get("_id") match {
             case None => Future.failed(new Exception("The event had no id"))
-            case Some(eventId) => foldOne(watch(coll)(resumeAfter = Some(eventId)).cursor)
+            case Some(eventId) => foldOne(coll.watch(
+              resumeAfter = Some(eventId)
+            ).cursor[Cursor.WithOps])
           }
         }
 
@@ -91,7 +93,7 @@ class ChangeStreamSpec(implicit val ee: ExecutionEnv)
 
       "resume with the same event after a known operation time" in {
         // given
-        val cursor = watch(coll)().cursor
+        val cursor = coll.watch[BSONDocument]().cursor[Cursor.WithOps]
         val testDocument1 = BSONDocument(
           "_id" -> "clusterTime_test1",
           "foo" -> "bar",
@@ -110,7 +112,9 @@ class ChangeStreamSpec(implicit val ee: ExecutionEnv)
         val result = firstEventFuture.flatMap { firstEvent =>
           firstEvent.get("clusterTime") match {
             case None => Future.failed(new Exception("The event had no clusterTime"))
-            case Some(clusterTime) => foldOne(watch(coll)(startAtOperationTime = Some(clusterTime)).cursor)
+            case Some(clusterTime) => foldOne(coll.watch[BSONDocument](
+              startAtOperationTime = Some(clusterTime)
+            ).cursor[Cursor.WithOps])
           }
         }
 
@@ -125,7 +129,7 @@ class ChangeStreamSpec(implicit val ee: ExecutionEnv)
 
       "lookup the most recent document version" in {
         // given
-        val cursor = watch(coll)().cursor
+        val cursor = coll.watch[BSONDocument]().cursor[Cursor.WithOps]
         val id = "lookup_test1"
         val fieldName = "foo"
         val lastValue = "bar3"
@@ -157,10 +161,10 @@ class ChangeStreamSpec(implicit val ee: ExecutionEnv)
                   BSONDocument("_id" -> id),
                   BSONDocument(f"$$set" -> BSONDocument(fieldName -> lastValue))
                 )
-                event <- foldOne(watch(coll)(
+                event <- foldOne(coll.watch[BSONDocument](
                   resumeAfter = Some(eventId),
                   fullDocument = Some(ChangeStreams.FullDocument.UpdateLookup)
-                ).cursor)
+                ).cursor[Cursor.WithOps])
               } yield event
           }
         }
@@ -177,19 +181,6 @@ class ChangeStreamSpec(implicit val ee: ExecutionEnv)
     }
   } else {
     "untestable because the target mongo server is not within a Replica Set" in skipped
-  }
-
-  private def watch(collection: BSONCollection)(
-    resumeAfter: Option[BSONValue] = None,
-    startAtOperationTime: Option[BSONValue] = None,
-    fullDocument: Option[ChangeStreams.FullDocument] = None
-  ) = {
-    import collection.BatchCommands.AggregationFramework.ChangeStream
-    collection.aggregatorContext[BSONDocument](
-      firstOperator = ChangeStream(resumeAfter, startAtOperationTime, fullDocument),
-      readConcern = Some(ReadConcern.Majority),
-      cursorOptions = CursorOptions.empty.tailable,
-    ).prepared[Cursor.WithOps]
   }
 
   private val actorSystem = ActorSystem("changeStreams")

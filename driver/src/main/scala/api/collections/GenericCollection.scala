@@ -83,7 +83,7 @@ trait GenericCollectionProducer[P <: SerializationPack with Singleton, +C <: Gen
 trait GenericCollection[P <: SerializationPack with Singleton]
   extends Collection with GenericCollectionWithCommands[P]
   with CollectionMetaCommands with ImplicitCommandHelpers[P] with InsertOps[P]
-  with UpdateOps[P] with DeleteOps[P] with CountOp[P] with DistinctOp[P]
+  with UpdateOps[P] with DeleteOps[P] with CountOp[P] with DistinctOp[P] with ChangeStreamOps[P]
   with Aggregator[P] with GenericCollectionMetaCommands[P]
   with GenericCollectionWithQueryBuilder[P] with HintFactory[P] { self =>
 
