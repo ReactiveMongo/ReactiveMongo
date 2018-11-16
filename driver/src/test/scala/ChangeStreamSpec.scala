@@ -3,23 +3,23 @@ import scala.concurrent.{Await, Future, Promise}
 import scala.util.Try
 
 import akka.actor.ActorSystem
-import api.ChangeStreams
 import org.specs2.concurrent.ExecutionEnv
-import reactivemongo.api.Cursor
+import reactivemongo.api.{ChangeStreams, Cursor}
 import reactivemongo.api.collections.bson.BSONCollection
 import reactivemongo.bson.BSONDocument
 import reactivemongo.core.protocol.MongoWireVersion
 import tests.Common.timeout
-import util.{MongoSkips, WithTemporaryCollection}
+import util.{MongoSkips, WithTemporaryCollection, WithTemporaryDb}
 
 class ChangeStreamSpec(implicit val ee: ExecutionEnv)
   extends org.specs2.mutable.Specification
+    with WithTemporaryDb
     with WithTemporaryCollection
     with MongoSkips {
 
   "The ChangeStream of a collection" should {
     "return the next change event" in skippedIf(isNotReplicaSet, isNotAtLeast(db, MongoWireVersion.V36)) {
-      withTmpCollection { coll: BSONCollection =>
+      withTmpCollection(db) { coll: BSONCollection =>
         // given
         val cursor = coll.watch[BSONDocument]().cursor[Cursor.WithOps]
         val testDocument = BSONDocument(
@@ -47,7 +47,7 @@ class ChangeStreamSpec(implicit val ee: ExecutionEnv)
     }
 
     "resume with the next event after a known id" in skippedIf(isNotReplicaSet, isNotAtLeast(db, MongoWireVersion.V36)) {
-      withTmpCollection { coll: BSONCollection =>
+      withTmpCollection(db) { coll: BSONCollection =>
         // given
         val cursor = coll.watch[BSONDocument]().cursor[Cursor.WithOps]
         val testDocument1 = BSONDocument(
@@ -87,7 +87,7 @@ class ChangeStreamSpec(implicit val ee: ExecutionEnv)
     }
 
     "resume with the same event after a known operation time" in skippedIf(isNotReplicaSet, isNotAtLeast(db, MongoWireVersion.V40)) {
-      withTmpCollection { coll: BSONCollection =>
+      withTmpCollection(db) { coll: BSONCollection =>
         // given
         val cursor = coll.watch[BSONDocument]().cursor[Cursor.WithOps]
         val testDocument1 = BSONDocument(
@@ -127,7 +127,7 @@ class ChangeStreamSpec(implicit val ee: ExecutionEnv)
     }
 
     "lookup the most recent document version" in skippedIf(isNotReplicaSet, isNotAtLeast(db, MongoWireVersion.V36)) {
-      withTmpCollection { coll: BSONCollection =>
+      withTmpCollection(db) { coll: BSONCollection =>
         // given
         val cursor = coll.watch[BSONDocument]().cursor[Cursor.WithOps]
         val id = "lookup_test1"

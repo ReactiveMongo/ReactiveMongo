@@ -2,7 +2,6 @@ package reactivemongo.api.collections
 
 import scala.language.higherKinds
 
-import api.ChangeStreams
 import reactivemongo.api._
 
 trait ChangeStreamOps[P <: SerializationPack with Singleton] { collection: GenericCollection[P] =>

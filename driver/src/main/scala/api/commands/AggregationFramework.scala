@@ -1,7 +1,6 @@
 package reactivemongo.api.commands
 
-import api.ChangeStreams
-import reactivemongo.api.{ReadConcern, SerializationPack}
+import reactivemongo.api.{ChangeStreams, ReadConcern, SerializationPack}
 import reactivemongo.core.protocol.MongoWireVersion
 
 /**
