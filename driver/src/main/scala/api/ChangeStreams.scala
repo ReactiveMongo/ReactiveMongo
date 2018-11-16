@@ -1,4 +1,4 @@
-package api
+package reactivemongo.api
 
 object ChangeStreams {
   sealed abstract class FullDocument(val name: String)
@@ -7,5 +7,4 @@ object ChangeStreams {
     case object Default extends FullDocument("default")
     case object UpdateLookup extends FullDocument("updateLookup")
   }
-
 }
