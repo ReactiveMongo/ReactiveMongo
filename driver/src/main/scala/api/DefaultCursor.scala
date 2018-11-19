@@ -125,9 +125,8 @@ object DefaultCursor {
               "getMore" -> cursorId,
               "collection" -> collName,
               "batchSize" -> ntr,
-            ) ++ maxTimeMS.map { value =>
-              BSONDocument("maxTimeMS" -> value)
-            }.getOrElse(BSONDocument.empty)
+              "maxTimeMS" -> maxTimeMS
+            )
 
             moreQry -> BufferSequence.single(cmd)
           }

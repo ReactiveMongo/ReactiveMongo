@@ -10,15 +10,16 @@ import reactivemongo.bson.BSONDocument
 import reactivemongo.core.protocol.MongoWireVersion
 import tests.Common.timeout
 import util.{MongoSkips, WithTemporaryCollection, WithTemporaryDb}
+import WithTemporaryCollection._
+import org.specs2.execute.AsResult
 
 class ChangeStreamSpec(implicit val ee: ExecutionEnv)
   extends org.specs2.mutable.Specification
     with WithTemporaryDb
-    with WithTemporaryCollection
     with MongoSkips {
 
   "The ChangeStream of a collection" should {
-    "return the next change event" in skippedIf(isNotReplicaSet, isNotAtLeast(db, MongoWireVersion.V36)) {
+    "return the next change event" in skipIfNotRSAndNotVersionAtLeast(MongoWireVersion.V36) {
       withTmpCollection(db) { coll: BSONCollection =>
         // given
         val cursor = coll.watch[BSONDocument]().cursor[Cursor.WithOps]
@@ -37,16 +38,17 @@ class ChangeStreamSpec(implicit val ee: ExecutionEnv)
         } must beEqualTo(()).await
 
         // then
-        result.map { event =>
-          event.getAs[String]("operationType") must beSome("insert")
-          event.getAs[BSONDocument]("documentKey")
-            .flatMap(_.getAs[String]("_id")) must beSome("test")
-          event.getAs[BSONDocument]("fullDocument") must beSome(testDocument)
+        result must beLike[BSONDocument] {
+          case event: BSONDocument =>
+            event.getAs[String]("operationType") must beSome("insert")
+            event.getAs[BSONDocument]("documentKey")
+              .flatMap(_.getAs[String]("_id")) must beSome("test")
+            event.getAs[BSONDocument]("fullDocument") must beSome(testDocument)
         }.await(retries = 2, 1.second)
       }
     }
 
-    "resume with the next event after a known id" in skippedIf(isNotReplicaSet, isNotAtLeast(db, MongoWireVersion.V36)) {
+    "resume with the next event after a known id" in skipIfNotRSAndNotVersionAtLeast(MongoWireVersion.V36) {
       withTmpCollection(db) { coll: BSONCollection =>
         // given
         val cursor = coll.watch[BSONDocument]().cursor[Cursor.WithOps]
@@ -77,16 +79,17 @@ class ChangeStreamSpec(implicit val ee: ExecutionEnv)
         }
 
         // then
-        result.map { event =>
-          event.getAs[String]("operationType") must beSome("insert")
-          event.getAs[BSONDocument]("documentKey")
-            .flatMap(_.getAs[String]("_id")) must beSome("resume_test2")
-          event.getAs[BSONDocument]("fullDocument") must beSome(testDocument2)
+        result must beLike[BSONDocument] {
+          case event =>
+            event.getAs[String]("operationType") must beSome("insert")
+            event.getAs[BSONDocument]("documentKey")
+              .flatMap(_.getAs[String]("_id")) must beSome("resume_test2")
+            event.getAs[BSONDocument]("fullDocument") must beSome(testDocument2)
         }.await(retries = 2, 1.second)
       }
     }
 
-    "resume with the same event after a known operation time" in skippedIf(isNotReplicaSet, isNotAtLeast(db, MongoWireVersion.V40)) {
+    "resume with the same event after a known operation time" in skipIfNotRSAndNotVersionAtLeast(MongoWireVersion.V40) {
       withTmpCollection(db) { coll: BSONCollection =>
         // given
         val cursor = coll.watch[BSONDocument]().cursor[Cursor.WithOps]
@@ -117,16 +120,17 @@ class ChangeStreamSpec(implicit val ee: ExecutionEnv)
         }
 
         // then
-        result.map { event =>
-          event.getAs[String]("operationType") must beSome("insert")
-          event.getAs[BSONDocument]("documentKey")
-            .flatMap(_.getAs[String]("_id")) must beSome("clusterTime_test1")
-          event.getAs[BSONDocument]("fullDocument") must beSome(testDocument1)
+        result must beLike[BSONDocument] {
+          case event =>
+            event.getAs[String]("operationType") must beSome("insert")
+            event.getAs[BSONDocument]("documentKey")
+              .flatMap(_.getAs[String]("_id")) must beSome("clusterTime_test1")
+            event.getAs[BSONDocument]("fullDocument") must beSome(testDocument1)
         }.await(retries = 2, 1.second)
       }
     }
 
-    "lookup the most recent document version" in skippedIf(isNotReplicaSet, isNotAtLeast(db, MongoWireVersion.V36)) {
+    "lookup the most recent document version" in skipIfNotRSAndNotVersionAtLeast(MongoWireVersion.V36) {
       withTmpCollection(db) { coll: BSONCollection =>
         // given
         val cursor = coll.watch[BSONDocument]().cursor[Cursor.WithOps]
@@ -172,15 +176,20 @@ class ChangeStreamSpec(implicit val ee: ExecutionEnv)
         }
 
         // then
-        result.map { event =>
-          event.getAs[String]("operationType") must beSome("update")
-          event.getAs[BSONDocument]("documentKey")
-            .flatMap(_.getAs[String]("_id")) must beSome(id)
-          event.getAs[BSONDocument]("fullDocument")
-            .flatMap(_.getAs[String](fieldName)) must beSome(lastValue)
+        result must beLike[BSONDocument] {
+          case event =>
+            event.getAs[String]("operationType") must beSome("update")
+            event.getAs[BSONDocument]("documentKey")
+              .flatMap(_.getAs[String]("_id")) must beSome(id)
+            event.getAs[BSONDocument]("fullDocument")
+              .flatMap(_.getAs[String](fieldName)) must beSome(lastValue)
         }.await(retries = 2, 1.second)
       }
     }
+  }
+
+  private def skipIfNotRSAndNotVersionAtLeast[R: AsResult](version: MongoWireVersion)(r: => R) = {
+    skippedIf(isNotReplicaSet, isNotAtLeast(db, version))(r)
   }
 
   private val actorSystem = ActorSystem("changeStreams")

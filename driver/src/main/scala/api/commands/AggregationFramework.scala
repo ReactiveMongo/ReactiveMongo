@@ -543,7 +543,7 @@ trait AggregationFramework[P <: SerializationPack]
    * @param fullDocument if set to UpdateLookup, every update change event will be joined with the *current* version of the
    *                     relevant document.
    */
-  case class ChangeStream(
+  final class ChangeStream(
     resumeAfter: Option[pack.Value] = None,
     startAtOperationTime: Option[pack.Value] = None, // TODO restrict to something more like a timestamp?
     fullDocument: Option[ChangeStreams.FullDocument] = None

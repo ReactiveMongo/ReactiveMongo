@@ -39,7 +39,7 @@ trait ChangeStreamOps[P <: SerializationPack with Singleton] { collection: Gener
   )(implicit reader: pack.Reader[T]): WatchBuilder[T] = {
     new WatchBuilder[T] {
       protected val context: AggregatorContext[T] = aggregatorContext[T](
-        firstOperator = ChangeStream(resumeAfter, startAtOperationTime, fullDocument),
+        firstOperator = new ChangeStream(resumeAfter, startAtOperationTime, fullDocument),
         otherOperators = pipeline,
         readConcern = Some(ReadConcern.Majority),
         cursorOptions = CursorOptions.empty.tailable,
