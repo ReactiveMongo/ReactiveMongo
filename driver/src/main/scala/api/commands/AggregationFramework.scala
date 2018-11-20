@@ -1,6 +1,6 @@
 package reactivemongo.api.commands
 
-import reactivemongo.api.{ChangeStreams, ReadConcern, SerializationPack}
+import reactivemongo.api.{ ChangeStreams, ReadConcern, SerializationPack }
 import reactivemongo.core.protocol.MongoWireVersion
 
 /**
@@ -540,20 +540,20 @@ trait AggregationFramework[P <: SerializationPack]
    * @param resumeAfter the id of the last known Change Event, if any. The stream will resume just after that event.
    * @param startAtOperationTime the operation time before which all Change Events are known. Must be in the time range
    *                             of the oplog. (since MongoDB 4.0)
-   * @param fullDocument if set to UpdateLookup, every update change event will be joined with the *current* version of the
+   * @param fullDocumentStrategy if set to UpdateLookup, every update change event will be joined with the *current* version of the
    *                     relevant document.
    */
   final class ChangeStream(
     resumeAfter: Option[pack.Value] = None,
     startAtOperationTime: Option[pack.Value] = None, // TODO restrict to something more like a timestamp?
-    fullDocument: Option[ChangeStreams.FullDocument] = None
+    fullDocumentStrategy: Option[ChangeStreams.FullDocumentStrategy] = None
   ) extends PipelineOperator {
 
     def makePipe: pack.Document = builder.document(Seq(
       builder.elementProducer(f"$$changeStream", builder.document(Seq(
         resumeAfter.map(v => builder.elementProducer("resumeAfter", v)),
         startAtOperationTime.map(v => builder.elementProducer("startAtOperationTime", v)),
-        fullDocument.map(v => builder.elementProducer("fullDocument", builder.string(v.name))),
+        fullDocumentStrategy.map(v => builder.elementProducer("fullDocument", builder.string(v.name))),
       ).flatten))
     ))
   }
