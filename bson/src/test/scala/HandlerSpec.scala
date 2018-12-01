@@ -294,10 +294,12 @@ class HandlerSpec extends org.specs2.mutable.Specification {
 
   case class Artist(
     name: String,
+    birthDate: Date,
     albums: List[Album])
 
   val neilYoung = Artist(
     "Neil Young",
+    new Date(82, 9, 11, 18, 30),
     List(
       Album(
         "Everybody Knows this is Nowhere",
@@ -327,18 +329,22 @@ class HandlerSpec extends org.specs2.mutable.Specification {
     def write(artist: Artist) =
       BSONDocument(
         "name" -> artist.name,
+        "birthDate" -> artist.birthDate,
         "albums" -> artist.albums)
 
-    def read(doc: BSONDocument) = Artist(
-      doc.getAs[String]("name").get,
-      doc.getAs[List[Album]]("albums").get)
+    def read(doc: BSONDocument) = (for {
+      name <- doc.getAs[String]("name")
+      birthDate <- doc.getAs[Date]("birthDate")
+      albums <- doc.getAs[List[Album]]("albums")
+    } yield Artist(name, birthDate, albums)).get
   }
 
   "Neil Young" should {
-    "produce the expected BSONDocument" in {
+    "produce the expected pretty representation" in {
       val doc = BSON.write(neilYoung)
       BSONDocument.pretty(doc) mustEqual """{
   "name": "Neil Young",
+  "birthDate": ISODate("1982-10-11T17:30:00Z"),
   "albums": [
     {
       "name": "Everybody Knows this is Nowhere",
@@ -365,8 +371,8 @@ class HandlerSpec extends org.specs2.mutable.Specification {
         "Losing End (When You're On)",
         "Running Dry (Requiem For the Rockets)",
         "Cowgirl in the Sand")
-      ny2 mustEqual neilYoung
-      success
+
+      ny2 must_=== neilYoung
     }
   }
 }

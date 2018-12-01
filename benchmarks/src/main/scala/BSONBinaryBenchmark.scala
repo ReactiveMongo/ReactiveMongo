@@ -1,10 +1,8 @@
-package reactivemongo
+package reactivemongo.bson
 
 import java.util.UUID
 
 import org.openjdk.jmh.annotations._
-
-import reactivemongo.bson.BSONBinary
 
 @State(Scope.Benchmark)
 class BSONBinaryUUIDBenchmark {

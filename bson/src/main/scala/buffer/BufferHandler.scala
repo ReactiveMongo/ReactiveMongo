@@ -4,7 +4,10 @@ import reactivemongo.bson.{ BSONArray, BSONDocument, BSONElement, BSONValue }
 import scala.util.{ Success, Try }
 
 trait BufferHandler {
+  @deprecated("Unused", "0.16.6")
   def serialize(bson: BSONValue, buffer: WritableBuffer): WritableBuffer
+
+  @deprecated("Unused", "0.16.6")
   def deserialize(buffer: ReadableBuffer): Try[(String, BSONValue)]
 
   def write(buffer: WritableBuffer, document: BSONDocument) = {
@@ -19,6 +22,7 @@ trait BufferHandler {
     document: BSONDocument,
     buffer: WritableBuffer): WritableBuffer
 
+  @deprecated("Unused", "0.16.6")
   def stream(buffer: ReadableBuffer): Stream[(String, BSONValue)] =
     deserialize(buffer) match {
       case Success(elem) => elem #:: stream(buffer)

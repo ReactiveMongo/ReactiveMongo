@@ -36,6 +36,11 @@ object BSONIterator {
           case BSONBoolean(b) =>
             s"${prefix}$b"
 
+          case BSONDateTime(time) => {
+            val i = java.time.Instant.ofEpochMilli(time)
+            s"""${prefix}ISODate("${i}")"""
+          }
+
           case BSONDocument(elements) =>
             s"${prefix}{\n" + pretty(i + 1, elements.iterator) + s"\n$indent}"
 

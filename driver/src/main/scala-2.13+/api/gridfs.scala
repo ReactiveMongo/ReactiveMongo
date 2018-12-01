@@ -370,8 +370,7 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
     def go(previous: Chunk): Future[Chunk] =
       Future(input read buffer).flatMap {
         case n if n > 0 => {
-          //logger.debug
-          println(s"Processing new chunk from n=${previous.n}...\n")
+          logger.debug(s"Processing new chunk from n=${previous.n}...\n")
 
           previous.feed(buffer take n).flatMap(go)
         }

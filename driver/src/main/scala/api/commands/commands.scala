@@ -159,7 +159,7 @@ object Command {
         else options.flags
       }
 
-      val op = Query(flags, db.name + ".$cmd", 0, 1)
+      val op = Query(flags, db.name + f".$$cmd", 0, 1)
       val mongo26WriteCommand = command match {
         case _: Mongo26WriteCommand => true
         case _                      => false
@@ -194,7 +194,8 @@ object Command {
      */
     private[reactivemongo] def cursor[R, C <: CollectionCommand with CommandWithResult[R]](collection: Collection, command: C, options: CursorOptions, rp: ReadPreference, maxTimeMS: Option[Long])(implicit writer: pack.Writer[ResolvedCollectionCommand[C]], reader: pack.Reader[R]): DefaultCursor.Impl[R] = fetchCursor(
       collection.db, collection.fullCollectionName, pack,
-      ResolvedCollectionCommand(collection.name, command), failover, options, maxTimeMS).
+      ResolvedCollectionCommand(collection.name, command),
+      failover, options, maxTimeMS).
       cursor[R](rp)
 
     /**

@@ -45,6 +45,15 @@ sealed trait BSONNumberLike { self: BSONNumberLikeClass[_] =>
 
   /** Converts this number into a `Double`. */
   def toDouble: Double
+
+  override def equals(that: Any): Boolean = that match {
+    case other: BSONNumberLike => underlying == other.underlying
+    case _                     => false
+  }
+
+  @inline override def hashCode: Int = underlying.hashCode
+
+  override def toString = s"BSONNumberLike($underlying)"
 }
 
 private[bson] sealed trait HasNumeric[A] {
@@ -130,6 +139,15 @@ sealed trait BSONBooleanLike { _: BSONBooleanLikeClass[_] =>
 
   /** Returns the boolean equivalent value */
   def toBoolean: Boolean
+
+  override def equals(that: Any): Boolean = that match {
+    case other: BSONBooleanLike => underlying == other.underlying
+    case _                      => false
+  }
+
+  @inline override def hashCode: Int = underlying.hashCode
+
+  override def toString = s"BSONBooleanLike($underlying)"
 }
 
 sealed trait BSONBooleanLikeClass[B <: BSONValue] extends BSONBooleanLike

@@ -1,4 +1,8 @@
-import reactivemongo.bson._
+package reactivemongo
+package bson
+
+import org.specs2.specification.core.Fragments
+
 import reactivemongo.bson.buffer.{
   ArrayReadableBuffer,
   DefaultBufferHandler,
@@ -102,6 +106,39 @@ class EqualitySpec extends org.specs2.mutable.Specification {
       DefaultBufferHandler.readDocument(readBuffer).
         aka("result") must beSuccessfulTry(b1)
     }
+  }
+
+  "BSONBooleanLike" should {
+    Fragments.foreach[BSONValue](
+      BSONValueFixtures.bsonIntFixtures ++
+        BSONValueFixtures.bsonDoubleFixtures ++
+        BSONValueFixtures.bsonLongFixtures ++
+        BSONValueFixtures.bsonBoolFixtures ++
+        BSONValueFixtures.bsonDecimalFixtures ++
+        Seq(BSONNull, BSONUndefined)) { v =>
+
+        s"retain equality through handler for $v" in {
+          BSON.read[BSONValue, BSONBooleanLike](v) must beTypedEqualTo(
+            BSON.read[BSONValue, BSONBooleanLike](v))
+
+        }
+      }
+  }
+
+  "BSONNumberLike" should {
+    Fragments.foreach[BSONValue](
+      BSONValueFixtures.bsonIntFixtures ++
+        BSONValueFixtures.bsonDoubleFixtures ++
+        BSONValueFixtures.bsonLongFixtures ++
+        BSONValueFixtures.bsonDateTimeFixtures ++
+        BSONValueFixtures.bsonTsFixtures ++
+        BSONValueFixtures.bsonDecimalFixtures) { v =>
+
+        s"retain equality through handler for $v" in {
+          BSON.read[BSONValue, BSONNumberLike](v) must beTypedEqualTo(
+            BSON.read[BSONValue, BSONNumberLike](v))
+        }
+      }
   }
 
   section("unit")

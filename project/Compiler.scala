@@ -42,7 +42,7 @@ object Compiler {
         "-Yopt:_"
       )
     },
-    libraryDependencies in ThisBuild ++= {
+    libraryDependencies ++= {
       if (scalaVersion.value startsWith "2.10.") Nil
       else Seq(
         compilerPlugin(

@@ -53,6 +53,7 @@ trait DefaultBSONHandlers extends LowPrioBSONHandlers {
     def read(string: BSONString) = string.value
     def write(string: String) = BSONString(string)
   }
+
   implicit object BSONBooleanHandler extends BSONHandler[BSONBoolean, Boolean] {
     def read(boolean: BSONBoolean) = boolean.value
     def write(boolean: Boolean) = BSONBoolean(boolean)

@@ -15,7 +15,7 @@ private[core] final class Pack(
   val eventLoopGroup: () => EventLoopGroup,
   val channelClass: Class[_ <: Channel]) {
 
-  override def toString = s"NettyPack($channelClass)"
+  override def toString = s"NettyPack(${channelClass.getName})"
 }
 
 private[core] object Pack {

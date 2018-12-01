@@ -45,6 +45,8 @@ import reactivemongo.api.commands.CommandCodecs
  * @define readerParam the reader for the results type
  * @define resultTParam the results type
  * @define requireOneFunction Sends this query and gets a future `T` (alias for [[reactivemongo.api.Cursor.head]])
+ * @define filterFunction Sets the query predicate; If unspecified, then all documents in the collection will match the predicate
+ * @define projectionFunction Sets the [[https://docs.mongodb.com/manual/tutorial/project-fields-from-query-results/#projections projection specification]] to determine which fields to include in the returned documents
  */
 @deprecated("Internal: will be made private", "0.16.0")
 trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
@@ -58,6 +60,7 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
   def sortOption: Option[pack.Document]
   def projectionOption: Option[pack.Document]
   def hintOption: Option[pack.Document]
+
   def explainFlag: Boolean
   def snapshotFlag: Boolean
   def commentString: Option[String]
@@ -70,19 +73,6 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
 
   /** The read concern (since 3.2) */
   def readConcern: ReadConcern = ReadConcern.default // TODO: Remove body
-
-  /* TODO: https://docs.mongodb.com/v3.2/reference/command/find/#dbcmd.find
-
-   - singleBatch: boolean; Optional. Determines whether to close the cursor after the first batch. Defaults to false.
-   - maxScan: boolean; Optional. Maximum number of documents or index keys to scan when executing the query.
-   - max: document; Optional. The exclusive upper bound for a specific index; https://docs.mongodb.com/v3.4/reference/method/cursor.max/#cursor.max
-   - min: document; Optional. The exclusive upper bound for a specific index; https://docs.mongodb.com/v3.4/reference/method/cursor.min/#cursor.min
-   - returnKey: boolean; Optional. If true, returns only the index keys in the resulting documents.
-   - showRecordId: boolean; Optional. Determines whether to return the record identifier for each document.
-- noCursorTimeout: boolean; Optional. Prevents the server from timing out idle cursors after an inactivity period (10 minutes).
-   - allowPartialResults: boolean; Optional. For queries against a sharded collection, returns partial results from the mongos if some shards are unavailable instead of throwing an error.
-   - collation: document; Optional; Specifies the collation to use for the operation.
-   */
 
   /**
    * Makes a [[Cursor]] of this query, which can be enumerated.
@@ -139,22 +129,32 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
    */
   def requireOne[T](readPreference: ReadPreference)(implicit reader: pack.Reader[T], ec: ExecutionContext): Future[T] = copy(options = options.batchSize(1)).defaultCursor(readPreference)(reader).head
 
-  /**
-   * Sets the selector document.
-   *
-   * @tparam Qry The type of the query. An implicit `Writer[Qry]` typeclass for handling it has to be in the scope.
-   */
+  @deprecated("Use `filter`", "0.18.2")
   def query[Qry](selector: Qry)(implicit writer: pack.Writer[Qry]): Self =
     copy(queryOption = Some(pack.serialize(selector, writer)))
 
-  /** Sets the query (the selector document). */
+  @deprecated("Use `filter`", "0.18.2")
   def query(selector: pack.Document): Self = copy(queryOption = Some(selector))
 
-  /** Sets the sorting document. */
+  /**
+   * $filterFunction.
+   *
+   * @tparam Qry The type of the query. An implicit `Writer[Qry]` typeclass for handling it has to be in the scope.
+   */
+  def filter[Qry](predicate: Qry)(implicit writer: pack.Writer[Qry]): Self =
+    copy(queryOption = Some(pack.serialize(predicate, writer)))
+
+  /**
+   * $filterFunction.
+   */
+  def filter(predicate: pack.Document): Self =
+    copy(queryOption = Some(predicate))
+
+  /** Sets the sort specification for the ordering of the results. */
   def sort(document: pack.Document): Self = copy(sortOption = Some(document))
 
   /**
-   * Sets the projection document (for [[http://docs.mongodb.org/manual/core/read-operations-introduction/ retrieving only a subset of fields]]).
+   * $projectionFunction.
    *
    * @tparam Pjn The type of the projection. An implicit `Writer[Pjn]` typeclass for handling it has to be in the scope.
    */
@@ -162,7 +162,7 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
     copy(projectionOption = Some(pack.serialize(p, writer)))
 
   /**
-   * Sets the projection document (for [[http://docs.mongodb.org/manual/core/read-operations-introduction/ retrieving only a subset of fields]]).
+   * $projectionFunction.
    */
   def projection(p: pack.Document): Self = copy(projectionOption = Some(p))
 
@@ -269,8 +269,21 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
 
       document(elements.result())
     } else {
-      // TODO: singleBatch, maxScan, max, min, returnKey
-      // showRecordId, noCursorTimeout, allowPartialResults, collation
+      // MongoDB >= 3.2
+      // TODO: Split in separate functions, choosen according version
+
+      /* TODO: https://docs.mongodb.com/v3.2/reference/command/find/#dbcmd.find
+
+       - singleBatch: boolean; Optional. Determines whether to close the cursor after the first batch. Defaults to false.
+       - maxScan: boolean; Optional. Maximum number of documents or index keys to scan when executing the query.
+       - max: document; Optional. The exclusive upper bound for a specific index; https://docs.mongodb.com/v3.4/reference/method/cursor.max/#cursor.max
+       - min: document; Optional. The exclusive upper bound for a specific index; https://docs.mongodb.com/v3.4/reference/method/cursor.min/#cursor.min
+       - returnKey: boolean; Optional. If true, returns only the index keys in the resulting documents.
+       - showRecordId: boolean; Optional. Determines whether to return the record identifier for each document.
+       - noCursorTimeout: boolean; Optional. Prevents the server from timing out idle cursors after an inactivity period (10 minutes).
+       - allowPartialResults: boolean; Optional. For queries against a sharded collection, returns partial results from the mongos if some shards are unavailable instead of throwing an error.
+       - collation: document; Optional; Specifies the collation to use for the operation.
+       */
 
       import QueryFlags.{ AwaitData, OplogReplay, TailableCursor }
 

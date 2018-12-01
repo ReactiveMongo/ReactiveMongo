@@ -8,13 +8,13 @@ import reactivemongo.bson.buffer.{
   ArrayBSONBuffer,
   ReadableBuffer,
   WritableBuffer
-}, DefaultBufferHandler.serialize
+}
 
 sealed trait SerializationBenchmark {
+  protected var value: BSONValue = _
   private var written: WritableBuffer = _
-  private var value: BSONValue = _
 
-  private var input: ReadableBuffer = _
+  protected var input: ReadableBuffer = _
   private var output: WritableBuffer = _
 
   protected def setupSerialization[B <: BSONValue](values: Seq[B]): Unit =
@@ -22,7 +22,8 @@ sealed trait SerializationBenchmark {
       value = v
 
       written = DefaultBufferHandler.serialize(
-        v, (new ArrayBSONBuffer).writeByte(value.code)).writeString("field")
+        v, buffer = (new ArrayBSONBuffer).
+        writeByte(value.code).writeString("field"))
     }
 
   @Setup(Level.Invocation)
@@ -38,7 +39,8 @@ sealed trait SerializationBenchmark {
   @Benchmark
   def read(): Unit = {
     val result = DefaultBufferHandler.deserialize(input)
-    result == ("field" -> value)
+
+    assert(result.filter(_ == ("field" -> value)).isSuccess)
   }
 }
 
@@ -68,6 +70,12 @@ class BSONDoubleSerializationBenchmark extends SerializationBenchmark {
   @Setup(Level.Iteration)
   def setup(): Unit = setupSerialization(BSONValueFixtures.bsonDoubleFixtures)
 
+}
+
+@State(Scope.Benchmark)
+class BSONDocumentSerializationBenchmark extends SerializationBenchmark {
+  @Setup(Level.Iteration)
+  def setup(): Unit = setupSerialization(BSONValueFixtures.bsonDocFixtures)
 }
 
 @State(Scope.Benchmark)

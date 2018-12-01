@@ -106,6 +106,28 @@ class BSONArrayBenchmark {
     val arr = BSONArray.read(serializedBuffer)
     assert(arr.filter(_ == bsonArray).isSuccess)
   }
+
+  @Benchmark
+  def getAsOpt() = {
+    bigSet.getAs[BSONValue](0)
+    smallSet.getAs[BSONValue](0)
+  }
+
+  @Benchmark
+  def getAsTry() = {
+    bigSet.getAsTry[BSONValue](0)
+    smallSet.getAsTry[BSONValue](0)
+  }
+
+  @Benchmark
+  def readAsList() = {
+    assert(bigSet.asTry[List[BSONValue]](bsonArrayToCollectionReader).isSuccess)
+  }
+
+  @Benchmark
+  def writeFromList() = {
+    assert(collectionToBSONArrayCollectionWriter[BSONValue, Stream[BSONValue]].writeTry(smallSet.values).isSuccess)
+  }
 }
 
 object BSONArrayBenchmark {
