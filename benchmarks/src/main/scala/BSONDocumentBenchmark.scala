@@ -1,11 +1,13 @@
 package reactivemongo
 package bson
 
-import scala.util.Random
-
 import org.openjdk.jmh.annotations._
 
-import reactivemongo.bson.buffer.{ ArrayBSONBuffer, ReadableBuffer }
+import reactivemongo.bson.buffer.{
+  ArrayBSONBuffer,
+  ReadableBuffer,
+  WritableBuffer
+}
 
 @State(Scope.Benchmark)
 class BSONDocumentBenchmark {
@@ -40,7 +42,7 @@ class BSONDocumentBenchmark {
         bigSet = bigDocument()
         smallSet = a
 
-        Random.shuffle(bigSet.elements).headOption match {
+        bigSet.elements.lastOption match {
           case Some(BSONElement(k, _)) =>
             key = k
 
@@ -134,6 +136,15 @@ class BSONDocumentBenchmark {
     doc.byteSize
   }
 
+  @Benchmark
+  def emptyDocument() = BSONDocument.empty
+
+  @Benchmark
+  def prettyPrintDocument() = BSONDocument.pretty(smallSet)
+
+  @Benchmark
+  def elementsToDocument() = BSONDocument(bigSet.elements: _*)
+
   /* Benchmark the implements conversions */
   @Benchmark
   def varArgsToDocument() = BSONDocument(
@@ -147,13 +158,83 @@ class BSONDocumentBenchmark {
   )
 
   @Benchmark
+  def mapToDocument() = BSONDocument(smallSet.toMap)
+
+  @Benchmark
+  def concatDocuments(): ElementProducer =
+    ElementProducer.Composition(bigSet, smallSet)
+
+  @Benchmark
+  def elementsBigSet() = bigSet.elements
+
+  @Benchmark
+  def elementsSmallSet() = smallSet.elements
+
+  @Benchmark
+  def containsBigSet(): Boolean = bigSet.contains(key)
+
+  @Benchmark
+  def containsSmallSet(): Boolean = smallSet.contains(key)
+
+  @Benchmark
+  def valuesBigSet() = bigSet.values
+
+  @Benchmark
+  def valuesSmallSet() = smallSet.values
+
+  @Benchmark
+  def toMapBigSet() = bigSet.toMap
+
+  @Benchmark
+  def toMapSmallSet() = smallSet.toMap
+
+  @Benchmark
+  def headOptionBigSet: Option[BSONElement] = bigSet.headOption
+
+  @Benchmark
+  def headOptionSmallSet: Option[BSONElement] = smallSet.headOption
+
+  @Benchmark
+  def isEmptyBigSet: Boolean = bigSet.isEmpty
+
+  @Benchmark
+  def isEmptySmallSet: Boolean = smallSet.isEmpty
+
+  @Benchmark
+  def sizeBigSet: Int = bigSet.size
+
+  @Benchmark
+  def sizeSmallSet: Int = smallSet.size
+
+  @Benchmark
+  def appendSingleBigSet(): BSONDocument =
+    bigSet ++ BSONElement("_append", BSONString(key))
+
+  @Benchmark
+  def appendSingleSmallSet(): BSONDocument =
+    smallSet ++ BSONElement("_append", BSONString(key))
+
+  @Benchmark
+  def getBigSet(): Option[BSONValue] = bigSet.get(key)
+
+  @Benchmark
+  def getSmallSet(): Option[BSONValue] = smallSet.get(key)
+
+  @Benchmark
+  def writeBigDocument(): WritableBuffer =
+    BSONDocument.write(bigSet, emptyBuffer)
+
+  @Benchmark
+  def byteSize(): Int = bigSet.byteSize
+
+  @Benchmark
   def readDocument(): Unit = {
     val doc = BSONDocument.read(serializedBuffer)
     assert(!doc.isEmpty)
   }
 
   @Benchmark
-  def getAs() = {
+  def getAsOpt() = {
     bigSet.getAs[BSONValue](key)
     smallSet.getAs[BSONValue](key)
   }
@@ -162,6 +243,18 @@ class BSONDocumentBenchmark {
   def getAsTry() = {
     bigSet.getAsTry[BSONValue](key)
     smallSet.getAsTry[BSONValue](key)
+  }
+
+  @Benchmark
+  def getAsUnflattenedTry() = {
+    assert(bigSet.getAsUnflattenedTry[BSONValue](key).
+      toOption.flatten.isDefined)
+
+    assert(bigSet.getAsUnflattenedTry[String]("_null").
+      toOption.flatten.isEmpty)
+
+    assert(smallSet.getAsUnflattenedTry[BSONValue](key).
+      toOption.flatten.isEmpty)
   }
 
   @Benchmark
@@ -188,6 +281,8 @@ object BSONDocumentBenchmark {
 
       m += s"field${i}" -> vs.next()
     }
+
+    m += "_null" -> BSONNull
 
     BSONDocument(m.result())
   }

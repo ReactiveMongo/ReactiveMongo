@@ -1,5 +1,6 @@
 package reactivemongo.bson
 
+// TODO: beforeWriter
 trait BSONHandler[B <: BSONValue, T]
   extends BSONReader[B, T] with BSONWriter[T, B] {
 

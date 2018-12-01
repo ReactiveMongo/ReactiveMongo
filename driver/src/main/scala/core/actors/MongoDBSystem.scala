@@ -1126,7 +1126,7 @@ trait MongoDBSystem extends Actor {
           }
         }
 
-        trace(s"Discovered ${discoveredNodes.size} nodes: ${discoveredNodes mkString ", "}")
+        trace(s"""Discovered ${discoveredNodes.size} nodes${discoveredNodes mkString (": ", ", ", "")}""")
 
         val upSet = prepared.copy(
           name = isMaster.replicaSet.map(_.setName),

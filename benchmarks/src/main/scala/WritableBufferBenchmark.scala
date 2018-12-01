@@ -6,7 +6,6 @@ import org.openjdk.jmh.annotations._
 
 import reactivemongo.bson.buffer.{
   ArrayBSONBuffer,
-  ReadableBuffer,
   WritableBuffer
 }
 
@@ -25,6 +24,11 @@ class WritableBufferBenchmark {
     bytesBuffer = new ArrayBSONBuffer().writeBytes(bytes)
   }
 
+  @Benchmark
+  def toReadableBuffer(): Unit = {
+    assert(bytesBuffer.toReadableBuffer.size == bytes.size)
+  }
+
   @Benchmark // Only for internal testing, not part of runtime/API
   def empty(): ArrayBSONBuffer = new ArrayBSONBuffer()
 
@@ -35,7 +39,7 @@ class WritableBufferBenchmark {
   def setInt(): ArrayBSONBuffer = emptyBuffer.setInt(0, 10)
 
   @Benchmark
-  def writeBytes(): ArrayBSONBuffer = emptyBuffer.writeBytes(bytes)
+  def writeBytesArray(): ArrayBSONBuffer = emptyBuffer.writeBytes(bytes)
 
   @Benchmark
   def writeByte(): WritableBuffer = emptyBuffer.writeByte(0x04: Byte)

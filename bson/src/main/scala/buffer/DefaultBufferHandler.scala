@@ -19,6 +19,7 @@ import reactivemongo.bson._
 import scala.util.Try
 
 object DefaultBufferHandler extends BufferHandler {
+  @deprecated("Unused", "0.16.6")
   def serialize(bson: BSONValue, buffer: WritableBuffer): WritableBuffer = {
     handlersByCode.get(bson.code).
       get.asInstanceOf[BufferRW[BSONValue]].write(bson, buffer)
@@ -161,7 +162,7 @@ object DefaultBufferHandler extends BufferHandler {
 
     def read(buffer: ReadableBuffer) = {
       val length = buffer.readInt
-      val subtype = Subtype.apply(buffer.readByte)
+      val subtype = Subtype(buffer.readByte)
       val bin = buffer.slice(length)
       buffer.discard(length)
       BSONBinary(bin, subtype)
@@ -279,6 +280,7 @@ object DefaultBufferHandler extends BufferHandler {
     def read(buffer: ReadableBuffer) = BSONMaxKey
   }
 
+  @deprecated("Unused", "0.16.6")
   def deserialize(buffer: ReadableBuffer): Try[(String, BSONValue)] = Try {
     if (buffer.readable > 0) {
       val code = buffer.readByte

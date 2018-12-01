@@ -1,8 +1,9 @@
 package reactivemongo
 
-import scala.util.{ Failure, Try }
+import scala.util.Try
 
 import org.openjdk.jmh.annotations._
+import org.openjdk.jmh.infra.Blackhole
 
 import reactivemongo.bson.BSONObjectID
 
@@ -46,8 +47,21 @@ class BSONObjectIDStringReprBenchmark {
   def stringify(): String = oid.stringify
 
   @Benchmark
-  def parse(): Try[BSONObjectID] = BSONObjectID.parse(str)
-}
+  def parseString(hole: Blackhole): Try[BSONObjectID] =
+    BSONObjectID.parse(str).map { parsed =>
+      hole.consume(parsed.timeSecond)
+      hole.consume(parsed.valueAsArray)
 
-// TODO: HandlerSpec
-// TODO: SerializationSpec
+      parsed
+    }
+
+  @Benchmark
+  def parseBytes(hole: Blackhole): Try[BSONObjectID] =
+    Try(BSONObjectID(oid.valueAsArray)).map { parsed =>
+      hole.consume(parsed.timeSecond)
+      hole.consume(parsed.valueAsArray)
+
+      parsed
+    }
+
+}

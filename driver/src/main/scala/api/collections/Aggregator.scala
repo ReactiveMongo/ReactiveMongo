@@ -66,7 +66,8 @@ private[collections] trait Aggregator[P <: SerializationPack with Singleton] {
         context.readConcern, context.writeConcern)
 
       val cursor = runner.cursor[T, Aggregate[T]](
-        collection, cmd, context.cursorOptions, context.readPreference, context.maxTimeMS)
+        collection, cmd, context.cursorOptions,
+        context.readPreference, context.maxTimeMS)
 
       cp.produce(cursor)
     }

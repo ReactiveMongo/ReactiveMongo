@@ -85,12 +85,16 @@ private[api] trait Driver {
 
   private var closedBy = Array.empty[StackTraceElement]
 
-  protected final val supervisorName = s"Supervisor-${Driver.nextCounter}"
+  protected final val supervisorName =
+    s"Supervisor-${Driver.counter.incrementAndGet()}"
+
   private[reactivemongo] final val supervisorActor =
     system.actorOf(Props(new SupervisorActor(this)), supervisorName)
 
   protected final val connectionMonitors =
     MutableMap.empty[ActorRef, MongoConnection]
+
+  private val connectionCounter = new AtomicLong(0)
 
   /**
    * Closes this driver (and all its connections and resources).
@@ -141,7 +145,9 @@ private[api] trait Driver {
     options: MongoConnectionOptions,
     name: Option[String]): Future[MongoConnection] = {
 
-    val nm = name.getOrElse(s"Connection-${+Driver.nextCounter}")
+    val nm = name.getOrElse(
+      s"Connection-${connectionCounter.incrementAndGet()}")
+
     val authentications = options.credentials.map {
       case (db, c) => Authenticate(db, c.user, c.password)
     }.toSeq
@@ -285,6 +291,5 @@ private[api] trait Driver {
 object Driver {
   private val logger = LazyLogger("reactivemongo.api.Driver")
 
-  private[api] val _counter = new AtomicLong(0)
-  private[api] def nextCounter: Long = _counter.incrementAndGet()
+  private[api] val counter = new AtomicLong(0)
 }
