@@ -546,16 +546,13 @@ trait AggregationFramework[P <: SerializationPack]
   final class ChangeStream(
     resumeAfter: Option[pack.Value] = None,
     startAtOperationTime: Option[pack.Value] = None, // TODO restrict to something more like a timestamp?
-    fullDocumentStrategy: Option[ChangeStreams.FullDocumentStrategy] = None
-  ) extends PipelineOperator {
+    fullDocumentStrategy: Option[ChangeStreams.FullDocumentStrategy] = None) extends PipelineOperator {
 
     def makePipe: pack.Document = builder.document(Seq(
       builder.elementProducer(f"$$changeStream", builder.document(Seq(
         resumeAfter.map(v => builder.elementProducer("resumeAfter", v)),
         startAtOperationTime.map(v => builder.elementProducer("startAtOperationTime", v)),
-        fullDocumentStrategy.map(v => builder.elementProducer("fullDocument", builder.string(v.name)))
-      ).flatten))
-    ))
+        fullDocumentStrategy.map(v => builder.elementProducer("fullDocument", builder.string(v.name)))).flatten))))
   }
 
 }

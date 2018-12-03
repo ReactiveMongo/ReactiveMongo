@@ -64,8 +64,7 @@ object DefaultCursor {
     failover: FailoverStrategy,
     isMongo26WriteOp: Boolean,
     collectionName: String,
-    maxTimeMS: Option[Long]
-  )(implicit reader: pack.Reader[A]): Impl[A] =
+    maxTimeMS: Option[Long])(implicit reader: pack.Reader[A]): Impl[A] =
     new Impl[A] {
       val preference = readPreference
       val database = db
@@ -125,8 +124,7 @@ object DefaultCursor {
               "getMore" -> cursorId,
               "collection" -> collName,
               "batchSize" -> ntr,
-              "maxTimeMS" -> maxTimeMS
-            )
+              "maxTimeMS" -> maxTimeMS)
 
             moreQry -> BufferSequence.single(cmd)
           }
