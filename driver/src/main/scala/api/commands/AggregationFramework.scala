@@ -553,7 +553,7 @@ trait AggregationFramework[P <: SerializationPack]
       builder.elementProducer(f"$$changeStream", builder.document(Seq(
         resumeAfter.map(v => builder.elementProducer("resumeAfter", v)),
         startAtOperationTime.map(v => builder.elementProducer("startAtOperationTime", v)),
-        fullDocumentStrategy.map(v => builder.elementProducer("fullDocument", builder.string(v.name))),
+        fullDocumentStrategy.map(v => builder.elementProducer("fullDocument", builder.string(v.name)))
       ).flatten))
     ))
   }

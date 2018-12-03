@@ -64,7 +64,7 @@ object DefaultCursor {
     failover: FailoverStrategy,
     isMongo26WriteOp: Boolean,
     collectionName: String,
-    maxTimeMS: Option[Long],
+    maxTimeMS: Option[Long]
   )(implicit reader: pack.Reader[A]): Impl[A] =
     new Impl[A] {
       val preference = readPreference

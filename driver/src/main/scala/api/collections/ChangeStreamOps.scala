@@ -2,13 +2,18 @@ package reactivemongo.api.collections
 
 import scala.language.higherKinds
 
-import reactivemongo.api._
+import reactivemongo.api.{
+  ChangeStreams,
+  Cursor,
+  CursorProducer,
+  CursorOptions,
+  ReadConcern,
+  SerializationPack
+}
 
 trait ChangeStreamOps[P <: SerializationPack with Singleton] { collection: GenericCollection[P] =>
 
-  import BatchCommands.AggregationFramework.ChangeStream
-  // I wasn't able to prove that it is equal to `collection.pack.Value`
-  import BatchCommands.AggregationFramework.pack.Value
+  import collection.BatchCommands.AggregationFramework.ChangeStream
 
   /**
    * Prepares a builder for watching the changeStream of this collection
@@ -16,23 +21,23 @@ trait ChangeStreamOps[P <: SerializationPack with Singleton] { collection: Gener
    *
    * Note: the target mongo instance MUST be a replica-set (even in the case of a single node deployement).
    *
-   * @param resumeAfter          the id of the last known Change Event, if any. The stream will resume just after
+   * @param resumeAfter          The id of the last known Change Event, if any. The stream will resume just after
    *                             that event.
-   * @param startAtOperationTime the operation time before which all Change Events are known. Must be in the time range
+   * @param startAtOperationTime The operation time before which all Change Events are known. Must be in the time range
    *                             of the oplog. (since MongoDB 4.0)
    * @param pipeline             A sequence of aggregation stages to apply on events in the stream (see MongoDB
    *                             documentation for a list of valid stages for a change stream).
    * @param maxAwaitTimeMS       The maximum amount of time in milliseconds the server waits for new data changes
    *                             before returning an empty batch. In practice, this parameter controls the duration
    *                             of the long-polling behavior of the cursor.
-   * @param fullDocumentStrategy         if set to UpdateLookup, every update change event will be joined with the *current*
+   * @param fullDocumentStrategy if set to UpdateLookup, every update change event will be joined with the *current*
    *                             version of the relevant document.
    * @param reader               a reader of the resulting Change Events
    * @tparam T the type into which Change Events are deserialized
    */
   final def watch[T](
-    resumeAfter: Option[Value] = None,
-    startAtOperationTime: Option[Value] = None,
+    resumeAfter: Option[pack.Value] = None,
+    startAtOperationTime: Option[pack.Value] = None,
     pipeline: List[PipelineOperator] = Nil,
     maxAwaitTimeMS: Option[Long] = None,
     fullDocumentStrategy: Option[ChangeStreams.FullDocumentStrategy] = None
@@ -43,7 +48,7 @@ trait ChangeStreamOps[P <: SerializationPack with Singleton] { collection: Gener
         otherOperators = pipeline,
         readConcern = Some(ReadConcern.Majority),
         cursorOptions = CursorOptions.empty.tailable,
-        maxTimeMS = maxAwaitTimeMS,
+        maxTimeMS = maxAwaitTimeMS
       )
     }
   }

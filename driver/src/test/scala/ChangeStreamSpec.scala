@@ -1,14 +1,15 @@
 import scala.concurrent.duration._
-import scala.concurrent.{ Await, Future, Promise }
+import scala.concurrent.{ Future, Promise }
 
-import akka.actor.ActorSystem
 import org.specs2.concurrent.ExecutionEnv
 import org.specs2.execute.AsResult
 import org.specs2.matcher.Matcher
+
 import reactivemongo.api.collections.bson.BSONCollection
 import reactivemongo.api.{ ChangeStreams, Cursor }
 import reactivemongo.bson.BSONDocument
 import reactivemongo.core.protocol.MongoWireVersion
+
 import tests.Common.timeout
 import util.BsonMatchers._
 import util.WithTemporaryCollection._
@@ -27,13 +28,13 @@ class ChangeStreamSpec(implicit val ee: ExecutionEnv)
         val cursor = coll.watch[BSONDocument]().cursor[Cursor.WithOps]
         val testDocument = BSONDocument(
           "_id" -> "test",
-          "foo" -> "bar",
+          "foo" -> "bar"
         )
 
         // when
         val results = for {
           resultBefore <- cursor.headOption
-          _ <- coll.insert(ordered = false).one(testDocument)
+          _ <- coll.insert.one(testDocument)
           resultAfter <- cursor.headOption
         } yield (resultBefore, resultAfter)
 
@@ -52,7 +53,7 @@ class ChangeStreamSpec(implicit val ee: ExecutionEnv)
         val cursor = coll.watch[BSONDocument]().cursor[Cursor.WithOps]
         val testDocument = BSONDocument(
           "_id" -> "test",
-          "foo" -> "bar",
+          "foo" -> "bar"
         )
 
         // when
@@ -85,11 +86,11 @@ class ChangeStreamSpec(implicit val ee: ExecutionEnv)
         val initialCursor = coll.watch[BSONDocument]().cursor[Cursor.WithOps]
         val testDocument1 = BSONDocument(
           "_id" -> "resume_test1",
-          "foo" -> "bar",
+          "foo" -> "bar"
         )
         val testDocument2 = BSONDocument(
           "_id" -> "resume_test2",
-          "foo" -> "baz",
+          "foo" -> "baz"
         )
 
         // when
@@ -129,11 +130,11 @@ class ChangeStreamSpec(implicit val ee: ExecutionEnv)
         val initialCursor = coll.watch[BSONDocument]().cursor[Cursor.WithOps]
         val testDocument1 = BSONDocument(
           "_id" -> "clusterTime_test1",
-          "foo" -> "bar",
+          "foo" -> "bar"
         )
         val testDocument2 = BSONDocument(
           "_id" -> "clusterTime_test2",
-          "foo" -> "baz",
+          "foo" -> "baz"
         )
 
         // when
@@ -176,7 +177,7 @@ class ChangeStreamSpec(implicit val ee: ExecutionEnv)
         val lastValue = "bar3"
         val testDocument = BSONDocument(
           "_id" -> id,
-          fieldName -> "bar1",
+          fieldName -> "bar1"
         )
 
         // This test is a bit more tricky. We want to first capture the insert event so that we know where we will
