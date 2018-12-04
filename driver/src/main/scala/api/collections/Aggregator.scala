@@ -39,6 +39,7 @@ private[collections] trait Aggregator[P <: SerializationPack with Singleton] {
     val readPreference: ReadPreference,
     val batchSize: Option[Int],
     val cursorOptions: CursorOptions,
+    val maxTimeMS: Option[Long],
     val reader: pack.Reader[T]) {
 
     def prepared[AC[_] <: Cursor.WithOps[_]](
@@ -65,7 +66,7 @@ private[collections] trait Aggregator[P <: SerializationPack with Singleton] {
         context.readConcern, context.writeConcern)
 
       val cursor = runner.cursor[T, Aggregate[T]](
-        collection, cmd, context.cursorOptions, context.readPreference)
+        collection, cmd, context.cursorOptions, context.readPreference, context.maxTimeMS)
 
       cp.produce(cursor)
     }
