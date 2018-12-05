@@ -633,6 +633,9 @@ object MongoConnection {
           case ("rm.nbChannelsPerNode", v) => unsupported -> result.
             copy(nbChannelsPerNode = v.toInt)
 
+          case ("rm.reconnectDelayMS", v) => unsupported -> result.
+            copy(reconnectDelayMS = v.toInt)
+
           case ("writeConcern", "unacknowledged") => unsupported -> result.
             copy(writeConcern = WC.Unacknowledged)
 
