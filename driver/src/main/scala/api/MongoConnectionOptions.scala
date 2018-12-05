@@ -48,6 +48,7 @@ case class MongoConnectionOptions(
   tcpNoDelay: Boolean = false,
   keepAlive: Boolean = false,
   nbChannelsPerNode: Int = 10,
+  reconnectDelayMS: Int = 1000,
 
   // read and write preferences
   writeConcern: WriteConcern = WriteConcern.Default,
@@ -125,6 +126,7 @@ object MongoConnectionOptions {
       "maxIdleTimeMS" -> ms(options.maxIdleTimeMS), // TODO: Review
       "tcpNoDelay" -> options.tcpNoDelay.toString,
       "keepAlive" -> options.keepAlive.toString,
+      "reconnectDelayMS" -> options.reconnectDelayMS.toString,
       "sslEnabled" -> options.sslEnabled.toString,
       "sslAllowsInvalidCert" -> options.sslAllowsInvalidCert.toString,
       "writeConcern" -> options.writeConcern.toString,
