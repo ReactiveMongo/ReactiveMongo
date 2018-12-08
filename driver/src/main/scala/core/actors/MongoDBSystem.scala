@@ -398,28 +398,51 @@ trait MongoDBSystem extends Actor {
     @inline def event =
       s"ChannelDisconnected($channelId, ${_nodeSet.toShortString})"
 
-    @volatile var updated = false
+    @volatile var updated: Int = 0
 
-    updateNodeSet(event) { ns =>
+    val res = updateNodeSet(event) { ns =>
       val updSet = ns.updateNodeByChannelId(channelId) { n =>
         collectConnections(n) {
           case other if (other.channel.id != channelId) =>
             other // keep connections for other channels unchanged
 
           case con => {
-            updated = true
-
             if (con.channel.isOpen) { // can still be reused
+              updated = 1
               con.copy(status = ConnectionStatus.Disconnected)
             } else {
-              n.createConnection(channelFactory, self)
+              updated = 2 // delayed
+              con.copy(status = ConnectionStatus.Connecting)
             }
           }
         }
       }
 
-      f(updated, updSet)
+      f(updated > 0, updSet)
     }
+
+    if (updated == 2) {
+      scheduler.scheduleOnce(options.reconnectDelayMS.milliseconds) {
+        val reEvent =
+          s"ChannelReconnecting($channelId, ${_nodeSet.toShortString})"
+
+        updateNodeSet(reEvent) {
+          _.updateNodeByChannelId(channelId) { n =>
+            collectConnections(n) {
+              case other if (other.channel.id != channelId) =>
+                other // keep connections for other channels unchanged
+
+              case _ =>
+                n.createConnection(channelFactory, self)
+            }
+          }
+        }
+
+        ()
+      }
+    }
+
+    res
   }
 
   private def lastError(response: Response): Either[Throwable, LastError] = {
@@ -572,8 +595,6 @@ trait MongoDBSystem extends Actor {
       })
 
       debug(s"RefreshAll Job running... Status: $statusInfo")
-
-      ()
     }
 
     case ChannelConnected(channelId) => {
@@ -607,7 +628,7 @@ trait MongoDBSystem extends Actor {
           val ns = onDisconnect.updateNodeByChannelId(chanId) { n =>
             val node = {
               if (n.pingInfo.channelId.exists(_ == chanId)) {
-                // #cch2: The channel used to send isMaster request is
+                // #cch2: The channel used to send isMaster/ping request is
                 // the one disconnected there
 
                 debug(s"Discard pending isMaster ping: used channel #${chanId} is disconnected")
@@ -1173,7 +1194,7 @@ trait MongoDBSystem extends Actor {
     val info = s"connected:${node.connected.size}, channels:${node.connections.size}"
 
     if (!reqAuth) info else {
-      s"authenticated:${node.authenticatedConnections.subject.size}, $info"
+      s"authenticated:${node.authenticatedConnections.subject.size}, authenticating: ${node.connected.filter(_.authenticating.isDefined).size}, $info"
     }
   }
 

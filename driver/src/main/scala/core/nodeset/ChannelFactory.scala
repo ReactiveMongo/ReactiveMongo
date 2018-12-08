@@ -1,6 +1,5 @@
 package reactivemongo.core.nodeset // TODO: Move to `netty` package
 
-import java.util.concurrent.TimeUnit
 import java.lang.{ Boolean => JBool }
 
 import scala.concurrent.Promise
@@ -55,8 +54,6 @@ private[reactivemongo] final class ChannelFactory(
     option(SO_KEEPALIVE, JBool.valueOf(options.keepAlive)).
     option(CONNECT_TIMEOUT_MILLIS, Integer.valueOf(options.connectTimeoutMS)).
     handler(this)
-  //childHandler(new reactivemongo.io.netty.channel.ChannelHandlerAdapter {})
-  //config.setBufferFactory(bufferFactory)
 
   private[reactivemongo] def create(
     host: String = "localhost",
@@ -72,12 +69,7 @@ private[reactivemongo] final class ChannelFactory(
               s"Connection to ${host}:${port} refused for channel #${chanId}",
               op.cause)
 
-            op.channel().eventLoop().schedule(new Runnable {
-              def run(): Unit = {
-                receiver ! ChannelDisconnected(chanId)
-              }
-            }, options.reconnectDelayMS, TimeUnit.MILLISECONDS)
-
+            receiver ! ChannelDisconnected(chanId)
           }
         }
       })
