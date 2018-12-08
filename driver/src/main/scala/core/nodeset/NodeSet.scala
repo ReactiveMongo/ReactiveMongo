@@ -82,32 +82,33 @@ case class NodeSet(
 
     def filter(tags: Seq[Map[String, String]]) = ReadPreference.TagFilter(tags)
 
+    val resolve = pickConnectionAndFlatten(accept)
+
     if (mongos.isDefined) {
-      pickConnectionAndFlatten(accept)(mongos)
+      resolve(mongos)
     } else preference match {
       case ReadPreference.Primary =>
         pickConnectionAndFlatten(accept)(primary)
 
       case ReadPreference.PrimaryPreferred(tags) =>
-        pickConnectionAndFlatten(accept)(primary.orElse(
+        resolve(primary.orElse(
           pickFromGroupWithFilter(secondaries, filter(tags), secondaries.pick)))
 
       case ReadPreference.Secondary(tags) =>
-        pickConnectionAndFlatten(accept)(pickFromGroupWithFilter(
+        resolve(pickFromGroupWithFilter(
           secondaries, filter(tags), secondaries.pick))
 
       case ReadPreference.SecondaryPreferred(tags) =>
-        pickConnectionAndFlatten(accept)(pickFromGroupWithFilter(
+        resolve(pickFromGroupWithFilter(
           secondaries, filter(tags), secondaries.pick).orElse(primary))
 
       case ReadPreference.Nearest(tags) =>
-        pickConnectionAndFlatten(accept)(pickFromGroupWithFilter(
-          nearestGroup, filter(tags), nearest))
+        resolve(pickFromGroupWithFilter(nearestGroup, filter(tags), nearest))
     }
   }
 
   private def pickConnectionAndFlatten(accept: Connection => Boolean): Option[Node] => Option[(Node, Connection)] = {
-    val p: RoundRobiner[Connection, Vector] => Option[Connection] =
+    def p: RoundRobiner[Connection, Vector] => Option[Connection] =
       if (authenticates.isEmpty) _.pick //TODO: WithFilter(accept)
       else _.pickWithFilter(c =>
         !c.authenticating.isDefined && !c.authenticated.isEmpty && accept(c))
