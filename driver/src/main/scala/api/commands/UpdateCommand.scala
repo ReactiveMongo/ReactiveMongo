@@ -125,10 +125,16 @@ private[reactivemongo] object UpdateCommand {
         decoder.asDocument(v).map(readUpserted)
       })
 
-      UpdateWriteResult(
+      val n = decoder.int(doc, "nModified").
+        orElse(decoder.int(doc, "n")).
+        getOrElse(0)
+
+      new UpdateWriteResult(
         ok = decoder.booleanLike(doc, "ok").getOrElse(true),
-        n = decoder.int(doc, "n").getOrElse(0),
-        nModified = decoder.int(doc, "nModified").getOrElse(0),
+        n = n,
+        nMatched = decoder.int(doc, "nMatched").getOrElse(0),
+        nModified = n,
+        nUpserted = decoder.int(doc, "nUpserted").getOrElse(0),
         upserted = upserted.getOrElse(Seq.empty[Upserted]),
         writeErrors = werrors,
         writeConcernError = wcError,

@@ -7,6 +7,15 @@ lazy val `ReactiveMongo-BSON-Macros` = project.in(file("macros")).
   dependsOn(`ReactiveMongo-BSON`).
   settings(
     Common.settings ++ Findbugs.settings ++ Seq(
+      mimaBinaryIssueFilters ++= {
+        import com.typesafe.tools.mima.core._, ProblemFilters.{ exclude => x }
+
+        Seq(
+          x[MissingTypesProblem]("reactivemongo.bson.Macros$Options$UnionType"),
+          x[MissingTypesProblem]("reactivemongo.bson.Macros$Options$SaveSimpleName"),
+          x[MissingTypesProblem]("reactivemongo.bson.Macros$Options$SimpleUnionType")
+        )
+      },
       libraryDependencies ++= Seq(Dependencies.specs.value,
         "org.scala-lang" % "scala-compiler" % scalaVersion.value % Provided,
         Dependencies.shapelessTest % Test

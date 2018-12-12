@@ -38,9 +38,14 @@ private[reactivemongo] object CommandCodecs {
       val wcError = decoder.child(doc, "writeConcernError").
         map(readWriteConcernError)
 
+      val n = decoder.int(doc, "nInserted"). // TODO: According command/protover
+        orElse(decoder.int(doc, "nRemoved")).
+        orElse(decoder.int(doc, "n")).
+        getOrElse(0)
+
       DefaultWriteResult(
         ok = decoder.booleanLike(doc, "ok").getOrElse(true),
-        n = decoder.int(doc, "n").getOrElse(0),
+        n = n,
         writeErrors = werrors,
         writeConcernError = wcError,
         code = decoder.int(doc, "code"),

@@ -143,24 +143,43 @@ case class DefaultWriteResult(
 
 case class Upserted(index: Int, _id: BSONValue)
 
-case class UpdateWriteResult(
-  ok: Boolean,
-  n: Int,
-  nModified: Int,
-  upserted: Seq[Upserted],
-  writeErrors: Seq[WriteError],
-  writeConcernError: Option[WriteConcernError],
-  code: Option[Int],
-  errmsg: Option[String]) extends WriteResult {
+class UpdateWriteResult(
+  val ok: Boolean,
+  @deprecated("Will be removed in favor or nX", "0.16.1") val n: Int,
+  val nMatched: Int,
+  val nModified: Int,
+  val nUpserted: Int,
+  val upserted: Seq[Upserted],
+  val writeErrors: Seq[WriteError],
+  val writeConcernError: Option[WriteConcernError],
+  val code: Option[Int],
+  val errmsg: Option[String]) extends WriteResult with Serializable {
   def flatten = writeErrors.headOption.fold(this) { firstError =>
-    UpdateWriteResult(
+    new UpdateWriteResult(
       ok = false,
       n = n,
+      nMatched = nMatched,
       nModified = nModified,
+      nUpserted = nUpserted,
       upserted = upserted,
       writeErrors = writeErrors,
       writeConcernError = writeConcernError,
       code = code.orElse(Some(firstError.code)),
       errmsg = errmsg.orElse(Some(firstError.errmsg)))
   }
+}
+
+object UpdateWriteResult extends scala.runtime.AbstractFunction8[Boolean, Int, Int, Seq[Upserted], Seq[WriteError], Option[WriteConcernError], Option[Int], Option[String], UpdateWriteResult] {
+  @deprecated("Use constructor with nMatched and nUpserted", "0.16.1")
+  def apply(
+    ok: Boolean,
+    n: Int,
+    nModified: Int,
+    upserted: Seq[Upserted],
+    writeErrors: Seq[WriteError],
+    writeConcernError: Option[WriteConcernError],
+    code: Option[Int],
+    errmsg: Option[String]): UpdateWriteResult = new UpdateWriteResult(ok, n, nMatched = n, nModified, upserted.size, upserted, writeErrors, writeConcernError, code, errmsg)
+
+  def unapply(result: UpdateWriteResult): Option[(Boolean, Int, Int, Seq[Upserted], Seq[WriteError], Option[WriteConcernError], Option[Int], Option[String])] = Some((result.ok, result.n, result.nModified, result.upserted, result.writeErrors, result.writeConcernError, result.code, result.errmsg))
 }
