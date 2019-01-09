@@ -467,7 +467,7 @@ class MongoURISpec(implicit ee: ExecutionEnv)
             Name.fromConstantString("mongo1.domain.tld.")))),
         txts = txtResolver({ name =>
           if (name == "service.domain.tld") {
-            ListSet("authenticationMechanism=scram-sha1", "foo=lorem")
+            ListSet("authenticationMechanism=scram-sha1", "authenticationDatabase=admin&ignore=this")
           } else {
             throw new IllegalArgumentException(s"Unexpected: $name")
           }
@@ -476,13 +476,14 @@ class MongoURISpec(implicit ee: ExecutionEnv)
             hosts = List("mongo1.domain.tld" -> 27017),
             db = Some("somedb"),
             authenticate = Some(
-              Authenticate("somedb", "user123", Some("passwd123"))),
+              Authenticate("admin", "user123", Some("passwd123"))),
             options = MongoConnectionOptions(
               sslEnabled = false, // overriden from URI
+              authenticationDatabase = Some("admin"),
               authenticationMechanism = ScramSha1Authentication,
-              credentials = Map("somedb" -> Credential(
+              credentials = Map("admin" -> Credential(
                 "user123", Some("passwd123")))),
-            ignoredOptions = List("foo")))
+            ignoredOptions = List("foo", "ignore")))
 
     }
   }
