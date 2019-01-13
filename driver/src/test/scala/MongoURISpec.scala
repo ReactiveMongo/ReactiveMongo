@@ -480,7 +480,7 @@ class MongoURISpec(implicit ee: ExecutionEnv)
             options = MongoConnectionOptions(
               sslEnabled = false, // overriden from URI
               authenticationMechanism = ScramSha1Authentication,
-              credentials = Map("somedb" -> Credential(
+              credentials = Map("admin" -> Credential(
                 "user123", Some("passwd123")))),
             ignoredOptions = List("foo", "ignore")))
 
