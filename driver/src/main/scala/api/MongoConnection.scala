@@ -415,7 +415,9 @@ object MongoConnection {
           }
         }
 
-        makeOptions(txtOptions ++ parseOptions(useful), initial)
+        val optionStr = useful.drop(setSpec.size).stripPrefix("?")
+
+        makeOptions(txtOptions ++ parseOptions(optionStr), initial)
       }
 
       if (opts._2.maxIdleTimeMS != 0 &&
@@ -539,18 +541,19 @@ object MongoConnection {
           s"Could not parse hosts and database from URI: '$input'")
     }
 
-  private def parseOptions(uriAndOptions: String): Map[String, String] =
-    uriAndOptions.split('?').toList match {
-      case uri :: options :: Nil => options.split("&").map { option =>
+  private def parseOptions(options: String): Map[String, String] = {
+    if (options.isEmpty) {
+      Map.empty[String, String]
+    } else {
+      options.split("&").map { option =>
         option.split("=").toList match {
           case key :: value :: Nil => (key -> value)
           case _ => throw new URIParsingException(
-            s"Could not parse URI '$uri': invalid options '$options'")
+            s"Could not parse invalid options '$options'")
         }
       }(scala.collection.breakOut)
-
-      case _ => Map.empty
     }
+  }
 
   @deprecated("Will be private/internal", "0.16.0")
   val IntRe = "^([0-9]+)$".r
