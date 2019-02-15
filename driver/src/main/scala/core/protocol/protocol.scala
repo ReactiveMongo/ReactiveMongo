@@ -283,7 +283,6 @@ private[reactivemongo] class ResponseDecoder
       val docs = Unpooled.buffer(frame.readableBytes)
 
       docs.writeBytes(frame)
-      frame.release()
 
       ResponseDecoder.first(docs) match {
         case Failure(cause) => {
@@ -339,7 +338,6 @@ private[reactivemongo] class ResponseDecoder
       val docs = Unpooled.buffer(frame.readableBytes)
 
       docs.writeBytes(frame)
-      frame.release()
 
       Response(header, reply, docs, info)
     } else {
