@@ -17,7 +17,7 @@ package reactivemongo.bson
 
 import java.math.{ BigDecimal => JBigDec }
 
-import exceptions.DocumentKeyNotFound
+import exceptions.{ DocumentKeyNotFound, DocumentKeyIsNull }
 import scala.util.{ Failure, Success, Try }
 import buffer._
 import utils.Converters
@@ -996,7 +996,10 @@ case class BSONDocument(stream: Stream[Try[BSONElement]])
    */
   def getAsTry[T](key: String)(implicit reader: BSONReader[_ <: BSONValue, T]): Try[T] = {
     val tt = getTry(key)
-    tt.flatMap { element => Try(reader.asInstanceOf[BSONReader[BSONValue, T]].read(element)) }
+    tt.flatMap { element: BSONValue =>
+      Try(reader.asInstanceOf[BSONReader[BSONValue, T]].read(element))
+        .recoverWith { case _ if element == BSONNull => Failure(DocumentKeyIsNull(key)) }
+    }
   }
 
   /**
@@ -1006,9 +1009,9 @@ case class BSONDocument(stream: Stream[Try[BSONElement]])
    * If the value could not be deserialized or converted, returns a `Failure`.
    */
   def getAsUnflattenedTry[T](key: String)(implicit reader: BSONReader[_ <: BSONValue, T]): Try[Option[T]] = getAsTry(key)(reader) match {
-    case Failure(_: DocumentKeyNotFound) => Success(None)
-    case Failure(e)                      => Failure(e)
-    case Success(e)                      => Success(Some(e))
+    case Failure(_: DocumentKeyNotFound) | Failure(_: DocumentKeyIsNull) => Success(None)
+    case Failure(e) => Failure(e)
+    case Success(e) => Success(Some(e))
   }
 
   /** Creates a new [[BSONDocument]] containing all the elements of this one and the elements of the given document. */
