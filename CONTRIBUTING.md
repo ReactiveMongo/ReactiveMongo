@@ -29,6 +29,7 @@ This is the process for a contributor (that is, a non ReactiveMongo core develop
         * Casting
         * Introducing new, heavy external dependencies
 3. Submit a pull request. If an issue already exists for the pull request, then follow [these](http://opensoul.org/blog/archives/2012/11/09/convert-a-github-issue-into-a-pull-request/) instructions for converting an issue into a pull request.
+    * New contributors need to sign the [CLA](http://www.clahub.com/agreements/ReactiveMongo/ReactiveMongo)
 
 If the pull request does not meet the above requirements then the code should **not** be merged into master, or even reviewed - regardless of how good or important it is. No exceptions.
 
