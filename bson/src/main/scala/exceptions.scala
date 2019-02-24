@@ -21,10 +21,6 @@ case class DocumentKeyNotFound(name: String) extends Exception {
   override def getMessage = s"The key '$name' could not be found in this document or array"
 }
 
-case class DocumentKeyIsNull(name: String) extends Exception {
-  override def getMessage = s"The key '$name' is null"
-}
-
 case class TypeDoesNotMatch(message: String)
   extends Exception with NoStackTrace {
   override val getMessage = message
