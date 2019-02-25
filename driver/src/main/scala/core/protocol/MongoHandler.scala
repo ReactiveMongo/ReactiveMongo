@@ -94,6 +94,7 @@ private[reactivemongo] class MongoHandler(
   }
 
   override def exceptionCaught(ctx: ChannelHandlerContext, cause: Throwable) = {
+    println(s"ERROR: $cause")
     log(ctx, s"Error on channel #${ctx.channel.id}", cause)
 
     //super.exceptionCaught(ctx, cause) - Do not bubble as it's the last handler
