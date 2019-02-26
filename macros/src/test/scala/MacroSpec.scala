@@ -8,6 +8,7 @@ import reactivemongo.bson.{
   BSONDouble,
   BSONHandler,
   BSONInteger,
+  BSONNull,
   BSONReader,
   BSONString,
   BSONWriter,
@@ -52,6 +53,13 @@ class MacroSpec extends org.specs2.mutable.Specification {
         BSONDocument(
           "name" -> "invalidValueType",
           "value" -> 4)) must throwA[Exception]("BSONInteger")
+    }
+
+    "support null for optional value" in {
+      Macros.reader[Optional].read(
+        BSONDocument(
+          "name" -> "name",
+          "value" -> BSONNull)).value must be(None)
     }
 
     "support seq" in {
