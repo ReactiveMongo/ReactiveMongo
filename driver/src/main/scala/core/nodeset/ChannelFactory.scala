@@ -94,7 +94,7 @@ private[reactivemongo] final class ChannelFactory(
     val host = channel.attr(ChannelFactory.hostKey).get
 
     if (host == null) {
-      warn("Skip channel init as host is null")
+      info("Skip channel init as host is null")
     } else {
       val port = channel.attr(ChannelFactory.portKey).get
       val receiver = channel.attr(ChannelFactory.actorRefKey).get
