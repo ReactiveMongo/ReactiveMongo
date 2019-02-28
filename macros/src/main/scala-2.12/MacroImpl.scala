@@ -1,6 +1,11 @@
 package reactivemongo.bson
 
-import reactivemongo.bson.Macros.Annotations.{ Flatten, Ignore, Key }
+import reactivemongo.bson.Macros.Annotations.{
+  Flatten,
+  Ignore,
+  NoneAsNull,
+  Key
+}
 import reactivemongo.bson.Macros.Options.SaveSimpleName
 
 import scala.collection.immutable.Set
@@ -163,7 +168,6 @@ private object MacroImpl {
         headOption.toSeq.flatten.map { param =>
           val t = param.typeSignature
           val sig = boundTypes.getOrElse(t.typeSymbol.fullName, t)
-          val opt = optionTypeParameter(sig)
           val (reader, _) = resolve(sig)
           val pname = paramName(param)
 
@@ -183,9 +187,12 @@ private object MacroImpl {
             }
 
             q"${reader}.read(document)"
-          } else opt match {
-            case Some(_) => q"document.getAsUnflattenedTry($pname)($reader).get"
-            case _       => q"document.getAsTry($pname)($reader).get"
+          } else optionTypeParameter(sig) match {
+            case Some(_) =>
+              q"document.getAsUnflattenedTry($pname)($reader).get"
+
+            case _ =>
+              q"document.getAsTry($pname)($reader).get"
           }
         }
 
@@ -307,7 +314,11 @@ private object MacroImpl {
             vterm, TypeTree(sig), EmptyTree) // ${v} =>
           val field = reify((name.splice, bsv.splice)).tree
 
-          q"${tupleElement(i)}.foreach { $vp => $bufName += $field }"
+          if (param.annotations.exists(_.tree.tpe =:= typeOf[NoneAsNull])) {
+            q"$bufName += ${tupleElement(i)}.fold(reactivemongo.bson.BSONElement($name, reactivemongo.bson.BSONNull)) { $vp => $field }"
+          } else {
+            q"${tupleElement(i)}.foreach { $vp => $bufName += $field }"
+          }
       }
 
       // List[Tree] corresponding to fields appended to the buffer/builder
