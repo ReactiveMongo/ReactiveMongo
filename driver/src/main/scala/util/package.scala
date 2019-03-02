@@ -216,8 +216,6 @@ package object util {
 
       case records => {
         val txts: ListSet[String] = records.map({ rec =>
-          println(s"rec = $rec")
-
           val data = rec.rdataToString
           val stripped = data.stripPrefix("\"")
 

@@ -148,6 +148,19 @@ object Macros {
      */
     @meta.param
     case class Flatten() extends StaticAnnotation
+
+    /**
+     * Indicates that if an `Option` property is empty,
+     * it will be represented by `BSONNull` rather than being omitted.
+     *
+     * {{{
+     * case class Foo(
+     *   title: String,
+     *   @NoneAsNull description: Option[String])
+     * }}}
+     */
+    @meta.param
+    case class NoneAsNull() extends StaticAnnotation
   }
 
   /** Only for internal purposes */
