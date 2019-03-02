@@ -21,7 +21,7 @@ final class InsertCommandSpec extends org.specs2.mutable.Specification {
       val base = BSONDocument(
         "insert" -> "foo",
         "ordered" -> false,
-        "writeConcern" -> BSONDocument("w" -> 1, "j" -> true),
+        "writeConcern" -> BSONDocument("w" -> 1, "j" -> false),
         "documents" -> (firstDoc +: otherDocs))
 
       "without session" in {
