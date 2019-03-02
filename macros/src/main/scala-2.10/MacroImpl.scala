@@ -2,7 +2,12 @@ package reactivemongo.bson
 
 import scala.collection.immutable.Set
 
-import reactivemongo.bson.Macros.Annotations.{ Flatten, Ignore, Key }
+import reactivemongo.bson.Macros.Annotations.{
+  Flatten,
+  Ignore,
+  Key,
+  NoneAsNull
+}
 import reactivemongo.bson.Macros.Options.SaveSimpleName
 
 import scala.reflect.macros.Context
@@ -268,6 +273,15 @@ private object MacroImpl {
         reify { BSONDocument(Seq((nameE.splice))) }
       } getOrElse reify(BSONDocument.empty)).tree
 
+    private lazy val bsonNullTree = // reactivemongo.bson.BSONNull
+      Select(Select(Ident("reactivemongo"), "bson"), "BSONNull")
+
+    private lazy val bsonElementTree = // reactivemongo.bson.BSONElement
+      Select(Select(Ident("reactivemongo"), "bson"), "BSONElement")
+
+    private lazy val tuple2Tree = // scala.Tuple2
+      Select(Ident("scala"), "Tuple2")
+
     private def writeBodyConstructClass(id: Ident, tpe: Type): Tree = {
       val (constructor, deconstructor) = matchingApplyUnapply(tpe).getOrElse(
         c.abort(c.enclosingPosition, s"No matching apply/unapply found: $tpe"))
@@ -366,15 +380,23 @@ private object MacroImpl {
           val pname = paramName(param)
           val writer = resolveWriter(pname, sig)
           val vterm = newTermName("v")
-          val bsv = c.Expr[BSONValue]( // writer.write(${vterm})
-            Apply(Select(writer, "write"), List(Ident(vterm))))
+          val wtree = Apply( // writer.write(${vterm})
+            Select(writer, "write"), List(Ident(vterm)))
+
+          val bsv = c.Expr[BSONValue](wtree)
 
           val ap = append(pname, bsv)
 
-          val z = Apply(Select(tupleElement(i), newTermName("foreach")), List(
-            Function(List(
-              ValDef(Modifiers(c.universe.Flag.PARAM), vterm,
-                TypeTree(sig), EmptyTree)), ap)))
+          val z = {
+            if (param.annotations.exists(_.tpe =:= typeOf[NoneAsNull])) {
+              Apply(Select(Ident(bufName), f"$$plus$$eq"), List(Apply(Apply(Select(tupleElement(i), "fold"), List(Apply(bsonElementTree, List(Literal(Constant("value")), bsonNullTree)))), List(Function(List(ValDef(Modifiers(c.universe.Flag.PARAM), vterm, TypeTree(), EmptyTree)), Apply(Select(tuple2Tree, "apply"), List(Literal(Constant("value")), wtree)))))))
+            } else {
+              Apply(Select(tupleElement(i), newTermName("foreach")), List(
+                Function(List(
+                  ValDef(Modifiers(c.universe.Flag.PARAM), vterm,
+                    TypeTree(sig), EmptyTree)), ap)))
+            }
+          }
 
           List(z)
       }

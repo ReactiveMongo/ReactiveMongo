@@ -996,7 +996,12 @@ case class BSONDocument(stream: Stream[Try[BSONElement]])
    */
   def getAsTry[T](key: String)(implicit reader: BSONReader[_ <: BSONValue, T]): Try[T] = {
     val tt = getTry(key)
-    tt.flatMap { element => Try(reader.asInstanceOf[BSONReader[BSONValue, T]].read(element)) }
+    tt.flatMap {
+      case BSONNull =>
+        Failure(DocumentKeyNotFound(key))
+      case element =>
+        Try(reader.asInstanceOf[BSONReader[BSONValue, T]].read(element))
+    }
   }
 
   /**

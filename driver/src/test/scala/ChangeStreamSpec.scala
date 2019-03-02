@@ -63,7 +63,7 @@ class ChangeStreamSpec(implicit val ee: ExecutionEnv)
         }
 
         // then
-        (forkedInsertion must haveCompleted) and (result must {
+        (forkedInsertion.map(_ => {}) must haveCompleted) and (result must {
           {
             haveField[String]("operationType") that beTypedEqualTo("insert")
           } and {
@@ -104,7 +104,7 @@ class ChangeStreamSpec(implicit val ee: ExecutionEnv)
         }
 
         // then
-        (forkedInsertion must haveCompleted) and (result must {
+        (forkedInsertion.map(_ => {}) must haveCompleted) and (result must {
           {
             haveField[String]("operationType") that beTypedEqualTo("insert")
           } and {
@@ -145,7 +145,7 @@ class ChangeStreamSpec(implicit val ee: ExecutionEnv)
         }
 
         // then
-        (forkedInsertion must haveCompleted) and (result must {
+        (forkedInsertion.map(_ => {}) must haveCompleted) and (result must {
           {
             haveField[String]("operationType") that beTypedEqualTo("insert")
           } and {
@@ -161,82 +161,100 @@ class ChangeStreamSpec(implicit val ee: ExecutionEnv)
 
     "lookup the most recent document version" in skipIfNotRSAndNotVersionAtLeast(MongoWireVersion.V36) {
       withTmpCollection(db) { coll: BSONCollection =>
-        // given
-        val initialCursor = coll.watch[BSONDocument]().cursor[Cursor.WithOps]
-        val id = "lookup_test1"
+        type R = (String, Future[Unit], Future[BSONDocument])
+
         val fieldName = "foo"
         val lastValue = "bar3"
-        val testDocument = BSONDocument(
-          "_id" -> id,
-          fieldName -> "bar1")
 
-        // This test is a bit more tricky. We want to first capture the insert event so that we know where we will
-        // resume. Then we produce two update events, resume the stream with the first update event, but check that the
-        // looked-up document corresponds to the second update.
-        val result = foldOne(initialCursor).flatMap { firstEvent =>
-          firstEvent.get("_id") match {
-            case None => Future.failed(new Exception("The event had no id"))
-            case Some(eventId) =>
+        // This test is a bit more tricky. We want to first capture
+        // the insert event so that we know where we will resume.
+        // Then we produce two update events, resume the stream
+        // with the first update event, but check that the looked-up document
+        // corresponds to the second update.
+        def result: R = {
+          // given
+          val initialCursor = coll.watch[BSONDocument]().cursor[Cursor.WithOps]
+          val id = s"lookup_test${System identityHashCode initialCursor}"
+          val testDocument = BSONDocument(
+            "_id" -> id,
+            fieldName -> "bar1")
 
-              // when
-              for {
-                _ <- coll.update(ordered = false).one(
-                  BSONDocument("_id" -> id),
-                  BSONDocument(f"$$set" -> BSONDocument(fieldName -> "bar2")))
-                _ <- coll.update(ordered = false).one(
-                  BSONDocument("_id" -> id),
-                  BSONDocument(f"$$set" -> BSONDocument(fieldName -> lastValue)))
-                resumedCursor = coll.watch[BSONDocument](
-                  resumeAfter = Some(eventId),
-                  fullDocumentStrategy = Some(ChangeStreams.FullDocumentStrategy.UpdateLookup)).cursor[Cursor.WithOps]
-                event <- resumedCursor.head
-              } yield event
+          val res = foldOne(initialCursor).flatMap { firstEvent =>
+            firstEvent.get("_id") match {
+              case None => Future.failed(new Exception("The event had no id"))
+              case Some(eventId) =>
+
+                // when
+                for {
+                  _ <- coll.update(ordered = false).one(
+                    BSONDocument("_id" -> id),
+                    BSONDocument(f"$$set" -> BSONDocument(fieldName -> "bar2")))
+                  _ <- coll.update(ordered = false).one(
+                    BSONDocument("_id" -> id),
+                    BSONDocument(f"$$set" -> BSONDocument(fieldName -> lastValue)))
+                  resumedCursor = coll.watch[BSONDocument](
+                    resumeAfter = Some(eventId),
+                    fullDocumentStrategy = Some(
+                      ChangeStreams.FullDocumentStrategy.UpdateLookup)).cursor[Cursor.WithOps]
+
+                  event <- delayBy(500.millis)(resumedCursor.head)
+                } yield event
+            }
           }
-        }
-        // See comment above
-        val forkedInsertion = delayBy(500.millis) {
-          coll.insert(ordered = false).one(testDocument)
+
+          // See comment above
+          (id, delayBy(500.millis) {
+            coll.insert(ordered = false).one(testDocument).map(_ => {})
+          }, res)
         }
 
         // then
-        (forkedInsertion must haveCompleted) and (result must {
-          {
-            haveField[String]("operationType") that beTypedEqualTo("update")
-          } and {
-            haveField[BSONDocument]("documentKey") that {
-              haveField[String]("_id") that beTypedEqualTo(id)
+        result must beLike[R] {
+          case (id, insertion, res) =>
+            insertion must beTypedEqualTo({}).awaitFor(timeout) and {
+              res must {
+                {
+                  haveField[String]("operationType") that beTypedEqualTo("update")
+                } and {
+                  haveField[BSONDocument]("documentKey") that {
+                    haveField[String]("_id") that beTypedEqualTo(id)
+                  }
+                } and {
+                  haveField[BSONDocument]("fullDocument") that {
+                    haveField[String](fieldName) that beTypedEqualTo(lastValue)
+                  }
+                }
+              }.await(1, timeout)
             }
-          } and {
-            haveField[BSONDocument]("fullDocument") that {
-              haveField[String](fieldName) that beTypedEqualTo(lastValue)
-            }
-          }
-        }.awaitFor(timeout))
+        }.eventually(retries = 2, sleep = timeout)
       }
     }
 
   }
 
-  private def skipIfNotRSAndNotVersionAtLeast[R: AsResult](version: MongoWireVersion)(r: => R) = {
-    skippedIf(isNotReplicaSet, isNotAtLeast(db, version))(r)
-  }
+  @inline private def skipIfNotRSAndNotVersionAtLeast[R: AsResult](version: MongoWireVersion)(r: => R) = skippedIf(isNotReplicaSet, isNotAtLeast(db, version))(r)
 
   // head will always fail on a changeStream cursor, so we need to fold a single element
   private def foldOne[T](cursor: Cursor.WithOps[T]): Future[T] = {
     cursor.collect[List](maxDocs = 1, Cursor.FailOnError()).flatMap { result =>
       result.headOption match {
-        case None        => Future.failed(new NoSuchElementException())
         case Some(value) => Future.successful(value)
+        case _           => Future.failed(new NoSuchElementException())
+
       }
     }
   }
 
-  private def delayBy(duration: FiniteDuration)(f: => Future[_]): Future[Unit] = {
-    val promise = Promise[Unit]()
-    tests.Common.driver.system.scheduler.scheduleOnce(duration)(f.map(_ => ()).onComplete(promise.complete))
+  private def delayBy[T](duration: FiniteDuration)(f: => Future[T]): Future[T] = {
+    val promise = Promise[T]()
+
+    tests.Common.driver.system.scheduler.
+      scheduleOnce(duration)(f.onComplete(promise.complete))
+
     promise.future
   }
 
-  private def haveCompleted: Matcher[Future[Unit]] = beEqualTo(()).awaitFor(timeout)
+  private def haveCompleted: Matcher[Future[Unit]] =
+    beTypedEqualTo(()).awaitFor(timeout)
 
 }

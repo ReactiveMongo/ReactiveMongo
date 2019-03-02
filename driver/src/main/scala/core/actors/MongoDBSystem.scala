@@ -126,7 +126,9 @@ trait MongoDBSystem extends Actor {
 
   // history
   private lazy val historyMax = options.maxHistorySize
-  private lazy val history = EvictingQueue.create[(Long, String)](historyMax)
+  private lazy val history =
+    Queues.newConcurrentLinkedQueue(
+      EvictingQueue.create[(Long, String)](historyMax))
 
   private[reactivemongo] lazy val syncHistory =
     Queues.synchronizedQueue(history)
