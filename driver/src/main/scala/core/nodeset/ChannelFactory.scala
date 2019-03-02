@@ -214,8 +214,8 @@ private[reactivemongo] final class ChannelFactory(
   @inline private def trace(msg: => String) =
     logger.trace(s"[$supervisor/$connection] ${msg}")
 
-  @inline private def warn(msg: => String) =
-    logger.warn(s"[$supervisor/$connection] ${msg}")
+  @inline private def info(msg: => String) =
+    logger.info(s"[$supervisor/$connection] ${msg}")
 
   private object TrustAny extends javax.net.ssl.X509TrustManager {
     import java.security.cert.X509Certificate
