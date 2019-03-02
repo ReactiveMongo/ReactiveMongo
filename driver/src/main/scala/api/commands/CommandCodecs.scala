@@ -106,7 +106,7 @@ private[reactivemongo] object CommandCodecs {
       val elements = Seq.newBuilder[builder.pack.ElementProducer]
 
       elements += element("w", writeGLEW(writeConcern.w))
-      elements += element("j", builder.boolean(true))
+      elements += element("j", builder.boolean(writeConcern.j))
 
       writeConcern.wtimeout.foreach { t =>
         elements += element("wtimeout", int(t))

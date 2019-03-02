@@ -10,7 +10,6 @@ import reactivemongo.bson.{
   BSONInteger,
   BSONNull,
   BSONReader,
-  BSONString,
   BSONWriter,
   Macros
 }
@@ -18,7 +17,7 @@ import reactivemongo.bson.exceptions.DocumentKeyNotFound
 
 import org.specs2.matcher.MatchResult
 
-class MacroSpec extends org.specs2.mutable.Specification {
+final class MacroSpec extends org.specs2.mutable.Specification {
   "Macros" title
 
   import MacroTest._
@@ -60,6 +59,13 @@ class MacroSpec extends org.specs2.mutable.Specification {
         BSONDocument(
           "name" -> "name",
           "value" -> BSONNull)).value must be(None)
+    }
+
+    "write empty option as null" in {
+      Macros.writer[OptionalAsNull].
+        write(OptionalAsNull("asNull", None)) must_=== BSONDocument(
+          "name" -> "asNull",
+          "value" -> BSONNull)
     }
 
     "support seq" in {

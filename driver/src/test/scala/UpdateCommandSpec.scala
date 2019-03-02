@@ -23,7 +23,7 @@ final class UpdateCommandSpec extends org.specs2.mutable.Specification {
         "ordered" -> true,
         "writeConcern" -> BSONDocument(
           "w" -> 1,
-          "j" -> true),
+          "j" -> false),
         "updates" -> BSONArray(
           BSONDocument(
             "q" -> BSONDocument("_id" -> 1),
