@@ -12,8 +12,7 @@ import reactivemongo.io.netty.handler.timeout.IdleStateEvent
 
 import reactivemongo.core.actors.{ ChannelConnected, ChannelDisconnected }
 
-import reactivemongo.util.LazyLogger
-import reactivemongo.util.timestamp
+import reactivemongo.util.{ LazyLogger, timestamp }
 
 private[reactivemongo] class MongoHandler(
   supervisor: String,
