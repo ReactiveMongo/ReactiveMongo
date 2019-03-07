@@ -24,6 +24,7 @@ import reactivemongo.core.commands.{
 
 import reactivemongo.api.{ DefaultDB, FailoverStrategy }
 import reactivemongo.api.commands.DBUserRole
+import reactivemongo.util.timestamp
 
 import org.specs2.concurrent.ExecutionEnv
 
@@ -111,13 +112,13 @@ class DriverSpec(implicit ee: ExecutionEnv)
         List("foo:123"),
         DefaultOptions.copy(failoverStrategy = FailoverStrategy.remote))
 
-      val before = System.currentTimeMillis()
+      val before = timestamp()
       val unresolved = con.database(commonDb)
-      val after = System.currentTimeMillis()
+      val after = timestamp()
 
       (after - before) aka "invocation" must beBetween(0L, 75L) and {
         unresolved.map(_ => Option.empty[Throwable] -> -1L).recover {
-          case reason => Option(reason) -> (System.currentTimeMillis() - after)
+          case reason => Option(reason) -> (timestamp() - after)
         }.aka("duration") must beLike[(Option[Throwable], Long)] {
           case (Some(reason), duration) =>
             reason.getStackTrace.tail.headOption.

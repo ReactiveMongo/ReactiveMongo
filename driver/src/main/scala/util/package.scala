@@ -28,6 +28,10 @@ import reactivemongo.core.errors.GenericDriverException
 package object util {
   import scala.language.implicitConversions
 
+  // timestamp in milliseconds (not related to any system or wall-clock time)
+  @inline
+  def timestamp(): Long = System.nanoTime() / 1000000
+
   /** Makes an option of the value matching the condition. */
   def option[T](cond: => Boolean, value: => T): Option[T] =
     if (cond) Some(value) else None

@@ -13,6 +13,7 @@ import reactivemongo.io.netty.handler.timeout.IdleStateEvent
 import reactivemongo.core.actors.{ ChannelConnected, ChannelDisconnected }
 
 import reactivemongo.util.LazyLogger
+import reactivemongo.util.timestamp
 
 private[reactivemongo] class MongoHandler(
   supervisor: String,
@@ -26,7 +27,7 @@ private[reactivemongo] class MongoHandler(
   override def channelActive(ctx: ChannelHandlerContext): Unit = {
     log(ctx, "Channel is active")
 
-    last = System.currentTimeMillis()
+    last = timestamp()
 
     receiver ! ChannelConnected(ctx.channel.id)
 
@@ -35,7 +36,7 @@ private[reactivemongo] class MongoHandler(
 
   override def channelIdle(ctx: ChannelHandlerContext, e: IdleStateEvent) = {
     if (last != -1L) {
-      val now = System.currentTimeMillis()
+      val now = timestamp()
 
       log(ctx, s"Channel has been inactive for ${now - last} (last = $last)")
     }
@@ -46,7 +47,7 @@ private[reactivemongo] class MongoHandler(
   }
 
   override def channelInactive(ctx: ChannelHandlerContext): Unit = {
-    val now = System.currentTimeMillis()
+    val now = timestamp()
 
     if (last != -1) {
       val chan = ctx.channel
@@ -64,7 +65,7 @@ private[reactivemongo] class MongoHandler(
   }
 
   override def channelRead(ctx: ChannelHandlerContext, msg: Any): Unit = {
-    last = System.currentTimeMillis()
+    last = timestamp()
 
     msg match {
       case response: Response => {
@@ -88,7 +89,7 @@ private[reactivemongo] class MongoHandler(
     promise: ChannelPromise): Unit = {
     log(ctx, s"Channel is requested to write")
 
-    last = System.currentTimeMillis()
+    last = timestamp()
 
     super.write(ctx, msg, promise)
   }

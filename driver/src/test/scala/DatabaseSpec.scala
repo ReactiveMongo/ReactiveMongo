@@ -4,6 +4,8 @@ import scala.concurrent.duration.FiniteDuration
 import reactivemongo.api.{ DefaultDB, FailoverStrategy, MongoConnection }
 import reactivemongo.api.commands.CommandError
 
+import reactivemongo.util.timestamp
+
 import org.specs2.concurrent.ExecutionEnv
 
 class DatabaseSpec(implicit ee: ExecutionEnv)
@@ -35,13 +37,13 @@ class DatabaseSpec(implicit ee: ExecutionEnv)
         val fos2 = FailoverStrategy(FiniteDuration(50, "ms"), 20,
           _ * 2 toDouble) // without accumulator
 
-        val before = System.currentTimeMillis()
+        val before = timestamp()
         val estmout = estTimeout(fos2)
 
         con.database("foo", fos1).map(_ => List.empty[Int]).
           recover({ case _ => ws.result() }) must beEqualTo(expected).
           await(0, estmout * 2) and {
-            val duration = System.currentTimeMillis() - before
+            val duration = timestamp() - before
 
             duration must be_<(estmout.toMillis + 2000 /* ms */ )
           }

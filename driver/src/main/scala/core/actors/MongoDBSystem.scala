@@ -37,7 +37,7 @@ import reactivemongo.io.netty.channel.group.{
   DefaultChannelGroup
 }
 
-import reactivemongo.util.LazyLogger
+import reactivemongo.util.{ LazyLogger, timestamp }
 import reactivemongo.core.errors.GenericDriverException
 import reactivemongo.core.protocol.{
   GetMore,
@@ -157,7 +157,7 @@ trait MongoDBSystem extends Actor {
   // <-- monitor
 
   @inline private def updateHistory(event: String) =
-    syncHistory.offer(System.currentTimeMillis() -> event)
+    syncHistory.offer(timestamp() -> event)
 
   private[reactivemongo] def internalState() = new InternalState(
     history.toArray(Array.fill[(Long, String)](historyMax)(null)).
@@ -948,7 +948,7 @@ trait MongoDBSystem extends Actor {
                 // No longer waiting response for isMaster,
                 // reset the pending state, and update the ping time
                 val pingTime =
-                  System.currentTimeMillis() - node.pingInfo.lastIsMasterTime
+                  timestamp() - node.pingInfo.lastIsMasterTime
 
                 node.pingInfo.copy(
                   ping = pingTime,
@@ -1363,7 +1363,7 @@ trait MongoDBSystem extends Actor {
         ReadPreference.primaryPreferred,
         "admin") // only "admin" DB for the admin command
 
-      val now = System.currentTimeMillis()
+      val now = timestamp()
 
       val updated = if (node.pingInfo.lastIsMasterId == -1) {
         // There is no IsMaster request waiting response for the node:

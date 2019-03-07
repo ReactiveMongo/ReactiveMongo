@@ -24,6 +24,8 @@ import reactivemongo.core.netty.ChannelBufferReadableBuffer
 
 import reactivemongo.io.netty.channel.{ Channel, DefaultChannelId }
 
+import reactivemongo.util.timestamp
+
 import _root_.tests.{ Common, NettyEmbedder }
 
 trait UnresponsiveSecondarySpec { parent: NodeSetSpec =>
@@ -86,7 +88,7 @@ trait UnresponsiveSecondarySpec { parent: NodeSetSpec =>
                     n.copy(pingInfo = n.pingInfo.copy(
                       lastIsMasterId = 1,
                       lastIsMasterTime = (
-                        System.currentTimeMillis() - PingInfo.pingTimeout)))
+                        timestamp() - PingInfo.pingTimeout)))
                   } else n
                 }
               }

@@ -13,6 +13,7 @@ import org.specs2.concurrent.ExecutionEnv
 import reactivemongo.core.actors.StandardDBSystem
 import reactivemongo.core.nodeset.{ Authenticate, Connection, Node }
 import reactivemongo.core.protocol.{ Response, ResponseInfo }
+import reactivemongo.util.timestamp
 
 import reactivemongo.api.{
   MongoConnection,
@@ -192,7 +193,7 @@ class MonitorSpec(implicit ee: ExecutionEnv)
       withConAndSys(options = opts) { (con, sysRef) =>
         @inline def dbsystem = sysRef.underlyingActor
 
-        //println(s"MonitorSpec_1: ${System.currentTimeMillis()}")
+        //println(s"MonitorSpec_1: ${timestamp()}")
 
         Future.successful(eventually(2, timeout) {
           isAvailable(con, timeout) must beTrue.await(0, timeout)
@@ -238,7 +239,7 @@ class MonitorSpec(implicit ee: ExecutionEnv)
             // so the incoming buffer is not read
             // (and so no isMaster response).
 
-            val before4 = System.currentTimeMillis()
+            val before4 = timestamp()
 
             connections1.headOption.foreach { con1 =>
               con1.channel.deregister()
