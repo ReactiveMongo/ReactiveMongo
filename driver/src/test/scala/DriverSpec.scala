@@ -1,4 +1,4 @@
-import scala.concurrent.{ Await, ExecutionContext, Future, Promise }
+import scala.concurrent.{ Await, Future, Promise }
 import scala.concurrent.duration._
 
 import akka.actor.{ Actor, ActorRef, ActorSystem, Props }
@@ -246,8 +246,7 @@ class DriverSpec(implicit ee: ExecutionEnv)
 
     val id = System.identityHashCode(drv)
     val dbName = s"specs2-test-scramsha1${id}"
-    def db_(implicit ee: ExecutionContext) =
-      connection.flatMap(_.database(dbName, failoverStrategy))
+    def db_ = connection.flatMap(_.database(dbName, failoverStrategy))
 
     section("not_mongo26")
 

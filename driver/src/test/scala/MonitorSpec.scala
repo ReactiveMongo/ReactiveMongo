@@ -36,7 +36,7 @@ class MonitorSpec(implicit ee: ExecutionEnv)
       val expectFactor = 3L
       val opts = Common.DefaultOptions.copy(
         nbChannelsPerNode = 3,
-        monitorRefreshMS = 3600000 // disable refreshAll/connectAll during test
+        heartbeatFrequencyMS = 3600000 // disable refreshAll/connectAll during test
       )
 
       eventually(2, timeout) {
@@ -115,7 +115,7 @@ class MonitorSpec(implicit ee: ExecutionEnv)
       val expectFactor = 5L
       val opts = Common.DefaultOptions.copy(
         nbChannelsPerNode = 3,
-        monitorRefreshMS = 3600000 // disable refreshAll/connectAll during test
+        heartbeatFrequencyMS = 3600000 // disable refreshAll/connectAll during test
       )
 
       // Disable logging (as simulating errors)
@@ -185,7 +185,7 @@ class MonitorSpec(implicit ee: ExecutionEnv)
       val expectFactor = 4L
       val opts = Common.DefaultOptions.copy(
         nbChannelsPerNode = 2,
-        monitorRefreshMS = 3600000 // disable refreshAll/connectAll during test
+        heartbeatFrequencyMS = 3600000 // disable refreshAll/connectAll during test
       )
       val unavailTimeout = timeout + 1.second
 

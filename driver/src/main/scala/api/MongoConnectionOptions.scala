@@ -48,7 +48,7 @@ case class MongoConnectionOptions(
   tcpNoDelay: Boolean = false,
   keepAlive: Boolean = false,
   nbChannelsPerNode: Int = 10,
-  reconnectDelayMS: Int = 1000,
+  @deprecated("Unused, see heartbeatFrequencyMS", "0.16.4") reconnectDelayMS: Int = 1000,
 
   // read and write preferences
   writeConcern: WC = WC.Default,
@@ -56,7 +56,7 @@ case class MongoConnectionOptions(
 
   failoverStrategy: FailoverStrategy = FailoverStrategy.default,
 
-  monitorRefreshMS: Int = 10000,
+  @deprecatedName('monitorRefreshMS) heartbeatFrequencyMS: Int = 10000,
   maxIdleTimeMS: Int = 0,
   maxHistorySize: Int = 25,
   credentials: Map[String, MongoConnectionOptions.Credential] = Map.empty,
@@ -73,6 +73,9 @@ case class MongoConnectionOptions(
    */
   @deprecated("Use [[authenticationDatabase]]", "0.12.7")
   @inline def authSource: Option[String] = authenticationDatabase
+
+  @deprecated("Use heartbeatFrequencyMS", "0.16.4")
+  @inline def monitorRefreshMS = heartbeatFrequencyMS
 }
 
 object MongoConnectionOptions {
@@ -121,12 +124,11 @@ object MongoConnectionOptions {
     "authenticationDatabase" -> _.toString) ++ List(
       "authenticationMechanism" -> options.authMode.toString,
       "nbChannelsPerNode" -> options.nbChannelsPerNode.toString,
-      "monitorRefreshMS" -> ms(options.monitorRefreshMS),
+      "heartbeatFrequencyMS" -> ms(options.heartbeatFrequencyMS),
       "connectTimeoutMS" -> ms(options.connectTimeoutMS),
       "maxIdleTimeMS" -> ms(options.maxIdleTimeMS), // TODO: Review
       "tcpNoDelay" -> options.tcpNoDelay.toString,
       "keepAlive" -> options.keepAlive.toString,
-      "reconnectDelayMS" -> options.reconnectDelayMS.toString,
       "sslEnabled" -> options.sslEnabled.toString,
       "sslAllowsInvalidCert" -> options.sslAllowsInvalidCert.toString,
       "writeConcern" -> options.writeConcern.toString,
