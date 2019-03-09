@@ -349,36 +349,36 @@ class MongoURISpec(implicit ee: ExecutionEnv)
       }
     }
 
-    val monRefMS = "mongodb://host1?rm.monitorRefreshMS=456&rm.failover=123ms:4x5"
+    val monRefMS = "mongodb://host1?heartbeatFrequencyMS=567&rm.failover=123ms:4x5"
 
     s"parse $monRefMS with success" in {
       parseURI(monRefMS) must beSuccessfulTry[ParsedURI].like {
-        case uri => uri.options.monitorRefreshMS must_== 456
+        case uri => uri.options.heartbeatFrequencyMS must_== 567
       }
     }
 
-    val invalidMonRef1 = "mongodb://host1?rm.monitorRefreshMS=A"
+    val invalidMonRef1 = "mongodb://host1?heartbeatFrequencyMS=A"
 
     s"fail to parse $invalidMonRef1" in {
       parseURI(invalidMonRef1) must beSuccessfulTry[ParsedURI].like {
         case uri =>
-          uri.ignoredOptions.headOption must beSome("rm.monitorRefreshMS")
+          uri.ignoredOptions.headOption must beSome("heartbeatFrequencyMS")
       }
     }
 
-    val invalidMonRef2 = "mongodb://host1?rm.monitorRefreshMS=50"
+    val invalidMonRef2 = "mongodb://host1?heartbeatFrequencyMS=50"
 
-    s"fail to parse $invalidMonRef2 (monitorRefreshMS < 100)" in {
+    s"fail to parse $invalidMonRef2 (heartbeatFrequencyMS < 500)" in {
       parseURI(invalidMonRef2) must beSuccessfulTry[ParsedURI].like {
         case uri =>
-          uri.ignoredOptions.headOption must beSome("rm.monitorRefreshMS")
+          uri.ignoredOptions.headOption must beSome("heartbeatFrequencyMS")
       }
     }
 
-    val invalidIdle = "mongodb://host1?maxIdleTimeMS=99&rm.monitorRefreshMS=100"
+    val invalidIdle = "mongodb://host1?maxIdleTimeMS=99&heartbeatFrequencyMS=500"
 
-    s"fail to parse $invalidIdle (with maxIdleTimeMS < monitorRefreshMS)" in {
-      parseURI(invalidIdle) must beFailedTry[ParsedURI].withThrowable[MongoConnection.URIParsingException]("Invalid URI options: maxIdleTimeMS\\(99\\) < monitorRefreshMS\\(100\\)")
+    s"fail to parse $invalidIdle (with maxIdleTimeMS < heartbeatFrequencyMS)" in {
+      parseURI(invalidIdle) must beFailedTry[ParsedURI].withThrowable[MongoConnection.URIParsingException]("Invalid URI options: maxIdleTimeMS\\(99\\) < heartbeatFrequencyMS\\(500\\)")
     }
 
     val validSeedList = "mongodb+srv://usr:pwd@mongo.domain.tld/foo"

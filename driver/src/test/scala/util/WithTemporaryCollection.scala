@@ -5,8 +5,12 @@ import scala.concurrent.duration.FiniteDuration
 
 import scala.util.Random
 
-import reactivemongo.api.{ Collection, CollectionMetaCommands, CollectionProducer, DefaultDB }
-import tests.Common.timeout
+import reactivemongo.api.{
+  Collection,
+  CollectionMetaCommands,
+  CollectionProducer,
+  DefaultDB
+}
 
 object WithTemporaryCollection {
 

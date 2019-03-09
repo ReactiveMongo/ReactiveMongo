@@ -1,7 +1,5 @@
 import org.specs2.concurrent.ExecutionEnv
 
-import scala.collection.immutable.ListSet
-
 class UtilSpec(implicit ee: ExecutionEnv)
   extends org.specs2.mutable.Specification {
 

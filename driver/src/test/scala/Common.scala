@@ -58,7 +58,7 @@ object Common extends CommonAuth {
   val DefaultOptions = {
     val a = MongoConnectionOptions(
       failoverStrategy = failoverStrategy,
-      monitorRefreshMS = (timeout.toMillis / 2).toInt,
+      heartbeatFrequencyMS = (timeout.toMillis / 2).toInt,
       credentials = DefaultCredentials.map("" -> _)(scala.collection.breakOut),
       keyStore = sys.props.get("test.keyStore").map { uri =>
         MongoConnectionOptions.KeyStore(
@@ -102,7 +102,7 @@ object Common extends CommonAuth {
 
   val SlowOptions = DefaultOptions.copy(
     failoverStrategy = slowFailover,
-    monitorRefreshMS = (slowTimeout.toMillis / 2).toInt)
+    heartbeatFrequencyMS = (slowTimeout.toMillis / 2).toInt)
 
   val slowProxy: NettyProxy = {
     import java.net.InetSocketAddress

@@ -421,9 +421,9 @@ object MongoConnection {
       }
 
       if (opts._2.maxIdleTimeMS != 0 &&
-        opts._2.maxIdleTimeMS < opts._2.monitorRefreshMS) {
+        opts._2.maxIdleTimeMS < opts._2.heartbeatFrequencyMS) {
 
-        throw new URIParsingException(s"Invalid URI options: maxIdleTimeMS(${opts._2.maxIdleTimeMS}) < monitorRefreshMS(${opts._2.monitorRefreshMS})")
+        throw new URIParsingException(s"Invalid URI options: maxIdleTimeMS(${opts._2.maxIdleTimeMS}) < heartbeatFrequencyMS(${opts._2.heartbeatFrequencyMS})")
       }
 
       // ---
@@ -636,8 +636,16 @@ object MongoConnection {
           case ("rm.nbChannelsPerNode", v) => unsupported -> result.
             copy(nbChannelsPerNode = v.toInt)
 
-          case ("rm.reconnectDelayMS", v) => unsupported -> result.
-            copy(reconnectDelayMS = v.toInt)
+          case ("rm.reconnectDelayMS", opt @ IntRe(ms)) => {
+            logger.warn(s"Connection option 'rm.reconnectDelayMS' deprecated: use option 'heartbeatFrequencyMS'")
+
+            Try(ms.toInt).filter(_ >= 500 /* ms */ ).toOption match {
+              case Some(interval) => unsupported -> result.copy(
+                heartbeatFrequencyMS = interval)
+
+              case _ => (unsupported + ("rm.reconnectDelayMS" -> opt)) -> result
+            }
+          }
 
           case ("writeConcern", "unacknowledged") => unsupported -> result.
             copy(writeConcern = WC.Unacknowledged)
@@ -687,12 +695,23 @@ object MongoConnection {
             case _ => (unsupported + ("rm.failover" -> opt)) -> result
           }
 
-          case ("rm.monitorRefreshMS", opt @ IntRe(ms)) =>
-            Try(ms.toInt).filter(_ >= 100 /* ms */ ).toOption match {
+          case ("rm.monitorRefreshMS", opt @ IntRe(ms)) => {
+            logger.warn(s"Connection option 'rm.monitorRefreshMS' deprecated: use option 'heartbeatFrequencyMS'")
+
+            Try(ms.toInt).filter(_ >= 500 /* ms */ ).toOption match {
               case Some(interval) => unsupported -> result.copy(
-                monitorRefreshMS = interval)
+                heartbeatFrequencyMS = interval)
 
               case _ => (unsupported + ("rm.monitorRefreshMS" -> opt)) -> result
+            }
+          }
+
+          case ("heartbeatFrequencyMS", opt @ IntRe(ms)) =>
+            Try(ms.toInt).filter(_ >= 500 /* ms */ ).toOption match {
+              case Some(interval) => unsupported -> result.copy(
+                heartbeatFrequencyMS = interval)
+
+              case _ => (unsupported + ("heartbeatFrequencyMS" -> opt)) -> result
             }
 
           case kv => (unsupported + kv) -> result

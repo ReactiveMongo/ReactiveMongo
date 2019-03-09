@@ -151,6 +151,9 @@ trait MongoDBSystem extends Actor {
     }
 
   // monitor -->
+  private lazy val heartbeatFrequency =
+    options.heartbeatFrequencyMS.milliseconds
+
   private val nodeSetLock = new Object {}
   private[reactivemongo] var _nodeSet: NodeSet = null
   private var _setInfo: NodeSetInfo = null
@@ -260,17 +263,15 @@ trait MongoDBSystem extends Actor {
     nodeSetUpdated(s"Start(${ns.toShortString})", null, ns)
 
     // Prepare the period jobs
-    val refreshInterval = options.monitorRefreshMS.milliseconds
-
     connectAllJob = {
-      val ms = options.monitorRefreshMS / 5
-      val interval = if (ms < 100) 100.milliseconds else refreshInterval
+      val ms = options.heartbeatFrequencyMS / 5
+      val interval = if (ms < 100) 100.milliseconds else heartbeatFrequency
 
       scheduler.schedule(interval, interval, self, ConnectAll)
     }
 
     refreshAllJob = scheduler.schedule(
-      refreshInterval, refreshInterval, self, RefreshAll)
+      heartbeatFrequency, heartbeatFrequency, self, RefreshAll)
   }
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
@@ -298,7 +299,7 @@ trait MongoDBSystem extends Actor {
   override def postStop(): Unit = {
     info("Stopping the MongoDBSystem")
 
-    Await.result(release(), options.monitorRefreshMS.milliseconds)
+    Await.result(release(), heartbeatFrequency)
 
     ()
   }
@@ -424,7 +425,7 @@ trait MongoDBSystem extends Actor {
     }
 
     if (updated == 2) {
-      scheduler.scheduleOnce(options.reconnectDelayMS.milliseconds) {
+      scheduler.scheduleOnce(heartbeatFrequency) {
         val reEvent =
           s"ChannelReconnecting($channelId, ${_nodeSet.toShortString})"
 
