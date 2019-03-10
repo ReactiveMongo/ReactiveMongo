@@ -1320,13 +1320,60 @@ db.accounts.aggregate([
           AddFields(document(
             "totalScore" -> document(f"$$add" -> array(
               f"$$totalHomework", f"$$totalQuiz", f"$$extraCredit")))))
+
       }.collect[Set](Int.MaxValue, Cursor.FailOnError[Set[BSONDocument]]()).
         aka("aggregated") must beTypedEqualTo(expectedResults).await(0, timeout)
+    }
+  }
+
+  "Users" should {
+    implicit val userHandler: BSONDocumentHandler[User] = Macros.handler[User]
+
+    // See https://docs.mongodb.com/manual/reference/operator/aggregation/slice/#example
+    val users: BSONCollection =
+      db(s"users${System identityHashCode userHandler}")
+
+    "be inserted" in {
+      users.insert.many(Seq(
+        User(_id = 1, name = "dave123",
+          favorites = Seq("chocolate", "cake", "butter", "apples")),
+        User(_id = 2, name = "li", favorites = Seq("apples", "pudding", "pie")),
+        User(_id = 3, name = "ahn",
+          favorites = Seq("pears", "pecans", "chocolate", "cherries")),
+        User(_id = 4, name = "ty", favorites = Seq("ice cream")))).
+        map(_ => {}) must beTypedEqualTo({}).await(0, timeout)
+
+    }
+
+    f"be aggregated using $$slice" in {
+      users.aggregateWith1[User]() { framework =>
+        import framework.{ Project, Slice }
+
+        Project(BSONDocument(
+          "name" -> 1,
+          "favorites" -> Slice(
+            array = BSONString(f"$$favorites"),
+            n = BSONInteger(3)).makePipe)) -> List.empty
+
+      }.collect[Seq](4, Cursor.FailOnError[Seq[User]]()).
+        aka("top favorites") must beTypedEqualTo(Seq(
+          User(_id = 1, name = "dave123",
+            favorites = Seq("chocolate", "cake", "butter")),
+          User(_id = 2, name = "li", favorites = Seq("apples", "pudding", "pie")),
+          User(_id = 3, name = "ahn",
+            favorites = Seq("pears", "pecans", "chocolate")),
+          User(_id = 4, name = "ty", favorites = Seq("ice cream")))).
+        await(0, timeout)
     }
   }
   section("gt_mongo32")
 
   // ---
+
+  case class User(
+    _id: Int,
+    name: String,
+    favorites: Seq[String])
 
   case class Location(lon: Double, lat: Double)
 
