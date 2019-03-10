@@ -2,6 +2,8 @@ package reactivemongo.core.nodeset
 
 import scala.collection.immutable.Set
 
+import scala.util.{ Failure, Success, Try }
+
 import reactivemongo.io.netty.channel.ChannelId
 
 import akka.actor.ActorRef
@@ -53,19 +55,43 @@ private[reactivemongo] case class Node(
   private[core] def createNeededChannels(
     channelFactory: ChannelFactory,
     receiver: ActorRef,
-    upTo: Int): Node = {
+    upTo: Int): Try[Node] = {
     if (connections.size < upTo) {
-      _copy(connections = connections ++ (for {
-        _ ← 0 until (upTo - connections.size)
-      } yield createConnection(channelFactory, receiver)))
-    } else this
+      createConnections(
+        channelFactory, receiver, upTo - connections.size, Vector.empty).
+        map { created =>
+          _copy(connections = connections ++ created)
+        }
+
+    } else Success(this)
   }
 
-  private[core] def createConnection(
+  @annotation.tailrec
+  private def createConnections(
     channelFactory: ChannelFactory,
-    receiver: ActorRef): Connection = Connection(
-    channelFactory.create(host, port, receiver),
-    ConnectionStatus.Connecting, Set.empty, None)
+    receiver: ActorRef,
+    count: Int,
+    created: Vector[Connection]): Try[Vector[Connection]] = {
+    if (count > 0) {
+      createConnection(channelFactory, receiver) match {
+        case Success(con) =>
+          createConnections(channelFactory, receiver, count - 1, con +: created)
+
+        case Failure(cause) => Failure(cause)
+      }
+    } else {
+      Success(created)
+    }
+  }
+
+  @inline private[core] def createConnection(
+    channelFactory: ChannelFactory,
+    receiver: ActorRef): Try[Connection] =
+    channelFactory.create(host, port, receiver).map { chan =>
+      Connection(
+        chan,
+        ConnectionStatus.Connecting, Set.empty, None)
+    }
 
   // TODO: Remove when aliases is refactored
   private[reactivemongo] def _copy(

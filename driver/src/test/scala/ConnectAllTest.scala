@@ -91,7 +91,7 @@ trait ConnectAllTest { _: NodeSetSpec =>
       })
 
       def ns = nsNodes.map { nodes =>
-        NodeSet(Some("foo"), None, nodes, Set.empty)
+        new NodeSet(Some("foo"), None, nodes, Set.empty)
       }
 
       lazy val concurCon = ns.flatMap { nodes =>

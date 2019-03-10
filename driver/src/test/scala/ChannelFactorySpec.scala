@@ -4,7 +4,11 @@ import akka.actor.Actor
 
 import reactivemongo.io.netty.buffer.{ ByteBuf, Unpooled }
 
-import reactivemongo.io.netty.channel.{ ChannelFuture, ChannelFutureListener }
+import reactivemongo.io.netty.channel.{
+  Channel,
+  ChannelFuture,
+  ChannelFutureListener
+}
 
 import reactivemongo.core.protocol.{
   MessageHeader,
@@ -126,17 +130,19 @@ class ChannelFactorySpec(implicit ee: ExecutionEnv)
         }
 
         val actorRef = akka.testkit.TestActorRef(actor, "test3")
-        lazy val chan = createChannel(factory, actorRef, "foo", 27017)
 
-        arch must beLike[String] {
-          case "osx" =>
-            chan.close(); chan.getClass.getName must startWith(
-              "reactivemongo.io.netty.channel.kqueue.KQueue")
+        createChannel(factory, actorRef, "foo", 27017).
+          aka("channel") must beSuccessfulTry[Channel].like {
+            case chan => arch must beLike[String] {
+              case "osx" =>
+                chan.close(); chan.getClass.getName must startWith(
+                  "reactivemongo.io.netty.channel.kqueue.KQueue")
 
-          case "linux" =>
-            chan.close(); chan.getClass.getName must startWith(
-              "reactivemongo.io.netty.channel.epoll.Epoll")
-        }
+              case "linux" =>
+                chan.close(); chan.getClass.getName must startWith(
+                  "reactivemongo.io.netty.channel.epoll.Epoll")
+            }
+          }
       }
     }
   }
@@ -171,33 +177,36 @@ class ChannelFactorySpec(implicit ee: ExecutionEnv)
       }
 
       val actorRef = akka.testkit.TestActorRef(actor, "test2")
-      val chan = createChannel(factory, actorRef,
+
+      createChannel(factory, actorRef,
         host = Common.primaryHost.takeWhile(_ != ':'),
-        port = Common.primaryHost.dropWhile(_ != ':').drop(1).toInt)
+        port = Common.primaryHost.dropWhile(_ != ':').drop(1).toInt).
+        aka("channel") must beSuccessfulTry[Channel].like {
+          case chan =>
+            chanConnected.future must beEqualTo({}).await(1, timeout) and {
+              chan.writeAndFlush(isMasterRequest()).addListener(printOnError)
 
-      chanConnected.future must beEqualTo({}).await(1, timeout) and {
-        chan.writeAndFlush(isMasterRequest()).addListener(printOnError)
+              result.future must beLike[IsMasterResult] {
+                case IsMasterResult(true, 16777216, 48000000, _,
+                  Some(_), min, max, _, _) => min must be_<(max)
+              }.await(1, timeout) and {
+                if (!chan.closeFuture.isDone) {
+                  chan.close()
+                }
 
-        result.future must beLike[IsMasterResult] {
-          case IsMasterResult(true, 16777216, 48000000, _,
-            Some(_), min, max, _, _) => min must be_<(max)
-        }.await(1, timeout) and {
-          if (!chan.closeFuture.isDone) {
-            chan.close()
-          }
+                actorRef.stop()
 
-          actorRef.stop()
+                Common.nettyNativeArch.fold(ok) {
+                  case "osx" => chan.getClass.getName must startWith(
+                    "reactivemongo.io.netty.channel.kqueue.KQueue")
 
-          Common.nettyNativeArch.fold(ok) {
-            case "osx" => chan.getClass.getName must startWith(
-              "reactivemongo.io.netty.channel.kqueue.KQueue")
+                  case "linux" => chan.getClass.getName must startWith(
+                    "reactivemongo.io.netty.channel.epoll.Epoll")
 
-            case "linux" => chan.getClass.getName must startWith(
-              "reactivemongo.io.netty.channel.epoll.Epoll")
-
-          }
+                }
+              }
+            }
         }
-      }
     }
   }
 
