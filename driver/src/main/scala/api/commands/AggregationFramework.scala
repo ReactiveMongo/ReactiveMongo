@@ -8,7 +8,8 @@ import reactivemongo.core.protocol.MongoWireVersion
  */
 trait AggregationFramework[P <: SerializationPack]
   extends ImplicitCommandHelpers[P]
-  with GroupAggregation[P] with AggregationPipeline[P] {
+  with GroupAggregation[P] with SliceAggregation[P]
+  with AggregationPipeline[P] {
 
   protected lazy val builder = pack.newBuilder
 
@@ -197,6 +198,7 @@ trait AggregationFramework[P <: SerializationPack]
   /**
    * Skips over a number of documents before passing all further documents along the stream.
    * http://docs.mongodb.org/manual/reference/aggregation/skip/#_S_skip
+   *
    * @param skip the number of documents to skip
    */
   case class Skip(skip: Int) extends PipelineOperator {
