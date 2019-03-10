@@ -16,7 +16,7 @@ import reactivemongo.core.nodeset.ProtocolMetadata
  * It holds a promise that will be completed by the MongoDBSystem actor.
  * The future can be used to get the error or the successful response.
  */
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 sealed trait ExpectingResponse {
   private[actors] val promise: Promise[Response] = Promise()
 
@@ -24,7 +24,7 @@ sealed trait ExpectingResponse {
   val future: Future[Response] = promise.future
 }
 
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 object ExpectingResponse {
   def unapply(that: Any): Option[Promise[Response]] = that match {
     case req @ RequestMakerExpectingResponse(_, _) => Some(req.promise)
@@ -38,7 +38,7 @@ object ExpectingResponse {
  * @param requestMaker the request maker
  * @param isMongo26WriteOp true if the operation is a MongoDB 2.6 write one
  */
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 case class RequestMakerExpectingResponse(
   requestMaker: RequestMaker,
   isMongo26WriteOp: Boolean) extends ExpectingResponse
@@ -52,7 +52,7 @@ case class RequestMakerExpectingResponse(
 case class CheckedWriteRequestExpectingResponse(
   checkedWriteRequest: CheckedWriteRequest) extends ExpectingResponse
 
-@deprecated(message = "Will be private", since = "0.12.8")
+@deprecated(message = "Internal: will be made private", since = "0.12.8")
 sealed class Close {
   def source: String = "unknown"
 }
@@ -61,7 +61,7 @@ sealed class Close {
  * Message to close all active connections.
  * The MongoDBSystem actor must not be used after this message has been sent.
  */
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 case object Close extends Close {
   def apply(src: String): Close = new Close {
     override val source = src
@@ -80,7 +80,7 @@ private[reactivemongo] case class ChannelConnected(channelId: ChannelId)
 private[reactivemongo] case class ChannelDisconnected(channelId: ChannelId)
 
 /** Message sent when the primary has been discovered. */
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 class PrimaryAvailable(
   val metadata: ProtocolMetadata,
   private[reactivemongo] val setName: Option[String]) extends Product with Serializable {
@@ -107,7 +107,7 @@ class PrimaryAvailable(
   }
 }
 
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 object PrimaryAvailable extends scala.runtime.AbstractFunction1[ProtocolMetadata, PrimaryAvailable] {
 
   def apply(metadata: ProtocolMetadata): PrimaryAvailable =
@@ -120,10 +120,10 @@ object PrimaryAvailable extends scala.runtime.AbstractFunction1[ProtocolMetadata
 }
 
 /** Message sent when the primary has been lost. */
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 case object PrimaryUnavailable
 
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 class SetAvailable(
   val metadata: ProtocolMetadata,
   private[reactivemongo] val setName: Option[String])
@@ -151,7 +151,7 @@ class SetAvailable(
   }
 }
 
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 object SetAvailable extends scala.runtime.AbstractFunction1[ProtocolMetadata, SetAvailable] {
 
   def apply(metadata: ProtocolMetadata): SetAvailable =
@@ -164,15 +164,15 @@ object SetAvailable extends scala.runtime.AbstractFunction1[ProtocolMetadata, Se
 }
 
 // TODO
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 case object SetUnavailable
 
 /** Register a monitor. */
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 case object RegisterMonitor
 
 /** MongoDBSystem has been shut down. */
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 case object Closed
 
 @deprecated("Unused", "0.16.0")

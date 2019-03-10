@@ -12,7 +12,7 @@ private[reactivemongo] final class ResponseInfo(
   override def toString = s"ResponseInfo(${_channelId})"
 }
 
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 object ResponseInfo
   extends scala.runtime.AbstractFunction1[ChannelId, ResponseInfo] {
 

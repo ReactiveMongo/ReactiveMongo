@@ -1,6 +1,6 @@
 package reactivemongo.api.commands
 
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 case class CollStats(scale: Option[Int] = None)
   extends CollectionCommand with CommandWithResult[CollStatsResult]
 

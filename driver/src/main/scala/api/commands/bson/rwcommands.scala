@@ -92,12 +92,12 @@ object BSONCommonWriteCommandsImplicits {
   }
 }
 
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 object BSONInsertCommand extends InsertCommand[BSONSerializationPack.type] {
   val pack = BSONSerializationPack
 }
 
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 object BSONInsertCommandImplicits {
   import BSONInsertCommand._
 
@@ -112,17 +112,17 @@ object BSONInsertCommandImplicits {
   }
 }
 
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 object BSONUpdateCommand extends UpdateCommand[BSONSerializationPack.type] {
   val pack = BSONSerializationPack
 }
 
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 object BSONUpdateCommandImplicits {
   import BSONUpdateCommand._
   import BSONCommonWriteCommandsImplicits._
 
-  @deprecated("Will be private/internal", "0.16.0")
+  @deprecated("Internal: will be made private", "0.16.0")
   implicit object UpdateElementWriter extends BSONDocumentWriter[UpdateElement] {
     def write(element: UpdateElement) = BSONDocument(
       "q" -> element.q,
@@ -131,7 +131,7 @@ object BSONUpdateCommandImplicits {
       "multi" -> element.multi)
   }
 
-  @deprecated("Will be private/internal", "0.16.0")
+  @deprecated("Internal: will be made private", "0.16.0")
   implicit object UpdateWriter extends BSONDocumentWriter[ResolvedCollectionCommand[Update]] {
     def write(update: ResolvedCollectionCommand[Update]) = BSONDocument(
       "update" -> update.collection,
@@ -157,12 +157,12 @@ object BSONUpdateCommandImplicits {
   }
 }
 
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 object BSONDeleteCommand extends DeleteCommand[BSONSerializationPack.type] {
   val pack = BSONSerializationPack
 }
 
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 object BSONDeleteCommandImplicits {
   import BSONDeleteCommand._
   import BSONCommonWriteCommandsImplicits._

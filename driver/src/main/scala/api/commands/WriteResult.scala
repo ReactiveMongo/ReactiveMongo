@@ -122,7 +122,7 @@ case class WriteError(
  */
 case class WriteConcernError(code: Int, errmsg: String)
 
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 case class DefaultWriteResult(
   ok: Boolean,
   n: Int,

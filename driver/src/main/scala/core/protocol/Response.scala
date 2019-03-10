@@ -16,7 +16,7 @@ import reactivemongo.core.errors._
  * @param documents the body of this response, a [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ByteBuf.html ByteBuf]] containing 0, 1, or many documents
  * @param info some meta information about this response
  */
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 sealed abstract class Response(
   val header: MessageHeader,
   val reply: Reply,
@@ -49,7 +49,7 @@ sealed abstract class Response(
   override def toString = s"Response($header, $reply, $info)"
 }
 
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 object Response {
   import reactivemongo.api.BSONSerializationPack
   import reactivemongo.bson.BSONDocument

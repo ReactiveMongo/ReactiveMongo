@@ -46,7 +46,7 @@ import reactivemongo.api.commands.CommandCodecs
  * @define resultTParam the results type
  * @define requireOneFunction Sends this query and gets a future `T` (alias for [[reactivemongo.api.Cursor.head]])
  */
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
   // TODO: Unit test?
 
@@ -95,7 +95,7 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
   def cursor[T](readPreference: ReadPreference = readPreference, isMongo26WriteOp: Boolean = false)(implicit reader: pack.Reader[T], cp: CursorProducer[T]): cp.ProducedCursor = cp.produce(defaultCursor[T](readPreference, isMongo26WriteOp))
 
   /** The default [[ReadPreference]] */
-  @deprecated("Will be private/internal", "0.16.0")
+  @deprecated("Internal: will be made private", "0.16.0")
   @inline def readPreference: ReadPreference = ReadPreference.primary
 
   protected lazy val version =
@@ -201,7 +201,7 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
   def slaveOk = options(options.slaveOk)
   def tailable = options(options.tailable)
 
-  @deprecated("Will be private/internal", "0.16.0")
+  @deprecated("Internal: will be made private", "0.16.0")
   def copy(
     queryOption: Option[pack.Document] = queryOption,
     sortOption: Option[pack.Document] = sortOption,

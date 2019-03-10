@@ -72,7 +72,7 @@ import reactivemongo.api.commands.LastError
 import external.reactivemongo.ConnectionListener
 
 /** Main actor that processes the requests. */
-@deprecated("Internal class: will be made private", "0.11.14")
+@deprecated("Internal: will be made private", "0.11.14")
 trait MongoDBSystem extends Actor {
   import scala.concurrent.duration._
   import Exceptions._
@@ -1532,7 +1532,7 @@ trait MongoDBSystem extends Actor {
     logger.error(s"[$lnm] $msg", cause)
 }
 
-@deprecated("Internal class: will be made private", "0.11.14")
+@deprecated("Internal: will be made private", "0.11.14")
 final class LegacyDBSystem private[reactivemongo] (
   val supervisor: String,
   val name: String,
@@ -1545,7 +1545,7 @@ final class LegacyDBSystem private[reactivemongo] (
 
 }
 
-@deprecated("Internal class: will be made private", "0.11.14")
+@deprecated("Internal: will be made private", "0.11.14")
 final class StandardDBSystem private[reactivemongo] (
   val supervisor: String,
   val name: String,
@@ -1571,7 +1571,7 @@ final class StandardDBSystemWithX509 private[reactivemongo] (
     new ChannelFactory(supervisor, name, options)
 }
 
-@deprecated("Internal class: will be made private", "0.11.14")
+@deprecated("Internal: will be made private", "0.11.14")
 object MongoDBSystem {
 }
 

@@ -17,7 +17,7 @@ import reactivemongo.core.actors.StandardDBSystem
 
 import _root_.tests.NettyEmbedder
 
-trait ConnectAllSpec { _: NodeSetSpec =>
+trait ConnectAllTest { _: NodeSetSpec =>
   import reactivemongo.api.tests.connectAll
 
   private val testhost = java.net.InetAddress.getLocalHost.getHostName

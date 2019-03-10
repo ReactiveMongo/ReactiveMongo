@@ -11,13 +11,13 @@ import reactivemongo.bson.{
   BSONValue
 }
 
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 object BSONFindAndModifyCommand
   extends FindAndModifyCommand[BSONSerializationPack.type] {
   val pack: BSONSerializationPack.type = BSONSerializationPack
 }
 
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 object BSONFindAndModifyImplicits {
   import BSONFindAndModifyCommand._
   implicit object FindAndModifyResultReader

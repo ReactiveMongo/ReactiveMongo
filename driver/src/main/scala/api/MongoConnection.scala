@@ -71,11 +71,11 @@ private[api] case class ConnectionState(
  * @define failoverStrategy the failover strategy for sending requests
  */
 class MongoConnection(
-  @deprecated("Will be private", "0.17.0") val supervisor: String,
-  @deprecated("Will be private", "0.17.0") val name: String,
-  @deprecated("Will be private", "0.14.0") val actorSystem: ActorSystem,
-  @deprecated("Will be private", "0.17.0") val mongosystem: ActorRef,
-  @deprecated("Will be private", "0.17.0") val options: MongoConnectionOptions) { // TODO: toString as MongoURI
+  @deprecated("Internal: will be made private", "0.17.0") val supervisor: String,
+  @deprecated("Internal: will be made private", "0.17.0") val name: String,
+  @deprecated("Internal: will be made private", "0.14.0") val actorSystem: ActorSystem,
+  @deprecated("Internal: will be made private", "0.17.0") val mongosystem: ActorRef,
+  @deprecated("Internal: will be made private", "0.17.0") val options: MongoConnectionOptions) { // TODO: toString as MongoURI
   import Exceptions._
 
   /**
@@ -555,10 +555,10 @@ object MongoConnection {
     }
   }
 
-  @deprecated("Will be private/internal", "0.16.0")
+  @deprecated("Internal: will be made private", "0.16.0")
   val IntRe = "^([0-9]+)$".r
 
-  @deprecated("Will be private/internal", "0.16.0")
+  @deprecated("Internal: will be made private", "0.16.0")
   val FailoverRe = "^([^:]+):([0-9]+)x([0-9.]+)$".r
 
   private def makeOptions(

@@ -26,7 +26,7 @@ import reactivemongo.io.netty.channel.{ Channel, DefaultChannelId }
 
 import _root_.tests.{ Common, NettyEmbedder }
 
-trait UnresponsiveSecondarySpec { parent: NodeSetSpec =>
+trait UnresponsiveSecondaryTest { parent: NodeSetSpec =>
   import reactivemongo.api.tests._
 
   private val usd = Common.newDriver()

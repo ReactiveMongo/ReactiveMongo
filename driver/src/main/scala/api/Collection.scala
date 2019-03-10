@@ -34,11 +34,11 @@ trait Collection {
   def name: String
 
   /** The default failover strategy for the methods of this collection. */
-  @deprecated("Will be private", "0.16.0")
+  @deprecated("Internal: will be made private", "0.16.0")
   def failoverStrategy: FailoverStrategy
 
   /** Gets the full qualified name of this collection. */
-  @deprecated("Will be private", "0.17.0")
+  @deprecated("Internal: will be made private", "0.17.0")
   @inline final def fullCollectionName = db.name + "." + name
 
   /**

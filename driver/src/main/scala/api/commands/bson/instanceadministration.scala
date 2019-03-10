@@ -19,7 +19,7 @@ import reactivemongo.api.commands._
 
 import reactivemongo.core.errors.GenericDriverException
 
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 object BSONDropDatabaseImplicits {
   implicit object DropDatabaseWriter
     extends BSONDocumentWriter[DropDatabase.type] {
@@ -28,7 +28,7 @@ object BSONDropDatabaseImplicits {
   }
 }
 
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 object BSONListCollectionNamesImplicits {
   implicit object ListCollectionNamesWriter
     extends BSONDocumentWriter[ListCollectionNames.type] {
@@ -56,7 +56,7 @@ object BSONListCollectionNamesImplicits {
   }
 }
 
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 object BSONDropCollectionImplicits {
   implicit object DropCollectionWriter extends BSONDocumentWriter[ResolvedCollectionCommand[DropCollection.type]] {
     def write(command: ResolvedCollectionCommand[DropCollection.type]): BSONDocument = BSONDocument("drop" -> command.collection)
@@ -77,14 +77,14 @@ object BSONDropCollectionImplicits {
   }
 }
 
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 object BSONEmptyCappedImplicits {
   implicit object EmptyCappedWriter extends BSONDocumentWriter[ResolvedCollectionCommand[EmptyCapped.type]] {
     def write(command: ResolvedCollectionCommand[EmptyCapped.type]): BSONDocument = BSONDocument("emptyCapped" -> command.collection)
   }
 }
 
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 object BSONRenameCollectionImplicits {
   implicit object RenameCollectionWriter extends BSONDocumentWriter[RenameCollection] {
     def write(command: RenameCollection): BSONDocument =
@@ -95,7 +95,7 @@ object BSONRenameCollectionImplicits {
   }
 }
 
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 object BSONCreateImplicits {
   implicit object CappedWriter extends BSONDocumentWriter[Capped] {
     def write(capped: Capped): BSONDocument =
@@ -119,7 +119,7 @@ object BSONCreateImplicits {
   }
 }
 
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 object BSONCollStatsImplicits {
   implicit object CollStatsWriter extends BSONDocumentWriter[ResolvedCollectionCommand[CollStats]] {
     def write(command: ResolvedCollectionCommand[CollStats]): BSONDocument =
@@ -153,7 +153,7 @@ object BSONCollStatsImplicits {
   }
 }
 
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 object BSONConvertToCappedImplicits {
   implicit object ConvertToCappedWriter extends BSONDocumentWriter[ResolvedCollectionCommand[ConvertToCapped]] {
     def write(command: ResolvedCollectionCommand[ConvertToCapped]): BSONDocument =
@@ -161,7 +161,7 @@ object BSONConvertToCappedImplicits {
   }
 }
 
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 object BSONDropIndexesImplicits {
   implicit object BSONDropIndexesWriter extends BSONDocumentWriter[ResolvedCollectionCommand[DropIndexes]] {
     def write(command: ResolvedCollectionCommand[DropIndexes]): BSONDocument =
@@ -176,7 +176,7 @@ object BSONDropIndexesImplicits {
   }
 }
 
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 object BSONListIndexesImplicits {
   import scala.util.{ Failure, Success, Try }
   import reactivemongo.api.indexes.{ Index, IndexesManager }
@@ -214,7 +214,7 @@ object BSONListIndexesImplicits {
   }
 }
 
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 object BSONCreateIndexesImplicits {
   import reactivemongo.api.commands.WriteResult
 
@@ -244,7 +244,7 @@ object BSONCreateIndexesImplicits {
  * adminDb.runCommand(ReplSetGetStatus)
  * }}}
  */
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 object BSONReplSetGetStatusImplicits {
   implicit object ReplSetGetStatusWriter
     extends BSONDocumentWriter[ReplSetGetStatus.type] {
@@ -296,7 +296,7 @@ object BSONReplSetGetStatusImplicits {
  * db.runCommand(Resync)
  * }}}
  */
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 object BSONResyncImplicits {
   private val logger =
     reactivemongo.util.LazyLogger("reactivemongo.api.commands.bson.Resync")
@@ -323,7 +323,7 @@ object BSONResyncImplicits {
   }
 }
 
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 object BSONReplSetMaintenanceImplicits {
   implicit val ReplSetMaintenanceReader = CommonImplicits.UnitBoxReader
 
@@ -337,7 +337,7 @@ object BSONReplSetMaintenanceImplicits {
 
 import reactivemongo.api.BSONSerializationPack
 
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 object BSONCreateUserCommand
   extends CreateUserCommand[BSONSerializationPack.type] {
 
@@ -363,7 +363,7 @@ object BSONCreateUserCommand
   }
 }
 
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 object BSONPingCommandImplicits {
   implicit object PingWriter extends BSONDocumentWriter[PingCommand.type] {
     val command = BSONDocument("ping" -> 1.0)

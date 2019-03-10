@@ -164,7 +164,7 @@ private[reactivemongo] class Failover2[A](producer: () => Future[A], connection:
   //send(0)
 }
 
-@deprecated("Will be private/internal", "0.17.0")
+@deprecated("Internal: will be made private", "0.17.0")
 object Failover2 {
   private[api] val logger = LazyLogger("reactivemongo.api.Failover2")
 

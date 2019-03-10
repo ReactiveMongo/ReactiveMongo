@@ -11,7 +11,7 @@ import reactivemongo.bson.{
 /** Type of Index */
 sealed trait IndexType {
   /** Value of the index (`{fieldName: value}`). */
-  @deprecated("Will be private/internal", "0.17.0")
+  @deprecated("Internal: will be made private", "0.17.0")
   def value: BSONValue
 
   private[indexes] def valueStr: String
@@ -19,7 +19,7 @@ sealed trait IndexType {
 
 object IndexType {
   object Ascending extends IndexType {
-    @deprecated("Will be private/internal", "0.17.0")
+    @deprecated("Internal: will be made private", "0.17.0")
     def value = BSONInteger(1)
 
     val valueStr = "1"
@@ -27,7 +27,7 @@ object IndexType {
   }
 
   object Descending extends IndexType {
-    @deprecated("Will be private/internal", "0.17.0")
+    @deprecated("Internal: will be made private", "0.17.0")
     def value = BSONInteger(-1)
 
     val valueStr = "-1"
@@ -35,14 +35,14 @@ object IndexType {
   }
 
   object Geo2D extends IndexType {
-    @deprecated("Will be private/internal", "0.17.0")
+    @deprecated("Internal: will be made private", "0.17.0")
     def value = BSONString(valueStr)
 
     val valueStr = "2d"
   }
 
   object Geo2DSpherical extends IndexType {
-    @deprecated("Will be private/internal", "0.17.0")
+    @deprecated("Internal: will be made private", "0.17.0")
     def value = BSONString(valueStr)
 
     val valueStr = "2dsphere"
@@ -50,7 +50,7 @@ object IndexType {
   }
 
   object GeoHaystack extends IndexType {
-    @deprecated("Will be private/internal", "0.17.0")
+    @deprecated("Internal: will be made private", "0.17.0")
     def value = BSONString(valueStr)
 
     val valueStr = "geoHaystack"
@@ -58,7 +58,7 @@ object IndexType {
   }
 
   object Hashed extends IndexType {
-    @deprecated("Will be private/internal", "0.17.0")
+    @deprecated("Internal: will be made private", "0.17.0")
     def value = BSONString(valueStr)
 
     val valueStr = "hashed"
@@ -66,14 +66,14 @@ object IndexType {
   }
 
   object Text extends IndexType {
-    @deprecated("Will be private/internal", "0.17.0")
+    @deprecated("Internal: will be made private", "0.17.0")
     def value = BSONString(valueStr)
 
     val valueStr = "text"
     @inline override def toString = valueStr
   }
 
-  @deprecated("Will be private/internal", "0.17.0")
+  @deprecated("Internal: will be made private", "0.17.0")
   def unapply(value: BSONValue): Option[IndexType] = value match {
     case BSONInteger(i) if i > 0             => Some(Ascending)
     case BSONInteger(i) if i < 0             => Some(Descending)
@@ -89,7 +89,7 @@ object IndexType {
     case _                                   => None
   }
 
-  @deprecated("Will be private/internal", "0.17.0")
+  @deprecated("Internal: will be made private", "0.17.0")
   def apply(value: BSONValue): IndexType = value match {
     case IndexType(tpe) => tpe
     case _ =>

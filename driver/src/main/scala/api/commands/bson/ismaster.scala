@@ -4,10 +4,10 @@ import reactivemongo.api.BSONSerializationPack
 import reactivemongo.api.commands._
 import reactivemongo.bson._
 
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 object BSONIsMasterCommand extends IsMasterCommand[BSONSerializationPack.type]
 
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 object BSONIsMasterCommandImplicits {
   import BSONIsMasterCommand._
 
