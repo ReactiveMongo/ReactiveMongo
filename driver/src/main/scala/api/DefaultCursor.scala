@@ -35,7 +35,7 @@ import reactivemongo.core.actors.{
 
 import reactivemongo.api.commands.ResultCursor
 
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 object DefaultCursor {
   import Cursor.{ ErrorHandler, State, Cont, Fail, logger }
   import CursorOps.Unrecoverable

@@ -2,6 +2,8 @@ package reactivemongo.core.nodeset // TODO: Move to `netty` package
 
 import java.lang.{ Boolean => JBool }
 
+import scala.util.{ Failure, Success, Try }
+
 import scala.concurrent.Promise
 
 import reactivemongo.io.netty.util.concurrent.{ Future, GenericFutureListener }
@@ -29,6 +31,7 @@ import reactivemongo.core.protocol.{
   ResponseDecoder
 }
 import reactivemongo.core.actors.ChannelDisconnected
+import reactivemongo.core.errors.GenericDriverException
 
 import reactivemongo.api.MongoConnectionOptions
 
@@ -58,7 +61,18 @@ private[reactivemongo] final class ChannelFactory(
   private[reactivemongo] def create(
     host: String = "localhost",
     port: Int = 27017,
-    receiver: ActorRef): Channel = {
+    receiver: ActorRef): Try[Channel] = {
+    if (parentGroup.isShuttingDown ||
+      parentGroup.isShutdown || parentGroup.isTerminated) {
+
+      val msg =
+        s"Cannot create channel to '${host}:${port}' from inactive factory"
+
+      info(msg)
+
+      Failure(GenericDriverException(s"$msg ($supervisor/$connection)"))
+    }
+
     val resolution = channelFactory.connect(host, port).addListener(
       new ChannelFutureListener {
         def operationComplete(op: ChannelFuture) {
@@ -87,7 +101,7 @@ private[reactivemongo] final class ChannelFactory(
       channel.attr(ChannelFactory.actorRefKey).set(receiver)
     }
 
-    channel
+    Success(channel)
   }
 
   def initChannel(channel: Channel): Unit = {

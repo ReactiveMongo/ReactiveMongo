@@ -2,56 +2,56 @@ package reactivemongo.api.commands
 
 import reactivemongo.api.SerializationPack
 
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 object DropDatabase extends Command with CommandWithResult[UnitBox.type]
 
 /**
  * @param dropped true if the collection existed and was dropped
  */
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 case class DropCollectionResult(dropped: Boolean)
 
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 object DropCollection extends CollectionCommand
   with CommandWithResult[DropCollectionResult]
 
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 object EmptyCapped extends CollectionCommand
   with CommandWithResult[UnitBox.type]
 
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 case class RenameCollection(
   fullyQualifiedCollectionName: String,
   fullyQualifiedTargetName: String,
   dropTarget: Boolean = false) extends Command with CommandWithResult[UnitBox.type]
 
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 case class Create(
   capped: Option[Capped] = None, // if set, "capped" -> true, size -> <int>, max -> <int>
   autoIndexId: Boolean = true, // optional
   flags: Int = 1 // defaults to 1
 ) extends CollectionCommand with CommandWithResult[UnitBox.type]
 
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 case class Capped(
   size: Long,
   max: Option[Int] = None)
 
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 case class ConvertToCapped(
   capped: Capped) extends CollectionCommand with CommandWithResult[UnitBox.type]
 
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 case class DropIndexes(index: String) extends CollectionCommand with CommandWithResult[DropIndexesResult]
 
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 case class DropIndexesResult(value: Int) extends BoxedAnyVal[Int]
 
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 case class CollectionNames(names: List[String])
 
 /** List the names of DB collections. */
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 object ListCollectionNames
   extends Command with CommandWithResult[CollectionNames]
 
@@ -62,7 +62,7 @@ import reactivemongo.api.indexes.Index
  *
  * @param db the database name
  */
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 case class ListIndexes(db: String) extends CollectionCommand
   with CommandWithResult[List[Index]]
 
@@ -72,7 +72,7 @@ case class ListIndexes(db: String) extends CollectionCommand
  * @param db the database name
  * @param indexes the indexes to be created
  */
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 case class CreateIndexes(db: String, indexes: List[Index])
   extends CollectionCommand with CommandWithResult[WriteResult]
 
@@ -128,7 +128,7 @@ case class ReplSetStatus(
 /**
  * The command [[http://docs.mongodb.org/manual/reference/command/replSetGetStatus/ replSetGetStatus]]
  */
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 case object ReplSetGetStatus
   extends Command with CommandWithResult[ReplSetStatus]
 
@@ -156,7 +156,7 @@ object ResyncResult extends BoxedAnyVal[Unit] {
 /**
  * The command [[https://docs.mongodb.org/manual/reference/command/resync/ resync]]
  */
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 object Resync extends Command with CommandWithResult[ResyncResult.type]
 
 /**
@@ -165,7 +165,7 @@ object Resync extends Command with CommandWithResult[ResyncResult.type]
  *
  * @param enable if true the the member enters the `RECOVERING` state
  */
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 case class ReplSetMaintenance(enable: Boolean = true) extends Command
   with CommandWithResult[UnitBox.type]
 
@@ -189,7 +189,7 @@ object UserRole {
   def unapply(role: UserRole): Option[String] = Some(role.name)
 }
 
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 trait CreateUserCommand[P <: SerializationPack]
   extends ImplicitCommandHelpers[P] {
 
@@ -217,5 +217,5 @@ trait CreateUserCommand[P <: SerializationPack]
 /**
  * The [[https://docs.mongodb.com/manual/reference/command/ping/ ping]] command.
  */
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 case object PingCommand extends Command with CommandWithResult[Boolean]

@@ -36,7 +36,7 @@ trait BoxedAnyVal[A <: AnyVal] {
  * @param numberToReturn the number of documents to return
  * @param value the value parsed from the response
  */
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 case class ResponseResult[R](
   response: Response,
   numberToReturn: Int,
@@ -103,7 +103,7 @@ object Command {
   private[commands] lazy val logger =
     reactivemongo.util.LazyLogger("reactivemongo.api.commands")
 
-  @deprecated("Will be private/internal", "0.16.0")
+  @deprecated("Internal: will be made private", "0.16.0")
   def defaultCursorFetcher[P <: SerializationPack, A](db: DB, p: P, command: A, failover: FailoverStrategy)(implicit writer: p.Writer[A]): CursorFetcher[p.type, DefaultCursor.Impl] = fetchCursor[p.type, A](db, db.name + ".$cmd", p, command, failover, CursorOptions.empty, maxTimeMS = None)
 
   /**
@@ -172,7 +172,7 @@ object Command {
     }
   }
 
-  @deprecated("Will be private/internal", "0.16.0")
+  @deprecated("Internal: will be made private", "0.16.0")
   case class CommandWithPackRunner[P <: SerializationPack](pack: P, failover: FailoverStrategy = FailoverStrategy()) {
     def apply[R, C <: Command with CommandWithResult[R]](db: DB, command: C with CommandWithResult[R], rp: ReadPreference)(implicit writer: pack.Writer[C], reader: pack.Reader[R], ec: ExecutionContext): Future[R] = defaultCursorFetcher(db, pack, command, failover).one[R](rp)
 
@@ -242,7 +242,7 @@ object Command {
    *   unboxed(aCollection, Count(BSONDocument("bulk" -> true)))
    * }}}
    */
-  @deprecated("Will be private/internal", "0.16.0")
+  @deprecated("Internal: will be made private", "0.16.0")
   def run[P <: SerializationPack](pack: P, failover: FailoverStrategy): CommandWithPackRunner[pack.type] = CommandWithPackRunner(pack, failover)
 
   private[reactivemongo] def buildRequestMaker[P <: SerializationPack, A](pack: P)(command: A, writer: pack.Writer[A], readPreference: ReadPreference, db: String): (RequestMaker, Boolean) = {

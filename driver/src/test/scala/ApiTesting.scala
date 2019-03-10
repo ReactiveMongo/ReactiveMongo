@@ -2,6 +2,8 @@ package reactivemongo.api
 
 import java.util.UUID
 
+import scala.util.Try
+
 import scala.concurrent.{ ExecutionContext, Future, Promise }
 import scala.concurrent.duration.{ FiniteDuration, SECONDS }
 
@@ -14,6 +16,7 @@ import reactivemongo.io.netty.channel.{
   DefaultChannelId
 }
 
+import reactivemongo.io.netty.channel.Channel
 import reactivemongo.io.netty.buffer.{ ByteBuf, Unpooled }
 
 import reactivemongo.core.protocol.{
@@ -146,7 +149,7 @@ package object tests {
     factory: ChannelFactory,
     receiver: ActorRef,
     host: String,
-    port: Int) = factory.create(host, port, receiver)
+    port: Int): Try[Channel] = factory.create(host, port, receiver)
 
   @inline def releaseChannelFactory(f: ChannelFactory, clb: Promise[Unit]) =
     f.release(clb)

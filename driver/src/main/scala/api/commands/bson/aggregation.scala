@@ -7,14 +7,14 @@ import reactivemongo.api.BSONSerializationPack
 import reactivemongo.api.commands.{ AggregationFramework, ResultCursor }
 import reactivemongo.api.commands.bson.CommonImplicits.ReadConcernWriter
 
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 object BSONAggregationFramework
   extends AggregationFramework[BSONSerializationPack.type] {
 
   val pack: BSONSerializationPack.type = BSONSerializationPack
 }
 
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 object BSONAggregationImplicits {
   import reactivemongo.api.commands.ResolvedCollectionCommand
   import BSONAggregationFramework.{ Aggregate, AggregationResult, Cursor }
@@ -69,7 +69,7 @@ object BSONAggregationImplicits {
   }
 }
 
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 object BSONAggregationResultImplicits {
   import BSONAggregationFramework.{ IndexStatsResult, IndexStatAccesses }
 

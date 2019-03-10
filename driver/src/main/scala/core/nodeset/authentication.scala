@@ -10,7 +10,7 @@ sealed trait Authentication {
  * @param user the name (or subject for X509) of the user
  * @param password the password for the [[user]] (`None` for X509)
  */
-@deprecated("Will be private", "0.14.0")
+@deprecated("Internal: will be made private", "0.14.0")
 case class Authenticate(
   db: String,
   user: String,

@@ -29,7 +29,7 @@ object `package` {
 }
 
 @SerialVersionUID(1382847900L)
-final class BSONCollection @deprecated("Class will be refactored", "0.17.0") (
+final class BSONCollection @deprecated("Internal: will be made private", "0.17.0") (
   val db: DB,
   val name: String,
   val failoverStrategy: FailoverStrategy,

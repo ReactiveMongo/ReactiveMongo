@@ -4,7 +4,7 @@ import reactivemongo.api.{ SerializationPack, Session }
 
 import reactivemongo.core.protocol.MongoWireVersion
 
-@deprecated("Will be private/internal", "0.16.0")
+@deprecated("Internal: will be made private", "0.16.0")
 trait FindAndModifyCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] {
   import pack._
 

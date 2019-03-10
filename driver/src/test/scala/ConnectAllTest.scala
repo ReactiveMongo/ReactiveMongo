@@ -17,7 +17,7 @@ import reactivemongo.core.actors.StandardDBSystem
 
 import _root_.tests.NettyEmbedder
 
-trait ConnectAllSpec { _: NodeSetSpec =>
+trait ConnectAllTest { _: NodeSetSpec =>
   import reactivemongo.api.tests.connectAll
 
   private val testhost = java.net.InetAddress.getLocalHost.getHostName
@@ -91,7 +91,7 @@ trait ConnectAllSpec { _: NodeSetSpec =>
       })
 
       def ns = nsNodes.map { nodes =>
-        NodeSet(Some("foo"), None, nodes, Set.empty)
+        new NodeSet(Some("foo"), None, nodes, Set.empty)
       }
 
       lazy val concurCon = ns.flatMap { nodes =>

@@ -72,7 +72,7 @@ import reactivemongo.api.commands.LastError
 import external.reactivemongo.ConnectionListener
 
 /** Main actor that processes the requests. */
-@deprecated("Internal class: will be made private", "0.11.14")
+@deprecated("Internal: will be made private", "0.11.14")
 trait MongoDBSystem extends Actor {
   import scala.concurrent.duration._
   import Exceptions._
@@ -175,15 +175,33 @@ trait MongoDBSystem extends Actor {
   private[reactivemongo] def getNodeSet = _nodeSet // For test purposes
 
   /** On start or restart. */
-  private def initNodeSet(): NodeSet = {
-    val ns = NodeSet(None, None, seeds.map(seed => Node(seed, NodeStatus.Unknown, Vector.empty, Set.empty, None, ProtocolMetadata.Default).createNeededChannels(channelFactory, self, 1)).toVector, initialAuthenticates.toSet)
+  private def initNodeSet(): Try[NodeSet] = {
+    val seedNodeSet = NodeSet(None, None, seeds.map(seed => Node(seed, NodeStatus.Unknown, Vector.empty, Set.empty, None, ProtocolMetadata.Default)).toVector, initialAuthenticates.toSet)
 
-    debug(s"Initial node set: ${ns.toShortString}")
+    debug(s"Initial node set: ${seedNodeSet.toShortString}")
 
-    _nodeSet = ns
-    _setInfo = ns.info
+    seedNodeSet.createNeededChannels(channelFactory, self, 1) match {
+      case inited @ Success(ns) => {
+        _nodeSet = ns
+        _setInfo = ns.info
 
-    ns
+        inited
+      }
+
+      case result @ Failure(cause) => {
+        error("Fails to init the NodeSet", cause)
+
+        _nodeSet = NodeSet(
+          name = None,
+          version = None,
+          nodes = Vector.empty[Node],
+          authenticates = Set.empty[Authenticate])
+
+        _setInfo = _nodeSet.info
+
+        result
+      }
+    }
   }
 
   private def release(): Future[NodeSet] = {
@@ -258,9 +276,11 @@ trait MongoDBSystem extends Actor {
     channelFactory = newChannelFactory({})
     closingFactory = false
 
-    val ns = connectAll(initNodeSet())
+    initNodeSet().foreach { inited =>
+      val ns = connectAll(inited)
 
-    nodeSetUpdated(s"Start(${ns.toShortString})", null, ns)
+      nodeSetUpdated(s"Start(${ns.toShortString})", null, ns)
+    }
 
     // Prepare the period jobs
     connectAllJob = {
@@ -435,8 +455,15 @@ trait MongoDBSystem extends Actor {
               case other if (other.channel.id != channelId) =>
                 other // keep connections for other channels unchanged
 
-              case _ =>
-                n.createConnection(channelFactory, self)
+              case con =>
+                n.createConnection(channelFactory, self) match {
+                  case Success(c) => c
+
+                  case Failure(cause) => {
+                    warn(s"Cannot create connection for $n", cause)
+                    con //.copy(status = ConnectionStatus.Disconnected)
+                  }
+                }
             }
           }
         }
@@ -581,8 +608,15 @@ trait MongoDBSystem extends Actor {
       val statusInfo = _nodeSet.toShortString
 
       updateNodeSet(s"ConnectAll($statusInfo)") { ns =>
-        connectAll(ns.createNeededChannels(
-          channelFactory, self, options.nbChannelsPerNode))
+        ns.createNeededChannels(
+          channelFactory, self, options.nbChannelsPerNode) match {
+          case Success(upd) => connectAll(upd)
+
+          case Failure(cause) => {
+            warn("Fails to create channels for the NodeSet", cause)
+            ns
+          }
+        }
       }
 
       debug(s"ConnectAll Job running... Status: $statusInfo")
@@ -1059,8 +1093,15 @@ trait MongoDBSystem extends Actor {
       @inline def event = s"ConnectAll$$IsMaster(${response.header.responseTo}, ${updated.toShortString})"
 
       updateNodeSet(event) { ns =>
-        connectAll(ns.createNeededChannels(
-          channelFactory, self, options.nbChannelsPerNode))
+        ns.createNeededChannels(
+          channelFactory, self, options.nbChannelsPerNode) match {
+          case Success(upd) => connectAll(upd)
+
+          case Failure(cause) => {
+            warn("Fails to create channel for NodeSet", cause)
+            ns
+          }
+        }
       }
 
       ()
@@ -1532,7 +1573,7 @@ trait MongoDBSystem extends Actor {
     logger.error(s"[$lnm] $msg", cause)
 }
 
-@deprecated("Internal class: will be made private", "0.11.14")
+@deprecated("Internal: will be made private", "0.11.14")
 final class LegacyDBSystem private[reactivemongo] (
   val supervisor: String,
   val name: String,
@@ -1545,7 +1586,7 @@ final class LegacyDBSystem private[reactivemongo] (
 
 }
 
-@deprecated("Internal class: will be made private", "0.11.14")
+@deprecated("Internal: will be made private", "0.11.14")
 final class StandardDBSystem private[reactivemongo] (
   val supervisor: String,
   val name: String,
@@ -1571,7 +1612,7 @@ final class StandardDBSystemWithX509 private[reactivemongo] (
     new ChannelFactory(supervisor, name, options)
 }
 
-@deprecated("Internal class: will be made private", "0.11.14")
+@deprecated("Internal: will be made private", "0.11.14")
 object MongoDBSystem {
 }
 

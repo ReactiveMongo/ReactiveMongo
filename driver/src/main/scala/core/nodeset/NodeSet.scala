@@ -2,6 +2,8 @@ package reactivemongo.core.nodeset
 
 import scala.collection.immutable.Set
 
+import scala.util.{ Failure, Success, Try }
+
 import reactivemongo.io.netty.channel.ChannelId
 
 import akka.actor.ActorRef
@@ -124,7 +126,29 @@ case class NodeSet(
    * Returns a NodeSet with channels created to `upTo` given maximum,
    * per each member of the set.
    */
-  private[core] def createNeededChannels(channelFactory: ChannelFactory, receiver: ActorRef, upTo: Int): NodeSet = updateAll(_.createNeededChannels(channelFactory, receiver, upTo))
+  private[core] def createNeededChannels(
+    channelFactory: ChannelFactory,
+    receiver: ActorRef,
+    upTo: Int): Try[NodeSet] = {
+
+    @annotation.tailrec
+    def update(ns: Vector[Node], upd: Vector[Node]): Try[Vector[Node]] =
+      ns.headOption match {
+        case Some(node) =>
+          node.createNeededChannels(channelFactory, receiver, upTo) match {
+            case Failure(cause) =>
+              Failure(cause)
+
+            case Success(updated) =>
+              update(ns.tail, updated +: upd)
+          }
+
+        case _ =>
+          Success(upd)
+      }
+
+    update(nodes, Vector.empty).map { upd => copy(nodes = upd) }
+  }
 
   def toShortString =
     s"{{NodeSet $name ${nodes.map(_.toShortString).mkString(" | ")} }}"

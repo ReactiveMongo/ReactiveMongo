@@ -28,7 +28,7 @@ import reactivemongo.core.actors.Exceptions.PrimaryUnavailableException
 
 class NodeSetSpec(implicit val ee: ExecutionEnv)
   extends org.specs2.mutable.Specification
-  with ConnectAllSpec with UnresponsiveSecondarySpec {
+  with ConnectAllTest with UnresponsiveSecondaryTest {
 
   "Node set" title
 

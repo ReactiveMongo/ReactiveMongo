@@ -110,10 +110,10 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    */
   type PipelineOperator = BatchCommands.AggregationFramework.PipelineOperator
 
-  @deprecated("Will be private/internal", "0.16.0")
+  @deprecated("Internal: will be made private", "0.16.0")
   implicit def PackIdentityReader: pack.Reader[pack.Document] = pack.IdentityReader
 
-  @deprecated("Will be private/internal", "0.16.0")
+  @deprecated("Internal: will be made private", "0.16.0")
   implicit def PackIdentityWriter: pack.Writer[pack.Document] = pack.IdentityWriter
 
   implicit protected lazy val unitBoxReader: pack.Reader[UnitBox.type] =
@@ -373,7 +373,7 @@ trait GenericCollection[P <: SerializationPack with Singleton]
   def updateModifier[U](update: U, fetchNewObject: Boolean = false, upsert: Boolean = false)(implicit updateWriter: pack.Writer[U]): BatchCommands.FindAndModifyCommand.Update = BatchCommands.FindAndModifyCommand.Update(update, fetchNewObject, upsert)
 
   /** Returns a removal modifier, to be used with `findAndModify`. */
-  @deprecated("Will be private/internal", "0.16.0")
+  @deprecated("Internal: will be made private", "0.16.0")
   @transient lazy val removeModifier =
     BatchCommands.FindAndModifyCommand.Remove
 
