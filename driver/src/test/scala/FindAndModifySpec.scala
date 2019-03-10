@@ -159,8 +159,40 @@ final class FindAndModifySpec(implicit ee: ExecutionEnv)
         }
     }
 
-    "fail with invalid $$inc clause" in {
-      val colName = s"FindAndModifySpec${System identityHashCode this}-4"
+    "support arrayFilters" in {
+      // See https://docs.mongodb.com/manual/reference/method/db.collection.findAndModify/#findandmodify-arrayfilters
+
+      val colName = s"FindAndModifySpec${System identityHashCode this}-5"
+      val collection = db(colName)
+
+      collection.insert.many(Seq(
+        BSONDocument("_id" -> 1, "grades" -> Seq(95, 92, 90)),
+        BSONDocument("_id" -> 2, "grades" -> Seq(98, 100, 102)),
+        BSONDocument("_id" -> 3, "grades" -> Seq(95, 110, 100)))).
+        map(_ => {}) must beTypedEqualTo({}).await(0, timeout) and {
+          collection.findAndModify(
+            selector = BSONDocument("grades" -> BSONDocument(f"$$gte" -> 100)),
+            modifier = collection.updateModifier(
+              update = BSONDocument(f"$$set" -> BSONDocument(
+                f"grades.$$[element]" -> 100)),
+              fetchNewObject = true,
+              upsert = false),
+            sort = None,
+            fields = None,
+            bypassDocumentValidation = false,
+            writeConcern = WriteConcern.Journaled,
+            maxTime = None,
+            collation = None,
+            arrayFilters = Seq(
+              BSONDocument("element" -> BSONDocument(f"$$gte" -> 100)))).
+            map(_.value) must beSome(BSONDocument(
+              "_id" -> 2,
+              "grades" -> Seq(98, 100, 100 /* was 102*/ ))).await(0, timeout)
+        }
+    } tag "gt_mongo32"
+
+    f"fail with invalid $$inc clause" in {
+      val colName = s"FindAndModifySpec${System identityHashCode this}-5"
       val collection = db(colName)
 
       val query = BSONDocument("FindAndModifySpecFail" -> BSONDocument(
@@ -169,7 +201,7 @@ final class FindAndModifySpec(implicit ee: ExecutionEnv)
       val future = for {
         _ <- collection.insert(ordered = true).one(jack2)
         r <- collection.runCommand(
-          FindAndModify(query, Update(BSONDocument("$inc" -> "age"))),
+          FindAndModify(query, Update(BSONDocument(f"$$inc" -> "age"))),
           ReadPreference.Primary)
       } yield r
 

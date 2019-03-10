@@ -478,7 +478,7 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * @param fields $fieldsParam
    * @param swriter $swriterParam
    * @param writer writerParam
-   */
+   */ // TODO: arrayFilters
   def findAndUpdate[S, T](selector: S, update: T, fetchNewObject: Boolean = false, upsert: Boolean = false, sort: Option[pack.Document] = None, fields: Option[pack.Document] = None)(implicit swriter: pack.Writer[S], writer: pack.Writer[T], ec: ExecutionContext): Future[BatchCommands.FindAndModifyCommand.FindAndModifyResult] = {
     val updateOp = updateModifier(update, fetchNewObject, upsert)
 
