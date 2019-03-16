@@ -9,6 +9,7 @@ import reactivemongo.core.errors.GenericDriverException
 
 import reactivemongo.api.SerializationPack
 import reactivemongo.api.commands.{
+  Collation,
   MultiBulkWriteResult,
   ResolvedCollectionCommand,
   UpdateWriteResult,
@@ -54,16 +55,33 @@ private[reactivemongo] trait UpdateOps[P <: SerializationPack with Singleton] {
     /**
      * Performs a [[https://docs.mongodb.com/manual/reference/method/db.collection.updateOne/ single update]] (see [[UpdateCommand.UpdateElement]]).
      */
-    final def one[Q, U](q: Q, u: U, upsert: Boolean = false, multi: Boolean = false)(implicit ec: ExecutionContext, qw: pack.Writer[Q], uw: pack.Writer[U]): Future[UpdateWriteResult] = element[Q, U](q, u, upsert, multi).flatMap { upd => execute(Seq(upd)) }
+    final def one[Q, U](q: Q, u: U, upsert: Boolean = false, multi: Boolean = false)(implicit ec: ExecutionContext, qw: pack.Writer[Q], uw: pack.Writer[U]): Future[UpdateWriteResult] = element[Q, U](q, u, upsert, multi, None, Seq.empty).flatMap { upd => execute(Seq(upd)) }
+
+    /**
+     * Performs a [[https://docs.mongodb.com/manual/reference/method/db.collection.updateOne/ single update]] (see [[UpdateCommand.UpdateElement]]).
+     */
+    final def one[Q, U](q: Q, u: U, upsert: Boolean, multi: Boolean, collation: Option[Collation])(implicit ec: ExecutionContext, qw: pack.Writer[Q], uw: pack.Writer[U]): Future[UpdateWriteResult] = element[Q, U](q, u, upsert, multi, collation, Seq.empty).flatMap { upd => execute(Seq(upd)) }
+
+    /**
+     * Performs a [[https://docs.mongodb.com/manual/reference/method/db.collection.updateOne/ single update]] (see [[UpdateCommand.UpdateElement]]).
+     */
+    final def one[Q, U](q: Q, u: U, upsert: Boolean, multi: Boolean, collation: Option[Collation], arrayFilters: Seq[pack.Document])(implicit ec: ExecutionContext, qw: pack.Writer[Q], uw: pack.Writer[U]): Future[UpdateWriteResult] = element[Q, U](q, u, upsert, multi, collation, arrayFilters).flatMap { upd => execute(Seq(upd)) }
 
     /** Prepares an [[UpdateCommand.UpdateElement]] */
-    final def element[Q, U](q: Q, u: U, upsert: Boolean = false, multi: Boolean = false)(implicit qw: pack.Writer[Q], uw: pack.Writer[U]): Future[UpdateElement] =
+    final def element[Q, U](q: Q, u: U, upsert: Boolean = false, multi: Boolean = false)(implicit qw: pack.Writer[Q], uw: pack.Writer[U]): Future[UpdateElement] = element(q, u, upsert, multi, None, Seq.empty)
+
+    /** Prepares an [[UpdateCommand.UpdateElement]] */
+    final def element[Q, U](q: Q, u: U, upsert: Boolean, multi: Boolean, collation: Option[Collation])(implicit qw: pack.Writer[Q], uw: pack.Writer[U]): Future[UpdateElement] = element(q, u, upsert, multi, collation, Seq.empty)
+
+    /** Prepares an [[UpdateCommand.UpdateElement]] */
+    final def element[Q, U](q: Q, u: U, upsert: Boolean, multi: Boolean, collation: Option[Collation], arrayFilters: Seq[pack.Document])(implicit qw: pack.Writer[Q], uw: pack.Writer[U]): Future[UpdateElement] = {
       (Try(pack.serialize(q, qw)).map { query =>
-        UpdateElement(query, pack.serialize(u, uw), upsert, multi)
+        new UpdateElement(query, pack.serialize(u, uw), upsert, multi, collation, arrayFilters)
       }) match {
         case Success(element) => Future.successful(element)
         case Failure(cause)   => Future.failed[UpdateElement](cause)
       }
+    }
 
     /**
      * [[https://docs.mongodb.com/manual/reference/method/db.collection.updateMany/ Updates many documents]], according the ordered behaviour.
@@ -105,7 +123,8 @@ private[reactivemongo] trait UpdateOps[P <: SerializationPack with Singleton] {
 
     implicit private lazy val updateWriter: pack.Writer[UpdateCmd] = {
       val underlying = reactivemongo.api.commands.UpdateCommand.
-        writer(pack)(UpdateCommand)(collection.db.session)
+        writer(pack)(UpdateCommand)(
+          collection.db.session, metadata.maxWireVersion)
 
       pack.writer[UpdateCmd](underlying)
     }
@@ -126,13 +145,22 @@ private[reactivemongo] trait UpdateOps[P <: SerializationPack with Singleton] {
       val builder = pack.newBuilder
       val emptyDoc = builder.document(Seq.empty)
       val sfalse = builder.boolean(false)
-      val elements = Seq[pack.ElementProducer](
-        builder.elementProducer("q", emptyDoc),
-        builder.elementProducer("u", emptyDoc),
-        builder.elementProducer("upsert", sfalse),
-        builder.elementProducer("multi", sfalse))
 
-      pack.bsonSize(builder.document(elements))
+      import builder.{ elementProducer => elmt }
+
+      val elements = Seq.newBuilder[pack.ElementProducer] += (
+        elmt("q", emptyDoc), elmt("u", emptyDoc),
+        elmt("upsert", sfalse), elmt("multi", sfalse))
+
+      if (metadata.maxWireVersion >= MongoWireVersion.V34) {
+        elements += elmt("collation", emptyDoc)
+      }
+
+      if (metadata.maxWireVersion >= MongoWireVersion.V36) {
+        elements += elmt("arrayFilters", emptyDoc)
+      }
+
+      pack.bsonSize(builder.document(elements.result()))
     }
 
     implicit private val resultReader: pack.Reader[UpdateCommand.UpdateResult] =

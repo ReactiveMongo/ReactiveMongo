@@ -2,7 +2,7 @@ import scala.concurrent.duration.FiniteDuration
 
 import reactivemongo.bson._
 
-import reactivemongo.api.ReadPreference
+import reactivemongo.api.{ ReadPreference, WriteConcern }
 import reactivemongo.api.collections.bson.BSONCollection
 
 import reactivemongo.api.commands.{ UpdateWriteResult, WriteResult, Upserted }
@@ -163,6 +163,30 @@ trait UpdateSpec extends UpdateFixtures { collectionSpec: CollectionSpec =>
 
           spec(slowUpdCol1, slowTimeout, person)(_.copy(age = 66))
         }
+
+        "support arrayFilters" in {
+          // See https://docs.mongodb.com/manual/reference/command/update/#update-elements-match-arrayfilters-criteria
+
+          val colName = s"UpdateSpec${System identityHashCode this}-5"
+          val collection = db(colName)
+
+          collection.insert.many(Seq(
+            BSONDocument("_id" -> 1, "grades" -> Seq(95, 92, 90)),
+            BSONDocument("_id" -> 2, "grades" -> Seq(98, 100, 102)),
+            BSONDocument("_id" -> 3, "grades" -> Seq(95, 110, 100)))).
+            map(_ => {}) must beTypedEqualTo({}).await(0, timeout) and {
+              collection.update.one(
+                q = BSONDocument("grades" -> BSONDocument(f"$$gte" -> 100)),
+                u = BSONDocument(f"$$set" -> BSONDocument(
+                  f"grades.$$[element]" -> 100)),
+                upsert = false,
+                multi = true,
+                collation = None,
+                arrayFilters = Seq(
+                  BSONDocument("element" -> BSONDocument(f"$$gte" -> 100)))).
+                map(_.n) must beTypedEqualTo(2).await(0, timeout)
+            }
+        } tag "wip"
       }
       section("gt_mongo32")
     }

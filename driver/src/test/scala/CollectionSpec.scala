@@ -10,7 +10,7 @@ import org.specs2.concurrent.ExecutionEnv
 
 import _root_.tests.Common
 
-class CollectionSpec(implicit protected val ee: ExecutionEnv)
+final class CollectionSpec(implicit protected val ee: ExecutionEnv)
   extends org.specs2.mutable.Specification
   with org.specs2.specification.AfterAll
   with UpdateSpec with CollectionMetaSpec with CollectionFixtures {

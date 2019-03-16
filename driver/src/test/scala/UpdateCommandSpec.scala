@@ -2,6 +2,8 @@ package reactivemongo
 
 import reactivemongo.bson.{ BSONArray, BSONBinary, BSONDocument }
 
+import reactivemongo.core.protocol.MongoWireVersion
+
 import reactivemongo.api.{ BSONSerializationPack, ReplicaSetSession }
 
 import reactivemongo.api.commands.{
@@ -37,16 +39,18 @@ final class UpdateCommandSpec extends org.specs2.mutable.Specification {
             "multi" -> true)))
 
       "without session" in {
-        writer(None)(update1) must_=== base
+        writer(None, MongoWireVersion.V26)(update1) must_=== base
       }
 
       "with session" in {
         val session = new ReplicaSetSession(java.util.UUID.randomUUID())
 
-        writer(Some(session))(update1) must_=== (base ++ BSONDocument(
-          "lsid" -> BSONDocument(
-            "id" -> BSONBinary(session.lsid)),
-          "txnNumber" -> 1L))
+        writer(
+          Some(session),
+          MongoWireVersion.V26)(update1) must_=== (base ++ BSONDocument(
+            "lsid" -> BSONDocument(
+              "id" -> BSONBinary(session.lsid)),
+            "txnNumber" -> 1L))
       }
     }
   }
