@@ -137,7 +137,7 @@ trait UnresponsiveSecondaryTest { parent: NodeSetSpec =>
           }
         }
       }.andThen { case _ => usd.close() }.await(1, timeout)
-    } tag "wip"
+    }
 
   // ---
 

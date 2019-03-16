@@ -39,9 +39,8 @@ class UtilSpec(implicit ee: ExecutionEnv)
     }
 
     "resolve TXT record for gmail.com" in {
-      reactivemongo.util.txtRecords().apply("gmail.com")
-        .map(_.headOption) must beSome(
-          "v=spf1 redirect=_spf.google.com").await
+      reactivemongo.util.txtRecords().apply("gmail.com") must contain(
+        ===("v=spf1 redirect=_spf.google.com")).await
 
     }
   }

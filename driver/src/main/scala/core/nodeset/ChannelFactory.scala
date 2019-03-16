@@ -71,37 +71,37 @@ private[reactivemongo] final class ChannelFactory(
       info(msg)
 
       Failure(GenericDriverException(s"$msg ($supervisor/$connection)"))
-    }
-
-    val resolution = channelFactory.connect(host, port).addListener(
-      new ChannelFutureListener {
-        def operationComplete(op: ChannelFuture) {
-          if (!op.isSuccess) {
-            val chanId = op.channel.id
-
-            debug(
-              s"Connection to ${host}:${port} refused for channel #${chanId}",
-              op.cause)
-
-            receiver ! ChannelDisconnected(chanId)
-          }
-        }
-      })
-
-    val channel = resolution.channel
-
-    debug(s"Created new channel #${channel.id} to ${host}:${port} (registered = ${channel.isRegistered})")
-
-    if (channel.isRegistered) {
-      initChannel(channel, host, port, receiver)
     } else {
-      // Set state as attributes so available for the coming init
-      channel.attr(ChannelFactory.hostKey).set(host)
-      channel.attr(ChannelFactory.portKey).set(port)
-      channel.attr(ChannelFactory.actorRefKey).set(receiver)
-    }
+      val resolution = channelFactory.connect(host, port).addListener(
+        new ChannelFutureListener {
+          def operationComplete(op: ChannelFuture) {
+            if (!op.isSuccess) {
+              val chanId = op.channel.id
 
-    Success(channel)
+              debug(
+                s"Connection to ${host}:${port} refused for channel #${chanId}",
+                op.cause)
+
+              receiver ! ChannelDisconnected(chanId)
+            }
+          }
+        })
+
+      val channel = resolution.channel
+
+      debug(s"Created new channel #${channel.id} to ${host}:${port} (registered = ${channel.isRegistered})")
+
+      if (channel.isRegistered) {
+        initChannel(channel, host, port, receiver)
+      } else {
+        // Set state as attributes so available for the coming init
+        channel.attr(ChannelFactory.hostKey).set(host)
+        channel.attr(ChannelFactory.portKey).set(port)
+        channel.attr(ChannelFactory.actorRefKey).set(receiver)
+      }
+
+      Success(channel)
+    }
   }
 
   def initChannel(channel: Channel): Unit = {

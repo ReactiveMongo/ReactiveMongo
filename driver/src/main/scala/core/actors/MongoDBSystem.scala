@@ -923,7 +923,7 @@ trait MongoDBSystem extends Actor {
             }
           }
 
-          case _ => error(s"Oups. ${response.header.responseTo} not found! complete message is $response")
+          case _ => error(s"Received response does not correspond to an awaiting request #${response.header.responseTo}: $response")
         }
       }
 
@@ -997,6 +997,7 @@ trait MongoDBSystem extends Actor {
 
             val authenticating =
               if (!nodeStatus.queryable || nodeSet.authenticates.isEmpty) {
+                // Cannot or no need to authenticate the node
                 node
               } else {
                 authenticateNode(node, nodeSet.authenticates)
@@ -1398,8 +1399,8 @@ trait MongoDBSystem extends Actor {
       }, BSONIsMasterCommand.IsMaster
       import reactivemongo.api.commands.Command
 
-      val id = RequestId.isMaster.next
-      val (isMaster, _) = Command.buildRequestMaker(BSONSerializationPack)(
+      lazy val id = RequestId.isMaster.next
+      lazy val (isMaster, _) = Command.buildRequestMaker(BSONSerializationPack)(
         IsMaster(id.toString),
         BSONIsMasterCommandImplicits.IsMasterWriter,
         ReadPreference.primaryPreferred,
@@ -1407,80 +1408,89 @@ trait MongoDBSystem extends Actor {
 
       val now = System.currentTimeMillis()
 
-      val updated = if (node.pingInfo.lastIsMasterId == -1) {
-        // There is no IsMaster request waiting response for the node:
-        // sending a new one
-        debug(s"Prepares a fresh IsMaster request to ${node.toShortString} (channel #${con.channel.id})")
+      val (shouldProbe, updated): (Boolean, Node) = {
+        if (node.pingInfo.lastIsMasterId == -1) {
+          // There is no IsMaster request waiting response for the node:
+          // sending a new one
+          debug(s"Prepares a fresh IsMaster request to ${node.toShortString} (channel #${con.channel.id})")
 
-        node._copy(
-          pingInfo = node.pingInfo.copy(
-            lastIsMasterTime = now,
-            lastIsMasterId = id,
-            channelId = Some(con.channel.id)))
+          true -> node._copy(
+            pingInfo = node.pingInfo.copy(
+              lastIsMasterTime = now,
+              lastIsMasterId = id,
+              channelId = Some(con.channel.id)))
 
-      } else if ((
-        node.pingInfo.lastIsMasterTime + PingInfo.pingTimeout) < now) {
+        } else if ((
+          node.pingInfo.lastIsMasterTime + PingInfo.pingTimeout) < now) {
 
-        // The previous IsMaster request is expired
-        val msg = s"${node.toShortString} hasn't answered in time to last ping! Please check its connectivity"
+          // The previous IsMaster request is expired
+          val msg = s"${node.toShortString} hasn't answered in time to last ping! Please check its connectivity"
 
-        warn(msg)
+          warn(msg)
 
-        // Unregister the pending requests for this node
-        val channelIds = node.connections.map(_.channel.id)
-        val wasPrimary = node.status == NodeStatus.Primary
-        def error = {
-          val cause = new ClosedException(s"$msg ($lnm)")
+          // Unregister the pending requests for this node
+          val channelIds = node.connections.map(_.channel.id)
+          val wasPrimary = node.status == NodeStatus.Primary
+          def error = {
+            val cause = new ClosedException(s"$msg ($lnm)")
 
-          if (!wasPrimary) cause
-          else new PrimaryUnavailableException(supervisor, name, cause)
-        }
-
-        requestTracker.withAwaiting { (resps, chans) =>
-          resps.retain { (_, awaitingResponse) =>
-            chans -= awaitingResponse.channelID
-
-            //println(s"_release: ${awaitingResponse.channelID}")
-
-            if (channelIds contains awaitingResponse.channelID) {
-              trace(s"Unregistering the pending request ${awaitingResponse.promise} for ${node.toShortString}'")
-
-              awaitingResponse.promise.failure(error)
-              false
-            } else true
+            if (!wasPrimary) cause
+            else new PrimaryUnavailableException(supervisor, name, cause)
           }
+
+          requestTracker.withAwaiting { (resps, chans) =>
+            resps.retain { (_, awaitingResponse) =>
+              chans -= awaitingResponse.channelID
+
+              //println(s"_release: ${awaitingResponse.channelID}")
+
+              if (channelIds contains awaitingResponse.channelID) {
+                trace(s"Unregistering the pending request ${awaitingResponse.promise} for ${node.toShortString}'")
+
+                awaitingResponse.promise.failure(error)
+                false
+              } else true
+            }
+          }
+
+          // Reset node state
+          updateHistory {
+            if (wasPrimary) s"PrimaryUnavailable"
+            else s"NodeUnavailable($node)"
+          }
+
+          true -> node._copy(
+            status = NodeStatus.Unknown,
+            //connections = Vector.empty,
+            authenticated = Set.empty,
+            pingInfo = PingInfo(
+              ping = Long.MaxValue,
+              lastIsMasterTime = now,
+              lastIsMasterId = id,
+              channelId = con.channel.id))
+
+        } else {
+          debug(s"Do not prepare a isMaster request to already probed ${node.name}")
+
+          false -> node
         }
-
-        // Reset node state
-        updateHistory {
-          if (wasPrimary) s"PrimaryUnavailable"
-          else s"NodeUnavailable($node)"
-        }
-
-        node._copy(
-          status = NodeStatus.Unknown,
-          //connections = Vector.empty,
-          authenticated = Set.empty,
-          pingInfo = PingInfo(
-            ping = Long.MaxValue,
-            lastIsMasterTime = now,
-            lastIsMasterId = id,
-            channelId = con.channel.id))
-
-      } else {
-        debug(s"Do not prepare a isMaster request to already probed ${node.name}")
-
-        node
       }
 
-      new IsMasterRequest(updated, {
-        con.send(isMaster(id)).addListener(new OperationHandler(
-          error(s"Fails to send a isMaster request to ${node.name} (channel #${con.channel.id})", _),
-          { chanId =>
-            trace(s"isMaster request successful on channel #${chanId}")
-          }))
-        ()
-      })
+      val mayProbe: () => Unit = {
+        if (!shouldProbe) {
+          () => ()
+        } else { () =>
+          con.send(isMaster(id)).addListener(new OperationHandler(
+            error(s"Fails to send a isMaster request to ${node.name} (channel #${con.channel.id})", _),
+            { chanId =>
+              trace(s"isMaster request successful on channel #${chanId}")
+            }))
+
+          ()
+        }
+      }
+
+      new IsMasterRequest(updated, mayProbe())
     }
   }
 
