@@ -10,7 +10,7 @@ import org.specs2.concurrent.ExecutionEnv
 
 import _root_.tests.Common
 
-class CollectionSpec(implicit protected val ee: ExecutionEnv)
+final class CollectionSpec(implicit protected val ee: ExecutionEnv)
   extends org.specs2.mutable.Specification
   with org.specs2.specification.AfterAll
   with UpdateSpec with CollectionMetaSpec with CollectionFixtures {
@@ -34,20 +34,21 @@ class CollectionSpec(implicit protected val ee: ExecutionEnv)
       implicit val writer = PersonWriter
 
       "with insert" in {
-        collection.insert(person).map(_.ok) must beTrue.await(1, timeout) and {
-          val coll = slowColl.withReadPreference(ReadPreference.secondary)
+        collection.insert.
+          one(person).map(_.ok) must beTrue.await(1, timeout) and {
+            val coll = slowColl.withReadPreference(ReadPreference.secondary)
 
-          coll.readPreference must_== ReadPreference.secondary and {
-            // Anyway use ReadPreference.Primary for insert op
-            coll.insert(person2).map { r =>
-              r.ok -> r.n
-            } must beTypedEqualTo(true -> 1).await(1, timeout)
+            coll.readPreference must_== ReadPreference.secondary and {
+              // Anyway use ReadPreference.Primary for insert op
+              coll.insert.one(person2).map { r =>
+                r.ok -> r.n
+              } must beTypedEqualTo(true -> 1).await(1, timeout)
+            }
+          } and {
+            slowColl.find(BSONDocument.empty).cursor[BSONDocument]().
+              collect[List](-1, Cursor.FailOnError[List[BSONDocument]]()).
+              map(_.size) must beTypedEqualTo(2).await(1, slowTimeout)
           }
-        } and {
-          slowColl.find(BSONDocument.empty).cursor[BSONDocument]().
-            collect[List](-1, Cursor.FailOnError[List[BSONDocument]]()).
-            map(_.size) must beTypedEqualTo(2).await(1, slowTimeout)
-        }
       }
 
       "with bulkInsert" in {
@@ -183,13 +184,13 @@ class CollectionSpec(implicit protected val ee: ExecutionEnv)
         "fallbacking to final value using foldWhile" in {
           cursor.foldWhile(0)(
             (i, _) => Cursor.Cont(i + 1),
-            (_, e) => Cursor.Done(-1)) must beEqualTo(-1).await(1, timeout)
+            (_, _) => Cursor.Done(-1)) must beEqualTo(-1).await(1, timeout)
         }
 
         "skiping failure using foldWhile" in {
           cursor.foldWhile(0)(
             (i, _) => Cursor.Cont(i + 1),
-            (_, e) => Cursor.Cont(-3)) must beEqualTo(-2).await(1, timeout)
+            (_, _) => Cursor.Cont(-3)) must beEqualTo(-2).await(1, timeout)
         }
       }
 
@@ -223,7 +224,7 @@ class CollectionSpec(implicit protected val ee: ExecutionEnv)
     "write a document with error" >> {
       implicit val writer = BuggyPersonWriter
       def writeSpec(c: BSONCollection, timeout: FiniteDuration) =
-        c.insert(person).map { lastError =>
+        c.insert.one(person).map { _ /*lastError*/ =>
           //println(s"person write succeed??  $lastError")
           0
         }.recover {
@@ -246,7 +247,7 @@ class CollectionSpec(implicit protected val ee: ExecutionEnv)
       val selector = BSONDocument("age" -> 101)
       def find = collection.find(selector).one[BSONDocument]
 
-      collection.insert(BSONDocument(
+      collection.insert.one(BSONDocument(
         "age" -> 101,
         "name" -> BSONJavaScript("db.getName()"))).flatMap { _ =>
         find.map(_.flatMap(_.getAs[BSONJavaScript]("name")).map(_.value))
@@ -318,7 +319,7 @@ class CollectionSpec(implicit protected val ee: ExecutionEnv)
             val updated = base :~ ("value" -> 2)
 
             (for {
-              _ <- coll.insert(false).one(inserted)
+              _ <- coll.insert(ordered = false).one(inserted)
               r <- coll.find(base).one[BSONDocument]
             } yield r) must beSome(inserted).awaitFor(timeout) and {
               (for {

@@ -1,5 +1,7 @@
 package reactivemongo.api.commands
 
+import reactivemongo.core.protocol.MongoWireVersion
+
 import reactivemongo.api.{ Session, SerializationPack }
 
 /**
@@ -25,25 +27,62 @@ trait UpdateCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] {
    * @param u the modifications to apply
    * @param upsert if true perform an insert if no documents match the query
    * @param multi if true updates all the matching documents
+   * @param collation the collation to use for the operation
+   * @param arrayFilters an array of filter documents that determines which array elements to modify for an update operation on an array field
    */
-  case class UpdateElement(
-    q: pack.Document,
-    u: pack.Document,
-    upsert: Boolean,
-    multi: Boolean)
+  class UpdateElement @deprecated("Will be private/internal", "0.17.0") (
+    val q: pack.Document,
+    val u: pack.Document,
+    val upsert: Boolean,
+    val multi: Boolean,
+    val collation: Option[Collation],
+    val arrayFilters: Seq[pack.Document]) extends Serializable with Product4[pack.Document, pack.Document, Boolean, Boolean] {
+    @deprecated("Use `q`", "0.17.0") val _1 = q
+    @deprecated("Use `u`", "0.17.0") val _2 = u
+    @deprecated("Use `upsert`", "0.17.0") val _3 = upsert
+    @deprecated("Use `multi`", "0.17.0") val _4 = multi
 
+    private val data = (q, u, upsert, multi, collation, arrayFilters)
+
+    override def hashCode: Int = data.hashCode
+
+    override def equals(that: Any): Boolean = that match {
+      case other: UpdateElement => data == other.data
+      case _                    => false
+    }
+
+    def canEqual(that: Any): Boolean = that match {
+      case _: UpdateElement => true
+      case _                => false
+    }
+
+    override def toString: String = s"UpdateElement${data.toString}"
+  }
+
+  @deprecated("Will be private/internal", "0.17.0")
   object UpdateElement {
     def apply(q: ImplicitlyDocumentProducer, u: ImplicitlyDocumentProducer, upsert: Boolean = false, multi: Boolean = false): UpdateElement =
-      UpdateElement(
-        q.produce,
-        u.produce,
-        upsert,
-        multi)
+      new UpdateElement(
+        q = q.produce,
+        u = u.produce,
+        upsert = upsert,
+        multi = multi,
+        collation = None,
+        arrayFilters = Seq.empty)
+
+    def unapply(that: Any): Option[(pack.Document, pack.Document, Boolean, Boolean)] = that match {
+      case other: UpdateElement =>
+        Some(Tuple4(other.q, other.u, other.upsert, other.multi))
+
+      case _ =>
+        None
+    }
   }
 
   object Update {
     def apply(firstUpdate: UpdateElement, updates: UpdateElement*): Update =
       apply()(firstUpdate, updates: _*)
+
     def apply(ordered: Boolean = true, writeConcern: WriteConcern = WriteConcern.Default)(firstUpdate: UpdateElement, updates: UpdateElement*): Update =
       Update(
         firstUpdate +: updates,
@@ -54,32 +93,62 @@ trait UpdateCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] {
 
 private[reactivemongo] object UpdateCommand {
   def writeElement[P <: SerializationPack with Singleton](
-    context: UpdateCommand[P])(
-    builder: SerializationPack.Builder[context.pack.type]): context.UpdateElement => context.pack.Document = { element =>
+    context: UpdateCommand[P], ver: MongoWireVersion)(
+    builder: SerializationPack.Builder[context.pack.type]): context.UpdateElement => context.pack.Document = {
     import builder.{ boolean, document, elementProducer, pack }
 
-    document(Seq[pack.ElementProducer](
-      elementProducer("q", element.q),
-      elementProducer("u", element.u),
-      elementProducer("upsert", boolean(element.upsert)),
-      elementProducer("multi", boolean(element.multi))))
+    def base(element: context.UpdateElement) =
+      Seq.newBuilder[pack.ElementProducer] += (
+        elementProducer("q", element.q),
+        elementProducer("u", element.u),
+        elementProducer("upsert", boolean(element.upsert)),
+        elementProducer("multi", boolean(element.multi)))
 
+    if (ver < MongoWireVersion.V34) { element =>
+      document(base(element).result())
+    } else if (ver < MongoWireVersion.V36) { element =>
+      val elements = base(element)
+
+      element.collation.foreach { c =>
+        elements += elementProducer(
+          "collation",
+          Collation.serializeWith(pack, c)(builder))
+      }
+
+      document(elements.result())
+    } else { element => // > 3.4
+      val elements = base(element)
+
+      element.collation.foreach { c =>
+        elements += elementProducer(
+          "collation",
+          Collation.serializeWith(pack, c)(builder))
+      }
+
+      element.arrayFilters.headOption.foreach { f =>
+        elements += elementProducer(
+          "arrayFilters", builder.array(f, element.arrayFilters.tail))
+      }
+
+      document(elements.result())
+    }
   }
 
   // TODO: Unit test
   def writer[P <: SerializationPack with Singleton](pack: P)(
-    context: UpdateCommand[pack.type]): Option[Session] => ResolvedCollectionCommand[context.Update] => pack.Document = {
+    context: UpdateCommand[pack.type]): (Option[Session], MongoWireVersion) => ResolvedCollectionCommand[context.Update] => pack.Document = {
     val builder = pack.newBuilder
     val writeWriteConcern = CommandCodecs.writeWriteConcern(pack)
     val writeSession = CommandCodecs.writeSession(builder)
 
-    { session: Option[Session] =>
+    { (session: Option[Session], ver: MongoWireVersion) =>
       import builder.{ elementProducer => element }
+
+      val writeElement = UpdateCommand.writeElement(context, ver)(builder)
 
       { update =>
         import update.command
 
-        val writeElement = UpdateCommand.writeElement(context)(builder)
         val ordered = builder.boolean(command.ordered)
         val elements = Seq.newBuilder[pack.ElementProducer]
 

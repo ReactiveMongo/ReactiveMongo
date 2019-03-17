@@ -287,7 +287,7 @@ trait MongoDBSystem extends Actor {
       val ms = options.heartbeatFrequencyMS / 5
       val interval = if (ms < 100) 100.milliseconds else heartbeatFrequency
 
-      scheduler.schedule(interval, interval, self, ConnectAll)
+      scheduler.schedule(Duration.Zero, interval, self, ConnectAll)
     }
 
     refreshAllJob = scheduler.schedule(

@@ -1245,7 +1245,7 @@ db.accounts.aggregate([
       /*
       { "_id" : 1, "first_name" : "Gary", "last_name" : "Sheffield", "city" : "New York" }
        */
-      contacts.insert(document(
+      contacts.insert.one(document(
         "_id" -> 1,
         "first_name" -> "Gary",
         "last_name" -> "Sheffield",
@@ -1265,6 +1265,18 @@ db.accounts.aggregate([
 
       result must beSome(document(
         "full_name" -> "Gary Sheffield")).await(0, timeout)
+    }
+
+    "and counted" in {
+      implicit def countReader = BSONDocumentReader[Int] {
+        _.getAsTry[Int]("foo").get
+      }
+
+      contacts.aggregateWith[Int]() { framework =>
+        import framework.{ Count, Match }
+
+        Match(document("first_name" -> "Gary")) -> List(Count("foo"))
+      }.head must beTypedEqualTo(1).await(0, timeout)
     }
   }
 
@@ -1345,7 +1357,7 @@ db.accounts.aggregate([
 
     }
 
-    f"be aggregated using $$slice" in {
+    f"be aggregated using $$slice and $$count" in {
       users.aggregateWith1[User]() { framework =>
         import framework.{ Project, Slice }
 

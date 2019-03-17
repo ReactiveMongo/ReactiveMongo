@@ -57,6 +57,16 @@ trait AggregationFramework[P <: SerializationPack]
   }
 
   /**
+   * _Since MongoDB 3.4:_ Counts of the number of documents input.
+   * https://docs.mongodb.com/manual/reference/operator/aggregation/count/
+   * @param outputName the name of the output field which has the count as its value
+   */
+  case class Count(outputName: String) extends PipelineOperator {
+    val makePipe: pack.Document = builder.document(Seq(
+      builder.elementProducer(f"$$count", builder.string(outputName))))
+  }
+
+  /**
    * Reshapes a document stream by renaming, adding, or removing fields.
    * Also uses [[http://docs.mongodb.org/manual/reference/aggregation/project/#_S_project Project]] to create computed values or sub-objects.
    *
