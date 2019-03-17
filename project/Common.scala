@@ -19,7 +19,7 @@ object Common {
   val closeableObject = SettingKey[String]("class name of a closeable object")
 
   val settings = Defaults.coreDefaultSettings ++ baseSettings ++ Compiler.settings ++ Seq(
-    scalaVersion := "2.12.6",
+    scalaVersion := "2.12.8",
     crossScalaVersions := Seq("2.10.7", scalaCompatVer, scalaVersion.value),
     crossVersion := CrossVersion.binary,
     //parallelExecution in Test := false,

@@ -28,8 +28,8 @@ case object X509Authentication extends AuthenticationMode
  * @param writeConcern the default [[https://docs.mongodb.com/manual/reference/write-concern/ write concern]]
  * @param readPreference the default read preference
  * @param failoverStrategy the default failover strategy
- * @param monitorRefreshMS the interval in milliseconds used by monitor to refresh the node set (default: 10000 aka 10s)
- * @param maxIdleTimeMS the maximum number of milliseconds that a [[https://docs.mongodb.com/manual/reference/connection-string/#urioption.maxIdleTimeMS channel can remain idle]] in the connection pool before being removed and closed (default: 0 to disable, as implemented using [[http://netty.io/4.1/api/io/netty/handler/timeout/IdleStateHandler.html Netty IdleStateHandler]]); If not 0, must be greater or equal to [[#monitorRefreshMS]]
+ * @param heartbeatFrequencyMS the interval in milliseconds used by monitor to refresh the node set (default: 10000 aka 10s)
+ * @param maxIdleTimeMS the maximum number of milliseconds that a [[https://docs.mongodb.com/manual/reference/connection-string/#urioption.maxIdleTimeMS channel can remain idle]] in the connection pool before being removed and closed (default: 0 to disable, as implemented using [[http://netty.io/4.1/api/io/netty/handler/timeout/IdleStateHandler.html Netty IdleStateHandler]]); If not 0, must be greater or equal to [[#heartbeatFrequencyMS]]
  * @param maxHistorySize the maximum size of the pool history (default: 25)
  * @param credentials the credentials per authentication database names
  * @param keyStore an optional key store

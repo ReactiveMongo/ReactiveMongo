@@ -40,11 +40,9 @@ class IndexesSpec(implicit ee: ExecutionEnv)
   "Geo Indexes" should {
     {
       def spec(c: BSONCollection, timeout: FiniteDuration) = {
-        val futs: Seq[Future[Unit]] = for (i <- 1 until 10)
-          yield c.insert(BSONDocument(
-          "loc" -> BSONArray(i + 2D, i * 2D))).map(_ => {})
-
-        Future.sequence(futs) must not(throwA[Throwable]).await(1, timeout)
+        c.insert(ordered = true).many((1 until 10).map { i =>
+          BSONDocument("loc" -> BSONArray(i + 2D, i * 2D))
+        }).map(_ => {}) must beTypedEqualTo({}).await(1, timeout)
       }
 
       "insert some points with the default connection" in {
@@ -73,7 +71,7 @@ class IndexesSpec(implicit ee: ExecutionEnv)
     }
 
     "fail to insert some points out of range" in {
-      geo.insert(
+      geo.insert.one(
         BSONDocument("loc" -> BSONArray(27.88D, 97.21D))).
         map(_ => false).recover {
           case e: DatabaseException =>
@@ -118,7 +116,7 @@ class IndexesSpec(implicit ee: ExecutionEnv)
           "coordinates" -> BSONArray(i + 2D, i * 2D)))
       }
 
-      geo2DSpherical.insert(false).many(batch).map(_.n).
+      geo2DSpherical.insert(ordered = false).many(batch).map(_.n).
         aka("inserted") must beTypedEqualTo(9).await(1, timeout)
     }
 
@@ -140,10 +138,9 @@ class IndexesSpec(implicit ee: ExecutionEnv)
   "Hashed indexes" should {
     "insert some data" in {
       // With WiredTiger, collection must exist before
-      val futs: Seq[Future[Unit]] = for (i <- 1 until 10)
-        yield hashed.insert(BSONDocument("field" -> s"data-$i")).map(_ => {})
-
-      Future.sequence(futs) must not(throwA[Throwable]).await(1, timeout)
+      hashed.insert.many((1 until 10).map { i =>
+        BSONDocument("field" -> s"data-$i")
+      }).map(_ => {}) must beTypedEqualTo({}).await(1, timeout)
     }
 
     "make index" in {
@@ -205,7 +202,7 @@ class IndexesSpec(implicit ee: ExecutionEnv)
       BSONDocument("username" -> "rajiv", "age" -> 57))
 
     @inline def fixturesInsert =
-      fixtures.map { partial.insert(_) }
+      fixtures.map { partial.insert.one(_) }
 
     "have fixtures" in {
       Future.sequence(fixturesInsert).
@@ -247,15 +244,16 @@ class IndexesSpec(implicit ee: ExecutionEnv)
     "allow duplicate if the filter doesn't match" in {
       def insertAndCount = for {
         a <- partial.count()
-        _ <- partial.insert(BSONDocument("username" -> "david", "age" -> 20))
-        _ <- partial.insert(BSONDocument("username" -> "amanda"))
-        _ <- partial.insert(BSONDocument(
-          "username" -> "rajiv", "age" -> Option.empty[Int]))
+        _ <- partial.insert(ordered = true).many(Seq(
+          BSONDocument("username" -> "david", "age" -> 20),
+          BSONDocument("username" -> "amanda"),
+          BSONDocument(
+            "username" -> "rajiv", "age" -> Option.empty[Int])))
 
         b <- partial.count()
       } yield a -> b
 
-      insertAndCount must beEqualTo(3 -> 6).await(0, timeout)
+      insertAndCount must beTypedEqualTo(3 -> 6).await(0, timeout)
     } tag "not_mongo26"
   }
 

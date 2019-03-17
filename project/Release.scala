@@ -81,12 +81,12 @@ object Release {
   val settings = Seq(
     releaseVersion := { ver =>
       Version(ver).map(_.withoutQualifier.string).
-        getOrElse(sbtrelease.versionFormatError)
+        getOrElse(sbtrelease.versionFormatError(ver))
     },
     releaseNextVersion := { ver =>
       // e.g. 1.2 => 1.3-SNAPSHOT
       Version(ver).map(_.bumpBugfix.asSnapshot.string).
-        getOrElse(sbtrelease.versionFormatError)
+        getOrElse(sbtrelease.versionFormatError(ver))
     },
     releaseCommitMessage := {
       val ver = (version in ThisBuild).value
