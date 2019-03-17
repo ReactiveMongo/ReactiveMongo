@@ -224,7 +224,7 @@ final class CollectionSpec(implicit protected val ee: ExecutionEnv)
     "write a document with error" >> {
       implicit val writer = BuggyPersonWriter
       def writeSpec(c: BSONCollection, timeout: FiniteDuration) =
-        c.insert.one(person).map { _/*lastError*/ =>
+        c.insert.one(person).map { _ /*lastError*/ =>
           //println(s"person write succeed??  $lastError")
           0
         }.recover {
