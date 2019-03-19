@@ -47,6 +47,10 @@ private[reactivemongo] case class Node(
   @transient val connected: Vector[Connection] =
     connections.filter(_.status == ConnectionStatus.Connected)
 
+  /**
+   * The [[connected]] connections with no required authentication,
+   * or already authenticated (at least once).
+   */
   @transient val authenticatedConnections = new RoundRobiner(
     connected.filter(_.authenticated.forall { auth =>
       authenticated.exists(_ == auth)
@@ -124,7 +128,7 @@ private[reactivemongo] case class Node(
     else this
   }
 
-  def toShortString = s"""Node[$name: $status (${connected.size}/${connections.size} available connections), latency=${pingInfo.ping}, authenticated={${authenticated mkString ", "}}]"""
+  def toShortString = s"""Node[$name: $status (${authenticatedConnections.size}/${connected.size}/${connections.size} available connections), latency=${pingInfo.ping}, authenticated={${authenticated.map(_.toShortString) mkString ", "}}]"""
 
   /** Returns the read-only information about this node. */
   def info = NodeInfo(name, aliases.result(), host, port, status,

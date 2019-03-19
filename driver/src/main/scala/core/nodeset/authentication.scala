@@ -61,4 +61,6 @@ case class X509Authenticating(db: String, user: String) extends Authenticating {
   def password = "deprecated"
 }
 
-case class Authenticated(db: String, user: String) extends Authentication
+case class Authenticated(db: String, user: String) extends Authentication {
+  val toShortString: String = s"${user}@${db}"
+}

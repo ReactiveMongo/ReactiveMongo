@@ -23,4 +23,6 @@ private[reactivemongo] class RoundRobiner[A, M[T] <: Iterable[T]](
       }
     } else Option.empty[A]
   }
+
+  @inline def size: Int = subject.size
 }
