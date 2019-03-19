@@ -23,7 +23,7 @@ import reactivemongo.api.{
 
 import _root_.tests.Common
 
-class MonitorSpec(implicit ee: ExecutionEnv)
+final class MonitorSpec(implicit ee: ExecutionEnv)
   extends org.specs2.mutable.Specification {
 
   "Monitor" title

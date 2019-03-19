@@ -58,8 +58,8 @@ object Exceptions {
 
   final class InternalState private[actors] (
     trace: Array[StackTraceElement]) extends DriverException with NoStackTrace {
-    override def getMessage: String = null
     val message = "InternalState"
+    @inline override def getMessage: String = ""
     super.setStackTrace(trace)
   }
 
