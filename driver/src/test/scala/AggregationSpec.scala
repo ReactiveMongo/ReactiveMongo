@@ -629,9 +629,8 @@ class AggregationSpec(implicit ee: ExecutionEnv)
           "_id" -> 7020, "title" -> "Iliad",
           "author" -> "Homer", "copies" -> 10))
 
-      // TODO: bulk insert
-      Future.sequence(fixtures.map { doc => books.insert(doc) }).map(_ => {}).
-        aka("fixtures") must beEqualTo({}).await(0, timeout)
+      books.insert.many(fixtures).map(_ => {}).
+        aka("fixtures") must beTypedEqualTo({}).await(0, timeout)
     }
 
     "be outputed to collection" in {
@@ -645,13 +644,12 @@ class AggregationSpec(implicit ee: ExecutionEnv)
         } yield id -> books).get
       }
 
-      books.aggregateWith1[Author]() {
-        framework =>
-          import framework._
+      books.aggregateWith1[Author]() { framework =>
+        import framework._
 
-          Sort(Ascending("title")) -> List(
-            Group(BSONString(f"$$author"))("books" -> PushField("title")),
-            Out(outColl))
+        Sort(Ascending("title")) -> List(
+          Group(BSONString(f"$$author"))("books" -> PushField("title")),
+          Out(outColl))
       }.collect[List](Int.MaxValue, Cursor.FailOnError[List[Author]]()).map(_ => {}) must beEqualTo({}).await(0, timeout) and {
         db.collection[BSONCollection](outColl).find(BSONDocument.empty).cursor[Author]().
           collect[List](3, Cursor.FailOnError[List[Author]]()) must beTypedEqualTo(
@@ -856,8 +854,6 @@ class AggregationSpec(implicit ee: ExecutionEnv)
     } tag "not_mongo26"
 
     "return the standard deviation of user ages" in {
-      //TODO: Remove: implicit val reader = Macros.reader[QuizStdDev]
-
       // { "_id" : null, "ageStdDev" : 11.135528725660043 }
       val expected = BSONDocument("_id" -> BSONNull, "ageStdDev" -> 11.135528725660043D)
 

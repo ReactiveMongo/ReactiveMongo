@@ -58,7 +58,6 @@ object Common extends CommonAuth {
   val DefaultOptions = {
     val a = MongoConnectionOptions(
       failoverStrategy = failoverStrategy,
-      nbChannelsPerNode = 2, // TODO: Remove
       heartbeatFrequencyMS = (timeout.toMillis / 2).toInt,
       credentials = DefaultCredentials.map("" -> _)(scala.collection.breakOut),
       keyStore = sys.props.get("test.keyStore").map { uri =>
