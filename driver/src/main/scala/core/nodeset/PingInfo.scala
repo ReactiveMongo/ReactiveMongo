@@ -62,6 +62,6 @@ object PingInfo {
 
   def unapply(other: PingInfo): Option[(Long, Long, Int)] = Some(other.tupled)
 
-  // TODO: Use MongoConnectionOption (e.g. heartbeatFrequencyMS)
+  @deprecated("See MongoConnectionOptions.heartbeatFrequencyMS", "0.16.6")
   val pingTimeout = 60 * 1000
 }

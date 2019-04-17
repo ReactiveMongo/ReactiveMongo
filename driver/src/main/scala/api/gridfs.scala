@@ -362,7 +362,7 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
       def finish(): Future[ReadFile[Id]] = {
         logger.debug(s"Writing last chunk #$n")
 
-        val uploadDate = file.uploadDate.getOrElse(System.currentTimeMillis)
+        val uploadDate = file.uploadDate.getOrElse(System.nanoTime() / 1000000)
 
         for {
           f <- writeChunk(n, previous)

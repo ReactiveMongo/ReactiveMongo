@@ -86,7 +86,7 @@ object ScramSha1Initiate extends BSONCommandResultMaker[ScramSha1Challenge] {
   }.toStream
 
   def randomPrefix(seed: Int): String = {
-    val pos = (System.currentTimeMillis % 100).toInt // temporal position
+    val pos = ((System.nanoTime() / 1000000L) % 100).toInt // temporal position
     val slice = authChars.slice(pos, pos + 24 /* random str length */ )
     val rand = new scala.util.Random(seed)
 

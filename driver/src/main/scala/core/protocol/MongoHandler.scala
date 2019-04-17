@@ -21,12 +21,12 @@ private[reactivemongo] class MongoHandler(
   idleTimeMS: Long) extends IdleStateHandler(
   idleTimeMS, idleTimeMS, idleTimeMS, TimeUnit.MILLISECONDS) {
 
-  private var last: Long = -1L
+  private var last: Long = -1L // in nano-precision
 
   override def channelActive(ctx: ChannelHandlerContext): Unit = {
     log(ctx, "Channel is active")
 
-    last = System.currentTimeMillis()
+    last = System.nanoTime()
 
     receiver ! ChannelConnected(ctx.channel.id)
 
@@ -35,7 +35,7 @@ private[reactivemongo] class MongoHandler(
 
   override def channelIdle(ctx: ChannelHandlerContext, e: IdleStateEvent) = {
     if (last != -1L) {
-      val now = System.currentTimeMillis()
+      val now = System.nanoTime()
 
       log(ctx, s"Channel has been inactive for ${now - last} (last = $last)")
     }
@@ -46,7 +46,7 @@ private[reactivemongo] class MongoHandler(
   }
 
   override def channelInactive(ctx: ChannelHandlerContext): Unit = {
-    val now = System.currentTimeMillis()
+    val now = System.nanoTime()
 
     if (last != -1) {
       val chan = ctx.channel
@@ -64,7 +64,7 @@ private[reactivemongo] class MongoHandler(
   }
 
   override def channelRead(ctx: ChannelHandlerContext, msg: Any): Unit = {
-    last = System.currentTimeMillis()
+    last = System.nanoTime()
 
     msg match {
       case response: Response => {
@@ -88,7 +88,7 @@ private[reactivemongo] class MongoHandler(
     promise: ChannelPromise): Unit = {
     log(ctx, s"Channel is requested to write")
 
-    last = System.currentTimeMillis()
+    last = System.nanoTime()
 
     super.write(ctx, msg, promise)
   }
