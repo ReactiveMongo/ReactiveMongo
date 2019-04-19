@@ -400,51 +400,28 @@ trait MongoDBSystem extends Actor {
     @inline def event =
       s"ChannelDisconnected($channelId, ${_nodeSet.toShortString})"
 
-    @volatile var updated: Int = 0
+    @volatile var updated = false
 
-    val res = updateNodeSet(event) { ns =>
+    updateNodeSet(event) { ns =>
       val updSet = ns.updateNodeByChannelId(channelId) { n =>
         collectConnections(n) {
           case other if (other.channel.id != channelId) =>
             other // keep connections for other channels unchanged
 
           case con => {
+            updated = true
+
             if (con.channel.isOpen) { // can still be reused
-              updated = 1
               con.copy(status = ConnectionStatus.Disconnected)
             } else {
-              updated = 2 // delayed
-              con.copy(status = ConnectionStatus.Connecting)
+              n.createConnection(channelFactory, self)
             }
           }
         }
       }
 
-      f(updated > 0, updSet)
+      f(updated, updSet)
     }
-
-    if (updated == 2) {
-      scheduler.scheduleOnce(options.reconnectDelayMS.milliseconds) {
-        val reEvent =
-          s"ChannelReconnecting($channelId, ${_nodeSet.toShortString})"
-
-        updateNodeSet(reEvent) {
-          _.updateNodeByChannelId(channelId) { n =>
-            collectConnections(n) {
-              case other if (other.channel.id != channelId) =>
-                other // keep connections for other channels unchanged
-
-              case _ =>
-                n.createConnection(channelFactory, self)
-            }
-          }
-        }
-
-        ()
-      }
-    }
-
-    res
   }
 
   private def lastError(response: Response): Either[Throwable, LastError] = {
