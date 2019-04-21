@@ -1529,6 +1529,9 @@ trait MongoDBSystem extends Actor {
 
   @inline protected def info(msg: => String) = logger.info(s"[$lnm] $msg")
 
+  @inline protected def info(msg: => String, cause: Throwable) =
+    logger.info(s"[$lnm] $msg", cause)
+
   @inline protected def trace(msg: => String) = logger.trace(s"[$lnm] $msg")
 
   @inline protected def warn(msg: => String) = logger.warn(s"[$lnm] $msg")
