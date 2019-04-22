@@ -184,7 +184,7 @@ private object MacroImpl {
 
             q"${reader}.read(document)"
           } else opt match {
-            case Some(_) => q"document.getAs($pname)($reader)"
+            case Some(_) => q"document.getAsUnflattenedTry($pname)($reader).get"
             case _       => q"document.getAsTry($pname)($reader).get"
           }
         }
