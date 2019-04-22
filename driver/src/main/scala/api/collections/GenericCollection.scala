@@ -560,10 +560,10 @@ trait GenericCollection[P <: SerializationPack with Singleton]
 
     val (firstOp, otherOps) = f(BatchCommands.AggregationFramework)
 
-    val aggregateCursor: Cursor[T] = aggregatorContext[T](
+    val aggregateCursor: Cursor.WithOps[T] = aggregatorContext[T](
       firstOp, otherOps, explain, allowDiskUse,
       bypassDocumentValidation, readConcern, readPreference, batchSize).
-      prepared[Cursor](CursorProducer.defaultCursorProducer[T]).cursor
+      prepared[Cursor.WithOps](CursorProducer.defaultCursorProducer[T]).cursor
 
     cp.produce(aggregateCursor)
   }

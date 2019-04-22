@@ -2,7 +2,7 @@ import scala.concurrent.{ Await, Future }
 import scala.concurrent.duration._
 
 import reactivemongo.bson._
-import reactivemongo.api.{ Cursor, QueryOpts, WrappedCursor }
+import reactivemongo.api.{ Cursor, QueryOpts }
 
 import reactivemongo.api.collections.bson.BSONCollection
 
@@ -533,25 +533,20 @@ class CursorSpec(implicit val ee: ExecutionEnv)
     /*
     "Benchmark" in {
       import reactivemongo.api.tests
-
       def resp(reqID: Long) = tests.fakeResponse(
         document("_id" -> reqID),
         reqID.toInt,
         (reqID - 1L).toInt
       )
-
       var i = 0L
       val max = Int.MaxValue.toLong + 2
-
       implicit val actorSys = akka.actor.ActorSystem(
         "reactivemongo", defaultExecutionContext = Some(ee.executionContext)
       )
-
       def result = tests.foldResponses[Unit](
         _ => Future.successful(resp(i)),
         { (_, _) =>
           if (i % 1000 == 0) println(s"i = $i ? ${(i < max)}")
-
           if (i < max) {
             i = i + 1
             Future.successful(Some(resp(i)))
@@ -563,7 +558,6 @@ class CursorSpec(implicit val ee: ExecutionEnv)
         (_, _) => Future.successful(Cursor.Cont({})),
         (_, l) => Cursor.Fail[Unit](l)
       )
-
       result must beEqualTo({}).await(0, Int.MaxValue.seconds)
     } tag "benchmark"
      */
@@ -577,20 +571,7 @@ class CursorSpec(implicit val ee: ExecutionEnv)
 
   /* A selector matching all the documents, with an unique content for debug. */
   @inline def matchAll(name: String) =
-    BSONDocument(name -> BSONDocument("$exists" -> false))
-
-  trait FooCursor[T] extends Cursor[T] { def foo: String }
-
-  class DefaultFooCursor[T](val wrappee: Cursor[T])
-    extends FooCursor[T] with WrappedCursor[T] {
-    val foo = "Bar"
-  }
-
-  class FlattenedFooCursor[T](cursor: Future[FooCursor[T]])
-    extends reactivemongo.api.FlattenedCursor[T](cursor) with FooCursor[T] {
-
-    val foo = "raB"
-  }
+    BSONDocument(name -> BSONDocument(f"$$exists" -> false))
 }
 
 sealed trait CursorSpecEnv { spec: CursorSpec =>

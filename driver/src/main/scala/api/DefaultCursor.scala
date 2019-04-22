@@ -429,9 +429,9 @@ object DefaultCursor {
 }
 
 /** Internal cursor operations. */
-sealed trait CursorOps[T] { cursor: Cursor[T] =>
+trait CursorOps[T] { cursor: Cursor[T] =>
   /** Sends the initial request. */
-  private[reactivemongo] def makeRequest(maxDocs: Int)(implicit ctx: ExecutionContext): Future[Response]
+  private[reactivemongo] def makeRequest(maxDocs: Int)(implicit ec: ExecutionContext): Future[Response]
 
   /**
    * Returns a function that can be used to get the next response,
@@ -454,9 +454,9 @@ sealed trait CursorOps[T] { cursor: Cursor[T] =>
    *
    * @param id the cursor ID
    */
-  private[reactivemongo] def killCursor(id: Long)(implicit ctx: ExecutionContext): Unit
+  private[reactivemongo] def killCursor(id: Long)(implicit ec: ExecutionContext): Unit
 
-  /** Indicates whether the underlying cursor is taible. */
+  /** Indicates whether the underlying cursor is [[https://docs.mongodb.com/manual/core/tailable-cursors/ tailable]]. */
   def tailable: Boolean
 
   /** Returns the underlying connection. */
