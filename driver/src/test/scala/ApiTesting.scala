@@ -67,10 +67,15 @@ package object tests {
     d.supervisorActor ? message
   }
 
-  def history(sys: MongoDBSystem): Traversable[(Long, String)] =
-    sys.syncHistory.toArray.toList.collect {
+  def history(sys: MongoDBSystem): Traversable[(Long, String)] = {
+    val snap = sys.history.synchronized {
+      sys.history.toArray()
+    }
+
+    snap.toList.collect {
       case (time: Long, event: String) => time -> event
     }
+  }
 
   def nodeSet(sys: MongoDBSystem): NodeSet = sys.getNodeSet
 

@@ -1,6 +1,6 @@
 import org.specs2.concurrent.ExecutionEnv
 
-class UtilSpec(implicit ee: ExecutionEnv)
+final class UtilSpec(implicit ee: ExecutionEnv)
   extends org.specs2.mutable.Specification {
 
   "Utilities" title
@@ -24,6 +24,46 @@ class UtilSpec(implicit ee: ExecutionEnv)
       reactivemongo.api.tests.withContent(resource.toURI) { in =>
         Source.fromInputStream(in).mkString must beTypedEqualTo(
           Source.fromURL(resource).mkString)
+      }
+    }
+  }
+
+  "Simple ring" should {
+    "have a fixed-size & be circular" in {
+      val ring = new reactivemongo.util.SimpleRing[Int](3)
+
+      ring.enqueue(1) must_=== 1 and {
+        ring.enqueue(2) must_=== 2
+      } and {
+        ring.toArray() must_=== Array(1, 2)
+      } and {
+        ring.enqueue(3) must_=== 3
+      } and {
+        ring.enqueue(4) must_=== 3
+      } and {
+        ring.toArray() must_=== Array(2, 3, 4)
+      } and {
+        ring.dequeue() must beSome(2)
+      } and {
+        ring.dequeue() must beSome(3)
+      } and {
+        ring.enqueue(5) must_=== 2
+      } and {
+        ring.dequeue() must beSome(4)
+      } and {
+        ring.toArray() must_=== Array(5)
+      } and {
+        ring.enqueue(6) must_=== 2
+      } and {
+        ring.enqueue(7) must_=== 3
+      } and {
+        ring.enqueue(8) must_=== 3
+      } and {
+        ring.toArray() must_=== Array(6, 7, 8)
+      } and {
+        ring.dequeue() must beSome(6)
+      } and {
+        ring.dequeue() must beSome(7)
       }
     }
   }
