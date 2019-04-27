@@ -18,12 +18,10 @@ object Shaded {
         autoScalaLibrary := false,
         resolvers += Resolver.mavenLocal,
         libraryDependencies ++= Seq(
-          "io.netty" % "netty-handler" % Dependencies.netty,
-          "com.google.guava" % "guava" % "19.0" cross CrossVersion.Disabled()
+          "io.netty" % "netty-handler" % Dependencies.netty
         ),
         assemblyShadeRules in assembly := Seq(
-          ShadeRule.rename("io.netty.**" -> "reactivemongo.io.netty.@1").inAll,
-          ShadeRule.rename("com.google.**" -> "reactivemongo.com.google.@1").inAll
+          ShadeRule.rename("io.netty.**" -> "reactivemongo.io.netty.@1").inAll
         ),
         assemblyMergeStrategy in assembly := {
           case "META-INF/io.netty.versions.properties" => MergeStrategy.last
