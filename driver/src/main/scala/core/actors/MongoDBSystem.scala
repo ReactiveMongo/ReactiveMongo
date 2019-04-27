@@ -156,9 +156,7 @@ trait MongoDBSystem extends Actor {
     val now = System.currentTimeMillis()
     // TODO: nanoTime
 
-    history.synchronized {
-      history.enqueue(now -> event)
-    }
+    self ! (now -> event)
   }
 
   private[reactivemongo] def internalState() = {
@@ -473,6 +471,11 @@ trait MongoDBSystem extends Actor {
   protected def authReceive: Receive
 
   private val processing: Receive = {
+    case (time: Long, event: String) =>
+      history.synchronized {
+        history.enqueue(time -> event)
+      }
+
     case RegisterMonitor => {
       debug(s"Register monitor $sender")
 
@@ -653,6 +656,11 @@ trait MongoDBSystem extends Actor {
   }
 
   val closing: Receive = {
+    case (time: Long, event: String) =>
+      history.synchronized {
+        history.enqueue(time -> event)
+      }
+
     case RegisterMonitor => { monitors += sender; () }
 
     case req @ ExpectingResponse(promise) => {
