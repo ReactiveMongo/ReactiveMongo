@@ -22,8 +22,6 @@ import scala.concurrent.{ Await, Future, Promise }
 import scala.util.{ Failure, Success, Try }
 import scala.util.control.NonFatal
 
-import reactivemongo.com.google.common.collect.{ EvictingQueue, Queues }
-
 import akka.actor.{ Actor, ActorRef, Cancellable }
 
 import reactivemongo.io.netty.channel.{
@@ -37,7 +35,8 @@ import reactivemongo.io.netty.channel.group.{
   DefaultChannelGroup
 }
 
-import reactivemongo.util.LazyLogger
+import reactivemongo.util.{ LazyLogger, SimpleRing }
+
 import reactivemongo.core.errors.GenericDriverException
 import reactivemongo.core.protocol.{
   GetMore,
@@ -124,12 +123,8 @@ trait MongoDBSystem extends Actor {
   private var connectAllJob: Cancellable = NoJob
   private var refreshAllJob: Cancellable = NoJob
 
-  // history
-  private lazy val historyMax = options.maxHistorySize
-  private lazy val history = EvictingQueue.create[(Long, String)](historyMax)
-
-  private[reactivemongo] lazy val syncHistory =
-    Queues.synchronizedQueue(history)
+  private[reactivemongo] lazy val history =
+    new SimpleRing[(Long, String)](options.maxHistorySize)
 
   private type NodeSetHandler = (String, NodeSetInfo, NodeSet) => Unit
   private val nodeSetUpdated: NodeSetHandler =
@@ -154,18 +149,26 @@ trait MongoDBSystem extends Actor {
   private var _setInfo: NodeSetInfo = null
   // <-- monitor
 
-  @inline private def updateHistory(event: String) =
-    syncHistory.offer(System.currentTimeMillis() -> event)
+  @inline private def updateHistory(event: String) = {
+    val now = System.currentTimeMillis()
+    // TODO: nanoTime
 
-  private[reactivemongo] def internalState() = new InternalState(
-    history.toArray(Array.fill[(Long, String)](historyMax)(null)).
-      foldLeft(Array.empty[StackTraceElement]) {
-        case (trace, null) => trace
+    self ! (now -> event)
+  }
 
-        case (trace, (time, event)) => new StackTraceElement(
-          "reactivemongo", event.asInstanceOf[String],
-          s"<time:$time>", -1) +: trace
-      })
+  private[reactivemongo] def internalState() = {
+    val snap = history.synchronized {
+      history.toArray()
+    }
+
+    new InternalState(snap.foldLeft(Array.empty[StackTraceElement]) {
+      case (trace, null) => trace
+
+      case (trace, (time, event)) => new StackTraceElement(
+        "reactivemongo", event.asInstanceOf[String],
+        s"<time:$time>", -1) +: trace
+    })
+  }
 
   private[reactivemongo] def getNodeSet = _nodeSet // For test purposes
 
@@ -302,7 +305,7 @@ trait MongoDBSystem extends Actor {
   }
 
   override def postRestart(reason: Throwable): Unit = {
-    info(s"MongoDBSystem is restarted: $reason")
+    info("MongoDBSystem is restarted", reason)
 
     nodeSetUpdated("Restart", null, _nodeSet)
 
@@ -490,6 +493,11 @@ trait MongoDBSystem extends Actor {
   protected def authReceive: Receive
 
   private val processing: Receive = {
+    case (time: Long, event: String) =>
+      history.synchronized {
+        history.enqueue(time -> event)
+      }
+
     case RegisterMonitor => {
       debug(s"Register monitor $sender")
 
@@ -731,6 +739,11 @@ trait MongoDBSystem extends Actor {
   }
 
   val closing: Receive = {
+    case (time: Long, event: String) =>
+      history.synchronized {
+        history.enqueue(time -> event)
+      }
+
     case RegisterMonitor => { monitors += sender; () }
 
     case req @ ExpectingResponse(promise) => {
