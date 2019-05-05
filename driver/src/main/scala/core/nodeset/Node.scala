@@ -128,7 +128,7 @@ private[reactivemongo] case class Node(
     else this
   }
 
-  def toShortString = s"""Node[$name: $status (${authenticatedConnections.size}/${connected.size}/${connections.size} available connections), latency=${pingInfo.ping}, authenticated={${authenticated.map(_.toShortString) mkString ", "}}]"""
+  def toShortString = s"""Node[$name: $status (${authenticatedConnections.size}/${connected.size}/${connections.size} available connections), latency=${pingInfo.ping}ns, authenticated={${authenticated.map(_.toShortString) mkString ", "}}]"""
 
   /** Returns the read-only information about this node. */
   def info = NodeInfo(name, aliases.result(), host, port, status,

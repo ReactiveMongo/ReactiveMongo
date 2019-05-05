@@ -147,17 +147,15 @@ trait MongoDBSystem extends Actor {
   private lazy val heartbeatFrequency =
     options.heartbeatFrequencyMS.milliseconds
 
+  private val pingTimeout = options.heartbeatFrequencyMS * 1000000L
+
   private val nodeSetLock = new Object {}
   private[reactivemongo] var _nodeSet: NodeSet = null
   private var _setInfo: NodeSetInfo = null
   // <-- monitor
 
-  @inline private def updateHistory(event: String) = {
-    val now = System.currentTimeMillis()
-    // TODO: nanoTime
-
-    self ! (now -> event)
-  }
+  @inline private def updateHistory(event: String): Unit =
+    self ! (System.nanoTime() -> event)
 
   private[reactivemongo] def internalState() = {
     val snap = history.synchronized {
@@ -192,12 +190,7 @@ trait MongoDBSystem extends Actor {
       case result @ Failure(cause) => {
         error("Fails to init the NodeSet", cause)
 
-        _nodeSet = NodeSet(
-          name = None,
-          version = None,
-          nodes = Vector.empty[Node],
-          authenticates = Set.empty[Authenticate])
-
+        _nodeSet = seedNodeSet // anyway
         _setInfo = _nodeSet.info
 
         result
@@ -294,7 +287,7 @@ trait MongoDBSystem extends Actor {
     }
 
     refreshAllJob = scheduler.schedule(
-      heartbeatFrequency, heartbeatFrequency, self, RefreshAll)
+      Duration.Zero, heartbeatFrequency, self, RefreshAll)
   }
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
@@ -471,10 +464,13 @@ trait MongoDBSystem extends Actor {
   protected def authReceive: Receive
 
   private val processing: Receive = {
-    case (time: Long, event: String) =>
+    case (time: Long, event: String) => {
       history.synchronized {
         history.enqueue(time -> event)
       }
+
+      ()
+    }
 
     case RegisterMonitor => {
       debug(s"Register monitor $sender")
@@ -542,8 +538,6 @@ trait MongoDBSystem extends Actor {
                 isMongo26WriteOp = req.isMongo26WriteOp)
 
               chans += con.channel.id
-
-              //println(s"_reserve: ${con.channel.id}")
 
               trace(s"Registering awaiting response for requestID $reqId on channel #${con.channel.id}, awaitingResponses: $resps")
             }
@@ -656,10 +650,13 @@ trait MongoDBSystem extends Actor {
   }
 
   val closing: Receive = {
-    case (time: Long, event: String) =>
+    case (time: Long, event: String) => {
       history.synchronized {
         history.enqueue(time -> event)
       }
+
+      ()
+    }
 
     case RegisterMonitor => { monitors += sender; () }
 
@@ -771,7 +768,7 @@ trait MongoDBSystem extends Actor {
             }
           }
 
-          case _ => error(s"Received response does not correspond to an awaiting request #${response.header.responseTo}: $response")
+          case _ => info(s"Skip response that does not correspond to an awaiting request #${response.header.responseTo} (was discarded?): $response")
         }
       }
 
@@ -808,18 +805,17 @@ trait MongoDBSystem extends Actor {
     ns: NodeSet,
     discardedChannels: Map[ChannelId, Exception]): Unit = {
     // TODO: Refactor with #retry_1?
-    val retried = Map.newBuilder[Int, AwaitingResponse]
 
     requestTracker.withAwaiting { (resps, chans) =>
-      resps.retain { (_, awaitingResponse) =>
+      val retried = Map.newBuilder[Int, AwaitingResponse]
+
+      val withoutRetriedAwaiting = resps.retain { (_, awaitingResponse) =>
         chans -= awaitingResponse.channelID
-
-        val retriedChans = Set.newBuilder[ChannelId]
-
-        //println(s"_release: ${awaitingResponse.channelID}")
 
         discardedChannels.get(awaitingResponse.channelID) match {
           case Some(error) => {
+            val retriedChans = Set.newBuilder[ChannelId]
+
             retry(ns, awaitingResponse) match {
               case Some(awaiting) => {
                 trace(s"Retrying to await response for requestID ${awaiting.requestID} on channel #${awaiting.channelID}: $awaiting")
@@ -840,6 +836,8 @@ trait MongoDBSystem extends Actor {
               }
             }
 
+            chans ++= retriedChans.result()
+
             false
           }
 
@@ -847,6 +845,8 @@ trait MongoDBSystem extends Actor {
             true
         }
       }
+
+      withoutRetriedAwaiting ++= retried.result()
 
       ()
     }
@@ -940,12 +940,11 @@ trait MongoDBSystem extends Actor {
     }
 
     // #retry_1
-    val retried = Map.newBuilder[Int, AwaitingResponse]
-
     requestTracker.withAwaiting { (resps, chans) =>
-      chans -= chanId
-
+      val retried = Map.newBuilder[Int, AwaitingResponse]
       val retriedChans = Set.newBuilder[ChannelId]
+
+      chans -= chanId
 
       resps.retain { (_, awaitingResponse) =>
         if (awaitingResponse.channelID == chanId) {
@@ -1044,24 +1043,23 @@ trait MongoDBSystem extends Actor {
         // Update the details of the node corresponding to the response chan
         val prepared =
           nodeSet.updateNodeByChannelId(response.info._channelId) { node =>
-            val pingInfo =
+            val pingTime: Long = {
               if (node.pingInfo.lastIsMasterId == respTo) {
-                // No longer waiting response for isMaster,
-                // reset the pending state, and update the ping time
-                val pingTime =
-                  System.currentTimeMillis() - node.pingInfo.lastIsMasterTime
+                System.nanoTime() - node.pingInfo.lastIsMasterTime
+              } else { // not accurate - fallback
+                val expected = node.pingInfo.lastIsMasterId
 
-                node.pingInfo.copy(
-                  ping = pingTime,
-                  lastIsMasterTime = 0,
-                  lastIsMasterId = -1,
-                  channelId = None)
+                warn(s"Received unexpected isMaster from ${node.name} response #$respTo (expected #${if (expected != -1) expected.toString else "<none>"})! Please check connectivity.", internalState())
 
-              } else {
-                warn(s"Received unexpected isMaster response: #${node.pingInfo.lastIsMasterId} != $respTo")
-
-                node.pingInfo
+                Long.MaxValue
               }
+            }
+
+            val pingInfo = node.pingInfo.copy(
+              ping = pingTime, // latency
+              lastIsMasterTime = 0,
+              lastIsMasterId = -1,
+              channelId = None)
 
             val nodeStatus = isMaster.status
 
@@ -1318,8 +1316,9 @@ trait MongoDBSystem extends Actor {
   }
 
   private def pickChannel(ns: NodeSet, request: Request): Try[(Node, Connection)] = request.channelIdHint match {
-    case Some(chanId) => ns.pickByChannelId(chanId).map(Success(_)).getOrElse(
-      Failure(new ChannelNotFound(s"#${chanId}", false, internalState)))
+    case Some(chanId) => ns.pickByChannelId(chanId).
+      fold[Try[(Node, Connection)]](Failure(new ChannelNotFound(
+        s"#${chanId}", false, internalState)))(Success(_))
 
     case _ => requestTracker.withAwaiting { (_, chans) =>
       val accept = { c: Connection => !chans.contains(c.channel.id) }
@@ -1464,11 +1463,40 @@ trait MongoDBSystem extends Actor {
     def send(): (Node, Option[Exception]) = { f(); node -> error }
   }
 
-  private def requestIsMaster(node: Node): IsMasterRequest = {
-    // Avoid selecting always the same
-    def pickConnection = Random.shuffle(node.connected).headOption
+  /**
+   * Picks a connection available to send `isMaster`
+   */
+  private def pickMasterConnection(node: Node): Option[Connection] = {
+    val awaitingChannels = requestTracker.channels()
 
-    /*_println(s"requestIsMaster? ${node.connected.headOption.mkString}"); */ pickConnection.fold(new IsMasterRequest(node)) { con =>
+    val freeConnections = node.connected.filterNot { c =>
+      awaitingChannels.contains(c.channel.id)
+    }
+
+    val preferred: Vector[Connection] = {
+      if (freeConnections.nonEmpty) {
+        freeConnections
+      } else {
+        val lessBusy = requestTracker.responses().
+          filter { r => node.connected.exists(_.channel.id == r.channelID) }.
+          groupBy(_.channelID).map { case (chanId, rs) => chanId -> rs.size }.
+          toSeq.sortBy(_._2).take(
+            scala.math.ceil(options.nbChannelsPerNode / 3D).toInt)
+
+        node.connected.filter { c =>
+          lessBusy.contains(c.channel.id)
+        }
+      }
+    }
+
+    val available = if (preferred.nonEmpty) preferred else node.connected
+
+    Random.shuffle(available).headOption
+  }
+
+  private def requestIsMaster(node: Node): IsMasterRequest = {
+
+    /*_println(s"requestIsMaster? ${node.connected.headOption.mkString}"); */ pickMasterConnection(node).fold(new IsMasterRequest(node)) { con =>
       import reactivemongo.api.BSONSerializationPack
       import reactivemongo.api.commands.bson.{
         BSONIsMasterCommandImplicits,
@@ -1483,9 +1511,12 @@ trait MongoDBSystem extends Actor {
         ReadPreference.primaryPreferred,
         "admin") // only "admin" DB for the admin command
 
-      val now = System.currentTimeMillis()
+      val now = System.nanoTime()
 
       def renewedPingInfo = node.pingInfo.copy(
+        ping = { // latency
+          now - node.pingInfo.lastIsMasterTime
+        },
         lastIsMasterTime = now,
         lastIsMasterId = id,
         channelId = Some(con.channel.id))
@@ -1509,14 +1540,7 @@ trait MongoDBSystem extends Actor {
           node = node._copy(pingInfo = renewedPingInfo),
           f = sendFresh)
 
-      } else if ((
-        node.pingInfo.lastIsMasterTime + PingInfo.pingTimeout) < now) {
-
-        // The previous IsMaster request is expired
-        val msg = s"${node.toShortString} hasn't answered in time to last ping! Please check its connectivity"
-
-        warn(msg)
-
+      } else if ((node.pingInfo.lastIsMasterTime + pingTimeout) < now) {
         // Unregister the pending requests for this node
         val wasPrimary = node.status == NodeStatus.Primary
 
@@ -1525,6 +1549,11 @@ trait MongoDBSystem extends Actor {
           //connections = Vector.empty,
           authenticated = Set.empty,
           pingInfo = renewedPingInfo)
+
+        // The previous IsMaster request is expired
+        val msg = s"${updated.toShortString} hasn't answered in time to last ping! Please check its connectivity"
+
+        warn(msg, internalState())
 
         // Reset node state
         updateHistory {
@@ -1710,6 +1739,10 @@ private[actors] final class RequestTracker {
   private val awaitingResponses = LinkedHashMap.empty[Int, AwaitingResponse]
 
   private val awaitingChannels = Set.empty[ChannelId]
+
+  @inline def channels() = awaitingChannels.toSet
+
+  @inline def responses() = awaitingResponses.values.toSeq
 
   private[actors] def withAwaiting[T](f: Function2[LinkedHashMap[Int, AwaitingResponse], Set[ChannelId], T]): T =
     awaitingResponses.synchronized {

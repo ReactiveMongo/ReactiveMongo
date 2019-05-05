@@ -10,12 +10,13 @@ import org.specs2.matcher.MatchResult
 
 import reactivemongo.bson.BSONDocument
 
+import reactivemongo.api.MongoConnectionOptions
+
 import reactivemongo.core.nodeset.{
   Authenticated,
   Connection,
   ConnectionStatus,
   NodeStatus,
-  PingInfo,
   Node
 }
 import reactivemongo.core.protocol.Request
@@ -36,7 +37,10 @@ trait UnresponsiveSecondaryTest { parent: NodeSetSpec =>
 
   def unresponsiveSecondarySpec =
     "mark as Unknown the unresponsive secondary" in {
-      withConAndSys(usd) { (con, ref) =>
+      val opts = MongoConnectionOptions(nbChannelsPerNode = 1)
+      val pingTimeout = opts.heartbeatFrequencyMS * 1000000L
+
+      withConAndSys(usd, opts) { (con, ref) =>
         def nsState: Set[(String, NodeStatus)] =
           nodeSet(ref.underlyingActor).nodes.map { n =>
             n.name -> n.status
@@ -85,8 +89,7 @@ trait UnresponsiveSecondaryTest { parent: NodeSetSpec =>
                     // Simulate a isMaster timeout for node2
                     n.copy(pingInfo = n.pingInfo.copy(
                       lastIsMasterId = 1,
-                      lastIsMasterTime = (
-                        System.currentTimeMillis() - PingInfo.pingTimeout)))
+                      lastIsMasterTime = System.nanoTime() - pingTimeout))
                   } else n
                 }
               }

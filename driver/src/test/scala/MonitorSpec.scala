@@ -238,7 +238,7 @@ final class MonitorSpec(implicit ee: ExecutionEnv)
             // so the incoming buffer is not read
             // (and so no isMaster response).
 
-            val before4 = System.currentTimeMillis()
+            val before4 = System.nanoTime()
 
             connections1.headOption.foreach { con1 =>
               con1.channel.deregister()
