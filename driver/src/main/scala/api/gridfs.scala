@@ -282,7 +282,7 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
    */
   @deprecated("Use [[iterateeWithMD5]]", "0.12.0")
   def iteratee[Id <: pack.Value](file: FileToSave[pack.type, Id], chunkSize: Int = 262144)(implicit readFileReader: pack.Reader[ReadFile[Id]], @deprecatedName('ctx) ec: ExecutionContext, idProducer: IdProducer[Id], docWriter: BSONDocumentWriter[file.pack.Document]): Iteratee[Array[Byte], Future[ReadFile[Id]]] =
-    iterateeMaybeMD5[Id, Unit](file, {}, (_: Unit, chunk) => {},
+    iterateeMaybeMD5[Id, Unit](file, {}, (_: Unit, _) => {},
       { _: Unit => Future.successful(Option.empty[Array[Byte]]) }, chunkSize)
 
   /**
@@ -365,7 +365,7 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
         val uploadDate = file.uploadDate.getOrElse(System.nanoTime() / 1000000)
 
         for {
-          f <- writeChunk(n, previous)
+          _ <- writeChunk(n, previous)
           md5 <- digestFinalize(md)
           bson = BSONDocument(idProducer("_id" -> file.id)) ++ (
             "filename" -> file.filename.map(BSONString(_)),
@@ -376,7 +376,7 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
             "md5" -> md5.map(Converters.hex2Str),
             "metadata" -> option(!pack.isEmpty(file.metadata), file.metadata))
 
-          res <- asBSON(files.name).insert(bson).map { _ =>
+          res <- asBSON(files.name).insert.one(bson).map { _ =>
             val buf = ChannelBufferWritableBuffer()
             BSONSerializationPack.writeToBuffer(buf, bson)
             pack.readAndDeserialize(buf.toReadableBuffer, readFileReader)
@@ -392,7 +392,7 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
           "n" -> BSONInteger(n),
           "data" -> BSONBinary(array, Subtype.GenericBinarySubtype))
 
-        asBSON(chunks.name).insert(bson)
+        asBSON(chunks.name).insert.one(bson)
       }
     }
 

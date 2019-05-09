@@ -30,7 +30,19 @@ private[actors] class RequestIdGenerator(val lower: Int, val upper: Int) {
   override lazy val hashCode: Int = (lower, upper).hashCode
 }
 
-private[actors] object RequestIdGenerator {
+private[reactivemongo] object RequestIdGenerator {
   def unapply(g: RequestIdGenerator): Option[(Int, Int)] =
     Some(g.lower -> g.upper)
+
+  // all requestIds [0, 1000[ are for isMaster messages
+  val isMaster = new RequestIdGenerator(0, 999)
+
+  // all requestIds [1000, 2000[ are for getnonce messages
+  val getNonce = new RequestIdGenerator(1000, 1999) // CR auth
+
+  // all requestIds [2000, 3000[ are for authenticate messages
+  val authenticate = new RequestIdGenerator(2000, 2999)
+
+  // all requestIds [3000[ are for common messages
+  val common = new RequestIdGenerator(3000, Int.MaxValue - 1)
 }

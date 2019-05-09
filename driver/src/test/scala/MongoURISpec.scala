@@ -15,7 +15,7 @@ import reactivemongo.core.errors.GenericDriverException
 
 import org.specs2.concurrent.ExecutionEnv
 
-class MongoURISpec(implicit ee: ExecutionEnv)
+final class MongoURISpec(implicit ee: ExecutionEnv)
   extends org.specs2.mutable.Specification {
 
   "Mongo URI" title
@@ -33,7 +33,7 @@ class MongoURISpec(implicit ee: ExecutionEnv)
           hosts = List("host1" -> 27017),
           db = None,
           authenticate = None,
-          options = MongoConnectionOptions(),
+          options = MongoConnectionOptions.default,
           ignoredOptions = List.empty))
     }
 
@@ -44,7 +44,7 @@ class MongoURISpec(implicit ee: ExecutionEnv)
         hosts = List("host1" -> 27017),
         db = None,
         authenticate = None,
-        options = MongoConnectionOptions(),
+        options = MongoConnectionOptions.default,
         ignoredOptions = List("foo"))
 
       parseURI(withOpts) must beSuccessfulTry(expected) and {
@@ -61,7 +61,7 @@ class MongoURISpec(implicit ee: ExecutionEnv)
           hosts = List("host1" -> 27018),
           db = None,
           authenticate = None,
-          options = MongoConnectionOptions(),
+          options = MongoConnectionOptions.default,
           ignoredOptions = List()))
     }
 
@@ -82,7 +82,7 @@ class MongoURISpec(implicit ee: ExecutionEnv)
           hosts = List("host1" -> 27017),
           db = Some("somedb"),
           authenticate = None,
-          options = MongoConnectionOptions(),
+          options = MongoConnectionOptions.default,
           ignoredOptions = List()))
     }
 
@@ -93,7 +93,7 @@ class MongoURISpec(implicit ee: ExecutionEnv)
           hosts = List("host1" -> 27017),
           db = Some("somedb"),
           authenticate = Some(Authenticate("somedb", "user123", Some("passwd123"))),
-          options = MongoConnectionOptions(credentials = Map(
+          options = MongoConnectionOptions.default.copy(credentials = Map(
             "somedb" -> Credential("user123", Some("passwd123")))),
           ignoredOptions = List.empty))
     }
@@ -111,7 +111,7 @@ class MongoURISpec(implicit ee: ExecutionEnv)
           hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
           db = Some("somedb"),
           authenticate = Some(Authenticate("somedb", "user123", Some("passwd123"))),
-          options = MongoConnectionOptions(
+          options = MongoConnectionOptions.default.copy(
             authenticationMechanism = ScramSha1Authentication,
             credentials = Map("somedb" -> Credential(
               "user123", Some("passwd123")))),
@@ -127,7 +127,7 @@ class MongoURISpec(implicit ee: ExecutionEnv)
           db = Some("somedb"),
           authenticate = Some(Authenticate(
             "authdb", "user123", Some(";qGu:je/LX}nN\\8"))),
-          options = MongoConnectionOptions(
+          options = MongoConnectionOptions.default.copy(
             authenticationDatabase = Some("authdb"),
             credentials = Map(
               "authdb" -> Credential("user123", Some(";qGu:je/LX}nN\\8")))),
@@ -142,7 +142,7 @@ class MongoURISpec(implicit ee: ExecutionEnv)
           hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
           db = Some("somedb"),
           authenticate = Some(Authenticate("somedb", "", None)),
-          options = MongoConnectionOptions(
+          options = MongoConnectionOptions.default.copy(
             authenticationMechanism = X509Authentication,
             credentials = Map("somedb" -> Credential("", None))),
           ignoredOptions = List("foo")))
@@ -156,7 +156,7 @@ class MongoURISpec(implicit ee: ExecutionEnv)
           hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
           db = Some("somedb"),
           authenticate = Some(Authenticate("somedb", "username@test.com,CN=127.0.0.1,OU=TEST_CLIENT,O=TEST_CLIENT,L=LONDON,ST=LONDON,C=UK", None)),
-          options = MongoConnectionOptions(
+          options = MongoConnectionOptions.default.copy(
             authenticationMechanism = X509Authentication,
             credentials = Map(
               "somedb" -> Credential("username@test.com,CN=127.0.0.1,OU=TEST_CLIENT,O=TEST_CLIENT,L=LONDON,ST=LONDON,C=UK", None))),
@@ -170,7 +170,7 @@ class MongoURISpec(implicit ee: ExecutionEnv)
         hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
         db = Some("somedb"),
         authenticate = Some(Authenticate("somedb", "user123", Some("passwd123"))),
-        options = MongoConnectionOptions(
+        options = MongoConnectionOptions.default.copy(
           writeConcern = WriteConcern.Journaled,
           credentials = Map(
             "somedb" -> Credential("user123", Some("passwd123")))),
@@ -184,7 +184,7 @@ class MongoURISpec(implicit ee: ExecutionEnv)
         hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
         db = Some("somedb"),
         authenticate = Some(Authenticate("somedb", "user123", Some("passwd123"))),
-        options = MongoConnectionOptions(
+        options = MongoConnectionOptions.default.copy(
           writeConcern = WriteConcern.Default.copy(
             w = reactivemongo.api.commands.WriteConcern.Majority),
           credentials = Map(
@@ -199,7 +199,7 @@ class MongoURISpec(implicit ee: ExecutionEnv)
         hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
         db = Some("somedb"),
         authenticate = Some(Authenticate("somedb", "user123", Some("passwd123"))),
-        options = MongoConnectionOptions(
+        options = MongoConnectionOptions.default.copy(
           writeConcern = WriteConcern.Default.copy(
             w = reactivemongo.api.commands.WriteConcern.TagSet("anyTag")),
           credentials = Map(
@@ -214,7 +214,7 @@ class MongoURISpec(implicit ee: ExecutionEnv)
         hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
         db = Some("somedb"),
         authenticate = Some(Authenticate("somedb", "user123", Some("passwd123"))),
-        options = MongoConnectionOptions(
+        options = MongoConnectionOptions.default.copy(
           writeConcern = WriteConcern.Default.copy(
             w = reactivemongo.api.commands.WriteConcern.
               WaitForAcknowledgments(5)),
@@ -231,7 +231,7 @@ class MongoURISpec(implicit ee: ExecutionEnv)
           hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
           db = Some("somedb"),
           authenticate = Some(Authenticate("somedb", "user123", Some("passwd123"))),
-          options = MongoConnectionOptions(
+          options = MongoConnectionOptions.default.copy(
             writeConcern = WriteConcern.Default.copy(j = true),
             credentials = Map(
               "somedb" -> Credential("user123", Some("passwd123")))),
@@ -246,7 +246,7 @@ class MongoURISpec(implicit ee: ExecutionEnv)
           hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
           db = Some("somedb"),
           authenticate = Some(Authenticate("somedb", "user123", Some("passwd123"))),
-          options = MongoConnectionOptions(
+          options = MongoConnectionOptions.default.copy(
             writeConcern = WriteConcern.Journaled.copy(j = false),
             credentials = Map(
               "somedb" -> Credential("user123", Some("passwd123")))),
@@ -261,7 +261,7 @@ class MongoURISpec(implicit ee: ExecutionEnv)
           hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
           db = Some("somedb"),
           authenticate = Some(Authenticate("somedb", "user123", Some("passwd123"))),
-          options = MongoConnectionOptions(
+          options = MongoConnectionOptions.default.copy(
             writeConcern = WriteConcern.Default.copy(wtimeout = Some(1543)),
             credentials = Map(
               "somedb" -> Credential("user123", Some("passwd123")))),
@@ -286,7 +286,7 @@ class MongoURISpec(implicit ee: ExecutionEnv)
     s"parse $defaultFo with success" in {
       parseURI(defaultFo) must beSuccessfulTry[ParsedURI].like {
         case uri =>
-          strategyStr(uri) must_== "100 milliseconds100 milliseconds200 milliseconds300 milliseconds500 milliseconds600 milliseconds700 milliseconds800 milliseconds1000 milliseconds1100 milliseconds1200 milliseconds"
+          strategyStr(uri) must_=== "100 milliseconds100 milliseconds200 milliseconds300 milliseconds500 milliseconds600 milliseconds700 milliseconds800 milliseconds1000 milliseconds1100 milliseconds1200 milliseconds"
       }
     }
 
@@ -295,7 +295,7 @@ class MongoURISpec(implicit ee: ExecutionEnv)
     s"parse $remoteFo with success" in {
       parseURI(remoteFo) must beSuccessfulTry[ParsedURI].like {
         case uri =>
-          strategyStr(uri) must_== "100 milliseconds100 milliseconds200 milliseconds300 milliseconds500 milliseconds600 milliseconds700 milliseconds800 milliseconds1000 milliseconds1100 milliseconds1200 milliseconds1300 milliseconds1500 milliseconds1600 milliseconds1700 milliseconds1800 milliseconds2000 milliseconds"
+          strategyStr(uri) must_=== "100 milliseconds100 milliseconds200 milliseconds300 milliseconds500 milliseconds600 milliseconds700 milliseconds800 milliseconds1000 milliseconds1100 milliseconds1200 milliseconds1300 milliseconds1500 milliseconds1600 milliseconds1700 milliseconds1800 milliseconds2000 milliseconds"
       }
     }
 
@@ -304,7 +304,7 @@ class MongoURISpec(implicit ee: ExecutionEnv)
     s"parse $strictFo with success" in {
       parseURI(strictFo) must beSuccessfulTry[ParsedURI].like {
         case uri =>
-          strategyStr(uri) must_== "100 milliseconds100 milliseconds200 milliseconds300 milliseconds500 milliseconds600 milliseconds"
+          strategyStr(uri) must_=== "100 milliseconds100 milliseconds200 milliseconds300 milliseconds500 milliseconds600 milliseconds"
       }
     }
 
@@ -313,7 +313,7 @@ class MongoURISpec(implicit ee: ExecutionEnv)
     s"parse $customFo with success" in {
       parseURI(customFo) must beSuccessfulTry[ParsedURI].like {
         case uri =>
-          strategyStr(uri) must_== "123 milliseconds615 milliseconds1230 milliseconds1845 milliseconds2460 milliseconds"
+          strategyStr(uri) must_=== "123 milliseconds615 milliseconds1230 milliseconds1845 milliseconds2460 milliseconds"
       }
     }
 
@@ -353,7 +353,15 @@ class MongoURISpec(implicit ee: ExecutionEnv)
 
     s"parse $monRefMS with success" in {
       parseURI(monRefMS) must beSuccessfulTry[ParsedURI].like {
-        case uri => uri.options.heartbeatFrequencyMS must_== 567
+        case uri => uri.options.heartbeatFrequencyMS must_=== 567
+      }
+    }
+
+    val maxInFlight = "mongodb://host1?rm.maxInFlightRequestsPerChannel=128"
+
+    s"parse $maxInFlight with success" in {
+      parseURI(maxInFlight) must beSuccessfulTry[ParsedURI].like {
+        case uri => uri.options.maxInFlightRequestsPerChannel must beSome(128)
       }
     }
 
@@ -477,7 +485,7 @@ class MongoURISpec(implicit ee: ExecutionEnv)
             db = Some("somedb"),
             authenticate = Some(
               Authenticate("admin", "user123", Some("passwd123"))),
-            options = MongoConnectionOptions(
+            options = MongoConnectionOptions.default.copy(
               sslEnabled = false, // overriden from URI
               authenticationDatabase = Some("admin"),
               authenticationMechanism = ScramSha1Authentication,

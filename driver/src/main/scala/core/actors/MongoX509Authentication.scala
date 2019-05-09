@@ -12,14 +12,14 @@ private[reactivemongo] trait MongoX509Authentication { system: MongoDBSystem =>
     nextAuth: Authenticate): Connection = {
 
     connection.send(X509Authenticate(Option(nextAuth.user))(
-      f"$$external").maker(RequestId.authenticate.next))
+      f"$$external").maker(RequestIdGenerator.authenticate.next))
 
     connection.copy(authenticating = Some(
       X509Authenticating(nextAuth.db, nextAuth.user)))
   }
 
   protected val authReceive: Receive = {
-    case resp: Response if RequestId.authenticate accepts resp => {
+    case resp: Response if RequestIdGenerator.authenticate accepts resp => {
       val chanId = resp.info._channelId
 
       debug(s"AUTH: got authenticated response #${chanId}!")

@@ -209,6 +209,8 @@ final class NodeSet private[jmx] () extends NotificationBroadcasterSupport
   private var nearest: String = null
   private var nodes: String = null
   private var secondaries: String = null
+  private var awaitingRequests: Int = -1
+  private var maxAwaitingRequestsPerChannel: Int = -1
 
   // MBean attributes
 
@@ -222,6 +224,8 @@ final class NodeSet private[jmx] () extends NotificationBroadcasterSupport
   def getPrimary(): String = primary
   def getNodes() = nodes
   def getSecondaries() = secondaries
+  def getAwaitingRequests() = awaitingRequests
+  def getMaxAwaitingRequestsPerChannel() = maxAwaitingRequestsPerChannel
 
   // Notification support
 
@@ -250,6 +254,8 @@ final class NodeSet private[jmx] () extends NotificationBroadcasterSupport
     var _nearest: String = null
     var _nodes: String = null
     var _secondaries: String = null
+    var _awaitingRequests: Int = -1
+    var _maxAwaitingRequestsPerChannel: Int = -1
 
     info.foreach { i =>
       _name = i.name.getOrElse(null)
@@ -259,6 +265,10 @@ final class NodeSet private[jmx] () extends NotificationBroadcasterSupport
       _nearest = i.nearest.fold[String](null)(_.toString)
       _nodes = i.nodes.toArray.map(_.toString).mkString("; ")
       _secondaries = i.secondaries.toArray.map(_.toString).mkString("; ")
+      _awaitingRequests = i.awaitingRequests.getOrElse(-1)
+
+      _maxAwaitingRequestsPerChannel =
+        i.maxAwaitingRequestsPerChannel.getOrElse(-1)
     }
 
     attributeChanged("Name", "The name of node set has changed",
@@ -283,6 +293,16 @@ final class NodeSet private[jmx] () extends NotificationBroadcasterSupport
     attributeChanged("Secondaries", "The information about the secondary nodes",
       secondaries, _secondaries) { secondaries = _ }
 
+    attributeChanged[java.lang.Integer](
+      "AwaitingRequests", "The number of awaiting requests",
+      awaitingRequests, _awaitingRequests) { awaitingRequests = _ }
+
+    attributeChanged[java.lang.Integer](
+      "MaxAwaitingRequestsPerChannel",
+      "The maximum number of awaiting requests per channel",
+      maxAwaitingRequestsPerChannel, _maxAwaitingRequestsPerChannel) {
+        maxAwaitingRequestsPerChannel = _
+      }
   }
 }
 

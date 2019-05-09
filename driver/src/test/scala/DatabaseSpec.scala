@@ -22,7 +22,7 @@ class DatabaseSpec(implicit ee: ExecutionEnv)
         val fos = FailoverStrategy(FiniteDuration(50, "ms"), 20, _ * 2D)
 
         Common.connection.database(Common.commonDb, fos).
-          map(_ => {}) must beEqualTo({}).await(1, estTimeout(fos))
+          map(_ => {}) must beTypedEqualTo({}).await(1, estTimeout(fos))
 
       }
 
@@ -43,7 +43,7 @@ class DatabaseSpec(implicit ee: ExecutionEnv)
           await(0, estmout * 2) and {
             val duration = System.currentTimeMillis() - before
 
-            duration must be_<(estmout.toMillis + 2000 /* ms */ )
+            duration must be_<(estmout.toMillis + 2500 /* ms */ )
           }
       } tag "unit"
     }

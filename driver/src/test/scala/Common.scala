@@ -42,7 +42,7 @@ object Common extends CommonAuth {
 
   val failoverStrategy = FailoverStrategy(retries = failoverRetries)
 
-  private val timeoutFactor = 1.25D
+  private val timeoutFactor = 1.18D
   def estTimeout(fos: FailoverStrategy): FiniteDuration =
     (1 to fos.retries).foldLeft(fos.initialDelay) { (d, i) =>
       d + (fos.initialDelay * ((timeoutFactor * fos.delayFactor(i)).toLong))
@@ -56,7 +56,7 @@ object Common extends CommonAuth {
   }
 
   val DefaultOptions = {
-    val a = MongoConnectionOptions(
+    val a = MongoConnectionOptions.default.copy(
       failoverStrategy = failoverStrategy,
       heartbeatFrequencyMS = (timeout.toMillis / 2).toInt,
       credentials = DefaultCredentials.map("" -> _)(scala.collection.breakOut),

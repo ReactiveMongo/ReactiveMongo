@@ -21,7 +21,7 @@ import reactivemongo.api.commands.{
  * @define writeConcernParam the [[https://docs.mongodb.com/manual/reference/write-concern/ writer concern]] to be used
  * @define orderedParam the [[https://docs.mongodb.com/manual/reference/method/db.collection.update/#perform-an-unordered-update ordered]] behaviour
  */
-private[reactivemongo] trait UpdateOps[P <: SerializationPack with Singleton] {
+trait UpdateOps[P <: SerializationPack with Singleton] {
   collection: GenericCollection[P] =>
 
   object UpdateCommand

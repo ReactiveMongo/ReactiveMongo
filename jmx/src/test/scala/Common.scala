@@ -15,7 +15,7 @@ object Common extends CommonAuth {
   }
 
   val DefaultOptions = {
-    val a = MongoConnectionOptions(
+    val a = MongoConnectionOptions.default.copy(
       nbChannelsPerNode = 2,
       credentials = DefaultCredentials.map("" -> _)(scala.collection.breakOut),
       keyStore = sys.props.get("test.keyStore").map { uri =>
