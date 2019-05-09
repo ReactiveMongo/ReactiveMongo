@@ -56,6 +56,23 @@ private[reactivemongo] case class Node(
       authenticated.exists(_ == auth)
     }))
 
+  // Only for signaling (isMaster)
+  private var signaling: Option[Connection] = None
+
+  @inline def signalingConnection: Option[Connection] = signaling
+
+  private[core] def createSignalingConnection(
+    channelFactory: ChannelFactory,
+    receiver: ActorRef): Try[Node] = {
+    if (signaling != null) {
+      Success(this)
+    } else {
+      createConnection(channelFactory, receiver).map { con =>
+        _copy(signalingConnection = Some(con))
+      }
+    }
+  }
+
   private[core] def createNeededChannels(
     channelFactory: ChannelFactory,
     receiver: ActorRef,
@@ -107,12 +124,14 @@ private[reactivemongo] case class Node(
     protocolMetadata: ProtocolMetadata = this.protocolMetadata,
     pingInfo: PingInfo = this.pingInfo,
     isMongos: Boolean = this.isMongos,
-    aliases: Set[String] = this.aliases.result()): Node = {
+    aliases: Set[String] = this.aliases.result(),
+    signalingConnection: Option[Connection] = this.signaling): Node = {
 
     val node = copy(name, status, connections, authenticated, tags,
       protocolMetadata, pingInfo, isMongos)
 
     node.aliases ++= aliases
+    node.signaling = signalingConnection
 
     node
   }

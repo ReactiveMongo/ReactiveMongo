@@ -1495,8 +1495,10 @@ trait MongoDBSystem extends Actor {
   }
 
   private def requestIsMaster(node: Node): IsMasterRequest = {
+    val masterCon: Option[Connection] =
+      node.signalingConnection orElse pickMasterConnection(node)
 
-    /*_println(s"requestIsMaster? ${node.connected.headOption.mkString}"); */ pickMasterConnection(node).fold(new IsMasterRequest(node)) { con =>
+    masterCon.fold(new IsMasterRequest(node)) { con =>
       import reactivemongo.api.BSONSerializationPack
       import reactivemongo.api.commands.bson.{
         BSONIsMasterCommandImplicits,
@@ -1553,7 +1555,7 @@ trait MongoDBSystem extends Actor {
         // The previous IsMaster request is expired
         val msg = s"${updated.toShortString} hasn't answered in time to last ping! Please check its connectivity"
 
-        warn(msg, internalState())
+        warn(s"${msg} (<time:${System.nanoTime()}>).", internalState())
 
         // Reset node state
         updateHistory {
@@ -1562,7 +1564,15 @@ trait MongoDBSystem extends Actor {
         }
 
         new IsMasterRequest(
-          node = updated,
+          node = updated.createSignalingConnection(channelFactory, self) match {
+            case Success(n) => n
+
+            case Failure(e) => {
+              warn(s"Fails to create signaling connection on ${node.toShortString}", e)
+
+              updated
+            }
+          },
           f = sendFresh,
           error = Some {
             val cause = new ClosedException(s"$msg ($lnm)")
