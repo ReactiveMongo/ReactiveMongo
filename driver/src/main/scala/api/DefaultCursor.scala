@@ -188,7 +188,7 @@ object DefaultCursor {
       }
 
       if (lessThenV32) {
-        { (off: Int, maxDocs: Int, req: RequestMakerExpectingResponse) =>
+        { (_: Int, maxDocs: Int, req: RequestMakerExpectingResponse) =>
           val max = if (maxDocs > 0) maxDocs else Int.MaxValue
 
           { implicit ec: ExecutionContext =>

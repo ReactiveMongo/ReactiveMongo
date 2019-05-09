@@ -177,8 +177,3 @@ case object Closed
 
 @deprecated("Unused", "0.16.0")
 case object GetLastMetadata
-
-private[actors] object IsMasterResponse {
-  def unapply(response: Response): Option[Response] =
-    if (RequestId.isMaster accepts response) Some(response) else None
-}

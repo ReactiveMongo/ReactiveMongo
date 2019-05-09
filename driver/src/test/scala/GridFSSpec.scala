@@ -56,7 +56,7 @@ class GridFSSpec(implicit ee: ExecutionEnv)
     lazy val content1 = (1 to 100).view.map(_.toByte).toArray
 
     "ensure the indexes are ok" in {
-      gfs.ensureIndex() must beTrue.await(1, timeout)
+      gfs.ensureIndex() must beTrue.await(2, timeout)
     }
 
     "store a file without a computed MD5" in {

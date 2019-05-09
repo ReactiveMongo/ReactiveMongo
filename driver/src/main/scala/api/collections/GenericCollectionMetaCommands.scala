@@ -13,6 +13,7 @@ import reactivemongo.api.commands.{
   UnitBox
 }
 
+// TODO: Move to CollectionMetaCommands in parent package
 /** The meta commands for collection that require the serialization pack. */
 private[reactivemongo] trait GenericCollectionMetaCommands[P <: SerializationPack with Singleton] { self: GenericCollection[P] =>
 

@@ -74,7 +74,7 @@ class Failover[T](message: T, connection: MongoConnection, @deprecatedName('stra
     }
   }
 
-  private def isRetryable(throwable: Throwable) = throwable match {
+  private def isRetryable(throwable: Throwable): Boolean = throwable match {
     case e: ChannelNotFound             => e.retriable
     case _: NotAuthenticatedException   => true
     case _: PrimaryUnavailableException => true

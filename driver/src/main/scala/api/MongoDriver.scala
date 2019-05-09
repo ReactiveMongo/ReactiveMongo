@@ -68,7 +68,7 @@ class MongoDriver(
    * @param name $connectionNameParam
    */
   @deprecated("Use `connection` without `authentications` (but possibly without `options.credentials`)", "0.14.0")
-  def connection(nodes: Seq[String], options: MongoConnectionOptions = MongoConnectionOptions(), authentications: Seq[Authenticate] = Seq.empty, name: Option[String] = None): MongoConnection = {
+  def connection(nodes: Seq[String], options: MongoConnectionOptions = MongoConnectionOptions.default, authentications: Seq[Authenticate] = Seq.empty, name: Option[String] = None): MongoConnection = {
     val credentials = options.credentials ++ authentications.map { a =>
       a.db -> MongoConnectionOptions.Credential(a.user, a.password)
     }
@@ -85,7 +85,7 @@ class MongoDriver(
    * @param nodes $nodesParam
    */
   def connection(nodes: Seq[String]): MongoConnection = Await.result(
-    askConnection(nodes, MongoConnectionOptions(), Option.empty), Duration.Inf)
+    askConnection(nodes, MongoConnectionOptions.default, Option.empty), Duration.Inf)
 
   /**
    * Creates a new MongoConnection.
@@ -156,7 +156,9 @@ class MongoDriver(
     if (!parsedURI.ignoredOptions.isEmpty && strictUri) {
       Failure(new IllegalArgumentException(s"The connection URI contains unsupported options: ${parsedURI.ignoredOptions.mkString(", ")}"))
     } else {
-      if (!parsedURI.ignoredOptions.isEmpty) logger.warn(s"Some options were ignored because they are not supported (yet): ${parsedURI.ignoredOptions.mkString(", ")}")
+      if (!parsedURI.ignoredOptions.isEmpty) {
+        logger.warn(s"Some options were ignored because they are not supported (yet): ${parsedURI.ignoredOptions.mkString(", ")}")
+      }
 
       Success(connection(parsedURI.hosts.map(h => h._1 + ':' + h._2), parsedURI.options, parsedURI.authenticate.toSeq, name))
     }
@@ -179,6 +181,7 @@ class MongoDriver(
    *
    * @param parsedURI $parsedURIParam
    */
+  @deprecated("Use a safe `connection` as `Try`", "0.17.0")
   def connection(parsedURI: MongoConnection.ParsedURI): MongoConnection =
     connection(parsedURI, None, false).get // Unsafe
 

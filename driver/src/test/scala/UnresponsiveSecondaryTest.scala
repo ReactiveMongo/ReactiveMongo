@@ -37,7 +37,7 @@ trait UnresponsiveSecondaryTest { parent: NodeSetSpec =>
 
   def unresponsiveSecondarySpec =
     "mark as Unknown the unresponsive secondary" in {
-      val opts = MongoConnectionOptions(nbChannelsPerNode = 1)
+      val opts = MongoConnectionOptions.default.copy(nbChannelsPerNode = 1)
       val pingTimeout = opts.heartbeatFrequencyMS * 1000000L
 
       withConAndSys(usd, opts) { (con, ref) =>
@@ -46,7 +46,7 @@ trait UnresponsiveSecondaryTest { parent: NodeSetSpec =>
             n.name -> n.status
           }.toSet
 
-        withConMon1(ref.underlyingActor.name) { conMon =>
+        withConMon1(ref.underlyingActor.name) { _ =>
           val channels = List.newBuilder[Channel]
 
           (for {
@@ -69,7 +69,7 @@ trait UnresponsiveSecondaryTest { parent: NodeSetSpec =>
                   n.copy(
                     authenticated = Set(
                       Authenticated(Common.commonDb, "test")),
-                    connections = Vector(connectedCon(chan)))
+                    connections = Vector(connectedCon(chan, true)))
                 }
               }
 
@@ -148,11 +148,13 @@ trait UnresponsiveSecondaryTest { parent: NodeSetSpec =>
     usSys.actorSelection(s"/user/Monitor-$name").
       resolveOne(timeout).flatMap(f)
 
-  private def connectedCon(channel: Channel) = Connection(
-    channel = channel,
-    status = ConnectionStatus.Connected,
-    authenticated = Set(Authenticated(Common.commonDb, "test")),
-    authenticating = None)
+  private def connectedCon(channel: Channel, signaling: Boolean) =
+    new Connection(
+      channel = channel,
+      status = ConnectionStatus.Connected,
+      authenticated = Set(Authenticated(Common.commonDb, "test")),
+      authenticating = None,
+      signaling = signaling)
 
   private def isPrim = BSONDocument(
     "ok" -> 1,

@@ -52,7 +52,7 @@ object ScramSha1Initiate extends BSONCommandResultMaker[ScramSha1Challenge] {
   def parseResponse(response: Response): Either[CommandError, ScramSha1Challenge] = apply(response)
 
   def apply(bson: BSONDocument) = {
-    CommandError.checkOk(bson, Some("authenticate"), (doc, name) => {
+    CommandError.checkOk(bson, Some("authenticate"), (doc, _) => {
       FailedAuthentication(doc.getAs[BSONString]("errmsg").
         map(_.value).getOrElse(""), Some(doc))
     }).map[Either[CommandError, ScramSha1Challenge]](Left(_)).getOrElse {
@@ -307,7 +307,7 @@ object CrAuthenticate extends BSONCommandResultMaker[SuccessfulAuthentication] {
   def parseResponse(response: Response): Either[CommandError, SuccessfulAuthentication] = apply(response)
 
   def apply(document: BSONDocument) = {
-    CommandError.checkOk(document, Some("authenticate"), (doc, name) => {
+    CommandError.checkOk(document, Some("authenticate"), (doc, _) => {
       FailedAuthentication(
         doc.getAs[BSONString]("errmsg").fold("")(_.value), Some(doc))
 
@@ -340,7 +340,7 @@ object X509Authenticate extends BSONCommandResultMaker[SuccessfulAuthentication]
   def parseResponse(response: Response): Either[CommandError, SuccessfulAuthentication] = apply(response)
 
   def apply(document: BSONDocument) = {
-    CommandError.checkOk(document, Some("authenticate"), (doc, name) => {
+    CommandError.checkOk(document, Some("authenticate"), (doc, _) => {
       FailedAuthentication(doc.getAs[BSONString]("errmsg").map(_.value).getOrElse(""), Some(doc))
     }).toLeft(SilentSuccessfulAuthentication)
   }

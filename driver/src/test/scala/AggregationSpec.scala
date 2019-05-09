@@ -98,12 +98,12 @@ class AggregationSpec(implicit ee: ExecutionEnv)
 
     "be inserted" in {
       def insert(data: List[ZipCode]): Future[Unit] = data.headOption match {
-        case Some(zip) => coll.insert(zip).flatMap(_ => insert(data.tail))
+        case Some(zip) => coll.insert.one(zip).flatMap(_ => insert(data.tail))
         case _         => Future.successful({})
       }
 
-      insert(zipCodes) aka "insert" must beEqualTo({}).await(1, timeout) and {
-        coll.count() aka "c#1" must beEqualTo(4).await(1, slowTimeout)
+      insert(zipCodes) must beTypedEqualTo({}).await(1, timeout) and {
+        coll.count() aka "c#1" must beTypedEqualTo(4).await(1, slowTimeout)
       } and {
         slowZipColl.count() aka "c#2" must beEqualTo(4).await(1, slowTimeout)
       }
@@ -211,8 +211,8 @@ class AggregationSpec(implicit ee: ExecutionEnv)
 
       "successfully as a single batch" in {
         withCtx(coll) { (firstOp, pipeline) =>
-          val result = coll.aggregateWith1[BSONDocument]() {
-            framework => firstOp -> pipeline
+          val result = coll.aggregateWith1[BSONDocument]() { _ =>
+            firstOp -> pipeline
           }.collect[List](Int.MaxValue, Cursor.FailOnError[List[BSONDocument]]())
 
           result aka "results" must beEqualTo(expected).await(1, timeout)
@@ -221,17 +221,18 @@ class AggregationSpec(implicit ee: ExecutionEnv)
 
       "with cursor" >> {
         def collect(c: BSONCollection, upTo: Int = Int.MaxValue) = withCtx(c) { (firstOp, pipeline) =>
-          c.aggregateWith1[BSONDocument](batchSize = Some(1)) {
-            framework => firstOp -> pipeline
+          c.aggregateWith1[BSONDocument](batchSize = Some(1)) { _ =>
+            firstOp -> pipeline
           }.collect[List](upTo, Cursor.FailOnError[List[BSONDocument]]())
         }
 
         "without limit (maxDocs)" in {
-          collect(coll) must beEqualTo(expected).await(1, timeout)
+          collect(coll) must beTypedEqualTo(expected).await(1, timeout)
         }
 
         "with limit (maxDocs)" in {
-          collect(coll, 2) must beEqualTo(expected take 2).await(1, timeout)
+          collect(coll, 2) must beTypedEqualTo(expected take 2).
+            await(1, timeout)
         }
 
         "with metadata sort" in {
@@ -402,26 +403,28 @@ class AggregationSpec(implicit ee: ExecutionEnv)
     "be provided with order fixtures" in {
       (for {
         // orders
-        _ <- orders.insert(BSONDocument(
-          "_id" -> 1, "item" -> "abc", "price" -> 12, "quantity" -> 2))
-        _ <- orders.insert(BSONDocument(
-          "_id" -> 2, "item" -> "jkl", "price" -> 20, "quantity" -> 1))
-        _ <- orders.insert(BSONDocument("_id" -> 3))
+        _ <- orders.insert.many(Seq(
+          BSONDocument(
+            "_id" -> 1, "item" -> "abc", "price" -> 12, "quantity" -> 2),
+          BSONDocument(
+            "_id" -> 2, "item" -> "jkl", "price" -> 20, "quantity" -> 1),
+          BSONDocument("_id" -> 3)))
 
         // inventory
-        _ <- inventory.insert(BSONDocument("_id" -> 1, "sku" -> "abc",
-          "description" -> "product 1", "instock" -> 120))
-        _ <- inventory.insert(BSONDocument("_id" -> 2, "sku" -> "def",
-          "description" -> "product 2", "instock" -> 80))
-        _ <- inventory.insert(BSONDocument("_id" -> 3, "sku" -> "ijk",
-          "description" -> "product 3", "instock" -> 60))
-        _ <- inventory.insert(BSONDocument("_id" -> 4, "sku" -> "jkl",
-          "description" -> "product 4", "instock" -> 70))
-        _ <- inventory.insert(BSONDocument(
-          "_id" -> 5,
-          "sku" -> Option.empty[String], "description" -> "Incomplete"))
-        _ <- inventory.insert(BSONDocument("_id" -> 6))
-      } yield ()) must beEqualTo({}).await(0, timeout)
+        _ <- inventory.insert.many(Seq(
+          BSONDocument("_id" -> 1, "sku" -> "abc",
+            "description" -> "product 1", "instock" -> 120),
+          BSONDocument("_id" -> 2, "sku" -> "def",
+            "description" -> "product 2", "instock" -> 80),
+          BSONDocument("_id" -> 3, "sku" -> "ijk",
+            "description" -> "product 3", "instock" -> 60),
+          BSONDocument("_id" -> 4, "sku" -> "jkl",
+            "description" -> "product 4", "instock" -> 70),
+          BSONDocument("_id" -> 5, "sku" -> Option.empty[String],
+            "description" -> "Incomplete"),
+          BSONDocument("_id" -> 6)))
+
+      } yield ()) must beTypedEqualTo({}).await(0, timeout)
     } tag "not_mongo26"
 
     "perform a simple lookup so the joined documents are returned" in {
@@ -511,8 +514,8 @@ class AggregationSpec(implicit ee: ExecutionEnv)
         document("_id" -> 2, "items" -> array(
           document("itemId" -> 4, "quantity" -> 1, "price" -> 23))))
 
-      Future.sequence(fixtures.map { doc => sales.insert(doc) }).
-        map(_ => {}) must beEqualTo({}).await(0, timeout)
+      Future.sequence(fixtures.map { doc => sales.insert.one(doc) }).
+        map(_ => {}) must beTypedEqualTo({}).await(0, timeout)
     } tag "not_mongo26"
 
     "filter when using a '$project' stage" in {
@@ -549,22 +552,24 @@ class AggregationSpec(implicit ee: ExecutionEnv)
     "be provided the fixtures" in {
       (for {
         // orders
-        _ <- orders.insert(BSONDocument(
+        _ <- orders.insert.one(BSONDocument(
           "_id" -> 1, "item" -> "MON1003", "price" -> 350, "quantity" -> 2,
           "specs" -> BSONArray("27 inch", "Retina display", "1920x1080"),
           "type" -> "Monitor"))
 
         // inventory
-        _ <- inventory.insert(BSONDocument("_id" -> 1, "sku" -> "MON1003",
-          "type" -> "Monitor", "instock" -> 120, "size" -> "27 inch",
-          "resolution" -> "1920x1080"))
-        _ <- inventory.insert(BSONDocument("_id" -> 2, "sku" -> "MON1012",
-          "type" -> "Monitor", "instock" -> 85, "size" -> "23 inch",
-          "resolution" -> "1920x1080"))
-        _ <- inventory.insert(BSONDocument("_id" -> 3, "sku" -> "MON1031",
-          "type" -> "Monitor", "instock" -> 60, "size" -> "23 inch",
-          "displayType" -> "LED"))
-      } yield ()) must beEqualTo({}).await(0, timeout)
+        _ <- inventory.insert.many(Seq(
+          BSONDocument("_id" -> 1, "sku" -> "MON1003",
+            "type" -> "Monitor", "instock" -> 120, "size" -> "27 inch",
+            "resolution" -> "1920x1080"),
+          BSONDocument("_id" -> 2, "sku" -> "MON1012",
+            "type" -> "Monitor", "instock" -> 85, "size" -> "23 inch",
+            "resolution" -> "1920x1080"),
+          BSONDocument("_id" -> 3, "sku" -> "MON1031",
+            "type" -> "Monitor", "instock" -> 60, "size" -> "23 inch",
+            "displayType" -> "LED")))
+
+      } yield ()) must beTypedEqualTo({}).await(0, timeout)
     } tag "not_mongo26"
 
     "so the joined documents are returned" in {
@@ -714,8 +719,9 @@ class AggregationSpec(implicit ee: ExecutionEnv)
           "_id" -> 6,
           "name" -> "ty", "quiz" -> 2, "score" -> 82))
 
-      Future.sequence(fixtures.map { doc => contest.insert(doc) }).map(_ => {}).
-        aka("fixtures") must beEqualTo({}).await(0, timeout)
+      Future.sequence(fixtures.map { doc =>
+        contest.insert.one(doc)
+      }).map(_ => {}) aka "fixtures" must beTypedEqualTo({}).await(0, timeout)
     }
 
     "return the standard deviation of each quiz" in {
@@ -849,8 +855,8 @@ class AggregationSpec(implicit ee: ExecutionEnv)
         BSONDocument("_id" -> 1, "username" -> "user1", "age" -> 42),
         BSONDocument("_id" -> 2, "username" -> "user2", "age" -> 28))
 
-      Future.sequence(fixtures.map { doc => contest.insert(doc) }).map(_ => {}).
-        aka("fixtures") must beEqualTo({}).await(0, timeout)
+      contest.insert.many(fixtures).map(_ => {}).
+        aka("fixtures") must beTypedEqualTo({}).await(0, timeout)
     } tag "not_mongo26"
 
     "return the standard deviation of user ages" in {
@@ -864,12 +870,11 @@ class AggregationSpec(implicit ee: ExecutionEnv)
        ])
       */
 
-      contest.aggregateWith1[BSONDocument]() {
-        framework =>
-          import framework._
+      contest.aggregateWith1[BSONDocument]() { framework =>
+        import framework._
 
-          Sample(100) -> List(Group(BSONNull)(
-            "ageStdDev" -> StdDevSamp(BSONString(f"$$age"))))
+        Sample(100) -> List(Group(BSONNull)(
+          "ageStdDev" -> StdDevSamp(BSONString(f"$$age"))))
       }.headOption must beSome(expected).await(0, timeout)
     } tag "not_mongo26"
   }
@@ -904,7 +909,7 @@ class AggregationSpec(implicit ee: ExecutionEnv)
        }
        */
 
-        Future.sequence(Seq(
+        places.insert.many(Seq(
           document(
             "type" -> "public",
             "loc" -> document(
@@ -916,8 +921,8 @@ class AggregationSpec(implicit ee: ExecutionEnv)
             "loc" -> document(
               "type" -> "Point", "coordinates" -> array(-73.88, 40.78)),
             "name" -> "La Guardia Airport",
-            "category" -> "Airport")).map { doc => places.insert(doc) }).
-          map(_ => {}) must beEqualTo({}).await(0, timeout)
+            "category" -> "Airport"))).
+          map(_ => {}) must beTypedEqualTo({}).await(0, timeout)
       }
     }
 
@@ -1006,7 +1011,7 @@ class AggregationSpec(implicit ee: ExecutionEnv)
 }
  */
 
-      forecasts.insert(BSONDocument(
+      forecasts.insert.one(BSONDocument(
         "_id" -> 1,
         "title" -> "123 Department Report",
         "tags" -> BSONArray("G", "STLW"),
@@ -1025,7 +1030,8 @@ class AggregationSpec(implicit ee: ExecutionEnv)
             "tags" -> BSONArray("TK"),
             "content" -> BSONDocument(
               "text" -> "Section 3: This is the content of section3.",
-              "tags" -> BSONArray("HCS")))))).map(_ => {}) must beEqualTo({}).await(0, timeout)
+              "tags" -> BSONArray("HCS")))))).
+        map(_ => {}) must beTypedEqualTo({}).await(0, timeout)
     }
 
     "be redacted" in {
@@ -1136,7 +1142,7 @@ db.forecasts.aggregate(
   status: "A"
 }
 */
-      customers.insert(document(
+      customers.insert.one(document(
         "_id" -> 1,
         "level" -> 1,
         "acct_id" -> "xyz123",
@@ -1158,7 +1164,8 @@ db.forecasts.aggregate(
               "level" -> 3,
               "addr1" -> "PO Box 0123",
               "city" -> "Some City"))),
-        "status" -> "A")).map(_ => {}) must beEqualTo({}).await(0, timeout)
+        "status" -> "A")).
+        map(_ => {}) must beTypedEqualTo({}).await(0, timeout)
     }
 
     "be redacted" in {
@@ -1210,7 +1217,7 @@ db.accounts.aggregate([
          "on_order" : { "oranges" : 35, "apples" : 75 }
       }
        */
-      fruits.insert(document(
+      fruits.insert.one(document(
         "_id" -> 1,
         "fruit" -> array("apples", "oranges"),
         "in_stock" -> document(
@@ -1218,7 +1225,8 @@ db.accounts.aggregate([
           "apples" -> 60),
         "on_order" -> document(
           "oranges" -> 35,
-          "apples" -> 75))).map(_ => {}) must beEqualTo({}).await(0, timeout)
+          "apples" -> 75))).
+        map(_ => {}) must beTypedEqualTo({}).await(0, timeout)
     }
 
     "and reshaped using $replaceRoot" in {
@@ -1282,20 +1290,20 @@ db.accounts.aggregate([
       db(s"students${System identityHashCode this}")
 
     "be inserted" in {
-      (for {
-        _ <- students.insert(document(
+      students.insert.many(Seq(
+        document(
           "_id" -> 1,
           "student" -> "Maya",
           "homework" -> BSONArray(10, 5, 10),
           "quiz" -> BSONArray(10, 8),
-          "extraCredit" -> 0))
-        _ <- students.insert(document(
+          "extraCredit" -> 0),
+        document(
           "_id" -> 2,
           "student" -> "Ryan",
           "homework" -> BSONArray(5, 6, 5),
           "quiz" -> BSONArray(8, 8),
-          "extraCredit" -> 8))
-      } yield ()) must beTypedEqualTo({}).await(0, timeout)
+          "extraCredit" -> 8))).
+        map(_ => {}) must beTypedEqualTo({}).await(0, timeout)
     }
 
     "be aggregated with $$sum on array fields" in {

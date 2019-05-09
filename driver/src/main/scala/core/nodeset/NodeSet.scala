@@ -49,7 +49,7 @@ case class NodeSet(
 
   def isReachable = !primary.isEmpty || !secondaries.subject.isEmpty
 
-  def updateOrAddNode(f: PartialFunction[Node, Node], default: Node) = {
+  def updateOrAddNode(f: PartialFunction[Node, Node], default: Node): NodeSet = {
     val (maybeUpdatedNodes, updated) = utils.update(nodes)(f)
     if (!updated) copy(nodes = default +: nodes)
     else copy(nodes = maybeUpdatedNodes)
@@ -74,6 +74,7 @@ case class NodeSet(
         con.status == ConnectionStatus.Connected) => node -> con
     }
 
+  @deprecated("", "")
   def pick(preference: ReadPreference): Option[(Node, Connection)] =
     pick(preference, _ => true)
 
@@ -84,49 +85,49 @@ case class NodeSet(
 
     def filter(tags: Seq[Map[String, String]]) = ReadPreference.TagFilter(tags)
 
-    val resolve = pickConnectionAndFlatten(accept)
+    val resolve = connectionAndFlatten(accept)
 
     if (mongos.isDefined) {
       resolve(mongos)
     } else preference match {
       case ReadPreference.Primary =>
-        pickConnectionAndFlatten(accept)(primary)
+        resolve(primary)
 
       case ReadPreference.PrimaryPreferred(tags) =>
-        resolve(primary.orElse(
-          pickFromGroupWithFilter(secondaries, filter(tags), secondaries.pick)))
+        resolve(primary).orElse(
+          resolve(findNode(secondaries, filter(tags), secondaries.pick)))
 
       case ReadPreference.Secondary(tags) =>
-        resolve(pickFromGroupWithFilter(
+        resolve(findNode(
           secondaries, filter(tags), secondaries.pick))
 
       case ReadPreference.SecondaryPreferred(tags) =>
-        resolve(pickFromGroupWithFilter(
-          secondaries, filter(tags), secondaries.pick).orElse(primary))
+        resolve(findNode(
+          secondaries, filter(tags), secondaries.pick)).orElse(resolve(primary))
 
       case ReadPreference.Nearest(tags) =>
-        resolve(pickFromGroupWithFilter(nearestGroup, filter(tags), nearest))
+        resolve(findNode(nearestGroup, filter(tags), nearest))
     }
   }
 
-  private def pickConnectionAndFlatten(accept: Connection => Boolean): Option[Node] => Option[(Node, Connection)] = {
+  private def connectionAndFlatten(accept: Connection => Boolean): Option[Node] => Option[(Node, Connection)] = {
     def p: RoundRobiner[Connection, Vector] => Option[Connection] =
-      if (authenticates.isEmpty) _.pick //TODO: WithFilter(accept)
+      if (authenticates.isEmpty) _.pickWithFilter(accept)
       else _.pickWithFilter(c =>
         !c.authenticating.isDefined && !c.authenticated.isEmpty && accept(c))
 
     _.flatMap(node => p(node.authenticatedConnections).map(node -> _))
   }
 
-  private def pickFromGroupWithFilter(roundRobiner: RoundRobiner[Node, Vector], filter: Option[BSONDocument => Boolean], fallback: => Option[Node]) =
+  private def findNode(roundRobiner: RoundRobiner[Node, Vector], filter: Option[BSONDocument => Boolean], fallback: => Option[Node]): Option[Node] =
     filter.fold(fallback)(f =>
-      roundRobiner.pickWithFilter(_.tags.fold(false)(f)))
+      roundRobiner.pickWithFilter(_.tags.fold(false)(f)).orElse(fallback))
 
   /**
    * Returns a NodeSet with channels created to `upTo` given maximum,
    * per each member of the set.
    */
-  private[core] def createNeededChannels(
+  private[core] def createUserConnections(
     channelFactory: ChannelFactory,
     receiver: ActorRef,
     upTo: Int): Try[NodeSet] = {
@@ -135,7 +136,7 @@ case class NodeSet(
     def update(ns: Vector[Node], upd: Vector[Node]): Try[Vector[Node]] =
       ns.headOption match {
         case Some(node) =>
-          node.createNeededChannels(channelFactory, receiver, upTo) match {
+          node.createUserConnections(channelFactory, receiver, upTo) match {
             case Failure(cause) =>
               Failure(cause)
 
@@ -154,23 +155,11 @@ case class NodeSet(
     s"{{NodeSet $name ${nodes.map(_.toShortString).mkString(" | ")} }}"
 
   /** Returns the read-only information about this node. */
-  def info = {
+  def info: NodeSetInfo = {
     val ns = nodes.map(_.info)
 
     NodeSetInfo(name, version, ns, primary.map(_.info),
       mongos.map(_.info), ns.filter(_.status == NodeStatus.Secondary),
       nearest.map(_.info))
   }
-}
-
-case class NodeSetInfo(
-  name: Option[String],
-  version: Option[Long],
-  nodes: Vector[NodeInfo],
-  primary: Option[NodeInfo],
-  mongos: Option[NodeInfo],
-  secondaries: Vector[NodeInfo],
-  nearest: Option[NodeInfo]) {
-
-  override lazy val toString = s"{{NodeSet $name ${nodes.mkString(" | ")} }}"
 }

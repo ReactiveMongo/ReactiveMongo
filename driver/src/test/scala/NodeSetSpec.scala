@@ -88,7 +88,8 @@ class NodeSetSpec(implicit val ee: ExecutionEnv)
         org.specs2.specification.core.Fragments.foreach[ReadPreference](
           Seq(ReadPreference.primaryPreferred, ReadPreference.secondary)) { readPref =>
             s"using $readPref" in {
-              val opts = MongoConnectionOptions(readPreference = readPref)
+              val opts = MongoConnectionOptions.
+                default.copy(readPreference = readPref)
 
               withCon(opts) { (_, con, mon) =>
                 def test = (for {
@@ -108,7 +109,7 @@ class NodeSetSpec(implicit val ee: ExecutionEnv)
 
     "be unavailable" >> {
       "with the primary unavailable if default preference" in {
-        withCon() { (name, con, mon) =>
+        withCon() { (_, con, mon) =>
           mon ! new SetAvailable(ProtocolMetadata.Default, None)
           mon ! new PrimaryAvailable(ProtocolMetadata.Default, None)
 
@@ -127,10 +128,10 @@ class NodeSetSpec(implicit val ee: ExecutionEnv)
       }
 
       "without the primary if slave ok" in {
-        val opts = MongoConnectionOptions(
+        val opts = MongoConnectionOptions.default.copy(
           readPreference = ReadPreference.primaryPreferred)
 
-        withCon(opts) { (name, con, mon) =>
+        withCon(opts) { (_, con, mon) =>
           mon ! new SetAvailable(ProtocolMetadata.Default, None)
 
           def test = (for {
@@ -173,7 +174,7 @@ class NodeSetSpec(implicit val ee: ExecutionEnv)
 
   // ---
 
-  def withConAndSys[T](drv: MongoDriver, options: MongoConnectionOptions = MongoConnectionOptions(nbChannelsPerNode = 1), _nodes: Seq[String] = nodes)(f: (MongoConnection, TestActorRef[StandardDBSystem]) => Future[T]): Future[T] = {
+  def withConAndSys[T](drv: MongoDriver, options: MongoConnectionOptions = MongoConnectionOptions.default.copy(nbChannelsPerNode = 1), _nodes: Seq[String] = nodes)(f: (MongoConnection, TestActorRef[StandardDBSystem]) => Future[T]): Future[T] = {
     // See MongoDriver#connection
     val supervisorName = s"withConAndSys-sup-${System identityHashCode ee}"
     val poolName = s"withConAndSys-con-${System identityHashCode f}"
@@ -196,7 +197,7 @@ class NodeSetSpec(implicit val ee: ExecutionEnv)
     }
   }
 
-  private def withCon[T](opts: MongoConnectionOptions = MongoConnectionOptions())(test: (String, MongoConnection, ActorRef) => MatchResult[T]): org.specs2.execute.Result = {
+  private def withCon[T](opts: MongoConnectionOptions = MongoConnectionOptions.default)(test: (String, MongoConnection, ActorRef) => MatchResult[T]): org.specs2.execute.Result = {
     val name = s"withCon-${System identityHashCode opts}"
     val con = md.connection(
       nodes, options = opts.copy(credentials = Map(

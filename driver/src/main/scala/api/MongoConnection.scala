@@ -393,7 +393,7 @@ object MongoConnection {
       val credentialEnd = setSpec.indexOf("@")
 
       def opts = {
-        val empty = MongoConnectionOptions()
+        val empty = MongoConnectionOptions.default
         val initial = if (!seedList) empty else {
           empty.copy(sslEnabled = true)
         }
@@ -646,6 +646,10 @@ object MongoConnection {
               case _ => (unsupported + ("rm.reconnectDelayMS" -> opt)) -> result
             }
           }
+
+          case ("rm.maxInFlightRequestsPerChannel", IntRe(max)) =>
+            unsupported -> result.copy(
+              maxInFlightRequestsPerChannel = Some(max.toInt))
 
           case ("writeConcern", "unacknowledged") => unsupported -> result.
             copy(writeConcern = WC.Unacknowledged)

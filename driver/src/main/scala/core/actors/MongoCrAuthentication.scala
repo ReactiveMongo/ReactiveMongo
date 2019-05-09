@@ -13,7 +13,8 @@ private[reactivemongo] trait MongoCrAuthentication { system: MongoDBSystem =>
   import reactivemongo.core.commands.{ CrAuthenticate, GetCrNonce }
 
   protected final def sendAuthenticate(connection: Connection, nextAuth: Authenticate): Connection = {
-    connection.send(GetCrNonce(nextAuth.db).maker(RequestId.getNonce.next))
+    connection.send(GetCrNonce(nextAuth.db).
+      maker(RequestIdGenerator.getNonce.next))
 
     nextAuth.password match {
       case Some(password) => connection.copy(authenticating = Some(
@@ -27,7 +28,7 @@ private[reactivemongo] trait MongoCrAuthentication { system: MongoDBSystem =>
   }
 
   protected val authReceive: Receive = {
-    case response: Response if RequestId.getNonce accepts response => {
+    case response: Response if RequestIdGenerator.getNonce accepts response => {
       GetCrNonce.ResultMaker(response).fold(
         { e =>
           warn(s"An error has occured while processing getNonce response #${response.header.responseTo}", e)
@@ -44,7 +45,7 @@ private[reactivemongo] trait MongoCrAuthentication { system: MongoDBSystem =>
               con.authenticating match {
                 case Some(a @ CrAuthenticating(db, user, pass, _)) => {
                   con.send(CrAuthenticate(user, pass, nonce)(db).
-                    maker(RequestId.authenticate.next)).
+                    maker(RequestIdGenerator.authenticate.next)).
                     addListener(new OperationHandler(
                       { cause =>
                         error(s"Fails to send request after CR nonce #${chanId}", cause)
@@ -75,7 +76,7 @@ private[reactivemongo] trait MongoCrAuthentication { system: MongoDBSystem =>
       ()
     }
 
-    case resp: Response if RequestId.authenticate accepts resp => {
+    case resp: Response if RequestIdGenerator.authenticate accepts resp => {
       val chanId = resp.info._channelId
 
       debug(s"Got authenticated response #${chanId}! ${resp.getClass}")
