@@ -143,6 +143,11 @@ trait MongoDBSystem extends Actor {
       }
     }
 
+  val channelsPerNode = options.nbChannelsPerNode + 1 /* signaling */
+
+  // max awaiting request per connection (excepts signaling)
+  val maxInFlightQuery = 10
+
   // monitor -->
   private lazy val heartbeatFrequency =
     options.heartbeatFrequencyMS.milliseconds
@@ -179,9 +184,20 @@ trait MongoDBSystem extends Actor {
 
     debug(s"Initial node set: ${seedNodeSet.toShortString}")
 
-    seedNodeSet.createNeededChannels(channelFactory, self, 1) match {
+    seedNodeSet.updateAll { n =>
+      n.createSignalingConnection(channelFactory, self) match {
+        case Success(node) => node
+
+        case Failure(cause) => {
+          warn(s"Fails to create the signaling channel: ${n.toShortString}", cause)
+
+          n
+        }
+      }
+    }.createNeededChannels(channelFactory, self, 1) match {
       case inited @ Success(ns) => {
         _nodeSet = ns
+
         _setInfo = ns.info
 
         inited
@@ -422,7 +438,7 @@ trait MongoDBSystem extends Actor {
         updateNodeSet(reEvent) {
           _.updateNodeByChannelId(channelId) { n =>
             n.updateByChannelId(channelId)({ con =>
-              n.createConnection(channelFactory, self) match {
+              n.createConnection(channelFactory, self, con.signaling) match {
                 case Success(c) => c
 
                 case Failure(cause) => {
@@ -532,12 +548,16 @@ trait MongoDBSystem extends Actor {
         req.promise.failure(_), { (_, con) =>
           if (request.op.expectsResponse) {
             requestTracker.withAwaiting { (resps, chans) =>
+              val chanId = con.channel.id
+
               resps += reqId -> AwaitingResponse(
-                request, con.channel.id, req.promise,
+                request, chanId, req.promise,
                 isGetLastError = false,
                 isMongo26WriteOp = req.isMongo26WriteOp)
 
-              chans += con.channel.id
+              val countBefore = chans.getOrElseUpdate(chanId, 0)
+
+              chans += chanId -> (countBefore + 1)
 
               trace(s"Registering awaiting response for requestID $reqId on channel #${con.channel.id}, awaitingResponses: $resps")
             }
@@ -560,7 +580,7 @@ trait MongoDBSystem extends Actor {
 
       updateNodeSet(s"ConnectAll($statusInfo)") { ns =>
         ns.createNeededChannels(
-          channelFactory, self, options.nbChannelsPerNode) match {
+          channelFactory, self, channelsPerNode) match {
           case Success(upd) => connectAll(upd)
 
           case Failure(cause) => {
@@ -574,13 +594,15 @@ trait MongoDBSystem extends Actor {
     }
 
     case RefreshAll => {
+      // TODO: Refactor with ChannelConnected
+
       val statusInfo = _nodeSet.toShortString
       val discardedChannels = Map.newBuilder[ChannelId, Exception]
 
       val upd = updateNodeSet(s"RefreshAll($statusInfo)")(_.updateAll { node =>
         trace(s"Try to refresh ${node.name}")
 
-        requestIsMaster(node).send() match {
+        requestIsMaster("RefreshAll", node).send() match {
           case (n, Some(err)) => {
             discardedChannels ++= node.connections.map(_.channel.id -> err)
             n
@@ -592,7 +614,11 @@ trait MongoDBSystem extends Actor {
 
       debug(s"RefreshAll Job running... Status: $statusInfo")
 
-      retryAwaitingOnError(upd, discardedChannels.result())
+      scheduler.scheduleOnce(heartbeatFrequency) {
+        retryAwaitingOnError(upd, discardedChannels.result())
+      }
+
+      ()
     }
 
     case ChannelConnected(chanId) => {
@@ -604,7 +630,7 @@ trait MongoDBSystem extends Actor {
       val upd = updateNodeSet(s"ChannelConnected($chanId, $statusInfo)") { ns =>
         ns.updateByChannelId(chanId)(
           _.copy(status = ConnectionStatus.Connected)) { node =>
-            requestIsMaster(node).send() match {
+            requestIsMaster("ChannelConnected", node).send() match {
               case (n, Some(err)) => {
                 discardedChannels ++= node.connections.map(_.channel.id -> err)
                 n
@@ -615,7 +641,11 @@ trait MongoDBSystem extends Actor {
           }
       }
 
-      retryAwaitingOnError(upd, discardedChannels.result())
+      scheduler.scheduleOnce(heartbeatFrequency) {
+        retryAwaitingOnError(upd, discardedChannels.result())
+      }
+
+      ()
     }
 
     case ChannelDisconnected(chanId) => {
@@ -710,8 +740,6 @@ trait MongoDBSystem extends Actor {
             resps -= response.header.responseTo
             chans -= chanId
 
-            //println(s"_release: $chanId")
-
             response match {
               case cmderr: Response.CommandError =>
                 promise.success(cmderr); ()
@@ -721,7 +749,7 @@ trait MongoDBSystem extends Actor {
                   debug(s"{${response.header.responseTo}} sending a failure... (${error})")
 
                   if (error.isNotAPrimaryError) {
-                    onPrimaryUnavailable()
+                    onPrimaryUnavailable(error)
                   }
 
                   promise.failure(error)
@@ -740,7 +768,9 @@ trait MongoDBSystem extends Actor {
                     if (lastError.inError) {
                       trace(s"{${response.header.responseTo}} sending a failure (lasterror is not ok)")
 
-                      if (lastError.isNotAPrimaryError) onPrimaryUnavailable()
+                      if (lastError.isNotAPrimaryError) {
+                        onPrimaryUnavailable(lastError)
+                      }
 
                       promise.failure(lastError)
                     } else {
@@ -836,7 +866,11 @@ trait MongoDBSystem extends Actor {
               }
             }
 
-            chans ++= retriedChans.result()
+            retriedChans.result().foreach { chanId =>
+              val countBefore = chans.getOrElseUpdate(chanId, 0)
+
+              chans += chanId -> (countBefore + 1)
+            }
 
             false
           }
@@ -899,7 +933,8 @@ trait MongoDBSystem extends Actor {
 
       if (notAPrimary) {
         debug(s"{${response.header.responseTo}} [MongoDB26 Write Op response] not a primary error!")
-        onPrimaryUnavailable()
+
+        onPrimaryUnavailable(GenericDriverException("Not a primary"))
       }
 
       promise.failure(new PrimaryUnavailableException(
@@ -969,7 +1004,12 @@ trait MongoDBSystem extends Actor {
         } else true
       }
 
-      chans ++= retriedChans.result()
+      retriedChans.result().foreach { chanId =>
+        val countBefore = chans.getOrElseUpdate(chanId, 0)
+
+        chans += chanId -> (countBefore + 1)
+      }
+
       resps ++= retried.result()
     }
 
@@ -990,7 +1030,7 @@ trait MongoDBSystem extends Actor {
 
         broadcastMonitors(PrimaryUnavailable)
 
-        updateHistory(s"PrimaryUnavailable(${ns.toShortString})")
+        updateHistory(s"OnDisconnect$$PrimaryUnavailable(${ns.toShortString})")
       } else {
         debug("The primary is still unavailable, is there a network problem?")
       }
@@ -1033,7 +1073,7 @@ trait MongoDBSystem extends Actor {
 
     val updated = {
       val respTo = response.header.responseTo
-      @inline def event = s"IsMaster(${respTo}, ${_nodeSet.toShortString})"
+      @inline def event = s"IsMaster(${isMaster.isMaster}, ${respTo}, ${_nodeSet.toShortString})"
 
       updateNodeSet(event) { nodeSet =>
         val nodeSetWasReachable = nodeSet.isReachable
@@ -1163,9 +1203,8 @@ trait MongoDBSystem extends Actor {
       @inline def event = s"ConnectAll$$IsMaster(${response.header.responseTo}, ${updated.toShortString})"
 
       updateNodeSet(event) { ns =>
-        ns.createNeededChannels(
-          channelFactory, self, options.nbChannelsPerNode) match {
-          case Success(upd) => connectAll(upd)
+        ns.createNeededChannels(channelFactory, self, 1) match {
+          case Success(upd) => upd
 
           case Failure(cause) => {
             warn("Fails to create channel for NodeSet", cause)
@@ -1180,10 +1219,13 @@ trait MongoDBSystem extends Actor {
     ()
   }
 
-  private[reactivemongo] def onPrimaryUnavailable(): Unit = {
+  private[reactivemongo] def onPrimaryUnavailable(cause: Throwable): Unit = {
     self ! RefreshAll
 
-    updateNodeSet("PrimaryUnavailable")(_.updateAll { node =>
+    val error = s"${cause.getClass}(${cause.getMessage})"
+    val st = s"OnError$$PrimaryUnavailable($error, ${_nodeSet.toShortString})"
+
+    updateNodeSet(st)(_.updateAll { node =>
       if (node.status != NodeStatus.Primary) node
       else node._copy(status = NodeStatus.Unknown)
     })
@@ -1321,9 +1363,13 @@ trait MongoDBSystem extends Actor {
         s"#${chanId}", false, internalState)))(Success(_))
 
     case _ => requestTracker.withAwaiting { (_, chans) =>
-      val accept = { c: Connection => !chans.contains(c.channel.id) }
+      val accept = { c: Connection =>
+        val count = chans.getOrElse(c.channel.id, 0)
 
-      ns.pick(request.readPreference, accept).map(Success(_)).getOrElse {
+        !c.signaling && count < maxInFlightQuery
+      }
+
+      ns.pick(request.readPreference, accept).fold({
         val secOk = secondaryOK(request)
         lazy val reqAuth = ns.authenticates.nonEmpty
         val cause: Throwable = if (!secOk) {
@@ -1362,8 +1408,8 @@ trait MongoDBSystem extends Actor {
           }
         }
 
-        Failure(cause)
-      }
+        Failure(cause): Try[(Node, Connection)]
+      })(Success(_))
     }
   }
 
@@ -1481,7 +1527,7 @@ trait MongoDBSystem extends Actor {
           filter { r => node.connected.exists(_.channel.id == r.channelID) }.
           groupBy(_.channelID).map { case (chanId, rs) => chanId -> rs.size }.
           toSeq.sortBy(_._2).take(
-            scala.math.ceil(options.nbChannelsPerNode / 3D).toInt)
+            scala.math.ceil(channelsPerNode / 3D).toInt)
 
         node.connected.filter { c =>
           lessBusy.contains(c.channel.id)
@@ -1494,9 +1540,9 @@ trait MongoDBSystem extends Actor {
     Random.shuffle(available).headOption
   }
 
-  private def requestIsMaster(node: Node): IsMasterRequest = {
+  private def requestIsMaster(context: String, node: Node): IsMasterRequest = {
     val masterCon: Option[Connection] =
-      node.signalingConnection orElse pickMasterConnection(node)
+      node.signaling orElse pickMasterConnection(node)
 
     masterCon.fold(new IsMasterRequest(node)) { con =>
       import reactivemongo.api.BSONSerializationPack
@@ -1559,8 +1605,11 @@ trait MongoDBSystem extends Actor {
 
         // Reset node state
         updateHistory {
-          if (wasPrimary) s"PrimaryUnavailable"
-          else s"NodeUnavailable($node)"
+          val evtPrefix = s"${context}$$RequestIsMaster$$"
+
+          if (wasPrimary) {
+            s"${evtPrefix}PrimaryUnavailable(${node.toShortString})"
+          } else s"${evtPrefix}NodeUnavailable(${node.toShortString})"
         }
 
         new IsMasterRequest(
@@ -1744,17 +1793,19 @@ case class AuthRequest(
 }
 
 private[actors] final class RequestTracker {
-  import scala.collection.mutable.{ LinkedHashMap, Set }
+  import scala.collection.mutable.LinkedHashMap
 
+  /* Request ID -> AwaitingResponse */
   private val awaitingResponses = LinkedHashMap.empty[Int, AwaitingResponse]
 
-  private val awaitingChannels = Set.empty[ChannelId]
+  /* ChannelId -> count */
+  private val awaitingChannels = LinkedHashMap.empty[ChannelId, Int]
 
-  @inline def channels() = awaitingChannels.toSet
+  @inline def channels() = awaitingChannels.keySet.toSet
 
   @inline def responses() = awaitingResponses.values.toSeq
 
-  private[actors] def withAwaiting[T](f: Function2[LinkedHashMap[Int, AwaitingResponse], Set[ChannelId], T]): T =
+  private[actors] def withAwaiting[T](f: Function2[LinkedHashMap[Int, AwaitingResponse], LinkedHashMap[ChannelId, Int], T]): T =
     awaitingResponses.synchronized {
       f(awaitingResponses, awaitingChannels)
     }

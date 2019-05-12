@@ -56,21 +56,18 @@ private[reactivemongo] case class Node(
       authenticated.exists(_ == auth)
     }))
 
-  // Only for signaling (isMaster)
-  private var signaling: Option[Connection] = None
-
-  @inline def signalingConnection: Option[Connection] = signaling
+  private[core] lazy val signaling: Option[Connection] =
+    connections.find(_.signaling)
 
   private[core] def createSignalingConnection(
     channelFactory: ChannelFactory,
-    receiver: ActorRef): Try[Node] = {
-    if (signaling != null) {
-      Success(this)
-    } else {
-      createConnection(channelFactory, receiver).map { con =>
-        _copy(signalingConnection = Some(con))
+    receiver: ActorRef): Try[Node] = signaling match {
+    case Some(_) => Success(this)
+
+    case _ =>
+      createConnection(channelFactory, receiver, true).map { con =>
+        _copy(connections = con +: connections)
       }
-    }
   }
 
   private[core] def createNeededChannels(
@@ -94,7 +91,7 @@ private[reactivemongo] case class Node(
     count: Int,
     created: Vector[Connection]): Try[Vector[Connection]] = {
     if (count > 0) {
-      createConnection(channelFactory, receiver) match {
+      createConnection(channelFactory, receiver, false) match {
         case Success(con) =>
           createConnections(channelFactory, receiver, count - 1, con +: created)
 
@@ -107,11 +104,12 @@ private[reactivemongo] case class Node(
 
   @inline private[core] def createConnection(
     channelFactory: ChannelFactory,
-    receiver: ActorRef): Try[Connection] =
+    receiver: ActorRef,
+    signaling: Boolean): Try[Connection] =
     channelFactory.create(host, port, receiver).map { chan =>
       Connection(
         chan,
-        ConnectionStatus.Connecting, Set.empty, None)
+        ConnectionStatus.Connecting, Set.empty, None, signaling)
     }
 
   // TODO: Remove when aliases is refactored
@@ -124,14 +122,12 @@ private[reactivemongo] case class Node(
     protocolMetadata: ProtocolMetadata = this.protocolMetadata,
     pingInfo: PingInfo = this.pingInfo,
     isMongos: Boolean = this.isMongos,
-    aliases: Set[String] = this.aliases.result(),
-    signalingConnection: Option[Connection] = this.signaling): Node = {
+    aliases: Set[String] = this.aliases.result()): Node = {
 
     val node = copy(name, status, connections, authenticated, tags,
       protocolMetadata, pingInfo, isMongos)
 
     node.aliases ++= aliases
-    node.signaling = signalingConnection
 
     node
   }

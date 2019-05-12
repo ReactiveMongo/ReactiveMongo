@@ -207,7 +207,7 @@ private[bson] object Decimal128 {
         if (pad >= 0) {
           buffer ++= "0."
 
-          (0 until pad).foreach { i =>
+          (0 until pad).foreach { _ =>
             buffer += '0'
           }
 

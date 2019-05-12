@@ -24,7 +24,7 @@ sealed trait BSONIterator extends Iterator[(String, BSONValue)] {
 
 object BSONIterator {
   private[bson] def pretty(i: Int, it: Iterator[Try[BSONElement]], f: String => String = { name => s""""${name}": """ }): String = {
-    val indent = (0 to i).map { i => "  " }.mkString("")
+    val indent = (0 to i).map { _ => "  " }.mkString("")
 
     it.map {
       case Success(BSONElement(name, value)) => {
