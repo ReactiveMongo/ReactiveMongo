@@ -211,8 +211,8 @@ class AggregationSpec(implicit ee: ExecutionEnv)
 
       "successfully as a single batch" in {
         withCtx(coll) { (firstOp, pipeline) =>
-          val result = coll.aggregateWith1[BSONDocument]() {
-            framework => firstOp -> pipeline
+          val result = coll.aggregateWith1[BSONDocument]() { _ =>
+            firstOp -> pipeline
           }.collect[List](Int.MaxValue, Cursor.FailOnError[List[BSONDocument]]())
 
           result aka "results" must beEqualTo(expected).await(1, timeout)
@@ -221,17 +221,18 @@ class AggregationSpec(implicit ee: ExecutionEnv)
 
       "with cursor" >> {
         def collect(c: BSONCollection, upTo: Int = Int.MaxValue) = withCtx(c) { (firstOp, pipeline) =>
-          c.aggregateWith1[BSONDocument](batchSize = Some(1)) {
-            framework => firstOp -> pipeline
+          c.aggregateWith1[BSONDocument](batchSize = Some(1)) { _ =>
+            firstOp -> pipeline
           }.collect[List](upTo, Cursor.FailOnError[List[BSONDocument]]())
         }
 
         "without limit (maxDocs)" in {
-          collect(coll) must beEqualTo(expected).await(1, timeout)
+          collect(coll) must beTypedEqualTo(expected).await(1, timeout)
         }
 
         "with limit (maxDocs)" in {
-          collect(coll, 2) must beEqualTo(expected take 2).await(1, timeout)
+          collect(coll, 2) must beTypedEqualTo(expected take 2).
+            await(1, timeout)
         }
 
         "with metadata sort" in {

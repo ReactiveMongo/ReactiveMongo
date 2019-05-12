@@ -63,7 +63,7 @@ trait ConnectAllTest { _: NodeSetSpec =>
   }
 
   private def builder(specTitle: String)(conAll: StandardDBSystem => NodeSet => NodeSet) = specTitle in {
-    withConAndSys(md, _nodes = Seq.empty) { (con, ref) =>
+    withConAndSys(md, _nodes = Seq.empty) { (_, ref) =>
       def node(
         chanId: ChannelId,
         host: String,

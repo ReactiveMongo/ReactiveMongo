@@ -108,7 +108,7 @@ class NodeSetSpec(implicit val ee: ExecutionEnv)
 
     "be unavailable" >> {
       "with the primary unavailable if default preference" in {
-        withCon() { (name, con, mon) =>
+        withCon() { (_, con, mon) =>
           mon ! new SetAvailable(ProtocolMetadata.Default, None)
           mon ! new PrimaryAvailable(ProtocolMetadata.Default, None)
 
@@ -130,7 +130,7 @@ class NodeSetSpec(implicit val ee: ExecutionEnv)
         val opts = MongoConnectionOptions(
           readPreference = ReadPreference.primaryPreferred)
 
-        withCon(opts) { (name, con, mon) =>
+        withCon(opts) { (_, con, mon) =>
           mon ! new SetAvailable(ProtocolMetadata.Default, None)
 
           def test = (for {

@@ -34,7 +34,7 @@ import reactivemongo.core.actors, actors.{
   ChannelConnected,
   ChannelDisconnected,
   MongoDBSystem,
-  RequestId,
+  RequestIdGenerator,
   StandardDBSystem
 }
 
@@ -143,7 +143,7 @@ package object tests {
 
   @inline def nodeSet(sys: StandardDBSystem) = sys._nodeSet
 
-  @inline def isMasterReqId(): Int = RequestId.isMaster.next
+  @inline def isMasterReqId(): Int = RequestIdGenerator.isMaster.next
 
   @inline def connectAll(sys: StandardDBSystem, ns: NodeSet) =
     sys.connectAll(ns)
@@ -159,7 +159,7 @@ package object tests {
   @inline def releaseChannelFactory(f: ChannelFactory, clb: Promise[Unit]) =
     f.release(clb)
 
-  @inline def isMasterRequest(reqId: Int = RequestId.isMaster.next): Request = {
+  @inline def isMasterRequest(reqId: Int = RequestIdGenerator.isMaster.next): Request = {
     import reactivemongo.api.BSONSerializationPack
     import reactivemongo.api.commands.bson.{
       BSONIsMasterCommandImplicits,
@@ -173,11 +173,11 @@ package object tests {
       reactivemongo.api.ReadPreference.primaryPreferred,
       "admin") // only "admin" DB for the admin command
 
-    isMaster(reqId) // RequestId.isMaster
+    isMaster(reqId) // RequestIdGenerator.isMaster
   }
 
   @inline def isMasterResponse(response: Response) =
-    RequestId.isMaster accepts response
+    RequestIdGenerator.isMaster accepts response
 
   def decodeResponse[T]: Array[Byte] => (Tuple2[ByteBuf, Response] => T) => T = {
     val decoder = new ResponseDecoder()

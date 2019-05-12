@@ -27,7 +27,7 @@ private[reactivemongo] trait MongoScramSha1Authentication {
   protected final def sendAuthenticate(connection: Connection, nextAuth: Authenticate): Connection = {
     val start = ScramSha1Initiate(nextAuth.user)
 
-    connection.send(start(nextAuth.db).maker(RequestId.getNonce.next))
+    connection.send(start(nextAuth.db).maker(RequestIdGenerator.getNonce.next))
 
     nextAuth.password match {
       case Some(password) => connection.copy(authenticating = Some(
@@ -42,7 +42,7 @@ private[reactivemongo] trait MongoScramSha1Authentication {
   }
 
   protected val authReceive: Receive = {
-    case resp: Response if RequestId.getNonce accepts resp => {
+    case resp: Response if RequestIdGenerator.getNonce accepts resp => {
       ScramSha1Initiate.parseResponse(resp).fold(
         { err =>
           val respTo = resp.header.responseTo
@@ -75,7 +75,7 @@ private[reactivemongo] trait MongoScramSha1Authentication {
                     { sig =>
                       ns.updateConnectionByChannelId(chanId) { con =>
                         con.send(negociation(db).
-                          maker(RequestId.authenticate.next)).
+                          maker(RequestIdGenerator.authenticate.next)).
                           addListener(new OperationHandler(
                             { cause =>
                               error(s"Fails to send request after SCRAM-SHA1 nonce #${chanId}", cause)
@@ -106,7 +106,7 @@ private[reactivemongo] trait MongoScramSha1Authentication {
         })
     }
 
-    case response: Response if RequestId.authenticate accepts response => {
+    case response: Response if RequestIdGenerator.authenticate accepts response => {
       val chanId = response.info._channelId
 
       debug(s"Got authenticated response #${chanId}!")
@@ -146,7 +146,7 @@ private[reactivemongo] trait MongoScramSha1Authentication {
                     val negociation = ScramSha1FinalNegociation(cid, payload)
 
                     con.send(negociation(db).
-                      maker(RequestId.authenticate.next)).
+                      maker(RequestIdGenerator.authenticate.next)).
                       addListener(new OperationHandler(
                         { e =>
                           error(s"Fails to negociate SCRAM-SHA1 #${chanId}", e)

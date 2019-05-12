@@ -46,7 +46,7 @@ trait UnresponsiveSecondaryTest { parent: NodeSetSpec =>
             n.name -> n.status
           }.toSet
 
-        withConMon1(ref.underlyingActor.name) { conMon =>
+        withConMon1(ref.underlyingActor.name) { _ =>
           val channels = List.newBuilder[Channel]
 
           (for {

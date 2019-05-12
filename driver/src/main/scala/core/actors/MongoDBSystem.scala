@@ -22,6 +22,8 @@ import scala.concurrent.{ Await, Future, Promise }
 import scala.util.{ Failure, Random, Success, Try }
 import scala.util.control.NonFatal
 
+import scala.collection.mutable.{ Map => MMap }
+
 import akka.actor.{ Actor, ActorRef, Cancellable }
 
 import reactivemongo.io.netty.channel.{
@@ -144,9 +146,6 @@ trait MongoDBSystem extends Actor {
     }
 
   val channelsPerNode = options.nbChannelsPerNode + 1 /* signaling */
-
-  // max awaiting request per connection (excepts signaling)
-  val maxInFlightQuery = 10
 
   // monitor -->
   private lazy val heartbeatFrequency =
@@ -538,7 +537,7 @@ trait MongoDBSystem extends Actor {
     }
 
     case req @ RequestMakerExpectingResponse(maker, _) => {
-      val reqId = RequestId.common.next
+      val reqId = RequestIdGenerator.common.next
 
       debug(s"Received a request expecting a response ($reqId): $req")
 
@@ -550,14 +549,14 @@ trait MongoDBSystem extends Actor {
             requestTracker.withAwaiting { (resps, chans) =>
               val chanId = con.channel.id
 
-              resps += reqId -> AwaitingResponse(
+              resps.put(reqId, AwaitingResponse(
                 request, chanId, req.promise,
                 isGetLastError = false,
-                isMongo26WriteOp = req.isMongo26WriteOp)
+                isMongo26WriteOp = req.isMongo26WriteOp))
 
               val countBefore = chans.getOrElseUpdate(chanId, 0)
 
-              chans += chanId -> (countBefore + 1)
+              chans.put(chanId, countBefore + 1)
 
               trace(s"Registering awaiting response for requestID $reqId on channel #${con.channel.id}, awaitingResponses: $resps")
             }
@@ -594,55 +593,25 @@ trait MongoDBSystem extends Actor {
     }
 
     case RefreshAll => {
-      // TODO: Refactor with ChannelConnected
+      refreshNodeSet(statusInfo => {
+        debug(s"RefreshAll Job running... Status: $statusInfo")
 
-      val statusInfo = _nodeSet.toShortString
-      val discardedChannels = Map.newBuilder[ChannelId, Exception]
-
-      val upd = updateNodeSet(s"RefreshAll($statusInfo)")(_.updateAll { node =>
-        trace(s"Try to refresh ${node.name}")
-
-        requestIsMaster("RefreshAll", node).send() match {
-          case (n, Some(err)) => {
-            discardedChannels ++= node.connections.map(_.channel.id -> err)
-            n
-          }
-
-          case (n, _) => n
-        }
-      })
-
-      debug(s"RefreshAll Job running... Status: $statusInfo")
-
-      scheduler.scheduleOnce(heartbeatFrequency) {
-        retryAwaitingOnError(upd, discardedChannels.result())
+        s"RefreshAll($statusInfo)"
+      }) { ns =>
+        ns.updateAll(_)
       }
 
       ()
     }
 
     case ChannelConnected(chanId) => {
-      val statusInfo = _nodeSet.toShortString
-      val discardedChannels = Map.newBuilder[ChannelId, Exception]
+      refreshNodeSet(statusInfo => {
+        trace(s"Channel #$chanId is connected; NodeSet status: $statusInfo")
 
-      trace(s"Channel #$chanId is connected; NodeSet status: $statusInfo")
-
-      val upd = updateNodeSet(s"ChannelConnected($chanId, $statusInfo)") { ns =>
+        s"ChannelConnected($chanId, $statusInfo)"
+      }) { ns =>
         ns.updateByChannelId(chanId)(
-          _.copy(status = ConnectionStatus.Connected)) { node =>
-            requestIsMaster("ChannelConnected", node).send() match {
-              case (n, Some(err)) => {
-                discardedChannels ++= node.connections.map(_.channel.id -> err)
-                n
-              }
-
-              case (n, _) => n
-            }
-          }
-      }
-
-      scheduler.scheduleOnce(heartbeatFrequency) {
-        retryAwaitingOnError(upd, discardedChannels.result())
+          _.copy(status = ConnectionStatus.Connected))(_)
       }
 
       ()
@@ -662,10 +631,11 @@ trait MongoDBSystem extends Actor {
       ()
     }
 
-    case IsMasterResponse(response) => onIsMaster(response)
+    case response: Response if (RequestIdGenerator.isMaster accepts response) =>
+      onIsMaster(response)
 
     case err @ Response.CommandError(_, _, _, cause) if (
-      RequestId.authenticate accepts err) => {
+      RequestIdGenerator.authenticate accepts err) => {
       // Successful authenticate responses go to `authReceive` then
 
       warn("Fails to authenticate", cause)
@@ -729,7 +699,7 @@ trait MongoDBSystem extends Actor {
 
   // any other response
   private val fallback: Receive = {
-    case response: Response if RequestId.common accepts response =>
+    case response: Response if RequestIdGenerator.common accepts response =>
       requestTracker.withAwaiting { (resps, chans) =>
         resps.get(response.header.responseTo) match {
           case Some(AwaitingResponse(
@@ -738,7 +708,17 @@ trait MongoDBSystem extends Actor {
             trace(s"Got a response from ${response.info._channelId} to ${response.header.responseTo}! Will give back message=$response to promise ${System.identityHashCode(promise)}")
 
             resps -= response.header.responseTo
-            chans -= chanId
+
+            val awaitingBefore = chans.getOrElse(chanId, 0)
+
+            if (awaitingBefore <= 1) {
+              // Response corresponds to the last one currently
+              // awaited for the specified channel
+
+              chans -= chanId
+            } else {
+              chans.put(chanId, awaitingBefore - 1)
+            }
 
             response match {
               case cmderr: Response.CommandError =>
@@ -831,15 +811,48 @@ trait MongoDBSystem extends Actor {
 
   // ---
 
+  /*
+   * @param event a function applied on description of the [[NodeSet]] before
+   * @param update the update function
+    */
+  private def refreshNodeSet(event: String => String)(update: NodeSet => ((Node => Node) => NodeSet)): NodeSet = {
+    val statusInfo = _nodeSet.toShortString
+    val discardedChannels = MMap.empty[ChannelId, Exception]
+
+    val upd = updateNodeSet(event(statusInfo)) { ns =>
+      update(ns) { node =>
+        trace(s"Try to refresh ${node.name}")
+
+        requestIsMaster("RefreshNodeSet", node).send() match {
+          case (n, Some(err)) => {
+            node.connections.foreach { c =>
+              discardedChannels.put(c.channel.id, err)
+            }
+
+            n
+          }
+
+          case (n, _) => n
+        }
+      }
+    }
+
+    scheduler.scheduleOnce(heartbeatFrequency) {
+      retryAwaitingOnError(upd, discardedChannels.toMap)
+    }
+
+    upd
+  }
+
   private def retryAwaitingOnError(
     ns: NodeSet,
     discardedChannels: Map[ChannelId, Exception]): Unit = {
     // TODO: Refactor with #retry_1?
 
     requestTracker.withAwaiting { (resps, chans) =>
-      val retried = Map.newBuilder[Int, AwaitingResponse]
+      val retried = MMap.empty[Int, AwaitingResponse]
 
-      val withoutRetriedAwaiting = resps.retain { (_, awaitingResponse) =>
+      resps.retain { (_, awaitingResponse) =>
         chans -= awaitingResponse.channelID
 
         discardedChannels.get(awaitingResponse.channelID) match {
@@ -850,7 +863,7 @@ trait MongoDBSystem extends Actor {
               case Some(awaiting) => {
                 trace(s"Retrying to await response for requestID ${awaiting.requestID} on channel #${awaiting.channelID}: $awaiting")
 
-                retried += awaiting.requestID -> awaiting
+                retried.put(awaiting.requestID, awaiting)
                 retriedChans += awaiting.channelID
               }
 
@@ -869,7 +882,7 @@ trait MongoDBSystem extends Actor {
             retriedChans.result().foreach { chanId =>
               val countBefore = chans.getOrElseUpdate(chanId, 0)
 
-              chans += chanId -> (countBefore + 1)
+              chans.put(chanId, countBefore + 1)
             }
 
             false
@@ -880,7 +893,7 @@ trait MongoDBSystem extends Actor {
         }
       }
 
-      withoutRetriedAwaiting ++= retried.result()
+      resps ++= retried.result()
 
       ()
     }
@@ -976,7 +989,7 @@ trait MongoDBSystem extends Actor {
 
     // #retry_1
     requestTracker.withAwaiting { (resps, chans) =>
-      val retried = Map.newBuilder[Int, AwaitingResponse]
+      val retried = MMap.empty[Int, AwaitingResponse]
       val retriedChans = Set.newBuilder[ChannelId]
 
       chans -= chanId
@@ -987,7 +1000,7 @@ trait MongoDBSystem extends Actor {
             case Some(awaiting) => {
               trace(s"Retrying to await response for requestID ${awaiting.requestID} on channel #${awaiting.channelID}: $awaiting")
 
-              retried += awaiting.requestID -> awaiting
+              retried.put(awaiting.requestID, awaiting)
               retriedChans += awaiting.channelID
             }
 
@@ -1007,7 +1020,7 @@ trait MongoDBSystem extends Actor {
       retriedChans.result().foreach { chanId =>
         val countBefore = chans.getOrElseUpdate(chanId, 0)
 
-        chans += chanId -> (countBefore + 1)
+        chans.put(chanId, countBefore + 1)
       }
 
       resps ++= retried.result()
@@ -1366,7 +1379,7 @@ trait MongoDBSystem extends Actor {
       val accept = { c: Connection =>
         val count = chans.getOrElse(c.channel.id, 0)
 
-        !c.signaling && count < maxInFlightQuery
+        !c.signaling && count < options.maxInFlightPerChannel
       }
 
       ns.pick(request.readPreference, accept).fold({
@@ -1510,6 +1523,7 @@ trait MongoDBSystem extends Actor {
   }
 
   /**
+   * TODO: Remove
    * Picks a connection available to send `isMaster`
    */
   private def pickMasterConnection(node: Node): Option[Connection] = {
@@ -1552,7 +1566,7 @@ trait MongoDBSystem extends Actor {
       }, BSONIsMasterCommand.IsMaster
       import reactivemongo.api.commands.Command
 
-      lazy val id = RequestId.isMaster.next
+      lazy val id = RequestIdGenerator.isMaster.next
       lazy val (isMaster, _) = Command.buildRequestMaker(BSONSerializationPack)(
         IsMaster(id.toString),
         BSONIsMasterCommandImplicits.IsMasterWriter,
@@ -1772,20 +1786,6 @@ final class StandardDBSystemWithX509 private[reactivemongo] (
 object MongoDBSystem {
 }
 
-private[reactivemongo] object RequestId {
-  // all requestIds [0, 1000[ are for isMaster messages
-  val isMaster = new RequestIdGenerator(0, 999)
-
-  // all requestIds [1000, 2000[ are for getnonce messages
-  val getNonce = new RequestIdGenerator(1000, 1999) // CR auth
-
-  // all requestIds [2000, 3000[ are for authenticate messages
-  val authenticate = new RequestIdGenerator(2000, 2999)
-
-  // all requestIds [3000[ are for common messages
-  val common = new RequestIdGenerator(3000, Int.MaxValue - 1)
-}
-
 case class AuthRequest(
   authenticate: Authenticate,
   promise: Promise[SuccessfulAuthentication] = Promise()) {
@@ -1801,6 +1801,7 @@ private[actors] final class RequestTracker {
   /* ChannelId -> count */
   private val awaitingChannels = LinkedHashMap.empty[ChannelId, Int]
 
+  // TODO: monitor max in flight: awaitingChannels.max?
   @inline def channels() = awaitingChannels.keySet.toSet
 
   @inline def responses() = awaitingResponses.values.toSeq
