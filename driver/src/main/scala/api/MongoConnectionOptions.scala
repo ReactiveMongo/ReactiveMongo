@@ -79,7 +79,7 @@ case class MongoConnectionOptions(
 
   // TODO: Expose in API/config parsing
   // Max awaiting request per connection (excepts the signaling one)
-  private[reactivemongo] val maxInFlightPerChannel = 200
+  private[reactivemongo] val maxInFlightPerChannel: Option[Int] = None //TODO:Some(200)
 }
 
 object MongoConnectionOptions {

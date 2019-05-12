@@ -554,7 +554,7 @@ trait MongoDBSystem extends Actor {
                 isGetLastError = false,
                 isMongo26WriteOp = req.isMongo26WriteOp))
 
-              val countBefore = chans.getOrElseUpdate(chanId, 0)
+              val countBefore = chans.getOrElse(chanId, 0)
 
               chans.put(chanId, countBefore + 1)
 
@@ -846,14 +846,14 @@ trait MongoDBSystem extends Actor {
 
   private def retryAwaitingOnError(
     ns: NodeSet,
-    discardedChannels: Map[ChannelId, Exception]): Unit = {
-    // TODO: Refactor with #retry_1?
-
+    discardedChannels: Map[ChannelId, Exception]): Unit =
     requestTracker.withAwaiting { (resps, chans) =>
       val retried = MMap.empty[Int, AwaitingResponse]
 
+      chans --= discardedChannels.keySet
+
       resps.retain { (_, awaitingResponse) =>
-        chans -= awaitingResponse.channelID
+        //chans -= awaitingResponse.channelID
 
         discardedChannels.get(awaitingResponse.channelID) match {
           case Some(error) => {
@@ -897,7 +897,6 @@ trait MongoDBSystem extends Actor {
 
       ()
     }
-  }
 
   // TODO: Remove with MongoDB 2.6 end of support
   private def onMongo26Write(
@@ -987,44 +986,8 @@ trait MongoDBSystem extends Actor {
       }
     }
 
-    // #retry_1
-    requestTracker.withAwaiting { (resps, chans) =>
-      val retried = MMap.empty[Int, AwaitingResponse]
-      val retriedChans = Set.newBuilder[ChannelId]
-
-      chans -= chanId
-
-      resps.retain { (_, awaitingResponse) =>
-        if (awaitingResponse.channelID == chanId) {
-          retry(ns, awaitingResponse) match {
-            case Some(awaiting) => {
-              trace(s"Retrying to await response for requestID ${awaiting.requestID} on channel #${awaiting.channelID}: $awaiting")
-
-              retried.put(awaiting.requestID, awaiting)
-              retriedChans += awaiting.channelID
-            }
-
-            case _ => {
-              debug(s"Completing response for '${awaitingResponse.request.op}' with error='socket disconnected' (channel #$chanId)")
-
-              failureOrLog(awaitingResponse.promise, SocketDisconnected)(
-                err => warn(
-                  s"Channel disconnected #$chanId", err))
-            }
-          }
-
-          false
-        } else true
-      }
-
-      retriedChans.result().foreach { chanId =>
-        val countBefore = chans.getOrElseUpdate(chanId, 0)
-
-        chans.put(chanId, countBefore + 1)
-      }
-
-      resps ++= retried.result()
-    }
+    retryAwaitingOnError(
+      ns, Map.empty[ChannelId, Exception].updated(chanId, SocketDisconnected))
 
     if (!ns.isReachable) {
       if (nodeSetWasReachable) {
@@ -1379,7 +1342,7 @@ trait MongoDBSystem extends Actor {
       val accept = { c: Connection =>
         val count = chans.getOrElse(c.channel.id, 0)
 
-        !c.signaling && count < options.maxInFlightPerChannel
+        !c.signaling && options.maxInFlightPerChannel.forall(count < _)
       }
 
       ns.pick(request.readPreference, accept).fold({
@@ -1794,6 +1757,8 @@ case class AuthRequest(
 
 private[actors] final class RequestTracker {
   import scala.collection.mutable.LinkedHashMap
+
+  // TODO: Max awaiting response (maxConcurrentRequests?) to limit awaitingResponses?
 
   /* Request ID -> AwaitingResponse */
   private val awaitingResponses = LinkedHashMap.empty[Int, AwaitingResponse]
