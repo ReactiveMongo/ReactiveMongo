@@ -647,6 +647,9 @@ object MongoConnection {
             }
           }
 
+          case ("rm.maxInFlightRequestsPerChannel", IntRe(max)) =>
+            unsupported -> result.withMaxInFlightRequestsPerChannel(max.toInt)
+
           case ("writeConcern", "unacknowledged") => unsupported -> result.
             copy(writeConcern = WC.Unacknowledged)
 

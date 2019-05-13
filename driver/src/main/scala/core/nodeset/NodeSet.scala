@@ -127,7 +127,7 @@ case class NodeSet(
    * Returns a NodeSet with channels created to `upTo` given maximum,
    * per each member of the set.
    */
-  private[core] def createNeededChannels(
+  private[core] def createUserConnections(
     channelFactory: ChannelFactory,
     receiver: ActorRef,
     upTo: Int): Try[NodeSet] = {
@@ -136,7 +136,7 @@ case class NodeSet(
     def update(ns: Vector[Node], upd: Vector[Node]): Try[Vector[Node]] =
       ns.headOption match {
         case Some(node) =>
-          node.createNeededChannels(channelFactory, receiver, upTo) match {
+          node.createUserConnections(channelFactory, receiver, upTo) match {
             case Failure(cause) =>
               Failure(cause)
 

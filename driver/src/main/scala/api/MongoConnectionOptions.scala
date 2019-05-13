@@ -77,9 +77,24 @@ case class MongoConnectionOptions(
   @deprecated("Use heartbeatFrequencyMS", "0.16.4")
   @inline def monitorRefreshMS = heartbeatFrequencyMS
 
-  // TODO: Expose in API/config parsing
-  // Max awaiting request per connection (excepts the signaling one)
-  private[reactivemongo] val maxInFlightPerChannel: Option[Int] = None //TODO:Some(200)
+  // TODO: Refactor as property
+  private[reactivemongo] var maxInFlightPerChannel: Option[Int] = Some(200)
+
+  /**
+   * !EXPERIMENTAL! Maximum number of live/awaiting requests per connection
+   * (Default: 200; Not applied to the signaling channel).
+   */
+  @inline def maxInFlightRequestsPerChannel(): Option[Int] = maxInFlightPerChannel
+
+  /** !EXPERIMENTAL! See [[maxInFlightRequestsPerChannel]] */
+  def withMaxInFlightRequestsPerChannel(max: Int): MongoConnectionOptions = {
+    val updated = copy()
+    updated.maxInFlightPerChannel = Some(max)
+    updated
+  }
+
+  // TODO: Expose?
+  @inline private[reactivemongo] def minIdleChannelsPerNode: Int = 1
 }
 
 object MongoConnectionOptions {

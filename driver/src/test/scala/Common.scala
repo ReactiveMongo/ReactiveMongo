@@ -42,7 +42,7 @@ object Common extends CommonAuth {
 
   val failoverStrategy = FailoverStrategy(retries = failoverRetries)
 
-  private val timeoutFactor = 1.25D
+  private val timeoutFactor = 1.18D
   def estTimeout(fos: FailoverStrategy): FiniteDuration =
     (1 to fos.retries).foldLeft(fos.initialDelay) { (d, i) =>
       d + (fos.initialDelay * ((timeoutFactor * fos.delayFactor(i)).toLong))

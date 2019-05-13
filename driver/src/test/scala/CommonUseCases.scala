@@ -61,7 +61,7 @@ final class CommonUseCases(implicit ee: ExecutionEnv)
 
       it.collect[List](Int.MaxValue, Cursor.FailOnError[List[BSONDocument]]()).
         map(_.map(_.getAs[BSONInteger]("age").get.value).
-          mkString("")) must beEqualTo((18 to 60).mkString("")).
+          mkString("")) must beTypedEqualTo((18 to 60).mkString("")).
         await(1, timeout * 2)
 
     }
@@ -70,7 +70,7 @@ final class CommonUseCases(implicit ee: ExecutionEnv)
       collection.find(BSONDocument("name" -> BSONRegex("ack2", ""))).
         cursor[BSONDocument]().
         collect[List](Int.MaxValue, Cursor.FailOnError[List[BSONDocument]]()).
-        map(_.size) must beEqualTo(10).await(1, timeout)
+        map(_.size) must beTypedEqualTo(10).await(1, timeout)
     }
 
     "find by regexp with flag" in {
@@ -82,7 +82,7 @@ final class CommonUseCases(implicit ee: ExecutionEnv)
 
       collection.find(query).cursor[BSONDocument]().
         collect[List](Int.MaxValue, Cursor.FailOnError[List[BSONDocument]]()).
-        map(_.size) aka "size" must beEqualTo(20).await(1, timeout)
+        map(_.size) aka "size" must beTypedEqualTo(20).await(1, timeout)
     }
 
     "find them with a projection" >> {
@@ -98,7 +98,7 @@ final class CommonUseCases(implicit ee: ExecutionEnv)
         it.collect[List](
           Int.MaxValue, Cursor.FailOnError[List[BSONDocument]]()).map {
             _.map(_.getAs[BSONInteger]("age").get.value).mkString("")
-          } must beEqualTo((18 to 60).mkString("")).await(0, t)
+          } must beTypedEqualTo((18 to 60).mkString("")).await(0, t)
       }
 
       "with the default connection" in {
@@ -106,9 +106,7 @@ final class CommonUseCases(implicit ee: ExecutionEnv)
       }
 
       "with the slow connection" in eventually(2, timeout) {
-        val t = Common.ifX509(slowTimeout * 5)(slowTimeout * 2)
-
-        findSpec(slowColl, t)
+        findSpec(slowColl, Common.ifX509(slowTimeout * 5)(slowTimeout * 3))
       }
     }
 

@@ -25,4 +25,6 @@ private[reactivemongo] class RoundRobiner[A, M[T] <: Iterable[T]](
   }
 
   @inline def size: Int = subject.size
+
+  override def toString = s"RoundRobiner($subject)"
 }

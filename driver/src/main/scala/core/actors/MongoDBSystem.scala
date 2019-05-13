@@ -19,7 +19,7 @@ import java.net.InetSocketAddress
 
 import scala.concurrent.{ Await, Future, Promise }
 
-import scala.util.{ Failure, Random, Success, Try }
+import scala.util.{ Failure, Success, Try }
 import scala.util.control.NonFatal
 
 import scala.collection.mutable.{ Map => MMap }
@@ -106,7 +106,8 @@ trait MongoDBSystem extends Actor {
   /** Returns a fresh channel factory. */
   protected def newChannelFactory(effect: Unit): ChannelFactory
 
-  private var channelFactory: ChannelFactory = null //newChannelFactory({})
+  private[reactivemongo] var channelFactory: ChannelFactory = null //newChannelFactory({})
+
   @volatile private var closingFactory = false
 
   private val listener: Option[ConnectionListener] = {
@@ -145,7 +146,8 @@ trait MongoDBSystem extends Actor {
       }
     }
 
-  val channelsPerNode = options.nbChannelsPerNode + 1 /* signaling */
+  @inline private def userConnectionsPerNode = options.nbChannelsPerNode
+  private val channelsPerNode = userConnectionsPerNode + 1 /* signaling */
 
   // monitor -->
   private lazy val heartbeatFrequency =
@@ -193,10 +195,9 @@ trait MongoDBSystem extends Actor {
           n
         }
       }
-    }.createNeededChannels(channelFactory, self, 1) match {
+    }.createUserConnections(channelFactory, self, 1) match {
       case inited @ Success(ns) => {
         _nodeSet = ns
-
         _setInfo = ns.info
 
         inited
@@ -293,20 +294,18 @@ trait MongoDBSystem extends Actor {
       nodeSetUpdated(s"Start(${ns.toShortString})", null, ns)
     }
 
-    // Prepare the period jobs
-    connectAllJob = {
+    // Prepare the periodic jobs
+    val interval = {
       val ms = options.heartbeatFrequencyMS / 5
-      val interval = if (ms < 100) 100.milliseconds else heartbeatFrequency
-
-      scheduler.schedule(Duration.Zero, interval, self, ConnectAll)
+      if (ms < 100) 100.milliseconds else heartbeatFrequency
     }
 
-    refreshAllJob = scheduler.schedule(
-      Duration.Zero, heartbeatFrequency, self, RefreshAll)
+    refreshAllJob = scheduler.schedule(interval, interval, self, RefreshAll)
+    connectAllJob = scheduler.schedule(interval, interval, self, ConnectAll)
   }
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
-    val details = message.map { m => s": $m" }.getOrElse("")
+    val details = message.fold("") { m => s": $m" }
     val msg = s"Restarting the MongoDBSystem${details}"
 
     warn(msg, reason)
@@ -376,7 +375,9 @@ trait MongoDBSystem extends Actor {
   }
 
   private final def authenticateNode(node: Node, auths: Set[Authenticate]): Node = node._copy(connections = node.connections.map {
-    case connection if connection.status == ConnectionStatus.Connected =>
+    case connection if (
+      !connection.signaling &&
+      connection.status == ConnectionStatus.Connected) =>
       authenticateConnection(connection, auths)
 
     case connection => connection
@@ -578,8 +579,8 @@ trait MongoDBSystem extends Actor {
       val statusInfo = _nodeSet.toShortString
 
       updateNodeSet(s"ConnectAll($statusInfo)") { ns =>
-        ns.createNeededChannels(
-          channelFactory, self, channelsPerNode) match {
+        ns.createUserConnections(
+          channelFactory, self, userConnectionsPerNode) match {
           case Success(upd) => connectAll(upd)
 
           case Failure(cause) => {
@@ -739,7 +740,7 @@ trait MongoDBSystem extends Actor {
                 case _ if isGetLastError => {
                   debug(s"{${response.header.responseTo}} it's a getlasterror")
 
-                  // todo, for now rewinding buffer at original index
+                  // TODO: for now rewinding buffer at original index
 
                   lastError(response).fold({ e =>
                     error(s"Error deserializing LastError message #${response.header.responseTo}", e)
@@ -853,8 +854,6 @@ trait MongoDBSystem extends Actor {
       chans --= discardedChannels.keySet
 
       resps.retain { (_, awaitingResponse) =>
-        //chans -= awaitingResponse.channelID
-
         discardedChannels.get(awaitingResponse.channelID) match {
           case Some(error) => {
             val retriedChans = Set.newBuilder[ChannelId]
@@ -976,7 +975,7 @@ trait MongoDBSystem extends Actor {
         }
       }
 
-      if (node.connected.isEmpty) {
+      if (node.signaling.isEmpty) {
         // If there no longer established connection
         trace(s"Unset the node status on disconnect (#${chanId})")
 
@@ -1179,7 +1178,8 @@ trait MongoDBSystem extends Actor {
       @inline def event = s"ConnectAll$$IsMaster(${response.header.responseTo}, ${updated.toShortString})"
 
       updateNodeSet(event) { ns =>
-        ns.createNeededChannels(channelFactory, self, 1) match {
+        ns.createUserConnections(
+          channelFactory, self, options.minIdleChannelsPerNode) match {
           case Success(upd) => upd
 
           case Failure(cause) => {
@@ -1342,7 +1342,7 @@ trait MongoDBSystem extends Actor {
       val accept = { c: Connection =>
         val count = chans.getOrElse(c.channel.id, 0)
 
-        !c.signaling && options.maxInFlightPerChannel.forall(count < _)
+        !c.signaling && options.maxInFlightRequestsPerChannel.forall(count < _)
       }
 
       ns.pick(request.readPreference, accept).fold({
@@ -1413,8 +1413,6 @@ trait MongoDBSystem extends Actor {
     @annotation.tailrec
     def updateNode(n: Node, before: Vector[Connection], updated: Vector[Connection]): Node = before.headOption match {
       case Some(c) => {
-        //println(s"${n.name} -> ${c.channel} = ${c.status} ? ${c.channel.isActive}")
-
         if (c.status == ConnectionStatus.Connecting ||
           c.status == ConnectionStatus.Connected) {
 
@@ -1471,7 +1469,7 @@ trait MongoDBSystem extends Actor {
       }
     }
 
-    //println(s"_connect_all: ${nodeSet.nodes}")
+    //_println(s"_connect_all: ${nodeSet.nodes}")
 
     nodeSet.copy(nodes = nodeSet.nodes.map { node =>
       updateNode(node, node.connections, Vector.empty)
@@ -1485,43 +1483,8 @@ trait MongoDBSystem extends Actor {
     def send(): (Node, Option[Exception]) = { f(); node -> error }
   }
 
-  /**
-   * TODO: Remove
-   * Picks a connection available to send `isMaster`
-   */
-  private def pickMasterConnection(node: Node): Option[Connection] = {
-    val awaitingChannels = requestTracker.channels()
-
-    val freeConnections = node.connected.filterNot { c =>
-      awaitingChannels.contains(c.channel.id)
-    }
-
-    val preferred: Vector[Connection] = {
-      if (freeConnections.nonEmpty) {
-        freeConnections
-      } else {
-        val lessBusy = requestTracker.responses().
-          filter { r => node.connected.exists(_.channel.id == r.channelID) }.
-          groupBy(_.channelID).map { case (chanId, rs) => chanId -> rs.size }.
-          toSeq.sortBy(_._2).take(
-            scala.math.ceil(channelsPerNode / 3D).toInt)
-
-        node.connected.filter { c =>
-          lessBusy.contains(c.channel.id)
-        }
-      }
-    }
-
-    val available = if (preferred.nonEmpty) preferred else node.connected
-
-    Random.shuffle(available).headOption
-  }
-
   private def requestIsMaster(context: String, node: Node): IsMasterRequest = {
-    val masterCon: Option[Connection] =
-      node.signaling orElse pickMasterConnection(node)
-
-    masterCon.fold(new IsMasterRequest(node)) { con =>
+    node.signaling.fold(new IsMasterRequest(node)) { con =>
       import reactivemongo.api.BSONSerializationPack
       import reactivemongo.api.commands.bson.{
         BSONIsMasterCommandImplicits,
@@ -1559,7 +1522,7 @@ trait MongoDBSystem extends Actor {
       if (node.pingInfo.lastIsMasterId == -1) {
         // There is no IsMaster request waiting response for the node:
         // sending a new one
-        debug(s"Prepares a fresh IsMaster request to ${node.toShortString} (channel #${con.channel.id})")
+        debug(s"Prepares a fresh IsMaster request to ${node.toShortString} (channel #${con.channel.id}@${con.channel.localAddress})")
 
         new IsMasterRequest(
           node = node._copy(pingInfo = renewedPingInfo),
@@ -1590,15 +1553,7 @@ trait MongoDBSystem extends Actor {
         }
 
         new IsMasterRequest(
-          node = updated.createSignalingConnection(channelFactory, self) match {
-            case Success(n) => n
-
-            case Failure(e) => {
-              warn(s"Fails to create signaling connection on ${node.toShortString}", e)
-
-              updated
-            }
-          },
+          node = updated,
           f = sendFresh,
           error = Some {
             val cause = new ClosedException(s"$msg ($lnm)")

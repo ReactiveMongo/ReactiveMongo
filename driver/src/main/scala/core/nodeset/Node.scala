@@ -44,8 +44,8 @@ private[reactivemongo] case class Node(
     })
   }
 
-  @transient val connected: Vector[Connection] =
-    connections.filter(_.status == ConnectionStatus.Connected)
+  @transient val connected: Vector[Connection] = connections.filter(c =>
+    !c.signaling && c.status == ConnectionStatus.Connected)
 
   /**
    * The [[connected]] connections with no required authentication,
@@ -56,10 +56,10 @@ private[reactivemongo] case class Node(
       authenticated.exists(_ == auth)
     }))
 
-  private[core] lazy val signaling: Option[Connection] =
-    connections.find(_.signaling)
+  private[reactivemongo] lazy val signaling: Option[Connection] =
+    connections.find(c => c.signaling && c.status == ConnectionStatus.Connected)
 
-  private[core] def createSignalingConnection(
+  private[reactivemongo] def createSignalingConnection(
     channelFactory: ChannelFactory,
     receiver: ActorRef): Try[Node] = signaling match {
     case Some(_) => Success(this)
@@ -70,22 +70,23 @@ private[reactivemongo] case class Node(
       }
   }
 
-  private[core] def createNeededChannels(
+  /* Create channels (not for signaling). */
+  private[core] def createUserConnections(
     channelFactory: ChannelFactory,
     receiver: ActorRef,
     upTo: Int): Try[Node] = {
-    if (connections.size < upTo) {
-      createConnections(
-        channelFactory, receiver, upTo - connections.size, Vector.empty).
-        map { created =>
-          _copy(connections = connections ++ created)
-        }
+    val count = connections.count(!_.signaling)
 
+    if (count < upTo) {
+      createChannels(
+        channelFactory, receiver, upTo - count, Vector.empty).map { created =>
+        _copy(connections = connections ++ created)
+      }
     } else Success(this)
   }
 
   @annotation.tailrec
-  private def createConnections(
+  private def createChannels(
     channelFactory: ChannelFactory,
     receiver: ActorRef,
     count: Int,
@@ -93,7 +94,7 @@ private[reactivemongo] case class Node(
     if (count > 0) {
       createConnection(channelFactory, receiver, false) match {
         case Success(con) =>
-          createConnections(channelFactory, receiver, count - 1, con +: created)
+          createChannels(channelFactory, receiver, count - 1, con +: created)
 
         case Failure(cause) => Failure(cause)
       }
@@ -143,11 +144,12 @@ private[reactivemongo] case class Node(
     else this
   }
 
-  def toShortString = s"""Node[$name: $status (${authenticatedConnections.size}/${connected.size}/${connections.size} available connections), latency=${pingInfo.ping}ns, authenticated={${authenticated.map(_.toShortString) mkString ", "}}]"""
+  lazy val toShortString = s"""Node[$name: $status (${authenticatedConnections.size}/${connected.size}/${connections.filterNot(_.signaling).size} available connections), latency=${pingInfo.ping}ns, authenticated={${authenticated.map(_.toShortString) mkString ", "}}]"""
 
   /** Returns the read-only information about this node. */
   def info = NodeInfo(name, aliases.result(), host, port, status,
-    connections.size, connections.count(_.status == ConnectionStatus.Connected),
+    connections.count(!_.signaling),
+    connections.count(_.status == ConnectionStatus.Connected),
     authenticatedConnections.subject.size, tags,
     protocolMetadata, pingInfo, isMongos)
 

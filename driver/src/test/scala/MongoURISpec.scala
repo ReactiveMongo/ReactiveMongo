@@ -15,7 +15,7 @@ import reactivemongo.core.errors.GenericDriverException
 
 import org.specs2.concurrent.ExecutionEnv
 
-class MongoURISpec(implicit ee: ExecutionEnv)
+final class MongoURISpec(implicit ee: ExecutionEnv)
   extends org.specs2.mutable.Specification {
 
   "Mongo URI" title
@@ -286,7 +286,7 @@ class MongoURISpec(implicit ee: ExecutionEnv)
     s"parse $defaultFo with success" in {
       parseURI(defaultFo) must beSuccessfulTry[ParsedURI].like {
         case uri =>
-          strategyStr(uri) must_== "100 milliseconds100 milliseconds200 milliseconds300 milliseconds500 milliseconds600 milliseconds700 milliseconds800 milliseconds1000 milliseconds1100 milliseconds1200 milliseconds"
+          strategyStr(uri) must_=== "100 milliseconds100 milliseconds200 milliseconds300 milliseconds500 milliseconds600 milliseconds700 milliseconds800 milliseconds1000 milliseconds1100 milliseconds1200 milliseconds"
       }
     }
 
@@ -295,7 +295,7 @@ class MongoURISpec(implicit ee: ExecutionEnv)
     s"parse $remoteFo with success" in {
       parseURI(remoteFo) must beSuccessfulTry[ParsedURI].like {
         case uri =>
-          strategyStr(uri) must_== "100 milliseconds100 milliseconds200 milliseconds300 milliseconds500 milliseconds600 milliseconds700 milliseconds800 milliseconds1000 milliseconds1100 milliseconds1200 milliseconds1300 milliseconds1500 milliseconds1600 milliseconds1700 milliseconds1800 milliseconds2000 milliseconds"
+          strategyStr(uri) must_=== "100 milliseconds100 milliseconds200 milliseconds300 milliseconds500 milliseconds600 milliseconds700 milliseconds800 milliseconds1000 milliseconds1100 milliseconds1200 milliseconds1300 milliseconds1500 milliseconds1600 milliseconds1700 milliseconds1800 milliseconds2000 milliseconds"
       }
     }
 
@@ -304,7 +304,7 @@ class MongoURISpec(implicit ee: ExecutionEnv)
     s"parse $strictFo with success" in {
       parseURI(strictFo) must beSuccessfulTry[ParsedURI].like {
         case uri =>
-          strategyStr(uri) must_== "100 milliseconds100 milliseconds200 milliseconds300 milliseconds500 milliseconds600 milliseconds"
+          strategyStr(uri) must_=== "100 milliseconds100 milliseconds200 milliseconds300 milliseconds500 milliseconds600 milliseconds"
       }
     }
 
@@ -313,7 +313,7 @@ class MongoURISpec(implicit ee: ExecutionEnv)
     s"parse $customFo with success" in {
       parseURI(customFo) must beSuccessfulTry[ParsedURI].like {
         case uri =>
-          strategyStr(uri) must_== "123 milliseconds615 milliseconds1230 milliseconds1845 milliseconds2460 milliseconds"
+          strategyStr(uri) must_=== "123 milliseconds615 milliseconds1230 milliseconds1845 milliseconds2460 milliseconds"
       }
     }
 
@@ -353,7 +353,15 @@ class MongoURISpec(implicit ee: ExecutionEnv)
 
     s"parse $monRefMS with success" in {
       parseURI(monRefMS) must beSuccessfulTry[ParsedURI].like {
-        case uri => uri.options.heartbeatFrequencyMS must_== 567
+        case uri => uri.options.heartbeatFrequencyMS must_=== 567
+      }
+    }
+
+    val maxInFlight = "mongodb://host1?rm.maxInFlightRequestsPerChannel=128"
+
+    s"parse $maxInFlight with success" in {
+      parseURI(maxInFlight) must beSuccessfulTry[ParsedURI].like {
+        case uri => uri.options.maxInFlightRequestsPerChannel must beSome(128)
       }
     }
 

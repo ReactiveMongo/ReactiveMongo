@@ -43,7 +43,7 @@ class DriverSpec(implicit ee: ExecutionEnv)
     "cleanly start and close with no connections #1" in {
       val md = newDriver()
 
-      reactivemongo.api.tests.numConnections(md) must_== 0 and {
+      reactivemongo.api.tests.numConnections(md) must_=== 0 and {
         md.close(timeout) must not(throwA[Throwable])
       } and {
         md.close(timeout) aka "extra close" must_=== ({})
@@ -53,7 +53,7 @@ class DriverSpec(implicit ee: ExecutionEnv)
     "cleanly start and close with no connections #2" in {
       val md = newDriver()
 
-      reactivemongo.api.tests.numConnections(md) must_== 0 and (
+      reactivemongo.api.tests.numConnections(md) must_=== 0 and (
         md.close(timeout) must not(throwA[Throwable]))
     }
 
@@ -103,7 +103,7 @@ class DriverSpec(implicit ee: ExecutionEnv)
         priMon ! con.mongosystem
 
         Future.sequence(Seq(setAvailable.future, priAvailable.future))
-      }.map(_.size) must beEqualTo(2).await(0, timeout)
+      }.map(_.size) must beTypedEqualTo(2).await(0, timeout)
     }
 
     "fail within expected timeout interval" in eventually(2, timeout) {
@@ -123,9 +123,9 @@ class DriverSpec(implicit ee: ExecutionEnv)
             reason.getStackTrace.tail.headOption.
               aka("most recent") must beSome[StackTraceElement].like {
                 case mostRecent =>
-                  mostRecent.getClassName aka "class" must beEqualTo(
+                  mostRecent.getClassName aka "class" must beTypedEqualTo(
                     "reactivemongo.api.MongoConnection") and (
-                      mostRecent.getMethodName aka "method" must_== "database")
+                      mostRecent.getMethodName aka "method" must_=== "database")
 
               } and {
                 Option(reason.getCause) must beSome[Throwable].like {
@@ -159,13 +159,14 @@ class DriverSpec(implicit ee: ExecutionEnv)
     section("mongo2")
 
     "be the default mode" in {
-      db_.flatMap(_.drop()).map(_ => {}) must beEqualTo({}).await(1, timeout)
+      db_.flatMap(_.drop()).
+        map(_ => {}) must beTypedEqualTo({}).await(1, timeout)
     }
 
     "create a user" in {
       db_.flatMap(_.createUser(s"test-$id", Some(s"password-$id"),
         roles = List(DBUserRole("readWrite", dbName)))).
-        aka("creation") must beEqualTo({}).await(0, timeout)
+        aka("creation") must beTypedEqualTo({}).await(0, timeout)
     }
 
     "not be successful with wrong credentials" in {
@@ -190,25 +191,25 @@ class DriverSpec(implicit ee: ExecutionEnv)
     "be successful with right credentials" in {
       connection.authenticate(
         dbName, s"test-$id", s"password-$id", failoverStrategy).
-        aka("authentication") must beLike[SuccessfulAuthentication](
-          { case _ => ok }).await(1, timeout) and {
-            db_.flatMap {
-              _("testcol").insert(BSONDocument("foo" -> "bar")).map(_ => {})
-            } must beEqualTo({}).await(0, timeout)
-          } and {
-            // With credential in initial connection options
-            val con = drv.connection(
-              List(primaryHost),
-              options = DefaultOptions.copy(
-                authenticationMechanism = reactivemongo.api.CrAuthentication,
-                credentials = Map(dbName -> MongoConnectionOptions.
-                  Credential(s"test-$id", Some(s"password-$id"))),
-                nbChannelsPerNode = 1))
+        aka("authentication") must beAnInstanceOf[SuccessfulAuthentication].
+        await(1, timeout) and {
+          db_.flatMap {
+            _("testcol").insert.one(BSONDocument("foo" -> "bar")).map(_ => {})
+          } must beTypedEqualTo({}).await(0, timeout)
+        } and {
+          // With credential in initial connection options
+          val con = drv.connection(
+            List(primaryHost),
+            options = DefaultOptions.copy(
+              authenticationMechanism = reactivemongo.api.CrAuthentication,
+              credentials = Map(dbName -> MongoConnectionOptions.
+                Credential(s"test-$id", Some(s"password-$id"))),
+              nbChannelsPerNode = 1))
 
-            con.database(dbName, failoverStrategy).
-              map(_ => {}) must beTypedEqualTo({}).await(0, timeout)
+          con.database(dbName, failoverStrategy).
+            map(_ => {}) must beTypedEqualTo({}).await(0, timeout)
 
-          }
+        }
     }
 
     "driver shutdown" in { // mainly to ensure the test driver is closed
@@ -250,15 +251,13 @@ class DriverSpec(implicit ee: ExecutionEnv)
 
     section("not_mongo26")
 
-    "work only if configured" in {
-      db_.flatMap(_.drop()).map(_ => {}) must beEqualTo({}).
-        await(0, timeout * 2)
-    }
-
     "create a user" in {
-      db_.flatMap(_.createUser(s"test-$id", Some(s"password-$id"),
-        roles = List(DBUserRole("readWrite", dbName)))).
-        aka("creation") must beEqualTo({}).await(0, timeout)
+      (for {
+        d <- db_
+        _ <- d.drop()
+        _ <- d.createUser(s"test-$id", Some(s"password-$id"),
+          roles = List(DBUserRole("readWrite", dbName)))
+      } yield ()) must beTypedEqualTo({}).await(0, timeout * 2)
     }
 
     "not be successful with wrong credentials" >> {
@@ -281,13 +280,14 @@ class DriverSpec(implicit ee: ExecutionEnv)
     "be successful on existing connection with right credentials" >> {
       "with the default connection" in {
         connection.flatMap(
-          _.authenticate(dbName, s"test-$id", s"password-$id",
-            failoverStrategy)) must beLike[SuccessfulAuthentication](
-            { case _ => ok }).await(1, timeout) and {
-              db_.flatMap {
-                _("testcol").insert(BSONDocument("foo" -> "bar"))
-              }.map(_ => {}) must beEqualTo({}).await(1, timeout * 2)
-            }
+          _.authenticate(
+            dbName, s"test-$id", s"password-$id", failoverStrategy)).
+          aka("auth request") must beAnInstanceOf[SuccessfulAuthentication].
+          await(1, timeout) and {
+            db_.flatMap {
+              _("testcol").insert.one(BSONDocument("foo" -> "bar"))
+            }.map(_ => {}) must beTypedEqualTo({}).await(1, timeout * 2)
+          }
 
       }
 
@@ -295,13 +295,13 @@ class DriverSpec(implicit ee: ExecutionEnv)
         eventually(2, timeout) {
           slowConnection.flatMap(
             _.authenticate(dbName, s"test-$id", s"password-$id", slowFailover)).
-            aka("authentication") must beLike[SuccessfulAuthentication](
-              { case _ => ok }).await(0, slowTimeout)
+            aka("authentication") must beAnInstanceOf[SuccessfulAuthentication].
+            awaitFor(slowTimeout)
         }
       }
     }
 
-    "be successful with right credentials" >> {
+    "be successful on new connection with right credentials" >> {
       val rightCreds = Map(
         dbName -> MongoConnectionOptions.Credential(
           s"test-$id", Some(s"password-$id")))
@@ -315,9 +315,9 @@ class DriverSpec(implicit ee: ExecutionEnv)
 
         con.database(dbName, failoverStrategy).
           aka("authed DB") must beLike[DefaultDB] {
-            case rdb => rdb.collection("testcol").insert(
+            case rdb => rdb.collection("testcol").insert.one(
               BSONDocument("foo" -> "bar")).map(_ => {}).
-              aka("insertion") must beEqualTo({}).await(1, timeout)
+              aka("insertion") must beTypedEqualTo({}).await(1, timeout)
 
           }.await(1, timeout) and {
             con.askClose()(timeout).
@@ -333,7 +333,7 @@ class DriverSpec(implicit ee: ExecutionEnv)
           slowTimeout)
 
         con.database(dbName, slowFailover).
-          aka("authed DB") must beLike[DefaultDB] { case _ => ok }.
+          aka("authed DB") must beAnInstanceOf[DefaultDB].
           await(1, slowTimeout) and {
             con.askClose()(slowTimeout) must not(throwA[Exception]).
               await(1, slowTimeout)
@@ -360,9 +360,9 @@ class DriverSpec(implicit ee: ExecutionEnv)
             case reason => reason.getStackTrace.tail.headOption.
               aka("most recent") must beSome[StackTraceElement].like {
                 case mostRecent =>
-                  mostRecent.getClassName aka "class" must beEqualTo(
+                  mostRecent.getClassName aka "class" must beTypedEqualTo(
                     "reactivemongo.api.MongoConnection") and (
-                      mostRecent.getMethodName aka "method" must_== "database")
+                      mostRecent.getMethodName aka "method" must_=== "database")
               } and {
                 Option(reason.getCause).
                   aka("cause") must beSome[Throwable].like {
@@ -413,9 +413,9 @@ class DriverSpec(implicit ee: ExecutionEnv)
       conOpts.credentials must not(beEmpty) and {
         con.database(dbName, failoverStrategy).
           aka("authed DB") must beLike[DefaultDB] {
-            case rdb => rdb.collection("testcol").insert(
+            case rdb => rdb.collection("testcol").insert.one(
               BSONDocument("foo" -> "bar")).map(_ => {}).
-              aka("insertion") must beEqualTo({}).await(1, timeout)
+              aka("insertion") must beTypedEqualTo({}).await(1, timeout)
 
           }.await(1, timeout) and {
             con.askClose()(timeout).
