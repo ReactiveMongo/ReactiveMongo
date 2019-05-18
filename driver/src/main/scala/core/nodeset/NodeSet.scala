@@ -155,23 +155,11 @@ case class NodeSet(
     s"{{NodeSet $name ${nodes.map(_.toShortString).mkString(" | ")} }}"
 
   /** Returns the read-only information about this node. */
-  def info = {
+  def info: NodeSetInfo = {
     val ns = nodes.map(_.info)
 
     NodeSetInfo(name, version, ns, primary.map(_.info),
       mongos.map(_.info), ns.filter(_.status == NodeStatus.Secondary),
       nearest.map(_.info))
   }
-}
-
-case class NodeSetInfo(
-  name: Option[String],
-  version: Option[Long],
-  nodes: Vector[NodeInfo],
-  primary: Option[NodeInfo],
-  mongos: Option[NodeInfo],
-  secondaries: Vector[NodeInfo],
-  nearest: Option[NodeInfo]) {
-
-  override lazy val toString = s"{{NodeSet $name ${nodes.mkString(" | ")} }}"
 }

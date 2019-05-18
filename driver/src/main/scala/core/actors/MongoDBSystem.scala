@@ -138,7 +138,10 @@ trait MongoDBSystem extends Actor {
         updateHistory(event)
 
         scheduler.scheduleOnce(1.second) {
-          _setInfo = updated.info
+          _setInfo = updated.info.withAwaitingRequests(
+            requestTracker.responses.size,
+            requestTracker.maxAwaitingPerChannel)
+
           l.nodeSetUpdated(previous, _setInfo)
         }
 
@@ -147,7 +150,6 @@ trait MongoDBSystem extends Actor {
     }
 
   @inline private def userConnectionsPerNode = options.nbChannelsPerNode
-  private val channelsPerNode = userConnectionsPerNode + 1 /* signaling */
 
   // monitor -->
   private lazy val heartbeatFrequency =
@@ -1340,7 +1342,7 @@ trait MongoDBSystem extends Actor {
 
     case _ => requestTracker.withAwaiting { (_, chans) =>
       val accept = { c: Connection =>
-        val count = chans.getOrElse(c.channel.id, 0)
+        val count: Int = chans.getOrElse(c.channel.id, 0)
 
         !c.signaling && options.maxInFlightRequestsPerChannel.forall(count < _)
       }
@@ -1713,16 +1715,18 @@ case class AuthRequest(
 private[actors] final class RequestTracker {
   import scala.collection.mutable.LinkedHashMap
 
-  // TODO: Max awaiting response (maxConcurrentRequests?) to limit awaitingResponses?
-
   /* Request ID -> AwaitingResponse */
   private val awaitingResponses = LinkedHashMap.empty[Int, AwaitingResponse]
 
   /* ChannelId -> count */
   private val awaitingChannels = LinkedHashMap.empty[ChannelId, Int]
 
-  // TODO: monitor max in flight: awaitingChannels.max?
   @inline def channels() = awaitingChannels.keySet.toSet
+
+  @inline def maxAwaitingPerChannel(): Int = {
+    if (awaitingChannels.isEmpty) 0
+    else awaitingChannels.map(_._2).max
+  }
 
   @inline def responses() = awaitingResponses.values.toSeq
 

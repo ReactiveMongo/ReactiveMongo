@@ -35,33 +35,34 @@ case object X509Authentication extends AuthenticationMode
  * @param keyStore an optional key store
  * @param readConcern the default [[https://docs.mongodb.com/manual/reference/read-concern/ read concern]]
  */
-case class MongoConnectionOptions(
+class MongoConnectionOptions private[reactivemongo] (
   // canonical options - connection
-  connectTimeoutMS: Int = 0,
+  val connectTimeoutMS: Int = 0,
+
   // canonical options - authentication options
-  @deprecatedName('authSource) authenticationDatabase: Option[String] = None,
-  sslEnabled: Boolean = false,
-  sslAllowsInvalidCert: Boolean = false,
-  @deprecatedName('authMode) authenticationMechanism: AuthenticationMode = ScramSha1Authentication,
+  val authenticationDatabase: Option[String] = None,
+  val sslEnabled: Boolean = false,
+  val sslAllowsInvalidCert: Boolean = false,
+  val authenticationMechanism: AuthenticationMode = ScramSha1Authentication,
 
   // reactivemongo specific options
-  tcpNoDelay: Boolean = false,
-  keepAlive: Boolean = false,
-  nbChannelsPerNode: Int = 10,
-  @deprecated("Unused, see heartbeatFrequencyMS", "0.16.4") reconnectDelayMS: Int = 1000,
+  val tcpNoDelay: Boolean = false,
+  val keepAlive: Boolean = false,
+  val nbChannelsPerNode: Int = 10,
+  val maxInFlightRequestsPerChannel: Option[Int] = Some(200),
 
   // read and write preferences
-  writeConcern: WC = WC.Default,
-  readPreference: ReadPreference = ReadPreference.primary,
+  val writeConcern: WC = WC.Default,
+  val readPreference: ReadPreference = ReadPreference.primary,
 
-  failoverStrategy: FailoverStrategy = FailoverStrategy.default,
+  val failoverStrategy: FailoverStrategy = FailoverStrategy.default,
 
-  @deprecatedName('monitorRefreshMS) heartbeatFrequencyMS: Int = 10000,
-  maxIdleTimeMS: Int = 0,
-  maxHistorySize: Int = 25,
-  credentials: Map[String, MongoConnectionOptions.Credential] = Map.empty,
-  keyStore: Option[MongoConnectionOptions.KeyStore] = Option.empty,
-  readConcern: ReadConcern = ReadConcern.default) {
+  val heartbeatFrequencyMS: Int = 10000,
+  val maxIdleTimeMS: Int = 0,
+  val maxHistorySize: Int = 25,
+  val credentials: Map[String, MongoConnectionOptions.Credential] = Map.empty,
+  val keyStore: Option[MongoConnectionOptions.KeyStore] = Option.empty,
+  val readConcern: ReadConcern = ReadConcern.default) extends Product with Serializable {
 
   /**
    * The database source for authentication credentials (corresponds to the `authenticationMechanism` with MongoShell).
@@ -77,28 +78,183 @@ case class MongoConnectionOptions(
   @deprecated("Use heartbeatFrequencyMS", "0.16.4")
   @inline def monitorRefreshMS = heartbeatFrequencyMS
 
-  // TODO: Refactor as property
-  private[reactivemongo] var maxInFlightPerChannel: Option[Int] = Some(200)
-
-  /**
-   * !EXPERIMENTAL! Maximum number of live/awaiting requests per connection
-   * (Default: 200; Not applied to the signaling channel).
-   */
-  @inline def maxInFlightRequestsPerChannel(): Option[Int] = maxInFlightPerChannel
-
-  /** !EXPERIMENTAL! See [[maxInFlightRequestsPerChannel]] */
-  def withMaxInFlightRequestsPerChannel(max: Int): MongoConnectionOptions = {
-    val updated = copy()
-    updated.maxInFlightPerChannel = Some(max)
-    updated
-  }
-
   // TODO: Expose?
   @inline private[reactivemongo] def minIdleChannelsPerNode: Int = 1
+
+  @deprecated("Use the other `copy`", "0.17.0")
+  def copy(
+    connectTimeoutMS: Int,
+    @deprecatedName('authSource) authenticationDatabase: Option[String],
+    sslEnabled: Boolean,
+    sslAllowsInvalidCert: Boolean,
+    @deprecatedName('authMode) authenticationMechanism: AuthenticationMode,
+    tcpNoDelay: Boolean,
+    keepAlive: Boolean,
+    nbChannelsPerNode: Int,
+    @deprecated("Unused, see heartbeatFrequencyMS", "0.16.4") reconnectDelayMS: Int,
+    writeConcern: WC,
+    readPreference: ReadPreference,
+    failoverStrategy: FailoverStrategy,
+    @deprecatedName('monitorRefreshMS) heartbeatFrequencyMS: Int,
+    maxIdleTimeMS: Int,
+    maxHistorySize: Int,
+    credentials: Map[String, MongoConnectionOptions.Credential],
+    keyStore: Option[MongoConnectionOptions.KeyStore],
+    readConcern: ReadConcern): MongoConnectionOptions =
+    MongoConnectionOptions(
+      connectTimeoutMS, authenticationDatabase, sslEnabled,
+      sslAllowsInvalidCert, authenticationMechanism, tcpNoDelay, keepAlive,
+      nbChannelsPerNode, reconnectDelayMS, writeConcern, readPreference,
+      failoverStrategy: FailoverStrategy, heartbeatFrequencyMS, maxIdleTimeMS,
+      maxHistorySize, credentials, keyStore, readConcern)
+
+  def copy(
+    connectTimeoutMS: Int = this.connectTimeoutMS,
+    authenticationDatabase: Option[String] = this.authenticationDatabase,
+    sslEnabled: Boolean = this.sslEnabled,
+    sslAllowsInvalidCert: Boolean = this.sslAllowsInvalidCert,
+    authenticationMechanism: AuthenticationMode = this.authenticationMechanism,
+    tcpNoDelay: Boolean = this.tcpNoDelay,
+    keepAlive: Boolean = this.keepAlive,
+    nbChannelsPerNode: Int = this.nbChannelsPerNode,
+    maxInFlightRequestsPerChannel: Option[Int] = this.maxInFlightRequestsPerChannel,
+    writeConcern: WC = this.writeConcern,
+    readPreference: ReadPreference = this.readPreference,
+    failoverStrategy: FailoverStrategy = this.failoverStrategy,
+    heartbeatFrequencyMS: Int = this.heartbeatFrequencyMS,
+    maxIdleTimeMS: Int = this.maxIdleTimeMS,
+    maxHistorySize: Int = this.maxHistorySize,
+    credentials: Map[String, MongoConnectionOptions.Credential] = this.credentials,
+    keyStore: Option[MongoConnectionOptions.KeyStore] = this.keyStore,
+    readConcern: ReadConcern = this.readConcern): MongoConnectionOptions =
+    new MongoConnectionOptions(
+      connectTimeoutMS = connectTimeoutMS,
+      authenticationDatabase = authenticationDatabase,
+      sslEnabled = sslEnabled,
+      sslAllowsInvalidCert = sslAllowsInvalidCert,
+      authenticationMechanism = authenticationMechanism,
+      tcpNoDelay = tcpNoDelay,
+      keepAlive = keepAlive,
+      nbChannelsPerNode = nbChannelsPerNode,
+      maxInFlightRequestsPerChannel = maxInFlightRequestsPerChannel,
+      writeConcern = writeConcern,
+      readPreference = readPreference,
+      failoverStrategy = failoverStrategy,
+      heartbeatFrequencyMS = heartbeatFrequencyMS,
+      maxIdleTimeMS = maxIdleTimeMS,
+      maxHistorySize = maxHistorySize,
+      credentials = credentials,
+      keyStore = keyStore,
+      readConcern = readConcern)
+
+  @deprecated("Will no longer be a `Product`", "0.17.0")
+  val productArity = 18
+
+  @deprecated("Will no longer be a `Product`", "0.17.0")
+  def productElement(n: Int): Any = (n: @annotation.switch) match {
+    case 0  => connectTimeoutMS
+    case 1  => authenticationDatabase
+    case 2  => sslEnabled
+    case 3  => sslAllowsInvalidCert
+    case 4  => authenticationMechanism
+    case 5  => tcpNoDelay
+    case 6  => keepAlive
+    case 7  => nbChannelsPerNode
+    case 8  => maxInFlightRequestsPerChannel
+    case 9  => writeConcern
+    case 10 => readPreference
+    case 11 => failoverStrategy
+    case 12 => heartbeatFrequencyMS
+    case 13 => maxIdleTimeMS
+    case 14 => maxHistorySize
+    case 15 => credentials
+    case 16 => keyStore
+    case 17 => readConcern
+  }
+
+  def canEqual(that: Any): Boolean = that match {
+    case _: MongoConnectionOptions => true
+    case _                         => false
+  }
+
+  override def toString = s"""MongoConnectionOptions { ${MongoConnectionOptions.toStrings(this).mkString(", ")} }"""
+
+  override def hashCode: Int = tupled.hashCode
+
+  override def equals(that: Any): Boolean = that match {
+    case other: MongoConnectionOptions =>
+      other.tupled == this.tupled
+
+    case _ =>
+      false
+  }
+
+  private[api] lazy val tupled = Tuple18(
+    connectTimeoutMS,
+    authenticationDatabase,
+    sslEnabled,
+    sslAllowsInvalidCert,
+    authenticationMechanism,
+    tcpNoDelay,
+    keepAlive,
+    nbChannelsPerNode,
+    maxInFlightRequestsPerChannel,
+    writeConcern,
+    readPreference,
+    failoverStrategy,
+    heartbeatFrequencyMS,
+    maxIdleTimeMS,
+    maxHistorySize,
+    credentials,
+    keyStore,
+    readConcern)
+
 }
 
 object MongoConnectionOptions {
-  @inline private def ms(duration: Int): String = s"${duration}ms"
+  /** The default options */
+  @inline def default: MongoConnectionOptions = new MongoConnectionOptions()
+
+  @deprecated("Use `MongoConnectionOptions` constructor", "0.17.0")
+  def apply(
+    connectTimeoutMS: Int = 0,
+    @deprecatedName('authSource) authenticationDatabase: Option[String] = None,
+    sslEnabled: Boolean = false,
+    sslAllowsInvalidCert: Boolean = false,
+    @deprecatedName('authMode) authenticationMechanism: AuthenticationMode = ScramSha1Authentication,
+    tcpNoDelay: Boolean = false,
+    keepAlive: Boolean = false,
+    nbChannelsPerNode: Int = 10,
+    @deprecated("Unused, see heartbeatFrequencyMS", "0.16.4") reconnectDelayMS: Int = 1000,
+    writeConcern: WC = WC.Default,
+    readPreference: ReadPreference = ReadPreference.primary,
+    failoverStrategy: FailoverStrategy = FailoverStrategy.default,
+    @deprecatedName('monitorRefreshMS) heartbeatFrequencyMS: Int = 10000,
+    maxIdleTimeMS: Int = 0,
+    maxHistorySize: Int = 25,
+    credentials: Map[String, MongoConnectionOptions.Credential] = Map.empty,
+    keyStore: Option[MongoConnectionOptions.KeyStore] = Option.empty,
+    readConcern: ReadConcern = ReadConcern.default): MongoConnectionOptions =
+    new MongoConnectionOptions(
+      connectTimeoutMS = connectTimeoutMS,
+      authenticationDatabase = authenticationDatabase,
+      sslEnabled = sslEnabled,
+      sslAllowsInvalidCert = sslAllowsInvalidCert,
+      authenticationMechanism = authenticationMechanism,
+      tcpNoDelay = tcpNoDelay,
+      keepAlive = keepAlive,
+      nbChannelsPerNode = nbChannelsPerNode,
+      writeConcern = writeConcern,
+      readPreference = readPreference,
+      failoverStrategy = failoverStrategy,
+      heartbeatFrequencyMS = heartbeatFrequencyMS,
+      maxIdleTimeMS = maxIdleTimeMS,
+      maxHistorySize = maxHistorySize,
+      credentials = credentials,
+      keyStore = keyStore,
+      readConcern = readConcern)
+
+  // ---
 
   /**
    * @param user the name (or subject) of the user
@@ -139,10 +295,15 @@ object MongoConnectionOptions {
     }
   }
 
+  // ---
+
+  @inline private def ms(duration: Int): String = s"${duration}ms"
+
   private[reactivemongo] def toStrings(options: MongoConnectionOptions): List[(String, String)] = options.authenticationDatabase.toList.map(
     "authenticationDatabase" -> _.toString) ++ List(
       "authenticationMechanism" -> options.authMode.toString,
       "nbChannelsPerNode" -> options.nbChannelsPerNode.toString,
+      "maxInFlightRequestsPerChannel" -> options.maxInFlightRequestsPerChannel.fold("<unlimited>")(_.toString),
       "heartbeatFrequencyMS" -> ms(options.heartbeatFrequencyMS),
       "connectTimeoutMS" -> ms(options.connectTimeoutMS),
       "maxIdleTimeMS" -> ms(options.maxIdleTimeMS), // TODO: Review

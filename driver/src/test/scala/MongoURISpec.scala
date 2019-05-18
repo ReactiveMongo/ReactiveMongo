@@ -33,7 +33,7 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
           hosts = List("host1" -> 27017),
           db = None,
           authenticate = None,
-          options = MongoConnectionOptions(),
+          options = MongoConnectionOptions.default,
           ignoredOptions = List.empty))
     }
 
@@ -44,7 +44,7 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
         hosts = List("host1" -> 27017),
         db = None,
         authenticate = None,
-        options = MongoConnectionOptions(),
+        options = MongoConnectionOptions.default,
         ignoredOptions = List("foo"))
 
       parseURI(withOpts) must beSuccessfulTry(expected) and {
@@ -61,7 +61,7 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
           hosts = List("host1" -> 27018),
           db = None,
           authenticate = None,
-          options = MongoConnectionOptions(),
+          options = MongoConnectionOptions.default,
           ignoredOptions = List()))
     }
 
@@ -82,7 +82,7 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
           hosts = List("host1" -> 27017),
           db = Some("somedb"),
           authenticate = None,
-          options = MongoConnectionOptions(),
+          options = MongoConnectionOptions.default,
           ignoredOptions = List()))
     }
 
@@ -93,7 +93,7 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
           hosts = List("host1" -> 27017),
           db = Some("somedb"),
           authenticate = Some(Authenticate("somedb", "user123", Some("passwd123"))),
-          options = MongoConnectionOptions(credentials = Map(
+          options = MongoConnectionOptions.default.copy(credentials = Map(
             "somedb" -> Credential("user123", Some("passwd123")))),
           ignoredOptions = List.empty))
     }
@@ -111,7 +111,7 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
           hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
           db = Some("somedb"),
           authenticate = Some(Authenticate("somedb", "user123", Some("passwd123"))),
-          options = MongoConnectionOptions(
+          options = MongoConnectionOptions.default.copy(
             authenticationMechanism = ScramSha1Authentication,
             credentials = Map("somedb" -> Credential(
               "user123", Some("passwd123")))),
@@ -127,7 +127,7 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
           db = Some("somedb"),
           authenticate = Some(Authenticate(
             "authdb", "user123", Some(";qGu:je/LX}nN\\8"))),
-          options = MongoConnectionOptions(
+          options = MongoConnectionOptions.default.copy(
             authenticationDatabase = Some("authdb"),
             credentials = Map(
               "authdb" -> Credential("user123", Some(";qGu:je/LX}nN\\8")))),
@@ -142,7 +142,7 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
           hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
           db = Some("somedb"),
           authenticate = Some(Authenticate("somedb", "", None)),
-          options = MongoConnectionOptions(
+          options = MongoConnectionOptions.default.copy(
             authenticationMechanism = X509Authentication,
             credentials = Map("somedb" -> Credential("", None))),
           ignoredOptions = List("foo")))
@@ -156,7 +156,7 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
           hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
           db = Some("somedb"),
           authenticate = Some(Authenticate("somedb", "username@test.com,CN=127.0.0.1,OU=TEST_CLIENT,O=TEST_CLIENT,L=LONDON,ST=LONDON,C=UK", None)),
-          options = MongoConnectionOptions(
+          options = MongoConnectionOptions.default.copy(
             authenticationMechanism = X509Authentication,
             credentials = Map(
               "somedb" -> Credential("username@test.com,CN=127.0.0.1,OU=TEST_CLIENT,O=TEST_CLIENT,L=LONDON,ST=LONDON,C=UK", None))),
@@ -170,7 +170,7 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
         hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
         db = Some("somedb"),
         authenticate = Some(Authenticate("somedb", "user123", Some("passwd123"))),
-        options = MongoConnectionOptions(
+        options = MongoConnectionOptions.default.copy(
           writeConcern = WriteConcern.Journaled,
           credentials = Map(
             "somedb" -> Credential("user123", Some("passwd123")))),
@@ -184,7 +184,7 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
         hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
         db = Some("somedb"),
         authenticate = Some(Authenticate("somedb", "user123", Some("passwd123"))),
-        options = MongoConnectionOptions(
+        options = MongoConnectionOptions.default.copy(
           writeConcern = WriteConcern.Default.copy(
             w = reactivemongo.api.commands.WriteConcern.Majority),
           credentials = Map(
@@ -199,7 +199,7 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
         hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
         db = Some("somedb"),
         authenticate = Some(Authenticate("somedb", "user123", Some("passwd123"))),
-        options = MongoConnectionOptions(
+        options = MongoConnectionOptions.default.copy(
           writeConcern = WriteConcern.Default.copy(
             w = reactivemongo.api.commands.WriteConcern.TagSet("anyTag")),
           credentials = Map(
@@ -214,7 +214,7 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
         hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
         db = Some("somedb"),
         authenticate = Some(Authenticate("somedb", "user123", Some("passwd123"))),
-        options = MongoConnectionOptions(
+        options = MongoConnectionOptions.default.copy(
           writeConcern = WriteConcern.Default.copy(
             w = reactivemongo.api.commands.WriteConcern.
               WaitForAcknowledgments(5)),
@@ -231,7 +231,7 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
           hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
           db = Some("somedb"),
           authenticate = Some(Authenticate("somedb", "user123", Some("passwd123"))),
-          options = MongoConnectionOptions(
+          options = MongoConnectionOptions.default.copy(
             writeConcern = WriteConcern.Default.copy(j = true),
             credentials = Map(
               "somedb" -> Credential("user123", Some("passwd123")))),
@@ -246,7 +246,7 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
           hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
           db = Some("somedb"),
           authenticate = Some(Authenticate("somedb", "user123", Some("passwd123"))),
-          options = MongoConnectionOptions(
+          options = MongoConnectionOptions.default.copy(
             writeConcern = WriteConcern.Journaled.copy(j = false),
             credentials = Map(
               "somedb" -> Credential("user123", Some("passwd123")))),
@@ -261,7 +261,7 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
           hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
           db = Some("somedb"),
           authenticate = Some(Authenticate("somedb", "user123", Some("passwd123"))),
-          options = MongoConnectionOptions(
+          options = MongoConnectionOptions.default.copy(
             writeConcern = WriteConcern.Default.copy(wtimeout = Some(1543)),
             credentials = Map(
               "somedb" -> Credential("user123", Some("passwd123")))),
@@ -485,7 +485,7 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
             db = Some("somedb"),
             authenticate = Some(
               Authenticate("admin", "user123", Some("passwd123"))),
-            options = MongoConnectionOptions(
+            options = MongoConnectionOptions.default.copy(
               sslEnabled = false, // overriden from URI
               authenticationDatabase = Some("admin"),
               authenticationMechanism = ScramSha1Authentication,

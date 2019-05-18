@@ -33,7 +33,7 @@ class AsyncDriver(
    * @param name $connectionNameParam
    */
   @deprecated("Use `connect` without `authencations` (but possibily with `credentials` on `options`)", "0.14.0")
-  def connect(nodes: Seq[String], options: MongoConnectionOptions = MongoConnectionOptions(), authentications: Seq[Authenticate] = Seq.empty, name: Option[String] = None): Future[MongoConnection] = {
+  def connect(nodes: Seq[String], options: MongoConnectionOptions = MongoConnectionOptions.default, authentications: Seq[Authenticate] = Seq.empty, name: Option[String] = None): Future[MongoConnection] = {
     val credentials = options.credentials ++ authentications.map { a =>
       a.db -> MongoConnectionOptions.Credential(a.user, a.password)
     }
@@ -47,7 +47,7 @@ class AsyncDriver(
    * @param nodes $nodesParam
    */
   def connect(nodes: Seq[String]): Future[MongoConnection] =
-    askConnection(nodes, MongoConnectionOptions(), Option.empty)
+    askConnection(nodes, MongoConnectionOptions.default, Option.empty)
 
   /**
    * Creates a new MongoConnection.
