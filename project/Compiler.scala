@@ -36,18 +36,31 @@ object Compiler {
     scalacOptions in Compile ++= {
       if (scalaVersion.value startsWith "2.10.") Nil
       else {
-        val internal = ".*Internal:\\ will\\ be\\ made\\ private.*"
         val m26 = "MongoDB\\ 2\\.6\\ EOL\\ reached\\ by\\ Oct\\ 2016"
         val m3 = "MongoDB\\ 3\\.0\\ EOL\\ reached\\ by\\ Feb\\ 2018"
+
+        // Driver
+        val internal = ".*Internal:\\ will\\ be\\ made\\ private.*"
         val cmd = "Will\\ be\\ removed;\\ See\\ `Command`"
         val repl = "Will\\ be\\ replaced\\ by\\ `reactivemongo.*"
+        val ns1 = ".*in\\ package\\ nodeset.*is\\ deprecated.*"
+        val ns2 = ".*class\\ NodeSet.*;NodeSetInfo\\ is\\ deprecated.*"
+        val bcmd = ".*in\\ package\\ bson.*"
+        val driver = s"$internal;$cmd;$repl;$ns1;$ns2;$bcmd"
+
+        // BSON
+        val bll = ".*in\\ package\\ lowlevel\\ is\\ deprecated.*"
+        val bxn = ".*ExtendedNumeric\\ is\\ deprecated.*"
+        val bson = s"$bll;$bxn"
+
+        val macros = ".*value\\ macro.*\\ is never used"
 
         Seq(
           "-Ywarn-infer-any",
           "-Ywarn-unused",
           "-Ywarn-unused-import",
           "-Xlint:missing-interpolator",
-          s"-P:silencer:globalFilters=$internal;$m26;$m3;$internal;$repl"
+          s"-P:silencer:globalFilters=$bson;$driver;$m26;$m3;$macros"
         )
       }
     },

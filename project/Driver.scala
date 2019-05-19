@@ -376,33 +376,4 @@ object Version {
   } andThen Common.filter
 
   private val driverCleanup = taskKey[Unit]("Driver compilation cleanup")
-
-  /* TODO: Remove
-  private def ivyXml(f: File, ver: String, org: String): File = {
-    val orig = XML loadFile f
-
-    val tr = new RuleTransformer(new RewriteRule {
-      override def transform(node: XmlNode): NodeSeq = node match {
-        case e: XmlElem if e.label == "dependencies" => {
-          val x: XmlElem = <dependency conf="compile-&gt;default(compile)" name="reactivemongo-shaded" />
-
-          val shadedDep = x % XmlAttr("", "rev", ver,
-            XmlAttr("", "org", org, x.attributes))
-
-          XmlElem(e.prefix, e.label, e.attributes, e.scope,
-            e.minimizeEmpty, (shadedDep +: e.child): _*)
-
-        }
-
-        case _ => node
-      }
-    })
-
-    val xml = tr.transform(orig).headOption.getOrElse(orig)
-
-    XML.save(f.getPath, xml, "UTF-8", true)
-
-    f
-  }
-   */
 }

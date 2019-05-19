@@ -37,7 +37,8 @@ private[core] object Pack {
       val groupClass = Class.forName(s"${kqueuePkg}.KQueueEventLoopGroup").
         asInstanceOf[Class[_ <: EventLoopGroup]]
 
-      new Pack(() => groupClass.newInstance(), chanClass)
+      new Pack(() =>
+        groupClass.getDeclaredConstructor().newInstance(), chanClass)
     }
   } catch {
     case cause: Exception =>
@@ -54,7 +55,8 @@ private[core] object Pack {
       val groupClass = Class.forName(s"${epollPkg}.EpollEventLoopGroup").
         asInstanceOf[Class[_ <: EventLoopGroup]]
 
-      new Pack(() => groupClass.newInstance(), chanClass)
+      new Pack(() =>
+        groupClass.getDeclaredConstructor().newInstance(), chanClass)
     }
   } catch {
     case cause: Exception =>

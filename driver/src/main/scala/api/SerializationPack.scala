@@ -57,6 +57,7 @@ trait SerializationPack { self: Singleton =>
   // Returns a BSON value
   private[reactivemongo] def bsonValue(value: Value): BSONValue
 
+  @com.github.ghik.silencer.silent
   private[reactivemongo] def bsonSize(value: Value): Int = -1
   // TODO: Remove the default value after release
 

@@ -2,6 +2,16 @@ package reactivemongo.api
 
 import reactivemongo.core.protocol.QueryFlags
 
+/**
+ * @param flags the [[https://docs.mongodb.com/manual/reference/method/cursor.addOption/#flags flags]] representing the current options
+ *
+ * {{{
+ * import reactivemongo.api.CursorOptions
+ *
+ * // Create a options to specify a cursor is tailable
+ * val opts = CursorOptions.empty.tailable
+ * }}}
+ */
 final class CursorOptions(val flags: Int) extends AnyVal {
   def tailable = copy(flags | QueryFlags.TailableCursor)
 

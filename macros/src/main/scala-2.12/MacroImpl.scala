@@ -11,9 +11,9 @@ import reactivemongo.bson.Macros.Options.SaveSimpleName
 import scala.collection.immutable.Set
 import scala.reflect.macros.whitebox.Context
 
-private object MacroImpl {
+private[bson] object MacroImpl {
   def reader[A: c.WeakTypeTag, Opts: c.WeakTypeTag](c: Context): c.Expr[BSONDocumentReader[A]] = c.universe.reify(new BSONDocumentReader[A] {
-    private val r: BSONDocument => A = { document =>
+    private val r: BSONDocument => A = { macroDoc =>
       Helper[A, Opts](c).readBody.splice
     }
 
@@ -23,7 +23,7 @@ private object MacroImpl {
   })
 
   def writer[A: c.WeakTypeTag, Opts: c.WeakTypeTag](c: Context): c.Expr[BSONDocumentWriter[A]] = c.universe.reify(new BSONDocumentWriter[A] {
-    private val w: A => BSONDocument = { v =>
+    private val w: A => BSONDocument = { macroVal =>
       Helper[A, Opts](c).writeBody.splice
     }
 
@@ -33,13 +33,13 @@ private object MacroImpl {
   })
 
   def handler[A: c.WeakTypeTag, Opts: c.WeakTypeTag](c: Context): c.Expr[BSONDocumentHandler[A]] = c.universe.reify(new BSONDocumentReader[A] with BSONDocumentWriter[A] with BSONHandler[BSONDocument, A] {
-    private val r: BSONDocument => A = { document =>
+    private val r: BSONDocument => A = { macroDoc =>
       Helper[A, Opts](c).readBody.splice
     }
 
     lazy val forwardReader: BSONDocumentReader[A] = BSONDocumentReader[A](r)
 
-    private val w: A => BSONDocument = { v =>
+    private val w: A => BSONDocument = { macroVal =>
       Helper[A, Opts](c).writeBody.splice
     }
 
@@ -85,7 +85,7 @@ private object MacroImpl {
 
           cq"$pattern => $body"
         }
-        def className = q"""document.getAs[String]("className").get"""
+        def className = q"""macroDoc.getAs[String]("className").get"""
 
         Match(className, cases)
       } getOrElse readBodyConstruct(A)
@@ -103,7 +103,7 @@ private object MacroImpl {
       val writer = unionTypes.map { types =>
         val resolve = resolver(Map.empty, "Writer")(writerType)
         val cases = types.map { typ =>
-          val nme = TermName(c.freshName("v"))
+          val nme = TermName(c.freshName("macroVal"))
           val id = Ident(nme)
           val body = writeBodyFromImplicit(id, typ)(resolve).getOrElse {
             // No existing implicit, but can fallback to automatic mat
@@ -113,8 +113,8 @@ private object MacroImpl {
           cq"$nme: $typ => $body"
         }
 
-        Match(Ident(TermName("v")), cases)
-      } getOrElse writeBodyConstruct(Ident(TermName("v")), A)
+        Match(Ident(TermName("macroVal")), cases)
+      } getOrElse writeBodyConstruct(Ident(TermName("macroVal")), A)
 
       val result = c.Expr[BSONDocument](writer)
 
@@ -129,7 +129,7 @@ private object MacroImpl {
     private def readBodyFromImplicit(tpe: Type)(r: Type => Implicit): Option[Tree] = {
       val (reader, _) = r(tpe)
 
-      if (!reader.isEmpty) Some(q"$reader.read(document)")
+      if (!reader.isEmpty) Some(q"$reader.read(macroDoc)")
       else if (!hasOption[Macros.Options.AutomaticMaterialization]) {
         c.abort(c.enclosingPosition, s"Implicit not found for '${tpe.typeSymbol.name}': ${classOf[Reader[_]].getName}[_, ${tpe.typeSymbol.fullName}]")
       } else None
@@ -186,13 +186,13 @@ private object MacroImpl {
               c.abort(c.enclosingPosition, s"Cannot flatten reader '$reader': doesn't conform BSONDocumentReader")
             }
 
-            q"${reader}.read(document)"
+            q"${reader}.read(macroDoc)"
           } else optionTypeParameter(sig) match {
             case Some(_) =>
-              q"document.getAsUnflattenedTry($pname)($reader).get"
+              q"macroDoc.getAsUnflattenedTry($pname)($reader).get"
 
             case _ =>
-              q"document.getAsTry($pname)($reader).get"
+              q"macroDoc.getAsTry($pname)($reader).get"
           }
         }
 
@@ -307,11 +307,11 @@ private object MacroImpl {
           val writer = resolveWriter(pname, sig)
           val name = c.Expr[String](q"$pname")
 
-          val vterm = TermName("v")
+          val vterm = TermName("macroVal")
           val bsv = c.Expr[BSONValue](q"$writer.write($vterm)")
           val vp = ValDef(
             Modifiers(c.universe.Flag.PARAM),
-            vterm, TypeTree(sig), EmptyTree) // ${v} =>
+            vterm, TypeTree(sig), EmptyTree) // ${macroVal} =>
           val field = reify((name.splice, bsv.splice)).tree
 
           if (param.annotations.exists(_.tree.tpe =:= typeOf[NoneAsNull])) {
