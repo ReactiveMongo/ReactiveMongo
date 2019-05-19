@@ -119,14 +119,14 @@ final class LegacyIndexesManager(db: DB)(
 
   val collection = db("system.indexes")
 
-  def list(): Future[List[NSIndex]] = collection.find(BSONDocument()).cursor(db.connection.options.readPreference)(IndexesManager.NSIndexReader, CursorProducer.defaultCursorProducer).collect[List](-1, Cursor.FailOnError[List[NSIndex]]())
+  def list(): Future[List[NSIndex]] = collection.find(BSONDocument.empty, Option.empty[BSONDocument]).cursor(db.connection.options.readPreference)(IndexesManager.NSIndexReader, CursorProducer.defaultCursorProducer).collect[List](-1, Cursor.FailOnError[List[NSIndex]]())
 
   def ensure(nsIndex: NSIndex): Future[Boolean] = {
     val query = BSONDocument(
       "ns" -> nsIndex.namespace,
       "name" -> nsIndex.index.eventualName)
 
-    collection.find(query).one.flatMap { idx =>
+    collection.find(query, Option.empty[BSONDocument]).one.flatMap { idx =>
       if (!idx.isDefined) {
         create(nsIndex).map(_ => true)
       } else {
@@ -137,7 +137,7 @@ final class LegacyIndexesManager(db: DB)(
 
   def create(nsIndex: NSIndex): Future[WriteResult] = {
     implicit val writer = IndexesManager.NSIndexWriter
-    collection.insert(nsIndex)
+    collection.insert.one(nsIndex)
   }
 
   def drop(collectionName: String, indexName: String): Future[Int] = {

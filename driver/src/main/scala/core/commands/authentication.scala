@@ -140,9 +140,18 @@ private[core] case class ScramSha1StartNegociation(
 
   import javax.crypto.spec.PBEKeySpec
   import org.apache.commons.codec.binary.Base64
-  import org.apache.commons.codec.digest.{ DigestUtils, HmacUtils }
+  import org.apache.commons.codec.digest.{
+    DigestUtils,
+    HmacAlgorithms,
+    HmacUtils
+  }
   import akka.util.ByteString
   import reactivemongo.bson.buffer.ArrayReadableBuffer
+
+  import HmacAlgorithms.{ HMAC_SHA_1 => algorithm }
+
+  @inline private def hmac(key: Array[Byte], input: Array[Byte]): Array[Byte] =
+    new HmacUtils(algorithm, key).hmac(input)
 
   val data: Either[CommandError, ScramSha1Negociation] = {
     val challenge = new String(payload, "UTF-8")
@@ -161,8 +170,6 @@ private[core] case class ScramSha1StartNegociation(
       }.toRight(CommandError("invalid SCRAM-SHA1 iteration count")).right
 
       nego <- try {
-        import HmacUtils.hmacSha1
-
         val nonce = s"c=biws,r=$rand" // biws = base64("n,,")
         val saltedPassword: Array[Byte] = {
           val digest = DigestUtils.md5Hex(s"$user:mongo:$password")
@@ -173,17 +180,17 @@ private[core] case class ScramSha1StartNegociation(
           s"${startMessage.drop(3)},$challenge,$nonce".getBytes("UTF-8")
 
         val clientKey =
-          hmacSha1(saltedPassword, ScramSha1StartNegociation.ClientKeySeed)
-        val clientSig = hmacSha1(DigestUtils.sha1(clientKey), authMsg)
+          hmac(saltedPassword, ScramSha1StartNegociation.ClientKeySeed)
+        val clientSig = hmac(DigestUtils.sha1(clientKey), authMsg)
         val clientProof: Array[Byte] = (clientKey, clientSig).
           zipped.map((a, b) => (a ^ b).toByte)
 
         val message = s"$nonce,p=${Base64.encodeBase64String(clientProof)}"
         val serverKey =
-          hmacSha1(saltedPassword, ScramSha1StartNegociation.ServerKeySeed)
+          hmac(saltedPassword, ScramSha1StartNegociation.ServerKeySeed)
 
         Right(ScramSha1Negociation(
-          serverSignature = hmacSha1(serverKey, authMsg),
+          serverSignature = hmac(serverKey, authMsg),
           request = BSONDocument(
             "saslContinue" -> 1, "conversationId" -> conversationId,
             "payload" -> BSONBinary(

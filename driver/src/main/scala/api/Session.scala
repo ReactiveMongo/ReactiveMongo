@@ -25,6 +25,7 @@ private[reactivemongo] sealed abstract class Session(
   @inline def operationTime: Option[Long] = Option.empty[Long]
 
   /** No-op as not tracking times, save for [[ReplicaSetSession]]. */
+  @com.github.ghik.silencer.silent
   private[api] def update(
     operationTime: Long,
     clusterTime: Option[Long]): Session = this // No-op

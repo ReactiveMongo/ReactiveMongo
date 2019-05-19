@@ -14,7 +14,7 @@ import scala.reflect.macros.Context
 
 private object MacroImpl {
   def reader[A: c.WeakTypeTag, Opts: c.WeakTypeTag](c: Context): c.Expr[BSONDocumentReader[A]] = c.universe.reify(new BSONDocumentReader[A] {
-    private val r: BSONDocument => A = { document =>
+    private val r: BSONDocument => A = { macroDoc =>
       Helper[A, Opts](c).readBody.splice
     }
 
@@ -24,7 +24,7 @@ private object MacroImpl {
   })
 
   def writer[A: c.WeakTypeTag, Opts: c.WeakTypeTag](c: Context): c.Expr[BSONDocumentWriter[A]] = c.universe.reify(new BSONDocumentWriter[A] {
-    private val w: A => BSONDocument = { v =>
+    private val w: A => BSONDocument = { macroVal =>
       Helper[A, Opts](c).writeBody.splice
     }
 
@@ -37,13 +37,13 @@ private object MacroImpl {
     val helper = Helper[A, Opts](c)
     c.universe.reify(
       new BSONDocumentReader[A] with BSONDocumentWriter[A] with BSONHandler[BSONDocument, A] {
-        private val r: BSONDocument => A = { document =>
+        private val r: BSONDocument => A = { macroDoc =>
           Helper[A, Opts](c).readBody.splice
         }
 
         lazy val forwardReader = BSONDocumentReader[A](r)
 
-        private val w: A => BSONDocument = { v =>
+        private val w: A => BSONDocument = { macroVal =>
           Helper[A, Opts](c).writeBody.splice
         }
 
@@ -94,7 +94,7 @@ private object MacroImpl {
           CaseDef(pattern, body)
         }
 
-        def className = c.parse("""document.getAs[String]("className").get""")
+        def className = c.parse("""macroDoc.getAs[String]("className").get""")
 
         Match(className, cases)
       } getOrElse readBodyConstruct(A)
@@ -112,7 +112,7 @@ private object MacroImpl {
       val writer = unionTypes.map { types =>
         val resolve = resolver(Map.empty, "Writer")(writerType)
         val cases = types.map { typ =>
-          val n = c.fresh("v")
+          val n = c.fresh("macroVal")
           val id = Ident(n)
 
           val pattern = Bind(newTermName(n), {
@@ -128,8 +128,8 @@ private object MacroImpl {
           CaseDef(pattern, body)
         }
 
-        Match(Ident("v"), cases)
-      } getOrElse writeBodyConstruct(Ident("v"), A)
+        Match(Ident("macroVal"), cases)
+      } getOrElse writeBodyConstruct(Ident("macroVal"), A)
 
       val result = c.Expr[BSONDocument](writer)
 
@@ -145,7 +145,7 @@ private object MacroImpl {
       val (reader, _) = r(tpe)
 
       if (!reader.isEmpty) {
-        Some(Apply(Select(reader, "read"), List(Ident("document"))))
+        Some(Apply(Select(reader, "read"), List(Ident("macroDoc"))))
       } else if (!hasOption[Macros.Options.AutomaticMaterialization]) {
         c.abort(c.enclosingPosition, s"Implicit not found for '${tpe.typeSymbol.name}': ${classOf[Reader[_]].getName}[_, ${tpe.typeSymbol.fullName}]")
       } else None
@@ -208,7 +208,7 @@ private object MacroImpl {
         def tree(getter: String) =
           Select(Apply(Apply(
             TypeApply(
-              Select(Ident("document"), getter),
+              Select(Ident("macroDoc"), getter),
               List(TypeTree(typ))),
             List(Literal(Constant(pname)))), List(reader)), "get")
 
@@ -228,7 +228,7 @@ private object MacroImpl {
           }
 
           Apply( // ${reader}.read(document)
-            Select(reader, "read"), List(Ident("document")))
+            Select(reader, "read"), List(Ident("macroDoc")))
         } else opt match {
           case Some(_) =>
             // document.getAsUnflattenedTry[$typ]($pname)($reader).get
@@ -379,7 +379,7 @@ private object MacroImpl {
           val sig = optionTypeParameter(optType).get
           val pname = paramName(param)
           val writer = resolveWriter(pname, sig)
-          val vterm = newTermName("v")
+          val vterm = newTermName("macroVal")
           val wtree = Apply( // writer.write(${vterm})
             Select(writer, "write"), List(Ident(vterm)))
 
