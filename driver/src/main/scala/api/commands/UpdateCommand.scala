@@ -154,8 +154,7 @@ private[reactivemongo] object UpdateCommand {
 
         elements ++= Seq[pack.ElementProducer](
           element("update", builder.string(update.collection)),
-          element("ordered", ordered),
-          element("writeConcern", writeWriteConcern(command.writeConcern)))
+          element("ordered", ordered))
 
         command.updates match {
           case first +: updates =>
@@ -170,6 +169,14 @@ private[reactivemongo] object UpdateCommand {
 
         session.foreach { s =>
           elements ++= writeSession(s)
+        }
+
+        if (!session.exists(_.transaction.isDefined)) {
+          // writeConcern is not allowed within a multi-statement transaction
+          // code=72
+
+          elements += element(
+            "writeConcern", writeWriteConcern(command.writeConcern))
         }
 
         builder.document(elements.result())

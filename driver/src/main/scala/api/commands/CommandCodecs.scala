@@ -1,6 +1,11 @@
 package reactivemongo.api.commands
 
-import reactivemongo.api.{ ReadConcern, Session, SerializationPack }
+import reactivemongo.api.{
+  ReadConcern,
+  Session,
+  SerializationPack,
+  WriteConcern => WC
+}
 
 private[reactivemongo] object CommandCodecs {
   /**
@@ -55,41 +60,56 @@ private[reactivemongo] object CommandCodecs {
 
   def writeReadConcern[P <: SerializationPack with Singleton](builder: SerializationPack.Builder[P]): ReadConcern => Seq[builder.pack.ElementProducer] = { c: ReadConcern => Seq(builder.elementProducer("level", builder.string(c.level))) }
 
-  def writeSessionReadConcern[P <: SerializationPack with Singleton](builder: SerializationPack.Builder[P], session: Option[Session]): ReadConcern => Seq[builder.pack.ElementProducer] = {
+  def writeSessionReadConcern[P <: SerializationPack with Singleton](builder: SerializationPack.Builder[P]): Option[Session] => ReadConcern => Seq[builder.pack.ElementProducer] = {
     import builder.{ document, elementProducer => element, pack }
 
-    val simpleWriteConcern = writeReadConcern(builder)
-    def simpleWrite(c: ReadConcern): pack.ElementProducer =
-      element("readConcern", document(simpleWriteConcern(c)))
+    val simpleReadConcern = writeReadConcern(builder)
+    def simpleRead(c: ReadConcern): pack.ElementProducer =
+      element("readConcern", document(simpleReadConcern(c)))
 
     val writeSession = CommandCodecs.writeSession(builder)
 
-    session match {
-      case Some(s) => { c: ReadConcern =>
-        val elements = Seq.newBuilder[pack.ElementProducer]
+    { session =>
+      session match {
+        case Some(s) => {
+          val elements = Seq.newBuilder[pack.ElementProducer]
 
-        elements ++= writeSession(s)
+          elements ++= writeSession(s)
 
-        s.operationTime match {
-          case Some(opTime) =>
-            elements += element("readConcern", document(
-              simpleWriteConcern(c) :+ element(
-                "afterClusterTime", builder.timestamp(opTime))))
+          if (!s.transaction.exists(_.flagSent)) {
+            // No transaction, or flag not yet send (first tx command)
+            s.operationTime match {
+              case Some(opTime) => { c: ReadConcern =>
+                elements += element("readConcern", document(
+                  simpleReadConcern(c) :+ element(
+                    "afterClusterTime", builder.timestamp(opTime))))
 
-          case _ => elements += simpleWrite(c)
+                elements.result()
+              }
+
+              case _ => { c: ReadConcern =>
+                elements += simpleRead(c)
+
+                elements.result()
+              }
+            }
+          } else { _: ReadConcern =>
+            // Ignore: Only the first command in a transaction
+            // may specify a readConcern (code=72)
+
+            elements.result()
+          }
         }
 
-        elements.result()
+        case _ => { c: ReadConcern => Seq(simpleRead(c)) }
       }
-
-      case _ => { c: ReadConcern => Seq(simpleWrite(c)) }
     }
   }
 
-  @inline def writeWriteConcern[P <: SerializationPack with Singleton](pack: P): WriteConcern => pack.Document = writeWriteConcern[pack.type](pack.newBuilder)
+  @inline def writeWriteConcern[P <: SerializationPack with Singleton](pack: P): WC => pack.Document = writeWriteConcern[pack.type](pack.newBuilder)
 
   def writeGetLastErrorWWriter[P <: SerializationPack with Singleton](
-    builder: SerializationPack.Builder[P]): GetLastError.W => builder.pack.Value = {
+    builder: SerializationPack.Builder[P]): WC.W => builder.pack.Value = {
     case GetLastError.TagSet(tagSet)            => builder.string(tagSet)
     case GetLastError.WaitForAcknowledgments(n) => builder.int(n)
     case GetLastError.WaitForAknowledgments(n)  => builder.int(n)
@@ -97,10 +117,10 @@ private[reactivemongo] object CommandCodecs {
   }
 
   def writeWriteConcern[P <: SerializationPack with Singleton](
-    builder: SerializationPack.Builder[P]): WriteConcern => builder.pack.Document = {
+    builder: SerializationPack.Builder[P]): WC => builder.pack.Document = {
     val writeGLEW = writeGetLastErrorWWriter(builder)
 
-    { writeConcern: WriteConcern =>
+    { writeConcern: WC =>
       import builder.{ elementProducer => element, int }
 
       val elements = Seq.newBuilder[builder.pack.ElementProducer]
@@ -123,10 +143,22 @@ private[reactivemongo] object CommandCodecs {
       val idElmt = builder.document(Seq(
         element("id", builder.uuid(session.lsid))))
 
-      session.nextTxnNumber match {
-        case Some(txnNumber) => Seq(
-          element("lsid", idElmt),
-          element("txnNumber", builder.long(txnNumber)))
+      session.transaction.map(_.txnNumber) match {
+        case Some(n) => {
+          val elms = Seq.newBuilder[builder.pack.ElementProducer]
+
+          elms ++= Seq(
+            element("lsid", idElmt),
+            element("txnNumber", builder.long(n)))
+
+          if (!session.transactionToFlag()) {
+            elms += element("startTransaction", builder.boolean(true))
+          }
+
+          elms += element("autocommit", builder.boolean(false))
+
+          elms.result()
+        }
 
         case _ => Seq(element("lsid", idElmt))
       }

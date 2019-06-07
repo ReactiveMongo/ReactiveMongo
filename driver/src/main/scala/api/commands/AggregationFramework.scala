@@ -320,9 +320,15 @@ trait AggregationFramework[P <: SerializationPack]
    * @param identifiers any BSON value acceptable by mongodb as identifier
    * @param ops the sequence of operators specifying aggregate calculation
    */
-  case class BucketAuto(groupBy: pack.Value, buckets: Int, granularity: Option[String])(output: (String, GroupFunction)*)
+  case class BucketAuto(
+    groupBy: pack.Value,
+    buckets: Int,
+    granularity: Option[String])(
+    output: (String, GroupFunction)*)
     extends PipelineOperator {
+
     import builder.{ document, elementProducer => element }
+
     val makePipe: pack.Document = document(Seq(
       element(f"$$bucketAuto", document(Seq(
         Some(element("groupBy", groupBy)),
@@ -371,7 +377,9 @@ trait AggregationFramework[P <: SerializationPack]
     val makePipe: pack.Document = document(Seq(
       element(f"$$sort", document(fields.map {
         case Ascending(field)  => element(field, builder.int(1))
+
         case Descending(field) => element(field, builder.int(-1))
+
         case MetadataSort(field, keyword) => {
           val meta = document(Seq(
             element(f"$$meta", builder.string(keyword.name))))

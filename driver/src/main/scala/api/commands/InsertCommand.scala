@@ -45,11 +45,18 @@ private[reactivemongo] object InsertCommand {
         elements ++= Seq[pack.ElementProducer](
           element("insert", builder.string(insert.collection)),
           element("ordered", ordered),
-          element("writeConcern", writeWriteConcern(command.writeConcern)),
           element("documents", documents))
 
         session.foreach { s =>
           elements ++= writeSession(s)
+        }
+
+        if (!session.exists(_.transaction.isDefined)) {
+          // writeConcern is not allowed within a multi-statement transaction
+          // code=72
+
+          elements += element(
+            "writeConcern", writeWriteConcern(command.writeConcern))
         }
 
         builder.document(elements.result())

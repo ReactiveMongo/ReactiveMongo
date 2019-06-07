@@ -4,7 +4,9 @@ import java.util.UUID
 
 import reactivemongo.api.SerializationPack
 
+// TODO: EndSession like EndTransaction
 // See https://docs.mongodb.com/manual/reference/command/killSessions/
+// See https://docs.mongodb.com/manual/reference/command/endSessions/
 private[reactivemongo] final class KillSessions(val id: UUID, val ids: UUID*)
   extends Command with CommandWithResult[UnitBox.type]
 

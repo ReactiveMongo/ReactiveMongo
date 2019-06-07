@@ -100,9 +100,6 @@ private[collections] trait Aggregator[P <: SerializationPack with Singleton] {
     val session = collection.db.session.filter( // TODO: Remove
       _ => (version.compareTo(MongoWireVersion.V36) >= 0))
 
-    val writeReadConcern = CommandCodecs.writeSessionReadConcern(
-      builder, session)
-
     val writeWriteConcern = CommandCodecs.writeWriteConcern(builder)
 
     pack.writer[AggregateCmd[T]] { agg =>
@@ -117,6 +114,9 @@ private[collections] trait Aggregator[P <: SerializationPack with Singleton] {
         case BatchCommands.AggregationFramework.Out(_) => true
         case _                                         => false
       }
+
+      val writeReadConcern =
+        CommandCodecs.writeSessionReadConcern(builder)(session)
 
       val elements = Seq.newBuilder[pack.ElementProducer]
 

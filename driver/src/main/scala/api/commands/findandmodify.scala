@@ -122,10 +122,11 @@ trait FindAndModifyCommand[P <: SerializationPack] extends ImplicitCommandHelper
         element("bypassDocumentValidation", boolean(
           command.bypassDocumentValidation)))
 
-      if (wireVer.compareTo(MongoWireVersion.V40) >= 0) {
+      if (wireVer.compareTo(MongoWireVersion.V40) >= 0 &&
+        !session.exists(_.transaction.isDefined)) {
+
         elements += element(
-          "writeConcern",
-          writeWriteConcern(command.writeConcern))
+          "writeConcern", writeWriteConcern(command.writeConcern))
       }
 
       elements ++= sessionElmts
