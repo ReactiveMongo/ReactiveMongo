@@ -25,7 +25,6 @@ import reactivemongo.api.commands.{
   CommandCodecs,
   CommandError,
   EndSessions,
-  KillSessions,
   StartSession,
   StartSessionResult,
   EndTransaction,
@@ -122,16 +121,6 @@ sealed trait DB {
   def startSession()(implicit ec: ExecutionContext): Future[Option[DBType]]
 
   /**
-   * [[https://docs.mongodb.com/manual/reference/command/endSessions Ends the session]] associated with this database reference, if any otherwise does nothing (since MongoDB 3.6).
-   *
-   * '''EXPERIMENTAL:''' API may change without notice.
-   *
-   * @return `None` if there is no session to end
-   * or `Some` database reference with session ended
-   */
-  def endSession()(implicit ec: ExecutionContext): Future[Option[DBType]]
-
-  /**
    * Starts a transaction if none is already started with
    * the current client session, otherwise does nothing (since MongoDB 3.6).
    *
@@ -161,6 +150,16 @@ sealed trait DB {
    * or `Some` database reference with transaction aborted (but not session)
    */
   def commitTransaction()(implicit ec: ExecutionContext): Future[Option[DBType]]
+
+  /**
+   * [[https://docs.mongodb.com/manual/reference/command/endSessions Ends the session]] associated with this database reference, if any otherwise does nothing (since MongoDB 3.6).
+   *
+   * '''EXPERIMENTAL:''' API may change without notice.
+   *
+   * @return `None` if there is no session to end
+   * or `Some` database reference with session ended
+   */
+  def endSession()(implicit ec: ExecutionContext): Future[Option[DBType]]
 
   /**
    * [[https://docs.mongodb.com/manual/reference/command/killSessions Kills the session]] (abort) associated with this database reference, if any otherwise does nothing (since MongoDB 3.6).
@@ -242,26 +241,6 @@ class DefaultDB private[api] (
         }
       })
 
-  def endSession()(implicit ec: ExecutionContext): Future[Option[DefaultDB]] =
-    session.map(_.lsid) match {
-      case Some(lsid) => {
-        implicit def w: BSONSerializationPack.Writer[EndSessions] =
-          EndSessions.commandWriter(BSONSerializationPack)
-
-        val endSessions = new EndSessions(lsid)
-
-        Command.run(BSONSerializationPack, failoverStrategy).
-          apply(this, endSessions, defaultReadPreference).map(_ =>
-            Some(new DefaultDB(
-              name, connection, connectionState, failoverStrategy,
-              session = None)))
-
-      }
-
-      case _ =>
-        Future.successful(Option.empty[DefaultDB]) // NoOp
-    }
-
   def startTransaction(writeConcern: Option[WriteConcern]): Option[DBType] = {
     val wc = writeConcern getOrElse defaultWriteConcern
 
@@ -301,23 +280,31 @@ class DefaultDB private[api] (
       case _ => Future.successful(Option.empty[DefaultDB]) // NoOp
     }
 
+  def endSession()(implicit ec: ExecutionContext): Future[Option[DefaultDB]] =
+    endSessionById { lsid => EndSessions.end(lsid) }
+
   def killSession()(implicit ec: ExecutionContext): Future[DefaultDB] =
-    session.map(_.lsid) match {
-      case Some(uuid) => {
-        implicit def w: BSONSerializationPack.Writer[KillSessions] =
-          KillSessions.commandWriter(BSONSerializationPack)
-
-        val killSessions = new KillSessions(uuid)
-
-        Command.run(BSONSerializationPack, failoverStrategy).
-          apply(this, killSessions, defaultReadPreference).map(_ =>
-            new DefaultDB(name, connection, connectionState, failoverStrategy,
-              None))
-
-      }
-
-      case _ => Future.successful(this) // NoOp
+    endSessionById { lsid => EndSessions.kill(lsid) }.map {
+      case Some(updated) => updated
+      case _             => this
     }
+
+  private def endSessionById(command: java.util.UUID => EndSessions)(implicit ec: ExecutionContext): Future[Option[DefaultDB]] = session.map(_.lsid) match {
+    case Some(lsid) => {
+      implicit def w: BSONSerializationPack.Writer[EndSessions] =
+        EndSessions.commandWriter(BSONSerializationPack)
+
+      Command.run(BSONSerializationPack, failoverStrategy).
+        apply(this, command(lsid), defaultReadPreference).map(_ =>
+          Some(new DefaultDB(
+            name, connection, connectionState, failoverStrategy,
+            session = None)))
+
+    }
+
+    case _ =>
+      Future.successful(Option.empty[DefaultDB]) // NoOp
+  }
 
   @deprecated("DefaultDB will no longer be a Product", "0.16.0")
   val productArity = 3

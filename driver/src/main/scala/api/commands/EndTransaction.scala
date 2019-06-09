@@ -12,11 +12,13 @@ private[reactivemongo] sealed abstract class EndTransaction(
 }
 
 private[reactivemongo] object EndTransaction {
+  /** Returns an [[https://docs.mongodb.com/manual/reference/command/abortTransaction/ abortTransaction]] command */
   def abort(session: Session, writeConcern: WC): EndTransaction =
     new EndTransaction(session, writeConcern) {
       val kind = "abortTransaction"
     }
 
+  /** Returns an [[https://docs.mongodb.com/manual/reference/command/commitTransaction/ commitTransaction]] command */
   def commit(session: Session, writeConcern: WC): EndTransaction =
     new EndTransaction(session, writeConcern) {
       val kind = "commitTransaction"

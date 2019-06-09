@@ -195,7 +195,7 @@ trait UpdateSpec extends UpdateFixtures { collectionSpec: CollectionSpec =>
                   BSONDocument("element" -> BSONDocument(f"$$gte" -> 100)))).
                 map(_.n) must beTypedEqualTo(2).await(0, timeout)
             }
-        } tag "wip"
+        }
       }
       section("gt_mongo32")
     }
