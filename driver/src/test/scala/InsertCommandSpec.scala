@@ -1,13 +1,11 @@
-package reactivemongo
+package reactivemongo.api
 
 import reactivemongo.bson.{ BSONBinary, BSONDocument }
-
-import reactivemongo.api.{ BSONSerializationPack, ReplicaSetSession }
 
 import reactivemongo.api.commands.{
   InsertCommand,
   ResolvedCollectionCommand,
-  WriteConcern
+  WriteConcern => WC
 }
 
 final class InsertCommandSpec extends org.specs2.mutable.Specification {
@@ -21,20 +19,43 @@ final class InsertCommandSpec extends org.specs2.mutable.Specification {
       val base = BSONDocument(
         "insert" -> "foo",
         "ordered" -> false,
-        "writeConcern" -> BSONDocument("w" -> 1, "j" -> false),
         "documents" -> (firstDoc +: otherDocs))
 
+      lazy val session = new ReplicaSetSession(java.util.UUID.randomUUID())
+
+      val lsid = BSONDocument(
+        "lsid" -> BSONDocument(
+          "id" -> BSONBinary(session.lsid)))
+
+      val writeConcern = BSONDocument(
+        "writeConcern" -> BSONDocument("w" -> 1, "j" -> false))
+
+      // ---
+
       "without session" in {
-        writer(None)(insert1) must_=== base
+        writer(None)(insert1) must_=== (base ++ writeConcern)
       }
 
       "with session" in {
-        val session = new ReplicaSetSession(java.util.UUID.randomUUID())
+        val write = writer(Some(session))
 
-        writer(Some(session))(insert1) must_=== (base ++ BSONDocument(
-          "lsid" -> BSONDocument(
-            "id" -> BSONBinary(session.lsid)),
-          "txnNumber" -> 1L))
+        // w/o transaction started
+        write(insert1) must_=== (base ++ lsid ++ writeConcern) and {
+          session.startTransaction(WriteConcern.Default).
+            aka("transaction") must beSome[SessionTransaction].which { _ =>
+              // w/ transaction started
+
+              write(insert1) must_=== (base ++ lsid ++ BSONDocument(
+                "txnNumber" -> 1L,
+                "startTransaction" -> true, // as first command in tx
+                "autocommit" -> false))
+            }
+        } and {
+          // w/o 'startTransaction' flag after first command in tx
+
+          write(insert1) must_=== (base ++ lsid ++ BSONDocument(
+            "txnNumber" -> 1L, "autocommit" -> false))
+        }
       }
     }
   }
@@ -54,7 +75,7 @@ final class InsertCommandSpec extends org.specs2.mutable.Specification {
       head = firstDoc,
       tail = otherDocs,
       ordered = false,
-      writeConcern = WriteConcern.Default))
+      writeConcern = WC.Default))
 
   private object Command extends InsertCommand[BSONSerializationPack.type] {
     val pack = BSONSerializationPack

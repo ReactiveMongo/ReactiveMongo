@@ -91,8 +91,8 @@ private[api] trait DistinctOp[P <: SerializationPack with Singleton] {
     val session = collection.db.session.filter( // TODO: Remove
       _ => (version.compareTo(MongoWireVersion.V36) >= 0))
 
-    val writeReadConcern = CommandCodecs.writeSessionReadConcern(
-      builder, session)
+    val writeReadConcern =
+      CommandCodecs.writeSessionReadConcern(builder)(session)
 
     import builder.{ document, elementProducer => element, string }
 

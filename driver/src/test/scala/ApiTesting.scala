@@ -260,4 +260,6 @@ package object tests {
   def sessionId(db: DB): Option[UUID] = db.session.map(_.lsid)
 
   def preload(resp: Response)(implicit ec: ExecutionContext): Future[(Response, BSONDocument)] = Response.preload(resp)
+
+  @inline def session(db: DefaultDB): Option[Session] = db.session
 }

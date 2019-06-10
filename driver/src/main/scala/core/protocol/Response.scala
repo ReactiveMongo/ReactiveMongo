@@ -71,12 +71,8 @@ object Response {
     implicit
     ec: ExecutionContext): Future[(Response, BSONDocument)] =
     response match {
-      case r @ WithCursor(_, _, _, _, _, preloaded +: _) =>
-        Future.successful(r -> preloaded)
-
-      case WithCursor(_, _, _, _, _, _) =>
-        Future.failed(ReactiveMongoException(
-          s"Cannot preload cursor response: $response"))
+      case r @ WithCursor(_, _, _, _, _, cursorDoc, _) =>
+        Future.successful(r -> cursorDoc)
 
       case CommandError(_, _, _, cause) =>
         Future.failed(cause)
@@ -128,8 +124,10 @@ object Response {
     _documents: ByteBuf,
     _info: ResponseInfo,
     ns: String,
+    private[core]cursor: BSONDocument,
     private[core]preloaded: Seq[BSONDocument]) extends Response(
     _header, _reply, _documents, _info) {
+
     private[reactivemongo] def cursorID(id: Long): Response =
       copy(_reply = this._reply.copy(cursorID = id))
 

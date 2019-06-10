@@ -340,7 +340,7 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
         _ => (version.compareTo(MongoWireVersion.V36) >= 0))
 
       elements ++= CommandCodecs.writeSessionReadConcern(
-        builder, session)(readConcern)
+        builder)(session)(readConcern)
 
       val readPref = element(f"$$readPreference", writeReadPref(readPreference))
 

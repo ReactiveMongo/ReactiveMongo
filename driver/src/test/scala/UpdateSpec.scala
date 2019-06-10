@@ -42,8 +42,9 @@ trait UpdateSpec extends UpdateFixtures { collectionSpec: CollectionSpec =>
           upsert = true) must beLike[UpdateWriteResult]({
             case result => result.upserted.toList must beLike[List[Upserted]] {
               case Upserted(0, id: BSONObjectID) :: Nil =>
-                c.find(BSONDocument("_id" -> id)).one[T].
-                  aka("found") must beSome(upd(person)).await(1, timeout)
+                c.find(
+                  selector = BSONDocument("_id" -> id),
+                  projection = Option.empty[BSONDocument]).one[T] must beSome(upd(person)).await(1, timeout)
             }
           }).await(1, timeout)
       }
@@ -90,7 +91,9 @@ trait UpdateSpec extends UpdateFixtures { collectionSpec: CollectionSpec =>
         c.update.one(q = BSONDocument.empty, u = doc, upsert = true).
           map(_.upserted.toList) must beLike[List[Upserted]] {
             case Upserted(0, id @ BSONString("foo")) :: Nil =>
-              c.find(BSONDocument("_id" -> id)).one[BSONDocument].
+              c.find(
+                selector = BSONDocument("_id" -> id),
+                projection = Option.empty[BSONDocument]).one[BSONDocument].
                 aka("found") must beSome(doc).await(1, timeout)
           }.await(1, timeout) and {
             c.insert.one(doc).map(_ => true).recover {
@@ -116,9 +119,11 @@ trait UpdateSpec extends UpdateFixtures { collectionSpec: CollectionSpec =>
           q = doc, u = BSONDocument("$set" -> BSONDocument("bar" -> 3)))),
         ReadPreference.primary) aka "result" must beLike[UpdateWriteResult]({
           case result => result.nModified must_== 1 and (
-            updCol2.find(BSONDocument("_id" -> "foo")).one[BSONDocument].
-            aka("updated") must beSome(BSONDocument(
-              "_id" -> "foo", "bar" -> 3)).await(1, timeout))
+            updCol2.find(
+              selector = BSONDocument("_id" -> "foo"),
+              projection = Option.empty[BSONDocument]).one[BSONDocument].
+              aka("updated") must beSome(BSONDocument(
+                "_id" -> "foo", "bar" -> 3)).await(1, timeout))
         }).await(1, timeout)
     }
 
@@ -131,8 +136,10 @@ trait UpdateSpec extends UpdateFixtures { collectionSpec: CollectionSpec =>
             q = person, u = BSONDocument("$set" -> BSONDocument("age" -> 66)))),
           ReadPreference.primary) must beLike[UpdateWriteResult]({
             case result => result.nModified mustEqual 1 and (
-              c.find(BSONDocument("age" -> 66)).
-              one[T] must beSome(upd(person)).await(1, timeout))
+              c.find(
+                selector = BSONDocument("age" -> 66),
+                projection = Option.empty[BSONDocument]).
+                one[T] must beSome(upd(person)).await(1, timeout))
           }).await(1, timeout)
       }
 
@@ -188,7 +195,7 @@ trait UpdateSpec extends UpdateFixtures { collectionSpec: CollectionSpec =>
                   BSONDocument("element" -> BSONDocument(f"$$gte" -> 100)))).
                 map(_.n) must beTypedEqualTo(2).await(0, timeout)
             }
-        } tag "wip"
+        }
       }
       section("gt_mongo32")
     }

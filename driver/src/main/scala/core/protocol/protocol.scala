@@ -126,7 +126,7 @@ object ReplyDocumentIterator {
         //throw ReplyDocumentIteratorExhaustedException(cause)
       }
 
-    case Response.WithCursor(_, _, _, _, _, preloaded) => {
+    case Response.WithCursor(_, _, _, _, _, _, preloaded) => {
       val buf = response.documents
 
       if (buf.readableBytes == 0) {
@@ -311,7 +311,7 @@ private[reactivemongo] class ResponseDecoder
               } yield {
                 val r = reply.copy(cursorID = id, numberReturned = batch.size)
 
-                Response.WithCursor(header, r, docs, info, ns, batch)
+                Response.WithCursor(header, r, docs, info, ns, cursor, batch)
               }
 
               docs.resetReaderIndex()
