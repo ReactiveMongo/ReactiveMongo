@@ -14,7 +14,8 @@ object BSONValueFixtures {
   val bsonArrayFixtures = List(
     BSONArray(bsonDoubleFixtures), BSONArray(bsonStrFixtures),
     BSONArray(bsonIntFixtures),
-    BSONArray(bsonIntFixtures ++ bsonStrFixtures))
+    BSONArray(bsonIntFixtures ++ bsonStrFixtures),
+    BSONArray(BSONSymbol("foo"), BSONTimestamp(45678L)))
 
   val bsonArrayByteSizes = List(38, 29, 19, 43)
 

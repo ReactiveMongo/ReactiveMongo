@@ -60,6 +60,7 @@ object Producer {
   implicit val noneOptionValueProducer: None.type => Producer[BSONValue] =
     _ => OptionValueProducer(None)
 
+  implicit def identityValueProducer[B <: BSONValue](value: B): Producer[BSONValue] = OptionValueProducer(Some(value))
 }
 
 sealed trait BSONValue {
