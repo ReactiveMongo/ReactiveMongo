@@ -4,7 +4,6 @@ import scala.language.higherKinds
 
 import scala.util.{ Failure, Success, Try }
 
-import scala.collection.generic.CanBuildFrom
 import scala.collection.mutable.Builder
 
 import scala.concurrent.{ ExecutionContext, Future }
@@ -22,7 +21,7 @@ import reactivemongo.api.commands.{
   ResolvedCollectionCommand
 }
 
-private[api] trait DistinctOp[P <: SerializationPack with Singleton] {
+private[api] trait DistinctOp[P <: SerializationPack with Singleton] extends DistinctOpCompat[P] {
   collection: GenericCollection[P] =>
 
   implicit private lazy val distinctWriter: pack.Writer[DistinctCmd] = commandWriter
@@ -35,18 +34,16 @@ private[api] trait DistinctOp[P <: SerializationPack with Singleton] {
     key: String,
     query: Option[pack.Document],
     readConcern: ReadConcern,
-    collation: Option[Collation])(implicit
+    collation: Option[Collation],
+    builder: Builder[T, M[T]])(implicit
     reader: pack.NarrowValueReader[T],
-    ec: ExecutionContext,
-    cbf: CanBuildFrom[M[_], T, M[T]]): Future[M[T]] = {
+    ec: ExecutionContext): Future[M[T]] = {
 
-    implicit val widenReader = pack.widenReader(reader)
-
-    val cmd = Distinct(
-      key, query, readConcern, collation)
+    val widenReader = pack.widenReader(reader)
+    val cmd = Distinct(key, query, readConcern, collation)
 
     runCommand(cmd, readPreference).flatMap {
-      _.result[T, M] match {
+      _.result[T, M](widenReader, builder) match {
         case Failure(cause)  => Future.failed[M[T]](cause)
         case Success(result) => Future.successful(result)
       }
@@ -65,9 +62,9 @@ private[api] trait DistinctOp[P <: SerializationPack with Singleton] {
   /**
    * @param values the raw values (should not contain duplicate)
    */
-  private case class DistinctResult(values: Traversable[pack.Value]) {
+  protected case class DistinctResult(values: Traversable[pack.Value]) {
     @annotation.tailrec
-    private def result[T, M[_]](
+    protected final def result[T, M[_]](
       values: Traversable[pack.Value],
       reader: pack.WidenValueReader[T],
       out: Builder[T, M[T]]): Try[M[T]] = values.headOption match {
@@ -79,11 +76,10 @@ private[api] trait DistinctOp[P <: SerializationPack with Singleton] {
       case _ => Success(out.result())
     }
 
-    def result[T, M[_] <: Iterable[_]](
-      implicit
+    @inline def result[T, M[_]](
       reader: pack.WidenValueReader[T],
-      cbf: CanBuildFrom[M[_], T, M[T]]): Try[M[T]] =
-      result(values, reader, cbf())
+      cbf: Builder[T, M[T]]): Try[M[T]] =
+      result(values, reader, cbf)
   }
 
   private def commandWriter: pack.Writer[DistinctCmd] = {

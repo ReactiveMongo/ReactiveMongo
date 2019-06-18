@@ -1,3 +1,4 @@
+import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
 
 import reactivemongo.bson.{
@@ -7,9 +8,7 @@ import reactivemongo.bson.{
   BSONDocumentWriter
 }
 
-import reactivemongo.core.protocol.MongoWireVersion
-
-import reactivemongo.api.{ BSONSerializationPack, ReadPreference }
+import reactivemongo.api.BSONSerializationPack
 import reactivemongo.api.commands._
 
 import reactivemongo.api.collections.bson.BSONCollection
@@ -25,10 +24,7 @@ final class FindAndModifySpec(implicit ee: ExecutionEnv)
   import Common._
 
   "Raw findAndModify" should {
-    import reactivemongo.api.commands.bson.BSONFindAndModifyCommand
-    import BSONFindAndModifyCommand._
-    import reactivemongo.api.commands.bson.
-      BSONFindAndModifyImplicits.FindAndModifyResultReader
+    type FindAndModifyResult = FindAndModifyCommand.Result[BSONSerializationPack.type]
 
     case class Person(
       firstName: String,
@@ -49,8 +45,6 @@ final class FindAndModifySpec(implicit ee: ExecutionEnv)
         "age" -> person.age)
     }
 
-    implicit val writer: BSONDocumentWriter[ResolvedCollectionCommand[FindAndModify]] = BSONSerializationPack.writer[ResolvedCollectionCommand[FindAndModify]] { BSONFindAndModifyCommand.serialize(MongoWireVersion.V34, None) }
-
     val jack1 = Person("Jack", "London", 27)
     val jack2 = jack1.copy(age = /* updated to */ 40)
 
@@ -61,25 +55,21 @@ final class FindAndModifySpec(implicit ee: ExecutionEnv)
         age: Int,
         timeout: FiniteDuration)(
         check: FindAndModifyResult => org.specs2.matcher.MatchResult[Any]) = {
-        val upsertOp = Update(
-          BSONDocument(
-            "$set" -> BSONDocument("age" -> age)),
-          fetchNewObject = true, upsert = true)
 
         val after = p.copy(age = age)
 
-        val cmd = FindAndModify(
-          query = p,
-          modify = upsertOp,
+        c.findAndUpdate(
+          selector = p,
+          update = BSONDocument(f"$$set" -> BSONDocument("age" -> age)),
+          fetchNewObject = true,
+          upsert = true,
           sort = Option.empty,
           fields = Option.empty,
           bypassDocumentValidation = false,
-          writeConcern = WriteConcern.Journaled,
-          maxTimeMS = Option.empty,
+          writeConcern = WriteConcern.Default,
+          maxTime = Option.empty,
           collation = Option.empty,
-          arrayFilters = Seq.empty)
-
-        c.runCommand(cmd, ReadPreference.primary).
+          arrayFilters = Seq.empty).
           aka("result") must (beLike[FindAndModifyResult] {
             case result =>
               //println(s"FindAndModify#0: $age -> ${result.lastError}")
@@ -132,10 +122,10 @@ final class FindAndModifySpec(implicit ee: ExecutionEnv)
       }
     }
 
-    "modify a document and fetch its previous value" in {
-      val incrementAge = BSONDocument("$inc" -> BSONDocument("age" -> 1))
+    val colName = s"FindAndModifySpec${System identityHashCode this}-3"
 
-      val colName = s"FindAndModifySpec${System identityHashCode this}-3"
+    "modify a document and fetch its previous value" in {
+      val incrementAge = BSONDocument(f"$$inc" -> BSONDocument("age" -> 1))
       val collection = db(colName)
 
       def future = collection.findAndUpdate(jack2, incrementAge)
@@ -157,6 +147,45 @@ final class FindAndModifySpec(implicit ee: ExecutionEnv)
           collection.find(jack2.copy(age = jack2.age + 1)).one[Person].
             aka("incremented") must beSome[Person].await(1, timeout)
         }
+    }
+
+    if (replSetOn) {
+      section("ge_mongo4")
+
+      val james = Person("James", "Joyce", 27)
+
+      "support transaction & rollback" in {
+        val selector = BSONDocument(
+          "firstName" -> james.firstName,
+          "lastName" -> james.lastName)
+
+        (for {
+          _ <- db.collection(colName).create(failsIfExists = false)
+          ds <- db.startSession().flatMap {
+            case Some(d) => Future.successful(d)
+            case _       => Future.failed(new Exception("Fails to start session"))
+          }
+          dt <- ds.startTransaction(None) match {
+            case Some(d) => Future.successful(d)
+            case _       => Future.failed(new Exception("Fails to start TX"))
+          }
+
+          coll = dt.collection(colName)
+          _ <- coll.findAndUpdate(selector, james, upsert = true)
+          p1 <- coll.find(selector).requireOne[Person].map(_.age)
+
+          _ <- dt.abortTransaction().collect {
+            case Some(d) => d
+          }
+          p2 <- coll.find(selector).one[Person].map(_.fold(-1)(_.age))
+        } yield p1 -> p2).andThen {
+          case _ => db.killSession()
+        } must beLike[(Int, Int)] {
+          case (27, -1 /*not found after rlb*/ ) => ok
+        }.await(1, timeout)
+      }
+
+      section("ge_mongo4")
     }
 
     "support arrayFilters" in {
@@ -198,12 +227,20 @@ final class FindAndModifySpec(implicit ee: ExecutionEnv)
       val query = BSONDocument("FindAndModifySpecFail" -> BSONDocument(
         f"$$exists" -> false))
 
-      val future = for {
-        _ <- collection.insert(ordered = true).one(jack2)
-        r <- collection.runCommand(
-          FindAndModify(query, Update(BSONDocument(f"$$inc" -> "age"))),
-          ReadPreference.Primary)
-      } yield r
+      val future = collection.insert(ordered = true).one(jack2).flatMap { _ =>
+        collection.findAndUpdate(
+          selector = query,
+          update = BSONDocument(f"$$inc" -> "age"),
+          fetchNewObject = false,
+          upsert = false,
+          sort = Option.empty,
+          fields = Option.empty,
+          bypassDocumentValidation = false,
+          writeConcern = WriteConcern.Default,
+          maxTime = Option.empty,
+          collation = Option.empty,
+          arrayFilters = Seq.empty)
+      }
 
       future.map(_ => Option.empty[Int]).recover {
         case e: CommandError =>

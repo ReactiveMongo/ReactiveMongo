@@ -12,7 +12,7 @@ import reactivemongo.api.gridfs.Implicits._
 
 import org.specs2.concurrent.ExecutionEnv
 
-class GridFSSpec(implicit ee: ExecutionEnv)
+final class GridFSSpec(implicit ee: ExecutionEnv)
   extends org.specs2.mutable.Specification
   with org.specs2.specification.AfterAll {
 
@@ -55,8 +55,14 @@ class GridFSSpec(implicit ee: ExecutionEnv)
 
     lazy val content1 = (1 to 100).view.map(_.toByte).toArray
 
+    "not exists before" in {
+      gfs.exists must beFalse.awaitFor(timeout)
+    }
+
     "ensure the indexes are ok" in {
-      gfs.ensureIndex() must beTrue.await(2, timeout)
+      gfs.ensureIndex() must beTrue.await(2, timeout) and {
+        gfs.exists must beTrue.awaitFor(timeout)
+      }
     }
 
     "store a file without a computed MD5" in {

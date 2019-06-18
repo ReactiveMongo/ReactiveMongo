@@ -42,7 +42,7 @@ import reactivemongo.core.protocol.Response
 import reactivemongo.core.commands.SuccessfulAuthentication
 import reactivemongo.api.commands.{ WriteConcern => WC }
 
-import reactivemongo.util.{ LazyLogger, SRVRecordResolver, TXTResolver }
+import reactivemongo.util, util.{ LazyLogger, SRVRecordResolver, TXTResolver }
 
 private[api] case class ConnectionState(
   metadata: ProtocolMetadata,
@@ -496,7 +496,7 @@ object MongoConnection {
         reactivemongo.util.dnsTimeout).toList
 
     } else {
-      hosts.split(",").map({ h =>
+      hosts.split(",").map { h =>
         h.span(_ != ':') match {
           case ("", _) => throw new URIParsingException(
             s"No valid host in the URI: '$h'")
@@ -521,7 +521,7 @@ object MongoConnection {
           case _ => throw new URIParsingException(
             s"Could not parse host from URI: invalid definition '$h'")
         }
-      })(scala.collection.breakOut)
+      }.toList
     }
   }
 
@@ -545,13 +545,13 @@ object MongoConnection {
     if (options.isEmpty) {
       Map.empty[String, String]
     } else {
-      options.split("&").map { option =>
+      util.toMap(options.split("&")) { option =>
         option.split("=").toList match {
           case key :: value :: Nil => (key -> value)
           case _ => throw new URIParsingException(
             s"Could not parse invalid options '$options'")
         }
-      }(scala.collection.breakOut)
+      }
     }
   }
 

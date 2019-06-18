@@ -8,6 +8,7 @@ import reactivemongo.bson.{
   BSONString,
   Subtype
 }
+import reactivemongo.util
 import reactivemongo.core.protocol.Response
 
 // --- MongoDB SCRAM-SHA1 authentication ---
@@ -108,8 +109,8 @@ object ScramSha1Negociation {
    * during the SCRAM-SHA1 authentication.
    */
   def parsePayload(payload: String): Map[String, String] =
-    payload.split(",").map(_.split("=", 2)).
-      map(array => array(0) -> array(1))(scala.collection.breakOut)
+    util.toMap(payload.split(",").map(_.split("=", 2)))(
+      array => array(0) -> array(1))
 
   /**
    * Parses the binary `payload` as a map of properties exchanged
@@ -182,8 +183,8 @@ private[core] case class ScramSha1StartNegociation(
         val clientKey =
           hmac(saltedPassword, ScramSha1StartNegociation.ClientKeySeed)
         val clientSig = hmac(DigestUtils.sha1(clientKey), authMsg)
-        val clientProof: Array[Byte] = (clientKey, clientSig).
-          zipped.map((a, b) => (a ^ b).toByte)
+        val clientProof = (clientKey, clientSig).
+          zipped.map((a, b) => (a ^ b).toByte).toArray
 
         val message = s"$nonce,p=${Base64.encodeBase64String(clientProof)}"
         val serverKey =

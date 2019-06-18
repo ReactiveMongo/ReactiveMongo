@@ -2,7 +2,7 @@ import scala.concurrent._, duration.FiniteDuration
 
 import reactivemongo.api._, collections.bson._
 
-import reactivemongo.api.commands.WriteConcern
+import reactivemongo.api.commands.{ CommandError, WriteConcern }
 
 import reactivemongo.bson._
 
@@ -30,6 +30,44 @@ final class CollectionSpec(implicit protected val ee: ExecutionEnv)
   // ---
 
   "BSON collection" should {
+    "support creation" >> {
+      "successfully when not exist" in {
+        collection.create() must beTypedEqualTo({}).awaitFor(timeout)
+      }
+
+      "with error when already exists (failsIfExists = true)" in {
+        def test(create: => Future[Unit]): Future[Boolean] =
+          create.map(_ => true).recover {
+            case CommandError.Code(48 /*already exists */ ) => false
+
+            case CommandError.Message(
+              "collection already exists") => false
+          }
+
+        test(collection.create()) must beFalse.awaitFor(timeout) and {
+          test(collection.create(
+            failsIfExists = true)) must beFalse.awaitFor(timeout)
+        }
+      }
+
+      "successfully when already exists (failsIfExists = false)" in {
+        collection.create(
+          failsIfExists = false) must beTypedEqualTo({}).awaitFor(timeout)
+      }
+    }
+
+    "expose stats" in {
+      db.collection(s"not_exists_${System identityHashCode collection}").
+        stats().map(_ => true).recover {
+          case _ => false
+        } must beFalse.awaitFor(timeout) and {
+          collection.stats().
+            map(s => s.ns -> s.count) must beLike[(String, Int)] {
+              case (ns, 0) => ns.endsWith(collection.name) must beTrue
+            }.awaitFor(timeout)
+        }
+    }
+
     "write successfully 5 documents" >> {
       implicit val writer = PersonWriter
 
@@ -38,7 +76,7 @@ final class CollectionSpec(implicit protected val ee: ExecutionEnv)
           one(person).map(_.ok) must beTrue.await(1, timeout) and {
             val coll = slowColl.withReadPreference(ReadPreference.secondary)
 
-            coll.readPreference must_== ReadPreference.secondary and {
+            coll.readPreference must_=== ReadPreference.secondary and {
               // Anyway use ReadPreference.Primary for insert op
               coll.insert.one(person2).map { r =>
                 r.ok -> r.n

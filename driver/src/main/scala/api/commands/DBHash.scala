@@ -1,5 +1,6 @@
 package reactivemongo.api.commands
 
+import reactivemongo.util
 import reactivemongo.api.SerializationPack
 
 // See https://docs.mongodb.com/manual/reference/command/dbHash/
@@ -37,7 +38,6 @@ private[reactivemongo] object DBHash {
 }
 
 private[reactivemongo] object DBHashResult {
-  import scala.collection.breakOut
   import CommandCodecs.{ dealingWithGenericCommandErrorsReader => cmdReader }
 
   def reader[P <: SerializationPack](pack: P): pack.Reader[DBHashResult] = {
@@ -50,9 +50,9 @@ private[reactivemongo] object DBHashResult {
         md5 <- decoder.string(doc, "md5")
         collections <- decoder.child(doc, "collections")
         names = decoder.names(collections)
-        hashes: Map[String, String] = names.flatMap({ name =>
+        hashes = util.toFlatMap(names) { name =>
           decoder.string(collections, name).map { name -> _ }
-        })(breakOut)
+        }
       } yield DBHashResult(host, hashes, md5, timeMillis)).get
     }
   }

@@ -40,10 +40,15 @@ trait CollectionMetaCommands { self: Collection =>
     command.unboxed(self, Create(None, false), ReadPreference.primary)
 
   /**
-   * @param autoIndexId DEPRECATED: $autoIndexIdParam
+   * @param failsIfExists if true fails if the collection already exists (default: false)
    */
-  @deprecated("Use `create` without deprecated `autoIndexId`", "0.14.0")
-  def create(autoIndexId: Boolean = false)(implicit ec: ExecutionContext): Future[Unit] = command.unboxed(self, Create(None, autoIndexId), ReadPreference.primary)
+  def create(@deprecatedName('autoIndexId) failsIfExists: Boolean = false)(implicit ec: ExecutionContext): Future[Unit] = create().recover {
+    case CommandError.Code(48 /* already exists */ ) if !failsIfExists => ()
+
+    case CommandError.Message(
+      "collection already exists") if !failsIfExists => ()
+
+  }
 
   /**
    * Creates this collection as a capped one.

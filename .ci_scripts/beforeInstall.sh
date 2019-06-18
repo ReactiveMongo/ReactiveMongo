@@ -34,7 +34,7 @@ if [ "$MONGO_VER" = "4" ]; then
     MONGO_MINOR="4.0.0"
 fi
     
-if [ "$AKKA_VERSION" = "2.5.13" ]; then
+if [ "$AKKA_VERSION" = "2.5.23" ]; then
     MONGO_MINOR="4.0.0"
     MONGO_VER="4"
 

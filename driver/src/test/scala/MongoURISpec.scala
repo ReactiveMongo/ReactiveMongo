@@ -47,7 +47,14 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
         options = MongoConnectionOptions.default,
         ignoredOptions = List("foo"))
 
-      parseURI(withOpts) must beSuccessfulTry(expected) and {
+      {
+        parseURI(withOpts) match {
+          case x @ scala.util.Success(_) => x
+          case scala.util.Failure(e) =>
+            e.printStackTrace()
+            scala.util.Failure(e)
+        }
+      } must beSuccessfulTry(expected) and {
         Common.driver.connection(expected, true) must beFailedTry.
           withThrowable[IllegalArgumentException](
             "The connection URI contains unsupported options: foo")

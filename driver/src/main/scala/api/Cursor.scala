@@ -17,8 +17,6 @@ package reactivemongo.api
 
 import scala.language.higherKinds
 
-import scala.collection.generic.CanBuildFrom
-
 import scala.concurrent.{ ExecutionContext, Future }
 
 import reactivemongo.util.LazyLogger
@@ -35,7 +33,6 @@ import reactivemongo.core.protocol.Response
  * @define errorHandlerParam The binary operator to be applied when failing to get the next response. Exception or [[reactivemongo.api.Cursor$.Fail Fail]] raised within the `suc` function cannot be recovered by this error handler.
  * @define zeroParam the initial value
  * @define getHead Returns the first document matching the query
- * @define collect Collects all the documents into a collection of type `M[T]`
  * @define resultTParam the result type of the binary operator
  * @define sucRespParam The binary operator to be applied when the next response is successfully read
  * @define foldResp Applies a binary operator to a start value and all responses handled by this cursor, going first to last.
@@ -44,23 +41,9 @@ import reactivemongo.core.protocol.Response
  * @define foldWhile Applies a binary operator to a start value and all elements retrieved by this cursor, going first to last.
  * @define sucDocParam The binary operator to be applied when the next document is successfully read
  */
-trait Cursor[T] {
+trait Cursor[T] extends CursorCompatAPI[T] {
   // TODO: maxDocs; 0 for unlimited maxDocs
   import Cursor.{ ErrorHandler, FailOnError }
-
-  /**
-   * $collect.
-   *
-   * @param maxDocs $maxDocsParam.
-   * @param err $errorHandlerParam
-   *
-   * {{{
-   * val cursor = collection.find(query, filter).cursor[BSONDocument]()
-   * // return the 3 first documents in a Vector[BSONDocument].
-   * val vector = cursor.collect[Vector](3, Cursor.FailOnError[Vector[BSONDocument]]())
-   * }}}
-   */
-  def collect[M[_]](maxDocs: Int, err: ErrorHandler[M[T]])(implicit cbf: CanBuildFrom[M[_], T, M[T]], ec: ExecutionContext): Future[M[T]]
 
   /**
    * $foldResp

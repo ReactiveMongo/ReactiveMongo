@@ -30,7 +30,7 @@ services:
       args:
         - mongoMajor=${MONGO_VER:-4}
         - mongoProfile=${MONGO_PROFILE:-default}
-        - akkaVersion=${AKKA_VERSION:-2.5.13}
+        - akkaVersion=${AKKA_VERSION:-2.5.23}
         - iterateesVersion=${ITERATEES_VERSION:-2.6.1}
         - scalaVersion=${SCALA_VERSION:-2.12.8}
         - sslPass=${SSL_PASS:-reactivemongo}

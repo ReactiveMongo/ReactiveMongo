@@ -20,6 +20,7 @@ import reactivemongo.api.{
   Cursor,
   CursorOps,
   CursorProducer,
+  ReadConcern,
   WrappedCursor,
   WrappedCursorOps
 }
@@ -27,7 +28,7 @@ import reactivemongo.api.collections.bson.BSONCollection
 
 import org.specs2.concurrent.ExecutionEnv
 
-class AggregationSpec(implicit ee: ExecutionEnv)
+final class AggregationSpec(implicit ee: ExecutionEnv)
   extends org.specs2.mutable.Specification
   with org.specs2.specification.AfterAll {
 
@@ -373,9 +374,12 @@ class AggregationSpec(implicit ee: ExecutionEnv)
     }
 
     "return distinct states" >> {
-      def distinctSpec(c: BSONCollection, timeout: FiniteDuration) = c.distinct[String, ListSet]("state").
-        aka("states") must beTypedEqualTo(ListSet("NY", "FR", "JP")).
-        await(1, timeout)
+      def distinctSpec(c: BSONCollection, timeout: FiniteDuration) =
+        c.distinct[String, ListSet](
+          key = "state",
+          selector = None,
+          readConcern = ReadConcern.Local,
+          collation = None) must beTypedEqualTo(ListSet("NY", "FR", "JP")).await(1, timeout)
 
       "with the default connection" in {
         distinctSpec(coll, timeout)

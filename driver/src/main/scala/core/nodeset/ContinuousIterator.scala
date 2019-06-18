@@ -1,21 +1,21 @@
 package reactivemongo.core.nodeset
 
 private[reactivemongo] class ContinuousIterator[A](iterable: Iterable[A], private var toDrop: Int = 0) extends Iterator[A] {
-  private var iterator = iterable.iterator
+  private var underlying = iterable.iterator
   private var i = 0
 
-  val hasNext = iterator.hasNext
+  val hasNext = underlying.hasNext
 
   if (hasNext) drop(toDrop)
 
   def next =
     if (!hasNext) throw new NoSuchElementException("empty iterator")
     else {
-      if (!iterator.hasNext) {
-        iterator = iterable.iterator
+      if (!underlying.hasNext) {
+        underlying = iterable.iterator
         i = 0
       }
-      val a = iterator.next
+      val a = underlying.next
       i += 1
       a
     }
