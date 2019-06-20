@@ -158,7 +158,7 @@ private[bson] object MacroImpl {
         case i @ ClassInfoType(_, _, _) => i.typeArgs
       }
       val boundTypes: Map[String, Type] =
-        (constructor.typeParams -> tpeArgs).zipped.map {
+        constructor.typeParams.lazyZip(tpeArgs).map {
           case (sym, ty) => sym.fullName -> ty
         }.to(Map)
 
@@ -238,7 +238,7 @@ private[bson] object MacroImpl {
         case i @ ClassInfoType(_, _, _) => i.typeArgs
       }
       val boundTypes: Map[String, Type] =
-        (constructor.typeParams -> tpeArgs).zipped.map {
+        constructor.typeParams.lazyZip(tpeArgs).map {
           case (sym, ty) => sym.fullName -> ty
         }.to(Map)
 
@@ -326,7 +326,7 @@ private[bson] object MacroImpl {
         q"$bufName += $cn"
       }
 
-      val writer = q"val ${bufName} = scala.collection.immutable.Stream.newBuilder[reactivemongo.bson.BSONElement]" +: (fields :+ q"reactivemongo.bson.BSONDocument(${bufName}.result())")
+      val writer = q"val ${bufName} = _root_.scala.collection.immutable.LazyList.newBuilder[_root_.reactivemongo.bson.BSONElement]" +: (fields :+ q"_root_.reactivemongo.bson.BSONDocument(${bufName}.result())")
 
       if (values.isEmpty && extra.isEmpty) {
         q"{..$writer}"
