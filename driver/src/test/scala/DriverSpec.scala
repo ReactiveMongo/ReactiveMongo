@@ -27,7 +27,7 @@ import reactivemongo.api.commands.DBUserRole
 
 import org.specs2.concurrent.ExecutionEnv
 
-class DriverSpec(implicit ee: ExecutionEnv)
+final class DriverSpec(implicit ee: ExecutionEnv)
   extends org.specs2.mutable.Specification {
 
   "Driver" title

@@ -1,8 +1,5 @@
 package reactivemongo.bson
 
-import scala.collection.generic.CanBuildFrom
-import scala.util.Try
-
 /*
  * Copyright 2013 Stephane Godbillon (@sgodbillon)
  *
@@ -167,9 +164,9 @@ trait DefaultBSONHandlers extends LowPrioBSONHandlers {
   implicit def MapReader[K, V](implicit keyReader: BSONReader[BSONString, K], valueReader: BSONReader[_ <: BSONValue, V]): BSONDocumentReader[Map[K, V]] =
     new BSONDocumentReader[Map[K, V]] {
       def read(bson: BSONDocument): Map[K, V] =
-        bson.elements.map { element =>
-          keyReader.read(BSONString(element.name)) -> element.value.seeAsTry[V].get
-        }(scala.collection.breakOut)
+        Compat.toMap(bson.elements) { e =>
+          keyReader.read(BSONString(e.name)) -> e.value.seeAsTry[V].get
+        }
     }
 
   implicit def MapWriter[K, V](implicit keyWriter: BSONWriter[K, BSONString], valueWriter: BSONWriter[V, _ <: BSONValue]): BSONDocumentWriter[Map[K, V]] =
@@ -181,29 +178,6 @@ trait DefaultBSONHandlers extends LowPrioBSONHandlers {
         BSONDocument(elements)
       }
     }
-}
-
-trait LowPrioBSONHandlers {
-  import scala.language.higherKinds
-
-  // Collections Handlers
-  class BSONArrayCollectionReader[M[_], T](implicit cbf: CanBuildFrom[M[_], T, M[T]], reader: BSONReader[_ <: BSONValue, T]) extends BSONReader[BSONArray, M[T]] {
-    def read(array: BSONArray) =
-      array.stream.filter(_.isSuccess).map { v =>
-        reader.asInstanceOf[BSONReader[BSONValue, T]].read(v.get)
-      }.to[M]
-  }
-
-  class BSONArrayCollectionWriter[T, Repr <% Traversable[T]](implicit writer: BSONWriter[T, _ <: BSONValue]) extends VariantBSONWriter[Repr, BSONArray] {
-    def write(repr: Repr) = {
-      new BSONArray(repr.map(s => Try(writer.write(s))).to[Stream])
-    }
-  }
-
-  implicit def collectionToBSONArrayCollectionWriter[T, Repr <% Traversable[T]](implicit writer: BSONWriter[T, _ <: BSONValue]): VariantBSONWriter[Repr, BSONArray] = new BSONArrayCollectionWriter[T, Repr]
-
-  implicit def bsonArrayToCollectionReader[M[_], T](implicit cbf: CanBuildFrom[M[_], T, M[T]], reader: BSONReader[_ <: BSONValue, T]): BSONReader[BSONArray, M[T]] = new BSONArrayCollectionReader
-
 }
 
 private[bson] final class BSONDocumentHandlerImpl[T](

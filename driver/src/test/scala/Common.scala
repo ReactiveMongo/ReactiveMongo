@@ -59,7 +59,7 @@ object Common extends CommonAuth {
     val a = MongoConnectionOptions.default.copy(
       failoverStrategy = failoverStrategy,
       heartbeatFrequencyMS = (timeout.toMillis / 2).toInt,
-      credentials = DefaultCredentials.map("" -> _)(scala.collection.breakOut),
+      credentials = DefaultCredentials.map("" -> _).toMap,
       keyStore = sys.props.get("test.keyStore").map { uri =>
         MongoConnectionOptions.KeyStore(
           resource = new java.net.URI(uri), // file://..

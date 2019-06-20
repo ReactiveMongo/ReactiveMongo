@@ -2,9 +2,25 @@ import sbt._
 import sbt.Keys._
 
 object Compiler {
-  private val silencerVersion = "1.2.1"
+  private val silencerVersion = Def.setting[String] {
+    if (scalaVersion.value startsWith "2.10.") "1.2.1"
+    else "1.4.1"
+  }
+
+  private def unmanaged(ver: String, base: File): File = 
+    CrossVersion.partialVersion(ver) match {
+      case Some((2, n)) if n >= 13 => base / "scala-2.13+"
+      case _                       => base / "scala-2.13-"
+    }
+
 
   val settings = Seq(
+    unmanagedSourceDirectories in Compile += {
+      unmanaged(scalaVersion.value, (sourceDirectory in Compile).value)
+    },
+    unmanagedSourceDirectories in Test += {
+      unmanaged(scalaVersion.value, (sourceDirectory in Test).value)
+    },
     scalacOptions ++= Seq(
       "-encoding", "UTF-8",
       "-unchecked",
@@ -30,12 +46,15 @@ object Compiler {
       if (scalaVersion.value startsWith "2.10.") Nil
       else Seq(
         compilerPlugin(
-          "com.github.ghik" %% "silencer-plugin" % silencerVersion),
-        "com.github.ghik" %% "silencer-lib" % silencerVersion % Provided)
+          "com.github.ghik" %% "silencer-plugin" % silencerVersion.value),
+        "com.github.ghik" %% "silencer-lib" % silencerVersion.value % Provided)
     },
     scalacOptions in Compile ++= {
-      if (scalaVersion.value startsWith "2.10.") Nil
-      else {
+      val v = scalaVersion.value
+
+      if (v.startsWith("2.10.") || v.startsWith("2.13.")) {
+        Nil
+      } else {
         val m26 = "MongoDB\\ 2\\.6\\ EOL\\ reached\\ by\\ Oct\\ 2016"
         val m3 = "MongoDB\\ 3\\.0\\ EOL\\ reached\\ by\\ Feb\\ 2018"
 
@@ -65,8 +84,11 @@ object Compiler {
       }
     },
     scalacOptions in Compile ++= {
-      if (!scalaVersion.value.startsWith("2.12.")) Seq("-target:jvm-1.6")
-      else Seq("-target:jvm-1.8")
+      val v = scalaVersion.value
+
+      if (!v.startsWith("2.12.") && !v.startsWith("2.13.")) {
+        Seq("-target:jvm-1.6")
+      } else Seq("-target:jvm-1.8")
     },
     scalacOptions in (Compile, console) ~= {
       _.filterNot(excludeOpt)

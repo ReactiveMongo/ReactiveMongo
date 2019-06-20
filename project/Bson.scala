@@ -14,13 +14,27 @@ class Bson(shaded: Project) {
   import Dependencies._
   import XmlUtil._
 
+  val discipline = Def.setting[ModuleID] {
+    if (scalaVersion.value startsWith "2.10.") {
+      "org.typelevel" %% "discipline" % "0.9.0"
+    } else {
+      "org.typelevel" %% "discipline-specs2" % "0.12.0-M3"
+    }
+  }
+
+  val spireLawsVer = Def.setting[String] {
+    if (scalaVersion.value startsWith "2.10.") "0.15.0"
+    else "0.17.0-M1"
+  }
+
   lazy val module = Project("ReactiveMongo-BSON", file("bson")).
     enablePlugins(CpdPlugin).
     settings(Common.settings ++ Findbugs.settings ++ Seq(
-      libraryDependencies ++= Seq(specs.value,
+      libraryDependencies ++= Seq(
+        specs.value,
         "org.specs2" %% "specs2-scalacheck" % specsVer.value % Test,
-        "org.typelevel" %% "discipline" % "0.9.0" % Test,
-        "org.typelevel" %% "spire-laws" % "0.15.0" % Test),
+        discipline.value % Test,
+        "org.typelevel" %% "spire-laws" % spireLawsVer.value % Test),
       compile in Compile := (compile in Compile).
         dependsOn(assembly in shaded).value,
       unmanagedJars in Compile := {

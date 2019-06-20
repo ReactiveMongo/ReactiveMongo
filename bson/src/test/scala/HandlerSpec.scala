@@ -76,7 +76,8 @@ class HandlerSpec extends org.specs2.mutable.Specification {
 
     "should not have a surname2" in {
       doc.getTry("surname2") must beFailedTry and (
-        doc.getUnflattenedTry("surname2") must beSuccessfulTry(None))
+        doc.getUnflattenedTry("surname2") must beSuccessfulTry(
+          Option.empty[BSONValue]))
     }
 
     "should be read" in {

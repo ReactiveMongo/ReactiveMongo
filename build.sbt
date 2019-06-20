@@ -1,5 +1,9 @@
 lazy val `ReactiveMongo-Shaded` = Shaded.commonModule
 
+//scalafixDependencies in ThisBuild += "org.scala-lang.modules" %% "scala-collection-migrations" % "2.0.0"
+
+//scalacOptions ++= List("-Yrangepos", "-P:semanticdb:synthetics:on")
+
 lazy val `ReactiveMongo-BSON` = new Bson(`ReactiveMongo-Shaded`).module
 
 lazy val `ReactiveMongo-BSON-Macros` = project.in(file("macros")).

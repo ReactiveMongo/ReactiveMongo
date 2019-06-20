@@ -213,7 +213,7 @@ class SerializationSpec extends org.specs2.mutable.Specification {
     }
 
     "serialize a document containing a long" in {
-      val dlong = BSONDocument("long" -> BSONLong(8888122134234l))
+      val dlong = BSONDocument("long" -> BSONLong(8888122134234L))
       val expected = Array[Byte](19, 0, 0, 0, 18, 108, 111, 110, 103, 0, -38, -50, 92, 109, 21, 8, 0, 0, 0)
       val buffer = new ArrayBSONBuffer
       DefaultBufferHandler.write(buffer, dlong)

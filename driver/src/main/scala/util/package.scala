@@ -25,7 +25,7 @@ import scala.collection.immutable.ListSet
 
 import reactivemongo.core.errors.GenericDriverException
 
-package object util {
+package object util extends UtilCompat {
   import scala.language.implicitConversions
 
   /** Makes an option of the value matching the condition. */
@@ -215,7 +215,7 @@ package object util {
       case null => ListSet.empty[String]
 
       case records => {
-        val txts: ListSet[String] = records.map({ rec =>
+        val txts: ListSet[String] = toListSet(records) { rec =>
           val data = rec.rdataToString
           val stripped = data.stripPrefix("\"")
 
@@ -224,7 +224,7 @@ package object util {
           } else {
             stripped.stripSuffix("\"")
           }
-        })(scala.collection.breakOut)
+        }
 
         txts
       }

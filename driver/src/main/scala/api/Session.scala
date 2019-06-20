@@ -121,7 +121,7 @@ private[api] object Session {
       }
 
       opTime.fold(session -> resp) { operationTime =>
-        logger.debug(s"Update session ${session.lsid} with response to ${response.header.responseTo} at $operationTime")
+        logger.debug(s"Update session ${session.lsid} with response to #${response.header.responseTo} at $operationTime")
 
         val clusterTime = for {
           nested <- preloaded.getAs[BSONDocument](f"$$clusterTime")

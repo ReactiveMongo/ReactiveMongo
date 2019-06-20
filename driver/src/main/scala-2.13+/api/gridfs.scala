@@ -17,9 +17,9 @@ package reactivemongo.api.gridfs
 
 import java.io.{ InputStream, OutputStream }
 import java.util.Arrays
-import scala.concurrent.{ ExecutionContext, Future }
+import java.security.MessageDigest
 
-import play.api.libs.iteratee.{ Concurrent, Enumerator, Iteratee }
+import scala.concurrent.{ ExecutionContext, Future }
 
 import reactivemongo.bson.{
   BSONBinary,
@@ -47,7 +47,7 @@ import reactivemongo.api.{
   ReadPreference,
   SerializationPack
 }
-import reactivemongo.api.commands.{ CommandError, WriteResult }
+import reactivemongo.api.commands.WriteResult
 
 import reactivemongo.util._
 
@@ -230,32 +230,7 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
    *
    * @tparam S The type of the selector document. An implicit `Writer[S]` must be in the scope.
    */
-  def find[S, T <: ReadFile[_]](selector: S)(implicit sWriter: pack.Writer[S], readFileReader: pack.Reader[T], @deprecatedName('ctx) ec: ExecutionContext, cp: CursorProducer[T]): cp.ProducedCursor = files.find(selector).cursor(defaultReadPreference)
-
-  /**
-   * Saves the content provided by the given enumerator with the given metadata.
-   *
-   * @param enumerator Producer of content.
-   * @param file Metadata of the file to store.
-   * @param chunkSize Size of the chunks. Defaults to 256kB.
-   *
-   * @return A future of a ReadFile[Id].
-   */
-  @deprecated("Will be moved to `reactivemongo.play.iteratees.GridFS`", "0.17.0")
-  def save[Id <: pack.Value](enumerator: Enumerator[Array[Byte]], file: FileToSave[pack.type, Id], chunkSize: Int = 262144)(implicit readFileReader: pack.Reader[ReadFile[Id]], @deprecatedName('ctx) ec: ExecutionContext, idProducer: IdProducer[Id], docWriter: BSONDocumentWriter[file.pack.Document]): Future[ReadFile[Id]] = (enumerator |>>> iteratee(file, chunkSize)).flatMap(f => f)
-
-  /**
-   * Saves the content provided by the given enumerator with the given metadata,
-   * with the MD5 computed.
-   *
-   * @param enumerator Producer of content.
-   * @param file Metadata of the file to store.
-   * @param chunkSize Size of the chunks. Defaults to 256kB.
-   *
-   * @return A future of a ReadFile[Id].
-   */
-  @deprecated("Will be moved to `reactivemongo.play.iteratees.GridFS`", "0.17.0")
-  def saveWithMD5[Id <: pack.Value](enumerator: Enumerator[Array[Byte]], file: FileToSave[pack.type, Id], chunkSize: Int = 262144)(implicit readFileReader: pack.Reader[ReadFile[Id]], @deprecatedName('ctx) ec: ExecutionContext, idProducer: IdProducer[Id], docWriter: BSONDocumentWriter[file.pack.Document]): Future[ReadFile[Id]] = (enumerator |>>> iterateeWithMD5(file, chunkSize)).flatMap(f => f)
+  def find[S, T <: ReadFile[_]](selector: S)(implicit sWriter: pack.Writer[S], readFileReader: pack.Reader[T], ec: ExecutionContext, cp: CursorProducer[T]): cp.ProducedCursor = files.find(selector).cursor(defaultReadPreference)
 
   /** Concats two array - fast way */
   private def concat[T](a1: Array[T], a2: Array[T])(implicit m: Manifest[T]): Array[T] = {
@@ -273,38 +248,6 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
   }
 
   /**
-   * Returns an `Iteratee` that will consume data to put into a GridFS store.
-   *
-   * @param file the metadata of the file to store.
-   * @param chunkSize Size of the chunks. Defaults to 256kB.
-   *
-   * @tparam Id the type of the id of this file (generally `BSONObjectID` or `BSONValue`).
-   */
-  @deprecated("Use [[iterateeWithMD5]]", "0.12.0")
-  def iteratee[Id <: pack.Value](file: FileToSave[pack.type, Id], chunkSize: Int = 262144)(implicit readFileReader: pack.Reader[ReadFile[Id]], @deprecatedName('ctx) ec: ExecutionContext, idProducer: IdProducer[Id], docWriter: BSONDocumentWriter[file.pack.Document]): Iteratee[Array[Byte], Future[ReadFile[Id]]] =
-    iterateeMaybeMD5[Id, Unit](file, {}, (_: Unit, _) => {},
-      { _: Unit => Future.successful(Option.empty[Array[Byte]]) }, chunkSize)
-
-  /**
-   * Returns an `Iteratee` that will consume data to put into a GridFS store,
-   * computing the MD5.
-   *
-   * @param file the metadata of the file to store.
-   * @param chunkSize Size of the chunks. Defaults to 256kB.
-   *
-   * @tparam Id the type of the id of this file (generally `BSONObjectID` or `BSONValue`).
-   */
-  @deprecated("Will be moved to `reactivemongo.play.iteratees.GridFS`", "0.12.0")
-  def iterateeWithMD5[Id <: pack.Value](file: FileToSave[pack.type, Id], chunkSize: Int = 262144)(implicit readFileReader: pack.Reader[ReadFile[Id]], @deprecatedName('ctx) ec: ExecutionContext, idProducer: IdProducer[Id], docWriter: BSONDocumentWriter[file.pack.Document]): Iteratee[Array[Byte], Future[ReadFile[Id]]] = {
-    import java.security.MessageDigest
-
-    iterateeMaybeMD5[Id, MessageDigest](file, MessageDigest.getInstance("MD5"),
-      { (md: MessageDigest, chunk) => md.update(chunk); md },
-      { md: MessageDigest => Future(md.digest()).map(Some(_)) },
-      chunkSize)
-  }
-
-  /**
    * @param name the collection name
    */
   private def asBSON(name: String): BSONCollection = {
@@ -312,19 +255,45 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
     producer.apply(db, name, db.failoverStrategy)
   }
 
-  /**
-   * Returns an `Iteratee` that will consume data to put into a GridFS store.
-   *
-   * @param file the metadata of the file to store.
-   * @param digestInit the factory for the message digest
-   * @param digestUpdate the function to update the digest
-   * @param digestFinalize the function to finalize the digest
-   * @param chunkSize Size of the chunks. Defaults to 256kB.
-   *
-   * @tparam Id the type of the id of this file (generally `BSONObjectID` or `BSONValue`).
-   * @tparam M the type of the message digest
-   */
-  private def iterateeMaybeMD5[Id <: pack.Value, M](file: FileToSave[pack.type, Id], digestInit: => M, digestUpdate: (M, Array[Byte]) => M, digestFinalize: M => Future[Option[Array[Byte]]], chunkSize: Int)(implicit readFileReader: pack.Reader[ReadFile[Id]], @deprecatedName('ctx) ec: ExecutionContext, idProducer: IdProducer[Id], docWriter: BSONDocumentWriter[file.pack.Document]): Iteratee[Array[Byte], Future[ReadFile[Id]]] = {
+  /** Reads the given file and writes its contents to the given OutputStream */
+  def readToOutputStream[Id <: pack.Value](file: ReadFile[Id], out: OutputStream)(implicit ec: ExecutionContext, idProducer: IdProducer[Id]): Future[Unit] = {
+    def selector = BSONDocument(idProducer("files_id" -> file.id)) ++ (
+      "n" -> BSONDocument(
+        "$gte" -> 0,
+        "$lte" -> BSONLong(file.length / file.chunkSize + (
+          if (file.length % file.chunkSize > 0) 1 else 0))))
+
+    @inline def cursor = asBSON(chunks.name).find(selector).
+      sort(BSONDocument("n" -> 1)).cursor[BSONDocument](defaultReadPreference)
+
+    @inline def pushChunk(doc: BSONDocument): Cursor.State[Unit] = doc.get("data") match {
+      case Some(BSONBinary(data, _)) => {
+        val array = new Array[Byte](data.readable)
+        data.slice(data.readable).readBytes(array)
+        Cursor.Cont(out write array)
+      }
+
+      case _ => {
+        val errmsg = s"not a chunk! failed assertion: data field is missing: ${BSONDocument pretty doc}"
+
+        logger.error(errmsg)
+        Cursor.Fail(ReactiveMongoException(errmsg))
+      }
+    }
+
+    cursor.foldWhile({})((_, doc) => pushChunk(doc), Cursor.FailOnError())
+  }
+
+  /** Writes the data provided by the given InputStream to the given file. */
+  def writeFromInputStream[Id <: pack.Value](file: FileToSave[pack.type, Id], input: InputStream, chunkSize: Int = 262144)(implicit readFileReader: pack.Reader[ReadFile[Id]], ec: ExecutionContext, idProducer: IdProducer[Id], docWriter: BSONDocumentWriter[file.pack.Document]): Future[ReadFile[Id]] = {
+    type M = MessageDigest
+
+    lazy val digestInit = MessageDigest.getInstance("MD5")
+
+    def digestUpdate(md: MessageDigest, chunk: Array[Byte]) = { md.update(chunk); md }
+
+    def digestFinalize(md: MessageDigest) = Future(md.digest()).map(Some(_))
+
     case class Chunk(
       previous: Array[Byte],
       n: Int,
@@ -396,57 +365,24 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
       }
     }
 
-    Iteratee.foldM(Chunk(Array.empty, 0, digestInit, 0)) {
-      (previous, chunk: Array[Byte]) =>
-        logger.debug(s"Processing new enumerated chunk from n=${previous.n}...\n")
-        previous.feed(chunk)
-    }.map(_.finish)
-  }
+    val buffer = Array.ofDim[Byte](chunkSize)
 
-  /**
-   * Produces an enumerator of chunks of bytes from the `chunks` collection
-   * matching the given file metadata.
-   *
-   * @param file the file to be read
-   */
-  @deprecated("Will be moved to `reactivemongo.play.iteratees.GridFS`", "0.17.0")
-  def enumerate[Id <: pack.Value](file: ReadFile[Id])(implicit @deprecatedName('ctx) ec: ExecutionContext, idProducer: IdProducer[Id]): Enumerator[Array[Byte]] = {
-    def selector = BSONDocument(idProducer("files_id" -> file.id)) ++ (
-      "n" -> BSONDocument(
-        "$gte" -> 0,
-        "$lte" -> BSONLong(file.length / file.chunkSize + (
-          if (file.length % file.chunkSize > 0) 1 else 0))))
+    def go(previous: Chunk): Future[Chunk] =
+      Future(input read buffer).flatMap {
+        case n if n > 0 => {
+          //logger.debug
+          println(s"Processing new chunk from n=${previous.n}...\n")
 
-    @inline def cursor = asBSON(chunks.name).find(selector).
-      sort(BSONDocument("n" -> 1)).cursor[BSONDocument](defaultReadPreference)
+          previous.feed(buffer take n).flatMap(go)
+        }
 
-    @inline def pushChunk(chan: Concurrent.Channel[Array[Byte]], doc: BSONDocument): Cursor.State[Unit] = doc.get("data") match {
-      case Some(BSONBinary(data, _)) => {
-        val array = new Array[Byte](data.readable)
-        data.slice(data.readable).readBytes(array)
-        Cursor.Cont(chan push array)
+        case _ =>
+          Future.successful(previous)
+
       }
 
-      case _ => {
-        val errmsg = s"not a chunk! failed assertion: data field is missing: ${BSONDocument pretty doc}"
-
-        logger.error(errmsg)
-        Cursor.Fail(ReactiveMongoException(errmsg))
-      }
-    }
-
-    Concurrent.unicast[Array[Byte]] { chan =>
-      cursor.foldWhile({})(
-        (_, doc) => pushChunk(chan, doc),
-        Cursor.FailOnError()).onComplete { case _ => chan.eofAndEnd() }
-    }
+    go(Chunk(Array.empty, 0, digestInit, 0)).flatMap(_.finish)
   }
-
-  /** Reads the given file and writes its contents to the given OutputStream */
-  def readToOutputStream[Id <: pack.Value](file: ReadFile[Id], out: OutputStream)(implicit @deprecatedName('ctx) ec: ExecutionContext, idProducer: IdProducer[Id]): Future[Unit] = enumerate(file) |>>> Iteratee.foreach { out.write(_) }
-
-  /** Writes the data provided by the given InputStream to the given file. */
-  def writeFromInputStream[Id <: pack.Value](file: FileToSave[pack.type, Id], input: InputStream, chunkSize: Int = 262144)(implicit readFileReader: pack.Reader[ReadFile[Id]], @deprecatedName('ctx) ec: ExecutionContext, idProducer: IdProducer[Id], docWriter: BSONDocumentWriter[file.pack.Document]): Future[ReadFile[Id]] = save(Enumerator.fromStream(input, chunkSize), file)
 
   /**
    * Removes a file from this store.
@@ -455,7 +391,7 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
    *
    * @param file the file entry to remove from this store
    */
-  def remove[Id <: pack.Value](file: BasicMetadata[Id])(implicit @deprecatedName('ctx) ec: ExecutionContext, idProducer: IdProducer[Id]): Future[WriteResult] = remove(file.id)
+  def remove[Id <: pack.Value](file: BasicMetadata[Id])(implicit ec: ExecutionContext, idProducer: IdProducer[Id]): Future[WriteResult] = remove(file.id)
 
   /**
    * Removes a file from this store.
@@ -464,7 +400,7 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
    *
    * @param id the file id to remove from this store
    */
-  def remove[Id <: pack.Value](id: Id)(implicit @deprecatedName('ctx) ec: ExecutionContext, idProducer: IdProducer[Id]): Future[WriteResult] =
+  def remove[Id <: pack.Value](id: Id)(implicit ec: ExecutionContext, idProducer: IdProducer[Id]): Future[WriteResult] =
     asBSON(chunks.name).delete().one(BSONDocument(idProducer("files_id" -> id))).
       flatMap { _ =>
         asBSON(files.name).delete().one(BSONDocument(idProducer("_id" -> id)))
@@ -478,21 +414,26 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
    *
    * @return A future containing true if the index was created, false if it already exists.
    */
-  def ensureIndex()(implicit @deprecatedName('ctx) ec: ExecutionContext): Future[Boolean] = for {
-    _ <- chunks.create().recover {
-      case CommandError.Code(48 /*NamespaceExists*/ ) =>
-        logger.info(s"Collection ${chunks.fullCollectionName} already exists")
-    }
+  def ensureIndex()(implicit ec: ExecutionContext): Future[Boolean] = for {
+    _ <- chunks.create(failsIfExists = false)
     c <- chunks.indexesManager.ensure(
       Index(List("files_id" -> Ascending, "n" -> Ascending), unique = true))
 
-    _ <- files.create().recover {
-      case CommandError.Code(48 /*NamespaceExists*/ ) =>
-        logger.info(s"Collection ${files.fullCollectionName} already exists")
-    }
+    _ <- files.create(failsIfExists = false)
     f <- files.indexesManager.ensure(
       Index(List("filename" -> Ascending, "uploadDate" -> Ascending)))
   } yield (c && f)
+
+  /**
+   * Returns whether the data related to this GridFS instance
+   * exists on the database.
+   */
+  def exists(implicit ec: ExecutionContext): Future[Boolean] = (for {
+    _ <- chunks.stats()
+    _ <- files.stats()
+  } yield true).recover {
+    case _ => false
+  }
 
   override def toString: String = s"GridFS(db = ${db.name}, files = ${files.name}, chunks = ${chunks.name})"
 }

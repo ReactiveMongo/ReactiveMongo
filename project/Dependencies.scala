@@ -13,7 +13,9 @@ object Dependencies {
 
   val akka = Def.setting[Seq[ModuleID]] {
     val ver = sys.env.get("AKKA_VERSION").getOrElse {
-      if (scalaVersion.value startsWith "2.12.") "2.5.22"
+      val v = scalaVersion.value
+
+      if (v.startsWith("2.12.") || v.startsWith("2.13.")) "2.5.23"
       else "2.3.13"
     }
 
@@ -34,7 +36,7 @@ object Dependencies {
 
   val specsVer = Def.setting[String] {
     if (scalaVersion.value startsWith "2.10") "3.9.5" // 4.0.1 not avail
-    else "4.3.5" // due to discipline 0.11 not compat with scala 2.10
+    else "4.5.1"/*"4.3.5"*/ // due to discipline 0.11 not compat with scala 2.10
   }
 
   val specs = Def.setting[ModuleID] {

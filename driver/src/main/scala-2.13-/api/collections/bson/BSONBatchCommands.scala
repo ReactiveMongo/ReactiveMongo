@@ -29,8 +29,8 @@ object BSONBatchCommands extends BatchCommands[BSONSerializationPack.type] {
   implicit def DefaultWriteResultReader = BSONCommonWriteCommandsImplicits.DefaultWriteResultReader
 
   val FindAndModifyCommand = BSONFindAndModifyCommand
-  implicit def FindAndModifyWriter = BSONFindAndModifyImplicits.FindAndModifyWriter
-  implicit def FindAndModifyReader = BSONFindAndModifyImplicits.FindAndModifyResultReader
+  implicit def FindAndModifyWriter = ???
+  implicit def FindAndModifyReader = ???
 
   val AggregationFramework = BSONAggregationFramework
   implicit def AggregateWriter = BSONAggregationImplicits.AggregateWriter

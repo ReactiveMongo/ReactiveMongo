@@ -20,7 +20,8 @@ object Common {
 
   val settings = Defaults.coreDefaultSettings ++ baseSettings ++ Compiler.settings ++ Seq(
     scalaVersion := "2.12.8",
-    crossScalaVersions := Seq("2.10.7", scalaCompatVer, scalaVersion.value),
+    crossScalaVersions := Seq(
+      "2.10.7", scalaCompatVer, scalaVersion.value, "2.13.0"),
     crossVersion := CrossVersion.binary,
     //parallelExecution in Test := false,
     //fork in Test := true, // Don't share executioncontext between SBT CLI/tests

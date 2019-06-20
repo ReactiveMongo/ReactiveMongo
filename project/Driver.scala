@@ -79,9 +79,16 @@ object Version {
 
           Seq(Attributed(dir / jar)(AttributeMap.empty))
         },
+        libraryDependencies ++= {
+          if (!scalaVersion.value.startsWith("2.13.")) {
+            Seq(playIteratees.value)
+          } else {
+            Seq.empty
+          }
+        },
         libraryDependencies ++= akka.value ++ Seq(
             "dnsjava" % "dnsjava" % "2.1.8",
-            playIteratees.value, commonsCodec,
+          commonsCodec,
             shapelessTest % Test, specs.value) ++ logApi,
         findbugsAnalyzedPath += target.value / "external",
         mimaBinaryIssueFilters ++= {

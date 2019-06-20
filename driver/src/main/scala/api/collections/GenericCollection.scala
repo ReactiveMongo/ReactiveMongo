@@ -18,8 +18,6 @@ package reactivemongo.api.collections
 import scala.util.Try
 import scala.util.control.NonFatal
 
-import scala.collection.generic.CanBuildFrom
-
 import scala.concurrent.{ ExecutionContext, Future }
 import scala.concurrent.duration.FiniteDuration
 
@@ -27,10 +25,10 @@ import reactivemongo.api._
 import reactivemongo.api.commands.{
   CommandCodecs,
   Collation,
+  FindAndModifyCommand => FNM,
   ImplicitCommandHelpers,
   UnitBox,
   UpdateWriteResult,
-  ResolvedCollectionCommand,
   WriteConcern,
   WriteResult
 }
@@ -79,15 +77,16 @@ trait GenericCollectionProducer[P <: SerializationPack with Singleton, +C <: Gen
  * @define aggregationPipelineFunction the function to create the aggregation pipeline using the aggregation framework depending on the collection type
  * @define orderedParam the [[https://docs.mongodb.com/manual/reference/method/db.collection.insert/#perform-an-unordered-insert ordered]] behaviour
  * @define collationParam the collation
+ * @define arrayFiltersParam an array of filter documents that determines which array elements to modify for an update operation on an array field
  */
 trait GenericCollection[P <: SerializationPack with Singleton]
   extends Collection with GenericCollectionWithCommands[P]
   with CollectionMetaCommands with ImplicitCommandHelpers[P] with InsertOps[P]
-  with UpdateOps[P] with DeleteOps[P] with CountOp[P] with DistinctOp[P] with ChangeStreamOps[P]
+  with UpdateOps[P] with DeleteOps[P] with CountOp[P] with DistinctOp[P]
+  with GenericCollectionWithDistinctOps[P]
+  with FindAndModifyOps[P] with ChangeStreamOps[P]
   with Aggregator[P] with GenericCollectionMetaCommands[P]
   with GenericCollectionWithQueryBuilder[P] with HintFactory[P] { self =>
-
-  import scala.language.higherKinds
 
   val pack: P
 
@@ -189,7 +188,18 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * @param hint the index to use (either the index name or the index document)
    */
   @deprecated("Use `count` with `readConcern` parameter", "0.16.0")
-  def count[H](selector: Option[pack.Document] = None, limit: Int = 0, skip: Int = 0, hint: Option[H] = None)(implicit h: H => CountCommand.Hint, ec: ExecutionContext): Future[Int] = runValueCommand(CountCommand.Count(query = selector, limit, skip, hint.map(h)), readPreference)
+  def count[H](
+    selector: Option[pack.Document] = None,
+    limit: Int = 0,
+    skip: Int = 0,
+    hint: Option[H] = None)(implicit h: H => CountCommand.Hint, ec: ExecutionContext): Future[Int] = countDocuments(selector, Some(limit), skip,
+    hint = hint.map {
+      h(_) match {
+        case CountCommand.HintString(n)   => self.hint(n)
+        case CountCommand.HintDocument(d) => self.hint(d)
+      }
+    },
+    readConcern = self.readConcern).map(_.toInt)
 
   /**
    * Counts the matching documents.
@@ -208,38 +218,6 @@ trait GenericCollection[P <: SerializationPack with Singleton]
     hint: Option[Hint[pack.type]],
     readConcern: ReadConcern)(implicit ec: ExecutionContext): Future[Long] =
     countDocuments(selector, limit, skip, hint, readConcern)
-
-  @deprecated("Use `distinct` with `Collation`", "0.16.0")
-  def distinct[T, M[_] <: Iterable[_]](
-    key: String,
-    selector: Option[pack.Document] = None,
-    readConcern: ReadConcern = self.readConcern)(implicit reader: pack.NarrowValueReader[T], ec: ExecutionContext, cbf: CanBuildFrom[M[_], T, M[T]]): Future[M[T]] = distinctDocuments[T, M](key, selector, readConcern, collation = None)
-
-  /**
-   * Returns the distinct values for a specified field
-   * across a single collection.
-   *
-   * @tparam T the element type of the distinct values
-   * @tparam M the container, that must be a [[scala.collection.Iterable]]
-   *
-   * @param key the field for which to return distinct values
-   * @param selector $selectorParam, that specifies the documents from which to retrieve the distinct values.
-   * @param readConcern $readConcernParam
-   * @param collation $collationParam
-   *
-   * {{{
-   * val distinctStates = collection.distinct[String, Set](
-   *   "state", None, ReadConcern.Local, None)
-   * }}}
-   */
-  def distinct[T, M[_] <: Iterable[_]](
-    key: String,
-    @deprecatedName('query) selector: Option[pack.Document],
-    readConcern: ReadConcern,
-    collation: Option[Collation])(implicit
-    reader: pack.NarrowValueReader[T],
-    ec: ExecutionContext, cbf: CanBuildFrom[M[_], T, M[T]]): Future[M[T]] =
-    distinctDocuments[T, M](key, selector, readConcern, collation)
 
   /**
    * Inserts a document into the collection and waits for the [[reactivemongo.api.commands.WriteResult]].
@@ -384,7 +362,11 @@ trait GenericCollection[P <: SerializationPack with Singleton]
     writeConcern = writeConcern,
     maxTime = Option.empty[FiniteDuration],
     collation = Option.empty[Collation],
-    arrayFilters = Seq.empty[pack.Document])
+    arrayFilters = Seq.empty[pack.Document]).map { result =>
+    BatchCommands.FindAndModifyCommand.FindAndModifyResult(
+      lastError = result.lastError,
+      value = result.value)
+  }
 
   /**
    * Applies a [[http://docs.mongodb.org/manual/reference/command/findAndModify/ findAndModify]] operation. See [[findAndUpdate]] and [[findAndRemove]] convenient functions.
@@ -412,7 +394,7 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * @param writeConcern $writeConcernParam
    * @param maxTime
    * @param collation $collationParam
-   * @param arrayFilters
+   * @param arrayFilters $arrayFiltersParam
    * @param swriter $swriterParam
    */
   def findAndModify[S](
@@ -424,37 +406,37 @@ trait GenericCollection[P <: SerializationPack with Singleton]
     writeConcern: WriteConcern,
     maxTime: Option[FiniteDuration],
     collation: Option[Collation],
-    arrayFilters: Seq[pack.Document])(implicit swriter: pack.Writer[S], ec: ExecutionContext): Future[BatchCommands.FindAndModifyCommand.FindAndModifyResult] = {
+    arrayFilters: Seq[pack.Document])(implicit swriter: pack.Writer[S], ec: ExecutionContext): Future[FNM.Result[pack.type]] = {
 
-    import FindAndModifyCommand.{
-      FindAndModify,
-      ImplicitlyDocumentProducer => DP
-    }
-
-    implicit val writer =
-      pack.writer[ResolvedCollectionCommand[FindAndModify]] {
-        FindAndModifyCommand.serialize(version, db.session)
-      }
-
-    Future(FindAndModify(
-      query = implicitly[DP](selector),
-      modify = modifier,
-      sort = sort.map(implicitly[DP](_)),
-      fields = fields.map(implicitly[DP](_)),
+    val op = prepareFindAndModify(
+      selector = selector,
+      modifier = modifier,
+      sort = sort,
+      fields = fields,
       bypassDocumentValidation = bypassDocumentValidation,
       writeConcern = writeConcern,
-      maxTimeMS = maxTime.flatMap { t =>
-        val ms = t.toMillis
-
-        if (ms < Int.MaxValue) {
-          Some(ms.toInt)
-        } else {
-          Option.empty[Int]
-        }
-      },
+      maxTime = maxTime,
       collation = collation,
-      arrayFilters = arrayFilters.map(implicitly[DP](_)))).
-      flatMap(runCommand(_, writePreference))
+      arrayFilters = arrayFilters)
+
+    op()
+  }
+
+  @deprecated("Use other `findAndUpdate`", "0.18.0")
+  def findAndUpdate[S, T](
+    selector: S,
+    update: T,
+    fetchNewObject: Boolean = false,
+    upsert: Boolean = false,
+    sort: Option[pack.Document] = None,
+    fields: Option[pack.Document] = None)(
+    implicit
+    swriter: pack.Writer[S],
+    writer: pack.Writer[T],
+    ec: ExecutionContext): Future[BatchCommands.FindAndModifyCommand.FindAndModifyResult] = findAndUpdate[S, T](selector, update, fetchNewObject, upsert, sort, fields, bypassDocumentValidation = false, writeConcern = writeConcern, maxTime = None, collation = None, arrayFilters = Seq.empty).map { result =>
+    BatchCommands.FindAndModifyCommand.FindAndModifyResult(
+      lastError = result.lastError,
+      value = result.value)
   }
 
   /**
@@ -476,19 +458,45 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * @param upsert $upsertParam
    * @param sort $sortParam (default: `None`)
    * @param fields $fieldsParam
+   * @param bypassDocumentValidation
+   * @param writeConcern $writeConcernParam
    * @param swriter $swriterParam
-   * @param writer writerParam
-   */ // TODO: arrayFilters
-  def findAndUpdate[S, T](selector: S, update: T, fetchNewObject: Boolean = false, upsert: Boolean = false, sort: Option[pack.Document] = None, fields: Option[pack.Document] = None)(implicit swriter: pack.Writer[S], writer: pack.Writer[T], ec: ExecutionContext): Future[BatchCommands.FindAndModifyCommand.FindAndModifyResult] = {
+   * @param writer $writerParam
+   * @param maxTime
+   * @param collation $collationParam
+   * @param arrayFilters $arrayFiltersParam
+   */
+  def findAndUpdate[S, T](
+    selector: S,
+    update: T,
+    fetchNewObject: Boolean,
+    upsert: Boolean,
+    sort: Option[pack.Document],
+    fields: Option[pack.Document],
+    bypassDocumentValidation: Boolean,
+    writeConcern: WriteConcern,
+    maxTime: Option[FiniteDuration],
+    collation: Option[Collation],
+    arrayFilters: Seq[pack.Document])(
+    implicit
+    swriter: pack.Writer[S],
+    writer: pack.Writer[T],
+    ec: ExecutionContext): Future[FNM.Result[pack.type]] = {
     val updateOp = updateModifier(update, fetchNewObject, upsert)
 
     findAndModify(selector, updateOp, sort, fields,
-      bypassDocumentValidation = false,
+      bypassDocumentValidation = bypassDocumentValidation,
       writeConcern = writeConcern,
-      maxTime = Option.empty[FiniteDuration],
-      collation = Option.empty[Collation],
-      arrayFilters = Seq.empty[pack.Document])
+      maxTime = maxTime,
+      collation = collation,
+      arrayFilters = arrayFilters)
+  }
 
+  @deprecated("Use the other `findAndRemove`", "0.18.0")
+  def findAndRemove[S](selector: S, sort: Option[pack.Document] = None, fields: Option[pack.Document] = None)(implicit swriter: pack.Writer[S], ec: ExecutionContext): Future[BatchCommands.FindAndModifyCommand.FindAndModifyResult] = findAndRemove[S](selector, sort, fields, writeConcern = this.writeConcern, maxTime = None, collation = None, arrayFilters = Seq.empty).map { result =>
+    BatchCommands.FindAndModifyCommand.FindAndModifyResult(
+      lastError = result.lastError,
+      value = result.value)
   }
 
   /**
@@ -505,14 +513,26 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * @param modifier $modifierParam
    * @param sort $sortParam
    * @param fields $fieldsParam
+   * @param writeConcern $writeConcernParam
+   * @param maxTime
+   * @param collation $collationParam
+   * @param arrayFilters $arrayFiltersParam
    * @param swriter $swriterParam
    */
-  def findAndRemove[S](selector: S, sort: Option[pack.Document] = None, fields: Option[pack.Document] = None)(implicit swriter: pack.Writer[S], ec: ExecutionContext): Future[BatchCommands.FindAndModifyCommand.FindAndModifyResult] = findAndModify[S](selector, removeModifier, sort, fields,
+  def findAndRemove[S](
+    selector: S,
+    sort: Option[pack.Document],
+    fields: Option[pack.Document],
+    writeConcern: WriteConcern,
+    maxTime: Option[FiniteDuration],
+    collation: Option[Collation],
+    arrayFilters: Seq[pack.Document])(implicit swriter: pack.Writer[S], ec: ExecutionContext): Future[FNM.Result[pack.type]] = findAndModify[S](
+    selector, removeModifier, sort, fields,
     bypassDocumentValidation = false,
     writeConcern = writeConcern,
-    maxTime = Option.empty[FiniteDuration],
-    collation = Option.empty[Collation],
-    arrayFilters = Seq.empty[pack.Document])
+    maxTime = maxTime,
+    collation = collation,
+    arrayFilters = arrayFilters)
 
   /**
    * $aggregation.

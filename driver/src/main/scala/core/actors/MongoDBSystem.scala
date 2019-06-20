@@ -138,9 +138,16 @@ trait MongoDBSystem extends Actor {
         updateHistory(event)
 
         scheduler.scheduleOnce(1.second) {
-          _setInfo = updated.info.withAwaitingRequests(
-            requestTracker.responses.size,
-            requestTracker.maxAwaitingPerChannel)
+          requestTracker.withAwaiting { (responses, channels) =>
+            val maxAwaitingPerChannel = {
+              if (channels.isEmpty) 0
+              else channels.map(_._2).max
+            }
+
+            _setInfo = updated.info.withAwaitingRequests(
+              responses.size,
+              maxAwaitingPerChannel)
+          }
 
           l.nodeSetUpdated(previous, _setInfo)
         }
@@ -1722,13 +1729,6 @@ private[actors] final class RequestTracker {
   private val awaitingChannels = LinkedHashMap.empty[ChannelId, Int]
 
   @inline def channels() = awaitingChannels.keySet.toSet
-
-  @inline def maxAwaitingPerChannel(): Int = {
-    if (awaitingChannels.isEmpty) 0
-    else awaitingChannels.map(_._2).max
-  }
-
-  @inline def responses() = awaitingResponses.values.toSeq
 
   private[actors] def withAwaiting[T](f: Function2[LinkedHashMap[Int, AwaitingResponse], LinkedHashMap[ChannelId, Int], T]): T =
     awaitingResponses.synchronized {

@@ -1,11 +1,6 @@
 package reactivemongo.api
 
-import scala.language.higherKinds
-
 import scala.util.{ Failure, Success, Try }
-
-import scala.collection.generic.CanBuildFrom
-import scala.collection.mutable.Builder
 
 import scala.concurrent.{ ExecutionContext, Future }
 
@@ -37,7 +32,7 @@ import reactivemongo.api.commands.ResultCursor
 
 @deprecated("Internal: will be made private", "0.16.0")
 object DefaultCursor {
-  import Cursor.{ ErrorHandler, State, Cont, Fail, logger }
+  import Cursor.{ State, Cont, Fail, logger }
   import CursorOps.Unrecoverable
 
   @deprecated("No longer implemented", "0.16.0")
@@ -144,7 +139,9 @@ object DefaultCursor {
     isMongo26WriteOp: Boolean)(implicit reader: pack.Reader[A]): Impl[A] =
     throw new UnsupportedOperationException("No longer implemented")
 
-  private[reactivemongo] trait Impl[A] extends Cursor[A] with CursorOps[A] {
+  private[reactivemongo] trait Impl[A]
+    extends Cursor[A] with CursorOps[A] with CursorCompat[A] {
+
     /** The read preference */
     def preference: ReadPreference
 
@@ -392,13 +389,6 @@ object DefaultCursor {
 
       foldBulksM(z, maxDocs)(go, err)
     }
-
-    def collect[M[_]](maxDocs: Int, err: ErrorHandler[M[A]])(implicit cbf: CanBuildFrom[M[_], A, M[A]], ec: ExecutionContext): Future[M[A]] =
-      foldWhile[Builder[A, M[A]]](cbf(), maxDocs)(
-        { (builder, a) => Cont(builder += a) },
-        { (b: Builder[A, M[A]], t: Throwable) =>
-          err(b.result(), t).map[Builder[A, M[A]]](_ => b)
-        }).map(_.result())
 
     def nextResponse(maxDocs: Int): (ExecutionContext, Response) => Future[Option[Response]] = {
       if (!tailable) { (ec: ExecutionContext, r: Response) =>

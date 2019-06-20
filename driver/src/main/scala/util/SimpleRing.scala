@@ -1,7 +1,5 @@
 package reactivemongo.util
 
-import scala.collection.mutable.ArrayOps
-
 import scala.util.hashing.MurmurHash3
 
 import scala.reflect.ClassTag
