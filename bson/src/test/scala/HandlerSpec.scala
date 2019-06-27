@@ -297,9 +297,11 @@ class HandlerSpec extends org.specs2.mutable.Specification {
     birthDate: Date,
     albums: List[Album])
 
+  val birthInstant = java.time.Instant.parse("1982-10-11T17:30:00Z")
+
   val neilYoung = Artist(
     "Neil Young",
-    new Date(82, 9, 11, 18, 30),
+    new Date(birthInstant.toEpochMilli),
     List(
       Album(
         "Everybody Knows this is Nowhere",
