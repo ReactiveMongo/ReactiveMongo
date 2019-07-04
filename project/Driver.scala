@@ -87,7 +87,7 @@ object Version {
           }
         },
         libraryDependencies ++= akka.value ++ Seq(
-            "dnsjava" % "dnsjava" % "2.1.8",
+            "dnsjava" % "dnsjava" % "2.1.9",
           commonsCodec,
             shapelessTest % Test, specs.value) ++ logApi,
         findbugsAnalyzedPath += target.value / "external",
