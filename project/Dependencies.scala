@@ -44,7 +44,7 @@ object Dependencies {
   }
 
   val slf4jVer = "1.7.12"
-  val log4jVer = "2.5"
+  val log4jVer = "2.12.0"
 
   val slf4j = "org.slf4j" % "slf4j-api" % slf4jVer
   val slf4jSimple = "org.slf4j" % "slf4j-simple" % slf4jVer
