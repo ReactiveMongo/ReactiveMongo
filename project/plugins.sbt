@@ -23,7 +23,7 @@ addSbtPlugin("net.virtual-void" % "sbt-dependency-graph" % "0.9.2")
 
 addSbtPlugin("com.eed3si9n" % "sbt-assembly" % "0.14.10")
 
-addSbtPlugin("com.typesafe" % "sbt-mima-plugin" % "0.4.0")
+addSbtPlugin("com.typesafe" % "sbt-mima-plugin" % "0.5.0")
 
 addSbtPlugin("com.github.sbt" % "sbt-findbugs" % "2.0.0")
 
