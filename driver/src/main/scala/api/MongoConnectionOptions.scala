@@ -1,5 +1,7 @@
 package reactivemongo.api
 
+import java.net.URI
+
 import reactivemongo.api.commands.{ WriteConcern => WC }
 
 /** Then mode of authentication against the replica set. */
@@ -262,24 +264,40 @@ object MongoConnectionOptions {
    */
   case class Credential(user: String, password: Option[String])
 
-  /**
-   * @param resource the ressource to load as key store
-   * @param password the password to load the store
-   * @param storeType the type of the key store (e.g. `PKCS12`)
-   */
-  case class KeyStore(
-    resource: java.net.URI,
-    password: Option[Array[Char]],
-    storeType: String) {
+  final class KeyStore(
+    val resource: URI,
+    val password: Option[Array[Char]],
+    val storeType: String,
+    val trust: Boolean) extends Product {
+    @deprecated("Use constructor with `trust` parameter", "0.18.2")
+    def this(
+      resource: URI,
+      password: Option[Array[Char]],
+      storeType: String) = this(resource, password, storeType, true)
+
     override def toString = s"KeyStore#${storeType}{$resource}"
 
     import java.util.Arrays
 
+    def canEqual(that: Any): Boolean = that match {
+      case _: KeyStore => true
+      case _           => false
+    }
+
+    val productArity = 4
+
+    def productElement(n: Int): Any = (n: @annotation.switch) match {
+      case 0 => resource
+      case 1 => password
+      case 2 => storeType
+      case _ => trust
+    }
+
     override def equals(that: Any): Boolean = that match {
-      case KeyStore(`resource`, Some(p), `storeType`) =>
+      case KeyStore(`resource`, Some(p), `storeType`, `trust`) =>
         password.exists(pwd => Arrays.equals(p, pwd))
 
-      case KeyStore(`resource`, None, `storeType`) =>
+      case KeyStore(`resource`, None, `storeType`, `trust`) =>
         password.isEmpty
 
       case _ => false
@@ -292,6 +310,30 @@ object MongoConnectionOptions {
       password.foreach { p =>
         p.indices.foreach { p(_) = '\u0000' }
       }
+    }
+  }
+
+  object KeyStore {
+    @inline def apply(
+      resource: URI,
+      password: Option[Array[Char]],
+      storeType: String): KeyStore = apply(resource, password, storeType, true)
+
+    /**
+     * @param resource the ressource to load as key store
+     * @param password the password to load the store
+     * @param storeType the type of the key store (e.g. `PKCS12`)
+     * @param trust whether the store defines a certificate to be trusted
+     */
+    def apply(
+      resource: URI,
+      password: Option[Array[Char]],
+      storeType: String,
+      trust: Boolean): KeyStore =
+      new KeyStore(resource, password, storeType, trust)
+
+    def unapply(keyStore: KeyStore): Option[(URI, Option[Array[Char]], String, Boolean)] = Option(keyStore).map { ks =>
+      Tuple4(ks.resource, ks.password, ks.storeType, ks.trust)
     }
   }
 
