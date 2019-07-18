@@ -171,7 +171,7 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    */
   def find[S, J](selector: S, projection: Option[J] = Option.empty)(implicit swriter: pack.Writer[S], pwriter: pack.Writer[J]): GenericQueryBuilder[pack.type] = {
     val queryBuilder: GenericQueryBuilder[pack.type] =
-      genericQueryBuilder.query(selector)
+      genericQueryBuilder.filter(selector)
 
     projection.fold(queryBuilder) { queryBuilder.projection(_) }
   }
@@ -369,7 +369,7 @@ trait GenericCollection[P <: SerializationPack with Singleton]
   }
 
   /**
-   * Applies a [[http://docs.mongodb.org/manual/reference/command/findAndModify/ findAndModify]] operation. See [[findAndUpdate]] and [[findAndRemove]] convenient functions.
+   * Applies a [[http://docs.mongodb.org/manual/reference/command/findAndModify/ findAndModify]] operation. See `findAndUpdate` and `findAndRemove` convenient functions.
    *
    * {{{
    * val updateOp = collection.updateModifier(
@@ -582,7 +582,8 @@ trait GenericCollection[P <: SerializationPack with Singleton]
 
     val aggregateCursor: Cursor.WithOps[T] = aggregatorContext[T](
       firstOp, otherOps, explain, allowDiskUse,
-      bypassDocumentValidation, readConcern, readPreference, batchSize).
+      bypassDocumentValidation, readConcern, readPreference,
+      this.writeConcern, batchSize).
       prepared[Cursor.WithOps](CursorProducer.defaultCursorProducer[T]).cursor
 
     cp.produce(aggregateCursor)

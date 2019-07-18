@@ -162,7 +162,7 @@ trait FindAndModifyCommand[P <: SerializationPack] extends ImplicitCommandHelper
 object FindAndModifyCommand {
   /** A modify operation, part of a FindAndModify command */
   sealed trait ModifyOp {
-    /** Only for the [[Update]] modifier */
+    /** Only for the `Update` modifier */
     def upsert: Boolean
   }
 

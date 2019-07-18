@@ -142,7 +142,7 @@ private[reactivemongo] final class ChannelFactory(
       new ResponseFrameDecoder(), new ResponseDecoder(),
       new RequestEncoder(), mongoHandler)
 
-    trace(s"Netty channel configuration:\n- connectTimeoutMS: ${options.connectTimeoutMS}\n- maxIdleTimeMS: ${options.maxIdleTimeMS}ms\n- tcpNoDelay: ${options.tcpNoDelay}\n- keepAlive: ${options.keepAlive}\n- sslEnabled: ${options.sslEnabled}\n- keyStore: ${options.keyStore}")
+    trace(s"Netty channel configuration:\n- connectTimeoutMS: ${options.connectTimeoutMS}\n- maxIdleTimeMS: ${options.maxIdleTimeMS}ms\n- tcpNoDelay: ${options.tcpNoDelay}\n- keepAlive: ${options.keepAlive}\n- sslEnabled: ${options.sslEnabled}\n- keyStore: ${options.keyStore.fold("None")(_.toString)}")
   }
 
   private def keyStore: Option[MongoConnectionOptions.KeyStore] =
@@ -159,35 +159,55 @@ private[reactivemongo] final class ChannelFactory(
 
   private def sslContext = {
     import java.security.KeyStore
-    import javax.net.ssl.{ KeyManagerFactory, TrustManager }
+    import javax.net.ssl.{
+      KeyManagerFactory,
+      TrustManager,
+      TrustManagerFactory
+    }
 
-    val keyManagers = keyStore.map { settings =>
+    lazy val loadedStore = keyStore.map { settings =>
       val password = settings.password.getOrElse(Array.empty[Char])
 
-      val ks = reactivemongo.util.withContent(settings.resource) { storeIn =>
+      reactivemongo.util.withContent(settings.resource) { storeIn =>
         val res = KeyStore.getInstance(settings.storeType)
 
         res.load(storeIn, password)
 
-        res
+        res -> password
       }
+    }
 
-      val kmf = {
-        val res = KeyManagerFactory.getInstance(
-          KeyManagerFactory.getDefaultAlgorithm)
+    val keyManagers = loadedStore.map {
+      case (ks, password) =>
+        val kmf = {
+          val res = KeyManagerFactory.getInstance(
+            KeyManagerFactory.getDefaultAlgorithm)
 
-        res.init(ks, password)
-        res
-      }
+          res.init(ks, password)
+          res
+        }
 
-      kmf.getKeyManagers
+        kmf.getKeyManagers
     }
 
     val sslCtx = {
       val res = javax.net.ssl.SSLContext.getInstance("SSL")
 
-      val tm: Array[TrustManager] =
-        if (options.sslAllowsInvalidCert) Array(TrustAny) else null
+      val tm: Array[TrustManager] = {
+        def trust = keyStore.fold[Boolean](true)(_.trust)
+
+        if (options.sslAllowsInvalidCert) Array(TrustAny)
+        else if (!trust) null
+        else loadedStore.fold(null.asInstanceOf[Array[TrustManager]]) {
+          case (ks, _) =>
+            val tmf = TrustManagerFactory.getInstance(
+              TrustManagerFactory.getDefaultAlgorithm)
+
+            tmf.init(ks)
+
+            tmf.getTrustManagers()
+        }
+      }
 
       val rand = new scala.util.Random(System.identityHashCode(tm))
       val seed = Array.ofDim[Byte](128)
