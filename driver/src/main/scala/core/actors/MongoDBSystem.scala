@@ -39,6 +39,7 @@ import reactivemongo.io.netty.channel.group.{
 
 import reactivemongo.util.{ LazyLogger, SimpleRing }
 
+import reactivemongo.core.ClientMetadata
 import reactivemongo.core.errors.GenericDriverException
 import reactivemongo.core.protocol.{
   GetMore,
@@ -109,6 +110,9 @@ trait MongoDBSystem extends Actor {
   private[reactivemongo] var channelFactory: ChannelFactory = null //newChannelFactory({})
 
   @volatile private var closingFactory = false
+
+  private[reactivemongo] lazy val clientMetadata: ClientMetadata =
+    new ClientMetadata(options.appName getOrElse lnm)
 
   private val listener: Option[ConnectionListener] = {
     val cl = ConnectionListener()
@@ -1053,7 +1057,7 @@ trait MongoDBSystem extends Actor {
     val isMaster = BSONSerializationPack.readAndDeserialize(
       response, BSONIsMasterCommandImplicits.IsMasterResultReader)
 
-    trace(s"IsMaster response: $isMaster")
+    trace(s"IsMaster response document: $isMaster")
 
     val updated = {
       val respTo = response.header.responseTo
@@ -1173,7 +1177,7 @@ trait MongoDBSystem extends Actor {
               if (node.names.contains(n.name) && // the node itself
                 n.status != node.status) {
                 // invalidate node status on status conflict
-                warn(s"Invalid node status for ${node.name}; Fallback to Unknown status")
+                warn(s"Invalid node status ${node.status} for ${node.name} (expected: ${n.status}); Fallback to Unknown status")
 
                 n._copy(status = NodeStatus.Unknown)
               } else n
@@ -1502,8 +1506,11 @@ trait MongoDBSystem extends Actor {
       import reactivemongo.api.commands.Command
 
       lazy val id = RequestIdGenerator.isMaster.next
+      val client: Option[ClientMetadata] =
+        if (node.pingInfo.firstSent) None else Some(clientMetadata)
+
       lazy val (isMaster, _) = Command.buildRequestMaker(BSONSerializationPack)(
-        IsMaster(id.toString),
+        IsMaster(client, id.toString),
         BSONIsMasterCommandImplicits.IsMasterWriter,
         ReadPreference.primaryPreferred,
         "admin") // only "admin" DB for the admin command
@@ -1511,6 +1518,7 @@ trait MongoDBSystem extends Actor {
       val now = System.nanoTime()
 
       def renewedPingInfo = node.pingInfo.copy(
+        firstSent = true,
         ping = { // latency
           now - node.pingInfo.lastIsMasterTime
         },

@@ -102,13 +102,17 @@ class MongoConnectionOptions private[reactivemongo] (
     maxHistorySize: Int,
     credentials: Map[String, MongoConnectionOptions.Credential],
     keyStore: Option[MongoConnectionOptions.KeyStore],
-    readConcern: ReadConcern): MongoConnectionOptions =
-    MongoConnectionOptions(
+    readConcern: ReadConcern): MongoConnectionOptions = {
+    val copied = MongoConnectionOptions(
       connectTimeoutMS, authenticationDatabase, sslEnabled,
       sslAllowsInvalidCert, authenticationMechanism, tcpNoDelay, keepAlive,
       nbChannelsPerNode, reconnectDelayMS, writeConcern, readPreference,
       failoverStrategy: FailoverStrategy, heartbeatFrequencyMS, maxIdleTimeMS,
       maxHistorySize, credentials, keyStore, readConcern)
+
+    copied._appName = this.appName
+    copied
+  }
 
   def copy(
     connectTimeoutMS: Int = this.connectTimeoutMS,
@@ -128,8 +132,8 @@ class MongoConnectionOptions private[reactivemongo] (
     maxHistorySize: Int = this.maxHistorySize,
     credentials: Map[String, MongoConnectionOptions.Credential] = this.credentials,
     keyStore: Option[MongoConnectionOptions.KeyStore] = this.keyStore,
-    readConcern: ReadConcern = this.readConcern): MongoConnectionOptions =
-    new MongoConnectionOptions(
+    readConcern: ReadConcern = this.readConcern): MongoConnectionOptions = {
+    val copied = new MongoConnectionOptions(
       connectTimeoutMS = connectTimeoutMS,
       authenticationDatabase = authenticationDatabase,
       sslEnabled = sslEnabled,
@@ -148,6 +152,10 @@ class MongoConnectionOptions private[reactivemongo] (
       credentials = credentials,
       keyStore = keyStore,
       readConcern = readConcern)
+
+    copied._appName = this.appName
+    copied
+  }
 
   @deprecated("Will no longer be a `Product`", "0.17.0")
   val productArity = 18
@@ -172,6 +180,7 @@ class MongoConnectionOptions private[reactivemongo] (
     case 15 => credentials
     case 16 => keyStore
     case 17 => readConcern
+    case 18 => _appName
   }
 
   def canEqual(that: Any): Boolean = that match {
@@ -191,7 +200,7 @@ class MongoConnectionOptions private[reactivemongo] (
       false
   }
 
-  private[api] lazy val tupled = Tuple18(
+  private[api] lazy val tupled = Tuple19(
     connectTimeoutMS,
     authenticationDatabase,
     sslEnabled,
@@ -209,8 +218,19 @@ class MongoConnectionOptions private[reactivemongo] (
     maxHistorySize,
     credentials,
     keyStore,
-    readConcern)
+    readConcern,
+    _appName)
 
+  /** The application name (custom or default) */
+  @inline def appName: Option[String] = _appName
+
+  private var _appName = Option.empty[String]
+
+  private[reactivemongo] def withAppName(name: String): MongoConnectionOptions = {
+    val opts = copy()
+    opts._appName = Option(name)
+    opts
+  }
 }
 
 object MongoConnectionOptions {

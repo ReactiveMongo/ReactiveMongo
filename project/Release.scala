@@ -73,8 +73,11 @@ object Release {
 
   val major = Def.setting[String] {
     Version(version.value) match {
-      case Some(Version(maj, Seq(min, _), _)) => s"${maj}.${min}"
-      case _                                  => sys.error(s"Invalid version: ${version.value}")
+      case Some(Version(maj, Seq(min, _), _)) =>
+        s"${maj}.${min}"
+
+      case _ =>
+        sys.error(s"Invalid version: ${version.value}")
     }
   }
 

@@ -1,7 +1,10 @@
 package reactivemongo.api.commands.bson
 
+import reactivemongo.core.ClientMetadata
+
 import reactivemongo.api.BSONSerializationPack
 import reactivemongo.api.commands._
+
 import reactivemongo.bson._
 
 @deprecated("Internal: will be made private", "0.16.0")
@@ -11,8 +14,17 @@ object BSONIsMasterCommand extends IsMasterCommand[BSONSerializationPack.type]
 object BSONIsMasterCommandImplicits {
   import BSONIsMasterCommand._
 
+  private val serializeClientMeta: ClientMetadata => Option[BSONDocument] =
+    ClientMetadata.serialize[BSONSerializationPack.type](BSONSerializationPack)
+
   implicit def IsMasterWriter[T <: IsMaster] = BSONDocumentWriter[T] { im: T =>
-    BSONDocument("ismaster" -> 1, f"$$comment" -> im.comment)
+    val base = BSONDocument(
+      "ismaster" -> 1,
+      f"$$comment" -> im.comment)
+
+    im.client.fold(base) { meta =>
+      base ++ ("client" -> serializeClientMeta(meta))
+    }
   }
 
   implicit object IsMasterResultReader extends DealingWithGenericCommandErrorsReader[IsMasterResult] {

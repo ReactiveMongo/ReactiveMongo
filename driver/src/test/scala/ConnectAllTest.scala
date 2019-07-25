@@ -73,7 +73,8 @@ trait ConnectAllTest { _: NodeSetSpec =>
           val con = Connection(
             chan, status,
             authenticated = Set.empty,
-            authenticating = None)
+            authenticating = None,
+            signaling = false)
 
           Node(
             host,

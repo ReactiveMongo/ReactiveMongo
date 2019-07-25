@@ -718,6 +718,13 @@ object MongoConnection {
               case _ => (unsupported + ("heartbeatFrequencyMS" -> opt)) -> result
             }
 
+          case ("appName", nme) => Option(nme).map(_.trim).filter(v => {
+            v.nonEmpty && v.getBytes("UTF-8").size < 128
+          }) match {
+            case Some(appName) => unsupported -> result.withAppName(appName)
+            case _             => (unsupported + ("appName" -> nme)) -> result
+          }
+
           case kv => (unsupported + kv) -> result
         }
       }
