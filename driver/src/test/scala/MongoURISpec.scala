@@ -393,7 +393,9 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
     val invalidIdle = "mongodb://host1?maxIdleTimeMS=99&heartbeatFrequencyMS=500"
 
     s"fail to parse $invalidIdle (with maxIdleTimeMS < heartbeatFrequencyMS)" in {
-      parseURI(invalidIdle) must beFailedTry[ParsedURI].withThrowable[MongoConnection.URIParsingException]("Invalid URI options: maxIdleTimeMS\\(99\\) < heartbeatFrequencyMS\\(500\\)")
+      parseURI(invalidIdle) must beFailedTry[ParsedURI].
+        withThrowable[MongoConnection.URIParsingException](
+          "Invalid URI options: maxIdleTimeMS\\(99\\) < heartbeatFrequencyMS\\(500\\)")
     }
 
     val validSeedList = "mongodb+srv://usr:pwd@mongo.domain.tld/foo"
@@ -500,6 +502,31 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
                 "user123", Some("passwd123")))),
             ignoredOptions = List("foo", "ignore")))
 
+    }
+
+    val validName = "validName1"
+    val withValidName = s"mongodb://host1?appName=$validName"
+
+    s"parse $withValidName with success" in {
+      parseURI(withValidName).toOption.flatMap(
+        _.options.appName) must beSome(validName)
+    }
+
+    val withInvalidName = s"mongodb://host1?appName="
+
+    s"ignore empty application name in $withInvalidName" in {
+      parseURI(withInvalidName).toOption.flatMap(
+        _.options.appName) must beNone
+    }
+
+    val withNameTooLong = {
+      val tooLong = Array.fill[Byte](136)(72: Byte)
+      s"""mongodb://host1?appName=${new String(tooLong, "UTF-8")}"""
+    }
+
+    s"ignore too long application name" in {
+      parseURI(withNameTooLong).toOption.flatMap(
+        _.options.appName) must beNone
     }
   }
 

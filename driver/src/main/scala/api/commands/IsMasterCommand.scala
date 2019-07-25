@@ -1,15 +1,36 @@
 package reactivemongo.api.commands
 
 import reactivemongo.api.SerializationPack
+
+import reactivemongo.core.ClientMetadata
 import reactivemongo.core.nodeset.NodeStatus
 
 @deprecated("Internal: will be made private", "0.16.0")
 trait IsMasterCommand[P <: SerializationPack] {
-  class IsMaster(val comment: Option[String]) extends Command
-    with CommandWithResult[IsMasterResult] with CommandWithPack[P]
+  /**
+   * @param client the client metadata (only for first isMaster request)
+   */
+  class IsMaster(
+    val client: Option[ClientMetadata],
+    val comment: Option[String]) extends Command
+    with CommandWithResult[IsMasterResult] with CommandWithPack[P] {
 
+    @deprecated("Use new constructor", "0.18.2")
+    def this(comment: Option[String]) = this(
+      client = None,
+      comment = comment)
+  }
+
+  // TODO: 'compression'
+  // TODO: saslSupportedMechs
   object IsMaster extends IsMaster(None) {
-    def apply(comment: String): IsMaster = new IsMaster(Some(comment))
+    @deprecated("Use factory with client metadata", "0.18.2")
+    def apply(comment: String): IsMaster =
+      new IsMaster(None, Some(comment))
+
+    def apply(client: Option[ClientMetadata], comment: String): IsMaster =
+      new IsMaster(client, Some(comment))
+
   }
 
   /**

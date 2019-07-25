@@ -34,8 +34,13 @@ object Compiler {
       "-g:vars"
     ),
     scalacOptions in Compile ++= {
-      if (!scalaVersion.value.startsWith("2.11.")) Nil
-      else Seq(
+      val ver = scalaBinaryVersion.value
+
+      if (ver == "2.12") {
+        Seq("-Ywarn-macros:after")
+      } else if (ver != "2.11") {
+        Nil
+      } else Seq(
         "-Yconst-opt",
         "-Yclosure-elim",
         "-Ydead-code",

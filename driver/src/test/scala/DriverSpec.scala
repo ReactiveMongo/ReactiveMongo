@@ -370,7 +370,6 @@ final class DriverSpec(implicit ee: ExecutionEnv)
                   }
               }
           }.await(1, timeout)
-
       }
 
       "with the slow connection" in {

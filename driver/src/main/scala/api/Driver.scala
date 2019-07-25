@@ -152,30 +152,35 @@ private[api] trait Driver {
       case (db, c) => Authenticate(db, c.user, c.password)
     }.toSeq
 
-    // TODO: Passing ref to MongoDBSystem.history to AddConnection
-    // TODO: pass options.credentials.fallback
+    val opts = options.appName match {
+      case Some(_) => options
+      case _       => options.withAppName(s"${supervisorName}/${nm}")
+    }
 
-    lazy val dbsystem: MongoDBSystem = options.authMode match {
+    // TODO: Passing ref to MongoDBSystem.history to AddConnection
+    // TODO: pass opts.credentials.fallback
+
+    lazy val dbsystem: MongoDBSystem = opts.authMode match {
       case CrAuthentication => new LegacyDBSystem(
-        supervisorName, nm, nodes, authentications, options)
+        supervisorName, nm, nodes, authentications, opts)
 
       case X509Authentication => new StandardDBSystemWithX509(
-        supervisorName, nm, nodes, authentications, options)
+        supervisorName, nm, nodes, authentications, opts)
 
       case _ => new StandardDBSystem(
-        supervisorName, nm, nodes, authentications, options)
+        supervisorName, nm, nodes, authentications, opts)
     }
 
     val mongosystem = system.actorOf(Props(dbsystem), nm)
 
-    def timeout = if (options.connectTimeoutMS > 0) {
-      Timeout(options.connectTimeoutMS.toLong, MILLISECONDS)
+    def timeout = if (opts.connectTimeoutMS > 0) {
+      Timeout(opts.connectTimeoutMS.toLong, MILLISECONDS)
     } else {
       Timeout(10000L, MILLISECONDS) // 10s
     }
 
     def connection = (supervisorActor ? AddConnection(
-      nm, nodes, options, mongosystem))(timeout)
+      nm, nodes, opts, mongosystem))(timeout)
 
     logger.info(s"[$supervisorName] Creating connection: $nm")
 
