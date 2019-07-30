@@ -479,7 +479,7 @@ trait AggregationFramework[P <: SerializationPack]
    * http://docs.mongodb.org/manual/reference/aggregation/unwind/#_S_unwind
    * @param field the name of the array to unwind
    */
-  case class UnwindField(field: String) extends Unwind(1, { case 1 => field },
+  case class UnwindField(field: String) extends Unwind(1, { case 0 => field },
     builder.document(Seq(
       builder.elementProducer(f"$$unwind", builder.string("$" + field)))))
 
