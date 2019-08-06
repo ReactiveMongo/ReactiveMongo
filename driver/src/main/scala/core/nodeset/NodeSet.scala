@@ -2,6 +2,8 @@ package reactivemongo.core.nodeset
 
 import scala.collection.immutable.Set
 
+import scala.math.Ordering
+
 import scala.util.{ Failure, Success, Try }
 
 import reactivemongo.io.netty.channel.ChannelId
@@ -29,6 +31,7 @@ case class NodeSet(
   val mongos: Option[Node] = nodes.find(_.isMongos)
 
   private val _secondaries = nodes.filter(_.status == NodeStatus.Secondary)
+
   @transient val secondaries = RoundRobiner(_secondaries)
 
   val queryable = _secondaries ++ primary
@@ -38,10 +41,10 @@ case class NodeSet(
     queryable.sortWith { _.pingInfo.ping < _.pingInfo.ping })
 
   /** The first node from the [[nearestGroup]]. */
-  @inline def nearest = nearestGroup.pick
+  val nearest = nearestGroup.pick
 
   val protocolMetadata: ProtocolMetadata =
-    primary.orElse(_secondaries.headOption).
+    primary.orElse(secondaries.pick).
       fold(ProtocolMetadata.Default)(_.protocolMetadata)
 
   def primary(authenticated: Authenticated): Option[Node] =
@@ -74,14 +77,20 @@ case class NodeSet(
         con.status == ConnectionStatus.Connected) => node -> con
     }
 
+  // TODO: Remove when deprecated `pick` is also removed
+  private val nodeDummyOrdering = Ordering.by[Node, String](_.name)
+
   @deprecated("", "")
   def pick(preference: ReadPreference): Option[(Node, Connection)] =
-    pick(preference, _ => true)
+    pick(preference, 1, _ => true)(nodeDummyOrdering)
 
   // http://docs.mongodb.org/manual/reference/read-preference/
   private[reactivemongo] def pick(
     preference: ReadPreference,
-    accept: Connection => Boolean): Option[(Node, Connection)] = {
+    unpriorised: Int,
+    accept: Connection => Boolean)(
+    implicit
+    ord: Ordering[Node]): Option[(Node, Connection)] = {
 
     def filter(tags: Seq[Map[String, String]]) = ReadPreference.TagFilter(tags)
 
@@ -94,24 +103,25 @@ case class NodeSet(
         resolve(primary)
 
       case ReadPreference.PrimaryPreferred(tags) =>
-        resolve(primary).orElse(
-          resolve(findNode(secondaries, filter(tags), secondaries.pick)))
+        resolve(primary).orElse(resolve(
+          findNode(secondaries, filter(tags), secondaries.pick, unpriorised)))
 
       case ReadPreference.Secondary(tags) =>
         resolve(findNode(
-          secondaries, filter(tags), secondaries.pick))
+          secondaries, filter(tags), secondaries.pick, unpriorised))
 
       case ReadPreference.SecondaryPreferred(tags) =>
         resolve(findNode(
-          secondaries, filter(tags), secondaries.pick)).orElse(resolve(primary))
+          secondaries, filter(tags), secondaries.pick, unpriorised)).
+          orElse(resolve(primary))
 
       case ReadPreference.Nearest(tags) =>
-        resolve(findNode(nearestGroup, filter(tags), nearest))
+        resolve(findNode(nearestGroup, filter(tags), nearest, unpriorised))
     }
   }
 
   private def connectionAndFlatten(accept: Connection => Boolean): Option[Node] => Option[(Node, Connection)] = {
-    def p: RoundRobiner[Connection, Vector] => Option[Connection] =
+    val p: RoundRobiner[Connection, Vector] => Option[Connection] =
       if (authenticates.isEmpty) _.pickWithFilter(accept)
       else _.pickWithFilter(c =>
         !c.authenticating.isDefined && !c.authenticated.isEmpty && accept(c))
@@ -119,9 +129,24 @@ case class NodeSet(
     _.flatMap(node => p(node.authenticatedConnections).map(node -> _))
   }
 
-  private def findNode(roundRobiner: RoundRobiner[Node, Vector], filter: Option[BSONDocument => Boolean], fallback: => Option[Node]): Option[Node] =
-    filter.fold(fallback)(f =>
-      roundRobiner.pickWithFilter(_.tags.fold(false)(f)).orElse(fallback))
+  private def findNode(
+    roundRobiner: RoundRobiner[Node, Vector],
+    filter: Option[BSONDocument => Boolean],
+    fallback: => Option[Node],
+    unpriorised: Int)(implicit ord: Ordering[Node]): Option[Node] =
+    filter match {
+      case Some(f) => {
+        val nodeFilter = (_: Node).tags.fold(false)(f)
+
+        if (unpriorised > 1) {
+          roundRobiner.pickWithFilterAndPriority(nodeFilter, unpriorised)
+        } else {
+          roundRobiner.pickWithFilter(nodeFilter)
+        }
+      }.orElse(fallback)
+
+      case _ => fallback
+    }
 
   /**
    * Returns a NodeSet with channels created to `upTo` given maximum,

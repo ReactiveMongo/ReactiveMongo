@@ -1358,7 +1358,28 @@ trait MongoDBSystem extends Actor {
         !c.signaling && options.maxInFlightRequestsPerChannel.forall(count < _)
       }
 
-      ns.pick(request.readPreference, accept).fold({
+      // Ordering Node by pending requests or lastIsMasterTime
+      implicit val ord = new math.Ordering[Node] {
+        def compare(x: Node, y: Node): Int = {
+          val xReqs = x.connections.foldLeft(0) { (count, c) =>
+            count + chans.getOrElse(c.channel.id, 0)
+          }
+
+          val yReqs = y.connections.foldLeft(0) { (count, c) =>
+            count + chans.getOrElse(c.channel.id, 0)
+          }
+
+          val rdiff = xReqs - yReqs
+
+          if (rdiff != 0) rdiff else {
+            (x.pingInfo.lastIsMasterTime - y.pingInfo.lastIsMasterTime).toInt
+          }
+        }
+      }
+
+      val unpriorised = math.ceil(ns.nodes.size.toDouble / 2D).toInt
+
+      ns.pick(request.readPreference, unpriorised, accept).fold({
         val secOk = secondaryOK(request)
         lazy val reqAuth = ns.authenticates.nonEmpty
         val cause: Throwable = if (!secOk) {
