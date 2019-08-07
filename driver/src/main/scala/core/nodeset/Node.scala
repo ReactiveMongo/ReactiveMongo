@@ -51,7 +51,7 @@ private[reactivemongo] case class Node(
    * The [[connected]] connections with no required authentication,
    * or already authenticated (at least once).
    */
-  @transient val authenticatedConnections = new RoundRobiner(
+  @transient val authenticatedConnections = RoundRobiner(
     connected.filter(_.authenticated.forall { auth =>
       authenticated.exists(_ == auth)
     }))
@@ -150,7 +150,7 @@ private[reactivemongo] case class Node(
   def info = NodeInfo(name, aliases.result(), host, port, status,
     connections.count(!_.signaling),
     connections.count(_.status == ConnectionStatus.Connected),
-    authenticatedConnections.subject.size, tags,
+    authenticatedConnections.size, tags,
     protocolMetadata, pingInfo, isMongos)
 
 }

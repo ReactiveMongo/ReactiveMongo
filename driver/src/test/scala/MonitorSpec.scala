@@ -61,7 +61,7 @@ final class MonitorSpec(implicit ee: ExecutionEnv)
             var chanId1: ChannelId = null
 
             def authedCons = primary1.toVector.flatMap {
-              _.authenticatedConnections.subject
+              _.authenticatedConnections.toList
             }
 
             // #1
@@ -84,7 +84,7 @@ final class MonitorSpec(implicit ee: ExecutionEnv)
                   case (node, con) =>
                     val primary2 = nodeSet(dbsystem).primary
                     val authCon2 = primary2.toVector.flatMap {
-                      _.authenticatedConnections.subject
+                      _.authenticatedConnections.toList
                     }
 
                     node.name aka "node #1" must_=== Common.primaryHost and {
@@ -152,7 +152,7 @@ final class MonitorSpec(implicit ee: ExecutionEnv)
           primary1 aka "primary #1" must beSome[Node] and {
             eventually(1, 3.seconds) {
               authCon1 = primary1.toVector.flatMap {
-                _.authenticatedConnections.subject
+                _.authenticatedConnections.toList
               }
 
               authCon1 aka "connections #1" must not(beEmpty)

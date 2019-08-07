@@ -1342,7 +1342,7 @@ trait MongoDBSystem extends Actor {
     val info = s"connected:${node.connected.size}, channels:${node.connections.size}"
 
     if (!reqAuth) info else {
-      s"authenticated:${node.authenticatedConnections.subject.size}, authenticating: ${node.connected.filter(_.authenticating.isDefined).size}, $info"
+      s"authenticated:${node.authenticatedConnections.size}, authenticating: ${node.connected.filter(_.authenticating.isDefined).size}, $info"
     }
   }
 

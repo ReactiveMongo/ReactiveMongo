@@ -28,26 +28,26 @@ case class NodeSet(
   /** The `mongos` node, if any. */
   val mongos: Option[Node] = nodes.find(_.isMongos)
 
-  @transient val secondaries = new RoundRobiner(
-    nodes.filter(_.status == NodeStatus.Secondary))
+  private val _secondaries = nodes.filter(_.status == NodeStatus.Secondary)
+  @transient val secondaries = RoundRobiner(_secondaries)
 
-  val queryable = secondaries.subject ++ primary
+  val queryable = _secondaries ++ primary
 
   /** See the [[https://docs.mongodb.com/manual/reference/read-preference/#nearest nearest]] read preference. */
-  @transient val nearestGroup = new RoundRobiner(
+  @transient val nearestGroup = RoundRobiner(
     queryable.sortWith { _.pingInfo.ping < _.pingInfo.ping })
 
   /** The first node from the [[nearestGroup]]. */
-  val nearest = nearestGroup.subject.headOption
+  @inline def nearest = nearestGroup.pick
 
   val protocolMetadata: ProtocolMetadata =
-    primary.orElse(secondaries.subject.headOption).
+    primary.orElse(_secondaries.headOption).
       fold(ProtocolMetadata.Default)(_.protocolMetadata)
 
   def primary(authenticated: Authenticated): Option[Node] =
     primary.filter(_.authenticated.exists(_ == authenticated))
 
-  def isReachable = !primary.isEmpty || !secondaries.subject.isEmpty
+  def isReachable = !primary.isEmpty || !_secondaries.isEmpty
 
   def updateOrAddNode(f: PartialFunction[Node, Node], default: Node): NodeSet = {
     val (maybeUpdatedNodes, updated) = utils.update(nodes)(f)

@@ -32,7 +32,7 @@ services:
         - mongoProfile=${MONGO_PROFILE:-default}
         - akkaVersion=${AKKA_VERSION:-2.5.23}
         - iterateesVersion=${ITERATEES_VERSION:-2.6.1}
-        - scalaVersion=${SCALA_VERSION:-2.12.8}
+        - scalaVersion=${SCALA_VERSION:-2.12.9}
         - sslPass=${SSL_PASS:-reactivemongo}
     entrypoint:
       - ./.ci_scripts/runIntegration.sh
