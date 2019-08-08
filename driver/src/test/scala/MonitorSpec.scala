@@ -39,6 +39,8 @@ final class MonitorSpec(implicit ee: ExecutionEnv)
   import reactivemongo.api.tests._
   import Common.{ timeout, tryUntil }
 
+  implicit val nodeDummyOrdering = math.Ordering.by[Node, String](_.name)
+
   "Monitor" should {
     "manage a single node DB system" in {
       val expectFactor = 3L
@@ -61,7 +63,7 @@ final class MonitorSpec(implicit ee: ExecutionEnv)
             var chanId1: ChannelId = null
 
             def authedCons = primary1.toVector.flatMap {
-              _.authenticatedConnections.subject
+              _.authenticatedConnections.toList
             }
 
             // #1
@@ -79,12 +81,12 @@ final class MonitorSpec(implicit ee: ExecutionEnv)
               // ... as connectAll is disabled by heartbeatFrequencyMS,
               // so only the first user connection could be there
             } and { // #2
-              nodeset1.pick(ReadPreference.Primary, _ => true).
+              nodeset1.pick(ReadPreference.Primary, 1, _ => true).
                 aka("channel #1") must beSome[(Node, Connection)].like {
                   case (node, con) =>
                     val primary2 = nodeSet(dbsystem).primary
                     val authCon2 = primary2.toVector.flatMap {
-                      _.authenticatedConnections.subject
+                      _.authenticatedConnections.toList
                     }
 
                     node.name aka "node #1" must_=== Common.primaryHost and {
@@ -111,7 +113,7 @@ final class MonitorSpec(implicit ee: ExecutionEnv)
                   primary1.map(_.name) must beSome(primary3.name) and {
                     primary3.signaling must beSome[Connection]
                   } and {
-                    nodeSet3.pick(ReadPreference.Primary, _ => true).
+                    nodeSet3.pick(ReadPreference.Primary, 1, _ => true).
                       aka("channel #3") must beNone
                   }
                 }
@@ -152,13 +154,13 @@ final class MonitorSpec(implicit ee: ExecutionEnv)
           primary1 aka "primary #1" must beSome[Node] and {
             eventually(1, 3.seconds) {
               authCon1 = primary1.toVector.flatMap {
-                _.authenticatedConnections.subject
+                _.authenticatedConnections.toList
               }
 
               authCon1 aka "connections #1" must not(beEmpty)
             }
           } and {
-            nodeset1.pick(ReadPreference.Primary, _ => true).
+            nodeset1.pick(ReadPreference.Primary, 1, _ => true).
               aka("channel #1") must beSome[(Node, Connection)]
           } and { // #2
             val respWithNulls = Response(null, null, null,
@@ -187,7 +189,7 @@ final class MonitorSpec(implicit ee: ExecutionEnv)
 
             primary5.map(_.name) aka "primary #5 (after Akka Restart)" must (
               beSome(primary1.get.name)) and eventually(1, timeout) {
-                nodeSet5.pick(ReadPreference.Primary, _ => true).
+                nodeSet5.pick(ReadPreference.Primary, 1, _ => true).
                   aka("channel #5") must beSome[(Node, Connection)]
               }
           }

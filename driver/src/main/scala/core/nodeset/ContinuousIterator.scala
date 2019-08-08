@@ -1,5 +1,6 @@
 package reactivemongo.core.nodeset
 
+@deprecated("Unused", "0.18.4")
 private[reactivemongo] class ContinuousIterator[A](iterable: Iterable[A], private var toDrop: Int = 0) extends Iterator[A] {
   private var underlying = iterable.iterator
   private var i = 0

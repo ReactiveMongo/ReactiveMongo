@@ -16,7 +16,9 @@ object Publish {
   val previousVersion = "0.11.0"
 
   val missingMethodInOld: ProblemFilter = {
-    case ReversedMissingMethodProblem(_) => false
+    case ReversedAbstractMethodProblem(_) |
+        ReversedMissingMethodProblem(_) => false
+
     case DirectMissingMethodProblem(old) => !old.isAccessible
     case InheritedNewAbstractMethodProblem(_, _) => false
     case IncompatibleResultTypeProblem(old, _) => !old.isAccessible
