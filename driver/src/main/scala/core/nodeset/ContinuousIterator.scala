@@ -1,29 +1,25 @@
 package reactivemongo.core.nodeset
 
-private[reactivemongo] object ContinuousIterator {
-  @inline def apply[A](iterable: Iterable[A]): Iterator[A] =
-    if (iterable.isEmpty) empty[A] else wrapped(iterable)
+@deprecated("Unused", "0.18.4")
+private[reactivemongo] class ContinuousIterator[A](iterable: Iterable[A], private var toDrop: Int = 0) extends Iterator[A] {
+  private var underlying = iterable.iterator
+  private var i = 0
 
-  def empty[A]: Iterator[A] = new Iterator[A] {
-    val hasNext: Boolean = false
-    override val isTraversableAgain: Boolean = false
+  val hasNext = underlying.hasNext
 
-    def next(): A = throw new NoSuchElementException("empty iterator")
-  }
+  if (hasNext) drop(toDrop)
 
-  private def wrapped[A](iterable: Iterable[A]): Iterator[A] =
-    new Iterator[A] {
-      private var underlying = iterable.iterator
-
-      override val isTraversableAgain: Boolean = true
-      val hasNext: Boolean = true
-
-      def next(): A = {
-        if (!underlying.hasNext) {
-          underlying = iterable.iterator
-        }
-
-        underlying.next()
+  def next =
+    if (!hasNext) throw new NoSuchElementException("empty iterator")
+    else {
+      if (!underlying.hasNext) {
+        underlying = iterable.iterator
+        i = 0
       }
+      val a = underlying.next
+      i += 1
+      a
     }
+
+  def nextIndex = i
 }

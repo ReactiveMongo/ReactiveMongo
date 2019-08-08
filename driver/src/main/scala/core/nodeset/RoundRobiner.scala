@@ -40,22 +40,40 @@ private[reactivemongo] object RoundRobiner {
     }
 
   private def wrapped[A, M[T] <: Iterable[T]](subject: M[A]): RoundRobiner[A, M] = new RoundRobiner[A, M] {
+    private var underlying = subject.iterator
+
     def toList: List[A] = subject.toList
 
-    private val iterator = ContinuousIterator(subject)
+    private def next(): A = {
+      if (!underlying.hasNext) {
+        underlying = subject.iterator
+      }
 
-    def pick: Option[A] = Some(iterator.next)
+      underlying.next()
+    }
 
-    def pickWithFilterAndPriority(filter: A => Boolean, unpriorized: Int)(implicit ord: Ordering[A]): Option[A] = pickWithFilterAndPriority(filter, 0, unpriorized, List.empty)
+    def pick: Option[A] = Some(next())
+
+    def pickWithFilterAndPriority(
+      filter: A => Boolean,
+      unpriorized: Int)(
+      implicit
+      ord: Ordering[A]): Option[A] = {
+      if (unpriorized < size) {
+        pickWithFilterAndPriority(filter, 0, unpriorized, List.empty)
+      } else {
+        subject.toList
+      }
+    }.sorted.headOption
 
     @annotation.tailrec
     private def pickWithFilterAndPriority(
       filter: A => Boolean,
       tested: Int,
       unpriorized: Int,
-      acc: List[A])(implicit ord: Ordering[A]): Option[A] = {
+      acc: List[A])(implicit ord: Ordering[A]): List[A] = {
       if (unpriorized > 0 && tested < size) {
-        val v = iterator.next
+        val v = next()
 
         if (filter(v)) {
           pickWithFilterAndPriority(
@@ -65,7 +83,7 @@ private[reactivemongo] object RoundRobiner {
           pickWithFilterAndPriority(
             filter, tested + 1, unpriorized, acc)
         }
-      } else acc.sorted.headOption
+      } else acc
     }
 
     def pickWithFilter(filter: A => Boolean): Option[A] =
@@ -74,7 +92,7 @@ private[reactivemongo] object RoundRobiner {
     @annotation.tailrec
     private def pickWithFilter(filter: A => Boolean, tested: Int): Option[A] = {
       if (tested < size) {
-        val v = iterator.next
+        val v = next()
 
         if (filter(v)) Some(v)
         else pickWithFilter(filter, tested + 1)

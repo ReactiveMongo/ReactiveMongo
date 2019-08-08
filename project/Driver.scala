@@ -552,7 +552,7 @@ object Version {
             isp("reactivemongo.api.commands.AggregationFramework#Skip.this"),
             isp("reactivemongo.api.commands.GroupAggregation#Sum.this"),
             isp("reactivemongo.api.commands.AggregationFramework#TextScore.this"),
-            ProblemFilters.exclude[FinalClassProblem]("reactivemongo.core.nodeset.ContinuousIterator"),
+            fcp("reactivemongo.core.nodeset.ContinuousIterator"),
             isp("reactivemongo.api.FoldResponses#ProcResponses.this"),
             isp("reactivemongo.api.MongoDriver#AddConnection.this"),
             isp("reactivemongo.api.FoldResponses#OnError.this"),
