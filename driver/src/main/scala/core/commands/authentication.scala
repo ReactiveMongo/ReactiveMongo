@@ -1,5 +1,12 @@
 package reactivemongo.core.commands
 
+import javax.crypto.SecretKeyFactory
+
+import reactivemongo.api.{
+  AuthenticationMode,
+  ScramSha1Authentication
+}
+
 import reactivemongo.bson.{
   BSONBinary,
   BSONDocument,
@@ -11,28 +18,41 @@ import reactivemongo.bson.{
 import reactivemongo.util
 import reactivemongo.core.protocol.Response
 
-// --- MongoDB SCRAM-SHA1 authentication ---
+// --- MongoDB SCRAM authentication ---
+
+private[core] sealed trait ScramChallenge[M <: AuthenticationMode.Scram] {
+  protected def mechanism: M
+
+  def conversationId: Int
+  def payload: Array[Byte]
+
+  override def toString = s"ScramChallenge(${mechanism}, $conversationId)"
+}
 
 private[core] case class ScramSha1Challenge(
-  conversationId: Int, payload: Array[Byte]) {
-  override def toString = s"ScramSha1Challenge($conversationId)"
+  conversationId: Int,
+  payload: Array[Byte]) extends ScramChallenge[ScramSha1Authentication.type] {
+
+  val mechanism = ScramSha1Authentication
 }
 
 /**
- * Command to start with Mongo SCRAM-SHA1 authentication.
- *
- * @param user username
+ * Command to start with Mongo SCRAM authentication.
  */
-private[core] case class ScramSha1Initiate(
-  user: String) extends Command[ScramSha1Challenge] {
+private[core] sealed trait ScramInitiate[M <: AuthenticationMode.Scram] extends Command[ScramChallenge[M]] {
+
+  /** The user name */
+  def user: String
+
+  protected def mechanism: M
+
+  val randomPrefix = ScramInitiate.randomPrefix(this.hashCode)
 
   import akka.util.ByteString
   import reactivemongo.bson.buffer.ArrayReadableBuffer
 
-  val randomPrefix = ScramSha1Initiate.randomPrefix(this.hashCode)
-
-  /** Initial SCRAM-SHA1 message */
-  val message = {
+  /** Initial SCRAM message */
+  val message: String = {
     val preparedUsername =
       s"""n=${user.replace("=", "=3D").replace(",", "=2D")}"""
 
@@ -41,34 +61,49 @@ private[core] case class ScramSha1Initiate(
 
   override def makeDocuments = BSONDocument(
     "saslStart" -> 1,
-    "mechanism" -> "SCRAM-SHA-1",
+    "mechanism" -> mechanism.name,
     "payload" -> BSONBinary(
       ArrayReadableBuffer(ByteString(message).toArray[Byte]),
       Subtype.GenericBinarySubtype))
 
+  val ResultMaker: BSONCommandResultMaker[ScramChallenge[M]]
+}
+
+private[core] case class ScramSha1Initiate(
+  user: String) extends ScramInitiate[ScramSha1Authentication.type] {
+  val mechanism = ScramSha1Authentication
   val ResultMaker = ScramSha1Initiate
 }
 
-object ScramSha1Initiate extends BSONCommandResultMaker[ScramSha1Challenge] {
-  def parseResponse(response: Response): Either[CommandError, ScramSha1Challenge] = apply(response)
+@deprecated("Will be private", "0.18.4")
+object ScramSha1Initiate extends BSONCommandResultMaker[ScramChallenge[ScramSha1Authentication.type]] {
+  def parseResponse(response: Response): Either[CommandError, ScramChallenge[ScramSha1Authentication.type]] = apply(response)
 
-  def apply(bson: BSONDocument) = {
+  def apply(bson: BSONDocument) = ScramInitiate.parseResponse(ScramSha1Authentication, bson)(ScramSha1Challenge.apply)
+
+  @inline def authChars: Stream[Char] = ScramInitiate.authChars
+
+  @inline def randomPrefix(seed: Int): String = ScramInitiate.randomPrefix(seed)
+}
+
+private[core] object ScramInitiate {
+  def parseResponse[M <: AuthenticationMode.Scram](mechanism: M, bson: BSONDocument)(f: (Int, Array[Byte]) => ScramChallenge[M]): Either[CommandError, ScramChallenge[M]] = {
     CommandError.checkOk(bson, Some("authenticate"), (doc, _) => {
-      FailedAuthentication(doc.getAs[BSONString]("errmsg").
-        map(_.value).getOrElse(""), Some(doc))
-    }).map[Either[CommandError, ScramSha1Challenge]](Left(_)).getOrElse {
+      FailedAuthentication(
+        doc.getAs[BSONString]("errmsg").fold("")(_.value), Some(doc))
+    }).map[Either[CommandError, ScramChallenge[M]]](Left(_)).getOrElse {
       (for {
         cid <- bson.getAs[BSONNumberLike]("conversationId").map(_.toInt)
         pay <- bson.getAs[Array[Byte]]("payload")
-      } yield (cid, pay)).fold[Either[CommandError, ScramSha1Challenge]](Left(FailedAuthentication(s"invalid SCRAM-SHA1 challenge response: ${BSONDocument pretty bson}", Some(bson)))) {
+      } yield (cid, pay)).fold[Either[CommandError, ScramChallenge[M]]](Left(FailedAuthentication(s"invalid $mechanism challenge response: ${BSONDocument pretty bson}", Some(bson)))) {
         case (conversationId, payload) =>
-          Right(ScramSha1Challenge(conversationId, payload))
+          Right(f(conversationId, payload))
       }
     }
   }
 
   // Request utility
-  private val authChars: Stream[Char] = new Iterator[Char] {
+  val authChars: Stream[Char] = new Iterator[Char] {
     val rand = new scala.util.Random(this.hashCode)
     val chars = rand.shuffle("""!"#$%&'()*+-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~""".toList)
 
@@ -99,11 +134,146 @@ object ScramSha1Initiate extends BSONCommandResultMaker[ScramSha1Challenge] {
  * @param serverSignature the SCRAM-SHA1 signature for the MongoDB server
  * @param request the next client request for the SCRAM-SHA1 authentication
  */
+private[core] case class ScramNegociation(
+  serverSignature: Array[Byte],
+  request: BSONDocument)
+
+@deprecated("Use `ScramNegociation`", "0.18.4")
 private[core] case class ScramSha1Negociation(
   serverSignature: Array[Byte],
   request: BSONDocument)
 
+@deprecated("Will be internal", "0.18.4")
 object ScramSha1Negociation {
+  @inline def parsePayload(payload: String): Map[String, String] = ScramNegociation.parsePayload(payload)
+
+  def parsePayload(payload: Array[Byte]): Map[String, String] =
+    parsePayload(new String(payload, "UTF-8"))
+
+}
+
+/**
+ * Command to continue with Mongo SCRAM authentication.
+ */
+private[core] sealed trait ScramStartNegociation[M <: AuthenticationMode.Scram]
+  extends Command[Either[SuccessfulAuthentication, Array[Byte]]] {
+
+  protected def mechanism: M
+
+  /** The name of the user */
+  def user: String
+
+  /** The user password */
+  def password: String
+
+  def conversationId: Int
+
+  /** The initial payload */
+  def payload: Array[Byte]
+
+  protected val randomPrefix: String
+
+  def startMessage: String
+
+  protected def digest(data: Array[Byte]): Array[Byte]
+
+  protected def hmac(key: Array[Byte], input: Array[Byte]): Array[Byte]
+
+  protected def keyFactory: SecretKeyFactory
+
+  // ---
+
+  import javax.crypto.spec.PBEKeySpec
+  import org.apache.commons.codec.digest.DigestUtils
+  import org.apache.commons.codec.binary.Base64
+  import akka.util.ByteString
+  import reactivemongo.bson.buffer.ArrayReadableBuffer
+
+  val data: Either[CommandError, ScramNegociation] = {
+    val challenge = new String(payload, "UTF-8")
+    val response = ScramNegociation.parsePayload(challenge)
+
+    for {
+      rand <- response.get("r").filter(_ startsWith randomPrefix).
+        toRight(CommandError(s"invalid $mechanism random prefix")).right
+
+      salt <- response.get("s").flatMap[Array[Byte]] { s =>
+        try { Some(Base64 decodeBase64 s) } catch { case _: Throwable => None }
+      }.toRight(CommandError(s"invalid $mechanism password salt")).right
+
+      iter <- response.get("i").flatMap[Int] { i =>
+        try { Some(i.toInt) } catch { case _: Throwable => None }
+      }.toRight(CommandError(s"invalid $mechanism iteration count")).right
+
+      nego <- try {
+        val nonce = s"c=biws,r=$rand" // biws = base64("n,,")
+        val saltedPassword: Array[Byte] = {
+          val digest = DigestUtils.md5Hex(s"$user:mongo:$password")
+          val spec = new PBEKeySpec(digest.toCharArray, salt, iter, 160 /* 20 * 8 = 20 bytes */ )
+          keyFactory.generateSecret(spec).getEncoded
+        }
+        val authMsg =
+          s"${startMessage.drop(3)},$challenge,$nonce".getBytes("UTF-8")
+
+        val clientKey = hmac(saltedPassword, ScramNegociation.ClientKeySeed)
+
+        val clientSig = hmac(digest(clientKey), authMsg)
+        val clientProof = (clientKey, clientSig).
+          zipped.map((a, b) => (a ^ b).toByte).toArray
+
+        val message = s"$nonce,p=${Base64 encodeBase64String clientProof}"
+        val serverKey = hmac(saltedPassword, ScramNegociation.ServerKeySeed)
+
+        Right(ScramNegociation(
+          serverSignature = hmac(serverKey, authMsg),
+          request = BSONDocument(
+            "saslContinue" -> 1,
+            "conversationId" -> conversationId,
+            "payload" -> BSONBinary(
+              ArrayReadableBuffer(ByteString(message).toArray[Byte]),
+              Subtype.GenericBinarySubtype)))).right
+
+      } catch {
+        case err: Throwable => Left(CommandError(
+          s"fails to negociate $mechanism: ${err.getMessage}")).right
+      }
+    } yield nego
+  }
+
+  def serverSignature: Either[CommandError, Array[Byte]] =
+    data.right.map(_.serverSignature)
+
+  override def makeDocuments = data.right.map(_.request).right.get
+
+}
+
+private[core] case class ScramSha1StartNegociation(
+  user: String,
+  password: String,
+  conversationId: Int,
+  payload: Array[Byte],
+  randomPrefix: String,
+  startMessage: String) extends ScramStartNegociation[ScramSha1Authentication.type] {
+  val mechanism = ScramSha1Authentication
+
+  import org.apache.commons.codec.digest.{
+    DigestUtils,
+    HmacAlgorithms,
+    HmacUtils
+  }
+
+  @inline def hmac(key: Array[Byte], input: Array[Byte]): Array[Byte] =
+    new HmacUtils(HmacAlgorithms.HMAC_SHA_1, key).hmac(input)
+
+  @inline def digest(data: Array[Byte]): Array[Byte] = DigestUtils.sha1(data)
+
+  @inline def keyFactory: SecretKeyFactory =
+    ScramSha1StartNegociation.keyFactory
+
+  val ResultMaker = ScramSha1StartNegociation
+}
+
+private[core] object ScramNegociation {
   /**
    * Parses the UTF-8 `payload` as a map of properties exchanged
    * during the SCRAM-SHA1 authentication.
@@ -119,152 +289,108 @@ object ScramSha1Negociation {
   def parsePayload(payload: Array[Byte]): Map[String, String] =
     parsePayload(new String(payload, "UTF-8"))
 
-}
-
-/**
- * Command to continue with Mongo SCRAM-SHA1 authentication.
- *
- * @param user the name of the user
- * @param password the user password
- * @param conversationId
- * @param payload the initial payload
- * @param randomPrefix
- * @param startMessage
- */
-private[core] case class ScramSha1StartNegociation(
-  user: String,
-  password: String,
-  conversationId: Int,
-  payload: Array[Byte],
-  randomPrefix: String,
-  startMessage: String) extends Command[Either[SuccessfulAuthentication, Array[Byte]]] {
-
-  import javax.crypto.spec.PBEKeySpec
-  import org.apache.commons.codec.binary.Base64
-  import org.apache.commons.codec.digest.{
-    DigestUtils,
-    HmacAlgorithms,
-    HmacUtils
-  }
-  import akka.util.ByteString
-  import reactivemongo.bson.buffer.ArrayReadableBuffer
-
-  import HmacAlgorithms.{ HMAC_SHA_1 => algorithm }
-
-  @inline private def hmac(key: Array[Byte], input: Array[Byte]): Array[Byte] =
-    new HmacUtils(algorithm, key).hmac(input)
-
-  val data: Either[CommandError, ScramSha1Negociation] = {
-    val challenge = new String(payload, "UTF-8")
-    val response = ScramSha1Negociation.parsePayload(challenge)
-
-    for {
-      rand <- response.get("r").filter(_ startsWith randomPrefix).
-        toRight(CommandError("invalid SCRAM-SHA1 random prefix")).right
-
-      salt <- response.get("s").flatMap[Array[Byte]] { s =>
-        try { Some(Base64 decodeBase64 s) } catch { case _: Throwable => None }
-      }.toRight(CommandError("invalid SCRAM-SHA1 password salt")).right
-
-      iter <- response.get("i").flatMap[Int] { i =>
-        try { Some(i.toInt) } catch { case _: Throwable => None }
-      }.toRight(CommandError("invalid SCRAM-SHA1 iteration count")).right
-
-      nego <- try {
-        val nonce = s"c=biws,r=$rand" // biws = base64("n,,")
-        val saltedPassword: Array[Byte] = {
-          val digest = DigestUtils.md5Hex(s"$user:mongo:$password")
-          val spec = new PBEKeySpec(digest.toCharArray, salt, iter, 160 /* 20 * 8 = 20 bytes */ )
-          ScramSha1StartNegociation.keyFactory.generateSecret(spec).getEncoded
-        }
-        val authMsg =
-          s"${startMessage.drop(3)},$challenge,$nonce".getBytes("UTF-8")
-
-        val clientKey =
-          hmac(saltedPassword, ScramSha1StartNegociation.ClientKeySeed)
-        val clientSig = hmac(DigestUtils.sha1(clientKey), authMsg)
-        val clientProof = (clientKey, clientSig).
-          zipped.map((a, b) => (a ^ b).toByte).toArray
-
-        val message = s"$nonce,p=${Base64.encodeBase64String(clientProof)}"
-        val serverKey =
-          hmac(saltedPassword, ScramSha1StartNegociation.ServerKeySeed)
-
-        Right(ScramSha1Negociation(
-          serverSignature = hmac(serverKey, authMsg),
-          request = BSONDocument(
-            "saslContinue" -> 1, "conversationId" -> conversationId,
-            "payload" -> BSONBinary(
-              ArrayReadableBuffer(ByteString(message).toArray[Byte]),
-              Subtype.GenericBinarySubtype)))).right
-
-      } catch {
-        case err: Throwable => Left(CommandError(
-          s"fails to negociate SCRAM-SHA1: ${err.getMessage}")).right
-      }
-    } yield nego
-  }
-
-  def serverSignature: Either[CommandError, Array[Byte]] =
-    data.right.map(_.serverSignature)
-
-  override def makeDocuments = data.right.map(_.request).right.get
-
-  val ResultMaker = ScramSha1StartNegociation
-}
-
-@SerialVersionUID(113814637L)
-object ScramSha1StartNegociation extends BSONCommandResultMaker[Either[SuccessfulAuthentication, Array[Byte]]] {
-  import reactivemongo.bson.BSONBooleanLike
-
-  type ResType = Either[CommandError, Either[SuccessfulAuthentication, Array[Byte]]]
-
-  def parseResponse(response: Response): ResType = apply(response)
-
-  def apply(bson: BSONDocument) = {
-    if (!bson.getAs[BSONBooleanLike]("ok").fold(false)(_.toBoolean)) {
-      Left(CommandError(bson.getAs[String]("errmsg").
-        getOrElse("SCRAM-SHA1 authentication failure")))
-
-    } else if (bson.getAs[BSONBooleanLike]("done").fold(false)(_.toBoolean)) {
-      Right(Left(SilentSuccessfulAuthentication))
-    } else bson.getAs[Array[Byte]]("payload").fold[ResType](
-      Left(CommandError("missing SCRAM-SHA1 payload")))(
-        bytes => Right(Right(bytes)))
-  }
-
   private[commands] val ClientKeySeed = // "Client Key" bytes
     Array[Byte](67, 108, 105, 101, 110, 116, 32, 75, 101, 121)
 
   private[commands] val ServerKeySeed = // "Server Key" bytes
     Array[Byte](83, 101, 114, 118, 101, 114, 32, 75, 101, 121)
 
-  @transient lazy val keyFactory =
-    javax.crypto.SecretKeyFactory.getInstance("PBKDF2WithHmacSHA1")
 }
 
-/**
- * @param conversationId the ID of the SCRAM-SHA1 conversation
- */
-@SerialVersionUID(304027329L)
-private[core] case class ScramSha1FinalNegociation(
-  conversationId: Int,
-  payload: Array[Byte]) extends Command[SuccessfulAuthentication] {
+private[core] object ScramStartNegociation {
+  import reactivemongo.bson.BSONBooleanLike
+
+  type ResType = Either[CommandError, Either[SuccessfulAuthentication, Array[Byte]]]
+
+  def parseResponse[M <: AuthenticationMode.Scram](
+    mechanism: M, bson: BSONDocument): ResType = {
+
+    if (!bson.getAs[BSONBooleanLike]("ok").fold(false)(_.toBoolean)) {
+      Left(CommandError(bson.getAs[String]("errmsg").
+        getOrElse(s"${mechanism} authentication failure")))
+
+    } else if (bson.getAs[BSONBooleanLike]("done").fold(false)(_.toBoolean)) {
+      Right(Left(SilentSuccessfulAuthentication))
+    } else bson.getAs[Array[Byte]]("payload").fold[ResType](
+      Left(CommandError(s"missing ${mechanism} payload")))(
+        bytes => Right(Right(bytes)))
+  }
+}
+
+@deprecated("Will be internal", "0.18.4")
+@SerialVersionUID(113814637L)
+object ScramSha1StartNegociation extends BSONCommandResultMaker[Either[SuccessfulAuthentication, Array[Byte]]] {
+  type ResType = ScramStartNegociation.ResType
+
+  def parseResponse(response: Response): ResType = apply(response)
+
+  @inline def apply(bson: BSONDocument) =
+    ScramStartNegociation.parseResponse(ScramSha1Authentication, bson)
+
+  @inline private[commands] def ClientKeySeed = ScramNegociation.ClientKeySeed
+
+  @inline private[commands] def ServerKeySeed = ScramNegociation.ServerKeySeed
+
+  @transient lazy val keyFactory =
+    SecretKeyFactory.getInstance("PBKDF2WithHmacSHA1")
+
+}
+
+sealed trait ScramFinalNegociation extends Command[SuccessfulAuthentication] {
+  /** The ID of the SCRAM conversation */
+  def conversationId: Int
+
+  def payload: Array[Byte]
 
   import reactivemongo.bson.buffer.ArrayReadableBuffer
 
   override def makeDocuments = BSONDocument(
-    "saslContinue" -> 1, "conversationId" -> conversationId,
+    "saslContinue" -> 1,
+    "conversationId" -> conversationId,
     "payload" -> BSONBinary(
       ArrayReadableBuffer(payload), Subtype.GenericBinarySubtype))
 
-  val ResultMaker = ScramSha1FinalNegociation
+  val ResultMaker = ScramFinalNegociation
+
+  private[core] lazy val tupled = conversationId -> payload
 }
 
+@deprecated("Use ScramFinalNegociation", "0.18.4")
+@SerialVersionUID(304027329L)
+private[core] case class ScramSha1FinalNegociation(
+  conversationId: Int,
+  payload: Array[Byte]) extends ScramFinalNegociation {
+
+}
+
+@deprecated("Unused", "0.18.4")
 object ScramSha1FinalNegociation
   extends BSONCommandResultMaker[SuccessfulAuthentication] {
 
   def apply(bson: BSONDocument) = ???
+}
+
+private[core] object ScramFinalNegociation
+  extends BSONCommandResultMaker[SuccessfulAuthentication] {
+
+  def apply(bson: BSONDocument) = ???
+
+  def apply(
+    conversationId: Int,
+    payload: Array[Byte]): ScramFinalNegociation =
+    new Default(conversationId, payload)
+
+  private final class Default(
+    val conversationId: Int,
+    val payload: Array[Byte]) extends ScramFinalNegociation {
+
+    override def equals(that: Any): Boolean = that match {
+      case other: ScramFinalNegociation => tupled == other.tupled
+      case _                            => false
+    }
+
+    override def hashCode: Int = tupled.hashCode
+  }
 }
 
 // --- MongoDB CR authentication ---

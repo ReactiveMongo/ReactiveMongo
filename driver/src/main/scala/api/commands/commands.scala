@@ -14,7 +14,7 @@ import reactivemongo.api.{
   ReadPreference
 }
 
-import reactivemongo.core.protocol.Response
+import reactivemongo.core.protocol.{ Reply, Response }
 import reactivemongo.core.actors.RequestMakerExpectingResponse
 import reactivemongo.core.errors.ReactiveMongoException
 
@@ -138,13 +138,18 @@ object Command {
             case _ => Future.failed[T](cause)
           }
 
+        case response @ Response.Successful(_, Reply(_, _, _, 0), _, _) =>
+          Future.failed[T](ReactiveMongoException(
+            s"Cannot parse empty response: $response"))
+
         case response => db.session match {
           case Some(session) =>
             Session.updateOnResponse(session, response).map {
               case (_, resp) => pack.readAndDeserialize(resp, reader)
             }
 
-          case _ => Future(pack.readAndDeserialize(response, reader))
+          case _ =>
+            Future(pack.readAndDeserialize(response, reader))
         }
       }
     }

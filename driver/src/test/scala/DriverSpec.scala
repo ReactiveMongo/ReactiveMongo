@@ -23,7 +23,11 @@ import reactivemongo.core.commands.{
 }
 
 import reactivemongo.api.{ DefaultDB, FailoverStrategy }
-import reactivemongo.api.commands.DBUserRole
+import reactivemongo.api.commands.{
+  AuthenticationMechanism,
+  DBUserRole,
+  WriteConcern
+}
 
 import org.specs2.concurrent.ExecutionEnv
 
@@ -233,166 +237,176 @@ final class DriverSpec(implicit ee: ExecutionEnv)
     section("cr_auth")
   }
 
-  "Authentication SCRAM-SHA1" should {
-    section("scram_auth")
+  section("scram_auth")
+  section("not_mongo26")
 
-    lazy val drv = newAsyncDriver()
-    val conOpts = DefaultOptions.copy(nbChannelsPerNode = 1)
-    lazy val connection = drv.connect(List(primaryHost), options = conOpts)
-    val slowOpts = SlowOptions.copy(nbChannelsPerNode = 1)
-    lazy val slowConnection = {
-      val started = slowProxy.isStarted
-      drv.connect(List(slowPrimary), slowOpts).filter(_ => started)
-    }
-
-    val id = System.identityHashCode(drv)
-    val dbName = s"specs2-test-scramsha1${id}"
-    def db_ = connection.flatMap(_.database(dbName, failoverStrategy))
-
-    section("not_mongo26")
-
-    "create a user" in {
-      (for {
-        d <- db_
-        _ <- d.drop()
-        _ <- d.createUser(s"test-$id", Some(s"password-$id"),
-          roles = List(DBUserRole("readWrite", dbName)))
-      } yield ()) must beTypedEqualTo({}).await(0, timeout * 2)
-    }
-
-    "not be successful with wrong credentials" >> {
-      "with the default connection" in {
-        connection.flatMap(_.authenticate(
-          dbName, "foo", "bar", failoverStrategy)).
-          aka("authentication") must throwA[FailedAuthentication].
-          await(0, timeout)
-
+  def scramSpec(mechanism: AuthenticationMechanism) = {
+    s"Authentication $mechanism" should {
+      lazy val drv = newAsyncDriver()
+      val conOpts = DefaultOptions.copy(nbChannelsPerNode = 1)
+      lazy val connection = drv.connect(List(primaryHost), options = conOpts)
+      val slowOpts = SlowOptions.copy(nbChannelsPerNode = 1)
+      lazy val slowConnection = {
+        val started = slowProxy.isStarted
+        drv.connect(List(slowPrimary), slowOpts).filter(_ => started)
       }
 
-      "with the slow connection" in {
-        slowConnection.flatMap(_.authenticate(
-          dbName, "foo", "bar", slowFailover)).
-          aka("authentication") must throwA[FailedAuthentication].
-          await(1, slowTimeout)
-      }
-    }
+      val id = System.identityHashCode(drv)
+      val dbName = s"specs2-test-${mechanism}-${id}"
+      def db_ = connection.flatMap(_.database(dbName, failoverStrategy))
 
-    "be successful on existing connection with right credentials" >> {
-      "with the default connection" in {
-        connection.flatMap(
-          _.authenticate(
-            dbName, s"test-$id", s"password-$id", failoverStrategy)).
-          aka("auth request") must beAnInstanceOf[SuccessfulAuthentication].
-          await(1, timeout) and {
-            db_.flatMap {
-              _("testcol").insert.one(BSONDocument("foo" -> "bar"))
-            }.map(_ => {}) must beTypedEqualTo({}).await(1, timeout * 2)
-          }
-
+      "create a user" in {
+        (for {
+          d <- db_
+          _ <- d.drop()
+          _ <- d.createUser(
+            user = s"test-$id",
+            pwd = Some(s"password-$id"),
+            customData = None,
+            roles = List(DBUserRole("readWrite", dbName)),
+            digestPassword = true,
+            writeConcern = WriteConcern.Default,
+            restrictions = List.empty,
+            mechanisms = List(mechanism))
+        } yield ()) must beTypedEqualTo({}).await(0, timeout * 2)
       }
 
-      "with the slow connection" in {
-        eventually(2, timeout) {
-          slowConnection.flatMap(
-            _.authenticate(dbName, s"test-$id", s"password-$id", slowFailover)).
-            aka("authentication") must beAnInstanceOf[SuccessfulAuthentication].
-            awaitFor(slowTimeout)
+      "not be successful with wrong credentials" >> {
+        "with the default connection" in {
+          connection.flatMap(_.authenticate(
+            dbName, "foo", "bar", failoverStrategy)).
+            aka("authentication") must throwA[FailedAuthentication].
+            await(0, timeout)
+
+        }
+
+        "with the slow connection" in {
+          slowConnection.flatMap(_.authenticate(
+            dbName, "foo", "bar", slowFailover)).
+            aka("authentication") must throwA[FailedAuthentication].
+            await(1, slowTimeout)
         }
       }
-    }
 
-    "be successful on new connection with right credentials" >> {
-      val rightCreds = Map(
-        dbName -> MongoConnectionOptions.Credential(
-          s"test-$id", Some(s"password-$id")))
+      "be successful on existing connection with right credentials" >> {
+        "with the default connection" in {
+          connection.flatMap(
+            _.authenticate(
+              dbName, s"test-$id", s"password-$id", failoverStrategy)).
+            aka("auth request") must beAnInstanceOf[SuccessfulAuthentication].
+            await(1, timeout) and {
+              db_.flatMap {
+                _("testcol").insert.one(BSONDocument("foo" -> "bar"))
+              }.map(_ => {}) must beTypedEqualTo({}).await(1, timeout * 2)
+            }
 
-      "with the default connection" in {
-        val con = Await.result(
-          drv.connect(
-            List(primaryHost),
-            options = conOpts.copy(credentials = rightCreds)),
-          timeout)
+        }
 
-        con.database(dbName, failoverStrategy).
-          aka("authed DB") must beLike[DefaultDB] {
-            case rdb => rdb.collection("testcol").insert.one(
-              BSONDocument("foo" -> "bar")).map(_ => {}).
-              aka("insertion") must beTypedEqualTo({}).await(1, timeout)
-
-          }.await(1, timeout) and {
-            con.askClose()(timeout).
-              aka("close") must not(throwA[Exception]).await(1, timeout)
-          }
-      }
-
-      "with the slow connection" in {
-        val con = Await.result(
-          drv.connect(
-            List(slowPrimary),
-            options = slowOpts.copy(credentials = rightCreds)),
-          slowTimeout)
-
-        con.database(dbName, slowFailover).
-          aka("authed DB") must beAnInstanceOf[DefaultDB].
-          await(1, slowTimeout) and {
-            con.askClose()(slowTimeout) must not(throwA[Exception]).
-              await(1, slowTimeout)
-          }
-      }
-    }
-
-    "driver shutdown" in {
-      // mainly to ensure the test driver is closed
-      drv.close(timeout) must not(throwA[Exception]).await(1, timeout)
-    }
-
-    "fail on DB with invalid credential" >> {
-      val invalidCreds = Map(commonDb ->
-        MongoConnectionOptions.Credential("test", Some("password")))
-
-      "with the default connection" in {
-        def con = driver.connection(
-          List(primaryHost),
-          options = conOpts.copy(credentials = invalidCreds))
-
-        con.database(commonDb, failoverStrategy).
-          aka("DB resolution") must throwA[PrimaryUnavailableException].like {
-            case reason => reason.getStackTrace.tail.headOption.
-              aka("most recent") must beSome[StackTraceElement].like {
-                case mostRecent =>
-                  mostRecent.getClassName aka "class" must beTypedEqualTo(
-                    "reactivemongo.api.MongoConnection") and (
-                      mostRecent.getMethodName aka "method" must_=== "database")
-              } and {
-                Option(reason.getCause).
-                  aka("cause") must beSome[Throwable].like {
-                    case _: InternalState => ok
-                  }
-              }
-          }.await(1, timeout)
-      }
-
-      "with the slow connection" in {
-        def con = driver.connection(
-          List(slowPrimary),
-          options = slowOpts.copy(credentials = invalidCreds))
-
-        slowProxy.isStarted must beTrue and {
+        "with the slow connection" in {
           eventually(2, timeout) {
-            //println("DriverSpec_1")
-
-            con.database(commonDb, slowFailover).
-              aka("resolution") must throwA[PrimaryUnavailableException].
-              await(0, slowTimeout + timeout)
+            slowConnection.flatMap(
+              _.authenticate(dbName, s"test-$id", s"password-$id", slowFailover)).
+              aka("authentication") must beAnInstanceOf[SuccessfulAuthentication].
+              awaitFor(slowTimeout)
           }
         }
+      }
 
+      "be successful on new connection with right credentials" >> {
+        val rightCreds = Map(
+          dbName -> MongoConnectionOptions.Credential(
+            s"test-$id", Some(s"password-$id")))
+
+        "with the default connection" in {
+          val con = Await.result(
+            drv.connect(
+              List(primaryHost),
+              options = conOpts.copy(credentials = rightCreds)),
+            timeout)
+
+          con.database(dbName, failoverStrategy).
+            aka("authed DB") must beLike[DefaultDB] {
+              case rdb => rdb.collection("testcol").insert.one(
+                BSONDocument("foo" -> "bar")).map(_ => {}).
+                aka("insertion") must beTypedEqualTo({}).await(1, timeout)
+
+            }.await(1, timeout) and {
+              con.askClose()(timeout).
+                aka("close") must not(throwA[Exception]).await(1, timeout)
+            }
+        }
+
+        "with the slow connection" in {
+          val con = Await.result(
+            drv.connect(
+              List(slowPrimary),
+              options = slowOpts.copy(credentials = rightCreds)),
+            slowTimeout)
+
+          con.database(dbName, slowFailover).
+            aka("authed DB") must beAnInstanceOf[DefaultDB].
+            await(1, slowTimeout) and {
+              con.askClose()(slowTimeout) must not(throwA[Exception]).
+                await(1, slowTimeout)
+            }
+        }
+      }
+
+      "driver shutdown" in {
+        // mainly to ensure the test driver is closed
+        drv.close(timeout) must not(throwA[Exception]).await(1, timeout)
+      }
+
+      "fail on DB with invalid credential" >> {
+        val invalidCreds = Map(commonDb ->
+          MongoConnectionOptions.Credential("test", Some("password")))
+
+        "with the default connection" in {
+          def con = driver.connection(
+            List(primaryHost),
+            options = conOpts.copy(credentials = invalidCreds))
+
+          con.database(commonDb, failoverStrategy).
+            aka("DB resolution") must throwA[PrimaryUnavailableException].like {
+              case reason => reason.getStackTrace.tail.headOption.
+                aka("most recent") must beSome[StackTraceElement].like {
+                  case mostRecent =>
+                    mostRecent.getClassName aka "class" must beTypedEqualTo(
+                      "reactivemongo.api.MongoConnection") and (
+                        mostRecent.getMethodName aka "method" must_=== "database")
+                } and {
+                  Option(reason.getCause).
+                    aka("cause") must beSome[Throwable].like {
+                      case _: InternalState => ok
+                    }
+                }
+            }.await(1, timeout)
+        }
+
+        "with the slow connection" in {
+          def con = driver.connection(
+            List(slowPrimary),
+            options = slowOpts.copy(credentials = invalidCreds))
+
+          slowProxy.isStarted must beTrue and {
+            eventually(2, timeout) {
+              //println("DriverSpec_1")
+
+              con.database(commonDb, slowFailover).
+                aka("resolution") must throwA[PrimaryUnavailableException].
+                await(0, slowTimeout + timeout)
+            }
+          }
+
+        }
       }
     }
-    section("not_mongo26")
-
-    section("scram_auth")
   }
+
+  scramSpec(AuthenticationMechanism.ScramSha1)
+
+  section("not_mongo26")
+  section("scram_auth")
 
   "X509 Authentication" should {
     section("x509")

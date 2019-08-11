@@ -4,18 +4,6 @@ import java.net.URI
 
 import reactivemongo.api.commands.{ WriteConcern => WC }
 
-/** Then mode of authentication against the replica set. */
-sealed trait AuthenticationMode
-
-/** MongoDB-CR authentication */
-case object CrAuthentication extends AuthenticationMode
-
-/** SCRAM-SHA-1 authentication (see MongoDB 3.0) */
-case object ScramSha1Authentication extends AuthenticationMode
-
-/** X509 authentication */
-case object X509Authentication extends AuthenticationMode
-
 /**
  * Options for MongoConnection.
  *
