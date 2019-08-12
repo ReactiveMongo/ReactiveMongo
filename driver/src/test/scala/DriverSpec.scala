@@ -268,7 +268,6 @@ final class DriverSpec(implicit ee: ExecutionEnv)
       "create a user" in {
         (for {
           d <- db_
-          _ = println(s"db = ${d.name}")
           _ <- d.drop()
           _ <- d.createUser(
             user = userName,
@@ -280,7 +279,7 @@ final class DriverSpec(implicit ee: ExecutionEnv)
             restrictions = List.empty,
             mechanisms = List(mechanism))
         } yield ()) must beTypedEqualTo({}).await(0, timeout * 2)
-      } tag "wip"
+      }
 
       "not be successful with wrong credentials" >> {
         "with the default connection" in {
@@ -311,7 +310,7 @@ final class DriverSpec(implicit ee: ExecutionEnv)
               }.map(_ => {}) must beTypedEqualTo({}).await(1, timeout * 2)
             }
 
-        } tag "wip"
+        }
 
         "with the slow connection" in {
           eventually(2, timeout) {
@@ -367,7 +366,7 @@ final class DriverSpec(implicit ee: ExecutionEnv)
       "driver shutdown" in {
         // mainly to ensure the test driver is closed
         drv.close(timeout) must not(throwA[Exception]).await(1, timeout)
-      } tag "wip"
+      }
 
       "fail on DB with invalid credential" >> {
         val invalidCreds = Map(commonDb ->
@@ -415,8 +414,11 @@ final class DriverSpec(implicit ee: ExecutionEnv)
     }
   }
 
-  //scramSpec(ScramSha1Authentication)
+  scramSpec(ScramSha1Authentication)
+
+  section("ge_mongo4")
   scramSpec(ScramSha256Authentication)
+  section("ge_mongo4")
 
   section("not_mongo26")
   section("scram_auth")

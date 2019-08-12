@@ -197,7 +197,7 @@ private[core] sealed trait ScramStartNegociation[M <: AuthenticationMode.Scram]
 
   protected val randomPrefix: String
 
-  def startMessage: String
+  protected def startMessage: String
 
   protected def digest(data: Array[Byte]): Array[Byte]
 
@@ -205,10 +205,13 @@ private[core] sealed trait ScramStartNegociation[M <: AuthenticationMode.Scram]
 
   protected def keyFactory: SecretKeyFactory
 
+  protected def credential: Either[CommandError, String]
+
+  protected def storedKeySize: Int
+
   // ---
 
   import javax.crypto.spec.PBEKeySpec
-  import org.apache.commons.codec.digest.DigestUtils
   import org.apache.commons.codec.binary.Base64
   import akka.util.ByteString
   import reactivemongo.bson.buffer.ArrayReadableBuffer
@@ -216,11 +219,6 @@ private[core] sealed trait ScramStartNegociation[M <: AuthenticationMode.Scram]
   val data: Either[CommandError, ScramNegociation] = {
     val challenge = new String(payload, "UTF-8")
     val response = ScramNegociation.parsePayload(challenge)
-
-    println(s"data = $response")
-
-    //SHA1:val storedKeySize = 160 /* 20 x 8 = 20 bytes */
-    val storedKeySize = 256 /* 32 x 8 = 256 bytes */
 
     for {
       rand <- response.get("r").filter(_ startsWith randomPrefix).
@@ -234,16 +232,17 @@ private[core] sealed trait ScramStartNegociation[M <: AuthenticationMode.Scram]
         try { Some(i.toInt) } catch { case _: Throwable => None }
       }.toRight(CommandError(s"invalid $mechanism iteration count")).right
 
+      hashCredential <- credential.right
       nego <- try {
         val nonce = s"c=biws,r=$rand" // biws = base64("n,,")
         val saltedPassword: Array[Byte] = {
-          val digest = DigestUtils.md5Hex(s"$user:mongo:$password")
+          val digest = hashCredential
+
           val spec = new PBEKeySpec(
             digest.toCharArray, salt, iter, storedKeySize)
 
           keyFactory.generateSecret(spec).getEncoded
         }
-        println(s"saltedPassword = ${Base64 encodeBase64String saltedPassword}")
         val authMsg =
           s"${startMessage drop 3},$challenge,$nonce".getBytes("UTF-8")
 
@@ -253,13 +252,9 @@ private[core] sealed trait ScramStartNegociation[M <: AuthenticationMode.Scram]
         val clientProof = (clientKey, clientSig).
           zipped.map((a, b) => (a ^ b).toByte).toArray
 
-        // reactivemongo.core.SaslPrep.saslPrepStored
-
         val message = s"$nonce,p=${Base64 encodeBase64String clientProof}"
 
         val serverKey = hmac(saltedPassword, ScramNegociation.ServerKeySeed)
-
-        println(s"$message // storeKey = ${Base64 encodeBase64String digest(clientKey)}")
 
         Right(ScramNegociation(
           serverSignature = hmac(serverKey, authMsg),
@@ -303,6 +298,11 @@ private[core] case class ScramSha1StartNegociation(
     new HmacUtils(HmacAlgorithms.HMAC_SHA_1, key).hmac(input)
 
   @inline def digest(data: Array[Byte]): Array[Byte] = DigestUtils.sha1(data)
+
+  @inline def credential: Either[CommandError, String] =
+    Right(DigestUtils.md5Hex(s"$user:mongo:$password"))
+
+  @inline def storedKeySize = 160 /* 20 x 8 = 20 bytes */
 
   @inline def keyFactory: SecretKeyFactory =
     ScramSha1StartNegociation.keyFactory
@@ -348,6 +348,10 @@ private[core] case class ScramSha256StartNegociation(
     new HmacUtils(HmacAlgorithms.HMAC_SHA_256, key).hmac(input)
 
   @inline def digest(data: Array[Byte]): Array[Byte] = DigestUtils.sha256(data)
+
+  @inline def storedKeySize = 256 /* 32 x 8 = 256 bytes */
+
+  @inline def credential = SaslPrep(password, false).left.map(CommandError(_))
 
   @inline def keyFactory: SecretKeyFactory =
     ScramSha256StartNegociation.keyFactory
