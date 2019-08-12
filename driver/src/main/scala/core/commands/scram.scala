@@ -4,7 +4,8 @@ import javax.crypto.SecretKeyFactory
 
 import reactivemongo.api.{
   AuthenticationMode,
-  ScramSha1Authentication
+  ScramSha1Authentication,
+  ScramSha256Authentication
 }
 
 import reactivemongo.bson.{
@@ -33,6 +34,13 @@ private[core] case class ScramSha1Challenge(
   payload: Array[Byte]) extends ScramChallenge[ScramSha1Authentication.type] {
 
   val mechanism = ScramSha1Authentication
+}
+
+private[core] case class ScramSha256Challenge(
+  conversationId: Int,
+  payload: Array[Byte]) extends ScramChallenge[ScramSha256Authentication.type] {
+
+  val mechanism = ScramSha256Authentication
 }
 
 /**
@@ -80,9 +88,22 @@ object ScramSha1Initiate extends BSONCommandResultMaker[ScramChallenge[ScramSha1
 
   def apply(bson: BSONDocument) = ScramInitiate.parseResponse(ScramSha1Authentication, bson)(ScramSha1Challenge.apply)
 
+  @deprecated("Will be private", "0.18.4")
   @inline def authChars: Stream[Char] = ScramInitiate.authChars
 
   @inline def randomPrefix(seed: Int): String = ScramInitiate.randomPrefix(seed)
+}
+
+private[core] case class ScramSha256Initiate(
+  user: String) extends ScramInitiate[ScramSha256Authentication.type] {
+  val mechanism = ScramSha256Authentication
+  val ResultMaker = ScramSha256Initiate
+}
+
+private[core] object ScramSha256Initiate extends BSONCommandResultMaker[ScramChallenge[ScramSha256Authentication.type]] {
+  def parseResponse(response: Response): Either[CommandError, ScramChallenge[ScramSha256Authentication.type]] = apply(response)
+
+  def apply(bson: BSONDocument) = ScramInitiate.parseResponse(ScramSha256Authentication, bson)(ScramSha256Challenge.apply)
 }
 
 private[core] object ScramInitiate {
@@ -137,14 +158,18 @@ private[core] case class ScramNegociation(
   serverSignature: Array[Byte],
   request: BSONDocument)
 
-@deprecated("Use `ScramNegociation`", "0.18.4")
 private[core] case class ScramSha1Negociation(
+  serverSignature: Array[Byte],
+  request: BSONDocument)
+
+private[core] case class ScramSha256Negociation(
   serverSignature: Array[Byte],
   request: BSONDocument)
 
 @deprecated("Will be internal", "0.18.4")
 object ScramSha1Negociation {
-  @inline def parsePayload(payload: String): Map[String, String] = ScramNegociation.parsePayload(payload)
+  @inline def parsePayload(payload: String): Map[String, String] =
+    ScramNegociation.parsePayload(payload)
 
   def parsePayload(payload: Array[Byte]): Map[String, String] =
     parsePayload(new String(payload, "UTF-8"))
@@ -192,6 +217,11 @@ private[core] sealed trait ScramStartNegociation[M <: AuthenticationMode.Scram]
     val challenge = new String(payload, "UTF-8")
     val response = ScramNegociation.parsePayload(challenge)
 
+    println(s"data = $response")
+
+    //SHA1:val storedKeySize = 160 /* 20 x 8 = 20 bytes */
+    val storedKeySize = 256 /* 32 x 8 = 256 bytes */
+
     for {
       rand <- response.get("r").filter(_ startsWith randomPrefix).
         toRight(CommandError(s"invalid $mechanism random prefix")).right
@@ -208,11 +238,14 @@ private[core] sealed trait ScramStartNegociation[M <: AuthenticationMode.Scram]
         val nonce = s"c=biws,r=$rand" // biws = base64("n,,")
         val saltedPassword: Array[Byte] = {
           val digest = DigestUtils.md5Hex(s"$user:mongo:$password")
-          val spec = new PBEKeySpec(digest.toCharArray, salt, iter, 160 /* 20 * 8 = 20 bytes */ )
+          val spec = new PBEKeySpec(
+            digest.toCharArray, salt, iter, storedKeySize)
+
           keyFactory.generateSecret(spec).getEncoded
         }
+        println(s"saltedPassword = ${Base64 encodeBase64String saltedPassword}")
         val authMsg =
-          s"${startMessage.drop(3)},$challenge,$nonce".getBytes("UTF-8")
+          s"${startMessage drop 3},$challenge,$nonce".getBytes("UTF-8")
 
         val clientKey = hmac(saltedPassword, ScramNegociation.ClientKeySeed)
 
@@ -220,8 +253,13 @@ private[core] sealed trait ScramStartNegociation[M <: AuthenticationMode.Scram]
         val clientProof = (clientKey, clientSig).
           zipped.map((a, b) => (a ^ b).toByte).toArray
 
+        // reactivemongo.core.SaslPrep.saslPrepStored
+
         val message = s"$nonce,p=${Base64 encodeBase64String clientProof}"
+
         val serverKey = hmac(saltedPassword, ScramNegociation.ServerKeySeed)
+
+        println(s"$message // storeKey = ${Base64 encodeBase64String digest(clientKey)}")
 
         Right(ScramNegociation(
           serverSignature = hmac(serverKey, authMsg),
@@ -272,6 +310,62 @@ private[core] case class ScramSha1StartNegociation(
   val ResultMaker = ScramSha1StartNegociation
 }
 
+@deprecated("Will be internal", "0.18.4")
+@SerialVersionUID(113814637L)
+object ScramSha1StartNegociation extends BSONCommandResultMaker[Either[SuccessfulAuthentication, Array[Byte]]] {
+  type ResType = ScramStartNegociation.ResType
+
+  def parseResponse(response: Response): ResType = apply(response)
+
+  @inline def apply(bson: BSONDocument) =
+    ScramStartNegociation.parseResponse(ScramSha1Authentication, bson)
+
+  @inline private[commands] def ClientKeySeed = ScramNegociation.ClientKeySeed
+
+  @inline private[commands] def ServerKeySeed = ScramNegociation.ServerKeySeed
+
+  @transient lazy val keyFactory =
+    SecretKeyFactory.getInstance("PBKDF2WithHmacSHA1")
+
+}
+
+private[core] case class ScramSha256StartNegociation(
+  user: String,
+  password: String,
+  conversationId: Int,
+  payload: Array[Byte],
+  randomPrefix: String,
+  startMessage: String) extends ScramStartNegociation[ScramSha256Authentication.type] {
+  val mechanism = ScramSha256Authentication
+
+  import org.apache.commons.codec.digest.{
+    DigestUtils,
+    HmacAlgorithms,
+    HmacUtils
+  }
+
+  @inline def hmac(key: Array[Byte], input: Array[Byte]): Array[Byte] =
+    new HmacUtils(HmacAlgorithms.HMAC_SHA_256, key).hmac(input)
+
+  @inline def digest(data: Array[Byte]): Array[Byte] = DigestUtils.sha256(data)
+
+  @inline def keyFactory: SecretKeyFactory =
+    ScramSha256StartNegociation.keyFactory
+
+  val ResultMaker = ScramSha256StartNegociation
+}
+
+private[core] object ScramSha256StartNegociation extends BSONCommandResultMaker[Either[SuccessfulAuthentication, Array[Byte]]] {
+  def parseResponse(response: Response): ScramStartNegociation.ResType = apply(response)
+
+  @inline def apply(bson: BSONDocument) =
+    ScramStartNegociation.parseResponse(ScramSha256Authentication, bson)
+
+  @transient lazy val keyFactory =
+    SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
+
+}
+
 private[core] object ScramNegociation {
   /**
    * Parses the UTF-8 `payload` as a map of properties exchanged
@@ -315,25 +409,6 @@ private[core] object ScramStartNegociation {
       Left(CommandError(s"missing ${mechanism} payload")))(
         bytes => Right(Right(bytes)))
   }
-}
-
-@deprecated("Will be internal", "0.18.4")
-@SerialVersionUID(113814637L)
-object ScramSha1StartNegociation extends BSONCommandResultMaker[Either[SuccessfulAuthentication, Array[Byte]]] {
-  type ResType = ScramStartNegociation.ResType
-
-  def parseResponse(response: Response): ResType = apply(response)
-
-  @inline def apply(bson: BSONDocument) =
-    ScramStartNegociation.parseResponse(ScramSha1Authentication, bson)
-
-  @inline private[commands] def ClientKeySeed = ScramNegociation.ClientKeySeed
-
-  @inline private[commands] def ServerKeySeed = ScramNegociation.ServerKeySeed
-
-  @transient lazy val keyFactory =
-    SecretKeyFactory.getInstance("PBKDF2WithHmacSHA1")
-
 }
 
 sealed trait ScramFinalNegociation extends Command[SuccessfulAuthentication] {

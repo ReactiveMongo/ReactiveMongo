@@ -580,6 +580,10 @@ object MongoConnection {
           case ("authenticationMechanism", "mongocr") => unsupported -> result.
             copy(authenticationMechanism = CrAuthentication)
 
+          case ("authenticationMechanism", "scram-sha256") =>
+            unsupported -> result.copy(
+              authenticationMechanism = ScramSha256Authentication)
+
           case ("authenticationMechanism", _) => unsupported -> result.
             copy(authenticationMechanism = ScramSha1Authentication)
 

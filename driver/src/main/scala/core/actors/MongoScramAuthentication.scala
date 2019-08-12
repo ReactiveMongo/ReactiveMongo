@@ -1,6 +1,10 @@
 package reactivemongo.core.actors
 
-import reactivemongo.api.{ AuthenticationMode, ScramSha1Authentication }
+import reactivemongo.api.{
+  AuthenticationMode,
+  ScramSha1Authentication,
+  ScramSha256Authentication
+}
 
 import reactivemongo.core.commands.{
   CommandError,
@@ -19,6 +23,72 @@ import reactivemongo.core.nodeset.{
   Connection,
   ScramAuthenticating
 }
+
+private[reactivemongo] trait MongoScramSha1Authentication
+  extends MongoScramAuthentication[ScramSha1Authentication.type] {
+  system: MongoDBSystem =>
+
+  val mechanism = ScramSha1Authentication
+
+  import reactivemongo.core.commands.{
+    CommandError,
+    ScramSha1Initiate,
+    ScramSha1Challenge,
+    ScramSha1Negociation,
+    ScramSha1StartNegociation
+  }
+
+  protected def initiate(user: String) = ScramSha1Initiate(user)
+
+  protected def parseChallenge(resp: Response) =
+    ScramSha1Initiate.parseResponse(resp)
+
+  protected def startNegociation(
+    user: String,
+    password: String,
+    conversationId: Int,
+    payload: Array[Byte],
+    randomPrefix: String,
+    message: String) = ScramSha1StartNegociation(user, password,
+    conversationId, payload, randomPrefix, message)
+
+  protected def parseNegociation(resp: Response): ScramStartNegociation.ResType = ScramSha1StartNegociation.parseResponse(resp)
+
+}
+
+private[reactivemongo] trait MongoScramSha256Authentication
+  extends MongoScramAuthentication[ScramSha256Authentication.type] {
+  system: MongoDBSystem =>
+
+  val mechanism = ScramSha256Authentication
+
+  import reactivemongo.core.commands.{
+    CommandError,
+    ScramSha256Initiate,
+    ScramSha256Challenge,
+    ScramSha256Negociation,
+    ScramSha256StartNegociation
+  }
+
+  protected def initiate(user: String) = ScramSha256Initiate(user)
+
+  protected def parseChallenge(resp: Response) =
+    ScramSha256Initiate.parseResponse(resp)
+
+  protected def startNegociation(
+    user: String,
+    password: String,
+    conversationId: Int,
+    payload: Array[Byte],
+    randomPrefix: String,
+    message: String) = ScramSha256StartNegociation(user, password,
+    conversationId, payload, randomPrefix, message)
+
+  protected def parseNegociation(resp: Response): ScramStartNegociation.ResType = ScramSha256StartNegociation.parseResponse(resp)
+
+}
+
+// ---
 
 private[reactivemongo] sealed trait MongoScramAuthentication[M <: AuthenticationMode.Scram] { system: MongoDBSystem =>
   import org.apache.commons.codec.binary.Base64
@@ -194,37 +264,4 @@ private[reactivemongo] sealed trait MongoScramAuthentication[M <: Authentication
       ()
     }
   }
-}
-
-private[reactivemongo] trait MongoScramSha1Authentication
-  extends MongoScramAuthentication[ScramSha1Authentication.type] {
-  system: MongoDBSystem =>
-
-  val mechanism = ScramSha1Authentication
-
-  import reactivemongo.core.commands.{
-    CommandError,
-    ScramSha1Initiate,
-    ScramSha1Challenge,
-    ScramSha1Negociation,
-    ScramSha1FinalNegociation,
-    ScramSha1StartNegociation
-  }
-
-  protected def initiate(user: String) = ScramSha1Initiate(user)
-
-  protected def parseChallenge(resp: Response) =
-    ScramSha1Initiate.parseResponse(resp)
-
-  protected def startNegociation(
-    user: String,
-    password: String,
-    conversationId: Int,
-    payload: Array[Byte],
-    randomPrefix: String,
-    message: String) = ScramSha1StartNegociation(user, password,
-    conversationId, payload, randomPrefix, message)
-
-  protected def parseNegociation(resp: Response): ScramStartNegociation.ResType = ScramSha1StartNegociation.parseResponse(resp)
-
 }

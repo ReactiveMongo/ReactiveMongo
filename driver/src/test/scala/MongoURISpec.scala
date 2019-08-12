@@ -6,6 +6,7 @@ import reactivemongo.api.{
   MongoConnection,
   MongoConnectionOptions,
   ScramSha1Authentication,
+  ScramSha256Authentication,
   X509Authentication,
   WriteConcern
 }, MongoConnection.{ ParsedURI, URIParsingException }
@@ -120,6 +121,21 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
           authenticate = Some(Authenticate("somedb", "user123", Some("passwd123"))),
           options = MongoConnectionOptions.default.copy(
             authenticationMechanism = ScramSha1Authentication,
+            credentials = Map("somedb" -> Credential(
+              "user123", Some("passwd123")))),
+          ignoredOptions = List("foo")))
+    }
+
+    val scramSha256 = "mongodb://user123:passwd123@host1:27018,host2:27019,host3:27020/somedb?foo=bar&authenticationMechanism=scram-sha256"
+
+    s"parse $scramSha256 with success" in {
+      parseURI(scramSha256) must beSuccessfulTry(
+        ParsedURI(
+          hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
+          db = Some("somedb"),
+          authenticate = Some(Authenticate("somedb", "user123", Some("passwd123"))),
+          options = MongoConnectionOptions.default.copy(
+            authenticationMechanism = ScramSha256Authentication,
             credentials = Map("somedb" -> Credential(
               "user123", Some("passwd123")))),
           ignoredOptions = List("foo")))

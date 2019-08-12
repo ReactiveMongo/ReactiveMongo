@@ -3,7 +3,16 @@ import scala.concurrent.duration._
 
 import akka.actor.{ Actor, ActorRef, ActorSystem, Props }
 
-import reactivemongo.api.{ MongoConnectionOptions, X509Authentication }
+import reactivemongo.api.{
+  AuthenticationMode,
+  DefaultDB,
+  FailoverStrategy,
+  MongoConnectionOptions,
+  ScramSha1Authentication,
+  ScramSha256Authentication,
+  X509Authentication
+}
+
 import reactivemongo.bson.BSONDocument
 
 import reactivemongo.core.actors.{
@@ -22,12 +31,7 @@ import reactivemongo.core.commands.{
   SuccessfulAuthentication
 }
 
-import reactivemongo.api.{ DefaultDB, FailoverStrategy }
-import reactivemongo.api.commands.{
-  AuthenticationMechanism,
-  DBUserRole,
-  WriteConcern
-}
+import reactivemongo.api.commands.{ DBUserRole, WriteConcern }
 
 import org.specs2.concurrent.ExecutionEnv
 
@@ -240,12 +244,17 @@ final class DriverSpec(implicit ee: ExecutionEnv)
   section("scram_auth")
   section("not_mongo26")
 
-  def scramSpec(mechanism: AuthenticationMechanism) = {
+  def scramSpec(mechanism: AuthenticationMode) = {
     s"Authentication $mechanism" should {
       lazy val drv = newAsyncDriver()
-      val conOpts = DefaultOptions.copy(nbChannelsPerNode = 1)
+      val conOpts = DefaultOptions.copy(
+        nbChannelsPerNode = 1,
+        authenticationMechanism = mechanism)
+
       lazy val connection = drv.connect(List(primaryHost), options = conOpts)
-      val slowOpts = SlowOptions.copy(nbChannelsPerNode = 1)
+      val slowOpts = SlowOptions.copy(
+        nbChannelsPerNode = 1,
+        authenticationMechanism = mechanism)
       lazy val slowConnection = {
         val started = slowProxy.isStarted
         drv.connect(List(slowPrimary), slowOpts).filter(_ => started)
@@ -253,14 +262,16 @@ final class DriverSpec(implicit ee: ExecutionEnv)
 
       val id = System.identityHashCode(drv)
       val dbName = s"specs2-test-${mechanism}-${id}"
+      val userName = s"${mechanism}-${id}"
       def db_ = connection.flatMap(_.database(dbName, failoverStrategy))
 
       "create a user" in {
         (for {
           d <- db_
+          _ = println(s"db = ${d.name}")
           _ <- d.drop()
           _ <- d.createUser(
-            user = s"test-$id",
+            user = userName,
             pwd = Some(s"password-$id"),
             customData = None,
             roles = List(DBUserRole("readWrite", dbName)),
@@ -269,7 +280,7 @@ final class DriverSpec(implicit ee: ExecutionEnv)
             restrictions = List.empty,
             mechanisms = List(mechanism))
         } yield ()) must beTypedEqualTo({}).await(0, timeout * 2)
-      }
+      } tag "wip"
 
       "not be successful with wrong credentials" >> {
         "with the default connection" in {
@@ -292,7 +303,7 @@ final class DriverSpec(implicit ee: ExecutionEnv)
         "with the default connection" in {
           connection.flatMap(
             _.authenticate(
-              dbName, s"test-$id", s"password-$id", failoverStrategy)).
+              dbName, userName, s"password-$id", failoverStrategy)).
             aka("auth request") must beAnInstanceOf[SuccessfulAuthentication].
             await(1, timeout) and {
               db_.flatMap {
@@ -300,13 +311,14 @@ final class DriverSpec(implicit ee: ExecutionEnv)
               }.map(_ => {}) must beTypedEqualTo({}).await(1, timeout * 2)
             }
 
-        }
+        } tag "wip"
 
         "with the slow connection" in {
           eventually(2, timeout) {
             slowConnection.flatMap(
-              _.authenticate(dbName, s"test-$id", s"password-$id", slowFailover)).
-              aka("authentication") must beAnInstanceOf[SuccessfulAuthentication].
+              _.authenticate(
+                dbName,
+                userName, s"password-$id", slowFailover)) must beAnInstanceOf[SuccessfulAuthentication].
               awaitFor(slowTimeout)
           }
         }
@@ -315,7 +327,7 @@ final class DriverSpec(implicit ee: ExecutionEnv)
       "be successful on new connection with right credentials" >> {
         val rightCreds = Map(
           dbName -> MongoConnectionOptions.Credential(
-            s"test-$id", Some(s"password-$id")))
+            userName, Some(s"password-$id")))
 
         "with the default connection" in {
           val con = Await.result(
@@ -355,7 +367,7 @@ final class DriverSpec(implicit ee: ExecutionEnv)
       "driver shutdown" in {
         // mainly to ensure the test driver is closed
         drv.close(timeout) must not(throwA[Exception]).await(1, timeout)
-      }
+      } tag "wip"
 
       "fail on DB with invalid credential" >> {
         val invalidCreds = Map(commonDb ->
@@ -403,7 +415,8 @@ final class DriverSpec(implicit ee: ExecutionEnv)
     }
   }
 
-  scramSpec(AuthenticationMechanism.ScramSha1)
+  //scramSpec(ScramSha1Authentication)
+  scramSpec(ScramSha256Authentication)
 
   section("not_mongo26")
   section("scram_auth")

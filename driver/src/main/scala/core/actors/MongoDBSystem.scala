@@ -1727,6 +1727,18 @@ final class StandardDBSystem private[reactivemongo] (
   def this(s: Seq[String], a: Seq[Authenticate], opts: MongoConnectionOptions) = this(s"unknown-${System identityHashCode opts}", s"unknown-${System identityHashCode opts}", s, a, opts)
 }
 
+private[reactivemongo] final class StandardDBSystemWithScramSha256(
+  val supervisor: String,
+  val name: String,
+  val seeds: Seq[String],
+  val initialAuthenticates: Seq[Authenticate],
+  val options: MongoConnectionOptions) extends MongoDBSystem with MongoScramSha256Authentication {
+
+  def newChannelFactory(effect: Unit): ChannelFactory =
+    new ChannelFactory(supervisor, name, options)
+
+}
+
 final class StandardDBSystemWithX509 private[reactivemongo] (
   val supervisor: String,
   val name: String,
