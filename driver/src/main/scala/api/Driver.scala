@@ -20,7 +20,8 @@ import reactivemongo.core.actors.{
   LegacyDBSystem,
   MongoDBSystem,
   StandardDBSystem,
-  StandardDBSystemWithX509
+  StandardDBSystemWithX509,
+  StandardDBSystemWithScramSha256
 }
 import reactivemongo.core.nodeset.Authenticate
 import reactivemongo.util.LazyLogger
@@ -165,6 +166,9 @@ private[api] trait Driver {
         supervisorName, nm, nodes, authentications, opts)
 
       case X509Authentication => new StandardDBSystemWithX509(
+        supervisorName, nm, nodes, authentications, opts)
+
+      case ScramSha256Authentication => new StandardDBSystemWithScramSha256(
         supervisorName, nm, nodes, authentications, opts)
 
       case _ => new StandardDBSystem(

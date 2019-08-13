@@ -352,7 +352,7 @@ object BSONCreateUserCommand
     }
   }
 
-  implicit object CreateUserWriter extends BSONDocumentWriter[CreateUser] {
+  object CreateUserWriter extends BSONDocumentWriter[CreateUser] {
     def write(create: CreateUser) = BSONDocument(
       "createUser" -> create.name,
       "pwd" -> create.pwd,

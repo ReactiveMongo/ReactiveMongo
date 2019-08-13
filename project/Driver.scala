@@ -704,7 +704,11 @@ object Version {
             isp("reactivemongo.api.commands.GroupAggregation#MaxField.this"),
             isp("reactivemongo.api.commands.DeleteCommand#DeleteElement.this"),
             dam("reactivemongo.core.nodeset.RoundRobiner.pick"),
-            dam("reactivemongo.core.nodeset.RoundRobiner.pickWithFilter")
+            dam("reactivemongo.core.nodeset.RoundRobiner.pickWithFilter"),
+            isp("reactivemongo.core.commands.ScramSha1Initiate.apply"),
+            isp("reactivemongo.core.commands.ScramSha1Initiate.parseResponse"),
+            isp("reactivemongo.core.commands.ScramSha1StartNegociation.data"),
+            x[StaticVirtualMemberProblem]("reactivemongo.core.commands.ScramSha1StartNegociation.keyFactory")
           )
         },
         Common.closeableObject in Test := "tests.Common$",

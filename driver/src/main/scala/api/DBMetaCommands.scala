@@ -2,10 +2,13 @@ package reactivemongo.api
 
 import scala.concurrent.{ ExecutionContext, Future }
 
+import reactivemongo.api.commands.AuthenticationRestriction
+
 import reactivemongo.api.indexes.IndexesManager
 import reactivemongo.bson.{
   BSONDocument,
   BSONDocumentReader,
+  BSONDocumentWriter,
   BSONRegex,
   BSONString
 }
@@ -17,11 +20,10 @@ import reactivemongo.api.collections.bson.{
 
 /** A mixin that provides commands about this database itself. */
 trait DBMetaCommands { self: DB =>
-  // TODO: endSessions, killAllSessions, killAllSessionsByPattern, killSessions, refreshSessions
-
   import reactivemongo.core.protocol.MongoWireVersion
   import reactivemongo.api.commands.{
     Command,
+    CreateUserCommand,
     DropDatabase,
     DBHash,
     DBHashResult,
@@ -47,8 +49,8 @@ trait DBMetaCommands { self: DB =>
 
   /** Drops this database. */
   def drop()(implicit ec: ExecutionContext): Future[Unit] =
-    Command.run(BSONSerializationPack, failoverStrategy).unboxed(
-      self, DropDatabase, ReadPreference.primary)
+    Command.run(BSONSerializationPack, failoverStrategy).
+      unboxed(self, DropDatabase, ReadPreference.primary)
 
   /** Returns an index manager for this database. */
   def indexesManager(implicit ec: ExecutionContext) = IndexesManager(self)
@@ -77,10 +79,11 @@ trait DBMetaCommands { self: DB =>
       val coll: BSONCollection =
         producer.apply(self, "system.namespaces", self.failoverStrategy)
 
-      coll.find(BSONDocument(
-        "name" -> BSONRegex("^[^\\$]+$", "") // strip off any indexes
-      )).cursor(defaultReadPreference)(
-        CollectionNameReader, CursorProducer.defaultCursorProducer).
+      coll.find(
+        // strip off any indexes
+        selector = BSONDocument("name" -> BSONRegex("^[^\\$]+$", "")),
+        projection = Option.empty[BSONDocument]).cursor(defaultReadPreference)(
+          CollectionNameReader, CursorProducer.defaultCursorProducer).
         collect[List](-1, Cursor.FailOnError[List[String]]())
     }
   }
@@ -110,27 +113,50 @@ trait DBMetaCommands { self: DB =>
     Command.run(BSONSerializationPack, failoverStrategy)(
       self, ServerStatus, ReadPreference.primary)
 
-  /**
-   * Create the specified user.
-   *
-   * @param user the name of the user to be created
-   * @param pwd the user password (not required if the database uses external credentials)
-   * @param roles the roles granted to the user, possibly an empty to create users without roles
-   * @param digestPassword when true, the mongod instance will create the hash of the user password (default: `true`)
-   * @param writeConcern the optional level of [[https://docs.mongodb.com/manual/reference/write-concern/ write concern]]
-   * @param customData the custom data to associate with the user account
-   *
-   * @see https://docs.mongodb.com/manual/reference/command/createUser/
-   */
+  @deprecated("Use `createUser` with complete authentication options", "0.18.4")
   def createUser(
     @deprecatedName('name) user: String,
     pwd: Option[String],
     roles: List[UserRole],
     digestPassword: Boolean = true,
     writeConcern: WC = connection.options.writeConcern,
-    customData: Option[BSONDocument] = None)(implicit ec: ExecutionContext): Future[Unit] = {
-    val command = BSONCreateUserCommand.CreateUser(
-      user, pwd, roles, digestPassword, Some(writeConcern), customData)
+    customData: Option[BSONDocument] = None)(implicit ec: ExecutionContext): Future[Unit] = createUser(user, pwd, customData, roles, digestPassword, writeConcern, List.empty, List.empty)
+
+  implicit private val createUserWriter: BSONDocumentWriter[CreateUserCommand[BSONSerializationPack.type]#CreateUser] = CreateUserCommand.writer(BSONSerializationPack)
+
+  /**
+   * Create the specified user.
+   *
+   * @param user the name of the user to be created
+   * @param pwd the user password (not required if the database uses external credentials)
+   * @param customData the custom data to associate with the user account
+   * @param roles the roles granted to the user, possibly an empty to create users without roles
+   * @param digestPassword when true, the mongod instance will create the hash of the user password (default: `true`)
+   * @param writeConcern the optional level of [[https://docs.mongodb.com/manual/reference/write-concern/ write concern]]
+   * @param restrictions the authentication restriction
+   * @param mechanisms the authentication mechanisms (e.g. SCRAM-SHA-1)
+   *
+   * @see https://docs.mongodb.com/manual/reference/command/createUser/
+   */
+  def createUser(
+    user: String,
+    pwd: Option[String],
+    customData: Option[BSONDocument],
+    roles: List[UserRole],
+    digestPassword: Boolean,
+    writeConcern: WC,
+    restrictions: List[AuthenticationRestriction],
+    mechanisms: List[AuthenticationMode])(implicit ec: ExecutionContext): Future[Unit] = {
+    val command: CreateUserCommand[BSONSerializationPack.type]#CreateUser =
+      new BSONCreateUserCommand.CreateUser(
+        name = user,
+        pwd = pwd,
+        customData = customData,
+        roles = roles,
+        digestPassword = digestPassword,
+        writeConcern = Some(writeConcern),
+        authenticationRestrictions = restrictions,
+        mechanisms = mechanisms)
 
     Command.run(BSONSerializationPack, failoverStrategy)(
       self, command, ReadPreference.primary).map(_ => {})
