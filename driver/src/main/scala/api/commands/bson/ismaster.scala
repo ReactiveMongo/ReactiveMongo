@@ -1,5 +1,7 @@
 package reactivemongo.api.commands.bson
 
+import java.util.Date
+
 import reactivemongo.core.ClientMetadata
 
 import reactivemongo.api.BSONSerializationPack
@@ -48,10 +50,22 @@ object BSONIsMasterCommandImplicits {
           isHidden = doc.getAs[BSONBooleanLike]("hidden").
             fold(false)(_.toBoolean),
           tags = doc.getAs[BSONDocument]("tags"),
-          electionId = doc.getAs[BSONNumberLike]("electionId").fold(-1)(_.toInt))
+          electionId = doc.getAs[BSONNumberLike]("electionId").
+            fold(-1)(_.toInt),
+          lastWrite = doc.getAs[BSONDocument]("lastWrite").flatMap { ld =>
+            for {
+              opTime <- ld.getAs[BSONNumberLike]("opTime")
+              lastWriteDate <- ld.getAs[Date]("lastWriteDate")
+              majorityOpTime <- ld.getAs[BSONNumberLike]("majorityOpTime")
+              majorityWriteDate <- ld.getAs[Date]("majorityWriteDate")
+            } yield new LastWrite(
+              opTime.toLong, lastWriteDate,
+              majorityOpTime.toLong, majorityWriteDate)
+          })
+
       }
 
-      IsMasterResult(
+      new IsMasterResult(
         isMaster = doc.getAs[BSONBooleanLike](
           "ismaster").fold(false)(_.toBoolean), // `ismaster`
         maxBsonObjectSize = doc.getAs[BSONNumberLike]("maxBsonObjectSize").
@@ -61,10 +75,14 @@ object BSONIsMasterCommandImplicits {
         maxWriteBatchSize = doc.getAs[BSONNumberLike]("maxWriteBatchSize").
           fold[Int](1000)(_.toInt),
         localTime = doc.getAs[BSONDateTime]("localTime").map(_.value), // date? mongod >= 2.2
+        logicalSessionTimeoutMinutes = doc.getAs[BSONNumberLike]("logicalSessionTimeoutMinutes").map(_.toLong),
         minWireVersion = doc.getAs[BSONNumberLike]("minWireVersion").
           fold[Int](0)(_.toInt), // int? mongod >= 2.6
         maxWireVersion = doc.getAs[BSONNumberLike]("maxWireVersion").
           fold[Int](0)(_.toInt), // int? mongod >= 2.6
+        readOnly = doc.getAs[BSONBooleanLike]("readOnly").map(_.toBoolean),
+        compression = doc.getAs[List[String]]("compression").getOrElse(List.empty),
+        saslSupportedMech = doc.getAs[List[String]]("saslSupportedMech").getOrElse(List.empty),
         replicaSet = rs, // flattened in the result
         msg = doc.getAs[String]("msg") // Contains the value isdbgrid when isMaster returns from a mongos instance.
       )
