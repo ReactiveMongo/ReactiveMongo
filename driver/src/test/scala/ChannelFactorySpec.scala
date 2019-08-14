@@ -29,7 +29,7 @@ import org.specs2.concurrent.ExecutionEnv
 
 import _root_.tests.{ Common, NettyEmbedder }
 
-class ChannelFactorySpec(implicit ee: ExecutionEnv)
+final class ChannelFactorySpec(implicit ee: ExecutionEnv)
   extends org.specs2.mutable.Specification with AfterAll {
 
   "Channel factory" title

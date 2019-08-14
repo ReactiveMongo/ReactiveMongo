@@ -1,11 +1,6 @@
 package reactivemongo.core.commands
 
-import reactivemongo.bson.{
-  BSONDocument,
-  BSONInteger,
-  BSONNumberLike,
-  BSONString
-}
+import reactivemongo.bson.{ BSONDocument, BSONInteger, BSONString }
 import reactivemongo.core.protocol.Response
 
 // --- MongoDB CR authentication ---

@@ -31,10 +31,7 @@ private[reactivemongo] trait MongoScramSha1Authentication
   val mechanism = ScramSha1Authentication
 
   import reactivemongo.core.commands.{
-    CommandError,
     ScramSha1Initiate,
-    ScramSha1Challenge,
-    ScramSha1Negociation,
     ScramSha1StartNegociation
   }
 
@@ -63,10 +60,7 @@ private[reactivemongo] trait MongoScramSha256Authentication
   val mechanism = ScramSha256Authentication
 
   import reactivemongo.core.commands.{
-    CommandError,
     ScramSha256Initiate,
-    ScramSha256Challenge,
-    ScramSha256Negociation,
     ScramSha256StartNegociation
   }
 
