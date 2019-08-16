@@ -431,7 +431,7 @@ trait AggregationFramework[P <: SerializationPack]
    * @param distanceField the output field that contains the calculated distance
    * @param includeLocs this specifies the output field that identifies the location used to calculate the distance
    */
-  class GeoNear(
+  class GeoNear private[reactivemongo] (
     val near: pack.Value,
     val spherical: Boolean,
     val limit: Option[Long],
@@ -494,8 +494,10 @@ trait AggregationFramework[P <: SerializationPack]
 
     override def toString: String = s"GeoNear${tupled.toString}"
 
+    @deprecated("No longer a case class", "0.18.5")
     val productArity: Int = 10
 
+    @deprecated("No longer a case class", "0.18.5")
     def productElement(n: Int): Any = (n: @annotation.switch) match {
       case 0 => near
       case 1 => spherical
