@@ -7,7 +7,7 @@ import reactivemongo.core.netty._, ChannelBufferWritableBuffer.{
   single => makeBuffer
 }, ChannelBufferReadableBuffer.{ document => makeDocument }
 
-class BsonSpec extends org.specs2.mutable.Specification {
+final class BsonSpec extends org.specs2.mutable.Specification {
   "BSON serialization" title
 
   val simple = Array[Byte](0x16, 0x00, 0x00, 0x00, 0x02, 'h', 'e', 'l', 'l', 'o', 0x00, 0x06, 0x00, 0x00, 0x00, 'w', 'o', 'r', 'l', 'd', 0x00, 0x00)

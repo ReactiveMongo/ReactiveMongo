@@ -23,7 +23,7 @@ final class CollectionSpec(implicit protected val ee: ExecutionEnv)
 
   import Common.{ timeout, slowTimeout }
 
-  lazy val (db, slowDb) = Common.databases(s"reactivemongo-gridfs-${System identityHashCode this}", Common.connection, Common.slowConnection)
+  lazy val (db, slowDb) = Common.databases(s"reactivemongo-${System identityHashCode this}", Common.connection, Common.slowConnection)
 
   def afterAll = { db.drop(); () }
 
@@ -58,14 +58,15 @@ final class CollectionSpec(implicit protected val ee: ExecutionEnv)
 
     "expose stats" in {
       db.collection(s"not_exists_${System identityHashCode collection}").
-        stats().map(_ => true).recover {
-          case _ => false
-        } must beFalse.awaitFor(timeout) and {
-          collection.stats().
-            map(s => s.ns -> s.count) must beLike[(String, Int)] {
-              case (ns, 0) => ns.endsWith(collection.name) must beTrue
-            }.awaitFor(timeout)
-        }
+        stats().map(
+          _.size > 0 /* since 4.2 stats are returns anyway */ ).recover {
+            case _ => false
+          } must beFalse.awaitFor(timeout) and {
+            collection.stats().
+              map(s => s.ns -> s.count) must beLike[(String, Int)] {
+                case (ns, 0) => ns.endsWith(collection.name) must beTrue
+              }.awaitFor(timeout)
+          }
     }
 
     "write successfully 5 documents" >> {

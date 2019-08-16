@@ -19,7 +19,7 @@ cache:
   - $HOME/ssl
   - $HOME/mongodb-linux-x86_64-2.6.12
   - $HOME/mongodb-linux-x86_64-amazon-3.2.10
-  - $HOME/mongodb-linux-x86_64-amazon-4.0.0
+  - $HOME/mongodb-linux-x86_64-amazon-4.2.0
 env:
   - _DISABLED=true
 matrix:

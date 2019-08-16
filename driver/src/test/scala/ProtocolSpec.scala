@@ -76,11 +76,7 @@ class ProtocolSpec(implicit ee: ExecutionEnv)
         val bytes = Array[Byte](58, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -44, 7, 0, 0, 4, 0, 0, 0, 97, 100, 109, 105, 110, 46, 36, 99, 109, 100, 0, 0, 0, 0, 0, 1, 0, 0, 0, 19, 0, 0, 0, 16, 105, 115, 109, 97, 115, 116, 101, 114, 0, 1, 0, 0, 0, 0)
 
         req.writeTo(buffer) must_=== ({}) and {
-          val x = getBytes(buffer, req.size)
-
-          println(s"x = ${x.toList}")
-
-          x must_=== bytes
+          getBytes(buffer, req.size) must_=== bytes
         }
       }
     }

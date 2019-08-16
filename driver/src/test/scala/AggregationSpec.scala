@@ -118,29 +118,26 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
 
       def withRes[T](c: BSONCollection)(f: Future[List[BSONDocument]] => T): T = {
         f(c.aggregateWith1[BSONDocument]() { framework =>
-          import framework.{ Group, Match, SumField }
+          import framework.{ Ascending, Group, Match, Sort, SumField }
 
           Group(BSONString(f"$$state"))(
             "totalPop" -> SumField("population")) -> List(
-              Match(document("totalPop" -> document(f"$$gte" -> 10000000L))))
+              Match(document("totalPop" -> document(f"$$gte" -> 10000000L))),
+              Sort(Ascending("_id")))
         }.collect[List](Int.MaxValue, Cursor.FailOnError[List[BSONDocument]]()))
       }
 
-      "with the default connection" in {
-        withRes(coll) {
-          _ aka "results" must beEqualTo(expected).await(1, timeout)
-        }
+      "with the default connection" in withRes(coll) {
+        _ aka "results" must beTypedEqualTo(expected).await(1, timeout)
       }
 
-      "with the slow connection" in {
-        withRes(slowZipColl) {
-          _ aka "results" must beEqualTo(expected).await(1, slowTimeout)
-        }
+      "with the slow connection" in withRes(slowZipColl) {
+        _ aka "results" must beTypedEqualTo(expected).await(1, slowTimeout)
       }
 
       "using a view" in {
         import coll.BatchCommands.AggregationFramework
-        import AggregationFramework.{ Group, Match, SumField }
+        import AggregationFramework.{ Ascending, Group, Match, Sort, SumField }
 
         val viewName = s"pop10m${System identityHashCode this}"
 
@@ -150,14 +147,16 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
             operator = Group(BSONString(f"$$state"))(
               "totalPop" -> SumField("population")),
             pipeline = Seq(
-              Match(document("totalPop" -> document(f"$$gte" -> 10000000L)))))
+              Match(document("totalPop" -> document(f"$$gte" -> 10000000L))),
+              Sort(Ascending("_id"))))
           view: BSONCollection = db(viewName)
           res <- view.find(
             BSONDocument.empty).cursor[BSONDocument]().collect[List](
               expected.size + 2, Cursor.FailOnError[List[BSONDocument]]())
+
         } yield res
 
-        result must beEqualTo(expected).await(1, timeout)
+        result must beTypedEqualTo(expected).await(1, timeout)
       } tag "gt_mongo32"
 
       "with expected count" in {
@@ -191,13 +190,13 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
     "return average city population by state" >> {
       // See http://docs.mongodb.org/manual/tutorial/aggregation-zip-code-data-set/#return-average-city-population-by-state
       val expected = List(
-        document("_id" -> "NY", "avgCityPop" -> 19746227D),
         document("_id" -> "FR", "avgCityPop" -> 148169D),
-        document("_id" -> "JP", "avgCityPop" -> 6592851D))
+        document("_id" -> "JP", "avgCityPop" -> 6592851D),
+        document("_id" -> "NY", "avgCityPop" -> 19746227D))
 
       def withCtx[T](c: BSONCollection)(f: (c.BatchCommands.AggregationFramework.Group, List[c.PipelineOperator]) => T): T = {
         import c.BatchCommands.AggregationFramework
-        import AggregationFramework.{ Group, SumField }
+        import AggregationFramework.{ Ascending, Group, Sort, SumField }
 
         val firstOp = Group(document(
           "state" -> f"$$state", "city" -> f"$$city"))(
@@ -205,7 +204,8 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
 
         val pipeline = List(
           Group(BSONString(f"$$_id.state"))("avgCityPop" ->
-            AggregationFramework.AvgField("pop")))
+            AggregationFramework.AvgField("pop")),
+          Sort(Ascending("_id")))
 
         f(firstOp, pipeline)
       }
@@ -216,16 +216,17 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
             firstOp -> pipeline
           }.collect[List](Int.MaxValue, Cursor.FailOnError[List[BSONDocument]]())
 
-          result aka "results" must beEqualTo(expected).await(1, timeout)
+          result aka "results" must beTypedEqualTo(expected).await(1, timeout)
         }
       }
 
       "with cursor" >> {
-        def collect(c: BSONCollection, upTo: Int = Int.MaxValue) = withCtx(c) { (firstOp, pipeline) =>
-          c.aggregateWith1[BSONDocument](batchSize = Some(1)) { _ =>
-            firstOp -> pipeline
-          }.collect[List](upTo, Cursor.FailOnError[List[BSONDocument]]())
-        }
+        def collect(c: BSONCollection, upTo: Int = Int.MaxValue) =
+          withCtx(c) { (firstOp, pipeline) =>
+            c.aggregateWith1[BSONDocument](batchSize = Some(1)) { _ =>
+              firstOp -> pipeline
+            }.collect[List](upTo, Cursor.FailOnError[List[BSONDocument]]())
+          }
 
         "without limit (maxDocs)" in {
           collect(coll) must beTypedEqualTo(expected).await(1, timeout)
@@ -259,44 +260,39 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
       }
 
       "with produced cursor" >> {
-        "without limit (maxDocs)" in {
-          withCtx(coll) { (firstOp, pipeline) =>
-            val cursor = coll.aggregatorContext[BSONDocument](
-              firstOp, pipeline, batchSize = Some(1)).prepared.cursor
+        "without limit (maxDocs)" in withCtx(coll) { (firstOp, pipeline) =>
+          val cursor = coll.aggregatorContext[BSONDocument](
+            firstOp, pipeline, batchSize = Some(1)).prepared.cursor
 
-            cursor.collect[List](
-              Int.MaxValue, Cursor.FailOnError[List[BSONDocument]]()) must beTypedEqualTo(expected).await(1, timeout)
-          }
+          cursor.collect[List](
+            Int.MaxValue, Cursor.FailOnError[List[BSONDocument]]()) must beTypedEqualTo(expected).await(1, timeout)
         }
 
-        "of expected type" in {
-          withCtx(coll) { (firstOp, pipeline) =>
-            // Custom cursor support
-            trait FooCursor[T] extends Cursor[T] with CursorOps[T] {
-              def foo: String
-            }
-
-            class DefaultFooCursor[T](val wrappee: Cursor.WithOps[T])
-              extends FooCursor[T] with WrappedCursor[T]
-              with WrappedCursorOps[T] {
-
-              @inline def opsWrappee = wrappee
-
-              val foo = "Bar"
-            }
-
-            implicit def fooProducer[T] = new CursorProducer[T] {
-              type ProducedCursor = FooCursor[T]
-              def produce(base: Cursor.WithOps[T]) = new DefaultFooCursor(base)
-            }
-
-            // Aggregation itself
-            val aggregator = coll.aggregatorContext[BSONDocument](
-              firstOp, pipeline, batchSize = Some(1)).prepared[FooCursor]
-
-            aggregator.cursor.isInstanceOf[FooCursor[BSONDocument]].
-              aka("cursor") must beTrue
+        "of expected type" in withCtx(coll) { (firstOp, pipeline) =>
+          // Custom cursor support
+          trait FooCursor[T] extends Cursor[T] with CursorOps[T] {
+            def foo: String
           }
+
+          class DefaultFooCursor[T](val wrappee: Cursor.WithOps[T])
+            extends FooCursor[T] with WrappedCursor[T]
+            with WrappedCursorOps[T] {
+
+            @inline def opsWrappee = wrappee
+
+            val foo = "Bar"
+          }
+
+          implicit def fooProducer[T] = new CursorProducer[T] {
+            type ProducedCursor = FooCursor[T]
+            def produce(base: Cursor.WithOps[T]) = new DefaultFooCursor(base)
+          }
+
+          // Aggregation itself
+          val aggregator = coll.aggregatorContext[BSONDocument](
+            firstOp, pipeline, batchSize = Some(1)).prepared[FooCursor]
+
+          aggregator.cursor.isInstanceOf[FooCursor[BSONDocument]] must beTrue
         }
       }
     }
@@ -312,7 +308,8 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
         Project,
         Sort,
         Ascending,
-        Skip
+        Skip,
+        SumField
       }
 
       val expected = List(
@@ -335,7 +332,13 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
             "name" -> "NEW YORK", "population" -> 19746227L),
           "state" -> "NY"))
 
+      val primGroup = Group(document(
+        "state" -> f"$$state", "city" -> f"$$city"))(
+        "pop" -> SumField("population"))
+
       val groupPipeline = List(
+        Sort( // enforce order before Group using {First,Last}Field
+          Ascending("state"), Ascending("pop")),
         Group(BSONString(f"$$_id.state"))(
           "biggestCity" -> LastField("_id.city"),
           "biggestPop" -> LastField("pop"),
@@ -349,26 +352,14 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
         Sort(Ascending("state")))
 
       coll.aggregateWith1[BSONDocument]() { framework =>
-        import framework.{ Group, SumField }
-
-        Group(document("state" -> f"$$state", "city" -> f"$$city"))(
-          "pop" -> SumField("population")) -> groupPipeline
-
+        primGroup -> groupPipeline
       }.collect[List](Int.MaxValue, Cursor.FailOnError[List[BSONDocument]]()) must beTypedEqualTo(expected).await(1, timeout) and {
         coll.aggregateWith1[BSONDocument]() { framework =>
-          import framework.{ Group, SumField }
-
-          Group(document("state" -> f"$$state", "city" -> f"$$city"))(
-            "pop" -> SumField("population")) -> (groupPipeline :+ Limit(2))
-
+          primGroup -> (groupPipeline :+ Limit(2))
         }.collect[List](Int.MaxValue, Cursor.FailOnError[List[BSONDocument]]()) must beTypedEqualTo(expected take 2).await(1, timeout)
       } and {
         coll.aggregateWith1[BSONDocument]() { framework =>
-          import framework.{ Group, SumField }
-
-          Group(document("state" -> f"$$state", "city" -> f"$$city"))(
-            "pop" -> SumField("population")) -> (groupPipeline :+ Skip(2))
-
+          primGroup -> (groupPipeline :+ Skip(2))
         }.collect[List](Int.MaxValue, Cursor.FailOnError[List[BSONDocument]]()) must beTypedEqualTo(expected drop 2).await(1, timeout)
       }
     }
@@ -379,7 +370,8 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
           key = "state",
           selector = None,
           readConcern = ReadConcern.Local,
-          collation = None) must beTypedEqualTo(ListSet("NY", "FR", "JP")).await(1, timeout)
+          collation = None) must beTypedEqualTo(
+          ListSet("NY", "FR", "JP")).await(1, timeout)
 
       "with the default connection" in {
         distinctSpec(coll, timeout)
@@ -660,11 +652,14 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
           Group(BSONString(f"$$author"))("books" -> PushField("title")),
           Out(outColl))
       }.collect[List](Int.MaxValue, Cursor.FailOnError[List[Author]]()).map(_ => {}) must beEqualTo({}).await(0, timeout) and {
-        db.collection[BSONCollection](outColl).find(BSONDocument.empty).cursor[Author]().
+        db.collection[BSONCollection](outColl).find(BSONDocument.empty).
+          sort(BSONDocument("_id" -> -1)).cursor[Author]().
           collect[List](3, Cursor.FailOnError[List[Author]]()) must beTypedEqualTo(
             List(
               "Homer" -> List("Iliad", "The Odyssey"),
-              "Dante" -> List("Divine Comedy", "Eclogues", "The Banquet"))).await(0, timeout)
+              "Dante" -> List(
+                "Divine Comedy",
+                "Eclogues", "The Banquet"))).await(0, timeout)
       }
     }
 
@@ -956,7 +951,7 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
       implicit val placeReader: BSONDocumentReader[GeoPlace] = Macros.reader[GeoPlace]
 
       import coll.BatchCommands.AggregationFramework
-      import AggregationFramework.GeoNear
+      import AggregationFramework.{ GeoNear, Limit }
 
       places.aggregatorContext[GeoPlace](
         GeoNear(document(
@@ -966,8 +961,7 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
           maxDistance = Some(5000),
           query = Some(document("type" -> "public")),
           includeLocs = Some("dist.loc"),
-          limit = 5,
-          spherical = true)).prepared.cursor
+          spherical = true), List(Limit(5))).prepared.cursor
         .collect[List](Int.MaxValue, Cursor.FailOnError[List[GeoPlace]]()) aka "places" must beTypedEqualTo(List(
           GeoPlace(
             loc = GeoPoint(List(-73.97D, 40.77D)),

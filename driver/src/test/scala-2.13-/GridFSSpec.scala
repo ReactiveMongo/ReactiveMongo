@@ -95,12 +95,11 @@ final class GridFSSpec(implicit ee: ExecutionEnv)
 
         val buf = new java.io.ByteArrayOutputStream()
 
-        res.map(_.result()) must beTypedEqualTo(content).
-          await(1, timeout) and {
-            gfs.readToOutputStream(actual, buf).
-              map(_ => buf.toByteArray) must beTypedEqualTo(content).
-              await(1, timeout)
-          }
+        res.map(_.result()) must beTypedEqualTo(content).await(1, timeout) and {
+          gfs.readToOutputStream(actual, buf).
+            map(_ => buf.toByteArray) must beTypedEqualTo(content).
+            await(1, timeout)
+        }
       }
 
       find(filename1) aka "file #1" must beSome[GFile].
@@ -110,7 +109,7 @@ final class GridFSSpec(implicit ee: ExecutionEnv)
 
             matchFile(actual, file2, content2) and {
               actual.md5 must beSome[String].which {
-                _ aka "MD5" must_== expectedMd5
+                _ aka "MD5" must_=== expectedMd5
               }
             }
           }.await(1, timeout)
