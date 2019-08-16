@@ -15,10 +15,9 @@ import util.BsonMatchers._
 import util.WithTemporaryCollection._
 import util.{ MongoSkips, WithTemporaryDb }
 
-class ChangeStreamSpec(implicit val ee: ExecutionEnv)
+final class ChangeStreamSpec(implicit val ee: ExecutionEnv)
   extends org.specs2.mutable.Specification
-  with WithTemporaryDb
-  with MongoSkips {
+  with WithTemporaryDb with MongoSkips {
 
   "The ChangeStream of a collection" should {
 

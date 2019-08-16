@@ -40,6 +40,8 @@ object BSONAggregationImplicits {
         "allowDiskUse" -> BSONBoolean(agg.command.allowDiskUse),
         "cursor" -> agg.command.cursor.map(CursorWriter.write(_)))
 
+      println(s"pipeline = ${agg.command.pipeline.map(_.makePipe.asInstanceOf[BSONDocument]).map(BSONDocument.pretty)}")
+
       if (agg.command.wireVersion < MongoWireVersion.V32) cmd else {
         cmd ++ (
           "bypassDocumentValidation" -> BSONBoolean(

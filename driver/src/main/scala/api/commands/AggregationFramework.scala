@@ -5,6 +5,8 @@ import reactivemongo.core.protocol.MongoWireVersion
 
 /**
  * Implements the [[http://docs.mongodb.org/manual/applications/aggregation/ Aggregation Framework]].
+ *
+ * @see [[PipelineOperator]]
  */
 trait AggregationFramework[P <: SerializationPack]
   extends ImplicitCommandHelpers[P]
@@ -421,7 +423,7 @@ trait AggregationFramework[P <: SerializationPack]
    * http://docs.mongodb.org/manual/reference/operator/aggregation/geoNear/#pipe._S_geoNear
    * @param near the point for which to find the closest documents
    * @param spherical if using a 2dsphere index
-   * @param limit the maximum number of documents to return
+   * @param limit the maximum number of documents to return (no longer supported since MongoDB 4.2)
    * @param maxDistance the maximum distance from the center point that the documents can be
    * @param query limits the results to the matching documents
    * @param distanceMultiplier the factor to multiply all distances returned by the query
@@ -429,13 +431,43 @@ trait AggregationFramework[P <: SerializationPack]
    * @param distanceField the output field that contains the calculated distance
    * @param includeLocs this specifies the output field that identifies the location used to calculate the distance
    */
-  case class GeoNear(near: pack.Value, spherical: Boolean = false, limit: Long = 100, minDistance: Option[Long] = None, maxDistance: Option[Long] = None, query: Option[pack.Document] = None, distanceMultiplier: Option[Double] = None, uniqueDocs: Boolean = false, distanceField: Option[String] = None, includeLocs: Option[String] = None) extends PipelineOperator {
-    import builder.{ boolean, elementProducer => element, document, long, string }
+  class GeoNear(
+    val near: pack.Value,
+    val spherical: Boolean,
+    val limit: Option[Long],
+    val minDistance: Option[Long],
+    val maxDistance: Option[Long],
+    val query: Option[pack.Document],
+    val distanceMultiplier: Option[Double],
+    val uniqueDocs: Boolean,
+    val distanceField: Option[String],
+    val includeLocs: Option[String]) extends PipelineOperator with Product with Serializable {
+    @deprecated("Use the constructor with optional `limit`", "0.18.5")
+    def this(
+      near: pack.Value,
+      spherical: Boolean,
+      limit: Long,
+      minDistance: Option[Long],
+      maxDistance: Option[Long],
+      query: Option[pack.Document],
+      distanceMultiplier: Option[Double],
+      uniqueDocs: Boolean,
+      distanceField: Option[String],
+      includeLocs: Option[String]) = this(near, spherical, Some(limit), minDistance, maxDistance, query, distanceMultiplier, uniqueDocs, distanceField, includeLocs)
+
+    import builder.{
+      boolean,
+      elementProducer => element,
+      document,
+      long,
+      string
+    }
+
     def makePipe: pack.Document = document(Seq(
       element(f"$$geoNear", document(Seq(
         element("near", near),
-        element("spherical", boolean(spherical)),
-        element("limit", long(limit))) ++ Seq(
+        element("spherical", boolean(spherical))) ++ Seq(
+          limit.map(l => element("limit", long(l))),
           minDistance.map(l => element("minDistance", long(l))),
           maxDistance.map(l => element("maxDistance", long(l))),
           query.map(s => element("query", s)),
@@ -446,6 +478,68 @@ trait AggregationFramework[P <: SerializationPack]
             element("distanceField", string(s))),
           includeLocs.map(s =>
             element("includeLocs", string(s)))).flatten))))
+
+    @deprecated("No longer a case class", "0.18.5")
+    def canEqual(that: Any): Boolean = that match {
+      case _: GeoNear => true
+      case _          => false
+    }
+
+    override def equals(that: Any): Boolean = that match {
+      case other: GeoNear => tupled == other.tupled
+      case _              => false
+    }
+
+    override def hashCode: Int = tupled.hashCode
+
+    override def toString: String = s"GeoNear${tupled.toString}"
+
+    val productArity: Int = 10
+
+    def productElement(n: Int): Any = (n: @annotation.switch) match {
+      case 0 => near
+      case 1 => spherical
+      case 2 => limit
+      case 3 => minDistance
+      case 4 => maxDistance
+      case 5 => query
+      case 6 => distanceMultiplier
+      case 7 => uniqueDocs
+      case 8 => distanceField
+      case _ => includeLocs
+    }
+
+    private[reactivemongo] lazy val tupled = Tuple10(near, spherical, limit, minDistance, maxDistance, query, distanceMultiplier, uniqueDocs, distanceField, includeLocs)
+  }
+
+  object GeoNear {
+    @deprecated("Use the factory with optional `limit` (no longer supported since MongoDB 4.2", "0.18.5")
+    def apply(
+      near: pack.Value,
+      spherical: Boolean,
+      limit: Long,
+      minDistance: Option[Long],
+      maxDistance: Option[Long],
+      query: Option[pack.Document],
+      distanceMultiplier: Option[Double],
+      uniqueDocs: Boolean,
+      distanceField: Option[String],
+      includeLocs: Option[String]): GeoNear = new GeoNear(near, spherical, Some(limit), minDistance, maxDistance, query, distanceMultiplier, uniqueDocs, distanceField, includeLocs)
+
+    def apply(
+      near: pack.Value,
+      spherical: Boolean = false,
+      limit: Option[Long] = None,
+      minDistance: Option[Long] = None,
+      maxDistance: Option[Long] = None,
+      query: Option[pack.Document] = None,
+      distanceMultiplier: Option[Double] = None,
+      uniqueDocs: Boolean = false,
+      distanceField: Option[String] = None,
+      includeLocs: Option[String] = None): GeoNear = new GeoNear(near, spherical, limit, minDistance, maxDistance, query, distanceMultiplier, uniqueDocs, distanceField, includeLocs)
+
+    @deprecated("No longer a case class", "0.18.5")
+    def unapply(stage: GeoNear): Option[Tuple10[pack.Value, Boolean, Long, Option[Long], Option[Long], Option[pack.Document], Option[Double], Boolean, Option[String], Option[String]]] = Some(Tuple10(stage.near, stage.spherical, stage.limit.getOrElse(100L), stage.minDistance, stage.maxDistance, stage.query, stage.distanceMultiplier, stage.uniqueDocs, stage.distanceField, stage.includeLocs))
   }
 
   /**
@@ -464,7 +558,7 @@ trait AggregationFramework[P <: SerializationPack]
     val productArity: Int,
     element: Int => Any,
     operator: => pack.Document) extends PipelineOperator with Product
-    with Serializable with java.io.Serializable {
+    with Serializable {
 
     val makePipe: pack.Document = operator
 

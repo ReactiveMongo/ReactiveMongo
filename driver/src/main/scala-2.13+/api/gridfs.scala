@@ -428,8 +428,8 @@ class GridFS[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, 
    * exists on the database.
    */
   def exists(implicit ec: ExecutionContext): Future[Boolean] = (for {
-    _ <- chunks.stats()
-    _ <- files.stats()
+    _ <- chunks.stats().filter { s => s.size > 0 || s.nindexes > 0 }
+    _ <- files.stats().filter { s => s.size > 0 || s.nindexes > 0 }
   } yield true).recover {
     case _ => false
   }
