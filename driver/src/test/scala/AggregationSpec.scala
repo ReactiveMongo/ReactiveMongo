@@ -351,14 +351,14 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
             "name" -> f"$$smallestCity", "population" -> f"$$smallestPop"))),
         Sort(Ascending("state")))
 
-      coll.aggregateWith1[BSONDocument]() { framework =>
+      coll.aggregateWith1[BSONDocument]() { _ =>
         primGroup -> groupPipeline
       }.collect[List](Int.MaxValue, Cursor.FailOnError[List[BSONDocument]]()) must beTypedEqualTo(expected).await(1, timeout) and {
-        coll.aggregateWith1[BSONDocument]() { framework =>
+        coll.aggregateWith1[BSONDocument]() { _ =>
           primGroup -> (groupPipeline :+ Limit(2))
         }.collect[List](Int.MaxValue, Cursor.FailOnError[List[BSONDocument]]()) must beTypedEqualTo(expected take 2).await(1, timeout)
       } and {
-        coll.aggregateWith1[BSONDocument]() { framework =>
+        coll.aggregateWith1[BSONDocument]() { _ =>
           primGroup -> (groupPipeline :+ Skip(2))
         }.collect[List](Int.MaxValue, Cursor.FailOnError[List[BSONDocument]]()) must beTypedEqualTo(expected drop 2).await(1, timeout)
       }

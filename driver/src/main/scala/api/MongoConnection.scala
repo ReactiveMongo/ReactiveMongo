@@ -25,6 +25,8 @@ import akka.util.Timeout
 import akka.actor.{ Actor, ActorRef, ActorSystem, Props }
 import akka.pattern.ask
 
+import reactivemongo.core.protocol.Response
+
 import reactivemongo.core.actors.{
   AuthRequest,
   Close,
@@ -38,7 +40,6 @@ import reactivemongo.core.actors.{
   SetUnavailable
 }
 import reactivemongo.core.nodeset.{ Authenticate, ProtocolMetadata }
-import reactivemongo.core.protocol.Response
 import reactivemongo.core.commands.SuccessfulAuthentication
 import reactivemongo.api.commands.{ WriteConcern => WC }
 
@@ -46,7 +47,8 @@ import reactivemongo.util, util.{ LazyLogger, SRVRecordResolver, TXTResolver }
 
 private[api] case class ConnectionState(
   metadata: ProtocolMetadata,
-  setName: Option[String])
+  setName: Option[String],
+  isMongos: Boolean)
 
 /**
  * A pool of MongoDB connections, obtained from a [[reactivemongo.api.MongoDriver]].
@@ -245,7 +247,8 @@ class MongoConnection(
 
         _metadata = Some(available.metadata)
 
-        val state = ConnectionState(available.metadata, available.setName)
+        val state = ConnectionState(
+          available.metadata, available.setName, available.isMongos)
 
         if (!primaryAvailable.trySuccess(state)) {
           primaryAvailable = Promise.successful(state)
@@ -265,7 +268,8 @@ class MongoConnection(
 
         _metadata = Some(available.metadata)
 
-        val state = ConnectionState(available.metadata, available.setName)
+        val state = ConnectionState(
+          available.metadata, available.setName, available.isMongos)
 
         if (!setAvailable.trySuccess(state)) {
           setAvailable = Promise.successful(state)

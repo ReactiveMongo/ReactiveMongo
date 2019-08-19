@@ -81,37 +81,42 @@ private[reactivemongo] case class ChannelDisconnected(channelId: ChannelId)
 
 /** Message sent when the primary has been discovered. */
 @deprecated("Internal: will be made private", "0.16.0")
-class PrimaryAvailable(
+class PrimaryAvailable private[reactivemongo] (
   val metadata: ProtocolMetadata,
-  private[reactivemongo] val setName: Option[String]) extends Product with Serializable {
+  private[reactivemongo] val setName: Option[String],
+  private[reactivemongo] val isMongos: Boolean) extends Product with Serializable {
 
-  val productArity = 2
+  @deprecated("Use the constructor with `isMongos`", "0.18.5")
+  def this(
+    metadata: ProtocolMetadata,
+    setName: Option[String]) = this(metadata, setName, false)
 
-  def productElement(n: Int): Any = n match {
-    case 1 => metadata
-    case _ => setName
-  }
+  @inline def productArity: Int = tupled.productArity
+
+  @inline def productElement(n: Int): Any = tupled.productElement(n)
 
   override def equals(that: Any): Boolean = that match {
     case other: PrimaryAvailable =>
-      (metadata -> setName) == (other.metadata -> other.setName)
+      tupled == other.tupled
 
     case _ => false
   }
 
-  override def hashCode: Int = (metadata -> setName).hashCode
+  override lazy val hashCode: Int = tupled.hashCode
 
   def canEqual(that: Any): Boolean = that match {
     case _: PrimaryAvailable => true
     case _                   => false
   }
+
+  private lazy val tupled = Tuple3(metadata, setName, isMongos)
 }
 
 @deprecated("Internal: will be made private", "0.16.0")
 object PrimaryAvailable extends scala.runtime.AbstractFunction1[ProtocolMetadata, PrimaryAvailable] {
 
   def apply(metadata: ProtocolMetadata): PrimaryAvailable =
-    new PrimaryAvailable(metadata, None)
+    new PrimaryAvailable(metadata, None, false)
 
   def unapply(that: Any): Option[ProtocolMetadata] = that match {
     case a: PrimaryAvailable => Option(a.metadata)
@@ -124,38 +129,43 @@ object PrimaryAvailable extends scala.runtime.AbstractFunction1[ProtocolMetadata
 case object PrimaryUnavailable
 
 @deprecated("Internal: will be made private", "0.16.0")
-class SetAvailable(
+class SetAvailable private[reactivemongo] (
   val metadata: ProtocolMetadata,
-  private[reactivemongo] val setName: Option[String])
+  private[reactivemongo] val setName: Option[String],
+  private[reactivemongo] val isMongos: Boolean)
   extends Product with Serializable {
 
-  val productArity = 2
+  @deprecated("Use the constructor with `isMongos`", "0.18.5")
+  def this(
+    metadata: ProtocolMetadata, setName: Option[String]) =
+    this(metadata, setName, false)
 
-  def productElement(n: Int): Any = n match {
-    case 1 => metadata
-    case _ => setName
-  }
+  lazy val productArity: Int = tupled.productArity
+
+  @inline def productElement(n: Int): Any = tupled.productElement(n)
 
   override def equals(that: Any): Boolean = that match {
     case other: SetAvailable =>
-      (metadata -> setName) == (other.metadata -> other.setName)
+      tupled == other.tupled
 
     case _ => false
   }
 
-  override def hashCode: Int = (metadata -> setName).hashCode
+  override lazy val hashCode: Int = tupled.hashCode
 
   def canEqual(that: Any): Boolean = that match {
     case _: SetAvailable => true
     case _               => false
   }
+
+  private lazy val tupled = Tuple3(metadata, setName, isMongos)
 }
 
 @deprecated("Internal: will be made private", "0.16.0")
 object SetAvailable extends scala.runtime.AbstractFunction1[ProtocolMetadata, SetAvailable] {
 
   def apply(metadata: ProtocolMetadata): SetAvailable =
-    new SetAvailable(metadata, None)
+    new SetAvailable(metadata, None, false)
 
   def unapply(that: Any): Option[ProtocolMetadata] = that match {
     case a: SetAvailable => Option(a.metadata)

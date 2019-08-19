@@ -54,7 +54,14 @@ private[reactivemongo] final class PlainSession(
   lsid: UUID,
   causalConsistency: Boolean = true) extends Session(lsid, causalConsistency) {
 
-  val transaction = Option.empty[SessionTransaction]
+  private val tx = Option.empty[SessionTransaction]
+
+  @inline def transaction: Option[SessionTransaction] = {
+    Session.logger.info(
+      s"Cannot start transaction for session '$lsid': no replicaset")
+
+    tx
+  }
 }
 
 private[reactivemongo] final class ReplicaSetSession(
@@ -109,7 +116,7 @@ private[reactivemongo] final class ReplicaSetSession(
 private[api] object Session {
   import java.util.function.{ BinaryOperator, UnaryOperator }
 
-  private val logger =
+  private[api] val logger =
     reactivemongo.util.LazyLogger("reactivemongo.api.Session")
 
   def updateOnResponse(

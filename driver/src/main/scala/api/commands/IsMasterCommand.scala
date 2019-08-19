@@ -212,7 +212,7 @@ trait IsMasterCommand[P <: SerializationPack] {
       msg: Option[String]) = this(
       isMaster, maxBsonObjectSize, maxMessageSizeBytes, maxWriteBatchSize, localTime, None, minWireVersion, maxWireVersion, None, List.empty, List.empty, replicaSet, msg)
 
-    def isMongos: Boolean = msg.isDefined
+    def isMongos: Boolean = msg.contains("isdbgrid")
 
     def status: NodeStatus = {
       if (isMaster) NodeStatus.Primary

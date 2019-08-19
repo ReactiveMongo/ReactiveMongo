@@ -18,6 +18,8 @@ package reactivemongo.api
 import scala.concurrent.{ Await, ExecutionContext, Future }
 import scala.concurrent.duration.FiniteDuration
 
+import reactivemongo.core.protocol.MongoWireVersion
+
 import reactivemongo.core.commands.SuccessfulAuthentication
 
 import reactivemongo.api.commands.{
@@ -235,9 +237,15 @@ class DefaultDB private[api] (
   private def withNewSession(result: StartSessionResult): DefaultDB =
     new DefaultDB(name, connection, connectionState, failoverStrategy,
       session = Option(result).map { r =>
-        connectionState.setName match {
-          case Some(_) => new ReplicaSetSession(r.id)
-          case _       => new PlainSession(r.id)
+        if (connectionState.setName.isDefined || (
+          connectionState.isMongos &&
+          connectionState.metadata.
+          maxWireVersion.compareTo(MongoWireVersion.V42) >= 0)) {
+
+          // rs || (sharding && v4.2+)
+          new ReplicaSetSession(r.id)
+        } else {
+          new PlainSession(r.id)
         }
       })
 
@@ -268,6 +276,10 @@ class DefaultDB private[api] (
         connection.database("admin").flatMap { adminDb =>
           Command.run(BSONSerializationPack, failoverStrategy).
             apply(adminDb, command(s, wc), defaultReadPreference).
+            andThen {
+              case res =>
+                println(s"endTransaction: $res")
+            }.
             map(_ => { /*TODO*/ }).recoverWith {
               case CommandError.Code(251) =>
                 // Transaction isn't in progress (started but no op within)

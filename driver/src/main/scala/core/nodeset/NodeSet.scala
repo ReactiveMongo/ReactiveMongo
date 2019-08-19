@@ -27,6 +27,8 @@ case class NodeSet(
   /** The node which is the current primary one. */
   val primary: Option[Node] = nodes.find(_.status == NodeStatus.Primary)
 
+  @inline private[core] def isMongos: Boolean = primary.exists(_.isMongos)
+
   /** The `mongos` node, if any. */
   val mongos: Option[Node] = nodes.find(_.isMongos)
 
