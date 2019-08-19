@@ -168,21 +168,11 @@ class MongoConnection(
   }
 
   private[api] def sendExpectingResponse(
-    expectingResponse: RequestMakerExpectingResponse)(
-    implicit
-    ec: ExecutionContext): Future[(Response, Option[String])] = whenActive {
-    mongosystem ! expectingResponse
-
-    expectingResponse.future.flatMap { r =>
-      expectingResponse.node match {
-        case Some(nodeResolution) =>
-          nodeResolution.map { node => r -> Option(node.name) }
-
-        case _ =>
-          Future.successful(r -> Option.empty[String])
-      }
+    expectingResponse: RequestMakerExpectingResponse): Future[Response] =
+    whenActive {
+      mongosystem ! expectingResponse
+      expectingResponse.future
     }
-  }
 
   private case class IsAvailable(result: Promise[ConnectionState]) {
     override val toString = s"IsAvailable#${System identityHashCode this}?"

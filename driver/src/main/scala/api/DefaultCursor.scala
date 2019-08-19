@@ -93,11 +93,9 @@ object DefaultCursor {
         // MongoDB2.6: Int.MaxValue
 
         val op = query.copy(numberToReturn = ntr)
-        val req = new RequestMakerExpectingResponse(
-          requestMaker = RequestMaker(
-            op, requestBuffer(maxDocs), readPreference),
-          isMongo26WriteOp = isMongo26WriteOp,
-          resolveNode = database.session.isDefined)
+        val req = RequestMakerExpectingResponse(
+          RequestMaker(op, requestBuffer(maxDocs), readPreference),
+          isMongo26WriteOp)
 
         requester(0, maxDocs, req)(ec)
       }.future.flatMap {
@@ -176,15 +174,13 @@ object DefaultCursor {
       val base: ExecutionContext => RequestMakerExpectingResponse => Future[Response] = { implicit ec: ExecutionContext =>
         database.session match {
           case Some(session) => { req: RequestMakerExpectingResponse =>
-            connection.sendExpectingResponse(req)(ec).flatMap {
-              case (resp, node) =>
-                Session.updateOnResponse(session, resp, node).map(_._2)
+            connection.sendExpectingResponse(req).flatMap {
+              Session.updateOnResponse(session, _).map(_._2)
             }
           }
 
           case _ =>
-            connection.sendExpectingResponse(
-              _: RequestMakerExpectingResponse).map(_._1)
+            connection.sendExpectingResponse(_: RequestMakerExpectingResponse)
         }
       }
 
@@ -238,12 +234,11 @@ object DefaultCursor {
 
         logger.trace(s"Asking for the next batch of $ntr documents on cursor #${reply.cursorID}, after ${nextOffset}: $op")
 
-        def req = new RequestMakerExpectingResponse(
-          requestMaker = RequestMaker(op, cmd,
+        def req = RequestMakerExpectingResponse(
+          RequestMaker(op, cmd,
             readPreference = preference,
             channelIdHint = Some(response.info._channelId)),
-          isMongo26WriteOp = mongo26WriteOp,
-          resolveNode = database.session.isDefined)
+          mongo26WriteOp)
 
         Failover2(connection, failoverStrategy) { () =>
           requester(nextOffset, maxDocs, req)(ec)
@@ -293,19 +288,17 @@ object DefaultCursor {
       if (cursorID != 0) {
         logger.debug(s"[$logCat] Clean up $cursorID, sending KillCursors")
 
-        def send(r: Boolean) = connection.sendExpectingResponse(
-          new RequestMakerExpectingResponse(
-            requestMaker = RequestMaker(
-              KillCursors(Set(cursorID)), readPreference = preference),
-            isMongo26WriteOp = false,
-            resolveNode = r))
+        def send() = connection.sendExpectingResponse(
+          RequestMakerExpectingResponse(RequestMaker(
+            KillCursors(Set(cursorID)),
+            readPreference = preference), false))
 
         val result = database.session match {
-          case Some(session) => send(true).flatMap {
-            case (resp, node) => Session.updateOnResponse(session, resp, node)
+          case Some(session) => send().flatMap {
+            Session.updateOnResponse(session, _)
           }.map(_._2)
 
-          case _ => send(false)
+          case _ => send()
         }
 
         result.onComplete {

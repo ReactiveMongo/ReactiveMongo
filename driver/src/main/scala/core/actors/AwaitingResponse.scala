@@ -4,14 +4,12 @@ import scala.concurrent.Promise
 
 import reactivemongo.io.netty.channel.ChannelId
 
-import reactivemongo.core.nodeset.Node
 import reactivemongo.core.protocol.{ Request, Response }
 
 private[actors] case class AwaitingResponse(
   request: Request,
   channelID: ChannelId,
   promise: Promise[Response],
-  nodeResolution: Option[Promise[Node]],
   isGetLastError: Boolean,
   isMongo26WriteOp: Boolean) {
   @inline def requestID: Int = request.requestID
@@ -44,22 +42,9 @@ private[actors] case class AwaitingResponse(
     request: Request = this.request,
     channelID: ChannelId = this.channelID,
     promise: Promise[Response] = this.promise,
-    nodeResolution: Option[Promise[Node]] = this.nodeResolution,
     isGetLastError: Boolean = this.isGetLastError,
     isMongo26WriteOp: Boolean = this.isMongo26WriteOp): AwaitingResponse =
-    AwaitingResponse(request, channelID, promise, nodeResolution,
+    AwaitingResponse(request, channelID, promise,
       isGetLastError, isMongo26WriteOp)
 
-}
-
-private[actors] object AwaitingResponse extends scala.runtime.AbstractFunction5[Request, ChannelId, Promise[Response], Boolean, Boolean, AwaitingResponse] {
-  @deprecated("Use complete constructor", "0.18.5")
-  def apply(
-    request: Request,
-    channelID: ChannelId,
-    promise: Promise[Response],
-    isGetLastError: Boolean,
-    isMongo26WriteOp: Boolean): AwaitingResponse =
-    new AwaitingResponse(
-      request, channelID, promise, None, isGetLastError, isMongo26WriteOp)
 }

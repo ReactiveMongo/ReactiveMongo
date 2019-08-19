@@ -127,11 +127,10 @@ object Command {
 
       Failover2(db.connection, failover) { () =>
         db.connection.sendExpectingResponse(
-          new RequestMakerExpectingResponse(requestMaker, m26WriteCommand,
-            resolveNode = db.session.isDefined))
+          RequestMakerExpectingResponse(requestMaker, m26WriteCommand))
 
       }.future.flatMap {
-        case (Response.CommandError(_, _, _, cause), _) =>
+        case Response.CommandError(_, _, _, cause) =>
           cause.originalDocument match {
             case Some(doc) =>
               Future(pack.deserialize(pack.document(doc), reader))
@@ -139,13 +138,13 @@ object Command {
             case _ => Future.failed[T](cause)
           }
 
-        case (response @ Response.Successful(_, Reply(_, _, _, 0), _, _), _) =>
+        case response @ Response.Successful(_, Reply(_, _, _, 0), _, _) =>
           Future.failed[T](ReactiveMongoException(
             s"Cannot parse empty response: $response"))
 
-        case (response, node) => db.session match {
+        case response => db.session match {
           case Some(session) =>
-            Session.updateOnResponse(session, response, node).map {
+            Session.updateOnResponse(session, response).map {
               case (_, resp) => pack.readAndDeserialize(resp, reader)
             }
 
