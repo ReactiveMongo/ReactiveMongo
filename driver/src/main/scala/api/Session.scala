@@ -119,9 +119,13 @@ private[api] object Session {
   private[api] val logger =
     reactivemongo.util.LazyLogger("reactivemongo.api.Session")
 
+  /**
+   * @param node the name of the answering node
+   */
   def updateOnResponse(
     session: Session,
-    response: Response)(implicit ec: ExecutionContext): Future[(Session, Response)] = Response.preload(response).map {
+    response: Response,
+    node: Option[String])(implicit ec: ExecutionContext): Future[(Session, Response)] = Response.preload(response).map {
     case (resp, preloaded) =>
       val opTime = preloaded.get("operationTime").collect {
         case BSONTimestamp(time) => time

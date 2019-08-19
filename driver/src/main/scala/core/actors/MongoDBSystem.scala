@@ -560,13 +560,16 @@ trait MongoDBSystem extends Actor {
       val request = maker(reqId)
 
       foldNodeConnection(_nodeSet, request)(
-        req.promise.failure(_), { (_, con) =>
+        { err =>
+          req.promise.failure(err)
+          req.nodeResolution.foreach(_.failure(err))
+        }, { (_, con) =>
           if (request.op.expectsResponse) {
             requestTracker.withAwaiting { (resps, chans) =>
               val chanId = con.channel.id
 
               resps.put(reqId, AwaitingResponse(
-                request, chanId, req.promise,
+                request, chanId, req.promise, req.nodeResolution,
                 isGetLastError = false,
                 isMongo26WriteOp = req.isMongo26WriteOp))
 
@@ -585,9 +588,9 @@ trait MongoDBSystem extends Actor {
             { chanId =>
               trace(s"Request $reqId successful on channel #${chanId}")
             }))
-        })
 
-      ()
+          ()
+        })
     }
 
     case ConnectAll => { // monitor
@@ -719,7 +722,8 @@ trait MongoDBSystem extends Actor {
       requestTracker.withAwaiting { (resps, chans) =>
         resps.get(response.header.responseTo) match {
           case Some(AwaitingResponse(
-            _, chanId, promise, isGetLastError, isMongo26WriteOp)) => {
+            _, chanId, promise, nodeResolution,
+            isGetLastError, isMongo26WriteOp)) => {
 
             trace(s"Got a response from ${response.info._channelId} to ${response.header.responseTo}! Will give back message=$response to promise ${System.identityHashCode(promise)}")
 
@@ -736,9 +740,29 @@ trait MongoDBSystem extends Actor {
               chans.put(chanId, awaitingBefore - 1)
             }
 
+            def resolveNode(): Unit = nodeResolution.foreach { p =>
+              val n: Option[Node] = nodeSetLock.synchronized {
+                this._nodeSet.pickByChannelId(chanId).map(_._1)
+              }
+
+              n match {
+                case Some(node) =>
+                  p.success(node)
+
+                case _ =>
+                  p.failure(new ChannelNotFound(
+                    s"Node cannot be found by channel ID: $chanId",
+                    false, internalState))
+              }
+
+              ()
+            }
+
             response match {
-              case cmderr: Response.CommandError =>
-                promise.success(cmderr); ()
+              case cmderr: Response.CommandError => {
+                promise.success(cmderr)
+                resolveNode()
+              }
 
               case _ => response.error match {
                 case Some(error) => {
@@ -749,7 +773,7 @@ trait MongoDBSystem extends Actor {
                   }
 
                   promise.failure(error)
-                  ()
+                  nodeResolution.foreach(_.failure(error))
                 }
 
                 case _ if isGetLastError => {
@@ -760,6 +784,8 @@ trait MongoDBSystem extends Actor {
                   lastError(response).fold({ e =>
                     error(s"Error deserializing LastError message #${response.header.responseTo}", e)
                     promise.failure(new RuntimeException(s"Error deserializing LastError message #${response.header.responseTo} ($lnm)", e))
+
+                    nodeResolution.foreach(_.failure(e))
                   }, { lastError =>
                     if (lastError.inError) {
                       trace(s"{${response.header.responseTo}} sending a failure (lasterror is not ok)")
@@ -769,26 +795,28 @@ trait MongoDBSystem extends Actor {
                       }
 
                       promise.failure(lastError)
+                      resolveNode()
                     } else {
                       trace(s"{${response.header.responseTo}} sending a success (lasterror is ok)")
 
                       response.documents.readerIndex(response.documents.readerIndex)
 
                       promise.success(response)
+                      resolveNode()
                     }
                   })
-
-                  ()
                 }
 
-                case _ if isMongo26WriteOp =>
+                case _ if isMongo26WriteOp => {
                   onMongo26Write(response, promise)
+                  resolveNode()
+                }
 
                 case _ => {
                   trace(s"{${response.header.responseTo}} [MongoDB26 Write Op response] sending a success!")
 
                   promise.success(response)
-                  ()
+                  resolveNode()
                 }
               }
             }
