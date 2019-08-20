@@ -40,6 +40,10 @@ private[reactivemongo] object EndTransaction {
 
       elements ++= writeSession(end.session)
 
+      end.session.transaction.toOption.flatMap(_.recoveryToken).foreach { t =>
+        elements += elementProducer("recoveryToken", pack.document(t))
+      }
+
       builder.document(elements.result())
     }
   }

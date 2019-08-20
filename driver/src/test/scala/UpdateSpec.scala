@@ -38,7 +38,7 @@ trait UpdateSpec extends UpdateFixtures { collectionSpec: CollectionSpec =>
 
         c.update.one(
           q = person,
-          u = BSONDocument("$set" -> BSONDocument("age" -> 33)),
+          u = BSONDocument(f"$$set" -> BSONDocument("age" -> 33)),
           upsert = true) must beLike[UpdateWriteResult]({
             case result => result.upserted.toList must beLike[List[Upserted]] {
               case Upserted(0, id: BSONObjectID) :: Nil =>
@@ -116,7 +116,7 @@ trait UpdateSpec extends UpdateFixtures { collectionSpec: CollectionSpec =>
 
       updCol2.runCommand(
         Update(UpdateElement(
-          q = doc, u = BSONDocument("$set" -> BSONDocument("bar" -> 3)))),
+          q = doc, u = BSONDocument(f"$$set" -> BSONDocument("bar" -> 3)))),
         ReadPreference.primary) aka "result" must beLike[UpdateWriteResult]({
           case result => result.nModified must_== 1 and (
             updCol2.find(
@@ -133,7 +133,8 @@ trait UpdateSpec extends UpdateFixtures { collectionSpec: CollectionSpec =>
 
         c.runCommand(
           Update(UpdateElement(
-            q = person, u = BSONDocument("$set" -> BSONDocument("age" -> 66)))),
+            q = person, u = BSONDocument(
+            f"$$set" -> BSONDocument("age" -> 66)))),
           ReadPreference.primary) must beLike[UpdateWriteResult]({
             case result => result.nModified mustEqual 1 and (
               c.find(

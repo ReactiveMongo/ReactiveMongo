@@ -32,6 +32,7 @@ import reactivemongo.core.actors.{
   Close,
   Closed,
   Exceptions,
+  PickNode,
   PrimaryAvailable,
   PrimaryUnavailable,
   RegisterMonitor,
@@ -172,6 +173,16 @@ class MongoConnection(
     whenActive {
       mongosystem ! expectingResponse
       expectingResponse.future
+    }
+
+  /** The name of the picked node */
+  private[api] def pickNode(readPreference: ReadPreference): Future[String] =
+    whenActive {
+      val req = PickNode(readPreference)
+
+      mongosystem ! req
+
+      req.future
     }
 
   private case class IsAvailable(result: Promise[ConnectionState]) {

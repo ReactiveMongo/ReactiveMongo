@@ -2,6 +2,8 @@ package reactivemongo.core.actors
 
 import scala.concurrent.{ Future, Promise }
 
+import reactivemongo.api.ReadPreference
+
 import reactivemongo.io.netty.channel.ChannelId
 
 import reactivemongo.core.protocol.{
@@ -17,11 +19,14 @@ import reactivemongo.core.nodeset.ProtocolMetadata
  * The future can be used to get the error or the successful response.
  */
 @deprecated("Internal: will be made private", "0.16.0")
-sealed trait ExpectingResponse {
+sealed trait ExpectingResponse { // TODO: Merge with RequestMakerExpectingResponse once CheckedWriteRequestExpectingResponse is removed
+  // TODO: final
   private[actors] val promise: Promise[Response] = Promise()
 
   /** The future response of this request. */
-  val future: Future[Response] = promise.future
+  val future: Future[Response] = promise.future // TODO: final
+
+  private[reactivemongo] def pinnedNode: Option[String] = None
 }
 
 @deprecated("Internal: will be made private", "0.16.0")
@@ -39,9 +44,48 @@ object ExpectingResponse {
  * @param isMongo26WriteOp true if the operation is a MongoDB 2.6 write one
  */
 @deprecated("Internal: will be made private", "0.16.0")
-case class RequestMakerExpectingResponse(
-  requestMaker: RequestMaker,
-  isMongo26WriteOp: Boolean) extends ExpectingResponse
+class RequestMakerExpectingResponse private[reactivemongo] (
+  val requestMaker: RequestMaker,
+  val isMongo26WriteOp: Boolean,
+  private[reactivemongo] override val pinnedNode: Option[String]) extends ExpectingResponse with Product with Serializable {
+  @deprecated("Use constructor with `pinnedNode`", "0.18.5")
+  def this(
+    requestMaker: RequestMaker,
+    isMongo26WriteOp: Boolean) = this(requestMaker, isMongo26WriteOp, None)
+
+  def canEqual(that: Any): Boolean = that match {
+    case _: RequestMakerExpectingResponse => true
+    case _                                => false
+  }
+
+  override def equals(that: Any): Boolean = that match {
+    case other: RequestMakerExpectingResponse =>
+      tupled == other.tupled
+
+    case _ =>
+      false
+  }
+
+  override lazy val hashCode: Int = tupled.hashCode
+
+  lazy val productArity: Int = tupled.productArity
+
+  @inline def productElement(n: Int): Any = tupled.productElement(n)
+
+  private lazy val tupled = Tuple3(requestMaker, isMongo26WriteOp, pinnedNode)
+}
+
+@deprecated("Internal: will be made private", "0.16.0")
+object RequestMakerExpectingResponse extends scala.runtime.AbstractFunction2[RequestMaker, Boolean, RequestMakerExpectingResponse] {
+
+  def apply(
+    requestMaker: RequestMaker,
+    isMongo26WriteOp: Boolean): RequestMakerExpectingResponse =
+    new RequestMakerExpectingResponse(requestMaker, isMongo26WriteOp, None)
+
+  def unapply(m: RequestMakerExpectingResponse): Option[(RequestMaker, Boolean)] = Option(m).map { s => s.requestMaker -> s.isMongo26WriteOp }
+
+}
 
 /**
  * A checked write request expecting a response.
@@ -187,3 +231,10 @@ case object Closed
 
 @deprecated("Unused", "0.16.0")
 case object GetLastMetadata
+
+private[reactivemongo] case class PickNode(readPreference: ReadPreference) {
+  private[actors] val promise = Promise[String]()
+
+  /** The node name */
+  private[reactivemongo] def future: Future[String] = promise.future
+}

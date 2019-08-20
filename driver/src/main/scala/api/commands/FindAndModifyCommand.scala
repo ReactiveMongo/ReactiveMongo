@@ -267,7 +267,7 @@ object FindAndModifyCommand {
             command.bypassDocumentValidation)))
 
         if (wireVer.compareTo(MongoWireVersion.V40) >= 0 &&
-          !session.exists(_.transaction.isDefined)) {
+          !session.exists(_.transaction.isSuccess)) {
 
           elements += element(
             "writeConcern", writeWriteConcern(command.writeConcern))
