@@ -1155,8 +1155,8 @@ trait MongoDBSystem extends Actor {
             val meta = ProtocolMetadata(
               MongoWireVersion(isMaster.minWireVersion),
               MongoWireVersion(isMaster.maxWireVersion),
-              isMaster.maxBsonObjectSize,
               isMaster.maxMessageSizeBytes,
+              isMaster.maxBsonObjectSize,
               isMaster.maxWriteBatchSize)
 
             val an = authenticating._copy(
