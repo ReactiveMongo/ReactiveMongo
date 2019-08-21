@@ -22,6 +22,7 @@ import scala.concurrent.{ Await, Future, Promise }
 import scala.util.{ Failure, Success, Try }
 import scala.util.control.NonFatal
 
+import scala.collection.{ Map => IMap }
 import scala.collection.mutable.{ Map => MMap }
 
 import akka.actor.{ Actor, ActorRef, Cancellable }
@@ -492,6 +493,32 @@ trait MongoDBSystem extends Actor {
 
   protected def authReceive: Receive
 
+  private class NodeOrdering(
+    chans: IMap[ChannelId, Int]) extends math.Ordering[Node] {
+
+    def compare(x: Node, y: Node): Int = {
+      val xReqs = x.connections.foldLeft(0) { (count, c) =>
+        count + chans.getOrElse(c.channel.id, 0)
+      }
+
+      val yReqs = y.connections.foldLeft(0) { (count, c) =>
+        count + chans.getOrElse(c.channel.id, 0)
+      }
+
+      val rdiff = xReqs - yReqs
+
+      if (rdiff != 0) rdiff else {
+        (x.pingInfo.lastIsMasterTime - y.pingInfo.lastIsMasterTime).toInt
+      }
+    }
+  }
+
+  private def acceptBalancedCon(chans: IMap[ChannelId, Int]): Connection => Boolean = { c: Connection =>
+    val count: Int = chans.getOrElse(c.channel.id, 0)
+
+    !c.signaling && options.maxInFlightRequestsPerChannel.forall(count < _)
+  }
+
   private val processing: Receive = {
     case (time: Long, event: String) => {
       history.synchronized {
@@ -512,7 +539,8 @@ trait MongoDBSystem extends Actor {
       val ns = nodeSetLock.synchronized { this._nodeSet }
 
       if (ns.isReachable) {
-        sender ! new SetAvailable(ns.protocolMetadata, ns.name)
+        sender ! new SetAvailable(ns.protocolMetadata, ns.name, ns.isMongos)
+
         debug("The node set is available")
       }
 
@@ -520,7 +548,8 @@ trait MongoDBSystem extends Actor {
         if (ns.authenticates.nonEmpty && prim.authenticated.isEmpty) {
           debug(s"The node set is available (${prim.names}); Waiting authentication: ${prim.authenticated}")
         } else {
-          sender ! new PrimaryAvailable(ns.protocolMetadata, ns.name)
+          sender ! new PrimaryAvailable(
+            ns.protocolMetadata, ns.name, ns.isMongos)
 
           debug(s"The primary is available: $prim")
         }
@@ -550,6 +579,30 @@ trait MongoDBSystem extends Actor {
       }
     }
 
+    case req @ PickNode(readPref) => {
+      val p: Option[(Node, Connection)] = nodeSetLock.synchronized {
+        requestTracker.withAwaiting { (_, chans) =>
+          val unpriorised = math.ceil(_nodeSet.nodes.size.toDouble / 2D).toInt
+          implicit val ord: NodeOrdering = new NodeOrdering(chans)
+
+          _nodeSet.pick(readPref, unpriorised, acceptBalancedCon(chans))
+        }
+      }
+
+      p match {
+        case Some((node, _)) =>
+          req.promise.success(node.name)
+
+        case _ =>
+          req.promise.failure(new ChannelNotFound(
+            s"No active channel can be found: ${readPref}",
+            false, internalState))
+
+      }
+
+      ()
+    }
+
     case req @ RequestMakerExpectingResponse(maker, _) => {
       val reqId = RequestIdGenerator.common.next
 
@@ -557,7 +610,7 @@ trait MongoDBSystem extends Actor {
 
       val request = maker(reqId)
 
-      foldNodeConnection(_nodeSet, request)(
+      foldNodeConnection(_nodeSet, req.pinnedNode, request)(
         req.promise.failure(_), { (_, con) =>
           if (request.op.expectsResponse) {
             requestTracker.withAwaiting { (resps, chans) =>
@@ -1035,7 +1088,7 @@ trait MongoDBSystem extends Actor {
     }
 
     req.retriable(requestRetries).flatMap { renew =>
-      foldNodeConnection(ns, req.request)({ error =>
+      foldNodeConnection(ns, req.pinnedNode, req.request)({ error =>
         onError(error)
         None
       }, { (_, con) =>
@@ -1145,8 +1198,8 @@ trait MongoDBSystem extends Actor {
             if (!nodeSetWasReachable && upSet.isReachable) {
               debug("The node set is now available")
 
-              broadcastMonitors(
-                new SetAvailable(upSet.protocolMetadata, upSet.name))
+              broadcastMonitors(new SetAvailable(
+                upSet.protocolMetadata, upSet.name, upSet.isMongos))
 
               updateHistory(s"IsMaster$$SetAvailable(${nodeSet.toShortString})")
             }
@@ -1160,7 +1213,7 @@ trait MongoDBSystem extends Actor {
               debug(s"The primary is now available: ${newPrim.mkString}")
 
               broadcastMonitors(new PrimaryAvailable(
-                upSet.protocolMetadata, upSet.name))
+                upSet.protocolMetadata, upSet.name, upSet.isMongos))
 
               updateHistory(
                 s"IsMaster$$PrimaryAvailable(${nodeSet.toShortString})")
@@ -1261,8 +1314,8 @@ trait MongoDBSystem extends Actor {
               if (nodeSet.isReachable) {
                 debug("The node set is now authenticated")
 
-                broadcastMonitors(
-                  new SetAvailable(nodeSet.protocolMetadata, nodeSet.name))
+                broadcastMonitors(new SetAvailable(
+                  nodeSet.protocolMetadata, nodeSet.name, nodeSet.isMongos))
 
                 updateHistory(
                   s"AuthResponse$$SetAvailable(${nodeSet.toShortString})")
@@ -1271,8 +1324,8 @@ trait MongoDBSystem extends Actor {
               if (nodeSet.primary.isDefined) {
                 debug("The primary is now authenticated")
 
-                broadcastMonitors(
-                  new PrimaryAvailable(nodeSet.protocolMetadata, nodeSet.name))
+                broadcastMonitors(new PrimaryAvailable(
+                  nodeSet.protocolMetadata, nodeSet.name, nodeSet.isMongos))
 
                 updateHistory(
                   s"AuthResponse$$PrimaryAvailable(${nodeSet.toShortString})")
@@ -1346,40 +1399,29 @@ trait MongoDBSystem extends Actor {
     }
   }
 
-  private def pickChannel(ns: NodeSet, request: Request): Try[(Node, Connection)] = request.channelIdHint match {
+  private def pickChannel(
+    ns: NodeSet,
+    pinnedNode: Option[String],
+    request: Request): Try[(Node, Connection)] = request.channelIdHint match {
     case Some(chanId) => ns.pickByChannelId(chanId).
       fold[Try[(Node, Connection)]](Failure(new ChannelNotFound(
         s"#${chanId}", false, internalState)))(Success(_))
 
     case _ => requestTracker.withAwaiting { (_, chans) =>
-      val accept = { c: Connection =>
-        val count: Int = chans.getOrElse(c.channel.id, 0)
-
-        !c.signaling && options.maxInFlightRequestsPerChannel.forall(count < _)
-      }
-
       // Ordering Node by pending requests or lastIsMasterTime
-      implicit val ord = new math.Ordering[Node] {
-        def compare(x: Node, y: Node): Int = {
-          val xReqs = x.connections.foldLeft(0) { (count, c) =>
-            count + chans.getOrElse(c.channel.id, 0)
-          }
-
-          val yReqs = y.connections.foldLeft(0) { (count, c) =>
-            count + chans.getOrElse(c.channel.id, 0)
-          }
-
-          val rdiff = xReqs - yReqs
-
-          if (rdiff != 0) rdiff else {
-            (x.pingInfo.lastIsMasterTime - y.pingInfo.lastIsMasterTime).toInt
-          }
-        }
-      }
-
+      implicit val ord = new NodeOrdering(chans)
       val unpriorised = math.ceil(ns.nodes.size.toDouble / 2D).toInt
+      val accept = acceptBalancedCon(chans)
 
-      ns.pick(request.readPreference, unpriorised, accept).fold({
+      def pick: Option[(Node, Connection)] = pinnedNode.fold(
+        ns.pick(request.readPreference, unpriorised, accept)) { name =>
+          for {
+            n <- ns.nodes.find(_.names contains name)
+            c <- n.connections.find(accept)
+          } yield n -> c
+        }
+
+      pick.fold({
         val secOk = secondaryOK(request)
         lazy val reqAuth = ns.authenticates.nonEmpty
         val cause: Throwable = if (!secOk) {
@@ -1424,7 +1466,7 @@ trait MongoDBSystem extends Actor {
   }
 
   private def foldNodeConnection[T](
-    ns: NodeSet, request: Request)(e: Throwable => T, f: (Node, Connection) => T): T = pickChannel(ns, request) match {
+    ns: NodeSet, pinnedNode: Option[String], request: Request)(e: Throwable => T, f: (Node, Connection) => T): T = pickChannel(ns, pinnedNode, request) match {
     case Failure(error) => {
       trace(s"No channel for request: $request")
       e(error)

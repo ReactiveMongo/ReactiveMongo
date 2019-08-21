@@ -56,7 +56,7 @@ class NodeSetSpec(implicit val ee: ExecutionEnv)
 
       "if the primary is not available if default preference" in {
         withCon() { (name, con, mon) =>
-          mon ! new SetAvailable(ProtocolMetadata.Default, None)
+          mon ! new SetAvailable(ProtocolMetadata.Default, None, false)
 
           waitIsAvailable(con, failoverStrategy).map(_ => true).recover {
             case reason: PrimaryUnavailableException if (
@@ -71,8 +71,8 @@ class NodeSetSpec(implicit val ee: ExecutionEnv)
         withCon() { (_, con, mon) =>
           def test = (for {
             _ <- {
-              mon ! new SetAvailable(ProtocolMetadata.Default, None)
-              mon ! new PrimaryAvailable(ProtocolMetadata.Default, None)
+              mon ! new SetAvailable(ProtocolMetadata.Default, None, false)
+              mon ! new PrimaryAvailable(ProtocolMetadata.Default, None, false)
 
               waitIsAvailable(con, failoverStrategy)
             }
@@ -94,7 +94,9 @@ class NodeSetSpec(implicit val ee: ExecutionEnv)
               withCon(opts) { (_, con, mon) =>
                 def test = (for {
                   _ <- {
-                    mon ! new SetAvailable(ProtocolMetadata.Default, None)
+                    mon ! new SetAvailable(
+                      ProtocolMetadata.Default, None, false)
+
                     waitIsAvailable(con, failoverStrategy)
                   }
                   after <- isAvailable(con, timeout)
@@ -110,8 +112,8 @@ class NodeSetSpec(implicit val ee: ExecutionEnv)
     "be unavailable" >> {
       "with the primary unavailable if default preference" in {
         withCon() { (_, con, mon) =>
-          mon ! new SetAvailable(ProtocolMetadata.Default, None)
-          mon ! new PrimaryAvailable(ProtocolMetadata.Default, None)
+          mon ! new SetAvailable(ProtocolMetadata.Default, None, false)
+          mon ! new PrimaryAvailable(ProtocolMetadata.Default, None, false)
 
           def test = (for {
             _ <- waitIsAvailable(con, failoverStrategy)
@@ -132,7 +134,7 @@ class NodeSetSpec(implicit val ee: ExecutionEnv)
           readPreference = ReadPreference.primaryPreferred)
 
         withCon(opts) { (_, con, mon) =>
-          mon ! new SetAvailable(ProtocolMetadata.Default, None)
+          mon ! new SetAvailable(ProtocolMetadata.Default, None, false)
 
           def test = (for {
             _ <- waitIsAvailable(con, failoverStrategy)

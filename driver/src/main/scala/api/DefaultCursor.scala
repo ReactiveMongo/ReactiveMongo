@@ -93,9 +93,11 @@ object DefaultCursor {
         // MongoDB2.6: Int.MaxValue
 
         val op = query.copy(numberToReturn = ntr)
-        val req = RequestMakerExpectingResponse(
-          RequestMaker(op, requestBuffer(maxDocs), readPreference),
-          isMongo26WriteOp)
+        val req = new RequestMakerExpectingResponse(
+          requestMaker = RequestMaker(
+            op, requestBuffer(maxDocs), readPreference),
+          isMongo26WriteOp = isMongo26WriteOp,
+          pinnedNode = transaction.flatMap(_.pinnedNode))
 
         requester(0, maxDocs, req)(ec)
       }.future.flatMap {
@@ -146,6 +148,9 @@ object DefaultCursor {
     def preference: ReadPreference
 
     def database: DB
+
+    @inline protected final def transaction =
+      database.session.flatMap(_.transaction.toOption)
 
     @inline def connection: MongoConnection = database.connection
 
@@ -234,11 +239,12 @@ object DefaultCursor {
 
         logger.trace(s"Asking for the next batch of $ntr documents on cursor #${reply.cursorID}, after ${nextOffset}: $op")
 
-        def req = RequestMakerExpectingResponse(
-          RequestMaker(op, cmd,
+        def req = new RequestMakerExpectingResponse(
+          requestMaker = RequestMaker(op, cmd,
             readPreference = preference,
             channelIdHint = Some(response.info._channelId)),
-          mongo26WriteOp)
+          isMongo26WriteOp = mongo26WriteOp,
+          pinnedNode = transaction.flatMap(_.pinnedNode))
 
         Failover2(connection, failoverStrategy) { () =>
           requester(nextOffset, maxDocs, req)(ec)
@@ -288,18 +294,13 @@ object DefaultCursor {
       if (cursorID != 0) {
         logger.debug(s"[$logCat] Clean up $cursorID, sending KillCursors")
 
-        def send() = connection.sendExpectingResponse(
-          RequestMakerExpectingResponse(RequestMaker(
-            KillCursors(Set(cursorID)),
-            readPreference = preference), false))
-
-        val result = database.session match {
-          case Some(session) => send().flatMap {
-            Session.updateOnResponse(session, _)
-          }.map(_._2)
-
-          case _ => send()
-        }
+        val result = connection.sendExpectingResponse(
+          new RequestMakerExpectingResponse(
+            requestMaker = RequestMaker(
+              KillCursors(Set(cursorID)),
+              readPreference = preference),
+            isMongo26WriteOp = false,
+            pinnedNode = transaction.flatMap(_.pinnedNode)))
 
         result.onComplete {
           case Failure(cause) => logger.warn(

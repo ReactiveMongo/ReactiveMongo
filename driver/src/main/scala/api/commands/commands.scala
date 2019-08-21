@@ -126,9 +126,14 @@ object Command {
         buildRequestMaker(pack)(command, writer, readPreference, db.name)
 
       Failover2(db.connection, failover) { () =>
-        db.connection.sendExpectingResponse(
-          RequestMakerExpectingResponse(requestMaker, m26WriteCommand))
-
+        db.connection.sendExpectingResponse(new RequestMakerExpectingResponse(
+          requestMaker = requestMaker,
+          isMongo26WriteOp = m26WriteCommand,
+          pinnedNode = for {
+            s <- db.session
+            t <- s.transaction.toOption
+            n <- t.pinnedNode
+          } yield n))
       }.future.flatMap {
         case Response.CommandError(_, _, _, cause) =>
           cause.originalDocument match {

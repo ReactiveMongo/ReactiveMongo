@@ -51,7 +51,7 @@ private[reactivemongo] object InsertCommand {
           elements ++= writeSession(s)
         }
 
-        if (!session.exists(_.transaction.isDefined)) {
+        if (!session.exists(_.transaction.isSuccess)) {
           // writeConcern is not allowed within a multi-statement transaction
           // code=72
 

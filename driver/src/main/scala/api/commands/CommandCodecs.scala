@@ -1,5 +1,7 @@
 package reactivemongo.api.commands
 
+import scala.util.Success
+
 import reactivemongo.api.{
   ReadConcern,
   Session,
@@ -76,7 +78,7 @@ private[reactivemongo] object CommandCodecs {
 
           elements ++= writeSession(s)
 
-          if (!s.transaction.exists(_.flagSent)) {
+          if (!s.transaction.filter(_.flagSent).isSuccess) {
             // No transaction, or flag not yet send (first tx command)
             s.operationTime match {
               case Some(opTime) => { c: ReadConcern =>
@@ -143,13 +145,13 @@ private[reactivemongo] object CommandCodecs {
       val idElmt = builder.document(Seq(
         element("id", builder.uuid(session.lsid))))
 
-      session.transaction.map(_.txnNumber) match {
-        case Some(n) => {
+      session.transaction match {
+        case Success(transaction) => {
           val elms = Seq.newBuilder[builder.pack.ElementProducer]
 
           elms ++= Seq(
             element("lsid", idElmt),
-            element("txnNumber", builder.long(n)))
+            element("txnNumber", builder.long(transaction.txnNumber)))
 
           if (!session.transactionToFlag()) {
             elms += element("startTransaction", builder.boolean(true))

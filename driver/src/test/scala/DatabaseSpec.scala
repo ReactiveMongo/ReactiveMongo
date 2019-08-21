@@ -107,18 +107,6 @@ final class DatabaseSpec(implicit protected val ee: ExecutionEnv)
       }
     }
 
-    "be hashed" in {
-      import reactivemongo.api.commands.DBHashResult
-
-      reactivemongo.api.tests.dbHash(db) must beLike[DBHashResult] {
-        case hash => hash.host must not(beEmpty[String]) and {
-          hash.md5 must not(beEmpty[String])
-        } and {
-          hash.collectionHashes must not(beEmpty[Map[String, String]])
-        }
-      }.await(1, timeout)
-    }
-
     {
       val dbName = s"databasespec-${System identityHashCode ee}"
 

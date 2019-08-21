@@ -15,7 +15,7 @@ object Dependencies {
     val ver = sys.env.get("AKKA_VERSION").getOrElse {
       val v = scalaVersion.value
 
-      if (v.startsWith("2.12.") || v.startsWith("2.13.")) "2.5.23"
+      if (v.startsWith("2.12.") || v.startsWith("2.13.")) "2.5.25"
       else "2.3.13"
     }
 

@@ -21,7 +21,7 @@ final class InsertCommandSpec extends org.specs2.mutable.Specification {
         "ordered" -> false,
         "documents" -> (firstDoc +: otherDocs))
 
-      lazy val session = new ReplicaSetSession(java.util.UUID.randomUUID())
+      lazy val session = new NodeSetSession(java.util.UUID.randomUUID())
 
       val lsid = BSONDocument(
         "lsid" -> BSONDocument(
@@ -41,8 +41,8 @@ final class InsertCommandSpec extends org.specs2.mutable.Specification {
 
         // w/o transaction started
         write(insert1) must_=== (base ++ lsid ++ writeConcern) and {
-          session.startTransaction(WriteConcern.Default).
-            aka("transaction") must beSome[SessionTransaction].which { _ =>
+          session.startTransaction(WriteConcern.Default, None).
+            aka("transaction") must beSuccessfulTry[(SessionTransaction, Boolean)].which { _ =>
               // w/ transaction started
 
               write(insert1) must_=== (base ++ lsid ++ BSONDocument(

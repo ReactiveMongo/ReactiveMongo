@@ -1,4 +1,3 @@
-import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
 
 import reactivemongo.bson.{
@@ -161,22 +160,15 @@ final class FindAndModifySpec(implicit ee: ExecutionEnv)
 
         (for {
           _ <- db.collection(colName).create(failsIfExists = false)
-          ds <- db.startSession().flatMap {
-            case Some(d) => Future.successful(d)
-            case _       => Future.failed(new Exception("Fails to start session"))
-          }
-          dt <- ds.startTransaction(None) match {
-            case Some(d) => Future.successful(d)
-            case _       => Future.failed(new Exception("Fails to start TX"))
-          }
+          ds <- db.startSession()
+          dt <- ds.startTransaction(None)
 
           coll = dt.collection(colName)
           _ <- coll.findAndUpdate(selector, james, upsert = true)
           p1 <- coll.find(selector).requireOne[Person].map(_.age)
 
-          _ <- dt.abortTransaction().collect {
-            case Some(d) => d
-          }
+          _ <- dt.abortTransaction()
+
           p2 <- coll.find(selector).one[Person].map(_.fold(-1)(_.age))
         } yield p1 -> p2).andThen {
           case _ => db.killSession()

@@ -349,48 +349,49 @@ final class CollectionSpec(implicit protected val ee: ExecutionEnv)
       section("gt_mongo32")
 
       "start & end" in {
-        Common.db.startSession() must beSome[DefaultDB].which { db =>
-          val coll = db.collection(s"session_${System identityHashCode this}")
-          val id = System.identityHashCode(db)
-          val base = BSONDocument("_id" -> id)
-          val inserted = base :~ ("value" -> 1)
-          val updated = base :~ ("value" -> 2)
+        Common.db.startSession() must beLike[DefaultDB] {
+          case db =>
+            val coll = db.collection(s"session_${System identityHashCode this}")
+            val id = System.identityHashCode(db)
+            val base = BSONDocument("_id" -> id)
+            val inserted = base :~ ("value" -> 1)
+            val updated = base :~ ("value" -> 2)
 
-          (for {
-            _ <- coll.insert(ordered = false).one(inserted)
-            r <- coll.find(base).one[BSONDocument]
-          } yield r) must beSome(inserted).awaitFor(timeout) and {
             (for {
-              _ <- coll.update(false).one(
-                q = base,
-                u = BSONDocument(f"$$set" -> BSONDocument("value" -> 2)),
-                upsert = false,
-                multi = false)
-
+              _ <- coll.insert(ordered = false).one(inserted)
               r <- coll.find(base).one[BSONDocument]
-            } yield r) must beSome(updated).awaitFor(timeout)
-          } and {
-            coll.distinct[Int, List](
-              key = "_id",
-              selector = None,
-              readConcern = ReadConcern.Local,
-              collation = None) must beTypedEqualTo(List(id)).
-              awaitFor(timeout)
+            } yield r) must beSome(inserted).awaitFor(timeout) and {
+              (for {
+                _ <- coll.update(false).one(
+                  q = base,
+                  u = BSONDocument(f"$$set" -> BSONDocument("value" -> 2)),
+                  upsert = false,
+                  multi = false)
 
-          } and {
-            coll.delete(ordered = true).one(base).
-              map(_ => {}) must beTypedEqualTo({}).awaitFor(timeout)
+                r <- coll.find(base).one[BSONDocument]
+              } yield r) must beSome(updated).awaitFor(timeout)
+            } and {
+              coll.distinct[Int, List](
+                key = "_id",
+                selector = None,
+                readConcern = ReadConcern.Local,
+                collation = None) must beTypedEqualTo(List(id)).
+                awaitFor(timeout)
 
-          } and {
-            coll.count(
-              selector = Some(base), hint = None,
-              limit = None, skip = 0,
-              readConcern = ReadConcern.Local) must beTypedEqualTo(0L).
-              awaitFor(timeout)
+            } and {
+              coll.delete(ordered = true).one(base).
+                map(_ => {}) must beTypedEqualTo({}).awaitFor(timeout)
 
-          } and {
-            db.endSession().map(_ => {}) must beEqualTo({}).awaitFor(timeout)
-          }
+            } and {
+              coll.count(
+                selector = Some(base), hint = None,
+                limit = None, skip = 0,
+                readConcern = ReadConcern.Local) must beTypedEqualTo(0L).
+                awaitFor(timeout)
+
+            } and {
+              db.endSession().map(_ => {}) must beEqualTo({}).awaitFor(timeout)
+            }
         }.awaitFor(timeout)
       }
 
