@@ -89,6 +89,10 @@ object MacroTest {
 
     case object DoNotExtendsA
     object DoNotExtendsB
+
+    trait UT2
+    case class UA2(n: Int) extends UT2
+    case class UB2(s: String) extends UT2
   }
 
   trait NestModule {

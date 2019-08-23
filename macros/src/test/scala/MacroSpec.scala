@@ -200,6 +200,20 @@ final class MacroSpec extends org.specs2.mutable.Specification {
         } and roundtrip(a, format) and roundtrip(b, format)
     }
 
+    "handle union types in non sealed trait" in {
+      import Union._
+      import Macros.Options._
+      val a = UA2(1)
+      val b = UB2("hai")
+      val format = Macros.handlerOpts[UT2, UnionType[UA2 \/ UB2] with AutomaticMaterialization]
+
+      format.write(a).getAs[String]("className").
+        aka("class #1") must beSome("MacroTest.Union.UA2") and {
+          format.write(b).getAs[String]("className").
+            aka("class #2") must beSome("MacroTest.Union.UB2")
+        } and roundtrip(a, format) and roundtrip(b, format)
+    }
+
     "handle union types (ADT) with simple names" in {
       import Union._
       import Macros.Options._
