@@ -330,7 +330,10 @@ trait MongoDBSystem extends Actor {
       // ... so the monitors are restored after restart
       debug("Restore monitor registrations after restart")
 
-      monitors.foreach { mon =>
+      val ms = monitors.toSeq
+      monitors.clear()
+
+      ms.foreach { mon =>
         self.tell(RegisterMonitor, mon)
       }
 
@@ -456,7 +459,11 @@ trait MongoDBSystem extends Actor {
                 case Success(c) => c
 
                 case Failure(cause) => {
-                  warn(s"Cannot create connection for $n", cause)
+                  val msg = s"Cannot create connection for $n"
+
+                  if (!closingFactory) warn(msg, cause)
+                  else info(msg)
+
                   con //.copy(status = ConnectionStatus.Disconnected)
                 }
               }
