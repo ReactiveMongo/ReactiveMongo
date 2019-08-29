@@ -8,7 +8,7 @@ import scala.concurrent.{ ExecutionContext, Future, Promise }
 import scala.concurrent.duration.{ FiniteDuration, SECONDS }
 
 import akka.util.Timeout
-import akka.actor.ActorRef
+import akka.actor.{ ActorRef, ActorRefFactory }
 
 import reactivemongo.io.netty.channel.{
   Channel,
@@ -148,7 +148,8 @@ package object tests {
   @inline def connectAll(sys: StandardDBSystem, ns: NodeSet) =
     sys.connectAll(ns)
 
-  @inline def channelFactory(supervisorName: String, connectionName: String, options: MongoConnectionOptions): ChannelFactory = new ChannelFactory(supervisorName, connectionName, options)
+  @inline def channelFactory(supervisorName: String, connectionName: String, options: MongoConnectionOptions)(implicit arf: ActorRefFactory): ChannelFactory =
+    new ChannelFactory(supervisorName, connectionName, options)
 
   @inline def createChannel(
     factory: ChannelFactory,

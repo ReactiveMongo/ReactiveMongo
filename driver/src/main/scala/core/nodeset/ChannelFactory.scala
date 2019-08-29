@@ -4,7 +4,8 @@ import java.lang.{ Boolean => JBool }
 
 import scala.util.{ Failure, Success, Try }
 
-import scala.concurrent.Promise
+import scala.concurrent.{ Await, Promise }
+import scala.concurrent.duration._
 
 import reactivemongo.io.netty.util.concurrent.{ Future, GenericFutureListener }
 
@@ -12,6 +13,7 @@ import reactivemongo.io.netty.bootstrap.Bootstrap
 
 import reactivemongo.io.netty.channel.{
   Channel,
+  ChannelId,
   ChannelFuture,
   ChannelFutureListener,
   ChannelOption,
@@ -20,7 +22,9 @@ import reactivemongo.io.netty.channel.{
 
 import reactivemongo.io.netty.channel.ChannelInitializer
 
-import akka.actor.ActorRef
+import akka.actor.{ ActorRef, ActorRefFactory, Props }
+import akka.pattern.ask
+import akka.util.Timeout
 
 import reactivemongo.util.LazyLogger
 
@@ -42,7 +46,8 @@ import reactivemongo.api.MongoConnectionOptions
 private[reactivemongo] final class ChannelFactory(
   supervisor: String,
   connection: String,
-  options: MongoConnectionOptions) extends ChannelInitializer[Channel] {
+  options: MongoConnectionOptions)(implicit arf: ActorRefFactory) extends ChannelInitializer[Channel] {
+  import ChannelFactory._
 
   private val pack = reactivemongo.core.netty.Pack()
   private val parentGroup: EventLoopGroup = pack.eventLoopGroup()
@@ -57,6 +62,12 @@ private[reactivemongo] final class ChannelFactory(
     option(SO_KEEPALIVE, JBool.valueOf(options.keepAlive)).
     option(CONNECT_TIMEOUT_MILLIS, Integer.valueOf(options.connectTimeoutMS)).
     handler(this)
+
+  private def connectTimeout =
+    if (options.connectTimeoutMS <= 0) 10.seconds
+    else options.connectTimeoutMS.millis
+
+  private val attrsHolder = arf.actorOf(Props(new AttributesHolder), "attributesHolder")
 
   private[reactivemongo] def create(
     host: String = "localhost",
@@ -91,29 +102,18 @@ private[reactivemongo] final class ChannelFactory(
 
       debug(s"Created new channel #${channel.id} to ${host}:${port} (registered = ${channel.isRegistered})")
 
-      if (channel.isRegistered) {
-        initChannel(channel, host, port, receiver)
-      } else {
-        // Set state as attributes so available for the coming init
-        channel.attr(ChannelFactory.hostKey).set(host)
-        channel.attr(ChannelFactory.portKey).set(port)
-        channel.attr(ChannelFactory.actorRefKey).set(receiver)
-      }
+      // Set state as attributes so available for the coming init
+      attrsHolder ! AddChannelSettings(channel.id(), host, port, receiver)
 
       Success(channel)
     }
   }
 
   def initChannel(channel: Channel): Unit = {
-    val host = channel.attr(ChannelFactory.hostKey).get
-
-    if (host == null) {
-      info("Skip channel init as host is null")
-    } else {
-      val port = channel.attr(ChannelFactory.portKey).get
-      val receiver = channel.attr(ChannelFactory.actorRefKey).get
-
-      initChannel(channel, host, port, receiver)
+    implicit val timeout: Timeout = connectTimeout / 2
+    Try(Await.result((attrsHolder ? GetChannelSettings(channel.id())).mapTo[ChannelSettings], Duration.Inf)) match {
+      case Failure(_)                                     => info("Skip channel init as settings not found")
+      case Success(ChannelSettings(host, port, receiver)) => initChannel(channel, host, port, receiver)
     }
   }
 
@@ -261,11 +261,27 @@ private[reactivemongo] final class ChannelFactory(
 }
 
 private[reactivemongo] object ChannelFactory {
-  import reactivemongo.io.netty.util.AttributeKey
+  import akka.actor.{ Actor, Stash }
 
-  val hostKey = AttributeKey.newInstance[String]("mongoHost")
+  private case class AddChannelSettings(channelId: ChannelId, host: String, port: Int, receiver: ActorRef)
+  private case class GetChannelSettings(channelId: ChannelId)
+  private case class ChannelSettings(host: String, port: Int, receiver: ActorRef)
 
-  val portKey = AttributeKey.newInstance[Int]("mongoPort")
+  private class AttributesHolder extends Actor with Stash {
+    private var settings = Map.empty[ChannelId, ChannelSettings]
 
-  val actorRefKey = AttributeKey.newInstance[ActorRef]("actorRef")
+    override def receive: Receive = {
+      case AddChannelSettings(id, host, port, receiver) =>
+        settings += (id -> ChannelSettings(host, port, receiver))
+        unstashAll()
+
+      case GetChannelSettings(id) =>
+        settings get id match {
+          case None => stash()
+          case Some(chanSettings) =>
+            sender() ! chanSettings
+            settings -= id
+        }
+    }
+  }
 }
