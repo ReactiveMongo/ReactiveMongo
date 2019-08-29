@@ -200,7 +200,7 @@ final class MacroSpec extends org.specs2.mutable.Specification {
         } and roundtrip(a, format) and roundtrip(b, format)
     }
 
-    "handle union types in non sealed trait" in {
+    "handle union types as sealed family" in {
       import Union._
       import Macros.Options._
       val a = UA2(1)
