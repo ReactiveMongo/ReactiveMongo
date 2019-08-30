@@ -50,13 +50,9 @@ private[reactivemongo] final class ChannelFactory(
 
   private val logger = LazyLogger("reactivemongo.core.nodeset.ChannelFactory")
 
-  private lazy val channelFactory = new Bootstrap().
-    group(parentGroup).
-    channel(pack.channelClass).
-    option(TCP_NODELAY, JBool.valueOf(options.tcpNoDelay)).
-    option(SO_KEEPALIVE, JBool.valueOf(options.keepAlive)).
-    option(CONNECT_TIMEOUT_MILLIS, Integer.valueOf(options.connectTimeoutMS)).
-    handler(this)
+  private val tcpNoDelay = JBool.valueOf(options.tcpNoDelay)
+  private val keepAlive = JBool.valueOf(options.keepAlive)
+  private val timeoutMs = Integer.valueOf(options.connectTimeoutMS)
 
   private[reactivemongo] def create(
     host: String = "localhost",
@@ -72,7 +68,14 @@ private[reactivemongo] final class ChannelFactory(
 
       Failure(GenericDriverException(s"$msg ($supervisor/$connection)"))
     } else {
-      val resolution = channelFactory.connect(host, port).addListener(
+      // Create a channel bootstrap from config, with state as attributes
+      // so available for the coming init (event before calling connect)
+      val f = channelFactory()
+      f.attr(ChannelFactory.hostKey, host)
+      f.attr(ChannelFactory.portKey, port)
+      f.attr(ChannelFactory.actorRefKey, receiver)
+
+      val resolution = f.connect(host, port).addListener(
         new ChannelFutureListener {
           def operationComplete(op: ChannelFuture) {
             if (!op.isSuccess) {
@@ -91,30 +94,16 @@ private[reactivemongo] final class ChannelFactory(
 
       debug(s"Created new channel #${channel.id} to ${host}:${port} (registered = ${channel.isRegistered})")
 
-      if (channel.isRegistered) {
-        initChannel(channel, host, port, receiver)
-      } else {
-        // Set state as attributes so available for the coming init
-        channel.attr(ChannelFactory.hostKey).set(host)
-        channel.attr(ChannelFactory.portKey).set(port)
-        channel.attr(ChannelFactory.actorRefKey).set(receiver)
-      }
-
       Success(channel)
     }
   }
 
   def initChannel(channel: Channel): Unit = {
     val host = channel.attr(ChannelFactory.hostKey).get
+    val port = channel.attr(ChannelFactory.portKey).get
+    val receiver = channel.attr(ChannelFactory.actorRefKey).get
 
-    if (host == null) {
-      info("Skip channel init as host is null")
-    } else {
-      val port = channel.attr(ChannelFactory.portKey).get
-      val receiver = channel.attr(ChannelFactory.actorRefKey).get
-
-      initChannel(channel, host, port, receiver)
-    }
+    initChannel(channel, host, port, receiver)
   }
 
   private[reactivemongo] def initChannel(
@@ -220,6 +209,14 @@ private[reactivemongo] final class ChannelFactory(
 
     sslCtx
   }
+
+  @inline private def channelFactory() = new Bootstrap().
+    group(parentGroup).
+    channel(pack.channelClass).
+    option(TCP_NODELAY, tcpNoDelay).
+    option(SO_KEEPALIVE, keepAlive).
+    option(CONNECT_TIMEOUT_MILLIS, timeoutMs).
+    handler(this)
 
   private[reactivemongo] def release(callback: Promise[Unit]): Unit = {
     parentGroup.shutdownGracefully().
