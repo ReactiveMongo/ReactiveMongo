@@ -50,7 +50,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
     val makeFunction = document(f"$$sum", builder.int(1))
   }
 
-  @deprecated("Use [[SumAll]]", "0.12.0")
+  @deprecated("Use `SumAll`", "0.12.0")
   case class SumValue(value: Int) extends GroupFunction {
     val makeFunction = document(f"$$sum", builder.int(value))
   }
