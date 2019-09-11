@@ -19,10 +19,10 @@ object Publish {
     case ReversedAbstractMethodProblem(_) |
         ReversedMissingMethodProblem(_) => false
 
-    case DirectMissingMethodProblem(old) => !old.isAccessible
+    case DirectMissingMethodProblem(old) => old.nonAccessible
     case InheritedNewAbstractMethodProblem(_, _) => false
-    case IncompatibleResultTypeProblem(old, _) => !old.isAccessible
-    case IncompatibleMethTypeProblem(old, _) => !old.isAccessible
+    case IncompatibleResultTypeProblem(old, _) => old.nonAccessible
+    case IncompatibleMethTypeProblem(old, _) => old.nonAccessible
     case MissingClassProblem(old) => !old.isPublic
     case AbstractClassProblem(old) => !old.isPublic
     case _ => true
