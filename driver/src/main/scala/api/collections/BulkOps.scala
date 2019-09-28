@@ -71,7 +71,8 @@ private[reactivemongo] object BulkOps {
           Left(s"size of document #${offset + docs} exceed the maxBsonSize: $bsz + 3 > $maxBsonSize")
         } else {
           val nc = docs + 1
-          val nsz = bsonSize + bsz + docs.toString.getBytes.length + BSONElementSet.typePrefixByteSize
+          val keySize = docs.toString.getBytes.size // string repr. of current index used as key
+          val nsz = bsonSize + bsz + keySize + BSONElementSet.typePrefixByteSize
 
           if (nsz > maxBsonSize) {
             Right(BulkStage[I](

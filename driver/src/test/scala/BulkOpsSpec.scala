@@ -78,7 +78,7 @@ class BulkOpsSpec(implicit ee: ExecutionEnv)
       }
     }
 
-    s"take minimal size into account into total size" in {
+    "take minimal size into account into total size" in {
       bulks[BSONDocument](
         documents = producer2Docs,
         maxBsonSize = doc1.byteSize,
@@ -88,13 +88,13 @@ class BulkOpsSpec(implicit ee: ExecutionEnv)
       }
     }
 
-    s"take into account the fact that keys increase in size in a larger array" in {
-      val ExpectedFirstBulk = Iterator.continually(doc1).take(10).toList
+    "take into account the fact that keys increase in size in a larger array" in {
+      val ExpectedFirstBulk = List.fill(10)(doc1)
       val ExpectedSecondBulk = List(doc1)
       val enoughSizeWithoutConsideringSizeIncrease = (doc1.byteSize + 1 + BSONElementSet.typePrefixByteSize) * 11
 
       bulks[BSONDocument](
-        documents = Iterator.continually(doc1).take(11).toSeq,
+        documents = Seq.fill(11)(doc1),
         maxBsonSize = enoughSizeWithoutConsideringSizeIncrease,
         maxBulkSize = 11)(_.byteSize) must beLike[BulkProducer[BSONDocument]] {
         case prod1 =>
