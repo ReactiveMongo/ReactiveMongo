@@ -907,7 +907,7 @@ sealed trait BSONElementSet extends ElementProducer { self: BSONValue =>
   override private[reactivemongo] lazy val byteSize: Int =
     elements.foldLeft(5) {
       case (sz, BSONElement(n, v)) =>
-        sz + 2 + n.getBytes.size + v.byteSize
+        sz + BSONElementSet.docElementByteOverhead + n.getBytes.size + v.byteSize
     }
 }
 
@@ -919,6 +919,8 @@ object BSONElementSet {
   implicit def apply(set: Traversable[BSONElement]): BSONElementSet =
     new BSONDocument(set.map(Success(_)).toStream)
 
+  // key null terminator + type prefix for the element
+  private[reactivemongo] val docElementByteOverhead = 2
 }
 
 /**

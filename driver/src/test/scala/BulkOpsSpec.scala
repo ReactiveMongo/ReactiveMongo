@@ -3,9 +3,7 @@ package reactivemongo
 import scala.concurrent.{ ExecutionContext, Future }
 
 import org.specs2.concurrent.ExecutionEnv
-
-import reactivemongo.bson.BSONDocument
-
+import reactivemongo.bson.{ BSONArray, BSONDocument, BSONElementSet }
 import reactivemongo.api.collections.BulkOps._
 
 class BulkOpsSpec(implicit ee: ExecutionEnv)
@@ -14,16 +12,16 @@ class BulkOpsSpec(implicit ee: ExecutionEnv)
   "Bulk operations" title
 
   val doc1 = BSONDocument("foo" -> 1)
-  val doc2 = BSONDocument("bar" -> "lorem", "int" -> 2)
+  val doc2 = BSONDocument("bar" -> "lorem ipsum", "int" -> 2)
 
-  val bsonSize1 = doc1.byteSize * 2
+  val bsonSize1 = BSONArray(doc1, doc1).byteSize - BSONArray.empty.byteSize
 
   def producer1 = bulks[BSONDocument](
     documents = Seq.empty,
     maxBsonSize = bsonSize1,
     maxBulkSize = 2)(_.byteSize)
 
-  val bsonSize2 = doc2.byteSize * 2
+  val bsonSize2 = BSONArray(doc2, doc2).byteSize - BSONArray.empty.byteSize
 
   val producer2Docs = Seq(doc1, doc1, doc2, doc1, doc2)
   def producer2 = bulks[BSONDocument](
@@ -55,7 +53,7 @@ class BulkOpsSpec(implicit ee: ExecutionEnv)
             case BulkStage(bulk1, Some(prod2)) =>
               bulk1.toList must_== List(doc1, doc1) and {
                 prod2() must beLeft(
-                  s"size of document #2 exceed the maxBsonSize: ${doc2.byteSize} > ${bsonSize1}")
+                  s"size of document #2 exceed the maxBsonSize: ${doc2.byteSize} + 3 > ${bsonSize1}")
               }
           }
         }
@@ -79,6 +77,32 @@ class BulkOpsSpec(implicit ee: ExecutionEnv)
         }
       }
     }
+
+    "take minimal size into account into total size" in {
+      bulks[BSONDocument](
+        documents = producer2Docs,
+        maxBsonSize = doc1.byteSize,
+        maxBulkSize = 2)(_.byteSize) must beLike[BulkProducer[BSONDocument]] {
+          case prod1 =>
+            prod1() must beLeft(s"size of document #0 exceed the maxBsonSize: ${doc1.byteSize} + 3 > ${doc1.byteSize}")
+      }
+    }
+
+    "take into account the fact that keys increase in size in a larger array" in {
+      val ExpectedFirstBulk = List.fill(10)(doc1)
+      val ExpectedSecondBulk = List(doc1)
+      bulks[BSONDocument](
+        documents = Seq.fill(11)(doc1),
+        maxBsonSize = (doc1.byteSize + 1 + BSONElementSet.docElementByteOverhead) * 11,
+        maxBulkSize = 11)(_.byteSize) must beLike[BulkProducer[BSONDocument]] {
+          case prod1 =>
+            prod1() must beRight.like {
+              case BulkStage(ExpectedFirstBulk, Some(prod2)) =>
+                prod2() must beRight(BulkStage(ExpectedSecondBulk, None))
+            }
+        }
+    }
+
   }
 
   "Application" should {
