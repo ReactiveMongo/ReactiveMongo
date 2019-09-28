@@ -91,10 +91,11 @@ class BulkOpsSpec(implicit ee: ExecutionEnv)
     s"take into account the fact that keys increase in size in a larger array" in {
       val ExpectedFirstBulk = Iterator.continually(doc1).take(10).toList
       val ExpectedSecondBulk = List(doc1)
+      val enoughSizeWithoutConsideringSizeIncrease = (doc1.byteSize + 1 + BSONElementSet.typePrefixByteSize) * 11
 
       bulks[BSONDocument](
         documents = Iterator.continually(doc1).take(11).toSeq,
-        maxBsonSize = (doc1.byteSize + 1 + BSONElementSet.typePrefixByteSize) * 11,
+        maxBsonSize = enoughSizeWithoutConsideringSizeIncrease,
         maxBulkSize = 11)(_.byteSize) must beLike[BulkProducer[BSONDocument]] {
         case prod1 =>
           prod1() must beRight.like {
