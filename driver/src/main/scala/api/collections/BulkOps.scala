@@ -2,6 +2,7 @@ package reactivemongo.api.collections
 
 import scala.concurrent.{ ExecutionContext, Future }
 
+import reactivemongo.bson.BSONElementSet
 import reactivemongo.core.errors.GenericDriverException
 
 /** Internal bulk operations */
@@ -66,7 +67,7 @@ private[reactivemongo] object BulkOps {
         val bsz = sz(doc)
 
         // Total minimal size is key '1' size (1 byte) + type prefix (2 bytes)
-        if (bsz + 1 + 2 > maxBsonSize) {
+        if (bsz + 1 + BSONElementSet.typePrefixByteSize > maxBsonSize) {
           Left(s"size of document #${offset + docs} exceed the maxBsonSize: $bsz > $maxBsonSize")
         } else {
           val nc = docs + 1
