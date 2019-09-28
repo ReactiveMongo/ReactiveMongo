@@ -65,7 +65,8 @@ private[reactivemongo] object BulkOps {
       case Some(doc) => {
         val bsz = sz(doc)
 
-        if (bsz > maxBsonSize) {
+        // Total minimal size is key '1' size (1 byte) + type prefix (2 bytes)
+        if (bsz + 1 + 2 > maxBsonSize) {
           Left(s"size of document #${offset + docs} exceed the maxBsonSize: $bsz > $maxBsonSize")
         } else {
           val nc = docs + 1
