@@ -53,7 +53,7 @@ class BulkOpsSpec(implicit ee: ExecutionEnv)
             case BulkStage(bulk1, Some(prod2)) =>
               bulk1.toList must_== List(doc1, doc1) and {
                 prod2() must beLeft(
-                  s"size of document #2 exceed the maxBsonSize: ${doc2.byteSize} > ${bsonSize1}")
+                  s"size of document #2 exceed the maxBsonSize: ${doc2.byteSize} + 3 > ${bsonSize1}")
               }
           }
         }
@@ -78,7 +78,7 @@ class BulkOpsSpec(implicit ee: ExecutionEnv)
       }
     }
 
-    s"take key size into account into total size" in {
+    s"take minimal size into account into total size" in {
       bulks[BSONDocument](
         documents = producer2Docs,
         maxBsonSize = doc1.byteSize,
@@ -87,6 +87,7 @@ class BulkOpsSpec(implicit ee: ExecutionEnv)
           prod1() must beLeft
       }
     }
+
   }
 
   "Application" should {
