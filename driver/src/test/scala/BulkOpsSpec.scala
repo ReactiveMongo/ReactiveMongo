@@ -83,26 +83,24 @@ class BulkOpsSpec(implicit ee: ExecutionEnv)
         documents = producer2Docs,
         maxBsonSize = doc1.byteSize,
         maxBulkSize = 2)(_.byteSize) must beLike[BulkProducer[BSONDocument]] {
-        case prod1 =>
-          prod1() must beLeft
+          case prod1 =>
+            prod1() must beLeft(s"size of document #0 exceed the maxBsonSize: ${doc1.byteSize} + 3 > ${doc1.byteSize}")
       }
     }
 
     "take into account the fact that keys increase in size in a larger array" in {
       val ExpectedFirstBulk = List.fill(10)(doc1)
       val ExpectedSecondBulk = List(doc1)
-      val enoughSizeWithoutConsideringSizeIncrease = (doc1.byteSize + 1 + BSONElementSet.typePrefixByteSize) * 11
-
       bulks[BSONDocument](
         documents = Seq.fill(11)(doc1),
-        maxBsonSize = enoughSizeWithoutConsideringSizeIncrease,
+        maxBsonSize = (doc1.byteSize + 1 + BSONElementSet.docElementByteOverhead) * 11,
         maxBulkSize = 11)(_.byteSize) must beLike[BulkProducer[BSONDocument]] {
-        case prod1 =>
-          prod1() must beRight.like {
-            case BulkStage(ExpectedFirstBulk, Some(prod2)) =>
-              prod2() must beRight(BulkStage(ExpectedSecondBulk, None))
-          }
-      }
+          case prod1 =>
+            prod1() must beRight.like {
+              case BulkStage(ExpectedFirstBulk, Some(prod2)) =>
+                prod2() must beRight(BulkStage(ExpectedSecondBulk, None))
+            }
+        }
     }
 
   }
