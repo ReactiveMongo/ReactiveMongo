@@ -3,7 +3,7 @@ package reactivemongo
 import scala.concurrent.{ ExecutionContext, Future }
 
 import org.specs2.concurrent.ExecutionEnv
-import reactivemongo.bson.{ BSONArray, BSONDocument }
+import reactivemongo.bson.{ BSONArray, BSONDocument, BSONElementSet }
 import reactivemongo.api.collections.BulkOps._
 
 class BulkOpsSpec(implicit ee: ExecutionEnv)
@@ -85,6 +85,22 @@ class BulkOpsSpec(implicit ee: ExecutionEnv)
         maxBulkSize = 2)(_.byteSize) must beLike[BulkProducer[BSONDocument]] {
         case prod1 =>
           prod1() must beLeft
+      }
+    }
+
+    s"take into account the fact that keys increase in size in a larger array" in {
+      val ExpectedFirstBulk = Iterator.continually(doc1).take(10).toList
+      val ExpectedSecondBulk = List(doc1)
+
+      bulks[BSONDocument](
+        documents = Iterator.continually(doc1).take(11).toSeq,
+        maxBsonSize = (doc1.byteSize + 1 + BSONElementSet.typePrefixByteSize) * 11,
+        maxBulkSize = 11)(_.byteSize) must beLike[BulkProducer[BSONDocument]] {
+        case prod1 =>
+          prod1() must beRight.like {
+            case BulkStage(ExpectedFirstBulk, Some(prod2)) =>
+              prod2() must beRight(BulkStage(ExpectedSecondBulk, None))
+          }
       }
     }
 
