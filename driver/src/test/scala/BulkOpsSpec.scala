@@ -83,8 +83,8 @@ class BulkOpsSpec(implicit ee: ExecutionEnv)
         documents = producer2Docs,
         maxBsonSize = doc1.byteSize,
         maxBulkSize = 2)(_.byteSize) must beLike[BulkProducer[BSONDocument]] {
-          case prod1 =>
-            prod1() must beLeft(s"size of document #0 exceed the maxBsonSize: ${doc1.byteSize} + 3 > ${doc1.byteSize}")
+        case prod1 =>
+          prod1() must beLeft(s"size of document #0 exceed the maxBsonSize: ${doc1.byteSize} + 3 > ${doc1.byteSize}")
       }
     }
 

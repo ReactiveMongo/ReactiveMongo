@@ -9,7 +9,7 @@ import scala.concurrent.{ ExecutionContext, Future }
 
 import reactivemongo.bson.{ BSONDocument, BSONTimestamp }
 
-import reactivemongo.core.errors.{ DatabaseException, GenericDriverException }
+import reactivemongo.core.errors.GenericDriverException
 import reactivemongo.core.protocol.Response
 
 /**

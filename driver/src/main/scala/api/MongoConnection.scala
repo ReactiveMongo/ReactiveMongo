@@ -583,6 +583,12 @@ object MongoConnection {
     val (remOpts, step1) = opts.iterator.foldLeft(
       Map.empty[String, String] -> initial) {
         case ((unsupported, result), kv) => kv match {
+          case ("replicaSet", _) => {
+            logger.info("Connection option 'replicaSet' is ignored: determined from servers response")
+
+            unsupported -> result
+          }
+
           case ("authSource", v) => {
             logger.warn(s"Connection option 'authSource' deprecated: use option 'authenticationDatabase'")
 
