@@ -348,6 +348,14 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
 
     }
 
+    val ignoredRs = "mongodb://host1?replicaSet=foo"
+
+    s"ignore 'replicaSet' option" in {
+      parseURI(ignoredRs) must beSuccessfulTry[ParsedURI].like {
+        case uri => uri.ignoredOptions must beEmpty
+      }
+    }
+
     val foInvalidDelay = "mongodb://host1?rm.failover=123ko:4x5"
 
     s"fail to parse $foInvalidDelay" in {
