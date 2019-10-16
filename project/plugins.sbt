@@ -29,6 +29,6 @@ addSbtPlugin("com.github.sbt" % "sbt-findbugs" % "2.0.0")
 
 addSbtPlugin("com.github.sbt" % "sbt-cpd" % "2.0.0")
 
-addSbtPlugin("com.github.gseitz" % "sbt-release" % "1.0.11")
+addSbtPlugin("com.github.gseitz" % "sbt-release" % "1.0.12")
 
 addSbtPlugin("pl.project13.scala" % "sbt-jmh" % "0.3.7")
