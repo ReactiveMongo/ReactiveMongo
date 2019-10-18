@@ -162,7 +162,7 @@ private[reactivemongo] object CreateUserCommand {
       restriction.serverAddress match {
         case head :: tail =>
           elmts += elmt(
-            "clientSource", builder.array(string(head), tail.map(string)))
+            "serverAddress", builder.array(string(head), tail.map(string)))
 
         case _ =>
           ()
