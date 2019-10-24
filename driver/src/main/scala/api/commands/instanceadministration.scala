@@ -1,9 +1,21 @@
 package reactivemongo.api.commands
 
+import scala.util.control.NonFatal
+
 import reactivemongo.api.SerializationPack
 
+import reactivemongo.core.errors.GenericDriverException
+
 @deprecated("Internal: will be made private", "0.16.0")
-object DropDatabase extends Command with CommandWithResult[UnitBox.type]
+object DropDatabase extends Command with CommandWithResult[UnitBox.type] {
+  private[api] def writer[P <: SerializationPack](pack: P): pack.Writer[DropDatabase.type] = {
+    val builder = pack.newBuilder
+    val cmd = builder.document(Seq(
+      builder.elementProducer("dropDatabase", builder.int(1))))
+
+    pack.writer[DropDatabase.type](_ => cmd)
+  }
+}
 
 /**
  * @param dropped true if the collection existed and was dropped
@@ -11,9 +23,44 @@ object DropDatabase extends Command with CommandWithResult[UnitBox.type]
 @deprecated("Internal: will be made private", "0.16.0")
 case class DropCollectionResult(dropped: Boolean)
 
+private[api] object DropCollectionResult {
+  def reader[P <: SerializationPack](pack: P): pack.Reader[DropCollectionResult] = {
+    val decoder = pack.newDecoder
+    val unitBoxReader = CommandCodecs.unitBoxReader[pack.type](pack)
+
+    pack.reader[DropCollectionResult] { doc =>
+      try {
+        pack.deserialize(doc, unitBoxReader)
+
+        DropCollectionResult(true)
+      } catch {
+        case NonFatal(cause) =>
+          def code = decoder.int(doc, "code")
+          def msg = decoder.string(doc, "errmsg")
+
+          if (code.contains(26) || msg.exists(_ startsWith "ns not found")) {
+            DropCollectionResult(false)
+          } else {
+            throw cause
+          }
+      }
+    }
+  }
+}
+
 @deprecated("Internal: will be made private", "0.16.0")
 object DropCollection extends CollectionCommand
-  with CommandWithResult[DropCollectionResult]
+  with CommandWithResult[DropCollectionResult] {
+
+  private[api] def writer[P <: SerializationPack](pack: P): pack.Writer[ResolvedCollectionCommand[DropCollection.type]] = {
+    val builder = pack.newBuilder
+
+    pack.writer[ResolvedCollectionCommand[DropCollection.type]] { drop =>
+      builder.document(Seq(
+        builder.elementProducer("drop", builder.string(drop.collection))))
+    }
+  }
+}
 
 @deprecated("Internal: will be made private", "0.16.0")
 object EmptyCapped extends CollectionCommand
@@ -51,14 +98,69 @@ case class Create(
   flags: Int = 1 // defaults to 1
 ) extends CollectionCommand with CommandWithResult[UnitBox.type]
 
+private[api] object CreateCollection {
+  def writer[P <: SerializationPack](pack: P): pack.Writer[ResolvedCollectionCommand[Create]] = {
+    val builder = pack.newBuilder
+    import builder.{ boolean, elementProducer => element }
+
+    pack.writer[ResolvedCollectionCommand[Create]] { create =>
+      val elms = Seq.newBuilder[pack.ElementProducer]
+
+      elms += element("create", builder.string(create.collection))
+
+      if (create.command.autoIndexId) {
+        elms += element("autoIndexId", boolean(create.command.autoIndexId))
+      }
+
+      create.command.capped.foreach { capped =>
+        elms += element("capped", boolean(true))
+
+        Capped.writeTo[pack.type](pack)(builder, elms += _)(capped)
+      }
+
+      builder.document(elms.result())
+    }
+  }
+}
+
 @deprecated("Internal: will be made private", "0.16.0")
 case class Capped(
   size: Long,
   max: Option[Int] = None)
 
+private[api] object Capped {
+  def writeTo[P <: SerializationPack](pack: P)(builder: SerializationPack.Builder[pack.type], append: pack.ElementProducer => Unit)(capped: Capped): Unit = {
+    import builder.{ elementProducer => element }
+
+    append(element("size", builder.long(capped.size)))
+
+    capped.max.foreach { max =>
+      append(element("max", builder.int(max)))
+    }
+  }
+}
+
 @deprecated("Internal: will be made private", "0.16.0")
 case class ConvertToCapped(
   capped: Capped) extends CollectionCommand with CommandWithResult[UnitBox.type]
+
+private[api] object ConvertToCapped {
+  def writer[P <: SerializationPack](pack: P): pack.Writer[ResolvedCollectionCommand[ConvertToCapped]] = {
+    val builder = pack.newBuilder
+
+    pack.writer[ResolvedCollectionCommand[ConvertToCapped]] { convert =>
+      val elms = Seq.newBuilder[pack.ElementProducer]
+
+      elms += builder.elementProducer(
+        "convertToCapped", builder.string(convert.collection))
+
+      Capped.writeTo[pack.type](pack)(
+        builder, elms += _)(convert.command.capped)
+
+      builder.document(elms.result())
+    }
+  }
+}
 
 @deprecated("Internal: will be made private", "0.16.0")
 case class DropIndexes(index: String) extends CollectionCommand with CommandWithResult[DropIndexesResult]
@@ -72,7 +174,40 @@ case class CollectionNames(names: List[String])
 /** List the names of DB collections. */
 @deprecated("Internal: will be made private", "0.16.0")
 object ListCollectionNames
-  extends Command with CommandWithResult[CollectionNames]
+  extends Command with CommandWithResult[CollectionNames] {
+
+  private[api] def writer[P <: SerializationPack](pack: P): pack.Writer[ListCollectionNames.type] = {
+    val builder = pack.newBuilder
+
+    val cmd = builder.document(Seq(
+      builder.elementProducer("listCollections", builder.int(1))))
+
+    pack.writer[ListCollectionNames.type](_ => cmd)
+  }
+
+  private[api] def reader[P <: SerializationPack](pack: P): pack.Reader[CollectionNames] = {
+    val decoder = pack.newDecoder
+
+    pack.reader[CollectionNames] { doc =>
+      (for {
+        cr <- decoder.child(doc, "cursor")
+        fb = decoder.children(cr, "firstBatch")
+        ns <- wtColNames[pack.type](pack)(decoder, fb, List.empty)
+      } yield CollectionNames(ns)).getOrElse[CollectionNames](
+        throw GenericDriverException("fails to read collection names"))
+    }
+  }
+
+  @annotation.tailrec
+  private def wtColNames[P <: SerializationPack](pack: P)(decoder: SerializationPack.Decoder[pack.type], meta: List[pack.Document], ns: List[String]): Option[List[String]] = meta match {
+    case d :: ds => decoder.string(d, "name") match {
+      case Some(n) => wtColNames[pack.type](pack)(decoder, ds, n :: ns)
+      case _       => Option.empty[List[String]] // error
+    }
+
+    case _ => Some(ns.reverse)
+  }
+}
 
 import reactivemongo.api.indexes.Index
 

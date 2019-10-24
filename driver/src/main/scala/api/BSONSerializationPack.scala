@@ -111,8 +111,9 @@ object BSONSerializationPack extends SerializationPack { self =>
 
     def uuid(id: UUID): Value = BSONBinary(id)
 
-    /** Returns a timestamp as a serialized value. */
     def timestamp(time: Long): Value = BSONTimestamp(time)
+
+    def regex(pattern: String, options: String) = BSONRegex(pattern, options)
   }
 
   private object Decoder
@@ -145,7 +146,7 @@ object BSONSerializationPack extends SerializationPack { self =>
     }
 
     def double(document: BSONDocument, name: String): Option[Double] =
-      document.getAs[Double](name)
+      document.getAs[BSONNumberLike](name).map(_.toDouble)
 
     def int(document: BSONDocument, name: String): Option[Int] =
       document.getAs[Int](name)

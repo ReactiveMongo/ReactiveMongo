@@ -21,7 +21,7 @@ import reactivemongo.core.errors.GenericDriverException
 
 @deprecated("Internal: will be made private", "0.16.0")
 object BSONDropDatabaseImplicits {
-  implicit object DropDatabaseWriter
+  object DropDatabaseWriter
     extends BSONDocumentWriter[DropDatabase.type] {
     val command = BSONDocument("dropDatabase" -> 1)
     def write(dd: DropDatabase.type): BSONDocument = command
@@ -30,13 +30,13 @@ object BSONDropDatabaseImplicits {
 
 @deprecated("Internal: will be made private", "0.16.0")
 object BSONListCollectionNamesImplicits {
-  implicit object ListCollectionNamesWriter
+  object ListCollectionNamesWriter
     extends BSONDocumentWriter[ListCollectionNames.type] {
     val command = BSONDocument("listCollections" -> 1)
     def write(ls: ListCollectionNames.type): BSONDocument = command
   }
 
-  implicit object BSONCollectionNameReaders
+  object BSONCollectionNameReaders
     extends DealingWithGenericCommandErrorsReader[CollectionNames] {
     def readResult(doc: BSONDocument): CollectionNames = (for {
       cr <- doc.getAs[BSONDocument]("cursor")
@@ -58,11 +58,11 @@ object BSONListCollectionNamesImplicits {
 
 @deprecated("Internal: will be made private", "0.16.0")
 object BSONDropCollectionImplicits {
-  implicit object DropCollectionWriter extends BSONDocumentWriter[ResolvedCollectionCommand[DropCollection.type]] {
+  object DropCollectionWriter extends BSONDocumentWriter[ResolvedCollectionCommand[DropCollection.type]] {
     def write(command: ResolvedCollectionCommand[DropCollection.type]): BSONDocument = BSONDocument("drop" -> command.collection)
   }
 
-  implicit object DropCollectionResultReader
+  object DropCollectionResultReader
     extends BSONDocumentReader[DropCollectionResult] {
     def read(doc: BSONDocument): DropCollectionResult =
       CommonImplicits.UnitBoxReader.readTry(doc).transform(
@@ -97,14 +97,14 @@ object BSONRenameCollectionImplicits {
 
 @deprecated("Internal: will be made private", "0.16.0")
 object BSONCreateImplicits {
-  implicit object CappedWriter extends BSONDocumentWriter[Capped] {
+  object CappedWriter extends BSONDocumentWriter[Capped] {
     def write(capped: Capped): BSONDocument =
       BSONDocument(
         "size" -> capped.size,
         "max" -> capped.max)
   }
 
-  implicit object CreateWriter extends BSONDocumentWriter[ResolvedCollectionCommand[Create]] {
+  object CreateWriter extends BSONDocumentWriter[ResolvedCollectionCommand[Create]] {
     def write(command: ResolvedCollectionCommand[Create]): BSONDocument = {
       val base = BSONDocument("create" -> command.collection)
 
@@ -121,7 +121,7 @@ object BSONCreateImplicits {
 
 @deprecated("Internal: will be made private", "0.16.0")
 object BSONCollStatsImplicits {
-  implicit object CollStatsWriter extends BSONDocumentWriter[ResolvedCollectionCommand[CollStats]] {
+  object CollStatsWriter extends BSONDocumentWriter[ResolvedCollectionCommand[CollStats]] {
     def write(command: ResolvedCollectionCommand[CollStats]): BSONDocument =
       BSONDocument(
         "collStats" -> command.collection,
@@ -155,7 +155,7 @@ object BSONCollStatsImplicits {
 
 @deprecated("Internal: will be made private", "0.16.0")
 object BSONConvertToCappedImplicits {
-  implicit object ConvertToCappedWriter extends BSONDocumentWriter[ResolvedCollectionCommand[ConvertToCapped]] {
+  object ConvertToCappedWriter extends BSONDocumentWriter[ResolvedCollectionCommand[ConvertToCapped]] {
     def write(command: ResolvedCollectionCommand[ConvertToCapped]): BSONDocument =
       BSONDocument("convertToCapped" -> command.collection) ++ BSONCreateImplicits.CappedWriter.write(command.command.capped)
   }

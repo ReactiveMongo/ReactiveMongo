@@ -107,6 +107,9 @@ object SerializationPack {
 
     /** Returns a timestamp as a serialized value. */
     def timestamp(time: Long): pack.Value
+
+    /** Returns a regular expression value. */
+    def regex(pattern: String, options: String): pack.Value
   }
 
   /**

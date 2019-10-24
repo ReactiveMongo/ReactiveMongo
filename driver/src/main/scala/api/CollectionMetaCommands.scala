@@ -5,7 +5,6 @@ import scala.concurrent.{ ExecutionContext, Future }
 import reactivemongo.core.errors.GenericDatabaseException
 
 import reactivemongo.api.commands._
-import reactivemongo.api.commands.bson._
 
 import reactivemongo.api.indexes.CollectionIndexesManager
 
@@ -17,10 +16,10 @@ import reactivemongo.api.indexes.CollectionIndexesManager
  * @define cappedMaxParam the maximum number of documents this capped collection can contain
  */
 trait CollectionMetaCommands { self: Collection =>
-  import CommonImplicits._
-  import BSONCreateImplicits._
-  import BSONCollStatsImplicits._
-  import BSONConvertToCappedImplicits._
+  private implicit lazy val unitBoxReader =
+    CommandCodecs.unitBoxReader(command.pack)
+
+  private implicit lazy val createWriter = CreateCollection.writer(command.pack)
 
   /**
    * Creates this collection.
@@ -41,7 +40,7 @@ trait CollectionMetaCommands { self: Collection =>
   /**
    * @param failsIfExists if true fails if the collection already exists (default: false)
    */
-  def create(@deprecatedName('autoIndexId) failsIfExists: Boolean = false)(implicit ec: ExecutionContext): Future[Unit] = create().recover {
+  def create(@deprecatedName(Symbol("autoIndexId")) failsIfExists: Boolean = false)(implicit ec: ExecutionContext): Future[Unit] = create().recover {
     case CommandError.Code(48 /* already exists */ ) if !failsIfExists => ()
 
     case CommandError.Message(
@@ -74,6 +73,11 @@ trait CollectionMetaCommands { self: Collection =>
   def drop()(implicit ec: ExecutionContext): Future[Unit] =
     drop(true).map(_ => {})
 
+  private implicit lazy val dropWriter = DropCollection.writer(command.pack)
+
+  private implicit lazy val dropReader =
+    DropCollectionResult.reader(command.pack)
+
   /**
    * Drops this collection.
    *
@@ -86,8 +90,6 @@ trait CollectionMetaCommands { self: Collection =>
    * Otherwise in case, the future will be completed with the encountered error.
    */
   def drop(failIfNotFound: Boolean)(implicit ec: ExecutionContext): Future[Boolean] = {
-    import BSONDropCollectionImplicits._
-
     command(self, DropCollection, ReadPreference.primary).flatMap {
       case DropCollectionResult(false) if failIfNotFound =>
         Future.failed[Boolean](GenericDatabaseException(
@@ -97,6 +99,8 @@ trait CollectionMetaCommands { self: Collection =>
         Future.successful(dropped)
     }
   }
+
+  private implicit lazy val convertWriter = ConvertToCapped.writer(command.pack)
 
   /**
    * Converts this collection to a capped one.
@@ -120,6 +124,10 @@ trait CollectionMetaCommands { self: Collection =>
 
     command.unboxed(self.db, RenameCollection(db.name + "." + name, db.name + "." + to, dropExisting), ReadPreference.primary)
   }
+
+  private implicit lazy val statsWriter = CollStats.writer(command.pack)
+
+  private implicit lazy val statsReader = CollStats.reader(command.pack)
 
   /**
    * Returns various information about this collection.

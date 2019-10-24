@@ -6,4 +6,5 @@ private[reactivemongo] object Compat {
 
   @inline def internalSerializationPack =
     reactivemongo.api.bson.collection.BSONSerializationPack
+
 }
