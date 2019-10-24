@@ -9,7 +9,7 @@ object Resolvers {
 }
 
 object Dependencies {
-  val netty = "4.1.42.Final"
+  val netty = "4.1.43.Final"
 
   val akka = Def.setting[Seq[ModuleID]] {
     val ver = sys.env.get("AKKA_VERSION").getOrElse {
