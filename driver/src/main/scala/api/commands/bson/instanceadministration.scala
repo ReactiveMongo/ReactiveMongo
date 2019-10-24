@@ -86,7 +86,7 @@ object BSONEmptyCappedImplicits {
 
 @deprecated("Internal: will be made private", "0.16.0")
 object BSONRenameCollectionImplicits {
-  implicit object RenameCollectionWriter extends BSONDocumentWriter[RenameCollection] {
+  object RenameCollectionWriter extends BSONDocumentWriter[RenameCollection] {
     def write(command: RenameCollection): BSONDocument =
       BSONDocument(
         "renameCollection" -> command.fullyQualifiedCollectionName,

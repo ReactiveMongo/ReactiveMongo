@@ -1,5 +1,7 @@
 package reactivemongo.api.commands
 
+import reactivemongo.api.SerializationPack
+
 @deprecated("Internal: will be made private", "0.16.0")
 object DropDatabase extends Command with CommandWithResult[UnitBox.type]
 
@@ -22,6 +24,25 @@ case class RenameCollection(
   fullyQualifiedCollectionName: String,
   fullyQualifiedTargetName: String,
   dropTarget: Boolean = false) extends Command with CommandWithResult[UnitBox.type]
+
+private[api] object RenameCollection extends scala.runtime.AbstractFunction3[String, String, Boolean, RenameCollection] {
+  def writer[P <: SerializationPack with Singleton](pack: P): pack.Writer[RenameCollection] = {
+    val builder = pack.newBuilder
+
+    import builder.{ elementProducer => element, string }
+
+    pack.writer[RenameCollection] { rename =>
+      val elements = Seq[pack.ElementProducer](
+        element(
+          "renameCollection",
+          string(rename.fullyQualifiedCollectionName)),
+        element("to", string(rename.fullyQualifiedTargetName)),
+        element("dropTarget", builder.boolean(rename.dropTarget)))
+
+      builder.document(elements)
+    }
+  }
+}
 
 @deprecated("Internal: will be made private", "0.16.0")
 case class Create(

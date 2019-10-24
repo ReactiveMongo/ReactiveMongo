@@ -3,22 +3,28 @@ import sbt.Keys._
 
 object Compiler {
   private val silencerVersion = Def.setting[String] {
-    if (scalaVersion.value startsWith "2.10.") "1.2.1"
+    if (scalaBinaryVersion.value == "2.10") "1.2.1"
     else "1.4.1"
   }
 
-  private def unmanaged(ver: String, base: File): File = 
+  private def unmanaged(ver: String, base: File): Seq[File] =
     CrossVersion.partialVersion(ver) match {
-      case Some((2, n)) if n >= 13 => base / "scala-2.13+"
-      case _                       => base / "scala-2.13-"
+      case Some((2, 10)) =>
+        Seq(base / "scala-2.13-")
+
+      case Some((2, n)) if n < 13 =>
+        Seq(base / "scala-2.13-", base / "scala-2.11+")
+
+      case _ =>
+        Seq(base / "scala-2.13+", base / "scala-2.11+")
+
     }
 
-
   val settings = Seq(
-    unmanagedSourceDirectories in Compile += {
+    unmanagedSourceDirectories in Compile ++= {
       unmanaged(scalaVersion.value, (sourceDirectory in Compile).value)
     },
-    unmanagedSourceDirectories in Test += {
+    unmanagedSourceDirectories in Test ++= {
       unmanaged(scalaVersion.value, (sourceDirectory in Test).value)
     },
     scalacOptions ++= Seq(
@@ -48,16 +54,16 @@ object Compiler {
       )
     },
     libraryDependencies ++= {
-      if (scalaVersion.value startsWith "2.10.") Nil
+      if (scalaBinaryVersion.value == "2.10") Nil
       else Seq(
         compilerPlugin(
           "com.github.ghik" %% "silencer-plugin" % silencerVersion.value),
         "com.github.ghik" %% "silencer-lib" % silencerVersion.value % Provided)
     },
     scalacOptions in Compile ++= {
-      val v = scalaVersion.value
+      val v = scalaBinaryVersion.value
 
-      if (v.startsWith("2.10.") || v.startsWith("2.13.")) {
+      if (v == "2.10" || v == "2.13") {
         Nil
       } else {
         val m26 = "MongoDB\\ 2\\.6\\ EOL\\ reached\\ by\\ Oct\\ 2016"
@@ -88,13 +94,6 @@ object Compiler {
         )
       }
     },
-    scalacOptions in Compile ++= {
-      val v = scalaVersion.value
-
-      if (!v.startsWith("2.12.") && !v.startsWith("2.13.")) {
-        Seq("-target:jvm-1.6")
-      } else Seq("-target:jvm-1.8")
-    },
     scalacOptions in (Compile, console) ~= {
       _.filterNot(excludeOpt)
     },
@@ -105,7 +104,7 @@ object Compiler {
     scalacOptions in Compile := {
       val opts = (scalacOptions in Compile).value
 
-      if (scalaVersion.value != "2.10.7") opts
+      if (scalaBinaryVersion.value != "2.10") opts
       else {
         opts.filter(_ != "-Ywarn-unused-import")
       }

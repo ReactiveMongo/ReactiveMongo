@@ -83,16 +83,23 @@ object Version {
           Seq(Attributed(dir / jar)(AttributeMap.empty))
         },
         libraryDependencies ++= {
-          if (!scalaVersion.value.startsWith("2.13.")) {
+          if (scalaBinaryVersion.value != "2.13") {
             Seq(playIteratees.value)
           } else {
             Seq.empty
           }
         },
         libraryDependencies ++= akka.value ++ Seq(
-            "dnsjava" % "dnsjava" % "2.1.9",
+          "dnsjava" % "dnsjava" % "2.1.9",
           commonsCodec,
-            shapelessTest % Test, specs.value) ++ logApi,
+          shapelessTest % Test, specs.value) ++ logApi,
+        libraryDependencies ++= {
+          if (scalaBinaryVersion.value != "2.10") {
+            Seq("org.reactivemongo" %% "reactivemongo-bson-collection" % version.value)
+          } else {
+            Seq.empty
+          }
+        },
         findbugsAnalyzedPath += target.value / "external",
         mimaBinaryIssueFilters ++= {
           import com.typesafe.tools.mima.core._, ProblemFilters.{ exclude => x }
@@ -340,6 +347,8 @@ object Version {
             // MiMa 0.5.0
             ProblemFilters.exclude[StaticVirtualMemberProblem]("java.lang.Object.hashCode"),
             ProblemFilters.exclude[StaticVirtualMemberProblem]("java.lang.Object.toString"),
+            ProblemFilters.exclude[StaticVirtualMemberProblem]("reactivemongo.core.actors.Close.hashCode"),
+            ProblemFilters.exclude[StaticVirtualMemberProblem]("reactivemongo.core.actors.Close.toString"),
             isp("reactivemongo.core.actors.ChannelConnected.unapply"),
             isp("reactivemongo.core.actors.AwaitingResponse.unapply"),
             isp("reactivemongo.core.actors.ChannelDisconnected.unapply"),

@@ -2,7 +2,11 @@ package reactivemongo.api
 
 import scala.concurrent.{ ExecutionContext, Future }
 
-import reactivemongo.api.commands.AuthenticationRestriction
+import reactivemongo.api.commands.{
+  AuthenticationRestriction,
+  CommandCodecs,
+  RenameCollection
+}
 
 import reactivemongo.api.indexes.IndexesManager
 import reactivemongo.bson.{
@@ -88,6 +92,12 @@ trait DBMetaCommands { self: DB =>
     }
   }
 
+  private lazy implicit val unitBoxReader =
+    CommandCodecs.unitBoxReader(Compat.internalSerializationPack)
+
+  private lazy implicit val renameWriter =
+    RenameCollection.writer(Compat.internalSerializationPack)
+
   /**
    * [[https://docs.mongodb.com/manual/reference/command/renameCollection/ Renames a collection]].
    * Can only be executed if the this database reference is the `admin` one.
@@ -99,11 +109,8 @@ trait DBMetaCommands { self: DB =>
    *
    * @return a failure if the dropExisting option is false and the target collection already exists
    */
-  def renameCollection[C <: Collection](db: String, from: String, to: String, dropExisting: Boolean = false, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit ec: ExecutionContext, producer: CollectionProducer[C] = collections.bson.BSONCollectionProducer): Future[C] = {
-    import reactivemongo.api.commands.RenameCollection
-    import reactivemongo.api.commands.bson.BSONRenameCollectionImplicits._
-
-    Command.run(BSONSerializationPack, failoverStrategy).unboxed(
+  def renameCollection[C <: Collection](db: String, from: String, to: String, dropExisting: Boolean = false, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit ec: ExecutionContext, producer: CollectionProducer[C] = Compat.defaultCollectionProducer): Future[C] = {
+    Command.run(Compat.internalSerializationPack, failoverStrategy).unboxed(
       self, RenameCollection(s"${db}.$from", s"${db}.$to", dropExisting),
       ReadPreference.primary).map(_ => self.collection(to))
   }
