@@ -1,18 +1,19 @@
 import scala.concurrent.duration.FiniteDuration
 
-import reactivemongo.bson._
-
 import reactivemongo.api.ReadPreference
-import reactivemongo.api.collections.bson.BSONCollection
 
-import reactivemongo.api.commands.{ UpdateWriteResult, WriteResult, Upserted }
-import reactivemongo.api.commands.bson.BSONUpdateCommand._
-import reactivemongo.api.commands.bson.BSONUpdateCommandImplicits._
+import reactivemongo.api.commands.{
+  UpdateWriteResult,
+  WriteResult,
+  Upserted
+}
 
 import _root_.tests.Common
 
-trait UpdateSpec extends UpdateFixtures { collectionSpec: CollectionSpec =>
+import reactivemongo.api.tests.{ builder, decoder, pack, reader, writer }
 
+trait UpdateSpec extends UpdateFixtures { collectionSpec: CollectionSpec =>
+  import reactivemongo.api.TestCompat._
   import Common._
 
   private lazy val updCol1 = db(s"update1${System identityHashCode db}")
@@ -33,7 +34,7 @@ trait UpdateSpec extends UpdateFixtures { collectionSpec: CollectionSpec =>
     val jane = Person("Jack London", 18)
 
     {
-      def spec[T: BSONDocumentWriter: BSONDocumentReader](c: BSONCollection, timeout: FiniteDuration, f: => T)(upd: T => T) = {
+      def spec[T](c: BSONCollection, timeout: FiniteDuration, f: => T)(upd: T => T)(implicit w: pack.Writer[T], r: pack.Reader[T]) = {
         val person = f
 
         c.update.one(
@@ -41,7 +42,9 @@ trait UpdateSpec extends UpdateFixtures { collectionSpec: CollectionSpec =>
           u = BSONDocument(f"$$set" -> BSONDocument("age" -> 33)),
           upsert = true) must beLike[UpdateWriteResult]({
             case result => result.upserted.toList must beLike[List[Upserted]] {
-              case Upserted(0, id: BSONObjectID) :: Nil =>
+              case Upserted(0, bid: reactivemongo.bson.BSONObjectID) :: Nil =>
+                val id = BSONObjectID(bid.valueAsArray)
+
                 c.find(
                   selector = BSONDocument("_id" -> id),
                   projection = Option.empty[BSONDocument]).one[T] must beSome(upd(person)).await(1, timeout)
@@ -59,7 +62,7 @@ trait UpdateSpec extends UpdateFixtures { collectionSpec: CollectionSpec =>
           val coll = slowUpdCol1.withReadPreference(
             ReadPreference.secondaryPreferred)
 
-          coll.readPreference must_== ReadPreference.secondaryPreferred and {
+          coll.readPreference must_=== ReadPreference.secondaryPreferred and {
             spec(coll, slowTimeout, jane)(_.copy(age = 33))
           }
         }
@@ -90,9 +93,10 @@ trait UpdateSpec extends UpdateFixtures { collectionSpec: CollectionSpec =>
 
         c.update.one(q = BSONDocument.empty, u = doc, upsert = true).
           map(_.upserted.toList) must beLike[List[Upserted]] {
-            case Upserted(0, id @ BSONString("foo")) :: Nil =>
+            case Upserted(
+              0, reactivemongo.bson.BSONString("foo")) :: Nil =>
               c.find(
-                selector = BSONDocument("_id" -> id),
+                selector = BSONDocument("_id" -> "foo"),
                 projection = Option.empty[BSONDocument]).one[BSONDocument].
                 aka("found") must beSome(doc).await(1, timeout)
           }.await(1, timeout) and {
@@ -111,37 +115,20 @@ trait UpdateSpec extends UpdateFixtures { collectionSpec: CollectionSpec =>
       }
     }
 
-    "update a document directly using the Update command" in {
-      val doc = BSONDocument("_id" -> "foo", "bar" -> 2)
-
-      updCol2.runCommand(
-        Update(UpdateElement(
-          q = doc, u = BSONDocument(f"$$set" -> BSONDocument("bar" -> 3)))),
-        ReadPreference.primary) aka "result" must beLike[UpdateWriteResult]({
-          case result => result.nModified must_== 1 and (
-            updCol2.find(
-              selector = BSONDocument("_id" -> "foo"),
-              projection = Option.empty[BSONDocument]).one[BSONDocument].
-              aka("updated") must beSome(BSONDocument(
-                "_id" -> "foo", "bar" -> 3)).await(1, timeout))
-        }).await(1, timeout)
-    }
-
     {
-      def spec[T: BSONDocumentWriter: BSONDocumentReader](c: BSONCollection, timeout: FiniteDuration, f: => T)(upd: T => T) = {
+      def spec[T](c: BSONCollection, timeout: FiniteDuration, f: => T)(upd: T => T)(implicit w: c.pack.Writer[T], r: c.pack.Reader[T]) = {
         val person = f
 
-        c.runCommand(
-          Update(UpdateElement(
-            q = person, u = BSONDocument(
-            f"$$set" -> BSONDocument("age" -> 66)))),
-          ReadPreference.primary) must beLike[UpdateWriteResult]({
-            case result => result.nModified mustEqual 1 and (
+        c.update.one(
+          q = person,
+          u = BSONDocument(f"$$set" -> BSONDocument("age" -> 66))) must beLike[UpdateWriteResult] {
+            case result => result.nModified must_=== 1 and {
               c.find(
                 selector = BSONDocument("age" -> 66),
                 projection = Option.empty[BSONDocument]).
-                one[T] must beSome(upd(person)).await(1, timeout))
-          }).await(1, timeout)
+                one[T] must beSome(upd(person)).await(1, timeout)
+            }
+          }.await(1, timeout)
       }
 
       section("mongo2", "mongo24", "not_mongo26")
@@ -211,22 +198,25 @@ sealed trait UpdateFixtures { _: UpdateSpec =>
     score: BigDecimal) // Mongo +3.4
 
   object Person3 {
-    implicit val personReader: BSONDocumentReader[Person3] =
-      BSONDocumentReader[Person3] { doc: BSONDocument =>
+    implicit lazy val personReader: pack.Reader[Person3] =
+      reader[Person3] { doc: pack.Document =>
         Person3(
-          doc.getAs[String]("firstName").getOrElse(""),
-          doc.getAs[String]("lastName").getOrElse(""),
-          doc.getAs[Int]("age").getOrElse(0),
-          doc.getAs[BigDecimal]("score").getOrElse(BigDecimal(-1L)))
+          decoder.string(doc, "firstName").getOrElse(""),
+          decoder.string(doc, "lastName").getOrElse(""),
+          decoder.int(doc, "age").getOrElse(0),
+          decoder.double(doc, "score").fold(BigDecimal(-1L))(BigDecimal(_)))
       }
 
-    implicit val personWriter: BSONDocumentWriter[Person3] =
-      BSONDocumentWriter[Person3] { person: Person3 =>
-        BSONDocument(
-          "firstName" -> person.firstName,
-          "lastName" -> person.lastName,
-          "age" -> person.age,
-          "score" -> person.score)
+    implicit lazy val personWriter: pack.Writer[Person3] = {
+      import builder.{ elementProducer => e, string }
+
+      writer[Person3] { person: Person3 =>
+        builder.document(Seq(
+          e("firstName", string(person.firstName)),
+          e("lastName", string(person.lastName)),
+          e("age", builder.int(person.age)),
+          e("score", builder.double(person.score.doubleValue))))
       }
+    }
   }
 }

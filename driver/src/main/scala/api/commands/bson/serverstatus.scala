@@ -33,14 +33,14 @@ import reactivemongo.bson.{
  */
 @deprecated("Internal: will be made private", "0.16.0")
 object BSONServerStatusImplicits {
-  implicit object BSONServerStatusWriter
+  object BSONServerStatusWriter
     extends BSONDocumentWriter[ServerStatus.type] {
 
     val bsonCmd = BSONDocument("serverStatus" -> 1)
     def write(command: ServerStatus.type) = bsonCmd
   }
 
-  implicit object BSONServerStatusAssertsReader
+  object BSONServerStatusAssertsReader
     extends BSONDocumentReader[ServerStatusAsserts] {
     def read(doc: BSONDocument): ServerStatusAsserts = (for {
       regular <- doc.getAsTry[BSONNumberLike]("regular").map(_.toInt)
@@ -51,7 +51,9 @@ object BSONServerStatusImplicits {
     } yield ServerStatusAsserts(regular, warning, msg, user, rollovers)).get
   }
 
-  implicit object BSONServerStatusBackgroundFlushingReader
+  private implicit def assertsReader = BSONServerStatusAssertsReader
+
+  object BSONServerStatusBackgroundFlushingReader
     extends BSONDocumentReader[ServerStatusBackgroundFlushing] {
     def read(doc: BSONDocument): ServerStatusBackgroundFlushing = (for {
       flushes <- doc.getAsTry[BSONNumberLike]("flushes").map(_.toInt)
@@ -64,7 +66,10 @@ object BSONServerStatusImplicits {
       flushes, totalMs, averageMs, lastMs, lastFinished)).get
   }
 
-  implicit object BSONServerStatusConnections
+  private implicit def bgFlushingReader =
+    BSONServerStatusBackgroundFlushingReader
+
+  object BSONServerStatusConnections
     extends BSONDocumentReader[ServerStatusConnections] {
     def read(doc: BSONDocument): ServerStatusConnections = (for {
       current <- doc.getAsTry[BSONNumberLike]("current").map(_.toInt)
@@ -73,7 +78,9 @@ object BSONServerStatusImplicits {
     } yield ServerStatusConnections(current, available, totalCreated)).get
   }
 
-  implicit object BSONServerStatusJournalingTime
+  private implicit def connectionsReader = BSONServerStatusConnections
+
+  object BSONServerStatusJournalingTime
     extends BSONDocumentReader[ServerStatusJournalingTime] {
     def read(doc: BSONDocument): ServerStatusJournalingTime = (for {
       dt <- doc.getAsTry[BSONNumberLike]("dt").map(_.toLong)
@@ -92,8 +99,11 @@ object BSONServerStatusImplicits {
       writeToDataFiles, remapPrivateView, commits, commitsInWriteLock)).get
   }
 
-  implicit object BSONServerStatusJournaling
+  private implicit def timeReader = BSONServerStatusJournalingTime
+
+  object BSONServerStatusJournaling
     extends BSONDocumentReader[ServerStatusJournaling] {
+
     def read(doc: BSONDocument): ServerStatusJournaling = (for {
       commits <- doc.getAsTry[BSONNumberLike]("commits").map(_.toInt)
       journaledMB <- doc.getAsTry[BSONNumberLike]("journaledMB").map(_.toDouble)
@@ -108,7 +118,9 @@ object BSONServerStatusImplicits {
       compression, commitsInWriteLock, earlyCommits, timeMs)).get
   }
 
-  implicit object BSONServerStatusNetwork
+  private implicit def journalingReader = BSONServerStatusJournaling
+
+  object BSONServerStatusNetwork
     extends BSONDocumentReader[ServerStatusNetwork] {
     def read(doc: BSONDocument): ServerStatusNetwork = (for {
       bytesIn <- doc.getAsTry[BSONNumberLike]("bytesIn").map(_.toInt)
@@ -117,7 +129,9 @@ object BSONServerStatusImplicits {
     } yield ServerStatusNetwork(bytesIn, bytesOut, numRequests)).get
   }
 
-  implicit object BSONServerStatusLock
+  private implicit def networkReader = BSONServerStatusNetwork
+
+  object BSONServerStatusLock
     extends BSONDocumentReader[ServerStatusLock] {
     def read(doc: BSONDocument): ServerStatusLock = (for {
       total <- doc.getAsTry[BSONNumberLike]("total").map(_.toInt)
@@ -126,7 +140,9 @@ object BSONServerStatusImplicits {
     } yield ServerStatusLock(total, readers, writers)).get
   }
 
-  implicit object BSONServerStatusGlobalLock
+  private implicit def statusLockReader = BSONServerStatusLock
+
+  object BSONServerStatusGlobalLock
     extends BSONDocumentReader[ServerStatusGlobalLock] {
     def read(doc: BSONDocument): ServerStatusGlobalLock = (for {
       totalTime <- doc.getAsTry[BSONNumberLike]("totalTime").map(_.toInt)
@@ -135,7 +151,9 @@ object BSONServerStatusImplicits {
     } yield ServerStatusGlobalLock(totalTime, currentQueue, activeClients)).get
   }
 
-  implicit object BSONServerStatusExtraInfo
+  private implicit def globalLockReader = BSONServerStatusGlobalLock
+
+  object BSONServerStatusExtraInfo
     extends BSONDocumentReader[ServerStatusExtraInfo] {
     def read(doc: BSONDocument): ServerStatusExtraInfo = (for {
       heapUsageBytes <- doc.getAsTry[BSONNumberLike](
@@ -144,7 +162,9 @@ object BSONServerStatusImplicits {
     } yield ServerStatusExtraInfo(heapUsageBytes, pageFaults)).get
   }
 
-  implicit object BSONServerStatusResultReader
+  private implicit def extraReader = BSONServerStatusExtraInfo
+
+  object BSONServerStatusResultReader
     extends DealingWithGenericCommandErrorsReader[ServerStatusResult] {
 
     def readResult(doc: BSONDocument): ServerStatusResult = (for {

@@ -26,8 +26,8 @@ case class Index(
   sparse: Boolean = false,
   version: Option[Int] = None, // let MongoDB decide
   // TODO: storageEngine (new for Mongo3)
-  partialFilter: Option[BSONDocument] = None,
-  options: BSONDocument = BSONDocument()) {
+  @deprecated("Will be internal", "0.19.0") partialFilter: Option[BSONDocument] = None,
+  @deprecated("Will be internal", "0.19.0") options: BSONDocument = BSONDocument.empty) {
 
   /** The name of the index (a default one is computed if none). */
   lazy val eventualName: String = name.getOrElse(key.foldLeft("") { (name, kv) =>

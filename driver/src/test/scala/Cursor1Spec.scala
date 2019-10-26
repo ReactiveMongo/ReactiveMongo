@@ -1,15 +1,13 @@
 import scala.concurrent.{ Await, Future }
 import scala.concurrent.duration.FiniteDuration
 
-import reactivemongo.bson.BSONDocument
-
 import reactivemongo.api.{
   Cursor,
   CursorFlattener,
   CursorProducer,
   WrappedCursor
 }
-import reactivemongo.api.collections.bson.BSONCollection
+import reactivemongo.api.TestCompat._
 
 trait Cursor1Spec { spec: CursorSpec =>
   def group1 = {

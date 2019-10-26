@@ -1,16 +1,18 @@
 import scala.concurrent.{ Await, Future, Promise }
 import scala.concurrent.duration._
 
-import reactivemongo.bson.{ BSONDocument, BSONDocumentReader }
 import reactivemongo.core.protocol.Response
 import reactivemongo.api.{ Cursor, DB, QueryOpts }
 
 import _root_.tests.Common
 
+import reactivemongo.api.TestCompat._
+import reactivemongo.api.tests.{ decoder, reader => docReader }
+
 trait TailableCursorSpec { specs: CursorSpec =>
   def tailableSpec = {
-    object IdReader extends BSONDocumentReader[Int] {
-      def read(doc: BSONDocument): Int = doc.getAs[Int]("id").get
+    lazy val legacyIdReader = reactivemongo.bson.BSONDocumentReader[Int] {
+      _.getAs[Int]("id").get
     }
 
     "read from capped collection" >> {
@@ -38,14 +40,16 @@ trait TailableCursorSpec { specs: CursorSpec =>
       }
 
       @inline def tailable(n: String, database: DB = db) = {
-        implicit val reader = IdReader
+        implicit val reader = docReader[Int] { decoder.int(_, "id").get }
+
         collection(n, database).find(matchAll("cursorspec50")).options(
           QueryOpts().tailable).batchSize(512).cursor[Int]()
       }
 
       "using tailable" >> {
         "to fold responses" in {
-          implicit val reader = IdReader
+          implicit val reader = legacyIdReader
+
           tailable("foldr0").foldResponses(List.empty[Int], 6) { (s, resp) =>
             val bulk = Response.parse(resp).flatMap(_.asOpt[Int].toList)
 
@@ -54,7 +58,7 @@ trait TailableCursorSpec { specs: CursorSpec =>
         }
 
         "to fold responses with async function" in {
-          implicit val reader = IdReader
+          implicit val reader = legacyIdReader
           tailable("foldr0").foldResponsesM(List.empty[Int], 6) { (s, resp) =>
             val bulk = Response.parse(resp).flatMap(_.asOpt[Int].toList)
 

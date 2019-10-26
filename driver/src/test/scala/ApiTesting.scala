@@ -43,7 +43,14 @@ import reactivemongo.bson.BSONDocument
 import reactivemongo.api.collections.QueryCodecs
 
 package object tests {
-  val pack = BSONSerializationPack
+  val pack = Compat.internalSerializationPack
+
+  lazy val decoder = pack.newDecoder
+  lazy val builder = pack.newBuilder
+
+  def reader[T](f: pack.Document => T): pack.Reader[T] = pack.reader[T](f)
+
+  def writer[T](f: T => pack.Document): pack.Writer[T] = pack.writer[T](f)
 
   def numConnections(d: MongoDriver): Int = d.numConnections
 
@@ -262,4 +269,37 @@ package object tests {
   def preload(resp: Response)(implicit ec: ExecutionContext): Future[(Response, BSONDocument)] = Response.preload(resp)
 
   @inline def session(db: DefaultDB): Option[Session] = db.session
+
+  object commands {
+    implicit val replSetMaintenanceWriter =
+      reactivemongo.api.commands.ReplSetMaintenance.writer(pack)
+
+    implicit val unitBoxReader =
+      reactivemongo.api.commands.CommandCodecs.unitBoxReader(pack)
+
+    implicit val replSetGetStatusWriter =
+      reactivemongo.api.commands.ReplSetGetStatus.writer(pack)
+
+    import reactivemongo.api.commands.ReplSetStatus
+
+    implicit val replSetStatusReader: pack.Reader[ReplSetStatus] =
+      reactivemongo.api.commands.ReplSetGetStatus.reader(pack)
+
+    implicit val serverStatusWriter =
+      reactivemongo.api.commands.ServerStatus.writer(pack)
+
+    implicit val serverStatusReader =
+      reactivemongo.api.commands.ServerStatus.reader(pack)
+
+    import reactivemongo.api.commands.IsMasterCommand
+    type IsMaster = IsMasterCommand[pack.type]#IsMaster
+
+    def isMasterWriter(cmd: IsMasterCommand[pack.type]) = new {
+      def get[T <: cmd.IsMaster]: pack.Writer[T] = cmd.writer[T](pack)
+    }
+
+    def isMasterReader(cmd: IsMasterCommand[pack.type]) = new {
+      def get(implicit dr: pack.NarrowValueReader[java.util.Date], sr: pack.NarrowValueReader[String]): pack.Reader[cmd.IsMasterResult] = cmd.reader(pack)
+    }
+  }
 }

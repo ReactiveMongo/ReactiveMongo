@@ -54,7 +54,7 @@ trait Cursor[T] extends CursorCompatAPI[T] {
    * @param err $errorHandlerParam
    * @tparam A $resultTParam
    */
-  def foldResponses[A](z: => A, maxDocs: Int = -1)(suc: (A, Response) => Cursor.State[A], err: ErrorHandler[A] = FailOnError[A]())(implicit @deprecatedName('ctx) ec: ExecutionContext): Future[A]
+  def foldResponses[A](z: => A, maxDocs: Int = -1)(suc: (A, Response) => Cursor.State[A], err: ErrorHandler[A] = FailOnError[A]())(implicit @deprecatedName(Symbol("ctx")) ec: ExecutionContext): Future[A]
 
   /**
    * $foldResp
@@ -65,7 +65,7 @@ trait Cursor[T] extends CursorCompatAPI[T] {
    * @param err $errorHandlerParam
    * @tparam A $resultTParam
    */
-  def foldResponsesM[A](z: => A, maxDocs: Int = -1)(suc: (A, Response) => Future[Cursor.State[A]], err: ErrorHandler[A] = FailOnError[A]())(implicit @deprecatedName('ctx) ec: ExecutionContext): Future[A]
+  def foldResponsesM[A](z: => A, maxDocs: Int = -1)(suc: (A, Response) => Future[Cursor.State[A]], err: ErrorHandler[A] = FailOnError[A]())(implicit @deprecatedName(Symbol("ctx")) ec: ExecutionContext): Future[A]
 
   /**
    * $foldBulks
@@ -76,7 +76,7 @@ trait Cursor[T] extends CursorCompatAPI[T] {
    * @param err $errorHandlerParam
    * @tparam A $resultTParam
    */
-  def foldBulks[A](z: => A, maxDocs: Int = -1)(suc: (A, Iterator[T]) => Cursor.State[A], err: ErrorHandler[A] = FailOnError[A]())(implicit @deprecatedName('ctx) ec: ExecutionContext): Future[A]
+  def foldBulks[A](z: => A, maxDocs: Int = -1)(suc: (A, Iterator[T]) => Cursor.State[A], err: ErrorHandler[A] = FailOnError[A]())(implicit @deprecatedName(Symbol("ctx")) ec: ExecutionContext): Future[A]
 
   /**
    * $foldBulks
@@ -87,7 +87,7 @@ trait Cursor[T] extends CursorCompatAPI[T] {
    * @param err $errorHandlerParam
    * @tparam A $resultTParam
    */
-  def foldBulksM[A](z: => A, maxDocs: Int = -1)(suc: (A, Iterator[T]) => Future[Cursor.State[A]], err: ErrorHandler[A] = FailOnError[A]())(implicit @deprecatedName('ctx) ec: ExecutionContext): Future[A]
+  def foldBulksM[A](z: => A, maxDocs: Int = -1)(suc: (A, Iterator[T]) => Future[Cursor.State[A]], err: ErrorHandler[A] = FailOnError[A]())(implicit @deprecatedName(Symbol("ctx")) ec: ExecutionContext): Future[A]
 
   /**
    * $foldWhile
@@ -103,7 +103,7 @@ trait Cursor[T] extends CursorCompatAPI[T] {
    *   { (l, e) => println("last valid value: " + l); Cursor.Fail(e) })
    * }}}
    */
-  def foldWhile[A](z: => A, maxDocs: Int = -1)(suc: (A, T) => Cursor.State[A], err: ErrorHandler[A] = FailOnError[A]())(implicit @deprecatedName('ctx) ec: ExecutionContext): Future[A]
+  def foldWhile[A](z: => A, maxDocs: Int = -1)(suc: (A, T) => Cursor.State[A], err: ErrorHandler[A] = FailOnError[A]())(implicit @deprecatedName(Symbol("ctx")) ec: ExecutionContext): Future[A]
 
   /**
    * $foldWhile
@@ -123,7 +123,7 @@ trait Cursor[T] extends CursorCompatAPI[T] {
    *   })
    * }}}
    */
-  def foldWhileM[A](z: => A, maxDocs: Int = -1)(suc: (A, T) => Future[Cursor.State[A]], err: ErrorHandler[A] = FailOnError[A]())(implicit @deprecatedName('ctx) ec: ExecutionContext): Future[A]
+  def foldWhileM[A](z: => A, maxDocs: Int = -1)(suc: (A, T) => Future[Cursor.State[A]], err: ErrorHandler[A] = FailOnError[A]())(implicit @deprecatedName(Symbol("ctx")) ec: ExecutionContext): Future[A]
 
   /**
    * $foldWhile
@@ -139,7 +139,7 @@ trait Cursor[T] extends CursorCompatAPI[T] {
    *   { (l, e) => println("last valid value: " + l); Cursor.Fail(e) })
    * }}}
    */
-  def fold[A](z: => A, maxDocs: Int = -1)(suc: (A, T) => A)(implicit @deprecatedName('ctx) ec: ExecutionContext): Future[A] = foldWhile[A](z, maxDocs)(
+  def fold[A](z: => A, maxDocs: Int = -1)(suc: (A, T) => A)(implicit @deprecatedName(Symbol("ctx")) ec: ExecutionContext): Future[A] = foldWhile[A](z, maxDocs)(
     { (st, v) => Cursor.Cont[A](suc(st, v)) }, FailOnError[A]())
 
   /**
@@ -151,7 +151,7 @@ trait Cursor[T] extends CursorCompatAPI[T] {
    * val first: Future[BSONDocument] = cursor.head
    * }}}
    */
-  def head(implicit @deprecatedName('ctx) ec: ExecutionContext): Future[T]
+  def head(implicit @deprecatedName(Symbol("ctx")) ec: ExecutionContext): Future[T]
 
   /**
    * $getHead, if any.
@@ -162,7 +162,7 @@ trait Cursor[T] extends CursorCompatAPI[T] {
    * val maybeFirst: Future[Option[BSONDocument]] = cursor.headOption
    * }}}
    */
-  def headOption(implicit @deprecatedName('ctx) ec: ExecutionContext): Future[Option[T]]
+  def headOption(implicit @deprecatedName(Symbol("ctx")) ec: ExecutionContext): Future[Option[T]]
 }
 
 /** Cursor companion object */

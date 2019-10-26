@@ -28,13 +28,11 @@ import reactivemongo.core.commands.SuccessfulAuthentication
 
 import reactivemongo.api.commands.{
   Command,
-  CommandCodecs,
   CommandError,
   EndSessions,
   StartSession,
   StartSessionResult,
-  EndTransaction,
-  UnitBox
+  EndTransaction
 }
 
 /**
@@ -83,7 +81,7 @@ sealed trait DB {
    * @param name $nameParam
    * @param failoverStrategy $failoverStrategyParam
    */
-  def apply[C <: Collection](name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit producer: CollectionProducer[C] = collections.bson.BSONCollectionProducer): C = collection(name, failoverStrategy)
+  def apply[C <: Collection](name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit producer: CollectionProducer[C] = Compat.defaultCollectionProducer): C = collection(name, failoverStrategy)
 
   /**
    * $resolveDescription.
@@ -91,7 +89,7 @@ sealed trait DB {
    * @param name $nameParam
    * @param failoverStrategy $failoverStrategyParam
    */
-  def collection[C <: Collection](name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit producer: CollectionProducer[C] = collections.bson.BSONCollectionProducer): C = producer(this, name, failoverStrategy)
+  def collection[C <: Collection](name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit producer: CollectionProducer[C] = Compat.defaultCollectionProducer): C = producer(this, name, failoverStrategy)
 
   @inline def defaultReadPreference: ReadPreference =
     connection.options.readPreference
@@ -152,7 +150,7 @@ sealed trait DB {
    * $startTxDescription, if none is already started with
    * the current client session otherwise does nothing.
    *
-   * It fails if no session is previously started (see [[startSession]]).
+   * It fails if no session is previously started (see `startSession`).
    *
    * '''EXPERIMENTAL:''' API may change without notice.
    *
@@ -171,7 +169,7 @@ sealed trait DB {
    * $startTxDescription, if none is already started with
    * the current client session otherwise does nothing.
    *
-   * It fails if no session is previously started (see [[startSession]]).
+   * It fails if no session is previously started (see `startSession`).
    *
    *
    * '''EXPERIMENTAL:''' API may change without notice.
@@ -313,15 +311,14 @@ class DefaultDB private[api] (
   val connectionState: ConnectionState,
   @transient val failoverStrategy: FailoverStrategy = FailoverStrategy(),
   @transient private[reactivemongo] val session: Option[Session] = Option.empty)
-  extends DB with DBMetaCommands with GenericDB[BSONSerializationPack.type]
+  extends DB with DBMetaCommands with GenericDB[Compat.SerializationPack]
   with Product with Serializable {
+
+  import Compat.{ internalSerializationPack, unitBoxReader }
 
   type DBType = DefaultDB
 
-  @transient val pack: BSONSerializationPack.type = BSONSerializationPack
-
-  private implicit def unitReader: BSONSerializationPack.Reader[UnitBox.type] =
-    CommandCodecs.unitBoxReader(BSONSerializationPack)
+  @transient val pack: Compat.SerializationPack = internalSerializationPack
 
   def startSession(failIfAlreadyStarted: Boolean)(implicit ec: ExecutionContext): Future[DefaultDB] = session match {
     case Some(s) if failIfAlreadyStarted =>
@@ -332,13 +329,10 @@ class DefaultDB private[api] (
       Future.successful(this) // NoOp
 
     case _ => {
-      implicit def w: BSONSerializationPack.Writer[StartSession.type] =
-        StartSession.commandWriter(BSONSerializationPack)
+      implicit def w = StartSession.commandWriter(internalSerializationPack)
+      implicit def r = StartSessionResult.reader(internalSerializationPack)
 
-      implicit def r: BSONSerializationPack.Reader[StartSessionResult] =
-        StartSessionResult.reader(BSONSerializationPack)
-
-      Command.run(BSONSerializationPack, failoverStrategy).
+      Command.run(internalSerializationPack, failoverStrategy).
         apply(this, StartSession, defaultReadPreference).map { res =>
           withNewSession(res)
         }
@@ -419,11 +413,11 @@ class DefaultDB private[api] (
 
       case Success(tx) => tx.writeConcern match {
         case Some(wc) => {
-          implicit def w: BSONSerializationPack.Writer[EndTransaction] =
-            EndTransaction.commandWriter(BSONSerializationPack)
+          implicit def w = EndTransaction.commandWriter(
+            internalSerializationPack)
 
           connection.database("admin").flatMap { adminDb =>
-            Command.run(BSONSerializationPack, failoverStrategy).apply(
+            Command.run(internalSerializationPack, failoverStrategy).apply(
               adminDb.withSession(s), command(s, wc), defaultReadPreference).
               map(_ => {}).recoverWith {
                 case CommandError.Code(251) =>
@@ -468,10 +462,9 @@ class DefaultDB private[api] (
 
   private def endSessionById(failIfNotStarted: Boolean)(command: java.util.UUID => EndSessions)(implicit ec: ExecutionContext): Future[DefaultDB] = session.map(_.lsid) match {
     case Some(lsid) => {
-      implicit def w: BSONSerializationPack.Writer[EndSessions] =
-        EndSessions.commandWriter(BSONSerializationPack)
+      implicit def w = EndSessions.commandWriter(internalSerializationPack)
 
-      Command.run(BSONSerializationPack, failoverStrategy).
+      Command.run(internalSerializationPack, failoverStrategy).
         apply(this, command(lsid), defaultReadPreference).map(_ =>
           new DefaultDB(
             name, connection, connectionState, failoverStrategy,

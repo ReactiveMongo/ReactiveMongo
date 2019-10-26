@@ -1,16 +1,14 @@
 import scala.concurrent.{ Await, Future }
 import scala.concurrent.duration._
 
-import reactivemongo.bson._
 import reactivemongo.api.{ Cursor, QueryOpts }
-
-import reactivemongo.api.collections.bson.BSONCollection
 
 import org.specs2.concurrent.ExecutionEnv
 
 import _root_.tests.Common
+import reactivemongo.api.TestCompat._
 
-class CursorSpec(implicit val ee: ExecutionEnv)
+final class CursorSpec(implicit val ee: ExecutionEnv)
   extends org.specs2.mutable.Specification with CursorSpecEnv
   with Cursor1Spec with TailableCursorSpec {
 

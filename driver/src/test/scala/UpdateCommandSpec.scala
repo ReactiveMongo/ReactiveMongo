@@ -1,8 +1,15 @@
-package reactivemongo.api
+package reactivemongo
 
 import reactivemongo.bson.{ BSONArray, BSONBinary, BSONDocument }
 
 import reactivemongo.core.protocol.MongoWireVersion
+
+import reactivemongo.api.{
+  BSONSerializationPack,
+  NodeSetSession,
+  SessionTransaction,
+  WriteConcern
+}
 
 import reactivemongo.api.commands.{
   UpdateCommand,

@@ -1,48 +1,46 @@
 import scala.concurrent.duration.FiniteDuration
 
-import reactivemongo.bson.{
-  BSON,
-  BSONDocument,
-  BSONDocumentReader,
-  BSONDocumentWriter
-}
-
-import reactivemongo.api.BSONSerializationPack
 import reactivemongo.api.commands._
 
-import reactivemongo.api.collections.bson.BSONCollection
-
 import org.specs2.concurrent.ExecutionEnv
+
+import reactivemongo.api.tests.{ builder, decoder, pack, reader, writer }
 
 final class FindAndModifySpec(implicit ee: ExecutionEnv)
   extends org.specs2.mutable.Specification { // with FindAndModifyFixtures {
 
   "FindAndModify" title
 
+  import reactivemongo.api.TestCompat._
   import tests.Common
   import Common._
 
   "Raw findAndModify" should {
-    type FindAndModifyResult = FindAndModifyCommand.Result[BSONSerializationPack.type]
+    type FindAndModifyResult = FindAndModifyCommand.Result[pack.type]
 
     case class Person(
       firstName: String,
       lastName: String,
       age: Int)
 
-    implicit object PersonReader extends BSONDocumentReader[Person] {
-      def read(doc: BSONDocument): Person = Person(
-        doc.getAs[String]("firstName").getOrElse(""),
-        doc.getAs[String]("lastName").getOrElse(""),
-        doc.getAs[Int]("age").getOrElse(0))
+    implicit val PersonReader = reader[Person] { doc =>
+      Person(
+        decoder.string(doc, "firstName").getOrElse(""),
+        decoder.string(doc, "lastName").getOrElse(""),
+        decoder.int(doc, "age").getOrElse(0))
     }
 
-    implicit object PersonWriter extends BSONDocumentWriter[Person] {
-      def write(person: Person): BSONDocument = BSONDocument(
-        "firstName" -> person.firstName,
-        "lastName" -> person.lastName,
-        "age" -> person.age)
+    implicit val PersonWriter = writer[Person] { person =>
+      import builder.{ elementProducer => e }
+
+      builder.document(Seq(
+        e("firstName", builder.string(person.firstName)),
+        e("lastName", builder.string(person.lastName)),
+        e("age", builder.int(person.age))))
     }
+
+    def writeDocument[T](value: T)(implicit w: pack.Writer[T]) =
+      pack.serialize(value, w)
 
     val jack1 = Person("Jack", "London", 27)
     val jack2 = jack1.copy(age = /* updated to */ 40)
@@ -81,9 +79,9 @@ final class FindAndModifySpec(implicit ee: ExecutionEnv)
                 /*c.find(BSONDocument.empty).cursor[BSONDocument]().
                   collect[List]().flatMap { docs =>
                     println(s"FindAndModify#2: docs = ${docs.map(BSONDocument.pretty)}")
-                    c.count(Some(BSON.writeDocument(after)))
+                    c.count(Some(writeDocument(after)))
                   }.*/
-                c.count(Some(BSON.writeDocument(after))).
+                c.count(Some(writeDocument(after))).
                   aka("count after") must beTypedEqualTo(1).await(1, timeout)
               }
           }).await(1, timeout)
@@ -94,7 +92,7 @@ final class FindAndModifySpec(implicit ee: ExecutionEnv)
         val colName = s"FindAndModifySpec${System identityHashCode this}-1"
         val collection = db(colName)
 
-        collection.count(Some(BSON.writeDocument(jack1))).
+        collection.count(Some(writeDocument(jack1))).
           aka("count before") must beTypedEqualTo(0).await(1, timeout) and {
             upsertAndFetch(collection, jack1, after.age, timeout) { result =>
               result.lastError.exists(_.upsertedId.isDefined) must beTrue
@@ -110,7 +108,7 @@ final class FindAndModifySpec(implicit ee: ExecutionEnv)
 
         slowColl.insert(ordered = true).one(before).
           map(_.n) must beTypedEqualTo(1).await(0, slowTimeout) and {
-            slowColl.count(Some(BSON.writeDocument(before))).
+            slowColl.count(Some(writeDocument(before))).
               aka("count before") must beTypedEqualTo(1).await(1, slowTimeout)
           } and eventually(2, timeout) {
             upsertAndFetch(

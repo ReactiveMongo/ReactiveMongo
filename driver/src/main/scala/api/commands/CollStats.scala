@@ -6,7 +6,9 @@ import reactivemongo.api.SerializationPack
 case class CollStats(scale: Option[Int] = None)
   extends CollectionCommand with CommandWithResult[CollStatsResult]
 
-private[api] object CollStats {
+private[api] object CollStats { //extends scala.runtime.AbstractFunction1[Option[Int], CollStats] {
+  //@inline def apply(scale: Option[Int]): CollStats = new CollStats(scale)
+
   def writer[P <: SerializationPack](pack: P): pack.Writer[ResolvedCollectionCommand[CollStats]] = {
     val builder = pack.newBuilder
 

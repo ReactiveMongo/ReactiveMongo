@@ -94,7 +94,7 @@ trait GenericCollection[P <: SerializationPack with Singleton]
   protected lazy val version = db.connectionState.metadata.maxWireVersion
 
   protected val BatchCommands: BatchCommands[pack.type]
-  import BatchCommands._
+  import BatchCommands.CountCommand
 
   /**
    * Alias for type of the aggregation framework,
@@ -192,14 +192,15 @@ trait GenericCollection[P <: SerializationPack with Singleton]
     selector: Option[pack.Document] = None,
     limit: Int = 0,
     skip: Int = 0,
-    hint: Option[H] = None)(implicit h: H => CountCommand.Hint, ec: ExecutionContext): Future[Int] = countDocuments(selector, Some(limit), skip,
-    hint = hint.map {
-      h(_) match {
-        case CountCommand.HintString(n)   => self.hint(n)
-        case CountCommand.HintDocument(d) => self.hint(d)
-      }
-    },
-    readConcern = self.readConcern).map(_.toInt)
+    hint: Option[H] = None)(implicit h: H => CountCommand.Hint, ec: ExecutionContext): Future[Int] =
+    countDocuments(selector, Some(limit), skip,
+      hint = hint.map {
+        h(_) match {
+          case CountCommand.HintString(n)   => self.hint(n)
+          case CountCommand.HintDocument(d) => self.hint(d)
+        }
+      },
+      readConcern = self.readConcern).map(_.toInt)
 
   /**
    * Counts the matching documents.

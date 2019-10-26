@@ -1,7 +1,6 @@
 scalacOptions ++= Seq("-deprecation", "-unchecked", "-feature")
 
 resolvers ++= Seq(
-  "jgit-repo" at "http://download.eclipse.org/jgit/maven",
   Resolver.url("sbt-repo", url(
     "https://dl.bintray.com/sbt/sbt-plugin-releases/"))(Resolver.ivyStylePatterns),
   Resolver.url("typesafe-repo", url(

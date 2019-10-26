@@ -66,7 +66,7 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
   def commentString: Option[String]
   def options: QueryOpts
 
-  @deprecatedName('failover) def failoverStrategy: FailoverStrategy
+  @deprecatedName(Symbol("failover")) def failoverStrategy: FailoverStrategy
 
   def collection: Collection
   def maxTimeMsOption: Option[Long]
@@ -211,7 +211,7 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
     snapshotFlag: Boolean = snapshotFlag,
     commentString: Option[String] = commentString,
     options: QueryOpts = options,
-    @deprecatedName('failover) failoverStrategy: FailoverStrategy = failoverStrategy,
+    @deprecatedName(Symbol("failover")) failoverStrategy: FailoverStrategy = failoverStrategy,
     maxTimeMsOption: Option[Long] = maxTimeMsOption): Self
 
   // ---

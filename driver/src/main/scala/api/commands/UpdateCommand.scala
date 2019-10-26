@@ -12,7 +12,7 @@ trait UpdateCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] {
   val pack: P
 
   case class Update( // TODO: bypassDocumentValidation: bool
-    @deprecatedName('documents) updates: Seq[UpdateElement],
+    @deprecatedName(Symbol("documents")) updates: Seq[UpdateElement],
     ordered: Boolean,
     writeConcern: WriteConcern) extends CollectionCommand with CommandWithResult[UpdateResult] with Mongo26WriteCommand {
 

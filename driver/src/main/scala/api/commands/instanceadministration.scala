@@ -4,6 +4,8 @@ import scala.util.control.NonFatal
 
 import reactivemongo.api.SerializationPack
 
+import reactivemongo.api.indexes.{ IndexesManager, NSIndex }
+
 import reactivemongo.core.errors.GenericDriverException
 
 @deprecated("Internal: will be made private", "0.16.0")
@@ -23,7 +25,9 @@ object DropDatabase extends Command with CommandWithResult[UnitBox.type] {
 @deprecated("Internal: will be made private", "0.16.0")
 case class DropCollectionResult(dropped: Boolean)
 
-private[api] object DropCollectionResult {
+private[api] object DropCollectionResult { //extends scala.runtime.AbstractFunction1[Boolean, DropCollectionResult] {
+  //@inline def apply(dropped: Boolean): DropCollectionResult = new DropCollectionResult(dropped)
+
   def reader[P <: SerializationPack](pack: P): pack.Reader[DropCollectionResult] = {
     val decoder = pack.newDecoder
     val unitBoxReader = CommandCodecs.unitBoxReader[pack.type](pack)
@@ -38,7 +42,7 @@ private[api] object DropCollectionResult {
           def code = decoder.int(doc, "code")
           def msg = decoder.string(doc, "errmsg")
 
-          if (code.contains(26) || msg.exists(_ startsWith "ns not found")) {
+          if (code.exists(_ == 26) || msg.exists(_ startsWith "ns not found")) {
             DropCollectionResult(false)
           } else {
             throw cause
@@ -128,8 +132,11 @@ case class Capped(
   size: Long,
   max: Option[Int] = None)
 
-private[api] object Capped {
-  def writeTo[P <: SerializationPack](pack: P)(builder: SerializationPack.Builder[pack.type], append: pack.ElementProducer => Unit)(capped: Capped): Unit = {
+private[api] object Capped { //extends scala.runtime.AbstractFunction2[Long, Option[Int], Capped] {
+
+  //@inline def apply(size: Long, max: Option[Int]): Capped = new Capped(size, max)
+
+  def writeTo[P <: SerializationPack](pack: P)(builder: SerializationPack.Builder[pack.type], append: pack.ElementProducer => Any)(capped: Capped): Unit = {
     import builder.{ elementProducer => element }
 
     append(element("size", builder.long(capped.size)))
@@ -144,7 +151,9 @@ private[api] object Capped {
 case class ConvertToCapped(
   capped: Capped) extends CollectionCommand with CommandWithResult[UnitBox.type]
 
-private[api] object ConvertToCapped {
+private[api] object ConvertToCapped { //extends scala.runtime.AbstractFunction1[Capped, ConvertToCapped] {
+  //@inline def apply(capped: Capped): ConvertToCapped = new ConvertToCapped(capped)
+
   def writer[P <: SerializationPack](pack: P): pack.Writer[ResolvedCollectionCommand[ConvertToCapped]] = {
     val builder = pack.newBuilder
 
@@ -168,6 +177,28 @@ case class DropIndexes(index: String) extends CollectionCommand with CommandWith
 @deprecated("Internal: will be made private", "0.16.0")
 case class DropIndexesResult(value: Int) extends BoxedAnyVal[Int]
 
+private[api] object DropIndexes {
+  def writer[P <: SerializationPack](pack: P): pack.Writer[ResolvedCollectionCommand[DropIndexes]] = {
+    val builder = pack.newBuilder
+
+    import builder.{ elementProducer => element, string }
+
+    pack.writer[ResolvedCollectionCommand[DropIndexes]] { drop =>
+      builder.document(Seq(
+        element("dropIndexes", string(drop.collection)),
+        element("index", string(drop.command.index))))
+    }
+  }
+
+  def reader[P <: SerializationPack](pack: P): pack.Reader[DropIndexesResult] = {
+    val decoder = pack.newDecoder
+
+    CommandCodecs.dealingWithGenericCommandErrorsReader[pack.type, DropIndexesResult](pack) { doc =>
+      DropIndexesResult(decoder.int(doc, "nIndexesWas").getOrElse(0))
+    }
+  }
+}
+
 @deprecated("Internal: will be made private", "0.16.0")
 case class CollectionNames(names: List[String])
 
@@ -188,7 +219,7 @@ object ListCollectionNames
   private[api] def reader[P <: SerializationPack](pack: P): pack.Reader[CollectionNames] = {
     val decoder = pack.newDecoder
 
-    pack.reader[CollectionNames] { doc =>
+    CommandCodecs.dealingWithGenericCommandErrorsReader[pack.type, CollectionNames](pack) { doc =>
       (for {
         cr <- decoder.child(doc, "cursor")
         fb = decoder.children(cr, "firstBatch")
@@ -220,6 +251,40 @@ import reactivemongo.api.indexes.Index
 case class ListIndexes(db: String) extends CollectionCommand
   with CommandWithResult[List[Index]]
 
+private[api] object ListIndexes { //extends scala.runtime.AbstractFunction1[String, ListIndexes] {
+  //@inline def apply(db: String): ListIndexes = new ListIndexes(db)
+
+  def writer[P <: SerializationPack](pack: P): pack.Writer[ResolvedCollectionCommand[ListIndexes]] = {
+    val builder = pack.newBuilder
+
+    pack.writer[ResolvedCollectionCommand[ListIndexes]] { list =>
+      builder.document(Seq(builder.elementProducer(
+        "listIndexes", builder.string(list.collection))))
+    }
+  }
+
+  def reader[P <: SerializationPack](pack: P)(implicit r: pack.Reader[Index]): pack.Reader[List[Index]] = {
+    val decoder = pack.newDecoder
+
+    @annotation.tailrec
+    def readBatch(batch: List[pack.Document], indexes: List[Index]): List[Index] = batch match {
+      case d :: ds =>
+        readBatch(ds, pack.deserialize(d, r) :: indexes)
+
+      case _ => indexes
+    }
+
+    //import BSONCommonWriteCommandsImplicits.DefaultWriteResultReader
+
+    CommandCodecs.dealingWithGenericCommandErrorsReader[pack.type, List[Index]](pack) { doc =>
+      decoder.child(doc, "cursor").map {
+        decoder.children(_, "firstBatch")
+      }.fold[List[Index]](throw GenericDriverException(
+        "the cursor and firstBatch must be defined"))(readBatch(_, Nil))
+    }
+  }
+}
+
 /**
  * Creates the given indexes on the specified collection.
  *
@@ -229,6 +294,37 @@ case class ListIndexes(db: String) extends CollectionCommand
 @deprecated("Internal: will be made private", "0.16.0")
 case class CreateIndexes(db: String, indexes: List[Index])
   extends CollectionCommand with CommandWithResult[WriteResult]
+
+private[api] object CreateIndexes { //extends scala.runtime.AbstractFunction2[String, List[Index], CreateIndexes] {
+  //@inline def apply(db: String, indexes: List[Index]): CreateIndexes = new CreateIndexes(db, indexes)
+
+  def writer[P <: SerializationPack](pack: P): pack.Writer[ResolvedCollectionCommand[CreateIndexes]] = {
+    val builder = pack.newBuilder
+    val nsIndexWriter = IndexesManager.nsIndexWriter(pack)
+
+    import builder.{ elementProducer => element }
+
+    pack.writer[ResolvedCollectionCommand[CreateIndexes]] { create =>
+      val indexes = create.command.indexes.map { i =>
+        val nsi = NSIndex(create.command.db + "." + create.collection, i)
+        pack.serialize(nsi, nsIndexWriter)
+      }
+
+      val elements = Seq.newBuilder[pack.ElementProducer]
+
+      elements += element("createIndexes", builder.string(create.collection))
+
+      indexes match {
+        case head :: tail =>
+          elements += element("indexes", builder.array(head, tail))
+
+        case _ =>
+      }
+
+      builder.document(elements.result())
+    }
+  }
+}
 
 /**
  * Replica set member.
@@ -284,7 +380,53 @@ case class ReplSetStatus(
  */
 @deprecated("Internal: will be made private", "0.16.0")
 case object ReplSetGetStatus
-  extends Command with CommandWithResult[ReplSetStatus]
+  extends Command with CommandWithResult[ReplSetStatus] {
+
+  private[api] def writer[P <: SerializationPack](pack: P): pack.Writer[ReplSetGetStatus.type] = {
+    val builder = pack.newBuilder
+    val cmd = builder.document(Seq(builder.elementProducer(
+      "replSetGetStatus", builder.int(1))))
+
+    pack.writer[ReplSetGetStatus.type](_ => cmd)
+  }
+
+  private def readMember[P <: SerializationPack](pack: P)(decoder: SerializationPack.Decoder[pack.type], doc: pack.Document): Option[ReplSetMember] = {
+    import decoder.{ int, long, string }
+
+    for {
+      id <- long(doc, "_id")
+      name <- string(doc, "name")
+      health <- int(doc, "health")
+      state <- int(doc, "state")
+      stateStr <- string(doc, "stateStr")
+      uptime <- long(doc, "uptime")
+      optime <- long(doc, "optimeDate")
+    } yield ReplSetMember(id, name, health, state, stateStr, uptime, optime,
+      long(doc, "lastHeartbeat"),
+      long(doc, "lastHeartbeatRecv"),
+      string(doc, "lastHeartbeatMessage"),
+      long(doc, "electionTime"),
+      decoder.booleanLike(doc, "self").getOrElse(false),
+      long(doc, "pingMs"),
+      string(doc, "syncingTo"),
+      int(doc, "configVersion"))
+  }
+
+  private[api] def reader[P <: SerializationPack](pack: P): pack.Reader[ReplSetStatus] = {
+    val decoder = pack.newDecoder
+
+    CommandCodecs.dealingWithGenericCommandErrorsReader[pack.type, ReplSetStatus](pack) { doc =>
+      (for {
+        name <- decoder.string(doc, "set")
+        time <- decoder.long(doc, "date")
+        myState <- decoder.int(doc, "myState")
+        members = decoder.children(doc, "members").flatMap { m =>
+          readMember[pack.type](pack)(decoder, m)
+        }
+      } yield ReplSetStatus(name, time, myState, members)).get
+    }
+  }
+}
 
 sealed trait ServerProcess
 
@@ -322,6 +464,18 @@ object Resync extends Command with CommandWithResult[ResyncResult.type]
 @deprecated("Internal: will be made private", "0.16.0")
 case class ReplSetMaintenance(enable: Boolean = true) extends Command
   with CommandWithResult[UnitBox.type]
+
+@deprecated("Internal: will be made private", "0.19.0")
+object ReplSetMaintenance {
+  private[api] def writer[P <: SerializationPack](pack: P): pack.Writer[ReplSetMaintenance] = {
+    val builder = pack.newBuilder
+
+    pack.writer[ReplSetMaintenance] { set =>
+      builder.document(Seq(builder.elementProducer(
+        "replSetMaintenance", builder.boolean(set.enable))))
+    }
+  }
+}
 
 /**
  * The [[https://docs.mongodb.com/manual/reference/command/ping/ ping]] command.

@@ -1,5 +1,7 @@
 package reactivemongo.api.indexes
 
+import reactivemongo.api.SerializationPack
+
 import reactivemongo.bson.{
   BSONDouble,
   BSONInteger,
@@ -15,6 +17,8 @@ sealed trait IndexType {
   def value: BSONValue
 
   private[indexes] def valueStr: String
+
+  @inline override def toString = valueStr
 }
 
 object IndexType {
@@ -94,5 +98,16 @@ object IndexType {
     case IndexType(tpe) => tpe
     case _ =>
       throw new IllegalArgumentException("unsupported index type")
+  }
+
+  private[api] def write[P <: SerializationPack](pack: P)(builder: SerializationPack.Builder[pack.type]): IndexType => pack.Value = {
+    case _: Ascending.type =>
+      builder.int(1)
+
+    case _: Descending.type =>
+      builder.int(-1)
+
+    case t =>
+      builder.string(t.valueStr)
   }
 }

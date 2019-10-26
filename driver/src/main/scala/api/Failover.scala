@@ -29,7 +29,7 @@ import reactivemongo.util.LazyLogger
  * @param expectingResponseMaker a function that takes a message of type `T` and wraps it into an ExpectingResponse message
  */
 @deprecated("Unused, will be removed", "0.17.0")
-class Failover[T](message: T, connection: MongoConnection, @deprecatedName('strategy) failoverStrategy: FailoverStrategy)(expectingResponseMaker: T => ExpectingResponse)(implicit ec: ExecutionContext) {
+class Failover[T](message: T, connection: MongoConnection, @deprecatedName(Symbol("strategy")) failoverStrategy: FailoverStrategy)(expectingResponseMaker: T => ExpectingResponse)(implicit ec: ExecutionContext) {
   import Failover2.logger
   import reactivemongo.core.errors._
   import reactivemongo.core.actors.Exceptions._
@@ -90,7 +90,7 @@ class Failover[T](message: T, connection: MongoConnection, @deprecatedName('stra
   send(0)
 }
 
-private[reactivemongo] class Failover2[A](producer: () => Future[A], connection: MongoConnection, @deprecatedName('strategy) failoverStrategy: FailoverStrategy)(implicit ec: ExecutionContext) {
+private[reactivemongo] class Failover2[A](producer: () => Future[A], connection: MongoConnection, @deprecatedName(Symbol("strategy")) failoverStrategy: FailoverStrategy)(implicit ec: ExecutionContext) {
   import Failover2.logger, logger.trace
   import reactivemongo.core.errors._
   import reactivemongo.core.actors.Exceptions._
@@ -170,7 +170,7 @@ object Failover2 {
 
   def apply[A](
     connection: MongoConnection,
-    @deprecatedName('strategy) failoverStrategy: FailoverStrategy)(
+    @deprecatedName(Symbol("strategy")) failoverStrategy: FailoverStrategy)(
     producer: () => Future[A])(implicit ec: ExecutionContext): Failover2[A] =
     new Failover2(producer, connection, failoverStrategy)
 }

@@ -1,6 +1,13 @@
-package reactivemongo.api
+package reactivemongo
 
 import reactivemongo.bson.{ BSONBinary, BSONDocument }
+
+import reactivemongo.api.{
+  BSONSerializationPack,
+  NodeSetSession,
+  SessionTransaction,
+  WriteConcern
+}
 
 import reactivemongo.api.commands.{
   InsertCommand,

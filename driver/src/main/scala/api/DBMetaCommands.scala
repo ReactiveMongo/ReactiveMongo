@@ -4,7 +4,6 @@ import scala.concurrent.{ ExecutionContext, Future }
 
 import reactivemongo.api.commands.{
   AuthenticationRestriction,
-  CommandCodecs,
   RenameCollection
 }
 
@@ -29,17 +28,12 @@ trait DBMetaCommands { self: DB =>
   }
   import reactivemongo.api.commands.bson.{
     CommonImplicits,
-    BSONServerStatusImplicits,
     BSONCreateUserCommand,
     BSONPingCommandImplicits
   }
   import CommonImplicits._
-  import BSONServerStatusImplicits._
   import BSONPingCommandImplicits._
-  import Compat.internalSerializationPack
-
-  private lazy implicit val unitBoxReader =
-    CommandCodecs.unitBoxReader(internalSerializationPack)
+  import Compat.{ internalSerializationPack, unitBoxReader }
 
   private implicit lazy val dropWriter =
     DropDatabase.writer(internalSerializationPack)
@@ -117,9 +111,15 @@ trait DBMetaCommands { self: DB =>
       ReadPreference.primary).map(_ => self.collection(to))
   }
 
+  private implicit lazy val serverStatusWriter =
+    ServerStatus.writer(internalSerializationPack)
+
+  private implicit lazy val serverStatusReader =
+    ServerStatus.reader(internalSerializationPack)
+
   /** Returns the server status. */
   def serverStatus(implicit ec: ExecutionContext): Future[ServerStatusResult] =
-    Command.run(BSONSerializationPack, failoverStrategy)(
+    Command.run(internalSerializationPack, failoverStrategy)(
       self, ServerStatus, ReadPreference.primary)
 
   @deprecated("Use `createUser` with complete authentication options", "0.18.4")

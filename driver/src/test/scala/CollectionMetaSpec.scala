@@ -1,14 +1,13 @@
 import scala.concurrent.duration.FiniteDuration
 
-import reactivemongo.bson._
-
-import reactivemongo.api._, collections.bson.BSONCollection
+import reactivemongo.api._
 
 import reactivemongo.api.commands.CollStatsResult
 import reactivemongo.api.commands.CommandError.{ Code, Message }
 
 // TODO: Separate Spec?
 trait CollectionMetaSpec { collSpec: CollectionSpec =>
+  import TestCompat._
   import _root_.tests.Common
   import Common._
 
