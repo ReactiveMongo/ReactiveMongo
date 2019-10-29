@@ -130,9 +130,33 @@ object SerializationPack {
     def get(document: pack.Document, name: String): Option[pack.Value]
 
     /**
+     * @returnsNamedElement, if the element exists
+     * with expected `T` as value type.
+     */
+    final def value[T <: pack.Value](
+      document: pack.Document,
+      name: String)(implicit cls: scala.reflect.ClassTag[T]): Option[T] =
+      get(document, name).flatMap(cls.unapply)
+
+    final def read[T](document: pack.Document, name: String)(implicit r: pack.NarrowValueReader[T]): Option[T] = {
+      val widenReader = pack.widenReader[T](r)
+
+      get(document, name).flatMap(
+        pack.readValue[T](_, widenReader).toOption)
+    }
+
+    /**
      * @returnsNamedElement, if the element is an array field.
      */
     def array(document: pack.Document, name: String): Option[Seq[pack.Value]]
+
+    final def values[T](document: pack.Document, name: String)(implicit r: pack.NarrowValueReader[T]): Option[Seq[T]] = {
+      val widenReader = pack.widenReader[T](r)
+
+      array(document, name).map {
+        _.flatMap(pack.readValue[T](_, widenReader).toOption)
+      }
+    }
 
     /**
      * @returnsNamedElement, if the element is a boolean-like field

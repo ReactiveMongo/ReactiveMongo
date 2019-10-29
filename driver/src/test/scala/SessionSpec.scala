@@ -1,8 +1,16 @@
-package reactivemongo.api
+package reactivemongo
 
 import java.util.UUID
 
 import reactivemongo.core.errors.GenericDriverException
+
+import reactivemongo.api.{
+  DistributedSession,
+  NodeSetSession,
+  Session,
+  SessionTransaction,
+  WriteConcern
+}
 
 final class SessionSpec extends org.specs2.mutable.Specification {
   "Session" title

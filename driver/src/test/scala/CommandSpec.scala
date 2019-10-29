@@ -1,11 +1,24 @@
 import scala.concurrent.duration.FiniteDuration
 
-import reactivemongo.bson.BSONDocument
+import reactivemongo.api.{ DefaultDB, ReadPreference }
 
-import reactivemongo.api.{ BSONSerializationPack, DefaultDB, ReadPreference }
-import reactivemongo.api.commands._
+import reactivemongo.api.commands.{
+  Command,
+  CommandError,
+  IsMasterCommand,
+  MongodProcess,
+  ReplSetGetStatus,
+  ReplSetMaintenance,
+  ReplSetStatus,
+  ServerStatus,
+  ServerStatusResult
+}
 
 import org.specs2.concurrent.ExecutionEnv
+
+import reactivemongo.api.tests.{ commands, decoder, pack }
+
+import reactivemongo.api.TestCompat._
 
 final class CommandSpec(implicit ee: ExecutionEnv)
   extends org.specs2.mutable.Specification {
@@ -17,7 +30,7 @@ final class CommandSpec(implicit ee: ExecutionEnv)
 
   "Raw command" should {
     "re-index test collection with command as document" >> {
-      lazy val runner = Command.run(BSONSerializationPack, db.failoverStrategy)
+      lazy val runner = Command.run(pack, db.failoverStrategy)
 
       def reindexSpec(db: DefaultDB, coll: String, t: FiniteDuration) = {
         val reIndexDoc = BSONDocument("reIndex" -> coll)
@@ -25,12 +38,7 @@ final class CommandSpec(implicit ee: ExecutionEnv)
         db(coll).create() must beEqualTo({}).await(0, t) and {
           runner.apply(db, runner.rawCommand(reIndexDoc)).one[BSONDocument](
             ReadPreference.primary) must beLike[BSONDocument] {
-              case doc =>
-                if (doc.getAs[Double]("ok").exists(_ != 1)) {
-                  println(s"CommandSpec#reIndex: ${BSONDocument pretty doc}")
-                }
-
-                doc.getAs[Double]("ok") must beSome(1)
+              case doc => decoder.double(doc, "ok") must beSome(1)
             }.await(1, t)
         }
       }
@@ -48,10 +56,15 @@ final class CommandSpec(implicit ee: ExecutionEnv)
     }
 
     "check isMaster" in {
-      import reactivemongo.api.commands.bson.BSONIsMasterCommand._
-      import reactivemongo.api.commands.bson.BSONIsMasterCommandImplicits._
+      val runner = Command.run(pack, db.failoverStrategy)
+      implicit val dr = dateReader
 
-      val runner = Command.run(BSONSerializationPack, db.failoverStrategy)
+      val isMaster = new IsMasterCommand[pack.type] {}
+      import isMaster._
+
+      import scala.language.reflectiveCalls
+      implicit val w = commands.isMasterWriter(isMaster).get[IsMaster.type]
+      implicit val r = commands.isMasterReader(isMaster).get
 
       runner(db, IsMaster, ReadPreference.primary).
         map(_ => {}) must beEqualTo({}).await(1, timeout)
@@ -70,9 +83,9 @@ final class CommandSpec(implicit ee: ExecutionEnv)
     }
 
     "expose serverStatus" >> {
-      "using raw command" in {
-        import bson.BSONServerStatusImplicits._
+      import commands.{ serverStatusReader, serverStatusWriter }
 
+      "using raw command" in {
         db.runCommand(ServerStatus, Common.failoverStrategy).
           aka("result") must beLike[ServerStatusResult]({
             case ServerStatusResult(_, _, MongodProcess,
@@ -93,7 +106,10 @@ final class CommandSpec(implicit ee: ExecutionEnv)
     }
 
     "execute ReplSetMaintenance" in {
-      import bson.BSONReplSetMaintenanceImplicits._
+      import commands.{
+        replSetMaintenanceWriter,
+        unitBoxReader
+      }
 
       // MongoDB 3
       if (!replSetOn) {
@@ -152,7 +168,8 @@ final class CommandSpec(implicit ee: ExecutionEnv)
   // ---
 
   private def replSetGetStatusTest = {
-    import bson.BSONReplSetGetStatusImplicits._
+    import commands.{ replSetStatusReader, replSetGetStatusWriter }
+
     connection.database("admin").flatMap(
       _.runCommand(ReplSetGetStatus, Common.failoverStrategy))
   }

@@ -163,14 +163,14 @@ object BSONConvertToCappedImplicits {
 
 @deprecated("Internal: will be made private", "0.16.0")
 object BSONDropIndexesImplicits {
-  implicit object BSONDropIndexesWriter extends BSONDocumentWriter[ResolvedCollectionCommand[DropIndexes]] {
+  object BSONDropIndexesWriter extends BSONDocumentWriter[ResolvedCollectionCommand[DropIndexes]] {
     def write(command: ResolvedCollectionCommand[DropIndexes]): BSONDocument =
       BSONDocument(
         "dropIndexes" -> command.collection,
         "index" -> command.command.index)
   }
 
-  implicit object BSONDropIndexesReader extends DealingWithGenericCommandErrorsReader[DropIndexesResult] {
+  object BSONDropIndexesReader extends DealingWithGenericCommandErrorsReader[DropIndexesResult] {
     def readResult(doc: BSONDocument): DropIndexesResult =
       DropIndexesResult(doc.getAs[BSONNumberLike]("nIndexesWas").map(_.toInt).getOrElse(0))
   }
@@ -181,12 +181,12 @@ object BSONListIndexesImplicits {
   import scala.util.{ Failure, Success, Try }
   import reactivemongo.api.indexes.{ Index, IndexesManager }
 
-  implicit object BSONListIndexesWriter extends BSONDocumentWriter[ResolvedCollectionCommand[ListIndexes]] {
+  object BSONListIndexesWriter extends BSONDocumentWriter[ResolvedCollectionCommand[ListIndexes]] {
     def write(command: ResolvedCollectionCommand[ListIndexes]): BSONDocument =
       BSONDocument("listIndexes" -> command.collection)
   }
 
-  implicit object BSONIndexListReader
+  object BSONIndexListReader
     extends DealingWithGenericCommandErrorsReader[List[Index]] {
 
     @deprecated("Only for internal use", "0.12.7")
@@ -218,15 +218,20 @@ object BSONListIndexesImplicits {
 object BSONCreateIndexesImplicits {
   import reactivemongo.api.commands.WriteResult
 
-  implicit object BSONCreateIndexesWriter extends BSONDocumentWriter[ResolvedCollectionCommand[CreateIndexes]] {
+  object BSONCreateIndexesWriter extends BSONDocumentWriter[ResolvedCollectionCommand[CreateIndexes]] {
     import reactivemongo.api.indexes.{ IndexesManager, NSIndex }
-    implicit val nsIndexWriter = IndexesManager.NSIndexWriter
+    implicit val nsIndexWriter = IndexesManager.nsIndexWriter(
+      reactivemongo.api.BSONSerializationPack)
 
     def write(cmd: ResolvedCollectionCommand[CreateIndexes]): BSONDocument = {
+      val indexes = cmd.command.indexes.map { i =>
+        val nsi = NSIndex(cmd.command.db + "." + cmd.collection, i)
+        nsIndexWriter.write(nsi)
+      }
+
       BSONDocument(
         "createIndexes" -> cmd.collection,
-        "indexes" -> cmd.command.indexes.map(NSIndex(
-          cmd.command.db + "." + cmd.collection, _)))
+        "indexes" -> indexes)
     }
   }
 
@@ -246,14 +251,14 @@ object BSONCreateIndexesImplicits {
  */
 @deprecated("Internal: will be made private", "0.16.0")
 object BSONReplSetGetStatusImplicits {
-  implicit object ReplSetGetStatusWriter
+  object ReplSetGetStatusWriter
     extends BSONDocumentWriter[ReplSetGetStatus.type] {
 
     val bsonCmd = BSONDocument("replSetGetStatus" -> 1)
     def write(command: ReplSetGetStatus.type): BSONDocument = bsonCmd
   }
 
-  implicit object ReplSetMemberReader
+  object ReplSetMemberReader
     extends BSONDocumentReader[ReplSetMember] {
 
     def read(doc: BSONDocument): ReplSetMember = (for {
@@ -276,8 +281,10 @@ object BSONReplSetGetStatusImplicits {
 
   }
 
-  implicit object ReplSetStatusReader
+  object ReplSetStatusReader
     extends DealingWithGenericCommandErrorsReader[ReplSetStatus] {
+
+    private implicit def memberReader = ReplSetMemberReader
 
     def readResult(doc: BSONDocument): ReplSetStatus = (for {
       name <- doc.getAsTry[String]("set")
@@ -327,7 +334,7 @@ object BSONResyncImplicits {
 object BSONReplSetMaintenanceImplicits {
   implicit val ReplSetMaintenanceReader = CommonImplicits.UnitBoxReader
 
-  implicit object ReplSetMaintenanceWriter
+  object ReplSetMaintenanceWriter
     extends BSONDocumentWriter[ReplSetMaintenance] {
 
     def write(command: ReplSetMaintenance) =

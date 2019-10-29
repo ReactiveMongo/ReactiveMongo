@@ -1,5 +1,7 @@
 package reactivemongo.api.commands
 
+import reactivemongo.api.SerializationPack
+
 /**
  * @see [[ServerStatusResult]]
  * @see https://docs.mongodb.com/manual/reference/command/serverStatus/
@@ -186,4 +188,150 @@ case class ServerStatusResult(
 /** Server [[http://docs.mongodb.org/manual/reference/server-status/ status]] */
 @deprecated("Internal: will be made private", "0.16.0")
 case object ServerStatus
-  extends Command with CommandWithResult[ServerStatusResult]
+  extends Command with CommandWithResult[ServerStatusResult] {
+
+  private[api] def writer[P <: SerializationPack](pack: P): pack.Writer[ServerStatus.type] = {
+    val builder = pack.newBuilder
+    val cmd = builder.document(Seq(builder.elementProducer(
+      "serverStatus", builder.int(1))))
+
+    pack.writer[ServerStatus.type](_ => cmd)
+  }
+
+  private def readAsserts[P <: SerializationPack](pack: P)(
+    decoder: SerializationPack.Decoder[pack.type],
+    doc: pack.Document): Option[ServerStatusAsserts] = for {
+    regular <- decoder.int(doc, "regular")
+    warning <- decoder.int(doc, "warning")
+    msg <- decoder.int(doc, "msg")
+    user <- decoder.int(doc, "user")
+    rollovers <- decoder.int(doc, "rollovers")
+  } yield ServerStatusAsserts(regular, warning, msg, user, rollovers)
+
+  private def readBgFlushing[P <: SerializationPack](pack: P)(
+    decoder: SerializationPack.Decoder[pack.type],
+    doc: pack.Document): Option[ServerStatusBackgroundFlushing] = for {
+    flushes <- decoder.int(doc, "flushes")
+    totalMs <- decoder.long(doc, "total_ms")
+    averageMs <- decoder.long(doc, "average_ms")
+    lastMs <- decoder.long(doc, "last_ms")
+    lastFinished <- decoder.long(doc, "last_finished")
+  } yield ServerStatusBackgroundFlushing(
+    flushes, totalMs, averageMs, lastMs, lastFinished)
+
+  private def readConnections[P <: SerializationPack](pack: P)(
+    decoder: SerializationPack.Decoder[pack.type],
+    doc: pack.Document): Option[ServerStatusConnections] = for {
+    current <- decoder.int(doc, "current")
+    available <- decoder.int(doc, "available")
+    totalCreated <- decoder.long(doc, "totalCreated")
+  } yield ServerStatusConnections(current, available, totalCreated)
+
+  private def readJournalingTime[P <: SerializationPack](pack: P)(
+    decoder: SerializationPack.Decoder[pack.type],
+    doc: pack.Document): Option[ServerStatusJournalingTime] = for {
+    dt <- decoder.long(doc, "dt")
+    prepLogBuffer <- decoder.long(doc, "prepLogBuffer")
+    writeToJournal <- decoder.long(doc, "writeToJournal")
+    writeToDataFiles <- decoder.long(doc, "writeToDataFiles")
+    remapPrivateView <- decoder.long(doc, "remapPrivateView")
+    commits <- decoder.long(doc, "commits")
+    commitsInWriteLock <- decoder.long(doc, "commitsInWriteLock")
+  } yield ServerStatusJournalingTime(dt, prepLogBuffer, writeToJournal,
+    writeToDataFiles, remapPrivateView, commits, commitsInWriteLock)
+
+  private def readJournaling[P <: SerializationPack](pack: P)(
+    decoder: SerializationPack.Decoder[pack.type],
+    doc: pack.Document): Option[ServerStatusJournaling] = for {
+    commits <- decoder.int(doc, "commits")
+    journaledMB <- decoder.double(doc, "journaledMB")
+    writeToDataFilesMB <- decoder.double(doc, "writeToDataFilesMB")
+    compression <- decoder.double(doc, "compression")
+    commitsInWriteLock <- decoder.int(doc, "commitsInWriteLock")
+    earlyCommits <- decoder.int(doc, "earlyCommits")
+    timeDoc <- decoder.child(doc, "timeMs")
+    timeMs <- readJournalingTime[pack.type](pack)(decoder, timeDoc)
+  } yield ServerStatusJournaling(commits, journaledMB, writeToDataFilesMB,
+    compression, commitsInWriteLock, earlyCommits, timeMs)
+
+  private def readNetwork[P <: SerializationPack](pack: P)(
+    decoder: SerializationPack.Decoder[pack.type],
+    doc: pack.Document): Option[ServerStatusNetwork] = for {
+    bytesIn <- decoder.int(doc, "bytesIn")
+    bytesOut <- decoder.int(doc, "bytesOut")
+    numRequests <- decoder.int(doc, "numRequests")
+  } yield ServerStatusNetwork(bytesIn, bytesOut, numRequests)
+
+  private def readStatusLock[P <: SerializationPack](pack: P)(
+    decoder: SerializationPack.Decoder[pack.type],
+    doc: pack.Document): Option[ServerStatusLock] = for {
+    total <- decoder.int(doc, "total")
+    readers <- decoder.int(doc, "readers")
+    writers <- decoder.int(doc, "writers")
+  } yield ServerStatusLock(total, readers, writers)
+
+  private def readGlobalLock[P <: SerializationPack](pack: P)(
+    decoder: SerializationPack.Decoder[pack.type],
+    doc: pack.Document): Option[ServerStatusGlobalLock] = for {
+    totalTime <- decoder.long(doc, "totalTime")
+    currentQueue <- decoder.child(doc, "currentQueue").flatMap {
+      readStatusLock[pack.type](pack)(decoder, _)
+    }
+    activeClients <- decoder.child(doc, "activeClients").flatMap {
+      readStatusLock[pack.type](pack)(decoder, _)
+    }
+  } yield ServerStatusGlobalLock(totalTime.toInt, currentQueue, activeClients)
+
+  private def readExtraInfo[P <: SerializationPack](pack: P)(
+    decoder: SerializationPack.Decoder[pack.type],
+    doc: pack.Document): Option[ServerStatusExtraInfo] = for {
+    heapUsageBytes <- decoder.int(doc, "heap_usage_bytes")
+    pageFaults <- decoder.int(doc, "page_faults")
+  } yield ServerStatusExtraInfo(heapUsageBytes, pageFaults)
+
+  private[api] def reader[P <: SerializationPack](pack: P)(implicit rs: pack.NarrowValueReader[String]): pack.Reader[ServerStatusResult] = {
+    val decoder = pack.newDecoder
+    import decoder.{ child, long, string }
+
+    CommandCodecs.dealingWithGenericCommandErrorsReader[pack.type, ServerStatusResult](pack) { doc =>
+      (for {
+        host <- string(doc, "host")
+        version <- string(doc, "version")
+        process <- string(doc, "process").map[ServerProcess] {
+          ServerProcess.unapply(_).getOrElse(MongodProcess)
+        }
+        pid <- long(doc, "pid")
+        uptime <- long(doc, "uptime")
+        uptimeMillis <- long(doc, "uptimeMillis")
+        uptimeEstimate <- long(doc, "uptimeEstimate")
+        localTime <- long(doc, "localTime")
+        advisoryHostFQDNs = decoder.values[String](doc, "advisoryHostFQDNs")
+        asserts <- child(doc, "asserts").flatMap {
+          readAsserts[pack.type](pack)(decoder, _)
+        }
+        backgroundFlushing = child(doc, "backgroundFlushing").flatMap {
+          readBgFlushing[pack.type](pack)(decoder, _)
+        }
+        connections <- child(doc, "connections").flatMap {
+          readConnections[pack.type](pack)(decoder, _)
+        }
+        dur = child(doc, "dur").flatMap {
+          readJournaling[pack.type](pack)(decoder, _)
+        }
+        extraInfo = child(doc, "extra_info").flatMap {
+          readExtraInfo[pack.type](pack)(decoder, _)
+        }
+        globalLock <- child(doc, "globalLock").flatMap {
+          readGlobalLock[pack.type](pack)(decoder, _)
+        }
+        network <- child(doc, "network").flatMap {
+          readNetwork[pack.type](pack)(decoder, _)
+        }
+      } yield ServerStatusResult(host, version, process, pid,
+        uptime, uptimeMillis, uptimeEstimate, localTime,
+        advisoryHostFQDNs.fold(List.empty[String])(_.toList),
+        asserts, backgroundFlushing, connections,
+        dur, extraInfo, globalLock, network)).get
+    }
+  }
+}

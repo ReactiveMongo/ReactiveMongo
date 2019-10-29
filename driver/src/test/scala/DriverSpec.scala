@@ -13,8 +13,6 @@ import reactivemongo.api.{
   X509Authentication
 }
 
-import reactivemongo.bson.BSONDocument
-
 import reactivemongo.core.actors.{
   PrimaryAvailable,
   RegisterMonitor,
@@ -42,6 +40,7 @@ final class DriverSpec(implicit ee: ExecutionEnv)
 
   sequential
 
+  import reactivemongo.api.TestCompat._
   import tests.Common
   import Common._
 

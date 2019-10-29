@@ -141,6 +141,7 @@ case class DefaultWriteResult(
   }
 }
 
+// TODO: Migrate to new BSON API
 case class Upserted(index: Int, _id: BSONValue)
 
 case class UpdateWriteResult(

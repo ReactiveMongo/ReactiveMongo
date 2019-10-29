@@ -19,7 +19,7 @@ object BSONIsMasterCommandImplicits {
   private val serializeClientMeta: ClientMetadata => Option[BSONDocument] =
     ClientMetadata.serialize[BSONSerializationPack.type](BSONSerializationPack)
 
-  implicit def IsMasterWriter[T <: IsMaster] = BSONDocumentWriter[T] { im: T =>
+  def IsMasterWriter[T <: IsMaster] = BSONDocumentWriter[T] { im: T =>
     val base = BSONDocument(
       "ismaster" -> 1,
       f"$$comment" -> im.comment)

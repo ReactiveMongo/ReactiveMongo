@@ -1,19 +1,21 @@
 import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
 
-import reactivemongo.bson.{ BSONArray, BSONDocument, BSONInteger }
+import reactivemongo.bson.{ BSONDocument => LegacyDoc }
+
 import reactivemongo.api.indexes.{ Index, IndexType }, IndexType.{
   Hashed,
   Geo2D,
   Geo2DSpherical
 }
-import reactivemongo.api.collections.bson.BSONCollection
 import reactivemongo.api.commands.CommandError
 import reactivemongo.core.errors.DatabaseException
 
+import reactivemongo.api.TestCompat._
+
 import org.specs2.concurrent.ExecutionEnv
 
-class IndexesSpec(implicit ee: ExecutionEnv)
+final class IndexesSpec(implicit ee: ExecutionEnv)
   extends org.specs2.mutable.Specification
   with org.specs2.specification.AfterAll {
 
@@ -58,7 +60,7 @@ class IndexesSpec(implicit ee: ExecutionEnv)
       def spec(c: BSONCollection, timeout: FiniteDuration) =
         c.indexesManager.ensure(Index(
           List("loc" -> Geo2D),
-          options = BSONDocument("min" -> -95, "max" -> 95, "bits" -> 28))).
+          options = LegacyDoc("min" -> -95, "max" -> 95, "bits" -> 28))).
           aka("index") must beTrue.await(1, timeout * 2)
 
       "be created with the default connection" in {
@@ -89,10 +91,16 @@ class IndexesSpec(implicit ee: ExecutionEnv)
         }.filter(!_.isEmpty).map(_.apply(0))
 
         future must beLike[Index] {
-          case Index(("loc", Geo2D) :: _, _, _, _, _, _, _, _, opts) =>
-            opts.getAs[BSONInteger]("min").get.value mustEqual -95 and (
-              opts.getAs[BSONInteger]("max").get.value mustEqual 95) and (
-                opts.getAs[BSONInteger]("bits").get.value mustEqual 28)
+          case Index(Seq(("loc", Geo2D)), _, _, _, _, _, _, _, opts) =>
+            def int(n: String) =
+              opts.getAs[reactivemongo.bson.BSONNumberLike](n).map(_.toInt)
+
+            int("min") must beSome(-95) and {
+              int("max") must beSome(95)
+            } and {
+              int("bits") must beSome(28)
+            }
+
         }.await(1, timeout)
       }
 
@@ -227,8 +235,8 @@ class IndexesSpec(implicit ee: ExecutionEnv)
       partial.indexesManager.create(Index(
         key = Seq("username" -> IndexType.Ascending),
         unique = true,
-        partialFilter = Some(BSONDocument(
-          "age" -> BSONDocument("$gte" -> 21))))).
+        partialFilter = Some(LegacyDoc(
+          "age" -> LegacyDoc(f"$$gte" -> 21))))).
         map(_.ok) must beTrue.awaitFor(timeout)
     } tag "not_mongo26"
 

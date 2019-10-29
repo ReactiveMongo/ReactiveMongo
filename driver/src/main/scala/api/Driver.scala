@@ -101,7 +101,7 @@ private[api] trait Driver {
    * Closes this driver (and all its connections and resources).
    * Will wait until the timeout for proper closing of connections before forcing hard shutdown.
    */
-  protected final def askClose(timeout: FiniteDuration)(implicit @deprecatedName('executionContext) ec: ExecutionContext): Future[Unit] = {
+  protected final def askClose(timeout: FiniteDuration)(implicit @deprecatedName(Symbol("executionContext")) ec: ExecutionContext): Future[Unit] = {
     logger.info(s"[$supervisorName] Closing instance of ReactiveMongo driver")
 
     val callerSTE = Thread.currentThread.getStackTrace.drop(3).take(3)

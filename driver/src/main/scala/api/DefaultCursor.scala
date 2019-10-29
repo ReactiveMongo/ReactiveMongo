@@ -87,7 +87,7 @@ object DefaultCursor {
 
       val makeIterator = ReplyDocumentIterator.parse(pack)(_: Response)(reader)
 
-      @inline def makeRequest(maxDocs: Int)(implicit @deprecatedName('ctx) ec: ExecutionContext): Future[Response] = Failover2(connection, failoverStrategy) { () =>
+      @inline def makeRequest(maxDocs: Int)(implicit @deprecatedName(Symbol("ctx")) ec: ExecutionContext): Future[Response] = Failover2(connection, failoverStrategy) { () =>
         val ntr = toReturn(numberToReturn, maxDocs, 0)
 
         // MongoDB2.6: Int.MaxValue
@@ -313,7 +313,7 @@ object DefaultCursor {
       }
     }
 
-    def head(implicit @deprecatedName('ctx) ec: ExecutionContext): Future[A] =
+    def head(implicit @deprecatedName(Symbol("ctx")) ec: ExecutionContext): Future[A] =
       makeRequest(1).flatMap { response =>
         val result = documentIterator(response)
 
@@ -322,7 +322,7 @@ object DefaultCursor {
         } else Future(result.next())
       }
 
-    final def headOption(implicit @deprecatedName('ctx) ec: ExecutionContext): Future[Option[A]] =
+    final def headOption(implicit @deprecatedName(Symbol("ctx")) ec: ExecutionContext): Future[Option[A]] =
       makeRequest(1).flatMap { response =>
         val result = documentIterator(response)
 
@@ -335,26 +335,26 @@ object DefaultCursor {
 
     @inline private def syncSuccess[T, U](f: (T, U) => State[T])(implicit ec: ExecutionContext): (T, U) => Future[State[T]] = { (a: T, b: U) => Future(f(a, b)) }
 
-    def foldResponses[T](z: => T, maxDocs: Int = -1)(suc: (T, Response) => State[T], err: (T, Throwable) => State[T])(implicit @deprecatedName('ctx) ec: ExecutionContext): Future[T] = FoldResponses(z, makeRequest(maxDocs)(_: ExecutionContext),
+    def foldResponses[T](z: => T, maxDocs: Int = -1)(suc: (T, Response) => State[T], err: (T, Throwable) => State[T])(implicit @deprecatedName(Symbol("ctx")) ec: ExecutionContext): Future[T] = FoldResponses(z, makeRequest(maxDocs)(_: ExecutionContext),
       nextResponse(maxDocs), killCursors _, syncSuccess(suc), err, maxDocs)(
         connection.actorSystem, ec)
 
-    def foldResponsesM[T](z: => T, maxDocs: Int = -1)(suc: (T, Response) => Future[State[T]], err: (T, Throwable) => State[T])(implicit @deprecatedName('ctx) ec: ExecutionContext): Future[T] = FoldResponses(z, makeRequest(maxDocs)(_: ExecutionContext),
+    def foldResponsesM[T](z: => T, maxDocs: Int = -1)(suc: (T, Response) => Future[State[T]], err: (T, Throwable) => State[T])(implicit @deprecatedName(Symbol("ctx")) ec: ExecutionContext): Future[T] = FoldResponses(z, makeRequest(maxDocs)(_: ExecutionContext),
       nextResponse(maxDocs), killCursors _, suc, err, maxDocs)(
         connection.actorSystem, ec)
 
-    def foldBulks[T](z: => T, maxDocs: Int = -1)(suc: (T, Iterator[A]) => State[T], err: (T, Throwable) => State[T])(implicit @deprecatedName('ctx) ec: ExecutionContext): Future[T] = foldBulksM[T](z, maxDocs)(syncSuccess[T, Iterator[A]](suc), err)
+    def foldBulks[T](z: => T, maxDocs: Int = -1)(suc: (T, Iterator[A]) => State[T], err: (T, Throwable) => State[T])(implicit @deprecatedName(Symbol("ctx")) ec: ExecutionContext): Future[T] = foldBulksM[T](z, maxDocs)(syncSuccess[T, Iterator[A]](suc), err)
 
-    def foldBulksM[T](z: => T, maxDocs: Int = -1)(suc: (T, Iterator[A]) => Future[State[T]], err: (T, Throwable) => State[T])(implicit @deprecatedName('ctx) ec: ExecutionContext): Future[T] = foldResponsesM(z, maxDocs)({ (s, r) =>
+    def foldBulksM[T](z: => T, maxDocs: Int = -1)(suc: (T, Iterator[A]) => Future[State[T]], err: (T, Throwable) => State[T])(implicit @deprecatedName(Symbol("ctx")) ec: ExecutionContext): Future[T] = foldResponsesM(z, maxDocs)({ (s, r) =>
       Try(makeIterator(r)) match {
         case Success(it) => suc(s, it)
         case Failure(e)  => Future.successful[State[T]](Fail(e))
       }
     }, err)
 
-    def foldWhile[T](z: => T, maxDocs: Int = -1)(suc: (T, A) => State[T], err: (T, Throwable) => State[T])(implicit @deprecatedName('ctx) ec: ExecutionContext): Future[T] = foldWhileM[T](z, maxDocs)(syncSuccess[T, A](suc), err)
+    def foldWhile[T](z: => T, maxDocs: Int = -1)(suc: (T, A) => State[T], err: (T, Throwable) => State[T])(implicit @deprecatedName(Symbol("ctx")) ec: ExecutionContext): Future[T] = foldWhileM[T](z, maxDocs)(syncSuccess[T, A](suc), err)
 
-    def foldWhileM[T](z: => T, maxDocs: Int = -1)(suc: (T, A) => Future[State[T]], err: (T, Throwable) => State[T])(implicit @deprecatedName('ctx) ec: ExecutionContext): Future[T] = {
+    def foldWhileM[T](z: => T, maxDocs: Int = -1)(suc: (T, A) => Future[State[T]], err: (T, Throwable) => State[T])(implicit @deprecatedName(Symbol("ctx")) ec: ExecutionContext): Future[T] = {
       def go(v: T, it: Iterator[A]): Future[State[T]] = {
         if (!it.hasNext) {
           Future.successful(Cont(v))

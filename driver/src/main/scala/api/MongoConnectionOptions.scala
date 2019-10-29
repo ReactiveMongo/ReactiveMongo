@@ -74,10 +74,10 @@ class MongoConnectionOptions private[reactivemongo] (
   @deprecated("Use the other `copy`", "0.17.0")
   def copy(
     connectTimeoutMS: Int,
-    @deprecatedName('authSource) authenticationDatabase: Option[String],
+    @deprecatedName(Symbol("authSource")) authenticationDatabase: Option[String],
     sslEnabled: Boolean,
     sslAllowsInvalidCert: Boolean,
-    @deprecatedName('authMode) authenticationMechanism: AuthenticationMode,
+    @deprecatedName(Symbol("authMode")) authenticationMechanism: AuthenticationMode,
     tcpNoDelay: Boolean,
     keepAlive: Boolean,
     nbChannelsPerNode: Int,
@@ -85,7 +85,7 @@ class MongoConnectionOptions private[reactivemongo] (
     writeConcern: WC,
     readPreference: ReadPreference,
     failoverStrategy: FailoverStrategy,
-    @deprecatedName('monitorRefreshMS) heartbeatFrequencyMS: Int,
+    @deprecatedName(Symbol("monitorRefreshMS")) heartbeatFrequencyMS: Int,
     maxIdleTimeMS: Int,
     maxHistorySize: Int,
     credentials: Map[String, MongoConnectionOptions.Credential],
@@ -228,10 +228,10 @@ object MongoConnectionOptions {
   @deprecated("Use `MongoConnectionOptions` constructor", "0.17.0")
   def apply(
     connectTimeoutMS: Int = 0,
-    @deprecatedName('authSource) authenticationDatabase: Option[String] = None,
+    @deprecatedName(Symbol("authSource")) authenticationDatabase: Option[String] = None,
     sslEnabled: Boolean = false,
     sslAllowsInvalidCert: Boolean = false,
-    @deprecatedName('authMode) authenticationMechanism: AuthenticationMode = ScramSha1Authentication,
+    @deprecatedName(Symbol("authMode")) authenticationMechanism: AuthenticationMode = ScramSha1Authentication,
     tcpNoDelay: Boolean = false,
     keepAlive: Boolean = false,
     nbChannelsPerNode: Int = 10,
@@ -239,7 +239,7 @@ object MongoConnectionOptions {
     writeConcern: WC = WC.Default,
     readPreference: ReadPreference = ReadPreference.primary,
     failoverStrategy: FailoverStrategy = FailoverStrategy.default,
-    @deprecatedName('monitorRefreshMS) heartbeatFrequencyMS: Int = 10000,
+    @deprecatedName(Symbol("monitorRefreshMS")) heartbeatFrequencyMS: Int = 10000,
     maxIdleTimeMS: Int = 0,
     maxHistorySize: Int = 25,
     credentials: Map[String, MongoConnectionOptions.Credential] = Map.empty,

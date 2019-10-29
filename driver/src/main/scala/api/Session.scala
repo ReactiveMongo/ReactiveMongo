@@ -28,15 +28,15 @@ private[reactivemongo] sealed abstract class Session(
   @inline def operationTime: Option[Long] = Option.empty[Long]
 
   /** No-op as not tracking times, save for [[NodeSetSession]]. */
-  private[api] val update: Function3[Long, Option[Long], Option[BSONDocument], Session] = (_, _, _) => this // No-op
+  private[reactivemongo] val update: Function3[Long, Option[Long], Option[BSONDocument], Session] = (_, _, _) => this // No-op
 
   /** Returns `Some` newly started transaction if any. */
-  private[api] val startTransaction: Function2[WriteConcern, Option[String], Try[(SessionTransaction, Boolean)]] = (_, _) => transaction.map(_ -> false)
+  private[reactivemongo] val startTransaction: Function2[WriteConcern, Option[String], Try[(SessionTransaction, Boolean)]] = (_, _) => transaction.map(_ -> false)
 
-  private[api] def transactionToFlag(): Boolean = false
+  private[reactivemongo] def transactionToFlag(): Boolean = false
 
   /** Returns `Some` ended transaction if any. */
-  private[api] def endTransaction(): Option[SessionTransaction] = None
+  private[reactivemongo] def endTransaction(): Option[SessionTransaction] = None
 
   // ---
 
@@ -76,7 +76,7 @@ private[reactivemongo] sealed class NodeSetSession(
 
   final protected val gossip = new AtomicReference(0L -> 0L)
 
-  override private[api] val update: Function3[Long, Option[Long], Option[BSONDocument], Session] = (operationTime, clusterTime, _) => {
+  override private[reactivemongo] val update: Function3[Long, Option[Long], Option[BSONDocument], Session] = (operationTime, clusterTime, _) => {
     gossip.getAndAccumulate(
       operationTime -> clusterTime.getOrElse(0),
       Session.UpdateGossip)
@@ -91,19 +91,19 @@ private[reactivemongo] sealed class NodeSetSession(
   final def transaction: Try[SessionTransaction] =
     Try(txState.get()).filter(_.isStarted)
 
-  override private[api] val startTransaction: (WriteConcern, Option[String]) => Try[(SessionTransaction, Boolean)] = { (wc, _) =>
+  override private[reactivemongo] val startTransaction: (WriteConcern, Option[String]) => Try[(SessionTransaction, Boolean)] = { (wc, _) =>
     val startOp = new Session.IncTxnNumberIfNotStarted(wc)
 
     Try(txState updateAndGet startOp).map(_ -> startOp.updated)
   }
 
-  final override private[api] def transactionToFlag(): Boolean = {
+  final override private[reactivemongo] def transactionToFlag(): Boolean = {
     val before = txState.getAndUpdate(Session.TransactionStartSent)
 
     before.flagSent // was not sent before, so need to send it now
   }
 
-  final override private[api] def endTransaction(): Option[SessionTransaction] =
+  final override private[reactivemongo] def endTransaction(): Option[SessionTransaction] =
     Option(txState getAndUpdate Session.EndTxIfStarted).filter(_.isStarted)
 }
 
@@ -111,7 +111,7 @@ private[reactivemongo] sealed class DistributedSession(
   lsid: UUID,
   causalConsistency: Boolean = true) extends NodeSetSession(lsid, causalConsistency) {
 
-  final override private[api] val startTransaction: (WriteConcern, Option[String]) => Try[(SessionTransaction, Boolean)] = {
+  final override private[reactivemongo] val startTransaction: (WriteConcern, Option[String]) => Try[(SessionTransaction, Boolean)] = {
     case (wc, Some(txNode)) => {
       val startOp = new Session.IncTxnNumberAndPinNodeIfNotStarted(wc, txNode)
 
@@ -123,7 +123,7 @@ private[reactivemongo] sealed class DistributedSession(
         "Cannot start a distributed transaction without a pinned node"))
   }
 
-  final override private[api] val update: Function3[Long, Option[Long], Option[BSONDocument], Session] = (operationTime, clusterTime, recoveryToken) => {
+  final override private[reactivemongo] val update: Function3[Long, Option[Long], Option[BSONDocument], Session] = (operationTime, clusterTime, recoveryToken) => {
     recoveryToken.foreach { token =>
       txState.updateAndGet(new Session.TransactionSetRecoveryToken(token))
     }

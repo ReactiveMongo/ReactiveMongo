@@ -15,27 +15,20 @@
  */
 package reactivemongo.api.indexes
 
-import reactivemongo.bson.{
-  BSONBoolean,
-  BSONBooleanLike,
-  BSONDocument,
-  BSONDocumentReader,
-  BSONDocumentWriter,
-  BSONNumberLike,
-  BSONString
-}
-
 import reactivemongo.core.protocol.MongoWireVersion
 
 import reactivemongo.api.{
+  Compat,
   DB,
   DBMetaCommands,
-  BSONSerializationPack,
   Cursor,
   CursorProducer,
-  ReadPreference
+  ReadPreference,
+  SerializationPack
 }
+
 import reactivemongo.api.commands.{ CommandError, DropIndexes, WriteResult }
+
 import scala.concurrent.{ Future, ExecutionContext }
 
 /**
@@ -105,7 +98,7 @@ sealed trait IndexesManager {
    *
    * @param collectionName $collectionNameParam
    */
-  def onCollection(@deprecatedName('name) collectionName: String): CollectionIndexesManager
+  def onCollection(@deprecatedName(Symbol("name")) collectionName: String): CollectionIndexesManager
 }
 
 /**
@@ -117,16 +110,21 @@ final class LegacyIndexesManager(db: DB)(
   implicit
   ec: ExecutionContext) extends IndexesManager {
 
-  val collection = db("system.indexes")
+  val collection = db("system.indexes")(Compat.defaultCollectionProducer)
+  import collection.pack
 
-  def list(): Future[List[NSIndex]] = collection.find(BSONDocument.empty, Option.empty[BSONDocument]).cursor(db.connection.options.readPreference)(IndexesManager.NSIndexReader, CursorProducer.defaultCursorProducer).collect[List](-1, Cursor.FailOnError[List[NSIndex]]())
+  private lazy val builder = pack.newBuilder
+
+  def list(): Future[List[NSIndex]] = collection.find(builder.document(Seq.empty), Option.empty[pack.Document]).cursor(db.connection.options.readPreference)(IndexesManager.nsIndexReader, CursorProducer.defaultCursorProducer).collect[List](-1, Cursor.FailOnError[List[NSIndex]]())
 
   def ensure(nsIndex: NSIndex): Future[Boolean] = {
-    val query = BSONDocument(
-      "ns" -> nsIndex.namespace,
-      "name" -> nsIndex.index.eventualName)
+    import builder.string
 
-    collection.find(query, Option.empty[BSONDocument]).one.flatMap { idx =>
+    val query = builder.document(Seq(
+      builder.elementProducer("ns", string(nsIndex.namespace)),
+      builder.elementProducer("name", string(nsIndex.index.eventualName))))
+
+    collection.find(query, Option.empty[pack.Document]).one.flatMap { idx =>
       if (!idx.isDefined) {
         create(nsIndex).map(_ => true)
       } else {
@@ -135,20 +133,26 @@ final class LegacyIndexesManager(db: DB)(
     }
   }
 
-  def create(nsIndex: NSIndex): Future[WriteResult] = {
-    implicit val writer = IndexesManager.NSIndexWriter
+  private[reactivemongo] implicit lazy val nsIndexWriter =
+    IndexesManager.nsIndexWriter(pack)
+
+  def create(nsIndex: NSIndex): Future[WriteResult] =
     collection.insert.one(nsIndex)
-  }
+
+  private implicit lazy val dropWriter = DropIndexes.writer(pack)
+
+  private lazy val dropReader = DropIndexes.reader(pack)
 
   def drop(collectionName: String, indexName: String): Future[Int] = {
-    import reactivemongo.api.commands.bson.BSONDropIndexesImplicits._
+    implicit def reader = dropReader
+
     db.collection(collectionName).
       runValueCommand(DropIndexes(indexName), ReadPreference.primary)
   }
 
   def dropAll(collectionName: String): Future[Int] = drop(collectionName, "*")
 
-  def onCollection(@deprecatedName('name) collectionName: String): CollectionIndexesManager = new LegacyCollectionIndexesManager(db.name, collectionName, this)
+  def onCollection(@deprecatedName(Symbol("name")) collectionName: String): CollectionIndexesManager = new LegacyCollectionIndexesManager(db.name, collectionName, this)
 }
 
 /**
@@ -182,7 +186,7 @@ final class DefaultIndexesManager(db: DB with DBMetaCommands)(
   def dropAll(collectionName: String): Future[Int] =
     onCollection(collectionName).dropAll()
 
-  def onCollection(@deprecatedName('name) collectionName: String): CollectionIndexesManager = new DefaultCollectionIndexesManager(db, collectionName)
+  def onCollection(@deprecatedName(Symbol("name")) collectionName: String): CollectionIndexesManager = new DefaultCollectionIndexesManager(db, collectionName)
 }
 
 /**
@@ -266,16 +270,24 @@ private class DefaultCollectionIndexesManager(db: DB, collectionName: String)(
     Command,
     ListIndexes
   }
-  import reactivemongo.api.commands.bson.BSONListIndexesImplicits._
-  import reactivemongo.api.commands.bson.BSONCreateIndexesImplicits._
-  import reactivemongo.api.commands.bson.
-    BSONCommonWriteCommandsImplicits.DefaultWriteResultReader
+
+  import Compat.{ internalSerializationPack, writeResultReader }
 
   private lazy val collection = db(collectionName)
   private lazy val listCommand = ListIndexes(db.name)
 
   private lazy val runner =
-    Command.run(BSONSerializationPack, db.failoverStrategy)
+    Command.run(internalSerializationPack, db.failoverStrategy)
+
+  private implicit lazy val listWriter =
+    ListIndexes.writer(internalSerializationPack)
+
+  private implicit lazy val indexReader =
+    IndexesManager.indexReader[Compat.SerializationPack](
+      internalSerializationPack)
+
+  private implicit lazy val listReader =
+    ListIndexes.reader(internalSerializationPack)
 
   def list(): Future[List[Index]] =
     runner(collection, listCommand, ReadPreference.primary).recoverWith {
@@ -298,8 +310,8 @@ private class DefaultCollectionIndexesManager(db: DB, collectionName: String)(
     }
   }
 
-  implicit private val writeResultReader =
-    BSONDocumentReader[WriteResult] { DefaultWriteResultReader.read(_) }
+  private implicit val createWriter =
+    CreateIndexes.writer(internalSerializationPack)
 
   def create(index: Index): Future[WriteResult] =
     runner(
@@ -307,8 +319,10 @@ private class DefaultCollectionIndexesManager(db: DB, collectionName: String)(
       CreateIndexes(db.name, List(index)),
       ReadPreference.primary)
 
+  private implicit def dropWriter = IndexesManager.dropWriter
+  private implicit def dropReader = IndexesManager.dropReader
+
   def drop(indexName: String): Future[Int] = {
-    import reactivemongo.api.commands.bson.BSONDropIndexesImplicits._
     runner(
       collection, DropIndexes(indexName), ReadPreference.primary).map(_.value)
   }
@@ -335,8 +349,6 @@ object CollectionIndexesManager {
 }
 
 object IndexesManager {
-  import reactivemongo.util.option
-
   /**
    * Returns an indexes manager for specified database.
    *
@@ -349,78 +361,161 @@ object IndexesManager {
     else new LegacyIndexesManager(db)
   }
 
-  protected def toBSONDocument(nsIndex: NSIndex) = {
-    BSONDocument(
-      "ns" -> BSONString(nsIndex.namespace),
-      "name" -> BSONString(nsIndex.index.eventualName),
-      "key" -> BSONDocument(
-        (for (kv <- nsIndex.index.key)
-          yield kv._1 -> kv._2.value).toStream),
-      "background" -> option(nsIndex.index.background, BSONBoolean(true)),
-      "dropDups" -> option(nsIndex.index.dropDups, BSONBoolean(true)),
-      "sparse" -> option(nsIndex.index.sparse, BSONBoolean(true)),
-      "unique" -> option(nsIndex.index.unique, BSONBoolean(true)),
-      "partialFilterExpression" -> nsIndex.index.partialFilter) ++ nsIndex.index.options
+  @deprecated("Will be internal", "0.19.0")
+  object NSIndexWriter extends reactivemongo.bson.BSONDocumentWriter[NSIndex] {
+    private val underlying =
+      nsIndexWriter(reactivemongo.api.BSONSerializationPack)
+
+    def write(nsIndex: NSIndex): reactivemongo.bson.BSONDocument =
+      underlying.write(nsIndex)
   }
 
-  implicit object NSIndexWriter extends BSONDocumentWriter[NSIndex] {
-    def write(nsIndex: NSIndex): BSONDocument = {
-      if (nsIndex.index.key.isEmpty) {
+  private[reactivemongo] def nsIndexWriter[P <: SerializationPack](pack: P): pack.Writer[NSIndex] = {
+    val builder = pack.newBuilder
+    val decoder = pack.newDecoder
+    val writeIndexType = IndexType.write(pack)(builder)
+
+    import builder.{ boolean, document, elementProducer => element, string }
+
+    pack.writer[NSIndex] { nsIndex =>
+      import nsIndex.index
+
+      if (index.key.isEmpty) {
         throw new RuntimeException("the key should not be empty!")
       }
 
-      toBSONDocument(nsIndex)
+      val elements = Seq.newBuilder[pack.ElementProducer]
+
+      elements ++= Seq(
+        element("ns", string(nsIndex.namespace)),
+        element("name", string(index.eventualName)),
+        element("key", document(index.key.collect {
+          case (k, v) => element(k, writeIndexType(v))
+        })))
+
+      if (index.background) {
+        elements += element("background", boolean(true))
+      }
+
+      if (index.sparse) {
+        elements += element("sparse", boolean(true))
+      }
+
+      if (index.unique) {
+        elements += element("unique", boolean(true))
+      }
+
+      index.partialFilter.foreach { partialFilter =>
+        elements += element(
+          "partialFilterExpression", pack.document(partialFilter))
+      }
+
+      val opts = pack.document(index.options)
+      decoder.names(opts).foreach { nme =>
+        decoder.get(opts, nme).foreach { v =>
+          elements += element(nme, v)
+        }
+      }
+
+      document(elements.result())
     }
   }
 
-  implicit object IndexReader extends BSONDocumentReader[Index] {
-    def read(doc: BSONDocument): Index = doc.getAs[BSONDocument]("key").map(
-      _.elements.map { elem => elem.name -> IndexType(elem.value) }.toList).
-      fold[Index](throw new Exception("the key must be defined")) { k =>
-        val key = doc.getAs[BSONDocument]("weights").fold(k) { w =>
-          val fields = w.elements.map(_.name)
+  @deprecated("Will be internal", "0.19.0")
+  object IndexReader extends reactivemongo.bson.BSONDocumentReader[Index] {
+    private val underlying =
+      indexReader(reactivemongo.api.BSONSerializationPack)
 
-          (k, fields).zipped.map {
-            case ((_, tpe), name) => name -> tpe
-          }.toList
+    def read(doc: reactivemongo.bson.BSONDocument): Index = underlying.read(doc)
+  }
+
+  private[reactivemongo] def indexReader[P <: SerializationPack](pack: P): pack.Reader[Index] = {
+    val decoder = pack.newDecoder
+    val builder = pack.newBuilder
+
+    pack.reader[Index] { doc =>
+      decoder.child(doc, "key").fold[Index](
+        throw new Exception("the key must be defined")) { k =>
+          val ks = decoder.names(k).flatMap { nme =>
+            decoder.get(k, nme).map { v =>
+              nme -> IndexType(pack.bsonValue(v))
+            }
+          }
+
+          val key = decoder.child(doc, "weights").fold(ks) { w =>
+            val fields = decoder.names(w)
+
+            (ks, fields).zipped.map {
+              case ((_, tpe), name) => name -> tpe
+            }
+          }.toSeq
+
+          val opts = builder.document(decoder.names(doc).flatMap {
+            case "ns" | "key" | "name" | "unique" |
+              "background" | "dropDups" | "sparse" | "v" | "partialFilterExpression" =>
+              Seq.empty[pack.ElementProducer]
+
+            case nme =>
+              decoder.get(doc, nme).map { v =>
+                builder.elementProducer(nme, v)
+              }
+          }.toSeq)
+
+          val options = pack.bsonValue(opts) match {
+            case legacyDoc: reactivemongo.bson.BSONDocument =>
+              legacyDoc
+
+            case _ =>
+              reactivemongo.bson.BSONDocument.empty
+          }
+
+          val name = decoder.string(doc, "name")
+          val unique = decoder.booleanLike(doc, "unique").getOrElse(false)
+          val background = decoder.booleanLike(doc, "background").getOrElse(false)
+          val dropDups = decoder.booleanLike(doc, "dropDups").getOrElse(false)
+          val sparse = decoder.booleanLike(doc, "sparse").getOrElse(false)
+          val version = decoder.int(doc, "v")
+          val partialFilter =
+            decoder.child(doc, "partialFilterExpression").
+              map(pack.bsonValue).collect {
+                case legacyDoc: reactivemongo.bson.BSONDocument =>
+                  legacyDoc
+              }
+
+          Index(key, name, unique, background, dropDups,
+            sparse, version, partialFilter, options)
         }
-
-        val options = doc.elements.filterNot { element =>
-          element.name == "ns" || element.name == "key" ||
-            element.name == "name" || element.name == "unique" ||
-            element.name == "background" || element.name == "dropDups" ||
-            element.name == "sparse" || element.name == "v" ||
-            element.name == "partialFilterExpression"
-        }.toSeq
-
-        (for {
-          name <- doc.getAsUnflattenedTry[String]("name")
-          unique <- doc.getAsUnflattenedTry[BSONBooleanLike]("unique").
-            map(_.fold(false)(_.toBoolean))
-
-          background <- doc.getAsUnflattenedTry[BSONBooleanLike]("background").
-            map(_.fold(false)(_.toBoolean))
-
-          dropDups <- doc.getAsUnflattenedTry[BSONBooleanLike]("dropDups").
-            map(_.fold(false)(_.toBoolean))
-
-          sparse <- doc.getAsUnflattenedTry[BSONBooleanLike]("sparse").
-            map(_.fold(false)(_.toBoolean))
-
-          version <- doc.getAsUnflattenedTry[BSONNumberLike]("v").
-            map(_.map(_.toInt))
-
-          partialFilter <- doc.getAsUnflattenedTry[BSONDocument](
-            "partialFilterExpression")
-        } yield Index(key, name, unique, background, dropDups,
-          sparse, version, partialFilter, BSONDocument(options))).get
-      }
+    }
   }
 
-  implicit object NSIndexReader extends BSONDocumentReader[NSIndex] {
-    def read(doc: BSONDocument): NSIndex =
-      doc.getAs[BSONString]("ns").map(_.value).fold[NSIndex](
-        throw new Exception("the namespace ns must be defined"))(
-          NSIndex(_, doc.as[Index]))
+  @deprecated("Will be private", "0.19.0")
+  object NSIndexReader extends reactivemongo.bson.BSONDocumentReader[NSIndex] {
+    private val underlying =
+      nsIndexReader(reactivemongo.api.BSONSerializationPack)
+
+    def read(doc: reactivemongo.bson.BSONDocument): NSIndex =
+      underlying.read(doc)
   }
+
+  private[reactivemongo] def nsIndexReader[P <: SerializationPack](pack: P): pack.Reader[NSIndex] = {
+    val decoder = pack.newDecoder
+    val indexReader: pack.Reader[Index] = this.indexReader(pack)
+
+    pack.reader[NSIndex] { doc =>
+      decoder.string(doc, "ns").fold[NSIndex](
+        throw new Exception("the namespace ns must be defined")) { ns =>
+          NSIndex(ns, pack.deserialize(doc, indexReader))
+        }
+    }
+  }
+
+  private[api] implicit lazy val nsIndexReader =
+    nsIndexReader[Compat.SerializationPack](Compat.internalSerializationPack)
+
+  private[api] lazy val dropWriter =
+    DropIndexes.writer(Compat.internalSerializationPack)
+
+  private[api] lazy val dropReader =
+    DropIndexes.reader(Compat.internalSerializationPack)
+
 }

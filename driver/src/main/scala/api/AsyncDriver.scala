@@ -125,7 +125,7 @@ class AsyncDriver(
    * Closes this driver (and all its connections and resources).
    * Will wait until the timeout for proper closing of connections before forcing hard shutdown.
    */
-  final def close(timeout: FiniteDuration = FiniteDuration(2, SECONDS))(implicit @deprecatedName('executionContext) ec: ExecutionContext): Future[Unit] = askClose(timeout)
+  final def close(timeout: FiniteDuration = FiniteDuration(2, SECONDS))(implicit @deprecatedName(Symbol("executionContext")) ec: ExecutionContext): Future[Unit] = askClose(timeout)
 
 }
 

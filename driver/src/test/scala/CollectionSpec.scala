@@ -1,14 +1,15 @@
 import scala.concurrent._, duration.FiniteDuration
 
-import reactivemongo.api._, collections.bson._
+import reactivemongo.api._
 
 import reactivemongo.api.commands.{ CommandError, WriteConcern }
-
-import reactivemongo.bson._
 
 import org.specs2.concurrent.ExecutionEnv
 
 import _root_.tests.Common
+
+import reactivemongo.api.TestCompat._
+import reactivemongo.api.tests.{ builder, decoder, pack, reader, writer }
 
 final class CollectionSpec(implicit protected val ee: ExecutionEnv)
   extends org.specs2.mutable.Specification
@@ -103,7 +104,7 @@ final class CollectionSpec(implicit protected val ee: ExecutionEnv)
         selector: Option[BSONDocument] = None,
         limit: Option[Int] = None,
         skip: Int = 0,
-        hint: Option[collections.Hint[BSONSerializationPack.type]] = None,
+        hint: Option[collections.Hint[pack.type]] = None,
         readConcern: ReadConcern = ReadConcern.Local) =
         collection.count(selector, limit, skip, hint, readConcern)
 
@@ -132,15 +133,15 @@ final class CollectionSpec(implicit protected val ee: ExecutionEnv)
 
       "when empty with success using collect" in {
         cursor.collect[Vector](10, Cursor.FailOnError[Vector[BSONDocument]]()).
-          map(_.length) must beEqualTo(0).
-          await(1, timeout)
+          map(_.length) must beTypedEqualTo(0).await(1, timeout)
       }
 
       "successfully with 'name' projection using collect" in {
         collection.find(BSONDocument("age" -> 25), BSONDocument("name" -> 1)).
           one[BSONDocument] must beSome[BSONDocument].which { doc =>
-            doc.elements.size must_== 2 /* _id+name */ and (
-              doc.getAs[String]("name") aka "name" must beSome("Jack"))
+            doc.elements.size must_=== 2 /* _id+name */ and {
+              decoder.string(doc, "name") aka "name" must beSome("Jack")
+            }
           }.await(1, timeout)
       }
 
@@ -148,24 +149,25 @@ final class CollectionSpec(implicit protected val ee: ExecutionEnv)
         "when MongoDB > 2.6" in {
           findAll(collection).explain().one[BSONDocument].
             aka("explanation") must beSome[BSONDocument].which { result =>
-              result.getAs[BSONDocument]("queryPlanner").
-                aka("queryPlanner") must beSome and (
-                  result.getAs[BSONDocument]("executionStats").
-                  aka("stats") must beSome) and (
-                    result.getAs[BSONDocument]("serverInfo").
-                    aka("serverInfo") must beSome)
-
+              decoder.child(result, "queryPlanner").
+                aka("queryPlanner") must beSome and {
+                  decoder.child(result, "executionStats").
+                    aka("stats") must beSome
+                } and {
+                  decoder.child(result, "serverInfo").
+                    aka("serverInfo") must beSome
+                }
             }.await(1, timeout)
         } tag "not_mongo26"
 
         "when MongoDB = 2.6" in {
           findAll(collection).explain().one[BSONDocument].
             aka("explanation") must beSome[BSONDocument].which { result =>
-              result.getAs[List[BSONDocument]]("allPlans").
-                aka("plans") must beSome[List[BSONDocument]] and (
-                  result.getAs[String]("server").
-                  aka("server") must beSome[String])
-
+              decoder.children(result, "allPlans").
+                aka("plans") must beLike[List[BSONDocument]] {
+                  case _ => decoder.string(result, "server").
+                    aka("server") must beSome[String]
+                }
             }.await(1, timeout)
         } tag "mongo2"
       }
@@ -197,7 +199,7 @@ final class CollectionSpec(implicit protected val ee: ExecutionEnv)
 
     {
       def cursorSpec(c: BSONCollection, timeout: FiniteDuration) = {
-        implicit val reader = new SometimesBuggyPersonReader
+        implicit val reader = SometimesBuggyPersonReader()
         @inline def cursor = findAll(c).cursor[Person]()
 
         "using collect" in {
@@ -244,7 +246,7 @@ final class CollectionSpec(implicit protected val ee: ExecutionEnv)
 
     "read documents skipping errors using collect" >> {
       // TODO: Move to CursorSpec?
-      implicit val reader = new SometimesBuggyPersonReader
+      implicit val reader = SometimesBuggyPersonReader()
 
       def resultSpec(c: BSONCollection, timeout: FiniteDuration) =
         findAll(c).cursor[Person]().collect[Vector](
@@ -289,7 +291,10 @@ final class CollectionSpec(implicit protected val ee: ExecutionEnv)
       collection.insert.one(BSONDocument(
         "age" -> 101,
         "name" -> BSONJavaScript("db.getName()"))).flatMap { _ =>
-        find.map(_.flatMap(_.getAs[BSONJavaScript]("name")).map(_.value))
+
+        find.map(_.flatMap {
+          decoder.value[BSONJavaScript](_, "name")
+        }.map(_.value))
       } aka "inserted" must beSome("db.getName()").await(1, timeout) and {
         collection.delete().one(selector).map(_.n) must beTypedEqualTo(1).
           await(1, timeout)
@@ -348,14 +353,22 @@ final class CollectionSpec(implicit protected val ee: ExecutionEnv)
     "manage session" >> {
       section("gt_mongo32")
 
+      import builder.{ elementProducer => elm, int }
+
       "start & end" in {
         Common.db.startSession() must beLike[DefaultDB] {
           case db =>
             val coll = db.collection(s"session_${System identityHashCode this}")
             val id = System.identityHashCode(db)
-            val base = BSONDocument("_id" -> id)
-            val inserted = base :~ ("value" -> 1)
-            val updated = base :~ ("value" -> 2)
+            val baseElms = {
+              val b = Seq.newBuilder[pack.ElementProducer]
+              b += elm("_id", int(id))
+            }
+            val base = builder.document(baseElms.result())
+            val inserted = builder.document(
+              { baseElms += elm("value", int(1)) }.result())
+            val updated = builder.document(
+              { baseElms += elm("value", int(2)) }.result())
 
             (for {
               _ <- coll.insert(ordered = false).one(inserted)
@@ -495,32 +508,37 @@ sealed trait CollectionFixtures { specs: CollectionSpec =>
   case class Person(name: String, age: Int)
   case class CustomException(msg: String) extends Exception(msg)
 
-  object BuggyPersonWriter extends BSONDocumentWriter[Person] {
-    def write(p: Person): BSONDocument =
-      throw CustomException("PersonWrite error")
+  lazy val BuggyPersonWriter = writer[Person] { _ =>
+    throw CustomException("PersonWrite error")
   }
 
-  object BuggyPersonReader extends BSONDocumentReader[Person] {
-    def read(doc: BSONDocument): Person = throw CustomException("hey hey hey")
+  lazy val BuggyPersonReader = reader[Person] { _ =>
+    throw CustomException("hey hey hey")
   }
 
-  class SometimesBuggyPersonReader extends BSONDocumentReader[Person] {
+  def SometimesBuggyPersonReader() = {
     var i = 0
-    def read(doc: BSONDocument): Person = {
+
+    reader[Person] { doc =>
       i += 1
       if (i % 4 == 0) throw CustomException("hey hey hey")
-      else Person(doc.getAs[String]("name").get, doc.getAs[Int]("age").get)
+      else pack.deserialize(doc, PersonReader)
     }
   }
 
-  object PersonWriter extends BSONDocumentWriter[Person] {
-    def write(p: Person): BSONDocument =
-      BSONDocument("age" -> p.age, "name" -> p.name)
+  lazy val PersonWriter = writer[Person] { p =>
+    import builder.{ elementProducer => e }
+
+    builder.document(Seq(
+      e("age", builder.int(p.age)),
+      e("name", builder.string(p.name))))
   }
 
-  object PersonReader extends BSONDocumentReader[Person] {
-    def read(doc: BSONDocument): Person =
-      Person(doc.getAs[String]("name").get, doc.getAs[Int]("age").get)
+  lazy val PersonReader = reader[Person] { doc =>
+    (for {
+      nme <- decoder.string(doc, "name")
+      age <- decoder.int(doc, "age")
+    } yield Person(nme, age)).get
   }
 
   val person = Person("Jack", 25)

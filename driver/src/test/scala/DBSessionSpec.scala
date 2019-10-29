@@ -1,7 +1,7 @@
 import reactivemongo.api.{ DefaultDB, WriteConcern, tests => apiTests }
 import reactivemongo.api.commands.GetLastError
 
-import reactivemongo.bson.BSONDocument
+import reactivemongo.api.TestCompat._
 
 trait DBSessionSpec { specs: DatabaseSpec =>
   import tests.Common
@@ -30,7 +30,7 @@ trait DBSessionSpec { specs: DatabaseSpec =>
       }) must beLike[(Int, Int)] {
         case (hash1, hash2) => hash1 must not(beEqualTo(hash2))
       }.awaitFor(timeout)
-    } tag "wip"
+    }
 
     "not kill without start" in {
       Common.db.killSession() must beAnInstanceOf[DefaultDB].await

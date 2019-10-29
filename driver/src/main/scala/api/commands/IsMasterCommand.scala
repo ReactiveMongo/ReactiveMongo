@@ -279,4 +279,90 @@ trait IsMasterCommand[P <: SerializationPack] {
     @deprecated("Use complete extractor", "0.18.5")
     def unapply(res: IsMasterResult): Option[(Boolean, Int, Int, Int, Option[Long], Int, Int, Option[ReplicaSet], Option[String])] = Some(Tuple9(res.isMaster, res.maxBsonObjectSize, res.maxMessageSizeBytes, res.maxWriteBatchSize, res.localTime, res.minWireVersion, res.maxWireVersion, res.replicaSet, res.msg))
   }
+
+  // ---
+
+  private[api] def writer[T <: IsMaster](pack: P): pack.Writer[T] = {
+    val builder = pack.newBuilder
+    import builder.{ elementProducer => element }
+
+    val serializeClientMeta: ClientMetadata => Option[pack.Document] =
+      ClientMetadata.serialize[pack.type](pack)
+
+    pack.writer[T] { im =>
+      val elms = Seq.newBuilder[pack.ElementProducer]
+
+      elms += element("ismaster", builder.int(1))
+
+      im.comment.foreach { comment =>
+        elms += element(f"$$comment", builder.string(comment))
+      }
+
+      im.client.flatMap(serializeClientMeta).foreach { meta =>
+        elms += element("client", meta)
+      }
+
+      builder.document(elms.result())
+    }
+  }
+
+  private[api] def reader(pack: P)(implicit dr: pack.NarrowValueReader[Date], sr: pack.NarrowValueReader[String]): pack.Reader[IsMasterResult] = {
+    val decoder = pack.newDecoder
+
+    import decoder.{ booleanLike, int, long, string, values }
+
+    pack.reader[IsMasterResult] { doc =>
+      def rs = for {
+        me <- string(doc, "me")
+        setName <- string(doc, "setName")
+      } yield new ReplicaSet(
+        setName = setName,
+        setVersion = int(doc, "setVersion").getOrElse(-1),
+        me = me,
+        primary = string(doc, "primary"),
+        hosts = values[String](doc, "hosts").getOrElse(Seq.empty),
+        passives = values[String](doc, "passives").getOrElse(Seq.empty),
+        arbiters = values[String](doc, "arbiters").getOrElse(Seq.empty),
+        isSecondary = booleanLike(doc, "secondary").getOrElse(false),
+        isArbiterOnly = booleanLike(doc, "arbiterOnly").getOrElse(false),
+        isPassive = booleanLike(doc, "passive").getOrElse(false),
+        isHidden = booleanLike(doc, "hidden").getOrElse(false),
+        tags = decoder.child(doc, "tags"),
+        electionId = int(doc, "electionId").getOrElse(-1),
+        lastWrite = decoder.child(doc, "lastWrite").flatMap { ld =>
+          for {
+            opTime <- long(ld, "opTime")
+            lastWriteDate <- decoder.read[Date](ld, "lastWriteDate")
+            majorityOpTime <- long(ld, "majorityOpTime")
+            majorityWriteDate <- decoder.read[Date](ld, "majorityWriteDate")
+          } yield new LastWrite(
+            opTime.toLong, lastWriteDate,
+            majorityOpTime.toLong, majorityWriteDate)
+        })
+
+      new IsMasterResult(
+        isMaster = booleanLike(doc, "ismaster").getOrElse(false), // `ismaster`
+        maxBsonObjectSize = int(doc, "maxBsonObjectSize").
+          getOrElse(16777216), // default = 16 * 1024 * 1024
+        maxMessageSizeBytes = int(doc, "maxMessageSizeBytes").
+          getOrElse(48000000), // default = 48000000, mongod >= 2.4
+        maxWriteBatchSize = int(doc, "maxWriteBatchSize").getOrElse(1000),
+        localTime = long(doc, "localTime"), // date? mongod >= 2.2
+        logicalSessionTimeoutMinutes = long(
+          doc, "logicalSessionTimeoutMinutes"),
+        minWireVersion = int(doc, "minWireVersion").
+          getOrElse(0), // int? mongod >= 2.6
+        maxWireVersion = int(doc, "maxWireVersion").
+          getOrElse(0), // int? mongod >= 2.6
+        readOnly = booleanLike(doc, "readOnly"),
+        compression = values[String](doc, "compression").
+          fold(List.empty[String])(_.toList),
+        saslSupportedMech = values[String](doc, "saslSupportedMech").
+          fold(List.empty[String])(_.toList),
+        replicaSet = rs, // flattened in the result
+        msg = string(doc, "msg") // Contains the value isdbgrid when isMaster returns from a mongos instance.
+      )
+    }
+  }
+
 }

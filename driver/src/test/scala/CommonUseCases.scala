@@ -2,14 +2,12 @@ import scala.concurrent._
 import scala.concurrent.duration.FiniteDuration
 
 import reactivemongo.api._
-import reactivemongo.bson._
-import reactivemongo.api.collections.bson.BSONCollection
-import reactivemongo.api.commands.bson.BSONCountCommand._
-import reactivemongo.api.commands.bson.BSONCountCommandImplicits._
 
 import org.specs2.concurrent.ExecutionEnv
 
 import _root_.tests.Common
+import reactivemongo.api.TestCompat._
+import reactivemongo.api.tests.{ builder, decoder }
 
 final class CommonUseCases(implicit ee: ExecutionEnv)
   extends org.specs2.mutable.Specification
@@ -22,6 +20,7 @@ final class CommonUseCases(implicit ee: ExecutionEnv)
   // ---
 
   import Common.{ timeout, slowTimeout }
+  import builder.regex
 
   lazy val (db, slowDb) = Common.databases(s"reactivemongo-usecases-${System identityHashCode this}", Common.connection, Common.slowConnection)
 
@@ -40,14 +39,12 @@ final class CommonUseCases(implicit ee: ExecutionEnv)
 
     "insert some docs from a seq of docs" in {
       val docs = (18 to 60).toStream.map(i => BSONDocument(
-        "age" -> BSONInteger(i), "name" -> BSONString("Jack" + i)))
+        "age" -> i, "name" -> s"Jack${i}"))
 
       (for {
         _ /*result*/ <- collection.insert(ordered = true).many(docs)
-        count <- collection.runValueCommand(
-          Count(BSONDocument(
-            "age" -> BSONDocument("$gte" -> 18, "$lte" -> 60))),
-          ReadPreference.Primary)
+        count <- collection.count(Some(
+          BSONDocument("age" -> BSONDocument(f"$$gte" -> 18, f"$$lte" -> 60))))
       } yield count) must beEqualTo(43).await(1, timeout)
     }
 
@@ -60,14 +57,15 @@ final class CommonUseCases(implicit ee: ExecutionEnv)
       //import reactivemongo.api.tests.{ makeRequest => req, nextResponse }
 
       it.collect[List](Int.MaxValue, Cursor.FailOnError[List[BSONDocument]]()).
-        map(_.map(_.getAs[BSONInteger]("age").get.value).
-          mkString("")) must beTypedEqualTo((18 to 60).mkString("")).
+        map(_.map { doc =>
+          decoder.int(doc, "age").mkString
+        }.mkString("")) must beTypedEqualTo((18 to 60).mkString("")).
         await(1, timeout * 2)
 
     }
 
     "find by regexp" in {
-      collection.find(BSONDocument("name" -> BSONRegex("ack2", ""))).
+      collection.find(BSONDocument("name" -> regex("ack2", ""))).
         cursor[BSONDocument]().
         collect[List](Int.MaxValue, Cursor.FailOnError[List[BSONDocument]]()).
         map(_.size) must beTypedEqualTo(10).await(1, timeout)
@@ -76,9 +74,9 @@ final class CommonUseCases(implicit ee: ExecutionEnv)
     "find by regexp with flag" in {
       val query =
         BSONDocument(
-          "$or" -> BSONArray(
-            BSONDocument("name" -> BSONRegex("^jack2", "i")),
-            BSONDocument("name" -> BSONRegex("^jack3", "i"))))
+          f"$$or" -> BSONArray(
+            BSONDocument("name" -> regex("^jack2", "i")),
+            BSONDocument("name" -> regex("^jack3", "i"))))
 
       collection.find(query).cursor[BSONDocument]().
         collect[List](Int.MaxValue, Cursor.FailOnError[List[BSONDocument]]()).
@@ -97,7 +95,7 @@ final class CommonUseCases(implicit ee: ExecutionEnv)
 
         it.collect[List](
           Int.MaxValue, Cursor.FailOnError[List[BSONDocument]]()).map {
-            _.map(_.getAs[BSONInteger]("age").get.value).mkString("")
+            _.map(doc => decoder.int(doc, "age").mkString).mkString("")
           } must beTypedEqualTo((18 to 60).mkString("")).await(0, t)
       }
 
@@ -110,36 +108,35 @@ final class CommonUseCases(implicit ee: ExecutionEnv)
       }
     }
 
-    "insert a document containing a merged array of objects, fetch and check it" in {
+    "insert a document containing merged objects, fetch and check it" in {
       val array = BSONArray(
         BSONDocument(
           "entry" -> BSONInteger(1),
           "type" -> BSONString("telephone"),
           "professional" -> BSONBoolean(true),
           "value" -> BSONString("+331234567890")))
+
       val array2 = BSONArray(
         BSONDocument(
           "entry" -> BSONInteger(2),
           "type" -> BSONString("mail"),
           "professional" -> BSONBoolean(true),
           "value" -> BSONString("joe@plop.com")))
+
       val doc = BSONDocument(
         "name" -> BSONString("Joe"),
         "contacts" -> (array ++ array2))
 
-      Await.result(collection.insert.one(doc), timeout).ok must beTrue
-
-      val fetched = Await.result(collection.find(BSONDocument("name" -> BSONString("Joe"))).one[BSONDocument], timeout)
-
-      fetched.isDefined mustEqual true
-      val contactsString = fetched.get.getAs[BSONArray]("contacts").
-        get.values.collect {
-          case contact: BSONDocument =>
-            contact.getAs[BSONString]("type").get.value + ":" +
-              contact.getAs[BSONString]("value").get.value
+      collection.insert.one(doc).flatMap { _ =>
+        collection.find(BSONDocument("name" -> "Joe")).one[BSONDocument]
+      } must beSome[BSONDocument].which { fetched =>
+        val contactsString = decoder.children(fetched, "contacts").map { c =>
+          decoder.string(c, "type").mkString + ":" +
+            decoder.string(c, "value").mkString
         }.mkString(",")
 
-      contactsString mustEqual "telephone:+331234567890,mail:joe@plop.com"
+        contactsString must_=== "telephone:+331234567890,mail:joe@plop.com"
+      }.awaitFor(timeout)
     }
 
     "insert a weird doc" in {
@@ -154,7 +151,7 @@ final class CommonUseCases(implicit ee: ExecutionEnv)
     }
 
     "fail with this error" in {
-      val query = BSONDocument("$and" ->
+      val query = BSONDocument(f"$$and" ->
         BSONDocument("name" -> BSONString("toto")))
 
       Await.result(collection.find(query).one[BSONDocument], timeout).

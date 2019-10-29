@@ -26,12 +26,9 @@ private[api] trait CountOp[P <: SerializationPack with Singleton] {
     hint: Option[Hint[pack.type]],
     readConcern: ReadConcern)(
     implicit
-    ec: ExecutionContext): Future[Long] = {
-
-    runCommand(
-      new CountCommand(query, limit, skip, hint, readConcern),
-      collection.readPreference)
-  }
+    ec: ExecutionContext): Future[Long] = runCommand(
+    new CountCommand(query, limit, skip, hint, readConcern),
+    collection.readPreference)
 
   private final class CountCommand(
     val query: Option[pack.Document],
