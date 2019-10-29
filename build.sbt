@@ -20,11 +20,33 @@ lazy val `ReactiveMongo-Shaded-Native-osx-x86_64` =
 lazy val `ReactiveMongo-Shaded-Native-linux-x86_64` =
   Shaded.nativeModule("linux-x86_64", "epoll")
 
+lazy val `ReactiveMongo-Core` = project.in(file("core")).
+  enablePlugins(CpdPlugin).
+  dependsOn(
+    `ReactiveMongo-Shaded` % Provided,
+    `ReactiveMongo-BSON` % Provided).
+  settings(
+    Common.settings ++ Findbugs.settings ++ Seq(
+      compile in Compile := (compile in Compile).
+        dependsOn(assembly in `ReactiveMongo-Shaded`).value,
+      unmanagedJars in Compile := {
+        val dir = (target in `ReactiveMongo-Shaded`).value
+        val jar = (assemblyJarName in (`ReactiveMongo-Shaded`, assembly)).value
+
+        (dir / "classes").mkdirs() // Findbugs workaround
+
+        Seq(Attributed(dir / jar)(AttributeMap.empty))
+      }))
+
+
+
 lazy val `ReactiveMongo` = new Driver(
+  `ReactiveMongo-BSON`,
   `ReactiveMongo-BSON-Macros`,
   `ReactiveMongo-Shaded`,
   `ReactiveMongo-Shaded-Native-linux-x86_64`,
-  `ReactiveMongo-Shaded-Native-osx-x86_64`
+  `ReactiveMongo-Shaded-Native-osx-x86_64`,
+  `ReactiveMongo-Core`
 ).module
 
 lazy val `ReactiveMongo-JMX` = new Jmx(`ReactiveMongo`).module
@@ -48,6 +70,7 @@ lazy val `ReactiveMongo-Root` = project.in(file(".")).
     `ReactiveMongo-Shaded`,
     `ReactiveMongo-Shaded-Native-osx-x86_64`,
     `ReactiveMongo-Shaded-Native-linux-x86_64`,
+    `ReactiveMongo-Core`,
     `ReactiveMongo`,
     `ReactiveMongo-JMX`)
 

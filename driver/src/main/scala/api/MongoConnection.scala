@@ -89,7 +89,7 @@ class MongoConnection(
    * @param name $dbName
    * @param failoverStrategy $failoverStrategy
    */
-  def database(name: String, failoverStrategy: FailoverStrategy = options.failoverStrategy)(implicit @deprecatedName('context) ec: ExecutionContext): Future[DefaultDB] =
+  def database(name: String, failoverStrategy: FailoverStrategy = options.failoverStrategy)(implicit @deprecatedName(Symbol("context")) ec: ExecutionContext): Future[DefaultDB] =
     waitIsAvailable(failoverStrategy, stackTrace()).map { state =>
       new DefaultDB(name, this, state, failoverStrategy)
     }

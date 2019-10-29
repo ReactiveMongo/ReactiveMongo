@@ -15,7 +15,7 @@ class Bson(shaded: Project) {
   import XmlUtil._
 
   val discipline = Def.setting[ModuleID] {
-    if (scalaVersion.value startsWith "2.10.") {
+    if (scalaBinaryVersion.value == "2.10") {
       "org.typelevel" %% "discipline" % "0.9.0"
     } else {
       "org.typelevel" %% "discipline-specs2" % "0.12.0-M3"
@@ -23,7 +23,7 @@ class Bson(shaded: Project) {
   }
 
   val spireLawsVer = Def.setting[String] {
-    if (scalaVersion.value startsWith "2.10.") "0.15.0"
+    if (scalaBinaryVersion.value == "2.10") "0.15.0"
     else "0.17.0-M1"
   }
 

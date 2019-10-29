@@ -27,7 +27,7 @@ object `package` {
       buffer
     }
 
-    /** Write the contents of the given [[reactivemongo.core.protocol.ChannelBufferWritable]]. */
+    /** Write the contents of the given `reactivemongo.core.protocol.ChannelBufferWritable`. */
     def write(writable: ChannelBufferWritable) = writable writeTo buffer
 
     /** Reads a UTF-8 String. */

@@ -39,8 +39,7 @@ import reactivemongo.core.errors.ConnectionNotInitialized
 trait GenericCollectionProducer[P <: SerializationPack with Singleton, +C <: GenericCollection[P]] extends CollectionProducer[C]
 
 /**
- * A Collection that provides default methods using a `SerializationPack`
- * (e.g. the default [[reactivemongo.api.BSONSerializationPack]]).
+ * A Collection that provides default methods using a `SerializationPack`.
  *
  * Some methods of this collection accept instances of `Reader[T]` and `Writer[T]`, that transform any `T` instance into a document, compatible with the selected serialization pack, and vice-versa.
  *

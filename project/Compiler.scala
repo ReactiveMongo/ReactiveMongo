@@ -4,7 +4,7 @@ import sbt.Keys._
 object Compiler {
   private val silencerVersion = Def.setting[String] {
     if (scalaBinaryVersion.value == "2.10") "1.2.1"
-    else "1.4.1"
+    else "1.4.4"
   }
 
   private def unmanaged(ver: String, base: File): Seq[File] =
@@ -57,8 +57,10 @@ object Compiler {
       if (scalaBinaryVersion.value == "2.10") Nil
       else Seq(
         compilerPlugin(
-          "com.github.ghik" %% "silencer-plugin" % silencerVersion.value),
-        "com.github.ghik" %% "silencer-lib" % silencerVersion.value % Provided)
+          ("com.github.ghik" %% "silencer-plugin" % silencerVersion.value).
+            cross(CrossVersion.full)),
+        ("com.github.ghik" %% "silencer-lib" % silencerVersion.
+          value % Provided).cross(CrossVersion.full))
     },
     scalacOptions in Compile ++= {
       val v = scalaBinaryVersion.value
