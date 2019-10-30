@@ -19,16 +19,17 @@ import sbtassembly.AssemblyKeys, AssemblyKeys._
 import com.github.sbt.findbugs.FindbugsKeys.findbugsAnalyzedPath
 
 final class Driver(
+  bson: Project,
   bsonmacros: Project,
   shaded: Project,
   linuxShaded: Project,
-  osxShaded: Project) {
+  osxShaded: Project,
+  core: Project) {
 
   import Dependencies._
 
   lazy val module = Project("ReactiveMongo", file("driver")).
     enablePlugins(CpdPlugin).
-    dependsOn(bsonmacros).
     settings(
       Common.settings ++ Findbugs.settings ++ Seq(
         resolvers := Resolvers.resolversList,
@@ -95,7 +96,7 @@ object Version {
           shapelessTest % Test, specs.value) ++ logApi,
         libraryDependencies ++= {
           if (scalaBinaryVersion.value != "2.10") {
-            Seq("org.reactivemongo" %% "reactivemongo-bson-collection" % version.value)
+            Seq("org.reactivemongo" %% "reactivemongo-bson-pack" % version.value)
           } else {
             Seq.empty
           }
@@ -757,7 +758,7 @@ object Version {
 
         case _ => p
       }
-    }.dependsOn(shaded)
+    }.dependsOn(bson, core, shaded, bsonmacros % Test)
 
   // ---
 

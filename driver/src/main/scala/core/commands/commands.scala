@@ -163,7 +163,7 @@ class DefaultCommandError(
  */
 class MakableCommand(val db: String, val command: Command[_]) {
   /**
-   * Produces the [[reactivemongo.core.protocol.Query]] instance for the given command.
+   * Produces the `reactivemongo.core.protocol.Query` instance for the given command.
    */
   def makeQuery: Query = Query(if (command.slaveOk) QueryFlags.SlaveOk else 0, db + ".$cmd", 0, 1)
 

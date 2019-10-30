@@ -35,7 +35,7 @@ object Dependencies {
   }
 
   val specsVer = Def.setting[String] {
-    if (scalaVersion.value startsWith "2.10") "3.9.5" // 4.0.1 not avail
+    if (scalaBinaryVersion.value == "2.10") "3.10.0" // 4.0.1 not avail
     else "4.5.1"/*"4.3.5"*/ // due to discipline 0.11 not compat with scala 2.10
   }
 
