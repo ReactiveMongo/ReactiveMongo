@@ -1,21 +1,16 @@
 import sbt._
 import sbt.Keys._
 
-object Resolvers {
-  val resolversList = Seq(
-    Resolver.typesafeRepo("releases"),
-    Resolver.sonatypeRepo("snapshots")
-  )
-}
-
 object Dependencies {
-  val netty = "4.1.43.Final"
+  val shaded = Def.setting[ModuleID] {
+    organization.value % "reactivemongo-shaded" % version.value
+  }
 
   val akka = Def.setting[Seq[ModuleID]] {
     val ver = sys.env.get("AKKA_VERSION").getOrElse {
-      val v = scalaVersion.value
+      val v = scalaBinaryVersion.value
 
-      if (v.startsWith("2.12.") || v.startsWith("2.13.")) "2.5.25"
+      if (v == "2.12" || v == "2.13") "2.5.25"
       else "2.3.13"
     }
 
@@ -27,7 +22,7 @@ object Dependencies {
 
   val playIteratees = Def.setting[ModuleID] {
     val ver = sys.env.get("ITERATEES_VERSION").getOrElse {
-      if (scalaVersion.value startsWith "2.10.") "2.3.9"
+      if (scalaBinaryVersion.value == "2.10") "2.3.9"
       else "2.6.1"
     }
 
@@ -43,7 +38,7 @@ object Dependencies {
     "org.specs2" %% "specs2-core" % specsVer.value % Test
   }
 
-  val slf4jVer = "1.7.28"
+  val slf4jVer = "1.7.29"
   val log4jVer = "2.12.1"
 
   val slf4j = "org.slf4j" % "slf4j-api" % slf4jVer

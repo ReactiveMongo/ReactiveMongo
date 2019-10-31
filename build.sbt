@@ -1,6 +1,4 @@
-lazy val `ReactiveMongo-Shaded` = Shaded.commonModule
-
-lazy val `ReactiveMongo-BSON` = new Bson(`ReactiveMongo-Shaded`).module
+lazy val `ReactiveMongo-BSON` = new Bson().module
 
 lazy val `ReactiveMongo-BSON-Macros` = project.in(file("macros")).
   enablePlugins(CpdPlugin).
@@ -14,38 +12,31 @@ lazy val `ReactiveMongo-BSON-Macros` = project.in(file("macros")).
     )
   )
 
-lazy val `ReactiveMongo-Shaded-Native-osx-x86_64` =
-  Shaded.nativeModule("osx-x86_64", "kqueue")
-
-lazy val `ReactiveMongo-Shaded-Native-linux-x86_64` =
-  Shaded.nativeModule("linux-x86_64", "epoll")
+lazy val `ReactiveMongo-BSON-Compat` = project.in(file("bson-compat")).
+  settings(Common.settings ++ Seq(
+    //name := s"${baseArtifact}-compat",
+    crossScalaVersions ~= {
+      _.filterNot(_ startsWith "2.10")
+    },
+    description := "Compatibility library between legacy & new BSON APIs",
+    fork in Test := true,
+    libraryDependencies ++= Seq(
+      Dependencies.shaded.value % Provided,
+      organization.value %% "reactivemongo-bson-api" % version.value % Provided,
+      Dependencies.specs.value),
+  )).dependsOn(`ReactiveMongo-BSON`)
 
 lazy val `ReactiveMongo-Core` = project.in(file("core")).
   enablePlugins(CpdPlugin).
-  dependsOn(
-    `ReactiveMongo-Shaded` % Provided,
-    `ReactiveMongo-BSON` % Provided).
+  dependsOn(`ReactiveMongo-BSON` % Provided).
   settings(
     Common.settings ++ Findbugs.settings ++ Seq(
-      compile in Compile := (compile in Compile).
-        dependsOn(assembly in `ReactiveMongo-Shaded`).value,
-      unmanagedJars in Compile := {
-        val dir = (target in `ReactiveMongo-Shaded`).value
-        val jar = (assemblyJarName in (`ReactiveMongo-Shaded`, assembly)).value
-
-        (dir / "classes").mkdirs() // Findbugs workaround
-
-        Seq(Attributed(dir / jar)(AttributeMap.empty))
-      }))
-
-
+      libraryDependencies += Dependencies.shaded.value,
+    ))
 
 lazy val `ReactiveMongo` = new Driver(
   `ReactiveMongo-BSON`,
   `ReactiveMongo-BSON-Macros`,
-  `ReactiveMongo-Shaded`,
-  `ReactiveMongo-Shaded-Native-linux-x86_64`,
-  `ReactiveMongo-Shaded-Native-osx-x86_64`,
   `ReactiveMongo-Core`
 ).module
 
@@ -53,7 +44,7 @@ lazy val `ReactiveMongo-JMX` = new Jmx(`ReactiveMongo`).module
 
 // ---
 
-def docSettings = Documentation(excludes = Seq(`ReactiveMongo-Shaded`, `ReactiveMongo-JMX`)).settings
+def docSettings = Documentation(excludes = Seq(`ReactiveMongo-JMX`)).settings
 
 lazy val `ReactiveMongo-Root` = project.in(file(".")).
   enablePlugins(ScalaUnidocPlugin, CpdPlugin).
@@ -67,9 +58,7 @@ lazy val `ReactiveMongo-Root` = project.in(file(".")).
   )).aggregate(
     `ReactiveMongo-BSON`,
     `ReactiveMongo-BSON-Macros`,
-    `ReactiveMongo-Shaded`,
-    `ReactiveMongo-Shaded-Native-osx-x86_64`,
-    `ReactiveMongo-Shaded-Native-linux-x86_64`,
+    `ReactiveMongo-BSON-Compat`,
     `ReactiveMongo-Core`,
     `ReactiveMongo`,
     `ReactiveMongo-JMX`)

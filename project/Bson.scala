@@ -8,9 +8,7 @@ import com.typesafe.tools.mima.plugin.MimaKeys.{
 
 import com.github.sbt.cpd.CpdPlugin
 
-import sbtassembly.AssemblyKeys, AssemblyKeys._
-
-class Bson(shaded: Project) {
+class Bson() {
   import Dependencies._
   import XmlUtil._
 
@@ -31,20 +29,11 @@ class Bson(shaded: Project) {
     enablePlugins(CpdPlugin).
     settings(Common.settings ++ Findbugs.settings ++ Seq(
       libraryDependencies ++= Seq(
+        shaded.value % Provided,
         specs.value,
         "org.specs2" %% "specs2-scalacheck" % specsVer.value % Test,
         discipline.value % Test,
         "org.typelevel" %% "spire-laws" % spireLawsVer.value % Test),
-      compile in Compile := (compile in Compile).
-        dependsOn(assembly in shaded).value,
-      unmanagedJars in Compile := {
-        val dir = (target in shaded).value
-        val jar = (assemblyJarName in (shaded, assembly)).value
-
-        (dir / "classes").mkdirs() // Findbugs workaround
-
-        Seq(Attributed(dir / jar)(AttributeMap.empty))
-      },
       mimaBinaryIssueFilters ++= {
         import com.typesafe.tools.mima.core._, ProblemFilters.{ exclude => x }
 
@@ -65,5 +54,5 @@ class Bson(shaded: Project) {
           x[UpdateForwarderBodyProblem]("reactivemongo.bson.DefaultBSONHandlers.bsonArrayToCollectionReader")
         )
       }
-    )).dependsOn(shaded % Provided)
+    ))
 }

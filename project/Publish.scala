@@ -30,11 +30,11 @@ object Publish {
 
   val mimaSettings = mimaDefaultSettings ++ Seq(
     mimaPreviousArtifacts := {
-      val v = scalaVersion.value
+      val v = scalaBinaryVersion.value
 
-      if (v.startsWith("2.12.") && crossPaths.value) {
+      if (v == "2.12" && crossPaths.value) {
         Set(organization.value % s"${moduleName.value}_${scalaBinaryVersion.value}" % "0.12.7")
-      } else if (v startsWith "2.13.") {
+      } else if (v == "2.13") {
         Set.empty
       } else if (crossPaths.value) {
         Set(organization.value % s"${moduleName.value}_${scalaBinaryVersion.value}" % previousVersion)
