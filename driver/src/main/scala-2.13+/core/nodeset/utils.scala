@@ -1,7 +1,5 @@
 package reactivemongo.core.nodeset
 
-import scala.language.higherKinds
-
 import scala.collection.Factory
 
 package object utils {

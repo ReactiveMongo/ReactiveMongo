@@ -14,16 +14,11 @@ import com.typesafe.tools.mima.plugin.MimaKeys.mimaBinaryIssueFilters
 
 import com.github.sbt.cpd.CpdPlugin
 
-import sbtassembly.AssemblyKeys, AssemblyKeys._
-
 import com.github.sbt.findbugs.FindbugsKeys.findbugsAnalyzedPath
 
 final class Driver(
   bson: Project,
   bsonmacros: Project,
-  shaded: Project,
-  linuxShaded: Project,
-  osxShaded: Project,
   core: Project) {
 
   import Dependencies._
@@ -32,9 +27,6 @@ final class Driver(
     enablePlugins(CpdPlugin).
     settings(
       Common.settings ++ Findbugs.settings ++ Seq(
-        resolvers := Resolvers.resolversList,
-        compile in Compile := (compile in Compile).
-          dependsOn(assembly in shaded).value,
         sourceGenerators in Compile += Def.task {
           val ver = version.value
           val dir = (sourceManaged in Compile).value
@@ -75,14 +67,6 @@ object Version {
           IO.move(listenerClass, extDir / classFile)
         },
         driverCleanup := driverCleanup.triggeredBy(compile in Compile).value,
-        unmanagedJars in Compile := {
-          val dir = (target in shaded).value
-          val jar = (assemblyJarName in (shaded, assembly)).value
-
-          (dir / "classes").mkdirs() // Findbugs workaround
-
-          Seq(Attributed(dir / jar)(AttributeMap.empty))
-        },
         libraryDependencies ++= {
           if (scalaBinaryVersion.value != "2.13") {
             Seq(playIteratees.value)
@@ -96,7 +80,9 @@ object Version {
           shapelessTest % Test, specs.value) ++ logApi,
         libraryDependencies ++= {
           if (scalaBinaryVersion.value != "2.10") {
-            Seq("org.reactivemongo" %% "reactivemongo-bson-pack" % version.value)
+            Seq("api", "compat").map { n =>
+              "org.reactivemongo" %% s"reactivemongo-bson-$n" % version.value
+            }
           } else {
             Seq.empty
           }
@@ -731,34 +717,29 @@ object Version {
     ).configure { p =>
       sys.props.get("test.nettyNativeArch") match {
         case Some("osx") => p.settings(Seq(
-          compile in Test := (compile in Test).
-            dependsOn(osxShaded / Compile / packageBin).value,
-          unmanagedJars in Test += {
-            val dir = (target in osxShaded).value
-            val jar = (assemblyJarName in (osxShaded, assembly)).value
-
-            (dir / "classes").mkdirs() // Findbugs workaround
-
-            Attributed(dir / jar)(AttributeMap.empty)
-          }
+          libraryDependencies += shadedNative("osx-x86-64").value % Test
         ))
 
         case Some(_/* linux */) => p.settings(Seq(
-          compile in Test := (compile in Test).
-            dependsOn(linuxShaded / Compile / packageBin).value,
-          unmanagedJars in Test += {
-            val dir = (target in linuxShaded).value
-            val jar = (assemblyJarName in (linuxShaded, assembly)).value
-
-            (dir / "classes").mkdirs() // Findbugs workaround
-
-            Attributed(dir / jar)(AttributeMap.empty)
-          }
+          libraryDependencies += shadedNative("linux-x86-64").value % Test
         ))
 
         case _ => p
       }
-    }.dependsOn(bson, core, shaded, bsonmacros % Test)
+    }.dependsOn(bson, core, bsonmacros % Test)
+
+  private def shadedNative(arch: String) = Def.setting[ModuleID] {
+    val v = version.value
+    val s = {
+      if (v endsWith "-SNAPSHOT") {
+        s"${v.dropRight(9)}-${arch}-SNAPSHOT"
+      } else {
+        s"${v}-${arch}"
+      }
+    }
+
+    organization.value % "reactivemongo-shaded-native" % s
+  }
 
   // ---
 

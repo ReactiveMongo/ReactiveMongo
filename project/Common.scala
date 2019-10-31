@@ -2,7 +2,13 @@ import sbt._
 import sbt.Keys._
 
 object Common {
-  val baseSettings = Seq(organization := "org.reactivemongo")
+  val baseSettings = Seq(
+    organization := "org.reactivemongo",
+    resolvers ++= Seq(
+      Resolver.typesafeRepo("releases"),
+      Resolver.sonatypeRepo("snapshots")
+    )
+  )
 
   val filter = { (ms: Seq[(File, String)]) =>
     ms filter {
@@ -21,7 +27,7 @@ object Common {
   val settings = Defaults.coreDefaultSettings ++ baseSettings ++ Compiler.settings ++ Seq(
     scalaVersion := "2.12.9",
     crossScalaVersions := Seq(
-      "2.10.7", scalaCompatVer, scalaVersion.value, "2.13.0"),
+      "2.10.7", scalaCompatVer, scalaVersion.value, "2.13.1"),
     crossVersion := CrossVersion.binary,
     //parallelExecution in Test := false,
     //fork in Test := true, // Don't share executioncontext between SBT CLI/tests

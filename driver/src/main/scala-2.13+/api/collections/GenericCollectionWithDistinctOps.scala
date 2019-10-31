@@ -1,7 +1,5 @@
 package reactivemongo.api.collections
 
-import scala.language.higherKinds
-
 import scala.collection.Factory
 
 import scala.concurrent.{ Future, ExecutionContext }

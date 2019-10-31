@@ -1,6 +1,14 @@
-package reactivemongo.api
+package reactivemongo.api.bson.collection
 
 import scala.util.{ Failure, Try }
+
+import reactivemongo.api.{
+  Compat,
+  CollectionMetaCommands,
+  DB,
+  FailoverStrategy,
+  ReadPreference
+}
 
 import reactivemongo.api.bson.{
   BSONDocument,

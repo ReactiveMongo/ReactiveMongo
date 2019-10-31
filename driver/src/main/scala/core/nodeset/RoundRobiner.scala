@@ -1,7 +1,5 @@
 package reactivemongo.core.nodeset
 
-import scala.language.higherKinds
-
 import scala.math.Ordering
 
 private[reactivemongo] abstract class RoundRobiner[A, M[T] <: Iterable[T]] {
