@@ -17,8 +17,8 @@ package reactivemongo.core.errors
 
 import scala.util.control.NoStackTrace
 
-import reactivemongo.bson._
-import DefaultBSONHandlers._
+import reactivemongo.bson.{ BSONDocument, BSONInteger }
+import reactivemongo.bson.DefaultBSONHandlers._
 
 /** An error that can come from a MongoDB node or not. */
 trait ReactiveMongoException extends Exception {

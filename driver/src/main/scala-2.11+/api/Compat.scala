@@ -24,12 +24,7 @@ private[reactivemongo] object Compat {
   lazy implicit val unitBoxReader =
     CommandCodecs.unitBoxReader(internalSerializationPack)
 
-  lazy implicit val writeResultReader = {
-    val p = internalSerializationPack
-    val r = CommandCodecs.defaultWriteResultReader(p)
-
-    p.reader[WriteResult] { doc =>
-      p.deserialize(doc, r)
-    }
-  }
+  lazy implicit val writeResultReader =
+    CommandCodecs.writeResultReader[WriteResult, SerializationPack](
+      internalSerializationPack)
 }

@@ -1,5 +1,7 @@
 package reactivemongo.api.commands
 
+import scala.language.higherKinds
+
 import scala.concurrent.{ ExecutionContext, Future }
 
 import reactivemongo.api.{
@@ -243,8 +245,8 @@ object Command {
    * @param failover the failover strategy
    *
    * {{{
-   * import reactivemongo.bson.BSONDocument
-   * import reactivemongo.api.BSONSerializationPack
+   * import reactivemongo.api.bson.BSONDocument
+   * import reactivemongo.api.bson.collection.BSONSerializationPack
    * import reactivemongo.api.commands.{ Command, Count }
    *
    * Command.run(BSONSerializationPack).

@@ -4,8 +4,6 @@ import scala.util.control.NonFatal
 
 import reactivemongo.api.SerializationPack
 
-import reactivemongo.api.indexes.{ IndexesManager, NSIndex }
-
 import reactivemongo.core.errors.GenericDriverException
 
 @deprecated("Internal: will be made private", "0.16.0")
@@ -128,33 +126,38 @@ private[api] object CreateCollection {
 }
 
 @deprecated("Internal: will be made private", "0.16.0")
-case class Capped(
-  size: Long,
-  max: Option[Int] = None)
+class ConvertToCapped(
+  val capped: Capped) extends Product with Serializable with CollectionCommand with CommandWithResult[UnitBox.type] {
 
-private[api] object Capped { //extends scala.runtime.AbstractFunction2[Long, Option[Int], Capped] {
+  val productArity = 1
 
-  //@inline def apply(size: Long, max: Option[Int]): Capped = new Capped(size, max)
+  def productElement(n: Int): Any = capped
 
-  def writeTo[P <: SerializationPack](pack: P)(builder: SerializationPack.Builder[pack.type], append: pack.ElementProducer => Any)(capped: Capped): Unit = {
-    import builder.{ elementProducer => element }
-
-    append(element("size", builder.long(capped.size)))
-
-    capped.max.foreach { max =>
-      append(element("max", builder.int(max)))
-    }
+  def canEqual(that: Any): Boolean = that match {
+    case _: ConvertToCapped => true
+    case _                  => false
   }
+
+  override def equals(that: Any): Boolean = that match {
+    case other: ConvertToCapped =>
+      this.capped == other.capped
+
+    case _ =>
+      false
+  }
+
+  override def hashCode: Int = capped.hashCode
+
+  override def toString: String = s"ConvertToCapped($capped)"
 }
 
-@deprecated("Internal: will be made private", "0.16.0")
-case class ConvertToCapped(
-  capped: Capped) extends CollectionCommand with CommandWithResult[UnitBox.type]
+object ConvertToCapped
+  extends scala.runtime.AbstractFunction1[Capped, ConvertToCapped] {
 
-private[api] object ConvertToCapped { //extends scala.runtime.AbstractFunction1[Capped, ConvertToCapped] {
-  //@inline def apply(capped: Capped): ConvertToCapped = new ConvertToCapped(capped)
+  @inline def apply(capped: Capped): ConvertToCapped =
+    new ConvertToCapped(capped)
 
-  def writer[P <: SerializationPack](pack: P): pack.Writer[ResolvedCollectionCommand[ConvertToCapped]] = {
+  private[api] def writer[P <: SerializationPack](pack: P): pack.Writer[ResolvedCollectionCommand[ConvertToCapped]] = {
     val builder = pack.newBuilder
 
     pack.writer[ResolvedCollectionCommand[ConvertToCapped]] { convert =>
@@ -167,34 +170,6 @@ private[api] object ConvertToCapped { //extends scala.runtime.AbstractFunction1[
         builder, elms += _)(convert.command.capped)
 
       builder.document(elms.result())
-    }
-  }
-}
-
-@deprecated("Internal: will be made private", "0.16.0")
-case class DropIndexes(index: String) extends CollectionCommand with CommandWithResult[DropIndexesResult]
-
-@deprecated("Internal: will be made private", "0.16.0")
-case class DropIndexesResult(value: Int) extends BoxedAnyVal[Int]
-
-private[api] object DropIndexes {
-  def writer[P <: SerializationPack](pack: P): pack.Writer[ResolvedCollectionCommand[DropIndexes]] = {
-    val builder = pack.newBuilder
-
-    import builder.{ elementProducer => element, string }
-
-    pack.writer[ResolvedCollectionCommand[DropIndexes]] { drop =>
-      builder.document(Seq(
-        element("dropIndexes", string(drop.collection)),
-        element("index", string(drop.command.index))))
-    }
-  }
-
-  def reader[P <: SerializationPack](pack: P): pack.Reader[DropIndexesResult] = {
-    val decoder = pack.newDecoder
-
-    CommandCodecs.dealingWithGenericCommandErrorsReader[pack.type, DropIndexesResult](pack) { doc =>
-      DropIndexesResult(decoder.int(doc, "nIndexesWas").getOrElse(0))
     }
   }
 }
@@ -237,92 +212,6 @@ object ListCollectionNames
     }
 
     case _ => Some(ns.reverse)
-  }
-}
-
-import reactivemongo.api.indexes.Index
-
-/**
- * Lists the indexes of the specified collection.
- *
- * @param db the database name
- */
-@deprecated("Internal: will be made private", "0.16.0")
-case class ListIndexes(db: String) extends CollectionCommand
-  with CommandWithResult[List[Index]]
-
-private[api] object ListIndexes { //extends scala.runtime.AbstractFunction1[String, ListIndexes] {
-  //@inline def apply(db: String): ListIndexes = new ListIndexes(db)
-
-  def writer[P <: SerializationPack](pack: P): pack.Writer[ResolvedCollectionCommand[ListIndexes]] = {
-    val builder = pack.newBuilder
-
-    pack.writer[ResolvedCollectionCommand[ListIndexes]] { list =>
-      builder.document(Seq(builder.elementProducer(
-        "listIndexes", builder.string(list.collection))))
-    }
-  }
-
-  def reader[P <: SerializationPack](pack: P)(implicit r: pack.Reader[Index]): pack.Reader[List[Index]] = {
-    val decoder = pack.newDecoder
-
-    @annotation.tailrec
-    def readBatch(batch: List[pack.Document], indexes: List[Index]): List[Index] = batch match {
-      case d :: ds =>
-        readBatch(ds, pack.deserialize(d, r) :: indexes)
-
-      case _ => indexes
-    }
-
-    //import BSONCommonWriteCommandsImplicits.DefaultWriteResultReader
-
-    CommandCodecs.dealingWithGenericCommandErrorsReader[pack.type, List[Index]](pack) { doc =>
-      decoder.child(doc, "cursor").map {
-        decoder.children(_, "firstBatch")
-      }.fold[List[Index]](throw GenericDriverException(
-        "the cursor and firstBatch must be defined"))(readBatch(_, Nil))
-    }
-  }
-}
-
-/**
- * Creates the given indexes on the specified collection.
- *
- * @param db the database name
- * @param indexes the indexes to be created
- */
-@deprecated("Internal: will be made private", "0.16.0")
-case class CreateIndexes(db: String, indexes: List[Index])
-  extends CollectionCommand with CommandWithResult[WriteResult]
-
-private[api] object CreateIndexes { //extends scala.runtime.AbstractFunction2[String, List[Index], CreateIndexes] {
-  //@inline def apply(db: String, indexes: List[Index]): CreateIndexes = new CreateIndexes(db, indexes)
-
-  def writer[P <: SerializationPack](pack: P): pack.Writer[ResolvedCollectionCommand[CreateIndexes]] = {
-    val builder = pack.newBuilder
-    val nsIndexWriter = IndexesManager.nsIndexWriter(pack)
-
-    import builder.{ elementProducer => element }
-
-    pack.writer[ResolvedCollectionCommand[CreateIndexes]] { create =>
-      val indexes = create.command.indexes.map { i =>
-        val nsi = NSIndex(create.command.db + "." + create.collection, i)
-        pack.serialize(nsi, nsIndexWriter)
-      }
-
-      val elements = Seq.newBuilder[pack.ElementProducer]
-
-      elements += element("createIndexes", builder.string(create.collection))
-
-      indexes match {
-        case head :: tail =>
-          elements += element("indexes", builder.array(head, tail))
-
-        case _ =>
-      }
-
-      builder.document(elements.result())
-    }
   }
 }
 

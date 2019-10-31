@@ -29,7 +29,7 @@ object Travis {
       // Base specifications about JDK/Scala
       val javaSpecs = List(
         "openjdk8", "oraclejdk9",
-        "scala2.12.9", "scala2.11.12"
+        "scala2.12.10", "scala2.11.12"
       ).combinations(2).flatMap {
         case jdk :: scala :: Nil if (
           !jdk.startsWith("scala") && scala.startsWith("scala")) => {
@@ -186,7 +186,7 @@ object Travis {
                 flags.contains("MONGO_VER" -> mongoLower)
             )) {
             List(
-              "    - scala: 2.12.9",
+              "    - scala: 2.12.10",
               s"      env: ${integrationVars(flags)}",
               "    - jdk: oraclejdk9",
               s"      env: ${integrationVars(flags)}"

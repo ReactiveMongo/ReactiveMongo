@@ -926,9 +926,7 @@ object BSONElementSet {
 /**
  * A `BSONDocument` structure (BSON type `0x03`).
  *
- * A `BSONDocument` is basically a stream of tuples `(String, BSONValue)`.
- * It is completely lazy. The stream it wraps is a `Stream[Try[(String, BSONValue)]]` since
- * we cannot be sure that a not yet deserialized value will be processed without error.
+ * A `BSONDocument` is basically a stream of elements.
  *
  * @define keyParam the key to be found in the document
  */

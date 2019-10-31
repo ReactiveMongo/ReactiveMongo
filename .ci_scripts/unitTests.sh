@@ -10,7 +10,7 @@ if [ `git grep "$SCRIPT_DIR" $(basename "$SCRIPT_DIR") | grep -v $(basename $0) 
   exit 2
 fi
 
-if [ "$SCALA_VERSION" = "2.11.12" -a `javac -version 2>&1 | grep 1.7 | wc -l` -eq 1 ]; then
+if [ "$SCALA_VERSION" = "2.11.12" ]; then
     echo "[INFO] Check the source format and backward compatibility"
 
     sbt ++$SCALA_VERSION scalariformFormat test:scalariformFormat > /dev/null
@@ -23,6 +23,7 @@ EOF
     )
 
     sbt ++$SCALA_VERSION ";error ;mimaReportBinaryIssues" || exit 3
+    exit
 
     sbt ++$SCALA_VERSION ";project ReactiveMongo-BSON ;findbugs ;project ReactiveMongo-BSON-Macros ;findbugs ;project ReactiveMongo ;findbugs ;project ReactiveMongo-JMX ;findbugs" || exit 4
 fi
