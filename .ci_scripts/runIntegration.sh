@@ -73,7 +73,7 @@ if [ $# -ge 1 ]; then
     MODE="$1"
 fi
 
-sed -e 's/"-deprecation", //' < project/Common.scala > .tmp && mv .tmp project/Common.scala
+perl -pe "s/"-deprecation", //;s|resolvers |resolvers += Resolver.sonatypeRepo(\"staging\"),\r\n    resolvers |" < "project/Common.scala" > /tmp/Common.scala && mv /tmp/Common.scala "project/Common.scala"
 
 if [ "x$MODE" = "xinteractive" ]; then
     sbt #++$SCALA_VERSION

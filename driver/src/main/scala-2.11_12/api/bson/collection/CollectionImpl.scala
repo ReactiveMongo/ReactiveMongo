@@ -4,10 +4,10 @@ import scala.util.{ Failure, Try }
 
 import reactivemongo.api.{
   CollectionMetaCommands,
-  Compat,
   DB,
   FailoverStrategy,
-  ReadPreference
+  ReadPreference,
+  Serialization
 }
 
 import reactivemongo.api.bson.{
@@ -30,16 +30,15 @@ import reactivemongo.api.commands.{
 /**
  * A Collection that interacts with the BSON library.
  */
-private[reactivemongo] final class BSONCollection(
+private[reactivemongo] final class CollectionImpl(
   val db: DB,
   val name: String,
   val failoverStrategy: FailoverStrategy,
-  override val readPreference: ReadPreference) extends GenericCollection[Compat.SerializationPack] with CollectionMetaCommands { self =>
+  override val readPreference: ReadPreference) extends GenericCollection[Serialization.Pack] with CollectionMetaCommands { self =>
 
-  val pack: Compat.SerializationPack = Compat.internalSerializationPack
+  val pack: Serialization.Pack = Serialization.internalSerializationPack
 
-  def withReadPreference(pref: ReadPreference): BSONCollection =
-    new BSONCollection(db, name, failoverStrategy, pref)
+  def withReadPreference(pref: ReadPreference): Serialization.DefaultCollection = new CollectionImpl(db, name, failoverStrategy, pref)
 
   object BatchCommands
     extends reactivemongo.api.collections.BatchCommands[pack.type] { commands =>

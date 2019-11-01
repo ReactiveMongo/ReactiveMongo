@@ -17,13 +17,22 @@ package reactivemongo.bson
 
 import java.math.{ BigDecimal => JBigDec }
 
-import exceptions.DocumentKeyNotFound
 import scala.util.{ Failure, Success, Try }
-import buffer._
-import utils.Converters
 
 import scala.language.implicitConversions
 import scala.Iterable
+
+import exceptions.DocumentKeyNotFound
+
+import buffer.{
+  ArrayReadableBuffer,
+  BufferHandler,
+  DefaultBufferHandler,
+  ReadableBuffer,
+  WritableBuffer
+}
+
+import utils.Converters
 
 sealed trait Producer[T] {
   private[bson] def generate(): Iterable[T]

@@ -19,14 +19,25 @@ import com.github.sbt.findbugs.FindbugsKeys.findbugsAnalyzedPath
 final class Driver(
   bson: Project,
   bsonmacros: Project,
-  core: Project) {
-
+  core: Project,
+  bsonCompat: Project
+) {
   import Dependencies._
+  import XmlUtil._
 
   lazy val module = Project("ReactiveMongo", file("driver")).
     enablePlugins(CpdPlugin).
     settings(
       Common.settings ++ Findbugs.settings ++ Seq(
+        unmanagedSourceDirectories in Compile ++= {
+          val v = scalaBinaryVersion.value
+
+          if (v == "2.11" || v == "2.12") {
+            Seq((sourceDirectory in Compile).value / "scala-2.11_12")
+          } else {
+            Seq.empty[File]
+          }
+        },
         sourceGenerators in Compile += Def.task {
           val ver = version.value
           val dir = (sourceManaged in Compile).value
@@ -80,9 +91,7 @@ object Version {
           shapelessTest % Test, specs.value) ++ logApi,
         libraryDependencies ++= {
           if (scalaBinaryVersion.value != "2.10") {
-            Seq("api", "compat").map { n =>
-              "org.reactivemongo" %% s"reactivemongo-bson-$n" % version.value
-            }
+            Seq("org.reactivemongo" %% "reactivemongo-bson-api" % version.value)
           } else {
             Seq.empty
           }
@@ -712,7 +721,11 @@ object Version {
         mappings in (Compile, packageBin) ~= driverFilter,
         //mappings in (Compile, packageDoc) ~= driverFilter,
         mappings in (Compile, packageSrc) ~= driverFilter,
-        apiMappings ++= Documentation.mappings("com.typesafe.akka", "http://doc.akka.io/api/akka/%s/")("akka-actor").value ++ Documentation.mappings("com.typesafe.play", "http://playframework.com/documentation/%s/api/scala/index.html", _.replaceAll("[\\d]$", "x"))("play-iteratees").value
+        apiMappings ++= Documentation.mappings("com.typesafe.akka", "http://doc.akka.io/api/akka/%s/")("akka-actor").value ++ Documentation.mappings("com.typesafe.play", "http://playframework.com/documentation/%s/api/scala/index.html", _.replaceAll("[\\d]$", "x"))("play-iteratees").value,
+        pomPostProcess := {
+          if (scalaBinaryVersion.value == "2.10") skipScala210
+          else identity[XmlNode]
+        }
       )
     ).configure { p =>
       sys.props.get("test.nettyNativeArch") match {
@@ -726,7 +739,9 @@ object Version {
 
         case _ => p
       }
-    }.dependsOn(bson, core, bsonmacros % Test)
+    }.dependsOn(bson, core, bsonCompat, bsonmacros % Test)
+
+  // ---
 
   private def shadedNative(arch: String) = Def.setting[ModuleID] {
     val v = version.value
@@ -741,8 +756,6 @@ object Version {
     organization.value % "reactivemongo-shaded-native" % s
   }
 
-  // ---
-
   private val driverFilter: Seq[(File, String)] => Seq[(File, String)] = {
     (_: Seq[(File, String)]).filter {
       case (file, name) =>
@@ -751,4 +764,17 @@ object Version {
   } andThen Common.filter
 
   private val driverCleanup = taskKey[Unit]("Driver compilation cleanup")
+
+  // ---
+
+  private lazy val skipScala210: XmlNode => XmlNode = {
+    import scala.xml.NodeSeq
+    import scala.xml.transform.{ RewriteRule, RuleTransformer }
+
+    transformPomDependencies { dep: XmlElem =>
+      if ((dep \ "artifactId").text startsWith "reactivemongo-bson-compat") {
+        None
+      } else Some(dep)
+    }
+  }
 }

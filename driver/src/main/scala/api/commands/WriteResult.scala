@@ -104,7 +104,7 @@ case class LastError(
   override def inError: Boolean = !ok || errmsg.isDefined
 
   @deprecated("Use the detailed properties (e.g. `code`)", "0.12.0")
-  def originalDocument = Option.empty[Document]
+  override def originalDocument = Option.empty[reactivemongo.bson.BSONDocument]
 
   override lazy val message = errmsg.getOrElse("<none>")
 }

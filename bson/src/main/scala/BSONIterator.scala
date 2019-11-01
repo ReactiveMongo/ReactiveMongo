@@ -80,5 +80,6 @@ object BSONIterator {
   }
 
   /** Makes a pretty String representation of the given iterator of BSON elements. */
-  def pretty(it: Iterator[Try[BSONElement]]): String = "{\n" + pretty(0, it) + "\n}"
+  def pretty(it: Iterator[Try[BSONElement]]): String =
+    "{\n" + pretty(0, it) + "\n}"
 }

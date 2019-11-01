@@ -3,7 +3,7 @@ package reactivemongo.api
 import reactivemongo.bson.{ BSONElement, BSONValue, Producer }
 
 object TestCompat {
-  type BSONCollection = reactivemongo.api.collections.GenericCollection[Compat.SerializationPack]
+  type BSONCollection = reactivemongo.api.collections.GenericCollection[Serialization.Pack]
 
   type BSONDocument = reactivemongo.bson.BSONDocument
 

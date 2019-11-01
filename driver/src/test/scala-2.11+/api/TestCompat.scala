@@ -2,11 +2,13 @@ package reactivemongo.api
 
 import java.util.Date
 
-import reactivemongo.api.bson.{ BSONReader, BSONValue, Producer }
+import reactivemongo.api.bson.{ BSONReader, Producer }
 
 // Use to migration test between legacy BSON API to new one
 object TestCompat {
-  type BSONCollection = reactivemongo.api.collections.GenericCollection[Compat.SerializationPack]
+  type BSONCollection = reactivemongo.api.collections.GenericCollection[Serialization.Pack]
+
+  type BSONValue = reactivemongo.api.bson.BSONValue
 
   type BSONDocument = reactivemongo.api.bson.BSONDocument
 

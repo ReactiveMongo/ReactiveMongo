@@ -4,6 +4,8 @@ import java.util.UUID
 
 import scala.language.higherKinds
 
+import scala.reflect.ClassTag
+
 import scala.util.Try
 
 import reactivemongo.bson.{ BSONDocument, BSONValue }
@@ -21,7 +23,8 @@ trait SerializationPack { self: Singleton =>
   type NarrowValueReader[A]
   private[reactivemongo] type WidenValueReader[A]
 
-  private[reactivemongo] val IsDocument: scala.reflect.ClassTag[Document]
+  private[reactivemongo] val IsDocument: ClassTag[Document]
+  private[reactivemongo] val IsValue: ClassTag[Value]
 
   def IdentityWriter: Writer[Document]
   def IdentityReader: Reader[Document]
@@ -59,6 +62,8 @@ trait SerializationPack { self: Singleton =>
   // Returns a BSON value
   private[reactivemongo] def bsonValue(value: Value): BSONValue
 
+  private[reactivemongo] def narrowIdentityReader: NarrowValueReader[Value]
+
   @com.github.ghik.silencer.silent
   private[reactivemongo] def bsonSize(value: Value): Int = -1
   // TODO: Remove the default value after release
@@ -80,6 +85,9 @@ object SerializationPack {
 
     /** Returns a new non empty array of values */
     def array(value: pack.Value, values: Seq[pack.Value]): pack.Value
+
+    /** Returns a byte array as a serialized value. */
+    def binary(data: Array[Byte]): pack.Value
 
     /**
      * Returns a producer of element, for the given `name` and `value`.
@@ -110,8 +118,14 @@ object SerializationPack {
     /** Returns a timestamp as a serialized value. */
     def timestamp(time: Long): pack.Value
 
+    /** Returns a date/time as a serialized value. */
+    def dateTime(time: Long): pack.Value
+
     /** Returns a regular expression value. */
     def regex(pattern: String, options: String): pack.Value
+
+    /** Returns a new object ID. */
+    def generateObjectId(): pack.Value
   }
 
   /**
@@ -135,10 +149,12 @@ object SerializationPack {
      * @returnsNamedElement, if the element exists
      * with expected `T` as value type.
      */
-    final def value[T <: pack.Value](
+    final def value[T](
       document: pack.Document,
-      name: String)(implicit cls: scala.reflect.ClassTag[T]): Option[T] =
-      get(document, name).flatMap(cls.unapply)
+      name: String)(
+      implicit
+      ev: T <:< pack.Value, cls: ClassTag[T]): Option[T] =
+      get(document, name).collect { case `cls`(t) => t }
 
     final def read[T](document: pack.Document, name: String)(implicit r: pack.NarrowValueReader[T]): Option[T] = {
       val widenReader = pack.widenReader[T](r)
@@ -159,6 +175,11 @@ object SerializationPack {
         _.flatMap(pack.readValue[T](_, widenReader).toOption)
       }
     }
+
+    /**
+     * @returnsNamedElement, if the element is a binary field
+     */
+    def binary(document: pack.Document, name: String): Option[Array[Byte]]
 
     /**
      * @returnsNamedElement, if the element is a boolean-like field

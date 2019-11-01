@@ -4,10 +4,10 @@ import scala.util.{ Failure, Try }
 
 import reactivemongo.api.{
   CollectionMetaCommands,
-  Compat,
   DB,
   FailoverStrategy,
-  ReadPreference
+  ReadPreference,
+  Serialization
 }
 
 import reactivemongo.api.bson.{
@@ -22,7 +22,6 @@ import reactivemongo.api.commands.{
   CountCommand => CC,
   DeleteCommand => DC,
   InsertCommand => IC,
-  DistinctCommand => DistC,
   ResolvedCollectionCommand,
   UpdateCommand => UC
 }
@@ -30,16 +29,15 @@ import reactivemongo.api.commands.{
 /**
  * A Collection that interacts with the BSON library.
  */
-private[reactivemongo] final class BSONCollection(
+private[reactivemongo] final class CollectionImpl(
   val db: DB,
   val name: String,
   val failoverStrategy: FailoverStrategy,
-  override val readPreference: ReadPreference) extends GenericCollection[Compat.SerializationPack] with CollectionMetaCommands { self =>
+  override val readPreference: ReadPreference) extends GenericCollection[Serialization.Pack] with CollectionMetaCommands { self =>
 
-  val pack: Compat.SerializationPack = Compat.internalSerializationPack
+  val pack: Serialization.Pack = Serialization.internalSerializationPack
 
-  def withReadPreference(pref: ReadPreference): BSONCollection =
-    new BSONCollection(db, name, failoverStrategy, pref)
+  def withReadPreference(pref: ReadPreference): Serialization.DefaultCollection = new CollectionImpl(db, name, failoverStrategy, pref)
 
   object BatchCommands
     extends reactivemongo.api.collections.BatchCommands[pack.type] { commands =>
@@ -59,19 +57,6 @@ private[reactivemongo] final class BSONCollection(
 
     object CountResultReader
       extends BSONDocumentReader[CountCommand.CountResult] {
-      def readDocument(doc: BSONDocument) = deprecated
-    }
-
-    object DistinctCommand extends DistC[pack.type] {
-      val pack = commands.pack
-    }
-
-    object DistinctWriter
-      extends BSONDocumentWriter[ResolvedCollectionCommand[DistinctCommand.Distinct]] {
-      def writeTry(cmd: ResolvedCollectionCommand[DistinctCommand.Distinct]) = deprecated
-    }
-
-    object DistinctResultReader extends BSONDocumentReader[DistinctCommand.DistinctResult] {
       def readDocument(doc: BSONDocument) = deprecated
     }
 

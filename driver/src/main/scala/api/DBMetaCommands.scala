@@ -33,7 +33,7 @@ trait DBMetaCommands { self: DB =>
   }
   import CommonImplicits._
   import BSONPingCommandImplicits._
-  import Compat.{ internalSerializationPack, unitBoxReader }
+  import Serialization.{ internalSerializationPack, unitBoxReader }
 
   private implicit lazy val dropWriter =
     DropDatabase.writer(internalSerializationPack)
@@ -73,7 +73,7 @@ trait DBMetaCommands { self: DB =>
         self, ListCollectionNames, ReadPreference.primary).map(_.names)
 
     } else {
-      implicit def producer = Compat.defaultCollectionProducer
+      implicit def producer = Serialization.defaultCollectionProducer
 
       val coll = producer(self, "system.namespaces", self.failoverStrategy)
       import coll.{ pack => p }
@@ -105,7 +105,7 @@ trait DBMetaCommands { self: DB =>
    *
    * @return a failure if the dropExisting option is false and the target collection already exists
    */
-  def renameCollection[C <: Collection](db: String, from: String, to: String, dropExisting: Boolean = false, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit ec: ExecutionContext, producer: CollectionProducer[C] = Compat.defaultCollectionProducer): Future[C] = {
+  def renameCollection[C <: Collection](db: String, from: String, to: String, dropExisting: Boolean = false, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit ec: ExecutionContext, producer: CollectionProducer[C] = Serialization.defaultCollectionProducer): Future[C] = {
     Command.run(internalSerializationPack, failoverStrategy).unboxed(
       self, RenameCollection(s"${db}.$from", s"${db}.$to", dropExisting),
       ReadPreference.primary).map(_ => self.collection(to))

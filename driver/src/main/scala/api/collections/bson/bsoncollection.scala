@@ -25,6 +25,8 @@ import reactivemongo.api.BSONSerializationPack
 @deprecated("Will be removed", "0.19.0")
 object `package` {
   implicit object BSONCollectionProducer extends GenericCollectionProducer[BSONSerializationPack.type, BSONCollection] {
+    val pack = BSONSerializationPack
+
     def apply(db: DB, name: String, failoverStrategy: FailoverStrategy = FailoverStrategy()): BSONCollection = new BSONCollection(db, name, failoverStrategy, db.defaultReadPreference)
   }
 }

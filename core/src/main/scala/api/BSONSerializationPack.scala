@@ -4,6 +4,8 @@ import java.util.UUID
 
 import scala.util.Try
 
+import scala.reflect.ClassTag
+
 import reactivemongo.bson.buffer.{ ReadableBuffer, WritableBuffer }
 
 import reactivemongo.core.protocol.Response
@@ -22,8 +24,8 @@ object BSONSerializationPack extends SerializationPack { self =>
   type NarrowValueReader[A] = BSONReader[_ <: BSONValue, A]
   private[reactivemongo] type WidenValueReader[A] = UnsafeBSONReader[A]
 
-  private[reactivemongo] val IsDocument =
-    implicitly[scala.reflect.ClassTag[BSONDocument]]
+  private[reactivemongo] val IsDocument = implicitly[ClassTag[BSONDocument]]
+  private[reactivemongo] val IsValue = implicitly[ClassTag[BSONValue]]
 
   object IdentityReader extends Reader[Document] {
     def read(document: Document): Document = document
@@ -80,6 +82,8 @@ object BSONSerializationPack extends SerializationPack { self =>
 
   private[reactivemongo] def bsonValue(value: BSONValue): BSONValue = value
 
+  private[reactivemongo] val narrowIdentityReader: NarrowValueReader[BSONValue] = BSONReader[BSONValue, BSONValue](identity)
+
   override private[reactivemongo] val newBuilder: SerializationPack.Builder[BSONSerializationPack.type] = Builder
 
   override private[reactivemongo] val newDecoder: SerializationPack.Decoder[BSONSerializationPack.type] = Decoder
@@ -100,6 +104,9 @@ object BSONSerializationPack extends SerializationPack { self =>
     def array(value: Value, values: Seq[Value]): Value =
       BSONArray(value +: values)
 
+    def binary(data: Array[Byte]): Value =
+      BSONBinary(data, Subtype.GenericBinarySubtype)
+
     def elementProducer(name: String, value: Value): ElementProducer =
       BSONElement(name, value)
 
@@ -117,7 +124,11 @@ object BSONSerializationPack extends SerializationPack { self =>
 
     def timestamp(time: Long): Value = BSONTimestamp(time)
 
+    def dateTime(time: Long): Value = BSONDateTime(time)
+
     def regex(pattern: String, options: String) = BSONRegex(pattern, options)
+
+    def generateObjectId() = BSONObjectID.generate()
   }
 
   private object Decoder
@@ -128,6 +139,11 @@ object BSONSerializationPack extends SerializationPack { self =>
       case doc: BSONDocument => Some(doc)
       case _                 => None
     }
+
+    def binary(document: BSONDocument, name: String): Option[Array[Byte]] =
+      document.get(name).collect {
+        case bin: BSONBinary => bin.byteArray
+      }
 
     def names(document: BSONDocument): Set[String] =
       document.elements.map(_.name).toSet

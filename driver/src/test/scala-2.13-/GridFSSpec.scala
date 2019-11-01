@@ -7,8 +7,13 @@ import reactivemongo.bson._
 import reactivemongo.bson.utils.Converters
 
 import reactivemongo.api.BSONSerializationPack
-import reactivemongo.api.gridfs.{ ReadFile, DefaultFileToSave, GridFS }
-import reactivemongo.api.gridfs.Implicits._
+
+import reactivemongo.api.gridfs.{
+  DefaultFileToSave,
+  GridFS,
+  Implicits,
+  ReadFile
+}
 
 import org.specs2.concurrent.ExecutionEnv
 
@@ -32,18 +37,21 @@ final class GridFSSpec(implicit ee: ExecutionEnv)
   // ---
 
   "Default connection" should {
+    import reactivemongo.api.collections.bson.BSONCollectionProducer
+
     val prefix = s"fs${System identityHashCode db}"
-    gridFsSpec(GridFS[BSONSerializationPack.type](db, prefix), timeout)
+    gridFsSpec(GridFS(BSONSerializationPack, db, prefix), timeout)
   }
 
   "Slow connection" should {
     val prefix = s"fs${System identityHashCode slowDb}"
-    gridFsSpec(GridFS[BSONSerializationPack.type](slowDb, prefix), slowTimeout)
+    gridFsSpec(GridFS(slowDb, prefix), slowTimeout)
   }
 
   // ---
 
   type GFile = ReadFile[BSONSerializationPack.type, BSONValue]
+  import Implicits.DefaultReadFileReader
 
   def gridFsSpec(
     gfs: GridFS[BSONSerializationPack.type],
@@ -62,6 +70,8 @@ final class GridFSSpec(implicit ee: ExecutionEnv)
     "ensure the indexes are ok" in {
       gfs.ensureIndex() must beTrue.await(2, timeout) and {
         gfs.exists must beTrue.awaitFor(timeout)
+      } and {
+        gfs.ensureIndex() must beFalse.awaitFor(timeout)
       }
     }
 
@@ -99,6 +109,9 @@ final class GridFSSpec(implicit ee: ExecutionEnv)
           gfs.readToOutputStream(actual, buf).
             map(_ => buf.toByteArray) must beTypedEqualTo(content).
             await(1, timeout)
+        } and {
+          gfs.chunks(actual).fold(ArrayBuilder.make[Byte]()) { _ ++= _ }.
+            map(_.result()) must beTypedEqualTo(content).await(1, timeout)
         }
       }
 
@@ -120,7 +133,7 @@ final class GridFSSpec(implicit ee: ExecutionEnv)
       (for {
         a <- gfs.remove(file1.id).map(_.n)
         b <- gfs.remove(file2.id).map(_.n)
-      } yield a + b) must beEqualTo(2).await(1, timeout)
+      } yield a + b) must beTypedEqualTo(2).await(1, timeout)
     }
   }
 }

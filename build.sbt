@@ -20,16 +20,34 @@ lazy val `ReactiveMongo-BSON-Macros` = project.in(file("macros")).
 lazy val `ReactiveMongo-BSON-Compat` = project.in(file("bson-compat")).
   settings(Common.settings ++ Seq(
     //name := s"${baseArtifact}-compat",
-    crossScalaVersions ~= {
-      _.filterNot(_ startsWith "2.10")
-    },
     description := "Compatibility library between legacy & new BSON APIs",
+    sourceDirectory := {
+      if (scalaBinaryVersion.value == "2.10") new java.io.File("/no/sources")
+      else sourceDirectory.value
+    },
+    publishArtifact := (scalaBinaryVersion.value != "2.10"),
+    publish := (Def.taskDyn {
+      val ver = scalaBinaryVersion.value
+      val go = publish.value
+
+      Def.task {
+        if (ver != "2.13") {
+          go
+        }
+      }
+    }).value,
     fork in Test := true,
     mimaPreviousArtifacts := Set.empty,
-    libraryDependencies ++= Seq(
-      Dependencies.shaded.value % Provided,
-      organization.value %% "reactivemongo-bson-api" % version.value % Provided,
-      Dependencies.specs.value),
+    libraryDependencies ++= {
+      if (scalaBinaryVersion.value != "2.10") {
+        Seq(
+          Dependencies.shaded.value % Provided,
+          organization.value %% "reactivemongo-bson-api" % version.value % Provided,
+          Dependencies.specs.value)
+      } else {
+        Seq.empty
+      }
+    }
   )).dependsOn(`ReactiveMongo-BSON`)
 
 lazy val `ReactiveMongo-Core` = project.in(file("core")).
@@ -83,7 +101,8 @@ lazy val `ReactiveMongo-Core` = project.in(file("core")).
 lazy val `ReactiveMongo` = new Driver(
   `ReactiveMongo-BSON`,
   `ReactiveMongo-BSON-Macros`,
-  `ReactiveMongo-Core`
+  `ReactiveMongo-Core`,
+  `ReactiveMongo-BSON-Compat`
 ).module
 
 lazy val `ReactiveMongo-JMX` = new Jmx(`ReactiveMongo`).module
