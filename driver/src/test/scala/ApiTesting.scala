@@ -43,10 +43,13 @@ import reactivemongo.bson.BSONDocument
 import reactivemongo.api.collections.QueryCodecs
 
 package object tests {
-  val pack = Compat.internalSerializationPack
+  type Pack = Serialization.Pack
+  val pack: Pack = Serialization.internalSerializationPack
 
   lazy val decoder = pack.newDecoder
   lazy val builder = pack.newBuilder
+
+  def newBuilder[P <: SerializationPack](pack: P) = pack.newBuilder
 
   def reader[T](f: pack.Document => T): pack.Reader[T] = pack.reader[T](f)
 

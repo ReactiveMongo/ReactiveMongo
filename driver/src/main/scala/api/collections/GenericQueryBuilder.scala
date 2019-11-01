@@ -75,7 +75,7 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
   def readConcern: ReadConcern = ReadConcern.default // TODO: Remove body
 
   /**
-   * Makes a [[Cursor]] of this query, which can be enumerated.
+   * Returns a [[Cursor]] for the result of this query.
    *
    * @param readPreference $readPrefParam
    * @param reader $readerParam
@@ -131,7 +131,7 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
 
   @deprecated("Use `filter`", "0.18.2")
   def query[Qry](selector: Qry)(implicit writer: pack.Writer[Qry]): Self =
-    copy(queryOption = Some(pack.serialize(selector, writer)))
+    copy(queryOption = Some(pack.serialize(selector, writer))) // TODO: ser
 
   @deprecated("Use `filter`", "0.18.2")
   def query(selector: pack.Document): Self = copy(queryOption = Some(selector))

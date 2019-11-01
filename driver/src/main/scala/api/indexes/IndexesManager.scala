@@ -18,12 +18,12 @@ package reactivemongo.api.indexes
 import reactivemongo.core.protocol.MongoWireVersion
 
 import reactivemongo.api.{
-  Compat,
   DB,
   DBMetaCommands,
   Cursor,
   CursorProducer,
   ReadPreference,
+  Serialization,
   SerializationPack
 }
 
@@ -110,7 +110,7 @@ final class LegacyIndexesManager(db: DB)(
   implicit
   ec: ExecutionContext) extends IndexesManager {
 
-  val collection = db("system.indexes")(Compat.defaultCollectionProducer)
+  val collection = db("system.indexes")(Serialization.defaultCollectionProducer)
   import collection.pack
 
   private lazy val builder = pack.newBuilder
@@ -271,7 +271,7 @@ private class DefaultCollectionIndexesManager(db: DB, collectionName: String)(
     ListIndexes
   }
 
-  import Compat.{ internalSerializationPack, writeResultReader }
+  import Serialization.{ internalSerializationPack, writeResultReader }
 
   private lazy val collection = db(collectionName)
   private lazy val listCommand = ListIndexes(db.name)
@@ -283,7 +283,7 @@ private class DefaultCollectionIndexesManager(db: DB, collectionName: String)(
     ListIndexes.writer(internalSerializationPack)
 
   private implicit lazy val indexReader =
-    IndexesManager.indexReader[Compat.SerializationPack](
+    IndexesManager.indexReader[Serialization.Pack](
       internalSerializationPack)
 
   private implicit lazy val listReader =
@@ -510,12 +510,12 @@ object IndexesManager {
   }
 
   private[api] implicit lazy val nsIndexReader =
-    nsIndexReader[Compat.SerializationPack](Compat.internalSerializationPack)
+    nsIndexReader[Serialization.Pack](Serialization.internalSerializationPack)
 
   private[api] lazy val dropWriter =
-    DropIndexes.writer(Compat.internalSerializationPack)
+    DropIndexes.writer(Serialization.internalSerializationPack)
 
   private[api] lazy val dropReader =
-    DropIndexes.reader(Compat.internalSerializationPack)
+    DropIndexes.reader(Serialization.internalSerializationPack)
 
 }

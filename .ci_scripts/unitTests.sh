@@ -28,6 +28,10 @@ EOF
     sbt ++$SCALA_VERSION ";project ReactiveMongo-BSON ;findbugs ;project ReactiveMongo-BSON-Macros ;findbugs ;project ReactiveMongo ;findbugs ;project ReactiveMongo-JMX ;findbugs" || exit 4
 fi
 
+perl -pe "s|resolvers |resolvers += Resolver.sonatypeRepo(\"staging\"),\r\n    resolvers |" < "project/Common.scala" > /tmp/Common.scala && mv /tmp/Common.scala "project/Common.scala"
+
+cat "project/Common.scala"
+
 # JVM/SBT setup
 source "$SCRIPT_DIR/jvmopts.sh"
 

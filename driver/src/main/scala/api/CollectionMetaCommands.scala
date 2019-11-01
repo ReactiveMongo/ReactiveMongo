@@ -148,5 +148,5 @@ trait CollectionMetaCommands { self: Collection =>
 
   // Command runner
   private lazy val command =
-    Command.run(Compat.internalSerializationPack, failoverStrategy)
+    Command.run(Serialization.internalSerializationPack, failoverStrategy)
 }

@@ -4,6 +4,8 @@ import java.util.UUID
 
 import scala.util.{ Failure, Success, Try }
 
+import scala.reflect.ClassTag
+
 import reactivemongo.core.errors.ReactiveMongoException
 
 import reactivemongo.bson.{
@@ -47,8 +49,8 @@ object BSONSerializationPack
   type NarrowValueReader[A] = BSONReader[A]
   private[reactivemongo] type WidenValueReader[A] = BSONReader[A]
 
-  private[reactivemongo] val IsDocument =
-    implicitly[scala.reflect.ClassTag[BSONDocument]]
+  private[reactivemongo] val IsDocument = implicitly[ClassTag[BSONDocument]]
+  private[reactivemongo] val IsValue = implicitly[ClassTag[BSONValue]]
 
   val IdentityReader: Reader[Document] = BSONDocumentIdentity
   val IdentityWriter: Writer[Document] = BSONDocumentIdentity
@@ -148,6 +150,8 @@ object BSONSerializationPack
   private[reactivemongo] def bsonValue(value: Value): LegacyValue =
     ValueConverters.fromValue(value)
 
+  private[reactivemongo] val narrowIdentityReader: NarrowValueReader[BSONValue] = BSONReader[BSONValue](identity)
+
   override private[reactivemongo] val newBuilder: SerializationPack.Builder[BSONSerializationPack.type] = Builder
 
   override private[reactivemongo] val newDecoder: SerializationPack.Decoder[BSONSerializationPack.type] = Decoder
@@ -168,6 +172,9 @@ object BSONSerializationPack
     def array(value: Value, values: Seq[Value]): Value =
       BSONArray(value +: values)
 
+    def binary(data: Array[Byte]): Value =
+      BSONBinary(data, Subtype.GenericBinarySubtype)
+
     def elementProducer(name: String, value: Value): ElementProducer =
       BSONElement(name, value)
 
@@ -185,8 +192,12 @@ object BSONSerializationPack
 
     def timestamp(time: Long): Value = BSONTimestamp(time)
 
+    def dateTime(time: Long): Value = BSONDateTime(time)
+
     def regex(pattern: String, options: String): Value =
       BSONRegex(pattern, options)
+
+    def generateObjectId() = BSONObjectID.generate()
   }
 
   private object Decoder
@@ -200,6 +211,11 @@ object BSONSerializationPack
 
     def names(document: BSONDocument): Set[String] =
       document.elements.map(_.name).toSet
+
+    def binary(document: BSONDocument, name: String): Option[Array[Byte]] =
+      document.get(name).collect {
+        case bin: BSONBinary => bin.byteArray
+      }
 
     def get(document: BSONDocument, name: String): Option[BSONValue] =
       document.get(name)

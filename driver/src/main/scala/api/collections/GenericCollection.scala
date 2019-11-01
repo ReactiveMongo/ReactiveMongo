@@ -36,7 +36,9 @@ import reactivemongo.api.commands.{
 import reactivemongo.core.protocol.MongoWireVersion
 import reactivemongo.core.errors.ConnectionNotInitialized
 
-trait GenericCollectionProducer[P <: SerializationPack with Singleton, +C <: GenericCollection[P]] extends CollectionProducer[C]
+trait GenericCollectionProducer[P <: SerializationPack with Singleton, +C <: GenericCollection[P]] extends CollectionProducer[C] {
+  private[reactivemongo] val pack: P
+}
 
 /**
  * A Collection that provides default methods using a `SerializationPack`.

@@ -21,12 +21,41 @@ object DropDatabase extends Command with CommandWithResult[UnitBox.type] {
  * @param dropped true if the collection existed and was dropped
  */
 @deprecated("Internal: will be made private", "0.16.0")
-case class DropCollectionResult(dropped: Boolean)
+class DropCollectionResult(val dropped: Boolean) extends Product with Serializable {
+  val productArity = 1
 
-private[api] object DropCollectionResult { //extends scala.runtime.AbstractFunction1[Boolean, DropCollectionResult] {
-  //@inline def apply(dropped: Boolean): DropCollectionResult = new DropCollectionResult(dropped)
+  def productElement(n: Int) = dropped
 
-  def reader[P <: SerializationPack](pack: P): pack.Reader[DropCollectionResult] = {
+  def canEqual(that: Any): Boolean = that match {
+    case _: DropCollectionResult => true
+    case _                       => false
+  }
+
+  override def equals(that: Any): Boolean = that match {
+    case other: DropCollectionResult =>
+      this.dropped == other.dropped
+
+    case _ =>
+      false
+  }
+
+  override def hashCode: Int = dropped.hashCode
+
+  override def toString = s"DropCollectionResult($dropped)"
+}
+
+object DropCollectionResult extends scala.runtime.AbstractFunction1[Boolean, DropCollectionResult] {
+  @inline def apply(dropped: Boolean): DropCollectionResult = new DropCollectionResult(dropped)
+
+  @deprecated("", "0.19.0")
+  def unapply(that: Any): Option[Boolean] = that match {
+    case other: DropCollectionResult =>
+      Option(other).map(_.dropped)
+
+    case _ => None
+  }
+
+  private[api] def reader[P <: SerializationPack](pack: P): pack.Reader[DropCollectionResult] = {
     val decoder = pack.newDecoder
     val unitBoxReader = CommandCodecs.unitBoxReader[pack.type](pack)
 
@@ -351,11 +380,46 @@ object Resync extends Command with CommandWithResult[ResyncResult.type]
  * @param enable if true the the member enters the `RECOVERING` state
  */
 @deprecated("Internal: will be made private", "0.16.0")
-case class ReplSetMaintenance(enable: Boolean = true) extends Command
-  with CommandWithResult[UnitBox.type]
+class ReplSetMaintenance(val enable: Boolean = true)
+  extends Product with Serializable
+  with Command with CommandWithResult[UnitBox.type] {
+  val productArity = 1
+
+  def productElement(n: Int) = enable
+
+  def canEqual(that: Any): Boolean = that match {
+    case _: DropCollectionResult => true
+    case _                       => false
+  }
+
+  override def equals(that: Any): Boolean = that match {
+    case other: ReplSetMaintenance =>
+      this.enable == other.enable
+
+    case _ =>
+      false
+  }
+
+  override def hashCode: Int = enable.hashCode
+
+  override def toString = s"ReplSetMaintenance($enable)"
+}
 
 @deprecated("Internal: will be made private", "0.19.0")
-object ReplSetMaintenance {
+object ReplSetMaintenance
+  extends scala.runtime.AbstractFunction1[Boolean, ReplSetMaintenance] {
+
+  @inline def apply(enable: Boolean): ReplSetMaintenance =
+    new ReplSetMaintenance(enable)
+
+  @deprecated("", "0.19.0")
+  def unapply(that: Any): Option[Boolean] = that match {
+    case other: ReplSetMaintenance =>
+      Option(other).map(_.enable)
+
+    case _ => None
+  }
+
   private[api] def writer[P <: SerializationPack](pack: P): pack.Writer[ReplSetMaintenance] = {
     val builder = pack.newBuilder
 

@@ -10,7 +10,6 @@ import com.github.sbt.cpd.CpdPlugin
 
 class Bson() {
   import Dependencies._
-  import XmlUtil._
 
   val discipline = Def.setting[ModuleID] {
     if (scalaBinaryVersion.value == "2.10") {

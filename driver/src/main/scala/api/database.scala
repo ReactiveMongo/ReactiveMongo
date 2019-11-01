@@ -81,7 +81,7 @@ sealed trait DB {
    * @param name $nameParam
    * @param failoverStrategy $failoverStrategyParam
    */
-  def apply[C <: Collection](name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit producer: CollectionProducer[C] = Compat.defaultCollectionProducer): C = collection(name, failoverStrategy)
+  def apply[C <: Collection](name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit producer: CollectionProducer[C] = Serialization.defaultCollectionProducer): C = collection(name, failoverStrategy)
 
   /**
    * $resolveDescription.
@@ -89,7 +89,7 @@ sealed trait DB {
    * @param name $nameParam
    * @param failoverStrategy $failoverStrategyParam
    */
-  def collection[C <: Collection](name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit producer: CollectionProducer[C] = Compat.defaultCollectionProducer): C = producer(this, name, failoverStrategy)
+  def collection[C <: Collection](name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit producer: CollectionProducer[C] = Serialization.defaultCollectionProducer): C = producer(this, name, failoverStrategy)
 
   @inline def defaultReadPreference: ReadPreference =
     connection.options.readPreference
@@ -311,14 +311,14 @@ class DefaultDB private[api] (
   val connectionState: ConnectionState,
   @transient val failoverStrategy: FailoverStrategy = FailoverStrategy(),
   @transient private[reactivemongo] val session: Option[Session] = Option.empty)
-  extends DB with DBMetaCommands with GenericDB[Compat.SerializationPack]
+  extends DB with DBMetaCommands with GenericDB[Serialization.Pack]
   with Product with Serializable {
 
-  import Compat.{ internalSerializationPack, unitBoxReader }
+  import Serialization.{ internalSerializationPack, unitBoxReader }
 
   type DBType = DefaultDB
 
-  @transient val pack: Compat.SerializationPack = internalSerializationPack
+  @transient val pack: Serialization.Pack = internalSerializationPack
 
   def startSession(failIfAlreadyStarted: Boolean)(implicit ec: ExecutionContext): Future[DefaultDB] = session match {
     case Some(s) if failIfAlreadyStarted =>

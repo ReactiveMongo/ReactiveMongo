@@ -6,6 +6,7 @@ import com.typesafe.tools.mima.plugin.MimaKeys.mimaFailOnNoPrevious
 object Common {
   val baseSettings = Seq(
     organization := "org.reactivemongo",
+    resolvers += Resolver.sonatypeRepo("staging"),
     resolvers ++= Seq(
       Resolver.typesafeRepo("releases"),
       Resolver.sonatypeRepo("snapshots")
@@ -44,6 +45,7 @@ object Common {
 
       Seq((sourceDirectory in Compile).value / jdir)
     },
+    testFrameworks ~= { _.filterNot(_ == TestFrameworks.ScalaTest) },
     scalacOptions in (Compile, doc) ++= Seq("-unchecked", "-deprecation",
       /*"-diagrams", */"-implicits", "-skip-packages", "samples"),
     scalacOptions in (Compile, doc) ++= Opts.doc.title("ReactiveMongo API"),
