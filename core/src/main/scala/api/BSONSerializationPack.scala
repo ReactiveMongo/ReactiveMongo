@@ -22,6 +22,9 @@ object BSONSerializationPack extends SerializationPack { self =>
   type NarrowValueReader[A] = BSONReader[_ <: BSONValue, A]
   private[reactivemongo] type WidenValueReader[A] = UnsafeBSONReader[A]
 
+  private[reactivemongo] val IsDocument =
+    implicitly[scala.reflect.ClassTag[BSONDocument]]
+
   object IdentityReader extends Reader[Document] {
     def read(document: Document): Document = document
   }

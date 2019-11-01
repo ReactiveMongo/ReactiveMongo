@@ -137,7 +137,10 @@ object Command {
       }.future.flatMap {
         case Response.CommandError(_, _, _, cause) =>
           cause.originalDocument match {
-            case Some(doc) =>
+            case pack.IsDocument(doc) =>
+              Future(pack.deserialize(doc, reader))
+
+            case Some(doc: reactivemongo.bson.BSONDocument) => // TODO: Remove
               Future(pack.deserialize(pack.document(doc), reader))
 
             case _ => Future.failed[T](cause)

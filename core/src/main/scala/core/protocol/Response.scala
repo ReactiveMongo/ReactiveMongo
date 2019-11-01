@@ -51,9 +51,8 @@ sealed abstract class Response(
 
 @deprecated("Internal: will be made private", "0.16.0")
 object Response {
-  import reactivemongo.api.BSONSerializationPack
+  import reactivemongo.api.{ BSONSerializationPack, SerializationPack }
   import reactivemongo.bson.BSONDocument
-  import reactivemongo.bson.DefaultBSONHandlers.BSONDocumentIdentity
 
   def apply(
     header: MessageHeader,
@@ -61,9 +60,12 @@ object Response {
     documents: ByteBuf,
     info: ResponseInfo): Response = Successful(header, reply, documents, info)
 
-  def parse(response: Response): Iterator[BSONDocument] =
-    ReplyDocumentIterator.parse(BSONSerializationPack)(
-      response)(BSONDocumentIdentity)
+  @inline def parse(response: Response): Iterator[BSONDocument] =
+    parse(BSONSerializationPack)(response)
+
+  private[reactivemongo] def parse[P <: SerializationPack](pack: P)(
+    response: Response): Iterator[pack.Document] =
+    ReplyDocumentIterator.parse(pack)(response)(pack.IdentityReader)
 
   def unapply(response: Response): Option[(MessageHeader, Reply, ByteBuf, ResponseInfo)] = Some((response.header, response.reply, response.documents, response.info))
 
