@@ -15,6 +15,8 @@
  */
 package reactivemongo.core.errors
 
+import reactivemongo.api.SerializationPack
+
 import scala.util.control.NoStackTrace
 
 import reactivemongo.bson.{ BSONDocument, BSONInteger }
@@ -39,6 +41,7 @@ object ReactiveMongoException {
 /** An error thrown by a MongoDB node. */
 trait DatabaseException extends ReactiveMongoException {
   /** original document of this error */
+  @deprecated("Internal: will be private", "0.19.0")
   def originalDocument: Option[BSONDocument]
 
   /** error code */
@@ -57,18 +60,52 @@ trait DatabaseException extends ReactiveMongoException {
     case 10057 | 15845 | 16550 => true
     case _                     => false
   }.getOrElse(false)
+
+  override def equals(that: Any): Boolean = that match {
+    case other: DatabaseException =>
+      this.tupled == other.tupled
+
+    case _ =>
+      false
+  }
+
+  override def hashCode: Int = tupled.hashCode
+
+  override def toString: String = getMessage
+
+  private lazy val tupled = originalDocument -> code
 }
 
 private[reactivemongo] object DatabaseException {
+  @deprecated("Will be remove", "0.19.0")
   def apply(doc: BSONDocument): DatabaseException =
     new DetailedDatabaseException(doc)
 
   def apply(cause: Throwable): DatabaseException = new Default(cause)
 
+  def apply[P <: SerializationPack](pack: P)(doc: pack.Document): DatabaseException = new DatabaseException {
+    private lazy val decoder = pack.newDecoder
+
+    val originalDocument = Some(pack bsonValue doc).collect {
+      case doc: BSONDocument => doc
+    }
+
+    lazy val message = {
+      decoder.string(doc, f"$$err").orElse {
+        decoder.string(doc, "errmsg")
+      }.getOrElse(
+        s"message is not present, unknown error: ${pack pretty doc}")
+    }
+
+    lazy val code = decoder.int(doc, "code")
+  }
+
   // ---
 
   private final class Default(val cause: Throwable) extends DatabaseException {
-    val originalDocument = Option.empty[BSONDocument]
+    type Document = Nothing
+
+    val originalDocument = Option.empty[Nothing]
     val code = Option.empty[Int]
     val message = s"${cause.getClass.getName}: ${cause.getMessage}"
   }
@@ -130,8 +167,11 @@ case class GenericDatabaseException(
 }
 
 /** An error thrown by a MongoDB node (containing the original document of the error). */
+@deprecated("Will be remove", "0.19.0")
 class DetailedDatabaseException(
   doc: BSONDocument) extends DatabaseException with NoStackTrace {
+
+  type Document = BSONDocument
 
   val originalDocument = Some(doc)
 

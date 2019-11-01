@@ -47,6 +47,9 @@ object BSONSerializationPack
   type NarrowValueReader[A] = BSONReader[A]
   private[reactivemongo] type WidenValueReader[A] = BSONReader[A]
 
+  private[reactivemongo] val IsDocument =
+    implicitly[scala.reflect.ClassTag[BSONDocument]]
+
   val IdentityReader: Reader[Document] = BSONDocumentIdentity
   val IdentityWriter: Writer[Document] = BSONDocumentIdentity
 

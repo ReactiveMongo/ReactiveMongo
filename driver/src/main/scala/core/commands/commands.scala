@@ -15,7 +15,8 @@
  */
 package reactivemongo.core.commands
 
-import reactivemongo.api.ReadPreference
+import reactivemongo.api.{ ReadPreference, SerializationPack }
+
 import reactivemongo.bson.{ BSONDocument, BSONNumberLike }
 import reactivemongo.core.errors.ReactiveMongoException
 import reactivemongo.core.protocol.{ RequestMaker, Query, QueryFlags, Response }
@@ -62,22 +63,27 @@ trait Command[Result] {
  * @tparam Result The result type of this command.
  */
 trait CommandResultMaker[Result] {
+  protected type Pack <: SerializationPack
+
+  protected val pack: Pack
+
   /**
    * Deserializes the given response into an instance of Result.
    */
-  def apply(response: Response): Either[CommandError, Result]
-}
-
-trait BSONCommandResultMaker[Result] extends CommandResultMaker[Result] {
-  final def apply(response: Response): Either[CommandError, Result] = {
-    lazy val document = response match {
+  def apply(response: Response): Either[CommandError, Result] = {
+    lazy val document: pack.Document = response match {
       case Response.CommandError(_, _, _, cause) =>
         cause.originalDocument match {
-          case Some(doc) => doc
-          case _         => throw cause
+          case pack.IsDocument(doc) =>
+            doc
+
+          case Some(doc: reactivemongo.bson.BSONDocument) =>
+            pack.document(doc) // TODO: Remove
+
+          case _ => throw cause
         }
 
-      case _ => Response.parse(response).next()
+      case _ => Response.parse[pack.type](pack)(response).next()
     }
 
     try {
@@ -86,11 +92,29 @@ trait BSONCommandResultMaker[Result] extends CommandResultMaker[Result] {
       case e: CommandError => Left(e)
 
       case e: Throwable =>
-        val error = CommandError("exception while deserializing this command's result!", Some(document))
-        error.initCause(e);
+        val error = CommandError(pack)(
+          _message = "exception while deserializing this command's result!",
+          originalDocument = Some(document),
+          _code = None)
+
+        error.initCause(e)
         Left(error)
     }
   }
+
+  /**
+   * Deserializes the given document into an instance of Result.
+   */
+  protected def apply(document: pack.Document): Either[CommandError, Result]
+}
+
+trait BSONCommandResultMaker[Result] extends CommandResultMaker[Result] {
+  protected type Pack = reactivemongo.api.BSONSerializationPack.type
+
+  protected val pack: Pack = reactivemongo.api.BSONSerializationPack
+
+  final override def apply(response: Response): Either[CommandError, Result] =
+    super.apply(response)
 
   /**
    * Deserializes the given document into an instance of Result.
@@ -126,6 +150,19 @@ object CommandError {
   def apply(message: String, originalDocument: Option[BSONDocument] = None, code: Option[Int] = None): DefaultCommandError =
     new DefaultCommandError(message, code, originalDocument)
 
+  private[reactivemongo] def apply[P <: SerializationPack](pack: P)(
+    _message: String,
+    originalDocument: Option[pack.Document],
+    _code: Option[Int]): CommandError =
+    new CommandError {
+      val code = _code
+      val message = _message
+
+      override def getMessage: String =
+        s"CommandError['$message'" + code.map(c => " (code = " + c + ")").getOrElse("") + "]" +
+          originalDocument.map(doc => " with original doc " + pack.pretty(doc)).getOrElse("")
+    }
+
   /**
    * Checks if the given document contains a 'ok' field which value equals 1, and produces a command error if not.
    *
@@ -133,7 +170,7 @@ object CommandError {
    * @param name The optional name of the command.
    * @param error A function that takes the document of the response and the optional name of the command as arguments, and produces a command error.
    */
-  def checkOk(
+  def checkOk( // TODO
     doc: BSONDocument, name: Option[String],
     error: (BSONDocument, Option[String]) => CommandError = (doc, name) => CommandError("command " + name.map(_ + " ").getOrElse("") + "failed because the 'ok' field is missing or equals 0", Some(doc))): Option[CommandError] = {
     doc.getAs[BSONNumberLike]("ok").map(_.toInt).orElse(Some(0)).flatMap {

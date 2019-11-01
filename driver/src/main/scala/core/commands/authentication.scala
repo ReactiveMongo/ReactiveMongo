@@ -10,6 +10,7 @@ import reactivemongo.core.protocol.Response
  *
  * Gets a nonce for authentication token.
  */
+@deprecated("Internal: will be made private", "0.19.0")
 object GetCrNonce extends Command[String] {
   override def makeDocuments = BSONDocument("getnonce" -> BSONInteger(1))
 
@@ -47,6 +48,7 @@ private[core] case class CrAuthenticate(
 }
 
 /** Authentication command's response deserializer. */
+@deprecated("Internal: will be made private", "0.19.0")
 object CrAuthenticate extends BSONCommandResultMaker[SuccessfulAuthentication] {
   def parseResponse(response: Response): Either[CommandError, SuccessfulAuthentication] = apply(response)
 
@@ -80,6 +82,7 @@ private[core] case class X509Authenticate(user: Option[String])
   override val ResultMaker = X509Authenticate
 }
 
+@deprecated("Internal: will be made private", "0.19.0")
 object X509Authenticate extends BSONCommandResultMaker[SuccessfulAuthentication] {
   def parseResponse(response: Response): Either[CommandError, SuccessfulAuthentication] = apply(response)
 
@@ -90,13 +93,16 @@ object X509Authenticate extends BSONCommandResultMaker[SuccessfulAuthentication]
   }
 }
 
-/** an authentication result */
+/** An authentication result */
+@deprecated("Internal: will be made private", "0.19.0")
 sealed trait AuthenticationResult
 
 /** A successful authentication result. */
+@deprecated("Internal: will be made private", "0.19.0")
 sealed trait SuccessfulAuthentication extends AuthenticationResult
 
 /** A silent successful authentication result (MongoDB <= 2.0).*/
+@deprecated("Internal: will be made private", "0.19.0")
 object SilentSuccessfulAuthentication extends SuccessfulAuthentication
 
 /**
@@ -108,6 +114,7 @@ object SilentSuccessfulAuthentication extends SuccessfulAuthentication
  * @param user the user name
  * @param readOnly states if the authentication gives us only the right to read from the database.
  */
+@deprecated("Internal: will be made private", "0.19.0")
 case class VerboseSuccessfulAuthentication(
   db: String,
   user: String,
@@ -120,6 +127,6 @@ case class VerboseSuccessfulAuthentication(
  */
 case class FailedAuthentication(
   message: String,
-  originalDocument: Option[BSONDocument] = None) extends BSONCommandError with AuthenticationResult {
+  originalDocument: Option[BSONDocument /* TODO */ ] = None) extends BSONCommandError with AuthenticationResult {
   val code = None
 }

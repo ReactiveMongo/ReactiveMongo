@@ -99,10 +99,12 @@ case class LastError(
   writeErrors: Seq[WriteError] = Nil,
   writeConcernError: Option[WriteConcernError] = None) extends DatabaseException with WriteResult with NoStackTrace {
 
+  type Document = Nothing
+
   override def inError: Boolean = !ok || errmsg.isDefined
 
   @deprecated("Use the detailed properties (e.g. `code`)", "0.12.0")
-  def originalDocument = Option.empty[reactivemongo.bson.BSONDocument] // TODO
+  def originalDocument = Option.empty[Document]
 
   override lazy val message = errmsg.getOrElse("<none>")
 }

@@ -21,6 +21,8 @@ trait SerializationPack { self: Singleton =>
   type NarrowValueReader[A]
   private[reactivemongo] type WidenValueReader[A]
 
+  private[reactivemongo] val IsDocument: scala.reflect.ClassTag[Document]
+
   def IdentityWriter: Writer[Document]
   def IdentityReader: Reader[Document]
 

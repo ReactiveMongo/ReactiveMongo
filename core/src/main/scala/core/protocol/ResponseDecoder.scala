@@ -7,6 +7,8 @@ import scala.util.{ Failure, Success, Try }
 import reactivemongo.io.netty.buffer.{ ByteBuf, Unpooled }
 import reactivemongo.io.netty.channel.ChannelHandlerContext
 
+import reactivemongo.api.BSONSerializationPack
+
 import reactivemongo.bson.{ BSONBooleanLike, BSONDocument, BSONNumberLike }
 
 import reactivemongo.core.netty.ChannelBufferReadableBuffer
@@ -81,7 +83,9 @@ private[reactivemongo] class ResponseDecoder
               else reply.copy(flags = reply.flags | 0x02)
             }
 
-            Response.CommandError(header, r, info, DatabaseException(doc))
+            // TODO
+            Response.CommandError(
+              header, r, info, DatabaseException(BSONSerializationPack)(doc))
           }
 
           doc.getAs[BSONDocument]("cursor") match {
