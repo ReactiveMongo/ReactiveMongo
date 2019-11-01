@@ -3,13 +3,38 @@ package reactivemongo.api.commands
 import reactivemongo.api.SerializationPack
 
 @deprecated("Internal: will be made private", "0.16.0")
-case class CollStats(scale: Option[Int] = None)
-  extends CollectionCommand with CommandWithResult[CollStatsResult]
+class CollStats(val scale: Option[Int] = None)
+  extends Product with Serializable
+  with CollectionCommand with CommandWithResult[CollStatsResult] {
 
-private[api] object CollStats { //extends scala.runtime.AbstractFunction1[Option[Int], CollStats] {
-  //@inline def apply(scale: Option[Int]): CollStats = new CollStats(scale)
+  val productArity = 1
 
-  def writer[P <: SerializationPack](pack: P): pack.Writer[ResolvedCollectionCommand[CollStats]] = {
+  def productElement(n: Int): Any = scale
+
+  def canEqual(that: Any): Boolean = that match {
+    case _: CollStats => true
+    case _            => false
+  }
+
+  override def equals(that: Any): Boolean = that match {
+    case other: CollStats =>
+      this.scale == other.scale
+
+    case _ =>
+      false
+  }
+
+  override def hashCode: Int = scale.hashCode
+
+  override def toString: String = s"CollStats($scale)"
+}
+
+object CollStats
+  extends scala.runtime.AbstractFunction1[Option[Int], CollStats] {
+
+  @inline def apply(scale: Option[Int]): CollStats = new CollStats(scale)
+
+  private[api] def writer[P <: SerializationPack](pack: P): pack.Writer[ResolvedCollectionCommand[CollStats]] = {
     val builder = pack.newBuilder
 
     pack.writer[ResolvedCollectionCommand[CollStats]] { cmd =>

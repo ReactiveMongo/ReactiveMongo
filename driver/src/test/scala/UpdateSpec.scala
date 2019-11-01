@@ -42,9 +42,7 @@ trait UpdateSpec extends UpdateFixtures { collectionSpec: CollectionSpec =>
           u = BSONDocument(f"$$set" -> BSONDocument("age" -> 33)),
           upsert = true) must beLike[UpdateWriteResult]({
             case result => result.upserted.toList must beLike[List[Upserted]] {
-              case Upserted(0, bid: reactivemongo.bson.BSONObjectID) :: Nil =>
-                val id = BSONObjectID(bid.valueAsArray)
-
+              case Upserted(0, id: BSONObjectID) :: Nil =>
                 c.find(
                   selector = BSONDocument("_id" -> id),
                   projection = Option.empty[BSONDocument]).one[T] must beSome(upd(person)).await(1, timeout)
@@ -79,7 +77,7 @@ trait UpdateSpec extends UpdateFixtures { collectionSpec: CollectionSpec =>
           val coll = slowUpdCol1.withReadPreference(
             ReadPreference.secondaryPreferred)
 
-          coll.readPreference must_== ReadPreference.secondaryPreferred and {
+          coll.readPreference must_=== ReadPreference.secondaryPreferred and {
             spec(coll, slowTimeout, jane3)(_.copy(age = 33))
           }
         }
@@ -93,8 +91,7 @@ trait UpdateSpec extends UpdateFixtures { collectionSpec: CollectionSpec =>
 
         c.update.one(q = BSONDocument.empty, u = doc, upsert = true).
           map(_.upserted.toList) must beLike[List[Upserted]] {
-            case Upserted(
-              0, reactivemongo.bson.BSONString("foo")) :: Nil =>
+            case Upserted(0, BSONString("foo")) :: Nil =>
               c.find(
                 selector = BSONDocument("_id" -> "foo"),
                 projection = Option.empty[BSONDocument]).one[BSONDocument].

@@ -1,5 +1,7 @@
 package reactivemongo.api.collections
 
+import scala.language.higherKinds
+
 import reactivemongo.api.{
   Cursor,
   CursorOptions,

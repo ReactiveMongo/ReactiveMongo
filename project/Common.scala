@@ -1,13 +1,16 @@
 import sbt._
 import sbt.Keys._
 
+import com.typesafe.tools.mima.plugin.MimaKeys.mimaFailOnNoPrevious
+
 object Common {
   val baseSettings = Seq(
     organization := "org.reactivemongo",
     resolvers ++= Seq(
       Resolver.typesafeRepo("releases"),
       Resolver.sonatypeRepo("snapshots")
-    )
+    ),
+    mimaFailOnNoPrevious := false
   )
 
   val filter = { (ms: Seq[(File, String)]) =>
@@ -25,7 +28,7 @@ object Common {
   val closeableObject = SettingKey[String]("class name of a closeable object")
 
   val settings = Defaults.coreDefaultSettings ++ baseSettings ++ Compiler.settings ++ Seq(
-    scalaVersion := "2.12.9",
+    scalaVersion := "2.12.10",
     crossScalaVersions := Seq(
       "2.10.7", scalaCompatVer, scalaVersion.value, "2.13.1"),
     crossVersion := CrossVersion.binary,

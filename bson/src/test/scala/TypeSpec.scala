@@ -24,11 +24,15 @@ class TypeSpec extends Specification {
 
   "BSON document" should {
     "be empty" in {
-      BSONDocument().elements must beEmpty and (
-        BSONDocument.empty.elements must beEmpty) and (
-          document.elements must beEmpty) and (
-            document().elements must beEmpty) and (
-              BSONDocument.empty.contains("foo") must beFalse)
+      BSONDocument().elements must beEmpty and {
+        BSONDocument.empty.elements must beEmpty
+      } and {
+        document.elements must beEmpty
+      } and {
+        document().elements must beEmpty
+      } and {
+        BSONDocument.empty.contains("foo") must beFalse
+      }
     }
 
     "be created with a new element " in {

@@ -22,12 +22,14 @@ import reactivemongo.api.collections.{
 }
 import reactivemongo.api.BSONSerializationPack
 
+@deprecated("Will be removed", "0.19.0")
 object `package` {
   implicit object BSONCollectionProducer extends GenericCollectionProducer[BSONSerializationPack.type, BSONCollection] {
     def apply(db: DB, name: String, failoverStrategy: FailoverStrategy = FailoverStrategy()): BSONCollection = new BSONCollection(db, name, failoverStrategy, db.defaultReadPreference)
   }
 }
 
+@deprecated("Will be removed", "0.19.0")
 @SerialVersionUID(1382847900L)
 final class BSONCollection @deprecated("Internal: will be made private", "0.17.0") (
   val db: DB,

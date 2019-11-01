@@ -41,17 +41,32 @@ class Bson() {
         @inline def mtp(s: String) = x[MissingTypesProblem](s)
         @inline def fmp(s: String) = x[FinalMethodProblem](s)
         @inline def imt(s: String) = x[IncompatibleMethTypeProblem](s)
+        @inline def isp(s: String) = x[IncompatibleSignatureProblem](s)
+
+        val pkg = "reactivemongo.bson"
 
         Seq(
-          mtp("reactivemongo.bson.BSONDBPointer$"),
-          mtp("reactivemongo.bson.BSONDBPointer"),
-          mtp("reactivemongo.bson.BSONTimestamp$"),
-          mtp("reactivemongo.bson.ExtendedNumeric"),
-          fmp("reactivemongo.bson.ExtendedNumeric.value"),
-          imt("reactivemongo.bson.ExtendedNumeric.this"),
-          mtp("reactivemongo.bson.ExtendedNumeric$"),
-          x[UpdateForwarderBodyProblem]("reactivemongo.bson.DefaultBSONHandlers.collectionToBSONArrayCollectionWriter"),
-          x[UpdateForwarderBodyProblem]("reactivemongo.bson.DefaultBSONHandlers.bsonArrayToCollectionReader")
+          isp(/* package private */
+            s"${pkg}.buffer.BSONIterator.pretty"),
+          isp(s"${pkg}.BSONDocument.++"),
+          isp(s"${pkg}.BSONDocument.elements"),
+          isp(s"${pkg}.BSONDocument.stream"),
+          isp(s"${pkg}.BSONDocument.copy"),
+          isp(s"${pkg}.BSONDocument.copy$$default$$1"),
+          isp(s"${pkg}.BSONDocument.apply"),
+          isp(s"${pkg}.BSONDocument.unapply"),
+          isp(s"${pkg}.BSONDocument.this"),
+          isp(s"${pkg}.BSONHandler.apply"),
+          isp(s"${pkg}.package.document"),
+          mtp(s"${pkg}.BSONDBPointer$$"),
+          mtp(s"${pkg}.BSONDBPointer"),
+          mtp(s"${pkg}.BSONTimestamp$$"),
+          mtp(s"${pkg}.ExtendedNumeric"),
+          fmp(s"${pkg}.ExtendedNumeric.value"),
+          imt(s"${pkg}.ExtendedNumeric.this"),
+          mtp(s"${pkg}.ExtendedNumeric$$"),
+          x[UpdateForwarderBodyProblem](s"${pkg}.DefaultBSONHandlers.collectionToBSONArrayCollectionWriter"),
+          x[UpdateForwarderBodyProblem](s"${pkg}.DefaultBSONHandlers.bsonArrayToCollectionReader")
         )
       }
     ))

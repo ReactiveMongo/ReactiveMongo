@@ -34,12 +34,14 @@ private[reactivemongo] object CommandCodecs {
     }
   }
 
-  def defaultWriteResultReader[P <: SerializationPack with Singleton](pack: P): pack.Reader[DefaultWriteResult] = {
+  @inline def defaultWriteResultReader[P <: SerializationPack with Singleton](pack: P): pack.Reader[DefaultWriteResult] = writeResultReader[DefaultWriteResult, pack.type](pack)
+
+  def writeResultReader[WR >: DefaultWriteResult, P <: SerializationPack with Singleton](pack: P): pack.Reader[WR] = {
     val decoder = pack.newDecoder
     val readWriteError = CommandCodecs.readWriteError(decoder)
     val readWriteConcernError = CommandCodecs.readWriteConcernError(decoder)
 
-    dealingWithGenericCommandErrorsReader[pack.type, DefaultWriteResult](pack) { doc =>
+    dealingWithGenericCommandErrorsReader[pack.type, WR](pack) { doc =>
       val werrors = decoder.children(doc, "writeErrors").map(readWriteError)
 
       val wcError = decoder.child(doc, "writeConcernError").
@@ -182,10 +184,10 @@ private[reactivemongo] object CommandCodecs {
     } yield WriteConcernError(code, err)).get
   }
 
-  def readUpserted[P <: SerializationPack with Singleton](decoder: SerializationPack.Decoder[P]): decoder.pack.Document => Upserted = { document =>
+  def readUpserted[P <: SerializationPack with Singleton](decoder: SerializationPack.Decoder[P]): decoder.pack.Document => Upserted.Aux[P] = { document =>
     (for {
       index <- decoder.int(document, "index")
-      id <- decoder.get(document, "_id").map(decoder.pack.bsonValue)
-    } yield Upserted(index, id)).get
+      id <- decoder.get(document, "_id")
+    } yield Upserted.init[P](index, id)).get
   }
 }
