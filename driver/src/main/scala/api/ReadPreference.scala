@@ -22,6 +22,7 @@ object ReadPreference {
     override val toString = "Primary"
   }
 
+  // TODO: Refactor with Node.tags
   private[reactivemongo] def TagFilter(
     tagSet: Seq[Map[String, String]]): Option[BSONDocument => Boolean] = {
     if (tagSet.isEmpty) None else Some { doc: BSONDocument =>
