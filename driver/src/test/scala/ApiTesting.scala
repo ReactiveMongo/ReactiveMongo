@@ -42,6 +42,8 @@ import reactivemongo.bson.BSONDocument
 
 import reactivemongo.api.collections.QueryCodecs
 
+import reactivemongo.api.indexes.Index
+
 package object tests {
   type Pack = Serialization.Pack
   val pack: Pack = Serialization.internalSerializationPack
@@ -272,6 +274,8 @@ package object tests {
   def preload(resp: Response)(implicit ec: ExecutionContext): Future[(Response, BSONDocument)] = Response.preload(resp)
 
   @inline def session(db: DefaultDB): Option[Session] = db.session
+
+  @inline def indexOptions[P <: SerializationPack](i: Index.Aux[P]): i.pack.Document = i.optionDocument
 
   object commands {
     implicit val replSetMaintenanceWriter =

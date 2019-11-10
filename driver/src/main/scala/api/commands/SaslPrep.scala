@@ -1,4 +1,4 @@
-package reactivemongo.core.commands
+package reactivemongo.api.commands
 
 import java.nio.CharBuffer
 import java.text.Normalizer
@@ -9,7 +9,7 @@ import java.text.Normalizer
  * @define rfc3454Url https://tools.ietf.org/html/rfc3454
  * @define rfc4013Url https://tools.ietf.org/html/rfc4013
  */
-private[core] object SaslPrep {
+private[reactivemongo] object SaslPrep {
   /**
    * Return the SASLPrep-canonicalised version of the given `str` for use as a stored string.
    * This implements the SASLPrep algorithm defined in [[${rfc4013Url} RFC 4013]].

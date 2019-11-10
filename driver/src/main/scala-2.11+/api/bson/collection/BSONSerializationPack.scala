@@ -90,6 +90,11 @@ object BSONSerializationPack
       throw ReactiveMongoException(s"Unsupported writable buffer: $buffer")
   }
 
+  private[reactivemongo] def writeToBuffer(
+    buffer: WritableBuffer,
+    document: Document): WritableBuffer =
+    DefaultBufferHandler.writeDocument(document, buffer)
+
   def readFromBuffer(buffer: LegacyReadable): Document = buffer match {
     case in: ArrayReadableBuffer => {
       val buf = new ReadableBuffer(in.bytebuffer)
@@ -98,7 +103,7 @@ object BSONSerializationPack
     }
 
     case in: ChannelBufferReadableBuffer => {
-      val bytes = Array.ofDim[Byte](in.size)
+      val bytes = Array.ofDim[Byte](in.readable)
       in.readBytes(bytes)
 
       val buf = ReadableBuffer(bytes)

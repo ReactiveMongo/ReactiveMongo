@@ -1,6 +1,6 @@
 package reactivemongo.api.commands
 
-import reactivemongo.api.{ SerializationPack, Session, WriteConcern => WC }
+import reactivemongo.api.{ Serialization, Session, WriteConcern => WC }
 
 /**
  * Support for [[https://docs.mongodb.com/manual/reference/command/abortTransaction/ abortTransaction]] and [[https://docs.mongodb.com/manual/reference/command/commitTransaction/ commitTransaction]] commands.
@@ -24,7 +24,8 @@ private[reactivemongo] object EndTransaction {
       val kind = "commitTransaction"
     }
 
-  def commandWriter[P <: SerializationPack](pack: P): pack.Writer[EndTransaction] = {
+  def commandWriter: Serialization.Pack#Writer[EndTransaction] = {
+    val pack = Serialization.internalSerializationPack
     val builder = pack.newBuilder
     val writeWriteConcern = CommandCodecs.writeWriteConcern(builder)
     val writeSession = CommandCodecs.writeSession(builder)
@@ -41,7 +42,7 @@ private[reactivemongo] object EndTransaction {
       elements ++= writeSession(end.session)
 
       end.session.transaction.toOption.flatMap(_.recoveryToken).foreach { t =>
-        elements += elementProducer("recoveryToken", pack.document(t))
+        elements += elementProducer("recoveryToken", t)
       }
 
       builder.document(elements.result())

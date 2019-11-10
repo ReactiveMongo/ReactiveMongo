@@ -7,10 +7,10 @@ import java.util.concurrent.atomic.AtomicReference
 import scala.util.{ Failure, Try }
 import scala.concurrent.{ ExecutionContext, Future }
 
-import reactivemongo.bson.{ BSONDocument, BSONTimestamp }
-
 import reactivemongo.core.errors.GenericDriverException
 import reactivemongo.core.protocol.Response
+
+import reactivemongo.api.Serialization.Pack
 
 /**
  * The [[https://docs.mongodb.com/manual/reference/server-sessions/#command-options options]] to execute commands using a started session.
@@ -28,7 +28,7 @@ private[reactivemongo] sealed abstract class Session(
   @inline def operationTime: Option[Long] = Option.empty[Long]
 
   /** No-op as not tracking times, save for [[NodeSetSession]]. */
-  private[reactivemongo] val update: Function3[Long, Option[Long], Option[BSONDocument], Session] = (_, _, _) => this // No-op
+  private[reactivemongo] val update: Function3[Long, Option[Long], Option[Pack#Document], Session] = (_, _, _) => this // No-op
 
   /** Returns `Some` newly started transaction if any. */
   private[reactivemongo] val startTransaction: Function2[WriteConcern, Option[String], Try[(SessionTransaction, Boolean)]] = (_, _) => transaction.map(_ -> false)
@@ -71,12 +71,12 @@ private[reactivemongo] sealed class NodeSetSession(
       txnNumber = 0L,
       writeConcern = Option.empty[WriteConcern], // not started
       pinnedNode = Option.empty[String], // not started
-      recoveryToken = Option.empty[BSONDocument],
+      recoveryToken = Option.empty[Pack#Document],
       flagSent = false))
 
   final protected val gossip = new AtomicReference(0L -> 0L)
 
-  override private[reactivemongo] val update: Function3[Long, Option[Long], Option[BSONDocument], Session] = (operationTime, clusterTime, _) => {
+  override private[reactivemongo] val update: Function3[Long, Option[Long], Option[Pack#Document], Session] = (operationTime, clusterTime, _) => {
     gossip.getAndAccumulate(
       operationTime -> clusterTime.getOrElse(0),
       Session.UpdateGossip)
@@ -123,7 +123,7 @@ private[reactivemongo] sealed class DistributedSession(
         "Cannot start a distributed transaction without a pinned node"))
   }
 
-  final override private[reactivemongo] val update: Function3[Long, Option[Long], Option[BSONDocument], Session] = (operationTime, clusterTime, recoveryToken) => {
+  final override private[reactivemongo] val update: Function3[Long, Option[Long], Option[Pack#Document], Session] = (operationTime, clusterTime, recoveryToken) => {
     recoveryToken.foreach { token =>
       txState.updateAndGet(new Session.TransactionSetRecoveryToken(token))
     }
@@ -142,25 +142,23 @@ private[api] object Session {
   private[api] val logger =
     reactivemongo.util.LazyLogger("reactivemongo.api.Session")
 
+  private lazy val decoder = Serialization.internalSerializationPack.newDecoder
+
   def updateOnResponse(
     session: Session,
     response: Response)(implicit ec: ExecutionContext): Future[(Session, Response)] = Response.preload(response).map {
     case (resp, preloaded) =>
-      val opTime = preloaded.get("operationTime").collect {
-        case BSONTimestamp(time) => time
-      }
+      val opTime = decoder.long(preloaded, "operationTime")
 
       opTime.fold(session -> resp) { operationTime =>
         logger.debug(s"Update session ${session.lsid} with response to #${response.header.responseTo} at $operationTime")
 
         val clusterTime = for {
-          nested <- preloaded.getAs[BSONDocument](f"$$clusterTime")
-          time <- nested.get("clusterTime").collect {
-            case BSONTimestamp(value) => value
-          }
+          nested <- decoder.child(preloaded, f"$$clusterTime")
+          time <- decoder.long(nested, "clusterTime")
         } yield time
 
-        val recoveryToken = preloaded.getAs[BSONDocument]("recoveryToken")
+        val recoveryToken = decoder.child(preloaded, "recoveryToken")
 
         session.update(operationTime, clusterTime, recoveryToken) -> resp
       }
@@ -235,7 +233,7 @@ private[api] object Session {
   }
 
   final class TransactionSetRecoveryToken(
-    recoveryToken: BSONDocument) extends UnaryOperator[SessionTransaction] {
+    recoveryToken: Pack#Document) extends UnaryOperator[SessionTransaction] {
 
     def apply(current: SessionTransaction): SessionTransaction =
       if (current.isStarted) {
@@ -256,7 +254,7 @@ private[reactivemongo] case class SessionTransaction(
   writeConcern: Option[WriteConcern],
   pinnedNode: Option[String],
   flagSent: Boolean,
-  recoveryToken: Option[BSONDocument]) {
+  recoveryToken: Option[Pack#Document]) {
 
   @inline def isStarted: Boolean = writeConcern.isDefined
 }

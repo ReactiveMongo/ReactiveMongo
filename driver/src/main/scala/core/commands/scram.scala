@@ -3,10 +3,12 @@ package reactivemongo.core.commands
 import javax.crypto.SecretKeyFactory
 
 import reactivemongo.api.{
+  BSONSerializationPack => pack,
   AuthenticationMode,
   ScramSha1Authentication,
   ScramSha256Authentication
 }
+import reactivemongo.api.commands.SaslPrep
 
 import reactivemongo.bson.{
   BSONBinary,
@@ -109,16 +111,22 @@ private[core] object ScramSha256Initiate extends BSONCommandResultMaker[ScramCha
 private[core] object ScramInitiate {
   def parseResponse[M <: AuthenticationMode.Scram](mechanism: M, bson: BSONDocument)(f: (Int, Array[Byte]) => ScramChallenge[M]): Either[CommandError, ScramChallenge[M]] = {
     CommandError.checkOk(bson, Some("authenticate"), (doc, _) => {
-      FailedAuthentication(
-        doc.getAs[BSONString]("errmsg").fold("")(_.value), Some(doc))
+      FailedAuthentication(pack)(
+        doc.getAs[BSONString]("errmsg").fold("")(_.value),
+        doc.getAs[BSONNumberLike]("code").map(_.toInt),
+        Some(doc))
     }).fold({
       (for {
         cid <- bson.getAs[BSONNumberLike]("conversationId").map(_.toInt)
         pay <- bson.getAs[Array[Byte]]("payload")
-      } yield (cid, pay)).fold[Either[CommandError, ScramChallenge[M]]](Left(FailedAuthentication(s"invalid $mechanism challenge response: ${BSONDocument pretty bson}", Some(bson)))) {
-        case (conversationId, payload) =>
-          Right(f(conversationId, payload))
-      }
+      } yield (cid, pay)).fold[Either[CommandError, ScramChallenge[M]]](
+        Left(FailedAuthentication(pack)(
+          s"invalid $mechanism challenge response: ${BSONDocument pretty bson}",
+          None,
+          Some(bson)))) {
+          case (conversationId, payload) =>
+            Right(f(conversationId, payload))
+        }
     })(Left(_))
   }
 

@@ -450,7 +450,14 @@ object IndexesManager {
             }
           }.toSeq
 
-          val opts = builder.document(decoder.names(doc).flatMap {
+          val name = decoder.string(doc, "name")
+          val unique = decoder.booleanLike(doc, "unique").getOrElse(false)
+          val background = decoder.booleanLike(doc, "background").getOrElse(false)
+          val dropDups = decoder.booleanLike(doc, "dropDups").getOrElse(false)
+          val sparse = decoder.booleanLike(doc, "sparse").getOrElse(false)
+          val version = decoder.int(doc, "v")
+
+          val options = builder.document(decoder.names(doc).flatMap {
             case "ns" | "key" | "name" | "unique" |
               "background" | "dropDups" | "sparse" | "v" | "partialFilterExpression" =>
               Seq.empty[pack.ElementProducer]
@@ -461,28 +468,10 @@ object IndexesManager {
               }
           }.toSeq)
 
-          val options = pack.bsonValue(opts) match {
-            case legacyDoc: reactivemongo.bson.BSONDocument =>
-              legacyDoc
-
-            case _ =>
-              reactivemongo.bson.BSONDocument.empty
-          }
-
-          val name = decoder.string(doc, "name")
-          val unique = decoder.booleanLike(doc, "unique").getOrElse(false)
-          val background = decoder.booleanLike(doc, "background").getOrElse(false)
-          val dropDups = decoder.booleanLike(doc, "dropDups").getOrElse(false)
-          val sparse = decoder.booleanLike(doc, "sparse").getOrElse(false)
-          val version = decoder.int(doc, "v")
           val partialFilter =
-            decoder.child(doc, "partialFilterExpression").
-              map(pack.bsonValue).collect {
-                case legacyDoc: reactivemongo.bson.BSONDocument =>
-                  legacyDoc
-              }
+            decoder.child(doc, "partialFilterExpression")
 
-          Index(key, name, unique, background, dropDups,
+          Index(pack)(key, name, unique, background, dropDups,
             sparse, version, partialFilter, options)
         }
     }

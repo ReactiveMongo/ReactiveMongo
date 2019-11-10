@@ -31,7 +31,7 @@ object `package` {
   }
 }
 
-@deprecated("Will be removed", "0.19.0")
+@deprecated("Use `reactivemongo.api.bson.collection.BSONCollection`", "0.19.0")
 @SerialVersionUID(1382847900L)
 final class BSONCollection @deprecated("Internal: will be made private", "0.17.0") (
   val db: DB,

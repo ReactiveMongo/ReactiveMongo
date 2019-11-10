@@ -40,6 +40,8 @@ import reactivemongo.io.netty.channel.group.{
 
 import reactivemongo.util.{ LazyLogger, SimpleRing }
 
+import reactivemongo.api.Serialization
+
 import reactivemongo.core.ClientMetadata
 import reactivemongo.core.errors.GenericDriverException
 import reactivemongo.core.protocol.{
@@ -79,6 +81,10 @@ import external.reactivemongo.ConnectionListener
 trait MongoDBSystem extends Actor {
   import scala.concurrent.duration._
   import Exceptions._
+
+  protected type Pack = Serialization.Pack
+
+  protected val pack: Pack = Serialization.internalSerializationPack
 
   protected final val logger =
     LazyLogger("reactivemongo.core.actors.MongoDBSystem")
@@ -195,7 +201,7 @@ trait MongoDBSystem extends Actor {
 
   /** On start or restart. */
   private def initNodeSet(): Try[NodeSet] = {
-    val seedNodeSet = NodeSet(None, None, seeds.map(seed => Node(seed, NodeStatus.Unknown, Vector.empty, Set.empty, None, ProtocolMetadata.Default)).toVector, initialAuthenticates.toSet)
+    val seedNodeSet = NodeSet(None, None, seeds.map(seed => new Node(seed, Set.empty, NodeStatus.Unknown, Vector.empty, Set.empty, _tags = Map.empty[String, String], ProtocolMetadata.Default, PingInfo(), false)).toVector, initialAuthenticates.toSet)
 
     debug(s"Initial node set: ${seedNodeSet.toShortString}")
 
@@ -716,7 +722,7 @@ trait MongoDBSystem extends Actor {
 
       updateNodeSet(s"AuthenticationFailure(${err.info._channelId})") { ns =>
         handleAuthResponse(ns, err)(
-          Left(FailedAuthentication(cause.getMessage)))
+          Left(FailedAuthentication(pack)(cause.getMessage, None, None)))
       }
 
       ()
@@ -867,7 +873,7 @@ trait MongoDBSystem extends Actor {
         val authenticates = ns.authenticates + authenticate
 
         ns.copy(authenticates = authenticates).updateAll {
-          case node @ Node(_, status, _, _, _, _, _, _) if status.queryable =>
+          case Node.Queryable(node) =>
             authenticateNode(node, authenticates)
 
           case node => node
@@ -1110,12 +1116,13 @@ trait MongoDBSystem extends Actor {
     }
   }
 
-  private def onIsMaster(response: Response): Unit = {
-    import reactivemongo.api.BSONSerializationPack
-    import reactivemongo.api.commands.bson.BSONIsMasterCommandImplicits
+  private object IsMasterCommand
+    extends reactivemongo.api.commands.IsMasterCommand[Pack]
 
-    val isMaster = BSONSerializationPack.readAndDeserialize(
-      response, BSONIsMasterCommandImplicits.IsMasterResultReader)
+  private lazy val isMasterReader = IsMasterCommand.reader(pack)
+
+  private def onIsMaster(response: Response): Unit = {
+    val isMaster = pack.readAndDeserialize(response, isMasterReader)
 
     trace(s"IsMaster response document: $isMaster")
 
@@ -1169,7 +1176,7 @@ trait MongoDBSystem extends Actor {
             val an = authenticating._copy(
               status = nodeStatus,
               pingInfo = pingInfo,
-              tags = isMaster.replicaSet.flatMap(_.tags),
+              tags = isMaster.replicaSet.map(_.tags).getOrElse(Map.empty),
               protocolMetadata = meta,
               isMongos = isMaster.isMongos)
 
@@ -1185,8 +1192,9 @@ trait MongoDBSystem extends Actor {
           _.hosts.collect {
             case host if (!prepared.nodes.exists(_.names contains host)) =>
               // Prepare node for newly discovered host in the RS
-              Node(host, NodeStatus.Uninitialized,
-                Vector.empty, Set.empty, None, ProtocolMetadata.Default)
+              new Node(host, Set.empty, NodeStatus.Uninitialized,
+                Vector.empty, Set.empty, _tags = Map.empty[String, String],
+                ProtocolMetadata.Default, PingInfo(), false)
           }
         }
 

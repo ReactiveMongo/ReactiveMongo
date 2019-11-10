@@ -308,7 +308,6 @@ final class DriverSpec(implicit ee: ExecutionEnv)
                 _("testcol").insert.one(BSONDocument("foo" -> "bar"))
               }.map(_ => {}) must beTypedEqualTo({}).await(1, timeout * 2)
             }
-
         }
 
         "with the slow connection" in {
@@ -407,7 +406,6 @@ final class DriverSpec(implicit ee: ExecutionEnv)
                 await(0, slowTimeout + timeout)
             }
           }
-
         }
       }
     }

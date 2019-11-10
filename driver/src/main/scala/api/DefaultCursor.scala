@@ -4,8 +4,6 @@ import scala.util.{ Failure, Success, Try }
 
 import scala.concurrent.{ ExecutionContext, Future }
 
-import reactivemongo.bson.BSONDocument
-
 import reactivemongo.util.ExtendedFutures.DelayedFuture
 
 import reactivemongo.core.netty.BufferSequence
@@ -108,7 +106,8 @@ object DefaultCursor {
           Future.successful(response)
       }
 
-      // TODO: maxTimeMS
+      val builder = pack.newBuilder
+
       val getMoreOpCmd: Function2[Long, Int, (RequestOp, BufferSequence)] = {
         if (lessThenV32) { (cursorId, ntr) =>
           GetMore(fullCollectionName, ntr, cursorId) -> BufferSequence.empty
@@ -117,13 +116,20 @@ object DefaultCursor {
           val collName = fullCollectionName.span(_ != '.')._2.tail
 
           { (cursorId, ntr) =>
-            val cmd = BSONDocument(
-              "getMore" -> cursorId,
-              "collection" -> collName,
-              "batchSize" -> ntr,
-              "maxTimeMS" -> maxTimeMS)
+            import builder.{ elementProducer => elem, int, long, string }
 
-            moreQry -> BufferSequence.single(cmd)
+            val cmdOpts = Seq.newBuilder[pack.ElementProducer] ++= Seq(
+              elem("getMore", long(cursorId)),
+              elem("collection", string(collName)),
+              elem("batchSize", int(ntr)))
+
+            maxTimeMS.foreach { ms =>
+              cmdOpts += elem("maxTimeMS", long(ms))
+            }
+
+            val cmd = builder.document(cmdOpts.result())
+
+            moreQry -> BufferSequence.single[pack.type](pack)(cmd)
           }
         }
       }

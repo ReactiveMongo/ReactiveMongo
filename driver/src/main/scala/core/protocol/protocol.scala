@@ -73,6 +73,7 @@ case class CheckedWriteRequest(
  * @param documents body of this request, a [[http://netty.io/4.1/api/io/netty/buffer/ByteBuf.html ByteBuf]] containing 0, 1, or many documents.
  * @param channelIdHint a hint for sending this request on a particular channel.
  */
+@deprecated("Internal: will be private", "0.19.1")
 case class RequestMaker(
   op: RequestOp,
   documents: BufferSequence = BufferSequence.empty,

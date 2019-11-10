@@ -55,6 +55,7 @@ object Common extends CommonAuth {
   }
 
   def close(): Unit = try {
+    println("_close")
     driver.close()
   } catch { case _: Throwable => () }
 }

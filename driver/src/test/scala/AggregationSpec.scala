@@ -17,6 +17,7 @@ import reactivemongo.bson.{
   document
 }
 import reactivemongo.api.{
+  BSONSerializationPack,
   Cursor,
   CursorOps,
   CursorProducer,
@@ -24,6 +25,8 @@ import reactivemongo.api.{
   WrappedCursor,
   WrappedCursorOps
 }
+import reactivemongo.api.indexes._, IndexType._
+
 import reactivemongo.api.collections.bson.BSONCollection
 
 import org.specs2.concurrent.ExecutionEnv
@@ -47,11 +50,9 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
 
   val zipColName = s"zipcodes${System identityHashCode this}"
   lazy val coll: BSONCollection = {
-    import reactivemongo.api.indexes._, IndexType._
-
     val c: BSONCollection = db(zipColName)
     scala.concurrent.Await.result(c.create().flatMap(_ =>
-      c.indexesManager.ensure(Index(
+      c.indexesManager.ensure(index(
         List("city" -> Text, "state" -> Text))).map(_ => c)), timeout * 2)
   }
   lazy val slowZipColl: BSONCollection = slowDb(zipColName)
@@ -887,7 +888,7 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
       import reactivemongo.api.indexes._, IndexType._
 
       places.create().flatMap { _ =>
-        places.indexesManager.ensure(Index(List("loc" -> Geo2DSpherical)))
+        places.indexesManager.ensure(index(List("loc" -> Geo2DSpherical)))
       }.map(_ => {}) must beEqualTo({}).await(1, timeout) and {
         /*
        {
@@ -1383,6 +1384,17 @@ db.accounts.aggregate([
   section("gt_mongo32")
 
   // ---
+
+  def index(
+    key: Seq[(String, IndexType)],
+    name: Option[String] = None,
+    unique: Boolean = false,
+    background: Boolean = false,
+    dropDups: Boolean = false,
+    sparse: Boolean = false,
+    version: Option[Int] = None, // let MongoDB decide
+    partialFilter: Option[BSONDocument] = None,
+    options: BSONDocument = BSONDocument.empty) = Index(BSONSerializationPack)(key, name, unique, background, dropDups, sparse, version, partialFilter, options)
 
   case class User(
     _id: Int,

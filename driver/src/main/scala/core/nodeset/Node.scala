@@ -8,32 +8,62 @@ import reactivemongo.io.netty.channel.ChannelId
 
 import akka.actor.ActorRef
 
-import reactivemongo.bson.BSONDocument
+import reactivemongo.bson.{ BSONDocument, BSONElement, BSONString }
 
 /**
  * @param name the main name of the node
  */
 @SerialVersionUID(440354552L)
-private[reactivemongo] case class Node(
-  name: String,
-  @transient status: NodeStatus,
-  @transient connections: Vector[Connection],
-  @transient authenticated: Set[Authenticated], // TODO: connections.authenticated (remove)
-  tags: Option[BSONDocument],
-  protocolMetadata: ProtocolMetadata,
-  pingInfo: PingInfo = PingInfo(),
-  isMongos: Boolean = false) {
+private[reactivemongo] sealed class Node(
+  val name: String,
+  val aliases: Set[String],
+  @transient val status: NodeStatus,
+  @transient val connections: Vector[Connection],
+  @transient val authenticated: Set[Authenticated], // TODO: connections.authenticated (remove)
+  private[reactivemongo] val _tags: Map[String, String],
+  val protocolMetadata: ProtocolMetadata,
+  val pingInfo: PingInfo,
+  val isMongos: Boolean) extends Product with Serializable {
 
-  private[nodeset] val aliases = Set.newBuilder[String]
+  @deprecated("Use constructor with new tags", "0.19.1")
+  def this(
+    name: String,
+    status: NodeStatus,
+    connections: Vector[Connection],
+    authenticated: Set[Authenticated],
+    tags: Option[BSONDocument],
+    protocolMetadata: ProtocolMetadata,
+    pingInfo: PingInfo,
+    isMongos: Boolean) = this(name, Set.empty, status, connections,
+    authenticated, tags.map(Node.tags).getOrElse(Map.empty),
+    protocolMetadata, pingInfo, isMongos)
 
-  // TODO: Refactor as immutable once private
-  def withAlias(as: String): Node = {
-    aliases += as
-    this
+  @deprecated("Will be removed", "0.19.1")
+  lazy val tags: Option[BSONDocument] = if (_tags.isEmpty) None else {
+    Some(BSONDocument(_tags.map {
+      case (k, v) => BSONElement(k, BSONString(v))
+    }))
   }
 
+  @deprecated("Will be removed", "0.19.1")
+  def copy(
+    name: String = this.name,
+    status: NodeStatus = this.status,
+    connections: Vector[Connection] = this.connections,
+    authenticated: Set[Authenticated] = this.authenticated,
+    tags: Option[BSONDocument] = this.tags,
+    protocolMetadata: ProtocolMetadata = this.protocolMetadata,
+    pingInfo: PingInfo = this.pingInfo,
+    isMongos: Boolean = this.isMongos): Node = new Node(
+    name, status, connections, authenticated, tags,
+    protocolMetadata, pingInfo, isMongos)
+
+  def withAlias(as: String): Node =
+    new Node(name, aliases + as, status, connections, authenticated, _tags,
+      protocolMetadata, pingInfo, isMongos)
+
   /** All the node names (including its aliases) */
-  def names: Set[String] = aliases.result() + name
+  def names: Set[String] = aliases + name
 
   val (host: String, port: Int) = {
     val splitted = name.span(_ != ':')
@@ -119,19 +149,13 @@ private[reactivemongo] case class Node(
     status: NodeStatus = this.status,
     connections: Vector[Connection] = this.connections,
     authenticated: Set[Authenticated] = this.authenticated,
-    tags: Option[BSONDocument] = this.tags,
+    tags: Map[String, String] = _tags,
     protocolMetadata: ProtocolMetadata = this.protocolMetadata,
     pingInfo: PingInfo = this.pingInfo,
     isMongos: Boolean = this.isMongos,
-    aliases: Set[String] = this.aliases.result()): Node = {
-
-    val node = copy(name, status, connections, authenticated, tags,
+    aliases: Set[String] = this.aliases): Node =
+    new Node(name, aliases, status, connections, authenticated, tags,
       protocolMetadata, pingInfo, isMongos)
-
-    node.aliases ++= aliases
-
-    node
-  }
 
   @inline private[core] def pickConnectionByChannelId(id: ChannelId): Option[Connection] = connections.find(_.channel.id == id)
 
@@ -147,12 +171,65 @@ private[reactivemongo] case class Node(
   lazy val toShortString = s"""Node[$name: $status (${authenticatedConnections.size}/${connected.size}/${connections.filterNot(_.signaling).size} available connections), latency=${pingInfo.ping}ns, authenticated={${authenticated.map(_.toShortString) mkString ", "}}]"""
 
   /** Returns the read-only information about this node. */
-  def info = NodeInfo(name, aliases.result(), host, port, status,
+  def info = new NodeInfo(name, aliases, host, port, status,
     connections.count(!_.signaling),
     connections.count(_.status == ConnectionStatus.Connected),
-    authenticatedConnections.size, tags,
+    authenticatedConnections.size, _tags,
     protocolMetadata, pingInfo, isMongos)
 
+  @deprecated("No longer a case class", "0.19.1")
+  val productArity = 8
+
+  @deprecated("No longer a case class", "0.19.1")
+  @inline def productElement(n: Int): Any = tupled.productElement(n)
+
+  @deprecated("No longer a case class", "0.19.1")
+  def canEqual(that: Any): Boolean = that match {
+    case _: Node => true
+    case _       => false
+  }
+
+  override def equals(that: Any): Boolean = that match {
+    case other: Node =>
+      other.tupled == this.tupled
+
+    case _ => false
+  }
+
+  override def hashCode: Int = tupled.hashCode
+
+  private[reactivemongo] lazy val tupled = (name, status, connections,
+    authenticated, tags, protocolMetadata, pingInfo, isMongos)
+}
+
+private[reactivemongo] object Node extends scala.runtime.AbstractFunction8[String, NodeStatus, Vector[Connection], Set[Authenticated], Option[BSONDocument], ProtocolMetadata, PingInfo, Boolean, Node] {
+  @deprecated("Will be removed", "0.19.1")
+  def apply(
+    name: String,
+    status: NodeStatus,
+    connections: Vector[Connection],
+    authenticated: Set[Authenticated],
+    tags: Option[BSONDocument],
+    protocolMetadata: ProtocolMetadata,
+    pingInfo: PingInfo = PingInfo(),
+    isMongos: Boolean = false): Node =
+    new Node(name, Set.empty, status, connections, authenticated,
+      tags.map(Node.tags).getOrElse(Map.empty),
+      protocolMetadata, pingInfo, isMongos)
+
+  @deprecated("No longer a case class", "0.19.1")
+  def unapply(node: Node): Option[(String, NodeStatus, Vector[Connection], Set[Authenticated], Option[BSONDocument], ProtocolMetadata, PingInfo, Boolean)] = Option(node).map(_.tupled)
+
+  @deprecated("Will be removed", "0.19.1")
+  @inline def tags(doc: BSONDocument): Map[String, String] =
+    doc.elements.collect {
+      case BSONElement(k, BSONString(v)) => k -> v
+    }.toMap
+
+  private[reactivemongo] object Queryable {
+    def unapply(node: Node): Option[Node] =
+      Option(node).filter(_.status.queryable)
+  }
 }
 
 /**
@@ -160,22 +237,92 @@ private[reactivemongo] case class Node(
  * @param connected the number of established connections for this node
  * @param authenticated the number of authenticated connections
  */
-case class NodeInfo(
-  name: String,
-  aliases: Set[String],
-  host: String,
-  port: Int,
-  status: NodeStatus,
-  connections: Int,
-  connected: Int,
-  authenticated: Int,
-  tags: Option[BSONDocument],
-  protocolMetadata: ProtocolMetadata,
-  pingInfo: PingInfo,
-  isMongos: Boolean) {
+class NodeInfo(
+  val name: String,
+  val aliases: Set[String],
+  val host: String,
+  val port: Int,
+  val status: NodeStatus,
+  val connections: Int,
+  val connected: Int,
+  val authenticated: Int,
+  private[reactivemongo] val _tags: Map[String, String],
+  val protocolMetadata: ProtocolMetadata,
+  val pingInfo: PingInfo,
+  val isMongos: Boolean) extends Product with Serializable {
+
+  @deprecated("Use the constructor with tag map", "0.19.1")
+  def this(
+    name: String,
+    aliases: Set[String],
+    host: String,
+    port: Int,
+    status: NodeStatus,
+    connections: Int,
+    connected: Int,
+    authenticated: Int,
+    tags: Option[BSONDocument],
+    protocolMetadata: ProtocolMetadata,
+    pingInfo: PingInfo,
+    isMongos: Boolean) = this(name, aliases, host, port, status, connections,
+    connected, authenticated, tags.map(Node.tags).getOrElse(Map.empty),
+    protocolMetadata, pingInfo, isMongos)
+
+  @deprecated("Will be removed", "0.19.1")
+  def tags: Option[BSONDocument] = if (_tags.isEmpty) None else {
+    Some(BSONDocument(_tags.map {
+      case (k, v) => BSONElement(k, BSONString(v))
+    }))
+  }
+
+  @deprecated("No longer a case class", "0.19.1")
+  def canEqual(that: Any): Boolean = that match {
+    case _: NodeInfo => true
+    case _           => false
+  }
+
+  @deprecated("No longer a case class", "0.19.1")
+  val productArity: Int = 12
+
+  @deprecated("No longer a case class", "0.19.1")
+  @inline def productElement(n: Int): Any = tupled.productElement(n)
+
+  private[reactivemongo] lazy val tupled =
+    (name, aliases, host, port, status, connections,
+      connected, authenticated, tags, protocolMetadata, pingInfo, isMongos)
 
   /** All the node names (including its aliases) */
   def names: Set[String] = aliases + name
 
   override lazy val toString = s"Node[$name: $status ($connected/$connections available connections), latency=${pingInfo.ping}, auth=$authenticated]"
+
+  override def equals(that: Any): Boolean = that match {
+    case other: NodeInfo =>
+      other.tupled == this.tupled
+
+    case _ => false
+  }
+
+  override lazy val hashCode: Int = tupled.hashCode
+}
+
+object NodeInfo extends scala.runtime.AbstractFunction12[String, Set[String], String, Int, NodeStatus, Int, Int, Int, Option[BSONDocument], ProtocolMetadata, PingInfo, Boolean, NodeInfo] {
+
+  @deprecated("No longer a case class", "0.19.1")
+  def apply(
+    name: String,
+    aliases: Set[String],
+    host: String,
+    port: Int,
+    status: NodeStatus,
+    connections: Int,
+    connected: Int,
+    authenticated: Int,
+    tags: Option[BSONDocument],
+    protocolMetadata: ProtocolMetadata,
+    pingInfo: PingInfo,
+    isMongos: Boolean): NodeInfo = new NodeInfo(name, aliases, host, port,
+    status, connections, connected, authenticated,
+    tags.map(Node.tags).getOrElse(Map.empty),
+    protocolMetadata, pingInfo, isMongos)
 }

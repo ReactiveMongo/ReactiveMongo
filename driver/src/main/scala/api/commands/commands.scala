@@ -266,7 +266,7 @@ object Command {
 
     val documents = BufferSequence(buffer.buffer)
     val flags = if (readPreference.slaveOk) QueryFlags.SlaveOk else 0
-    val query = Query(flags, db + ".$cmd", 0, 1)
+    val query = Query(flags, db + f".$$cmd", 0, 1)
     val mongo26WriteCommand = command match {
       case _: Mongo26WriteCommand => true
       case _                      => false

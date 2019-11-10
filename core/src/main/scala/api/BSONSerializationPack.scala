@@ -6,14 +6,19 @@ import scala.util.Try
 
 import scala.reflect.ClassTag
 
-import reactivemongo.bson.buffer.{ ReadableBuffer, WritableBuffer }
+import reactivemongo.bson.buffer.{
+  ReadableBuffer,
+  WritableBuffer => LegacyWritable
+}
 
 import reactivemongo.core.protocol.Response
 import reactivemongo.core.netty.ChannelBufferReadableBuffer
 
 /** The default serialization pack. */
 @deprecated("Will be replaced with `reactivemongo.api.bson.collection.BSONSerializationPack`", "0.19.0")
-object BSONSerializationPack extends SerializationPack { self =>
+object BSONSerializationPack
+  extends SerializationPack with BSONSerializationPackCompat { self =>
+
   import reactivemongo.bson._, buffer.DefaultBufferHandler
 
   type Value = BSONValue
@@ -40,7 +45,7 @@ object BSONSerializationPack extends SerializationPack { self =>
   def deserialize[A](document: Document, reader: Reader[A]): A =
     reader.read(document)
 
-  def writeToBuffer(buffer: WritableBuffer, document: Document): WritableBuffer = DefaultBufferHandler.writeDocument(document, buffer)
+  def writeToBuffer(buffer: LegacyWritable, document: Document): LegacyWritable = DefaultBufferHandler.writeDocument(document, buffer)
 
   def readFromBuffer(buffer: ReadableBuffer): Document =
     DefaultBufferHandler.readDocument(buffer).get
