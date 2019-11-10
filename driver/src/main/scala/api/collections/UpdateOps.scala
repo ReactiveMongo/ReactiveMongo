@@ -91,8 +91,8 @@ trait UpdateOps[P <: SerializationPack with Singleton] {
      * [[https://docs.mongodb.com/manual/reference/method/db.collection.updateMany/ Updates many documents]], according the ordered behaviour.
      *
      * {{{
-     * import reactivemongo.bson.BSONDocument
-     * import reactivemongo.api.collections.BSONCollection
+     * import reactivemongo.api.bson.BSONDocument
+     * import reactivemongo.api.bson.collection.BSONCollection
      *
      * def updateMany(coll: BSONCollection, docs: Iterable[BSONDocument]) = {
      *   val update = coll.update(ordered = true)

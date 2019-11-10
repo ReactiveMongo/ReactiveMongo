@@ -87,8 +87,8 @@ trait InsertOps[P <: SerializationPack with Singleton] {
      * Inserts a single document.
      *
      * {{{
-     * import reactivemongo.bson.BSONDocument
-     * import reactivemongo.api.collections.BSONCollection
+     * import reactivemongo.api.bson.BSONDocument
+     * import reactivemongo.api.bson.collection.BSONCollection
      *
      * def insertOne(coll: BSONCollection, doc: BSONDocument) = {
      *   val insert = coll.insert(ordered = true)
@@ -106,8 +106,8 @@ trait InsertOps[P <: SerializationPack with Singleton] {
      * [[https://docs.mongodb.com/manual/reference/method/db.collection.insertMany/ Inserts many documents]], according the ordered behaviour.
      *
      * {{{
-     * import reactivemongo.bson.BSONDocument
-     * import reactivemongo.api.collections.BSONCollection
+     * import reactivemongo.api.bson.BSONDocument
+     * import reactivemongo.api.bson.collection.BSONCollection
      *
      * def insertMany(coll: BSONCollection, docs: Iterable[BSONDocument]) = {
      *   val insert = coll.insert(ordered = true)

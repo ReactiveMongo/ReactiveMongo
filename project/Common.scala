@@ -6,7 +6,6 @@ import com.typesafe.tools.mima.plugin.MimaKeys.mimaFailOnNoPrevious
 object Common {
   val baseSettings = Seq(
     organization := "org.reactivemongo",
-    resolvers += Resolver.sonatypeRepo("staging"),
     resolvers ++= Seq(
       Resolver.typesafeRepo("releases"),
       Resolver.sonatypeRepo("snapshots")
