@@ -9,7 +9,11 @@ import reactivemongo.io.netty.channel.ChannelHandlerContext
 
 import reactivemongo.api.BSONSerializationPack
 
-import reactivemongo.bson.{ BSONBooleanLike, BSONDocument, BSONNumberLike }
+import reactivemongo.bson.{
+  BSONBooleanLike,
+  BSONDocument => LegacyDoc,
+  BSONNumberLike
+}
 
 import reactivemongo.core.netty.ChannelBufferReadableBuffer
 import reactivemongo.core.errors.DatabaseException
@@ -88,13 +92,13 @@ private[reactivemongo] class ResponseDecoder
               header, r, info, DatabaseException(BSONSerializationPack)(doc))
           }
 
-          doc.getAs[BSONDocument]("cursor") match {
+          doc.getAs[LegacyDoc]("cursor") match {
             case Some(cursor) if ok.exists(_.toBoolean) => {
               val withCursor: Option[Response] = for {
                 id <- cursor.getAs[BSONNumberLike]("id").map(_.toLong)
                 ns <- cursor.getAs[String]("ns")
-                batch <- cursor.getAs[Seq[BSONDocument]]("firstBatch").orElse(
-                  cursor.getAs[Seq[BSONDocument]]("nextBatch"))
+                batch <- cursor.getAs[Seq[LegacyDoc]]("firstBatch").orElse(
+                  cursor.getAs[Seq[LegacyDoc]]("nextBatch"))
               } yield {
                 val r = reply.copy(cursorID = id, numberReturned = batch.size)
 
@@ -140,7 +144,8 @@ private[reactivemongo] class ResponseDecoder
 }
 
 private[reactivemongo] object ResponseDecoder {
-  @inline private[reactivemongo] def first(buf: ByteBuf) = Try[BSONDocument] {
+  @deprecated("Internal: will be private", "0.19.0")
+  @inline private[reactivemongo] def first(buf: ByteBuf) = Try[LegacyDoc] {
     val sz = buf.getIntLE(buf.readerIndex)
     val bytes = Array.ofDim[Byte](sz)
 

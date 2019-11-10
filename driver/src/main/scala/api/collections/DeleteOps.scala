@@ -90,8 +90,8 @@ trait DeleteOps[P <: SerializationPack with Singleton] {
      * Performs a bulk operation using many deletes, each can delete multiple documents.
      *
      * {{{
-     * import reactivemongo.bson.BSONDocument
-     * import reactivemongo.api.collections.BSONCollection
+     * import reactivemongo.api.bson.BSONDocument
+     * import reactivemongo.api.bson.collection.BSONCollection
      *
      * def bulkDelete(coll: BSONCollection, docs: Iterable[BSONDocument]) = {
      *   val delete = coll.delete(ordered = true)

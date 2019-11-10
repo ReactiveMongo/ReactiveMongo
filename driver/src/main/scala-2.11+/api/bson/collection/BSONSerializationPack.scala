@@ -98,7 +98,7 @@ object BSONSerializationPack
     }
 
     case in: ChannelBufferReadableBuffer => {
-      val bytes = Array.ofDim[Byte](in.size)
+      val bytes = Array.ofDim[Byte](in.readable)
       in.readBytes(bytes)
 
       val buf = ReadableBuffer(bytes)

@@ -8,7 +8,7 @@ import reactivemongo.api.commands.{
 }
 
 import reactivemongo.api.indexes.IndexesManager
-import reactivemongo.bson.{ BSONDocument, BSONDocumentWriter }
+import reactivemongo.bson.{ BSONDocument => LegacyDoc, BSONDocumentWriter }
 
 /** A mixin that provides commands about this database itself. */
 trait DBMetaCommands { self: DB =>
@@ -33,7 +33,7 @@ trait DBMetaCommands { self: DB =>
   }
   import CommonImplicits._
   import BSONPingCommandImplicits._
-  import Serialization.{ internalSerializationPack, unitBoxReader }
+  import Serialization.{ Pack, internalSerializationPack, unitBoxReader }
 
   private implicit lazy val dropWriter =
     DropDatabase.writer(internalSerializationPack)
@@ -129,28 +129,15 @@ trait DBMetaCommands { self: DB =>
     roles: List[UserRole],
     digestPassword: Boolean = true,
     writeConcern: WC = connection.options.writeConcern,
-    customData: Option[BSONDocument] = None)(implicit ec: ExecutionContext): Future[Unit] = createUser(user, pwd, customData, roles, digestPassword, writeConcern, List.empty, List.empty)
+    customData: Option[LegacyDoc] = None)(implicit ec: ExecutionContext): Future[Unit] = createUser(user, pwd, customData, roles, digestPassword, writeConcern, List.empty, List.empty)
 
-  implicit private val createUserWriter: BSONDocumentWriter[CreateUserCommand[BSONSerializationPack.type]#CreateUser] = CreateUserCommand.writer(BSONSerializationPack)
+  private lazy val createUserWriter: BSONDocumentWriter[CreateUserCommand[BSONSerializationPack.type]#CreateUser] = CreateUserCommand.writer(BSONSerializationPack)
 
-  /**
-   * Create the specified user.
-   *
-   * @param user the name of the user to be created
-   * @param pwd the user password (not required if the database uses external credentials)
-   * @param customData the custom data to associate with the user account
-   * @param roles the roles granted to the user, possibly an empty to create users without roles
-   * @param digestPassword when true, the mongod instance will create the hash of the user password (default: `true`)
-   * @param writeConcern the optional level of [[https://docs.mongodb.com/manual/reference/write-concern/ write concern]]
-   * @param restrictions the authentication restriction
-   * @param mechanisms the authentication mechanisms (e.g. SCRAM-SHA-1)
-   *
-   * @see https://docs.mongodb.com/manual/reference/command/createUser/
-   */
+  @deprecated("Use `createUser` with `DBMetaWriter`", "0.19.1")
   def createUser(
     user: String,
     pwd: Option[String],
-    customData: Option[BSONDocument],
+    customData: Option[LegacyDoc],
     roles: List[UserRole],
     digestPassword: Boolean,
     writeConcern: WC,
@@ -167,7 +154,59 @@ trait DBMetaCommands { self: DB =>
         authenticationRestrictions = restrictions,
         mechanisms = mechanisms)
 
+    implicit def writer = createUserWriter
+
     Command.run(BSONSerializationPack, failoverStrategy)(
+      self, command, ReadPreference.primary).map(_ => {})
+  }
+
+  /** Type of writer to serialization database metadata */
+  type DBMetaWriter[T] = Pack#Writer[T]
+
+  private object InternalCreateUser extends CreateUserCommand[Pack] {
+    val pack: Pack = internalSerializationPack
+
+    implicit val writer =
+      CreateUserCommand.writer[Pack](InternalCreateUser.pack: Pack)
+  }
+
+  /**
+   * Create the specified user.
+   *
+   * @param user the name of the user to be created
+   * @param pwd the user password (not required if the database uses external credentials)
+   * @param customData the custom data to associate with the user account
+   * @param roles the roles granted to the user, possibly an empty to create users without roles
+   * @param digestPassword when true, the mongod instance will create the hash of the user password (default: `true`)
+   * @param writeConcern the optional level of [[https://docs.mongodb.com/manual/reference/write-concern/ write concern]]
+   * @param restrictions the authentication restriction
+   * @param mechanisms the authentication mechanisms (e.g. SCRAM-SHA-1)
+   *
+   * @see https://docs.mongodb.com/manual/reference/command/createUser/
+   */
+  def createUser[T](
+    user: String,
+    pwd: Option[String],
+    customData: Option[T],
+    roles: List[UserRole],
+    digestPassword: Boolean,
+    writeConcern: WC,
+    restrictions: List[AuthenticationRestriction],
+    mechanisms: List[AuthenticationMode])(implicit ec: ExecutionContext, w: DBMetaWriter[T]): Future[Unit] = {
+    val command: CreateUserCommand[Pack]#CreateUser =
+      new InternalCreateUser.CreateUser(
+        name = user,
+        pwd = pwd,
+        customData = customData.flatMap(w.writeOpt),
+        roles = roles,
+        digestPassword = digestPassword,
+        writeConcern = Some(writeConcern),
+        authenticationRestrictions = restrictions,
+        mechanisms = mechanisms)
+
+    import InternalCreateUser.writer
+
+    Command.run(InternalCreateUser.pack, failoverStrategy)(
       self, command, ReadPreference.primary).map(_ => {})
   }
 
