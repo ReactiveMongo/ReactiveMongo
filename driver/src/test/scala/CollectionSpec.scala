@@ -435,8 +435,16 @@ final class CollectionSpec(implicit protected val ee: ExecutionEnv)
 
           (for {
             _ <- c.create()
-            r <- c.indexesManager.ensure(
-              Index(List("plop" -> Ascending), unique = true))
+            r <- c.indexesManager.ensure(Index(pack)(
+              key = List("plop" -> Ascending),
+              name = None,
+              unique = true,
+              background = false,
+              dropDups = false,
+              sparse = false,
+              version = None,
+              partialFilter = None,
+              options = BSONDocument()))
           } yield r) must beTrue.await(1, timeout) and {
             c.insert(ordered = false).many(docs).
               map(_.n) must beTypedEqualTo(e).await(1, timeout * (n / 2L))

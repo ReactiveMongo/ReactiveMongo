@@ -413,8 +413,7 @@ class DefaultDB private[api] (
 
       case Success(tx) => tx.writeConcern match {
         case Some(wc) => {
-          implicit def w = EndTransaction.commandWriter(
-            internalSerializationPack)
+          implicit def w = EndTransaction.commandWriter
 
           connection.database("admin").flatMap { adminDb =>
             Command.run(internalSerializationPack, failoverStrategy).apply(

@@ -1,7 +1,5 @@
 package reactivemongo.api
 
-import reactivemongo.bson.BSONDocument
-
 /**
  * MongoDB Read Preferences enable to read from primary or secondaries
  * with a predefined strategy.
@@ -24,14 +22,13 @@ object ReadPreference {
 
   // TODO: Refactor with Node.tags
   private[reactivemongo] def TagFilter(
-    tagSet: Seq[Map[String, String]]): Option[BSONDocument => Boolean] = {
-    if (tagSet.isEmpty) None else Some { doc: BSONDocument =>
+    tagSet: Seq[Map[String, String]]): Option[Map[String, String] => Boolean] = {
+    if (tagSet.isEmpty) None else Some { tags: Map[String, String] =>
       val matching = tagSet.find(_.foldLeft(Map.empty[String, String]) {
         case (ms, (k, v)) =>
-          doc.getAs[String](k).filter(_ == v) match {
-            case None => ms + (k -> v)
-            case _    => ms
-          }
+          if (tags.get(k).exists(_ == v)) {
+            ms + (k -> v)
+          } else ms
       }.isEmpty)
 
       matching.isDefined

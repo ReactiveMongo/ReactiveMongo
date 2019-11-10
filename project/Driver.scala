@@ -89,13 +89,6 @@ object Version {
           "dnsjava" % "dnsjava" % "2.1.9",
           commonsCodec,
           shapelessTest % Test, specs.value) ++ logApi,
-        libraryDependencies ++= {
-          if (scalaBinaryVersion.value != "2.10") {
-            Seq("org.reactivemongo" %% "reactivemongo-bson-api" % version.value)
-          } else {
-            Seq.empty
-          }
-        },
         findbugsAnalyzedPath += target.value / "external",
         mimaBinaryIssueFilters ++= {
           import com.typesafe.tools.mima.core._, ProblemFilters.{ exclude => x }

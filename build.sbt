@@ -95,7 +95,23 @@ lazy val `ReactiveMongo-Core` = project.in(file("core")).
         )
       },
       //mimaPreviousArtifacts := Set.empty,
-      libraryDependencies += Dependencies.shaded.value,
+      sourceDirectories in Compile ++= {
+        if (scalaBinaryVersion.value != "2.10") {
+          Seq((sourceDirectory in Compile).value / "scala-2.11+")
+        } else {
+          Seq.empty
+        }
+      },
+      libraryDependencies ++= {
+        val deps = Seq(Dependencies.shaded.value)
+
+        if (scalaBinaryVersion.value != "2.10") {
+          ("org.reactivemongo" %% "reactivemongo-bson-api" % version.
+            value) +: deps
+        } else {
+          deps
+        }
+      }
     ))
 
 lazy val `ReactiveMongo` = new Driver(
@@ -130,5 +146,8 @@ lazy val `ReactiveMongo-Root` = project.in(file(".")).
 
 lazy val benchmarks = (project in file("benchmarks")).
   enablePlugins(JmhPlugin).
-  settings(Common.settings ++ Compiler.settings).
+  settings(Common.settings ++ Compiler.settings ++ Seq(
+      libraryDependencies += organization.value % "reactivemongo-shaded" % version.value
+    )
+  ).
   dependsOn(`ReactiveMongo-BSON` % "compile->test")

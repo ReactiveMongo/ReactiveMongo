@@ -10,7 +10,6 @@ import reactivemongo.io.netty.channel.ChannelId
 
 import akka.actor.ActorRef
 
-import reactivemongo.bson.BSONDocument
 import reactivemongo.api.ReadPreference
 
 /**
@@ -133,12 +132,15 @@ case class NodeSet(
 
   private def findNode(
     roundRobiner: RoundRobiner[Node, Vector],
-    filter: Option[BSONDocument => Boolean],
+    filter: Option[Map[String, String] => Boolean],
     fallback: => Option[Node],
     unpriorised: Int)(implicit ord: Ordering[Node]): Option[Node] =
     filter match {
       case Some(f) => {
-        val nodeFilter = (_: Node).tags.fold(false)(f)
+        val nodeFilter = { n: Node =>
+          if (n._tags.isEmpty) false
+          else f(n._tags)
+        }
 
         if (unpriorised > 1) {
           roundRobiner.pickWithFilterAndPriority(nodeFilter, unpriorised)

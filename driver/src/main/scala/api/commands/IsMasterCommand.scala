@@ -68,9 +68,30 @@ trait IsMasterCommand[P <: SerializationPack] {
     val isArbiterOnly: Boolean, // `arbiterOnly`
     val isPassive: Boolean, // `passive`
     val isHidden: Boolean, // `hidden`
-    val tags: Option[P#Document],
+    val tags: Map[String, String],
     val electionId: Int,
     val lastWrite: Option[LastWrite]) extends Product with Serializable {
+
+    @deprecated("Use the constructor with tag map", "0.19.1")
+    def this(
+      setName: String,
+      setVersion: Int,
+      me: String,
+      primary: Option[String],
+      hosts: Seq[String],
+      passives: Seq[String],
+      arbiters: Seq[String],
+      isSecondary: Boolean,
+      isArbiterOnly: Boolean,
+      isPassive: Boolean,
+      isHidden: Boolean,
+      tags: Option[P#Document],
+      electionId: Int,
+      lastWrite: Option[LastWrite]) =
+      this(setName, setVersion, me, primary, hosts, passives, arbiters,
+        isSecondary, isArbiterOnly, isPassive, isHidden,
+        Map.empty[String, String],
+        electionId, lastWrite)
 
     @deprecated("Use the constructor with lastWrite", "0.18.5")
     def this(
@@ -89,6 +110,38 @@ trait IsMasterCommand[P <: SerializationPack] {
       electionId: Int) = this(setName, setVersion, me,
       primary, hosts, passives, arbiters, isSecondary, isArbiterOnly,
       isPassive, isHidden, tags, electionId, None)
+
+    @deprecated("No longer a case class", "0.19.1")
+    def copy(
+      setName: String = this.setName,
+      me: String = this.me,
+      primary: Option[String] = this.primary,
+      hosts: Seq[String] = this.hosts,
+      passives: Seq[String] = this.passives,
+      arbiters: Seq[String] = this.arbiters,
+      isSecondary: Boolean = this.isSecondary,
+      isArbiterOnly: Boolean = this.isArbiterOnly,
+      isPassive: Boolean = this.isPassive,
+      isHidden: Boolean = this.isHidden,
+      tags: Option[P#Document] = None): ReplicaSet = new ReplicaSet(
+      setName, -1, me, primary, hosts, passives, arbiters, isSecondary,
+      isArbiterOnly, isPassive, isHidden, Map.empty[String, String], -1, None)
+
+    @deprecated("No longer a case class", "0.19.1")
+    def this(
+      setName: String,
+      me: String,
+      primary: Option[String],
+      hosts: Seq[String],
+      passives: Seq[String],
+      arbiters: Seq[String],
+      isSecondary: Boolean, // `secondary`
+      isArbiterOnly: Boolean, // `arbiterOnly`
+      isPassive: Boolean, // `passive`
+      isHidden: Boolean, // `hidden`
+      tags: Option[P#Document]) = this(setName, -1, me, primary, hosts,
+      passives, arbiters, isSecondary, isArbiterOnly, isPassive,
+      isHidden, tags, -1, None)
 
     // setVersion
     override lazy val toString = s"""ReplicaSet($setName, primary = $primary, me = $me, hosts = ${hosts.mkString("[", ",", "]")}, lastWrite = $lastWrite)"""
@@ -127,36 +180,6 @@ trait IsMasterCommand[P <: SerializationPack] {
     }
 
     override val productPrefix = "ReplicaSet"
-
-    def this(
-      setName: String,
-      me: String,
-      primary: Option[String],
-      hosts: Seq[String],
-      passives: Seq[String],
-      arbiters: Seq[String],
-      isSecondary: Boolean, // `secondary`
-      isArbiterOnly: Boolean, // `arbiterOnly`
-      isPassive: Boolean, // `passive`
-      isHidden: Boolean, // `hidden`
-      tags: Option[P#Document]) = this(setName, -1, me, primary, hosts,
-      passives, arbiters, isSecondary, isArbiterOnly, isPassive,
-      isHidden, tags, -1)
-
-    def copy(
-      setName: String = this.setName,
-      me: String = this.me,
-      primary: Option[String] = this.primary,
-      hosts: Seq[String] = this.hosts,
-      passives: Seq[String] = this.passives,
-      arbiters: Seq[String] = this.arbiters,
-      isSecondary: Boolean = this.isSecondary,
-      isArbiterOnly: Boolean = this.isArbiterOnly,
-      isPassive: Boolean = this.isPassive,
-      isHidden: Boolean = this.isHidden,
-      tags: Option[P#Document] = this.tags): ReplicaSet = new ReplicaSet(
-      setName, -1, me, primary, hosts, passives, arbiters, isSecondary,
-      isArbiterOnly, isPassive, isHidden, tags, -1)
   }
 
   object ReplicaSet extends scala.runtime.AbstractFunction11[String, String, Option[String], Seq[String], Seq[String], Seq[String], Boolean, Boolean, Boolean, Boolean, Option[P#Document], ReplicaSet] {
@@ -178,9 +201,10 @@ trait IsMasterCommand[P <: SerializationPack] {
       tags: Option[P#Document]): ReplicaSet = new ReplicaSet(
       setName,
       -1, me, primary, hosts, passives, arbiters, isSecondary,
-      isArbiterOnly, isPassive, isHidden, tags, -1)
+      isArbiterOnly, isPassive, isHidden, Map.empty[String, String], -1, None)
 
-    def unapply(rs: ReplicaSet): Option[(String, String, Option[String], Seq[String], Seq[String], Seq[String], Boolean, Boolean, Boolean, Boolean, Option[P#Document])] = Some((rs.setName, rs.me, rs.primary, rs.hosts, rs.passives, rs.arbiters, rs.isSecondary, rs.isArbiterOnly, rs.isPassive, rs.isHidden, rs.tags))
+    @deprecated("No longer a case class", "0.19.1")
+    def unapply(rs: ReplicaSet): Option[(String, String, Option[String], Seq[String], Seq[String], Seq[String], Boolean, Boolean, Boolean, Boolean, Option[P#Document])] = Some((rs.setName, rs.me, rs.primary, rs.hosts, rs.passives, rs.arbiters, rs.isSecondary, rs.isArbiterOnly, rs.isPassive, rs.isHidden, None))
   }
 
   class IsMasterResult private[commands] (
@@ -306,7 +330,7 @@ trait IsMasterCommand[P <: SerializationPack] {
     }
   }
 
-  private[api] def reader(pack: P)(implicit dr: pack.NarrowValueReader[Date], sr: pack.NarrowValueReader[String]): pack.Reader[IsMasterResult] = {
+  private[reactivemongo] def reader(pack: P)(implicit sr: pack.NarrowValueReader[String]): pack.Reader[IsMasterResult] = {
     val decoder = pack.newDecoder
 
     import decoder.{ booleanLike, int, long, string, values }
@@ -327,14 +351,18 @@ trait IsMasterCommand[P <: SerializationPack] {
         isArbiterOnly = booleanLike(doc, "arbiterOnly").getOrElse(false),
         isPassive = booleanLike(doc, "passive").getOrElse(false),
         isHidden = booleanLike(doc, "hidden").getOrElse(false),
-        tags = decoder.child(doc, "tags"),
+        tags = decoder.child(doc, "tags").map { doc =>
+          decoder.names(doc).flatMap { tag =>
+            string(doc, tag).map(tag -> _)
+          }.toMap
+        }.getOrElse(Map.empty),
         electionId = int(doc, "electionId").getOrElse(-1),
         lastWrite = decoder.child(doc, "lastWrite").flatMap { ld =>
           for {
             opTime <- long(ld, "opTime")
-            lastWriteDate <- decoder.read[Date](ld, "lastWriteDate")
+            lastWriteDate <- long(ld, "lastWriteDate").map(new Date(_))
             majorityOpTime <- long(ld, "majorityOpTime")
-            majorityWriteDate <- decoder.read[Date](ld, "majorityWriteDate")
+            majorityWriteDate <- long(ld, "majorityWriteDate").map(new Date(_))
           } yield new LastWrite(
             opTime.toLong, lastWriteDate,
             majorityOpTime.toLong, majorityWriteDate)

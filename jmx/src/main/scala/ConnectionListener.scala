@@ -335,8 +335,6 @@ final class Node private[jmx] (
   connection: String) extends NotificationBroadcasterSupport
   with NodeMBean with NotificationSupport {
 
-  import reactivemongo.bson.BSONDocument
-
   private var name = "unknown"
   private var aliases: String = null
   private var host = "unknown"
@@ -359,7 +357,7 @@ final class Node private[jmx] (
     val _connections = info.connections
     val _connected = info.connected
     val _authenticated = info.authenticated
-    val _tags = info.tags.fold[String](null)(BSONDocument.pretty(_))
+    val _tags = info._tags.mkString("{", ", ", "}")
     val _mongos = info.isMongos
 
     val _protocolMetadata = {

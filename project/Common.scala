@@ -44,7 +44,6 @@ object Common {
 
       Seq((sourceDirectory in Compile).value / jdir)
     },
-    testFrameworks ~= { _.filterNot(_ == TestFrameworks.ScalaTest) },
     scalacOptions in (Compile, doc) ++= Seq("-unchecked", "-deprecation",
       /*"-diagrams", */"-implicits", "-skip-packages", "samples"),
     scalacOptions in (Compile, doc) ++= Opts.doc.title("ReactiveMongo API"),
@@ -52,6 +51,7 @@ object Common {
     mappings in (Compile, packageBin) ~= filter,
     mappings in (Compile, packageSrc) ~= filter,
     mappings in (Compile, packageDoc) ~= filter,
+    testFrameworks ~= { _.filterNot(_ == TestFrameworks.ScalaTest) },
     closeableObject in Test := "Common$"
   ) ++ Publish.settings ++ Format.settings ++ (
     Release.settings ++ Publish.mimaSettings)

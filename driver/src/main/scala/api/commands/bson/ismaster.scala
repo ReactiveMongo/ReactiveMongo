@@ -49,7 +49,11 @@ object BSONIsMasterCommandImplicits {
             "passive").fold(false)(_.toBoolean),
           isHidden = doc.getAs[BSONBooleanLike]("hidden").
             fold(false)(_.toBoolean),
-          tags = doc.getAs[BSONDocument]("tags"),
+          tags = doc.getAs[BSONDocument]("tags").map {
+            _.elements.collect {
+              case BSONElement(tag, BSONString(v)) => tag -> v
+            }.toMap
+          }.getOrElse(Map.empty),
           electionId = doc.getAs[BSONNumberLike]("electionId").
             fold(-1)(_.toInt),
           lastWrite = doc.getAs[BSONDocument]("lastWrite").flatMap { ld =>

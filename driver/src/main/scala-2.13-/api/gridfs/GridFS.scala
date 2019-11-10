@@ -242,10 +242,10 @@ abstract class GridFS[P <: SerializationPack with Singleton] @deprecated("Intern
         }
       }
 
-      import reactivemongo.bson.utils.Converters
+      import reactivemongo.util
 
       @inline def finish(): Future[ReadFile[Id]] =
-        digestFinalize(md).map(_.map(Converters.hex2Str)).flatMap { md5Hex =>
+        digestFinalize(md).map(_.map(util.hex2Str)).flatMap { md5Hex =>
           finalizeFile[Id](file, previous, n, chunkSize, length.toLong, md5Hex)
         }
 
@@ -348,12 +348,29 @@ abstract class GridFS[P <: SerializationPack with Singleton] @deprecated("Intern
    */
   def ensureIndex()(implicit @deprecatedName(Symbol("ctx")) ec: ExecutionContext): Future[Boolean] = for {
     _ <- chunks.create(failsIfExists = false)
-    c <- chunks.indexesManager.ensure(
-      Index(List("files_id" -> Ascending, "n" -> Ascending), unique = true))
+    c <- chunks.indexesManager.ensure(Index(pack)(
+      key = List("files_id" -> Ascending, "n" -> Ascending),
+      name = None,
+      unique = true,
+      background = false,
+      dropDups = false,
+      sparse = false,
+      version = None,
+      partialFilter = None,
+      options = builder.document(Seq.empty)))
 
     _ <- files.create(failsIfExists = false)
-    f <- files.indexesManager.ensure(
-      Index(List("filename" -> Ascending, "uploadDate" -> Ascending)))
+    f <- files.indexesManager.ensure(Index(pack)(
+      key = List("filename" -> Ascending, "uploadDate" -> Ascending),
+      name = None,
+      unique = false,
+      background = false,
+      dropDups = false,
+      sparse = false,
+      version = None,
+      partialFilter = None,
+      options = builder.document(Seq.empty)))
+
   } yield (c && f)
 
   /**
@@ -472,35 +489,32 @@ abstract class GridFS[P <: SerializationPack with Singleton] @deprecated("Intern
 }
 
 object GridFS extends LowPriorityGridFS {
-  val apply = Factory
+  def apply[P <: SerializationPack with Singleton](
+    _pack: P,
+    db: DB with DBMetaCommands,
+    prefix: String)(implicit producer: GenericCollectionProducer[P, GenericCollection[P]]): GridFS[P] =
+    new GridFS(db, prefix)(producer) {
+      override lazy val pack: P = _pack
 
-  object Factory {
-    def apply[P <: SerializationPack with Singleton](
-      _pack: P,
-      db: DB with DBMetaCommands,
-      prefix: String)(implicit producer: GenericCollectionProducer[_pack.type, GenericCollection[_pack.type]]): GridFS[_pack.type] = {
-      new GridFS(db, prefix)(producer) {
-        override lazy val pack: _pack.type = _pack
+      override lazy val files = db(prefix + ".files")(producer).
+        asInstanceOf[GenericCollection[pack.type]]
 
-        override lazy val files = db(prefix + ".files")(producer)
-
-        override lazy val chunks = db(prefix + ".chunks")(producer)
-      }
+      override lazy val chunks = db(prefix + ".chunks")(producer).
+        asInstanceOf[GenericCollection[pack.type]]
     }
 
-    def apply(
-      db: DB with DBMetaCommands,
-      prefix: String): GridFS[Serialization.Pack] =
-      apply[Serialization.Pack](
-        Serialization.internalSerializationPack, db, prefix)
+  def apply(
+    db: DB with DBMetaCommands,
+    prefix: String): GridFS[Serialization.Pack] =
+    apply[Serialization.Pack](
+      Serialization.internalSerializationPack, db, prefix)
 
-    def apply(db: DB with DBMetaCommands): GridFS[Serialization.Pack] =
-      apply[Serialization.Pack](
-        Serialization.internalSerializationPack, db, prefix = "fs")
-  }
+  def apply(db: DB with DBMetaCommands): GridFS[Serialization.Pack] =
+    apply[Serialization.Pack](
+      Serialization.internalSerializationPack, db, prefix = "fs")
 }
 
-private[gridfs] trait LowPriorityGridFS {
+private[gridfs] sealed trait LowPriorityGridFS {
   @deprecated("Use `GridFS(_pack, db, prefix)`", "0.19.0")
   def apply[P <: SerializationPack with Singleton](db: DB with DBMetaCommands, prefix: String = "fs")(implicit producer: GenericCollectionProducer[P, GenericCollection[P]] = BSONCollectionProducer): GridFS[P] = new GridFS(db, prefix)(producer) {
     override lazy val pack = producer.pack

@@ -10,6 +10,7 @@ import reactivemongo.core.nodeset.{
   Node,
   NodeSet,
   NodeStatus,
+  PingInfo,
   ProtocolMetadata
 }
 
@@ -76,13 +77,16 @@ trait ConnectAllTest { _: NodeSetSpec =>
             authenticating = None,
             signaling = false)
 
-          Node(
+          new Node(
             host,
+            Set.empty,
             NodeStatus.Unknown,
             Vector(con),
             Set.empty,
-            None,
-            ProtocolMetadata.Default)
+            _tags = Map.empty[String, String],
+            ProtocolMetadata.Default,
+            PingInfo(),
+            false)
         }
       }
 
