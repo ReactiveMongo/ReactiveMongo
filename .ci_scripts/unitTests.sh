@@ -30,8 +30,6 @@ fi
 
 perl -pe "s|resolvers |resolvers += Resolver.sonatypeRepo(\"staging\"),\r\n    resolvers |" < "project/Common.scala" > /tmp/Common.scala && mv /tmp/Common.scala "project/Common.scala"
 
-cat "project/Common.scala"
-
 # JVM/SBT setup
 source "$SCRIPT_DIR/jvmopts.sh"
 
