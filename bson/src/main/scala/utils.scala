@@ -31,6 +31,10 @@ object Converters {
     new String(hex)
   }
 
+  @deprecated("Unused: will be removed", "0.19.1")
+  def md5Hex(string: String, encoding: String): String =
+    hex2Str(md5(string, encoding))
+
   /** Turns a hexadecimal String into an array of Byte. */
   def str2Hex(str: String): Array[Byte] = {
     val bytes = new Array[Byte](str.length / 2)
@@ -42,22 +46,7 @@ object Converters {
     bytes
   }
 
-  /**
-   * Returns the MD5 hash for the given `string`,
-   * and turns it into a hexadecimal String representation.
-   *
-   * @param string the string to be hashed
-   * @param encoding the string encoding/charset
-   */
-  def md5Hex(string: String, encoding: String): String =
-    hex2Str(md5(string, encoding))
-
-  /**
-   * Returns the MD5 hash of the given `string`.
-   *
-   * @param string the string to be hashed
-   * @param encoding the string encoding/charset
-   */
+  @deprecated("Unused: will be removed", "0.19.1")
   def md5(string: String, encoding: String): Array[Byte] =
     md5(string.getBytes(encoding))
 

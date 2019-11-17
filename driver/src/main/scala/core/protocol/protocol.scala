@@ -24,19 +24,6 @@ import reactivemongo.api.commands.GetLastError
 
 import reactivemongo.api.ReadPreference
 
-/**
- * A constructor of T instances from a [[http://netty.io/4.1/api/io/netty/buffer/ByteBuf.html ByteBuf]].
- *
- * @tparam T type which instances can be constructed with this.
- */
-trait ChannelBufferReadable[T] {
-  /** Makes an instance of T from the data from the given buffer. */
-  def readFrom(buffer: ByteBuf): T
-
-  /** @see readFrom */
-  def apply(buffer: ByteBuf): T = readFrom(buffer)
-}
-
 // concrete classes
 
 /**
@@ -73,6 +60,7 @@ case class CheckedWriteRequest(
  * @param documents body of this request, a [[http://netty.io/4.1/api/io/netty/buffer/ByteBuf.html ByteBuf]] containing 0, 1, or many documents.
  * @param channelIdHint a hint for sending this request on a particular channel.
  */
+@deprecated("Internal: will be private", "0.19.1")
 case class RequestMaker(
   op: RequestOp,
   documents: BufferSequence = BufferSequence.empty,

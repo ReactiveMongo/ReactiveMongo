@@ -45,7 +45,7 @@ class BSONBooleanHandlerBenchmark extends HandlerBenchmark[BSONBoolean] {
   val handler = BSONBooleanHandler
   lazy val unsafeHandler = handler.beforeRead {
     case b @ BSONBoolean(_) => b
-    case _ => sys.error("Fail")
+    case _                  => sys.error("Fail")
   }
 }
 
@@ -56,7 +56,7 @@ class BSONDateTimeHandlerBenchmark extends HandlerBenchmark[BSONDateTime] {
   val handler = BSONDateTimeHandler
   lazy val unsafeHandler = handler.beforeRead {
     case dt @ BSONDateTime(_) => dt
-    case _ => sys.error("Fail")
+    case _                    => sys.error("Fail")
   }
 }
 
@@ -64,13 +64,13 @@ class BSONDateTimeHandlerBenchmark extends HandlerBenchmark[BSONDateTime] {
 class BSONDecimalHandlerBenchmark extends HandlerBenchmark[BSONDecimal] {
   val values = BSONValueFixtures.bsonDecimalFixtures.filter {
     case BSONDecimal.NegativeZero => false
-    case dec => !dec.isInfinite && !dec.isNaN
+    case dec                      => !dec.isInfinite && !dec.isNaN
   }
 
   val handler = BSONDecimalHandler
   lazy val unsafeHandler = handler.beforeRead {
     case dec: BSONDecimal => dec
-    case _ => sys.error("Fail")
+    case _                => sys.error("Fail")
   }
 }
 
@@ -81,7 +81,7 @@ class BSONDoubleHandlerBenchmark extends HandlerBenchmark[BSONDouble] {
   val handler = BSONDoubleHandler
   lazy val unsafeHandler = handler.beforeRead {
     case d @ BSONDouble(_) => d
-    case _ => sys.error("Fail")
+    case _                 => sys.error("Fail")
   }
 }
 
@@ -92,7 +92,7 @@ class BSONIntegerHandlerBenchmark extends HandlerBenchmark[BSONInteger] {
   val handler = BSONIntegerHandler
   lazy val unsafeHandler = handler.beforeRead {
     case i @ BSONInteger(_) => i
-    case _ => sys.error("Fail")
+    case _                  => sys.error("Fail")
   }
 }
 
@@ -103,7 +103,7 @@ class BSONLongHandlerBenchmark extends HandlerBenchmark[BSONLong] {
   val handler = BSONLongHandler
   lazy val unsafeHandler = handler.beforeRead {
     case l @ BSONLong(_) => l
-    case _ => sys.error("Fail")
+    case _               => sys.error("Fail")
   }
 }
 
@@ -114,7 +114,7 @@ class BSONStringHandlerBenchmark extends HandlerBenchmark[BSONString] {
   val handler = BSONStringHandler
   lazy val unsafeHandler = handler.beforeRead {
     case str @ BSONString(_) => str
-    case _ => sys.error("Fail")
+    case _                   => sys.error("Fail")
   }
 }
 
@@ -125,6 +125,6 @@ class BSONBinaryHandlerBenchmark extends HandlerBenchmark[BSONBinary] {
   val handler = BSONBinaryHandler
   lazy val unsafeHandler = handler.beforeRead {
     case bin @ BSONBinary(_, _) => bin
-    case _ => sys.error("Fail")
+    case _                      => sys.error("Fail")
   }
 }

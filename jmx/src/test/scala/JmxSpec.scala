@@ -124,7 +124,7 @@ class JmxSpec(implicit ee: ExecutionEnv)
                 "", // aliases
                 host,
                 port.toString,
-                null.asInstanceOf[String], // tags
+                "{}", // tags
                 "minWireVersion = 3.0, maxWireVersion = 3.0, maxMessageSizeBytes = 48000000, maxBsonSize = 16777216, maxBulkSize = 1000", // protocol metadata
                 "false" // mongos
               ))

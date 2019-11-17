@@ -9,12 +9,15 @@ import scala.reflect.ClassTag
 import scala.util.Try
 
 import reactivemongo.bson.{ BSONDocument, BSONValue }
-import reactivemongo.bson.buffer.{ ReadableBuffer, WritableBuffer }
+import reactivemongo.bson.buffer.{
+  ReadableBuffer,
+  WritableBuffer => LegacyWritable
+}
 
 import reactivemongo.core.protocol.Response
 import reactivemongo.core.netty.ChannelBufferReadableBuffer
 
-trait SerializationPack { self: Singleton =>
+trait SerializationPack extends SerializationPackCompat { self: Singleton =>
   type Value
   type ElementProducer
   type Document <: Value
@@ -36,13 +39,13 @@ trait SerializationPack { self: Singleton =>
   def deserialize[A](document: Document, reader: Reader[A]): A
 
   @deprecated("Internal: will be private", "0.19.1")
-  def writeToBuffer(buffer: WritableBuffer, document: Document): WritableBuffer
+  def writeToBuffer(buffer: LegacyWritable, document: Document): LegacyWritable
 
   @deprecated("Internal: will be private", "0.19.1")
   def readFromBuffer(buffer: ReadableBuffer): Document
 
   @deprecated("Internal: will be private", "0.19.1")
-  def serializeAndWrite[A](buffer: WritableBuffer, document: A, writer: Writer[A]): WritableBuffer = writeToBuffer(buffer, serialize(document, writer))
+  def serializeAndWrite[A](buffer: LegacyWritable, document: A, writer: Writer[A]): LegacyWritable = writeToBuffer(buffer, serialize(document, writer))
 
   @deprecated("Internal: will be private", "0.19.1")
   def readAndDeserialize[A](buffer: ReadableBuffer, reader: Reader[A]): A =

@@ -15,7 +15,11 @@
  */
 package reactivemongo.core.commands
 
-import reactivemongo.api.{ ReadPreference, SerializationPack }
+import reactivemongo.api.{
+  BSONSerializationPack,
+  ReadPreference,
+  SerializationPack
+}
 
 import reactivemongo.bson.{ BSONDocument, BSONNumberLike }
 import reactivemongo.core.errors.ReactiveMongoException
@@ -109,9 +113,9 @@ trait CommandResultMaker[Result] {
 }
 
 trait BSONCommandResultMaker[Result] extends CommandResultMaker[Result] {
-  protected type Pack = reactivemongo.api.BSONSerializationPack.type
+  protected type Pack = BSONSerializationPack.type
 
-  protected val pack: Pack = reactivemongo.api.BSONSerializationPack
+  protected val pack: Pack = BSONSerializationPack
 
   final override def apply(response: Response): Either[CommandError, Result] =
     super.apply(response)
@@ -209,7 +213,7 @@ class MakableCommand(val db: String, val command: Command[_]) {
    */
   def maker = RequestMaker(
     makeQuery,
-    BufferSequence.single(command.makeDocuments))
+    BufferSequence.single(BSONSerializationPack)(command.makeDocuments))
 
   /**
    * Returns the [[reactivemongo.core.protocol.RequestMaker]] for the given command, using the given ReadPreference.
@@ -223,6 +227,7 @@ class MakableCommand(val db: String, val command: Command[_]) {
 
     RequestMaker(
       query.copy(flags = flags),
-      BufferSequence.single(command.makeDocuments), readPreference)
+      BufferSequence.single(BSONSerializationPack)(command.makeDocuments),
+      readPreference)
   }
 }

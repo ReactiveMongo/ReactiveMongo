@@ -11,6 +11,7 @@ import reactivemongo.api.indexes.{ Index, IndexType }, IndexType.{
 import reactivemongo.api.commands.CommandError
 import reactivemongo.core.errors.DatabaseException
 
+import reactivemongo.api.tests.{ decoder, pack, indexOptions, Pack }
 import reactivemongo.api.TestCompat._
 
 import org.specs2.concurrent.ExecutionEnv
@@ -58,7 +59,7 @@ final class IndexesSpec(implicit ee: ExecutionEnv)
 
     {
       def spec(c: BSONCollection, timeout: FiniteDuration) =
-        c.indexesManager.ensure(Index(
+        c.indexesManager.ensure(index(
           List("loc" -> Geo2D),
           options = LegacyDoc("min" -> -95, "max" -> 95, "bits" -> 28))).
           aka("index") must beTrue.await(1, timeout * 2)
@@ -91,9 +92,13 @@ final class IndexesSpec(implicit ee: ExecutionEnv)
         }.filter(!_.isEmpty).map(_.apply(0))
 
         future must beLike[Index] {
-          case Index(Seq(("loc", Geo2D)), _, _, _, _, _, _, _, opts) =>
-            def int(n: String) =
-              opts.getAs[reactivemongo.bson.BSONNumberLike](n).map(_.toInt)
+          case idx @ Index.Key(("loc", Geo2D)) =>
+            lazy val opts = idx match {
+              case i: Index.Aux[Pack] => indexOptions(i)
+              case _                  => ???
+            }
+
+            def int(n: String) = decoder.int(opts, n)
 
             int("min") must beSome(-95) and {
               int("max") must beSome(95)
@@ -130,7 +135,7 @@ final class IndexesSpec(implicit ee: ExecutionEnv)
 
     "make index" in {
       geo2DSpherical.indexesManager.ensure(
-        Index(List("loc" -> Geo2DSpherical))) must beTrue.await(1, timeout * 2)
+        index(List("loc" -> Geo2DSpherical))) must beTrue.await(1, timeout * 2)
     }
 
     "retrieve indexes" in {
@@ -152,7 +157,7 @@ final class IndexesSpec(implicit ee: ExecutionEnv)
     }
 
     "make index" in {
-      hashed.indexesManager.ensure(Index(List("field" -> Hashed))).
+      hashed.indexesManager.ensure(index(List("field" -> Hashed))).
         aka("index") must beTrue.await(1, timeout)
     }
 
@@ -178,13 +183,13 @@ final class IndexesSpec(implicit ee: ExecutionEnv)
 
     "be first created" in {
       col.create().flatMap { _ =>
-        col.indexesManager.ensure(Index(
+        col.indexesManager.ensure(index(
           Seq("token" -> IndexType.Ascending), unique = true))
       } aka "index creation" must beTrue.await(1, timeout * 2)
     }
 
     "not be created if already exists" in {
-      col.indexesManager.ensure(Index(
+      col.indexesManager.ensure(index(
         Seq("token" -> IndexType.Ascending), unique = true)).
         aka("index creation") must beFalse.await(1, timeout * 2)
 
@@ -219,7 +224,7 @@ final class IndexesSpec(implicit ee: ExecutionEnv)
     } tag "not_mongo26"
 
     "fail with already inserted documents" in {
-      val idx = Index(
+      val idx = index(
         key = Seq("age" -> IndexType.Ascending),
         unique = true)
 
@@ -232,7 +237,7 @@ final class IndexesSpec(implicit ee: ExecutionEnv)
     } tag "not_mongo26"
 
     "be created" in {
-      partial.indexesManager.create(Index(
+      partial.indexesManager.create(index(
         key = Seq("username" -> IndexType.Ascending),
         unique = true,
         partialFilter = Some(LegacyDoc(
@@ -270,7 +275,7 @@ final class IndexesSpec(implicit ee: ExecutionEnv)
     lazy val mngr = coll.indexesManager
 
     val name = "mySearchIndex"
-    val textIndex = Index(
+    val textIndex = index(
       Seq(
         "someFieldA" -> IndexType.Text,
         "someFieldB" -> IndexType.Text),
@@ -286,4 +291,18 @@ final class IndexesSpec(implicit ee: ExecutionEnv)
       mngr.ensure(textIndex) must beFalse.await(0, timeout)
     }
   }
+
+  // ---
+
+  def index(
+    key: Seq[(String, IndexType)],
+    name: Option[String] = None,
+    unique: Boolean = false,
+    background: Boolean = false,
+    dropDups: Boolean = false,
+    sparse: Boolean = false,
+    version: Option[Int] = None, // let MongoDB decide
+    partialFilter: Option[BSONDocument] = None,
+    options: BSONDocument = BSONDocument.empty) = Index[Pack](pack)(key, name, unique, background, dropDups, sparse, version, partialFilter, options)
+
 }

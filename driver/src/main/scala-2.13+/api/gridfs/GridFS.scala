@@ -19,8 +19,6 @@ import java.io.{ InputStream, OutputStream }
 import java.util.Arrays
 import java.security.MessageDigest
 
-import scala.reflect.ClassTag
-
 import scala.concurrent.{ ExecutionContext, Future }
 
 import reactivemongo.api.{
@@ -31,7 +29,6 @@ import reactivemongo.api.{
   DBMetaCommands,
   FailoverStrategy,
   QueryOpts,
-  ReadConcern,
   ReadPreference,
   Serialization,
   SerializationPack
@@ -47,14 +44,8 @@ import reactivemongo.api.commands.{
 }
 
 import reactivemongo.core.errors.ReactiveMongoException
-import reactivemongo.core.netty.ChannelBufferWritableBuffer
 
-import reactivemongo.api.collections.{
-  GenericCollection,
-  GenericCollectionProducer,
-  GenericQueryBuilder
-}
-import reactivemongo.api.collections.bson.BSONCollectionProducer
+import reactivemongo.api.collections.{ GenericCollection, GenericQueryBuilder }
 
 import reactivemongo.api.indexes.{ Index, IndexType }, IndexType.Ascending
 
@@ -121,7 +112,7 @@ sealed trait GridFS[P <: SerializationPack]
    *   BSONDocument("filename" -> n)).headOption
    * }}}
    */
-  def find[S, Id <: pack.Value](selector: S)(implicit w: pack.Writer[S], ec: ExecutionContext, r: FileReader[Id], cp: CursorProducer[ReadFile[Id]]): cp.ProducedCursor = {
+  def find[S, Id <: pack.Value](selector: S)(implicit w: pack.Writer[S], r: FileReader[Id], cp: CursorProducer[ReadFile[Id]]): cp.ProducedCursor = {
     val q = pack.serialize(selector, w) // TODO: Unsafe, failed cursor?
     val query = new QueryBuilder(fileColl, db.failoverStrategy, Some(q), None)
 
@@ -153,7 +144,7 @@ sealed trait GridFS[P <: SerializationPack]
    */
   def chunks(
     file: ReadFile[pack.Value],
-    readPreference: ReadPreference = defaultReadPreference)(implicit ec: ExecutionContext, cp: CursorProducer[Array[Byte]]): cp.ProducedCursor = {
+    readPreference: ReadPreference = defaultReadPreference)(implicit cp: CursorProducer[Array[Byte]]): cp.ProducedCursor = {
     val selectorOpts = chunkSelector(file)
     val sortOpts = document(Seq(elem("n", builder.int(1))))
     implicit def reader = chunkReader
@@ -237,10 +228,10 @@ sealed trait GridFS[P <: SerializationPack]
         }
       }
 
-      import reactivemongo.bson.utils.Converters
+      import reactivemongo.util
 
       @inline def finish(): Future[ReadFile[Id]] =
-        digestFinalize(md).map(_.map(Converters.hex2Str)).flatMap { md5Hex =>
+        digestFinalize(md).map(_.map(util.hex2Str)).flatMap { md5Hex =>
           finalizeFile[Id](file, previous, n, chunkSize, length.toLong, md5Hex)
         }
 
@@ -320,12 +311,28 @@ sealed trait GridFS[P <: SerializationPack]
 
     for {
       _ <- create(chunkColl)
-      c <- indexMngr.onCollection(chunkColl.name).ensure(
-        Index(List("files_id" -> Ascending, "n" -> Ascending), unique = true))
+      c <- indexMngr.onCollection(chunkColl.name).ensure(Index(pack)(
+        key = List("files_id" -> Ascending, "n" -> Ascending),
+        name = None,
+        unique = true,
+        background = false,
+        dropDups = false,
+        sparse = false,
+        version = None, // let MongoDB decide
+        partialFilter = None,
+        options = builder.document(Seq.empty)))
 
       _ <- create(fileColl)
-      f <- indexMngr.onCollection(fileColl.name).ensure(
-        Index(List("filename" -> Ascending, "uploadDate" -> Ascending)))
+      f <- indexMngr.onCollection(fileColl.name).ensure(Index(pack)(
+        key = List("filename" -> Ascending, "uploadDate" -> Ascending),
+        name = None,
+        unique = false,
+        background = false,
+        dropDups = false,
+        sparse = false,
+        version = None, // let MongoDB decide
+        partialFilter = None,
+        options = builder.document(Seq.empty)))
     } yield (c && f)
   }
 
@@ -594,7 +601,7 @@ object GridFS {
   def apply[P <: SerializationPack with Singleton](
     _pack: P,
     db: DB with DBMetaCommands,
-    prefix: String)(implicit producer: CollectionProducer[GenericCollection[P]]): GridFS[P] = {
+    prefix: String): GridFS[P] = {
     def _prefix = prefix
     def _db = db
 
@@ -607,17 +614,11 @@ object GridFS {
 
   def apply(
     db: DB with DBMetaCommands,
-    prefix: String): GridFS[Serialization.Pack] = {
-    import Serialization.defaultCollectionProducer
-
+    prefix: String): GridFS[Serialization.Pack] =
     apply[Serialization.Pack](
       Serialization.internalSerializationPack, db, prefix)
-  }
 
-  def apply(db: DB with DBMetaCommands): GridFS[Serialization.Pack] = {
-    import Serialization.defaultCollectionProducer
-
+  def apply(db: DB with DBMetaCommands): GridFS[Serialization.Pack] =
     apply[Serialization.Pack](
       Serialization.internalSerializationPack, db, prefix = "fs")
-  }
 }

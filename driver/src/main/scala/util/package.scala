@@ -28,6 +28,43 @@ import reactivemongo.core.errors.GenericDriverException
 package object util extends UtilCompat {
   import scala.language.implicitConversions
 
+  private val HEX_CHARS: Array[Char] = "0123456789abcdef".toCharArray
+
+  /** Turns an array of Byte into a String representation in hexadecimal. */
+  private[reactivemongo] def hex2Str(bytes: Array[Byte]): String = {
+    val hex = new Array[Char](2 * bytes.length)
+    var i = 0
+    while (i < bytes.length) {
+      hex(2 * i) = HEX_CHARS((bytes(i) & 0xF0) >>> 4)
+      hex(2 * i + 1) = HEX_CHARS(bytes(i) & 0x0F)
+      i = i + 1
+    }
+    new String(hex)
+  }
+
+  /**
+   * Returns the MD5 hash for the given `string`,
+   * and turns it into a hexadecimal String representation.
+   *
+   * @param string the string to be hashed
+   * @param encoding the string encoding/charset
+   */
+  private[reactivemongo] def md5Hex(string: String, encoding: String): String =
+    hex2Str(md5(string, encoding))
+
+  /**
+   * Returns the MD5 hash of the given `string`.
+   *
+   * @param string the string to be hashed
+   * @param encoding the string encoding/charset
+   */
+  private def md5(string: String, encoding: String): Array[Byte] =
+    md5(string.getBytes(encoding))
+
+  /** Computes the MD5 hash of the given `bytes`. */
+  private def md5(bytes: Array[Byte]): Array[Byte] =
+    java.security.MessageDigest.getInstance("MD5").digest(bytes)
+
   /** Makes an option of the value matching the condition. */
   def option[T](cond: => Boolean, value: => T): Option[T] =
     if (cond) Some(value) else None

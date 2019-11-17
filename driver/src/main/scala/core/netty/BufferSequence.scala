@@ -17,7 +17,7 @@ package reactivemongo.core.netty
 
 import reactivemongo.io.netty.buffer.{ ByteBuf, Unpooled }
 
-import reactivemongo.bson.BSONDocument
+import reactivemongo.bson.{ BSONDocument => LegacyDoc }
 
 case class BufferSequence(
   private val head: ByteBuf,
@@ -29,12 +29,12 @@ case class BufferSequence(
     Unpooled.wrappedBuffer((head +: tail): _*)
 }
 
-object BufferSequence {
+object BufferSequence extends BufferSequenceCompat {
   /** Returns an empty buffer sequence. */
   val empty: BufferSequence = BufferSequence(Unpooled.EMPTY_BUFFER)
 
   /** Returns a new channel buffer with the give `document` written on. */
-  private[reactivemongo] def single(document: BSONDocument): BufferSequence =
+  @deprecated("Will be removed", "0.19.1")
+  private[reactivemongo] def single(document: LegacyDoc): BufferSequence =
     BufferSequence(ChannelBufferWritableBuffer single document)
-
 }
