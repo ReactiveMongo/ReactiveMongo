@@ -242,8 +242,8 @@ class SerializationSpec extends org.specs2.mutable.Specification {
     "be 0 for any BSON constant" >> {
       Fragments.foreach(bsonConstFixtures) { bsonConst =>
         s"like $bsonConst" in {
-          bsonConst.byteSize must_== 0 and {
-            written(bsonConst) must_== 0
+          bsonConst.byteSize must_=== 0 and {
+            written(bsonConst) must_=== 0
           }
         }
       }
@@ -252,8 +252,8 @@ class SerializationSpec extends org.specs2.mutable.Specification {
     "be the Double one (8) for any BSONDouble" >> {
       Fragments.foreach(bsonDoubleFixtures) { bsonDouble =>
         s"like $bsonDouble" in {
-          bsonDouble.byteSize must_== 8 and {
-            written(bsonDouble) must_== 8
+          bsonDouble.byteSize must_=== 8 and {
+            written(bsonDouble) must_=== 8
           }
         }
       }
@@ -262,8 +262,8 @@ class SerializationSpec extends org.specs2.mutable.Specification {
     "be the Long one (8) for any BSONLong" >> {
       Fragments.foreach(bsonLongFixtures) { bsonLong =>
         s"like $bsonLong" in {
-          bsonLong.byteSize must_== 8 and {
-            written(bsonLong) must_== 8
+          bsonLong.byteSize must_=== 8 and {
+            written(bsonLong) must_=== 8
           }
         }
       }
@@ -272,8 +272,8 @@ class SerializationSpec extends org.specs2.mutable.Specification {
     "be the Long one (8) for any BSONDateTime" >> {
       Fragments.foreach(bsonDateTimeFixtures) { bsonDateTime =>
         s"like $bsonDateTime" in {
-          bsonDateTime.byteSize must_== 8 and {
-            written(bsonDateTime) must_== 8
+          bsonDateTime.byteSize must_=== 8 and {
+            written(bsonDateTime) must_=== 8
           }
         }
       }

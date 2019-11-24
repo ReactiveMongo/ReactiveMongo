@@ -4,16 +4,14 @@ import scala.util.Random
 
 import org.openjdk.jmh.annotations._
 
-import reactivemongo.bson.buffer.{
-  ArrayBSONBuffer,
-  WritableBuffer
-}
+import reactivemongo.bson.buffer.{ ArrayBSONBuffer, WritableBuffer, ReadableBuffer }
 
 @State(Scope.Benchmark)
 class WritableBufferBenchmark {
   private var bytes: Array[Byte] = null
   private var emptyBuffer: ArrayBSONBuffer = null
-  private var bytesBuffer: ArrayBSONBuffer = null
+  private var outputBuffer: ArrayBSONBuffer = null
+  private var bytesBuffer: ReadableBuffer = _
 
   @Setup(Level.Iteration)
   def setup(): Unit = {
@@ -21,12 +19,13 @@ class WritableBufferBenchmark {
     Random.nextBytes(bytes)
 
     emptyBuffer = new ArrayBSONBuffer()
-    bytesBuffer = new ArrayBSONBuffer().writeBytes(bytes)
+    outputBuffer = new ArrayBSONBuffer().writeBytes(bytes)
+    bytesBuffer = outputBuffer.toReadableBuffer
   }
 
   @Benchmark
   def toReadableBuffer(): Unit = {
-    assert(bytesBuffer.toReadableBuffer.size == bytes.size)
+    assert(outputBuffer.toReadableBuffer.size == bytes.size)
   }
 
   @Benchmark // Only for internal testing, not part of runtime/API
@@ -42,7 +41,11 @@ class WritableBufferBenchmark {
   def writeBytesArray(): ArrayBSONBuffer = emptyBuffer.writeBytes(bytes)
 
   @Benchmark
-  def writeByte(): WritableBuffer = emptyBuffer.writeByte(0x04: Byte)
+  def writeBytesBuf(): WritableBuffer =
+    emptyBuffer.writeBytes(bytesBuffer)
+
+  @Benchmark
+  def writeByte() = emptyBuffer.writeByte(0x04: Byte)
 
   @Benchmark
   def writeInt(): WritableBuffer = emptyBuffer.writeInt(20)
@@ -55,7 +58,7 @@ class WritableBufferBenchmark {
 
   @Benchmark
   def array(): Array[Byte] = {
-    val res = bytesBuffer.array
+    val res = outputBuffer.array
     assert(java.util.Arrays.equals(bytes, res))
     res
   }
