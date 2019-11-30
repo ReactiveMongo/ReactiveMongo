@@ -201,7 +201,8 @@ trait GenericCollection[P <: SerializationPack with Singleton]
           case CountCommand.HintDocument(d) => self.hint(d)
         }
       },
-      readConcern = self.readConcern).map(_.toInt)
+      readConcern = self.readConcern,
+      readPreference = self.readPreference).map(_.toInt)
 
   /**
    * Counts the matching documents.
@@ -219,7 +220,26 @@ trait GenericCollection[P <: SerializationPack with Singleton]
     skip: Int,
     hint: Option[Hint[pack.type]],
     readConcern: ReadConcern)(implicit ec: ExecutionContext): Future[Long] =
-    countDocuments(selector, limit, skip, hint, readConcern)
+    countDocuments(selector, limit, skip, hint, readConcern, self.readPreference)
+
+  /**
+   * Counts the matching documents.
+   * @see $queryLink
+   *
+   * @param selector $selectorParam
+   * @param limit the maximum number of matching documents to count
+   * @param skip the number of matching documents to skip before counting
+   * @param hint the index to use (either the index name or the index document; see `hint(..)`)
+   * @param readConcern $readConcernParam
+   * @param readPreference $readPrefParam
+   */
+  def count(
+    selector: Option[pack.Document],
+    limit: Option[Int],
+    skip: Int,
+    hint: Option[Hint[pack.type]],
+    readConcern: ReadConcern,
+    readPreference: ReadPreference)(implicit ec: ExecutionContext): Future[Long] = countDocuments(selector, limit, skip, hint, readConcern, readPreference)
 
   /**
    * Inserts a document into the collection and waits for the [[reactivemongo.api.commands.WriteResult]].
