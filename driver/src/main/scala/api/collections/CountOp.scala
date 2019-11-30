@@ -4,7 +4,7 @@ import scala.concurrent.{ ExecutionContext, Future }
 
 import reactivemongo.core.protocol.MongoWireVersion
 
-import reactivemongo.api.{ ReadConcern, SerializationPack }
+import reactivemongo.api.{ ReadConcern, ReadPreference, SerializationPack }
 
 import reactivemongo.api.commands.{
   CollectionCommand,
@@ -24,11 +24,12 @@ private[api] trait CountOp[P <: SerializationPack with Singleton] {
     limit: Option[Int],
     skip: Int,
     hint: Option[Hint[pack.type]],
-    readConcern: ReadConcern)(
+    readConcern: ReadConcern,
+    readPreference: ReadPreference)(
     implicit
     ec: ExecutionContext): Future[Long] = runCommand(
     new CountCommand(query, limit, skip, hint, readConcern),
-    collection.readPreference)
+    readPreference)
 
   private final class CountCommand(
     val query: Option[pack.Document],

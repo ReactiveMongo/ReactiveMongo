@@ -150,4 +150,6 @@ lazy val benchmarks = (project in file("benchmarks")).
       libraryDependencies += organization.value % "reactivemongo-shaded" % version.value
     )
   ).
-  dependsOn(`ReactiveMongo-BSON` % "compile->test")
+  dependsOn(
+    `ReactiveMongo-BSON` % "compile->test",
+    `ReactiveMongo`)

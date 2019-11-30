@@ -36,73 +36,73 @@ final class HandlerConverterSpec
   import reactivemongo.api.bson.compat._
 
   "Converters" should {
+    "from legacy" >> {
+      s"convert legacy reader" in {
+        implicit val lr = LegacyReader[LegacyValue, Long] { _ => 1L }
+        def br: BSONReader[Long] = lr
+
+        toReader(lr).readTry(BSONLong(2L)) must beSuccessfulTry(1L) and {
+          br.readTry(BSONLong(3L)) must beSuccessfulTry(1L)
+        }
+      }
+
+      "convert legacy handler" in {
+        object Foo
+
+        implicit val lh = LegacyHandler[LegacyInteger, Foo.type](
+          _ => Foo,
+          _ => LegacyInteger(1))
+
+        def bh: BSONHandler[Foo.type] = lh
+
+        bh.writeTry(Foo) must beSuccessfulTry(BSONInteger(1)) and {
+          bh.readTry(BSONInteger(2)) must beSuccessfulTry(Foo)
+        }
+      }
+    }
+
+    "to legacy" >> {
+      s"convert reader to BSON" in {
+        implicit val br = BSONReader[Unit] { _ => () }
+        def lr: LegacyReader[LegacyValue, Unit] = br
+
+        fromReader(br).read(LegacyInteger(1)) must_=== ({}) and {
+          lr.read(LegacyInteger(2)) must_=== ({})
+        }
+      }
+
+      "convert handler to BSON" in {
+        object Bar
+
+        implicit val bh = BSONHandler[Bar.type](
+          _ => Bar,
+          _ => BSONDouble(1.2D))
+
+        def lh: LegacyHandler[LegacyValue, Bar.type] = bh
+
+        lh.write(Bar) must_=== LegacyDouble(1.2D) and {
+          lh.read(LegacyDouble(3.4D)) must_=== Bar
+        }
+      }
+    }
+
     Fragment.foreach(fixtures) {
       case (legacy, bson) =>
-        "from legacy" >> {
-          s"convert reader for $legacy" in {
-            implicit val lr = LegacyReader[LegacyValue, Long] { _ => 1L }
-            def br: BSONReader[Long] = lr
+        s"convert writer for $legacy" in {
+          implicit val lw = LegacyWriter[Unit, LegacyValue] { _ => legacy }
+          def bw: BSONWriter[Unit] = lw
 
-            toReader(lr).readTry(BSONLong(2L)) must beSuccessfulTry(1L) and {
-              br.readTry(BSONLong(3L)) must beSuccessfulTry(1L)
-            }
-          }
-
-          s"convert writer for $legacy" in {
-            implicit val lw = LegacyWriter[Unit, LegacyValue] { _ => legacy }
-            def bw: BSONWriter[Unit] = lw
-
-            toWriter(lw).writeTry({}) must beSuccessfulTry(bson) and {
-              bw.writeTry({}) must beSuccessfulTry(bson)
-            }
-          }
-
-          s"convert handler for $legacy" in {
-            object Foo
-
-            implicit val lh = LegacyHandler[LegacyInteger, Foo.type](
-              _ => Foo,
-              _ => LegacyInteger(1))
-
-            def bh: BSONHandler[Foo.type] = lh
-
-            bh.writeTry(Foo) must beSuccessfulTry(BSONInteger(1)) and {
-              bh.readTry(BSONInteger(2)) must beSuccessfulTry(Foo)
-            }
+          toWriter(lw).writeTry({}) must beSuccessfulTry(bson) and {
+            bw.writeTry({}) must beSuccessfulTry(bson)
           }
         }
 
-        "to legacy" >> {
-          s"convert reader to $bson" in {
-            implicit val br = BSONReader[Unit] { _ => () }
-            def lr: LegacyReader[LegacyValue, Unit] = br
+        s"convert writer to $bson" in {
+          implicit val bw = BSONWriter[Int] { _ => bson }
+          def lw: LegacyWriter[Int, LegacyValue] = bw
 
-            fromReader(br).read(LegacyInteger(1)) must_=== ({}) and {
-              lr.read(LegacyInteger(2)) must_=== ({})
-            }
-          }
-
-          s"convert writer to $bson" in {
-            implicit val bw = BSONWriter[Int] { _ => bson }
-            def lw: LegacyWriter[Int, LegacyValue] = bw
-
-            fromWriter(bw).write(1) must_=== legacy and {
-              lw.write(2) must_=== legacy
-            }
-          }
-
-          s"convert handler to $bson" in {
-            object Bar
-
-            implicit val bh = BSONHandler[Bar.type](
-              _ => Bar,
-              _ => BSONDouble(1.2D))
-
-            def lh: LegacyHandler[LegacyValue, Bar.type] = bh
-
-            lh.write(Bar) must_=== LegacyDouble(1.2D) and {
-              lh.read(LegacyDouble(3.4D)) must_=== Bar
-            }
+          fromWriter(bw).write(1) must_=== legacy and {
+            lw.write(2) must_=== legacy
           }
         }
     }
@@ -124,7 +124,9 @@ final class HandlerConverterSpec
       }
 
       "in reader" in {
-        implicit val lr: LegacyDocReader[Float] = LegacyDocReader[Float](_ => 1.2F)
+        implicit val lr: LegacyDocReader[Float] =
+          LegacyDocReader[Float](_ => 1.2F)
+
         def br1: BSONDocumentReader[Float] = lr
         def br2 = implicitly[BSONDocumentReader[Float]]
 

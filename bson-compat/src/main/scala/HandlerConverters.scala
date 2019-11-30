@@ -49,7 +49,7 @@ trait HandlerConverters extends LowPriorityHandlerConverters1 {
    * Implicit conversion from legacy `BSONDocumentHandler` to the new API.
    *
    * {{{
-   * import reactivemongo.api.bson.HandlerConverters.toDocumentHandler
+   * import reactivemongo.api.bson.compat.HandlerConverters.toDocumentHandler
    *
    * def foo[T](lh: reactivemongo.bson.BSONDocumentHandler[T]) = {
    *   val h: reactivemongo.api.bson.BSONDocumentHandler[T] = lh
@@ -63,7 +63,7 @@ trait HandlerConverters extends LowPriorityHandlerConverters1 {
    * Implicit conversion from new `BSONDocumentHandler` to the legacy API.
    *
    * {{{
-   * import reactivemongo.api.bson.HandlerConverters.fromDocumentHandler
+   * import reactivemongo.api.bson.compat.HandlerConverters.fromDocumentHandler
    *
    * def bar[T](lh: reactivemongo.api.bson.BSONDocumentHandler[T]) = {
    *   val h: reactivemongo.bson.BSONDocumentHandler[T] = lh
@@ -125,7 +125,7 @@ private[bson] sealed trait LowPriorityHandlerConverters2
 
   /**
    * {{{
-   * import reactivemongo.api.bson.HandlerConverters.toDocumentWriter
+   * import reactivemongo.api.bson.compat.HandlerConverters.toDocumentWriter
    *
    * def foo[T](lw: reactivemongo.bson.BSONDocumentWriter[T]) = {
    *   val w: reactivemongo.api.bson.BSONDocumentWriter[T] = lw
@@ -137,7 +137,7 @@ private[bson] sealed trait LowPriorityHandlerConverters2
 
   /**
    * {{{
-   * import reactivemongo.api.bson.HandlerConverters.toDocumentReader
+   * import reactivemongo.api.bson.compat.HandlerConverters.toDocumentReader
    *
    * def lorem[T](lw: reactivemongo.bson.BSONDocumentReader[T]) = {
    *   val w: reactivemongo.api.bson.BSONDocumentReader[T] = lw
@@ -151,7 +151,7 @@ private[bson] sealed trait LowPriorityHandlerConverters2
 
   /**
    * {{{
-   * import reactivemongo.api.bson.HandlerConverters.fromDocumentWriter
+   * import reactivemongo.api.bson.compat.HandlerConverters.fromDocumentWriter
    *
    * def bar[T](lw: reactivemongo.api.bson.BSONDocumentWriter[T]) = {
    *   val w: reactivemongo.bson.BSONDocumentWriter[T] = lw
@@ -168,7 +168,7 @@ private[bson] sealed trait LowPriorityHandlerConverters2
 
   /**
    * {{{
-   * import reactivemongo.api.bson.HandlerConverters.toDocumentWriter
+   * import reactivemongo.api.bson.compat.HandlerConverters.toDocumentWriter
    *
    * def foo[T](lw: reactivemongo.bson.BSONDocumentWriter[T]) = {
    *   val w: reactivemongo.api.bson.BSONDocumentWriter[T] = lw

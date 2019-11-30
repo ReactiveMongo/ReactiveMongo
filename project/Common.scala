@@ -8,7 +8,8 @@ object Common {
     organization := "org.reactivemongo",
     resolvers ++= Seq(
       Resolver.typesafeRepo("releases"),
-      Resolver.sonatypeRepo("snapshots")
+      Resolver.sonatypeRepo("snapshots"),
+      Resolver.sonatypeRepo("staging")
     ),
     mimaFailOnNoPrevious := false
   )
