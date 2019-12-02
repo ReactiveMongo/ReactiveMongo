@@ -87,6 +87,8 @@ trait InsertOps[P <: SerializationPack with Singleton] {
      * Inserts a single document.
      *
      * {{{
+     * import scala.concurrent.ExecutionContext.Implicits.global
+     *
      * import reactivemongo.api.bson.BSONDocument
      * import reactivemongo.api.bson.collection.BSONCollection
      *
@@ -106,13 +108,15 @@ trait InsertOps[P <: SerializationPack with Singleton] {
      * [[https://docs.mongodb.com/manual/reference/method/db.collection.insertMany/ Inserts many documents]], according the ordered behaviour.
      *
      * {{{
+     * import scala.concurrent.ExecutionContext.Implicits.global
+     *
      * import reactivemongo.api.bson.BSONDocument
      * import reactivemongo.api.bson.collection.BSONCollection
      *
      * def insertMany(coll: BSONCollection, docs: Iterable[BSONDocument]) = {
      *   val insert = coll.insert(ordered = true)
      *
-     *   insert.many(elements) // Future[MultiBulkWriteResult]
+     *   insert.many(docs) // Future[MultiBulkWriteResult]
      * }
      * }}}
      */

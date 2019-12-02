@@ -5,6 +5,9 @@ import reactivemongo.api._
 import reactivemongo.api.commands.CollStatsResult
 import reactivemongo.api.commands.CommandError.{ Code, Message }
 
+import reactivemongo.api.bson.{ BSONDocument, BSONString }
+import reactivemongo.api.bson.collection.BSONCollection
+
 // TODO: Separate Spec?
 trait CollectionMetaSpec { collSpec: CollectionSpec =>
   import TestCompat._

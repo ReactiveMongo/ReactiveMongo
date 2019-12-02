@@ -13,6 +13,8 @@ import reactivemongo.api.{
   X509Authentication
 }
 
+import reactivemongo.api.bson.BSONDocument
+
 import reactivemongo.core.actors.{
   PrimaryAvailable,
   RegisterMonitor,

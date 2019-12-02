@@ -41,11 +41,13 @@ import reactivemongo.api.commands.{
  * You should consider the provided [[reactivemongo.api.DefaultDB]] implementation.
  *
  * {{{
+ * import scala.concurrent.ExecutionContext
  * import reactivemongo.api._
  *
- * val connection = MongoConnection(List("localhost:27017"))
- * val db = connection.database("plugin")
- * val collection = db.map(_("acoll"))
+ * def foo(connection: MongoConnection)(implicit ec: ExecutionContext) = {
+ *   val db = connection.database("plugin")
+ *   val collection = db.map(_("acoll"))
+ * }
  * }}}
  *
  * @define resolveDescription Returns a [[reactivemongo.api.Collection]] from this database
@@ -126,8 +128,11 @@ sealed trait DB {
    * '''EXPERIMENTAL:''' API may change without notice.
    *
    * {{{
-   * // Equivalent to
-   * db.startSession(failIfAlreadyStarted = false)
+   * import scala.concurrent.ExecutionContext
+   * import reactivemongo.api.DefaultDB
+   *
+   * def equivalentTo(db: DefaultDB)(implicit ec: ExecutionContext) =
+   *   db.startSession(failIfAlreadyStarted = false)
    * }}}
    *
    * @return The database reference updated with a new session
@@ -155,8 +160,12 @@ sealed trait DB {
    * '''EXPERIMENTAL:''' API may change without notice.
    *
    * {{{
-   * // Equivalent to
-   * db.startTransaction(aWriteConcern, failIfAlreadyStarted = false)
+   * import scala.concurrent.ExecutionContext
+   * import reactivemongo.api.{ DefaultDB, WriteConcern }
+   *
+   * def equivalentTo(db: DefaultDB, aWriteConcern: Option[WriteConcern])(
+   *   implicit ec: ExecutionContext) =
+   *   db.startTransaction(aWriteConcern, failIfAlreadyStarted = false)
    * }}}
    *
    * @param writeConcern the write concern for the transaction operation
@@ -175,8 +184,12 @@ sealed trait DB {
    * '''EXPERIMENTAL:''' API may change without notice.
    *
    * {{{
-   * // Equivalent to
-   * db.startTransaction(aWriteConcern, failIfAlreadyStarted = false)
+   * import scala.concurrent.ExecutionContext
+   * import reactivemongo.api.{ DefaultDB, WriteConcern }
+   *
+   * def equivalentTo(db: DefaultDB, aWriteConcern: Option[WriteConcern])(
+   *   implicit ec: ExecutionContext) =
+   *   db.startTransaction(aWriteConcern, failIfAlreadyStarted = false)
    * }}}
    *
    * @param writeConcern the write concern for the transaction operation
@@ -191,8 +204,11 @@ sealed trait DB {
    * '''EXPERIMENTAL:''' API may change without notice.
    *
    * {{{
-   * // Equivalent to
-   * db.abortTransaction(failIfNotStarted = false)
+   * import scala.concurrent.ExecutionContext
+   * import reactivemongo.api.DefaultDB
+   *
+   * def equivalentTo(db: DefaultDB)(implicit ec: ExecutionContext) =
+   *   db.abortTransaction(failIfNotStarted = false)
    * }}}
    *
    * @return The database reference with transaction aborted (but not session)
@@ -214,8 +230,11 @@ sealed trait DB {
    * '''EXPERIMENTAL:''' API may change without notice.
    *
    * {{{
-   * // Equivalent to
-   * db.commitTransaction(failIfNotStarted = false)
+   * import scala.concurrent.ExecutionContext
+   * import reactivemongo.api.DefaultDB
+   *
+   * def equivalentTo(db: DefaultDB)(implicit ec: ExecutionContext) =
+   *   db.commitTransaction(failIfNotStarted = false)
    * }}}
    *
    * @return The database reference with transaction commited (but not session)
@@ -237,8 +256,11 @@ sealed trait DB {
    * '''EXPERIMENTAL:''' API may change without notice.
    *
    * {{{
-   * // Equivalent to
-   * db.endSession(failIfNotStarted = false)
+   * import scala.concurrent.ExecutionContext
+   * import reactivemongo.api.DefaultDB
+   *
+   * def equivalentTo(db: DefaultDB)(implicit ec: ExecutionContext) =
+   *   db.endSession(failIfNotStarted = false)
    * }}}
    *
    * @return The database reference with session ended
@@ -260,8 +282,11 @@ sealed trait DB {
    * '''EXPERIMENTAL:''' API may change without notice.
    *
    * {{{
-   * // Equivalent to
-   * db.killSession(failIfNotStarted = false)
+   * import scala.concurrent.ExecutionContext
+   * import reactivemongo.api.DefaultDB
+   *
+   * def equivalentTo(db: DefaultDB)(implicit ec: ExecutionContext) =
+   *   db.killSession(failIfNotStarted = false)
    * }}}
    *
    * @return The database reference with session aborted

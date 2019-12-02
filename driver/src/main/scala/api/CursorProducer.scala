@@ -28,6 +28,10 @@ object CursorProducer {
  * Flattening strategy for cursor.
  *
  * {{{
+ * import scala.concurrent.Future
+ *
+ * import reactivemongo.api.{ Cursor, CursorFlattener, FlattenedCursor }
+ *
  * trait FooCursor[T] extends Cursor[T] { def foo: String }
  *
  * implicit def fooFlattener[T] = new CursorFlattener[FooCursor] {

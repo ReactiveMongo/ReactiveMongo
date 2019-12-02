@@ -248,12 +248,17 @@ object Command {
    * @param failover the failover strategy
    *
    * {{{
+   * import reactivemongo.api.FailoverStrategy
+   * import reactivemongo.api.commands.Command
+   *
    * import reactivemongo.api.bson.BSONDocument
    * import reactivemongo.api.bson.collection.BSONSerializationPack
-   * import reactivemongo.api.commands.{ Command, Count }
    *
-   * Command.run(BSONSerializationPack).
-   *   unboxed(aCollection, Count(BSONDocument("bulk" -> true)))
+   * val runner = Command.run(BSONSerializationPack, FailoverStrategy.default)
+   * val cmd: runner.RawCommand =
+   *   runner.rawCommand(BSONDocument(f"$$count" -> "coll"))
+   *
+   * def foo(db: reactivemongo.api.DefaultDB) = runner(db, cmd)
    * }}}
    */
   @deprecated("Internal: will be made private", "0.16.0")

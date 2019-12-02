@@ -241,14 +241,6 @@ object BSONCreateIndexesImplicits {
   }
 }
 
-/**
- * {{{
- * import reactivemongo.api.commands.ReplSetGetStatus
- * import reactivemongo.api.commands.bson.BSONReplSetGetStatusImplicits._
- *
- * adminDb.runCommand(ReplSetGetStatus)
- * }}}
- */
 @deprecated("Internal: will be made private", "0.16.0")
 object BSONReplSetGetStatusImplicits {
   object ReplSetGetStatusWriter
@@ -295,14 +287,6 @@ object BSONReplSetGetStatusImplicits {
   }
 }
 
-/**
- * {{{
- * import reactivemongo.api.commands.Resync
- * import reactivemongo.api.commands.bson.BSONResyncImplicits._
- *
- * db.runCommand(Resync)
- * }}}
- */
 @deprecated("Internal: will be made private", "0.16.0")
 object BSONResyncImplicits {
   private val logger =

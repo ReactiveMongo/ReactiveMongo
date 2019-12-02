@@ -31,8 +31,13 @@ private[collections] trait GenericCollectionWithDistinctOps[P <: SerializationPa
    * @param collation $collationParam
    *
    * {{{
-   * val distinctStates = collection.distinct[String, Set](
-   *   "state", None, ReadConcern.Local, None)
+   * import scala.concurrent.ExecutionContext
+   *
+   * import reactivemongo.api.ReadConcern
+   * import reactivemongo.api.bson.collection.BSONCollection
+   *
+   * def distinctStates(coll: BSONCollection)(implicit ec: ExecutionContext) =
+   *   coll.distinct[String, Set]("state", None, ReadConcern.Local, None)
    * }}}
    */
   def distinct[T, M[_] <: Iterable[_]](

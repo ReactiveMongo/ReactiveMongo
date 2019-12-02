@@ -3,6 +3,9 @@ import scala.concurrent.duration._
 
 import reactivemongo.api.{ Cursor, QueryOpts }
 
+import reactivemongo.api.bson.{ BSONDocument, BSONString }
+import reactivemongo.api.bson.collection.BSONCollection
+
 import org.specs2.concurrent.ExecutionEnv
 
 import _root_.tests.Common
@@ -35,8 +38,8 @@ final class CursorSpec(implicit val ee: ExecutionEnv)
 
       { // .foldResponse
         def foldRespSpec(
-          defaultColl: BSONCollection,
-          specCol: String => BSONCollection,
+          defaultColl: DefaultCollection,
+          specCol: String => DefaultCollection,
           timeout: FiniteDuration) = {
 
           "if fails while processing with existing documents" in {
@@ -196,7 +199,7 @@ final class CursorSpec(implicit val ee: ExecutionEnv)
       }
 
       { // .foldWhile
-        def foldWhileSpec(defaultColl: BSONCollection, timeout: FiniteDuration) = {
+        def foldWhileSpec(defaultColl: DefaultCollection, timeout: FiniteDuration) = {
           "if fails while processing with existing documents" in {
             @volatile var count = 0
             val onError: (Unit, Throwable) => Unit = { (_, _) =>
@@ -284,7 +287,7 @@ final class CursorSpec(implicit val ee: ExecutionEnv)
       @inline def slowDefaultColl = slowCursorDb(collName)
 
       { // .foldResponses
-        def foldRespSpec(defaultColl: BSONCollection, specCol: String => BSONCollection, timeout: FiniteDuration) = {
+        def foldRespSpec(defaultColl: DefaultCollection, specCol: String => DefaultCollection, timeout: FiniteDuration) = {
           def delayedTimeout = FiniteDuration(
             (timeout.toMillis * 1.25D).toLong, MILLISECONDS)
 
@@ -454,7 +457,7 @@ final class CursorSpec(implicit val ee: ExecutionEnv)
       }
 
       { // .foldWhile
-        def foldWhileSpec(defaultColl: BSONCollection, timeout: FiniteDuration) = {
+        def foldWhileSpec(defaultColl: DefaultCollection, timeout: FiniteDuration) = {
           def delayedTimeout = FiniteDuration(
             (timeout.toMillis * 1.25D).toLong, MILLISECONDS)
 

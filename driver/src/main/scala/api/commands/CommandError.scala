@@ -23,15 +23,15 @@ object CommandError {
      * Pattern matching extractor for the error code.
      *
      * {{{
-     * import reactivemongo.api.commands.CommandError
+     * import reactivemongo.api.commands.{ CommandError, WriteResult }
      *
      * def testError(err: CommandError): String = err match {
-     *   case CommandError.Code(code) => s"hasCode: \$code"
+     *   case CommandError.Code(code) => s"hasCode: \\$code"
      *   case _ => "no-code"
      * }
      *
      * def testWriteRes(res: WriteResult): String = res match {
-     *   case CommandError.Code(code) => s"onlyIfFailure: \$code"
+     *   case CommandError.Code(code) => s"onlyIfFailure: \\$code"
      *   case _ => "no-code"
      * }
      * }}}
@@ -51,15 +51,15 @@ object CommandError {
      * Pattern matching extractor for the error message.
      *
      * {{{
-     * import reactivemongo.api.commands.CommandError
+     * import reactivemongo.api.commands.{ CommandError, WriteResult }
      *
      * def testError(err: CommandError): String = err match {
-     *   case CommandError.Message(msg) => s"hasMessage: \$msg"
+     *   case CommandError.Message(msg) => s"hasMessage: \\$msg"
      *   case _ => "no-message"
      * }
      *
      * def testWriteRes(res: WriteResult): String = res match {
-     *   case CommandError.Message(msg) => s"onlyIfFailure: \$msg"
+     *   case CommandError.Message(msg) => s"onlyIfFailure: \\$msg"
      *   case _ => "no-message"
      * }
      * }}}

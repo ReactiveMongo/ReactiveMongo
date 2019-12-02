@@ -105,6 +105,9 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    */
   type AggregationFramework = BatchCommands.AggregationFramework.type
 
+  lazy val aggregationFramework: AggregationFramework =
+    BatchCommands.AggregationFramework
+
   /**
    * Alias for [[reactivemongo.api.commands.AggregationFramework.PipelineOperator]]
    */
@@ -252,10 +255,13 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * @return $returnWriteResult
    *
    * {{{
-   * collection.insert(myDoc)
+   * import scala.concurrent.ExecutionContext
    *
-   * // Equivalent to:
-   * collection.insert(true, defaultWriteConcern).one(document)
+   * import reactivemongo.api.bson.BSONDocument
+   * import reactivemongo.api.bson.collection.BSONCollection
+   *
+   * def withDefaultWriteConcern(coll: BSONCollection, myDoc: BSONDocument)(
+   *   implicit ec: ExecutionContext) = coll.insert(myDoc)
    * }}}
    */
   @deprecated("Use `.insert(ordered = false).one(..)`", "0.16.1")
@@ -270,9 +276,18 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * @param ordered $orderedParam
    *
    * {{{
-   * collection.insert(ordered = true).one(singleDoc)
+   * import scala.concurrent.ExecutionContext
    *
-   * collection.insert(ordered = true).many(multiInserts)
+   * import reactivemongo.api.bson.BSONDocument
+   * import reactivemongo.api.bson.collection.BSONCollection
+   *
+   * def one(coll: BSONCollection, singleDoc: BSONDocument)(
+   *   implicit ec: ExecutionContext) =
+   *   coll.insert.one(singleDoc)
+   *
+   * def many(coll: BSONCollection, multiInserts: Iterable[BSONDocument])(
+   *   implicit ec: ExecutionContext) =
+   *   coll.insert.many(multiInserts)
    * }}}
    */
   def insert: InsertBuilder = prepareInsert(false, writeConcern)
@@ -285,9 +300,18 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * @param ordered $orderedParam
    *
    * {{{
-   * collection.insert(ordered = true).one(singleDoc)
+   * import scala.concurrent.ExecutionContext
    *
-   * collection.insert(ordered = true).many(multiInserts)
+   * import reactivemongo.api.bson.BSONDocument
+   * import reactivemongo.api.bson.collection.BSONCollection
+   *
+   * def one(coll: BSONCollection, singleDoc: BSONDocument)(
+   *   implicit ec: ExecutionContext) =
+   *   coll.insert(ordered = true).one(singleDoc)
+   *
+   * def many(coll: BSONCollection, multiInserts: Iterable[BSONDocument])(
+   *   implicit ec: ExecutionContext) =
+   *   coll.insert(ordered = true).many(multiInserts)
    * }}}
    */
   def insert(ordered: Boolean): InsertBuilder =
@@ -302,9 +326,13 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * @param writeConcern $writeConcernParam
    *
    * {{{
-   * collection.insert(true, aWriteConcern).one(singleDoc)
+   * import scala.concurrent.ExecutionContext
    *
-   * collection.insert(true, aWriteConcern).many(multiInserts)
+   * import reactivemongo.api.bson.BSONDocument
+   * import reactivemongo.api.bson.collection.BSONCollection
+   *
+   * def withDefaultWriteConcern(coll: BSONCollection, query: BSONDocument)(
+   *   implicit ec: ExecutionContext) = coll.insert(true).one(query)
    * }}}
    */
   def insert(ordered: Boolean, writeConcern: WriteConcern): InsertBuilder =
@@ -335,7 +363,18 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * Returns an unordered update builder.
    *
    * {{{
-   * collection.update.one(query, update, upsert = false, multi = false)
+   * import scala.concurrent.ExecutionContext
+   *
+   * import reactivemongo.api.bson.BSONDocument
+   * import reactivemongo.api.bson.collection.BSONCollection
+   *
+   * def withDefaultWriteConcern(
+   *   coll: BSONCollection,
+   *   query: BSONDocument,
+   *   update: BSONDocument
+   * )(implicit ec: ExecutionContext) = {
+   *   coll.update.one(query, update, upsert = false, multi = false)
+   * }
    * }}}
    */
   def update: UpdateBuilder = prepareUpdate(false, writeConcern)
@@ -344,8 +383,19 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * Returns an update builder.
    *
    * {{{
-   * collection.update(ordered = true).
-   *   one(query, update, upsert = false, multi = false)
+   * import scala.concurrent.ExecutionContext
+   *
+   * import reactivemongo.api.bson.BSONDocument
+   * import reactivemongo.api.bson.collection.BSONCollection
+   *
+   * def withDefaultWriteConcern(
+   *   coll: BSONCollection,
+   *   query: BSONDocument,
+   *   update: BSONDocument
+   * )(implicit ec: ExecutionContext) = {
+   *   coll.update(ordered = true).
+   *     one(query, update, upsert = false, multi = false)
+   * }
    * }}}
    */
   def update(ordered: Boolean): UpdateBuilder =
@@ -355,7 +405,19 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * Returns an update builder.
    *
    * {{{
-   * collection.update(ordered, writeConcern).many(updates)
+   * import scala.concurrent.ExecutionContext
+   *
+   * import reactivemongo.api.commands.WriteConcern
+   * import reactivemongo.api.bson.BSONDocument
+   * import reactivemongo.api.bson.collection.BSONCollection
+   *
+   * def withDefaultWriteConcern(
+   *   coll: BSONCollection,
+   *   query: BSONDocument,
+   *   update: BSONDocument,
+   *   wc: WriteConcern
+   * )(implicit ec: ExecutionContext) =
+   *   coll.update(ordered = false, writeConcern = wc).one(query, update)
    * }}}
    */
   def update(
@@ -394,16 +456,26 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * Applies a [[http://docs.mongodb.org/manual/reference/command/findAndModify/ findAndModify]] operation. See `findAndUpdate` and `findAndRemove` convenient functions.
    *
    * {{{
-   * val updateOp = collection.updateModifier(
-   *   BSONDocument("\$set" -> BSONDocument("age" -> 35)))
+   * import scala.concurrent.{ ExecutionContext, Future }
    *
-   * val personBeforeUpdate: Future[Option[Person]] =
-   *   collection.findAndModify(BSONDocument("name" -> "Joline"), updateOp).
-   *   map(_.result[Person])
+   * import reactivemongo.api.bson.{ BSONDocument, BSONDocumentReader }
+   * import reactivemongo.api.bson.collection.BSONCollection
    *
-   * val removedPerson: Future[Option[Person]] = collection.findAndModify(
-   *   BSONDocument("name" -> "Jack"), collection.removeModifier).
-   *   map(_.result[Person])
+   * case class Person(name: String, age: Int)
+   *
+   * def foo(coll: BSONCollection)(
+   *   implicit ec: ExecutionContext, r: BSONDocumentReader[Person]) = {
+   *   val updateOp = coll.updateModifier(
+   *     BSONDocument(f"$$set" -> BSONDocument("age" -> 35)))
+   *
+   *   val personBeforeUpdate: Future[Option[Person]] =
+   *     coll.findAndModify(BSONDocument("name" -> "Joline"), updateOp).
+   *     map(_.result[Person])
+   *
+   *   val removedPerson: Future[Option[Person]] = coll.findAndModify(
+   *     BSONDocument("name" -> "Jack"), coll.removeModifier).
+   *     map(_.result[Person])
+   * }
    * }}}
    *
    * @param tparam S $selectorTParam
@@ -465,11 +537,18 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * Finds some matching document, and updates it (using `findAndModify`).
    *
    * {{{
-   * val person: Future[BSONDocument] = collection.findAndUpdate(
-   *   BSONDocument("name" -> "James"),
-   *   BSONDocument("\$set" -> BSONDocument("age" -> 17)),
-   *   fetchNewObject = true) // on success, return the update document:
-   *                          // { "age": 17 }
+   * import scala.concurrent.{ ExecutionContext, Future }
+   *
+   * import reactivemongo.api.bson.BSONDocument
+   * import reactivemongo.api.bson.collection.BSONCollection
+   *
+   * def findPerson(coll: BSONCollection)(
+   *   implicit ec: ExecutionContext): Future[Option[BSONDocument]] =
+   *   coll.findAndUpdate(
+   *     BSONDocument("name" -> "James"),
+   *     BSONDocument(f"$$set" -> BSONDocument("age" -> 17)),
+   *     fetchNewObject = true).map(_.value)
+   *     // on success, return the update document: { "age": 17 }
    * }}}
    *
    * @tparam selectorTParam
@@ -525,8 +604,18 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * Finds some matching document, and removes it (using `findAndModify`).
    *
    * {{{
-   * val removed: Future[Person] = collection.findAndRemove(
-   *   BSONDocument("name" -> "Foo")).map(_.result[Person])
+   * import scala.concurrent.{ ExecutionContext, Future }
+   *
+   * import reactivemongo.api.bson.{ BSONDocument, BSONDocumentReader }
+   * import reactivemongo.api.bson.collection.BSONCollection
+   *
+   * case class Person(name: String, age: Int)
+   *
+   * def removed(coll: BSONCollection)(
+   *   implicit ec: ExecutionContext,
+   *   r: BSONDocumentReader[Person]): Future[Option[Person]] =
+   *   coll.findAndRemove(
+   *     BSONDocument("name" -> "Foo")).map(_.result[Person])
    * }}}
    *
    * @tparam S $selectorTParam
@@ -621,18 +710,23 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * import scala.concurrent.Future
    * import scala.concurrent.ExecutionContext.Implicits.global
    *
-   * import reactivemongo.bson._
-   * import reactivemongo.api.collections.bson.BSONCollection
+   * import reactivemongo.api.Cursor
+   * import reactivemongo.api.bson._
+   * import reactivemongo.api.bson.collection.BSONCollection
    *
    * def populatedStates(cities: BSONCollection): Future[List[BSONDocument]] = {
-   *   import cities.BatchCommands.AggregationFramework
-   *   import AggregationFramework.{ Group, Match, SumField }
+   *   import cities.aggregationFramework
+   *   import aggregationFramework.{ Group, Match, SumField }
    *
-   *   cities.aggregatorContext[BSONDocument](Group(BSONString("\$state"))(
-   *     "totalPop" -> SumField("population")), List(
-   *       Match(document("totalPop" ->
-   *         document("\$gte" -> 10000000L))))).
-   *     prepared.cursor.collect[List]()
+   *   cities.aggregatorContext[BSONDocument](
+   *     Group(BSONString(f"$$state"))(
+   *       "totalPop" -> SumField("population")), List(
+   *         Match(BSONDocument("totalPop" ->
+   *           BSONDocument(f"$$gte" -> 10000000L))))
+   *   ).prepared.cursor.collect[List](
+   *     maxDocs = 3,
+   *     err = Cursor.FailOnError[List[BSONDocument]]()
+   *   )
    * }
    * }}}
    *
@@ -686,11 +780,6 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * @param swriter $swriterParam
    *
    * @return a future [[reactivemongo.api.commands.WriteResult]] that can be used to check whether the removal was successful
-   *
-   * {{{
-   * // Equivalent to:
-   * collection.delete(true, defaultWriteConcern).one(document, limit)
-   * }}}
    */
   @deprecated("Use delete().one(selector, limit)", "0.13.1")
   def remove[S](selector: S, writeConcern: WriteConcern = writeConcern, firstMatchOnly: Boolean = false)(implicit swriter: pack.Writer[S], ec: ExecutionContext): Future[WriteResult] = {
@@ -710,9 +799,15 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * Prepares an unordered [[https://docs.mongodb.com/manual/reference/command/delete/ delete]] builder.
    *
    * {{{
-   * collection.delete.one(document, limit)
+   * import scala.concurrent.ExecutionContext
    *
-   * // Equivalent to .delete(false, defaultWriteConcern)
+   * import reactivemongo.api.bson.BSONDocument
+   * import reactivemongo.api.bson.collection.BSONCollection
+   *
+   * def doIt(coll: BSONCollection, query: BSONDocument)(
+   *   implicit ec: ExecutionContext) = coll.delete.one(query)
+   *
+   * def equivalentTo(coll: BSONCollection) = coll.delete(false)
    * }}}
    */
   def delete: DeleteBuilder = prepareDelete(false, writeConcern)
@@ -724,7 +819,13 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * @param writeConcern $writeConcernParam
    *
    * {{{
-   * collection.delete(true, defaultWriteConcern).one(document, limit)
+   * import scala.concurrent.ExecutionContext
+   *
+   * import reactivemongo.api.bson.BSONDocument
+   * import reactivemongo.api.bson.collection.BSONCollection
+   *
+   * def foo(coll: BSONCollection, query: BSONDocument)(
+   *   implicit ec: ExecutionContext) = coll.delete(true).one(query)
    * }}}
    */
   def delete(ordered: Boolean = true, writeConcern: WriteConcern = writeConcern): DeleteBuilder = prepareDelete(ordered, writeConcern)
@@ -752,4 +853,5 @@ trait GenericCollection[P <: SerializationPack with Singleton]
   @inline protected def MissingMetadata() =
     ConnectionNotInitialized.MissingMetadata(db.connection.history())
 
+  override def toString: String = s"collection[${name}]"
 }

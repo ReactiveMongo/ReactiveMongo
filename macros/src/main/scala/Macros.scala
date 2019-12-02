@@ -6,6 +6,8 @@ package reactivemongo.bson
  * class implementations by hand.
  *
  * {{{
+ * import reactivemongo.bson.Macros
+ *
  * case class Person(name: String, surname: String)
  * implicit val personHandler = Macros.handler[Person]
  * }}}
@@ -111,6 +113,8 @@ object Macros {
      * but don't want to actually use `_id` in your code.
      *
      * {{{
+     * import reactivemongo.bson.Macros.Annotations.Key
+     *
      * case class Website(@Key("_id") url: String)
      * }}}
      *
@@ -132,14 +136,16 @@ object Macros {
      * rather than nesting it.
      *
      * {{{
+     * import reactivemongo.bson.Macros.Annotations.Flatten
+     *
      * case class Range(start: Int, end: Int)
      *
      * case class LabelledRange(
      *   name: String,
      *   @Flatten range: Range)
      *
-     * // Flattened
-     * BSONDocument("name" -> "foo", "start" -> 0, "end" -> 1)
+     * val flattened = reactivemongo.bson.BSONDocument(
+     *   "name" -> "foo", "start" -> 0, "end" -> 1)
      *
      * // Rather than:
      * // BSONDocument("name" -> "foo", "range" -> BSONDocument(
@@ -154,6 +160,8 @@ object Macros {
      * it will be represented by `BSONNull` rather than being omitted.
      *
      * {{{
+     * import reactivemongo.bson.Macros.Annotations.NoneAsNull
+     *
      * case class Foo(
      *   title: String,
      *   @NoneAsNull description: Option[String])

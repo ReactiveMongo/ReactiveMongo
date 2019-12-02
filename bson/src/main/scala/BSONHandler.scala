@@ -33,7 +33,7 @@ object BSONHandler {
    *
    * val foo: BSONHandler[BSONString, Foo] = BSONHandler(
    *   { read: BSONString => Foo(read.value) },
-   *   { write: Foo => BSONString(write.value)
+   *   { write: Foo => BSONString(write.value) }
    * )
    * }}}
    */

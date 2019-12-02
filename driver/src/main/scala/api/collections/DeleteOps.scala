@@ -90,18 +90,24 @@ trait DeleteOps[P <: SerializationPack with Singleton] {
      * Performs a bulk operation using many deletes, each can delete multiple documents.
      *
      * {{{
+     * import scala.concurrent.{ ExecutionContext, Future }
+     *
      * import reactivemongo.api.bson.BSONDocument
      * import reactivemongo.api.bson.collection.BSONCollection
      *
-     * def bulkDelete(coll: BSONCollection, docs: Iterable[BSONDocument]) = {
+     * def bulkDelete(
+     *   coll: BSONCollection,
+     *   docs: Iterable[BSONDocument])(implicit ec: ExecutionContext) = {
      *   val delete = coll.delete(ordered = true)
-     *   val elements = docs.map { doc =>
+     *   val elements = Future.sequence(docs.map { doc =>
      *     delete.element(
      *       q = BSONDocument("filter" -> "value"),
      *       limit = Some(1)) // only first match
-     *   }
+     *   })
      *
-     *   delete.many(elements) // Future[MultiBulkWriteResult]
+     *   elements.flatMap { ops =>
+     *     delete.many(ops) // Future[MultiBulkWriteResult]
+     *   }
      * }
      * }}}
      */
