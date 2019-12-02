@@ -2,6 +2,8 @@ import scala.concurrent._, duration.FiniteDuration
 
 import reactivemongo.api._
 
+import reactivemongo.api.bson.BSONDocument
+
 import reactivemongo.api.commands.{ CommandError, WriteConcern }
 
 import org.specs2.concurrent.ExecutionEnv
@@ -198,7 +200,7 @@ final class CollectionSpec(implicit protected val ee: ExecutionEnv)
     }
 
     {
-      def cursorSpec(c: BSONCollection, timeout: FiniteDuration) = {
+      def cursorSpec(c: DefaultCollection, timeout: FiniteDuration) = {
         implicit val reader = SometimesBuggyPersonReader()
         @inline def cursor = findAll(c).cursor[Person]()
 
@@ -248,7 +250,7 @@ final class CollectionSpec(implicit protected val ee: ExecutionEnv)
       // TODO: Move to CursorSpec?
       implicit val reader = SometimesBuggyPersonReader()
 
-      def resultSpec(c: BSONCollection, timeout: FiniteDuration) =
+      def resultSpec(c: DefaultCollection, timeout: FiniteDuration) =
         findAll(c).cursor[Person]().collect[Vector](
           Int.MaxValue, Cursor.ContOnError[Vector[Person]]()).
           map(_.length) must beTypedEqualTo(4).await(1, timeout)
@@ -264,7 +266,7 @@ final class CollectionSpec(implicit protected val ee: ExecutionEnv)
 
     "write a document with error" >> {
       implicit val writer = BuggyPersonWriter
-      def writeSpec(c: BSONCollection, timeout: FiniteDuration) =
+      def writeSpec(c: DefaultCollection, timeout: FiniteDuration) =
         c.insert.one(person).map { _ /*lastError*/ =>
           //println(s"person write succeed??  $lastError")
           0
@@ -308,7 +310,7 @@ final class CollectionSpec(implicit protected val ee: ExecutionEnv)
       implicit val writer = PersonWriter
       // TODO: Move to FindAndModifySpec
 
-      def findAndUpdateSpec(c: BSONCollection, timeout: FiniteDuration, five: Person = person5) = {
+      def findAndUpdateSpec(c: DefaultCollection, timeout: FiniteDuration, five: Person = person5) = {
         "by updating age of 'Joline', & returns the old document" in {
           val updateOp = c.updateModifier(
             BSONDocument("$set" -> BSONDocument("age" -> 35)))
@@ -422,7 +424,7 @@ final class CollectionSpec(implicit protected val ee: ExecutionEnv)
         import reactivemongo.api.indexes.IndexType.Ascending
 
         def bulkSpec(
-          c: BSONCollection,
+          c: DefaultCollection,
           n: Int,
           e: Int,
           timeout: FiniteDuration) = {
@@ -505,7 +507,7 @@ final class CollectionSpec(implicit protected val ee: ExecutionEnv)
     updateSpecs
   }
 
-  @inline def findAll(c: BSONCollection) = c.find(BSONDocument.empty)
+  @inline def findAll(c: DefaultCollection) = c.find(BSONDocument.empty)
 }
 
 sealed trait CollectionFixtures { specs: CollectionSpec =>

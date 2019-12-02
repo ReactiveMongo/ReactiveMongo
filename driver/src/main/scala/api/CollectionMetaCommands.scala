@@ -28,10 +28,17 @@ trait CollectionMetaCommands { self: Collection =>
    * this collection already exists.
    *
    * {{{
-   * coll.create().recover {
-   *   case CommandError.Code(48 /*NamespaceExists*/ ) =>
-   *     println(s"Collection \${coll.fullCollectionName} already exists")
-   * }
+   * import scala.concurrent.ExecutionContext
+   *
+   * import reactivemongo.api.CollectionMetaCommands
+   * import reactivemongo.api.commands.CommandError
+   *
+   * def createColl(
+   *   coll: CollectionMetaCommands)(implicit ec: ExecutionContext) =
+   *   coll.create().recover {
+   *     case CommandError.Code(48) => // NamespaceExists
+   *       println(s"Collection \\${coll} already exists")
+   *   }
    * }}}
    */
   def create()(implicit ec: ExecutionContext): Future[Unit] =

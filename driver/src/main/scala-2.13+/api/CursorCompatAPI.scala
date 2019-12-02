@@ -37,9 +37,18 @@ trait CursorCompatAPI[T] { _: Cursor[T] =>
    * @param err $errorHandlerParam
    *
    * {{{
-   * val cursor = collection.find(query, filter).cursor[BSONDocument]()
-   * // return the 3 first documents in a Vector[BSONDocument].
-   * val vector = cursor.collect[Vector](3, Cursor.FailOnError[Vector[BSONDocument]]())
+   * import scala.concurrent.ExecutionContext
+   *
+   * import reactivemongo.api.Cursor
+   * import reactivemongo.api.bson.BSONDocument
+   * import reactivemongo.api.bson.collection.BSONCollection
+   *
+   * def foo(collection: BSONCollection, query: BSONDocument)(
+   *   implicit ec: ExecutionContext) = {
+   *   val cursor = collection.find(query).cursor[BSONDocument]()
+   *   // return the 3 first documents in a Vector[BSONDocument].
+   *   cursor.collect[Vector](3, Cursor.FailOnError[Vector[BSONDocument]]())
+   * }
    * }}}
    */
   def collect[M[_]](maxDocs: Int, err: ErrorHandler[M[T]])(implicit cbf: Factory[T, M[T]], ec: ExecutionContext): Future[M[T]]

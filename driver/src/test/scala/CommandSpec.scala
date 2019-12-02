@@ -1,6 +1,7 @@
 import scala.concurrent.duration.FiniteDuration
 
 import reactivemongo.api.{ DefaultDB, ReadPreference }
+import reactivemongo.api.bson.BSONDocument
 
 import reactivemongo.api.commands.{
   Command,

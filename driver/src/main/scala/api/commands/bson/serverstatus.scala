@@ -23,14 +23,6 @@ import reactivemongo.bson.{
   BSONNumberLike
 }
 
-/**
- * {{{
- * import reactivemongo.api.commands.ServerStatus
- * import reactivemongo.api.commands.bson.BSONServerStatusImplicits._
- *
- * db.runCommand(ServerStatus)
- * }}}
- */
 @deprecated("Internal: will be made private", "0.16.0")
 object BSONServerStatusImplicits {
   object BSONServerStatusWriter

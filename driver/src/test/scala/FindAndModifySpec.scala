@@ -2,6 +2,8 @@ import scala.concurrent.duration.FiniteDuration
 
 import reactivemongo.api.commands._
 
+import reactivemongo.api.bson.{ BSONDocument, BSONString }
+
 import org.specs2.concurrent.ExecutionEnv
 
 import reactivemongo.api.tests.{ builder, decoder, pack, reader, writer }
@@ -47,7 +49,7 @@ final class FindAndModifySpec(implicit ee: ExecutionEnv)
 
     "upsert a doc and fetch it" >> {
       def upsertAndFetch(
-        c: BSONCollection,
+        c: DefaultCollection,
         p: Person,
         age: Int,
         timeout: FiniteDuration)(

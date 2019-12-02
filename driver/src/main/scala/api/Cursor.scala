@@ -99,8 +99,14 @@ trait Cursor[T] extends CursorCompatAPI[T] {
    * @tparam A $resultTParam
    *
    * {{{
-   * cursor.foldWhile(Nil: Seq[Person])((s, p) => Cursor.Cont(s :+ p),
-   *   { (l, e) => println("last valid value: " + l); Cursor.Fail(e) })
+   * import reactivemongo.api.Cursor
+   * import scala.concurrent.ExecutionContext
+   *
+   * case class Person(name: String, age: Int)
+   *
+   * def foo(cursor: Cursor[Person])(implicit ec: ExecutionContext) =
+   *   cursor.foldWhile(Nil: Seq[Person])((s, p) => Cursor.Cont(s :+ p),
+   *     { (l, e) => println("last valid value: " + l); Cursor.Fail(e) })
    * }}}
    */
   def foldWhile[A](z: => A, maxDocs: Int = -1)(suc: (A, T) => Cursor.State[A], err: ErrorHandler[A] = FailOnError[A]())(implicit @deprecatedName(Symbol("ctx")) ec: ExecutionContext): Future[A]
@@ -115,12 +121,18 @@ trait Cursor[T] extends CursorCompatAPI[T] {
    * @tparam A $resultTParam
    *
    * {{{
-   * cursor.foldWhileM(Nil: Seq[Person])(
-   *   (s, p) => Future.successful(Cursor.Cont(s :+ p)),
-   *   { (l, e) => Future {
-   *     println("last valid value: " + l)
-   *     Cursor.Fail(e)
-   *   })
+   * import scala.concurrent.{ ExecutionContext, Future }
+   * import reactivemongo.api.Cursor
+   *
+   * case class Person(name: String, age: Int)
+   *
+   * def foo(cursor: Cursor[Person])(implicit ec: ExecutionContext) =
+   *   cursor.foldWhileM(Nil: Seq[Person])(
+   *     (s, p) => Future.successful(Cursor.Cont(s :+ p)),
+   *     { (l, e) =>
+   *       println("last valid value: " + l)
+   *       Cursor.Fail[Seq[Person]](e)
+   *     })
    * }}}
    */
   def foldWhileM[A](z: => A, maxDocs: Int = -1)(suc: (A, T) => Future[Cursor.State[A]], err: ErrorHandler[A] = FailOnError[A]())(implicit @deprecatedName(Symbol("ctx")) ec: ExecutionContext): Future[A]
@@ -135,8 +147,14 @@ trait Cursor[T] extends CursorCompatAPI[T] {
    * @tparam A $resultTParam
    *
    * {{{
-   * cursor.foldWhile(Nil: Seq[Person])((s, p) => Cursor.Cont(s :+ p),
-   *   { (l, e) => println("last valid value: " + l); Cursor.Fail(e) })
+   * import scala.concurrent.ExecutionContext
+   * import reactivemongo.api.Cursor
+   *
+   * case class Person(name: String, age: Int)
+   *
+   * def foo(cursor: Cursor[Person])(implicit ec: ExecutionContext) =
+   *   cursor.foldWhile(Nil: Seq[Person])((s, p) => Cursor.Cont(s :+ p),
+   *     { (l, e) => println("last valid value: " + l); Cursor.Fail(e) })
    * }}}
    */
   def fold[A](z: => A, maxDocs: Int = -1)(suc: (A, T) => A)(implicit @deprecatedName(Symbol("ctx")) ec: ExecutionContext): Future[A] = foldWhile[A](z, maxDocs)(
@@ -146,9 +164,17 @@ trait Cursor[T] extends CursorCompatAPI[T] {
    * $getHead, or fails with [[Cursor.NoSuchResultException]] if none.
    *
    * {{{
-   * val cursor = collection.find(query, filter).cursor[BSONDocument]
-   * // return option of the first element.
-   * val first: Future[BSONDocument] = cursor.head
+   * import scala.concurrent.{ ExecutionContext, Future }
+   *
+   * import reactivemongo.bson.BSONDocument
+   * import reactivemongo.api.collections.bson.BSONCollection
+   *
+   * def first(query: BSONDocument)(collection: BSONCollection)(
+   *   implicit ec: ExecutionContext): Future[BSONDocument] = {
+   *   val cursor = collection.find(query).cursor[BSONDocument]()
+   *   // return option of the first element.
+   *   cursor.head
+   * }
    * }}}
    */
   def head(implicit @deprecatedName(Symbol("ctx")) ec: ExecutionContext): Future[T]
@@ -157,9 +183,18 @@ trait Cursor[T] extends CursorCompatAPI[T] {
    * $getHead, if any.
    *
    * {{{
-   * val cursor = collection.find(query, filter).cursor[BSONDocument]
-   * // return option of the first element.
-   * val maybeFirst: Future[Option[BSONDocument]] = cursor.headOption
+   * import scala.concurrent.{ ExecutionContext, Future }
+   *
+   * import reactivemongo.api.bson.BSONDocument
+   *
+   * import reactivemongo.api.bson.collection.BSONCollection
+   *
+   * def maybeFirst(query: BSONDocument)(collection: BSONCollection)(
+   *   implicit ec: ExecutionContext): Future[Option[BSONDocument]] = {
+   *   val cursor = collection.find(query).cursor[BSONDocument]()
+   *   // return option of the first element.
+   *   cursor.headOption
+   * }
    * }}}
    */
   def headOption(implicit @deprecatedName(Symbol("ctx")) ec: ExecutionContext): Future[Option[T]]

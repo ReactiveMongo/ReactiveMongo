@@ -8,6 +8,8 @@ import reactivemongo.api.commands.{
   Upserted
 }
 
+import reactivemongo.api.bson.{ BSONDocument, BSONString }
+
 import _root_.tests.Common
 
 import reactivemongo.api.tests.{ builder, decoder, pack, reader, writer }
@@ -34,7 +36,7 @@ trait UpdateSpec extends UpdateFixtures { collectionSpec: CollectionSpec =>
     val jane = Person("Jack London", 18)
 
     {
-      def spec[T](c: BSONCollection, timeout: FiniteDuration, f: => T)(upd: T => T)(implicit w: pack.Writer[T], r: pack.Reader[T]) = {
+      def spec[T](c: DefaultCollection, timeout: FiniteDuration, f: => T)(upd: T => T)(implicit w: pack.Writer[T], r: pack.Reader[T]) = {
         val person = f
 
         c.update.one(
@@ -86,7 +88,7 @@ trait UpdateSpec extends UpdateFixtures { collectionSpec: CollectionSpec =>
     }
 
     "upsert a document" >> {
-      def spec(c: BSONCollection, timeout: FiniteDuration) = {
+      def spec(c: DefaultCollection, timeout: FiniteDuration) = {
         val doc = BSONDocument("_id" -> "foo", "bar" -> 2)
 
         c.update.one(q = BSONDocument.empty, u = doc, upsert = true).
@@ -113,7 +115,7 @@ trait UpdateSpec extends UpdateFixtures { collectionSpec: CollectionSpec =>
     }
 
     {
-      def spec[T](c: BSONCollection, timeout: FiniteDuration, f: => T)(upd: T => T)(implicit w: c.pack.Writer[T], r: c.pack.Reader[T]) = {
+      def spec[T](c: DefaultCollection, timeout: FiniteDuration, f: => T)(upd: T => T)(implicit w: c.pack.Writer[T], r: c.pack.Reader[T]) = {
         val person = f
 
         c.update.one(

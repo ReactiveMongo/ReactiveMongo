@@ -38,7 +38,7 @@ object HandlerConverters extends HandlerConverters
  * import reactivemongo.bson.BSONValue
  *
  * def bar[T](lr: reactivemongo.api.bson.BSONReader[T]) = {
- *   val r: reactivemongo.bson.BSONWriter[BSONValue, T] = lr
+ *   val r: reactivemongo.bson.BSONReader[BSONValue, T] = lr
  *   r
  * }
  * }}}
@@ -125,7 +125,7 @@ private[bson] sealed trait LowPriorityHandlerConverters2
 
   /**
    * {{{
-   * import reactivemongo.api.bson.compat.HandlerConverters.toDocumentWriter
+   * import reactivemongo.api.bson.compat.HandlerConverters.toDocumentWriterConv
    *
    * def foo[T](lw: reactivemongo.bson.BSONDocumentWriter[T]) = {
    *   val w: reactivemongo.api.bson.BSONDocumentWriter[T] = lw
@@ -137,7 +137,7 @@ private[bson] sealed trait LowPriorityHandlerConverters2
 
   /**
    * {{{
-   * import reactivemongo.api.bson.compat.HandlerConverters.toDocumentReader
+   * import reactivemongo.api.bson.compat.HandlerConverters.toDocumentReaderConv
    *
    * def lorem[T](lw: reactivemongo.bson.BSONDocumentReader[T]) = {
    *   val w: reactivemongo.api.bson.BSONDocumentReader[T] = lw
@@ -168,11 +168,11 @@ private[bson] sealed trait LowPriorityHandlerConverters2
 
   /**
    * {{{
-   * import reactivemongo.api.bson.compat.HandlerConverters.toDocumentWriter
+   * import reactivemongo.api.bson.compat.HandlerConverters.fromDocumentReader
    *
-   * def foo[T](lw: reactivemongo.bson.BSONDocumentWriter[T]) = {
-   *   val w: reactivemongo.api.bson.BSONDocumentWriter[T] = lw
-   *   w
+   * def foo[T](r: reactivemongo.api.bson.BSONDocumentReader[T]) = {
+   *   val lr: reactivemongo.bson.BSONDocumentReader[T] = r
+   *   lr
    * }
    * }}}
    */

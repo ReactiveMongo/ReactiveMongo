@@ -59,11 +59,14 @@ private[api] case class ConnectionState(
  *
  * Example:
  * {{{
+ * import scala.concurrent.ExecutionContext
  * import reactivemongo.api._
  *
- * val connection = MongoConnection(List("localhost"))
- * val db = connection.database("plugin")
- * val collection = db.map(_.("acoll"))
+ * def foo(driver: MongoDriver)(implicit ec: ExecutionContext) = {
+ *   val con = driver.connection(List("localhost"))
+ *   val db = con.database("plugin")
+ *   val collection = db.map(_("acoll"))
+ * }
  * }}}
  *
  * @param supervisor the name of the supervisor

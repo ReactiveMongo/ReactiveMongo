@@ -91,20 +91,25 @@ trait UpdateOps[P <: SerializationPack with Singleton] {
      * [[https://docs.mongodb.com/manual/reference/method/db.collection.updateMany/ Updates many documents]], according the ordered behaviour.
      *
      * {{{
+     * import scala.concurrent.{ ExecutionContext, Future }
      * import reactivemongo.api.bson.BSONDocument
      * import reactivemongo.api.bson.collection.BSONCollection
      *
-     * def updateMany(coll: BSONCollection, docs: Iterable[BSONDocument]) = {
+     * def updateMany(
+     *   coll: BSONCollection,
+     *   docs: Iterable[BSONDocument])(implicit ec: ExecutionContext) = {
      *   val update = coll.update(ordered = true)
-     *   val elements = docs.map { doc =>
+     *   val elements = Future.sequence(docs.map { doc =>
      *     update.element(
      *       q = BSONDocument("update" -> "selector"),
-     *       u = BSONDocument("\$set" -> doc),
+     *       u = BSONDocument(f"$$set" -> doc),
      *       upsert = true,
      *       multi = false)
-     *   }
+     *   })
      *
-     *   update.many(elements) // Future[MultiBulkWriteResult]
+     *   elements.flatMap { ups =>
+     *     update.many(ups) // Future[MultiBulkWriteResult]
+     *   }
      * }
      * }}}
      */

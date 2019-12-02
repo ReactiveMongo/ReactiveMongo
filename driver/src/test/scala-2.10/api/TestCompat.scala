@@ -3,35 +3,12 @@ package reactivemongo.api
 import reactivemongo.bson.{ BSONElement, BSONValue, Producer }
 
 object TestCompat {
-  type BSONCollection = reactivemongo.api.collections.GenericCollection[Serialization.Pack]
-
-  type BSONDocument = reactivemongo.bson.BSONDocument
-
-  @inline def BSONDocument(elements: Producer[BSONElement]*) =
-    reactivemongo.bson.BSONDocument(elements: _*)
-
-  object BSONDocument {
-    @inline def empty = reactivemongo.bson.BSONDocument.empty
-  }
+  type DefaultCollection = Serialization.DefaultCollection
 
   @inline def BSONArray(values: Producer[BSONValue]*) =
     reactivemongo.bson.BSONArray(values: _*)
 
   @inline def BSONBoolean(b: Boolean) = reactivemongo.bson.BSONBoolean(b)
-
-  type BSONString = reactivemongo.bson.BSONString
-
-  @inline def BSONString(s: String) = reactivemongo.bson.BSONString(s)
-
-  object BSONString {
-    def unapply(v: reactivemongo.bson.BSONValue): Option[String] =
-      v match {
-        case reactivemongo.bson.BSONString(str) => Option(str)
-        case _                                  => None
-      }
-  }
-
-  @inline def BSONInteger(i: Int) = reactivemongo.bson.BSONInteger(i)
 
   type BSONObjectID = reactivemongo.bson.BSONObjectID
 

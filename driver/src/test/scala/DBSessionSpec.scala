@@ -1,6 +1,8 @@
 import reactivemongo.api.{ DefaultDB, WriteConcern, tests => apiTests }
 import reactivemongo.api.commands.GetLastError
 
+import reactivemongo.api.bson.BSONDocument
+
 import reactivemongo.api.TestCompat._
 
 trait DBSessionSpec { specs: DatabaseSpec =>

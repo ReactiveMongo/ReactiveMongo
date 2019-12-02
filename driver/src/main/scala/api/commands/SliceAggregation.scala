@@ -33,11 +33,23 @@ private[commands] trait SliceAggregation[P <: SerializationPack] {
 
   /**
    * {{{
-   * Project(BSONDocument(
-   *   "name" -> 1,
-   *   "favorites" -> Slice(
-   *     array = BSONString(f"$$favorites"),
-   *     n = BSONInteger(3)).makePipe))
+   * import scala.concurrent.ExecutionContext
+   *
+   * import reactivemongo.api.bson.{ BSONDocument, BSONInteger, BSONString }
+   * import reactivemongo.api.bson.collection.BSONCollection
+   *
+   * def foo(coll: BSONCollection)(implicit ec: ExecutionContext) = {
+   *   coll.aggregateWith[BSONDocument]() { agg =>
+   *     import agg.{ Project, Slice }
+   *
+   *     // Define the pipeline stages
+   *     Project(BSONDocument(
+   *       "name" -> 1,
+   *       "favorites" -> Slice(
+   *         array = BSONString(f"$$favorites"),
+   *         n = BSONInteger(3)).makePipe)) -> List.empty
+   *   }
+   * }
    * }}}
    */
   object Slice {

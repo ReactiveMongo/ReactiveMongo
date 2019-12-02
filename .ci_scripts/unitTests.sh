@@ -62,7 +62,7 @@ TEST_ARGS="$TEST_ARGS reactivemongo.InsertCommandSpec"
 TEST_ARGS="$TEST_ARGS reactivemongo.UpdateCommandSpec"
 TEST_ARGS="$TEST_ARGS -- include unit"
 
-TEST_ARGS="$TEST_ARGS ;project ReactiveMongo-BSON-Macros ;testQuick"
+TEST_ARGS="$TEST_ARGS ;project ReactiveMongo-BSON-Macros ;testQuick ;doc"
 
 sed -e 's/"-deprecation", //' < project/Driver.scala > .tmp && mv .tmp project/Driver.scala
 

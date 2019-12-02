@@ -108,8 +108,16 @@ sealed trait GridFS[P <: SerializationPack]
    * @tparam Id the type of the file ID to be read
    *
    * {{{
-   * gfs.find[BSONDocument, BSONValue](
-   *   BSONDocument("filename" -> n)).headOption
+   * import scala.concurrent.ExecutionContext
+   *
+   * import reactivemongo.api.gridfs.GridFS
+   *
+   * import reactivemongo.api.bson.{ BSONDocument, BSONValue }
+   * import reactivemongo.api.bson.collection.{ BSONSerializationPack => Pack }
+   *
+   * def foo(gfs: GridFS[Pack.type], n: String)(implicit ec: ExecutionContext) =
+   *   gfs.find[BSONDocument, BSONValue](
+   *     BSONDocument("filename" -> n)).headOption
    * }}}
    */
   def find[S, Id <: pack.Value](selector: S)(implicit w: pack.Writer[S], r: FileReader[Id], cp: CursorProducer[ReadFile[Id]]): cp.ProducedCursor = {
@@ -128,7 +136,15 @@ sealed trait GridFS[P <: SerializationPack]
    * @param r $fileReader
    *
    * {{{
-   * gfs.find(BSONDocument("filename" -> n)).headOption
+   * import scala.concurrent.ExecutionContext
+   *
+   * import reactivemongo.api.gridfs.GridFS
+   *
+   * import reactivemongo.api.bson.{ BSONDocument, BSONValue }
+   * import reactivemongo.api.bson.collection.{ BSONSerializationPack => Pack }
+   *
+   * def foo(gfs: GridFS[Pack.type], n: String)(implicit ec: ExecutionContext) =
+   *   gfs.find(BSONDocument("filename" -> n)).headOption
    * }}}
    */
   def find(selector: pack.Document)(implicit ec: ExecutionContext, r: FileReader[pack.Value], cp: CursorProducer[ReadFile[pack.Value]]): cp.ProducedCursor = {

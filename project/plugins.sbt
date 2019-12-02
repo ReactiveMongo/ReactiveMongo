@@ -1,6 +1,7 @@
 scalacOptions ++= Seq("-deprecation", "-unchecked", "-feature")
 
 resolvers ++= Seq(
+  "Tatami Releases" at "https://raw.github.com/cchantep/tatami/master/releases",
   Resolver.url("sbt-repo", url(
     "https://dl.bintray.com/sbt/sbt-plugin-releases/"))(Resolver.ivyStylePatterns),
   Resolver.url("typesafe-repo", url(
@@ -31,3 +32,5 @@ addSbtPlugin("com.github.sbt" % "sbt-cpd" % "2.0.0")
 addSbtPlugin("com.github.gseitz" % "sbt-release" % "1.0.12")
 
 addSbtPlugin("pl.project13.scala" % "sbt-jmh" % "0.3.7")
+
+addSbtPlugin("cchantep" % "sbt-scaladoc-compiler" % "0.1")

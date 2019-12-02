@@ -2,7 +2,9 @@ import scala.concurrent.{ Await, Future, Promise }
 import scala.concurrent.duration._
 
 import reactivemongo.core.protocol.Response
+
 import reactivemongo.api.{ Cursor, DB, QueryOpts }
+import reactivemongo.api.bson.BSONDocument
 
 import _root_.tests.Common
 

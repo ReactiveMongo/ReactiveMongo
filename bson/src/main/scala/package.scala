@@ -2,6 +2,8 @@ package reactivemongo.bson
 
 /**
  * {{{
+ * import reactivemongo.bson._
+ *
  * // { "name": "Johny", "surname": "Doe", "age": 28, "months": [1, 2, 3] }
  * document ++ ("name" -> "Johny") ++ ("surname" -> "Doe") ++
  * ("age" -> 28) ++ ("months" -> array(1, 2, 3))

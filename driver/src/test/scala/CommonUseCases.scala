@@ -3,6 +3,8 @@ import scala.concurrent.duration.FiniteDuration
 
 import reactivemongo.api._
 
+import reactivemongo.api.bson.{ BSONDocument, BSONInteger, BSONString }
+
 import org.specs2.concurrent.ExecutionEnv
 
 import _root_.tests.Common
@@ -86,7 +88,7 @@ final class CommonUseCases(implicit ee: ExecutionEnv)
     "find them with a projection" >> {
       val pjn = BSONDocument("name" -> 1, "age" -> 1, "something" -> 1)
 
-      def findSpec(c: BSONCollection, t: FiniteDuration) = {
+      def findSpec(c: DefaultCollection, t: FiniteDuration) = {
         def it = c.find(BSONDocument.empty, pjn).
           options(QueryOpts().batchSize(2)).cursor[BSONDocument]()
 

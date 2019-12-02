@@ -20,7 +20,20 @@ private[commands] trait AggregationPipeline[P <: SerializationPack] {
    * For example for `{ \$sample: { size: 2 } }`
    *
    * {{{
-   * PipelineOperator(BSONDocument("\$sample" -> BSONDocument("size" -> 2)))
+   * import scala.concurrent.ExecutionContext
+   *
+   * import reactivemongo.api.bson.{ BSONDocument, BSONInteger, BSONString }
+   * import reactivemongo.api.bson.collection.BSONCollection
+   *
+   * def foo(coll: BSONCollection)(implicit ec: ExecutionContext) =
+   *   coll.aggregateWith[BSONDocument]() { agg =>
+   *     import agg.PipelineOperator
+   *
+   *     val stage = PipelineOperator(BSONDocument(
+   *       f"$$sample" -> BSONDocument("size" -> 2)))
+   *
+   *     stage -> List.empty
+   *   }
    * }}}
    */
   object PipelineOperator {

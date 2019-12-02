@@ -21,23 +21,29 @@ private[reactivemongo] trait GenericCollectionMetaCommands[P <: SerializationPac
    * Creates a view on this collection, using an aggregation pipeline.
    *
    * {{{
-   * import coll.BatchCommands.AggregationFramework
-   * import AggregationFramework.{ Group, Match, SumField }
+   * import scala.concurrent.ExecutionContext
    *
-   * // See http://docs.mongodb.org/manual/tutorial/aggregation-zip-code-data-set/#return-states-with-populations-above-10-million
+   * import reactivemongo.api.bson.{ BSONDocument, BSONString }
+   * import reactivemongo.api.bson.collection.BSONCollection
    *
-   * // Create 'myview'
-   * coll.createView(
-   *   name = "myview",
-   *   operator = Group(BSONString(f"$$state"))(
-   *     "totalPop" -> SumField("population")),
-   * pipeline = Seq(
-   * Match(document("totalPop" -> document(f"$$gte" -> 10000000L)))))
+   * def foo(coll: BSONCollection)(implicit ec: ExecutionContext) = {
+   *   import coll.aggregationFramework
+   *   import aggregationFramework.{ Group, Match, SumField }
    *
+   *   // See http://docs.mongodb.org/manual/tutorial/aggregation-zip-code-data-set/#return-states-with-populations-above-10-million
    *
-   * // Then the view can be resolved as any collection
-   * // (but won't be writeable)
-   * val view: BSONCollection = db("myview")
+   *   // Create 'myview'
+   *   coll.createView(
+   *     name = "myview",
+   *     operator = Group(BSONString(f"$$state"))(
+   *       "totalPop" -> SumField("population")),
+   *     pipeline = Seq(Match(
+   *       BSONDocument("totalPop" -> BSONDocument(f"$$gte" -> 10000000L)))))
+   *
+   *   // Then the view can be resolved as any collection
+   *   // (but won't be writeable)
+   *   val view: BSONCollection = coll.db("myview")
+   * }
    * }}}
    *
    * @param name the name of the view to be created

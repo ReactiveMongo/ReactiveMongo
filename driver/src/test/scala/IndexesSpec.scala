@@ -9,6 +9,9 @@ import reactivemongo.api.indexes.{ Index, IndexType }, IndexType.{
   Geo2DSpherical
 }
 import reactivemongo.api.commands.CommandError
+
+import reactivemongo.api.bson.{ BSONDocument, BSONString }
+
 import reactivemongo.core.errors.DatabaseException
 
 import reactivemongo.api.tests.{ decoder, pack, indexOptions, Pack }
@@ -42,7 +45,7 @@ final class IndexesSpec(implicit ee: ExecutionEnv)
 
   "Geo Indexes" should {
     {
-      def spec(c: BSONCollection, timeout: FiniteDuration) = {
+      def spec(c: DefaultCollection, timeout: FiniteDuration) = {
         c.insert(ordered = true).many((1 until 10).map { i =>
           BSONDocument("loc" -> BSONArray(i + 2D, i * 2D))
         }).map(_ => {}) must beTypedEqualTo({}).await(1, timeout)
@@ -58,7 +61,7 @@ final class IndexesSpec(implicit ee: ExecutionEnv)
     }
 
     {
-      def spec(c: BSONCollection, timeout: FiniteDuration) =
+      def spec(c: DefaultCollection, timeout: FiniteDuration) =
         c.indexesManager.ensure(index(
           List("loc" -> Geo2D),
           options = LegacyDoc("min" -> -95, "max" -> 95, "bits" -> 28))).
@@ -86,7 +89,7 @@ final class IndexesSpec(implicit ee: ExecutionEnv)
     }
 
     {
-      def spec(c: BSONCollection, timeout: FiniteDuration) = {
+      def spec(c: DefaultCollection, timeout: FiniteDuration) = {
         def future = c.indexesManager.list().map {
           _.filter(_.name.get == "loc_2d")
         }.filter(!_.isEmpty).map(_.apply(0))
