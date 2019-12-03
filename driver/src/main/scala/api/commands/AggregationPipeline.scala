@@ -41,4 +41,9 @@ private[commands] trait AggregationPipeline[P <: SerializationPack] {
       val makePipe = pipe
     }
   }
+
+  /**
+   * Aggregation pipeline (with at least one stage operator)
+   */
+  type Pipeline = (PipelineOperator, List[PipelineOperator])
 }

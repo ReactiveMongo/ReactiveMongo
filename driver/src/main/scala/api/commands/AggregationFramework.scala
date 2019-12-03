@@ -278,15 +278,29 @@ trait AggregationFramework[P <: SerializationPack]
   }
 
   /**
-   * Processes multiple aggregation pipelines within a single stage on the same set of input documents.
-   * Each sub-pipeline has its own field in the output document where its results are stored as an array of documents.
-   * https://docs.mongodb.com/manual/reference/operator/aggregation/facet/
+   * Processes multiple aggregation pipelines within a single stage
+   * on the same set of input documents.
    *
-   * @param specifications The subpipelines to run.
+   * Each sub-pipeline has its own field in the output document
+   * where its results are stored as an array of documents.
+   *
+   * @param specifications the subpipelines to run
+   * @see https://docs.mongodb.com/manual/reference/operator/aggregation/facet/
    */
-  case class Facet(specifications: pack.Document) extends PipelineOperator {
-    val makePipe: pack.Document = builder.document(Seq(
-      builder.elementProducer(f"$$facet", specifications)))
+  case class Facet(
+    specifications: Iterable[(String, Pipeline)]) extends PipelineOperator {
+
+    val makePipe: pack.Document = {
+      import builder.{ document, elementProducer => elem }
+
+      val specDoc = document(specifications.map {
+        case (name, (firstOp, subOps)) => elem(name, builder.array(
+          firstOp.makePipe, subOps.map(_.makePipe)))
+
+      }.toSeq)
+
+      document(Seq(elem(f"$$facet", specDoc)))
+    }
   }
 
   /**

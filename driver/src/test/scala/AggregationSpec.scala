@@ -592,11 +592,10 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
         Lookup(inventory.name, "specs", "size", "docs"),
         Match(document("docs" -> document(f"$$ne" -> BSONArray()))))
 
-      orders.aggregateWith1[BSONDocument]() {
-        framework =>
-          import framework._
+      orders.aggregateWith1[BSONDocument]() { framework =>
+        import framework._
 
-          UnwindField("specs") -> afterUnwind
+        UnwindField("specs") -> afterUnwind
       }.headOption must beSome(expected).await(0, timeout) and {
         orders.aggregateWith1[BSONDocument]() {
           framework =>
@@ -1382,6 +1381,24 @@ db.accounts.aggregate([
     }
   }
   section("gt_mongo32")
+
+  "Facet" should {
+    // See https://docs.mongodb.com/manual/reference/operator/aggregation/facet/
+
+    "be represented as expected" in {
+      import coll.aggregationFramework.{ Count, Facet, Out, UnwindField }
+
+      Facet(Seq(
+        "foo" -> (UnwindField("bar"), List(Count("c"))),
+        "lorem" -> (Out("ipsum"), List.empty))).makePipe must_=== BSONDocument(
+        f"$$facet" -> BSONDocument(
+          "foo" -> BSONArray(
+            BSONDocument(f"$$unwind" -> f"$$bar"),
+            BSONDocument(f"$$count" -> "c")),
+          "lorem" -> BSONArray(
+            BSONDocument(f"$$out" -> "ipsum"))))
+    } tag "wip"
+  }
 
   // ---
 
