@@ -108,6 +108,8 @@ trait GenericCollection[P <: SerializationPack with Singleton]
   lazy val aggregationFramework: AggregationFramework =
     BatchCommands.AggregationFramework
 
+  import aggregationFramework.{ Pipeline => AggregationPipeline }
+
   /**
    * Alias for [[reactivemongo.api.commands.AggregationFramework.PipelineOperator]]
    */
@@ -661,7 +663,7 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * @param cf $cursorFlattenerParam
    */
   @deprecated("Use [[aggregateWith]]", "0.16.0")
-  def aggregateWith1[T](explain: Boolean = false, allowDiskUse: Boolean = false, bypassDocumentValidation: Boolean = false, readConcern: Option[ReadConcern] = None, readPreference: ReadPreference = ReadPreference.primary, batchSize: Option[Int] = None)(f: AggregationFramework => (PipelineOperator, List[PipelineOperator]))(implicit ec: ExecutionContext, reader: pack.Reader[T], cf: CursorFlattener[Cursor], cp: CursorProducer[T]): cp.ProducedCursor = aggregateWith[T](explain, allowDiskUse, bypassDocumentValidation, readConcern, readPreference, batchSize)(f)
+  def aggregateWith1[T](explain: Boolean = false, allowDiskUse: Boolean = false, bypassDocumentValidation: Boolean = false, readConcern: Option[ReadConcern] = None, readPreference: ReadPreference = ReadPreference.primary, batchSize: Option[Int] = None)(f: AggregationFramework => AggregationPipeline)(implicit ec: ExecutionContext, reader: pack.Reader[T], cf: CursorFlattener[Cursor], cp: CursorProducer[T]): cp.ProducedCursor = aggregateWith[T](explain, allowDiskUse, bypassDocumentValidation, readConcern, readPreference, batchSize)(f)
 
   /**
    * $aggregation.
@@ -684,7 +686,7 @@ trait GenericCollection[P <: SerializationPack with Singleton]
     readConcern: Option[ReadConcern] = None,
     readPreference: ReadPreference = ReadPreference.primary,
     batchSize: Option[Int] = None)(
-    f: AggregationFramework => (PipelineOperator, List[PipelineOperator]))(
+    f: AggregationFramework => AggregationPipeline)(
     implicit
     reader: pack.Reader[T],
     cp: CursorProducer[T]): cp.ProducedCursor = {
