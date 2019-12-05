@@ -1397,7 +1397,7 @@ db.accounts.aggregate([
             BSONDocument(f"$$count" -> "c")),
           "lorem" -> BSONArray(
             BSONDocument(f"$$out" -> "ipsum"))))
-    } tag "wip"
+    }
   }
 
   // ---

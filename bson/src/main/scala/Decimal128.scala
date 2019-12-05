@@ -68,7 +68,6 @@ private[bson] object Decimal128 {
           }
         }
 
-        // TODO: common with computeLow
         @annotation.tailrec
         def computeHigh(i: Int, localHigh: Long): Long = {
           if (i >= bitLength) localHigh

@@ -322,7 +322,6 @@ private object MacroImpl {
         else { i: Int => Select(tuple, "_" + (i + 1)) }
       }
 
-      // TODO: buf newTermName
       val bufName = newTermName("buf")
 
       // buf += ${pname} -> ${bsv}

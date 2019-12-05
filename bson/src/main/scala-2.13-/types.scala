@@ -619,7 +619,7 @@ case class BSONSymbol(value: String) extends BSONValue {
 /**
  * BSON scoped JavaScript value.
  *
- * @param value The JavaScript source code. TODO
+ * @param value The JavaScript source code.
  */
 case class BSONJavaScriptWS(value: String)
   extends BSONValue {
