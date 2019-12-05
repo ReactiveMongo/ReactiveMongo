@@ -41,7 +41,7 @@ object DefaultBufferHandler extends BufferHandler {
     (0x02: Byte) -> BSONStringBufferHandler,
     (0x03: Byte) -> BSONDocumentBufferHandler,
     (0x04: Byte) -> BSONArrayBufferHandler, // array
-    (0x05: Byte) -> BSONBinaryBufferHandler, // binary TODO
+    (0x05: Byte) -> BSONBinaryBufferHandler, // binary
     (0x06: Byte) -> BSONUndefinedBufferHandler, // undefined,
     (0x07: Byte) -> BSONObjectIDBufferHandler, // objectid,
     (0x08: Byte) -> BSONBooleanBufferHandler, // boolean
@@ -109,7 +109,7 @@ object DefaultBufferHandler extends BufferHandler {
 
       val stream = makeStream
 
-      stream.force // TODO remove
+      stream.force
 
       new BSONDocument(stream)
     }
@@ -146,7 +146,7 @@ object DefaultBufferHandler extends BufferHandler {
         } else Stream.empty
       }
       val stream = makeStream
-      stream.force // TODO remove
+      stream.force
       new BSONArray(stream)
     }
   }
@@ -156,7 +156,7 @@ object DefaultBufferHandler extends BufferHandler {
       buffer.writeInt(binary.value.readable)
       buffer.writeByte(binary.subtype.value.toByte)
       val bin = binary.value.slice(binary.value.readable)
-      buffer.writeBytes(bin.readArray(bin.readable)) // TODO
+      buffer.writeBytes(bin.readArray(bin.readable))
       buffer
     }
 

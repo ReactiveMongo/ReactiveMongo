@@ -337,7 +337,6 @@ final class MacroSpec extends org.specs2.mutable.Specification {
       }
 
       "along with Key annotation" in {
-        // TODO: Macros.reader or handler (manage Ignore with reader?)
         implicit val handler: BSONDocumentWriter[IgnoredAndKey] =
           Macros.writer[IgnoredAndKey]
 

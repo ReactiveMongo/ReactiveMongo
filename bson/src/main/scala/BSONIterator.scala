@@ -10,7 +10,7 @@ sealed trait BSONIterator extends Iterator[(String, BSONValue)] {
   val startIndex = buffer.index
   val documentSize = buffer.readInt
 
-  @SuppressWarnings(Array("OptionGet")) // TODO: Review
+  @SuppressWarnings(Array("OptionGet"))
   def next: (String, BSONValue) = {
     val code = buffer.readByte
     buffer.readString -> DefaultBufferHandler.handlersByCode.get(code).map(_.read(buffer)).get

@@ -169,7 +169,6 @@ class LowLevelBsonDocReader[A <: ReadableBuffer](rbuf: A) {
         }
 
         case 0x0F =>
-          // TODO
           ???
 
         case x => throw new RuntimeException(s"unexpected type $x")
@@ -338,7 +337,7 @@ class LowLevelBsonDocWriter[A <: WritableBuffer](buf: A) {
   def openBinary(key: String, tpe: Byte): this.type = {
     buf.writeByte(0x05)
     buf.writeCString(key)
-    mark(0x05) // TODO
+    mark(0x05)
     buf.writeInt(0) // length
     buf.writeByte(tpe)
     this

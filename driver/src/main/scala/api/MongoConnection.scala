@@ -131,7 +131,6 @@ class MongoConnection(
 
   // --- Internals ---
 
-  // TODO: Review
   private[api] var history = () => InternalState.empty
 
   /** Whether this connection has been killed/is closed */
