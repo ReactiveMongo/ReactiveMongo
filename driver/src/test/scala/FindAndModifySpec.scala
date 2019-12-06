@@ -2,7 +2,7 @@ import scala.concurrent.duration.FiniteDuration
 
 import reactivemongo.api.commands._
 
-import reactivemongo.api.bson.{ BSONDocument, BSONString }
+import reactivemongo.api.bson.BSONDocument
 
 import org.specs2.concurrent.ExecutionEnv
 

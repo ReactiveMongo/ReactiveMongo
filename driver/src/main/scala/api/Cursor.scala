@@ -26,6 +26,26 @@ import reactivemongo.core.protocol.Response
 /**
  * Cursor over results from MongoDB.
  *
+ * {{{
+ * import scala.concurrent.{ ExecutionContext, Future }
+ *
+ * import reactivemongo.api.Cursor
+ * import reactivemongo.api.bson.{ BSONDocument, Macros }
+ * import reactivemongo.api.bson.collection.BSONCollection
+ *
+ * case class User(name: String, pass: String)
+ *
+ * implicit val handler = Macros.reader[User]
+ *
+ * def findUsers(coll: BSONCollection)(
+ *   implicit ec: ExecutionContext): Future[List[User]] =
+ *   coll.find(BSONDocument("enabled" -> true)).
+ *     cursor[User](). // obtain cursor for User results
+ *     collect[List](
+ *       maxDocs = 10,
+ *       err = Cursor.FailOnError[List[User]]())
+ * }}}
+ *
  * @tparam T the type parsed from each result document
  * @define maxDocsParam the maximum number of documents to be retrieved (-1 for unlimited)
  * @define maxDocsWarning The actual document count can exceed this, when this maximum devided by the batch size given a non-zero remainder
@@ -54,6 +74,7 @@ trait Cursor[T] extends CursorCompatAPI[T] {
    * @param err $errorHandlerParam
    * @tparam A $resultTParam
    */
+  @deprecated("Internal: will be made private", "0.19.4")
   def foldResponses[A](z: => A, maxDocs: Int = -1)(suc: (A, Response) => Cursor.State[A], err: ErrorHandler[A] = FailOnError[A]())(implicit @deprecatedName(Symbol("ctx")) ec: ExecutionContext): Future[A]
 
   /**
@@ -65,6 +86,7 @@ trait Cursor[T] extends CursorCompatAPI[T] {
    * @param err $errorHandlerParam
    * @tparam A $resultTParam
    */
+  @deprecated("Internal: will be made private", "0.19.4")
   def foldResponsesM[A](z: => A, maxDocs: Int = -1)(suc: (A, Response) => Future[Cursor.State[A]], err: ErrorHandler[A] = FailOnError[A]())(implicit @deprecatedName(Symbol("ctx")) ec: ExecutionContext): Future[A]
 
   /**
@@ -75,6 +97,18 @@ trait Cursor[T] extends CursorCompatAPI[T] {
    * @param suc $sucRespParam.
    * @param err $errorHandlerParam
    * @tparam A $resultTParam
+   *
+   * {{{
+   * import reactivemongo.api.Cursor
+   * import scala.concurrent.ExecutionContext
+   *
+   * case class Person(name: String, age: Int)
+   *
+   * def foo(cursor: Cursor[Person])(implicit ec: ExecutionContext) =
+   *   cursor.foldBulks(Nil: Seq[Person])(
+   *     (s, bulk: Iterator[Person]) => Cursor.Cont(s ++ bulk),
+   *     { (l, e) => println("last valid value: " + l); Cursor.Fail(e) })
+   * }}}
    */
   def foldBulks[A](z: => A, maxDocs: Int = -1)(suc: (A, Iterator[T]) => Cursor.State[A], err: ErrorHandler[A] = FailOnError[A]())(implicit @deprecatedName(Symbol("ctx")) ec: ExecutionContext): Future[A]
 
@@ -86,6 +120,23 @@ trait Cursor[T] extends CursorCompatAPI[T] {
    * @param suc $sucRespParam. $sucSafeWarning.
    * @param err $errorHandlerParam
    * @tparam A $resultTParam
+   *
+   * {{{
+   * import scala.concurrent.{ ExecutionContext, Future }
+   * import reactivemongo.api.Cursor
+   *
+   * case class Person(name: String, age: Int)
+   *
+   * def foo(cursor: Cursor[Person])(implicit ec: ExecutionContext) =
+   *   cursor.foldBulksM(Nil: Seq[Person])(
+   *     { (s, bulk: Iterator[Person]) =>
+   *      Future.successful(Cursor.Cont(s ++ bulk))
+   *    },
+   *     { (l, e) =>
+   *       println("last valid value: " + l)
+   *       Cursor.Fail[Seq[Person]](e)
+   *     })
+   * }}}
    */
   def foldBulksM[A](z: => A, maxDocs: Int = -1)(suc: (A, Iterator[T]) => Future[Cursor.State[A]], err: ErrorHandler[A] = FailOnError[A]())(implicit @deprecatedName(Symbol("ctx")) ec: ExecutionContext): Future[A]
 

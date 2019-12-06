@@ -8,7 +8,6 @@ import reactivemongo.api.bson.BSONDocument
 
 import _root_.tests.Common
 
-import reactivemongo.api.TestCompat._
 import reactivemongo.api.tests.{ decoder, reader => docReader }
 
 trait TailableCursorSpec { specs: CursorSpec =>

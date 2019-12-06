@@ -7,9 +7,18 @@ import scala.concurrent.duration.FiniteDuration
  * The default uses 10 retries:
  * 125ms, 250ms, 375ms, 500ms, 625ms, 750ms, 875ms, 1s, 1125ms, 1250ms
  *
+ * {{{
+ * import scala.concurrent.duration._
+ *
+ * reactivemongo.api.FailoverStrategy(
+ *   initialDelay = 150.milliseconds,
+ *   retries = 20,
+ *   delayFactor = { `try` => `try` * 1.5D })
+ * }}}
+ *
  * @param initialDelay the initial delay between the first failed attempt and the next one.
  * @param retries the number of retries to do before giving up.
- * @param delayFactor a function that takes the current iteration and returns a factor to be applied to the initialDelay (default: [[FailoverStrategy.defaultFactor]])
+ * @param delayFactor a function that takes the current iteration and returns a factor to be applied to the initialDelay (default: [[FailoverStrategy.defaultFactor]]; see [[FailoverStrategy.FactorFun]])
  */
 case class FailoverStrategy(
   initialDelay: FiniteDuration = FiniteDuration(100, "ms"),
@@ -24,6 +33,7 @@ case class FailoverStrategy(
   }
 }
 
+/** [[FailoverStrategy]] utilities */
 object FailoverStrategy {
   /** The default strategy */
   val default = FailoverStrategy()

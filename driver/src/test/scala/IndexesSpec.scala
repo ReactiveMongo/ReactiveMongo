@@ -10,7 +10,7 @@ import reactivemongo.api.indexes.{ Index, IndexType }, IndexType.{
 }
 import reactivemongo.api.commands.CommandError
 
-import reactivemongo.api.bson.{ BSONDocument, BSONString }
+import reactivemongo.api.bson.BSONDocument
 
 import reactivemongo.core.errors.DatabaseException
 

@@ -341,10 +341,12 @@ object DefaultCursor {
 
     @inline private def syncSuccess[T, U](f: (T, U) => State[T])(implicit ec: ExecutionContext): (T, U) => Future[State[T]] = { (a: T, b: U) => Future(f(a, b)) }
 
+    @deprecated("Internal: will be made private", "0.19.4")
     def foldResponses[T](z: => T, maxDocs: Int = -1)(suc: (T, Response) => State[T], err: (T, Throwable) => State[T])(implicit @deprecatedName(Symbol("ctx")) ec: ExecutionContext): Future[T] = FoldResponses(z, makeRequest(maxDocs)(_: ExecutionContext),
       nextResponse(maxDocs), killCursors _, syncSuccess(suc), err, maxDocs)(
         connection.actorSystem, ec)
 
+    @deprecated("Internal: will be made private", "0.19.4")
     def foldResponsesM[T](z: => T, maxDocs: Int = -1)(suc: (T, Response) => Future[State[T]], err: (T, Throwable) => State[T])(implicit @deprecatedName(Symbol("ctx")) ec: ExecutionContext): Future[T] = FoldResponses(z, makeRequest(maxDocs)(_: ExecutionContext),
       nextResponse(maxDocs), killCursors _, suc, err, maxDocs)(
         connection.actorSystem, ec)

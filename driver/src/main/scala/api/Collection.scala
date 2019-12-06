@@ -19,15 +19,14 @@ package reactivemongo.api
  * A MongoDB Collection, resolved from a [[reactivemongo.api.DefaultDB]].
  *
  * You should consider the generic API
- * ([[reactivemongo.api.collections.GenericCollection]])
- * and the default [[reactivemongo.api.collections.bson.BSONCollection]].
+ * ([[reactivemongo.api.collections.GenericCollection]]).
  *
  * @define failoverStrategyParam the failover strategy to override the default one
  */
 trait Collection {
   import collections.bson.BSONCollectionProducer
 
-  /** The database which this collection belong to. */
+  /** The database which this collection belongs to. */
   def db: DB
 
   /** The name of the collection. */
@@ -57,6 +56,7 @@ trait Collection {
    * @param name the name of another collection
    * @param failoverStrategy $failoverStrategyParam
    */
+  @deprecated("Use `DB.collection(name)`", "0.19.4")
   def sibling[C <: Collection](name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit producer: CollectionProducer[C] = BSONCollectionProducer): C = producer.apply(db, name, failoverStrategy)
 }
 
@@ -67,6 +67,8 @@ trait Collection {
  */
 trait CollectionProducer[+C <: Collection] {
   /**
+   * Resolve a [[Collection]] reference.
+   *
    * @param db the database which this collection belong to
    * @param name the name of the collection
    * @param failoverStrategy the failover strategy for the collection operations

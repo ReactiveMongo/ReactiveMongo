@@ -19,6 +19,7 @@ case class DBUserRole(
 /** User role extractor */
 object UserRole {
   def apply(name: String): UserRole = new UserRole(name)
+
   def unapply(role: UserRole): Option[String] = Some(role.name)
 }
 

@@ -11,6 +11,7 @@ import reactivemongo.api.indexes.CollectionIndexesManager
 /**
  * A mixin that provides commands about this Collection itself.
  *
+ * @define createDescription Creates this collection
  * @define autoIndexIdParam If true should automatically add an index on the `_id` field. By default, regular collections will have an indexed `_id` field, in contrast to capped collections. This MongoDB option is deprecated and will be removed in a future release.
  * @define cappedSizeParam the size of the collection (number of bytes)
  * @define cappedMaxParam the maximum number of documents this capped collection can contain
@@ -22,10 +23,10 @@ trait CollectionMetaCommands { self: Collection =>
   private implicit lazy val createWriter = CreateCollection.writer(command.pack)
 
   /**
-   * Creates this collection.
+   * $createDescription.
    *
-   * The returned future will be completed with an error if
-   * this collection already exists.
+   * The returned future will be completed,
+   * with an error if this collection already exists.
    *
    * {{{
    * import scala.concurrent.ExecutionContext
@@ -45,6 +46,17 @@ trait CollectionMetaCommands { self: Collection =>
     command.unboxed(self, Create(None, false), ReadPreference.primary)
 
   /**
+   * $createDescription.
+   *
+   * {{{
+   * import scala.concurrent.{ ExecutionContext, Future }
+   * import reactivemongo.api.CollectionMetaCommands
+   *
+   * def createIfNotExists(coll: CollectionMetaCommands)(
+   *   implicit ec: ExecutionContext): Future[Unit] =
+   *   coll.create(failsIfExists = true)
+   * }}}
+   *
    * @param failsIfExists if true fails if the collection already exists (default: false)
    */
   def create(@deprecatedName(Symbol("autoIndexId")) failsIfExists: Boolean = false)(implicit ec: ExecutionContext): Future[Unit] = create().recover {
@@ -56,7 +68,7 @@ trait CollectionMetaCommands { self: Collection =>
   }
 
   /**
-   * Creates this collection as a capped one.
+   * $createDescription as a capped one.
    *
    * The returned future will be completed with an error if this collection already exists.
    *
@@ -64,7 +76,10 @@ trait CollectionMetaCommands { self: Collection =>
    * @param maxDocuments $cappedMaxParam
    * @param autoIndexId $autoIndexIdParam
    */
-  def createCapped(size: Long, maxDocuments: Option[Int], autoIndexId: Boolean = false)(implicit ec: ExecutionContext): Future[Unit] =
+  def createCapped(
+    size: Long,
+    maxDocuments: Option[Int],
+    autoIndexId: Boolean = false)(implicit ec: ExecutionContext): Future[Unit] =
     command.unboxed(
       self,
       Create(Some(Capped(size, maxDocuments)), autoIndexId),
@@ -95,6 +110,18 @@ trait CollectionMetaCommands { self: Collection =>
    * the returned future will be completed with false.
    *
    * Otherwise in case, the future will be completed with the encountered error.
+   *
+   *
+   * {{{
+   * import scala.concurrent.{ ExecutionContext, Future }
+   * import reactivemongo.api.CollectionMetaCommands
+   *
+   * def dropIfNotFound(coll: CollectionMetaCommands)(
+   *   implicit ec: ExecutionContext): Future[Boolean] =
+   *   coll.drop(failIfNotFound = true)
+   * }}}
+   *
+   * @param failIfNotFound the flag to request whether it should fail
    */
   def drop(failIfNotFound: Boolean)(implicit ec: ExecutionContext): Future[Boolean] = {
     command(self, DropCollection, ReadPreference.primary).flatMap {
@@ -149,7 +176,20 @@ trait CollectionMetaCommands { self: Collection =>
    */
   def stats(scale: Int)(implicit ec: ExecutionContext): Future[CollStatsResult] = command(self, CollStats(Some(scale)), ReadPreference.primary)
 
-  /** Returns an index manager for this collection. */
+  /**
+   * Returns an index manager for this collection.
+   *
+   * {{{
+   * import scala.concurrent.{ ExecutionContext, Future }
+   * import reactivemongo.api.CollectionMetaCommands
+   *
+   * def listIndexes(coll: CollectionMetaCommands)(
+   *   implicit ec: ExecutionContext): Future[List[String]] =
+   *   coll.indexesManager.list().map(_.flatMap { idx =>
+   *     idx.name.toList
+   *   })
+   * }}}
+   */
   def indexesManager(implicit ec: ExecutionContext): CollectionIndexesManager =
     CollectionIndexesManager(self.db, name)
 

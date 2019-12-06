@@ -9,40 +9,77 @@ import reactivemongo.api.SerializationPack
  *
  * Consider reading [[http://www.mongodb.org/display/DOCS/Indexes the documentation about indexes in MongoDB]].
  *
- * @param key The index key (it can be composed of multiple fields). This list should not be empty!
- * @param name The name of this index. If you provide none, a name will be computed for you.
- * @param unique Enforces uniqueness.
- * @param background States if this index should be built in background. You should read [[http://www.mongodb.org/display/DOCS/Indexes#Indexes-background%3Atrue the documentation about background indexing]] before using it.
- * @param dropDups States if duplicates should be discarded (if unique = true). Warning: you should read [[http://www.mongodb.org/display/DOCS/Indexes#Indexes-dropDups%3Atrue the documentation]].
- * @param sparse States if the index to build should only consider the documents that have the indexed fields. See [[http://www.mongodb.org/display/DOCS/Indexes#Indexes-sparse%3Atrue the documentation]] on the consequences of such an index.
- * @param version Indicates the [[http://www.mongodb.org/display/DOCS/Index+Versions version]] of the index (1 for >= 2.0, else 0). You should let MongoDB decide.
- * @param options Optional parameters for this index (typically specific to an IndexType like Geo2D).
- * @param partialFilter Optional [[https://docs.mongodb.com/manual/core/index-partial/#partial-index-with-unique-constraints partial filter]] (since MongoDB 3.2)
+ * {{{
+ * import reactivemongo.api.bson.BSONDocument
+ * import reactivemongo.api.bson.collection.BSONSerializationPack
+ * import reactivemongo.api.indexes.{ Index, IndexType }
+ *
+ * val bsonIndex = Index(BSONSerializationPack)(
+ *   key = Seq("name" -> IndexType.Ascending),
+ *   name = Some("name_idx"),
+ *   unique = false,
+ *   background = false,
+ *   dropDups = false,
+ *   sparse = false,
+ *   version = None,
+ *   partialFilter = None,
+ *   options = BSONDocument.empty)
+ * }}}
  */
 sealed abstract class Index extends Product with Serializable {
   type Pack <: SerializationPack
   val pack: Pack
 
-  // TODO: Remove impl
-  def key: Seq[(String, IndexType)] = Seq.empty
+  /**
+   * The index key (it can be composed of multiple fields).
+   * This list should not be empty!
+   */
+  def key: Seq[(String, IndexType)] = Seq.empty // TODO: Remove impl
 
+  /**
+   * The name of this index.
+   * If you provide none, a name will be computed for you.
+   */
   def name: Option[String] = None
 
+  /** Enforces uniqueness */
   def unique: Boolean = false
 
+  /**
+   * Ff this index should be built in background.
+   * You should read [[http://www.mongodb.org/display/DOCS/Indexes#Indexes-background%3Atrue the documentation about background indexing]] before using it.
+   */
   def background: Boolean = false
 
+  /**
+   * If duplicates should be discarded (if unique = true).
+   * _Warning_: you should read [[http://www.mongodb.org/display/DOCS/Indexes#Indexes-dropDups%3Atrue the documentation]].
+   */
   @deprecated("Since MongoDB 2.6", "0.19.1")
   def dropDups: Boolean = false
 
+  /**
+   * If the index to build should only consider the documents
+   * that have the indexed fields.
+   * See [[http://www.mongodb.org/display/DOCS/Indexes#Indexes-sparse%3Atrue the documentation]] on the consequences of such an index.
+   */
   def sparse: Boolean = false
 
+  /**
+   * Indicates the [[http://www.mongodb.org/display/DOCS/Index+Versions version]] of the index (1 for >= 2.0, else 0). You should let MongoDB decide.
+   */
   def version: Option[Int] = None
 
   // TODO: storageEngine (new for Mongo3)
 
+  /**
+   * Optional [[https://docs.mongodb.com/manual/core/index-partial/#partial-index-with-unique-constraints partial filter]] (since MongoDB 3.2)
+   */
   private[api] def partialFilterDocument: Option[pack.Document]
 
+  /**
+   * Optional parameters for this index (typically specific to an IndexType like Geo2D).
+   */
   private[api] def optionDocument: pack.Document
 
   @deprecated("Will be internal", "0.19.0")

@@ -37,8 +37,8 @@ final class CommandSpec(implicit ee: ExecutionEnv)
         val reIndexDoc = BSONDocument("reIndex" -> coll)
 
         db(coll).create() must beEqualTo({}).await(0, t) and {
-          runner.apply(db, runner.rawCommand(reIndexDoc)).one[BSONDocument](
-            ReadPreference.primary) must beLike[BSONDocument] {
+          db.runCommand(reIndexDoc, db.failoverStrategy).
+            one[BSONDocument](ReadPreference.primary) must beLike[BSONDocument] {
               case doc => decoder.double(doc, "ok") must beSome(1)
             }.await(1, t)
         }

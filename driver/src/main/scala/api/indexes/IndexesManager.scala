@@ -34,35 +34,79 @@ import scala.concurrent.{ Future, ExecutionContext }
 /**
  * Indexes manager at database level.
  *
+ * @define createDescription Creates the given index
+ * @define dropDescription Drops the specified index
  * @define collectionNameParam the collection name
  * @define nsIndexToCreate the index to create
  * @define droppedCount The number of indexes that were dropped.
  */
 sealed trait IndexesManager {
 
-  /** Gets a future list of all the index on this database. */
+  /**
+   * Lists all the index on this database.
+   *
+   * {{{
+   * import scala.concurrent.{ ExecutionContext, Future }
+   *
+   * import reactivemongo.api.DefaultDB
+   * import reactivemongo.api.indexes.NSIndex
+   *
+   * def listIndexes(db: DefaultDB)(
+   *   implicit ec: ExecutionContext): Future[List[String]] =
+   *   db.indexesManager.list().map(_.flatMap { ni: NSIndex =>
+   *     ni.index.name.toList
+   *   })
+   * }}}
+   */
   def list(): Future[List[NSIndex]]
 
   /**
-   * Creates the given index only if it does not exist on this database.
+   * $createDescription only if it does not exist on this database.
    *
    * The following rules are used to check the matching index:
    * - if `nsIndex.isDefined`, it checks using the index name,
    * - otherwise it checks using the key.
    *
-   * Warning: given the options you choose, and the data to index, it can be a long and blocking operation on the database.
+   * {{{
+   * import scala.concurrent.{ ExecutionContext, Future }
+   *
+   * import reactivemongo.api.DefaultDB
+   * import reactivemongo.api.indexes.NSIndex
+   *
+   * def ensureIndexes(
+   *   db: DefaultDB, is: Seq[NSIndex])(
+   *   implicit ec: ExecutionContext): Future[Unit] =
+   *   Future.sequence(
+   *     is.map(idx => db.indexesManager.ensure(idx))).map(_ => {})
+   * }}}
+   *
+   * _Warning_: given the options you choose, and the data to index,
+   * it can be a long and blocking operation on the database.
    * You should really consider reading [[http://www.mongodb.org/display/DOCS/Indexes]] before doing this, especially in production.
    *
    * @param nsIndex $nsIndexToCreate
-   *
    * @return true if the index was created, false if it already exists.
    */
   def ensure(nsIndex: NSIndex): Future[Boolean]
 
   /**
-   * Creates the given index.
+   * $createDescription.
    *
-   * Warning: given the options you choose, and the data to index, it can be a long and blocking operation on the database.
+   * {{{
+   * import scala.concurrent.{ ExecutionContext, Future }
+   *
+   * import reactivemongo.api.DefaultDB
+   * import reactivemongo.api.indexes.NSIndex
+   *
+   * def createIndexes(
+   *   db: DefaultDB, is: Seq[NSIndex])(
+   *   implicit ec: ExecutionContext): Future[Unit] =
+   *   Future.sequence(
+   *     is.map(idx => db.indexesManager.create(idx))).map(_ => {})
+   * }}}
+   *
+   * _Warning_: given the options you choose, and the data to index,
+   * it can be a long and blocking operation on the database.
    * You should really consider reading [[http://www.mongodb.org/display/DOCS/Indexes]] before doing this, especially in production.
    *
    * @param nsIndex $nsIndexToCreate
@@ -70,7 +114,18 @@ sealed trait IndexesManager {
   def create(nsIndex: NSIndex): Future[WriteResult]
 
   /**
-   * Drops the given index on the given collection.
+   * $dropDescription.
+   *
+   * {{{
+   * import scala.concurrent.{ ExecutionContext, Future }
+   *
+   * import reactivemongo.api.DefaultDB
+   * import reactivemongo.api.indexes.NSIndex
+   *
+   * def dropIndex(db: DefaultDB, idx: NSIndex)(
+   *   implicit ec: ExecutionContext): Future[Int] =
+   *   db.indexesManager.drop(idx)
+   * }}}
    *
    * @return $droppedCount
    */
@@ -78,7 +133,16 @@ sealed trait IndexesManager {
     drop(nsIndex.collectionName, nsIndex.index.eventualName)
 
   /**
-   * Drops the given index on the given collection.
+   * $dropDescription on the given collection.
+   *
+   * {{{
+   * import scala.concurrent.{ ExecutionContext, Future }
+   * import reactivemongo.api.DefaultDB
+   *
+   * def dropIndex(db: DefaultDB, name: String)(
+   *   implicit ec: ExecutionContext): Future[Int] =
+   *   db.indexesManager.drop("myColl", name)
+   * }}}
    *
    * @param collectionName $collectionNameParam
    * @param indexName the name of the index to be dropped
@@ -87,14 +151,33 @@ sealed trait IndexesManager {
   def drop(collectionName: String, indexName: String): Future[Int]
 
   /**
-   * Drops all the indexes on the given collection.
+   * Drops all the indexes on the specified collection.
+   *
+   * {{{
+   * import scala.concurrent.{ ExecutionContext, Future }
+   * import reactivemongo.api.DefaultDB
+   *
+   * def dropAllIndexes(db: DefaultDB)(
+   *   implicit ec: ExecutionContext): Future[Int] =
+   *   db.indexesManager.dropAll("myColl")
+   * }}}
    *
    * @param collectionName $collectionNameParam
+   * @return $droppedCount
    */
   def dropAll(collectionName: String): Future[Int]
 
   /**
-   * Returns a manager for the given collection.
+   * Returns a manager for the specified collection.
+   *
+   * {{{
+   * import scala.concurrent.{ ExecutionContext, Future }
+   * import reactivemongo.api.DefaultDB
+   *
+   * def countCollIndexes(db: DefaultDB, collName: String)(
+   *   implicit ec: ExecutionContext): Future[Int] =
+   *   db.indexesManager.onCollection(collName).list().map(_.size)
+   * }}}
    *
    * @param collectionName $collectionNameParam
    */
@@ -158,7 +241,7 @@ final class LegacyIndexesManager(db: DB)(
 /**
  * A helper class to manage the indexes on a Mongo 3.x database.
  *
- * @param db The subject database.
+ * @param db the subject database
  */
 final class DefaultIndexesManager(db: DB with DBMetaCommands)(
   implicit
@@ -193,19 +276,47 @@ final class DefaultIndexesManager(db: DB with DBMetaCommands)(
  * @define the index to create
  * @define droppedCount The number of indexes that were dropped.
  * @define indexToCreate the index to create
+ * @define createDescription Creates the given index
  */
 sealed trait CollectionIndexesManager {
-  /** Returns the list of indexes for the current collection. */
+  /**
+   * Lists the indexes for the current collection.
+   *
+   * {{{
+   * import scala.concurrent.{ ExecutionContext, Future }
+   * import reactivemongo.api.CollectionMetaCommands
+   *
+   * def listIndexes(coll: CollectionMetaCommands)(
+   *   implicit ec: ExecutionContext): Future[List[String]] =
+   *   coll.indexesManager.list().map(_.flatMap { idx =>
+   *     idx.name.toList
+   *   })
+   * }}}
+   */
   def list(): Future[List[Index]]
 
   /**
-   * Creates the given index only if it does not exist on this collection.
+   * $createDescription only if it does not exist on this collection.
    *
    * The following rules are used to check the matching index:
    * - if `nsIndex.isDefined`, it checks using the index name,
    * - otherwise it checks using the key.
    *
-   * Warning: given the options you choose, and the data to index, it can be a long and blocking operation on the database.
+   * {{{
+   * import scala.concurrent.{ ExecutionContext, Future }
+   *
+   * import reactivemongo.api.CollectionMetaCommands
+   * import reactivemongo.api.indexes.Index
+   *
+   * def ensureIndexes(
+   *   coll: CollectionMetaCommands, is: Seq[Index])(
+   *   implicit ec: ExecutionContext): Future[Unit] =
+   *   Future.sequence(
+   *     is.map(idx => coll.indexesManager.ensure(idx))).map(_ => {})
+   * }}}
+   *
+   * _Warning_: given the options you choose, and the data to index,
+   * it can be a long and blocking operation on the database.
    * You should really consider reading [[http://www.mongodb.org/display/DOCS/Indexes]] before doing this, especially in production.
    *
    * @param index $indexToCreate
@@ -215,9 +326,23 @@ sealed trait CollectionIndexesManager {
   def ensure(index: Index): Future[Boolean]
 
   /**
-   * Creates the given index.
+   * $createDescription.
    *
-   * Warning: given the options you choose, and the data to index, it can be a long and blocking operation on the database.
+   * {{{
+   * import scala.concurrent.{ ExecutionContext, Future }
+   *
+   * import reactivemongo.api.CollectionMetaCommands
+   * import reactivemongo.api.indexes.Index
+   *
+   * def createIndexes(
+   *   coll: CollectionMetaCommands, is: Seq[Index])(
+   *   implicit ec: ExecutionContext): Future[Unit] =
+   *   Future.sequence(
+   *     is.map(idx => coll.indexesManager.create(idx))).map(_ => {})
+   * }}}
+   *
+   * _Warning_: given the options you choose, and the data to index,
+   * it can be a long and blocking operation on the database.
    * You should really consider reading [[http://www.mongodb.org/display/DOCS/Indexes]] before doing this, especially in production.
    *
    * @param index $indexToCreate
@@ -227,6 +352,16 @@ sealed trait CollectionIndexesManager {
   /**
    * Drops the given index on that collection.
    *
+   * {{{
+   * import scala.concurrent.{ ExecutionContext, Future }
+   *
+   * import reactivemongo.api.CollectionMetaCommands
+   *
+   * def dropIndex(coll: CollectionMetaCommands, name: String)(
+   *   implicit ec: ExecutionContext): Future[Int] =
+   *   coll.indexesManager.drop(name)
+   * }}}
+   *
    * @param indexName the name of the index to be dropped
    * @return $droppedCount
    */
@@ -234,6 +369,16 @@ sealed trait CollectionIndexesManager {
 
   /**
    * Drops all the indexes on that collection.
+   *
+   * {{{
+   * import scala.concurrent.{ ExecutionContext, Future }
+   * import reactivemongo.api.CollectionMetaCommands
+   *
+   * def dropAllIndexes(coll: CollectionMetaCommands)(
+   *   implicit ec: ExecutionContext): Future[Int] =
+   *   coll.indexesManager.dropAll()
+   * }}}
+   *
    * @return $droppedCount
    */
   def dropAll(): Future[Int]

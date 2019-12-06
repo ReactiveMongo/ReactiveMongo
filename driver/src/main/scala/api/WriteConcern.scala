@@ -1,27 +1,54 @@
 package reactivemongo.api
 
-trait WriteConcern {
+/** The [[https://docs.mongodb.com/manual/reference/write-concern/index.html write concern]] */
+trait WriteConcern { // TODO: sealed
   def w: WriteConcern.W
   def j: Boolean
   def fsync: Boolean
   def wtimeout: Option[Int]
 }
 
+/**
+ * [[https://docs.mongodb.com/manual/reference/write-concern/index.html Write concern]] utilities.
+ *
+ * {{{
+ * import scala.concurrent.ExecutionContext
+ * import reactivemongo.api.{ DefaultDB, WriteConcern }
+ * import reactivemongo.api.bson.BSONDocument
+ *
+ * def foo(db: DefaultDB)(implicit ec: ExecutionContext) =
+ *   db.collection("myColl").
+ *     insert(ordered = false, WriteConcern.Acknowledged).
+ *     one(BSONDocument("foo" -> "bar"))
+ * }}}
+ */
 object WriteConcern {
   import reactivemongo.api.commands.GetLastError
 
+  /** [[https://docs.mongodb.com/manual/reference/write-concern/index.html#w-option Acknowledgment]] specification (w) */
   sealed trait W
 
+  /** [[https://docs.mongodb.com/manual/reference/write-concern/index.html#writeconcern._dq_majority_dq_ Majority]] acknowledgment */
   sealed trait Majority extends W
+
+  /** [[https://docs.mongodb.com/manual/reference/write-concern/index.html#writeconcern.%3Ccustom-write-concern-name%3E Tagged]] acknowledgment */
   sealed class TagSet(val tag: String) extends W
+
+  /** Requests acknowledgment [[https://docs.mongodb.com/manual/reference/write-concern/index.html#writeconcern.%3Cnumber%3E by at least]] `i` nodes. */
   sealed class WaitForAcknowledgments(val i: Int) extends W
 
+  /** [[WriteConcern]] with no acknowledgment required. */
   val Unacknowledged: GetLastError with WriteConcern =
     GetLastError(GetLastError.WaitForAcknowledgments(0), false, false, None)
 
+  /** [[WriteConcern]] with one acknowledgment required. */
   val Acknowledged: GetLastError with WriteConcern =
     GetLastError(GetLastError.WaitForAcknowledgments(1), false, false, None)
 
+  /**
+   * [[WriteConcern]] with one acknowledgment and operation
+   * written to the [[https://docs.mongodb.com/manual/reference/write-concern/index.html#j-option on-disk journal]].
+   */
   val Journaled: GetLastError with WriteConcern =
     GetLastError(GetLastError.WaitForAcknowledgments(1), true, false, None)
 
@@ -29,6 +56,7 @@ object WriteConcern {
 
   def TagReplicaAcknowledged(tag: String, timeout: Int, journaled: Boolean): GetLastError with WriteConcern = GetLastError(GetLastError.TagSet(tag), journaled, false, (if (timeout <= 0) None else Some(timeout)))
 
+  /** The default [[WriteConcern]] */
   def Default: GetLastError with WriteConcern = Acknowledged
 }
 

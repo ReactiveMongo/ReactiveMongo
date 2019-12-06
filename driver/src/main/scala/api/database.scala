@@ -36,13 +36,14 @@ import reactivemongo.api.commands.{
 }
 
 /**
- * The reference to a MongoDB database, obtained from a [[reactivemongo.api.MongoConnection]].
+ * The reference to a MongoDB database,
+ * obtained from a [[reactivemongo.api.MongoConnection]].
  *
  * You should consider the provided [[reactivemongo.api.DefaultDB]] implementation.
  *
  * {{{
  * import scala.concurrent.ExecutionContext
- * import reactivemongo.api._
+ * import reactivemongo.api.MongoConnection
  *
  * def foo(connection: MongoConnection)(implicit ec: ExecutionContext) = {
  *   val db = connection.database("plugin")
@@ -50,7 +51,7 @@ import reactivemongo.api.commands.{
  * }
  * }}}
  *
- * @define resolveDescription Returns a [[reactivemongo.api.Collection]] from this database
+ * @define resolveDescription Returns a [[reactivemongo.api.Collection]] reference from this database
  * @define nameParam the name of the collection to resolve
  * @define failoverStrategyParam the failover strategy to override the default one
  * @define startSessionDescription Starts a [[https://docs.mongodb.com/manual/reference/command/startSession/ new session]] (since MongoDB 3.6)
@@ -78,8 +79,9 @@ sealed trait DB {
   private[api] def session: Option[Session]
 
   /**
-   * $resolveDescription (alias for the `collection` method).
+   * $resolveDescription (alias for the [[collection]] method).
    *
+   * @tparam C the [[Collection]] type
    * @param name $nameParam
    * @param failoverStrategy $failoverStrategyParam
    */
@@ -88,11 +90,21 @@ sealed trait DB {
   /**
    * $resolveDescription.
    *
+   * @tparam C the [[Collection]] type
    * @param name $nameParam
    * @param failoverStrategy $failoverStrategyParam
+   *
+   * {{{
+   * import scala.concurrent.ExecutionContext
+   * import reactivemongo.api.DB
+   *
+   * def resoleColl(db: DB)(implicit ec: ExecutionContext) =
+   *   db.collection("acoll")
+   * }}}
    */
   def collection[C <: Collection](name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit producer: CollectionProducer[C] = Serialization.defaultCollectionProducer): C = producer(this, name, failoverStrategy)
 
+  @deprecated("Internal: will be made private", "0.19.4")
   @inline def defaultReadPreference: ReadPreference =
     connection.options.readPreference
 
@@ -101,6 +113,8 @@ sealed trait DB {
    *
    * @param user the name of the user
    * @param password the user password
+   *
+   * @see `MongoConnection.authenticate`
    */
   def authenticate(user: String, password: String)(implicit ec: ExecutionContext): Future[SuccessfulAuthentication] = connection.authenticate(name, user, password, failoverStrategy)
 
@@ -120,6 +134,7 @@ sealed trait DB {
    * @param name $nameParam
    * @param failoverStrategy $failoverStrategyParam
    */
+  @deprecated("Use `connection.database(name)`", "0.19.4")
   def sibling1(name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit ec: ExecutionContext): Future[DefaultDB] = connection.database(name, failoverStrategy)
 
   /**
@@ -143,6 +158,14 @@ sealed trait DB {
    * $startSessionDescription.
    *
    * '''EXPERIMENTAL:''' API may change without notice.
+   *
+   * {{{
+   * import scala.concurrent.ExecutionContext
+   * import reactivemongo.api.DefaultDB
+   *
+   * def startIt(db: DefaultDB)(implicit ec: ExecutionContext) =
+   *   db.startSession(failIfAlreadyStarted = true)
+   * }}}
    *
    * @param failIfAlreadyStarted if true fails if a session is already started
    *
@@ -187,9 +210,9 @@ sealed trait DB {
    * import scala.concurrent.ExecutionContext
    * import reactivemongo.api.{ DefaultDB, WriteConcern }
    *
-   * def equivalentTo(db: DefaultDB, aWriteConcern: Option[WriteConcern])(
+   * def doIt(db: DefaultDB, aWriteConcern: Option[WriteConcern])(
    *   implicit ec: ExecutionContext) =
-   *   db.startTransaction(aWriteConcern, failIfAlreadyStarted = false)
+   *   db.startTransaction(aWriteConcern, failIfAlreadyStarted = true)
    * }}}
    *
    * @param writeConcern the write concern for the transaction operation
@@ -245,6 +268,14 @@ sealed trait DB {
    * $commitTxDescription, if any otherwise does nothing .
    *
    * '''EXPERIMENTAL:''' API may change without notice.
+   *
+   * {{{
+   * import scala.concurrent.ExecutionContext
+   * import reactivemongo.api.DefaultDB
+   *
+   * def commitIt(db: DefaultDB)(implicit ec: ExecutionContext) =
+   *   db.commitTransaction(failIfNotStarted = true)
+   * }}}
    *
    * @return The database reference with transaction commited (but not session)
    */
@@ -305,7 +336,14 @@ sealed trait DB {
 }
 
 /**
+ * @define commandTParam the [[reactivemongo.api.commands.Command]] type
+ * @define commandParam the command to be executed on the current database
  * @define failoverStrategyParam the failover strategy to override the default one
+ * @define writerParam the writer for the command
+ * @define readerParam the reader for the result of command execution
+ * @define resultType the result type
+ * @define cursorFetcher A cursor for the command results
+ * @define singleResult A single result from command execution
  */
 private[api] sealed trait GenericDB[P <: SerializationPack with Singleton] { self: DB =>
   val pack: P
@@ -313,17 +351,59 @@ private[api] sealed trait GenericDB[P <: SerializationPack with Singleton] { sel
   import reactivemongo.api.commands._
 
   /**
+   * @tparam R $resultType
+   * @tparam C $commandTParam
+   * @param command $commandParam
    * @param failoverStrategy $failoverStrategyParam
+   * @param writer $writerParam
+   * @param reader $readerParam
+   * @return $singleResult
    */
   def runCommand[R, C <: Command with CommandWithResult[R]](command: C with CommandWithResult[R], failoverStrategy: FailoverStrategy)(implicit writer: pack.Writer[C], reader: pack.Reader[R], ec: ExecutionContext): Future[R] = Command.run(pack, failoverStrategy).apply(self, command, self.defaultReadPreference)
 
   /**
+   * @tparam C $commandTParam
+   * @param command $commandParam
    * @param failoverStrategy $failoverStrategyParam
+   * @param writer $writerParam
+   * @param reader $readerParam
+   * @return $cursorFetcher
    */
   def runCommand[C <: Command](command: C, failoverStrategy: FailoverStrategy)(implicit writer: pack.Writer[C]): CursorFetcher[pack.type, Cursor] = Command.run(pack, failoverStrategy).apply(self, command)
 
   /**
+   * Run a raw command (represented by a document).
+   *
+   * {{{
+   * import reactivemongo.api.FailoverStrategy
+   * import reactivemongo.api.bson.BSONDocument
+   *
+   * def getUsers(db: reactivemongo.api.DefaultDB) =
+   *   db.runCommand(BSONDocument("usersInfo" -> 1), FailoverStrategy.default)
+   * }}}
+   *
+   * @param command $commandParam
    * @param failoverStrategy $failoverStrategyParam
+   * @return $cursorFetcher
+   */
+  def runCommand(
+    command: pack.Document,
+    failoverStrategy: FailoverStrategy): CursorFetcher[pack.type, Cursor] = {
+    val runner = Command.run[pack.type](pack, failoverStrategy)
+    implicit def w = pack.IdentityWriter
+    import runner.RawCommand.writer
+
+    runner(self, runner.rawCommand(command))
+  }
+
+  /**
+   * @tparam R $resultType
+   * @tparam C $commandTParam
+   * @param command $commandParam
+   * @param failoverStrategy $failoverStrategyParam
+   * @param writer $writerParam
+   * @param reader $readerParam
+   * @return $singleResult
    */
   def runValueCommand[A <: AnyVal, R <: BoxedAnyVal[A], C <: Command with CommandWithResult[R]](command: C with CommandWithResult[R with BoxedAnyVal[A]], failoverStrategy: FailoverStrategy, readPreference: ReadPreference)(implicit writer: pack.Writer[C], reader: pack.Reader[R], ec: ExecutionContext): Future[A] = Command.run(pack, failoverStrategy).unboxed(self, command, readPreference)
 }

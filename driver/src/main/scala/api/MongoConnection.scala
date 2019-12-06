@@ -85,12 +85,21 @@ class MongoConnection(
   import Exceptions._
 
   /**
-   * Returns a DefaultDB reference using this connection.
+   * Returns a [[DefaultDB]] reference using this connection.
    * The failover strategy is also used to wait for the node set to be ready,
-   * before returning an available DB.
+   * before returning an valid database reference.
    *
    * @param name $dbName
    * @param failoverStrategy $failoverStrategy
+   *
+   * {{{
+   * import scala.concurrent.{ ExecutionContext, Future }
+   * import reactivemongo.api.{ DefaultDB, MongoConnection }
+   *
+   * def resolveDB(con: MongoConnection, name: String)(
+   *   implicit ec: ExecutionContext): Future[DefaultDB] =
+   *   con.database(name) // with configured failover
+   * }}}
    */
   def database(name: String, failoverStrategy: FailoverStrategy = options.failoverStrategy)(implicit @deprecatedName(Symbol("context")) ec: ExecutionContext): Future[DefaultDB] =
     waitIsAvailable(failoverStrategy, stackTrace()).map { state =>
@@ -107,6 +116,20 @@ class MongoConnection(
    * @param user the user name
    * @param password the user password
    * @param failoverStrategy $failoverStrategy
+   *
+   * {{{
+   * import scala.concurrent.{ ExecutionContext, Future }
+   * import reactivemongo.api.MongoConnection
+   *
+   * def authDB(con: MongoConnection, user: String, pass: String)(
+   *   implicit ec: ExecutionContext): Future[Unit] =
+   *   con.authenticate("myDB", user, pass).map(_ => {})
+   *   // with configured failover
+   *
+   * }}}
+   *
+   * @see [[MongoConnectionOptions.credentials]]
+   * @see [[DB.authenticate]]
    */
   def authenticate(
     db: String,
@@ -119,10 +142,13 @@ class MongoConnection(
     req.future
   }
 
+  @deprecated("Use `close`", "0.19.4")
+  def askClose()(implicit timeout: FiniteDuration): Future[_] = close()
+
   /**
    * Closes this MongoConnection (closes all the channels and ends the actors).
    */
-  def askClose()(implicit timeout: FiniteDuration): Future[_] = whenActive {
+  def close()(implicit timeout: FiniteDuration): Future[_] = whenActive {
     ask(monitor, Close("MongoConnection.askClose"))(Timeout(timeout))
   }
 

@@ -254,8 +254,6 @@ package object tests {
     bytes
   }
 
-  @inline def dbHash(db: DB with DBMetaCommands, collections: Seq[String] = Seq.empty)(implicit ec: ExecutionContext) = db.hash(collections)
-
   def withContent[T](uri: java.net.URI)(f: java.io.InputStream => T): T =
     reactivemongo.util.withContent[T](uri)(f)
 
@@ -306,7 +304,7 @@ package object tests {
     }
 
     def isMasterReader(cmd: IsMasterCommand[pack.type]) = new {
-      def get(implicit dr: pack.NarrowValueReader[java.util.Date], sr: pack.NarrowValueReader[String]): pack.Reader[cmd.IsMasterResult] = cmd.reader(pack)
+      def get(implicit sr: pack.NarrowValueReader[String]): pack.Reader[cmd.IsMasterResult] = cmd.reader(pack)
     }
   }
 }

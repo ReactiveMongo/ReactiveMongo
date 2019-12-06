@@ -77,6 +77,21 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
   /**
    * Returns a [[Cursor]] for the result of this query.
    *
+   * {{{
+   * import scala.concurrent.{ ExecutionContext, Future }
+   *
+   * import reactivemongo.api.Cursor
+   * import reactivemongo.api.bson.BSONDocument
+   * import reactivemongo.api.bson.collection.BSONCollection
+   *
+   * def findAllVisible(coll: BSONCollection)(
+   *   implicit ec: ExecutionContext): Future[List[BSONDocument]] =
+   *   coll.find(BSONDocument("visible" -> true)).
+   *     cursor[BSONDocument]().collect[List](
+   *      maxDocs = 10,
+   *      err = Cursor.FailOnError[List[BSONDocument]]())
+   * }}}
+   *
    * @param readPreference $readPrefParam
    * @param reader $readerParam
    *
@@ -92,16 +107,44 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
     collection.db.connectionState.metadata.maxWireVersion
 
   /**
-   * $oneFunction.
+   * $oneFunction (using the default [[reactivemongo.api.ReadPreference]]).
+   *
+   * {{{
+   * import scala.concurrent.{ ExecutionContext, Future }
+   *
+   * import reactivemongo.api.bson.{ BSONDocument, Macros }
+   * import reactivemongo.api.bson.collection.BSONCollection
+   *
+   * case class User(name: String, pass: String)
+   *
+   * implicit val handler = Macros.reader[User]
+   *
+   * def findUser(coll: BSONCollection, name: String)(
+   *   implicit ec: ExecutionContext): Future[Option[User]] =
+   *   coll.find(BSONDocument("user" -> name)).one[User]
+   * }}}
    *
    * @param reader $readerParam
    *
    * @tparam T $resultTParam
    */
-  def one[T](implicit reader: pack.Reader[T], ec: ExecutionContext): Future[Option[T]] = one(readPreference)
+  def one[T](implicit reader: pack.Reader[T], ec: ExecutionContext): Future[Option[T]] = one(this.readPreference)
 
   /**
    * $oneFunction.
+   *
+   * {{{
+   * import scala.concurrent.{ ExecutionContext, Future }
+   *
+   * import reactivemongo.api.ReadPreference
+   * import reactivemongo.api.bson.BSONDocument
+   * import reactivemongo.api.bson.collection.BSONCollection
+   *
+   * def findUser(coll: BSONCollection, name: String)(
+   *   implicit ec: ExecutionContext): Future[Option[BSONDocument]] =
+   *   coll.find(BSONDocument("user" -> name)).
+   *     one[BSONDocument](ReadPreference.primaryPreferred)
+   * }}}
    *
    * @param readPreference $readPrefParam
    * @param reader $readerParam
@@ -111,7 +154,19 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
   def one[T](readPreference: ReadPreference)(implicit reader: pack.Reader[T], ec: ExecutionContext): Future[Option[T]] = copy(options = options.batchSize(1)).defaultCursor(readPreference)(reader).headOption
 
   /**
-   * $requireOneFunction.
+   * $requireOneFunction
+   * (using the default [[reactivemongo.api.ReadPreference]]).
+   *
+   * {{{
+   * import scala.concurrent.{ ExecutionContext, Future }
+   *
+   * import reactivemongo.api.bson.BSONDocument
+   * import reactivemongo.api.bson.collection.BSONCollection
+   *
+   * def findUser(coll: BSONCollection, name: String)(
+   *   implicit ec: ExecutionContext): Future[BSONDocument] =
+   *   coll.find(BSONDocument("user" -> name)).requireOne[BSONDocument]
+   * }}}
    *
    * @param reader $readerParam
    *
@@ -121,6 +176,23 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
 
   /**
    * $requireOneFunction.
+   *
+   * {{{
+   * import scala.concurrent.{ ExecutionContext, Future }
+   *
+   * import reactivemongo.api.ReadPreference
+   * import reactivemongo.api.bson.{ BSONDocument, Macros }
+   * import reactivemongo.api.bson.collection.BSONCollection
+   *
+   * case class User(name: String, pass: String)
+   *
+   * implicit val handler = Macros.handler[User]
+   *
+   * def findUser(coll: BSONCollection, name: String)(
+   *   implicit ec: ExecutionContext): Future[User] =
+   *   coll.find(BSONDocument("user" -> name)).
+   *     requireOne[User](ReadPreference.primaryPreferred)
+   * }}}
    *
    * @param readPreference $readPrefParam
    * @param reader $readerParam
@@ -141,16 +213,39 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
    *
    * @tparam Qry The type of the query. An implicit `Writer[Qry]` typeclass for handling it has to be in the scope.
    */
+  @deprecated(
+    "Specify the filter predicate using `collection.find(..)`", "0.19.4")
   def filter[Qry](predicate: Qry)(implicit writer: pack.Writer[Qry]): Self =
     copy(queryOption = Some(pack.serialize(predicate, writer)))
 
   /**
    * $filterFunction.
    */
+  @deprecated(
+    "Specify the filter predicate using `collection.find(..)`", "0.19.4")
   def filter(predicate: pack.Document): Self =
     copy(queryOption = Some(predicate))
 
-  /** Sets the sort specification for the ordering of the results. */
+  /**
+   * Sets the sort specification for the ordering of the results.
+   *
+   * {{{
+   * import scala.concurrent.{ ExecutionContext, Future }
+   *
+   * import reactivemongo.api.Cursor
+   * import reactivemongo.api.bson.BSONDocument
+   * import reactivemongo.api.bson.collection.BSONCollection
+   *
+   * def findSortedVisible(coll: BSONCollection)(
+   *   implicit ec: ExecutionContext): Future[List[BSONDocument]] =
+   *   coll.find(BSONDocument("visible" -> true)).
+   *     sort(BSONDocument("age" -> 1)). // sort per age
+   *     cursor[BSONDocument]().
+   *     collect[List](
+   *       maxDocs = 100,
+   *       err = Cursor.FailOnError[List[BSONDocument]]())
+   * }}}
+   */
   def sort(document: pack.Document): Self = copy(sortOption = Some(document))
 
   /**
@@ -181,7 +276,7 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
   /** Adds a comment to this query, that may appear in the MongoDB logs. */
   def comment(message: String): Self = copy(commentString = Some(message))
 
-  /** Adds maxTimeMs to query https://docs.mongodb.org/v3.0/reference/operator/meta/maxTimeMS/ */
+  /** Adds [[https://docs.mongodb.org/v3.0/reference/operator/meta/maxTimeMS/ maxTimeMs]] to query  */
   def maxTimeMs(p: Long): Self = copy(maxTimeMsOption = Some(p))
 
   def options(options: QueryOpts): Self = copy(options = options)

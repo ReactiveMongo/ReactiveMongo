@@ -299,6 +299,7 @@ private[api] trait Driver {
 }
 
 /** The driver factory */
+@deprecated("Internal: will be made private", "0.19.4")
 object Driver {
   private val logger = LazyLogger("reactivemongo.api.Driver")
 

@@ -1,6 +1,6 @@
 package tests
 
-import scala.concurrent.{ Await, ExecutionContext, Future }
+import scala.concurrent.{ Await, ExecutionContext }
 import scala.concurrent.duration._
 
 import reactivemongo.api.{
@@ -67,11 +67,8 @@ object Common extends CommonAuth {
     }
   }
 
-  lazy val connection = {
-    import ExecutionContext.Implicits.global
-
+  lazy val connection =
     Await.result(driver.connect(List(primaryHost), DefaultOptions), timeout)
-  }
 
   val commonDb = "specs2-test-reactivemongo"
 
