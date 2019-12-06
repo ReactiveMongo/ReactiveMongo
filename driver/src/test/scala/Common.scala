@@ -1,6 +1,6 @@
 package tests
 
-import scala.concurrent.{ Await, ExecutionContext }
+import scala.concurrent.{ Await, ExecutionContext, Future }
 import scala.concurrent.duration._
 
 import reactivemongo.api.{
@@ -28,17 +28,6 @@ object Common extends CommonAuth {
 
   val failoverRetries = sys.props.get("test.failoverRetries").
     flatMap(r => scala.util.Try(r.toInt).toOption).getOrElse(7)
-
-  private val driverReg = Seq.newBuilder[MongoDriver]
-  def newDriver(): MongoDriver = driverReg.synchronized {
-    val drv = MongoDriver()
-
-    driverReg += drv
-
-    drv
-  }
-
-  lazy val driver = newDriver()
 
   val failoverStrategy = FailoverStrategy(retries = failoverRetries)
 
@@ -78,7 +67,11 @@ object Common extends CommonAuth {
     }
   }
 
-  lazy val connection = driver.connection(List(primaryHost), DefaultOptions)
+  lazy val connection = {
+    import ExecutionContext.Implicits.global
+
+    Await.result(driver.connect(List(primaryHost), DefaultOptions), timeout)
+  }
 
   val commonDb = "specs2-test-reactivemongo"
 
@@ -123,13 +116,16 @@ object Common extends CommonAuth {
     prx
   }
 
-  lazy val slowConnection = driver.connection(List(slowPrimary), SlowOptions)
+  lazy val slowConnection =
+    Await.result(driver.connect(List(slowPrimary), SlowOptions), slowTimeout)
 
   def databases(name: String, con: MongoConnection, slowCon: MongoConnection): (DefaultDB, DefaultDB) = {
     import ExecutionContext.Implicits.global
 
-    val _db = con.database(
-      name, failoverStrategy).flatMap { d => d.drop.map(_ => d) }
+    val _db = for {
+      d <- con.database(name, failoverStrategy)
+      _ <- d.drop
+    } yield d
 
     Await.result(_db, timeout) -> Await.result((for {
       _ <- slowProxy.start()
@@ -159,20 +155,12 @@ object Common extends CommonAuth {
     drv
   }
 
+  lazy val driver = newAsyncDriver()
+
   // ---
 
   def close(): Unit = {
     import ExecutionContext.Implicits.global
-
-    driverReg.result().foreach { driver =>
-      try {
-        driver.close(timeout)
-      } catch {
-        case e: Throwable =>
-          logger.warn(s"Fails to stop driver: $e")
-          logger.debug("Fails to stop driver", e)
-      }
-    }
 
     asyncDriverReg.result().foreach { driver =>
       try {
@@ -191,7 +179,7 @@ object Common extends CommonAuth {
 sealed trait CommonAuth {
   import reactivemongo.api.AuthenticationMode
 
-  def driver: MongoDriver
+  def driver: AsyncDriver
 
   def authMode: Option[AuthenticationMode] =
     sys.props.get("test.authenticationMechanism").flatMap {

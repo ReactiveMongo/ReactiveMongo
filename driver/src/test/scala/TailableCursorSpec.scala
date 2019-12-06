@@ -101,24 +101,24 @@ trait TailableCursorSpec { specs: CursorSpec =>
         }
 
         "gracefully stop at connection close w/o maxDocs" in {
-          val con = driver.connection(List(primaryHost), DefaultOptions)
+          val con = driver.connect(List(primaryHost), DefaultOptions)
           lazy val delayedTimeout = FiniteDuration(
             (timeout.toMillis * 1.25D).toLong, MILLISECONDS)
 
-          con.database(
-            "specs2-test-reactivemongo", failoverStrategy).flatMap { d =>
-              tailable("foldw3", d).foldWhile(List.empty[Int])((s, i) => {
-                if (i == 1) { // Force connection close
-                  Await.result(con.askClose()(timeout), timeout)
-                }
-
-                Cursor.Cont(i :: s)
-              }, (_, e) => Cursor.Fail(e))
-            } must beLike[List[Int]] {
-              case is => is.reverse must beLike[List[Int]] {
-                case 0 :: 1 :: _ => ok
+          con.flatMap(_.database(
+            "specs2-test-reactivemongo", failoverStrategy)).flatMap { d =>
+            tailable("foldw3", d).foldWhile(List.empty[Int])((s, i) => {
+              if (i == 1) { // Force connection close
+                Await.result(con.flatMap(_.askClose()(timeout)), timeout)
               }
-            }.await(2, delayedTimeout)
+
+              Cursor.Cont(i :: s)
+            }, (_, e) => Cursor.Fail(e))
+          } must beLike[List[Int]] {
+            case is => is.reverse must beLike[List[Int]] {
+              case 0 :: 1 :: _ => ok
+            }
+          }.await(2, delayedTimeout)
         }
       }
     }

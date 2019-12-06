@@ -32,8 +32,6 @@ class MongoDriver(
   /** Keep a list of all connections so that we can terminate the actors */
   private[reactivemongo] def connections: Iterable[MongoConnection] = connectionMonitors.values
 
-  private[reactivemongo] def numConnections: Int = connectionMonitors.size
-
   private[reactivemongo] case class AddConnection(
     name: String,
     nodes: Seq[String],

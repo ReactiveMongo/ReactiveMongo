@@ -57,7 +57,7 @@ package object tests {
 
   def writer[T](f: T => pack.Document): pack.Writer[T] = pack.writer[T](f)
 
-  def numConnections(d: MongoDriver): Int = d.numConnections
+  def numConnections(d: AsyncDriver): Int = d.numConnections
 
   // Test alias
   def _failover2[A](c: MongoConnection, s: FailoverStrategy)(p: () => Future[A])(implicit ec: ExecutionContext): Failover2[A] = Failover2.apply(c, s)(p)(ec)
@@ -70,7 +70,7 @@ package object tests {
 
   def standardDBSystem(supervisor: String, name: String, nodes: Seq[String], authenticates: Seq[Authenticate], options: MongoConnectionOptions) = new StandardDBSystem(supervisor, name, nodes, authenticates, options)
 
-  def addConnection(d: MongoDriver, name: String, nodes: Seq[String], options: MongoConnectionOptions, mongosystem: ActorRef): Future[Any] = {
+  def addConnection(d: AsyncDriver, name: String, nodes: Seq[String], options: MongoConnectionOptions, mongosystem: ActorRef): Future[Any] = {
     import akka.pattern.ask
 
     def message = d.addConnectionMsg(name, nodes, options, mongosystem)
