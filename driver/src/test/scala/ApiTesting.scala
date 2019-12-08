@@ -57,7 +57,7 @@ package object tests {
 
   def writer[T](f: T => pack.Document): pack.Writer[T] = pack.writer[T](f)
 
-  def numConnections(d: MongoDriver): Int = d.numConnections
+  def numConnections(d: AsyncDriver): Int = d.numConnections
 
   // Test alias
   def _failover2[A](c: MongoConnection, s: FailoverStrategy)(p: () => Future[A])(implicit ec: ExecutionContext): Failover2[A] = Failover2.apply(c, s)(p)(ec)
@@ -70,7 +70,7 @@ package object tests {
 
   def standardDBSystem(supervisor: String, name: String, nodes: Seq[String], authenticates: Seq[Authenticate], options: MongoConnectionOptions) = new StandardDBSystem(supervisor, name, nodes, authenticates, options)
 
-  def addConnection(d: MongoDriver, name: String, nodes: Seq[String], options: MongoConnectionOptions, mongosystem: ActorRef): Future[Any] = {
+  def addConnection(d: AsyncDriver, name: String, nodes: Seq[String], options: MongoConnectionOptions, mongosystem: ActorRef): Future[Any] = {
     import akka.pattern.ask
 
     def message = d.addConnectionMsg(name, nodes, options, mongosystem)
@@ -254,8 +254,6 @@ package object tests {
     bytes
   }
 
-  @inline def dbHash(db: DB with DBMetaCommands, collections: Seq[String] = Seq.empty)(implicit ec: ExecutionContext) = db.hash(collections)
-
   def withContent[T](uri: java.net.URI)(f: java.io.InputStream => T): T =
     reactivemongo.util.withContent[T](uri)(f)
 
@@ -306,7 +304,7 @@ package object tests {
     }
 
     def isMasterReader(cmd: IsMasterCommand[pack.type]) = new {
-      def get(implicit dr: pack.NarrowValueReader[java.util.Date], sr: pack.NarrowValueReader[String]): pack.Reader[cmd.IsMasterResult] = cmd.reader(pack)
+      def get(implicit sr: pack.NarrowValueReader[String]): pack.Reader[cmd.IsMasterResult] = cmd.reader(pack)
     }
   }
 }

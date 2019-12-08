@@ -3,8 +3,6 @@ import reactivemongo.api.commands.GetLastError
 
 import reactivemongo.api.bson.BSONDocument
 
-import reactivemongo.api.TestCompat._
-
 trait DBSessionSpec { specs: DatabaseSpec =>
   import tests.Common
   import Common._

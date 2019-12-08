@@ -1389,7 +1389,7 @@ db.accounts.aggregate([
       import coll.aggregationFramework.{ Count, Facet, Out, UnwindField }
 
       Facet(Seq(
-        "foo" -> (UnwindField("bar"), List(Count("c"))),
+        "foo" -> (UnwindField("bar") -> List(Count("c"))),
         "lorem" -> (Out("ipsum"), List.empty))).makePipe must_=== BSONDocument(
         f"$$facet" -> BSONDocument(
           "foo" -> BSONArray(

@@ -69,6 +69,8 @@ private[api] trait Driver {
     ActorSystem("reactivemongo", Some(cfg), classLoader)
   }
 
+  private[reactivemongo] def numConnections: Int = connectionMonitors.size
+
   private val systemClose: Option[FiniteDuration] => Future[Unit] =
     SystemControl(system) match {
       case Success(TimedSystemControl(close)) => { timeout =>
@@ -297,6 +299,7 @@ private[api] trait Driver {
 }
 
 /** The driver factory */
+@deprecated("Internal: will be made private", "0.19.4")
 object Driver {
   private val logger = LazyLogger("reactivemongo.api.Driver")
 

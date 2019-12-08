@@ -23,9 +23,9 @@ import reactivemongo.core.nodeset.{ Authenticate, Connection, Node, NodeSet }
 import reactivemongo.core.protocol.{ Response, ResponseInfo }
 
 import reactivemongo.api.{
+  AsyncDriver,
   MongoConnection,
   MongoConnectionOptions,
-  MongoDriver,
   ReadPreference
 }
 
@@ -425,9 +425,9 @@ final class MonitorSpec(implicit ee: ExecutionEnv)
   private def withConAndSys[T](
     options: MongoConnectionOptions,
     nodes: Seq[String] = Seq(Common.primaryHost),
-    drv: MongoDriver = Common.driver,
+    drv: AsyncDriver = Common.driver,
     authentications: Seq[Authenticate] = Seq.empty[Authenticate])(f: (MongoConnection, TestActorRef[StandardDBSystem]) => Future[T]): Future[T] = {
-    // See MongoDriver#connection
+    // See AsyncDriver#connect
     val supervisorName = s"monitorspec-sup-${System identityHashCode ee}"
     val poolName = s"monitorspec-con-${System identityHashCode f}"
 

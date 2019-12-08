@@ -10,6 +10,17 @@ import com.typesafe.config.Config
 import reactivemongo.core.nodeset.Authenticate
 
 /**
+ * The asynchronous driver (see [[MongoConnection]]).
+ *
+ * {{{
+ * import scala.concurrent.Future
+ * import reactivemongo.api.{ AsyncDriver, MongoConnection }
+ *
+ * val driver = AsyncDriver()
+ * val connection: Future[MongoConnection] =
+ *   driver.connect("mongodb://node:27017")
+ * }}}
+ *
  * @param config a custom configuration (otherwise the default options are used)
  * @param classLoader a classloader used to load the actor system
  *
@@ -45,6 +56,17 @@ class AsyncDriver(
    * Creates a new MongoConnection.
    *
    * @param nodes $nodesParam
+   *
+   * {{{
+   * import scala.concurrent.Future
+   * import reactivemongo.api.MongoConnection
+   *
+   * val driver = reactivemongo.api.AsyncDriver()
+   *
+   * val con: Future[MongoConnection] = driver.connect(
+   *   Seq("node1:27017", "node2:27017", "node3:27017"))
+   * // with default options and automatic name
+   * }}}
    */
   def connect(nodes: Seq[String]): Future[MongoConnection] =
     askConnection(nodes, MongoConnectionOptions.default, Option.empty)
@@ -54,6 +76,18 @@ class AsyncDriver(
    *
    * @param nodes $nodesParam
    * @param options $optionsParam
+   *
+   * {{{
+   * import scala.concurrent.Future
+   * import reactivemongo.api.{ MongoConnection, MongoConnectionOptions }
+   *
+   * val driver = reactivemongo.api.AsyncDriver()
+   *
+   * val con: Future[MongoConnection] = driver.connect(
+   *   nodes = Seq("node1:27017", "node2:27017", "node3:27017"),
+   *   options = MongoConnectionOptions.default.copy(nbChannelsPerNode = 10))
+   * // with automatic name
+   * }}}
    */
   def connect(
     nodes: Seq[String],
@@ -66,6 +100,18 @@ class AsyncDriver(
    * @param nodes $nodesParam
    * @param options $optionsParam
    * @param name $connectionNameParam
+   *
+   * {{{
+   * import scala.concurrent.Future
+   * import reactivemongo.api.{ MongoConnection, MongoConnectionOptions }
+   *
+   * val driver = reactivemongo.api.AsyncDriver()
+   *
+   * val con: Future[MongoConnection] = driver.connect(
+   *   nodes = Seq("node1:27017", "node2:27017", "node3:27017"),
+   *   options = MongoConnectionOptions.default.copy(nbChannelsPerNode = 10),
+   *   name = "ConnectionName")
+   * }}}
    */
   def connect(
     nodes: Seq[String],
@@ -76,6 +122,16 @@ class AsyncDriver(
    * Creates a new MongoConnection from URI.
    *
    * @param uriStrict $uriStrictParam
+   *
+   * {{{
+   * import scala.concurrent.Future
+   * import reactivemongo.api.MongoConnection
+   *
+   * val driver = reactivemongo.api.AsyncDriver()
+   *
+   * val con: Future[MongoConnection] = driver.connect("mongodb://user123:passwd123@host1:27018,host2:27019,host3:27020/somedb?foo=bar&authenticationMechanism=scram-sha1")
+   * // with automatic name
+   * }}}
    */
   def connect(uriStrict: String): Future[MongoConnection] =
     connect(uriStrict, name = None)
@@ -85,6 +141,15 @@ class AsyncDriver(
    *
    * @param uriStrict $uriStrictParam
    * @param name $connectionNameParam
+   *
+   * {{{
+   * import scala.concurrent.Future
+   * import reactivemongo.api.MongoConnection
+   *
+   * val driver = reactivemongo.api.AsyncDriver()
+   *
+   * val con: Future[MongoConnection] = driver.connect("mongodb://user123:passwd123@host1:27018,host2:27019,host3:27020/somedb?foo=bar&authenticationMechanism=scram-sha1", name = Some("ConnectionName"))
+   * }}}
    */
   def connect(uriStrict: String, name: Option[String]): Future[MongoConnection] = MongoConnection.parseURI(uriStrict) match {
     case Success(parsedURI) => connect(parsedURI, name)
@@ -96,6 +161,16 @@ class AsyncDriver(
    *
    * @param parsedURI The URI parsed by [[reactivemongo.api.MongoConnection.parseURI]]
    * @param name $connectionNameParam
+   *
+   * {{{
+   * import scala.concurrent.Future
+   * import reactivemongo.api.MongoConnection, MongoConnection.ParsedURI
+   *
+   * val driver = reactivemongo.api.AsyncDriver()
+   *
+   * def con(uri: ParsedURI): Future[MongoConnection] =
+   *   driver.connect(uri, name = Some("ConnectionName"))
+   * }}}
    */
   def connect(parsedURI: MongoConnection.ParsedURI, name: Option[String]): Future[MongoConnection] = {
     if (!parsedURI.ignoredOptions.isEmpty) {
@@ -117,6 +192,16 @@ class AsyncDriver(
    * Creates a new MongoConnection from URI.
    *
    * @param parsedURI $parsedURIParam
+   *
+   * {{{
+   * import scala.concurrent.Future
+   * import reactivemongo.api.MongoConnection, MongoConnection.ParsedURI
+   *
+   * val driver = reactivemongo.api.AsyncDriver()
+   *
+   * def con(uri: ParsedURI): Future[MongoConnection] = driver.connect(uri)
+   * // with automatic name
+   * }}}
    */
   def connect(parsedURI: MongoConnection.ParsedURI): Future[MongoConnection] =
     connect(parsedURI, None)

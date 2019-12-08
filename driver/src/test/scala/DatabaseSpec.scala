@@ -28,7 +28,7 @@ final class DatabaseSpec(implicit protected val ee: ExecutionEnv)
       }
 
       "with failure" in {
-        lazy val con = Common.driver.connection(List("unavailable:27017"))
+        lazy val con = Common.driver.connect(List("unavailable:27017"))
         val ws = scala.collection.mutable.ListBuffer.empty[Int]
         val expected = List(2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40)
         val fos1 = FailoverStrategy(FiniteDuration(50, "ms"), 20,
@@ -39,7 +39,7 @@ final class DatabaseSpec(implicit protected val ee: ExecutionEnv)
         val before = System.currentTimeMillis()
         val estmout = estTimeout(fos2)
 
-        con.database("foo", fos1).map(_ => List.empty[Int]).
+        con.flatMap(_.database("foo", fos1)).map(_ => List.empty[Int]).
           recover({ case _ => ws.result() }) must beEqualTo(expected).
           await(0, estmout * 2) and {
             val duration = System.currentTimeMillis() - before

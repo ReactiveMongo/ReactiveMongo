@@ -23,6 +23,7 @@ import reactivemongo.util.LazyLogger
  * @define seeConnectDBTutorial See [[http://reactivemongo.org/releases/0.12/documentation/tutorial/connect-database.html how to connect to the database]]
  * @define uriStrictParam the strict URI, that will be parsed by [[reactivemongo.api.MongoConnection.parseURI]]
  */
+@deprecated("Use `reactivemongo.api.AsyncDriver", "0.19.4")
 class MongoDriver(
   protected val config: Option[Config] = None,
   protected val classLoader: Option[ClassLoader] = None) extends Driver {
@@ -31,8 +32,6 @@ class MongoDriver(
 
   /** Keep a list of all connections so that we can terminate the actors */
   private[reactivemongo] def connections: Iterable[MongoConnection] = connectionMonitors.values
-
-  private[reactivemongo] def numConnections: Int = connectionMonitors.size
 
   private[reactivemongo] case class AddConnection(
     name: String,
@@ -188,6 +187,7 @@ class MongoDriver(
 }
 
 /** The driver factory */
+@deprecated("Use `reactivemongo.api.AsyncDriver", "0.19.4")
 object MongoDriver {
   private val logger = LazyLogger("reactivemongo.api.MongoDriver")
 

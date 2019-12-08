@@ -1,7 +1,7 @@
 package reactivemongo.api
 
 /**
- * MongoDB Read Preferences enable to read from primary or secondaries
+ * MongoDB [[https://docs.mongodb.com/manual/core/read-preference/index.html read preference]] enables to read from primary or secondaries
  * with a predefined strategy.
  */
 sealed trait ReadPreference {
@@ -83,22 +83,22 @@ object ReadPreference {
     override val toString = s"""Nearest(${tags mkString ", "})"""
   }
 
-  /** Reads only from the primary. This is the default choice. */
+  /** [[https://docs.mongodb.com/manual/reference/read-preference/#primary Reads only from the primary]]. This is the default choice. */
   def primary: Primary.type = Primary
 
-  /** Reads from the primary if it is available, or secondaries if it is not. */
+  /** Reads from the [[https://docs.mongodb.com/manual/reference/read-preference/#primaryPreferred primary if it is available]], or secondaries if it is not. */
   val primaryPreferred: PrimaryPreferred = new PrimaryPreferred(List.empty)
 
   /** Reads from any node that has the given `tagSet` in the replica set (preferably the primary). */
   def primaryPreferred(tagSet: List[Map[String, String]]): PrimaryPreferred = new PrimaryPreferred(tagSet)
 
-  /** Reads only from any secondary. */
+  /** [[https://docs.mongodb.com/manual/reference/read-preference/#secondary Reads only from any secondary]]. */
   val secondary: Secondary = new Secondary(List.empty)
 
   /** Reads from a secondary that has the given `tagSet` in the replica set. */
   def secondary(tagSet: List[Map[String, String]]): Secondary = new Secondary(tagSet)
 
-  /** Reads from any secondary, or from the primary if they are not available. */
+  /** [[https://docs.mongodb.com/manual/reference/read-preference/#secondaryPreferred Reads from any secondary]], or from the primary if they are not available. */
   val secondaryPreferred: SecondaryPreferred =
     new SecondaryPreferred(List.empty)
 
@@ -106,8 +106,7 @@ object ReadPreference {
   def secondaryPreferred(tagSet: List[Map[String, String]]): SecondaryPreferred = new SecondaryPreferred(tagSet)
 
   /**
-   * Reads from the fastest node (ie the node which replies faster than all others), regardless its status
-   * (primary or secondary).
+   * Reads from the [[https://docs.mongodb.com/manual/reference/read-preference/#nearest nearest node]] (the node which replies faster than all others), regardless its status (primary or secondary).
    */
   val nearest: Nearest = new Nearest(List.empty)
 

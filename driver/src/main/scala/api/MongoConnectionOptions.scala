@@ -5,7 +5,7 @@ import java.net.URI
 import reactivemongo.api.commands.{ WriteConcern => WC }
 
 /**
- * Options for MongoConnection.
+ * Options for [[MongoConnection]] (see [[http://reactivemongo.org/releases/0.1x/documentation/tutorial/connect-database.html#connection-options more documentation]]).
  *
  * @param connectTimeoutMS The number of milliseconds to wait for a connection to be established before giving up.
  * @param authenticationDatabase the name of the database used for authentication

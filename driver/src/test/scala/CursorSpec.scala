@@ -23,12 +23,14 @@ final class CursorSpec(implicit val ee: ExecutionEnv)
     group1 // include fixture insert
 
     "stop on error" >> {
-      lazy val cursorDrv = Common.newDriver
-      lazy val cursorCon =
-        cursorDrv.connection(List(primaryHost), DefaultOptions)
+      lazy val cursorDrv = Common.newAsyncDriver
+      lazy val cursorCon = Await.result(
+        cursorDrv.connect(List(primaryHost), DefaultOptions),
+        Common.timeout)
 
-      lazy val slowCursorCon =
-        cursorDrv.connection(List(slowPrimary), SlowOptions)
+      lazy val slowCursorCon = Await.result(
+        cursorDrv.connect(List(slowPrimary), SlowOptions),
+        Common.slowTimeout)
 
       lazy val (cursorDb, slowCursorDb) =
         Common.databases(Common.commonDb, cursorCon, slowCursorCon)
@@ -95,15 +97,17 @@ final class CursorSpec(implicit val ee: ExecutionEnv)
               debug(s"stopOnError: foldResponses (#4): $count")
               count = count + 1
             }
-            val con14 = driver.connection(
+            val con14 = driver.connect(
               List(primaryHost), DefaultOptions.copy(nbChannelsPerNode = 1))
 
-            val db14 = Await.result(con14.database("dbspec14"), timeout)
+            val db14 = Await.result(
+              con14.flatMap(_.database("dbspec14")), timeout)
+
             val cursor = db14(collName).find(matchAll("cursorspec14")).cursor()
 
             // Close connection to make the related cursor erroneous
-            con14.askClose()(timeout).map(_ => {}) must beEqualTo({}).
-              await(1, timeout) and {
+            con14.flatMap(_.askClose()(timeout)).
+              map(_ => {}) must beEqualTo({}).await(1, timeout) and {
                 cursor.foldResponsesM({}, 128)(
                   (_, _) => Future.successful(Cursor.Cont({})),
                   Cursor.FailOnError[Unit](onError)).
@@ -179,16 +183,18 @@ final class CursorSpec(implicit val ee: ExecutionEnv)
             debug(s"stopOnError: foldBulks (#4): $count")
             count = count + 1
           }
-          val con21 = driver.connection(
+          val con21 = driver.connect(
             List(primaryHost), DefaultOptions.copy(nbChannelsPerNode = 1))
 
-          val db21 = Await.result(con21.database("dbspec21"), timeout)
+          val db21 = Await.result(
+            con21.flatMap(_.database("dbspec21")), timeout)
+
           lazy val c = db21(collName)
           lazy val cursor = c.find(matchAll("cursorspec21")).options(
             QueryOpts(batchSizeN = 64)).cursor()
 
           // Close connection to make the related cursor erroneous
-          con21.askClose()(timeout).map(_ => {}) must beEqualTo({}).
+          con21.flatMap(_.askClose()(timeout)).map(_ => {}) must beEqualTo({}).
             await(1, timeout) and {
               cursor.foldBulks({}, 128)(
                 { (_, _) => Cursor.Cont({}) },
@@ -238,15 +244,17 @@ final class CursorSpec(implicit val ee: ExecutionEnv)
               debug(s"stopOnError: foldWhile (#3): $count")
               count = count + 1
             }
-            val con27 = driver.connection(
+            val con27 = driver.connect(
               List(primaryHost), DefaultOptions.copy(nbChannelsPerNode = 1))
 
-            val db27 = Await.result(con27.database("dbspec27"), timeout)
+            val db27 = Await.result(
+              con27.flatMap(_.database("dbspec27")), timeout)
+
             lazy val c = db27(collName)
             val cursor = c.find(matchAll("cursorspec27")).cursor()
 
             // Close connection to make the related cursor erroneous
-            con27.askClose()(timeout).
+            con27.flatMap(_.askClose()(timeout)).
               map(_ => {}) must beEqualTo({}).await(1, timeout) and {
                 cursor.foldWhile({}, 128)(
                   (_, _) => Cursor.Cont({}),
@@ -273,12 +281,12 @@ final class CursorSpec(implicit val ee: ExecutionEnv)
     }
 
     "continue on error" >> {
-      lazy val cursorDrv = Common.newDriver
-      lazy val cursorCon =
-        cursorDrv.connection(List(primaryHost), DefaultOptions)
+      lazy val cursorDrv = Common.newAsyncDriver
+      lazy val cursorCon = Await.result(
+        cursorDrv.connect(List(primaryHost), DefaultOptions), timeout)
 
-      lazy val slowCursorCon =
-        cursorDrv.connection(List(slowPrimary), SlowOptions)
+      lazy val slowCursorCon = Await.result(
+        cursorDrv.connect(List(slowPrimary), SlowOptions), slowTimeout)
 
       lazy val (cursorDb, slowCursorDb) =
         Common.databases(Common.commonDb, cursorCon, slowCursorCon)
@@ -349,16 +357,18 @@ final class CursorSpec(implicit val ee: ExecutionEnv)
               debug(s"continueOnError: foldResponses (#4): $count")
               count = count + 1
             }
-            val con33 = driver.connection(
+            val con33 = driver.connect(
               List(primaryHost), DefaultOptions.copy(nbChannelsPerNode = 1))
 
-            lazy val db33 = Await.result(con33.database("dbspec33"), timeout)
+            lazy val db33 = Await.result(
+              con33.flatMap(_.database("dbspec33")), timeout)
+
             lazy val c = db33(collName)
             val cursor = c.find(matchAll("cursorspec33")).cursor()
 
             // Close connection to make the related cursor erroneous
-            con33.askClose()(timeout).map(_ => {}) must beEqualTo({}).
-              await(1, timeout) and {
+            con33.flatMap(_.askClose()(timeout)).
+              map(_ => {}) must beEqualTo({}).await(1, timeout) and {
                 cursor.foldResponses({}, 128)(
                   (_, _) => Cursor.Cont({}),
                   Cursor.ContOnError[Unit](onError)).map(_ => count).
@@ -437,16 +447,18 @@ final class CursorSpec(implicit val ee: ExecutionEnv)
             debug(s"continueOnError: foldBulks (#4): $count")
             count = count + 1
           }
-          val con40 = driver.connection(
+          val con40 = driver.connect(
             List(primaryHost), DefaultOptions.copy(nbChannelsPerNode = 1))
 
-          lazy val db40 = Await.result(con40.database("dbspec40"), timeout)
+          lazy val db40 = Await.result(
+            con40.flatMap(_.database("dbspec40")), timeout)
+
           lazy val c = db40(collName)
           val cursor = c.find(matchAll("cursorspec40")).options(
             QueryOpts(batchSizeN = 64)).cursor()
 
           // Close connection to make the related cursor erroneous
-          con40.askClose()(timeout).map(_ => {}) must beEqualTo({}).
+          con40.flatMap(_.askClose()(timeout)).map(_ => {}) must beEqualTo({}).
             await(1, timeout) and {
               cursor.foldBulks({}, 128)(
                 { (_, _) => Cursor.Cont({}) },
@@ -498,15 +510,17 @@ final class CursorSpec(implicit val ee: ExecutionEnv)
               debug(s"continueOnError: foldWhile(#3): $count")
               count = count + 1
             }
-            val con46 = driver.connection(
+            val con46 = driver.connect(
               List(primaryHost), DefaultOptions.copy(nbChannelsPerNode = 1))
 
-            lazy val db46 = Await.result(con46.database("dbspec46"), timeout)
+            lazy val db46 = Await.result(
+              con46.flatMap(_.database("dbspec46")), timeout)
+
             lazy val c = db46(collName)
             val cursor = c.find(matchAll("cursorspec46")).cursor()
 
             // Close connection to make the related cursor erroneous
-            con46.askClose()(timeout).
+            con46.flatMap(_.askClose()(timeout)).
               map(_ => {}) must beEqualTo({}).await(1, timeout) and {
                 cursor.foldWhileM({}, 64)(
                   (_, _) => Future.successful(Cursor.Cont({})),

@@ -9,9 +9,9 @@ import org.specs2.matcher.MatchResult
 import org.specs2.concurrent.ExecutionEnv
 
 import reactivemongo.api.{
+  AsyncDriver,
   MongoConnection,
   MongoConnectionOptions,
-  MongoDriver,
   ReadPreference
 }
 
@@ -39,7 +39,7 @@ class NodeSetSpec(implicit val ee: ExecutionEnv)
 
   @inline def failoverStrategy = Common.failoverStrategy
   @inline def timeout = Common.timeout
-  lazy val md = Common.newDriver()
+  lazy val md = Common.newAsyncDriver()
   lazy val actorSystem = md.system
 
   protected val nodes = Seq(
@@ -176,8 +176,8 @@ class NodeSetSpec(implicit val ee: ExecutionEnv)
 
   // ---
 
-  def withConAndSys[T](drv: MongoDriver, options: MongoConnectionOptions = MongoConnectionOptions.default.copy(nbChannelsPerNode = 1), _nodes: Seq[String] = nodes)(f: (MongoConnection, TestActorRef[StandardDBSystem]) => Future[T]): Future[T] = {
-    // See MongoDriver#connection
+  def withConAndSys[T](drv: AsyncDriver, options: MongoConnectionOptions = MongoConnectionOptions.default.copy(nbChannelsPerNode = 1), _nodes: Seq[String] = nodes)(f: (MongoConnection, TestActorRef[StandardDBSystem]) => Future[T]): Future[T] = {
+    // See AsyncDriver#connect
     val supervisorName = s"withConAndSys-sup-${System identityHashCode ee}"
     val poolName = s"withConAndSys-con-${System identityHashCode f}"
 
@@ -201,19 +201,21 @@ class NodeSetSpec(implicit val ee: ExecutionEnv)
 
   private def withCon[T](opts: MongoConnectionOptions = MongoConnectionOptions.default)(test: (String, MongoConnection, ActorRef) => MatchResult[T]): org.specs2.execute.Result = {
     val name = s"withCon-${System identityHashCode opts}"
-    val con = md.connection(
+    val con = md.connect(
       nodes, options = opts.copy(credentials = Map(
       Common.commonDb -> MongoConnectionOptions.Credential(
         "test", Some("password")))), name = Some(name))
 
-    val res = actorSystem.actorSelection(s"/user/Monitor-$name").
-      resolveOne(timeout).map(test(name, con, _)).andThen {
-        case _ => try {
-          Await.result(con.askClose()(timeout), timeout); ()
-        } catch {
-          case cause: Exception => cause.printStackTrace()
+    val res = con.flatMap { c =>
+      actorSystem.actorSelection(s"/user/Monitor-$name").
+        resolveOne(timeout).map(test(name, c, _)).andThen {
+          case _ => try {
+            Await.result(c.askClose()(timeout), timeout); ()
+          } catch {
+            case cause: Exception => cause.printStackTrace()
+          }
         }
-      }
+    }
 
     res.await(0, Common.slowTimeout /* tolerate nested timeout */ )
   }

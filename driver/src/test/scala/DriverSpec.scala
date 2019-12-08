@@ -50,44 +50,46 @@ final class DriverSpec(implicit ee: ExecutionEnv)
 
   "Connection pool" should {
     "cleanly start and close with no connections #1" in {
-      val md = newDriver()
+      val md = newAsyncDriver()
 
       reactivemongo.api.tests.numConnections(md) must_=== 0 and {
-        md.close(timeout) must not(throwA[Throwable])
+        md.close(timeout) must not(throwA[Throwable]).awaitFor(timeout)
       } and {
-        md.close(timeout) aka "extra close" must_=== ({})
+        md.close(timeout) aka "extra close" must beTypedEqualTo({}).
+          awaitFor(timeout)
       }
     }
 
     "cleanly start and close with no connections #2" in {
-      val md = newDriver()
+      val md = newAsyncDriver()
 
       reactivemongo.api.tests.numConnections(md) must_=== 0 and (
         md.close(timeout) must not(throwA[Throwable]))
     }
 
     "start and close with one connection open (using raw URI)" in {
-      newDriver().close(timeout) must not(throwA[Exception])
+      newAsyncDriver().close(timeout) must not(throwA[Exception])
     }
 
     "start and close with multiple connections open" in {
-      newDriver().close(timeout) must not(throwA[Exception])
+      newAsyncDriver().close(timeout) must not(throwA[Exception])
     }
 
     "use the failover strategy defined in the options" in {
-      lazy val con = driver.connection(
+      lazy val con = driver.connect(
         List(primaryHost),
         DefaultOptions.copy(failoverStrategy = FailoverStrategy.remote))
 
-      con.database(commonDb).map(_.failoverStrategy).
+      con.flatMap(_.database(commonDb)).map(_.failoverStrategy).
         aka("strategy") must beTypedEqualTo(FailoverStrategy.remote).
         await(1, timeout) and {
-          con.askClose()(timeout) must not(throwA[Exception]).await(1, timeout)
+          con.flatMap(_.askClose()(timeout)) must not(
+            throwA[Exception]).await(1, timeout)
         }
     }
 
     "notify a monitor after the NodeSet is started" in {
-      val con = driver.connection(List(primaryHost), DefaultOptions)
+      val con = driver.connect(List(primaryHost), DefaultOptions)
       val setAvailable = Promise[ProtocolMetadata]()
       val priAvailable = Promise[ProtocolMetadata]()
 
@@ -104,24 +106,28 @@ final class DriverSpec(implicit ee: ExecutionEnv)
         case _ => None
       }
 
-      con.database(commonDb).flatMap { _ =>
-        // Database is resolved (so NodeSet and Primary is reachable) ...
+      (for {
+        c <- con
+        _ <- c.database(commonDb)
+        r <- {
+          // Database is resolved (so NodeSet and Primary is reachable) ...
 
-        // ... register monitors after
-        setMon ! con.mongosystem
-        priMon ! con.mongosystem
+          // ... register monitors after
+          setMon ! c.mongosystem
+          priMon ! c.mongosystem
 
-        Future.sequence(Seq(setAvailable.future, priAvailable.future))
-      }.map(_.size) must beTypedEqualTo(2).await(0, timeout)
+          Future.sequence(Seq(setAvailable.future, priAvailable.future))
+        }
+      } yield r.size) must beTypedEqualTo(2).awaitFor(timeout)
     }
 
     "fail within expected timeout interval" in eventually(2, timeout) {
-      lazy val con = driver.connection(
+      lazy val con = driver.connect(
         List("foo:123"),
         DefaultOptions.copy(failoverStrategy = FailoverStrategy.remote))
 
       val before = System.currentTimeMillis()
-      val unresolved = con.database(commonDb)
+      val unresolved = con.flatMap(_.database(commonDb))
       val after = System.currentTimeMillis()
 
       (after - before) aka "invocation" must beBetween(0L, 75L) and {
@@ -144,7 +150,8 @@ final class DriverSpec(implicit ee: ExecutionEnv)
                 (duration must be_>=(17000L)) and (duration must be_<(28500L))
               }
         }.await(0, 22.seconds) and {
-          con.askClose()(timeout) must not(throwA[Exception]).await(0, timeout)
+          con.flatMap(_.askClose()(timeout)) must not(
+            throwA[Exception]).await(0, timeout)
         }
       }
     }
@@ -153,15 +160,15 @@ final class DriverSpec(implicit ee: ExecutionEnv)
   "CR Authentication" should {
     section("cr_auth")
 
-    lazy val drv = newDriver()
-    lazy val connection = drv.connection(
+    lazy val drv = newAsyncDriver()
+    lazy val connection = drv.connect(
       List(primaryHost),
       options = DefaultOptions.copy(
         authenticationMechanism = reactivemongo.api.CrAuthentication, // enforce
         nbChannelsPerNode = 1))
 
     val dbName = s"specs2-test-cr${System identityHashCode drv}"
-    lazy val db_ = connection.database(dbName, failoverStrategy)
+    lazy val db_ = connection.flatMap(_.database(dbName, failoverStrategy))
 
     val id = System.identityHashCode(drv)
 
@@ -179,11 +186,12 @@ final class DriverSpec(implicit ee: ExecutionEnv)
     }
 
     "not be successful with wrong credentials" in {
-      connection.authenticate(dbName, "foo", "bar", failoverStrategy).
+      connection.flatMap(
+        _.authenticate(dbName, "foo", "bar", failoverStrategy)).
         aka("authentication") must throwA[FailedAuthentication].
         await(0, timeout) and {
           // With credential in initial connection options
-          val con = drv.connection(
+          val con = drv.connect(
             List(primaryHost),
             options = DefaultOptions.copy(
               authenticationMechanism = reactivemongo.api.CrAuthentication,
@@ -191,15 +199,15 @@ final class DriverSpec(implicit ee: ExecutionEnv)
                 Credential("foo", Some("bar"))),
               nbChannelsPerNode = 1))
 
-          con.database(dbName, failoverStrategy).
+          con.flatMap(_.database(dbName, failoverStrategy)).
             map(_ => {}) must throwA[PrimaryUnavailableException].
             await(0, timeout)
         }
     }
 
     "be successful with right credentials" in {
-      connection.authenticate(
-        dbName, s"test-$id", s"password-$id", failoverStrategy).
+      connection.flatMap(_.authenticate(
+        dbName, s"test-$id", s"password-$id", failoverStrategy)).
         aka("authentication") must beAnInstanceOf[SuccessfulAuthentication].
         await(1, timeout) and {
           db_.flatMap {
@@ -207,7 +215,7 @@ final class DriverSpec(implicit ee: ExecutionEnv)
           } must beTypedEqualTo({}).await(0, timeout)
         } and {
           // With credential in initial connection options
-          val con = drv.connection(
+          val con = drv.connect(
             List(primaryHost),
             options = DefaultOptions.copy(
               authenticationMechanism = reactivemongo.api.CrAuthentication,
@@ -215,7 +223,7 @@ final class DriverSpec(implicit ee: ExecutionEnv)
                 Credential(s"test-$id", Some(s"password-$id"))),
               nbChannelsPerNode = 1))
 
-          con.database(dbName, failoverStrategy).
+          con.flatMap(_.database(dbName, failoverStrategy)).
             map(_ => {}) must beTypedEqualTo({}).await(0, timeout)
 
         }
@@ -226,15 +234,15 @@ final class DriverSpec(implicit ee: ExecutionEnv)
     }
 
     "fail on DB without authentication" in {
-      def con = driver.connection(
+      def con = driver.connect(
         List(primaryHost),
         options = DefaultOptions.copy(
           nbChannelsPerNode = 1,
           credentials = Map(commonDb -> MongoConnectionOptions.
             Credential("test", Some("password")))))
 
-      Await.result(con.database(
-        commonDb, failoverStrategy), timeout).
+      Await.result(con.flatMap(_.database(
+        commonDb, failoverStrategy)), timeout).
         aka("database resolution") must throwA[PrimaryUnavailableException]
     }
     section("mongo2")
@@ -373,11 +381,11 @@ final class DriverSpec(implicit ee: ExecutionEnv)
           MongoConnectionOptions.Credential("test", Some("password")))
 
         "with the default connection" in {
-          def con = driver.connection(
+          def con = driver.connect(
             List(primaryHost),
             options = conOpts.copy(credentials = invalidCreds))
 
-          con.database(commonDb, failoverStrategy).
+          con.flatMap(_.database(commonDb, failoverStrategy)).
             aka("DB resolution") must throwA[PrimaryUnavailableException].like {
               case reason => reason.getStackTrace.tail.headOption.
                 aka("most recent") must beSome[StackTraceElement].like {
@@ -395,7 +403,7 @@ final class DriverSpec(implicit ee: ExecutionEnv)
         }
 
         "with the slow connection" in {
-          def con = driver.connection(
+          def con = driver.connect(
             List(slowPrimary),
             options = slowOpts.copy(credentials = invalidCreds))
 
@@ -403,7 +411,7 @@ final class DriverSpec(implicit ee: ExecutionEnv)
             eventually(2, timeout) {
               //println("DriverSpec_1")
 
-              con.database(commonDb, slowFailover).
+              con.flatMap(_.database(commonDb, slowFailover)).
                 aka("resolution") must throwA[PrimaryUnavailableException].
                 await(0, slowTimeout + timeout)
             }
@@ -464,11 +472,13 @@ final class DriverSpec(implicit ee: ExecutionEnv)
         commonDb -> MongoConnectionOptions.Credential(
           unauthorizedUser, Some("password"))))
 
-      def con = driver.connection(List(primaryHost), options = unauthOpts)
+      def con = driver.connect(List(primaryHost), options = unauthOpts)
 
-      con.database(commonDb, failoverStrategy).flatMap(_.collectionNames).
-        map(_ => {}) must beTypedEqualTo({}).await(0, timeout)
-
+      (for {
+        c <- con
+        db <- c.database(commonDb, failoverStrategy)
+        _ <- db.collectionNames
+      } yield {}) must beTypedEqualTo({}).await(0, timeout)
     }
 
     "fail without a valid credential" in {
@@ -477,9 +487,9 @@ final class DriverSpec(implicit ee: ExecutionEnv)
         commonDb -> MongoConnectionOptions.Credential(
           unauthorizedUser, Some("password"))))
 
-      def con = driver.connection(List(primaryHost), options = unauthOpts)
+      def con = driver.connect(List(primaryHost), options = unauthOpts)
 
-      con.database(commonDb, failoverStrategy).
+      con.flatMap(_.database(commonDb, failoverStrategy)).
         aka("DB resolution") must throwA[PrimaryUnavailableException].like {
           case reason => reason.getStackTrace.tail.headOption.
             aka("most recent") must beSome[StackTraceElement].like {
