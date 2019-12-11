@@ -113,10 +113,9 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
   }
 
   /**
-   * Since MongoDB 3.4
+   * [[https://docs.mongodb.com/manual/reference/operator/aggregation/addFields/ \$addFields]] stage (since MongoDB 3.4)
    *
    * @param specifications The fields to include. The resulting objects will also contain these fields.
-   * @see https://docs.mongodb.com/manual/reference/operator/aggregation/addFields/
    */
   case class AddFields(specifications: pack.Document) extends PipelineOperator {
     val makePipe = document(f"$$addFields", specifications)

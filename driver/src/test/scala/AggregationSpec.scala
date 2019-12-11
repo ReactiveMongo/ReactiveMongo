@@ -3,15 +3,18 @@ import scala.collection.immutable.{ ListSet, Set }
 import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
 
+// TODO: bison
 import reactivemongo.bson.{
   BSONArray,
   BSONDocument,
   BSONDocumentHandler,
   BSONDocumentReader,
   BSONInteger,
+  BSONLong,
   BSONNull,
   BSONNumberLike,
   BSONString,
+  BSONValue,
   Macros,
   array,
   document
@@ -465,7 +468,7 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
         .collect[List](Int.MaxValue, Cursor.FailOnError[List[InventoryReport]]()) must beTypedEqualTo(expected).await(0, timeout)
     } tag "gt_mongo32"
 
-    "automatically group in bucket" in {
+    "prepare stage to group in bucket" in {
       // https://docs.mongodb.com/manual/reference/operator/aggregation/bucketAuto/
 
       val expected = Set(
@@ -485,13 +488,14 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
             "max" -> 20),
           "count" -> 1))
 
-      orders.aggregateWith1[BSONDocument]() { framework =>
-        import framework.BucketAuto
+      import coll.aggregationFramework.BucketAuto
 
-        BucketAuto(BSONString(f"$$price"), 3, None)() -> List.empty
-      }.collect[Set](Int.MaxValue, Cursor.FailOnError[Set[BSONDocument]]()).
-        aka("buckets") must beEqualTo(expected).await(0, timeout)
-    } tag "gt_mongo32"
+      BucketAuto(BSONString(f"$$price"), 3, None)().
+        makePipe must_=== BSONDocument(f"$$bucketAuto" -> BSONDocument(
+          "groupBy" -> f"$$price",
+          "buckets" -> 3,
+          "output" -> BSONDocument.empty))
+    }
 
     // Sales
 
@@ -1382,21 +1386,58 @@ db.accounts.aggregate([
   }
   section("gt_mongo32")
 
-  "Facet" should {
+  "Stage" should {
     // See https://docs.mongodb.com/manual/reference/operator/aggregation/facet/
 
-    "be represented as expected" in {
+    f"be $$facet" in {
       import coll.aggregationFramework.{ Count, Facet, Out, UnwindField }
 
       Facet(Seq(
         "foo" -> (UnwindField("bar") -> List(Count("c"))),
-        "lorem" -> (Out("ipsum"), List.empty))).makePipe must_=== BSONDocument(
+        "lorem" -> (Out("ipsum") -> List.empty))).makePipe must_=== BSONDocument(
         f"$$facet" -> BSONDocument(
           "foo" -> BSONArray(
             BSONDocument(f"$$unwind" -> f"$$bar"),
             BSONDocument(f"$$count" -> "c")),
           "lorem" -> BSONArray(
             BSONDocument(f"$$out" -> "ipsum"))))
+    }
+
+    f"$$bucket" in {
+      import coll.aggregationFramework.{ Bucket, SumField }
+
+      Bucket(
+        groupBy = BSONString(f"$$foo"),
+        boundaries = Seq(BSONInteger(10), BSONLong(20), BSONInteger(30)),
+        default = "literal")("totalPop" -> SumField("population")).
+        makePipe must_=== BSONDocument(
+          f"$$bucket" -> BSONDocument(
+            "groupBy" -> f"$$foo",
+            "default" -> "literal",
+            "output" -> BSONDocument(
+              "totalPop" -> BSONDocument(f"$$sum" -> f"$$population")),
+            "boundaries" -> BSONArray(
+              BSONInteger(10), BSONLong(20), BSONInteger(30))))
+
+    }
+
+    f"$$collStats" in {
+      import coll.aggregationFramework.CollStats
+
+      CollStats(
+        latencyStatsHistograms = true,
+        storageStatsScale = Some(1.23D),
+        count = true).makePipe must_=== BSONDocument(
+          f"$$collStats" -> BSONDocument(
+            "latencyStats" -> BSONDocument("histograms" -> true),
+            "storageStats" -> BSONDocument("scale" -> 1.23D),
+            "count" -> BSONDocument.empty))
+    }
+
+    f"$$planCacheStats" in {
+      coll.aggregationFramework.PlanCacheStats.makePipe must_=== BSONDocument(
+        f"$$planCacheStats" -> BSONDocument.empty)
+
     }
   }
 
