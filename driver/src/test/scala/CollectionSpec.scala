@@ -131,8 +131,8 @@ final class CollectionSpec(implicit protected val ee: ExecutionEnv)
           collect[List](
             maxDocs = 0,
             err = Cursor.FailOnError[List[BSONDocument]]()).
-          aka("result") must beTypedEqualTo(List.empty[BSONDocument]).
-          awaitFor(timeout)
+            aka("result") must beTypedEqualTo(List.empty[BSONDocument]).
+            awaitFor(timeout)
       }
 
       "use read preference from the collection" in {

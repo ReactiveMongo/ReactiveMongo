@@ -141,7 +141,7 @@ trait DBMetaCommands { self: DB =>
    *   admin: DefaultDB,
    *   coll: String,
    *   suffix: String)(implicit ec: ExecutionContext): Future[Unit] =
-   *   admin.renameCollection("myDB", coll, s"\${coll}\${suffix}").map(_ => {})
+   *   admin.renameCollection("myDB", coll, coll + suffix).map(_ => {})
    * }}}
    *
    * @param db the name of the database where the collection exists with the `current` name
