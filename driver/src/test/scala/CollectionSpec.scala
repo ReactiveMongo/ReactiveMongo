@@ -126,6 +126,15 @@ final class CollectionSpec(implicit protected val ee: ExecutionEnv)
         collection.withReadPreference(ReadPreference.secondaryPreferred).
           find(BSONDocument("plop" -> "plop")).cursor[BSONDocument]()
 
+      "with maxDocs=0" in {
+        collection.find(BSONDocument.empty).cursor[BSONDocument]().
+          collect[List](
+            maxDocs = 0,
+            err = Cursor.FailOnError[List[BSONDocument]]()).
+          aka("result") must beTypedEqualTo(List.empty[BSONDocument]).
+          awaitFor(timeout)
+      }
+
       "use read preference from the collection" in {
         import scala.language.reflectiveCalls
         val withPref = cursor.asInstanceOf[{ def preference: ReadPreference }]
