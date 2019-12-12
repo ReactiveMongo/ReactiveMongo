@@ -2,16 +2,17 @@ package reactivemongo.api.commands
 
 import reactivemongo.api.SerializationPack
 
+/**
+ * @define opDocBaseUrl https://docs.mongodb.com/manual/reference/operator/aggregation
+ * @define fieldParam the field name
+ */
 private[commands] trait GroupAggregation[P <: SerializationPack] {
   aggregation: AggregationFramework[P] =>
-
-  @inline private def document(name: String, arg: pack.Value): pack.Document =
-    builder.document(Seq(builder.elementProducer(name, arg)))
 
   /**
    * Represents one of the group/accumulator operators,
    * for the `\$group` aggregation. Operation.
-   * @see https://docs.mongodb.com/manual/reference/operator/aggregation/group/#accumulator-operator
+   * @see $opDocBaseUrl/group/#accumulator-operator
    */
   sealed trait GroupFunction {
     def makeFunction: pack.Value
@@ -28,127 +29,202 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
      */
     def apply(name: String, arg: pack.Value): GroupFunction =
       new GroupFunction {
-        val makeFunction = document(name, arg)
+        val makeFunction = pipe(name, arg)
       }
   }
 
   // ---
 
-  case class SumField(field: String) extends GroupFunction {
-    val makeFunction = document(f"$$sum", builder.string("$" + field))
+  /**
+   * The [[$opDocBaseUrl/avg/#grp._S_avg \$avg]] group accumulator.
+   *
+   * @param field $fieldParam
+   */
+  case class AvgField(field: String) extends GroupFunction {
+    val makeFunction = pipe(f"$$avg", builder.string("$" + field))
   }
 
   /**
+   * The [[$opDocBaseUrl/avg/#grp._S_avg \$avg]] group accumulator.
+   */
+  case class Avg(avgExpr: pack.Value) extends GroupFunction {
+    val makeFunction = pipe(f"$$avg", avgExpr)
+  }
+
+  /**
+   * The [[$opDocBaseUrl/first/#grp._S_first \$field]] group accumulator.
+   *
+   * @param field $fieldParam
+   */
+  case class FirstField(field: String) extends GroupFunction {
+    val makeFunction = pipe(f"$$first", builder.string("$" + field))
+  }
+
+  /**
+   * The [[$opDocBaseUrl/first/#grp._S_first \$field]] group accumulator.
+   */
+  case class First(firstExpr: pack.Value) extends GroupFunction {
+    val makeFunction = pipe(f"$$first", firstExpr)
+  }
+
+  /**
+   * The [[$opDocBaseUrl/last/#grp._S_last \$field]] group accumulator.
+   *
+   * @param field $fieldParam
+   */
+  case class LastField(field: String) extends GroupFunction {
+    val makeFunction = pipe(f"$$last", builder.string("$" + field))
+  }
+
+  /**
+   * The [[$opDocBaseUrl/last/#grp._S_last \$field]] group accumulator.
+   */
+  case class Last(lastExpr: pack.Value) extends GroupFunction {
+    val makeFunction = pipe(f"$$last", lastExpr)
+  }
+
+  /**
+   * The [[$opDocBaseUrl/max/#grp._S_max \$max]] group accumulator.
+   *
+   * @param field $fieldParam
+   */
+  case class MaxField(field: String) extends GroupFunction {
+    val makeFunction = pipe(f"$$max", builder.string("$" + field))
+  }
+
+  /**
+   * The [[$opDocBaseUrl/max/#grp._S_max \$max]] group accumulator.
+   *
+   * @param maxExpr the `\$max` expression
+   */
+  case class Max(maxExpr: pack.Value) extends GroupFunction {
+    val makeFunction = pipe(f"$$max", maxExpr)
+  }
+
+  /**
+   * The [[$opDocBaseUrl/mergeObjects/#exp._S_mergeObjects \$mergeObjects]]
+   * group accumulator.
+   *
+   * @param mergeExpr the `\$mergeObjects` expression
+   */
+  case class MergeObjects(mergeExpr: pack.Value) extends GroupFunction {
+    val makeFunction = pipe(f"$$mergeObjects", mergeExpr)
+  }
+
+  /**
+   * The [[$opDocBaseUrl/min/#grp._S_min \$min]] group accumulator.
+   *
+   * @param field $fieldParam
+   */
+  case class MinField(field: String) extends GroupFunction {
+    val makeFunction = pipe(f"$$min", builder.string("$" + field))
+  }
+
+  /**
+   * The [[$opDocBaseUrl/min/#grp._S_min \$min]] group accumulator.
+   *
+   * @param minExpr the `\$min` expression
+   */
+  case class Min(minExpr: pack.Value) extends GroupFunction {
+    val makeFunction = pipe(f"$$min", minExpr)
+  }
+
+  /**
+   * The [[$opDocBaseUrl/push/#grp._S_push \$push]] group accumulator.
+   *
+   * @param field $fieldParam
+   */
+  case class PushField(field: String) extends GroupFunction {
+    val makeFunction = pipe(f"$$push", builder.string("$" + field))
+  }
+
+  /**
+   * The [[$opDocBaseUrl/push/#grp._S_push \$push]] group accumulator.
+   *
+   * @param pushExpr the `\$push` expression
+   */
+  case class Push(pushExpr: pack.Value) extends GroupFunction {
+    val makeFunction = pipe(f"$$push", pushExpr)
+  }
+
+  /**
+   * The [[$opDocBaseUrl/addToSet/ \$addToSet]] group accumulator.
+   *
+   * @param field $fieldParam
+   */
+  case class AddFieldToSet(field: String) extends GroupFunction {
+    val makeFunction = pipe(f"$$addToSet", builder.string("$" + field))
+  }
+
+  /**
+   * The [[$opDocBaseUrl/addToSet/ \$addToSet]] group accumulator.
+   *
+   * @param addToSetExpr the `\$addToSet` expression
+   */
+  case class AddToSet(addToSetExpr: pack.Value) extends GroupFunction {
+    val makeFunction = pipe(f"$$addToSet", addToSetExpr)
+  }
+
+  /**
+   * The [[$opDocBaseUrl/stdDevPop/ \$stdDevPop]] group accumulator
+   * (since MongoDB 3.2)
+   */
+  case class StdDevPop(expression: pack.Value) extends GroupFunction {
+    val makeFunction = pipe(f"$$stdDevPop", expression)
+  }
+
+  /**
+   * The [[$opDocBaseUrl/stdDevPop/ \$stdDevPop]] for a single field (since MongoDB 3.2)
+   *
+   * @param field $fieldParam
+   */
+  case class StdDevPopField(field: String) extends GroupFunction {
+    val makeFunction = pipe(f"$$stdDevPop", builder.string("$" + field))
+  }
+
+  /**
+   * The [[$opDocBaseUrl/stdDevSamp/ \$stdDevSamp]] group accumulator
+   * (since MongoDB 3.2)
+   */
+  case class StdDevSamp(expression: pack.Value) extends GroupFunction {
+    val makeFunction = pipe(f"$$stdDevSamp", expression)
+  }
+
+  /**
+   * The [[$opDocBaseUrl/stdDevSamp/ \$stdDevSamp]] for a single field
+   * (since MongoDB 3.2)
+   *
+   * @param field $fieldParam
+   */
+  case class StdDevSampField(field: String) extends GroupFunction {
+    val makeFunction = pipe(f"$$stdDevSamp", builder.string("$" + field))
+  }
+
+  /**
+   * The [[$opDocBaseUrlsum/#grp._S_sum \$sum]] group accumulator.
+   *
+   * @param field $fieldParam
+   */
+  case class SumField(field: String) extends GroupFunction {
+    val makeFunction = pipe(f"$$sum", builder.string("$" + field))
+  }
+
+  /**
+   * The [[$opDocBaseUrlsum/#grp._S_sum \$sum]] group accumulator.
+   *
    * @param sumExpr the `\$sum` expression
    */
   case class Sum(sumExpr: pack.Value) extends GroupFunction {
-    val makeFunction: pack.Document = document(f"$$sum", sumExpr)
+    val makeFunction: pack.Document = pipe(f"$$sum", sumExpr)
   }
 
-  /** Sum operation of the form `\$sum: 1` */
+  /** The [[$opDocBaseUrlsum/#grp._S_sum `\$sum: 1`]] group accumulator. */
   case object SumAll extends GroupFunction {
-    val makeFunction = document(f"$$sum", builder.int(1))
+    val makeFunction = pipe(f"$$sum", builder.int(1))
   }
 
   @deprecated("Use `SumAll`", "0.12.0")
   case class SumValue(value: Int) extends GroupFunction {
-    val makeFunction = document(f"$$sum", builder.int(value))
-  }
-
-  case class AvgField(field: String) extends GroupFunction {
-    val makeFunction = document(f"$$avg", builder.string("$" + field))
-  }
-
-  case class Avg(avgExpr: pack.Value) extends GroupFunction {
-    val makeFunction = document(f"$$avg", avgExpr)
-  }
-
-  case class FirstField(field: String) extends GroupFunction {
-    val makeFunction = document(f"$$first", builder.string("$" + field))
-  }
-
-  case class First(firstExpr: pack.Value) extends GroupFunction {
-    val makeFunction = document(f"$$first", firstExpr)
-  }
-
-  case class LastField(field: String) extends GroupFunction {
-    val makeFunction = document(f"$$last", builder.string("$" + field))
-  }
-
-  case class Last(lastExpr: pack.Value) extends GroupFunction {
-    val makeFunction = document(f"$$last", lastExpr)
-  }
-
-  case class MaxField(field: String) extends GroupFunction {
-    val makeFunction = document(f"$$max", builder.string("$" + field))
-  }
-
-  /**
-   * @param maxExpr the `\$max` expression
-   */
-  case class Max(maxExpr: pack.Value) extends GroupFunction {
-    val makeFunction = document(f"$$max", maxExpr)
-  }
-
-  case class MinField(field: String) extends GroupFunction {
-    val makeFunction = document(f"$$min", builder.string("$" + field))
-  }
-
-  /**
-   * @param minExpr the `\$min` expression
-   */
-  case class Min(minExpr: pack.Value) extends GroupFunction {
-    val makeFunction = document(f"$$min", minExpr)
-  }
-
-  case class PushField(field: String) extends GroupFunction {
-    val makeFunction = document(f"$$push", builder.string("$" + field))
-  }
-
-  /**
-   * @param pushExpr the `\$push` expression
-   */
-  case class Push(pushExpr: pack.Value) extends GroupFunction {
-    val makeFunction = document(f"$$push", pushExpr)
-  }
-
-  /**
-   * [[https://docs.mongodb.com/manual/reference/operator/aggregation/addFields/ \$addFields]] stage (since MongoDB 3.4)
-   *
-   * @param specifications The fields to include. The resulting objects will also contain these fields.
-   */
-  case class AddFields(specifications: pack.Document) extends PipelineOperator {
-    val makePipe = document(f"$$addFields", specifications)
-  }
-
-  case class AddFieldToSet(field: String) extends GroupFunction {
-    val makeFunction = document(f"$$addToSet", builder.string("$" + field))
-  }
-
-  /**
-   * @param addToSetExpr the `\$addToSet` expression
-   */
-  case class AddToSet(addToSetExpr: pack.Value) extends GroupFunction {
-    val makeFunction = document(f"$$addToSet", addToSetExpr)
-  }
-
-  /** The [[https://docs.mongodb.com/manual/reference/operator/aggregation/stdDevPop/ \$stdDevPop]] group accumulator (since MongoDB 3.2) */
-  case class StdDevPop(expression: pack.Value) extends GroupFunction {
-    val makeFunction = document(f"$$stdDevPop", expression)
-  }
-
-  /** The [[https://docs.mongodb.com/manual/reference/operator/aggregation/stdDevPop/ \$stdDevPop]] for a single field (since MongoDB 3.2) */
-  case class StdDevPopField(field: String) extends GroupFunction {
-    val makeFunction = document(f"$$stdDevPop", builder.string("$" + field))
-  }
-
-  /** The [[https://docs.mongodb.com/manual/reference/operator/aggregation/stdDevSamp/ \$stdDevSamp]] group accumulator (since MongoDB 3.2) */
-  case class StdDevSamp(expression: pack.Value) extends GroupFunction {
-    val makeFunction = document(f"$$stdDevSamp", expression)
-  }
-
-  /** The [[https://docs.mongodb.com/manual/reference/operator/aggregation/stdDevSamp/ \$stdDevSamp]] for a single field (since MongoDB 3.2) */
-  case class StdDevSampField(field: String) extends GroupFunction {
-    val makeFunction = document(f"$$stdDevSamp", builder.string("$" + field))
+    val makeFunction = pipe(f"$$sum", builder.int(value))
   }
 }

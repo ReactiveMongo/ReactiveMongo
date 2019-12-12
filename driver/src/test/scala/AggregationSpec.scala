@@ -33,6 +33,7 @@ import reactivemongo.api.indexes._, IndexType._
 import reactivemongo.api.collections.bson.BSONCollection
 
 import org.specs2.concurrent.ExecutionEnv
+import org.specs2.specification.core.Fragments
 
 final class AggregationSpec(implicit ee: ExecutionEnv)
   extends org.specs2.mutable.Specification
@@ -1387,9 +1388,18 @@ db.accounts.aggregate([
   section("gt_mongo32")
 
   "Stage" should {
-    // See https://docs.mongodb.com/manual/reference/operator/aggregation/facet/
+    f"be $$addFields" in {
+      import coll.aggregationFramework.AddFields
+
+      val specs = BSONDocument("foo" -> 1, "bar" -> 2L)
+
+      AddFields(specs).
+        makePipe must_=== BSONDocument(f"$$addFields" -> BSONDocument(specs))
+    }
 
     f"be $$facet" in {
+      // See https://docs.mongodb.com/manual/reference/operator/aggregation/facet/
+
       import coll.aggregationFramework.{ Count, Facet, Out, UnwindField }
 
       Facet(Seq(
@@ -1434,10 +1444,145 @@ db.accounts.aggregate([
             "count" -> BSONDocument.empty))
     }
 
+    f"$$currentOp" in {
+      import coll.aggregationFramework.CurrentOp
+
+      CurrentOp().makePipe must_=== BSONDocument(f"$$currentOp" -> BSONDocument(
+        "allUsers" -> false,
+        "idleConnections" -> false,
+        "idleCursors" -> false,
+        "idleSessions" -> true,
+        "localOps" -> false))
+    }
+
+    f"$$graphLookup" in {
+      import coll.aggregationFramework.GraphLookup
+
+      GraphLookup(
+        from = "foo",
+        startWith = BSONInteger(1),
+        connectFromField = "bar",
+        connectToField = "lorem",
+        as = "ipsum",
+        maxDepth = Some(2),
+        depthField = Some("depth"),
+        restrictSearchWithMatch = Some(BSONDocument.empty)).makePipe must_=== BSONDocument(f"$$graphLookup" -> BSONDocument(
+          "from" -> "foo",
+          "startWith" -> 1,
+          "connectFromField" -> "bar",
+          "connectToField" -> "lorem",
+          "as" -> "ipsum",
+          "maxDepth" -> 2,
+          "depthField" -> "depth",
+          "restrictSearchWithMatch" -> BSONDocument.empty))
+
+    }
+
+    f"$$listLocalSessions" in {
+      import coll.aggregationFramework.ListLocalSessions
+
+      ListLocalSessions(BSONDocument("allUsers" -> true)).
+        makePipe must_=== BSONDocument(
+          f"$$listLocalSessions" -> BSONDocument("allUsers" -> true))
+    }
+
+    f"$$listSessions" in {
+      import coll.aggregationFramework.ListSessions
+
+      ListSessions(BSONDocument("allUsers" -> true)).
+        makePipe must_=== BSONDocument(
+          f"$$listSessions" -> BSONDocument("allUsers" -> true))
+    }
+
+    f"$$merge" in {
+      import coll.aggregationFramework.Merge
+
+      Merge(
+        intoDb = "foo",
+        intoCollection = "bar",
+        on = Seq("lorem", "ipsum"),
+        whenMatched = Some("replace"),
+        let = Some(BSONDocument("var" -> "v")),
+        whenNotMatched = None).makePipe must_=== BSONDocument(
+          f"$$merge" -> BSONDocument(
+            "into" -> "foo.bar",
+            "on" -> Seq("lorem", "ipsum"),
+            "whenMatched" -> "replace",
+            "let" -> BSONDocument("var" -> "v")))
+
+    }
+
     f"$$planCacheStats" in {
       coll.aggregationFramework.PlanCacheStats.makePipe must_=== BSONDocument(
         f"$$planCacheStats" -> BSONDocument.empty)
 
+    }
+
+    f"$$replaceWith" in {
+      import coll.aggregationFramework.ReplaceWith
+
+      ReplaceWith(BSONDocument("foo" -> 1)).makePipe must_=== BSONDocument(
+        f"$$replaceWith" -> BSONDocument("foo" -> 1))
+    }
+
+    f"$$set" in {
+      import coll.aggregationFramework.Set
+
+      Set(BSONDocument("foo" -> 1)).makePipe must_=== BSONDocument(
+        f"$$set" -> BSONDocument("foo" -> 1))
+    }
+
+    f"$$sortByCount" in {
+      import coll.aggregationFramework.{ SortByCount, SortByFieldCount }
+
+      val expected = BSONDocument(f"$$sortByCount" -> f"$$foo")
+
+      SortByCount(BSONString(f"$$foo")).makePipe must_=== expected and {
+        SortByFieldCount("foo").makePipe must_=== expected
+      }
+    }
+
+    f"$$unset" in {
+      import coll.aggregationFramework.Unset
+
+      Unset("foo", List("bar", "lorem")).makePipe must_=== BSONDocument(
+        f"$$unset" -> List("foo", "bar", "lorem"))
+
+    }
+  }
+
+  "Group accumulator" >> { // TODO: tag as unit
+    import coll.aggregationFramework._
+
+    Fragments.foreach(Seq[(GroupFunction, BSONDocument)](
+      AvgField("foo") -> BSONDocument(f"$$avg" -> f"$$foo"),
+      Avg(BSONString(f"$$bar")) -> BSONDocument(f"$$avg" -> f"$$bar"),
+      FirstField("foo") -> BSONDocument(f"$$first" -> f"$$foo"),
+      First(BSONString(f"$$bar")) -> BSONDocument(f"$$first" -> f"$$bar"),
+      LastField("foo") -> BSONDocument(f"$$last" -> f"$$foo"),
+      Last(BSONString(f"$$bar")) -> BSONDocument(f"$$last" -> f"$$bar"),
+      MaxField("foo") -> BSONDocument(f"$$max" -> f"$$foo"),
+      Max(BSONString(f"$$bar")) -> BSONDocument(f"$$max" -> f"$$bar"),
+      MinField("foo") -> BSONDocument(f"$$min" -> f"$$foo"),
+      Min(BSONString(f"$$bar")) -> BSONDocument(f"$$min" -> f"$$bar"),
+      MergeObjects(
+        BSONDocument("lorem" -> 1)) -> BSONDocument(
+          f"$$mergeObjects" -> BSONDocument("lorem" -> 1)),
+      PushField("foo") -> BSONDocument(f"$$push" -> f"$$foo"),
+      Push(BSONString(f"$$bar")) -> BSONDocument(f"$$push" -> f"$$bar"),
+      AddFieldToSet("foo") -> BSONDocument(f"$$addToSet" -> f"$$foo"),
+      AddToSet(BSONString(f"$$bar")) -> BSONDocument(f"$$addToSet" -> f"$$bar"),
+      StdDevPopField("foo") -> BSONDocument(f"$$stdDevPop" -> f"$$foo"),
+      StdDevPop(BSONString(f"$$bar")) -> BSONDocument(
+        f"$$stdDevPop" -> f"$$bar"),
+      StdDevSampField("foo") -> BSONDocument(f"$$stdDevSamp" -> f"$$foo"),
+      StdDevSamp(BSONString(f"$$bar")) -> BSONDocument(
+        f"$$stdDevSamp" -> f"$$bar"),
+      SumField("foo") -> BSONDocument(f"$$sum" -> f"$$foo"),
+      Sum(BSONString(f"$$bar")) -> BSONDocument(f"$$sum" -> f"$$bar"))) {
+      case (gfun, expected) => gfun.getClass.getSimpleName in {
+        gfun.makeFunction must_=== expected
+      }
     }
   }
 
