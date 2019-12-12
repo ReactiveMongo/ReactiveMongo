@@ -37,8 +37,10 @@ private[core] object Pack {
       val groupClass = Class.forName(s"${kqueuePkg}.KQueueEventLoopGroup").
         asInstanceOf[Class[_ <: EventLoopGroup]]
 
-      new Pack(() =>
+      val pack = new Pack(() =>
         groupClass.getDeclaredConstructor().newInstance(), chanClass)
+      logger.info("Netty KQueue successfully loaded")
+      pack
     }
   } catch {
     case cause: Exception =>
@@ -55,8 +57,10 @@ private[core] object Pack {
       val groupClass = Class.forName(s"${epollPkg}.EpollEventLoopGroup").
         asInstanceOf[Class[_ <: EventLoopGroup]]
 
-      new Pack(() =>
+      val pack = new Pack(() =>
         groupClass.getDeclaredConstructor().newInstance(), chanClass)
+      logger.info("Netty EPoll successfully loaded")
+      pack
     }
   } catch {
     case cause: Exception =>
