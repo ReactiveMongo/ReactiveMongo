@@ -34,7 +34,7 @@ object CursorProducer {
  *
  * trait FooCursor[T] extends Cursor[T] { def foo: String }
  *
- * implicit def fooFlattener[T] = new CursorFlattener[FooCursor] {
+ * implicit def fooFlattener = new CursorFlattener[FooCursor] {
  *   def flatten[T](future: Future[FooCursor[T]]): FooCursor[T] =
  *     new FlattenedCursor[T](future) with FooCursor[T] {
  *       def foo = "Flattened"

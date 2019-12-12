@@ -59,13 +59,50 @@ trait AggregationFramework[P <: SerializationPack]
   }
 
   /**
-   * _Since MongoDB 3.4:_ Counts of the number of documents input.
-   * https://docs.mongodb.com/manual/reference/operator/aggregation/count/
+   * [[https://docs.mongodb.com/manual/reference/operator/aggregation/collStats/ \$collStats]] aggregation stage.
+   */
+  case class CollStats(
+    latencyStatsHistograms: Boolean,
+    storageStatsScale: Option[Double],
+    count: Boolean) {
+
+    import builder.{ document, elementProducer => element }
+
+    def makePipe: pack.Document = {
+      val opts = Seq.newBuilder[pack.ElementProducer]
+
+      opts += element("latencyStats", document(
+        Seq(element("histograms", builder.boolean(latencyStatsHistograms)))))
+
+      storageStatsScale.foreach { scale =>
+        opts += element("storageStats", document(
+          Seq(element("scale", builder.double(scale)))))
+      }
+
+      if (count) {
+        opts += element("count", document(Seq.empty))
+      }
+
+      document(Seq(element(f"$$collStats", document(opts.result()))))
+    }
+  }
+
+  /**
+   * [[https://docs.mongodb.com/manual/reference/operator/aggregation/count/ \$count]] of the number of documents input (since MongoDB 3.4).
+   *
    * @param outputName the name of the output field which has the count as its value
    */
   case class Count(outputName: String) extends PipelineOperator {
     val makePipe: pack.Document = builder.document(Seq(
       builder.elementProducer(f"$$count", builder.string(outputName))))
+  }
+
+  /**
+   * [[https://docs.mongodb.com/manual/reference/operator/aggregation/planCacheStats/ \$planCacheStats]] aggregation stage (since MongoDB 4.2)
+   */
+  case object PlanCacheStats extends PipelineOperator {
+    val makePipe = builder.document(Seq(builder.elementProducer(
+      f"$$planCacheStats", builder.document(Seq.empty))))
   }
 
   /**
@@ -208,8 +245,7 @@ trait AggregationFramework[P <: SerializationPack]
   }
 
   /**
-   * Skips over a number of documents before passing all further documents along the stream.
-   * http://docs.mongodb.org/manual/reference/aggregation/skip/#_S_skip
+   * [[http://docs.mongodb.org/manual/reference/aggregation/skip/#_S_skip \$skip]]s over a number of documents before passing all further documents along the stream.
    *
    * @param skip the number of documents to skip
    */
@@ -219,8 +255,8 @@ trait AggregationFramework[P <: SerializationPack]
   }
 
   /**
-   * Randomly selects the specified number of documents from its input.
-   * https://docs.mongodb.org/master/reference/operator/aggregation/sample/
+   * [[https://docs.mongodb.org/master/reference/operator/aggregation/sample/ \$sample]] aggregation stage, that randomly selects the specified number of documents from its input.
+   *
    * @param size the number of documents to return
    */
   case class Sample(size: Int) extends PipelineOperator {
@@ -339,14 +375,15 @@ trait AggregationFramework[P <: SerializationPack]
     accesses: IndexStatAccesses)
 
   /**
-   * Since MongoDB 3.4
-   * Categorizes incoming documents into a specific number of groups, called buckets,
-   * based on a specified expression. Bucket boundaries are automatically determined
-   * in an attempt to evenly distribute the documents into the specified number of buckets.
+   * [[https://docs.mongodb.com/manual/reference/operator/aggregation/bucketAuto/ \$bucket]] aggregation stage (since MongoDB 3.4).
+   *
+   * Categorizes incoming documents into a specific number of groups,
+   * called buckets, based on a specified expression.
+   *
+   * Bucket boundaries are automatically determined in an attempt
+   * to evenly distribute the documents into the specified number of buckets.
+   *
    * Document fields identifier must be prefixed with `$`.
-   * https://docs.mongodb.com/manual/reference/operator/aggregation/bucketAuto/
-   * @param identifiers any BSON value acceptable by mongodb as identifier
-   * @param ops the sequence of operators specifying aggregate calculation
    */
   case class BucketAuto(
     groupBy: pack.Value,
@@ -357,6 +394,7 @@ trait AggregationFramework[P <: SerializationPack]
 
     import builder.{ document, elementProducer => element }
 
+    // TODO: Refactor with builder
     val makePipe: pack.Document = document(Seq(
       element(f"$$bucketAuto", document(Seq(
         Some(element("groupBy", groupBy)),
@@ -365,6 +403,35 @@ trait AggregationFramework[P <: SerializationPack]
         Some(element("output", document(output.map({
           case (field, op) => element(field, op.makeFunction)
         }))))).flatten))))
+  }
+
+  /**
+   * [[https://docs.mongodb.com/manual/reference/operator/aggregation/bucket/ \$bucket]] aggregation stage.
+   */
+  case class Bucket(
+    groupBy: pack.Value,
+    boundaries: Seq[pack.Value],
+    default: String)(
+    output: (String, GroupFunction)*) extends PipelineOperator {
+
+    import builder.{ document, elementProducer => element }
+
+    val makePipe: pack.Document = {
+      val opts = Seq.newBuilder[pack.ElementProducer]
+
+      opts ++= Seq(
+        element("groupBy", groupBy),
+        element("default", builder.string(default)),
+        element("output", document(output.map({
+          case (field, op) => element(field, op.makeFunction)
+        }))))
+
+      boundaries.headOption.foreach { first =>
+        opts += element("boundaries", builder.array(first, boundaries.tail))
+      }
+
+      document(Seq(element(f"$$bucket", document(opts.result()))))
+    }
   }
 
   /** References the score associated with the corresponding [[https://docs.mongodb.org/v3.0/reference/operator/query/text/#op._S_text `\$text`]] query for each matching document. */
