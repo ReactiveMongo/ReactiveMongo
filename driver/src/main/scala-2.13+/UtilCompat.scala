@@ -16,6 +16,7 @@
 package reactivemongo
 
 import scala.collection.immutable.{ ListSet, Map }
+import scala.concurrent.ExecutionContext
 
 private[reactivemongo] trait UtilCompat {
   @inline private[reactivemongo] def toListSet[A, B](in: Iterable[A])(f: A => B): ListSet[B] = in.view.map(f).to(ListSet)
@@ -25,4 +26,7 @@ private[reactivemongo] trait UtilCompat {
   @inline private[reactivemongo] def toFlatMap[T, K, V](in: Iterable[T])(f: T => Iterable[(K, V)]): Map[K, V] = in.view.flatMap(f).to(Map)
 
   private[reactivemongo] type ArrayOps[T] = scala.collection.ArrayOps[T]
+
+  @inline private[reactivemongo] def sameThreadExecutionContext: ExecutionContext = ExecutionContext.parasitic
+
 }

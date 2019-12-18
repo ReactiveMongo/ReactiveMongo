@@ -2,10 +2,12 @@ package reactivemongo.core
 
 import scala.util.{ Failure, Success, Try }
 
-import scala.concurrent.{ ExecutionContext, Future }
+import scala.concurrent.Future
 import scala.concurrent.duration.{ Duration, FiniteDuration }
 
 import akka.actor.ActorSystem
+
+import reactivemongo.util.sameThreadExecutionContext
 
 private[reactivemongo] sealed trait SystemControl
 
@@ -67,6 +69,6 @@ private[reactivemongo] object SystemControl {
   }
 
   private def modernControl(system: Modern) = AsyncSystemControl { () =>
-    system.terminate().map(_ => {})(ExecutionContext.global)
+    system.terminate().map(_ => {})(sameThreadExecutionContext)
   }
 }
