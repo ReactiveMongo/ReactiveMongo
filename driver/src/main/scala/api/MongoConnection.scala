@@ -81,7 +81,7 @@ class MongoConnection(
   @deprecated("Internal: will be made private", "0.17.0") val name: String,
   @deprecated("Internal: will be made private", "0.14.0") val actorSystem: ActorSystem,
   @deprecated("Internal: will be made private", "0.17.0") val mongosystem: ActorRef,
-  @deprecated("Internal: will be made private", "0.17.0") val options: MongoConnectionOptions) { // TODO: toString as MongoURI
+  val options: MongoConnectionOptions) { // TODO: toString as MongoURI
   import Exceptions._
 
   /**
