@@ -3,7 +3,6 @@ package reactivemongo.api.commands
 import reactivemongo.api.SerializationPack
 
 /**
- * @define opDocBaseUrl https://docs.mongodb.com/manual/reference/operator/aggregation
  * @define fieldParam the field name
  */
 private[commands] trait GroupAggregation[P <: SerializationPack] {
@@ -12,7 +11,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
   /**
    * Represents one of the group/accumulator operators,
    * for the `\$group` aggregation. Operation.
-   * @see $opDocBaseUrl/group/#accumulator-operator
+   * @see https://docs.mongodb.com/manual/reference/operator/aggregation/group/#accumulator-operator
    */
   sealed trait GroupFunction {
     def makeFunction: pack.Value
@@ -36,7 +35,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
   // ---
 
   /**
-   * The [[$opDocBaseUrl/avg/#grp._S_avg \$avg]] group accumulator.
+   * The [[https://docs.mongodb.com/manual/reference/operator/aggregation/avg/#grp._S_avg \$avg]] group accumulator.
    *
    * @param field $fieldParam
    */
@@ -45,14 +44,14 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
   }
 
   /**
-   * The [[$opDocBaseUrl/avg/#grp._S_avg \$avg]] group accumulator.
+   * The [[https://docs.mongodb.com/manual/reference/operator/aggregation/avg/#grp._S_avg \$avg]] group accumulator.
    */
   case class Avg(avgExpr: pack.Value) extends GroupFunction {
     val makeFunction = pipe(f"$$avg", avgExpr)
   }
 
   /**
-   * The [[$opDocBaseUrl/first/#grp._S_first \$field]] group accumulator.
+   * The [[https://docs.mongodb.com/manual/reference/operator/aggregation/first/#grp._S_first \$field]] group accumulator.
    *
    * @param field $fieldParam
    */
@@ -61,14 +60,14 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
   }
 
   /**
-   * The [[$opDocBaseUrl/first/#grp._S_first \$field]] group accumulator.
+   * The [[https://docs.mongodb.com/manual/reference/operator/aggregation/first/#grp._S_first \$field]] group accumulator.
    */
   case class First(firstExpr: pack.Value) extends GroupFunction {
     val makeFunction = pipe(f"$$first", firstExpr)
   }
 
   /**
-   * The [[$opDocBaseUrl/last/#grp._S_last \$field]] group accumulator.
+   * The [[https://docs.mongodb.com/manual/reference/operator/aggregation/last/#grp._S_last \$field]] group accumulator.
    *
    * @param field $fieldParam
    */
@@ -77,14 +76,14 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
   }
 
   /**
-   * The [[$opDocBaseUrl/last/#grp._S_last \$field]] group accumulator.
+   * The [[https://docs.mongodb.com/manual/reference/operator/aggregation/last/#grp._S_last \$field]] group accumulator.
    */
   case class Last(lastExpr: pack.Value) extends GroupFunction {
     val makeFunction = pipe(f"$$last", lastExpr)
   }
 
   /**
-   * The [[$opDocBaseUrl/max/#grp._S_max \$max]] group accumulator.
+   * The [[https://docs.mongodb.com/manual/reference/operator/aggregation/max/#grp._S_max \$max]] group accumulator.
    *
    * @param field $fieldParam
    */
@@ -93,7 +92,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
   }
 
   /**
-   * The [[$opDocBaseUrl/max/#grp._S_max \$max]] group accumulator.
+   * The [[https://docs.mongodb.com/manual/reference/operator/aggregation/max/#grp._S_max \$max]] group accumulator.
    *
    * @param maxExpr the `\$max` expression
    */
@@ -102,7 +101,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
   }
 
   /**
-   * The [[$opDocBaseUrl/mergeObjects/#exp._S_mergeObjects \$mergeObjects]]
+   * The [[https://docs.mongodb.com/manual/reference/operator/aggregation/mergeObjects/#exp._S_mergeObjects \$mergeObjects]]
    * group accumulator.
    *
    * @param mergeExpr the `\$mergeObjects` expression
@@ -112,7 +111,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
   }
 
   /**
-   * The [[$opDocBaseUrl/min/#grp._S_min \$min]] group accumulator.
+   * The [[https://docs.mongodb.com/manual/reference/operator/aggregation/min/#grp._S_min \$min]] group accumulator.
    *
    * @param field $fieldParam
    */
@@ -121,7 +120,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
   }
 
   /**
-   * The [[$opDocBaseUrl/min/#grp._S_min \$min]] group accumulator.
+   * The [[https://docs.mongodb.com/manual/reference/operator/aggregation/min/#grp._S_min \$min]] group accumulator.
    *
    * @param minExpr the `\$min` expression
    */
@@ -130,7 +129,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
   }
 
   /**
-   * The [[$opDocBaseUrl/push/#grp._S_push \$push]] group accumulator.
+   * The [[https://docs.mongodb.com/manual/reference/operator/aggregation/push/#grp._S_push \$push]] group accumulator.
    *
    * @param field $fieldParam
    */
@@ -139,7 +138,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
   }
 
   /**
-   * The [[$opDocBaseUrl/push/#grp._S_push \$push]] group accumulator.
+   * The [[https://docs.mongodb.com/manual/reference/operator/aggregation/push/#grp._S_push \$push]] group accumulator.
    *
    * @param pushExpr the `\$push` expression
    */
@@ -148,7 +147,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
   }
 
   /**
-   * The [[$opDocBaseUrl/addToSet/ \$addToSet]] group accumulator.
+   * The [[https://docs.mongodb.com/manual/reference/operator/aggregation/addToSet/ \$addToSet]] group accumulator.
    *
    * @param field $fieldParam
    */
@@ -157,7 +156,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
   }
 
   /**
-   * The [[$opDocBaseUrl/addToSet/ \$addToSet]] group accumulator.
+   * The [[https://docs.mongodb.com/manual/reference/operator/aggregation/addToSet/ \$addToSet]] group accumulator.
    *
    * @param addToSetExpr the `\$addToSet` expression
    */
@@ -166,7 +165,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
   }
 
   /**
-   * The [[$opDocBaseUrl/stdDevPop/ \$stdDevPop]] group accumulator
+   * The [[https://docs.mongodb.com/manual/reference/operator/aggregation/stdDevPop/ \$stdDevPop]] group accumulator
    * (since MongoDB 3.2)
    */
   case class StdDevPop(expression: pack.Value) extends GroupFunction {
@@ -174,7 +173,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
   }
 
   /**
-   * The [[$opDocBaseUrl/stdDevPop/ \$stdDevPop]] for a single field (since MongoDB 3.2)
+   * The [[https://docs.mongodb.com/manual/reference/operator/aggregation/stdDevPop/ \$stdDevPop]] for a single field (since MongoDB 3.2)
    *
    * @param field $fieldParam
    */
@@ -183,7 +182,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
   }
 
   /**
-   * The [[$opDocBaseUrl/stdDevSamp/ \$stdDevSamp]] group accumulator
+   * The [[https://docs.mongodb.com/manual/reference/operator/aggregation/stdDevSamp/ \$stdDevSamp]] group accumulator
    * (since MongoDB 3.2)
    */
   case class StdDevSamp(expression: pack.Value) extends GroupFunction {
@@ -191,7 +190,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
   }
 
   /**
-   * The [[$opDocBaseUrl/stdDevSamp/ \$stdDevSamp]] for a single field
+   * The [[https://docs.mongodb.com/manual/reference/operator/aggregation/stdDevSamp/ \$stdDevSamp]] for a single field
    * (since MongoDB 3.2)
    *
    * @param field $fieldParam
@@ -201,7 +200,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
   }
 
   /**
-   * The [[$opDocBaseUrlsum/#grp._S_sum \$sum]] group accumulator.
+   * The [[https://docs.mongodb.com/manual/reference/operator/aggregation/sum/#grp._S_sum \$sum]] group accumulator.
    *
    * @param field $fieldParam
    */
@@ -210,7 +209,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
   }
 
   /**
-   * The [[$opDocBaseUrlsum/#grp._S_sum \$sum]] group accumulator.
+   * The [[https://docs.mongodb.com/manual/reference/operator/aggregation/sum/#grp._S_sum \$sum]] group accumulator.
    *
    * @param sumExpr the `\$sum` expression
    */
@@ -218,7 +217,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
     val makeFunction: pack.Document = pipe(f"$$sum", sumExpr)
   }
 
-  /** The [[$opDocBaseUrlsum/#grp._S_sum `\$sum: 1`]] group accumulator. */
+  /** The [[https://docs.mongodb.com/manual/reference/operator/aggregation/sum/#grp._S_sum `\$sum: 1`]] group accumulator. */
   case object SumAll extends GroupFunction {
     val makeFunction = pipe(f"$$sum", builder.int(1))
   }

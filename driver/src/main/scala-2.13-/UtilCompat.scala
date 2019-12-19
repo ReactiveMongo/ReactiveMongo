@@ -17,6 +17,8 @@ package reactivemongo
 
 import scala.collection.immutable.{ ListSet, Map }
 
+import scala.concurrent.ExecutionContext
+
 private[reactivemongo] trait UtilCompat {
   import scala.collection.breakOut
 
@@ -27,4 +29,14 @@ private[reactivemongo] trait UtilCompat {
   @inline private[reactivemongo] def toFlatMap[T, K, V](in: Iterable[T])(f: T => Iterable[(K, V)]): Map[K, V] = in.flatMap(f)(breakOut)
 
   private[reactivemongo] type ArrayOps[T] = scala.collection.mutable.ArrayOps[T]
+
+  @inline private[reactivemongo] def sameThreadExecutionContext: ExecutionContext = SameThreadExecutionContext
+
+  private object SameThreadExecutionContext extends ExecutionContext {
+    def execute(command: Runnable): Unit = command.run()
+
+    def reportFailure(t: Throwable): Unit =
+      throw new IllegalStateException(
+        "exception in sameThreadExecutionContext", t)
+  }
 }
