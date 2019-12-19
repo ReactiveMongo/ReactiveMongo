@@ -38,7 +38,7 @@ object Dependencies {
     "org.specs2" %% "specs2-core" % specsVer.value % Test
   }
 
-  val slf4jVer = "1.7.29"
+  val slf4jVer = "1.7.30"
   val log4jVer = "2.13.0"
 
   val slf4j = "org.slf4j" % "slf4j-api" % slf4jVer
