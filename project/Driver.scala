@@ -85,6 +85,13 @@ object Version {
             Seq.empty
           }
         },
+        libraryDependencies ++= {
+          if (!Common.useShaded.value) {
+            Seq(Dependencies.netty % Provided)
+          } else {
+            Seq.empty[ModuleID]
+          }
+        },
         libraryDependencies ++= akka.value ++ Seq(
           "dnsjava" % "dnsjava" % "2.1.9",
           commonsCodec,

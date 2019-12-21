@@ -19,6 +19,13 @@ final class Jmx(driver: Project) {
         mimaPreviousArtifacts := Set.empty,
         testOptions in Test += Tests.Cleanup(Common.cleanup.value),
         libraryDependencies ++= Seq(specs.value) ++ logApi,
+        libraryDependencies ++= {
+          if (!Common.useShaded.value) {
+            Seq(Dependencies.netty % Provided)
+          } else {
+            Seq.empty[ModuleID]
+          }
+        },
         pomPostProcess := providedInternalDeps
       )
     )

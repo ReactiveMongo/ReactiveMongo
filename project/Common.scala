@@ -28,11 +28,27 @@ object Common {
 
   val closeableObject = SettingKey[String]("class name of a closeable object")
 
+  val useShaded = settingKey[Boolean](
+    "Use ReactiveMongo-Shaded (see system property 'reactivemongo.shaded')")
+
+  // TODO: auto plugin
   val settings = Defaults.coreDefaultSettings ++ baseSettings ++ Compiler.settings ++ Seq(
     scalaVersion := "2.12.10",
     crossScalaVersions := Seq(
       "2.10.7", scalaCompatVer, scalaVersion.value, "2.13.1"),
     crossVersion := CrossVersion.binary,
+    useShaded := sys.env.get("REACTIVEMONGO_SHADED").fold(true)(_.toBoolean),
+    version := { 
+      val ver = (version in ThisBuild).value
+      val suffix = {
+        if (useShaded.value) "" // default ~> no suffix
+        else "-noshaded"
+      }
+
+      ver.span(_ != '-') match {
+        case (a, b) => s"${a}${suffix}${b}"
+      }
+    },
     //parallelExecution in Test := false,
     //fork in Test := true, // Don't share executioncontext between SBT CLI/tests
     unmanagedSourceDirectories in Compile ++= {

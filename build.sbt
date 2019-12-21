@@ -40,12 +40,12 @@ lazy val `ReactiveMongo-BSON-Compat` = project.in(file("bson-compat")).
     mimaPreviousArtifacts := Set.empty,
     libraryDependencies ++= {
       if (scalaBinaryVersion.value != "2.10") {
-        Seq(
-          Dependencies.shaded.value % Provided,
+        Dependencies.shaded.value ++ Seq(
           organization.value %% "reactivemongo-bson-api" % version.value % Provided,
           Dependencies.specs.value)
+
       } else {
-        Seq.empty
+        Seq.empty[ModuleID]
       }
     }
   )).dependsOn(`ReactiveMongo-BSON`)
@@ -103,7 +103,7 @@ lazy val `ReactiveMongo-Core` = project.in(file("core")).
         }
       },
       libraryDependencies ++= {
-        val deps = Seq(Dependencies.shaded.value)
+        val deps = Dependencies.shaded.value
 
         if (scalaBinaryVersion.value != "2.10") {
           ("org.reactivemongo" %% "reactivemongo-bson-api" % version.
