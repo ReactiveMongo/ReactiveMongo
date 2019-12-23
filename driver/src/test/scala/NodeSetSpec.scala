@@ -15,7 +15,7 @@ import reactivemongo.api.{
   ReadPreference
 }
 
-import reactivemongo.core.nodeset.{ Authenticate, ProtocolMetadata }
+import reactivemongo.core.nodeset.{ Authenticate, NodeSet, ProtocolMetadata }
 
 import reactivemongo.core.actors.{
   PrimaryAvailable,
@@ -26,7 +26,7 @@ import reactivemongo.core.actors.{
 }
 import reactivemongo.core.actors.Exceptions.PrimaryUnavailableException
 
-class NodeSetSpec(implicit val ee: ExecutionEnv)
+final class NodeSetSpec(implicit val ee: ExecutionEnv)
   extends org.specs2.mutable.Specification
   with ConnectAllTest with UnresponsiveSecondaryTest {
 
@@ -155,6 +155,50 @@ class NodeSetSpec(implicit val ee: ExecutionEnv)
 
     unresponsiveSecondarySpec
 
+    "discover node2 and create signaling channels" in {
+      def isPrim = reactivemongo.bson.BSONDocument(
+        "ok" -> 1,
+        "ismaster" -> true,
+        "minWireVersion" -> 4,
+        "maxWireVersion" -> 5,
+        "me" -> "nodesetspec.node1:27017",
+        "setName" -> "rs0",
+        "setVersion" -> 0,
+        "secondary" -> false,
+        "hosts" -> nodes,
+        "primary" -> "nodesetspec.node1:27017")
+
+      var before = Vector.empty[String]
+
+      withConAndSys(md, _nodes = nodes.headOption.toSeq) { (_, sys) =>
+        before = sys.underlyingActor._nodeSet.nodes.map(_.name)
+
+        import scala.concurrent.duration._
+        import akka.pattern.ask
+        import akka.util.Timeout
+
+        implicit def timeout = Timeout(3.seconds)
+
+        ask(sys, fakeResponse(
+          doc = isPrim, reqID = isMasterReqId())).mapTo[NodeSet]
+
+      } must beLike[NodeSet] {
+        case ns =>
+          val after = ns.nodes
+
+          before.size must_=== 1 and {
+            before.headOption must_=== nodes.headOption
+          } and {
+            // Node2 discovered and signaling channel created for
+            after.size must_=== 2
+          } and {
+            after.map(_.name).sorted must_=== nodes.toVector
+          } and {
+            after.exists(_.connections.count(_.signaling) == 1) must beTrue
+          }
+      }.awaitFor(timeout)
+    }
+
     "be closed" in {
       md.close(timeout) must not(throwA[Exception])
     }
@@ -186,7 +230,7 @@ class NodeSetSpec(implicit val ee: ExecutionEnv)
     val auths = Seq(Authenticate(
       Common.commonDb, "test", Some("password")))
     lazy val mongosystem = TestActorRef[StandardDBSystem](
-      standardDBSystem(supervisorName, poolName, nodes, auths, options),
+      standardDBSystem(supervisorName, poolName, _nodes, auths, options),
       poolName)
 
     def connection = addConnection(

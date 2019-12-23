@@ -723,6 +723,7 @@ object Version {
         mappings in (Compile, packageSrc) ~= driverFilter,
         apiMappings ++= Documentation.mappings("com.typesafe.akka", "http://doc.akka.io/api/akka/%s/")("akka-actor").value ++ Documentation.mappings("com.typesafe.play", "http://playframework.com/documentation/%s/api/scala/index.html", _.replaceAll("[\\d]$", "x"))("play-iteratees").value,
         pomPostProcess := {
+          // TODO: Filter silencer-lib
           if (scalaBinaryVersion.value == "2.10") skipScala210
           else identity[XmlNode]
         }
