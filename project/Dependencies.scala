@@ -7,7 +7,7 @@ object Dependencies {
   val shaded = Def.setting[Seq[ModuleID]] {
     val v = (version in ThisBuild).value
 
-    if (Common.useShaded.value) {
+    if (Common.useShaded.value || scalaBinaryVersion.value == "2.10") {
       Seq(organization.value % "reactivemongo-shaded" % v)
     } else {
       Seq(

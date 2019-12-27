@@ -14,25 +14,23 @@ final class Jmx(driver: Project) {
   lazy val module = Project("ReactiveMongo-JMX", file("jmx")).
     enablePlugins(CpdPlugin).
     dependsOn(driver).
-    settings(
-      Common.settings ++ Findbugs.settings ++ Seq(
-        mimaPreviousArtifacts := Set.empty,
-        testOptions in Test += Tests.Cleanup(Common.cleanup.value),
-        libraryDependencies ++= Seq(specs.value) ++ logApi,
-        libraryDependencies ++= {
-          if (!Common.useShaded.value) {
-            Seq(Dependencies.netty % Provided)
-          } else {
-            Seq.empty[ModuleID]
-          }
-        },
-        pomPostProcess := providedInternalDeps
-      )
-    )
+    settings(Findbugs.settings ++ Seq(
+      mimaPreviousArtifacts := Set.empty,
+      testOptions in Test += Tests.Cleanup(Common.cleanup.value),
+      libraryDependencies ++= Seq(specs.value) ++ logApi,
+      libraryDependencies ++= {
+        if (!Common.useShaded.value) {
+          Seq(Dependencies.netty % Provided)
+        } else {
+          Seq.empty[ModuleID]
+        }
+      },
+      Common.pomTransformer := Some(providedInternalDeps)
+    ))
 
   // ---
 
-  private lazy val providedInternalDeps: XmlNode => XmlNode = {
+  private lazy val providedInternalDeps: XmlElem => Option[XmlElem] = {
     import scala.xml.NodeSeq
     import scala.xml.transform.{ RewriteRule, RuleTransformer }
 
@@ -45,7 +43,7 @@ final class Jmx(driver: Project) {
       }
     })
 
-    transformPomDependencies { dep: XmlElem =>
+    { dep: XmlElem =>
       if ((dep \ "groupId").text == "org.reactivemongo") {
         asProvided.transform(dep).headOption.collectFirst {
           case e: XmlElem => e.copy(
