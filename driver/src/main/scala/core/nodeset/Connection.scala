@@ -29,7 +29,7 @@ class Connection(
   def isAuthenticated(db: String, user: String): Boolean =
     authenticated.exists(auth => auth.user == user && auth.db == db)
 
-  @deprecated("No longer a case class", "0.17.0")
+  @deprecated("No longer a ReactiveMongo case class", "0.17.0")
   def copy(
     channel: Channel = this.channel,
     status: ConnectionStatus = this.status,
@@ -42,10 +42,10 @@ class Connection(
     case _             => false
   }
 
-  @deprecated("No longer a case class", "0.17.0")
+  @deprecated("No longer a ReactiveMongo case class", "0.17.0")
   val productArity: Int = 5
 
-  @deprecated("No longer a case class", "0.17.0")
+  @deprecated("No longer a ReactiveMongo case class", "0.17.0")
   def productElement(n: Int): Any = (n: @annotation.switch) match {
     case 0 => channel
     case 1 => status

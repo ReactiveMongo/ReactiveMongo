@@ -44,30 +44,43 @@ import reactivemongo.api.collections.{
 }
 import reactivemongo.api.collections.bson.BSONCollectionProducer
 
+import com.github.ghik.silencer.silent
+
 /**
  * A GridFS store.
  * @param db The database where this store is located.
  * @param prefix The prefix of this store. The `files` and `chunks` collections will be actually named `\${prefix}.files` and `\${prefix}.chunks`.
  */
-abstract class GridFS[P <: SerializationPack with Singleton] @deprecated("Internal: will be private", "0.19.0") (
+abstract class GridFS[P <: SerializationPack with Singleton] @deprecated("Internal: will be made private", "0.19.0") (
   db: DB with DBMetaCommands,
   prefix: String = "fs")(implicit producer: GenericCollectionProducer[P, GenericCollection[P]] = BSONCollectionProducer) { self =>
   import reactivemongo.api.indexes.{ Index, IndexType }, IndexType.Ascending
 
-  @deprecated("Internal: will be private", "0.19.0")
-  lazy val pack: P =
-    throw new UnsupportedOperationException(
+  @deprecated("Internal: will be made private", "0.19.0")
+  lazy val pack: P = {
+    @silent def eval: P = throw new UnsupportedOperationException(
       "Use `GridFS(..)` to create instance")
+
+    eval
+  }
 
   /** The `files` collection */
-  lazy val files: GenericCollection[pack.type] =
-    throw new UnsupportedOperationException(
-      "Use `GridFS(..)` to create instance")
+  lazy val files: GenericCollection[pack.type] = {
+    @silent def eval: GenericCollection[pack.type] =
+      throw new UnsupportedOperationException(
+        "Use `GridFS(..)` to create instance")
+
+    eval
+  }
 
   /** The `chunks` collection */
-  lazy val chunks: GenericCollection[pack.type] =
-    throw new UnsupportedOperationException(
-      "Use `GridFS(..)` to create instance")
+  lazy val chunks: GenericCollection[pack.type] = {
+    @silent def eval: GenericCollection[pack.type] =
+      throw new UnsupportedOperationException(
+        "Use `GridFS(..)` to create instance")
+
+    eval
+  }
 
   private val builder = pack.newBuilder
   private val decoder = pack.newDecoder
@@ -93,6 +106,7 @@ abstract class GridFS[P <: SerializationPack with Singleton] @deprecated("Intern
    * Returns a cursor for the chunks of the specified file.
    * The cursor walks the chunks orderly.
    */
+  @silent(".*(ec|readPreference)\\ .*is\\ never\\ used.*")
   def chunks(file: ReadFile[pack.Value], readPreference: ReadPreference = defaultReadPreference)(implicit ec: ExecutionContext, cp: CursorProducer[Array[Byte]]): cp.ProducedCursor = {
     val selector = document(Seq(
       elem("files_id", file.id),
@@ -104,7 +118,8 @@ abstract class GridFS[P <: SerializationPack with Singleton] @deprecated("Intern
     val sortOpts = document(Seq(elem("n", builder.int(1))))
     implicit def reader = chunkReader
 
-    self.chunks.find(selector).sort(sortOpts).cursor(defaultReadPreference)
+    self.chunks.find(selector, Option.empty[pack.Document]).
+      sort(sortOpts).cursor(defaultReadPreference)
   }
 
   /**
@@ -114,13 +129,16 @@ abstract class GridFS[P <: SerializationPack with Singleton] @deprecated("Intern
    *
    * @tparam S The type of the selector document. An implicit `Writer[S]` must be in the scope.
    */
-  def find[S, T <: ReadFile[_]](selector: S)(implicit sWriter: pack.Writer[S], readFileReader: pack.Reader[T], @deprecatedName(Symbol("ctx")) ec: ExecutionContext, cp: CursorProducer[T]): cp.ProducedCursor = files.find(selector).cursor(defaultReadPreference)
+  @silent(".*ec\\ .*is\\ never\\ used.*")
+  def find[S, T <: ReadFile[_]](selector: S)(implicit sWriter: pack.Writer[S], readFileReader: pack.Reader[T], @deprecatedName(Symbol("ctx")) ec: ExecutionContext, cp: CursorProducer[T]): cp.ProducedCursor = files.find(selector, Option.empty[pack.Document]).cursor(defaultReadPreference)
 
+  @silent(".*ec\\ .*is\\ never\\ used.*")
   @inline def find(selector: pack.Document)(implicit ec: ExecutionContext, cp: CursorProducer[ReadFile[pack.Value]]): cp.ProducedCursor = {
     implicit def idTag = pack.IsValue
     implicit def readFileReader = RF.reader[P, pack.Value](pack)
 
-    files.find(selector).cursor(defaultReadPreference)
+    files.find(selector, Option.empty[pack.Document]).
+      cursor(defaultReadPreference)
   }
 
   /**
@@ -208,6 +226,7 @@ abstract class GridFS[P <: SerializationPack with Singleton] @deprecated("Intern
    * @tparam Id the type of the id of this file (generally `BSONObjectID` or `BSONValue`).
    * @tparam M the type of the message digest
    */
+  @silent(".*readFileReader\\ .*is\\ never\\ used.*")
   private def iterateeMaybeMD5[Id <: pack.Value, M](file: FileToSave[pack.type, Id], digestInit: => M, digestUpdate: (M, Array[Byte]) => M, digestFinalize: M => Future[Option[Array[Byte]]], chunkSize: Int)(implicit readFileReader: pack.Reader[ReadFile[Id]], @deprecatedName(Symbol("ctx")) ec: ExecutionContext, @deprecated("Unused", "0.19.0") idProducer: IdProducer[Id], @deprecated("Unused", "0.19.0") docWriter: BSONDocumentWriter[file.pack.Document]): Iteratee[Array[Byte], Future[ReadFile[Id]]] = {
     case class Chunk(
       previous: Array[Byte],

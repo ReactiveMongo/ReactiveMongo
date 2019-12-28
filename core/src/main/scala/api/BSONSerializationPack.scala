@@ -15,7 +15,7 @@ import reactivemongo.core.protocol.Response
 import reactivemongo.core.netty.ChannelBufferReadableBuffer
 
 /** The default serialization pack. */
-@deprecated("Will be replaced with `reactivemongo.api.bson.collection.BSONSerializationPack`", "0.19.0")
+@deprecated("Will be replaced by `reactivemongo.api.bson.collection.BSONSerializationPack`", "0.19.0")
 object BSONSerializationPack
   extends SerializationPack with BSONSerializationPackCompat { self =>
 

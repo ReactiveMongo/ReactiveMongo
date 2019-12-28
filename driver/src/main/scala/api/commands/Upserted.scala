@@ -55,6 +55,6 @@ object Upserted
     override val _id = id
   }
 
-  @deprecated("No longer a case class", "0.19.0")
+  @deprecated("No longer a ReactiveMongo case class", "0.19.0")
   def unapply(that: Upserted): Option[(Int, Any)] = Option(that).map(_.tupled)
 }

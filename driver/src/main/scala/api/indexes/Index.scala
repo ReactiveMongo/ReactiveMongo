@@ -82,7 +82,7 @@ sealed abstract class Index extends Product with Serializable {
    */
   private[api] def optionDocument: pack.Document
 
-  @deprecated("Will be internal", "0.19.0")
+  @deprecated("Internal: will be made private", "0.19.0")
   def partialFilter: Option[BSONDocument] = partialFilterDocument.flatMap {
     pack.bsonValue(_) match {
       case doc: BSONDocument =>
@@ -93,7 +93,7 @@ sealed abstract class Index extends Product with Serializable {
     }
   }
 
-  @deprecated("Will be internal", "0.19.0")
+  @deprecated("Internal: will be made private", "0.19.0")
   def options: BSONDocument = pack.bsonValue(optionDocument) match {
     case doc: BSONDocument => doc
     case _                 => BSONDocument.empty
@@ -105,7 +105,7 @@ sealed abstract class Index extends Product with Serializable {
       name + (if (name.length > 0) "_" else "") + kv._1 + "_" + kv._2.valueStr
   })
 
-  @deprecated("No longer a case class", "0.19.1")
+  @deprecated("No longer a ReactiveMongo case class", "0.19.1")
   val productArity = 9
 
   def productElement(n: Int): Any = tupled.productElement(n)
@@ -141,8 +141,8 @@ object Index { //extends scala.runtime.AbstractFunction9[Seq[(String, IndexType)
     @deprecated("Since MongoDB 2.6", "0.19.1") dropDups: Boolean = false,
     sparse: Boolean = false,
     version: Option[Int] = None, // let MongoDB decide
-    @deprecated("Will be internal", "0.19.0") partialFilter: Option[BSONDocument] = None,
-    @deprecated("Will be internal", "0.19.0") options: BSONDocument = BSONDocument.empty): Index = apply(BSONSerializationPack)(key, name, unique, background, dropDups, sparse, version, partialFilter, options)
+    @deprecated("Internal: will be made private", "0.19.0") partialFilter: Option[BSONDocument] = None,
+    @deprecated("Internal: will be made private", "0.19.0") options: BSONDocument = BSONDocument.empty): Index = apply(BSONSerializationPack)(key, name, unique, background, dropDups, sparse, version, partialFilter, options)
 
   def apply[P <: SerializationPack](_pack: P)(
     key: Seq[(String, IndexType)],
@@ -180,7 +180,7 @@ object Index { //extends scala.runtime.AbstractFunction9[Seq[(String, IndexType)
     }
   }
 
-  @deprecated("No longer a case class", "0.19.1")
+  @deprecated("No longer a ReactiveMongo case class", "0.19.1")
   def unapply(index: Index): Option[Tuple9[Seq[(String, IndexType)], Option[String], Boolean, Boolean, Boolean, Boolean, Option[Int], Option[BSONDocument], BSONDocument]] = Option(index).map { i =>
     Tuple9(i.key, i.name, i.unique, i.background, i.dropDups,
       i.sparse, i.version, i.partialFilter, i.options)

@@ -7,7 +7,7 @@ import reactivemongo.io.netty.channel.ChannelId
  * @param lastIsMasterTime the timestamp when the last IsMaster request has been sent (or 0)
  * @param lastIsMasterId the ID of the last IsMaster request (or -1 if none)
  */
-@deprecated("Will be internal", "0.18.2")
+@deprecated("Internal: will be made private", "0.18.2")
 class PingInfo(
   val ping: Long,
   val lastIsMasterTime: Long,

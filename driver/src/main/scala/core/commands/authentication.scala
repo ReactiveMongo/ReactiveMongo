@@ -174,10 +174,10 @@ sealed abstract class FailedAuthentication
     case _                       => false
   }
 
-  @deprecated("No longer a case class", "0.19.1")
+  @deprecated("No longer a ReactiveMongo case class", "0.19.1")
   val productArity: Int = 2
 
-  @deprecated("No longer a case class", "0.19.1")
+  @deprecated("No longer a ReactiveMongo case class", "0.19.1")
   def productElement(n: Int): Any = tupled.productElement(n)
 }
 
@@ -190,7 +190,7 @@ object FailedAuthentication extends scala.runtime.AbstractFunction2[String, Opti
     originalDocument: Option[BSONDocument] = None): FailedAuthentication =
     apply(BSONSerializationPack)(message, None, originalDocument)
 
-  @deprecated("No longer a case class", "0.19.1")
+  @deprecated("No longer a ReactiveMongo case class", "0.19.1")
   def unapply(that: FailedAuthentication): Option[(String, Option[BSONDocument])] = Option(that).map { a => a.message -> a.originalDocument }
 
   private[reactivemongo] def apply[P <: SerializationPack](_pack: P)(

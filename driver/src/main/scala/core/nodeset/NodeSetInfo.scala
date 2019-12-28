@@ -14,10 +14,10 @@ class NodeSetInfo(
 
   private[reactivemongo] def withAwaitingRequests(count: Int, maxPerChannel: Int): NodeSetInfo = new NodeSetInfo(name, version, nodes, primary, mongos, secondaries, nearest, Some(count), Some(maxPerChannel))
 
-  @deprecated("No longer a case class", "0.17.0")
+  @deprecated("No longer a ReactiveMongo case class", "0.17.0")
   val productArity = 9
 
-  @deprecated("No longer a case class", "0.17.0")
+  @deprecated("No longer a ReactiveMongo case class", "0.17.0")
   def productElement(n: Int): Any = (n: @annotation.switch) match {
     case 0 => name
     case 1 => version
@@ -60,7 +60,7 @@ object NodeSetInfo extends scala.runtime.AbstractFunction7[Option[String], Optio
     nearest: Option[NodeInfo]): NodeSetInfo = new NodeSetInfo(
     name, version, nodes, primary, mongos, secondaries, nearest, None, None)
 
-  @deprecated("No longer a case class", "0.17.0")
+  @deprecated("No longer a ReactiveMongo case class", "0.17.0")
   def unapply(info: NodeSetInfo): Option[(Option[String], Option[Long], Vector[NodeInfo], Option[NodeInfo], Option[NodeInfo], Vector[NodeInfo], Option[NodeInfo])] = Some((info.name, info.version, info.nodes, info.primary, info.mongos, info.secondaries, info.nearest))
 }
 /*

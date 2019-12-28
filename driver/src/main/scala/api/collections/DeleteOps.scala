@@ -25,7 +25,7 @@ import reactivemongo.api.commands.{
 trait DeleteOps[P <: SerializationPack with Singleton] {
   collection: GenericCollection[P] =>
 
-  @deprecated("Internal: will be private", "0.19.0")
+  @deprecated("Internal: will be made private", "0.19.0")
   object DeleteCommand
     extends reactivemongo.api.commands.DeleteCommand[collection.pack.type] {
     val pack: collection.pack.type = collection.pack

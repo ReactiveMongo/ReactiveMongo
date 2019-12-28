@@ -46,23 +46,23 @@ final class BSONCollection @deprecated("Internal: will be made private", "0.17.0
   override lazy val toString =
     s"BSONCollection('${db.name}'.'$name', $failoverStrategy)"
 
-  @deprecated(message = "No longer a case class", since = "0.12-RC2")
+  @deprecated(message = "No longer a ReactiveMongo case class", since = "0.12-RC2")
   def canEqual(that: Any): Boolean = that match {
     case _: BSONCollection => true
     case _                 => false
   }
 
-  @deprecated(message = "No longer a case class", since = "0.12-RC2")
+  @deprecated(message = "No longer a ReactiveMongo case class", since = "0.12-RC2")
   val productArity = 3
 
-  @deprecated(message = "No longer a case class", since = "0.12-RC2")
+  @deprecated(message = "No longer a ReactiveMongo case class", since = "0.12-RC2")
   def productElement(n: Int) = n match {
     case 0 => db
     case 1 => name
     case _ => failoverStrategy
   }
 
-  @deprecated(message = "No longer a case class", since = "0.12-RC2")
+  @deprecated(message = "No longer a ReactiveMongo case class", since = "0.12-RC2")
   def copy(
     db: DB = this.db,
     name: String = this.name,

@@ -277,7 +277,7 @@ trait AggregationFramework[P <: SerializationPack]
         includeLocs.map(s =>
           element("includeLocs", string(s)))).flatten))
 
-    @deprecated("No longer a case class", "0.18.5")
+    @deprecated("No longer a ReactiveMongo case class", "0.18.5")
     def canEqual(that: Any): Boolean = that match {
       case _: GeoNear => true
       case _          => false
@@ -292,10 +292,10 @@ trait AggregationFramework[P <: SerializationPack]
 
     override def toString: String = s"GeoNear${tupled.toString}"
 
-    @deprecated("No longer a case class", "0.18.5")
+    @deprecated("No longer a ReactiveMongo case class", "0.18.5")
     val productArity: Int = 10
 
-    @deprecated("No longer a case class", "0.18.5")
+    @deprecated("No longer a ReactiveMongo case class", "0.18.5")
     def productElement(n: Int): Any = (n: @annotation.switch) match {
       case 0 => near
       case 1 => spherical
@@ -338,7 +338,7 @@ trait AggregationFramework[P <: SerializationPack]
       distanceField: Option[String] = None,
       includeLocs: Option[String] = None): GeoNear = new GeoNear(near, spherical, limit, minDistance, maxDistance, query, distanceMultiplier, uniqueDocs, distanceField, includeLocs)
 
-    @deprecated("No longer a case class", "0.18.5")
+    @deprecated("No longer a ReactiveMongo case class", "0.18.5")
     def unapply(stage: GeoNear): Option[Tuple10[pack.Value, Boolean, Long, Option[Long], Option[Long], Option[pack.Document], Option[Double], Boolean, Option[String], Option[String]]] = Some(Tuple10(stage.near, stage.spherical, stage.limit.getOrElse(100L), stage.minDistance, stage.maxDistance, stage.query, stage.distanceMultiplier, stage.uniqueDocs, stage.distanceField, stage.includeLocs))
   }
 

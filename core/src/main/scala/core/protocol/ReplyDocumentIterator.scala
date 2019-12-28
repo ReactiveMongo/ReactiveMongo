@@ -26,6 +26,7 @@ object ReplyDocumentIterator {
 
           def docs = parseDocuments[P, A](pack)(buf)
 
+          @com.github.ghik.silencer.silent(".*SerializationPack\\ is\\ deprecated.*")
           val firstBatch = preloaded.iterator.map { bson =>
             pack.deserialize(pack.document(bson), reader)
           }
@@ -51,6 +52,7 @@ object ReplyDocumentIterator {
     override val isTraversableAgain = false // TODO: Add test
     override def hasNext = buffer.isReadable()
 
+    @com.github.ghik.silencer.silent(".*SerializationPack\\ is\\ deprecated.*")
     override def next = try {
       val sz = buffer.getIntLE(buffer.readerIndex)
       //val cbrb = ChannelBufferReadableBuffer(buffer readBytes sz)
