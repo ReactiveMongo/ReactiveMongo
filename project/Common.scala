@@ -1,9 +1,15 @@
+import scala.xml.{ Elem => XmlElem, Node => XmlNode }
+
 import sbt._
 import sbt.Keys._
+import sbt.plugins.JvmPlugin
 
 import com.typesafe.tools.mima.plugin.MimaKeys.mimaFailOnNoPrevious
 
-object Common {
+object Common extends AutoPlugin {
+  override def trigger = allRequirements
+  override def requires = JvmPlugin
+
   val baseSettings = Seq(
     organization := "org.reactivemongo",
     resolvers ++= Seq(
@@ -28,11 +34,29 @@ object Common {
 
   val closeableObject = SettingKey[String]("class name of a closeable object")
 
-  val settings = Defaults.coreDefaultSettings ++ baseSettings ++ Compiler.settings ++ Seq(
+  val useShaded = settingKey[Boolean](
+    "Use ReactiveMongo-Shaded (see system property 'reactivemongo.shaded')")
+
+  val pomTransformer = settingKey[Option[XmlElem => Option[XmlElem]]](
+    "Optional XML node transformer")
+
+  override def projectSettings = Defaults.coreDefaultSettings ++ baseSettings ++ Compiler.settings ++ Seq(
     scalaVersion := "2.12.10",
     crossScalaVersions := Seq(
       "2.10.7", scalaCompatVer, scalaVersion.value, "2.13.1"),
     crossVersion := CrossVersion.binary,
+    useShaded := sys.env.get("REACTIVEMONGO_SHADED").fold(true)(_.toBoolean),
+    version := { 
+      val ver = (version in ThisBuild).value
+      val suffix = {
+        if (useShaded.value) "" // default ~> no suffix
+        else "-noshaded"
+      }
+
+      ver.span(_ != '-') match {
+        case (a, b) => s"${a}${suffix}${b}"
+      }
+    },
     //parallelExecution in Test := false,
     //fork in Test := true, // Don't share executioncontext between SBT CLI/tests
     unmanagedSourceDirectories in Compile ++= {
@@ -53,7 +77,24 @@ object Common {
     mappings in (Compile, packageSrc) ~= filter,
     mappings in (Compile, packageDoc) ~= filter,
     testFrameworks ~= { _.filterNot(_ == TestFrameworks.ScalaTest) },
-    closeableObject in Test := "Common$"
+    closeableObject in Test := "Common$",
+    pomTransformer := None,
+    pomPostProcess := {
+      val next: XmlElem => Option[XmlElem] = pomTransformer.value match {
+        case Some(t) => t
+        case None => Some(_: XmlElem)
+      }
+
+      val f: XmlElem => Option[XmlElem] = { dep =>
+        if ((dep \ "artifactId").text startsWith "silencer-lib") {
+          Option.empty[XmlElem]
+        } else {
+          next(dep)
+        }
+      }
+
+      XmlUtil.transformPomDependencies(f)
+    }
   ) ++ Publish.settings ++ Format.settings ++ (
     Release.settings ++ Publish.mimaSettings)
 

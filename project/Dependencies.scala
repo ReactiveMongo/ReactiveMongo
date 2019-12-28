@@ -2,8 +2,18 @@ import sbt._
 import sbt.Keys._
 
 object Dependencies {
-  val shaded = Def.setting[ModuleID] {
-    organization.value % "reactivemongo-shaded" % version.value
+  val netty = "io.netty" % "netty-handler" % "4.1.43.Final"
+
+  val shaded = Def.setting[Seq[ModuleID]] {
+    val v = (version in ThisBuild).value
+
+    if (Common.useShaded.value || scalaBinaryVersion.value == "2.10") {
+      Seq(organization.value % "reactivemongo-shaded" % v)
+    } else {
+      Seq(
+        netty % Provided,
+        "org.reactivemongo" %% "reactivemongo-alias" % v)
+    }
   }
 
   val akka = Def.setting[Seq[ModuleID]] {

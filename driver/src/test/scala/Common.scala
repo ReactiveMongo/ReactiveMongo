@@ -130,6 +130,11 @@ object Common extends CommonAuth {
     } yield resolved), timeout + slowTimeout)
   }
 
+  lazy val foo = {
+    import ExecutionContext.Implicits.global
+    Await.result(connection.database(commonDb, failoverStrategy), timeout)
+  }
+
   lazy val (db, slowDb) = databases(commonDb, connection, slowConnection)
 
   @annotation.tailrec

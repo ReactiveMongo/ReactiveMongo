@@ -1192,13 +1192,23 @@ trait MongoDBSystem extends Actor {
           _.hosts.collect {
             case host if (!prepared.nodes.exists(_.names contains host)) =>
               // Prepare node for newly discovered host in the RS
-              new Node(host, Set.empty, NodeStatus.Uninitialized,
+              val n = new Node(host, Set.empty, NodeStatus.Uninitialized,
                 Vector.empty, Set.empty, _tags = Map.empty[String, String],
                 ProtocolMetadata.Default, PingInfo(), false)
+
+              n.createSignalingConnection(channelFactory, self) match {
+                case Success(upd) =>
+                  upd
+
+                case Failure(err) => {
+                  warn(s"Fails to create signaling channel for ${n.toShortString}", err)
+                  n
+                }
+              }
           }
         }
 
-        trace(s"""Discovered ${discoveredNodes.size} nodes${discoveredNodes mkString (": ", ", ", "")}""")
+        trace(s"""Discovered ${discoveredNodes.size} nodes${discoveredNodes.map(_.toShortString) mkString (": [ ", ", ", " ]")}""")
 
         val upSet = prepared.copy(
           name = isMaster.replicaSet.map(_.setName),
@@ -1255,6 +1265,8 @@ trait MongoDBSystem extends Actor {
       }
     }
 
+    val origSender = context.sender
+
     scheduler.scheduleOnce(Duration.Zero) {
       @inline def event = s"ConnectAll$$IsMaster(${response.header.responseTo}, ${updated.toShortString})"
 
@@ -1268,6 +1280,10 @@ trait MongoDBSystem extends Actor {
             ns
           }
         }
+      }
+
+      if (origSender != null) {
+        origSender ! _nodeSet
       }
 
       ()
@@ -1574,7 +1590,7 @@ trait MongoDBSystem extends Actor {
     def send(): (Node, Option[Exception]) = { f(); node -> error }
   }
 
-  private def requestIsMaster(context: String, node: Node): IsMasterRequest = {
+  private def requestIsMaster(context: String, node: Node): IsMasterRequest =
     node.signaling.fold(new IsMasterRequest(node)) { con =>
       import reactivemongo.api.BSONSerializationPack
       import reactivemongo.api.commands.bson.{
@@ -1608,7 +1624,7 @@ trait MongoDBSystem extends Actor {
         con.send(isMaster(id)).addListener(new OperationHandler(
           error(s"Fails to send a isMaster request to ${node.name} (channel #${con.channel.id})", _),
           { chanId =>
-            trace(s"isMaster request successful on channel #${chanId}")
+            trace(s"isMaster request to ${node.toShortString} successful on channel #${chanId}")
           }))
 
         ()
@@ -1662,7 +1678,6 @@ trait MongoDBSystem extends Actor {
         new IsMasterRequest(node) // unchanged
       }
     }
-  }
 
   @inline private def scheduler = context.system.scheduler
 

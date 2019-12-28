@@ -3,22 +3,20 @@ lazy val `ReactiveMongo-BSON` = new Bson().module
 lazy val `ReactiveMongo-BSON-Macros` = project.in(file("macros")).
   enablePlugins(CpdPlugin).
   dependsOn(`ReactiveMongo-BSON`).
-  settings(
-    Common.settings ++ Findbugs.settings ++ Seq(
-      mimaBinaryIssueFilters += {
-        import com.typesafe.tools.mima.core._, ProblemFilters.{ exclude => x }
+  settings(Findbugs.settings ++ Seq(
+    mimaBinaryIssueFilters += {
+      import com.typesafe.tools.mima.core._, ProblemFilters.{ exclude => x }
 
-        x[MissingTypesProblem]("reactivemongo.bson.Macros$Options$UnionType")
-      },
-      libraryDependencies ++= Seq(Dependencies.specs.value,
-        "org.scala-lang" % "scala-compiler" % scalaVersion.value % Provided,
-        Dependencies.shapelessTest % Test
-      )
+      x[MissingTypesProblem]("reactivemongo.bson.Macros$Options$UnionType")
+    },
+    libraryDependencies ++= Seq(Dependencies.specs.value,
+      "org.scala-lang" % "scala-compiler" % scalaVersion.value % Provided,
+      Dependencies.shapelessTest % Test
     )
-  )
+  ))
 
 lazy val `ReactiveMongo-BSON-Compat` = project.in(file("bson-compat")).
-  settings(Common.settings ++ Seq(
+  settings(Seq(
     //name := s"${baseArtifact}-compat",
     description := "Compatibility library between legacy & new BSON APIs",
     sourceDirectory := {
@@ -40,12 +38,12 @@ lazy val `ReactiveMongo-BSON-Compat` = project.in(file("bson-compat")).
     mimaPreviousArtifacts := Set.empty,
     libraryDependencies ++= {
       if (scalaBinaryVersion.value != "2.10") {
-        Seq(
-          Dependencies.shaded.value % Provided,
+        Dependencies.shaded.value ++ Seq(
           organization.value %% "reactivemongo-bson-api" % version.value % Provided,
           Dependencies.specs.value)
+
       } else {
-        Seq.empty
+        Seq.empty[ModuleID]
       }
     }
   )).dependsOn(`ReactiveMongo-BSON`)
@@ -54,7 +52,7 @@ lazy val `ReactiveMongo-Core` = project.in(file("core")).
   enablePlugins(CpdPlugin).
   dependsOn(`ReactiveMongo-BSON` % Provided).
   settings(
-    Common.settings ++ Findbugs.settings ++ Seq(
+    Findbugs.settings ++ Seq(
       mimaPreviousArtifacts := {
         val v = scalaBinaryVersion.value
         import Publish.previousVersion
@@ -103,7 +101,7 @@ lazy val `ReactiveMongo-Core` = project.in(file("core")).
         }
       },
       libraryDependencies ++= {
-        val deps = Seq(Dependencies.shaded.value)
+        val deps = Dependencies.shaded.value
 
         if (scalaBinaryVersion.value != "2.10") {
           ("org.reactivemongo" %% "reactivemongo-bson-api" % version.
@@ -129,7 +127,7 @@ def docSettings = Documentation(excludes = Seq(`ReactiveMongo-JMX`)).settings
 
 lazy val `ReactiveMongo-Root` = project.in(file(".")).
   enablePlugins(ScalaUnidocPlugin, CpdPlugin).
-  settings(Common.settings ++ docSettings ++
+  settings(docSettings ++
     Travis.settings ++ Seq(
       publishArtifact := false,
       publishTo := None,
@@ -146,7 +144,7 @@ lazy val `ReactiveMongo-Root` = project.in(file(".")).
 
 lazy val benchmarks = (project in file("benchmarks")).
   enablePlugins(JmhPlugin).
-  settings(Common.settings ++ Compiler.settings ++ Seq(
+  settings(Compiler.settings ++ Seq(
       libraryDependencies += organization.value % "reactivemongo-shaded" % version.value
     )
   ).

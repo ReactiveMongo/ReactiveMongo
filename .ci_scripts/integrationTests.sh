@@ -67,5 +67,4 @@ if [ "$MONGO_PROFILE" = "rs" ]; then
     )
 fi
 
-
 source "$SCRIPT_DIR/runIntegration.sh"

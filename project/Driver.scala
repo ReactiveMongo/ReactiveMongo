@@ -5,7 +5,6 @@ import scala.xml.{
   NodeSeq,
   XML
 }
-import scala.xml.transform.{ RewriteRule, RuleTransformer }
 
 import sbt._
 import sbt.Keys._
@@ -27,8 +26,7 @@ final class Driver(
 
   lazy val module = Project("ReactiveMongo", file("driver")).
     enablePlugins(CpdPlugin).
-    settings(
-      Common.settings ++ Findbugs.settings ++ Seq(
+    settings(Findbugs.settings ++ Seq(
         unmanagedSourceDirectories in Compile ++= {
           val v = scalaBinaryVersion.value
 
@@ -83,6 +81,13 @@ object Version {
             Seq(playIteratees.value)
           } else {
             Seq.empty
+          }
+        },
+        libraryDependencies ++= {
+          if (!Common.useShaded.value) {
+            Seq(Dependencies.netty % Provided)
+          } else {
+            Seq.empty[ModuleID]
           }
         },
         libraryDependencies ++= akka.value ++ Seq(
@@ -715,12 +720,11 @@ object Version {
         //mappings in (Compile, packageDoc) ~= driverFilter,
         mappings in (Compile, packageSrc) ~= driverFilter,
         apiMappings ++= Documentation.mappings("com.typesafe.akka", "http://doc.akka.io/api/akka/%s/")("akka-actor").value ++ Documentation.mappings("com.typesafe.play", "http://playframework.com/documentation/%s/api/scala/index.html", _.replaceAll("[\\d]$", "x"))("play-iteratees").value,
-        pomPostProcess := {
-          if (scalaBinaryVersion.value == "2.10") skipScala210
-          else identity[XmlNode]
-        }
-      )
-    ).configure { p =>
+      Common.pomTransformer := {
+        if (scalaBinaryVersion.value == "2.10") Some(skipScala210)
+        else None
+      }
+    )).configure { p =>
       sys.props.get("test.nettyNativeArch") match {
         case Some("osx") => p.settings(Seq(
           libraryDependencies += shadedNative("osx-x86-64").value % Test
@@ -760,14 +764,9 @@ object Version {
 
   // ---
 
-  private lazy val skipScala210: XmlNode => XmlNode = {
-    import scala.xml.NodeSeq
-    import scala.xml.transform.{ RewriteRule, RuleTransformer }
-
-    transformPomDependencies { dep: XmlElem =>
-      if ((dep \ "artifactId").text startsWith "reactivemongo-bson-compat") {
-        None
-      } else Some(dep)
-    }
+  private lazy val skipScala210: XmlElem => Option[XmlElem] = { dep =>
+    if ((dep \ "artifactId").text startsWith "reactivemongo-bson-compat") {
+      None
+    } else Some(dep)
   }
 }
