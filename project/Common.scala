@@ -46,6 +46,10 @@ object Common extends AutoPlugin {
       "2.10.7", scalaCompatVer, scalaVersion.value, "2.13.1"),
     crossVersion := CrossVersion.binary,
     useShaded := sys.env.get("REACTIVEMONGO_SHADED").fold(true)(_.toBoolean),
+    target := {
+      if (useShaded.value) target.value / "shaded"
+      else target.value / "noshaded"
+    },
     version := { 
       val ver = (version in ThisBuild).value
       val suffix = {

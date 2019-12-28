@@ -11,8 +11,6 @@ import reactivemongo.api.{
 import reactivemongo.api.bson.BSONDocument
 import reactivemongo.api.bson.collection.BSONCollection
 
-import reactivemongo.api.TestCompat._
-
 trait Cursor1Spec { spec: CursorSpec =>
   def group1 = {
     val nDocs = 16517

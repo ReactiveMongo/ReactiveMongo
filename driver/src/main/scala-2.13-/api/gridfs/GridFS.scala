@@ -35,7 +35,6 @@ import reactivemongo.api.{
 import reactivemongo.api.commands.WriteResult
 
 import reactivemongo.core.errors.ReactiveMongoException
-import reactivemongo.core.netty.ChannelBufferWritableBuffer
 
 import reactivemongo.api.gridfs.{ ReadFile => RF }
 

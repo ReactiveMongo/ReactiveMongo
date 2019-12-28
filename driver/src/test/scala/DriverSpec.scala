@@ -42,7 +42,6 @@ final class DriverSpec(implicit ee: ExecutionEnv)
 
   sequential
 
-  import reactivemongo.api.TestCompat._
   import tests.Common
   import Common._
 

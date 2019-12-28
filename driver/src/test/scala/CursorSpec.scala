@@ -3,7 +3,7 @@ import scala.concurrent.duration._
 
 import reactivemongo.api.{ Cursor, QueryOpts }
 
-import reactivemongo.api.bson.{ BSONDocument, BSONString }
+import reactivemongo.api.bson.BSONDocument
 import reactivemongo.api.bson.collection.BSONCollection
 
 import org.specs2.concurrent.ExecutionEnv
