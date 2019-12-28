@@ -71,8 +71,11 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
   def collection: Collection
   def maxTimeMsOption: Option[Long]
 
+  // TODO: Remove
+  private var _readConcern: ReadConcern = ReadConcern.default
+
   /** The read concern (since 3.2) */
-  def readConcern: ReadConcern = ReadConcern.default // TODO: Remove body
+  def readConcern: ReadConcern = _readConcern
 
   /**
    * Returns a [[Cursor]] for the result of this query.
@@ -280,6 +283,13 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
   def maxTimeMs(p: Long): Self = copy(maxTimeMsOption = Some(p))
 
   def options(options: QueryOpts): Self = copy(options = options)
+
+  /** Sets the [[ReadConcern]] */
+  def readConcern(concern: ReadConcern): Self = {
+    val upd = copy()
+    upd._readConcern = concern
+    upd
+  }
 
   @deprecated("Use `options` or the separate query ops", "0.12.4")
   def updateOptions(update: QueryOpts => QueryOpts): Self =

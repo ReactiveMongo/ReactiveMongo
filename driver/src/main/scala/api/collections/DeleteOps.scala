@@ -101,7 +101,7 @@ trait DeleteOps[P <: SerializationPack with Singleton] {
      *   val delete = coll.delete(ordered = true)
      *   val elements = Future.sequence(docs.map { doc =>
      *     delete.element(
-     *       q = BSONDocument("filter" -> "value"),
+     *       q = doc,
      *       limit = Some(1)) // only first match
      *   })
      *
