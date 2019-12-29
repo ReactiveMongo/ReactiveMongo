@@ -10,6 +10,8 @@ import akka.actor.ActorRef
 
 import reactivemongo.bson.{ BSONDocument, BSONElement, BSONString }
 
+import reactivemongo.core.netty.ChannelFactory
+
 /**
  * @param name the main name of the node
  */

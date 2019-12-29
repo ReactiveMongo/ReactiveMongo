@@ -139,6 +139,9 @@ object Version {
             fmp("reactivemongo.api.commands.AggregationFramework#Project.toString"),
             fmp("reactivemongo.api.commands.AggregationFramework#Redact.toString"),
             fmp("reactivemongo.api.commands.AggregationFramework#Sort.toString"),
+            isp("reactivemongo.api.commands.AggregationFramework#Sort.apply"),
+            isp("reactivemongo.api.commands.AggregationFramework#Sort.unapplySeq"),
+            isp("reactivemongo.api.commands.AggregationFramework#Sort.fields"),
             fmp("reactivemongo.core.actors.LegacyDBSystem.lnm"),
             fmp("reactivemongo.core.actors.StandardDBSystem.lnm"),
             imt("reactivemongo.api.MongoConnection.sendExpectingResponse"), // priv

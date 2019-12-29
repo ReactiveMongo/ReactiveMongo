@@ -62,9 +62,9 @@ private[api] case class ConnectionState(
  * import scala.concurrent.ExecutionContext
  * import reactivemongo.api._
  *
- * def foo(driver: MongoDriver)(implicit ec: ExecutionContext) = {
- *   val con = driver.connection(List("localhost"))
- *   val db = con.database("plugin")
+ * def foo(driver: AsyncDriver)(implicit ec: ExecutionContext) = {
+ *   val con = driver.connect(List("localhost"))
+ *   val db = con.flatMap(_.database("plugin"))
  *   val collection = db.map(_("acoll"))
  * }
  * }}}
@@ -81,7 +81,7 @@ class MongoConnection(
   @deprecated("Internal: will be made private", "0.17.0") val name: String,
   @deprecated("Internal: will be made private", "0.14.0") val actorSystem: ActorSystem,
   @deprecated("Internal: will be made private", "0.17.0") val mongosystem: ActorRef,
-  val options: MongoConnectionOptions) { // TODO: toString as MongoURI
+  val options: MongoConnectionOptions) {
   import Exceptions._
 
   /**
@@ -103,7 +103,7 @@ class MongoConnection(
    */
   def database(name: String, failoverStrategy: FailoverStrategy = options.failoverStrategy)(implicit @deprecatedName(Symbol("context")) ec: ExecutionContext): Future[DefaultDB] =
     waitIsAvailable(failoverStrategy, stackTrace()).map { state =>
-      new DefaultDB(name, this, state, failoverStrategy)
+      new DefaultDB(name, this, state, failoverStrategy, None)
     }
 
   @deprecated("Use `authenticate` with `failoverStrategy`", "0.14.0")
@@ -146,7 +146,20 @@ class MongoConnection(
   def askClose()(implicit timeout: FiniteDuration): Future[_] = close()
 
   /**
-   * Closes this MongoConnection (closes all the channels and ends the actors).
+   * Closes this connection (closes all the channels and ends the actors).
+   *
+   * {{{
+   * import scala.concurrent.{ ExecutionContext, Future }
+   * import scala.concurrent.duration._
+   *
+   * import reactivemongo.api.MongoConnection
+   *
+   * def afterClose(con: MongoConnection)(
+   *   implicit ec: ExecutionContext): Future[Unit] =
+   *   con.close()(5.seconds).map { res =>
+   *     println("Close result: " + res)
+   *   }
+   * }}}
    */
   def close()(implicit timeout: FiniteDuration): Future[_] = whenActive {
     ask(monitor, Close("MongoConnection.askClose"))(Timeout(timeout))
@@ -156,6 +169,8 @@ class MongoConnection(
   @inline def active: Boolean = !killed
 
   // --- Internals ---
+
+  override def toString: String = s"MongoConnection { ${MongoConnectionOptions.toStrings(options).mkString(", ")} }"
 
   private[api] var history = () => InternalState.empty
 
@@ -396,6 +411,7 @@ object MongoConnection {
    * @param db the name of the database
    * @param authenticate the authenticate information (see [[MongoConnectionOptions.authenticationMechanism]])
    */
+  @com.github.ghik.silencer.silent(".*authenticate.*" /*deprecated*/ )
   final case class ParsedURI(
     hosts: List[(String, Int)], // TODO: ListSet
     options: MongoConnectionOptions,
@@ -405,9 +421,19 @@ object MongoConnection {
   // TODO: Type for URI with required DB name
 
   /**
-   * Parses a MongoURI.
+   * Parses a [[http://docs.mongodb.org/manual/reference/connection-string/ connection URI]].
    *
-   * @param uri the connection URI (see [[http://docs.mongodb.org/manual/reference/connection-string/ the MongoDB URI documentation]] for more information)
+   * {{{
+   * import scala.concurrent.{ ExecutionContext, Future }
+   * import reactivemongo.api.{ AsyncDriver, MongoConnection }
+   *
+   * def connectFromUri(drv: AsyncDriver, uri: String)(
+   *   implicit ec: ExecutionContext): Future[MongoConnection] =
+   *   Future.fromTry(MongoConnection parseURI uri).
+   *     flatMap { drv.connect(_) }
+   * }}}
+   *
+   * @param uri the connection URI
    */
   def parseURI(uri: String): Try[ParsedURI] = {
     import scala.concurrent.ExecutionContext.Implicits.global
@@ -604,7 +630,6 @@ object MongoConnection {
   @deprecated("Internal: will be made private", "0.16.0")
   val FailoverRe = "^([^:]+):([0-9]+)x([0-9.]+)$".r
 
-  @com.github.ghik.silencer.silent(".*Use\\ SCRAM\\ or\\ X509.*")
   private def makeOptions(
     opts: Map[String, String],
     initial: MongoConnectionOptions): (List[String], MongoConnectionOptions) = {

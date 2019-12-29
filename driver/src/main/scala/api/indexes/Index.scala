@@ -4,6 +4,8 @@ import reactivemongo.bson.BSONDocument
 
 import reactivemongo.api.SerializationPack
 
+import com.github.ghik.silencer.silent
+
 /**
  * A MongoDB index (excluding the namespace).
  *
@@ -110,6 +112,7 @@ sealed abstract class Index extends Product with Serializable {
 
   def productElement(n: Int): Any = tupled.productElement(n)
 
+  @silent(".*dropDups.*")
   private[api] lazy val tupled = Tuple9(key, name, unique, background, dropDups, sparse, version, partialFilterDocument, optionDocument)
 
   // TODO: storageEngine (new for Mongo3)
@@ -158,7 +161,7 @@ object Index { //extends scala.runtime.AbstractFunction9[Seq[(String, IndexType)
     def n = name
     def u = unique
     def b = background
-    def d = dropDups
+    @silent def d = dropDups
     def s = sparse
     def v = version
     def pf = partialFilter

@@ -64,7 +64,6 @@ case class CollStatsResult(
 
 object CollStatsResult extends BSONCommandResultMaker[CollStatsResult] {
   def apply(doc: BSONDocument): Either[CommandError, CollStatsResult] = {
-    // TODO support sharding info
     CommandError.checkOk(doc, Some("collStats")).toLeft {
       CollStatsResult(
         doc.getAs[BSONString]("ns").get.value,

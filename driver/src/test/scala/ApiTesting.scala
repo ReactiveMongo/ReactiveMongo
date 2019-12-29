@@ -25,11 +25,9 @@ import reactivemongo.core.protocol.{
   ResponseFrameDecoder,
   ResponseDecoder
 }
-import reactivemongo.core.nodeset.{
-  Authenticate,
-  ChannelFactory,
-  NodeSet
-}
+import reactivemongo.core.netty.ChannelFactory
+
+import reactivemongo.core.nodeset.{ Authenticate, NodeSet }
 import reactivemongo.core.actors, actors.{
   ChannelConnected,
   ChannelDisconnected,

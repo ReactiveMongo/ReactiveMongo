@@ -11,6 +11,7 @@ import reactivemongo.api.indexes.IndexesManager
 import reactivemongo.bson.{ BSONDocument => LegacyDoc, BSONDocumentWriter }
 
 /** A mixin that provides commands about this database itself. */
+@deprecated("Internal: will be made private", "0.19.8")
 trait DBMetaCommands { self: DB =>
   import reactivemongo.core.protocol.MongoWireVersion
   import reactivemongo.api.commands.{
@@ -283,7 +284,8 @@ trait DBMetaCommands { self: DB =>
 
   /**
    * Tests if the server, resolved according to the given read preference, responds to commands.
-   * (since MongoDB 3.0)
+   *
+   * @since MongoDB 3.0
    *
    * {{{
    * import scala.concurrent.{ ExecutionContext, Future }

@@ -57,6 +57,7 @@ private[api] trait Driver {
    * so it can have complete control separate from other
    * Actor Systems in the application
    */
+  @deprecated("Internal: will be made private", "0.19.8")
   val system = {
     import com.typesafe.config.ConfigFactory
 

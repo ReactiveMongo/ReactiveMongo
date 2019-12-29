@@ -321,6 +321,7 @@ abstract class GridFS[P <: SerializationPack with Singleton] @deprecated("Intern
   }
 
   /** Reads the given file and writes its contents to the given OutputStream */
+  @silent(".*(IdProducer|enumerate).*")
   def readToOutputStream[Id <: pack.Value](file: ReadFile[Id], out: OutputStream)(implicit ec: ExecutionContext): Future[Unit] = {
     implicit val unused = null.asInstanceOf[IdProducer[Id]]
 
@@ -328,6 +329,7 @@ abstract class GridFS[P <: SerializationPack with Singleton] @deprecated("Intern
   }
 
   /** Writes the data provided by the given InputStream to the given file. */
+  @silent(".*(idProducer|save).*")
   def writeFromInputStream[Id <: pack.Value](file: FileToSave[pack.type, Id], input: InputStream, chunkSize: Int = 262144)(implicit readFileReader: pack.Reader[ReadFile[Id]], @deprecatedName(Symbol("ctx")) ec: ExecutionContext, @deprecated("Unused", "0.19.0") idProducer: IdProducer[Id], docWriter: BSONDocumentWriter[pack.Document]): Future[ReadFile[Id]] = save(Enumerator.fromStream(input, chunkSize), file)
 
   /**

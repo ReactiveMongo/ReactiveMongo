@@ -101,8 +101,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
   }
 
   /**
-   * The [[https://docs.mongodb.com/manual/reference/operator/aggregation/mergeObjects/#exp._S_mergeObjects \$mergeObjects]]
-   * group accumulator.
+   * The [[https://docs.mongodb.com/manual/reference/operator/aggregation/mergeObjects/#exp._S_mergeObjects \$mergeObjects]] group accumulator.
    *
    * @param mergeExpr the `\$mergeObjects` expression
    */
@@ -165,16 +164,18 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
   }
 
   /**
-   * The [[https://docs.mongodb.com/manual/reference/operator/aggregation/stdDevPop/ \$stdDevPop]] group accumulator
-   * (since MongoDB 3.2)
+   * The [[https://docs.mongodb.com/manual/reference/operator/aggregation/stdDevPop/ \$stdDevPop]] group accumulator.
+   *
+   * @since MongoDB 3.2
    */
   case class StdDevPop(expression: pack.Value) extends GroupFunction {
     val makeFunction = pipe(f"$$stdDevPop", expression)
   }
 
   /**
-   * The [[https://docs.mongodb.com/manual/reference/operator/aggregation/stdDevPop/ \$stdDevPop]] for a single field (since MongoDB 3.2)
+   * The [[https://docs.mongodb.com/manual/reference/operator/aggregation/stdDevPop/ \$stdDevPop]] for a single field.
    *
+   * @since MongoDB 3.2
    * @param field $fieldParam
    */
   case class StdDevPopField(field: String) extends GroupFunction {
@@ -183,7 +184,8 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
 
   /**
    * The [[https://docs.mongodb.com/manual/reference/operator/aggregation/stdDevSamp/ \$stdDevSamp]] group accumulator
-   * (since MongoDB 3.2)
+   *
+   * @since MongoDB 3.2
    */
   case class StdDevSamp(expression: pack.Value) extends GroupFunction {
     val makeFunction = pipe(f"$$stdDevSamp", expression)
@@ -191,8 +193,8 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
 
   /**
    * The [[https://docs.mongodb.com/manual/reference/operator/aggregation/stdDevSamp/ \$stdDevSamp]] for a single field
-   * (since MongoDB 3.2)
    *
+   * @since MongoDB 3.2
    * @param field $fieldParam
    */
   case class StdDevSampField(field: String) extends GroupFunction {

@@ -1,4 +1,4 @@
-package reactivemongo.core.nodeset // TODO: Move to `netty` package
+package reactivemongo.core.netty
 
 import java.lang.{ Boolean => JBool }
 

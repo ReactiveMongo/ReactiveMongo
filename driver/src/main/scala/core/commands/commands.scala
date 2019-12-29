@@ -82,7 +82,7 @@ trait CommandResultMaker[Result] {
             doc
 
           case Some(doc: reactivemongo.bson.BSONDocument) =>
-            pack.document(doc) // TODO: Remove
+            pack.document(doc) // TODO: Remove after release 1.0
 
           case _ => throw cause
         }
@@ -174,7 +174,7 @@ object CommandError {
    * @param name The optional name of the command.
    * @param error A function that takes the document of the response and the optional name of the command as arguments, and produces a command error.
    */
-  def checkOk( // TODO
+  def checkOk(
     doc: BSONDocument, name: Option[String],
     error: (BSONDocument, Option[String]) => CommandError = (doc, name) => CommandError("command " + name.map(_ + " ").getOrElse("") + "failed because the 'ok' field is missing or equals 0", Some(doc))): Option[CommandError] = {
     doc.getAs[BSONNumberLike]("ok").map(_.toInt).orElse(Some(0)).flatMap {

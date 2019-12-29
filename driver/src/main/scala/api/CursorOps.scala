@@ -35,10 +35,10 @@ trait CursorOps[T] { cursor: Cursor[T] =>
   /** Indicates whether the underlying cursor is [[https://docs.mongodb.com/manual/core/tailable-cursors/ tailable]]. */
   def tailable: Boolean
 
-  /** Returns the underlying connection. */
+  /** The underlying connection */
   def connection: MongoConnection
 
-  /** Returns the strategy to failover the cursor operations. */
+  /** The strategy to failover the cursor operations */
   def failoverStrategy: FailoverStrategy
 }
 

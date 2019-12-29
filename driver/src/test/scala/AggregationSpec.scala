@@ -471,23 +471,6 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
     "prepare stage to group in bucket" in {
       // https://docs.mongodb.com/manual/reference/operator/aggregation/bucketAuto/
 
-      val expected = Set(
-        document(
-          "_id" -> document(
-            "min" -> BSONNull,
-            "max" -> 12),
-          "count" -> 1),
-        document(
-          "_id" -> document(
-            "min" -> 12,
-            "max" -> 20),
-          "count" -> 1),
-        document(
-          "_id" -> document(
-            "min" -> 20,
-            "max" -> 20),
-          "count" -> 1))
-
       import coll.aggregationFramework.BucketAuto
 
       BucketAuto(BSONString(f"$$price"), 3, None)().

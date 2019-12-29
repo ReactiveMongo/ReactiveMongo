@@ -221,6 +221,13 @@ class MongoConnectionOptions private[reactivemongo] (
   }
 }
 
+/**
+ * [[MongoConnectionOptions]] factory.
+ *
+ * {{{
+ * reactivemongo.api.MongoConnectionOptions(nbChannelsPerNode = 10)
+ * }}}
+ */
 object MongoConnectionOptions {
   /** The default options */
   @inline def default: MongoConnectionOptions = new MongoConnectionOptions()

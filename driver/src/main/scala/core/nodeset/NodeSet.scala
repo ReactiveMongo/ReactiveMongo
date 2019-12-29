@@ -6,9 +6,11 @@ import scala.math.Ordering
 
 import scala.util.{ Failure, Success, Try }
 
+import akka.actor.ActorRef
+
 import reactivemongo.io.netty.channel.ChannelId
 
-import akka.actor.ActorRef
+import reactivemongo.core.netty.ChannelFactory
 
 import reactivemongo.api.ReadPreference
 

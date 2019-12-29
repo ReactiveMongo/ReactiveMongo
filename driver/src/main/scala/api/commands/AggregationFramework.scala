@@ -11,7 +11,7 @@ import reactivemongo.core.protocol.MongoWireVersion
 trait AggregationFramework[P <: SerializationPack]
   extends ImplicitCommandHelpers[P]
   with GroupAggregation[P] with SliceAggregation[P] with SortAggregation[P]
-  with AggregationPipeline[P] {
+  with AggregationPipeline[P] { self =>
 
   protected final lazy val builder = pack.newBuilder
 
@@ -24,12 +24,13 @@ trait AggregationFramework[P <: SerializationPack]
   case class Cursor(batchSize: Int)
 
   /**
+   * @since MongoDB 3.2
    * @param pipeline the sequence of MongoDB aggregation operations
    * @param explain specifies to return the information on the processing of the pipeline
    * @param allowDiskUse enables writing to temporary files
    * @param cursor the cursor object for aggregation
    * @param bypassDocumentValidation available only if you specify the \$out aggregation operator
-   * @param readConcern the read concern (since MongoDB 3.2)
+   * @param readConcern the read concern
    */
   @deprecated("Use `api.collections.Aggregator`", "0.12.7")
   case class Aggregate(
@@ -61,8 +62,9 @@ trait AggregationFramework[P <: SerializationPack]
   }
 
   /**
-   * [[https://docs.mongodb.com/manual/reference/operator/aggregation/addFields/ \$addFields]] stage (since MongoDB 3.4)
+   * [[https://docs.mongodb.com/manual/reference/operator/aggregation/addFields/ \$addFields]] stage.
    *
+   * @since MongoDB 3.4
    * @param specifications The fields to include.
    * The resulting objects will also contain these fields.
    */
@@ -100,7 +102,9 @@ trait AggregationFramework[P <: SerializationPack]
   }
 
   /**
-   * [[https://docs.mongodb.com/manual/reference/operator/aggregation/bucketAuto/ \$bucket]] aggregation stage (since MongoDB 3.4).
+   * [[https://docs.mongodb.com/manual/reference/operator/aggregation/bucketAuto/ \$bucket]] aggregation stage.
+   *
+   * @since MongoDB 3.4
    *
    * Categorizes incoming documents into a specific number of groups,
    * called buckets, based on a specified expression.
@@ -159,8 +163,9 @@ trait AggregationFramework[P <: SerializationPack]
   }
 
   /**
-   * [[https://docs.mongodb.com/manual/reference/operator/aggregation/count/ \$count]] of the number of documents input (since MongoDB 3.4).
+   * [[https://docs.mongodb.com/manual/reference/operator/aggregation/count/ \$count]] of the number of documents input.
    *
+   * @since MongoDB 3.4
    * @param outputName the name of the output field which has the count as its value
    */
   case class Count(outputName: String) extends PipelineOperator {
@@ -168,8 +173,9 @@ trait AggregationFramework[P <: SerializationPack]
   }
 
   /**
-   * [[https://docs.mongodb.com/manual/reference/operator/aggregation/currentOp/ \$currentOp]] (since MongoDB 3.6).
+   * [[https://docs.mongodb.com/manual/reference/operator/aggregation/currentOp/ \$currentOp]].
    *
+   * @since MongoDB 3.6
    * @param allUsers (Defaults to `false`)
    * @param idleConnections if set to true, all operations including idle connections will be returned (Defaults to `false`)
    * @param idleCursors (Defaults to `false`; new in 4.2)
@@ -389,7 +395,9 @@ trait AggregationFramework[P <: SerializationPack]
   }
 
   /**
-   * [[https://docs.mongodb.com/manual/reference/operator/aggregation/indexStats/ \$indexStats]] aggregation stage (Since MongoDB 3.2)
+   * [[https://docs.mongodb.com/manual/reference/operator/aggregation/indexStats/ \$indexStats]] aggregation stage.
+   *
+   * @since MongoDB 3.2
    */
   case object IndexStats extends PipelineOperator {
     val makePipe: pack.Document = pipe(f"$$indexStats", builder.document(Nil))
@@ -423,8 +431,9 @@ trait AggregationFramework[P <: SerializationPack]
   }
 
   /**
-   * [[https://docs.mongodb.com/manual/reference/operator/aggregation/listLocalSessions/ \$listLocalSessions]] aggregation stage (since MongoDB 3.6)
+   * [[https://docs.mongodb.com/manual/reference/operator/aggregation/listLocalSessions/ \$listLocalSessions]] aggregation stage.
    *
+   * @since MongoDB 3.6
    * @param expression
    */
   case class ListLocalSessions(
@@ -433,8 +442,9 @@ trait AggregationFramework[P <: SerializationPack]
   }
 
   /**
-   * [[https://docs.mongodb.com/manual/reference/operator/aggregation/listSessions/ \$listSessions]] aggregation stage (since MongoDB 3.6)
+   * [[https://docs.mongodb.com/manual/reference/operator/aggregation/listSessions/ \$listSessions]] aggregation stage.
    *
+   * @since MongoDB 3.6
    * @param expression
    */
   case class ListSessions(
@@ -443,8 +453,9 @@ trait AggregationFramework[P <: SerializationPack]
   }
 
   /**
-   * The [[https://docs.mongodb.com/manual/reference/operator/aggregation/graphLookup/ \$graphLookup]] aggregation stage (since MongoDB 3.4)
+   * The [[https://docs.mongodb.com/manual/reference/operator/aggregation/graphLookup/ \$graphLookup]] aggregation stage.
    *
+   * @since MongoDB 3.4
    * @param from the target collection for the \$graphLookup operation to search
    * @param startWith the expression that specifies the value of the `connectFromField` with which to start the recursive search
    * @param connectFromField the field name whose value `\$graphLookup` uses to recursively match against the `connectToField` of other documents in the collection
@@ -494,9 +505,9 @@ trait AggregationFramework[P <: SerializationPack]
   }
 
   /**
-   * _Since MongoDB 3.2:_ Performs a left outer join to an unsharded collection in the same database to filter in documents from the "joined" collection for processing.
-   * https://docs.mongodb.com/v3.2/reference/operator/aggregation/lookup/#pipe._S_lookup
+   * Performs a [[https://docs.mongodb.com/v3.2/reference/operator/aggregation/lookup/#pipe._S_lookup left outer join]] to an unsharded collection in the same database to filter in documents from the "joined" collection for processing.
    *
+   * @since MongoDB 3.2
    * @param from the collection to perform the join with
    * @param localField the field from the documents input
    * @param foreignField the field from the documents in the `from` collection
@@ -526,8 +537,9 @@ trait AggregationFramework[P <: SerializationPack]
   }
 
   /**
-   * [[https://docs.mongodb.com/manual/reference/operator/aggregation/merge/ \$merge]] aggregation stage (since MongoDB 4.2)
+   * [[https://docs.mongodb.com/manual/reference/operator/aggregation/merge/ \$merge]] aggregation stage.
    *
+   * @since MongoDB 4.2
    * @param intoDb the name of the `into` database
    * @param intoCollection the name of the `into` collection
    */
@@ -576,7 +588,9 @@ trait AggregationFramework[P <: SerializationPack]
   }
 
   /**
-   * [[https://docs.mongodb.com/manual/reference/operator/aggregation/planCacheStats/ \$planCacheStats]] aggregation stage (since MongoDB 4.2)
+   * [[https://docs.mongodb.com/manual/reference/operator/aggregation/planCacheStats/ \$planCacheStats]] aggregation stage.
+   *
+   * @since MongoDB 4.2
    */
   case object PlanCacheStats extends PipelineOperator {
     val makePipe = pipe(f"$$planCacheStats", builder.document(Seq.empty))
@@ -624,8 +638,9 @@ trait AggregationFramework[P <: SerializationPack]
   }
 
   /**
-   * The [[https://docs.mongodb.com/manual/reference/operator/aggregation/replaceWith/ \$replaceWith]] aggregation stage (Since MongoDB 4.2)
+   * The [[https://docs.mongodb.com/manual/reference/operator/aggregation/replaceWith/ \$replaceWith]] aggregation stage.
    *
+   * @since MongoDB 4.2
    * @param replacementDocument
    */
   case class ReplaceWith(
@@ -684,8 +699,9 @@ trait AggregationFramework[P <: SerializationPack]
   }
 
   /**
-   * The [[https://docs.mongodb.com/manual/reference/operator/aggregation/sortByCount/ \$sortByCount]] aggregation stage (Since MongoDB 3.4)
+   * The [[https://docs.mongodb.com/manual/reference/operator/aggregation/sortByCount/ \$sortByCount]] aggregation stage.
    *
+   * @since MongoDB 3.4
    * @param expression
    */
   case class SortByCount(expression: pack.Value) extends PipelineOperator {
@@ -693,8 +709,9 @@ trait AggregationFramework[P <: SerializationPack]
   }
 
   /**
-   * The [[https://docs.mongodb.com/manual/reference/operator/aggregation/sortByCount/ \$sortByCount]] aggregation stage (Since MongoDB 3.4)
+   * The [[https://docs.mongodb.com/manual/reference/operator/aggregation/sortByCount/ \$sortByCount]] aggregation stage.
    *
+   * @since MongoDB 3.4
    * @param field the field name
    */
   case class SortByFieldCount(field: String) extends PipelineOperator {
@@ -703,8 +720,9 @@ trait AggregationFramework[P <: SerializationPack]
   }
 
   /**
-   * The [[https://docs.mongodb.com/manual/reference/operator/aggregation/unset/ \$unset]] aggregation stage (Since MongoDB 4.2)
+   * The [[https://docs.mongodb.com/manual/reference/operator/aggregation/unset/ \$unset]] aggregation stage.
    *
+   * @since MongoDB 4.2
    * @param field the field name
    * @param otherFields
    */
@@ -748,10 +766,10 @@ trait AggregationFramework[P <: SerializationPack]
     def apply(field: String): Unwind = UnwindField(field)
 
     /**
-     * (Since MongoDB 3.2)
      * Turns a document with an array into multiple documents,
      * one document for each element in the array.
      *
+     * @since MongoDB 3.2
      * @param path the field path to an array field (without the `\$` prefix)
      * @param includeArrayIndex the name of a new field to hold the array index of the element
      */
@@ -824,19 +842,19 @@ trait AggregationFramework[P <: SerializationPack]
   // https://github.com/mongodb/specifications/blob/master/source/change-streams/change-streams.rst#server-specification
 
   /**
-   * Low level pipeline operator which allows to open a tailable cursor against subsequent ChangeEvents of a given
-   * collection (since MongoDB 3.6).
-   * https://docs.mongodb.com/manual/reference/change-events/
+   * Low level pipeline operator which allows to open a tailable cursor
+   * against subsequent [[https://docs.mongodb.com/manual/reference/change-events/ change events]] of a given collection.
    *
-   * For common use-cases, you might prefer to use the `watch` operator on a collection.
+   * For common use-cases, you might prefer to use the `watch`
+   * operator on a collection.
    *
-   * Note: the target mongo instance MUST be a replica-set (even in the case of a single node deployement).
+   * '''Note:''' the target mongo instance MUST be a replica-set
+   * (even in the case of a single node deployement).
    *
-   * @param resumeAfter the id of the last known Change Event, if any. The stream will resume just after that event.
-   * @param startAtOperationTime the operation time before which all Change Events are known. Must be in the time range
-   *                             of the oplog. (since MongoDB 4.0)
-   * @param fullDocumentStrategy if set to UpdateLookup, every update change event will be joined with the *current* version of the
-   *                     relevant document.
+   * @since MongoDB 3.6
+   * @param resumeAfter the id of the last known change event, if any. The stream will resume just after that event.
+   * @param startAtOperationTime the operation time before which all change events are known. Must be in the time range of the oplog. (since MongoDB 4.0)
+   * @param fullDocumentStrategy if set to UpdateLookup, every update change event will be joined with the ''current'' version of the relevant document.
    */
   final class ChangeStream(
     resumeAfter: Option[pack.Value] = None,

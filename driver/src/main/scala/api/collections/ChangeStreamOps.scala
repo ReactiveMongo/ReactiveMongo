@@ -16,23 +16,30 @@ trait ChangeStreamOps[P <: SerializationPack with Singleton] { collection: Gener
   import collection.BatchCommands.AggregationFramework.ChangeStream
 
   /**
-   * Prepares a builder for watching the changeStream of this collection
-   * [[https://docs.mongodb.com/manual/changeStreams]] (since MongoDB 3.6).
+   * Prepares a builder for watching the [[https://docs.mongodb.com/manual/changeStreams change stream]] of this collection.
    *
-   * Note: the target mongo instance MUST be a replica-set (even in the case of a single node deployement).
+   * '''Note:''' The target mongo instance MUST be a replica-set
+   * (even in the case of a single node deployement).
    *
-   * @param resumeAfter          The id of the last known Change Event, if any. The stream will resume just after
-   *                             that event.
-   * @param startAtOperationTime The operation time before which all Change Events are known. Must be in the time range
-   *                             of the oplog. (since MongoDB 4.0)
-   * @param pipeline             A sequence of aggregation stages to apply on events in the stream (see MongoDB
-   *                             documentation for a list of valid stages for a change stream).
-   * @param maxAwaitTimeMS       The maximum amount of time in milliseconds the server waits for new data changes
-   *                             before returning an empty batch. In practice, this parameter controls the duration
-   *                             of the long-polling behavior of the cursor.
-   * @param fullDocumentStrategy if set to UpdateLookup, every update change event will be joined with the *current*
-   *                             version of the relevant document.
-   * @param reader               a reader of the resulting Change Events
+   * {{{
+   * import scala.concurrent.{ ExecutionContext, Future }
+   *
+   * import reactivemongo.api.Cursor
+   * import reactivemongo.api.bson.BSONDocument
+   * import reactivemongo.api.bson.collection.BSONCollection
+   *
+   * def events(coll: BSONCollection)(
+   *   implicit ec: ExecutionContext): Cursor[BSONDocument] =
+   *   coll.watch[BSONDocument]().cursor
+   * }}}
+   *
+   * @since MongoDB 3.6
+   * @param resumeAfter The id of the last known Change Event, if any. The stream will resume just after that event.
+   * @param startAtOperationTime The operation time before which all Change Events are known. Must be in the time range of the oplog. (since MongoDB 4.0)
+   * @param pipeline The sequence of aggregation stages to apply on events in the stream (see MongoDB documentation for a list of valid stages for a change stream).
+   * @param maxAwaitTimeMS The maximum amount of time in milliseconds the server waits for new data changes before returning an empty batch. In practice, this parameter controls the duration of the long-polling behavior of the cursor.
+   * @param fullDocumentStrategy if set to UpdateLookup, every update change event will be joined with the ''current'' version of the relevant document.
+   * @param reader the reader of the resulting change events
    * @tparam T the type into which Change Events are deserialized
    */
   final def watch[T](
@@ -52,7 +59,8 @@ trait ChangeStreamOps[P <: SerializationPack with Singleton] { collection: Gener
   }
 
   /**
-   * A builder for the `watch` collection helper, which allows to consume the collection's ChangeStream.
+   * A builder for the `watch` collection helper,
+   * which allows to consume the collection's ChangeStream.
    */
   sealed trait WatchBuilder[T] {
 
@@ -86,9 +94,7 @@ trait ChangeStreamOps[P <: SerializationPack with Singleton] { collection: Gener
      * established, if there is is some next event. Therefore, `head` is guaranteed to eventually return the next
      * change event beyond the resume point, when such an event appears.
      */
-    def cursor[AC[_] <: Cursor.WithOps[_]](implicit cp: CursorProducer.Aux[T, AC]): AC[T] = {
-      context.prepared[AC].cursor
-    }
+    def cursor[AC[_] <: Cursor.WithOps[_]](implicit cp: CursorProducer.Aux[T, AC]): AC[T] = context.prepared[AC].cursor
 
   }
 
