@@ -111,7 +111,7 @@ trait IsMasterCommand[P <: SerializationPack] {
       primary, hosts, passives, arbiters, isSecondary, isArbiterOnly,
       isPassive, isHidden, tags, electionId, None)
 
-    @deprecated("No longer a case class", "0.19.1")
+    @deprecated("No longer a ReactiveMongo case class", "0.19.1")
     def copy(
       setName: String = this.setName,
       me: String = this.me,
@@ -127,7 +127,7 @@ trait IsMasterCommand[P <: SerializationPack] {
       setName, -1, me, primary, hosts, passives, arbiters, isSecondary,
       isArbiterOnly, isPassive, isHidden, Map.empty[String, String], -1, None)
 
-    @deprecated("No longer a case class", "0.19.1")
+    @deprecated("No longer a ReactiveMongo case class", "0.19.1")
     def this(
       setName: String,
       me: String,
@@ -203,7 +203,7 @@ trait IsMasterCommand[P <: SerializationPack] {
       -1, me, primary, hosts, passives, arbiters, isSecondary,
       isArbiterOnly, isPassive, isHidden, Map.empty[String, String], -1, None)
 
-    @deprecated("No longer a case class", "0.19.1")
+    @deprecated("No longer a ReactiveMongo case class", "0.19.1")
     def unapply(rs: ReplicaSet): Option[(String, String, Option[String], Seq[String], Seq[String], Seq[String], Boolean, Boolean, Boolean, Boolean, Option[P#Document])] = Some((rs.setName, rs.me, rs.primary, rs.hosts, rs.passives, rs.arbiters, rs.isSecondary, rs.isArbiterOnly, rs.isPassive, rs.isHidden, None))
   }
 

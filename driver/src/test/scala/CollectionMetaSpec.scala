@@ -10,7 +10,6 @@ import reactivemongo.api.bson.collection.BSONCollection
 
 // TODO: Separate Spec?
 trait CollectionMetaSpec { collSpec: CollectionSpec =>
-  import TestCompat._
   import _root_.tests.Common
   import Common._
 

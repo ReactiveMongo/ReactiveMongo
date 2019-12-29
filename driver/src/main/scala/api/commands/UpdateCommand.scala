@@ -30,7 +30,7 @@ trait UpdateCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] {
    * @param collation the collation to use for the operation
    * @param arrayFilters an array of filter documents that determines which array elements to modify for an update operation on an array field
    */
-  class UpdateElement @deprecated("Will be private/internal", "0.17.0") (
+  class UpdateElement @deprecated("Internal: will be made private/internal", "0.17.0") (
     val q: pack.Document,
     val u: pack.Document,
     val upsert: Boolean,
@@ -59,7 +59,7 @@ trait UpdateCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] {
     override def toString: String = s"UpdateElement${data.toString}"
   }
 
-  @deprecated("Will be private/internal", "0.17.0")
+  @deprecated("Internal: will be made private/internal", "0.17.0")
   object UpdateElement {
     def apply(q: ImplicitlyDocumentProducer, u: ImplicitlyDocumentProducer, upsert: Boolean = false, multi: Boolean = false): UpdateElement =
       new UpdateElement(

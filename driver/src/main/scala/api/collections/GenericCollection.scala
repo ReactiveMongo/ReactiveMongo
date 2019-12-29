@@ -176,6 +176,7 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * @return $returnQueryBuilder
    */
   def find[S, J](selector: S, projection: Option[J] = Option.empty)(implicit swriter: pack.Writer[S], pwriter: pack.Writer[J]): GenericQueryBuilder[pack.type] = {
+    @com.github.ghik.silencer.silent(".*filter\\ predicate.*")
     val queryBuilder: GenericQueryBuilder[pack.type] =
       genericQueryBuilder.filter(selector)
 

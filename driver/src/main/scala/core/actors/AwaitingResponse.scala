@@ -92,7 +92,7 @@ private[actors] class AwaitingResponse(
 
 }
 
-@deprecated("No longer a case class", "0.18.5")
+@deprecated("No longer a ReactiveMongo case class", "0.18.5")
 private[actors] object AwaitingResponse extends scala.runtime.AbstractFunction5[Request, ChannelId, Promise[Response], Boolean, Boolean, AwaitingResponse] {
   def apply(
     request: Request,

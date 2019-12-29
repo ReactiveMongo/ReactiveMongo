@@ -41,7 +41,7 @@ object ReactiveMongoException {
 /** An error thrown by a MongoDB node. */
 trait DatabaseException extends ReactiveMongoException {
   /** original document of this error */
-  @deprecated("Internal: will be private", "0.19.0")
+  @deprecated("Internal: will be made private", "0.19.0")
   def originalDocument: Option[BSONDocument]
 
   /** error code */
@@ -73,6 +73,7 @@ trait DatabaseException extends ReactiveMongoException {
 
   override def toString: String = getMessage
 
+  @com.github.ghik.silencer.silent(".*Internal:\\ will\\ be\\ private.*")
   private lazy val tupled = originalDocument -> code
 }
 

@@ -506,7 +506,7 @@ object IndexesManager {
     else new LegacyIndexesManager(db)
   }
 
-  @deprecated("Will be internal", "0.19.0")
+  @deprecated("Internal: will be made private", "0.19.0")
   object NSIndexWriter extends reactivemongo.bson.BSONDocumentWriter[NSIndex] {
     private val underlying =
       nsIndexWriter(reactivemongo.api.BSONSerializationPack)
@@ -566,7 +566,7 @@ object IndexesManager {
     }
   }
 
-  @deprecated("Will be internal", "0.19.0")
+  @deprecated("Internal: will be made private", "0.19.0")
   object IndexReader extends reactivemongo.bson.BSONDocumentReader[Index] {
     private val underlying =
       indexReader(reactivemongo.api.BSONSerializationPack)
@@ -622,7 +622,7 @@ object IndexesManager {
     }
   }
 
-  @deprecated("Will be private", "0.19.0")
+  @deprecated("Internal: will be made private", "0.19.0")
   object NSIndexReader extends reactivemongo.bson.BSONDocumentReader[NSIndex] {
     private val underlying =
       nsIndexReader(reactivemongo.api.BSONSerializationPack)

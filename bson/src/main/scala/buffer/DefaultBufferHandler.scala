@@ -72,6 +72,7 @@ object DefaultBufferHandler extends BufferHandler {
   }
 
   object BSONDocumentBufferHandler extends BufferRW[BSONDocument] {
+    @com.github.ghik.silencer.silent(".*Unused.*")
     def write(doc: BSONDocument, buffer: WritableBuffer) = {
       val now = buffer.index
 
@@ -116,6 +117,7 @@ object DefaultBufferHandler extends BufferHandler {
   }
 
   object BSONArrayBufferHandler extends BufferRW[BSONArray] {
+    @com.github.ghik.silencer.silent(".*Unused.*")
     def write(array: BSONArray, buffer: WritableBuffer) = {
       val now = buffer.index
 
@@ -291,6 +293,7 @@ object DefaultBufferHandler extends BufferHandler {
   def readDocument(buffer: ReadableBuffer): Try[BSONDocument] =
     Try(BSONDocumentBufferHandler read buffer)
 
+  @com.github.ghik.silencer.silent(".*Unused.*")
   def writeDocument(
     document: BSONDocument,
     buffer: WritableBuffer): WritableBuffer = serialize(document, buffer)

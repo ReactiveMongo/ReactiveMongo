@@ -1282,7 +1282,7 @@ trait MongoDBSystem extends Actor {
         }
       }
 
-      if (origSender != null) {
+      if (origSender != null && origSender != context.system.deadLetters) {
         origSender ! _nodeSet
       }
 

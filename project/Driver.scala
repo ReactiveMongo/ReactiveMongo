@@ -741,16 +741,23 @@ object Version {
   // ---
 
   private def shadedNative(arch: String) = Def.setting[ModuleID] {
-    val v = version.value
-    val s = {
-      if (v endsWith "-SNAPSHOT") {
-        s"${v.dropRight(9)}-${arch}-SNAPSHOT"
-      } else {
-        s"${v}-${arch}"
+    if (Common.useShaded.value) {
+      val v = version.value
+      val s = {
+        if (v endsWith "-SNAPSHOT") {
+          s"${v.dropRight(9)}-${arch}-SNAPSHOT"
+        } else {
+          s"${v}-${arch}"
+        }
       }
-    }
 
-    organization.value % "reactivemongo-shaded-native" % s
+      organization.value % "reactivemongo-shaded-native" % s
+    } else {
+      val variant = if (arch == "osx-x86-64") "kqueue" else "epoll"
+      val classifier = if (arch == "osx-x86-64") "osx-x86_64" else "linux-x86_64"
+
+      ("io.netty" % s"netty-transport-native-${variant}" % Dependencies.nettyVer).classifier(classifier)
+    }
   }
 
   private val driverFilter: Seq[(File, String)] => Seq[(File, String)] = {

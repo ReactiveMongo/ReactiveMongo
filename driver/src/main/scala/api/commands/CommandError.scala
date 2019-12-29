@@ -84,6 +84,7 @@ object CommandError {
     originalDocument: pack.Document): CommandError =
     new DefaultCommandError(code, errmsg, () => pack pretty originalDocument)
 
+  @com.github.ghik.silencer.silent(".*pack\\ .*is\\ never\\ used.*")
   private[reactivemongo] def parse[P <: SerializationPack](
     pack: P)(error: DatabaseException): CommandError =
     new DefaultCommandError(error.code, Some(error.getMessage), { () =>

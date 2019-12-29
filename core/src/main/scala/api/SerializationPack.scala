@@ -32,26 +32,26 @@ trait SerializationPack extends SerializationPackCompat { self: Singleton =>
   def IdentityWriter: Writer[Document]
   def IdentityReader: Reader[Document]
 
-  @deprecated("Internal: will be private", "0.19.1")
+  @deprecated("Internal: will be made private", "0.19.1")
   def serialize[A](a: A, writer: Writer[A]): Document
 
-  @deprecated("Internal: will be private", "0.19.1")
+  @deprecated("Internal: will be made private", "0.19.1")
   def deserialize[A](document: Document, reader: Reader[A]): A
 
-  @deprecated("Internal: will be private", "0.19.1")
+  @deprecated("Internal: will be made private", "0.19.1")
   def writeToBuffer(buffer: LegacyWritable, document: Document): LegacyWritable
 
-  @deprecated("Internal: will be private", "0.19.1")
+  @deprecated("Internal: will be made private", "0.19.1")
   def readFromBuffer(buffer: ReadableBuffer): Document
 
-  @deprecated("Internal: will be private", "0.19.1")
+  @deprecated("Internal: will be made private", "0.19.1")
   def serializeAndWrite[A](buffer: LegacyWritable, document: A, writer: Writer[A]): LegacyWritable = writeToBuffer(buffer, serialize(document, writer))
 
-  @deprecated("Internal: will be private", "0.19.1")
+  @deprecated("Internal: will be made private", "0.19.1")
   def readAndDeserialize[A](buffer: ReadableBuffer, reader: Reader[A]): A =
     deserialize(readFromBuffer(buffer), reader)
 
-  @deprecated("Internal: will be private", "0.19.1")
+  @deprecated("Internal: will be made private", "0.19.1")
   def readAndDeserialize[A](response: Response, reader: Reader[A]): A = {
     val channelBuf = ChannelBufferReadableBuffer(response.documents)
     readAndDeserialize(channelBuf, reader)
@@ -65,7 +65,7 @@ trait SerializationPack extends SerializationPackCompat { self: Singleton =>
 
   def widenReader[T](r: NarrowValueReader[T]): WidenValueReader[T]
 
-  def readValue[A](value: Value, reader: WidenValueReader[A]): Try[A]
+  private[reactivemongo] def readValue[A](value: Value, reader: WidenValueReader[A]): Try[A]
 
   // Returns a Reader from a function
   private[reactivemongo] def reader[A](f: Document => A): Reader[A]
@@ -163,6 +163,7 @@ object SerializationPack {
      * @returnsNamedElement, if the element exists
      * with expected `T` as value type.
      */
+    @com.github.ghik.silencer.silent(".*\\ ev\\ .*is\\ never\\ used.*")
     final def value[T](
       document: pack.Document,
       name: String)(

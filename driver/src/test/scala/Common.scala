@@ -8,7 +8,6 @@ import reactivemongo.api.{
   CrAuthentication,
   DefaultDB,
   FailoverStrategy,
-  MongoDriver,
   MongoConnection,
   MongoConnectionOptions,
   X509Authentication

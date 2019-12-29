@@ -19,6 +19,15 @@ private[core] final class Pack(
 }
 
 private[core] object Pack {
+  private val shaded: Boolean = try {
+    // Type alias but no class if not shaded
+    Class.forName("reactivemongo.io.netty.channel.Channel")
+
+    true
+  } catch {
+    case _: Throwable => false
+  }
+
   private val logger = LazyLogger("reactivemongo.core.netty.Pack")
 
   def apply(): Pack = {
@@ -29,7 +38,11 @@ private[core] object Pack {
     pack
   }
 
-  private val kqueuePkg = "reactivemongo.io.netty.channel.kqueue"
+  private val kqueuePkg: String = {
+    if (shaded) "reactivemongo.io.netty.channel.kqueue"
+    else "io.netty.channel.kqueue"
+  }
+
   private def kqueue: Option[Pack] = try {
     Some(Class.forName(
       s"${kqueuePkg}.KQueueSocketChannel")).map { cls =>
@@ -39,16 +52,22 @@ private[core] object Pack {
 
       val pack = new Pack(() =>
         groupClass.getDeclaredConstructor().newInstance(), chanClass)
-      logger.info("Netty KQueue successfully loaded")
+
+      logger.info(s"Netty KQueue successfully loaded (shaded: $shaded)")
+
       pack
     }
   } catch {
     case cause: Exception =>
-      logger.debug("Cannot use Netty KQueue", cause)
+      logger.debug(s"Cannot use Netty KQueue (shaded: $shaded)", cause)
       None
   }
 
-  private val epollPkg = "reactivemongo.io.netty.channel.epoll"
+  private val epollPkg: String = {
+    if (shaded) "reactivemongo.io.netty.channel.epoll"
+    else "io.netty.channel.epoll"
+  }
+
   private def epoll: Option[Pack] = try {
     Some(Class.forName(
       s"${epollPkg}.EpollSocketChannel")).map { cls =>
@@ -59,12 +78,14 @@ private[core] object Pack {
 
       val pack = new Pack(() =>
         groupClass.getDeclaredConstructor().newInstance(), chanClass)
-      logger.info("Netty EPoll successfully loaded")
+
+      logger.info(s"Netty EPoll successfully loaded (shaded: $shaded)")
+
       pack
     }
   } catch {
     case cause: Exception =>
-      logger.debug("Cannot use Netty EPoll", cause)
+      logger.debug(s"Cannot use Netty EPoll (shaded: $shaded)", cause)
       None
   }
 

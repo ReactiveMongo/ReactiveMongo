@@ -84,13 +84,13 @@ private[core] case class ScramSha1Initiate(
   val ResultMaker = ScramSha1Initiate
 }
 
-@deprecated("Will be private", "0.18.4")
+@deprecated("Internal: will be made private", "0.18.4")
 object ScramSha1Initiate extends BSONCommandResultMaker[ScramChallenge[ScramSha1Authentication.type]] {
   def parseResponse(response: Response): Either[CommandError, ScramChallenge[ScramSha1Authentication.type]] = apply(response)
 
   def apply(bson: BSONDocument) = ScramInitiate.parseResponse(ScramSha1Authentication, bson)(ScramSha1Challenge.apply)
 
-  @deprecated("Will be private", "0.18.4")
+  @deprecated("Internal: will be made private", "0.18.4")
   @inline def authChars: Stream[Char] = ScramInitiate.authChars
 
   @inline def randomPrefix(seed: Int): String = ScramInitiate.randomPrefix(seed)
@@ -174,7 +174,7 @@ private[core] case class ScramSha256Negociation(
   serverSignature: Array[Byte],
   request: BSONDocument)
 
-@deprecated("Will be internal", "0.18.4")
+@deprecated("Internal: will be made private", "0.18.4")
 object ScramSha1Negociation {
   @inline def parsePayload(payload: String): Map[String, String] =
     ScramNegociation.parsePayload(payload)
@@ -318,7 +318,7 @@ private[core] case class ScramSha1StartNegociation(
   val ResultMaker = ScramSha1StartNegociation
 }
 
-@deprecated("Will be internal", "0.18.4")
+@deprecated("Internal: will be made private", "0.18.4")
 @SerialVersionUID(113814637L)
 object ScramSha1StartNegociation extends BSONCommandResultMaker[Either[SuccessfulAuthentication, Array[Byte]]] {
   type ResType = ScramStartNegociation.ResType

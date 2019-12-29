@@ -216,6 +216,7 @@ private[api] trait Driver {
   final class SupervisorActor(driver: Driver) extends Actor {
     @inline def isEmpty = driver.connectionMonitors.isEmpty
 
+    @com.github.ghik.silencer.silent(".*askClose.*")
     val receive: Receive = {
       case AddConnection(name, _, opts, sys) => {
         logger.debug(

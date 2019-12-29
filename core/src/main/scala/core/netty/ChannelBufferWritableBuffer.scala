@@ -20,7 +20,7 @@ import reactivemongo.io.netty.buffer.{ ByteBuf, Unpooled }
 import reactivemongo.bson.BSONDocument
 import reactivemongo.bson.buffer.{ ReadableBuffer, WritableBuffer }
 
-@deprecated("Internal: will be private", "0.19.1")
+@deprecated("Internal: will be made private", "0.19.1")
 class ChannelBufferWritableBuffer(
   val buffer: ByteBuf = Unpooled.buffer(32)) extends WritableBuffer {
 

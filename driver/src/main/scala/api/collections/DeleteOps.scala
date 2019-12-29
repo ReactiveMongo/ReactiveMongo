@@ -25,7 +25,7 @@ import reactivemongo.api.commands.{
 trait DeleteOps[P <: SerializationPack with Singleton] {
   collection: GenericCollection[P] =>
 
-  @deprecated("Internal: will be private", "0.19.0")
+  @deprecated("Internal: will be made private", "0.19.0")
   object DeleteCommand
     extends reactivemongo.api.commands.DeleteCommand[collection.pack.type] {
     val pack: collection.pack.type = collection.pack
@@ -101,7 +101,7 @@ trait DeleteOps[P <: SerializationPack with Singleton] {
      *   val delete = coll.delete(ordered = true)
      *   val elements = Future.sequence(docs.map { doc =>
      *     delete.element(
-     *       q = BSONDocument("filter" -> "value"),
+     *       q = doc,
      *       limit = Some(1)) // only first match
      *   })
      *

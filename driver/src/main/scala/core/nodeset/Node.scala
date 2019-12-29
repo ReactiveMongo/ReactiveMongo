@@ -177,13 +177,13 @@ private[reactivemongo] sealed class Node(
     authenticatedConnections.size, _tags,
     protocolMetadata, pingInfo, isMongos)
 
-  @deprecated("No longer a case class", "0.19.1")
+  @deprecated("No longer a ReactiveMongo case class", "0.19.1")
   val productArity = 8
 
-  @deprecated("No longer a case class", "0.19.1")
+  @deprecated("No longer a ReactiveMongo case class", "0.19.1")
   @inline def productElement(n: Int): Any = tupled.productElement(n)
 
-  @deprecated("No longer a case class", "0.19.1")
+  @deprecated("No longer a ReactiveMongo case class", "0.19.1")
   def canEqual(that: Any): Boolean = that match {
     case _: Node => true
     case _       => false
@@ -217,7 +217,7 @@ private[reactivemongo] object Node extends scala.runtime.AbstractFunction8[Strin
       tags.map(Node.tags).getOrElse(Map.empty),
       protocolMetadata, pingInfo, isMongos)
 
-  @deprecated("No longer a case class", "0.19.1")
+  @deprecated("No longer a ReactiveMongo case class", "0.19.1")
   def unapply(node: Node): Option[(String, NodeStatus, Vector[Connection], Set[Authenticated], Option[BSONDocument], ProtocolMetadata, PingInfo, Boolean)] = Option(node).map(_.tupled)
 
   @deprecated("Will be removed", "0.19.1")
@@ -275,16 +275,16 @@ class NodeInfo(
     }))
   }
 
-  @deprecated("No longer a case class", "0.19.1")
+  @deprecated("No longer a ReactiveMongo case class", "0.19.1")
   def canEqual(that: Any): Boolean = that match {
     case _: NodeInfo => true
     case _           => false
   }
 
-  @deprecated("No longer a case class", "0.19.1")
+  @deprecated("No longer a ReactiveMongo case class", "0.19.1")
   val productArity: Int = 12
 
-  @deprecated("No longer a case class", "0.19.1")
+  @deprecated("No longer a ReactiveMongo case class", "0.19.1")
   @inline def productElement(n: Int): Any = tupled.productElement(n)
 
   private[reactivemongo] lazy val tupled =
@@ -308,7 +308,7 @@ class NodeInfo(
 
 object NodeInfo extends scala.runtime.AbstractFunction12[String, Set[String], String, Int, NodeStatus, Int, Int, Int, Option[BSONDocument], ProtocolMetadata, PingInfo, Boolean, NodeInfo] {
 
-  @deprecated("No longer a case class", "0.19.1")
+  @deprecated("No longer a ReactiveMongo case class", "0.19.1")
   def apply(
     name: String,
     aliases: Set[String],

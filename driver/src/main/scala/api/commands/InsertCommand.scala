@@ -19,7 +19,7 @@ trait InsertCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] {
 
   type InsertResult = DefaultWriteResult // for simplified imports
 
-  @deprecated("Useless, will be removed", "0.16.0")
+  @deprecated("Will be removed; See `Command`", "0.16.0")
   object Insert {
   }
 }

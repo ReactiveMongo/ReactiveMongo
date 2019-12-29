@@ -78,12 +78,15 @@ object Compiler {
         val ns1 = ".*in\\ package\\ nodeset.*is\\ deprecated.*"
         val ns2 = ".*class\\ NodeSet.*;NodeSetInfo\\ is\\ deprecated.*"
         val bcmd = ".*in\\ package\\ bson.*"
-        val driver = s"$internal;$cmd;$repl;$ns1;$ns2;$bcmd"
+        val ncc = ".*No\\ longer\\ a\\ ReactiveMongo\\ case\\ class.*"
+        val dc = ".*Command\\ in\\ package\\ commands\\ is\\ deprecated.*"
+        val driver = s"$internal;$cmd;$repl;$ns1;$ns2;$bcmd;$ncc;$dc"
 
         // BSON
         val bll = ".*in\\ package\\ lowlevel\\ is\\ deprecated.*"
         val bxn = ".*ExtendedNumeric\\ is\\ deprecated.*"
-        val bson = s"$bll;$bxn"
+        val useBison = ".*Use\\ reactivemongo-bson-api.*"
+        val bson = s"$bll;$bxn;$useBison"
 
         val macros = ".*value\\ macro.*\\ is never used"
 

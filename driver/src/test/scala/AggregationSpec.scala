@@ -14,7 +14,6 @@ import reactivemongo.bson.{
   BSONNull,
   BSONNumberLike,
   BSONString,
-  BSONValue,
   Macros,
   array,
   document

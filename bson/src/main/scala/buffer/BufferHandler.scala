@@ -10,10 +10,11 @@ trait BufferHandler {
   @deprecated("Unused", "0.16.6")
   def deserialize(buffer: ReadableBuffer): Try[(String, BSONValue)]
 
-  def write(buffer: WritableBuffer, document: BSONDocument) = {
+  @com.github.ghik.silencer.silent(".*Unused.*")
+  def write(buffer: WritableBuffer, document: BSONDocument) =
     serialize(document, buffer)
-  }
 
+  @com.github.ghik.silencer.silent(".*Unused.*")
   def write(buffer: WritableBuffer, arr: BSONArray) = serialize(arr, buffer)
 
   def readDocument(buffer: ReadableBuffer): Try[BSONDocument]

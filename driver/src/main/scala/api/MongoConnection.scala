@@ -604,6 +604,7 @@ object MongoConnection {
   @deprecated("Internal: will be made private", "0.16.0")
   val FailoverRe = "^([^:]+):([0-9]+)x([0-9.]+)$".r
 
+  @com.github.ghik.silencer.silent(".*Use\\ SCRAM\\ or\\ X509.*")
   private def makeOptions(
     opts: Map[String, String],
     initial: MongoConnectionOptions): (List[String], MongoConnectionOptions) = {
