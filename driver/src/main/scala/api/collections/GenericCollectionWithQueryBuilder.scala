@@ -39,6 +39,10 @@ private[api] trait GenericCollectionWithQueryBuilder[P <: SerializationPack with
     type Self = CollectionQueryBuilder
     val pack: parent.pack.type = parent.pack
     override val collection = parent
+
+    protected lazy val version =
+      collection.db.connectionState.metadata.maxWireVersion
+
     @inline override def readPreference = parent.readPreference
 
     def copy(

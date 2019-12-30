@@ -2,13 +2,12 @@ package reactivemongo.api.collections
 
 import scala.concurrent.{ ExecutionContext, Future }
 
-import reactivemongo.api.SerializationPack
+import reactivemongo.api.{ Collation, SerializationPack }
 
 import reactivemongo.api.commands.{
   CollectionCommand,
   Command,
   CommandWithResult,
-  Collation,
   ResolvedCollectionCommand,
   UnitBox
 }

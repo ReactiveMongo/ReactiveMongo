@@ -572,12 +572,15 @@ sealed trait GridFS[P <: SerializationPack]
   // ---
 
   private final class QueryBuilder(
-    val collection: Collection,
+    override val collection: Collection,
     val failoverStrategy: FailoverStrategy,
     val queryOption: Option[pack.Document],
     val sortOption: Option[pack.Document]) extends GenericQueryBuilder[pack.type] {
     type Self = QueryBuilder
     val pack: self.pack.type = self.pack
+
+    protected lazy val version =
+      collection.db.connectionState.metadata.maxWireVersion
 
     val projectionOption = Option.empty[pack.Document]
     val hintOption = Option.empty[pack.Document]

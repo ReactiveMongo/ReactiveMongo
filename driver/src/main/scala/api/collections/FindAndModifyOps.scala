@@ -3,9 +3,8 @@ package reactivemongo.api.collections
 import scala.concurrent.{ ExecutionContext, Future }
 import scala.concurrent.duration.FiniteDuration
 
-import reactivemongo.api.SerializationPack
+import reactivemongo.api.{ Collation, SerializationPack }
 import reactivemongo.api.commands.{
-  Collation,
   CommandCodecs,
   FindAndModifyCommand => FNM,
   ResolvedCollectionCommand,

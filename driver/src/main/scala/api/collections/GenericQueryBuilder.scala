@@ -21,6 +21,7 @@ import reactivemongo.core.protocol.{ Query, QueryFlags, MongoWireVersion }
 import reactivemongo.core.netty.{ BufferSequence, ChannelBufferWritableBuffer }
 
 import reactivemongo.api.{
+  Collation,
   Collection,
   Cursor,
   CursorProducer,
@@ -40,6 +41,19 @@ import reactivemongo.api.commands.CommandCodecs
  *
  * When the query is ready, you can call `cursor` to get a [[Cursor]], or `one` if you want to retrieve just one document.
  *
+ * {{{
+ * import scala.concurrent.{ ExecutionContext, Future }
+ *
+ * import reactivemongo.api.bson.BSONDocument
+ * import reactivemongo.api.bson.collection.BSONCollection
+ *
+ * def firstFirst(coll: BSONCollection)(
+ *   implicit ec: ExecutionContext): Future[Option[BSONDocument]] = {
+ *   val queryBuilder = coll.find(BSONDocument.empty)
+ *   queryBuilder.one[BSONDocument]
+ * }
+ * }}}
+ *
  * @define oneFunction Sends this query and gets a future `Option[T]` (alias for [[reactivemongo.api.Cursor.headOption]])
  * @define readPrefParam The [[reactivemongo.api.ReadPreference]] for this query. If the `ReadPreference` implies that this query can be run on a secondary, the slaveOk flag will be set.
  * @define readerParam the reader for the results type
@@ -50,8 +64,6 @@ import reactivemongo.api.commands.CommandCodecs
  */
 @deprecated("Internal: will be made private", "0.16.0")
 trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
-  // TODO: Unit test?
-
   val pack: P
 
   type Self <: GenericQueryBuilder[pack.type]
@@ -68,14 +80,62 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
 
   @deprecatedName(Symbol("failover")) def failoverStrategy: FailoverStrategy
 
-  def collection: Collection
+  def collection: Collection = ???
+
   def maxTimeMsOption: Option[Long]
 
   // TODO: Remove
   private var _readConcern: ReadConcern = ReadConcern.default
+  private var _singleBatch: Boolean = false
+  private var _maxScan: Boolean = false
+  private var _returnKey: Boolean = false
+  private var _showRecordId: Boolean = false
+  private var _min = Option.empty[pack.Document]
+  private var _max = Option.empty[pack.Document]
+  private var _collation = Option.empty[Collation]
 
-  /** The read concern (since 3.2) */
-  def readConcern: ReadConcern = _readConcern
+  /**
+   * The flag to determines whether to close the cursor after the first batch
+   * (default: `false`)
+   */
+  @inline def singleBatch: Boolean = _singleBatch
+
+  @inline def maxScan: Boolean = _maxScan
+
+  /**
+   * If this flag is true, returns only the index keys
+   * in the resulting documents.
+   */
+  @inline def returnKey: Boolean = _returnKey
+
+  /**
+   * The flags to determines whether to return
+   * the record identifier for each document.
+   */
+  @inline def showRecordId: Boolean = _showRecordId
+
+  /**
+   * The read concern
+   * @since MongoDB 3.6
+   */
+  @inline def readConcern: ReadConcern = _readConcern
+
+  /**
+   * The optional exclusive [[https://docs.mongodb.com/v3.4/reference/method/cursor.max/#cursor.max upper bound]] for a specific index (default: `None`).
+   */
+  @inline def max: Option[pack.Document] = _max
+
+  /**
+   * The optional exclusive [[https://docs.mongodb.com/v3.4/reference/method/cursor.min/#cursor.min lower bound]] for a specific index (default: `None`).
+   */
+  @inline def min: Option[pack.Document] = _min
+
+  /**
+   * The optional collation to use for the find command (default: `None`).
+   *
+   * @since MongoDB 3.4
+   */
+  @inline def collation: Option[Collation] = _collation
 
   /**
    * Returns a [[Cursor]] for the result of this query.
@@ -106,8 +166,7 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
   @deprecated("Internal: will be made private", "0.16.0")
   @inline def readPreference: ReadPreference = ReadPreference.primary
 
-  protected lazy val version =
-    collection.db.connectionState.metadata.maxWireVersion
+  protected def version: MongoWireVersion
 
   /**
    * $oneFunction (using the default [[reactivemongo.api.ReadPreference]]).
@@ -254,6 +313,23 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
   /**
    * $projectionFunction.
    *
+   * {{{
+   * import scala.concurrent.{ ExecutionContext, Future }
+   *
+   * import reactivemongo.api.Cursor
+   * import reactivemongo.api.bson.BSONDocument
+   * import reactivemongo.api.bson.collection.BSONCollection
+   *
+   * def findAllWithProjection(coll: BSONCollection)(
+   *   implicit ec: ExecutionContext): Future[List[BSONDocument]] =
+   *   coll.find(BSONDocument.empty).
+   *     projection(BSONDocument("age" -> 1)). // only consider 'age' field
+   *     cursor[BSONDocument]().
+   *     collect[List](
+   *       maxDocs = 100,
+   *       err = Cursor.FailOnError[List[BSONDocument]]())
+   * }}}
+   *
    * @tparam Pjn The type of the projection. An implicit `Writer[Pjn]` typeclass for handling it has to be in the scope.
    */
   def projection[Pjn](p: Pjn)(implicit writer: pack.Writer[Pjn]): Self =
@@ -264,11 +340,8 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
    */
   def projection(p: pack.Document): Self = copy(projectionOption = Some(p))
 
-  /** Sets the hint document (a document that declares the index MongoDB should use for this query). */
+  /** Sets the [[https://docs.mongodb.com/manual/reference/operator/meta/hint/ hint document]] (a document that declares the index MongoDB should use for this query). */
   def hint(document: pack.Document): Self = copy(hintOption = Some(document))
-
-  /** Sets the hint document (a document that declares the index MongoDB should use for this query). */
-  // TODO def hint(indexName: String): Self = copy(hintOption = Some(BSONDocument(indexName -> BSONInteger(1))))
 
   /** Toggles [[https://docs.mongodb.org/manual/reference/method/cursor.explain/#cursor.explain explain mode]]. */
   def explain(flag: Boolean = true): Self = copy(explainFlag = flag)
@@ -284,10 +357,62 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
 
   def options(options: QueryOpts): Self = copy(options = options)
 
-  /** Sets the [[ReadConcern]] */
+  /** Sets the [[ReadConcern]]. */
   def readConcern(concern: ReadConcern): Self = {
     val upd = copy()
     upd._readConcern = concern
+    upd
+  }
+
+  /** Sets the `singleBatch` flag. */
+  def singleBatch(flag: Boolean): Self = {
+    val upd = copy()
+    upd._singleBatch = flag
+    upd
+  }
+
+  /** Sets the `maxScan` flag. */
+  def maxScan(flag: Boolean): Self = {
+    val upd = copy()
+    upd._maxScan = flag
+    upd
+  }
+
+  /** Sets the `returnKey` flag. */
+  def returnKey(flag: Boolean): Self = {
+    val upd = copy()
+    upd._returnKey = flag
+    upd
+  }
+
+  /** Sets the `showRecordId` flag. */
+  def showRecordId(flag: Boolean): Self = {
+    val upd = copy()
+    upd._showRecordId = flag
+    upd
+  }
+
+  /** Sets the `max` document. */
+  def max(document: pack.Document): Self = {
+    val upd = copy()
+    upd._max = Option(document)
+    upd
+  }
+
+  /** Sets the `min` document. */
+  def min(document: pack.Document): Self = {
+    val upd = copy()
+    upd._min = Option(document)
+    upd
+  }
+
+  /**
+   * Sets the `collation` document.
+   * @since MongoDB 3.4
+   */
+  def collation(collation: Collation): Self = {
+    val upd = copy()
+    upd._collation = Option(collation)
     upd
   }
 
@@ -301,8 +426,24 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
   def exhaust = options(options.exhaust)
   def noCursorTimeout = options(options.noCursorTimeout)
   def oplogReplay = options(options.oplogReplay)
+
+  @deprecated("Use `allowPartialResults`", "0.19.8")
   def partial = options(options.partial)
+
+  /**
+   * For queries against a sharded collection,
+   * returns partial results from the mongos if some shards are unavailable
+   * instead of throwing an error.
+   */
+  def allowPartialResults = options(options.partial)
+
+  /**
+   * Sets the number of documents to skip at the beginning of the results.
+   *
+   * @see [[QueryOpts.skipN]]
+   */
   def skip(n: Int) = options(options.skip(n))
+
   def slaveOk = options(options.slaveOk)
   def tailable = options(options.tailable)
 
@@ -321,26 +462,25 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
 
   // ---
 
-  // TODO: Unit test (see merge test in ReactiveMongo-Play-Json)
-  private[reactivemongo] def merge(readPreference: ReadPreference, maxDocs: Int): pack.Document = {
-    val builder = pack.newBuilder
+  lazy val builder = pack.newBuilder
 
-    import builder.{
-      boolean,
-      document,
-      elementProducer => element,
-      int,
-      long,
-      string
-    }
+  import builder.{
+    boolean,
+    document,
+    elementProducer => element,
+    int,
+    long,
+    string
+  }
 
-    // Primary and SecondaryPreferred are encoded as the slaveOk flag;
-    // the others are encoded as $readPreference field.
+  private lazy val writeReadPref = QueryCodecs.writeReadPref[pack.type](builder)
 
-    val writeReadPref = QueryCodecs.writeReadPref[pack.type](builder)
-
-    val merged = if (version.compareTo(MongoWireVersion.V32) < 0) {
+  private val mergeLt32: Function2[ReadPreference, Int, pack.Document] =
+    { (readPreference: ReadPreference, _: Int) =>
       val elements = Seq.newBuilder[pack.ElementProducer]
+
+      // Primary and SecondaryPreferred are encoded as the slaveOk flag;
+      // the others are encoded as $readPreference field.
 
       queryOption.foreach {
         elements += element(f"$$query", _)
@@ -372,28 +512,32 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
 
       elements += element(f"$$readPreference", writeReadPref(readPreference))
 
-      document(elements.result())
-    } else {
-      // MongoDB >= 3.2
-      // TODO: Split in separate functions, choosen according version
+      val merged = document(elements.result())
 
-      /* TODO: https://docs.mongodb.com/v3.2/reference/command/find/#dbcmd.find
+      logger.trace(s"command: ${pack pretty merged}")
 
-       - singleBatch: boolean; Optional. Determines whether to close the cursor after the first batch. Defaults to false.
-       - maxScan: boolean; Optional. Maximum number of documents or index keys to scan when executing the query.
-       - max: document; Optional. The exclusive upper bound for a specific index; https://docs.mongodb.com/v3.4/reference/method/cursor.max/#cursor.max
-       - min: document; Optional. The exclusive upper bound for a specific index; https://docs.mongodb.com/v3.4/reference/method/cursor.min/#cursor.min
-       - returnKey: boolean; Optional. If true, returns only the index keys in the resulting documents.
-       - showRecordId: boolean; Optional. Determines whether to return the record identifier for each document.
-       - noCursorTimeout: boolean; Optional. Prevents the server from timing out idle cursors after an inactivity period (10 minutes).
-       - allowPartialResults: boolean; Optional. For queries against a sharded collection, returns partial results from the mongos if some shards are unavailable instead of throwing an error.
-       - collation: document; Optional; Specifies the collation to use for the operation.
-       */
+      merged
+    }
 
-      import QueryFlags.{ AwaitData, OplogReplay, TailableCursor }
+  private val merge32: Function2[ReadPreference, Int, pack.Document] = {
+    val writeCollation = Collation.serializeWith[pack.type](
+      pack, _: Collation)(builder)
 
+    { (readPreference, maxDocs) =>
+      import QueryFlags.{
+        AwaitData,
+        OplogReplay,
+        Partial,
+        NoCursorTimeout,
+        TailableCursor
+      }
+
+      def partial: Boolean = (options.flagsN & Partial) == Partial
       def awaitData: Boolean = (options.flagsN & AwaitData) == AwaitData
       def oplogReplay: Boolean = (options.flagsN & OplogReplay) == OplogReplay
+      def noTimeout: Boolean =
+        (options.flagsN & NoCursorTimeout) == NoCursorTimeout
+
       def tailable: Boolean =
         (options.flagsN & TailableCursor) == TailableCursor
 
@@ -416,7 +560,13 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
         element("skip", int(options.skipN)),
         element("tailable", boolean(tailable)),
         element("awaitData", boolean(awaitData)),
-        element("oplogReplay", boolean(oplogReplay)))
+        element("oplogReplay", boolean(oplogReplay)),
+        element("noCursorTimeout", boolean(noTimeout)),
+        element("allowPartialResults", boolean(partial)),
+        element("singleBatch", boolean(singleBatch)),
+        element("maxScan", boolean(maxScan)),
+        element("returnKey", boolean(returnKey)),
+        element("showRecordId", boolean(showRecordId)))
 
       if (version.compareTo(MongoWireVersion.V34) < 0) {
         elements += element("snapshot", boolean(snapshotFlag))
@@ -454,6 +604,18 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
         elements += element("maxTimeMS", long(l))
       }
 
+      max.foreach { doc =>
+        elements += element("max", doc)
+      }
+
+      min.foreach { doc =>
+        elements += element("min", doc)
+      }
+
+      collation.foreach { c =>
+        elements += element("collation", writeCollation(c))
+      }
+
       val session = collection.db.session.filter( // TODO: Remove
         _ => (version.compareTo(MongoWireVersion.V36) >= 0))
 
@@ -462,7 +624,7 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
 
       val readPref = element(f"$$readPreference", writeReadPref(readPreference))
 
-      if (!explainFlag) {
+      val merged = if (!explainFlag) {
         elements += readPref
 
         document(elements.result())
@@ -471,12 +633,14 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
           element("explain", document(elements.result())),
           readPref))
       }
+
+      logger.trace(s"command: ${pack pretty merged}")
+
+      merged
     }
-
-    logger.debug(s"command: ${pack pretty merged}")
-
-    merged
   }
+
+  private[reactivemongo] lazy val merge: Function2[ReadPreference, Int, pack.Document] = if (version.compareTo(MongoWireVersion.V32) < 0) mergeLt32 else merge32
 
   private def defaultCursor[T](
     readPreference: ReadPreference,

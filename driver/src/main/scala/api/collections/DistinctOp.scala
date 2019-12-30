@@ -10,10 +10,9 @@ import scala.concurrent.{ ExecutionContext, Future }
 
 import reactivemongo.core.protocol.MongoWireVersion
 
-import reactivemongo.api.{ ReadConcern, SerializationPack }
+import reactivemongo.api.{ Collation, ReadConcern, SerializationPack }
 
 import reactivemongo.api.commands.{
-  Collation,
   CollectionCommand,
   CommandCodecs,
   CommandWithResult,

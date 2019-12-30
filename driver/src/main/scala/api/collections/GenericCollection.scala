@@ -24,7 +24,6 @@ import scala.concurrent.duration.FiniteDuration
 import reactivemongo.api._
 import reactivemongo.api.commands.{
   CommandCodecs,
-  Collation,
   FindAndModifyCommand => FNM,
   ImplicitCommandHelpers,
   UnitBox,

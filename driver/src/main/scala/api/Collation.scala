@@ -1,11 +1,23 @@
-package reactivemongo.api.commands
-
-import reactivemongo.api.SerializationPack
+package reactivemongo.api
 
 /**
  * Represents a [[https://docs.mongodb.com/manual/reference/collation/ collection, view, index or operation]] specific collation.
+ *
+ * {{{
+ * import reactivemongo.api.Collation
+ *
+ * val collation = new Collation(
+ *   locale = "en-US",
+ *   caseLevel = None,
+ *   caseFirst = None,
+ *   strength = Some(Collation.PrimaryStrength),
+ *   numericOrdering = None,
+ *   alternate = None,
+ *   maxVariable = None,
+ *   backwards = None)
+ * }}}
  */
-final class Collation( // TODO: Move to `api` package
+final class Collation(
   val locale: String,
   val caseLevel: Option[Boolean],
   val caseFirst: Option[Collation.CaseFirst],
@@ -22,6 +34,8 @@ final class Collation( // TODO: Move to `api` package
 
   override def hashCode: Int = tupled.hashCode
 
+  override def toString = s"Collation${tupled.toString}"
+
   // ---
 
   private[api] def tupled =
@@ -30,24 +44,27 @@ final class Collation( // TODO: Move to `api` package
 
 }
 
+/**
+ * [[Collation]] utilities.
+ */
 object Collation {
-  class Strength(val value: Int) extends AnyVal
+  final class Strength(val value: Int) extends AnyVal
   val PrimaryStrength = new Strength(1)
   val SecondaryStrength = new Strength(2)
   val TertiaryStrength = new Strength(3)
   val QuaternaryStrength = new Strength(4)
   val IdentityStrength = new Strength(5)
 
-  class CaseFirst(val value: String) extends AnyVal
+  final class CaseFirst(val value: String) extends AnyVal
   val UpperCaseFirst = new CaseFirst("upper")
   val LowerCaseFirst = new CaseFirst("lower")
   val OffCaseFirst = new CaseFirst("off")
 
-  class Alternate(val value: String) extends AnyVal
+  final class Alternate(val value: String) extends AnyVal
   val NonIgnorable = new Alternate("non-ignorable")
   val Shifted = new Alternate("shifted")
 
-  class MaxVariable(val value: String) extends AnyVal
+  final class MaxVariable(val value: String) extends AnyVal
   val Punct = new MaxVariable("punct")
   val Space = new MaxVariable("space")
 

@@ -4,9 +4,7 @@ import scala.collection.Factory
 
 import scala.concurrent.{ Future, ExecutionContext }
 
-import reactivemongo.api.{ ReadConcern, SerializationPack }
-
-import reactivemongo.api.commands.Collation
+import reactivemongo.api.{ Collation, ReadConcern, SerializationPack }
 
 private[collections] trait GenericCollectionWithDistinctOps[P <: SerializationPack with Singleton] { self: GenericCollection[P] with DistinctOp[P] with HintFactory[P] =>
 

@@ -28,7 +28,7 @@ import reactivemongo.api.collections.GenericQueryBuilder
 @SerialVersionUID(1634796413L)
 @deprecated("Useless, will be remove", "0.16.0")
 case class BSONQueryBuilder(
-  collection: Collection,
+  override val collection: Collection,
   @deprecatedName(Symbol("failover")) failoverStrategy: FailoverStrategy,
   queryOption: Option[BSONDocument] = None,
   sortOption: Option[BSONDocument] = None,
@@ -41,6 +41,9 @@ case class BSONQueryBuilder(
   maxTimeMsOption: Option[Long] = None) extends GenericQueryBuilder[BSONSerializationPack.type] {
   type Self = BSONQueryBuilder
   @transient val pack = BSONSerializationPack
+
+  protected lazy val version =
+    collection.db.connectionState.metadata.maxWireVersion
 
   def copy(
     queryOption: Option[BSONDocument] = queryOption,

@@ -7,9 +7,8 @@ import scala.concurrent.{ ExecutionContext, Future }
 import reactivemongo.core.protocol.MongoWireVersion
 import reactivemongo.core.errors.GenericDriverException
 
-import reactivemongo.api.SerializationPack
+import reactivemongo.api.{ Collation, SerializationPack }
 import reactivemongo.api.commands.{
-  Collation,
   MultiBulkWriteResult,
   ResolvedCollectionCommand,
   UpdateWriteResult,

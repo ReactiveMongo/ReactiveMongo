@@ -81,7 +81,7 @@ object Compiler {
         val ncc = ".*No\\ longer\\ a\\ ReactiveMongo\\ case\\ class.*"
         val dc = ".*Command\\ in\\ package\\ commands\\ is\\ deprecated.*"
         val auth = ".*Use\\ SCRAM\\ or\\ X509.*"
-        val driver = s"$internal;$cmd;$repl;$ns1;$ns2;$bcmd;$ncc;$dc;$auth"
+        val driver = s".*Unused.*;$internal;$cmd;$repl;$ns1;$ns2;$bcmd;$ncc;$dc;$auth"
 
         // BSON
         val bll = ".*in\\ package\\ lowlevel\\ is\\ deprecated.*"

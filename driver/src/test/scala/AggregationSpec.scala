@@ -140,8 +140,8 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
       }
 
       "using a view" in {
-        import coll.BatchCommands.AggregationFramework
-        import AggregationFramework.{ Ascending, Group, Match, Sort, SumField }
+        import coll.aggregationFramework
+        import aggregationFramework.{ Ascending, Group, Match, Sort, SumField }
 
         val viewName = s"pop10m${System identityHashCode this}"
 
@@ -164,8 +164,8 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
       } tag "gt_mongo32"
 
       "with expected count" in {
-        import coll.BatchCommands.AggregationFramework
-        import AggregationFramework.{ Group, SumAll }
+        import coll.aggregationFramework
+        import aggregationFramework.{ Group, SumAll }
         val result = coll.aggregatorContext[BSONDocument](Group(BSONString(f"$$state"))("count" -> SumAll)).prepared.cursor
           .collect[Set](Int.MaxValue, Cursor.FailOnError[Set[BSONDocument]]())
 
@@ -199,8 +199,8 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
         document("_id" -> "NY", "avgCityPop" -> 19746227D))
 
       def withCtx[T](c: BSONCollection)(f: (c.BatchCommands.AggregationFramework.Group, List[c.PipelineOperator]) => T): T = {
-        import c.BatchCommands.AggregationFramework
-        import AggregationFramework.{ Ascending, Group, Sort, SumField }
+        import c.aggregationFramework
+        import aggregationFramework.{ Ascending, Group, Sort, SumField }
 
         val firstOp = Group(document(
           "state" -> f"$$state", "city" -> f"$$city"))(
@@ -208,7 +208,7 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
 
         val pipeline = List(
           Group(BSONString(f"$$_id.state"))("avgCityPop" ->
-            AggregationFramework.AvgField("pop")),
+            aggregationFramework.AvgField("pop")),
           Sort(Ascending("_id")))
 
         f(firstOp, pipeline)
@@ -303,8 +303,8 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
 
     "return largest and smallest cities by state" in {
       // See http://docs.mongodb.org/manual/tutorial/aggregation-zip-code-data-set/#return-largest-and-smallest-cities-by-state
-      import coll.BatchCommands.AggregationFramework
-      import AggregationFramework.{
+      import coll.aggregationFramework
+      import aggregationFramework.{
         FirstField,
         Group,
         LastField,
@@ -385,14 +385,6 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
         distinctSpec(slowZipColl, slowTimeout)
       }
     }
-
-    "return a random sample" in {
-      import coll.BatchCommands.AggregationFramework.Sample
-
-      coll.aggregatorContext[ZipCode](Sample(2)).prepared.cursor
-        .collect[List](Int.MaxValue, Cursor.FailOnError[List[ZipCode]]())
-        .map(_.count(zipCodes.contains)) must beEqualTo(2).await(0, timeout)
-    } tag "not_mongo26"
   }
 
   "Inventory #1" should {
@@ -441,8 +433,7 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
         InventoryReport(3, docs = List(
           Product(5, None, Some("Incomplete")), Product(6))))
 
-      import coll.BatchCommands.AggregationFramework
-      import AggregationFramework.Lookup
+      import coll.aggregationFramework.Lookup
 
       orders.aggregatorContext[InventoryReport](Lookup(inventory.name, "item", "sku", "docs")).prepared.cursor
         .collect[List](Int.MaxValue, Cursor.FailOnError[List[InventoryReport]]()) must beTypedEqualTo(expected).await(0, timeout)
@@ -461,8 +452,7 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
           List(Product(4, Some("jkl"), Some("product 4"), Some(70)))),
         InventoryReport(3, docs = List.empty))
 
-      import coll.BatchCommands.AggregationFramework
-      import AggregationFramework.GraphLookup
+      import coll.aggregationFramework.GraphLookup
 
       orders.aggregatorContext[InventoryReport](GraphLookup(inventory.name, BSONString(f"$$item"), "item", "sku", "docs")).prepared.cursor
         .collect[List](Int.MaxValue, Cursor.FailOnError[List[InventoryReport]]()) must beTypedEqualTo(expected).await(0, timeout)
@@ -557,8 +547,7 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
     } tag "not_mongo26"
 
     "so the joined documents are returned" in {
-      import orders.BatchCommands.AggregationFramework
-      import AggregationFramework.{ Lookup, Match }
+      import orders.aggregationFramework.{ Lookup, Match }
 
       def expected = document(
         "_id" -> 1,
@@ -734,8 +723,7 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
     } tag "not_mongo26"
 
     "return a sum as hash per quiz" in {
-      import coll.BatchCommands.AggregationFramework
-      import AggregationFramework.{ Group, Sum }
+      import coll.aggregationFramework.{ Group, Sum }
 
       contest.aggregatorContext[BSONDocument](
         Group(BSONString(f"$$quiz"))(
@@ -746,8 +734,7 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
     }
 
     "return the maximum score per quiz" in {
-      import coll.BatchCommands.AggregationFramework
-      import AggregationFramework.{ Group, MaxField }
+      import coll.aggregationFramework.{ Group, MaxField }
 
       contest.aggregatorContext[BSONDocument](
         Group(BSONString(f"$$quiz"))("maxScore" -> MaxField("score"))).prepared.cursor
@@ -757,8 +744,7 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
     }
 
     "return a max as hash per quiz" in {
-      import coll.BatchCommands.AggregationFramework
-      import AggregationFramework.{ Group, Max }
+      import coll.aggregationFramework.{ Group, Max }
 
       contest.aggregatorContext[BSONDocument](
         Group(BSONString(f"$$quiz"))(
@@ -770,8 +756,7 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
     }
 
     "return the minimum score per quiz" in {
-      import coll.BatchCommands.AggregationFramework
-      import AggregationFramework.{ Group, MinField }
+      import coll.aggregationFramework.{ Group, MinField }
 
       contest.aggregatorContext[BSONDocument](Group(BSONString(f"$$quiz"))("minScore" -> MinField("score"))).prepared.cursor
         .collect[Set](Int.MaxValue, Cursor.FailOnError[Set[BSONDocument]]()) must beTypedEqualTo(Set(
@@ -780,8 +765,7 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
     }
 
     "return a min as hash per quiz" in {
-      import coll.BatchCommands.AggregationFramework
-      import AggregationFramework.{ Group, Min }
+      import coll.aggregationFramework.{ Group, Min }
 
       contest.aggregatorContext[BSONDocument](
         Group(BSONString(f"$$quiz"))(
@@ -799,8 +783,7 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
         QuizScores(1, Set(
           Score("dave123", 85), Score("dave2", 90), Score("ahn", 71))))
 
-      import coll.BatchCommands.AggregationFramework
-      import AggregationFramework.{ Group, Push }
+      import coll.aggregationFramework.{ Group, Push }
 
       contest.aggregatorContext[QuizScores](
         Group(BSONString(f"$$quiz"))(
@@ -815,8 +798,7 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
         QuizScores(1, Set(
           Score("dave123", 85), Score("dave2", 90), Score("ahn", 71))))
 
-      import coll.BatchCommands.AggregationFramework
-      import AggregationFramework.{ Group, AddToSet }
+      import coll.aggregationFramework.{ Group, AddToSet }
 
       contest.aggregatorContext[QuizScores](
         Group(BSONString(f"$$quiz"))(
@@ -937,8 +919,7 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
       }
       implicit val placeReader: BSONDocumentReader[GeoPlace] = Macros.reader[GeoPlace]
 
-      import coll.BatchCommands.AggregationFramework
-      import AggregationFramework.{ GeoNear, Limit }
+      import coll.aggregationFramework.{ GeoNear, Limit }
 
       places.aggregatorContext[GeoPlace](
         GeoNear(document(
@@ -1370,8 +1351,10 @@ db.accounts.aggregate([
   section("gt_mongo32")
 
   "Stage" should {
+    import coll.aggregationFramework
+
     f"be $$addFields" in {
-      import coll.aggregationFramework.AddFields
+      import aggregationFramework.AddFields
 
       val specs = BSONDocument("foo" -> 1, "bar" -> 2L)
 
@@ -1382,7 +1365,7 @@ db.accounts.aggregate([
     f"be $$facet" in {
       // See https://docs.mongodb.com/manual/reference/operator/aggregation/facet/
 
-      import coll.aggregationFramework.{ Count, Facet, Out, UnwindField }
+      import aggregationFramework.{ Count, Facet, Out, UnwindField }
 
       Facet(Seq(
         "foo" -> (UnwindField("bar") -> List(Count("c"))),
@@ -1396,7 +1379,7 @@ db.accounts.aggregate([
     }
 
     f"$$bucket" in {
-      import coll.aggregationFramework.{ Bucket, SumField }
+      import aggregationFramework.{ Bucket, SumField }
 
       Bucket(
         groupBy = BSONString(f"$$foo"),
@@ -1414,7 +1397,7 @@ db.accounts.aggregate([
     }
 
     f"$$collStats" in {
-      import coll.aggregationFramework.CollStats
+      import aggregationFramework.CollStats
 
       CollStats(
         latencyStatsHistograms = true,
@@ -1427,7 +1410,7 @@ db.accounts.aggregate([
     }
 
     f"$$currentOp" in {
-      import coll.aggregationFramework.CurrentOp
+      import aggregationFramework.CurrentOp
 
       CurrentOp().makePipe must_=== BSONDocument(f"$$currentOp" -> BSONDocument(
         "allUsers" -> false,
@@ -1438,7 +1421,7 @@ db.accounts.aggregate([
     }
 
     f"$$graphLookup" in {
-      import coll.aggregationFramework.GraphLookup
+      import aggregationFramework.GraphLookup
 
       GraphLookup(
         from = "foo",
@@ -1461,7 +1444,7 @@ db.accounts.aggregate([
     }
 
     f"$$listLocalSessions" in {
-      import coll.aggregationFramework.ListLocalSessions
+      import aggregationFramework.ListLocalSessions
 
       ListLocalSessions(BSONDocument("allUsers" -> true)).
         makePipe must_=== BSONDocument(
@@ -1469,7 +1452,7 @@ db.accounts.aggregate([
     }
 
     f"$$listSessions" in {
-      import coll.aggregationFramework.ListSessions
+      import aggregationFramework.ListSessions
 
       ListSessions(BSONDocument("allUsers" -> true)).
         makePipe must_=== BSONDocument(
@@ -1477,7 +1460,7 @@ db.accounts.aggregate([
     }
 
     f"$$merge" in {
-      import coll.aggregationFramework.Merge
+      import aggregationFramework.Merge
 
       Merge(
         intoDb = "foo",
@@ -1495,27 +1478,27 @@ db.accounts.aggregate([
     }
 
     f"$$planCacheStats" in {
-      coll.aggregationFramework.PlanCacheStats.makePipe must_=== BSONDocument(
+      aggregationFramework.PlanCacheStats.makePipe must_=== BSONDocument(
         f"$$planCacheStats" -> BSONDocument.empty)
 
     }
 
     f"$$replaceWith" in {
-      import coll.aggregationFramework.ReplaceWith
+      import aggregationFramework.ReplaceWith
 
       ReplaceWith(BSONDocument("foo" -> 1)).makePipe must_=== BSONDocument(
         f"$$replaceWith" -> BSONDocument("foo" -> 1))
     }
 
     f"$$set" in {
-      import coll.aggregationFramework.Set
+      import aggregationFramework.Set
 
       Set(BSONDocument("foo" -> 1)).makePipe must_=== BSONDocument(
         f"$$set" -> BSONDocument("foo" -> 1))
     }
 
     f"$$sortByCount" in {
-      import coll.aggregationFramework.{ SortByCount, SortByFieldCount }
+      import aggregationFramework.{ SortByCount, SortByFieldCount }
 
       val expected = BSONDocument(f"$$sortByCount" -> f"$$foo")
 
@@ -1525,11 +1508,18 @@ db.accounts.aggregate([
     }
 
     f"$$unset" in {
-      import coll.aggregationFramework.Unset
+      import aggregationFramework.Unset
 
       Unset("foo", List("bar", "lorem")).makePipe must_=== BSONDocument(
         f"$$unset" -> List("foo", "bar", "lorem"))
 
+    }
+
+    f"$$sample" in {
+      import aggregationFramework.Sample
+
+      Sample(2).makePipe must_=== BSONDocument(
+        f"$$sample" -> BSONDocument("size" -> 2))
     }
   }
 
