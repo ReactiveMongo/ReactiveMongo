@@ -180,10 +180,7 @@ case class ServerStatusResult(
   dur: Option[ServerStatusJournaling],
   extraInfo: Option[ServerStatusExtraInfo],
   globalLock: ServerStatusGlobalLock,
-  // TODO: locks
-  network: ServerStatusNetwork
-// TODO: opcounters, opcountersRepl, rangeDeleter, repl, security, storageEngine, wiredTiger
-)
+  network: ServerStatusNetwork)
 
 /** Server [[http://docs.mongodb.org/manual/reference/server-status/ status]] */
 @deprecated("Internal: will be made private", "0.16.0")

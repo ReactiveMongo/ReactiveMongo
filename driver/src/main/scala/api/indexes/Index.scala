@@ -2,7 +2,7 @@ package reactivemongo.api.indexes
 
 import reactivemongo.bson.BSONDocument
 
-import reactivemongo.api.SerializationPack
+import reactivemongo.api.{ Collation, SerializationPack }
 
 import com.github.ghik.silencer.silent
 
@@ -23,6 +23,19 @@ import com.github.ghik.silencer.silent
  *   background = false,
  *   dropDups = false,
  *   sparse = false,
+ *   expireAfterSeconds = None,
+ *   storageEngine = None,
+ *   weights = None,
+ *   defaultLanguage = None,
+ *   languageOverride = None,
+ *   textIndexVersion = None,
+ *   sphereIndexVersion = None,
+ *   bits = None,
+ *   min = None,
+ *   max = None,
+ *   bucketSize = None,
+ *   collation = None,
+ *   wildcardProjection = None,
  *   version = None,
  *   partialFilter = None,
  *   options = BSONDocument.empty)
@@ -39,13 +52,10 @@ sealed abstract class Index extends Product with Serializable {
   def key: Seq[(String, IndexType)] = Seq.empty // TODO: Remove impl
 
   /**
-   * The name of this index.
+   * The name of this index (default: `None`).
    * If you provide none, a name will be computed for you.
    */
   def name: Option[String] = None
-
-  /** Enforces uniqueness */
-  def unique: Boolean = false
 
   /**
    * Ff this index should be built in background.
@@ -53,31 +63,101 @@ sealed abstract class Index extends Product with Serializable {
    */
   def background: Boolean = false
 
+  /** The flag to enforces uniqueness (default: `false`) */
+  def unique: Boolean = false
+
   /**
-   * If duplicates should be discarded (if unique = true).
+   * Optional [[https://docs.mongodb.com/manual/core/index-partial/#partial-index-with-unique-constraints partial filter]]
+   *
+   * @since MongoDB 3.2
+   */
+  private[api] def partialFilterDocument: Option[pack.Document]
+
+  /**
+   * The flags to indicates if the index to build
+   * should only consider the documents that have the indexed fields
+   * (default: `false`).
+   *
+   * See [[https://docs.mongodb.com/manual/indexes/#sparse-indexes the documentation]] on the consequences of such an index.
+   */
+  def sparse: Boolean = false
+
+  /**
+   * Optionally specifies a value, in seconds, as a [[https://docs.mongodb.com/manual/reference/glossary/#term-ttl TTL]] to control how long MongoDB retains documents in this collection.
+   */
+  def expireAfterSeconds: Option[Int] = None
+
+  /**
+   * Optionally specifies a configuration for the storage engine on a per-index basis when creating an index.
+   *
+   * @since MongoDB 3.0
+   */
+  def storageEngine: Option[pack.Document] = None
+
+  /**
+   * An optional document that contains field and weight pairs for [[https://docs.mongodb.com/manual/core/index-text/ text indexes]].
+   */
+  def weights: Option[pack.Document] = None
+
+  /**
+   * An optional default language for [[https://docs.mongodb.com/manual/core/index-text/ text indexes]].
+   */
+  def defaultLanguage: Option[String] = None
+
+  /**
+   * An optional language override for [[https://docs.mongodb.com/manual/core/index-text/ text indexes]].
+   */
+  def languageOverride: Option[String] = None
+
+  /**
+   * An optional `text` index [[https://docs.mongodb.com/manual/core/index-text/#text-versions version number]].
+   */
+  def textIndexVersion: Option[Int] = None
+
+  /**
+   * An optional `2dsphere` index [[https://docs.mongodb.com/manual/core/index-text/#text-versions version number]].
+   */
+  def _2dsphereIndexVersion: Option[Int] = None
+
+  /**
+   * Optionally indicates the precision of [[https://docs.mongodb.com/manual/reference/glossary/#term-geohash geohash]] for [[https://docs.mongodb.com/manual/core/2d/ 2d indexes]].
+   */
+  def bits: Option[Int] = None
+
+  /**
+   * Optionally indicates the lower inclusive boundary for longitude and latitude for [[https://docs.mongodb.com/manual/core/2d/ 2d indexes]].
+   */
+  def min: Option[Double] = None
+
+  /**
+   * Optionally indicates the upper inclusive boundary for longitude and latitude for [[https://docs.mongodb.com/manual/core/2d/ 2d indexes]].
+   */
+  def max: Option[Double] = None
+
+  /**
+   * Optionally specifies the number of units within which
+   * to group the location values
+   * for [[https://docs.mongodb.com/manual/core/geohaystack/ geoHaystack]]
+   * indexes.
+   */
+  def bucketSize: Option[Double] = None
+
+  /** An optional [[Collation]] (default: `None`) */
+  def collation: Option[Collation] = None
+
+  def wildcardProjection: Option[pack.Document] = None
+
+  /**
+   * If duplicates should be discarded (if unique = true; default: `false`).
    * _Warning_: you should read [[http://www.mongodb.org/display/DOCS/Indexes#Indexes-dropDups%3Atrue the documentation]].
    */
   @deprecated("Since MongoDB 2.6", "0.19.1")
   def dropDups: Boolean = false
 
   /**
-   * If the index to build should only consider the documents
-   * that have the indexed fields.
-   * See [[http://www.mongodb.org/display/DOCS/Indexes#Indexes-sparse%3Atrue the documentation]] on the consequences of such an index.
-   */
-  def sparse: Boolean = false
-
-  /**
    * Indicates the [[http://www.mongodb.org/display/DOCS/Index+Versions version]] of the index (1 for >= 2.0, else 0). You should let MongoDB decide.
    */
   def version: Option[Int] = None
-
-  // TODO: storageEngine (new for Mongo3)
-
-  /**
-   * Optional [[https://docs.mongodb.com/manual/core/index-partial/#partial-index-with-unique-constraints partial filter]] (since MongoDB 3.2)
-   */
-  private[api] def partialFilterDocument: Option[pack.Document]
 
   /**
    * Optional parameters for this index (typically specific to an IndexType like Geo2D).
@@ -115,13 +195,12 @@ sealed abstract class Index extends Product with Serializable {
   @silent(".*dropDups.*")
   private[api] lazy val tupled = Tuple9(key, name, unique, background, dropDups, sparse, version, partialFilterDocument, optionDocument)
 
-  // TODO: storageEngine (new for Mongo3)
-
   override def canEqual(that: Any): Boolean = that match {
     case _: Index => true
     case _        => false
   }
 
+  // TODO: Review after deprecation cleanup (include all fields)
   override def equals(that: Any): Boolean = that match {
     case other: Index => tupled == other.tupled
     case _            => false
@@ -145,7 +224,7 @@ object Index { //extends scala.runtime.AbstractFunction9[Seq[(String, IndexType)
     sparse: Boolean = false,
     version: Option[Int] = None, // let MongoDB decide
     @deprecated("Internal: will be made private", "0.19.0") partialFilter: Option[BSONDocument] = None,
-    @deprecated("Internal: will be made private", "0.19.0") options: BSONDocument = BSONDocument.empty): Index = apply(BSONSerializationPack)(key, name, unique, background, dropDups, sparse, version, partialFilter, options)
+    @deprecated("Internal: will be made private", "0.19.0") options: BSONDocument = BSONDocument.empty): Index = apply(BSONSerializationPack)(key, name, unique, background, dropDups, sparse, None, None, None, None, None, None, None, None, None, None, None, None, None, version, partialFilter, options)
 
   def apply[P <: SerializationPack](_pack: P)(
     key: Seq[(String, IndexType)],
@@ -154,6 +233,19 @@ object Index { //extends scala.runtime.AbstractFunction9[Seq[(String, IndexType)
     background: Boolean,
     @deprecated("Since MongoDB 2.6", "0.19.1") dropDups: Boolean,
     sparse: Boolean,
+    expireAfterSeconds: Option[Int],
+    storageEngine: Option[_pack.Document],
+    weights: Option[_pack.Document],
+    defaultLanguage: Option[String],
+    languageOverride: Option[String],
+    textIndexVersion: Option[Int],
+    sphereIndexVersion: Option[Int],
+    bits: Option[Int],
+    min: Option[Double],
+    max: Option[Double],
+    bucketSize: Option[Double],
+    collation: Option[Collation],
+    wildcardProjection: Option[_pack.Document],
     version: Option[Int],
     partialFilter: Option[_pack.Document],
     options: _pack.Document): Index.Aux[_pack.type] = {
@@ -163,6 +255,18 @@ object Index { //extends scala.runtime.AbstractFunction9[Seq[(String, IndexType)
     def b = background
     @silent def d = dropDups
     def s = sparse
+    def e = expireAfterSeconds
+    def se = storageEngine
+    def w = weights
+    def dl = defaultLanguage
+    def lo = languageOverride
+    def tiv = textIndexVersion
+    def bs = bits
+    def mi = min
+    def mx = max
+    def bu = bucketSize
+    def cl = collation
+    def wp = wildcardProjection
     def v = version
     def pf = partialFilter
     def o = options
@@ -177,6 +281,19 @@ object Index { //extends scala.runtime.AbstractFunction9[Seq[(String, IndexType)
       override val background = b
       override val dropDups = d
       override val sparse = s
+      override val expireAfterSeconds = e
+      override val storageEngine = se
+      override val weights = w
+      override val defaultLanguage = dl
+      override val languageOverride = lo
+      override val textIndexVersion = tiv
+      override val _2dsphereIndexVersion = sphereIndexVersion
+      override val bits = bs
+      override val min = mi
+      override val max = mx
+      override val bucketSize = bu
+      override val collation = cl
+      override val wildcardProjection = wp
       override val version = v
       val partialFilterDocument = pf
       val optionDocument = o

@@ -20,6 +20,7 @@ import reactivemongo.core.protocol.MongoWireVersion
 import reactivemongo.api.{
   DB,
   DBMetaCommands,
+  Collation,
   Cursor,
   CursorProducer,
   ReadPreference,
@@ -519,6 +520,7 @@ object IndexesManager {
     val builder = pack.newBuilder
     val decoder = pack.newDecoder
     val writeIndexType = IndexType.write(pack)(builder)
+    val writeCollation = Collation.serializeWith(pack, _: Collation)(builder)
 
     import builder.{ boolean, document, elementProducer => element, string }
 
@@ -544,6 +546,67 @@ object IndexesManager {
 
       if (index.sparse) {
         elements += element("sparse", boolean(true))
+      }
+
+      index.expireAfterSeconds.foreach { sec =>
+        elements += element("expireAfterSeconds", builder.int(sec))
+      }
+
+      index.storageEngine.map(index.pack.bsonValue).foreach {
+        case pack.IsDocument(conf) =>
+          elements += element("storageEngine", conf)
+
+        case _ => ()
+      }
+
+      index.weights.map(index.pack.bsonValue).foreach {
+        case pack.IsDocument(w) =>
+          elements += element("weights", w)
+
+        case _ => ()
+      }
+
+      index.defaultLanguage.foreach { lang =>
+        elements += element("default_language", builder.string(lang))
+      }
+
+      index.languageOverride.foreach { lang =>
+        elements += element("language_override", builder.string(lang))
+      }
+
+      index.textIndexVersion.foreach { ver =>
+        elements += element("textIndexVersion", builder.int(ver))
+      }
+
+      index._2dsphereIndexVersion.foreach { ver =>
+        elements += element("2dsphereIndexVersion", builder.int(ver))
+      }
+
+      index.bits.foreach { bits =>
+        elements += element("bits", builder.int(bits))
+      }
+
+      index.min.foreach { min =>
+        elements += element("min", builder.double(min))
+      }
+
+      index.max.foreach { max =>
+        elements += element("max", builder.double(max))
+      }
+
+      index.bucketSize.foreach { size =>
+        elements += element("bucketSize", builder.double(size))
+      }
+
+      index.collation.foreach { collation =>
+        elements += element("collation", writeCollation(collation))
+      }
+
+      index.wildcardProjection.map(index.pack.bsonValue).foreach {
+        case pack.IsDocument(projection) =>
+          elements += element("wildcardProjection", projection)
+
+        case _ => ()
       }
 
       if (index.unique) {
@@ -577,9 +640,12 @@ object IndexesManager {
   private[reactivemongo] def indexReader[P <: SerializationPack](pack: P): pack.Reader[Index] = {
     val decoder = pack.newDecoder
     val builder = pack.newBuilder
+    val readCollation = Collation.read(pack)
+
+    import decoder.{ booleanLike, child, double, int, string }
 
     pack.reader[Index] { doc =>
-      decoder.child(doc, "key").fold[Index](
+      child(doc, "key").fold[Index](
         throw new Exception("the key must be defined")) { k =>
           val ks = decoder.names(k).flatMap { nme =>
             decoder.get(k, nme).map { v =>
@@ -587,7 +653,7 @@ object IndexesManager {
             }
           }
 
-          val key = decoder.child(doc, "weights").fold(ks) { w =>
+          val key = child(doc, "weights").fold(ks) { w =>
             val fields = decoder.names(w)
 
             (ks, fields).zipped.map {
@@ -595,16 +661,33 @@ object IndexesManager {
             }
           }.toSeq
 
-          val name = decoder.string(doc, "name")
-          val unique = decoder.booleanLike(doc, "unique").getOrElse(false)
-          val background = decoder.booleanLike(doc, "background").getOrElse(false)
-          val dropDups = decoder.booleanLike(doc, "dropDups").getOrElse(false)
-          val sparse = decoder.booleanLike(doc, "sparse").getOrElse(false)
-          val version = decoder.int(doc, "v")
+          val name = string(doc, "name")
+          val unique = booleanLike(doc, "unique").getOrElse(false)
+          val background = booleanLike(doc, "background").getOrElse(false)
+          val dropDups = booleanLike(doc, "dropDups").getOrElse(false)
+          val sparse = booleanLike(doc, "sparse").getOrElse(false)
+          val expireAfterSeconds = int(doc, "expireAfterSeconds")
+          val storageEngine = child(doc, "storageEngine")
+          val weights = child(doc, "weights")
+          val defaultLanguage = string(doc, "default_language")
+          val languageOverride = string(doc, "language_override")
+          val textIndexVersion = int(doc, "textIndexVersion")
+          val sphereIndexVersion = int(doc, "2dsphereIndexVersion")
+          val bits = int(doc, "bits")
+          val min = double(doc, "min")
+          val max = double(doc, "max")
+          val bucketSize = double(doc, "bucketSize")
+          val wildcardProjection = child(doc, "wildcardProjection")
+          val collation = child(doc, "collation").flatMap(readCollation)
+          val version = int(doc, "v")
 
           val options = builder.document(decoder.names(doc).flatMap {
-            case "ns" | "key" | "name" | "unique" |
-              "background" | "dropDups" | "sparse" | "v" | "partialFilterExpression" =>
+            case "ns" | "key" | "name" | "unique" | "background" |
+              "dropDups" | "sparse" | "v" | "partialFilterExpression" |
+              "expireAfterSeconds" | "storageEngine" | "weights" |
+              "defaultLanguage" | "languageOverride" | "textIndexVersion" |
+              "2dsphereIndexVersion" | "bits" | "min" | "max" |
+              "bucketSize" | "collation" | "wildcardProjection" =>
               Seq.empty[pack.ElementProducer]
 
             case nme =>
@@ -614,10 +697,13 @@ object IndexesManager {
           }.toSeq)
 
           val partialFilter =
-            decoder.child(doc, "partialFilterExpression")
+            child(doc, "partialFilterExpression")
 
           Index(pack)(key, name, unique, background, dropDups,
-            sparse, version, partialFilter, options)
+            sparse, expireAfterSeconds, storageEngine, weights,
+            defaultLanguage, languageOverride, textIndexVersion,
+            sphereIndexVersion, bits, min, max, bucketSize, collation,
+            wildcardProjection, version, partialFilter, options)
         }
     }
   }

@@ -116,4 +116,27 @@ object Collation {
 
     builder.document(elements.result())
   }
+
+  private[api] def read[P <: SerializationPack](pack: P): pack.Document => Option[Collation] = {
+    val decoder = pack.newDecoder
+
+    import decoder.{ booleanLike, string }
+
+    { doc =>
+      string(doc, "locale").map { locale =>
+        new Collation(
+          locale,
+          caseLevel = booleanLike(doc, "caseLevel"),
+          caseFirst = string(doc, "caseFirst").map(new Collation.CaseFirst(_)),
+          strength = decoder.int(
+            doc, "strength").map(new Collation.Strength(_)),
+          numericOrdering = booleanLike(doc, "numericOrdering"),
+          alternate = string(doc, "alternate").map(new Collation.Alternate(_)),
+          maxVariable = string(
+            doc, "maxVariable").map(new Collation.MaxVariable(_)),
+          backwards = booleanLike(doc, "backwards"))
+
+      }
+    }
+  }
 }

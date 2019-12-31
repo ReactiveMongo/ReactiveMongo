@@ -1569,7 +1569,7 @@ db.accounts.aggregate([
     sparse: Boolean = false,
     version: Option[Int] = None, // let MongoDB decide
     partialFilter: Option[BSONDocument] = None,
-    options: BSONDocument = BSONDocument.empty) = Index(BSONSerializationPack)(key, name, unique, background, dropDups, sparse, version, partialFilter, options)
+    options: BSONDocument = BSONDocument.empty) = Index(BSONSerializationPack)(key, name, unique, background, dropDups, sparse, None, None, None, None, None, None, None, None, None, None, None, None, None, version, partialFilter, options)
 
   case class User(
     _id: Int,

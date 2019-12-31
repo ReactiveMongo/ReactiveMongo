@@ -3,6 +3,12 @@ package reactivemongo.api
 /**
  * MongoDB [[https://docs.mongodb.com/manual/core/read-preference/index.html read preference]] enables to read from primary or secondaries
  * with a predefined strategy.
+ *
+ * {{{
+ * import reactivemongo.api.ReadPreference
+ *
+ * val pref: ReadPreference = ReadPreference.primary
+ * }}}
  */
 sealed trait ReadPreference {
   /** Indicates whether a slave member is ok. */
@@ -11,6 +17,7 @@ sealed trait ReadPreference {
   //def filterTag: Option[BSONDocument => Boolean]
 }
 
+/** [[ReadPreference]] utilities and factories. */
 object ReadPreference {
   /** Reads only from the primary. This is the default choice. */
   object Primary extends ReadPreference {
