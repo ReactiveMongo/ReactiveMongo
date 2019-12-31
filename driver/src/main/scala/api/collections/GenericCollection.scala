@@ -78,6 +78,8 @@ trait GenericCollectionProducer[P <: SerializationPack with Singleton, +C <: Gen
  * @define orderedParam the [[https://docs.mongodb.com/manual/reference/method/db.collection.insert/#perform-an-unordered-insert ordered]] behaviour
  * @define collationParam the collation
  * @define arrayFiltersParam an array of filter documents that determines which array elements to modify for an update operation on an array field
+ * @define hintParam the index to use (either the index name or the index document)
+ * @define maxTimeParam the time limit for processing operations on a cursor (`maxTimeMS`)
  */
 trait GenericCollection[P <: SerializationPack with Singleton]
   extends Collection with GenericCollectionWithCommands[P]
@@ -191,7 +193,7 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * @param selector $selectorParam (default: `None` to count all)
    * @param limit the maximum number of matching documents to count
    * @param skip the number of matching documents to skip before counting
-   * @param hint the index to use (either the index name or the index document)
+   * @param hint $hintParam
    */
   @deprecated("Use `count` with `readConcern` parameter", "0.16.0")
   def count[H](
@@ -488,7 +490,7 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * @param fields $fieldsParam
    * @param bypassDocumentValidation
    * @param writeConcern $writeConcernParam
-   * @param maxTime
+   * @param maxTime $maxTimeParam
    * @param collation $collationParam
    * @param arrayFilters $arrayFiltersParam
    * @param swriter $swriterParam
@@ -565,7 +567,7 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * @param writeConcern $writeConcernParam
    * @param swriter $swriterParam
    * @param writer $writerParam
-   * @param maxTime
+   * @param maxTime $maxTimeParam
    * @param collation $collationParam
    * @param arrayFilters $arrayFiltersParam
    */
@@ -627,7 +629,7 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * @param sort $sortParam
    * @param fields $fieldsParam
    * @param writeConcern $writeConcernParam
-   * @param maxTime
+   * @param maxTime $maxTimeParam
    * @param collation $collationParam
    * @param arrayFilters $arrayFiltersParam
    * @param swriter $swriterParam
@@ -705,6 +707,37 @@ trait GenericCollection[P <: SerializationPack with Singleton]
   @deprecated("Use aggregator context with optional writeConcern", "0.17.0")
   @inline def aggregatorContext[T](firstOperator: PipelineOperator, otherOperators: List[PipelineOperator], explain: Boolean, allowDiskUse: Boolean, bypassDocumentValidation: Boolean, readConcern: Option[ReadConcern], readPreference: ReadPreference, batchSize: Option[Int])(implicit reader: pack.Reader[T]): AggregatorContext[T] = aggregatorContext[T](firstOperator, otherOperators, explain, allowDiskUse, bypassDocumentValidation, readConcern, readPreference, this.writeConcern, batchSize, CursorOptions.empty)
 
+  @deprecated("Use aggregator context with comment", "0.19.8")
+  @inline def aggregatorContext[T](
+    firstOperator: PipelineOperator,
+    otherOperators: List[PipelineOperator] = Nil,
+    explain: Boolean = false,
+    allowDiskUse: Boolean = false,
+    bypassDocumentValidation: Boolean = false,
+    readConcern: Option[ReadConcern] = None,
+    readPreference: ReadPreference = ReadPreference.primary,
+    writeConcern: WriteConcern = this.writeConcern,
+    batchSize: Option[Int] = None,
+    cursorOptions: CursorOptions = CursorOptions.empty,
+    maxTimeMS: Option[Long] = None)(implicit reader: pack.Reader[T]): AggregatorContext[T] = {
+    new AggregatorContext[T](
+      firstOperator,
+      otherOperators,
+      explain,
+      allowDiskUse,
+      bypassDocumentValidation,
+      readConcern = readConcern.getOrElse(self.readConcern),
+      readPreference = readPreference,
+      writeConcern = writeConcern,
+      batchSize = batchSize,
+      cursorOptions = cursorOptions,
+      maxTime = maxTimeMS.map(FiniteDuration(_, "milliseconds")),
+      hint = None,
+      comment = None,
+      collation = None,
+      reader = reader)
+  }
+
   /**
    * [[http://docs.mongodb.org/manual/reference/command/aggregate/ Aggregates]] the matching documents.
    *
@@ -745,35 +778,44 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * @param writeConcern $writeConcernParam
    * @param batchSize $aggBatchSizeParam
    * @param cursorOptions the options for the result cursor
-   * @param maxTimeMS specifies a time limit in milliseconds for processing operations on a cursor.
+   * @param maxTime $maxTimeParam
+   * @param hint $hintParam
+   * @param comment the [[https://docs.mongodb.com/manual/reference/method/cursor.comment/#cursor.comment comment]] to annotation the aggregation command
+   * @param collation $collationParam
    * @param reader $readerParam
    * @param cp $cursorProducerParam
    */
   def aggregatorContext[T](
     firstOperator: PipelineOperator,
-    otherOperators: List[PipelineOperator] = Nil,
-    explain: Boolean = false,
-    allowDiskUse: Boolean = false,
-    bypassDocumentValidation: Boolean = false,
-    readConcern: Option[ReadConcern] = None,
-    readPreference: ReadPreference = ReadPreference.primary,
-    writeConcern: WriteConcern = this.writeConcern,
-    batchSize: Option[Int] = None,
-    cursorOptions: CursorOptions = CursorOptions.empty,
-    maxTimeMS: Option[Long] = None)(implicit reader: pack.Reader[T]): AggregatorContext[T] = {
+    otherOperators: List[PipelineOperator],
+    explain: Boolean,
+    allowDiskUse: Boolean,
+    bypassDocumentValidation: Boolean,
+    readConcern: ReadConcern,
+    readPreference: ReadPreference,
+    writeConcern: WriteConcern,
+    batchSize: Option[Int],
+    cursorOptions: CursorOptions,
+    maxTime: Option[FiniteDuration],
+    hint: Option[Hint[pack.type]],
+    comment: Option[String],
+    collation: Option[Collation])(implicit reader: pack.Reader[T]): AggregatorContext[T] = {
     new AggregatorContext[T](
       firstOperator,
       otherOperators,
       explain,
       allowDiskUse,
       bypassDocumentValidation,
-      readConcern.getOrElse(self.readConcern),
+      readConcern,
       writeConcern,
       readPreference,
       batchSize,
       cursorOptions,
-      maxTimeMS,
-      reader)
+      maxTime,
+      reader,
+      hint,
+      comment,
+      collation)
   }
 
   /**
@@ -842,7 +884,7 @@ trait GenericCollection[P <: SerializationPack with Singleton]
 
   /** The default read preference */
   @inline def readPreference: ReadPreference = db.defaultReadPreference
-  // TODO: Remove default value from this trait after next release
+  // TODO#1.1: Remove default value from this trait after next release
 
   /** The default read concern */
   @inline protected def readConcern = db.connection.options.readConcern

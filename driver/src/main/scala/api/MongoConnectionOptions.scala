@@ -363,7 +363,7 @@ object MongoConnectionOptions {
       "maxInFlightRequestsPerChannel" -> options.maxInFlightRequestsPerChannel.fold("<unlimited>")(_.toString),
       "heartbeatFrequencyMS" -> ms(options.heartbeatFrequencyMS),
       "connectTimeoutMS" -> ms(options.connectTimeoutMS),
-      "maxIdleTimeMS" -> ms(options.maxIdleTimeMS), // TODO: Review
+      "maxIdleTimeMS" -> ms(options.maxIdleTimeMS),
       "tcpNoDelay" -> options.tcpNoDelay.toString,
       "keepAlive" -> options.keepAlive.toString,
       "sslEnabled" -> options.sslEnabled.toString,

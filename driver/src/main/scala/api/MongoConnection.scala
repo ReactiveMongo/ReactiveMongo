@@ -18,6 +18,8 @@ package reactivemongo.api
 import scala.util.Try
 import scala.util.control.{ NonFatal, NoStackTrace }
 
+import scala.collection.immutable.ListSet
+
 import scala.concurrent.{ Await, ExecutionContext, Future, Promise }
 import scala.concurrent.duration.{ Duration, FiniteDuration }
 
@@ -162,7 +164,7 @@ class MongoConnection(
    * }}}
    */
   def close()(implicit timeout: FiniteDuration): Future[_] = whenActive {
-    ask(monitor, Close("MongoConnection.askClose"))(Timeout(timeout))
+    ask(monitor, Close("MongoConnection.askClose", timeout))(Timeout(timeout))
   }
 
   /** Returns true if the connection has not been killed. */
@@ -189,7 +191,7 @@ class MongoConnection(
 
     debug("Waiting is available...")
 
-    val timeoutFactor = 1.25D // TODO: Review
+    val timeoutFactor = 1.25D
     val timeout: FiniteDuration = (1 to failoverStrategy.retries).
       foldLeft(failoverStrategy.initialDelay) { (d, i) =>
         d + (failoverStrategy.initialDelay * (
@@ -282,7 +284,7 @@ class MongoConnection(
   private[api] lazy val monitor = actorSystem.actorOf(
     Props(new MonitorActor), s"Monitor-$name")
 
-  // TODO: Remove (use probe or DB.connectionState)
+  // TODO#1.1: Remove (use probe or DB.connectionState)
   @volatile private[api] var _metadata = Option.empty[ProtocolMetadata]
 
   private class MonitorActor extends Actor {
@@ -348,7 +350,7 @@ class MongoConnection(
         ()
       }
 
-      case Close(src) => {
+      case close @ Close(src) => {
         debug(s"Monitor received Close request from $src")
 
         killed = true
@@ -358,7 +360,7 @@ class MongoConnection(
         setAvailable = Promise.failed[ConnectionState](
           new Exception(s"[$lnm] Closing connection..."))
 
-        mongosystem ! Close("MonitorActor#Close")
+        mongosystem ! Close("MonitorActor#Close", close.timeout)
         waitingForClose += sender
 
         ()
@@ -412,13 +414,71 @@ object MongoConnection {
    * @param authenticate the authenticate information (see [[MongoConnectionOptions.authenticationMechanism]])
    */
   @com.github.ghik.silencer.silent(".*authenticate.*" /*deprecated*/ )
-  final case class ParsedURI(
-    hosts: List[(String, Int)], // TODO: ListSet
-    options: MongoConnectionOptions,
-    ignoredOptions: List[String],
-    db: Option[String],
-    @deprecated("Use `options.credentials`", "0.14.0") authenticate: Option[Authenticate])
-  // TODO: Type for URI with required DB name
+  sealed class ParsedURI(
+    private[api] val _hosts: ListSet[(String, Int)],
+    val options: MongoConnectionOptions,
+    val ignoredOptions: List[String],
+    val db: Option[String],
+    val authenticate: Option[Authenticate]) extends Product with Serializable {
+    // TODO: Type for URI with required DB name
+
+    @deprecated("Will return a ListSet", "0.19.8")
+    lazy val hosts = _hosts.toList
+
+    @deprecated("No longer a case class", "0.19.8")
+    val productArity = 5
+
+    @deprecated("No longer a case class", "0.19.8")
+    def productElement(n: Int): Any = n match {
+      case 0 => hosts
+      case 1 => options
+      case 2 => ignoredOptions
+      case 3 => db
+      case _ => authenticate
+    }
+
+    @deprecated("No longer a case class", "0.19.8")
+    def canEqual(that: Any): Boolean = that match {
+      case _: ParsedURI => true
+      case _            => false
+    }
+
+    override def equals(that: Any): Boolean = that match {
+      case other: ParsedURI => other.tupled == tupled
+      case _                => false
+    }
+
+    override def hashCode: Int = tupled.hashCode
+
+    private[api] lazy val tupled =
+      Tuple5(_hosts.toList, options, ignoredOptions, db, authenticate)
+
+  }
+
+  object ParsedURI extends scala.runtime.AbstractFunction5[List[(String, Int)], MongoConnectionOptions, List[String], Option[String], Option[Authenticate], ParsedURI] {
+    @com.github.ghik.silencer.silent(".*authenticate.*" /*deprecated*/ )
+    @deprecated("Use factory with ListSet", "0.19.8")
+    def apply(
+      hosts: List[(String, Int)],
+      options: MongoConnectionOptions,
+      ignoredOptions: List[String],
+      db: Option[String],
+      authenticate: Option[Authenticate]) = new ParsedURI(ListSet.empty ++ hosts, options, ignoredOptions, db, authenticate)
+
+    @com.github.ghik.silencer.silent(".*authenticate.*" /*deprecated*/ )
+    def apply(
+      hosts: ListSet[(String, Int)],
+      options: MongoConnectionOptions,
+      ignoredOptions: List[String],
+      db: Option[String],
+      @deprecated("Use `options.credentials`", "0.14.0") authenticate: Option[Authenticate]) = new ParsedURI(hosts, options, ignoredOptions, db, authenticate)
+
+    @deprecated("No longer a case class", "0.19.8")
+    def unapply(that: Any): Option[(List[(String, Int)], MongoConnectionOptions, List[String], Option[String], Option[Authenticate])] = that match {
+      case uri: ParsedURI => Some(uri.tupled)
+      case _              => None
+    }
+  }
 
   /**
    * Parses a [[http://docs.mongodb.org/manual/reference/connection-string/ connection URI]].
@@ -474,6 +534,7 @@ object MongoConnection {
             val serviceName = setSpec. // strip credentials before '@',
               drop(credentialEnd + 1).takeWhile(_ != '/') // and DB after '/'
 
+            // TODO: Future
             val records = Await.result(
               txtResolver(serviceName),
               reactivemongo.util.dnsTimeout)
@@ -509,11 +570,11 @@ object MongoConnection {
             val optsWithX509 = options.copy(credentials = Map(
               dbName -> MongoConnectionOptions.Credential("", None)))
 
-            ParsedURI(hosts.toList, optsWithX509, unsupportedKeys, db,
+            ParsedURI(hosts, optsWithX509, unsupportedKeys, db,
               Some(Authenticate(dbName, "", None)))
           }
 
-          case _ => ParsedURI(hosts.toList, options, unsupportedKeys, db, None)
+          case _ => ParsedURI(hosts, options, unsupportedKeys, db, None)
         }
       } else {
         val WithAuth = """([^:]+)(|:[^@]*)@(.+)""".r
@@ -542,7 +603,7 @@ object MongoConnection {
                   authDb -> MongoConnectionOptions.Credential(
                     user, password)))
 
-              ParsedURI(hosts.toList, optsWithCred, unsupportedKeys,
+              ParsedURI(hosts, optsWithCred, unsupportedKeys,
                 Some(database), Some(Authenticate(authDb, user, password)))
             }
           }
@@ -556,17 +617,19 @@ object MongoConnection {
   private def parseHosts(
     seedList: Boolean,
     hosts: String,
-    srvRecResolver: SRVRecordResolver): List[(String, Int)] = {
+    srvRecResolver: SRVRecordResolver): ListSet[(String, Int)] = {
     if (seedList) {
       import scala.concurrent.ExecutionContext.Implicits.global
 
-      Await.result(
+      ListSet.empty ++ Await.result(
         reactivemongo.util.srvRecords(hosts)(srvRecResolver),
         reactivemongo.util.dnsTimeout).toList
 
     } else {
-      hosts.split(",").map { h =>
-        h.span(_ != ':') match {
+      val buf = ListSet.newBuilder[(String, Int)]
+
+      hosts.split(",").foreach { h =>
+        val node = h.span(_ != ':') match {
           case ("", _) => throw new URIParsingException(
             s"No valid host in the URI: '$h'")
 
@@ -590,14 +653,18 @@ object MongoConnection {
           case _ => throw new URIParsingException(
             s"Could not parse host from URI: invalid definition '$h'")
         }
-      }.toList
+
+        buf += node
+      }
+
+      buf.result()
     }
   }
 
   private def parseHostsAndDbName(
     seedList: Boolean,
     input: String,
-    srvRecResolver: SRVRecordResolver): (Option[String], List[(String, Int)]) =
+    srvRecResolver: SRVRecordResolver): (Option[String], ListSet[(String, Int)]) =
     input.span(_ != '/') match {
       case (hosts, "") =>
         None -> parseHosts(seedList, hosts, srvRecResolver)

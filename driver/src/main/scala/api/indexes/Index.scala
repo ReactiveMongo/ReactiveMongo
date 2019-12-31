@@ -49,7 +49,7 @@ sealed abstract class Index extends Product with Serializable {
    * The index key (it can be composed of multiple fields).
    * This list should not be empty!
    */
-  def key: Seq[(String, IndexType)] = Seq.empty // TODO: Remove impl
+  def key: Seq[(String, IndexType)] = Seq.empty // TODO#1.1: Remove impl
 
   /**
    * The name of this index (default: `None`).
@@ -200,7 +200,7 @@ sealed abstract class Index extends Product with Serializable {
     case _        => false
   }
 
-  // TODO: Review after deprecation cleanup (include all fields)
+  // TODO#1.1: Review after deprecation cleanup (include all fields)
   override def equals(that: Any): Boolean = that match {
     case other: Index => tupled == other.tupled
     case _            => false
@@ -209,7 +209,7 @@ sealed abstract class Index extends Product with Serializable {
   override def hashCode: Int = tupled.hashCode
 }
 
-object Index { //extends scala.runtime.AbstractFunction9[Seq[(String, IndexType)], Option[String], Boolean, Boolean, Boolean, Boolean, Option[Int], Option[BSONDocument], BSONDocument, Index] {
+object Index extends scala.runtime.AbstractFunction9[Seq[(String, IndexType)], Option[String], Boolean, Boolean, Boolean, Boolean, Option[Int], Option[BSONDocument], BSONDocument, Index] {
   import reactivemongo.api.BSONSerializationPack
 
   type Aux[P] = Index { type Pack = P }

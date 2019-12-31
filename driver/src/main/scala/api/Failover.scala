@@ -95,8 +95,6 @@ private[reactivemongo] class Failover2[A](producer: () => Future[A], connection:
   import reactivemongo.core.errors._
   import reactivemongo.core.actors.Exceptions._
 
-  // TODO: Pass an explicit stack trace, to be able to raise with possible err
-
   private val lnm = s"${connection.supervisor}/${connection.name}" // log name
 
   /**

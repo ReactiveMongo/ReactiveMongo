@@ -14,12 +14,6 @@ final class QueryBuilderSpec extends org.specs2.mutable.Specification { specs =>
 
   "Boolean flag" should {
     "be set for" >> {
-      "maxScan" in {
-        b.maxScan must beFalse and {
-          b.maxScan(true).maxScan must beTrue
-        }
-      }
-
       "returnKey" in {
         b.returnKey must beFalse and {
           b.returnKey(true).returnKey must beTrue
@@ -71,6 +65,16 @@ final class QueryBuilderSpec extends org.specs2.mutable.Specification { specs =>
         b.min must beNone and {
           val doc = BSONDocument("min" -> 2)
           b.min(doc).min must beSome(doc)
+        }
+      }
+    }
+  }
+
+  "Numeric option" should {
+    "be set for" >> {
+      "maxScan" in {
+        b.maxScan must beNone and {
+          b.maxScan(1.23D).maxScan must beSome(1.23D)
         }
       }
     }

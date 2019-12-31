@@ -1378,7 +1378,7 @@ db.accounts.aggregate([
             BSONDocument(f"$$out" -> "ipsum"))))
     }
 
-    f"$$bucket" in {
+    f"be $$bucket" in {
       import aggregationFramework.{ Bucket, SumField }
 
       Bucket(
@@ -1396,7 +1396,7 @@ db.accounts.aggregate([
 
     }
 
-    f"$$collStats" in {
+    f"be $$collStats" in {
       import aggregationFramework.CollStats
 
       CollStats(
@@ -1409,7 +1409,7 @@ db.accounts.aggregate([
             "count" -> BSONDocument.empty))
     }
 
-    f"$$currentOp" in {
+    f"be $$currentOp" in {
       import aggregationFramework.CurrentOp
 
       CurrentOp().makePipe must_=== BSONDocument(f"$$currentOp" -> BSONDocument(
@@ -1443,7 +1443,7 @@ db.accounts.aggregate([
 
     }
 
-    f"$$listLocalSessions" in {
+    f"be $$listLocalSessions" in {
       import aggregationFramework.ListLocalSessions
 
       ListLocalSessions(BSONDocument("allUsers" -> true)).
@@ -1451,7 +1451,7 @@ db.accounts.aggregate([
           f"$$listLocalSessions" -> BSONDocument("allUsers" -> true))
     }
 
-    f"$$listSessions" in {
+    f"be $$listSessions" in {
       import aggregationFramework.ListSessions
 
       ListSessions(BSONDocument("allUsers" -> true)).
@@ -1459,7 +1459,7 @@ db.accounts.aggregate([
           f"$$listSessions" -> BSONDocument("allUsers" -> true))
     }
 
-    f"$$merge" in {
+    f"be $$merge" in {
       import aggregationFramework.Merge
 
       Merge(
@@ -1477,27 +1477,27 @@ db.accounts.aggregate([
 
     }
 
-    f"$$planCacheStats" in {
+    f"be $$planCacheStats" in {
       aggregationFramework.PlanCacheStats.makePipe must_=== BSONDocument(
         f"$$planCacheStats" -> BSONDocument.empty)
 
     }
 
-    f"$$replaceWith" in {
+    f"be $$replaceWith" in {
       import aggregationFramework.ReplaceWith
 
       ReplaceWith(BSONDocument("foo" -> 1)).makePipe must_=== BSONDocument(
         f"$$replaceWith" -> BSONDocument("foo" -> 1))
     }
 
-    f"$$set" in {
+    f"be $$set" in {
       import aggregationFramework.Set
 
       Set(BSONDocument("foo" -> 1)).makePipe must_=== BSONDocument(
         f"$$set" -> BSONDocument("foo" -> 1))
     }
 
-    f"$$sortByCount" in {
+    f"be $$sortByCount" in {
       import aggregationFramework.{ SortByCount, SortByFieldCount }
 
       val expected = BSONDocument(f"$$sortByCount" -> f"$$foo")
@@ -1507,7 +1507,7 @@ db.accounts.aggregate([
       }
     }
 
-    f"$$unset" in {
+    f"be $$unset" in {
       import aggregationFramework.Unset
 
       Unset("foo", List("bar", "lorem")).makePipe must_=== BSONDocument(
@@ -1515,7 +1515,7 @@ db.accounts.aggregate([
 
     }
 
-    f"$$sample" in {
+    f"be $$sample" in {
       import aggregationFramework.Sample
 
       Sample(2).makePipe must_=== BSONDocument(

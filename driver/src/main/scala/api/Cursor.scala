@@ -62,7 +62,6 @@ import reactivemongo.core.protocol.Response
  * @define sucDocParam The binary operator to be applied when the next document is successfully read
  */
 trait Cursor[T] extends CursorCompatAPI[T] {
-  // TODO: maxDocs; 0 for unlimited maxDocs
   import Cursor.{ ErrorHandler, FailOnError }
 
   /**
@@ -292,7 +291,16 @@ object Cursor {
   def Ignore[A](callback: A => Unit = (_: A) => {}): (Unit, A) => State[Unit] = { (_, a) => Cont(callback(a)) }
 
   /**
-   * Flattens the given future [[reactivemongo.api.Cursor]] to a [[reactivemongo.api.FlattenedCursor]].
+   * Flattens the given future [[reactivemongo.api.Cursor]]
+   * to a [[reactivemongo.api.FlattenedCursor]].
+   *
+   * {{{
+   * import scala.concurrent.Future
+   * import reactivemongo.api.Cursor
+   *
+   * def flatCursor[T](cursor: Future[Cursor[T]]): Cursor[T] =
+   *   Cursor.flatten(cursor)
+   * }}}
    */
   def flatten[T, C[_] <: Cursor[_]](future: Future[C[T]])(implicit fs: CursorFlattener[C]): C[T] = fs.flatten(future)
 

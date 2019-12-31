@@ -31,7 +31,7 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
     s"parse $simplest with success" in {
       parseURI(simplest) must beSuccessfulTry(
         ParsedURI(
-          hosts = List("host1" -> 27017),
+          hosts = ListSet("host1" -> 27017),
           db = None,
           authenticate = None,
           options = MongoConnectionOptions.default,
@@ -42,7 +42,7 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
 
     s"parse $withOpts with success" in {
       val expected = ParsedURI(
-        hosts = List("host1" -> 27017),
+        hosts = ListSet("host1" -> 27017),
         db = None,
         authenticate = None,
         options = MongoConnectionOptions.default,
@@ -66,7 +66,7 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
     s"parse $withPort with success" in {
       parseURI(withPort) must beSuccessfulTry(
         ParsedURI(
-          hosts = List("host1" -> 27018),
+          hosts = ListSet("host1" -> 27018),
           db = None,
           authenticate = None,
           options = MongoConnectionOptions.default,
@@ -87,7 +87,7 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
     s"parse $withDb with success" in {
       parseURI(withDb) must beSuccessfulTry(
         ParsedURI(
-          hosts = List("host1" -> 27017),
+          hosts = ListSet("host1" -> 27017),
           db = Some("somedb"),
           authenticate = None,
           options = MongoConnectionOptions.default,
@@ -98,7 +98,7 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
     s"parse $withAuth with success" in {
       parseURI(withAuth) must beSuccessfulTry(
         ParsedURI(
-          hosts = List("host1" -> 27017),
+          hosts = ListSet("host1" -> 27017),
           db = Some("somedb"),
           authenticate = Some(Authenticate("somedb", "user123", Some("passwd123"))),
           options = MongoConnectionOptions.default.copy(credentials = Map(
@@ -116,7 +116,7 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
     s"parse $fullFeatured with success" in {
       parseURI(fullFeatured) must beSuccessfulTry(
         ParsedURI(
-          hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
+          hosts = ListSet("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
           db = Some("somedb"),
           authenticate = Some(Authenticate("somedb", "user123", Some("passwd123"))),
           options = MongoConnectionOptions.default.copy(
@@ -131,7 +131,7 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
     s"parse $scramSha256 with success" in {
       parseURI(scramSha256) must beSuccessfulTry(
         ParsedURI(
-          hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
+          hosts = ListSet("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
           db = Some("somedb"),
           authenticate = Some(Authenticate("somedb", "user123", Some("passwd123"))),
           options = MongoConnectionOptions.default.copy(
@@ -146,7 +146,7 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
     s"parse $withAuthParamAndSource with success" in {
       parseURI(withAuthParamAndSource) must beSuccessfulTry(
         ParsedURI(
-          hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
+          hosts = ListSet("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
           db = Some("somedb"),
           authenticate = Some(Authenticate(
             "authdb", "user123", Some(";qGu:je/LX}nN\\8"))),
@@ -162,7 +162,7 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
     s"parse $withAuthModeX509WithNoUser with success" in {
       parseURI(withAuthModeX509WithNoUser) must beSuccessfulTry(
         ParsedURI(
-          hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
+          hosts = ListSet("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
           db = Some("somedb"),
           authenticate = Some(Authenticate("somedb", "", None)),
           options = MongoConnectionOptions.default.copy(
@@ -176,7 +176,7 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
     s"parse $withAuthModeX509WithUser with success" in {
       parseURI(withAuthModeX509WithUser) must beSuccessfulTry(
         ParsedURI(
-          hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
+          hosts = ListSet("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
           db = Some("somedb"),
           authenticate = Some(Authenticate("somedb", "username@test.com,CN=127.0.0.1,OU=TEST_CLIENT,O=TEST_CLIENT,L=LONDON,ST=LONDON,C=UK", None)),
           options = MongoConnectionOptions.default.copy(
@@ -190,7 +190,7 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
 
     s"parse $withWriteConcern with success" in {
       parseURI(withWriteConcern) must beSuccessfulTry(ParsedURI(
-        hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
+        hosts = ListSet("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
         db = Some("somedb"),
         authenticate = Some(Authenticate("somedb", "user123", Some("passwd123"))),
         options = MongoConnectionOptions.default.copy(
@@ -204,7 +204,7 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
 
     s"parse $withWriteConcernWMaj with success" in {
       parseURI(withWriteConcernWMaj) must beSuccessfulTry(ParsedURI(
-        hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
+        hosts = ListSet("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
         db = Some("somedb"),
         authenticate = Some(Authenticate("somedb", "user123", Some("passwd123"))),
         options = MongoConnectionOptions.default.copy(
@@ -219,7 +219,7 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
 
     s"parse $withWriteConcernWTag with success" in {
       parseURI(withWriteConcernWTag) must beSuccessfulTry(ParsedURI(
-        hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
+        hosts = ListSet("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
         db = Some("somedb"),
         authenticate = Some(Authenticate("somedb", "user123", Some("passwd123"))),
         options = MongoConnectionOptions.default.copy(
@@ -234,7 +234,7 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
 
     s"parse $withWriteConcernWAck with success" in {
       parseURI(withWriteConcernWAck) must beSuccessfulTry(ParsedURI(
-        hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
+        hosts = ListSet("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
         db = Some("somedb"),
         authenticate = Some(Authenticate("somedb", "user123", Some("passwd123"))),
         options = MongoConnectionOptions.default.copy(
@@ -251,7 +251,7 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
     s"parse $withWriteConcernJournaled with success" in {
       parseURI(withWriteConcernJournaled) must beSuccessfulTry(
         ParsedURI(
-          hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
+          hosts = ListSet("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
           db = Some("somedb"),
           authenticate = Some(Authenticate("somedb", "user123", Some("passwd123"))),
           options = MongoConnectionOptions.default.copy(
@@ -266,7 +266,7 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
     s"parse $withWriteConcernNJ with success" in {
       parseURI(withWriteConcernNJ) must beSuccessfulTry(
         ParsedURI(
-          hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
+          hosts = ListSet("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
           db = Some("somedb"),
           authenticate = Some(Authenticate("somedb", "user123", Some("passwd123"))),
           options = MongoConnectionOptions.default.copy(
@@ -281,7 +281,7 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
     s"parse $withWriteConcernTmout with success" in {
       parseURI(withWriteConcernTmout) must beSuccessfulTry(
         ParsedURI(
-          hosts = List("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
+          hosts = ListSet("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
           db = Some("somedb"),
           authenticate = Some(Authenticate("somedb", "user123", Some("passwd123"))),
           options = MongoConnectionOptions.default.copy(
@@ -514,7 +514,7 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
           }
         })) must beSuccessfulTry(
           ParsedURI(
-            hosts = List("mongo1.domain.tld" -> 27017),
+            hosts = ListSet("mongo1.domain.tld" -> 27017),
             db = Some("somedb"),
             authenticate = Some(
               Authenticate("admin", "user123", Some("passwd123"))),

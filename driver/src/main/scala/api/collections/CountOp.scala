@@ -44,7 +44,7 @@ private[api] trait CountOp[P <: SerializationPack with Singleton] {
   // TODO: Unit test
   private def commandWriter: pack.Writer[CountCmd] = {
     val builder = pack.newBuilder
-    val session = collection.db.session.filter( // TODO: Remove
+    val session = collection.db.session.filter( // TODO#1.1: Remove
       _ => (version.compareTo(MongoWireVersion.V36) >= 0))
 
     val writeReadConcern =

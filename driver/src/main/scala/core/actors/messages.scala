@@ -1,6 +1,7 @@
 package reactivemongo.core.actors
 
 import scala.concurrent.{ Future, Promise }
+import scala.concurrent.duration.FiniteDuration
 
 import reactivemongo.api.ReadPreference
 
@@ -99,6 +100,9 @@ case class CheckedWriteRequestExpectingResponse(
 @deprecated(message = "Internal: will be made private", since = "0.12.8")
 sealed class Close {
   def source: String = "unknown"
+
+  private[reactivemongo] def timeout: FiniteDuration =
+    FiniteDuration(10, "seconds")
 }
 
 /**
@@ -107,8 +111,17 @@ sealed class Close {
  */
 @deprecated("Internal: will be made private", "0.16.0")
 case object Close extends Close {
+  @deprecated("Will be removed", "0.19.8")
   def apply(src: String): Close = new Close {
     override val source = src
+  }
+
+  def apply(src: String, timeout: FiniteDuration): Close = {
+    def t = timeout
+    new Close {
+      override val source = src
+      override val timeout = t
+    }
   }
 
   def unapply(msg: Close): Option[String] = Some(msg.source)

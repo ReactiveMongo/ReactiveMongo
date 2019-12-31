@@ -108,7 +108,7 @@ trait DBMetaCommands { self: DB =>
         self, ListCollectionNames, ReadPreference.primary).map(_.names)
 
     } else {
-      // TODO: Remove (MongoDB 2.6-)
+      // TODO#1.1: Remove (MongoDB 2.6-)
       implicit def producer = Serialization.defaultCollectionProducer
 
       val coll = producer(self, "system.namespaces", self.failoverStrategy)

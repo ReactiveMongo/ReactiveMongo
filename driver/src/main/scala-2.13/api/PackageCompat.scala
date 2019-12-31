@@ -1,4 +1,4 @@
 package reactivemongo.api
 
-// TODO: Remove after release 1.0
+// TODO#1.1: Remove after release 1.0
 private[api] trait PackageCompat {}

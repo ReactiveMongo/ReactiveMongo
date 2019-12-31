@@ -83,7 +83,7 @@ private[api] trait DistinctOp[P <: SerializationPack with Singleton] extends Dis
 
   private def commandWriter: pack.Writer[DistinctCmd] = {
     val builder = pack.newBuilder
-    val session = collection.db.session.filter( // TODO: Remove
+    val session = collection.db.session.filter( // TODO#1.1: Remove
       _ => (version.compareTo(MongoWireVersion.V36) >= 0))
 
     val writeReadConcern =

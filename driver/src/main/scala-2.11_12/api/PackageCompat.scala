@@ -10,7 +10,7 @@ import reactivemongo.bson.{ BSONDocument => LegacyDocument }
 
 import play.api.libs.iteratee.{ Enumeratee, Iteratee }
 
-// TODO: Remove after release 1.0
+// TODO#1.1: Remove after release 1.0
 private[api] trait PackageCompat {
   @deprecated("Use reactivemongo-bson-api", "0.19.0") /*implicit */
   implicit def toDocumentIteratorIteratee[T](it: Iteratee[Iterator[LegacyDocument], T])(implicit ec: ExecutionContext): Iteratee[Iterator[BSONDocument], T] =

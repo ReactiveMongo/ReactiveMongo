@@ -27,6 +27,7 @@ import reactivemongo.api.{
   CursorProducer,
   DB,
   DBMetaCommands,
+  FailingCursor,
   FailoverStrategy,
   QueryOpts,
   ReadPreference,
@@ -120,13 +121,16 @@ sealed trait GridFS[P <: SerializationPack]
    *     BSONDocument("filename" -> n)).headOption
    * }}}
    */
-  def find[S, Id <: pack.Value](selector: S)(implicit w: pack.Writer[S], r: FileReader[Id], cp: CursorProducer[ReadFile[Id]]): cp.ProducedCursor = {
-    val q = pack.serialize(selector, w) // TODO: Unsafe, failed cursor?
+  def find[S, Id <: pack.Value](selector: S)(implicit w: pack.Writer[S], r: FileReader[Id], cp: CursorProducer[ReadFile[Id]]): cp.ProducedCursor = try {
+    val q = pack.serialize(selector, w)
     val query = new QueryBuilder(fileColl, db.failoverStrategy, Some(q), None)
 
     import r.reader
 
     query.cursor[ReadFile[Id]](defaultReadPreference)
+  } catch {
+    case NonFatal(cause) =>
+      FailingCursor(db.connection, cause)
   }
 
   /**

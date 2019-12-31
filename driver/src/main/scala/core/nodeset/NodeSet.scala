@@ -80,7 +80,7 @@ case class NodeSet(
         con.status == ConnectionStatus.Connected) => node -> con
     }
 
-  // TODO: Remove when deprecated `pick` is also removed
+  // TODO#1.1: Remove when deprecated `pick` is also removed
   private val nodeDummyOrdering = Ordering.by[Node, String](_.name)
 
   @deprecated("", "")

@@ -183,7 +183,7 @@ class AsyncDriver(
         }
 
       askConnection(
-        parsedURI.hosts.map(h => h._1 + ':' + h._2),
+        parsedURI._hosts.map(h => h._1 + ':' + h._2).toSeq,
         parsedURI.options.copy(credentials = credentials),
         name)
     }

@@ -977,11 +977,10 @@ trait MongoDBSystem extends Actor {
       ()
     }
 
-  // TODO: Remove with MongoDB 2.6 end of support
+  // TODO#1.1: Remove with MongoDB 2.6 end of support
   private def onMongo26Write(
     response: Response, promise: Promise[Response]): Unit = {
 
-    // TODO - logs, bson
     // MongoDB 26 Write Protocol errors
     trace(s"Received a response to a MongoDB2.6 Write Op")
 

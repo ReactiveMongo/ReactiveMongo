@@ -15,7 +15,7 @@ class PingInfo(
   private[core] val channelId: Option[ChannelId],
   private[core] val firstSent: Boolean) extends Product3[Long, Long, Int] with Serializable {
 
-  // TODO: Remove
+  // TODO#1.1: Remove
   def this(
     ping: Long,
     lastIsMasterTime: Long,
@@ -27,7 +27,7 @@ class PingInfo(
   @inline def _2 = lastIsMasterTime
   @inline def _3 = lastIsMasterId
 
-  // TODO: Remove
+  // TODO#1.1: Remove
   @inline def copy(
     ping: Long,
     lastIsMasterTime: Long,

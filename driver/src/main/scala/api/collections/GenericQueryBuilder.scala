@@ -84,10 +84,10 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
 
   def maxTimeMsOption: Option[Long]
 
-  // TODO: Remove
+  // TODO#1.1: Remove
   private var _readConcern: ReadConcern = ReadConcern.default
   private var _singleBatch: Boolean = false
-  private var _maxScan: Boolean = false
+  private var _maxScan = Option.empty[Double]
   private var _returnKey: Boolean = false
   private var _showRecordId: Boolean = false
   private var _min = Option.empty[pack.Document]
@@ -100,7 +100,11 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
    */
   @inline def singleBatch: Boolean = _singleBatch
 
-  @inline def maxScan: Boolean = _maxScan
+  /**
+   * This option specifies a maximum number of documents
+   * or index keys the query plan will scan.
+   */
+  @inline def maxScan: Option[Double] = _maxScan
 
   /**
    * If this flag is true, returns only the index keys
@@ -265,7 +269,7 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
 
   @deprecated("Use `filter`", "0.18.2")
   def query[Qry](selector: Qry)(implicit writer: pack.Writer[Qry]): Self =
-    copy(queryOption = Some(pack.serialize(selector, writer))) // TODO: ser
+    copy(queryOption = Some(pack.serialize(selector, writer)))
 
   @deprecated("Use `filter`", "0.18.2")
   def query(selector: pack.Document): Self = copy(queryOption = Some(selector))
@@ -372,9 +376,9 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
   }
 
   /** Sets the `maxScan` flag. */
-  def maxScan(flag: Boolean): Self = {
+  def maxScan(max: Double): Self = {
     val upd = copy()
-    upd._maxScan = flag
+    upd._maxScan = Some(max)
     upd
   }
 
@@ -564,12 +568,15 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
         element("noCursorTimeout", boolean(noTimeout)),
         element("allowPartialResults", boolean(partial)),
         element("singleBatch", boolean(singleBatch)),
-        element("maxScan", boolean(maxScan)),
         element("returnKey", boolean(returnKey)),
         element("showRecordId", boolean(showRecordId)))
 
       if (version.compareTo(MongoWireVersion.V34) < 0) {
         elements += element("snapshot", boolean(snapshotFlag))
+      }
+
+      maxScan.foreach { max =>
+        elements += element("maxScan", builder.double(max))
       }
 
       queryOption.foreach {
@@ -616,7 +623,7 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
         elements += element("collation", writeCollation(c))
       }
 
-      val session = collection.db.session.filter( // TODO: Remove
+      val session = collection.db.session.filter( // TODO#1.1: Remove
         _ => (version.compareTo(MongoWireVersion.V36) >= 0))
 
       elements ++= CommandCodecs.writeSessionReadConcern(
