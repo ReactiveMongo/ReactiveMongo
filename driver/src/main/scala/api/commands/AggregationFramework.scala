@@ -123,14 +123,20 @@ trait AggregationFramework[P <: SerializationPack]
 
     import builder.{ document, elementProducer => element }
 
-    // TODO: Refactor with builder
-    val makePipe: pack.Document = pipe(f"$$bucketAuto", document(Seq(
-      Some(element("groupBy", groupBy)),
-      Some(element("buckets", builder.int(buckets))),
-      granularity.map { g => element("granularity", builder.string(g)) },
-      Some(element("output", document(output.map({
-        case (field, op) => element(field, op.makeFunction)
-      }))))).flatten))
+    val makePipe: pack.Document = {
+      val opts = Seq.newBuilder[pack.ElementProducer] ++= Seq(
+        element("groupBy", groupBy),
+        element("buckets", builder.int(buckets)),
+        element("output", document(output.map({
+          case (field, op) => element(field, op.makeFunction)
+        }))))
+
+      granularity.foreach { g =>
+        opts += element("granularity", builder.string(g))
+      }
+
+      pipe(f"$$bucketAuto", document(opts.result()))
+    }
   }
 
   /**
@@ -858,7 +864,7 @@ trait AggregationFramework[P <: SerializationPack]
    */
   final class ChangeStream(
     resumeAfter: Option[pack.Value] = None,
-    startAtOperationTime: Option[pack.Value] = None, // TODO restrict to something more like a timestamp?
+    startAtOperationTime: Option[pack.Value] = None, // TODO#1.1: restrict to something more like a timestamp?
     fullDocumentStrategy: Option[ChangeStreams.FullDocumentStrategy] = None) extends PipelineOperator {
 
     def makePipe: pack.Document = pipe(f"$$changeStream", builder.document(Seq(

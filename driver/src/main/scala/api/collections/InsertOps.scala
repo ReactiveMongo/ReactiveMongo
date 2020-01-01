@@ -20,11 +20,10 @@ import reactivemongo.api.commands.{
 /**
  * @define writeConcernParam the [[https://docs.mongodb.com/manual/reference/write-concern/ writer concern]] to be used
  * @define orderedParam the [[https://docs.mongodb.com/manual/reference/method/db.collection.insert/#perform-an-unordered-insert ordered]] behaviour
+ * @define bypassDocumentValidationParam the flag to bypass document validation during the operation
  */
 trait InsertOps[P <: SerializationPack with Singleton] {
   collection: GenericCollection[P] =>
-
-  // TODO: bypassDocumentValidation: bool
 
   private object InsertCommand
     extends reactivemongo.api.commands.InsertCommand[collection.pack.type] {
@@ -33,25 +32,59 @@ trait InsertOps[P <: SerializationPack with Singleton] {
 
   /**
    * @param ordered $orderedParam
-   * @param writeConcern writeConcernParam
+   * @param writeConcern $writeConcernParam
+   * @param bypassDocumentValidation $bypassDocumentValidationParam
    */
   private[reactivemongo] final def prepareInsert(
     ordered: Boolean,
-    writeConcern: WriteConcern): InsertBuilder = {
+    writeConcern: WriteConcern,
+    bypassDocumentValidation: Boolean): InsertBuilder = {
     if (ordered) {
-      new OrderedInsert(writeConcern)
+      new OrderedInsert(writeConcern, bypassDocumentValidation)
     } else {
-      new UnorderedInsert(writeConcern)
+      new UnorderedInsert(writeConcern, bypassDocumentValidation)
     }
   }
 
   private type InsertCmd = ResolvedCollectionCommand[InsertCommand.Insert]
 
   implicit private lazy val insertWriter: pack.Writer[InsertCmd] = {
-    val underlying = reactivemongo.api.commands.InsertCommand.
-      writer(pack)(InsertCommand)(collection.db.session)
+    val builder = pack.newBuilder
+    val writeWriteConcern = CommandCodecs.writeWriteConcern(pack)
+    val writeSession = CommandCodecs.writeSession(builder)
+    val session = collection.db.session
 
-    pack.writer[InsertCmd](underlying)
+    import builder.{ elementProducer => element }
+
+    pack.writer[InsertCmd] { insert =>
+      import insert.command
+
+      val documents = builder.array(command.head, command.tail)
+      val ordered = builder.boolean(command.ordered)
+      val elements = Seq.newBuilder[pack.ElementProducer]
+
+      elements ++= Seq[pack.ElementProducer](
+        element("insert", builder.string(insert.collection)),
+        element("ordered", ordered),
+        element("documents", documents),
+        element(
+          "bypassDocumentValidation",
+          builder.boolean(command.bypassDocumentValidation)))
+
+      session.foreach { s =>
+        elements ++= writeSession(s)
+      }
+
+      if (!session.exists(_.transaction.isSuccess)) {
+        // writeConcern is not allowed within a multi-statement transaction
+        // code=72
+
+        elements += element(
+          "writeConcern", writeWriteConcern(command.writeConcern))
+      }
+
+      builder.document(elements.result())
+    }
   }
 
   /** Builder for insert operations. */
@@ -68,7 +101,7 @@ trait InsertOps[P <: SerializationPack with Singleton] {
       val emptyCmd = ResolvedCollectionCommand(
         collection.name,
         InsertCommand.Insert(
-          emptyDoc, Seq.empty[pack.Document], ordered, writeConcern))
+          emptyDoc, Seq.empty[pack.Document], ordered, writeConcern, false))
 
       val doc = pack.serialize(emptyCmd, insertWriter)
 
@@ -80,6 +113,9 @@ trait InsertOps[P <: SerializationPack with Singleton] {
 
     /** $writeConcernParam */
     def writeConcern: WriteConcern
+
+    /** $bypassDocumentValidationParam (default: `false`) */
+    def bypassDocumentValidation: Boolean
 
     protected def bulkRecover: Option[Exception => Future[WriteResult]]
 
@@ -154,7 +190,8 @@ trait InsertOps[P <: SerializationPack with Singleton] {
       case Some(head) => {
         if (metadata.maxWireVersion >= MongoWireVersion.V26) {
           val cmd = InsertCommand.Insert(
-            head, documents.tail, ordered, writeConcern)
+            head, documents.tail, ordered, writeConcern,
+            bypassDocumentValidation)
 
           runCommand(cmd, writePreference).flatMap { wr =>
             val flattened = wr.flatten
@@ -182,7 +219,8 @@ trait InsertOps[P <: SerializationPack with Singleton] {
   private val orderedRecover = Option.empty[Exception => Future[WriteResult]]
 
   private final class OrderedInsert(
-    val writeConcern: WriteConcern) extends InsertBuilder {
+    val writeConcern: WriteConcern,
+    val bypassDocumentValidation: Boolean) extends InsertBuilder {
 
     val ordered = true
     val bulkRecover = orderedRecover
@@ -209,7 +247,8 @@ trait InsertOps[P <: SerializationPack with Singleton] {
     }
 
   private final class UnorderedInsert(
-    val writeConcern: WriteConcern) extends InsertBuilder {
+    val writeConcern: WriteConcern,
+    val bypassDocumentValidation: Boolean) extends InsertBuilder {
 
     val ordered = false
     val bulkRecover = unorderedRecover

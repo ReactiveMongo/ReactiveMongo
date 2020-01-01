@@ -82,7 +82,7 @@ trait CommandResultMaker[Result] {
             doc
 
           case Some(doc: reactivemongo.bson.BSONDocument) =>
-            pack.document(doc) // TODO: Remove after release 1.0
+            pack.document(doc) // TODO#1.1: Remove after release 1.0
 
           case _ => throw cause
         }

@@ -270,7 +270,7 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    */
   @deprecated("Use `.insert(ordered = false).one(..)`", "0.16.1")
   def insert[T](document: T, writeConcern: WriteConcern = writeConcern)(implicit writer: pack.Writer[T], ec: ExecutionContext): Future[WriteResult] =
-    prepareInsert(true, writeConcern).one(document)
+    prepareInsert(true, writeConcern, false).one(document)
 
   /**
    * Returns an unordered builder for insert operations.
@@ -294,7 +294,7 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    *   coll.insert.many(multiInserts)
    * }}}
    */
-  def insert: InsertBuilder = prepareInsert(false, writeConcern)
+  def insert: InsertBuilder = prepareInsert(false, writeConcern, false)
 
   /**
    * Returns a builder for insert operations.
@@ -319,7 +319,7 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * }}}
    */
   def insert(ordered: Boolean): InsertBuilder =
-    prepareInsert(ordered, writeConcern)
+    prepareInsert(ordered, writeConcern, false)
 
   /**
    * Returns a builder for insert operations.
@@ -332,15 +332,44 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * {{{
    * import scala.concurrent.ExecutionContext
    *
+   * import reactivemongo.api.WriteConcern
    * import reactivemongo.api.bson.BSONDocument
    * import reactivemongo.api.bson.collection.BSONCollection
    *
    * def withDefaultWriteConcern(coll: BSONCollection, query: BSONDocument)(
-   *   implicit ec: ExecutionContext) = coll.insert(true).one(query)
+   *   implicit ec: ExecutionContext) =
+   *   coll.insert(true, WriteConcern.Journaled).one(query)
    * }}}
    */
   def insert(ordered: Boolean, writeConcern: WriteConcern): InsertBuilder =
-    prepareInsert(ordered, writeConcern)
+    prepareInsert(ordered, writeConcern, false)
+
+  /**
+   * Returns a builder for insert operations.
+   *
+   * @tparam T The type of the document to insert. $implicitWriterT.
+   *
+   * @param ordered $orderedParam
+   * @param writeConcern $writeConcernParam
+   * @param bypassDocumentValidation the flag to bypass document validation during the operation
+   *
+   * {{{
+   * import scala.concurrent.ExecutionContext
+   *
+   * import reactivemongo.api.WriteConcern
+   * import reactivemongo.api.bson.BSONDocument
+   * import reactivemongo.api.bson.collection.BSONCollection
+   *
+   * def withDefaultWriteConcern(coll: BSONCollection, query: BSONDocument)(
+   *   implicit ec: ExecutionContext) =
+   *   coll.insert(true, WriteConcern.Journaled, true).one(query)
+   * }}}
+   */
+  def insert(
+    ordered: Boolean,
+    writeConcern: WriteConcern,
+    bypassDocumentValidation: Boolean): InsertBuilder =
+    prepareInsert(ordered, writeConcern, bypassDocumentValidation)
 
   /**
    * Updates one or more documents matching the given selector

@@ -80,11 +80,11 @@ trait SerializationPack extends SerializationPackCompat { self: Singleton =>
 
   @com.github.ghik.silencer.silent
   private[reactivemongo] def bsonSize(value: Value): Int = -1
-  // TODO: Remove the default value after release
+  // TODO#1.1: Remove the default value after release
 
-  private[reactivemongo] def newBuilder: SerializationPack.Builder[self.type] = null // TODO: Remove the default value after release
+  private[reactivemongo] def newBuilder: SerializationPack.Builder[self.type] = null // TODO#1.1: Remove the default value after release
 
-  private[reactivemongo] def newDecoder: SerializationPack.Decoder[self.type] = null // TODO: Remove the default value after release
+  private[reactivemongo] def newDecoder: SerializationPack.Decoder[self.type] = null // TODO#1.1: Remove the default value after release
 
   private[reactivemongo] def pretty(doc: Document): String = doc.toString
 }

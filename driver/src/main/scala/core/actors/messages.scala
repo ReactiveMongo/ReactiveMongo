@@ -20,12 +20,12 @@ import reactivemongo.core.nodeset.ProtocolMetadata
  * The future can be used to get the error or the successful response.
  */
 @deprecated("Internal: will be made private", "0.16.0")
-sealed trait ExpectingResponse { // TODO: Merge with RequestMakerExpectingResponse once CheckedWriteRequestExpectingResponse is removed
-  // TODO: final
+sealed trait ExpectingResponse { // TODO#1.1: Merge with RequestMakerExpectingResponse once CheckedWriteRequestExpectingResponse is removed
+  // TODO#1.1: final
   private[actors] val promise: Promise[Response] = Promise()
 
   /** The future response of this request. */
-  val future: Future[Response] = promise.future // TODO: final
+  val future: Future[Response] = promise.future // TODO#1.1: final
 
   private[reactivemongo] def pinnedNode: Option[String] = None
 }
@@ -230,7 +230,6 @@ object SetAvailable extends scala.runtime.AbstractFunction1[ProtocolMetadata, Se
   }
 }
 
-// TODO
 @deprecated("Internal: will be made private", "0.16.0")
 case object SetUnavailable
 

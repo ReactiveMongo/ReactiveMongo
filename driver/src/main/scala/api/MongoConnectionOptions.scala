@@ -68,7 +68,7 @@ class MongoConnectionOptions private[reactivemongo] (
   @deprecated("Use heartbeatFrequencyMS", "0.16.4")
   @inline def monitorRefreshMS = heartbeatFrequencyMS
 
-  // TODO: Expose?
+  // TODO#1.1: Expose?
   @inline private[reactivemongo] def minIdleChannelsPerNode: Int = 1
 
   @deprecated("Use the other `copy`", "0.17.0")
