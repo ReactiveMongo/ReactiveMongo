@@ -59,6 +59,7 @@ trait InsertCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] {
   }
 
   object Insert {
+    @deprecated("Use factory with bypassDocumentValidation", "0.19.8")
     def apply(
       head: pack.Document,
       tail: Seq[pack.Document],
@@ -74,6 +75,7 @@ trait InsertCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] {
       bypassDocumentValidation: Boolean): Insert =
       new Insert(head, tail, ordered, writeConcern, bypassDocumentValidation)
 
+    @deprecated("No longer a case class", "0.19.8")
     def unapply(that: Any): Option[(pack.Document, Seq[pack.Document], Boolean, WriteConcern)] = that match {
       case other: Insert => Option(other).map(_.tupled)
       case _             => None

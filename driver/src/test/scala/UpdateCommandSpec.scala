@@ -100,9 +100,11 @@ final class UpdateCommandSpec extends org.specs2.mutable.Specification {
   private lazy val update1 = ResolvedCollectionCommand(
     collection = "foo",
     command = Command.Update(
-      updates = Seq(elements1, elements2),
       ordered = true,
-      writeConcern = WC.Default))
+      writeConcern = WC.Default,
+      bypassDocumentValidation = false,
+      firstUpdate = elements1,
+      updates = elements2))
 
   private object Command extends UpdateCommand[BSONSerializationPack.type] {
     val pack = BSONSerializationPack

@@ -11,13 +11,49 @@ import reactivemongo.api.{ Session, SerializationPack }
 trait UpdateCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] {
   val pack: P
 
-  case class Update( // TODO: bypassDocumentValidation: bool
-    @deprecatedName(Symbol("documents")) updates: Seq[UpdateElement],
-    ordered: Boolean,
-    writeConcern: WriteConcern) extends CollectionCommand with CommandWithResult[UpdateResult] with Mongo26WriteCommand {
+  sealed class Update(
+    val firstUpdate: UpdateElement,
+    val updates: Seq[UpdateElement],
+    val ordered: Boolean,
+    val writeConcern: WriteConcern,
+    val bypassDocumentValidation: Boolean) extends CollectionCommand with CommandWithResult[UpdateResult] with Mongo26WriteCommand with Serializable with Product {
+    @deprecated("Use constructor with bypassDocumentValidation", "0.19.8")
+    def this(
+      updates: Seq[UpdateElement],
+      ordered: Boolean,
+      writeConcern: WriteConcern) = this(
+      updates.head, updates.tail, ordered, writeConcern, false)
 
     @deprecated(message = "Use [[updates]]", since = "0.12.7")
     def documents = updates
+
+    @deprecated("No longer a case class", "0.19.8")
+    val productArity = 3
+
+    @deprecated("No longer a case class", "0.19.8")
+    def productElement(n: Int): Any = n match {
+      case 0 => updates
+      case 1 => ordered
+      case 2 => writeConcern
+      case _ => bypassDocumentValidation
+    }
+
+    @deprecated("No longer a case class", "0.19.8")
+    def canEqual(that: Any): Boolean = that match {
+      case _: Update => true
+      case _         => false
+    }
+
+    // TODO#1.1: All fields after release
+    private[commands] lazy val tupled = Tuple3(updates, ordered, writeConcern)
+
+    override def equals(that: Any): Boolean = that match {
+      case other: Update => other.tupled == this.tupled
+      case _             => false
+    }
+
+    @inline override def hashCode: Int = tupled.hashCode
+
   }
 
   type UpdateResult = UpdateWriteResult
@@ -80,14 +116,47 @@ trait UpdateCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] {
   }
 
   object Update {
-    def apply(firstUpdate: UpdateElement, updates: UpdateElement*): Update =
-      apply()(firstUpdate, updates: _*)
+    @deprecated("Use factory with bypassDocumentValidation", "0.19.8")
+    def apply(
+      @deprecatedName(Symbol("documents")) updates: Seq[UpdateElement],
+      ordered: Boolean,
+      writeConcern: WriteConcern): Update =
+      new Update(updates, ordered, writeConcern)
 
-    def apply(ordered: Boolean = true, writeConcern: WriteConcern = WriteConcern.Default)(firstUpdate: UpdateElement, updates: UpdateElement*): Update =
-      Update(
+    @deprecated("Use factory with bypassDocumentValidation", "0.19.8")
+    def apply(firstUpdate: UpdateElement, updates: UpdateElement*): Update =
+      new Update(
         firstUpdate +: updates,
+        ordered = true,
+        writeConcern = WriteConcern.Default)
+
+    @deprecated("Use factory with bypassDocumentValidation", "0.19.8")
+    def apply(ordered: Boolean = true, writeConcern: WriteConcern = WriteConcern.Default)(firstUpdate: UpdateElement, updates: UpdateElement*): Update =
+      new Update(
+        firstUpdate,
+        updates,
         ordered,
-        writeConcern)
+        writeConcern,
+        bypassDocumentValidation = false)
+
+    def apply(
+      ordered: Boolean,
+      writeConcern: WriteConcern,
+      bypassDocumentValidation: Boolean,
+      firstUpdate: UpdateElement,
+      updates: UpdateElement*): Update =
+      new Update(
+        firstUpdate,
+        updates,
+        ordered,
+        writeConcern,
+        bypassDocumentValidation)
+
+    @deprecated("No longer a case class", "0.19.8")
+    def unapply(that: Any): Option[(Seq[UpdateElement], Boolean, WriteConcern)] = that match {
+      case up: Update => Option(up).map(_.tupled)
+      case _          => None
+    }
   }
 }
 
@@ -154,18 +223,10 @@ private[reactivemongo] object UpdateCommand {
 
         elements ++= Seq[pack.ElementProducer](
           element("update", builder.string(update.collection)),
-          element("ordered", ordered))
-
-        command.updates match {
-          case first +: updates =>
-            elements += element("updates", builder.array(
-              writeElement(first), updates.map(writeElement)))
-
-          case _ =>
-            elements += element(
-              "updates",
-              builder.string("_used_by_UpdateOps_to_compute_bson_size"))
-        }
+          element("ordered", ordered),
+          element("updates", builder.array(
+            writeElement(command.firstUpdate),
+            command.updates.map(writeElement))))
 
         session.foreach { s =>
           elements ++= writeSession(s)

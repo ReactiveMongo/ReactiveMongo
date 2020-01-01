@@ -54,6 +54,7 @@ trait GenericCollectionProducer[P <: SerializationPack with Singleton, +C <: Gen
  * @define returnQueryBuilder A [[GenericQueryBuilder]] that you can use to to customize the query. You can obtain a cursor by calling the method [[reactivemongo.api.Cursor]] on this query builder.
  * @define implicitWriterT An implicit `Writer[T]` typeclass for handling it has to be in the scope
  * @define writeConcernParam the [[https://docs.mongodb.com/manual/reference/write-concern/ writer concern]] to be used
+ * @define bypassDocumentValidationParam the flag to bypass document validation during the operation
  * @define writerParam the writer to create the document
  * @define upsertParam if true, creates a new document if no document is matching, otherwise if at least one document matches, an update is applied
  * @define returnWriteResult a future [[reactivemongo.api.commands.WriteResult]] that can be used to check whether the insertion was successful
@@ -351,7 +352,7 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    *
    * @param ordered $orderedParam
    * @param writeConcern $writeConcernParam
-   * @param bypassDocumentValidation the flag to bypass document validation during the operation
+   * @param bypassDocumentValidation $bypassDocumentValidationParam
    *
    * {{{
    * import scala.concurrent.ExecutionContext
@@ -389,7 +390,10 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * @return $returnWriteResult
    */
   @deprecated("Use `.update(ordered = false).one(..)`", "0.16.1")
-  def update[S, T](selector: S, update: T, writeConcern: WriteConcern = writeConcern, upsert: Boolean = false, multi: Boolean = false)(implicit swriter: pack.Writer[S], writer: pack.Writer[T], ec: ExecutionContext): Future[UpdateWriteResult] = prepareUpdate(ordered = true, writeConcern = writeConcern).
+  def update[S, T](selector: S, update: T, writeConcern: WriteConcern = writeConcern, upsert: Boolean = false, multi: Boolean = false)(implicit swriter: pack.Writer[S], writer: pack.Writer[T], ec: ExecutionContext): Future[UpdateWriteResult] = prepareUpdate(
+    ordered = true,
+    writeConcern = writeConcern,
+    bypassDocumentValidation = false).
     one(selector, update, upsert, multi)
 
   /**
@@ -410,7 +414,7 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * }
    * }}}
    */
-  def update: UpdateBuilder = prepareUpdate(false, writeConcern)
+  def update: UpdateBuilder = prepareUpdate(false, writeConcern, false)
 
   /**
    * Returns an update builder.
@@ -430,9 +434,11 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    *     one(query, update, upsert = false, multi = false)
    * }
    * }}}
+   *
+   * @param ordered $orderedParam
    */
   def update(ordered: Boolean): UpdateBuilder =
-    prepareUpdate(ordered, writeConcern)
+    prepareUpdate(ordered, writeConcern, false)
 
   /**
    * Returns an update builder.
@@ -452,11 +458,46 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * )(implicit ec: ExecutionContext) =
    *   coll.update(ordered = false, writeConcern = wc).one(query, update)
    * }}}
+   *
+   * @param ordered $orderedParam
+   * @param writeConcern $writeConcernParam
    */
   def update(
     ordered: Boolean,
     writeConcern: WriteConcern): UpdateBuilder =
-    prepareUpdate(ordered, writeConcern)
+    prepareUpdate(ordered, writeConcern, false)
+
+  /**
+   * Returns an update builder.
+   *
+   * {{{
+   * import scala.concurrent.ExecutionContext
+   *
+   * import reactivemongo.api.commands.WriteConcern
+   * import reactivemongo.api.bson.BSONDocument
+   * import reactivemongo.api.bson.collection.BSONCollection
+   *
+   * def withDefaultWriteConcern(
+   *   coll: BSONCollection,
+   *   query: BSONDocument,
+   *   update: BSONDocument,
+   *   wc: WriteConcern
+   * )(implicit ec: ExecutionContext) = coll.update(
+   *   ordered = false,
+   *   writeConcern = wc,
+   *   bypassDocumentValidation = true
+   * ).one(query, update)
+   * }}}
+   *
+   * @param ordered $orderedParam
+   * @param writeConcern $writeConcernParam
+   * @param bypassDocumentValidation $bypassDocumentValidationParam
+   */
+  def update(
+    ordered: Boolean,
+    writeConcern: WriteConcern,
+    bypassDocumentValidation: Boolean): UpdateBuilder =
+    prepareUpdate(ordered, writeConcern, bypassDocumentValidation)
 
   /**
    * Returns an update modifier, to be used with `findAndModify`.
