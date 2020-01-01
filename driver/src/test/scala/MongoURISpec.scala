@@ -22,20 +22,20 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
   "Mongo URI" title
 
   import MongoConnectionOptions.Credential
-  import tests.Common
+  import tests.Common, Common.timeout
 
   section("unit")
   "MongoConnection URI parser" should {
     val simplest = "mongodb://host1"
 
     s"parse $simplest with success" in {
-      parseURI(simplest) must beSuccessfulTry(
+      parseURI(simplest) must beTypedEqualTo(
         ParsedURI(
           hosts = ListSet("host1" -> 27017),
           db = None,
           authenticate = None,
           options = MongoConnectionOptions.default,
-          ignoredOptions = List.empty))
+          ignoredOptions = List.empty)).awaitFor(timeout)
     }
 
     val withOpts = "mongodb://host1?foo=bar"
@@ -48,14 +48,7 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
         options = MongoConnectionOptions.default,
         ignoredOptions = List("foo"))
 
-      {
-        parseURI(withOpts) match {
-          case x @ scala.util.Success(_) => x
-          case scala.util.Failure(e) =>
-            e.printStackTrace()
-            scala.util.Failure(e)
-        }
-      } must beSuccessfulTry(expected) and {
+      parseURI(withOpts) must beTypedEqualTo(expected).awaitFor(timeout) and {
         Common.driver.connect(expected) must throwA[IllegalArgumentException](
           "The connection URI contains unsupported options: foo").
           awaitFor(Common.timeout)
@@ -64,57 +57,57 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
 
     val withPort = "mongodb://host1:27018"
     s"parse $withPort with success" in {
-      parseURI(withPort) must beSuccessfulTry(
+      parseURI(withPort) must beTypedEqualTo(
         ParsedURI(
           hosts = ListSet("host1" -> 27018),
           db = None,
           authenticate = None,
           options = MongoConnectionOptions.default,
-          ignoredOptions = List()))
+          ignoredOptions = List.empty)).awaitFor(timeout)
     }
 
     val withWrongPort = "mongodb://host1:68903"
     s"parse $withWrongPort with failure" in {
-      parseURI(withWrongPort).isFailure must beTrue
+      parseURI(withWrongPort) must throwA[Exception].awaitFor(timeout)
     }
 
     val withWrongPort2 = "mongodb://host1:kqjbce"
     s"parse $withWrongPort2 with failure" in {
-      parseURI(withWrongPort2).isFailure must beTrue
+      parseURI(withWrongPort2) must throwA[Exception].awaitFor(timeout)
     }
 
     val withDb = "mongodb://host1/somedb"
     s"parse $withDb with success" in {
-      parseURI(withDb) must beSuccessfulTry(
+      parseURI(withDb) must beTypedEqualTo(
         ParsedURI(
           hosts = ListSet("host1" -> 27017),
           db = Some("somedb"),
           authenticate = None,
           options = MongoConnectionOptions.default,
-          ignoredOptions = List()))
+          ignoredOptions = List.empty)).awaitFor(timeout)
     }
 
     val withAuth = "mongodb://user123:passwd123@host1/somedb"
     s"parse $withAuth with success" in {
-      parseURI(withAuth) must beSuccessfulTry(
+      parseURI(withAuth) must beTypedEqualTo(
         ParsedURI(
           hosts = ListSet("host1" -> 27017),
           db = Some("somedb"),
           authenticate = Some(Authenticate("somedb", "user123", Some("passwd123"))),
           options = MongoConnectionOptions.default.copy(credentials = Map(
             "somedb" -> Credential("user123", Some("passwd123")))),
-          ignoredOptions = List.empty))
+          ignoredOptions = List.empty)).awaitFor(timeout)
     }
 
     val wrongWithAuth = "mongodb://user123:passwd123@host1"
     s"parse $wrongWithAuth with failure" in {
-      parseURI(wrongWithAuth).isFailure must beTrue
+      parseURI(wrongWithAuth) must throwA[Exception].awaitFor(timeout)
     }
 
     val fullFeatured = "mongodb://user123:passwd123@host1:27018,host2:27019,host3:27020/somedb?foo=bar&authenticationMechanism=scram-sha1"
 
     s"parse $fullFeatured with success" in {
-      parseURI(fullFeatured) must beSuccessfulTry(
+      parseURI(fullFeatured) must beTypedEqualTo(
         ParsedURI(
           hosts = ListSet("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
           db = Some("somedb"),
@@ -123,13 +116,13 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
             authenticationMechanism = ScramSha1Authentication,
             credentials = Map("somedb" -> Credential(
               "user123", Some("passwd123")))),
-          ignoredOptions = List("foo")))
+          ignoredOptions = List("foo"))).awaitFor(timeout)
     }
 
     val scramSha256 = "mongodb://user123:passwd123@host1:27018,host2:27019,host3:27020/somedb?foo=bar&authenticationMechanism=scram-sha256"
 
     s"parse $scramSha256 with success" in {
-      parseURI(scramSha256) must beSuccessfulTry(
+      parseURI(scramSha256) must beTypedEqualTo(
         ParsedURI(
           hosts = ListSet("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
           db = Some("somedb"),
@@ -138,13 +131,13 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
             authenticationMechanism = ScramSha256Authentication,
             credentials = Map("somedb" -> Credential(
               "user123", Some("passwd123")))),
-          ignoredOptions = List("foo")))
+          ignoredOptions = List("foo"))).awaitFor(timeout)
     }
 
     val withAuthParamAndSource = "mongodb://user123:;qGu:je/LX}nN\\8@host1:27018,host2:27019,host3:27020/somedb?foo=bar&authenticationDatabase=authdb"
 
     s"parse $withAuthParamAndSource with success" in {
-      parseURI(withAuthParamAndSource) must beSuccessfulTry(
+      parseURI(withAuthParamAndSource) must beTypedEqualTo(
         ParsedURI(
           hosts = ListSet("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
           db = Some("somedb"),
@@ -154,13 +147,13 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
             authenticationDatabase = Some("authdb"),
             credentials = Map(
               "authdb" -> Credential("user123", Some(";qGu:je/LX}nN\\8")))),
-          ignoredOptions = List("foo")))
+          ignoredOptions = List("foo"))).awaitFor(timeout)
     }
 
     val withAuthModeX509WithNoUser = "mongodb://host1:27018,host2:27019,host3:27020/somedb?foo=bar&authenticationMechanism=x509"
 
     s"parse $withAuthModeX509WithNoUser with success" in {
-      parseURI(withAuthModeX509WithNoUser) must beSuccessfulTry(
+      parseURI(withAuthModeX509WithNoUser) must beTypedEqualTo(
         ParsedURI(
           hosts = ListSet("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
           db = Some("somedb"),
@@ -168,13 +161,13 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
           options = MongoConnectionOptions.default.copy(
             authenticationMechanism = X509Authentication,
             credentials = Map("somedb" -> Credential("", None))),
-          ignoredOptions = List("foo")))
+          ignoredOptions = List("foo"))).awaitFor(timeout)
     }
 
     val withAuthModeX509WithUser = "mongodb://username@test.com,CN=127.0.0.1,OU=TEST_CLIENT,O=TEST_CLIENT,L=LONDON,ST=LONDON,C=UK@host1:27018,host2:27019,host3:27020/somedb?foo=bar&authenticationMechanism=x509"
 
     s"parse $withAuthModeX509WithUser with success" in {
-      parseURI(withAuthModeX509WithUser) must beSuccessfulTry(
+      parseURI(withAuthModeX509WithUser) must beTypedEqualTo(
         ParsedURI(
           hosts = ListSet("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
           db = Some("somedb"),
@@ -183,13 +176,13 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
             authenticationMechanism = X509Authentication,
             credentials = Map(
               "somedb" -> Credential("username@test.com,CN=127.0.0.1,OU=TEST_CLIENT,O=TEST_CLIENT,L=LONDON,ST=LONDON,C=UK", None))),
-          ignoredOptions = List("foo")))
+          ignoredOptions = List("foo"))).awaitFor(timeout)
     }
 
     val withWriteConcern = "mongodb://user123:passwd123@host1:27018,host2:27019,host3:27020/somedb?writeConcern=journaled"
 
     s"parse $withWriteConcern with success" in {
-      parseURI(withWriteConcern) must beSuccessfulTry(ParsedURI(
+      parseURI(withWriteConcern) must beTypedEqualTo(ParsedURI(
         hosts = ListSet("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
         db = Some("somedb"),
         authenticate = Some(Authenticate("somedb", "user123", Some("passwd123"))),
@@ -197,13 +190,13 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
           writeConcern = WriteConcern.Journaled,
           credentials = Map(
             "somedb" -> Credential("user123", Some("passwd123")))),
-        ignoredOptions = Nil))
+        ignoredOptions = Nil)).awaitFor(timeout)
     }
 
     val withWriteConcernWMaj = "mongodb://user123:passwd123@host1:27018,host2:27019,host3:27020/somedb?writeConcernW=majority"
 
     s"parse $withWriteConcernWMaj with success" in {
-      parseURI(withWriteConcernWMaj) must beSuccessfulTry(ParsedURI(
+      parseURI(withWriteConcernWMaj) must beTypedEqualTo(ParsedURI(
         hosts = ListSet("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
         db = Some("somedb"),
         authenticate = Some(Authenticate("somedb", "user123", Some("passwd123"))),
@@ -212,13 +205,13 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
             w = reactivemongo.api.commands.WriteConcern.Majority),
           credentials = Map(
             "somedb" -> Credential("user123", Some("passwd123")))),
-        ignoredOptions = Nil))
+        ignoredOptions = Nil)).awaitFor(timeout)
     }
 
     val withWriteConcernWTag = "mongodb://user123:passwd123@host1:27018,host2:27019,host3:27020/somedb?writeConcernW=anyTag"
 
     s"parse $withWriteConcernWTag with success" in {
-      parseURI(withWriteConcernWTag) must beSuccessfulTry(ParsedURI(
+      parseURI(withWriteConcernWTag) must beTypedEqualTo(ParsedURI(
         hosts = ListSet("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
         db = Some("somedb"),
         authenticate = Some(Authenticate("somedb", "user123", Some("passwd123"))),
@@ -227,13 +220,13 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
             w = reactivemongo.api.commands.WriteConcern.TagSet("anyTag")),
           credentials = Map(
             "somedb" -> Credential("user123", Some("passwd123")))),
-        ignoredOptions = Nil))
+        ignoredOptions = Nil)).awaitFor(timeout)
     }
 
     val withWriteConcernWAck = "mongodb://user123:passwd123@host1:27018,host2:27019,host3:27020/somedb?writeConcernW=5"
 
     s"parse $withWriteConcernWAck with success" in {
-      parseURI(withWriteConcernWAck) must beSuccessfulTry(ParsedURI(
+      parseURI(withWriteConcernWAck) must beTypedEqualTo(ParsedURI(
         hosts = ListSet("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
         db = Some("somedb"),
         authenticate = Some(Authenticate("somedb", "user123", Some("passwd123"))),
@@ -243,13 +236,13 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
               WaitForAcknowledgments(5)),
           credentials = Map(
             "somedb" -> Credential("user123", Some("passwd123")))),
-        ignoredOptions = Nil))
+        ignoredOptions = Nil)).awaitFor(timeout)
     }
 
     val withWriteConcernJournaled = "mongodb://user123:passwd123@host1:27018,host2:27019,host3:27020/somedb?writeConcernJ=true"
 
     s"parse $withWriteConcernJournaled with success" in {
-      parseURI(withWriteConcernJournaled) must beSuccessfulTry(
+      parseURI(withWriteConcernJournaled) must beTypedEqualTo(
         ParsedURI(
           hosts = ListSet("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
           db = Some("somedb"),
@@ -258,13 +251,13 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
             writeConcern = WriteConcern.Default.copy(j = true),
             credentials = Map(
               "somedb" -> Credential("user123", Some("passwd123")))),
-          ignoredOptions = Nil))
+          ignoredOptions = Nil)).awaitFor(timeout)
     }
 
     val withWriteConcernNJ = "mongodb://user123:passwd123@host1:27018,host2:27019,host3:27020/somedb?writeConcernJ=false&writeConcern=journaled"
 
     s"parse $withWriteConcernNJ with success" in {
-      parseURI(withWriteConcernNJ) must beSuccessfulTry(
+      parseURI(withWriteConcernNJ) must beTypedEqualTo(
         ParsedURI(
           hosts = ListSet("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
           db = Some("somedb"),
@@ -273,13 +266,13 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
             writeConcern = WriteConcern.Journaled.copy(j = false),
             credentials = Map(
               "somedb" -> Credential("user123", Some("passwd123")))),
-          ignoredOptions = Nil))
+          ignoredOptions = Nil)).awaitFor(timeout)
     }
 
     val withWriteConcernTmout = "mongodb://user123:passwd123@host1:27018,host2:27019,host3:27020/somedb?writeConcernTimeout=1543"
 
     s"parse $withWriteConcernTmout with success" in {
-      parseURI(withWriteConcernTmout) must beSuccessfulTry(
+      parseURI(withWriteConcernTmout) must beTypedEqualTo(
         ParsedURI(
           hosts = ListSet("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
           db = Some("somedb"),
@@ -288,138 +281,136 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
             writeConcern = WriteConcern.Default.copy(wtimeout = Some(1543)),
             credentials = Map(
               "somedb" -> Credential("user123", Some("passwd123")))),
-          ignoredOptions = Nil))
+          ignoredOptions = Nil)).awaitFor(timeout)
     }
 
     val withKeyStore = "mongodb://host1?keyStore=file:///tmp/foo&keyStoreType=PKCS12&keyStorePassword=bar"
 
     s"fail to parse $withKeyStore" in {
-      parseURI(withKeyStore) must beSuccessfulTry[ParsedURI].like {
+      parseURI(withKeyStore) must beLike[ParsedURI] {
         case uri => uri.options.keyStore must beSome(
           MongoConnectionOptions.KeyStore(
             resource = new java.io.File("/tmp/foo").toURI,
             password = Some("bar".toCharArray),
             storeType = "PKCS12"))
 
-      }
+      }.awaitFor(timeout)
     }
 
     val defaultFo = "mongodb://host1?rm.failover=default"
 
     s"parse $defaultFo with success" in {
-      parseURI(defaultFo) must beSuccessfulTry[ParsedURI].like {
+      parseURI(defaultFo) must beLike[ParsedURI] {
         case uri =>
           strategyStr(uri) must_=== "100 milliseconds100 milliseconds200 milliseconds300 milliseconds500 milliseconds600 milliseconds700 milliseconds800 milliseconds1000 milliseconds1100 milliseconds1200 milliseconds"
-      }
+      }.awaitFor(timeout)
     }
 
     val remoteFo = "mongodb://host1?rm.failover=remote&writeConcernJ=true"
 
     s"parse $remoteFo with success" in {
-      parseURI(remoteFo) must beSuccessfulTry[ParsedURI].like {
+      parseURI(remoteFo) must beLike[ParsedURI] {
         case uri =>
           strategyStr(uri) must_=== "100 milliseconds100 milliseconds200 milliseconds300 milliseconds500 milliseconds600 milliseconds700 milliseconds800 milliseconds1000 milliseconds1100 milliseconds1200 milliseconds1300 milliseconds1500 milliseconds1600 milliseconds1700 milliseconds1800 milliseconds2000 milliseconds"
-      }
+      }.awaitFor(timeout)
     }
 
     val strictFo = "mongodb://host1?rm.failover=strict&writeConcernJ=true"
 
     s"parse $strictFo with success" in {
-      parseURI(strictFo) must beSuccessfulTry[ParsedURI].like {
+      parseURI(strictFo) must beLike[ParsedURI] {
         case uri =>
           strategyStr(uri) must_=== "100 milliseconds100 milliseconds200 milliseconds300 milliseconds500 milliseconds600 milliseconds"
-      }
+      }.awaitFor(timeout)
     }
 
     val customFo = "mongodb://host1?rm.failover=123ms:4x5&writeConcernJ=true"
 
     s"parse $customFo with success" in {
-      parseURI(customFo) must beSuccessfulTry[ParsedURI].like {
+      parseURI(customFo) must beLike[ParsedURI] {
         case uri =>
           strategyStr(uri) must_=== "123 milliseconds615 milliseconds1230 milliseconds1845 milliseconds2460 milliseconds"
-      }
+      }.awaitFor(timeout)
     }
 
     val invalidNoNodes = "mongodb://?writeConcern=journaled"
 
     s"fail to parse $invalidNoNodes" in {
-      parseURI(invalidNoNodes) must beFailedTry.
-        withThrowable[URIParsingException]("No valid host in the URI: ''")
+      parseURI(invalidNoNodes) must throwA[URIParsingException]("No valid host in the URI: ''").awaitFor(timeout)
 
     }
 
     val ignoredRs = "mongodb://host1?replicaSet=foo"
 
     s"ignore 'replicaSet' option" in {
-      parseURI(ignoredRs) must beSuccessfulTry[ParsedURI].like {
+      parseURI(ignoredRs) must beLike[ParsedURI] {
         case uri => uri.ignoredOptions must beEmpty
-      }
+      }.awaitFor(timeout)
     }
 
     val foInvalidDelay = "mongodb://host1?rm.failover=123ko:4x5"
 
     s"fail to parse $foInvalidDelay" in {
-      parseURI(foInvalidDelay) must beSuccessfulTry[ParsedURI].like {
+      parseURI(foInvalidDelay) must beLike[ParsedURI] {
         case uri => uri.ignoredOptions.headOption must beSome("rm.failover")
-      }
+      }.awaitFor(timeout)
     }
 
     val foInvalidRetry = "mongodb://host1?rm.failover=123ms:Ax5"
 
     s"fail to parse $foInvalidRetry" in {
-      parseURI(foInvalidRetry) must beSuccessfulTry[ParsedURI].like {
+      parseURI(foInvalidRetry) must beLike[ParsedURI] {
         case uri => uri.ignoredOptions.headOption must beSome("rm.failover")
-      }
+      }.awaitFor(timeout)
     }
 
     val foInvalidFactor = "mongodb://host1?rm.failover=123ms:2xO"
 
     s"fail to parse $foInvalidFactor" in {
-      parseURI(foInvalidFactor) must beSuccessfulTry[ParsedURI].like {
+      parseURI(foInvalidFactor) must beLike[ParsedURI] {
         case uri => uri.ignoredOptions.headOption must beSome("rm.failover")
-      }
+      }.awaitFor(timeout)
     }
 
     val monRefMS = "mongodb://host1?heartbeatFrequencyMS=567&rm.failover=123ms:4x5"
 
     s"parse $monRefMS with success" in {
-      parseURI(monRefMS) must beSuccessfulTry[ParsedURI].like {
+      parseURI(monRefMS) must beLike[ParsedURI] {
         case uri => uri.options.heartbeatFrequencyMS must_=== 567
-      }
+      }.awaitFor(timeout)
     }
 
     val maxInFlight = "mongodb://host1?rm.maxInFlightRequestsPerChannel=128"
 
     s"parse $maxInFlight with success" in {
-      parseURI(maxInFlight) must beSuccessfulTry[ParsedURI].like {
+      parseURI(maxInFlight) must beLike[ParsedURI] {
         case uri => uri.options.maxInFlightRequestsPerChannel must beSome(128)
-      }
+      }.awaitFor(timeout)
     }
 
     val invalidMonRef1 = "mongodb://host1?heartbeatFrequencyMS=A"
 
     s"fail to parse $invalidMonRef1" in {
-      parseURI(invalidMonRef1) must beSuccessfulTry[ParsedURI].like {
+      parseURI(invalidMonRef1) must beLike[ParsedURI] {
         case uri =>
           uri.ignoredOptions.headOption must beSome("heartbeatFrequencyMS")
-      }
+      }.awaitFor(timeout)
     }
 
     val invalidMonRef2 = "mongodb://host1?heartbeatFrequencyMS=50"
 
     s"fail to parse $invalidMonRef2 (heartbeatFrequencyMS < 500)" in {
-      parseURI(invalidMonRef2) must beSuccessfulTry[ParsedURI].like {
+      parseURI(invalidMonRef2) must beLike[ParsedURI] {
         case uri =>
           uri.ignoredOptions.headOption must beSome("heartbeatFrequencyMS")
-      }
+      }.awaitFor(timeout)
     }
 
     val invalidIdle = "mongodb://host1?maxIdleTimeMS=99&heartbeatFrequencyMS=500"
 
     s"fail to parse $invalidIdle (with maxIdleTimeMS < heartbeatFrequencyMS)" in {
-      parseURI(invalidIdle) must beFailedTry[ParsedURI].
-        withThrowable[MongoConnection.URIParsingException](
-          "Invalid URI options: maxIdleTimeMS\\(99\\) < heartbeatFrequencyMS\\(500\\)")
+      parseURI(invalidIdle) must throwA[MongoConnection.URIParsingException](
+        "Invalid URI options: maxIdleTimeMS\\(99\\) < heartbeatFrequencyMS\\(500\\)").awaitFor(timeout)
     }
 
     val validSeedList = "mongodb+srv://usr:pwd@mongo.domain.tld/foo"
@@ -443,7 +434,7 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
         } else {
           throw new IllegalArgumentException(s"Unexpected name '$name'")
         }
-      }) must beSuccessfulTry[ParsedURI].like {
+      }) must beLike[ParsedURI] {
         case uri => uri.db must beSome("foo") and {
           // enforced by default when seed list ...
           uri.options.sslEnabled must beTrue and {
@@ -455,7 +446,7 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
               "foo" -> Credential("usr", Some("pwd")))
           }
         }
-      }
+      }.awaitFor(timeout)
     }
 
     s"fail to parse seed list when target hosts are not with same base" in {
@@ -477,8 +468,9 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
         } else {
           throw new IllegalArgumentException(s"Unexpected name '$name'")
         }
-      }) must beFailedTry.withThrowable[GenericDriverException](
-        ".*mongo1\\.other\\.tld\\. is not subdomain of domain\\.tld\\..*")
+      }) must throwA[GenericDriverException](
+        ".*mongo1\\.other\\.tld\\. is not subdomain of domain\\.tld\\..*").
+        awaitFor(timeout)
     }
 
     s"fail to parse seed list when non-SRV records are resolved" in {
@@ -490,8 +482,8 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
           Type.A, 3600, java.net.InetAddress.getLoopbackAddress))
 
       parseURI(validSeedList, srvRecResolver(_ => records)).
-        aka("failure") must beFailedTry.withThrowable[GenericDriverException](
-          ".*Unexpected record: mongo\\.domain\\.tld\\..*")
+        aka("failure") must throwA[GenericDriverException](
+          ".*Unexpected record: mongo\\.domain\\.tld\\..*").awaitFor(timeout)
     }
 
     val fullFeaturedSeedList = "mongodb+srv://user123:passwd123@service.domain.tld/somedb?foo=bar&sslEnabled=false"
@@ -512,7 +504,7 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
           } else {
             throw new IllegalArgumentException(s"Unexpected: $name")
           }
-        })) must beSuccessfulTry(
+        })) must beTypedEqualTo(
           ParsedURI(
             hosts = ListSet("mongo1.domain.tld" -> 27017),
             db = Some("somedb"),
@@ -524,7 +516,7 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
               authenticationMechanism = ScramSha1Authentication,
               credentials = Map("admin" -> Credential(
                 "user123", Some("passwd123")))),
-            ignoredOptions = List("foo", "ignore")))
+            ignoredOptions = List("foo", "ignore"))).awaitFor(timeout)
 
     }
 
@@ -532,15 +524,15 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
     val withValidName = s"mongodb://host1?appName=$validName"
 
     s"parse $withValidName with success" in {
-      parseURI(withValidName).toOption.flatMap(
-        _.options.appName) must beSome(validName)
+      parseURI(withValidName).map(
+        _.options.appName) must beSome(validName).awaitFor(timeout)
     }
 
     val withInvalidName = s"mongodb://host1?appName="
 
     s"ignore empty application name in $withInvalidName" in {
-      parseURI(withInvalidName).toOption.flatMap(
-        _.options.appName) must beNone
+      parseURI(withInvalidName).map(
+        _.options.appName) must beNone.awaitFor(timeout)
     }
 
     val withNameTooLong = {
@@ -549,8 +541,8 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
     }
 
     s"ignore too long application name" in {
-      parseURI(withNameTooLong).toOption.flatMap(
-        _.options.appName) must beNone
+      parseURI(withNameTooLong).map(
+        _.options.appName) must beNone.awaitFor(timeout)
     }
   }
 

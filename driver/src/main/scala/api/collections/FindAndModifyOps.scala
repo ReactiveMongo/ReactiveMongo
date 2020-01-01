@@ -67,17 +67,17 @@ trait FindAndModifyOps[P <: SerializationPack with Singleton] {
     // ---
 
     implicit private val resultReader: pack.Reader[FNM.Result[pack.type]] = {
-      val decoder = pack.newDecoder
+      val decoder: SerializationPack.Decoder[pack.type] = pack.newDecoder
 
       CommandCodecs.dealingWithGenericCommandErrorsReader(pack) { result =>
         FNM.Result[pack.type](pack)(
           decoder.child(result, "lastErrorObject").map { doc =>
-            FNM.UpdateLastError(
-              updatedExisting = decoder.booleanLike(
+            FNM.UpdateLastError[pack.type](pack)(
+              decoder.booleanLike(
                 doc, "updatedExisting").getOrElse(false),
-              n = decoder.int(doc, "n").getOrElse(0),
-              err = decoder.string(doc, "err"),
-              upsertedId = decoder.get(doc, "upserted"))
+              decoder.get(doc, "upserted"),
+              decoder.int(doc, "n").getOrElse(0),
+              decoder.string(doc, "err"))
           },
           decoder.child(result, "value"))
       }

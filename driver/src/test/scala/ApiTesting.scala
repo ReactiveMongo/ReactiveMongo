@@ -260,8 +260,10 @@ package object tests {
   def parseURI(
     uri: String,
     srvResolver: reactivemongo.util.SRVRecordResolver,
-    txtResolver: reactivemongo.util.TXTResolver) =
-    MongoConnection.parseURI(uri, srvResolver, txtResolver)
+    txtResolver: reactivemongo.util.TXTResolver)(
+    implicit
+    ec: ExecutionContext) =
+    MongoConnection.fromString(uri, srvResolver, txtResolver)
 
   @inline def probe(con: MongoConnection, timeout: FiniteDuration) = con.probe(timeout)
 
