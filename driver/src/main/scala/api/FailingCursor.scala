@@ -6,7 +6,7 @@ import reactivemongo.core.protocol.Response
 
 private[api] final class FailingCursor[T](
   val connection: MongoConnection,
-  cause: Exception)
+  cause: Throwable)
   extends Cursor[T] with CursorOps[T] with FailingCursorCompat[T] {
 
   protected lazy val failure = Future.failed(cause)
@@ -46,6 +46,6 @@ private[api] final class FailingCursor[T](
 private[api] object FailingCursor {
   def apply[T](
     connection: MongoConnection,
-    cause: Exception)(implicit cp: CursorProducer[T]): cp.ProducedCursor =
+    cause: Throwable)(implicit cp: CursorProducer[T]): cp.ProducedCursor =
     cp.produce(new FailingCursor[T](connection, cause))
 }

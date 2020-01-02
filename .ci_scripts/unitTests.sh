@@ -25,7 +25,7 @@ EOF
     sbt ++$SCALA_VERSION ";error ;mimaReportBinaryIssues" || exit 3
     exit
 
-    sbt ++$SCALA_VERSION ";project ReactiveMongo-BSON ;findbugs ;project ReactiveMongo-BSON-Macros ;findbugs ;project ReactiveMongo ;findbugs ;project ReactiveMongo-JMX ;findbugs" || exit 4
+    sbt ++$SCALA_VERSION ";project ReactiveMongo-BSON ;findbugs ;project ReactiveMongo-BSON-Macros ;findbugs ;project ReactiveMongo ;findbugs" || exit 4
 fi
 
 perl -pe "s|resolvers |resolvers += Resolver.sonatypeRepo(\"staging\"),\r\n    resolvers |" < "project/Common.scala" > /tmp/Common.scala && mv /tmp/Common.scala "project/Common.scala"

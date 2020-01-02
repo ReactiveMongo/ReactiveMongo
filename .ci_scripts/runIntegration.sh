@@ -79,7 +79,6 @@ if [ "x$MODE" = "xinteractive" ]; then
     sbt #++$SCALA_VERSION
 else
     TEST_ARGS=";project ReactiveMongo ;testQuick -- $TEST_OPTS"
-    TEST_ARGS="$TEST_ARGS ;project ReactiveMongo-JMX ;testQuick -- $TEST_OPTS"
 
     sbt ++$SCALA_VERSION "$TEST_ARGS"
 fi

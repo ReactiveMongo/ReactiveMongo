@@ -19,6 +19,8 @@ import java.io.{ InputStream, OutputStream }
 import java.util.Arrays
 import java.security.MessageDigest
 
+import scala.util.control.NonFatal
+
 import scala.concurrent.{ ExecutionContext, Future }
 
 import reactivemongo.api.{
