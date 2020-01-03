@@ -1,6 +1,0 @@
-<FindBugsFilter>
-  <Match>
-    <Class name="reactivemongo.jmx.ConnectionListener" />
-    <Bug pattern="NM_SAME_SIMPLE_NAME_AS_INTERFACE" />
-  </Match>
-</FindBugsFilter>

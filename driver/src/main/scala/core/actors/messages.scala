@@ -1,6 +1,7 @@
 package reactivemongo.core.actors
 
 import scala.concurrent.{ Future, Promise }
+import scala.concurrent.duration.FiniteDuration
 
 import reactivemongo.api.ReadPreference
 
@@ -19,12 +20,12 @@ import reactivemongo.core.nodeset.ProtocolMetadata
  * The future can be used to get the error or the successful response.
  */
 @deprecated("Internal: will be made private", "0.16.0")
-sealed trait ExpectingResponse { // TODO: Merge with RequestMakerExpectingResponse once CheckedWriteRequestExpectingResponse is removed
-  // TODO: final
+sealed trait ExpectingResponse { // TODO#1.1: Merge with RequestMakerExpectingResponse once CheckedWriteRequestExpectingResponse is removed
+  // TODO#1.1: final
   private[actors] val promise: Promise[Response] = Promise()
 
   /** The future response of this request. */
-  val future: Future[Response] = promise.future // TODO: final
+  val future: Future[Response] = promise.future // TODO#1.1: final
 
   private[reactivemongo] def pinnedNode: Option[String] = None
 }
@@ -99,6 +100,9 @@ case class CheckedWriteRequestExpectingResponse(
 @deprecated(message = "Internal: will be made private", since = "0.12.8")
 sealed class Close {
   def source: String = "unknown"
+
+  private[reactivemongo] def timeout: FiniteDuration =
+    FiniteDuration(10, "seconds")
 }
 
 /**
@@ -107,8 +111,17 @@ sealed class Close {
  */
 @deprecated("Internal: will be made private", "0.16.0")
 case object Close extends Close {
+  @deprecated("Will be removed", "0.19.8")
   def apply(src: String): Close = new Close {
     override val source = src
+  }
+
+  def apply(src: String, timeout: FiniteDuration): Close = {
+    def t = timeout
+    new Close {
+      override val source = src
+      override val timeout = t
+    }
   }
 
   def unapply(msg: Close): Option[String] = Some(msg.source)
@@ -217,7 +230,6 @@ object SetAvailable extends scala.runtime.AbstractFunction1[ProtocolMetadata, Se
   }
 }
 
-// TODO
 @deprecated("Internal: will be made private", "0.16.0")
 case object SetUnavailable
 

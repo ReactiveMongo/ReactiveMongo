@@ -26,12 +26,13 @@ import reactivemongo.core.protocol.QueryFlags
  * @param batchSizeN the upper limit on the number of documents to retrieve per batch (0 for unspecified)
  * @param flagsN the query flags
  */
+@deprecated("Internal: will be made private", "0.19.8")
 case class QueryOpts(
   skipN: Int = 0,
   batchSizeN: Int = 0,
   flagsN: Int = 0) extends QueryOps {
 
-  // TODO: Merge skipN and batchSizeN with QueryBuilder
+  // TODO#1.1: Merge skipN and batchSizeN with QueryBuilder
   // keep flags preparation as internal for compat < 3.2
   type Self = QueryOpts
 

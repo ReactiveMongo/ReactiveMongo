@@ -25,9 +25,9 @@ private[actors] class AwaitingResponse(
 
   @inline def requestID: Int = request.requestID
 
-  private var _retry = 0 // TODO: Refactor as property
+  private var _retry = 0 // TODO#1.1: Refactor as property
 
-  // TODO: Refactor as Property
+  // TODO#1.1: Refactor as Property
   var _writeConcern: Option[Request] = None
   def withWriteConcern(wc: Request): AwaitingResponse = {
     _writeConcern = Some(wc)
@@ -49,7 +49,7 @@ private[actors] class AwaitingResponse(
       req
     })
 
-  def copy( // TODO: Remove
+  def copy( // TODO#1.1: Remove
     request: Request,
     channelID: ChannelId,
     promise: Promise[Response],

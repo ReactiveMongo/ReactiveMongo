@@ -18,6 +18,9 @@ package reactivemongo.api
 import scala.util.Try
 import scala.util.control.{ NonFatal, NoStackTrace }
 
+import scala.collection.immutable.ListSet
+import scala.collection.mutable.{ Map => MMap }
+
 import scala.concurrent.{ Await, ExecutionContext, Future, Promise }
 import scala.concurrent.duration.{ Duration, FiniteDuration }
 
@@ -62,9 +65,9 @@ private[api] case class ConnectionState(
  * import scala.concurrent.ExecutionContext
  * import reactivemongo.api._
  *
- * def foo(driver: MongoDriver)(implicit ec: ExecutionContext) = {
- *   val con = driver.connection(List("localhost"))
- *   val db = con.database("plugin")
+ * def foo(driver: AsyncDriver)(implicit ec: ExecutionContext) = {
+ *   val con = driver.connect(List("localhost"))
+ *   val db = con.flatMap(_.database("plugin"))
  *   val collection = db.map(_("acoll"))
  * }
  * }}}
@@ -81,7 +84,7 @@ class MongoConnection(
   @deprecated("Internal: will be made private", "0.17.0") val name: String,
   @deprecated("Internal: will be made private", "0.14.0") val actorSystem: ActorSystem,
   @deprecated("Internal: will be made private", "0.17.0") val mongosystem: ActorRef,
-  val options: MongoConnectionOptions) { // TODO: toString as MongoURI
+  val options: MongoConnectionOptions) {
   import Exceptions._
 
   /**
@@ -103,7 +106,7 @@ class MongoConnection(
    */
   def database(name: String, failoverStrategy: FailoverStrategy = options.failoverStrategy)(implicit @deprecatedName(Symbol("context")) ec: ExecutionContext): Future[DefaultDB] =
     waitIsAvailable(failoverStrategy, stackTrace()).map { state =>
-      new DefaultDB(name, this, state, failoverStrategy)
+      new DefaultDB(name, this, state, failoverStrategy, None)
     }
 
   @deprecated("Use `authenticate` with `failoverStrategy`", "0.14.0")
@@ -146,16 +149,31 @@ class MongoConnection(
   def askClose()(implicit timeout: FiniteDuration): Future[_] = close()
 
   /**
-   * Closes this MongoConnection (closes all the channels and ends the actors).
+   * Closes this connection (closes all the channels and ends the actors).
+   *
+   * {{{
+   * import scala.concurrent.{ ExecutionContext, Future }
+   * import scala.concurrent.duration._
+   *
+   * import reactivemongo.api.MongoConnection
+   *
+   * def afterClose(con: MongoConnection)(
+   *   implicit ec: ExecutionContext): Future[Unit] =
+   *   con.close()(5.seconds).map { res =>
+   *     println("Close result: " + res)
+   *   }
+   * }}}
    */
   def close()(implicit timeout: FiniteDuration): Future[_] = whenActive {
-    ask(monitor, Close("MongoConnection.askClose"))(Timeout(timeout))
+    ask(monitor, Close("MongoConnection.askClose", timeout))(Timeout(timeout))
   }
 
   /** Returns true if the connection has not been killed. */
   @inline def active: Boolean = !killed
 
   // --- Internals ---
+
+  override def toString: String = s"MongoConnection { ${MongoConnectionOptions.toStrings(options).mkString(", ")} }"
 
   private[api] var history = () => InternalState.empty
 
@@ -174,7 +192,7 @@ class MongoConnection(
 
     debug("Waiting is available...")
 
-    val timeoutFactor = 1.25D // TODO: Review
+    val timeoutFactor = 1.25D
     val timeout: FiniteDuration = (1 to failoverStrategy.retries).
       foldLeft(failoverStrategy.initialDelay) { (d, i) =>
         d + (failoverStrategy.initialDelay * (
@@ -267,7 +285,7 @@ class MongoConnection(
   private[api] lazy val monitor = actorSystem.actorOf(
     Props(new MonitorActor), s"Monitor-$name")
 
-  // TODO: Remove (use probe or DB.connectionState)
+  // TODO#1.1: Remove (use probe or DB.connectionState)
   @volatile private[api] var _metadata = Option.empty[ProtocolMetadata]
 
   private class MonitorActor extends Actor {
@@ -333,7 +351,7 @@ class MongoConnection(
         ()
       }
 
-      case Close(src) => {
+      case close @ Close(src) => {
         debug(s"Monitor received Close request from $src")
 
         killed = true
@@ -343,7 +361,7 @@ class MongoConnection(
         setAvailable = Promise.failed[ConnectionState](
           new Exception(s"[$lnm] Closing connection..."))
 
-        mongosystem ! Close("MonitorActor#Close")
+        mongosystem ! Close("MonitorActor#Close", close.timeout)
         waitingForClose += sender
 
         ()
@@ -396,205 +414,344 @@ object MongoConnection {
    * @param db the name of the database
    * @param authenticate the authenticate information (see [[MongoConnectionOptions.authenticationMechanism]])
    */
-  final case class ParsedURI(
-    hosts: List[(String, Int)], // TODO: ListSet
-    options: MongoConnectionOptions,
-    ignoredOptions: List[String],
-    db: Option[String],
-    @deprecated("Use `options.credentials`", "0.14.0") authenticate: Option[Authenticate])
-  // TODO: Type for URI with required DB name
+  @com.github.ghik.silencer.silent(".*authenticate.*" /*deprecated*/ )
+  sealed class ParsedURI(
+    private[api] val _hosts: ListSet[(String, Int)],
+    val options: MongoConnectionOptions,
+    val ignoredOptions: List[String],
+    val db: Option[String],
+    val authenticate: Option[Authenticate]) extends Product with Serializable {
+    // TODO: Type for URI with required DB name
 
-  /**
-   * Parses a MongoURI.
-   *
-   * @param uri the connection URI (see [[http://docs.mongodb.org/manual/reference/connection-string/ the MongoDB URI documentation]] for more information)
-   */
-  def parseURI(uri: String): Try[ParsedURI] = {
-    import scala.concurrent.ExecutionContext.Implicits.global
+    @deprecated("Will return a ListSet", "0.19.8")
+    lazy val hosts = _hosts.toList
 
-    parseURI(
-      uri,
-      reactivemongo.util.dnsResolve(),
-      reactivemongo.util.txtRecords())
+    @deprecated("No longer a case class", "0.19.8")
+    val productArity = 5
+
+    @deprecated("No longer a case class", "0.19.8")
+    def productElement(n: Int): Any = n match {
+      case 0 => hosts
+      case 1 => options
+      case 2 => ignoredOptions
+      case 3 => db
+      case _ => authenticate
+    }
+
+    @deprecated("No longer a case class", "0.19.8")
+    def canEqual(that: Any): Boolean = that match {
+      case _: ParsedURI => true
+      case _            => false
+    }
+
+    override def equals(that: Any): Boolean = that match {
+      case other: ParsedURI => other.tupled == tupled
+      case _                => false
+    }
+
+    override def hashCode: Int = tupled.hashCode
+
+    private[api] lazy val tupled =
+      Tuple5(_hosts.toList, options, ignoredOptions, db, authenticate)
+
   }
 
-  private[reactivemongo] def parseURI(
+  object ParsedURI extends scala.runtime.AbstractFunction5[List[(String, Int)], MongoConnectionOptions, List[String], Option[String], Option[Authenticate], ParsedURI] {
+    @com.github.ghik.silencer.silent(".*authenticate.*" /*deprecated*/ )
+    @deprecated("Use factory with ListSet", "0.19.8")
+    def apply(
+      hosts: List[(String, Int)],
+      options: MongoConnectionOptions,
+      ignoredOptions: List[String],
+      db: Option[String],
+      authenticate: Option[Authenticate]) = new ParsedURI(ListSet.empty ++ hosts, options, ignoredOptions, db, authenticate)
+
+    @com.github.ghik.silencer.silent(".*authenticate.*" /*deprecated*/ )
+    def apply(
+      hosts: ListSet[(String, Int)],
+      options: MongoConnectionOptions,
+      ignoredOptions: List[String],
+      db: Option[String],
+      @deprecated("Use `options.credentials`", "0.14.0") authenticate: Option[Authenticate]) = new ParsedURI(hosts, options, ignoredOptions, db, authenticate)
+
+    @deprecated("No longer a case class", "0.19.8")
+    def unapply(that: Any): Option[(List[(String, Int)], MongoConnectionOptions, List[String], Option[String], Option[Authenticate])] = that match {
+      case uri: ParsedURI => Some(uri.tupled)
+      case _              => None
+    }
+  }
+
+  @deprecated("Use fromString", "0.19.8")
+  def parseURI(uri: String): Try[ParsedURI] = {
+    implicit def ec = util.sameThreadExecutionContext
+
+    Try(Await.result(fromString(uri), FiniteDuration(10, "seconds")))
+  }
+
+  /**
+   * Parses a [[http://docs.mongodb.org/manual/reference/connection-string/ connection URI]] from its string representation.
+   *
+   * {{{
+   * import scala.concurrent.{ ExecutionContext, Future }
+   * import reactivemongo.api.{ AsyncDriver, MongoConnection }
+   *
+   * def connectFromUri(drv: AsyncDriver, uri: String)(
+   *   implicit ec: ExecutionContext): Future[MongoConnection] = for {
+   *   parsedUri <- MongoConnection.fromString(uri)
+   *   con <- drv.connect(parsedUri)
+   * } yield con
+   * }}}
+   *
+   * @param uri the connection URI
+   */
+  def fromString(uri: String)(implicit ec: ExecutionContext): Future[ParsedURI] = fromString(uri, reactivemongo.util.dnsResolve(), reactivemongo.util.txtRecords())
+
+  private[reactivemongo] def fromString(
     uri: String,
     srvRecResolver: SRVRecordResolver,
-    txtResolver: TXTResolver): Try[ParsedURI] = {
+    txtResolver: TXTResolver)(
+    implicit
+    ec: ExecutionContext): Future[ParsedURI] = {
 
     val seedList = uri.startsWith("mongodb+srv://")
 
-    Try {
-      val useful: String = {
-        if (uri startsWith "mongodb://") uri.drop(10)
-        else if (seedList) uri.drop(14)
-        else throw new URIParsingException(s"Invalid scheme: $uri")
+    for {
+      useful <- {
+        if (uri startsWith "mongodb://") {
+          Future.successful(uri drop 10)
+        } else if (seedList) {
+          Future.successful(uri drop 14)
+        } else {
+          Future.failed(new URIParsingException(s"Invalid scheme: $uri"))
+        }
       }
+      setSpec = useful.takeWhile(_ != '?') // options already parsed
+      credentialEnd = setSpec.indexOf("@")
 
-      val setSpec = useful.takeWhile(_ != '?') // options already parsed
-      val credentialEnd = setSpec.indexOf("@")
-
-      def opts = {
+      (unsupportedKeys, options) <- {
         val empty = MongoConnectionOptions.default
         val initial = if (!seedList) empty else {
           empty.copy(sslEnabled = true)
         }
 
-        def txtOptions: Map[String, String] = {
+        def txtOptions: Future[Map[String, String]] = {
           if (!seedList) {
-            Map.empty[String, String]
+            Future.successful(Map.empty[String, String])
           } else {
             val serviceName = setSpec. // strip credentials before '@',
               drop(credentialEnd + 1).takeWhile(_ != '/') // and DB after '/'
 
-            val records = Await.result(
-              txtResolver(serviceName),
-              reactivemongo.util.dnsTimeout)
+            for {
+              records <- Await.ready(
+                txtResolver(serviceName),
+                reactivemongo.util.dnsTimeout)
+              res <- records.foldLeft(
+                Future.successful(Map.empty[String, String])) { (o, r) =>
+                  for {
+                    prev <- o
+                    cur <- parseOptions(r)
+                  } yield prev ++ cur
+                }
+            } yield res
+          }
+        }
 
-            records.foldLeft(Map.empty[String, String]) { (o, r) =>
-              o ++ parseOptions(r)
+        def optionStr = useful.drop(setSpec.size).stripPrefix("?")
+
+        for {
+          txt <- txtOptions
+          os <- parseOptions(optionStr)
+          opts = makeOptions(txt ++ os, initial)
+          res <- {
+            if (opts._2.maxIdleTimeMS != 0 &&
+              opts._2.maxIdleTimeMS < opts._2.heartbeatFrequencyMS) {
+
+              Future.failed[(List[String], MongoConnectionOptions)](new URIParsingException(s"Invalid URI options: maxIdleTimeMS(${opts._2.maxIdleTimeMS}) < heartbeatFrequencyMS(${opts._2.heartbeatFrequencyMS})"))
+            } else {
+              Future.successful(opts)
             }
           }
-        }
-
-        val optionStr = useful.drop(setSpec.size).stripPrefix("?")
-
-        makeOptions(txtOptions ++ parseOptions(optionStr), initial)
+        } yield res
       }
 
-      if (opts._2.maxIdleTimeMS != 0 &&
-        opts._2.maxIdleTimeMS < opts._2.heartbeatFrequencyMS) {
+      parsedUri <- {
+        if (credentialEnd == -1) {
+          parseHostsAndDbName(seedList, setSpec, srvRecResolver).flatMap {
+            case (db, hosts) => options.authenticationMechanism match {
+              case X509Authentication => db match {
+                case Some(dbName) => {
+                  val optsWithX509 = options.copy(credentials = Map(
+                    dbName -> MongoConnectionOptions.Credential("", None)))
 
-        throw new URIParsingException(s"Invalid URI options: maxIdleTimeMS(${opts._2.maxIdleTimeMS}) < heartbeatFrequencyMS(${opts._2.heartbeatFrequencyMS})")
-      }
+                  Future.successful(ParsedURI(
+                    hosts, optsWithX509, unsupportedKeys, db,
+                    Some(Authenticate(dbName, "", None))))
+                }
 
-      // ---
-
-      val (unsupportedKeys, options) = opts
-
-      if (credentialEnd == -1) {
-        val (db, hosts) = parseHostsAndDbName(seedList, setSpec, srvRecResolver)
-
-        options.authenticationMechanism match {
-          case X509Authentication => {
-            val dbName = db.getOrElse(throw new URIParsingException(s"Could not parse URI '$uri': authentication information found but no database name in URI"))
-
-            val optsWithX509 = options.copy(credentials = Map(
-              dbName -> MongoConnectionOptions.Credential("", None)))
-
-            ParsedURI(hosts.toList, optsWithX509, unsupportedKeys, db,
-              Some(Authenticate(dbName, "", None)))
-          }
-
-          case _ => ParsedURI(hosts.toList, options, unsupportedKeys, db, None)
-        }
-      } else {
-        val WithAuth = """([^:]+)(|:[^@]*)@(.+)""".r
-
-        setSpec match {
-          case WithAuth(user, p, hostsPortsAndDbName) => {
-            val pass = p.stripPrefix(":")
-            val (db, hosts) = parseHostsAndDbName(
-              seedList, hostsPortsAndDbName, srvRecResolver)
-
-            db.fold[ParsedURI](throw new URIParsingException(s"Could not parse URI '$uri': authentication information found but no database name in URI")) { database =>
-
-              if (options.authenticationMechanism == X509Authentication && pass.nonEmpty) {
-                throw new URIParsingException("You should not provide a password when authenticating with X509 authentication")
+                case _ =>
+                  Future.failed[ParsedURI](new URIParsingException(s"Could not parse URI '$uri': authentication information found but no database name in URI"))
               }
 
-              val password = {
-                if (options.authenticationMechanism != X509Authentication) {
-                  Option(pass)
-                } else Option.empty[String]
-              }
-
-              val authDb = options.authenticationDatabase.getOrElse(database)
-              val optsWithCred = options.copy(
-                credentials = options.credentials + (
-                  authDb -> MongoConnectionOptions.Credential(
-                    user, password)))
-
-              ParsedURI(hosts.toList, optsWithCred, unsupportedKeys,
-                Some(database), Some(Authenticate(authDb, user, password)))
+              case _ => Future.successful(
+                ParsedURI(hosts, options, unsupportedKeys, db, None))
             }
           }
+        } else {
+          val WithAuth = """([^:]+)(|:[^@]*)@(.+)""".r
 
-          case _ => throw new URIParsingException(s"Could not parse URI '$uri'")
+          setSpec match {
+            case WithAuth(user, p, hostsPortsAndDbName) => {
+              val pass = p.stripPrefix(":")
+
+              parseHostsAndDbName(
+                seedList, hostsPortsAndDbName, srvRecResolver).flatMap {
+                case (Some(database), hosts) => {
+                  if (options.authenticationMechanism == X509Authentication && pass.nonEmpty) {
+                    Future.failed[ParsedURI](new URIParsingException("You should not provide a password when authenticating with X509 authentication"))
+                  } else {
+                    val password = {
+                      if (options.authenticationMechanism != X509Authentication) {
+                        Option(pass)
+                      } else Option.empty[String]
+                    }
+
+                    val authDb = options.
+                      authenticationDatabase.getOrElse(database)
+
+                    val optsWithCred = options.copy(
+                      credentials = options.credentials + (
+                        authDb -> MongoConnectionOptions.Credential(
+                          user, password)))
+
+                    Future.successful(ParsedURI(
+                      hosts, optsWithCred, unsupportedKeys,
+                      Some(database),
+                      Some(Authenticate(authDb, user, password))))
+                  }
+                }
+
+                case _ =>
+                  Future.failed[ParsedURI](new URIParsingException(s"Could not parse URI '$uri': authentication information found but no database name in URI"))
+              }
+            }
+
+            case _ => Future.failed[ParsedURI](
+              new URIParsingException(s"Could not parse URI '$uri'"))
+          }
         }
       }
-    }
+    } yield parsedUri
   }
 
   private def parseHosts(
     seedList: Boolean,
     hosts: String,
-    srvRecResolver: SRVRecordResolver): List[(String, Int)] = {
+    srvRecResolver: SRVRecordResolver)(implicit ec: ExecutionContext): Future[ListSet[(String, Int)]] = {
     if (seedList) {
-      import scala.concurrent.ExecutionContext.Implicits.global
-
-      Await.result(
+      Await.ready(
         reactivemongo.util.srvRecords(hosts)(srvRecResolver),
-        reactivemongo.util.dnsTimeout).toList
-
+        reactivemongo.util.dnsTimeout).map {
+          ListSet.empty ++ _.toList
+        }
     } else {
-      hosts.split(",").map { h =>
-        h.span(_ != ':') match {
-          case ("", _) => throw new URIParsingException(
-            s"No valid host in the URI: '$h'")
+      val buf = ListSet.newBuilder[(String, Int)]
 
-          case (host, "") => host -> DefaultPort
+      @annotation.tailrec
+      def parse(input: Iterable[String]): Future[ListSet[(String, Int)]] =
+        input.headOption match {
+          case Some(h) => h.span(_ != ':') match {
+            case ("", _) => Future.failed(
+              new URIParsingException(s"No valid host in the URI: '$h'"))
 
-          case (host, port) => host -> {
-            try {
-              val p = port.drop(1).toInt
-              if (p > 0 && p < 65536) p
-              else throw new URIParsingException(
-                s"Could not parse host '$h' from URI: invalid port '$port'")
-
-            } catch {
-              case _: NumberFormatException => throw new URIParsingException(
-                s"Could not parse host '$h' from URI: invalid port '$port'")
-
-              case NonFatal(e) => throw e
+            case (host, "") => {
+              buf += host -> DefaultPort
+              parse(input.tail)
             }
+
+            case (host, port) => {
+              val res: Either[Throwable, (String, Int)] = try {
+                val p = port.drop(1).toInt
+
+                if (p <= 0 || p >= 65536) {
+                  Left(new URIParsingException(s"Could not parse host '$h' from URI: invalid port '$port'"))
+                } else {
+                  Right(host -> p)
+                }
+              } catch {
+                case _: NumberFormatException =>
+                  Left(new URIParsingException(s"Could not parse host '$h' from URI: invalid port '$port'"))
+
+                case NonFatal(cause) => Left(cause)
+              }
+
+              res match {
+                case Left(cause) =>
+                  Future.failed(cause)
+
+                case Right(node) => {
+                  buf += node
+                  parse(input.tail)
+                }
+              }
+            }
+
+            case _ => Future.failed(new URIParsingException(
+              s"Could not parse host from URI: invalid definition '$h'"))
           }
 
-          case _ => throw new URIParsingException(
-            s"Could not parse host from URI: invalid definition '$h'")
+          case _ =>
+            Future.successful(buf.result())
         }
-      }.toList
+
+      parse(hosts split ",")
     }
   }
 
   private def parseHostsAndDbName(
     seedList: Boolean,
     input: String,
-    srvRecResolver: SRVRecordResolver): (Option[String], List[(String, Int)]) =
+    srvRecResolver: SRVRecordResolver)(
+    implicit
+    ec: ExecutionContext): Future[(Option[String], ListSet[(String, Int)])] =
     input.span(_ != '/') match {
       case (hosts, "") =>
-        None -> parseHosts(seedList, hosts, srvRecResolver)
+        parseHosts(seedList, hosts, srvRecResolver).map(None -> _)
 
       case (hosts, dbName) =>
-        Some(dbName drop 1) -> parseHosts(seedList, hosts, srvRecResolver)
+        parseHosts(seedList, hosts, srvRecResolver).map {
+          Some(dbName drop 1) -> _
+        }
 
       case _ =>
-        throw new URIParsingException(
-          s"Could not parse hosts and database from URI: '$input'")
+        Future.failed(new URIParsingException(
+          s"Could not parse hosts and database from URI: '$input'"))
     }
 
-  private def parseOptions(options: String): Map[String, String] = {
+  private def parseOptions(options: String): Future[Map[String, String]] = {
     if (options.isEmpty) {
-      Map.empty[String, String]
+      Future.successful(Map.empty[String, String])
     } else {
-      util.toMap(options.split("&")) { option =>
-        option.split("=").toList match {
-          case key :: value :: Nil => (key -> value)
-          case _ => throw new URIParsingException(
-            s"Could not parse invalid options '$options'")
+      val buf = MMap.empty[String, String]
+
+      @annotation.tailrec
+      def parse(input: Iterable[String]): Future[Map[String, String]] =
+        input.headOption match {
+          case Some(option) => option.span(_ != '=') match {
+            case (_, "") => Future.failed[Map[String, String]](
+              new URIParsingException(
+                s"Could not parse invalid options '$options'"))
+
+            case (key, v) => {
+              buf.put(key, v.drop(1))
+              parse(input.tail)
+            }
+          }
+
+          case _ =>
+            Future.successful(buf.toMap)
         }
-      }
+
+      parse(options split "&")
     }
   }
 
@@ -604,10 +761,18 @@ object MongoConnection {
   @deprecated("Internal: will be made private", "0.16.0")
   val FailoverRe = "^([^:]+):([0-9]+)x([0-9.]+)$".r
 
-  @com.github.ghik.silencer.silent(".*Use\\ SCRAM\\ or\\ X509.*")
   private def makeOptions(
     opts: Map[String, String],
     initial: MongoConnectionOptions): (List[String], MongoConnectionOptions) = {
+
+    @inline def make(name: String, input: String, unsupported: Map[String, String], parsed: MongoConnectionOptions)(f: => MongoConnectionOptions): (Map[String, String], MongoConnectionOptions) = try {
+      unsupported -> f
+    } catch {
+      case NonFatal(cause) =>
+        logger.debug(s"Invalid option '$name': $input", cause)
+
+        (unsupported + (name -> input)) -> parsed
+    }
 
     val (remOpts, step1) = opts.iterator.foldLeft(
       Map.empty[String, String] -> initial) {
@@ -690,14 +855,18 @@ object MongoConnection {
           case ("rm.nbChannelsPerNode", v) => unsupported -> result.
             copy(nbChannelsPerNode = v.toInt)
 
-          case ("rm.reconnectDelayMS", opt @ IntRe(ms)) => {
+          case ("rm.reconnectDelayMS", IntRe(ms)) => {
             logger.warn(s"Connection option 'rm.reconnectDelayMS' deprecated: use option 'heartbeatFrequencyMS'")
 
-            Try(ms.toInt).filter(_ >= 500 /* ms */ ).toOption match {
-              case Some(interval) => unsupported -> result.copy(
-                heartbeatFrequencyMS = interval)
+            make("rm.reconnectDelayMS", ms, unsupported, result) {
+              val millis = ms.toInt
 
-              case _ => (unsupported + ("rm.reconnectDelayMS" -> opt)) -> result
+              if (millis < 500) {
+                throw new URIParsingException(
+                  s"'rm.reconnectDelayMS' must be >= 500 milliseconds")
+              }
+
+              result.copy(heartbeatFrequencyMS = millis)
             }
           }
 
@@ -741,35 +910,48 @@ object MongoConnection {
           case ("rm.failover", "strict") => unsupported -> result.copy(
             failoverStrategy = FailoverStrategy.strict)
 
-          case ("rm.failover", opt @ FailoverRe(d, r, f)) => (for {
-            (time, unit) <- Try(Duration(d)).toOption.flatMap(Duration.unapply)
-            delay <- Some(FiniteDuration(time, unit))
-            retry <- Try(r.toInt).toOption
-            factor <- Try(f.toDouble).toOption
-          } yield FailoverStrategy(delay, retry, _ * factor)) match {
-            case Some(strategy) =>
-              unsupported -> result.copy(failoverStrategy = strategy)
+          case ("rm.failover", opt @ FailoverRe(d, r, f)) =>
+            make("rm.failover", opt, unsupported, result) {
+              val (time, unit) = Duration.unapply(Duration(d)) match {
+                case Some(dur) => dur
+                case _ =>
+                  throw new URIParsingException(
+                    s"Invalid duration 'rm.failover': $opt")
+              }
 
-            case _ => (unsupported + ("rm.failover" -> opt)) -> result
-          }
+              val delay = FiniteDuration(time, unit)
+              val retry = r.toInt
+              val factor = f.toDouble
+              val strategy = FailoverStrategy(delay, retry, _ * factor)
 
-          case ("rm.monitorRefreshMS", opt @ IntRe(ms)) => {
+              result.copy(failoverStrategy = strategy)
+            }
+
+          case ("rm.monitorRefreshMS", IntRe(ms)) => {
             logger.warn(s"Connection option 'rm.monitorRefreshMS' deprecated: use option 'heartbeatFrequencyMS'")
 
-            Try(ms.toInt).filter(_ >= 500 /* ms */ ).toOption match {
-              case Some(interval) => unsupported -> result.copy(
-                heartbeatFrequencyMS = interval)
+            make("rm.monitorRefreshMS", ms, unsupported, result) {
+              val millis = ms.toInt
 
-              case _ => (unsupported + ("rm.monitorRefreshMS" -> opt)) -> result
+              if (millis < 500) {
+                throw new URIParsingException(
+                  "'rm.monitorRefreshMS' must be >= 500 milliseconds")
+              }
+
+              result.copy(heartbeatFrequencyMS = millis)
             }
           }
 
-          case ("heartbeatFrequencyMS", opt @ IntRe(ms)) =>
-            Try(ms.toInt).filter(_ >= 500 /* ms */ ).toOption match {
-              case Some(interval) => unsupported -> result.copy(
-                heartbeatFrequencyMS = interval)
+          case ("heartbeatFrequencyMS", IntRe(ms)) =>
+            make("heartbeatFrequencyMS", ms, unsupported, result) {
+              val millis = ms.toInt
 
-              case _ => (unsupported + ("heartbeatFrequencyMS" -> opt)) -> result
+              if (millis < 500) {
+                throw new URIParsingException(
+                  "'heartbeatFrequencyMS' must be >= 500 milliseconds")
+              }
+
+              result.copy(heartbeatFrequencyMS = millis)
             }
 
           case ("appName", nme) => Option(nme).map(_.trim).filter(v => {

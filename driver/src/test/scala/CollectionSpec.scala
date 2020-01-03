@@ -1,10 +1,12 @@
 import scala.concurrent._, duration.FiniteDuration
 
-import reactivemongo.api._
-
 import reactivemongo.api.bson.BSONDocument
 
+import reactivemongo.api.{ Cursor, DefaultDB, ReadConcern, ReadPreference }
+
 import reactivemongo.api.commands.{ CommandError, WriteConcern }
+
+import reactivemongo.api.collections.Hint
 
 import org.specs2.concurrent.ExecutionEnv
 
@@ -106,7 +108,7 @@ final class CollectionSpec(implicit protected val ee: ExecutionEnv)
         selector: Option[BSONDocument] = None,
         limit: Option[Int] = None,
         skip: Int = 0,
-        hint: Option[collections.Hint[pack.type]] = None,
+        hint: Option[Hint[pack.type]] = None,
         readConcern: ReadConcern = ReadConcern.Local) =
         collection.count(selector, limit, skip, hint, readConcern)
 
@@ -453,6 +455,19 @@ final class CollectionSpec(implicit protected val ee: ExecutionEnv)
               background = false,
               dropDups = false,
               sparse = false,
+              expireAfterSeconds = None,
+              storageEngine = None,
+              weights = None,
+              defaultLanguage = None,
+              languageOverride = None,
+              textIndexVersion = None,
+              sphereIndexVersion = None,
+              bits = None,
+              max = None,
+              min = None,
+              bucketSize = None,
+              collation = None,
+              wildcardProjection = None,
               version = None,
               partialFilter = None,
               options = BSONDocument()))

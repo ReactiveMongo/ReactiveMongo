@@ -17,7 +17,7 @@ import reactivemongo.api.ReadPreference
  */
 case class Request(
   requestID: Int,
-  responseTo: Int, // TODO remove, nothing to do here.
+  responseTo: Int,
   op: RequestOp,
   documents: BufferSequence,
   readPreference: ReadPreference = ReadPreference.primary,

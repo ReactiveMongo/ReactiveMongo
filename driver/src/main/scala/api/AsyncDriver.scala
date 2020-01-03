@@ -176,13 +176,14 @@ class AsyncDriver(
     if (!parsedURI.ignoredOptions.isEmpty) {
       Future.failed(new IllegalArgumentException(s"The connection URI contains unsupported options: ${parsedURI.ignoredOptions.mkString(", ")}"))
     } else {
-      val credentials = parsedURI.options.
+      @com.github.ghik.silencer.silent(".*authenticate.*" /*deprecated*/ )
+      def credentials = parsedURI.options.
         credentials ++ parsedURI.authenticate.map { a =>
           a.db -> MongoConnectionOptions.Credential(a.user, a.password)
         }
 
       askConnection(
-        parsedURI.hosts.map(h => h._1 + ':' + h._2),
+        parsedURI._hosts.map(h => h._1 + ':' + h._2).toSeq,
         parsedURI.options.copy(credentials = credentials),
         name)
     }
@@ -208,7 +209,17 @@ class AsyncDriver(
 
   /**
    * Closes this driver (and all its connections and resources).
-   * Will wait until the timeout for proper closing of connections before forcing hard shutdown.
+   * Will wait until the timeout for proper closing of connections
+   * before forcing hard shutdown.
+   *
+   * {{{
+   * import scala.concurrent.ExecutionContext
+   *
+   * def afterClose(drv: reactivemongo.api.AsyncDriver)(
+   *   implicit ec: ExecutionContext) = drv.close().andThen {
+   *     case res => println("Close 'Try' result: " + res)
+   *   }
+   * }}}
    */
   final def close(timeout: FiniteDuration = FiniteDuration(2, SECONDS))(implicit @deprecatedName(Symbol("executionContext")) ec: ExecutionContext): Future[Unit] = askClose(timeout)
 

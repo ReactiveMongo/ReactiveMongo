@@ -32,6 +32,7 @@ object BSONFindAndModifyImplicits {
         BSONSerializationPack)(
         result.getAs[BSONDocument]("lastErrorObject").map { doc =>
           FindAndModifyCommand.UpdateLastError(
+            BSONSerializationPack)(
             updatedExisting = doc.getAs[Boolean]("updatedExisting").getOrElse(false),
             n = doc.getAs[Int]("n").getOrElse(0),
             err = doc.getAs[String]("err"),

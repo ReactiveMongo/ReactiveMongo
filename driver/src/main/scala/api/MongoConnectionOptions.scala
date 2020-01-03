@@ -68,7 +68,7 @@ class MongoConnectionOptions private[reactivemongo] (
   @deprecated("Use heartbeatFrequencyMS", "0.16.4")
   @inline def monitorRefreshMS = heartbeatFrequencyMS
 
-  // TODO: Expose?
+  // TODO#1.1: Expose?
   @inline private[reactivemongo] def minIdleChannelsPerNode: Int = 1
 
   @deprecated("Use the other `copy`", "0.17.0")
@@ -221,6 +221,13 @@ class MongoConnectionOptions private[reactivemongo] (
   }
 }
 
+/**
+ * [[MongoConnectionOptions]] factory.
+ *
+ * {{{
+ * reactivemongo.api.MongoConnectionOptions(nbChannelsPerNode = 10)
+ * }}}
+ */
 object MongoConnectionOptions {
   /** The default options */
   @inline def default: MongoConnectionOptions = new MongoConnectionOptions()
@@ -356,7 +363,7 @@ object MongoConnectionOptions {
       "maxInFlightRequestsPerChannel" -> options.maxInFlightRequestsPerChannel.fold("<unlimited>")(_.toString),
       "heartbeatFrequencyMS" -> ms(options.heartbeatFrequencyMS),
       "connectTimeoutMS" -> ms(options.connectTimeoutMS),
-      "maxIdleTimeMS" -> ms(options.maxIdleTimeMS), // TODO: Review
+      "maxIdleTimeMS" -> ms(options.maxIdleTimeMS),
       "tcpNoDelay" -> options.tcpNoDelay.toString,
       "keepAlive" -> options.keepAlive.toString,
       "sslEnabled" -> options.sslEnabled.toString,

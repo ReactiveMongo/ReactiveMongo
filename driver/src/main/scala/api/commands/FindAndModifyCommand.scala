@@ -1,6 +1,6 @@
 package reactivemongo.api.commands
 
-import reactivemongo.api.{ SerializationPack, Session }
+import reactivemongo.api.{ Serialization, SerializationPack, Session }
 
 import reactivemongo.core.protocol.MongoWireVersion
 
@@ -186,11 +186,100 @@ object FindAndModifyCommand {
     val upsert = false
   }
 
-  case class UpdateLastError(
-    updatedExisting: Boolean,
-    upsertedId: Option[Any], // TODO. It is the id of the upserted value
-    n: Int,
-    err: Option[String])
+  sealed abstract class UpdateLastError extends Serializable with Product {
+    private[api] type Pack <: SerializationPack
+    private[api] val pack: Pack
+
+    // TODO#1.1: Refactor
+    lazy val upsertedId: Option[Any] = upserted.map { v => (v: Any) }
+    def updatedExisting: Boolean = false
+    def n: Int = 0
+    def err: Option[String] = None
+
+    /** Value of the upserted ID */
+    private[api] def upserted: Option[pack.Value] = None
+
+    @deprecated("No longer a case class", "0.19.8")
+    def canEqual(that: Any): Boolean = that match {
+      case _: UpdateLastError => true
+      case _                  => false
+    }
+
+    @deprecated("No longer a case class", "0.19.8")
+    val productArity = 4
+
+    @deprecated("No longer a case class", "0.19.8")
+    def productElement(n: Int): Any = n match {
+      case 0 => updatedExisting
+      case 1 => upsertedId
+      case 2 => n
+      case _ => err
+    }
+
+    // TODO#1.1: All fields after release
+    override def equals(that: Any): Boolean = that match {
+      case other: UpdateLastError => other.tupled == tupled
+      case _                      => false
+    }
+
+    // TODO#1.1: All fields after release
+    override def hashCode: Int = tupled.hashCode
+
+    private[commands] lazy val tupled =
+      Tuple4(updatedExisting, upsertedId, n, err)
+  }
+
+  object UpdateLastError extends scala.runtime.AbstractFunction4[Boolean, Option[Any], Int, Option[String], UpdateLastError] {
+    private[api] type Aux[P] = UpdateLastError { type Pack = P }
+
+    @deprecated("Use constructor with serialization pack", "0.19.8")
+    def apply(
+      updatedExisting: Boolean,
+      upsertedId: Option[Any],
+      n: Int,
+      err: Option[String]): UpdateLastError = {
+      def ue = updatedExisting
+      def ui = upsertedId
+      def _n = n
+      def e = err
+
+      new UpdateLastError {
+        type Pack = Serialization.Pack
+        override val pack = Serialization.internalSerializationPack
+        override val updatedExisting = ue
+        override lazy val upsertedId = ui
+        override val n = _n
+        override val err = e
+      }
+    }
+
+    def apply[P <: SerializationPack](_pack: P)(
+      updatedExisting: Boolean,
+      upsertedId: Option[_pack.Value],
+      n: Int,
+      err: Option[String]): UpdateLastError.Aux[_pack.type] = {
+      def ue = updatedExisting
+      lazy val ui = upsertedId
+      def _n = n
+      def e = err
+
+      new UpdateLastError {
+        type Pack = _pack.type
+        override val pack: Pack = _pack
+        override val updatedExisting = ue
+        override val upserted = ui
+        override val n = _n
+        override val err = e
+      }
+    }
+
+    @deprecated("No longer a case class", "0.19.8")
+    def unapply(that: Any): Option[(Boolean, Any, Int, Option[String])] =
+      that match {
+        case other: UpdateLastError => Option(other).map(_.tupled)
+        case _                      => None
+      }
+  }
 
   trait Result[P <: SerializationPack with Singleton] extends Serializable {
     val pack: P

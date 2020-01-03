@@ -42,6 +42,8 @@ import reactivemongo.util.{ LazyLogger, SimpleRing }
 
 import reactivemongo.api.Serialization
 
+import reactivemongo.core.netty.{ ChannelBufferReadableBuffer, ChannelFactory }
+
 import reactivemongo.core.ClientMetadata
 import reactivemongo.core.errors.GenericDriverException
 import reactivemongo.core.protocol.{
@@ -62,7 +64,6 @@ import reactivemongo.core.nodeset.{
   Authenticate,
   Authenticated,
   Authenticating,
-  ChannelFactory,
   Connection,
   ConnectionStatus,
   Node,
@@ -976,16 +977,14 @@ trait MongoDBSystem extends Actor {
       ()
     }
 
-  // TODO: Remove with MongoDB 2.6 end of support
+  // TODO#1.1: Remove with MongoDB 2.6 end of support
   private def onMongo26Write(
     response: Response, promise: Promise[Response]): Unit = {
 
-    // TODO - logs, bson
     // MongoDB 26 Write Protocol errors
     trace(s"Received a response to a MongoDB2.6 Write Op")
 
     import reactivemongo.bson.lowlevel._
-    import reactivemongo.core.netty.ChannelBufferReadableBuffer
 
     val fields = {
       val reader = new LowLevelBsonDocReader(

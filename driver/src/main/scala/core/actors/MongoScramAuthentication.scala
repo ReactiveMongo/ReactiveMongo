@@ -245,7 +245,7 @@ private[reactivemongo] sealed trait MongoScramAuthentication[M <: Authentication
               con.authenticating match {
                 case Some(a @ ScramAuthenticating(
                   db, _, _, _, _, Some(cid), Some(sig),
-                  1 /* step; TODO: more retry? */ )) => {
+                  1 /* step; TODO#1.1: more retry? */ )) => {
 
                   val serverSig: Option[String] =
                     ScramNegociation.parsePayload(payload).get("v")

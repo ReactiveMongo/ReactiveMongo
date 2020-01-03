@@ -2,7 +2,10 @@ package reactivemongo.api.collections
 
 import scala.language.higherKinds
 
+import scala.concurrent.duration.FiniteDuration
+
 import reactivemongo.api.{
+  Collation,
   Cursor,
   CursorOptions,
   CursorProducer,
@@ -22,9 +25,7 @@ import reactivemongo.api.commands.{
 import reactivemongo.core.protocol.MongoWireVersion
 
 private[collections] trait Aggregator[P <: SerializationPack with Singleton] {
-  collection: GenericCollection[P] =>
-
-  // TODO: comment, hint, collation, maxTimeMS
+  collection: GenericCollection[P] with HintFactory[P] =>
 
   // ---
 
@@ -42,8 +43,14 @@ private[collections] trait Aggregator[P <: SerializationPack with Singleton] {
     val readPreference: ReadPreference,
     val batchSize: Option[Int],
     val cursorOptions: CursorOptions,
-    val maxTimeMS: Option[Long],
-    val reader: pack.Reader[T]) {
+    val maxTime: Option[FiniteDuration],
+    val reader: pack.Reader[T],
+    val hint: Option[Hint[pack.type]],
+    val comment: Option[String],
+    val collation: Option[Collation]) {
+
+    @deprecated("Use `maxTime`", "0.19.8")
+    val maxTimeMS: Option[Long] = maxTime.map(_.toMillis)
 
     def prepared[AC[_] <: Cursor.WithOps[_]](
       implicit
@@ -66,7 +73,8 @@ private[collections] trait Aggregator[P <: SerializationPack with Singleton] {
         context.firstOperator, context.otherOperators, context.explain,
         context.allowDiskUse, batchSz, ver,
         context.bypassDocumentValidation,
-        context.readConcern, context.writeConcern)
+        context.readConcern, context.writeConcern,
+        context.hint, context.comment, context.collation)
 
       val cursor = runner.cursor[T, Aggregate[T]](
         collection, cmd, context.cursorOptions,
@@ -93,7 +101,10 @@ private[collections] trait Aggregator[P <: SerializationPack with Singleton] {
     val wireVersion: MongoWireVersion,
     val bypassDocumentValidation: Boolean,
     val readConcern: ReadConcern,
-    val writeConcern: WriteConcern) extends CollectionCommand
+    val writeConcern: WriteConcern,
+    val hint: Option[Hint[pack.type]],
+    val comment: Option[String],
+    val collation: Option[Collation]) extends CollectionCommand
     with CommandWithPack[pack.type]
     with CommandWithResult[T]
 
@@ -101,10 +112,11 @@ private[collections] trait Aggregator[P <: SerializationPack with Singleton] {
 
   private def commandWriter[T]: pack.Writer[AggregateCmd[T]] = {
     val builder = pack.newBuilder
-    val session = collection.db.session.filter( // TODO: Remove
+    val session = collection.db.session.filter( // TODO#1.1: Remove
       _ => (version.compareTo(MongoWireVersion.V36) >= 0))
 
     val writeWriteConcern = CommandCodecs.writeWriteConcern(builder)
+    val writeCollation = Collation.serializeWith(pack, _: Collation)(builder)
 
     pack.writer[AggregateCmd[T]] { agg =>
       import builder.{ boolean, document, elementProducer => element }
@@ -137,6 +149,22 @@ private[collections] trait Aggregator[P <: SerializationPack with Singleton] {
           cmd.bypassDocumentValidation))
 
         elements ++= writeReadConcern(cmd.readConcern)
+      }
+
+      cmd.comment.foreach { comment =>
+        elements += element("comment", builder.string(comment))
+      }
+
+      cmd.hint.foreach {
+        case HintString(str) =>
+          elements += element("hint", builder.string(str))
+
+        case HintDocument(doc) =>
+          elements += element("hint", doc)
+      }
+
+      cmd.collation.foreach { collation =>
+        elements += element("collation", writeCollation(collation))
       }
 
       if (cmd.wireVersion >= MongoWireVersion.V36 && isOut) {

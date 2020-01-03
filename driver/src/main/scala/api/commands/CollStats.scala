@@ -102,7 +102,8 @@ object CollStats
  * @param max The maximum number of documents of this collection, if capped.
  * @param maxSize The maximum size in bytes (or in bytes / scale, if any) of this collection, if capped.
  */
-case class CollStatsResult( // TODO: Move to `api` package
+@deprecated("Will be replaced by `reactivemongo.api.CollStatsResult`", "0.19.8")
+case class CollStatsResult( // TODO#1.1: Move to `api` package
   ns: String,
   count: Int,
   size: Double,

@@ -2,23 +2,23 @@ package reactivemongo.api.collections
 
 import scala.concurrent.{ ExecutionContext, Future }
 
-import reactivemongo.api.SerializationPack
+import reactivemongo.api.{ Collation, SerializationPack }
 
 import reactivemongo.api.commands.{
   CollectionCommand,
   Command,
   CommandWithResult,
-  Collation,
   ResolvedCollectionCommand,
   UnitBox
 }
 
-// TODO: Move to CollectionMetaCommands in parent package
 /** The meta commands for collection that require the serialization pack. */
 private[reactivemongo] trait GenericCollectionMetaCommands[P <: SerializationPack with Singleton] { self: GenericCollection[P] =>
 
   /**
-   * Creates a view on this collection, using an aggregation pipeline.
+   * [[https://docs.mongodb.com/manual/reference/method/db.createView/ Creates a view]] on this collection, using an aggregation pipeline.
+   *
+   * @since MongoDB 3.4
    *
    * {{{
    * import scala.concurrent.ExecutionContext
@@ -50,10 +50,8 @@ private[reactivemongo] trait GenericCollectionMetaCommands[P <: SerializationPac
    * @param operator the first (required) operator for the aggregation pipeline
    * @param pipeline the other pipeline operators
    * @param collation the view collation
-   *
-   * @see [[https://docs.mongodb.com/manual/reference/method/db.createView/ db.createView]]
    */
-  def createView( // TODO: Avoid GenericCollection with write op for view
+  def createView(
     name: String,
     operator: PipelineOperator,
     pipeline: Seq[PipelineOperator],

@@ -148,7 +148,7 @@ private[api] final class FoldResponses[T](
    */
   def !(message: Any): Unit = {
     actorSys.scheduler.scheduleOnce(
-      // TODO: on retry, add some delay according FailoverStrategy
+      // TODO#1.1: on retry, add some delay according FailoverStrategy
       scala.concurrent.duration.Duration.Zero)(handle(message))(ec)
 
     ()

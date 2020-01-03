@@ -6,9 +6,11 @@ import scala.math.Ordering
 
 import scala.util.{ Failure, Success, Try }
 
+import akka.actor.ActorRef
+
 import reactivemongo.io.netty.channel.ChannelId
 
-import akka.actor.ActorRef
+import reactivemongo.core.netty.ChannelFactory
 
 import reactivemongo.api.ReadPreference
 
@@ -78,7 +80,7 @@ case class NodeSet(
         con.status == ConnectionStatus.Connected) => node -> con
     }
 
-  // TODO: Remove when deprecated `pick` is also removed
+  // TODO#1.1: Remove when deprecated `pick` is also removed
   private val nodeDummyOrdering = Ordering.by[Node, String](_.name)
 
   @deprecated("", "")

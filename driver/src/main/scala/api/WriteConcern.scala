@@ -1,15 +1,7 @@
 package reactivemongo.api
 
-/** The [[https://docs.mongodb.com/manual/reference/write-concern/index.html write concern]] */
-trait WriteConcern { // TODO: sealed
-  def w: WriteConcern.W
-  def j: Boolean
-  def fsync: Boolean
-  def wtimeout: Option[Int]
-}
-
 /**
- * [[https://docs.mongodb.com/manual/reference/write-concern/index.html Write concern]] utilities.
+ * The [[https://docs.mongodb.com/manual/reference/write-concern/index.html write concern]].
  *
  * {{{
  * import scala.concurrent.ExecutionContext
@@ -22,6 +14,14 @@ trait WriteConcern { // TODO: sealed
  *     one(BSONDocument("foo" -> "bar"))
  * }}}
  */
+sealed trait WriteConcern {
+  def w: WriteConcern.W
+  def j: Boolean
+  def fsync: Boolean
+  def wtimeout: Option[Int]
+}
+
+/** [[WriteConcern]] utilities. */
 object WriteConcern {
   import reactivemongo.api.commands.GetLastError
 

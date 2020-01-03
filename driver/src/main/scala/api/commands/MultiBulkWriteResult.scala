@@ -1,13 +1,14 @@
 package reactivemongo.api.commands
 
-// TODO: Move to `api` ?
+// TODO#1.1: Move to `api` ?
+@deprecated("Will be replaced by `reactivemongo.api.MultiWriteResult`", "0.19.8")
 case class MultiBulkWriteResult(
   ok: Boolean,
   n: Int,
   nModified: Int,
   upserted: Seq[Upserted],
   writeErrors: Seq[WriteError],
-  writeConcernError: Option[WriteConcernError], // TODO ?
+  writeConcernError: Option[WriteConcernError],
   code: Option[Int],
   errmsg: Option[String],
   totalN: Int) {
@@ -37,6 +38,7 @@ case class MultiBulkWriteResult(
   }
 }
 
+@deprecated("Will be replaced by `reactivemongo.api.MultiWriteResult`", "0.19.8")
 object MultiBulkWriteResult {
   def apply(wr: WriteResult): MultiBulkWriteResult = empty.merge(wr)
 

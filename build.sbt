@@ -119,11 +119,9 @@ lazy val `ReactiveMongo` = new Driver(
   `ReactiveMongo-BSON-Compat`
 ).module
 
-lazy val `ReactiveMongo-JMX` = new Jmx(`ReactiveMongo`).module
-
 // ---
 
-def docSettings = Documentation(excludes = Seq(`ReactiveMongo-JMX`)).settings
+def docSettings = Documentation(excludes = Seq.empty).settings
 
 lazy val `ReactiveMongo-Root` = project.in(file(".")).
   enablePlugins(ScalaUnidocPlugin, CpdPlugin).
@@ -139,8 +137,7 @@ lazy val `ReactiveMongo-Root` = project.in(file(".")).
     `ReactiveMongo-BSON-Macros`,
     `ReactiveMongo-BSON-Compat`,
     `ReactiveMongo-Core`,
-    `ReactiveMongo`,
-    `ReactiveMongo-JMX`)
+    `ReactiveMongo`)
 
 lazy val benchmarks = (project in file("benchmarks")).
   enablePlugins(JmhPlugin).

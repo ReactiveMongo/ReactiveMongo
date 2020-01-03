@@ -19,6 +19,8 @@ import java.io.{ InputStream, OutputStream }
 import java.util.Arrays
 import java.security.MessageDigest
 
+import scala.util.control.NonFatal
+
 import scala.concurrent.{ ExecutionContext, Future }
 
 import reactivemongo.api.{
@@ -27,6 +29,7 @@ import reactivemongo.api.{
   CursorProducer,
   DB,
   DBMetaCommands,
+  FailingCursor,
   FailoverStrategy,
   QueryOpts,
   ReadPreference,
@@ -120,13 +123,16 @@ sealed trait GridFS[P <: SerializationPack]
    *     BSONDocument("filename" -> n)).headOption
    * }}}
    */
-  def find[S, Id <: pack.Value](selector: S)(implicit w: pack.Writer[S], r: FileReader[Id], cp: CursorProducer[ReadFile[Id]]): cp.ProducedCursor = {
-    val q = pack.serialize(selector, w) // TODO: Unsafe, failed cursor?
+  def find[S, Id <: pack.Value](selector: S)(implicit w: pack.Writer[S], r: FileReader[Id], cp: CursorProducer[ReadFile[Id]]): cp.ProducedCursor = try {
+    val q = pack.serialize(selector, w)
     val query = new QueryBuilder(fileColl, db.failoverStrategy, Some(q), None)
 
     import r.reader
 
     query.cursor[ReadFile[Id]](defaultReadPreference)
+  } catch {
+    case NonFatal(cause) =>
+      FailingCursor(db.connection, cause)
   }
 
   /**
@@ -334,6 +340,19 @@ sealed trait GridFS[P <: SerializationPack]
         background = false,
         dropDups = false,
         sparse = false,
+        expireAfterSeconds = None,
+        storageEngine = None,
+        weights = None,
+        defaultLanguage = None,
+        languageOverride = None,
+        textIndexVersion = None,
+        sphereIndexVersion = None,
+        bits = None,
+        min = None,
+        max = None,
+        bucketSize = None,
+        collation = None,
+        wildcardProjection = None,
         version = None, // let MongoDB decide
         partialFilter = None,
         options = builder.document(Seq.empty)))
@@ -346,6 +365,19 @@ sealed trait GridFS[P <: SerializationPack]
         background = false,
         dropDups = false,
         sparse = false,
+        expireAfterSeconds = None,
+        storageEngine = None,
+        weights = None,
+        defaultLanguage = None,
+        languageOverride = None,
+        textIndexVersion = None,
+        sphereIndexVersion = None,
+        bits = None,
+        min = None,
+        max = None,
+        bucketSize = None,
+        collation = None,
+        wildcardProjection = None,
         version = None, // let MongoDB decide
         partialFilter = None,
         options = builder.document(Seq.empty)))
@@ -572,12 +604,15 @@ sealed trait GridFS[P <: SerializationPack]
   // ---
 
   private final class QueryBuilder(
-    val collection: Collection,
+    override val collection: Collection,
     val failoverStrategy: FailoverStrategy,
     val queryOption: Option[pack.Document],
     val sortOption: Option[pack.Document]) extends GenericQueryBuilder[pack.type] {
     type Self = QueryBuilder
     val pack: self.pack.type = self.pack
+
+    protected lazy val version =
+      collection.db.connectionState.metadata.maxWireVersion
 
     val projectionOption = Option.empty[pack.Document]
     val hintOption = Option.empty[pack.Document]

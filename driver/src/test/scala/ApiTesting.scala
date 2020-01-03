@@ -25,11 +25,9 @@ import reactivemongo.core.protocol.{
   ResponseFrameDecoder,
   ResponseDecoder
 }
-import reactivemongo.core.nodeset.{
-  Authenticate,
-  ChannelFactory,
-  NodeSet
-}
+import reactivemongo.core.netty.ChannelFactory
+
+import reactivemongo.core.nodeset.{ Authenticate, NodeSet }
 import reactivemongo.core.actors, actors.{
   ChannelConnected,
   ChannelDisconnected,
@@ -262,8 +260,10 @@ package object tests {
   def parseURI(
     uri: String,
     srvResolver: reactivemongo.util.SRVRecordResolver,
-    txtResolver: reactivemongo.util.TXTResolver) =
-    MongoConnection.parseURI(uri, srvResolver, txtResolver)
+    txtResolver: reactivemongo.util.TXTResolver)(
+    implicit
+    ec: ExecutionContext) =
+    MongoConnection.fromString(uri, srvResolver, txtResolver)
 
   @inline def probe(con: MongoConnection, timeout: FiniteDuration) = con.probe(timeout)
 

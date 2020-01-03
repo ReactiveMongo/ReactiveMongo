@@ -16,6 +16,7 @@ import reactivemongo.api.indexes.CollectionIndexesManager
  * @define cappedSizeParam the size of the collection (number of bytes)
  * @define cappedMaxParam the maximum number of documents this capped collection can contain
  */
+@deprecated("Internal: will be made private", "0.19.8")
 trait CollectionMetaCommands { self: Collection =>
   private implicit lazy val unitBoxReader =
     CommandCodecs.unitBoxReader(command.pack)
@@ -72,9 +73,19 @@ trait CollectionMetaCommands { self: Collection =>
    *
    * The returned future will be completed with an error if this collection already exists.
    *
+   * {{{
+   * import scala.concurrent.{ ExecutionContext, Future }
+   *
+   * def capped(coll: reactivemongo.api.bson.collection.BSONCollection)(
+   *   implicit ec: ExecutionContext): Future[Unit] =
+   *   coll.createCapped(size = 10, maxDocuments = Some(100))
+   * }}}
+   *
    * @param size $cappedSizeParam
    * @param maxDocuments $cappedMaxParam
    * @param autoIndexId $autoIndexIdParam
+   *
+   * @see [[convertToCapped]]
    */
   def createCapped(
     size: Long,
@@ -123,6 +134,7 @@ trait CollectionMetaCommands { self: Collection =>
    *
    * @param failIfNotFound the flag to request whether it should fail
    */
+  @com.github.ghik.silencer.silent(".*DropCollectionResult.*" /*internal*/ )
   def drop(failIfNotFound: Boolean)(implicit ec: ExecutionContext): Future[Boolean] = {
     command(self, DropCollection, ReadPreference.primary).flatMap {
       case DropCollectionResult(false) if failIfNotFound =>
@@ -137,7 +149,15 @@ trait CollectionMetaCommands { self: Collection =>
   private implicit lazy val convertWriter = ConvertToCapped.writer(command.pack)
 
   /**
-   * Converts this collection to a capped one.
+   * Converts this collection to a [[https://docs.mongodb.com/manual/core/capped-collections/ capped one]].
+   *
+   * {{{
+   * import scala.concurrent.{ ExecutionContext, Future }
+   *
+   * def capColl(coll: reactivemongo.api.bson.collection.BSONCollection)(
+   *   implicit ec: ExecutionContext): Future[Unit] =
+   *   coll.convertToCapped(size = 10L, maxDocuments = Some(100))
+   * }}}
    *
    * @param size $cappedSizeParam
    * @param maxDocuments $cappedMaxParam
@@ -149,8 +169,7 @@ trait CollectionMetaCommands { self: Collection =>
    *
    * @param to the new name of this collection
    * @param dropExisting if a collection of name `to` already exists, then drops that collection before renaming this one
-   *
-   * @return a failure if the dropExisting option is false and the target collection already exists
+   * @return A failure if the dropExisting option is false and the target collection already exists.
    */
   @deprecated(message = "Use `reactivemongo.api.DBMetaCommands.renameCollection on the admin database instead.", since = "0.12.4")
   def rename(to: String, dropExisting: Boolean = false)(implicit ec: ExecutionContext): Future[Unit] = {
@@ -165,12 +184,28 @@ trait CollectionMetaCommands { self: Collection =>
 
   /**
    * Returns various information about this collection.
+   *
+   * {{{
+   * import scala.concurrent.{ ExecutionContext, Future }
+   *
+   * def isCapped(coll: reactivemongo.api.bson.collection.BSONCollection)(
+   *   implicit ec: ExecutionContext): Future[Boolean] =
+   *   coll.stats().map(_.capped)
+   * }}}
    */
   def stats()(implicit ec: ExecutionContext): Future[CollStatsResult] =
     command(self, CollStats(None), ReadPreference.primary)
 
   /**
    * Returns various information about this collection.
+   *
+   * {{{
+   * import scala.concurrent.{ ExecutionContext, Future }
+   *
+   * def getSize(coll: reactivemongo.api.bson.collection.BSONCollection)(
+   *   implicit ec: ExecutionContext): Future[Double] =
+   *   coll.stats(scale = 1024).map(_.size)
+   * }}}
    *
    * @param scale the scale factor (for example, to get all the sizes in kilobytes)
    */

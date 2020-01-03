@@ -57,6 +57,7 @@ private[api] trait Driver {
    * so it can have complete control separate from other
    * Actor Systems in the application
    */
+  @deprecated("Internal: will be made private", "0.19.8")
   val system = {
     import com.typesafe.config.ConfigFactory
 
@@ -124,7 +125,9 @@ private[api] trait Driver {
     } else {
       // Tell the supervisor to close.
       // It will shut down all the connections and monitors
-      (supervisorActor ? Close("Driver.askClose"))(Timeout(timeout)).recover {
+      def msg = Close("Driver.askClose", timeout)
+
+      (supervisorActor ? msg)(Timeout(timeout)).recover {
         case err =>
           err.setStackTrace(callerSTE)
 
@@ -144,58 +147,59 @@ private[api] trait Driver {
    * @param name $connectionNameParam
    */
   protected final def askConnection(
-    nodes: Seq[String], // TODO: Check nodes is empty
+    nodes: Seq[String],
     options: MongoConnectionOptions,
     name: Option[String]): Future[MongoConnection] = {
 
-    val nm = name.getOrElse(
-      s"Connection-${connectionCounter.incrementAndGet()}")
-
-    val authentications = options.credentials.map {
-      case (db, c) => Authenticate(db, c.user, c.password)
-    }.toSeq
-
-    val opts = options.appName match {
-      case Some(_) => options
-      case _       => options.withAppName(s"${supervisorName}/${nm}")
-    }
-
-    // TODO: Passing ref to MongoDBSystem.history to AddConnection
-    // TODO: pass opts.credentials.fallback
-
-    lazy val dbsystem: MongoDBSystem = opts.authMode match {
-      case CrAuthentication => new LegacyDBSystem(
-        supervisorName, nm, nodes, authentications, opts)
-
-      case X509Authentication => new StandardDBSystemWithX509(
-        supervisorName, nm, nodes, authentications, opts)
-
-      case ScramSha256Authentication => new StandardDBSystemWithScramSha256(
-        supervisorName, nm, nodes, authentications, opts)
-
-      case _ => new StandardDBSystem(
-        supervisorName, nm, nodes, authentications, opts)
-    }
-
-    val mongosystem = system.actorOf(Props(dbsystem), nm)
-
-    def timeout = if (opts.connectTimeoutMS > 0) {
-      Timeout(opts.connectTimeoutMS.toLong, MILLISECONDS)
+    if (nodes.isEmpty) {
+      Future.failed[MongoConnection](
+        reactivemongo.core.errors.ConnectionException("No node specified"))
     } else {
-      Timeout(10000L, MILLISECONDS) // 10s
-    }
+      val nm = name.getOrElse(
+        s"Connection-${connectionCounter.incrementAndGet()}")
 
-    def connection = (supervisorActor ? AddConnection(
-      nm, nodes, opts, mongosystem))(timeout)
+      val authentications = options.credentials.map {
+        case (db, c) => Authenticate(db, c.user, c.password)
+      }.toSeq
 
-    logger.info(s"[$supervisorName] Creating connection: $nm")
+      val opts = options.appName match {
+        case Some(_) => options
+        case _       => options.withAppName(s"${supervisorName}/${nm}")
+      }
 
-    import system.dispatcher
+      lazy val dbsystem: MongoDBSystem = opts.authMode match {
+        case CrAuthentication => new LegacyDBSystem(
+          supervisorName, nm, nodes, authentications, opts)
 
-    connection.mapTo[MongoConnection].map { c =>
-      // TODO: Review
-      c.history = () => dbsystem.internalState
-      c
+        case X509Authentication => new StandardDBSystemWithX509(
+          supervisorName, nm, nodes, authentications, opts)
+
+        case ScramSha256Authentication => new StandardDBSystemWithScramSha256(
+          supervisorName, nm, nodes, authentications, opts)
+
+        case _ => new StandardDBSystem(
+          supervisorName, nm, nodes, authentications, opts)
+      }
+
+      val mongosystem = system.actorOf(Props(dbsystem), nm)
+
+      def timeout = if (opts.connectTimeoutMS > 0) {
+        Timeout(opts.connectTimeoutMS.toLong, MILLISECONDS)
+      } else {
+        Timeout(10000L, MILLISECONDS) // 10s
+      }
+
+      def connection = (supervisorActor ? AddConnection(
+        nm, nodes, opts, mongosystem))(timeout)
+
+      logger.info(s"[$supervisorName] Creating connection: $nm")
+
+      import system.dispatcher
+
+      connection.mapTo[MongoConnection].map { c =>
+        c.history = () => dbsystem.internalState
+        c
+      }
     }
   }
 
@@ -241,7 +245,7 @@ private[api] trait Driver {
         ()
       }
 
-      case Close(src) => {
+      case close @ Close(src) => {
         logger.debug(s"[$supervisorName] Close the supervisor for $src")
 
         if (isEmpty) {
@@ -250,8 +254,7 @@ private[api] trait Driver {
         } else {
           context.become(closing)
 
-          // TODO
-          implicit def timeout = FiniteDuration(10, "seconds")
+          implicit def timeout = close.timeout
           implicit def ec: ExecutionContext = context.dispatcher
 
           Future.sequence(driver.connectionMonitors.values.map(_.askClose()))

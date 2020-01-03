@@ -140,7 +140,7 @@ object Command {
             case pack.IsDocument(doc) =>
               Future(pack.deserialize(doc, reader))
 
-            case Some(doc: reactivemongo.bson.BSONDocument) => // TODO: Remove
+            case Some(doc: reactivemongo.bson.BSONDocument) => // TODO#1.1: Remove
               Future(pack.deserialize(pack.document(doc), reader))
 
             case _ => Future.failed[T](cause)

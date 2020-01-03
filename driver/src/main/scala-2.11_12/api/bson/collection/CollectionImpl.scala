@@ -112,10 +112,12 @@ private[reactivemongo] final class CollectionImpl(
       val pack = commands.pack
     }
 
+    @deprecated("FindAndModify", "0.18.0")
     object FindAndModifyWriter extends BSONDocumentWriter[ResolvedCollectionCommand[FindAndModifyCommand.FindAndModify]] {
       def writeTry(cmd: ResolvedCollectionCommand[FindAndModifyCommand.FindAndModify]) = deprecated
     }
 
+    @deprecated("FindAndModifyResult", "0.18.0")
     object FindAndModifyReader
       extends BSONDocumentReader[FindAndModifyCommand.FindAndModifyResult] {
       def readDocument(doc: BSONDocument) = deprecated
@@ -125,10 +127,12 @@ private[reactivemongo] final class CollectionImpl(
       val pack = commands.pack
     }
 
+    @deprecated("AggregationFramework", "0.12.7")
     object AggregateWriter extends BSONDocumentWriter[ResolvedCollectionCommand[AggregationFramework.Aggregate]] {
       def writeTry(cmd: ResolvedCollectionCommand[AggregationFramework.Aggregate]) = deprecated
     }
 
+    @deprecated("AggregationFramework", "0.12.7")
     object AggregateReader extends BSONDocumentReader[AggregationFramework.AggregationResult] {
       def readDocument(doc: BSONDocument) = deprecated
     }

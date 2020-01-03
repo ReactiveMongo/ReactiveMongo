@@ -6,9 +6,7 @@ import scala.collection.generic.CanBuildFrom
 
 import scala.concurrent.{ ExecutionContext, Future }
 
-import reactivemongo.api.{ ReadConcern, SerializationPack }
-
-import reactivemongo.api.commands.Collation
+import reactivemongo.api.{ Collation, ReadConcern, SerializationPack }
 
 private[collections] trait DistinctOpCompat[P <: SerializationPack with Singleton] { collection: GenericCollection[P] with DistinctOp[P] =>
 

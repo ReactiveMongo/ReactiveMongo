@@ -10,6 +10,8 @@ import akka.actor.ActorRef
 
 import reactivemongo.bson.{ BSONDocument, BSONElement, BSONString }
 
+import reactivemongo.core.netty.ChannelFactory
+
 /**
  * @param name the main name of the node
  */
@@ -19,7 +21,7 @@ private[reactivemongo] sealed class Node(
   val aliases: Set[String],
   @transient val status: NodeStatus,
   @transient val connections: Vector[Connection],
-  @transient val authenticated: Set[Authenticated], // TODO: connections.authenticated (remove)
+  @transient val authenticated: Set[Authenticated],
   private[reactivemongo] val _tags: Map[String, String],
   val protocolMetadata: ProtocolMetadata,
   val pingInfo: PingInfo,
@@ -143,7 +145,7 @@ private[reactivemongo] sealed class Node(
         ConnectionStatus.Connecting, Set.empty, None, signaling)
     }
 
-  // TODO: Remove when aliases is refactored
+  // TODO#1.1: Remove when aliases is refactored
   private[reactivemongo] def _copy(
     name: String = this.name,
     status: NodeStatus = this.status,

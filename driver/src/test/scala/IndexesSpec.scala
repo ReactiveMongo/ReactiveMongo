@@ -96,17 +96,10 @@ final class IndexesSpec(implicit ee: ExecutionEnv)
 
         future must beLike[Index] {
           case idx @ Index.Key(("loc", Geo2D)) =>
-            lazy val opts = idx match {
-              case i: Index.Aux[Pack] => indexOptions(i)
-              case _                  => ???
-            }
-
-            def int(n: String) = decoder.int(opts, n)
-
-            int("min") must beSome(-95) and {
-              int("max") must beSome(95)
+            idx.min must beSome(-95) and {
+              idx.max must beSome(95)
             } and {
-              int("bits") must beSome(28)
+              idx.bits must beSome(28)
             }
 
         }.await(1, timeout)
@@ -306,6 +299,6 @@ final class IndexesSpec(implicit ee: ExecutionEnv)
     sparse: Boolean = false,
     version: Option[Int] = None, // let MongoDB decide
     partialFilter: Option[BSONDocument] = None,
-    options: BSONDocument = BSONDocument.empty) = Index[Pack](pack)(key, name, unique, background, dropDups, sparse, version, partialFilter, options)
+    options: BSONDocument = BSONDocument.empty) = Index[Pack](pack)(key, name, unique, background, dropDups, sparse, None, None, None, None, None, None, None, None, None, None, None, None, None, version, partialFilter, options)
 
 }

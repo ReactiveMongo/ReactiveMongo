@@ -28,7 +28,7 @@ trait DistinctCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] 
   /**
    * @param values the raw values (should not contain duplicate)
    */
-  case class DistinctResult(values: Traversable[pack.Value]) {
+  sealed case class DistinctResult(values: Traversable[pack.Value]) {
     @annotation.tailrec
     private def result[T, M[_]](values: Traversable[pack.Value], reader: pack.WidenValueReader[T], out: Builder[T, M[T]]): Try[M[T]] =
       values.headOption match {

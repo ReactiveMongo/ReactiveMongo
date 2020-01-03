@@ -24,7 +24,6 @@ import scala.concurrent.duration.FiniteDuration
 import reactivemongo.api._
 import reactivemongo.api.commands.{
   CommandCodecs,
-  Collation,
   FindAndModifyCommand => FNM,
   ImplicitCommandHelpers,
   UnitBox,
@@ -55,6 +54,7 @@ trait GenericCollectionProducer[P <: SerializationPack with Singleton, +C <: Gen
  * @define returnQueryBuilder A [[GenericQueryBuilder]] that you can use to to customize the query. You can obtain a cursor by calling the method [[reactivemongo.api.Cursor]] on this query builder.
  * @define implicitWriterT An implicit `Writer[T]` typeclass for handling it has to be in the scope
  * @define writeConcernParam the [[https://docs.mongodb.com/manual/reference/write-concern/ writer concern]] to be used
+ * @define bypassDocumentValidationParam the flag to bypass document validation during the operation
  * @define writerParam the writer to create the document
  * @define upsertParam if true, creates a new document if no document is matching, otherwise if at least one document matches, an update is applied
  * @define returnWriteResult a future [[reactivemongo.api.commands.WriteResult]] that can be used to check whether the insertion was successful
@@ -79,6 +79,8 @@ trait GenericCollectionProducer[P <: SerializationPack with Singleton, +C <: Gen
  * @define orderedParam the [[https://docs.mongodb.com/manual/reference/method/db.collection.insert/#perform-an-unordered-insert ordered]] behaviour
  * @define collationParam the collation
  * @define arrayFiltersParam an array of filter documents that determines which array elements to modify for an update operation on an array field
+ * @define hintParam the index to use (either the index name or the index document)
+ * @define maxTimeParam the time limit for processing operations on a cursor (`maxTimeMS`)
  */
 trait GenericCollection[P <: SerializationPack with Singleton]
   extends Collection with GenericCollectionWithCommands[P]
@@ -192,7 +194,7 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * @param selector $selectorParam (default: `None` to count all)
    * @param limit the maximum number of matching documents to count
    * @param skip the number of matching documents to skip before counting
-   * @param hint the index to use (either the index name or the index document)
+   * @param hint $hintParam
    */
   @deprecated("Use `count` with `readConcern` parameter", "0.16.0")
   def count[H](
@@ -269,7 +271,7 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    */
   @deprecated("Use `.insert(ordered = false).one(..)`", "0.16.1")
   def insert[T](document: T, writeConcern: WriteConcern = writeConcern)(implicit writer: pack.Writer[T], ec: ExecutionContext): Future[WriteResult] =
-    prepareInsert(true, writeConcern).one(document)
+    prepareInsert(true, writeConcern, false).one(document)
 
   /**
    * Returns an unordered builder for insert operations.
@@ -293,7 +295,7 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    *   coll.insert.many(multiInserts)
    * }}}
    */
-  def insert: InsertBuilder = prepareInsert(false, writeConcern)
+  def insert: InsertBuilder = prepareInsert(false, writeConcern, false)
 
   /**
    * Returns a builder for insert operations.
@@ -318,7 +320,7 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * }}}
    */
   def insert(ordered: Boolean): InsertBuilder =
-    prepareInsert(ordered, writeConcern)
+    prepareInsert(ordered, writeConcern, false)
 
   /**
    * Returns a builder for insert operations.
@@ -331,15 +333,44 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * {{{
    * import scala.concurrent.ExecutionContext
    *
+   * import reactivemongo.api.WriteConcern
    * import reactivemongo.api.bson.BSONDocument
    * import reactivemongo.api.bson.collection.BSONCollection
    *
    * def withDefaultWriteConcern(coll: BSONCollection, query: BSONDocument)(
-   *   implicit ec: ExecutionContext) = coll.insert(true).one(query)
+   *   implicit ec: ExecutionContext) =
+   *   coll.insert(true, WriteConcern.Journaled).one(query)
    * }}}
    */
   def insert(ordered: Boolean, writeConcern: WriteConcern): InsertBuilder =
-    prepareInsert(ordered, writeConcern)
+    prepareInsert(ordered, writeConcern, false)
+
+  /**
+   * Returns a builder for insert operations.
+   *
+   * @tparam T The type of the document to insert. $implicitWriterT.
+   *
+   * @param ordered $orderedParam
+   * @param writeConcern $writeConcernParam
+   * @param bypassDocumentValidation $bypassDocumentValidationParam
+   *
+   * {{{
+   * import scala.concurrent.ExecutionContext
+   *
+   * import reactivemongo.api.WriteConcern
+   * import reactivemongo.api.bson.BSONDocument
+   * import reactivemongo.api.bson.collection.BSONCollection
+   *
+   * def withDefaultWriteConcern(coll: BSONCollection, query: BSONDocument)(
+   *   implicit ec: ExecutionContext) =
+   *   coll.insert(true, WriteConcern.Journaled, true).one(query)
+   * }}}
+   */
+  def insert(
+    ordered: Boolean,
+    writeConcern: WriteConcern,
+    bypassDocumentValidation: Boolean): InsertBuilder =
+    prepareInsert(ordered, writeConcern, bypassDocumentValidation)
 
   /**
    * Updates one or more documents matching the given selector
@@ -359,7 +390,10 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * @return $returnWriteResult
    */
   @deprecated("Use `.update(ordered = false).one(..)`", "0.16.1")
-  def update[S, T](selector: S, update: T, writeConcern: WriteConcern = writeConcern, upsert: Boolean = false, multi: Boolean = false)(implicit swriter: pack.Writer[S], writer: pack.Writer[T], ec: ExecutionContext): Future[UpdateWriteResult] = prepareUpdate(ordered = true, writeConcern = writeConcern).
+  def update[S, T](selector: S, update: T, writeConcern: WriteConcern = writeConcern, upsert: Boolean = false, multi: Boolean = false)(implicit swriter: pack.Writer[S], writer: pack.Writer[T], ec: ExecutionContext): Future[UpdateWriteResult] = prepareUpdate(
+    ordered = true,
+    writeConcern = writeConcern,
+    bypassDocumentValidation = false).
     one(selector, update, upsert, multi)
 
   /**
@@ -380,7 +414,7 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * }
    * }}}
    */
-  def update: UpdateBuilder = prepareUpdate(false, writeConcern)
+  def update: UpdateBuilder = prepareUpdate(false, writeConcern, false)
 
   /**
    * Returns an update builder.
@@ -400,9 +434,11 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    *     one(query, update, upsert = false, multi = false)
    * }
    * }}}
+   *
+   * @param ordered $orderedParam
    */
   def update(ordered: Boolean): UpdateBuilder =
-    prepareUpdate(ordered, writeConcern)
+    prepareUpdate(ordered, writeConcern, false)
 
   /**
    * Returns an update builder.
@@ -422,11 +458,46 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * )(implicit ec: ExecutionContext) =
    *   coll.update(ordered = false, writeConcern = wc).one(query, update)
    * }}}
+   *
+   * @param ordered $orderedParam
+   * @param writeConcern $writeConcernParam
    */
   def update(
     ordered: Boolean,
     writeConcern: WriteConcern): UpdateBuilder =
-    prepareUpdate(ordered, writeConcern)
+    prepareUpdate(ordered, writeConcern, false)
+
+  /**
+   * Returns an update builder.
+   *
+   * {{{
+   * import scala.concurrent.ExecutionContext
+   *
+   * import reactivemongo.api.commands.WriteConcern
+   * import reactivemongo.api.bson.BSONDocument
+   * import reactivemongo.api.bson.collection.BSONCollection
+   *
+   * def withDefaultWriteConcern(
+   *   coll: BSONCollection,
+   *   query: BSONDocument,
+   *   update: BSONDocument,
+   *   wc: WriteConcern
+   * )(implicit ec: ExecutionContext) = coll.update(
+   *   ordered = false,
+   *   writeConcern = wc,
+   *   bypassDocumentValidation = true
+   * ).one(query, update)
+   * }}}
+   *
+   * @param ordered $orderedParam
+   * @param writeConcern $writeConcernParam
+   * @param bypassDocumentValidation $bypassDocumentValidationParam
+   */
+  def update(
+    ordered: Boolean,
+    writeConcern: WriteConcern,
+    bypassDocumentValidation: Boolean): UpdateBuilder =
+    prepareUpdate(ordered, writeConcern, bypassDocumentValidation)
 
   /**
    * Returns an update modifier, to be used with `findAndModify`.
@@ -489,7 +560,7 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * @param fields $fieldsParam
    * @param bypassDocumentValidation
    * @param writeConcern $writeConcernParam
-   * @param maxTime
+   * @param maxTime $maxTimeParam
    * @param collation $collationParam
    * @param arrayFilters $arrayFiltersParam
    * @param swriter $swriterParam
@@ -566,7 +637,7 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * @param writeConcern $writeConcernParam
    * @param swriter $swriterParam
    * @param writer $writerParam
-   * @param maxTime
+   * @param maxTime $maxTimeParam
    * @param collation $collationParam
    * @param arrayFilters $arrayFiltersParam
    */
@@ -628,7 +699,7 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * @param sort $sortParam
    * @param fields $fieldsParam
    * @param writeConcern $writeConcernParam
-   * @param maxTime
+   * @param maxTime $maxTimeParam
    * @param collation $collationParam
    * @param arrayFilters $arrayFiltersParam
    * @param swriter $swriterParam
@@ -706,6 +777,37 @@ trait GenericCollection[P <: SerializationPack with Singleton]
   @deprecated("Use aggregator context with optional writeConcern", "0.17.0")
   @inline def aggregatorContext[T](firstOperator: PipelineOperator, otherOperators: List[PipelineOperator], explain: Boolean, allowDiskUse: Boolean, bypassDocumentValidation: Boolean, readConcern: Option[ReadConcern], readPreference: ReadPreference, batchSize: Option[Int])(implicit reader: pack.Reader[T]): AggregatorContext[T] = aggregatorContext[T](firstOperator, otherOperators, explain, allowDiskUse, bypassDocumentValidation, readConcern, readPreference, this.writeConcern, batchSize, CursorOptions.empty)
 
+  @deprecated("Use aggregator context with comment", "0.19.8")
+  @inline def aggregatorContext[T](
+    firstOperator: PipelineOperator,
+    otherOperators: List[PipelineOperator] = Nil,
+    explain: Boolean = false,
+    allowDiskUse: Boolean = false,
+    bypassDocumentValidation: Boolean = false,
+    readConcern: Option[ReadConcern] = None,
+    readPreference: ReadPreference = ReadPreference.primary,
+    writeConcern: WriteConcern = this.writeConcern,
+    batchSize: Option[Int] = None,
+    cursorOptions: CursorOptions = CursorOptions.empty,
+    maxTimeMS: Option[Long] = None)(implicit reader: pack.Reader[T]): AggregatorContext[T] = {
+    new AggregatorContext[T](
+      firstOperator,
+      otherOperators,
+      explain,
+      allowDiskUse,
+      bypassDocumentValidation,
+      readConcern = readConcern.getOrElse(self.readConcern),
+      readPreference = readPreference,
+      writeConcern = writeConcern,
+      batchSize = batchSize,
+      cursorOptions = cursorOptions,
+      maxTime = maxTimeMS.map(FiniteDuration(_, "milliseconds")),
+      hint = None,
+      comment = None,
+      collation = None,
+      reader = reader)
+  }
+
   /**
    * [[http://docs.mongodb.org/manual/reference/command/aggregate/ Aggregates]] the matching documents.
    *
@@ -746,35 +848,44 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * @param writeConcern $writeConcernParam
    * @param batchSize $aggBatchSizeParam
    * @param cursorOptions the options for the result cursor
-   * @param maxTimeMS specifies a time limit in milliseconds for processing operations on a cursor.
+   * @param maxTime $maxTimeParam
+   * @param hint $hintParam
+   * @param comment the [[https://docs.mongodb.com/manual/reference/method/cursor.comment/#cursor.comment comment]] to annotation the aggregation command
+   * @param collation $collationParam
    * @param reader $readerParam
    * @param cp $cursorProducerParam
    */
   def aggregatorContext[T](
     firstOperator: PipelineOperator,
-    otherOperators: List[PipelineOperator] = Nil,
-    explain: Boolean = false,
-    allowDiskUse: Boolean = false,
-    bypassDocumentValidation: Boolean = false,
-    readConcern: Option[ReadConcern] = None,
-    readPreference: ReadPreference = ReadPreference.primary,
-    writeConcern: WriteConcern = this.writeConcern,
-    batchSize: Option[Int] = None,
-    cursorOptions: CursorOptions = CursorOptions.empty,
-    maxTimeMS: Option[Long] = None)(implicit reader: pack.Reader[T]): AggregatorContext[T] = {
+    otherOperators: List[PipelineOperator],
+    explain: Boolean,
+    allowDiskUse: Boolean,
+    bypassDocumentValidation: Boolean,
+    readConcern: ReadConcern,
+    readPreference: ReadPreference,
+    writeConcern: WriteConcern,
+    batchSize: Option[Int],
+    cursorOptions: CursorOptions,
+    maxTime: Option[FiniteDuration],
+    hint: Option[Hint[pack.type]],
+    comment: Option[String],
+    collation: Option[Collation])(implicit reader: pack.Reader[T]): AggregatorContext[T] = {
     new AggregatorContext[T](
       firstOperator,
       otherOperators,
       explain,
       allowDiskUse,
       bypassDocumentValidation,
-      readConcern.getOrElse(self.readConcern),
+      readConcern,
       writeConcern,
       readPreference,
       batchSize,
       cursorOptions,
-      maxTimeMS,
-      reader)
+      maxTime,
+      reader,
+      hint,
+      comment,
+      collation)
   }
 
   /**
@@ -843,7 +954,7 @@ trait GenericCollection[P <: SerializationPack with Singleton]
 
   /** The default read preference */
   @inline def readPreference: ReadPreference = db.defaultReadPreference
-  // TODO: Remove default value from this trait after next release
+  // TODO#1.1: Remove default value from this trait after next release
 
   /** The default read concern */
   @inline protected def readConcern = db.connection.options.readConcern
