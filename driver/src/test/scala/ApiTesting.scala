@@ -38,7 +38,7 @@ import reactivemongo.core.actors, actors.{
 
 import reactivemongo.bson.BSONDocument
 
-import reactivemongo.api.collections.QueryCodecs
+import reactivemongo.api.collections.{ GenericQueryBuilder, QueryCodecs }
 
 import reactivemongo.api.indexes.Index
 
@@ -86,6 +86,11 @@ package object tests {
       case (time: Long, event: String) => time -> event
     }
   }
+
+  def merge[P <: SerializationPack](
+    qb: GenericQueryBuilder[P],
+    pref: ReadPreference,
+    maxDocs: Int) = qb.merge(pref, maxDocs)
 
   def nodeSet(sys: MongoDBSystem): NodeSet = sys.getNodeSet
 
