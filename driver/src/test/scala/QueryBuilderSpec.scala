@@ -1,9 +1,16 @@
 import reactivemongo.core.protocol.MongoWireVersion
 
-import reactivemongo.api.{ Collation, FailoverStrategy, QueryOpts }
+import reactivemongo.api.{
+  Collation,
+  FailoverStrategy,
+  QueryOpts,
+  ReadPreference
+}
 import reactivemongo.api.collections.GenericQueryBuilder
 
 import reactivemongo.api.bson.BSONDocument
+
+import reactivemongo.api.tests
 
 final class QueryBuilderSpec extends org.specs2.mutable.Specification { specs =>
   "Query builder" title
@@ -81,6 +88,125 @@ final class QueryBuilderSpec extends org.specs2.mutable.Specification { specs =>
   }
 
   section("unit")
+
+  "Merge" should {
+    lazy val coll = _root_.tests.Common.db(
+      s"querybuilder${System identityHashCode this}")
+
+    section("mongo2")
+    "for MongoDB 2.6" >> {
+      "write minimal query" in {
+        val builder = coll.find(
+          BSONDocument("username" -> "John Doe"),
+          Option.empty[BSONDocument])
+
+        val expected = BSONDocument(
+          f"$$query" -> BSONDocument("username" -> "John Doe"),
+          f"$$readPreference" -> BSONDocument("mode" -> "primary"))
+
+        tests.merge(
+          builder, ReadPreference.Primary, 1) must_=== expected
+      }
+
+      "write with more options" >> {
+        lazy val builder1: GenericQueryBuilder[coll.pack.type] =
+          coll.find(
+            BSONDocument("username" -> "John Doe"),
+            Option.empty[BSONDocument]).sort(BSONDocument("age" -> 1))
+
+        "with query builder #1" in {
+          val expected = BSONDocument(
+            f"$$query" -> BSONDocument("username" -> "John Doe"),
+            f"$$orderby" -> BSONDocument("age" -> 1),
+            f"$$readPreference" -> BSONDocument("mode" -> "primary"))
+
+          tests.merge(
+            builder1, ReadPreference.Primary, 1) must_=== expected
+        }
+
+        "with query builder #2" in {
+          val builder2 = builder1.comment("get john doe users sorted by age")
+
+          val expected = BSONDocument(
+            f"$$query" -> BSONDocument("username" -> "John Doe"),
+            f"$$orderby" -> BSONDocument("age" -> 1),
+            f"$$comment" -> "get john doe users sorted by age",
+            f"$$readPreference" -> BSONDocument("mode" -> "primary"))
+
+          tests.merge(
+            builder2, ReadPreference.Primary, 1) must_=== expected
+        }
+      }
+    }
+    section("mongo2")
+
+    section("gt_mongo32")
+    "for MongoDB >3.2" >> {
+      "write minimal query" in {
+        val builder = coll.find(
+          BSONDocument("username" -> "John Doe"),
+          Option.empty[BSONDocument])
+
+        val expected = BSONDocument(
+          "find" -> coll.name,
+          "skip" -> 0,
+          "tailable" -> false,
+          "awaitData" -> false,
+          "oplogReplay" -> false,
+          "noCursorTimeout" -> false,
+          "allowPartialResults" -> false,
+          "singleBatch" -> false,
+          "returnKey" -> false,
+          "showRecordId" -> false,
+          "filter" -> BSONDocument("username" -> "John Doe"),
+          "limit" -> 10, // maxDocs
+          "readConcern" -> BSONDocument("level" -> "local"),
+          f"$$readPreference" -> BSONDocument("mode" -> "primary"))
+
+        tests.merge(
+          builder, ReadPreference.Primary, 10) must_=== expected
+      }
+
+      "write with more options" >> {
+        lazy val builder1: GenericQueryBuilder[pack.type] = coll.find(
+          BSONDocument("username" -> "John Doe"), Option.empty[BSONDocument]).
+          sort(BSONDocument("age" -> 1))
+
+        val expected1 = BSONDocument(
+          "find" -> coll.name,
+          "skip" -> 0,
+          "tailable" -> false,
+          "awaitData" -> false,
+          "oplogReplay" -> false,
+          "noCursorTimeout" -> false,
+          "allowPartialResults" -> false,
+          "singleBatch" -> false,
+          "returnKey" -> false,
+          "showRecordId" -> false,
+          "filter" -> BSONDocument("username" -> "John Doe"),
+          "limit" -> 11,
+          "sort" -> BSONDocument("age" -> 1),
+          "readConcern" -> BSONDocument("level" -> "local"),
+          f"$$readPreference" -> BSONDocument("mode" -> "primary"))
+
+        "with query builder #1" in {
+          tests.merge(
+            builder1, ReadPreference.Primary, 11) must_=== expected1
+        }
+
+        "with query builder #2" in {
+          val c = "get john doe users sorted by age"
+          val builder2 = builder1.comment(c)
+
+          val expected = expected1 ++ ("comment" -> c, "limit" -> 12)
+
+          tests.merge(
+            builder2, ReadPreference.Primary, 12) must_=== expected
+        }
+      }
+    }
+    section("gt_mongo32")
+  }
 
   // ---
 

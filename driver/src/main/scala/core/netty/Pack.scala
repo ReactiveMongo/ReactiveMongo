@@ -15,6 +15,15 @@ private[core] final class Pack(
   val eventLoopGroup: () => EventLoopGroup,
   val channelClass: Class[_ <: Channel]) {
 
+  override def equals(that: Any): Boolean = that match {
+    case other: Pack =>
+      other.channelClass.getName == channelClass.getName
+
+    case _ => false
+  }
+
+  override def hashCode: Int = channelClass.getName.hashCode
+
   override def toString = s"NettyPack(${channelClass.getName})"
 }
 
@@ -43,7 +52,7 @@ private[core] object Pack {
     else "io.netty.channel.kqueue"
   }
 
-  private def kqueue: Option[Pack] = try {
+  private[core] def kqueue: Option[Pack] = try {
     Some(Class.forName(
       s"${kqueuePkg}.KQueueSocketChannel")).map { cls =>
       val chanClass = cls.asInstanceOf[Class[_ <: Channel]]
@@ -68,7 +77,7 @@ private[core] object Pack {
     else "io.netty.channel.epoll"
   }
 
-  private def epoll: Option[Pack] = try {
+  private[core] def epoll: Option[Pack] = try {
     Some(Class.forName(
       s"${epollPkg}.EpollSocketChannel")).map { cls =>
 
@@ -89,7 +98,7 @@ private[core] object Pack {
       None
   }
 
-  @inline private def nio = new Pack(
+  @inline private[core] def nio = new Pack(
     () => new NioEventLoopGroup(), classOf[NioSocketChannel])
 
 }

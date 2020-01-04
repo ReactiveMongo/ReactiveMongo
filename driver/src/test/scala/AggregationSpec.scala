@@ -435,8 +435,12 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
 
       import coll.aggregationFramework.Lookup
 
-      orders.aggregatorContext[InventoryReport](Lookup(inventory.name, "item", "sku", "docs")).prepared.cursor
-        .collect[List](Int.MaxValue, Cursor.FailOnError[List[InventoryReport]]()) must beTypedEqualTo(expected).await(0, timeout)
+      orders.aggregatorContext[InventoryReport](
+        Lookup(inventory.name, "item", "sku", "docs")).
+        prepared.cursor.collect[List](
+          Int.MaxValue, Cursor.FailOnError[List[InventoryReport]]()).
+          aka("result") must beTypedEqualTo(expected).await(0, timeout)
+
     } tag "not_mongo26"
 
     "perform a graph lookup so the joined documents are returned" in {
@@ -454,68 +458,13 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
 
       import coll.aggregationFramework.GraphLookup
 
-      orders.aggregatorContext[InventoryReport](GraphLookup(inventory.name, BSONString(f"$$item"), "item", "sku", "docs")).prepared.cursor
-        .collect[List](Int.MaxValue, Cursor.FailOnError[List[InventoryReport]]()) must beTypedEqualTo(expected).await(0, timeout)
+      orders.aggregatorContext[InventoryReport](
+        GraphLookup(
+          inventory.name, BSONString(f"$$item"), "item", "sku", "docs")).prepared.cursor.collect[List](
+          Int.MaxValue, Cursor.FailOnError[List[InventoryReport]]()).
+          aka("result") must beTypedEqualTo(expected).await(0, timeout)
+
     } tag "gt_mongo32"
-
-    "prepare stage to group in bucket" in {
-      // https://docs.mongodb.com/manual/reference/operator/aggregation/bucketAuto/
-
-      import coll.aggregationFramework.BucketAuto
-
-      BucketAuto(BSONString(f"$$price"), 3, None)().
-        makePipe must_=== BSONDocument(f"$$bucketAuto" -> BSONDocument(
-          "groupBy" -> f"$$price",
-          "buckets" -> 3,
-          "output" -> BSONDocument.empty))
-    }
-
-    // Sales
-
-    val sales: BSONCollection = db.collection(s"agg-sales-A-${System identityHashCode this}")
-    implicit val saleItemHandler: BSONDocumentHandler[SaleItem] = Macros.handler[SaleItem]
-    implicit val saleHandler: BSONDocumentHandler[Sale] = Macros.handler[Sale]
-
-    "be provided with sale fixtures" in {
-      def fixtures = Seq(
-        document("_id" -> 0, "items" -> array(
-          document("itemId" -> 43, "quantity" -> 2, "price" -> 10),
-          document("itemId" -> 2, "quantity" -> 1, "price" -> 240))),
-        document("_id" -> 1, "items" -> array(
-          document("itemId" -> 23, "quantity" -> 3, "price" -> 110),
-          document("itemId" -> 103, "quantity" -> 4, "price" -> 5),
-          document("itemId" -> 38, "quantity" -> 1, "price" -> 300))),
-        document("_id" -> 2, "items" -> array(
-          document("itemId" -> 4, "quantity" -> 1, "price" -> 23))))
-
-      Future.sequence(fixtures.map { doc => sales.insert.one(doc) }).
-        map(_ => {}) must beTypedEqualTo({}).await(0, timeout)
-    } tag "not_mongo26"
-
-    "filter when using a '$project' stage" in {
-      // See https://docs.mongodb.com/master/reference/operator/aggregation/filter/#example
-
-      def expected = List(
-        Sale(_id = 0, items = List(SaleItem(2, 1, 240))),
-        Sale(_id = 1, items = List(
-          SaleItem(23, 3, 110), SaleItem(38, 1, 300))),
-        Sale(_id = 2, items = Nil))
-
-      sales.aggregateWith1[Sale]() { framework =>
-        import framework.{ Ascending, Filter, Project, Sort }
-
-        val sort = Sort(Ascending("_id"))
-
-        Project(document("items" -> Filter(
-          input = BSONString(f"$$items"),
-          as = "item",
-          cond = document(
-            f"$$gte" -> array(f"$$$$item.price", 100))))) -> List(sort)
-
-      }.collect[List](Int.MaxValue, Cursor.FailOnError[List[Sale]]()).
-        aka("filtered") must beTypedEqualTo(expected).await(0, timeout)
-
-    } tag "not_mongo26"
   }
 
   "Inventory #2" should {
@@ -637,26 +586,6 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
                 "Divine Comedy",
                 "Eclogues", "The Banquet"))).await(0, timeout)
       }
-    }
-
-    "be added to set" in {
-      implicit val catReader: BSONDocumentReader[AuthorCatalog] = BSONDocumentReader[AuthorCatalog] { doc =>
-        (for {
-          id <- doc.getAsTry[String]("_id")
-          bs <- doc.getAsTry[Set[String]]("books")
-        } yield AuthorCatalog(id, bs)).get
-      }
-
-      books.aggregateWith1[AuthorCatalog]() {
-        framework =>
-          import framework._
-
-          Sort(Ascending("title")) -> List(Group(BSONString(f"$$author"))(
-            "books" -> AddFieldToSet("title")))
-      }.collect[Set](Int.MaxValue, Cursor.FailOnError[Set[AuthorCatalog]]()) must beTypedEqualTo(Set(
-        AuthorCatalog(_id = "Homer", books = Set("The Odyssey", "Iliad")),
-        AuthorCatalog(_id = "Dante", books = Set(
-          "The Banquet", "Eclogues", "Divine Comedy")))).await(1, timeout)
     }
   }
 
@@ -1396,6 +1325,18 @@ db.accounts.aggregate([
 
     }
 
+    f"be $$bucketAuto" in {
+      // https://docs.mongodb.com/manual/reference/operator/aggregation/bucketAuto/
+
+      import aggregationFramework.BucketAuto
+
+      BucketAuto(BSONString(f"$$price"), 3, None)().
+        makePipe must_=== BSONDocument(f"$$bucketAuto" -> BSONDocument(
+          "groupBy" -> f"$$price",
+          "buckets" -> 3,
+          "output" -> BSONDocument.empty))
+    }
+
     f"be $$collStats" in {
       import aggregationFramework.CollStats
 
@@ -1593,14 +1534,6 @@ db.accounts.aggregate([
     price: Option[Int] = None,
     quantity: Option[Int] = None,
     docs: List[Product] = Nil)
-
-  case class SaleItem(itemId: Int, quantity: Int, price: Int)
-  case class Sale(_id: Int, items: List[SaleItem])
-
-  case class AuthorCatalog(
-    _id: String, // author name
-    books: Set[String] // books titles
-  )
 
   case class QuizStdDev(_id: Int, stdDev: Double)
 
