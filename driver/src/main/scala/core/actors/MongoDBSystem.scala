@@ -161,7 +161,7 @@ trait MongoDBSystem extends Actor {
               maxAwaitingPerChannel)
           }
 
-          l.nodeSetUpdated(previous, _setInfo)
+          l.nodeSetUpdated(supervisor, name, previous, _setInfo)
         }
 
         ()

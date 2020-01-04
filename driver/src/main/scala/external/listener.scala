@@ -5,7 +5,12 @@ import scala.util.Try
 import reactivemongo.api.MongoConnectionOptions
 import reactivemongo.core.nodeset.NodeSetInfo
 
-/** Listener definition for the connection events. */
+/**
+ * Listener definition for the connection events.
+ *
+ * @define supervisorParam the name of the pool supervisor (for logging)
+ * @define connectionParam the name of the connection pool
+ */
 trait ConnectionListener {
   /** Logger available for the listener implementation. */
   lazy val logger: org.slf4j.Logger = ConnectionListener.logger.slf4j
@@ -14,25 +19,34 @@ trait ConnectionListener {
    * The connection pool is initialized.
    *
    * @param options the connection options
-   * @param supervisor the name of the pool supervisor (for logging)
-   * @param connection the name of the connection pool
+   * @param supervisor $supervisorParam
+   * @param connection $connectionParam
    */
-  def poolCreated(options: MongoConnectionOptions, supervisor: String, connection: String): Unit
+  def poolCreated(
+    options: MongoConnectionOptions,
+    supervisor: String,
+    connection: String): Unit
 
   /**
    * The node set of the connection pool has been updated.
    * This is fired asynchronously.
    *
+   * @param supervisor $supervisorName
+   * @param connection $connectionName
    * @param previous the previous node set
    * @param updated the new/updated node set
    */
-  def nodeSetUpdated(previous: NodeSetInfo, updated: NodeSetInfo): Unit
+  def nodeSetUpdated(
+    supervisor: String,
+    connection: String,
+    previous: NodeSetInfo,
+    updated: NodeSetInfo): Unit
 
   /**
    * The connection is being shut down.
    *
-   * @param supervisor the name of the pool supervisor (for logging)
-   * @param connection the name of the connection pool
+   * @param supervisor $supervisorName
+   * @param connection $connectionName
    */
   def poolShutdown(supervisor: String, connection: String): Unit
 }
