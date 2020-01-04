@@ -14,7 +14,7 @@ object Travis {
       val scalaUpper = scalaVersion.value
 
       // Major libs
-      val (akkaLower, akkaUpper) = "2.3.13" -> "2.5.23"
+      val (akkaLower, akkaUpper) = "2.3.16" -> "2.5.23"
       val (playLower, playUpper) = "2.3.8" -> "2.6.1"
 
       // Base specifications for the integration envs
