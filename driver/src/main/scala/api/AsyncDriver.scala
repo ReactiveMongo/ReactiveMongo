@@ -172,8 +172,30 @@ class AsyncDriver(
    *   driver.connect(uri, name = Some("ConnectionName"))
    * }}}
    */
-  def connect(parsedURI: MongoConnection.ParsedURI, name: Option[String]): Future[MongoConnection] = {
-    if (!parsedURI.ignoredOptions.isEmpty) {
+  def connect(parsedURI: MongoConnection.ParsedURI, name: Option[String]): Future[MongoConnection] = connect(parsedURI, name, true)
+
+  /**
+   * Creates a new MongoConnection from URI.
+   *
+   * @param parsedURI The URI parsed by [[reactivemongo.api.MongoConnection.parseURI]]
+   * @param name $connectionNameParam
+   * @param strictMode the flag to indicate whether the given URI must be a strict one (no ignored/invalid options)
+   *
+   * {{{
+   * import scala.concurrent.Future
+   * import reactivemongo.api.MongoConnection, MongoConnection.ParsedURI
+   *
+   * val driver = reactivemongo.api.AsyncDriver()
+   *
+   * def con(uri: ParsedURI): Future[MongoConnection] =
+   *   driver.connect(uri, name = Some("ConnectionName"))
+   * }}}
+   */
+  def connect(
+    parsedURI: MongoConnection.ParsedURI,
+    name: Option[String],
+    strictMode: Boolean): Future[MongoConnection] = {
+    if (strictMode && !parsedURI.ignoredOptions.isEmpty) {
       Future.failed(new IllegalArgumentException(s"The connection URI contains unsupported options: ${parsedURI.ignoredOptions.mkString(", ")}"))
     } else {
       @com.github.ghik.silencer.silent(".*authenticate.*" /*deprecated*/ )

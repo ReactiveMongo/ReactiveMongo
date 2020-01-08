@@ -3,7 +3,7 @@ package reactivemongo.core.nodeset
 import reactivemongo.io.netty.channel.ChannelId
 
 /**
- * @param ping the response delay (in milliseconds) for the last IsMaster request (duration between request and its response, or `Long.MaxValue`)
+ * @param ping the response delay (in nanoseconds) for the last IsMaster request (duration between request and its response, or `Long.MaxValue`)
  * @param lastIsMasterTime the timestamp when the last IsMaster request has been sent (or 0)
  * @param lastIsMasterId the ID of the last IsMaster request (or -1 if none)
  */

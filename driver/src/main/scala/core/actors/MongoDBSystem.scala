@@ -149,19 +149,21 @@ trait MongoDBSystem extends Actor {
       { (event: String, previous: NodeSetInfo, updated: NodeSet) =>
         updateHistory(event)
 
-        scheduler.scheduleOnce(1.second) {
-          requestTracker.withAwaiting { (responses, channels) =>
-            val maxAwaitingPerChannel = {
-              if (channels.isEmpty) 0
-              else channels.map(_._2).max
+        if (context != null && context.system != null /* Akka workaround */ ) {
+          scheduler.scheduleOnce(1.second) {
+            requestTracker.withAwaiting { (responses, channels) =>
+              val maxAwaitingPerChannel = {
+                if (channels.isEmpty) 0
+                else channels.map(_._2).max
+              }
+
+              _setInfo = updated.info.withAwaitingRequests(
+                responses.size,
+                maxAwaitingPerChannel)
             }
 
-            _setInfo = updated.info.withAwaitingRequests(
-              responses.size,
-              maxAwaitingPerChannel)
+            l.nodeSetUpdated(supervisor, name, previous, _setInfo)
           }
-
-          l.nodeSetUpdated(supervisor, name, previous, _setInfo)
         }
 
         ()
