@@ -31,8 +31,8 @@ trait ConnectionListener {
    * The node set of the connection pool has been updated.
    * This is fired asynchronously.
    *
-   * @param supervisor $supervisorName
-   * @param connection $connectionName
+   * @param supervisor $supervisorParam
+   * @param connection $connectionParam
    * @param previous the previous node set
    * @param updated the new/updated node set
    */
@@ -45,8 +45,8 @@ trait ConnectionListener {
   /**
    * The connection is being shut down.
    *
-   * @param supervisor $supervisorName
-   * @param connection $connectionName
+   * @param supervisor $supervisorParam
+   * @param connection $connectionParam
    */
   def poolShutdown(supervisor: String, connection: String): Unit
 }

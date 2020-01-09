@@ -260,7 +260,9 @@ package object tests {
   def withContent[T](uri: java.net.URI)(f: java.io.InputStream => T): T =
     reactivemongo.util.withContent[T](uri)(f)
 
-  def srvRecords(name: String, srvPrefix: String)(implicit ec: ExecutionContext) = reactivemongo.util.srvRecords(name)(reactivemongo.util.dnsResolve(srvPrefix = srvPrefix))
+  def srvRecords(name: String, srvPrefix: String)(implicit ec: ExecutionContext): Future[List[(String, Int)]] = srvRecords(name)(reactivemongo.util.dnsResolve(srvPrefix = srvPrefix))
+
+  def srvRecords(name: String)(resolver: reactivemongo.util.SRVRecordResolver)(implicit ec: ExecutionContext): Future[List[(String, Int)]] = reactivemongo.util.srvRecords(name)(resolver)
 
   def parseURI(
     uri: String,
