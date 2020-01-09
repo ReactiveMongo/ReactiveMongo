@@ -34,7 +34,8 @@ private[util] final class DefaultSRVResolver(
       name.dropWhile(_ != '.').drop(1), Name.root)
 
     @annotation.tailrec
-    def go(records: Array[Record], names: List[SRV]): Future[List[SRV]] = { // Common checks and transformation whatever is the `resolve`
+    def go(records: Array[Record], names: List[SRV]): Future[List[SRV]] = {
+      // Common checks and transformation whatever is the `resolve`
       records.headOption match {
         case Some(rec: SRVRecord) => {
           val nme = rec.getAdditionalName
@@ -64,6 +65,12 @@ private[util] final class DefaultSRVResolver(
 
     // ---
 
-    resolve(ec)(name).flatMap { records => go(records, List.empty) }
+    resolve(ec)(name).flatMap {
+      case null =>
+        Future.successful(List.empty[SRV])
+
+      case records =>
+        go(records, List.empty)
+    }
   }
 }

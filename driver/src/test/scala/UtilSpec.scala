@@ -1,5 +1,7 @@
 import org.specs2.concurrent.ExecutionEnv
 
+import scala.concurrent.Future
+
 final class UtilSpec(implicit ee: ExecutionEnv)
   extends org.specs2.mutable.Specification {
 
@@ -70,6 +72,13 @@ final class UtilSpec(implicit ee: ExecutionEnv)
   section("unit")
 
   "DNS resolver" should {
+    "handle empty/null record" in {
+      reactivemongo.api.tests.
+        srvRecords("gmail.com") { _ => _ => Future.successful(null)
+        } must beTypedEqualTo(List.empty[(String, Int)]).await
+
+    }
+
     "resolve SRV record for _imaps._tcp at gmail.com" in {
       reactivemongo.api.tests.srvRecords(
         name = "gmail.com",
