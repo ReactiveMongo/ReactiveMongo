@@ -344,66 +344,183 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
    */
   def projection(p: pack.Document): Self = copy(projectionOption = Some(p))
 
-  /** Sets the [[https://docs.mongodb.com/manual/reference/operator/meta/hint/ hint document]] (a document that declares the index MongoDB should use for this query). */
+  /**
+   * Sets the [[https://docs.mongodb.com/manual/reference/operator/meta/hint/ hint document]] (a document that declares the index MongoDB should use for this query).
+   *
+   * {{{
+   * import reactivemongo.api.bson.BSONDocument
+   * import reactivemongo.api.bson.collection.BSONCollection
+   *
+   * def foo(coll: BSONCollection) = coll.find(BSONDocument.empty).
+   *   hint(BSONDocument("hint" -> 1)) // sets the hint
+   * }}}
+   */
   def hint(document: pack.Document): Self = copy(hintOption = Some(document))
 
-  /** Toggles [[https://docs.mongodb.org/manual/reference/method/cursor.explain/#cursor.explain explain mode]]. */
+  /**
+   * Toggles [[https://docs.mongodb.org/manual/reference/method/cursor.explain/#cursor.explain explain mode]].
+   *
+   * {{{
+   * import reactivemongo.api.bson.BSONDocument
+   * import reactivemongo.api.bson.collection.BSONCollection
+   *
+   * def foo(coll: BSONCollection) = coll.find(BSONDocument.empty).explain()
+   * }}}
+   */
   def explain(flag: Boolean = true): Self = copy(explainFlag = flag)
 
-  /** Toggles [[https://docs.mongodb.org/manual/faq/developers/#faq-developers-isolate-cursors snapshot mode]]. */
+  /**
+   * Toggles [[https://docs.mongodb.org/manual/faq/developers/#faq-developers-isolate-cursors snapshot mode]].
+   *
+   * {{{
+   * import reactivemongo.api.bson.BSONDocument
+   * import reactivemongo.api.bson.collection.BSONCollection
+   *
+   * def foo(coll: BSONCollection) = coll.find(BSONDocument.empty).snapshot()
+   * }}}
+   */
   def snapshot(flag: Boolean = true): Self = copy(snapshotFlag = flag)
 
-  /** Adds a comment to this query, that may appear in the MongoDB logs. */
+  /**
+   * Adds a comment to this query, that may appear in the MongoDB logs.
+   *
+   * {{{
+   * import reactivemongo.api.bson.BSONDocument
+   * import reactivemongo.api.bson.collection.BSONCollection
+   *
+   * def foo(coll: BSONCollection) = coll.find(BSONDocument.empty).
+   *   comment("Any comment to trace the query")
+   * }}}
+   */
   def comment(message: String): Self = copy(commentString = Some(message))
 
-  /** Adds [[https://docs.mongodb.org/v3.0/reference/operator/meta/maxTimeMS/ maxTimeMs]] to query  */
+  /**
+   * Adds [[https://docs.mongodb.org/v3.0/reference/operator/meta/maxTimeMS/ maxTimeMs]] to query.
+   *
+   * {{{
+   * import reactivemongo.api.bson.BSONDocument
+   * import reactivemongo.api.bson.collection.BSONCollection
+   *
+   * def foo(coll: BSONCollection) = coll.find(BSONDocument.empty).
+   *   maxTimeMs(1000L/* 1s */)
+   * }}}
+   */
   def maxTimeMs(p: Long): Self = copy(maxTimeMsOption = Some(p))
 
   def options(options: QueryOpts): Self = copy(options = options)
 
-  /** Sets the [[ReadConcern]]. */
+  /**
+   * Sets the [[ReadConcern]].
+   *
+   * {{{
+   * import reactivemongo.api.bson.BSONDocument
+   * import reactivemongo.api.bson.collection.BSONCollection
+   *
+   * def foo(coll: BSONCollection) = coll.find(BSONDocument.empty).
+   *   readConcern(reactivemongo.api.ReadConcern.Local)
+   * }}}
+   */
   def readConcern(concern: ReadConcern): Self = {
     val upd = copy()
     upd._readConcern = concern
     upd
   }
 
-  /** Sets the `singleBatch` flag. */
-  def singleBatch(flag: Boolean): Self = {
+  /**
+   * Sets the `singleBatch` flag.
+   *
+   * {{{
+   * import reactivemongo.api.bson.BSONDocument
+   * import reactivemongo.api.bson.collection.BSONCollection
+   *
+   * def foo(coll: BSONCollection) = coll.find(BSONDocument.empty).
+   *   singleBatch()
+   * }}}
+   */
+  def singleBatch(flag: Boolean = true): Self = {
     val upd = copy()
     upd._singleBatch = flag
     upd
   }
 
-  /** Sets the `maxScan` flag. */
+  /**
+   * Sets the `maxScan` flag.
+   *
+   * {{{
+   * import reactivemongo.api.bson.BSONDocument
+   * import reactivemongo.api.bson.collection.BSONCollection
+   *
+   * def foo(coll: BSONCollection) = coll.find(BSONDocument.empty).
+   *   maxScan(1.23D)
+   * }}}
+   */
   def maxScan(max: Double): Self = {
     val upd = copy()
     upd._maxScan = Some(max)
     upd
   }
 
-  /** Sets the `returnKey` flag. */
-  def returnKey(flag: Boolean): Self = {
+  /**
+   * Sets the `returnKey` flag.
+   *
+   * {{{
+   * import reactivemongo.api.bson.BSONDocument
+   * import reactivemongo.api.bson.collection.BSONCollection
+   *
+   * def foo(coll: BSONCollection) = coll.find(BSONDocument.empty).returnKey()
+   * }}}
+   */
+  def returnKey(flag: Boolean = true): Self = {
     val upd = copy()
     upd._returnKey = flag
     upd
   }
 
-  /** Sets the `showRecordId` flag. */
-  def showRecordId(flag: Boolean): Self = {
+  /**
+   * Sets the `showRecordId` flag.
+   *
+   * {{{
+   * import reactivemongo.api.bson.BSONDocument
+   * import reactivemongo.api.bson.collection.BSONCollection
+   *
+   * def foo(coll: BSONCollection) = coll.find(BSONDocument.empty).
+   *   showRecordId()
+   * }}}
+   */
+  def showRecordId(flag: Boolean = true): Self = {
     val upd = copy()
     upd._showRecordId = flag
     upd
   }
 
-  /** Sets the `max` document. */
+  /**
+   * Sets the `max` document.
+   *
+   * {{{
+   * import reactivemongo.api.bson.BSONDocument
+   * import reactivemongo.api.bson.collection.BSONCollection
+   *
+   * def foo(coll: BSONCollection) = coll.find(BSONDocument.empty).
+   *   max(BSONDocument("field" -> "maxValue"))
+   * }}}
+   */
   def max(document: pack.Document): Self = {
     val upd = copy()
     upd._max = Option(document)
     upd
   }
 
-  /** Sets the `min` document. */
+  /**
+   * Sets the `min` document.
+   *
+   * {{{
+   * import reactivemongo.api.bson.BSONDocument
+   * import reactivemongo.api.bson.collection.BSONCollection
+   *
+   * def foo(coll: BSONCollection) = coll.find(BSONDocument.empty).
+   *   min(BSONDocument("field" -> "minValue"))
+   * }}}
+   */
   def min(document: pack.Document): Self = {
     val upd = copy()
     upd._min = Option(document)
@@ -413,6 +530,16 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
   /**
    * Sets the `collation` document.
    * @since MongoDB 3.4
+   *
+   *
+   * {{{
+   * import reactivemongo.api.Collation
+   * import reactivemongo.api.bson.BSONDocument
+   * import reactivemongo.api.bson.collection.BSONCollection
+   *
+   * def foo(coll: BSONCollection, c: Collation) =
+   *   coll.find(BSONDocument.empty).collation(c)
+   * }}}
    */
   def collation(collation: Collation): Self = {
     val upd = copy()

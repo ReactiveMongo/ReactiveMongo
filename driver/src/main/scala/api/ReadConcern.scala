@@ -29,4 +29,11 @@ object ReadConcern {
 
   /** Local */
   @inline private[api] def default: ReadConcern = Local
+
+  private[api] def unapply(level: String): Option[ReadConcern] = level match {
+    case Available.level    => Some(Available)
+    case Majority.level     => Some(Majority)
+    case Linearizable.level => Some(Linearizable)
+    case _                  => Some(Local)
+  }
 }
