@@ -42,7 +42,6 @@ import scala.concurrent.{ Future, ExecutionContext }
  * @define droppedCount The number of indexes that were dropped.
  */
 sealed trait IndexesManager {
-
   /**
    * Lists all the index on this database.
    *
@@ -89,6 +88,8 @@ sealed trait IndexesManager {
    * @return true if the index was created, false if it already exists.
    */
   def ensure(nsIndex: NSIndex): Future[Boolean]
+
+  import reactivemongo.api.bson.BSONDocument
 
   /**
    * $createDescription.
