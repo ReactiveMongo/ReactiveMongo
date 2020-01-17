@@ -2,7 +2,7 @@ package reactivemongo.api.indexes
 
 import reactivemongo.bson.BSONDocument
 
-import reactivemongo.api.{ Collation, SerializationPack }
+import reactivemongo.api.{ Collation, Serialization, SerializationPack }
 
 import com.github.ghik.silencer.silent
 
@@ -16,12 +16,11 @@ import com.github.ghik.silencer.silent
  * import reactivemongo.api.bson.collection.BSONSerializationPack
  * import reactivemongo.api.indexes.{ Index, IndexType }
  *
- * val bsonIndex = Index(BSONSerializationPack)(
+ * val bsonIndex = Index(
  *   key = Seq("name" -> IndexType.Ascending),
  *   name = Some("name_idx"),
  *   unique = false,
  *   background = false,
- *   dropDups = false,
  *   sparse = false,
  *   expireAfterSeconds = None,
  *   storageEngine = None,
@@ -226,6 +225,37 @@ object Index extends scala.runtime.AbstractFunction9[Seq[(String, IndexType)], O
     @deprecated("Internal: will be made private", "0.19.0") partialFilter: Option[BSONDocument] = None,
     @deprecated("Internal: will be made private", "0.19.0") options: BSONDocument = BSONDocument.empty): Index = apply(BSONSerializationPack)(key, name, unique, background, dropDups, sparse, None, None, None, None, None, None, None, None, None, None, None, None, None, version, partialFilter, options)
 
+  /**
+   * {{{
+   * import reactivemongo.api.bson.BSONDocument
+   * import reactivemongo.api.bson.collection.BSONSerializationPack
+   * import reactivemongo.api.indexes.{ Index, IndexType }
+   *
+   * val bsonIndex = Index(BSONSerializationPack)(
+   *   key = Seq("name" -> IndexType.Ascending),
+   *   name = Some("name_idx"),
+   *   unique = false,
+   *   background = false,
+   *   dropDups = false,
+   *   sparse = false,
+   *   expireAfterSeconds = None,
+   *   storageEngine = None,
+   *   weights = None,
+   *   defaultLanguage = None,
+   *   languageOverride = None,
+   *   textIndexVersion = None,
+   *   sphereIndexVersion = None,
+   *   bits = None,
+   *   min = None,
+   *   max = None,
+   *   bucketSize = None,
+   *   collation = None,
+   *   wildcardProjection = None,
+   *   version = None,
+   *   partialFilter = None,
+   *   options = BSONDocument.empty)
+   * }}}
+   */
   def apply[P <: SerializationPack](_pack: P)(
     key: Seq[(String, IndexType)],
     name: Option[String],
@@ -299,6 +329,52 @@ object Index extends scala.runtime.AbstractFunction9[Seq[(String, IndexType)], O
       val optionDocument = o
     }
   }
+
+  def apply(
+    key: Seq[(String, IndexType)],
+    name: Option[String],
+    unique: Boolean,
+    background: Boolean,
+    sparse: Boolean,
+    expireAfterSeconds: Option[Int],
+    storageEngine: Option[Serialization.Pack#Document],
+    weights: Option[Serialization.Pack#Document],
+    defaultLanguage: Option[String],
+    languageOverride: Option[String],
+    textIndexVersion: Option[Int],
+    sphereIndexVersion: Option[Int],
+    bits: Option[Int],
+    min: Option[Double],
+    max: Option[Double],
+    bucketSize: Option[Double],
+    collation: Option[Collation],
+    wildcardProjection: Option[Serialization.Pack#Document],
+    version: Option[Int],
+    partialFilter: Option[Serialization.Pack#Document],
+    options: Serialization.Pack#Document): Index.Aux[Serialization.Pack] =
+    apply[Serialization.Pack](Serialization.internalSerializationPack)(
+      key,
+      name,
+      unique,
+      background,
+      dropDups = false,
+      sparse,
+      expireAfterSeconds,
+      storageEngine,
+      weights,
+      defaultLanguage,
+      languageOverride,
+      textIndexVersion,
+      sphereIndexVersion,
+      bits,
+      min,
+      max,
+      bucketSize,
+      collation,
+      wildcardProjection,
+      version,
+      partialFilter,
+      options)
 
   @deprecated("No longer a ReactiveMongo case class", "0.19.1")
   def unapply(index: Index): Option[Tuple9[Seq[(String, IndexType)], Option[String], Boolean, Boolean, Boolean, Boolean, Option[Int], Option[BSONDocument], BSONDocument]] = Option(index).map { i =>

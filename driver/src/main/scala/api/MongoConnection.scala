@@ -903,6 +903,9 @@ object MongoConnection {
           case ("readPreference", "nearest") => unsupported -> result.copy(
             readPreference = ReadPreference.nearest)
 
+          case ("readConcernLevel", ReadConcern(c)) =>
+            unsupported -> result.copy(readConcern = c)
+
           case ("rm.failover", "default") => unsupported -> result
           case ("rm.failover", "remote") => unsupported -> result.copy(
             failoverStrategy = FailoverStrategy.remote)

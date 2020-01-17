@@ -5,6 +5,7 @@ import scala.concurrent.Future
 import reactivemongo.api.{
   MongoConnection,
   MongoConnectionOptions,
+  ReadConcern,
   ScramSha1Authentication,
   ScramSha256Authentication,
   X509Authentication,
@@ -543,6 +544,20 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
     s"ignore too long application name" in {
       parseURI(withNameTooLong).map(
         _.options.appName) must beNone.awaitFor(timeout)
+    }
+
+    "support readConcern" >> {
+      import org.specs2.specification.core.Fragments
+
+      Fragments.foreach(Seq(
+        ReadConcern.Local, ReadConcern.Majority,
+        ReadConcern.Linearizable, ReadConcern.Available)) { c =>
+
+        s"for $c" in {
+          parseURI(s"mongodb://host1?readConcernLevel=${c.level}").
+            map(_.options.readConcern) must beTypedEqualTo(c).awaitFor(timeout)
+        }
+      }
     }
   }
 
