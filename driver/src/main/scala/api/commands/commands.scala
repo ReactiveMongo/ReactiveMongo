@@ -61,7 +61,49 @@ trait CursorFetcher[P <: SerializationPack, +C[_] <: Cursor[_]] {
  * @param cursorId the ID of the cursor
  * @param fullCollectionName the namespace of the collection
  */
-case class ResultCursor(cursorId: Long, fullCollectionName: String)
+class ResultCursor(
+  val cursorId: Long,
+  val fullCollectionName: String)
+  extends Product2[Long, String] with Serializable {
+
+  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @inline def _1 = cursorId
+
+  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @inline def _2 = fullCollectionName
+
+  @deprecated("No longer a case class", "1.0.0-rc.1")
+  def canEqual(that: Any): Boolean = that match {
+    case _: ResultCursor => true
+    case _               => false
+  }
+
+  private[api] def tupled = cursorId -> fullCollectionName
+
+  override def equals(that: Any): Boolean = that match {
+    case other: ResultCursor =>
+      this.tupled == other.tupled
+
+    case _ =>
+      false
+  }
+
+  override def hashCode: Int = tupled.hashCode
+
+  override def toString = s"ResultCursor${tupled.toString}"
+}
+
+object ResultCursor
+  extends scala.runtime.AbstractFunction2[Long, String, ResultCursor] {
+
+  def apply(
+    cursorId: Long,
+    fullCollectionName: String): ResultCursor = new ResultCursor(
+    cursorId, fullCollectionName)
+
+  @deprecated("No longer a case class", "1.0.0-rc.1")
+  def unapply(other: ResultCursor) = Option(other).map(_.tupled)
+}
 
 trait ImplicitCommandHelpers[P <: SerializationPack] {
   import scala.language.implicitConversions
@@ -285,6 +327,7 @@ object Command {
  * @param collection the name of the collection against which the command is executed
  * @param command the executed command
  */
+@deprecated("Internal: will be made private", "1.0.0-rc.1")
 final case class ResolvedCollectionCommand[C <: CollectionCommand](
   collection: String,
   command: C) extends Command

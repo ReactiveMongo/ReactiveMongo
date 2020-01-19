@@ -19,11 +19,12 @@ import reactivemongo.api.ReadPreference
  * @param version the replicaSet version
  */
 @SerialVersionUID(527078726L)
-case class NodeSet(
-  name: Option[String],
-  version: Option[Long],
-  nodes: Vector[Node],
-  @transient authenticates: Set[Authenticate]) {
+@deprecated("Internal: will be made private", "1.0.0-rc.1")
+class NodeSet private[reactivemongo] (
+  val name: Option[String],
+  val version: Option[Long],
+  val nodes: Vector[Node],
+  @transient val authenticates: Set[Authenticate]) extends Product4[Option[String], Option[Long], Vector[Node], Set[Authenticate]] with Serializable {
 
   /** The node which is the current primary one. */
   val primary: Option[Node] = nodes.find(_.status == NodeStatus.Primary)
@@ -193,4 +194,57 @@ case class NodeSet(
       mongos.map(_.info), ns.filter(_.status == NodeStatus.Secondary),
       nearest.map(_.info))
   }
+
+  @deprecated("No longer case class", "1.0.0-rc.1")
+  @inline def _1 = name
+
+  @deprecated("No longer case class", "1.0.0-rc.1")
+  @inline def _2 = version
+
+  @deprecated("No longer case class", "1.0.0-rc.1")
+  @inline def _3 = nodes
+
+  @deprecated("No longer case class", "1.0.0-rc.1")
+  @inline def _4 = authenticates
+
+  @deprecated("No longer case class", "1.0.0-rc.1")
+  def canEqual(that: Any): Boolean = that match {
+    case _: NodeSet => true
+    case _          => false
+  }
+
+  @deprecated("No longer case class", "1.0.0-rc.1")
+  def copy(
+    name: Option[String] = this.name,
+    version: Option[Long] = this.version,
+    nodes: Vector[Node] = this.nodes,
+    authenticates: Set[Authenticate] = this.authenticates): NodeSet =
+    new NodeSet(name, version, nodes, authenticates)
+
+  private[core] lazy val tupled = Tuple4(name, version, nodes, authenticates)
+
+  override def equals(that: Any): Boolean = that match {
+    case other: NodeSet =>
+      this.tupled == other.tupled
+
+    case _ =>
+      false
+  }
+
+  override def hashCode: Int = tupled.hashCode
+
+  override def toString = s"NodeSet${tupled.toString}"
+}
+
+@deprecated("Internal: will be made private", "1.0.0-rc.1")
+object NodeSet extends scala.runtime.AbstractFunction4[Option[String], Option[Long], Vector[Node], Set[Authenticate], NodeSet] {
+
+  def apply(
+    name: Option[String],
+    version: Option[Long],
+    nodes: Vector[Node],
+    authenticates: Set[Authenticate]): NodeSet =
+    new NodeSet(name, version, nodes, authenticates)
+
+  def unapply(nodeSet: NodeSet): Option[Tuple4[Option[String], Option[Long], Vector[Node], Set[Authenticate]]] = Option(nodeSet).map(_.tupled)
 }

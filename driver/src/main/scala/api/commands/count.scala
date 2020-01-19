@@ -18,14 +18,110 @@ trait CountCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] {
   }
 
   sealed trait Hint
-  case class HintString(s: String) extends Hint
-  case class HintDocument(doc: pack.Document) extends Hint
-  object Hint {
-    implicit def strToHint(s: String): Hint = HintString(s)
-    implicit def docToHint(doc: ImplicitlyDocumentProducer): Hint = HintDocument(doc.produce)
+
+  class HintString private[api] (val s: String)
+    extends Hint with Product1[String] with Serializable {
+
+    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @inline def _1 = s
+
+    def canEqual(that: Any): Boolean = that match {
+      case _: HintString => true
+      case _             => false
+    }
+
+    override def equals(that: Any): Boolean = that match {
+      case other: HintString =>
+        (this.s == null && other.s == null) || (
+          this.s != null && this.s.equals(other.s))
+
+      case _ =>
+        false
+    }
+
+    override def hashCode: Int = if (s == null) -1 else s.hashCode
+
+    override def toString = s"Hint['$s']"
   }
 
-  case class CountResult(count: Int) extends BoxedAnyVal[Int] {
-    def value = count
+  @deprecated("No longer a case class", "1.0.0-rc.1")
+  object HintString
+    extends scala.runtime.AbstractFunction1[String, HintString] {
+
+    def apply(s: String): HintString = new HintString(s)
+
+    def unapply(hint: HintString): Option[String] = Option(hint).map(_.s)
+  }
+
+  class HintDocument private[api] (val doc: pack.Document)
+    extends Hint with Product1[pack.Document] with Serializable {
+
+    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @inline def _1 = doc
+
+    def canEqual(that: Any): Boolean = that match {
+      case _: HintDocument => true
+      case _               => false
+    }
+
+    override def equals(that: Any): Boolean = that match {
+      case other: HintDocument =>
+        (this.doc == null && other.doc == null) || (
+          this.doc != null && this.doc.equals(other.doc))
+
+      case _ =>
+        false
+    }
+
+    override def hashCode: Int = if (doc == null) -1 else doc.hashCode
+
+    override def toString = s"Hint${pack pretty doc}"
+  }
+
+  @deprecated("No longer a case class", "1.0.0-rc.1")
+  object HintDocument
+    extends scala.runtime.AbstractFunction1[pack.Document, HintDocument] {
+
+    def apply(doc: pack.Document): HintDocument = new HintDocument(doc)
+
+    def unapply(hint: HintDocument): Option[pack.Document] =
+      Option(hint).map(_.doc)
+  }
+
+  object Hint {
+    implicit def strToHint(s: String): Hint = new HintString(s)
+
+    implicit def docToHint(doc: ImplicitlyDocumentProducer): Hint =
+      new HintDocument(doc.produce)
+  }
+
+  class CountResult(@deprecatedName(Symbol("count")) val value: Int) extends BoxedAnyVal[Int] with Product1[Int] with Serializable {
+
+    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @inline def _1 = value
+
+    @deprecated("No longer a case class", "1.0.0-rc.1")
+    def canEqual(that: Any): Boolean = that match {
+      case _: CountResult => true
+      case _              => false
+    }
+
+    override def equals(that: Any): Boolean = that match {
+      case other: CountResult => this.value == other.value
+      case _                  => false
+    }
+
+    @inline override def hashCode: Int = value
+
+    override def toString = s"CountResult($value)"
+  }
+
+  @deprecated("No longer a case class", "1.0.0-rc.1")
+  object CountResult
+    extends scala.runtime.AbstractFunction1[Int, CountResult] {
+
+    def apply(value: Int): CountResult = new CountResult(value)
+
+    def unapply(hint: CountResult): Option[Int] = Option(hint).map(_.value)
   }
 }

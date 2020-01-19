@@ -519,7 +519,7 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
                 "user123", Some("passwd123")))),
             ignoredOptions = List("foo", "ignore"))).awaitFor(timeout)
 
-    }
+    } tag "wip"
 
     val validName = "validName1"
     val withValidName = s"mongodb://host1?appName=$validName"

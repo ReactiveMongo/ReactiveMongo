@@ -330,6 +330,36 @@ object Index extends scala.runtime.AbstractFunction9[Seq[(String, IndexType)], O
     }
   }
 
+  /**
+   * {{{
+   * import reactivemongo.api.bson.BSONDocument
+   * import reactivemongo.api.bson.collection.BSONSerializationPack
+   * import reactivemongo.api.indexes.{ Index, IndexType }
+   *
+   * val bsonIndex = Index(
+   *   key = Seq("name" -> IndexType.Ascending),
+   *   name = Some("name_idx"),
+   *   unique = false,
+   *   background = false,
+   *   sparse = false,
+   *   expireAfterSeconds = None,
+   *   storageEngine = None,
+   *   weights = None,
+   *   defaultLanguage = None,
+   *   languageOverride = None,
+   *   textIndexVersion = None,
+   *   sphereIndexVersion = None,
+   *   bits = None,
+   *   min = None,
+   *   max = None,
+   *   bucketSize = None,
+   *   collation = None,
+   *   wildcardProjection = None,
+   *   version = None,
+   *   partialFilter = None,
+   *   options = BSONDocument.empty)
+   * }}}
+   */
   def apply(
     key: Seq[(String, IndexType)],
     name: Option[String],
@@ -398,9 +428,46 @@ object Index extends scala.runtime.AbstractFunction9[Seq[(String, IndexType)], O
  * @param namespace The fully qualified name of the indexed collection.
  * @param index The other fields of the index.
  */
-case class NSIndex(namespace: String, index: Index) {
+class NSIndex private[api] (
+  val namespace: String,
+  val index: Index) extends Product2[String, Index] with Serializable {
+
   val (dbName: String, collectionName: String) = {
     val spanned = namespace.span(_ != '.')
     spanned._1 -> spanned._2.drop(1)
   }
+
+  @inline def _1 = namespace
+
+  @inline def _2 = index
+
+  def canEqual(that: Any): Boolean = that match {
+    case _: NSIndex =>
+      true
+
+    case _ =>
+      false
+  }
+
+  private[api] lazy val tupled = namespace -> index
+
+  override def equals(that: Any): Boolean = that match {
+    case other: NSIndex =>
+      this.tupled == other.tupled
+
+    case _ =>
+      false
+  }
+
+  override def hashCode: Int = tupled.hashCode
+
+  override def toString = s"NSIndex${tupled.toString}"
+}
+
+object NSIndex extends scala.runtime.AbstractFunction2[String, Index, NSIndex] {
+  def apply(namespace: String, index: Index): NSIndex =
+    new NSIndex(namespace, index)
+
+  def unapply(nsIndex: NSIndex): Option[(String, Index)] =
+    Option(nsIndex).map(_.tupled)
 }
