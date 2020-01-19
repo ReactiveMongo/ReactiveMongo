@@ -12,20 +12,68 @@ import reactivemongo.core.protocol.BufferAccessors.writeTupleToBuffer4
  * @param responseTo id of the request that the message including this a response to (> 0 for reply operation, else 0).
  * @param opCode operation code of this message.
  */
-case class MessageHeader(
-  messageLength: Int,
-  requestID: Int,
-  responseTo: Int,
-  opCode: Int) extends ChannelBufferWritable {
+@deprecated("No longer a case class, no longer a case class", "1.0.0-rc.1")
+class MessageHeader(
+  val messageLength: Int,
+  val requestID: Int,
+  val responseTo: Int,
+  val opCode: Int) extends ChannelBufferWritable
+  with Product4[Int, Int, Int, Int] with Serializable {
 
   val writeTo: ByteBuf => Unit = writeTupleToBuffer4(
     (messageLength, requestID, responseTo, opCode)) _
 
   override val size = MessageHeader.size
+
+  private[core] lazy val tupled =
+    Tuple4(messageLength, requestID, responseTo, opCode)
+
+  @deprecated("No longer case class", "1.0.0-rc.1")
+  @inline def _1 = messageLength
+
+  @deprecated("No longer case class", "1.0.0-rc.1")
+  @inline def _2 = requestID
+
+  @deprecated("No longer case class", "1.0.0-rc.1")
+  @inline def _3 = responseTo
+
+  @deprecated("No longer case class", "1.0.0-rc.1")
+  @inline def _4 = opCode
+
+  @deprecated("No longer case class", "1.0.0-rc.1")
+  def canEqual(that: Any): Boolean = that match {
+    case _: MessageHeader => true
+    case _                => false
+  }
+
+  override def equals(that: Any): Boolean = that match {
+    case other: MessageHeader =>
+      this.tupled == other.tupled
+
+    case _ =>
+      false
+  }
+
+  override def hashCode: Int = tupled.hashCode
+
+  override def toString: String =
+    s"MessageHeader($messageLength, $requestID, $responseTo, $opCode)"
 }
 
 /** Header deserializer from a [[http://netty.io/4.1/api/io/netty/buffer/ByteBuf.html ByteBuf]]. */
-object MessageHeader extends ChannelBufferReadable[MessageHeader] {
+@deprecated("Internal: will be made private", "1.0.0-rc.1")
+object MessageHeader extends scala.runtime.AbstractFunction4[Int, Int, Int, Int, MessageHeader] with ChannelBufferReadable[MessageHeader] {
+
+  def apply(
+    messageLength: Int,
+    requestID: Int,
+    responseTo: Int,
+    opCode: Int): MessageHeader =
+    new MessageHeader(messageLength, requestID, responseTo, opCode)
+
+  def unapply(header: MessageHeader): Option[Tuple4[Int, Int, Int, Int]] =
+    Option(header).map(_.tupled)
+
   override def readFrom(buffer: ByteBuf): MessageHeader = {
     val messageLength = buffer.readIntLE
     val requestID = buffer.readIntLE

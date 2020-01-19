@@ -70,5 +70,36 @@ object ReplyDocumentIterator {
   }
 }
 
-case class ReplyDocumentIteratorExhaustedException(
-  val cause: Exception) extends Exception(cause)
+@deprecated("Internal: will be made private", "1.0.0-rc.1")
+class ReplyDocumentIteratorExhaustedException private[core] (
+  val cause: Exception) extends Exception(cause) with Product1[Exception] with Serializable {
+
+  @inline def _1 = cause
+
+  def canEqual(that: Any): Boolean = that match {
+    case _: ReplyDocumentIteratorExhaustedException =>
+      true
+
+    case _ =>
+      false
+  }
+
+  override def equals(that: Any): Boolean = that match {
+    case other: ReplyDocumentIteratorExhaustedException =>
+      (this.cause == null && other.cause == null) || (
+        this.cause != null && this.cause.equals(other.cause))
+
+    case _ =>
+      false
+  }
+
+  override def hashCode: Int = if (cause == null) -1 else cause.hashCode
+}
+
+@deprecated("Internal: will be made private", "1.0.0-rc.1")
+object ReplyDocumentIteratorExhaustedException extends scala.runtime.AbstractFunction1[Exception, ReplyDocumentIteratorExhaustedException] {
+  def apply(cause: Exception): ReplyDocumentIteratorExhaustedException =
+    new ReplyDocumentIteratorExhaustedException(cause)
+
+  def unapply(exception: ReplyDocumentIteratorExhaustedException): Option[Exception] = Option(exception).map(_.cause)
+}

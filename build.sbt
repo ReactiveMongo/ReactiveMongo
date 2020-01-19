@@ -89,7 +89,8 @@ lazy val `ReactiveMongo-Core` = project.in(file("core")).
           isp("reactivemongo.core.protocol.Response.unapply"),
           isp("reactivemongo.core.protocol.ResponseInfo.andThen"),
           isp("reactivemongo.core.protocol.ResponseInfo.compose"),
-          isp("reactivemongo.api.BSONSerializationPack.readAndDeserialize")
+          isp("reactivemongo.api.BSONSerializationPack.readAndDeserialize"),
+          isp("reactivemongo.api.BSONSerializationPack.serializeAndWrite")
         )
       },
       //mimaPreviousArtifacts := Set.empty,
