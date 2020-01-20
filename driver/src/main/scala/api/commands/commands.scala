@@ -61,7 +61,7 @@ trait CursorFetcher[P <: SerializationPack, +C[_] <: Cursor[_]] {
  * @param cursorId the ID of the cursor
  * @param fullCollectionName the namespace of the collection
  */
-class ResultCursor(
+class ResultCursor private[api] (
   val cursorId: Long,
   val fullCollectionName: String)
   extends Product2[Long, String] with Serializable {

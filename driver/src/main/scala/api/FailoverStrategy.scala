@@ -23,7 +23,8 @@ import scala.concurrent.duration.FiniteDuration
 class FailoverStrategy private[api] (
   val initialDelay: FiniteDuration,
   val retries: Int,
-  val delayFactor: Int => Double) extends Product3[FiniteDuration, Int, Int => Double] with Serializable {
+  val delayFactor: Int => Double)
+  extends Product3[FiniteDuration, Int, Int => Double] with Serializable {
 
   @deprecated("No longer a case class", "1.0.0-rc.1")
   @inline def _1 = initialDelay
@@ -64,7 +65,9 @@ object FailoverStrategy {
   val strict = FailoverStrategy(retries = 5)
 
   /** A factor function using simple multiplication. */
-  case class FactorFun(multiplier: Double) extends (Int => Double) {
+  class FactorFun private[api] (val multiplier: Double)
+    extends (Int => Double) with Product1[Double] with Serializable {
+
     /**
      * Returns the factor by which the initial delay must be multiplied,
      * for the current try.
@@ -74,6 +77,33 @@ object FailoverStrategy {
     final def apply(`try`: Int): Double = `try` * multiplier
 
     override lazy val toString = s"× $multiplier"
+
+    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @inline def _1 = multiplier
+
+    @deprecated("No longer a case class", "1.0.0-rc.1")
+    def canEqual(that: Any): Boolean = that match {
+      case _: FactorFun => true
+      case _            => false
+    }
+
+    override def equals(that: Any): Boolean = that match {
+      case other: FactorFun =>
+        this.multiplier == other.multiplier
+
+      case _ =>
+        false
+    }
+
+    override def hashCode: Int = multiplier.toInt
+  }
+
+  object FactorFun
+    extends scala.runtime.AbstractFunction1[Double, FactorFun] {
+
+    def apply(multiplier: Double): FactorFun = new FactorFun(multiplier)
+
+    def unapply(fun: FactorFun): Option[Double] = Some(fun.multiplier)
   }
 
   /** The factor function for the default strategy: × 1.25 */

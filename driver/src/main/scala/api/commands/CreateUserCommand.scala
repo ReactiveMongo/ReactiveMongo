@@ -12,7 +12,7 @@ class UserRole(val name: String)
 /**
  * @param db the name of the database
  */
-class DBUserRole(
+class DBUserRole private[api] (
   override val name: String,
   val db: String) extends UserRole(name)
   with Product2[String, String] with Serializable {

@@ -78,14 +78,76 @@ package commands {
   object GetLastError {
     sealed trait W extends WC.W
     case object Majority extends WC.Majority with W
-    case class TagSet(override val tag: String) extends WC.TagSet(tag) with W
+
+    class TagSet private[api] (override val tag: String)
+      extends WC.TagSet(tag) with W
+      with Product1[String] with Serializable {
+
+      @deprecated("No longer a case class", "1.0.0-rc.1")
+      @inline def _1 = tag
+
+      @deprecated("No longer a case class", "1.0.0-rc.1")
+      def canEqual(that: Any): Boolean = that match {
+        case _: TagSet => true
+        case _         => false
+      }
+
+      override def equals(that: Any): Boolean = that match {
+        case other: TagSet =>
+          this.tag == other.tag
+
+        case _ =>
+          false
+      }
+
+      override def hashCode: Int = tag.hashCode
+
+      override def toString = s"TagSet($tag)"
+    }
+
+    object TagSet extends scala.runtime.AbstractFunction1[String, TagSet] {
+      def apply(tag: String): TagSet = new TagSet(tag)
+
+      @deprecated("No longer a case class", "1.0.0-rc.1")
+      def unapply(set: TagSet): Option[String] = Option(set).map(_.tag)
+    }
 
     @deprecated(message = "Use `WaitForAcknowledgments`", since = "0.12.4")
     case class WaitForAknowledgments(override val i: Int)
       extends WC.WaitForAcknowledgments(i) with W
 
-    case class WaitForAcknowledgments(override val i: Int)
+    class WaitForAcknowledgments private[api] (override val i: Int)
       extends WC.WaitForAcknowledgments(i) with W
+      with Product1[Int] with Serializable {
+
+      @deprecated("No longer a case class", "1.0.0-rc.1")
+      @inline def _1 = i
+
+      @deprecated("No longer a case class", "1.0.0-rc.1")
+      def canEqual(that: Any): Boolean = that match {
+        case _: WaitForAcknowledgments => true
+        case _                         => false
+      }
+
+      override def equals(that: Any): Boolean = that match {
+        case other: WaitForAcknowledgments =>
+          this.i == other.i
+
+        case _ =>
+          false
+      }
+
+      override def hashCode: Int = i
+
+      override def toString = s"WaitForAcknowledgments($i)"
+    }
+
+    object WaitForAcknowledgments extends scala.runtime.AbstractFunction1[Int, WaitForAcknowledgments] {
+      def apply(i: Int): WaitForAcknowledgments = new WaitForAcknowledgments(i)
+
+      @deprecated("No longer a case class", "1.0.0-rc.1")
+      def unapply(set: WaitForAcknowledgments): Option[Int] = Option(set).map(_.i)
+    }
 
     object W {
       @deprecated(message = "Use `W(s)`", since = "0.12.7")

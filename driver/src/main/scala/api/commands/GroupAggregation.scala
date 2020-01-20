@@ -39,7 +39,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
    *
    * @param field $fieldParam
    */
-  class AvgField(val field: String) extends GroupFunction
+  class AvgField private[api] (val field: String) extends GroupFunction
     with Product1[String] with Serializable {
 
     val makeFunction = pipe(f"$$avg", builder.string("$" + field))
@@ -81,8 +81,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
   /**
    * The [[https://docs.mongodb.com/manual/reference/operator/aggregation/avg/#grp._S_avg \$avg]] group accumulator.
    */
-  class Avg(@deprecatedName(Symbol("avgExpr")) val expression: pack.Value)
-    extends GroupFunction with Product1[pack.Value] with Serializable {
+  class Avg private[api] (@deprecatedName(Symbol("avgExpr")) val expression: pack.Value) extends GroupFunction with Product1[pack.Value] with Serializable {
 
     val makeFunction = pipe(f"$$avg", expression)
 
@@ -125,7 +124,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
    *
    * @param field $fieldParam
    */
-  class FirstField(val field: String) extends GroupFunction
+  class FirstField private[api] (val field: String) extends GroupFunction
     with Product1[String] with Serializable {
 
     val makeFunction = pipe(f"$$first", builder.string("$" + field))
@@ -167,8 +166,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
   /**
    * The [[https://docs.mongodb.com/manual/reference/operator/aggregation/first/#grp._S_first \$field]] group accumulator.
    */
-  class First(@deprecatedName(Symbol("firstExpr")) val expression: pack.Value)
-    extends GroupFunction with Product1[pack.Value] with Serializable {
+  class First private[api] (@deprecatedName(Symbol("firstExpr")) val expression: pack.Value) extends GroupFunction with Product1[pack.Value] with Serializable {
 
     val makeFunction = pipe(f"$$first", expression)
 
@@ -211,7 +209,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
    *
    * @param field $fieldParam
    */
-  class LastField(val field: String) extends GroupFunction
+  class LastField private[api] (val field: String) extends GroupFunction
     with Product1[String] with Serializable {
 
     val makeFunction = pipe(f"$$last", builder.string("$" + field))
@@ -253,8 +251,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
   /**
    * The [[https://docs.mongodb.com/manual/reference/operator/aggregation/last/#grp._S_last \$field]] group accumulator.
    */
-  class Last(@deprecatedName(Symbol("lastExpr")) val expression: pack.Value)
-    extends GroupFunction with Product1[pack.Value] with Serializable {
+  class Last private[api] (@deprecatedName(Symbol("lastExpr")) val expression: pack.Value) extends GroupFunction with Product1[pack.Value] with Serializable {
 
     val makeFunction = pipe(f"$$last", expression)
 
@@ -297,7 +294,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
    *
    * @param field $fieldParam
    */
-  class MaxField(val field: String) extends GroupFunction
+  class MaxField private[api] (val field: String) extends GroupFunction
     with Product1[String] with Serializable {
 
     val makeFunction = pipe(f"$$max", builder.string("$" + field))
@@ -383,7 +380,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
    *
    * @param mergeExpr the `\$mergeObjects` expression
    */
-  class MergeObjects(@deprecatedName(Symbol("mergeExpr")) val expression: pack.Value) extends GroupFunction with Product1[pack.Value] with Serializable {
+  class MergeObjects private[api] (@deprecatedName(Symbol("mergeExpr")) val expression: pack.Value) extends GroupFunction with Product1[pack.Value] with Serializable {
 
     val makeFunction = pipe(f"$$mergeObjects", expression)
 
@@ -426,7 +423,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
    *
    * @param field $fieldParam
    */
-  class MinField(val field: String) extends GroupFunction
+  class MinField private[api] (val field: String) extends GroupFunction
     with Product1[String] with Serializable {
 
     val makeFunction = pipe(f"$$min", builder.string("$" + field))
@@ -514,7 +511,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
    *
    * @param field $fieldParam
    */
-  class PushField(val field: String) extends GroupFunction
+  class PushField private[api] (val field: String) extends GroupFunction
     with Product1[String] with Serializable {
 
     val makeFunction = pipe(f"$$push", builder.string("$" + field))
@@ -558,7 +555,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
    *
    * @param pushExpr the `\$push` expression
    */
-  class Push(@deprecatedName(Symbol("pushExpr")) val expression: pack.Value) extends GroupFunction with Product1[pack.Value] with Serializable {
+  class Push private[api] (@deprecatedName(Symbol("pushExpr")) val expression: pack.Value) extends GroupFunction with Product1[pack.Value] with Serializable {
 
     val makeFunction = pipe(f"$$push", expression)
 
@@ -601,7 +598,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
    *
    * @param field $fieldParam
    */
-  class AddFieldToSet(val field: String) extends GroupFunction
+  class AddFieldToSet private[api] (val field: String) extends GroupFunction
     with Product1[String] with Serializable {
 
     val makeFunction = pipe(f"$$addToSet", builder.string("$" + field))
@@ -645,7 +642,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
    *
    * @param addToSetExpr the `\$addToSet` expression
    */
-  class AddToSet(@deprecatedName(Symbol("addToSetExpr")) val expression: pack.Value) extends GroupFunction with Product1[pack.Value] with Serializable {
+  class AddToSet private[api] (@deprecatedName(Symbol("addToSetExpr")) val expression: pack.Value) extends GroupFunction with Product1[pack.Value] with Serializable {
     val makeFunction = pipe(f"$$addToSet", expression)
 
     @deprecated("No longer a case class", "1.0.0-rc.1")
@@ -687,7 +684,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
    *
    * @since MongoDB 3.2
    */
-  class StdDevPop(val expression: pack.Value) extends GroupFunction
+  class StdDevPop private[api] (val expression: pack.Value) extends GroupFunction
     with Product1[pack.Value] with Serializable {
     val makeFunction = pipe(f"$$stdDevPop", expression)
 
@@ -731,7 +728,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
    * @since MongoDB 3.2
    * @param field $fieldParam
    */
-  class StdDevPopField(val field: String) extends GroupFunction
+  class StdDevPopField private[api] (val field: String) extends GroupFunction
     with Product1[String] with Serializable {
 
     val makeFunction = pipe(f"$$stdDevPop", builder.string("$" + field))
@@ -775,8 +772,8 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
    *
    * @since MongoDB 3.2
    */
-  class StdDevSamp(val expression: pack.Value) extends GroupFunction
-    with Product1[pack.Value] with Serializable {
+  class StdDevSamp private[api] (val expression: pack.Value)
+    extends GroupFunction with Product1[pack.Value] with Serializable {
 
     val makeFunction = pipe(f"$$stdDevSamp", expression)
 
@@ -820,7 +817,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
    * @since MongoDB 3.2
    * @param field $fieldParam
    */
-  class StdDevSampField(val field: String) extends GroupFunction
+  class StdDevSampField private[api] (val field: String) extends GroupFunction
     with Product1[String] with Serializable {
 
     val makeFunction = pipe(f"$$stdDevSamp", builder.string("$" + field))
@@ -864,7 +861,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
    *
    * @param field $fieldParam
    */
-  class SumField(val field: String) extends GroupFunction
+  class SumField private[api] (val field: String) extends GroupFunction
     with Product1[String] with Serializable {
 
     val makeFunction = pipe(f"$$sum", builder.string("$" + field))
@@ -908,8 +905,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
    *
    * @param sumExpr the `\$sum` expression
    */
-  class Sum(@deprecatedName(Symbol("sumExpr")) val expression: pack.Value)
-    extends GroupFunction with Product1[pack.Value] with Serializable {
+  class Sum private[api] (@deprecatedName(Symbol("sumExpr")) val expression: pack.Value) extends GroupFunction with Product1[pack.Value] with Serializable {
 
     val makeFunction: pack.Document = pipe(f"$$sum", expression)
 

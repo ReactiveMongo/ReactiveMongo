@@ -28,7 +28,7 @@ private[commands] trait SortAggregation[P <: SerializationPack] {
   }
 
   /** Ascending sort order */
-  class Ascending(val field: String)
+  class Ascending private[api] (val field: String)
     extends SortOrder with Product1[String] with Serializable {
 
     @deprecated("No longer a case class", "1.0.0-rc.1")
@@ -63,7 +63,7 @@ private[commands] trait SortAggregation[P <: SerializationPack] {
   }
 
   /** Descending sort order */
-  class Descending(val field: String)
+  class Descending private[api] (val field: String)
     extends SortOrder with Product1[String] with Serializable {
 
     @deprecated("No longer a case class", "1.0.0-rc.1")
@@ -104,7 +104,7 @@ private[commands] trait SortAggregation[P <: SerializationPack] {
    *
    * @param keyword the metadata keyword to sort by
    */
-  class MetadataSort(
+  class MetadataSort private[api] (
     val field: String,
     val keyword: MetadataKeyword) extends SortOrder
     with Product2[String, MetadataKeyword] with Serializable {

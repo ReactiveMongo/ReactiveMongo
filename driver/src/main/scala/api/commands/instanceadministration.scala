@@ -21,7 +21,9 @@ object DropDatabase extends Command with CommandWithResult[UnitBox.type] {
  * @param dropped true if the collection existed and was dropped
  */
 @deprecated("Internal: will be made private", "0.16.0")
-class DropCollectionResult(val dropped: Boolean) extends Product with Serializable {
+class DropCollectionResult(val dropped: Boolean)
+  extends Product with Serializable {
+
   val productArity = 1
 
   def productElement(n: Int) = dropped
@@ -156,7 +158,8 @@ private[api] object CreateCollection {
 
 @deprecated("Internal: will be made private", "0.16.0")
 class ConvertToCapped(
-  val capped: Capped) extends Product with Serializable with CollectionCommand with CommandWithResult[UnitBox.type] {
+  val capped: Capped) extends Product with Serializable
+  with CollectionCommand with CommandWithResult[UnitBox.type] {
 
   val productArity = 1
 
@@ -262,7 +265,7 @@ object ListCollectionNames
  * @param syncingTo the hostname of the member from which this instance is syncing (only present on the output of `rs.status()` on secondary and recovering members)
  * @param configVersion the configuration version (since MongoDB 3.0)
  */
-class ReplSetMember(
+class ReplSetMember private[api] (
   val _id: Long,
   val name: String,
   val health: Int,
@@ -376,7 +379,7 @@ object ReplSetMember extends scala.runtime.AbstractFunction15[Long, String, Int,
  * @param state the [[http://docs.mongodb.org/manual/reference/replica-states/ state code]] of the current member
  * @param members the list of the members of this replicate set
  */
-class ReplSetStatus(
+class ReplSetStatus private[api] (
   val name: String,
   val time: Long,
   val myState: Int,

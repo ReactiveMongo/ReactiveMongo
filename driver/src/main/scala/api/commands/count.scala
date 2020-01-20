@@ -95,7 +95,7 @@ trait CountCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] {
       new HintDocument(doc.produce)
   }
 
-  class CountResult(@deprecatedName(Symbol("count")) val value: Int) extends BoxedAnyVal[Int] with Product1[Int] with Serializable {
+  class CountResult private[api] (@deprecatedName(Symbol("count")) val value: Int) extends BoxedAnyVal[Int] with Product1[Int] with Serializable {
 
     @deprecated("No longer a case class", "1.0.0-rc.1")
     @inline def _1 = value

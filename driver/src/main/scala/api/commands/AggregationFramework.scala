@@ -29,7 +29,7 @@ trait AggregationFramework[P <: SerializationPack]
    * @param batchSize the initial batch size for the cursor
    */
   @deprecated("Use `api.collections.Aggregator`", "0.12.7")
-  class Cursor(val batchSize: Int) extends Product1[Int] {
+  class Cursor private[api] (val batchSize: Int) extends Product1[Int] {
     @deprecated("No longer a case class", "1.0.0-rc.1")
     @inline def _1 = batchSize
 
@@ -104,7 +104,7 @@ trait AggregationFramework[P <: SerializationPack]
    * @param specifications The fields to include.
    * The resulting objects will also contain these fields.
    */
-  class AddFields(val specifications: pack.Document)
+  class AddFields private[api] (val specifications: pack.Document)
     extends PipelineOperator
     with Product1[pack.Document] with Serializable {
 
@@ -147,7 +147,7 @@ trait AggregationFramework[P <: SerializationPack]
   /**
    * [[https://docs.mongodb.com/manual/reference/operator/aggregation/bucket/ \$bucket]] aggregation stage.
    */
-  class Bucket(
+  class Bucket private[api] (
     val groupBy: pack.Value,
     val boundaries: Seq[pack.Value],
     val default: String)(
@@ -230,7 +230,7 @@ trait AggregationFramework[P <: SerializationPack]
    *
    * Document fields identifier must be prefixed with `$`.
    */
-  class BucketAuto(
+  class BucketAuto private[api] (
     val groupBy: pack.Value,
     val buckets: Int,
     val granularity: Option[String])(
@@ -304,7 +304,7 @@ trait AggregationFramework[P <: SerializationPack]
   /**
    * [[https://docs.mongodb.com/manual/reference/operator/aggregation/collStats/ \$collStats]] aggregation stage.
    */
-  class CollStats(
+  class CollStats private[api] (
     val latencyStatsHistograms: Boolean,
     val storageStatsScale: Option[Double],
     val count: Boolean) extends PipelineOperator
@@ -377,7 +377,7 @@ trait AggregationFramework[P <: SerializationPack]
    * @since MongoDB 3.4
    * @param outputName the name of the output field which has the count as its value
    */
-  class Count(val outputName: String)
+  class Count private[api] (val outputName: String)
     extends PipelineOperator with Product1[String] with Serializable {
 
     val makePipe: pack.Document = pipe(f"$$count", builder.string(outputName))
@@ -424,7 +424,7 @@ trait AggregationFramework[P <: SerializationPack]
    * @param idleSessions (Defaults to `true`; new in 4.0)
    * @param localOps (Defaults to false; new in 4.0)
    */
-  class CurrentOp(
+  class CurrentOp private[api] (
     val allUsers: Boolean,
     val idleConnections: Boolean,
     val idleCursors: Boolean,
@@ -497,7 +497,7 @@ trait AggregationFramework[P <: SerializationPack]
    * @param specifications the subpipelines to run
    * @see https://docs.mongodb.com/manual/reference/operator/aggregation/facet/
    */
-  class Facet(
+  class Facet private[api] (
     val specifications: Iterable[(String, Pipeline)])
     extends PipelineOperator with Product1[Iterable[(String, Pipeline)]]
     with Serializable {
@@ -681,7 +681,7 @@ trait AggregationFramework[P <: SerializationPack]
    * @param identifiers any BSON value acceptable by mongodb as identifier
    * @param ops the sequence of operators specifying aggregate calculation
    */
-  class Group(val identifiers: pack.Value)(val ops: (String, GroupFunction)*)
+  class Group private[api] (val identifiers: pack.Value)(val ops: (String, GroupFunction)*)
     extends PipelineOperator
     with Product2[pack.Value, Seq[(String, GroupFunction)]]
     with Serializable {
@@ -736,7 +736,7 @@ trait AggregationFramework[P <: SerializationPack]
    * @param idField the name of the field to aggregate on
    * @param ops the sequence of operators specifying aggregate calculation
    */
-  class GroupField(val idField: String)(val ops: (String, GroupFunction)*)
+  class GroupField private[api] (val idField: String)(val ops: (String, GroupFunction)*)
     extends PipelineOperator
     with Product2[String, Seq[(String, GroupFunction)]]
     with Serializable {
@@ -786,7 +786,7 @@ trait AggregationFramework[P <: SerializationPack]
    * @param idFields The fields to aggregate on, and the names they should be aggregated under.
    * @param ops the sequence of operators specifying aggregate calculation
    */
-  class GroupMulti(val idFields: (String, String)*)(
+  class GroupMulti private[api] (val idFields: (String, String)*)(
     val ops: (String, GroupFunction)*) extends PipelineOperator
     with Product2[Seq[(String, String)], Seq[(String, GroupFunction)]]
     with Serializable {
@@ -845,7 +845,7 @@ trait AggregationFramework[P <: SerializationPack]
    * @param ops the number of operations that used the index
    * @param since the time from which MongoDB gathered the statistics
    */
-  class IndexStatAccesses(
+  class IndexStatAccesses private[api] (
     val ops: Long,
     val since: Long) extends Product2[Long, Long] with Serializable {
 
@@ -892,7 +892,7 @@ trait AggregationFramework[P <: SerializationPack]
    * @param host the hostname and port of the mongod
    * @param accesses the index statistics
    */
-  class IndexStatsResult(
+  class IndexStatsResult private[api] (
     val name: String,
     val key: pack.Document,
     val host: String,
@@ -948,7 +948,7 @@ trait AggregationFramework[P <: SerializationPack]
    *
    * @param limit the number of documents to allow through
    */
-  class Limit(val limit: Int) extends PipelineOperator
+  class Limit private[api] (val limit: Int) extends PipelineOperator
     with Product1[Int] with Serializable {
 
     val makePipe: pack.Document = pipe(f"$$limit", builder.int(limit))
@@ -1083,7 +1083,7 @@ trait AggregationFramework[P <: SerializationPack]
    * @param depthField an optional name for a field to add to each traversed document in the search path
    * @param restrictSearchWithMatch an optional filter expression
    */
-  class GraphLookup(
+  class GraphLookup private[api] (
     val from: String,
     val startWith: pack.Value,
     val connectFromField: String,
@@ -1192,7 +1192,7 @@ trait AggregationFramework[P <: SerializationPack]
    * @param foreignField the field from the documents in the `from` collection
    * @param as the name of the new array field to add to the input documents
    */
-  class Lookup(
+  class Lookup private[api] (
     val from: String,
     val localField: String,
     val foreignField: String,
@@ -1256,7 +1256,8 @@ trait AggregationFramework[P <: SerializationPack]
    *
    * @param predicate the query that documents must satisfy to be in the stream
    */
-  class Match(val predicate: pack.Document) extends PipelineOperator
+  class Match private[api] (val predicate: pack.Document)
+    extends PipelineOperator
     with Product1[pack.Document] with Serializable {
 
     val makePipe: pack.Document = pipe(f"$$match", predicate)
@@ -1301,7 +1302,7 @@ trait AggregationFramework[P <: SerializationPack]
    * @param intoDb the name of the `into` database
    * @param intoCollection the name of the `into` collection
    */
-  class Merge(
+  class Merge private[api] (
     val intoDb: String,
     val intoCollection: String,
     val on: Seq[String],
@@ -1393,7 +1394,7 @@ trait AggregationFramework[P <: SerializationPack]
    *
    * @param collection the name of the output collection
    */
-  class Out(val collection: String) extends PipelineOperator
+  class Out private[api] (val collection: String) extends PipelineOperator
     with Product1[String] with Serializable {
 
     def makePipe: pack.Document = pipe(f"$$out", builder.string(collection))
@@ -1446,7 +1447,7 @@ trait AggregationFramework[P <: SerializationPack]
    *
    * @param specifications The fields to include. The resulting objects will contain only these fields.
    */
-  class Project(val specifications: pack.Document)
+  class Project private[api] (val specifications: pack.Document)
     extends PipelineOperator with Product1[pack.Document] with Serializable {
 
     val makePipe: pack.Document = pipe(f"$$project", specifications)
@@ -1490,7 +1491,7 @@ trait AggregationFramework[P <: SerializationPack]
    * http://docs.mongodb.org/manual/reference/operator/aggregation/redact/#pipe._S_redact Redact
    * @param expression the redact expression
    */
-  class Redact(val expression: pack.Document)
+  class Redact private[api] (val expression: pack.Document)
     extends PipelineOperator with Product1[pack.Document] with Serializable {
 
     val makePipe: pack.Document = pipe(f"$$redact", expression)
@@ -1535,7 +1536,7 @@ trait AggregationFramework[P <: SerializationPack]
    * https://docs.mongodb.com/manual/reference/operator/aggregation/replaceRoot
    * @param newRoot The field name to become the new root
    */
-  class ReplaceRootField(val newRoot: String)
+  class ReplaceRootField private[api] (val newRoot: String)
     extends PipelineOperator with Product1[String] with Serializable {
 
     val makePipe: pack.Document =
@@ -1581,7 +1582,7 @@ trait AggregationFramework[P <: SerializationPack]
    * https://docs.mongodb.com/manual/reference/operator/aggregation/replaceRoot
    * @param newRoot The new root object
    */
-  class ReplaceRoot(val newRoot: pack.Document)
+  class ReplaceRoot private[api] (val newRoot: pack.Document)
     extends PipelineOperator with Product1[pack.Document] with Serializable {
 
     val makePipe: pack.Document =
@@ -1627,7 +1628,7 @@ trait AggregationFramework[P <: SerializationPack]
    * @since MongoDB 4.2
    * @param replacementDocument
    */
-  class ReplaceWith(val replacementDocument: pack.Document)
+  class ReplaceWith private[api] (val replacementDocument: pack.Document)
     extends PipelineOperator
     with Product1[pack.Document] with Serializable {
 
@@ -1675,7 +1676,7 @@ trait AggregationFramework[P <: SerializationPack]
    *
    * @param size the number of documents to return
    */
-  class Sample(val size: Int) extends PipelineOperator
+  class Sample private[api] (val size: Int) extends PipelineOperator
     with Product1[Int] with Serializable {
 
     val makePipe: pack.Document =
@@ -1713,7 +1714,7 @@ trait AggregationFramework[P <: SerializationPack]
   /**
    * [[https://docs.mongodb.com/manual/reference/operator/aggregation/set/ \$set]] aggregation stage
    */
-  class Set(val expression: pack.Document)
+  class Set private[api] (val expression: pack.Document)
     extends PipelineOperator with Product1[pack.Document] with Serializable {
 
     def makePipe: pack.Document = pipe(f"$$set", expression)
@@ -1757,7 +1758,7 @@ trait AggregationFramework[P <: SerializationPack]
    *
    * @param skip the number of documents to skip
    */
-  class Skip(val skip: Int) extends PipelineOperator
+  class Skip private[api] (val skip: Int) extends PipelineOperator
     with Product1[Int] with Serializable {
 
     val makePipe: pack.Document = builder.document(Seq(
@@ -1797,7 +1798,7 @@ trait AggregationFramework[P <: SerializationPack]
    *
    * @param fields the fields to sort by
    */
-  class Sort(val fields: SortOrder*) extends PipelineOperator
+  class Sort private[api] (val fields: SortOrder*) extends PipelineOperator
     with Product1[Seq[SortOrder]] with Serializable {
 
     import builder.{ document, elementProducer => element }
@@ -1852,7 +1853,7 @@ trait AggregationFramework[P <: SerializationPack]
    * @since MongoDB 3.4
    * @param expression
    */
-  class SortByCount(val expression: pack.Value)
+  class SortByCount private[api] (val expression: pack.Value)
     extends PipelineOperator with Product1[pack.Value] with Serializable {
 
     def makePipe: pack.Document = pipe(f"$$sortByCount", expression)
@@ -1897,7 +1898,8 @@ trait AggregationFramework[P <: SerializationPack]
    * @since MongoDB 3.4
    * @param field the field name
    */
-  class SortByFieldCount(val field: String) extends PipelineOperator
+  class SortByFieldCount private[api] (val field: String)
+    extends PipelineOperator
     with Product1[String] with Serializable {
 
     def makePipe: pack.Document =
@@ -1944,7 +1946,7 @@ trait AggregationFramework[P <: SerializationPack]
    * @param field the field name
    * @param otherFields
    */
-  class Unset(
+  class Unset private[api] (
     val field: String,
     val otherFields: Seq[String]) extends PipelineOperator
     with Product2[String, Seq[String]] with Serializable {

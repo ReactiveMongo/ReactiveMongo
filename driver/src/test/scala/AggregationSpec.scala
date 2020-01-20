@@ -31,6 +31,8 @@ import reactivemongo.api.indexes._, IndexType._
 
 import reactivemongo.api.collections.bson.BSONCollection
 
+import reactivemongo.api.tests.{ builder, pack }
+
 import org.specs2.concurrent.ExecutionEnv
 import org.specs2.specification.core.Fragments
 
@@ -1518,8 +1520,8 @@ db.accounts.aggregate([
     dropDups: Boolean = false,
     sparse: Boolean = false,
     version: Option[Int] = None, // let MongoDB decide
-    partialFilter: Option[BSONDocument] = None,
-    options: BSONDocument = BSONDocument.empty) = Index(BSONSerializationPack)(key, name, unique, background, dropDups, sparse, None, None, None, None, None, None, None, None, None, None, None, None, None, version, partialFilter, options)
+    partialFilter: Option[pack.Document] = None,
+    options: pack.Document = builder.document(Seq.empty)) = Index(pack)(key, name, unique, background, dropDups, sparse, None, None, None, None, None, None, None, None, None, None, None, None, None, version, partialFilter, options)
 
   case class User(
     _id: Int,
